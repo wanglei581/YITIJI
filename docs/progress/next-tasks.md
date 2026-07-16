@@ -28,9 +28,32 @@
 - [x] **面试重设计候选取舍**：已完成只读深审并由 #100 收口唯一可迁移的旧 `/interview/setup-preview` 清理点；正式 `/interview/setup` 真实链路保留，旧分叉本体不迁，fair verify residue guard 已由当前 `main` 更新版覆盖。
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
+## P0/P1：用户中心商用级闭环
+
+> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。用户已批准先做 Wave 0 / Wave 1；方案已由 PR #259 合入 `main@602fe0d`，合并状态由 PR #260 收口至 `main@b91bb62`，Wave 0 基线已由 PR #261 合入 `origin/main@0c4cdd57`。授权撤回终态保护补丁已创建 [PR #263](https://github.com/wanglei581/YITIJI/pull/263)，`build-and-verify` 与 `postgres-readiness` 均通过；PR 尚未合并或部署。后续仍须一波一分支，Wave 1 不得直接在主工作区或 Wave 0 分支堆叠。
+
+- [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
+- [x] **Wave 0 真实表达与验证基线（已合入）**：PR #261 已将 `codex/user-center-wave0-truth-baseline` 的 RED→GREEN 改动合入 `origin/main@0c4cdd57`：删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。
+- [x] **Wave 0 授权撤回终态保护补丁（PR 待合并）**：`codex/user-center-wave0-data-truth-20260716` 在最新主线仅新增 `revoke_consent→rejected` 的 fail-closed 保护：授权已在请求创建时真实撤回，拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。已 RED→GREEN 并通过数据请求真值、Job-AI 隐私、API typecheck/lint/build，及 57 条 SQLite / 29 条本机 PostgreSQL 正式 migration 空库复验。Claude 与 Antigravity（`Gemini 3.5 Flash (High)` 精确 diff 审查）均为 `APPROVE（Critical 0 / Warning 0）`。[PR #263](https://github.com/wanglei581/YITIJI/pull/263) 的 GitHub Actions `29494612863` 中 `build-and-verify` 与 `postgres-readiness` 均已通过；未合并、未部署。
+- [ ] **Wave 1 账户安全与数据权利（待 PR #263 合入后启动）**：从合并后的干净 `main` 另起独立分支，按账户安全 → 数据权利 → 运营 UI 三段执行，补敏感操作 step-up、会员级 export/delete 互斥、异步数据导出、带租约的一次性手机下载与中断 reconciler、账户注销分类清理/匿名化、closing 状态最小回执、Admin 隐私请求处理页和可审计失败重试；复用现有 `UserDataRequest`、FileObject 和 AuditLog，不用 Prisma 裸 Cascade 表达业务注销。必须显式处理 Wave 0 遗留的 `delete` 工单 `pending/handling` 堆积、终态/SLA、会员级 AI 数据综合清除、服务端生成 `auditRef`、终态不可再次处理，以及 `revoke_consent` 创建时的原子完成与审计，不能靠客户端审计凭证或普通 reject 清账。账户安全和导出链可先实现；不可逆注销执行开关默认关闭，法务分类留存矩阵、冷静期、财务/审计期限和最小审计字段未签字前，只实现并验证 fail-closed gate，不提交不可逆 handler、不展示注销动作。
+- [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
+- [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
+- [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
+- [ ] **Wave 5 商用预生产与真机验收**：同一提交完成 PostgreSQL、Redis、COS、短信、Windows 一体机、真实打印、弱网、会话过期、键盘/读屏和隐私工单演练；收费模式另跑真实小额支付、退款和对账。
+
+
 ## P0：上线前真实验收
 
 - [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
+
+- [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
+
+- [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
+
+- [ ] **P0 离线验收证据矩阵后的逐项授权**：已完成仅仓库文档范围的 [证据矩阵](../reviews/2026-07-16-p0-offline-acceptance-evidence-matrix.md)，不连接任何环境且不改变真实验收状态。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
+
+- [x] **F1 future-only provenance clean-main 候选迁移（本地）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。不得将本地候选、fixture 或 CI 接线写作 production 来源一致性通过；不得 push、PR、合并、部署或执行首次启用。
 
 - [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项验证、独立复审和串行 CI 接线，但未 push/建 PR、未运行 GitHub CI、未部署、未发送真实短信或执行真实转移；本分支未修改依赖，也不得宣称可部署。
   1. **PR / CI**：推送候选并创建 PR，确认 `build-and-verify` 与 `postgres-readiness` 成功，且 Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁在共享 SQLite suite 中保持逐行串行。
@@ -168,11 +191,14 @@
 - [ ] **首期 Admin 商业化和运营后台**：统一任务中心覆盖打印、扫描、复印、证件照、材料包；支持取消、重试、释放卡住任务、人工确认、重新派发；补价格策略、权益券、免费额度、补贴核销、退款 / 异常处理、终端 / 设备能力、文件生命周期、审计和统计看板。
 - [ ] **首期验收门禁**：每个能力必须有前台页面、后端数据模型、Terminal Agent / 外设链路、Admin 管理、数据流、异常处理、审计和 verify；未通过真机、生产链路、隐私删除和合规验收前，不能对外宣称正式生产或试运营完成。
 
-## P1：青序 LightFlow 三端全页面迁移
+## P1：青序 LightFlow 用户前台迁移与双后台暖色边界
 
-- [x] **规范、命名与全页面事实盘点**：已将 4188 亮蓝白服务台方向正式命名为「青序 LightFlow」，产品与设计名称统一，工程内部保留 `service-desk` 主题命名；已基于最新三端路由逐项盘点 112 个正式页面组件、5 条重定向和 3 个路由壳层，并形成 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。本项只代表规范与盘点完成，不代表任何运行时页面已经迁移。
-- [x] **UI-0 / UI-1 代表页实施（本地候选）**：已按 `docs/superpowers/plans/2026-07-11-service-desk-ui0-ui1-first-batch.md` 建立 opt-in 的共享 token、密度与壳层合同，并迁移 Kiosk 首页、Admin 工作台、Partner 岗位管理三个代表页；本地 TDD 静态门禁、三端 typecheck/lint/build、真实 API 角色浏览器与规定视口矩阵、Antigravity + Claude 双模型审查均已完成，Critical=0。4 个新增 verify 已接入 `build-and-verify`，且 foundation verify 锁定 CI 接线与 CCG 归档边界；尚未 push，故 GitHub CI 尚未实际运行。当前仍未合并、部署或完成 Windows 真机验收。
-- [ ] **UI-2 十三个业务域波次**：三个代表页经用户视觉和真实流程验收后，再按 `docs/superpowers/plans/2026-07-12-qingxu-lightflow-all-pages-migration-program.md` 分 K1–K6、A1–A4、P1–P3 独立实施；每波次必须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完 112 页。K4 本人资产波次须等待当前“我的页商用闭环”任务完成、迁移或明确废弃后再开工。
+- [x] **暖色边界的持久发布集成（2026-07-16）**：暖色候选已以代码提交 `189a035c` 经 PR #257 合入 `main`（merge commit `bb9c7efb`），GitHub `build-and-verify` / `postgres-readiness` 与 Antigravity + Claude 完整 diff 终审均通过；生产 release `frontend-bb9c7efb-20260716T090846Z` 已更新 Admin / Partner 源码与静态产物，公网入口加载新哈希并通过服务器静态门禁、产物 SHA-256 和完全拦截生产 API 的浏览器视觉验收。Kiosk、API、数据库、环境、支付、终端、打印、扫描、账号状态、nginx / PM2 与 `CLOSED_MODE` 均未修改；环境文件哈希前后一致，回滚包已保留。
+- [ ] **Partner 相对 API URL 解析独立修复**：本次线上视觉验收确认 `partnerHttpAdapter.get()` 在 `VITE_API_BASE_URL=/api/v1` 时会把相对地址直接传给单参数 `new URL()`，请求发出前进入页面错误态；旧版 `e62a9789` 与本次产物均使用同一相对 base，因此不是暖色发布引入的回归。本任务按边界未改接口适配逻辑；后续应单独补失败验证并把相对 base 按当前页面 origin 解析，再跑 Partner typecheck / lint / build / 相关 verify 与真实 API 只读验收。
+- [x] **视觉边界修正（2026-07-15）**：用户确认 Kiosk 用户前台继续青序 LightFlow 蓝白服务台，Admin 与 Partner 恢复并固定为暖色 Inkpaper 运营后台。双后台已移除 `service-desk.css` 导入和路由级 opt-in，Admin 告警 CTA 回到墨绿投影，Partner 岗位分类改用现有低饱和分类工具类并继续与审核/发布状态语义分离；未改路由、真实数据、权限、API、支付、打印、扫描或数据库。三份既有 CI 静态 verify 已改为断言该边界，其中基础门禁递归扫描双后台运行时源码；本地 TDD RED→GREEN、两端 lint/typecheck、带 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 的 production build，以及 Admin 工作台 / Partner 岗位页 1440×1024 本地 mock 浏览器视觉验收均通过。2026-07-15 仅替换 Admin / Partner `dist` 的首轮发布属于历史临时验证，随后被 `main=e62a9789` 全量发布覆盖；最终持久化集成、正式发布、线上静态与浏览器证据以上一条已完成任务为准。
+- [x] **规范、命名与全页面事实盘点**：4188 亮蓝白服务台仍命名为「青序 LightFlow」，工程内部保留 `service-desk` 主题命名；112 个正式页面组件、5 条重定向和 3 个路由壳层的三端事实盘点保留在 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。LightFlow 后续只迁移用户前台，不代表双后台需要蓝白换装。
+- [x] **UI-0 / UI-1 代表页实施（历史本地候选，后台部分已被本次边界修正取代）**：该候选曾在 Kiosk 首页、Admin 工作台、Partner 岗位管理建立服务台 opt-in。Kiosk 首页的 LightFlow 结果保留；Admin / Partner 的服务台 opt-in、蓝色投影和服务台专用分类变量已由本次暖色 Inkpaper 恢复替代。既有静态 verify 与 CI 接线继续保留，但现在锁定 Kiosk 蓝白、后台暖色的分流规则。
+- [ ] **UI-2 用户前台业务域波次**：用户前台在真实流程验收后，按已批准的 K1–K6 范围独立实施；每波次必须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完页面。Admin / Partner 仅在用户重新批准具体后台视觉任务时单独调整，默认保持 Inkpaper。K4 本人资产波次须等待当前“我的页商用闭环”任务完成、迁移或明确废弃后再开工。
   - [x] **核心三 Tab 视觉冻结补充**：用户已批准 `docs/superpowers/specs/2026-07-13-qingxu-lightflow-reference-lock-and-core-tabs-design.md`。首页与真实登录弹窗、AI 助手和我的可见重复标题移除均已进入最新主线本地整合候选；未引用或吸收透明顾问素材任务的未提交资产。K4 后续只负责 `/profile` 之外经重新批准的本人资产视觉迁移，受保护的 `/me/*` 明细页仍不在本轮范围。
   - [x] **核心三 Tab 4188 布局修复（最新主线本地整合候选）**：首页保留 Hero、登录身份卡、继续办理和底部三 Tab，仅重构下方服务目录；`/assistant` 使用任务选择、真实对话、输入区的单列工作台；`/profile` 使用开放身份摘要、五个等权分区、23 个已接线路由和 3 个明确建设中入口。三个主 Tab 按各自的 4188 页面语法实现，不再错误共享首页分类导航和主次卡原语。Playwright 已完成原型/候选并排检查以及 1080×1920、390×844、390×700 浏览器矩阵；公共顶栏未知设备状态、Profile 重复入口和 TRTC 错误会话清理已在最新主线整合中补测修复。未 push、未创建 PR、未运行 GitHub CI、未部署；未完成线上/真机/真实登录/真实 AI/TRTC/API/打印验收，不得写为生产完成。
   - [x] **首页与真实登录弹窗本地候选**：按 `docs/superpowers/plans/2026-07-13-qingxu-lightflow-home-login.md` 保持 4188 视觉结构，仅落实已确认的 Hero / 小青删除、纯文字品牌、真实设备状态、服务价值卡与登录身份卡；登录弹窗复用真实手机号验证码链路，关闭即清空公共终端敏感输入。六项相关 verify、Kiosk typecheck/lint/build、1080/390 浏览器矩阵和双模型终审均通过，Critical=0、Warning=0。未 push、未合入 `main`、未部署，且未完成真实短信/API/PostgreSQL/Windows 真机验收。
@@ -182,7 +208,7 @@
 - [x] **K1 公共入口、身份与独立全屏页（已本地集成至当前 K2）**：按 `docs/superpowers/plans/2026-07-13-qingxu-lightflow-k1-public-entry.md`，候选基线已安全快进 `origin/main=08c7588e`；K1 静态合同 RED→GREEN、手机上传 `aria-label`、CSS 根作用域与 Help FAQ 无空格 a11y ID RED→GREEN、三个 K1 verify、Kiosk typecheck/lint（0 error；仅既有 `KioskBusyContext` 两条 Fast Refresh warning）、production build 与 diff check 均本地通过，CI 仅新增三条 K1 Kiosk 命令且保留主线 #211 CI 修复。2026-07-13 Ardot 审查后的功能排版整改也已完成 RED→GREEN：登录交互控件不再嵌套、扫码错误只播报一次、扫码/上传失效态只保留原因与恢复路径、壳层不再直出 `idle`；Playwright 已覆盖 1080×1920 / 390×844 / 390×700，并用仅存在于浏览器会话的测试列表核对待机媒体与安全唤醒。以上仍不构成 UX-2 真实短信/票据/上传、真实后台播放列表、预生产、Windows 真机或生产验收。Antigravity 因地区不可用未产生有效报告；Claude 分析有效，最终双模型代码审查仍待收口。K1 已由本地 merge commit `f6285b97` 吸收到当前 K2 分支；该集成尚未 push、合入 `main`、部署或完成 Windows 真机验收。
 - [x] **K2a 岗位匹配匿名授权恢复（本地候选）**：`/resume/job-fit` 已补匿名 `403 JOB_FIT_ANONYMOUS_CONSENT_REQUIRED → 明确授权 → 仅重试原始请求一次 → 撤回` 的前端闭环；consent 三接口强制只用 `x-resume-access-token`，并独立读取授权状态以避免过期读回覆盖刚完成的授权或撤回。会员 `USER_AI_CONSENT_REQUIRED` 继续使用既有 `/jobs` 岗位 AI 辅助授权入口；打印仍只传内部 `printFileUrl` 至既有确认页，不新增投递闭环。M1.5 UI 合同 RED→GREEN、Kiosk typecheck 均为本地通过，CI 同时执行 API 打印守卫；本 worktree 缺少被忽略的 Prisma client 生成产物，`verify:job-fit-print` 已完成 7 项静态检查但未能加载运行时服务，不能写为本地通过。未 push、合并、部署、进行真实匿名授权 / LLM / 打印确认 / 支付或 Windows 真机验收。K2a 的 LightFlow 视觉改造仍依原计划独立完成，不由本项代替。
 - [ ] **UI-2 后续业务域波次（K1/K2 最新主线本地整合候选已完成）**：`codex/qingxu-lightflow-integration-20260714` 已追平 `origin/main=9d0622e7`，完成 K1、K2a、K2b、K2c 与核心三 Tab 的本地整合、静态门禁、production build 和 1080/390 浏览器验收；执行期间新增的 25 个 Scan Session B1 主线提交与 LightFlow 文件交集为 0，并已无冲突合入；补齐 K2b CI 接线并修复首页服务校验读取旧文件的假失败。该候选未 push、未创建 PR、未运行 GitHub CI、未部署，也未完成真实登录、AI/TRTC、打印、Windows 真机或线上验收。下一步先由用户确认该本地候选视觉和交互，再按 `docs/superpowers/plans/2026-07-12-qingxu-lightflow-all-pages-migration-program.md` 独立推进 K3–K6、A1–A4、P1–P3；每波次仍须另写逐文件计划、静态 verify、浏览器矩阵和证据等级，禁止一次性改完 112 页。`/profile` 主入口本轮已经完成；K4 若要继续处理本人资产视觉，必须由用户重新批准具体 `/me/*` 明细范围，当前仍全部受保护。
-- [ ] **UI-3 / UI-4 跨页收口与旧主题退出**：十三个业务域波次完成后，统一处理加载、空态、错误、权限、超时、离线、部分成功、焦点恢复、reduced motion 和共享设备清场；只有在运行时引用清零、三端构建与浏览器矩阵通过后，才允许删除 InkPaper / Fusion Youth 旧主题。真机、支付、打印与预生产证据继续按 UX-1 至 UX-4 分级，不得越级宣称完成。
+- [ ] **UI-3 / UI-4 用户前台跨页收口**：Kiosk 用户前台业务域波次完成后，统一处理加载、空态、错误、权限、超时、离线、部分成功、焦点恢复、reduced motion 和共享设备清场。只有 Kiosk 运行时引用清零、Kiosk 构建与浏览器矩阵通过后，才可评估 Fusion Youth 的退出；Inkpaper 是 Admin / Partner 的现行主题，不得作为“旧主题”删除。真机、支付、打印与预生产证据继续按 UX-1 至 UX-4 分级，不得越级宣称完成。
 
 ## P1：渐进式重构首批业务闭环
 

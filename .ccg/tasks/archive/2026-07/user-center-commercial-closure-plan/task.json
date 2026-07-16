@@ -1,0 +1,12 @@
+{
+  "id": "user-center-commercial-closure-plan",
+  "title": "用户中心商用级闭环审计与开发方案",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "纯文档分支已验证并本地提交；等待用户授权 push/merge，集成正式基线后再执行 Wave 0",
+  "createdAt": "2026-07-16T08:06:29Z",
+  "branch": "codex/user-center-commercial-closure-docs-20260716"
+}

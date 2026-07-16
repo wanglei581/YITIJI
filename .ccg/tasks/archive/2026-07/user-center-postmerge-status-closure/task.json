@@ -1,0 +1,12 @@
+{
+  "id": "user-center-postmerge-status-closure",
+  "title": "用户中心方案合并后进度状态收口",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "已归档；等待状态收口 PR 的推送与合并授权",
+  "createdAt": "2026-07-16T18:00:00+08:00",
+  "branch": "codex/user-center-postmerge-status-20260716"
+}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
 const packageRoot = fileURLToPath(new URL('../', import.meta.url))
@@ -13,6 +13,23 @@ async function read(relativePath, root = packageRoot) {
       cause: error,
     })
   }
+}
+
+async function listRuntimeSourceFiles(relativeDirectory, root = repoRoot) {
+  const directoryUrl = new URL(`${relativeDirectory.replace(/\/?$/, '/')}`, new URL(`file://${root}/`))
+  const entries = await readdir(directoryUrl, { withFileTypes: true })
+  const files = []
+
+  for (const entry of entries) {
+    const relativePath = `${relativeDirectory}/${entry.name}`
+    if (entry.isDirectory()) {
+      files.push(...(await listRuntimeSourceFiles(relativePath, root)))
+    } else if (/\.(?:[cm]?[jt]sx?|css)$/.test(entry.name)) {
+      files.push(relativePath)
+    }
+  }
+
+  return files
 }
 
 function includesAll(source, fragments, label) {
@@ -265,12 +282,40 @@ for (const { legacySelector, scopedSelector, variables } of hookContracts) {
   }
 }
 
-for (const app of ['kiosk', 'admin', 'partner']) {
+const kioskCss = await read('apps/kiosk/src/index.css', repoRoot)
+const kioskLegacyImport = kioskCss.indexOf('@import "@ai-job-print/ui/styles/fusion-youth.css";')
+const kioskServiceDeskImport = kioskCss.indexOf('@import "@ai-job-print/ui/styles/service-desk.css";')
+assert.ok(kioskLegacyImport >= 0, 'kiosk must retain its Fusion-Youth base theme import')
+assert.ok(
+  kioskServiceDeskImport > kioskLegacyImport,
+  'kiosk must import service-desk.css after its base theme',
+)
+
+for (const app of ['admin', 'partner']) {
   const appCss = await read(`apps/${app}/src/index.css`, repoRoot)
-  const legacyImport = appCss.search(/@import "@ai-job-print\/ui\/styles\/(?:fusion-youth|inkpaper)\.css";/)
-  const serviceDeskImport = appCss.indexOf('@import "@ai-job-print/ui/styles/service-desk.css";')
-  assert.ok(legacyImport >= 0, `${app} must retain its legacy theme import`)
-  assert.ok(serviceDeskImport > legacyImport, `${app} must import service-desk.css after its legacy theme`)
+  assert.ok(
+    appCss.includes('@import "@ai-job-print/ui/styles/inkpaper.css";'),
+    `${app} must retain the Inkpaper backend theme import`,
+  )
+  assert.equal(
+    appCss.includes('@import "@ai-job-print/ui/styles/service-desk.css";'),
+    false,
+    `${app} must not import the Kiosk-only service-desk theme`,
+  )
+
+  const runtimeFiles = await listRuntimeSourceFiles(`apps/${app}/src`)
+  const serviceDeskReferences = []
+  for (const runtimeFile of runtimeFiles) {
+    const source = await read(runtimeFile, repoRoot)
+    if (source.includes('service-desk') || source.includes('--sd-')) {
+      serviceDeskReferences.push(runtimeFile)
+    }
+  }
+  assert.deepEqual(
+    serviceDeskReferences,
+    [],
+    `${app} runtime source must not contain Kiosk-only service-desk or --sd-* references`,
+  )
 }
 
-console.log('SERVICE_DESK_FOUNDATION_VERIFY_OK')
+console.log('VISUAL_STYLE_BOUNDARY_VERIFY_OK')

@@ -160,7 +160,7 @@ expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage 保留�
 expectAbsent(profileEntrySection, 'primaryEntry', 'Profile 不把每组第一项强制升级为主入口')
 expectAbsent(profileEntrySection, 'lf-reference-primary', 'Profile 入口保持等权')
 expectIncludes(profileEntrySection, 'kp-entry-grid', 'Profile 使用等权入口网格')
-for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益活动与服务套餐', '账户与支持']) {
+for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益与政策', '账户与支持']) {
   expectIncludes(profileEntries, title, `Profile 保留独立分区：${title}`)
 }
 for (const callback of ['onPrintFile', 'onDeleteResume', 'onDeleteScan', 'onDeleteAiRecord']) {

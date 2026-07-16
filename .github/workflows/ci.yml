@@ -115,6 +115,10 @@ jobs:
           pnpm --filter @ai-job-print/partner build
           pnpm --filter terminal-agent build
 
+      - name: Release provenance fixture
+        # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
+        run: pnpm --filter @ai-job-print/api verify:release-provenance
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
@@ -172,6 +176,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:price-single-source
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
+          pnpm --filter @ai-job-print/kiosk verify:user-center-wave0
           pnpm --filter @ai-job-print/kiosk verify:lightflow-profile-entry
           pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper
@@ -274,6 +279,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-data-quality
           pnpm --filter @ai-job-print/api verify:job-ai-backend
           pnpm --filter @ai-job-print/api verify:job-ai-privacy
+          pnpm --filter @ai-job-print/api verify:member-data-request-truth
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
@@ -366,6 +372,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          pnpm --filter @ai-job-print/api verify:member-data-request-truth
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks

@@ -535,7 +535,7 @@ export default function DashboardPage() {
           {alertCount > 0 && (
             <a
               href="/alerts"
-              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(23,105,232,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]"
+              className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-600 px-4 text-[13px] font-bold text-white shadow-[0_8px_18px_rgba(16,48,43,0.18)] transition-transform hover:-translate-y-px hover:bg-primary-700 active:scale-[0.97]"
             >
               <AlertTriangleIcon className="h-3.5 w-3.5" aria-hidden="true" />
               处理告警 ({alertCount})

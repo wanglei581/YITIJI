@@ -235,7 +235,6 @@ const expectedEntries = [
   ['AI助手', '/assistant'],
   ['浏览记录', '/me/activity'],
   ['外部跳转记录', '/me/activity?tab=jump'],
-  ['招聘会权益活动', '/activities?source=fair'],
   ['权益活动', '/activities'],
   ['政策补贴指引', '/renshi?tab=policy'],
   ['消息通知', '/me/notifications'],
@@ -244,7 +243,7 @@ const expectedEntries = [
   ['意见反馈', '/me/feedback'],
 ]
 
-expect(countMatches(entries, /\blabel:\s*'/g) === 26, 'Profile entries retain 23 wired entries and three honest construction entries')
+expect(countMatches(entries, /\blabel:\s*'/g) === 22, 'Profile entries retain exactly 22 real destinations')
 for (const [label, route] of expectedEntries) {
   expectMatches(
     entries,
@@ -252,16 +251,14 @@ for (const [label, route] of expectedEntries) {
     `Profile entries retain ${label} -> ${route}`,
   )
 }
-for (const label of ['招聘会扫码凭证', '求职打印套餐', 'AI服务套餐']) {
-  expectMatches(
-    entries,
-    new RegExp(`label:\\s*'${escapeRegexp(label)}'[\\s\\S]{0,180}?tag:\\s*'建设中'`),
-    `Profile entries retain ${label} as a construction-state entry`,
-  )
-}
-expect(countMatches(entries, /tag:\s*'建设中'/g) === 3, 'Profile entries retain exactly three construction-state tags')
+expectNotIncludes(entries, '招聘会扫码凭证', 'Profile removes the unavailable job-fair credential placeholder')
+expectNotIncludes(entries, '招聘会权益活动', 'Profile removes the duplicate fair-scoped activity destination')
+expectNotIncludes(entries, '求职打印套餐', 'Profile removes the unavailable print package placeholder')
+expectNotIncludes(entries, 'AI服务套餐', 'Profile removes the unavailable AI package placeholder')
+expectNotIncludes(entries, '/activities?source=fair', 'Profile keeps a single real activities destination')
+expect(countMatches(entries, /tag:\s*'建设中'/g) === 0, 'Profile contains no construction-state tags')
 expectNotIncludes(entries, "label: '身份切换'", 'Profile does not duplicate the account settings destination')
-for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益活动与服务套餐', '账户与支持']) {
+for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益与政策', '账户与支持']) {
   expect(countMatches(entries, new RegExp(`title:\\s*'${title}'`, 'g')) === 1, `Profile entry grouping retains ${title} exactly once`)
 }
 expectNotIncludes(entries, 'entries: [...FAIRS, ...BENEFITS]', 'Profile entry grouping does not collapse the two prototype sections')
@@ -314,7 +311,10 @@ for (const marker of [
   expectNotIncludes(combinedProfileCss, marker, `Profile CSS removes InkPaper marker ${marker}`)
 }
 
-const forbiddenMeChanges = changedFiles().filter((path) => path.startsWith('apps/kiosk/src/pages/profile/me/'))
+const allowedMeChanges = new Set(['apps/kiosk/src/pages/profile/me/MySettingsPage.tsx'])
+const forbiddenMeChanges = changedFiles().filter(
+  (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),
+)
 expect(forbiddenMeChanges.length === 0, `candidate change set does not touch /me/* (${forbiddenMeChanges.join(', ') || 'none'})`)
 
 if (failures > 0) {
