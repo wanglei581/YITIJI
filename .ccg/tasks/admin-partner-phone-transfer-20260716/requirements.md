@@ -41,7 +41,7 @@
 
 - TDD 覆盖正常转移、事务回滚、唯一约束顺序、并发竞争、陈旧 ticket、非 Partner 拒绝、OTP 重试、Partner 会话失效、Admin 会话保持、审计脱敏和 Partner 用户名密码登录兜底。
 - API/Admin typecheck、lint、build、专项 verifier、`git diff --check` 全部通过。
-- Antigravity 与 Claude 双模型终审必须有真实报告；当前 Antigravity 配额阻塞不得伪装为通过。
+- Antigravity 与 Claude 双模型终审必须有真实报告；已验证 Antigravity 可显式选择 `Claude Opus 4.6 (Thinking)`，但 2026-07-16 连续调用均因服务器高流量无报告，不得伪装为通过。
 
 ## 已知独立上线阻塞
 
