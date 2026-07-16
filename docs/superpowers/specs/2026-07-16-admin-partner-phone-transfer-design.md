@@ -58,7 +58,7 @@ POST /auth/admin/phone/transfer/start
    - 所有者不是 Partner：拒绝，不发送短信；
    - 所有者是 Partner：进入转移流程。
 5. 为当前 Admin 创建唯一活动 ticket。Ticket 加密或仅存不可逆/加密字段，包含：Admin ID 与 tokenVersion、Partner ID 与 tokenVersion、`phoneHash`、加密手机号。
-6. 使用现有 `bind_phone` OTP 目的向该手机号发送验证码。
+6. 使用独立 `transfer_phone` OTP 目的向该手机号发送验证码，避免与严格首次绑定的冷却、验证码和尝试计数互相污染。
 7. 返回 ticket、冷却/过期时间，以及 Admin 本来有权查看的最小来源摘要：Partner 用户名、机构名称、脱敏手机号。不得返回内部手机号字段或其他机构数据。
 
 除短信供应商的可操作错误外，所有账号不存在、角色不符、密码错误、状态变化和并发冲突均返回统一的 `AUTH_PHONE_TRANSFER_UNAVAILABLE`，避免形成新的匿名枚举面。
@@ -114,6 +114,8 @@ POST /auth/admin/phone/transfer/cancel
 
 - 授权因子：有效 Admin 会话、正确 Admin 当前密码、目标手机号 OTP，三者缺一不可。
 - 新端点必须具有与严格初绑相同或更严格的控制器 Guard、IP/账号/手机号/设备限流和密码失败节流。
+- 新服务必须复用严格初绑现有的 `internal:admin:phone-initial-bind:password-fail:<adminId>` 失败额度键；两个入口合计最多 5 次/300 秒，不能各自获得一份密码尝试额度。
+- 转移服务必须使用独立 `transfer_phone` OTP purpose；`bind_phone` 与 `transfer_phone` 的验证码、冷却和尝试计数不能跨流程消费或互相覆盖。
 - 不允许转移另一 Admin 或任何非 Partner 角色的手机号。
 - start/verify/cancel 的非短信错误使用统一文案，客户端不能依据错误区分手机号是否属于某个内部角色。
 - 日志只记录 Admin ID、Partner ID、动作结果和非敏感错误分类；不得记录候选手机号、掩码以外的手机号数据、OTP、ticket、密码或 Redis payload。
@@ -146,6 +148,8 @@ POST /auth/admin/phone/transfer/cancel
 - start 后 Partner 改号、改密、禁用或被删除时 CAS 失败且无部分写入；
 - 所有者是另一 Admin、无所有者或非 Partner 时拒绝且不发送 OTP；
 - 密码错误、密码尝试限流、OTP 错误可重试、OTP 过期/锁定；
+- 严格初绑与安全转移交替提交错误密码时仍共享 5 次/300 秒总额度；
+- `bind_phone` 与 `transfer_phone` 的验证码、冷却和尝试计数不能跨流程消费或互相污染；
 - 同 Admin 双 verify 和两个 Admin 抢同一 Partner 手机号；
 - 两条审计存在且不包含手机号明文、hash、密文、密码、OTP 或 ticket；
 - 转移后 Partner 用户名密码登录成功，短信登录/找回失败，Admin 重置密码仍可用。
@@ -165,6 +169,7 @@ Admin 静态 verifier 与浏览器冒烟至少覆盖：
 预计允许修改或新增：
 
 - `services/api/src/auth/admin-phone-transfer.service.ts`（新增，控制在 400 行内；如状态机超过预算，拆 ticket/错误纯函数）；
+- `services/api/src/auth/internal-otp.service.ts`（仅扩展 `transfer_phone` purpose）；
 - `services/api/src/auth/auth.controller.ts`；
 - `services/api/src/auth/auth.module.ts`；
 - `services/api/src/auth/dto/internal-auth.dto.ts`（优先复用，仅确需新字段时修改）；
@@ -184,6 +189,8 @@ Admin 静态 verifier 与浏览器冒烟至少覆盖：
 本任务的代码交付、合并、部署和真实手机号转移是四个不同授权阶段。实现阶段只产出代码、测试、审查和 PR 候选；不得自动部署、发送真实短信或修改生产账号。
 
 未来真实执行前必须再次确认：生产代码版本与 CI、Admin 当前仍未绑定手机号、来源仍是预期 Partner、无活动认证 ticket、短信供应商可用、数据库备份与回滚手册就绪。真实转移必须由用户在 Admin 页面输入密码和验证码，Codex 不读取、不保存密码或验证码。
+
+基线安全审计另发现 API 直接依赖 `multer@2.1.1` 存在深层字段 DoS。该问题不是本功能引入，也不得混入认证功能分支；但在本功能部署前，必须由独立 P0 升级到 `>=2.2.0` 并完成上传链路回归。
 
 ## 11. 外部分析状态
 

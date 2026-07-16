@@ -15,6 +15,8 @@
 
 - 只允许来源账号 `role=partner`；禁止转移另一 Admin 或其他角色的手机号。
 - 必须同时具备有效 Admin 会话、正确 Admin 当前密码和发送到目标手机号的正确 OTP。
+- 转移端点与严格首次绑定端点必须共用同一个 Admin 当前密码失败额度键，禁止通过交替调用两个端点扩大密码尝试次数。
+- 转移验证码必须使用独立 `transfer_phone` purpose，不得与严格首次绑定的 `bind_phone` 共用冷却、验证码或尝试计数命名空间。
 - 清空 Partner 手机号与绑定 Admin 必须处于同一个数据库事务中，并按“先清 Partner、后绑 Admin”的顺序执行。
 - 事务内递增 Partner `tokenVersion`，事务提交后清理其会话缓存；缓存清理失败不得回滚已提交的数据库真值，但必须记录脱敏告警。
 - Ticket 必须绑定 Admin、Partner、双方 tokenVersion、phoneHash 和加密手机号，并受 TTL、单活动 ticket、验证锁和 CAS 约束。
@@ -40,3 +42,7 @@
 - TDD 覆盖正常转移、事务回滚、唯一约束顺序、并发竞争、陈旧 ticket、非 Partner 拒绝、OTP 重试、Partner 会话失效、Admin 会话保持、审计脱敏和 Partner 用户名密码登录兜底。
 - API/Admin typecheck、lint、build、专项 verifier、`git diff --check` 全部通过。
 - Antigravity 与 Claude 双模型终审必须有真实报告；当前 Antigravity 配额阻塞不得伪装为通过。
+
+## 已知独立上线阻塞
+
+- 2026-07-16 基线 `pnpm audit --audit-level high` 发现 `multer@2.1.1` 深层字段 DoS；本分支未修改 manifest/lock，不在认证功能中顺手升级，但合并部署前必须由独立 P0 任务升级到 `>=2.2.0` 并回归上传链路。
