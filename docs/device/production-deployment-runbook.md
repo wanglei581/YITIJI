@@ -240,6 +240,11 @@ manifest/hash/archive、替换 PM2、reload、重启或修改 ecosystem。当前
 `<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`。release 根不得含 `.env`、日志、storage、uploads 或
 运行时缓存；这些目录必须位于 release 根外。
 
+在首次启用审批中，必须逐项列出 PM2 运行账户可继承的**最小环境变量名称**与用途；未经批准的
+部署账户、CI、调试或管理凭据不得进入 PM2 ecosystem。launcher/guard 必须继承运行账户的既有
+最小配置以启动 API，但不能把该继承误作新的秘密传递通道。`ecosystem` / `dump.pm2`、launcher、
+artifact 和 release 目录均须部署账户可写、运行账户只读。
+
 ```bash
 # 在尚未由 current 指向的 candidate release 根执行；SOURCE_ARCHIVE 必须来自已冻结的完整 commit。
 pnpm --filter @ai-job-print/api release:manifest -- create \
@@ -266,6 +271,10 @@ launcher 每次启动都解析 `current` 为真实目录，再调用该 release 
 仅当 candidate 与 previous 均验证成功后，才可运行下列**未来**激活命令。它会原子切换 `current`、
 reload PM2、核验上述 launcher path/cwd/args、检查本机 PostgreSQL health；任何失败只会回切到
 再次验证通过的 previous，否则返回 `NO-GO`。不得手工 `pm2 reload` 绕过该命令。
+
+激活器以排他方式创建 `<CURRENT_LINK>.activation.lock`，同一时刻只允许一个 activation。发现已有
+锁、锁令牌不匹配或锁无法清理时均为 `NO-GO`，不得并发执行或擅自删除残留锁；须先取得单独授权，
+只读确认没有在途 activation 与 `current` / PM2 实际状态后，才可处置残留锁。
 
 ```bash
 pnpm --filter @ai-job-print/api release:activate -- \

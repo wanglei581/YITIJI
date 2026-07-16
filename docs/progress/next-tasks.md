@@ -46,7 +46,7 @@
 - [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
 - [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
 
-- [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher 与 atomic activation；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**；当前外部架构复核调用为空正文，不能写作双模型批准。
+- [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
 
 - [ ] **F1 未来受控 release 首次启用与回滚演练（须单独生产授权）**：先取得稳定 launcher 安装与 SHA-256、固定 PM2 `cwd/script args`、artifact/current 绝对根、candidate 构建和本机 PostgreSQL health 的审批；再按 production runbook 在非 current candidate 验证 manifest，执行一次受控切换与 verified-previous 回滚演练。不得回填当前 release，亦不得把本地 fixture 或 CI 通过当作生产来源一致性通过。
 

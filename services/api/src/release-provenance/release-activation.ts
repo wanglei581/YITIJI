@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
-import { lstatSync, readFileSync, realpathSync, renameSync, symlinkSync, unlinkSync } from 'node:fs'
+import { closeSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { get } from 'node:http'
 import { isAbsolute, join } from 'node:path'
 import { ReleaseProvenanceError, verifyReleaseProvenance } from './release-provenance'
@@ -35,6 +35,11 @@ export type ReleaseActivationOptions = {
   launcherSha256: string
   runner?: CommandRunner
   healthProbe?: HealthProbe
+}
+
+type ActivationLock = {
+  path: string
+  token: string
 }
 
 function fail(code: string): never {
@@ -103,6 +108,35 @@ function replaceCurrentLink(currentLink: string, targetRoot: string): void {
     }
     if (error instanceof ReleaseProvenanceError) throw error
     fail('RELEASE_PROVENANCE_LINK_SWITCH_FAILED')
+  }
+}
+
+function acquireActivationLock(currentLink: string): ActivationLock {
+  const path = `${currentLink}.activation.lock`
+  const token = randomUUID()
+  try {
+    const descriptor = openSync(path, 'wx', 0o600)
+    try {
+      writeFileSync(descriptor, `${token}\n`, 'utf8')
+    } finally {
+      closeSync(descriptor)
+    }
+    return { path, token }
+  } catch {
+    fail('RELEASE_PROVENANCE_ACTIVATION_LOCKED')
+  }
+}
+
+function releaseActivationLock(lock: ActivationLock): void {
+  try {
+    const stat = lstatSync(lock.path)
+    if (!stat.isFile() || stat.isSymbolicLink() || readFileSync(lock.path, 'utf8') !== `${lock.token}\n`) {
+      fail('RELEASE_PROVENANCE_ACTIVATION_LOCK_RELEASE_FAILED')
+    }
+    unlinkSync(lock.path)
+  } catch (error) {
+    if (error instanceof ReleaseProvenanceError) throw error
+    fail('RELEASE_PROVENANCE_ACTIVATION_LOCK_RELEASE_FAILED')
   }
 }
 
@@ -237,25 +271,30 @@ export async function activateRelease(options: ReleaseActivationOptions): Promis
   assertPm2Name(options.pm2Name)
   assertHealthUrl(options.healthUrl)
   const launcher = assertApprovedLauncher(options.launcherCwd, options.launcherPath, options.launcherSha256)
-  const candidate = verifyReleaseProvenance({ releaseRoot: options.candidateRoot, artifactRoot: options.artifactRoot })
-  const candidateRoot = realpathSync(options.candidateRoot)
-  const previousRoot = readCurrentRelease(options.currentLink)
-  if (candidateRoot === previousRoot) fail('RELEASE_PROVENANCE_CANDIDATE_IS_CURRENT')
-  verifyReleaseProvenance({ releaseRoot: previousRoot, artifactRoot: options.artifactRoot })
-
-  const runner = options.runner ?? systemRunner
-  const healthProbe = options.healthProbe ?? systemHealthProbe
-  replaceCurrentLink(options.currentLink, candidateRoot)
+  const activationLock = acquireActivationLock(options.currentLink)
   try {
-    if (readCurrentRelease(options.currentLink) !== candidateRoot) fail('RELEASE_PROVENANCE_CURRENT_LINK_MISMATCH')
-    verifyReleaseProvenance({ releaseRoot: candidateRoot, artifactRoot: options.artifactRoot })
-    runner.reload(options.pm2Name)
-    assertPm2Snapshot(runner.inspect(options.pm2Name), options.pm2Name, launcher, options.currentLink, options.artifactRoot)
-    if (!await healthProbe(options.healthUrl)) fail('RELEASE_PROVENANCE_POST_SWITCH_HEALTH_FAILED')
-  } catch {
-    return rollback(previousRoot, options.currentLink, options.artifactRoot, options.pm2Name, options.healthUrl, runner, healthProbe, launcher)
+    const candidate = verifyReleaseProvenance({ releaseRoot: options.candidateRoot, artifactRoot: options.artifactRoot })
+    const candidateRoot = realpathSync(options.candidateRoot)
+    const previousRoot = readCurrentRelease(options.currentLink)
+    if (candidateRoot === previousRoot) fail('RELEASE_PROVENANCE_CANDIDATE_IS_CURRENT')
+    verifyReleaseProvenance({ releaseRoot: previousRoot, artifactRoot: options.artifactRoot })
+
+    const runner = options.runner ?? systemRunner
+    const healthProbe = options.healthProbe ?? systemHealthProbe
+    replaceCurrentLink(options.currentLink, candidateRoot)
+    try {
+      if (readCurrentRelease(options.currentLink) !== candidateRoot) fail('RELEASE_PROVENANCE_CURRENT_LINK_MISMATCH')
+      verifyReleaseProvenance({ releaseRoot: candidateRoot, artifactRoot: options.artifactRoot })
+      runner.reload(options.pm2Name)
+      assertPm2Snapshot(runner.inspect(options.pm2Name), options.pm2Name, launcher, options.currentLink, options.artifactRoot)
+      if (!await healthProbe(options.healthUrl)) fail('RELEASE_PROVENANCE_POST_SWITCH_HEALTH_FAILED')
+    } catch {
+      return rollback(previousRoot, options.currentLink, options.artifactRoot, options.pm2Name, options.healthUrl, runner, healthProbe, launcher)
+    }
+    return { status: 'activated', releaseId: candidate.releaseId }
+  } finally {
+    releaseActivationLock(activationLock)
   }
-  return { status: 'activated', releaseId: candidate.releaseId }
 }
 
 type ActivationCliOutput = {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -294,7 +295,34 @@ async function verifyActivationFixtures(): Promise<void> {
       activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner: noOpRunner, healthProbe: healthy }),
     )
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
     console.log('  PASS candidate verification failure does not switch or reload')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationLock(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    const existingLockPath = `${fixture.currentLink}.activation.lock`
+    const existingLockContent = 'another activation is in progress\n'
+    writeFixtureFile(existingLockPath, existingLockContent)
+    const noOpRunner: CommandRunner = {
+      reload: () => {
+        throw new Error('an existing activation lock must prevent PM2 reload')
+      },
+      inspect: () => {
+        throw new Error('an existing activation lock must prevent PM2 inspection')
+      },
+    }
+    await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_LOCKED', () =>
+      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner: noOpRunner, healthProbe: async () => true }),
+    )
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(existingLockPath), true)
+    assert.equal(readFileSync(existingLockPath, 'utf8'), existingLockContent)
+    console.log('  PASS existing activation lock prevents switching or reloading')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
   }
@@ -320,6 +348,7 @@ async function verifyActivationRollbacks(): Promise<void> {
     )
     assert.equal(reloads, 2)
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
     console.log('  PASS post-switch health failure rolls back only to verified previous')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
@@ -341,6 +370,7 @@ async function verifyActivationRollbacks(): Promise<void> {
     )
     assert.equal(reloads, 1)
     assert.equal(realpathSync(unverified.currentLink), realpathSync(unverified.candidate.releaseRoot))
+    assert.equal(existsSync(`${unverified.currentLink}.activation.lock`), false)
     console.log('  PASS unverified previous prevents rollback and remains NO-GO')
   } finally {
     rmSync(unverified.workspace, { recursive: true, force: true })
@@ -363,6 +393,7 @@ async function verifyActivationSuccess(): Promise<void> {
     assert.equal(result.releaseId, CANDIDATE_RELEASE_ID)
     assert.equal(reloads, 1)
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.candidate.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
     console.log('  PASS activation accepts only the approved stable PM2 launcher')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
@@ -388,6 +419,7 @@ async function verifyActivationRejectsWrongLauncherArgs(): Promise<void> {
     )
     assert.equal(reloads, 2)
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
     console.log('  PASS mismatched stable launcher arguments force NO-GO rollback status')
   } finally {
     rmSync(fixture.workspace, { recursive: true, force: true })
@@ -507,6 +539,7 @@ async function main(): Promise<void> {
   await verifyCurrentLauncher()
   await verifyCurrentLauncherSelfHash()
   await verifyActivationFixtures()
+  await verifyActivationLock()
   await verifyActivationRollbacks()
   await verifyActivationSuccess()
   await verifyActivationRejectsWrongLauncherArgs()

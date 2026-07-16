@@ -68,7 +68,7 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 4. 生成稳定键序 manifest 和 manifest sidecar；将源归档及证据副本放进本机 artifact 目录。
 5. 在候选目录运行 release guard。guard 同时验证 artifact 副本、manifest sidecar、manifest 字段、受控文件树和 API entrypoint hash；任何失败均停止，绝不切换软链。
 6. 将候选 release 与 artifact 目录设为部署账户可写、运行账户只读；确认运行时配置与可写数据均在 release 根外。
-7. 仅在 candidate 与 previous guard 均成功后原子切换 `current` 软链，并 reload 一个**位于 release 根外的稳定 current launcher**。launcher 的固定参数只含预先批准的绝对 `current` 软链和 artifact 根；每次启动都先将 `current` 解析为真实目录，再调用该目录内、已纳入 manifest 的 release guard。
+7. 仅在 candidate 与 previous guard 均成功后，以不可抢占的 `<CURRENT_LINK>.activation.lock` 获取单一 activation 所有权，再原子切换 `current` 软链，并 reload 一个**位于 release 根外的稳定 current launcher**。锁必须由排他创建和调用者令牌保护；锁已存在、令牌不匹配或无法清理均为 `NO-GO`，不得自动抢占或删除。launcher 的固定参数只含预先批准的绝对 `current` 软链和 artifact 根；每次启动都先将 `current` 解析为真实目录，再调用该目录内、已纳入 manifest 的 release guard。
 8. reload 后再运行只读验证，确认 `current` 的真实路径、PM2 的 `cwd`/`execPath` 与预先批准的稳定 launcher 一致、被 launcher 调用的 candidate manifest/运行文件树一致，以及本地 health 一致。
 
 ## Guard 与失败关闭
@@ -76,6 +76,10 @@ manifest 使用稳定键序 JSON，且只含下列字段。下方为字段格式
 PM2 不直接执行 `node dist/main.js`，而执行 release 根外的稳定 current launcher。launcher 不接受动态 release 路径：它只解析固定 `current` 软链，并以解析后的规范化目录调用其中的 release guard；release guard 在 `exec node services/api/dist/main.js` 前完成验证。因此不一致时 API 不绑定端口、不连接业务依赖、不处理请求。稳定 launcher 必须由部署账户单独安装、运行账户只读；其绝对路径与 SHA-256 在首次受控启用时记录，PM2 固定 args 必须传入同一 SHA-256 并由 launcher 在 spawn guard 前自校验，但它不替代 candidate manifest 中对 release guard 的 hash。
 
 guard 仅接受 launcher 已解析的规范化 release 根、固定 manifest 文件名和固定 artifact 根；拒绝动态路径、软链接、非 JSON manifest、未知 schema version、缺失字段、非小写 SHA-256、entrypoint 不在受控清单内和任意树 hash 不匹配。launcher 与 guard 均只输出固定状态码和脱敏字段，不输出环境变量、源文件内容或业务数据。
+
+launcher/guard 可继承运行账户的既有 API 配置，但首次启用审批必须将 PM2 ecosystem 的最小环境变量
+名称与用途逐项列入；部署账户、CI、调试或管理凭据不得进入运行账户环境。该环境最小化是部署前置
+条件，不能由 manifest 或 launcher SHA-256 替代。
 
 任何候选校验、软链切换、guard、PM2 reload、PM2 路径检查或 health 检查失败时：
 
@@ -91,7 +95,7 @@ guard 仅接受 launcher 已解析的规范化 release 根、固定 manifest 文
 
 - 单元测试：稳定键序 manifest、runtime 清单的稳定排序、路径规范化、重复路径/越界链接/循环链接拒绝、根内 pnpm 风格链接记录、SHA-256 格式校验。
 - 集成测试：以临时 release 和 artifact 目录覆盖 manifest 缺失、sidecar 不一致、源归档 hash 不一致、运行文件被篡改、entrypoint 缺失、受控范围外的可写文件、previous release 不可验证。
-- wrapper 测试：candidate guard 失败时不执行 PM2；PM2 reload 或 post-switch health 失败时仅在 previous release 验证成功后回切；previous release 不通过时停止并返回 `NO-GO`。
+- wrapper 测试：candidate guard 失败时不执行 PM2；已有 activation lock 时不切换且不执行 PM2；PM2 reload 或 post-switch health 失败时仅在 previous release 验证成功后回切；previous release 不通过时停止并返回 `NO-GO`。
 - 静态门禁：禁止 guard 读取 `.env`、数据库/Redis、日志和用户数据；禁止 manifest 包含常见秘密字段；禁止部署流程绕过 guard 直接启动 API。
 
 ## 上线资格
