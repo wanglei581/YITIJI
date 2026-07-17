@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import { CalendarIcon, MapPinIcon, QrCodeIcon, SmartphoneIcon, XIcon } from 'lucide-react'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
@@ -8,6 +8,7 @@ import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { isValidSourceUrl } from '../../lib/url'
+import { ProtoBadge, ProtoNotice, ProtoPage, ProtoStepStrip } from '../jobs-fairs-prototype'
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso)
@@ -59,52 +60,48 @@ function CheckinEntryCard({ fair, onOpenQr }: { fair: ExternalJobFairDTO; onOpen
   const navigate = useNavigate()
 
   return (
-    <Card className="grid gap-5 p-5 lg:grid-cols-[1fr_220px]">
+    <div className="grid grid-cols-[1fr_280px] gap-6 rounded-[var(--r-md)] border border-[var(--line)] border-t-4 border-t-[var(--wheat)] bg-[var(--surface)] p-7 shadow-sm">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-warning-bg px-3 py-1 text-xs font-semibold text-warning-fg">
+        <div className="jf-meta-chips">
+          <span className={`jf-chip ${fair.status === 'ongoing' ? 'ok' : 'warn'}`}>
             {fair.status === 'ongoing' ? '进行中' : '即将开始'}
           </span>
-          <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600">
-            {fair.sourceName}
-          </span>
+          <span className="jf-chip src">来源 · {fair.sourceName}</span>
         </div>
-        <h2 className="mt-3 text-xl font-bold text-neutral-900">{fair.name}</h2>
-        <div className="mt-4 grid gap-2 text-sm text-neutral-600 sm:grid-cols-2">
-          <span className="flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-warning-fg" />
+        <h2 className="mt-4 font-serif text-[30px] font-bold tracking-[1px]">{fair.name}</h2>
+        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[20px] text-[var(--muted)]">
+          <span className="inline-flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5" />
             {formatDateTime(fair.startTime)}
           </span>
-          <span className="flex items-center gap-2">
-            <MapPinIcon className="h-4 w-4 text-warning-fg" />
+          <span className="inline-flex items-center gap-2">
+            <MapPinIcon className="h-5 w-5" />
             {fair.city ? `${fair.city} · ` : ''}{fair.venue}
           </span>
         </div>
-        <p className="mt-4 rounded-xl bg-neutral-50 px-4 py-3 text-sm leading-relaxed text-neutral-600">
+        <p className="mt-4 rounded-xl bg-[var(--paper)] px-5 py-3.5 text-[18px] leading-relaxed text-[var(--muted)]">
           请使用手机扫码前往来源平台签到。本系统不记录签到结果，请以来源平台显示为准。
         </p>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="mt-4"
-          onClick={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
-        >
+        <div className="jf-meta-chips mt-4">
+          <span className="jf-chip">外部ID <b>{fair.externalId}</b></span>
+          <button type="button" className="jf-btn sm ghost" onClick={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}>
           查看详情
-        </Button>
+          </button>
+        </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-neutral-100 bg-white p-4">
+      <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--r-sm)] border border-[var(--line)] bg-[var(--paper)] p-5">
         {sourceUrlAvailable ? (
           <>
             <button
               type="button"
               onClick={onOpenQr}
-              className="flex h-[168px] w-[168px] flex-col items-center justify-center rounded-xl border border-warning-bg bg-warning-bg text-warning-fg transition-colors hover:bg-warning-bg active:bg-warning/30"
+              className="flex h-[190px] w-[190px] flex-col items-center justify-center rounded-xl border border-[var(--line)] bg-[var(--surface)] text-[var(--wheat-deep)]"
             >
               <QrCodeIcon className="h-14 w-14" aria-hidden="true" />
-              <span className="mt-3 text-sm font-bold">打开签到码</span>
+              <span className="mt-3 text-[20px] font-bold">来源平台签到码</span>
             </button>
-            <p className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-neutral-500">
+            <p className="flex items-center gap-1.5 text-[16px] font-semibold text-[var(--muted)]">
               <SmartphoneIcon className="h-3.5 w-3.5" />
               扫码前往来源平台签到
             </p>
@@ -115,7 +112,7 @@ function CheckinEntryCard({ fair, onOpenQr }: { fair: ExternalJobFairDTO; onOpen
           </div>
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -163,38 +160,59 @@ export function JobFairCheckinPage() {
   if (loading) return <LoadingState className="h-full" />
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="wheat"
+      title="来源平台入场入口"
+      subtitle="展示招聘会官方 / 第三方来源签到二维码，本系统不记录签到结果"
+      backLabel="返回"
+      onBack={() => navigate('/')}
+      badge={<ProtoBadge icon={QrCodeIcon}>{availableFairs.length} 场可签到</ProtoBadge>}
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={() => navigate('/')}>
+            返回首页
+          </button>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn dark" onClick={() => navigate('/job-fairs')}>
+            查看招聘会
+          </button>
+        </>
+      }
+    >
       {qrFair && <CheckinQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="来源平台入场入口"
-          subtitle="展示招聘会官方/第三方来源签到二维码，本系统不记录签到结果"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-              返回首页
-            </Button>
-          }
+      {error ? (
+        <ErrorState message="入口加载失败，请检查网络后重试" onRetry={() => setRetryKey((value) => value + 1)} />
+      ) : availableFairs.length === 0 ? (
+        <EmptyState
+          icon={QrCodeIcon}
+          title="暂无可展示的来源入口"
+          description="当前没有配置来源签到链接的进行中或即将开始招聘会"
+          className="py-20"
         />
-      </div>
-
-      <div className="mt-4 flex-1 overflow-y-auto px-6 pb-6">
-        {error ? (
-          <ErrorState message="入口加载失败，请检查网络后重试" onRetry={() => setRetryKey((value) => value + 1)} />
-        ) : availableFairs.length === 0 ? (
-          <EmptyState
-            icon={QrCodeIcon}
-            title="暂无可展示的来源入口"
-            description="当前没有配置来源签到链接的进行中或即将开始招聘会"
-            className="py-20"
-          />
-        ) : (
-          <div className="grid gap-4">
-            {availableFairs.map((fair) => (
-              <CheckinEntryCard key={fair.id} fair={fair} onOpenQr={() => openCheckinQr(fair)} />
-            ))}
+      ) : (
+        availableFairs.map((fair) => (
+          <CheckinEntryCard key={fair.id} fair={fair} onOpenQr={() => openCheckinQr(fair)} />
+        ))
+      )}
+      <section className="jf-card accented">
+        <div className="jf-card-head">
+          <span className="jf-g-icon">
+            <QrCodeIcon aria-hidden="true" />
+          </span>
+          <div>
+            <h2>签到步骤</h2>
+            <div className="sub">三步完成来源平台现场签到</div>
           </div>
-        )}
-      </div>
-    </div>
+        </div>
+        <ProtoStepStrip
+          steps={[
+            { title: '手机扫描签到码', desc: '扫描上方对应场次的二维码' },
+            { title: '来源平台完成签到', desc: '在来源平台页面按提示办理' },
+            { title: '出示入场凭证', desc: '向现场工作人员出示凭证进场' },
+          ]}
+        />
+      </section>
+      <ProtoNotice>签到与入场由主办方管理，本系统不记录签到结果、不接收报名信息或简历。</ProtoNotice>
+    </ProtoPage>
   )
 }

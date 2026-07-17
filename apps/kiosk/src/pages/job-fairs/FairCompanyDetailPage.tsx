@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { Button, PageHeader } from '@ai-job-print/ui'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
-import { BuildingIcon, InfoIcon } from 'lucide-react'
+import { BuildingIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getFairCompanyById } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { isValidSourceUrl } from '../../lib/url'
@@ -19,6 +18,7 @@ import {
   type PrintFile,
   type ViewMode,
 } from './components/FairCompanyDetailSections'
+import { ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -116,35 +116,44 @@ export function FairCompanyDetailPage() {
       <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
         <BuildingIcon className="h-12 w-12 text-neutral-200" />
         <p className="text-sm text-neutral-400">企业数据未找到</p>
-        <Button variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
+        <button type="button" className="jf-btn sm ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
           返回企业列表
-        </Button>
+        </button>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <ProtoPage
+      tone="wheat"
+      title={company.companyName}
+      subtitle={`展位 ${company.boothNumber ?? '—'} · ${company.industry}`}
+      backLabel="返回列表"
+      onBack={() => navigate(`/job-fairs/${fairId}/companies`)}
+      badge={<ProtoBadge icon={BuildingIcon}>{company.positions.length} 个岗位</ProtoBadge>}
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
+            返回列表
+          </button>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn primary" disabled={!isValidSourceUrl(company.sourceUrl)} onClick={openApplyQr}>
+            <QrCodeIcon aria-hidden="true" />
+            扫码投递
+          </button>
+          <button type="button" className="jf-btn dark" disabled={!isValidSourceUrl(company.sourceUrl)} onClick={openApplyQr}>
+            <ExternalLinkIcon aria-hidden="true" />
+            去来源平台投递
+          </button>
+        </>
+      }
+    >
       {showQr && <QrOverlay companyName={company.companyName} sourceUrl={company.sourceUrl} onClose={() => setShowQr(false)} />}
-
-      {/* Page header */}
-      <div className="border-b border-neutral-100 bg-white px-6 pt-4 pb-3">
-        <PageHeader
-          title={company.companyName}
-          subtitle={`展位 ${company.boothNumber ?? '—'} · ${company.industry}`}
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
-              返回列表
-            </Button>
-          }
-        />
-      </div>
 
       {/* Cover */}
       <CoverArea company={company} />
 
       {/* Content */}
-      <div className="flex flex-1 flex-col gap-4 px-6 py-5 pb-8">
         <CompanyInfoCard company={company} />
         <ActionBar
           sourceCanApply={isValidSourceUrl(company.sourceUrl)}
@@ -182,15 +191,10 @@ export function FairCompanyDetailPage() {
           <PositionPosterView positions={filteredPositions} companyName={company.companyName} industry={company.industry} />
         )}
 
-        {/* Compliance footer */}
-        <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3">
-          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
-          <p className="text-xs leading-relaxed text-neutral-400">
-            {company.applyNote}。本系统仅展示招聘会现场企业与岗位信息，不接收简历，不参与招聘闭环。
-            如需投递请扫码前往来源平台或现场前往展位咨询。
-          </p>
-        </div>
-      </div>
-    </div>
+        <ProtoNotice>
+          {company.applyNote}。本系统仅展示招聘会现场企业与岗位信息，不接收简历，不参与招聘闭环。
+          如需投递请扫码前往来源平台或现场前往展位咨询。
+        </ProtoNotice>
+    </ProtoPage>
   )
 }

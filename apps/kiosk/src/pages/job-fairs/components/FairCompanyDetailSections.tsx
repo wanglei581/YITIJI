@@ -1,12 +1,9 @@
 import { useState } from 'react'
-import { Button, Card } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairCompanyPositionDTO } from '@ai-job-print/shared'
 import { COMPANY_SCALE_LABELS } from '../../../types/fair'
 import {
   AwardIcon,
   BriefcaseIcon,
-  BuildingIcon,
-  CalendarIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   ExternalLinkIcon,
@@ -48,25 +45,6 @@ const POSITION_TYPE_LABELS: Record<string, string> = {
   part_time: '兼职',
   intern:    '实习',
 }
-const POSITION_TYPE_COLORS: Record<string, string> = {
-  full_time: 'bg-primary-50 text-primary-700',
-  part_time: 'bg-warning-bg text-warning-fg',
-  intern:    'bg-success-bg text-success-fg',
-}
-
-// ─── Industry gradient palette ────────────────────────────────────────────────
-
-const INDUSTRY_GRADIENT: Record<string, string> = {
-  '互联网/软件': 'from-primary-800 to-primary-600',
-  '金融/财务':  'from-success-fg to-success-fg',
-  '制造/工程':  'from-warning-fg to-warning-fg',
-  '政事业':     'from-plum to-plum',
-  '教育/医疗':  'from-primary-800 to-primary-600',
-  '产品/技术':  'from-plum to-plum',
-  '数据/AI':    'from-info-fg to-info',
-  '运营/市场':  'from-error-fg to-error-fg',
-}
-
 // ─── QR overlay ───────────────────────────────────────────────────────────────
 
 export function QrOverlay({
@@ -112,55 +90,51 @@ export function QrOverlay({
 // ─── Cover area ───────────────────────────────────────────────────────────────
 
 export function CoverArea({ company }: { company: FairCompanyDTO }) {
-  const gradient = INDUSTRY_GRADIENT[company.industry] ?? 'from-neutral-700 to-neutral-500'
   const totalHeadcount = company.positions.reduce((s, p) => s + p.headcount, 0)
 
   return (
-    <div className={`bg-gradient-to-br ${gradient} px-6 pt-5 pb-6`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold leading-tight text-white">{company.companyName}</h1>
-          <p className="mt-1 text-sm text-white/70">{company.industry} · {COMPANY_SCALE_LABELS[company.scale]}</p>
+    <section className="jf-card accented">
+      <div className="flex items-start gap-5">
+        <span className="jf-company-logo">{company.companyName.slice(0, 1)}</span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-serif text-[38px] font-black leading-tight text-[var(--ink)]">{company.companyName}</h2>
+          <p className="mt-2 text-[21px] text-[var(--muted)]">{company.industry} · {COMPANY_SCALE_LABELS[company.scale]}</p>
+          {company.honorTags && company.honorTags.length > 0 && (
+            <div className="jf-meta-chips mt-4">
+              {company.honorTags.map((tag) => (
+                <span key={tag} className="jf-chip ok">
+                  <AwardIcon aria-hidden="true" />
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         {company.boothNumber && (
-          <div className="shrink-0 rounded-lg bg-white/15 px-3 py-1.5 text-center">
-            <p className="text-[10px] text-white/60">展位</p>
-            <p className="text-base font-bold text-white">{company.boothNumber}</p>
+          <div className="jf-booth-tag">
+            <div className="k">展位</div>
+            <b>{company.boothNumber}</b>
           </div>
         )}
       </div>
 
-      {company.honorTags && company.honorTags.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {company.honorTags.map((tag) => (
-            <span
-              key={tag}
-              className="flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white"
-            >
-              <AwardIcon className="h-3 w-3" />
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-4 flex items-center gap-5 text-sm text-white/80">
-        <span className="flex items-center gap-1.5">
-          <BriefcaseIcon className="h-4 w-4 text-white/60" />
+      <div className="jf-row-info mt-5">
+        <span>
+          <BriefcaseIcon aria-hidden="true" />
           {company.positions.length} 个岗位
         </span>
-        <span className="flex items-center gap-1.5">
-          <UsersIcon className="h-4 w-4 text-white/60" />
+        <span>
+          <UsersIcon aria-hidden="true" />
           共招 {totalHeadcount} 人
         </span>
         {company.zoneName && (
-          <span className="flex items-center gap-1.5">
-            <MapPinIcon className="h-4 w-4 text-white/60" />
+          <span>
+            <MapPinIcon aria-hidden="true" />
             {company.zoneName}
           </span>
         )}
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -171,37 +145,38 @@ export function CompanyInfoCard({ company }: { company: FairCompanyDTO }) {
   const descLong = (company.description?.length ?? 0) > 100
 
   return (
-    <Card className="p-5">
-      <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-neutral-600">
+    <section className="jf-card">
+      <div className="jf-kv3">
         {company.founded && (
-          <span className="flex items-center gap-1.5">
-            <CalendarIcon className="h-4 w-4 text-neutral-400" />
-            成立 {company.founded} 年
-          </span>
+          <div className="jf-kv">
+            <div className="k">成立时间</div>
+            <div className="v">成立 {company.founded} 年</div>
+          </div>
         )}
         {company.headquarters && (
-          <span className="flex items-center gap-1.5">
-            <MapPinIcon className="h-4 w-4 text-neutral-400" />
-            总部：{company.headquarters}
-          </span>
+          <div className="jf-kv">
+            <div className="k">总部</div>
+            <div className="v">{company.headquarters}</div>
+          </div>
         )}
         {company.registeredCapital && (
-          <span className="flex items-center gap-1.5">
-            <BuildingIcon className="h-4 w-4 text-neutral-400" />
-            注册资本：{company.registeredCapital}
-          </span>
+          <div className="jf-kv">
+            <div className="k">注册资本</div>
+            <div className="v">{company.registeredCapital}</div>
+          </div>
         )}
       </div>
 
       {company.description && (
         <div className="mt-3">
-          <p className={['text-sm leading-relaxed text-neutral-600', !expanded && descLong ? 'line-clamp-3' : ''].join(' ')}>
+          <p className={['text-[20px] leading-relaxed text-[var(--muted)]', !expanded && descLong ? 'line-clamp-3' : ''].join(' ')}>
             {company.description}
           </p>
           {descLong && (
             <button
+              type="button"
               onClick={() => setExpanded(!expanded)}
-              className="mt-1.5 flex items-center gap-0.5 text-xs text-primary-600"
+              className="mt-3 flex items-center gap-1 text-[18px] font-semibold text-[var(--accent-deep)]"
             >
               {expanded
                 ? <><ChevronUpIcon className="h-3.5 w-3.5" />收起</>
@@ -212,13 +187,13 @@ export function CompanyInfoCard({ company }: { company: FairCompanyDTO }) {
       )}
 
       {company.sourceUrl && (
-        <div className="mt-3 flex items-center gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-400">
+        <div className="mt-4 flex items-center gap-2 border-t border-[var(--line)] pt-4 text-[17px] text-[var(--muted)]">
           <InfoIcon className="h-3.5 w-3.5 shrink-0" />
           <span>数据来自合作平台 · 仅供展示参考</span>
           <ExternalLinkIcon className="ml-auto h-3.5 w-3.5 shrink-0 text-primary-400" />
         </div>
       )}
-    </Card>
+    </section>
   )
 }
 
@@ -234,40 +209,31 @@ interface ActionBarProps {
 
 export function ActionBar({ sourceCanApply, onScanQr, onOpenSource, onPrintProfile, onPrintPositions }: ActionBarProps) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Button size="lg" onClick={onScanQr} disabled={!sourceCanApply} className="flex min-h-[56px] items-center justify-center gap-2">
-        <QrCodeIcon className="h-4 w-4" />
-        扫码投递
-      </Button>
-      <Button
-        size="lg"
-        variant="secondary"
-        className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={onOpenSource}
-        disabled={!sourceCanApply}
-      >
-        <ExternalLinkIcon className="h-4 w-4" />
-        去来源平台投递
-      </Button>
-      <Button
-        size="lg"
-        variant="secondary"
-        className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={onPrintProfile}
-      >
-        <PrinterIcon className="h-4 w-4" />
-        打印企业资料
-      </Button>
-      <Button
-        size="lg"
-        variant="secondary"
-        className="flex min-h-[56px] items-center justify-center gap-2"
-        onClick={onPrintPositions}
-      >
-        <PrinterIcon className="h-4 w-4" />
-        打印岗位清单
-      </Button>
-    </div>
+    <section className="jf-action-zone company">
+      <div className="jf-qr-panel">
+        <div className="jf-qr-box" aria-hidden="true" />
+        <div className="qr-title">来源平台入口</div>
+        <div className="qr-sub">扫码或前往来源平台办理岗位投递</div>
+      </div>
+      <div className="jf-next-grid">
+        <button type="button" className="jf-tile tinted" onClick={onScanQr} disabled={!sourceCanApply}>
+          <span className="jf-tile-icon"><QrCodeIcon aria-hidden="true" /></span>
+          <span><b>扫码投递</b><span>手机扫码前往来源平台</span></span>
+        </button>
+        <button type="button" className="jf-tile" onClick={onOpenSource} disabled={!sourceCanApply}>
+          <span className="jf-tile-icon"><ExternalLinkIcon aria-hidden="true" /></span>
+          <span><b>去来源平台投递</b><span>系统不接收简历</span></span>
+        </button>
+        <button type="button" className="jf-tile" onClick={onPrintProfile}>
+          <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
+          <span><b>打印企业资料</b><span>用于现场咨询准备</span></span>
+        </button>
+        <button type="button" className="jf-tile" onClick={onPrintPositions}>
+          <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
+          <span><b>打印岗位清单</b><span>按需打印本企业岗位</span></span>
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -293,17 +259,15 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
   ]
 
   const ChipRow = ({ label, opts, fk }: { label: string; opts: string[]; fk: keyof Filters }) => (
-    <div className="flex items-center gap-1.5">
-      <span className="w-8 shrink-0 text-xs text-neutral-400">{label}</span>
-      <div className="flex gap-1 overflow-x-auto pb-0.5">
+      <div className="flex items-center gap-2">
+        <span className="jf-filter-label w-12 shrink-0">{label}</span>
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
         {opts.map((opt) => (
           <button
             key={opt}
+            type="button"
             onClick={() => onFilter({ [fk]: opt })}
-            className={[
-              'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-              filters[fk] === opt ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-            ].join(' ')}
+            className={`jf-f-chip sm ${filters[fk] === opt ? 'on' : ''}`}
           >
             {opt}
           </button>
@@ -313,21 +277,23 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
   )
 
   return (
-    <Card className="p-4">
-      <div className="flex items-center gap-2 pb-3">
-        <FilterIcon className="h-4 w-4 text-neutral-400" />
-        <span className="text-sm font-medium text-neutral-700">筛选岗位</span>
-        <div className="ml-auto flex rounded-lg border border-neutral-200 p-0.5">
+    <section className="jf-card compact">
+      <div className="mb-4 flex items-center gap-3">
+        <FilterIcon className="h-6 w-6 text-[var(--accent-deep)]" />
+        <span className="text-[22px] font-semibold text-[var(--ink)]">筛选岗位</span>
+        <div className="ml-auto flex rounded-xl border border-[var(--line)] bg-[var(--paper)] p-1">
           <button
+            type="button"
             onClick={() => onViewMode('list')}
-            className={['rounded p-1.5 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-neutral-400 hover:text-neutral-600'].join(' ')}
+            className={['rounded-lg p-2 transition-colors', viewMode === 'list' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
             title="列表视图"
           >
             <ListIcon className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={() => onViewMode('poster')}
-            className={['rounded p-1.5 transition-colors', viewMode === 'poster' ? 'bg-primary-600 text-white' : 'text-neutral-400 hover:text-neutral-600'].join(' ')}
+            className={['rounded-lg p-2 transition-colors', viewMode === 'poster' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
             title="海报视图"
           >
             <LayoutGridIcon className="h-4 w-4" />
@@ -338,17 +304,15 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
         <ChipRow label="城市" opts={locations} fk="location" />
         <ChipRow label="学历" opts={educations} fk="education" />
         <ChipRow label="经验" opts={experiences} fk="experience" />
-        <div className="flex items-center gap-1.5">
-          <span className="w-8 shrink-0 text-xs text-neutral-400">类型</span>
-          <div className="flex gap-1">
+        <div className="flex items-center gap-2">
+          <span className="jf-filter-label w-12 shrink-0">类型</span>
+          <div className="flex gap-2">
             {typeOptions.map(({ value, label }) => (
               <button
                 key={value}
+                type="button"
                 onClick={() => onFilter({ positionType: value })}
-                className={[
-                  'shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors',
-                  filters.positionType === value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-                ].join(' ')}
+                className={`jf-f-chip sm ${filters.positionType === value ? 'on' : ''}`}
               >
                 {label}
               </button>
@@ -356,7 +320,7 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
           </div>
         </div>
       </div>
-    </Card>
+    </section>
   )
 }
 
@@ -375,32 +339,30 @@ export function PositionListView({ positions, companyName }: { positions: FairCo
   return (
     <div className="space-y-3">
       {positions.map((pos) => (
-        <Card key={pos.id} className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex-1 min-w-0">
+        <div key={pos.id} className="jf-job-row">
+          <div className="j-top">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-neutral-900">{pos.title}</p>
+                <b>{pos.title}</b>
                 {pos.positionType && (
-                  <span className={['rounded-full px-2 py-0.5 text-xs font-medium', POSITION_TYPE_COLORS[pos.positionType] ?? 'bg-neutral-100 text-neutral-600'].join(' ')}>
+                  <span className="jf-kind">
                     {POSITION_TYPE_LABELS[pos.positionType] ?? pos.positionType}
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
-                <span className="font-semibold text-success-fg">{pos.salary ?? '薪资面议'}</span>
-                <span>招 {pos.headcount} 人</span>
-                {pos.location && <span className="flex items-center gap-0.5"><MapPinIcon className="h-3 w-3" />{pos.location}</span>}
-                {pos.education && <span className="flex items-center gap-0.5"><GraduationCapIcon className="h-3 w-3" />{pos.education}</span>}
-                {pos.experience && <span>{pos.experience}</span>}
-                {pos.department && <span className="text-neutral-400">/ {pos.department}</span>}
-              </div>
             </div>
+            <span className="salary">{pos.salary ?? '薪资面议'}</span>
           </div>
-          {pos.requirements && (
-            <p className="mt-2.5 border-t border-neutral-50 pt-2.5 text-xs leading-relaxed text-neutral-500">{pos.requirements}</p>
-          )}
-          <p className="mt-2 text-right text-[10px] text-neutral-300">来源：{companyName}</p>
-        </Card>
+          <div className="j-meta">
+            <span>招 {pos.headcount} 人</span>
+            {pos.location && <span className="flex items-center gap-0.5"><MapPinIcon className="h-3 w-3" />{pos.location}</span>}
+            {pos.education && <span className="flex items-center gap-0.5"><GraduationCapIcon className="h-3 w-3" />{pos.education}</span>}
+            {pos.experience && <span>{pos.experience}</span>}
+            {pos.department && <span className="text-neutral-400">/ {pos.department}</span>}
+          </div>
+          {pos.requirements && <p className="mt-3 text-[17px] leading-relaxed text-[var(--muted)]">{pos.requirements}</p>}
+          <p className="mt-2 text-right text-[15px] text-[var(--muted)]">来源：{companyName}</p>
+        </div>
       ))}
     </div>
   )
@@ -464,4 +426,3 @@ export function PositionPosterView({ positions, companyName, industry }: { posit
     </div>
   )
 }
-

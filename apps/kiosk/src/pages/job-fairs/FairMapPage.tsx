@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairBoothDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { BOOTH_STATUS_LABELS } from '../../types/fair'
 import { BuildingIcon, MapPinIcon, XIcon } from 'lucide-react'
 import { getFairMap, getJobFairById } from '../../services/api'
+import { ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
 
 // ─── Booth detail sheet ───────────────────────────────────────────────────────
 
@@ -60,9 +61,9 @@ function BoothSheet({
           )}
         </div>
         {booth.companyId && (
-          <Button size="md" className="mt-5 w-full" onClick={() => onViewCompany(booth.companyId!)}>
-            查看企业详情 / 扫码查看
-          </Button>
+          <button type="button" className="jf-btn sm dark mt-5 w-full" onClick={() => onViewCompany(booth.companyId!)}>
+            查看详情
+          </button>
         )}
       </div>
     </div>
@@ -70,12 +71,6 @@ function BoothSheet({
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-
-const BOOTH_CELL_STYLES: Record<string, string> = {
-  available: 'bg-neutral-50 border-neutral-200 text-neutral-400',
-  occupied:  'bg-primary-50 border-primary-200 text-primary-700',
-  reserved:  'bg-warning-bg border-warning/30 text-warning-fg',
-}
 
 export function FairMapPage() {
   const navigate = useNavigate()
@@ -129,7 +124,25 @@ export function FairMapPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="wheat"
+      title="展馆导览"
+      subtitle={fair ? fair.venue : '展位分布图'}
+      backLabel="返回详情"
+      onBack={() => navigate(`/job-fairs/${fairId}`)}
+      badge={<ProtoBadge icon={MapPinIcon}>{displayedBooths.length} 个展位</ProtoBadge>}
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
+            参会企业
+          </button>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn dark" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            查看招聘会
+          </button>
+        </>
+      }
+    >
       {selectedBooth && (
         <BoothSheet
           booth={selectedBooth}
@@ -138,87 +151,89 @@ export function FairMapPage() {
         />
       )}
 
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="展馆导览"
-          subtitle={fair ? `${fair.venue}` : '展位分布图'}
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-              返回详情
-            </Button>
-          }
-        />
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <div className="jf-filter-bar">
           {zoneOptions.map((z) => (
             <button
               key={z}
+              type="button"
               onClick={() => setActiveZone(z === '全部展区' ? null : z)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                (z === '全部展区' && activeZone === null) || activeZone === z
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
+              className={`jf-f-chip sm ${((z === '全部展区' && activeZone === null) || activeZone === z) ? 'on' : ''}`}
             >
               {z}
             </button>
           ))}
         </div>
-        <div className="mt-3 flex items-center gap-4 text-xs text-neutral-500">
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-primary-200 bg-primary-50" />已入驻
+        <div className="jf-meta-chips">
+          <span className="jf-chip ok">
+            <span className="h-3 w-3 rounded border border-[var(--teal)] bg-[var(--teal-soft)]" />已入驻
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-warning/30 bg-warning-bg" />已预留
+          <span className="jf-chip warn">
+            <span className="h-3 w-3 rounded border border-[var(--wheat)] bg-[var(--wheat-soft)]" />已预留
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded border border-neutral-200 bg-neutral-50" />空闲
+          <span className="jf-chip">
+            <span className="h-3 w-3 rounded border border-[var(--line)] bg-[var(--surface)]" />空闲
           </span>
         </div>
-      </div>
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <section className="jf-card accented">
+          <div className="jf-card-head">
+            <span className="jf-g-icon">
+              <MapPinIcon aria-hidden="true" />
+            </span>
+            <div>
+              <h2>展区分布</h2>
+              <div className="sub">点击展区或展位查看现场信息</div>
+            </div>
+          </div>
+          <div className="jf-map-grid">
           {displayedZones.map((zone) => (
-            <Card key={zone.id} className="p-3">
-              <p className="text-xs font-medium text-neutral-700">{zone.zoneName}</p>
-              {zone.industry && <p className="mt-0.5 text-xs text-neutral-400">{zone.industry}</p>}
-              <div className="mt-2 flex items-center justify-between text-xs">
-                <span className="text-neutral-500">{zone.boothCount} 个展位</span>
-                <span className="text-success-fg">已签到 {zone.checkedInCount}</span>
-              </div>
-              <div className="mt-1.5 h-1 rounded-full bg-neutral-100">
-                <div
-                  className="h-1 rounded-full bg-success"
-                  style={{ width: `${zone.boothCount > 0 ? (zone.checkedInCount / zone.boothCount) * 100 : 0}%` }}
-                />
-              </div>
-            </Card>
+            <button
+              key={zone.id}
+              type="button"
+              className={`jf-zone ${displayedZones.indexOf(zone) % 3 === 0 ? 'z-a' : displayedZones.indexOf(zone) % 3 === 1 ? 'z-b' : 'z-c'}`}
+              onClick={() => setActiveZone(activeZone === zone.zoneName ? null : zone.zoneName)}
+            >
+              <b>{zone.zoneName}</b>
+              {zone.industry && <span className="theme">{zone.industry}</span>}
+              <span className="range">{zone.boothCount} 个展位 · 已签到 {zone.checkedInCount}</span>
+            </button>
           ))}
+          {displayedZones.length < 4 && (
+            <div className="jf-zone z-svc">
+              <b>服务台</b>
+              <span className="theme">签到 / 咨询 / 打印</span>
+              <span className="range">入口附近</span>
+            </div>
+          )}
         </div>
+        </section>
 
-        <div>
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-            <MapPinIcon className="h-4 w-4 text-neutral-400" />
-            展位分布（{displayedBooths.length} 个）
-            <span className="text-xs font-normal text-neutral-400">— 点击展位查看详情</span>
-          </p>
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+        <section className="jf-card">
+          <div className="jf-card-head">
+            <span className="jf-g-icon">
+              <BuildingIcon aria-hidden="true" />
+            </span>
+            <div>
+              <h2>展位分布</h2>
+              <div className="sub">{displayedBooths.length} 个展位 · 点击展位查看详情</div>
+            </div>
+          </div>
+          <div className="jf-booth-grid">
             {displayedBooths.map((booth) => (
               <button
                 key={booth.id}
+                type="button"
                 onClick={() => setSelectedBooth(booth)}
-                className={`rounded-lg border p-2 text-center transition-colors hover:opacity-80 ${BOOTH_CELL_STYLES[booth.status]}`}
+                className={`jf-booth-cell ${booth.status === 'occupied' ? 'occ' : booth.status === 'reserved' ? 'res' : ''}`}
               >
-                <BuildingIcon className="mx-auto h-4 w-4" />
-                <p className="mt-1 text-xs font-medium">{booth.boothNumber}</p>
-                {booth.companyName && (
-                  <p className="mt-0.5 truncate text-xs opacity-70">{booth.companyName.slice(0, 4)}</p>
-                )}
+                <span>{booth.boothNumber}</span>
+                {booth.companyName && <small>{booth.companyName.slice(0, 6)}</small>}
               </button>
             ))}
           </div>
-        </div>
-      </div>
-    </div>
+        </section>
+
+      <ProtoNotice>导览仅作为现场参考，实际展位和动线以主办方现场指引为准。</ProtoNotice>
+    </ProtoPage>
   )
 }

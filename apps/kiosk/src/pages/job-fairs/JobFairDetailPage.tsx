@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation, useParams } from 'react-router-dom'
-import { Button, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type {
   ExternalJobFairDTO,
   FairCompanyDTO,
@@ -24,6 +24,7 @@ import { FairDataScreen } from './components/FairDataScreen'
 import { DetailsTab, CompaniesTab, VenueGuideTab } from './components/JobFairDetailTabs'
 import { useFavorites } from '../../favorites/useFavorites'
 import { useAuth } from '../../auth/useAuth'
+import { ProtoPage } from '../jobs-fairs-prototype'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-primary-50',  text: 'text-primary-600' },
@@ -194,7 +195,53 @@ export function JobFairDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="wheat"
+      title={fair.name}
+      subtitle={`来源 · ${fair.sourceName} · 信息以来源平台为准`}
+      backLabel="返回"
+      onBack={() => navigate('/job-fairs')}
+      badge={
+        <div className="jf-meta-chips">
+          <span className={`jf-chip ${fair.status === 'ongoing' ? 'ok' : fair.status === 'upcoming' ? 'warn' : ''}`}>{sc.label}</span>
+          <button
+            type="button"
+            onClick={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
+            aria-label={isFav ? '取消收藏' : '收藏招聘会'}
+            className={`jf-chip${isFav ? ' warn' : ''}`}
+          >
+            <HeartIcon className={isFav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
+            {isFav ? '已收藏' : '收藏'}
+          </button>
+        </div>
+      }
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={handleVisitPlan}>
+            <SparklesIcon aria-hidden="true" />
+            AI准备单
+          </button>
+          <div className="jf-spacer" />
+          {!isEnded && fair.checkinUrl && (
+            <button type="button" className="jf-btn ghost" onClick={openCheckinQr}>
+              <QrCodeIcon aria-hidden="true" />
+              扫码签到
+            </button>
+          )}
+          <button type="button" className="jf-btn dark" onClick={handlePrintMaterial}>
+            <PrinterIcon aria-hidden="true" />
+            打印资料
+          </button>
+          {!isEnded && (
+            <button type="button" className="jf-btn primary" onClick={openBookingQr}>
+              <QrCodeIcon aria-hidden="true" />
+              扫码预约
+            </button>
+          )}
+        </>
+      }
+      tight
+    >
       {qr?.kind === 'book' && (
         <QrModal
           title="扫码前往来源平台预约"
@@ -231,99 +278,41 @@ export function JobFairDetailPage() {
         />
       )}
 
-      {/* 头部 */}
-      <div className="flex items-start justify-between gap-3 px-6 pb-3 pt-6">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold text-neutral-900">{fair.name}</h1>
-          <p className="mt-0.5 text-xs text-neutral-400">{fair.sourceName}</p>
-        </div>
-        {/* 收藏(C-2D):仅兴趣标记,登录走 /me/favorites,匿名存本机;不涉及任何预约/投递闭环 */}
-        <button
-          type="button"
-          onClick={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
-          aria-label={isFav ? '取消收藏' : '收藏招聘会'}
-          className={[
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors',
-            isFav ? 'border-error/30 bg-error-bg text-error-fg' : 'border-neutral-200 bg-white text-neutral-400 hover:text-error',
-          ].join(' ')}
-        >
-          <HeartIcon className={isFav ? 'h-5 w-5 fill-current' : 'h-5 w-5'} aria-hidden="true" />
-        </button>
-        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => navigate('/job-fairs')}>
-          关闭
-        </Button>
-      </div>
-
-      {/* Tab 栏 */}
-      <div className="flex gap-1 border-b border-neutral-100 px-6">
+      <div className="tabs flex gap-0 border-b-2 border-[var(--line)]">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={[
-              'relative min-h-[44px] px-3 text-sm font-medium transition-colors',
-              tab === t ? 'text-primary-600' : 'text-neutral-500 hover:text-neutral-700',
+              'tab relative flex min-h-[76px] flex-1 items-center justify-center gap-2 px-3 text-[23px] transition-colors',
+              tab === t ? 'on font-bold text-[var(--wheat-deep)] after:absolute after:inset-x-[22%] after:-bottom-0.5 after:h-1 after:rounded after:bg-[var(--wheat)]' : 'text-[var(--muted)]',
             ].join(' ')}
           >
             {t}
-            {tab === t && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary-600" />}
           </button>
         ))}
       </div>
 
-      {/* Tab 内容 */}
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 py-4">
-        {tab === '详情与特色' && (
-          <DetailsTab
-            fair={fair}
-            sc={sc}
-            featuredZones={featuredZones}
-            navUrl={navUrl}
-            onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })}
-          />
-        )}
-        {tab === '参展企业与岗位' && (
-          <CompaniesTab fairId={fair.id} companies={companies} />
-        )}
-        {tab === '场馆导览' && (
-          <VenueGuideTab fairId={fair.id} onGoCompanies={() => setTab('参展企业与岗位')} />
-        )}
-        {tab === '数据大屏' && (
-          stats && !stats.isMockData ? <FairDataScreen stats={stats} /> : (
-            <EmptyState icon={InfoIcon} title="暂无真实统计数据" description="该招聘会暂未接入真实来源数据，页面不会展示模拟统计" className="py-12" />
-          )
-        )}
-      </div>
-
-      {/* 底部操作条 */}
-      <div className="border-t border-neutral-100 px-6 pb-6 pt-3">
-        <div className="flex gap-3">
-          {!isEnded ? (
-            <Button size="lg" className="flex flex-1 items-center justify-center gap-2" onClick={openBookingQr}>
-              <QrCodeIcon className="h-5 w-5" />
-              扫码预约
-            </Button>
-          ) : (
-            <Button size="lg" variant="secondary" className="flex-1" onClick={() => navigate('/job-fairs')}>
-              返回列表
-            </Button>
-          )}
-          <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={handlePrintMaterial}>
-            <PrinterIcon className="h-5 w-5" />
-            打印资料
-          </Button>
-          {!isEnded && fair.checkinUrl && (
-            <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={openCheckinQr}>
-              <QrCodeIcon className="h-5 w-5" />
-              扫码签到
-            </Button>
-          )}
-          <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2" onClick={handleVisitPlan}>
-            <SparklesIcon className="h-5 w-5" />
-            AI准备单
-          </Button>
-        </div>
-      </div>
-    </div>
+      {tab === '详情与特色' && (
+        <DetailsTab
+          fair={fair}
+          sc={sc}
+          featuredZones={featuredZones}
+          navUrl={navUrl}
+          onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })}
+        />
+      )}
+      {tab === '参展企业与岗位' && (
+        <CompaniesTab fairId={fair.id} companies={companies} />
+      )}
+      {tab === '场馆导览' && (
+        <VenueGuideTab fairId={fair.id} onGoCompanies={() => setTab('参展企业与岗位')} />
+      )}
+      {tab === '数据大屏' && (
+        stats && !stats.isMockData ? <FairDataScreen stats={stats} /> : (
+          <EmptyState icon={InfoIcon} title="暂无真实统计数据" description="该招聘会暂未接入真实来源数据，页面不会展示模拟统计" className="py-12" />
+        )
+      )}
+    </ProtoPage>
   )
 }
