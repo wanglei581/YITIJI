@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import '../prototype/kiosk-prototype.css'
 
 interface SmartCampusCard {
   key: string
@@ -88,78 +89,75 @@ export function SmartCampusHomePage() {
   const cards: SmartCampusCard[] = config.enabled ? [...moduleEntries, ...SERVICE_ENTRIES] : []
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">智慧校园</h1>
-          <p className="mt-0.5 text-sm text-neutral-500">校园场景服务专区</p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-          返回首页
-        </Button>
-      </div>
-
-      {/* 合规来源条 */}
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-plum-soft bg-plum-soft/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-plum" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-plum">
-          校方授权的官方校园服务入口。仅信息展示与指引，不在本终端采集任何个人信息。
-        </p>
-      </div>
-
-      {!config.enabled || cards.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-100">
-            <PartyPopperIcon className="h-7 w-7 text-neutral-400" aria-hidden="true" />
-          </div>
-          <p className="text-sm text-neutral-500">本机暂未开启智慧校园服务</p>
-          <Button size="lg" onClick={() => navigate('/')}>
+    <div className="kproto kproto-teal">
+      <div className="kproto-shell">
+        <div className="kproto-pagehead">
+          <button type="button" className="kproto-back" onClick={() => navigate('/')}>
             返回首页
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {cards.map((entry) => {
-            const Icon = entry.icon
-            const disabled = !entry.to
-            return (
-              <button
-                key={entry.key}
-                type="button"
-                disabled={disabled}
-                onClick={() => entry.to && navigate(entry.to)}
-                className={[
-                  'flex min-h-[148px] flex-col rounded-xl border bg-white p-5 text-left shadow-sm transition-colors',
-                  disabled
-                    ? 'cursor-not-allowed border-neutral-200 opacity-70'
-                    : 'border-neutral-200 hover:border-plum/30 hover:bg-plum-soft/40 active:bg-plum-soft/40',
-                ].join(' ')}
-              >
-                <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-plum-soft">
-                  <Icon className="h-7 w-7 text-plum" aria-hidden="true" />
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <h3 className="text-lg font-semibold text-neutral-900">{entry.title}</h3>
-                  {disabled && (
-                    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-                      即将上线
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 flex-1 text-sm leading-relaxed text-neutral-500">{entry.description}</p>
-                {!disabled && (
-                  <div className="mt-2 flex min-h-[28px] items-center gap-0.5 text-sm font-semibold text-plum">
-                    <span>进入</span>
-                    <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
-                  </div>
-                )}
-              </button>
-            )
-          })}
+          </button>
+          <div className="kproto-title">
+            <h1>智慧校园</h1>
+            <p>校园场景服务专区 · 本机已开启校园模式</p>
+          </div>
+          <div className="kproto-aside">
+            <span className="kproto-badge">本校已开通 {cards.length} 项服务</span>
+          </div>
         </div>
-      )}
 
-      <div className="h-2" />
+        <main className="kproto-content">
+          <div className="kproto-auth">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>
+          校方授权的官方校园服务入口。仅信息展示与指引，不在本终端采集任何个人信息。
+            </p>
+          </div>
+
+          {!config.enabled || cards.length === 0 ? (
+            <Card className="kproto-card flex flex-col items-center justify-center gap-4 p-10 text-center">
+              <PartyPopperIcon className="h-12 w-12 text-neutral-400" aria-hidden="true" />
+              <p className="text-lg text-neutral-500">本机暂未开启智慧校园服务</p>
+              <Button size="lg" onClick={() => navigate('/')}>返回首页</Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-2 gap-5">
+              {cards.map((entry) => {
+                const Icon = entry.icon
+                const disabled = !entry.to
+                return (
+                  <button
+                    key={entry.key}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => entry.to && navigate(entry.to)}
+                    className={`flex min-h-[220px] flex-col rounded-[18px] border bg-[var(--kp-surface)] p-7 text-left shadow-sm ${disabled ? 'cursor-not-allowed opacity-60' : 'active:scale-[.985]'}`}
+                  >
+                    <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+                      <Icon className="h-8 w-8" aria-hidden="true" />
+                    </span>
+                    <span className="mt-5 flex items-center gap-3">
+                      <b className="font-serif text-[28px] font-bold tracking-[1px]">{entry.title}</b>
+                      {disabled && <span className="kproto-chip">即将上线</span>}
+                    </span>
+                    <span className="mt-2 flex-1 text-[19px] leading-normal text-[var(--kp-muted)]">{entry.description}</span>
+                    {!disabled && (
+                      <span className="mt-3 inline-flex items-center gap-2 text-[20px] font-bold text-[var(--kp-accent-deep)]">
+                        进入<ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="kproto-notice mt-auto">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>
+              实际办理请前往现场服务窗口或学校官方自助平台；校园大数据模块暂未开放，开放前不展示任何统计数据。
+            </p>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

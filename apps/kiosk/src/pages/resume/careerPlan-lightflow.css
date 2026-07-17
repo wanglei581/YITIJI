@@ -1,9 +1,30 @@
 .career-plan-lightflow {
+  --sd-color-canvas-outer: #f4f1e8;
+  --sd-color-canvas: #f4f1e8;
+  --sd-color-surface: #fffdf8;
+  --sd-color-primary: #1f9e86;
+  --sd-color-primary-strong: #157a67;
+  --sd-color-primary-soft: #e2f2ec;
+  --sd-color-text-strong: #10302b;
+  --sd-color-text: #10302b;
+  --sd-color-copy: #5d6b63;
+  --sd-color-copy-muted: #5d6b63;
+  --sd-color-line: #e2dccb;
+  --sd-color-line-strong: #d2c7b4;
+  --sd-category-blue-bg: #e2f2ec;
+  --sd-category-orange-bg: #f2ead6;
+  --sd-category-orange-fg: #8a6219;
+  --sd-card-radius: 18px;
+  --sd-shadow-touch: 0 3px 14px rgba(16, 48, 43, .05);
+  --sd-shadow-console: 0 3px 14px rgba(16, 48, 43, .05);
   min-height: 100dvh;
   box-sizing: border-box;
-  padding: 28px clamp(18px, 4vw, 48px) 0;
+  padding: 34px clamp(18px, 4vw, 48px) 0;
   color: var(--sd-color-text-strong);
-  background: var(--sd-color-canvas-outer);
+  background:
+    radial-gradient(1000px 520px at 88% -6%, rgba(31, 158, 134, .07), transparent 62%),
+    radial-gradient(760px 420px at -10% 28%, rgba(184, 104, 60, .06), transparent 58%),
+    var(--sd-color-canvas-outer);
   font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif);
 }
 
@@ -81,7 +102,8 @@
   margin: 8px 0 0;
   font-size: clamp(26px, 4vw, 40px);
   font-weight: 850;
-  letter-spacing: -0.04em;
+  letter-spacing: .02em;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
 }
 
 .career-plan-lightflow__state-card > p:not(.career-plan-lightflow__eyebrow),
@@ -113,7 +135,7 @@
 .career-plan-lightflow__eyebrow {
   margin: 18px 0 0;
   color: var(--sd-color-primary);
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: .08em;
 }
@@ -140,6 +162,7 @@
 .career-plan-lightflow__section { width: 100%; }
 
 .career-plan-lightflow__summary-card {
+  border-top: 4px solid var(--sd-color-primary);
   background: var(--sd-color-surface);
 }
 
@@ -152,7 +175,7 @@
   min-height: var(--sd-control-min, 48px);
 }
 
-.career-plan-lightflow__section-heading h2 { margin: 0; font-size: 19px; font-weight: 820; }
+.career-plan-lightflow__section-heading h2 { margin: 0; font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif; font-size: 24px; font-weight: 820; letter-spacing: .02em; }
 
 .career-plan-lightflow__section-icon { width: 42px; height: 42px; border-radius: 14px; }
 .career-plan-lightflow__section-icon svg { width: 19px; height: 19px; }
@@ -163,17 +186,17 @@
 .career-plan-lightflow__skill {
   padding: 15px 16px;
   border: 1px solid var(--sd-color-line);
-  border-radius: 18px;
+  border-radius: 14px;
   background: var(--sd-color-canvas);
 }
 
 .career-plan-lightflow__evidence p,
 .career-plan-lightflow__direction h3,
-.career-plan-lightflow__skill h3 { margin: 0; font-size: 16px; font-weight: 760; }
+.career-plan-lightflow__skill h3 { margin: 0; font-size: 19px; font-weight: 760; }
 .career-plan-lightflow__evidence span,
 .career-plan-lightflow__direction p,
 .career-plan-lightflow__skill p,
-.career-plan-lightflow__muted { color: var(--sd-color-copy); font-size: 14px; line-height: 1.65; }
+.career-plan-lightflow__muted { color: var(--sd-color-copy); font-size: 17px; line-height: 1.65; }
 .career-plan-lightflow__evidence span { display: block; margin-top: 5px; color: var(--sd-color-copy-muted); }
 
 .career-plan-lightflow__direction,
@@ -196,7 +219,7 @@
 .career-plan-lightflow__direction p,
 .career-plan-lightflow__skill p { margin: 5px 0 0; }
 .career-plan-lightflow__checklist { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
-.career-plan-lightflow__checklist li { display: flex; gap: 11px; color: var(--sd-color-text); font-size: 15px; line-height: 1.65; }
+.career-plan-lightflow__checklist li { display: flex; gap: 11px; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; }
 .career-plan-lightflow__checklist li::before { display: grid; flex: 0 0 auto; place-items: center; width: 22px; height: 22px; margin-top: 1px; content: '✓'; color: var(--sd-color-primary); background: var(--sd-category-blue-bg); border-radius: 50%; font-weight: 900; }
 
 .career-plan-lightflow__next-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
@@ -205,7 +228,7 @@
 .career-plan-lightflow__next-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding-inline: 10px; color: var(--sd-color-text); background: var(--sd-color-surface); }
 .career-plan-lightflow__next-actions svg { width: 18px; height: 18px; color: var(--sd-color-primary); }
 
-.career-plan-lightflow__guide-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; color: var(--sd-color-text); font-size: 15px; line-height: 1.65; }
+.career-plan-lightflow__guide-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; }
 .career-plan-lightflow__guide-list li { padding: 12px 14px; background: color-mix(in srgb, var(--sd-color-surface) 72%, transparent); border: 1px solid var(--sd-color-line); border-radius: 15px; }
 .career-plan-lightflow__muted { margin: 16px 0 0; }
 

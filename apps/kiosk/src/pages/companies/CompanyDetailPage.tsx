@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import {
   COMPANY_INDUSTRIES,
   COMPANY_TYPES,
@@ -42,6 +42,7 @@ import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
+import '../prototype/kiosk-prototype.css'
 
 const CATEGORY_LABEL: Record<string, string> = {
   fulltime: '全职', intern: '实习', campus: '校招', parttime: '兼职',
@@ -86,15 +87,15 @@ function MetricsCard({ metrics }: { metrics: CompanyDetailDTO['metrics'] }) {
   if (metrics.boothNo) entries.push({ icon: StoreIcon, label: '展位号', value: metrics.boothNo })
   if (entries.length === 0) return null
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-4 gap-3">
       {entries.map(({ icon: Icon, label, value }) => (
-        <div key={label} className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-            <Icon className="h-5 w-5" aria-hidden="true" />
+        <div key={label} className="flex items-center gap-3 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 py-4">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+            <Icon className="h-6 w-6" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-lg font-bold leading-tight text-neutral-900">{value}</p>
-            <p className="text-xs text-neutral-400">{label}</p>
+            <p className="truncate text-[25px] font-bold leading-tight text-[var(--kp-ink)]">{value}</p>
+            <p className="text-base text-[var(--kp-muted)]">{label}</p>
           </div>
         </div>
       ))}
@@ -188,7 +189,7 @@ export function CompanyDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="kproto kproto-clay flex h-full flex-col">
       {qr?.kind === 'source' && company.sourceUrl && (
         <QrModal
           title="扫码前往来源平台查看"
@@ -209,17 +210,15 @@ export function CompanyDetailPage() {
       )}
 
       {/* 头部 */}
-      <div className="flex items-start justify-between gap-3 px-6 pb-3 pt-6">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-bold text-neutral-900">{company.name}</h1>
-          <p className="mt-0.5 text-xs text-neutral-400">信息来源：{company.sourceName}</p>
+      <div className="kproto-pagehead px-12 pb-4 pt-8">
+        <button type="button" className="kproto-back" onClick={() => navigate('/companies')}>返回列表</button>
+        <div className="kproto-title min-w-0">
+          <h1>企业详情</h1>
+          <p>信息来源：{company.sourceName} · 以来源平台为准</p>
         </div>
-        <Button size="sm" variant="secondary" className="shrink-0" onClick={() => navigate('/companies')}>
-          返回列表
-        </Button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-12 pb-6">
         {/* 封面 / 宣传片（仅真实媒体；无媒体不放占位假视频） */}
         {company.promoVideoUrl ? (
           videoOpen ? (
@@ -251,51 +250,51 @@ export function CompanyDetailPage() {
         ) : null}
 
         {/* 基本信息 */}
-        <Card className="p-5">
+        <Card className="kproto-card accented">
           <div className="flex items-start gap-3">
             {company.logoUrl ? (
-              <img src={company.logoUrl} alt={`${company.name} logo`} className="h-14 w-14 shrink-0 rounded-xl border border-neutral-100 object-cover" />
+              <img src={company.logoUrl} alt={`${company.name} logo`} className="h-[72px] w-[72px] shrink-0 rounded-2xl border border-neutral-100 object-cover" />
             ) : (
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
-                <BuildingIcon className="h-7 w-7" aria-hidden="true" />
+              <span className="grid h-[72px] w-[72px] shrink-0 place-items-center rounded-2xl bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+                <BuildingIcon className="h-10 w-10" aria-hidden="true" />
               </span>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-neutral-900">{company.name}</p>
+              <p className="font-serif text-4xl font-black tracking-[1px] text-[var(--kp-ink)]">{company.name}</p>
               {company.legalName && company.legalName !== company.name && (
-                <p className="mt-0.5 text-xs text-neutral-400">{company.legalName}</p>
+                <p className="mt-1 text-lg text-[var(--kp-muted)]">{company.legalName}</p>
               )}
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <span className="rounded bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-600">信息来源：{company.sourceName}</span>
-                {typeLabel && <span className="rounded bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-600">{typeLabel}</span>}
-                {industryLabel && <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">{industryLabel}</span>}
-                {company.fairParticipant && <span className="rounded bg-warning-bg px-2 py-0.5 text-xs font-medium text-warning-fg">招聘会参展企业</span>}
+              <div className="kproto-meta mt-3">
+                <span className="kproto-chip source">信息来源 · {company.sourceName}</span>
+                {typeLabel && <span className="kproto-chip">{typeLabel}</span>}
+                {industryLabel && <span className="kproto-chip">{industryLabel}</span>}
+                {company.fairParticipant && <span className="kproto-chip warn">招聘会参展企业</span>}
                 {company.tags.map((t) => (
-                  <span key={t} className="rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">{t}</span>
+                  <span key={t} className="kproto-chip">{t}</span>
                 ))}
               </div>
             </div>
           </div>
 
           {company.description && (
-            <p className="mt-3 text-sm leading-relaxed text-neutral-600">{company.description}</p>
+            <p className="mt-4 text-[20px] leading-relaxed text-[var(--kp-ink)]">{company.description}</p>
           )}
 
           {company.honorTags.length > 0 && (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <span className="flex items-center gap-1 text-xs font-medium text-neutral-500">
-                <AwardIcon className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1 text-lg font-bold text-[var(--kp-wheat-deep)]">
+                <AwardIcon className="h-5 w-5" aria-hidden="true" />
                 企业荣誉
               </span>
               {company.honorTags.map((t) => (
-                <span key={t} className="rounded border border-warning/20 bg-warning-bg/60 px-2 py-0.5 text-xs text-warning-fg">{t}</span>
+                <span key={t} className="kproto-chip warn">{t}</span>
               ))}
             </div>
           )}
 
           {company.address && (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-neutral-400">
-              <MapPinIcon className="h-3.5 w-3.5" aria-hidden="true" />
+            <p className="mt-3 flex items-center gap-1.5 text-base text-[var(--kp-muted)]">
+              <MapPinIcon className="h-4 w-4" aria-hidden="true" />
               {[company.province, company.city, company.district, company.address].filter(Boolean).join(' ')}
             </p>
           )}
@@ -305,18 +304,18 @@ export function CompanyDetailPage() {
         <MetricsCard metrics={company.metrics} />
 
         {/* 合规提示条 */}
-        <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
-          <p className="text-xs leading-relaxed text-neutral-500">{company.dataSourceNote}</p>
+        <div className="kproto-notice">
+          <ShieldCheckIcon aria-hidden="true" />
+          <p>{company.dataSourceNote}</p>
         </div>
 
         {/* 在招岗位 */}
         <section id="company-jobs" aria-label="该公司在招岗位">
           <div className="mb-2 flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-base font-semibold text-neutral-900">
-              <BriefcaseIcon className="h-4 w-4 text-primary-500" aria-hidden="true" />
+            <p className="flex items-center gap-2 text-[24px] font-bold text-[var(--kp-ink)]">
+              <BriefcaseIcon className="h-6 w-6 text-[var(--kp-accent-deep)]" aria-hidden="true" />
               该公司在招岗位
-              {jobsTotal !== null && jobsTotal > 0 && <span className="text-sm font-normal text-neutral-400">（{jobsTotal}）</span>}
+              {jobsTotal !== null && jobsTotal > 0 && <span className="text-lg font-normal text-[var(--kp-muted)]">（{jobsTotal}）</span>}
             </p>
           </div>
 
@@ -334,42 +333,42 @@ export function CompanyDetailPage() {
           ) : (
             <div className="flex flex-col gap-3">
               {jobs.map((job) => (
-                <div key={job.id} className="rounded-xl border border-neutral-200 bg-white p-4">
-                  <div className="flex items-start justify-between gap-3">
+                <div key={job.id} className="rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-5 py-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-semibold text-neutral-900">{job.title}</p>
-                      <p className="mt-0.5 text-sm font-medium text-primary-600">{job.salaryDisplay}</p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <p className="truncate text-[22px] font-bold text-[var(--kp-ink)]">{job.title}</p>
+                      <p className="mt-0.5 text-[20px] font-bold text-[var(--kp-accent-deep)]">{job.salaryDisplay}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
                         {job.category && (
-                          <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-600">
+                          <span className="kproto-chip px-3 py-1 text-base">
                             {CATEGORY_LABEL[job.category] ?? job.category}
                           </span>
                         )}
-                        <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{job.city}</span>
+                        <span className="kproto-chip px-3 py-1 text-base">{job.city}</span>
                         {job.tags.slice(0, 4).map((t) => (
-                          <span key={t} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{t}</span>
+                          <span key={t} className="kproto-chip px-3 py-1 text-base">{t}</span>
                         ))}
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-3 flex gap-2">
+                    <div className="flex shrink-0 gap-2">
                     <button
                       type="button"
                       onClick={() => navigate(`/jobs/${job.id}`)}
-                      className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg border border-neutral-200 text-sm font-semibold text-neutral-700 active:bg-neutral-50"
+                      className="kproto-btn sm"
                     >
-                      <EyeIcon className="h-4 w-4" aria-hidden="true" />
+                      <EyeIcon aria-hidden="true" />
                       查看岗位
                     </button>
                     <button
                       type="button"
                       onClick={() => openJobQr(job)}
                       disabled={!isValidSourceUrl(job.sourceUrl)}
-                      className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg bg-primary-600 text-sm font-semibold text-white active:bg-primary-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+                      className="kproto-btn sm primary disabled:opacity-45"
                     >
-                      <QrCodeIcon className="h-4 w-4" aria-hidden="true" />
+                      <QrCodeIcon aria-hidden="true" />
                       去来源平台投递
                     </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -388,7 +387,7 @@ export function CompanyDetailPage() {
                       .finally(() => setJobsLoadingMore(false))
                   }}
                   disabled={jobsLoadingMore}
-                  className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-200 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
+                  className="kproto-btn sm w-full border-dashed text-[var(--kp-muted)] disabled:opacity-60"
                 >
                   {jobsLoadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
                   加载更多岗位
@@ -399,21 +398,21 @@ export function CompanyDetailPage() {
         </section>
 
         {/* 岗位匹配参考说明（只引导本人走既有 2D 链路，不展示无依据的匹配等级） */}
-        <Card className="p-5">
-          <p className="flex items-center gap-1.5 text-base font-semibold text-neutral-900">
-            <SparklesIcon className="h-4 w-4 text-plum" aria-hidden="true" />
+        <Card className="kproto-card kproto-plum accented">
+          <p className="flex items-center gap-2 text-[24px] font-bold text-[var(--kp-ink)]">
+            <SparklesIcon className="h-6 w-6 text-[var(--kp-plum-deep)]" aria-hidden="true" />
             岗位匹配参考
           </p>
-          <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+          <p className="mt-2 text-[19px] leading-relaxed text-[var(--kp-ink)]">
             完成 AI 简历诊断后，可对感兴趣的岗位生成「匹配参考：较高 / 中等 / 偏低」三档参考与提升建议。
           </p>
-          <p className="mt-1.5 text-xs text-neutral-400">
+          <p className="mt-1.5 text-[17px] text-[var(--kp-muted)]">
             仅供本人优化简历和选择岗位参考，不代表录用结果；结果不会提供给任何企业。
           </p>
           <button
             type="button"
             onClick={() => navigate('/resume/source?intent=diagnose')}
-            className="mt-3 flex min-h-[48px] items-center gap-1.5 rounded-lg border border-plum/30 bg-plum-soft px-4 text-sm font-semibold text-plum active:bg-plum-soft"
+            className="kproto-btn sm mt-3 border-[var(--kp-plum)] text-[var(--kp-plum-deep)]"
           >
             去做简历诊断与岗位匹配参考
             <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -421,23 +420,23 @@ export function CompanyDetailPage() {
         </Card>
 
         {/* 来源信息 */}
-        <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-            <Building2Icon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+        <Card className="kproto-card">
+          <p className="mb-3 flex items-center gap-2 text-[24px] font-bold text-[var(--kp-ink)]">
+            <Building2Icon className="h-6 w-6 text-[var(--kp-muted)]" aria-hidden="true" />
             数据来源
           </p>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between gap-4"><span className="text-neutral-400">来源机构</span><span className="text-right text-neutral-700">{company.sourceName}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-neutral-400">外部编号</span><span className="text-right font-mono text-xs text-neutral-600">{company.externalId}</span></div>
-            <div className="flex justify-between gap-4"><span className="text-neutral-400">同步时间</span><span className="text-right text-neutral-700">{company.syncTime.slice(0, 10)}</span></div>
+          <div className="kproto-grid-3 text-[20px]">
+            <div><div className="text-[var(--kp-muted)]">来源机构</div><b>{company.sourceName}</b></div>
+            <div><div className="text-[var(--kp-muted)]">外部ID</div><b>{company.externalId}</b></div>
+            <div><div className="text-[var(--kp-muted)]">同步时间</div><b>{company.syncTime.slice(0, 10)}</b></div>
           </div>
           {sourceCanOpen && (
             <button
               type="button"
               onClick={openSourceQr}
-              className="mt-3 flex min-h-[48px] items-center gap-1.5 rounded-lg border border-neutral-200 px-4 text-sm font-medium text-primary-600 hover:bg-primary-50"
+              className="kproto-btn sm primary mt-4"
             >
-              <ExternalLinkIcon className="h-4 w-4" aria-hidden="true" />
+              <ExternalLinkIcon aria-hidden="true" />
               去来源平台查看
             </button>
           )}
