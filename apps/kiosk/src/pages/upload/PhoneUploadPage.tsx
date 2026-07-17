@@ -138,7 +138,7 @@ export function PhoneUploadPage() {
             state === 'uploading' ? 'pointer-events-none opacity-75' : '',
           ].join(' ')}
         >
-          <input type="file" accept={accept} className="sr-only" disabled={state === 'uploading'} onChange={handleFile} />
+          <input type="file" accept={accept} aria-label={`选择${fileNoun}`} className="sr-only" disabled={state === 'uploading'} onChange={handleFile} />
           {state === 'uploading' ? <Loader2Icon className="h-10 w-10 animate-spin" /> : state === 'success' ? <CheckCircleIcon className="h-10 w-10" /> : <UploadCloudIcon className="h-10 w-10" />}
           <b className="text-lg font-bold">{state === 'success' ? '已上传到一体机' : '选择手机中的文件'}</b>
           <span className="text-[13px] leading-relaxed text-neutral-500">
