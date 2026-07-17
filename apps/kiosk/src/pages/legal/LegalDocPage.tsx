@@ -6,6 +6,7 @@
 // （见 docs/compliance/）。Kiosk 模式：大字号、可滚动、无外链。
 // ============================================================
 
+import { useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, PageHeader } from '@ai-job-print/ui'
 import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
@@ -113,47 +114,67 @@ export function LegalDocPage() {
   const { doc } = useParams<{ doc: string }>()
   const meta = doc === 'privacy' ? DOCS.privacy : DOCS.terms
   const Icon = meta.icon
+  const [fontPercent, setFontPercent] = useState(100)
+  const [activeSection, setActiveSection] = useState(0)
+  const sectionRefs = useRef<(HTMLElement | null)[]>([])
+
+  const selectSection = (index: number) => {
+    setActiveSection(index)
+    sectionRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div className="service-desk k1-legal-doc" data-visual-theme="service-desk" data-ux-density="touch">
       <div className="legal-doc-shell">
-      <PageHeader
-        className="legal-doc-page-header"
-        title={meta.title}
-        subtitle={`更新日期：${UPDATED_AT}`}
-        actions={
-          <Button size="sm" variant="secondary" className="legal-doc-back" onClick={() => navigate(-1)}>
-            返回
-          </Button>
-        }
-      />
-      <div className="legal-doc-scroller">
-        <article className="legal-doc-card">
-          <div className="legal-doc-intro">
-            <span className="legal-doc-icon">
-              <Icon aria-hidden="true" />
-            </span>
-            <p>
-              请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。
-            </p>
-          </div>
-          <div className="legal-doc-sections">
-            {meta.sections.map((s) => (
-              <section key={s.title}>
-              <h2>{s.title}</h2>
-              {s.paragraphs.map((para) => (
-                <p key={para.slice(0, 16)}>
-                  {para}
-                </p>
+        <PageHeader
+          className="legal-doc-page-header"
+          title={meta.title}
+          subtitle={`更新日期：${UPDATED_AT}`}
+          actions={
+            <div className="legal-doc-tools">
+              <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.max(90, value - 10))} aria-label="缩小字号">A−</button>
+              <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.min(120, value + 10))} aria-label="放大字号">A＋</button>
+              <Button size="sm" variant="secondary" className="legal-doc-back" onClick={() => navigate(-1)}>返回</Button>
+            </div>
+          }
+        />
+
+        <div className="legal-doc-tabs" role="group" aria-label="法律文档">
+          <button type="button" aria-pressed={doc !== 'privacy'} className={doc !== 'privacy' ? 'is-active' : ''} onClick={() => navigate('/legal/terms', { replace: true })}>用户服务协议</button>
+          <button type="button" aria-pressed={doc === 'privacy'} className={doc === 'privacy' ? 'is-active' : ''} onClick={() => navigate('/legal/privacy', { replace: true })}>隐私政策</button>
+        </div>
+
+        <article className="legal-doc-card" style={{ '--legal-font-scale': fontPercent / 100 } as CSSProperties}>
+          <aside className="legal-doc-toc" aria-label="章节目录">
+            {meta.sections.map((section, index) => (
+              <button key={section.title} type="button" className={activeSection === index ? 'is-active' : ''} onClick={() => selectSection(index)}>
+                {section.title}
+              </button>
+            ))}
+          </aside>
+
+          <div className="legal-doc-body">
+            <h2>AI求职打印服务终端 · {meta.title}</h2>
+            <p className="legal-doc-meta">更新日期 {UPDATED_AT} · 全文共 {meta.sections.length} 章</p>
+            <div className="legal-doc-intro">
+              <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
+              <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
+            </div>
+            <div className="legal-doc-sections">
+              {meta.sections.map((section, index) => (
+                <section key={section.title} ref={(node) => { sectionRefs.current[index] = node }}>
+                  <h3>{section.title}</h3>
+                  {section.paragraphs.map((para, paragraphIndex) => <p key={paragraphIndex}>{para}</p>)}
+                </section>
               ))}
-            </section>
-          ))}
+            </div>
+            <p className="legal-doc-endmark">— 全文完 · 可上下滑动回看 —</p>
           </div>
-          <p className="legal-doc-notice">
-            本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准。
-          </p>
         </article>
-      </div>
+
+        <p className="legal-doc-notice">
+          本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。
+        </p>
       </div>
     </div>
   )

@@ -1,0 +1,12 @@
+{
+  "id": "kiosk-system-batch8-visual-alignment",
+  "title": "Kiosk Batch 8 系统辅助屏 11 屏视觉对齐与会话超时、断网新屏实现",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已归档；提交并推送候选分支",
+  "createdAt": "2026-07-17T19:31:17Z",
+  "branch": "codex/system-batch8-20260717"
+}
