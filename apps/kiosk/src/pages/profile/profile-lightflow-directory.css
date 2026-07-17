@@ -123,11 +123,10 @@
   background: var(--surface);
 }
 
-.kprofile.kprofile-lightflow .kp-entry-icon.teal { color: var(--teal-deep); background: var(--teal-soft); }
-.kprofile.kprofile-lightflow .kp-entry-icon.slate { color: var(--slate-deep); background: var(--slate-soft); }
-.kprofile.kprofile-lightflow .kp-entry-icon.plum { color: var(--plum-deep); background: var(--plum-soft); }
-.kprofile.kprofile-lightflow .kp-entry-icon.clay,
-.kprofile.kprofile-lightflow .kp-entry-icon.rose { color: var(--clay-deep); background: var(--clay-soft); }
+.kprofile.kprofile-lightflow 
+.kprofile.kprofile-lightflow 
+.kprofile.kprofile-lightflow 
+.kprofile.kprofile-lightflow 
 .kprofile.kprofile-lightflow .kp-entry-icon.wheat { color: var(--wheat-deep); background: var(--wheat-soft); }
 .kprofile.kprofile-lightflow .kp-entry-icon.ink { color: var(--ink); background: var(--surface); }
 
@@ -257,4 +256,9 @@
   .kprofile.kprofile-lightflow .kp-entry-grid--account {
     grid-template-columns: 1fr;
   }
+}
+
+.kp-inner {
+  width: min(980px, calc(100% - 100px));
+  margin-inline: auto;
 }
