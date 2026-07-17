@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { isHealthyPrinterStatus } from '../terminals/printer-status'
 
 // ============================================================
 // AdminOpsService — 阶段1E:Admin 运营视图(打印任务流水 + 派生告警)
@@ -175,7 +176,7 @@ export class AdminOpsService {
           terminalCode: t.terminalCode,
           occurredAt: lastSeen.toISOString(),
         })
-      } else if (lastHeartbeat?.printerStatus && lastHeartbeat.printerStatus !== 'ok') {
+      } else if (lastHeartbeat?.printerStatus && !isHealthyPrinterStatus(lastHeartbeat.printerStatus)) {
         const label = PRINTER_STATUS_LABELS[lastHeartbeat.printerStatus] ?? `打印机状态异常(${lastHeartbeat.printerStatus})`
         alerts.push({
           id: `printer_issue:${t.id}`,
