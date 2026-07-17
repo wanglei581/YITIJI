@@ -1,0 +1,12 @@
+{
+  "id": "f1-parallel-genesis-bootstrap-plan-20260716",
+  "title": "编制 F1 平行 Genesis bootstrap 本地实现计划",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "release-governance",
+  "currentPhase": "completed",
+  "nextAction": "已完成计划、双模型审查和文档验证；归档后等待用户对 D1 本地实现的独立授权",
+  "createdAt": "2026-07-16T00:00:00+08:00",
+  "branch": "codex/f1-provenance-bootstrap-design-20260716"
+}
