@@ -2036,3 +2036,138 @@ model FeedbackReply {
   @@index([ticketId, createdAt])
   @@index([actorId])
 }
+
+model HelpItem {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  category    String
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model LegalDocVersion {
+  id          String    @id @default(cuid())
+  docType     String
+  version     String
+  content     String
+  publishedAt DateTime?
+  isActive    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([docType, version])
+}
+
+model OfflineAgency {
+  id            String       @id @default(cuid())
+  name          String
+  orgType       String
+  address       String
+  lat           Float?
+  lng           Float?
+  openHours     String?
+  phone         String?
+  services      String       @default("[]")
+  status        String       @default("active")
+  reviewStatus  String       @default("pending")
+  publishStatus String       @default("draft")
+  sourceOrgId   String?
+  externalId    String?
+  syncTime      DateTime?
+  jobs          OfflineJob[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model OfflineJob {
+  id           String        @id @default(cuid())
+  agencyId     String
+  agency       OfflineAgency @relation(fields: [agencyId], references: [id])
+  title        String
+  salary       String?
+  requirements String?
+  externalUrl  String?
+  externalId   String?
+  status       String        @default("active")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model KioskSession {
+  id           String   @id @default(cuid())
+  terminalId   String?
+  memberId     String?
+  startedAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  expiresAt    DateTime
+  isExpired    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PrintMaterialPack {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  items       String   @default("[]")
+  priceCents  Int      @default(0)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model UserNotification {
+  id        String    @id @default(cuid())
+  memberId  String
+  type      String
+  title     String
+  content   String
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model KioskActivity {
+  id          String   @id @default(cuid())
+  title       String
+  type        String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  benefits    String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model FairCompanyBooth {
+  id            String   @id @default(cuid())
+  fairId        String
+  companyName   String
+  boothNumber   String
+  zone          String?
+  checkinStatus String   @default("pending")
+  honors        String   @default("[]")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ScreensaverContent {
+  id        String   @id @default(cuid())
+  type      String
+  url       String
+  title     String?
+  duration  Int      @default(5)
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

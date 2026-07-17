@@ -88,6 +88,14 @@ export const kioskRouter = createBrowserRouter([
   // 待机宣传屏:顶级路由,全屏渲染(不套 KioskLayout 头部/底部导航)
   { path: '/screensaver', element: <ScreensaverPage /> },
   {
+    path: '/session-timeout',
+    lazy: async () => ({ Component: (await import('../pages/placeholders/SessionTimeoutPage')).default }),
+  },
+  {
+    path: '/error-offline',
+    lazy: async () => ({ Component: (await import('../pages/placeholders/ErrorOfflinePage')).default }),
+  },
+  {
     path: '/',
     element: <KioskRoot />,
     children: [
@@ -102,6 +110,10 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/ai-records',     element: <MyAiRecordsPage /> },
       { path: 'me/benefits',       element: <MyBenefitsPage /> },
       { path: 'me/activity',       element: <MyActivityPage /> },
+      {
+        path: 'me/activity/:id',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/MeActivityDetailPage')).default }),
+      },
       { path: 'me/notifications',  element: <MyNotificationsPage /> },
       { path: 'me/feedback',       element: <MyFeedbackPage /> },
       // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
@@ -113,6 +125,14 @@ export const kioskRouter = createBrowserRouter([
       { path: 'activities/:id',     element: <BenefitActivityDetailPage /> },
       { path: 'renshi',            element: <RenshiPage /> },
       { path: 'campus',            element: <CampusPage /> },
+      {
+        path: 'campus/welcome',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/CampusWelcomePage')).default }),
+      },
+      {
+        path: 'campus/freshman-insights',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
+      },
       // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
       { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
       { path: 'smart-campus/welcome',            element: <SmartCampusWelcomePage /> },
@@ -123,6 +143,18 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       { path: 'print-scan/convert',      element: <ConvertImagesPage /> },
       { path: 'print-scan/sign',         element: <SignStampPage /> },
+      {
+        path: 'print/scan-convert',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanConvertPage')).default }),
+      },
+      {
+        path: 'print/scan-sign',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanSignPage')).default }),
+      },
+      {
+        path: 'print/scan-feature',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanFeaturePage')).default }),
+      },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
@@ -152,6 +184,18 @@ export const kioskRouter = createBrowserRouter([
       // 岗位 / 招聘会（Phase 4）
       { path: 'jobs',                                  element: <JobsPage /> },
       { path: 'jobs/:id',                              element: <JobDetailPage /> },
+      {
+        path: 'jobs/:id/offline',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/OfflineJobDetailPage')).default }),
+      },
+      {
+        path: 'offline-agencies',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/OfflineAgenciesPage')).default }),
+      },
+      {
+        path: 'notifications',
+        lazy: async () => ({ Component: (await import('../pages/placeholders/NotificationsPage')).default }),
+      },
       { path: 'companies',                             element: <CompaniesPage /> },
       { path: 'companies/:id',                         element: <CompanyDetailPage /> },
       { path: 'job-fairs',                             element: <JobFairsPage /> },

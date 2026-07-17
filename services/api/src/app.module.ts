@@ -45,6 +45,13 @@ import { ScanTasksModule } from './scan-tasks/scan-tasks.module'
 import { PrintConversionModule } from './print-conversion/print-conversion.module'
 import { PrintSignModule } from './print-sign/print-sign.module'
 import { DeviceFleetModule } from './device-fleet/device-fleet.module'
+import { OfflineAgenciesModule } from './offline-agencies/offline-agencies.module'
+import { KioskSessionModule } from './kiosk-session/kiosk-session.module'
+import { HelpModule } from './help/help.module'
+import { LegalModule } from './legal/legal.module'
+import { NotificationsModule } from './notifications/notifications.module'
+import { ActivitiesModule } from './activities/activities.module'
+import { ScreensaverModule } from './screensaver/screensaver.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -117,6 +124,13 @@ const redisUrl = process.env['REDIS_URL']
     PrintConversionModule,
     PrintSignModule,
     DeviceFleetModule,
+    OfflineAgenciesModule,
+    KioskSessionModule,
+    HelpModule,
+    LegalModule,
+    NotificationsModule,
+    ActivitiesModule,
+    ScreensaverModule,
   ],
   controllers: [HealthController],
   providers: [
