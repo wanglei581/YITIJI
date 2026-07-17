@@ -97,6 +97,7 @@ const TEST_MATRIX = [
   'required audit 失败回滚请求且不入队',
   'queue add 失败补偿为 failed 并保留 activeKey',
   'worker 抢先执行不应阻断 workerJobId 写入或误回 503',
+  'Admin retry 的 worker 抢先执行不应误回 503',
 ] as const
 
 let failures = 0
@@ -244,6 +245,7 @@ function createHarness(Constructor: RuntimeServiceConstructor, options: HarnessO
   const prisma = {
     userDataRequest: rootDelegate,
     endUser: {
+      findUnique: async () => null,
       updateMany: async () => {
         counters.endUserWrites += 1
         return { count: 1 }
@@ -483,6 +485,17 @@ async function runServiceMatrix(Constructor: RuntimeServiceConstructor): Promise
     const stored = harness.rows().find((row) => row.id === result.id)
     assert.equal(stored?.status, 'handling')
     assert.equal(stored?.workerJobId, `member-export-${result.id}-0`)
+  })
+
+  await check(TEST_MATRIX[10], async () => {
+    const retryable = makeRow({ status: 'failed', failureCode: 'EXPORT_ARTIFACT_MISSING' })
+    const harness = createHarness(Constructor, { rows: [retryable], queueStartsWorker: true })
+    assert.ok(harness.service.retry, '管理员 retry 方法必须存在')
+    const error = await captureError(() => harness.service.retry!(retryable.id, 'admin-one'))
+    assertErrorCode(error, 'END_USER_NOT_FOUND')
+    const stored = harness.rows().find((row) => row.id === retryable.id)
+    assert.equal(stored?.status, 'handling')
+    assert.equal(stored?.workerJobId, `member-export-${retryable.id}-1`)
   })
 
   await check('orphan_cleanup_pending 禁止管理员 retry/reject 越过 reconciler', async () => {

@@ -11,10 +11,16 @@
 
 ## 外部双模型复审状态
 
-- 本次 Antigravity 复审调用未返回模型报告：账号所在地不支持当前 API。该失败不是有效审查结论。
-- 本次 Claude 复审包装器已调用但未产出报告正文；因此不得宣称 Claude 审查已通过。
+- Claude 全量只读审查在时间预算内返回 `INCOMPLETE`：已覆盖 step-up、会员归属、幂等/CAS、白名单、私有对象、下载和补偿，未覆盖 Redis 原子实现、migration 逐字对比、审计事务和 controller 装配；已覆盖部分没有 Critical。它识别出 Admin retry 仍保留 `status=pending` 的 worker 抢先竞态。
+- 该竞态已按 RED→GREEN 修复：新增真实运行时状态机用例，先证明旧实现返回 `DATA_REQUEST_EXECUTION_INCOMPLETE`，再将 retry 的事后 `workerJobId` CAS 收窄为请求 ID、`executionVersion` 与空 `workerJobId`。入口事务的旧状态/文件/failure CAS、队列 jobId 唯一约束均未放宽。
+- 修复后的精确 diff 已分别由 Antigravity/Gemini 与 Claude 只读复审；两者均 `APPROVE`，无 Critical/Warning。该批准只覆盖本次竞态补丁，不替代仍未完成的全量外部复审。
 
-需要在外部服务恢复可用后补跑 Antigravity 与 Claude 的只读复审；截至本记录，未发现未修复的本地 Critical/High 问题。
+仍建议在集成前补齐全量外部只读复审，重点为 Redis ticket/claim 原子性、双 migration、AuditService 事务语义和 controller 鉴权/下载 header；截至本记录，未发现未修复的本地 Critical/High 问题。
+
+## 设计取舍确认
+
+- 失败或清理不确定的 export 请求保留 `activeKey`，且 `EXPORT_CLEANUP_FAILED` 禁止 Admin retry/reject；这是为了防止未确认清理的私有对象被新请求绕过。普通失败项在 API 中仍以 `canRetry=true` 表示可由受控运营动作处理；本切片未新增用户或 Admin UI。
+- 下载的“单次”语义是“单次成功交付”：claim 后断连会释放/恢复 claim 而不误删 ready 对象，只有 finish 的原子收口才写 `downloadConsumedAt`。该取舍由现有下载/对账门禁覆盖，前端产品文案在新增下载 UI 前必须按此语义表述。
 
 ## 回归结论
 

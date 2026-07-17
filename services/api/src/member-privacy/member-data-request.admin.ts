@@ -154,7 +154,7 @@ export class MemberDataRequestAdminOperations {
       throw unavailable('QUEUE_ENQUEUE_FAILED', '数据导出任务暂时无法排队，请稍后重试')
     }
     const workerCas = await this.prisma.userDataRequest.updateMany({
-      where: { id, status: 'pending', executionVersion, workerJobId: null },
+      where: { id, executionVersion, workerJobId: null },
       data: { workerJobId: jobId },
     })
     if (workerCas.count !== 1) {
