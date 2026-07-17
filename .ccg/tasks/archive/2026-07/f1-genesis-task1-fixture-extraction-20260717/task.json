@@ -1,0 +1,12 @@
+{
+  "id": "f1-genesis-task1-fixture-extraction-20260717",
+  "title": "F1 Genesis Task 1：拆分 release provenance fixture",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "test-infrastructure",
+  "currentPhase": "completed",
+  "nextAction": "归档任务；下一步须单独创建 Task 2，并先写 activation runtime environment contract 的 RED 场景",
+  "createdAt": "2026-07-17T10:59:30+08:00",
+  "branch": "codex/f1-provenance-bootstrap-design-20260716"
+}
