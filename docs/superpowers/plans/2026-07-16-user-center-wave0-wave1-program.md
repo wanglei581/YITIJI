@@ -8,18 +8,20 @@
 
 **Tech Stack:** React 18 + Vite + TypeScript + Tailwind CSS + `@ai-job-print/ui`；NestJS 11 + Prisma 7；SQLite / PostgreSQL 双 schema；Redis + BullMQ；本地/COS 私有对象存储；现有 AuditService、FilesService 和会员短信通道。
 
+> **执行状态（2026-07-17，`origin/main@f1c6d4ad`）：** 方案文档已由 PR #259 合入；Wave 0 已由 PR #261 合入，授权撤回终态保护已由 PR #263 合入；Wave 1-A 账户安全底座已由 PR #265 合入，追加安全加固已由 PR #270（`88e940cd`）合入。PR #270 的 GitHub Actions `29552177099` 中 `build-and-verify` 与 `postgres-readiness` 均成功。以上均未部署；Wave 1-B 数据权利执行器与 Wave 1-C Kiosk/Admin 隐私运营 UI 尚未开始。本文件及四份详细计划中的复选框仍是完成定义，不因本摘要局部勾选。
+
 ---
 
 ## 1. 执行边界
 
 ### 1.1 分支与依赖顺序
 
-| 顺序 | 分支 | 对应详细计划 | 依赖 |
-|---|---|---|---|
-| 1 | `codex/user-center-wave0-truth-baseline` | `2026-07-16-user-center-wave0-truth-baseline.md` | 最新干净 `main` |
-| 2 | `codex/user-center-wave1-account-security` | `2026-07-16-user-center-wave1-account-security.md` | Wave 0 合入后的 `main` |
-| 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main`；状态机、导出和 fail-closed 注销门禁可先实施，不可逆注销 handler 必须等法务分类留存矩阵签字后才能提交 |
-| 4 | `codex/user-center-wave1-ops-ui` | `2026-07-16-user-center-wave1-ops-ui.md` | Wave 1 data-rights 可用契约合入后的 `main`；导出领取、请求列表和 Admin 队列可先实施，Kiosk 注销入口必须等法务矩阵与注销执行 feature flag 同时获准后才能展示 |
+| 顺序 | 分支 | 对应详细计划 | 依赖 | 当前状态 |
+|---|---|---|---|---|
+| 1 | `codex/user-center-wave0-truth-baseline` | `2026-07-16-user-center-wave0-truth-baseline.md` | 最新干净 `main` | 已由 PR #261 合入；PR #263 已合并补齐授权撤回终态保护。 |
+| 2 | `codex/user-center-wave1-account-security` | `2026-07-16-user-center-wave1-account-security.md` | Wave 0 合入后的 `main` | 基础版已由 PR #265 合入；追加安全加固已由 PR #270（`88e940cd`）合入；不含数据权利 UI 或执行器。 |
+| 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main`；状态机、导出和 fail-closed 注销门禁可先实施，不可逆注销 handler 必须等法务分类留存矩阵签字后才能提交 | 未开始；下一波必须从当前干净主线另建 worktree。 |
+| 4 | `codex/user-center-wave1-ops-ui` | `2026-07-16-user-center-wave1-ops-ui.md` | Wave 1 data-rights 可用契约合入后的 `main`；导出领取、请求列表和 Admin 队列可先实施，Kiosk 注销入口必须等法务矩阵与注销执行 feature flag 同时获准后才能展示 | 未开始；不得提前展示注销入口。 |
 
 每个分支单独建立 CCG task、独立 worktree、独立复审和验收。当前包含用户在途改动的工作区只用于只读分析和写本计划，禁止直接开始运行时代码。
 

@@ -1,0 +1,12 @@
+{
+  "id": "user-center-plan-status-reconcile-r2-20260717",
+  "title": "以最新主线二次校准用户中心计划状态",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "归档纯文档校准任务，提交并发起 PR；CI 通过后才按授权合并，不部署",
+  "createdAt": "2026-07-17T12:00:00+08:00",
+  "branch": "codex/user-center-plan-status-reconcile-r2-20260717"
+}
