@@ -1,0 +1,13 @@
+{
+  "id": "record-dependency-security-merge-20260717",
+  "title": "同步依赖安全 PR 合并与 CI 状态",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "等待文档 PR CI；不部署",
+  "createdAt": "2026-07-17T03:50:00Z",
+  "completedAt": "2026-07-17T03:55:00Z",
+  "branch": "codex/record-dependency-security-merge-20260717"
+}
