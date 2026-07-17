@@ -1,6 +1,17 @@
 # 下一步任务
 
 > 最后更新：2026-07-17
+
+## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
+
+设计基准:`docs/design/kiosk-proto-2026-07/`(75 屏 + shared.css token + README 开发规则);后台配套规划:`docs/product/console-plan-for-kiosk-proto-2026-07.md`。
+
+- [ ] **首批立项:G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台,同批开发,合规口径见原型 README §五
+- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
+- [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
+- [ ] 存量页面按原型逐屏换装对齐(±4px 截图比对验收),批次顺序建议:首页 → 打印扫描线 → 简历线 → 岗位招聘会线 → 我的 → 系统屏
+- [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
+
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
