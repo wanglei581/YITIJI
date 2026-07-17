@@ -3,5 +3,4 @@
 ALTER TABLE "UserDataRequest" ADD COLUMN "failureMessage" TEXT;
 
 -- 同一个非空幂等键只能对应一条会员数据权利请求；NULL 历史记录仍可并存。
-CREATE UNIQUE INDEX "UserDataRequest_idempotencyKey_key"
-  ON "UserDataRequest"("idempotencyKey");
+CREATE UNIQUE INDEX "UserDataRequest_idempotencyKey_key" ON "UserDataRequest"("idempotencyKey");

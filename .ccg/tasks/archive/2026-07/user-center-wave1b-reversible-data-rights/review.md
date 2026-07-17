@@ -18,4 +18,6 @@
 
 ## 回归结论
 
-所有 Wave 1-B formal verify、step-up integration、账户状态和文件保留门禁、PostgreSQL schema 同步检查、typecheck、lint、build、diff check 均通过。`pnpm audit --prod --audit-level=critical` 通过（仅报告一项现有 moderate 漏洞）。
+rebase 到 `origin/main@0ae51289` 后，发现并修复两个 migration 收口问题：旧切片遗留的空 migration 目录会令 Prisma 报 P3015；双库 unique index 的换行格式不符合静态契约门禁。仅清理空目录并统一 SQLite/PostgreSQL additive migration 的等价 SQL 格式，未改变 schema 或运行时语义。
+
+重放后所有 Wave 1-B formal verify、step-up integration、账户状态和文件保留门禁、PostgreSQL schema 同步检查、typecheck、lint、生产配置 build、diff check 均通过。`pnpm audit --prod --audit-level=critical` 通过（仅报告一项现有 moderate 漏洞）。
