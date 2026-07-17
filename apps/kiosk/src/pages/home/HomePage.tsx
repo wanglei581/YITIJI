@@ -39,14 +39,33 @@ const HOME_REFERENCE_HASH_IDS = new Set(['resume', 'jobs', 'job-fairs', 'print-s
 /* ── 顶栏（LightFlow 白色服务台 + 真实设备状态） ── */
 function KioskTopBar() {
   const deviceStatus = useHomeDeviceStatus()
+  const [now, setNow] = useState(() => new Date())
+  const terminalId = getTerminalId() || '01号机'
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const clock = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now)
 
   return (
     <header className="k-top">
-      <strong className="k-brand">AI求职打印一体机</strong>
+      <div className="k-brand">
+        <strong>就业服务大厅 · {terminalId}</strong>
+        <span>AI求职打印服务终端</span>
+      </div>
       <div className="k-status" role="status" aria-live="polite">
+        <time className="k-clock">{clock}</time>
         <span className="k-device-status" data-status={deviceStatus.tone}>
           <i aria-hidden="true" />
-          {deviceStatus.label}
+          {deviceStatus.label} · {deviceStatus.paperLabel}
         </span>
       </div>
     </header>

@@ -1,0 +1,154 @@
+.khome {
+  --home-canvas: #f4f1e8;
+  --home-canvas-outer: #f4f1e8;
+  --home-surface: #fffdf8;
+  --home-text: #10302b;
+  --home-copy: #5d6b63;
+  --home-muted: #5d6b63;
+  --home-primary: #1f9e86;
+  --home-primary-strong: #157a67;
+  --home-line: #e2dccb;
+  --home-line-strong: #d4cdbb;
+  width: min(1080px, 100%);
+  padding-bottom: 0;
+  background:
+    radial-gradient(1200px 600px at 85% -5%, rgb(31 158 134 / 6%), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgb(184 104 60 / 5%), transparent 55%),
+    var(--home-canvas);
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+.khome .k-top {
+  position: relative;
+  min-height: 76px;
+  padding: 0 44px;
+  color: #f4f1e8;
+  background: #10302b;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.khome .k-brand { display: flex; align-items: baseline; gap: 18px; }
+.khome .k-brand strong { font-family: 'Songti SC', 'SimSun', serif; font-size: 26px; letter-spacing: 1px; }
+.khome .k-brand span { font-size: 20px; opacity: .55; }
+.khome .k-status { gap: 28px; }
+.khome .k-clock { font-size: 20px; opacity: .85; font-variant-numeric: tabular-nums; }
+.khome .k-device-status {
+  min-height: 42px;
+  padding: 8px 18px;
+  color: #f4f1e8;
+  border-color: rgb(31 158 134 / 45%);
+  background: rgb(31 158 134 / 18%);
+  font-size: 19px;
+}
+.khome .k-device-status[data-status='positive'] { color: #f4f1e8; border-color: rgb(31 158 134 / 45%); background: rgb(31 158 134 / 18%); }
+
+.khome .khome-inner { width: min(984px, calc(100% - 96px)); }
+.khome .service-value {
+  min-height: 174px;
+  margin-top: 0;
+  padding: 24px 0 8px;
+  color: var(--home-text);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.khome .service-value::before { display: none; }
+.khome .service-value-tag { display: none; }
+.khome .service-value h1 {
+  max-width: 720px;
+  margin: 0;
+  font-family: 'Songti SC', 'SimSun', serif;
+  font-size: 46px;
+  line-height: 1.22;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+.khome .service-value p { margin-top: 10px; font-size: 22px; line-height: 1.45; letter-spacing: 1px; }
+.khome .service-value h1::first-line { color: var(--home-text); }
+
+.khome .identity {
+  min-height: 88px;
+  margin: 0 0 14px;
+  padding: 14px 22px;
+  border: 1px solid var(--home-line);
+  border-radius: 18px;
+  box-shadow: 0 3px 12px rgb(16 48 43 / 5%);
+}
+.khome .id-ava { width: 56px; height: 56px; border-radius: 14px; }
+.khome .id-copy strong { font-size: 18px; }
+.khome .id-copy p { font-size: 14px; }
+.khome .id-actions .btn.primary { min-height: 56px; border-radius: 14px; box-shadow: none; }
+.khome .id-actions .btn.cta { min-width: 236px; }
+.khome .id-stats { display: none; }
+
+.khome .reference-service-nav { display: none; }
+.khome .home-service-track { width: min(984px, calc(100% - 96px)); }
+.khome .home-service-catalog { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.khome .lf-reference-pair { display: contents; }
+.khome .home-reference-panel {
+  position: relative;
+  min-height: 0;
+  padding: 18px 24px 20px;
+  overflow: hidden;
+  border: 1px solid var(--home-line);
+  border-radius: 18px;
+  background: var(--home-surface);
+  box-shadow: 0 3px 12px rgb(16 48 43 / 5%);
+}
+.khome .home-reference-panel::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 6px; background: var(--home-primary); }
+.khome .home-reference-panel--wide { grid-column: 1 / -1; }
+.khome #jobs::before { background: #b8683c; }
+.khome #job-fairs::before, .khome #policy::before { background: #a9781f; }
+.khome #print-scan::before { background: #3f68b0; }
+.khome #interview::before { background: #7a5a86; }
+.khome .lf-reference-group-head { min-height: 54px; gap: 13px; margin-bottom: 10px; padding: 0; }
+.khome .lf-reference-group-head > :first-child { flex-basis: 46px; width: 46px; height: 46px; border-radius: 12px; }
+.khome .home-reference-icon svg { width: 26px; height: 26px; }
+.khome .home-reference-group-copy strong { font-family: 'Songti SC', 'SimSun', serif; font-size: 27px; letter-spacing: 1px; }
+.khome .home-reference-group-copy span { font-size: 15px; }
+.khome .home-reference-primary-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0 0 10px; }
+.khome .home-reference-panel--half .home-reference-primary-list { grid-template-columns: 1fr; }
+.khome .home-reference-secondary-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.khome .home-reference-panel--half .home-reference-secondary-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.khome .lf-reference-primary, .khome .lf-reference-secondary {
+  min-height: 76px;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--home-line);
+  border-radius: 14px;
+  background: var(--home-canvas);
+}
+.khome .lf-reference-primary { background: var(--home-primary); color: #fffdf8; border-color: var(--home-primary); }
+.khome #jobs .lf-reference-primary { background: #b8683c; border-color: #b8683c; }
+.khome #job-fairs .lf-reference-primary, .khome #policy .lf-reference-primary { background: #a9781f; border-color: #a9781f; }
+.khome #print-scan .lf-reference-primary { background: #3f68b0; border-color: #3f68b0; }
+.khome #interview .lf-reference-primary { background: #7a5a86; border-color: #7a5a86; }
+.khome .lf-reference-primary > :first-child, .khome .lf-reference-secondary > :first-child { flex-basis: 36px; width: 36px; height: 36px; border-radius: 9px; background: rgb(255 253 248 / 16%); color: inherit; }
+.khome .lf-reference-primary .home-reference-icon svg, .khome .lf-reference-secondary .home-reference-icon svg { width: 21px; height: 21px; }
+.khome .home-reference-entry-copy strong, .khome .lf-reference-primary .home-reference-entry-copy strong { font-size: 17px; line-height: 1.25; }
+.khome .home-reference-entry-copy span { margin-top: 2px; font-size: 13px; line-height: 1.3; }
+.khome .lf-reference-primary .home-reference-entry-copy span, .khome .lf-reference-primary .home-reference-arrow { color: rgb(255 253 248 / 80%); }
+.khome .home-reference-arrow { display: none; }
+.khome .home-reference-state { padding: 4px 8px; font-size: 11px; }
+
+.khome .home-extension-group { grid-column: span 1; min-height: 136px; padding: 16px 22px; border: 1px solid var(--home-line); border-radius: 18px; box-shadow: 0 3px 12px rgb(16 48 43 / 5%); }
+.khome .home-extension-heading { min-height: 56px; padding: 0; gap: 12px; }
+.khome .home-extension-icon { width: 50px; height: 50px; }
+.khome .home-extension-copy strong { font-family: 'Songti SC', 'SimSun', serif; font-size: 23px; }
+.khome .home-extension-copy span { font-size: 13px; }
+.khome .home-extension-list { display: none; }
+.khome .home-extension-empty { display: none; }
+.khome .compliance { margin: 12px 0 0; padding: 16px 0 110px; color: var(--home-muted); background: transparent; border: 0; }
+
+@media (max-width: 760px) {
+  .khome .k-top { padding: 0 20px; }
+  .khome .k-brand span, .khome .k-clock { display: none; }
+  .khome .k-brand strong { font-size: 18px; }
+  .khome .khome-inner, .khome .home-service-track { width: calc(100% - 32px); }
+  .khome .home-service-catalog { grid-template-columns: 1fr; }
+  .khome .home-reference-panel--wide { grid-column: auto; }
+  .khome .home-reference-primary-list, .khome .home-reference-secondary-list, .khome .home-reference-panel--half .home-reference-secondary-list { grid-template-columns: 1fr; }
+}

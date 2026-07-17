@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   CheckCircleIcon,
@@ -32,6 +32,7 @@ import {
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 interface LocationState {
   file?: PrintFileState
@@ -542,15 +543,13 @@ export function PrintMaterialCheckPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
-      <PageHeader
+    <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPrototypeHeader
         title="打印前材料检查"
-        subtitle="仅用于本次打印前确认；扫描件/图片内容可能通过第三方 OCR 服务识别文字"
-        actions={
-          <Button size="sm" variant="secondary" disabled={isWorking} onClick={() => navigate(uploadPath)}>
-            重新上传
-          </Button>
-        }
+        subtitle="文件体检、A4 规范化与隐私检查"
+        step={2}
+        backLabel="重新上传"
+        onBack={() => navigate(uploadPath)}
       />
 
       <Card className="mt-5 p-4">

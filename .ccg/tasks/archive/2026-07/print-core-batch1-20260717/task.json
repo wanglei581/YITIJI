@@ -1,0 +1,34 @@
+{
+  "id": "print-core-batch1-20260717",
+  "title": "Kiosk 打印核心页面视觉对齐与真实连接",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已归档",
+  "createdAt": "2026-07-17T00:00:00+08:00",
+  "branch": "codex/print-core-batch1-20260717",
+  "scope": {
+    "allowed": [
+      "apps/kiosk/src/pages/home/",
+      "apps/kiosk/src/pages/print/",
+      "apps/kiosk/src/index.css",
+      "docs/progress/current-progress.md",
+      "docs/progress/next-tasks.md"
+    ],
+    "forbidden": [
+      "services/",
+      "packages/",
+      "apps/terminal-agent/",
+      "apps/kiosk/src/routes/",
+      "docs/compliance/",
+      "legacy-miaoda/"
+    ]
+  },
+  "validation": [
+    "pnpm --filter @ai-job-print/kiosk exec tsc --noEmit",
+    "pnpm --filter @ai-job-print/kiosk lint",
+    "pnpm --filter @ai-job-print/kiosk build"
+  ]
+}

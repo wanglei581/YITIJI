@@ -6,6 +6,7 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { getPayStatus } from '../../services/print/paymentApi'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 interface PrintFile {
   name:     string
@@ -45,6 +46,7 @@ export function PrintDonePage() {
   // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
   const [pickupCode, setPickupCode] = useState<string | null>(null)
   const [pickupCodeError, setPickupCodeError] = useState<string | null>(null)
+  const [rating, setRating] = useState<'满意' | '一般' | '不满意' | null>(null)
   useEffect(() => {
     if (!success || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) return
     let cancelled = false
@@ -75,7 +77,15 @@ export function PrintDonePage() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-8">
+    <div className="print-proto flex min-h-full flex-col">
+      <PrintPrototypeHeader
+        title={success ? '打印完成' : '打印失败'}
+        subtitle={success ? '请从出纸口取走文件' : '请检查任务状态后重试'}
+        step={7}
+        backLabel="返回首页"
+        onBack={() => navigate('/')}
+      />
+      <main className="flex flex-1 flex-col items-center justify-center p-8">
       {/* Status icon */}
       <div
         className={[
@@ -163,6 +173,28 @@ export function PrintDonePage() {
         </Card>
       )}
 
+      {success && (
+        <section className="mt-6 w-full max-w-sm" aria-label="服务评价">
+          <p className="mb-3 text-center text-sm font-medium text-neutral-700">本次服务体验如何？</p>
+          <div className="grid grid-cols-3 gap-3">
+            {(['满意', '一般', '不满意'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={rating === item}
+                onClick={() => setRating(item)}
+                className={[
+                  'min-h-[56px] rounded-lg border px-3 text-sm font-semibold',
+                  rating === item ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
+                ].join(' ')}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Actions */}
       <div className="mt-8 flex w-full max-w-sm gap-3">
         {success ? (
@@ -189,6 +221,9 @@ export function PrintDonePage() {
             <Button size="lg" className="flex-1" onClick={() => navigate('/')}>
               返回首页
             </Button>
+            <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/me/print-orders')}>
+              查看订单
+            </Button>
           </>
         ) : (
           <>
@@ -206,6 +241,7 @@ export function PrintDonePage() {
           </>
         )}
       </div>
+      </main>
     </div>
   )
 }
