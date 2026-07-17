@@ -16,47 +16,57 @@
 import { Button, Card } from '@ai-job-print/ui'
 import { useNavigate } from 'react-router-dom'
 import { LockIcon, ShieldCheckIcon } from 'lucide-react'
+import '../prototype/kiosk-prototype.css'
 
 export function FreshmanInsightsPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">校园大数据</h1>
-          <p className="mt-0.5 text-sm text-neutral-500">迎新报到聚合统计</p>
+    <div className="kproto kproto-teal">
+      <div className="kproto-shell">
+        <div className="kproto-pagehead">
+          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
+          <div className="kproto-title">
+            <h1>校园大数据</h1>
+            <p>迎新报到聚合统计 · 暂未开放</p>
+          </div>
+          <div className="kproto-aside"><span className="kproto-chip warn">未开放</span></div>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
-          返回
-        </Button>
+
+        <main className="kproto-content justify-center">
+          <Card className="kproto-card accented flex flex-col items-center justify-center gap-5 px-14 py-14 text-center">
+            <span className="grid h-[120px] w-[120px] place-items-center rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] text-[var(--kp-muted)]">
+              <LockIcon className="h-14 w-14" aria-hidden="true" />
+            </span>
+            <h2 className="font-serif text-[40px] font-black tracking-[2px]">校园大数据暂未开放</h2>
+            <p className="max-w-[720px] text-[22px] leading-relaxed text-[var(--kp-muted)]">
+              该功能需在取得学校书面授权与数据处理协议、且仅接入聚合脱敏统计后才会开放。开放前本终端不展示任何统计数据，也不采集任何个人信息。
+            </p>
+            <Button size="lg" onClick={() => navigate('/smart-campus')}>返回智慧校园</Button>
+          </Card>
+
+          <section className="kproto-card">
+            <div className="kproto-card-head">
+              <span className="kproto-icon"><ShieldCheckIcon aria-hidden="true" /></span>
+              <div><h2>开放前提</h2><div className="sub">三项条件全部满足后，该模块才会解锁</div></div>
+            </div>
+            <div className="grid gap-3">
+              {['学校书面授权', '签署数据处理协议', '仅接入聚合脱敏统计'].map((item, index) => (
+                <div key={item} className="flex min-h-[86px] items-center gap-5 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-4">
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[25px] font-bold text-[var(--kp-accent-deep)]">{index + 1}</span>
+                  <b className="text-[22px]">{item}</b>
+                  <span className="ml-auto rounded-full border border-dashed border-[var(--kp-line)] bg-[var(--kp-surface)] px-4 py-1.5 text-[17px] text-[var(--kp-muted)]">待完成</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="kproto-auth">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>合规边界：校园大数据若上线，仅展示聚合统计，绝不含任何个人身份信息，也不在本终端采集任何个人信息。</p>
+          </div>
+        </main>
       </div>
-
-      <Card className="flex flex-col items-center justify-center gap-4 p-10 text-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
-          <LockIcon className="h-8 w-8 text-neutral-400" aria-hidden="true" />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-neutral-900">校园大数据暂未开放</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-neutral-500">
-            该功能需在取得学校书面授权与数据处理协议、且仅接入聚合脱敏统计后才会开放。
-            开放前本终端不展示任何统计数据，也不采集任何个人信息。
-          </p>
-        </div>
-        <Button size="lg" onClick={() => navigate('/smart-campus')}>
-          返回智慧校园
-        </Button>
-      </Card>
-
-      <div className="mt-5 flex items-start gap-2 rounded-xl border border-plum-soft bg-plum-soft/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-plum" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-plum">
-          合规边界：校园大数据若上线，仅展示<span className="font-semibold">聚合统计</span>，绝不含任何个人身份信息，
-          也不在本终端采集任何个人信息。
-        </p>
-      </div>
-
-      <div className="h-2" />
     </div>
   )
 }

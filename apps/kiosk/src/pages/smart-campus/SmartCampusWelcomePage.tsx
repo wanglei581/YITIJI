@@ -6,7 +6,6 @@
 // 学生身份 / 报到信息；报到登记一律引导至学校官方系统。
 // ============================================================
 
-import { Button, Card } from '@ai-job-print/ui'
 import { useNavigate } from 'react-router-dom'
 import {
   ChevronRightIcon,
@@ -18,6 +17,7 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
+import '../prototype/kiosk-prototype.css'
 
 const FLOW_STEPS = [
   { title: '线上预报到', sub: '前往学校迎新官网 / 公众号完成信息确认' },
@@ -50,90 +50,91 @@ export function SmartCampusWelcomePage() {
   const navigate = useNavigate()
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">迎新系统</h1>
-          <p className="mt-0.5 text-sm text-neutral-500">报到指引与入学准备</p>
+    <div className="kproto kproto-teal">
+      <div className="kproto-shell">
+        <div className="kproto-pagehead">
+          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
+          <div className="kproto-title">
+            <h1>迎新系统</h1>
+            <p>报到指引与入学准备 · 校方官方信息入口</p>
+          </div>
+          <div className="kproto-aside"><span className="kproto-badge">校方官方指引</span></div>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
-          返回
-        </Button>
-      </div>
 
-      {/* 合规来源条 */}
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-success-bg bg-success-bg/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-success-fg">
-          校方官方信息入口，仅展示与指引，<span className="font-semibold">不在本终端采集任何个人信息</span>；
-          报到登记请前往学校官方系统办理。
-        </p>
-      </div>
+        <main className="kproto-content">
+          <div className="kproto-auth">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；报到登记请前往学校官方系统办理。</p>
+          </div>
 
-      {/* 报到流程 */}
-      <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-neutral-700">报到流程</p>
-        <ol className="space-y-3">
-          {FLOW_STEPS.map((step, i) => (
-            <li key={step.title} className="flex gap-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-plum-soft text-sm font-bold text-plum">
-                {i + 1}
-              </span>
-              <div>
-                <p className="text-sm font-medium text-neutral-900">{step.title}</p>
-                <p className="mt-0.5 text-xs text-neutral-500">{step.sub}</p>
+          <div className="kproto-grid-2">
+            <section className="kproto-card accented">
+              <div className="kproto-card-head">
+                <span className="kproto-icon"><FileTextIcon aria-hidden="true" /></span>
+                <div><h2>报到流程</h2><div className="sub">四步完成入学报到</div></div>
               </div>
-            </li>
-          ))}
-        </ol>
-      </Card>
+              <ol className="grid gap-0">
+                {FLOW_STEPS.map((step, i) => (
+                  <li key={step.title} className="flex items-start gap-5">
+                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[26px] font-bold text-[var(--kp-accent-deep)]">
+                      {i + 1}
+                    </span>
+                    <div className="pb-6">
+                      <b className="block pt-1 text-2xl">{step.title}</b>
+                      <span className="mt-1.5 block text-lg leading-normal text-[var(--kp-muted)]">{step.sub}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
 
-      {/* 办事窗口 */}
-      <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-neutral-700">办事窗口</p>
-        <div className="grid grid-cols-2 gap-2">
-          {SERVICE_WINDOWS.map((w) => (
-            <div key={w.name} className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2">
-              <MapPinIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-              <div>
-                <p className="text-sm text-neutral-800">{w.name}</p>
-                <p className="text-[11px] text-neutral-400">{w.loc}</p>
+            <section className="kproto-card">
+              <div className="kproto-card-head">
+                <span className="kproto-icon"><SparklesIcon aria-hidden="true" /></span>
+                <div><h2>入学 &amp; 求职准备</h2><div className="sub">本机即可办理</div></div>
               </div>
+              <div className="grid gap-3">
+                {PREP_ENTRIES.map((entry) => {
+                  const Icon = entry.icon
+                  return (
+                    <button key={entry.label} type="button" className="kproto-tile primary" onClick={() => navigate(entry.to)}>
+                      <span className="tile-icon"><Icon aria-hidden="true" /></span>
+                      <span><b>{entry.label}</b><span>从本机继续办理</span></span>
+                      <ChevronRightIcon className="ml-auto h-6 w-6" aria-hidden="true" />
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          </div>
+
+          <section className="kproto-card">
+            <div className="kproto-card-head">
+              <span className="kproto-icon"><MapPinIcon aria-hidden="true" /></span>
+              <div><h2>办事窗口</h2><div className="sub">现场办理与咨询点位</div></div>
             </div>
-          ))}
-        </div>
-      </Card>
+            <div className="kproto-grid-2">
+              {SERVICE_WINDOWS.map((w) => (
+                <div key={w.name} className="flex min-h-[86px] items-center gap-4 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-4">
+                  <MapPinIcon className="h-7 w-7 text-[var(--kp-muted)]" aria-hidden="true" />
+                  <div><b className="block text-[21px]">{w.name}</b><span className="text-[17px] text-[var(--kp-muted)]">{w.loc}</span></div>
+                </div>
+              ))}
+            </div>
+          </section>
 
-      {/* 入学 & 求职准备：导回求职打印主业 */}
-      <Card className="mb-2 border-primary-200 bg-primary-50/40 p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <SparklesIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-          <p className="text-sm font-semibold text-primary-700">入学 & 求职准备（本机即可办）</p>
-        </div>
-        <div className="space-y-2">
-          {PREP_ENTRIES.map((entry) => {
-            const Icon = entry.icon
-            return (
-              <button
-                key={entry.label}
-                type="button"
-                onClick={() => navigate(entry.to)}
-                className="flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-primary-200 active:bg-primary-50"
-              >
-                <Icon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-                <span className="flex-1 text-sm font-medium text-neutral-800">{entry.label}</span>
-                <ChevronRightIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-              </button>
-            )
-          })}
-        </div>
-      </Card>
+          <div className="kproto-notice mt-auto">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>报到登记、缴费等请以学校官方系统为准；本终端仅提供信息指引与求职打印服务。</p>
+          </div>
 
-      <p className="px-1 pt-1 text-[11px] text-neutral-400">
-        报到登记、缴费等请以学校官方系统为准；本终端仅提供信息指引与求职打印服务。
-      </p>
-
-      <div className="h-2" />
+          <div className="kproto-actionbar">
+            <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
+            <div className="kproto-spacer" />
+            <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/service/campus-card')}>校园卡办理指引</button>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

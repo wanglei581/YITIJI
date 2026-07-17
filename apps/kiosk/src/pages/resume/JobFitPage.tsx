@@ -1,5 +1,5 @@
 // ============================================================
-// 2D 目标岗位定向优化 + 岗位匹配度参考。
+// 2D 目标岗位定向优化 + 岗位匹配参考。
 //
 // 入口：诊断报告页（携带 taskId/accessToken）。流程：选择系统内已发布岗位
 // （搜索选择）或手填目标岗位 → 真实分析 → 参考等级 + 匹配点（含原文依据）+
@@ -291,7 +291,7 @@ export function JobFitPage() {
       <div className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-header">
           <PageHeader
-            title="岗位匹配度参考"
+            title="岗位匹配参考"
             subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
             actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
           />
@@ -386,8 +386,8 @@ export function JobFitPage() {
       )}
       <div className="job-fit-header">
         <PageHeader
-          title="岗位匹配度参考"
-          subtitle="选择目标岗位，基于你的简历生成定向参考与优化建议"
+          title="岗位匹配参考"
+          subtitle="选择目标岗位，基于本人简历生成定向参考与优化建议"
           actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
         />
       </div>
