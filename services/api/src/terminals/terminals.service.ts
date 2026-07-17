@@ -43,6 +43,9 @@ import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-
 type TaskStatus = 'pending' | 'claimed' | 'printing' | 'completed' | 'failed' | 'cancelled'
 
 const TERMINAL_STATES: TaskStatus[] = ['completed', 'failed', 'cancelled']
+const REFUND_PAY_STATUSES = ['refunding', 'partial_refunded', 'refunded']
+
+class PrintTaskClaimRaceError extends Error {}
 
 const VALID_TRANSITIONS: Record<string, TaskStatus[]> = {
   claimed: ['printing', 'failed'],
@@ -699,42 +702,59 @@ export class TerminalsService implements OnModuleInit {
     const results: ClaimTaskResponse[] = []
 
     // C5-3 出纸门控：开启时只领取「已 paid 或无关联 Order」的 pending 任务；付费未支付单不出纸。
-    // 只读 payStatus，不改 PrintTask.status（与支付域解耦）。默认关闭 → 行为与 C5-3 前一致。
+    // 默认关闭时保留未支付历史单可领取的既有行为，但退款态订单始终不可领取。
     const paidGate = requirePaidBeforeClaim()
     const claimableWhere = paidGate
       ? {
           status: 'pending' as const,
           terminalId,
-          OR: [{ order: { is: null } }, { order: { is: { payStatus: 'paid' } } }],
+          OR: [{ order: { is: null } }, { order: { is: { payStatus: 'paid', taskStatus: 'pending' } } }],
         }
-      : { status: 'pending' as const, terminalId }
+      : {
+          status: 'pending' as const,
+          terminalId,
+          OR: [
+            { order: { is: null } },
+            { order: { is: { payStatus: { notIn: REFUND_PAY_STATUSES }, taskStatus: 'pending' } } },
+          ],
+        }
 
     // Atomic claim: find first pending task and claim it in a transaction
     for (let i = 0; i < limit; i++) {
-      const claimed = await this.prisma.$transaction(async (tx) => {
-        const task = await tx.printTask.findFirst({
-          where: claimableWhere,
-          orderBy: { createdAt: 'asc' },
-        })
-        if (!task) return null
+      let claimed
+      try {
+        claimed = await this.prisma.$transaction(async (tx) => {
+          const task = await tx.printTask.findFirst({
+            where: claimableWhere,
+            orderBy: { createdAt: 'asc' },
+          })
+          if (!task) return null
 
-        // status guard in WHERE prevents double-claim under concurrent requests
-        // (PostgreSQL READ COMMITTED: two transactions could both see the same
-        // pending task in findFirst; the guard ensures only one update wins)
-        const updatedTask = await tx.printTask.update({
-          where: { id: task.id, status: 'pending', terminalId },
-          data: {
-            status: 'claimed',
-            claimedAt: new Date(),
-            claimExpiry,
-          },
+          const order = await tx.order.findFirst({ where: { printTaskId: task.id }, select: { id: true } })
+          if (order) {
+            const claimedOrder = await tx.order.updateMany({
+              where: paidGate
+                ? { id: order.id, taskStatus: 'pending', payStatus: 'paid' }
+                : { id: order.id, taskStatus: 'pending', payStatus: { notIn: REFUND_PAY_STATUSES } },
+              data: { taskStatus: 'claimed', terminalId },
+            })
+            if (claimedOrder.count !== 1) return null
+          }
+
+          // Order 先作为状态序列点 CAS 成功后，才 CAS PrintTask。若后者竞态失败，
+          // 抛出哨兵让事务回滚 Order 更新，并把本轮 claim 如实返回为空。
+          const claimedAt = new Date()
+          const claimedTask = await tx.printTask.updateMany({
+            where: { id: task.id, status: 'pending', terminalId },
+            data: { status: 'claimed', claimedAt, claimExpiry },
+          })
+          if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()
+          return tx.printTask.findUnique({ where: { id: task.id } })
         })
-        await tx.order.updateMany({
-          where: { printTaskId: task.id },
-          data: { taskStatus: 'claimed', terminalId },
-        })
-        return updatedTask
-      })
+      } catch (error) {
+        if (error instanceof PrintTaskClaimRaceError) claimed = null
+        else throw error
+      }
 
       if (!claimed) break
 

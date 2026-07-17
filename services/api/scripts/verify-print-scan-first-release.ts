@@ -167,23 +167,30 @@ function main(): void {
   )
 
   const claimBlock = section(terminalsService, 'async claimTasks', '// ── 4. Patch task status')
-  // 注：C5-3 起 findFirst 的 where 抽成 claimableWhere（叠加出纸门控），但仍按 terminalId + pending 收窄；
-  // update 守卫（含 id + status + terminalId）保持不变，双重防越取仍在。
   mustContain(
     claimBlock,
     [
       'where: claimableWhere',
-      "{ status: 'pending' as const, terminalId }",
-      "where: { id: task.id, status: 'pending', terminalId }",
+      "status: 'pending' as const",
+      'terminalId,',
+      "payStatus: 'paid', taskStatus: 'pending'",
+      "payStatus: { notIn: REFUND_PAY_STATUSES }, taskStatus: 'pending'",
     ],
-    'claim must filter pending tasks by terminalId',
+    'claim must keep terminalId + pending filters and distinguish paid gate from refund-state guard',
   )
-  // C5-3 出纸门控：门控开启时只领取「已 paid 或无 Order」的 pending 任务（付费未支付单不出纸）。
   mustContain(
     claimBlock,
-    ['requirePaidBeforeClaim()', "order: { is: { payStatus: 'paid' } }", 'order: { is: null }'],
-    'C5-3 出纸门控：claim 开启时仅领取已 paid 或无 Order 的 pending 任务',
+    [
+      'requirePaidBeforeClaim()',
+      'const claimedOrder = await tx.order.updateMany',
+      "data: { taskStatus: 'claimed', terminalId }",
+      'const claimedTask = await tx.printTask.updateMany',
+      'if (claimedTask.count !== 1) throw new PrintTaskClaimRaceError()',
+      'if (error instanceof PrintTaskClaimRaceError) claimed = null',
+    ],
+    'claim must CAS Order pending→claimed before PrintTask and roll back a PrintTask race',
   )
+  mustContain(terminalsService, ['class PrintTaskClaimRaceError extends Error {}'], 'claim race must use a rollback sentinel')
   mustContain(
     claimBlock,
     ['canTerminalClaimTasks(terminalId)', 'return []'],

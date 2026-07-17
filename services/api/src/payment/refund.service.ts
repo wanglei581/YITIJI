@@ -43,6 +43,7 @@ const REAL_REFUND_CHANNELS = new Set(['wechat', 'alipay'])
 const REFUNDABLE_SOURCES = new Set(['sandbox', 'wechat', 'alipay', 'offline', 'manual_confirmed', 'free', 'voucher'])
 /** 已退款/退款中态：拒绝重复退款（不同 refundNo 也拒，靠订单态兜底）。 */
 const ALREADY_REFUND_STATES = new Set(['refunding', 'refunded', 'partial_refunded'])
+const ACTIVE_PRINT_TASK_STATES = new Set(['claimed', 'printing'])
 
 export interface RefundResultView {
   refund: {
@@ -276,7 +277,11 @@ export class RefundService {
     try {
       const staged = await this.prisma.$transaction(async (tx) => {
         const cas = await tx.order.updateMany({
-          where: { id: orderId, payStatus: 'paid' },
+          where: {
+            id: orderId,
+            payStatus: 'paid',
+            taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] },
+          },
           data: { payStatus: 'refunding' },
         })
         if (cas.count === 0) {
@@ -285,6 +290,9 @@ export class RefundService {
           const raced = await tx.refund.findUnique({ where: { refundNo } })
           if (raced) return { record: raced, raced: true as const }
           const fresh = await tx.order.findUnique({ where: { id: orderId } })
+          if (fresh && ACTIVE_PRINT_TASK_STATES.has(fresh.taskStatus)) {
+            throw new BadRequestException('ORDER_TASK_IN_PROGRESS')
+          }
           if (fresh && ALREADY_REFUND_STATES.has(fresh.payStatus)) throw new BadRequestException('ORDER_ALREADY_REFUNDED')
           throw new BadRequestException('ORDER_INVALID_TRANSITION')
         }
@@ -580,10 +588,20 @@ export class RefundService {
     // CAS：订单 paid→refunding + 记录 failed→pending，同事务；任一未命中即并发竞态，放弃本次重试。
     const reopened = await this.prisma.$transaction(async (tx) => {
       const casOrder = await tx.order.updateMany({
-        where: { id: refund.orderId, payStatus: 'paid' },
+        where: {
+          id: refund.orderId,
+          payStatus: 'paid',
+          taskStatus: { notIn: [...ACTIVE_PRINT_TASK_STATES] },
+        },
         data: { payStatus: 'refunding' },
       })
-      if (casOrder.count === 0) return false
+      if (casOrder.count === 0) {
+        const fresh = await tx.order.findUnique({ where: { id: refund.orderId } })
+        if (fresh && ACTIVE_PRINT_TASK_STATES.has(fresh.taskStatus)) {
+          throw new BadRequestException('ORDER_TASK_IN_PROGRESS')
+        }
+        return false
+      }
       const casRefund = await tx.refund.updateMany({
         where: { id: refund.id, status: 'failed' },
         data: { status: 'pending' },

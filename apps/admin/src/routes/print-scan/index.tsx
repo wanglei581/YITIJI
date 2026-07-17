@@ -174,22 +174,28 @@ function TaskCenter() {
   const implemented = TASK_TYPE_TABS.find((t) => t.value === taskType)?.implemented ?? false
 
   // 请求序号防竞态：快速切换类型/筛选时，旧的慢响应不得覆盖新状态。
+  const queryKey = [taskType, status, String(page)].join('\u0000')
+  const queryKeyRef = useRef(queryKey)
+  queryKeyRef.current = queryKey
   const loadSeq = useRef(0)
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<'success' | 'failed' | 'stale'> => {
+    const requestQueryKey = queryKey
     const seq = ++loadSeq.current
     setLoading(true)
     setError(null)
     try {
       const result = await adminPrintScanService.listTasks({ type: taskType, status: status || undefined, page, pageSize: 20 })
-      if (seq !== loadSeq.current) return
+      if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
       setData(result)
+      return 'success'
     } catch (e) {
-      if (seq !== loadSeq.current) return
+      if (seq !== loadSeq.current || queryKeyRef.current !== requestQueryKey) return 'stale'
       setError(e instanceof Error ? e.message : '加载失败')
+      return 'failed'
     } finally {
       if (seq === loadSeq.current) setLoading(false)
     }
-  }, [taskType, status, page])
+  }, [taskType, status, page, queryKey])
 
   useEffect(() => {
     void load()
@@ -213,21 +219,32 @@ function TaskCenter() {
     if (!detail || actionBusy) return
     const confirmText = action === 'retry' ? '确认将该失败任务重新排队打印？' : '确认取消该等待中的扫描任务？'
     if (!window.confirm(confirmText)) return
+    const actionQueryKey = queryKeyRef.current
     setActionBusy(true)
     setActionError(null)
     try {
       await adminPrintScanService.applyTaskAction(detail.type, detail.taskId, action)
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : '操作失败')
+      if (actionQueryKey === queryKeyRef.current) {
+        setActionError(e instanceof Error ? e.message : '操作失败')
+      }
       setActionBusy(false)
       return
     }
-    // 动作已在服务端执行成功；刷新失败必须与"操作失败"区分，避免管理员重复操作。
+    // 动作已在服务端执行成功；仅仍处在原查询条件时才刷新。stale 表示用户已切换筛选，
+    // 不应以旧闭包覆盖新列表，也不应误报刷新失败。
     try {
-      setDetail(await adminPrintScanService.getTaskDetail(detail.type, detail.taskId))
-      await load()
+      const refreshedDetail = await adminPrintScanService.getTaskDetail(detail.type, detail.taskId)
+      if (actionQueryKey !== queryKeyRef.current) return
+      setDetail(refreshedDetail)
+      const refreshResult = await load()
+      if (refreshResult === 'failed') {
+        setActionError('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
+      }
     } catch {
-      setActionError('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
+      if (actionQueryKey === queryKeyRef.current) {
+        setActionError('操作已执行成功，但页面刷新失败，请手动刷新查看最新状态')
+      }
     } finally {
       setActionBusy(false)
     }
@@ -471,6 +488,9 @@ function CapabilityCenter() {
   const [error, setError] = useState<string | null>(null)
   const [savingKey, setSavingKey] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const terminalIdRef = useRef(terminalId)
+  const saveSeq = useRef(0)
+  terminalIdRef.current = terminalId
 
   useEffect(() => {
     void (async () => {
@@ -506,22 +526,48 @@ function CapabilityCenter() {
   }, [])
 
   useEffect(() => {
+    // 终端切换使 A 的所有保存回包失效，并清掉 A 的保存中/错误 UI。
+    saveSeq.current += 1
+    setSavingKey(null)
+    setSaveError(null)
     if (terminalId) void loadCapabilities(terminalId)
   }, [terminalId, loadCapabilities])
 
   const selected = useMemo(() => terminals.find((t) => t.id === terminalId) ?? null, [terminals, terminalId])
 
+  const switchTerminal = (nextTerminalId: string) => {
+    if (nextTerminalId === terminalId) return
+    // 同一事件帧内先清掉 A 的 UI；effect 仍作为异步回包的二道防线。
+    saveSeq.current += 1
+    capSeq.current += 1
+    terminalIdRef.current = nextTerminalId
+    setSavingKey(null)
+    setSaveError(null)
+    setCapabilities(null)
+    setLoading(true)
+    setTerminalId(nextTerminalId)
+  }
+
   const save = async (key: PrintScanCapabilityKey, status: PrintScanCapabilityStatus, note: string) => {
     if (!terminalId || savingKey) return
+    const requestedTerminalId = terminalId
+    const requestSeq = ++saveSeq.current
+    const isCurrentSaveRequest = () =>
+      saveSeq.current === requestSeq && terminalIdRef.current === requestedTerminalId
     setSavingKey(key)
     setSaveError(null)
     try {
-      const res = await adminPrintScanService.updateCapability(terminalId, key, { status, note: note || undefined })
+      const res = await adminPrintScanService.updateCapability(requestedTerminalId, key, { status, note: note || undefined })
+      if (!isCurrentSaveRequest()) return
       setCapabilities((prev) => prev?.map((c) => (c.capabilityKey === key ? res.capability : c)) ?? null)
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : '保存失败')
+      if (isCurrentSaveRequest()) {
+        setSaveError(e instanceof Error ? e.message : '保存失败')
+      }
     } finally {
-      setSavingKey(null)
+      if (isCurrentSaveRequest()) {
+        setSavingKey(null)
+      }
     }
   }
 
@@ -535,7 +581,7 @@ function CapabilityCenter() {
       <div className="flex flex-wrap items-center gap-3">
         <select
           value={terminalId}
-          onChange={(e) => setTerminalId(e.target.value)}
+          onChange={(e) => switchTerminal(e.target.value)}
           className="h-9 rounded-lg border border-neutral-900/15 bg-surface px-3 text-[13px] font-bold text-neutral-800"
         >
           {terminals.map((t) => (
