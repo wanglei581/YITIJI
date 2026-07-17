@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>招聘会 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 14px; }
+  .toolrow { display: flex; gap: 14px; align-items: stretch; }
+  .searchbox {
+    flex: 1; display: flex; align-items: center; gap: 14px;
+    min-height: 68px; padding: 0 24px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    color: #7d8880; font-size: 22px;
+  }
+  .searchbox svg { width: 26px; height: 26px; flex: none; }
+  .toolrow .f-chip svg { width: 22px; height: 22px; margin-right: 10px; }
+  .steps { padding: 0; }
+  .count-line { display: flex; align-items: baseline; gap: 16px; font-size: 20px; color: var(--muted); }
+  .count-line b { color: var(--wheat-deep); font-size: 24px; font-variant-numeric: tabular-nums; }
+  .fair-list { display: flex; flex-direction: column; gap: 11px; flex: none; }
+  .fair-list .row-item { padding: 13px 26px; border-left: 5px solid var(--wheat); min-height: 112px; align-items: flex-start; }
+  .fair-list .row-item.past { opacity: .6; border-left-color: var(--line); }
+  .r-title { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .r-title b { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  .kind { flex: none; font-size: 17px; font-weight: 600; color: var(--wheat-deep); background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); padding: 4px 13px; border-radius: 999px; }
+  .kind.new { color: var(--teal-deep); background: var(--teal-soft); border-color: rgba(31,158,134,.3); }
+  .r-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin-top: 6px; font-size: 19px; color: var(--muted); }
+  .r-info span { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+  .r-info svg { width: 18px; height: 18px; flex: none; opacity: .7; }
+  .row-item .r-sub { margin-top: 7px; gap: 8px 10px; }
+  .row-item .r-sub .chip { font-size: 16px; padding: 3px 10px; }
+  .r-aside { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .qr-go { min-height: 56px; padding: 0 16px; font-size: 19px; white-space: nowrap; gap: 8px; }
+  .qr-go svg { width: 22px; height: 22px; }
+  .r-aside .nums { font-size: 20px; font-weight: 700; color: var(--wheat-deep); font-variant-numeric: tabular-nums; }
+  .r-aside .k { font-size: 15px; color: var(--muted); }
+  .star { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--paper); border: 1px solid var(--line); color: var(--muted); }
+  .star.on { background: var(--wheat-soft); border-color: rgba(169,120,31,.4); color: var(--wheat-deep); }
+  .star svg { width: 26px; height: 26px; }
+  .star.on svg { fill: currentColor; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>招聘会</h1>
+      <p>来源:第三方平台 · 官方机构,预约请前往来源平台</p>
+    </div>
+    <div class="aside">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>
+        每日同步更新
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="toolrow">
+      <div class="searchbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        搜索招聘会、企业、地点
+      </div>
+      <button class="f-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>全市 · 不限区县</button>
+      <button class="f-chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>按日期</button>
+    </div>
+
+    <div class="filter-bar">
+      <button class="f-chip on">全部</button>
+      <button class="f-chip">即将开始</button>
+      <button class="f-chip">进行中</button>
+      <button class="f-chip">已结束</button>
+      <button class="f-chip"><svg style="width:20px;height:20px;margin-right:8px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg>只看收藏 · 2</button>
+    </div>
+
+    <div class="steps">
+      <div class="step done"><span class="s-dot">1</span><span class="s-label">选地区</span></div>
+      <div class="step-line done"></div>
+      <div class="step active"><span class="s-dot">2</span><span class="s-label">浏览列表</span></div>
+      <div class="step-line"></div>
+      <div class="step"><span class="s-dot">3</span><span class="s-label">扫码预约</span></div>
+    </div>
+
+    <div class="count-line">共 <b>6</b> 场招聘会 <span>· 即将开始 4 场 · 进行中 1 场</span></div>
+
+    <div class="fair-list">
+
+      <div class="row-item">
+        <div class="r-main">
+          <div class="r-title"><b>2026年夏季高校毕业生招聘会</b><span class="kind">校园双选会</span><span class="kind new">NEW</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-20 09:00-16:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>市人才市场1F</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>120 家企业 · 860 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 市就业服务中心</span><span class="chip">同步 <b>今天 08:30</b></span><span class="chip">外部ID <b>FAIR-2071</b></span><span class="chip warn">即将开始</span></div>
+        </div>
+        <div class="r-aside"><span class="star on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg></span><button class="btn sm ghost qr-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <div class="r-main">
+          <div class="r-title"><b>现代服务业社会专场招聘会</b><span class="kind">综合招聘会</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-17 09:00-16:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>市人才市场2F</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>72 家企业 · 380 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 云梦人才网</span><span class="chip">同步 <b>今天 08:30</b></span><span class="chip">外部ID <b>FAIR-2066</b></span><span class="chip ok">进行中</span></div>
+        </div>
+        <div class="r-aside"><span class="star"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg></span><button class="btn sm ghost qr-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <div class="r-main">
+          <div class="r-title"><b>先进制造业专场招聘会</b><span class="kind">行业专场</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-22 09:30-15:30</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>高新区会展中心B馆</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>65 家企业 · 420 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 市就业服务中心</span><span class="chip">同步 <b>今天 08:30</b></span><span class="chip">外部ID <b>FAIR-2073</b></span><span class="chip warn">即将开始</span></div>
+        </div>
+        <div class="r-aside"><span class="star"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg></span><button class="btn sm ghost qr-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <div class="r-main">
+          <div class="r-title"><b>青云职业技术学院2026届毕业生校园双选会</b><span class="kind">校园双选会</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-24 13:00-17:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>青云职业技术学院体育馆</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>48 家企业 · 310 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 青云职业技术学院就业处</span><span class="chip">同步 <b>今天 08:10</b></span><span class="chip">外部ID <b>FAIR-2075</b></span><span class="chip warn">即将开始</span></div>
+        </div>
+        <div class="r-aside"><span class="star on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg></span><button class="btn sm ghost qr-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <div class="r-main">
+          <div class="r-title"><b>校企合作产教融合专场</b><span class="kind">校企合作专场</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-26 09:00-15:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>市大学生就业中心一号馆</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>40 家企业 · 260 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 市大学生就业中心</span><span class="chip">同步 <b>今天 08:30</b></span><span class="chip">外部ID <b>FAIR-2078</b></span><span class="chip warn">即将开始</span></div>
+        </div>
+        <div class="r-aside"><span class="star"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.7 5.6 6.3.9-4.5 4.4 1 6.1-5.5-2.9-5.5 2.9 1-6.1L3 9.5l6.3-.9z"/></svg></span><button class="btn sm ghost qr-go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item past">
+        <div class="r-main">
+          <div class="r-title"><b>数字经济人才专场招聘会</b><span class="kind">行业专场</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>07-12 09:00-16:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>高新区会展中心A馆</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>58 家企业 · 340 个岗位</span>
+          </div>
+          <div class="r-sub"><span class="chip src">来源 · 云梦人才网</span><span class="chip">同步 <b>07-12</b></span><span class="chip">外部ID <b>FAIR-2052</b></span><span class="chip">已结束</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本系统仅展示第三方来源招聘会信息,不参与报名流程,预约请前往来源平台。
+    </div>
+
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI面试训练 · 面试技巧</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 16px; }
+  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cols .col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .cols .card { padding: 22px 24px; }
+  .cols h2 { font-size: 26px; }
+  .cols .card-head { margin-bottom: 14px; }
+  /* 准备清单(可勾选) */
+  .ck-prog { height: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
+  .ck-prog i { display: block; height: 100%; width: 33%; background: var(--plum); border-radius: 999px; }
+  .ck { display: flex; flex-direction: column; gap: 9px; }
+  .ck button {
+    display: flex; gap: 12px; align-items: flex-start; text-align: left; cursor: pointer;
+    min-height: 60px; padding: 10px 14px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+    font-family: var(--sans); color: var(--ink);
+  }
+  .ck .box {
+    width: 26px; height: 26px; flex: none; margin-top: 2px; border-radius: 7px;
+    border: 2px solid var(--line); background: var(--surface);
+    display: grid; place-items: center; color: #fffdf8;
+  }
+  .ck .box svg { width: 16px; height: 16px; }
+  .ck b { display: block; font-size: 18px; font-weight: 700; }
+  .ck span.d { display: block; font-size: 14.5px; color: var(--muted); line-height: 1.4; margin-top: 3px; }
+  .ck button.done { background: var(--plum-soft); border-color: rgba(122,90,134,.35); }
+  .ck button.done .box { background: var(--plum); border-color: var(--plum); }
+  .ck button.done b { color: var(--plum-deep); }
+  .ck-count { margin-left: auto; font-size: 16px; color: var(--muted); }
+  /* 高频问题(手风琴) */
+  .faq { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .faq + .faq { margin-top: 9px; }
+  .faq .q {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    min-height: 58px; padding: 10px 16px; cursor: pointer;
+    background: var(--surface); font-size: 18.5px; font-weight: 700;
+  }
+  .faq .q svg { width: 20px; height: 20px; color: var(--muted); flex: none; }
+  .faq .a { border-top: 1px solid var(--line); background: var(--paper); padding: 12px 16px; display: flex; flex-direction: column; gap: 7px; }
+  .faq .a p { font-size: 15.5px; line-height: 1.5; color: var(--muted); }
+  .faq .a p b { color: var(--ink); font-weight: 600; }
+  .faq .a p b.warn { color: var(--clay-deep); }
+  .faq .a p b.tip { color: var(--plum-deep); }
+  /* STAR */
+  .star { display: flex; flex-direction: column; gap: 9px; }
+  .star .s-row { display: flex; gap: 14px; align-items: flex-start; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+  .star .s-key {
+    width: 40px; height: 40px; flex: none; border-radius: 10px;
+    display: grid; place-items: center; font-size: 20px; font-weight: 800;
+    background: var(--plum); color: #fffdf8;
+  }
+  .star b { display: block; font-size: 17.5px; font-weight: 700; }
+  .star span { display: block; font-size: 14.5px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
+  /* 自我介绍结构 */
+  .intro-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .intro { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .intro b { display: block; font-size: 18px; font-weight: 800; color: var(--plum-deep); margin-bottom: 8px; }
+  .intro li { list-style: none; display: flex; gap: 7px; font-size: 14.5px; color: var(--muted); line-height: 1.45; margin-top: 5px; }
+  .intro li i { font-style: normal; font-weight: 700; color: var(--ink); flex: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>面试技巧</h1>
+      <p>面试前准备工具:清单逐项过一遍,再开始模拟练习(通用建议,仅供参考)</p>
+    </div>
+  </div>
+
+  <main class="content">
+    <div class="cols">
+
+      <!-- 左列:准备清单 + STAR -->
+      <div class="col">
+        <section class="card accented a-plum" style="flex:none">
+          <div class="card-head">
+            <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5H6a1 1 0 00-1 1v14a1 1 0 001 1h12a1 1 0 001-1V6a1 1 0 00-1-1h-3"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M8.5 12l2 2 4-4"/></svg></span>
+            <div><h2>面试前准备清单</h2><div class="sub">点击逐项确认</div></div>
+            <span class="ck-count">2/6 已完成</span>
+          </div>
+          <div class="ck-prog"><i></i></div>
+          <div class="ck">
+            <button class="done"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></span><span><b>背景调研</b><span class="d">了解公司核心业务、近期动态、企业文化,并在面试中自然表达出来</span></span></button>
+            <button class="done"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12l5 5 9-10"/></svg></span><span><b>岗位匹配</b><span class="d">提取岗位职责描述中的关键词,对应准备你的经历故事</span></span></button>
+            <button><span class="box"></span><span><b>基础演练</b><span class="d">准备 1 分钟 / 3 分钟自我介绍,回顾简历上每段经历的细节</span></span></button>
+            <button><span class="box"></span><span><b>形象着装</b><span class="d">根据公司性质选择合适着装,保持整洁精神</span></span></button>
+            <button><span class="box"></span><span><b>面试材料</b><span class="d">简历、作品集、证件按需备齐(可在本终端打印简历)</span></span></button>
+            <button><span class="box"></span><span><b>面试安排</b><span class="d">确认时间、地点、交通路线;线上面试提前测试设备与网络</span></span></button>
+          </div>
+        </section>
+
+        <section class="card a-plum" style="flex:1">
+          <div class="card-head">
+            <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l2.6 6.6L21 9.2l-5 4.3 1.6 6.5L12 16.8 6.4 20l1.6-6.5-5-4.3 6.4-.6z"/></svg></span>
+            <div><h2>行为面试技巧(STAR)</h2><div class="sub">讲经历时四步说清,比泛泛而谈更有说服力</div></div>
+          </div>
+          <div class="star">
+            <div class="s-row"><span class="s-key">S</span><div><b>情境 Situation</b><span>简述事件背景,遇到了什么问题或挑战。</span></div></div>
+            <div class="s-row"><span class="s-key">T</span><div><b>任务 Task</b><span>明确你需要完成的目标或承担的角色。</span></div></div>
+            <div class="s-row"><span class="s-key">A</span><div><b>行动 Action</b><span>详述你采取的具体行动步骤,重点突出「你」做了什么。</span></div></div>
+            <div class="s-row"><span class="s-key">R</span><div><b>结果 Result</b><span>说明成果,尽量量化:提升比例、缩短周期、服务人数等。</span></div></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右列:高频问题 + 自我介绍结构 -->
+      <div class="col">
+        <section class="card accented a-plum" style="flex:1">
+          <div class="card-head">
+            <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9.8 9.5a2.3 2.3 0 114 1.6c-.7.7-1.8 1.1-1.8 2.4M12 16.5v.5"/></svg></span>
+            <div><h2>高频问题应对</h2><div class="sub">点击展开查看回答思路(精选 5 问)</div></div>
+          </div>
+          <div class="faq">
+            <div class="q">「请简单自我介绍一下?」<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 15l6-6 6 6"/></svg></div>
+            <div class="a">
+              <p><b>考察什么:</b>表达能力、重点提炼能力、与岗位的初步匹配度。</p>
+              <p><b>回答结构:</b>控制在 2-3 分钟:我是谁 + 我做过什么(核心成绩)+ 我为什么适合这个岗位。</p>
+              <p><b class="warn">常见错误:</b>背诵简历逐条复述;讲到童年成长经历;超过 5 分钟。</p>
+              <p><b class="tip">建议:</b>结尾落到「所以我希望在这个岗位上…」,把话题引向岗位。</p>
+            </div>
+          </div>
+          <div class="faq"><div class="q">「你为什么想应聘这个岗位?」<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9l6 6 6-6"/></svg></div></div>
+          <div class="faq"><div class="q">「你最大的优势 / 不足是什么?」<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9l6 6 6-6"/></svg></div></div>
+          <div class="faq"><div class="q">「你对薪资有什么期待?」<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9l6 6 6-6"/></svg></div></div>
+          <div class="faq"><div class="q">「你还有什么想问我们的?」<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9l6 6 6-6"/></svg></div></div>
+        </section>
+
+        <section class="card a-plum" style="flex:none">
+          <div class="card-head">
+            <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></span>
+            <div><h2>自我介绍结构建议</h2></div>
+          </div>
+          <div class="intro-grid">
+            <div class="intro"><b>30 秒版</b><li><i>1.</i>我是谁(姓名+当前身份)</li><li><i>2.</i>一句话核心优势</li><li><i>3.</i>我为什么来应聘</li></div>
+            <div class="intro"><b>1 分钟版</b><li><i>1.</i>我是谁</li><li><i>2.</i>我做过什么(1 个核心成绩)</li><li><i>3.</i>我为什么适合这个岗位</li></div>
+            <div class="intro"><b>3 分钟版</b><li><i>1.</i>我是谁</li><li><i>2.</i>2-3 段经历+量化成绩</li><li><i>3.</i>为什么适合</li><li><i>4.</i>想解决什么问题</li></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      面试是展示自我、与企业双向选择的过程,以上为通用准备建议,仅供参考。完成一次模拟面试(模拟练习,仅供参考)后,练习报告将附带个性化准备清单,可直接打印带走。
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 5l11 7-11 7z"/></svg>
+      开始模拟面试
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

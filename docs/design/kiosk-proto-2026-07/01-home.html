@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 首页</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* ── 欢迎区 ── */
+  .welcome {
+    flex: none; padding: 12px 48px 8px;
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 30px;
+  }
+  .welcome h1 { font-family: var(--serif); font-size: 46px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
+  .welcome h1 em { font-style: normal; color: var(--teal-deep); }
+  .welcome p { margin-top: 10px; font-size: 22px; color: var(--muted); letter-spacing: 1px; }
+  .login-btn {
+    flex: none; display: flex; align-items: center; gap: 16px;
+    min-height: 88px; padding: 0 38px;
+    background: var(--dark); color: #f4f1e8;
+    border: none; border-radius: var(--r-md); cursor: pointer;
+    font-family: var(--sans); font-size: 27px; font-weight: 600; letter-spacing: 1px;
+    box-shadow: 0 6px 18px rgba(16,48,43,.18);
+  }
+  .login-btn:active { transform: scale(.98); }
+  .login-btn svg { width: 38px; height: 38px; }
+  .login-btn small { display: block; font-size: 16px; font-weight: 400; opacity: .62; margin-top: 4px; text-align: left; letter-spacing: 0; }
+
+  /* ── 服务分组 ── */
+  .groups {
+    flex: 1; padding: 0 48px; min-height: 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px;
+    align-content: start;
+  }
+  .groups .card { padding: 18px 24px 20px; }
+  .groups .card-head { margin-bottom: 10px; }
+  .groups .tile { min-height: 76px; padding: 10px 14px; }
+  .groups .tile .t-text span { margin-top: 2px; }
+  /* V1 首页识别:品类色左侧描边(覆写 shared.css 的 content:none) */
+  .groups .card::before {
+    content: ''; position: absolute; inset: 0 auto 0 0; width: 6px;
+    background: var(--accent, var(--teal)); border-radius: 6px 0 0 6px;
+  }
+  .tiles { display: grid; gap: 10px; }
+  .tiles.c3 { grid-template-columns: repeat(3, 1fr); }
+  .tiles.c2 { grid-template-columns: repeat(2, 1fr); }
+  .tiles.c5 { grid-template-columns: repeat(5, 1fr); }
+  .tiles.c1 { grid-template-columns: 1fr; }
+  .tiles.c2 .tile, .tiles.c1 .tile { min-height: 70px; padding: 8px 14px; }
+  .tile.col { flex-direction: column; text-align: center; gap: 8px; padding: 12px 8px; min-height: 90px; justify-content: center; }
+  .tile.col .t-text { text-align: center; }
+  .tile.col .tag-soon { margin: 0 auto; }
+
+  /* ── 动态专区(百宝箱 / 智慧校园,后台配置后显示) ── */
+  .zone-row {
+    flex: none; margin: 8px 48px 0;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  }
+  .zone-card {
+    display: flex; flex-direction: column; align-items: stretch; gap: 12px;
+    min-height: 136px; padding: 16px 22px;
+    border-radius: var(--r-md);
+    cursor: pointer; text-align: left; font-family: var(--sans); color: var(--ink);
+    box-shadow: 0 3px 12px rgba(16,48,43,.05);
+    transition: transform .08s ease;
+  }
+  .zone-card:active { transform: scale(.98); }
+  .zone-card.z-plum { background: var(--plum-soft); border: 1px solid color-mix(in srgb, var(--plum) 38%, transparent); }
+  .zone-card.z-teal { background: var(--teal-soft); border: 1px solid color-mix(in srgb, var(--teal) 38%, transparent); }
+  .zone-card .z-icon {
+    width: 58px; height: 58px; flex: none; border-radius: 14px;
+    display: grid; place-items: center; color: #fffdf8;
+  }
+  .zone-card.z-plum .z-icon { background: var(--plum); }
+  .zone-card.z-teal .z-icon { background: var(--teal); }
+  .zone-card .z-icon svg { width: 31px; height: 31px; }
+  .zone-card .z-top { display: flex; align-items: center; gap: 18px; }
+  .zone-card .z-text { flex: 1; min-width: 0; }
+  .zone-card .z-text b { display: block; font-family: var(--serif); font-size: 27px; font-weight: 700; letter-spacing: 1px; }
+  .zone-card .z-text .z-sub { display: block; font-size: 16.5px; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+  .zone-card .z-chips { display: flex; gap: 8px; flex-wrap: nowrap; overflow: hidden; }
+  /* 动态专区规则:某一专区被后台关闭(不渲染)时,剩余一张卡自动通栏铺满,并多露出预览签 */
+  .zone-row .zone-card:only-child { grid-column: 1 / -1; }
+  .zone-card .z-chips i.more { display: none; }
+  .zone-card:only-child .z-chips i.more { display: inline-flex; }
+  .zone-card .z-chips i {
+    font-style: normal; font-size: 14.5px; white-space: nowrap;
+    padding: 4px 11px; border-radius: 999px;
+    background: rgba(255,253,248,.85); border: 1px solid var(--line); color: var(--muted);
+  }
+  .zone-card .z-side { flex: none; display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .zone-card .z-tag {
+    font-size: 14.5px; color: var(--muted); white-space: nowrap;
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; background: rgba(255,253,248,.85);
+  }
+  .zone-card .arrow { width: 24px; height: 24px; color: var(--muted); opacity: .55; }
+  .notice { margin: 6px 48px 0; }
+  .navbar { margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机在线</span>
+    </div>
+  </header>
+
+  <!-- 欢迎区 -->
+  <section class="welcome">
+    <div>
+      <h1>简历、打印、岗位信息<em>一趟办完</em></h1>
+      <p>游客可直接使用大部分功能 · 触摸下方卡片开始</p>
+    </div>
+    <button class="login-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      <span>登录 / 注册<small>手机号或扫码 · 记录可在「我的」查看</small></span>
+    </button>
+  </section>
+
+  <!-- 服务分组 -->
+  <main class="groups">
+
+    <!-- AI简历服务(通栏) -->
+    <section class="card wide a-teal">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12l2 2 4-4"/></svg></span>
+        <div><h2>AI简历服务</h2><div class="sub">诊断、优化、打印,一次完成</div></div>
+        <span class="badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.6L21 9.2l-5 4.3 1.6 6.5L12 16.8 6.4 20l1.6-6.5-5-4.3 6.4-.6z"/></svg>推荐先做</span>
+      </div>
+      <div class="tiles c3">
+        <button class="tile primary">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8.5 11l1.8 1.8 3.4-3.4"/></svg></span>
+          <span class="t-text"><b>AI简历诊断</b><span>上传后查看结构与表达建议</span></span>
+        </button>
+        <button class="tile primary">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+          <span class="t-text"><b>AI简历优化</b><span>基于目标岗位优化表达</span></span>
+        </button>
+        <button class="tile">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5a2 2 0 012-2h5v18H6a2 2 0 01-2-2zM11 3h7a2 2 0 012 2v14a2 2 0 01-2 2h-7"/></svg></span>
+          <span class="t-text"><b>简历素材库</b><span>选择模板与素材参考</span></span>
+        </button>
+        <button class="tile">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
+          <span class="t-text"><b>职业规划</b><span>梳理职业方向与行动建议</span></span>
+        </button>
+        <button class="tile">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <span class="t-text"><b>简历打印</b><span>生成后在本机打印</span></span>
+        </button>
+        <button class="tile">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+          <span class="t-text"><b>求职材料</b><span>整理求职材料与清单</span></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 岗位信息(半栏) -->
+    <section class="card a-clay">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18M12 11v2"/></svg></span>
+        <div><h2>岗位信息</h2><div class="sub">第三方来源岗位,去来源平台投递</div></div>
+      </div>
+      <div class="tiles c2">
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="t-text"><b>全职岗位</b><span>第三方来源全职信息</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3L2 8l10 5 10-5z"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5"/></svg></span><span class="t-text"><b>实习岗位</b><span>第三方来源实习信息</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span class="t-text"><b>兼职信息</b><span>第三方来源兼职信息</span></span></button>
+        <button class="tile primary"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg></span><span class="t-text"><b>全部岗位</b><span>按分类查看全部来源岗位</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V5a2 2 0 012-2h8a2 2 0 012 2v16M4 21h16M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2"/></svg></span><span class="t-text"><b>找企业</b><span>查看企业信息与职位来源</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l2.6 6.6 6.4.6-5 4.3 1.6 6.5L12 16.8 6.4 20l1.6-6.5-5-4.3 6.4-.6z"/></svg></span><span class="t-text"><b>岗位大师</b><span>岗位匹配参考与优化方向</span></span></button>
+      </div>
+    </section>
+
+    <!-- 招聘会(半栏) -->
+    <section class="card a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <div><h2>招聘会</h2><div class="sub">查看场次信息,去来源平台预约</div></div>
+      </div>
+      <div class="tiles c1">
+        <button class="tile primary">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0112 0M16 4.5a3 3 0 010 7M21 20a6 6 0 00-4.5-5.8"/></svg></span>
+          <span class="t-text"><b>社会招聘会</b><span>查看社会招聘会场次</span></span>
+        </button>
+        <button class="tile primary">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3L2 8l10 5 10-5z"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5"/></svg></span>
+          <span class="t-text"><b>校园招聘会</b><span>查看校园招聘会安排</span></span>
+        </button>
+        <button class="tile">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg></span>
+          <span class="t-text"><b>扫码签到</b><span>现场扫码签到指引</span></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 打印扫描(通栏) -->
+    <section class="card wide a-slate">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+        <div><h2>打印扫描</h2><div class="sub">上传或扫描,本机直接出纸</div></div>
+      </div>
+      <div class="tiles c5">
+        <button class="tile primary col">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <span class="t-text"><b>文档打印</b><span>上传文档后本机打印</span></span>
+        </button>
+        <button class="tile disabled col">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/></svg></span>
+          <span class="t-text"><b>证件复印</b><span>待设备能力开放</span></span>
+          <span class="tag-soon">即将上线</span>
+        </button>
+        <button class="tile primary col">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg></span>
+          <span class="t-text"><b>纸质扫描</b><span>扫描纸质文件后保存</span></span>
+        </button>
+        <button class="tile col">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg></span>
+          <span class="t-text"><b>格式转换</b><span>常用文件格式转换</span></span>
+        </button>
+        <button class="tile disabled col">
+          <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0114 0"/></svg></span>
+          <span class="t-text"><b>证件照打印</b><span>待设备能力开放</span></span>
+          <span class="tag-soon">即将上线</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- AI面试训练(半栏) -->
+    <section class="card a-plum">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></span>
+        <div><h2>AI面试训练</h2><div class="sub">模拟练习,仅供参考</div></div>
+      </div>
+      <div class="tiles c3">
+        <button class="tile primary col"><span class="t-text"><b>模拟面试</b><span>AI 模拟问答练习</span></span></button>
+        <button class="tile col"><span class="t-text"><b>面试技巧</b><span>常见面试技巧参考</span></span></button>
+        <button class="tile col"><span class="t-text"><b>面试报告</b><span>查看已生成的训练报告</span></span></button>
+      </div>
+    </section>
+
+    <!-- 政策服务(半栏) -->
+    <section class="card a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20z"/><path d="M9 9h6M9 13h6"/></svg></span>
+        <div><h2>政策服务</h2><div class="sub">政策查询与办事材料指引</div></div>
+      </div>
+      <div class="tiles c3">
+        <button class="tile col"><span class="t-text"><b>就业政策</b><span>就业政策与官方口径</span></span></button>
+        <button class="tile col"><span class="t-text"><b>社保指南</b><span>社保办事材料参考</span></span></button>
+        <button class="tile col"><span class="t-text"><b>档案 / 登记</b><span>档案登记材料指引</span></span></button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 动态专区(与真实首页一致:后台配置驱动,未配置不占位) -->
+  <div class="zone-row">
+    <button class="zone-card z-plum">
+      <span class="z-top">
+        <span class="z-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 016 0v2M3 13h18M12 12v3"/></svg></span>
+        <span class="z-text">
+          <b>百宝箱</b>
+          <span class="z-sub">本机扩展服务,审核后上架</span>
+        </span>
+        <span class="z-side">
+          <span class="z-tag">后台可配</span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6l6 6-6 6"/></svg>
+        </span>
+      </span>
+      <span class="z-chips"><i>证件照工具</i><i>文档工具</i><i class="more">照片冲印</i><i class="more">生活服务</i><i class="more">求职周边</i><i>更多上架中</i></span>
+    </button>
+    <button class="zone-card z-teal">
+      <span class="z-top">
+        <span class="z-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3L2 8l10 5 10-5z"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5M22 8v5"/></svg></span>
+        <span class="z-text">
+          <b>智慧校园</b>
+          <span class="z-sub">校园终端由校方开启后显示</span>
+        </span>
+        <span class="z-side">
+          <span class="z-tag">校方开启</span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6l6 6-6 6"/></svg>
+        </span>
+      </span>
+      <span class="z-chips"><i>迎新指引</i><i>VR校园</i><i>校园卡办理</i></span>
+    </button>
+  </div>
+
+  <!-- 合规提示条 -->
+  <div class="notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+    岗位与招聘会信息均来自第三方 / 官方来源,本终端仅提供信息展示与跳转,投递、预约请前往来源平台办理。
+  </div>
+
+  <!-- 底部导航 -->
+  <nav class="navbar">
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

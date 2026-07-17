@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>证件照 · 功能说明</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .hero-card { display: flex; align-items: center; gap: 24px; padding: 26px 30px; }
+  .hero-card .h-icon {
+    width: 96px; height: 96px; flex: none; border-radius: 24px;
+    display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+  }
+  .hero-card .h-icon svg { width: 50px; height: 50px; }
+  .hero-card .h-main { flex: 1; min-width: 0; }
+  .hero-card h2 { font-family: var(--serif); font-size: 36px; font-weight: 900; letter-spacing: 2px; display: flex; align-items: center; gap: 14px; }
+  .hero-card h2 .tag { font-size: 16px; font-weight: 600; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px; letter-spacing: 0; font-family: var(--sans); }
+  .hero-card p { font-size: 19px; color: var(--muted); margin-top: 8px; line-height: 1.55; }
+  .plan-card { flex: 1; padding: 20px 26px; display: flex; flex-direction: column; }
+  .plan-card b.hd { font-size: 22px; font-weight: 700; display: block; margin-bottom: 8px; }
+  .plan { flex: 1; display: flex; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px dashed var(--line); }
+  .plan:last-child { border-bottom: none; }
+  .plan .p-icon {
+    width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+  }
+  .plan .p-icon svg { width: 30px; height: 30px; }
+  .plan b { font-size: 21px; font-weight: 700; display: block; }
+  .plan span { font-size: 17px; color: var(--muted); display: block; margin-top: 4px; line-height: 1.5; }
+  .side-col { width: 420px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .spec-card { padding: 18px 22px; }
+  .spec-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .spec-card .sub2 { font-size: 16.5px; color: var(--muted); margin-bottom: 12px; }
+  .i-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .i-row:last-child { border-bottom: none; }
+  .i-row .k { font-size: 17.5px; color: var(--muted); }
+  .i-row .v { font-size: 18px; font-weight: 600; text-align: right; }
+  .alt-card { padding: 20px 22px; }
+  .alt-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 12px; }
+  .alt-card .tile { width: 100%; min-height: 96px; }
+  .flow-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .flow-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 4px; }
+  .flow-card .sub2 { font-size: 15.5px; color: var(--muted); margin-bottom: 8px; }
+  .fs { flex: 1; display: flex; align-items: center; gap: 14px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .fs:last-child { border-bottom: none; }
+  .fs .n {
+    width: 38px; height: 38px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep); font-size: 18px; font-weight: 700;
+  }
+  .fs p { font-size: 17px; line-height: 1.5; color: var(--muted); }
+  .fs p b { color: var(--ink); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回打印扫描服务
+    </button>
+    <div class="titles">
+      <h1>证件照</h1>
+      <p>功能说明(即将上线)</p>
+    </div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:功能说明 + 计划 -->
+      <div class="main-col">
+        <section class="card accented a-wheat hero-card">
+          <span class="h-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M8 17a4 4 0 018 0"/></svg></span>
+          <span class="h-main">
+            <h2>证件照 <span class="tag">即将上线</span></h2>
+            <p>即将支持常见规格证件照的尺寸排版与打印(一寸 / 二寸 / 小一寸等),排版到相纸或 A4 后直接接入打印流程出图。</p>
+          </span>
+        </section>
+
+        <section class="card accented a-wheat plan-card">
+          <b class="hd">计划支持</b>
+          <div class="plan">
+            <span class="p-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+            <span><b>选择证件照规格与底色</b><span>一寸、二寸、小一寸等常见规格,支持常用底色要求</span></span>
+          </div>
+          <div class="plan">
+            <span class="p-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg></span>
+            <span><b>自动排版到 6 寸相纸 / A4</b><span>同一版面排多张,按纸张规格自动计算张数;相纸支持以上线后本机配置为准</span></span>
+          </div>
+          <div class="plan">
+            <span class="p-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+            <span><b>直接接入打印流程出图</b><span>确认排版后走本机打印流程,现场取件</span></span>
+          </div>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+          隐私保护:证件照属敏感文件,设有效期并自动清理;文件访问使用临时签名链接并记录日志,不长期保存。
+        </div>
+      </div>
+
+      <!-- 右:常见规格参考 + 替代路径 -->
+      <div class="side-col">
+        <section class="card spec-card">
+          <b class="hd">常见证件照规格参考</b>
+          <div class="sub2">仅供了解,实际以功能上线后支持的规格为准</div>
+          <div class="i-row"><span class="k">一寸</span><span class="v">25 × 35 mm</span></div>
+          <div class="i-row"><span class="k">小一寸</span><span class="v">22 × 32 mm</span></div>
+          <div class="i-row"><span class="k">二寸</span><span class="v">35 × 49 mm</span></div>
+          <div class="i-row"><span class="k">小二寸</span><span class="v">35 × 45 mm</span></div>
+          <div class="i-row"><span class="k">简历常用</span><span class="v">一寸 / 小二寸</span></div>
+        </section>
+
+        <section class="card accented a-wheat alt-card">
+          <b class="hd">现在可以先这样做</b>
+          <button class="tile primary a-wheat">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 16l4.5-4 4 3.5L16 12l4 4"/></svg></span>
+            <span class="t-text"><b>先用照片打印</b><span>已有排好版的证件照图片,可直接上传打印</span></span>
+          </button>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          本机当前仅支持 A4 普通纸打印;相纸打印能力以功能上线后本机配置为准。
+        </div>
+
+        <section class="card flow-card">
+          <b class="hd">上线后使用流程(规划)</b>
+          <div class="sub2">以下为规划中的操作流程,最终以上线版本为准</div>
+          <div class="fs"><span class="n">1</span><p><b>上传或拍摄照片</b>,支持手机扫码上传</p></div>
+          <div class="fs"><span class="n">2</span><p><b>选择规格与底色</b>,按用途挑选常见规格</p></div>
+          <div class="fs"><span class="n">3</span><p><b>自动排版并预览</b>,确认张数与版面</p></div>
+          <div class="fs"><span class="n">4</span><p><b>进入打印流程</b>,本机出纸现场取件</p></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回打印扫描服务
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 420px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 16l4.5-4 4 3.5L16 12l4 4"/></svg>
+      先用照片打印
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

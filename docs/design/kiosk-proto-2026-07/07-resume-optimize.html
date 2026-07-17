@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历优化 · 新旧对比与编辑</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 348px; gap: 20px; }
+  .main-col, .side-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .side-col .card { padding: 20px 22px; }
+  .side-col h3 { font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: 1px; margin-bottom: 4px; }
+  .side-col .s-sub { font-size: 15.5px; color: var(--muted); line-height: 1.45; margin-bottom: 14px; }
+  /* 概览条 */
+  .brief { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .brief .big { font-size: 25px; font-weight: 800; }
+  .brief .big em { font-style: normal; color: var(--teal-deep); }
+  /* 统一 diff 模块 */
+  .diff-card { padding: 0; overflow: hidden; }
+  .diff-head { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+  .diff-head b { font-size: 21px; font-weight: 700; }
+  .diff-head .tag {
+    margin-left: auto; font-size: 15px; font-weight: 600; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
+  }
+  .diff-body { padding: 8px 0 12px; }
+  .dl-row { display: flex; gap: 14px; padding: 7px 24px; font-size: 19px; line-height: 1.55; }
+  .dl-row .sign { flex: none; width: 22px; font-weight: 800; text-align: center; }
+  .dl-row.del { background: rgba(193,74,52,.08); color: #8a4433; }
+  .dl-row.del .sign { color: var(--error); }
+  .dl-row.del p { text-decoration: line-through; text-decoration-color: rgba(193,74,52,.4); }
+  .dl-row.add { background: rgba(31,158,134,.1); color: var(--teal-deep); }
+  .dl-row.add .sign { color: var(--teal-deep); }
+  .dl-row mark { background: #cdeade; color: var(--teal-deep); padding: 1px 5px; border-radius: 5px; }
+  .dl-row .fill { background: var(--wheat-soft); color: var(--wheat-deep); padding: 1px 6px; border-radius: 5px; font-style: normal; }
+  .diff-legend { display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 24px 0; font-size: 15px; color: var(--muted); border-top: 1px dashed var(--line); }
+  .diff-legend i { font-style: normal; display: inline-block; width: 20px; height: 13px; border-radius: 4px; vertical-align: -1px; margin-right: 7px; }
+  .diff-legend .li-del { background: rgba(193,74,52,.18); }
+  .diff-legend .li-add { background: rgba(31,158,134,.22); }
+  .diff-legend .li-fill { background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35); }
+  /* 优化版编辑区 */
+  .ed-card .ed {
+    background: var(--paper); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 16px; font-size: 18px; line-height: 1.6; color: var(--ink); margin-top: 8px;
+  }
+  .ed-card .ed .pen { float: right; width: 18px; height: 18px; color: var(--muted); opacity: .6; }
+  .ed-card .ed-label { font-size: 16px; font-weight: 700; color: var(--muted); margin-top: 14px; }
+  /* 侧栏控件 */
+  .ctl-group { margin-bottom: 12px; }
+  .ctl-group:last-child { margin-bottom: 0; }
+  .ctl-group label { display: block; font-size: 15.5px; font-weight: 600; color: var(--muted); margin-bottom: 7px; }
+  .seg { display: grid; grid-auto-flow: column; gap: 6px; }
+  .seg button {
+    min-height: 48px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface); font-family: var(--sans); font-size: 16px; font-weight: 600;
+    color: var(--muted); cursor: pointer;
+  }
+  .seg button.on { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .tpl-opt {
+    width: 100%; display: block; text-align: left; font-family: var(--sans); cursor: pointer;
+    min-height: 56px; padding: 10px 16px; margin-bottom: 8px;
+    background: var(--surface); border: 2px solid var(--line); border-radius: 12px; color: var(--ink);
+  }
+  .tpl-opt b { display: block; font-size: 18px; font-weight: 700; }
+  .tpl-opt span { display: block; font-size: 15px; color: var(--muted); margin-top: 2px; }
+  .tpl-opt.on { border-color: var(--teal); background: var(--teal-soft); }
+  .ai-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ai-btns .btn.sm { min-height: 56px; font-size: 18px; padding: 0 10px; }
+  .undo-btn {
+    margin-top: 10px; width: 100%; min-height: 48px; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+    font-family: var(--sans); font-size: 16px; font-weight: 600; color: var(--teal-deep);
+  }
+  .undo-btn svg { width: 18px; height: 18px; }
+  .fmt-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+  .fmt-4 button {
+    min-height: 52px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface); font-family: var(--sans); font-size: 16.5px; font-weight: 700;
+    color: var(--muted); cursor: pointer;
+  }
+  .fmt-4 button.on { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .side-fine { font-size: 15px; color: var(--muted); line-height: 1.5; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回报告
+    </button>
+    <div class="titles">
+      <h1>优化建议</h1>
+      <p>基于已有内容优化表达(仅供参考),只重组原文事实,不补充虚构信息</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">目标方向 <b>行政专员 · 现代服务 · 1-3年 · 社招</b></span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传与方向</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">AI解析</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">诊断报告</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">4</span><span class="s-label">优化打印</span></div>
+  </div>
+
+  <main class="content a-teal">
+    <div class="wrap">
+
+      <!-- 左:对照修改项 + 优化版编辑区 -->
+      <div class="main-col">
+        <section class="card accented a-teal" style="flex:none">
+          <div class="brief">
+            <span class="big"><em>3 组</em>可对照修改项</span>
+            <span class="chip ok">动词强化 ×2</span>
+            <span class="chip warn">量化留白提示 ×2</span>
+            <span class="chip warn">冗余删减 ×1</span>
+            <span class="chip">基于诊断结果与原文片段生成,不展示无依据的分数提升</span>
+          </div>
+        </section>
+
+        <section class="card a-teal diff-card" style="flex:none">
+          <div class="diff-head">
+            <b>工作经历 · 行政助理(华宸贸易)</b>
+            <span class="tag">优化前(摘自原文)→ 建议参考</span>
+          </div>
+          <div class="diff-body">
+            <div class="dl-row del"><span class="sign">−</span><p>负责公司日常行政事务,处理办公用品的采购和管理工作。</p></div>
+            <div class="dl-row add"><span class="sign">+</span><p><mark>统筹</mark>日常行政事务,建立办公用品采购台账,<em class="fill">节约比例:原文无数据,请按台账补充</em>。</p></div>
+            <div class="dl-row del"><span class="sign">−</span><p>协助部门组织公司各类活动,做好会务安排等相关工作。</p></div>
+            <div class="dl-row add"><span class="sign">+</span><p><mark>主导</mark>年会、培训等活动会务组织,<em class="fill">场次与覆盖人数请按真实记录补充</em>。</p></div>
+          </div>
+        </section>
+
+        <section class="card a-teal diff-card" style="flex:none">
+          <div class="diff-head">
+            <b>个人简介</b>
+            <span class="tag">优化前(摘自原文)→ 建议参考</span>
+          </div>
+          <div class="diff-body">
+            <div class="dl-row del"><span class="sign">−</span><p>本人吃苦耐劳,执行力强,能够快速适应各种工作环境,希望获得一份行政类工作。</p></div>
+            <div class="dl-row add"><span class="sign">+</span><p>具备行政支持经验,熟悉采购台账、会务与档案管理;求职方向:<mark>行政专员</mark>。</p></div>
+          </div>
+          <div class="diff-legend">
+            <span><i class="li-del"></i>红色为原文中建议调整的表述</span>
+            <span><i class="li-add"></i>青色为建议参考稿</span>
+            <span><i class="li-fill"></i>黄色为留白项:原文没有的数据由你补充,AI 不代填</span>
+          </div>
+        </section>
+
+        <!-- 优化版编辑区(对应真实页面的可编辑简历) -->
+        <section class="card a-teal ed-card" style="flex:1; min-height:0">
+          <div class="diff-head" style="padding:0 0 12px">
+            <b>优化版简历编辑区</b>
+            <span class="tag">全部文本可直接点击修改</span>
+          </div>
+          <p class="ed-label" style="margin-top:12px">个人简介</p>
+          <div class="ed">
+            <svg class="pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M12 4l6 6-9 9H4v-5z"/></svg>
+            具备行政支持经验,熟悉采购台账、会务与档案管理;求职方向:行政专员。
+          </div>
+          <p class="ed-label">工作经历 · 行政助理(华宸贸易)</p>
+          <div class="ed">
+            <svg class="pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M12 4l6 6-9 9H4v-5z"/></svg>
+            统筹日常行政事务,建立办公用品采购台账;主导年会、培训等活动会务组织。技能特长(第 3 组修改项)也在此处继续编辑。
+          </div>
+        </section>
+
+        <div class="notice" style="flex:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          AI 生成内容,仅供参考;原文没有的事实保持为空,由你自行补充,不承诺提分或招聘结果。修改内容后需重新导出。
+        </div>
+      </div>
+
+      <!-- 右:排版 / 模板 / AI 辅助 / 导出 -->
+      <div class="side-col">
+        <section class="card a-teal" style="flex:none">
+          <h3>排版调整</h3>
+          <p class="s-sub">调整后编辑区实时预览,导出 PDF 按此排版</p>
+          <div class="ctl-group"><label>字号</label><div class="seg"><button>紧凑</button><button class="on">标准</button><button>放大</button></div></div>
+          <div class="ctl-group"><label>行距</label><div class="seg"><button>紧凑</button><button class="on">标准</button><button>舒展</button></div></div>
+          <div class="ctl-group"><label>页边距</label><div class="seg"><button>窄</button><button class="on">标准</button><button>宽</button></div></div>
+          <div class="ctl-group"><label>主色</label><div class="seg"><button class="on">蓝</button><button>绿</button><button>灰</button></div></div>
+          <div class="ctl-group"><label>栏数</label><div class="seg"><button class="on">单栏</button><button>双栏</button></div></div>
+        </section>
+
+        <section class="card a-teal" style="flex:none">
+          <h3>简历模板</h3>
+          <p class="s-sub">PDF 按所选模板填充版式;Word/TXT/Markdown 保持内容格式导出</p>
+          <button class="tpl-opt on"><b>简约单栏</b><span>经典排版 · 各行业通用</span></button>
+          <button class="tpl-opt"><b>校园单栏</b><span>突出教育与实习 · 应届适用</span></button>
+        </section>
+
+        <section class="card a-teal" style="flex:none">
+          <h3>AI 辅助调整</h3>
+          <p class="s-sub">仅基于当前简历和原文做表达密度调整,不新增经历或事实;调整失败会提示,可继续手动编辑</p>
+          <div class="ai-btns">
+            <button class="btn ghost sm">AI 精简</button>
+            <button class="btn ghost sm">AI 调整排版</button>
+          </div>
+          <button class="undo-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>
+            撤销上次 AI 调整
+          </button>
+        </section>
+
+        <section class="card a-teal" style="flex:none">
+          <h3>导出格式</h3>
+          <div class="fmt-4">
+            <button class="on">PDF</button><button>Word</button><button>TXT</button><button>Markdown</button>
+          </div>
+          <p class="side-fine">PDF 直接打印本文件;Word/TXT/Markdown 供下载编辑,打印时使用同内容 PDF 副本。导出成功后才会出现下载与打印入口;文件短期保留后自动清理。</p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+      保存优化建议
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></svg>
+      确认优化版,导出 PDF
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

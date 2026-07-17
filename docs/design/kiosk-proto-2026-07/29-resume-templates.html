@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>简历素材库 · 版式参考</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+  .tpl-grid { display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 18px; min-height: 0; }
+  .tpl-card { display: flex; gap: 18px; padding: 18px 20px; cursor: pointer; }
+  .tpl-card.sel { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(31,158,134,.15); }
+  .thumb {
+    width: 150px; flex: none; align-self: center; aspect-ratio: 210 / 297;
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(16,48,43,.08);
+    padding: 12px 10px; display: flex; gap: 7px;
+  }
+  .col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .l { height: 6px; border-radius: 4px; background: var(--line); }
+  .l.t { height: 12px; width: 62%; background: var(--ink); opacity: .7; }
+  .l.acc { height: 8px; width: 42%; background: var(--accent, var(--teal)); opacity: .55; }
+  .l.w9 { width: 92%; } .l.w7 { width: 72%; } .l.w5 { width: 52%; }
+  .thumb.v-side .side { width: 34%; flex: none; border-radius: 4px; background: var(--accent-soft, var(--teal-soft)); }
+  .thumb.v-double .col + .col { border-left: 1px dashed var(--line); padding-left: 7px; }
+  .tpl-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .tpl-body h3 { font-family: var(--serif); font-size: 25px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+  .tpl-body h3 svg { width: 24px; height: 24px; color: var(--teal-deep); }
+  .tpl-body .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .tpl-body p { font-size: 17px; color: var(--muted); line-height: 1.5; margin-top: 10px; }
+  .tpl-body small { display: block; margin-top: auto; padding-top: 8px; font-size: 15.5px; color: var(--wheat-deep); }
+  /* 右侧详情 */
+  .aside-col { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  .aside-col .card { padding: 22px; }
+  .aside-col .lab { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 1px; }
+  .aside-col h2 { font-family: var(--serif); font-size: 30px; font-weight: 800; letter-spacing: 1px; margin-top: 8px; }
+  .aside-col .desc { font-size: 17.5px; color: var(--muted); line-height: 1.6; margin-top: 12px; }
+  .boundary {
+    margin-top: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .boundary b { display: block; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .boundary span { font-size: 15.5px; color: var(--muted); line-height: 1.55; }
+  .aside-col .btn { width: 100%; margin-top: 18px; }
+  .aside-col .notice { align-items: flex-start; }
+  .aside-col .notice svg { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回首页
+    </button>
+    <div class="titles">
+      <h1>简历素材库</h1>
+      <p>先看版式方向(轻触卡片切换),再进入简历优化流程生成正式内容</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip">AI 简历服务 · 版式参考</span>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <div class="filter-bar">
+      <button class="f-chip on">全部</button>
+      <button class="f-chip">简历模板</button>
+      <button class="f-chip">通用</button>
+    </div>
+
+    <div class="wrap">
+      <!-- 左:模板目录 -->
+      <div class="tpl-grid">
+        <section class="card a-teal tpl-card sel">
+          <div class="thumb v-single">
+            <div class="col"><span class="l t"></span><span class="l w5"></span><span class="l acc"></span><span class="l w9"></span><span class="l w9"></span><span class="l w7"></span><span class="l acc"></span><span class="l w9"></span><span class="l w7"></span><span class="l w5"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>简约单栏<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">通用</span></div>
+            <p>经典自上而下排版,信息清晰,各行业通用,黑白打印效果稳妥。</p>
+            <small>推荐:首次制作简历 · 各行业通用</small>
+          </div>
+        </section>
+
+        <section class="card a-slate tpl-card">
+          <div class="thumb v-double">
+            <div class="col"><span class="l t"></span><span class="l acc"></span><span class="l w9"></span><span class="l w7"></span><span class="l w9"></span><span class="l w5"></span></div>
+            <div class="col"><span class="l acc"></span><span class="l w9"></span><span class="l w7"></span><span class="l acc"></span><span class="l w9"></span><span class="l w5"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>清爽双栏</h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">条目较多</span></div>
+            <p>左右分区展示经历与技能,适合项目、技能条目较多的求职者。</p>
+            <small>推荐:技术与专业岗位</small>
+          </div>
+        </section>
+
+        <section class="card a-plum tpl-card">
+          <div class="thumb v-side">
+            <div class="side"></div>
+            <div class="col"><span class="l t"></span><span class="l acc"></span><span class="l w9"></span><span class="l w7"></span><span class="l acc"></span><span class="l w9"></span><span class="l w5"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>侧栏重点</h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">管理类</span></div>
+            <p>侧栏突出核心能力与业绩概览,主栏按时间线叙述管理经历。</p>
+            <small>推荐:3 年以上经验 · 管理类岗位</small>
+          </div>
+        </section>
+
+        <section class="card a-wheat tpl-card">
+          <div class="thumb v-single">
+            <div class="col"><span class="l t"></span><span class="l w7"></span><span class="l acc"></span><span class="l w9"></span><span class="l w5"></span><span class="l acc"></span><span class="l w9"></span><span class="l w9"></span><span class="l w7"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>校园单栏</h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">应届生</span></div>
+            <p>突出教育背景、校园经历与实习,适合工作经历较少的同学。</p>
+            <small>推荐:应届毕业生 · 校招场景</small>
+          </div>
+        </section>
+
+        <section class="card a-clay tpl-card">
+          <div class="thumb v-double">
+            <div class="col"><span class="l t"></span><span class="l w5"></span><span class="l acc"></span><span class="l w9"></span><span class="l w9"></span><span class="l w7"></span></div>
+            <div class="col"><span class="l acc"></span><span class="l w7"></span><span class="l w9"></span><span class="l acc"></span><span class="l w7"></span><span class="l w5"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>项目双栏</h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">项目为主</span></div>
+            <p>以项目经历为主线的双栏排版,便于罗列成果与所用工具。</p>
+            <small>推荐:以项目成果说话的岗位</small>
+          </div>
+        </section>
+
+        <section class="card a-teal tpl-card">
+          <div class="thumb v-side">
+            <div class="side"></div>
+            <div class="col"><span class="l t"></span><span class="l w5"></span><span class="l acc"></span><span class="l w9"></span><span class="l w7"></span><span class="l acc"></span><span class="l w9"></span><span class="l w5"></span></div>
+          </div>
+          <div class="tpl-body">
+            <h3>稳重侧栏</h3>
+            <div class="tags"><span class="chip ok">简历模板</span><span class="chip">通用</span></div>
+            <p>沉稳版式与侧栏信息区,黑白打印同样清晰耐看。</p>
+            <small>推荐:社招 · 综合类岗位</small>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右:当前版式参考详情 -->
+      <div class="aside-col">
+        <section class="card accented a-teal" style="flex:1">
+          <p class="lab">当前版式参考</p>
+          <h2>简约单栏</h2>
+          <p class="desc">经典自上而下排版,信息层级清晰;标题使用衬线字体,正文行距适中,适合大多数岗位投递材料的打印场景。</p>
+          <div class="boundary">
+            <b>选择仅代表版式参考</b>
+            <span>不会自动生成或应用简历;正式简历需要在后续流程结合你的真实内容生成。</span>
+          </div>
+          <div class="boundary">
+            <b>下一步会发生什么</b>
+            <span>进入 AI 简历优化后,系统会基于你的内容生成正式简历,模板在优化页重新确认;本页不会保存或应用模板。</span>
+          </div>
+          <button class="btn primary" style="white-space:nowrap;padding:0 24px">
+            进入简历优化
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </section>
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          素材仅供个人求职准备、查看和打印;岗位申请和投递仍在来源平台或官方渠道完成,系统不收取求职者简历给企业。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

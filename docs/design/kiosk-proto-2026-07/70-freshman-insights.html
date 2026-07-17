@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>校园大数据 · 智慧校园 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--teal); --accent-deep: var(--teal-deep); --accent-soft: var(--teal-soft); gap: 22px; justify-content: center; }
+  .lock-card {
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 20px;
+    padding: 60px 60px 54px;
+  }
+  .lock-card .lock {
+    width: 120px; height: 120px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--paper); border: 1px solid var(--line); color: var(--muted);
+  }
+  .lock-card .lock svg { width: 56px; height: 56px; }
+  .lock-card h2 { font-family: var(--serif); font-size: 40px; font-weight: 900; letter-spacing: 2px; }
+  .lock-card p { max-width: 720px; font-size: 22px; color: var(--muted); line-height: 1.6; }
+  .cond-list { display: flex; flex-direction: column; gap: 14px; }
+  .cond {
+    display: flex; align-items: center; gap: 18px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 18px 24px; min-height: 92px;
+  }
+  .cond .c-num {
+    width: 52px; height: 52px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+    font-family: var(--serif); font-size: 25px; font-weight: 700;
+  }
+  .cond b { display: block; font-size: 22px; font-weight: 700; }
+  .cond span { display: block; font-size: 18px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+  .cond .tag {
+    flex: none; margin-left: auto; font-size: 17px; color: var(--muted);
+    border: 1px dashed var(--line); border-radius: 999px; padding: 6px 16px; background: var(--surface);
+  }
+  .auth-bar {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.35); border-radius: var(--r-sm);
+    padding: 18px 24px; font-size: 20px; color: var(--teal-deep); line-height: 1.5;
+  }
+  .auth-bar svg { width: 26px; height: 26px; flex: none; margin-top: 2px; }
+  .auth-bar b { font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>校园大数据</h1>
+      <p>迎新报到聚合统计 · 暂未开放</p>
+    </div>
+    <div class="aside">
+      <span class="chip warn">未开放</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 未开放主卡 -->
+    <section class="card accented a-teal lock-card">
+      <span class="lock">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3M12 15v2"/></svg>
+      </span>
+      <h2>校园大数据暂未开放</h2>
+      <p>该功能需在取得学校书面授权与数据处理协议、且仅接入聚合脱敏统计后才会开放。开放前本终端不展示任何统计数据(含示例 / 演示数据),也不采集任何个人信息。</p>
+      <button class="btn primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+        返回智慧校园
+      </button>
+    </section>
+
+    <!-- 开放前提 -->
+    <section class="card a-teal">
+      <div class="card-head" style="margin-bottom:16px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg></span>
+        <div><h2>开放前提</h2><div class="sub">三项条件全部满足后,该模块才会解锁</div></div>
+      </div>
+      <div class="cond-list">
+        <div class="cond">
+          <span class="c-num">1</span>
+          <div><b>学校书面授权</b><span>由校方出具正式授权文件,明确数据范围与用途</span></div>
+          <span class="tag">待完成</span>
+        </div>
+        <div class="cond">
+          <span class="c-num">2</span>
+          <div><b>签署数据处理协议</b><span>与校方签署数据处理协议,约定安全与保存要求</span></div>
+          <span class="tag">待完成</span>
+        </div>
+        <div class="cond">
+          <span class="c-num">3</span>
+          <div><b>仅接入聚合脱敏统计</b><span>只接收不含任何个人身份信息的聚合统计结果</span></div>
+          <span class="tag">待完成</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="auth-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+      合规边界:校园大数据若上线,仅展示<b>聚合统计</b>,绝不含任何个人身份信息,也不在本终端采集任何个人信息。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 14l8-9 8 9M6 12v8h12v-8M10 20v-5h4v5"/></svg>
+      查看迎新系统
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

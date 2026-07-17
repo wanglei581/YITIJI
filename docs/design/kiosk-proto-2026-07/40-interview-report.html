@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI面试训练 · 练习报告</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 16px; }
+  /* 综合表现:等级 + 摘要(真实报告为等级制,无数字评分) */
+  .hero-card { flex: none; }
+  .hero-head { display: flex; align-items: center; gap: 16px; }
+  .hero-head h2 { font-family: var(--serif); font-size: 30px; font-weight: 700; letter-spacing: 1px; }
+  .level-chip {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--serif); font-size: 26px; font-weight: 900; letter-spacing: 2px;
+    color: var(--plum-deep); background: var(--plum-soft);
+    border: 1px solid rgba(122,90,134,.35); border-radius: 999px; padding: 10px 26px;
+  }
+  .hero-card .sum { margin-top: 14px; font-size: 20px; line-height: 1.6; color: var(--ink); }
+  .hero-card .cap { margin-top: 10px; font-size: 15.5px; color: var(--muted); }
+  .hero-meta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  /* 能力维度参考:五组要点(非打分) */
+  .abil-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .abil {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 14px 18px;
+  }
+  .abil b { display: flex; align-items: center; gap: 8px; font-size: 18.5px; font-weight: 700; }
+  .abil b svg { width: 19px; height: 19px; color: var(--plum-deep); flex: none; }
+  .abil p { font-size: 16px; color: var(--muted); line-height: 1.5; margin-top: 7px; }
+  /* 风险点 */
+  .risk-list { display: flex; flex-direction: column; gap: 10px; }
+  .risk-list li {
+    list-style: none; display: flex; gap: 10px; align-items: flex-start;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.25); border-radius: 12px;
+    padding: 11px 16px; font-size: 17px; color: var(--wheat-deep); line-height: 1.5;
+  }
+  .risk-list li svg { width: 19px; height: 19px; flex: none; margin-top: 2px; }
+  /* 高频问题预测 */
+  .pq { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 18px; }
+  .pq + .pq { margin-top: 10px; }
+  .pq b { font-size: 18.5px; font-weight: 700; }
+  .pq p { font-size: 15.5px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
+  .pq p em { font-style: normal; font-weight: 600; color: var(--plum-deep); }
+  .two-col { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .two-col .card { display: flex; flex-direction: column; }
+  .two-col .card-head { margin-bottom: 12px; }
+  .two-col h2 { font-size: 26px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>模拟面试练习报告</h1>
+      <p>模拟练习,仅供参考 · 行政专员 · 零售/服务业 · HR 初筛</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip">2026年7月17日 10:24 完成</span>
+      <span class="chip ok">5 分钟练习 · 答 4 题 · 跳过 1 题</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 综合表现概览:等级制,不是分数 -->
+    <section class="card accented a-plum hero-card">
+      <div class="hero-head">
+        <h2>综合表现概览</h2>
+        <span class="level-chip">表现良好</span>
+      </div>
+      <p class="sum">整体表达有条理,举例真实可信;自我介绍与协调经历的呈现比较完整,岗位相关经验还可以更突出,建议把每段经历的结果说得更具体。</p>
+      <p class="cap">「表现良好」为本次练习表现等级,由 AI 根据你的回答生成,仅供参考,不代表录用结果或任何用人单位的评价标准。</p>
+    </section>
+
+    <!-- 能力维度参考(要点制) -->
+    <section class="card accented a-plum" style="flex:none">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V9M10 20V4M16 20v-8M22 20H2"/></svg></span>
+        <div><h2>能力维度参考</h2><div class="sub">按本次作答内容给出要点,不做数字打分</div></div>
+      </div>
+      <div class="abil-grid">
+        <div class="abil"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>表达清晰度</b><p>回答分点明确,时间控制得当;个别长句可拆短,先给结论再展开。</p></div>
+        <div class="abil"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/></svg>岗位匹配度参考</b><p>台账、会务等经历与行政岗位相关;建议主动关联岗位职责关键词。</p></div>
+        <div class="abil"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.3 2.3 4.7-4.7"/></svg>经历可信度与细节</b><p>用对照表化解排期分歧的例子具体可信;结果部分建议补充落地情况。</p></div>
+        <div class="abil"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-3.5 10.9c.8.6 1.5 1.3 1.5 2.1h4c0-.8.7-1.5 1.5-2.1A6 6 0 0012 3z"/></svg>专业能力表现</b><p>对 Excel 台账、盘点流程的描述扎实;可补充一个数字化的成果示例。</p></div>
+        <div class="abil" style="grid-column: span 2;"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 10h8M8 14h5M21 12a9 9 0 11-4.2-7.6"/></svg>沟通与应变能力</b><p>被追问时能保持节奏、礼貌回应;跳过的薪资问题建议提前准备一个有依据的区间说法。</p></div>
+      </div>
+    </section>
+
+    <div class="two-col">
+      <!-- 风险点与改进建议 -->
+      <section class="card a-wheat">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg></span>
+          <div><h2>风险点与改进建议</h2></div>
+        </div>
+        <ul class="risk-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>「离职原因」回答中出现对前同事的负面评价,建议改为客观陈述 + 个人发展诉求。</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>多段经历只讲了做了什么,缺少结果;建议每段补一个可验证的具体变化。</li>
+        </ul>
+      </section>
+
+      <!-- 高频问题预测 -->
+      <section class="card a-plum">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9.8 9.5a2.3 2.3 0 114 1.6c-.7.7-1.8 1.1-1.8 2.4M12 16.5v.5"/></svg></span>
+          <div><h2>高频问题预测</h2><div class="sub">建议继续准备</div></div>
+        </div>
+        <div class="pq">
+          <b>1. 你如何同时安排多项行政事务的优先级?</b>
+          <p><em>考察点:</em>统筹与时间管理 · <em>思路:</em>用一次真实的多任务经历,按紧急/重要说清取舍。</p>
+        </div>
+        <div class="pq">
+          <b>2. 期望薪资是多少?依据是什么?</b>
+          <p><em>考察点:</em>自我定位与沟通方式 · <em>思路:</em>给出有依据的区间,并表达对综合发展的关注。</p>
+        </div>
+      </section>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      完整报告还包含 STAR 回答建议与面试前准备清单,打印后可带走对照练习。本报告仅供本人面试练习与准备参考,不代表任何招聘结果承诺,不参与企业筛选、面试邀约或录用决策。
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10a8 8 0 108-8M4 10V4m0 6h6"/></svg>
+      重新练习
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 420px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印报告
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历生成 · 引导式填写</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .form-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .entry {
+    position: relative; background: var(--paper); border: 1px solid var(--line);
+    border-radius: var(--r-sm); padding: 20px 22px; margin-bottom: 16px;
+  }
+  .entry .del {
+    position: absolute; right: 12px; top: 12px;
+    width: 48px; height: 48px; display: grid; place-items: center;
+    background: none; border: none; color: var(--muted); opacity: .6; cursor: pointer;
+  }
+  .entry .del svg { width: 24px; height: 24px; }
+  .e-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .e-grid .full { grid-column: span 2; }
+  .field label { font-size: 18px; margin-bottom: 8px; }
+  .field label em { font-style: normal; color: var(--error); }
+  .field input { min-height: 62px; font-size: 20px; }
+  .field textarea {
+    width: 100%; padding: 14px 18px; min-height: 108px;
+    font-size: 20px; font-family: var(--sans); color: var(--ink); line-height: 1.6;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); resize: none;
+  }
+  .voice-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .voice-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    min-height: 48px; padding: 0 20px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); border-radius: 999px;
+    font-family: var(--sans); font-size: 17px; font-weight: 600; color: var(--teal-deep); cursor: pointer;
+  }
+  .voice-btn svg { width: 20px; height: 20px; }
+  .add-entry {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    min-height: 64px; width: 100%;
+    background: none; border: 2px dashed var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 20px; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .add-entry svg { width: 24px; height: 24px; }
+  /* 右:进度与说明 */
+  .side { width: 330px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .side .card { padding: 20px 22px; }
+  .side h3 { font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: 1px; margin-bottom: 14px; }
+  .prog-list { display: flex; flex-direction: column; gap: 10px; }
+  .prog {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 56px; padding: 0 16px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .prog .p-dot {
+    width: 34px; height: 34px; flex: none; border-radius: 50%;
+    display: grid; place-items: center; font-size: 16px; font-weight: 700;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+  }
+  .prog b { font-size: 18px; font-weight: 600; }
+  .prog .st { margin-left: auto; font-size: 15px; color: var(--muted); }
+  .prog.done .p-dot { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+  .prog.done .st { color: var(--teal-deep); font-weight: 600; }
+  .prog.now { border-color: rgba(31,158,134,.45); background: var(--teal-soft); }
+  .prog.now .p-dot { background: var(--teal); border-color: var(--teal); color: #fffdf8; }
+  .prog.now .st { color: var(--teal-deep); font-weight: 600; }
+  .prog .p-dot svg { width: 17px; height: 17px; }
+  .side .notice { align-items: flex-start; }
+  .side .notice svg { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回简历服务
+    </button>
+    <div class="titles">
+      <h1>AI简历生成</h1>
+      <p>填写你的真实信息,AI 帮你润色成一份结构化简历</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">内容仅本人可见 · 离开即清除</span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">基本信息</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">求职意向</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">教育经历</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">4</span><span class="s-label">工作经历</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">5</span><span class="s-label">项目经历</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">技能证书</span></div>
+  </div>
+
+  <main class="content a-teal">
+    <div class="split">
+
+      <!-- 左:当前步骤表单(实习 / 工作经历) -->
+      <section class="card accented a-teal form-card">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+          <div><h2>实习 / 工作经历</h2><div class="sub">写真实内容即可,AI 会帮你润色;没有经历可跳过,生成后会提示补充。语音输入:说完后转写成文字,确认修改后再填入</div></div>
+        </div>
+
+        <div class="entry">
+          <button class="del" aria-label="删除该条"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+          <div class="e-grid">
+            <div class="field"><label>公司 / 单位 <em>*</em></label><input type="text" value="鑫源商贸有限公司"></div>
+            <div class="field"><label>职位 <em>*</em></label><input type="text" value="仓储文员"></div>
+            <div class="field full"><label>起止时间</label><input type="text" value="2024.03 - 2026.05"></div>
+            <div class="field full">
+              <label>做了什么(写真实内容,AI 会帮你润色)</label>
+              <textarea>负责出入库单据登记和每月盘点,用 Excel 做库存表,盘点差错比以前少了。还帮主管排过配送班表。</textarea>
+              <div class="voice-row">
+                <button class="voice-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>语音输入工作内容</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="entry">
+          <button class="del" aria-label="删除该条"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+          <div class="e-grid">
+            <div class="field"><label>公司 / 单位 <em>*</em></label><input type="text" value="悦客连锁超市(暑期)"></div>
+            <div class="field"><label>职位 <em>*</em></label><input type="text" value="收银员"></div>
+            <div class="field full"><label>起止时间</label><input type="text" value="2023.07 - 2023.09"></div>
+            <div class="field full">
+              <label>做了什么(写真实内容,AI 会帮你润色)</label>
+              <textarea placeholder="如 负责的工作内容、用到的工具、取得的成果(有数字写数字)">暑期收银和理货,高峰期一天接待顾客几百人,交接班账目没有出过错。</textarea>
+              <div class="voice-row">
+                <button class="voice-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>语音输入工作内容</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="add-entry">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+          添加一段实习 / 工作经历(最多 8 条)
+        </button>
+      </section>
+
+      <!-- 右:填写进度 + 说明 -->
+      <div class="side">
+        <section class="card a-teal">
+          <h3>填写进度</h3>
+          <div class="prog-list">
+            <div class="prog done"><span class="p-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span><b>基本信息</b><span class="st">陈志远 · 已填</span></div>
+            <div class="prog done"><span class="p-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span><b>求职意向</b><span class="st">行政专员 · 全职</span></div>
+            <div class="prog done"><span class="p-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span><b>教育经历</b><span class="st">1 条</span></div>
+            <div class="prog now"><span class="p-dot">4</span><b>工作经历</b><span class="st">2 条 · 填写中</span></div>
+            <div class="prog"><span class="p-dot">5</span><b>项目经历</b><span class="st">选填</span></div>
+            <div class="prog"><span class="p-dot">6</span><b>技能证书</b><span class="st">待填</span></div>
+          </div>
+        </section>
+
+        <section class="card a-teal">
+          <h3>生成说明</h3>
+          <div class="notice" style="margin-bottom:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 4v5c0 4.4-3 8.2-7 9-4-0.8-7-4.6-7-9V7z"/><path d="M9.5 12l1.8 1.8 3.4-3.4"/></svg>
+            AI 只润色你填写的真实信息,不会替你编造学历、证书、公司或项目经历;没填的内容会提示你补充。
+          </div>
+          <div class="notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+            本机为公共设备:填写内容仅用于本次生成,离开页面即清除;生成结果与导出文件短期保留后自动清理。
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      上一步
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 420px;">
+      下一步:项目经历
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>场馆导览 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; }
+  .actionbar .btn { white-space: nowrap; }
+  .map {
+    display: grid; grid-template-columns: 1.25fr 1fr 1fr; grid-template-rows: 280px 200px 104px;
+    gap: 12px; margin-bottom: 16px;
+  }
+  .zone {
+    border-radius: 12px; border: 1px solid var(--line);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    text-align: center; padding: 10px; cursor: pointer;
+  }
+  .zone b { font-family: var(--serif); font-size: 34px; letter-spacing: 3px; }
+  .zone .theme { font-size: 20px; color: var(--ink); font-weight: 600; }
+  .zone .range { font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .z-a { grid-row: 1 / 3; background: var(--teal-soft); border-color: rgba(31,158,134,.35); }
+  .z-a b { color: var(--teal-deep); }
+  .z-a.sel { outline: 3px solid var(--teal); outline-offset: -3px; }
+  .z-b { grid-column: 2 / 4; background: var(--clay-soft); border-color: rgba(184,104,60,.35); }
+  .z-b b { color: var(--clay-deep); }
+  .z-c { grid-column: 2 / 4; background: var(--wheat-soft); border-color: rgba(169,120,31,.35); }
+  .z-c b { color: var(--wheat-deep); }
+  .z-svc { background: var(--paper); border-style: dashed; cursor: default; }
+  .z-svc b { font-family: var(--sans); font-size: 19px; color: var(--muted); font-weight: 600; letter-spacing: 1px; }
+  .zone-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .zs { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px 20px; }
+  .zs b { font-size: 21px; font-weight: 700; }
+  .zs .zs-nums { display: flex; justify-content: space-between; margin: 8px 0; font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .zs .progress { height: 12px; }
+  .booth-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px; }
+  .bcell {
+    min-height: 78px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 17px; font-weight: 700; color: var(--muted); background: var(--surface);
+    font-variant-numeric: tabular-nums;
+  }
+  .bcell small { font-size: 13px; font-weight: 400; }
+  .bcell.occ { background: var(--teal-soft); border-color: rgba(31,158,134,.35); color: var(--teal-deep); }
+  .bcell.res { background: var(--wheat-soft); border-color: rgba(169,120,31,.35); color: var(--wheat-deep); }
+  .bcell.sel { outline: 3px solid var(--teal); outline-offset: -3px; }
+  .picked {
+    display: flex; align-items: center; gap: 20px;
+    background: var(--surface); border: 1px solid rgba(31,158,134,.4); border-radius: var(--r-md);
+    border-left: 6px solid var(--teal);
+    padding: 18px 26px; box-shadow: 0 3px 14px rgba(16,48,43,.05);
+  }
+  .picked .p-booth {
+    width: 72px; height: 72px; flex: none; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+    font-family: var(--serif); font-size: 26px; font-weight: 700;
+  }
+  .picked .p-main { flex: 1; }
+  .picked .p-main b { display: block; font-size: 25px; font-weight: 700; }
+  .picked .p-main span { display: block; font-size: 18px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>场馆导览</h1>
+      <p>2026年夏季高校毕业生招聘会 · 市人才市场 · 点击展区 / 展位查看详情</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip"><span class="dot" style="width:12px;height:12px;border-radius:4px;background:var(--teal)"></span>已入驻</span>
+      <span class="chip"><span class="dot" style="width:12px;height:12px;border-radius:4px;background:var(--wheat)"></span>已预留</span>
+      <span class="chip"><span class="dot" style="width:12px;height:12px;border-radius:4px;background:var(--line)"></span>空闲</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 场馆分区示意 -->
+    <section class="card accented a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg></span>
+        <div><h2>场馆分区示意</h2><div class="sub">由主办方 / 管理员配置,现场以指示牌为准</div></div>
+      </div>
+      <div class="map">
+        <div class="zone z-a sel"><b>A区</b><span class="theme">综合 / 技术类</span><span class="range">展位 A01 - A40 · 40 家企业</span></div>
+        <div class="zone z-b"><b>B区</b><span class="theme">智能制造类</span><span class="range">展位 B01 - B36 · 36 家企业</span></div>
+        <div class="zone z-c"><b>C区</b><span class="theme">现代服务类</span><span class="range">展位 C01 - C44 · 44 家企业</span></div>
+        <div class="zone z-svc"><b>入口 / 签到</b></div>
+        <div class="zone z-svc"><b>咨询服务台</b></div>
+        <div class="zone z-svc"><b>打印服务点</b></div>
+      </div>
+      <div class="zone-stats">
+        <div class="zs"><b>A区 · 综合技术</b><div class="zs-nums"><span>40 个展位</span><span>已签到 34</span></div><div class="progress"><div class="p-fill" style="width:85%"></div></div></div>
+        <div class="zs"><b>B区 · 智能制造</b><div class="zs-nums"><span>36 个展位</span><span>已签到 30</span></div><div class="progress"><div class="p-fill" style="width:83%"></div></div></div>
+        <div class="zs"><b>C区 · 现代服务</b><div class="zs-nums"><span>44 个展位</span><span>已签到 34</span></div><div class="progress"><div class="p-fill" style="width:77%"></div></div></div>
+      </div>
+    </section>
+
+    <!-- A区展位分布 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+        <div><h2>A区展位分布</h2><div class="sub">已选 A区(共 40 个展位,本屏示例 A01 - A20)· 点击上方展区可切换 · 点击展位查看入驻企业</div></div>
+      </div>
+      <div class="booth-grid">
+        <div class="bcell occ">A01<small>晨光教育</small></div>
+        <div class="bcell occ">A02<small>科翼软件</small></div>
+        <div class="bcell res">A03<small>已预留</small></div>
+        <div class="bcell occ">A04<small>星野传媒</small></div>
+        <div class="bcell occ">A05<small>恒瑞精密</small></div>
+        <div class="bcell occ">A06<small>禾风农科</small></div>
+        <div class="bcell">A07<small>空闲</small></div>
+        <div class="bcell occ">A08<small>迅达通信</small></div>
+        <div class="bcell occ">A09<small>元启咨询</small></div>
+        <div class="bcell res">A10<small>已预留</small></div>
+        <div class="bcell occ">A11<small>沐阳健康</small></div>
+        <div class="bcell occ sel">A12<small>华辰科技</small></div>
+        <div class="bcell occ">A13<small>洲际物流</small></div>
+        <div class="bcell occ">A14<small>朗新材料</small></div>
+        <div class="bcell">A15<small>空闲</small></div>
+        <div class="bcell occ">A16<small>金穗银行</small></div>
+        <div class="bcell occ">A17<small>途乐文旅</small></div>
+        <div class="bcell occ">A18<small>蓝湾数据</small></div>
+        <div class="bcell res">A19<small>已预留</small></div>
+        <div class="bcell occ">A20<small>正合律所</small></div>
+      </div>
+    </section>
+
+    <!-- 选中展位 -->
+    <div class="picked">
+      <span class="p-booth">A12</span>
+      <div class="p-main">
+        <b>华辰科技 · 展位 A12 · 已入驻</b>
+        <span>所属展区 A区 · 综合技术类 · 智能制造 · 在招 12 个岗位</span>
+      </div>
+      <button class="btn sm dark">查看企业详情</button>
+    </div>
+
+    <div class="meta-chips">
+      <span class="chip src">来源机构 <b>市就业服务中心</b></span>
+      <span class="chip">同步时间 <b>2026-07-17 08:30</b></span>
+      <span class="chip">外部ID <b>FAIR-2071</b></span>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      场馆导览信息由主办方提供,仅供现场参考;岗位投递请前往来源平台办理。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回详情
+    </button>
+    <div class="spacer"></div>
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>
+      查看参展企业
+    </button>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印展位分布图
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI求职打印服务终端 · 手机上传</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 手机舞台覆写:390×844,居中展示,不用 shared.js 缩放 */
+  html, body { height: 100%; }
+  body { display: grid; place-items: center; padding: 24px 0; }
+  #stage {
+    width: 390px; height: 844px; transform: none;
+    border-radius: 28px; box-shadow: 0 24px 60px rgba(9,26,23,.4);
+    padding: 22px 20px 24px; gap: 16px;
+  }
+  /* 真机 390×844 视口:全出血渲染,不产生滚动 */
+  @media (max-height: 900px) {
+    body { padding: 0; }
+    #stage { border-radius: 0; box-shadow: none; }
+  }
+  .m-top { flex: none; display: flex; align-items: center; gap: 10px; }
+  .m-top .logo {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    display: grid; place-items: center; background: var(--dark); color: #f4f1e8;
+  }
+  .m-top .logo svg { width: 20px; height: 20px; }
+  .m-top b { font-family: var(--serif); font-size: 17px; font-weight: 700; letter-spacing: .5px; }
+  .m-top span { font-size: 13px; color: var(--muted); }
+  .m-terminal {
+    flex: none; font-size: 13px; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+  }
+  .m-terminal b { color: var(--ink); font-weight: 600; }
+  .m-pick {
+    flex: none; min-height: 150px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: var(--teal-soft); border: 2px dashed rgba(31,158,134,.45); border-radius: var(--r-md);
+    color: var(--teal-deep); font-family: var(--sans);
+  }
+  .m-pick:active { transform: scale(.98); }
+  .m-pick svg { width: 40px; height: 40px; }
+  .m-pick b { font-size: 18px; font-weight: 700; }
+  .m-pick span { font-size: 13px; color: var(--muted); }
+  .m-sec { flex: none; font-size: 14px; font-weight: 700; color: var(--ink); margin-top: 2px; }
+  .m-file {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 13px 14px;
+  }
+  .m-file .f-icon {
+    width: 40px; height: 40px; flex: none; border-radius: 10px;
+    display: grid; place-items: center; background: var(--clay-soft); color: var(--clay-deep);
+  }
+  .m-file .f-icon svg { width: 22px; height: 22px; }
+  .m-file .f-main { flex: 1; min-width: 0; }
+  .m-file .f-main b { display: block; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-file .f-main span { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .m-file .f-del {
+    flex: none; width: 48px; height: 48px; border-radius: 12px; cursor: pointer;
+    display: grid; place-items: center;
+    background: none; border: 1px solid var(--line); color: var(--muted);
+  }
+  .m-file .f-del svg { width: 20px; height: 20px; }
+  .m-upstate { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px; }
+  .m-upstate .u-head { display: flex; align-items: center; gap: 10px; font-size: 15px; }
+  .m-upstate .u-head b { font-weight: 700; }
+  .m-upstate .u-head span { margin-left: auto; font-size: 13px; color: var(--muted); }
+  /* 选择文件后立即上传;当前接口无逐字节进度,使用不定长进度动画 */
+  .m-upstate .progress { margin-top: 12px; height: 12px; position: relative; overflow: hidden; }
+  .m-upstate .p-fill {
+    position: absolute; inset: 0; width: 100%;
+    background: linear-gradient(90deg, rgba(31,158,134,0) 0%, var(--teal) 42%, #35ab8e 58%, rgba(31,158,134,0) 100%);
+    background-size: 45% 100%; background-repeat: no-repeat;
+    animation: slide 1.4s ease-in-out infinite;
+  }
+  @keyframes slide { 0% { background-position: -90% 0; } 100% { background-position: 190% 0; } }
+  @media (prefers-reduced-motion: reduce) { .m-upstate .p-fill { animation: none; background-position: 0 0; } }
+  .m-upstate .u-hint { margin-top: 10px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+  .m-notice { margin-top: auto; flex: none; font-size: 13px; }
+  .m-notice svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部小标 -->
+  <div class="m-top">
+    <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+    <div><b>AI求职打印服务终端</b><br><span>文件上传</span></div>
+  </div>
+
+  <!-- 目标终端 -->
+  <div class="m-terminal">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="13" rx="2"/><path d="M9 21h6M12 16v5"/></svg>
+    上传目标:<b>就业服务大厅 · 01号机</b>
+  </div>
+
+  <!-- 文件选择大按钮(选择后立即上传) -->
+  <button class="m-pick">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V5M7.5 9.5L12 5l4.5 4.5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+    <b>选择手机中的文件</b>
+    <span>打印支持 PDF / JPG / PNG,简历另支持 Word;单个最大 20MB,选择后自动上传</span>
+  </button>
+
+  <!-- 已选文件 -->
+  <div class="m-sec">本次文件(1)</div>
+  <div class="m-file">
+    <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 13h5M10 17h5"/></svg></span>
+    <span class="f-main"><b>王某某-市场营销-简历.pdf</b><span>1.2 MB · PDF</span></span>
+    <button class="f-del" disabled style="opacity:.4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <!-- 上传状态 -->
+  <div class="m-upstate" role="status" aria-live="polite">
+    <div class="u-head"><b>正在上传,请稍候…</b><span>请勿关闭本页</span></div>
+    <div class="progress"><div class="p-fill"></div></div>
+    <div class="u-hint">上传完成后,请回到一体机屏幕继续操作;上传失败时可重新选择文件重试。二维码 10 分钟内有效。</div>
+  </div>
+
+  <!-- 隐私提示 -->
+  <div class="notice m-notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+    本页使用一次性上传令牌,不会登录或读取你的账号;文件仅用于本次打印 / 简历服务,通过临时链接传输,到期自动清理。
+  </div>
+
+</div>
+</body>
+</html>

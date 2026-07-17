@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 会话超时提醒</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 背后示意页面(压暗前) */
+  .ghost-page { position: absolute; inset: 0; padding: 120px 48px; display: flex; flex-direction: column; gap: 26px; }
+  .ghost-page .gp-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); }
+  /* 压暗遮罩 */
+  .dim {
+    position: absolute; inset: 0; z-index: 2;
+    background: rgba(16,48,43,.62); backdrop-filter: blur(3px);
+  }
+  .modal-wrap {
+    position: absolute; inset: 0; z-index: 3;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 30px; padding: 0 90px;
+  }
+  .timeout-card {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--line); border-radius: var(--r-md);
+    box-shadow: 0 30px 80px rgba(9,26,23,.45);
+    padding: 64px 72px 60px; text-align: center;
+  }
+  .ring-box { position: relative; width: 300px; height: 300px; margin: 0 auto; }
+  .ring-box svg { width: 300px; height: 300px; transform: rotate(-90deg); }
+  .ring-box .ring-bg { fill: none; stroke: var(--line); stroke-width: 14; }
+  .ring-box .ring-val {
+    fill: none; stroke: var(--clay); stroke-width: 14; stroke-linecap: round;
+    stroke-dasharray: 848; stroke-dashoffset: 254; /* 剩余 21/30 秒 = 70% */
+  }
+  .ring-box .ring-num {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+  }
+  .ring-box .ring-num b {
+    font-family: var(--serif); font-size: 110px; font-weight: 900;
+    color: var(--clay-deep); line-height: 1; font-variant-numeric: tabular-nums;
+  }
+  .ring-box .ring-num span { font-size: 24px; color: var(--muted); letter-spacing: 2px; }
+  .timeout-card h1 {
+    margin-top: 40px; font-family: var(--serif);
+    font-size: 46px; font-weight: 900; letter-spacing: 2px;
+  }
+  .timeout-card .desc {
+    margin-top: 20px; font-size: 25px; line-height: 1.7; color: var(--muted); letter-spacing: 1px;
+  }
+  .timeout-card .acct {
+    margin-top: 30px; display: inline-flex; align-items: center; gap: 12px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    padding: 12px 26px; font-size: 20px; color: var(--muted);
+  }
+  .timeout-card .acct b { color: var(--ink); }
+  .clean-list {
+    margin-top: 34px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; text-align: left;
+  }
+  .clean-list li {
+    list-style: none; display: flex; align-items: flex-start; gap: 12px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .clean-list li svg { width: 24px; height: 24px; flex: none; color: var(--clay-deep); margin-top: 2px; }
+  .clean-list li b { display: block; font-size: 19px; font-weight: 700; }
+  .clean-list li span { display: block; margin-top: 4px; font-size: 15.5px; color: var(--muted); line-height: 1.4; }
+  .timeout-actions { margin-top: 40px; display: flex; flex-direction: column; gap: 18px; }
+  .timeout-actions .btn.primary { min-height: 118px; font-size: 34px; letter-spacing: 3px; }
+  .timeout-actions .btn.ghost { min-height: 88px; }
+  .modal-wrap .notice { background: rgba(255,253,248,.92); width: 100%; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 背后原页面示意(被压暗) -->
+  <div class="ghost-page">
+    <div class="gp-block" style="height:76px"></div>
+    <div class="gp-block" style="height:150px"></div>
+    <div class="gp-block" style="flex:1"></div>
+    <div class="gp-block" style="height:320px"></div>
+    <div class="gp-block" style="height:116px"></div>
+  </div>
+  <div class="dim"></div>
+
+  <!-- 居中提醒卡 -->
+  <div class="modal-wrap">
+    <section class="timeout-card" role="dialog" aria-modal="true" aria-labelledby="timeout-title">
+      <div class="ring-box">
+        <svg viewBox="0 0 300 300">
+          <circle class="ring-bg" cx="150" cy="150" r="135"/>
+          <circle class="ring-val" cx="150" cy="150" r="135"/>
+        </svg>
+        <div class="ring-num"><b>21</b><span>秒后自动退出</span></div>
+      </div>
+      <h1 id="timeout-title">还在使用吗?</h1>
+      <p class="desc">长时间未操作,即将退出登录并清除本机临时会话;<br>已保存到你账号的数据不受影响。如需继续,请点击下方按钮。</p>
+      <span class="acct">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+        当前登录:<b>王同学 · 138****1921</b>
+      </span>
+
+      <!-- 退出时将清除的内容(诚实明细) -->
+      <ul class="clean-list">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span><b>登录状态</b><span>退出账号,下次需重新验证</span></span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+          <span><b>本次上传文件缓存</b><span>已保存到「我的」的不受影响</span></span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>
+          <span><b>AI 助手对话</b><span>共享终端对话不留存</span></span>
+        </li>
+      </ul>
+
+      <div class="timeout-actions">
+        <button class="btn primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12l5 5 9-10"/></svg>
+          继续使用
+        </button>
+        <button class="btn ghost">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          立即退出并清除本机会话
+        </button>
+      </div>
+    </section>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+      为保护您的隐私,公共设备将在超时后自动退出登录并清理本机会话;打印、扫描或 AI 任务进行中不会弹出本提醒。
+    </div>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

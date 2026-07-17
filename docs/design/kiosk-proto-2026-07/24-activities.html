@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 权益活动</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .compliance-band {
+    padding: 14px 22px; font-size: 18px; line-height: 1.55; color: var(--wheat-deep);
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); border-radius: 12px;
+  }
+  .act-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .act-card { display: flex; flex-direction: column; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 22px 24px; box-shadow: 0 3px 14px rgba(16,48,43,.05); }
+  .act-card .a-head { display: flex; align-items: flex-start; gap: 14px; }
+  .act-card .a-ico { width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft, var(--wheat-soft)); color: var(--accent-deep, var(--wheat-deep)); }
+  .act-card .a-ico svg { width: 30px; height: 30px; }
+  .act-card .a-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .act-card .a-chips .chip { font-size: 15.5px; padding: 5px 13px; }
+  .act-card h2 { font-family: var(--serif); font-size: 25px; font-weight: 700; letter-spacing: .5px; margin-top: 6px; }
+  .act-card .a-desc { font-size: 17.5px; color: var(--muted); line-height: 1.5; }
+  .act-card .a-meta { font-size: 16.5px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+  .act-card .btn { min-height: 60px; font-size: 21px; width: 100%; }
+  .act-card.ended { opacity: .6; }
+  .stock { font-size: 15.5px; font-weight: 600; border-radius: 999px; padding: 4px 12px; margin-left: auto; white-space: nowrap; }
+  .stock.ok { background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); }
+  .stock.low { background: var(--wheat-soft); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.3); }
+  .stock.off { background: var(--paper); color: var(--muted); border: 1px solid var(--line); }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-wheat">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回我的
+    </button>
+    <div class="titles">
+      <h1>权益活动</h1>
+      <p>领取平台服务权益、打印额度和政策信息提示 · 共 6 个活动</p>
+    </div>
+    <div class="aside">
+      <button class="btn ghost sm" style="white-space:nowrap;flex:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg>
+        我的权益
+      </button>
+    </div>
+  </div>
+
+  <main class="content a-wheat">
+
+    <!-- 合规提示带 -->
+    <div class="compliance-band">
+      权益活动只用于本终端服务与打印辅助。政策资格提示只提供官方入口和材料指引;招聘会相关活动不生成报名、签到或投递凭证。
+    </div>
+
+    <!-- 活动列表 -->
+    <div class="act-grid">
+
+      <div class="act-card a-clay">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">平台活动</span><span class="chip">优惠券</span><span class="stock ok">已领取</span></div>
+            <h2>简历打印 5 折券</h2>
+          </div>
+        </div>
+        <p class="a-desc">活动期间打印简历类文件可按券面折扣计费,以现场公示价目为准。</p>
+        <div class="a-meta"><span>2026-07-14 至 2026-07-20</span><span>已领取 · 可在我的权益查看</span></div>
+        <button class="btn ghost">查看我的权益</button>
+      </div>
+
+      <div class="act-card a-teal">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">校园活动</span><span class="chip">免费次数</span><span class="stock ok">可领取</span></div>
+            <h2>AI 简历诊断免费 3 次</h2>
+          </div>
+        </div>
+        <p class="a-desc">面向高校毕业生的 AI 简历诊断免费额度,领取后自动计入本人权益。</p>
+        <div class="a-meta"><span>有效期至 2026-08-31</span><span>3 次 / 份服务额度</span></div>
+        <button class="btn primary">查看详情</button>
+      </div>
+
+      <div class="act-card a-wheat">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M8 12h8"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">合作机构活动</span><span class="chip">服务额度</span><span class="stock low">即将领完</span></div>
+            <h2>黑白打印 20 页额度包</h2>
+          </div>
+        </div>
+        <p class="a-desc">合作机构发放的打印页数额度,仅限本终端使用,先到先得。</p>
+        <div class="a-meta"><span>有效期至 2026-09-30</span><span>已领取 · 可在我的权益查看</span></div>
+        <button class="btn ghost">查看我的权益</button>
+      </div>
+
+      <div class="act-card a-slate">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">政策提示</span><span class="chip">政策资格提示</span><span class="stock ok">已领取</span></div>
+            <h2>求职补贴资格提示</h2>
+          </div>
+        </div>
+        <p class="a-desc">仅提供政策资格提示、材料说明和官方入口指引,申请与结果以官方渠道为准。</p>
+        <div class="a-meta"><span>有效期以活动规则为准</span><span>已领取 · 仅作信息指引</span></div>
+        <button class="btn ghost">查看我的权益</button>
+      </div>
+
+      <div class="act-card a-wheat">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">招聘会服务活动</span><span class="chip">免费次数</span><span class="stock off">已领完</span></div>
+            <h2>参会材料免费打印 2 页</h2>
+          </div>
+        </div>
+        <p class="a-desc">夏季综合招聘会期间的参会材料打印服务,不代表报名、签到或投递结果。</p>
+        <div class="a-meta"><span>2026-07-25 当日有效</span><span>2 次 / 份服务额度</span></div>
+        <button class="btn ghost" disabled>已领完</button>
+      </div>
+
+      <div class="act-card ended a-clay">
+        <div class="a-head">
+          <span class="a-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span>
+          <div style="flex:1">
+            <div class="a-chips"><span class="chip src">平台活动</span><span class="chip">优惠券</span><span class="stock off">已结束</span></div>
+            <h2>春季就业服务集市打印券</h2>
+          </div>
+        </div>
+        <p class="a-desc">春季就业服务集市期间发放的打印优惠券,活动已结束。</p>
+        <div class="a-meta"><span>2026-03-10 至 2026-03-16</span><span>一次性权益</span></div>
+        <button class="btn ghost" disabled>已结束</button>
+      </div>
+
+    </div>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      活动发布后才会在这里展示;未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

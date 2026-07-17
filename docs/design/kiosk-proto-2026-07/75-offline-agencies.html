@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>线下招聘机构 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--clay); --accent-deep: var(--clay-deep); --accent-soft: var(--clay-soft); gap: 16px; }
+  .filter-bar { align-items: center; }
+  .filter-bar .lbl { flex: none; font-size: 20px; color: var(--muted); margin-right: 4px; }
+  .search-btn {
+    margin-left: auto; min-height: 64px; padding: 0 28px;
+    display: inline-flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    font-family: var(--sans); font-size: 21px; color: var(--ink); cursor: pointer;
+  }
+  .search-btn svg { width: 24px; height: 24px; color: var(--muted); }
+  .stats-band {
+    display: flex; align-items: center; gap: 20px;
+    background: var(--dark); color: #f4f1e8; border-radius: var(--r-md);
+    padding: 20px 32px;
+  }
+  .stats-band svg { width: 34px; height: 34px; flex: none; opacity: .8; }
+  .stats-band .cells { flex: 1; display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; }
+  .stats-band .n { font-family: var(--serif); font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stats-band .t { font-size: 17px; opacity: .65; margin-top: 4px; }
+  .list-meta { display: flex; align-items: center; font-size: 20px; color: var(--muted); }
+  .list-meta b { color: var(--ink); font-weight: 700; }
+  .list-meta .page-ind { margin-left: auto; font-variant-numeric: tabular-nums; }
+  .ag-list { display: flex; flex-direction: column; gap: 16px; flex: none; }
+  .ag-list .row-item { padding: 14px 24px; border-left: 5px solid var(--clay); min-height: 150px; align-items: center; }
+  .ag-logo {
+    width: 60px; height: 60px; flex: none; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--clay-soft); color: var(--clay-deep);
+  }
+  .ag-logo svg { width: 32px; height: 32px; }
+  .r-title { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .r-title b { font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  .st { flex: none; display: inline-flex; align-items: center; gap: 7px; font-size: 18px; font-weight: 600; padding: 4px 14px; border-radius: 999px; }
+  .st .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .st.open { color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); }
+  .st.open .dot { background: var(--teal); }
+  .st.rest { color: var(--muted); background: var(--paper); border: 1px solid var(--line); }
+  .st.rest .dot { background: var(--muted); opacity: .6; }
+  .r-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; margin-top: 7px; font-size: 18px; color: var(--muted); }
+  .r-info svg { width: 17px; height: 17px; flex: none; opacity: .7; }
+  .r-info span { display: inline-flex; align-items: center; gap: 7px; }
+  .row-item .r-sub { margin-top: 7px; gap: 8px 10px; }
+  .row-item .r-sub .chip { font-size: 16px; padding: 3px 10px; }
+  .content > .notice { font-size: 19px; }
+  .r-aside { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .r-aside .jobs-n { font-size: 30px; font-weight: 700; color: var(--clay-deep); font-variant-numeric: tabular-nums; }
+  .r-aside .jobs-t { font-size: 16px; color: var(--muted); margin-top: -4px; }
+  .r-aside .mini-btn {
+    min-height: 48px; padding: 0 20px; cursor: pointer; border-radius: 999px;
+    background: var(--surface); border: 1px solid rgba(184,104,60,.4);
+    font-family: var(--sans); font-size: 17px; font-weight: 600; color: var(--clay-deep);
+  }
+  .content > .notice { margin-top: auto; }
+  /* QA终审:压缩纵向空间,消除内容裁切 */
+  .content { gap: 12px; }
+  .content .card { padding-top: 17px; padding-bottom: 17px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回岗位信息
+    </button>
+    <div class="titles">
+      <h1>线下招聘机构</h1>
+      <p>合作人力资源机构门店 · 岗位咨询与应聘到店办理</p>
+    </div>
+    <div class="aside">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        机构资质核验后收录
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="filter-bar">
+      <span class="lbl">区域</span>
+      <button class="f-chip on">全部</button>
+      <button class="f-chip">城东区</button>
+      <button class="f-chip">城南区</button>
+      <button class="f-chip">城北区</button>
+      <button class="f-chip">高新区</button>
+      <button class="search-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        搜索机构名称
+      </button>
+    </div>
+    <div class="filter-bar">
+      <span class="lbl">服务</span>
+      <button class="f-chip on">全部</button>
+      <button class="f-chip">岗位推荐</button>
+      <button class="f-chip">用工咨询</button>
+      <button class="f-chip">劳务派遣</button>
+    </div>
+
+    <div class="stats-band">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg>
+      <div class="cells">
+        <div><div class="n">5</div><div class="t">合作机构</div></div>
+        <div><div class="n">43</div><div class="t">在招岗位</div></div>
+        <div><div class="n">4</div><div class="t">覆盖区域</div></div>
+        <div><div class="n">今天</div><div class="t">最近信息更新</div></div>
+      </div>
+    </div>
+
+    <div class="list-meta">
+      <span>共 <b>5</b> 家合作机构 · 机构资质核验后收录</span>
+      <span class="page-ind">按直线距离由近到远 · 服务时间由机构提供,节假日可能调整</span>
+    </div>
+
+    <div class="ag-list">
+
+      <div class="row-item">
+        <span class="ag-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+        <div class="r-main">
+          <div class="r-title"><b>诚安人力资源 · 城南门店</b><span class="st open"><span class="dot"></span>今日服务 09:00-17:30</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城南区幸福路32号临街商铺 · 距本机约1.2km(直线)</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周一至周六 09:00-17:30</span>
+          </div>
+          <div class="r-sub">
+            <span class="chip">岗位推荐</span><span class="chip">用工咨询</span><span class="chip">入职登记指引</span>
+            <span class="chip src">来源机构编号 ORG-2201</span><span class="chip">信息更新 <b>今天 08:30</b></span><span class="chip ok">岗位信息已审核</span>
+          </div>
+        </div>
+        <div class="r-aside"><div class="jobs-n">16</div><div class="jobs-t">在招岗位</div><button class="mini-btn">查看门店信息</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="ag-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+        <div class="r-main">
+          <div class="r-title"><b>众合人力资源 · 汇金街门店</b><span class="st open"><span class="dot"></span>今日服务 09:00-18:00</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城北区汇金街19号 · 距本机约2.4km(直线)</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周一至周日 09:00-18:00</span>
+          </div>
+          <div class="r-sub">
+            <span class="chip">岗位推荐</span><span class="chip">劳务派遣</span>
+            <span class="chip src">来源机构编号 ORG-2318</span><span class="chip">信息更新 <b>今天 08:30</b></span><span class="chip ok">岗位信息已审核</span>
+          </div>
+        </div>
+        <div class="r-aside"><div class="jobs-n">12</div><div class="jobs-t">在招岗位</div><button class="mini-btn">查看门店信息</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="ag-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+        <div class="r-main">
+          <div class="r-title"><b>汇才人力资源 · 高新园区店</b><span class="st open"><span class="dot"></span>今日服务 09:00-17:00</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>高新区科创大道105号 · 距本机约3.8km(直线)</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周一至周五 09:00-17:00</span>
+          </div>
+          <div class="r-sub">
+            <span class="chip">岗位推荐</span><span class="chip">用工咨询</span><span class="chip">劳务派遣</span>
+            <span class="chip src">来源机构编号 ORG-2405</span><span class="chip">信息更新 <b>今天 07:50</b></span><span class="chip ok">岗位信息已审核</span>
+          </div>
+        </div>
+        <div class="r-aside"><div class="jobs-n">9</div><div class="jobs-t">在招岗位</div><button class="mini-btn">查看门店信息</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="ag-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+        <div class="r-main">
+          <div class="r-title"><b>启航劳务服务部 · 城东店</b><span class="st rest"><span class="dot"></span>机构临时休息 · 以门店公告为准</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城东区建业路8号 · 距本机约4.5km(直线)</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周二至周日 09:00-17:00</span>
+          </div>
+          <div class="r-sub">
+            <span class="chip">劳务派遣</span><span class="chip">用工咨询</span>
+            <span class="chip src">来源机构编号 ORG-2452</span><span class="chip">信息更新 <b>昨天 18:20</b></span><span class="chip ok">岗位信息已审核</span>
+          </div>
+        </div>
+        <div class="r-aside"><div class="jobs-n">4</div><div class="jobs-t">在招岗位</div><button class="mini-btn">查看门店信息</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="ag-logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+        <div class="r-main">
+          <div class="r-title"><b>安泰人力资源 · 火车站店</b><span class="st open"><span class="dot"></span>今日服务 09:00-17:30</span></div>
+          <div class="r-info">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城南区站前广场西侧12号 · 距本机约5.1km(直线)</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>周一至周六 08:30-17:30</span>
+          </div>
+          <div class="r-sub">
+            <span class="chip">岗位推荐</span><span class="chip">用工咨询</span>
+            <span class="chip src">来源机构编号 ORG-2489</span><span class="chip">信息更新 <b>今天 08:30</b></span><span class="chip ok">岗位信息已审核</span>
+          </div>
+        </div>
+        <div class="r-aside"><div class="jobs-n">2</div><div class="jobs-t">在招岗位</div><button class="mini-btn">查看门店信息</button></div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      线下机构岗位的咨询与应聘请前往机构门店办理;本终端不代收简历、不代收任何费用,机构服务项目与收费以门店依法公示为准,请勿支付押金或未公示费用。
+    </div>
+
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

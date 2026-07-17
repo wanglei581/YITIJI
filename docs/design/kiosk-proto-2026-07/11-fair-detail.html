@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>招聘会详情 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 20px; }
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--line); flex: none; }
+  .tab { flex: 1; min-height: 76px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: none; border: none; cursor: pointer; font-family: var(--sans);
+    font-size: 23px; color: var(--muted); position: relative; }
+  .tab.on { color: var(--wheat-deep); font-weight: 700; }
+  .tab.on::after { content: ''; position: absolute; left: 22%; right: 22%; bottom: -2px; height: 4px; border-radius: 3px; background: var(--wheat); }
+  .ov-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 26px; }
+  .kv .k { font-size: 18px; color: var(--muted); }
+  .kv .v { font-size: 23px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .pill-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+  .traffic { margin-top: 18px; font-size: 19px; color: var(--muted); line-height: 1.55; }
+  .traffic b { display: block; font-size: 20px; color: var(--ink); margin-bottom: 6px; }
+  .mini-map { border-radius: 12px; border: 1px solid var(--line); background: var(--paper); position: relative; min-height: 280px; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+  .mini-map .grid-bg { position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px),
+      repeating-linear-gradient(90deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px); }
+  .mini-map .road { position: absolute; height: 26px; left: -5%; right: -5%; top: 46%; background: #fffdf8; border: 1px solid var(--line); transform: rotate(-7deg); }
+  .mini-map .pin { position: relative; width: 64px; height: 64px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    background: var(--wheat); display: grid; place-items: center; box-shadow: 0 8px 16px rgba(169,120,31,.35); }
+  .mini-map .pin i { width: 22px; height: 22px; border-radius: 50%; background: #fffdf8; transform: rotate(45deg); }
+  .mini-map .venue-tag { position: relative; font-size: 20px; font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 20px; }
+  .zones3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .zone-card { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper); padding: 20px 22px; position: relative; }
+  .zone-card .city { position: absolute; right: 20px; top: 20px; font-size: 17px; font-weight: 600; color: var(--wheat-deep); }
+  .zone-card .z-icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--wheat-soft); color: var(--wheat-deep); }
+  .zone-card .z-icon svg { width: 28px; height: 28px; }
+  .zone-card b { display: block; font-size: 23px; font-weight: 700; margin-top: 14px; }
+  .zone-card span { display: block; font-size: 17px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+  .svc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .svc-tiles .tile { min-height: 108px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; }
+  .svc-tiles .tile .cnt { font-size: 15px; color: var(--muted); }
+  .kv3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .pagehead .titles h1 { font-size: 36px; }
+  .actionbar { gap: 14px; padding-left: 38px; padding-right: 38px; }
+  .actionbar .btn { padding: 0 24px; }
+  /* QA终审:压缩卡片纵向空间,消除卡内内容裁切 */
+  .content .card { padding-top: 17px; padding-bottom: 17px; }
+  .content { gap: 14px; }
+  .content .card-head { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>2026年夏季高校毕业生招聘会</h1>
+      <p>来源 · 市就业服务中心 · 信息以来源平台为准</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip warn">即将开始</span>
+      <span class="chip"><svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21C7 16.5 4 13.3 4 9.8A4.8 4.8 0 0112 6a4.8 4.8 0 018 3.8c0 3.5-3 6.7-8 11.2z"/></svg>已收藏</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="tabs">
+      <button class="tab on">详情与特色</button>
+      <button class="tab">参展企业与岗位</button>
+      <button class="tab">场馆导览</button>
+      <button class="tab">数据大屏</button>
+    </div>
+
+    <!-- 概览:信息左 / 位置示意右 -->
+    <section class="card accented a-wheat">
+      <div class="ov-grid">
+        <div>
+          <div class="kv"><div class="k">主办方</div><div class="v">市人力资源和社会保障局</div></div>
+          <div class="kv" style="margin-top:16px"><div class="k">活动时间</div><div class="v">2026年7月20日 09:00 - 16:00</div></div>
+          <div class="pill-row">
+            <span class="chip"><b>市人才市场1F</b></span>
+            <span class="chip">预计参会 <b>5,000 人</b></span>
+            <span class="chip">参展企业 <b>120 家</b></span>
+            <span class="chip">招聘岗位 <b>860 个</b></span>
+          </div>
+          <div class="traffic">
+            <b>详细地址与交通指引</b>
+            人才北路 88 号市人才市场一层大厅。地铁 2 号线「人才市场」站 B 口步行约 300 米;公交 15 / 28 / 102 路「人才市场」站下车即到,场馆西侧设临时停车场。
+          </div>
+        </div>
+        <div class="mini-map">
+          <span class="grid-bg"></span><span class="road"></span>
+          <span class="pin"><i></i></span>
+          <span class="venue-tag">市人才市场 · 1F</span>
+          <span style="position:relative;font-size:15px">位置示意,实际以现场为准</span>
+          <button class="btn sm ghost" style="position:relative">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l19-8-8 19-2.5-8.5z"/></svg>
+            扫码在手机上导航
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 各市区创新特色展区 -->
+    <section class="card a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.8L18 9.5l-4.2 1.7L12 16l-1.8-4.8L6 9.5l4.2-1.7z"/><path d="M19 15l.9 2.3 2.1.9-2.1.9L19 21l-.9-1.9-2.1-.9 2.1-.9z"/></svg></span>
+        <div><h2>各市区创新特色展区</h2><div class="sub">由主办方设置,现场以指示牌为准</div></div>
+      </div>
+      <div class="zones3">
+        <div class="zone-card"><span class="city">高新区</span>
+          <span class="z-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+          <b>数字经济展区</b><span>软件、数据服务与人工智能相关企业集中展示</span>
+        </div>
+        <div class="zone-card"><span class="city">经开区</span>
+          <span class="z-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V9l5 3V9l5 3V7l6-3v16z"/></svg></span>
+          <b>智能制造展区</b><span>先进制造、精密仪器与新能源装备企业专区</span>
+        </div>
+        <div class="zone-card"><span class="city">主城区</span>
+          <span class="z-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg></span>
+          <b>现代服务展区</b><span>商贸、文旅与生活服务类企业与岗位集中区</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 现场服务入口 -->
+    <section class="card a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+        <div><h2>现场服务</h2><div class="sub">导览、资料与 AI 参会准备</div></div>
+      </div>
+      <div class="svc-tiles">
+        <button class="tile tinted"><span class="t-text"><b>展馆导览</b><span class="cnt">3 个展区 · 120 展位</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>活动资料</b><span class="cnt">6 份 · 可免费打印</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>现场数据</b><span class="cnt">签到进度 · 行业分布</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>AI参会准备单</b><span class="cnt">基于本人简历生成</span></span></button>
+      </div>
+    </section>
+
+    <!-- 数据来源(合规必展示) -->
+    <section class="card accented a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/></svg></span>
+        <div><h2>数据来源</h2><div class="sub">第三方 / 官方来源信息,请核对后前往办理</div></div>
+      </div>
+      <div class="kv3">
+        <div class="kv"><div class="k">来源机构</div><div class="v">市就业服务中心</div></div>
+        <div class="kv"><div class="k">同步时间</div><div class="v">2026-07-17 08:30</div></div>
+        <div class="kv"><div class="k">外部ID</div><div class="v">FAIR-2071</div></div>
+      </div>
+      <div class="notice" style="margin-top:18px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        预约请点击底部「扫码预约」,使用手机前往来源平台办理。本系统仅展示第三方来源信息,不参与活动报名流程。
+      </div>
+    </section>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.8L18 9.5l-4.2 1.7L12 16l-1.8-4.8L6 9.5l4.2-1.7z"/><path d="M19 15l.9 2.3 2.1.9-2.1.9L19 21l-.9-1.9-2.1-.9 2.1-.9z"/></svg>
+      AI准备单
+    </button>
+    <div class="spacer"></div>
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>
+      扫码签到
+    </button>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印资料
+    </button>
+    <button class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>
+      扫码预约
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI求职打印服务终端 · 手机确认登录</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 手机舞台覆写:390×844,居中展示,不用 shared.js 缩放 */
+  html, body { height: 100%; }
+  body { display: grid; place-items: center; padding: 24px 0; }
+  #stage {
+    width: 390px; height: 844px; transform: none;
+    border-radius: 28px; box-shadow: 0 24px 60px rgba(9,26,23,.4);
+    padding: 20px 20px 20px; gap: 11px;
+  }
+  /* 真机 390×844 视口:全出血渲染,不产生滚动 */
+  @media (max-height: 900px) {
+    body { padding: 0; }
+    #stage { border-radius: 0; box-shadow: none; }
+  }
+  .m-top { flex: none; display: flex; align-items: center; gap: 10px; }
+  .m-top .logo {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    display: grid; place-items: center; background: var(--dark); color: #f4f1e8;
+  }
+  .m-top .logo svg { width: 20px; height: 20px; }
+  .m-top b { font-family: var(--serif); font-size: 17px; font-weight: 700; letter-spacing: .5px; }
+  .m-top span { font-size: 13px; color: var(--muted); }
+  .m-term-card {
+    flex: none; text-align: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 18px 20px 16px; box-shadow: 0 3px 14px rgba(16,48,43,.05);
+  }
+  .m-term-card .t-icon {
+    width: 56px; height: 56px; margin: 0 auto; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .m-term-card .t-icon svg { width: 34px; height: 34px; }
+  .m-term-card h1 { margin-top: 10px; font-family: var(--serif); font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+  .m-term-card .t-sub { margin-top: 6px; font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+  .m-term-card .t-meta {
+    margin-top: 10px; display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px;
+  }
+  .m-term-card .t-meta b { color: var(--ink); font-weight: 600; }
+  .m-field { flex: none; }
+  .m-field label { display: block; font-size: 13.5px; font-weight: 700; margin-bottom: 7px; }
+  .m-field .in-row { display: flex; gap: 10px; }
+  .m-field input {
+    flex: 1; min-width: 0; min-height: 54px; padding: 0 14px;
+    font-size: 17px; font-family: var(--sans); color: var(--ink); letter-spacing: 1px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-variant-numeric: tabular-nums;
+  }
+  .m-field input:focus { outline: 2px solid var(--teal); border-color: transparent; }
+  .m-send {
+    flex: none; min-height: 54px; padding: 0 14px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 14px; font-weight: 600; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .m-sent {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--teal-deep);
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3);
+    border-radius: 10px; padding: 9px 12px;
+  }
+  .m-sent svg { width: 16px; height: 16px; flex: none; }
+  .m-confirm {
+    flex: none; min-height: 62px; border: none; border-radius: var(--r-sm); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--teal); color: #fffdf8; font-family: var(--sans);
+    font-size: 19px; font-weight: 700; letter-spacing: 3px;
+    box-shadow: 0 6px 16px rgba(31,158,134,.28);
+  }
+  .m-confirm:active { transform: scale(.98); }
+  .m-confirm svg { width: 22px; height: 22px; }
+  .m-safe {
+    flex: none; font-size: 13.5px; line-height: 1.55; color: var(--muted);
+    background: var(--paper); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 9px 12px;
+  }
+  .m-notice { margin-top: auto; flex: none; font-size: 13px; }
+  .m-notice svg { width: 16px; height: 16px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部小标 -->
+  <div class="m-top">
+    <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg></span>
+    <div><b>AI求职打印服务终端</b><br><span>手机确认登录</span></div>
+  </div>
+
+  <!-- 终端信息卡 -->
+  <section class="m-term-card">
+    <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="13" rx="2"/><path d="M9 21h6M12 16v5"/></svg></span>
+    <h1>就业服务大厅 · 01号机</h1>
+    <p class="t-sub">该一体机正在请求登录你的账号。<br>请确认是你本人在现场操作,再完成手机号验证。</p>
+    <span class="t-meta">二维码 <b>3 分钟</b>内有效 · 到期请在一体机上刷新</span>
+  </section>
+
+  <!-- 手机号 + 短信验证码(与真实确认流程一致) -->
+  <div class="m-field">
+    <label>手机号</label>
+    <div class="in-row">
+      <input type="tel" inputmode="numeric" autocomplete="tel" value="138 3691 6192" placeholder="请输入 11 位手机号">
+    </div>
+  </div>
+  <div class="m-field">
+    <label>短信验证码</label>
+    <div class="in-row">
+      <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位验证码">
+      <button class="m-send">重新发送(52s)</button>
+    </div>
+  </div>
+
+  <!-- 发送状态 -->
+  <div class="m-sent">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg>
+    验证码已发送至 138 3691 6192,未注册手机号验证后自动创建账号
+  </div>
+
+  <!-- 确认 / 取消 -->
+  <button class="m-confirm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12l5 5 9-10"/></svg>
+    确认在一体机上登录
+  </button>
+  <div class="m-safe">如非本人在一体机前操作,请勿输入验证码,直接关闭本页即可;二维码到期后自动失效。</div>
+
+  <!-- 提示 -->
+  <div class="notice m-notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+    确认后请回到一体机继续使用;离开时请记得在一体机上退出登录。手机号在系统中加密存储,页面展示时脱敏。
+  </div>
+
+</div>
+</body>
+</html>

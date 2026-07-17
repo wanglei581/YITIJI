@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>活动资料 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; }
+  .list { display: flex; flex-direction: column; gap: 14px; flex: none; }
+  .mat-row {
+    display: flex; align-items: center; gap: 20px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 20px 26px; min-height: 116px;
+  }
+  .mat-row.off { opacity: .65; }
+  .step-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .step-row { display: flex; align-items: center; gap: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 20px; min-height: 80px; }
+  .step-row .num { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--wheat-soft); color: var(--wheat-deep); font-family: var(--serif); font-size: 23px; font-weight: 700; }
+  .step-row .s-txt b { display: block; font-size: 20px; font-weight: 700; }
+  .step-row .s-txt span { display: block; font-size: 15.5px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+  .f-icon {
+    width: 60px; height: 60px; flex: none; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+  }
+  .f-icon svg { width: 32px; height: 32px; }
+  .m-main { flex: 1; }
+  .m-title { display: flex; align-items: center; gap: 12px; }
+  .m-title b { font-size: 24px; font-weight: 700; }
+  .mtype { font-size: 15px; font-weight: 600; padding: 3px 12px; border-radius: 999px; }
+  .mtype.sch { color: var(--slate-deep); background: var(--slate-soft); border: 1px solid rgba(63,104,176,.3); }
+  .mtype.map { color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); }
+  .mtype.co  { color: var(--plum-deep); background: var(--plum-soft); border: 1px solid rgba(122,90,134,.3); }
+  .mtype.pos { color: var(--clay-deep); background: var(--clay-soft); border: 1px solid rgba(184,104,60,.3); }
+  .mtype.bro { color: var(--wheat-deep); background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); }
+  .m-main .m-desc { font-size: 17px; color: var(--muted); margin-top: 6px; }
+  .m-main .r-sub { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 8px; font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .m-off { font-size: 18px; color: var(--muted); flex: none; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>活动资料</h1>
+      <p>2026年夏季高校毕业生招聘会 · 共 6 份资料 · 5 份可免费打印,请按需取用、节约纸张</p>
+    </div>
+    <div class="aside">
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>逐份免费打印</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="list">
+      <div class="mat-row">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6zM14 3v6h6"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>参会指南</b><span class="mtype bro">参会手册</span></span>
+          <span class="m-desc">含日程安排、入场须知与常见问题解答</span>
+          <span class="r-sub"><span>12 页 · 1.2 MB</span><span>A4 黑白 · 双面</span><span>已打印 56 次</span></span>
+        </span>
+        <button class="btn sm ghost" disabled>正在准备打印文件…</button>
+      </div>
+      <div class="mat-row">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>展位分布图</b><span class="mtype map">场馆图</span></span>
+          <span class="m-desc">A / B / C 三个展区与服务点位分布</span>
+          <span class="r-sub"><span>1 页 · 480 KB</span><span>A4 彩色 · 单面</span><span>已打印 132 次</span></span>
+        </span>
+        <button class="btn sm ghost">免费打印(1 页)</button>
+      </div>
+      <div class="mat-row">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>参展企业名录</b><span class="mtype co">企业名册</span></span>
+          <span class="m-desc">120 家参展企业与展位号对照表</span>
+          <span class="r-sub"><span>8 页 · 890 KB</span><span>A4 黑白 · 双面</span><span>已打印 74 次</span></span>
+        </span>
+        <button class="btn sm ghost">免费打印(8 页)</button>
+      </div>
+      <div class="mat-row">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>岗位速查清单</b><span class="mtype pos">岗位清单</span></span>
+          <span class="m-desc">按行业分类的在招岗位与薪资速查</span>
+          <span class="r-sub"><span>6 页 · 720 KB</span><span>A4 黑白 · 双面</span><span>已打印 61 次</span></span>
+        </span>
+        <button class="btn sm ghost">免费打印(6 页)</button>
+      </div>
+      <div class="mat-row">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>活动日程表</b><span class="mtype sch">日程</span></span>
+          <span class="m-desc">开幕式、政策宣讲与专场活动时间表</span>
+          <span class="r-sub"><span>1 页 · 96 KB</span><span>A4 黑白 · 单面</span><span>已打印 88 次</span></span>
+        </span>
+        <button class="btn sm ghost">免费打印(1 页)</button>
+      </div>
+      <div class="mat-row off">
+        <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="10" r="3"/><path d="M12 2a8 8 0 018 8c0 5.4-8 12-8 12S4 15.4 4 10a8 8 0 018-8z"/></svg></span>
+        <span class="m-main">
+          <span class="m-title"><b>交通指引</b><span class="mtype bro">其他</span></span>
+          <span class="m-desc">地铁 / 公交 / 停车指引(主办方更新中)</span>
+          <span class="r-sub"><span>2 页 · 180 KB</span><span>A4 黑白</span></span>
+        </span>
+        <span class="m-off">该资料暂不开放打印</span>
+      </div>
+    </div>
+
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+        <div><h2>如何打印</h2><div class="sub">三步完成,免费出纸</div></div>
+      </div>
+      <div class="step-strip">
+        <div class="step-row"><span class="num">1</span><div class="s-txt"><b>选择一份资料</b><span>点击对应资料的「免费打印」</span></div></div>
+        <div class="step-row"><span class="num">2</span><div class="s-txt"><b>确认打印参数</b><span>黑白 / 双面等参数已按推荐预设</span></div></div>
+        <div class="step-row"><span class="num">3</span><div class="s-txt"><b>取纸</b><span>在出纸口领取,注意保管个人物品</span></div></div>
+      </div>
+    </section>
+
+    <div class="meta-chips">
+      <span class="chip src">来源机构 <b>市就业服务中心</b></span>
+      <span class="chip">同步时间 <b>2026-07-17 08:30</b></span>
+      <span class="chip">外部ID <b>FAIR-2071</b></span>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      资料由主办方 / 机构上传,标记为可打印的资料均可免费打印;实际页数以文件为准。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回详情
+    </button>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>
+      查看参展企业
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

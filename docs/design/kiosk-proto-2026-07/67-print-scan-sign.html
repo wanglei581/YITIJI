@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>签名盖章 · 版式合成</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .flow-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .flow-col .step-card:last-child { flex: 1; display: flex; flex-direction: column; }
+  .flow-col .step-card:last-child .pos-wrap { flex: 1; align-items: center; }
+  .step-card { padding: 18px 22px; }
+  .step-card .s-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .step-card .s-head .n {
+    width: 40px; height: 40px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--clay-soft); color: var(--clay-deep); font-size: 19px; font-weight: 700;
+  }
+  .step-card .s-head b { font-size: 21px; font-weight: 700; }
+  .step-card .s-head .chip { margin-left: auto; }
+  .picked {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 12px 16px;
+  }
+  .picked svg { width: 28px; height: 28px; flex: none; color: var(--clay-deep); }
+  .picked b { font-size: 19px; font-weight: 700; word-break: break-all; display: block; }
+  .picked span { font-size: 15.5px; color: var(--muted); display: block; margin-top: 2px; }
+  .picked .re { margin-left: auto; flex: none; min-height: 52px; padding: 0 18px; border-radius: 10px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink); font-family: var(--sans); font-size: 16.5px; font-weight: 600; }
+  .pg-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .pg-grid button {
+    min-height: 72px; border-radius: 10px; cursor: pointer;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+    font-family: var(--sans); font-size: 19px; font-weight: 600;
+  }
+  .pg-grid button.on { border-color: var(--clay); background: var(--clay-soft); color: var(--clay-deep); font-weight: 700; }
+  .pos-wrap { display: flex; gap: 20px; align-items: flex-start; }
+  .pos-grid { display: grid; grid-template-columns: repeat(3, 104px); gap: 10px; flex: none; }
+  .pos-grid button {
+    height: 74px; border-radius: 10px; cursor: pointer;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+    font-family: var(--sans); font-size: 17px; font-weight: 600;
+  }
+  .pos-grid button.on { border-color: var(--clay); background: var(--clay-soft); color: var(--clay-deep); font-weight: 700; }
+  .size-col { flex: 1; }
+  .size-col .lb { font-size: 16px; color: var(--muted); margin-bottom: 8px; }
+  .side-col { width: 400px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .auth-card { padding: 18px 22px; }
+  .auth-row { display: flex; gap: 14px; align-items: center; min-height: 56px; cursor: pointer; }
+  .auth-row .cbx {
+    width: 44px; height: 44px; flex: none; border-radius: 10px;
+    background: var(--surface); border: 2px solid var(--line);
+    display: grid; place-items: center; color: transparent;
+  }
+  .auth-row .cbx svg { width: 24px; height: 24px; }
+  .auth-row p { font-size: 17px; line-height: 1.55; }
+  .auth-card .law { margin-top: 12px; font-size: 15px; color: var(--muted); line-height: 1.55; }
+  .after-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .after-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 10px; }
+  .after-card .list { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .after-card .tile { flex: 1; min-height: 72px; }
+  .demo-sheet {
+    width: 240px; aspect-ratio: 210 / 297; margin: 0 auto;
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 6px 16px rgba(16,48,43,.1); position: relative;
+    padding: 18px 15px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .demo-sheet .ln { height: 6px; border-radius: 3px; background: var(--line); }
+  .demo-sheet .ln.t { height: 11px; width: 55%; background: var(--ink); opacity: .7; }
+  .demo-sheet .ln.w8 { width: 82%; } .demo-sheet .ln.w6 { width: 62%; }
+  .demo-sheet .stamp {
+    position: absolute; right: 16px; bottom: 18px;
+    width: 58px; height: 58px; border-radius: 50%;
+    border: 3px solid rgba(193,74,52,.65);
+    display: grid; place-items: center;
+    color: rgba(193,74,52,.75); font-size: 12px; font-weight: 700; transform: rotate(-12deg);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回打印扫描服务
+    </button>
+    <div class="titles">
+      <h1>签名盖章</h1>
+      <p>在 PDF 上叠加签名 / 印章图片(版式合成)</p>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 非 CA 电子签合规声明 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本功能仅做图片版式合成,不提供 CA 电子签、电子认证或合同签署服务,不具备法律认证效力;正式法律文件请通过具备资质的电子签名服务办理。
+    </div>
+
+    <div class="split">
+
+      <!-- 左:四步流程 -->
+      <div class="flow-col">
+        <section class="card accented a-clay step-card">
+          <div class="s-head"><span class="n">1</span><b>选择 PDF 文档</b><span class="chip ok">已选择</span></div>
+          <div class="picked">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+            <span><b>实习协议_王同学.pdf</b><span>1.4 MB · 共 6 页 · 本机上传(不超过 15 MB)</span></span>
+            <button class="re">重新选择</button>
+          </div>
+        </section>
+
+        <section class="card accented a-clay step-card">
+          <div class="s-head"><span class="n">2</span><b>上传签名或印章图片</b><span class="chip ok">已上传</span></div>
+          <div class="picked">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 16l4.5-4 4 3.5L16 12l4 4"/></svg>
+            <span><b>手写签名_白底.png</b><span>0.3 MB · 建议白底或透明底 PNG,不超过 10 MB</span></span>
+            <button class="re">重新上传</button>
+          </div>
+        </section>
+
+        <section class="card accented a-clay step-card">
+          <div class="s-head"><span class="n">3</span><b>选择叠加位置</b></div>
+          <div style="font-size:16px;color:var(--muted);margin-bottom:8px;">页码(共 6 页,默认最后一页)</div>
+          <div class="pg-grid">
+            <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button><button class="on">6</button>
+          </div>
+          <div style="height:14px;"></div>
+          <div class="pos-wrap">
+            <div>
+              <div style="font-size:16px;color:var(--muted);margin-bottom:8px;">位置(对应纸面方向)</div>
+              <div class="pos-grid">
+                <button>左上</button><button>上</button><button>右上</button>
+                <button>左</button><button>中</button><button>右</button>
+                <button>左下</button><button>下</button><button class="on">右下</button>
+              </div>
+            </div>
+            <div class="size-col">
+              <div class="lb">大小</div>
+              <div class="opt-group">
+                <button class="opt">小</button>
+                <button class="opt on">中</button>
+                <button class="opt">大</button>
+              </div>
+              <div class="lb" style="margin-top:14px;">生成说明</div>
+              <p style="font-size:16px;color:var(--muted);line-height:1.55;">每次生成产生一份新文件,按短期策略自动清理;生成后可预览、去打印,或再加一处签名 / 印章。</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右:效果示意 + 授权 -->
+      <div class="side-col">
+        <section class="card step-card">
+          <div class="s-head"><b>叠加效果示意</b><span class="chip" style="margin-left:auto;">第 6 页 · 右下 · 中</span></div>
+          <div class="demo-sheet">
+            <div class="ln t"></div><div class="ln w8"></div><div class="ln w6"></div><div class="ln w8"></div>
+            <div class="ln w8"></div><div class="ln w6"></div><div class="ln w8"></div><div class="ln w6"></div>
+            <span class="stamp">签名区</span>
+          </div>
+          <p style="margin-top:12px;font-size:15.5px;color:var(--muted);text-align:center;">实际效果以生成后的 PDF 预览为准</p>
+        </section>
+
+        <section class="card accented a-clay auth-card">
+          <div class="s-head" style="display:flex;align-items:center;gap:12px;margin-bottom:10px;"><span class="n" style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--clay-soft);color:var(--clay-deep);font-size:19px;font-weight:700;">4</span><b style="font-size:21px;font-weight:700;">确认授权并生成</b></div>
+          <div class="auth-row">
+            <span class="cbx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 8"/></svg></span>
+            <p>我确认本人拥有该签名 / 印章图片的使用授权,仅用于本人材料的版式整理</p>
+          </div>
+          <p class="law">请点击上方勾选确认授权后再生成。伪造、变造印章或冒用他人签名属违法行为,责任由使用者自负。</p>
+        </section>
+
+        <section class="card after-card">
+          <b class="hd">生成后你可以</b>
+          <div class="list">
+            <button class="tile primary a-clay">
+              <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+              <span class="t-text"><b>去打印</b><span>预览合成 PDF 后进入确认打印</span></span>
+            </button>
+            <button class="tile a-clay">
+              <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span class="t-text"><b>再加一处签名 / 印章</b><span>以合成结果为底,继续叠加</span></span>
+            </button>
+            <button class="tile a-clay">
+              <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5v5h5M4.6 14a8 8 0 102-8.5L4 8"/></svg></span>
+              <span class="t-text"><b>重新选位置</b><span>不满意可回到本步重新生成</span></span>
+            </button>
+          </div>
+        </section>
+
+        <div class="notice warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>
+          文件访问凭证有效期约 30 分钟,过期请重新选择文件;图片方向不对请在手机上旋转后重新上传。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" disabled style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 19l7-7a3 3 0 00-4-4l-7 7-2 6z"/><path d="M14.5 6.5l3 3"/></svg>
+      生成合成 PDF(请先确认授权)
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

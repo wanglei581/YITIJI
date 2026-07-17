@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 打印预览</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .zoom-card { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .zoom-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; position: relative; }
+  .sheet {
+    width: min(100%, 500px); aspect-ratio: 210 / 297;
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 10px 28px rgba(16,48,43,.12);
+    padding: 40px 36px; display: flex; flex-direction: column; gap: 17px;
+  }
+  .ln { height: 10px; border-radius: 5px; background: var(--line); opacity: .8; }
+  .ln.t { height: 24px; width: 46%; background: var(--ink); opacity: .75; margin-bottom: 6px; }
+  .ln.h { width: 32%; background: var(--slate); opacity: .45; margin-top: 12px; }
+  .ln.w9 { width: 92%; } .ln.w8 { width: 80%; } .ln.w7 { width: 68%; } .ln.w5 { width: 52%; }
+  .zoom-tag {
+    position: absolute; left: 18px; top: 6px;
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 16px; color: var(--muted); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px;
+  }
+  .zoom-tag svg { width: 18px; height: 18px; }
+  .side-col { width: 400px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .thumbs-card { padding: 20px 22px; }
+  .thumbs-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 14px; }
+  .thumb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; padding-bottom: 14px; }
+  .pager { display: flex; align-items: center; gap: 18px; }
+  .pg-btn {
+    width: 60px; height: 60px; border-radius: 50%; cursor: pointer;
+    display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+  }
+  .pg-btn svg { width: 24px; height: 24px; }
+  .pager .pg-num { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .chk-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .chk-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 8px; }
+  .chk { flex: 1; display: flex; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .chk:last-child { border-bottom: none; }
+  .chk svg { width: 20px; height: 20px; flex: none; margin-top: 2px; color: var(--teal-deep); }
+  .chk p { font-size: 16.5px; line-height: 1.5; color: var(--muted); }
+  .chk p b { color: var(--ink); font-weight: 600; }
+  .thumb {
+    aspect-ratio: 210 / 297; cursor: pointer; position: relative;
+    background: #fff; border: 2px solid var(--line); border-radius: 6px;
+    padding: 12px 10px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .thumb.on { border-color: var(--slate); box-shadow: 0 4px 12px rgba(63,104,176,.2); }
+  .thumb .ln { height: 5px; }
+  .thumb .ln.t { height: 9px; margin-bottom: 2px; }
+  .thumb .pg {
+    position: absolute; bottom: -12px; left: 50%; transform: translateX(-50%);
+    font-size: 14px; color: var(--muted); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 999px; padding: 2px 12px; white-space: nowrap;
+  }
+  .thumb.on .pg { color: var(--slate-deep); border-color: var(--slate); font-weight: 600; }
+  .range-card { padding: 20px 22px; }
+  .range-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .range-card .sub { font-size: 16px; color: var(--muted); margin-bottom: 14px; }
+  .range-input {
+    margin-top: 12px; display: flex; align-items: center; white-space: nowrap;
+    min-height: 64px; padding: 0 20px;
+    background: var(--paper); border: 1px dashed var(--line); border-radius: var(--r-sm);
+    font-size: 18px; color: var(--muted);
+  }
+  .range-input b { margin: 0 8px; }
+  .range-input b { color: var(--ink); font-weight: 600; }
+  .meta-card { padding: 20px 22px; }
+  .meta-card .m-row { display: flex; align-items: center; gap: 14px; }
+  .meta-card .m-row svg { width: 30px; height: 30px; flex: none; color: var(--slate-deep); }
+  .meta-card .m-row b { font-size: 21px; font-weight: 700; word-break: break-all; }
+  .meta-card .meta-chips { margin-top: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:25</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>打印预览</h1>
+      <p>核对页面内容与页数,选择需要打印的页范围</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:单页放大 -->
+      <section class="card accented a-slate zoom-card">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5M8 11h6M11 8v6"/></svg></span>
+          <div><h2>单页放大</h2><div class="sub">当前显示第 1 页 · A4 幅面示意</div></div>
+        </div>
+        <div class="zoom-wrap">
+          <span class="zoom-tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.2"/><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/></svg>
+            预览
+          </span>
+          <div class="sheet">
+            <div class="ln t"></div>
+            <div class="ln w7"></div>
+            <div class="ln h"></div>
+            <div class="ln w9"></div>
+            <div class="ln w8"></div>
+            <div class="ln w9"></div>
+            <div class="ln w5"></div>
+            <div class="ln h"></div>
+            <div class="ln w9"></div>
+            <div class="ln w8"></div>
+            <div class="ln w7"></div>
+            <div class="ln w5"></div>
+          </div>
+          <div class="pager">
+            <button class="pg-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <span class="pg-num">1 / 3</span>
+            <button class="pg-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右:缩略图 + 页范围 + 文件信息 -->
+      <div class="side-col">
+        <section class="card thumbs-card">
+          <b class="hd">页面缩略图(共 3 页)</b>
+          <div class="thumb-grid">
+            <div class="thumb on"><div class="ln t"></div><div class="ln w8"></div><div class="ln w9"></div><div class="ln w7"></div><div class="ln w9"></div><div class="ln w5"></div><span class="pg">第 1 页</span></div>
+            <div class="thumb"><div class="ln t"></div><div class="ln w9"></div><div class="ln w7"></div><div class="ln w9"></div><div class="ln w8"></div><div class="ln w7"></div><span class="pg">第 2 页</span></div>
+            <div class="thumb"><div class="ln t"></div><div class="ln w7"></div><div class="ln w9"></div><div class="ln w5"></div><div class="ln w8"></div><div class="ln w9"></div><span class="pg">第 3 页</span></div>
+          </div>
+        </section>
+
+        <section class="card accented a-slate range-card">
+          <b class="hd">页面范围</b>
+          <div class="sub">默认打印全部页面,也可只打部分页</div>
+          <div class="opt-group">
+            <button class="opt on">全部页面</button>
+            <button class="opt">自定义</button>
+          </div>
+          <div class="field" style="margin-top:12px;">
+            <input type="text" placeholder="例:1-2, 3(选「自定义」后可输入)" disabled style="opacity:.65;">
+          </div>
+        </section>
+
+        <section class="card chk-card">
+          <b class="hd">继续前请核对</b>
+          <div class="chk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg>
+            <p><b>页数完整</b>:缩略图共 3 页,与原文件一致</p>
+          </div>
+          <div class="chk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg>
+            <p><b>内容清晰</b>:放大查看文字无缺失、无乱码</p>
+          </div>
+          <div class="chk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg>
+            <p><b>隐私选择</b>:已在材料检查中确认保留 / 遮挡</p>
+          </div>
+        </section>
+
+        <section class="card meta-card">
+          <div class="m-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+            <b>个人简历_王同学.pdf</b>
+          </div>
+          <div class="meta-chips">
+            <span class="chip"><b>3</b> 页</span>
+            <span class="chip"><b>2.1</b> MB</span>
+            <span class="chip">A4 · PDF</span>
+            <span class="chip warn">已完成隐私检查 · 遮挡 1 项 · 打印仍使用原文件</span>
+          </div>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          PDF 和图片可页内预览;Word 文档暂不支持页内预览,请核对文件名和页数后继续。若预览空白,可能是文件链接过期,请返回重新上传。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回材料检查
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      下一步 · 设置参数
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

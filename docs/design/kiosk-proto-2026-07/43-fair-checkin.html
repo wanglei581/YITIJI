@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>来源平台入场入口 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 22px; }
+  .entry-card {
+    display: grid; grid-template-columns: 1fr 280px; gap: 26px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    border-top: 4px solid var(--wheat);
+    padding: 28px 30px; box-shadow: 0 3px 14px rgba(16,48,43,.05);
+  }
+  .entry-card h2 { font-family: var(--serif); font-size: 30px; font-weight: 700; letter-spacing: 1px; margin-top: 14px; }
+  .entry-card .e-info { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-top: 14px; font-size: 20px; color: var(--muted); }
+  .entry-card .e-info span { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+  .entry-card .e-info svg { width: 19px; height: 19px; flex: none; opacity: .7; }
+  .entry-card .e-note {
+    margin-top: 16px; padding: 14px 20px; font-size: 18px; color: var(--muted); line-height: 1.5;
+    background: var(--paper); border-radius: 12px;
+  }
+  .entry-card .meta-chips { margin-top: 16px; }
+  .qr-side {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper); padding: 18px;
+  }
+  .qr-side .qr-box { width: 190px; height: 190px; border-width: 8px; }
+  .qr-side b { font-size: 20px; font-weight: 700; }
+  .qr-side span { font-size: 16px; color: var(--muted); text-align: center; line-height: 1.4; }
+  .step-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .step-row {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 18px 22px; min-height: 92px;
+  }
+  .step-row .num {
+    width: 50px; height: 50px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+    font-family: var(--serif); font-size: 25px; font-weight: 700;
+  }
+  .step-row .s-txt b { display: block; font-size: 21px; font-weight: 700; }
+  .step-row .s-txt span { display: block; font-size: 16px; color: var(--muted); margin-top: 5px; line-height: 1.4; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>来源平台入场入口</h1>
+      <p>展示招聘会官方 / 第三方来源签到二维码,本系统不记录签到结果</p>
+    </div>
+    <div class="aside">
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>2 场可签到</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="entry-card">
+      <div>
+        <div class="meta-chips" style="margin-top:0">
+          <span class="chip ok">进行中</span>
+          <span class="chip src">来源 · 云梦人才网</span>
+        </div>
+        <h2>现代服务业社会专场招聘会</h2>
+        <div class="e-info">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>2026-07-17 09:00 - 16:00</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>市人才市场2F</span>
+        </div>
+        <div class="e-note">请使用手机扫码前往来源平台签到。本系统不记录签到结果,请以来源平台显示为准。</div>
+        <div class="meta-chips">
+          <span class="chip">同步 <b>今天 08:30</b></span>
+          <span class="chip">外部ID <b>FAIR-2066</b></span>
+          <button class="btn sm ghost">查看详情</button>
+        </div>
+      </div>
+      <div class="qr-side">
+        <b>来源平台签到码</b>
+        <div class="qr-box"></div>
+        <span>扫码前往来源平台签到</span>
+      </div>
+    </div>
+
+    <div class="entry-card">
+      <div>
+        <div class="meta-chips" style="margin-top:0">
+          <span class="chip warn">即将开始</span>
+          <span class="chip src">来源 · 市就业服务中心</span>
+        </div>
+        <h2>2026年夏季高校毕业生招聘会</h2>
+        <div class="e-info">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>2026-07-20 09:00 - 16:00</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>市人才市场1F</span>
+        </div>
+        <div class="e-note">可提前打开来源平台签到码;开放与入场安排由主办方管理,本终端仅提供指引。</div>
+        <div class="meta-chips">
+          <span class="chip">同步 <b>今天 08:30</b></span>
+          <span class="chip">外部ID <b>FAIR-2071</b></span>
+          <button class="btn sm ghost">查看详情</button>
+        </div>
+      </div>
+      <div class="qr-side">
+        <b>来源平台签到码</b>
+        <div class="qr-box"></div>
+        <span>扫码前往来源平台签到</span>
+      </div>
+    </div>
+
+    <section class="card accented a-wheat">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6h11M9 12h11M9 18h11M4 6h.5M4 12h.5M4 18h.5"/></svg></span>
+        <div><h2>签到步骤</h2><div class="sub">三步完成来源平台现场签到</div></div>
+      </div>
+      <div class="step-strip">
+        <div class="step-row">
+          <span class="num">1</span>
+          <div class="s-txt"><b>手机扫描签到码</b><span>扫描上方对应场次的二维码</span></div>
+        </div>
+        <div class="step-row">
+          <span class="num">2</span>
+          <div class="s-txt"><b>来源平台完成签到</b><span>在来源平台页面按提示办理</span></div>
+        </div>
+        <div class="step-row">
+          <span class="num">3</span>
+          <div class="s-txt"><b>出示入场凭证</b><span>向现场工作人员出示凭证进场</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      签到与入场由主办方管理,本系统不记录签到结果、不接收报名信息或简历。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回首页
+    </button>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+      查看招聘会列表
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

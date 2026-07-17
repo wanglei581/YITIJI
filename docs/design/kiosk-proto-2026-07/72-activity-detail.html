@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 权益活动详情</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .hero { display: flex; align-items: flex-start; gap: 22px; padding: 28px 32px; }
+  .hero .h-ico { width: 76px; height: 76px; flex: none; border-radius: 18px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-deep); }
+  .hero .h-ico svg { width: 40px; height: 40px; }
+  .hero .h-main { flex: 1; min-width: 0; }
+  .hero .h-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .hero h2 { font-family: var(--serif); font-size: 36px; font-weight: 800; letter-spacing: 1px; margin-top: 14px; }
+  .hero .h-desc { margin-top: 10px; font-size: 21px; color: var(--muted); line-height: 1.55; }
+  .stock { font-size: 17px; font-weight: 600; border-radius: 999px; padding: 6px 16px; background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); white-space: nowrap; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .info-cell { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 20px 24px; }
+  .info-cell span { display: block; font-size: 18px; color: var(--muted); }
+  .info-cell b { display: block; margin-top: 8px; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rules { padding: 22px 28px; }
+  .rules h3 { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: 1px; margin-bottom: 14px; }
+  .rules p { display: flex; gap: 12px; align-items: baseline; font-size: 20px; line-height: 1.6; color: var(--ink); }
+  .rules p + p { margin-top: 10px; }
+  .rules p::before { content: ''; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--wheat); transform: translateY(-3px); }
+  .compliance-band {
+    padding: 16px 24px; font-size: 19px; line-height: 1.55; color: var(--wheat-deep);
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); border-radius: 12px;
+  }
+  .use-steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 22px 28px; }
+  .use-steps .u-step { display: flex; align-items: flex-start; gap: 14px; }
+  .use-steps .u-num { width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 21px; font-weight: 700; background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); }
+  .use-steps b { display: block; font-size: 21px; font-weight: 700; }
+  .use-steps span { display: block; margin-top: 5px; font-size: 17px; color: var(--muted); line-height: 1.45; }
+  .cta { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .cta .btn { min-height: 92px; font-size: 28px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-wheat">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回活动
+    </button>
+    <div class="titles">
+      <h1>权益活动详情</h1>
+      <p>领取后会进入本人「我的权益」</p>
+    </div>
+  </div>
+
+  <main class="content a-wheat">
+
+    <!-- 活动主卡 -->
+    <section class="card accented a-teal hero">
+      <span class="h-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+      <div class="h-main">
+        <div class="h-chips">
+          <span class="chip src">校园活动</span>
+          <span class="chip">免费次数</span>
+          <span class="stock">可领取 · 剩余 37 份</span>
+        </div>
+        <h2>AI 简历诊断免费 3 次</h2>
+        <p class="h-desc">面向高校毕业生的 AI 简历诊断免费额度。领取后自动计入本人权益,使用时优先抵扣免费次数,超出部分按现场公示价目计费。</p>
+      </div>
+    </section>
+
+    <!-- 权益内容 -->
+    <div class="info-grid">
+      <div class="info-cell"><span>权益额度</span><b>3 次 / 份服务额度</b></div>
+      <div class="info-cell"><span>活动有效期</span><b>领取后至 2026-08-31</b></div>
+    </div>
+
+    <!-- 活动规则 -->
+    <section class="card rules a-wheat">
+      <h3>活动规则</h3>
+      <p>每位登录用户限领 1 份,领取后不可转赠;仅限本终端 AI 简历诊断服务使用。</p>
+      <p>免费次数用完后,继续使用按现场公示价目计费;活动额度先到先得,领完即止。</p>
+      <p>主办方:市大学生就业指导中心;活动解释权归主办方所有,如有调整以大厅现场公告为准。</p>
+    </section>
+
+    <!-- 使用路径 -->
+    <section class="card use-steps">
+      <div class="u-step"><span class="u-num">1</span><div><b>领取权益</b><span>登录后点「立即领取」,计入本人权益</span></div></div>
+      <div class="u-step"><span class="u-num">2</span><div><b>使用服务</b><span>进入 AI 简历服务,优先抵扣免费次数</span></div></div>
+      <div class="u-step"><span class="u-num">3</span><div><b>查看余量</b><span>在「我的 - 我的权益」查看剩余次数与有效期</span></div></div>
+    </section>
+
+    <!-- 合规提示带 -->
+    <div class="compliance-band">
+      权益仅用于本终端服务与打印辅助,不代表招聘会报名、签到、投递结果、面试或录用承诺。
+    </div>
+
+    <!-- 行动区 -->
+    <div class="cta">
+      <button class="btn primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg>
+        立即领取
+      </button>
+      <button class="btn ghost">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.4 2.4 4.6-4.8"/></svg>
+        我的权益
+      </button>
+    </div>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      未登录时按钮显示「登录后领取」;已领取后显示「查看我的权益」;已领完或已结束时不可领取。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

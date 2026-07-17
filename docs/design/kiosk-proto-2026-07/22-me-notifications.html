@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 通知与反馈</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .noti-head { display: flex; align-items: center; gap: 14px; }
+  .noti-head .filter-bar { flex: 1; }
+  .noti-head .btn.sm { min-height: 56px; font-size: 19px; }
+  .noti-list { display: flex; flex-direction: column; gap: 12px; }
+  .n-card { display: flex; align-items: flex-start; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px 22px; }
+  .n-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--error); box-shadow: 0 0 0 4px rgba(193,74,52,.15); margin-top: 10px; }
+  .n-dot.read { background: var(--line); box-shadow: none; }
+  .n-main { flex: 1; min-width: 0; }
+  .n-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .n-top b { font-size: 22px; font-weight: 700; }
+  .n-cat { flex: none; font-size: 15.5px; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); color: var(--teal-deep); }
+  .n-cat.print { background: var(--wheat-soft); border-color: rgba(169,120,31,.3); color: var(--wheat-deep); }
+  .n-cat.fb { background: var(--clay-soft); border-color: rgba(184,104,60,.3); color: var(--clay-deep); }
+  .n-cat.sys { background: var(--slate-soft); border-color: rgba(63,104,176,.3); color: var(--slate-deep); }
+  .n-main p { margin-top: 5px; font-size: 18px; color: var(--muted); line-height: 1.45; }
+  .n-time { font-size: 16px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .n-ops { display: flex; flex-direction: column; gap: 8px; flex: none; }
+  .n-ops .btn.sm { min-height: 48px; padding: 0 16px; font-size: 17px; }
+  .n-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 17px; font-weight: 600; color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); border-radius: 999px; padding: 8px 16px; cursor: pointer; font-family: var(--sans); min-height: 48px; }
+  .fb-form { display: flex; flex-direction: column; gap: 14px; }
+  .fb-row { display: flex; gap: 14px; }
+  .fb-box { flex: 1; height: 180px; resize: none; padding: 16px 20px; font-family: var(--sans); font-size: 20px; line-height: 1.55; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); }
+  .fb-box::placeholder { color: #7d8880; }
+  .fb-side { display: flex; flex-direction: column; gap: 10px; width: 300px; flex: none; }
+  .fb-side input { min-height: 52px; padding: 0 18px; font-size: 19px; font-family: var(--sans); background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); }
+  .fb-side .btn { min-height: 56px; font-size: 21px; }
+  .fb-tickets { display: flex; gap: 12px; }
+  .fb-ticket { flex: 1; display: flex; align-items: center; gap: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font-size: 17px; }
+  .fb-ticket b { font-size: 18px; }
+  .fb-ticket .st { margin-left: auto; font-size: 15px; font-weight: 600; border-radius: 999px; padding: 4px 12px; background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); }
+  .fb-ticket .st.wait { background: var(--wheat-soft); color: var(--wheat-deep); border-color: rgba(169,120,31,.3); }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>通知与反馈</h1>
+      <p>本人设备、打印、文件与服务消息 · 提交服务反馈</p>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 消息通知 -->
+    <section class="card accented a-teal">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 9a6 6 0 10-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a1.8 1.8 0 003 0"/></svg></span>
+        <div><h2>消息通知</h2><div class="sub">未读 2 · 当前 4 条</div></div>
+      </div>
+      <div class="noti-head" style="margin-bottom:14px">
+        <div class="filter-bar">
+          <button class="f-chip on">全部</button>
+          <button class="f-chip">未读 2</button>
+        </div>
+        <button class="btn ghost sm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12l5 5L20 7"/></svg>
+          全部已读
+        </button>
+      </div>
+      <div class="noti-list">
+        <div class="n-card">
+          <span class="n-dot"></span>
+          <div class="n-main">
+            <div class="n-top"><b>打印订单已完成</b><span class="n-cat print">打印</span></div>
+            <p>「王同学_行政专员_简历.pdf」已打印完成,请在出纸口取走文件并核对页数。</p>
+            <div class="n-time">今天 10:23</div>
+          </div>
+          <div class="n-ops"><button class="btn ghost sm">已读</button><button class="btn ghost sm">删除</button></div>
+        </div>
+        <div class="n-card">
+          <span class="n-dot"></span>
+          <div class="n-main">
+            <div class="n-top"><b>简历诊断报告已生成</b><span class="n-cat">AI服务</span></div>
+            <p>诊断已完成,可在「AI服务记录」中查看诊断结果并继续优化。</p>
+            <div class="n-time">今天 10:08</div>
+          </div>
+          <div class="n-ops"><button class="btn ghost sm">已读</button><button class="btn ghost sm">删除</button></div>
+        </div>
+        <div class="n-card">
+          <span class="n-dot read"></span>
+          <div class="n-main">
+            <div class="n-top"><b>您的反馈已回复</b><span class="n-cat fb">反馈</span></div>
+            <p>「打印订单问题反馈」已由运营人员回复,可查看处理说明。</p>
+            <button class="n-link">查看相关反馈
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:18px;height:18px"><path d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <div class="n-time">07-16 14:20</div>
+          </div>
+          <div class="n-ops"><button class="btn ghost sm">删除</button></div>
+        </div>
+        <div class="n-card">
+          <span class="n-dot read"></span>
+          <div class="n-main">
+            <div class="n-top"><b>终端维护预告</b><span class="n-cat sys">维护</span></div>
+            <p>7月20日 02:00-04:00 系统维护,期间暂停服务,请提前安排。</p>
+            <div class="n-time">07-15 09:00</div>
+          </div>
+          <div class="n-ops"><button class="btn ghost sm">删除</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 意见反馈(项目内为独立页 /me/feedback,原型合并展示) -->
+    <section class="card accented a-clay">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 10h6M9 13.5h4"/></svg></span>
+        <div><h2>意见反馈</h2><div class="sub">设备、打印、文件处理与一般建议 · 共 2 条历史反馈</div></div>
+      </div>
+      <div class="fb-form">
+        <div class="opt-group">
+          <button class="opt">设备使用</button>
+          <button class="opt on">打印服务</button>
+          <button class="opt">文件处理</button>
+          <button class="opt">一般建议</button>
+        </div>
+        <div class="fb-row">
+          <textarea class="fb-box" placeholder="请填写至少 10 个字的反馈内容,例如:在哪个页面、做了什么操作、看到了什么结果……"></textarea>
+          <div class="fb-side">
+            <input type="text" placeholder="反馈标题,如:打印预览显示不完整">
+            <input type="text" placeholder="联系手机号(选填)">
+            <button class="btn primary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+              提交反馈
+            </button>
+          </div>
+        </div>
+        <div class="fb-tickets">
+          <div class="fb-ticket"><b>打印订单问题反馈</b><span>打印服务 · 07-15</span><span class="st">已回复</span></div>
+          <div class="fb-ticket"><b>扫描预览显示建议</b><span>文件处理 · 07-10</span><span class="st wait">处理中</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      通知与反馈仅关联本人服务,不涉及招聘平台闭环承诺;反馈处理结果会以消息通知告知,可补充描述或关闭反馈。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 用户服务协议</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .doc-tools { display: flex; align-items: center; gap: 14px; }
+  .font-btn {
+    min-width: 72px; min-height: 64px; padding: 0 18px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--serif); font-size: 24px; font-weight: 700; color: var(--ink); cursor: pointer;
+  }
+  .font-btn:active { transform: scale(.96); }
+  .doc-card {
+    flex: 1; min-height: 0; padding: 0; overflow: hidden;
+    display: grid; grid-template-columns: 264px 1fr;
+  }
+  .toc {
+    background: var(--paper); border-right: 1px solid var(--line);
+    padding: 26px 0; display: flex; flex-direction: column; gap: 4px;
+  }
+  .toc button {
+    min-height: 58px; padding: 0 24px; text-align: left; cursor: pointer;
+    background: none; border: none; border-left: 4px solid transparent;
+    font-family: var(--sans); font-size: 19px; color: var(--muted);
+  }
+  .toc button.on {
+    border-left-color: var(--teal); background: var(--teal-soft);
+    color: var(--teal-deep); font-weight: 700;
+  }
+  /* 正文可上下滑动阅读全文(真实页为滚动容器) */
+  .doc-body { padding: 30px 38px 40px; overflow-y: auto; position: relative; }
+  .doc-body::-webkit-scrollbar { width: 10px; }
+  .doc-body::-webkit-scrollbar-thumb { background: var(--line); border-radius: 999px; }
+  .doc-body::-webkit-scrollbar-track { background: var(--paper); }
+  .doc-body h2 { font-family: var(--serif); font-size: 33px; font-weight: 900; letter-spacing: 1px; }
+  .doc-body .meta { margin-top: 10px; font-size: 17px; color: var(--muted); }
+  .doc-body .intro {
+    margin-top: 16px; display: flex; align-items: flex-start; gap: 12px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); border-radius: 12px;
+    padding: 14px 18px; font-size: 18px; line-height: 1.55; color: var(--teal-deep);
+  }
+  .doc-body .intro svg { width: 24px; height: 24px; flex: none; }
+  .doc-body h3 {
+    font-family: var(--serif); font-size: 24px; font-weight: 700;
+    margin-top: 24px; letter-spacing: .5px;
+  }
+  .doc-body p { margin-top: 10px; font-size: 19.5px; line-height: 1.68; color: var(--ink); }
+  .doc-body .endmark {
+    margin-top: 26px; padding-top: 16px; border-top: 1px dashed var(--line);
+    font-size: 17px; color: var(--muted); text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机在线</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>用户服务协议</h1>
+      <p>更新日期:2026 年 6 月 22 日</p>
+    </div>
+    <div class="aside doc-tools">
+      <button class="font-btn">A−</button>
+      <button class="font-btn">A＋</button>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 文档切换(与真实路由 /legal/terms、/legal/privacy 对应) -->
+    <div class="filter-bar" style="flex:none">
+      <button class="f-chip on">用户服务协议</button>
+      <button class="f-chip">隐私政策</button>
+    </div>
+
+    <!-- 文档卡:目录 + 正文 + 滚动指示 -->
+    <section class="card doc-card">
+      <aside class="toc">
+        <button class="on">一、服务说明</button>
+        <button>二、账号与登录</button>
+        <button>三、用户承诺</button>
+        <button>四、AI 服务的性质</button>
+        <button>五、收费与打印</button>
+        <button>六、其他</button>
+      </aside>
+      <div class="doc-body">
+        <h2>AI求职打印服务终端 · 用户服务协议</h2>
+        <div class="meta">更新日期 2026 年 6 月 22 日 · 全文共六章</div>
+        <div class="intro">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v.5M12 11v5"/></svg>
+          请在使用服务前仔细阅读。继续登录或使用本终端服务,即视为您已阅读并同意本用户服务协议。
+        </div>
+        <h3>一、服务说明</h3>
+        <p>本终端为「AI求职打印服务终端」,提供 AI 简历服务(诊断、优化、生成)、文档打印扫描、第三方岗位信息与招聘会信息浏览入口、政策信息查询等服务。</p>
+        <p>本平台不是网络招聘平台:不提供平台内投递、不向企业收取或转交您的简历、不参与任何企业筛选、面试或录用环节。岗位与招聘会信息均来自第三方/官方来源,投递与报名请通过页面提供的来源平台入口自行办理。</p>
+        <h3>二、账号与登录</h3>
+        <p>您可以游客身份使用大部分服务。使用手机验证码登录后,可将服务记录(简历记录、文档、打印订单、收藏、权益)关联到您的账号,仅本人可见。</p>
+        <p>本终端为公共设备:页面刷新、离开或闲置超时后将自动退出登录并清除会话信息,请勿在终端上留存个人物品与文件。</p>
+        <h3>三、用户承诺</h3>
+        <p>您承诺上传的简历及其他文件为本人所有或已获合法授权,内容真实、不含违法信息。不得利用本终端从事任何违法活动,不得上传含他人隐私、涉密或侵权内容的文件。</p>
+        <h3>四、AI 服务的性质</h3>
+        <p>AI 诊断、优化与生成结果仅基于您提供的内容产生,仅供您本人修改简历时参考,不代表任何招聘结果承诺。本平台不作出"保面试""保录用""提高通过率"等任何承诺。</p>
+        <p>AI 输出可能存在偏差;通过拍照或扫描识别的内容(OCR)可能存在识别误差,请您在使用前核对关键信息。</p>
+        <h3>五、收费与打印</h3>
+        <p>打印服务按现场公示价目执行。打印任务一经确认开始输出,纸张耗材即发生消耗,请在确认前核对打印参数。</p>
+        <h3>六、其他</h3>
+        <p>本协议未尽事宜以现场公示及运营方发布的正式版本为准。如本页内容与正式发布版本不一致,以正式发布版本为准。</p>
+        <div class="endmark">— 全文完 · 可上下滑动回看 —</div>
+      </div>
+    </section>
+
+    <div class="notice" style="flex:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本文本为试运营版本,正式运营前以运营方法务审定发布的版本为准;如有疑问可咨询现场工作人员。
+    </div>
+
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>
