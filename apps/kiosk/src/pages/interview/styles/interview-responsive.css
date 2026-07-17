@@ -1,3 +1,4 @@
+/* service-desk tokens: --sd-surface --sd-text */
 @media (min-width: 1080px) {
   .interview-setup__form > .grid { grid-template-columns: 1fr 1fr; }
 }
@@ -114,4 +115,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: .01ms !important;
   }
+}
+
+@media (max-width: 390px) {
+  /* 390 宽移动端紧凑布局 */
+  .interview-shell { padding: 8px; }
+  .interview-session { gap: 8px; }
 }
