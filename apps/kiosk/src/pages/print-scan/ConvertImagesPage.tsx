@@ -6,15 +6,18 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
+  ArrowLeftIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   FileType2Icon,
   ImageIcon,
+  InfoIcon,
   LoaderIcon,
+  PlusIcon,
   QrCodeIcon,
   TrashIcon,
   UploadIcon,
@@ -158,120 +161,149 @@ export function ConvertImagesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
-      <PageHeader
-        title="格式转换"
-        subtitle="多张图片合并为一份 PDF，仅支持 JPG / PNG"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/print-scan')}>
-            返回打印扫描服务
-          </Button>
-        }
-      />
+    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
+        <div>
+          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
+          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
+          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
+            <span className="h-2.5 w-2.5 rounded-full bg-current" />
+            打印机正常 · A4纸充足
+          </span>
+        </div>
+      </header>
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
-        <ComplianceBanner tone="info">
-          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限。
-        </ComplianceBanner>
+      <div className="mt-5 flex shrink-0 items-center gap-5">
+        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
+          <ArrowLeftIcon className="h-5 w-5" />
+          返回打印扫描服务
+        </button>
+        <div>
+          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">格式转换</h1>
+          <p className="mt-1 text-xl text-neutral-500">多张图片合并为一份 PDF，仅支持 JPG / PNG</p>
+        </div>
+      </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />
-          <Button size="lg" variant="secondary" disabled={uploading || atLimit} onClick={() => inputRef.current?.click()}>
-            {uploading ? <LoaderIcon className="mr-1.5 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-1.5 h-5 w-5" />}
-            本机上传一张
-          </Button>
-          <Button size="lg" variant="secondary" disabled={atLimit} onClick={() => setShowQr(true)}>
-            <QrCodeIcon className="mr-1.5 h-5 w-5" />
-            手机扫码添加
-          </Button>
+      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-lg leading-relaxed text-info-fg">
+          <InfoIcon className="h-6 w-6 shrink-0" />
+          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时；生成后直接进入确认打印。
         </div>
 
-        {showQr && (
-          <Card className="p-4">
-            <UploadSessionQrPanel
-              purpose="print_doc"
-              title="手机扫码添加图片"
-              description="手机扫码上传一张图片，确认后自动加入待合并列表；可重复扫码继续添加。"
-              confirmLabel="确认加入待合并列表"
-              onUploaded={handlePhoneUploaded}
-              onBusyChange={setQrBusy}
-            />
-          </Card>
-        )}
-
         {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
-            <AlertCircleIcon className="h-4 w-4 shrink-0" />
+          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-base text-error-fg">
+            <AlertCircleIcon className="h-5 w-5 shrink-0" />
             {error}
           </div>
         )}
 
-        <Card className="p-4">
-          <p className="mb-3 text-sm font-medium text-neutral-700">
-            待合并图片（{images.length}/{MAX_IMAGES}）
-          </p>
-          {images.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-8 text-neutral-400">
-              <ImageIcon className="h-10 w-10" />
-              <p className="text-sm">还没有添加图片</p>
+        <div className="flex min-h-0 flex-1 gap-5">
+          <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-info/30 bg-surface p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="grid h-12 w-12 place-items-center rounded-full bg-info-bg text-info-fg">
+                <ImageIcon className="h-6 w-6" />
+              </span>
+              <div>
+                <h2 className="text-[26px] font-bold">待合并图片（{images.length} / {MAX_IMAGES}）</h2>
+                <p className="text-base text-neutral-500">合并顺序即页面顺序，可用右侧按钮调整或移除</p>
+              </div>
             </div>
-          ) : (
-            <div className="flex flex-col gap-2">
+
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
               {images.map((img, index) => (
-                <div key={img.fileId} className="flex items-center gap-3 rounded-xl border border-neutral-100 px-3 py-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-500">
-                    {index + 1}
+                <div key={img.fileId} className="flex flex-1 items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
+                  <span className="flex aspect-[210/297] h-[96px] shrink-0 flex-col gap-1 rounded border border-neutral-200 bg-white p-2 shadow-sm">
+                    <i className="h-2 w-3/5 rounded-full bg-info-bg ring-1 ring-info/20" />
+                    <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
+                    <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
+                    <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
+                    <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-900">{img.name}</p>
-                    <p className="text-xs text-neutral-400">{img.size}</p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={index === 0}
-                    onClick={() => moveImage(index, -1)}
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-neutral-400 disabled:opacity-30"
-                    aria-label="上移"
-                  >
-                    <ArrowUpIcon className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={index === images.length - 1}
-                    onClick={() => moveImage(index, 1)}
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-neutral-400 disabled:opacity-30"
-                    aria-label="下移"
-                  >
-                    <ArrowDownIcon className="h-5 w-5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-error-fg"
-                    aria-label="移除"
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
+                  <span className="min-w-0 flex-1">
+                    <b className="block break-all text-[22px] font-bold">{img.name}</b>
+                    <span className="mt-1 block text-[16.5px] text-neutral-500">{img.size} · {img.name.includes('手机') ? '手机扫码上传' : '本机上传'}</span>
+                  </span>
+                  <span className="flex shrink-0 flex-col gap-1.5">
+                    <button type="button" disabled={index === 0} onClick={() => moveImage(index, -1)} className="grid h-12 w-12 place-items-center rounded-md border border-neutral-200 bg-surface text-neutral-500 disabled:opacity-30" aria-label="上移">
+                      <ArrowUpIcon className="h-5 w-5" />
+                    </button>
+                    <button type="button" disabled={index === images.length - 1} onClick={() => moveImage(index, 1)} className="grid h-12 w-12 place-items-center rounded-md border border-neutral-200 bg-surface text-neutral-500 disabled:opacity-30" aria-label="下移">
+                      <ArrowDownIcon className="h-5 w-5" />
+                    </button>
+                    <button type="button" onClick={() => removeImage(index)} className="grid h-12 w-12 place-items-center rounded-md border border-error/30 bg-surface text-error-fg" aria-label="移除">
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </span>
                 </div>
               ))}
-            </div>
-          )}
-        </Card>
-      </div>
 
-      <div className="absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
-        <Button size="lg" className="h-14 w-full text-base" disabled={generating || images.length === 0} onClick={() => void handleGenerate()}>
-          {generating ? (
-            <>
-              <LoaderIcon className="mr-2 h-5 w-5 animate-spin" />
-              正在生成…
-            </>
-          ) : (
-            <>
-              <FileType2Icon className="mr-1.5 h-5 w-5" />
-              生成 PDF（{images.length} 张）
-            </>
-          )}
+              <button type="button" disabled={atLimit} onClick={() => inputRef.current?.click()} className="flex flex-1 items-center justify-center gap-3 rounded-md border-2 border-dashed border-neutral-200 bg-surface text-xl font-semibold text-neutral-500 disabled:opacity-45">
+                <PlusIcon className="h-7 w-7" />
+                {images.length === 0 ? '添加第一张图片' : `继续添加图片（还可添加 ${MAX_IMAGES - images.length} 张）`}
+              </button>
+            </div>
+
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-4 py-3 text-base text-info-fg">
+              <InfoIcon className="h-5 w-5 shrink-0" />
+              生成的 PDF 每张图片占一页，按 A4 自动排版；生成后文件名为「格式转换-{images.length || 0}张图片.pdf」。
+            </div>
+          </section>
+
+          <aside className="flex w-[420px] shrink-0 flex-col gap-4">
+            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+              <b className="mb-3 block text-xl font-bold">继续添加图片</b>
+              <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />
+              <button type="button" disabled={uploading || atLimit} onClick={() => inputRef.current?.click()} className="flex min-h-[88px] w-full items-center gap-4 rounded-lg border border-info/30 bg-info-bg px-4 text-left text-info-fg disabled:opacity-45">
+                <span className="grid h-12 w-12 place-items-center rounded-md bg-surface">
+                  {uploading ? <LoaderIcon className="h-6 w-6 animate-spin" /> : <UploadIcon className="h-6 w-6" />}
+                </span>
+                <span><b className="block text-xl font-bold">本机上传一张</b><span className="mt-1 block text-base text-neutral-500">每次选择一张，可连续添加</span></span>
+              </button>
+              <button type="button" disabled={atLimit} onClick={() => setShowQr(true)} className="mt-3 flex min-h-[88px] w-full items-center gap-4 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                <span className="grid h-12 w-12 place-items-center rounded-md bg-surface text-info-fg">
+                  <QrCodeIcon className="h-6 w-6" />
+                </span>
+                <span><b className="block text-xl font-bold">手机扫码添加</b><span className="mt-1 block text-base text-neutral-500">手机拍摄或选图，确认后加入列表</span></span>
+              </button>
+            </section>
+
+            {showQr && (
+              <UploadSessionQrPanel
+                purpose="print_doc"
+                title="手机扫码添加图片"
+                description="手机扫码上传一张图片，确认后自动加入待合并列表；可重复扫码继续添加。"
+                confirmLabel="确认加入待合并列表"
+                onUploaded={handlePhoneUploaded}
+                onBusyChange={setQrBusy}
+              />
+            )}
+
+            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+              <b className="mb-2 block text-xl font-bold">转换规则</b>
+              <ul className="flex flex-1 list-disc flex-col justify-around gap-2 pl-5 text-[17.5px] leading-relaxed text-neutral-500">
+                <li>仅支持 JPG / PNG 图片，单张不超过 10 MB。</li>
+                <li>一次最多合并 20 张图片，生成一份 PDF。</li>
+                <li>合并顺序即 PDF 页面顺序，生成前请调整好。</li>
+                <li>生成后自动进入确认打印；PDF 已保存到「我的文档」。</li>
+              </ul>
+            </section>
+          </aside>
+        </div>
+      </main>
+
+      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+        <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
+          <ArrowLeftIcon className="mr-2 h-5 w-5" />
+          返回
+        </Button>
+        <span className="flex-1" />
+        <Button size="lg" className="h-14 min-w-[460px] text-lg" disabled={generating || images.length === 0} onClick={() => void handleGenerate()}>
+          {generating ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <FileType2Icon className="mr-2 h-5 w-5" />}
+          {generating ? '正在生成…' : `生成 PDF（${images.length} 张）`}
         </Button>
       </div>
     </div>

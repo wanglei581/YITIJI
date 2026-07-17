@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   makePrintParams,
@@ -17,8 +17,10 @@ import {
 } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
+  ArrowLeftIcon,
   FileTextIcon,
   ImageIcon,
+  InfoIcon,
   LoaderIcon,
   PenToolIcon,
   PrinterIcon,
@@ -275,232 +277,236 @@ export function SignStampPage() {
   }
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto px-6 pt-6 pb-8">
-      <PageHeader
-        title="签名盖章"
-        subtitle="在 PDF 上叠加签名/印章图片（版式合成）"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/print-scan')}>
-            返回打印扫描服务
-          </Button>
-        }
-      />
+    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
+        <div>
+          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
+          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
+          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
+            <span className="h-2.5 w-2.5 rounded-full bg-current" />
+            打印机正常 · A4纸充足
+          </span>
+        </div>
+      </header>
 
-      <div className="mt-4">
-        <ComplianceBanner tone="info">{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}</ComplianceBanner>
+      <div className="mt-5 flex shrink-0 items-center gap-5">
+        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
+          <ArrowLeftIcon className="h-5 w-5" />
+          返回打印扫描服务
+        </button>
+        <div>
+          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">签名盖章</h1>
+          <p className="mt-1 text-xl text-neutral-500">在 PDF 上叠加签名 / 印章图片（版式合成）</p>
+        </div>
       </div>
 
-      {error && (
-        <div className="mt-3 flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
-          <AlertCircleIcon className="h-4 w-4 shrink-0" />
-          {error}
+      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-5 py-4 text-lg leading-relaxed text-warning-fg">
+          <InfoIcon className="h-6 w-6 shrink-0" />
+          {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
         </div>
-      )}
+        {error && (
+          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-base text-error-fg">
+            <AlertCircleIcon className="h-5 w-5 shrink-0" />
+            {error}
+          </div>
+        )}
 
-      {result === null ? (
-        <div className="mt-4 flex flex-col gap-4">
-          {/* 第 1 步：文档 */}
-          <Card className="p-4">
-            <p className="mb-3 text-sm font-medium text-neutral-700">第 1 步 · 选择 PDF 文档</p>
-            {document ? (
-              <div className="flex items-center gap-3 rounded-xl border border-neutral-100 px-3 py-2.5">
-                <FileTextIcon className="h-6 w-6 shrink-0 text-primary-500" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-neutral-900">{document.name}</p>
-                  <p className="text-xs text-neutral-400">{document.size}{pages !== null ? ` · 共 ${pages} 页` : ''}</p>
-                </div>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setDocument(null); setPages(null); setStamp(null); setAuthorized(false); setError(null) }}>
-                  重新选择
-                </Button>
+        <div className="flex min-h-0 flex-1 gap-5">
+          <section className="flex min-w-0 flex-1 flex-col gap-4">
+            <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">1</span>
+                <b className="text-[21px] font-bold">选择 PDF 文档</b>
+                {document && <span className="ml-auto rounded-full bg-success-bg px-3 py-1 text-sm font-semibold text-success-fg">已选择</span>}
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <input ref={docInputRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => void handleLocalDoc(e)} />
-                <Button size="lg" variant="secondary" disabled={busy} onClick={() => docInputRef.current?.click()}>
-                  {busy ? <LoaderIcon className="mr-1.5 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-1.5 h-5 w-5" />}
-                  本机上传 PDF
-                </Button>
-                <Button size="lg" variant="secondary" disabled={busy} onClick={() => setShowQr('document')}>
-                  <QrCodeIcon className="mr-1.5 h-5 w-5" />
-                  手机扫码上传
-                </Button>
-              </div>
-            )}
-            {showQr === 'document' && (
-              <div className="mt-3">
-                <UploadSessionQrPanel
-                  purpose="print_doc"
-                  title="手机扫码上传 PDF 文档"
-                  description="手机扫码上传一份 PDF，确认后自动进入下一步。"
-                  confirmLabel="确认使用该文档"
-                  onUploaded={handlePhoneUploaded('document')}
-                  onBusyChange={setQrBusy}
-                />
-              </div>
-            )}
-          </Card>
-
-          {/* 第 2 步：签名/印章图片 */}
-          {document && (
-            <Card className="p-4">
-              <p className="mb-1 text-sm font-medium text-neutral-700">第 2 步 · 上传签名或印章图片</p>
-              <p className="mb-3 text-xs text-neutral-400">建议上传白底或透明底 PNG；若图片方向不对，请在手机上旋转后重新上传。</p>
-              {stamp ? (
-                <div className="flex items-center gap-3 rounded-xl border border-neutral-100 px-3 py-2.5">
-                  <StampIcon className="h-6 w-6 shrink-0 text-primary-500" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-neutral-900">{stamp.name}</p>
-                    <p className="text-xs text-neutral-400">{stamp.size}</p>
-                  </div>
-                  <Button size="sm" variant="secondary" disabled={busy} onClick={() => { setStamp(null); setAuthorized(false); setError(null) }}>
-                    重新上传
-                  </Button>
+              {document ? (
+                <div className="flex items-center gap-3 rounded-md border border-neutral-200 bg-canvas px-4 py-3">
+                  <FileTextIcon className="h-7 w-7 shrink-0 text-warning-fg" />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-[19px] font-bold">{document.name}</b>
+                    <span className="mt-0.5 block text-[15.5px] text-neutral-500">{document.size}{pages !== null ? ` · 共 ${pages} 页` : ''}</span>
+                  </span>
+                  <button type="button" disabled={busy} onClick={() => { setDocument(null); setPages(null); setStamp(null); setAuthorized(false); setError(null) }} className="h-12 rounded-md border border-neutral-200 bg-surface px-4 text-base font-semibold">
+                    重新选择
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
-                  <input ref={stampInputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void handleLocalStamp(e)} />
-                  <Button size="lg" variant="secondary" disabled={busy} onClick={() => stampInputRef.current?.click()}>
-                    {busy ? <LoaderIcon className="mr-1.5 h-5 w-5 animate-spin" /> : <ImageIcon className="mr-1.5 h-5 w-5" />}
-                    本机上传图片
+                  <input ref={docInputRef} type="file" accept="application/pdf" className="sr-only" onChange={(e) => void handleLocalDoc(e)} />
+                  <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => docInputRef.current?.click()}>
+                    {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <UploadIcon className="mr-2 h-5 w-5" />}
+                    本机上传 PDF
                   </Button>
-                  <Button size="lg" variant="secondary" disabled={busy} onClick={() => setShowQr('stamp')}>
-                    <QrCodeIcon className="mr-1.5 h-5 w-5" />
+                  <Button size="lg" variant="secondary" className="h-14" disabled={busy} onClick={() => setShowQr('document')}>
+                    <QrCodeIcon className="mr-2 h-5 w-5" />
                     手机扫码上传
+                  </Button>
+                </div>
+              )}
+              {showQr === 'document' && (
+                <div className="mt-3">
+                  <UploadSessionQrPanel purpose="print_doc" title="手机扫码上传 PDF 文档" description="手机扫码上传一份 PDF，确认后自动进入下一步。" confirmLabel="确认使用该文档" onUploaded={handlePhoneUploaded('document')} onBusyChange={setQrBusy} />
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">2</span>
+                <b className="text-[21px] font-bold">签名画布 / 上传签名或印章图片</b>
+                {stamp && <span className="ml-auto rounded-full bg-success-bg px-3 py-1 text-sm font-semibold text-success-fg">已上传</span>}
+              </div>
+              {stamp ? (
+                <div className="flex items-center gap-3 rounded-md border border-neutral-200 bg-canvas px-4 py-3">
+                  <StampIcon className="h-7 w-7 shrink-0 text-warning-fg" />
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-[19px] font-bold">{stamp.name}</b>
+                    <span className="mt-0.5 block text-[15.5px] text-neutral-500">{stamp.size}</span>
+                  </span>
+                  <button type="button" disabled={busy} onClick={() => { setStamp(null); setAuthorized(false); setError(null) }} className="h-12 rounded-md border border-neutral-200 bg-surface px-4 text-base font-semibold">
+                    重新上传
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-[1fr_180px_180px] gap-3">
+                  <div className="flex min-h-[88px] flex-col items-center justify-center rounded-md border-2 border-dashed border-warning/30 bg-warning-bg/50 px-4 text-center">
+                    <span className="text-[18px] font-semibold text-warning-fg">签名画布预留区</span>
+                    <span className="mt-1 text-sm leading-relaxed text-neutral-500">本批次请上传签名 / 印章图片；触屏手写将在校准后开放</span>
+                  </div>
+                  <input ref={stampInputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => void handleLocalStamp(e)} />
+                  <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => stampInputRef.current?.click()}>
+                    {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <ImageIcon className="mr-2 h-5 w-5" />}
+                    本机上传
+                  </Button>
+                  <Button size="lg" variant="secondary" className="h-full" disabled={busy || !document} onClick={() => setShowQr('stamp')}>
+                    <QrCodeIcon className="mr-2 h-5 w-5" />
+                    手机扫码
                   </Button>
                 </div>
               )}
               {showQr === 'stamp' && (
                 <div className="mt-3">
-                  <UploadSessionQrPanel
-                    purpose="signature_image"
-                    title="手机扫码上传签名/印章图片"
-                    description="手机拍摄或选择签名/印章图片（JPG/PNG），确认后自动进入下一步。"
-                    confirmLabel="确认使用该图片"
-                    onUploaded={handlePhoneUploaded('stamp')}
-                    onBusyChange={setQrBusy}
-                  />
+                  <UploadSessionQrPanel purpose="signature_image" title="手机扫码上传签名/印章图片" description="手机拍摄或选择签名/印章图片（JPG/PNG），确认后自动进入下一步。" confirmLabel="确认使用该图片" onUploaded={handlePhoneUploaded('stamp')} onBusyChange={setQrBusy} />
                 </div>
               )}
-            </Card>
-          )}
+            </div>
 
-          {/* 第 3 步：位置 */}
-          {document && stamp && pages !== null && (
-            <Card className="p-4">
-              <p className="mb-3 text-sm font-medium text-neutral-700">第 3 步 · 选择叠加位置</p>
-
-              <p className="mb-2 text-xs text-neutral-500">页码（共 {pages} 页）</p>
-              <div className="mb-4 grid grid-cols-6 gap-2">
-                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPage(p)}
-                    className={[
-                      'flex h-12 items-center justify-center rounded-lg border text-sm font-medium',
-                      p === page ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-neutral-200 text-neutral-600',
-                    ].join(' ')}
-                  >
+            <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">3</span>
+                <b className="text-[21px] font-bold">选择叠加位置</b>
+              </div>
+              <div className="mb-3 text-base text-neutral-500">页码（共 {pages ?? 1} 页，默认最后一页）</div>
+              <div className="grid grid-cols-6 gap-2">
+                {Array.from({ length: pages ?? 1 }, (_, i) => i + 1).map((p) => (
+                  <button key={p} type="button" disabled={!document || !stamp || pages === null} onClick={() => setPage(p)} className={['h-[54px] rounded-md border-2 text-lg font-semibold disabled:opacity-40', p === page ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
                     {p}
                   </button>
                 ))}
               </div>
-
-              <p className="mb-2 text-xs text-neutral-500">位置（对应纸面方向）</p>
-              <div className="mx-auto mb-4 grid w-full max-w-xs grid-cols-3 gap-2">
-                {POSITIONS.map((pos) => (
-                  <button
-                    key={pos.key}
-                    type="button"
-                    onClick={() => setPosition(pos.key)}
-                    className={[
-                      'flex h-14 items-center justify-center rounded-lg border text-sm font-medium',
-                      pos.key === position ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-neutral-200 text-neutral-600',
-                    ].join(' ')}
-                  >
-                    {pos.label}
-                  </button>
-                ))}
+              <div className="mt-4 flex flex-1 gap-5">
+                <div>
+                  <div className="mb-2 text-base text-neutral-500">位置（对应纸面方向）</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {POSITIONS.map((pos) => (
+                      <button key={pos.key} type="button" disabled={!document || !stamp} onClick={() => setPosition(pos.key)} className={['h-[58px] w-[92px] rounded-md border-2 text-base font-semibold disabled:opacity-40', pos.key === position ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
+                        {pos.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-2 text-base text-neutral-500">大小</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SIZES.map((s) => (
+                      <button key={s.key} type="button" disabled={!document || !stamp} onClick={() => setSize(s.key)} className={['h-[52px] rounded-md border-2 text-base font-semibold disabled:opacity-40', s.key === size ? 'border-warning bg-warning-bg text-warning-fg' : 'border-neutral-200 bg-surface text-neutral-500'].join(' ')}>
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-base leading-relaxed text-neutral-500">每次生成产生一份新文件，按短期策略自动清理；生成后可预览、去打印，或再加一处签名 / 印章。</p>
+                </div>
               </div>
-
-              <p className="mb-2 text-xs text-neutral-500">大小</p>
-              <div className="grid grid-cols-3 gap-2">
-                {SIZES.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => setSize(s.key)}
-                    className={[
-                      'flex h-12 items-center justify-center rounded-lg border text-sm font-medium',
-                      s.key === size ? 'border-primary-500 bg-primary-50 text-primary-600' : 'border-neutral-200 text-neutral-600',
-                    ].join(' ')}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* 授权确认 + 生成 */}
-          {document && stamp && pages !== null && (
-            <Card className="p-4">
-              <label className="flex min-h-12 cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={authorized}
-                  onChange={(e) => setAuthorized(e.target.checked)}
-                  className="mt-1 h-6 w-6 shrink-0 accent-primary-500"
-                />
-                <span className="text-sm leading-relaxed text-neutral-700">{AUTHORIZATION_LABEL}</span>
-              </label>
-              <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。本功能仅做图片版式合成，每次生成会产生一份新文件，按短期策略自动清理。
-              </p>
-              <Button size="lg" className="mt-4 h-14 w-full text-base" disabled={busy || !authorized} onClick={() => void handleCompose()}>
-                {busy ? (
-                  <>
-                    <LoaderIcon className="mr-2 h-5 w-5 animate-spin" />
-                    正在生成…
-                  </>
-                ) : (
-                  <>
-                    <PenToolIcon className="mr-1.5 h-5 w-5" />
-                    生成合成 PDF
-                  </>
-                )}
-              </Button>
-            </Card>
-          )}
-        </div>
-      ) : (
-        /* 第 4 步：结果预览 */
-        <div className="mt-4 flex flex-col gap-4">
-          <Card className="p-4">
-            <p className="mb-3 text-sm font-medium text-neutral-700">合成完成 · 预览</p>
-            <div className="h-[480px] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
-              <iframe title={`${result.name} 预览`} src={result.printFileUrl} className="h-full w-full bg-white" />
             </div>
-            <p className="mt-2 text-xs text-neutral-400">
-              {result.name} · {formatBytes(result.sizeBytes)} · 共 {result.pages} 页
-            </p>
-          </Card>
-          <Button size="lg" className="h-14 w-full text-base" onClick={goPrint}>
-            <PrinterIcon className="mr-1.5 h-5 w-5" />
+          </section>
+
+          <aside className="flex w-[400px] shrink-0 flex-col gap-4">
+            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-3">
+                <b className="text-xl font-bold">{result ? '合成 PDF 预览' : '叠加效果示意'}</b>
+                <span className="ml-auto rounded-full bg-neutral-50 px-3 py-1 text-sm font-semibold text-neutral-500">第 {page} 页 · {POSITIONS.find((p) => p.key === position)?.label} · {SIZES.find((s) => s.key === size)?.label}</span>
+              </div>
+              {result ? (
+                <div className="h-[360px] overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                  <iframe title={`${result.name} 预览`} src={result.printFileUrl} className="h-full w-full bg-white" />
+                </div>
+              ) : (
+                <div className="relative mx-auto flex aspect-[210/297] w-[240px] flex-col gap-2 rounded-md border border-neutral-200 bg-white p-4 shadow-md">
+                  <i className="h-3 w-1/2 rounded-full bg-neutral-800/70" />
+                  <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
+                  <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
+                  <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
+                  <span className="absolute bottom-4 right-4 grid h-[58px] w-[58px] rotate-[-12deg] place-items-center rounded-full border-[3px] border-error/60 text-xs font-bold text-error/70">签名区</span>
+                </div>
+              )}
+              <p className="mt-3 text-center text-[15.5px] text-neutral-500">{result ? `${result.name} · ${formatBytes(result.sizeBytes)} · 共 ${result.pages} 页` : '实际效果以生成后的 PDF 预览为准'}</p>
+            </section>
+
+            <section className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">4</span>
+                <b className="text-[21px] font-bold">确认授权并生成</b>
+              </div>
+              <label className="flex min-h-12 cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1 h-6 w-6 shrink-0 accent-warning" />
+                <span className="text-[17px] leading-relaxed text-neutral-700">{AUTHORIZATION_LABEL}</span>
+              </label>
+              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
+            </section>
+
+            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+              <b className="mb-3 block text-xl font-bold">生成后你可以</b>
+              <div className="flex flex-1 flex-col gap-2.5">
+                <button type="button" disabled={!result} onClick={goPrint} className="flex flex-1 items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
+                  <PrinterIcon className="h-6 w-6" />
+                  <span><b className="block text-lg font-bold">去打印</b><span className="text-sm text-neutral-500">预览合成 PDF 后进入确认打印</span></span>
+                </button>
+                <button type="button" disabled={!result} onClick={addAnother} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                  <StampIcon className="h-6 w-6 text-warning-fg" />
+                  <span><b className="block text-lg font-bold">再加一处签名 / 印章</b><span className="text-sm text-neutral-500">以合成结果为底继续叠加</span></span>
+                </button>
+                <button type="button" disabled={!result} onClick={redoPlacement} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                  <RotateCcwIcon className="h-6 w-6 text-warning-fg" />
+                  <span><b className="block text-lg font-bold">重新选位置</b><span className="text-sm text-neutral-500">不满意可回到本步重新生成</span></span>
+                </button>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </main>
+
+      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+        <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
+          <ArrowLeftIcon className="mr-2 h-5 w-5" />
+          返回
+        </Button>
+        <span className="flex-1" />
+        {result ? (
+          <Button size="lg" className="h-14 min-w-[460px] text-lg" onClick={goPrint}>
+            <PrinterIcon className="mr-2 h-5 w-5" />
             去打印
           </Button>
-          <div className="grid grid-cols-2 gap-3">
-            <Button size="lg" variant="secondary" onClick={addAnother}>
-              <StampIcon className="mr-1.5 h-5 w-5" />
-              再加一处签名/印章
-            </Button>
-            <Button size="lg" variant="secondary" onClick={redoPlacement}>
-              <RotateCcwIcon className="mr-1.5 h-5 w-5" />
-              重新选位置
-            </Button>
-          </div>
-        </div>
-      )}
+        ) : (
+          <Button size="lg" className="h-14 min-w-[460px] text-lg" disabled={busy || !document || !stamp || pages === null || !authorized} onClick={() => void handleCompose()}>
+            {busy ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <PenToolIcon className="mr-2 h-5 w-5" />}
+            {busy ? '正在生成…' : authorized ? '生成合成 PDF' : '生成合成 PDF（请先确认授权）'}
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
