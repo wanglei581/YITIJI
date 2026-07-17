@@ -143,18 +143,9 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print-scan/feature/:key', element: <PrintScanFeatureInfoPage /> },
       { path: 'print-scan/convert',      element: <ConvertImagesPage /> },
       { path: 'print-scan/sign',         element: <SignStampPage /> },
-      {
-        path: 'print/scan-convert',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanConvertPage')).default }),
-      },
-      {
-        path: 'print/scan-sign',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanSignPage')).default }),
-      },
-      {
-        path: 'print/scan-feature',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/PrintScanFeaturePage')).default }),
-      },
+      { path: 'print/scan-convert',      element: <Navigate to="/print-scan/convert" replace /> },
+      { path: 'print/scan-sign',         element: <Navigate to="/print-scan/sign" replace /> },
+      { path: 'print/scan-feature',      element: <Navigate to="/print-scan/feature/id-photo" replace /> },
       // 打印扫描流程（Phase 3）
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
