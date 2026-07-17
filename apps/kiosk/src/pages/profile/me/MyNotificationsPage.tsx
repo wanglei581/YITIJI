@@ -137,7 +137,7 @@ export function MyNotificationsPage() {
         )}
 
         <section className="me-detail-summary" aria-label="消息通知概览">
-          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
+          <span className="me-summary-icon me-tone-plum" aria-hidden="true">
             <KIcon name="bell" />
           </span>
           <div className="min-w-0 flex-1">
@@ -151,7 +151,7 @@ export function MyNotificationsPage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="me-notification-toolbar">
           <div className="me-tabbar">
             {[
               { key: false, label: '全部' },
@@ -177,10 +177,10 @@ export function MyNotificationsPage() {
             disabled={!canUseRemote || unreadCount === 0 || busyId === 'all'}
             onClick={() => void markAllRead()}
             className={[
-              'me-ripple inline-flex min-h-[44px] items-center gap-1.5 overflow-hidden rounded-full border px-4 text-sm font-bold transition-colors',
+              'me-ripple me-notification-action',
               !canUseRemote || unreadCount === 0 || busyId === 'all'
-                ? 'cursor-not-allowed border-[rgba(16,48,43,0.08)] bg-[rgba(16,48,43,0.04)] text-[color:var(--muted)] opacity-55'
-                : 'border-[rgba(16,48,43,0.12)] bg-[rgba(255,253,248,0.82)] text-[color:var(--ink-2)] hover:bg-[rgba(16,48,43,0.08)]',
+                ? 'is-disabled'
+                : '',
             ].join(' ')}
           >
             <span className="inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
@@ -208,14 +208,17 @@ export function MyNotificationsPage() {
             const meta = CATEGORY_META[item.category] ?? CATEGORY_META.system
             const feedbackRelated = item.relatedType === 'feedback_ticket' && item.relatedId
             return (
-              <Card key={`${item.kind}-${item.id}`} className="me-benefit-card">
+              <Card
+                key={`${item.kind}-${item.id}`}
+                className={['me-benefit-card me-notification-card', !item.isRead ? 'is-unread' : ''].join(' ')}
+              >
                 <div className="flex items-start gap-4">
                   <span className={['me-row-icon', `me-tone-${meta.tone}`].join(' ')} aria-hidden="true">
                     <KIcon name={meta.icon} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {!item.isRead && <span className="h-2 w-2 rounded-full bg-[color:var(--ink)]" aria-label="未读" />}
+                      {!item.isRead && <span className="me-notification-dot" aria-label="未读" />}
                       <span className="me-row-title min-w-0 flex-1">{item.title}</span>
                       <span className="me-chip">{meta.label}</span>
                     </div>
@@ -225,7 +228,7 @@ export function MyNotificationsPage() {
                       <button
                         type="button"
                         onClick={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
-                        className="me-ripple mt-3 inline-flex min-h-[40px] items-center gap-1 overflow-hidden rounded-full border border-[rgba(16,48,43,0.1)] bg-[rgba(16,48,43,0.07)] px-3 text-sm font-bold text-[color:var(--ink-2)]"
+                        className="me-ripple me-notification-action mt-3"
                       >
                         查看相关反馈
                         <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -233,13 +236,13 @@ export function MyNotificationsPage() {
                     )}
                   </div>
                 </div>
-                <div className="mt-4 flex justify-end gap-2">
+                <div className="me-notification-actions">
                   {!item.isRead && (
                     <button
                       type="button"
                       disabled={busyId === `read-${item.kind}-${item.id}`}
                       onClick={() => void markRead(item)}
-                      className="me-delete-button me-ripple"
+                      className="me-notification-action me-ripple"
                     >
                       <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
                         <KIcon name="check" />

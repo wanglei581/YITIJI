@@ -115,6 +115,14 @@ export function MyResumesPage() {
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
+        headerActions={
+          <Button className="me-ripple" size="sm" variant="secondary" onClick={() => navigate('/resume/source')}>
+            <span className="mr-1.5 inline-flex h-5 w-5 items-center justify-center" aria-hidden="true">
+              <KIcon name="upload" />
+            </span>
+            去上传简历
+          </Button>
+        }
       >
         <section className="me-detail-summary" aria-label="简历记录概览">
           <span className="me-summary-icon me-tone-teal" aria-hidden="true">
@@ -251,7 +259,7 @@ function ActionButton({
       title={disabled ? disabledReason : label}
       aria-label={disabled ? `${ariaLabel}（${disabledReason}）` : ariaLabel}
       className={[
-        'me-ripple inline-flex min-h-[44px] items-center gap-1.5 overflow-hidden rounded-full border px-3 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-100',
+        'me-ripple me-resume-action inline-flex items-center gap-1.5 overflow-hidden rounded-full border px-3 text-xs font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-primary-100',
         disabled
           ? 'cursor-not-allowed border-[rgba(16,48,43,0.08)] bg-[rgba(16,48,43,0.04)] text-[color:var(--muted)] opacity-55'
           : 'border-[rgba(16,48,43,0.12)] bg-[rgba(255,253,248,0.78)] text-[color:var(--ink-2)] hover:bg-[rgba(16,48,43,0.08)] hover:text-[color:var(--ink)]',
