@@ -7,17 +7,17 @@ import {
   SCENE_TEMPLATE_LABELS,
 } from '@ai-job-print/shared'
 import { Card, Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
-import { Building2Icon, KeyRoundIcon, PlusIcon, SmartphoneIcon, UserPlusIcon } from 'lucide-react'
+import { Building2Icon, PlusIcon } from 'lucide-react'
 import { Page } from '../Page'
 import { Pagination, useTableState } from '../components/DataTable'
 import {
   orgsAdminService,
-  type AdminOrgAccount,
   type AdminOrgDetail,
   type AdminOrgListItem,
   type CreateOrgInput,
   type UpdateOrgInput,
 } from '../../services/api/orgsAdmin'
+import { PartnerAccountManager } from './PartnerAccountManager'
 
 // ─── 展示常量 ─────────────────────────────────────────────────────────────────
 
@@ -279,16 +279,10 @@ function OrgDetailDrawer({
   const [form, setForm] = useState<UpdateOrgInput>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // 账号管理状态
-  const [showNewAccount, setShowNewAccount] = useState(false)
-  const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '', phone: '' })
-  const [resetTarget, setResetTarget] = useState<AdminOrgAccount | null>(null)
-  const [resetPassword, setResetPassword] = useState('')
-  const [accountBusy, setAccountBusy] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showLoading = true) => {
     if (!orgId) return
-    setState('loading')
+    if (showLoading) setState('loading')
     try {
       const d = await orgsAdminService.getOrgDetail(orgId)
       setDetail(d)
@@ -309,8 +303,6 @@ function OrgDetailDrawer({
   useEffect(() => {
     if (open) {
       setError(null)
-      setShowNewAccount(false)
-      setResetTarget(null)
       void load()
     }
   }, [open, load])
@@ -328,54 +320,6 @@ function OrgDetailDrawer({
       })
       onChanged()
       await load()
-    } catch (e) {
-      setError(errMsg(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const addAccount = async () => {
-    if (!orgId) return
-    setSaving(true)
-    setError(null)
-    try {
-      await orgsAdminService.createAccount(orgId, {
-        username: newAccount.username.trim(),
-        password: newAccount.password,
-        name: newAccount.name.trim(),
-        phone: newAccount.phone,
-      })
-      setShowNewAccount(false)
-      setNewAccount({ username: '', password: '', name: '', phone: '' })
-      await load()
-      onChanged()
-    } catch (e) {
-      setError(errMsg(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const toggleAccount = async (account: AdminOrgAccount) => {
-    if (!orgId) return
-    setAccountBusy(account.id)
-    try {
-      await orgsAdminService.setAccountStatus(orgId, account.id, account.enabled ? 'disable' : 'enable')
-      await load()
-    } finally {
-      setAccountBusy(null)
-    }
-  }
-
-  const doResetPassword = async () => {
-    if (!orgId || !resetTarget) return
-    setSaving(true)
-    setError(null)
-    try {
-      await orgsAdminService.resetAccountPassword(orgId, resetTarget.id, resetPassword)
-      setResetTarget(null)
-      setResetPassword('')
     } catch (e) {
       setError(errMsg(e))
     } finally {
@@ -458,125 +402,12 @@ function OrgDetailDrawer({
             </div>
           </div>
 
-          {/* 账号管理 */}
-          <div className="space-y-3 border-t border-neutral-100 pt-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-neutral-800">机构后台账号</p>
-              <button
-                onClick={() => setShowNewAccount((v) => !v)}
-                className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
-              >
-                <UserPlusIcon className="h-3.5 w-3.5" />
-                新增账号
-              </button>
-            </div>
-
-            {showNewAccount && (
-              <div className="space-y-3 rounded-lg border border-neutral-100 bg-neutral-50 p-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="登录用户名" required>
-                    <input className={inputCls} placeholder="字母数字及 _.-" value={newAccount.username} onChange={(e) => setNewAccount((a) => ({ ...a, username: e.target.value }))} />
-                  </Field>
-                <Field label="账号姓名" required>
-                  <input className={inputCls} value={newAccount.name} onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))} />
-                </Field>
-              </div>
-              <Field label="登录手机号" required>
-                <input
-                  className={inputCls}
-                  inputMode="numeric"
-                  value={newAccount.phone}
-                  onChange={(e) => setNewAccount((a) => ({ ...a, phone: e.target.value.replace(/\D/g, '').slice(0, 11) }))}
-                />
-              </Field>
-              <Field label="初始密码(至少 8 位)" required>
-                  <input type="password" autoComplete="new-password" className={inputCls} value={newAccount.password} onChange={(e) => setNewAccount((a) => ({ ...a, password: e.target.value }))} />
-                </Field>
-                <div className="flex justify-end">
-                  <button
-                    onClick={addAccount}
-                    disabled={
-                      saving ||
-                      newAccount.username.trim().length < 3 ||
-                      newAccount.password.length < 8 ||
-                      !newAccount.name.trim() ||
-                      !/^1[3-9]\d{9}$/.test(newAccount.phone)
-                    }
-                    className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
-                  >
-                    创建账号
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {detail.accounts.length === 0 ? (
-              <p className="rounded-lg bg-neutral-50 py-6 text-center text-xs text-neutral-400">该机构暂无后台账号</p>
-            ) : (
-              <div className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
-                {detail.accounts.map((account) => (
-                  <div key={account.id} className="flex items-center gap-3 px-3 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-neutral-800">{account.name}</p>
-                      <p className="font-mono text-xs text-neutral-400">{account.username}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-neutral-500">
-                        <SmartphoneIcon className="h-3.5 w-3.5" />
-                        {account.phoneMasked ?? '未绑定手机号'}
-                      </p>
-                    </div>
-                    <StatusBadge dot status={account.enabled ? 'success' : 'default'} label={account.enabled ? '启用' : '已停用'} />
-                    <StatusBadge dot status={account.phoneVerifiedAt ? 'success' : 'warning'} label={account.phoneVerifiedAt ? '手机号已验证' : '待验证'} />
-                    {!account.phoneVerifiedAt && account.phoneMasked && (
-                      <span className="max-w-[130px] text-xs leading-5 text-neutral-400">
-                        账号本人登录后验证
-                      </span>
-                    )}
-                    <button
-                      onClick={() => { setResetTarget(account); setResetPassword('') }}
-                      className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                    >
-                      <KeyRoundIcon className="h-3.5 w-3.5" />
-                      重置密码
-                    </button>
-                    <TwoStepButton
-                      label={account.enabled ? '停用' : '启用'}
-                      confirmLabel={account.enabled ? '确认停用?' : '确认启用?'}
-                      className={account.enabled ? 'text-warning-fg hover:bg-warning-bg' : 'text-success-fg hover:bg-success-bg'}
-                      confirmClassName={account.enabled ? 'bg-warning text-white' : 'bg-success text-white'}
-                      onConfirm={() => void toggleAccount(account)}
-                      disabled={accountBusy === account.id}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {resetTarget && (
-              <div className="space-y-3 rounded-lg border border-warning/20 bg-warning-bg p-3">
-                <p className="text-xs font-medium text-warning-fg">重置「{resetTarget.name}({resetTarget.username})」的登录密码</p>
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  className={inputCls}
-                  placeholder="新密码(至少 8 位)"
-                  value={resetPassword}
-                  onChange={(e) => setResetPassword(e.target.value)}
-                />
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setResetTarget(null)} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface">取消</button>
-                  <button
-                    onClick={doResetPassword}
-                    disabled={saving || resetPassword.length < 8}
-                    className="rounded-lg bg-warning px-3 py-1.5 text-xs font-medium text-white hover:bg-warning/90 disabled:opacity-50"
-                  >
-                    确认重置
-                  </button>
-                </div>
-                <p className="text-xs text-warning-fg">新密码仅单向提交,系统不回显;请线下安全告知。</p>
-              </div>
-            )}
-
-          </div>
+          <PartnerAccountManager
+            orgId={orgId ?? detail.id}
+            accounts={detail.accounts}
+            onReload={() => load(false)}
+            onChanged={onChanged}
+          />
 
           <p className="text-xs text-neutral-400">
             机构信息编辑、账号操作均记录审计日志。停用机构后:机构账号无法登录、数据导入接口拒绝;已发布数据不自动下架,如需下架请到岗位/招聘会信息源逐条操作。

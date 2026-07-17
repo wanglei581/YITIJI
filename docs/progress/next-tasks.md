@@ -17,6 +17,11 @@
 - [x] **T5 派生旧 PDF、docs 旧材料与 deliverables 清理**：已将旧 B2G/B2B2C 方案 PDF、本地 docx 原稿、旧 handoff 交接文件、两个已弃用 HTML 预览和 `deliverables/` 宣传片 / 交付物 Markdown 移出正式 Git；原始材料归档到本地 `其他文档/`，仓库内保留 Markdown 摘要、审计事实、当前正式入口和 OPC 交付物 sha256 完整性记录。
 - [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
 
+## P0：合作机构后台账号安全移除
+
+- [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
+- [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：等待 PR CI；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
+
 ## P0：剩余分支 / worktree 收口
 
 - [x] **QR 登录候选合入与旧 worktree 清理**：#91 已通过 rebase merge 合入 `main`，运行时代码基线为 `535587e0`；旧 `codex/qr-ticket-login` dirty worktree / 分支已按证据清理，本次过渡分支 `codex/qr-login-local-agent-bridge` 的本地 / 远程 head 也已清理。
@@ -32,7 +37,7 @@
 
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
 
-> 2026-07-17 最新状态：Wave 1-A 基础版及其会员打印订单、governed job-fit 夹具修复已经进入 `origin/main@f69bf1b7`。独立本地加固候选已完成 Redis 原子状态机、状态 epoch、provider 不确定结果、grant 碰撞/owner 隔离、注册后签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard，并通过 SQLite/PostgreSQL、静态门禁、主线能力回归及双模型终审；尚未 push/PR/merge/deploy。没有新增 UI、导出或注销执行器。远程交付前不得推进 Wave 1-B；生产发布前必须按实际 nginx 层级显式配置 Express `trust proxy` 可信跳数并真机确认 `req.ip`，禁止直接使用 `trust proxy=true`。
+> 2026-07-17 最新状态：Wave 1-A 基础版及其会员打印订单、governed job-fit 夹具修复已经进入主线；独立本地加固候选已继续整合含 Partner 账号安全移除能力的 `origin/main@30d168ce`，完成 Redis 原子状态机、状态 epoch、provider 不确定结果、grant 碰撞/owner 隔离、注册后签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard，并通过 SQLite/PostgreSQL、静态门禁、主线能力回归及双模型终审；尚未 push/PR/merge/deploy。没有新增 UI、导出或注销执行器。远程交付前不得推进 Wave 1-B；生产发布前必须按实际 nginx 层级显式配置 Express `trust proxy` 可信跳数并真机确认 `req.ip`，禁止直接使用 `trust proxy=true`。
 
 - [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
 - [x] **Wave 0 真实表达与验证基线（已合入）**：PR #261 已将 `codex/user-center-wave0-truth-baseline` 的 RED→GREEN 改动合入 `origin/main@0c4cdd57`：删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。

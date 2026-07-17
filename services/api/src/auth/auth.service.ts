@@ -50,6 +50,7 @@ interface InternalUser {
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
   tokenVersion: number
+  deletedAt: Date | null
 }
 
 interface ResetTarget {
@@ -173,12 +174,17 @@ export class AuthService {
     if (!userId) {
       throw this.resetFailed()
     }
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null },
+    })
+    if (!user) throw this.resetFailed()
     const passwordHash = await bcrypt.hash(newPassword, 10)
-    const user = await this.prisma.user.update({
-      where: { id: userId },
+    const updated = await this.prisma.user.updateMany({
+      where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
-    await this.publishCredentialChangeSessionState(user)
+    if (updated.count !== 1) throw this.resetFailed()
+    await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
     await this.writeAudit(user.id, user.role, 'auth.password_reset_complete', {})
     return { success: true }
   }
@@ -192,7 +198,7 @@ export class AuthService {
    *   校验通过后各自无条件覆盖,造成"两边都返回成功但只有一边真正生效"的静默丢失更新。
    */
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ success: true }> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    const user = await this.prisma.user.findFirst({ where: { id: userId, deletedAt: null } })
     if (!user) {
       throw new UnauthorizedException({ error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' } })
     }
@@ -218,7 +224,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
-      where: { id: user.id, passwordHash: user.passwordHash },
+      where: { id: user.id, deletedAt: null, passwordHash: user.passwordHash },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
     if (updated.count !== 1) {
@@ -286,22 +292,25 @@ export class AuthService {
   }
 
   async verifyAndBindPhone(userId: string, phone: string, code: string): Promise<{ phoneMasked: string; phoneVerifiedAt: Date }> {
+    await this.findUsableSelfPhoneUser(userId)
     await this.otp.verifyCode(phone, 'bind_phone', code)
     const normalized = normalizePhone(phone)
     const phoneHash = hashPhone(normalized)
-    const exists = await this.prisma.user.findFirst({ where: { phoneHash, NOT: { id: userId } } })
+    const exists = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null, NOT: { id: userId } } })
     if (exists) {
       throw new BadRequestException({ error: { code: 'PHONE_ALREADY_BOUND', message: '该手机号已绑定其他账号' } })
     }
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
+    const phoneVerifiedAt = new Date()
+    const updated = await this.prisma.user.updateMany({
+      where: { id: userId, enabled: true, deletedAt: null },
       data: {
         phoneHash,
         phoneEnc: encryptPhone(normalized),
-        phoneVerifiedAt: new Date(),
+        phoneVerifiedAt,
       },
     })
-    return { phoneMasked: maskPhone(normalized), phoneVerifiedAt: updated.phoneVerifiedAt! }
+    if (updated.count !== 1) throw this.sessionInvalid()
+    return { phoneMasked: maskPhone(normalized), phoneVerifiedAt }
   }
 
   async verifyOwnPhoneBindCode(
@@ -322,15 +331,15 @@ export class AuthService {
     const phone = this.normalizedPhoneOrNull(loginId)
     if (phone) {
       const phoneHash = hashPhone(phone)
-      const user = await this.prisma.user.findUnique({ where: { phoneHash } })
+      const user = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
       return user?.phoneVerifiedAt ? user : null
     }
-    return this.prisma.user.findUnique({ where: { username: loginId.trim() } })
+    return this.prisma.user.findFirst({ where: { username: loginId.trim(), deletedAt: null } })
   }
 
   private async findVerifiedUserByPhone(phone: string): Promise<InternalUser | null> {
     const phoneHash = hashPhone(phone)
-    const user = await this.prisma.user.findUnique({ where: { phoneHash } })
+    const user = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
     return user?.phoneVerifiedAt ? user : null
   }
 
@@ -341,7 +350,7 @@ export class AuthService {
       return user ? { user, phone } : null
     }
 
-    const user = await this.prisma.user.findUnique({ where: { username: loginIdOrPhone.trim() } })
+    const user = await this.prisma.user.findFirst({ where: { username: loginIdOrPhone.trim(), deletedAt: null } })
     if (!user?.phoneEnc || !user.phoneVerifiedAt) return null
     return { user, phone: decryptPhone(user.phoneEnc) }
   }
@@ -367,7 +376,7 @@ export class AuthService {
 
   private async canUseAccount(user: InternalUser, portal?: LoginPortal): Promise<boolean> {
     const role = user.role as UserRole
-    if (!user.enabled) return false
+    if (!user.enabled || user.deletedAt !== null) return false
     if (role !== 'admin' && role !== 'partner' && role !== 'kiosk') return false
     if (portal && role !== portal) return false
     if (role === 'partner') {
@@ -379,27 +388,29 @@ export class AuthService {
   }
 
   private async issueLogin(user: InternalUser): Promise<LoginResult> {
-    const updated = await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
+    const lastLoginAt = new Date()
+    const updated = await this.prisma.user.updateMany({
+      where: { id: user.id, enabled: true, deletedAt: null, passwordHash: user.passwordHash },
+      data: { lastLoginAt },
     })
-    const role = updated.role as UserRole
+    if (updated.count !== 1) throw this.loginFailed()
+    const role = user.role as UserRole
     const token = this.jwtService.sign({
-      sub: updated.id,
+      sub: user.id,
       role,
-      orgId: updated.orgId,
-      ver: updated.tokenVersion,
+      orgId: user.orgId,
+      ver: user.tokenVersion,
     })
 
     return {
       token,
       user: {
-        id: updated.id,
-        name: updated.name,
+        id: user.id,
+        name: user.name,
         role,
-        orgId: updated.orgId,
-        ...(updated.phoneEnc ? { phoneMasked: maskPhoneFromEnc(updated.phoneEnc) } : {}),
-        phoneVerifiedAt: updated.phoneVerifiedAt?.toISOString() ?? null,
+        orgId: user.orgId,
+        ...(user.phoneEnc ? { phoneMasked: maskPhoneFromEnc(user.phoneEnc) } : {}),
+        phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
       },
     }
   }
@@ -471,7 +482,7 @@ export class AuthService {
   }
 
   private async publishCredentialChangeSessionState(
-    user: Pick<InternalUser, 'id' | 'role' | 'orgId' | 'enabled' | 'tokenVersion'>,
+    user: Pick<InternalUser, 'id' | 'role' | 'orgId' | 'enabled' | 'tokenVersion' | 'deletedAt'>,
   ): Promise<void> {
     try {
       let orgEnabled: boolean | null = null
@@ -491,6 +502,7 @@ export class AuthService {
           orgId: user.orgId,
           enabled: user.enabled,
           tokenVersion: user.tokenVersion,
+          deletedAt: user.deletedAt?.toISOString() ?? null,
           orgEnabled,
         }),
         user.tokenVersion,
@@ -528,6 +540,12 @@ export class AuthService {
   private resetFailed(): UnauthorizedException {
     return new UnauthorizedException({
       error: { code: 'AUTH_RESET_FAILED', message: '验证码已过期或重置请求无效' },
+    })
+  }
+
+  private sessionInvalid(): UnauthorizedException {
+    return new UnauthorizedException({
+      error: { code: 'AUTH_SESSION_INVALID', message: '登录状态已失效' },
     })
   }
 }

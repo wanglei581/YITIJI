@@ -298,6 +298,7 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
           "tokenVersion" INTEGER NOT NULL DEFAULT 0,
           "lastLoginAt" DATETIME,
           "enabled" BOOLEAN NOT NULL DEFAULT true,
+          "deletedAt" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           CONSTRAINT "User_orgId_fkey" FOREIGN KEY ("orgId") REFERENCES "Organization" ("id") ON DELETE SET NULL ON UPDATE CASCADE
@@ -306,6 +307,7 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
         CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash");
         CREATE INDEX "User_orgId_idx" ON "User"("orgId");
         CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt");
+        CREATE INDEX "User_orgId_role_enabled_deletedAt_idx" ON "User"("orgId", "role", "enabled", "deletedAt");
         CREATE TABLE "AuditLog" (
           "id" TEXT NOT NULL PRIMARY KEY,
           "actorId" TEXT,

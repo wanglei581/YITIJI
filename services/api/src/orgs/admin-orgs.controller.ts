@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
@@ -25,6 +25,7 @@ import {
  *   POST   /admin/orgs/:id/accounts                     新增机构账号
  *   PATCH  /admin/orgs/:id/accounts/:accountId/status   账号启停
  *   PATCH  /admin/orgs/:id/accounts/:accountId/password 重置账号密码
+ *   DELETE /admin/orgs/:id/accounts/:accountId          安全移除成员账号（机构须保留有效账号）
  *
  * 合规:机构 = 外部数据来源方/运营协作方;启用模块白名单校验,招聘闭环模块硬拒绝。
  */
@@ -82,6 +83,15 @@ export class AdminOrgsController {
     @CurrentUser() user: AuthedUser,
   ) {
     return this.orgs.resetAccountPassword(id, accountId, dto.password, user)
+  }
+
+  @Delete('admin/orgs/:id/accounts/:accountId')
+  deleteAccount(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return this.orgs.deleteAccount(id, accountId, user)
   }
 
 }
