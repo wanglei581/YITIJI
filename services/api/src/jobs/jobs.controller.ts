@@ -487,7 +487,7 @@ export class JobsController {
   @Post('partner/excel/parse')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   parseExcel(@UploadedFile() file: Express.Multer.File | undefined) {
     if (!file) {
       throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel 文件' } })
@@ -498,7 +498,7 @@ export class JobsController {
   @Post('partner/excel/preview')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   previewExcel(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body('sourceId') sourceId: string,

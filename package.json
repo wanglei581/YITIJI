@@ -38,7 +38,10 @@
     "overrides": {
       "qs": "6.15.2",
       "@hono/node-server": "2.0.4",
-      "uuid": "14.0.0"
+      "uuid": "14.0.0",
+      "shell-quote": "1.8.4",
+      "hono": "4.12.25",
+      "multer": "2.2.0"
     }
   }
 }

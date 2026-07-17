@@ -62,7 +62,7 @@ export class UploadSessionsController {
 
   @Post(':sessionId/files')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async upload(
     @Param('sessionId') sessionId: string,
     @Body() body: PhoneUploadSessionDto,

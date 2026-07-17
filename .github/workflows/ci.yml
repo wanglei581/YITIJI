@@ -292,6 +292,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:resume-extraction
+          pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
 

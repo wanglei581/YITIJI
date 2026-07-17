@@ -303,7 +303,7 @@ export class AiController {
    */
   @Post('resume/voice/transcribe')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
-  @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES } }))
+  @UseInterceptors(FileInterceptor(RESUME_VOICE_AUDIO_FIELD, { limits: { fileSize: RESUME_VOICE_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribeResumeVoice(
     @UploadedFile() audio: Express.Multer.File | undefined,
   ): Promise<ResumeVoiceTranscribeResponseDto> {

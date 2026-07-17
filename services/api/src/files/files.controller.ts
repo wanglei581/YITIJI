@@ -102,7 +102,7 @@ export class FilesController {
 
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: UploadOptionsDto,
@@ -128,7 +128,7 @@ export class FilesController {
   /** Kiosk 一体机匿名 / 会员上传(无 User 登录态;有会员 token 则绑定 endUserId)。 */
   @Post('kiosk-upload')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async kioskUpload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() options: KioskUploadOptionsDto,
