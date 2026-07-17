@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-16
+> 最后更新：2026-07-17
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
 ## P0：项目规范化治理
@@ -16,6 +16,12 @@
 - [x] **T5 D 类外部材料索引**：已输出外部材料索引报告；只登记 Markdown 转正候选、PDF/二进制外部归档规则、OPC 输出处置，不提交原始外部材料。
 - [x] **T5 派生旧 PDF、docs 旧材料与 deliverables 清理**：已将旧 B2G/B2B2C 方案 PDF、本地 docx 原稿、旧 handoff 交接文件、两个已弃用 HTML 预览和 `deliverables/` 宣传片 / 交付物 Markdown 移出正式 Git；原始材料归档到本地 `其他文档/`，仓库内保留 Markdown 摘要、审计事实、当前正式入口和 OPC 交付物 sha256 完整性记录。
 - [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
+
+## P0：依赖审计与 multipart 上传限深（候选 CI 待验）
+
+- [x] **critical/high 审计与运行时防护候选**：`codex/dependency-security-remediation-main-20260716` 已在 `origin/main@30d168ce` 清除 `pnpm audit --audit-level=high` 的 1 个 critical / 3 个 high；`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0`、三端 `vite@6.4.3` 均经 override/direct manifest/lockfile 收敛，Nest 间接 Multer 同样为 2.2.0。10 个 API `FileInterceptor` 显式 `fieldNestingDepth: 0`，保留已有 `fileSize`、不擅自改变其余四处文件大小语义；AST + 真实 loopback multipart verify 证明 flat 204、`meta[nested]` 400，并已接入 SQLite CI。冻结安装、audit、依赖树、全 workspace typecheck、四端 build、相关上传回归均通过；尚未合并或部署。
+- [ ] **PR CI 验证**：在候选 PR 中确认 `build-and-verify` 与 `postgres-readiness` 均成功；前者必须在 Linux 的 fresh SQLite schema 后实际运行 `verify:multipart-field-nesting` 和既有 `verify:print-jobs`。本机对全新临时 SQLite 的 Prisma Schema Engine 只返回通用错误，未以 schema/migration 或生产环境绕过。
+- [ ] **P1 低/中危依赖评估**：当前完整 audit 仍有 `esbuild`（low）、`@babel/core`（low）和 `js-yaml`（moderate），但没有 high/critical；另起最小升级/兼容性任务处理，不与本 P0 补丁混合，也不得据此倒推出生产已部署。
 
 ## P0：合作机构后台账号安全移除
 
@@ -65,8 +71,8 @@
 
 - [x] **F1 future-only provenance clean-main 候选迁移（已合并，未部署）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。该候选已随 [PR #262](https://github.com/wanglei581/YITIJI/pull/262) 合入 `main`（merge commit `4b3c9887`，head `b7a365da`；`build-and-verify` 与 `postgres-readiness` 均成功）。不得将该合并、本地 fixture 或 CI 接线写作 production 来源一致性通过：未部署、未安装 launcher、未改 PM2，当前 production 继续 **NO-GO**，不得执行首次启用；首次启用与回滚演练仍须单独生产授权。
 
-- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：本地候选已完成代码、专项/回归/浏览器验证、双模型终审和串行 CI 接线；[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已创建，首轮 GitHub `build-and-verify` / `postgres-readiness` 均通过，当前下一步是等待合并授权与最新 HEAD CI。尚未合并、部署、发送真实短信或执行真实转移；依赖审计 P0 未清零前不得宣称可部署，生产执行仍需另行授权和本人 OTP。
-  1. **PR / CI**：推送候选并创建 PR，确认 `build-and-verify` 与 `postgres-readiness` 成功，且 Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁在共享 SQLite suite 中保持逐行串行。
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已 squash 合入 `main@cec65d9c`，合并后 GitHub Actions `29503789983` 的 `build-and-verify` / `postgres-readiness` 均成功，代码集成与主线 CI 已完成。尚未部署、发送真实短信或执行真实转移；当前下一步是单独清零依赖审计 P0，再取得部署授权并由用户本人完成 OTP。生产执行仍需另行授权，依赖阻塞未清除前不得部署或宣称可部署。
+  1. **PR / CI（已完成）**：候选已合入主线；Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁已在共享 SQLite suite 中保持逐行串行，合并后双 job 成功。
   2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
   3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。
 

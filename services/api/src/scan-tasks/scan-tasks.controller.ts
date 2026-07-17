@@ -71,7 +71,7 @@ export class ScanTasksController {
   /** 仅 Terminal Agent 调用：投递扫描到共享目录后产生的文件。 */
   @Post('terminals/:terminalId/scan-sessions/deliver')
   @Throttle({ default: { ttl: 60_000, limit: 30 } })
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 20 * 1024 * 1024, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async deliver(
     @Param('terminalId') terminalId: string,
     @UploadedFile() file: Express.Multer.File | undefined,

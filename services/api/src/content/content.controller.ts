@@ -72,7 +72,7 @@ export class ContentController {
   @Post('admin/ad-assets')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: UPLOAD_HARD_LIMIT } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: UPLOAD_HARD_LIMIT, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async uploadAsset(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: UploadAdAssetDto,

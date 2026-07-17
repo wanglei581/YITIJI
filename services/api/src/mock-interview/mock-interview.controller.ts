@@ -139,7 +139,7 @@ export class MockInterviewController {
    */
   @Post(':id/transcribe')
   @Throttle({ default: { ttl: 60_000, limit: 12 } })
-  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: ASR_MAX_AUDIO_BYTES } }))
+  @UseInterceptors(FileInterceptor('audio', { limits: { fileSize: ASR_MAX_AUDIO_BYTES, fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
   async transcribe(
     @Param('id') id: string,
     @UploadedFile() audio: Express.Multer.File | undefined,
