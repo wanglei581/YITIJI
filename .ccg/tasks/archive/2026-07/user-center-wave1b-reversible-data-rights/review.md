@@ -17,6 +17,8 @@
 
 仍建议在集成前补齐全量外部只读复审，重点为 Redis ticket/claim 原子性、双 migration、AuditService 事务语义和 controller 鉴权/下载 header；截至本记录，未发现未修复的本地 Critical/High 问题。
 
+2026-07-17 追加：针对上述未覆盖路径再次分段调用双模型。Antigravity 在获取模型配置时收到外部 EOF，未生成报告；Claude 两次在输出结论前超时，恢复同一会话也未返回报告。三次失败均不是有效审查结论，故该分段仍保持待全量外部复审状态。
+
 ## 设计取舍确认
 
 - 失败或清理不确定的 export 请求保留 `activeKey`，且 `EXPORT_CLEANUP_FAILED` 禁止 Admin retry/reject；这是为了防止未确认清理的私有对象被新请求绕过。普通失败项在 API 中仍以 `canRetry=true` 表示可由受控运营动作处理；本切片未新增用户或 Admin UI。
