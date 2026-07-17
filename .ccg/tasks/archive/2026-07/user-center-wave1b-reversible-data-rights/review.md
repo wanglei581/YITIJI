@@ -23,6 +23,8 @@
 
 2026-07-17 再次以 360 秒时限提交同一聚焦只读审查，并要求即使时间有限也输出结论；Claude 在完整时限内未输出任何报告，包装器以 execution timeout 结束。该轮同样不计作审查通过，且没有产生需修复的新发现。
 
+2026-07-17 随后改用禁用 MCP/缩小文件范围的 Claude 只读分段复审，Redis 原子状态机、双库 migration、Audit/执行器、下载服务/控制器、Admin retry、请求入口和 step-up 均已覆盖；与 Antigravity 的 11 文件 `APPROVE` 交叉后，没有 Critical。Claude 的 Redis“payload 未复验”提示经源码核实不成立：`assertPayload` 在写入时同时校验摘要格式及 `sha256(requestId/endUserId)`。其余 Warning 作为集成前决策/验收项保留：生产 migration 前核验历史非空幂等键无跨用户重复；评估 orphan 清理失败的独立告警与导出发起审计粒度；下载 finish 落库失败时允许重新授权的“单次成功交付”语义；以及 step-up deviceDigest 当前仅审计不拦截的产品安全取舍。Admin retry 的事后 CAS 已证实不再限定 `status=pending`，故 worker 先进入 `handling` 不会误回 503。
+
 ## 设计取舍确认
 
 - 失败或清理不确定的 export 请求保留 `activeKey`，且 `EXPORT_CLEANUP_FAILED` 禁止 Admin retry/reject；这是为了防止未确认清理的私有对象被新请求绕过。普通失败项在 API 中仍以 `canRetry=true` 表示可由受控运营动作处理；本切片未新增用户或 Admin UI。
