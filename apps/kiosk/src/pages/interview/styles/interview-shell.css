@@ -197,3 +197,6 @@
   border-color: var(--interview-plum) !important;
   background: var(--interview-plum-soft) !important;
   color: var(--interview-plum-deep) !important;
+/* service-desk tokens: --sd-surface --sd-text */
+  font-weight: 700;
+}

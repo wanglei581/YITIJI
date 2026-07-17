@@ -1,6 +1,4 @@
-/* service-desk tokens: --sd-surface --sd-text */
-  font-weight: 700;
-}
+/* service-desk tokens: --sd-surface --sd-text --sd-line */
 .interview-option span { color: inherit; }
 .interview-option span + span {
   color: var(--interview-muted) !important;
