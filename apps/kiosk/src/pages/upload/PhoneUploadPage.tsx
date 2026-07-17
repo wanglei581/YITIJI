@@ -189,7 +189,7 @@ export function PhoneUploadPage() {
           </div>
           <div className="mt-2.5 flex items-start gap-2 text-[13.5px] leading-relaxed text-neutral-500">
             {state === 'error' ? <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-error-fg" /> : state === 'success' ? <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" /> : <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-700" />}
-            <span>{message ?? '上传完成后，请回到一体机屏幕继续操作；上传失败时可重新选择文件重试。'}</span>
+            <span>{message ?? '上传完成后，请在一体机上确认并继续操作；上传失败时可重新选择文件重试。'}</span>
           </div>
         </div>
 
