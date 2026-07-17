@@ -76,9 +76,9 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Install CJK font + sqlite3 (resume PDF / terminal-device-config verify)
+      - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
 
       - name: PG schema drift check
         working-directory: services/api
@@ -283,7 +283,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:job-data-quality
           pnpm --filter @ai-job-print/api verify:job-ai-backend
           pnpm --filter @ai-job-print/api verify:job-ai-privacy
+          pnpm --filter @ai-job-print/api verify:member-data-request-contract
+          pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          pnpm --filter @ai-job-print/api verify:member-data-export-files
+          pnpm --filter @ai-job-print/api verify:member-data-export
+          pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
@@ -343,8 +348,8 @@ jobs:
           cache: pnpm
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
-      - name: Install CJK font + sqlite3 (PDF / member account status verify)
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
+      - name: Install CJK font + sqlite3 + redis-server (PDF / member data verify)
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
@@ -381,7 +386,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-step-up
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          pnpm --filter @ai-job-print/api verify:member-data-request-contract
+          pnpm --filter @ai-job-print/api verify:member-data-request-state-machine
           pnpm --filter @ai-job-print/api verify:member-data-request-truth
+          pnpm --filter @ai-job-print/api verify:member-data-export-files
+          pnpm --filter @ai-job-print/api verify:member-data-export
+          pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks

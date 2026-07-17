@@ -54,7 +54,7 @@ export function normalizeExt(ext: string): string {
  * owner-scoped 的用途(简历/扫描/打印/机构素材)需要 ownerId;
  * 缺 ownerId 时由 generateObjectKey 回退到 tmp/。
  */
-const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'tmp'; folder: string }> = {
+const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'export' | 'tmp'; folder: string }> = {
   // ── C 端求职者(users/{userId}/...)──────────────────────────────
   resume_upload: { scope: 'user', folder: 'resumes' },
   cover_letter: { scope: 'user', folder: 'resumes' },
@@ -62,6 +62,9 @@ const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' 
   id_scan: { scope: 'user', folder: 'scans' },
   print_doc: { scope: 'user', folder: 'print-files' },
   signature_image: { scope: 'user', folder: 'signatures' },
+  // 导出产物使用独立稳定前缀，便于单独配置对象存储生命周期。
+  // key 只含随机 fileId，不嵌入 endUserId / requestId / 手机号。
+  member_data_export: { scope: 'export', folder: 'member-data' },
   // ── 合作机构(partners/{orgId}/...)─────────────────────────────
   partner_profile: { scope: 'partner', folder: 'profiles' },
   partner_image: { scope: 'partner', folder: 'job-images' },
@@ -97,6 +100,8 @@ export function generateObjectKey(args: ObjectKeyArgs): string {
       return `admin/${mapping.folder}/${fileId}.${ext}`
     case 'screensaver':
       return `screensaver/${mapping.folder}/${fileId}.${ext}`
+    case 'export':
+      return `exports/${mapping.folder}/${fileId}.${ext}`
     case 'tmp':
     default:
       return `tmp/uploads/${session}/${fileId}.${ext}`
@@ -110,5 +115,6 @@ export function defaultOwnerType(purpose: FilePurpose): FileOwnerType {
   if (mapping.scope === 'user') return 'user'
   if (mapping.scope === 'partner') return 'partner'
   if (mapping.scope === 'admin') return 'admin'
+  if (mapping.scope === 'export') return 'user'
   return 'system'
 }

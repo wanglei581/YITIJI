@@ -2,7 +2,7 @@
  * 岗位 AI 用户同意 / 隐私 / 配额治理门禁。
  *
  * 覆盖：
- *   1. 会员 AI 同意、撤回、数据请求和 Admin 处理 API 存在。
+ *   1. 会员 AI 同意、撤回与数据权利 API 使用各自唯一状态真相源。
  *   2. Job AI recommendations / match 在 LLM 前强制检查会员同意和 Redis 配额。
  *   3. explain 不读取简历，但必须进入 Redis 配额。
  *   4. 配额必须用 Redis，禁止内存 Map 伪配额；Redis 异常必须 fail-closed。
@@ -57,7 +57,7 @@ async function main(): Promise<void> {
   const memberController = mustExist('src/member-privacy/member-privacy.controller.ts', 'MemberPrivacyController 已创建')
   const adminController = mustExist('src/member-privacy/admin-member-privacy.controller.ts', 'AdminMemberPrivacyController 已创建')
   const privacyService = mustExist('src/member-privacy/member-privacy.service.ts', 'MemberPrivacyService 已创建')
-  const dataRequestService = mustExist('src/member-privacy/member-data-request.service.ts', 'MemberDataRequestService 已创建')
+  const requestService = mustExist('src/member-privacy/member-data-request.service.ts', 'MemberDataRequestService 已创建')
   const privacyTypes = mustExist('src/member-privacy/member-privacy.types.ts', 'MemberPrivacy types 已创建')
   const quotaService = mustExist('src/job-ai/job-ai-quota.service.ts', 'JobAiQuotaService 已创建')
   const jobAiService = read('src/job-ai/job-ai.service.ts')
@@ -70,8 +70,17 @@ async function main(): Promise<void> {
 
   mustContain(
     moduleFile,
-    ['MemberPrivacyController', 'AdminMemberPrivacyController', 'MemberPrivacyService', 'MemberDataRequestService', 'EndUserAuthGuard', 'JwtAuthGuard', 'RolesGuard'],
-    'MemberPrivacyModule 注册会员端 / Admin 端 controller 和 guards',
+    [
+      'MemberPrivacyController',
+      'MemberDataRequestController',
+      'AdminMemberPrivacyController',
+      'MemberDataExportController',
+      'MemberPrivacyService',
+      'MemberDataRequestService',
+      'MemberAuthModule',
+      'AuthModule',
+    ],
+    'MemberPrivacyModule 通过鉴权模块注册唯一会员/Admin/下载入口',
   )
 
   mustContain(
@@ -85,9 +94,6 @@ async function main(): Promise<void> {
       "@Post(':scope/revoke')",
       "@Controller('me/data-requests')",
       "requestType: 'export' | 'delete' | 'revoke_consent'",
-      'MemberDataRequestService',
-      'idempotency-key',
-      'x-member-step-up-token',
     ],
     '会员端隐私 API 支持授权状态、授权、撤回和数据请求',
   )
@@ -99,13 +105,14 @@ async function main(): Promise<void> {
       '@UseGuards(JwtAuthGuard, RolesGuard)',
       "@Roles('admin')",
       "@Get('data-requests')",
-      "@Patch('data-requests/:id')",
-      'RejectDataRequestDto',
-      "@IsIn(['rejected'])",
-      'rejectExportRequest',
+      "@Post('data-requests/:id/retry')",
+      "@Post('data-requests/:id/reject')",
+      'this.requests.retry',
+      'this.requests.reject',
     ],
-    'Admin 隐私 API 仅保留导出请求 rejected 动作',
+    'Admin 隐私 API 只支持列表与明确 retry/reject 动作',
   )
+  mustNotContain(adminController, ["@Patch('data-requests/:id')"], 'Admin 不再提供 arbitrary status PATCH')
 
   mustContain(
     privacyService,
@@ -120,36 +127,42 @@ async function main(): Promise<void> {
       'revokedAt',
       'USER_AI_CONSENT_REQUIRED',
     ],
-    'MemberPrivacyService 仅维护 AI 同意状态',
-  )
-
-  mustContain(
-    dataRequestService,
-    [
-      'MemberDataRequestService',
-      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
-      'endUserId_idempotencyKey',
-      "'export_data_request'",
-      'DATA_REQUEST_ACTIVE',
-      'rejectExportRequest',
-      'MEMBER_STEP_UP_TOKEN_REQUIRED',
-    ],
-    'MemberDataRequestService 负责导出幂等、Step-up 与注销 fail-closed 边界',
+    'MemberPrivacyService 只负责 UserAiConsent 同意真相',
   )
 
   mustNotContain(
     privacyService,
-    ['deleteJobAiPersonalData', 'aiResumeResult.deleteMany', 'jobAiSession.deleteMany'],
-    'MemberPrivacyService 不再以部分同步删除伪造 delete 完成态',
+    [
+      'createDataRequest',
+      'listMyDataRequests',
+      'listDataRequestsForAdmin',
+      'handleDataRequest',
+      'deleteJobAiPersonalData',
+      'aiResumeResult.deleteMany',
+      'jobAiSession.deleteMany',
+    ],
+    'MemberPrivacyService 不保留数据请求双写或部分删除路径',
+  )
+
+  mustContain(
+    requestService,
+    [
+      'MemberDataRequestService',
+      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
+      'export_data_request',
+      'writeRequired',
+      'activeKey',
+      'idempotencyKey',
+      'MEMBER_EXPORT_JOB',
+    ],
+    'MemberDataRequestService 独占幂等、step-up、activeKey 与异步导出创建',
   )
 
   mustContain(
     privacyTypes,
     [
-      'MEMBER_DATA_REQUEST_TYPES',
+      "export type MemberDataRequestType = 'export' | 'delete' | 'revoke_consent'",
       "export type MemberAiConsentScope = 'job_ai'",
-      'MEMBER_DATA_REQUEST_STATUSES',
-      'MEMBER_DATA_REQUEST_STEP_UP_ACTIONS',
       'MemberAiConsentStatus',
       'MemberDataRequestItem',
     ],
@@ -230,7 +243,7 @@ async function main(): Promise<void> {
   mustContain(ci, ['verify:job-ai-privacy'], 'CI 串行 verify 接入岗位 AI 隐私门禁')
 
   mustNotContain(
-    [memberController, adminController, privacyService, dataRequestService, quotaService, jobAiService, governedJobFit].join('\n'),
+    [memberController, adminController, privacyService, requestService, quotaService, jobAiService, governedJobFit].join('\n'),
     [
       'resumeText:',
       'resumeContent',

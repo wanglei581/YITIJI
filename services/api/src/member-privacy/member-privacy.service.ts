@@ -1,9 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import type {
-  MemberAiConsentScope,
-  MemberAiConsentStatus,
-} from './member-privacy.types'
+import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
 

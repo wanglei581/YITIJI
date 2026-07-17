@@ -1,143 +1,184 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common'
+import { randomUUID } from 'node:crypto'
+import { InjectQueue } from '@nestjs/bullmq'
+import { Injectable, Logger, Optional } from '@nestjs/common'
+import type { Queue } from 'bullmq'
+import { AuditService } from '../audit/audit.service'
+import { RedisService } from '../common/redis/redis.service'
 import { MemberStepUpService } from '../member-auth/member-step-up.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { MemberDataRequestAdminOperations } from './member-data-request.admin'
 import {
-  MEMBER_DATA_REQUEST_STATUSES,
-  MEMBER_DATA_REQUEST_TYPES,
-  type AdminMemberDataRequestItem,
-  type MemberDataRequestItem,
-  type MemberDataRequestPage,
-  type MemberDataRequestStatus,
-  type MemberDataRequestType,
+  badRequest,
+  conflict,
+  cursorWhere,
+  decodeRequestCursor,
+  encodeRequestCursor,
+  exportJobId,
+  exportJobOptions,
+  pageSize,
+  toMemberDataRequestItem,
+  unavailable,
+  type DataRequestRow,
+} from './member-data-request.helpers'
+import {
+  MEMBER_EXPORT_JOB,
+  MEMBER_PRIVACY_QUEUE,
+  type MemberPrivacyJobData,
+} from './member-privacy.queue'
+import type {
+  AdminMemberDataRequestItem,
+  AdminMemberDataRequestPage,
+  AdminMemberDataRequestQuery,
+  MemberDataRequestItem,
+  MemberDataRequestPage,
+  MemberDataRequestType,
 } from './member-privacy.types'
 
-const REQUEST_TYPES = new Set<MemberDataRequestType>(MEMBER_DATA_REQUEST_TYPES)
-const REQUEST_STATUSES = new Set<MemberDataRequestStatus>(MEMBER_DATA_REQUEST_STATUSES)
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const PAGE_SIZE = 50
-
-export interface CreateMemberDataRequestInput {
-  requestType: MemberDataRequestType
-  idempotencyKey: string | null
-  stepUpToken: string | null
-  terminalId: string | null
-}
-
-type DataRequestRow = {
-  id: string
-  endUserId: string
-  requestType: string
-  status: string
-  requestedAt: Date
-  handledAt: Date | null
-  idempotencyKey: string | null
-  activeKey: string | null
-  executionStep: string | null
-  exportFileId: string | null
-  exportExpiresAt: Date | null
-  downloadConsumedAt: Date | null
-  failureCode: string | null
-}
+const REQUEST_TYPES = new Set<MemberDataRequestType>(['export', 'delete', 'revoke_consent'])
+const IDEMPOTENCY_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const CREATE_LOCK_TTL_SECONDS = 30
 
 @Injectable()
 export class MemberDataRequestService {
+  private readonly logger = new Logger(MemberDataRequestService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly stepUp: MemberStepUpService,
+    private readonly audit: AuditService,
+    private readonly redis: RedisService,
+    @Optional() @InjectQueue(MEMBER_PRIVACY_QUEUE)
+    private readonly queue?: Queue<MemberPrivacyJobData>,
   ) {}
 
-  async listMyDataRequests(endUserId: string, cursor?: string): Promise<MemberDataRequestPage> {
-    if (cursor) {
-      const cursorRow = await this.prisma.userDataRequest.findFirst({
-        where: { id: cursor, endUserId },
-        select: { id: true },
-      })
-      if (!cursorRow) {
-        throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_CURSOR', message: '数据请求分页游标无效' } })
-      }
+  async create(
+    endUserId: string,
+    requestType: MemberDataRequestType,
+    idempotencyKey: string,
+    stepUpToken: string | null,
+    deviceId: string | null,
+  ): Promise<MemberDataRequestItem> {
+    this.assertCreateInput(endUserId, requestType, idempotencyKey)
+    if (requestType === 'delete') {
+      throw badRequest('ACCOUNT_CLOSURE_NOT_AVAILABLE', '账号注销暂未开放')
     }
 
-    const rows = await this.prisma.userDataRequest.findMany({
-      where: { endUserId },
-      orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
-      cursor: cursor ? { id: cursor } : undefined,
-      skip: cursor ? 1 : 0,
-      take: PAGE_SIZE + 1,
-    })
-    const items = rows.slice(0, PAGE_SIZE).map(toMemberDataRequestItem)
-    return {
-      items,
-      nextCursor: rows.length > PAGE_SIZE ? items.at(-1)?.id ?? null : null,
-    }
-  }
-
-  async create(endUserId: string, input: CreateMemberDataRequestInput): Promise<MemberDataRequestItem> {
-    this.assertRequestType(input.requestType)
-
-    // 账户注销尚没有获批的分类留存矩阵、冷静期和独立执行开关。这里必须
-    // 位于任何依赖访问之前，不能创建账本、消费 grant 或留下待处理错觉。
-    if (input.requestType === 'delete') throw this.accountClosureUnavailable()
-
-    const idempotencyKey = this.requireIdempotencyKey(input.idempotencyKey)
-    const replay = await this.findIdempotentRequest(endUserId, idempotencyKey)
-    if (replay) return this.toIdempotentItem(replay, input.requestType)
-
-    if (input.requestType === 'revoke_consent') {
+    const replay = await this.findIdempotent(endUserId, requestType, idempotencyKey)
+    if (replay) return toMemberDataRequestItem(replay)
+    if (requestType === 'revoke_consent') {
       return this.createConsentRevocation(endUserId, idempotencyKey)
     }
-    return this.createExportRequest(endUserId, idempotencyKey, input.stepUpToken, input.terminalId)
-  }
+    this.assertQueueAvailable()
 
-  async listDataRequestsForAdmin(status?: string): Promise<AdminMemberDataRequestItem[]> {
-    if (status && !REQUEST_STATUSES.has(status as MemberDataRequestStatus)) {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_STATUS', message: '数据请求状态不支持' } })
-    }
-    const rows = await this.prisma.userDataRequest.findMany({
-      where: status ? { status } : {},
-      orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
-      take: 100,
-    })
-    return rows.map((row) => ({ ...toMemberDataRequestItem(row), endUserId: row.endUserId }))
-  }
-
-  async rejectExportRequest(id: string, handledBy: string, requestedStatus: 'rejected'): Promise<AdminMemberDataRequestItem> {
-    if (requestedStatus !== 'rejected') {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_STATUS', message: '数据请求状态不支持' } })
-    }
-    const existing = await this.prisma.userDataRequest.findUnique({ where: { id } })
-    if (!existing) {
-      throw new NotFoundException({ error: { code: 'DATA_REQUEST_NOT_FOUND', message: '数据请求不存在' } })
-    }
-    if (existing.requestType !== 'export') {
-      throw new BadRequestException({ error: { code: 'DATA_REQUEST_ACTION_NOT_ALLOWED', message: '仅可拒绝资料导出请求' } })
-    }
-    if (existing.status !== 'pending' && existing.status !== 'failed') {
-      throw new BadRequestException({ error: { code: 'DATA_REQUEST_STATUS_NOT_REJECTABLE', message: '仅可拒绝待处理或失败的资料导出请求' } })
-    }
-    const row = await this.prisma.userDataRequest.update({
-      where: { id },
-      data: {
-        status: 'rejected',
-        activeKey: null,
-        executionStep: 'admin_rejected',
-        handledAt: new Date(),
-        handledBy,
-      },
-    })
-    return { ...toMemberDataRequestItem(row), endUserId: row.endUserId }
-  }
-
-  private async createConsentRevocation(endUserId: string, idempotencyKey: string): Promise<MemberDataRequestItem> {
+    const lockKey = `member:data-request:create:${endUserId}`
+    const lockValue = randomUUID()
+    let locked: boolean
     try {
-      const result = await this.prisma.$transaction(async (tx) => {
-        const replay = await tx.userDataRequest.findUnique({
-          where: { endUserId_idempotencyKey: { endUserId, idempotencyKey } },
-        })
-        if (replay) return { kind: 'replay' as const, row: replay }
+      locked = await this.redis.setNxEx(lockKey, lockValue, CREATE_LOCK_TTL_SECONDS)
+    } catch {
+      throw unavailable('DATA_REQUEST_QUEUE_UNAVAILABLE', '数据请求协调服务暂不可用')
+    }
+    if (!locked) throw conflict('DATA_REQUEST_IN_PROGRESS', '数据权利请求正在创建，请稍后重试')
 
+    let created: DataRequestRow
+    try {
+      const lockedReplay = await this.findIdempotent(endUserId, requestType, idempotencyKey)
+      if (lockedReplay) return toMemberDataRequestItem(lockedReplay)
+
+      const activeKey = this.activeKey(endUserId)
+      const active = await this.prisma.userDataRequest.findFirst({ where: { activeKey } })
+      if (active) throw conflict('DATA_REQUEST_ALREADY_ACTIVE', '已有数据权利请求正在处理')
+
+      await this.stepUp.consumeGrant(
+        endUserId,
+        'export_data_request',
+        stepUpToken ?? '',
+        deviceId ?? undefined,
+      )
+      created = await this.createExportRow(endUserId, idempotencyKey, activeKey)
+    } catch (error) {
+      if (this.isUniqueConflict(error)) {
+        const uniqueReplay = await this.resolveUniqueConflict(endUserId, requestType, idempotencyKey)
+        if (uniqueReplay) return toMemberDataRequestItem(uniqueReplay)
+      }
+      throw error
+    } finally {
+      await this.redis.getAndDelIfEquals(lockKey, lockValue).catch(() => {
+        this.logger.warn('Member data request create lock release failed')
+      })
+    }
+
+    const jobId = exportJobId(created.id, created.executionVersion)
+    try {
+      await this.queue!.add(
+        MEMBER_EXPORT_JOB,
+        { requestId: created.id, executionVersion: created.executionVersion },
+        exportJobOptions(jobId),
+      )
+    } catch {
+      await this.markQueueFailure(created.id, created.executionVersion)
+      throw unavailable('QUEUE_ENQUEUE_FAILED', '数据导出任务暂时无法排队，请稍后重试')
+    }
+    const workerCas = await this.prisma.userDataRequest.updateMany({
+      where: {
+        id: created.id,
+        executionVersion: created.executionVersion,
+        workerJobId: null,
+      },
+      data: { workerJobId: jobId },
+    })
+    if (workerCas.count !== 1) {
+      throw unavailable('DATA_REQUEST_EXECUTION_INCOMPLETE', '数据导出任务状态尚未收敛，请稍后查看')
+    }
+    return toMemberDataRequestItem({ ...created, workerJobId: jobId })
+  }
+
+  async list(endUserId: string, cursor?: string, limit = 20): Promise<MemberDataRequestPage> {
+    const take = pageSize(limit)
+    const decoded = decodeRequestCursor(cursor)
+    const rows = await this.prisma.userDataRequest.findMany({
+      where: { endUserId, ...cursorWhere(decoded) },
+      orderBy: [{ requestedAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+    })
+    const hasMore = rows.length > take
+    const items = rows.slice(0, take)
+    return {
+      items: items.map(toMemberDataRequestItem),
+      nextCursor: hasMore && items.length > 0 ? encodeRequestCursor(items[items.length - 1]!) : null,
+      capabilities: { accountClosureAvailable: false },
+    }
+  }
+
+  listForAdmin(query: AdminMemberDataRequestQuery = {}): Promise<AdminMemberDataRequestPage> {
+    return this.admin().list(query)
+  }
+
+  retry(id: string, handledBy: string): Promise<AdminMemberDataRequestItem> {
+    return this.admin().retry(id, handledBy)
+  }
+
+  reject(id: string, handledBy: string, reason: string): Promise<AdminMemberDataRequestItem> {
+    return this.admin().reject(id, handledBy, reason)
+  }
+
+  private async createConsentRevocation(
+    endUserId: string,
+    idempotencyKey: string,
+  ): Promise<MemberDataRequestItem> {
+    try {
+      const row = await this.prisma.$transaction(async (tx) => {
+        const replay = await tx.userDataRequest.findUnique({ where: { idempotencyKey } })
+        if (replay) {
+          if (replay.endUserId !== endUserId || replay.requestType !== 'revoke_consent') {
+            throw conflict('IDEMPOTENCY_KEY_REUSED', '幂等键已用于其他数据请求')
+          }
+          return replay
+        }
+        const now = new Date()
         await tx.userAiConsent.updateMany({
           where: { endUserId, scope: 'job_ai', revokedAt: null },
-          data: { revokedAt: new Date() },
+          data: { revokedAt: now },
         })
         const created = await tx.userDataRequest.create({
           data: {
@@ -145,188 +186,124 @@ export class MemberDataRequestService {
             requestType: 'revoke_consent',
             status: 'completed',
             idempotencyKey,
-            executionStep: 'consent_revoked',
-            handledAt: new Date(),
+            activeKey: null,
+            executionVersion: 0,
+            handledAt: now,
+            handledBy: 'system',
           },
         })
-        return { kind: 'created' as const, row: created }
+        const auditRef = await this.audit.writeRequired(tx, {
+          actorId: null,
+          actorRole: 'end_user',
+          action: 'member_ai_consent.revoke',
+          targetType: 'user_data_request',
+          targetId: created.id,
+          payload: { scope: 'job_ai' },
+        })
+        return tx.userDataRequest.update({ where: { id: created.id }, data: { auditRef } })
       })
-      return result.kind === 'replay'
-        ? this.toIdempotentItem(result.row, 'revoke_consent')
-        : toMemberDataRequestItem(result.row)
+      return toMemberDataRequestItem(row)
     } catch (error) {
-      const replay = await this.findIdempotentRequest(endUserId, idempotencyKey)
-      if (replay) return this.toIdempotentItem(replay, 'revoke_consent')
+      if (this.isUniqueConflict(error)) {
+        const replay = await this.findIdempotent(endUserId, 'revoke_consent', idempotencyKey)
+        if (replay) return toMemberDataRequestItem(replay)
+      }
       throw error
     }
   }
 
-  private async createExportRequest(
+  private async createExportRow(
     endUserId: string,
     idempotencyKey: string,
-    stepUpToken: string | null,
-    terminalId: string | null,
-  ): Promise<MemberDataRequestItem> {
-    if (!stepUpToken) {
-      throw new BadRequestException({ error: { code: 'MEMBER_STEP_UP_TOKEN_REQUIRED', message: '资料导出需要二次验证授权' } })
-    }
-
-    const row = await this.reserveExportRequest(endUserId, idempotencyKey)
-    if ('replay' in row) return this.toIdempotentItem(row.replay, 'export')
-
-    try {
-      await this.stepUp.consumeGrant(endUserId, 'export_data_request', stepUpToken, terminalId ?? undefined)
-    } catch (error) {
-      await this.releaseUnauthorizedReservation(row.created.id)
-      throw error
-    }
-    return toMemberDataRequestItem(row.created)
-  }
-
-  private async reserveExportRequest(endUserId: string, idempotencyKey: string): Promise<{ replay: DataRequestRow } | { created: DataRequestRow }> {
-    const activeKey = this.activeKeyFor(endUserId)
-    try {
-      return await this.prisma.$transaction(async (tx) => {
-        const replay = await tx.userDataRequest.findUnique({
-          where: { endUserId_idempotencyKey: { endUserId, idempotencyKey } },
-        })
-        if (replay) {
-          this.assertReplayType(replay, 'export')
-          return { replay }
-        }
-
-        const active = await tx.userDataRequest.findUnique({ where: { activeKey } })
-        if (active) throw this.activeRequestConflict()
-
-        const user = await tx.endUser.findUnique({
-          where: { id: endUserId },
-          select: { enabled: true, status: true },
-        })
-        if (!user || !user.enabled || user.status !== 'active') throw this.accountUnavailable()
-
-        const created = await tx.userDataRequest.create({
-          data: {
-            endUserId,
-            requestType: 'export',
-            status: 'pending',
-            idempotencyKey,
-            activeKey,
-            executionVersion: 0,
-            executionStep: 'awaiting_export_worker',
-          },
-        })
-        return { created }
-      })
-    } catch (error) {
-      if (!this.isUniqueConstraint(error)) throw error
-      const replay = await this.findIdempotentRequest(endUserId, idempotencyKey)
-      if (replay) {
-        this.assertReplayType(replay, 'export')
-        return { replay }
-      }
-      throw this.activeRequestConflict()
-    }
-  }
-
-  private async releaseUnauthorizedReservation(id: string): Promise<void> {
-    try {
-      await this.prisma.userDataRequest.delete({ where: { id } })
-    } catch {
-      throw new ServiceUnavailableException({
-        error: {
-          code: 'DATA_REQUEST_RESERVATION_CLEANUP_FAILED',
-          message: '资料导出授权校验失败，系统正在保护性处理中，请稍后再试',
+    activeKey: string,
+  ): Promise<DataRequestRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.userDataRequest.create({
+        data: {
+          endUserId,
+          requestType: 'export',
+          status: 'pending',
+          idempotencyKey,
+          activeKey,
+          executionVersion: 0,
+          executionStep: null,
+          progressJson: '{}',
         },
       })
-    }
-  }
-
-  private findIdempotentRequest(endUserId: string, idempotencyKey: string): Promise<DataRequestRow | null> {
-    return this.prisma.userDataRequest.findUnique({
-      where: { endUserId_idempotencyKey: { endUserId, idempotencyKey } },
+      const auditRef = await this.audit.writeRequired(tx, {
+        actorId: null,
+        actorRole: 'end_user',
+        action: 'member_data_request.create',
+        targetType: 'user_data_request',
+        targetId: created.id,
+        payload: { requestType: 'export' },
+      })
+      return tx.userDataRequest.update({ where: { id: created.id }, data: { auditRef } })
     })
   }
 
-  private assertRequestType(requestType: string): asserts requestType is MemberDataRequestType {
+  private async findIdempotent(
+    endUserId: string,
+    requestType: MemberDataRequestType,
+    idempotencyKey: string,
+  ): Promise<DataRequestRow | null> {
+    const existing = await this.prisma.userDataRequest.findUnique({ where: { idempotencyKey } })
+    if (!existing) return null
+    if (existing.endUserId !== endUserId || existing.requestType !== requestType) {
+      throw conflict('IDEMPOTENCY_KEY_REUSED', '幂等键已用于其他数据请求')
+    }
+    return existing
+  }
+
+  private async resolveUniqueConflict(
+    endUserId: string,
+    requestType: MemberDataRequestType,
+    idempotencyKey: string,
+  ): Promise<DataRequestRow | null> {
+    const replay = await this.findIdempotent(endUserId, requestType, idempotencyKey)
+    if (replay) return replay
+    const active = await this.prisma.userDataRequest.findFirst({ where: { activeKey: this.activeKey(endUserId) } })
+    if (active) throw conflict('DATA_REQUEST_ALREADY_ACTIVE', '已有数据权利请求正在处理')
+    return null
+  }
+
+  private async markQueueFailure(id: string, executionVersion: number): Promise<void> {
+    await this.prisma.userDataRequest.updateMany({
+      where: { id, status: 'pending', executionVersion, workerJobId: null },
+      data: {
+        status: 'failed',
+        failureCode: 'QUEUE_ENQUEUE_FAILED',
+        failureMessage: 'queue enqueue failed',
+        lastAttemptAt: new Date(),
+      },
+    })
+  }
+
+  private assertCreateInput(endUserId: string, requestType: string, idempotencyKey: string): void {
+    if (typeof endUserId !== 'string' || endUserId.trim().length === 0 || endUserId.length > 128) {
+      throw badRequest('INVALID_END_USER', '会员身份无效')
+    }
     if (!REQUEST_TYPES.has(requestType as MemberDataRequestType)) {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_TYPE', message: '数据请求类型不支持' } })
+      throw badRequest('INVALID_DATA_REQUEST_TYPE', '数据请求类型不支持')
+    }
+    if (!IDEMPOTENCY_KEY.test(idempotencyKey)) {
+      throw badRequest('INVALID_IDEMPOTENCY_KEY', '幂等键格式无效')
     }
   }
 
-  private requireIdempotencyKey(idempotencyKey: string | null): string {
-    if (!idempotencyKey || !UUID_PATTERN.test(idempotencyKey)) {
-      throw new BadRequestException({ error: { code: 'INVALID_IDEMPOTENCY_KEY', message: 'Idempotency-Key 必须是 UUID' } })
-    }
-    return idempotencyKey.toLowerCase()
+  private assertQueueAvailable(): void {
+    if (!this.queue) throw unavailable('DATA_REQUEST_QUEUE_UNAVAILABLE', '数据导出队列暂不可用')
   }
 
-  private activeKeyFor(endUserId: string): string {
-    return `member-data-request:${endUserId}`
+  private activeKey(endUserId: string): string {
+    return `${endUserId}:privacy-exclusive`
   }
 
-  private toIdempotentItem(row: DataRequestRow, requestType: MemberDataRequestType): MemberDataRequestItem {
-    this.assertReplayType(row, requestType)
-    return toMemberDataRequestItem(row)
+  private isUniqueConflict(error: unknown): boolean {
+    return Boolean(error && typeof error === 'object' && (error as { code?: string }).code === 'P2002')
   }
 
-  private assertReplayType(row: DataRequestRow, requestType: MemberDataRequestType): void {
-    if (row.requestType !== requestType) {
-      throw new ConflictException({
-        error: {
-          code: 'IDEMPOTENCY_KEY_REUSED',
-          message: '该 Idempotency-Key 已用于另一类数据请求，请生成新的 UUID',
-        },
-      })
-    }
-  }
-
-  private accountUnavailable(): ForbiddenException {
-    return new ForbiddenException({
-      error: {
-        code: 'ACCOUNT_UNAVAILABLE',
-        message: '当前账号不可用，无法创建数据请求',
-      },
-    })
-  }
-
-  private accountClosureUnavailable(): ConflictException {
-    return new ConflictException({
-      error: {
-        code: 'ACCOUNT_CLOSURE_NOT_AVAILABLE',
-        message: '账户注销服务暂未开放，当前无法受理账户注销请求',
-      },
-    })
-  }
-
-  private activeRequestConflict(): ConflictException {
-    return new ConflictException({
-      error: {
-        code: 'DATA_REQUEST_ACTIVE',
-        message: '当前已有正在处理的数据请求，请勿重复提交',
-      },
-    })
-  }
-
-  private isUniqueConstraint(error: unknown): boolean {
-    return (error as { code?: string } | null)?.code === 'P2002'
-  }
-}
-
-export function toMemberDataRequestItem(row: DataRequestRow): MemberDataRequestItem {
-  const requestType = row.requestType as MemberDataRequestType
-  const status = row.status as MemberDataRequestStatus
-  return {
-    id: row.id,
-    requestType,
-    status,
-    requestedAt: row.requestedAt.toISOString(),
-    handledAt: row.handledAt ? row.handledAt.toISOString() : null,
-    executionStep: row.executionStep,
-    exportExpiresAt: row.exportExpiresAt ? row.exportExpiresAt.toISOString() : null,
-    failureCode: row.failureCode,
-    canRetry: requestType === 'export' && status === 'failed',
-    canDownload: requestType === 'export'
-      && status === 'ready'
-      && Boolean(row.exportFileId && row.exportExpiresAt && row.exportExpiresAt > new Date() && !row.downloadConsumedAt),
+  private admin(): MemberDataRequestAdminOperations {
+    return new MemberDataRequestAdminOperations(this.prisma, this.audit, this.queue)
   }
 }
