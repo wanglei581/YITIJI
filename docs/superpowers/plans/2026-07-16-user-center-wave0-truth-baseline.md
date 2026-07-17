@@ -8,6 +8,8 @@
 
 **Tech Stack:** React + TypeScript；NestJS + Prisma；Node 静态 verify；SQLite/PostgreSQL migration；GitHub Actions。
 
+> **执行状态（2026-07-17，`origin/main@d4101fcc`）：** Wave 0 已由 PR #261 合入，授权撤回终态保护已由 PR #263 合入；均未部署。本计划中的复选框保留为原始完成定义，不因该状态摘要回填。
+
 ---
 
 ## Task 0: 建立隔离工作区与 CCG 任务

@@ -10,6 +10,8 @@
 
 **Tech Stack:** NestJS + Prisma + BullMQ + Redis；SQLite/PostgreSQL；FilesService/StorageService；AuditService；Node crypto；shared TypeScript contracts。
 
+> **执行状态（2026-07-17，`origin/main@d4101fcc`）：** 本计划的 Slice 1（账本、导出 step-up 预约、同步撤回同意和 `delete` 零副作用闸门）已由 PR #275 合入 `main@0ae51289`，未部署。恢复型导出 Slice 2 仅有已入主线的设计方案，尚未有运行时代码合入；真实下载、账户注销和不可逆处理继续禁止。本计划中的复选框保留为原始完成定义。
+
 ---
 
 ## 0. 文件预算与不变量
