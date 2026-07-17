@@ -1,12 +1,12 @@
 {
   "id": "user-center-wave1-account-security",
   "title": "用户中心 Wave 1A 账户安全底座",
-  "status": "in_progress",
+  "status": "completed",
   "complexity": "L+",
   "risk": "high",
   "domain": "backend",
-  "currentPhase": "review",
-  "nextAction": "整合最新 origin/main 已合入的 Wave 1A 与 CI 修复，重跑全量门禁后完成双模型终审",
+  "currentPhase": "completed",
+  "nextAction": "已归档；远程 push/PR/merge/deploy 须另行授权",
   "createdAt": "2026-07-16T11:02:00Z",
   "branch": "codex/user-center-wave1-account-security-20260716"
 }
