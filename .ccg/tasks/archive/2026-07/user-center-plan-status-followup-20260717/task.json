@@ -1,0 +1,12 @@
+{
+  "id": "user-center-plan-status-followup-20260717",
+  "title": "用户中心计划状态主线重放",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "主线事实已重放并完成验证；等待更新 PR",
+  "createdAt": "2026-07-17T11:00:00+08:00",
+  "branch": "codex/user-center-plan-status-reconcile-20260716"
+}
