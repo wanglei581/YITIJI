@@ -16,6 +16,11 @@ export type Fixture = {
   workspace: string
 }
 
+export type RuntimeEnvironmentContractFixture = {
+  path: string
+  sha256: string
+}
+
 export function writeFixtureFile(path: string, content: string): void {
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(path, content)
@@ -69,6 +74,13 @@ export function createManifest(fixture: Fixture, releaseId = RELEASE_ID): void {
   assert.equal(created.manifest.releaseId, releaseId)
   assert.ok(created.manifest.entrypoints['services/api/dist/main.js'])
   assert.ok(created.manifest.entrypoints['services/api/dist/release-provenance/release-guard.js'])
+}
+
+export function createRuntimeEnvironmentContract(workspace: string): RuntimeEnvironmentContractFixture {
+  const path = join(workspace, 'runtime-env-contract.json')
+  const content = `${JSON.stringify({ schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' }] })}\n`
+  writeFileSync(path, content)
+  return { path, sha256: createHash('sha256').update(content, 'utf8').digest('hex') }
 }
 
 export function replaceManifestCopies(

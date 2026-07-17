@@ -1,28 +1,29 @@
 import { spawnSync } from 'node:child_process'
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { closeSync, lstatSync, openSync, readFileSync, realpathSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { get } from 'node:http'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import { ReleaseProvenanceError, verifyReleaseProvenance } from './release-provenance'
+import {
+  assertApprovedLauncher,
+  assertLocalHealthUrl,
+  assertPm2ArgumentPath,
+  assertPm2Name,
+  assertPm2Snapshot,
+  loadApprovedRuntimeEnvironment,
+  readCurrentRelease,
+  type ApprovedRuntimeEnvironment,
+  type HealthProbe,
+  type Pm2ProcessSnapshot,
+  type StableLauncher,
+} from './release-runtime-contract'
 
-const LOCAL_HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
-const SAFE_PM2_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
-const SHA256 = /^[0-9a-f]{64}$/
-
-export type Pm2ProcessSnapshot = {
-  name: string
-  status: string
-  cwd: string
-  execPath: string
-  scriptArgs: string
-}
+export type { HealthProbe, Pm2ProcessSnapshot } from './release-runtime-contract'
 
 export type CommandRunner = {
-  reload(pm2Name: string): void
-  inspect(pm2Name: string): Pm2ProcessSnapshot
+  reload(pm2Name: string, environment: ApprovedRuntimeEnvironment): void
+  inspect(pm2Name: string, environment: ApprovedRuntimeEnvironment): Pm2ProcessSnapshot | null
 }
-
-export type HealthProbe = (healthUrl: string) => Promise<boolean>
 
 export type ReleaseActivationOptions = {
   candidateRoot: string
@@ -33,6 +34,8 @@ export type ReleaseActivationOptions = {
   launcherCwd: string
   launcherPath: string
   launcherSha256: string
+  runtimeEnvContractPath: string
+  runtimeEnvContractSha256: string
   runner?: CommandRunner
   healthProbe?: HealthProbe
 }
@@ -42,57 +45,14 @@ type ActivationLock = {
   token: string
 }
 
+type Pm2CommandResult = {
+  status: number | null
+  stdout: string
+  stderr: string
+}
+
 function fail(code: string): never {
   throw new ReleaseProvenanceError(code)
-}
-
-function assertAbsolute(value: string, code: string): void {
-  if (!isAbsolute(value)) fail(code)
-}
-
-function assertPm2ArgumentPath(value: string, code: string): void {
-  assertAbsolute(value, code)
-  if (/\s/.test(value)) fail(code)
-}
-
-function assertHealthUrl(healthUrl: string): void {
-  if (healthUrl !== LOCAL_HEALTH_URL) fail('RELEASE_PROVENANCE_HEALTH_URL_INVALID')
-}
-
-function assertPm2Name(pm2Name: string): void {
-  if (!SAFE_PM2_NAME.test(pm2Name)) fail('RELEASE_PROVENANCE_PM2_NAME_INVALID')
-}
-
-function assertApprovedLauncher(launcherCwd: string, launcherPath: string, launcherSha256: string): { cwd: string; path: string; sha256: string } {
-  if (!isAbsolute(launcherCwd) || !isAbsolute(launcherPath) || !SHA256.test(launcherSha256)) {
-    fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
-  }
-  try {
-    const cwdStat = lstatSync(launcherCwd)
-    const launcherStat = lstatSync(launcherPath)
-    if (!cwdStat.isDirectory() || cwdStat.isSymbolicLink() || !launcherStat.isFile() || launcherStat.isSymbolicLink() || launcherStat.size > 1024 * 1024) {
-      fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
-    }
-    const cwd = realpathSync(launcherCwd)
-    const path = realpathSync(launcherPath)
-    const actualSha256 = createHash('sha256').update(readFileSync(path)).digest('hex')
-    if (actualSha256 !== launcherSha256) fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
-    return { cwd, path, sha256: launcherSha256 }
-  } catch (error) {
-    if (error instanceof ReleaseProvenanceError) throw error
-    fail('RELEASE_PROVENANCE_LAUNCHER_INVALID')
-  }
-}
-
-function readCurrentRelease(currentLink: string): string {
-  assertAbsolute(currentLink, 'RELEASE_PROVENANCE_CURRENT_LINK_INVALID')
-  try {
-    if (!lstatSync(currentLink).isSymbolicLink()) fail('RELEASE_PROVENANCE_CURRENT_LINK_INVALID')
-    return realpathSync(currentLink)
-  } catch (error) {
-    if (error instanceof ReleaseProvenanceError) throw error
-    fail('RELEASE_PROVENANCE_CURRENT_LINK_INVALID')
-  }
 }
 
 function replaceCurrentLink(currentLink: string, targetRoot: string): void {
@@ -161,18 +121,43 @@ function parsePm2Describe(output: string): Pm2ProcessSnapshot {
   return { name, status, cwd, execPath, scriptArgs }
 }
 
-function runPm2(args: readonly string[]): string {
-  const result = spawnSync('pm2', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-  if (result.error || result.status !== 0) fail('RELEASE_PROVENANCE_PM2_COMMAND_FAILED')
-  return result.stdout ?? ''
+function runPm2(args: readonly string[], environment: ApprovedRuntimeEnvironment): Pm2CommandResult {
+  const result = spawnSync('pm2', args, {
+    encoding: 'utf8',
+    env: environment,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  if (result.error) fail('RELEASE_PROVENANCE_PM2_COMMAND_FAILED')
+  return {
+    status: result.status,
+    stdout: typeof result.stdout === 'string' ? result.stdout : '',
+    stderr: typeof result.stderr === 'string' ? result.stderr : '',
+  }
+}
+
+function isExactMissingPm2Process(result: Pm2CommandResult, pm2Name: string): boolean {
+  const message = `[PM2][WARN] ${pm2Name} doesn't exist\n`
+  return (
+    (result.status === 0 || result.status === 1) &&
+    ((result.stdout === message && result.stderr === '') || (result.stdout === '' && result.stderr === message))
+  )
+}
+
+function assertPresentPm2Snapshot(snapshot: Pm2ProcessSnapshot | null): Pm2ProcessSnapshot {
+  if (snapshot === null) fail('RELEASE_PROVENANCE_PM2_INSPECT_INVALID')
+  return snapshot
 }
 
 const systemRunner: CommandRunner = {
-  reload(pm2Name: string): void {
-    runPm2(['reload', pm2Name, '--update-env'])
+  reload(pm2Name: string, environment: ApprovedRuntimeEnvironment): void {
+    const result = runPm2(['reload', pm2Name, '--update-env'], environment)
+    if (result.status !== 0) fail('RELEASE_PROVENANCE_PM2_COMMAND_FAILED')
   },
-  inspect(pm2Name: string): Pm2ProcessSnapshot {
-    return parsePm2Describe(runPm2(['describe', pm2Name, '--no-color']))
+  inspect(pm2Name: string, environment: ApprovedRuntimeEnvironment): Pm2ProcessSnapshot | null {
+    const result = runPm2(['describe', pm2Name, '--no-color'], environment)
+    if (isExactMissingPm2Process(result, pm2Name)) return null
+    if (result.status !== 0) fail('RELEASE_PROVENANCE_PM2_COMMAND_FAILED')
+    return parsePm2Describe(result.stdout)
   },
 }
 
@@ -214,49 +199,24 @@ const systemHealthProbe: HealthProbe = async (healthUrl) =>
     request.on('error', () => finish(false))
   })
 
-function assertPm2Snapshot(
-  snapshot: Pm2ProcessSnapshot,
-  pm2Name: string,
-  expectedLauncher: { cwd: string; path: string; sha256: string },
-  currentLink: string,
-  artifactRoot: string,
-): void {
-  let cwd: string
-  let execPath: string
-  try {
-    cwd = realpathSync(snapshot.cwd)
-    execPath = realpathSync(isAbsolute(snapshot.execPath) ? snapshot.execPath : join(snapshot.cwd, snapshot.execPath))
-  } catch {
-    fail('RELEASE_PROVENANCE_PM2_PATH_MISMATCH')
-  }
-  const expectedScriptArgs = `--current-link ${currentLink} --artifact-root ${artifactRoot} --launcher-sha256 ${expectedLauncher.sha256}`
-  if (
-    snapshot.name !== pm2Name ||
-    snapshot.status !== 'online' ||
-    cwd !== expectedLauncher.cwd ||
-    execPath !== expectedLauncher.path ||
-    snapshot.scriptArgs !== expectedScriptArgs
-  ) {
-    fail('RELEASE_PROVENANCE_PM2_PATH_MISMATCH')
-  }
-}
-
 async function rollback(
   previousRoot: string,
   currentLink: string,
   artifactRoot: string,
   pm2Name: string,
   healthUrl: string,
+  environment: ApprovedRuntimeEnvironment,
   runner: CommandRunner,
   healthProbe: HealthProbe,
-  launcher: { cwd: string; path: string; sha256: string },
+  launcher: StableLauncher,
 ): Promise<never> {
   try {
     verifyReleaseProvenance({ releaseRoot: previousRoot, artifactRoot })
     replaceCurrentLink(currentLink, previousRoot)
     if (readCurrentRelease(currentLink) !== previousRoot) fail('RELEASE_PROVENANCE_CURRENT_LINK_MISMATCH')
-    runner.reload(pm2Name)
-    assertPm2Snapshot(runner.inspect(pm2Name), pm2Name, launcher, currentLink, artifactRoot)
+    verifyReleaseProvenance({ releaseRoot: previousRoot, artifactRoot })
+    runner.reload(pm2Name, environment)
+    assertPm2Snapshot(assertPresentPm2Snapshot(runner.inspect(pm2Name, environment)), pm2Name, launcher, currentLink, artifactRoot)
     if (!await healthProbe(healthUrl)) fail('RELEASE_PROVENANCE_POST_SWITCH_HEALTH_FAILED')
   } catch {
     fail('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED')
@@ -265,12 +225,13 @@ async function rollback(
 }
 
 export async function activateRelease(options: ReleaseActivationOptions): Promise<{ status: 'activated'; releaseId: string }> {
-  assertAbsolute(options.candidateRoot, 'RELEASE_PROVENANCE_RELEASE_ROOT_INVALID')
+  if (!isAbsolute(options.candidateRoot)) fail('RELEASE_PROVENANCE_RELEASE_ROOT_INVALID')
   assertPm2ArgumentPath(options.currentLink, 'RELEASE_PROVENANCE_CURRENT_LINK_INVALID')
   assertPm2ArgumentPath(options.artifactRoot, 'RELEASE_PROVENANCE_ARTIFACT_ROOT_INVALID')
   assertPm2Name(options.pm2Name)
-  assertHealthUrl(options.healthUrl)
+  assertLocalHealthUrl(options.healthUrl)
   const launcher = assertApprovedLauncher(options.launcherCwd, options.launcherPath, options.launcherSha256)
+  const environment = loadApprovedRuntimeEnvironment(options.runtimeEnvContractPath, options.runtimeEnvContractSha256)
   const activationLock = acquireActivationLock(options.currentLink)
   try {
     const candidate = verifyReleaseProvenance({ releaseRoot: options.candidateRoot, artifactRoot: options.artifactRoot })
@@ -285,11 +246,11 @@ export async function activateRelease(options: ReleaseActivationOptions): Promis
     try {
       if (readCurrentRelease(options.currentLink) !== candidateRoot) fail('RELEASE_PROVENANCE_CURRENT_LINK_MISMATCH')
       verifyReleaseProvenance({ releaseRoot: candidateRoot, artifactRoot: options.artifactRoot })
-      runner.reload(options.pm2Name)
-      assertPm2Snapshot(runner.inspect(options.pm2Name), options.pm2Name, launcher, options.currentLink, options.artifactRoot)
+      runner.reload(options.pm2Name, environment)
+      assertPm2Snapshot(assertPresentPm2Snapshot(runner.inspect(options.pm2Name, environment)), options.pm2Name, launcher, options.currentLink, options.artifactRoot)
       if (!await healthProbe(options.healthUrl)) fail('RELEASE_PROVENANCE_POST_SWITCH_HEALTH_FAILED')
     } catch {
-      return rollback(previousRoot, options.currentLink, options.artifactRoot, options.pm2Name, options.healthUrl, runner, healthProbe, launcher)
+      return rollback(previousRoot, options.currentLink, options.artifactRoot, options.pm2Name, options.healthUrl, environment, runner, healthProbe, launcher)
     }
     return { status: 'activated', releaseId: candidate.releaseId }
   } finally {
@@ -302,9 +263,20 @@ type ActivationCliOutput = {
 }
 
 function parseActivationArgs(args: readonly string[]): Omit<ReleaseActivationOptions, 'runner' | 'healthProbe'> {
-  if (args.length !== 16) fail('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID')
+  if (args.length !== 20) fail('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID')
   const values: Record<string, string> = {}
-  const allowed = new Set(['--candidate-root', '--current-link', '--artifact-root', '--pm2-name', '--health-url', '--launcher-cwd', '--launcher-path', '--launcher-sha256'])
+  const allowed = new Set([
+    '--candidate-root',
+    '--current-link',
+    '--artifact-root',
+    '--pm2-name',
+    '--health-url',
+    '--launcher-cwd',
+    '--launcher-path',
+    '--launcher-sha256',
+    '--runtime-env-contract-path',
+    '--runtime-env-contract-sha256',
+  ])
   for (let index = 0; index < args.length; index += 2) {
     const flag = args[index]
     const value = args[index + 1]
@@ -319,8 +291,23 @@ function parseActivationArgs(args: readonly string[]): Omit<ReleaseActivationOpt
   const launcherCwd = values['--launcher-cwd']
   const launcherPath = values['--launcher-path']
   const launcherSha256 = values['--launcher-sha256']
-  if (!candidateRoot || !currentLink || !artifactRoot || !pm2Name || !healthUrl || !launcherCwd || !launcherPath || !launcherSha256) fail('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID')
-  return { candidateRoot, currentLink, artifactRoot, pm2Name, healthUrl, launcherCwd, launcherPath, launcherSha256 }
+  const runtimeEnvContractPath = values['--runtime-env-contract-path']
+  const runtimeEnvContractSha256 = values['--runtime-env-contract-sha256']
+  if (!candidateRoot || !currentLink || !artifactRoot || !pm2Name || !healthUrl || !launcherCwd || !launcherPath || !launcherSha256 || !runtimeEnvContractPath || !runtimeEnvContractSha256) {
+    fail('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID')
+  }
+  return {
+    candidateRoot,
+    currentLink,
+    artifactRoot,
+    pm2Name,
+    healthUrl,
+    launcherCwd,
+    launcherPath,
+    launcherSha256,
+    runtimeEnvContractPath,
+    runtimeEnvContractSha256,
+  }
 }
 
 export async function runReleaseActivationCli(args: readonly string[], output: ActivationCliOutput = process.stdout): Promise<void> {

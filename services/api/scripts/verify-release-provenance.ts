@@ -23,12 +23,15 @@ import { runReleaseGuard, type SpawnMain } from '../src/release-provenance/relea
 import { runCurrentLauncher, type SpawnGuard } from '../src/release-provenance/release-current-launcher'
 import {
   activateRelease,
+  runReleaseActivationCli,
   type CommandRunner,
   type HealthProbe,
+  type Pm2ProcessSnapshot,
 } from '../src/release-provenance/release-activation'
 import {
   createFixture,
   createManifest,
+  createRuntimeEnvironmentContract,
   GIT_COMMIT,
   RELEASE_ID,
   replaceManifestCopies,
@@ -154,7 +157,7 @@ async function verifyCurrentLauncherSelfHash(): Promise<void> {
   }
 }
 
-function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string, launcherSha256: string): ReturnType<CommandRunner['inspect']> {
+function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string, launcherSha256: string): Pm2ProcessSnapshot {
   return {
     name: 'fixture-api',
     status: 'online',
@@ -173,6 +176,8 @@ type ActivationFixture = {
   launcherCwd: string
   launcherPath: string
   launcherSha256: string
+  runtimeEnvContractPath: string
+  runtimeEnvContractSha256: string
 }
 
 function createActivationFixture(): ActivationFixture {
@@ -184,6 +189,7 @@ function createActivationFixture(): ActivationFixture {
   const launcherCwd = join(workspace, 'launcher')
   const launcherPath = join(launcherCwd, 'release-current-launcher.js')
   writeFixtureFile(launcherPath, 'console.log("fixture launcher")\n')
+  const runtimeEnvironmentContract = createRuntimeEnvironmentContract(workspace)
   createManifest(previous, PREVIOUS_RELEASE_ID)
   createManifest(candidate, CANDIDATE_RELEASE_ID)
   symlinkSync(previous.releaseRoot, currentLink)
@@ -197,7 +203,118 @@ function createActivationFixture(): ActivationFixture {
     launcherCwd: realpathSync(launcherCwd),
     launcherPath: canonicalLauncherPath,
     launcherSha256: createHash('sha256').update(readFileSync(canonicalLauncherPath)).digest('hex'),
+    runtimeEnvContractPath: runtimeEnvironmentContract.path,
+    runtimeEnvContractSha256: runtimeEnvironmentContract.sha256,
   }
+}
+
+function runtimeEnvironmentContractText(value: unknown): string {
+  return `${JSON.stringify(value)}\n`
+}
+
+function replaceRuntimeEnvironmentContract(fixture: ActivationFixture, value: unknown): void {
+  const content = runtimeEnvironmentContractText(value)
+  writeFileSync(fixture.runtimeEnvContractPath, content)
+  fixture.runtimeEnvContractSha256 = createHash('sha256').update(content, 'utf8').digest('hex')
+}
+
+function replaceRuntimeEnvironmentContractBytes(fixture: ActivationFixture, content: Buffer): void {
+  writeFileSync(fixture.runtimeEnvContractPath, content)
+  fixture.runtimeEnvContractSha256 = createHash('sha256').update(content).digest('hex')
+}
+
+function activationOptions(fixture: ActivationFixture, runner: CommandRunner, healthProbe: HealthProbe): Parameters<typeof activateRelease>[0] {
+  return {
+    candidateRoot: fixture.candidate.releaseRoot,
+    currentLink: fixture.currentLink,
+    artifactRoot: fixture.candidate.artifactRoot,
+    pm2Name: 'fixture-api',
+    healthUrl: fixture.healthUrl,
+    launcherCwd: fixture.launcherCwd,
+    launcherPath: fixture.launcherPath,
+    launcherSha256: fixture.launcherSha256,
+    runtimeEnvContractPath: fixture.runtimeEnvContractPath,
+    runtimeEnvContractSha256: fixture.runtimeEnvContractSha256,
+    runner,
+    healthProbe,
+  }
+}
+
+async function verifyActivationRuntimeEnvironmentContract(): Promise<void> {
+  const rejectedCases: readonly {
+    label: string
+    code: string
+    mutate(fixture: ActivationFixture): void
+  }[] = [
+    { label: 'missing contract', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => { fixture.runtimeEnvContractPath = join(fixture.workspace, 'missing-runtime-env-contract.json') } },
+    { label: 'contract hash mismatch', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_MISMATCH', mutate: (fixture) => { fixture.runtimeEnvContractSha256 = '0'.repeat(64) } },
+    { label: 'symlinked contract', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => {
+      const target = join(fixture.workspace, 'runtime-env-contract-target.json')
+      writeFileSync(target, readFileSync(fixture.runtimeEnvContractPath))
+      unlinkSync(fixture.runtimeEnvContractPath)
+      symlinkSync(target, fixture.runtimeEnvContractPath)
+    } },
+    { label: 'oversized contract', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContractBytes(fixture, Buffer.alloc(64 * 1024 + 1, 0x20)) },
+    { label: 'directory contract', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => { fixture.runtimeEnvContractPath = fixture.workspace } },
+    { label: 'invalid utf8 contract', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContractBytes(fixture, Buffer.from([0x7b, 0x80, 0x7d])) },
+    { label: 'unsupported contract schema', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 2, variables: [{ name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' }] }) },
+    { label: 'empty contract variables', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [] }) },
+    { label: 'unknown contract field', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' }], unexpected: true }) },
+    { label: 'invalid contract variable name', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'path', purpose: 'Invalid lowercase variable name.' }] }) },
+    { label: 'overlong contract purpose', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'x'.repeat(161) }] }) },
+    { label: 'control character in contract purpose', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'Contains\nline break.' }] }) },
+    { label: 'contract without PATH', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'NODE_ENV', purpose: 'Missing required PATH.' }] }) },
+    { label: 'duplicate contract variable', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_CONTRACT_INVALID', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' }, { name: 'PATH', purpose: 'Duplicate name.' }] }) },
+    { label: 'missing contract environment value', code: 'RELEASE_PROVENANCE_RUNTIME_ENV_VALUE_MISSING', mutate: (fixture) => replaceRuntimeEnvironmentContract(fixture, { schemaVersion: 1, variables: [{ name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' }, { name: 'RELEASE_PROVENANCE_FIXTURE_UNSET', purpose: 'Prove missing values fail closed.' }] }) },
+  ]
+
+  for (const rejected of rejectedCases) {
+    const fixture = createActivationFixture()
+    try {
+      let reloads = 0
+      const runner: CommandRunner = {
+        reload: () => { reloads += 1 },
+        inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
+      }
+      rejected.mutate(fixture)
+      await expectCodeAsync(rejected.code, () => activateRelease(activationOptions(fixture, runner, async () => true)))
+      assert.equal(reloads, 0)
+      assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+      assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
+    } finally {
+      rmSync(fixture.workspace, { recursive: true, force: true })
+    }
+  }
+  console.log('  PASS runtime environment contract rejects invalid inputs before switching or reloading')
+
+  const fixture = createActivationFixture()
+  try {
+    const environments: unknown[] = []
+    const runner: CommandRunner = {
+      reload: (_pm2Name, environment) => { environments.push(environment) },
+      inspect: (_pm2Name, environment) => {
+        environments.push(environment)
+        return pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256)
+      },
+    }
+    await activateRelease(activationOptions(fixture, runner, async () => true))
+    assert.equal(environments.length, 2)
+    assert.equal(environments[0], environments[1])
+    assert.deepEqual(Object.keys(environments[0] as Record<string, string>), ['PATH'])
+    assert.equal(Object.getPrototypeOf(environments[0]), null)
+    assert.equal(Object.isFrozen(environments[0]), true)
+    console.log('  PASS activation passes only the frozen null-prototype contract environment to the PM2 command runner')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationCliRejectsLegacyArgumentCount(): Promise<void> {
+  const output = { write: () => undefined }
+  await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID', () =>
+    runReleaseActivationCli(['--candidate-root', 'relative', '--current-link', '/current', '--artifact-root', '/artifacts', '--pm2-name', 'fixture-api', '--health-url', 'http://127.0.0.1:3010/api/v1/health', '--launcher-cwd', '/launcher', '--launcher-path', '/launcher/release-current-launcher.js', '--launcher-sha256', '0'.repeat(64)], output),
+  )
+  console.log('  PASS activation CLI rejects the legacy 16-argument contract')
 }
 
 async function verifyActivationFixtures(): Promise<void> {
@@ -214,7 +331,7 @@ async function verifyActivationFixtures(): Promise<void> {
     const healthy: HealthProbe = async () => true
     writeFixtureFile(join(fixture.candidate.releaseRoot, 'services/api/dist/main.js'), 'candidate tampered\n')
     await expectCodeAsync('RELEASE_PROVENANCE_RUNTIME_TREE_MISMATCH', () =>
-      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner: noOpRunner, healthProbe: healthy }),
+      activateRelease(activationOptions(fixture, noOpRunner, healthy)),
     )
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
     assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
@@ -239,7 +356,7 @@ async function verifyActivationLock(): Promise<void> {
       },
     }
     await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_LOCKED', () =>
-      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner: noOpRunner, healthProbe: async () => true }),
+      activateRelease(activationOptions(fixture, noOpRunner, async () => true)),
     )
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
     assert.equal(existsSync(existingLockPath), true)
@@ -254,11 +371,16 @@ async function verifyActivationRollbacks(): Promise<void> {
   const fixture = createActivationFixture()
   try {
     let reloads = 0
+    const environments: unknown[] = []
     const runner: CommandRunner = {
-      reload: () => {
+      reload: (_pm2Name, environment) => {
+        environments.push(environment)
         reloads += 1
       },
-      inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
+      inspect: (_pm2Name, environment) => {
+        environments.push(environment)
+        return pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256)
+      },
     }
     let healthChecks = 0
     const healthProbe: HealthProbe = async () => {
@@ -266,9 +388,11 @@ async function verifyActivationRollbacks(): Promise<void> {
       return healthChecks > 1
     }
     await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK', () =>
-      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe }),
+      activateRelease(activationOptions(fixture, runner, healthProbe)),
     )
     assert.equal(reloads, 2)
+    assert.equal(environments.length, 4)
+    assert.equal(environments.every((environment) => environment === environments[0]), true)
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
     assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
     console.log('  PASS post-switch health failure rolls back only to verified previous')
@@ -288,7 +412,7 @@ async function verifyActivationRollbacks(): Promise<void> {
     }
     const unhealthy: HealthProbe = async () => false
     await expectCodeAsync('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED', () =>
-      activateRelease({ candidateRoot: unverified.candidate.releaseRoot, currentLink: unverified.currentLink, artifactRoot: unverified.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: unverified.healthUrl, launcherCwd: unverified.launcherCwd, launcherPath: unverified.launcherPath, launcherSha256: unverified.launcherSha256, runner, healthProbe: unhealthy }),
+      activateRelease(activationOptions(unverified, runner, unhealthy)),
     )
     assert.equal(reloads, 1)
     assert.equal(realpathSync(unverified.currentLink), realpathSync(unverified.candidate.releaseRoot))
@@ -296,6 +420,34 @@ async function verifyActivationRollbacks(): Promise<void> {
     console.log('  PASS unverified previous prevents rollback and remains NO-GO')
   } finally {
     rmSync(unverified.workspace, { recursive: true, force: true })
+  }
+}
+
+async function verifyActivationRollsBackOnMissingPm2Snapshot(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    let reloads = 0
+    let inspections = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+      },
+      inspect: () => {
+        inspections += 1
+        if (inspections === 1) return null
+        return pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256)
+      },
+    }
+    await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK', () =>
+      activateRelease(activationOptions(fixture, runner, async () => true)),
+    )
+    assert.equal(reloads, 2)
+    assert.equal(inspections, 2)
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
+    console.log('  PASS injected missing PM2 snapshot forces a verified rollback')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
   }
 }
 
@@ -310,7 +462,7 @@ async function verifyActivationSuccess(): Promise<void> {
       inspect: () => pm2Snapshot(fixture.launcherCwd, fixture.launcherPath, fixture.currentLink, fixture.candidate.artifactRoot, fixture.launcherSha256),
     }
     const healthy: HealthProbe = async () => true
-    const result = await activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe: healthy })
+    const result = await activateRelease(activationOptions(fixture, runner, healthy))
     assert.equal(result.status, 'activated')
     assert.equal(result.releaseId, CANDIDATE_RELEASE_ID)
     assert.equal(reloads, 1)
@@ -337,7 +489,7 @@ async function verifyActivationRejectsWrongLauncherArgs(): Promise<void> {
     }
     const healthy: HealthProbe = async () => true
     await expectCodeAsync('RELEASE_PROVENANCE_ROLLBACK_UNVERIFIED', () =>
-      activateRelease({ candidateRoot: fixture.candidate.releaseRoot, currentLink: fixture.currentLink, artifactRoot: fixture.candidate.artifactRoot, pm2Name: 'fixture-api', healthUrl: fixture.healthUrl, launcherCwd: fixture.launcherCwd, launcherPath: fixture.launcherPath, launcherSha256: fixture.launcherSha256, runner, healthProbe: healthy }),
+      activateRelease(activationOptions(fixture, runner, healthy)),
     )
     assert.equal(reloads, 2)
     assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
@@ -460,9 +612,12 @@ async function main(): Promise<void> {
   await verifyGuardLaunch()
   await verifyCurrentLauncher()
   await verifyCurrentLauncherSelfHash()
+  await verifyActivationRuntimeEnvironmentContract()
+  await verifyActivationCliRejectsLegacyArgumentCount()
   await verifyActivationFixtures()
   await verifyActivationLock()
   await verifyActivationRollbacks()
+  await verifyActivationRollsBackOnMissingPm2Snapshot()
   await verifyActivationSuccess()
   await verifyActivationRejectsWrongLauncherArgs()
 
