@@ -19,6 +19,7 @@ import {
   MicIcon,
   SquareIcon,
 } from 'lucide-react'
+import { InterviewTopbar } from './InterviewTopbar'
 import './interview-service-desk.css'
 
 const CHECKLIST: Array<{ title: string; desc: string }> = [
@@ -118,15 +119,17 @@ export function InterviewTipsPage() {
 
   return (
     <div className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewTopbar />
       <PageHeader
+        className="interview-pagehead"
         title="面试技巧"
-        subtitle="面试前准备工具：清单逐项过一遍，再开始模拟练习"
+        subtitle="面试前准备工具：清单逐项过一遍，再开始模拟练习（通用建议，仅供参考）"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
-      <div className="interview-flow__scroll mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
           面试是展示自我、与企业双向选择的过程。以下内容为通用准备建议，仅供参考。
         </ComplianceBanner>

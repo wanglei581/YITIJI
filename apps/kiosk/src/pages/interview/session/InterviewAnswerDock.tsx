@@ -46,9 +46,23 @@ export function InterviewAnswerDock(props: InterviewAnswerDockProps) {
     draft, voiceAvailable, onDraftChange, onReviewChange, onReviewSubmit, onRetryVoice,
     onStopRecording, onUseText, onUseVoice, onSkip, onSubmitText, onFinish,
   } = props
+  const answerStatus =
+    phase === 'done_suggest' ? '本场已完成'
+    : mode === 'voice' && voice.kind === 'recording' ? '作答中 · 语音录制'
+    : mode === 'voice' && voice.kind === 'review' ? '作答中 · 转写确认'
+    : mode === 'voice' ? '作答中 · 语音回答'
+    : '作答中 · 文字输入'
 
   return (
     <footer className="interview-session__answer-dock">
+      <div className="interview-session__answer-head">
+        <span className="interview-session__card-icon"><PencilLineIcon aria-hidden="true" /></span>
+        <div>
+          <h2>我的回答</h2>
+          <p>文字输入，或用麦克风语音作答</p>
+        </div>
+        <span>{answerStatus}</span>
+      </div>
       {micError && (
         <div className="interview-session__mic-error">
           <div><AlertCircleIcon aria-hidden="true" /><p><strong>无法访问麦克风，请检查浏览器权限或改用文字输入</strong><span>确认浏览器已允许麦克风，并检查设备是否被其他程序占用。</span></p></div>

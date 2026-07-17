@@ -1,0 +1,157 @@
+/* service-desk tokens: --sd-surface --sd-text --sd-line */
+.interview-option span { color: inherit; }
+.interview-option span + span {
+  color: var(--interview-muted) !important;
+  font-weight: 400;
+}
+
+.interview-flow button:focus-visible,
+.interview-flow input:focus-visible,
+.interview-flow textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--interview-plum) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.interview-setup__layout,
+.interview-setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.interview-setup__form > .grid { gap: 18px; }
+.interview-setup__form input {
+  min-height: 60px;
+  border: 1px solid var(--interview-line);
+  border-radius: var(--interview-radius-sm);
+  background: var(--interview-surface);
+  color: var(--interview-ink);
+  font-size: 22px;
+}
+.interview-setup__form input::placeholder { color: color-mix(in srgb, var(--interview-muted) 72%, transparent); }
+.interview-setup__job .flex.flex-wrap button {
+  min-height: 52px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 20px;
+}
+.interview-setup__job > .mt-3 button {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--interview-line);
+  background: var(--interview-paper);
+  color: var(--interview-muted);
+  font-size: 17px;
+}
+.interview-setup__experience .interview-option,
+.interview-setup__duration .interview-option { min-height: 74px; }
+.interview-card--summary {
+  border-top: 4px solid var(--interview-plum);
+  background: var(--interview-surface);
+}
+.interview-summary-row {
+  min-height: 40px;
+  align-items: center;
+  border-color: var(--interview-line);
+}
+.interview-summary-row > span:first-child { color: var(--interview-muted); font-size: 17.5px; }
+.interview-summary-row > span:last-child { color: var(--interview-ink); font-size: 17.5px; }
+
+.interview-flow__action-bar {
+  z-index: 10;
+  display: flex;
+  flex: none;
+  gap: 20px;
+  align-items: center;
+  padding: 26px 48px 34px;
+  border-top: 1px solid var(--interview-line);
+  background: var(--interview-surface);
+  box-shadow: none;
+}
+.interview-flow__action-bar button,
+.interview-flow .btn,
+.interview-flow button[class*='h-14'],
+.interview-flow button[class*='h-12'] {
+  min-height: 56px;
+  border-radius: var(--interview-radius-md);
+}
+.interview-flow__action-bar button {
+  min-height: 88px;
+  font-size: 24px;
+}
+.interview-flow__action-bar button:first-child { background: var(--interview-surface); color: var(--interview-ink); }
+.interview-flow__action-bar button:not(:first-child),
+.interview-flow__action-bar button:only-child {
+  background: var(--interview-teal);
+  color: var(--interview-surface);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--interview-teal) 25%, transparent);
+}
+
+.interview-tips .interview-flow__scroll {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 18px;
+}
+.interview-tips .interview-flow__scroll > :first-child { grid-column: 1 / -1; }
+.interview-tips__checklist { border-color: var(--interview-line); }
+.interview-tips__progress {
+  height: 10px;
+  margin: 0 0 14px;
+  border: 1px solid var(--interview-line);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--interview-paper);
+}
+.interview-tips__progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--interview-plum);
+  transition: width .2s ease;
+}
+.interview-tips button[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--interview-plum) 35%, var(--interview-line)) !important;
+  background: var(--interview-plum-soft) !important;
+}
+
+.interview-reports__guest {
+  min-height: 440px;
+  justify-content: center;
+}
+.interview-reports__list {
+  display: flex;
+  max-width: none;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+}
+.interview-reports__row {
+  min-height: 110px;
+  padding: 22px 26px;
+  border-radius: var(--interview-radius-sm);
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.interview-reports__row:hover {
+  border-color: color-mix(in srgb, var(--interview-plum) 35%, var(--interview-line));
+  box-shadow: 0 8px 24px rgba(16, 48, 43, .08);
+  transform: translateY(-1px);
+}
+
+.interview-state-page,
+.interview-session-invalid {
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  text-align: center;
+}
+
+.interview-session-invalid > div:first-child {
+  display: flex;
+  width: 72px;
+  height: 72px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  background: var(--interview-error-soft);
+  color: var(--interview-error);
+}
