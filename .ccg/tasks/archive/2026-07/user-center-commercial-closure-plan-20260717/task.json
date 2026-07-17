@@ -1,0 +1,12 @@
+{
+  "id": "user-center-commercial-closure-plan-20260717",
+  "title": "用户中心商用级闭环审计与开发方案校准",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "documentation-governance",
+  "currentPhase": "completed",
+  "nextAction": "已完成文档事实校准，Claude Opus 4.8 与 Antigravity Gemini 3.1 Pro High 均 APPROVE；归档任务记录并创建本地文档提交，等待用户决定是否推送/创建 PR。",
+  "createdAt": "2026-07-17T10:00:00Z",
+  "branch": "codex/user-center-commercial-closure-plan-20260717"
+}

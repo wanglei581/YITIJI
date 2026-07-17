@@ -8,6 +8,8 @@
 
 **Tech Stack:** NestJS 11；Prisma 7；SQLite/PostgreSQL；Redis Lua 原子操作；现有 SMS sender；TypeScript shared contracts；现有 AuditService。
 
+> **执行状态（2026-07-17，`origin/main@d4101fcc`）：** 基础版已由 PR #265 合入，追加安全加固已由 PR #270（`88e940cd`）合入；均未部署。该波不包含数据导出执行器、下载、账户注销执行器或隐私运营 UI，本计划中的复选框保留为原始完成定义。
+
 ---
 
 ## 0. 文件预算与边界

@@ -51,7 +51,7 @@
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
 - [x] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（已合入，未部署）**：PR #275 已 squash 合入 `main@0ae51289`，合并前和合并后双 CI 均成功。UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 已进入主线；不得据此声称真实导出、下载或注销已经开放。
-- [~] **Wave 1-B Slice 2 导出执行器与恢复策略（方案本地候选，待 PR）**：方案已锁定必需审计、敏感队列、白名单 artifact、FileObject 预留、固定 job id、对象补偿与 `pending/handling` 恢复 sweep；实现必须先用 SQLite + fake queue/storage RED→GREEN 验证 grant/enqueue/worker 崩溃窗口，不做 UI、下载、用户取消或 Admin retry。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活。
+- [~] **Wave 1-B Slice 2 导出执行器与恢复策略（方案已入主线，运行时代码待独立 PR）**：方案已锁定必需审计、敏感队列、白名单 artifact、FileObject 预留、固定 job id、对象补偿与 `pending/handling` 恢复 sweep；实现必须先用 SQLite + fake queue/storage RED→GREEN 验证 grant/enqueue/worker 崩溃窗口，不做 UI、下载、用户取消或 Admin retry。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活。
 - [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。

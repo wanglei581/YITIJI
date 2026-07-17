@@ -8,6 +8,8 @@
 
 **Tech Stack:** React + Vite + TypeScript + Tailwind + `@ai-job-print/ui` + lucide-react + qrcode.react；NestJS Admin API；现有 AuthContext；Node static verify；浏览器/真机验收。
 
+> **执行状态（2026-07-17，`origin/main@d4101fcc`）：** 尚未开始。必须等待 Wave 1-B 的导出执行、下载租约与失败补偿契约合入后，才可实现 Kiosk 设置页或 Admin 隐私运营 UI；不得提前展示注销入口或伪造完成态。
+
 ---
 
 ## 0. 文件预算与视觉边界
