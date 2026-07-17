@@ -1,7 +1,7 @@
 .career-plan-lightflow {
   --sd-color-canvas-outer: #f4f1e8;
   --sd-color-canvas: #f4f1e8;
-  --sd-color-surface: #fffdf8;
+  --sd-color-surface: #ffffff;
   --sd-color-primary: #1f9e86;
   --sd-color-primary-strong: #157a67;
   --sd-color-primary-soft: #e2f2ec;
@@ -25,7 +25,7 @@
     radial-gradient(1000px 520px at 88% -6%, rgba(31, 158, 134, .07), transparent 62%),
     radial-gradient(760px 420px at -10% 28%, rgba(184, 104, 60, .06), transparent 58%),
     var(--sd-color-canvas-outer);
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  font-family: var(--sd-font-sans, system-ui, sans-serif);
 }
 
 .career-plan-lightflow--gate,
@@ -103,7 +103,7 @@
   font-size: clamp(26px, 4vw, 40px);
   font-weight: 850;
   letter-spacing: .02em;
-  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
+  font-family: var(--sd-font-sans, system-ui, sans-serif);
 }
 
 .career-plan-lightflow__state-card > p:not(.career-plan-lightflow__eyebrow),
@@ -175,7 +175,7 @@
   min-height: var(--sd-control-min, 48px);
 }
 
-.career-plan-lightflow__section-heading h2 { margin: 0; font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif; font-size: 24px; font-weight: 820; letter-spacing: .02em; }
+.career-plan-lightflow__section-heading h2 { margin: 0; font-family: var(--sd-font-sans, system-ui, sans-serif); font-size: 24px; font-weight: 820; letter-spacing: .02em; }
 
 .career-plan-lightflow__section-icon { width: 42px; height: 42px; border-radius: 14px; }
 .career-plan-lightflow__section-icon svg { width: 19px; height: 19px; }
