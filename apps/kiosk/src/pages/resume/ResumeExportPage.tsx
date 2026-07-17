@@ -3,6 +3,7 @@ import { Button, Card } from '@ai-job-print/ui'
 import { ArrowRightIcon, FileTextIcon, PrinterIcon, SaveIcon } from 'lucide-react'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import './resume-library-lightflow.css'
+import './resume-fusion-youth.css'
 
 export function ResumeExportPage() {
   const navigate = useNavigate()

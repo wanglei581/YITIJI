@@ -1,5 +1,5 @@
 // ============================================================
-// AI 简历生成 — 预览 / 编辑 / 导出(阶段2A)
+// AI 简历生成 - 预览 / 编辑 / 导出(阶段2A)
 //
 // - 预览生成结果,所有文本可直接编辑(用户对自己的简历有最终修改权)。
 // - 缺失提示(missingHints)来自服务端确定性计算:AI 不代填,提示用户返回补充。
@@ -31,6 +31,7 @@ import { exportGeneratedResume, getResumeGenerate } from '../../services/api'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import './resume-authoring-lightflow.css'
+import './resume-fusion-youth.css'
 
 interface LocationState {
   result?: ResumeGenerateResponse

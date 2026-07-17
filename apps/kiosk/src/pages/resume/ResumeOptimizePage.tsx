@@ -31,6 +31,7 @@ import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
 import { ResumeLayoutControls } from './components/ResumeLayoutControls'
 import { useResumeLayout } from './hooks/useResumeLayout'
 import './resume-authoring-lightflow.css'
+import './resume-fusion-youth.css'
 
 /** 导出格式可选项(Wave1 Task 8,Wave6 起四种格式均可打印):PDF 直接打印本文件；
  *  Word/TXT/Markdown 下载供编辑，打印时使用另外渲染的同内容 PDF 副本。 */

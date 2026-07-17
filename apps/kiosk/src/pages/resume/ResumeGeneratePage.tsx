@@ -1,5 +1,5 @@
 // ============================================================
-// AI 简历生成 — 引导式表单(阶段2A)
+// AI 简历生成 - 引导式表单(阶段2A)
 //
 // 合规红线:
 //   - AI 只润色用户提供的信息,不编造学历/证书/公司/项目;缺失内容提示补充,不代填。
@@ -33,6 +33,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { ResumeVoiceInputButton } from './components/ResumeVoiceInputButton'
 import './resume-authoring-lightflow.css'
+import './resume-fusion-youth.css'
 
 const STEPS = [
   { title: '基本信息', description: '姓名与联系方式' },
