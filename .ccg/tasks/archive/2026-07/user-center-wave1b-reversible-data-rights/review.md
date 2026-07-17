@@ -19,6 +19,8 @@
 
 2026-07-17 追加：针对上述未覆盖路径再次分段调用双模型。Antigravity 在获取模型配置时收到外部 EOF，未生成报告；Claude 两次在输出结论前超时，恢复同一会话也未返回报告。三次失败均不是有效审查结论，故该分段仍保持待全量外部复审状态。
 
+2026-07-17 授权恢复后，Antigravity 已通过模型列表和最小只读探针验证可用，并完成上述 11 个未覆盖文件的聚焦审查，结论为 `APPROVE`（无 Critical/Warning）；覆盖 Redis ticket/claim/finish 原子性、迁移一致性、审计事务和 controller 鉴权/下载 header。Claude 对同一范围的恢复会话仍在输出报告前超时，未形成有效结论。因此该候选仍不宣称完成双模型全量外部复审，待 Claude 提供有效报告后再解除集成前审查阻塞。
+
 ## 设计取舍确认
 
 - 失败或清理不确定的 export 请求保留 `activeKey`，且 `EXPORT_CLEANUP_FAILED` 禁止 Admin retry/reject；这是为了防止未确认清理的私有对象被新请求绕过。普通失败项在 API 中仍以 `canRetry=true` 表示可由受控运营动作处理；本切片未新增用户或 Admin UI。
