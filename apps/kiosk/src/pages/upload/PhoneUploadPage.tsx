@@ -1,3 +1,4 @@
+import './phone-upload-service-desk.css'
 import { useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
@@ -100,7 +101,14 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="grid min-h-[100svh] place-items-center bg-[#e9f1fb] px-0 py-0 font-sans text-neutral-900 sm:py-6">
+    <main className="k1-phone-upload service-desk grid min-h-[100svh] place-items-center bg-[#e9f1fb] px-0 py-0 font-sans text-neutral-900 sm:py-6" data-visual-theme="service-desk" data-ux-density="touch">
+      {!ready ? (
+        <div className="phone-upload-invalid flex flex-col items-center gap-4 px-6 text-center">
+          <AlertCircleIcon className="h-12 w-12 text-red-400" />
+          <p className="text-lg font-semibold text-neutral-700">上传链接已失效</p>
+          <p className="text-sm text-neutral-500">请回到一体机屏幕重新扫码获取新的上传链接。</p>
+        </div>
+      ) : (
       <section className="flex h-[844px] w-[390px] max-w-full flex-col gap-4 rounded-none bg-canvas px-5 py-6 shadow-none sm:rounded-[28px] sm:shadow-[0_24px_60px_rgba(9,26,23,0.25)]">
         <header className="flex shrink-0 items-center gap-2.5">
           <span className="grid h-[38px] w-[38px] place-items-center rounded-[10px] bg-dark text-surface">
@@ -190,6 +198,7 @@ export function PhoneUploadPage() {
           本页使用一次性上传令牌，不会登录或读取你的账号；文件仅用于本次打印 / 简历服务，到期自动清理。
         </div>
       </section>
+      )}
     </main>
   )
 }
