@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../auth/useAuth'
 import { listBenefitActivities } from '../../services/api/benefitActivities'
 import { formatTime } from '../profile/assets/format'
+import './activities-batch8.css'
 
 type PageState = 'loading' | 'ready' | 'error'
 
@@ -39,7 +40,9 @@ function validity(item: BenefitActivityListItem): string {
 }
 
 function stockLabel(item: BenefitActivityListItem): string {
+  if (item.ended) return '已结束'
   if (item.soldOut) return '已领完'
+  if (item.claimed) return '已领取'
   if (item.stockRemaining !== null && item.stockRemaining <= 5) return '即将领完'
   return '可领取'
 }
@@ -81,22 +84,29 @@ export function BenefitActivitiesPage() {
     : '领取平台服务权益、打印额度和政策信息提示'
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
+    <div className="k8-activities flex h-full min-h-0 flex-col px-12 py-5">
       <PageHeader
+        className="k8-activities-header"
         title={title}
-        subtitle={subtitle}
+        subtitle={`${subtitle}${state === 'ready' ? ` · 共 ${items.length} 个活动` : ''}`}
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
+          <div className="flex gap-3">
+            <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/me/benefits')}>
+              <TicketIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+              我的权益
+            </Button>
+          </div>
         }
       />
 
-      <div className="mt-4 rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
+      <div className="k8-activities-compliance mt-4 rounded-xl border border-warning/30 bg-warning-bg px-[22px] py-3.5 text-[18px] leading-relaxed text-warning-fg">
         权益活动只用于本终端服务与打印辅助。政策资格提示只提供官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。
       </div>
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="k8-activities-scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-5">
         {state === 'loading' ? (
           <LoadingState className="py-20" />
         ) : state === 'error' ? (
@@ -111,37 +121,40 @@ export function BenefitActivitiesPage() {
             />
           </Card>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="k8-activities-grid grid grid-cols-2 gap-4">
             {items.map((item) => {
               const meta = TYPE_META[item.benefitType]
               const Icon = meta.icon
               return (
-                <Card key={item.id} className="p-4">
-                  <div className="flex h-full flex-col gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className={['flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', meta.bg].join(' ')}>
-                        <Icon className={['h-6 w-6', meta.color].join(' ')} aria-hidden="true" />
+                <Card key={item.id} className="k8-activity-card p-0" data-benefit-type={item.benefitType} data-ended={item.ended || undefined}>
+                  <div className="flex h-full flex-col gap-3 p-[22px_24px]">
+                    <div className="flex items-start gap-3.5">
+                      <div className={['k8-activity-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px]', meta.bg].join(' ')}>
+                        <Icon className={['h-[30px] w-[30px]', meta.color].join(' ')} aria-hidden="true" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
-                          <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{meta.label}</span>
+                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[15px] font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
+                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[15px] font-medium text-neutral-500">{meta.label}</span>
+                          <span className={`k8-activity-stock ml-auto ${item.ended || item.soldOut ? 'is-off' : item.stockRemaining !== null && item.stockRemaining <= 5 ? 'is-low' : 'is-ok'}`}>
+                            {stockLabel(item)}
+                          </span>
                         </div>
-                        <h2 className="mt-2 text-base font-semibold leading-snug text-neutral-900">{item.title}</h2>
-                        {item.description && <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-neutral-500">{item.description}</p>}
+                        <h2 className="mt-2 font-serif text-[25px] font-bold leading-snug text-neutral-900">{item.title}</h2>
                       </div>
                     </div>
 
-                    <div className="mt-auto space-y-2 text-xs text-neutral-400">
+                    {item.description && <p className="line-clamp-2 text-[17px] leading-relaxed text-neutral-500">{item.description}</p>}
+
+                    <div className="mt-auto space-y-1 text-[16px] text-neutral-500">
                       <p>{validity(item)}</p>
                       <p>
-                        {stockLabel(item)}
-                        {item.claimed ? ' · 已领取' : ''}
+                        {item.claimed ? '已领取 · 可在我的权益查看' : stockLabel(item)}
                       </p>
                     </div>
 
                     <Button
-                      className="h-12 w-full"
+                      className="k8-activity-action min-h-[60px] w-full text-[20px]"
                       variant={item.claimed ? 'secondary' : 'primary'}
                       disabled={isLoggedIn && !item.claimed && (item.soldOut || item.ended)}
                       onClick={() => {
@@ -160,6 +173,10 @@ export function BenefitActivitiesPage() {
           </div>
         )}
       </div>
+
+      <p className="k8-activities-notice shrink-0 rounded-[14px] border border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[15px] leading-relaxed text-neutral-500">
+        活动发布后才会在这里展示；未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。
+      </p>
     </div>
   )
 }

@@ -46,7 +46,7 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
   ]
 
   return (
-    <div className="flex gap-1 rounded-xl border border-neutral-200 bg-neutral-100 p-1">
+    <div className="flex shrink-0 gap-3">
       {tabs.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
@@ -54,13 +54,13 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
           onClick={() => onChange(key)}
           aria-pressed={active === key}
           className={[
-            'flex min-h-[52px] flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm transition-colors',
+            'flex min-h-[58px] flex-1 items-center justify-center gap-2 rounded-full border px-5 text-[20px] transition-colors active:scale-[.98]',
             active === key
-              ? 'bg-white font-semibold text-warning-fg shadow-sm'
-              : 'font-medium text-neutral-500 hover:text-neutral-700',
+              ? 'border-warning/50 bg-warning-bg font-semibold text-warning-fg'
+              : 'border-neutral-200 bg-surface font-medium text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
           ].join(' ')}
         >
-          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
           {label}
         </button>
       ))}
@@ -71,10 +71,12 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
 /** 政策匹配筛选条：选身份即筛选下方「就业政策」事项。 */
 export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
   return (
-    <div>
-      <p className="text-base font-semibold text-neutral-900">先选你的情况</p>
-      <p className="mt-0.5 text-xs text-neutral-500">选择身份后，下方自动筛出更相关的政策事项；通用事项始终展示。</p>
-      <div className="mt-3 flex flex-wrap gap-2">
+    <div className="shrink-0">
+      <p className="text-[20px] font-semibold text-neutral-900">
+        先选你的情况
+        <span className="ml-3 text-[16px] font-normal text-neutral-500">选择身份后自动筛出更相关的政策事项，通用事项始终展示</span>
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2.5">
         {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => {
           const activeChip = value === key
           return (
@@ -84,13 +86,13 @@ export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChan
               onClick={() => onChange(key)}
               aria-pressed={activeChip}
               className={[
-                'flex min-h-[48px] min-w-[120px] flex-1 items-center justify-center gap-2 rounded-xl border px-4 text-sm transition-colors',
+                'flex min-h-[56px] items-center justify-center gap-2 rounded-full border px-6 text-[19px] transition-colors active:scale-[.98]',
                 activeChip
                   ? 'border-warning/50 bg-warning-bg font-semibold text-warning-fg'
                   : 'border-neutral-200 bg-white font-medium text-neutral-600 hover:border-neutral-300',
               ].join(' ')}
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
               {label}
             </button>
           )
@@ -108,20 +110,20 @@ export function DetailList({ icon: Icon, iconColor, title, items, ordered }: {
   ordered?: boolean
 }) {
   return (
-    <section className="rounded-xl bg-neutral-50 p-4">
-      <p className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
-        <Icon className={`h-4 w-4 ${iconColor}`} aria-hidden="true" />
+    <section>
+      <p className={`flex items-center gap-2.5 text-[20px] font-semibold ${iconColor}`}>
+        <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
         {title}
       </p>
-      <ul className="mt-2.5 flex flex-col gap-2">
+      <ul className={['mt-2.5 gap-2.5', title === '需要准备材料' ? 'grid grid-cols-2' : 'flex flex-col'].join(' ')}>
         {items.map((text, i) => (
-          <li key={i} className="flex gap-2 text-sm leading-relaxed text-neutral-600">
+          <li key={i} className="flex items-start gap-3 rounded-[12px] border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-[18px] leading-relaxed text-neutral-700">
             {ordered ? (
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xs font-bold text-warning-fg">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/20 text-[16px] font-bold text-warning-fg">
                 {i + 1}
               </span>
             ) : (
-              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+              <CheckCircle2Icon className="mt-0.5 h-6 w-6 shrink-0 text-warning-fg" aria-hidden="true" />
             )}
             {text}
           </li>

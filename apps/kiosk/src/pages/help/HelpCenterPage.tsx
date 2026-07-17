@@ -17,6 +17,7 @@ import {
   BriefcaseIcon,
   ChevronRightIcon,
   FilesIcon,
+  HeadphonesIcon,
   LandmarkIcon,
   LogInIcon,
   PrinterIcon,
@@ -28,6 +29,7 @@ import {
 interface QA {
   q: string
   a: string
+  pin?: boolean
   /** 可选的相关功能页跳转入口 */
   link?: { label: string; route: string }
 }
@@ -154,6 +156,7 @@ const SECTIONS: HelpSection[] = [
       {
         q: '我上传的简历会被泄露或推送给企业吗？',
         a: '不会。简历内容仅用于你本次发起的 AI 分析，不进入任何「简历库」，不推送给任何企业或第三方招聘方。',
+        pin: true,
       },
       {
         q: '文件会保存多久？',
@@ -164,26 +167,30 @@ const SECTIONS: HelpSection[] = [
   },
 ]
 
-function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
-  const [open, setOpen] = useState(false)
+function QaRow({ item, category, answerId, defaultOpen, onNavigate }: { item: QA; category: string; answerId: string; defaultOpen: boolean; onNavigate: (route: string) => void }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="k1-help-row border-t border-neutral-100 first:border-t-0">
+    <div className={`k1-help-row${open ? ' is-open' : ''}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={answerId}
-        className="k1-help-toggle flex min-h-[56px] w-full items-center gap-3 py-3.5 text-left"
+        className="k1-help-toggle flex min-h-[56px] w-full items-start gap-4 text-left"
       >
-        <span className="min-w-0 flex-1 text-sm font-semibold text-neutral-800">{item.q}</span>
+        <span className="k1-help-question-mark" aria-hidden="true">问</span>
+        <span className="min-w-0 flex-1">
+          <span className="k1-help-category">{category}</span>
+          <strong>{item.q}</strong>
+        </span>
         <ChevronRightIcon
           className={['k1-help-chevron h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-90' : ''].join(' ')}
           aria-hidden="true"
         />
       </button>
       {open && (
-        <div id={answerId} className="k1-help-answer pb-4">
-          <p className="text-sm leading-relaxed text-neutral-600">{item.a}</p>
+        <div id={answerId} className="k1-help-answer">
+          <p>{item.a}</p>
           {item.link && (
             <button
               type="button"
@@ -202,6 +209,7 @@ function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onN
 
 export function HelpCenterPage() {
   const navigate = useNavigate()
+  const [activeSection, setActiveSection] = useState('all')
   const handleNavigate = (route: string) => {
     if (route === '/login') {
       navigate('/login', { state: { from: '/help' } })
@@ -210,8 +218,15 @@ export function HelpCenterPage() {
     navigate(route)
   }
 
+  const allItems = SECTIONS.flatMap((section) => section.items.map((item) => ({ section, item })))
+  const privacyLead = allItems.find(({ item }) => item.pin)
+  const pinnedItems = [allItems[0], privacyLead].filter((entry, index, entries) => entry && entries.indexOf(entry) === index) as { section: HelpSection; item: QA }[]
+  const orderedItems = activeSection === 'all'
+    ? [...pinnedItems, ...allItems.filter((entry) => !pinnedItems.includes(entry))]
+    : allItems.filter(({ section }) => section.key === activeSection)
+
   return (
-    <div className="service-desk k1-help-center flex h-full flex-col px-6 pt-6">
+    <div className="service-desk k1-help-center flex h-full min-h-0 flex-col px-12 py-5">
       <div className="k1-help-topbar">
         <PageHeader
           title="帮助中心"
@@ -224,41 +239,40 @@ export function HelpCenterPage() {
         />
       </div>
 
-      <div className="k1-help-scroll mt-4 flex-1 overflow-y-auto pb-8">
-        <div className="flex flex-col gap-4">
-          {SECTIONS.map((section) => {
-            const Icon = section.icon
-            return (
-              <section
-                key={section.key}
-                aria-label={section.title}
-                className="k1-help-section rounded-2xl border border-neutral-200 bg-white px-5 py-3 shadow-sm"
-              >
-                <div className="k1-help-section-heading flex items-center gap-3 py-2">
-                  <span className={['k1-help-section-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', section.iconBg].join(' ')}>
-                    <Icon className={['h-5 w-5', section.iconColor].join(' ')} aria-hidden="true" />
-                  </span>
-                  <h2 className="text-base font-bold text-neutral-900">{section.title}</h2>
-                </div>
-                <div>
-                  {section.items.map((item, itemIndex) => (
-                    <QaRow
-                      key={item.q}
-                      item={item}
-                      answerId={`help-answer-${section.key}-${itemIndex}`}
-                      onNavigate={handleNavigate}
-                    />
-                  ))}
-                </div>
-              </section>
-            )
-          })}
+      <div className="k1-help-filters" role="group" aria-label="帮助问题分类">
+        <button type="button" aria-pressed={activeSection === 'all'} className={activeSection === 'all' ? 'is-active' : ''} onClick={() => setActiveSection('all')}>全部</button>
+        {SECTIONS.map((section) => (
+          <button key={section.key} type="button" aria-pressed={activeSection === section.key} className={activeSection === section.key ? 'is-active' : ''} onClick={() => setActiveSection(section.key)}>
+            {section.title}
+          </button>
+        ))}
+      </div>
 
-          <p className="k1-help-footer px-2 text-center text-xs leading-relaxed text-neutral-400">
-            如需更多帮助，请联系现场工作人员。本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。
-          </p>
+      <div className="k1-help-scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-4">
+        <div className="k1-help-faq-list">
+          {orderedItems.map(({ section, item }, index) => (
+            <QaRow
+              key={item.q}
+              item={item}
+              category={section.title}
+              answerId={`help-answer-${section.key}-${section.items.indexOf(item)}`}
+              defaultOpen={activeSection === 'all' && index < 2}
+              onNavigate={handleNavigate}
+            />
+          ))}
         </div>
       </div>
+
+      <section className="k1-help-contact">
+        <span><HeadphonesIcon aria-hidden="true" /></span>
+        <div>
+          <h2>联系现场工作人员</h2>
+          <p>如需更多帮助，请前往大厅服务台联系现场工作人员；设备故障请勿自行拆卸或拉扯纸张。</p>
+        </div>
+        <aside><small>现场服务时间</small><strong>以大厅现场公示为准</strong></aside>
+      </section>
+
+      <p className="k1-help-footer">本终端仅提供信息与打印辅助服务，办理结果以官方 / 来源平台为准。</p>
     </div>
   )
 }

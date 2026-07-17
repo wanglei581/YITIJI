@@ -5,6 +5,7 @@ import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
 import { getScreensaverPlaylist, getTerminalId } from '../../services/api/screensaver'
 import { prefetchAsset, resolveAssetUrl } from '../../services/screensaverCache'
+import { PointerIcon, ShieldCheckIcon } from 'lucide-react'
 import './screensaver-service-desk.css'
 
 /**
@@ -35,6 +36,12 @@ export function ScreensaverPage() {
   const [items, setItems] = useState<KioskScreensaverItem[]>(statePlaylist?.items ?? [])
   const [index, setIndex] = useState(0)
   const [mediaUrl, setMediaUrl] = useState<string | null>(null)
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const exit = useCallback(() => navigate('/', { replace: true }), [navigate])
 
@@ -132,6 +139,8 @@ export function ScreensaverPage() {
   }
 
   const loopVideo = items.length <= 1
+  const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim() || '就业服务大厅'
+  const clock = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
   return (
     <div className="service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black" data-visual-theme="service-desk" data-ux-density="touch" role="presentation">
@@ -139,7 +148,7 @@ export function ScreensaverPage() {
         <video
           key={current.id}
           src={mediaUrl}
-          className="h-full w-full object-contain"
+          className="h-full w-full object-cover"
           autoPlay
           muted
           playsInline
@@ -157,17 +166,37 @@ export function ScreensaverPage() {
         <img
           key={current.id}
           src={mediaUrl}
-          className="h-full w-full object-contain"
+          className="h-full w-full object-cover"
           alt=""
           onError={() => advanceRef.current()}
         />
       )}
 
-      {/* 触摸提示:克制、不喧宾夺主 */}
+      <div className="screensaver-shade" aria-hidden="true" />
+      <div className="screensaver-corner screensaver-corner--left" aria-hidden="true">
+        <span />{terminalName}
+      </div>
+      <time className="screensaver-corner screensaver-corner--right" aria-hidden="true">{clock}</time>
+
+      <span className="screensaver-media-tag" aria-hidden="true">
+        宣传素材 · 由管理员后台上传并审核后播放
+      </span>
+
+      <div className="screensaver-dots" aria-hidden="true">
+        {items.map((item, itemIndex) => (
+          <i key={item.id} className={itemIndex === index ? 'is-active' : ''} />
+        ))}
+      </div>
+
+      <p className="screensaver-privacy" aria-hidden="true">
+        <ShieldCheckIcon />
+        进入待机时已自动退出上一位用户的登录，并清除本次会话记录
+      </p>
+
       <div className="screensaver-wake-prompt" aria-hidden="true">
-        <span>
-          触摸屏幕开始使用
-        </span>
+        <PointerIcon />
+        <strong>触摸屏幕开始使用</strong>
+        <span>轻触任意位置进入首页</span>
       </div>
     </div>
   )

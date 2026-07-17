@@ -103,25 +103,25 @@ export function RenshiPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
+    <div className="k8-policy flex h-full min-h-0 flex-col gap-[18px] px-12 py-5">
       {qrEntry && <OfficialEntryQrOverlay title={qrEntry.title} url={qrEntry.url} onClose={() => setQrEntry(null)} />}
-      <PageHeader title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
+      <PageHeader className="shrink-0" title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
 
       {/* 合规边界：仅信息指引 + 直达 AI 助手政策问答 */}
-      <div className="flex flex-wrap items-start gap-3 rounded-xl border border-warning/30 bg-warning-bg px-4 py-3.5">
-        <ShieldCheckIcon className="h-5 w-5 shrink-0 text-warning-fg" aria-hidden="true" />
+      <div className="flex shrink-0 items-center gap-4 rounded-[14px] border border-warning/30 bg-warning-bg px-[22px] py-4">
+        <ShieldCheckIcon className="h-[30px] w-[30px] shrink-0 text-warning-fg" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-warning-fg">仅信息指引 · 不代办</p>
-          <p className="mt-0.5 text-xs leading-relaxed text-warning-fg">
+          <p className="text-[21px] font-semibold text-warning-fg">仅信息指引 · 不代办</p>
+          <p className="mt-1 text-[17px] leading-relaxed text-warning-fg/85">
             只做政策说明、材料清单、官方入口与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
           </p>
         </div>
         <button
           type="button"
           onClick={() => navigate('/assistant')}
-          className="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-lg border border-warning/50 bg-white px-3 text-sm font-semibold text-warning-fg hover:bg-warning/20"
+          className="flex min-h-[60px] shrink-0 items-center gap-2 rounded-[14px] border border-warning/50 bg-surface px-5 text-[18px] font-semibold text-warning-fg transition-colors hover:bg-warning/20 active:scale-[.98]"
         >
-          <MessageCircleQuestionIcon className="h-4 w-4" aria-hidden="true" />
+          <MessageCircleQuestionIcon className="h-5 w-5" aria-hidden="true" />
           问 AI 助手
         </button>
       </div>
@@ -136,7 +136,7 @@ export function RenshiPage() {
       {activeTab === 'register' && <RegisterPanel />}
 
       {/* 合规页脚 */}
-      <p className="pb-2 text-center text-xs leading-relaxed text-neutral-400">
+      <p className="shrink-0 rounded-[14px] border border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[15px] leading-relaxed text-neutral-500">
         政策与公告内容仅作展示说明，具体以官方发布为准。如需办理具体业务，请前往对应窗口或扫码访问官方平台。
       </p>
     </div>

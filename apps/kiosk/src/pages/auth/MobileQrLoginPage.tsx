@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCircle2Icon, CircleAlertIcon, LoaderCircleIcon, ShieldCheckIcon, SmartphoneIcon } from 'lucide-react'
+import { CheckCircle2Icon, CircleAlertIcon, LoaderCircleIcon, MonitorIcon, QrCodeIcon, ShieldCheckIcon } from 'lucide-react'
 import { MemberApiError, sendSmsCode } from '../../services/auth/memberAuthApi'
 import { confirmQrLogin, fetchQrLoginStatus } from '../../services/auth/memberQrLoginApi'
 import './mobile-qr-service-desk.css'
@@ -112,13 +112,17 @@ export function MobileQrLoginPage() {
   return (
     <main className="service-desk k1-mobile-qr-login" data-visual-theme="service-desk" data-ux-density="touch">
       <section className="k1-mobile-qr-content">
+        <header className="k1-mobile-qr-brand">
+          <span><QrCodeIcon aria-hidden="true" /></span>
+          <div><strong>AI求职打印服务终端</strong><small>手机确认登录</small></div>
+        </header>
         <div className="k1-mobile-qr-intro">
           <div className="k1-mobile-qr-icon">
-            <SmartphoneIcon aria-hidden="true" />
+            <MonitorIcon aria-hidden="true" />
           </div>
-          <h1>手机确认登录</h1>
+          <h1>{deviceLabel ?? '就业服务大厅 · 当前一体机'}</h1>
           <p>
-            输入手机号和短信验证码后，一体机会自动进入会员登录态。
+            该一体机正在请求登录你的账号。请确认是你本人在现场操作，再完成手机号验证。
           </p>
           {!ready && !recoveryMessage && (
             <div className="k1-mobile-qr-device" role="status" aria-live="polite">
@@ -127,9 +131,7 @@ export function MobileQrLoginPage() {
           )}
           {ready && (
             <div className="k1-mobile-qr-device">
-              设备提示：{deviceLabel ?? '当前扫码的一体机'}
-              <br />
-              请确认它与你面前的一体机一致，再继续登录。
+              二维码 <b>3 分钟</b>内有效 · 到期请在一体机上刷新
             </div>
           )}
         </div>
@@ -223,7 +225,7 @@ export function MobileQrLoginPage() {
         </div>
 
         <p className="k1-mobile-qr-footer">
-          本页面只用于确认当前一体机登录，不会在手机或一体机长期保存登录凭证。
+          确认后请回到一体机继续使用；离开时请记得在一体机上退出登录。手机号在系统中加密存储，页面展示时脱敏。
         </p>
       </section>
     </main>
