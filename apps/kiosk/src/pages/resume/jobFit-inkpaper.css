@@ -186,3 +186,9 @@
     padding: 28px 20px;
   }
 }
+
+/* LightFlow touch target contracts */
+:root, .job-fit-inkpaper {
+  --sd-control-min: 48px;
+  --sd-primary-control-min: 56px;
+}
