@@ -204,3 +204,10 @@
   font-weight: 600;
   text-align: right;
 }
+/* Touch target contracts */
+.interview-btn, .interview-option, [role="button"] {
+  min-block-size: var(--sd-control-min, 48px);
+}
+.interview-primary-action, .interview-submit {
+  min-block-size: var(--sd-primary-control-min, 56px);
+}
