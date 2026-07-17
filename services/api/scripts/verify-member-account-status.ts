@@ -71,6 +71,14 @@ function compactWhitespace(source: string): string {
   return source.replace(/\s+/g, ' ').trim()
 }
 
+function controllerFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolutePath = join(directory, entry.name)
+    if (entry.isDirectory()) return controllerFiles(absolutePath)
+    return entry.isFile() && entry.name.endsWith('.controller.ts') ? [absolutePath] : []
+  })
+}
+
 function sqliteQuery(databasePath: string, sql: string): string {
   return execFileSync('sqlite3', ['-batch', '-noheader', '-separator', '|', databasePath, sql], {
     encoding: 'utf8',
@@ -273,17 +281,9 @@ mustNotContain(
   'MemberClosureReceiptGuard',
 )
 
-let closureGuardControllerReferences = ''
-try {
-  closureGuardControllerReferences = execFileSync(
-    'rg',
-    ['-l', 'MemberClosureReceiptGuard', resolve(repoRoot, 'services/api/src'), '-g', '*.controller.ts'],
-    { encoding: 'utf8' },
-  ).trim()
-} catch (error) {
-  const exitCode = (error as { status?: number }).status
-  if (exitCode !== 1) throw error
-}
+const closureGuardControllerReferences = controllerFiles(resolve(repoRoot, 'services/api/src'))
+  .filter((filePath) => readFileSync(filePath, 'utf8').includes('MemberClosureReceiptGuard'))
+  .join('\n')
 expectEqual(closureGuardControllerReferences, '', 'MemberClosureReceiptGuard 当前未被任何 controller 引用')
 
 if (failures > 0) {
