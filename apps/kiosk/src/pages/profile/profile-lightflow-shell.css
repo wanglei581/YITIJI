@@ -1,24 +1,38 @@
 .kprofile.kprofile-lightflow {
-  --lf-canvas: #eaf5ff;
-  --lf-surface: #ffffff;
-  --lf-surface-soft: #f5faff;
-  --lf-ink: #143553;
-  --lf-ink-muted: #5d6d8a;
-  --lf-line: #d5e4ef;
-  --lf-blue: #0877f9;
-  --lf-blue-strong: #0758d7;
-  --lf-blue-soft: #dcefff;
-  --lf-cyan-soft: #e4f7ff;
-  --lf-lavender-soft: #f0eeff;
-  --lf-sand-soft: #fff6df;
-  --lf-orange-soft: #fff0e8;
-  --lf-rose-soft: #fff0f5;
+  --paper: #f4f1e8;
+  --surface: #fffdf8;
+  --ink: #10302b;
+  --muted: #5d6b63;
+  --line: #e2dccb;
+  --teal: #1f9e86;
+  --teal-deep: #157a67;
+  --teal-soft: #e2f2ec;
+  --clay: #b8683c;
+  --clay-deep: #9e5330;
+  --clay-soft: #f4e8dd;
+  --wheat: #a9781f;
+  --wheat-deep: #8a6219;
+  --wheat-soft: #f2ead6;
+  --plum: #7a5a86;
+  --plum-deep: #63466f;
+  --plum-soft: #efe7f1;
+  --slate: #3f68b0;
+  --slate-deep: #35608f;
+  --slate-soft: #e5edf4;
+  --error: #c14a34;
+  --error-soft: #f6e3de;
+  --r-sm: 14px;
+  --r-md: 18px;
+  --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   min-block-size: 100%;
-  padding-block-end: 56px;
   overflow-x: clip;
-  color: var(--lf-ink);
-  background: var(--lf-canvas);
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 85% -5%, color-mix(in srgb, var(--teal) 6%, transparent), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, color-mix(in srgb, var(--clay) 5%, transparent), transparent 55%),
+    var(--paper);
+  font-family: var(--sans);
 }
 
 .kprofile.kprofile-lightflow .kprofile-sr-only {
@@ -35,110 +49,114 @@
 
 .kprofile.kprofile-lightflow .kp-inner {
   display: grid;
-  width: min(980px, calc(100% - 100px));
-  gap: 0;
-  margin: 18px auto 0;
+  width: min(984px, calc(100% - 96px));
+  gap: 18px;
+  margin: 26px auto 0;
+  padding-block-end: 30px;
 }
 
 .kprofile.kprofile-lightflow .kp-profile-header {
-  border-bottom: 1px solid var(--lf-line);
-  color: var(--lf-ink);
-  background: transparent;
+  overflow: hidden;
+  padding: 22px 30px;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--teal);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .kprofile.kprofile-lightflow .kp-profile-main {
   display: grid;
-  min-block-size: 160px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 20px;
+  grid-template-columns: 84px minmax(170px, 1fr) auto auto;
+  gap: 22px;
   align-items: center;
-  padding: 24px 0;
 }
 
 .kprofile.kprofile-lightflow .p-ava {
   display: grid;
-  inline-size: 72px;
-  block-size: 72px;
+  inline-size: 84px;
+  block-size: 84px;
   place-items: center;
-  border: 1px solid var(--lf-blue);
-  border-radius: 16px;
-  color: #ffffff;
-  background: var(--lf-blue);
-  font-size: 23px;
-  font-weight: 800;
+  border: 2px solid color-mix(in srgb, var(--teal) 35%, transparent);
+  border-radius: 50%;
+  color: var(--teal-deep);
+  background: var(--teal-soft);
+  font-family: var(--serif);
+  font-size: 40px;
+  font-weight: 700;
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest {
-  border-color: transparent;
-  color: var(--lf-blue-strong);
-  background: var(--lf-blue-soft);
+  color: var(--teal-deep);
+  background: var(--teal-soft);
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest svg {
-  inline-size: 30px;
-  block-size: 30px;
+  inline-size: 36px;
+  block-size: 36px;
 }
 
 .kprofile.kprofile-lightflow .p-id {
   min-inline-size: 0;
 }
 
-.kprofile.kprofile-lightflow .p-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--lf-blue-strong);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.kprofile.kprofile-lightflow .p-kicker .dot {
-  inline-size: 7px;
-  block-size: 7px;
-  border-radius: 50%;
-  background: #1f9d77;
-}
-
 .kprofile.kprofile-lightflow .p-name {
   display: block;
-  margin-block-start: 6px;
-  color: var(--lf-ink);
+  color: var(--ink);
+  font-family: var(--serif);
   font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.3;
 }
 
-.kprofile.kprofile-lightflow .p-id p {
-  margin: 6px 0 0;
-  color: var(--lf-ink-muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.kprofile.kprofile-lightflow .p-actions {
+.kprofile.kprofile-lightflow .p-kicker {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-inline-start: auto;
+  margin-block-start: 6px;
+  color: var(--muted);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.kprofile.kprofile-lightflow .p-kicker .dot {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+.kprofile.kprofile-lightflow .p-id p {
+  display: none;
+}
+
+.kprofile.kprofile-lightflow .p-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 56px);
+  gap: 10px;
+  align-items: center;
+  margin-inline-start: 0;
 }
 
 .kprofile.kprofile-lightflow .p-iconbtn {
   position: relative;
   display: grid;
-  min-inline-size: 48px;
-  min-block-size: 48px;
+  inline-size: 56px;
+  block-size: 56px;
   place-items: center;
-  border: 1px solid var(--lf-line);
-  border-radius: 12px;
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--teal-deep);
+  background: var(--surface);
   cursor: pointer;
+  font: inherit;
 }
 
 .kprofile.kprofile-lightflow .p-iconbtn svg {
-  inline-size: 21px;
-  block-size: 21px;
+  inline-size: 26px;
+  block-size: 26px;
 }
 
 .kprofile.kprofile-lightflow .p-btn {
@@ -147,161 +165,162 @@
   min-block-size: 56px;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding-inline: 18px;
-  border: 1px solid var(--lf-line);
-  border-radius: 12px;
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface);
+  gap: 10px;
+  padding-inline: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  background: var(--surface);
   cursor: pointer;
   font: inherit;
-  font-size: 14px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .p-btn.ghost {
+  grid-column: 1 / -1;
 }
 
 .kprofile.kprofile-lightflow .p-btn.primary {
-  border-color: var(--lf-blue);
-  color: #ffffff;
-  background: var(--lf-blue);
+  grid-column: 1 / -1;
+  border-color: var(--teal);
+  color: var(--surface);
+  background: var(--teal);
 }
 
 .kprofile.kprofile-lightflow .p-btn svg {
-  inline-size: 18px;
-  block-size: 18px;
+  inline-size: 24px;
+  block-size: 24px;
 }
 
 .kprofile.kprofile-lightflow .p-iconbtn:hover,
 .kprofile.kprofile-lightflow .p-btn.ghost:hover {
-  border-color: var(--lf-blue);
-  color: var(--lf-blue);
-  background: var(--lf-blue-soft);
+  border-color: color-mix(in srgb, var(--teal) 40%, var(--line));
+  color: var(--teal-deep);
+  background: var(--teal-soft);
 }
 
 .kprofile.kprofile-lightflow .p-btn.primary:hover {
-  background: var(--lf-blue-strong);
+  background: var(--teal-deep);
+}
+
+.kprofile.kprofile-lightflow .p-iconbtn:active,
+.kprofile.kprofile-lightflow .p-btn:active {
+  transform: scale(0.98);
 }
 
 .kprofile.kprofile-lightflow .p-iconbtn:focus-visible,
 .kprofile.kprofile-lightflow .p-btn:focus-visible {
-  outline: 2px solid var(--lf-blue);
+  outline: 3px solid color-mix(in srgb, var(--teal) 40%, transparent);
   outline-offset: 2px;
 }
 
 .kprofile.kprofile-lightflow .p-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-top: 1px solid var(--lf-line);
+  display: flex;
+  gap: 14px;
 }
 
 .kprofile.kprofile-lightflow .p-stat {
-  min-inline-size: 0;
-  padding: 14px 16px;
-  border-inline-end: 1px solid var(--lf-line);
-}
-
-.kprofile.kprofile-lightflow .p-stat:last-child {
-  border-inline-end: 0;
+  min-inline-size: 108px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  text-align: center;
 }
 
 .kprofile.kprofile-lightflow .p-stat b {
   display: block;
-  color: var(--lf-ink);
-  font-size: 22px;
-  font-weight: 800;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .kprofile.kprofile-lightflow .p-stat b.unloaded {
-  color: #90a1bc;
+  color: var(--muted);
 }
 
 .kprofile.kprofile-lightflow .p-stat span {
   display: block;
   margin-block-start: 4px;
-  overflow: hidden;
-  color: var(--lf-ink-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: 17px;
   white-space: nowrap;
 }
 
 .kprofile.kprofile-lightflow .kp-profile-boundary {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px 0;
-  border-top: 1px solid var(--lf-line);
+  display: none;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-boundary > svg {
-  inline-size: 24px;
-  block-size: 24px;
-  flex: 0 0 auto;
-  color: var(--lf-blue-strong);
-}
-
-.kprofile.kprofile-lightflow .kp-profile-boundary > span {
-  display: grid;
-  gap: 3px;
-}
-
-.kprofile.kprofile-lightflow .kp-profile-boundary strong {
-  font-size: 15px;
-}
-
-.kprofile.kprofile-lightflow .kp-profile-boundary small {
-  color: var(--lf-ink-muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .kprofile.kprofile-lightflow .kp-profile-main {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 84px minmax(0, 1fr) auto;
   }
 
-  .kprofile.kprofile-lightflow .p-actions {
+  .kprofile.kprofile-lightflow .p-stats {
     grid-column: 1 / -1;
-    width: 100%;
-    margin-inline-start: 0;
+    order: 4;
   }
 
-  .kprofile.kprofile-lightflow .p-btn.primary {
+  .kprofile.kprofile-lightflow .p-stat {
     flex: 1;
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 620px) {
   .kprofile.kprofile-lightflow .kp-inner {
     width: calc(100% - 24px);
     margin-block-start: 14px;
   }
 
+  .kprofile.kprofile-lightflow .kp-profile-header {
+    padding: 18px;
+  }
+
   .kprofile.kprofile-lightflow .kp-profile-main {
-    min-block-size: 0;
-    gap: 13px;
-    padding: 18px 0;
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 14px;
   }
 
   .kprofile.kprofile-lightflow .p-ava {
-    inline-size: 60px;
-    block-size: 60px;
-    border-radius: 12px;
+    inline-size: 68px;
+    block-size: 68px;
+    font-size: 32px;
   }
 
   .kprofile.kprofile-lightflow .p-name {
-    font-size: 24px;
+    font-size: 25px;
   }
 
-  .kprofile.kprofile-lightflow .p-id p {
-    font-size: 13px;
+  .kprofile.kprofile-lightflow .p-kicker {
+    font-size: 15px;
   }
 
   .kprofile.kprofile-lightflow .p-actions {
-    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    width: 100%;
+    grid-template-columns: repeat(2, 56px) minmax(0, 1fr);
   }
 
-  .kprofile.kprofile-lightflow .p-btn.ghost {
-    flex: 1;
+  .kprofile.kprofile-lightflow .p-btn.ghost,
+  .kprofile.kprofile-lightflow .p-btn.primary {
+    grid-column: auto;
+  }
+
+  .kprofile.kprofile-lightflow .p-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .kprofile.kprofile-lightflow .p-stat {
+    min-inline-size: 0;
+    padding: 10px 6px;
+  }
+
+  .kprofile.kprofile-lightflow .p-stat span {
+    font-size: 13px;
   }
 }
