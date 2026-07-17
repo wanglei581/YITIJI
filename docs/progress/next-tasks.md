@@ -43,14 +43,15 @@
 
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
 
-> 2026-07-17 最新状态：Wave 1-A 基础版与追加加固均已进入主线；追加加固通过 [PR #270](https://github.com/wanglei581/YITIJI/pull/270) squash merge 到 `main@88e940cd`，最终 GitHub Actions `29552177099` 的 `postgres-readiness` 与 `build-and-verify` 均通过。当前仍未部署，没有新增 UI、导出或注销执行器。下一开发波次为 Wave 1-B，但法务分类留存矩阵未签字前不得执行不可逆删除；生产发布前必须按实际 nginx 层级显式配置 Express `trust proxy` 可信跳数并真机确认 `req.ip`，禁止直接使用 `trust proxy=true`。
+> 2026-07-17 最新状态：Wave 1-A 基础版与追加加固均已进入主线；Wave 1-B Slice 1 已在独立本地候选完成，尚未 push / PR / merge / 部署。该切片只建立数据请求账本、导出幂等与 step-up 预约、同步撤回同意及 `delete` 零副作用 `409` 闸门；没有真实导出、下载、注销、队列、文件操作或 UI。Slice 1 的已知限制是活跃导出槽没有 worker 超时回收或用户取消，须在下一切片显式补齐。法务分类留存矩阵未签字前不得执行不可逆删除；生产发布前必须按实际 nginx 层级显式配置 Express `trust proxy` 可信跳数并真机确认 `req.ip`，禁止直接使用 `trust proxy=true`。
 
 - [x] **用户中心方案文档正式基线**：PR #259 已将审计、产品方案、五份计划、CCG 归档和对应进度事实合入 `main@602fe0d`；`build-and-verify` 与 `postgres-readiness` 均通过，且双模型复审无 Critical/Warning。
 - [x] **Wave 0 真实表达与验证基线（已合入）**：PR #261 已将 `codex/user-center-wave0-truth-baseline` 的 RED→GREEN 改动合入 `origin/main@0c4cdd57`：删除重复/占位 Profile 入口和不可用邮箱登录，保留现有扫码登录；账号设置诚实说明未开放能力；`export/delete` 无真实执行器时禁止虚假完成/普通拒绝。SQLite 57 个与 PostgreSQL 29 个正式 migration 的一次性空库验证、相关业务 verify、类型检查、三端构建及 540×960/1080×1920 浏览器验收通过，临时库均已删除且未新增 schema/migration；Claude 与显式指定模型的 Antigravity 最终均 `APPROVE`，无 Critical/Warning。
 - [x] **Wave 0 授权撤回终态保护补丁（已合入，未部署）**：`revoke_consent→rejected` 已 fail closed，授权已在请求创建时真实撤回时拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。PR #263 的双 CI、SQLite/PostgreSQL 空库复验与双模型审查均通过。
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
-- [ ] **Wave 1-B 数据权利执行器（安全加固交付后下一步）**：按 `docs/superpowers/plans/2026-07-17-user-center-wave1b-reversible-data-rights.md` 先实施 Slice 1（账本/契约与零副作用删除闸门），再分 PR 推进异步白名单导出、一次性下载租约/finish/reconciler 与受限运营动作；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活。法务分类留存矩阵未签字前不得执行不可逆删除，也不得创建注销工单或进入 `closing`。
+- [~] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（本地候选，待 push / PR / CI）**：双 schema/migration、请求状态契约、会员列表/创建、UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 均已完成本地验证；不得因该候选声称真实导出、下载或注销已经开放。
+- [ ] **Wave 1-B Slice 2 导出执行器与恢复策略**：在 Slice 1 合入并通过 CI 后，先设计并验证必需审计、敏感队列、白名单 artifact、失败补偿；补 pending 超时回收与用户取消，避免活跃导出槽永久占用。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活。
 - [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。

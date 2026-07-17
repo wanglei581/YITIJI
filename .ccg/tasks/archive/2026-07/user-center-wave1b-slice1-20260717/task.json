@@ -1,0 +1,12 @@
+{
+  "id": "user-center-wave1b-slice1-20260717",
+  "title": "用户中心 Wave 1-B Slice 1：可逆数据权利账本与注销硬闸门",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "member-privacy",
+  "currentPhase": "completed",
+  "nextAction": "已完成本地候选、验证和终审；归档任务并保留后续 Slice 2（导出执行器与恢复策略）为独立工作",
+  "createdAt": "2026-07-17T13:00:00+08:00",
+  "branch": "codex/user-center-wave1b-slice1-20260717"
+}

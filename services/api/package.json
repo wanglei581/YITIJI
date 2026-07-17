@@ -136,6 +136,7 @@
     "verify:job-ai-backend": "node -r @swc-node/register scripts/verify-job-ai-backend.ts",
     "verify:job-ai-privacy": "node -r @swc-node/register scripts/verify-job-ai-privacy.ts",
     "verify:member-data-request-truth": "node -r @swc-node/register scripts/verify-member-data-request-truth.ts",
+    "verify:member-data-request-state-machine": "node -r @swc-node/register scripts/verify-member-data-request-state-machine.ts",
     "verify:job-ai-ops-dashboard": "node -r @swc-node/register scripts/verify-job-ai-ops-dashboard.ts",
     "verify:job-customer-sample-readiness": "node -r @swc-node/register scripts/verify-job-customer-sample-readiness.ts",
     "verify:job-info-ai-real-acceptance": "node -r @swc-node/register scripts/verify-job-info-ai-real-acceptance.ts",

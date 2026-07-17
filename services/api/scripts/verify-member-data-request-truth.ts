@@ -1,15 +1,16 @@
 /**
  * 用户数据请求真实状态集成守卫。
  *
- * SQLite 环境使用独立临时库并重放正式 migration；PostgreSQL readiness
- * 直接使用该 job 刚完成迁移的空库。两种路径都只实例化真实
- * PrismaService + AuditService + MemberPrivacyService，不启动完整 AppModule。
+ * SQLite 环境使用独立临时库重放正式 migration；PostgreSQL readiness 使用其
+ * 已完成迁移的空库。该验证不启动 AppModule，也不连接 Redis：导出一次性
+ * 授权的调用顺序由 state-machine verify 锁住，这里验证真实 schema、账本
+ * 及同步撤回同意的事实。
  */
 import { execFileSync } from 'node:child_process'
 import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AuditService } from '../src/audit/audit.service'
+import { MemberDataRequestService } from '../src/member-privacy/member-data-request.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -25,8 +26,6 @@ function cleanupEnvironment(): void {
 
 if (tempDir) {
   const databasePath = join(tempDir, 'truth.db')
-  // Prisma 7.8 的本机 schema engine 在部分 macOS worktree 中不会创建缺失的
-  // SQLite 文件；先创建空文件后仍由 migrate deploy 完整建立正式 schema。
   closeSync(openSync(databasePath, 'a'))
   process.env['DATABASE_URL'] = `file:${databasePath}`
   try {
@@ -55,37 +54,18 @@ function fail(message: string): void {
 function errorCode(error: unknown): string | undefined {
   const exception = error as { getResponse?: () => unknown; response?: unknown }
   const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
-    | { error?: { code?: string; message?: string } }
+    | { error?: { code?: string } }
     | undefined
   return response?.error?.code
 }
 
-function errorMessage(error: unknown): string | undefined {
-  const exception = error as { getResponse?: () => unknown; response?: unknown }
-  const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
-    | { error?: { message?: string } }
-    | undefined
-  return response?.error?.message
-}
-
-async function expectHttpError(
-  operation: () => Promise<unknown>,
-  expectedCode: string,
-  expectedMessage: string,
-  label: string,
-): Promise<void> {
+async function expectError(operation: () => Promise<unknown>, expectedCode: string, label: string): Promise<void> {
   try {
     await operation()
     fail(`${label} — 未 fail closed`)
   } catch (error) {
-    const actualCode = errorCode(error)
-    const actualMessage = errorMessage(error)
-    if (actualCode === expectedCode && actualMessage === expectedMessage) pass(`${label} — ${expectedCode}`)
-    else {
-      fail(
-        `${label} — 预期 ${expectedCode} / ${expectedMessage}，实际 ${actualCode ?? '无错误码'} / ${actualMessage ?? (error as Error).message}`,
-      )
-    }
+    if (errorCode(error) === expectedCode) pass(`${label} — ${expectedCode}`)
+    else fail(`${label} — 预期 ${expectedCode}，实际 ${errorCode(error) ?? (error as Error).message}`)
   }
 }
 
@@ -93,158 +73,123 @@ async function main(): Promise<void> {
   console.log(`\n=== 用户数据请求真实状态守卫（${usesPostgres ? 'PostgreSQL' : '临时 SQLite'}）===`)
 
   const prisma = new PrismaService()
-  const audit = new AuditService(prisma)
-  const privacy = new MemberPrivacyService(prisma, audit)
-  const tag = `wave0-data-rights-${Date.now()}-${process.pid}`
-  const adminId = `${tag}-admin`
+  let stepUpCalls = 0
+  const requests = new MemberDataRequestService(
+    prisma,
+    {
+      consumeGrant: async () => {
+        stepUpCalls += 1
+        throw new Error('truth verify must not consume export grant')
+      },
+    } as never,
+  )
+  const tag = `wave1b-data-rights-${Date.now()}-${process.pid}`
   const endUserId = `${tag}-member`
-  const unavailableMessage = '真实导出/注销执行器尚未开放，该请求将保持待处理，不能进入目标状态'
-  const alreadyExecutedMessage = '授权撤回已在请求创建时同步执行，只能记录为 completed'
 
   await prisma.onModuleInit()
   try {
-    await prisma.user.create({
-      data: {
-        id: adminId,
-        username: adminId,
-        passwordHash: 'verify-only-not-a-login-secret',
-        name: 'Wave 0 Verify Admin',
-        role: 'admin',
-      },
-    })
     await prisma.endUser.create({
       data: {
         id: endUserId,
         phoneHash: `${tag}-phone-hash`,
         phoneEnc: 'verify-only-encrypted-placeholder',
-        nickname: 'Wave 0 Verify Member',
+        nickname: 'Wave 1-B Verify Member',
       },
     })
 
-    const exportRequest = await privacy.createDataRequest(endUserId, 'export')
-    const deleteRequest = await privacy.createDataRequest(endUserId, 'delete')
-    await privacy.grantConsent(endUserId, 'job_ai', null)
+    await expectError(
+      () => requests.create(endUserId, {
+        requestType: 'delete',
+        idempotencyKey: null,
+        stepUpToken: null,
+        terminalId: null,
+      }),
+      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
+      'delete 请求不创建账本或消费 Step-up',
+    )
+    const afterDelete = await prisma.userDataRequest.count({ where: { endUserId } })
+    if (afterDelete === 0 && stepUpCalls === 0) pass('delete 拒绝后真实数据库没有请求行，且 Step-up 零调用')
+    else fail(`delete 拒绝仍留下副作用: rows=${afterDelete} stepUp=${stepUpCalls}`)
+
+    const legacyOne = await prisma.userDataRequest.create({
+      data: { endUserId, requestType: 'export', status: 'pending' },
+    })
+    const legacyTwo = await prisma.userDataRequest.create({
+      data: { endUserId, requestType: 'revoke_consent', status: 'completed', handledAt: new Date() },
+    })
+    const legacyPage = await requests.listMyDataRequests(endUserId)
+    if (legacyPage.items.some((item) => item.id === legacyOne.id) && legacyPage.items.some((item) => item.id === legacyTwo.id)) {
+      pass('历史无 idempotencyKey 的请求可查询，nullable unique 未阻断迁移')
+    } else {
+      fail('历史无 idempotencyKey 的请求无法查询')
+    }
+
+    await new MemberPrivacyService(prisma).grantConsent(endUserId, 'job_ai', null)
+    const revokeKey = '6ed2c12e-c6ac-48a8-9ef2-dbcaa0f34dbb'
+    const revoked = await requests.create(endUserId, {
+      requestType: 'revoke_consent',
+      idempotencyKey: revokeKey,
+      stepUpToken: null,
+      terminalId: null,
+    })
+    const replay = await requests.create(endUserId, {
+      requestType: 'revoke_consent',
+      idempotencyKey: revokeKey,
+      stepUpToken: null,
+      terminalId: null,
+    })
     const activeConsent = await prisma.userAiConsent.findFirst({
       where: { endUserId, scope: 'job_ai', revokedAt: null },
-      orderBy: { grantedAt: 'desc' },
     })
-    if (activeConsent) pass('revoke_consent 验证前已建立真实有效授权')
-    else fail('revoke_consent 验证前未建立真实有效授权')
-
-    const revokeRequest = await privacy.createDataRequest(endUserId, 'revoke_consent')
-    const revokedConsent = await prisma.userAiConsent.findFirst({
-      where: { endUserId, scope: 'job_ai' },
-      orderBy: { grantedAt: 'desc' },
-    })
-    if (activeConsent && revokedConsent?.id === activeConsent.id && revokedConsent.revokedAt !== null) {
-      pass('revoke_consent 创建时真实写入 revokedAt')
+    if (revoked.id === replay.id && revoked.status === 'completed' && revoked.executionStep === 'consent_revoked' && !activeConsent) {
+      pass('revoke_consent 同步撤回同意、写 completed 账本，并支持幂等重放')
     } else {
-      fail('revoke_consent 创建后有效授权仍未真实撤回')
+      fail(`revoke_consent 账本或同意状态不真实: ${JSON.stringify({ revoked, replay, activeConsent })}`)
     }
 
-    await expectHttpError(
-      () => privacy.handleDataRequest(exportRequest.id, { status: 'completed', handledBy: adminId }),
-      'DATA_REQUEST_EXECUTION_INCOMPLETE',
-      unavailableMessage,
-      'export 请求不能在没有真实执行器时标记 completed',
-    )
-    await expectHttpError(
-      () => privacy.handleDataRequest(deleteRequest.id, { status: 'completed', handledBy: adminId }),
-      'DATA_REQUEST_EXECUTION_INCOMPLETE',
-      unavailableMessage,
-      'delete 请求不能在没有真实执行器时标记 completed',
-    )
-    await expectHttpError(
-      () => privacy.handleDataRequest(deleteRequest.id, { status: 'rejected', handledBy: adminId }),
-      'DATA_REQUEST_EXECUTION_INCOMPLETE',
-      unavailableMessage,
-      'delete 请求不能以普通拒绝替代真实闭环',
-    )
-    await expectHttpError(
-      () => privacy.handleDataRequest(revokeRequest.id, { status: 'rejected', handledBy: adminId }),
-      'DATA_REQUEST_ALREADY_EXECUTED',
-      alreadyExecutedMessage,
-      'revoke_consent 请求不能以 rejected 覆盖已执行的授权撤回',
-    )
-
-    const [protectedRevoke, protectedRevokeAudits] = await Promise.all([
-      prisma.userDataRequest.findUnique({ where: { id: revokeRequest.id } }),
-      prisma.auditLog.findMany({
-        where: {
-          action: 'member_data_request.handle',
-          targetId: revokeRequest.id,
-        },
-      }),
-    ])
-    if (protectedRevoke?.status === 'pending' && protectedRevoke.handledAt === null && protectedRevoke.auditRef === null) {
-      pass('revoke_consent rejected 失败尝试不改变已执行授权撤回的请求状态')
-    } else {
-      fail(`revoke_consent rejected 失败尝试污染请求：${JSON.stringify(protectedRevoke)}`)
-    }
-    if (protectedRevokeAudits.length === 0) {
-      pass('revoke_consent rejected 失败尝试不写拒绝审计')
-    } else {
-      fail(`revoke_consent rejected 失败尝试写入了 ${protectedRevokeAudits.length} 条审计`)
-    }
-
-    const revoked = await privacy.handleDataRequest(revokeRequest.id, {
-      status: 'completed',
-      handledBy: adminId,
-    })
-    const revokeAudit = await prisma.auditLog.findFirst({
-      where: {
-        actorId: adminId,
-        action: 'member_data_request.handle',
-        targetId: revokeRequest.id,
+    const exportRequest = await prisma.userDataRequest.create({
+      data: {
+        endUserId,
+        requestType: 'export',
+        status: 'pending',
+        idempotencyKey: '63c93f92-2a96-47c6-947a-857f7e0f0759',
+        activeKey: `member-data-request:${endUserId}`,
+        executionVersion: 0,
       },
     })
-    if (revoked.status === 'completed' && revoked.auditRef && revokeAudit?.id === revoked.auditRef) {
-      pass('revoke_consent 保持可同步完成并写入真实审计')
+    const rejected = await requests.rejectExportRequest(exportRequest.id, 'verify-admin', 'rejected')
+    if (rejected.status === 'rejected') {
+      const stored = await prisma.userDataRequest.findUnique({ where: { id: exportRequest.id } })
+      if (stored?.activeKey === null && stored.executionStep === 'admin_rejected' && stored.handledBy === 'verify-admin') {
+        pass('Admin 仅能将 export 置为 rejected，并清理 activeKey')
+      } else {
+        fail(`Admin reject 未完整收口: ${JSON.stringify(stored)}`)
+      }
     } else {
-      fail(`revoke_consent 完成或审计不完整：${JSON.stringify({ revoked, revokeAudit })}`)
+      fail(`Admin reject 未进入 rejected: ${JSON.stringify(rejected)}`)
     }
 
-    const [storedExport, storedDelete, protectedAudits] = await Promise.all([
-      prisma.userDataRequest.findUnique({ where: { id: exportRequest.id } }),
-      prisma.userDataRequest.findUnique({ where: { id: deleteRequest.id } }),
-      prisma.auditLog.findMany({
-        where: {
-          action: 'member_data_request.handle',
-          targetId: { in: [exportRequest.id, deleteRequest.id] },
-        },
-      }),
-    ])
-
-    if (storedExport?.status === 'pending' && storedExport.handledAt === null && storedExport.auditRef === null) {
-      pass('export 失败尝试不改变请求状态或审计引用')
-    } else {
-      fail(`export 失败尝试污染请求：${JSON.stringify(storedExport)}`)
-    }
-    if (storedDelete?.status === 'pending' && storedDelete.handledAt === null && storedDelete.auditRef === null) {
-      pass('delete completed/rejected 失败尝试均不改变请求状态或审计引用')
-    } else {
-      fail(`delete 失败尝试污染请求：${JSON.stringify(storedDelete)}`)
-    }
-    if (protectedAudits.length === 0) {
-      pass('export/delete 失败尝试不写 completed/rejected 审计')
-    } else {
-      fail(`export/delete 失败尝试写入了 ${protectedAudits.length} 条审计`)
-    }
+    const legacyDelete = await prisma.userDataRequest.create({
+      data: { endUserId, requestType: 'delete', status: 'pending' },
+    })
+    await expectError(
+      () => requests.rejectExportRequest(legacyDelete.id, 'verify-admin', 'rejected'),
+      'DATA_REQUEST_ACTION_NOT_ALLOWED',
+      'Admin 不能 reject 历史 delete 请求',
+    )
   } finally {
-    await prisma.auditLog.deleteMany({ where: { actorId: adminId } })
     await prisma.userDataRequest.deleteMany({ where: { endUserId } })
     await prisma.userAiConsent.deleteMany({ where: { endUserId } })
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
-    await prisma.user.deleteMany({ where: { id: adminId } })
     await prisma.onModuleDestroy()
   }
 
   if (failures > 0) {
-    console.error(`\n❌ ${failures} 项失败 — 用户数据请求仍可产生虚假完成/拒绝状态\n`)
+    console.error(`\n❌ ${failures} 项失败 — 用户数据请求账本与实际状态不一致\n`)
     process.exitCode = 1
     return
   }
-  console.log('✅ ALL PASS — 用户数据请求状态与真实执行能力一致\n')
+  console.log('✅ ALL PASS — 用户数据请求账本与实际状态一致\n')
 }
 
 main()

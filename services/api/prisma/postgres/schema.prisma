@@ -1421,19 +1421,33 @@ model UserAiConsent {
 }
 
 model UserDataRequest {
-  id          String    @id @default(cuid())
-  endUserId   String
-  endUser     EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
-  requestType String
-  status      String    @default("pending")
-  requestedAt DateTime  @default(now())
-  handledAt   DateTime?
-  handledBy   String?
-  auditRef    String?
+  id                String    @id @default(cuid())
+  endUserId         String
+  endUser           EndUser   @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  requestType       String
+  status            String    @default("pending")
+  requestedAt       DateTime  @default(now())
+  handledAt         DateTime?
+  handledBy         String?
+  auditRef          String?
+  idempotencyKey    String?
+  activeKey         String?   @unique
+  executionVersion  Int       @default(0)
+  executionStep     String?
+  progressJson      String?
+  workerJobId       String?
+  exportFileId      String?   @unique
+  exportExpiresAt   DateTime?
+  downloadConsumedAt DateTime?
+  failureCode       String?
+  retryCount        Int       @default(0)
+  lastAttemptAt     DateTime?
 
+  @@unique([endUserId, idempotencyKey])
   @@index([endUserId, requestType])
   @@index([status])
   @@index([requestedAt])
+  @@index([exportExpiresAt])
 }
 
 model JobDataQualitySnapshot {

@@ -12,7 +12,6 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 
 let failed = 0
 
@@ -51,145 +50,6 @@ function mustNotContain(source: string, markers: string[], label: string): void 
   else pass(label)
 }
 
-type PrivacyTransitionType = 'export' | 'delete' | 'revoke_consent'
-
-function exceptionCode(error: unknown): string | undefined {
-  const exception = error as { getResponse?: () => unknown; response?: unknown }
-  const response = (typeof exception.getResponse === 'function' ? exception.getResponse() : exception.response) as
-    | { error?: { code?: string } }
-    | undefined
-  return response?.error?.code
-}
-
-function createPrivacyTransitionRun(requestType: PrivacyTransitionType) {
-  const state = {
-    calls: [] as string[],
-    auditWrites: 0,
-    requestStatus: 'pending',
-  }
-  const existing = {
-    id: `privacy-${requestType}-request`,
-    endUserId: 'privacy-member',
-    requestType,
-    status: 'pending',
-    requestedAt: new Date('2026-07-16T00:00:00.000Z'),
-    handledAt: null,
-    handledBy: null,
-    auditRef: null,
-  }
-  const recordUnexpectedDelete = (call: string) => async () => {
-    state.calls.push(call)
-    return { count: 1 }
-  }
-  const prisma = {
-    $transaction: async () => {
-      state.calls.push('$transaction')
-      throw new Error('unexpected privacy transaction')
-    },
-    aiResumeResult: { deleteMany: recordUnexpectedDelete('aiResumeResult.deleteMany') },
-    jobAiSession: { deleteMany: recordUnexpectedDelete('jobAiSession.deleteMany') },
-    userAiConsent: { updateMany: recordUnexpectedDelete('userAiConsent.updateMany') },
-    userDataRequest: {
-      findUnique: async () => {
-        state.calls.push('userDataRequest.findUnique')
-        return existing
-      },
-      update: async (args: {
-        data: { status: string; handledBy: string; auditRef: string | null; handledAt: Date | null }
-      }) => {
-        state.calls.push('userDataRequest.update')
-        state.requestStatus = args.data.status
-        return { ...existing, ...args.data }
-      },
-    },
-  }
-  const audit = {
-    write: async () => {
-      state.calls.push('audit.write')
-      state.auditWrites += 1
-      return 'audit-wave0'
-    },
-  }
-  return { prisma, audit, state }
-}
-
-async function verifyFailClosedDataRequestTransitions(): Promise<void> {
-  const blockedCases: Array<{
-    requestType: 'export' | 'delete'
-    status: 'completed' | 'rejected'
-    label: string
-  }> = [
-    { requestType: 'export', status: 'completed', label: 'export -> completed' },
-    { requestType: 'delete', status: 'completed', label: 'delete -> completed' },
-    { requestType: 'delete', status: 'rejected', label: 'delete -> rejected' },
-  ]
-
-  for (const testCase of blockedCases) {
-    const run = createPrivacyTransitionRun(testCase.requestType)
-    const service = new MemberPrivacyService(run.prisma as never, run.audit as never)
-    let code: string | undefined
-    try {
-      await service.handleDataRequest(`privacy-${testCase.requestType}-request`, {
-        status: testCase.status,
-        handledBy: 'admin-wave0',
-      })
-    } catch (error) {
-      code = exceptionCode(error)
-    }
-    const sideEffects = run.state.calls.filter((call) => call !== 'userDataRequest.findUnique')
-    if (
-      code === 'DATA_REQUEST_EXECUTION_INCOMPLETE' &&
-      sideEffects.length === 0 &&
-      run.state.auditWrites === 0 &&
-      run.state.requestStatus === 'pending'
-    ) {
-      pass(`${testCase.label} fail closed，且不删除、不审计、不更新 request`)
-    } else {
-      fail(`${testCase.label} 未安全阻断 code=${code ?? 'none'} calls=${run.state.calls.join(',')} audit=${run.state.auditWrites} status=${run.state.requestStatus}`)
-    }
-  }
-
-  const rejectedRevokeRun = createPrivacyTransitionRun('revoke_consent')
-  const rejectedRevokeService = new MemberPrivacyService(rejectedRevokeRun.prisma as never, rejectedRevokeRun.audit as never)
-  let rejectedRevokeCode: string | undefined
-  try {
-    await rejectedRevokeService.handleDataRequest('privacy-revoke_consent-request', {
-      status: 'rejected',
-      handledBy: 'admin-wave0',
-    })
-  } catch (error) {
-    rejectedRevokeCode = exceptionCode(error)
-  }
-  const rejectedRevokeSideEffects = rejectedRevokeRun.state.calls.filter((call) => call !== 'userDataRequest.findUnique')
-  if (
-    rejectedRevokeCode === 'DATA_REQUEST_ALREADY_EXECUTED' &&
-    rejectedRevokeSideEffects.length === 0 &&
-    rejectedRevokeRun.state.auditWrites === 0 &&
-    rejectedRevokeRun.state.requestStatus === 'pending'
-  ) {
-    pass('revoke_consent -> rejected fail closed，不能以拒绝状态覆盖已执行授权撤回')
-  } else {
-    fail(`revoke_consent -> rejected 未安全阻断 code=${rejectedRevokeCode ?? 'none'} calls=${rejectedRevokeRun.state.calls.join(',')} audit=${rejectedRevokeRun.state.auditWrites} status=${rejectedRevokeRun.state.requestStatus}`)
-  }
-
-  const revokeRun = createPrivacyTransitionRun('revoke_consent')
-  const revokeService = new MemberPrivacyService(revokeRun.prisma as never, revokeRun.audit as never)
-  const revoked = await revokeService.handleDataRequest('privacy-revoke_consent-request', {
-    status: 'completed',
-    handledBy: 'admin-wave0',
-  })
-  if (
-    revoked.status === 'completed' &&
-    revokeRun.state.requestStatus === 'completed' &&
-    revokeRun.state.auditWrites === 1 &&
-    revokeRun.state.calls.join(',') === 'userDataRequest.findUnique,audit.write,userDataRequest.update'
-  ) {
-    pass('revoke_consent -> completed 保持真实审计与状态更新')
-  } else {
-    fail(`revoke_consent 完成路径回退 calls=${revokeRun.state.calls.join(',')} audit=${revokeRun.state.auditWrites} status=${revokeRun.state.requestStatus}`)
-  }
-}
-
 async function main(): Promise<void> {
   console.log('\n=== 岗位 AI 用户同意 / 隐私 / 配额治理门禁 ===')
 
@@ -197,6 +57,7 @@ async function main(): Promise<void> {
   const memberController = mustExist('src/member-privacy/member-privacy.controller.ts', 'MemberPrivacyController 已创建')
   const adminController = mustExist('src/member-privacy/admin-member-privacy.controller.ts', 'AdminMemberPrivacyController 已创建')
   const privacyService = mustExist('src/member-privacy/member-privacy.service.ts', 'MemberPrivacyService 已创建')
+  const dataRequestService = mustExist('src/member-privacy/member-data-request.service.ts', 'MemberDataRequestService 已创建')
   const privacyTypes = mustExist('src/member-privacy/member-privacy.types.ts', 'MemberPrivacy types 已创建')
   const quotaService = mustExist('src/job-ai/job-ai-quota.service.ts', 'JobAiQuotaService 已创建')
   const jobAiService = read('src/job-ai/job-ai.service.ts')
@@ -209,7 +70,7 @@ async function main(): Promise<void> {
 
   mustContain(
     moduleFile,
-    ['MemberPrivacyController', 'AdminMemberPrivacyController', 'MemberPrivacyService', 'EndUserAuthGuard', 'JwtAuthGuard', 'RolesGuard'],
+    ['MemberPrivacyController', 'AdminMemberPrivacyController', 'MemberPrivacyService', 'MemberDataRequestService', 'EndUserAuthGuard', 'JwtAuthGuard', 'RolesGuard'],
     'MemberPrivacyModule 注册会员端 / Admin 端 controller 和 guards',
   )
 
@@ -224,6 +85,9 @@ async function main(): Promise<void> {
       "@Post(':scope/revoke')",
       "@Controller('me/data-requests')",
       "requestType: 'export' | 'delete' | 'revoke_consent'",
+      'MemberDataRequestService',
+      'idempotency-key',
+      'x-member-step-up-token',
     ],
     '会员端隐私 API 支持授权状态、授权、撤回和数据请求',
   )
@@ -236,10 +100,11 @@ async function main(): Promise<void> {
       "@Roles('admin')",
       "@Get('data-requests')",
       "@Patch('data-requests/:id')",
-      'handledBy',
-      'auditRef',
+      'RejectDataRequestDto',
+      "@IsIn(['rejected'])",
+      'rejectExportRequest',
     ],
-    'Admin 隐私 API 支持数据请求列表和处理留痕',
+    'Admin 隐私 API 仅保留导出请求 rejected 动作',
   )
 
   mustContain(
@@ -250,21 +115,26 @@ async function main(): Promise<void> {
       'revokeConsent',
       'getConsentStatus',
       'requireActiveConsent',
-      'createDataRequest',
-      'listDataRequestsForAdmin',
-      'handleDataRequest',
       'userAiConsent',
       'userAiConsent.updateMany',
-      'userDataRequest',
-      'DATA_REQUEST_EXECUTION_INCOMPLETE',
-      'DATA_REQUEST_ALREADY_EXECUTED',
-      "existing.requestType === 'export'",
-      "existing.requestType === 'delete'",
-      "existing.requestType === 'revoke_consent'",
       'revokedAt',
       'USER_AI_CONSENT_REQUIRED',
     ],
-    'MemberPrivacyService 使用现有 UserAiConsent / UserDataRequest 实现同意和数据请求',
+    'MemberPrivacyService 仅维护 AI 同意状态',
+  )
+
+  mustContain(
+    dataRequestService,
+    [
+      'MemberDataRequestService',
+      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
+      'endUserId_idempotencyKey',
+      "'export_data_request'",
+      'DATA_REQUEST_ACTIVE',
+      'rejectExportRequest',
+      'MEMBER_STEP_UP_TOKEN_REQUIRED',
+    ],
+    'MemberDataRequestService 负责导出幂等、Step-up 与注销 fail-closed 边界',
   )
 
   mustNotContain(
@@ -276,8 +146,10 @@ async function main(): Promise<void> {
   mustContain(
     privacyTypes,
     [
-      "export type MemberDataRequestType = 'export' | 'delete' | 'revoke_consent'",
+      'MEMBER_DATA_REQUEST_TYPES',
       "export type MemberAiConsentScope = 'job_ai'",
+      'MEMBER_DATA_REQUEST_STATUSES',
+      'MEMBER_DATA_REQUEST_STEP_UP_ACTIONS',
       'MemberAiConsentStatus',
       'MemberDataRequestItem',
     ],
@@ -358,7 +230,7 @@ async function main(): Promise<void> {
   mustContain(ci, ['verify:job-ai-privacy'], 'CI 串行 verify 接入岗位 AI 隐私门禁')
 
   mustNotContain(
-    [memberController, adminController, privacyService, quotaService, jobAiService, governedJobFit].join('\n'),
+    [memberController, adminController, privacyService, dataRequestService, quotaService, jobAiService, governedJobFit].join('\n'),
     [
       'resumeText:',
       'resumeContent',
@@ -380,8 +252,6 @@ async function main(): Promise<void> {
     ],
     '隐私治理和 Job AI 不持久化简历原文、完整模型内容、签名 URL 或招聘闭环状态',
   )
-
-  await verifyFailClosedDataRequestTransitions()
 
   if (failed > 0) {
     console.error(`\n❌ ${failed} 项失败 — 岗位 AI 隐私 / 配额门禁未通过\n`)
