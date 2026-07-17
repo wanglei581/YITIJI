@@ -24,6 +24,7 @@ import { kioskUploadFile } from '../../services/api'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
 import './resume-diagnosis-lightflow.css'
+import './resume-fusion-youth.css'
 
 type UploadChannel = 'usb' | 'cloud' | 'phone'
 

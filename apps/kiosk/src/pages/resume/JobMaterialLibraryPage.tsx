@@ -18,6 +18,7 @@ import {
   type JobMaterialDraftForm,
 } from './jobMaterialDraft'
 import './resume-library-lightflow.css'
+import './resume-fusion-youth.css'
 
 const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const
 
@@ -42,7 +43,7 @@ const EMPTY_FORM: FormState = {
 }
 
 function formatBytes(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return '—'
+  if (!Number.isFinite(n) || n <= 0) return '未知'
   if (n < 1024 * 1024) return `${Math.max(1, Math.round(n / 1024))} KB`
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }

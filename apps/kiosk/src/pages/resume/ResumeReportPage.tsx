@@ -10,6 +10,7 @@ import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { readAiResumeSession } from './aiResumeSession'
 import './resume-diagnosis-lightflow.css'
+import './resume-fusion-youth.css'
 
 interface ReportState {
   /** intent 分流(diagnose/optimize):由上传页随 state 透传 */
