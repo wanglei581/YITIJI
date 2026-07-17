@@ -13,12 +13,10 @@
   --sd-color-warning-soft: #f2ead6;
   --sd-control-min: 56px;
   --sd-primary-control-min: 72px;
-  --sd-serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif;
+  --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
   position: relative;
   min-height: 100dvh;
-  background:
-    none, transparent 62%),
-    none, transparent 58%),
+  background:,,
     var(--sd-color-canvas-outer);
   color: var(--sd-color-text);
 }
