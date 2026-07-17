@@ -1,0 +1,12 @@
+{
+  "id": "publish-wave1-account-security-hardening-20260717",
+  "title": "发布用户中心 Wave 1-A 账户安全追加加固候选",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "delivery",
+  "currentPhase": "completed",
+  "nextAction": "PR #270 保持打开，等待人工决定是否合并；合并和部署均未授权（任务已归档）",
+  "createdAt": "2026-07-17T00:00:00+08:00",
+  "branch": "codex/user-center-wave1-account-security-20260716"
+}
