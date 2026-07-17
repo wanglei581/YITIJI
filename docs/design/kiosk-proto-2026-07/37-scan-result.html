@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>材料扫描 · 扫描完成</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .result-card { display: flex; flex-direction: column; }
+  .res-body { display: flex; align-items: center; gap: 34px; }
+  .thumb-row { display: flex; gap: 18px; flex: none; }
+  .thumb {
+    width: 132px; aspect-ratio: 210 / 297;
+    background: #fff; border: 1px solid var(--line); border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(16,48,43,.1);
+    padding: 14px 11px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .thumb .ln { height: 5px; border-radius: 3px; background: var(--line); }
+  .thumb .ln.t { height: 9px; width: 55%; background: var(--ink); opacity: .7; }
+  .thumb .ln.c1 { background: var(--teal-soft); border: 1px solid rgba(31,158,134,.25); height: 22px; }
+  .thumb .ln.c2 { background: var(--clay-soft); height: 14px; }
+  .thumb .ln.w8 { width: 82%; } .thumb .ln.w6 { width: 62%; }
+  .res-meta { flex: 1; min-width: 0; }
+  .res-meta .f-name { font-size: 27px; font-weight: 700; word-break: break-all; display: flex; align-items: center; gap: 14px; }
+  .res-meta .f-name svg { width: 34px; height: 34px; flex: none; color: var(--teal-deep); }
+  .res-meta .meta-chips { margin-top: 16px; }
+  .res-meta .keep-note { margin-top: 14px; font-size: 17px; color: var(--muted); line-height: 1.5; }
+  .dest-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .dest-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 18px; }
+  .dest-tile {
+    display: flex; align-items: center; gap: 20px; text-align: left;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-md);
+    padding: 20px 24px; cursor: pointer; font-family: var(--sans); color: var(--ink);
+  }
+  .dest-tile:active { transform: scale(.98); }
+  .dest-tile.primary { background: var(--teal-soft); border-color: rgba(31,158,134,.4); }
+  .dest-tile .d-icon {
+    width: 68px; height: 68px; flex: none; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--line); color: var(--teal-deep);
+  }
+  .dest-tile.primary .d-icon { background: var(--teal); border: none; color: #fffdf8; }
+  .dest-tile .d-icon svg { width: 36px; height: 36px; }
+  .dest-tile .d-main { flex: 1; min-width: 0; }
+  .dest-tile b { font-size: 24px; font-weight: 700; letter-spacing: .5px; display: block; }
+  .dest-tile p { font-size: 17px; color: var(--muted); line-height: 1.5; margin-top: 5px; }
+  .dest-tile .d-tag {
+    flex: none; font-size: 15px; font-weight: 600; color: var(--teal-deep);
+    background: var(--surface); border: 1px solid rgba(31,158,134,.35);
+    border-radius: 999px; padding: 5px 14px; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:30</span>
+      <span class="status-chip"><span class="dot"></span>扫描仪就绪</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <div class="titles">
+      <h1>扫描完成</h1>
+      <p>文件已生成,请核对页数与清晰度,选择下一步操作</p>
+    </div>
+    <span class="aside badge">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 12.5l5 5 10-11"/></svg>
+      扫描已完成
+    </span>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">选择类型</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">扫描指引</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">扫描中</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">4</span><span class="s-label">完成</span></div>
+  </div>
+
+  <main class="content">
+
+    <!-- 扫描结果 -->
+    <section class="card accented a-teal result-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg></span>
+        <div><h2>扫描结果</h2><div class="sub">简历扫描 · 任务号 S-20260717-0018 · 如不满意可返回重新扫描</div></div>
+      </div>
+      <div class="res-body">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <div class="thumb-row">
+            <div class="thumb"><div class="ln t"></div><div class="ln w8"></div><div class="ln c1"></div><div class="ln w8"></div><div class="ln w6"></div><div class="ln c2"></div><div class="ln w8"></div></div>
+            <div class="thumb"><div class="ln t"></div><div class="ln w6"></div><div class="ln c2"></div><div class="ln w8"></div><div class="ln c1"></div><div class="ln w6"></div><div class="ln w8"></div></div>
+          </div>
+          <span style="font-size:15px;color:var(--muted);">页面预览示意 · 以实际文件为准</span>
+        </div>
+        <div class="res-meta">
+          <div class="f-name">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+            scan_20260717_1030.pdf
+          </div>
+          <div class="meta-chips">
+            <span class="chip"><b>1.8</b> MB</span>
+            <span class="chip ok">PDF</span>
+            <span class="chip">A4 幅面 · 页数以文件为准</span>
+            <span class="chip warn">未保存前设有效期</span>
+          </div>
+          <div class="keep-note">文件当前为临时保存;选择「保存到我的文档」后可长期查看,未选择去向的文件在本次服务结束后自动清理。</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 下一步操作(与真实功能一致) -->
+    <section class="card accented a-teal dest-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+        <div><h2>选择下一步操作</h2><div class="sub">简历扫描推荐直接进入 AI 简历识别</div></div>
+      </div>
+      <div class="dest-grid">
+        <button class="dest-tile primary">
+          <span class="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M18.5 15l.9 2.1L21.5 18l-2.1.9-.9 2.1-.9-2.1L15.5 18l2.1-.9z"/></svg></span>
+          <span class="d-main"><b>AI 简历识别</b><p>识别扫描件内容,进入简历诊断与优化</p></span>
+          <span class="d-tag">简历类型推荐</span>
+        </button>
+        <button class="dest-tile">
+          <span class="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <span class="d-main"><b>直接打印</b><p>按默认参数(黑白单面 1 份)进入确认打印,可再修改</p></span>
+        </button>
+        <button class="dest-tile">
+          <span class="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></span>
+          <span class="d-main"><b>保存到我的文档</b><p>当前为临时保存;登录并保存后可长期管理</p></span>
+        </button>
+        <button class="dest-tile">
+          <span class="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg></span>
+          <span class="d-main"><b>返回首页</b><p>结束本次扫描,回到功能大厅</p></span>
+        </button>
+      </div>
+    </section>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      若扫描失败或页数不对,可返回「扫描指引」重新扫描;证件类扫描文件按敏感文件策略自动清理并记录访问日志。
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5v5h5M4.6 14a8 8 0 102-8.5L4 8"/></svg>
+      重新扫描
+    </button>
+    <span class="spacer"></span>
+    <span style="font-size:18px;color:var(--muted);">请选择上方任一操作继续;未保存去向的文件将在本次服务结束后清理</span>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

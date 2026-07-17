@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 待机宣传屏</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #stage { background: var(--dark); }
+  .corner {
+    position: absolute; z-index: 3;
+    font-size: 22px; color: rgba(244,241,232,.85); letter-spacing: 1px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .corner.tl { top: 36px; left: 44px; }
+  .corner.tr { top: 36px; right: 44px; font-variant-numeric: tabular-nums; }
+  .corner .dot { width: 10px; height: 10px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 4px rgba(53,171,142,.18); }
+
+  /* 当前轮播帧:青绿底色大图区(CSS 渐变示意,不用图片) */
+  .frame {
+    position: absolute; inset: 0; overflow: hidden;
+    background:
+      radial-gradient(1400px 900px at 78% 8%, rgba(53,171,142,.35), transparent 60%),
+      radial-gradient(1100px 800px at 8% 92%, rgba(21,122,103,.5), transparent 58%),
+      linear-gradient(168deg, #12463c 0%, #157a67 46%, #1f9e86 100%);
+  }
+  .frame::before {
+    content: ''; position: absolute; left: -140px; top: 46%; width: 1360px; height: 1360px;
+    border-radius: 50%; border: 2px solid rgba(244,241,232,.14);
+    box-shadow: 0 0 0 120px rgba(244,241,232,.04), 0 0 0 280px rgba(244,241,232,.03);
+  }
+  .frame::after {
+    content: ''; position: absolute; right: 84px; top: 300px; width: 300px; height: 300px;
+    border-radius: 60px; transform: rotate(14deg);
+    background: linear-gradient(150deg, rgba(226,242,236,.2), rgba(226,242,236,.05));
+    border: 1px solid rgba(244,241,232,.22);
+  }
+  .hero {
+    position: absolute; z-index: 2; left: 96px; right: 96px; top: 500px;
+    color: #f4f1e8;
+  }
+  .hero .kicker {
+    display: inline-flex; align-items: center; gap: 14px;
+    font-size: 26px; letter-spacing: 6px; color: rgba(244,241,232,.85);
+    border: 1px solid rgba(244,241,232,.35); border-radius: 999px; padding: 12px 28px;
+  }
+  .hero h1 {
+    margin-top: 56px; font-family: var(--serif); font-weight: 900;
+    font-size: 108px; line-height: 1.22; letter-spacing: 6px;
+  }
+  .hero h1 em { font-style: normal; color: #d9efe4; border-bottom: 6px solid rgba(217,239,228,.5); }
+  .hero .sub {
+    margin-top: 44px; font-size: 34px; line-height: 1.7; letter-spacing: 2px;
+    color: rgba(244,241,232,.82); max-width: 780px;
+  }
+  .hero .points { margin-top: 64px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .hero .points span {
+    font-size: 24px; color: #eef6ef; letter-spacing: 1px;
+    background: rgba(16,48,43,.32); border: 1px solid rgba(244,241,232,.28);
+    border-radius: 999px; padding: 14px 30px;
+  }
+  .dots {
+    position: absolute; z-index: 3; left: 0; right: 0; bottom: 240px;
+    display: flex; justify-content: center; gap: 18px;
+  }
+  .dots i { width: 16px; height: 16px; border-radius: 999px; background: rgba(244,241,232,.35); }
+  .dots i.on { width: 52px; background: #f4f1e8; }
+  .media-tag {
+    position: absolute; z-index: 3; right: 44px; bottom: 296px;
+    font-size: 18px; color: rgba(244,241,232,.8); letter-spacing: 1px;
+    border: 1px solid rgba(244,241,232,.25); border-radius: 999px; padding: 8px 18px;
+  }
+  .privacy-line {
+    position: absolute; z-index: 3; left: 0; right: 0; bottom: 196px;
+    display: flex; justify-content: center; align-items: center; gap: 10px;
+    font-size: 20px; color: rgba(244,241,232,.82); letter-spacing: 1px;
+  }
+  .privacy-line svg { width: 22px; height: 22px; }
+
+  /* 底部通栏:触摸提示(呼吸动画) */
+  .touchbar {
+    position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; height: 172px;
+    background: rgba(16,48,43,.55); border-top: 1px solid rgba(244,241,232,.2);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center; gap: 26px;
+    color: #f4f1e8; animation: breath 2.6s ease-in-out infinite;
+  }
+  .touchbar b { font-family: var(--serif); font-size: 46px; font-weight: 700; letter-spacing: 6px; }
+  .touchbar span { font-size: 24px; color: rgba(244,241,232,.82); letter-spacing: 2px; }
+  .touchbar svg { width: 52px; height: 52px; }
+  @keyframes breath { 0%, 100% { opacity: 1; } 50% { opacity: .58; } }
+  @media (prefers-reduced-motion: reduce) { .touchbar { animation: none; } }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 轮播当前帧(第 1/3 帧,CSS 渐变色块示意) -->
+  <div class="frame"></div>
+
+  <!-- 四角信息 -->
+  <div class="corner tl"><span class="dot"></span>就业服务大厅 · 01号机</div>
+  <div class="corner tr" id="clock">2026年7月17日 10:24</div>
+
+  <!-- 宣传主文案 -->
+  <div class="hero">
+    <span class="kicker">本机服务 · 现场可用</span>
+    <h1>AI 简历诊断<br><em>现场即可体验</em></h1>
+    <p class="sub">上传或扫描你的简历,查看结构与表达建议,满意后可在本机直接打印带走。</p>
+    <div class="points">
+      <span>简历诊断与优化</span>
+      <span>A4 黑白 / 彩色打印 · 价格以现场公示为准</span>
+      <span>岗位与招聘会信息查询</span>
+    </div>
+  </div>
+
+  <!-- 素材来源标注(真实屏保为管理员后台上传的图/视频轮播) -->
+  <span class="media-tag">宣传素材 · 由管理员后台上传并审核后播放</span>
+
+  <!-- 轮播圆点 -->
+  <div class="dots"><i class="on"></i><i></i><i></i></div>
+
+  <!-- 会话保护说明(进入待机即退出登录并清除会话) -->
+  <div class="privacy-line">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+    进入待机时已自动退出上一位用户的登录,并清除本次会话记录
+  </div>
+
+  <!-- 底部触摸提示通栏 -->
+  <div class="touchbar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11V5a1.5 1.5 0 013 0v5.5M12 10.5V9a1.5 1.5 0 013 0v2.5M15 11.5v-1a1.5 1.5 0 013 0v4c0 3.5-2 6.5-5.5 6.5S7 18 6.2 15.6L5 12a1.4 1.4 0 012.6-1L9 13.5"/></svg>
+    <b>触摸屏幕开始使用</b>
+    <span>轻触任意位置进入首页</span>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

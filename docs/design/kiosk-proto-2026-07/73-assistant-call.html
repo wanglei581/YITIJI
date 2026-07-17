@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · AI助手语音通话中</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 背后助手页示意(被压暗) */
+  .ghost-page { position: absolute; inset: 0; padding: 100px 48px; display: flex; flex-direction: column; gap: 22px; }
+  .ghost-page .gp-block { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); }
+  .dim { position: absolute; inset: 0; z-index: 2; background: rgba(16,48,43,.66); backdrop-filter: blur(3px); }
+  .dialog-wrap {
+    position: absolute; inset: 0; z-index: 3;
+    display: flex; align-items: center; justify-content: center; padding: 0 72px;
+  }
+  .voice-dialog {
+    width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    box-shadow: 0 30px 80px rgba(9,26,23,.45);
+    display: flex; flex-direction: column; padding: 40px 56px 44px; gap: 30px;
+  }
+  .vd-head { display: flex; align-items: flex-start; gap: 18px; }
+  .vd-head .eyebrow { font-size: 19px; color: var(--muted); letter-spacing: 2px; }
+  .vd-head h1 { margin-top: 8px; font-family: var(--serif); font-size: 42px; font-weight: 900; letter-spacing: 2px; }
+  .vd-close {
+    margin-left: auto; flex: none; width: 76px; height: 76px; border-radius: var(--r-sm); cursor: pointer;
+    display: grid; place-items: center; background: var(--paper); border: 1px solid var(--line); color: var(--muted);
+  }
+  .vd-close svg { width: 30px; height: 30px; }
+  .live-status {
+    align-self: center; display: flex; align-items: center; gap: 14px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.35); border-radius: 999px;
+    padding: 12px 30px; font-size: 22px;
+  }
+  .live-status .dot { width: 13px; height: 13px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 5px rgba(53,171,142,.2); animation: pulse 1.6s infinite; }
+  .live-status b { font-weight: 700; color: var(--teal-deep); }
+  .live-status time { color: var(--muted); font-variant-numeric: tabular-nums; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 4px rgba(53,171,142,.25); } 50% { box-shadow: 0 0 0 9px rgba(53,171,142,.1); } }
+  .stage-avatar { align-self: center; position: relative; width: 320px; height: 320px; display: grid; place-items: center; }
+  .stage-avatar .ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(31,158,134,.3); animation: ripple 2.4s ease-out infinite; }
+  .stage-avatar .ring:nth-child(2) { animation-delay: 1.2s; }
+  @keyframes ripple { 0% { transform: scale(.78); opacity: .9; } 100% { transform: scale(1.12); opacity: 0; } }
+  .stage-avatar .core {
+    width: 236px; height: 236px; border-radius: 50%; display: grid; place-items: center;
+    background: linear-gradient(160deg, var(--teal) 0%, var(--teal-deep) 100%); color: #fffdf8;
+    font-family: var(--serif); font-size: 110px; font-weight: 900;
+    box-shadow: 0 14px 40px rgba(21,122,103,.4);
+  }
+  .stage-avatar .name {
+    position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+    font-size: 20px; color: var(--muted); background: var(--surface);
+    border: 1px solid var(--line); border-radius: 999px; padding: 7px 22px; white-space: nowrap;
+  }
+  .wave { align-self: center; display: flex; align-items: center; gap: 10px; height: 88px; }
+  .wave i { width: 10px; border-radius: 999px; background: var(--teal); animation: wv 1s ease-in-out infinite; }
+  .wave i:nth-child(odd) { height: 30px; }
+  .wave i:nth-child(even) { height: 62px; }
+  .wave i:nth-child(3n) { animation-delay: .16s; }
+  .wave i:nth-child(3n+1) { animation-delay: .32s; }
+  @keyframes wv { 0%,100% { transform: scaleY(.5); opacity: .55; } 50% { transform: scaleY(1); opacity: 1; } }
+  .caption { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-md); padding: 24px 30px; }
+  .caption .cap-head { display: flex; align-items: baseline; gap: 16px; }
+  .caption .cap-head b { font-family: var(--serif); font-size: 24px; font-weight: 700; }
+  .caption .cap-head span { margin-left: auto; font-size: 17px; color: var(--muted); }
+  .caption p { margin-top: 14px; font-size: 24px; line-height: 1.6; color: var(--ink); }
+  .caption p em { font-style: normal; color: var(--muted); }
+  .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .ctrl {
+    min-height: 132px; cursor: pointer; border-radius: var(--r-md);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    background: var(--paper); border: 1px solid var(--line);
+    font-family: var(--sans); font-size: 22px; font-weight: 600; color: var(--ink);
+  }
+  .ctrl:active { transform: scale(.97); }
+  .ctrl svg { width: 40px; height: 40px; }
+  .ctrl.hangup { background: var(--error-soft); border-color: rgba(193,74,52,.4); color: var(--error); }
+  .privacy { text-align: center; font-size: 17px; color: var(--muted); line-height: 1.5; }
+  @media (prefers-reduced-motion: reduce) {
+    .stage-avatar .ring, .wave i, .live-status .dot { animation: none; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 背后助手页示意(通话时置于 inert,不可操作) -->
+  <div class="ghost-page">
+    <div class="gp-block" style="height:76px"></div>
+    <div class="gp-block" style="height:130px"></div>
+    <div class="gp-block" style="flex:1"></div>
+    <div class="gp-block" style="height:260px"></div>
+    <div class="gp-block" style="height:116px"></div>
+  </div>
+  <div class="dim"></div>
+
+  <!-- 语音咨询模态 -->
+  <div class="dialog-wrap">
+    <section class="voice-dialog" role="dialog" aria-modal="true" aria-labelledby="voice-title">
+
+      <div class="vd-head">
+        <div>
+          <div class="eyebrow">AI助手 · 语音咨询</div>
+          <h1 id="voice-title">和小青语音咨询</h1>
+        </div>
+        <button class="vd-close" aria-label="关闭语音咨询">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+
+      <!-- 通话状态 + 时长 -->
+      <div class="live-status">
+        <span class="dot"></span>
+        <b>小青正在说</b>
+        <time>02:37</time>
+      </div>
+
+      <!-- 顾问形象位:CSS 圆形 + 宋体「青」 -->
+      <div class="stage-avatar">
+        <span class="ring"></span>
+        <span class="ring"></span>
+        <span class="core">青</span>
+        <span class="name">求职顾问 · 小青</span>
+      </div>
+
+      <!-- 声纹(CSS 条形动画) -->
+      <div class="wave" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </div>
+
+      <!-- 实时字幕 -->
+      <div class="caption">
+        <div class="cap-head">
+          <b>实时字幕</b>
+          <span>AI 内容仅供参考</span>
+        </div>
+        <p>应届生写项目经历,建议按「背景、动作、结果」三段展开:先一句话交代项目目标,再写你亲手做的两三件事,最后尽量用数字说明变化。<em>|</em></p>
+      </div>
+
+      <!-- 通话操作:静音 / 切换方式 / 文字咨询 / 挂断 -->
+      <div class="controls">
+        <button class="ctrl" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+          静音
+        </button>
+        <button class="ctrl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>
+          切换方式
+        </button>
+        <button class="ctrl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+          文字咨询
+        </button>
+        <button class="ctrl hangup">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 15c5-5 13-5 18 0l-2.5 3c-1-.8-2.3-1.6-3.5-2v-3a12 12 0 00-6 0v3c-1.2.4-2.5 1.2-3.5 2z"/></svg>
+          挂断
+        </button>
+      </div>
+
+      <p class="privacy">通话内容不保存音频;挂断、关闭或离开本页时会自动结束会话,不持续计费。</p>
+    </section>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

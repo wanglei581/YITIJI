@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>校园招聘专区 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .hero {
+    flex: none; background: var(--dark); color: #f4f1e8;
+    padding: 26px 48px 30px; position: relative; overflow: hidden;
+  }
+  .hero::after { content: ''; position: absolute; right: -80px; top: -80px; width: 320px; height: 320px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(169,120,31,.35), transparent 70%); }
+  .hero .h-top { display: flex; align-items: center; justify-content: space-between; }
+  .hero .h-back { display: inline-flex; align-items: center; gap: 10px; min-height: 56px; padding: 0 22px;
+    background: rgba(244,241,232,.12); border: 1px solid rgba(244,241,232,.25); border-radius: var(--r-sm);
+    color: #f4f1e8; font-size: 21px; cursor: pointer; font-family: var(--sans); }
+  .hero .h-back svg { width: 22px; height: 22px; }
+  .hero .h-date { font-size: 21px; background: rgba(244,241,232,.12); border: 1px solid rgba(244,241,232,.25);
+    padding: 10px 22px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+  .hero h1 { font-family: var(--serif); font-size: 40px; font-weight: 900; letter-spacing: 2px; margin-top: 20px; position: relative; }
+  .hero .h-status { display: inline-block; margin-left: 16px; vertical-align: middle;
+    font-size: 18px; font-weight: 600; color: #f2ead6; background: rgba(169,120,31,.4);
+    border: 1px solid rgba(169,120,31,.6); padding: 5px 16px; border-radius: 999px; }
+  .hero .tagline { margin-top: 10px; font-size: 21px; opacity: .75; }
+  .hero .h-meta { display: flex; flex-wrap: wrap; gap: 10px 30px; margin-top: 16px; font-size: 20px; opacity: .9; }
+  .hero .h-meta span { display: inline-flex; align-items: center; gap: 9px; }
+  .hero .h-meta svg { width: 20px; height: 20px; opacity: .8; }
+  .subtabs { flex: none; display: flex; background: var(--surface); border-bottom: 2px solid var(--line); }
+  .stab { flex: 1; min-height: 86px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    background: none; border: none; cursor: pointer; font-family: var(--sans); font-size: 19px; color: var(--muted); position: relative; }
+  .stab svg { width: 26px; height: 26px; }
+  .stab.on { color: var(--wheat-deep); font-weight: 700; }
+  .stab.on::after { content: ''; position: absolute; left: 26%; right: 26%; bottom: -2px; height: 4px; border-radius: 3px; background: var(--wheat); }
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; padding-top: 22px; }
+  .band4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .band4 .b { background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); border-radius: var(--r-sm); padding: 18px; text-align: center; }
+  .band4 .b b { display: block; font-family: var(--serif); font-size: 34px; font-weight: 900; color: var(--wheat-deep); font-variant-numeric: tabular-nums; }
+  .band4 .b span { display: block; font-size: 17px; color: var(--muted); margin-top: 4px; }
+  .info-rows { display: flex; flex-direction: column; gap: 12px; font-size: 20px; }
+  .info-rows .ir { display: flex; gap: 16px; }
+  .info-rows .ik { width: 112px; flex: none; color: var(--muted); }
+  .info-rows .iv { flex: 1; font-weight: 600; }
+  .qk4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .qk4 .tile { min-height: 112px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; }
+  .hot { display: flex; flex-direction: column; gap: 12px; }
+  .hot .h-row { display: flex; align-items: center; gap: 16px; background: var(--paper); border: 1px solid var(--line);
+    border-radius: var(--r-sm); padding: 14px 20px; min-height: 92px; cursor: pointer; font-family: var(--sans); color: var(--ink); text-align: left; }
+  .hot .h-logo { width: 58px; height: 58px; flex: none; border-radius: 12px; display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep); font-family: var(--serif); font-size: 26px; font-weight: 700; }
+  .hot .h-main { flex: 1; min-width: 0; }
+  .hot .h-main b { display: block; font-size: 22px; font-weight: 700; }
+  .hot .h-main span { display: block; font-size: 17px; color: var(--muted); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hot .h-cnt { flex: none; font-size: 18px; color: var(--wheat-deep); font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="h-top">
+      <button class="h-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>返回首页</button>
+      <span class="h-date">2026.07.24 13:00 - 17:00</span>
+    </div>
+    <h1>青云职业技术学院2026届毕业生校园双选会<span class="h-status">即将开始</span></h1>
+    <p class="tagline">面向 2026 届毕业生与实习生的校园双选专场</p>
+    <div class="h-meta">
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>青云职业技术学院体育馆</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>参展企业 48 家</span>
+      <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘岗位 310+</span>
+    </div>
+  </div>
+
+  <!-- 专区 Tab -->
+  <div class="subtabs">
+    <button class="stab on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>企业速览</button>
+    <button class="stab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>参展企业</button>
+    <button class="stab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>导览图</button>
+    <button class="stab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.8L18 9.5l-4.2 1.7L12 16l-1.8-4.8L6 9.5l4.2-1.7z"/><path d="M19 15l.9 2.3 2.1.9-2.1.9L19 21l-.9-1.9-2.1-.9 2.1-.9z"/></svg>AI求职</button>
+    <button class="stab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>打印服务</button>
+  </div>
+
+  <main class="content">
+
+    <!-- 数据 band -->
+    <div class="band4">
+      <div class="b"><b>48</b><span>参展企业</span></div>
+      <div class="b"><b>310+</b><span>招聘岗位</span></div>
+      <div class="b"><b>校园双选</b><span>活动类型</span></div>
+      <div class="b"><b>8+</b><span>行业覆盖</span></div>
+    </div>
+
+    <!-- 活动信息 -->
+    <section class="card accented a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></span>
+        <div><h2>活动信息</h2><div class="sub">信息由学校就业处提供,以来源平台为准</div></div>
+        <button class="btn sm primary" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>扫码预约 · 去来源平台办理</button>
+      </div>
+      <div class="info-rows">
+        <div class="ir"><span class="ik">举办时间</span><span class="iv">2026年7月24日 13:00 - 17:00</span></div>
+        <div class="ir"><span class="ik">举办地点</span><span class="iv">青云职业技术学院体育馆(校内北门旁)</span></div>
+        <div class="ir"><span class="ik">现场服务</span><span class="iv">简历免费打印 · 就业指导咨询 · 政策咨询台</span></div>
+        <div class="ir"><span class="ik">入场方式</span><span class="iv">校园卡或来源平台预约凭证入场</span></div>
+      </div>
+    </section>
+
+    <!-- 现场服务快捷入口 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 3L4 14h6l-1 7 9-11h-6z"/></svg></span>
+        <div><h2>现场服务快捷入口</h2></div>
+      </div>
+      <div class="qk4">
+        <button class="tile tinted"><span class="t-text"><b>参展企业查询</b><span>48 家企业</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>招聘会导览图</b><span>展位地图 / 日程</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>AI智能求职</b><span>简历 / 面试 / 准备单</span></span></button>
+        <button class="tile tinted"><span class="t-text"><b>自助打印服务</b><span>简历 / 活动资料</span></span></button>
+      </div>
+    </section>
+
+    <!-- 热门企业 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg></span>
+        <div><h2>热门企业</h2><div class="sub">按在招岗位数排序</div></div>
+        <span class="badge" style="margin-left:auto">查看全部 48 家</span>
+      </div>
+      <div class="hot">
+        <button class="h-row"><span class="h-logo">华</span><span class="h-main"><b>华辰科技</b><span>机械工程师 · 嵌入式软件工程师 · 品质管理</span></span><span class="h-cnt">12 个岗位</span></button>
+        <button class="h-row"><span class="h-logo">悦</span><span class="h-main"><b>悦达服务集团</b><span>储备干部 · 运营管理培训生 · 门店主管</span></span><span class="h-cnt">9 个岗位</span></button>
+        <button class="h-row"><span class="h-logo">启</span><span class="h-main"><b>启明电子</b><span>硬件测试 · 产线工艺 · 采购助理</span></span><span class="h-cnt">8 个岗位</span></button>
+      </div>
+    </section>
+
+    <!-- 数据来源(合规必展示) -->
+    <div class="meta-chips">
+      <span class="chip src">来源机构 <b>青云职业技术学院就业处</b></span>
+      <span class="chip">同步时间 <b>2026-07-17 08:10</b></span>
+      <span class="chip">外部ID <b>CAM-3021</b></span>
+    </div>
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本专区为第三方 / 官方校招信息入口,预约与投递一律前往来源平台办理,本系统不接收简历。
+    </div>
+
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 确认打印</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .left-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .side-col { width: 420px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .file-strip { display: flex; align-items: center; gap: 16px; padding: 18px 24px; }
+  .file-strip .f-icon {
+    width: 56px; height: 56px; flex: none; border-radius: 14px;
+    display: grid; place-items: center; background: var(--slate-soft); color: var(--slate-deep);
+  }
+  .file-strip .f-icon svg { width: 30px; height: 30px; }
+  .file-strip b { display: block; font-size: 23px; font-weight: 700; word-break: break-all; }
+  .file-strip span { display: block; font-size: 17px; color: var(--muted); margin-top: 4px; }
+  .sum-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 20px 26px; }
+  .sum-card b.hd { font-size: 21px; font-weight: 700; display: block; margin-bottom: 8px; }
+  .sum-table { flex: 1; display: flex; flex-direction: column; }
+  .sum-row { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 4px; border-bottom: 1px dashed var(--line); }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-row .k { font-size: 19px; color: var(--muted); }
+  .sum-row .v { font-size: 21px; font-weight: 600; text-align: right; }
+  .priv-card { padding: 18px 22px; background: var(--wheat-soft); border-color: rgba(169,120,31,.35); }
+  .priv-card .p-head { display: flex; align-items: center; gap: 12px; }
+  .priv-card .p-head svg { width: 26px; height: 26px; flex: none; color: var(--wheat-deep); }
+  .priv-card .p-head b { font-size: 20px; font-weight: 700; color: var(--wheat-deep); }
+  .priv-card p { margin-top: 8px; font-size: 17px; line-height: 1.55; color: var(--wheat-deep); }
+  .cost-card { padding: 18px 22px; }
+  .est-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 18px; }
+  .est-row:last-child { border-bottom: none; }
+  .est-row .k { color: var(--muted); }
+  .est-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .cost-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .cost-total .t-label { font-size: 17px; color: var(--muted); line-height: 1.5; }
+  .cost-total .t-num { font-family: var(--serif); font-size: 44px; font-weight: 900; color: var(--slate-deep); }
+  .cost-total .t-num small { font-size: 22px; font-weight: 700; margin-right: 2px; }
+  .rules-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .rules-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .rules-card ol { flex: 1; padding-left: 24px; display: flex; flex-direction: column; justify-content: space-around; gap: 9px; }
+  .rules-card li { font-size: 16.5px; line-height: 1.5; color: var(--muted); }
+  .flow-card { padding: 18px 22px; }
+  .flow-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 12px; }
+  .flow-row { display: flex; align-items: center; gap: 8px; }
+  .flow-row .f-step {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 8px;
+  }
+  .flow-row .f-step svg { width: 26px; height: 26px; color: var(--teal-deep); }
+  .flow-row .f-step span { font-size: 16px; font-weight: 600; }
+  .flow-row .f-arr { flex: none; width: 20px; height: 20px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:26</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回修改
+    </button>
+    <div class="titles">
+      <h1>确认打印</h1>
+      <p>核对以下参数,确认无误后提交打印任务</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:文件 + 参数摘要 -->
+      <div class="left-col">
+        <section class="card accented a-slate file-strip">
+          <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg></span>
+          <div><b>个人简历_王同学.pdf</b><span>2.1 MB · 3 页</span></div>
+          <span class="chip ok" style="margin-left:auto;">材料检查已完成</span>
+        </section>
+
+        <section class="card accented a-slate sum-card">
+          <b class="hd">参数确认清单</b>
+          <div class="sum-table">
+            <div class="sum-row"><span class="k">文件名称</span><span class="v">个人简历_王同学.pdf</span></div>
+            <div class="sum-row"><span class="k">文件页数</span><span class="v">3 页</span></div>
+            <div class="sum-row"><span class="k">纸张规格</span><span class="v">A4(210 × 297 mm)</span></div>
+            <div class="sum-row"><span class="k">打印份数</span><span class="v">2 份</span></div>
+            <div class="sum-row"><span class="k">色彩模式</span><span class="v">黑白</span></div>
+            <div class="sum-row"><span class="k">单双面</span><span class="v">双面(长边翻转)</span></div>
+            <div class="sum-row"><span class="k">页面方向</span><span class="v">自动</span></div>
+            <div class="sum-row"><span class="k">缩放方式</span><span class="v">适合页面</span></div>
+            <div class="sum-row"><span class="k">页面范围</span><span class="v">全部页面</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 右:隐私摘要 + 费用 + 须知 -->
+      <div class="side-col">
+        <section class="card priv-card">
+          <div class="p-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+            <b>隐私检查摘要</b>
+          </div>
+          <p>已完成打印前材料检查;遮挡 1 项,保留 3 项。当前版本尚未生成遮挡后文件,打印仍使用原文件,请确认是否继续。</p>
+        </section>
+
+        <section class="card accented a-teal cost-card">
+          <div class="est-row"><span class="k">总打印面</span><span class="v">6 面</span></div>
+          <div class="est-row"><span class="k">预计用纸</span><span class="v">4 张(双面省 2 张)</span></div>
+          <div class="est-row"><span class="k">计费方式</span><span class="v">0.50 元/页 × 3 页 × 2 份</span></div>
+          <div class="cost-total">
+            <span class="t-label">预计费用<br>按内容页计费 · 实付以收银台为准<br>金额以现场公示价为准</span>
+            <span class="t-num"><small>¥</small>3.00</span>
+          </div>
+        </section>
+
+        <section class="card flow-card">
+          <b class="hd">提交后流程 <span style="font-size:15px;font-weight:400;color:var(--muted);">免费订单自动跳过支付</span></b>
+          <div class="flow-row">
+            <span class="f-step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg><span>完成支付</span></span>
+            <svg class="f-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+            <span class="f-step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg><span>自动打印</span></span>
+            <svg class="f-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+            <span class="f-step"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 12.5l5 5 10-11"/></svg><span>取件核对</span></span>
+          </div>
+        </section>
+
+        <section class="card rules-card">
+          <b class="hd">打印须知</b>
+          <ol>
+            <li>上传文件需清晰完整,当前支持 PDF、JPG、PNG。</li>
+            <li>隐私检查仅用于本次打印前确认,扫描件 / 图片可能经第三方 OCR 识别文字。</li>
+            <li>提交后请留在机器旁,支付完成后自动开始打印。</li>
+            <li>打印完成请从出纸口取件;如有质量问题请联系现场工作人员。</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回修改
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      按以上设置打印原文件
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

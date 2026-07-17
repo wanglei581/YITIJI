@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历生成 · 简历预览与编辑</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  /* 左:可编辑纸面预览 */
+  .paper-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .paper {
+    flex: 1; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(16,48,43,.08);
+    padding: 30px 34px; overflow: hidden; display: flex; flex-direction: column; gap: 14px;
+  }
+  .rs-name { font-family: var(--serif); font-size: 34px; font-weight: 900; letter-spacing: 2px; }
+  .rs-meta { font-size: 16.5px; color: var(--muted); letter-spacing: .5px; border-bottom: 3px solid var(--teal); padding-bottom: 12px; }
+  .rs-sec { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+  .rs-sec i { width: 5px; height: 20px; border-radius: 3px; background: var(--teal); }
+  .rs-sec b { font-size: 19px; font-weight: 700; letter-spacing: 2px; }
+  .ed {
+    background: var(--surface); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 16px; font-size: 16.5px; line-height: 1.65; color: var(--ink);
+  }
+  .ed .pen { float: right; width: 18px; height: 18px; color: var(--muted); opacity: .6; }
+  .rs-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; }
+  .rs-line b { font-weight: 700; }
+  .rs-line span { color: var(--muted); font-size: 15px; }
+  .rs-skills { display: flex; gap: 8px; flex-wrap: wrap; }
+  .rs-skills i {
+    font-style: normal; font-size: 15px; color: var(--teal-deep);
+    background: var(--teal-soft); border-radius: 999px; padding: 6px 14px;
+  }
+  .edit-hint { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); margin-top: 12px; }
+  .edit-hint svg { width: 18px; height: 18px; }
+  /* 右栏 */
+  .side { width: 356px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .side .card { padding: 20px 22px; }
+  .side h3 { font-family: var(--serif); font-size: 23px; font-weight: 700; letter-spacing: 1px; margin-bottom: 12px; }
+  .hint-list { display: flex; flex-direction: column; gap: 10px; }
+  .hint-list li {
+    list-style: none; display: flex; gap: 10px; align-items: flex-start;
+    font-size: 17px; color: var(--wheat-deep); line-height: 1.5;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.25); border-radius: 10px; padding: 10px 14px;
+  }
+  .hint-list li svg { width: 20px; height: 20px; flex: none; margin-top: 2px; }
+  .ok-card { border-color: rgba(31,158,134,.4); background: var(--teal-soft); }
+  .ok-card .f-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--teal-deep); }
+  .ok-card .f-title svg { width: 24px; height: 24px; }
+  .ok-card .f-meta { font-size: 17px; color: var(--teal-deep); margin-top: 8px; }
+  .ok-card .f-fine { font-size: 14.5px; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  .side .notice { align-items: flex-start; }
+  .side .notice svg { margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      重新填写
+    </button>
+    <div class="titles">
+      <h1>简历预览</h1>
+      <p>轻触段落进入编辑;内容修改后需重新生成 PDF 再打印</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">生成完成 <b>A4 · 1 页</b></span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">填写信息</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">2</span><span class="s-label">预览编辑</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">导出打印</span></div>
+  </div>
+
+  <main class="content a-teal">
+    <div class="split">
+
+      <!-- 左:可编辑简历纸面 -->
+      <section class="card accented a-teal paper-card">
+        <div class="paper">
+          <div class="rs-name">陈志远</div>
+          <div class="rs-meta">求职意向:行政专员(全职) · 意向城市:本市 · 电话:138****2764</div>
+
+          <div class="rs-sec"><i></i><b>个人简介</b></div>
+          <div class="ed">
+            <svg class="pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M12 4l6 6-9 9H4v-5z"/></svg>
+            具备 2 年以上仓储行政与门店服务经验,熟悉单据登记、库存盘点与班表协调;工作细致、账目零差错,希望在行政专员岗位上发挥文档管理与协调能力。
+          </div>
+
+          <div class="rs-sec"><i></i><b>教育经历</b></div>
+          <div class="rs-line"><b>金州职业技术学院 · 行政管理 · 大专</b><span>2020.09 - 2023.06</span></div>
+          <div class="ed">主修行政管理、办公自动化、公文写作;在校期间任班级生活委员,负责活动物资采买与费用登记。</div>
+
+          <div class="rs-sec"><i></i><b>实习 / 工作经历</b></div>
+          <div class="rs-line"><b>鑫源商贸有限公司 · 仓储文员</b><span>2024.03 - 2026.05</span></div>
+          <div class="ed">
+            <svg class="pen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M12 4l6 6-9 9H4v-5z"/></svg>
+            负责出入库单据登记与月度盘点,使用 Excel 建立库存台账,盘点差错率明显下降;协助主管编排配送班表,保障旺季发货准时。
+          </div>
+          <div class="rs-line"><b>悦客连锁超市 · 收银员(暑期)</b><span>2023.07 - 2023.09</span></div>
+          <div class="ed">高峰期日均接待数百名顾客,负责收银与理货;全部交接班账目核对无误,零差错完成暑期结算。</div>
+
+          <div class="rs-sec"><i></i><b>技能</b></div>
+          <div class="rs-skills"><i>Excel 台账</i><i>Word 公文排版</i><i>库存盘点</i><i>班表协调</i><i>收银结算</i></div>
+
+          <div class="rs-sec"><i></i><b>证书 / 资质</b></div>
+          <div class="ed">普通话二级甲等 · 机动车驾驶证 C1</div>
+        </div>
+        <div class="edit-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M12 4l6 6-9 9H4v-5z"/></svg>
+          所有描述均可直接点击修改;事实信息(学校/公司/证书)以你填写的为准,AI 未做任何添加。
+        </div>
+      </section>
+
+      <!-- 右:补充提示 + 导出状态 -->
+      <div class="side">
+        <section class="card a-wheat">
+          <h3>建议补充(AI 不会替你编造)</h3>
+          <ul class="hint-list">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>未填写邮箱:建议补充,方便招聘方联系。</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>项目经历为空:如有校内活动或社会实践,可返回第 5 步补充。</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>期望薪资未填写:可留空,也可返回第 2 步填写区间。</li>
+          </ul>
+        </section>
+
+        <section class="card ok-card">
+          <p class="f-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.3 2.3 4.7-4.7"/></svg>
+            PDF 已生成
+          </p>
+          <p class="f-meta">陈志远-行政专员-简历.pdf · 1 页 · 96 KB · 打印链接已就绪</p>
+          <p class="f-fine">文件短期保留后自动清理,本机不长期保存你的简历;修改内容后需重新导出。</p>
+        </section>
+
+        <section class="card a-teal">
+          <h3>说明</h3>
+          <div class="notice" style="margin-bottom:12px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+            AI 生成内容,仅供参考;请核对每一段信息属实后再导出使用。
+          </div>
+          <div class="notice">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 4v5c0 4.4-3 8.2-7 9-4-0.8-7-4.6-7-9V7z"/><path d="M9.5 12l1.8 1.8 3.4-3.4"/></svg>
+            简历仅供个人保存与打印,系统不收取求职者简历给企业。
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11a8 8 0 10-2.3 5.7M20 11V5m0 6h-6"/></svg>
+      重新导出
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      去打印这份简历
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

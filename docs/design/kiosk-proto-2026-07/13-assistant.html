@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · AI助手</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .assist-head { padding: 26px 48px 18px; gap: 22px; }
+  .avatar {
+    width: 76px; height: 76px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal); color: #fffdf8;
+    font-family: var(--serif); font-size: 38px; font-weight: 700;
+    box-shadow: 0 4px 14px rgba(31,158,134,.3);
+  }
+  .assist-head .who h1 { font-family: var(--serif); font-size: 36px; font-weight: 900; letter-spacing: 1px; }
+  .assist-head .who .chip { margin-top: 10px; }
+  .content { gap: 16px; }
+  /* 咨询主题(源码 4 主题 + 直接问) */
+  .task-bar { flex: none; display: flex; gap: 12px; }
+  .task-bar .task {
+    flex: 1; min-height: 88px; padding: 12px 16px; cursor: pointer; text-align: left;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); color: var(--ink);
+  }
+  .task-bar .task b { display: block; font-size: 20px; font-weight: 700; }
+  .task-bar .task span { display: block; margin-top: 5px; font-size: 16.5px; color: var(--muted); line-height: 1.32; }
+  .task-bar .task.on { background: var(--teal-soft); border-color: rgba(31,158,134,.5); }
+  .task-bar .task.on b { color: var(--teal-deep); }
+  .task-bar .task.direct { border-style: dashed; display: flex; flex-direction: column; justify-content: center; }
+  .reselect {
+    flex: none; min-height: 48px; padding: 0 18px; cursor: pointer;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    font-family: var(--sans); font-size: 17px; color: var(--muted);
+  }
+  /* 对话卡 */
+  .chat-card {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 18px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 22px 26px; box-shadow: 0 3px 14px rgba(16,48,43,.05);
+  }
+  .chat-card .c-head { flex: none; display: flex; align-items: baseline; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+  .chat-card .c-head b { font-family: var(--serif); font-size: 24px; font-weight: 700; }
+  .chat-card .c-head span { font-size: 16px; color: var(--muted); margin-left: auto; }
+  .chat { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .msg { display: flex; gap: 12px; }
+  .msg.me { justify-content: flex-end; }
+  .msg .ava-s {
+    width: 44px; height: 44px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--teal); color: #fffdf8; font-family: var(--serif); font-size: 22px; font-weight: 700;
+  }
+  .bubble { font-size: 21px; line-height: 1.5; padding: 16px 20px; }
+  .bubble .ref { display: block; margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .bubble ul { margin: 8px 0 0 4px; }
+  .bubble li { list-style: none; display: flex; gap: 8px; margin-top: 6px; font-size: 20px; }
+  .bubble li::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); margin-top: 11px; }
+  .action-chips { display: flex; gap: 12px; margin-left: 56px; }
+  .action-chips .btn.sm { min-height: 58px; font-size: 20px; }
+  .thinking { display: flex; align-items: center; gap: 12px; font-size: 19px; color: var(--muted); }
+  .thinking .dots { display: inline-flex; gap: 5px; }
+  .thinking .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--teal); opacity: .4; animation: blink 1.2s infinite; }
+  .thinking .dots i:nth-child(2) { animation-delay: .2s; }
+  .thinking .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+  /* 输入区 */
+  .inputzone { flex: none; display: flex; flex-direction: column; gap: 14px; padding-bottom: 4px; }
+  .quick-qs { display: flex; gap: 12px; flex-wrap: wrap; }
+  .quick-qs .f-chip { min-height: 56px; font-size: 20px; }
+  .composer { display: flex; gap: 14px; align-items: stretch; }
+  .composer textarea {
+    flex: 1; min-height: 108px; padding: 16px 20px; resize: none;
+    font-size: 22px; font-family: var(--sans); color: var(--ink); line-height: 1.5;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .composer .side { flex: none; display: flex; flex-direction: column; gap: 10px; }
+  .composer .tool-btn {
+    display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 0 22px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 19px; color: var(--ink);
+  }
+  .composer .tool-btn svg { width: 24px; height: 24px; }
+  .composer .btn.primary { min-height: 108px; padding: 0 36px; }
+  .privacy { font-size: 15.5px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机在线</span>
+    </div>
+  </header>
+
+  <!-- 页头:顾问身份 + 语音咨询入口 -->
+  <div class="pagehead assist-head a-teal">
+    <span class="avatar">青</span>
+    <div class="who">
+      <h1>你好,我是小青</h1>
+      <span class="chip">AI 生成内容,仅供参考 · 不构成正式建议</span>
+    </div>
+    <div class="aside">
+      <button class="btn ghost sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+        语音咨询
+      </button>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 咨询主题(当前:简历与求职材料) -->
+    <div class="task-bar">
+      <button class="task on"><b>简历与求职材料</b><span>项目经历、格式与材料准备</span></button>
+      <button class="task"><b>面试与沟通</b><span>面试准备、自我介绍与谈薪</span></button>
+      <button class="task"><b>岗位与选择</b><span>岗位理解、Offer 对比与方向</span></button>
+      <button class="task"><b>入职与职场</b><span>入职材料、试用期与社保常识</span></button>
+      <button class="task direct"><b>直接问小青</b><span>其他问题,不选主题直接咨询</span></button>
+    </div>
+
+    <!-- 对话卡 -->
+    <section class="chat-card">
+      <div class="c-head">
+        <b>与小青咨询 · 简历与求职材料</b>
+        <button class="reselect">重新选择主题</button>
+        <span>共享终端 · 离开本页自动清空</span>
+      </div>
+
+      <div class="chat">
+        <div class="msg ai">
+          <span class="ava-s">青</span>
+          <div class="bubble ai">请告诉我你的目标岗位、目前的简历进度,以及最想解决的材料问题。<span class="ref">内容仅供参考</span></div>
+        </div>
+        <div class="msg me">
+          <div class="bubble me">我是应届生,想投市场营销岗,项目经历不知道怎么写。</div>
+        </div>
+        <div class="msg ai">
+          <span class="ava-s">青</span>
+          <div class="bubble ai">建议按「背景 — 我做了什么 — 带来什么结果」三段来写,每段一两句:
+            <ul>
+              <li>背景:一句话说清项目目标和你的角色,别只写课程名。</li>
+              <li>动作:用动词开头,写你亲手做的 2~3 件事,如策划、投放、复盘。</li>
+              <li>结果:尽量给数字,如覆盖人数、转化率;没有数字就写可验证的变化。</li>
+            </ul>
+            <span class="ref">内容仅供参考</span>
+          </div>
+        </div>
+        <div class="action-chips">
+          <button class="btn primary sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8.5 11l1.8 1.8 3.4-3.4"/></svg>
+            去做简历诊断
+          </button>
+          <button class="btn ghost sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+            去打印文件
+          </button>
+        </div>
+        <div class="msg me">
+          <div class="bubble me">简历打印用 PDF 还是 Word?</div>
+        </div>
+        <div class="msg ai">
+          <span class="ava-s">青</span>
+          <div class="bubble ai">建议导出为 PDF 再打印:排版和字体不会跑版,在本机预览所见即所得;黑白打印时注意浅色文字和底色的对比度。<span class="ref">内容仅供参考</span></div>
+        </div>
+        <div class="thinking">
+          <span class="ava-s" style="width:44px;height:44px">青</span>
+          小青正在整理建议
+          <span class="dots"><i></i><i></i><i></i></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 输入区 -->
+    <div class="inputzone">
+      <div class="quick-qs">
+        <button class="f-chip">项目经历应该怎么写?</button>
+        <button class="f-chip">简历打印用 PDF 还是 Word?</button>
+        <button class="f-chip">没有实习经历怎么办?</button>
+      </div>
+      <div class="composer">
+        <textarea placeholder="请补充「简历与求职材料」相关情况"></textarea>
+        <div class="side">
+          <button class="tool-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+            语音咨询
+          </button>
+          <button class="tool-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/></svg>
+            拼音键盘
+          </button>
+        </div>
+        <button class="btn primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12l16-7-4 7 4 7z"/><path d="M4 12h12"/></svg>
+          发送
+        </button>
+      </div>
+      <p class="privacy">AI 回复内容仅供参考,不构成正式建议;本次咨询不会保存在这台共享设备上。岗位投递与招聘会预约请前往来源平台完成。</p>
+    </div>
+  </main>
+
+  <!-- 底部导航:AI助手激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 我的文档</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .summary { display: flex; align-items: center; gap: 22px; padding: 20px 30px; }
+  .summary .s-ico { width: 60px; height: 60px; flex: none; border-radius: 15px; display: grid; place-items: center; background: var(--slate-soft); color: var(--slate-deep); }
+  .summary .s-ico svg { width: 32px; height: 32px; }
+  .summary .s-main p { font-size: 20px; color: var(--muted); }
+  .summary .s-main b { display: block; margin-top: 2px; font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .summary .s-note { flex: 1; font-size: 18px; color: var(--muted); line-height: 1.5; padding-left: 8px; }
+  .summary .s-mini { display: flex; gap: 12px; }
+  .summary .s-mini span { font-size: 18px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; }
+  .list { display: flex; flex-direction: column; gap: 13px; }
+  .d-card { display: flex; align-items: flex-start; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 18px 24px; }
+  .d-card.expired { opacity: .62; }
+  .d-card .f-ico { width: 54px; height: 54px; flex: none; border-radius: 13px; display: grid; place-items: center; background: var(--slate-soft); color: var(--slate-deep); }
+  .d-card .f-ico svg { width: 28px; height: 28px; }
+  .d-card .d-main { flex: 1; min-width: 0; }
+  .d-card .d-main b { display: block; font-size: 23px; font-weight: 700; }
+  .d-card .meta { margin-top: 6px; font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .d-chips { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+  .d-chips .chip { font-size: 16px; padding: 6px 14px; }
+  .d-chips .chip.bad { background: var(--error-soft); border-color: rgba(193,74,52,.3); color: var(--error); }
+  .ret-toggle { font-size: 16px; color: var(--teal-deep); background: none; border: 1px dashed rgba(31,158,134,.45); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-family: var(--sans); min-height: 48px; }
+  .ret-opts { display: flex; gap: 10px; margin-top: 10px; }
+  .ret-opts .opt { min-height: 52px; padding: 0 20px; font-size: 18px; }
+  .d-actions { display: flex; gap: 9px; flex: none; align-self: center; }
+  .d-actions .btn.sm { min-height: 56px; padding: 0 18px; font-size: 18px; }
+  .btn.danger { border-color: rgba(193,74,52,.4); color: var(--error); }
+  .btn.danger.confirm { background: var(--error-soft); }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>我的文档</h1>
+      <p>本人保存的文档(仅本人可见,到期自动清理)</p>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 概览 -->
+    <section class="card accented a-slate summary">
+      <span class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></span>
+      <div class="s-main"><p>文档资产</p><b>6</b></div>
+      <div class="s-note">查看和打印时才换取短期访问链接;到期或删除后不可恢复</div>
+      <div class="s-mini"><span>可用 5</span><span>长期 2</span><span>到期 1</span></div>
+    </section>
+
+    <!-- 文档列表 -->
+    <div class="list">
+
+      <div class="d-card">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg></span>
+        <div class="d-main">
+          <b>王同学_行政专员_简历.pdf</b>
+          <div class="meta">312 KB · 07-17 10:12 · 长期保存</div>
+          <div class="d-chips">
+            <span class="chip ok">长期保存</span>
+            <button class="ret-toggle">修改保存期限</button>
+          </div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm">查看</button>
+          <button class="btn ghost sm">打印</button>
+          <button class="btn ghost sm">签名盖章</button>
+          <button class="btn ghost sm danger">删除</button>
+        </div>
+      </div>
+
+      <div class="d-card">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg></span>
+        <div class="d-main">
+          <b>纸质简历扫描_0717.pdf</b>
+          <div class="meta">2.4 MB · 07-17 09:52 · 有效期至 10-15</div>
+          <div class="d-chips">
+            <span class="chip">保存 3 个月</span>
+            <button class="ret-toggle">修改保存期限</button>
+          </div>
+          <div class="ret-opts">
+            <button class="opt on">保存 3 个月</button>
+            <button class="opt">保存 6 个月</button>
+            <button class="opt">长期保存</button>
+          </div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm">查看</button>
+          <button class="btn ghost sm">打印</button>
+          <button class="btn ghost sm">签名盖章</button>
+          <button class="btn ghost sm danger">删除</button>
+        </div>
+      </div>
+
+      <div class="d-card">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+        <div class="d-main">
+          <b>简历诊断报告_0717.pdf</b>
+          <div class="meta">512 KB · 07-17 10:08 · 有效期至 10-15</div>
+          <div class="d-chips"><span class="chip">保存 3 个月</span><button class="ret-toggle">修改保存期限</button></div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm">查看</button>
+          <button class="btn ghost sm">打印</button>
+          <button class="btn ghost sm danger">删除</button>
+        </div>
+      </div>
+
+      <div class="d-card">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5-8 8"/></svg></span>
+        <div class="d-main">
+          <b>获奖证书扫描_0710.jpg</b>
+          <div class="meta">1.8 MB · 07-10 16:20 · 有效期至 01-10</div>
+          <div class="d-chips"><span class="chip warn">保存 6 个月</span><button class="ret-toggle">修改保存期限</button></div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm">查看</button>
+          <button class="btn ghost sm">打印</button>
+          <button class="btn ghost sm danger confirm">确认删除</button>
+        </div>
+      </div>
+
+      <div class="d-card">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+        <div class="d-main">
+          <b>职业规划建议_0712.pdf</b>
+          <div class="meta">340 KB · 07-12 09:24 · 长期保存</div>
+          <div class="d-chips"><span class="chip ok">长期保存</span><button class="ret-toggle">修改保存期限</button></div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm">查看</button>
+          <button class="btn ghost sm">打印</button>
+          <button class="btn ghost sm danger">删除</button>
+        </div>
+      </div>
+
+      <div class="d-card expired">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg></span>
+        <div class="d-main">
+          <b>求职材料清单_0410.docx</b>
+          <div class="meta">86 KB · 04-10 14:02 · 已到期,不可查看 · docx 格式暂不支持打印</div>
+          <div class="d-chips"><span class="chip bad">到期自动清理</span></div>
+        </div>
+        <div class="d-actions">
+          <button class="btn ghost sm" disabled>已到期</button>
+          <button class="btn ghost sm" disabled title="该文件格式暂不支持打印">打印</button>
+          <button class="btn ghost sm danger">删除</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      文件仅本人可查看和打印;访问链接短期有效;原始简历/求职材料默认 90 天,AI 优化成果确认后可长期保存;延长保存需二次同意。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

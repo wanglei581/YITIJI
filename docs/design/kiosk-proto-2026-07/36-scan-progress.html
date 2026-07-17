@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>材料扫描 · 等待扫描完成</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .wait-card { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 34px; }
+  .wait-icon {
+    width: 150px; height: 150px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+    box-shadow: 0 0 0 14px rgba(31,158,134,.08);
+  }
+  .wait-icon svg { width: 74px; height: 74px; }
+  .wait-title { font-family: var(--serif); font-size: 42px; font-weight: 900; letter-spacing: 2px; }
+  .wait-sub { font-size: 21px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .dots { display: flex; gap: 12px; }
+  .dots i { width: 14px; height: 14px; border-radius: 50%; background: var(--teal); opacity: .35; }
+  .dots i:nth-child(2) { opacity: .65; }
+  .dots i:nth-child(3) { opacity: 1; }
+  .side-col { width: 420px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .info-card { padding: 18px 22px; }
+  .info-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .i-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .i-row:last-child { border-bottom: none; }
+  .i-row .k { font-size: 17.5px; color: var(--muted); flex: none; }
+  .i-row .v { font-size: 18.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .st-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .st-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 8px; }
+  .st-list { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .st { flex: 1; display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px dashed var(--line); }
+  .st:last-child { border-bottom: none; }
+  .st .s-dot2 {
+    width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+  }
+  .st .s-dot2 svg { width: 22px; height: 22px; }
+  .st.done .s-dot2 { background: var(--teal); border-color: var(--teal); color: #fffdf8; }
+  .st.active .s-dot2 { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .st b { font-size: 19px; font-weight: 700; display: block; }
+  .st span { font-size: 15.5px; color: var(--muted); display: block; margin-top: 2px; }
+  .st.active b { color: var(--teal-deep); }
+  .cancel-btn { color: var(--error); border-color: rgba(193,74,52,.4); }
+  .bar-note { font-size: 18px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:28</span>
+      <span class="status-chip"><span class="dot"></span>扫描仪工作中</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <div class="titles">
+      <h1>等待扫描完成</h1>
+      <p>请在打印机上完成操作,本页每 2 秒自动检测结果</p>
+    </div>
+    <span class="aside badge">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      任务进行中
+    </span>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">选择类型</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">扫描指引</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">3</span><span class="s-label">扫描中</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">完成</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:等待主状态 -->
+      <section class="card accented a-teal wait-card">
+        <span class="wait-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg></span>
+        <div class="wait-title">等待打印机端扫描完成</div>
+        <div class="wait-sub">扫描完成后会自动进入结果页,请勿离开;<br>如打印机仍在进纸,请等待整叠原件全部扫完</div>
+        <div class="dots"><i></i><i></i><i></i></div>
+      </section>
+
+      <!-- 右:任务信息 + 处理阶段 -->
+      <div class="side-col">
+        <section class="card accented a-teal info-card">
+          <b class="hd">任务信息</b>
+          <div class="i-row"><span class="k">扫描类型</span><span class="v">简历扫描</span></div>
+          <div class="i-row"><span class="k">任务编号</span><span class="v">S-20260717-0018</span></div>
+          <div class="i-row"><span class="k">开始等待</span><span class="v">10:27 · 已等待 00:42</span></div>
+          <div class="i-row"><span class="k">输出格式</span><span class="v">PDF(自动生成)</span></div>
+        </section>
+
+        <section class="card st-card">
+          <b class="hd">流程说明 <span style="font-size:15px;font-weight:400;color:var(--muted);">实际进度以打印机端为准</span></b>
+          <div class="st-list">
+            <div class="st done">
+              <span class="s-dot2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg></span>
+              <div><b>任务已创建</b><span>本机已就绪,等待打印机端发起</span></div>
+            </div>
+            <div class="st active">
+              <span class="s-dot2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/></svg></span>
+              <div><b>等待扫描回传</b><span>打印机扫描并回传文件中</span></div>
+            </div>
+            <div class="st">
+              <span class="s-dot2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg></span>
+              <div><b>生成扫描文件</b><span>回传完成后自动生成 PDF</span></div>
+            </div>
+            <div class="st">
+              <span class="s-dot2"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5l7 7-7 7"/></svg></span>
+              <div><b>进入结果页</b><span>选择打印、保存或 AI 识别</span></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="notice warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>
+          扫描中请勿翻动或抽拉原件;任务超时未收到结果会提示重新开始。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost cancel-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>
+      取消扫描
+    </button>
+    <span class="spacer"></span>
+    <span class="bar-note">取消后本次任务作废;若打印机恰好已完成,系统会自动带你进入结果页</span>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

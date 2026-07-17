@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 参数设置</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .params-card { flex: 1; min-width: 0; display: flex; flex-direction: column; padding-bottom: 20px; }
+  .param-row { flex: 1; display: flex; align-items: center; gap: 24px; padding: 14px 0; border-bottom: 1px dashed var(--line); }
+  .param-row:last-child { border-bottom: none; }
+  .param-row .p-label { flex: none; width: 170px; }
+  .param-row .p-label b { font-size: 22px; font-weight: 700; display: block; }
+  .param-row .p-label small { font-size: 15.5px; color: var(--muted); font-weight: 400; display: block; margin-top: 4px; line-height: 1.4; }
+  .param-row .opt-group { flex: 1; }
+  .param-row .opt { min-height: 68px; font-size: 20px; padding: 0 24px; }
+  .side-col { width: 400px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .dev-strip {
+    display: flex; align-items: center; gap: 14px; padding: 16px 22px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .dev-strip .d-icon {
+    width: 48px; height: 48px; flex: none; border-radius: 50%;
+    display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .dev-strip .d-icon svg { width: 26px; height: 26px; }
+  .dev-strip b { font-size: 19px; font-weight: 700; display: block; }
+  .dev-strip span { font-size: 15.5px; color: var(--teal-deep); display: block; margin-top: 2px; }
+  .dev-strip .chip { margin-left: auto; }
+  .est-card { padding: 18px 22px; }
+  .est-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 8px; }
+  .est-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 18px; }
+  .est-row:last-child { border-bottom: none; }
+  .est-row .k { color: var(--muted); }
+  .est-row .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .save-tip {
+    margin-top: 10px; display: flex; align-items: center; gap: 8px;
+    font-size: 15.5px; color: var(--teal-deep); background: var(--teal-soft);
+    border-radius: 10px; padding: 8px 14px;
+  }
+  .save-tip svg { width: 18px; height: 18px; flex: none; }
+  .cost-card { padding: 18px 22px; }
+  .cost-total { display: flex; justify-content: space-between; align-items: baseline; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .cost-total .t-label { font-size: 17px; color: var(--muted); }
+  .cost-total .t-num { font-family: var(--serif); font-size: 40px; font-weight: 900; color: var(--slate-deep); }
+  .cost-total .t-num small { font-size: 20px; font-weight: 700; margin-right: 2px; }
+  .price-table { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; font-size: 17px; }
+  .price-table .pt-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); }
+  .price-table .pt-row:first-child { border-top: none; background: var(--paper); font-weight: 600; color: var(--ink); }
+  .price-table .pt-row b { color: var(--ink); font-weight: 600; }
+  .rules-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .rules-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .rules-card ol { flex: 1; padding-left: 22px; display: flex; flex-direction: column; justify-content: space-around; gap: 6px; }
+  .rules-card li { font-size: 17px; line-height: 1.5; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:25</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      上一步
+    </button>
+    <div class="titles">
+      <h1>参数设置</h1>
+      <p>设置份数、色彩与单双面,右侧实时查看用量与费用预估</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:参数 -->
+      <section class="card accented a-slate params-card">
+        <div class="card-head" style="margin-bottom: 8px;">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h10M18 18h2"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg></span>
+          <div><h2>打印参数</h2><div class="sub">个人简历_王同学.pdf · 3 页 · 2.1MB</div></div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>打印份数</b><small>最多 99 份</small></div>
+          <div class="stepper">
+            <button>-</button>
+            <span class="val">2</span>
+            <button>+</button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>色彩模式</b><small>彩色效果以设备耗材状态为准</small></div>
+          <div class="opt-group">
+            <button class="opt on">黑白</button>
+            <button class="opt">彩色</button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>单双面</b><small>长边适合纵向文档,短边适合横向</small></div>
+          <div class="opt-group">
+            <button class="opt">单面</button>
+            <button class="opt on">双面(长边)</button>
+            <button class="opt">双面(短边)</button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>页面方向</b></div>
+          <div class="opt-group">
+            <button class="opt on">自动</button>
+            <button class="opt">纵向</button>
+            <button class="opt">横向</button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>缩放方式</b></div>
+          <div class="opt-group">
+            <button class="opt on">适合页面</button>
+            <button class="opt">实际大小</button>
+          </div>
+        </div>
+
+        <div class="param-row">
+          <div class="p-label"><b>纸张规格</b><small>本机仅支持 A4</small></div>
+          <div class="opt-group">
+            <button class="opt on">A4(210 × 297 mm)</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右:设备 + 用量 + 费用 -->
+      <div class="side-col">
+        <div class="dev-strip">
+          <span class="d-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div><b>彩色激光打印机</b><span>在线 · A4纸充足 · 碳粉正常</span></div>
+          <span class="chip ok">可打印</span>
+        </div>
+
+        <section class="card accented a-slate est-card">
+          <b class="hd">用量预估</b>
+          <div class="est-row"><span class="k">文件页数</span><span class="v">3 页</span></div>
+          <div class="est-row"><span class="k">打印份数</span><span class="v">2 份</span></div>
+          <div class="est-row"><span class="k">总打印面</span><span class="v">6 面</span></div>
+          <div class="est-row"><span class="k">预计用纸</span><span class="v">4 张</span></div>
+          <div class="save-tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c4 4.5 6 7.6 6 10.2A6 6 0 016 13.2C6 10.6 8 7.5 12 3z"/></svg>
+            双面打印比单面节省 2 张纸
+          </div>
+        </section>
+
+        <section class="card accented a-teal cost-card">
+          <b class="hd" style="font-size:20px;font-weight:700;display:block;">费用预估</b>
+          <div class="est-row"><span class="k">单价(黑白)</span><span class="v">0.50 元 / 页</span></div>
+          <div class="est-row"><span class="k">计费页数 × 份数</span><span class="v">3 页 × 2 份</span></div>
+          <div class="cost-total">
+            <span class="t-label">预估金额<br>以现场公示价为准</span>
+            <span class="t-num"><small>¥</small>3.00</span>
+          </div>
+          <div class="price-table">
+            <div class="pt-row"><span>打印类型</span><span>黑白</span><span>彩色</span></div>
+            <div class="pt-row"><b>文档 / 简历 · A4</b><span>0.50 元/页</span><span>2.00 元/页</span></div>
+            <div class="pt-row"><b>照片打印 · 6寸光面纸</b><span>—</span><span>待接入</span></div>
+          </div>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          按内容页计费,双面打印不影响计费页数;实付金额以收银台显示为准。
+        </div>
+
+        <section class="card accented a-wheat rules-card">
+          <b class="hd">打印须知</b>
+          <ol>
+            <li>上传文件需清晰完整,当前支持 PDF、JPG、PNG。</li>
+            <li>预览页可查看 PDF 和图片;无法预览时请检查文件链接是否过期。</li>
+            <li>隐私检查仅用于本次打印前确认,遮挡产物未生成时打印仍使用原文件。</li>
+            <li>打印完成后请从出纸口取件,如有质量问题请联系现场工作人员。</li>
+          </ol>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回预览
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      确认参数 · 去核对
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

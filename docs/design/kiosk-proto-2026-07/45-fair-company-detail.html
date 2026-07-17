@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>展位企业详情 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; }
+  .co-head { display: flex; align-items: flex-start; gap: 22px; }
+  .co-head .logo {
+    width: 88px; height: 88px; flex: none; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+    font-family: var(--serif); font-size: 42px; font-weight: 900;
+  }
+  .co-head h2 { font-family: var(--serif); font-size: 38px; font-weight: 900; letter-spacing: 2px; }
+  .co-head .meta-chips { margin-top: 12px; }
+  .booth-tag {
+    margin-left: auto; flex: none; text-align: center;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35); border-radius: 14px; padding: 12px 24px;
+  }
+  .booth-tag .k { font-size: 15px; color: var(--wheat-deep); }
+  .booth-tag b { display: block; font-family: var(--serif); font-size: 32px; color: var(--wheat-deep); }
+  .honor { display: flex; gap: 10px; margin-top: 12px; }
+  .honor .chip { background: var(--wheat-soft); border-color: rgba(169,120,31,.3); color: var(--wheat-deep); font-weight: 600; }
+  .co-facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 12px; font-size: 19px; color: var(--muted); }
+  .co-facts b { color: var(--ink); font-weight: 600; }
+  .co-desc { margin-top: 10px; font-size: 19px; color: var(--muted); line-height: 1.55; }
+  .filter-rows { display: flex; flex-direction: column; gap: 8px; }
+  .filter-rows .fr { display: flex; align-items: center; gap: 12px; }
+  .filter-rows .fk { width: 64px; flex: none; font-size: 18px; color: var(--muted); }
+  .filter-rows .f-chip { min-height: 48px; padding: 0 22px; font-size: 19px; }
+  .job-list { display: flex; flex-direction: column; gap: 10px; }
+  .job-row {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 12px 22px;
+  }
+  .job-row .j-top { display: flex; align-items: center; gap: 14px; }
+  .job-row .j-top b { font-size: 24px; font-weight: 700; }
+  .jt { font-size: 15px; font-weight: 600; padding: 3px 12px; border-radius: 999px; }
+  .jt.full { color: var(--slate-deep); background: var(--slate-soft); border: 1px solid rgba(63,104,176,.3); }
+  .jt.intern { color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); }
+  .job-row .salary { margin-left: auto; font-size: 23px; font-weight: 700; color: var(--wheat-deep); font-variant-numeric: tabular-nums; }
+  .job-row .j-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 8px; font-size: 17px; color: var(--muted); }
+  .action-zone { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: stretch; }
+  .action-side {
+    display: flex; flex-direction: column; justify-content: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 24px 30px;
+  }
+  .action-side p { font-size: 18px; color: var(--muted); line-height: 1.5; }
+  .action-side .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .action-side .btn { width: 100%; min-height: 72px; font-size: 19px; padding: 0 12px; white-space: nowrap; }
+  .qr-panel { padding: 22px; gap: 12px; }
+  .qr-panel .qr-box { width: 176px; height: 176px; }
+  /* QA终审:压缩卡片纵向空间,消除卡内内容裁切 */
+  .content .card { padding-top: 17px; padding-bottom: 17px; }
+  .content { gap: 12px; }
+  .content .card-head { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>展位企业详情</h1>
+      <p>2026年夏季高校毕业生招聘会 · 7月20日 · 市人才市场</p>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 企业档案 -->
+    <section class="card accented a-wheat">
+      <div class="co-head">
+        <span class="logo">华</span>
+        <div>
+          <h2>华辰科技</h2>
+          <div class="honor">
+            <span class="chip">市级专精特新</span>
+            <span class="chip">高新技术企业</span>
+          </div>
+          <div class="meta-chips">
+            <span class="chip">行业 <b>智能制造</b></span>
+            <span class="chip">规模 <b>500-2000人</b></span>
+            <span class="chip">A区 · 综合展区</span>
+            <span class="chip ok">已签到</span>
+          </div>
+        </div>
+        <div class="booth-tag"><span class="k">展位</span><b>A12</b></div>
+      </div>
+      <div class="co-facts">
+        <span>成立 <b>2009 年</b></span>
+        <span>总部 <b>本市高新区</b></span>
+        <span>注册资本 <b>5,000 万</b></span>
+        <span>在招 <b>12 个岗位 · 共招 38 人</b></span>
+      </div>
+      <p class="co-desc">聚焦工业自动化设备研发与制造,设有省级企业技术中心,主要产品覆盖智能产线与检测装备,面向应届生开放「双导师制」培养岗位。数据来自合作平台 · 仅供展示参考。</p>
+    </section>
+
+    <!-- 岗位筛选 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M7 12h10M10 18h4"/></svg></span>
+        <div><h2>筛选岗位</h2><div class="sub">在招岗位 12 个 · 当前显示 3 个</div></div>
+        <span style="margin-left:auto;display:inline-flex;gap:8px">
+          <button class="f-chip on" style="min-height:52px">列表视图</button>
+          <button class="f-chip" style="min-height:52px">海报视图</button>
+        </span>
+      </div>
+      <div class="filter-rows">
+        <div class="fr"><span class="fk">地点</span><button class="f-chip on">不限</button><button class="f-chip">本市 · 高新区</button><button class="f-chip">本市 · 经开区</button></div>
+        <div class="fr"><span class="fk">学历</span><button class="f-chip on">不限</button><button class="f-chip">大专及以上</button><button class="f-chip">本科及以上</button></div>
+        <div class="fr"><span class="fk">经验</span><button class="f-chip on">不限</button><button class="f-chip">应届生</button><button class="f-chip">1年以上</button><button class="f-chip">3年以上</button></div>
+        <div class="fr"><span class="fk">类型</span><button class="f-chip on">不限</button><button class="f-chip">全职</button><button class="f-chip">实习</button><button class="f-chip" style="margin-left:auto;color:var(--wheat-deep)">清除筛选</button></div>
+      </div>
+    </section>
+
+    <!-- 在招岗位 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+        <div><h2>在招岗位</h2><div class="sub">其余 9 个岗位可在来源平台或现场展位查看</div></div>
+      </div>
+      <div class="job-list">
+        <div class="job-row">
+          <div class="j-top"><b>机械工程师</b><span class="jt full">全职</span><span class="salary">7k - 10k</span></div>
+          <div class="j-meta"><span>招 6 人</span><span>本科及以上</span><span>经验不限</span><span>本市 · 高新区</span><span>要求:熟悉 SolidWorks,可接受应届生</span></div>
+        </div>
+        <div class="job-row">
+          <div class="j-top"><b>嵌入式软件工程师</b><span class="jt full">全职</span><span class="salary">9k - 14k</span></div>
+          <div class="j-meta"><span>招 4 人</span><span>本科及以上</span><span>1-3 年</span><span>本市 · 高新区</span><span>要求:C/C++,有 RTOS 项目经验优先</span></div>
+        </div>
+        <div class="job-row">
+          <div class="j-top"><b>品质管理实习生</b><span class="jt intern">实习</span><span class="salary">180 / 天</span></div>
+          <div class="j-meta"><span>招 3 人</span><span>大专及以上</span><span>在校生</span><span>本市 · 高新区</span><span>要求:每周到岗 4 天,可转正</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 行动区 -->
+    <div class="action-zone">
+      <div class="qr-panel">
+        <div class="qr-title">扫码投递</div>
+        <div class="qr-box"></div>
+        <div class="qr-sub">手机扫码,前往来源平台查看该企业岗位并投递</div>
+      </div>
+      <div class="action-side">
+        <p>本终端仅展示招聘会现场企业与岗位信息,不接收简历、不参与招聘闭环。简历投递在来源平台完成,结果以来源平台为准。</p>
+        <button class="btn primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 4h6v6M20 4l-9 9M19 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"/></svg>
+          去来源平台投递
+        </button>
+        <div class="row2">
+          <button class="btn dark">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+            打印企业资料
+          </button>
+          <button class="btn ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+            打印岗位清单
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="meta-chips">
+      <span class="chip src">来源机构 <b>市就业服务中心</b></span>
+      <span class="chip">同步时间 <b>2026-07-17 08:30</b></span>
+      <span class="chip">外部ID <b>COMP-3312</b></span>
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回企业列表
+    </button>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>
+      查看场馆导览
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

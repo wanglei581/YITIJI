@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智慧校园 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--teal); --accent-deep: var(--teal-deep); --accent-soft: var(--teal-soft); gap: 20px; }
+  .auth-bar {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.35); border-radius: var(--r-sm);
+    padding: 18px 24px; font-size: 20px; color: var(--teal-deep); line-height: 1.5;
+  }
+  .auth-bar svg { width: 26px; height: 26px; flex: none; margin-top: 2px; }
+  .mod-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .mod {
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 26px 28px; min-height: 220px; cursor: pointer; text-align: left;
+    font-family: var(--sans); color: var(--ink);
+    box-shadow: 0 3px 14px rgba(16,48,43,.05);
+  }
+  .mod:active { transform: scale(.985); }
+  .mod .m-icon {
+    width: 64px; height: 64px; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .mod .m-icon svg { width: 34px; height: 34px; }
+  .mod .m-title { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+  .mod .m-title b { font-family: var(--serif); font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .mod .m-tag { font-size: 15px; font-weight: 600; color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); padding: 3px 12px; border-radius: 999px; }
+  .mod p { font-size: 19px; color: var(--muted); line-height: 1.5; margin-top: 4px; flex: 1; }
+  .mod .m-go { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 20px; font-weight: 700; color: var(--teal-deep); }
+  .mod .m-go svg { width: 20px; height: 20px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回首页
+    </button>
+    <div class="titles">
+      <h1>智慧校园</h1>
+      <p>校园场景服务专区 · 本机已开启校园模式</p>
+    </div>
+    <div class="aside">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        本校已开通 6 项服务
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="auth-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+      校方授权的官方校园服务入口。仅信息展示与指引,不在本终端采集任何个人信息。
+    </div>
+
+    <div class="mod-grid">
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 14l8-9 8 9M6 12v8h12v-8M10 20v-5h4v5"/></svg></span>
+        <span class="m-title"><b>迎新系统</b><span class="m-tag">官方指引</span></span>
+        <p>报到流程、办事窗口、入学与求职准备,一步一步照着办</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 8h14l-1.5 12h-11zM8 8V6a4 4 0 018 0v2"/></svg></span>
+        <span class="m-title"><b>行李帮运</b><span class="m-tag">合作服务</span></span>
+        <p>合作物流服务入口与服务点说明,新生行李短驳指引</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/></svg></span>
+        <span class="m-title"><b>VR校园</b><span class="m-tag">全景导览</span></span>
+        <p>360° 云游校园与重点场馆介绍,先认路再报到</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+        <span class="m-title"><b>校园卡办理</b><span class="m-tag">办理指引</span></span>
+        <p>新生办卡、补卡、挂失后快速办理,材料与窗口一次讲清</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="14" r="4"/><path d="M10.5 11.5L20 2M15 7l3 3M18 4l2 2"/></svg></span>
+        <span class="m-title"><b>一卡通开通</b><span class="m-tag">办理指引</span></span>
+        <p>开通食堂、门禁、图书馆等校园通行权限与自助圈存</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+
+      <button class="mod">
+        <span class="m-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 9a15 15 0 0120 0M5.5 12.5a10 10 0 0113 0M9 16a5 5 0 016 0M12 20h.01"/></svg></span>
+        <span class="m-title"><b>校园网开通</b><span class="m-tag">办理指引</span></span>
+        <p>激活校园 Wi-Fi、宿舍网络与上网账号,套餐选择说明</p>
+        <span class="m-go">进入<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </button>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      实际办理请前往现场服务窗口或学校官方自助平台;校园大数据模块暂未开放,开放前不展示任何统计数据。
+    </div>
+
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

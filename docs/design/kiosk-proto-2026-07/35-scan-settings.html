@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>材料扫描 · 扫描指引</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .guide-card { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .g-list { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0; }
+  .g-item { flex: 1; display: flex; align-items: center; gap: 20px; padding: 16px 4px; border-bottom: 1px dashed var(--line); }
+  .g-item:last-child { border-bottom: none; }
+  .g-item .n {
+    width: 52px; height: 52px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep); font-size: 24px; font-weight: 700;
+  }
+  .g-item .g-body b { display: block; font-size: 23px; font-weight: 700; }
+  .g-item .g-body p { font-size: 18px; color: var(--muted); margin-top: 5px; line-height: 1.55; }
+  .side-col { width: 420px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .sess-card { padding: 18px 22px; }
+  .sess-card .s-state { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .sess-card .s-state .dot2 {
+    width: 14px; height: 14px; border-radius: 50%; background: var(--teal);
+    box-shadow: 0 0 0 5px rgba(31,158,134,.18);
+  }
+  .sess-card .s-state b { font-size: 20px; font-weight: 700; color: var(--teal-deep); }
+  .i-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px dashed var(--line); }
+  .i-row:last-child { border-bottom: none; }
+  .i-row .k { font-size: 17.5px; color: var(--muted); flex: none; }
+  .i-row .v { font-size: 18.5px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .place-card { padding: 18px 22px; }
+  .place-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 12px; }
+  .place-row { display: flex; gap: 14px; }
+  .place {
+    flex: 1; display: flex; flex-direction: column; gap: 8px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 14px 16px;
+  }
+  .place b { font-size: 18px; font-weight: 700; }
+  .place p { font-size: 15.5px; color: var(--muted); line-height: 1.5; }
+  .tips-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .tips-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .tip { flex: 1; display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+  .tip:last-child { border-bottom: none; }
+  .tip svg { width: 20px; height: 20px; flex: none; margin-top: 2px; color: var(--wheat-deep); }
+  .tip p { font-size: 16.5px; line-height: 1.5; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:25</span>
+      <span class="status-chip"><span class="dot"></span>扫描仪就绪</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      上一步
+    </button>
+    <div class="titles">
+      <h1>扫描指引</h1>
+      <p>扫描任务已创建,请按下方指引在打印机上操作</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">选择类型</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">2</span><span class="s-label">扫描指引</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">扫描中</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">完成</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:打印机操作指引 -->
+      <section class="card accented a-teal guide-card">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2z"/><path d="M7 7l2-3h6l2 3M4 12h16"/></svg></span>
+          <div><h2>请到打印机操作面板依次操作</h2><div class="sub">以下步骤以本机实际下发的指引为准,操作完成后回到屏幕前等待</div></div>
+        </div>
+        <div class="g-list">
+          <div class="g-item">
+            <span class="n">1</span>
+            <div class="g-body"><b>放好原件</b><p>多页材料正面朝上放入顶部输稿器;单页证书掀开上盖,正面朝下对齐玻璃板左上角</p></div>
+          </div>
+          <div class="g-item">
+            <span class="n">2</span>
+            <div class="g-body"><b>在面板上选择「扫描」</b><p>点按打印机屏幕上的扫描功能,按面板提示选择本机对应的接收目录</p></div>
+          </div>
+          <div class="g-item">
+            <span class="n">3</span>
+            <div class="g-body"><b>按「开始」键发起扫描</b><p>输稿器会自动逐页进纸;平板扫描每页需手动更换原件后再按开始</p></div>
+          </div>
+          <div class="g-item">
+            <span class="n">4</span>
+            <div class="g-body"><b>回到本屏幕点击「开始等待」</b><p>本机会自动检测扫描结果并生成 PDF 文件,请勿离开</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右:任务信息 + 放置提示 + 注意事项 -->
+      <div class="side-col">
+        <section class="card accented a-teal sess-card">
+          <div class="s-state"><span class="dot2"></span><b>扫描任务已创建,等待打印机端操作</b></div>
+          <div class="i-row"><span class="k">扫描类型</span><span class="v">简历扫描</span></div>
+          <div class="i-row"><span class="k">任务编号</span><span class="v">S-20260717-0018</span></div>
+          <div class="i-row"><span class="k">任务有效期</span><span class="v">10 分钟内有效</span></div>
+          <div class="i-row"><span class="k">输出格式</span><span class="v">PDF(自动生成)</span></div>
+        </section>
+
+        <section class="card place-card">
+          <b class="hd">原件放置位置</b>
+          <div class="place-row">
+            <div class="place"><b>输稿器(多页)</b><p>正面朝上放入顶部输稿器,一次最多 50 页</p></div>
+            <div class="place"><b>玻璃板(单页)</b><p>正面朝下对齐左上角,适合证书、证件</p></div>
+          </div>
+        </section>
+
+        <section class="card tips-card">
+          <b class="hd">注意事项</b>
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>
+            <p>扫描前请取下订书钉、回形针并抚平折角,避免卡纸或图像歪斜。</p>
+          </div>
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <p>任务超时未收到扫描结果会自动结束,可返回重新创建。</p>
+          </div>
+          <div class="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+            <p>点击「返回」将取消本次扫描任务,不会保留任何文件。</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回(取消任务)
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 500px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 12.5l5 5 10-11"/></svg>
+      我已在打印机上操作,开始等待
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI参会准备单 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; }
+  .summary { font-size: 21px; line-height: 1.6; color: var(--ink); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+  .co-pick { display: flex; flex-direction: column; gap: 12px; }
+  .co-pick .cp {
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); border-radius: var(--r-sm);
+    padding: 16px 20px;
+  }
+  .co-pick .cp-top { display: flex; align-items: center; gap: 12px; }
+  .co-pick .cp-top b { font-size: 22px; font-weight: 700; color: var(--wheat-deep); }
+  .co-pick .cp-top .chip { background: var(--surface); }
+  .co-pick .cp p { margin-top: 8px; font-size: 17px; color: var(--muted); line-height: 1.5; }
+  .checklist { display: flex; flex-direction: column; gap: 12px; }
+  .ck { display: flex; align-items: flex-start; gap: 14px; font-size: 20px; line-height: 1.45; }
+  .ck .box {
+    width: 34px; height: 34px; flex: none; margin-top: 1px; border-radius: 8px;
+    border: 2px solid var(--line); background: var(--surface);
+  }
+  .bullets { display: flex; flex-direction: column; gap: 12px; }
+  .bullets .bu { display: flex; align-items: flex-start; gap: 14px; font-size: 20px; line-height: 1.5; color: var(--ink); }
+  .bullets .bu i {
+    width: 12px; height: 12px; flex: none; margin-top: 10px; border-radius: 4px; background: var(--wheat);
+  }
+  .based { display: flex; flex-wrap: wrap; gap: 12px; margin-top: auto; }
+  .tips-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .tips-row .tip { display: flex; align-items: flex-start; gap: 12px; background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); border-radius: var(--r-sm); padding: 14px 18px; font-size: 19px; line-height: 1.45; }
+  .tips-row .tip i { width: 12px; height: 12px; flex: none; margin-top: 9px; border-radius: 4px; background: var(--wheat); }
+  /* QA终审:压缩卡片纵向空间,消除卡内内容裁切 */
+  .content .card { padding-top: 17px; padding-bottom: 17px; }
+  .content { gap: 14px; }
+  .content .card-head { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>AI参会准备单</h1>
+      <p>2026年夏季高校毕业生招聘会 · 120 家企业 / 860 个岗位</p>
+    </div>
+    <div class="aside">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.8L18 9.5l-4.2 1.7L12 16l-1.8-4.8L6 9.5l4.2-1.7z"/><path d="M19 15l.9 2.3 2.1.9-2.1.9L19 21l-.9-1.9-2.1-.9 2.1-.9z"/></svg>
+        基于本人已诊断简历生成
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本准备单仅供本人参会准备参考;活动预约、岗位办理和结果均以来源平台为准,本系统不接收简历。
+    </div>
+
+    <!-- 总览 -->
+    <section class="card accented a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6zM14 3v6h6"/></svg></span>
+        <div><h2>总览</h2><div class="sub">结合你的简历方向(机械 / 嵌入式)与本场公开信息</div></div>
+      </div>
+      <p class="summary">你的简历以机械设计与嵌入式开发经历为主。本场智能制造与电子信息类企业占比过半,建议优先走 A区综合技术与 B区智能制造展位,预留 30 分钟到现场打印服务点补齐简历材料。</p>
+    </section>
+
+    <div class="two-col">
+      <!-- 现场优先了解企业 -->
+      <section class="card a-wheat">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg></span>
+          <div><h2>现场优先了解企业</h2><div class="sub">按与简历方向匹配程度排序</div></div>
+        </div>
+        <div class="co-pick">
+          <div class="cp">
+            <div class="cp-top"><b>华辰科技</b><span class="chip">展位 A12</span></div>
+            <p>机械工程师与嵌入式岗位与你的项目经历方向一致,面向应届生开放培养岗位。</p>
+          </div>
+          <div class="cp">
+            <div class="cp-top"><b>启明电子</b><span class="chip">展位 B03</span></div>
+            <p>嵌入式与测试类岗位数量多,你的单片机课程设计经历可作现场展示重点。</p>
+          </div>
+          <div class="cp">
+            <div class="cp-top"><b>恒瑞精密仪器</b><span class="chip">展位 A05</span></div>
+            <p>机械 / 电气复合岗位,规模较小但方向对口,可作为对比选择。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 参会前准备清单 -->
+      <section class="card a-wheat">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg></span>
+          <div><h2>参会前准备清单</h2><div class="sub">出发前逐项核对</div></div>
+        </div>
+        <div class="checklist">
+          <div class="ck"><span class="box"></span>打印 5 份最新版简历(本机可办,黑白 A4)</div>
+          <div class="ck"><span class="box"></span>在来源平台完成本场预约并保存入场凭证</div>
+          <div class="ck"><span class="box"></span>准备 1 分钟自我介绍,突出机械 + 嵌入式项目</div>
+          <div class="ck"><span class="box"></span>整理课程设计 / 实习作品照片存入手机</div>
+          <div class="ck"><span class="box"></span>规划路线:地铁 2 号线人才市场站 B 口</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="two-col">
+      <!-- 本场看点 -->
+      <section class="card a-wheat">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.8L18 9.5l-4.2 1.7L12 16l-1.8-4.8L6 9.5l4.2-1.7z"/></svg></span>
+          <div><h2>本场看点</h2></div>
+        </div>
+        <div class="bullets">
+          <div class="bu"><i></i>智能制造展区集中 36 家企业,应届生岗位占比高</div>
+          <div class="bu"><i></i>数字经济展区首次设立,含 AI 与数据服务岗位</div>
+          <div class="bu"><i></i>现场设政策咨询与打印服务点,可即时补材料</div>
+        </div>
+      </section>
+
+      <!-- 现场可咨询问题 -->
+      <section class="card a-wheat">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 115 0c0 1.6-2.5 2-2.5 3.5M12 17v.5"/></svg></span>
+          <div><h2>现场可咨询问题</h2></div>
+        </div>
+        <div class="bullets">
+          <div class="bu"><i></i>应届生培养机制与转正周期是怎样安排的?</div>
+          <div class="bu"><i></i>岗位常驻工作地点与出差频率如何?</div>
+          <div class="bu"><i></i>后续面试流程是否在来源平台统一通知?</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 现场提醒 -->
+    <section class="card a-wheat">
+      <div class="card-head" style="margin-bottom:14px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <div><h2>现场提醒</h2><div class="sub">AI 生成,仅供参考</div></div>
+      </div>
+      <div class="tips-row">
+        <div class="tip"><i></i>开场后 1 小时人流最集中,重点展位建议错峰前往</div>
+        <div class="tip"><i></i>与企业交流后记下岗位名称,回来源平台核对后再投递</div>
+        <div class="tip"><i></i>简历不足可到场内打印服务点即时补印</div>
+      </div>
+    </section>
+
+    <div class="based">
+      <span class="chip src">来源机构 · 市就业服务中心</span>
+      <span class="chip">依据 · 本人已诊断简历(今天 09:58)</span>
+      <span class="chip">依据 · 本场公开快照(同步 2026-07-17 08:30)</span>
+      <span class="chip">外部ID <b>FAIR-2071</b></span>
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回详情
+    </button>
+    <div class="spacer"></div>
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>
+      重新生成
+    </button>
+    <button class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印准备单
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI面试训练 · 答题现场</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .prog-card { flex: none; display: flex; align-items: center; gap: 24px; }
+  .prog-card .p-num { font-family: var(--serif); font-size: 34px; font-weight: 900; white-space: nowrap; }
+  .prog-card .p-num small { font-size: 21px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+  .prog-card .progress { flex: 1; }
+  .prog-card .p-fill { background: linear-gradient(90deg, var(--plum), #8d6c99); }
+  .timer-chip {
+    display: inline-flex; align-items: center; gap: 10px; white-space: nowrap;
+    background: var(--plum-soft); border: 1px solid rgba(122,90,134,.35);
+    color: var(--plum-deep); font-size: 22px; font-weight: 700;
+    font-variant-numeric: tabular-nums; padding: 12px 22px; border-radius: 999px;
+  }
+  .timer-chip svg { width: 22px; height: 22px; }
+  /* 面试官提问卡:身份 + 播报状态 */
+  .q-card { flex: none; }
+  .iv-status { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+  .iv-status .wave { display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+  .iv-status .wave i { width: 4px; border-radius: 2px; background: var(--plum); opacity: .75; }
+  .iv-status .wave i:nth-child(1) { height: 10px; } .iv-status .wave i:nth-child(2) { height: 20px; }
+  .iv-status .wave i:nth-child(3) { height: 14px; } .iv-status .wave i:nth-child(4) { height: 22px; }
+  .iv-status .wave i:nth-child(5) { height: 9px; }
+  .iv-status span { font-size: 17px; color: var(--plum-deep); font-weight: 600; }
+  .q-card .q-text { font-family: var(--serif); font-size: 38px; font-weight: 900; line-height: 1.45; letter-spacing: 1px; }
+  .q-card .q-prev { margin-top: 14px; font-size: 17px; color: var(--muted); display: flex; gap: 10px; align-items: baseline; }
+  .q-card .q-prev b { flex: none; font-weight: 600; color: var(--plum-deep); }
+  /* 作答区 */
+  .ans-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .ans-card .a-status { margin-left: auto; font-size: 17px; color: var(--muted); }
+  .ans-card textarea {
+    flex: 1; width: 100%; resize: none;
+    padding: 22px; font-size: 25px; line-height: 1.7; font-family: var(--sans); color: var(--ink);
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .ans-card textarea:focus { outline: 2px solid var(--plum); border-color: transparent; }
+  .ans-foot { flex: none; display: flex; align-items: center; gap: 18px; margin-top: 18px; }
+  .mic-btn {
+    width: 88px; height: 88px; flex: none; border-radius: 50%; cursor: pointer;
+    display: grid; place-items: center;
+    background: var(--surface); border: 2px solid var(--line); color: var(--plum-deep);
+  }
+  .mic-btn:active { transform: scale(.96); }
+  .mic-btn svg { width: 38px; height: 38px; }
+  .ans-foot .m-tip { font-size: 17px; color: var(--muted); line-height: 1.5; }
+  .ans-foot .priv { margin-left: auto; flex: none; font-size: 15.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; max-width: 300px; line-height: 1.4; }
+  .ans-foot .priv svg { width: 18px; height: 18px; flex: none; color: var(--wheat); }
+  .end-btn {
+    background: none; border: none; cursor: pointer; font-family: var(--sans);
+    min-height: 88px; padding: 0 26px;
+    font-size: 23px; color: var(--muted); text-decoration: underline; text-underline-offset: 6px;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 会话进行中不提供普通返回,离开只能走「结束练习」二次确认 -->
+  <div class="pagehead">
+    <div class="titles">
+      <h1>模拟面试 · 行政专员</h1>
+      <p>模拟练习,仅供参考 · 按自己的真实经历作答即可</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">语音回答可用</span>
+      <span class="chip">官方语音播报</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 进度:整场剩余时间倒计时 -->
+    <section class="card prog-card a-plum">
+      <span class="p-num">第 2 题<small>/ 目标 5 题</small></span>
+      <div class="progress"><div class="p-fill" style="width: 40%;"></div></div>
+      <span class="timer-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+        本场剩余 03:36
+      </span>
+    </section>
+
+    <!-- 面试官提问 -->
+    <section class="card accented a-plum q-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg></span>
+        <div><h2>HR 初筛 · AI 面试官</h2><div class="sub">经历类问题 · 建议用 STAR 法则作答</div></div>
+        <span class="iv-status">
+          <span class="wave"><i></i><i></i><i></i><i></i><i></i></span>
+          <span>本题已提问完毕</span>
+        </span>
+      </div>
+      <div class="q-text">「请介绍一次你解决同事间分歧的经历。」</div>
+      <div class="q-prev"><b>上一题</b>请做一个简短的自我介绍。(已作答)</div>
+    </section>
+
+    <!-- 作答区 -->
+    <section class="card accented a-plum ans-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M5 16l10.5-10.5a2.1 2.1 0 013 3L8 19l-4 1z"/></svg></span>
+        <div><h2>我的回答</h2><div class="sub">文字输入,或用麦克风语音作答</div></div>
+        <span class="a-status">作答中 · 文字输入</span>
+      </div>
+      <textarea>在上一份工作中,两位同事曾因活动物料的排期先后产生分歧,互相不肯让步。
+我先分别听了两边的时间安排,把关键节点列成一张对照表,再约大家一起对着表商量……</textarea>
+      <div class="ans-foot">
+        <button class="mic-btn" aria-label="开始录音">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
+        </button>
+        <span class="m-tip">点击麦克风<b>开始录音</b>,再点一次结束;<br>转写成文字后可修改确认再提交。麦克风不可用时可继续文字作答。</span>
+        <span class="priv">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 4v5c0 4.4-3 8.2-7 9-4-0.8-7-4.6-7-9V7z"/><path d="M9.5 12l1.8 1.8 3.4-3.4"/></svg>
+          对话仅用于生成练习报告,不会发送给任何企业
+        </span>
+      </div>
+    </section>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 5l7 7-7 7M13 5l7 7-7 7"/></svg>
+      跳过此题
+    </button>
+    <button class="end-btn">结束练习(需再次确认)</button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 400px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12l5 5 9-10"/></svg>
+      提交本题
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

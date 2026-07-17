@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历诊断 · 诊断报告</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 14px; }
+  .actionbar .btn { white-space: nowrap; }
+  .actionbar { padding-left: 40px; padding-right: 40px; gap: 16px; }
+  /* 总评卡:分数 + 雷达 + 报告说明 */
+  .score-card { padding: 18px 26px 18px; }
+  .score-card .card-head { margin-bottom: 12px; }
+  .score-card .s-body { display: flex; align-items: stretch; gap: 26px; padding: 0; }
+  .score-block {
+    flex: none; width: 250px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 10px 0;
+  }
+  .score-block .num {
+    font-family: var(--serif); font-size: 68px; font-weight: 900; line-height: 1;
+    color: var(--teal-deep); font-variant-numeric: tabular-nums;
+  }
+  .score-block .num small { font-size: 24px; font-weight: 700; color: var(--muted); }
+  .score-block .cap { font-size: 15px; color: var(--muted); text-align: center; line-height: 1.45; padding: 0 14px; }
+  .radar-block { flex: none; width: 360px; display: grid; place-items: center; }
+  .radar-block svg { width: 360px; height: 224px; }
+  .radar-block text { font-family: var(--sans); font-size: 16.5px; fill: var(--muted); }
+  .radar-block text.v { font-weight: 700; fill: var(--teal-deep); }
+  .rnotes { flex: 1; display: flex; flex-direction: column; gap: 7px; justify-content: center; }
+  .rnotes .rn-title { font-size: 19px; font-weight: 700; }
+  .rnotes li {
+    list-style: none; display: flex; gap: 10px; align-items: flex-start;
+    font-size: 16.5px; color: var(--muted); line-height: 1.5;
+  }
+  .rnotes li::before { content: ''; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--teal); opacity: .55; margin-top: 7px; }
+  .rnotes li.warn::before { background: var(--wheat); }
+  .rnotes li.warn { color: var(--wheat-deep); }
+  /* 双列区 */
+  .two-col { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .two-col .card { display: flex; flex-direction: column; }
+  .two-col .card-head { margin-bottom: 14px; }
+  .two-col h2 { font-size: 27px; }
+  .dims { display: flex; flex-direction: column; gap: 15px; }
+  .dim .d-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .dim .d-head b { font-size: 19px; font-weight: 600; }
+  .dim .d-head span { font-size: 19px; font-weight: 700; color: var(--teal-deep); font-variant-numeric: tabular-nums; }
+  .dim .d-head span.low { color: var(--clay-deep); }
+  .progress { height: 15px; }
+  .p-fill.low { background: linear-gradient(90deg, var(--clay), #c97b4e); }
+  /* 优先级 / 建议列表 */
+  .pri-list, .sug-list { display: flex; flex-direction: column; gap: 12px; }
+  .pri {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.25); border-radius: var(--r-sm);
+    padding: 14px 18px;
+  }
+  .pri .no {
+    width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: rgba(169,120,31,.18); color: var(--wheat-deep); font-size: 18px; font-weight: 700;
+  }
+  .pri b { display: block; font-size: 19.5px; font-weight: 700; }
+  .pri span { display: block; font-size: 16.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .sug {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 13px 18px; font-size: 18px; line-height: 1.55;
+  }
+  .sug .no {
+    width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep); font-size: 17px; font-weight: 700;
+  }
+  .risk-list { display: flex; flex-direction: column; gap: 11px; margin-top: 2px; }
+  .risk-list li {
+    list-style: none; display: flex; gap: 10px; align-items: flex-start;
+    font-size: 17.5px; color: var(--ink); line-height: 1.55;
+  }
+  .risk-list li::before { content: ''; width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--clay); opacity: .7; margin-top: 8px; }
+  .foot-compliance { font-size: 15.5px; color: var(--muted); text-align: center; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>诊断报告</h1>
+      <p>基于已有内容的 AI 分析结果(仅供参考)</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip">文件 <b>王雨晴-行政专员-简历.pdf</b></span>
+      <span class="chip ok">目标方向 <b>行政专员 · 现代服务 · 1-3年 · 社招</b></span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传与方向</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">AI解析</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">3</span><span class="s-label">诊断报告</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">优化打印</span></div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 总评:分数 + 能力雷达 + 报告说明 -->
+    <section class="card accented a-teal score-card">
+      <div class="s-body">
+        <div class="score-block">
+          <div class="num">420<small> /600</small></div>
+          <span class="cap">参考评分,由 6 个分项汇总<br>不代表真实招聘结果</span>
+        </div>
+        <div class="radar-block">
+          <svg viewBox="0 0 430 268">
+            <g transform="translate(215,134)">
+              <polygon points="0,-95 82,-47 82,47 0,95 -82,47 -82,-47" fill="none" stroke="var(--line)"/>
+              <polygon points="0,-63 55,-31 55,31 0,63 -55,31 -55,-31" fill="none" stroke="var(--line)"/>
+              <polygon points="0,-32 28,-16 28,16 0,32 -28,16 -28,-16" fill="none" stroke="var(--line)"/>
+              <path d="M0,-95L0,95M-82,-47L82,47M-82,47L82,-47" stroke="var(--line)" stroke-width=".7"/>
+              <polygon points="0,-84 61,-35 54,31 0,49 -50,29 -65,-37" fill="rgba(31,158,134,.22)" stroke="var(--teal)" stroke-width="2.5"/>
+              <circle cx="0" cy="-84" r="4" fill="var(--teal)"/><circle cx="61" cy="-35" r="4" fill="var(--teal)"/>
+              <circle cx="54" cy="31" r="4" fill="var(--teal)"/><circle cx="0" cy="49" r="4" fill="var(--teal)"/>
+              <circle cx="-50" cy="29" r="4" fill="var(--teal)"/><circle cx="-65" cy="-37" r="4" fill="var(--teal)"/>
+              <text x="0" y="-108" text-anchor="middle">基础信息完整度 <tspan class="v">88</tspan></text>
+              <text x="92" y="-50" text-anchor="start">求职目标清晰度 <tspan class="v">74</tspan></text>
+              <text x="92" y="58" text-anchor="start">经历表达清晰度 <tspan class="v">66</tspan></text>
+              <text x="0" y="118" text-anchor="middle">成果量化程度 <tspan class="v">52</tspan></text>
+              <text x="-92" y="58" text-anchor="end">岗位关键词覆盖 <tspan class="v">61</tspan></text>
+              <text x="-92" y="-50" text-anchor="end">版式与可读性 <tspan class="v">79</tspan></text>
+            </g>
+          </svg>
+        </div>
+        <ul class="rnotes">
+          <li style="list-style:none;display:block" class="rn-title">报告说明</li>
+          <li>本报告仅基于上传文件中可解析出的内容生成,供本人修改简历时参考。</li>
+          <li>报告不会发送给企业,也不代表录用、面试或投递结果。</li>
+          <li class="warn">本简历经文字识别(OCR)提取,识别置信度中等;第 2 页表格区文字可能存在误差,建议逐项人工复核。</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="two-col" style="flex:none">
+      <!-- 分项评估 -->
+      <section class="card a-teal">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></span>
+          <div><h2>分项评估</h2><div class="sub">6 个固定维度 · 各 100 分</div></div>
+        </div>
+        <div class="dims">
+          <div class="dim"><div class="d-head"><b>基础信息完整度</b><span>88 / 100</span></div><div class="progress"><div class="p-fill" style="width:88%"></div></div></div>
+          <div class="dim"><div class="d-head"><b>求职目标清晰度</b><span>74 / 100</span></div><div class="progress"><div class="p-fill" style="width:74%"></div></div></div>
+          <div class="dim"><div class="d-head"><b>经历表达清晰度</b><span>66 / 100</span></div><div class="progress"><div class="p-fill" style="width:66%"></div></div></div>
+          <div class="dim"><div class="d-head"><b>成果量化程度</b><span class="low">52 / 100</span></div><div class="progress"><div class="p-fill low" style="width:52%"></div></div></div>
+          <div class="dim"><div class="d-head"><b>岗位关键词覆盖</b><span class="low">61 / 100</span></div><div class="progress"><div class="p-fill low" style="width:61%"></div></div></div>
+          <div class="dim"><div class="d-head"><b>版式与可读性</b><span>79 / 100</span></div><div class="progress"><div class="p-fill" style="width:79%"></div></div></div>
+        </div>
+      </section>
+
+      <!-- 修改优先级建议 -->
+      <section class="card a-wheat">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 17L17 7M17 7H9M17 7v8"/></svg></span>
+          <div><h2>修改优先级建议</h2><div class="sub">按重要性排序,供本人修改简历参考</div></div>
+        </div>
+        <div class="pri-list">
+          <div class="pri"><span class="no">1</span><div><b>优先补充可量化的工作成果</b><span>三段经历均无数据佐证;建议补充台账节约成本比例、会务场次与覆盖人数等具体数字。</span></div></div>
+          <div class="pri"><span class="no">2</span><div><b>对齐行政专员岗位关键词</b><span>「固定资产管理」「差旅报销」「档案编号规范」等岗位常见词未出现,建议按真实经历补充。</span></div></div>
+          <div class="pri"><span class="no">3</span><div><b>压缩教育背景篇幅</b><span>教育经历占近 1/3 版面,建议压缩为两行,把空间留给工作经历与成果。</span></div></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="two-col" style="flex:none">
+      <!-- 风险表述提醒 -->
+      <section class="card a-clay">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg></span>
+          <div><h2>风险表述提醒</h2><div class="sub">仅针对简历文本表达,不涉及身份信息判断</div></div>
+        </div>
+        <ul class="risk-list">
+          <li>「精通各类办公软件」表述过强,建议改为可验证的水平描述,如「熟练使用 Excel 数据透视表与函数」。</li>
+          <li>两段工作经历时间存在 3 个月重叠(2023.06 - 2023.09),建议核对起止时间后统一。</li>
+          <li>自我评价中「吃苦耐劳、执行力强」为通用形容词,缺乏事实支撑,建议替换为具体事例。</li>
+        </ul>
+      </section>
+
+      <!-- 可执行建议 -->
+      <section class="card a-teal">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5H6a1 1 0 00-1 1v14a1 1 0 001 1h12a1 1 0 001-1V6a1 1 0 00-1-1h-3"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><h2>可执行建议</h2><div class="sub">逐条对照修改,改完可重新诊断对比</div></div>
+        </div>
+        <div class="sug-list">
+          <div class="sug"><span class="no">1</span>每段工作经历至少补充 1 个量化结果(金额、场次、人数、时长均可)。</div>
+          <div class="sug"><span class="no">2</span>技能栏按目标岗位取舍,保留 6-8 项与行政工作直接相关的核心技能。</div>
+          <div class="sug"><span class="no">3</span>个人简介压缩到 3 行以内:年限 + 岗位方向 + 1 个核心成果。</div>
+          <div class="sug"><span class="no">4</span>统一时间格式为「2023.06 - 2024.05」,避免中英文混排。</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      AI 生成内容,仅供参考;评分与建议不构成任何录用承诺,系统不收取求职者简历给企业。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11a8 8 0 10-2.3 5.7M20 11V5m0 6h-6"/></svg>
+      重新诊断
+    </button>
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+      岗位匹配参考
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 340px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+      查看优化建议
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

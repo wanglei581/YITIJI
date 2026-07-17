@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历诊断 · AI解析中</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .center-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .parse-card {
+    width: 860px; display: flex; flex-direction: column; align-items: center;
+    padding: 46px 56px 40px; gap: 26px;
+  }
+  .ring-box { position: relative; width: 250px; height: 250px; }
+  .ring-box svg { width: 100%; height: 100%; }
+  .ring-num {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-family: var(--serif); font-size: 54px; font-weight: 900; color: var(--teal-deep);
+  }
+  .ring-num small { font-size: 24px; font-weight: 700; margin-left: 4px; }
+  .parse-title { font-family: var(--serif); font-size: 34px; font-weight: 700; letter-spacing: 2px; }
+  .file-chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: -10px; }
+  .p-steps { width: 100%; display: flex; flex-direction: column; gap: 13px; }
+  .p-step {
+    display: flex; align-items: center; gap: 18px;
+    min-height: 70px; padding: 0 26px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .p-step .s-dot {
+    width: 42px; height: 42px; flex: none; border-radius: 50%;
+    display: grid; place-items: center; font-size: 19px; font-weight: 700;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+  }
+  .p-step b { font-size: 22px; font-weight: 600; }
+  .p-step em { font-style: normal; font-size: 16.5px; color: var(--muted); margin-left: 12px; }
+  .p-step .state { margin-left: auto; font-size: 18px; color: var(--muted); }
+  .p-step.done .s-dot { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+  .p-step.done .state { color: var(--teal-deep); font-weight: 600; }
+  .p-step.active { border-color: rgba(31,158,134,.45); background: var(--teal-soft); }
+  .p-step.active .s-dot { background: var(--teal); border-color: var(--teal); color: #fffdf8; }
+  .p-step.active .state { color: var(--teal-deep); font-weight: 600; }
+  .p-step.todo { opacity: .6; }
+  .p-step .s-dot svg { width: 20px; height: 20px; }
+  /* 6 维度点亮 */
+  .dim-lights { width: 100%; }
+  .dim-lights .dl-title { font-size: 18px; color: var(--muted); margin-bottom: 12px; }
+  .dl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .dl {
+    min-height: 58px; display: grid; place-items: center; padding: 6px 10px; text-align: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-size: 17.5px; font-weight: 600; color: var(--muted);
+  }
+  .dl.lit { background: var(--teal-soft); border-color: rgba(31,158,134,.35); color: var(--teal-deep); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <div class="titles">
+      <h1>AI 正在分析</h1>
+      <p>正在读取你上传的简历文件,处理中请勿离开</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传与方向</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">2</span><span class="s-label">AI解析</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">诊断报告</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">优化打印</span></div>
+  </div>
+
+  <main class="content a-teal">
+    <div class="center-wrap">
+      <section class="card accented a-teal parse-card">
+        <div class="ring-box">
+          <svg viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="88" fill="none" stroke="var(--line)" stroke-width="13"/>
+            <circle cx="100" cy="100" r="88" fill="none" stroke="var(--teal)" stroke-width="13"
+                    stroke-linecap="round" stroke-dasharray="414 552.9" transform="rotate(-90 100 100)"/>
+          </svg>
+          <span class="ring-num">3<small>/4 步</small></span>
+        </div>
+        <div class="parse-title">正在提取简历结构…</div>
+        <div class="file-chips">
+          <span class="chip">文件 <b>王雨晴-行政专员-简历.pdf</b></span>
+          <span class="chip">486 KB · 云端上传</span>
+          <span class="chip ok">方向 <b>行政专员 · 现代服务 · 1-3年 · 社招</b></span>
+        </div>
+
+        <div class="p-steps">
+          <div class="p-step done">
+            <span class="s-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>
+            <b>读取上传文件</b><em>校验格式与页数</em>
+            <span class="state">已完成</span>
+          </div>
+          <div class="p-step done">
+            <span class="s-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>
+            <b>识别可解析文字</b><em>图片 / 扫描件经 OCR 识别</em>
+            <span class="state">已完成</span>
+          </div>
+          <div class="p-step active">
+            <span class="s-dot">3</span>
+            <b>提取简历结构</b><em>识别教育、经历、技能等分区</em>
+            <span class="state">进行中…</span>
+          </div>
+          <div class="p-step todo">
+            <span class="s-dot">4</span>
+            <b>生成诊断报告</b><em>6 个评分维度 + 风险表述 + 优先级建议</em>
+            <span class="state">待处理</span>
+          </div>
+        </div>
+
+        <div class="dim-lights">
+          <div class="dl-title">评分维度准备进度(逐项点亮)</div>
+          <div class="dl-grid">
+            <span class="dl lit">基础信息完整度</span>
+            <span class="dl lit">求职目标清晰度</span>
+            <span class="dl lit">经历表达清晰度</span>
+            <span class="dl lit">成果量化程度</span>
+            <span class="dl">岗位关键词覆盖</span>
+            <span class="dl">版式与可读性</span>
+          </div>
+        </div>
+
+        <div class="notice" style="width:100%">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          解析通常在 1 分钟内完成,处理中请勿离开;若文件格式不支持、文字识别失败或服务暂不可用,将如实提示失败原因,可重试或重新上传。诊断结果由 AI 生成,仅供参考。
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <div class="notice" style="flex:1; border:none; background:none; padding:0;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 4v5c0 4.4-3 8.2-7 9-4-0.8-7-4.6-7-9V7z"/><path d="M9.5 12l1.8 1.8 3.4-3.4"/></svg>
+      简历原文仅用于本次解析和诊断,不会发送给任何企业,也不作为平台简历库沉淀。
+    </div>
+    <button class="btn ghost sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      取消解析
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

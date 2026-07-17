@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 打印前材料检查</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .left-col { width: 360px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .right-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .file-card { display: flex; align-items: center; gap: 16px; padding: 22px 24px; }
+  .file-card .f-icon {
+    width: 56px; height: 56px; flex: none; border-radius: 14px;
+    display: grid; place-items: center; background: var(--slate-soft); color: var(--slate-deep);
+  }
+  .file-card .f-icon svg { width: 30px; height: 30px; }
+  .file-card b { display: block; font-size: 22px; font-weight: 700; word-break: break-all; }
+  .file-card span { display: block; font-size: 17px; color: var(--muted); margin-top: 5px; }
+  .check-step {
+    flex: 1; display: flex; align-items: center; gap: 14px; padding: 16px 20px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .check-step .cs-dot {
+    width: 46px; height: 46px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .check-step .cs-dot svg { width: 24px; height: 24px; }
+  .check-step b { font-size: 20px; font-weight: 700; }
+  .check-step span { display: block; font-size: 15.5px; color: var(--muted); margin-top: 2px; }
+  .priv-note {
+    flex: 1; display: flex; align-items: center;
+    padding: 16px 20px; border-radius: 12px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3);
+    font-size: 16.5px; line-height: 1.55; color: var(--teal-deep);
+  }
+  .result-banner {
+    display: flex; align-items: center; gap: 14px; padding: 18px 24px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.35); border-radius: var(--r-sm);
+  }
+  .result-banner svg { width: 32px; height: 32px; flex: none; color: var(--teal-deep); }
+  .result-banner b { font-size: 22px; font-weight: 700; color: var(--teal-deep); }
+  .result-banner span { display: block; font-size: 17px; color: var(--teal-deep); margin-top: 3px; opacity: .85; }
+  .sum-card { padding: 18px 24px; }
+  .sum-card .s-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .sum-card .s-head b { font-size: 21px; font-weight: 700; }
+  .sum-card .s-head span { font-size: 16px; color: var(--muted); margin-top: 3px; display: block; }
+  .find-card { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 18px 24px; }
+  .find-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .find-head b { font-size: 21px; font-weight: 700; }
+  .batch { display: flex; gap: 12px; }
+  .batch button {
+    min-height: 56px; padding: 0 22px; border-radius: 12px; cursor: pointer;
+    font-family: var(--sans); font-size: 18px; font-weight: 600;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35); color: var(--wheat-deep);
+  }
+  .batch button.plain { background: var(--surface); border-color: var(--line); color: var(--ink); }
+  .finding { flex: 1; display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px dashed var(--line); }
+  .finding .fd-main { flex: 1; min-width: 0; }
+  .finding .fd-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; }
+  .risk { font-size: 16px; font-weight: 600; border-radius: 999px; padding: 4px 12px; }
+  .risk.hi { background: var(--error-soft); color: var(--error); }
+  .risk.mid { background: var(--wheat-soft); color: var(--wheat-deep); }
+  .risk.lo { background: var(--teal-soft); color: var(--teal-deep); }
+  .finding .fd-rows { margin-top: 8px; font-size: 17.5px; color: var(--muted); line-height: 1.6; }
+  .finding .fd-rows b { color: var(--ink); font-weight: 600; }
+  .fd-acts { flex: none; display: flex; gap: 10px; align-items: center; }
+  .fd-acts button {
+    min-width: 108px; min-height: 62px; border-radius: 12px; cursor: pointer;
+    font-family: var(--sans); font-size: 18px; font-weight: 700;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+  }
+  .fd-acts button.on-redact { background: var(--wheat-soft); border-color: var(--wheat); color: var(--wheat-deep); }
+  .fd-acts button.on-keep { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      重新上传
+    </button>
+    <div class="titles">
+      <h1>打印前材料检查</h1>
+      <p>仅用于本次打印前确认;扫描件 / 图片可能通过第三方 OCR 服务识别文字</p>
+    </div>
+  </div>
+
+  <!-- 步骤条(与真实流程一致) -->
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:文件 + 检查步骤 -->
+      <div class="left-col">
+        <section class="card accented a-slate file-card">
+          <span class="f-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg></span>
+          <div><b>个人简历_王同学.pdf</b><span>2.1 MB · 3 页</span></div>
+        </section>
+
+        <div class="check-step">
+          <span class="cs-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg></span>
+          <div><b>文件体检</b><span>格式、页数、可打印性检查完成</span></div>
+        </div>
+        <div class="check-step">
+          <span class="cs-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg></span>
+          <div><b>A4 规范化评估</b><span>版式适配 A4 评估完成</span></div>
+        </div>
+        <div class="check-step">
+          <span class="cs-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.5 12.5l5 5 10-11"/></svg></span>
+          <div><b>隐私片段检查</b><span>发现 4 个需确认片段</span></div>
+        </div>
+
+        <div class="priv-note">
+          文档文字层可本地读取;扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段,不展示完整原文。
+        </div>
+      </div>
+
+      <!-- 右:检查结果 + 隐私决策 -->
+      <div class="right-col">
+        <div class="result-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5.5-6.5"/></svg>
+          <div><b>检查完成</b><span>发现 4 个需确认片段,请逐项选择保留或遮挡</span></div>
+        </div>
+
+        <section class="card sum-card">
+          <div class="s-head">
+            <div><b>文件体检摘要</b><span>3 页 · 格式正常,可继续打印</span></div>
+            <span class="chip ok">可继续打印</span>
+          </div>
+        </section>
+
+        <section class="card sum-card">
+          <div class="s-head">
+            <div><b>A4 规范化摘要</b><span>目标纸张 A4 · 当前版本仍使用原文件打印</span></div>
+            <span class="chip ok">已完成评估</span>
+          </div>
+        </section>
+
+        <section class="card accented a-wheat find-card">
+          <div class="find-head">
+            <div><b>隐私片段确认(4 项)</b></div>
+            <div class="batch">
+              <button>按建议处理</button>
+              <button class="plain">全部保留</button>
+            </div>
+          </div>
+
+          <div class="finding" style="border-top:none;">
+            <div class="fd-main">
+              <div class="fd-title">手机号码 <span class="risk mid">中风险</span></div>
+              <div class="fd-rows">片段 <b>138****5678</b> · 建议:确认是否需要遮挡<br>出现位置:第 1 页 联系方式区域</div>
+            </div>
+            <div class="fd-acts">
+              <button>遮挡</button>
+              <button class="on-keep">保留</button>
+            </div>
+          </div>
+
+          <div class="finding">
+            <div class="fd-main">
+              <div class="fd-title">家庭住址 <span class="risk hi">高风险</span></div>
+              <div class="fd-rows">片段 <b>杭州***区**路</b> · 建议:遮挡后再打印<br>出现位置:第 1 页 基本信息区域</div>
+            </div>
+            <div class="fd-acts">
+              <button class="on-redact">遮挡</button>
+              <button>保留</button>
+            </div>
+          </div>
+
+          <div class="finding">
+            <div class="fd-main">
+              <div class="fd-title">电子邮箱 <span class="risk mid">中风险</span></div>
+              <div class="fd-rows">片段 <b>w***@example.com</b> · 建议:确认是否需要遮挡<br>出现位置:第 1 页 联系方式区域</div>
+            </div>
+            <div class="fd-acts">
+              <button>遮挡</button>
+              <button class="on-keep">保留</button>
+            </div>
+          </div>
+
+          <div class="finding">
+            <div class="fd-main">
+              <div class="fd-title">出生日期 <span class="risk lo">低风险</span></div>
+              <div class="fd-rows">片段 <b>19**年**月</b> · 建议:按材料用途确认保留或遮挡<br>出现位置:第 1 页 基本信息区域</div>
+            </div>
+            <div class="fd-acts">
+              <button>遮挡</button>
+              <button class="on-keep">保留</button>
+            </div>
+          </div>
+
+          <div class="notice warn" style="margin-top:auto;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>
+            当前版本会记录你的保留 / 遮挡选择并完成遮挡评估,但尚不生成遮挡后文件;打印仍使用原文件,进入确认页前会再次提示。
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回上传
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 12.5l5 5 10-11"/></svg>
+      进入打印预览 · 遮挡选择已记录
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

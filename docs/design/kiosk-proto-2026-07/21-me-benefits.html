@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 我的权益</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .summary { display: flex; align-items: center; gap: 22px; padding: 20px 30px; }
+  .summary .s-ico { width: 60px; height: 60px; flex: none; border-radius: 15px; display: grid; place-items: center; background: var(--plum-soft); color: var(--plum-deep); }
+  .summary .s-ico svg { width: 32px; height: 32px; }
+  .summary .s-main p { font-size: 20px; color: var(--muted); }
+  .summary .s-main b { display: block; margin-top: 2px; font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .summary .s-note { flex: 1; font-size: 18px; color: var(--muted); line-height: 1.5; padding-left: 8px; }
+  .summary .s-mini { display: flex; gap: 12px; }
+  .summary .s-mini span { font-size: 18px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; }
+  .list { display: flex; flex-direction: column; gap: 14px; }
+  .b-card { display: flex; align-items: flex-start; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 20px 26px; }
+  .b-card.ended { opacity: .62; }
+  .b-card .f-ico { width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--accent-soft, var(--plum-soft)); color: var(--accent-deep, var(--plum-deep)); }
+  .b-card .f-ico svg { width: 30px; height: 30px; }
+  .b-card .b-main { flex: 1; min-width: 0; }
+  .b-card .b-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .b-card .b-title { display: block; margin-top: 8px; font-size: 24px; font-weight: 700; }
+  .b-card .b-desc { margin-top: 6px; font-size: 18px; color: var(--muted); line-height: 1.5; }
+  .b-card .meta { margin-top: 8px; font-size: 17px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .st { font-size: 16px; font-weight: 600; border-radius: 999px; padding: 5px 14px; }
+  .st.ok { background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); }
+  .st.used { background: var(--paper); color: var(--muted); border: 1px solid var(--line); }
+  .st.exp { background: var(--wheat-soft); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.3); }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-plum">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>我的权益</h1>
+      <p>本人优惠券、免费次数、服务额度与政策资格提示</p>
+    </div>
+    <div class="aside">
+      <button class="btn ghost sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg>
+        去权益活动领取
+      </button>
+    </div>
+  </div>
+
+  <main class="content a-plum">
+
+    <!-- 概览 -->
+    <section class="card accented a-plum summary">
+      <span class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span>
+      <div class="s-main"><p>权益口袋</p><b>5</b></div>
+      <div class="s-note">仅展示本人已领取或已发放权益,不接支付、不做核销</div>
+      <div class="s-mini"><span>可用 3</span><span>已结束 2</span></div>
+    </section>
+
+    <!-- 权益列表 -->
+    <div class="list">
+
+      <div class="b-card a-clay">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span>
+        <div class="b-main">
+          <div class="b-top"><span class="chip">优惠券</span><span class="st ok">可用</span></div>
+          <b class="b-title">简历打印 5 折券</b>
+          <p class="b-desc">打印简历类文件时按券面折扣计费,以现场公示价目为准。</p>
+          <p class="meta">剩余 1 / 1 · 2026-07-14 至 2026-07-20</p>
+        </div>
+      </div>
+
+      <div class="b-card a-teal">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+        <div class="b-main">
+          <div class="b-top"><span class="chip">免费次数</span><span class="st used">已用完</span></div>
+          <b class="b-title">模拟面试免费体验次数</b>
+          <p class="b-desc">高校毕业生求职服务月发放,已于 07-12 全部使用。</p>
+          <p class="meta">剩余 0 / 2 · 有效期至 2026-08-31</p>
+        </div>
+      </div>
+
+      <div class="b-card a-wheat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M8 12h8"/></svg></span>
+        <div class="b-main">
+          <div class="b-top"><span class="chip">服务额度</span><span class="st ok">可用</span></div>
+          <b class="b-title">黑白打印页数额度包</b>
+          <p class="b-desc">合作机构活动发放的打印额度,仅限本终端使用。</p>
+          <p class="meta">剩余 14 / 20 · 有效期至 2026-09-30</p>
+        </div>
+      </div>
+
+      <div class="b-card a-slate">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg></span>
+        <div class="b-main">
+          <div class="b-top"><span class="chip">政策资格提示</span><span class="st ok">可用</span></div>
+          <b class="b-title">高校毕业生一次性求职补贴资格提示</b>
+          <p class="b-desc">根据您填写的毕业年份提示可能符合的政策;具体申请与结果以官方渠道为准。</p>
+          <p class="meta">仅作政策资格与官方入口指引 · 有效期以现场公示或活动规则为准</p>
+        </div>
+      </div>
+
+      <div class="b-card ended a-clay">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span>
+        <div class="b-main">
+          <div class="b-top"><span class="chip">优惠券</span><span class="st exp">已过期</span></div>
+          <b class="b-title">春季就业服务集市打印券</b>
+          <p class="b-desc">春季就业服务集市发放的打印优惠券。</p>
+          <p class="meta">一次性权益 · 2026-03-10 至 2026-03-16</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      权益仅用于本终端服务与打印辅助;政策资格提示只提供信息指引,具体办理与结果以官方平台为准。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

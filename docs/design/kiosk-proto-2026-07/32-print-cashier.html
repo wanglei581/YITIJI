@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 订单支付</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .left-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+  .pay-card { width: 470px; flex: none; display: flex; flex-direction: column; }
+  .sum-row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 14px 4px; border-bottom: 1px dashed var(--line); }
+  .sum-row:last-child { border-bottom: none; }
+  .sum-row .k { font-size: 19px; color: var(--muted); }
+  .sum-row .k small { display: block; font-size: 15px; margin-top: 3px; opacity: .85; }
+  .sum-row .v { font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .amount-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .amount-row .a-label { font-size: 19px; color: var(--muted); }
+  .amount-row .a-num { font-family: var(--serif); font-size: 62px; font-weight: 900; color: var(--slate-deep); line-height: 1; }
+  .amount-row .a-num small { font-size: 28px; font-weight: 700; margin-right: 4px; }
+  .rule-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .rule-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .rule-card ul { flex: 1; padding-left: 22px; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+  .rule-card li { font-size: 17.5px; line-height: 1.55; color: var(--muted); }
+  .ch-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .ch-row .opt { flex: 1; justify-content: center; min-height: 68px; font-size: 21px; }
+  .mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .mode-row .opt { justify-content: center; min-height: 64px; font-size: 19px; }
+  .qr-area { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .qr-area .qr-panel { flex: 1; justify-content: center; border-style: dashed; padding: 26px; gap: 16px; }
+  .qr-area .qr-box { width: 250px; height: 250px; }
+  .countdown { font-size: 17.5px; color: var(--wheat-deep); font-weight: 600; }
+  .verify-btn {
+    margin-top: 12px; min-height: 60px; border-radius: var(--r-sm); cursor: pointer;
+    font-family: var(--sans); font-size: 19px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--line); color: var(--ink);
+  }
+  .verify-btn:active { transform: scale(.98); }
+  .bar-note { font-size: 17.5px; color: var(--muted); line-height: 1.5; text-align: right; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:26</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <div class="titles">
+      <h1>订单支付</h1>
+      <p>请完成支付后开始打印;支付结果由系统自动确认</p>
+    </div>
+    <span class="aside badge">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      待支付
+    </span>
+  </div>
+
+  <div class="steps">
+    <div class="step done"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line done"></div>
+    <div class="step done"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line done"></div>
+    <div class="step active"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+    <div class="split">
+
+      <!-- 左:价目明细 + 规则 -->
+      <div class="left-col">
+        <section class="card accented a-slate">
+          <div class="card-head">
+            <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
+            <div><h2>价目明细</h2><div class="sub">订单号 O-20260717-0102 · 个人简历_王同学.pdf</div></div>
+          </div>
+          <div class="sum-row">
+            <span class="k">黑白打印<small>0.50 元/页 × 6(3 页 × 2 份)</small></span>
+            <span class="v">3.00 元</span>
+          </div>
+          <div class="sum-row">
+            <span class="k">双面附加<small>本单不收取</small></span>
+            <span class="v">0.00 元</span>
+          </div>
+          <div class="amount-row">
+            <span class="a-label">应付金额<br>示例金额 · 以现场公示价为准</span>
+            <span class="a-num"><small>¥</small>3.00</span>
+          </div>
+        </section>
+
+        <section class="card rule-card">
+          <b class="hd">支付与退款规则</b>
+          <ul>
+            <li>屏上收款码有效期 5 分钟;到期后重新出码或切换支付方式会先关闭旧码。</li>
+            <li>付款码支付如提示待核实,请勿重复扫码,等待系统查单。</li>
+            <li>订单超时未支付将自动关闭,不会扣款。</li>
+            <li>如需退款请联系现场工作人员协助处理,本机不提供自助退款。</li>
+          </ul>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          支付完成后自动进入打印,请勿离开;若长时间未响应,请联系现场工作人员。
+        </div>
+      </div>
+
+      <!-- 右:通道 + 方式 + 收款码 -->
+      <section class="card accented a-slate pay-card">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+          <div><h2>选择支付方式</h2><div class="sub">先选通道,再选扫码方式</div></div>
+        </div>
+
+        <div class="ch-row">
+          <button class="opt on">微信支付</button>
+          <button class="opt">支付宝</button>
+        </div>
+        <div class="mode-row">
+          <button class="opt on">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>
+            屏上收款码
+          </button>
+          <button class="opt">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg>
+            扫我的付款码
+          </button>
+        </div>
+
+        <div class="qr-area">
+          <div class="qr-panel">
+            <div class="qr-box"></div>
+            <div class="qr-title">请使用微信扫码支付</div>
+            <div class="qr-sub">支付主体与金额以手机端展示为准</div>
+            <div class="countdown">收款码 04:37 后失效,过期请重新出码</div>
+          </div>
+          <button class="verify-btn">已支付但未跳转?点此核实支付结果</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>
+      退出支付
+    </button>
+    <span class="spacer"></span>
+    <span class="bar-note">支付确认到账后自动进入打印;退出后订单超时未支付将自动关闭,不会扣款</span>
+    <button class="btn primary" disabled style="min-width: 320px;">等待支付…</button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

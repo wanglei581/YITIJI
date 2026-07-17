@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 打印订单</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .summary { display: flex; align-items: center; gap: 22px; padding: 18px 30px; }
+  .summary .s-ico { width: 58px; height: 58px; flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-deep); }
+  .summary .s-ico svg { width: 30px; height: 30px; }
+  .summary .s-main p { font-size: 19px; color: var(--muted); }
+  .summary .s-main b { display: block; font-size: 36px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .summary .s-note { flex: 1; font-size: 17.5px; color: var(--muted); line-height: 1.5; padding-left: 8px; }
+  .refresh-note { display: flex; align-items: center; gap: 12px; font-size: 17px; color: var(--muted); padding: 10px 20px; background: rgba(255,253,248,.7); border: 1px dashed var(--line); border-radius: 12px; }
+  .live-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 4px rgba(31,158,134,.18); }
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .o-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 16px 22px; }
+  .o-row { display: flex; align-items: center; gap: 16px; }
+  .o-row .f-ico { width: 52px; height: 52px; flex: none; border-radius: 13px; display: grid; place-items: center; background: var(--wheat-soft); color: var(--wheat-deep); }
+  .o-row .f-ico svg { width: 27px; height: 27px; }
+  .o-row .o-main { flex: 1; min-width: 0; }
+  .o-row .o-main b { display: block; font-size: 22.5px; font-weight: 700; }
+  .o-row .meta { margin-top: 5px; font-size: 16.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .pay-line { margin-top: 6px; display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; }
+  .pay-line .chip { font-size: 15px; padding: 4px 12px; }
+  .o-ops { display: flex; align-items: center; gap: 10px; flex: none; }
+  .o-ops .btn.sm { min-height: 54px; padding: 0 18px; font-size: 18px; }
+  .st { font-size: 16px; font-weight: 600; border-radius: 999px; padding: 5px 14px; white-space: nowrap; }
+  .st.ok { background: var(--teal-soft); color: var(--teal-deep); border: 1px solid rgba(31,158,134,.3); }
+  .st.run { background: var(--wheat-soft); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.3); }
+  .st.bad { background: var(--error-soft); color: var(--error); border: 1px solid rgba(193,74,52,.3); }
+  .st.off { background: var(--paper); color: var(--muted); border: 1px solid var(--line); }
+  .detail { margin-top: 14px; padding: 16px 20px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  .detail .dg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .detail .dg div span { display: block; font-size: 16px; color: var(--muted); }
+  .detail .dg div b { display: block; margin-top: 4px; font-size: 21px; font-weight: 700; }
+  .detail .dg div em { font-style: normal; font-size: 15px; color: var(--muted); margin-left: 6px; }
+  .detail .d-foot { display: flex; align-items: center; gap: 14px; margin-top: 14px; font-size: 16.5px; color: var(--muted); }
+  .detail .d-foot .btn.sm { min-height: 52px; font-size: 18px; }
+  .pickup { display: flex; align-items: center; gap: 16px; margin-top: 14px; padding: 14px 20px; background: var(--teal-soft); border: 1px dashed rgba(31,158,134,.45); border-radius: 12px; }
+  .pickup b { font-size: 30px; font-weight: 800; letter-spacing: 3px; font-variant-numeric: tabular-nums; color: var(--teal-deep); }
+  .pickup span { font-size: 16px; color: var(--muted); line-height: 1.45; }
+  .more { align-self: center; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>打印订单</h1>
+      <p>本人打印任务与订单记录(仅本人可见)</p>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 概览 -->
+    <section class="card accented summary">
+      <span class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+      <div class="s-main"><p>打印记录</p><b>18</b></div>
+      <div class="s-note">只展示本人打印任务与订单安全信息;支付状态和金额以真实订单数据为准</div>
+      <div class="s-mini"><span class="chip">已加载 6</span><span class="chip">进行中 2</span><span class="chip">筛选 6</span></div>
+    </section>
+
+    <!-- 状态筛选 -->
+    <div class="filter-bar">
+      <button class="f-chip on">全部 6</button>
+      <button class="f-chip">进行中 2</button>
+      <button class="f-chip">已完成 2</button>
+      <button class="f-chip">失败 1</button>
+      <button class="f-chip">已取消 1</button>
+    </div>
+
+    <!-- 自动刷新提示 -->
+    <div class="refresh-note">
+      <span class="live-dot"></span>
+      进行中任务自动更新中,上次同步 10:24:05(每 5 秒)
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="list">
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>王同学_行政专员_简历.pdf</b>
+            <div class="meta">2 份 · 黑白 · A4 · 07-17 10:23</div>
+            <div class="pay-line">¥1.20 · 已支付(线下收款)</div>
+          </div>
+          <div class="o-ops">
+            <button class="btn ghost sm">反馈</button>
+            <button class="btn ghost sm">详单</button>
+            <span class="st ok">已完成</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>简历诊断报告_0717.pdf</b>
+            <div class="meta">1 份 · 彩色 · A4 · 07-17 10:24</div>
+            <div class="pay-line">¥2.00 · 待现场确认</div>
+          </div>
+          <div class="o-ops"><button class="btn ghost sm">详单</button><span class="st run">打印中</span></div>
+        </div>
+      </div>
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>活动资料_夏季招聘会.pdf</b>
+            <div class="meta">1 份 · 黑白 · A4 · 07-17 10:20</div>
+            <div class="pay-line">免费 · 已支付(免费)<span class="chip ok">取件码</span></div>
+          </div>
+          <div class="o-ops"><button class="btn ghost sm">收起详单</button><span class="st run">排队中</span></div>
+        </div>
+        <div class="detail">
+          <div class="dg" style="grid-template-columns:repeat(3,1fr)">
+            <div><span>金额</span><b>免费</b></div>
+            <div><span>支付状态</span><b>已支付<em>免费</em></b></div>
+            <div><span>计费页数</span><b>2 页<em>系统识别 PDF 页数</em></b></div>
+          </div>
+          <div class="pickup">
+            <b>P-4172</b>
+            <span>取件码 · 凭此码现场取件;请向现场工作人员出示,订单完成或退款后取件码自动失效</span>
+          </div>
+          <div class="d-foot">
+            <button class="btn ghost sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+              去我的文档再打印
+            </button>
+            <span>再打印从「我的文档」重新选择文件发起,将创建新的打印任务与订单</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>获奖证书扫描_0710.jpg</b>
+            <div class="meta">1 份 · 彩色 · A4 · 07-15 16:40</div>
+            <div class="pay-line">¥2.00 · 已支付(人工确认)</div>
+          </div>
+          <div class="o-ops"><button class="btn ghost sm">反馈</button><button class="btn ghost sm">详单</button><span class="st ok">已完成</span></div>
+        </div>
+      </div>
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>求职材料清单_0410.docx</b>
+            <div class="meta">1 份 · 黑白 · A4 · 07-14 11:02</div>
+            <div class="pay-line">¥0.30 · 已退款</div>
+          </div>
+          <div class="o-ops"><button class="btn ghost sm">反馈</button><button class="btn ghost sm">详单</button><span class="st bad">失败</span></div>
+        </div>
+      </div>
+
+      <div class="o-card">
+        <div class="o-row">
+          <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+          <div class="o-main">
+            <b>面试技巧手册.pdf</b>
+            <div class="meta">1 份 · 黑白 · A4 · 06-28 15:12</div>
+            <div class="pay-line">暂无支付信息</div>
+          </div>
+          <div class="o-ops"><button class="btn ghost sm">详单</button><span class="st off">已取消</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <button class="btn ghost sm more">加载更多(已加载 6 / 共 18 条)</button>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      仅展示本人打印任务与订单的安全信息,不含文件内容;历史订单未关联支付记录时显示「暂无支付信息」,不作推断。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>参会企业 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--wheat); --accent-deep: var(--wheat-deep); --accent-soft: var(--wheat-soft); gap: 18px; }
+  .searchbox {
+    display: flex; align-items: center; gap: 14px;
+    min-height: 68px; padding: 0 24px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    color: #7d8880; font-size: 22px;
+  }
+  .searchbox svg { width: 26px; height: 26px; flex: none; }
+  .list { display: flex; flex-direction: column; gap: 14px; flex: none; }
+  .row-item { min-height: 148px; align-items: flex-start; padding: 20px 26px; }
+  .c-icon {
+    width: 64px; height: 64px; flex: none; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--wheat-soft); color: var(--wheat-deep);
+    font-family: var(--serif); font-size: 30px; font-weight: 700;
+  }
+  .r-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .r-title b { font-size: 25px; font-weight: 700; }
+  .scale { font-size: 16px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); padding: 3px 12px; border-radius: 999px; }
+  .st { font-size: 16px; font-weight: 600; padding: 4px 13px; border-radius: 999px; }
+  .st.in { color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); }
+  .st.wait { color: var(--wheat-deep); background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3); }
+  .r-meta { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 10px; font-size: 18px; color: var(--muted); }
+  .r-meta span { display: inline-flex; align-items: center; gap: 7px; font-variant-numeric: tabular-nums; }
+  .r-meta svg { width: 17px; height: 17px; flex: none; opacity: .7; }
+  .r-meta .booth { color: var(--wheat-deep); font-weight: 700; }
+  .r-desc { margin-top: 10px; font-size: 17px; color: var(--muted); line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .row-item .btn.sm { flex: none; align-self: center; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>参会企业</h1>
+      <p>2026年夏季高校毕业生招聘会 · 7月20日 · 市人才市场</p>
+    </div>
+    <div class="aside">
+      <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21V8l8-5 8 5v13M9 21v-6h6v6"/></svg>共 120 家 · 显示 1-6</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="searchbox">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      搜索企业名称或行业
+    </div>
+
+    <div class="filter-bar">
+      <button class="f-chip on">全部展区</button>
+      <button class="f-chip">A区 · 综合技术</button>
+      <button class="f-chip">B区 · 智能制造</button>
+      <button class="f-chip">C区 · 现代服务</button>
+    </div>
+
+    <div class="list">
+      <div class="row-item">
+        <span class="c-icon">华</span>
+        <span class="r-main">
+          <span class="r-title"><b>华辰科技</b><span class="scale">500-2000人</span><span class="st in">已签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 A12</span>
+            <span>智能制造</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 38 人 · 12 岗</span>
+          </span>
+          <span class="r-desc">聚焦工业自动化设备研发与制造,设有省级技术中心,面向应届生开放培养岗位。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="c-icon">启</span>
+        <span class="r-main">
+          <span class="r-title"><b>启明电子</b><span class="scale">200-500人</span><span class="st in">已签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 B03</span>
+            <span>电子信息</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 24 人 · 8 岗</span>
+          </span>
+          <span class="r-desc">消费电子与车载电子模组供应商,研发、测试与品质类岗位为主。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="c-icon">云</span>
+        <span class="r-main">
+          <span class="r-title"><b>云岭智造</b><span class="scale">200-500人</span><span class="st wait">未签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 B07</span>
+            <span>智能制造</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 18 人 · 6 岗</span>
+          </span>
+          <span class="r-desc">数控装备整机制造企业,提供一线技术与工艺工程师培养通道。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="c-icon">悦</span>
+        <span class="r-main">
+          <span class="r-title"><b>悦达服务集团</b><span class="scale">2000人以上</span><span class="st in">已签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 C21</span>
+            <span>生活服务</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 36 人 · 9 岗</span>
+          </span>
+          <span class="r-desc">连锁生活服务运营商,门店储备干部与运营管理培训生批量招聘。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="c-icon">恒</span>
+        <span class="r-main">
+          <span class="r-title"><b>恒瑞精密仪器</b><span class="scale">50-200人</span><span class="st in">已签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 A05</span>
+            <span>精密制造</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 12 人 · 5 岗</span>
+          </span>
+          <span class="r-desc">检测仪器与光学器件制造商,机械、电气与嵌入式方向岗位为主。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+
+      <div class="row-item">
+        <span class="c-icon">蓝</span>
+        <span class="r-main">
+          <span class="r-title"><b>蓝湾数据</b><span class="scale">200-500人</span><span class="st wait">未签到</span></span>
+          <span class="r-meta">
+            <span class="booth">展位 A18</span>
+            <span>信息技术</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg>招聘 20 人 · 7 岗</span>
+          </span>
+          <span class="r-desc">行业数据服务与软件外包企业,开发、测试与数据标注岗位充足。</span>
+        </span>
+        <button class="btn sm ghost">查看详情 / 扫码查看</button>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+
+    <div class="meta-chips">
+      <span class="chip src">来源机构 <b>市就业服务中心</b></span>
+      <span class="chip">同步时间 <b>2026-07-17 08:30</b></span>
+      <span class="chip">外部ID <b>FAIR-2071</b></span>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      系统仅展示参展企业信息,如需办理请扫码前往来源平台,系统不参与招聘闭环。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回招聘会详情
+    </button>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>
+      查看场馆导览
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

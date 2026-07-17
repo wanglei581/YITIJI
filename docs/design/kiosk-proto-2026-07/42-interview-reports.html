@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI面试训练 · 面试报告</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .list-card { flex: none; }
+  .report-list { display: flex; flex-direction: column; gap: 14px; }
+  .report-row { cursor: default; }
+  .report-row .r-ic {
+    width: 54px; height: 54px; flex: none; border-radius: 14px;
+    display: grid; place-items: center;
+    background: var(--plum-soft); color: var(--plum-deep);
+  }
+  .report-row .r-ic svg { width: 30px; height: 30px; }
+  .row-acts { flex: none; display: flex; gap: 12px; align-items: center; }
+  .del-btn {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    min-height: 64px; padding: 0 22px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 20px; color: var(--muted);
+  }
+  .del-btn svg { width: 22px; height: 22px; }
+  .del-btn.confirm { background: var(--error-soft); border-color: rgba(193,74,52,.4); color: var(--error); font-weight: 600; }
+  .keep-note { margin-top: 14px; text-align: center; font-size: 15.5px; color: var(--muted); }
+  /* 未登录 / 游客态 -->  */
+  .guest-card { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .guest-card .empty { flex: 1; justify-content: center; }
+  .guest-acts { display: flex; gap: 14px; justify-content: center; margin-top: 6px; }
+  .demo-tag {
+    margin-left: auto; flex: none; font-size: 16px; color: var(--muted);
+    border: 1px dashed var(--line); border-radius: 999px; padding: 5px 14px; background: var(--paper);
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>面试报告</h1>
+      <p>模拟面试练习的历史报告,仅本人可见 · 模拟练习,仅供参考</p>
+    </div>
+    <div class="aside">
+      <button class="btn ghost sm" style="white-space:nowrap;flex:none">AI服务记录</button>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 已登录:练习记录列表(等级见报告内,不在列表展示分数) -->
+    <section class="card accented a-plum list-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+        <div><h2>我的练习记录</h2><div class="sub">共 3 次模拟面试 · 点击「查看」进入完整报告</div></div>
+      </div>
+      <div class="report-list">
+
+        <div class="row-item report-row">
+          <span class="r-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+          <div class="r-main">
+            <b>行政专员 · HR 初筛</b>
+            <div class="r-sub"><span>零售 / 服务业</span><span>5 分钟练习</span><span>7月17日 10:24</span></div>
+          </div>
+          <div class="row-acts">
+            <button class="btn ghost sm">查看</button>
+            <button class="del-btn" aria-label="删除练习记录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+          </div>
+        </div>
+
+        <div class="row-item report-row">
+          <span class="r-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+          <div class="r-main">
+            <b>销售代表 · 业务主管</b>
+            <div class="r-sub"><span>零售 / 服务业</span><span>8 分钟练习</span><span>7月12日 15:02</span></div>
+          </div>
+          <div class="row-acts">
+            <button class="btn ghost sm">查看</button>
+            <button class="del-btn confirm" aria-label="再次点击确认删除">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>
+              确认删除
+            </button>
+          </div>
+        </div>
+
+        <div class="row-item report-row">
+          <span class="r-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+          <div class="r-main">
+            <b>客服专员 · 校招面试官</b>
+            <div class="r-sub"><span>教育培训</span><span>3 分钟练习</span><span>7月8日 09:41</span></div>
+          </div>
+          <div class="row-acts">
+            <button class="btn ghost sm">查看</button>
+            <button class="del-btn" aria-label="删除练习记录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+          </div>
+        </div>
+      </div>
+      <p class="keep-note">报告保存 7 天后自动清理;删除为物理删除并保留删除日志。打印在报告详情页进行。</p>
+    </section>
+
+    <!-- 未登录 / 游客态演示 -->
+    <section class="card guest-card">
+      <div class="card-head">
+        <span class="g-icon" style="background:var(--paper);color:var(--muted)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg></span>
+        <div><h2>未登录时展示</h2><div class="sub">游客也能练习,但报告不长期保存</div></div>
+        <span class="demo-tag">原型演示</span>
+      </div>
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 13h5M10 17h3"/></svg>
+        <b>登录后可保存练习报告</b>
+        <span>游客模式的练习报告短期有效(约 2 小时);<br>登录后报告保存 7 天,可随时回看与打印。</span>
+        <div class="guest-acts">
+          <button class="btn primary sm">手机号登录</button>
+          <button class="btn ghost sm">开始模拟面试</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      报告由 AI 生成,内容为模拟练习结果,仅供练习参考,不代表任何用人单位的真实评价标准,也不参与企业筛选、面试邀约或录用决策。
+    </div>
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

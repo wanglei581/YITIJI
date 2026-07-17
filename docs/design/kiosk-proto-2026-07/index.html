@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiosk 原型总览 · AI求职打印服务终端(75屏)</title>
+<style>
+  :root {
+    --paper: #f4f1e8; --surface: #fffdf8; --ink: #10302b; --muted: #5d6b63;
+    --line: #e2dccb; --teal: #1f9e86; --teal-deep: #157a67;
+    --clay: #b8683c; --wheat: #a9781f; --plum: #7a5a86; --slate: #3f68b0;
+    --serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    --sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); font-family: var(--sans); color: var(--ink); padding: 48px clamp(20px, 5vw, 80px) 80px; }
+  header h1 { font-family: var(--serif); font-size: clamp(28px, 4vw, 44px); font-weight: 900; letter-spacing: 2px; }
+  header p { margin-top: 10px; color: var(--muted); font-size: 17px; line-height: 1.6; }
+  .section { margin-top: 40px; }
+  .section h2 {
+    font-family: var(--serif); font-size: 22px; font-weight: 700;
+    padding-left: 14px; border-left: 5px solid var(--accent, var(--teal)); margin-bottom: 6px;
+  }
+  .section .s-sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; padding-left: 19px; }
+  .s-teal { --accent: var(--teal); } .s-clay { --accent: var(--clay); }
+  .s-wheat { --accent: var(--wheat); } .s-plum { --accent: var(--plum); } .s-slate { --accent: var(--slate); }
+  .s-ink { --accent: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  a.card {
+    display: block; text-decoration: none; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; transition: transform .1s ease, box-shadow .1s ease;
+  }
+  a.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16,48,43,.08); }
+  a.card b { display: block; font-size: 17px; font-weight: 700; }
+  a.card span { display: block; margin-top: 5px; font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+  a.card .num { display: inline-block; margin-bottom: 6px; font-size: 12px; color: var(--accent, var(--teal)); font-weight: 700; letter-spacing: 1px; }
+  .pending { opacity: .45; pointer-events: none; }
+  .tip { margin-top: 48px; padding: 14px 20px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 14px; background: rgba(255,253,248,.7); line-height: 1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kiosk 高保真原型总览 · 75 屏</h1>
+  <p>AI求职打印服务终端 · 1080×1920 竖屏(62/63 屏为手机尺寸)· 青绿米纸 V1 定稿风格 · 零外部依赖,断网可用<br>覆盖项目全部路由对应的真实功能,另含商用补缺屏(会话超时 / 异常态)与线上/线下来源深化设计屏(74/75)</p>
+</header>
+
+<div class="section s-teal">
+  <h2>首页 · 登录 · 系统屏</h2>
+  <div class="s-sub">入口层与公共终端安全屏</div>
+  <div class="grid">
+    <a class="card" href="01-home.html"><span class="num">01</span><b>首页</b><span>六大服务分组 + 扫码登录</span></a>
+    <a class="card" href="15-login.html"><span class="num">15</span><b>扫码登录</b><span>微信扫码 + 手机号登录 + 游客模式</span></a>
+    <a class="card" href="57-screensaver.html"><span class="num">57</span><b>待机宣传屏</b><span>轮播 + 触摸唤醒提示</span></a>
+    <a class="card" href="60-session-timeout.html"><span class="num">60</span><b>会话超时提醒</b><span>倒计时 + 自动清理会话(商用补缺)</span></a>
+    <a class="card" href="61-error-offline.html"><span class="num">61</span><b>网络/设备异常</b><span>断网降级说明,诚实状态(商用补缺)</span></a>
+    <a class="card" href="58-help.html"><span class="num">58</span><b>帮助中心</b><span>FAQ + 现场协助</span></a>
+    <a class="card" href="59-legal.html"><span class="num">59</span><b>法务文档</b><span>用户协议/隐私政策 + 字号调节</span></a>
+    <a class="card" href="62-phone-upload.html"><span class="num">62</span><b>手机上传落地页</b><span>390×844 手机尺寸</span></a>
+    <a class="card" href="63-qr-login-mobile.html"><span class="num">63</span><b>手机登录确认页</b><span>390×844 手机尺寸</span></a>
+  </div>
+</div>
+
+<div class="section s-slate">
+  <h2>打印 · 扫描</h2>
+  <div class="s-sub">打印七步主流程(上传→材料检查→预览→参数→确认→支付→打印)+ 扫描四步 + 工具能力</div>
+  <div class="grid">
+    <a class="card" href="02-print-hub.html"><span class="num">02</span><b>打印扫描中心</b><span>七能力卡 + 隐私横幅 + 记录入口</span></a>
+    <a class="card" href="31-print-material-check.html"><span class="num">31</span><b>材料检查</b><span>文件体检 + A4 规范化 + 隐私片段检查</span></a>
+    <a class="card" href="64-print-preview.html"><span class="num">64</span><b>打印预览</b><span>单页放大 + 缩略图 + 页面范围</span></a>
+    <a class="card" href="03-print-settings.html"><span class="num">03</span><b>打印参数</b><span>份数/色彩/双面/缩放 + 用量费用预估</span></a>
+    <a class="card" href="65-print-confirm.html"><span class="num">65</span><b>确认打印</b><span>参数确认清单 + 隐私摘要 + 须知</span></a>
+    <a class="card" href="32-print-cashier.html"><span class="num">32</span><b>收银台</b><span>价目明细 + 双支付方式 + 核实兜底</span></a>
+    <a class="card" href="04-print-progress.html"><span class="num">04</span><b>打印进度</b><span>状态时间线 + 异常应对指引</span></a>
+    <a class="card" href="33-print-done.html"><span class="num">33</span><b>打印完成</b><span>取件凭证码 + 任务摘要 + 满意度</span></a>
+    <a class="card" href="34-scan-start.html"><span class="num">34</span><b>扫描类型选择</b><span>简历/证件/普通文档三选一</span></a>
+    <a class="card" href="35-scan-settings.html"><span class="num">35</span><b>扫描指引</b><span>面板操作四步 + 任务会话</span></a>
+    <a class="card" href="36-scan-progress.html"><span class="num">36</span><b>扫描等待</b><span>诚实等待态 + 处理阶段时间线</span></a>
+    <a class="card" href="37-scan-result.html"><span class="num">37</span><b>扫描结果</b><span>AI简历识别/打印/保存文档</span></a>
+    <a class="card" href="66-print-scan-convert.html"><span class="num">66</span><b>格式转换</b><span>图片合并 PDF + 排序 + 双通道添加</span></a>
+    <a class="card" href="67-print-scan-sign.html"><span class="num">67</span><b>签名盖章</b><span>四步签章 + 授权勾选 + 非 CA 声明</span></a>
+    <a class="card" href="68-print-scan-feature.html"><span class="num">68</span><b>功能介绍</b><span>证件照·即将上线 + 替代路径</span></a>
+  </div>
+</div>
+
+<div class="section s-teal">
+  <h2>AI简历</h2>
+  <div class="s-sub">诊断、优化、生成、导出、素材全链路</div>
+  <div class="grid">
+    <a class="card" href="05-resume-source.html"><span class="num">05</span><b>简历来源选择</b><span>上传 / 扫码传 / 纸质扫描 OCR</span></a>
+    <a class="card" href="27-resume-parse.html"><span class="num">27</span><b>AI解析中</b><span>加载态 + 三步清单</span></a>
+    <a class="card" href="06-resume-diagnosis.html"><span class="num">06</span><b>AI诊断报告</b><span>总评分 + 维度条 + 逐项建议</span></a>
+    <a class="card" href="07-resume-optimize.html"><span class="num">07</span><b>优化对比</b><span>原文/建议双栏</span></a>
+    <a class="card" href="25-resume-generate.html"><span class="num">25</span><b>AI简历生成</b><span>信息表单 + 生成说明</span></a>
+    <a class="card" href="26-resume-generate-preview.html"><span class="num">26</span><b>生成预览</b><span>A4 缩略 + 分段重生成</span></a>
+    <a class="card" href="28-resume-export.html"><span class="num">28</span><b>导出</b><span>PDF/Word/纯文本 + 去向选择</span></a>
+    <a class="card" href="29-resume-templates.html"><span class="num">29</span><b>简历素材库</b><span>2×3 模板卡三种布局变体</span></a>
+    <a class="card" href="30-resume-materials.html"><span class="num">30</span><b>求职材料库</b><span>求职信/自我介绍/清单/证书</span></a>
+  </div>
+</div>
+
+<div class="section s-clay">
+  <h2>岗位 · 企业(第三方来源入口)</h2>
+  <div class="s-sub">线上招聘平台 + 线下招聘机构,来源三要素齐全</div>
+  <div class="grid">
+    <a class="card" href="08-jobs-list.html"><span class="num">08</span><b>岗位列表</b><span>类型/来源筛选 + 线上线下双轨标识</span></a>
+    <a class="card" href="09-job-detail.html"><span class="num">09</span><b>岗位详情(线上平台)</b><span>数据来源卡 + 扫码投递</span></a>
+    <a class="card" href="74-job-detail-offline.html"><span class="num">74</span><b>岗位详情(线下机构)</b><span>机构门店卡 + 到店咨询指引 + 打印带走</span></a>
+    <a class="card" href="75-offline-agencies.html"><span class="num">75</span><b>线下招聘机构</b><span>机构门店列表 + 营业状态 + 服务范围</span></a>
+    <a class="card" href="53-companies.html"><span class="num">53</span><b>找企业</b><span>来源企业与岗位导览</span></a>
+    <a class="card" href="54-company-detail.html"><span class="num">54</span><b>企业详情</b><span>在招岗位 + 来源说明</span></a>
+    <a class="card" href="55-job-fit.html"><span class="num">55</span><b>岗位匹配参考</b><span>较高/中等/偏低三档,仅供参考</span></a>
+    <a class="card" href="56-career-plan.html"><span class="num">56</span><b>职业规划</b><span>现状 + 方向建议 + 行动项</span></a>
+  </div>
+</div>
+
+<div class="section s-wheat">
+  <h2>招聘会 · 校园</h2>
+  <div class="s-sub">场次信息与现场服务,预约去来源平台</div>
+  <div class="grid">
+    <a class="card" href="10-fairs-list.html"><span class="num">10</span><b>招聘会列表</b><span>场次 + 状态标签</span></a>
+    <a class="card" href="11-fair-detail.html"><span class="num">11</span><b>招聘会详情</b><span>展位导览 + 扫码预约</span></a>
+    <a class="card" href="43-fair-checkin.html"><span class="num">43</span><b>扫码签到</b><span>三步指引,主办方管理</span></a>
+    <a class="card" href="44-fair-companies.html"><span class="num">44</span><b>参展企业</b><span>展位号 + 行业筛选</span></a>
+    <a class="card" href="45-fair-company-detail.html"><span class="num">45</span><b>展位企业详情</b><span>在招岗位 + 来源卡</span></a>
+    <a class="card" href="46-fair-map.html"><span class="num">46</span><b>场馆导览图</b><span>CSS 分区色块 + 路线提示</span></a>
+    <a class="card" href="47-fair-materials.html"><span class="num">47</span><b>活动资料</b><span>批量打印</span></a>
+    <a class="card" href="48-fair-visit-plan.html"><span class="num">48</span><b>AI参会准备单</b><span>基于本人简历 + 本场公开信息</span></a>
+    <a class="card" href="49-fair-stats.html"><span class="num">49</span><b>现场数据</b><span>签到进度 + 行业/意向分布</span></a>
+    <a class="card" href="50-campus.html"><span class="num">50</span><b>校园招聘专区</b><span>校招双选会 5-Tab 沉浸页</span></a>
+    <a class="card" href="51-smart-campus.html"><span class="num">51</span><b>智慧校园</b><span>迎新 + 校园自助服务 6 卡</span></a>
+    <a class="card" href="52-smart-campus-service.html"><span class="num">52</span><b>校园卡办理</b><span>自助服务办理指引(代表屏)</span></a>
+    <a class="card" href="69-smart-campus-welcome.html"><span class="num">69</span><b>迎新系统</b><span>报到流程 + 办事窗口 + 求职准备</span></a>
+    <a class="card" href="70-freshman-insights.html"><span class="num">70</span><b>校园大数据</b><span>未开放锁定态,合规兜底</span></a>
+  </div>
+</div>
+
+<div class="section s-plum">
+  <h2>AI面试 · 助手 · 政策</h2>
+  <div class="s-sub">模拟练习仅供参考;政策 info-only</div>
+  <div class="grid">
+    <a class="card" href="38-interview-setup.html"><span class="num">38</span><b>面试设置</b><span>岗位/难度/题量/方式</span></a>
+    <a class="card" href="39-interview-session.html"><span class="num">39</span><b>答题现场</b><span>问题卡 + 作答区 + 计时</span></a>
+    <a class="card" href="40-interview-report.html"><span class="num">40</span><b>面试报告</b><span>总分 + 四维度 + 逐题点评</span></a>
+    <a class="card" href="41-interview-tips.html"><span class="num">41</span><b>面试技巧</b><span>STAR 法则等 + 打印手册</span></a>
+    <a class="card" href="42-interview-reports.html"><span class="num">42</span><b>历史报告</b><span>记录列表 + 空态演示</span></a>
+    <a class="card" href="13-assistant.html"><span class="num">13</span><b>AI助手 · 小青</b><span>咨询主题 + 对话 + 白名单动作</span></a>
+    <a class="card" href="73-assistant-call.html"><span class="num">73</span><b>语音咨询中</b><span>声纹 + 实时字幕 + 通话控制</span></a>
+    <a class="card" href="12-policy.html"><span class="num">12</span><b>政策服务</b><span>三类政策 + 材料清单打印</span></a>
+  </div>
+</div>
+
+<div class="section s-ink">
+  <h2>我的</h2>
+  <div class="s-sub">入口与概览,明细归位业务页</div>
+  <div class="grid">
+    <a class="card" href="14-profile.html"><span class="num">14</span><b>我的(主页)</b><span>五分区入口 + 概览统计 + 本次记录</span></a>
+    <a class="card" href="16-me-resumes.html"><span class="num">16</span><b>我的简历</b><span>诊断/生成记录 + 报告/优化/岗位匹配</span></a>
+    <a class="card" href="17-me-documents.html"><span class="num">17</span><b>我的文档</b><span>保存期限管理 + 签名盖章 + 清理口径</span></a>
+    <a class="card" href="18-me-print-orders.html"><span class="num">18</span><b>打印订单</b><span>状态筛选 + 支付信息 + 取件码详单</span></a>
+    <a class="card" href="19-me-ai-records.html"><span class="num">19</span><b>AI服务记录</b><span>岗位 AI 会话 + 简历/规划记录</span></a>
+    <a class="card" href="20-me-favorites.html"><span class="num">20</span><b>我的收藏</b><span>岗位/招聘会/政策,浏览标记</span></a>
+    <a class="card" href="21-me-benefits.html"><span class="num">21</span><b>我的权益</b><span>券/免费次数/额度/政策资格提示</span></a>
+    <a class="card" href="22-me-notifications.html"><span class="num">22</span><b>通知与反馈</b><span>消息分类已读删除 + 反馈工单</span></a>
+    <a class="card" href="23-me-settings.html"><span class="num">23</span><b>账号设置</b><span>会话说明 + AI授权 + 退出登录</span></a>
+    <a class="card" href="24-activities.html"><span class="num">24</span><b>权益活动</b><span>领取型活动列表 + 库存状态</span></a>
+    <a class="card" href="71-me-activity.html"><span class="num">71</span><b>浏览与跳转记录</b><span>浏览 / 外部跳转两 Tab,只记动作</span></a>
+    <a class="card" href="72-activity-detail.html"><span class="num">72</span><b>权益活动详情</b><span>额度/有效期/规则 + 领取</span></a>
+  </div>
+</div>
+
+<div class="tip">
+  说明:全部页面为静态高保真原型,数据均为示例;岗位/招聘会/企业信息仅为第三方来源展示与跳转指引,不含平台内投递能力;金额均标注"以现场公示价为准"。原型不进正式工程,归档位置待定(docs/design 或原型分支)。60/61 为按商用完整性补缺的规划屏,项目路由中尚无对应实现。
+</div>
+</body>
+</html>

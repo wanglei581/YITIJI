@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>校园卡办理 · 智慧校园 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--teal); --accent-deep: var(--teal-deep); --accent-soft: var(--teal-soft); gap: 20px; }
+  .auth-bar {
+    display: flex; align-items: flex-start; gap: 14px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.35); border-radius: var(--r-sm);
+    padding: 18px 24px; font-size: 20px; color: var(--teal-deep); line-height: 1.5;
+  }
+  .auth-bar svg { width: 26px; height: 26px; flex: none; margin-top: 2px; }
+  .ov { display: flex; align-items: center; gap: 24px; }
+  .ov .o-icon {
+    width: 96px; height: 96px; flex: none; border-radius: 20px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .ov .o-icon svg { width: 50px; height: 50px; }
+  .ov h2 { font-family: var(--serif); font-size: 36px; font-weight: 900; letter-spacing: 2px; }
+  .ov p { font-size: 21px; color: var(--muted); margin-top: 8px; }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: stretch; }
+  .item-list { display: flex; flex-direction: column; gap: 14px; }
+  .item-list .it { display: flex; align-items: center; gap: 14px; font-size: 21px; }
+  .item-list .it svg { width: 26px; height: 26px; flex: none; color: var(--teal-deep); }
+  .item-list .it.dot i { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--line); margin: 0 8px; }
+  .loc {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 18px 24px; font-size: 21px; font-weight: 600;
+  }
+  .loc svg { width: 26px; height: 26px; flex: none; color: var(--muted); }
+  .loc small { display: block; font-size: 17px; font-weight: 400; color: var(--muted); margin-top: 4px; }
+  .bridge { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>校园卡办理</h1>
+      <p>新生办卡 · 补卡 · 挂失 · 智慧校园自助服务指引</p>
+    </div>
+    <div class="aside">
+      <span class="badge">办理指引 · 未接线上办理</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <div class="auth-bar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+      校方官方信息入口,仅展示与指引,不在本终端采集任何个人信息;实际办理请前往现场服务窗口或学校官方自助平台。
+    </div>
+
+    <!-- 服务概览 -->
+    <section class="card accented a-teal">
+      <div class="ov">
+        <span class="o-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+        <div>
+          <h2>校园卡办理</h2>
+          <p>新生办卡、补卡、挂失后快速办理;材料备齐一次办结</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="two-col">
+      <!-- 办理事项 -->
+      <section class="card a-teal">
+        <div class="card-head" style="margin-bottom:16px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6h11M9 12h11M9 18h11M4 6h.5M4 12h.5M4 18h.5"/></svg></span>
+          <div><h2>办理事项</h2></div>
+        </div>
+        <div class="item-list">
+          <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 12l3 3 5-6"/><circle cx="12" cy="12" r="9"/></svg>新生首次办卡</div>
+          <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 12l3 3 5-6"/><circle cx="12" cy="12" r="9"/></svg>卡片遗失补办</div>
+          <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 12l3 3 5-6"/><circle cx="12" cy="12" r="9"/></svg>挂失与解挂</div>
+          <div class="it"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 12l3 3 5-6"/><circle cx="12" cy="12" r="9"/></svg>信息变更换卡</div>
+        </div>
+      </section>
+
+      <!-- 所需材料 -->
+      <section class="card a-teal">
+        <div class="card-head" style="margin-bottom:16px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9l-6-6zM14 3v6h6"/></svg></span>
+          <div><h2>所需材料</h2></div>
+        </div>
+        <div class="item-list">
+          <div class="it dot"><i></i>录取通知书 / 学生证</div>
+          <div class="it dot"><i></i>本人身份证原件</div>
+          <div class="it dot"><i></i>近期一寸免冠照片</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 办理地点 -->
+    <section class="card a-teal">
+      <div class="card-head" style="margin-bottom:16px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <div><h2>办理地点</h2></div>
+      </div>
+      <div class="loc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>
+        <div>校园卡服务中心(一卡通中心) · 行政楼一层<small>具体受理时间以现场公示为准</small></div>
+      </div>
+    </section>
+
+    <div class="notice warn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>
+      校园卡线上办理后续开放,目前请携带上述材料前往校园卡服务中心办理;办理中遇到问题,可联系现场工作人员协助。
+    </div>
+
+    <!-- 本机可办(真实能力:证件照 / 打印) -->
+    <div class="bridge">
+      <button class="tile disabled a-teal">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="10" r="3.5"/><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M5 20c1.5-3 4-4.5 7-4.5s5.5 1.5 7 4.5"/></svg></span>
+        <span class="t-text"><b>证件照排版打印</b><span>功能即将上线;当前可用手机照片在打印扫描页打印</span></span>
+        <span class="tag-soon">即将上线</span>
+      </button>
+      <button class="tile primary a-teal">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+        <span class="t-text"><b>入学材料 / 表格打印</b><span>报到表、申请表等自助打印</span></span>
+      </button>
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回智慧校园
+    </button>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 14l8-9 8 9M6 12v8h12v-8M10 20v-5h4v5"/></svg>
+      查看迎新报到指引
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

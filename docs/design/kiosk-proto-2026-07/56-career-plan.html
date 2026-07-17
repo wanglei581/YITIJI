@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>职业规划建议 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--teal); --accent-deep: var(--teal-deep); --accent-soft: var(--teal-soft); gap: 16px; }
+  .sum-card .eyebrow { font-size: 18px; font-weight: 600; color: var(--teal-deep); }
+  .sum-card h2 { font-family: var(--serif); font-size: 30px; font-weight: 900; letter-spacing: 1px; margin-top: 6px; }
+  .sum-card p { margin-top: 12px; font-size: 20px; line-height: 1.6; color: var(--ink); }
+  .sum-card .meta-chips { margin-top: 14px; }
+  .ev-item { background: var(--teal-soft); border-radius: var(--r-sm); padding: 12px 18px; }
+  .ev-item p { font-size: 19px; font-weight: 600; line-height: 1.45; }
+  .ev-item span { display: block; font-size: 18px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .ev-stack { display: flex; flex-direction: column; gap: 10px; }
+  .dir-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .dir { display: flex; gap: 14px; }
+  .dir .no {
+    width: 44px; height: 44px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal); color: #fffdf8; font-family: var(--serif); font-size: 22px; font-weight: 700;
+  }
+  .dir h3 { font-size: 22px; font-weight: 700; }
+  .dir p { font-size: 18px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
+  .dir p b { color: var(--ink); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .skill-row { display: flex; align-items: flex-start; gap: 14px; }
+  .skill-row .tf {
+    flex: none; font-size: 16px; font-weight: 700; color: var(--wheat-deep);
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.3);
+    padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+  }
+  .skill-row b { display: block; font-size: 20px; font-weight: 700; }
+  .skill-row span { display: block; font-size: 18px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+  .skill-stack { display: flex; flex-direction: column; gap: 14px; }
+  .check-list { list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: act; }
+  .check-list li { display: flex; gap: 12px; font-size: 19px; line-height: 1.5; }
+  .check-list li::before {
+    counter-increment: act; content: counter(act);
+    flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--paper); border: 1px solid var(--line);
+    font-size: 17px; font-weight: 700; color: var(--teal-deep);
+  }
+  .next-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .next-row .tile { min-height: 88px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回首页
+    </button>
+    <div class="titles">
+      <h1>职业规划建议</h1>
+      <p>依据:本人简历 + 岗位匹配参考(中等) · AI 生成仅供参考</p>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 结论摘要 -->
+    <section class="card accented a-teal sum-card">
+      <div class="eyebrow">已生成的规划</div>
+      <h2>先看结论,再安排下一步</h2>
+      <p>你在行政类岗位方向基础扎实,近 1-2 年可优先在行政管理线进阶;人力资源方向可作为 6-12 个月的中期备选,需先补基础模块知识。</p>
+      <p style="margin-top:8px; font-size:17px; color:var(--muted)">AI 建议仅供参考,不构成任何就业、薪资或录用承诺。</p>
+      <div class="meta-chips">
+        <span class="chip">依据简历 <b>王**_行政求职简历.pdf</b></span>
+        <span class="chip">当前方向 <b>行政类 · 2 年经验</b></span>
+        <span class="chip ok">已存入 AI服务记录</span>
+      </div>
+    </section>
+
+    <!-- 现状画像 -->
+    <section class="card a-teal">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg></span>
+        <div><h2>现状画像</h2><div class="sub">每条结论均附简历原文依据,不编造经历</div></div>
+      </div>
+      <div class="ev-stack">
+        <div class="ev-item">
+          <p>行政事务处理能力成熟,可支撑独立岗位职责</p>
+          <span>简历依据:"负责公司日常行政事务与办公用品管理,服务约 120 人团队"</span>
+        </div>
+        <div class="ev-item">
+          <p>会议组织与档案管理是当前最突出的两项经历</p>
+          <span>简历依据:"每月组织例会及专项会议 8-10 场"、"建立部门档案归档规范"</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 发展方向 -->
+    <section class="card a-teal">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <div><h2>发展方向</h2><div class="sub">每个方向附「为什么适合」与可开始的第一步</div></div>
+      </div>
+      <div class="dir-grid">
+        <div class="dir">
+          <span class="no">1</span>
+          <div>
+            <h3>行政管理进阶</h3>
+            <p>为什么适合:与现有会议、档案、事务经历衔接度最高,可直接进阶。</p>
+            <p><b>第一步:</b>把现有行政成果量化后更新简历,并关注主管级岗位要求。</p>
+          </div>
+        </div>
+        <div class="dir">
+          <span class="no">2</span>
+          <div>
+            <h3>人力资源方向</h3>
+            <p>为什么适合:行政岗常与人事协作,已有考勤与入离职配合经历。</p>
+            <p><b>第一步:</b>学习招聘与培训基础模块,在现岗位争取人事协助事务。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 技能计划 + 行动清单 -->
+    <div class="two-col">
+      <section class="card a-wheat">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20h16M6 20V10M12 20V6M18 20v-7"/></svg></span>
+          <div><h2>技能提升计划</h2></div>
+        </div>
+        <div class="skill-stack">
+          <div class="skill-row"><span class="tf">1 个月内</span><div><b>办公自动化工具</b><span>熟练协同办公与流程审批类系统</span></div></div>
+          <div class="skill-row"><span class="tf">3 个月内</span><div><b>岗位要求的官方可查证书</b><span>如目标岗位确有要求,先在官方渠道核验再报考</span></div></div>
+          <div class="skill-row"><span class="tf">6 个月内</span><div><b>人力资源基础模块</b><span>招聘、培训、绩效与员工关系入门</span></div></div>
+        </div>
+      </section>
+      <section class="card a-teal">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg></span>
+          <div><h2>近期行动清单</h2></div>
+        </div>
+        <ol class="check-list">
+          <li>本周内量化会议场次、档案规模等成果并更新简历</li>
+          <li>用「岗位匹配参考」核对 2-3 个目标岗位差距</li>
+          <li>核验目标岗位是否要求证书,如需报考再定备考时间表</li>
+          <li>做一次模拟面试,检验岗位表达是否清晰</li>
+        </ol>
+      </section>
+    </div>
+
+    <!-- 继续下一步 -->
+    <div class="next-row">
+      <button class="tile a-teal">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></span>
+        <span class="t-text"><b>优化简历</b><span>按建议修改表达</span></span>
+      </button>
+      <button class="tile a-teal">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <span class="t-text"><b>岗位匹配参考</b><span>核对目标岗位差距</span></span>
+      </button>
+      <button class="tile a-teal">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></span>
+        <span class="t-text"><b>模拟面试</b><span>练习岗位问答表达</span></span>
+      </button>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本建议仅供本人职业发展参考,不构成任何就业、薪资或录用承诺;行动请基于真实经历,不要虚构。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>
+      重新生成
+    </button>
+    <span style="font-size:17px; color:var(--muted)">重新生成将替换当前结果</span>
+    <div class="spacer"></div>
+    <button class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印建议单
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

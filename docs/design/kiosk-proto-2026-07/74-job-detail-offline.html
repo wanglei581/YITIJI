@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>岗位详情(线下机构) · 前台客服 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--clay); --accent-deep: var(--clay-deep); --accent-soft: var(--clay-soft); gap: 20px; }
+  .sum-head { display: flex; align-items: flex-start; gap: 22px; }
+  .sum-head .titles-min { flex: 1; min-width: 0; }
+  .sum-head h2 { font-family: var(--serif); font-size: 36px; font-weight: 900; letter-spacing: 1px; }
+  .sum-loc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 26px; margin-top: 12px; font-size: 21px; color: var(--muted); }
+  .sum-loc svg { width: 20px; height: 20px; flex: none; opacity: .7; }
+  .sum-loc span { display: inline-flex; align-items: center; gap: 8px; }
+  .fav-chip {
+    flex: none; display: inline-flex; align-items: center; gap: 10px;
+    min-height: 60px; padding: 0 26px; cursor: pointer;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+    font-family: var(--sans); font-size: 21px; font-weight: 600; color: var(--muted);
+  }
+  .fav-chip svg { width: 24px; height: 24px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px; }
+  .metric { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 18px; }
+  .metric .k { font-size: 17px; color: var(--muted); }
+  .metric .v { font-size: 24px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .metric .v.salary { color: var(--clay-deep); }
+  .sum-card .meta-chips { margin-top: 16px; }
+  .desc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  .desc-grid h3 { font-size: 22px; font-weight: 700; margin-bottom: 12px; color: var(--clay-deep); }
+  .desc-grid ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .desc-grid li { font-size: 20px; line-height: 1.5; color: var(--ink); display: flex; gap: 10px; }
+  .desc-grid li::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); margin-top: 11px; }
+  .kv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .kv .k { font-size: 18px; color: var(--muted); }
+  .kv .v { font-size: 22px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .kv .v.dim { color: var(--muted); font-weight: 600; font-size: 20px; }
+  .src-card .notice { margin-top: 16px; }
+  .agency-zone { display: grid; grid-template-columns: 1fr 400px; gap: 20px; align-items: stretch; }
+  .agency-kv { display: flex; flex-direction: column; gap: 14px; }
+  .agency-kv .line { display: flex; gap: 14px; font-size: 21px; align-items: baseline; }
+  .agency-kv .line .k { flex: none; width: 128px; color: var(--muted); font-size: 19px; }
+  .agency-kv .line .v { font-weight: 600; }
+  .svc-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+  .fee-note { margin-top: 14px; font-size: 18px; color: var(--muted); line-height: 1.5; }
+  .content > .notice, .src-card .notice { font-size: 19px; }
+  .guide-panel {
+    display: flex; flex-direction: column; gap: 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 24px 26px;
+  }
+  .guide-panel .g-title { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .g-step { display: flex; gap: 12px; align-items: flex-start; }
+  .g-step .no {
+    flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--clay); color: #fffdf8; font-size: 19px; font-weight: 700;
+  }
+  .g-step b { display: block; font-size: 20px; font-weight: 700; }
+  .g-step span { display: block; font-size: 18px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .next-grid .tile { min-height: 96px; }
+  /* QA终审:压缩卡片纵向空间,消除卡内内容裁切 */
+  .content .card { padding-top: 17px; padding-bottom: 17px; }
+  .content { gap: 14px; }
+  .content .card-head { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回列表
+    </button>
+    <div class="titles">
+      <h1>岗位详情</h1>
+      <p>诚安人力资源 · 咨询与应聘请前往机构门店</p>
+    </div>
+    <div class="aside">
+      <span class="badge" style="background:var(--wheat-soft); border-color:rgba(169,120,31,.35); color:var(--wheat-deep)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg>
+        线下招聘机构来源
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 岗位摘要 -->
+    <section class="card accented a-clay sum-card">
+      <div class="sum-head">
+        <div class="titles-min">
+          <h2>前台客服</h2>
+          <div class="sum-loc">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M9 8h2M9 12h2M15 10h4v11"/></svg>悦居物业</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城南区 · 悦澜湾小区服务中心</span>
+          </div>
+        </div>
+        <button class="fav-chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l2.6 6.6 6.4.6-5 4.3 1.6 6.5L12 17.6 6.4 21l1.6-6.5-5-4.3 6.4-.6z"/></svg>
+          收藏
+        </button>
+      </div>
+      <div class="metric-grid">
+        <div class="metric"><div class="k">薪资</div><div class="v salary">4.5-6K / 月</div></div>
+        <div class="metric"><div class="k">类型</div><div class="v">全职</div></div>
+        <div class="metric"><div class="k">行业</div><div class="v">服务业</div></div>
+        <div class="metric"><div class="k">字段完整度</div><div class="v">88%</div></div>
+      </div>
+      <div class="meta-chips">
+        <span class="chip">学历不限</span>
+        <span class="chip">经验不限</span>
+        <span class="chip">双休</span>
+        <span class="chip">节日福利</span>
+        <span class="chip warn">线下机构 · 到店咨询</span>
+      </div>
+    </section>
+
+    <!-- 职责与要求 -->
+    <section class="card a-clay">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
+        <div><h2>职责与要求</h2><div class="sub">岗位信息由诚安人力资源提供 · 岗位信息已审核</div></div>
+      </div>
+      <div class="desc-grid">
+        <div>
+          <h3>岗位职责</h3>
+          <ul>
+            <li>负责小区前台接待、来访登记与业主咨询</li>
+            <li>受理报修、投诉工单并跟进处理进度</li>
+            <li>协助收发通知,维护前台区域整洁</li>
+          </ul>
+        </div>
+        <div>
+          <h3>任职要求</h3>
+          <ul>
+            <li>学历不限,普通话标准,形象大方</li>
+            <li>会基本电脑操作,能使用办公软件</li>
+            <li>有物业 / 前台 / 客服经历者优先</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 来源可信区 -->
+    <section class="card accented a-wheat src-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <div><h2>来源可信区</h2><div class="sub">线下机构来源信息,请核对后前往门店办理</div></div>
+      </div>
+      <div class="kv-grid">
+        <div class="kv"><div class="k">来源机构</div><div class="v">诚安人力资源</div></div>
+        <div class="kv"><div class="k">来源类型</div><div class="v">线下招聘机构</div></div>
+        <div class="kv"><div class="k">同步时间</div><div class="v">2026-07-16 18:20</div></div>
+        <div class="kv"><div class="k">外部ID</div><div class="v">JOB-87960</div></div>
+      </div>
+      <div class="notice warn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        本岗位由线下合作机构提供,未提供线上办理链接;咨询与应聘请前往机构门店办理。本终端不代收简历、不代收任何费用,所需材料与机构服务收费以门店依法公示为准。
+      </div>
+    </section>
+
+    <!-- 机构门店 + 到店咨询指引 -->
+    <div class="agency-zone">
+      <section class="card a-clay">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg></span>
+          <div><h2>机构服务门店</h2><div class="sub">诚安人力资源 · 城南门店</div></div>
+        </div>
+        <div class="agency-kv">
+          <div class="line"><span class="k">门店地址</span><span class="v">城南区幸福路32号临街商铺 · 距本机约1.2km(直线)</span></div>
+          <div class="line"><span class="k">门店服务时间</span><span class="v">周一至周六 09:00-17:30(机构提供,节假日可能调整)</span></div>
+          <div class="line"><span class="k">公开咨询电话</span><span class="v">0570-8801234(示例号 · 机构提供,以门店公示为准)</span></div>
+          <div class="line"><span class="k">机构公开服务</span>
+            <span class="svc-chips">
+              <span class="chip">岗位推荐</span>
+              <span class="chip">用工咨询</span>
+              <span class="chip">入职登记指引</span>
+            </span>
+          </div>
+        </div>
+        <p class="fee-note">机构服务、收费与电话均由机构提供并以门店依法公示为准;本终端不接听或转接电话,不代收简历与任何费用,请勿支付押金或未公示费用。</p>
+      </section>
+      <div class="guide-panel">
+        <div class="g-title">到店咨询指引</div>
+        <div class="g-step"><span class="no">1</span><div><b>打印岗位信息带走</b><span>含岗位要求、门店地址与来源编号,便于到店核对</span></div></div>
+        <div class="g-step"><span class="no">2</span><div><b>备好应聘材料</b><span>先向机构确认所需材料;如需纸质简历可在本终端自行打印</span></div></div>
+        <div class="g-step"><span class="no">3</span><div><b>到店咨询办理</b><span>应聘流程与结果以机构办理为准,本终端不参与咨询与应聘环节</span></div></div>
+      </div>
+    </div>
+
+    <!-- AI 辅助 -->
+    <div class="next-grid">
+      <button class="tile tinted a-clay">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg></span>
+        <span class="t-text"><b>AI岗位解读</b><span>看懂职责与准备点,内容仅供参考</span></span>
+      </button>
+      <button class="tile a-clay">
+        <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></span>
+        <span class="t-text"><b>岗位匹配参考</b><span>用本人简历做准备,需登录使用</span></span>
+      </button>
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <span style="font-size:18px; color:var(--muted); line-height:1.5; max-width:320px;">应聘与咨询在机构门店完成,本终端不代收简历</span>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9l1-4h16l1 4M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg>
+      查看来源机构门店
+    </button>
+    <button class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+      打印岗位信息带走
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

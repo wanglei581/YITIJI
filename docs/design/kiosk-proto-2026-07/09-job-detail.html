@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>岗位详情 · 行政专员 · AI求职打印服务终端</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { --accent: var(--clay); --accent-deep: var(--clay-deep); --accent-soft: var(--clay-soft); gap: 20px; }
+  .sum-head { display: flex; align-items: flex-start; gap: 22px; }
+  .sum-head .titles-min { flex: 1; min-width: 0; }
+  .sum-head h2 { font-family: var(--serif); font-size: 36px; font-weight: 900; letter-spacing: 1px; }
+  .sum-loc { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 26px; margin-top: 12px; font-size: 21px; color: var(--muted); }
+  .sum-loc svg { width: 20px; height: 20px; flex: none; opacity: .7; }
+  .sum-loc span { display: inline-flex; align-items: center; gap: 8px; }
+  .fav-chip {
+    flex: none; display: inline-flex; align-items: center; gap: 10px;
+    min-height: 60px; padding: 0 26px; cursor: pointer;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.4); border-radius: 999px;
+    font-family: var(--sans); font-size: 21px; font-weight: 600; color: var(--wheat-deep);
+  }
+  .fav-chip svg { width: 24px; height: 24px; }
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 20px; }
+  .metric { background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 14px 18px; }
+  .metric .k { font-size: 17px; color: var(--muted); }
+  .metric .v { font-size: 24px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .metric .v.salary { color: var(--clay-deep); }
+  .sum-card .meta-chips { margin-top: 16px; }
+  .desc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; }
+  .desc-grid h3 { font-size: 22px; font-weight: 700; margin-bottom: 12px; color: var(--clay-deep); }
+  .desc-grid ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .desc-grid li { font-size: 20px; line-height: 1.5; color: var(--ink); display: flex; gap: 10px; }
+  .desc-grid li::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); margin-top: 11px; }
+  .kv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .kv .k { font-size: 18px; color: var(--muted); }
+  .kv .v { font-size: 23px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .src-link { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-size: 18px; color: var(--muted); }
+  .src-link svg { width: 19px; height: 19px; flex: none; opacity: .7; }
+  .src-link b { color: var(--ink); font-weight: 600; word-break: break-all; }
+  .src-card .notice { margin-top: 16px; }
+  .action-zone { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: stretch; }
+  .next-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .next-grid .tile { min-height: 104px; }
+  .action-zone .qr-panel { padding: 20px; gap: 10px; }
+  .action-zone .qr-box { width: 170px; height: 170px; }
+  .action-zone .qr-sub { font-size: 17px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回列表
+    </button>
+    <div class="titles">
+      <h1>岗位详情</h1>
+      <p>XX人才网 · 信息以来源平台为准</p>
+    </div>
+    <div class="aside">
+      <span class="badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 4h6v6M20 4l-9 9M19 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"/></svg>
+        线上招聘平台来源
+      </span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 岗位摘要 -->
+    <section class="card accented a-clay sum-card">
+      <div class="sum-head">
+        <div class="titles-min">
+          <h2>行政专员</h2>
+          <div class="sum-loc">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M9 8h2M9 12h2M15 10h4v11"/></svg>华辰科技</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>城东区 · 幸福路120号写字楼B座</span>
+          </div>
+        </div>
+        <button class="fav-chip">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.6 6.6L21 9.2l-5 4.3 1.6 6.5L12 16.8 6.4 20l1.6-6.5-5-4.3 6.4-.6z"/></svg>
+          已收藏
+        </button>
+      </div>
+      <div class="metric-grid">
+        <div class="metric"><div class="k">薪资</div><div class="v salary">5-7K / 月</div></div>
+        <div class="metric"><div class="k">类型</div><div class="v">全职</div></div>
+        <div class="metric"><div class="k">行业</div><div class="v">信息技术</div></div>
+        <div class="metric"><div class="k">字段完整度</div><div class="v">92%</div></div>
+      </div>
+      <div class="meta-chips">
+        <span class="chip">大专及以上</span>
+        <span class="chip">经验不限</span>
+        <span class="chip">双休</span>
+        <span class="chip">五险一金</span>
+        <span class="chip">餐补</span>
+      </div>
+    </section>
+
+    <!-- 职责与要求 -->
+    <section class="card a-clay">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
+        <div><h2>职责与要求</h2><div class="sub">内容由来源平台同步</div></div>
+      </div>
+      <div class="desc-grid">
+        <div>
+          <h3>岗位职责</h3>
+          <ul>
+            <li>负责办公用品采购、登记与日常行政事务</li>
+            <li>协助组织公司会议,整理会议纪要</li>
+            <li>管理档案资料,协助员工考勤统计</li>
+            <li>对接物业与供应商,维护办公环境</li>
+          </ul>
+        </div>
+        <div>
+          <h3>任职要求</h3>
+          <ul>
+            <li>大专及以上学历,专业不限</li>
+            <li>熟练使用常用办公软件</li>
+            <li>工作细致耐心,沟通表达清晰</li>
+            <li>有行政 / 文员相关经历者优先</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 来源可信区 -->
+    <section class="card accented a-wheat src-card">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <div><h2>来源可信区</h2><div class="sub">第三方来源信息,请核对后前往办理</div></div>
+      </div>
+      <div class="kv-grid">
+        <div class="kv"><div class="k">来源机构</div><div class="v">XX人才网</div></div>
+        <div class="kv"><div class="k">来源类型</div><div class="v">线上招聘平台</div></div>
+        <div class="kv"><div class="k">同步时间</div><div class="v">2026-07-17 08:30</div></div>
+        <div class="kv"><div class="k">外部ID</div><div class="v">JOB-88231</div></div>
+      </div>
+      <div class="src-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 14a5 5 0 007.1 0l2.1-2.1a5 5 0 00-7.1-7.1L11 6"/><path d="M14 10a5 5 0 00-7.1 0l-2.1 2.1a5 5 0 007.1 7.1L13 18"/></svg>
+        来源链接 <b>job.example-hr.cn/post/88231</b><span style="margin-left:8px">(完整链接见扫码页)</span>
+      </div>
+      <div class="notice">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+        本岗位来自第三方 / 官方来源,本终端仅提供信息展示与跳转,不参与招聘流程,内容以来源平台为准。
+      </div>
+    </section>
+
+    <!-- 后续动作 -->
+    <div class="action-zone">
+      <section class="card a-clay">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          <div><h2>后续动作</h2><div class="sub">AI 内容仅供参考,需登录后使用</div></div>
+        </div>
+        <div class="next-grid">
+          <button class="tile tinted a-clay">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 4.6L18 9.4l-4.2 1.8L12 16l-1.8-4.8L6 9.4l4.2-1.8z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9z"/></svg></span>
+            <span class="t-text"><b>AI岗位解读</b><span>看懂职责与准备点</span></span>
+          </button>
+          <button class="tile a-clay">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></svg></span>
+            <span class="t-text"><b>岗位匹配参考</b><span>用本人简历做准备</span></span>
+          </button>
+          <button class="tile a-clay">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V5a1 1 0 011-1h8a1 1 0 011 1v16M9 8h2M9 12h2M15 10h4v11"/></svg></span>
+            <span class="t-text"><b>查看企业</b><span>华辰科技 · 企业风采</span></span>
+          </button>
+          <button class="tile a-clay">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span>
+            <span class="t-text"><b>打印岗位信息</b><span>A4 黑白 · 以现场公示价为准</span></span>
+          </button>
+        </div>
+      </section>
+      <div class="qr-panel">
+        <div class="qr-title">扫码投递</div>
+        <div class="qr-box"></div>
+        <div class="qr-sub">手机扫码打开来源平台投递页,投递结果以来源平台为准(图为占位示意,接线后生成)</div>
+      </div>
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <span style="font-size:18px; color:var(--muted); line-height:1.5; max-width:340px;">投递在来源平台完成,本终端不接收简历、不参与招聘流程</span>
+    <div class="spacer"></div>
+    <button class="btn dark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg>
+      扫码投递
+    </button>
+    <button class="btn primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 4h6v6M20 4l-9 9M19 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5"/></svg>
+      去来源平台投递
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

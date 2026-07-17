@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历服务 · 导出与打印(无输出物守门页)</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 20px; }
+  /* 诚实空态主卡 */
+  .void-card {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: 18px; padding: 40px 60px;
+  }
+  .void-card .v-icon {
+    width: 108px; height: 108px; border-radius: 28px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .void-card .v-icon svg { width: 56px; height: 56px; }
+  .void-card .lab { font-size: 17px; font-weight: 600; letter-spacing: 2px; color: var(--muted); }
+  .void-card h2 { font-family: var(--serif); font-size: 38px; font-weight: 900; letter-spacing: 2px; }
+  .void-card .desc { font-size: 20px; color: var(--muted); line-height: 1.6; max-width: 760px; }
+  .void-acts { display: flex; gap: 16px; margin-top: 6px; }
+  .void-card .go { margin-top: 4px; }
+  /* 获取真实文件的三条路径 */
+  .path-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .path {
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 18px 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .path .p-no {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 19px; font-weight: 700;
+    background: var(--teal-soft); color: var(--teal-deep);
+  }
+  .path b { font-size: 21px; font-weight: 700; }
+  .path span { font-size: 16px; color: var(--muted); line-height: 1.5; }
+  .foot-compliance { font-size: 16px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>导出与打印</h1>
+      <p>仅对已由真实导出流程生成的文件提供保存和打印</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip">AI 简历服务 · 输出物</span>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 诚实空态:当前没有真实输出物 -->
+    <section class="card accented a-teal void-card">
+      <span class="v-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 13h5M10 16.5h5"/></svg>
+      </span>
+      <p class="lab">暂无真实输出物</p>
+      <h2>当前流程尚未生成可导出的真实文件</h2>
+      <p class="desc">此页面不会虚构文件、保存结果或打印任务。请回到真实简历流程完成导出后,再使用导出完成页上对应的保存或打印操作。</p>
+      <div class="void-acts">
+        <button class="btn ghost" disabled title="尚无真实导出文件">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+          保存到我的简历
+        </button>
+        <button class="btn ghost" disabled title="尚无真实导出文件">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+          打印
+        </button>
+      </div>
+      <button class="btn primary go" style="min-width: 460px;">
+        返回真实简历流程
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <!-- 如何获得可导出的真实文件(对应三条真实链路) -->
+    <section class="card a-teal" style="flex:none">
+      <div class="card-head" style="margin-bottom:16px">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg></span>
+        <div><h2>如何获得可打印的简历文件</h2><div class="sub">完成任一真实流程后,即可在对应页面保存、下载或打印</div></div>
+      </div>
+      <div class="path-grid">
+        <div class="path"><span class="p-no">1</span><b>诊断优化后导出</b><span>上传简历 → AI 诊断 → 优化编辑 → 导出 PDF/Word/TXT/Markdown,并可当场打印。</span></div>
+        <div class="path"><span class="p-no">2</span><b>AI 生成简历后导出</b><span>没有电子简历时,引导式填写真实信息 → 预览编辑 → 导出 PDF → 打印。</span></div>
+        <div class="path"><span class="p-no">3</span><b>求职材料库生成</b><span>求职信、感谢信等材料填写后生成 PDF,进入「我的文档」,可再次打印。</span></div>
+      </div>
+    </section>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 4v5c0 4.4-3 8.2-7 9-4-0.8-7-4.6-7-9V7z"/><path d="M9.5 12l1.8 1.8 3.4-3.4"/></svg>
+      真实文件才会开放保存和打印;本页不会构造本人资产、成功状态或打印任务。文件短期保留后自动清理。
+    </div>
+
+    <p class="foot-compliance">简历仅供个人保存与打印,系统不收取求职者简历给企业。</p>
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

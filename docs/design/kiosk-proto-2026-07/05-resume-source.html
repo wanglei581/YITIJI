@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI简历诊断 · 上传与方向设置</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 20px; }
+  /* AI 生成入口条 */
+  .gen-strip {
+    display: flex; align-items: center; gap: 20px;
+    min-height: 88px; padding: 14px 26px;
+    background: var(--surface); border: 2px dashed rgba(31,158,134,.45); border-radius: var(--r-md);
+    cursor: pointer; text-align: left; font-family: var(--sans); color: var(--ink);
+  }
+  .gen-strip:active { transform: scale(.99); }
+  .gen-strip .gi {
+    width: 54px; height: 54px; flex: none; border-radius: 14px;
+    display: grid; place-items: center; background: var(--teal); color: #fffdf8;
+  }
+  .gen-strip .gi svg { width: 30px; height: 30px; }
+  .gen-strip b { display: block; font-size: 24px; font-weight: 700; }
+  .gen-strip span { display: block; font-size: 17px; color: var(--muted); margin-top: 4px; }
+  .gen-strip .go {
+    margin-left: auto; flex: none; font-size: 20px; font-weight: 600; color: var(--teal-deep);
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3);
+    padding: 12px 26px; border-radius: 999px;
+  }
+  /* 双栏:左上传 / 右方向设置 */
+  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .cols .card { display: flex; flex-direction: column; }
+  .ch-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .ch {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    min-height: 104px; padding: 14px 8px; text-align: center;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-sm);
+    cursor: pointer; font-family: var(--sans); color: var(--ink);
+  }
+  .ch svg { width: 30px; height: 30px; color: var(--teal-deep); }
+  .ch b { font-size: 20px; font-weight: 700; }
+  .ch span { font-size: 14.5px; color: var(--muted); line-height: 1.3; }
+  .ch.on { border-color: var(--teal); background: var(--teal-soft); }
+  .drop {
+    margin-top: 16px; flex: 1; min-height: 200px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: var(--teal-soft); border: 2px dashed rgba(31,158,134,.45); border-radius: var(--r-sm);
+    padding: 20px;
+  }
+  .drop svg { width: 50px; height: 50px; color: var(--teal-deep); }
+  .drop b { font-size: 24px; font-weight: 700; }
+  .drop .meta { font-size: 18px; color: var(--muted); }
+  .drop .fmt { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+  .fine { font-size: 16px; color: var(--muted); line-height: 1.5; margin-top: 14px; }
+  /* 方向设置 */
+  .dim-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .dim-chip {
+    min-height: 58px; display: grid; place-items: center; padding: 6px 8px; text-align: center;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 17.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .dim-chip.on { border-color: var(--teal); background: var(--teal-soft); color: var(--teal-deep); }
+  .form2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; margin-top: 16px; }
+  .form2 .field label { font-size: 18px; margin-bottom: 8px; }
+  .form2 .field input, .form2 .field select { min-height: 62px; font-size: 20px; }
+  .sec-label { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
+  .sec-label b { font-size: 20px; font-weight: 700; }
+  .sec-label .toggle {
+    font-size: 17px; font-weight: 600; color: var(--muted); cursor: pointer;
+    min-height: 48px; display: inline-flex; align-items: center;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0 22px;
+    font-family: var(--sans);
+  }
+  .sec-label small { font-size: 15.5px; color: var(--muted); font-weight: 400; }
+  /* 报告包含 */
+  .inc-card { flex: none; }
+  .inc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .inc {
+    min-height: 56px; display: grid; place-items: center; padding: 6px 8px; text-align: center;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-size: 17.5px; font-weight: 600; color: var(--ink);
+  }
+  .inc.extra { background: var(--wheat-soft); border-color: rgba(169,120,31,.3); color: var(--wheat-deep); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>AI简历诊断</h1>
+      <p>上传简历文件,生成基于真实内容的结构化诊断报告</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">隐私保护 <b>原文仅用于本次诊断,不沉淀简历库</b></span>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step active"><span class="s-dot">1</span><span class="s-label">上传与方向</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">2</span><span class="s-label">AI解析</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">诊断报告</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">优化打印</span></div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 没有电子简历 → AI 生成 -->
+    <button class="gen-strip">
+      <span class="gi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span>
+      <span><b>没有电子简历?AI 帮你生成一份</b><span>填写真实信息 → AI 润色排版 → 导出 PDF 当场打印(不编造任何经历)</span></span>
+      <span class="go">去生成</span>
+    </button>
+
+    <div class="cols">
+
+      <!-- 左:上传通道 + 文件 -->
+      <section class="card accented a-teal">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg></span>
+          <div><h2>上传简历文件</h2><div class="sub">三种方式任选,只读取你主动选择的文件</div></div>
+        </div>
+        <div class="ch-row">
+          <button class="ch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3h8v6H8zM10 3v3M6 9h12v11a1 1 0 01-1 1H7a1 1 0 01-1-1z"/></svg>
+            <b>U盘上传</b><span>从已插入的 U 盘中选择</span>
+          </button>
+          <button class="ch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg>
+            <b>纸质简历扫描</b><span>本机扫描,OCR 文字识别</span>
+          </button>
+          <button class="ch on">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg>
+            <b>手机扫码上传</b><span>一次性令牌,不带登录态</span>
+          </button>
+        </div>
+        <div class="drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 13h5M10 16.5h5"/></svg>
+          <b>王雨晴-行政专员-简历.pdf</b>
+          <span class="meta">486 KB · PDF · 手机扫码上传 · 已就绪</span>
+          <div class="fmt">
+            <span class="chip"><b>PDF</b></span><span class="chip"><b>DOC / DOCX</b></span>
+            <span class="chip"><b>JPG / PNG / WEBP</b></span><span class="chip">单文件 ≤ 20MB</span>
+          </div>
+        </div>
+        <p class="fine">再次触摸上方区域可更换文件;图片与扫描件将经 OCR 文字识别,识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因,可重试或更换上传方式。</p>
+      </section>
+
+      <!-- 右:诊断方向设置 -->
+      <section class="card accented a-teal">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></span>
+          <div><h2>诊断方向设置</h2><div class="sub">只影响建议关注顺序,报告仍固定输出 6 个维度</div></div>
+        </div>
+        <div class="sec-label">
+          <b>重点关注维度 <small>(默认 3 项,可增减)</small></b>
+          <button class="toggle">切换为通用诊断</button>
+        </div>
+        <div class="dim-grid">
+          <button class="dim-chip">基础信息完整度</button>
+          <button class="dim-chip">求职目标清晰度</button>
+          <button class="dim-chip on">经历表达清晰度</button>
+          <button class="dim-chip on">成果量化程度</button>
+          <button class="dim-chip on">岗位关键词覆盖</button>
+          <button class="dim-chip">版式与可读性</button>
+        </div>
+        <div class="form2">
+          <div class="field"><label>目标岗位</label><input type="text" value="行政专员"></div>
+          <div class="field"><label>行业方向</label><select><option>现代服务</option><option>互联网/科技</option><option>先进制造</option><option>教育/科研</option><option>通用</option></select></div>
+          <div class="field"><label>经验级别</label><select><option>1-3年</option><option>应届</option><option>3-5年</option><option>5年以上</option></select></div>
+          <div class="field"><label>求职场景</label><select><option>社招</option><option>校招</option><option>转岗</option><option>招聘会现场</option></select></div>
+          <div class="field"><label>专业(选填)</label><input type="text" placeholder="例如:行政管理"></div>
+          <div class="field"><label>学历(选填)</label><input type="text" placeholder="例如:大专、本科"></div>
+        </div>
+        <p class="fine">专业与学历仅用于本人简历表达的诊断重点参考,不影响是否可以诊断。</p>
+      </section>
+    </div>
+
+    <!-- 报告包含内容 -->
+    <section class="card a-teal inc-card">
+      <div class="sec-label" style="margin:0 0 14px">
+        <b>诊断报告包含以下内容</b>
+        <small>系统不会编造「超过多少人」「必然提分」等无法验证的结论</small>
+      </div>
+      <div class="inc-grid">
+        <span class="inc">基础信息完整度</span><span class="inc">求职目标清晰度</span>
+        <span class="inc">经历表达清晰度</span><span class="inc">成果量化程度</span>
+        <span class="inc">岗位关键词覆盖</span><span class="inc">版式与可读性</span>
+        <span class="inc extra">风险表述提醒</span><span class="inc extra">修改优先级建议</span>
+      </div>
+    </section>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      简历原文仅用于本次解析和诊断,不作为平台简历库沉淀;文件短期保留后自动清理,可在「我的文档」中删除。
+    </div>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 11a8 8 0 10-2.3 5.7M20 11V5m0 6h-6"/></svg>
+      更换文件
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8.5 11l1.8 1.8 3.4-3.4"/></svg>
+      开始 AI 诊断
+    </button>
+  </div>
+
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

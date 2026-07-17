@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>格式转换 · 图片合并 PDF</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .split { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .list-card { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .img-list { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+  .img-row {
+    flex: 1; display: flex; align-items: center; gap: 18px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 14px 20px; min-height: 96px;
+  }
+  .img-row .pv {
+    width: 96px; height: 128px; flex: none; border-radius: 6px;
+    background: #fff; border: 1px solid var(--line);
+    padding: 12px 10px; display: flex; flex-direction: column; gap: 6px;
+    box-shadow: 0 3px 8px rgba(16,48,43,.08);
+  }
+  .img-row .pv i { display: block; height: 5px; border-radius: 3px; background: var(--line); }
+  .img-row .pv i.t { height: 9px; width: 60%; background: var(--slate-soft); border: 1px solid rgba(63,104,176,.25); }
+  .img-row .pv i.w8 { width: 82%; } .img-row .pv i.w6 { width: 62%; }
+  .add-row {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 14px;
+    border: 2px dashed var(--line); border-radius: var(--r-sm); min-height: 96px;
+    background: var(--surface); color: var(--muted); font-size: 20px; cursor: pointer; font-family: var(--sans);
+  }
+  .add-row svg { width: 28px; height: 28px; }
+  .img-row .n {
+    width: 44px; height: 44px; flex: none; border-radius: 12px; display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--line);
+    font-size: 20px; font-weight: 700; color: var(--muted);
+  }
+  .img-row .i-icon {
+    width: 52px; height: 52px; flex: none; border-radius: 12px; display: grid; place-items: center;
+    background: var(--slate-soft); color: var(--slate-deep);
+  }
+  .img-row .i-icon svg { width: 28px; height: 28px; }
+  .img-row .i-main { flex: 1; min-width: 0; }
+  .img-row .i-main b { display: block; font-size: 22px; font-weight: 700; word-break: break-all; }
+  .img-row .i-main span { display: block; font-size: 16.5px; color: var(--muted); margin-top: 5px; }
+  .ctl { display: flex; flex-direction: column; gap: 7px; flex: none; }
+  .ctl button {
+    width: 56px; height: 56px; border-radius: 12px; cursor: pointer;
+    display: grid; place-items: center;
+    background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+  }
+  .ctl button:active { transform: scale(.94); }
+  .ctl button svg { width: 24px; height: 24px; }
+  .ctl button.del { border-color: rgba(193,74,52,.35); color: var(--error); }
+  .ctl button.dis { opacity: .3; }
+  .side-col { width: 420px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .add-card { padding: 18px 22px; }
+  .add-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 12px; }
+  .add-card .tile { min-height: 88px; width: 100%; }
+  .add-card .tile + .tile { margin-top: 12px; }
+  .qr-card { padding: 18px 22px; display: flex; align-items: center; gap: 18px; }
+  .qr-card .qr-box { width: 132px; height: 132px; flex: none; border-width: 6px; }
+  .qr-card .q-main b { font-size: 19px; font-weight: 700; display: block; }
+  .qr-card .q-main p { font-size: 16px; color: var(--muted); line-height: 1.5; margin-top: 6px; }
+  .rule-card { flex: 1; padding: 18px 22px; display: flex; flex-direction: column; }
+  .rule-card b.hd { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+  .rule-card ul { flex: 1; padding-left: 22px; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+  .rule-card li { font-size: 17.5px; line-height: 1.55; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回打印扫描服务
+    </button>
+    <div class="titles">
+      <h1>格式转换</h1>
+      <p>多张图片合并为一份 PDF,仅支持 JPG / PNG</p>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 去向说明 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      转换生成的 PDF 会保存到「我的文档」,默认保存约 24 小时,可在「我的文档」页面手动延长保存期限;生成后直接进入确认打印。
+    </div>
+
+    <div class="split">
+
+      <!-- 左:待合并列表 -->
+      <section class="card accented a-slate list-card">
+        <div class="card-head">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 16l4.5-4 4 3.5L16 12l4 4"/></svg></span>
+          <div><h2>待合并图片(3 / 20)</h2><div class="sub">合并顺序即页面顺序,可用右侧按钮调整或移除</div></div>
+        </div>
+        <div class="img-list">
+          <div class="img-row">
+            <span class="n">1</span>
+            <span class="pv"><i class="t"></i><i class="w8"></i><i class="w6"></i><i class="w8"></i><i class="w6"></i></span>
+            <span class="i-main"><b>毕业证书_拍摄.jpg</b><span>3.2 MB · 手机扫码上传</span></span>
+            <span class="ctl">
+              <button class="dis" disabled aria-label="上移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+              <button aria-label="下移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+              <button class="del" aria-label="移除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button>
+            </span>
+          </div>
+          <div class="img-row">
+            <span class="n">2</span>
+            <span class="pv"><i class="t"></i><i class="w6"></i><i class="w8"></i><i class="w8"></i><i class="w6"></i></span>
+            <span class="i-main"><b>学位证书_拍摄.jpg</b><span>2.8 MB · 手机扫码上传</span></span>
+            <span class="ctl">
+              <button aria-label="上移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+              <button aria-label="下移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+              <button class="del" aria-label="移除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button>
+            </span>
+          </div>
+          <div class="img-row">
+            <span class="n">3</span>
+            <span class="pv"><i class="t"></i><i class="w8"></i><i class="w6"></i><i class="w6"></i><i class="w8"></i></span>
+            <span class="i-main"><b>获奖证书_省级竞赛.png</b><span>1.6 MB · 本机上传</span></span>
+            <span class="ctl">
+              <button aria-label="上移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+              <button class="dis" disabled aria-label="下移"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+              <button class="del" aria-label="移除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7h16M9 7V5h6v2M7 7l1 13h8l1-13"/></svg></button>
+            </span>
+          </div>
+          <button class="add-row">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 5v14M5 12h14"/></svg>
+            继续添加图片(还可添加 17 张)
+          </button>
+        </div>
+        <div class="notice" style="margin-top: 16px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          生成的 PDF 每张图片占一页,按 A4 自动排版;生成后文件名为「格式转换-3张图片.pdf」。
+        </div>
+      </section>
+
+      <!-- 右:添加方式 + 规则 -->
+      <div class="side-col">
+        <section class="card add-card">
+          <b class="hd">继续添加图片</b>
+          <button class="tile primary a-slate">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V5M7.5 9.5L12 5l4.5 4.5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg></span>
+            <span class="t-text"><b>本机上传一张</b><span>每次选择一张,可连续添加</span></span>
+          </button>
+          <button class="tile a-slate">
+            <span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg></span>
+            <span class="t-text"><b>手机扫码添加</b><span>手机拍摄或选图,确认后加入列表</span></span>
+          </button>
+        </section>
+
+        <section class="card qr-card">
+          <span class="qr-box"></span>
+          <span class="q-main">
+            <b>手机扫码添加图片</b>
+            <p>手机扫码上传一张图片,确认后自动加入待合并列表;可重复扫码继续添加。</p>
+          </span>
+        </section>
+
+        <section class="card rule-card">
+          <b class="hd">转换规则</b>
+          <ul>
+            <li>仅支持 JPG / PNG 图片,单张不超过 10 MB。</li>
+            <li>一次最多合并 20 张图片,生成一份 PDF。</li>
+            <li>合并顺序即 PDF 页面顺序,生成前请调整好。</li>
+            <li>生成后自动进入确认打印;PDF 已保存到「我的文档」,不打印可直接返回。</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 7l4-4 4 4M8 3v10"/><path d="M20 17l-4 4-4-4M16 21V11"/></svg>
+      生成 PDF(3 张)
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

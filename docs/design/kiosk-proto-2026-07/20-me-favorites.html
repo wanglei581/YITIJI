@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 我的收藏</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .summary { display: flex; align-items: center; gap: 22px; padding: 20px 30px; }
+  .summary .s-ico { width: 60px; height: 60px; flex: none; border-radius: 15px; display: grid; place-items: center; background: var(--clay-soft); color: var(--clay-deep); }
+  .summary .s-ico svg { width: 32px; height: 32px; }
+  .summary .s-main p { font-size: 20px; color: var(--muted); }
+  .summary .s-main b { display: block; margin-top: 2px; font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .summary .s-note { flex: 1; font-size: 18px; color: var(--muted); line-height: 1.5; padding-left: 8px; }
+  .summary .s-mini { display: flex; gap: 12px; }
+  .summary .s-mini span { font-size: 18px; color: var(--muted); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 18px; }
+  .fav-list { display: flex; flex-direction: column; gap: 14px; }
+  .fav-list .row-item { min-height: 112px; padding: 20px 26px; }
+  .f-ico { width: 54px; height: 54px; flex: none; border-radius: 13px; display: grid; place-items: center; background: var(--accent-soft, var(--teal-soft)); color: var(--accent-deep, var(--teal-deep)); }
+  .f-ico svg { width: 28px; height: 28px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-clay">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>我的收藏</h1>
+      <p>本人收藏的岗位 / 招聘会 / 政策(仅本人可见)</p>
+    </div>
+  </div>
+
+  <main class="content a-clay">
+
+    <!-- 概览 -->
+    <section class="card accented a-clay summary">
+      <span class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z"/></svg></span>
+      <div class="s-main"><p>收藏夹</p><b>7</b></div>
+      <div class="s-note">只记录本人浏览兴趣,不含投递或预约结果</div>
+      <div class="s-mini"><span>岗位 3</span><span>招聘会 2</span><span>政策 2</span></div>
+    </section>
+
+    <!-- 类型 Tab -->
+    <div class="filter-bar">
+      <button class="f-chip on">全部 7</button>
+      <button class="f-chip">岗位 3</button>
+      <button class="f-chip">招聘会 2</button>
+      <button class="f-chip">政策 2</button>
+    </div>
+
+    <!-- 收藏列表(点击跳对应来源详情页) -->
+    <div class="fav-list">
+
+      <button class="row-item a-teal">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+        <div class="r-main">
+          <b>前端开发工程师 · 杭州云栖科技</b>
+          <div class="r-sub"><span>岗位 · 收藏于 07-16 21:40</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-teal">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+        <div class="r-main">
+          <b>行政专员 · 明州置业集团</b>
+          <div class="r-sub"><span>岗位 · 收藏于 07-15 16:22</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-teal">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18"/></svg></span>
+        <div class="r-main">
+          <b>电商运营(实习) · 青禾电子商务</b>
+          <div class="r-sub"><span>岗位 · 收藏于 07-15 10:08</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-wheat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <div class="r-main">
+          <b>2026 年夏季综合招聘会</b>
+          <div class="r-sub"><span>招聘会 · 收藏于 07-16 20:12</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-wheat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+        <div class="r-main">
+          <b>高校毕业生专场招聘会</b>
+          <div class="r-sub"><span>招聘会 · 收藏于 07-14 09:36</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-slate">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg></span>
+        <div class="r-main">
+          <b>高校毕业生一次性求职补贴申领指引</b>
+          <div class="r-sub"><span>政策 · 收藏于 07-12 11:05</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+      <button class="row-item a-slate">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg></span>
+        <div class="r-main">
+          <b>灵活就业社保补贴政策说明</b>
+          <div class="r-sub"><span>政策 · 收藏于 07-10 15:30</span></div>
+        </div>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+
+    </div>
+
+    <!-- 提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      收藏仅为本人浏览标记;来源机构、同步时间与外部ID在对应详情页查看。投递、预约请前往来源平台办理,本终端不代收简历。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

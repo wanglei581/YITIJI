@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 账号设置</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .acct-card { display: flex; align-items: center; gap: 24px; padding: 26px 32px; }
+  .acct-card .avatar {
+    width: 88px; height: 88px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal-soft); border: 2px solid rgba(31,158,134,.35);
+    color: var(--teal-deep); font-family: var(--serif); font-size: 42px; font-weight: 700;
+  }
+  .acct-card .u-info b { font-size: 30px; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+  .acct-card .u-info span { display: block; margin-top: 8px; font-size: 20px; color: var(--muted); }
+  .acct-card .u-top { display: flex; align-items: center; gap: 12px; }
+  .consent-row { display: flex; align-items: flex-start; gap: 18px; padding: 22px 30px; }
+  .consent-row .c-ico { width: 56px; height: 56px; flex: none; border-radius: 14px; display: grid; place-items: center; background: var(--plum-soft); color: var(--plum-deep); }
+  .consent-row .c-ico svg { width: 30px; height: 30px; }
+  .consent-row .c-main { flex: 1; min-width: 0; }
+  .consent-row .c-top { display: flex; align-items: center; gap: 12px; }
+  .consent-row .c-top b { font-size: 24px; font-weight: 700; }
+  .consent-row p { margin-top: 8px; font-size: 18px; color: var(--muted); line-height: 1.55; }
+  .consent-row .btn.sm { align-self: center; }
+  .session-note { display: flex; align-items: flex-start; gap: 16px; padding: 22px 30px; }
+  .session-note svg { width: 30px; height: 30px; flex: none; color: var(--teal-deep); }
+  .session-note b { font-size: 22px; font-weight: 700; }
+  .session-note p { margin-top: 6px; font-size: 18px; color: var(--muted); line-height: 1.6; }
+  .set-list { display: flex; flex-direction: column; gap: 13px; }
+  .set-row {
+    display: flex; align-items: center; gap: 20px;
+    min-height: 96px; padding: 18px 26px;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    cursor: pointer; text-align: left; font-family: var(--sans); color: var(--ink); width: 100%;
+  }
+  .set-row:active { transform: scale(.99); }
+  .set-row .s-icon { width: 54px; height: 54px; flex: none; border-radius: 13px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); color: var(--teal-deep); }
+  .set-row .s-icon svg { width: 28px; height: 28px; }
+  .set-row .s-text { flex: 1; min-width: 0; }
+  .set-row .s-text b { display: block; font-size: 24px; font-weight: 600; }
+  .set-row .s-text span { display: block; margin-top: 6px; font-size: 18px; color: var(--muted); line-height: 1.45; }
+  .set-row .arrow { flex: none; width: 26px; height: 26px; color: var(--muted); opacity: .6; }
+  .set-row.danger { background: var(--error-soft); border-color: rgba(193,74,52,.3); }
+  .set-row.danger .s-icon { color: var(--error); }
+  .set-row.danger .s-text b { color: var(--error); }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-teal">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>账号设置</h1>
+      <p>账号状态 · 会话说明 · 协议与隐私</p>
+    </div>
+  </div>
+
+  <main class="content a-teal">
+
+    <!-- 账号状态 -->
+    <section class="card accented acct-card">
+      <span class="avatar">王</span>
+      <div class="u-info">
+        <div class="u-top"><b>138****1921</b><span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8.5 12l2.4 2.4 4.6-4.8"/></svg>已登录</span></div>
+        <span>会员账号 · 手机号已脱敏展示,仅本人可见</span>
+      </div>
+    </section>
+
+    <!-- 隐私与 AI 授权管理 -->
+    <section class="card consent-row">
+      <span class="c-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+      <div class="c-main">
+        <div class="c-top"><b>隐私与 AI 授权管理</b><span class="chip ok">岗位 AI:已授权</span></div>
+        <p>岗位 AI 辅助只用于本人求职准备参考。撤回授权后,再次使用岗位推荐、解读或匹配时需要重新确认;已生成记录可在 AI服务记录中自行删除。</p>
+      </div>
+      <button class="btn ghost sm">撤回授权</button>
+    </section>
+
+    <!-- 公共终端会话说明 -->
+    <section class="card session-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/></svg>
+      <div>
+        <b>公共终端会话说明</b>
+        <p>本终端为公共设备,登录状态只保存在当前会话内存中,不写入本机存储。页面刷新、离开或闲置超时会自动退出登录并清除会话信息。请勿在终端上留存个人物品与文件。</p>
+      </div>
+    </section>
+
+    <!-- 协议与隐私 -->
+    <div class="duo">
+      <button class="set-row">
+        <span class="s-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span>
+        <span class="s-text"><b>用户服务协议</b><span>服务范围、账号、收费与打印说明</span></span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="set-row">
+        <span class="s-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+        <span class="s-text"><b>隐私政策</b><span>信息收集、使用与文件留存说明</span></span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <!-- 账号操作 -->
+    <div class="set-list">
+      <button class="set-row">
+        <span class="s-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 2l4 4-4 4M3 6h18M7 22l-4-4 4-4M21 18H3"/></svg></span>
+        <span class="s-text"><b>切换账号</b><span>退出当前账号后用另一手机号重新登录;当前会话信息会被清除,不会带入下一个账号</span></span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="set-row danger">
+        <span class="s-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></span>
+        <span class="s-text"><b>退出登录</b><span>退出后清除本次会话的登录状态,返回游客模式;本人记录已保存在账号下,下次登录仍可查看(需二次确认)</span></span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <!-- 暂不开放说明(诚实化) -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.2M12 17v.5"/></svg>
+      手机号换绑、账号注销和数据导出尚未开放;相关能力完成安全验证与运营闭环后将在本页提供。如需协助,请联系现场工作人员。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

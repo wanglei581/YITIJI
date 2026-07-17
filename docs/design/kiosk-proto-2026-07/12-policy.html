@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 政策服务</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 18px; }
+  /* 合规横幅:仅信息指引 · 不代办 + 问 AI 助手 */
+  .info-banner {
+    flex: none; display: flex; align-items: center; gap: 16px;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35);
+    border-radius: var(--r-sm); padding: 16px 22px;
+  }
+  .info-banner svg.shield { width: 30px; height: 30px; flex: none; color: var(--wheat-deep); }
+  .info-banner .ib-text { flex: 1; min-width: 0; }
+  .info-banner .ib-text b { display: block; font-size: 21px; color: var(--wheat-deep); }
+  .info-banner .ib-text span { display: block; margin-top: 4px; font-size: 17px; color: var(--wheat-deep); opacity: .85; line-height: 1.45; }
+  .info-banner .btn.sm { min-height: 60px; background: var(--surface); border: 1px solid rgba(169,120,31,.45); color: var(--wheat-deep); }
+  /* 身份筛选 */
+  .aud-wrap { flex: none; }
+  .aud-wrap .aud-cap { font-size: 20px; font-weight: 700; }
+  .aud-wrap .aud-cap small { font-size: 16px; font-weight: 400; color: var(--muted); margin-left: 14px; }
+  .aud-wrap .filter-bar { margin-top: 12px; }
+  .aud-wrap .f-chip { min-height: 56px; padding: 0 24px; font-size: 20px; }
+  .aud-wrap .f-chip.on { background: var(--wheat-soft); border-color: rgba(169,120,31,.55); color: var(--wheat-deep); }
+  .src-line { flex: none; display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--muted); }
+  .src-line svg { width: 18px; height: 18px; flex: none; }
+  /* 列表 + 详情双栏 */
+  .policy-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 430px 1fr; gap: 22px; align-items: stretch; }
+  .plist { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow-y: auto; }
+  .plist .row-item { align-items: flex-start; padding: 18px 20px; min-height: 0; }
+  .plist .r-main b { font-size: 22px; line-height: 1.35; }
+  .plist .r-main .r-sub { margin-top: 8px; font-size: 16px; gap: 6px 14px; }
+  .plist .ptag { display: inline-flex; font-size: 15px; font-weight: 600; border-radius: 999px; padding: 4px 12px; }
+  .ptag.amber { background: var(--wheat-soft); color: var(--wheat-deep); border: 1px solid rgba(169,120,31,.3); }
+  .ptag.slate { background: var(--slate-soft); color: var(--slate-deep); border: 1px solid rgba(63,104,176,.3); }
+  .plist .row-item.sel { border-color: rgba(169,120,31,.55); background: var(--wheat-soft); box-shadow: 0 3px 14px rgba(169,120,31,.12); }
+  .plist .fav { flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: none; border: none; color: var(--muted); opacity: .55; cursor: pointer; }
+  .plist .fav svg { width: 24px; height: 24px; }
+  .plist .fav.on { color: var(--error); opacity: 1; }
+  /* 详情 */
+  .detail { display: flex; flex-direction: column; gap: 16px; height: 100%; }
+  .detail h3 { font-family: var(--serif); font-size: 29px; font-weight: 700; line-height: 1.35; letter-spacing: 1px; }
+  .sec-title { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--wheat-deep); margin-bottom: 10px; }
+  .sec-title svg { width: 22px; height: 22px; }
+  .point-list { display: flex; flex-direction: column; gap: 9px; }
+  .point-list li { list-style: none; display: flex; align-items: flex-start; gap: 12px; font-size: 19px; line-height: 1.45; color: var(--ink); }
+  .point-list li::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--wheat); margin-top: 9px; }
+  .mat-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mat-list li { list-style: none; display: flex; align-items: center; gap: 10px; font-size: 18px; line-height: 1.35; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 11px 14px; }
+  .mat-list .ck { flex: none; width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35); color: var(--wheat-deep); }
+  .mat-list .ck svg { width: 16px; height: 16px; }
+  .step-list { display: flex; flex-direction: column; gap: 9px; }
+  .step-list li { list-style: none; display: flex; align-items: flex-start; gap: 12px; font-size: 19px; line-height: 1.45; }
+  .step-list .no { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--wheat-soft); color: var(--wheat-deep); font-size: 16px; font-weight: 700; }
+  .detail .actions { display: flex; gap: 14px; margin-top: auto; }
+  .detail .actions .btn { flex: 1; min-height: 78px; font-size: 21px; padding: 0 16px; white-space: nowrap; }
+  .detail .result-note { font-size: 15.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机在线</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead a-wheat" style="padding-bottom:18px">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>政策服务</h1>
+      <p>就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告</p>
+    </div>
+  </div>
+
+  <main class="content a-wheat">
+
+    <!-- 合规横幅:仅信息指引 -->
+    <div class="info-banner">
+      <svg class="shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+      <div class="ib-text">
+        <b>仅信息指引 · 不代办</b>
+        <span>只做政策说明、材料清单、官方入口与打印辅助;不代申请、不承诺补贴到账,不保存身份证 / 银行卡 / 社保等材料。</span>
+      </div>
+      <button class="btn sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M12 10v3M12 15.5v.5"/></svg>
+        问 AI 助手
+      </button>
+    </div>
+
+    <!-- 四个分类 tab(与真实页对齐) -->
+    <div class="filter-bar" style="flex:none">
+      <button class="f-chip on">就业政策</button>
+      <button class="f-chip">社保指南</button>
+      <button class="f-chip">就业登记</button>
+      <button class="f-chip">政策公告</button>
+    </div>
+
+    <!-- 身份筛选(政策匹配) -->
+    <div class="aud-wrap">
+      <div class="aud-cap">先选你的情况<small>选择身份后自动筛出更相关的政策事项,通用事项始终展示</small></div>
+      <div class="filter-bar">
+        <button class="f-chip on">全部</button>
+        <button class="f-chip">高校毕业生</button>
+        <button class="f-chip">灵活就业</button>
+        <button class="f-chip">返乡务工</button>
+        <button class="f-chip">创业人员</button>
+        <button class="f-chip">困难群体</button>
+      </div>
+    </div>
+
+    <!-- 数据来源说明 -->
+    <p class="src-line">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v.5M12 11v5"/></svg>
+      「政策发布」来源:市人社局 · 同步于 2026-07-15;其余为内置办事指引(整理参考,以官方发布为准)
+    </p>
+
+    <div class="policy-grid">
+
+      <!-- 左:政策事项列表 -->
+      <div class="plist">
+        <div class="row-item sel">
+          <div class="r-main">
+            <span class="ptag amber">补贴指引</span>
+            <b style="margin-top:8px;display:block">一次性求职创业补贴</b>
+            <div class="r-sub"><span>综合整理 · 国家政务服务平台口径</span></div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="r-main">
+            <span class="ptag amber">补贴指引</span>
+            <b style="margin-top:8px;display:block">灵活就业社保补贴</b>
+            <div class="r-sub"><span>综合整理 · 官方入口示例:青岛人社(其他地区请查询当地人社平台)</span></div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="r-main">
+            <span class="ptag amber">住房安家</span>
+            <b style="margin-top:8px;display:block">高校毕业生住房 / 安家政策</b>
+            <div class="r-sub"><span>综合整理 · 官方入口示例:青岛人才服务(其他地区请查询当地平台)</span></div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="r-main">
+            <span class="ptag slate">技能提升</span>
+            <b style="margin-top:8px;display:block">职业技能培训 / 技能提升补贴</b>
+            <div class="r-sub"><span>综合整理 · 人社培训补贴口径</span></div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="r-main">
+            <span class="ptag amber">创业扶持</span>
+            <b style="margin-top:8px;display:block">创业担保贷款 / 创业补贴</b>
+            <div class="r-sub"><span>综合整理 · 官方入口示例:青岛人社(其他地区请查询当地人社平台)</span></div>
+          </div>
+        </div>
+        <div class="row-item">
+          <div class="r-main">
+            <span class="ptag slate">政策发布</span>
+            <b style="margin-top:8px;display:block">高校毕业生就业见习补贴申领指引</b>
+            <div class="r-sub"><span>市人社局</span><span>更新 2026-07-15</span></div>
+          </div>
+          <button class="fav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7.5-4.8-9.5-9A5.4 5.4 0 0112 6.2 5.4 5.4 0 0121.5 12c-2 4.2-9.5 9-9.5 9z"/></svg></button>
+        </div>
+      </div>
+
+      <!-- 右:详情(条件 / 材料 / 办理路径) -->
+      <section class="card accented">
+        <div class="detail">
+          <h3>一次性求职创业补贴</h3>
+          <div class="meta-chips">
+            <span class="ptag amber">补贴指引</span>
+            <span class="chip">来源 <b>综合整理 · 国家政务服务平台口径</b></span>
+          </div>
+
+          <div>
+            <div class="sec-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+              先看是否符合
+            </div>
+            <ul class="point-list">
+              <li>毕业学年学生或当地政策规定的高校毕业生。</li>
+              <li>有就业创业意愿,且符合困难家庭、残疾、助学贷款等条件之一。</li>
+              <li>以学校或官方平台发布的申报周期为准。</li>
+            </ul>
+          </div>
+
+          <div>
+            <div class="sec-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5l1 1 2-2M4 11l1 1 2-2M4 17l1 1 2-2"/></svg>
+              需要准备材料
+            </div>
+            <ul class="mat-list">
+              <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>身份证明</li>
+              <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>学生身份或毕业信息证明</li>
+              <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>困难类型证明材料</li>
+              <li><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5 9-10"/></svg></span>本人银行卡或学校要求账户</li>
+            </ul>
+          </div>
+
+          <div>
+            <div class="sec-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+              建议办理路径
+            </div>
+            <ol class="step-list">
+              <li><span class="no">1</span>阅读本地政策口径与申报时间。</li>
+              <li><span class="no">2</span>按学校或官方平台要求准备材料。</li>
+              <li><span class="no">3</span>通过官方入口或学校渠道提交。</li>
+              <li><span class="no">4</span>等待官方审核结果。</li>
+            </ol>
+          </div>
+
+          <div class="actions">
+            <button class="btn ghost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg>
+              上传自备材料打印
+            </button>
+            <button class="btn dark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg>
+              扫码打开官方入口
+            </button>
+          </div>
+          <p class="result-note">办理结果以官方平台为准,本系统仅提供信息说明、材料清单与打印辅助。</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- 合规页脚 -->
+    <div class="notice" style="flex:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      政策与公告内容仅作展示说明,具体以官方发布为准。如需办理具体业务,请前往对应窗口或扫码访问官方平台。
+    </div>
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

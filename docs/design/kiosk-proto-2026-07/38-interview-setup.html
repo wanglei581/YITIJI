@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI面试训练 · 模拟面试设置</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 12px; }
+  .setup-card { padding: 16px 26px 18px; }
+  .setup-card .card-head { margin-bottom: 12px; }
+  .chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .chips .f-chip { min-height: 52px; padding: 0 22px; font-size: 20px; }
+  .chips .f-chip.on { background: var(--plum-soft); border-color: var(--plum); color: var(--plum-deep); font-weight: 700; }
+  .pos-input { margin-top: 10px; }
+  .pos-input input { min-height: 60px; font-size: 22px; }
+  .pos-eg { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .pos-eg button {
+    min-height: 48px; padding: 0 20px; cursor: pointer;
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    font-family: var(--sans); font-size: 17px; color: var(--muted);
+  }
+  /* 面试官 5 选 1 */
+  .iv-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .iv {
+    min-height: 72px; padding: 9px 18px; text-align: left; cursor: pointer;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); color: var(--ink);
+  }
+  .iv b { display: block; font-size: 20px; font-weight: 700; }
+  .iv span { display: block; font-size: 15px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+  .iv.on { border-color: var(--plum); background: var(--plum-soft); }
+  .iv.on b { color: var(--plum-deep); }
+  /* 难度 / 时长:带说明的选项 */
+  .lvl-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .lvl {
+    min-height: 74px; padding: 9px 14px; text-align: center; cursor: pointer;
+    background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); color: var(--ink);
+  }
+  .lvl b { display: block; font-size: 20px; font-weight: 700; }
+  .lvl span { display: block; font-size: 14.5px; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+  .lvl.on { border-color: var(--plum); background: var(--plum-soft); }
+  .lvl.on b { color: var(--plum-deep); }
+  /* 两列:经验+时长 / 简历+摘要 */
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .exp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .exp-grid .f-chip { min-height: 56px; justify-content: center; font-size: 19px; padding: 0 10px; }
+  .exp-grid .f-chip.on { background: var(--plum-soft); border-color: var(--plum); color: var(--plum-deep); font-weight: 700; }
+  /* 简历可选 */
+  .cv-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .cv-btn {
+    min-height: 64px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    font-family: var(--sans); font-size: 19px; font-weight: 600; color: var(--ink); cursor: pointer;
+  }
+  .cv-btn svg { width: 22px; height: 22px; color: var(--plum-deep); }
+  .cv-none {
+    min-height: 64px; display: flex; align-items: center; justify-content: center;
+    border: 1px dashed var(--line); border-radius: var(--r-sm);
+    font-size: 16px; color: var(--muted); background: var(--paper); padding: 0 12px; text-align: center;
+  }
+  .cv-fine { font-size: 15px; color: var(--muted); line-height: 1.5; margin-top: 8px; }
+  /* 摘要 */
+  .sum-list { display: flex; flex-direction: column; }
+  .sum-list .row {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+    min-height: 40px; border-bottom: 1px dashed var(--line); font-size: 17.5px; align-items: center;
+  }
+  .sum-list .row:last-child { border-bottom: none; }
+  .sum-list .k { color: var(--muted); flex: none; }
+  .sum-list b { font-weight: 700; text-align: right; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>模拟面试</h1>
+      <p>模拟练习,仅供参考 · 配置本次练习场景,进入 AI 面试间</p>
+    </div>
+    <div class="aside meta-chips">
+      <span class="chip ok">练习结果仅本人可见</span>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 岗位与行业 -->
+    <section class="card accented a-plum setup-card" style="flex:none">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
+        <div><h2>岗位与行业</h2><div class="sub">先确定目标岗位,后续题目会围绕这个方向展开</div></div>
+      </div>
+      <div class="chips">
+        <button class="f-chip">互联网 / AI</button>
+        <button class="f-chip">制造业</button>
+        <button class="f-chip">教育培训</button>
+        <button class="f-chip">医疗健康</button>
+        <button class="f-chip">金融服务</button>
+        <button class="f-chip">政务 / 国企</button>
+        <button class="f-chip on">零售 / 服务业</button>
+        <button class="f-chip">其他</button>
+      </div>
+      <div class="field pos-input">
+        <input type="text" value="行政专员" placeholder="输入目标岗位,如:前端开发工程师">
+      </div>
+      <div class="pos-eg">
+        <button>前端开发工程师</button>
+        <button>行政专员</button>
+        <button>市场运营</button>
+        <button>机械工程师</button>
+        <button>会计</button>
+        <button>销售代表</button>
+      </div>
+    </section>
+
+    <!-- 面试官与难度 -->
+    <section class="card accented a-plum setup-card" style="flex:none">
+      <div class="card-head">
+        <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg></span>
+        <div><h2>面试官与难度</h2><div class="sub">先选择面试官身份,再选择练习压力</div></div>
+      </div>
+      <div class="iv-grid">
+        <button class="iv on"><b>HR 初筛</b><span>自我介绍 · 求职动机 · 稳定性 · 薪资沟通</span></button>
+        <button class="iv"><b>业务主管</b><span>过往经历 · 岗位理解 · 协作与执行</span></button>
+        <button class="iv"><b>技术面试官</b><span>专业技能 · 项目细节 · 问题解决</span></button>
+        <button class="iv"><b>校招面试官</b><span>校园经历 · 学习能力 · 职业规划</span></button>
+        <button class="iv" style="grid-column: span 2;"><b>终面负责人</b><span>价值观 · 长期发展 · 综合判断</span></button>
+      </div>
+      <div class="lvl-grid" style="margin-top:12px">
+        <button class="lvl"><b>轻松练习</b><span>适合第一次练习,问题更基础</span></button>
+        <button class="lvl on"><b>标准面试</b><span>接近真实面试节奏</span></button>
+        <button class="lvl"><b>压力面试</b><span>更多追问与细节验证</span></button>
+      </div>
+    </section>
+
+    <!-- 经验 + 时长 -->
+    <div class="duo" style="flex:none">
+      <section class="card a-plum setup-card">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M22 9L12 4 2 9l10 5z"/><path d="M6 11.5V16c0 1.6 2.7 3 6 3s6-1.4 6-3v-4.5"/></svg></span>
+          <div><h2>经验</h2></div>
+        </div>
+        <div class="exp-grid">
+          <button class="f-chip">应届生</button>
+          <button class="f-chip">1 年以内</button>
+          <button class="f-chip on">1-3 年</button>
+          <button class="f-chip">3-5 年</button>
+          <button class="f-chip">5 年以上</button>
+          <button class="f-chip">转行求职</button>
+        </div>
+      </section>
+      <section class="card a-plum setup-card">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
+          <div><h2>时长</h2></div>
+        </div>
+        <div class="lvl-grid">
+          <button class="lvl"><b>3 分钟</b><span>快速练习<br>约 3-4 题</span></button>
+          <button class="lvl on"><b>5 分钟</b><span>标准练习<br>约 4-6 题</span></button>
+          <button class="lvl"><b>8 分钟</b><span>深度练习<br>约 6-8 题</span></button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 简历(可选) + 摘要 -->
+    <div class="duo" style="flex:none">
+      <section class="card a-plum setup-card">
+        <div class="card-head" style="margin-bottom:14px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 13h5M10 16.5h5"/></svg></span>
+          <div><h2>简历(可选)</h2><div class="sub">上传后面试官会结合经历提问</div></div>
+        </div>
+        <div class="cv-row">
+          <button class="cv-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 002 2h12a2 2 0 002-2v-3"/></svg>
+            上传简历
+          </button>
+          <span class="cv-none">不上传也可以开始练习</span>
+        </div>
+        <p class="cv-fine">不上传则按通用问题练习;简历仅用于本次出题,不发送给任何企业。</p>
+      </section>
+      <section class="card accented a-plum setup-card">
+        <div class="card-head" style="margin-bottom:10px">
+          <span class="g-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5H6a1 1 0 00-1 1v14a1 1 0 001 1h12a1 1 0 001-1V6a1 1 0 00-1-1h-3"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><h2>本次练习摘要</h2></div>
+        </div>
+        <div class="sum-list">
+          <div class="row"><span class="k">面试官</span><b>HR 初筛</b></div>
+          <div class="row"><span class="k">行业 / 岗位</span><b>零售 / 服务业 · 行政专员</b></div>
+          <div class="row"><span class="k">经验 / 难度</span><b>1-3 年 · 标准面试</b></div>
+          <div class="row"><span class="k">时长</span><b>5 分钟 · 约 4-6 题</b></div>
+          <div class="row"><span class="k">使用简历</span><b>不使用简历</b></div>
+        </div>
+      </section>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本功能仅供本人面试练习与准备参考,不代表任何招聘结果承诺,不参与企业筛选、面试邀约或录用决策。报告将基于你的回答与确认后的转写文本生成,仅供本人练习复盘。
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 460px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 5l11 7-11 7z"/></svg>
+      开始模拟面试
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

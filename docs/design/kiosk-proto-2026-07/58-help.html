@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 帮助中心</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 18px; }
+  .filter-bar { flex: none; }
+  .filter-bar .f-chip { min-height: 58px; font-size: 20px; padding: 0 24px; }
+  .faq-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 13px; }
+  .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .faq-grid .faq { padding: 15px 18px; }
+  .faq-grid .q-body b { font-size: 21px; }
+  .faq-grid .arrow { margin-top: 22px; }
+  .faq {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 18px 24px; cursor: pointer;
+    display: flex; align-items: flex-start; gap: 16px;
+    width: 100%; text-align: left; font-family: var(--sans); color: var(--ink);
+    box-shadow: 0 3px 10px rgba(16,48,43,.04);
+  }
+  .faq:active { transform: scale(.995); }
+  .faq .q-mark {
+    flex: none; width: 44px; height: 44px; border-radius: 12px;
+    display: grid; place-items: center;
+    background: var(--teal-soft); color: var(--teal-deep);
+    font-family: var(--serif); font-size: 24px; font-weight: 900;
+  }
+  .faq .q-body { flex: 1; min-width: 0; }
+  .faq .q-body .q-cat {
+    display: inline-flex; font-size: 15px; font-weight: 600; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 999px;
+    padding: 3px 12px; margin-bottom: 8px;
+  }
+  .faq .q-body b { display: block; font-size: 23px; font-weight: 700; letter-spacing: .5px; }
+  .faq .arrow { flex: none; width: 26px; height: 26px; color: var(--muted); opacity: .6; margin-top: 26px; }
+  .faq.open { border-color: rgba(31,158,134,.45); }
+  .faq.open .arrow { transform: rotate(90deg); margin-top: 26px; }
+  .faq .q-ans { margin-top: 10px; font-size: 19px; line-height: 1.55; color: var(--muted); }
+  .faq .q-link {
+    margin-top: 14px; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 24px; cursor: pointer;
+    background: var(--paper); border: 1px solid rgba(31,158,134,.45); border-radius: 12px;
+    font-family: var(--sans); font-size: 19px; font-weight: 600; color: var(--teal-deep);
+  }
+  .faq .q-link svg { width: 20px; height: 20px; }
+  .contact-card { display: flex; align-items: center; gap: 22px; }
+  .contact-card .c-icon {
+    flex: none; width: 76px; height: 76px; border-radius: 18px;
+    display: grid; place-items: center;
+    background: var(--clay-soft); color: var(--clay-deep);
+  }
+  .contact-card .c-icon svg { width: 40px; height: 40px; }
+  .contact-card .c-main { flex: 1; }
+  .contact-card .c-main b { display: block; font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .contact-card .c-main p { margin-top: 6px; font-size: 19px; color: var(--muted); line-height: 1.5; }
+  .contact-card .c-time {
+    flex: none; text-align: center;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+    padding: 14px 26px;
+  }
+  .contact-card .c-time span { display: block; font-size: 16px; color: var(--muted); }
+  .contact-card .c-time b { display: block; margin-top: 5px; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机在线</span>
+    </div>
+  </header>
+
+  <!-- 页头 -->
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回我的
+    </button>
+    <div class="titles">
+      <h1>帮助中心</h1>
+      <p>常见问题与使用说明</p>
+    </div>
+  </div>
+
+  <main class="content">
+
+    <!-- 问题分组(与真实页七大分组对齐) -->
+    <div class="filter-bar">
+      <button class="f-chip on">全部</button>
+      <button class="f-chip">登录与账号</button>
+      <button class="f-chip">AI简历服务</button>
+      <button class="f-chip">打印与扫描</button>
+      <button class="f-chip">政策服务</button>
+      <button class="f-chip">岗位与招聘会</button>
+      <button class="f-chip">我的记录</button>
+      <button class="f-chip">隐私与留存</button>
+    </div>
+
+    <!-- FAQ 列表(7 条,首条展开) -->
+    <div class="faq-list">
+      <button class="faq open">
+        <span class="q-mark">问</span>
+        <span class="q-body">
+          <span class="q-cat">登录与账号</span>
+          <b>一定要登录才能使用吗?</b>
+          <span class="q-ans">不需要。大部分服务可以游客身份直接使用。使用手机验证码登录后,本次服务记录(简历记录、文档、打印订单、收藏等)会关联到你的账号,仅本人可见。</span>
+          <span class="q-link">去登录<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+        </span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <button class="faq open">
+        <span class="q-mark">问</span>
+        <span class="q-body">
+          <span class="q-cat">隐私与留存</span>
+          <b>我上传的简历会被泄露或推送给企业吗?</b>
+          <span class="q-ans">不会。简历内容仅用于你本次发起的 AI 分析,不进入任何「简历库」,不推送给任何企业或第三方招聘方。</span>
+        </span>
+        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+      <div class="faq-grid">
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">登录与账号</span><b>为什么离开或刷新后又变回游客了?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">登录与账号</span><b>怎么切换成另一个账号?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">AI简历服务</span><b>AI 简历服务能做什么?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">AI简历服务</span><b>AI 会保证我面试或录用成功吗?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">打印与扫描</span><b>怎么打印文件?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">打印与扫描</span><b>扫描的文件保存在哪里?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">政策服务</span><b>政策服务能帮我申请补贴吗?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">岗位与招聘会</span><b>可以在这里办理岗位申请吗?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">我的记录</span><b>在哪里查看我的文档和订单?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button class="faq">
+          <span class="q-mark">问</span>
+          <span class="q-body"><span class="q-cat">隐私与留存</span><b>文件会保存多久?</b></span>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 联系现场工作人员 -->
+    <section class="card a-clay accented" style="flex:none">
+      <div class="contact-card">
+        <span class="c-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12a8 8 0 0116 0M3 14a2 2 0 012-2h1v6H5a2 2 0 01-2-2zM21 14a2 2 0 00-2-2h-1v6h1a2 2 0 002-2v-2zM19 18a4 4 0 01-4 3h-2"/></svg></span>
+        <span class="c-main">
+          <b>联系现场工作人员</b>
+          <p>如需更多帮助,请前往大厅服务台联系现场工作人员;设备故障请勿自行拆卸或拉扯纸张。</p>
+        </span>
+        <span class="c-time"><span>现场服务时间</span><b>以大厅现场公示为准</b></span>
+      </div>
+    </section>
+
+    <div class="notice" style="flex:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      本终端仅提供信息与打印辅助服务,办理结果以官方 / 来源平台为准。
+    </div>
+
+  </main>
+
+  <!-- 底部导航 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>
