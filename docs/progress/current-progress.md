@@ -1,6 +1,8 @@
 # 当前开发进度
 
-2026-07-17 **用户中心计划状态二次校准候选（纯文档，待 PR/CI）**：PR #272 已将 Wave 1-A 的合入事实写回进度 SSOT；本候选从 `origin/main@f1c6d4ad` 出发，只同步仍停留在“运行时代码尚未开工”的产品方案和 Wave 0–1 总控计划。校准后确认 Wave 0、授权撤回终态保护、Wave 1-A 基础版及追加安全加固已合入主线，Wave 1-B/1-C、真实导出和不可逆注销仍未开始；不改 `next-tasks.md`，因为它已是最新真值。未修改运行时代码、数据库、依赖、CI、生产配置或密钥，未部署。
+2026-07-17 **用户中心计划状态二次校准已合入主线**：PR #274 已 merge 至 `main@4e6c894b`，GitHub Actions `29553761306` 的 `postgres-readiness` 与 `build-and-verify` 均成功；校准后的正式真值为 Wave 0、授权撤回终态保护、Wave 1-A 基础版及追加安全加固均已合入，Wave 1-B/1-C、真实导出和不可逆注销仍未开始，且未部署。
+
+2026-07-17 **Wave 1-B 可逆数据权利实施计划（纯文档，待进入 Slice 1）**：新增 `docs/superpowers/plans/2026-07-17-user-center-wave1b-reversible-data-rights.md`，将数据导出拆为账本/契约与删除 fail-closed 闸门、必需审计与敏感队列、白名单 artifact、一次性下载租约与 reconciler、受限运营动作五个独立切片。计划明确 `delete` 在任何 Prisma、Redis、BullMQ、文件或审计副作用前返回 `ACCOUNT_CLOSURE_NOT_AVAILABLE`；法务签字的分类留存矩阵、冷静期、财务/审计期限和独立执行开关未齐前，不新增删除 worker、不创建注销工单、不改变会员状态。本项未修改运行时代码、schema、migration、配置或生产环境，也未开放 Kiosk/Admin 可见入口。
 
 2026-07-17 **用户中心 Wave 1-A 追加安全加固已合入主线，未部署**：[PR #270](https://github.com/wanglei581/YITIJI/pull/270) 已于 2026-07-17 squash merge 到 `main@88e940cd`。首轮 `postgres-readiness` 暴露 GitHub runner 未安装 `rg`：`verify-member-account-status.ts` 的静态 guard 扫描因 `spawnSync rg ENOENT` 失败；`e5a1bb7a` 已改为 Node 标准库递归扫描 controller 文件，并在本机移除 `rg` 的 PATH 下完成 RED→GREEN、专项验证、API typecheck/lint、依赖 critical 审计和双模型复审。合并前最终 GitHub Actions `29552177099` 的 `postgres-readiness` 与 `build-and-verify` 均通过，PR 合并状态为 `MERGED`。修复只改验证脚本，不改变运行时账户安全语义；本轮仍未部署，未触碰生产、真实短信、数据库、Redis、密钥、支付、Windows 或打印。
 

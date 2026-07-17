@@ -50,7 +50,7 @@
 - [x] **Wave 0 授权撤回终态保护补丁（已合入，未部署）**：`revoke_consent→rejected` 已 fail closed，授权已在请求创建时真实撤回时拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。PR #263 的双 CI、SQLite/PostgreSQL 空库复验与双模型审查均通过。
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
-- [ ] **Wave 1-B 数据权利执行器（安全加固交付后下一步）**：补 export/delete 请求互斥、导出包异步生成、单次下载租约/finish/reconciler、服务端 auditRef、closing 最小回执和注销分类 fail-closed gate；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活；法务分类留存矩阵未签字前不得执行不可逆删除。
+- [ ] **Wave 1-B 数据权利执行器（安全加固交付后下一步）**：按 `docs/superpowers/plans/2026-07-17-user-center-wave1b-reversible-data-rights.md` 先实施 Slice 1（账本/契约与零副作用删除闸门），再分 PR 推进异步白名单导出、一次性下载租约/finish/reconciler 与受限运营动作；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一数据库事务内更新 `statusChangedAt`，确保既有 grant 无法跨状态纪元复活。法务分类留存矩阵未签字前不得执行不可逆删除，也不得创建注销工单或进入 `closing`。
 - [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。

@@ -1,0 +1,12 @@
+{
+  "id": "user-center-wave1b-execution-plan-r2-20260717",
+  "title": "Wave 1-B 可逆数据权利实施计划与安全收口",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "member-privacy",
+  "currentPhase": "completed",
+  "nextAction": "已形成可逆数据权利计划；后续经确认后从 Slice 1 开始运行时代码实施",
+  "createdAt": "2026-07-17T12:30:00+08:00",
+  "branch": "codex/user-center-wave1b-execution-plan-r2-20260717"
+}
