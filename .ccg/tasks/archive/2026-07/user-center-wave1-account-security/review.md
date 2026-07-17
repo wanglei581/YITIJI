@@ -6,7 +6,8 @@
 
 - 本地候选首次在 `bbdd4176` 整合主线，并在终审期间继续无冲突整合 `origin/main@30d168ce`。
 - Antigravity：`Gemini 3.5 Flash (High)`，`APPROVE`，Critical 0 / Warning 0。
-- Claude：`APPROVE`，Critical 0；2 项非阻塞交付条件已转为正式任务门禁。
+- Claude：首次终审 `APPROVE`，Critical 0；2 项非阻塞交付条件已转为正式任务门禁。
+- 最新主线复审（`68efc5d0`）：Antigravity `APPROVE`，Critical 0 / Warning 0；Claude `APPROVE`，Critical 0 / Warning 1，唯一 Warning 为已登记的生产 `trust proxy` 门禁。
 - 合并冲突只读复核：初始 15 个冲突（4 add/add + 11 content）均已解决；未回退 release provenance、Admin 手机转移、会员打印订单和 governed job-fit 主线修复。
 
 ## 已关闭的风险
