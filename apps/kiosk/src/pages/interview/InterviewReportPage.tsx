@@ -25,6 +25,7 @@ import {
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { InterviewTopbar } from './InterviewTopbar'
 import './interview-service-desk.css'
 
 interface ReportState {
@@ -40,9 +41,9 @@ const LEVEL_META: Record<string, { label: string; cls: string }> = {
   excellent: { label: '表现突出', cls: 'bg-success-bg text-success-fg' },
 }
 
-function Section({ icon: Icon, title, children }: { icon: React.ElementType; title: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, children, className = '' }: { icon: React.ElementType; title: string; children: React.ReactNode; className?: string }) {
   return (
-    <Card className="interview-card interview-report__section p-5">
+    <Card className={['interview-card interview-report__section p-5', className].filter(Boolean).join(' ')}>
       <div className="mb-3 flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary-600" aria-hidden="true" />
         <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
@@ -130,15 +131,17 @@ export function InterviewReportPage() {
 
   return (
     <div className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewTopbar />
       <PageHeader
+        className="interview-pagehead"
         title="模拟面试练习报告"
-        subtitle={`${data.position} · ${data.industry} · ${data.interviewerLabel}`}
+        subtitle={`模拟练习，仅供参考 · ${data.position} · ${data.industry} · ${data.interviewerLabel}`}
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
-      <div className="interview-flow__scroll mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
           本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
@@ -161,7 +164,8 @@ export function InterviewReportPage() {
           <Section icon={MessageSquareTextIcon} title="沟通与应变能力"><Bullets items={data.report.adaptability} /></Section>
         </div>
 
-        <Section icon={AlertTriangleIcon} title="风险点与改进建议">
+        <div className="interview-report__two-col">
+        <Section icon={AlertTriangleIcon} title="风险点与改进建议" className="interview-report__risk">
           <ul className="flex flex-col gap-2">
             {data.report.risks.map((t) => (
               <li key={t.slice(0, 24)} className="flex items-start gap-2 rounded-lg bg-warning-bg px-3 py-2 text-sm leading-relaxed text-warning-fg">
@@ -172,7 +176,7 @@ export function InterviewReportPage() {
           </ul>
         </Section>
 
-        <Section icon={HelpCircleIcon} title="高频问题预测（建议继续准备）">
+        <Section icon={HelpCircleIcon} title="高频问题预测" className="interview-report__questions">
           <div className="flex flex-col gap-3">
             {data.report.predictedQuestions.map((q, i) => (
               <div key={q.question.slice(0, 24)} className="rounded-xl border border-neutral-100 bg-neutral-50/60 p-3.5">
@@ -183,6 +187,7 @@ export function InterviewReportPage() {
             ))}
           </div>
         </Section>
+        </div>
 
         <Section icon={LightbulbIcon} title="STAR 回答建议">
           <div className="flex flex-col gap-2 text-sm leading-relaxed text-neutral-700">

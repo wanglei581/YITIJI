@@ -12,6 +12,7 @@ import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
+import { InterviewTopbar } from './InterviewTopbar'
 import './interview-service-desk.css'
 
 function formatTime(iso: string) {
@@ -69,17 +70,19 @@ export function InterviewReportsPage() {
 
   return (
     <div className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewTopbar />
       <PageHeader
+        className="interview-pagehead"
         title="面试报告"
-        subtitle="模拟面试练习的历史报告（仅本人可见）"
+        subtitle="模拟面试练习的历史报告，仅本人可见 · 模拟练习，仅供参考"
         actions={
           <div className="flex gap-2">
             {isLoggedIn && (
               <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-                去我的 AI服务记录
+                AI服务记录
               </Button>
             )}
-            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
           </div>
         }
       />
@@ -90,7 +93,7 @@ export function InterviewReportsPage() {
         </div>
       )}
 
-      <div className="interview-flow__scroll mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="interview-flow__scroll flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
           <Card className="interview-card interview-reports__guest flex flex-col items-center gap-4 p-10 text-center">
             <FileSearchIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />

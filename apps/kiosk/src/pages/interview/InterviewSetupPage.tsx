@@ -30,6 +30,7 @@ import { createInterview, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { InterviewTopbar } from './InterviewTopbar'
 import './interview-service-desk.css'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
@@ -189,20 +190,22 @@ export function InterviewSetupPage() {
 
   return (
     <div className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewTopbar />
       <PageHeader
+        className="interview-pagehead"
         title="模拟面试"
-        subtitle="配置本次练习场景，进入 AI 数字人面试间"
+        subtitle="模拟练习，仅供参考 · 配置本次练习场景，进入 AI 面试间"
         actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
-      <div className="interview-flow__scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-28">
+      <div className="interview-flow__scroll min-h-0 flex-1 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">
           本功能仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
 
-        <div className="interview-setup__layout mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="interview-setup__layout mt-4 grid gap-4">
           <div className="interview-setup__form space-y-4">
             <Card className="interview-card interview-setup__job p-5">
               <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="先确定目标岗位，后续题目会围绕这个方向展开。" />
@@ -261,20 +264,20 @@ export function InterviewSetupPage() {
             </Card>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="interview-card p-5">
+              <Card className="interview-card interview-setup__experience p-5">
                 <SectionTitle icon={GraduationCapIcon} title="经验" />
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {EXPERIENCES.map((e) => (
                     <OptionButton key={e.key} active={experience === e.key} onClick={() => setExperience(e.key)}>{e.label}</OptionButton>
                   ))}
                 </div>
               </Card>
 
-              <Card className="interview-card p-5">
+              <Card className="interview-card interview-setup__duration p-5">
                 <SectionTitle icon={ClockIcon} title="时长" />
-                <div className="grid gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {DURATIONS.map((d) => (
-                    <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-left">
+                    <OptionButton key={d.key} active={duration === d.key} onClick={() => setDuration(d.key)} className="text-center">
                       <span className="block font-semibold">{d.label}</span>
                       <span className="mt-0.5 block text-xs font-normal text-neutral-500">{d.desc}</span>
                     </OptionButton>
@@ -318,7 +321,7 @@ export function InterviewSetupPage() {
             </Card>
           </div>
 
-          <aside className="interview-setup__summary xl:sticky xl:top-0 xl:self-start">
+          <aside className="interview-setup__summary">
             <Card className="interview-card interview-card--summary p-5">
               <div className="mb-4 flex items-center gap-2">
                 <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
