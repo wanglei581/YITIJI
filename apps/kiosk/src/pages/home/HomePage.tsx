@@ -59,7 +59,7 @@ function KioskTopBar() {
     <header className="k-top">
       <div className="k-brand">
         <strong>就业服务大厅 · {terminalId}</strong>
-        <span>AI求职打印服务终端</span>
+        <span>AI求职打印一体机</span>
       </div>
       <div className="k-status" role="status" aria-live="polite">
         <time className="k-clock">{clock}</time>
