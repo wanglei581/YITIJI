@@ -95,7 +95,7 @@ export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
           setDeviceStatus({ label: '打印机离线', paperLabel: paperLabelFor(data.paperLevel), tone: 'negative', networkIssue: false })
           return
         }
-        setDeviceStatus(mapPrinterStatus(data.printerStatus, data.paperLevel))
+        setDeviceStatus(mapPrinterStatus(data.printerStatus))
       } catch {
         if (generation !== requestGenerationRef.current) return
         if (controller.signal.aborted) return
