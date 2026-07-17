@@ -141,7 +141,7 @@ export class MemberAuthService {
     // 验证通过:立即销毁尝试计数；验证码已由 Redis 原子脚本删除(防并发重放)。
     await this.redis.del(attemptKey)
 
-    // upsert EndUser(by phoneHash)。新旧门禁双轨期间任何不可用状态都拒绝登录。
+    // upsert EndUser(by phoneHash)。新用户落 phoneEnc;不可用用户统一拒登。
     let user = await this.prisma.endUser.findUnique({ where: { phoneHash } })
     if (user && (!user.enabled || user.status !== 'active')) {
       throw this.accountUnavailable()
@@ -151,8 +151,8 @@ export class MemberAuthService {
         data: {
           phoneHash,
           phoneEnc: encryptPhone(phone),
-          enabled: true,
           status: 'active',
+          enabled: true,
           lastLoginAt: new Date(),
         },
       })
@@ -167,7 +167,6 @@ export class MemberAuthService {
   }
 
   async issueLoginForUser(user: MemberAuthUser): Promise<MemberLoginResult> {
-    // QR 确认与最终 claim 之间账户状态可能变化，签发前必须重读双轨门禁。
     const current = await this.prisma.endUser.findUnique({
       where: { id: user.id },
       select: { enabled: true, status: true },
@@ -179,11 +178,20 @@ export class MemberAuthService {
     // 建立 Redis 会话(jti),签发短期 JWT(aud=enduser + jti)。
     const sessionId = randomUUID()
     await this.redis.registerMemberSession(user.id, sessionId, SESSION_TTL)
-    const token = this.jwtService.sign({ sub: user.id }, { jwtid: sessionId })
+    try {
+      const afterRegistration = await this.prisma.endUser.findUnique({
+        where: { id: user.id },
+        select: { enabled: true, status: true },
+      })
+      if (!afterRegistration || !afterRegistration.enabled || afterRegistration.status !== 'active') {
+        throw this.accountUnavailable()
+      }
 
-    return {
-      token,
-      user,
+      const token = this.jwtService.sign({ sub: user.id }, { jwtid: sessionId })
+      return { token, user }
+    } catch (error) {
+      await this.cleanupRegisteredSession(user.id, sessionId)
+      throw error
     }
   }
 
@@ -254,5 +262,14 @@ export class MemberAuthService {
     return new ForbiddenException({
       error: { code: 'ACCOUNT_UNAVAILABLE', message: '账号当前不可登录，请联系工作人员' },
     })
+  }
+
+  private async cleanupRegisteredSession(endUserId: string, sessionId: string): Promise<void> {
+    try {
+      await this.redis.unregisterMemberSession(endUserId, sessionId)
+    } catch {
+      // Best effort only: never replace the original security/DB/signing error.
+      // No token is returned, and account-status guards remain fail-closed.
+    }
   }
 }

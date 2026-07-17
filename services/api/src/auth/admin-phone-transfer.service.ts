@@ -35,6 +35,7 @@ type PartnerSessionState = {
   orgId: string | null
   enabled: boolean
   tokenVersion: number
+  deletedAt: string | null
   orgEnabled: boolean
 }
 
@@ -285,6 +286,7 @@ export class AdminPhoneTransferService {
           orgId: freshPartner.orgId,
           enabled: freshPartner.enabled,
           tokenVersion: freshPartner.tokenVersion,
+          deletedAt: freshPartner.deletedAt?.toISOString() ?? null,
           orgEnabled: freshPartner.org?.enabled ?? false,
         }
       })

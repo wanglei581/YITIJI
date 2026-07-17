@@ -41,6 +41,9 @@ async function main(): Promise<void> {
   if (!process.env['REDIS_URL']) { fail('REDIS_URL missing'); process.exit(1) }
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['error', 'warn'] })
+  // Test-only trusted loopback proxy keeps this verifier's rate-limit buckets
+  // isolated without making production trust client-supplied forwarding headers.
+  app.set('trust proxy', 'loopback')
   app.setGlobalPrefix('api/v1')
   app.useGlobalPipes(
     new ValidationPipe({

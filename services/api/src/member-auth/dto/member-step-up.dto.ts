@@ -1,15 +1,8 @@
 import { IsIn, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator'
-
-export const MEMBER_STEP_UP_ACTIONS = [
-  'export_data_request',
-  'export_data_download',
-  'close_account',
-] as const
-
-export type MemberStepUpAction = (typeof MEMBER_STEP_UP_ACTIONS)[number]
+import { MEMBER_STEP_UP_ACTIONS, type MemberStepUpAction } from '../member-step-up.types'
 
 export class SendMemberStepUpCodeDto {
-  @IsIn([...MEMBER_STEP_UP_ACTIONS])
+  @IsIn(MEMBER_STEP_UP_ACTIONS)
   action!: MemberStepUpAction
 
   @IsOptional()

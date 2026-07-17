@@ -10,6 +10,7 @@
  * 6. 机构停用后 partner 登录失败。
  * 7. 忘记密码验证码重置后旧 token 立即失效。
  * 8. 响应不含明文手机号或验证码。
+ * 9. 墓碑账号无法通过登录、改密、绑手机号或陈旧会话缓存重新获得访问。
  *
  * 运行时总是自建并清理 OS 临时 SQLite，不读取或写入调用方的 DATABASE_URL。
  */
@@ -324,6 +325,7 @@ function createIsolatedVerificationDatabase(): { cleanup: () => void } {
         "phoneVerifiedAt" DATETIME,
         "tokenVersion" INTEGER NOT NULL DEFAULT 0,
         "lastLoginAt" DATETIME,
+        "deletedAt" DATETIME,
         "enabled" BOOLEAN NOT NULL DEFAULT true,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -471,8 +473,11 @@ async function main() {
   const verifiedPhone = phone('139', 1)
   const unverifiedPhone = phone('138', 2)
   const unknownPhone = phone('137', 3)
+  const disabledDuringResetPhone = phone('136', 5)
   const passwordV1 = `InitPass_${suffix}`
   const passwordV2 = `ResetPass_${suffix}`
+  const passwordV3 = `DisabledResetPass_${suffix}`
+  const passwordV4 = `DisabledSelfChangePass_${suffix}`
   let orgId = ''
 
   const cleanup = async () => {
@@ -500,6 +505,32 @@ async function main() {
         orgId,
         phoneHash: hashPhone(verifiedPhone),
         phoneEnc: encryptPhone(verifiedPhone),
+        phoneVerifiedAt: new Date(),
+      },
+    })
+    const deletedPartner = await prisma.user.create({
+      data: {
+        username: `via_deleted_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        name: '已移除合作机构账号',
+        role: 'partner',
+        orgId,
+        enabled: true,
+        deletedAt: new Date(),
+        phoneHash: hashPhone(phone('136', 4)),
+        phoneEnc: encryptPhone(phone('136', 4)),
+        phoneVerifiedAt: new Date(),
+      },
+    })
+    const disabledDuringReset = await prisma.user.create({
+      data: {
+        username: `via_disabled_reset_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        name: '重置确认后停用账号',
+        role: 'partner',
+        orgId,
+        phoneHash: hashPhone(disabledDuringResetPhone),
+        phoneEnc: encryptPhone(disabledDuringResetPhone),
         phoneVerifiedAt: new Date(),
       },
     })
@@ -561,6 +592,42 @@ async function main() {
     await expectCode(() => auth.login(unverifiedPhone, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '3. 未验证手机号不能密码登录')
     await expectCode(() => auth.login(verified.username, passwordV1, 'admin'), 'AUTH_LOGIN_FAILED', '4. partner 账号不能登录 admin portal')
 
+    await expectCode(
+      () => auth.login(deletedPartner.username, passwordV1, 'partner'),
+      'AUTH_LOGIN_FAILED',
+      '4a. 墓碑账号不能密码登录',
+    )
+    await expectCode(
+      () => auth.changePassword(deletedPartner.id, passwordV1, passwordV2),
+      'AUTH_SESSION_INVALID',
+      '4b. 墓碑账号不能自助改密',
+    )
+    const deletedBindPhone = phone('135', 5)
+    await auth.sendPhoneBindCode(deletedBindPhone, '127.0.0.1')
+    const deletedBindCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(deletedBindPhone)}`)
+    if (!deletedBindCode) fail('4c. 墓碑账号手机号绑定验证缺少 OTP 夹具')
+    await expectCode(
+      () => auth.verifyAndBindPhone(deletedPartner.id, deletedBindPhone, deletedBindCode),
+      'AUTH_SESSION_INVALID',
+      '4c. 墓碑账号不能写回手机号',
+    )
+    const deletedToken = jwt.sign({ sub: deletedPartner.id, role: 'partner', orgId, ver: 0 })
+    const deletedCacheKey = `internal:session-state:${deletedPartner.id}`
+    await redis.setEx(deletedCacheKey, 60, JSON.stringify({
+      userId: deletedPartner.id,
+      role: 'partner',
+      orgId,
+      enabled: true,
+      tokenVersion: 0,
+      deletedAt: null,
+      orgEnabled: true,
+    }))
+    await expectCode(
+      () => guard.canActivate(mockCtx(`Bearer ${deletedToken}`)),
+      'AUTH_TOKEN_INVALID',
+      '4d. Redis 残留可用 Partner 缓存不能复活墓碑账号',
+    )
+
     await auth.sendSmsCode({ phone: verifiedPhone, purpose: 'login', portal: 'partner' }, '127.0.0.1')
     const loginCode = await redis.get(`internal:sms:code:login:${hashPhone(verifiedPhone)}`)
     if (!loginCode) fail('5. 未写入登录验证码')
@@ -610,6 +677,31 @@ async function main() {
       'AUTH_TOKEN_INVALID',
       '8e. 重置密码后旧 token 立即失效',
     )
+
+    await auth.startPasswordReset(disabledDuringResetPhone, '127.0.0.1')
+    const disabledDuringResetCode = await redis.get(`internal:sms:code:reset_password:${hashPhone(disabledDuringResetPhone)}`)
+    if (!disabledDuringResetCode) fail('8f. 重置确认后停用账号缺少重置验证码')
+    const { resetTicket: disabledDuringResetTicket } = await auth.verifyPasswordReset(
+      disabledDuringResetPhone,
+      disabledDuringResetCode,
+    )
+    await prisma.user.update({ where: { id: disabledDuringReset.id }, data: { enabled: false } })
+    await auth.completePasswordReset(disabledDuringResetTicket, passwordV3)
+    const disabledAfterReset = await prisma.user.findUniqueOrThrow({ where: { id: disabledDuringReset.id } })
+    if (disabledAfterReset.enabled || !(await bcrypt.compare(passwordV3, disabledAfterReset.passwordHash))) {
+      fail('8f. 普通停用账号在重置确认后未保留历史改密行为，或被意外重新启用')
+    }
+    await auth.changePassword(disabledDuringReset.id, passwordV3, passwordV4)
+    const disabledAfterSelfChange = await prisma.user.findUniqueOrThrow({ where: { id: disabledDuringReset.id } })
+    if (disabledAfterSelfChange.enabled || !(await bcrypt.compare(passwordV4, disabledAfterSelfChange.passwordHash))) {
+      fail('8f. 普通停用账号未保留历史自助改密行为，或被意外重新启用')
+    }
+    await expectCode(
+      () => auth.login(disabledDuringReset.username, passwordV4, 'partner'),
+      'AUTH_LOGIN_FAILED',
+      '8f. 普通停用账号重置后仍不可登录',
+    )
+    pass('8f. 普通停用账号不被删除功能额外收紧，且重置不重新启用账号')
 
     await expectCode(
       () => auth.sendOwnPhoneBindCode(unboundAdmin.id, '127.0.0.1'),

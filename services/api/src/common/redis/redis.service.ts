@@ -3,6 +3,12 @@ import { Redis } from 'ioredis'
 
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT')
 
+export type MemberStepUpChallengeConsumeResult =
+  | { status: 'missing' }
+  | { status: 'owner_mismatch' }
+  | { status: 'mismatched'; attempts: number }
+  | { status: 'matched'; meta: string }
+
 /**
  * ioredis 薄封装。阶段 A(member-auth)用于:
  *   - 短信验证码(TTL 5min,用后删除)
@@ -91,13 +97,6 @@ export class RedisService implements OnModuleDestroy {
     await this.client.set(key, value, 'EX', ttlSeconds)
   }
 
-  /**
-   * Atomically register a member session and the owning user's session index.
-   *
-   * These Lua operations are intentionally for the current single-node Redis
-   * deployment. A future Redis Cluster migration must first colocate the two
-   * keys in the same hash slot or replace the revocation strategy.
-   */
   async registerMemberSession(endUserId: string, sessionId: string, ttlSeconds: number): Promise<void> {
     const result = await this.client.eval(
       `
@@ -123,14 +122,15 @@ export class RedisService implements OnModuleDestroy {
     if (result !== 1) throw new Error('Member session ownership conflict')
   }
 
-  /** Delete one session only when it is still owned by the requesting member. */
   async unregisterMemberSession(endUserId: string, sessionId: string): Promise<void> {
     await this.client.eval(
       `
       local owner = redis.call('GET', KEYS[1])
       if owner == ARGV[1] then redis.call('DEL', KEYS[1]) end
       redis.call('SREM', KEYS[2], ARGV[2])
-      if redis.call('SCARD', KEYS[2]) == 0 then redis.call('DEL', KEYS[2]) end
+      if redis.call('SCARD', KEYS[2]) == 0 then
+        redis.call('DEL', KEYS[2])
+      end
       return 1
       `,
       2,
@@ -141,7 +141,6 @@ export class RedisService implements OnModuleDestroy {
     )
   }
 
-  /** Revoke every indexed session that is still owned by the target member. */
   async revokeMemberSessions(endUserId: string): Promise<number> {
     const result = await this.client.eval(
       `
@@ -163,7 +162,133 @@ export class RedisService implements OnModuleDestroy {
     return Number(result)
   }
 
-  /** Store a one-time step-up grant and the owning member's grant index. */
+  async consumeMemberStepUpChallenge(
+    endUserId: string,
+    challengeId: string,
+    expectedCodeDigest: string,
+    maxAttempts: number,
+  ): Promise<MemberStepUpChallengeConsumeResult> {
+    if (!endUserId || !challengeId || !/^[a-f0-9]{64}$/.test(expectedCodeDigest)) {
+      throw new Error('Invalid member step-up challenge input')
+    }
+    if (!Number.isSafeInteger(maxAttempts) || maxAttempts <= 0) {
+      throw new Error('Invalid member step-up challenge max attempts')
+    }
+
+    const challengeKeyPrefix = `member:step-up:challenge:${challengeId}`
+    const result: unknown = await this.client.eval(
+      `
+      local function keyType(key)
+        local result = redis.call('TYPE', key)
+        if type(result) == 'table' then return result.ok end
+        return result
+      end
+
+      local function clearChallenge()
+        redis.call('DEL', KEYS[1], KEYS[2], KEYS[3])
+      end
+
+      local metaType = keyType(KEYS[1])
+      local codeType = keyType(KEYS[2])
+      local attemptType = keyType(KEYS[3])
+      local meta = metaType == 'string' and redis.call('GET', KEYS[1]) or nil
+      local code = codeType == 'string' and redis.call('GET', KEYS[2]) or nil
+      local attempt = attemptType == 'string' and redis.call('GET', KEYS[3]) or nil
+
+      if metaType ~= 'string' or not meta or meta == '' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      local decodedOk, decoded = pcall(cjson.decode, meta)
+      if not decodedOk or type(decoded) ~= 'table'
+        or type(decoded.endUserId) ~= 'string' or decoded.endUserId == '' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if decoded.endUserId ~= ARGV[1] then
+        return { 'owner_mismatch' }
+      end
+
+      if codeType ~= 'string' or not code or string.len(code) ~= 64
+        or not string.match(code, '^[0-9a-f]+$') then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if attemptType ~= 'string' or not attempt then
+        clearChallenge()
+        return { 'missing' }
+      end
+      local attemptNumber = tonumber(attempt)
+      if not attemptNumber or attemptNumber < 0
+        or attemptNumber ~= math.floor(attemptNumber)
+        or attemptNumber >= tonumber(ARGV[3]) then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      local metaTtl = redis.call('PTTL', KEYS[1])
+      local codeTtl = redis.call('PTTL', KEYS[2])
+      local attemptTtl = redis.call('PTTL', KEYS[3])
+      if metaTtl <= 0 or codeTtl <= 0 or attemptTtl <= 0 then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if code == ARGV[2] then
+        clearChallenge()
+        return { 'matched', meta }
+      end
+
+      local attempts = redis.pcall('INCR', KEYS[3])
+      if type(attempts) ~= 'number' then
+        clearChallenge()
+        return { 'missing' }
+      end
+
+      if attempts >= tonumber(ARGV[3]) then
+        clearChallenge()
+      else
+        redis.call('PEXPIRE', KEYS[3], math.min(metaTtl, codeTtl))
+      end
+      return { 'mismatched', attempts }
+      `,
+      3,
+      `${challengeKeyPrefix}:meta`,
+      `${challengeKeyPrefix}:code`,
+      `${challengeKeyPrefix}:attempt`,
+      endUserId,
+      expectedCodeDigest,
+      maxAttempts,
+    )
+
+    if (!Array.isArray(result) || typeof result[0] !== 'string') {
+      throw new Error('Invalid member step-up challenge consume result')
+    }
+    if (result[0] === 'missing' && result.length === 1) return { status: 'missing' }
+    if (result[0] === 'owner_mismatch' && result.length === 1) return { status: 'owner_mismatch' }
+    if (
+      result[0] === 'mismatched'
+      && result.length === 2
+      && typeof result[1] === 'number'
+      && Number.isSafeInteger(result[1])
+      && result[1] > 0
+    ) {
+      return { status: 'mismatched', attempts: result[1] }
+    }
+    if (
+      result[0] === 'matched'
+      && result.length === 2
+      && typeof result[1] === 'string'
+      && result[1] !== ''
+    ) {
+      return { status: 'matched', meta: result[1] }
+    }
+    throw new Error('Invalid member step-up challenge consume result')
+  }
+
   async registerMemberStepUpGrant(
     endUserId: string,
     tokenHash: string,
@@ -172,9 +297,15 @@ export class RedisService implements OnModuleDestroy {
   ): Promise<void> {
     const result = await this.client.eval(
       `
-      if redis.call('GET', KEYS[1]) then return 0 end
+      if redis.call('EXISTS', KEYS[1]) == 1 then return 0 end
+
+      local indexType = redis.call('TYPE', KEYS[2])
+      if type(indexType) == 'table' then indexType = indexType.ok end
+      if indexType ~= 'none' and indexType ~= 'set' then return -1 end
 
       local grantTtl = tonumber(ARGV[3])
+      if not grantTtl or grantTtl <= 0 then return -1 end
+
       redis.call('SET', KEYS[1], ARGV[1], 'EX', grantTtl)
       redis.call('SADD', KEYS[2], ARGV[2])
       local currentIndexTtl = redis.call('TTL', KEYS[2])
@@ -190,47 +321,60 @@ export class RedisService implements OnModuleDestroy {
       tokenHash,
       ttlSeconds,
     )
-    if (result !== 1) throw new Error('Member step-up grant conflict')
+    if (result !== 1) throw new Error('Member step-up grant registration failed')
   }
 
-  /**
-   * Atomically consume a grant only when the Redis payload still belongs to
-   * the expected member. Owner checks happen inside Lua so a mismatched index
-   * can never delete another member's grant.
-   */
   async getDelMemberStepUpGrant(endUserId: string, tokenHash: string): Promise<string | null> {
     const result = await this.client.eval(
       `
+      local function removeFromIndex(indexKey)
+        local removed = redis.pcall('SREM', indexKey, ARGV[1])
+        if type(removed) == 'table' and removed.err then return end
+
+        local size = redis.pcall('SCARD', indexKey)
+        if type(size) == 'number' and size == 0 then
+          redis.call('DEL', indexKey)
+        end
+      end
+
       local value = redis.call('GET', KEYS[1])
-      if not value then return false end
-      local ok, record = pcall(cjson.decode, value)
-      if not ok or not record or record.endUserId ~= ARGV[2] then return false end
-      redis.call('DEL', KEYS[1])
-      redis.call('SREM', KEYS[2], ARGV[1])
-      if redis.call('SCARD', KEYS[2]) == 0 then redis.call('DEL', KEYS[2]) end
+      if value then redis.call('DEL', KEYS[1]) end
+
+      removeFromIndex(KEYS[2])
+      if not value then return nil end
+
+      local decodedOk, decoded = pcall(cjson.decode, value)
+      if decodedOk and type(decoded) == 'table'
+        and type(decoded.endUserId) == 'string' and decoded.endUserId ~= '' then
+        local ownerIndexKey = 'member:user-step-up-grants:' .. decoded.endUserId
+        removeFromIndex(ownerIndexKey)
+      end
       return value
       `,
       2,
       `member:step-up:grant:${tokenHash}`,
       `member:user-step-up-grants:${endUserId}`,
       tokenHash,
-      endUserId,
     )
     return typeof result === 'string' ? result : null
   }
 
-  /** Revoke every indexed grant still owned by a member without a KEYS scan. */
   async revokeMemberStepUpGrants(endUserId: string): Promise<number> {
     const result = await this.client.eval(
       `
-      local grants = redis.call('SMEMBERS', KEYS[1])
+      local grants = redis.pcall('SMEMBERS', KEYS[1])
+      if grants.err then
+        redis.call('DEL', KEYS[1])
+        return 0
+      end
+
       local deleted = 0
       for _, tokenHash in ipairs(grants) do
         local grantKey = 'member:step-up:grant:' .. tokenHash
-        local value = redis.call('GET', grantKey)
-        if value then
-          local ok, record = pcall(cjson.decode, value)
-          if ok and record and record.endUserId == ARGV[1] then
+        local payload = redis.pcall('GET', grantKey)
+        if type(payload) == 'string' then
+          local decodedOk, decoded = pcall(cjson.decode, payload)
+          if decodedOk and type(decoded) == 'table' and decoded.endUserId == ARGV[1] then
             deleted = deleted + redis.call('DEL', grantKey)
           end
         end

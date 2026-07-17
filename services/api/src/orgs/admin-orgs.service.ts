@@ -13,6 +13,7 @@ import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import { encryptPhone, hashPhone, maskPhoneFromEnc, normalizePhone } from '../common/crypto/phone-identity'
 import { RedisService } from '../common/redis/redis.service'
+import { Prisma } from '../generated/prisma/client'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
 
 // ============================================================
@@ -234,7 +235,16 @@ export class AdminOrgsService {
   async listOrgs(): Promise<AdminOrgListItem[]> {
     const rows = await this.prisma.organization.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { users: true, jobSources: true, jobs: true, jobFairs: true } } },
+      include: {
+        _count: {
+          select: {
+            users: { where: { role: 'partner', deletedAt: null } },
+            jobSources: true,
+            jobs: true,
+            jobFairs: true,
+          },
+        },
+      },
     })
     return rows.map((o) =>
       mapOrg(o, {
@@ -250,9 +260,17 @@ export class AdminOrgsService {
     const o = await this.prisma.organization.findUnique({
       where: { id: orgId },
       include: {
-        _count: { select: { users: true, jobSources: true, jobs: true, jobFairs: true } },
+        _count: {
+          select: {
+            users: { where: { role: 'partner', deletedAt: null } },
+            jobSources: true,
+            jobs: true,
+            jobFairs: true,
+          },
+        },
         // 绝不 select passwordHash
         users: {
+          where: { role: 'partner', deletedAt: null },
           orderBy: { createdAt: 'asc' },
           select: {
             id: true,
@@ -431,12 +449,15 @@ export class AdminOrgsService {
   ): Promise<AdminOrgAccount> {
     const account = await this.assertAccountInOrg(orgId, accountId)
     const toEnabled = action === 'enable'
-    const updated = account.enabled === toEnabled
-      ? account
-      : await this.prisma.user.update({
-          where: { id: accountId },
-          data: { enabled: toEnabled, tokenVersion: { increment: 1 } },
-        })
+    let updated = account
+    if (account.enabled !== toEnabled) {
+      const result = await this.prisma.user.updateMany({
+        where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+        data: { enabled: toEnabled, tokenVersion: { increment: 1 } },
+      })
+      if (result.count !== 1) this.throwAccountNotFound(orgId, accountId)
+      updated = { ...account, enabled: toEnabled, tokenVersion: account.tokenVersion + 1 }
+    }
     if (account.enabled !== toEnabled) {
       await this.writeAudit(admin, toEnabled ? 'org.account.enable' : 'org.account.disable', orgId, {
         accountId,
@@ -455,13 +476,89 @@ export class AdminOrgsService {
   ): Promise<{ success: true }> {
     const account = await this.assertAccountInOrg(orgId, accountId)
     const passwordHash = await bcrypt.hash(password, 10)
-    await this.prisma.user.update({
-      where: { id: accountId },
+    const updated = await this.prisma.user.updateMany({
+      where: { id: accountId, orgId, role: 'partner', deletedAt: null },
       data: { passwordHash, tokenVersion: { increment: 1 } },
     })
+    if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
     await this.invalidateAccountSession(accountId)
     // 审计绝不含密码 / hash
     await this.writeAudit(admin, 'org.account.reset_password', orgId, { accountId, username: account.username })
+    return { success: true }
+  }
+
+  /**
+   * 安全移除机构成员账号：保留 User 主键与历史关联，但撤销访问并释放可复用凭据。
+   * 最后有效账号判断、墓碑更新和审计必须在同一可串行化事务内完成。
+   */
+  async deleteAccount(
+    orgId: string,
+    accountId: string,
+    admin: AuthedUser,
+  ): Promise<{ success: true }> {
+    const tombstonePasswordHash = await bcrypt.hash(randomUUID(), 10)
+    const deleted = await this.withSerializableRetry(() => this.prisma.$transaction(
+      async (tx) => {
+        const account = await tx.user.findFirst({
+          where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+        })
+        if (!account) this.throwAccountNotFound(orgId, accountId)
+
+        const activeCount = await tx.user.count({
+          where: { orgId, role: 'partner', enabled: true, deletedAt: null },
+        })
+        if (activeCount - (account.enabled ? 1 : 0) < 1) {
+          throw new ConflictException({
+            error: {
+              code: 'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED',
+              message: '请先新增并启用接替账号，再移除此账号',
+            },
+          })
+        }
+
+        const deletedAt = new Date()
+        const updated = await tx.user.updateMany({
+          where: { id: account.id, orgId, role: 'partner', deletedAt: null },
+          data: {
+            deletedAt,
+            enabled: false,
+            tokenVersion: { increment: 1 },
+            username: `deleted:${account.id}`,
+            passwordHash: tombstonePasswordHash,
+            name: '已移除账号',
+            phoneHash: null,
+            phoneEnc: null,
+            phoneVerifiedAt: null,
+            lastLoginAt: null,
+          },
+        })
+        if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
+
+        await tx.auditLog.create({
+          data: {
+            actorId: admin.userId,
+            actorRole: 'admin',
+            action: 'org.account.delete',
+            targetType: 'organization',
+            targetId: orgId,
+            payloadJson: JSON.stringify({ accountId: account.id }),
+          },
+        })
+        return {
+          id: account.id,
+          role: account.role,
+          orgId: account.orgId,
+          tokenVersion: account.tokenVersion + 1,
+          deletedAt,
+        }
+      },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: 5_000,
+        timeout: 10_000,
+      },
+    ))
+    await this.publishDeletedSessionState(deleted)
     return { success: true }
   }
 
@@ -529,6 +626,12 @@ export class AdminOrgsService {
     throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: `Organization ${orgId} not found` } })
   }
 
+  private throwAccountNotFound(orgId: string, accountId: string): never {
+    throw new NotFoundException({
+      error: { code: 'ACCOUNT_NOT_FOUND', message: `Account ${accountId} not found in org ${orgId}` },
+    })
+  }
+
   private async assertOrgExists(orgId: string) {
     const org = await this.prisma.organization.findUnique({ where: { id: orgId } })
     if (!org) this.throwOrgNotFound(orgId)
@@ -536,7 +639,7 @@ export class AdminOrgsService {
   }
 
   private async assertPhoneAvailable(phone: string): Promise<void> {
-    const exists = await this.prisma.user.findUnique({ where: { phoneHash: hashPhone(phone) } })
+    const exists = await this.prisma.user.findFirst({ where: { phoneHash: hashPhone(phone), deletedAt: null } })
     if (exists) {
       throw new ConflictException({ error: { code: 'PHONE_ALREADY_BOUND', message: '该手机号已绑定其他账号' } })
     }
@@ -544,11 +647,21 @@ export class AdminOrgsService {
 
   private async assertAccountInOrg(orgId: string, accountId: string) {
     await this.assertOrgExists(orgId)
-    const account = await this.prisma.user.findFirst({ where: { id: accountId, orgId, role: 'partner' } })
-    if (!account) {
-      throw new NotFoundException({ error: { code: 'ACCOUNT_NOT_FOUND', message: `Account ${accountId} not found in org ${orgId}` } })
-    }
+    const account = await this.prisma.user.findFirst({ where: { id: accountId, orgId, role: 'partner', deletedAt: null } })
+    if (!account) this.throwAccountNotFound(orgId, accountId)
     return account
+  }
+
+  private async withSerializableRetry<T>(operation: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await operation()
+      } catch (error) {
+        const retryable = error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
+        if (!retryable || attempt === 2) throw error
+      }
+    }
+    throw new Error('unreachable')
   }
 
   private sessionStateKey(userId: string): string {
@@ -559,8 +672,43 @@ export class AdminOrgsService {
     await this.redis.del(this.sessionStateKey(userId))
   }
 
+  /**
+   * 写入高版本禁用状态而非只删除缓存，避免晚到的旧 Guard 写回可用会话。
+   * Redis 故障不回滚已经提交的墓碑；Guard 会回源数据库并失败关闭。
+   */
+  private async publishDeletedSessionState(user: {
+    id: string
+    role: string
+    orgId: string | null
+    tokenVersion: number
+    deletedAt: Date
+  }): Promise<void> {
+    try {
+      await this.redis.setJsonIfVersionNotOlder(
+        this.sessionStateKey(user.id),
+        60,
+        JSON.stringify({
+          userId: user.id,
+          role: user.role,
+          orgId: user.orgId,
+          enabled: false,
+          tokenVersion: user.tokenVersion,
+          deletedAt: user.deletedAt.toISOString(),
+          orgEnabled: false,
+        }),
+        user.tokenVersion,
+      )
+    } catch {
+      await this.invalidateAccountSession(user.id).catch(() => undefined)
+      this.logger.warn(`account deletion session state publish failed: userId=${user.id}`)
+    }
+  }
+
   private async invalidateOrgSessions(orgId: string): Promise<void> {
-    const users = await this.prisma.user.findMany({ where: { orgId }, select: { id: true } })
+    const users = await this.prisma.user.findMany({
+      where: { orgId, role: 'partner', deletedAt: null },
+      select: { id: true },
+    })
     await Promise.all(users.map((user) => this.invalidateAccountSession(user.id)))
   }
 
@@ -587,7 +735,9 @@ export class AdminOrgsService {
       select: {
         id: true, name: true, type: true, contact: true, contactPhone: true,
         sceneTemplate: true, enabledModulesJson: true, enabled: true, createdAt: true,
-        _count: { select: { jobSources: true, users: true } },
+        _count: {
+          select: { jobSources: true, users: { where: { role: 'partner', deletedAt: null } } },
+        },
       },
     })
     if (!o) {
