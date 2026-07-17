@@ -76,9 +76,9 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Install CJK font + sqlite3 (resume PDF / terminal-device-config verify)
+      - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
 
       - name: PG schema drift check
         working-directory: services/api
@@ -348,8 +348,8 @@ jobs:
           cache: pnpm
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
-      - name: Install CJK font + sqlite3 (PDF / member account status verify)
-        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3
+      - name: Install CJK font + sqlite3 + redis-server (PDF / member data verify)
+        run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
