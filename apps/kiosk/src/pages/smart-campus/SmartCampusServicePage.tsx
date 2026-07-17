@@ -10,7 +10,7 @@
 // 实际办理一律引导至现场服务窗口 / 学校官方自助平台。无任何招聘闭环语义。
 // ============================================================
 
-import { Button, Card } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   CheckCircle2Icon,
@@ -26,6 +26,7 @@ import {
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
+import '../prototype/kiosk-prototype.css'
 
 type ServiceKey = 'campus-card' | 'all-in-one' | 'campus-network' | 'luggage' | 'panorama'
 
@@ -131,95 +132,89 @@ export function SmartCampusServicePage() {
   const Icon = info.icon
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-canvas p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900">{info.title}</h1>
-          <p className="mt-0.5 text-sm text-neutral-500">{info.subtitle}</p>
-        </div>
-        <Button size="sm" variant="secondary" onClick={() => navigate('/smart-campus')}>
-          返回
-        </Button>
-      </div>
-
-      {/* 合规来源条 */}
-      <div className="mb-5 flex items-start gap-2 rounded-xl border border-success-bg bg-success-bg/60 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-success-fg" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-success-fg">
-          校方官方信息入口，仅展示与指引，<span className="font-semibold">不在本终端采集任何个人信息</span>；
-          实际办理请前往现场服务窗口或学校官方自助平台。
-        </p>
-      </div>
-
-      {/* 服务概览 */}
-      <Card className="mb-4 p-5">
-        <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
-            <Icon className="h-8 w-8 text-plum" aria-hidden="true" />
+    <div className="kproto kproto-teal">
+      <div className="kproto-shell">
+        <div className="kproto-pagehead">
+          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
+          <div className="kproto-title">
+            <h1>{info.title}</h1>
+            <p>{info.subtitle} · 智慧校园自助服务指引</p>
           </div>
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold text-neutral-900">{info.title}</h2>
-            <p className="mt-1 text-sm leading-relaxed text-neutral-500">{info.summary}</p>
+          <div className="kproto-aside"><span className="kproto-badge">办理指引 · 未接线上办理</span></div>
+        </div>
+
+        <main className="kproto-content">
+          <div className="kproto-auth">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；实际办理请前往现场服务窗口或学校官方自助平台。</p>
           </div>
-        </div>
-      </Card>
 
-      {/* 办理事项 / 开通内容 */}
-      <Card className="mb-4 p-5">
-        <div className="mb-3 flex items-center gap-2">
-          <ClipboardListIcon className="h-4 w-4 text-plum" aria-hidden="true" />
-          <p className="text-sm font-semibold text-neutral-700">{info.itemsTitle}</p>
-        </div>
-        <ul className="space-y-2.5">
-          {info.items.map((item) => (
-            <li key={item} className="flex items-start gap-2.5 text-sm text-neutral-600">
-              <CheckCircle2Icon className="mt-0.5 h-4 w-4 shrink-0 text-plum" aria-hidden="true" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+          <section className="kproto-card accented">
+            <div className="flex items-center gap-6">
+              <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[20px] bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+                <Icon className="h-12 w-12" aria-hidden="true" />
+              </span>
+              <div>
+                <h2 className="font-serif text-4xl font-black tracking-[2px]">{info.title}</h2>
+                <p className="mt-2 text-[21px] leading-normal text-[var(--kp-muted)]">{info.summary}</p>
+              </div>
+            </div>
+          </section>
 
-      {/* 所需材料 */}
-      <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-neutral-700">所需材料</p>
-        <ul className="space-y-2.5">
-          {info.materials.map((m) => (
-            <li key={m} className="flex items-start gap-2.5 text-sm text-neutral-600">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-neutral-300" aria-hidden="true" />
-              <span>{m}</span>
-            </li>
-          ))}
-        </ul>
-      </Card>
+          <div className="kproto-grid-2">
+            <section className="kproto-card">
+              <div className="kproto-card-head">
+                <span className="kproto-icon"><ClipboardListIcon aria-hidden="true" /></span>
+                <div><h2>{info.itemsTitle}</h2></div>
+              </div>
+              <div className="grid gap-3 text-[21px]">
+                {info.items.map((item) => (
+                  <div key={item} className="flex items-center gap-3">
+                    <CheckCircle2Icon className="h-6 w-6 text-[var(--kp-accent-deep)]" aria-hidden="true" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </section>
 
-      {/* 办理地点 */}
-      <Card className="mb-4 p-5">
-        <p className="mb-3 text-sm font-semibold text-neutral-700">办理地点</p>
-        <div className="flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2.5">
-          <MapPinIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-          <p className="text-sm text-neutral-800">{info.location}</p>
-        </div>
-      </Card>
+            <section className="kproto-card">
+              <div className="kproto-card-head">
+                <span className="kproto-icon"><ClipboardListIcon aria-hidden="true" /></span>
+                <div><h2>所需材料</h2></div>
+              </div>
+              <div className="grid gap-3 text-[21px]">
+                {info.materials.map((m) => (
+                  <div key={m} className="flex items-center gap-4"><span className="h-2.5 w-2.5 rounded-full bg-[var(--kp-line)]" />{m}</div>
+                ))}
+              </div>
+            </section>
+          </div>
 
-      {/* 现场办理提示 */}
-      <div className="mb-2 flex items-start gap-2 rounded-xl border border-warning/20 bg-warning-bg/70 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-warning-fg">{info.note}</p>
+          <section className="kproto-card">
+            <div className="kproto-card-head">
+              <span className="kproto-icon"><MapPinIcon aria-hidden="true" /></span>
+              <div><h2>办理地点</h2></div>
+            </div>
+            <div className="flex items-center gap-4 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-5 text-[21px] font-bold">
+              <MapPinIcon className="h-7 w-7 text-[var(--kp-muted)]" aria-hidden="true" />
+              {info.location}
+            </div>
+          </section>
+
+          <div className="kproto-notice">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>{info.note}</p>
+          </div>
+
+          <div className="kproto-actionbar">
+            <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
+            <div className="kproto-spacer" />
+            <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/welcome')}>
+              查看迎新报到指引<ChevronRightIcon aria-hidden="true" />
+            </button>
+          </div>
+        </main>
       </div>
-
-      {/* 顺带导向迎新指引（真实可达页面），避免死路 */}
-      <button
-        type="button"
-        onClick={() => navigate('/smart-campus/welcome')}
-        className="mt-2 flex min-h-[56px] w-full items-center gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:border-plum/30 active:bg-plum-soft"
-      >
-        <PartyPopperIcon className="h-5 w-5 shrink-0 text-plum" aria-hidden="true" />
-        <span className="flex-1 text-sm font-medium text-neutral-800">查看迎新报到指引</span>
-        <ChevronRightIcon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-      </button>
-
-      <div className="h-2" />
     </div>
   )
 }

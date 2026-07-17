@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import {
   COMPANY_INDUSTRIES,
   COMPANY_SOURCE_KINDS,
@@ -22,7 +22,6 @@ import {
   Building2Icon,
   BuildingIcon,
   ChevronRightIcon,
-  InfoIcon,
   Loader2Icon,
   MapPinIcon,
   SearchIcon,
@@ -30,6 +29,7 @@ import {
 } from 'lucide-react'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
+import '../prototype/kiosk-prototype.css'
 
 const PAGE_SIZE = 10
 
@@ -55,28 +55,22 @@ function ChipRow({
   onChange: (v: string) => void
 }) {
   return (
-    <div className="flex items-start gap-2">
-      <span className="mt-2.5 shrink-0 text-xs font-medium text-neutral-400">{label}</span>
-      <div className="flex flex-1 flex-wrap gap-1.5">
+    <div className="flex flex-wrap items-center gap-3">
+      <span className="min-w-[52px] shrink-0 text-[20px] text-[var(--kp-muted)]">{label}</span>
+      <div className="flex flex-1 flex-wrap gap-3">
         <button
           type="button"
           onClick={() => onChange('')}
-          className={[
-            'min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors',
-            active === '' ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-          ].join(' ')}
+          className={`min-h-[58px] rounded-full px-7 text-[21px] ${active === '' ? 'bg-[var(--kp-dark)] font-bold text-[#f4f1e8]' : 'border border-[var(--kp-line)] bg-[var(--kp-surface)] text-[var(--kp-muted)]'}`}
         >
-          不限
+          全部
         </button>
         {options.map((o) => (
           <button
             key={o.value}
             type="button"
             onClick={() => onChange(active === o.value ? '' : o.value)}
-            className={[
-              'min-h-[44px] rounded-lg px-3 text-sm font-medium transition-colors',
-              active === o.value ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200',
-            ].join(' ')}
+            className={`min-h-[58px] rounded-full px-7 text-[21px] ${active === o.value ? 'bg-[var(--kp-dark)] font-bold text-[#f4f1e8]' : 'border border-[var(--kp-line)] bg-[var(--kp-surface)] text-[var(--kp-muted)]'}`}
           >
             {o.text}
           </button>
@@ -97,57 +91,47 @@ function CompanyCard({ company, onDetail, onJobs }: {
   const industryLabel = labelOfIndustry(company.industry)
   const region = [company.province, company.city, company.district].filter(Boolean).join(' · ')
   return (
-    <div className="flex flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
-      <div className="flex items-start gap-3">
+    <article className="flex min-h-[124px] items-center gap-5 rounded-[14px] border border-[var(--kp-line)] border-l-[5px] border-l-[var(--kp-accent)] bg-[var(--kp-surface)] px-6 py-3 shadow-sm">
+      <button type="button" className="flex min-w-0 flex-1 items-center gap-5 text-left" onClick={onDetail}>
         {company.logoUrl ? (
-          <img src={company.logoUrl} alt={`${company.name} logo`} className="h-12 w-12 shrink-0 rounded-lg border border-neutral-100 object-cover" />
+          <img src={company.logoUrl} alt={`${company.name} logo`} className="h-[60px] w-[60px] shrink-0 rounded-[14px] border border-neutral-100 object-cover" />
         ) : (
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
-            <BuildingIcon className="h-6 w-6" aria-hidden="true" />
+          <span className="grid h-[60px] w-[60px] shrink-0 place-items-center rounded-[14px] bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+            <BuildingIcon className="h-8 w-8" aria-hidden="true" />
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-neutral-900">{company.name}</p>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {typeLabel && <span className="rounded bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-600">{typeLabel}</span>}
-            {industryLabel && <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{industryLabel}</span>}
-            {company.fairParticipant && <span className="rounded bg-warning-bg px-1.5 py-0.5 text-[11px] font-medium text-warning-fg">招聘会参展</span>}
+          <div className="flex flex-wrap items-baseline gap-3">
+            <b className="truncate text-[26px] font-bold tracking-[.5px]">{company.name}</b>
+            {industryLabel && <span className="kproto-chip source px-3 py-1 text-base">{industryLabel}</span>}
+            {company.fairParticipant && <span className="kproto-chip warn px-3 py-1 text-base">招聘会参展</span>}
+            {typeLabel && <span className="kproto-chip px-3 py-1 text-base">{typeLabel}</span>}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[18px] text-[var(--kp-muted)]">
+            {region && <span className="inline-flex items-center gap-1"><MapPinIcon className="h-4 w-4" aria-hidden="true" />{region}</span>}
+          </div>
+          {company.repJobTitles.length > 0 && (
+            <p className="mt-1 truncate text-[17px] text-[var(--kp-muted)]">代表岗位：<b className="font-semibold text-[var(--kp-ink)]">{company.repJobTitles.join(' · ')}</b></p>
+          )}
+          <div className="mt-1 flex flex-wrap gap-2">
+            <span className="kproto-chip source px-3 py-1 text-base">来源 · {company.sourceName}</span>
           </div>
         </div>
-        {company.openJobCount > 0 && (
-          <span className="shrink-0 text-xs font-medium text-primary-600">{company.openJobCount} 个来源岗位</span>
-        )}
-      </div>
-
-      <p className="mt-2 text-xs text-neutral-400">
-        来源：{company.sourceName}
-        {region && <span className="ml-2 inline-flex items-center gap-0.5"><MapPinIcon className="h-3 w-3" aria-hidden="true" />{region}</span>}
-      </p>
-      {company.description && (
-        <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-neutral-600">{company.description}</p>
-      )}
-      {company.repJobTitles.length > 0 && (
-        <p className="mt-1.5 truncate text-xs text-neutral-500">代表岗位：{company.repJobTitles.join('、')}</p>
-      )}
-
-      <div className="mt-3 flex gap-2">
-        <button
-          type="button"
-          onClick={onDetail}
-          className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg border border-primary-200 bg-white text-sm font-semibold text-primary-600 active:bg-primary-50"
-        >
-          查看企业风采
-        </button>
+      </button>
+      <div className="flex shrink-0 flex-col items-center gap-1">
+        <div className="text-[30px] font-bold text-[var(--kp-accent-deep)] tabular-nums">{company.openJobCount}</div>
+        <div className="mt-[-4px] text-base text-[var(--kp-muted)]">在招岗位</div>
         <button
           type="button"
           onClick={onJobs}
           disabled={company.openJobCount === 0}
-          className="flex min-h-[48px] flex-1 items-center justify-center gap-1 rounded-lg bg-primary-600 text-sm font-semibold text-white active:bg-primary-700 disabled:bg-neutral-200 disabled:text-neutral-400"
+          className="mt-1 min-h-[48px] rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[17px] font-bold text-[var(--kp-accent-deep)] disabled:opacity-45"
         >
-          查看来源岗位
+          查看在招岗位
         </button>
       </div>
-    </div>
+      <ChevronRightIcon className="h-6 w-6 shrink-0 text-[var(--kp-muted)] opacity-60" aria-hidden="true" />
+    </article>
   )
 }
 
@@ -257,7 +241,7 @@ export function CompaniesPage() {
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
       aria-label={placeholder}
-      className="min-h-[48px] flex-1 rounded-lg border border-neutral-200 bg-white px-3 text-sm text-neutral-700 disabled:bg-neutral-50 disabled:text-neutral-400"
+      className="min-h-[58px] flex-1 rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5 text-[19px] text-[var(--kp-ink)] disabled:bg-[var(--kp-paper)] disabled:text-[var(--kp-muted)]"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -265,108 +249,100 @@ export function CompaniesPage() {
   )
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <PageHeader
-        title="找企业 · 来源企业导览"
-        subtitle="按地区 / 类型 / 行业浏览来源企业与岗位"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/jobs')}>
-            返回岗位信息
-          </Button>
-        }
-      />
-
-      {/* 搜索 */}
-      <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4">
-        <SearchIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
-        <input
-          value={keywordInput}
-          onChange={(e) => setKeywordInput(e.target.value)}
-          placeholder="搜索企业名称、岗位关键词…"
-          className="min-h-[52px] flex-1 bg-transparent text-sm text-neutral-800 outline-none placeholder:text-neutral-300"
-        />
-      </div>
-
-      {/* 地区（完整省/市/区字典，可选任意地区；结果由后端真实过滤，无企业即空态） */}
-      <div className="flex gap-2">
-        {regionSelect(province, (v) => { setProvince(v); setCity(''); setDistrict('') }, '全部省份', provinceOpts)}
-        {regionSelect(city, (v) => { setCity(v); setDistrict('') }, isMunicipalProvince ? '直辖市' : '全部城市', cityOpts, !province || isMunicipalProvince)}
-        {regionSelect(district, setDistrict, '全部区县', districtOpts, !province || (!isMunicipalProvince && !city))}
-      </div>
-
-      {/* 筛选 chips */}
-      <div className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-4">
-        <ChipRow label="类型" options={typeOpts} active={companyType} onChange={setCompanyType} />
-        <ChipRow label="行业" options={industryOpts} active={industry} onChange={setIndustry} />
-        <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
-        <ChipRow label="来源" options={sourceOpts} active={sourceKind} onChange={setSourceKind} />
-      </div>
-
-      {/* 统计条（真实聚合；加载完成才展示，不显示假数字） */}
-      {state === 'ready' && stats && (
-        <div className="flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-4 text-white">
-          <Building2Icon className="h-6 w-6 shrink-0" aria-hidden="true" />
-          <div className="grid flex-1 grid-cols-4 gap-2 text-center">
-            <div><p className="text-xl font-bold leading-tight">{stats.companyCount}</p><p className="text-[11px] text-white/75">来源企业</p></div>
-            <div><p className="text-xl font-bold leading-tight">{stats.openJobCount}</p><p className="text-[11px] text-white/75">在招岗位</p></div>
-            <div><p className="text-xl font-bold leading-tight">{stats.todayNewJobCount}</p><p className="text-[11px] text-white/75">今日新增</p></div>
-            <div><p className="text-xl font-bold leading-tight">{stats.fairCompanyCount}</p><p className="text-[11px] text-white/75">招聘会参展</p></div>
+    <div className="kproto kproto-clay">
+      <div className="kproto-shell">
+        <div className="kproto-pagehead">
+          <button type="button" className="kproto-back" onClick={() => navigate('/jobs')}>返回</button>
+          <div className="kproto-title">
+            <h1>找企业</h1>
+            <p>来源企业与岗位导览 · 按地区 / 类型 / 行业浏览</p>
           </div>
+          <div className="kproto-aside"><span className="kproto-badge">最近更新 · 实时数据</span></div>
         </div>
-      )}
 
-      {/* 合规说明 */}
-      <div className="flex items-start gap-2 rounded-lg border border-primary-100 bg-primary-50/50 px-4 py-3">
-        <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-primary-500" aria-hidden="true" />
-        <p className="text-xs leading-relaxed text-neutral-500">
-          本页仅展示来源机构提供的企业与岗位信息，本系统不接收简历，不参与招聘流程。
-        </p>
-      </div>
-
-      {/* 列表 */}
-      {state === 'loading' ? (
-        <LoadingState className="py-16" />
-      ) : state === 'error' ? (
-        <ErrorState message="企业数据加载失败，请检查后端连接后重试" onRetry={load} className="py-16" />
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={Building2Icon}
-          title="暂无符合条件的来源企业"
-          description="企业信息由来源机构提供、管理员审核发布后展示；可调整筛选条件再试"
-          className="py-16"
-        />
-      ) : (
-        <>
-          <p className="text-xs text-neutral-400">共 {total} 家来源企业</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {items.map((c) => (
-              <CompanyCard
-                key={c.id}
-                company={c}
-                onDetail={() => navigate(`/companies/${c.id}`)}
-                onJobs={() => navigate(`/companies/${c.id}?tab=jobs`)}
-              />
-            ))}
+        <main className="kproto-content gap-3">
+          <div className="grid gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <ChipRow label="类型" options={typeOpts.slice(0, 3)} active={companyType} onChange={setCompanyType} />
+              <label className="ml-auto flex min-h-[58px] min-w-[280px] items-center gap-3 rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5">
+                <SearchIcon className="h-6 w-6 text-[var(--kp-muted)]" aria-hidden="true" />
+                <input
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  placeholder="搜索企业 / 岗位"
+                  className="min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
+                />
+              </label>
+            </div>
+            <ChipRow label="行业" options={industryOpts.slice(0, 5)} active={industry} onChange={setIndustry} />
+            <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
+            <ChipRow label="来源" options={sourceOpts.slice(0, 4)} active={sourceKind} onChange={setSourceKind} />
+            <div className="flex gap-3">
+              {regionSelect(province, (v) => { setProvince(v); setCity(''); setDistrict('') }, '全部省份', provinceOpts)}
+              {regionSelect(city, (v) => { setCity(v); setDistrict('') }, isMunicipalProvince ? '直辖市' : '全部城市', cityOpts, !province || isMunicipalProvince)}
+              {regionSelect(district, setDistrict, '全部区县', districtOpts, !province || (!isMunicipalProvince && !city))}
+            </div>
           </div>
-          {nextCursor && (
-            <button
-              type="button"
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 text-sm font-medium text-neutral-500 hover:bg-neutral-50 disabled:opacity-60"
-            >
-              {loadingMore && <Loader2Icon className="h-4 w-4 animate-spin" aria-hidden="true" />}
-              加载更多
-              <ChevronRightIcon className="h-4 w-4 rotate-90" aria-hidden="true" />
-            </button>
-          )}
-        </>
-      )}
 
-      <p className="flex items-center justify-center gap-1.5 pb-2 text-center text-xs text-neutral-400">
-        <InfoIcon className="h-3.5 w-3.5" aria-hidden="true" />
-        投递请前往岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理
-      </p>
+          {state === 'ready' && stats && (
+            <div className="flex items-center gap-5 rounded-[18px] bg-[var(--kp-dark)] px-8 py-3 text-[#f4f1e8]">
+              <Building2Icon className="h-9 w-9 shrink-0 opacity-80" aria-hidden="true" />
+              <div className="grid flex-1 grid-cols-4 text-center">
+                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.companyCount}</div><div className="text-[17px] opacity-70">来源企业</div></div>
+                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.openJobCount}</div><div className="text-[17px] opacity-70">在招岗位</div></div>
+                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.todayNewJobCount}</div><div className="text-[17px] opacity-70">今日新增岗位</div></div>
+                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.fairCompanyCount}</div><div className="text-[17px] opacity-70">招聘会参展</div></div>
+              </div>
+            </div>
+          )}
+
+          {state === 'loading' ? (
+            <LoadingState className="py-16" />
+          ) : state === 'error' ? (
+            <ErrorState message="企业数据加载失败，请检查后端连接后重试" onRetry={load} className="py-16" />
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={Building2Icon}
+              title="暂无符合条件的来源企业"
+              description="企业信息由来源机构提供、管理员审核发布后展示；可调整筛选条件再试"
+              className="py-16"
+            />
+          ) : (
+            <>
+              <div className="flex items-center text-[20px] text-[var(--kp-muted)]">
+                <span>共 <b className="text-[var(--kp-ink)]">{total}</b> 家来源企业 · 投递请进入岗位详情在来源平台办理</span>
+                <span className="ml-auto tabular-nums">已显示 {items.length} / {total ?? items.length}</span>
+              </div>
+              <div className="grid gap-2.5">
+                {items.map((c) => (
+                  <CompanyCard
+                    key={c.id}
+                    company={c}
+                    onDetail={() => navigate(`/companies/${c.id}`)}
+                    onJobs={() => navigate(`/companies/${c.id}?tab=jobs`)}
+                  />
+                ))}
+              </div>
+              {nextCursor && (
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="kproto-btn sm w-full border-dashed text-[var(--kp-muted)] disabled:opacity-60"
+                >
+                  {loadingMore && <Loader2Icon className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                  加载更多
+                </button>
+              )}
+            </>
+          )}
+
+          <div className="kproto-notice mt-auto">
+            <ShieldCheckIcon aria-hidden="true" />
+            <p>企业与岗位信息由来源机构提供、审核发布后展示；投递请进入岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理。</p>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }

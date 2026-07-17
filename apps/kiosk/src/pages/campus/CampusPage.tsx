@@ -34,6 +34,7 @@ import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
+import '../prototype/kiosk-prototype.css'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
 
@@ -235,7 +236,7 @@ export function CampusPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50">
+    <div className="campus-proto flex h-full flex-col">
       {qr?.kind === 'book' && (
         <QrModal
           title="扫码前往来源平台预约"
@@ -260,7 +261,12 @@ export function CampusPage() {
       )}
 
       {/* ── Hero（蓝色渐变大图）─────────────────────────────────── */}
-      <div className="relative shrink-0 bg-gradient-to-br from-primary-600 via-primary-600 to-primary-500 px-5 pb-5 pt-6 text-white">
+      <header className="campus-topbar">
+        <div className="flex items-baseline gap-4"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+        <div className="flex items-center gap-4"><span>校园招聘专区</span><span className="rounded-full border border-[rgba(31,158,134,.45)] bg-[rgba(31,158,134,.18)] px-4 py-2">打印机正常 · A4纸充足</span></div>
+      </header>
+
+      <div className="campus-hero relative shrink-0 bg-gradient-to-br from-primary-600 via-primary-600 to-primary-500 px-5 pb-5 pt-6 text-white">
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={() => navigate('/')}
@@ -269,13 +275,13 @@ export function CampusPage() {
           >
             <ChevronLeftIcon className="h-6 w-6" />
           </button>
-          <span className="rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium tabular-nums">
+          <span className="campus-date rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium tabular-nums">
             {fmtDateBadge(fair.startTime, fair.endTime)}
           </span>
         </div>
         <div className="mt-2 flex items-start gap-2">
           <h1 className="flex-1 text-xl font-bold leading-snug">{fair.name}</h1>
-          <span className={`mt-1 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
+          <span className={`campus-status mt-1 shrink-0 rounded-full px-4 py-1 text-lg font-semibold ${sc.bg} ${sc.text}`}>{sc.label}</span>
         </div>
         {fair.tagline && <p className="mt-1 text-sm text-white/80">{fair.tagline}</p>}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/90">
@@ -292,13 +298,14 @@ export function CampusPage() {
       </div>
 
       {/* ── Tab 栏 ─────────────────────────────────────────────── */}
-      <div className="flex shrink-0 border-b border-neutral-100 bg-white">
+      <div className="campus-tabs flex shrink-0 border-b border-neutral-100 bg-white">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key
           return (
             <button
               key={key}
               onClick={() => setTab(key)}
+              aria-pressed={active}
               className={[
                 'relative flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
                 active ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600',
@@ -313,7 +320,7 @@ export function CampusPage() {
       </div>
 
       {/* ── Tab 内容 ───────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="campus-tab-body flex-1 overflow-y-auto">
         {tab === 'overview' && (
           <OverviewTab
             fair={fair}

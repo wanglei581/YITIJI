@@ -1,22 +1,22 @@
-/* 岗位匹配局部 LightFlow 视觉层：不改全局 token 或业务行为。 */
 .job-fit-inkpaper {
-  --sd-color-canvas-outer: #e8f1ff;
-  --sd-color-canvas: #f6f9ff;
+  --sd-color-canvas-outer: #f4f1e8;
+  --sd-color-canvas: #f4f1e8;
   --sd-color-surface: #ffffff;
-  --sd-color-primary: #1769e8;
-  --sd-color-primary-strong: #0759d7;
-  --sd-color-primary-soft: #e9f2ff;
-  --sd-color-text-strong: #0a2452;
-  --sd-color-text: #23446f;
-  --sd-color-text-muted: #627a9d;
-  --sd-color-line: #d8e4f5;
-  --sd-color-success-soft: #e8f8f1;
-  --sd-color-warning-soft: #fff4df;
-  --sd-control-min: 48px;
-  --sd-primary-control-min: 56px;
+  --sd-color-primary: #b8683c;
+  --sd-color-primary-strong: #9e5330;
+  --sd-color-primary-soft: #f4e8dd;
+  --sd-color-text-strong: #10302b;
+  --sd-color-text: #10302b;
+  --sd-color-text-muted: #5d6b63;
+  --sd-color-line: #e2dccb;
+  --sd-color-success-soft: #e2f2ec;
+  --sd-color-warning-soft: #f2ead6;
+  --sd-control-min: 56px;
+  --sd-primary-control-min: 72px;
+  --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
   position: relative;
   min-height: 100dvh;
-  background: linear-gradient(180deg, var(--sd-color-canvas-outer) 0, var(--sd-color-canvas) 42%, #f4f8ff 100%);
+  background:     var(--sd-color-canvas-outer);
   color: var(--sd-color-text);
 }
 
@@ -26,9 +26,9 @@
 }
 
 .job-fit-inkpaper .job-fit-content {
-  width: min(100%, 840px);
+  width: min(100%, 984px);
   margin-inline: auto;
-  scrollbar-color: #b8cbea transparent;
+  scrollbar-color: #d7ccb8 transparent;
 }
 
 .job-fit-inkpaper .job-fit-card,
@@ -36,12 +36,12 @@
 .job-fit-inkpaper .job-fit-state-card {
   border: 1px solid var(--sd-color-line);
   background: var(--sd-color-surface);
-  box-shadow: 0 10px 28px rgba(46, 91, 163, 0.08);
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
 }
 
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary {
-  border-radius: 20px;
+  border-radius: 18px;
 }
 
 .job-fit-inkpaper .job-fit-state-card {
@@ -49,7 +49,7 @@
   width: min(100%, 420px);
   justify-items: center;
   gap: 16px;
-  border-radius: 24px;
+  border-radius: 18px;
   padding: 32px 28px;
   text-align: center;
 }
@@ -59,9 +59,10 @@
 }
 
 .job-fit-inkpaper .job-fit-summary {
-  border-color: #bfd5fa;
-  background: linear-gradient(135deg, #f3f8ff 0, var(--sd-color-surface) 74%);
-  box-shadow: inset 4px 0 0 var(--sd-color-primary), 0 10px 28px rgba(46, 91, 163, 0.08);
+  border-color: #e2dccb;
+  border-top: 4px solid var(--sd-color-primary);
+  background: var(--sd-color-surface);
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
 }
 
 .job-fit-inkpaper .job-fit-summary > div > div > p:first-child,
@@ -70,13 +71,21 @@
   color: var(--sd-color-text-strong);
 }
 
+.job-fit-inkpaper .job-fit-header h1,
+.job-fit-inkpaper .job-fit-summary h2,
+.job-fit-inkpaper .job-fit-card h2,
+.job-fit-inkpaper .job-fit-card h3 {
+  font-family: var(--sd-font-sans, system-ui, sans-serif);
+  letter-spacing: .02em;
+}
+
 .job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
-  border-left: 3px solid #39a879;
+  border-left: 3px solid #1f9e86;
   background: var(--sd-color-success-soft);
 }
 
 .job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
-  border-left: 3px solid #e6a441;
+  border-left: 3px solid #a9781f;
   background: var(--sd-color-warning-soft);
 }
 
@@ -85,7 +94,7 @@
 }
 
 .job-fit-inkpaper .job-fit-notice {
-  border: 1px solid #bfd5fa;
+  border: 1px solid #d8c5ac;
   background: var(--sd-color-primary-soft);
   color: var(--sd-color-text-strong);
 }
@@ -98,17 +107,17 @@
 .job-fit-inkpaper .job-fit-action-bar {
   border-color: var(--sd-color-line);
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 -10px 26px rgba(46, 91, 163, 0.06);
+  box-shadow: 0 -8px 20px rgba(16, 48, 43, .06);
 }
 
 .job-fit-inkpaper .job-fit-action-bar > * {
-  width: min(100%, 840px);
+  width: min(100%, 984px);
   margin-inline: auto;
 }
 
 .job-fit-inkpaper .job-fit-action-grid > button:first-child,
 .job-fit-inkpaper button[aria-pressed='false'] {
-  border-color: #cbd9ed;
+  border-color: var(--sd-color-line);
   color: var(--sd-color-text);
 }
 
@@ -128,7 +137,7 @@
 .job-fit-inkpaper .job-fit-primary-action {
   min-height: var(--sd-primary-control-min);
   background: var(--sd-color-primary);
-  box-shadow: 0 8px 18px rgba(23, 105, 232, 0.22);
+  box-shadow: 0 6px 18px rgba(184, 104, 60, .22);
 }
 
 .job-fit-inkpaper .job-fit-primary-action:hover:not(:disabled) {
@@ -137,7 +146,7 @@
 
 .job-fit-inkpaper input,
 .job-fit-inkpaper textarea {
-  border-color: #cbd9ed;
+  border-color: var(--sd-color-line);
   background: var(--sd-color-surface);
   color: var(--sd-color-text-strong);
 }
@@ -149,7 +158,7 @@
 .job-fit-inkpaper button:focus-visible,
 .job-fit-inkpaper input:focus-visible,
 .job-fit-inkpaper textarea:focus-visible {
-  outline: 3px solid rgba(23, 105, 232, 0.36);
+  outline: 3px solid rgba(184, 104, 60, .35);
   outline-offset: 2px;
 }
 
@@ -176,4 +185,10 @@
   .job-fit-inkpaper .job-fit-state-card {
     padding: 28px 20px;
   }
+}
+
+/* LightFlow touch target contracts */
+:root, .job-fit-inkpaper {
+  --sd-control-min: 48px;
+  --sd-primary-control-min: 56px;
 }

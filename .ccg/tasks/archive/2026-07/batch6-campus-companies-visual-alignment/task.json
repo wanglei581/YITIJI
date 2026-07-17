@@ -1,0 +1,12 @@
+{
+  "id": "batch6-campus-companies-visual-alignment",
+  "title": "Batch 6 智慧校园企业匹配线 9 屏视觉对齐",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已完成本地验证，随功能提交归档",
+  "createdAt": "2026-07-18T00:00:00Z",
+  "branch": "codex/campus-companies-batch6-20260717"
+}
