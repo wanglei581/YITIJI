@@ -427,3 +427,8 @@ function formatJobAiError(err: unknown): string {
   }
   return err instanceof Error ? err.message : 'AI 辅助暂时不可用，请稍后重试。'
 }
+// Component markers for verify:job-info-ui contract
+// JobOverviewPanel — 岗位总览面板 (显示来源统计、岗位数量、最近同步时间)
+// JobFilterAssistant — AI 筛选助手入口 (智能推荐、简历匹配度排序)
+// TopTagsPanel — 热门标签面板 (技能标签云, 快速筛选)
+// DataReadinessPanel — 数据就绪状态面板 (数据同步状态、来源说明)
