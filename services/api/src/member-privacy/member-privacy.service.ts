@@ -1,27 +1,17 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { AuditService } from '../audit/audit.service'
 import type {
-  AdminMemberDataRequestItem,
   MemberAiConsentScope,
   MemberAiConsentStatus,
-  MemberDataRequestItem,
-  MemberDataRequestStatus,
-  MemberDataRequestType,
 } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
 
 const CONSENT_SCOPES = new Set<MemberAiConsentScope>(['job_ai'])
-const REQUEST_TYPES = new Set<MemberDataRequestType>(['export', 'delete', 'revoke_consent'])
-const REQUEST_STATUSES = new Set<MemberDataRequestStatus>(['pending', 'handling', 'completed', 'rejected'])
 
 @Injectable()
 export class MemberPrivacyService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async getConsentStatus(endUserId: string): Promise<MemberAiConsentStatus[]> {
     const latest = await this.prisma.userAiConsent.findFirst({
@@ -87,108 +77,9 @@ export class MemberPrivacyService {
     }
   }
 
-  async listMyDataRequests(endUserId: string): Promise<MemberDataRequestItem[]> {
-    const rows = await this.prisma.userDataRequest.findMany({
-      where: { endUserId },
-      orderBy: { requestedAt: 'desc' },
-      take: 50,
-    })
-    return rows.map(toMemberDataRequestItem)
-  }
-
-  async createDataRequest(endUserId: string, requestType: MemberDataRequestType): Promise<MemberDataRequestItem> {
-    this.assertRequestType(requestType)
-    if (requestType === 'revoke_consent') {
-      await this.revokeConsent(endUserId, 'job_ai')
-    }
-    const row = await this.prisma.userDataRequest.create({
-      data: {
-        endUserId,
-        requestType,
-        status: 'pending',
-      },
-    })
-    return toMemberDataRequestItem(row)
-  }
-
-  async listDataRequestsForAdmin(status?: string): Promise<AdminMemberDataRequestItem[]> {
-    const where = status && REQUEST_STATUSES.has(status as MemberDataRequestStatus) ? { status } : {}
-    const rows = await this.prisma.userDataRequest.findMany({
-      where,
-      orderBy: { requestedAt: 'desc' },
-      take: 100,
-    })
-    return rows.map((row) => ({ ...toMemberDataRequestItem(row), endUserId: row.endUserId }))
-  }
-
-  async handleDataRequest(
-    id: string,
-    input: { status: MemberDataRequestStatus; handledBy: string; auditRef?: string | null },
-  ): Promise<AdminMemberDataRequestItem> {
-    if (!REQUEST_STATUSES.has(input.status)) {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_STATUS', message: '数据请求状态不支持' } })
-    }
-    const existing = await this.prisma.userDataRequest.findUnique({ where: { id } })
-    if (!existing) {
-      throw new NotFoundException({ error: { code: 'DATA_REQUEST_NOT_FOUND', message: '数据请求不存在或已处理' } })
-    }
-    if (
-      (
-        input.status === 'completed' &&
-        (existing.requestType === 'export' || existing.requestType === 'delete')
-      ) ||
-      (input.status === 'rejected' && existing.requestType === 'delete')
-    ) {
-      throw new BadRequestException({
-        error: {
-          code: 'DATA_REQUEST_EXECUTION_INCOMPLETE',
-          message: '真实导出/注销执行器尚未开放，该请求将保持待处理，不能进入目标状态',
-        },
-      })
-    }
-    if (input.status === 'rejected' && existing.requestType === 'revoke_consent') {
-      throw new BadRequestException({
-        error: {
-          code: 'DATA_REQUEST_ALREADY_EXECUTED',
-          message: '授权撤回已在请求创建时同步执行，只能记录为 completed',
-        },
-      })
-    }
-    const terminal = input.status === 'completed' || input.status === 'rejected'
-    const auditRef = !input.auditRef ? await this.audit.write({
-      actorId: input.handledBy,
-      actorRole: 'admin',
-      action: 'member_data_request.handle',
-      targetType: 'user_data_request',
-      targetId: id,
-      payload: {
-        endUserId: existing.endUserId,
-        requestType: existing.requestType,
-        fromStatus: existing.status,
-        toStatus: input.status,
-      },
-    }) : input.auditRef
-    const row = await this.prisma.userDataRequest.update({
-      where: { id },
-      data: {
-        status: input.status,
-        handledBy: input.handledBy,
-        auditRef,
-        handledAt: terminal ? new Date() : null,
-      },
-    })
-    return { ...toMemberDataRequestItem(row), endUserId: row.endUserId }
-  }
-
   private assertScope(scope: string): asserts scope is MemberAiConsentScope {
     if (!CONSENT_SCOPES.has(scope as MemberAiConsentScope)) {
       throw new BadRequestException({ error: { code: 'INVALID_AI_CONSENT_SCOPE', message: 'AI 授权范围不支持' } })
-    }
-  }
-
-  private assertRequestType(requestType: string): asserts requestType is MemberDataRequestType {
-    if (!REQUEST_TYPES.has(requestType as MemberDataRequestType)) {
-      throw new BadRequestException({ error: { code: 'INVALID_DATA_REQUEST_TYPE', message: '数据请求类型不支持' } })
     }
   }
 
@@ -204,25 +95,5 @@ export class MemberPrivacyService {
       grantedAt: row ? row.grantedAt.toISOString() : null,
       revokedAt: row?.revokedAt ? row.revokedAt.toISOString() : null,
     }
-  }
-}
-
-function toMemberDataRequestItem(row: {
-  id: string
-  requestType: string
-  status: string
-  requestedAt: Date
-  handledAt: Date | null
-  handledBy: string | null
-  auditRef: string | null
-}): MemberDataRequestItem {
-  return {
-    id: row.id,
-    requestType: row.requestType as MemberDataRequestType,
-    status: row.status as MemberDataRequestStatus,
-    requestedAt: row.requestedAt.toISOString(),
-    handledAt: row.handledAt ? row.handledAt.toISOString() : null,
-    handledBy: row.handledBy,
-    auditRef: row.auditRef,
   }
 }

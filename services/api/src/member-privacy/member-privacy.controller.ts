@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common'
-import { IsIn } from 'class-validator'
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { MemberDataRequestService } from './member-data-request.service'
 import { MemberPrivacyService } from './member-privacy.service'
 import type { MemberAiConsentScope, MemberDataRequestType } from './member-privacy.types'
 
@@ -35,6 +36,11 @@ class CreateDataRequestDto implements CreateDataRequestShape {
   requestType!: 'export' | 'delete' | 'revoke_consent'
 }
 
+class ListDataRequestDto {
+  @IsOptional() @IsString() @MaxLength(64)
+  cursor?: string
+}
+
 @Controller('me/ai-consents')
 @UseGuards(EndUserAuthGuard)
 export class MemberPrivacyController {
@@ -63,16 +69,21 @@ export class MemberPrivacyController {
 @Controller('me/data-requests')
 @UseGuards(EndUserAuthGuard)
 export class MemberDataRequestController {
-  constructor(private readonly privacy: MemberPrivacyService) {}
+  constructor(private readonly requests: MemberDataRequestService) {}
 
   @Get()
-  async list(@CurrentEndUser() user: AuthedEndUser) {
-    return ApiResponse.ok(await this.privacy.listMyDataRequests(user.endUserId))
+  async list(@CurrentEndUser() user: AuthedEndUser, @Query() query: ListDataRequestDto) {
+    return ApiResponse.ok(await this.requests.listMyDataRequests(user.endUserId, query.cursor))
   }
 
   @Post()
-  async create(@CurrentEndUser() user: AuthedEndUser, @Body() dto: CreateDataRequestDto) {
+  async create(@CurrentEndUser() user: AuthedEndUser, @Body() dto: CreateDataRequestDto, @Req() req: ReqLike) {
     const requestType: MemberDataRequestType = dto.requestType
-    return ApiResponse.ok(await this.privacy.createDataRequest(user.endUserId, requestType))
+    return ApiResponse.ok(await this.requests.create(user.endUserId, {
+      requestType,
+      idempotencyKey: headerOf(req, 'idempotency-key'),
+      stepUpToken: headerOf(req, 'x-member-step-up-token'),
+      terminalId: terminalIdOf(req),
+    }))
   }
 }
