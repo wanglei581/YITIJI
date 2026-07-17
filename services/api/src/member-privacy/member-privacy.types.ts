@@ -1,26 +1,14 @@
 export type MemberAiConsentScope = 'job_ai'
-
-export const MEMBER_DATA_REQUEST_TYPES = ['export', 'delete', 'revoke_consent'] as const
-export type MemberDataRequestType = (typeof MEMBER_DATA_REQUEST_TYPES)[number]
-
-export const MEMBER_DATA_REQUEST_STATUSES = [
-  'pending',
-  'handling',
-  'ready',
-  'completed',
-  'expired',
-  'failed',
-  'rejected',
-  'cancelled',
-] as const
-export type MemberDataRequestStatus = (typeof MEMBER_DATA_REQUEST_STATUSES)[number]
-
-export const MEMBER_DATA_REQUEST_STEP_UP_ACTIONS = [
-  'export_data_request',
-  'export_data_download',
-  'close_account',
-] as const
-export type MemberDataRequestStepUpAction = (typeof MEMBER_DATA_REQUEST_STEP_UP_ACTIONS)[number]
+export type MemberDataRequestType = 'export' | 'delete' | 'revoke_consent'
+export type MemberDataRequestStatus =
+  | 'pending'
+  | 'handling'
+  | 'ready'
+  | 'completed'
+  | 'expired'
+  | 'failed'
+  | 'rejected'
+  | 'cancelled'
 
 export interface MemberAiConsentStatus {
   scope: MemberAiConsentScope
@@ -46,8 +34,29 @@ export interface MemberDataRequestItem {
 export interface MemberDataRequestPage {
   items: MemberDataRequestItem[]
   nextCursor: string | null
+  capabilities: {
+    accountClosureAvailable: false
+  }
 }
 
 export interface AdminMemberDataRequestItem extends MemberDataRequestItem {
   endUserId: string
+  phoneMasked: string
+  nickname: string | null
+  retryCount: number
+  lastAttemptAt: string | null
+  handledBy: string | null
+  auditRef: string | null
+}
+
+export interface AdminMemberDataRequestPage {
+  items: AdminMemberDataRequestItem[]
+  nextCursor: string | null
+}
+
+export interface AdminMemberDataRequestQuery {
+  status?: MemberDataRequestStatus
+  requestType?: MemberDataRequestType
+  cursor?: string
+  limit?: number
 }

@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 import { FilesController } from './files.controller'
 import { FilesService } from './files.service'
 import { FilesCleanupTask } from './files.cleanup.task'
+import { MemberDataExportFileService } from './member-data-export-file.service'
 
 /**
  * BE-1 文件模块。
@@ -28,7 +29,7 @@ import { FilesCleanupTask } from './files.cleanup.task'
     JwtVerifierModule,
   ],
   controllers: [FilesController],
-  providers: [FilesService, FilesCleanupTask],
-  exports: [FilesService],
+  providers: [FilesService, MemberDataExportFileService, FilesCleanupTask],
+  exports: [FilesService, MemberDataExportFileService],
 })
 export class FilesModule {}

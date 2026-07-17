@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
+import { Body, Controller, Get, Headers, Param, Post, Query, Req, UseGuards } from '@nestjs/common'
+import { Type } from 'class-transformer'
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current-end-user.decorator'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
+import { MemberDataExportDownloadService } from './member-data-export-download.service'
 import { MemberDataRequestService } from './member-data-request.service'
 import { MemberPrivacyService } from './member-privacy.service'
 import type { MemberAiConsentScope, MemberDataRequestType } from './member-privacy.types'
@@ -36,10 +38,15 @@ class CreateDataRequestDto implements CreateDataRequestShape {
   requestType!: 'export' | 'delete' | 'revoke_consent'
 }
 
-class ListDataRequestDto {
-  @IsOptional() @IsString() @MaxLength(64)
+class ListDataRequestsQueryDto {
+  @IsOptional() @IsString() @MaxLength(512)
   cursor?: string
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit?: number
 }
+
+class EmptyDto {}
 
 @Controller('me/ai-consents')
 @UseGuards(EndUserAuthGuard)
@@ -69,21 +76,50 @@ export class MemberPrivacyController {
 @Controller('me/data-requests')
 @UseGuards(EndUserAuthGuard)
 export class MemberDataRequestController {
-  constructor(private readonly requests: MemberDataRequestService) {}
+  constructor(
+    private readonly requests: MemberDataRequestService,
+    private readonly downloads: MemberDataExportDownloadService,
+  ) {}
 
   @Get()
-  async list(@CurrentEndUser() user: AuthedEndUser, @Query() query: ListDataRequestDto) {
-    return ApiResponse.ok(await this.requests.listMyDataRequests(user.endUserId, query.cursor))
+  async list(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Query() query: ListDataRequestsQueryDto,
+  ) {
+    return ApiResponse.ok(await this.requests.list(user.endUserId, query.cursor, query.limit))
   }
 
   @Post()
-  async create(@CurrentEndUser() user: AuthedEndUser, @Body() dto: CreateDataRequestDto, @Req() req: ReqLike) {
+  async create(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: CreateDataRequestDto,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Headers('x-member-step-up-token') stepUpToken: string | undefined,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+  ) {
     const requestType: MemberDataRequestType = dto.requestType
-    return ApiResponse.ok(await this.requests.create(user.endUserId, {
+    return ApiResponse.ok(await this.requests.create(
+      user.endUserId,
       requestType,
-      idempotencyKey: headerOf(req, 'idempotency-key'),
-      stepUpToken: headerOf(req, 'x-member-step-up-token'),
-      terminalId: terminalIdOf(req),
-    }))
+      idempotencyKey ?? '',
+      stepUpToken ?? null,
+      terminalId?.slice(0, 128) ?? null,
+    ))
+  }
+
+  @Post(':id/download-authorizations')
+  async authorizeDownload(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param('id') id: string,
+    @Body() _dto: EmptyDto,
+    @Headers('x-member-step-up-token') stepUpToken: string | undefined,
+    @Headers('x-terminal-id') terminalId: string | undefined,
+  ) {
+    return ApiResponse.ok(await this.downloads.authorizeDownload(
+      user.endUserId,
+      id,
+      stepUpToken ?? null,
+      terminalId?.slice(0, 128) ?? null,
+    ))
   }
 }

@@ -31,6 +31,7 @@ export type FilePurpose =
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
   | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
+  | 'member_data_export'   // 会员本人数据导出(仅服务端生成,高敏短期 JSON)
 
 export type FileSensitiveLevel = 'normal' | 'sensitive' | 'highly_sensitive'
 

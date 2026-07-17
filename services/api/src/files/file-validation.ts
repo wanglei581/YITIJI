@@ -26,6 +26,21 @@ export type UploadValidationMode = 'proxy' | 'intent'
 
 const MB = 1024 * 1024
 
+/**
+ * 会员数据导出的完整文件策略。该 purpose 不接受外部上传，
+ * MemberDataExportFileService 在存储前校验 JSON 内容与明确到期时间。
+ */
+export const MEMBER_DATA_EXPORT_FILE_POLICY = {
+  mimes: ['application/json'],
+  maxBytes: 15 * MB,
+  sensitiveLevel: 'highly_sensitive',
+  retentionPolicy: 'system_short',
+  retentionSetBy: 'system',
+  visibility: 'private',
+  maxTtlHours: 24,
+  serverGeneratedOnly: true,
+} as const
+
 /** MIME → 允许的扩展名集合(扩展名与 MIME 必须一致)。 */
 const MIME_EXTS: Record<string, string[]> = {
   'application/pdf': ['pdf'],
@@ -69,6 +84,10 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   temp: { mimes: [...PRINTABLE, 'image/webp'], maxBytes: 20 * MB },
   // 签名/印章图片:仅供签章合成读取,高敏、系统短期、锁定不可延期(见 retention-policy.ts)
   signature_image: { mimes: ['image/jpeg', 'image/png'], maxBytes: 10 * MB },
+  member_data_export: {
+    mimes: [...MEMBER_DATA_EXPORT_FILE_POLICY.mimes],
+    maxBytes: MEMBER_DATA_EXPORT_FILE_POLICY.maxBytes,
+  },
 }
 
 /** 服务端代理上传(multipart,整 buffer 进内存)的硬上限。超此须走 upload-intent 直传。 */
@@ -90,6 +109,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   admin_upload: 'normal',
   temp: 'sensitive',
   signature_image: 'highly_sensitive',
+  member_data_export: MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel,
 }
 
 /** 从文件名提取扩展名(小写,不带点);无则空串。 */

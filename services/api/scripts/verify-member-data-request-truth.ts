@@ -1,15 +1,16 @@
 /**
  * 用户数据请求真实状态集成守卫。
  *
- * SQLite 环境使用独立临时库重放正式 migration；PostgreSQL readiness 使用其
- * 已完成迁移的空库。该验证不启动 AppModule，也不连接 Redis：导出一次性
- * 授权的调用顺序由 state-machine verify 锁住，这里验证真实 schema、账本
- * 及同步撤回同意的事实。
+ * SQLite 环境重放正式 migration；PostgreSQL readiness 使用该 job 的空库。
+ * 覆盖唯一请求服务、delete 零副作用 fail-closed、revoke_consent 同事务完成，
+ * 以及队列缺失时 export 不创建伪 pending 记录。
  */
+import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { AuditService } from '../src/audit/audit.service'
 import { MemberDataRequestService } from '../src/member-privacy/member-data-request.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -59,13 +60,12 @@ function errorCode(error: unknown): string | undefined {
   return response?.error?.code
 }
 
-async function expectError(operation: () => Promise<unknown>, expectedCode: string, label: string): Promise<void> {
+async function captureCode(operation: () => Promise<unknown>): Promise<string | undefined> {
   try {
     await operation()
-    fail(`${label} — 未 fail closed`)
+    return undefined
   } catch (error) {
-    if (errorCode(error) === expectedCode) pass(`${label} — ${expectedCode}`)
-    else fail(`${label} — 预期 ${expectedCode}，实际 ${errorCode(error) ?? (error as Error).message}`)
+    return errorCode(error)
   }
 }
 
@@ -73,16 +73,23 @@ async function main(): Promise<void> {
   console.log(`\n=== 用户数据请求真实状态守卫（${usesPostgres ? 'PostgreSQL' : '临时 SQLite'}）===`)
 
   const prisma = new PrismaService()
-  let stepUpCalls = 0
-  const requests = new MemberDataRequestService(
-    prisma,
-    {
-      consumeGrant: async () => {
-        stepUpCalls += 1
-        throw new Error('truth verify must not consume export grant')
-      },
-    } as never,
-  )
+  const audit = new AuditService(prisma)
+  const consent = new MemberPrivacyService(prisma)
+  const counters = { stepUp: 0, redis: 0 }
+  const stepUp = {
+    consumeGrant: async () => {
+      counters.stepUp += 1
+      throw new Error('queue gate should run before step-up')
+    },
+  }
+  const redis = {
+    setNxEx: async () => {
+      counters.redis += 1
+      throw new Error('queue gate should run before Redis lock')
+    },
+    getAndDelIfEquals: async () => 'matched' as const,
+  }
+  const requests = new MemberDataRequestService(prisma, stepUp as never, audit, redis as never, undefined)
   const tag = `wave1b-data-rights-${Date.now()}-${process.pid}`
   const endUserId = `${tag}-member`
 
@@ -97,87 +104,81 @@ async function main(): Promise<void> {
       },
     })
 
-    await expectError(
-      () => requests.create(endUserId, {
-        requestType: 'delete',
-        idempotencyKey: null,
-        stepUpToken: null,
-        terminalId: null,
-      }),
-      'ACCOUNT_CLOSURE_NOT_AVAILABLE',
-      'delete 请求不创建账本或消费 Step-up',
-    )
-    const afterDelete = await prisma.userDataRequest.count({ where: { endUserId } })
-    if (afterDelete === 0 && stepUpCalls === 0) pass('delete 拒绝后真实数据库没有请求行，且 Step-up 零调用')
-    else fail(`delete 拒绝仍留下副作用: rows=${afterDelete} stepUp=${stepUpCalls}`)
+    const legacyMethods = Object.getOwnPropertyNames(MemberPrivacyService.prototype)
+    const leaked = ['listMyDataRequests', 'createDataRequest', 'listDataRequestsForAdmin', 'handleDataRequest']
+      .filter((method) => legacyMethods.includes(method))
+    if (leaked.length === 0) pass('MemberPrivacyService 不再暴露第二套数据请求写入口')
+    else fail(`MemberPrivacyService 仍暴露旧入口：${leaked.join(',')}`)
 
-    const legacyOne = await prisma.userDataRequest.create({
-      data: { endUserId, requestType: 'export', status: 'pending' },
-    })
-    const legacyTwo = await prisma.userDataRequest.create({
-      data: { endUserId, requestType: 'revoke_consent', status: 'completed', handledAt: new Date() },
-    })
-    const legacyPage = await requests.listMyDataRequests(endUserId)
-    if (legacyPage.items.some((item) => item.id === legacyOne.id) && legacyPage.items.some((item) => item.id === legacyTwo.id)) {
-      pass('历史无 idempotencyKey 的请求可查询，nullable unique 未阻断迁移')
+    const beforeDeleteRows = await prisma.userDataRequest.count({ where: { endUserId } })
+    const beforeDeleteAudits = await prisma.auditLog.count({ where: { targetId: endUserId } })
+    const deleteCode = await captureCode(() => requests.create(
+      endUserId,
+      'delete',
+      randomUUID(),
+      'must-not-be-consumed',
+      'must-not-be-read',
+    ))
+    const afterDeleteRows = await prisma.userDataRequest.count({ where: { endUserId } })
+    const afterDeleteAudits = await prisma.auditLog.count({ where: { targetId: endUserId } })
+    if (
+      deleteCode === 'ACCOUNT_CLOSURE_NOT_AVAILABLE'
+      && beforeDeleteRows === afterDeleteRows
+      && beforeDeleteAudits === afterDeleteAudits
+      && counters.stepUp === 0
+      && counters.redis === 0
+    ) {
+      pass('delete 在 DB/审计/Redis/step-up 前 ACCOUNT_CLOSURE_NOT_AVAILABLE')
     } else {
-      fail('历史无 idempotencyKey 的请求无法查询')
+      fail(`delete 零副作用失败 code=${deleteCode ?? 'none'} rows=${afterDeleteRows} audit=${afterDeleteAudits}`)
     }
 
-    await new MemberPrivacyService(prisma).grantConsent(endUserId, 'job_ai', null)
-    const revokeKey = '6ed2c12e-c6ac-48a8-9ef2-dbcaa0f34dbb'
-    const revoked = await requests.create(endUserId, {
-      requestType: 'revoke_consent',
-      idempotencyKey: revokeKey,
-      stepUpToken: null,
-      terminalId: null,
-    })
-    const replay = await requests.create(endUserId, {
-      requestType: 'revoke_consent',
-      idempotencyKey: revokeKey,
-      stepUpToken: null,
-      terminalId: null,
-    })
-    const activeConsent = await prisma.userAiConsent.findFirst({
-      where: { endUserId, scope: 'job_ai', revokedAt: null },
-    })
-    if (revoked.id === replay.id && revoked.status === 'completed' && revoked.executionStep === 'consent_revoked' && !activeConsent) {
-      pass('revoke_consent 同步撤回同意、写 completed 账本，并支持幂等重放')
+    await consent.grantConsent(endUserId, 'job_ai', null)
+    const revokeKey = randomUUID()
+    const revoked = await requests.create(endUserId, 'revoke_consent', revokeKey, null, null)
+    const replay = await requests.create(endUserId, 'revoke_consent', revokeKey, null, null)
+    const [storedRevoke, activeConsent, revokeAudits] = await Promise.all([
+      prisma.userDataRequest.findUnique({ where: { id: revoked.id } }),
+      prisma.userAiConsent.count({ where: { endUserId, scope: 'job_ai', revokedAt: null } }),
+      prisma.auditLog.count({ where: { targetId: revoked.id, action: 'member_ai_consent.revoke' } }),
+    ])
+    if (
+      revoked.status === 'completed'
+      && replay.id === revoked.id
+      && storedRevoke?.status === 'completed'
+      && storedRevoke.activeKey === null
+      && activeConsent === 0
+      && revokeAudits === 1
+    ) {
+      pass('revoke_consent 同事务撤回授权、完成请求、required audit 且幂等重放')
     } else {
-      fail(`revoke_consent 账本或同意状态不真实: ${JSON.stringify({ revoked, replay, activeConsent })}`)
+      fail(`revoke_consent 真相不一致 request=${JSON.stringify(storedRevoke)} audits=${revokeAudits}`)
     }
 
-    const exportRequest = await prisma.userDataRequest.create({
-      data: {
-        endUserId,
-        requestType: 'export',
-        status: 'pending',
-        idempotencyKey: '63c93f92-2a96-47c6-947a-857f7e0f0759',
-        activeKey: `member-data-request:${endUserId}`,
-        executionVersion: 0,
-      },
-    })
-    const rejected = await requests.rejectExportRequest(exportRequest.id, 'verify-admin', 'rejected')
-    if (rejected.status === 'rejected') {
-      const stored = await prisma.userDataRequest.findUnique({ where: { id: exportRequest.id } })
-      if (stored?.activeKey === null && stored.executionStep === 'admin_rejected' && stored.handledBy === 'verify-admin') {
-        pass('Admin 仅能将 export 置为 rejected，并清理 activeKey')
-      } else {
-        fail(`Admin reject 未完整收口: ${JSON.stringify(stored)}`)
-      }
+    const exportCode = await captureCode(() => requests.create(
+      endUserId,
+      'export',
+      randomUUID(),
+      'must-not-be-consumed',
+      null,
+    ))
+    const exportRows = await prisma.userDataRequest.count({ where: { endUserId, requestType: 'export' } })
+    if (
+      exportCode === 'DATA_REQUEST_QUEUE_UNAVAILABLE'
+      && exportRows === 0
+      && counters.stepUp === 0
+      && counters.redis === 0
+    ) {
+      pass('队列缺失时 export fail closed，不消费 grant、不加锁、不创建伪记录')
     } else {
-      fail(`Admin reject 未进入 rejected: ${JSON.stringify(rejected)}`)
+      fail(`export 队列门禁失败 code=${exportCode ?? 'none'} rows=${exportRows}`)
     }
-
-    const legacyDelete = await prisma.userDataRequest.create({
-      data: { endUserId, requestType: 'delete', status: 'pending' },
-    })
-    await expectError(
-      () => requests.rejectExportRequest(legacyDelete.id, 'verify-admin', 'rejected'),
-      'DATA_REQUEST_ACTION_NOT_ALLOWED',
-      'Admin 不能 reject 历史 delete 请求',
-    )
   } finally {
+    const requestIds = (await prisma.userDataRequest.findMany({
+      where: { endUserId },
+      select: { id: true },
+    })).map((row) => row.id)
+    await prisma.auditLog.deleteMany({ where: { targetId: { in: [...requestIds, endUserId] } } })
     await prisma.userDataRequest.deleteMany({ where: { endUserId } })
     await prisma.userAiConsent.deleteMany({ where: { endUserId } })
     await prisma.endUser.deleteMany({ where: { id: endUserId } })
@@ -185,18 +186,16 @@ async function main(): Promise<void> {
   }
 
   if (failures > 0) {
-    console.error(`\n❌ ${failures} 项失败 — 用户数据请求账本与实际状态不一致\n`)
+    console.error(`\n❌ ${failures} 项失败 — 用户数据请求真实状态守卫未通过\n`)
     process.exitCode = 1
     return
   }
-  console.log('✅ ALL PASS — 用户数据请求账本与实际状态一致\n')
+  console.log('✅ ALL PASS — 数据请求状态与真实执行能力一致\n')
 }
 
-main()
+void main()
   .catch((error) => {
     console.error(error)
     process.exitCode = 1
   })
-  .finally(() => {
-    cleanupEnvironment()
-  })
+  .finally(cleanupEnvironment)

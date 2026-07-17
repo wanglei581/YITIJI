@@ -93,6 +93,11 @@ export class FilesService {
     /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
   }): Promise<FileUploadResponse> {
+    if (args.purpose === 'member_data_export') {
+      throw new BadRequestException({
+        error: { code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY', message: '该文件用途仅允许服务端生成' },
+      })
+    }
     const validation = validateUpload({
       purpose: args.purpose,
       mimeType: args.mimeType,
@@ -140,34 +145,47 @@ export class FilesService {
 
     const put = await this.storage.putObject(objectKey, args.buffer, args.mimeType)
 
-    const record = await this.prisma.fileObject.create({
-      data: {
-        id,
-        storageKey: objectKey,
-        bucket: this.storage.defaultBucket,
-        region: this.storage.defaultRegion,
-        filename: args.filename,
-        mimeType: args.mimeType,
-        sizeBytes: put.sizeBytes,
-        sha256: put.sha256,
-        uploaderId: args.uploaderId,
-        endUserId: args.endUserId ?? null,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-        purpose: args.purpose,
-        sensitiveLevel,
-        visibility: 'private',
-        status: 'active',
-        createdBy: args.createdBy ?? args.uploaderId ?? null,
-        assetCategory: args.assetCategory ?? 'original',
-        sourceFileId: args.sourceFileId ?? null,
-        expiresAt: args.expiresAtOverride ?? retention.expiresAt,
-        retentionPolicy: retention.retentionPolicy,
-        retentionSetBy: retention.retentionSetBy,
-        retentionConsentAt: retention.retentionConsentAt,
-        retentionConsentVersion: retention.retentionConsentVersion,
-      },
-    })
+    const bucket = this.storage.defaultBucket
+    const region = this.storage.defaultRegion
+    let record
+    try {
+      record = await this.prisma.fileObject.create({
+        data: {
+          id,
+          storageKey: objectKey,
+          bucket,
+          region,
+          filename: args.filename,
+          mimeType: args.mimeType,
+          sizeBytes: put.sizeBytes,
+          sha256: put.sha256,
+          uploaderId: args.uploaderId,
+          endUserId: args.endUserId ?? null,
+          ownerType: owner.ownerType,
+          ownerId: owner.ownerId,
+          purpose: args.purpose,
+          sensitiveLevel,
+          visibility: 'private',
+          status: 'active',
+          createdBy: args.createdBy ?? args.uploaderId ?? null,
+          assetCategory: args.assetCategory ?? 'original',
+          sourceFileId: args.sourceFileId ?? null,
+          expiresAt: args.expiresAtOverride ?? retention.expiresAt,
+          retentionPolicy: retention.retentionPolicy,
+          retentionSetBy: retention.retentionSetBy,
+          retentionConsentAt: retention.retentionConsentAt,
+          retentionConsentVersion: retention.retentionConsentVersion,
+        },
+      })
+    } catch (createError) {
+      try {
+        await this.storage.deleteObject(objectKey, bucket)
+      } catch {
+        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
+        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
+      }
+      throw createError
+    }
 
     // 上传响应给 30 分钟签名 URL,覆盖"上传→预览→确认打印"整段触控窗口。
     const signed = this.storage.getDownloadUrl(
@@ -204,6 +222,11 @@ export class FilesService {
     createdBy?: string | null
   }): Promise<UploadIntentResponse> {
     const { body } = args
+    if (body.purpose === 'member_data_export') {
+      throw new BadRequestException({
+        error: { code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY', message: '该文件用途仅允许服务端生成' },
+      })
+    }
     if (!isPurpose(body.purpose)) {
       throw new BadRequestException({ error: { code: 'FILE_PURPOSE_INVALID', message: `不支持的文件用途: ${body.purpose}` } })
     }
@@ -299,10 +322,7 @@ export class FilesService {
    * 通过则 status→active。COS 端 sha256 无法就 buffer 计算,沿用意图阶段客户端值(可空)。
    */
   async completeUpload(fileId: string, requester: FileRequester): Promise<CompleteUploadResponse> {
-    const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!record || record.deletedAt) {
-      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
-    }
+    const record = await this.requireAlive(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({ error: { code: 'FILE_ACCESS_DENIED', message: '无权确认此文件' } })
     }
@@ -353,10 +373,7 @@ export class FilesService {
 
   /** 本地后端直传:接收原始 buffer 写入,并复核大小/落地 active。 */
   async writeRawUpload(fileId: string, buffer: Buffer): Promise<void> {
-    const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!record || record.deletedAt) {
-      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在' } })
-    }
+    const record = await this.requireAlive(fileId)
     const validation = validateUpload({
       purpose: record.purpose,
       mimeType: record.mimeType,
@@ -556,7 +573,7 @@ export class FilesService {
 
   /** 服务端生命周期任务删除系统派生文件；不暴露给 controller。 */
   async systemDelete(fileId: string, reason: string): Promise<FileMetadata> {
-    return this._delete(fileId, 'system', reason)
+    return this._delete(fileId, 'system', reason, true)
   }
 
   /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
@@ -612,8 +629,8 @@ export class FilesService {
     }
   }
 
-  private async _delete(fileId: string, deletedBy: string, reason: string): Promise<FileMetadata> {
-    const record = await this.requireAlive(fileId)
+  private async _delete(fileId: string, deletedBy: string, reason: string, allowMemberDataExport = false): Promise<FileMetadata> {
+    const record = await this.requireAlive(fileId, allowMemberDataExport)
     await this.storage.deleteObject(record.storageKey, record.bucket)
     const updated = await this.prisma.fileObject.update({
       where: { id: fileId },
@@ -628,7 +645,9 @@ export class FilesService {
   async cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
     const now = new Date()
     const expired = await this.prisma.fileObject.findMany({
-      where: { deletedAt: null, expiresAt: { lt: now } },
+      // 导出文件必须由 member-privacy reconciler 同步收口请求账本，
+      // 通用 cron 不得越过账本直接删除。
+      where: { deletedAt: null, purpose: { not: 'member_data_export' }, expiresAt: { lt: now } },
       select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
     })
 
@@ -710,9 +729,10 @@ export class FilesService {
     return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
   }
 
-  private async requireAlive(fileId: string) {
+  private async requireAlive(fileId: string, allowMemberDataExport = false) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!record || record.deletedAt) {
+    if (!record || record.deletedAt || (!allowMemberDataExport && record.purpose === 'member_data_export')) {
+      // 禁止通用端点成为导出 artifact 存在性探针。
       throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
     }
     return record
@@ -787,15 +807,16 @@ function toMetadata(r: {
   deleteReason: string | null
   createdAt: Date
 }): FileMetadata {
+  const protectedExport = r.purpose === 'member_data_export'
   return {
     id: r.id,
-    bucket: r.bucket,
-    region: r.region,
-    objectKey: r.storageKey,
+    bucket: protectedExport ? '' : r.bucket,
+    region: protectedExport ? '' : r.region,
+    objectKey: protectedExport ? '' : r.storageKey,
     filename: r.filename,
     mimeType: r.mimeType,
     sizeBytes: r.sizeBytes,
-    sha256: r.sha256,
+    sha256: protectedExport ? '' : r.sha256,
     purpose: r.purpose as FilePurpose,
     sensitiveLevel: r.sensitiveLevel as FileSensitiveLevel,
     ownerType: r.ownerType as FileOwnerType | null,

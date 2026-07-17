@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import type {
   AuditAction,
   AuditLogListQuery,
@@ -7,6 +7,18 @@ import type {
   AuditLogRecord,
   AuditTargetType,
 } from './audit.types'
+
+interface AuditWriteArgs {
+  actorId: string | null
+  actorRole: string
+  action: AuditAction | string
+  targetType: AuditTargetType | string
+  targetId?: string | null
+  payload?: Record<string, unknown>
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string | null
+}
 
 /**
  * 审计日志服务(BE-2)。
@@ -38,17 +50,7 @@ export class AuditService {
    *   - payload 只放"上下文摘要"(reason / 旧值 / 新值 / 计数),
    *     避免塞整份请求体
    */
-  async write(args: {
-    actorId: string | null
-    actorRole: string
-    action: AuditAction | string
-    targetType: AuditTargetType | string
-    targetId?: string | null
-    payload?: Record<string, unknown>
-    ipAddress?: string | null
-    userAgent?: string | null
-    requestId?: string | null
-  }): Promise<string | null> {
+  async write(args: AuditWriteArgs): Promise<string | null> {
     const payloadJson = this.safeStringify(args.payload ?? {})
     try {
       const row = await this.prisma.auditLog.create({
@@ -73,6 +75,33 @@ export class AuditService {
       )
       return null
     }
+  }
+
+  /**
+   * 在调用方事务内写必须成功的审计记录。
+   *
+   * 与 write() 共用同一 payload 限长规则，但不捕获数据库异常：隐私状态、
+   * consent 撤回等强一致动作必须在审计失败时一起回滚。
+   */
+  async writeRequired(
+    tx: Pick<PrismaTransactionClient, 'auditLog'>,
+    args: AuditWriteArgs,
+  ): Promise<string> {
+    const payloadJson = this.safeStringify(args.payload ?? {})
+    const row = await tx.auditLog.create({
+      data: {
+        actorId: args.actorId,
+        actorRole: args.actorRole,
+        action: args.action,
+        targetType: args.targetType,
+        targetId: args.targetId ?? null,
+        payloadJson,
+        ipAddress: args.ipAddress ?? null,
+        userAgent: args.userAgent ?? null,
+        requestId: args.requestId ?? null,
+      },
+    })
+    return row.id
   }
 
   /** 列表查询(admin)。 */

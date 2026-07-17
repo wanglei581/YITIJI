@@ -1430,7 +1430,7 @@ model UserDataRequest {
   handledAt         DateTime?
   handledBy         String?
   auditRef          String?
-  idempotencyKey    String?
+  idempotencyKey    String?   @unique
   activeKey         String?   @unique
   executionVersion  Int       @default(0)
   executionStep     String?
@@ -1440,6 +1440,7 @@ model UserDataRequest {
   exportExpiresAt   DateTime?
   downloadConsumedAt DateTime?
   failureCode       String?
+  failureMessage    String?
   retryCount        Int       @default(0)
   lastAttemptAt     DateTime?
 
