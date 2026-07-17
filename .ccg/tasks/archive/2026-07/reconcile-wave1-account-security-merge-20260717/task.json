@@ -1,0 +1,12 @@
+{
+  "id": "reconcile-wave1-account-security-merge-20260717",
+  "title": "校准用户中心 Wave 1-A PR #270 合并状态",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "提交纯文档校准并创建 PR；不部署，不启动 Wave 1-B（任务已归档）",
+  "createdAt": "2026-07-17T11:31:15+08:00",
+  "branch": "codex/reconcile-wave1-account-security-merge-20260717"
+}
