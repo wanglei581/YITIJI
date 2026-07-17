@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
-import { CheckCircleIcon, GiftIcon, LandmarkIcon, PackageIcon, TicketIcon, type LucideIcon } from 'lucide-react'
+import { CheckCircleIcon, ChevronLeftIcon, GiftIcon, LandmarkIcon, PackageIcon, TicketIcon, type LucideIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { BenefitActivitiesApiError, claimBenefitActivity, getBenefitActivity } from '../../services/api/benefitActivities'
 import { formatTime } from '../profile/assets/format'
+import '../profile/me/me-detail-inkpaper.css'
 
 type PageState = 'loading' | 'ready' | 'error'
 
@@ -35,6 +36,14 @@ function quantityText(item: BenefitActivityListItem): string {
   if (item.benefitType === 'subsidy_eligibility_hint') return '仅提供政策资格和官方入口指引'
   if (item.quantityTotal === null) return '一次性权益'
   return `${item.quantityTotal} 次 / 份服务额度`
+}
+
+function stockText(item: BenefitActivityListItem): string {
+  if (item.claimed) return '已领取'
+  if (item.ended) return '活动已结束'
+  if (item.soldOut) return '已领完'
+  if (item.stockRemaining !== null) return `可领取 · 剩余 ${item.stockRemaining} 份`
+  return '可领取'
 }
 
 export function BenefitActivityDetailPage() {
@@ -91,80 +100,93 @@ export function BenefitActivityDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
-      <PageHeader
-        title="权益活动详情"
-        subtitle="领取后会进入本人「我的权益」"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/activities')}>
-            返回活动
-          </Button>
-        }
-      />
+    <div className="me-inkdetail benefit-activity-detail h-full">
+      <header className="me-pagehead">
+        <button type="button" className="me-pagehead-back" onClick={() => navigate('/activities')}>
+          <ChevronLeftIcon aria-hidden="true" />
+          返回活动
+        </button>
+        <div className="me-pagehead-titles">
+          <h1>权益活动详情</h1>
+          <p>领取后会进入本人「我的权益」</p>
+        </div>
+      </header>
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <main className="benefit-activity-content">
         {state === 'loading' ? (
-          <LoadingState className="py-20" />
+          <LoadingState className="benefit-activity-state" />
         ) : state === 'error' || !item ? (
-          <ErrorState className="py-20" onRetry={load} />
+          <ErrorState className="benefit-activity-state" onRetry={load} />
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-4">
-            <Card className="p-5">
-              <div className="flex items-start gap-4">
-                <div className={['flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl', TYPE_META[item.benefitType].bg].join(' ')}>
-                  {(() => {
-                    const Icon = TYPE_META[item.benefitType].icon
-                    return <Icon className={['h-7 w-7', TYPE_META[item.benefitType].color].join(' ')} aria-hidden="true" />
-                  })()}
+          <>
+            <Card className="benefit-activity-hero">
+              <span className={['benefit-activity-icon', `is-${item.benefitType}`].join(' ')} aria-hidden="true">
+                {(() => {
+                  const Icon = TYPE_META[item.benefitType].icon
+                  return <Icon />
+                })()}
+              </span>
+              <div className="benefit-activity-hero-main">
+                <div className="benefit-activity-chips">
+                  <span className="me-chip">{SOURCE_LABEL[item.sourceType]}</span>
+                  <span className="me-chip">{TYPE_META[item.benefitType].label}</span>
+                  <span className={['benefit-activity-stock', item.claimed ? 'is-claimed' : item.soldOut || item.ended ? 'is-ended' : ''].join(' ')}>
+                    {stockText(item)}
+                  </span>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-500">{TYPE_META[item.benefitType].label}</span>
-                    {item.claimed && <span className="rounded-full bg-success-bg px-2.5 py-1 text-xs font-medium text-success-fg">已领取</span>}
-                  </div>
-                  <h1 className="mt-3 text-xl font-bold leading-snug text-neutral-900">{item.title}</h1>
-                  {item.description && <p className="mt-2 text-sm leading-relaxed text-neutral-600">{item.description}</p>}
-                </div>
+                <h2>{item.title}</h2>
+                {item.description && <p>{item.description}</p>}
               </div>
             </Card>
 
-            <Card className="p-5">
-              <h2 className="text-sm font-semibold text-neutral-900">权益内容</h2>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-xl bg-neutral-50 p-3">
-                  <p className="text-xs text-neutral-400">权益额度</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">{quantityText(item)}</p>
-                </div>
-                <div className="rounded-xl bg-neutral-50 p-3">
-                  <p className="text-xs text-neutral-400">活动有效期</p>
-                  <p className="mt-1 text-sm font-semibold text-neutral-900">{validity(item)}</p>
-                </div>
+            <section className="benefit-activity-info" aria-label="权益内容">
+              <div>
+                <span>权益额度</span>
+                <strong>{quantityText(item)}</strong>
               </div>
-              {item.rulesText && (
-                <div className="mt-4 rounded-xl border border-neutral-100 p-3">
-                  <p className="text-xs font-medium text-neutral-500">活动规则</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-neutral-600">{item.rulesText}</p>
-                </div>
-              )}
+              <div>
+                <span>活动有效期</span>
+                <strong>{validity(item)}</strong>
+              </div>
+            </section>
+
+            {item.rulesText && (
+              <Card className="benefit-activity-rules">
+                <h3>活动规则</h3>
+                <p>{item.rulesText}</p>
+              </Card>
+            )}
+
+            <Card className="benefit-activity-steps">
+              <div>
+                <span>1</span>
+                <p><strong>领取权益</strong><small>登录后点「立即领取」，计入本人权益</small></p>
+              </div>
+              <div>
+                <span>2</span>
+                <p><strong>使用服务</strong><small>进入对应服务，按活动规则使用权益</small></p>
+              </div>
+              <div>
+                <span>3</span>
+                <p><strong>查看余量</strong><small>在「我的 - 我的权益」查看余量与有效期</small></p>
+              </div>
             </Card>
 
-            <div className="rounded-xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-700">
+            <div className="benefit-activity-compliance">
               {item.benefitType === 'subsidy_eligibility_hint'
                 ? '本活动仅提供政策资格提示、材料说明和官方入口指引，具体申请、审核和结果以官方渠道为准。'
                 : '权益仅用于本终端服务与打印辅助，不代表招聘会报名、签到、投递结果、面试或录用承诺。'}
             </div>
 
             {message && (
-              <div className="rounded-xl border border-success-bg bg-success-bg px-4 py-3 text-sm font-medium text-success-fg">
+              <div className="benefit-activity-message" role="status">
                 {message}
               </div>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="benefit-activity-cta">
               <Button
                 size="lg"
-                className="h-14"
                 disabled={claiming || (isLoggedIn && !item.claimed && (item.soldOut || item.ended))}
                 onClick={() => {
                   if (item.claimed) navigate('/me/benefits')
@@ -178,13 +200,17 @@ export function BenefitActivityDetailPage() {
                   </>
                 ) : claiming ? '领取中...' : isLoggedIn ? '立即领取' : '登录后领取'}
               </Button>
-              <Button size="lg" variant="secondary" className="h-14" onClick={() => navigate('/me/benefits')}>
+              <Button size="lg" variant="secondary" onClick={() => navigate('/me/benefits')}>
                 我的权益
               </Button>
             </div>
-          </div>
+
+            <p className="me-legal-note benefit-activity-note">
+              登录后即可领取；已领取的权益可在「我的权益」查看；活动已领完或已结束时不可领取。
+            </p>
+          </>
         )}
-      </div>
+      </main>
     </div>
   )
 }

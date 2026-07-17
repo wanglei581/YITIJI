@@ -37,17 +37,24 @@ export function ProfileHeader({
           {isLoggedIn ? avatarInitial(displayName) : <KIcon name="user" />}
         </div>
         <div className="p-id">
+          <strong className="p-name">{isLoggedIn ? displayName : '登录后查看本人记录'}</strong>
           <span className="p-kicker">
             <i className="dot" aria-hidden="true" />
             {isLoggedIn ? `已登录 · ${phoneMasked || '手机号已绑定'}` : '游客 · 仅本次会话'}
           </span>
-          <strong className="p-name">{isLoggedIn ? displayName : '登录后查看本人记录'}</strong>
           <p>
             {isLoggedIn
               ? '本人简历、文档、打印订单与来源收藏均由下方正式入口提供。'
               : '可直接使用基础服务；本人记录与账号概览需先登录。'}
-          </p>
+            </p>
         </div>
+        {isLoggedIn && (
+          <div className="p-stats">
+            <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
+            <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
+            <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
+          </div>
+        )}
         <div className="p-actions">
           {isLoggedIn ? (
             <>
@@ -69,14 +76,6 @@ export function ProfileHeader({
           )}
         </div>
       </div>
-
-      {isLoggedIn && (
-        <div className="p-stats">
-          <ProfileStat value={stats.aiRecords} label="AI记录" loading={statsLoading} />
-          <ProfileStat value={stats.favorites} label="收藏记录" loading={statsLoading} />
-          <ProfileStat value={stats.documents} label="文档记录" loading={statsLoading} />
-        </div>
-      )}
 
       <div className="kp-profile-boundary">
         <KIcon name="shield" />

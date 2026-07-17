@@ -10,8 +10,8 @@
 
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
-import { LogInIcon, type LucideIcon } from 'lucide-react'
+import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { ChevronLeftIcon, LogInIcon, type LucideIcon } from 'lucide-react'
 
 export type MeListState = 'loading' | 'error' | 'ready'
 
@@ -28,6 +28,7 @@ interface MeListShellProps {
   emptyIcon?: LucideIcon
   emptyTitle?: string
   emptyDescription?: string
+  headerActions?: ReactNode
   /** ready 且非空时渲染（列表 / Tab 内容） */
   children: ReactNode
 }
@@ -43,22 +44,25 @@ export function MeListShell({
   emptyIcon,
   emptyTitle,
   emptyDescription,
+  headerActions,
   children,
 }: MeListShellProps) {
   const navigate = useNavigate()
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
-        }
-      />
+    <div className="me-list-shell">
+      <header className="me-pagehead">
+        <button type="button" className="me-pagehead-back" onClick={() => navigate('/profile')}>
+          <ChevronLeftIcon aria-hidden="true" />
+          返回
+        </button>
+        <div className="me-pagehead-titles">
+          <h1>{title}</h1>
+          <p>{subtitle}</p>
+        </div>
+        {headerActions && <div className="me-pagehead-actions">{headerActions}</div>}
+      </header>
 
-      <div className="mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="me-list-content">
         {!isLoggedIn ? (
           <Card className="flex flex-col items-center gap-4 p-10 text-center">
             <LogInIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
@@ -89,7 +93,7 @@ export function MeListShell({
             />
           </Card>
         ) : (
-          <div className="flex flex-col gap-3">{children}</div>
+          <div className="me-list-ready flex flex-col gap-3">{children}</div>
         )}
       </div>
     </div>

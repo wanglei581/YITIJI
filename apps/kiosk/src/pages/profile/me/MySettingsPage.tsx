@@ -13,9 +13,10 @@
 
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import {
   BadgeCheckIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   FileTextIcon,
   LogInIcon,
@@ -192,16 +193,16 @@ export function MySettingsPage() {
         </div>
       )}
 
-      <PageHeader
-        className="me-page-header"
-        title="账号设置"
-        subtitle="账号状态 · 会话说明 · 协议与隐私"
-        actions={
-          <Button size="sm" variant="secondary" className="me-ripple me-back-button" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
-        }
-      />
+      <header className="me-pagehead">
+        <button type="button" className="me-pagehead-back me-ripple" onClick={() => navigate('/profile')}>
+          <ChevronLeftIcon aria-hidden="true" />
+          返回
+        </button>
+        <div className="me-pagehead-titles">
+          <h1>账号设置</h1>
+          <p>账号状态 · 会话说明 · 协议与隐私</p>
+        </div>
+      </header>
 
       <div className="me-detail-scroll mt-4 flex-1 overflow-y-auto pb-8">
         <div className="flex flex-col gap-4">
@@ -291,7 +292,7 @@ export function MySettingsPage() {
           </Card>
 
           {/* 协议 / 隐私入口 */}
-          <section aria-label="协议与隐私" className={`${cardSurface} py-1`}>
+          <section aria-label="协议与隐私" className={`${cardSurface} me-settings-duo py-1`}>
             <LinkRow
               icon={FileTextIcon}
               iconBg="bg-primary-50"
@@ -312,7 +313,7 @@ export function MySettingsPage() {
 
           {/* 账号操作（仅登录态） */}
           {isLoggedIn && (
-            <section aria-label="账号操作" className={`${cardSurface} py-1`}>
+            <section aria-label="账号操作" className={`${cardSurface} me-settings-duo py-1`}>
               <LinkRow
                 icon={RepeatIcon}
                 iconBg="bg-plum-soft"

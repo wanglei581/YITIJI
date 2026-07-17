@@ -363,7 +363,7 @@ export function MyDocumentsPage() {
           const canChangeRetention = !expired && policies.length > 1
           const retentionOpen = retentionPanelId === doc.id
           return (
-            <Card key={doc.id} className="me-document-card">
+            <Card key={doc.id} className={['me-document-card', expired ? 'is-expired' : ''].join(' ')}>
               <span className="me-row-icon me-tone-slate" aria-hidden="true">
                 <KIcon name="files" />
               </span>
