@@ -17,10 +17,10 @@
 - [x] **T5 派生旧 PDF、docs 旧材料与 deliverables 清理**：已将旧 B2G/B2B2C 方案 PDF、本地 docx 原稿、旧 handoff 交接文件、两个已弃用 HTML 预览和 `deliverables/` 宣传片 / 交付物 Markdown 移出正式 Git；原始材料归档到本地 `其他文档/`，仓库内保留 Markdown 摘要、审计事实、当前正式入口和 OPC 交付物 sha256 完整性记录。
 - [x] **剩余候选分支定级**：已输出并更新 `docs/reviews/remaining-branch-candidates-2026-06-25.md`；旧 UI、QR 登录、Sprint1 订单、Sprint1 Partner dashboard、面试重设计本地候选与备份候选均已完成迁移 / 取舍 / 清理，当前无剩余本地或远程候选分支。
 
-## P0：依赖审计与 multipart 上传限深（候选 CI 待验）
+## P0：依赖审计与 multipart 上传限深（已合入，未部署）
 
-- [x] **critical/high 审计与运行时防护候选**：`codex/dependency-security-remediation-main-20260716` 已在 `origin/main@30d168ce` 清除 `pnpm audit --audit-level=high` 的 1 个 critical / 3 个 high；`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0`、三端 `vite@6.4.3` 均经 override/direct manifest/lockfile 收敛，Nest 间接 Multer 同样为 2.2.0。10 个 API `FileInterceptor` 显式 `fieldNestingDepth: 0`，保留已有 `fileSize`、不擅自改变其余四处文件大小语义；AST + 真实 loopback multipart verify 证明 flat 204、`meta[nested]` 400，并已接入 SQLite CI。冻结安装、audit、依赖树、全 workspace typecheck、四端 build、相关上传回归均通过；尚未合并或部署。
-- [ ] **PR CI 验证**：在候选 PR 中确认 `build-and-verify` 与 `postgres-readiness` 均成功；前者必须在 Linux 的 fresh SQLite schema 后实际运行 `verify:multipart-field-nesting` 和既有 `verify:print-jobs`。本机对全新临时 SQLite 的 Prisma Schema Engine 只返回通用错误，未以 schema/migration 或生产环境绕过。
+- [x] **critical/high 审计与运行时防护（已合入）**：[PR #271](https://github.com/wanglei581/YITIJI/pull/271) 已 squash merge 到 `main@f8b8f1ec`。`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0`、三端 `vite@6.4.3` 通过 override/direct manifest/lockfile 收敛，Nest 间接 Multer 同样为 2.2.0。10 个 API `FileInterceptor` 显式 `fieldNestingDepth: 0`，保留已有 `fileSize`、不擅自改变其余四处文件大小语义；AST + 真实 loopback multipart verify 证明 flat 204、`meta[nested]` 400 且为 `LIMIT_FIELD_NESTING`，已接入 SQLite CI。冻结安装、audit、依赖树、全 workspace typecheck、四端 build、相关上传回归均通过；未部署。
+- [x] **PR CI 验证（已完成）**：GitHub Actions [`29552724252`](https://github.com/wanglei581/YITIJI/actions/runs/29552724252) 的 `build-and-verify` 与 `postgres-readiness` 均成功；前者在 Linux fresh SQLite schema 后实际运行新增 `verify:multipart-field-nesting` 与既有 `verify:print-jobs`。本机临时 SQLite 的 Prisma Schema Engine 通用错误未被 schema/migration 或生产环境绕过。
 - [ ] **P1 低/中危依赖评估**：当前完整 audit 仍有 `esbuild`（low）、`@babel/core`（low）和 `js-yaml`（moderate），但没有 high/critical；另起最小升级/兼容性任务处理，不与本 P0 补丁混合，也不得据此倒推出生产已部署。
 
 ## P0：合作机构后台账号安全移除
