@@ -4,12 +4,14 @@ export type HomeDeviceTone = 'positive' | 'warning' | 'negative' | 'neutral'
 
 export interface HomeDeviceStatusView {
   label: string
+  paperLabel: string
   tone: HomeDeviceTone
   networkIssue: boolean
 }
 
 interface HomePrinterStatusResponse {
   printerStatus?: unknown
+  paperLevel?: unknown
   isOnline?: boolean
 }
 
@@ -17,29 +19,39 @@ function isNetworkOffline(): boolean {
   return typeof navigator !== 'undefined' && navigator.onLine === false
 }
 
-function mapPrinterStatus(printerStatus: unknown): HomeDeviceStatusView {
+function paperLabelFor(paperLevel: unknown): string {
+  switch (paperLevel) {
+    case 'sufficient': return 'A4纸充足'
+    case 'low': return 'A4纸余量偏低'
+    case 'empty': return 'A4纸已用尽'
+    default: return 'A4纸状态待检测'
+  }
+}
+
+function mapPrinterStatus(printerStatus: unknown, paperLevel?: unknown): HomeDeviceStatusView {
+  const paperLabel = paperLabelFor(paperLevel)
   switch (printerStatus) {
     case 'ready':
-      return { label: '打印机在线', tone: 'positive', networkIssue: false }
+      return { label: '打印机在线', paperLabel, tone: 'positive', networkIssue: false }
     case 'offline':
-      return { label: '打印机离线', tone: 'negative', networkIssue: false }
+      return { label: '打印机离线', paperLabel, tone: 'negative', networkIssue: false }
     case 'error':
-      return { label: '打印机异常', tone: 'negative', networkIssue: false }
+      return { label: '打印机异常', paperLabel, tone: 'negative', networkIssue: false }
     case 'low_paper':
-      return { label: '纸张余量偏低', tone: 'warning', networkIssue: false }
+      return { label: '纸张余量偏低', paperLabel: 'A4纸余量偏低', tone: 'warning', networkIssue: false }
     default:
-      return { label: '打印机状态未知', tone: 'neutral', networkIssue: false }
+      return { label: '打印机状态未知', paperLabel, tone: 'neutral', networkIssue: false }
   }
 }
 
 function initialDeviceStatus(terminalId: string): HomeDeviceStatusView {
   if (isNetworkOffline()) {
-    return { label: '网络异常', tone: 'negative', networkIssue: true }
+    return { label: '网络异常', paperLabel: '纸张状态待检测', tone: 'negative', networkIssue: true }
   }
   if (!terminalId) {
-    return { label: '设备状态未配置', tone: 'neutral', networkIssue: false }
+    return { label: '设备状态未配置', paperLabel: '纸张状态待检测', tone: 'neutral', networkIssue: false }
   }
-  return { label: '设备状态检测中', tone: 'neutral', networkIssue: false }
+  return { label: '设备状态检测中', paperLabel: '纸张状态待检测', tone: 'neutral', networkIssue: false }
 }
 
 export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
@@ -58,16 +70,16 @@ export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
       abortControllerRef.current = controller
 
       if (navigator.onLine === false) {
-        setDeviceStatus({ label: '网络异常', tone: 'negative', networkIssue: true })
+        setDeviceStatus({ label: '网络异常', paperLabel: '纸张状态待检测', tone: 'negative', networkIssue: true })
         return
       }
       if (!terminalId) {
-        setDeviceStatus({ label: '设备状态未配置', tone: 'neutral', networkIssue: false })
+        setDeviceStatus({ label: '设备状态未配置', paperLabel: '纸张状态待检测', tone: 'neutral', networkIssue: false })
         return
       }
 
       if (showLoading) {
-        setDeviceStatus({ label: '设备状态检测中', tone: 'neutral', networkIssue: false })
+        setDeviceStatus({ label: '设备状态检测中', paperLabel: '纸张状态待检测', tone: 'neutral', networkIssue: false })
       }
 
       try {
@@ -80,7 +92,7 @@ export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
         if (generation !== requestGenerationRef.current) return
         if (controller.signal.aborted) return
         if (data.isOnline === false) {
-          setDeviceStatus({ label: '打印机离线', tone: 'negative', networkIssue: false })
+          setDeviceStatus({ label: '打印机离线', paperLabel: paperLabelFor(data.paperLevel), tone: 'negative', networkIssue: false })
           return
         }
         setDeviceStatus(mapPrinterStatus(data.printerStatus))
@@ -89,8 +101,8 @@ export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
         if (controller.signal.aborted) return
         setDeviceStatus(
           isNetworkOffline()
-            ? { label: '网络异常', tone: 'negative', networkIssue: true }
-            : { label: '设备状态暂不可用', tone: 'neutral', networkIssue: false },
+            ? { label: '网络异常', paperLabel: '纸张状态待检测', tone: 'negative', networkIssue: true }
+            : { label: '设备状态暂不可用', paperLabel: '纸张状态待检测', tone: 'neutral', networkIssue: false },
         )
       }
     }
@@ -101,7 +113,7 @@ export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
     const handleOffline = () => {
       abortControllerRef.current?.abort()
       ++requestGenerationRef.current
-      setDeviceStatus({ label: '网络异常', tone: 'negative', networkIssue: true })
+      setDeviceStatus({ label: '网络异常', paperLabel: '纸张状态待检测', tone: 'negative', networkIssue: true })
     }
 
     void refreshDeviceStatus(true)

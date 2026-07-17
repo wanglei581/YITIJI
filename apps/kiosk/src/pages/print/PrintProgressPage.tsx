@@ -3,7 +3,7 @@
 //
 // Two modes:
 //   REAL  — state.taskId is set (API_MODE=http, real job submitted)
-//           Polls GET /api/v1/print/jobs/:taskId every 1s.
+//           Polls GET /api/v1/print/jobs/:taskId every 3s.
 //           Maps backend status → UI steps.
 //   SIM   — no taskId (mock mode or virtual file from W5 enterprise flow)
 //           Same setTimeout-based animation as before.
@@ -29,6 +29,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
 import { printUploadPathForSource } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ function errorCodeToMessage(code?: string): string | undefined {
   return code ? ERROR_CODE_MESSAGES[code] : undefined
 }
 
-const POLL_INTERVAL_MS = 1000
+const POLL_INTERVAL_MS = 3000
 const REAL_POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes — guard against Agent never claiming without false timeout
 
 const stepIndex = (key: Step) => STEPS.findIndex((s) => s.key === key)
@@ -297,7 +298,15 @@ export function PrintProgressPage() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center p-8">
+    <div className="print-proto flex min-h-full flex-col">
+      <PrintPrototypeHeader
+        title="正在打印"
+        subtitle="任务已提交，正在等待终端处理"
+        step={7}
+        backLabel="返回首页"
+        onBack={() => navigate('/')}
+      />
+      <main className="relative flex flex-1 flex-col items-center justify-center p-8">
       {/* 状态图标 */}
       <div
         className={[
@@ -322,6 +331,10 @@ export function PrintProgressPage() {
           ? '任务已提交，正在等待终端处理…'
           : '请勿离开，任务处理中…'}
       </p>
+      <div className="mt-4 flex min-h-[48px] items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 text-sm font-medium text-primary-700">
+        <span className="h-2.5 w-2.5 rounded-full bg-primary-600" aria-hidden="true" />
+        Terminal Agent：{useRealApi ? '正在接收打印状态' : '演示模式'}
+      </div>
 
       {/* 步骤列表 */}
       <div className="mt-12 w-full max-w-sm space-y-4">
@@ -401,6 +414,7 @@ export function PrintProgressPage() {
           <p className="text-xs text-neutral-400">taskId: {taskId}</p>
         </div>
       )}
+      </main>
     </div>
   )
 }

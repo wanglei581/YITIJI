@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -36,6 +36,7 @@ import {
   unitCentsFor,
   usePrintPriceConfig,
 } from '../../services/print/priceConfigApi'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -383,15 +384,13 @@ export function PrintPreviewPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col p-6">
-      <PageHeader
+    <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPrototypeHeader
         title="打印设置"
-        subtitle="设置打印参数后进入确认"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
-            上一步
-          </Button>
-        }
+        subtitle="预览文件内容并设置打印参数后进入确认"
+        step={4}
+        backLabel="返回材料检查"
+        onBack={() => navigate(-1)}
       />
 
       <div className="mt-6 grid grid-cols-[18rem_minmax(0,1fr)] gap-6">

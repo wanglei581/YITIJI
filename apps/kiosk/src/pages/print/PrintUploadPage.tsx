@@ -18,7 +18,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   FileTextIcon,
@@ -41,6 +41,7 @@ import {
   type UsbStatus,
 } from '../../services/files/usbImportApi'
 import { useAuth } from '../../auth/useAuth'
+import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import {
   clearPrintMaterialSession,
@@ -49,6 +50,8 @@ import {
   type PrintMaterialContentCategory,
   type PrintMaterialSource,
 } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 
 type UploadTab = 'file' | 'qr' | 'usb'
 
@@ -108,6 +111,7 @@ export function PrintUploadPage() {
   const [usbFiles, setUsbFiles] = useState<UsbFileListItem[] | null>(null)
   const [usbError, setUsbError] = useState<string | null>(null)
   const [usbUploading, setUsbUploading] = useState(false)
+  const [recentFiles, setRecentFiles] = useState<MemberPrintOrderItem[]>([])
   // 上传中或扫码会话进行中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading || qrBusy || usbUploading)
 
@@ -169,6 +173,26 @@ export function PrintUploadPage() {
       if (timer !== undefined) window.clearTimeout(timer)
     }
   }, [tab, usbConfigured, file, usbUploading])
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setRecentFiles([])
+      return
+    }
+    const token = getToken()
+    if (!token) return
+    let alive = true
+    void getMyPrintOrders(token, { pageSize: 3 })
+      .then((response) => {
+        if (alive) setRecentFiles(response.items)
+      })
+      .catch(() => {
+        if (alive) setRecentFiles([])
+      })
+    return () => {
+      alive = false
+    }
+  }, [getToken, isLoggedIn])
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0]
@@ -259,15 +283,13 @@ export function PrintUploadPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
-      <PageHeader
+    <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPrototypeHeader
         title={pageTitle}
         subtitle={pageSubtitle}
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-        }
+        step={1}
+        backLabel="返回首页"
+        onBack={() => navigate('/')}
       />
 
       {source === 'resume' && (
@@ -301,14 +323,14 @@ export function PrintUploadPage() {
       )}
 
       {/* Tab bar */}
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 grid grid-cols-2 gap-3">
         {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
           <button
             key={key}
             disabled={disabled}
             onClick={() => { if (!disabled) { setTab(key); setFile(null); setUploadError(null) } }}
             className={[
-              'flex flex-1 min-h-[56px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
+              'flex min-h-[72px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
               disabled ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300' :
               tab === key
                 ? 'border-primary-600 bg-primary-50 text-primary-600'
@@ -320,7 +342,35 @@ export function PrintUploadPage() {
             {note && <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium">{note}</span>}
           </button>
         ))}
+        {!isResumePrint && (
+          <button
+            type="button"
+            onClick={() => navigate('/scan/start')}
+            className="flex min-h-[72px] items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white py-4 text-sm font-medium text-neutral-500 transition-colors hover:border-primary-400 hover:text-primary-700"
+          >
+            <PrinterIcon className="h-5 w-5" />
+            <span>扫描原件</span>
+          </button>
+        )}
       </div>
+
+      {recentFiles.length > 0 && (
+        <section className="mt-4 rounded-lg border border-neutral-200 bg-white p-4" aria-label="最近打印文件">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-semibold text-neutral-900">最近文件</h2>
+            <span className="text-xs text-neutral-500">最近 3 份</span>
+          </div>
+          <div className="grid gap-2">
+            {recentFiles.map((item) => (
+              <div key={item.id} className="flex min-h-[56px] items-center gap-3 rounded-lg bg-neutral-50 px-3">
+                <FileTextIcon className="h-5 w-5 shrink-0 text-primary-600" />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">{item.fileName ?? '打印文件'}</span>
+                <span className="text-xs text-neutral-500">{item.status}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Tab content */}
       <div className="mt-4 flex flex-1 flex-col">

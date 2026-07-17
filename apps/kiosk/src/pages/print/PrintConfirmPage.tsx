@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import { AlertCircleIcon, FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
@@ -20,6 +20,7 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -172,15 +173,13 @@ export function PrintConfirmPage() {
   }
 
   return (
-    <div className="flex h-full flex-col p-6">
-      <PageHeader
+    <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPrototypeHeader
         title="确认打印"
-        subtitle="核对以下参数，确认无误后开始打印"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate(-1)}>
-            返回修改
-          </Button>
-        }
+        subtitle="核对以下参数，确认无误后提交打印任务"
+        step={5}
+        backLabel="返回修改"
+        onBack={() => navigate(-1)}
       />
 
       <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
