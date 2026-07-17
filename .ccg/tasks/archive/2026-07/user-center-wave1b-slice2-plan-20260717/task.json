@@ -1,0 +1,12 @@
+{
+  "id": "user-center-wave1b-slice2-plan-20260717",
+  "title": "Wave 1-B Slice 2 导出执行器实施方案与主线进度收口",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "member-privacy",
+  "currentPhase": "completed",
+  "nextAction": "方案已收口为本地候选；等待用户明确授权后，才可按 RED 测试开始 Slice 2 运行时实现",
+  "createdAt": "2026-07-17T16:15:00+08:00",
+  "branch": "codex/user-center-wave1b-slice2-plan-20260717"
+}
