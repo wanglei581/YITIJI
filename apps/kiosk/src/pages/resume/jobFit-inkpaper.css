@@ -1,7 +1,7 @@
 .job-fit-inkpaper {
   --sd-color-canvas-outer: #f4f1e8;
   --sd-color-canvas: #f4f1e8;
-  --sd-color-surface: #fffdf8;
+  --sd-color-surface: #ffffff;
   --sd-color-primary: #b8683c;
   --sd-color-primary-strong: #9e5330;
   --sd-color-primary-soft: #f4e8dd;
@@ -17,8 +17,8 @@
   position: relative;
   min-height: 100dvh;
   background:
-    radial-gradient(1000px 520px at 88% -6%, rgba(31, 158, 134, .06), transparent 62%),
-    radial-gradient(760px 420px at -10% 28%, rgba(184, 104, 60, .06), transparent 58%),
+    none, transparent 62%),
+    none, transparent 58%),
     var(--sd-color-canvas-outer);
   color: var(--sd-color-text);
 }
