@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card } from '@ai-job-print/ui'
 import { AlertCircleIcon, InfoIcon, ScanLineIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -39,6 +39,7 @@ import {
 } from './cashierStatus'
 import { CashierPaymentPanel, type CashierSnapshot, type PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
+import { PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 interface CashierLocationState {
   orderId?: string
@@ -400,8 +401,14 @@ export function PrintCashierPage() {
   const canReissue = view?.canReissue ?? false
 
   return (
-    <div className="flex h-full flex-col p-6">
-      <PageHeader title="订单支付" subtitle="请完成支付后开始打印" />
+    <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPrototypeHeader
+        title="订单支付"
+        subtitle="请选择支付方式并完成付款"
+        step={6}
+        backLabel="返回确认"
+        onBack={() => navigate('/print/confirm', { state })}
+      />
 
       <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* 价目明细 */}
