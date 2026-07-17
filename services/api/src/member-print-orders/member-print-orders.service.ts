@@ -76,7 +76,8 @@ export class MemberPrintOrdersService {
     // 只把映射后的安全 failureReasonForUser 回给会员端。
     const rows = await this.prisma.printTask.findMany({
       where,
-<<<<<<< HEAD
+id: true, status: true, paramsJson: true, createdAt: true, completedAt: true,
+        errorCode: true, errorMessage: true,
       // 只取安全列 + 关联 Order 的支付安全字段（绝不取 fileUrl / fileMd5）。
       select: {
         id: true,
@@ -99,28 +100,20 @@ export class MemberPrintOrdersService {
             discountCents: true,
           },
         },
-=======
-      select: {
-        id: true, status: true, paramsJson: true, createdAt: true, completedAt: true,
-        errorCode: true, errorMessage: true,
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
       },
       ...memberPageArgs(page),
     })
     return buildMemberPage(rows, page, total, (r) => {
       const params = parseSafeParams(r.paramsJson)
-<<<<<<< HEAD
+// 失败判定与打印域 getStatus 口径一致：终态 failed，或已落库 errorCode/errorMessage。
+      // 未知 errorCode / 仅有原始 errorMessage → mapFailureReasonForUser 返回统一兜底文案。
+      const hasFailure = r.status === 'failed' || Boolean(r.errorCode) || Boolean(r.errorMessage)
       const order = r.order
       // 取件码门控：仅 paid 且未退款、任务未进入完成/取消/失败终态时返回；其余（unpaid/refunded/终态）一律 null。
       const pickupCode =
         order && pickupCodeVisibleFor({ payStatus: order.payStatus, taskStatus: order.taskStatus, refundedAt: order.refundedAt })
           ? order.pickupCode
           : null
-=======
-      // 失败判定与打印域 getStatus 口径一致：终态 failed，或已落库 errorCode/errorMessage。
-      // 未知 errorCode / 仅有原始 errorMessage → mapFailureReasonForUser 返回统一兜底文案。
-      const hasFailure = r.status === 'failed' || Boolean(r.errorCode) || Boolean(r.errorMessage)
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
       return {
         id: r.id,
         status: r.status,
@@ -130,7 +123,7 @@ export class MemberPrintOrdersService {
         copies: params.copies,
         colorMode: params.colorMode,
         paperSize: params.paperSize,
-<<<<<<< HEAD
+failureReasonForUser: hasFailure ? mapFailureReasonForUser(r.errorCode) : null,
         // 支付字段：历史无 Order 一律 null，不编造。paymentSource 只会是 offline/free/manual_confirmed/null。
         amountCents: order ? order.amountCents : null,
         payStatus: order ? (order.payStatus as OrderPayStatus) : null,
@@ -141,9 +134,6 @@ export class MemberPrintOrdersService {
         // C5-4 只读：已退金额 / 券抵扣额（历史无 Order 为 null）。券=平台 credit 非资金。
         refundedAmountCents: order ? order.refundedAmountCents : null,
         discountCents: order ? order.discountCents : null,
-=======
-        failureReasonForUser: hasFailure ? mapFailureReasonForUser(r.errorCode) : null,
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
       }
     })
   }

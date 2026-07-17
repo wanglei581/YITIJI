@@ -87,19 +87,12 @@ const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
   // 显式登记本测试创建的 PrintTask id：PrintTask→EndUser 是 onDelete:SetNull（非级联），
   // 删用户不会删任务，必须按 id 显式清理（含匿名任务）。
   const t = (k: string) => `ptask_po_${k}_${suffix}`
-<<<<<<< HEAD
-  const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'), t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder')]
-=======
-  const taskIds = [
-    t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'),
-    t('d_known'), t('d_unknown'), t('d_rawonly'), t('d_ok'),
-  ]
-
+t('d_known'), t('d_unknown'), t('d_rawonly'), t('d_ok'),
   // Agent 回传的原始 errorMessage（含设备路径 / 驱动 / 主机名等内部细节），绝不可透出到会员端。
   const RAW_SENSITIVE_MESSAGE =
     'CUPS backend usb://Canon/LBP2900 failed at /var/spool/cups on host kiosk-prod-07: driver segfault 0xDEADBEEF'
   const RAW_UNKNOWN_CODE = 'INTERNAL_DRIVER_PANIC_9F'
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
+  const taskIds = [t('a1'), t('a2'), t('a_bad'), t('b1'), t('anon'), t('d_unpaid'), t('d_paid'), t('d_refunded'), t('d_noorder')]
 
   async function cleanup() {
     await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
@@ -250,14 +243,11 @@ const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
     } else fail(`4. 空列表未返回空分页结果：${JSON.stringify(pageC)}`)
 
     // ── 5. 不返回敏感字段 ───────────────────────────────────────
-<<<<<<< HEAD
-    const allItems = [...listA, ...listB]
-    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
-=======
-    const listD = (await orders.list(userD, defaultPage)).items
+const listD = (await orders.list(userD, defaultPage)).items
     const allItems = [...listA, ...listB, ...listD]
     const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'failureReasonForUser'])
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
+    const allItems = [...listA, ...listB]
+    const allowedKeys = new Set(['id', 'status', 'fileName', 'createdAt', 'completedAt', 'copies', 'colorMode', 'paperSize', 'amountCents', 'payStatus', 'paymentSource', 'billablePages', 'billingPageSource', 'pickupCode', 'refundedAmountCents', 'discountCents'])
     let leak: string | null = null
     for (const item of allItems) {
       for (const k of Object.keys(item)) {
@@ -273,11 +263,8 @@ const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
       if (serialized.includes(RAW_UNKNOWN_CODE)) { leak = '序列化命中原始未知 errorCode'; break }
       if (leak) break
     }
-<<<<<<< HEAD
+if (!leak) pass('5. 不返回敏感字段：仅 9 个白名单键，无 fileUrl/fileMd5/paramsJson/errorCode/errorMessage/支付/越权字段')
     if (!leak) pass('5. 不返回敏感字段：仅白名单键(含 P0a 支付安全字段)，无 fileUrl/fileMd5/paramsJson/内部错误/越权字段')
-=======
-    if (!leak) pass('5. 不返回敏感字段：仅 9 个白名单键，无 fileUrl/fileMd5/paramsJson/errorCode/errorMessage/支付/越权字段')
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
     else fail(`5. 敏感字段泄漏：${leak}`)
 
     // ── 6. 鉴权（EndUserAuthGuard）─────────────────────────────
@@ -300,7 +287,37 @@ const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
     if (allowed === true && injected?.endUserId === userA) pass('6d. 有效会员 token + 会话 → 通过并注入本人 endUserId')
     else fail('6d. 有效会员鉴权未通过或未注入 endUser')
 
-<<<<<<< HEAD
+// ── 7. 失败原因安全口径 ─────────────────────────────────────
+    // DB 仍完整保留原始 errorCode/errorMessage（后台排障用），会员端只回安全映射文案。
+    const dbKnown = await prisma.printTask.findUnique({ where: { id: t('d_known') }, select: { errorCode: true, errorMessage: true } })
+    if (dbKnown?.errorCode === 'PRINTER_OFFLINE' && dbKnown.errorMessage === RAW_SENSITIVE_MESSAGE) {
+      pass('7a. DB 仍完整保存原始 errorCode/errorMessage（后台排障可用）')
+    } else fail(`7a. DB 未保留原始错误：${JSON.stringify(dbKnown)}`)
+    const dKnown = listD.find((o) => o.id === t('d_known'))!
+    const dUnknown = listD.find((o) => o.id === t('d_unknown'))!
+    const dRawOnly = listD.find((o) => o.id === t('d_rawonly'))!
+    const dOk = listD.find((o) => o.id === t('d_ok'))!
+    // 白名单 errorCode → 对应可读文案（取自 SSOT 映射函数，且绝非原始文案）。
+      dKnown.status === 'failed' &&
+      dKnown.failureReasonForUser === failureReasonForUser('PRINTER_OFFLINE') &&
+      dKnown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
+    ) pass('7b. 白名单 errorCode → 映射为安全可读文案')
+    else fail(`7b. 白名单映射异常：${JSON.stringify(dKnown)}`)
+    // 未知 errorCode → 统一兜底文案，且兜底 !== 原始未知码/原始 message。
+    const generic = failureReasonForUser(null)
+      dUnknown.failureReasonForUser === generic &&
+      dUnknown.failureReasonForUser !== RAW_UNKNOWN_CODE &&
+      dUnknown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
+    ) pass('7c. 未知 errorCode → 统一安全兜底文案（不透出原始码/原始 message）')
+    else fail(`7c. 未知码兜底异常：${JSON.stringify(dUnknown)}`)
+    // 仅有原始 errorMessage（无 errorCode）→ 统一兜底文案。
+    if (dRawOnly.failureReasonForUser === generic && dRawOnly.status === 'failed')
+      pass('7d. 仅有原始 errorMessage（无 errorCode）→ 统一安全兜底文案')
+    else fail(`7d. 仅消息兜底异常：${JSON.stringify(dRawOnly)}`)
+    // 非失败订单 failureReasonForUser 必须为 null。
+    if (dOk.status === 'completed' && dOk.failureReasonForUser === null)
+      pass('7e. 非失败订单 failureReasonForUser 为 null')
+    else fail(`7e. 非失败订单失败原因非 null：${JSON.stringify(dOk)}`)
     // ── 7. P0a 支付字段真实化：join Order，诚实字段 + pickupCode 门控 + 无 live 网关来源 ──
     const dPay = { unpaid: t('d_unpaid'), paid: t('d_paid'), refunded: t('d_refunded'), noorder: t('d_noorder') }
     for (const [key, id] of Object.entries(dPay)) {
@@ -337,46 +354,6 @@ const userD = `eu_po_d_${suffix}` // 失败原因安全口径专用
     } else {
       fail(`7. 支付字段异常：unpaid=${JSON.stringify(uItem)} paid=${JSON.stringify(pItem)} refunded=${JSON.stringify(rItem)} noOrder=${JSON.stringify(nItem)} noLiveGateway=${noLiveGateway}`)
     }
-=======
-    // ── 7. 失败原因安全口径 ─────────────────────────────────────
-    // DB 仍完整保留原始 errorCode/errorMessage（后台排障用），会员端只回安全映射文案。
-    const dbKnown = await prisma.printTask.findUnique({ where: { id: t('d_known') }, select: { errorCode: true, errorMessage: true } })
-    if (dbKnown?.errorCode === 'PRINTER_OFFLINE' && dbKnown.errorMessage === RAW_SENSITIVE_MESSAGE) {
-      pass('7a. DB 仍完整保存原始 errorCode/errorMessage（后台排障可用）')
-    } else fail(`7a. DB 未保留原始错误：${JSON.stringify(dbKnown)}`)
-
-    const dKnown = listD.find((o) => o.id === t('d_known'))!
-    const dUnknown = listD.find((o) => o.id === t('d_unknown'))!
-    const dRawOnly = listD.find((o) => o.id === t('d_rawonly'))!
-    const dOk = listD.find((o) => o.id === t('d_ok'))!
-
-    // 白名单 errorCode → 对应可读文案（取自 SSOT 映射函数，且绝非原始文案）。
-    if (
-      dKnown.status === 'failed' &&
-      dKnown.failureReasonForUser === failureReasonForUser('PRINTER_OFFLINE') &&
-      dKnown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
-    ) pass('7b. 白名单 errorCode → 映射为安全可读文案')
-    else fail(`7b. 白名单映射异常：${JSON.stringify(dKnown)}`)
-
-    // 未知 errorCode → 统一兜底文案，且兜底 !== 原始未知码/原始 message。
-    const generic = failureReasonForUser(null)
-    if (
-      dUnknown.failureReasonForUser === generic &&
-      dUnknown.failureReasonForUser !== RAW_UNKNOWN_CODE &&
-      dUnknown.failureReasonForUser !== RAW_SENSITIVE_MESSAGE
-    ) pass('7c. 未知 errorCode → 统一安全兜底文案（不透出原始码/原始 message）')
-    else fail(`7c. 未知码兜底异常：${JSON.stringify(dUnknown)}`)
-
-    // 仅有原始 errorMessage（无 errorCode）→ 统一兜底文案。
-    if (dRawOnly.failureReasonForUser === generic && dRawOnly.status === 'failed')
-      pass('7d. 仅有原始 errorMessage（无 errorCode）→ 统一安全兜底文案')
-    else fail(`7d. 仅消息兜底异常：${JSON.stringify(dRawOnly)}`)
-
-    // 非失败订单 failureReasonForUser 必须为 null。
-    if (dOk.status === 'completed' && dOk.failureReasonForUser === null)
-      pass('7e. 非失败订单 failureReasonForUser 为 null')
-    else fail(`7e. 非失败订单失败原因非 null：${JSON.stringify(dOk)}`)
->>>>>>> 733d3df6 (feat(member-print-orders): 我的订单失败原因安全回显)
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()
