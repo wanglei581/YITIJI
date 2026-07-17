@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Button, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobExplainResponse, MemberResumeItem } from '@ai-job-print/shared'
+import { ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
 import { getJobById } from '../../services/api'
 import {
   explainJobWithAi,
@@ -25,8 +26,8 @@ import {
   JobSummarySection,
   JobTrustSection,
   QrOverlay,
-  StickyActionBar,
 } from './components/JobDetailSections'
+import { ProtoBadge, ProtoPage } from '../jobs-fairs-prototype'
 
 export function JobDetailPage() {
   const navigate = useNavigate()
@@ -236,7 +237,28 @@ export function JobDetailPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="clay"
+      title="岗位详情"
+      subtitle={`${currentJob.sourceName} · 信息以来源平台为准`}
+      backLabel="返回列表"
+      onBack={() => navigate('/jobs')}
+      badge={<ProtoBadge icon={ExternalLinkIcon}>线上招聘平台来源</ProtoBadge>}
+      actionBar={
+        <>
+          <span className="jf-action-note">投递在来源平台完成，本终端不接收简历、不参与招聘流程</span>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn dark" disabled={!sourceCanApply} onClick={openSourceQr}>
+            <QrCodeIcon aria-hidden="true" />
+            扫码投递
+          </button>
+          <button type="button" className="jf-btn primary" disabled={!sourceCanApply} onClick={openSourcePlatform}>
+            <ExternalLinkIcon aria-hidden="true" />
+            去来源平台投递
+          </button>
+        </>
+      }
+    >
       {showQr && <QrOverlay job={currentJob} onClose={() => setShowQr(false)} />}
       <JobAiConsentModal
         open={showConsent}
@@ -255,58 +277,41 @@ export function JobDetailPage() {
         onSelect={(resume) => void runMatch(resume)}
         onUpload={() => navigate('/resume/source?intent=diagnose')}
       />
-
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="岗位详情"
-          subtitle={currentJob.sourceName}
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/jobs')}>
-              返回列表
-            </Button>
-          }
+      <JobSummarySection
+        job={currentJob}
+        favorite={favorite}
+        onToggleFavorite={() => toggleFavorite({ type: 'job', id: currentJob.id, title: currentJob.title })}
+      />
+      <JobDescriptionSection job={currentJob} />
+      <JobTrustSection job={currentJob} sourceCanApply={sourceCanApply} />
+      <JobNextActionsSection
+        job={currentJob}
+        sourceCanApply={sourceCanApply}
+        onOpenSource={openSourcePlatform}
+        onOpenQr={openSourceQr}
+        onViewCompany={viewCompany}
+        onExplainAi={() => void startExplain()}
+        onMatchAi={() => void startMatch()}
+      />
+      {(aiLoading || aiError || explanation || matchResult) && (
+        <JobAiResultPanel
+          title={matchResult ? '岗位匹配参考' : 'AI岗位解读'}
+          loading={aiLoading}
+          error={aiError}
+          explanation={explanation}
+          match={matchResult}
+          onRetry={() => {
+            if (pendingAiAction === 'match') void startMatch()
+            else void startExplain()
+          }}
+          onClear={() => {
+            setExplanation(null)
+            setMatchResult(null)
+            setAiError(null)
+          }}
         />
-      </div>
-
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
-        <JobSummarySection
-          job={currentJob}
-          favorite={favorite}
-          onToggleFavorite={() => toggleFavorite({ type: 'job', id: currentJob.id, title: currentJob.title })}
-        />
-        <JobDescriptionSection job={currentJob} />
-        <JobTrustSection job={currentJob} sourceCanApply={sourceCanApply} />
-        <JobNextActionsSection
-          job={currentJob}
-          sourceCanApply={sourceCanApply}
-          onOpenSource={openSourcePlatform}
-          onOpenQr={openSourceQr}
-          onViewCompany={viewCompany}
-          onExplainAi={() => void startExplain()}
-          onMatchAi={() => void startMatch()}
-        />
-        {(aiLoading || aiError || explanation || matchResult) && (
-          <JobAiResultPanel
-            title={matchResult ? '岗位匹配参考' : 'AI岗位解读'}
-            loading={aiLoading}
-            error={aiError}
-            explanation={explanation}
-            match={matchResult}
-            onRetry={() => {
-              if (pendingAiAction === 'match') void startMatch()
-              else void startExplain()
-            }}
-            onClear={() => {
-              setExplanation(null)
-              setMatchResult(null)
-              setAiError(null)
-            }}
-          />
-        )}
-      </div>
-
-      <StickyActionBar sourceCanApply={sourceCanApply} onOpenSource={openSourcePlatform} onOpenQr={openSourceQr} />
-    </div>
+      )}
+    </ProtoPage>
   )
 }
 

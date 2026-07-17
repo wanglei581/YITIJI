@@ -1,15 +1,11 @@
-import { Button, Card, EmptyState } from '@ai-job-print/ui'
+import { useEffect, useMemo, useState } from 'react'
+import { EmptyState } from '@ai-job-print/ui'
 import type { ExternalJobDTO } from '@ai-job-print/shared'
-import { BriefcaseIcon, BuildingIcon, ClockIcon, MapPinIcon, QrCodeIcon, StarIcon } from 'lucide-react'
+import { BriefcaseIcon, BuildingIcon, ChevronLeftIcon, ChevronRightIcon, MapPinIcon, QrCodeIcon, StarIcon } from 'lucide-react'
 import { isValidSourceUrl } from '../../../lib/url'
 import { CATEGORY_LABEL, CATEGORY_STYLE, formatSync } from '../utils/jobDisplay'
 
-const SORT_OPTIONS = [
-  { value: 'latest', label: '最新同步' },
-  { value: 'salary_first', label: '薪资标注优先' },
-] as const
-
-export type JobSortMode = (typeof SORT_OPTIONS)[number]['value']
+export type JobSortMode = 'latest' | 'salary_first'
 
 export function JobResultsSection({
   jobs,
@@ -30,34 +26,20 @@ export function JobResultsSection({
   onToggleFavorite: (job: ExternalJobDTO) => void
   onOpen: (job: ExternalJobDTO) => void
 }) {
+  void sortMode
+  void onSortChange
+  const pageSize = 6
+  const [page, setPage] = useState(0)
+  const pageCount = Math.max(1, Math.ceil(jobs.length / pageSize))
+  const visibleJobs = useMemo(() => jobs.slice(page * pageSize, page * pageSize + pageSize), [jobs, page])
+
+  useEffect(() => {
+    setPage(0)
+  }, [jobs])
+
   return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <BriefcaseIcon className="h-5 w-5 text-primary-600" />
-        <h2 className="text-base font-semibold text-neutral-900">{favoritesOnly ? '我的收藏' : '岗位列表'}</h2>
-        <span className="text-sm text-neutral-400">共 {jobs.length} 个</span>
-        {listLoading && <span className="text-xs text-neutral-400">加载中...</span>}
-        {/* 展示端排序：仅重排已载入数据；薪资标注优先=来源提供薪资的岗位排前，不伪造数值 */}
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-xs text-neutral-500">排序</span>
-          {SORT_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={sortMode === option.value}
-              onClick={() => onSortChange(option.value)}
-              className={
-                'h-12 min-w-[48px] rounded-full border px-4 text-sm font-semibold transition-colors ' +
-                (sortMode === option.value
-                  ? 'border-primary-600 bg-primary-600 text-white'
-                  : 'border-neutral-200 bg-surface text-neutral-600 active:bg-neutral-50')
-              }
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
+    <section className="jf-list">
+      {listLoading && <span className="text-xs text-neutral-400">加载中...</span>}
 
       {jobs.length === 0 ? (
         <EmptyState
@@ -67,8 +49,8 @@ export function JobResultsSection({
           className="py-12"
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-          {jobs.map((job) => (
+        <>
+          {visibleJobs.map((job) => (
             <JobResultCard
               key={job.id}
               job={job}
@@ -77,7 +59,23 @@ export function JobResultsSection({
               onOpen={() => onOpen(job)}
             />
           ))}
-        </div>
+          <div className="jf-pager">
+            <button type="button" className="jf-btn ghost sm" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>
+              <ChevronLeftIcon aria-hidden="true" />
+              上一页
+            </button>
+            <span className="jf-page-ind">第 {page + 1} / {pageCount} 页 · 每页 {pageSize} 条</span>
+            <button
+              type="button"
+              className="jf-btn ghost sm"
+              disabled={page >= pageCount - 1}
+              onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))}
+            >
+              下一页
+              <ChevronRightIcon aria-hidden="true" />
+            </button>
+          </div>
+        </>
       )}
     </section>
   )
@@ -94,69 +92,58 @@ function JobResultCard({
   onToggleFavorite: () => void
   onOpen: () => void
 }) {
+  const validSource = isValidSourceUrl(job.sourceUrl)
   return (
-    <Card padding="none" className="flex min-h-[286px] flex-col p-5">
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 flex-1 text-base font-semibold leading-snug text-neutral-900">{job.title}</p>
-        <button
-          onClick={onToggleFavorite}
-          aria-pressed={favorite}
-          aria-label={favorite ? '取消收藏' : '收藏岗位'}
-          className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 hover:bg-neutral-100"
-        >
-          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-warning text-warning' : 'text-neutral-300'}`} />
-        </button>
-      </div>
-
-      <span className="mt-2 text-sm font-semibold text-primary-600">{job.salaryDisplay || '薪资面议'}</span>
-
-      <div className="mt-2 flex items-center gap-1.5 text-sm text-neutral-600">
-        <BuildingIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-        <span className="truncate">{job.company}</span>
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
-        <span className="flex items-center gap-1">
-          <MapPinIcon className="h-3.5 w-3.5 text-neutral-400" />
-          {job.city}
-        </span>
-        {job.industry && <span className="rounded bg-neutral-100 px-2 py-0.5 text-neutral-600">{job.industry}</span>}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {job.category && (
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${CATEGORY_STYLE[job.category] ?? 'bg-neutral-100 text-neutral-500'}`}>
-            {CATEGORY_LABEL[job.category] ?? job.category}
+    <div className="jf-row" role="button" tabIndex={0} onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter') onOpen() }}>
+      <div className="jf-row-main">
+        <div className="jf-row-title">
+          <b>{job.title}</b>
+          <span className="jf-salary">{job.salaryDisplay || '薪资面议'}</span>
+          {job.category && <span className={`jf-kind ${CATEGORY_STYLE[job.category]?.includes('success') ? 'teal' : ''}`}>{CATEGORY_LABEL[job.category] ?? job.category}</span>}
+        </div>
+        <div className="jf-row-info">
+          <span><BuildingIcon aria-hidden="true" />{job.company}</span>
+          <span><MapPinIcon aria-hidden="true" />{job.city}</span>
+          {job.industry && <span>{job.industry}</span>}
+          {job.tags[0] && <span>{job.tags[0]}</span>}
+        </div>
+        <div className="jf-row-sub">
+          <span className="jf-chip src">来源 · {job.sourceName}</span>
+          <span className="jf-chip">同步 <b>{formatSync(job.syncTime)}</b></span>
+          <span className="jf-chip">外部ID <b>{job.externalId}</b></span>
+          <span className={`jf-chip ${validSource ? 'ok' : 'warn'}`}>
+            {validSource ? (
+              <>
+                <QrCodeIcon className="h-3 w-3" aria-hidden="true" />
+                线上平台 · 可扫码投递
+              </>
+            ) : '来源链接待补齐'}
           </span>
-        )}
-        {job.tags.slice(0, 4).map((tag) => (
-          <span key={tag} className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-500">
-            {tag}
-          </span>
-        ))}
+        </div>
       </div>
-
-      <p className="mt-3 line-clamp-2 text-xs leading-relaxed text-neutral-500">
-        {job.description || job.requirements || '来源平台暂未提供岗位描述，建议进入详情查看来源信息。'}
-      </p>
-
-      <div className="mt-auto flex items-center gap-1.5 border-t border-neutral-100 pt-3 text-[11px] text-neutral-400">
-        <span className="truncate">来源：{job.sourceName}</span>
-        {isValidSourceUrl(job.sourceUrl) && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary-50 px-2 py-0.5 text-primary-600">
-            <QrCodeIcon className="h-3 w-3" />
-            可扫码
-          </span>
-        )}
-        <span className="ml-auto flex shrink-0 items-center gap-1">
-          <ClockIcon className="h-3 w-3" />
-          {formatSync(job.syncTime)}
-        </span>
-      </div>
-
-      <Button size="md" className="mt-4 w-full" onClick={onOpen}>
-        查看详情
-      </Button>
-    </Card>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onToggleFavorite()
+        }}
+        aria-pressed={favorite}
+        aria-label={favorite ? '取消收藏' : '收藏岗位'}
+        className={`jf-fav${favorite ? ' on' : ''}`}
+      >
+        <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className="jf-btn ghost sm"
+        onClick={(event) => {
+          event.stopPropagation()
+          onOpen()
+        }}
+      >
+        查看岗位
+      </button>
+      <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
+    </div>
   )
 }

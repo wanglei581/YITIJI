@@ -1,0 +1,12 @@
+{
+  "id": "jobs-fairs-batch5-visual-alignment",
+  "title": "Batch 5 岗位招聘会线 11 屏视觉对齐",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交",
+  "createdAt": "2026-07-18T00:00:00+08:00",
+  "branch": "codex/jobs-fairs-batch5-20260717"
+}

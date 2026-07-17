@@ -1,19 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
   Building2Icon,
   CalendarIcon,
   ChevronRightIcon,
-  ClockIcon,
   MapIcon,
   MapPinIcon,
   QrCodeIcon,
+  RefreshCwIcon,
   SearchIcon,
   SmartphoneIcon,
   StarIcon,
-  UsersIcon,
   XIcon,
 } from 'lucide-react'
 import { getJobFairs, getTerminalId } from '../../services/api'
@@ -24,21 +23,7 @@ import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { FairCalendarPopover } from './components/FairCalendarPopover'
 import { RegionPicker } from './components/RegionPicker'
 import { matchesRegion, type RegionSelection } from '../../lib/regions'
-
-// 来源品牌渐变（按来源名 hash 取色，复刻参考图彩色大卡；class 为字面量，Tailwind 不 purge）
-const GRADIENTS = [
-  'from-primary-500 to-plum',
-  'from-plum to-plum',
-  'from-warning to-warning',
-  'from-primary-500 to-info',
-  'from-error-fg to-plum',
-  'from-info to-primary-600',
-]
-function gradOf(s: string) {
-  let h = 0
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
-  return GRADIENTS[h % GRADIENTS.length]
-}
+import { ProtoBadge, ProtoListSteps, ProtoNotice, ProtoPage, formatShortDateTime } from '../jobs-fairs-prototype'
 
 const STATUS_DOT = {
   upcoming: { label: '即将开始', dot: 'bg-warning/50' },
@@ -52,17 +37,9 @@ const STATUS_FILTER_MAP: Record<string, string> = { 即将开始: 'upcoming', �
 const THEME_LABEL: Record<string, string> = {
   campus: '校园双选会', campus_corp: '校企合作专场', industry: '行业专场', general: '综合招聘会',
 }
-const THEME_TAGS: Record<string, string[]> = {
-  campus: ['应届生', '校招', '多行业'],
-  campus_corp: ['校企合作', '产学研', '应届生'],
-  industry: ['行业专场', '社招/校招'],
-  general: ['社招', '综合', '本地'],
-}
-
 function pad(n: number) { return String(n).padStart(2, '0') }
 function dateKey(iso: string) { const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
 function fmtDate(iso: string) { const d = new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` }
-function fmtTime(iso: string) { const d = new Date(iso); return `${pad(d.getHours())}:${pad(d.getMinutes())}` }
 
 // ─── 扫码预约二维码弹层（真实二维码，承载来源平台链接）────────────────────────────
 
@@ -91,23 +68,6 @@ function BookingQrOverlay({ fair, onClose }: { fair: ExternalJobFairDTO; onClose
   )
 }
 
-// ─── 步骤条（复刻参考图：选城市 → 浏览列表 → 表单预约）─────────────────────────────
-
-function Stepper() {
-  const steps = ['选地区', '浏览列表', '扫码预约']
-  return (
-    <div className="flex items-center gap-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
-      {steps.map((s, i) => (
-        <div key={s} className="flex flex-1 items-center">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-600 text-xs font-semibold text-white">{i + 1}</span>
-          <span className="ml-1.5 text-sm font-medium text-neutral-700">{s}</span>
-          {i < steps.length - 1 && <span className="mx-2 h-px flex-1 bg-neutral-200" />}
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ─── 彩色渐变招聘会大卡（复刻参考图）─────────────────────────────────────────────
 
 function FairCard({
@@ -125,97 +85,73 @@ function FairCard({
   onDetail: () => void
   onMap: () => void
 }) {
-  const grad = gradOf(fair.sourceName)
   const sc = STATUS_DOT[fair.status]
   const isEnded = fair.status === 'ended'
   const themeLabel = fair.theme ? THEME_LABEL[fair.theme] ?? '招聘会' : '招聘会'
-  const tags = (fair.theme && THEME_TAGS[fair.theme]) || []
   const companyCount = fair.hasManagedData ? fair.managedCompanyCount : fair.boothCount ?? 0
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-100 shadow-sm">
-      {/* 渐变头部 */}
-      <div className={`bg-gradient-to-br ${grad} p-5 text-white ${isEnded ? 'opacity-80 saturate-50' : ''}`}>
-        <div className="flex items-start justify-between gap-2">
-          <span className="rounded-md bg-white/20 px-2 py-0.5 text-xs font-medium backdrop-blur-sm">{fair.sourceName}</span>
-          <div className="flex items-center gap-1.5">
-            {fair.hasManagedData && (
-              <button onClick={onMap} className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1 text-xs font-medium hover:bg-white/25">
-                <MapIcon className="h-3.5 w-3.5" />场馆导览
-              </button>
-            )}
-            <button
-              onClick={onToggleFavorite}
-              aria-label={favorite ? '取消收藏' : '收藏招聘会'}
-              aria-pressed={favorite}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30"
-            >
-              <StarIcon className={`h-4 w-4 ${favorite ? 'fill-white text-white' : 'text-white'}`} />
-            </button>
-          </div>
+    <div className={`jf-row align-start${isEnded ? ' past' : ''}`} onClick={onDetail} role="button" tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter') onDetail() }}>
+      <div className="jf-row-main">
+        <div className="jf-row-title">
+          <b>{fair.name}</b>
+          <span className="jf-kind">{themeLabel}</span>
+          {fair.status === 'upcoming' && <span className="jf-kind teal">NEW</span>}
         </div>
-        <div className="mt-2 flex items-center gap-1.5">
-          {fair.status === 'upcoming' && <span className="rounded bg-white/25 px-1.5 py-0.5 text-[11px] font-semibold">NEW</span>}
-          <span className="rounded bg-white/20 px-1.5 py-0.5 text-[11px] font-medium">{themeLabel}</span>
+        <div className="jf-row-info">
+          <span><CalendarIcon aria-hidden="true" />{formatShortDateTime(fair.startTime, fair.endTime)}</span>
+          <span><MapPinIcon aria-hidden="true" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}</span>
+          <span><Building2Icon aria-hidden="true" />{companyCount} 家企业 · {fair.jobCount ?? 0} 个岗位</span>
         </div>
-        <h3 className="mt-2 text-xl font-bold leading-tight">{fair.name}</h3>
-        <p className="mt-0.5 line-clamp-1 text-sm text-white/80">主办：{fair.organizer}</p>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/90">
-          <span className="flex items-center gap-1"><CalendarIcon className="h-4 w-4" />{fmtDate(fair.startTime)}</span>
-          <span className="flex items-center gap-1"><ClockIcon className="h-4 w-4" />{fmtTime(fair.startTime)}—{fmtTime(fair.endTime)}</span>
-        </div>
-        <div className="mt-3 flex items-center justify-between border-t border-white/15 pt-3">
-          <span className="flex items-center gap-1.5 text-sm">
-            <span className={`h-2 w-2 rounded-full ${sc.dot}`} />{sc.label}
-          </span>
-          {fair.jobCount != null && <span className="text-sm font-semibold">{fair.jobCount.toLocaleString()} 个岗位</span>}
+        <div className="jf-row-sub">
+          <span className="jf-chip src">来源 · {fair.sourceName}</span>
+          <span className="jf-chip">同步 <b>{fmtDate(fair.syncTime)}</b></span>
+          <span className="jf-chip">外部ID <b>{fair.externalId}</b></span>
+          <span className={`jf-chip ${fair.status === 'ongoing' ? 'ok' : fair.status === 'upcoming' ? 'warn' : ''}`}>{sc.label}</span>
         </div>
       </div>
-
-      {/* 白底信息区 */}
-      <div className="space-y-3 bg-white p-5">
-        <div className="flex items-start gap-1.5 text-sm text-neutral-700">
-          <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning-fg" />
-          <span className="min-w-0 flex-1">{fair.city ? `${fair.city} · ` : ''}{fair.venue}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex -space-x-1.5">
-              {[0, 1, 2].map((i) => (
-                <span key={i} className={`h-6 w-6 rounded-full border-2 border-white bg-gradient-to-br ${GRADIENTS[i]}`} />
-              ))}
-            </div>
-            <span className="flex items-center gap-1 text-sm text-neutral-600">
-              <Building2Icon className="h-4 w-4 text-neutral-400" />{companyCount} 家企业
-            </span>
-          </div>
-          <div className="flex flex-wrap justify-end gap-1">
-            {tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500">{t}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* 操作区 */}
-      <div className="flex gap-2 bg-white px-5 pb-5">
-        {!isEnded ? (
-          <button
-            onClick={onBook}
-            className={`flex flex-[2] items-center justify-center gap-1.5 rounded-lg bg-gradient-to-r ${grad} py-3 text-sm font-semibold text-white shadow-sm active:opacity-90`}
-          >
-            <QrCodeIcon className="h-4 w-4" />扫码预约
-          </button>
-        ) : (
-          <div className="flex flex-[2] items-center justify-center rounded-lg bg-neutral-100 py-3 text-sm font-medium text-neutral-400">活动已结束</div>
-        )}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation()
+          onToggleFavorite()
+        }}
+        aria-label={favorite ? '取消收藏' : '收藏招聘会'}
+        aria-pressed={favorite}
+        className={`jf-fav${favorite ? ' on' : ''}`}
+      >
+        <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
+      </button>
+      {!isEnded && (
         <button
-          onClick={onDetail}
-          className="flex flex-1 items-center justify-center gap-0.5 rounded-lg border border-neutral-200 py-3 text-sm font-semibold text-neutral-700 active:bg-neutral-50"
+          type="button"
+          className="jf-btn ghost sm"
+          onClick={(event) => {
+            event.stopPropagation()
+            onBook()
+          }}
         >
-          详情<ChevronRightIcon className="h-4 w-4" />
+          <QrCodeIcon aria-hidden="true" />
+          扫码预约
         </button>
-      </div>
+      )}
+      {fair.hasManagedData && (
+        <button
+          type="button"
+          className="jf-btn ghost sm"
+          onClick={(event) => {
+            event.stopPropagation()
+            onMap()
+          }}
+        >
+          <MapIcon aria-hidden="true" />
+          场馆导览
+        </button>
+      )}
+      <button type="button" className="jf-btn ghost sm" onClick={(event) => { event.stopPropagation(); onDetail() }}>
+        查看招聘会
+      </button>
+      <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
     </div>
   )
 }
@@ -268,110 +204,93 @@ export function JobFairsPage() {
   }, [fairs, statusFilter, region, selectedDate, query, favoritesOnly, favoriteSet])
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="wheat"
+      title="招聘会"
+      subtitle="来源：第三方平台 · 官方机构，预约请前往来源平台"
+      backLabel="返回"
+      onBack={() => navigate('/')}
+      badge={<ProtoBadge icon={RefreshCwIcon}>每日同步更新</ProtoBadge>}
+      tight
+    >
       {qrFair && <BookingQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
 
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="招聘会"
-          subtitle="来源：第三方平台 · 官方机构"
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
-        />
-
-        {/* 搜索 */}
-        <div className="mt-4">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索招聘会、企业、地点"
-              className="h-12 w-full rounded-full border border-neutral-200 bg-neutral-50 pl-9 pr-4 text-sm text-neutral-700 placeholder:text-neutral-400 focus:border-primary-400 focus:bg-white focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* 地区筛选（全国省/市/区） + 日历小按钮 */}
-        <div className="mt-3 flex items-center gap-2">
+      <div className="jf-toolrow">
+        <label className="jf-searchbox">
+          <SearchIcon aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索招聘会、企业、地点"
+          />
+        </label>
+        <div className="contents">
           <RegionPicker value={region} onChange={setRegion} />
           <FairCalendarPopover fairs={fairs} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
         </div>
+      </div>
 
-        {/* 状态筛选 + 只看收藏 */}
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-          {ALL_STATUS.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={[
-                'flex min-h-[44px] shrink-0 items-center rounded-full px-4 text-sm font-medium transition-colors',
-                statusFilter === s ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
-              ].join(' ')}
-            >
-              {s}
-            </button>
-          ))}
+      <div className="jf-filter-bar">
+        {ALL_STATUS.map((s) => (
           <button
-            onClick={() => setFavoritesOnly((v) => !v)}
-            aria-pressed={favoritesOnly}
-            className={[
-              'flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors',
-              favoritesOnly ? 'bg-warning text-white' : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200',
-            ].join(' ')}
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            className={`jf-f-chip${statusFilter === s ? ' on' : ''}`}
           >
-            <StarIcon className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
-            只看收藏
-            {favoriteSet.size > 0 && <span className="text-xs opacity-80">{favoriteSet.size}</span>}
+            {s}
           </button>
-        </div>
-
-        {/* 步骤条 */}
-        <div className="mt-3"><Stepper /></div>
+        ))}
+        <button
+          type="button"
+          onClick={() => setFavoritesOnly((v) => !v)}
+          aria-pressed={favoritesOnly}
+          className={`jf-f-chip${favoritesOnly ? ' on' : ''}`}
+        >
+          <StarIcon className={favoritesOnly ? 'fill-current' : ''} aria-hidden="true" />
+          只看收藏 · {favoriteSet.size}
+        </button>
       </div>
 
-      <div className="mt-3 flex flex-1 flex-col overflow-y-auto px-6 pb-6">
-        {loading ? (
-          <LoadingState className="flex-1" />
-        ) : error ? (
-          <ErrorState message="加载失败，请稍后重试" onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
-        ) : (
-          <>
-            <p className="mb-3 text-sm text-neutral-500">
-              共 <span className="font-semibold text-primary-600">{visible.length}</span> 场招聘会
-            </p>
-            {visible.length === 0 ? (
-              <EmptyState
-                icon={favoritesOnly ? StarIcon : CalendarIcon}
-                title={favoritesOnly ? '还没有收藏的招聘会' : '没有符合条件的招聘会'}
-                description={favoritesOnly ? '在招聘会卡片上点击星标即可收藏，方便稍后查看' : '请调整搜索、地区、状态或日期筛选'}
-                className="flex-1"
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {visible.map((fair) => (
-                  <FairCard
-                    key={fair.id}
-                    fair={fair}
-                    favorite={favoriteSet.has(fair.id)}
-                    onToggleFavorite={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
-                    onBook={() => openBookingQr(fair)}
-                    onDetail={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
-                    onMap={() => navigate(`/job-fairs/${fair.id}/map`)}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      <ProtoListSteps />
 
-      {/* 合规说明 */}
-      <div className="border-t border-neutral-100 px-6 py-2">
-        <p className="flex items-center gap-1.5 text-xs text-neutral-400">
-          <UsersIcon className="h-3.5 w-3.5" />
-          本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台
-        </p>
-      </div>
-    </div>
+      {loading ? (
+        <LoadingState className="flex-1" />
+      ) : error ? (
+        <ErrorState message="加载失败，请稍后重试" onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
+      ) : (
+        <>
+          <p className="jf-count-line">
+            共 <b>{visible.length}</b> 场招聘会 <span>· 即将开始 {visible.filter((fair) => fair.status === 'upcoming').length} 场 · 进行中 {visible.filter((fair) => fair.status === 'ongoing').length} 场</span>
+          </p>
+          {visible.length === 0 ? (
+            <EmptyState
+              icon={favoritesOnly ? StarIcon : CalendarIcon}
+              title={favoritesOnly ? '还没有收藏的招聘会' : '没有符合条件的招聘会'}
+              description={favoritesOnly ? '在招聘会卡片上点击星标即可收藏，方便稍后查看' : '请调整搜索、地区、状态或日期筛选'}
+              className="flex-1"
+            />
+          ) : (
+            <div className="jf-list">
+              {visible.map((fair) => (
+                <FairCard
+                  key={fair.id}
+                  fair={fair}
+                  favorite={favoriteSet.has(fair.id)}
+                  onToggleFavorite={() => toggleFavorite({ type: 'job_fair', id: fair.id, title: fair.name })}
+                  onBook={() => openBookingQr(fair)}
+                  onDetail={() => navigate(`/job-fairs/${fair.id}`, { state: { fair } })}
+                  onMap={() => navigate(`/job-fairs/${fair.id}/map`)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <ProtoNotice>
+        本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台。
+      </ProtoNotice>
+    </ProtoPage>
   )
 }

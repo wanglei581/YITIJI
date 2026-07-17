@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, EmptyState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { EmptyState, LoadingState } from '@ai-job-print/ui'
 import type { FairLiveStatsDTO } from '@ai-job-print/shared'
 import {
   ActivityIcon,
@@ -13,6 +13,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { getFairStats } from '../../services/api'
+import { CardHead, ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
 
 function BigStat({
   label,
@@ -27,17 +28,16 @@ function BigStat({
   icon: React.ElementType
   accent: string
 }) {
+  void accent
   return (
-    <Card className="p-4">
-      <div className="flex items-start justify-between">
-        <div className={`rounded-lg p-2 ${accent}`}>
-          <Icon className="h-5 w-5" />
-        </div>
+    <div className="jf-stat-card">
+      <div className="k">
+        <Icon aria-hidden="true" />
+        {label}
       </div>
-      <p className="mt-3 text-2xl font-bold text-neutral-900">{value}</p>
-      <p className="mt-0.5 text-xs font-medium text-neutral-500">{label}</p>
-      {note && <p className="mt-0.5 text-xs text-neutral-400">{note}</p>}
-    </Card>
+      <div className="v">{value}</div>
+      {note && <div className="note">{note}</div>}
+    </div>
   )
 }
 
@@ -92,24 +92,26 @@ export function FairStatsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="现场数据"
-          subtitle={`${stats.fairName} · 准实时数据`}
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-              返回详情
-            </Button>
-          }
-        />
-        <p className="mt-1 text-xs text-neutral-400">
-          数据更新于 {formatTime(stats.lastUpdated)} · 系统仅记录服务数据，不记录求职者个人信息
-        </p>
-      </div>
-
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
-        <div className="grid grid-cols-2 gap-3">
+    <ProtoPage
+      tone="wheat"
+      title="现场数据"
+      subtitle={`${stats.fairName} · 更新于 ${formatTime(stats.lastUpdated)}`}
+      backLabel="返回详情"
+      onBack={() => navigate(`/job-fairs/${fairId}`)}
+      badge={<ProtoBadge icon={ActivityIcon}>准实时数据</ProtoBadge>}
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
+            参会企业
+          </button>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn dark" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            查看招聘会
+          </button>
+        </>
+      }
+    >
+        <div className="jf-stat-grid">
           <BigStat
             label="参展企业"
             value={stats.totalCompanies}
@@ -124,138 +126,129 @@ export function FairStatsPage() {
             icon={BriefcaseIcon}
             accent="bg-success-bg text-success-fg"
           />
+          <BigStat
+            label="资料打印"
+            value={stats.printCount}
+            note="现场服务次数"
+            icon={PrinterIcon}
+            accent="bg-warning-bg text-warning-fg"
+          />
+          <BigStat
+            label="二维码展示"
+            value={stats.scanCount}
+            note="来源平台入口展示"
+            icon={QrCodeIcon}
+            accent="bg-primary-50 text-primary-600"
+          />
         </div>
 
-        <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-            <TrendingUpIcon className="h-4 w-4 text-neutral-400" />
-            服务数据统计
-            <span className="ml-auto text-xs font-normal text-neutral-400">（系统服务行为，不含求职者信息）</span>
-          </p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <div className="rounded-lg bg-neutral-50 p-3 text-center">
-              <ScanIcon className="mx-auto h-5 w-5 text-neutral-400" />
-              <p className="mt-1.5 text-xl font-bold text-neutral-900">{stats.browseCount}</p>
-              <p className="mt-0.5 text-xs text-neutral-500">信息浏览</p>
+        <section className="jf-card accented">
+          <CardHead icon={TrendingUpIcon} title="服务数据统计" subtitle="系统服务行为，不含求职者个人信息" />
+          <div className="jf-service4">
+            <div className="jf-sv">
+              <ScanIcon aria-hidden="true" />
+              <b>{stats.browseCount}</b>
+              <span>信息浏览</span>
             </div>
-            <div className="rounded-lg bg-neutral-50 p-3 text-center">
-              <QrCodeIcon className="mx-auto h-5 w-5 text-neutral-400" />
-              <p className="mt-1.5 text-xl font-bold text-neutral-900">{stats.scanCount}</p>
-              <p className="mt-0.5 text-xs text-neutral-500">二维码展示</p>
+            <div className="jf-sv">
+              <QrCodeIcon aria-hidden="true" />
+              <b>{stats.scanCount}</b>
+              <span>二维码展示</span>
             </div>
-            <div className="rounded-lg bg-neutral-50 p-3 text-center">
-              <PrinterIcon className="mx-auto h-5 w-5 text-neutral-400" />
-              <p className="mt-1.5 text-xl font-bold text-neutral-900">{stats.printCount}</p>
-              <p className="mt-0.5 text-xs text-neutral-500">资料打印</p>
+            <div className="jf-sv">
+              <PrinterIcon aria-hidden="true" />
+              <b>{stats.printCount}</b>
+              <span>资料打印</span>
             </div>
-            <div className="rounded-lg bg-neutral-50 p-3 text-center">
-              <UsersIcon className="mx-auto h-5 w-5 text-neutral-400" />
-              <p className="mt-1.5 text-xl font-bold text-neutral-900">{stats.checkinCount}</p>
-              <p className="mt-0.5 text-xs text-neutral-500">现场签到</p>
+            <div className="jf-sv">
+              <UsersIcon aria-hidden="true" />
+              <b>{stats.checkinCount}</b>
+              <span>现场签到</span>
             </div>
           </div>
-        </Card>
+        </section>
 
-        <Card className="p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm font-medium text-neutral-700">企业签到进度</p>
-            <span className="text-sm font-semibold text-success-fg">{checkinRate}%</span>
+        <section className="jf-card">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="jf-card-head mb-0">
+              <span className="jf-g-icon">
+                <BuildingIcon aria-hidden="true" />
+              </span>
+              <div>
+                <h2>企业签到进度</h2>
+                <div className="sub">{stats.checkedInCompanies} / {stats.totalCompanies} 家企业已签到入场</div>
+              </div>
+            </div>
+            <span className="text-[32px] font-bold text-[var(--teal-deep)]">{checkinRate}%</span>
           </div>
-          <div className="h-3 rounded-full bg-neutral-100">
-            <div
-              className="h-3 rounded-full bg-success transition-all"
-              style={{ width: `${checkinRate}%` }}
-            />
+          <div className="jf-progress">
+            <div className="jf-progress-fill" style={{ width: `${checkinRate}%` }} />
           </div>
-          <p className="mt-2 text-xs text-neutral-400">
-            {stats.checkedInCompanies} / {stats.totalCompanies} 家企业已签到入场
-          </p>
 
           {stats.zoneBreakdown.length > 0 && (
-            <div className="mt-4 space-y-2">
+            <div className="jf-zone-rows mt-5">
               {stats.zoneBreakdown.map((zone) => {
                 const rate = zone.boothCount > 0
                   ? Math.round((zone.checkedInCount / zone.boothCount) * 100)
                   : 0
                 return (
-                  <div key={zone.id}>
-                    <div className="flex items-center justify-between text-xs text-neutral-500">
-                      <span>{zone.zoneName}</span>
-                      <span>{zone.checkedInCount}/{zone.boothCount}</span>
+                  <div key={zone.id} className="jf-zone-row">
+                    <span>{zone.zoneName}</span>
+                    <div className="jf-progress">
+                      <div className="jf-progress-fill" style={{ width: `${rate}%` }} />
                     </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-neutral-100">
-                      <div
-                        className="h-1.5 rounded-full bg-primary-400"
-                        style={{ width: `${rate}%` }}
-                      />
-                    </div>
+                    <span className="n">{zone.checkedInCount}/{zone.boothCount}</span>
                   </div>
                 )
               })}
             </div>
           )}
-        </Card>
+        </section>
 
         {/* 参展企业行业分布（真实聚合已录企业，柱状图；无数据不渲染，不伪造） */}
         {stats.industryDistribution.length > 0 && (
-          <Card className="p-5">
-            <p className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-              <BuildingIcon className="h-4 w-4 text-neutral-400" />
-              参展企业行业分布
-              <span className="ml-auto text-xs font-normal text-neutral-400">按已录 {stats.totalCompanies} 家企业聚合</span>
-            </p>
-            <div className="space-y-2.5">
+          <section className="jf-card">
+            <CardHead icon={BuildingIcon} title="参展企业行业分布" subtitle={`按已录 ${stats.totalCompanies} 家企业聚合`} />
+            <div className="jf-bar-rows">
               {(() => {
                 const maxCount = Math.max(...stats.industryDistribution.map((slice) => slice.count), 1)
                 return stats.industryDistribution.map((slice) => (
-                  <div key={slice.label}>
-                    <div className="flex items-center justify-between text-xs text-neutral-600">
-                      <span className="font-medium">{slice.label}</span>
-                      <span className="tabular-nums text-neutral-500">{slice.count} 家</span>
+                  <div key={slice.label} className="jf-bar-row">
+                    <span>{slice.label}</span>
+                    <div className="jf-progress">
+                      <div className="jf-progress-fill" style={{ width: `${Math.round((slice.count / maxCount) * 100)}%` }} />
                     </div>
-                    <div className="mt-1 h-2 rounded-full bg-neutral-100">
-                      <div
-                        className="h-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all"
-                        style={{ width: `${Math.round((slice.count / maxCount) * 100)}%` }}
-                      />
-                    </div>
+                    <span className="n">{slice.count} 家</span>
                   </div>
                 ))
               })()}
             </div>
-          </Card>
+          </section>
         )}
 
         {/* 求职意向分布（机构录入预计值，横向占比；标注来源口径，非实时） */}
         {stats.seekerIntent.length > 0 && (
-          <Card className="p-5">
-            <p className="mb-1 flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-              <UsersIcon className="h-4 w-4 text-neutral-400" />
-              求职意向分布
-            </p>
-            <p className="mb-3 text-xs text-neutral-400">
-              {stats.dataSourceLabel}
-              {stats.expectedAttendance != null && ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人`}
-            </p>
-            <div className="space-y-2.5">
+          <section className="jf-card">
+            <CardHead
+              icon={UsersIcon}
+              title="求职意向分布"
+              subtitle={`${stats.dataSourceLabel}${stats.expectedAttendance != null ? ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人` : ''}`}
+            />
+            <div className="jf-bar-rows">
               {stats.seekerIntent.map((slice) => (
-                <div key={slice.label}>
-                  <div className="flex items-center justify-between text-xs text-neutral-600">
-                    <span className="font-medium">{slice.label}</span>
-                    <span className="tabular-nums text-neutral-500">{slice.percent}%</span>
+                <div key={slice.label} className="jf-bar-row">
+                  <span>{slice.label}</span>
+                  <div className="jf-progress">
+                    <div className="jf-progress-fill" style={{ width: `${Math.max(0, Math.min(100, slice.percent))}%` }} />
                   </div>
-                  <div className="mt-1 h-2 rounded-full bg-neutral-100">
-                    <div
-                      className="h-2 rounded-full bg-gradient-to-r from-warning to-warning-fg transition-all"
-                      style={{ width: `${Math.max(0, Math.min(100, slice.percent))}%` }}
-                    />
-                  </div>
+                  <span className="n">{slice.percent}%</span>
                 </div>
               ))}
             </div>
-          </Card>
+          </section>
         )}
-      </div>
-    </div>
+
+      <ProtoNotice>系统仅记录服务数据，不记录求职者个人信息；活动办理结果以来源平台和现场为准。</ProtoNotice>
+    </ProtoPage>
   )
 }

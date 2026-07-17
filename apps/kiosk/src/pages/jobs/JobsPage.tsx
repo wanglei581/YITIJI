@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
+import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
 import { getJobs } from '../../services/api'
 import {
   getJobAiConsentStatus,
@@ -12,20 +13,11 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import { useAuth } from '../../auth/useAuth'
 import { useFavorites } from '../../favorites/useFavorites'
 import { JobAiConsentModal } from './components/JobAiConsentModal'
-import { JobAiEntryPanel } from './components/JobAiEntryPanel'
 import { JobAiResultPanel } from './components/JobAiResultPanel'
 import { ResumeSelectModal } from './components/ResumeSelectModal'
-import {
-  DataReadinessPanel,
-  JobBusinessNote,
-  JobOverviewPanel,
-  SourceInstitutionPanel,
-  TopTagsPanel,
-  CompanyGuideEntry,
-} from './components/JobListInsights'
-import { JobFilterAssistant } from './components/JobFilterAssistant'
 import { JobResultsSection } from './components/JobResultsSection'
-import { buildJobInsights, buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
+import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
+import { ProtoBadge, ProtoNotice, ProtoPage, formatDate } from '../jobs-fairs-prototype'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
 
@@ -165,30 +157,16 @@ export function JobsPage() {
     })
   }, [listJobs, favoritesOnly, favoriteSet, sortMode])
 
-  const insightJobs = hasServerFilter ? listJobs : facetJobs
-  const insightTotal = hasServerFilter ? listTotal : facetTotal
-  const insights = useMemo(() => buildJobInsights(insightJobs, insightTotal), [insightJobs, insightTotal])
   const activeSourceName = sourceCards.find((source) => source.orgId === sourceOrgId)?.name ?? (sourceOrgId ? '指定来源机构' : undefined)
   const hasAnyFilter = hasServerFilter || favoritesOnly
   const aiRecommendationMode = aiRecommendations !== null
-
-  function resetAll() {
-    setKeyword('')
-    setDebouncedKeyword('')
-    setCity('')
-    setIndustry('')
-    setCategory('')
-    setSourceOrgId('')
-    setFavoritesOnly(false)
-  }
-
-  function selectTag(tag: string) {
-    if (industryOptions.includes(tag)) {
-      setIndustry(tag)
-      return
-    }
-    setKeyword(tag)
-  }
+  const latestSync = useMemo(() => {
+    const times = displayedJobs
+      .map((job) => Date.parse(job.syncTime))
+      .filter((value) => !Number.isNaN(value))
+    if (times.length === 0) return '暂无'
+    return formatDate(new Date(Math.max(...times)).toISOString())
+  }, [displayedJobs])
 
   function requireToken(): string | null {
     const token = getToken()
@@ -281,7 +259,25 @@ export function JobsPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <ProtoPage
+      tone="clay"
+      title="岗位信息"
+      subtitle="第三方 / 官方来源岗位入口，去来源平台投递"
+      backLabel="返回"
+      onBack={() => navigate('/')}
+      badge={<ProtoBadge icon={RefreshCwIcon}>按来源定时同步</ProtoBadge>}
+      tight
+      actionBar={
+        <>
+          <span className="jf-action-note">本系统仅展示来源岗位信息，不接收简历、不参与招聘流程。</span>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn ghost" onClick={() => navigate('/companies')}>
+            <Building2Icon aria-hidden="true" />
+            找企业
+          </button>
+        </>
+      }
+    >
       <JobAiConsentModal
         open={showConsent}
         loading={aiLoading}
@@ -296,98 +292,128 @@ export function JobsPage() {
         onSelect={(resume) => void runAiRecommend(resume)}
         onUpload={() => navigate('/resume/source?intent=diagnose')}
       />
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="岗位信息"
-          subtitle="第三方 / 官方来源岗位入口"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-              返回首页
-            </Button>
-          }
-        />
-        <p className="mt-3 text-xs leading-relaxed text-neutral-400">
-          本系统仅展示客户接入并经审核发布的岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理。
-        </p>
-      </div>
+      {facetLoading ? (
+        <LoadingState className="flex-1" />
+      ) : error ? (
+        <ErrorState message={error} onRetry={() => setRetryKey((key) => key + 1)} className="flex-1" />
+      ) : (
+        <>
+          <div className="jf-filter-bar">
+            {[
+              { value: '', label: '全部' },
+              { value: 'fulltime', label: '全职' },
+              { value: 'intern', label: '实习' },
+              { value: 'campus', label: '校招' },
+              { value: 'parttime', label: '兼职' },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={`jf-f-chip${category === item.value ? ' on' : ''}`}
+                onClick={() => setCategory(item.value)}
+              >
+                {item.label}
+              </button>
+            ))}
+            <label className="jf-searchbox">
+              <SearchIcon aria-hidden="true" />
+              <input
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="搜索职位 / 公司"
+              />
+            </label>
+          </div>
 
-      <div className="mt-4 flex flex-1 flex-col gap-6 overflow-y-auto px-6 pb-8">
-        {facetLoading ? (
-          <LoadingState className="flex-1" />
-        ) : error ? (
-          <ErrorState message={error} onRetry={() => setRetryKey((key) => key + 1)} className="flex-1" />
-        ) : (
-          <>
-            <JobAiEntryPanel
+          <div className="jf-filter-bar">
+            <span className="jf-filter-label">来源</span>
+            <button type="button" className={`jf-f-chip${sourceOrgId ? '' : ' on'}`} onClick={() => setSourceOrgId('')}>
+              全部
+            </button>
+            {sourceCards.slice(0, 3).map((source) => (
+              <button
+                key={source.orgId}
+                type="button"
+                className={`jf-f-chip${sourceOrgId === source.orgId ? ' on' : ''}`}
+                onClick={() => setSourceOrgId(sourceOrgId === source.orgId ? '' : source.orgId)}
+              >
+                {source.name}
+              </button>
+            ))}
+            <button type="button" className="jf-f-chip" onClick={() => navigate('/offline-agencies')}>
+              <StoreIcon aria-hidden="true" />
+              线下机构门店
+            </button>
+            <button type="button" className="jf-f-chip" onClick={() => {
+              if (cityOptions[0]) setCity(cityOptions[0])
+              else if (industryOptions[0]) setIndustry(industryOptions[0])
+            }}>
+              <FilterIcon aria-hidden="true" />
+              城市 / 行业筛选
+            </button>
+          </div>
+
+          <div className="jf-list-meta">
+            <span>
+              共 <b>{listTotal}</b> 个岗位 · 当前展示 <b>{displayedJobs.length}</b> 个 · 来源机构 <b>{sourceCards.length}</b> 个 · 最新同步 <b>{latestSync}</b>
+            </span>
+            <span className="jf-sort-group">
+              <button type="button" className={`jf-f-chip sm${favoritesOnly ? ' on' : ''}`} onClick={() => setFavoritesOnly((value) => !value)}>
+                仅看收藏 {favoriteSet.size}
+              </button>
+              排序
+              <button type="button" className={`jf-f-chip sm${sortMode === 'latest' ? ' on' : ''}`} onClick={() => setSortMode('latest')}>
+                最新同步
+              </button>
+              <button type="button" className={`jf-f-chip sm${sortMode === 'salary_first' ? ' on' : ''}`} onClick={() => setSortMode('salary_first')}>
+                薪资标注优先
+              </button>
+            </span>
+          </div>
+
+          {(aiLoading || aiError || aiRecommendations) && (
+            <JobAiResultPanel
               title="AI岗位推荐"
-              clearLabel="退出 AI 推荐"
               loading={aiLoading}
-              hasResult={Boolean(aiRecommendations || aiError)}
-              onStart={() => void startAiRecommend()}
+              error={aiError}
+              recommendations={aiRecommendations ?? undefined}
+              clearLabel="退出 AI 推荐"
+              onRetry={() => void startAiRecommend()}
               onClear={clearAiRecommendations}
+              onOpenRecommendation={(jobId) => navigate(`/jobs/${jobId}`)}
             />
+          )}
 
-            <JobOverviewPanel insights={insights} displayedCount={displayedJobs.length} />
-
-            {(aiLoading || aiError || aiRecommendations) && (
-              <JobAiResultPanel
-                title="AI岗位推荐"
-                loading={aiLoading}
-                error={aiError}
-                recommendations={aiRecommendations ?? undefined}
-                clearLabel="退出 AI 推荐"
-                onRetry={() => void startAiRecommend()}
-                onClear={clearAiRecommendations}
-                onOpenRecommendation={(jobId) => navigate(`/jobs/${jobId}`)}
-              />
-            )}
-
-            <JobFilterAssistant
-              keyword={keyword}
-              city={city}
-              industry={industry}
-              category={category}
+          {!aiRecommendationMode && (
+            <JobResultsSection
+              jobs={displayedJobs}
               favoritesOnly={favoritesOnly}
-              cityOptions={cityOptions}
-              industryOptions={industryOptions}
-              favoriteCount={favoriteSet.size}
-              activeSourceName={activeSourceName}
-              debouncedKeyword={debouncedKeyword}
-              hasAnyFilter={hasAnyFilter}
-              onKeywordChange={setKeyword}
-              onCityChange={setCity}
-              onIndustryChange={setIndustry}
-              onCategoryChange={setCategory}
-              onToggleFavorites={() => setFavoritesOnly((value) => !value)}
-              onReset={resetAll}
+              listLoading={listLoading}
+              favoriteSet={favoriteSet}
+              sortMode={sortMode}
+              onSortChange={setSortMode}
+              onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
+              onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
             />
+          )}
 
-            <JobBusinessNote />
+          <div className="jf-quick-row">
+            <button type="button" className="jf-tile tinted" onClick={() => void startAiRecommend()}>
+              <span className="jf-tile-icon"><SparklesIcon aria-hidden="true" /></span>
+              <span><b>{aiRecommendations ? '退出 AI 推荐' : 'AI岗位推荐'}</b><span>登录后基于本人简历推荐，仅供参考</span></span>
+            </button>
+            <button type="button" className="jf-tile" onClick={() => navigate('/companies')}>
+              <span className="jf-tile-icon"><Building2Icon aria-hidden="true" /></span>
+              <span><b>找企业</b><span>来源企业与岗位导览</span></span>
+            </button>
+          </div>
 
-            {category !== 'parttime' && <CompanyGuideEntry onOpen={() => navigate('/companies')} />}
-
-            {!aiRecommendationMode && (
-              <JobResultsSection
-                jobs={displayedJobs}
-                favoritesOnly={favoritesOnly}
-                listLoading={listLoading}
-                favoriteSet={favoriteSet}
-                sortMode={sortMode}
-                onSortChange={setSortMode}
-                onToggleFavorite={(job) => toggleFavorite({ type: 'job', id: job.id, title: job.title })}
-                onOpen={(job) => navigate(`/jobs/${job.id}`, { state: { job } })}
-              />
-            )}
-
-            <SourceInstitutionPanel sources={sourceCards} activeSourceOrgId={sourceOrgId} onSelect={setSourceOrgId} />
-
-            <TopTagsPanel tags={topTags} onSelect={selectTag} />
-
-            <DataReadinessPanel insights={insights} />
-          </>
-        )}
-      </div>
-    </div>
+          <ProtoNotice>
+            本系统仅展示客户接入并经审核发布的岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理。{hasAnyFilter && activeSourceName ? ` 当前来源：${activeSourceName}。` : ''}
+          </ProtoNotice>
+        </>
+      )}
+    </ProtoPage>
   )
 }
 

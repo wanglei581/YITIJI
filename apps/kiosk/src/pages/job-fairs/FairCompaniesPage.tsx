@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { COMPANY_SCALE_SHORT } from '../../types/fair'
-import { BuildingIcon, BriefcaseIcon, MapPinIcon, SearchIcon } from 'lucide-react'
+import { BuildingIcon, BriefcaseIcon, ChevronRightIcon, MapPinIcon, QrCodeIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
+import { ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
 
-const CHECKIN_STYLES = {
-  checked_in: 'bg-success-bg text-success-fg',
-  pending:    'bg-warning-bg text-warning-fg',
-  absent:     'bg-neutral-100 text-neutral-400',
-}
 const CHECKIN_LABELS = {
   checked_in: '已签到',
   pending:    '未签到',
@@ -81,103 +77,109 @@ export function FairCompaniesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="px-6 pt-6">
-        <PageHeader
-          title="参会企业"
-          subtitle={fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`}
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/job-fairs/${fairId}`)}>
-              返回详情
-            </Button>
-          }
-        />
-        <div className="relative mt-4">
-          <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+    <ProtoPage
+      tone="wheat"
+      title="参会企业"
+      subtitle={fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`}
+      backLabel="返回详情"
+      onBack={() => navigate(`/job-fairs/${fairId}`)}
+      badge={<ProtoBadge icon={BuildingIcon}>{filtered.length} 家匹配</ProtoBadge>}
+      actionBar={
+        <>
+          <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/map`)}>
+            场馆导览
+          </button>
+          <div className="jf-spacer" />
+          <button type="button" className="jf-btn dark" onClick={() => navigate(`/job-fairs/${fairId}`)}>
+            查看招聘会
+          </button>
+        </>
+      }
+    >
+        <div className="jf-searchbox">
+          <SearchIcon aria-hidden="true" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索企业名称或行业..."
-            className="w-full rounded-xl border border-neutral-200 bg-white py-3 pl-10 pr-4 text-sm text-neutral-700 placeholder-neutral-400 focus:border-primary-400 focus:outline-none"
+            placeholder="搜索企业名称或行业"
           />
         </div>
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <div className="jf-filter-bar">
           {zoneOptions.map((z) => (
             <button
               key={z}
+              type="button"
               onClick={() => setZoneFilter(z)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                zoneFilter === z
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
-              }`}
+              className={`jf-f-chip sm ${zoneFilter === z ? 'on' : ''}`}
             >
               {z}
             </button>
           ))}
         </div>
-      </div>
 
-      <div className="mt-3 flex flex-1 flex-col gap-3 overflow-y-auto px-6 pb-6">
+      <section className="jf-list">
         {filtered.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center py-16">
-            <p className="text-sm text-neutral-400">无匹配企业</p>
-          </div>
+          <div className="jf-card compact text-center text-[var(--muted)]">无匹配企业</div>
         ) : (
           filtered.map((company) => (
-            <Card key={company.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-neutral-900">{company.companyName}</p>
-                    <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500">
-                      {COMPANY_SCALE_SHORT[company.scale]}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-neutral-500">{company.industry}</p>
-                </div>
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${CHECKIN_STYLES[company.checkinStatus]}`}>
-                  {CHECKIN_LABELS[company.checkinStatus]}
+            <button
+              key={company.id}
+              type="button"
+              className="jf-row align-start"
+              onClick={() => navigate(`/job-fairs/${fairId}/companies/${company.id}`, { state: { company } })}
+            >
+              <span className="jf-company-icon">{company.companyName.slice(0, 1)}</span>
+              <span className="jf-row-main">
+                <span className="jf-row-title">
+                  <b>{company.companyName}</b>
+                  <span className="jf-kind">{company.industry}</span>
+                  <span className={`jf-chip ${company.checkinStatus === 'checked_in' ? 'ok' : company.checkinStatus === 'pending' ? 'warn' : ''}`}>
+                    {CHECKIN_LABELS[company.checkinStatus]}
+                  </span>
                 </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
-                {company.boothNumber && (
-                  <span className="flex items-center gap-1">
-                    <MapPinIcon className="h-3.5 w-3.5" />
-                    展位 {company.boothNumber}
+                <span className="jf-row-info">
+                  <span>{COMPANY_SCALE_SHORT[company.scale]}</span>
+                  {company.boothNumber && (
+                    <span>
+                      <MapPinIcon aria-hidden="true" />
+                      展位 {company.boothNumber}
+                    </span>
+                  )}
+                  {company.positions.length > 0 && (
+                    <span>
+                      <BriefcaseIcon aria-hidden="true" />
+                      招聘 {company.positions.reduce((s, p) => s + p.headcount, 0)} 人 · {company.positions.length} 岗
+                    </span>
+                  )}
+                </span>
+                {company.description && (
+                  <span className="mt-2 block line-clamp-2 text-[18px] leading-relaxed text-[var(--muted)]">
+                    {company.description}
                   </span>
                 )}
-                {company.positions.length > 0 && (
-                  <span className="flex items-center gap-1">
-                    <BriefcaseIcon className="h-3.5 w-3.5" />
-                    招聘 {company.positions.reduce((s, p) => s + p.headcount, 0)} 人 · {company.positions.length} 岗
+                <span className="jf-row-sub">
+                  <span className="jf-chip">
+                    展区 <b>{company.zoneName ?? '未分区'}</b>
                   </span>
-                )}
-              </div>
-              {company.description && (
-                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-neutral-400">
-                  {company.description}
-                </p>
-              )}
-              <div className="mt-3">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="w-full"
-                  onClick={() => navigate(`/job-fairs/${fairId}/companies/${company.id}`, { state: { company } })}
-                >
-                  查看详情 / 扫码查看来源平台
-                </Button>
-              </div>
-            </Card>
+                  <span className="jf-chip src">
+                    <QrCodeIcon aria-hidden="true" />
+                    扫码查看
+                  </span>
+                </span>
+              </span>
+              <span className="jf-btn sm ghost">
+                查看详情
+              </span>
+              <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
+            </button>
           ))
         )}
-      </div>
+      </section>
 
-      <p className="px-6 pb-4 text-xs text-neutral-400">
+      <ProtoNotice>
         系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。
-      </p>
-    </div>
+      </ProtoNotice>
+    </ProtoPage>
   )
 }
