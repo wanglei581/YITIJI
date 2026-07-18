@@ -4,7 +4,6 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Card, EmptyState } from '@ai-job-print/ui'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
 import { GiftIcon } from 'lucide-react'
@@ -44,7 +43,6 @@ function validityLine(item: MemberBenefitItem): string {
 }
 
 export function MyBenefitsPage() {
-  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberBenefitItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
@@ -78,14 +76,9 @@ export function MyBenefitsPage() {
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
-        headerActions={(
-          <button type="button" className="me-ripple" onClick={() => navigate('/activities')}>
-            去权益活动领取
-          </button>
-        )}
       >
         <section className="me-detail-summary" aria-label="权益概览">
-          <span className="me-summary-icon me-tone-plum" aria-hidden="true">
+          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
             <KIcon name="ticket" />
           </span>
           <div className="min-w-0 flex-1">
@@ -113,10 +106,7 @@ export function MyBenefitsPage() {
             const type = TYPE_META[item.benefitType]
             const status = STATUS_META[item.status]
             return (
-              <Card
-                key={item.id}
-                className={['me-benefit-card me-ripple', item.status !== 'active' ? 'is-ended' : ''].join(' ')}
-              >
+              <Card key={item.id} className="me-benefit-card me-ripple">
                 <div className="flex items-start gap-4">
                   <span className={['me-row-icon', `me-tone-${type.tone}`].join(' ')}>
                     <KIcon name={type.icon} />
