@@ -106,6 +106,8 @@
     "verify:partner-account-action:schema": "node -r @swc-node/register scripts/verify-partner-account-action-schema.ts",
     "verify:partner-account-action:otp": "node -r @swc-node/register scripts/verify-partner-account-action-otp.ts",
     "verify:partner-account-action:redis": "node -r @swc-node/register scripts/verify-partner-account-action-redis.ts",
+    "verify:partner-account-action": "node -r @swc-node/register scripts/verify-partner-account-action.ts",
+    "verify:partner-account-action:postgres": "node -r @swc-node/register scripts/verify-partner-account-action-postgres.ts",
     "verify:internal-auth-phone:target-guard": "node -r @swc-node/register scripts/verify-internal-auth-phone-target-guard.ts",
     "verify:change-password:target-guard": "node -r @swc-node/register scripts/verify-change-password-target-guard.ts",
     "verify:change-password": "node scripts/run-verify-change-password.mjs",

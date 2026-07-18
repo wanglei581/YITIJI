@@ -22,6 +22,10 @@ import {
   mapAdminOrgAccount,
   type AdminOrgAccount,
 } from './admin-org-account-view'
+import {
+  loadTrustedAccountForDeletion,
+  type TrustedAccountActionBinding,
+} from './admin-org-account-security'
 
 export type { AdminOrgAccount } from './admin-org-account-view'
 
@@ -472,14 +476,18 @@ export class AdminOrgsService {
     orgId: string,
     accountId: string,
     admin: AuthedUser,
+    trustedBinding: TrustedAccountActionBinding,
   ): Promise<{ success: true }> {
     const tombstonePasswordHash = await bcrypt.hash(randomUUID(), 10)
     const deleted = await this.withSerializableRetry(() => this.prisma.$transaction(
       async (tx) => {
-        const account = await tx.user.findFirst({
-          where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-        })
-        if (!account) this.throwAccountNotFound(orgId, accountId)
+        const account = await loadTrustedAccountForDeletion(
+          tx,
+          orgId,
+          accountId,
+          admin.userId,
+          trustedBinding,
+        )
 
         const activeCount = await tx.user.count({
           where: { orgId, role: 'partner', enabled: true, deletedAt: null },

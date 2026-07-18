@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Ip, Post, UseGuards } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, HttpCode, Ip, Post, UseGuards } from '@nestjs/common'
 import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
@@ -23,6 +23,7 @@ import {
   SmsLoginDto,
 } from './dto/internal-auth.dto'
 import { LoginDto } from './dto/login.dto'
+import { PartnerAccountActionRedisService } from '../common/redis/partner-account-action-redis.service'
 
 @Controller('auth')
 export class AuthController {
@@ -31,6 +32,7 @@ export class AuthController {
     private readonly initialPhoneBindService: InitialPhoneBindService,
     private readonly adminInitialPhoneBindService: AdminInitialPhoneBindService,
     private readonly adminPhoneTransferService: AdminPhoneTransferService,
+    private readonly partnerAccountActionRedis: PartnerAccountActionRedisService,
   ) {}
 
   /**
@@ -238,6 +240,20 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: AuthedUser): ApiResponse<AuthedUser> {
     return ApiResponse.ok(user)
+  }
+
+  /**
+   * 显式退出只撤销 Admin 近期高风险验证。当前内部 JWT 没有 jti，
+   * 因此本端点不声称在服务端撤销已签发 JWT；客户端仍需立即清除本地 token。
+   */
+  @Post('logout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  async logout(@CurrentUser() user: AuthedUser): Promise<ApiResponse<{ loggedOut: true }>> {
+    if (user.role === 'admin') {
+      await this.partnerAccountActionRedis.clearAdminRecentVerification(user.userId)
+    }
+    return ApiResponse.ok({ loggedOut: true })
   }
 
   private initialPhoneBindUnavailable(): BadRequestException {
