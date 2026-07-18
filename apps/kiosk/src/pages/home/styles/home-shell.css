@@ -18,7 +18,6 @@
   --home-line: var(--sd-color-line);
   --home-line-strong: var(--sd-color-line-strong);
   --home-shadow: var(--sd-shadow-touch);
-
   position: relative;
   width: min(1080px, 100%);
   min-height: 100%;
