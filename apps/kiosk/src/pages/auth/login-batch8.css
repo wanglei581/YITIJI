@@ -118,7 +118,8 @@
 .k1-login .k-key { min-height: 72px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-900); background: var(--color-canvas); font-family: var(--font-serif); font-size: 32px; font-weight: 700; }
 .k1-login .k-key.fn { color: var(--color-neutral-500); font-family: var(--font-sans); font-size: 20px; font-weight: 650; }
 .k1-login .k-key:active { background: var(--color-primary-100); transform: scale(.97); }
-.k1-login .k-cta { min-height: 96px; order: 3; border: 0; border-radius: 14px; color: var(--color-surface); background: var(--color-dark); font-size: 28px; font-weight: 750; letter-spacing: .12em; }
+/* 原型：登录 CTA 高 104px，字号 30px，letter-spacing 4px */
+.k1-login .k-cta { min-height: 104px; order: 3; border: 0; border-radius: 14px; color: var(--color-surface); background: var(--color-dark); font-size: 30px; font-weight: 750; letter-spacing: 4px; }
 .k1-login .k-cta:disabled { color: var(--color-neutral-400); background: var(--color-neutral-200); }
 .k1-login .k-notice,
 .k1-login .k-error { min-height: 48px; margin: 0; }

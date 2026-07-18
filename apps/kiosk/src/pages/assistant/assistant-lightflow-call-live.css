@@ -1,122 +1,150 @@
+/* ── Live call state — service-desk (fusion-youth) 色调 ── */
 .kassist-lightflow .assistant-voice-live {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: center;
   padding-top: 30px;
+  gap: 20px;
 }
 
+/* 通话状态条 */
 .kassist-lightflow .assistant-voice-live-status {
-  display: grid;
-  grid-template-columns: 10px auto;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px 10px;
-  color: #5e7799;
-  text-align: center;
+  gap: 10px;
+  padding: 10px 28px;
+  border: 1px solid rgba(31, 158, 134, 0.35);
+  border-radius: 999px;
+  color: #157a67;
+  background: #e2f2ec;
+  font-size: 20px;
 }
 
 .kassist-lightflow .assistant-voice-live-status > span {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #f5a623;
+  background: #8a9e98;
+  flex-shrink: 0;
 }
 
 .kassist-lightflow .assistant-voice-live-status > span.is-live {
-  background: #159b7e;
-  box-shadow: 0 0 0 5px rgba(21, 155, 126, 0.12);
+  background: #35ab8e;
+  box-shadow: 0 0 0 5px rgba(53, 171, 142, 0.2);
+  animation: kassist-lf-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes kassist-lf-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(53,171,142,.25); }
+  50%       { box-shadow: 0 0 0 9px rgba(53,171,142,.1); }
 }
 
 .kassist-lightflow .assistant-voice-live-status strong {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
+  color: #157a67;
 }
 
 .kassist-lightflow .assistant-voice-live-status time {
-  grid-column: 1 / -1;
-  color: #0b2859;
-  font-size: 38px;
-  font-weight: 860;
+  color: #5d6b63;
+  font-size: 18px;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
 }
 
+/* 头像 */
 .kassist-lightflow .assistant-voice-avatar--live {
-  width: 270px;
-  height: 330px;
-  margin-top: 24px;
-  border-width: 4px;
-  border-color: #ffffff;
-  border-radius: 42% 42% 24px 24px;
-  box-shadow: 0 0 0 8px #eaf3ff, 0 22px 42px rgba(49, 102, 170, 0.16);
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  border: 4px solid #fffdf8;
+  box-shadow: 0 0 0 8px #e2f2ec, 0 20px 48px rgba(16, 48, 43, 0.18);
+  position: relative;
+  overflow: visible;
+}
+
+.kassist-lightflow .assistant-voice-avatar--live::before,
+.kassist-lightflow .assistant-voice-avatar--live::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border: 1.5px solid rgba(31, 158, 134, 0.3);
+  border-radius: 50%;
+  animation: kassist-lf-ripple 2.4s ease-out infinite;
 }
 
 .kassist-lightflow .assistant-voice-avatar--live::after {
-  position: absolute;
-  inset: -8px;
-  border: 2px solid rgba(30, 111, 242, 0.38);
-  border-radius: inherit;
-  content: "";
-  animation: kassist-lightflow-voice-pulse 2s ease-out infinite;
+  animation-delay: 1.2s;
 }
 
+@keyframes kassist-lf-ripple {
+  0%   { transform: scale(.82); opacity: .9; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+/* 声纹 */
 .kassist-lightflow .assistant-voice-wave {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 78px;
-  gap: 7px;
+  height: 80px;
+  gap: 8px;
 }
 
 .kassist-lightflow .assistant-voice-wave i {
-  width: 7px;
-  border-radius: 5px;
-  background: #2f7df1;
-  animation: kassist-lightflow-voice-wave 1.05s ease-in-out infinite;
+  width: 9px;
+  border-radius: 999px;
+  background: #1f9e86;
+  animation: kassist-lf-wave 1s ease-in-out infinite;
 }
 
 .kassist-lightflow .assistant-voice-wave i:nth-child(1),
-.kassist-lightflow .assistant-voice-wave i:nth-child(10) { height: 16px; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(10) { height: 20px; }
 .kassist-lightflow .assistant-voice-wave i:nth-child(2),
-.kassist-lightflow .assistant-voice-wave i:nth-child(9) { height: 28px; animation-delay: 0.12s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(9) { height: 34px; animation-delay: 0.12s; }
 .kassist-lightflow .assistant-voice-wave i:nth-child(3),
-.kassist-lightflow .assistant-voice-wave i:nth-child(8) { height: 44px; animation-delay: 0.24s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(8) { height: 52px; animation-delay: 0.24s; }
 .kassist-lightflow .assistant-voice-wave i:nth-child(4),
-.kassist-lightflow .assistant-voice-wave i:nth-child(7) { height: 58px; animation-delay: 0.08s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(7) { height: 62px; animation-delay: 0.08s; }
 .kassist-lightflow .assistant-voice-wave i:nth-child(5),
-.kassist-lightflow .assistant-voice-wave i:nth-child(6) { height: 68px; animation-delay: 0.18s; }
+.kassist-lightflow .assistant-voice-wave i:nth-child(6) { height: 70px; animation-delay: 0.18s; }
 
 .kassist-lightflow .assistant-voice-wave.is-quiet i {
-  opacity: 0.34;
-  transform: scaleY(0.28);
+  opacity: 0.3;
+  transform: scaleY(0.25);
   animation-play-state: paused;
 }
 
+@keyframes kassist-lf-wave {
+  0%, 100% { transform: scaleY(.48); opacity: .55; }
+  50%       { transform: scaleY(1);   opacity: 1; }
+}
+
+/* 继续播放提示 */
 .kassist-lightflow .assistant-voice-resume {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 50px;
   gap: 10px;
-  margin-bottom: 18px;
   padding: 0 22px;
-  border: 1px solid #9ec4fa;
+  border: 1px solid rgba(31, 158, 134, 0.45);
   border-radius: 999px;
-  color: #0f62d7;
-  background: #edf5ff;
-  font-size: 15px;
-  font-weight: 800;
+  color: #157a67;
+  background: #e2f2ec;
+  font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
 }
 
+/* 实时字幕 */
 .kassist-lightflow .assistant-voice-caption {
   width: min(720px, 100%);
-  min-height: 124px;
-  padding: 20px 24px;
-  border: 1px solid #d6e4f6;
-  border-radius: 22px;
-  background: #f7faff;
+  min-height: 120px;
+  padding: 20px 26px;
+  border: 1px solid #e2dccb;
+  border-radius: 18px;
+  background: #f4f1e8;
 }
 
 .kassist-lightflow .assistant-voice-caption > div {
@@ -127,20 +155,21 @@
 }
 
 .kassist-lightflow .assistant-voice-caption strong {
-  color: #0f5fcf;
-  font-size: 14px;
-  font-weight: 820;
+  color: #10302b;
+  font-size: 16px;
+  font-weight: 800;
+  font-family: var(--font-serif, 'Noto Serif SC', serif);
 }
 
 .kassist-lightflow .assistant-voice-caption > div span {
-  color: #8193aa;
-  font-size: 12px;
+  color: #5d6b63;
+  font-size: 14px;
 }
 
 .kassist-lightflow .assistant-voice-caption > p {
-  margin: 14px 0 0;
-  color: #173965;
-  font-size: 18px;
+  margin: 12px 0 0;
+  color: #10302b;
+  font-size: 20px;
   line-height: 1.65;
 }
 
@@ -148,22 +177,22 @@
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  color: #815a0e;
-  background: #fff6dd;
+  color: #8a6219;
+  background: #f2ead6;
   font-size: 14px;
 }
 
+/* 通话操作按钮组 */
 .kassist-lightflow .assistant-voice-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(88px, 1fr));
   width: min(720px, 100%);
-  gap: 16px;
-  margin-top: 26px;
-  padding: 18px;
-  border: 1px solid #dde8f7;
-  border-radius: 24px;
-  background: #ffffff;
-  box-shadow: 0 12px 34px rgba(43, 84, 139, 0.1);
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #e2dccb;
+  border-radius: 18px;
+  background: #fffdf8;
+  box-shadow: 0 8px 24px rgba(16, 48, 43, 0.07);
 }
 
 .kassist-lightflow .assistant-voice-control {
@@ -171,21 +200,21 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 92px;
-  gap: 9px;
-  border: 0;
-  border-radius: 18px;
-  color: #234b78;
-  background: #f5f9ff;
-  font-size: 14px;
-  font-weight: 760;
+  min-height: 120px;
+  gap: 10px;
+  border: 1px solid #e2dccb;
+  border-radius: 14px;
+  color: #10302b;
+  background: #f4f1e8;
+  font-size: 20px;
+  font-weight: 600;
   cursor: pointer;
-  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+  transition: color 120ms ease, background 120ms ease, transform 100ms ease;
 }
 
 .kassist-lightflow .assistant-voice-control:hover {
-  color: #0d62da;
-  background: #eaf3ff;
+  background: #e2f2ec;
+  border-color: rgba(31, 158, 134, 0.35);
   transform: translateY(-1px);
 }
 
@@ -193,32 +222,41 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
-  border: 1px solid #cbdcf3;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #e2dccb;
   border-radius: 50%;
-  background: #ffffff;
+  background: #fffdf8;
 }
 
 .kassist-lightflow .assistant-voice-control svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .kassist-lightflow .assistant-voice-control.is-active {
-  color: #0c63dc;
-  background: #e5f1ff;
+  color: #157a67;
+  background: #e2f2ec;
+  border-color: rgba(31, 158, 134, 0.45);
 }
 
+.kassist-lightflow .assistant-voice-control.is-active > span {
+  background: #1f9e86;
+  border-color: #1f9e86;
+  color: #fffdf8;
+}
+
+/* 挂断按钮 — 红色 */
 .kassist-lightflow .assistant-voice-control--hangup {
-  color: #a42c2c;
-  background: #fff1f0;
+  color: #c14a34;
+  background: #f6e3de;
+  border-color: rgba(193, 74, 52, 0.35);
 }
 
 .kassist-lightflow .assistant-voice-control--hangup > span {
-  border-color: #e45a55;
+  border-color: rgba(193, 74, 52, 0.5);
   color: #ffffff;
-  background: #d94742;
+  background: #c14a34;
 }
 
 .kassist-lightflow .assistant-voice-control--hangup svg {
@@ -228,11 +266,12 @@
 .kassist-lightflow .assistant-voice-control:disabled,
 .kassist-lightflow .assistant-voice-close:disabled,
 .kassist-lightflow .assistant-voice-error-actions button:disabled {
-  opacity: 0.48;
+  opacity: 0.45;
   cursor: wait;
   transform: none;
 }
 
+/* 错误状态 */
 .kassist-lightflow .assistant-voice-error {
   display: flex;
   flex: 1;
@@ -247,13 +286,14 @@
   height: 210px;
   margin-bottom: 28px;
   border-radius: 24px;
+  border: 1px solid #e2dccb;
 }
 
 .kassist-lightflow .assistant-voice-error-message {
   max-width: 620px;
   margin: 18px 0 0;
-  color: #6e8099;
-  font-size: 16px;
+  color: #5d6b63;
+  font-size: 17px;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -268,19 +308,36 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 54px;
+  min-height: 56px;
   gap: 9px;
-  padding: 0 24px;
-  border: 1px solid #b7d2f7;
-  border-radius: 16px;
-  color: #0d5fcf;
-  background: #edf5ff;
-  font-size: 16px;
-  font-weight: 800;
+  padding: 0 28px;
+  border: 1px solid rgba(31, 158, 134, 0.4);
+  border-radius: 14px;
+  color: #157a67;
+  background: #e2f2ec;
+  font-size: 18px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .kassist-lightflow .assistant-voice-error-actions button:last-child {
-  color: #ffffff;
-  background: #1d6ff0;
+  color: #fffdf8;
+  background: #1f9e86;
+  border-color: #1f9e86;
+}
+
+/* 隐私提示 */
+.kassist-lightflow .assistant-voice-privacy {
+  margin: 0;
+  color: #5d6b63;
+  font-size: 15px;
+  line-height: 1.65;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kassist-lightflow .assistant-voice-live-status > span.is-live,
+  .kassist-lightflow .assistant-voice-avatar--live::before,
+  .kassist-lightflow .assistant-voice-avatar--live::after,
+  .kassist-lightflow .assistant-voice-wave i { animation: none; }
 }

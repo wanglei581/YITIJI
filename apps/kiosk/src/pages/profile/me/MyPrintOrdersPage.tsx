@@ -36,11 +36,11 @@ const MAX_REFRESH_PAGE_SIZE = 50
 
 const STATUS_META: Record<MemberPrintOrderItem['status'], { label: string; cls: string }> = {
   pending: { label: '排队中', cls: 'me-status is-warning' },
-  claimed: { label: '已领取', cls: 'me-status is-active' },
-  printing: { label: '打印中', cls: 'me-status is-active' },
+  claimed: { label: '已领取', cls: 'me-status is-warning' },
+  printing: { label: '打印中', cls: 'me-status is-warning' },
   completed: { label: '已完成', cls: 'me-status is-active' },
   failed: { label: '失败', cls: 'me-status is-danger' },
-  cancelled: { label: '已取消', cls: 'me-status is-muted' },
+  cancelled: { label: '已取消', cls: 'me-status is-off' },
 }
 
 /** 任务状态筛选（客户端过滤已加载数据；「进行中」= pending/claimed/printing）。 */

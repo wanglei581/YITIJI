@@ -209,55 +209,49 @@ export function MyNotificationsPage() {
             const feedbackRelated = item.relatedType === 'feedback_ticket' && item.relatedId
             return (
               <Card key={`${item.kind}-${item.id}`} className="me-benefit-card">
-                <div className="flex items-start gap-4">
-                  <span className={['me-row-icon', `me-tone-${meta.tone}`].join(' ')} aria-hidden="true">
-                    <KIcon name={meta.icon} />
-                  </span>
+                <div className="flex items-start gap-3">
+                  <span
+                    className={['me-noti-dot', item.isRead ? 'is-read' : ''].join(' ')}
+                    aria-label={item.isRead ? '已读' : '未读'}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      {!item.isRead && <span className="h-2 w-2 rounded-full bg-[color:var(--ink)]" aria-label="未读" />}
                       <span className="me-row-title min-w-0 flex-1">{item.title}</span>
-                      <span className="me-chip">{meta.label}</span>
+                      <span className={['me-chip', item.category === 'print' ? 'me-chip-print' : item.category === 'feedback' ? 'me-chip-fb' : item.category === 'maintenance' ? 'me-chip-sys' : ''].join(' ')}>{meta.label}</span>
                     </div>
-                    <p className="mt-1 text-sm leading-6 text-[color:var(--ink-2)]">{item.content}</p>
-                    <p className="mt-2 text-xs text-[color:var(--muted)]">{formatTime(item.createdAt)}</p>
+                    <p className="mt-2 text-base leading-6 text-[color:var(--ink-2)]">{item.content}</p>
                     {feedbackRelated && (
                       <button
                         type="button"
                         onClick={() => navigate(`/me/feedback?ticket=${encodeURIComponent(item.relatedId ?? '')}`)}
-                        className="me-ripple mt-3 inline-flex min-h-[40px] items-center gap-1 overflow-hidden rounded-full border border-[rgba(16,48,43,0.1)] bg-[rgba(16,48,43,0.07)] px-3 text-sm font-bold text-[color:var(--ink-2)]"
+                        className="me-ripple mt-3 inline-flex min-h-[44px] items-center gap-1 overflow-hidden rounded-full border border-[rgba(31,158,134,0.3)] bg-[rgba(226,242,236,0.9)] px-4 text-sm font-bold text-[color:var(--ink-2)]"
                       >
                         查看相关反馈
                         <ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
+                    <p className="mt-2 text-sm text-[color:var(--muted)]">{formatTime(item.createdAt)}</p>
                   </div>
-                </div>
-                <div className="mt-4 flex justify-end gap-2">
-                  {!item.isRead && (
+                  <div className="me-noti-ops">
+                    {!item.isRead && (
+                      <button
+                        type="button"
+                        disabled={busyId === `read-${item.kind}-${item.id}`}
+                        onClick={() => void markRead(item)}
+                        className="me-delete-button me-ripple"
+                      >
+                        已读
+                      </button>
+                    )}
                     <button
                       type="button"
-                      disabled={busyId === `read-${item.kind}-${item.id}`}
-                      onClick={() => void markRead(item)}
+                      disabled={busyId === `delete-${item.kind}-${item.id}`}
+                      onClick={() => void remove(item)}
                       className="me-delete-button me-ripple"
                     >
-                      <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                        <KIcon name="check" />
-                      </span>
-                      已读
+                      删除
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    disabled={busyId === `delete-${item.kind}-${item.id}`}
-                    onClick={() => void remove(item)}
-                    className="me-delete-button me-ripple"
-                  >
-                    <span className="mr-1.5 inline-flex h-4 w-4 items-center justify-center" aria-hidden="true">
-                      <KIcon name="close" />
-                    </span>
-                    删除
-                  </button>
+                  </div>
                 </div>
               </Card>
             )

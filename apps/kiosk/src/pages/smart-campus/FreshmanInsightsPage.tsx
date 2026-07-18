@@ -51,11 +51,18 @@ export function FreshmanInsightsPage() {
               <div><h2>开放前提</h2><div className="sub">三项条件全部满足后，该模块才会解锁</div></div>
             </div>
             <div className="grid gap-3">
-              {['学校书面授权', '签署数据处理协议', '仅接入聚合脱敏统计'].map((item, index) => (
-                <div key={item} className="flex min-h-[86px] items-center gap-5 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-4">
-                  <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[25px] font-bold text-[var(--kp-accent-deep)]">{index + 1}</span>
-                  <b className="text-[22px]">{item}</b>
-                  <span className="ml-auto rounded-full border border-dashed border-[var(--kp-line)] bg-[var(--kp-surface)] px-4 py-1.5 text-[17px] text-[var(--kp-muted)]">待完成</span>
+              {([
+                { title: '学校书面授权', desc: '由校方出具正式授权文件，明确数据范围与用途' },
+                { title: '签署数据处理协议', desc: '与校方签署数据处理协议，约定安全与保存要求' },
+                { title: '仅接入聚合脱敏统计', desc: '只接收不含任何个人身份信息的聚合统计结果' },
+              ] as const).map((item, index) => (
+                <div key={item.title} className="flex min-h-[92px] items-center gap-5 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-6 py-4">
+                  <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[25px] font-bold text-[var(--kp-accent-deep)]">{index + 1}</span>
+                  <div>
+                    <b className="block text-[22px]">{item.title}</b>
+                    <span className="mt-1.5 block text-[18px] leading-snug text-[var(--kp-muted)]">{item.desc}</span>
+                  </div>
+                  <span className="ml-auto shrink-0 rounded-full border border-dashed border-[var(--kp-line)] bg-[var(--kp-surface)] px-4 py-1.5 text-[17px] text-[var(--kp-muted)]">待完成</span>
                 </div>
               ))}
             </div>

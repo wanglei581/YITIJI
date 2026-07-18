@@ -1,20 +1,19 @@
 import { PencilLineIcon } from 'lucide-react'
 
-/** 复用决策台的改写呈现，但数据严格限于既有 targetedSuggestions 字符串列表。 */
+/** 简历定向优化建议 — 对齐原型屏55 a-clay card with sug-list */
 export function ResumeRewriteCard({ items }: { items: string[] }) {
   if (items.length === 0) return null
   return (
-    <section className="job-fit-card job-fit-rewrite rounded-2xl border border-neutral-100 bg-white p-5" aria-label="简历定向优化建议">
-      <div className="mb-3 flex items-center gap-2">
-        <PencilLineIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-        <h2 className="text-base font-semibold text-neutral-900">简历定向优化建议</h2>
+    <section className="job-fit-card job-fit-rewrite jf-section jf-section--clay" aria-label="简历定向优化建议">
+      <div className="jf-card-head">
+        <span className="jf-card-icon" aria-hidden="true"><PencilLineIcon /></span>
+        <div>
+          <h2>简历定向优化建议</h2>
+        </div>
       </div>
-      <ul className="flex flex-col gap-2">
+      <ul className="jf-sug-list">
         {items.map((item, index) => (
-          <li key={`${item.slice(0, 24)}-${index}`} className="flex items-start gap-2 text-sm leading-relaxed text-neutral-700">
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary-400" aria-hidden="true" />
-            {item}
-          </li>
+          <li key={`${item.slice(0, 24)}-${index}`}>{item}</li>
         ))}
       </ul>
     </section>

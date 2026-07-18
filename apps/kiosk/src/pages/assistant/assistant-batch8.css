@@ -193,13 +193,16 @@
   padding: 16px 20px;
   border-color: var(--color-neutral-200);
   border-radius: 4px 14px 14px 14px;
-  background: var(--color-primary-100);
+  /* 原型：AI 气泡用暖白底，与用户气泡形成冷暖对比 */
+  background: var(--color-surface);
 }
 
 .kassist.kassist-lightflow .assistant-message--user .assistant-message-bubble {
-  border-color: var(--color-primary-600);
+  /* 原型：用户气泡用浅青底+深墨字，与 AI 气泡形成色差 */
+  border-color: color-mix(in srgb, var(--color-primary-600) 30%, var(--color-neutral-200));
   border-radius: 14px 4px 14px 14px;
-  background: var(--color-primary-600);
+  color: var(--color-neutral-900);
+  background: var(--color-primary-100);
 }
 
 .kassist.kassist-lightflow .assistant-message-bubble p { font-size: 20px; line-height: 1.5; }
@@ -232,7 +235,8 @@
   border-radius: 999px;
   color: var(--color-neutral-700);
   background: var(--color-surface);
-  font-size: 18px;
+  /* 原型：快捷问题 chip 字号 20px */
+  font-size: 20px;
 }
 
 .kassist.kassist-lightflow .assistant-composer > label { display: none; }
@@ -251,11 +255,17 @@
   gap: 12px;
 }
 
-.kassist.kassist-lightflow .assistant-tool-button,
-.kassist.kassist-lightflow .assistant-send {
+.kassist.kassist-lightflow .assistant-tool-button {
   min-height: 60px;
   border-radius: 14px;
   font-size: 19px;
+}
+
+/* 原型：发送按钮高度与 textarea 等高（108px），视觉权重更突出 */
+.kassist.kassist-lightflow .assistant-send {
+  min-height: 108px;
+  border-radius: 14px;
+  font-size: 22px;
 }
 
 .kassist.kassist-lightflow .assistant-tool-button {

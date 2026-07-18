@@ -1,0 +1,356 @@
+/*
+ * 权益活动详情页 — 原型 72 视觉对齐（kiosk 触控比例）
+ * Scoped under .k8-act-detail; matches 72-activity-detail.html prototype.
+ * 色值沿用 fusion-youth 设计令牌（var(--color-*)），不引入硬编码值。
+ */
+
+.k8-act-detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  color: var(--color-neutral-900);
+  background: var(--color-canvas);
+}
+
+.k8-act-header {
+  flex-shrink: 0;
+}
+
+.k8-act-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+/* ── Hero card (teal accent) ───────────────────────────────── */
+.k8-act-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 28px 32px;
+  border: 1px solid rgba(16, 48, 43, 0.14);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.k8-act-hero-ico {
+  width: 76px;
+  height: 76px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+}
+
+.k8-act-hero-ico svg {
+  width: 40px;
+  height: 40px;
+}
+
+.k8-act-hero-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.k8-act-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.k8-act-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 48, 43, 0.14);
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-500);
+  font-size: 15.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.k8-act-stock {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+  font-size: 17px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.k8-act-stock.is-low {
+  border-color: color-mix(in srgb, var(--color-wheat) 30%, transparent);
+  background: var(--color-wheat-soft);
+  color: var(--color-wheat-fg);
+}
+
+.k8-act-stock.is-off {
+  border-color: rgba(16, 48, 43, 0.14);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-500);
+}
+
+.k8-act-title {
+  margin-top: 14px;
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--color-neutral-900);
+  line-height: 1.25;
+}
+
+.k8-act-desc {
+  margin-top: 10px;
+  font-size: 21px;
+  color: var(--color-neutral-500);
+  line-height: 1.55;
+}
+
+/* ── Info grid ─────────────────────────────────────────────── */
+.k8-act-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.k8-act-info-cell {
+  background: var(--color-surface);
+  border: 1px solid rgba(16, 48, 43, 0.14);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+}
+
+.k8-act-info-cell span {
+  display: block;
+  font-size: 18px;
+  color: var(--color-neutral-500);
+}
+
+.k8-act-info-cell b {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-900);
+}
+
+/* ── Activity rules (wheat accent) ────────────────────────── */
+.k8-act-rules {
+  padding: 22px 28px;
+  border: 1px solid rgba(169, 120, 31, 0.22);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--color-wheat-soft) 60%, var(--color-surface));
+  box-shadow: var(--shadow-sm);
+}
+
+.k8-act-rules h3 {
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+  color: var(--color-neutral-900);
+}
+
+.k8-act-rules-item {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 20px;
+  line-height: 1.6;
+  color: var(--color-neutral-800);
+}
+
+.k8-act-rules-item + .k8-act-rules-item {
+  margin-top: 10px;
+}
+
+.k8-act-rules-item::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-wheat);
+  transform: translateY(6px);
+}
+
+/* ── Use steps (3-column) ──────────────────────────────────── */
+.k8-act-steps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  padding: 22px 28px;
+  border: 1px solid rgba(16, 48, 43, 0.14);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.k8-act-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.k8-act-step-num {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 21px;
+  font-weight: 700;
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+  border: 1px solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+}
+
+.k8-act-step-body b {
+  display: block;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.k8-act-step-body span {
+  display: block;
+  margin-top: 5px;
+  font-size: 17px;
+  color: var(--color-neutral-500);
+  line-height: 1.45;
+}
+
+/* ── Compliance band ───────────────────────────────────────── */
+.k8-act-compliance {
+  padding: 16px 24px;
+  font-size: 19px;
+  line-height: 1.55;
+  color: var(--color-wheat-fg);
+  background: var(--color-wheat-soft);
+  border: 1px solid color-mix(in srgb, var(--color-wheat) 30%, transparent);
+  border-radius: 12px;
+}
+
+/* ── Feedback message ──────────────────────────────────────── */
+.k8-act-message {
+  padding: 14px 18px;
+  border-radius: var(--radius-lg);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.k8-act-message.is-success {
+  background: var(--color-success-bg);
+  color: var(--color-success-fg);
+  border: 1px solid color-mix(in srgb, var(--color-success) 25%, transparent);
+}
+
+.k8-act-message.is-error {
+  background: var(--color-error-bg);
+  color: var(--color-error-fg);
+  border: 1px solid color-mix(in srgb, var(--color-error) 25%, transparent);
+}
+
+/* ── CTA buttons ───────────────────────────────────────────── */
+.k8-act-cta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.k8-act-btn {
+  min-height: 92px;
+  border-radius: var(--radius-xl);
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  border: none;
+  transition: transform 180ms ease, opacity 180ms ease, background 180ms ease;
+}
+
+.k8-act-btn:active:not(:disabled) {
+  transform: translateY(2px) scale(0.988);
+}
+
+.k8-act-btn:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+.k8-act-btn svg {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.k8-act-btn.primary {
+  background: var(--color-primary-600);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(31, 158, 134, 0.3);
+}
+
+.k8-act-btn.primary:hover:not(:disabled) {
+  background: var(--color-primary-700);
+}
+
+.k8-act-btn.ghost {
+  background: var(--color-surface);
+  color: var(--color-neutral-700);
+  border: 1px solid rgba(16, 48, 43, 0.18);
+  box-shadow: var(--shadow-sm);
+}
+
+.k8-act-btn.ghost:hover:not(:disabled) {
+  border-color: rgba(16, 48, 43, 0.28);
+}
+
+/* ── Notice ────────────────────────────────────────────────── */
+.k8-act-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--color-neutral-500);
+  padding: 14px 18px;
+  background: var(--color-neutral-50);
+  border: 1px solid rgba(16, 48, 43, 0.1);
+  border-radius: var(--radius-lg);
+}
+
+.k8-act-notice svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+/* Responsive: stack on narrow viewport */
+@media (max-width: 680px) {
+  .k8-act-hero { flex-direction: column; }
+  .k8-act-info-grid { grid-template-columns: 1fr; }
+  .k8-act-steps { grid-template-columns: 1fr; }
+  .k8-act-cta { grid-template-columns: 1fr; }
+}

@@ -91,14 +91,14 @@ function LinkRow({
       onClick={onClick}
       className="me-link-row me-ripple"
     >
-      <span className={['flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', iconBg].join(' ')}>
-        <Icon className={['h-5 w-5', iconColor].join(' ')} aria-hidden="true" />
+      <span className={['flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl', iconBg].join(' ')}>
+        <Icon className={['h-7 w-7', iconColor].join(' ')} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-neutral-800">{label}</span>
-        {desc && <span className="mt-0.5 block text-xs text-neutral-400">{desc}</span>}
+        <span className="block text-lg font-semibold text-neutral-800">{label}</span>
+        {desc && <span className="mt-1 block text-sm text-neutral-400">{desc}</span>}
       </span>
-      <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+      <ChevronRightIcon className="h-6 w-6 shrink-0 text-neutral-300" aria-hidden="true" />
     </button>
   )
 }
@@ -208,35 +208,35 @@ export function MySettingsPage() {
           {/* 账号状态 */}
           {isLoggedIn ? (
             <div className={`${cardSurface} py-5`}>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-5">
                 <span className="me-account-avatar me-tone-teal">
                   <KIcon name="phone" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-bold text-neutral-900">{phoneMasked || '已登录用户'}</p>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-0.5 text-xs font-semibold text-success-fg">
-                      <BadgeCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <p className="text-2xl font-bold text-neutral-900">{phoneMasked || '已登录用户'}</p>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-1 text-sm font-semibold text-success-fg">
+                      <BadgeCheckIcon className="h-4 w-4" aria-hidden="true" />
                       已登录
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-neutral-500">会员账号 · 手机号已脱敏展示，仅本人可见</p>
+                  <p className="mt-2 text-base text-neutral-500">会员账号 · 手机号已脱敏展示，仅本人可见</p>
                 </div>
               </div>
             </div>
           ) : (
             <div className={`${cardSurface} py-5`}>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-5">
                 <span className="me-account-avatar me-tone-slate">
                   <KIcon name="user" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-bold text-neutral-900">游客</p>
-                  <p className="mt-1 text-sm text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
+                  <p className="text-2xl font-bold text-neutral-900">游客</p>
+                  <p className="mt-2 text-base text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
                 </div>
                 <Button
                   size="lg"
-                  className="me-ripple flex h-12 shrink-0 items-center gap-1 px-4"
+                  className="me-ripple flex h-14 shrink-0 items-center gap-1 px-5"
                   onClick={() => navigate('/login', { state: { from: '/me/settings' } })}
                 >
                   <LogInIcon className="h-5 w-5" aria-hidden="true" />
@@ -248,21 +248,21 @@ export function MySettingsPage() {
 
           {isLoggedIn && (
             <section aria-label="隐私与 AI 授权管理" className={`${cardSurface} py-5`}>
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-plum-soft">
-                  <KIcon name="shield" className="h-5 w-5 text-plum" />
+              <div className="flex items-start gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-plum-soft">
+                  <KIcon name="shield" className="h-7 w-7 text-plum" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold text-neutral-900">隐私与 AI 授权管理</p>
+                    <p className="text-lg font-semibold text-neutral-900">隐私与 AI 授权管理</p>
                     <span className={[
-                      'inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                      'inline-flex rounded-full px-3 py-1 text-sm font-semibold',
                       jobAiGranted ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-500',
                     ].join(' ')}>
-                      {jobAiLoading ? '查询中' : jobAiGranted ? '已授权' : '未授权'}
+                      {jobAiLoading ? '查询中' : jobAiGranted ? '岗位 AI：已授权' : '未授权'}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">
                     岗位 AI 辅助只用于本人求职准备参考。撤回授权后，再次使用岗位推荐、解读或匹配时需要重新确认；已生成记录可在 AI服务记录中自行删除。
                   </p>
                 </div>
@@ -280,35 +280,39 @@ export function MySettingsPage() {
           )}
 
           {/* 会话说明 */}
-          <Card className="me-card flex items-start gap-3 p-5">
-            <ShieldCheckIcon className="h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
+          <Card className="me-card flex items-start gap-4 p-5">
+            <ShieldCheckIcon className="h-7 w-7 shrink-0 text-primary-600" aria-hidden="true" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-neutral-900">公共终端会话说明</p>
-              <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+              <p className="text-lg font-semibold text-neutral-900">公共终端会话说明</p>
+              <p className="mt-2 text-sm leading-relaxed text-neutral-500">
                 本终端为公共设备，登录状态只保存在当前会话内存中，不写入本机存储。页面刷新、离开或闲置超时会自动退出登录并清除会话信息。请勿在终端上留存个人物品与文件。
               </p>
             </div>
           </Card>
 
-          {/* 协议 / 隐私入口 */}
-          <section aria-label="协议与隐私" className={`${cardSurface} py-1`}>
-            <LinkRow
-              icon={FileTextIcon}
-              iconBg="bg-primary-50"
-              iconColor="text-primary-600"
-              label="用户服务协议"
-              desc="服务范围、账号、收费与打印说明"
-              onClick={() => navigate('/legal/terms')}
-            />
-            <LinkRow
-              icon={ShieldCheckIcon}
-              iconBg="bg-info-bg"
-              iconColor="text-info"
-              label="隐私政策"
-              desc="信息收集、使用与文件留存说明"
-              onClick={() => navigate('/legal/privacy')}
-            />
-          </section>
+          {/* 协议 / 隐私入口 — 双列 */}
+          <div className="me-settings-duo">
+            <section aria-label="用户服务协议" className={`${cardSurface}`}>
+              <LinkRow
+                icon={FileTextIcon}
+                iconBg="bg-primary-50"
+                iconColor="text-primary-600"
+                label="用户服务协议"
+                desc="服务范围、账号、收费与打印说明"
+                onClick={() => navigate('/legal/terms')}
+              />
+            </section>
+            <section aria-label="隐私政策" className={`${cardSurface}`}>
+              <LinkRow
+                icon={ShieldCheckIcon}
+                iconBg="bg-info-bg"
+                iconColor="text-info"
+                label="隐私政策"
+                desc="信息收集、使用与文件留存说明"
+                onClick={() => navigate('/legal/privacy')}
+              />
+            </section>
+          </div>
 
           {/* 账号操作（仅登录态） */}
           {isLoggedIn && (
@@ -326,19 +330,19 @@ export function MySettingsPage() {
                 onClick={() => setConfirm('logout')}
                 className="me-link-row me-ripple"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-error-bg">
-                  <LogOutIcon className="h-5 w-5 text-error-fg" aria-hidden="true" />
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-error-bg">
+                  <LogOutIcon className="h-7 w-7 text-error-fg" aria-hidden="true" />
                 </span>
-                <span className="min-w-0 flex-1 text-sm font-semibold text-error-fg">退出登录</span>
-                <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />
+                <span className="min-w-0 flex-1 text-lg font-semibold text-error-fg">退出登录</span>
+                <ChevronRightIcon className="h-6 w-6 shrink-0 text-neutral-300" aria-hidden="true" />
               </button>
             </section>
           )}
 
           {/* 暂不开放说明（诚实化：避免被误以为可改资料 / 注销） */}
           <div className="me-note flex items-start gap-3 px-5 py-4">
-            <ShieldQuestionIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
-            <p className="text-xs leading-relaxed text-neutral-500">
+            <ShieldQuestionIcon className="h-6 w-6 shrink-0 text-neutral-400" aria-hidden="true" />
+            <p className="text-sm leading-relaxed text-neutral-500">
               手机号换绑、账号注销和数据导出尚未开放；相关能力完成安全验证与运营闭环后将在本页提供。如需协助，请联系现场工作人员。
             </p>
           </div>

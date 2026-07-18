@@ -36,14 +36,18 @@ const SERVICE_WINDOWS = [
 interface PrepEntry {
   icon: LucideIcon
   label: string
+  sub: string
   to: string
+  /** 功能尚未上线，仅展示"即将上线"状态，不可点击 */
+  comingSoon?: boolean
 }
 
-// 把迎新流量导回求职打印主业（均为真实可达页面）。
+// 把迎新流量导回求职打印主业。
+// 证件照排版打印功能尚未上线，以 disabled + "即将上线" 标签展示。
 const PREP_ENTRIES: PrepEntry[] = [
-  { icon: UserSquareIcon, label: '证件照拍摄 / 打印', to: '/print-scan' },
-  { icon: FileTextIcon, label: '入学材料 / 表格打印', to: '/print/upload' },
-  { icon: FileSearchIcon, label: '第一份简历 · AI 诊断', to: '/resume' },
+  { icon: UserSquareIcon, label: '证件照排版打印', sub: '即将上线；当前可用手机照片自助打印', to: '/print-scan', comingSoon: true },
+  { icon: FileTextIcon, label: '入学材料 / 表格打印', sub: '报到表、承诺书等自助打印', to: '/print/upload' },
+  { icon: FileSearchIcon, label: '第一份简历 · AI 诊断', sub: '实习求职从这里开始', to: '/resume' },
 ]
 
 export function SmartCampusWelcomePage() {
@@ -75,14 +79,19 @@ export function SmartCampusWelcomePage() {
               </div>
               <ol className="grid gap-0">
                 {FLOW_STEPS.map((step, i) => (
-                  <li key={step.title} className="flex items-start gap-5">
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[26px] font-bold text-[var(--kp-accent-deep)]">
-                      {i + 1}
-                    </span>
-                    <div className="pb-6">
-                      <b className="block pt-1 text-2xl">{step.title}</b>
-                      <span className="mt-1.5 block text-lg leading-normal text-[var(--kp-muted)]">{step.sub}</span>
+                  <li key={step.title}>
+                    <div className="flex items-start gap-5">
+                      <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[var(--kp-accent-soft)] font-serif text-[26px] font-bold text-[var(--kp-accent-deep)]">
+                        {i + 1}
+                      </span>
+                      <div>
+                        <b className="block pt-1 text-2xl">{step.title}</b>
+                        <span className="mt-1.5 block text-lg leading-normal text-[var(--kp-muted)]">{step.sub}</span>
+                      </div>
                     </div>
+                    {i < FLOW_STEPS.length - 1 && (
+                      <div className="ml-[27px] h-6 w-0.5 bg-[var(--kp-line)]" aria-hidden="true" />
+                    )}
                   </li>
                 ))}
               </ol>
@@ -96,11 +105,20 @@ export function SmartCampusWelcomePage() {
               <div className="grid gap-3">
                 {PREP_ENTRIES.map((entry) => {
                   const Icon = entry.icon
+                  if (entry.comingSoon) {
+                    return (
+                      <div key={entry.label} className="kproto-tile disabled" aria-disabled="true">
+                        <span className="tile-icon"><Icon aria-hidden="true" /></span>
+                        <span><b>{entry.label}</b><span>{entry.sub}</span></span>
+                        <span className="ml-auto shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-sm text-[var(--kp-muted)]">即将上线</span>
+                      </div>
+                    )
+                  }
                   return (
                     <button key={entry.label} type="button" className="kproto-tile primary" onClick={() => navigate(entry.to)}>
                       <span className="tile-icon"><Icon aria-hidden="true" /></span>
-                      <span><b>{entry.label}</b><span>从本机继续办理</span></span>
-                      <ChevronRightIcon className="ml-auto h-6 w-6" aria-hidden="true" />
+                      <span><b>{entry.label}</b><span>{entry.sub}</span></span>
+                      <ChevronRightIcon className="ml-auto h-6 w-6 shrink-0" aria-hidden="true" />
                     </button>
                   )
                 })}

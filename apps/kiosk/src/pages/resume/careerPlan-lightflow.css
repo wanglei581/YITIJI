@@ -201,32 +201,95 @@
 
 .career-plan-lightflow__direction,
 .career-plan-lightflow__skill { display: flex; gap: 13px; }
-.career-plan-lightflow__direction > span,
+.career-plan-lightflow__direction > span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--sd-category-blue-bg);
+  color: var(--sd-color-primary);
+  font-family: var(--sd-font-sans, system-ui, sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+
 .career-plan-lightflow__skill > span {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  min-width: 32px;
-  height: 32px;
-  padding-inline: 8px;
-  color: var(--sd-color-primary);
-  background: var(--sd-category-blue-bg);
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 850;
+  min-width: 80px;
+  height: 30px;
+  padding-inline: 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--sd-category-orange-fg);
+  background: var(--sd-category-orange-bg);
+  border: 1px solid color-mix(in srgb, var(--sd-category-orange-fg) 25%, transparent);
 }
 
 .career-plan-lightflow__direction p,
 .career-plan-lightflow__skill p { margin: 5px 0 0; }
-.career-plan-lightflow__checklist { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; }
-.career-plan-lightflow__checklist li { display: flex; gap: 11px; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; }
-.career-plan-lightflow__checklist li::before { display: grid; flex: 0 0 auto; place-items: center; width: 22px; height: 22px; margin-top: 1px; content: '✓'; color: var(--sd-color-primary); background: var(--sd-category-blue-bg); border-radius: 50%; font-weight: 900; }
+.career-plan-lightflow__checklist { display: grid; gap: 10px; margin: 16px 0 0; padding: 0; list-style: none; counter-reset: cp-action; }
+.career-plan-lightflow__checklist li { display: flex; gap: 11px; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; counter-increment: cp-action; }
+.career-plan-lightflow__checklist li::before {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 3px;
+  content: counter(cp-action);
+  color: var(--sd-color-primary);
+  background: var(--sd-category-blue-bg);
+  border: 1px solid color-mix(in srgb, var(--sd-color-primary) 20%, var(--sd-color-line));
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 900;
+}
 
 .career-plan-lightflow__next-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
-.career-plan-lightflow__next-actions button,
+.career-plan-lightflow__next-actions button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  min-height: 88px;
+  padding: 14px 16px;
+  border: 1px solid var(--sd-color-line);
+  border-radius: 14px;
+  background: var(--sd-color-canvas);
+  color: var(--sd-color-text);
+}
+.career-plan-lightflow__next-actions button svg {
+  width: 24px;
+  height: 24px;
+  color: var(--sd-color-primary);
+}
+.career-plan-lightflow__next-actions button span {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
 .career-plan-lightflow__secondary-action { min-height: var(--sd-control-min, 48px); border-color: var(--sd-color-line-strong); border-radius: 15px; }
-.career-plan-lightflow__next-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding-inline: 10px; color: var(--sd-color-text); background: var(--sd-color-surface); }
-.career-plan-lightflow__next-actions svg { width: 18px; height: 18px; color: var(--sd-color-primary); }
+
+.career-plan-lightflow__meta-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.career-plan-lightflow__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--sd-category-blue-bg);
+  border: 1px solid color-mix(in srgb, var(--sd-color-primary) 25%, var(--sd-color-line));
+  color: var(--sd-color-primary);
+}
 
 .career-plan-lightflow__guide-list { display: grid; gap: 10px; margin: 20px 0 0; padding: 0; list-style: none; color: var(--sd-color-text); font-size: 18px; line-height: 1.65; }
 .career-plan-lightflow__guide-list li { padding: 12px 14px; background: color-mix(in srgb, var(--sd-color-surface) 72%, transparent); border: 1px solid var(--sd-color-line); border-radius: 15px; }
