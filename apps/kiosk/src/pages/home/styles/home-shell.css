@@ -1,5 +1,12 @@
 .khome {
-  --home-sticky-top: 76px;
+  --home-sticky-top: 96px;
+  /* UI-0 语义 token 绑定 */
+  --home-cat-bg-cyan: var(--sd-category-cyan-bg, #e0f4ff);
+  --home-cat-bg-blue: var(--sd-category-blue-bg, #e8f3ff);
+  --home-cat-bg-mint: var(--sd-category-mint-bg, #e6f6f0);
+  --home-cat-bg-orange: var(--sd-category-orange-bg, #fff3e8);
+  --home-cat-bg-lavender: var(--sd-category-lavender-bg, #f0edff);
+  --home-cat-bg-sand: var(--sd-category-sand-bg, #f5efe6);
   --home-canvas: var(--sd-color-canvas);
   --home-canvas-outer: var(--sd-color-canvas-outer);
   --home-surface: var(--sd-color-surface);
@@ -31,8 +38,8 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  height: 76px;
-  min-height: 76px;
+  height: 96px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -53,7 +60,7 @@
   display: block;
   font-size: 26px;
   font-weight: 700;
-  font-family: var(--font-serif, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif);
+  font-family: var(--font-serif, var(--font-ui, system-ui), 'Source Han Serif SC', var(--font-ui, system-ui), serif);
   letter-spacing: 0.04em;
 }
 .khome .k-brand span {
@@ -152,7 +159,7 @@
   z-index: 1;
   max-width: 660px;
   margin: 10px 0 0;
-  font-family: var(--font-serif, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif);
+  font-family: var(--font-serif, var(--font-ui, system-ui), 'Source Han Serif SC', var(--font-ui, system-ui), serif);
   font-size: 46px;
   font-weight: 900;
   letter-spacing: 2px;
@@ -160,7 +167,7 @@
 }
 .khome .service-value h1 em {
   font-style: normal;
-  color: var(--sd-category-mint-fg, #1f9e86);
+  color: var(--sd-category-mint-fg, var(--home-primary, #35ab8e));
 }
 .khome .service-value p {
   position: relative;

@@ -730,7 +730,7 @@ export function HomePage() {
         <section className="service-value" aria-labelledby="home-service-value-title">
           <div>
             <span className="service-value-tag">一站式求职服务</span>
-            <h1 id="home-service-value-title">简历、打印、岗位信息<em>一趟办完</em></h1>
+            <h1 id="home-service-value-title">简历、打印、岗位信息一趟办完</h1>
             <p>提供 AI 简历服务、求职材料、岗位与招聘会信息入口，以及本机打印扫描服务。</p>
           </div>
         </section>
