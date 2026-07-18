@@ -4,18 +4,20 @@
 // 修改密码走登录态自助改密 POST /auth/password/change（须校验当前密码），
 // 成功后后端旧 token 立即失效，前端主动 logout() 并跳登录页重新登录。
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Card, Button } from '@ai-job-print/ui'
 import {
   CircleAlertIcon,
   CircleCheckIcon,
   LockKeyholeIcon,
+  MonitorIcon,
   PhoneIcon,
   ShieldCheckIcon,
   ShieldOffIcon,
 } from 'lucide-react'
 import { Page } from '../Page'
 import { changePassword, getUser, logout, type AuthedUser } from '../../services/auth'
+import { getAuditLogs, type AuditLogRecord } from '../../services/api/audit'
 import { AdminInitialPhoneBindingCard } from './AdminInitialPhoneBindingCard'
 import { AdminPhoneTransferCard } from './AdminPhoneTransferCard'
 
@@ -23,6 +25,25 @@ const ROLE_LABEL: Record<AuthedUser['role'], string> = {
   admin:   '超级管理员',
   partner: '合作机构',
   kiosk:   '终端用户',
+}
+
+function parseDevice(ua: string | null): string {
+  if (!ua) return '未知设备'
+  if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS 设备'
+  if (/Android/i.test(ua)) return 'Android 设备'
+  if (/Macintosh/i.test(ua)) return 'macOS'
+  if (/Windows/i.test(ua)) return 'Windows'
+  if (/Linux/i.test(ua)) return 'Linux'
+  return '浏览器'
+}
+
+function formatLoginTime(iso: string): string {
+  const d = new Date(iso)
+  const diff = Date.now() - d.getTime()
+  if (diff < 60_000) return '刚刚'
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 const labelCls = 'block text-sm font-medium text-neutral-700 mb-1.5'
@@ -88,6 +109,13 @@ export default function AccountSettingsPage() {
   const [pwError, setPwError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
+  const [loginLogs, setLoginLogs] = useState<AuditLogRecord[]>([])
+
+  useEffect(() => {
+    getAuditLogs({ limit: 5, action: 'system.login' })
+      .then((res) => setLoginLogs(res.items))
+      .catch(() => undefined) // 非关键功能，失败不打断页面
+  }, [])
 
   function handlePhoneBound(phone: Pick<AuthedUser, 'phoneMasked' | 'phoneVerifiedAt'>): void {
     setUser((current) => current ? { ...current, ...phone } : current)
@@ -278,6 +306,43 @@ export default function AccountSettingsPage() {
             </form>
           </Card>
         </div>
+
+        {/* ── 最近登录记录 ─────────────────────────────────── */}
+        {loginLogs.length > 0 && (
+          <div>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+              <h2 className="text-[13px] font-bold text-neutral-700">最近登录记录</h2>
+            </div>
+            <Card className="overflow-hidden p-0">
+              <div className="divide-y divide-neutral-900/[0.06]">
+                {loginLogs.map((log, i) => (
+                  <div key={log.id} className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-primary-50 text-primary-600">
+                      <MonitorIcon className="h-4 w-4" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-2 text-[13px] font-semibold text-neutral-900">
+                        {formatLoginTime(log.createdAt)}
+                        {i === 0 && (
+                          <span className="rounded-full bg-success-bg px-2 py-0.5 text-[10.5px] font-bold text-success-fg">
+                            当前会话
+                          </span>
+                        )}
+                      </p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        {log.ipAddress ?? '未记录 IP'} · {parseDevice(log.userAgent)}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs tabular-nums text-neutral-400">
+                      {new Date(log.createdAt).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
     </Page>
   )
