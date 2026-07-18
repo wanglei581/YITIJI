@@ -70,7 +70,6 @@
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   background: var(--surface);
-  box-shadow: 0 3px 14px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .kprofile.kprofile-lightflow .kp-session-group-icon {

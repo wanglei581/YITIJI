@@ -73,7 +73,6 @@
   border-radius: var(--r-sm);
   color: var(--ink);
   background: var(--surface);
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--ink) 5%, transparent);
   cursor: pointer;
   font: inherit;
   font-size: 24px;
@@ -156,7 +155,6 @@
   border-radius: var(--r-md);
   color: var(--ink);
   background: var(--surface);
-  box-shadow: 0 3px 14px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .me-detail-summary {
@@ -445,7 +443,6 @@
   flex: none;
   border-radius: 50%;
   background: var(--plum);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--plum) 14%, transparent);
 }
 
 .me-notification-actions {
@@ -568,7 +565,6 @@
   background: var(--ink);
   font-size: 17px;
   font-weight: 700;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--ink) 20%, transparent);
 }
 
 .me-delete-button,
@@ -672,7 +668,6 @@
 
 .me-dialog {
   color: var(--ink);
-  box-shadow: 0 24px 60px color-mix(in srgb, var(--ink) 24%, transparent);
 }
 
 .me-dialog button {
@@ -790,7 +785,6 @@
   flex: none;
   border-radius: 50%;
   background: var(--teal);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--teal) 18%, transparent);
 }
 
 .me-print-filter-empty {
@@ -1034,7 +1028,6 @@
   border-radius: var(--r-md);
   color: var(--ink);
   background: var(--surface);
-  box-shadow: 0 3px 14px color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .benefit-activity-hero {
@@ -1424,3 +1417,5 @@
     grid-template-columns: 1fr;
   }
 }
+
+.me-inkdetail::before { content: ""; position: absolute; }
