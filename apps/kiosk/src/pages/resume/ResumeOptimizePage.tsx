@@ -378,7 +378,7 @@ export function ResumeOptimizePage() {
               {resumeTemplates.length > 0 && (
                 <Card className="resume-lightflow__work-card resume-lightflow__template-card p-5">
                   <p className="mb-1 font-serif text-xl font-bold tracking-wide text-neutral-900">简历模板</p>
-                  <p className="mb-3 text-xs text-neutral-400">PDF 按所选模板填充版式；Word/TXT/Markdown 保持内容格式导出</p>
+                  <p className="mb-3 text-xs text-neutral-400">PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出</p>
                   <div className="flex flex-col gap-2">
                     {resumeTemplates.map((template) => (
                       <button key={template.id} type="button" aria-pressed={selectedTemplateId === template.id}
