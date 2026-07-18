@@ -13,10 +13,12 @@ import {
   normalizePhone,
 } from '../common/crypto/phone-identity'
 import type { UserRole } from '../common/decorators/roles.decorator'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
+import { PASSWORD_PROOF_STATE, passwordProofState } from './password-proof-state'
 
 type LoginPortal = 'admin' | 'partner' | 'kiosk'
 type SmsPortal = 'admin' | 'partner'
@@ -24,7 +26,6 @@ type SmsPortal = 'admin' | 'partner'
 const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
-const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 export interface LoginResult {
   token: string
@@ -181,7 +182,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.OWNER_MANAGED),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) throw this.resetFailed()
     await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
@@ -225,7 +230,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: user.id, deletedAt: null, passwordHash: user.passwordHash },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.OWNER_MANAGED),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) {
       throw new HttpException({

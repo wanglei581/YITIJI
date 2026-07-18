@@ -24,8 +24,16 @@ const sqliteUser = modelBody(sqliteSchema, 'User')
 const postgresUser = modelBody(postgresSchema, 'User')
 const sqliteMigration = read('prisma/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
 const postgresMigration = read('prisma/postgres/migrations/20260716193000_add_partner_account_tombstone/migration.sql')
+const sqlitePasswordProofMigration = read(
+  'prisma/migrations/20260718143000_add_partner_password_proof_state/migration.sql',
+)
+const postgresPasswordProofMigration = read(
+  'prisma/postgres/migrations/20260718143000_add_partner_password_proof_state/migration.sql',
+)
+const adminOrgsSource = read('src/orgs/admin-orgs.service.ts')
+const accountViewSource = read('src/orgs/admin-org-account-view.ts')
 
-console.log('\n=== Partner account tombstone schema verification ===')
+console.log('\n=== Partner account tombstone and password proof schema verification ===')
 
 expect(/deletedAt\s+DateTime\?/.test(sqliteUser), 'SQLite User schema 缺少 deletedAt DateTime?')
 expect(
@@ -46,10 +54,47 @@ expect(
     && postgresMigration.includes('User_orgId_role_enabled_deletedAt_idx'),
   'PostgreSQL tombstone migration 不完整',
 )
+expect(
+  /passwordProofState\s+String\s+@default\("legacy"\)/.test(sqliteUser),
+  'SQLite User schema 缺少 passwordProofState String @default("legacy")',
+)
+expect(
+  /passwordProofState\s+String\s+@default\("legacy"\)/.test(postgresUser),
+  'PostgreSQL User schema 未对称同步 passwordProofState',
+)
+for (const [label, migration] of [
+  ['SQLite', sqlitePasswordProofMigration],
+  ['PostgreSQL', postgresPasswordProofMigration],
+] as const) {
+  expect(
+    migration.includes('ADD COLUMN "passwordProofState" TEXT NOT NULL DEFAULT \'legacy\'')
+      && migration.includes(
+        'CHECK ("passwordProofState" IN (\'legacy\', \'temporary\', \'owner_managed\'))',
+      ),
+    `${label} passwordProofState migration 缺失三态 CHECK 约束`,
+  )
+}
+const temporaryPasswordWrites = adminOrgsSource.match(
+  /passwordProofState:\s*passwordProofState\(PASSWORD_PROOF_STATE\.TEMPORARY\)/g,
+) ?? []
+expect(
+  temporaryPasswordWrites.length === 4,
+  'AdminOrgsService 创建、重置与墓碑密码写入未标记 temporary',
+)
+expect(
+  adminOrgsSource.includes("from './admin-org-account-view'")
+    && accountViewSource.includes('availableActionVerificationMethods')
+    && accountViewSource.includes('passwordProofState'),
+  'Admin 机构账号视图未抽离密码证明与可用验证方式计算',
+)
+expect(
+  !/passwordProofState:\s*passwordProofState/.test(accountViewSource),
+  'Admin 机构账号 DTO 不得暴露 passwordProofState',
+)
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`  FAIL ${failure}`)
   process.exit(1)
 }
 
-console.log('  PASS User tombstone schema 和双 migration 已对齐')
+console.log('  PASS User tombstone/passwordProofState schema 和双 migration 已对齐')

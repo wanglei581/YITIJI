@@ -429,6 +429,7 @@ model User {
   id           String        @id @default(cuid())
   username     String        @unique
   passwordHash String
+  passwordProofState String  @default("legacy")
   name         String
   role         String        // 见 UserRole
   orgId        String?

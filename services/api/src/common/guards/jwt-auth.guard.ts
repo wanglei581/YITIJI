@@ -4,7 +4,10 @@ import type { Request } from 'express'
 import type { AuthedUser } from '../decorators/current-user.decorator'
 import type { UserRole } from '../decorators/roles.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
 import { RedisService } from '../redis/redis.service'
+
+export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
 
 interface JwtPayload {
   sub:   string
@@ -24,8 +27,6 @@ interface CachedSessionState {
   deletedAt: string | null
   orgEnabled: boolean | null
 }
-
-export const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 /**
  * 解析请求头 `Authorization: Bearer <token>`,验证 JWT,
