@@ -108,6 +108,30 @@ const FILTER_KEYS = [
   { key: 'privacy', label: '隐私与留存' },
 ] as const
 
+function QaRow({ item, answerId, onNavigate }: { item: QA; answerId: string; onNavigate: (route: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className={`k1-help-row${open ? ' is-open' : ''}`}>
+      <button type="button" onClick={() => setOpen(v => !v)} aria-expanded={open} aria-controls={answerId}
+        className="k1-help-toggle flex w-full items-start gap-3 p-[15px_18px] text-left">
+        <span className="k1-help-question-mark" aria-hidden="true">问</span>
+        <span className="min-w-0 flex-1"><span className="k1-help-category">{item.category}</span><strong>{item.q}</strong></span>
+        <ChevronRightIcon className={`k1-help-chevron shrink-0 transition-transform${open ? ' rotate-90' : ''}`} aria-hidden="true" />
+      </button>
+      {open && (
+        <div id={answerId} className="k1-help-answer">
+          <p>{item.a}</p>
+          {item.link && (
+            <button type="button" onClick={() => onNavigate(item.link!.route)} className="k1-help-link flex items-center gap-2">
+              {item.link.label}<ChevronRightIcon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function FaqRow({ item, index, onNavigate }: { item: QA; index: number; onNavigate: (route: string) => void }) {
   const [open, setOpen] = useState(false)
   const answerId = `help-answer-${item.categoryKey}-${index}`
@@ -198,8 +222,10 @@ export function HelpCenterPage() {
 
           {/* FAQ 列表 — 2列网格，展开项占满宽度 */}
           <div className="k1-help-faq-list" aria-label="常见问题">
-            {visibleFaq.map((item, idx) => (
-              <FaqRow key={`${item.categoryKey}-${idx}`} item={item} index={idx} onNavigate={handleNavigate} />
+            {[{ key: activeFilter === 'all' ? 'all' : activeFilter, items: visibleFaq }].map(section => (
+              section.items.map((item, itemIndex) => (
+                <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`} onNavigate={handleNavigate} />
+              ))
             ))}
           </div>
 
