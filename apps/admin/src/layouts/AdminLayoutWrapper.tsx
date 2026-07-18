@@ -67,7 +67,8 @@ const PATH_TO_KEY: Record<string, string> = {
   '/alerts':       'alerts',
   '/permissions':  'permissions',
   '/audit':        'audit',
-  '/account-settings': 'account-settings',
+  '/account-settings':  'account-settings',
+  '/offline-agencies':  'offline-agencies',
 }
 
 // 反向映射:菜单 key → 落地路径。
@@ -106,6 +107,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'import-batches', label: 'Excel 导入记录', icon: FileSpreadsheetIcon, href: KEY_TO_PATH['import-batches'] },
   { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
   { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户', href: KEY_TO_PATH.partners },
+  { key: 'offline-agencies', label: '线下机构', icon: Building2Icon, href: KEY_TO_PATH['offline-agencies'] },
   { key: 'users',        label: '用户管理',     icon: UsersIcon, href: KEY_TO_PATH.users },
   { key: 'benefit-activities', label: '权益活动', icon: GiftIcon, href: KEY_TO_PATH['benefit-activities'] },
   { key: 'member-benefits', label: '会员权益', icon: GiftIcon, href: KEY_TO_PATH['member-benefits'] },

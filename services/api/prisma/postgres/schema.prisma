@@ -2069,13 +2069,18 @@ model LegalDocVersion {
 model OfflineAgency {
   id            String       @id @default(cuid())
   name          String
-  orgType       String
+  orgType       String       @default("recruitment")
   address       String
+  district      String?
   lat           Float?
   lng           Float?
   openHours     String?
   phone         String?
+  contactEmail  String?
+  website       String?
   services      String       @default("[]")
+  description   String?
+  logoUrl       String?
   status        String       @default("active")
   reviewStatus  String       @default("pending")
   publishStatus String       @default("draft")
@@ -2092,8 +2097,16 @@ model OfflineJob {
   agencyId     String
   agency       OfflineAgency @relation(fields: [agencyId], references: [id])
   title        String
-  salary       String?
+  jobType      String        @default("fulltime")
+  salaryMin    Int?
+  salaryMax    Int?
+  salaryUnit   String        @default("month")
   requirements String?
+  description  String?
+  headcount    Int           @default(1)
+  location     String?
+  education    String?
+  experience   String?
   externalUrl  String?
   externalId   String?
   status       String        @default("active")

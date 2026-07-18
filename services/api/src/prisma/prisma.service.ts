@@ -363,6 +363,16 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.toolboxLaunchEvent
   }
 
+  // ── G1 线下招聘机构 ───────────────────────────────────────────────────────────
+
+  get offlineAgency() {
+    return this.client.offlineAgency
+  }
+
+  get offlineJob() {
+    return this.client.offlineJob
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   $transaction<R>(fn: (prisma: PrismaTransactionClient) => Promise<R>, options?: { maxWait?: number; timeout?: number; isolationLevel?: unknown }): Promise<R>

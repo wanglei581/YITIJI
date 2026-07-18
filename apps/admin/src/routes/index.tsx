@@ -31,6 +31,7 @@ import ToolboxPage from './toolbox'
 import SmartCampusPage from './smart-campus'
 import JobMaterialsPage from './job-materials'
 import AccountSettingsPage from './account-settings'
+import OfflineAgenciesPage from './offline-agencies'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -73,6 +74,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'toolbox',         element: <ToolboxPage /> },
       { path: 'smart-campus',    element: <SmartCampusPage /> },
       { path: 'account-settings', element: <AccountSettingsPage /> },
+      { path: 'offline-agencies', element: <OfflineAgenciesPage /> },
     ],
   },
 ])
