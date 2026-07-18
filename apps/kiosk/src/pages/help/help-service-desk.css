@@ -35,5 +35,5 @@
 @media (max-width: 760px) { .k1-help-center { padding-inline: 20px; } .k1-help-center .k1-help-faq-list { grid-template-columns: 1fr; } .k1-help-center .k1-help-row.is-open { grid-column: auto; } .k1-help-center .k1-help-contact aside { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation: none !important; transition: none !important; }
+  .k1-help-center * { animation: none !important; transition: none !important; }
 }
