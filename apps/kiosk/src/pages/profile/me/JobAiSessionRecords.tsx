@@ -36,7 +36,7 @@ export function JobAiSessionRecords({
 }) {
   if (items.length === 0) return null
   return (
-    <section aria-label="岗位 AI 参考记录" className="me-job-ai-records space-y-3">
+    <section aria-label="岗位 AI 参考记录" className="space-y-3">
       <div className="me-section-copy flex items-start justify-between gap-3">
         <div>
           <h2>岗位 AI 参考记录</h2>

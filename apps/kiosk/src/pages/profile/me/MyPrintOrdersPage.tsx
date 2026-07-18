@@ -347,7 +347,7 @@ export function MyPrintOrdersPage() {
                     aria-label={`${expanded ? '收起' : '查看'}订单详单 ${item.fileName ?? '未命名订单'}`}
                     className="me-ripple me-print-order-action"
                   >
-                    {expanded ? '收起详单' : '详单'}
+                    详单
                     <ChevronDownIcon
                       className={['transition-transform', expanded ? 'rotate-180' : ''].join(' ')}
                       aria-hidden="true"

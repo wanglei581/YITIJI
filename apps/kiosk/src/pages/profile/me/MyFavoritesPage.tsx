@@ -81,7 +81,7 @@ export function MyFavoritesPage() {
         onRetry={() => setReloadKey((k) => k + 1)}
       >
         <section className="me-detail-summary" aria-label="收藏概览">
-          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
+          <span className="me-summary-icon me-tone-rose" aria-hidden="true">
             <KIcon name="heart" />
           </span>
           <div className="min-w-0 flex-1">
