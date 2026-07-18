@@ -127,8 +127,8 @@
 .kprofile.kprofile-lightflow 
 .kprofile.kprofile-lightflow 
 .kprofile.kprofile-lightflow 
-.kprofile.kprofile-lightflow .kp-entry-icon.wheat { color: var(--wheat-deep); background: var(--wheat-soft); }
-.kprofile.kprofile-lightflow .kp-entry-icon.ink { color: var(--ink); background: var(--surface); }
+.kprofile.kprofile-lightflow 
+.kprofile.kprofile-lightflow 
 
 .kprofile.kprofile-lightflow .kp-entry-icon svg {
   inline-size: 26px;
