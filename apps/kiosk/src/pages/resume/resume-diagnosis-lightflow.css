@@ -289,3 +289,9 @@
   letter-spacing: 2px;
   color: var(--fy-ink, #10302b);
 }
+@media (prefers-reduced-motion: reduce) {
+  .resume-source-lightflow *, .resume-parse-lightflow *, .resume-report-lightflow * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
