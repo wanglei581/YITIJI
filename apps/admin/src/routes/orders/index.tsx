@@ -232,8 +232,11 @@ export default function OrdersPage() {
                       return (
                         <tr
                           key={order.id}
-                          className="cursor-pointer transition-colors hover:bg-neutral-50"
+                          className="cursor-pointer transition-colors hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
                           onClick={() => void openDetail(order.id)}
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(order.id) } }}
+                          aria-label={`查看订单 ${order.orderNo}`}
                         >
                           <td className={`${TD_CLS} font-bold text-primary-700`}>{order.orderNo}</td>
                           <td className={`${TD_CLS} max-w-56 truncate font-semibold text-neutral-900`}>{order.printFileName ?? '未记录'}</td>

@@ -334,7 +334,10 @@ function TaskCenter() {
                   <tr
                     key={item.taskId}
                     onClick={() => void openDetail(item)}
-                    className="cursor-pointer border-b border-neutral-900/5 last:border-b-0 hover:bg-primary-50/40"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(item) } }}
+                    tabIndex={0}
+                    aria-label={`查看打印任务 ${item.taskId}`}
+                    className="cursor-pointer border-b border-neutral-900/5 last:border-b-0 hover:bg-primary-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
                   >
                     <td className="px-4 py-2.5">
                       <div className="font-bold text-neutral-800">{taskSummary(item)}</div>

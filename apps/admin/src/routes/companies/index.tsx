@@ -128,7 +128,7 @@ export default function CompaniesPage() {
               </thead>
               <tbody className="divide-y divide-neutral-900/[0.06]">
                 {rows.map((c) => (
-                  <tr key={c.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => setSelectedId(c.id)}>
+                  <tr key={c.id} className="cursor-pointer hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500" onClick={() => setSelectedId(c.id)} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(c.id) } }} aria-label={`查看企业 ${c.name}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Building2Icon className="h-4 w-4 shrink-0 text-neutral-400" />
