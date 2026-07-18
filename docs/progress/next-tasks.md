@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-17
+> 最后更新：2026-07-18
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 
@@ -45,6 +45,7 @@
 
 ## P0：合作机构后台账号安全移除
 
+- [x] **双验证删除与手机号换绑本地候选（2026-07-18）**：现有 Admin 机构账号入口已升级为“Admin 本人近期验证 + Partner 原手机号 OTP / 本人当前密码”的操作绑定状态机；换绑额外验证新手机号。SQLite、真实 Redis、真实隔离 PostgreSQL、旧认证与 UI 门禁均通过，CI 已接入 SQLite/Redis/PG 专项脚本。当前仅为本地分支候选，未 push / PR / merge / deploy，未发送真实短信；下一步是用户确认后决定是否推送并走 PR/CI，生产 migration、真实短信和线上操作仍须另行授权。
 - [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
 - [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：等待 PR CI；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
 
