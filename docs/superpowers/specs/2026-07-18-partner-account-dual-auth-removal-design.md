@@ -191,8 +191,8 @@ internal:partner-account-action:commit-lock:<orgId>:account-membership
 - `challengeId` 是至少 128 bit CSPRNG 生成的不可预测标识；`ticketHash` 和 `rebindTicketHash` 是服务端收到随机 bearer ticket 后计算的 SHA-256 摘要，Redis 永不保存明文 ticket。
 - `challenge:<challengeId>` 保存待验证挑战，TTL 300 秒。
 - `verified:<ticketHash>` 保存已验证操作票据绑定信息，TTL 90 秒。
-- `rebind:<rebindTicketHash>` 保存已验证旧因子、新手机号 hash、加密密文及目标版本，TTL 300 秒；不保存手机号明文。
-- `active:<adminId>:<partnerId>:<action>` 的值为当前 `challengeId`，TTL 300 秒。同一范围创建新挑战时覆盖 active 指针，使旧挑战即使尚未过期也不能再验证。
+- `rebind:<rebindTicketHash>` 保存已验证旧因子、`adminId`、`adminTokenVersion`、`orgId`、`partnerId`、`partnerTokenVersion`、新手机号 hash、加密密文及目标版本，TTL 300 秒；不保存手机号明文。
+- `active:<adminId>:<partnerId>:<action>` 的值为当前 `challengeId`，TTL 300 秒。同一范围创建新挑战时，用 Lua 原子读取旧 active 值、删除其指向的旧 `challenge:<challengeId>`，再写入新 active 指针和挑战。验证接口必须同时确认传入的 `challengeId` 与当前 active 值完全一致；只检查 challenge key 存在不构成有效验证。
 - `admin-recent-verify:<adminId>` 保存 `adminTokenVersion` 和绝对过期时间，TTL 600 秒。
 - 删除提交锁按机构而不是目标账号加锁，避免两个不同目标账号并发删除绕过“至少一个有效账号”约束。锁值为服务端 `requestId`，TTL 30 秒，只能由持有相同 `requestId` 的请求通过 Lua 安全释放。
 
@@ -253,7 +253,7 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/action-challenges
 POST /api/v1/admin/orgs/:orgId/accounts/:accountId/action-challenges/:challengeId/verify
 ```
 
-短信请求体只含 `code`，密码请求体只含 `currentPassword`。成功返回 `actionTicket` 和 90 秒有效期；服务端随后立即销毁挑战，前端立即清空输入值。
+短信请求体只含 `code`，密码请求体只含 `currentPassword`。服务端先读取 `active:<adminId>:<partnerId>:<action>`，只有它与路径 `:challengeId` 完全一致时才验证；不一致或不存在返回 `ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE`。凭据校验成功后，使用 Redis Lua 再次比较 active/challenge，原子删除挑战和 active 指针并创建唯一的 `verified:<ticketHash>`；并发验证只能有一个请求签出票据。短信方式同时原子消费对应 purpose 的 OTP，密码方式在 bcrypt 校验后以 challenge 的单次 CAS 决定唯一赢家。成功返回 `actionTicket` 和 90 秒有效期，前端立即清空输入值。
 
 关闭弹窗或主动切换操作时调用：
 
@@ -261,7 +261,7 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/action-challenges/:challengeI
 DELETE /api/v1/admin/orgs/:orgId/accounts/:accountId/action-challenges/:challengeId
 ```
 
-取消接口删除 active 指针和挑战；即使取消请求失败，前端也清空所有敏感输入，服务端挑战最多在 300 秒后自动失效。
+取消接口使用比较并删除 Lua：只有 active 值仍等于路径 `challengeId` 时才删除 active 指针和该挑战，绝不能误删随后创建的新挑战。即使取消请求失败，前端也清空所有敏感输入，服务端挑战最多在 300 秒后自动失效。
 
 ### 11.3 执行删除
 
@@ -283,13 +283,17 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/phone-rebind/resend-new
 POST /api/v1/admin/orgs/:orgId/accounts/:accountId/phone-rebind/verify
 ```
 
-`start` 消费 `rebind_phone` 的 action ticket，校验新手机号格式与唯一性，向新手机号发送 `partner_phone_rebind_new` 验证码并返回 300 秒有效的独立 rebind ticket。`resend-new` 在 rebind ticket 仍有效、目标版本和新手机号未变化时重发验证码，不重复消费旧因子，也必须遵守 60 秒冷却和全局发送配额。`verify` 仅在新手机号验证码正确时原子消费 rebind ticket 和验证码，然后更新目标账号：
+`start` 消费 `rebind_phone` 的 action ticket，校验新手机号格式与唯一性，向新手机号发送 `partner_phone_rebind_new` 验证码并返回 300 秒有效的独立 rebind ticket。`resend-new` 在 rebind ticket 仍有效、目标版本和新手机号未变化时重发验证码，不重复消费旧因子，也必须遵守 60 秒冷却和全局发送配额。
+
+`start`、`resend-new`、`verify` 每次都必须校验当前请求 Admin 的 `adminId`、`adminTokenVersion` 以及路径 `orgId/accountId` 与 rebind ticket 绑定完全一致。`verify` 仅在新手机号验证码正确时原子消费 rebind ticket 和验证码，然后在同一数据库事务中再次检查目标版本和新 `phoneHash` 唯一性，再更新目标账号：
 
 - 写入新 `phoneHash`、`phoneEnc`、`phoneVerifiedAt`；
 - 递增 `tokenVersion`；
 - 保持账号启停状态不变；
 - 发布新版本会话状态，使旧会话失效；
 - 写入脱敏审计。
+
+`phoneHash` 必须由数据库唯一约束兜底。若在 `start` 后的 300 秒窗口内被其他请求占用，最终事务捕获唯一约束冲突并返回 `PHONE_TAKEN`；已成功消费的 rebind ticket 不恢复，用户选择其他手机号后重新验证旧因子。
 
 ## 12. 主要错误码
 
@@ -300,6 +304,7 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/phone-rebind/verify
 | `ACCOUNT_ACTION_STEP_UP_REQUIRED` | 403 | 重新开始验证 |
 | `ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE` | 409 | 挑战过期、已用或不匹配，重新开始 |
 | `ACCOUNT_ACTION_TICKET_STALE` | 409 | 目标账号状态已变化，刷新后重新验证 |
+| `ACCOUNT_COMMIT_CONFLICT` | 409 | 当前机构有另一账号变更正在提交，在票据有效期内稍后重试 |
 | `ACCOUNT_ACTION_METHOD_UNAVAILABLE` | 422 | 当前验证方式不可用，选择另一方式 |
 | `ACCOUNT_PASSWORD_PROOF_NOT_READY` | 409 | 目标密码仍为旧版或管理员临时密码，先完成本人自助改密 |
 | `ACCOUNT_CREDENTIAL_INVALID` | 422 | 验证码或目标密码错误，留在当前步骤重试 |
@@ -310,11 +315,13 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/phone-rebind/verify
 
 错误响应不得回传密码 hash、手机号明文、Redis key、票据内容或内部堆栈。
 
+`401` 只表示当前登录会话无效。Admin 或目标账号在高风险操作请求体中提交的错误密码/验证码使用 `422`，避免前端误触发全局退出或登录跳转。
+
 ## 13. 删除事务
 
 最终删除继续使用短事务和 PostgreSQL Serializable 隔离，并在 SQLite 验证环境维持同一业务顺序：
 
-1. 使用单个 Redis Lua 脚本校验并删除 `verified:<ticketHash>`，同时以 `SET NX EX 30` 获得机构级提交锁；只有锁获取成功才消费票据。
+1. 使用单个 Redis Lua 脚本读取并校验 `verified:<ticketHash>`、以 `SET NX EX 30` 获得机构级提交锁，并在成功后删除票据。Lua 必须把可信绑定字段 `adminId`、`adminTokenVersion`、`orgId`、`partnerId`、`partnerTokenVersion`、`action` 作为返回值交给应用层；应用层不得用请求参数替代这些版本和范围值。只有锁获取成功才消费票据。
 2. 回数据库校验 Admin、机构、目标账号、角色、`deletedAt`，以及 ticket 中的 `adminTokenVersion`、`partnerTokenVersion`。
 3. 重新统计有效 Partner 账号；删除后若少于一个则返回 `LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED`。
 4. 写入墓碑：`deletedAt`、`enabled=false`、`tokenVersion+1`、不可登录用户名、随机密码 hash、清空手机号和最后登录信息。
@@ -323,15 +330,17 @@ POST /api/v1/admin/orgs/:orgId/accounts/:accountId/phone-rebind/verify
 
 无论数据库事务成功、业务冲突或提交失败，只要 Lua 已成功消费票据，该票据都不能恢复，用户必须重新验证。事务结束后以比较锁值和 `requestId` 的 Lua 脚本安全释放锁；进程崩溃时由 30 秒 TTL 兜底。
 
+若机构级锁已被其他请求持有，Lua 返回 `ACCOUNT_COMMIT_CONFLICT` 且不消费票据；客户端可在 action ticket 剩余 90 秒内重试，票据到期后再重新验证。
+
 机构级 Redis 锁是防御性串行化，PostgreSQL Serializable 事务和最终有效账号计数仍是正确性事实来源。不同票据并发删除两个账号时，最多只有一个请求能让有效账号计数减少到一，另一个请求返回 409。SQLite 测试只能验证相同业务顺序和单写者条件，不能证明与 PostgreSQL 完全相同的并发语义；必须另跑 PostgreSQL 并发集成测试。
 
 ## 14. 审计与隐私
 
 至少记录：
 
-- Admin 发起挑战、验证成功、验证锁定、取消、删除成功、换绑成功。
+- Admin 发起挑战、验证成功、验证失败、验证锁定、取消、票据消费失败、提交锁冲突、删除成功、换绑成功。
 - `actorId`、`actorRole`、`orgId`、`partnerId`、操作类型、验证方式、结果、时间。
-- 必要时记录服务端生成的 request ID 和脱敏手机号。
+- 验证失败只记录累计失败次数和错误类别，不记录输入内容；必要时记录服务端生成的 request ID 和脱敏手机号。
 
 绝不记录：
 
@@ -367,6 +376,9 @@ confirm_rebind
   -> new_phone_sms_verify
   -> rebind_committing
   -> success
+
+new_phone_sms_verify
+  -- rebind ticket expired --> confirm_rebind
 ```
 
 交互要求：
@@ -382,6 +394,8 @@ confirm_rebind
 - 密码输入允许粘贴和密码管理器，不通过阻止粘贴制造虚假安全；提交成功、切换方式或关闭弹窗时立即清空。
 - `role="alertdialog"`、标题/说明关联、Escape、Tab 焦点约束和关闭后的焦点恢复必须保留。
 - 成功后刷新机构详情和账号计数；错误保留当前可恢复步骤，但过期、状态变化和锁定错误要求重新开始。
+- action ticket 在最终提交前过期时返回操作起点；rebind ticket 在新手机号验证阶段过期时返回 `confirm_rebind`，重新完成旧因子授权，不能停留在失效步骤继续重发。
+- 多管理员并发导致 `ACCOUNT_ACTION_TICKET_STALE`、`ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE` 或账号已变化时，提示“账号信息已被其他操作更新，请刷新后重新开始”，并刷新机构详情。
 
 ## 16. 测试策略
 
@@ -390,6 +404,7 @@ confirm_rebind
 ### 16.1 单元测试
 
 - challenge/ticket 序列化、摘要、TTL、操作范围和单次消费。
+- Redis Lua：新挑战原子替换 active 并删除旧挑战；验证强校验 active 且并发请求只能签发一个 verified ticket；取消只能比较删除自身挑战；票据消费与机构锁在成功时返回可信绑定字段并删除票据；锁冲突、票据不存在或范围不匹配时不修改状态；锁值不匹配时安全释放脚本不得删除他人锁。
 - DTO 联合校验：短信方式只能提交 code，密码方式只能提交 currentPassword。
 - Admin 与 Partner 密码失败限流。
 - Admin 近期验证绑定 `adminTokenVersion`。
@@ -405,6 +420,7 @@ confirm_rebind
 - `legacy`、`temporary` 密码不能用于降级授权；`owner_managed` 可以。
 - Admin 重置密码、Partner 自助改密、启停、换绑或删除后，旧挑战和票据因 `tokenVersion` 变化失效。
 - 新手机号已占用、格式错误、验证码错误或过期时不修改数据库。
+- `start` 检查后新手机号被并发占用时，`verify` 由事务内复核和数据库唯一约束返回 `PHONE_TAKEN`，不覆盖他人手机号。
 - rebind ticket 在 300 秒内可以按冷却规则重发新手机号验证码；超时后必须重新验证旧因子。
 - 换绑成功后旧手机号可按既有唯一性规则复用，旧会话失效。
 - 墓碑删除后密码、短信登录、找回密码、改密和手机号绑定全部拒绝。
