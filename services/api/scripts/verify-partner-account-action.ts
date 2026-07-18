@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { HttpException } from '@nestjs/common'
 import * as bcrypt from 'bcryptjs'
+import { validate } from 'class-validator'
 import Redis from 'ioredis'
 import { AuditService } from '../src/audit/audit.service'
 import { InternalOtpService } from '../src/auth/internal-otp.service'
@@ -12,7 +13,10 @@ import { PartnerAccountActionRedisService } from '../src/common/redis/partner-ac
 import { RedisService } from '../src/common/redis/redis.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
-import { assertExactCredentialDto } from '../src/orgs/dto/partner-account-action.dto'
+import {
+  assertExactCredentialDto,
+  CreatePartnerAccountActionChallengeDto,
+} from '../src/orgs/dto/partner-account-action.dto'
 import { prepareIsolatedDatabase } from './support/internal-auth-verify-harness'
 import { verifyPartnerAccountActionStaticContract } from './support/partner-account-action-static-contract'
 
@@ -34,6 +38,17 @@ async function main(): Promise<void> {
   assert.throws(
     () => assertExactCredentialDto({ code: '123456', currentPassword: 'owner-password' }),
     (error) => apiCode(error) === 'VALIDATION_FAILED',
+  )
+
+  const legacyAdminCredential = Object.assign(new CreatePartnerAccountActionChallengeDto(), {
+    action: 'delete_account',
+    verifyMethod: 'password',
+    adminCurrentPassword: 'admin',
+  })
+  assert.equal(
+    (await validate(legacyAdminCredential)).length,
+    0,
+    '当前管理员密码验证必须兼容既有短密码；新密码强度由改密/重置入口负责',
   )
 
   let deleteCalls = 0
@@ -138,6 +153,7 @@ function createActionService(options: {
   const redis = { get: options.redisGet ?? (async () => null) }
   const actionRedis = {
     getAdminRecentVerification: async () => null,
+    reservePasswordAttempt: async () => !(options.passwordLocked ?? false),
     isPasswordLocked: async () => options.passwordLocked ?? false,
   }
   const otp = {}
@@ -198,7 +214,7 @@ async function verifySqliteAndRedisFlow(): Promise<void> {
     const audit = new AuditService(prisma)
     const adminOrgs = new AdminOrgsService(prisma, audit, redis)
     const actions = new PartnerAccountActionService(prisma, redis, actionRedis, otp, adminOrgs, audit)
-    const rebind = new PartnerPhoneRebindService(prisma, redis, actionRedis, otp)
+    const rebind = new PartnerPhoneRebindService(prisma, redis, actionRedis, otp, audit)
 
     const adminPassword = 'AdminPass123'
     const targetPassword = 'TargetPass123'
@@ -228,8 +244,29 @@ async function verifySqliteAndRedisFlow(): Promise<void> {
       ],
     })
 
+    await expectCode(
+      () => actions.createChallenge(
+        ADMIN,
+        'org-delete',
+        'partner-delete',
+        { action: 'delete_account', verifyMethod: 'password', adminCurrentPassword: 'wrong-admin-password' },
+        { ip: '127.0.0.1' },
+      ),
+      'ADMIN_CREDENTIAL_INVALID',
+    )
+
     const deleteTicket = await issuePasswordAction(
       actions, 'org-delete', 'partner-delete', 'delete_account', adminPassword, targetPassword,
+    )
+    await expectCode(
+      () => actions.verifyChallenge(
+        ADMIN,
+        'org-delete',
+        'partner-delete',
+        '../../invalid-challenge-id',
+        { currentPassword: targetPassword },
+      ),
+      'ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE',
     )
     await expectCode(
       () => rebind.start(ADMIN, 'org-delete', 'partner-delete', deleteTicket, `137${phoneSuffix}`, { ip: '127.0.0.1' }),
@@ -278,8 +315,14 @@ async function verifySqliteAndRedisFlow(): Promise<void> {
       ADMIN, 'org-rebind', 'partner-rebind', actionTicket, newPhone, { ip: '127.0.0.2' },
     )
     assert.equal(started.phoneMasked, `${newPhone.slice(0, 3)}****${newPhone.slice(7)}`)
+    const newPhoneCode = sms.codeFor(newPhone)
+    const wrongNewPhoneCode = newPhoneCode === '000000' ? '000001' : '000000'
+    await expectCode(
+      () => rebind.verify(ADMIN, 'org-rebind', 'partner-rebind', started.rebindTicket, wrongNewPhoneCode),
+      'ACCOUNT_CREDENTIAL_INVALID',
+    )
     await rebind.verify(
-      ADMIN, 'org-rebind', 'partner-rebind', started.rebindTicket, sms.codeFor(newPhone),
+      ADMIN, 'org-rebind', 'partner-rebind', started.rebindTicket, newPhoneCode,
     )
     const rebound = await prisma.user.findUniqueOrThrow({ where: { id: 'partner-rebind' } })
     assert.equal(rebound.phoneHash, hashPhone(newPhone))
@@ -315,6 +358,18 @@ async function verifySqliteAndRedisFlow(): Promise<void> {
     const afterRace = await prisma.user.findUniqueOrThrow({ where: { id: 'partner-rebind' } })
     assert.equal(afterRace.phoneHash, hashPhone(newPhone))
     assert.equal(afterRace.tokenVersion, 1)
+
+    const failureAudits = await prisma.auditLog.findMany({
+      where: { actorId: ADMIN.userId, action: { endsWith: '_failed' } },
+      select: { action: true, payloadJson: true },
+    })
+    assert.ok(failureAudits.some((entry) => entry.action === 'org.account.admin_verification_failed'))
+    assert.ok(failureAudits.some((entry) => entry.action === 'org.account.delete_failed'))
+    assert.ok(failureAudits.some((entry) => entry.action === 'org.account.phone_rebind_failed'))
+    const serializedFailures = JSON.stringify(failureAudits)
+    for (const secret of [adminPassword, targetPassword, newPhone, started.rebindTicket, wrongNewPhoneCode]) {
+      assert.equal(serializedFailures.includes(secret), false, '失败审计不得包含密码、手机号、验证码或票据')
+    }
   } finally {
     if (prisma) await prisma.onModuleDestroy()
     const keys = await rawRedis.keys(`${namespace}:*`)

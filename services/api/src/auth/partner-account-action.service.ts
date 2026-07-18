@@ -68,7 +68,21 @@ export class PartnerAccountActionService {
       '当前验证方式不可用',
       { availableMethods },
     )
-    await this.verifyAdminRecentOrPassword(state.admin, dto.adminCurrentPassword)
+    try {
+      await this.verifyAdminRecentOrPassword(state.admin, dto.adminCurrentPassword)
+    } catch (error) {
+      if (dto.adminCurrentPassword !== undefined) {
+        const code = httpErrorCode(error)
+        if (code === 'ADMIN_CREDENTIAL_INVALID' || code === 'ADMIN_CREDENTIAL_LOCKED') {
+          await this.auditEvent(admin.userId, orgId, partnerId, 'org.account.admin_verification_failed', {
+            action: dto.action,
+            verifyMethod: dto.verifyMethod,
+            result: code === 'ADMIN_CREDENTIAL_LOCKED' ? 'locked' : 'invalid',
+          })
+        }
+      }
+      throw error
+    }
     const challengeId = createChallengeId()
     const binding: ActionChallengeBinding = {
       challengeId,
@@ -168,10 +182,10 @@ export class PartnerAccountActionService {
           '目标账号密码尚未由持有人管理，请先完成本人自助改密',
         )
       }
-      await this.assertPasswordNotLocked('partner', partnerId, 'ACCOUNT_CREDENTIAL_LOCKED')
+      await this.reservePasswordAttempt('partner', partnerId, 'ACCOUNT_CREDENTIAL_LOCKED')
       const valid = await bcrypt.compare(credential.currentPassword, state.partner.passwordHash).catch(() => false)
       if (!valid) {
-        const result = await this.actionRedis.recordPasswordFailure('partner', partnerId)
+        const result = await this.actionRedis.isPasswordLocked('partner', partnerId) ? 'locked' : 'retry'
         await this.auditCredentialFailure(admin.userId, orgId, partnerId, challenge, result)
         if (result === 'locked') throw accountCredentialLocked()
         throw accountActionError(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCOUNT_CREDENTIAL_INVALID', '目标账号凭据不正确')
@@ -192,7 +206,10 @@ export class PartnerAccountActionService {
       await this.auditCredentialFailure(admin.userId, orgId, partnerId, challenge, 'retry')
       throw accountActionError(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCOUNT_CREDENTIAL_INVALID', '目标账号凭据不正确')
     }
-    if (consumeResult !== 'consumed') throw accountActionChallengeUnavailable()
+    if (consumeResult !== 'consumed') {
+      await this.auditCredentialFailure(admin.userId, orgId, partnerId, challenge, 'unavailable')
+      throw accountActionChallengeUnavailable()
+    }
 
     if (challenge.verifyMethod === 'password') {
       await this.actionRedis.clearPasswordFailures('partner', partnerId)
@@ -235,11 +252,20 @@ export class PartnerAccountActionService {
     partnerId: string,
     ticket: string | undefined,
   ): Promise<{ success: true }> {
-    if (!ticket) throw accountActionStepUpRequired()
+    if (!ticket) {
+      await this.auditDeleteFailure(admin, orgId, partnerId, 'step_up_required')
+      throw accountActionStepUpRequired()
+    }
     const binding = await this.loadActionTicket(ticket)
-    if (!binding) throw accountActionStepUpRequired()
+    if (!binding) {
+      await this.auditDeleteFailure(admin, orgId, partnerId, 'ticket_unavailable')
+      throw accountActionStepUpRequired()
+    }
     if (binding.adminId !== admin.userId || binding.orgId !== orgId || binding.partnerId !== partnerId
-      || binding.action !== 'delete_account') throw accountActionTicketStale()
+      || binding.action !== 'delete_account') {
+      await this.auditDeleteFailure(admin, orgId, partnerId, 'ticket_scope_mismatch')
+      throw accountActionTicketStale()
+    }
     const requestId = randomUUID()
     const consumed = await this.actionRedis.consumeDeleteTicketAndAcquireLock({
       actionTicketHash: digestOpaqueTicket(ticket),
@@ -247,17 +273,26 @@ export class PartnerAccountActionService {
       requestId,
       lockSeconds: COMMIT_LOCK_SECONDS,
     })
-    if (consumed.kind === 'conflict') throw accountActionError(
-      HttpStatus.CONFLICT,
-      'ACCOUNT_COMMIT_CONFLICT',
-      '当前机构有另一项账号变更正在提交，请稍后重试',
-    )
-    if (consumed.kind !== 'acquired') throw accountActionStepUpRequired()
+    if (consumed.kind === 'conflict') {
+      await this.auditDeleteFailure(admin, orgId, partnerId, 'commit_lock_conflict')
+      throw accountActionError(
+        HttpStatus.CONFLICT,
+        'ACCOUNT_COMMIT_CONFLICT',
+        '当前机构有另一项账号变更正在提交，请稍后重试',
+      )
+    }
+    if (consumed.kind !== 'acquired') {
+      await this.auditDeleteFailure(admin, orgId, partnerId, 'ticket_consume_failed')
+      throw accountActionStepUpRequired()
+    }
     try {
       return await this.adminOrgs.deleteAccount(orgId, partnerId, admin, {
         adminTokenVersion: consumed.binding.adminTokenVersion,
         partnerTokenVersion: consumed.binding.partnerTokenVersion,
       })
+    } catch (error) {
+      await this.auditDeleteFailure(admin, orgId, partnerId, httpErrorCode(error) ?? 'commit_failed')
+      throw error
     } finally {
       await this.actionRedis.releaseCommitLock(orgId, requestId).catch(() => undefined)
     }
@@ -273,11 +308,10 @@ export class PartnerAccountActionService {
       'ADMIN_REAUTH_REQUIRED',
       '请先输入管理员本人当前密码',
     )
-    await this.assertPasswordNotLocked('admin', admin.id, 'ADMIN_CREDENTIAL_LOCKED')
+    await this.reservePasswordAttempt('admin', admin.id, 'ADMIN_CREDENTIAL_LOCKED')
     const valid = await bcrypt.compare(submittedPassword, admin.passwordHash).catch(() => false)
     if (!valid) {
-      const result = await this.actionRedis.recordPasswordFailure('admin', admin.id)
-      if (result === 'locked') throw accountActionError(
+      if (await this.actionRedis.isPasswordLocked('admin', admin.id)) throw accountActionError(
         HttpStatus.TOO_MANY_REQUESTS,
         'ADMIN_CREDENTIAL_LOCKED',
         '管理员密码尝试次数过多，请稍后再试',
@@ -315,7 +349,13 @@ export class PartnerAccountActionService {
   }
 
   private async loadChallenge(challengeId: string): Promise<ActionChallengeBinding | null> {
-    const raw = await this.redis.get(partnerAccountActionRedisKey('challenge', challengeId))
+    let key: string
+    try {
+      key = partnerAccountActionRedisKey('challenge', challengeId)
+    } catch {
+      return null
+    }
+    const raw = await this.redis.get(key)
     return raw ? parseChallengeBinding(raw) : null
   }
 
@@ -330,12 +370,12 @@ export class PartnerAccountActionService {
     return raw ? parseActionTicketBinding(raw) : null
   }
 
-  private async assertPasswordNotLocked(
+  private async reservePasswordAttempt(
     subject: 'admin' | 'partner',
     id: string,
     code: 'ADMIN_CREDENTIAL_LOCKED' | 'ACCOUNT_CREDENTIAL_LOCKED',
   ): Promise<void> {
-    if (!await this.actionRedis.isPasswordLocked(subject, id)) return
+    if (await this.actionRedis.reservePasswordAttempt(subject, id)) return
     if (code === 'ADMIN_CREDENTIAL_LOCKED') throw accountActionError(
       HttpStatus.TOO_MANY_REQUESTS,
       code,
@@ -368,11 +408,23 @@ export class PartnerAccountActionService {
     orgId: string,
     partnerId: string,
     challenge: ActionChallengeBinding,
-    result: 'retry' | 'locked',
+    result: 'retry' | 'locked' | 'unavailable',
   ): Promise<void> {
     await this.auditEvent(adminId, orgId, partnerId, 'org.account.action_verification_failed', {
       action: challenge.action,
       verifyMethod: challenge.verifyMethod,
+      result,
+    })
+  }
+
+  private async auditDeleteFailure(
+    admin: AuthedUser,
+    orgId: string,
+    partnerId: string,
+    result: string,
+  ): Promise<void> {
+    await this.auditEvent(admin.userId, orgId, partnerId, 'org.account.delete_failed', {
+      action: 'delete_account',
       result,
     })
   }
@@ -393,4 +445,12 @@ export class PartnerAccountActionService {
       payload: { partnerId, ...payload },
     })
   }
+}
+
+function httpErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof HttpException)) return undefined
+  const response = error.getResponse()
+  if (!response || typeof response !== 'object' || !('error' in response)) return undefined
+  const envelope = response as { error?: { code?: unknown } }
+  return typeof envelope.error?.code === 'string' ? envelope.error.code : undefined
 }

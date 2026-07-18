@@ -241,7 +241,7 @@ await withCase('rebind-sms', async (service, ns) => {
   assert.equal(await redis.exists(`${ns}:rebind:${sha256(rebindTicket)}`, otp.codeKey, otp.attemptKey), 0)
 })
 
-await withCase('recent-and-failures', async (service) => {
+await withCase('recent-and-failures', async (service, ns) => {
   assert.equal(await service.getAdminRecentVerification('admin-1'), null)
   await service.setAdminRecentVerification('admin-1', 7)
   assert.equal(await service.getAdminRecentVerification('admin-1'), 7)
@@ -249,17 +249,25 @@ await withCase('recent-and-failures', async (service) => {
   assert.equal(await service.getAdminRecentVerification('admin-1'), null)
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
-    assert.equal(await service.recordPasswordFailure('admin', 'admin-1'), 'retry')
+    assert.equal(await service.reservePasswordAttempt('admin', 'admin-1'), true)
   }
+  await redis.expire(`${ns}:admin-password-fail:admin-1`, 1)
   assert.equal(await service.isPasswordLocked('admin', 'admin-1'), false)
-  assert.equal(await service.recordPasswordFailure('admin', 'admin-1'), 'locked')
+  assert.equal(await service.reservePasswordAttempt('admin', 'admin-1'), true)
   assert.equal(await service.isPasswordLocked('admin', 'admin-1'), true)
-  assert.equal(await service.recordPasswordFailure('admin', 'admin-1'), 'locked')
+  assert.ok(
+    await redis.ttl(`${ns}:admin-password-fail:admin-1`) >= 299,
+    '第五次失败必须重新开始完整 300 秒锁定期',
+  )
+  assert.equal(await service.reservePasswordAttempt('admin', 'admin-1'), false)
   await service.clearPasswordFailures('admin', 'admin-1')
   assert.equal(await service.isPasswordLocked('admin', 'admin-1'), false)
-  assert.equal(await service.recordPasswordFailure('admin', 'admin-1'), 'retry')
+  const concurrent = await Promise.all(
+    Array.from({ length: 12 }, () => service.reservePasswordAttempt('admin', 'admin-1')),
+  )
+  assert.equal(concurrent.filter(Boolean).length, 5, 'bcrypt 前原子预约最多放行 5 个并发尝试')
   await service.clearPasswordFailures('admin', 'admin-1')
-  assert.equal(await service.recordPasswordFailure('partner', 'partner-1'), 'retry')
+  assert.equal(await service.reservePasswordAttempt('partner', 'partner-1'), true)
   await service.clearPasswordFailures('partner', 'partner-1')
 })
 

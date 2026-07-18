@@ -95,6 +95,7 @@ async function main(): Promise<void> {
       redisService,
       actionRedis,
       otp,
+      audit,
     )
     const adminUser = { userId: adminId, role: 'admin' as const, orgId: null }
 

@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
+import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import {
   decryptPhone,
@@ -38,6 +39,7 @@ export class PartnerPhoneRebindService {
     private readonly redis: RedisService,
     private readonly actionRedis: PartnerAccountActionRedisService,
     private readonly otp: InternalOtpService,
+    private readonly audit: AuditService,
   ) {}
 
   async start(
@@ -48,15 +50,24 @@ export class PartnerPhoneRebindService {
     newPhoneInput: string,
     context: OtpRequestContext,
   ): Promise<StartRebindResponse> {
-    if (!actionTicket) throw stepUpRequired()
+    if (!actionTicket) {
+      await this.auditFailure(admin, orgId, partnerId, 'start', 'step_up_required')
+      throw stepUpRequired()
+    }
     const actionBinding = await this.loadActionTicket(actionTicket)
     if (!actionBinding || actionBinding.action !== 'rebind_phone'
       || actionBinding.adminId !== admin.userId || actionBinding.orgId !== orgId
-      || actionBinding.partnerId !== partnerId) throw ticketStale()
+      || actionBinding.partnerId !== partnerId) {
+      await this.auditFailure(admin, orgId, partnerId, 'start', 'ticket_scope_mismatch')
+      throw ticketStale()
+    }
 
     const state = await this.loadCurrentState(admin, orgId, partnerId)
     if (state.adminTokenVersion !== actionBinding.adminTokenVersion
-      || state.partnerTokenVersion !== actionBinding.partnerTokenVersion) throw ticketStale()
+      || state.partnerTokenVersion !== actionBinding.partnerTokenVersion) {
+      await this.auditFailure(admin, orgId, partnerId, 'start', 'ticket_stale')
+      throw ticketStale()
+    }
 
     const newPhone = normalizePhone(newPhoneInput)
     if (!isValidCnMobile(newPhone)) throw actionError(HttpStatus.BAD_REQUEST, 'VALIDATION_FAILED', '新手机号格式不正确')
@@ -80,7 +91,10 @@ export class PartnerPhoneRebindService {
       rebindBinding,
       rebindTtlSeconds: REBIND_TTL_SECONDS,
     })
-    if (!consumed) throw ticketStale()
+    if (!consumed) {
+      await this.auditFailure(admin, orgId, partnerId, 'start', 'ticket_consume_failed')
+      throw ticketStale()
+    }
 
     try {
       await this.otp.sendCode({
@@ -97,6 +111,7 @@ export class PartnerPhoneRebindService {
         partnerId,
         action: 'rebind_phone',
       }).catch(() => undefined)
+      await this.auditFailure(admin, orgId, partnerId, 'start', 'otp_delivery_failed')
       throw error
     }
     return {
@@ -114,8 +129,14 @@ export class PartnerPhoneRebindService {
     rebindTicket: string | undefined,
     context: OtpRequestContext,
   ): Promise<ResendRebindResponse> {
-    const binding = await this.requireRebindTicket(admin, orgId, partnerId, rebindTicket)
-    await this.assertBindingCurrent(admin, binding)
+    let binding: RebindTicketBinding
+    try {
+      binding = await this.requireRebindTicket(admin, orgId, partnerId, rebindTicket)
+      await this.assertBindingCurrent(admin, binding)
+    } catch (error) {
+      await this.auditFailure(admin, orgId, partnerId, 'resend', httpErrorCode(error) ?? 'ticket_unavailable')
+      throw error
+    }
     const phone = this.trustedNewPhone(binding)
     const sent = await this.otp.sendCode({
       phone,
@@ -140,27 +161,40 @@ export class PartnerPhoneRebindService {
     rebindTicket: string | undefined,
     code: string,
   ): Promise<{ success: true }> {
-    const binding = await this.requireRebindTicket(admin, orgId, partnerId, rebindTicket)
-    await this.assertBindingCurrent(admin, binding)
+    let binding: RebindTicketBinding
+    try {
+      binding = await this.requireRebindTicket(admin, orgId, partnerId, rebindTicket)
+      await this.assertBindingCurrent(admin, binding)
+    } catch (error) {
+      await this.auditFailure(admin, orgId, partnerId, 'verify', httpErrorCode(error) ?? 'ticket_unavailable')
+      throw error
+    }
     const phone = this.trustedNewPhone(binding)
     const consumeResult = await this.actionRedis.consumeRebindSmsTicket({
       rebindTicketHash: digestOpaqueTicket(rebindTicket!),
       scope: { adminId: admin.userId, orgId, partnerId, action: 'rebind_phone' },
       otp: this.otp.verificationDescriptor(phone, 'partner_phone_rebind_new', code),
     })
-    if (consumeResult === 'credential_invalid') throw actionError(
-      HttpStatus.UNPROCESSABLE_ENTITY,
-      'ACCOUNT_CREDENTIAL_INVALID',
-      '新手机号验证码不正确',
-    )
-    if (consumeResult === 'credential_locked') throw actionError(
-      HttpStatus.TOO_MANY_REQUESTS,
-      'ACCOUNT_CREDENTIAL_LOCKED',
-      '新手机号验证尝试次数过多，请重新开始',
-    )
-    if (consumeResult !== 'consumed') throw ticketStale()
+    if (consumeResult === 'credential_invalid') {
+      await this.auditFailure(admin, orgId, partnerId, 'verify', 'credential_invalid')
+      throw actionError(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCOUNT_CREDENTIAL_INVALID', '新手机号验证码不正确')
+    }
+    if (consumeResult === 'credential_locked') {
+      await this.auditFailure(admin, orgId, partnerId, 'verify', 'credential_locked')
+      throw actionError(HttpStatus.TOO_MANY_REQUESTS, 'ACCOUNT_CREDENTIAL_LOCKED', '新手机号验证尝试次数过多，请重新开始')
+    }
+    if (consumeResult !== 'consumed') {
+      await this.auditFailure(admin, orgId, partnerId, 'verify', 'ticket_consume_failed')
+      throw ticketStale()
+    }
 
-    const sessionState = await this.commitRebind(binding)
+    let sessionState: SessionState
+    try {
+      sessionState = await this.commitRebind(binding)
+    } catch (error) {
+      await this.auditFailure(admin, orgId, partnerId, 'commit', httpErrorCode(error) ?? 'commit_failed')
+      throw error
+    }
     await this.publishSessionState(sessionState)
     return { success: true }
   }
@@ -277,6 +311,23 @@ export class PartnerPhoneRebindService {
     }
   }
 
+  private async auditFailure(
+    admin: AuthedUser,
+    orgId: string,
+    partnerId: string,
+    phase: 'start' | 'resend' | 'verify' | 'commit',
+    result: string,
+  ): Promise<void> {
+    await this.audit.write({
+      actorId: admin.userId,
+      actorRole: 'admin',
+      action: 'org.account.phone_rebind_failed',
+      targetType: 'organization',
+      targetId: orgId,
+      payload: { partnerId, phase, result },
+    })
+  }
+
   private async requireRebindTicket(
     admin: AuthedUser,
     orgId: string,
@@ -386,4 +437,12 @@ function phoneTaken(): HttpException {
 
 function isPhoneUniqueConflict(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002'
+}
+
+function httpErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof HttpException)) return undefined
+  const response = error.getResponse()
+  if (!response || typeof response !== 'object' || !('error' in response)) return undefined
+  const envelope = response as { error?: { code?: unknown } }
+  return typeof envelope.error?.code === 'string' ? envelope.error.code : undefined
 }

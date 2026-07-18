@@ -328,24 +328,26 @@ export class PartnerAccountActionRedisService {
     }
   }
 
-  async recordPasswordFailure(subject: 'admin' | 'partner', id: string): Promise<'retry' | 'locked'> {
+  async reservePasswordAttempt(subject: 'admin' | 'partner', id: string): Promise<boolean> {
     assertPasswordSubject(subject)
     assertKeyPart(id, `${subject}Id`)
     const result = await this.client.eval(
       `
       local current = tonumber(redis.call('GET', KEYS[1]) or '0')
-      if current >= tonumber(ARGV[1]) then return 1 end
+      if current >= tonumber(ARGV[1]) then return 0 end
       current = redis.call('INCR', KEYS[1])
       if current == 1 then redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2])) end
-      if current >= tonumber(ARGV[1]) then return 1 end
-      return 0
+      if current >= tonumber(ARGV[1]) then
+        redis.call('EXPIRE', KEYS[1], tonumber(ARGV[2]))
+      end
+      return 1
       `,
       1,
       this.passwordFailureKey(subject, id),
       PASSWORD_MAX_ATTEMPTS,
       PASSWORD_FAILURE_TTL_SECONDS,
     )
-    return result === 1 ? 'locked' : 'retry'
+    return result === 1
   }
 
   async isPasswordLocked(subject: 'admin' | 'partner', id: string): Promise<boolean> {

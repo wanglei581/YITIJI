@@ -140,6 +140,7 @@ export function PartnerAccountManager({
       await orgsAdminService.resetAccountPassword(orgId, resetTarget.id, resetPassword)
       setResetTarget(null)
       setResetPassword('')
+      await reloadAccounts()
     } catch (caught) {
       setError(messageForAccountError(caught))
     } finally {

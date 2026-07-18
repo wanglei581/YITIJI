@@ -14,7 +14,7 @@ export class CreatePartnerAccountActionChallengeDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(8)
+  @MinLength(1)
   @MaxLength(72)
   adminCurrentPassword?: string
 

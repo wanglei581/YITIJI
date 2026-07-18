@@ -114,7 +114,7 @@ export function ActionCredentialSteps({ flow }: { flow: UsePartnerAccountActionR
         />
         <p className="text-xs leading-5 text-neutral-500">这是当前管理员账号的密码，仅用于确认本次高风险操作。</p>
         <div className="flex justify-end">
-          <button className={primaryCls} disabled={state.busy || adminPassword.length < 8}>确认管理员身份</button>
+          <button className={primaryCls} disabled={state.busy || adminPassword.length === 0}>确认管理员身份</button>
         </div>
       </form>
     )
