@@ -22,9 +22,7 @@
   --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
   position: relative;
   min-height: 100dvh;
-  background:
- transparent 60%),
-    var(--sd-color-canvas-outer);
+  background: var(--sd-color-canvas-outer);
   color: var(--sd-color-text);
 }
 .job-fit-inkpaper .job-fit-header {
