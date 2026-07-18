@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common'
 import { Redis } from 'ioredis'
 import { MemberDataExportRedisService } from './member-data-export-redis.service'
+import { PartnerAccountActionRedisService } from './partner-account-action-redis.service'
 import { REDIS_CLIENT, RedisService } from './redis.service'
 
 /**
@@ -27,7 +28,8 @@ import { REDIS_CLIENT, RedisService } from './redis.service'
     },
     RedisService,
     MemberDataExportRedisService,
+    PartnerAccountActionRedisService,
   ],
-  exports: [RedisService, MemberDataExportRedisService],
+  exports: [RedisService, MemberDataExportRedisService, PartnerAccountActionRedisService],
 })
 export class RedisModule {}
