@@ -1,0 +1,12 @@
+{
+  "id": "partner-account-dual-auth-removal",
+  "title": "合作机构账号短信或密码验证后换绑手机号或安全移除",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack-security",
+  "currentPhase": "completed",
+  "nextAction": "任务已完成并归档；如用户确认，再另行授权 push / PR / CI / 部署",
+  "createdAt": "2026-07-18T06:53:36Z",
+  "branch": "codex/partner-account-dual-auth-removal-design-20260718"
+}
