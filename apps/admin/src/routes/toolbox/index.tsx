@@ -22,24 +22,42 @@ export default function ToolboxPage() {
   const [apps, setApps] = useState<ToolboxAdminAppView[]>([])
   const [hosts, setHosts] = useState<ToolboxAllowedHostRecord[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [terminalsError, setTerminalsError] = useState('')
+  const [appsError, setAppsError] = useState('')
+  const [hostsError, setHostsError] = useState('')
 
   const load = () => {
     setLoading(true)
-    setError('')
-    Promise.all([
+    setTerminalsError('')
+    setAppsError('')
+    setHostsError('')
+    Promise.allSettled([
       toolboxService.listTerminals(),
       toolboxService.getLaunchSummary({ days: 7 }),
       toolboxService.listApps(),
       toolboxService.listAllowedHosts(),
     ])
-      .then(([terminalRows, usage, appRows, hostRows]) => {
-        setTerminals(terminalRows)
-        setSummary(usage)
-        setApps(appRows)
-        setHosts(hostRows)
+      .then(([terminalsResult, summaryResult, appsResult, hostsResult]) => {
+        if (terminalsResult.status === 'fulfilled') {
+          setTerminals(terminalsResult.value)
+        } else {
+          setTerminalsError(terminalsResult.reason instanceof Error ? terminalsResult.reason.message : '终端数据加载失败')
+        }
+        if (summaryResult.status === 'fulfilled') {
+          setSummary(summaryResult.value)
+        }
+        // summary 失败时静默保留上次值，不阻断其他面板
+        if (appsResult.status === 'fulfilled') {
+          setApps(appsResult.value)
+        } else {
+          setAppsError(appsResult.reason instanceof Error ? appsResult.reason.message : '微应用数据加载失败')
+        }
+        if (hostsResult.status === 'fulfilled') {
+          setHosts(hostsResult.value)
+        } else {
+          setHostsError(hostsResult.reason instanceof Error ? hostsResult.reason.message : '域名白名单加载失败')
+        }
       })
-      .catch((err) => setError(err instanceof Error ? err.message : '加载百宝箱治理数据失败'))
       .finally(() => setLoading(false))
   }
 
@@ -64,13 +82,19 @@ export default function ToolboxPage() {
       <ToolboxLaunchSummaryCard summary={summary} />
 
       {activeTab === 'governance' && (
-        <ToolboxGovernancePanel apps={apps} terminals={terminals} onRefresh={load} />
+        <>
+          {appsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{appsError}</p>}
+          <ToolboxGovernancePanel apps={apps} terminals={terminals} onRefresh={load} />
+        </>
       )}
       {activeTab === 'hosts' && (
-        <ToolboxAllowedHostPanel hosts={hosts} onRefresh={load} />
+        <>
+          {hostsError && <p className="mb-3 rounded-lg border border-error/30 bg-error-bg px-4 py-2 text-sm text-error-fg">{hostsError}</p>}
+          <ToolboxAllowedHostPanel hosts={hosts} onRefresh={load} />
+        </>
       )}
       {activeTab === 'terminals' && (
-        <TerminalToolboxPanel terminals={terminals} loading={loading} error={error} onReload={load} />
+        <TerminalToolboxPanel terminals={terminals} loading={loading} error={terminalsError} onReload={load} />
       )}
     </div>
   )

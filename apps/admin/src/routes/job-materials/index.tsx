@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Card, ComplianceBanner, EmptyState } from '@ai-job-print/ui'
+import { Card, ComplianceBanner, EmptyState, LoadingState } from '@ai-job-print/ui'
 import type { JobMaterialAdminSummary, JobMaterialTemplate, JobMaterialTemplateType } from '@ai-job-print/shared'
 import { FileTextIcon, LayoutTemplateIcon, RefreshCwIcon } from 'lucide-react'
 import { Page } from '../Page'
@@ -94,7 +94,7 @@ export default function JobMaterialsPage() {
 
       <Card className="mt-3 overflow-hidden p-0">
         {loading ? (
-          <div className="p-8 text-center text-sm text-neutral-500">加载中...</div>
+          <LoadingState text="加载中…" className="py-8" />
         ) : templates.length === 0 ? (
           <EmptyState icon={LayoutTemplateIcon} title="暂无模板" className="p-8" />
         ) : (

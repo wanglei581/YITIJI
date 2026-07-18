@@ -122,7 +122,7 @@ export default function CompaniesPage() {
               <thead>
                 <tr>
                   {['企业名称', '来源机构', '地区', '行业', '类型', '审核状态', '发布状态', '关联岗位', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>

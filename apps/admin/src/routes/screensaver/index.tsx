@@ -106,7 +106,8 @@ function AssetsTab() {
   const [title, setTitle] = useState('')
   const [duration, setDuration] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [listError, setListError] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [previewAsset, setPreviewAsset] = useState<AdAssetView | null>(null)
 
   // 外部视频直链
@@ -121,7 +122,7 @@ function AssetsTab() {
     screensaverService
       .listAssets()
       .then(setAssets)
-      .catch((e) => setError(e?.message ?? '加载失败'))
+      .catch((e) => setListError(e?.message ?? '加载失败'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -129,11 +130,11 @@ function AssetsTab() {
 
   const handleUpload = useCallback(async () => {
     if (!file || !title.trim()) {
-      setError('请选择文件并填写标题')
+      setUploadError('请选择文件并填写标题')
       return
     }
     setUploading(true)
-    setError(null)
+    setUploadError(null)
     try {
       const dur = duration.trim() ? Number(duration) : undefined
       await screensaverService.uploadAsset(file, title.trim(), Number.isFinite(dur) ? dur : undefined)
@@ -142,7 +143,7 @@ function AssetsTab() {
       setDuration('')
       reload()
     } catch (e) {
-      setError((e as Error)?.message ?? '上传失败')
+      setUploadError((e as Error)?.message ?? '上传失败')
     } finally {
       setUploading(false)
     }
@@ -232,7 +233,7 @@ function AssetsTab() {
             {uploading ? '上传中…' : '上传'}
           </Button>
         </div>
-        {error && <p className="mt-2 text-sm text-error">{error}</p>}
+        {uploadError && <p className="mt-2 text-sm text-error">{uploadError}</p>}
       </Card>
 
       {/* 外部视频直链 */}
@@ -288,6 +289,8 @@ function AssetsTab() {
       {/* 素材网格 */}
       {loading ? (
         <p className="text-sm text-neutral-400">加载中…</p>
+      ) : listError ? (
+        <p className="text-sm text-error">{listError}</p>
       ) : assets.length === 0 ? (
         <EmptyState title="暂无素材" description="先上传图片或视频，再到「播放方案」组合排期。" />
       ) : (

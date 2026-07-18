@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon, PlayIcon, SettingsIcon } from 'lucide-react'
 import { API_BASE_URL, API_MODE } from '../../services/api/client'
@@ -111,7 +111,7 @@ export default function SyncSourcesPage() {
   const [error,        setError]        = useState(false)
   const [triggers,     setTriggers]     = useState<Record<string, TriggerState>>({})
   const [configSrc,    setConfigSrc]    = useState<ApiSyncSourceItem | null>(null)
-  const [configDraft,  setConfigDraft]  = useState<ConfigDraft>({ dataType: 'job', rootPath: '', fields: [] })
+  const [configDraft,  setConfigDraft]  = useState<ConfigDraft | null>(null)
   const [configSaving, setConfigSaving] = useState(false)
   const [configErr,    setConfigErr]    = useState<string | null>(null)
 
@@ -127,6 +127,9 @@ export default function SyncSourcesPage() {
   useEffect(() => { load() }, [load])
 
   const openConfig = async (src: ApiSyncSourceItem) => {
+    // Bug 1 fix: reset stale draft and error BEFORE opening the drawer,
+    // so the drawer never briefly shows the previous source's data.
+    setConfigDraft(null)
     setConfigErr(null)
     setConfigSrc(src)
     if (API_MODE !== 'http') {
@@ -144,12 +147,14 @@ export default function SyncSourcesPage() {
         fields: rc?.fields ? Object.entries(rc.fields).map(([std, src]) => ({ std, src })) : [],
       })
     } catch {
-      setConfigDraft({ dataType: 'job', rootPath: '', fields: [] })
+      // Bug 2 fix: do NOT silently fall back to an empty draft (that risks
+      // overwriting real mappings on save). Surface the error instead.
+      setConfigErr('配置加载失败，请关闭后重试')
     }
   }
 
   const saveConfig = async () => {
-    if (!configSrc) return
+    if (!configSrc || !configDraft) return
     setConfigSaving(true)
     setConfigErr(null)
     const dto = {
@@ -195,7 +200,7 @@ export default function SyncSourcesPage() {
     return (
       <Page title="API 同步数据源" subtitle="管理 API 拉取模式的数据源及手动触发同步">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -237,7 +242,7 @@ export default function SyncSourcesPage() {
             <thead>
               <tr>
                 {['数据源名称', '机构 ID', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -336,76 +341,93 @@ export default function SyncSourcesPage() {
             <button onClick={() => setConfigSrc(null)} className="rounded p-1 hover:bg-neutral-100 text-neutral-400">x</button>
           </div>
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Data type</label>
-              <select
-                value={configDraft.dataType}
-                onChange={(e) => setConfigDraft((d) => ({ ...d, dataType: e.target.value as 'job' | 'fair' }))}
-                className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
-              >
-                <option value="job">Job (岗位)</option>
-                <option value="fair">Job fair (招聘会)</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Root path (e.g. data.items)</label>
-              <input
-                value={configDraft.rootPath}
-                onChange={(e) => setConfigDraft((d) => ({ ...d, rootPath: e.target.value }))}
-                placeholder="Leave empty for auto-detect"
-                className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
-              />
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-600">Field mappings (standard -&gt; source field)</span>
-                <button
-                  onClick={() => setConfigDraft((d) => ({ ...d, fields: [...d.fields, { std: '', src: '' }] }))}
-                  className="rounded px-2 py-1 text-xs text-primary-600 hover:bg-primary-50"
-                >
-                  + Add
-                </button>
+            {/* Bug 1: configDraft === null means load is in-flight — show spinner */}
+            {configDraft === null && !configErr && (
+              <LoadingState text="加载配置中…" className="py-8" />
+            )}
+            {/* Bug 2: load failed — show error, never render the editable form */}
+            {configDraft === null && configErr && (
+              <div className="rounded-lg border border-error/20 bg-error-bg px-4 py-3 text-sm text-error-fg">
+                {configErr}
               </div>
-              {configDraft.fields.map((f, i) => (
-                <div key={i} className="mb-2 flex items-center gap-2">
-                  <input
-                    value={f.std}
-                    placeholder="standard field"
-                    onChange={(e) => setConfigDraft((d) => ({ ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, std: e.target.value } : ff) }))}
-                    className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
-                  />
-                  <span className="text-neutral-400">-&gt;</span>
-                  <input
-                    value={f.src}
-                    placeholder="source field"
-                    onChange={(e) => setConfigDraft((d) => ({ ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, src: e.target.value } : ff) }))}
-                    className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
-                  />
-                  <button
-                    onClick={() => setConfigDraft((d) => ({ ...d, fields: d.fields.filter((_, ii) => ii !== i) }))}
-                    className="text-xs text-error-fg hover:text-error-fg"
+            )}
+            {configDraft !== null && (
+              <>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">Data type</label>
+                  <select
+                    value={configDraft.dataType}
+                    onChange={(e) => setConfigDraft((d) => d ? { ...d, dataType: e.target.value as 'job' | 'fair' } : d)}
+                    className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
                   >
-                    Del
-                  </button>
+                    <option value="job">Job (岗位)</option>
+                    <option value="fair">Job fair (招聘会)</option>
+                  </select>
                 </div>
-              ))}
-              {configDraft.fields.length === 0 && (
-                <p className="text-xs text-neutral-400">No mappings - auto-detect mode</p>
-              )}
-            </div>
-            {configErr && <p className="text-xs text-error-fg">{configErr}</p>}
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">Root path (e.g. data.items)</label>
+                  <input
+                    value={configDraft.rootPath}
+                    onChange={(e) => setConfigDraft((d) => d ? { ...d, rootPath: e.target.value } : d)}
+                    placeholder="Leave empty for auto-detect"
+                    className="h-9 w-full rounded border border-neutral-200 px-3 text-sm"
+                  />
+                </div>
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-medium text-neutral-600">Field mappings (standard -&gt; source field)</span>
+                    <button
+                      onClick={() => setConfigDraft((d) => d ? { ...d, fields: [...d.fields, { std: '', src: '' }] } : d)}
+                      className="rounded px-2 py-1 text-xs text-primary-600 hover:bg-primary-50"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  {configDraft.fields.map((f, i) => (
+                    <div key={i} className="mb-2 flex items-center gap-2">
+                      <input
+                        value={f.std}
+                        placeholder="standard field"
+                        onChange={(e) => setConfigDraft((d) => d ? { ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, std: e.target.value } : ff) } : d)}
+                        className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
+                      />
+                      <span className="text-neutral-400">-&gt;</span>
+                      <input
+                        value={f.src}
+                        placeholder="source field"
+                        onChange={(e) => setConfigDraft((d) => d ? { ...d, fields: d.fields.map((ff, ii) => ii === i ? { ...ff, src: e.target.value } : ff) } : d)}
+                        className="h-8 flex-1 rounded border border-neutral-200 px-2 text-xs"
+                      />
+                      <button
+                        onClick={() => setConfigDraft((d) => d ? { ...d, fields: d.fields.filter((_, ii) => ii !== i) } : d)}
+                        className="text-xs text-error-fg hover:text-error-fg"
+                      >
+                        Del
+                      </button>
+                    </div>
+                  ))}
+                  {configDraft.fields.length === 0 && (
+                    <p className="text-xs text-neutral-400">No mappings - auto-detect mode</p>
+                  )}
+                </div>
+                {configErr && <p className="text-xs text-error-fg">{configErr}</p>}
+              </>
+            )}
           </div>
           <div className="border-t border-neutral-100 px-5 py-3 flex justify-end gap-2">
             <button onClick={() => setConfigSrc(null)} className="rounded px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100">
               Cancel
             </button>
-            <button
-              onClick={saveConfig}
-              disabled={configSaving}
-              className="rounded bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50"
-            >
-              {configSaving ? 'Saving...' : 'Save'}
-            </button>
+            {/* Hide Save when draft is null (loading in-flight or load failed) to prevent accidental overwrites */}
+            {configDraft !== null && (
+              <button
+                onClick={saveConfig}
+                disabled={configSaving}
+                className="rounded bg-primary-600 px-4 py-2 text-sm text-white hover:bg-primary-700 disabled:opacity-50"
+              >
+                {configSaving ? 'Saving...' : 'Save'}
+              </button>
+            )}
           </div>
         </div>
       )}

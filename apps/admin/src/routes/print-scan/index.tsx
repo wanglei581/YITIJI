@@ -317,7 +317,7 @@ function TaskCenter() {
         <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
           <table className="w-full min-w-[760px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-neutral-900/10 text-[12px] text-neutral-500">
+              <tr className="border-b border-neutral-900/10 bg-neutral-50/90 text-[12px] text-neutral-500">
                 <th className="px-4 py-2.5 font-bold">任务</th>
                 <th className="px-4 py-2.5 font-bold">终端</th>
                 <th className="px-4 py-2.5 font-bold">归属</th>
@@ -613,7 +613,7 @@ function CapabilityCenter() {
         <div className="overflow-x-auto rounded-xl border border-neutral-900/10 bg-surface">
           <table className="w-full min-w-[720px] text-left text-[13px]">
             <thead>
-              <tr className="border-b border-neutral-900/10 text-[12px] text-neutral-500">
+              <tr className="border-b border-neutral-900/10 bg-neutral-50/90 text-[12px] text-neutral-500">
                 <th className="px-4 py-2.5 font-bold">能力</th>
                 <th className="px-4 py-2.5 font-bold">当前状态</th>
                 <th className="px-4 py-2.5 font-bold">调整为</th>

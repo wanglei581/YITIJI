@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Card, Drawer, EmptyState, StatusBadge } from '@ai-job-print/ui'
+import { Card, Drawer, EmptyState, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { FileTextIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
 import {
@@ -201,7 +201,7 @@ export default function PolicyPage() {
     return (
       <Page title="政策公告" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -249,7 +249,7 @@ export default function PolicyPage() {
               <thead>
                 <tr>
                   {['类型', '标题', '分组/标签', '展示日期', '审核状态', '发布状态', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>

@@ -58,7 +58,7 @@ function amountText(amountCents: number, currency: string): string {
 
 // ─── 原型规范局部件 ───────────────────────────────────────────────────────────
 
-const TH_CLS = 'whitespace-nowrap border-b border-neutral-900/10 px-2.5 py-2 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500'
+const TH_CLS = 'whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/80 px-2.5 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500'
 const TD_CLS = 'whitespace-nowrap border-b border-neutral-900/[0.06] px-2.5 py-[11px]'
 
 function Info({ label, value }: { label: string; value: string }) {
@@ -265,7 +265,7 @@ export default function OrdersPage() {
                 >
                   ‹
                 </button>
-                <span className="grid h-7 min-w-7 place-items-center rounded-lg bg-neutral-900 px-2 text-[12.5px] font-bold text-white">
+                <span className="grid h-7 min-w-7 place-items-center rounded-lg bg-primary-600 px-2 text-[12.5px] font-bold text-white">
                   {page}
                 </span>
                 <button

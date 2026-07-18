@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, Drawer, StatusBadge, EmptyState } from '@ai-job-print/ui'
+import { Card, Drawer, ErrorState, LoadingState, StatusBadge, EmptyState } from '@ai-job-print/ui'
 import { Page } from '../Page'
-import { CalendarIcon, FilterIcon, XIcon } from 'lucide-react'
+import { CalendarIcon, FilterIcon, SearchIcon, XIcon } from 'lucide-react'
+import { FilterChip } from '../components/FilterChip'
 import type { AdminFairSourceRecord, ReviewStatus, PublishStatus, JobFairStatus } from '../../services/api'
 import {
   getFairSources,
@@ -123,9 +124,7 @@ export default function FairSourcesPage() {
   if (loading) {
     return (
       <Page title="招聘会信息源" subtitle="第三方平台同步招聘会数据管理">
-        <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
-        </div>
+        <LoadingState text="加载招聘会信息源…" className="py-24" />
       </Page>
     )
   }
@@ -133,10 +132,7 @@ export default function FairSourcesPage() {
   if (error) {
     return (
       <Page title="招聘会信息源" subtitle="第三方平台同步招聘会数据管理">
-        <div className="flex h-48 flex-col items-center justify-center gap-3">
-          <CalendarIcon className="h-10 w-10 text-neutral-200" />
-          <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
-        </div>
+        <ErrorState title="加载失败" message="请检查网络或稍后重试" className="py-24" />
       </Page>
     )
   }
@@ -161,24 +157,27 @@ export default function FairSourcesPage() {
       )}
 
       {/* 筛选标签 */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex gap-2">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
           {REVIEW_FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => { setReviewFilter(f); setPage(1) }}
-            className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-              reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
-            }`}
-          >
-{f}
-              <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>
-            </button>
+            <FilterChip
+              key={f}
+              active={reviewFilter === f}
+              label={f}
+              count={counts[f]}
+              onClick={() => { setReviewFilter(f); setPage(1) }}
+            />
           ))}
         </div>
         <div className="relative">
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索招聘会名称..." className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200" />
-          <svg className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+          <SearchIcon className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索招聘会名称…"
+            className="h-8 w-56 rounded-lg border border-neutral-200 bg-surface pl-8 pr-3 text-xs text-neutral-700 placeholder:text-neutral-400 focus:border-primary-300 focus:outline-none focus:ring-1 focus:ring-primary-200"
+          />
         </div>
       </div>
 
@@ -189,7 +188,7 @@ export default function FairSourcesPage() {
             <thead>
               <tr>
                 {['来源机构', '外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="sticky top-0 whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500 backdrop-blur-sm">{h}</th>
                 ))}
               </tr>
             </thead>

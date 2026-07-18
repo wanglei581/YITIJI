@@ -7,7 +7,6 @@ import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
 import { getPrinters, type AdminPrinterRecord } from '../../services/api/devices'
 
-const PAGE_SIZE = 10
 const PRINTERS_REFRESH_KEY = 'admin:printers'
 
 const STATUS_MAP: Record<AdminPrinterRecord['status'], { badge: 'success' | 'error'; label: string }> = {
@@ -59,6 +58,7 @@ export default function PrintersPage() {
   const [filter, setFilter] = useState<string>('全部')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   const {
     data: printerData,
@@ -93,7 +93,7 @@ export default function PrintersPage() {
     : printers.filter((p) => p.status === FILTER_STATUS[filter])
   const filtered = byStatus.filter((p) => matchesSearch(p, search))
   const total = filtered.length
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize)
 
   const counts = {
     全部: printers.length,
@@ -146,7 +146,7 @@ export default function PrintersPage() {
             <thead>
               <tr>
                 {['设备名称', '型号', 'SN', '绑定终端', '状态', '当前任务', '碳粉余量', '纸张状态', '故障信息', '最近同步'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -237,9 +237,9 @@ export default function PrintersPage() {
         <Pagination
           total={total}
           page={page}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
           onPageChange={setPage}
-          onPageSizeChange={() => { setPage(1) }}
+          onPageSizeChange={(s) => { setPageSize(s); setPage(1) }}
         />
       </Card>
 

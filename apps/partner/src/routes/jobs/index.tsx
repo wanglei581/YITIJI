@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { mergeById, replaceIfChanged, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { BriefcaseIcon, PlusIcon } from 'lucide-react'
 import type {
@@ -107,6 +107,12 @@ export default function JobsPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [noticeIsError, setNoticeIsError] = useState(false)
+
+  function showNotice(msg: string, isError = false) {
+    setNotice(msg)
+    setNoticeIsError(isError)
+  }
 
   const { data, status, refresh } = useRefreshable(
     PARTNER_JOBS_REFRESH_KEY,
@@ -159,7 +165,7 @@ export default function JobsPage() {
       await unpublishPartnerJob(id)
       void refresh()
     } catch (e) {
-      setNotice(errMsg(e))
+      showNotice(errMsg(e), true)
     } finally {
       setBusyId(null)
     }
@@ -226,7 +232,7 @@ export default function JobsPage() {
     return (
       <Page title="岗位信息管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -255,7 +261,11 @@ export default function JobsPage() {
       }
     >
       {notice && (
-        <div className="mb-4 rounded-lg border border-success/30 bg-success-bg px-4 py-3 text-sm text-success-fg">
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          noticeIsError
+            ? 'border-error/30 bg-error-bg text-error-fg'
+            : 'border-success/30 bg-success-bg text-success-fg'
+        }`}>
           {notice}
         </div>
       )}
@@ -306,7 +316,7 @@ export default function JobsPage() {
             <thead>
               <tr>
                 {['外部编号', '岗位标题', '公司', '城市', '类型', '来源链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>

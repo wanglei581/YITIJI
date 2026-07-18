@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import {
   CopyIcon,
@@ -81,6 +81,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
   const [created, setCreated] = useState<PartnerDataSource | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [copied, setCopied] = useState<string | null>(null)
 
   const submit = async () => {
     if (!name.trim()) { setError('请填写数据源名称'); return }
@@ -113,6 +114,20 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
   const copy = (text?: string) => {
     if (!text) return
     void navigator.clipboard?.writeText(text)
+  }
+
+  const copySecret = (text?: string) => {
+    if (!text) return
+    const promise = navigator.clipboard?.writeText(text)
+    const markCopied = () => {
+      setCopied('secret')
+      setTimeout(() => setCopied((prev) => (prev === 'secret' ? null : prev)), 2000)
+    }
+    if (promise) {
+      promise.then(markCopied).catch(() => { /* ignore clipboard errors */ })
+    } else {
+      markCopied()
+    }
   }
 
   return (
@@ -259,7 +274,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 <div className="rounded-lg border border-warning/30 bg-warning-bg p-3">
                   <div className="flex items-center justify-between">
                     <div className="text-xs font-medium text-warning-fg">签名密钥（仅显示一次）</div>
-                    <button type="button" onClick={() => copy(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-warning-fg"><CopyIcon className="h-3 w-3" />复制</button>
+                    <button type="button" onClick={() => copySecret(created.webhookSecretOnce)} className="flex items-center gap-1 text-xs text-warning-fg"><CopyIcon className="h-3 w-3" />{copied === 'secret' ? '已复制 ✓' : '复制'}</button>
                   </div>
                   <div className="mt-1 break-all font-mono text-xs text-warning-fg">{created.webhookSecretOnce}</div>
                 </div>
@@ -288,6 +303,8 @@ export default function SourcesPage() {
   const [excelSource, setExcelSource] = useState<PartnerDataSource | null>(null)
   // Webhook 接入说明抽屉(审计修复:原「查看接入」死按钮)
   const [webhookGuide, setWebhookGuide] = useState<PartnerDataSource | null>(null)
+  const [togglingId,   setTogglingId]   = useState<string | null>(null)
+  const [toggleError,  setToggleError]  = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -299,9 +316,20 @@ export default function SourcesPage() {
   }, [])
 
   const handleToggle = (id: string) => {
-    toggleDataSource(id).then((updated) => {
-      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
-    })
+    if (togglingId) return
+    setTogglingId(id)
+    setToggleError(null)
+    toggleDataSource(id)
+      .then((updated) => {
+        setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      })
+      .catch(() => {
+        setToggleError(id)
+        setTimeout(() => setToggleError((prev) => (prev === id ? null : prev)), 3000)
+      })
+      .finally(() => {
+        setTogglingId(null)
+      })
   }
 
   const handleSourceCreated = async (payload: CreateDataSourcePayload) => {
@@ -317,7 +345,7 @@ export default function SourcesPage() {
     return (
       <Page title="数据源管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -365,7 +393,7 @@ export default function SourcesPage() {
             <thead>
               <tr>
                 {['数据源名称', '接入方式', '说明', '同步频率', '最近同步', '连接状态', '成功数', '失败数', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -393,37 +421,43 @@ export default function SourcesPage() {
                     <td className="px-4 py-3 text-center font-medium text-success-fg">{s.successCount}</td>
                     <td className="px-4 py-3 text-center font-medium text-error-fg">{s.failCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
-                      <div className="flex gap-2">
-                        {/* 「测试连接」已移除:后端暂无连通性测试端点,不放死按钮(审计修复) */}
-                        {s.accessMode === 'excel' && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex gap-2">
+                          {/* 「测试连接」已移除:后端暂无连通性测试端点,不放死按钮(审计修复) */}
+                          {s.accessMode === 'excel' && (
+                            <button
+                              className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
+                              type="button"
+                              onClick={() => setExcelSource(s)}
+                            >
+                              字段映射
+                            </button>
+                          )}
+                          {s.accessMode === 'webhook' && (
+                            <button
+                              className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
+                              type="button"
+                              onClick={() => setWebhookGuide(s)}
+                            >
+                              查看接入
+                            </button>
+                          )}
                           <button
-                            className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100"
+                            className={`rounded px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
+                              s.connStatus === 'disabled'
+                                ? 'text-success-fg hover:bg-success-bg'
+                                : 'text-warning-fg hover:bg-warning-bg'
+                            }`}
                             type="button"
-                            onClick={() => setExcelSource(s)}
+                            disabled={togglingId === s.id}
+                            onClick={() => handleToggle(s.id)}
                           >
-                            字段映射
+                            {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
                           </button>
+                        </div>
+                        {toggleError === s.id && (
+                          <span className="text-xs text-error-fg">操作失败，请重试</span>
                         )}
-                        {s.accessMode === 'webhook' && (
-                          <button
-                            className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50"
-                            type="button"
-                            onClick={() => setWebhookGuide(s)}
-                          >
-                            查看接入
-                          </button>
-                        )}
-                        <button
-                          className={`rounded px-2 py-1 text-xs font-medium ${
-                            s.connStatus === 'disabled'
-                              ? 'text-success-fg hover:bg-success-bg'
-                              : 'text-warning-fg hover:bg-warning-bg'
-                          }`}
-                          type="button"
-                          onClick={() => handleToggle(s.id)}
-                        >
-                          {s.connStatus === 'disabled' ? '启用' : '停用'}
-                        </button>
                       </div>
                     </td>
                   </tr>
