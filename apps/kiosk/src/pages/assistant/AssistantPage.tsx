@@ -551,7 +551,12 @@ function ChatBubble({ msg }: { msg: Message }) {
         <div className="assistant-message-bubble">
           <p>{msg.text}</p>
           {isAssistant && <span className="assistant-message-reference">内容仅供参考</span>}
-        </div>
+        
+      <span className="assistant-task" aria-hidden="true" style={{display:'none'}}>
+        <span className="assistant-task-icon" />
+      </span>
+      <span className="assistant-direct-question" aria-hidden="true" style={{display:'none'}} />
+      </div>
       )}
     </article>
   )
