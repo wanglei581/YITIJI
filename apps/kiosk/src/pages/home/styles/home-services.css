@@ -9,6 +9,29 @@
   gap: 26px;
 }
 
+/* ── 服务分组面板：左侧品类色描边 ── */
+.khome .lf-reference-panel {
+  position: relative;
+}
+.khome .lf-reference-panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 6px 0 0 6px;
+  background: var(--cat-accent, var(--home-primary));
+  pointer-events: none;
+}
+.khome .lf-reference-panel[data-accent="teal"]  { --cat-accent: #1f9e86; }
+.khome .lf-reference-panel[data-accent="clay"]  { --cat-accent: #b8683c; }
+.khome .lf-reference-panel[data-accent="wheat"] { --cat-accent: #a9781f; }
+.khome .lf-reference-panel[data-accent="plum"]  { --cat-accent: #7a5a86; }
+.khome .lf-reference-panel[data-accent="slate"] { --cat-accent: #3f68b0; }
+.khome .lf-reference-panel[data-accent="tool"]  { --cat-accent: var(--home-primary); }
+
+
 .khome .home-reference-panel {
   min-width: 0;
   scroll-margin-top: 112px;

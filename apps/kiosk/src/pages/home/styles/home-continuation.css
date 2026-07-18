@@ -46,18 +46,16 @@
 .khome .continue .btn { flex: 0 0 auto; }
 
 .khome .compliance {
-  margin: 28px 4px 0;
-  padding: 17px 20px;
+  margin: 6px 0 0;
+  padding: 6px 48px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 9px;
+  gap: 12px;
   color: var(--home-muted);
-  background: var(--home-surface);
-  border: 1px solid var(--home-line);
-  border-radius: 18px;
-  font-size: 13px;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 18px;
   line-height: 1.6;
-  text-align: center;
 }
-.khome .compliance svg { width: 16px; height: 16px; flex: 0 0 auto; color: var(--sd-category-sand-fg); }
+.khome .compliance svg { width: 20px; height: 20px; flex: 0 0 auto; color: var(--sd-category-sand-fg); }
