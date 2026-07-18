@@ -26,7 +26,7 @@
   padding-bottom: 44px;
   color: var(--home-text);
   background: linear-gradient(180deg, var(--home-canvas-outer) 0, var(--home-canvas) 360px);
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-);
 }
 
 .khome .khome-inner {
@@ -60,7 +60,7 @@
   display: block;
   font-size: 26px;
   font-weight: 700;
-  font-family: var(--font-serif, var(--font-ui, system-ui), 'Source Han Serif SC', var(--font-ui, system-ui), serif);
+  font-family: var(--font-, var(--font-ui, system-ui), var(--font-ui, system-ui));
   letter-spacing: 0.04em;
 }
 .khome .k-brand span {
@@ -159,7 +159,7 @@
   z-index: 1;
   max-width: 660px;
   margin: 10px 0 0;
-  font-family: var(--font-serif, var(--font-ui, system-ui), 'Source Han Serif SC', var(--font-ui, system-ui), serif);
+  font-family: var(--font-, var(--font-ui, system-ui), var(--font-ui, system-ui));
   font-size: 46px;
   font-weight: 900;
   letter-spacing: 2px;
