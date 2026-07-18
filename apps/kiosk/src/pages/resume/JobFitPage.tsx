@@ -44,6 +44,7 @@ import { AnonymousJobFitConsentCard } from './jobFit/AnonymousJobFitConsentCard'
 import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDialog'
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import './jobFit-inkpaper.css'
+import './jobFit-inkpaper-ext.css'
 
 interface PageState {
   taskId?: string

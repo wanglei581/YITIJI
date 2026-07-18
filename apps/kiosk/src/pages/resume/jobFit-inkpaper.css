@@ -23,23 +23,19 @@
   position: relative;
   min-height: 100dvh;
   background:
-    radial-gradient(900px 480px at 90% -4%, rgba(31,158,134,.06), transparent 60%),
-    radial-gradient(700px 400px at -8% 30%, rgba(184,104,60,.05), transparent 55%),
+ transparent 60%),
     var(--sd-color-canvas-outer);
   color: var(--sd-color-text);
 }
-
 .job-fit-inkpaper .job-fit-header {
   flex: 0 0 auto;
   padding: 2px 2px 0;
 }
-
 .job-fit-inkpaper .job-fit-content {
   width: min(100%, 984px);
   margin-inline: auto;
   scrollbar-color: #d7ccb8 transparent;
 }
-
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary,
 .job-fit-inkpaper .job-fit-state-card {
@@ -47,12 +43,10 @@
   background: var(--sd-color-surface);
   box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
 }
-
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary {
   border-radius: 18px;
 }
-
 .job-fit-inkpaper .job-fit-state-card {
   display: grid;
   width: min(100%, 420px);
@@ -62,24 +56,20 @@
   padding: 32px 28px;
   text-align: center;
 }
-
 .job-fit-inkpaper .job-fit-state-card > svg {
   color: var(--sd-color-primary);
 }
-
 .job-fit-inkpaper .job-fit-summary {
   border-color: #e2dccb;
   border-top: 4px solid var(--sd-color-primary);
   background: var(--sd-color-surface);
   box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
 }
-
 .job-fit-inkpaper .job-fit-summary > div > div > p:first-child,
 .job-fit-inkpaper .job-fit-card h2,
 .job-fit-inkpaper .job-fit-card h3 {
   color: var(--sd-color-text-strong);
 }
-
 .job-fit-inkpaper .job-fit-header h1,
 .job-fit-inkpaper .job-fit-summary h2,
 .job-fit-inkpaper .job-fit-card h2,
@@ -87,145 +77,118 @@
   font-family: var(--sd-font-sans, system-ui, sans-serif);
   letter-spacing: .02em;
 }
-
 .job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
   border-left: 3px solid #1f9e86;
   background: var(--sd-color-success-soft);
 }
-
 .job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
   border-left: 3px solid #a9781f;
   background: var(--sd-color-warning-soft);
 }
-
 .job-fit-inkpaper .job-fit-source {
   border-style: dashed;
 }
-
 .job-fit-inkpaper .job-fit-notice {
   border: 1px solid #d8c5ac;
   background: var(--sd-color-primary-soft);
   color: var(--sd-color-text-strong);
 }
-
 .job-fit-inkpaper .job-fit-alert {
   border: 1px solid #f3c4c7;
   background: #fff1f2;
 }
-
 .job-fit-inkpaper .job-fit-action-bar {
   border-color: var(--sd-color-line);
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 -8px 20px rgba(16, 48, 43, .06);
 }
-
 .job-fit-inkpaper .job-fit-action-bar > * {
   width: min(100%, 984px);
   margin-inline: auto;
 }
-
 .job-fit-inkpaper .job-fit-action-grid > button:first-child,
 .job-fit-inkpaper button[aria-pressed='false'] {
   border-color: var(--sd-color-line);
   color: var(--sd-color-text);
 }
-
 .job-fit-inkpaper button[aria-pressed='true'] {
   border-color: var(--sd-color-primary);
   background: var(--sd-color-primary-soft);
   color: var(--sd-color-primary-strong);
   box-shadow: inset 0 0 0 1px var(--sd-color-primary);
 }
-
 .job-fit-inkpaper button,
 .job-fit-inkpaper input,
 .job-fit-inkpaper textarea {
   min-height: var(--sd-control-min);
 }
-
 .job-fit-inkpaper .job-fit-primary-action {
   min-height: var(--sd-primary-control-min);
   background: var(--sd-color-primary);
   box-shadow: 0 6px 18px rgba(184, 104, 60, .22);
 }
-
 .job-fit-inkpaper .job-fit-primary-action:hover:not(:disabled) {
   background: var(--sd-color-primary-strong);
 }
-
 .job-fit-inkpaper input,
 .job-fit-inkpaper textarea {
   border-color: var(--sd-color-line);
   background: var(--sd-color-surface);
   color: var(--sd-color-text-strong);
 }
-
 .job-fit-inkpaper textarea {
   min-height: 128px;
 }
-
 .job-fit-inkpaper button:focus-visible,
 .job-fit-inkpaper input:focus-visible,
 .job-fit-inkpaper textarea:focus-visible {
   outline: 3px solid rgba(184, 104, 60, .35);
   outline-offset: 2px;
 }
-
 @media (max-width: 1080px) {
   .job-fit-inkpaper .job-fit-content,
   .job-fit-inkpaper .job-fit-action-bar > * {
     width: 100%;
   }
-
   .job-fit-inkpaper .job-fit-header {
     padding-inline: 2px;
   }
 }
-
 @media (max-width: 390px) {
   .job-fit-inkpaper .job-fit-action-grid {
     grid-template-columns: 1fr;
   }
-
   .job-fit-inkpaper .job-fit-action-bar {
     padding-inline: 16px;
   }
-
   .job-fit-inkpaper .job-fit-state-card {
     padding: 28px 20px;
   }
 }
-
 /* LightFlow touch target contracts */
 :root, .job-fit-inkpaper {
   --sd-control-min: 48px;
   --sd-primary-control-min: 56px;
 }
-
 /* ── 屏55 视觉对齐：原型 fusion-youth 风格子组件 ─────────────────── */
-
 /* 决策摘要卡（clay accent） */
 .job-fit-inkpaper .jf-decision-summary {
   border-top: 4px solid var(--sd-color-primary);
 }
-
 .job-fit-inkpaper .jf-decision-summary__head {
   display: flex;
   align-items: flex-start;
   gap: 20px;
 }
-
 .job-fit-inkpaper .jf-decision-summary__titles {
   flex: 1;
   min-width: 0;
 }
-
 .job-fit-inkpaper .jf-decision-summary__eyebrow {
   font-size: 18px;
   font-weight: 600;
   color: var(--sd-color-primary);
 }
-
 .job-fit-inkpaper .jf-decision-summary__title {
   font-family: var(--sd-serif);
   font-size: clamp(22px, 3vw, 32px);
@@ -234,21 +197,18 @@
   margin-top: 6px;
   color: var(--sd-color-text-strong);
 }
-
 .job-fit-inkpaper .jf-decision-summary__body {
   margin-top: 14px;
   font-size: 18px;
   line-height: 1.65;
   color: var(--sd-color-text);
 }
-
 .job-fit-inkpaper .jf-decision-summary__disclaimer {
   margin-top: 10px;
   font-size: 15px;
   color: var(--sd-color-text-muted);
   line-height: 1.5;
 }
-
 /* 匹配等级徽章 */
 .jf-fit-badge {
   display: inline-flex;
@@ -261,27 +221,22 @@
   font-size: 18px;
   font-weight: 700;
 }
-
 .jf-fit-badge svg { width: 22px; height: 22px; }
-
 .jf-fit-badge--high {
   background: var(--sd-color-teal-soft);
   border: 1px solid rgba(31, 158, 134, .4);
   color: var(--sd-color-teal-deep);
 }
-
 .jf-fit-badge--medium {
   background: var(--sd-color-wheat-soft);
   border: 1px solid rgba(169, 120, 31, .4);
   color: var(--sd-color-wheat-deep);
 }
-
 .jf-fit-badge--low {
   background: var(--sd-color-primary-soft);
   border: 1px solid rgba(184, 104, 60, .4);
   color: var(--sd-color-primary-strong);
 }
-
 /* 通用卡片 section — card-head + icon 布局 */
 .job-fit-inkpaper .jf-section {
   border: 1px solid var(--sd-color-line);
@@ -290,14 +245,12 @@
   padding: 22px 24px 24px;
   box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
 }
-
 .job-fit-inkpaper .jf-card-head {
   display: flex;
   align-items: center;
   gap: 16px;
   margin-bottom: 18px;
 }
-
 .job-fit-inkpaper .jf-card-icon {
   display: grid;
   width: 48px;
@@ -306,21 +259,17 @@
   place-items: center;
   border-radius: 14px;
 }
-
 .job-fit-inkpaper .jf-card-icon svg { width: 26px; height: 26px; }
-
 .job-fit-inkpaper .jf-card-head h2 {
   font-size: 22px;
   font-weight: 800;
   color: var(--sd-color-text-strong);
 }
-
 .job-fit-inkpaper .jf-card-sub {
   font-size: 16px;
   color: var(--sd-color-text-muted);
   margin-top: 3px;
 }
-
 /* teal section accent */
 .job-fit-inkpaper .jf-section--teal {
   border-top: 3px solid var(--sd-color-teal);
@@ -329,7 +278,6 @@
   background: var(--sd-color-teal-soft);
   color: var(--sd-color-teal-deep);
 }
-
 /* wheat section accent */
 .job-fit-inkpaper .jf-section--wheat {
   border-top: 3px solid var(--sd-color-wheat);
@@ -338,7 +286,6 @@
   background: var(--sd-color-wheat-soft);
   color: var(--sd-color-wheat-deep);
 }
-
 /* clay section accent */
 .job-fit-inkpaper .jf-section--clay {
   border-top: 3px solid var(--sd-color-primary);
@@ -346,106 +293,3 @@
 .job-fit-inkpaper .jf-section--clay .jf-card-icon {
   background: var(--sd-color-primary-soft);
   color: var(--sd-color-primary-strong);
-}
-
-/* 证据条目堆叠 */
-.job-fit-inkpaper .jf-ev-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.job-fit-inkpaper .jf-ev-item {
-  border-radius: 14px;
-  padding: 14px 18px;
-}
-
-.job-fit-inkpaper .jf-ev-item p {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.45;
-  color: var(--sd-color-text-strong);
-}
-
-.job-fit-inkpaper .jf-ev-item span {
-  display: block;
-  font-size: 16px;
-  color: var(--sd-color-text-muted);
-  margin-top: 5px;
-  line-height: 1.5;
-}
-
-.job-fit-inkpaper .jf-ev-item--match {
-  background: var(--sd-color-teal-soft);
-}
-
-.job-fit-inkpaper .jf-ev-item--gap {
-  background: var(--sd-color-wheat-soft);
-}
-
-/* 关键词覆盖行 */
-.job-fit-inkpaper .jf-kw-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--sd-color-line);
-}
-
-.job-fit-inkpaper .jf-kw-label {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--sd-color-text-muted);
-}
-
-.job-fit-inkpaper .jf-chip {
-  display: inline-flex;
-  align-items: center;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-
-.job-fit-inkpaper .jf-chip--ok {
-  background: var(--sd-color-teal-soft);
-  border: 1px solid rgba(31, 158, 134, .3);
-  color: var(--sd-color-teal-deep);
-}
-
-.job-fit-inkpaper .jf-chip--warn {
-  background: var(--sd-color-wheat-soft);
-  border: 1px solid rgba(169, 120, 31, .3);
-  color: var(--sd-color-wheat-deep);
-}
-
-/* 简历定向优化建议列表 */
-.job-fit-inkpaper .jf-sug-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-}
-
-.job-fit-inkpaper .jf-sug-list li {
-  display: flex;
-  gap: 10px;
-  font-size: 18px;
-  line-height: 1.55;
-  color: var(--sd-color-text);
-}
-
-.job-fit-inkpaper .jf-sug-list li::before {
-  content: '';
-  flex: none;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--sd-color-primary);
-  margin-top: 9px;
-}
