@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
@@ -12,7 +11,6 @@ import {
   PrinterIcon,
   RotateCcwIcon,
   SparklesIcon,
-  StarIcon,
 } from 'lucide-react'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -50,8 +48,6 @@ export function ScanResultPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = (location.state ?? {}) as ScanResultState
-  const [rating, setRating] = useState(0)
-
   const { scanType = 'document', success = true, reason, file } = state
 
   const handleRetry = () => {
@@ -192,22 +188,6 @@ export function ScanResultPage() {
               <p className="mt-3 text-[17px] leading-relaxed text-neutral-500">
                 文件当前为临时保存；选择「保存到我的文档」后可长期查看，未选择去向的文件在本次服务结束后自动清理。
               </p>
-              <div className="mt-4 flex items-center gap-3">
-                <span className="text-lg font-semibold text-neutral-700">扫描清晰度评分</span>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setRating(value)}
-                      className={['grid h-10 w-10 place-items-center rounded-full', value <= rating ? 'text-warning' : 'text-neutral-300'].join(' ')}
-                      aria-label={`评分 ${value} 星`}
-                    >
-                      <StarIcon className={['h-7 w-7', value <= rating ? 'fill-current' : ''].join(' ')} />
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </section>
@@ -233,7 +213,7 @@ export function ScanResultPage() {
                 <SparklesIcon className="h-9 w-9" />
               </span>
               <span className="min-w-0 flex-1">
-                <b className="block text-2xl font-bold">进入AI简历诊断</b>
+                <b className="block text-2xl font-bold">AI 简历识别</b>
                 <span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">识别扫描件内容，进入简历诊断与优化</span>
               </span>
               <span className="rounded-full border border-primary-200 bg-surface px-3.5 py-1.5 text-[15px] font-semibold text-primary-700">简历类型推荐</span>
@@ -242,13 +222,13 @@ export function ScanResultPage() {
               <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px] border border-neutral-200 bg-surface text-primary-700">
                 <PrinterIcon className="h-9 w-9" />
               </span>
-              <span><b className="block text-2xl font-bold">直接打印</b><span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">按默认参数进入确认打印，可再修改</span></span>
+              <span><b className="block text-2xl font-bold">直接打印</b><span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">按默认参数（黑白单面 1 份）进入确认打印，可再修改</span></span>
             </button>
             <button type="button" disabled={!file} onClick={handleSave} className="flex items-center gap-5 rounded-lg border-2 border-neutral-200 bg-canvas p-5 text-left disabled:opacity-45">
               <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px] border border-neutral-200 bg-surface text-primary-700">
                 <FolderIcon className="h-9 w-9" />
               </span>
-              <span><b className="block text-2xl font-bold">保存到文档</b><span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">当前为临时保存；登录并保存后可长期管理</span></span>
+              <span><b className="block text-2xl font-bold">保存到我的文档</b><span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">当前为临时保存；登录并保存后可长期管理</span></span>
             </button>
             <button type="button" onClick={() => navigate('/')} className="flex items-center gap-5 rounded-lg border-2 border-neutral-200 bg-canvas p-5 text-left">
               <span className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-[16px] border border-neutral-200 bg-surface text-primary-700">

@@ -1,9 +1,27 @@
 import { useNavigate } from 'react-router-dom'
 import { Button, Card } from '@ai-job-print/ui'
-import { ArrowRightIcon, FileTextIcon, PrinterIcon, SaveIcon } from 'lucide-react'
+import { ArrowRightIcon, FileTextIcon, InfoIcon, PrinterIcon, SaveIcon, ShieldCheckIcon } from 'lucide-react'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import './resume-library-lightflow.css'
 import './resume-fusion-youth.css'
+
+const HOW_TO_PATHS = [
+  {
+    no: 1,
+    title: '诊断优化后导出',
+    desc: '上传简历 → AI 诊断 → 优化编辑 → 导出 PDF/Word/TXT/Markdown，并可当场打印。',
+  },
+  {
+    no: 2,
+    title: 'AI 生成简历后导出',
+    desc: '没有电子简历时，引导式填写真实信息 → 预览编辑 → 导出 PDF → 打印。',
+  },
+  {
+    no: 3,
+    title: '求职材料库生成',
+    desc: '求职信、感谢信等材料填写后生成 PDF，进入「我的文档」，可再次打印。',
+  },
+] as const
 
 export function ResumeExportPage() {
   const navigate = useNavigate()
@@ -40,11 +58,31 @@ export function ResumeExportPage() {
           </Button>
         </Card>
 
+        {/* 如何获得可打印文件的三条路径 */}
+        <section className="rp-export__paths" aria-label="如何获得可打印的简历文件">
+          <div className="rp-export__paths-head">
+            <span className="rp-export__paths-icon" aria-hidden="true"><InfoIcon /></span>
+            <div>
+              <h2>如何获得可打印的简历文件</h2>
+              <p>完成任一真实流程后，即可在对应页面保存、下载或打印</p>
+            </div>
+          </div>
+          <div className="rp-export__paths-grid">
+            {HOW_TO_PATHS.map((p) => (
+              <div key={p.no} className="rp-export__path">
+                <span className="rp-export__path-no">{p.no}</span>
+                <strong>{p.title}</strong>
+                <span>{p.desc}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="resume-lightflow__notice" aria-label="导出边界说明">
-          <FileTextIcon aria-hidden="true" />
+          <ShieldCheckIcon aria-hidden="true" />
           <div>
             <strong>真实文件才会开放保存和打印。</strong>
-            <p>如果已经完成导出，请从导出完成页面使用对应操作；本页不会构造本人资产、成功状态或打印任务。</p>
+            <p>本页不会构造本人资产、成功状态或打印任务；文件短期保留后自动清理。</p>
           </div>
         </section>
 

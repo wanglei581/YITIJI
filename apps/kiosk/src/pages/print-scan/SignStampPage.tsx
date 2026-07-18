@@ -461,11 +461,24 @@ export function SignStampPage() {
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">4</span>
                 <b className="text-[21px] font-bold">确认授权并生成</b>
               </div>
-              <label className="flex min-h-12 cursor-pointer items-start gap-3">
-                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1 h-6 w-6 shrink-0 accent-warning" />
+              <label className="flex min-h-[56px] cursor-pointer items-start gap-3">
+                <span
+                  className={[
+                    'mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border-2 transition-colors',
+                    authorized
+                      ? 'border-warning bg-warning-bg text-warning-fg'
+                      : 'border-neutral-300 bg-surface text-transparent',
+                  ].join(' ')}
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} className="h-6 w-6">
+                    <path d="M5 12.5l4.5 4.5L19 8" />
+                  </svg>
+                </span>
+                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="sr-only" />
                 <span className="text-[17px] leading-relaxed text-neutral-700">{AUTHORIZATION_LABEL}</span>
               </label>
-              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">请点击上方勾选确认授权后再生成。伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
             </section>
 
             <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">

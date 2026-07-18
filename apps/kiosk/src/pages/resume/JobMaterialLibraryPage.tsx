@@ -239,7 +239,12 @@ export function JobMaterialLibraryPage() {
                     <div className="resume-lightflow__tags">
                       {template.tags.map((tag) => <span key={tag}>{tag}</span>)}
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => selectTemplate(template)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className={['rp-state-badge', active ? '' : ''].join(' ').trim()}
+                      onClick={() => selectTemplate(template)}
+                    >
                       {active ? '正在填写' : '选择并填写'}
                     </Button>
                   </Card>

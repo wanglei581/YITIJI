@@ -129,7 +129,7 @@ export function PrintScanFeatureInfoPage() {
 
       <main className="mt-4 flex min-h-0 flex-1 gap-5">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <section className="flex items-center gap-6 rounded-lg border border-warning/30 bg-surface p-7 shadow-sm">
+          <section className="flex items-center gap-6 rounded-lg border border-warning/30 border-t-4 border-t-[#a9781f] bg-surface p-7 shadow-sm">
             <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-warning-bg text-warning-fg">
               <Icon className="h-12 w-12" aria-hidden="true" />
             </span>
@@ -142,7 +142,7 @@ export function PrintScanFeatureInfoPage() {
             </span>
           </section>
 
-          <section className="flex flex-1 flex-col rounded-lg border border-warning/30 bg-surface p-6 shadow-sm">
+          <section className="flex flex-1 flex-col rounded-lg border border-warning/30 border-t-4 border-t-[#a9781f] bg-surface p-6 shadow-sm">
             <b className="mb-2 block text-[22px] font-bold">计划支持</b>
             {PLAN_SUPPORT.map(([PlanIcon, title, copy]) => (
               <div key={String(title)} className="flex flex-1 items-center gap-4 border-b border-dashed border-neutral-200 py-3 last:border-b-0">

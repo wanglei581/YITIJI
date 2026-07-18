@@ -384,11 +384,23 @@ export function ResumeSourcePage() {
             </p>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {DIAGNOSIS_DIMENSIONS.map((item) => (
-              <div key={item} className="flex min-h-[64px] items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50 px-3 text-center text-sm font-semibold text-neutral-700">
-                {item}
-              </div>
-            ))}
+            {DIAGNOSIS_DIMENSIONS.map((item, idx) => {
+              // 最后两项（风险表述提醒、修改优先级建议）为扩展维度，用 wheat 色区分
+              const isExtra = idx >= DIAGNOSIS_DIMENSIONS.length - 2
+              return (
+                <div
+                  key={item}
+                  className={[
+                    'flex min-h-[64px] items-center justify-center rounded-2xl border px-3 text-center text-sm font-semibold',
+                    isExtra
+                      ? 'fy-inc-extra border-amber-200 bg-amber-50 text-amber-800'
+                      : 'border-neutral-200 bg-neutral-50 text-neutral-700',
+                  ].join(' ')}
+                >
+                  {item}
+                </div>
+              )
+            })}
           </div>
           <div className="mt-4 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
             <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

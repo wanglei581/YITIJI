@@ -267,10 +267,41 @@
 
 .resume-source-lightflow .resume-source-methods > button > div:first-child {
   flex-direction: column;
+  align-items: center;
   gap: 8px;
+  width: 100%;
 }
 
-.resume-source-lightflow .resume-source-methods > button p:last-child {
+/* icon container inside method card */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:first-child {
+  width: 54px !important;
+  height: 54px !important;
+  border-radius: 14px !important;
+  flex: none;
+}
+
+/* checkmark hidden in column layout */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > svg:last-child {
+  display: none;
+}
+
+/* label text: center, right size */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:last-of-type > p:first-child {
+  text-align: center;
+  font-size: 20px !important;
+}
+
+/* description text below label */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:last-of-type > p:last-child {
+  text-align: center;
+  font-size: 14.5px !important;
+  color: var(--fy-muted) !important;
+  line-height: 1.3;
+  display: block !important;
+}
+
+/* helper text at bottom of button hidden (already shown in description slot above) */
+.resume-source-lightflow .resume-source-methods > button > p:last-child {
   display: none;
 }
 
@@ -325,7 +356,8 @@
   display: grid !important;
   grid-template-columns: minmax(220px, .78fr) minmax(320px, 1.1fr) minmax(300px, 1fr);
   align-items: stretch;
-  overflow: hidden !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
 }
 
 .resume-report-lightflow .resume-report-summary {
@@ -821,6 +853,172 @@
   box-shadow: 0 0 0 3px rgba(31, 158, 134, .15) !important;
 }
 
+/* ─── Screen06: 诊断报告 ─────────────────────────────────── */
+
+/* 总评分卡:大分数块居中, paper 背景 */
+.resume-report-lightflow .resume-report-summary > div {
+  display: flex !important;
+}
+
+.resume-report-lightflow .fy-score-block {
+  height: 100%;
+  padding: 20px 12px;
+  background: var(--fy-paper);
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+}
+
+/* 大分数数字 */
+.resume-report-lightflow .fy-score-num {
+  display: block;
+  font-family: var(--fy-serif) !important;
+  font-size: 64px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  color: var(--fy-teal-deep) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 分母 */
+.resume-report-lightflow .fy-score-denom {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--fy-muted) !important;
+}
+
+/* 低分进度条 → clay 渐变 */
+.resume-report-lightflow [role='progressbar'].fy-progress-low {
+  background: linear-gradient(90deg, var(--fy-clay), #c97b4e) !important;
+}
+
+/* 风险提醒列表项:clay 背景 + 内边距 + 圆角 */
+.resume-report-lightflow .resume-report-risks li {
+  padding: 12px 16px;
+  border-radius: var(--fy-r-sm) !important;
+}
+
+/* clay 子弹点 */
+.resume-report-lightflow .fy-dot-clay {
+  background: var(--fy-clay) !important;
+  opacity: .7;
+}
+
+/* 可执行建议列表项:paper 背景 + 边框 + 内边距 */
+.resume-report-lightflow .resume-report-suggestions li {
+  padding: 13px 16px;
+  border-radius: var(--fy-r-sm) !important;
+}
+
+/* 建议序号圆圈 */
+.resume-report-lightflow .fy-sug-no {
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+  flex: none;
+}
+
+/* 修改优先级建议:wheat 背景 */
+.resume-report-lightflow .resume-report-priorities .fy-pri-item {
+  background: var(--fy-wheat-soft) !important;
+  border: 1px solid rgba(169, 120, 31, .25) !important;
+  border-radius: var(--fy-r-sm) !important;
+  padding: 14px 18px;
+}
+
+.resume-report-lightflow .resume-report-priorities .fy-pri-no {
+  background: rgba(169, 120, 31, .18) !important;
+  color: var(--fy-wheat-deep) !important;
+  flex: none;
+}
+
+/* 进度条高度 → 匹配原型 15px */
+.resume-report-lightflow .h-2 {
+  height: 14px !important;
+  border-radius: 999px;
+}
+
+/* ─── Screen05: 来源 / QR 面板 ──────────────────────────── */
+
+/* 手机扫码面板内层 Card → 去掉双重边框 */
+.resume-source-lightflow .resume-source-phone-session > * {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* QR 码容器:圆角边框 */
+.resume-source-lightflow .resume-source-phone-session .fy-qr-box {
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+  background: #fff;
+}
+
+/* 手机扫码面板: 内层 grid 改为单列居中，QR 大图在上、信息在下 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 18px !important;
+}
+
+/* QR 图片区域: 固定220×220、居中显示、白底圆角 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:first-child {
+  width: 220px !important;
+  height: 220px !important;
+  flex: none !important;
+  border: 1px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-sm) !important;
+  background: #fff !important;
+}
+
+/* 信息区: 宽度撑满，去掉背景色，文字居中 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:last-child {
+  width: 100%;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* 操作按钮排为行 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:last-child > div:last-child {
+  justify-content: center;
+}
+
+/* 面板头部 (icon + title + desc) */
+.resume-source-lightflow .resume-source-phone-session > * > div:first-child {
+  display: none !important;
+}
+
+/* ─── Screen05: 诊断报告包含内容 — 最后两项(风险/优先级)用 wheat 色 ── */
+.resume-source-lightflow .resume-source-evidence [class*='grid'] > div:nth-child(n+7) {
+  background: var(--fy-wheat-soft) !important;
+  border-color: rgba(169, 120, 31, .3) !important;
+  color: var(--fy-wheat-deep) !important;
+}
+
+/* DiagnosisDirectionForm 内 dimension 按钮尺寸 */
+.resume-source-lightflow .resume-source-direction .fy-dim-chip {
+  min-height: 58px !important;
+  border-radius: var(--fy-r-sm) !important;
+  font-size: 17.5px !important;
+}
+
+/* 诊断方向表单字段高度 */
+.resume-source-lightflow .resume-source-direction :is(input, select) {
+  min-height: 62px !important;
+  font-size: 20px !important;
+  border-radius: var(--fy-r-sm) !important;
+  padding: 0 18px !important;
+}
+
+/* 诊断方向 label */
+.resume-source-lightflow .resume-source-direction label > span:first-child {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--fy-ink) !important;
+}
+
 @media (max-width: 900px) {
   .resume-source-lightflow .resume-source-content,
   .resume-report-lightflow .resume-report-content,
@@ -861,5 +1059,427 @@
 
   .resume-lightflow :is(.resume-lightflow__header, .resume-lightflow__content) {
     padding-inline: 0 !important;
+  }
+}
+
+/* ─── 屏29:隐藏 card 内 React 缩略图（::before CSS 版已提供）─ */
+.resume-templates-lightflow .resume-lightflow__item .rp-thumb {
+  display: none !important;
+}
+
+/* ─── 屏30:素材卡片选中状态徽章 ──────────────────────────── */
+.resume-materials-lightflow .resume-lightflow__item .rp-state-badge {
+  flex: none;
+  align-self: center;
+  grid-column: 3;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+  min-height: 0 !important;
+  border: 1px solid var(--fy-line);
+  color: var(--fy-muted);
+  background: var(--fy-surface);
+}
+
+.resume-materials-lightflow .resume-lightflow__item.is-selected .rp-state-badge {
+  color: var(--fy-teal-deep);
+  background: var(--fy-teal-soft);
+  border-color: rgba(31, 158, 134, .35);
+}
+
+/* ─── 屏07/25/26 视觉对齐补丁 ───────────────────────────────
+   sidebar 容器 + 生成页两栏 + 进度列表 + diff 样式覆盖
+   ─────────────────────────────────────────────────────────── */
+
+/* --- 通用侧栏容器 ------------------------------------------ */
+.resume-generate-lightflow .resume-lightflow__sidebar,
+.resume-generate-preview-lightflow .resume-lightflow__sidebar,
+.resume-optimize-lightflow .resume-lightflow__sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.resume-generate-lightflow .resume-lightflow__sidebar .fy-side-card,
+.resume-generate-preview-lightflow .resume-lightflow__sidebar .fy-side-card,
+.resume-optimize-lightflow .resume-lightflow__sidebar .fy-side-card {
+  flex: none;
+  background: var(--fy-surface);
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+  padding: 20px 22px;
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
+}
+
+.resume-generate-lightflow .resume-lightflow__sidebar .fy-side-card h3,
+.resume-generate-preview-lightflow .resume-lightflow__sidebar .fy-side-card h3,
+.resume-optimize-lightflow .resume-lightflow__sidebar .fy-side-card h3 {
+  font-family: var(--fy-serif);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+  color: var(--fy-ink);
+}
+
+.resume-generate-lightflow .resume-lightflow__sidebar .fy-side-card .fy-side-sub,
+.resume-generate-preview-lightflow .resume-lightflow__sidebar .fy-side-card .fy-side-sub,
+.resume-optimize-lightflow .resume-lightflow__sidebar .fy-side-card .fy-side-sub {
+  font-size: 14.5px;
+  color: var(--fy-muted);
+  line-height: 1.45;
+  margin-bottom: 14px;
+}
+
+/* --- 屏25 生成页: 两栏布局 --------------------------------- */
+.resume-generate-lightflow .resume-lightflow__content {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 22px;
+  align-items: start;
+  overflow: hidden !important;
+}
+
+.resume-generate-lightflow .resume-lightflow__form-col {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.resume-generate-lightflow .resume-lightflow__sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
+/* --- 屏25 进度列表 ----------------------------------------- */
+.fy-prog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fy-prog-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 0 14px;
+  background: var(--fy-paper);
+  border: 1px solid var(--fy-line);
+  border-radius: 11px;
+}
+
+.fy-prog-item.done {
+  border-color: rgba(31, 158, 134, .3);
+}
+
+.fy-prog-item.now {
+  border-color: rgba(31, 158, 134, .45);
+  background: var(--fy-teal-soft);
+}
+
+.fy-prog-dot {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  background: var(--fy-surface);
+  border: 2px solid var(--fy-line);
+  color: var(--fy-muted);
+}
+
+.fy-prog-item.done .fy-prog-dot {
+  background: var(--fy-teal-soft);
+  border-color: var(--fy-teal);
+  color: var(--fy-teal-deep);
+}
+
+.fy-prog-item.now .fy-prog-dot {
+  background: var(--fy-teal);
+  border-color: var(--fy-teal);
+  color: #fffdf8;
+}
+
+.fy-prog-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fy-ink);
+}
+
+.fy-prog-status {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--fy-muted);
+  white-space: nowrap;
+}
+
+.fy-prog-item.done .fy-prog-status {
+  color: var(--fy-teal-deep);
+  font-weight: 600;
+}
+
+.fy-prog-item.now .fy-prog-status {
+  color: var(--fy-teal-deep);
+  font-weight: 600;
+}
+
+/* --- 屏07 优化页: 侧栏绑定到 col 2 ----------------------- */
+.resume-optimize-lightflow .resume-lightflow__sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
+/* 导出格式按钮 */
+.resume-optimize-lightflow .fy-fmt-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+}
+
+.resume-optimize-lightflow .fy-fmt-grid button {
+  min-height: 48px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--fy-line) !important;
+  background: var(--fy-surface) !important;
+  font-size: 15.5px !important;
+  font-weight: 700 !important;
+  color: var(--fy-muted) !important;
+}
+
+.resume-optimize-lightflow .fy-fmt-grid button[aria-pressed='true'] {
+  border-color: var(--fy-teal) !important;
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+/* 侧栏内分段控制组 */
+.resume-optimize-lightflow .fy-seg {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.resume-optimize-lightflow .fy-seg button {
+  min-height: 44px !important;
+  border-radius: 9px !important;
+  border: 1px solid var(--fy-line) !important;
+  background: var(--fy-surface) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--fy-muted) !important;
+}
+
+.resume-optimize-lightflow .fy-seg button[aria-pressed='true'] {
+  border-color: var(--fy-teal) !important;
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+/* 模板选项按钮 */
+.resume-optimize-lightflow .fy-tpl-btn {
+  width: 100%;
+  display: block;
+  text-align: left;
+  min-height: 52px !important;
+  padding: 10px 14px !important;
+  margin-bottom: 8px;
+  background: var(--fy-surface) !important;
+  border: 2px solid var(--fy-line) !important;
+  border-radius: 11px !important;
+  color: var(--fy-ink);
+}
+
+.resume-optimize-lightflow .fy-tpl-btn[aria-pressed='true'] {
+  border-color: var(--fy-teal) !important;
+  background: var(--fy-teal-soft) !important;
+}
+
+.resume-optimize-lightflow .fy-tpl-btn b {
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.resume-optimize-lightflow .fy-tpl-btn span {
+  display: block;
+  font-size: 14px;
+  color: var(--fy-muted);
+  margin-top: 2px;
+}
+
+/* AI 辅助按钮 */
+.resume-optimize-lightflow .fy-ai-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* 撤销按钮 */
+.resume-optimize-lightflow .fy-undo-btn {
+  width: 100%;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--fy-line) !important;
+  background: var(--fy-paper) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+/* --- 屏07 ReactDiffViewer 样式覆盖 ------------------------ */
+.resume-optimize-lightflow .resume-lightflow__comparison-card table {
+  font-size: 17px !important;
+  line-height: 1.55 !important;
+}
+
+.resume-optimize-lightflow .resume-lightflow__comparison-card td,
+.resume-optimize-lightflow .resume-lightflow__comparison-card th {
+  padding: 6px 20px !important;
+}
+
+/* 标题行 */
+.resume-optimize-lightflow .resume-lightflow__comparison-card thead th {
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  color: var(--fy-muted) !important;
+  background: var(--fy-surface) !important;
+  border-bottom: 1px solid var(--fy-line) !important;
+}
+
+/* 删除行 */
+.resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="removed"],
+.resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="wordRemoved"] {
+  background: rgba(193, 74, 52, .08) !important;
+  color: #8a4433 !important;
+}
+
+/* 增加行 */
+.resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="added"],
+.resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="wordAdded"] {
+  background: rgba(31, 158, 134, .10) !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+/* diff 高亮 */
+.resume-optimize-lightflow .resume-lightflow__comparison-card span[class*="marker"] {
+  font-weight: 800 !important;
+}
+
+/* --- 屏26 预览页: 侧栏绑定到 col 2 ----------------------- */
+.resume-generate-preview-lightflow .resume-lightflow__sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
+}
+
+/* 补充提示列表(wheat 色) */
+.fy-hint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.fy-hint-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 16px;
+  color: var(--fy-wheat-deep);
+  line-height: 1.5;
+  background: var(--fy-wheat-soft);
+  border: 1px solid rgba(169, 120, 31, .25);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.fy-hint-item svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin-top: 2px;
+}
+
+/* PDF 状态卡(teal ok) */
+.fy-ok-card {
+  background: var(--fy-teal-soft) !important;
+  border-color: rgba(31, 158, 134, .4) !important;
+}
+
+.fy-ok-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fy-teal-deep);
+}
+
+.fy-ok-title svg {
+  width: 22px;
+  height: 22px;
+}
+
+.fy-ok-meta {
+  font-size: 15.5px;
+  color: var(--fy-teal-deep);
+  margin-top: 8px;
+}
+
+.fy-ok-fine {
+  font-size: 13.5px;
+  color: var(--fy-muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* 预览页 paper 主列 */
+.resume-generate-preview-lightflow .resume-lightflow__paper-col {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  gap: 14px;
+}
+
+/* --- 响应式: ≤900px 还原单列 ----------------------------- */
+@media (max-width: 900px) {
+  .resume-generate-lightflow .resume-lightflow__content {
+    grid-template-columns: 1fr !important;
+  }
+
+  .resume-generate-lightflow .resume-lightflow__form-col,
+  .resume-generate-lightflow .resume-lightflow__sidebar {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .resume-generate-preview-lightflow .resume-lightflow__sidebar {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .resume-optimize-lightflow .resume-lightflow__sidebar {
+    grid-column: 1;
+    grid-row: auto;
   }
 }

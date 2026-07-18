@@ -145,6 +145,383 @@
 
 :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow).resume-parse-lightflow {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: clamp(16px, 2.8vw, 32px);
+}
+
+/* ── 屏27:顶部 AI 简历服务 4 步进度条 ──────────────────── */
+.resume-parse-lightflow .rp-flow-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0 0 20px;
+  flex: none;
+}
+
+.resume-parse-lightflow .rp-flow-steps__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resume-parse-lightflow .rp-flow-steps__dot {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 700;
+  background: var(--fy-surface, #fffdf8);
+  border: 2px solid var(--fy-line, #e2dccb);
+  color: var(--fy-muted, #5d6b63);
+}
+
+.resume-parse-lightflow .rp-flow-steps__dot svg {
+  width: 18px;
+  height: 18px;
+}
+
+.resume-parse-lightflow .rp-flow-steps__dot--done {
+  background: var(--fy-teal-soft, #e2f2ec);
+  border-color: var(--fy-teal, #1f9e86);
+  color: var(--fy-teal-deep, #157a67);
+}
+
+.resume-parse-lightflow .rp-flow-steps__dot--active {
+  background: var(--fy-teal, #1f9e86);
+  border-color: var(--fy-teal, #1f9e86);
+  color: #fffdf8;
+}
+
+.resume-parse-lightflow .rp-flow-steps__label {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--fy-muted, #5d6b63);
+  white-space: nowrap;
+}
+
+.resume-parse-lightflow .rp-flow-steps__label--active {
+  font-weight: 700;
+  color: var(--fy-teal-deep, #157a67);
+}
+
+.resume-parse-lightflow .rp-flow-steps__line {
+  display: block;
+  width: clamp(28px, 4vw, 60px);
+  height: 2px;
+  background: var(--fy-line, #e2dccb);
+  border-radius: 2px;
+  flex: none;
+  margin: 0 6px;
+}
+
+.resume-parse-lightflow .rp-flow-steps__line--done {
+  background: var(--fy-teal, #1f9e86);
+}
+
+@media (max-width: 600px) {
+  .resume-parse-lightflow .rp-flow-steps__label {
+    display: none;
+  }
+  .resume-parse-lightflow .rp-flow-steps__line {
+    width: 20px;
+    margin: 0 3px;
+  }
+}
+
+/* ── 解析页:中心卡片布局 ──────────────────────────────── */
+.resume-parse-lightflow .rp-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resume-parse-lightflow .rp-card {
+  width: min(860px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: clamp(28px, 4vw, 46px) clamp(20px, 5vw, 56px) clamp(24px, 4vw, 40px);
+  background: rgba(255, 253, 248, .96);
+  border: 1px solid rgba(31, 158, 134, .28);
+  border-top: 4px solid var(--fy-teal, #1f9e86);
+  border-radius: 20px;
+  box-shadow: 0 12px 36px rgba(16, 48, 43, .09);
+}
+
+/* 环形进度 */
+.resume-parse-lightflow .rp-ring-box {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  flex: none;
+}
+
+.resume-parse-lightflow .rp-ring-num {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--fy-serif, serif);
+  font-size: 52px;
+  font-weight: 900;
+  color: var(--fy-teal-deep, #157a67);
+}
+
+.resume-parse-lightflow .rp-ring-num small {
+  font-size: 22px;
+  font-weight: 700;
+  margin-left: 3px;
+}
+
+/* 解析标题 */
+.resume-parse-lightflow .rp-title {
+  font-family: var(--fy-serif, serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--fy-ink, #10302b);
+}
+
+/* 文件信息 chips */
+.resume-parse-lightflow .rp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
+.resume-parse-lightflow .rp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  color: var(--fy-muted, #5d6b63);
+  background: var(--fy-paper, #f4f1e8);
+  border: 1px solid var(--fy-line, #e2dccb);
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* 步骤列表 */
+.resume-parse-lightflow .rp-steps {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.resume-parse-lightflow .rp-step {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 68px;
+  padding: 0 22px;
+  background: var(--fy-paper, #f4f1e8);
+  border: 1px solid var(--fy-line, #e2dccb);
+  border-radius: 13px;
+}
+
+.resume-parse-lightflow .rp-step--done {
+  background: var(--fy-surface, #fffdf8);
+}
+
+.resume-parse-lightflow .rp-step--active {
+  background: var(--fy-teal-soft, #e2f2ec);
+  border-color: rgba(31, 158, 134, .45);
+}
+
+.resume-parse-lightflow .rp-step--todo {
+  opacity: .6;
+}
+
+.resume-parse-lightflow .rp-step__dot {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  font-weight: 700;
+  background: var(--fy-surface, #fffdf8);
+  border: 2px solid var(--fy-line, #e2dccb);
+  color: var(--fy-muted, #5d6b63);
+}
+
+.resume-parse-lightflow .rp-step__dot--done {
+  background: var(--fy-teal-soft, #e2f2ec);
+  border-color: var(--fy-teal, #1f9e86);
+  color: var(--fy-teal-deep, #157a67);
+}
+
+.resume-parse-lightflow .rp-step__dot--active {
+  background: var(--fy-teal, #1f9e86);
+  border-color: var(--fy-teal, #1f9e86);
+  color: #fffdf8;
+}
+
+.resume-parse-lightflow .rp-step__dot--error {
+  background: var(--fy-error-soft, #f6e3de);
+  border-color: var(--fy-error, #c14a34);
+  color: var(--fy-error, #c14a34);
+}
+
+.resume-parse-lightflow .rp-step__label {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fy-ink, #10302b);
+  white-space: nowrap;
+}
+
+.resume-parse-lightflow .rp-step__hint {
+  font-style: normal;
+  font-size: 15px;
+  color: var(--fy-muted, #5d6b63);
+  margin-left: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-parse-lightflow .rp-step__state {
+  margin-left: auto;
+  font-size: 16px;
+  color: var(--fy-muted, #5d6b63);
+  white-space: nowrap;
+}
+
+.resume-parse-lightflow .rp-step--done .rp-step__state,
+.resume-parse-lightflow .rp-step--active .rp-step__state {
+  color: var(--fy-teal-deep, #157a67);
+  font-weight: 600;
+}
+
+/* 维度网格 */
+.resume-parse-lightflow .rp-dims {
+  width: 100%;
+}
+
+.resume-parse-lightflow .rp-dims__title {
+  font-size: 16px;
+  color: var(--fy-muted, #5d6b63);
+  margin-bottom: 11px;
+}
+
+.resume-parse-lightflow .rp-dims__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.resume-parse-lightflow .rp-dim {
+  min-height: 56px;
+  display: grid;
+  place-items: center;
+  padding: 6px 10px;
+  text-align: center;
+  background: var(--fy-surface, #fffdf8);
+  border: 1px solid var(--fy-line, #e2dccb);
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fy-muted, #5d6b63);
+}
+
+.resume-parse-lightflow .rp-dim--lit {
+  background: var(--fy-teal-soft, #e2f2ec);
+  border-color: rgba(31, 158, 134, .35);
+  color: var(--fy-teal-deep, #157a67);
+}
+
+/* 卡片内 notice */
+.resume-parse-lightflow .rp-notice {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--fy-muted, #5d6b63);
+  line-height: 1.6;
+  padding: 12px 16px;
+  background: rgba(255, 253, 248, .7);
+  border: 1px dashed var(--fy-line, #e2dccb);
+  border-radius: 11px;
+}
+
+.resume-parse-lightflow .rp-notice svg {
+  color: var(--fy-wheat, #a9781f);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* 底部行动条 */
+.resume-parse-lightflow .rp-actionbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px clamp(16px, 3vw, 40px) clamp(16px, 2.5vw, 28px);
+  background: var(--fy-surface, #fffdf8);
+  border-top: 1px solid var(--fy-line, #e2dccb);
+  margin-top: 20px;
+}
+
+.resume-parse-lightflow .rp-actionbar__notice {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--fy-muted, #5d6b63);
+  line-height: 1.55;
+}
+
+.resume-parse-lightflow .rp-actionbar__notice svg {
+  color: var(--fy-teal, #1f9e86);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.resume-parse-lightflow .rp-cancel {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 0 24px;
+  background: var(--fy-paper, #f4f1e8);
+  border: 1px solid var(--fy-line, #e2dccb);
+  border-radius: 13px;
+  font-family: var(--fy-sans, sans-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fy-muted, #5d6b63);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.resume-parse-lightflow .rp-cancel:hover {
+  border-color: var(--fy-error, #c14a34);
+  color: var(--fy-error, #c14a34);
+}
+
+@media (max-width: 600px) {
+  .resume-parse-lightflow .rp-dims__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .resume-parse-lightflow .rp-step__hint { display: none; }
+  .resume-parse-lightflow .rp-actionbar { flex-wrap: wrap; }
 }
 
 :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-status-mark {
