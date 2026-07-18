@@ -296,7 +296,6 @@ export function JobFairDetailPage() {
       {tab === '详情与特色' && (
         <DetailsTab
           fair={fair}
-          sc={sc}
           featuredZones={featuredZones}
           navUrl={navUrl}
           onNav={() => navUrl && setQr({ kind: 'nav', url: navUrl })}

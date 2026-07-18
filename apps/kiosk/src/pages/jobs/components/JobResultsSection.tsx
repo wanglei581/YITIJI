@@ -133,16 +133,6 @@ function JobResultCard({
       >
         <StarIcon className={favorite ? 'fill-current' : ''} aria-hidden="true" />
       </button>
-      <button
-        type="button"
-        className="jf-btn ghost sm"
-        onClick={(event) => {
-          event.stopPropagation()
-          onOpen()
-        }}
-      >
-        查看岗位
-      </button>
       <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
     </div>
   )

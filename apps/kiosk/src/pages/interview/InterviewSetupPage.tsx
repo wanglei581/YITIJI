@@ -89,11 +89,12 @@ function OptionButton({ active, onClick, children, className = '' }: { active: b
 
 function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: string; desc?: string }) {
   return (
-    <div className="interview-section-title mb-4 flex items-start gap-2">
-      <Icon className="mt-0.5 h-5 w-5 text-primary-600" aria-hidden="true" />
+    <div className="interview-section-title mb-4 flex items-start gap-4">
+      {/* icon box — CSS (.interview-section-title svg) 已处理 56px/plum 配色，不加 text-* 避免冲突 */}
+      <Icon aria-hidden="true" />
       <div>
-        <h2 className="text-base font-semibold text-neutral-900">{title}</h2>
-        {desc && <p className="mt-0.5 text-xs text-neutral-500">{desc}</p>}
+        <h2 className="font-semibold">{title}</h2>
+        {desc && <p className="mt-1">{desc}</p>}
       </div>
     </div>
   )
@@ -101,9 +102,9 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="interview-summary-row flex items-start justify-between gap-4 border-b border-neutral-100 py-3 last:border-b-0">
-      <span className="text-sm text-neutral-500">{label}</span>
-      <span className="max-w-[13rem] text-right text-sm font-semibold text-neutral-900">{value}</span>
+    <div className="interview-summary-row flex items-center justify-between gap-4 border-b py-3 last:border-b-0">
+      <span className="shrink-0">{label}</span>
+      <span className="max-w-[13rem] text-right font-semibold">{value}</span>
     </div>
   )
 }
@@ -289,8 +290,9 @@ export function InterviewSetupPage() {
             <Card className="interview-card p-5">
               <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="上传后面试官会结合经历提问；不上传则按通用问题练习。" />
               {resumeFile ? (
-                <div className="flex items-center justify-between rounded-xl border border-primary-100 bg-primary-50 px-4 py-3">
-                  <span className="truncate text-sm font-medium text-primary-700">{resumeFile.name}</span>
+                <div className="flex items-center justify-between rounded-xl border px-4 py-3"
+                  style={{ borderColor: 'rgba(122,90,134,.35)', background: 'var(--interview-plum-soft, #efe7f1)' }}>
+                  <span className="truncate text-sm font-medium" style={{ color: 'var(--interview-plum-deep, #63466f)' }}>{resumeFile.name}</span>
                   <button
                     type="button"
                     onClick={() => setResumeFile(null)}
@@ -327,7 +329,7 @@ export function InterviewSetupPage() {
                 <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
                 <h2 className="text-base font-semibold text-neutral-900">本次练习摘要</h2>
               </div>
-              <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4">
+              <div className="rounded-xl border px-4" style={{ borderColor: 'var(--interview-line, #e2dccb)', background: 'var(--interview-paper, #f4f1e8)' }}>
                 <SummaryRow label="面试官类型" value={interviewerLabel} />
                 <SummaryRow label="行业" value={industry} />
                 <SummaryRow label="目标岗位" value={positionReady ? position.trim() : '待填写'} />

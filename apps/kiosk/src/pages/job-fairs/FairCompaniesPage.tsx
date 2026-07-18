@@ -3,9 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-print/shared'
 import { COMPANY_SCALE_SHORT } from '../../types/fair'
-import { BuildingIcon, BriefcaseIcon, ChevronRightIcon, MapPinIcon, QrCodeIcon, SearchIcon } from 'lucide-react'
+import { BriefcaseIcon, BuildingIcon, ChevronRightIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
-import { ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
+import { ProtoBadge, ProtoNotice, ProtoPage, SourceMetaChips } from '../jobs-fairs-prototype'
 
 const CHECKIN_LABELS = {
   checked_in: '已签到',
@@ -133,19 +133,16 @@ export function FairCompaniesPage() {
               <span className="jf-row-main">
                 <span className="jf-row-title">
                   <b>{company.companyName}</b>
-                  <span className="jf-kind">{company.industry}</span>
+                  <span className="jf-scale-tag">{COMPANY_SCALE_SHORT[company.scale]}</span>
                   <span className={`jf-chip ${company.checkinStatus === 'checked_in' ? 'ok' : company.checkinStatus === 'pending' ? 'warn' : ''}`}>
                     {CHECKIN_LABELS[company.checkinStatus]}
                   </span>
                 </span>
                 <span className="jf-row-info">
-                  <span>{COMPANY_SCALE_SHORT[company.scale]}</span>
                   {company.boothNumber && (
-                    <span>
-                      <MapPinIcon aria-hidden="true" />
-                      展位 {company.boothNumber}
-                    </span>
+                    <span className="jf-booth-label">展位 {company.boothNumber}</span>
                   )}
+                  <span>{company.industry}</span>
                   {company.positions.length > 0 && (
                     <span>
                       <BriefcaseIcon aria-hidden="true" />
@@ -154,28 +151,27 @@ export function FairCompaniesPage() {
                   )}
                 </span>
                 {company.description && (
-                  <span className="mt-2 block line-clamp-2 text-[18px] leading-relaxed text-[var(--muted)]">
+                  <span className="mt-2 block line-clamp-1 text-[17px] leading-relaxed text-[var(--muted)]">
                     {company.description}
                   </span>
                 )}
-                <span className="jf-row-sub">
-                  <span className="jf-chip">
-                    展区 <b>{company.zoneName ?? '未分区'}</b>
-                  </span>
-                  <span className="jf-chip src">
-                    <QrCodeIcon aria-hidden="true" />
-                    扫码查看
-                  </span>
-                </span>
               </span>
               <span className="jf-btn sm ghost">
-                查看详情
+                查看详情 / 扫码查看
               </span>
               <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
             </button>
           ))
         )}
       </section>
+
+      {fair && (
+        <SourceMetaChips
+          sourceName={fair.sourceName}
+          syncTime={fair.syncTime ?? fair.startTime}
+          externalId={fair.externalId}
+        />
+      )}
 
       <ProtoNotice>
         系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。

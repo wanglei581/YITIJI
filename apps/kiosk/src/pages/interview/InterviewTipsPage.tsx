@@ -17,7 +17,6 @@ import {
   HelpCircleIcon,
   LightbulbIcon,
   MicIcon,
-  SquareIcon,
 } from 'lucide-react'
 import { InterviewTopbar } from './InterviewTopbar'
 import './interview-service-desk.css'
@@ -129,131 +128,145 @@ export function InterviewTipsPage() {
         }
       />
 
-      <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
+      <div className="interview-flow__scroll flex-1 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
           面试是展示自我、与企业双向选择的过程。以下内容为通用准备建议，仅供参考。
         </ComplianceBanner>
 
-        {/* 1. 面试前准备清单（可勾选） */}
-        <Card className="interview-card interview-tips__checklist p-5">
-          <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardListIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-neutral-900">面试前准备清单</h2>
-            </div>
-            <span className="text-xs text-neutral-400">{checked.size}/{CHECKLIST.length} 已完成</span>
-          </div>
-          <div className="interview-tips__progress" aria-hidden="true">
-            <span style={{ width: `${Math.round((checked.size / CHECKLIST.length) * 100)}%` }} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {CHECKLIST.map((item, i) => {
-              const done = checked.has(i)
-              return (
-                <button
-                  key={item.title}
-                  type="button"
-                  onClick={() => toggleCheck(i)}
-                  aria-pressed={done}
-                  className={[
-                    'flex min-h-[56px] items-start gap-3 rounded-xl border px-4 py-3 text-left transition-colors',
-                    done ? 'border-primary-200 bg-primary-50/60' : 'border-neutral-100 bg-white hover:border-neutral-200',
-                  ].join(' ')}
-                >
-                  {done
-                    ? <CheckSquareIcon className="mt-0.5 h-5 w-5 shrink-0 text-primary-600" aria-hidden="true" />
-                    : <SquareIcon className="mt-0.5 h-5 w-5 shrink-0 text-neutral-300" aria-hidden="true" />}
-                  <span>
-                    <span className={['block text-sm font-semibold', done ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{item.title}</span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-neutral-500">{item.desc}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        </Card>
+        {/* 2 列并排（原型 41：左: 准备清单+STAR，右: 高频问题+自我介绍结构）*/}
+        <div className="interview-tips__cols">
 
-        {/* 2. 高频问题卡片（可展开） */}
-        <Card className="interview-card p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <HelpCircleIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-neutral-900">高频问题应对</h2>
-          </div>
-          <div className="flex flex-col gap-2">
-            {FAQS.map((f, i) => {
-              const open = openFaq === i
-              return (
-                <div key={f.q} className="overflow-hidden rounded-xl border border-neutral-100">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(open ? null : i)}
-                    aria-expanded={open}
-                    className="flex min-h-[52px] w-full items-center justify-between gap-3 bg-white px-4 py-3 text-left"
-                  >
-                    <span className="text-sm font-semibold text-neutral-900">“{f.q}”</span>
-                    <ChevronDownIcon
-                      className={['h-4 w-4 shrink-0 text-neutral-400 transition-transform', open ? 'rotate-180' : ''].join(' ')}
-                      aria-hidden="true"
-                    />
-                  </button>
-                  {open && (
-                    <div className="flex flex-col gap-2 border-t border-neutral-100 bg-neutral-50/60 px-4 py-3 text-xs leading-relaxed">
-                      <p><span className="font-semibold text-neutral-700">考察什么：</span><span className="text-neutral-600">{f.examine}</span></p>
-                      <p><span className="font-semibold text-neutral-700">回答结构：</span><span className="text-neutral-600">{f.structure}</span></p>
-                      <p><span className="font-semibold text-error-fg">常见错误：</span><span className="text-neutral-600">{f.mistake}</span></p>
-                      <p><span className="font-semibold text-primary-700">建议：</span><span className="text-neutral-600">{f.tip}</span></p>
-                    </div>
-                  )}
+          {/* ── 左列 ── */}
+          <div className="interview-tips__col">
+
+            {/* 1. 面试前准备清单（可勾选） */}
+            <Card className="interview-card interview-tips__checklist p-5">
+              <div className="interview-tips__checklist-head card-head-row mb-3 flex items-center justify-between">
+                <div className="interview-section-title mb-0 flex items-center gap-4">
+                  <ClipboardListIcon aria-hidden="true" />
+                  <h2 className="font-semibold">面试前准备清单</h2>
                 </div>
-              )
-            })}
-          </div>
-        </Card>
+                <span className="interview-tips__ck-count">{checked.size}/{CHECKLIST.length} 已完成</span>
+              </div>
+              <div className="interview-tips__progress" aria-hidden="true">
+                <span style={{ width: `${Math.round((checked.size / CHECKLIST.length) * 100)}%` }} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                {CHECKLIST.map((item, i) => {
+                  const done = checked.has(i)
+                  return (
+                    <button
+                      key={item.title}
+                      type="button"
+                      onClick={() => toggleCheck(i)}
+                      aria-pressed={done}
+                      className="interview-tips__ck-item"
+                    >
+                      <span className="interview-tips__ck-box" aria-hidden="true">
+                        {done && <CheckSquareIcon />}
+                      </span>
+                      <span>
+                        <span className="interview-tips__ck-title">{item.title}</span>
+                        <span className="interview-tips__ck-desc">{item.desc}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
 
-        {/* 3. STAR 法则（完整版） */}
-        <Card className="interview-card p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <LightbulbIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-neutral-900">行为面试技巧（STAR 法则）</h2>
-          </div>
-          <p className="mb-3 text-xs leading-relaxed text-neutral-500">
-            被问到「讲一段经历」类问题时，用 STAR 四步把事情讲清楚，比泛泛而谈更有说服力。
-          </p>
-          <div className="flex flex-col gap-2">
-            {STAR.map((s) => (
-              <div key={s.k} className="flex items-start gap-3 rounded-xl bg-neutral-50/80 px-4 py-3">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-600 text-sm font-bold text-white">{s.k}</span>
+            {/* 3. STAR 法则（完整版） */}
+            <Card className="interview-card p-5">
+              <div className="interview-section-title mb-3 flex items-center gap-4">
+                <LightbulbIcon aria-hidden="true" />
                 <div>
-                  <p className="text-sm font-semibold text-neutral-900">{s.name}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-neutral-600">{s.desc}</p>
+                  <h2 className="font-semibold">行为面试技巧（STAR 法则）</h2>
+                  <p className="mt-1 text-sm">讲经历时四步说清，比泛泛而谈更有说服力</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* 4. 自我介绍结构 */}
-        <Card className="interview-card p-5">
-          <div className="mb-3 flex items-center gap-2">
-            <MicIcon className="h-4 w-4 text-primary-600" aria-hidden="true" />
-            <h2 className="text-base font-semibold text-neutral-900">自我介绍结构建议</h2>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-3">
-            {INTRO_STRUCTURES.map((it) => (
-              <div key={it.duration} className="rounded-xl border border-neutral-100 bg-white p-3.5">
-                <p className="mb-2 text-sm font-bold text-primary-700">{it.duration}版</p>
-                <ol className="flex flex-col gap-1.5">
-                  {it.points.map((p, i) => (
-                    <li key={p} className="flex items-start gap-1.5 text-xs leading-relaxed text-neutral-600">
-                      <span className="font-semibold text-neutral-400">{i + 1}.</span>
-                      {p}
-                    </li>
-                  ))}
-                </ol>
+              <div className="flex flex-col gap-2">
+                {STAR.map((s) => (
+                  <div key={s.k} className="interview-tips__star-row">
+                    <span className="interview-tips__star-key">{s.k}</span>
+                    <div>
+                      <p className="interview-tips__star-name">{s.name}</p>
+                      <p className="interview-tips__star-desc">{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </Card>
           </div>
-        </Card>
+
+          {/* ── 右列 ── */}
+          <div className="interview-tips__col">
+
+            {/* 2. 高频问题（手风琴） */}
+            <Card className="interview-card p-5">
+              <div className="interview-section-title mb-3 flex items-center gap-4">
+                <HelpCircleIcon aria-hidden="true" />
+                <div>
+                  <h2 className="font-semibold">高频问题应对</h2>
+                  <p className="mt-1 text-sm">点击展开查看回答思路</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                {FAQS.map((f, i) => {
+                  const open = openFaq === i
+                  return (
+                    <div key={f.q} className="interview-tips__faq">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaq(open ? null : i)}
+                        aria-expanded={open}
+                        className="interview-tips__faq-q"
+                      >
+                        <span>「{f.q}」</span>
+                        <ChevronDownIcon
+                          className={['interview-tips__faq-arrow', open ? 'is-open' : ''].filter(Boolean).join(' ')}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {open && (
+                        <div className="interview-tips__faq-a">
+                          <p><b>考察什么：</b>{f.examine}</p>
+                          <p><b>回答结构：</b>{f.structure}</p>
+                          <p><b className="interview-tips__faq-warn">常见错误：</b>{f.mistake}</p>
+                          <p><b className="interview-tips__faq-tip">建议：</b>{f.tip}</p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+
+            {/* 4. 自我介绍结构 */}
+            <Card className="interview-card p-5">
+              <div className="interview-section-title mb-3 flex items-center gap-4">
+                <MicIcon aria-hidden="true" />
+                <div>
+                  <h2 className="font-semibold">自我介绍结构建议</h2>
+                </div>
+              </div>
+              <div className="interview-tips__intro-grid">
+                {INTRO_STRUCTURES.map((it) => (
+                  <div key={it.duration} className="interview-tips__intro">
+                    <b>{it.duration}版</b>
+                    <ol>
+                      {it.points.map((p, idx) => (
+                        <li key={p}>
+                          <i>{idx + 1}.</i>
+                          {p}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        </div>
       </div>
 
       {/* 底部 CTA */}

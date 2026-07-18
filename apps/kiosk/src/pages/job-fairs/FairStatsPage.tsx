@@ -115,35 +115,21 @@ export function FairStatsPage() {
           <BigStat
             label="参展企业"
             value={stats.totalCompanies}
-            note={`已签到 ${stats.checkedInCompanies}`}
+            note={`已签到 ${stats.checkedInCompanies} 家 · 主办方同步`}
             icon={BuildingIcon}
             accent="bg-primary-50 text-primary-600"
           />
           <BigStat
             label="招聘岗位"
             value={stats.totalPositions}
-            note={`合计 ${stats.totalHeadcount} 人次`}
+            note={`计划招聘 ${stats.totalHeadcount.toLocaleString()} 人 · 主办方提供`}
             icon={BriefcaseIcon}
             accent="bg-success-bg text-success-fg"
-          />
-          <BigStat
-            label="资料打印"
-            value={stats.printCount}
-            note="现场服务次数"
-            icon={PrinterIcon}
-            accent="bg-warning-bg text-warning-fg"
-          />
-          <BigStat
-            label="二维码展示"
-            value={stats.scanCount}
-            note="来源平台入口展示"
-            icon={QrCodeIcon}
-            accent="bg-primary-50 text-primary-600"
           />
         </div>
 
         <section className="jf-card accented">
-          <CardHead icon={TrendingUpIcon} title="服务数据统计" subtitle="系统服务行为，不含求职者个人信息" />
+          <CardHead icon={TrendingUpIcon} title="服务数据统计" subtitle="本终端服务行为统计 · 不含求职者个人信息" />
           <div className="jf-service4">
             <div className="jf-sv">
               <ScanIcon aria-hidden="true" />
@@ -163,7 +149,7 @@ export function FairStatsPage() {
             <div className="jf-sv">
               <UsersIcon aria-hidden="true" />
               <b>{stats.checkinCount}</b>
-              <span>现场签到</span>
+              <span>外部跳转</span>
             </div>
           </div>
         </section>

@@ -56,9 +56,10 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
           className={[
             'flex min-h-[58px] flex-1 items-center justify-center gap-2 rounded-full border px-5 text-[20px] transition-colors active:scale-[.98]',
             active === key
-              ? 'border-warning/50 bg-warning-bg font-semibold text-warning-fg'
+              ? 'font-semibold text-wheat-fg bg-wheat-bg'
               : 'border-neutral-200 bg-surface font-medium text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
           ].join(' ')}
+          style={active === key ? { borderColor: 'rgba(169,120,31,.50)' } : undefined}
         >
           <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
           {label}
@@ -88,9 +89,10 @@ export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChan
               className={[
                 'flex min-h-[56px] items-center justify-center gap-2 rounded-full border px-6 text-[19px] transition-colors active:scale-[.98]',
                 activeChip
-                  ? 'border-warning/50 bg-warning-bg font-semibold text-warning-fg'
+                  ? 'font-semibold text-wheat-fg bg-wheat-bg'
                   : 'border-neutral-200 bg-white font-medium text-neutral-600 hover:border-neutral-300',
               ].join(' ')}
+              style={activeChip ? { borderColor: 'rgba(169,120,31,.50)' } : undefined}
             >
               <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
               {label}
@@ -119,11 +121,11 @@ export function DetailList({ icon: Icon, iconColor, title, items, ordered }: {
         {items.map((text, i) => (
           <li key={i} className="flex items-start gap-3 rounded-[12px] border border-neutral-200 bg-neutral-50 px-3.5 py-2.5 text-[18px] leading-relaxed text-neutral-700">
             {ordered ? (
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-warning/20 text-[16px] font-bold text-warning-fg">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[16px] font-bold text-wheat-fg bg-wheat-bg">
                 {i + 1}
               </span>
             ) : (
-              <CheckCircle2Icon className="mt-0.5 h-6 w-6 shrink-0 text-warning-fg" aria-hidden="true" />
+              <CheckCircle2Icon className="mt-0.5 h-6 w-6 shrink-0 text-wheat-fg" aria-hidden="true" />
             )}
             {text}
           </li>

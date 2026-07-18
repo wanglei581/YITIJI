@@ -287,11 +287,11 @@ export function JobDetailPage() {
       <JobNextActionsSection
         job={currentJob}
         sourceCanApply={sourceCanApply}
-        onOpenSource={openSourcePlatform}
         onOpenQr={openSourceQr}
         onViewCompany={viewCompany}
         onExplainAi={() => void startExplain()}
         onMatchAi={() => void startMatch()}
+        onPrint={() => navigate('/print/upload', { state: { source: 'job_detail', jobId: currentJob.id, jobTitle: currentJob.title } })}
       />
       {(aiLoading || aiError || explanation || matchResult) && (
         <JobAiResultPanel

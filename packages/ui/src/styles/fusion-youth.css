@@ -65,6 +65,8 @@
   --color-clay-soft:   #f4e8dd;
   --color-wheat:       #a9781f;   /* 麦金：政策 */
   --color-wheat-soft:  #f2ead6;
+  --color-wheat-bg:    #f2ead6;   /* alias for bg-wheat-bg utility */
+  --color-wheat-fg:    #8a6219;   /* deep wheat for text-wheat-fg utility */
   --color-plum:        #7a5a86;   /* 梅：权益/AI记录 */
   --color-plum-soft:   #efe7f1;
 

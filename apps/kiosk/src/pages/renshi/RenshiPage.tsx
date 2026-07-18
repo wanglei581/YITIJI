@@ -108,18 +108,19 @@ export function RenshiPage() {
       <PageHeader className="shrink-0" title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
 
       {/* 合规边界：仅信息指引 + 直达 AI 助手政策问答 */}
-      <div className="flex shrink-0 items-center gap-4 rounded-[14px] border border-warning/30 bg-warning-bg px-[22px] py-4">
-        <ShieldCheckIcon className="h-[30px] w-[30px] shrink-0 text-warning-fg" aria-hidden="true" />
+      <div className="flex shrink-0 items-center gap-4 rounded-[14px] border bg-wheat-bg px-[22px] py-4" style={{ borderColor: 'rgba(169,120,31,.35)' }}>
+        <ShieldCheckIcon className="h-[30px] w-[30px] shrink-0 text-wheat-fg" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <p className="text-[21px] font-semibold text-warning-fg">仅信息指引 · 不代办</p>
-          <p className="mt-1 text-[17px] leading-relaxed text-warning-fg/85">
+          <p className="text-[21px] font-semibold text-wheat-fg">仅信息指引 · 不代办</p>
+          <p className="mt-1 text-[17px] leading-relaxed text-wheat-fg/85">
             只做政策说明、材料清单、官方入口与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
           </p>
         </div>
         <button
           type="button"
           onClick={() => navigate('/assistant')}
-          className="flex min-h-[60px] shrink-0 items-center gap-2 rounded-[14px] border border-warning/50 bg-surface px-5 text-[18px] font-semibold text-warning-fg transition-colors hover:bg-warning/20 active:scale-[.98]"
+          className="flex min-h-[60px] shrink-0 items-center gap-2 rounded-[14px] border bg-surface px-5 text-[18px] font-semibold text-wheat-fg transition-colors hover:bg-wheat-soft active:scale-[.98]"
+          style={{ borderColor: 'rgba(169,120,31,.45)' }}
         >
           <MessageCircleQuestionIcon className="h-5 w-5" aria-hidden="true" />
           问 AI 助手
