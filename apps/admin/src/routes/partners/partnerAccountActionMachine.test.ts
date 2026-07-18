@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   initialPartnerAccountActionState,
   reducePartnerAccountAction,
+  shouldExpirePartnerAccountResource,
   type PartnerAccountActionState,
 } from './partnerAccountActionMachine.ts'
 
@@ -174,6 +175,37 @@ test('rebind progresses only through new phone verification before commit', () =
   state = reducePartnerAccountAction(state, { type: 'COMMIT_REBIND' })
   assert.equal(state.step, 'rebind_committing')
   assert.equal(reducePartnerAccountAction(state, { type: 'SUCCESS' }).step, 'success')
+})
+
+test('invalid new-phone code returns to the verification step with the ticket intact', () => {
+  const committing = reducePartnerAccountAction(withRebindTicket(), { type: 'COMMIT_REBIND' })
+  const invalid = reducePartnerAccountAction(committing, { type: 'ERROR', code: 'ACCOUNT_CREDENTIAL_INVALID' })
+  assert.equal(invalid.step, 'new_phone_sms_verify')
+  assert.equal(invalid.busy, false)
+  assert.equal(invalid.rebindTicket, 'rebind-ticket')
+})
+
+test('SMS delivery failures recover according to whether an action ticket was consumed', () => {
+  let challenge = reducePartnerAccountAction(openDelete(), { type: 'CONFIRM' })
+  challenge = reducePartnerAccountAction(challenge, { type: 'CHOOSE_METHOD', method: 'sms' })
+  challenge = reducePartnerAccountAction(challenge, { type: 'REQUEST_STARTED' })
+  const challengeFailed = reducePartnerAccountAction(challenge, { type: 'ERROR', code: 'SMS_SEND_FAILED' })
+  assert.equal(challengeFailed.step, 'choose_method')
+  assert.equal(challengeFailed.busy, false)
+
+  const rebindStart = reducePartnerAccountAction(withDeleteTicket(), { type: 'SWITCH_ACTION', action: 'rebind_phone' })
+  const authorized = { ...rebindStart, step: 'new_phone_input' as const, actionTicket: 'ticket-rebind' }
+  const sending = reducePartnerAccountAction(authorized, { type: 'REQUEST_STARTED' })
+  const sendFailed = reducePartnerAccountAction(sending, { type: 'ERROR', code: 'SMS_TOO_FREQUENT' })
+  assert.equal(sendFailed.step, 'confirm_rebind')
+  assert.equal(sendFailed.actionTicket, undefined)
+})
+
+test('deadline expiry never aborts an in-flight request', () => {
+  const ready = withDeleteTicket()
+  assert.equal(shouldExpirePartnerAccountResource(ready, ready.actionTicket, 1_000, 1_000), true)
+  const committing = reducePartnerAccountAction(ready, { type: 'COMMIT_DELETE' })
+  assert.equal(shouldExpirePartnerAccountResource(committing, committing.actionTicket, 1_000, 2_000), false)
 })
 
 test('close and success reset all in-memory bearer state', () => {

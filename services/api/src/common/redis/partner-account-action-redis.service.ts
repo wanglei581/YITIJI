@@ -303,20 +303,22 @@ export class PartnerAccountActionRedisService {
     await this.revokeScoped(this.rebindKey(sha256(ticket)), scope)
   }
 
-  async setAdminRecentVerification(adminId: string, tokenVersion: number): Promise<void> {
+  async setAdminRecentVerification(adminId: string, sessionId: string, tokenVersion: number): Promise<void> {
     assertKeyPart(adminId, 'adminId')
+    assertKeyPart(sessionId, 'adminSessionId')
     assertVersion(tokenVersion, 'adminTokenVersion')
     await this.client.set(
-      this.adminRecentKey(adminId),
+      this.adminRecentKey(adminId, sessionId),
       JSON.stringify({ tokenVersion, expiresAt: Date.now() + ADMIN_RECENT_TTL_SECONDS * 1_000 }),
       'EX',
       ADMIN_RECENT_TTL_SECONDS,
     )
   }
 
-  async getAdminRecentVerification(adminId: string): Promise<number | null> {
+  async getAdminRecentVerification(adminId: string, sessionId: string): Promise<number | null> {
     assertKeyPart(adminId, 'adminId')
-    const raw = await this.client.get(this.adminRecentKey(adminId))
+    assertKeyPart(sessionId, 'adminSessionId')
+    const raw = await this.client.get(this.adminRecentKey(adminId, sessionId))
     if (!raw) return null
     try {
       const value = JSON.parse(raw) as { tokenVersion?: unknown; expiresAt?: unknown }
@@ -363,9 +365,10 @@ export class PartnerAccountActionRedisService {
     await this.client.del(this.passwordFailureKey(subject, id))
   }
 
-  async clearAdminRecentVerification(adminId: string): Promise<void> {
+  async clearAdminRecentVerification(adminId: string, sessionId: string): Promise<void> {
     assertKeyPart(adminId, 'adminId')
-    await this.client.del(this.adminRecentKey(adminId))
+    assertKeyPart(sessionId, 'adminSessionId')
+    await this.client.del(this.adminRecentKey(adminId, sessionId))
   }
 
   private async revokeScoped(key: string, scope: TicketScope): Promise<void> {
@@ -389,7 +392,9 @@ export class PartnerAccountActionRedisService {
     return `${this.ns}:active:${value.adminId}:${value.partnerId}:${value.action}`
   }
   private commitLockKey(orgId: string): string { return `${this.ns}:commit-lock:${orgId}:account-membership` }
-  private adminRecentKey(adminId: string): string { return `${this.ns}:admin-recent-verify:${adminId}` }
+  private adminRecentKey(adminId: string, sessionId: string): string {
+    return `${this.ns}:admin-recent-verify:${adminId}:${sessionId}`
+  }
   private passwordFailureKey(subject: 'admin' | 'partner', id: string): string {
     return `${this.ns}:${subject}-password-fail:${id}`
   }

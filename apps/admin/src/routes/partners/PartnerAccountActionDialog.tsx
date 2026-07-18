@@ -10,7 +10,7 @@ const errorMessages: Record<string, string> = {
   ACCOUNT_CREDENTIAL_INVALID: '验证码或目标账号密码不正确，请重试。',
   ACCOUNT_CREDENTIAL_LOCKED: '验证尝试次数过多，请等待限制解除后重新开始。',
   ACCOUNT_ACTION_METHOD_UNAVAILABLE: '当前验证方式已不可用，请选择其他方式。',
-  ACCOUNT_PASSWORD_PROOF_NOT_READY: '目标账号密码验证尚未就绪，请由持有人先完成一次自助改密。',
+  ACCOUNT_PASSWORD_PROOF_NOT_READY: '目标账号密码尚无独立持有人证明，请使用已验证手机号或完成线下核验恢复。',
   ACCOUNT_ACTION_TICKET_STALE: '账号信息已被其他操作更新，请刷新后重新开始。',
   ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE: '安全验证已过期或被替换，请重新开始。',
   ACCOUNT_ACTION_STEP_UP_REQUIRED: '安全授权已失效，请重新开始验证。',
@@ -19,6 +19,13 @@ const errorMessages: Record<string, string> = {
   LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED: '该机构必须保留至少一个已启用账号，请先新增并启用接替账号。',
   ACCOUNT_NOT_FOUND: '账号已不存在或已被其他操作更新，机构详情已刷新。',
   NETWORK_ERROR: '网络状态异常，未自动重试最终操作；请以刷新后的机构详情为准。',
+  SMS_TOO_FREQUENT: '验证码发送过于频繁，请稍后重试或改用其他验证方式。',
+  SMS_DAILY_LIMIT: '今日验证码请求次数已达上限，请改用其他验证方式或稍后处理。',
+  SMS_IP_LIMIT: '当前网络请求验证码过于频繁，请稍后重试。',
+  SMS_DEVICE_LIMIT: '当前设备请求验证码过于频繁，请稍后重试。',
+  SMS_PROVIDER_PHONE_DAILY_LIMIT: '该手机号今日短信发送次数已达上限，请稍后处理。',
+  SMS_PROVIDER_RATE_LIMIT: '短信通道繁忙，请稍后重试。',
+  SMS_SEND_FAILED: '短信发送失败；若旧因子授权已被消费，请重新完成安全验证。',
 }
 
 function secondsLeft(deadline: number, nowMs: number): number {
@@ -53,7 +60,7 @@ export function PartnerAccountActionDialog({
       if (trigger?.isConnected) trigger.focus()
       else fallbackFocusRef.current?.focus()
     })
-  }, [fallbackFocusRef, flow.triggerElementRef, open])
+  }, [fallbackFocusRef, flow.triggerElementRef, open, state.step])
 
   if (!open || !flow.account) return null
 

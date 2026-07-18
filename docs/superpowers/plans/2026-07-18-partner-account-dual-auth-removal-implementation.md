@@ -218,7 +218,9 @@ git commit -m "test: define partner account action security gates"
 ```ts
 assert.equal(created.passwordProofState, 'temporary');
 assert.equal(reset.passwordProofState, 'temporary');
-assert.equal(changed.passwordProofState, 'owner_managed');
+assert.equal(adminChanged.passwordProofState, 'owner_managed');
+assert.equal(temporaryPartnerChanged.passwordProofState, 'temporary');
+assert.equal(legacyPartnerChanged.passwordProofState, 'legacy');
 assert.equal(recovered.passwordProofState, 'owner_managed');
 assert.equal(changed.tokenVersion, before.tokenVersion + 1);
 ```
@@ -255,7 +257,7 @@ export type PasswordProofState = (typeof PASSWORD_PROOF_STATE)[keyof typeof PASS
 export const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60;
 ```
 
-`createOrg`/`createAccount`/`resetAccountPassword` 和 `seed.ts` 中任何 Admin 可知密码写入均写 `temporary`；`changePassword`/`completePasswordReset` 在与 `passwordHash` 和 `tokenVersion: { increment: 1 }` 同一个 update/updateMany 中写 `owner_managed`。每个写入值用 `satisfies PasswordProofState` 或类型化 helper 限制，不把 SQLite `CHECK` 当作唯一防线。墓碑删除写 `temporary`，并把 `JwtAuthGuard`、凭据变更和删除会话发布 TTL 统一引用共享常量。`AdminOrgAccount` 类型、map/select 和可用验证方式计算移入 `admin-org-account-view.ts`，避免 792 行的 service 越过 800 行红线。
+`createOrg`/`createAccount`/`resetAccountPassword` 和 `seed.ts` 中任何 Admin 可知密码写入均写 `temporary`；`changePassword` 对 Admin 可写 `owner_managed`，对 Partner 必须保留既有证明状态，不得把 Admin 已知的 `temporary` 或未确认归属的 `legacy` 升级；只有通过已验证手机执行 `completePasswordReset` 才在与 `passwordHash` 和 `tokenVersion: { increment: 1 }` 同一个 update/updateMany 中写 `owner_managed`。每个写入值用 `satisfies PasswordProofState` 或类型化 helper 限制，不把 SQLite `CHECK` 当作唯一防线。墓碑删除写 `temporary`，并把 `JwtAuthGuard`、凭据变更和删除会话发布 TTL 统一引用共享常量。`AdminOrgAccount` 类型、map/select 和可用验证方式计算移入 `admin-org-account-view.ts`，避免 792 行的 service 越过 800 行红线。
 
 - [ ] **Step 4: 生成 Prisma client 并跑 GREEN**
 
@@ -477,7 +479,7 @@ revokeRebindTicket(admin: AuthedUser, orgId: string, partnerId: string, rebindTi
 
 换绑细节下沉到 `PartnerPhoneRebindService`：`start` 消费 `rebind_phone` action ticket，规范化/加密/哈希新手机号，创建 rebind ticket 并发送新 purpose OTP；`phoneMasked` 必须由 `decryptPhone(newPhoneEnc)` 后的规范化值计算，并在测试中与最终账号脱敏号码相等。`verify` 原子消费 OTP + rebind ticket，在 Serializable 事务内重读版本和唯一性，写 `phoneHash/phoneEnc/phoneVerifiedAt/tokenVersion+1`，捕获 Prisma `P2002` 返回 `PHONE_TAKEN`，提交后发布高版本会话。两个 service 均保持低于 400 行。
 
-`AuthController` 新增受 `JwtAuthGuard` 保护的 `POST /auth/logout`：Admin 调用 `clearAdminRecentVerification(user.userId)`，Partner 仅返回 `{ loggedOut: true }`。JSDoc 必须明确“只撤销近期高风险验证，不会服务端撤销无 jti 的当前 JWT”。Admin 前端 `logout()` 先捕获当前 bearer token 并 best-effort 发送该请求，再立即执行现有 `clearAuth()`；网络失败不阻止本地退出。
+`AuthController` 新增受 `JwtAuthGuard` 保护的 `POST /auth/logout`：Admin 仅在 Guard 提供非空 `sessionId` 时调用 `clearAdminRecentVerification(user.userId, user.sessionId)`，缺失会话标识必须 fail closed，Partner 仅返回 `{ loggedOut: true }`。新签发的内部 JWT 带随机 `jti`，Guard 使用当前 Bearer Token 的 SHA-256 指纹作为 `sessionId`，同秒多次登录也不得共享近期验证。JSDoc 必须明确“只撤销当前 jti 对应会话的近期高风险验证，不声称服务端撤销已签发 JWT”。Admin 前端 `logout()` 先捕获当前 bearer token 并 best-effort 发送该请求，再立即执行现有 `clearAuth()`；网络失败不阻止本地退出。
 
 - [ ] **Step 4: 用专用 controller 收紧路由**
 
@@ -653,7 +655,7 @@ OTP 输入为 6 位数字且 `autoComplete="one-time-code"`。两个密码输入
 
 - [ ] **Step 4: 缩减 PartnerAccountManager 为编排入口**
 
-`PartnerAccountManager` 只保留账号列表、新增/重置/启停与打开 action dialog，不保存 challenge/ticket/倒计时。每行使用可换行的“账号安全操作”组，不新增页面。如 `availableActionVerificationMethods.length === 0`，禁用移除/换绑并就地说明“该账号安全验证未就绪，请让持有人在登录态完成自助改密；原手机也不可用时只能走独立线下核验，本系统不提供管理员绕过”。成功后调用已有 `onChanged` 刷新详情；删除成功因触发按钮消失，焦点落到账号区标题/容器。删除旧 `PartnerAccountDeletionDialog.tsx`前确认只有 Manager import。
+`PartnerAccountManager` 只保留账号列表、新增/重置/启停与打开 action dialog，不保存 challenge/ticket/倒计时。每行使用可换行的“账号安全操作”组，不新增页面。如 `availableActionVerificationMethods.length === 0`，禁用移除/换绑并就地说明“该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过”。成功后调用已有 `onChanged` 刷新详情；删除成功因触发按钮消失，焦点落到账号区标题/容器。删除旧 `PartnerAccountDeletionDialog.tsx`前确认只有 Manager import。
 
 - [ ] **Step 5: 跑 UI GREEN 和生产构建**
 

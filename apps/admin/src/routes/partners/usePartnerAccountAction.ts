@@ -9,6 +9,7 @@ import {
 import {
   initialPartnerAccountActionState,
   reducePartnerAccountAction,
+  shouldExpirePartnerAccountResource,
   type PartnerAccountActionState,
 } from './partnerAccountActionMachine'
 
@@ -184,16 +185,19 @@ export function usePartnerAccountAction(
     const snapshot = stateRef.current
     if (snapshot.busy) return
     invalidateOperation()
+    const operationId = operationIdRef.current
     clearTiming()
     dispatch({ type: 'CHOOSE_METHOD', method })
     await revokeResources(snapshot, accountRef.current)
+    if (operationId !== operationIdRef.current) return
     await createChallenge(method)
   }, [clearTiming, createChallenge, invalidateOperation, revokeResources])
 
   const verifyCredential = useCallback(async (value: string) => {
     const snapshot = stateRef.current
     const target = accountRef.current
-    if (!target || !snapshot.challengeId || !snapshot.verifyMethod) return
+    if (!target || !snapshot.challengeId || !snapshot.verifyMethod
+      || (snapshot.step !== 'sms_verify' && snapshot.step !== 'password_verify')) return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -222,7 +226,7 @@ export function usePartnerAccountAction(
   const startRebind = useCallback(async (newPhone: string) => {
     const snapshot = stateRef.current
     const target = accountRef.current
-    if (!target || !snapshot.actionTicket) return
+    if (!target || !snapshot.actionTicket || snapshot.step !== 'new_phone_input') return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -252,7 +256,8 @@ export function usePartnerAccountAction(
   const resendNewPhoneCode = useCallback(async () => {
     const snapshot = stateRef.current
     const target = accountRef.current
-    if (!target || !snapshot.rebindTicket || Date.now() < resendAvailableAt) return
+    if (!target || !snapshot.rebindTicket || snapshot.step !== 'new_phone_sms_verify'
+      || Date.now() < resendAvailableAt) return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -287,7 +292,7 @@ export function usePartnerAccountAction(
   const verifyNewPhone = useCallback(async (code: string) => {
     const snapshot = stateRef.current
     const target = accountRef.current
-    if (!target || !snapshot.rebindTicket) return
+    if (!target || !snapshot.rebindTicket || snapshot.step !== 'new_phone_sms_verify') return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -312,7 +317,7 @@ export function usePartnerAccountAction(
   const commitDelete = useCallback(async () => {
     const snapshot = stateRef.current
     const target = accountRef.current
-    if (!target || !snapshot.actionTicket) return
+    if (!target || !snapshot.actionTicket || snapshot.step !== 'delete_ready') return
     const operationId = operationIdRef.current
     const controller = new AbortController()
     controllerRef.current = controller
@@ -340,8 +345,8 @@ export function usePartnerAccountAction(
 
   useEffect(() => {
     const expire = (kind: DeadlineKind, ticket: string | undefined, deadline: number) => {
-      if (!ticket || deadline === 0 || deadline > nowMs) return false
       const snapshot = stateRef.current
+      if (!shouldExpirePartnerAccountResource(snapshot, ticket, deadline, nowMs)) return false
       invalidateOperation()
       void revokeResources(snapshot, accountRef.current)
       clearTiming()

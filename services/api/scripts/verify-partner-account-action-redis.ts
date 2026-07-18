@@ -242,11 +242,12 @@ await withCase('rebind-sms', async (service, ns) => {
 })
 
 await withCase('recent-and-failures', async (service, ns) => {
-  assert.equal(await service.getAdminRecentVerification('admin-1'), null)
-  await service.setAdminRecentVerification('admin-1', 7)
-  assert.equal(await service.getAdminRecentVerification('admin-1'), 7)
-  await service.clearAdminRecentVerification('admin-1')
-  assert.equal(await service.getAdminRecentVerification('admin-1'), null)
+  assert.equal(await service.getAdminRecentVerification('admin-1', 'session-a'), null)
+  await service.setAdminRecentVerification('admin-1', 'session-a', 7)
+  assert.equal(await service.getAdminRecentVerification('admin-1', 'session-a'), 7)
+  assert.equal(await service.getAdminRecentVerification('admin-1', 'session-b'), null)
+  await service.clearAdminRecentVerification('admin-1', 'session-a')
+  assert.equal(await service.getAdminRecentVerification('admin-1', 'session-a'), null)
 
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     assert.equal(await service.reservePasswordAttempt('admin', 'admin-1'), true)

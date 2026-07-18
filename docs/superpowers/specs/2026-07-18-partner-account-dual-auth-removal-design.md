@@ -109,14 +109,14 @@ passwordProofState: legacy | temporary | owner_managed
 
 - 既有历史账号迁移为 `legacy`。
 - Admin 新建账号或重置密码后为 `temporary`。
-- Partner 在登录态下完成自助改密，或通过已验证手机号完成找回密码后为 `owner_managed`。
+- 通过已验证手机号完成找回密码后为 `owner_managed`；登录态自助改密只保留既有证明状态，不能把 Admin 已知的 `temporary` 或未确认归属的 `legacy` 升级为持有人证明。
 - 墓碑删除后该字段保留无业务意义的安全默认值，不再用于认证。
 
-密码降级授权只接受 `owner_managed`。`legacy` 和 `temporary` 返回可执行错误，提示先让账号本人完成一次自助改密；不能静默退化为 Admin 设置密码也可删除。
+密码降级授权只接受 `owner_managed`。`legacy` 和 `temporary` 返回可执行错误：原已验证手机可用时由账号持有人通过手机找回密码，否则进入独立线下核验；不能静默退化为 Admin 设置密码也可删除。
 
-该规则会给旧账号增加一次过渡动作，但能够明确关闭“先重置目标密码，再用新密码删除”的直接绕过。任何状态变化均随密码更新一起提交并递增 `tokenVersion`。Partner 自助改密完成后当前旧会话随版本变化失效，需要使用新密码重新登录；这是有意的高风险凭据轮换行为，UI 必须在提交前提示。
+该规则能够明确关闭“先重置目标密码，再用新密码删除”和“用 Admin 预录手机号自行建立短信因子”两条绕过。任何密码更新均递增 `tokenVersion`。Partner 自助改密完成后当前旧会话失效，但证明状态仍保持原值；只有已验证手机找回或未来单独批准的线下恢复才能建立新的持有人证明。
 
-上线影响必须显式告知：所有历史账号初始为 `legacy`，在本人完成一次自助改密或通过原绑定手机号找回密码前，密码回退不可用；管理员新建或重置后的 `temporary` 账号同样如此。上线前应在账号列表展示“密码验证尚未就绪”，并通知机构账号本人在手机号仍可用或仍能登录时完成一次自助改密。
+上线影响必须显式告知：所有历史账号初始为 `legacy`，在通过原已验证手机号找回密码或完成未来单独批准的线下恢复前，密码回退不可用；管理员新建或重置后的 `temporary` 账号同样如此。上线前应在账号列表展示“密码验证尚未就绪”，并通知机构账号持有人在原已验证手机仍可用时完成找回密码。
 
 如果账号同时满足“原手机号不可用”和“密码证明不是 `owner_managed`”，本功能必须拒绝删除和换绑，不提供超级管理员、客服口令或 Admin 重置密码绕过。此类遗留账号只能进入独立、留痕、线下核验的恢复流程；恢复流程不在本任务范围内，未另行设计和批准前不得实现。
 
@@ -129,7 +129,7 @@ passwordProofState: legacy | temporary | owner_managed
 - `AdminOrgsService`：继续负责机构归属检查、最后有效账号保护和墓碑删除事务。
 - `PartnerAccountActionService`：安全挑战、Admin 近期验证、目标短信/密码验证、票据签发与消费、换绑事务编排。
 - `InternalOtpService`：复用现有限流、发送和验证码原子消费能力，只增加隔离的 purpose。
-- `AuthService`：在自助改密和手机号找回密码完成时维护 `passwordProofState`，并继续发布新会话版本。
+- `AuthService`：自助改密时保留 Partner 既有 `passwordProofState`，通过已验证手机找回密码时设为 `owner_managed`，并继续发布新会话版本。
 - Redis：只保存短期挑战与授权票据，不保存明文密码、验证码副本之外的敏感业务数据或完整手机号。
 
 ## 8. OTP 用途隔离
@@ -184,7 +184,7 @@ internal:partner-account-action:active:<adminId>:<partnerId>:<action>
 internal:partner-account-action:challenge:<challengeId>
 internal:partner-account-action:verified:<ticketHash>
 internal:partner-account-action:rebind:<rebindTicketHash>
-internal:partner-account-action:admin-recent-verify:<adminId>
+internal:partner-account-action:admin-recent-verify:<adminId>:<sessionId>
 internal:partner-account-action:admin-password-fail:<adminId>
 internal:partner-account-action:partner-password-fail:<partnerId>
 internal:partner-account-action:commit-lock:<orgId>:account-membership
@@ -195,7 +195,7 @@ internal:partner-account-action:commit-lock:<orgId>:account-membership
 - `verified:<ticketHash>` 保存已验证操作票据绑定信息，TTL 90 秒。
 - `rebind:<rebindTicketHash>` 保存已验证旧因子、`adminId`、`adminTokenVersion`、`orgId`、`partnerId`、`partnerTokenVersion`、新手机号 hash、加密密文及目标版本，TTL 300 秒；不保存手机号明文。
 - `active:<adminId>:<partnerId>:<action>` 的值为当前 `challengeId`，TTL 300 秒。同一范围创建新挑战时，用 Lua 原子读取旧 active 值、删除其指向的旧 `challenge:<challengeId>`，再写入新 active 指针和挑战。验证接口必须同时确认传入的 `challengeId` 与当前 active 值完全一致；只检查 challenge key 存在不构成有效验证。
-- `admin-recent-verify:<adminId>` 保存 `adminTokenVersion` 和绝对过期时间，TTL 600 秒。
+- `admin-recent-verify:<adminId>:<sessionId>` 保存 `adminTokenVersion` 和绝对过期时间，TTL 600 秒；`sessionId` 是当前 Bearer Token 的 SHA-256 指纹。新签发的内部 JWT 带随机 `jti`，确保同一账号同秒多次登录也不共享近期验证。
 - 删除提交锁按机构而不是目标账号加锁，避免两个不同目标账号并发删除绕过“至少一个有效账号”约束。锁值为服务端 `requestId`，TTL 60 秒，覆盖已有 Serializable 事务最多 3 次重试的理论上界，且只能由持有相同 `requestId` 的请求通过 Lua 安全释放。
 
 Redis 不承担最终授权事实。最终写入前仍须回数据库校验 Admin、机构、Partner、`deletedAt`、`enabled`、`tokenVersion` 和手机号唯一性。
@@ -209,7 +209,7 @@ Redis 不承担最终授权事实。最终写入前仍须回数据库校验 Admi
 - 前端不得把 Admin 密码写入 localStorage、sessionStorage、全局状态或日志，只保留在当前受控输入框并在请求结束后清空。
 - 前端必须明确区分“管理员本人密码”和“目标机构账号密码”，避免输入错误账号凭据。
 
-新增受保护的 `POST /api/v1/auth/logout`，用于在 Admin 显式退出时撤销该 Admin 的近期高风险验证；Partner 调用返回同样的 `{ "loggedOut": true }` 但不影响任何 Admin key。当前内部 JWT 没有单会话 `jti`，因此该端点只负责近期验证撤销，不对外声称服务端已撤销当前 JWT；前端仍按现有方式立即清除本地 token。
+新增受保护的 `POST /api/v1/auth/logout`，用于在 Admin 显式退出时撤销当前 `jti` 对应会话的近期高风险验证；Partner 调用返回同样的 `{ "loggedOut": true }` 但不影响任何 Admin key。该端点不对外声称服务端已撤销当前 JWT；前端仍按现有方式立即清除本地 token。`/auth/me` 不回显服务端 `sessionId` 指纹。
 
 ## 11. API 契约
 
@@ -342,7 +342,7 @@ X-Phone-Rebind-Ticket: <opaque-ticket>
 | `ACCOUNT_ACTION_TICKET_STALE` | 409 | Admin 或目标账号版本/状态已变化，刷新后重新验证 |
 | `ACCOUNT_COMMIT_CONFLICT` | 409 | 当前机构有另一账号变更正在提交，在票据有效期内稍后重试 |
 | `ACCOUNT_ACTION_METHOD_UNAVAILABLE` | 422 | 当前验证方式不可用，选择另一方式 |
-| `ACCOUNT_PASSWORD_PROOF_NOT_READY` | 409 | 目标密码仍为旧版或管理员临时密码，先完成本人自助改密 |
+| `ACCOUNT_PASSWORD_PROOF_NOT_READY` | 409 | 目标密码仍为旧版或管理员临时密码；使用已验证手机找回密码，否则走独立线下恢复 |
 | `ACCOUNT_CREDENTIAL_INVALID` | 422 | 验证码或目标密码错误，留在当前步骤重试 |
 | `ACCOUNT_CREDENTIAL_LOCKED` | 429 | 尝试次数过多，等待后重新开始 |
 | `PHONE_TAKEN` | 409 | 更换未占用手机号 |
@@ -429,7 +429,7 @@ new_phone_sms_verify
 - action ticket 展示剩余有效时间，在剩余 15 秒时提示即将过期；rebind ticket 展示独立的 300 秒有效期。无障碍播报只在关键状态和 15 秒提醒时触发，不逐秒打扰读屏。
 - 密码输入允许粘贴和密码管理器，不通过阻止粘贴制造虚假安全；提交成功、切换方式或关闭弹窗时立即清空。
 - 长流程使用稳定挂载的 `role="dialog"`，删除最终确认使用独立挂载的 `role="alertdialog"`，不在同一 DOM node 上动态切换 role；标题/说明关联、Escape、Tab 焦点约束和关闭后的焦点恢复必须保留。
-- 如服务端返回的 `availableActionVerificationMethods` 为空，移除和换绑按钮禁用并就地说明：请账号持有人先完成自助改密；原手机号也不可用时只能走独立线下核验，不提供 Admin 绕过。
+- 如服务端返回的 `availableActionVerificationMethods` 为空，移除和换绑按钮禁用并就地说明：原已验证手机可用时请由账号持有人通过手机找回密码；否则只能走独立线下核验，不提供 Admin 绕过。
 - 成功后刷新机构详情和账号计数；错误保留当前可恢复步骤，但过期、状态变化和锁定错误要求重新开始。
 - action ticket 在最终提交前过期时返回操作起点；rebind ticket 在新手机号验证阶段过期时返回 `confirm_rebind`，重新完成旧因子授权，不能停留在失效步骤继续重发。
 - 多管理员并发导致 `ACCOUNT_ACTION_TICKET_STALE`、`ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE` 或账号已变化时，提示“账号信息已被其他操作更新，请刷新后重新开始”，并刷新机构详情。
@@ -455,7 +455,7 @@ new_phone_sms_verify
 - 验证码和密码累计 5 次失败后锁定；锁定期间正确凭据也被拒绝，必须等待限制解除并重新开始。
 - 三种新增 OTP purpose 共享手机号、IP、设备全局发送配额，切换 purpose 不能放大发送次数。
 - `legacy`、`temporary` 密码不能用于降级授权；`owner_managed` 可以。
-- Admin 重置密码、Partner 自助改密、启停、换绑或删除后，旧挑战和票据因 `tokenVersion` 变化失效。
+- Admin 重置密码、Partner 自助改密、启停、换绑或删除后，旧挑战和票据因 `tokenVersion` 变化失效；Partner 自助改密不升级 `legacy` / `temporary` 证明状态。
 - 新手机号已占用、格式错误、验证码错误或过期时不修改数据库。
 - `start` 检查后新手机号被并发占用时，`verify` 由事务内复核和数据库唯一约束返回 `PHONE_TAKEN`，不覆盖他人手机号。
 - rebind ticket 在 300 秒内可以按冷却规则重发新手机号验证码；超时后必须重新验证旧因子。

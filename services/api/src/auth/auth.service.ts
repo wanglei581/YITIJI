@@ -18,7 +18,11 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
-import { PASSWORD_PROOF_STATE, passwordProofState } from './password-proof-state'
+import {
+  PASSWORD_PROOF_STATE,
+  passwordProofState,
+  passwordProofStateAfterSelfChange,
+} from './password-proof-state'
 
 type LoginPortal = 'admin' | 'partner' | 'kiosk'
 type SmsPortal = 'admin' | 'partner'
@@ -43,6 +47,7 @@ interface InternalUser {
   id: string
   username: string
   passwordHash: string
+  passwordProofState: string
   name: string
   role: string
   orgId: string | null
@@ -232,7 +237,7 @@ export class AuthService {
       where: { id: user.id, deletedAt: null, passwordHash: user.passwordHash },
       data: {
         passwordHash,
-        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.OWNER_MANAGED),
+        passwordProofState: passwordProofStateAfterSelfChange(user.passwordProofState, user.role),
         tokenVersion: { increment: 1 },
       },
     })
@@ -291,6 +296,7 @@ export class AuthService {
     deviceId?: string,
   ): Promise<InternalSendCodeResult> {
     const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     if (!user.phoneEnc) {
       throw new BadRequestException({ error: { code: 'PHONE_NOT_BOUND', message: '当前账号未绑定登录手机号' } })
     }
@@ -301,7 +307,8 @@ export class AuthService {
   }
 
   async verifyAndBindPhone(userId: string, phone: string, code: string): Promise<{ phoneMasked: string; phoneVerifiedAt: Date }> {
-    await this.findUsableSelfPhoneUser(userId)
+    const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     await this.otp.verifyCode(phone, 'bind_phone', code)
     const normalized = normalizePhone(phone)
     const phoneHash = hashPhone(normalized)
@@ -311,7 +318,18 @@ export class AuthService {
     }
     const phoneVerifiedAt = new Date()
     const updated = await this.prisma.user.updateMany({
-      where: { id: userId, enabled: true, deletedAt: null },
+      where: {
+        id: userId,
+        enabled: true,
+        deletedAt: null,
+        phoneEnc: user.phoneEnc,
+        ...(user.role === 'partner'
+          ? {
+              passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
+              tokenVersion: user.tokenVersion,
+            }
+          : {}),
+      },
       data: {
         phoneHash,
         phoneEnc: encryptPhone(normalized),
@@ -327,6 +345,7 @@ export class AuthService {
     code: string,
   ): Promise<{ phoneMasked: string; phoneVerifiedAt: string }> {
     const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     if (!user.phoneEnc) {
       throw new BadRequestException({ error: { code: 'PHONE_NOT_BOUND', message: '当前账号未绑定登录手机号' } })
     }
@@ -409,6 +428,7 @@ export class AuthService {
       role,
       orgId: user.orgId,
       ver: user.tokenVersion,
+      jti: randomUUID(),
     })
 
     return {
@@ -427,6 +447,16 @@ export class AuthService {
   private normalizedPhoneOrNull(value: string): string | null {
     const normalized = normalizePhone(value.trim())
     return isValidCnMobile(normalized) ? normalized : null
+  }
+
+  private assertPartnerPasswordProofReady(user: Pick<InternalUser, 'role' | 'passwordProofState'>): void {
+    if (user.role !== 'partner' || user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED) return
+    throw new HttpException({
+      error: {
+        code: 'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+        message: '该机构账号尚无独立持有人证明，请先完成线下核验恢复',
+      },
+    }, HttpStatus.CONFLICT)
   }
 
   private maskLoginIdentity(value: string): string {

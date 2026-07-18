@@ -69,7 +69,7 @@ export function ActionCredentialSteps({ flow }: { flow: UsePartnerAccountActionR
         <div className="grid gap-2 sm:grid-cols-2">
           <button
             type="button"
-            data-autofocus
+            data-autofocus={methods.includes('sms') ? '' : undefined}
             className={primaryCls}
             disabled={state.busy || !methods.includes('sms')}
             onClick={() => void flow.chooseMethod('sms')}
@@ -78,6 +78,7 @@ export function ActionCredentialSteps({ flow }: { flow: UsePartnerAccountActionR
           </button>
           <button
             type="button"
+            data-autofocus={!methods.includes('sms') && methods.includes('password') ? '' : undefined}
             className={secondaryCls}
             disabled={state.busy || !methods.includes('password')}
             onClick={() => void flow.chooseMethod('password')}

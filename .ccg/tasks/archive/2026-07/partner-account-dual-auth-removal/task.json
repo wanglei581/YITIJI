@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "fullstack-security",
   "currentPhase": "completed",
-  "nextAction": "任务已完成并归档；如用户确认，再另行授权 push / PR / CI / 部署",
+  "nextAction": "本地实现与终审已完成；用户已授权 push / PR / CI，未授权 merge 或部署",
   "createdAt": "2026-07-18T06:53:36Z",
   "branch": "codex/partner-account-dual-auth-removal-design-20260718"
 }

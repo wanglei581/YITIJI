@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   console.log('verify-partner-account-action: PASS')
 }
 
-const ADMIN = { userId: 'admin-a', role: 'admin' as const, orgId: null }
+const ADMIN = { userId: 'admin-a', role: 'admin' as const, orgId: null, sessionId: 'admin-session-a' }
 
 function currentAdmin() {
   return {

@@ -535,7 +535,7 @@ async function main() {
         phoneVerifiedAt: new Date(),
       },
     })
-    await prisma.user.create({
+    const unverified = await prisma.user.create({
       data: {
         username: `via_unverified_${suffix}`,
         passwordHash: await bcrypt.hash(passwordV1, 10),
@@ -544,6 +544,20 @@ async function main() {
         orgId,
         phoneHash: hashPhone(unverifiedPhone),
         phoneEnc: encryptPhone(unverifiedPhone),
+        passwordProofState: 'owner_managed',
+      },
+    })
+    const temporaryPrerecordedPhone = phone('138', 12)
+    const temporaryPrerecordedPartner = await prisma.user.create({
+      data: {
+        username: `via_temporary_prerecorded_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        passwordProofState: 'temporary',
+        name: '管理员预录手机号的临时机构账号',
+        role: 'partner',
+        orgId,
+        phoneHash: hashPhone(temporaryPrerecordedPhone),
+        phoneEnc: encryptPhone(temporaryPrerecordedPhone),
       },
     })
 
@@ -564,6 +578,27 @@ async function main() {
         role: 'partner',
         orgId,
         tokenVersion: 8,
+        passwordProofState: 'owner_managed',
+      },
+    })
+    const temporaryUnboundPartner = await prisma.user.create({
+      data: {
+        username: `via_temporary_partner_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        passwordProofState: 'temporary',
+        name: '管理员重置后的未绑定合作机构账号',
+        role: 'partner',
+        orgId,
+      },
+    })
+    const legacyUnboundPartner = await prisma.user.create({
+      data: {
+        username: `via_legacy_partner_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        passwordProofState: 'legacy',
+        name: '迁移前未确认密码归属的合作机构账号',
+        role: 'partner',
+        orgId,
       },
     })
     const strictTicketKey = (userId: string, ticket: string) => `internal:admin:phone-initial-bind:ticket:${userId}:${ticket}`
@@ -586,6 +621,27 @@ async function main() {
     const byUsername = await auth.login(verified.username, passwordV1, 'partner')
     if (!byUsername.token || byUsername.user.orgId !== orgId) fail('1. 用户名密码登录失败')
     pass('1. 用户名密码登录仍可用')
+    const originalDateNow = Date.now
+    Date.now = () => 1_790_000_000_000
+    let sameSecondLoginA: Awaited<ReturnType<AuthService['login']>>
+    let sameSecondLoginB: Awaited<ReturnType<AuthService['login']>>
+    try {
+      sameSecondLoginA = await auth.login(verified.username, passwordV1, 'partner')
+      sameSecondLoginB = await auth.login(verified.username, passwordV1, 'partner')
+    } finally {
+      Date.now = originalDateNow
+    }
+    const sameSecondPayloadA = jwt.decode(sameSecondLoginA.token) as { jti?: string } | null
+    const sameSecondPayloadB = jwt.decode(sameSecondLoginB.token) as { jti?: string } | null
+    if (
+      sameSecondLoginA.token === sameSecondLoginB.token ||
+      !sameSecondPayloadA?.jti ||
+      !sameSecondPayloadB?.jti ||
+      sameSecondPayloadA.jti === sameSecondPayloadB.jti
+    ) {
+      fail('1a. 同秒两次登录必须签发独立 jti 与不同 token')
+    }
+    pass('1a. 同秒两次登录使用独立 jti 隔离高风险近期验证')
     const byPhone = await auth.login(verifiedPhone, passwordV1, 'partner')
     if (JSON.stringify(byPhone).includes(verifiedPhone)) fail('2. 手机号登录响应泄露明文手机号')
     pass('2. 已验证手机号可作为密码登录账号,且响应不含明文手机号')
@@ -715,6 +771,34 @@ async function main() {
       'PHONE_NOT_BOUND',
       '8g. 旧 phone/verify 对未绑定账号仍拒绝，不作为首次绑定旁路',
     )
+    await expectCode(
+      () => auth.sendOwnPhoneBindCode(temporaryPrerecordedPartner.id, '127.0.0.1'),
+      'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+      '8h. temporary Partner 不能向管理员预录手机号发送验证码',
+    )
+    await expectCode(
+      () => auth.verifyOwnPhoneBindCode(temporaryPrerecordedPartner.id, '123456'),
+      'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+      '8i. temporary Partner 不能验证管理员预录手机号',
+    )
+    await auth.sendOwnPhoneBindCode(unverified.id, '127.0.0.1')
+    const prerecordedCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(unverifiedPhone)}`)
+    if (!prerecordedCode) fail('8j. owner-managed Partner 预录手机号没有生成验证码')
+    await auth.verifyOwnPhoneBindCode(unverified.id, prerecordedCode)
+    const verifiedPrerecorded = await prisma.user.findUniqueOrThrow({ where: { id: unverified.id } })
+    if (!verifiedPrerecorded.phoneVerifiedAt) fail('8j. owner-managed Partner 预录手机号无法完成验证')
+    pass('8h-8j. 旧预录手机号入口按 Partner 持有人证明 fail closed')
+
+    const meResult = AuthController.prototype.me({
+      userId: verified.id,
+      role: 'partner',
+      orgId,
+      sessionId: 'server-only-session-fingerprint',
+    })
+    if (JSON.stringify(meResult).includes('sessionId') || JSON.stringify(meResult).includes('server-only-session-fingerprint')) {
+      fail('8k. /auth/me 不得回显服务端会话指纹')
+    }
+    pass('8k. /auth/me 仅返回公开用户上下文')
 
     const unavailable = 'AUTH_INITIAL_PHONE_BIND_UNAVAILABLE'
     const disabledAdmin = await createStrictAdmin('disabled', 1, false)
@@ -1067,6 +1151,18 @@ async function main() {
     }
     pass('14-17. TTL、P2002、tokenVersion CAS 与并发开始均按严格状态机收口')
 
+    const staleProofPhone = phone('130', 99)
+    const staleProofStart = await initialPhoneBind.start(unboundPartner.id, passwordV1, staleProofPhone, '127.0.0.1')
+    const staleProofCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(staleProofPhone)}`)
+    if (!staleProofCode) fail('18. 证明状态竞态场景没有写入 OTP')
+    await prisma.user.update({ where: { id: unboundPartner.id }, data: { passwordProofState: 'temporary' } })
+    await expectCode(
+      () => initialPhoneBind.verify(unboundPartner.id, staleProofStart.bindTicket, staleProofCode),
+      'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+      '18. start 后被管理员重置为 temporary 的账号不能继续完成绑号',
+    )
+    await prisma.user.update({ where: { id: unboundPartner.id }, data: { passwordProofState: 'owner_managed' } })
+
     const partnerPhone = phone('130', 100)
     const partnerStart = await initialPhoneBind.start(unboundPartner.id, passwordV1, partnerPhone, '127.0.0.1')
     const partnerCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(partnerPhone)}`)
@@ -1077,6 +1173,81 @@ async function main() {
       fail('18. Admin 收紧改动破坏了 Partner 既有首次绑定闭环')
     }
     pass('18. Partner 仍使用主线 InitialPhoneBindService，既有闭环未退化')
+    const sentBeforeUntrustedBind = sms.sent.length
+    for (const [label, userId, offset] of [
+      ['temporary', temporaryUnboundPartner.id, 101],
+      ['legacy', legacyUnboundPartner.id, 102],
+    ] as const) {
+      await expectCode(
+        () => initialPhoneBind.start(userId, passwordV1, phone('130', offset), '127.0.0.1'),
+        'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+        `18a.${label} 密码不能绑定管理员控制的手机号并伪造持有人因子`,
+      )
+    }
+    if (sms.sent.length !== sentBeforeUntrustedBind) fail('18a. 非 owner-managed Partner 被拒绝前不应发送 OTP')
+    pass('18a. temporary / legacy Partner 首次绑号绕过路径均被 fail closed')
+
+    const racingPartner = await prisma.user.create({
+      data: {
+        username: `via_racing_partner_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        passwordProofState: 'owner_managed',
+        name: '并发重置竞态机构账号',
+        role: 'partner',
+        orgId,
+        tokenVersion: 41,
+      },
+    })
+    const racingPhone = phone('130', 103)
+    const racingStart = await initialPhoneBind.start(racingPartner.id, passwordV1, racingPhone, '127.0.0.1')
+    const racingCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(racingPhone)}`)
+    if (!racingCode) fail('18b. 竞态场景没有生成 OTP')
+    let resetInjected = false
+    const racingPrisma = new Proxy(prisma, {
+      get(target, property, receiver) {
+        if (property !== 'user') return Reflect.get(target, property, receiver)
+        return new Proxy(target.user, {
+          get(delegate, method, delegateReceiver) {
+            if (method !== 'updateMany') return Reflect.get(delegate, method, delegateReceiver)
+            return async (args: unknown) => {
+              const request = args as { where?: { id?: string }; data?: { phoneHash?: unknown } }
+              if (!resetInjected && request.where?.id === racingPartner.id && request.data?.phoneHash) {
+                resetInjected = true
+                await prisma.user.update({
+                  where: { id: racingPartner.id },
+                  data: { passwordProofState: 'temporary', tokenVersion: { increment: 1 } },
+                })
+              }
+              return Reflect.apply(delegate.updateMany, delegate, [args])
+            }
+          },
+        })
+      },
+    }) as PrismaService
+    const racingPhoneBind = new InitialPhoneBindService(
+      racingPrisma,
+      redis as unknown as RedisService,
+      otp,
+      audit as unknown as AuditService,
+      auth,
+    )
+    await expectCode(
+      () => racingPhoneBind.verify(racingPartner.id, racingStart.bindTicket, racingCode),
+      'PHONE_BIND_CONFLICT',
+      '18b. 最终写入前发生管理员重置时必须由证明状态与 tokenVersion CAS 拒绝',
+    )
+    const racingAfter = await prisma.user.findUniqueOrThrow({ where: { id: racingPartner.id } })
+    if (
+      !resetInjected ||
+      racingAfter.passwordProofState !== 'temporary' ||
+      racingAfter.tokenVersion !== 42 ||
+      racingAfter.phoneHash ||
+      racingAfter.phoneEnc ||
+      racingAfter.phoneVerifiedAt
+    ) {
+      fail('18b. 并发重置后仍写入了手机号，或未保留重置状态')
+    }
+    pass('18b. Partner 首绑最终写入使用持有人证明与 tokenVersion 双 CAS')
   } finally {
     await cleanup()
     await prisma.onModuleDestroy()

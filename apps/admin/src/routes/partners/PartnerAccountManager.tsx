@@ -259,7 +259,7 @@ export function PartnerAccountManager({
               </div>
               {actionsUnavailable && (
                 <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
-                  该账号安全验证未就绪，请让持有人在登录态完成自助改密；原手机也不可用时只能走独立线下核验，本系统不提供管理员绕过。
+                  该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过。
                 </p>
               )}
             </div>

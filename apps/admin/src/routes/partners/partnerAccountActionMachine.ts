@@ -87,6 +87,12 @@ const RESPONSE_EVENTS = new Set<PartnerAccountActionEvent['type']>([
   'SUCCESS',
 ])
 
+const RESTART_AUTH_ERRORS = new Set<PartnerAccountActionErrorCode>([
+  'ACCOUNT_CREDENTIAL_LOCKED',
+  'ADMIN_CREDENTIAL_LOCKED',
+  'ACCOUNT_ACTION_STEP_UP_REQUIRED',
+])
+
 function startStep(action: PartnerAccountAction): PartnerAccountActionStep {
   return action === 'delete_account' ? 'confirm' : 'confirm_rebind'
 }
@@ -131,7 +137,19 @@ function reduceError(
   state: PartnerAccountActionState,
   code: PartnerAccountActionErrorCode,
 ): PartnerAccountActionState {
+  if (code === 'ACCOUNT_CREDENTIAL_INVALID' && state.step === 'rebind_committing') {
+    return { ...state, step: 'new_phone_sms_verify', busy: false, errorCode: code }
+  }
+
   if (code === 'ACCOUNT_CREDENTIAL_INVALID' || code === 'ADMIN_CREDENTIAL_INVALID') {
+    return { ...state, busy: false, errorCode: code }
+  }
+
+  if (code.startsWith('SMS_')) {
+    if (state.step === 'new_phone_input') return { ...operationStart(state), errorCode: code }
+    if (state.step === 'sms_verify') {
+      return clearAuthorization(state, { step: 'choose_method', errorCode: code })
+    }
     return { ...state, busy: false, errorCode: code }
   }
 
@@ -156,15 +174,20 @@ function reduceError(
     return { ...operationStart(state, true), errorCode: code }
   }
 
-  if (
-    code === 'ACCOUNT_CREDENTIAL_LOCKED' ||
-    code === 'ADMIN_CREDENTIAL_LOCKED' ||
-    code === 'ACCOUNT_ACTION_STEP_UP_REQUIRED'
-  ) {
+  if (RESTART_AUTH_ERRORS.has(code)) {
     return { ...operationStart(state), errorCode: code }
   }
 
   return { ...state, busy: false, errorCode: code }
+}
+
+export function shouldExpirePartnerAccountResource(
+  state: Readonly<PartnerAccountActionState>,
+  ticket: string | undefined,
+  deadline: number,
+  nowMs: number,
+): boolean {
+  return !state.busy && Boolean(ticket) && deadline !== 0 && deadline <= nowMs
 }
 
 export function reducePartnerAccountAction(

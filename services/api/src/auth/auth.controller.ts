@@ -238,20 +238,22 @@ export class AuthController {
   /** 校验 token 是否有效并回显当前用户(前端 boot 时常用) */
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: AuthedUser): ApiResponse<AuthedUser> {
-    return ApiResponse.ok(user)
+  me(@CurrentUser() user: AuthedUser): ApiResponse<Omit<AuthedUser, 'sessionId'>> {
+    return ApiResponse.ok({ userId: user.userId, role: user.role, orgId: user.orgId })
   }
 
   /**
-   * 显式退出只撤销 Admin 近期高风险验证。当前内部 JWT 没有 jti，
-   * 因此本端点不声称在服务端撤销已签发 JWT；客户端仍需立即清除本地 token。
+   * 显式退出只撤销当前 jti 对应会话的 Admin 近期高风险验证。
+   * 本端点不声称在服务端撤销已签发 JWT；客户端仍需立即清除本地 token。
    */
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
   async logout(@CurrentUser() user: AuthedUser): Promise<ApiResponse<{ loggedOut: true }>> {
     if (user.role === 'admin') {
-      await this.partnerAccountActionRedis.clearAdminRecentVerification(user.userId)
+      if (user.sessionId) {
+        await this.partnerAccountActionRedis.clearAdminRecentVerification(user.userId, user.sessionId)
+      }
     }
     return ApiResponse.ok({ loggedOut: true })
   }

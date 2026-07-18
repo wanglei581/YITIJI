@@ -19,16 +19,21 @@ export function PartnerAccountDeleteConfirmationDialog({
   const cancelRef = useRef<HTMLButtonElement>(null)
   const alertRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { cancelRef.current?.focus() }, [])
+  useEffect(() => {
+    if (busy) alertRef.current?.focus()
+    else cancelRef.current?.focus()
+  }, [busy])
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-neutral-950/55 p-4">
       <div
         ref={alertRef}
         role="alertdialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="partner-account-final-delete-title"
         aria-describedby="partner-account-final-delete-description"
+        aria-busy={busy}
         className="w-full max-w-md rounded-xl bg-surface p-5 shadow-xl"
         onKeyDown={(event) => {
           if (event.key === 'Escape' && !busy) {
@@ -39,7 +44,11 @@ export function PartnerAccountDeleteConfirmationDialog({
           }
           if (event.key === 'Tab') {
             const focusable = Array.from(alertRef.current?.querySelectorAll<HTMLButtonElement>('button:not([disabled])') ?? [])
-            if (focusable.length === 0) return
+            if (focusable.length === 0) {
+              event.preventDefault()
+              alertRef.current?.focus()
+              return
+            }
             const first = focusable[0]
             const last = focusable[focusable.length - 1]
             if (event.shiftKey && document.activeElement === first) {

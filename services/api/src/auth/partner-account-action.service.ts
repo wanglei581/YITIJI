@@ -60,16 +60,24 @@ export class PartnerAccountActionService {
     dto: CreatePartnerAccountActionChallengeDto,
     context: OtpRequestContext,
   ): Promise<CreateChallengeResponse> {
+    const adminSessionId = this.requireAdminSessionId(admin)
     const state = await this.loadCurrentState(admin, orgId, partnerId)
     const availableMethods = availablePartnerVerificationMethods(state.partner)
-    if (!availableMethods.includes(dto.verifyMethod)) throw accountActionError(
-      HttpStatus.UNPROCESSABLE_ENTITY,
-      'ACCOUNT_ACTION_METHOD_UNAVAILABLE',
-      '当前验证方式不可用',
-      { availableMethods },
-    )
+    if (!availableMethods.includes(dto.verifyMethod)) {
+      await this.auditEvent(admin.userId, orgId, partnerId, 'org.account.action_verification_failed', {
+        action: dto.action,
+        verifyMethod: dto.verifyMethod,
+        result: 'method_unavailable',
+      })
+      throw accountActionError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ACCOUNT_ACTION_METHOD_UNAVAILABLE',
+        '当前验证方式不可用',
+        { availableMethods },
+      )
+    }
     try {
-      await this.verifyAdminRecentOrPassword(state.admin, dto.adminCurrentPassword)
+      await this.verifyAdminRecentOrPassword(state.admin, adminSessionId, dto.adminCurrentPassword)
     } catch (error) {
       if (dto.adminCurrentPassword !== undefined) {
         const code = httpErrorCode(error)
@@ -103,13 +111,23 @@ export class PartnerAccountActionService {
         : 'partner_phone_rebind_authorize' as const
       binding.phoneHash = state.partner.phoneHash!
       binding.otpPurpose = purpose
-      const sent = await this.otp.sendCode({
-        phone,
-        purpose,
-        ip: context.ip,
-        deviceId: context.deviceId,
-        shouldDeliver: true,
-      })
+      let sent: Awaited<ReturnType<InternalOtpService['sendCode']>>
+      try {
+        sent = await this.otp.sendCode({
+          phone,
+          purpose,
+          ip: context.ip,
+          deviceId: context.deviceId,
+          shouldDeliver: true,
+        })
+      } catch (error) {
+        await this.auditEvent(admin.userId, orgId, partnerId, 'org.account.action_verification_failed', {
+          action: dto.action,
+          verifyMethod: dto.verifyMethod,
+          result: 'otp_delivery_failed',
+        })
+        throw error
+      }
       phoneMasked = maskPhone(phone)
       cooldownSeconds = sent.cooldownSeconds
     }
@@ -139,7 +157,12 @@ export class PartnerAccountActionService {
     const credential = assertExactCredentialDto(dto)
     const challenge = await this.loadChallenge(challengeId)
     if (!challenge || challenge.adminId !== admin.userId || challenge.orgId !== orgId
-      || challenge.partnerId !== partnerId) throw accountActionChallengeUnavailable()
+      || challenge.partnerId !== partnerId) {
+      await this.auditEvent(admin.userId, orgId, partnerId, 'org.account.action_verification_failed', {
+        result: 'challenge_unavailable',
+      })
+      throw accountActionChallengeUnavailable()
+    }
     if (('code' in credential) !== (challenge.verifyMethod === 'sms')) {
       throw new HttpException(
         { error: { code: 'VALIDATION_FAILED', message: '提交的凭据与挑战验证方式不一致' } },
@@ -148,7 +171,10 @@ export class PartnerAccountActionService {
     }
     const state = await this.loadCurrentState(admin, orgId, partnerId)
     if (state.admin.tokenVersion !== challenge.adminTokenVersion
-      || state.partner.tokenVersion !== challenge.partnerTokenVersion) throw accountActionTicketStale()
+      || state.partner.tokenVersion !== challenge.partnerTokenVersion) {
+      await this.auditCredentialFailure(admin.userId, orgId, partnerId, challenge, 'unavailable')
+      throw accountActionTicketStale()
+    }
 
     const ticket = createOpaqueTicket()
     const ticketBinding: ActionTicketBinding = {
@@ -179,7 +205,7 @@ export class PartnerAccountActionService {
         throw accountActionError(
           HttpStatus.CONFLICT,
           'ACCOUNT_PASSWORD_PROOF_NOT_READY',
-          '目标账号密码尚未由持有人管理，请先完成本人自助改密',
+          '目标账号密码尚无独立持有人证明，请使用已验证手机号或完成线下核验恢复',
         )
       }
       await this.reservePasswordAttempt('partner', partnerId, 'ACCOUNT_CREDENTIAL_LOCKED')
@@ -299,9 +325,10 @@ export class PartnerAccountActionService {
   }
   private async verifyAdminRecentOrPassword(
     admin: CurrentAdmin,
+    adminSessionId: string,
     submittedPassword: string | undefined,
   ): Promise<void> {
-    const recentVersion = await this.actionRedis.getAdminRecentVerification(admin.id)
+    const recentVersion = await this.actionRedis.getAdminRecentVerification(admin.id, adminSessionId)
     if (recentVersion === admin.tokenVersion && submittedPassword === undefined) return
     if (submittedPassword === undefined) throw accountActionError(
       HttpStatus.FORBIDDEN,
@@ -318,8 +345,12 @@ export class PartnerAccountActionService {
       )
       throw accountActionError(HttpStatus.UNPROCESSABLE_ENTITY, 'ADMIN_CREDENTIAL_INVALID', '管理员本人密码不正确')
     }
-    await this.actionRedis.setAdminRecentVerification(admin.id, admin.tokenVersion)
+    await this.actionRedis.setAdminRecentVerification(admin.id, adminSessionId, admin.tokenVersion)
     await this.actionRedis.clearPasswordFailures('admin', admin.id)
+  }
+  private requireAdminSessionId(admin: AuthedUser): string {
+    if (!admin.sessionId) throw accountActionTicketStale()
+    return admin.sessionId
   }
   private async loadCurrentState(admin: AuthedUser, orgId: string, partnerId: string): Promise<CurrentAccountActionState> {
     if (admin.role !== 'admin') throw accountActionTicketStale()

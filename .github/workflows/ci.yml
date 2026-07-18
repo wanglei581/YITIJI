@@ -200,6 +200,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-device-fleet-overview-ui
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
+          pnpm --filter @ai-job-print/admin verify:partner-account-action-state
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui

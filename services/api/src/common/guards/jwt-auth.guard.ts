@@ -1,4 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { createHash } from 'node:crypto'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedUser } from '../decorators/current-user.decorator'
@@ -92,7 +93,12 @@ export class JwtAuthGuard implements CanActivate {
       }
     }
 
-    req.user = { userId: state.userId, role, orgId: state.orgId }
+    req.user = {
+      userId: state.userId,
+      role,
+      orgId: state.orgId,
+      sessionId: createHash('sha256').update(token).digest('hex'),
+    }
     return true
   }
 

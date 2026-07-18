@@ -277,7 +277,7 @@ async function main() {
       (changedAfterRace as typeof changedAfterRace & { passwordProofState?: string }).passwordProofState
         !== 'owner_managed'
     ) {
-      fail('2a-1. 登录态自助改密必须将 passwordProofState 原子设为 owner_managed')
+      fail('2a-1. Admin 登录态自助改密必须将 passwordProofState 原子设为 owner_managed')
     }
     if (changedAfterRace.tokenVersion !== beforeRace.tokenVersion + 1) {
       fail(
@@ -285,7 +285,7 @@ async function main() {
         + `改密前 ${beforeRace.tokenVersion},改密后 ${changedAfterRace.tokenVersion}`,
       )
     }
-    pass('2a-1. 自助改密原子写入 owner_managed 并且 tokenVersion + 1')
+    pass('2a-1. Admin 自助改密原子写入 owner_managed 并且 tokenVersion + 1')
     await expectCode(() => auth.login(admin.username, losingPassword, 'admin'), 'AUTH_LOGIN_FAILED', '2a. 落败一侧的新密码不可登录')
     const loginAfterRace = await auth.login(admin.username, winningPassword, 'admin')
     if (!loginAfterRace.token) fail('2b. 获胜一侧的新密码应可登录')
@@ -442,20 +442,21 @@ async function main() {
         name: '改密验证机构账号',
         role: 'partner',
         orgId,
+        passwordProofState: 'temporary',
       },
     })
     await auth.changePassword(partner.id, passwordV1, passwordV2)
     const changedPartner = await prisma.user.findUniqueOrThrow({ where: { id: partner.id } })
     if (
       (changedPartner as typeof changedPartner & { passwordProofState?: string }).passwordProofState
-        !== 'owner_managed'
+        !== 'temporary'
       || changedPartner.tokenVersion !== partner.tokenVersion + 1
     ) {
-      fail('10. partner 自助改密必须原子写入 owner_managed 并且 tokenVersion + 1')
+      fail('10. Admin 已知的 temporary 密码自助改密后不得升级为 owner_managed，且 tokenVersion 必须 + 1')
     }
     const partnerLogin = await auth.login(partner.username, passwordV2, 'partner')
     if (!partnerLogin.token) fail('10. partner 账号改密后应可用新密码登录')
-    pass('10. partner 账号同样可用登录态自助改密')
+    pass('10. partner 可自助改密，但 temporary 证明状态不会被管理员已知密码升级')
 
     const changePasswordRoles = Reflect.getMetadata(ROLES_KEY, AuthController.prototype.changePassword) as string[] | undefined
     if (JSON.stringify(changePasswordRoles) !== JSON.stringify(['admin', 'partner'])) {
