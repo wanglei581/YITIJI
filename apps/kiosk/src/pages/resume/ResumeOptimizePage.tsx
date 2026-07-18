@@ -408,7 +408,7 @@ export function ResumeOptimizePage() {
                   </Button>
                 </div>
                 {lastResumeBeforeAiAdjust && (
-                  <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={handleUndoAiAdjust}>撤销上次 AI 调整</Button>
+                  <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={handleUndoAiAdjust}>撤销 AI 调整</Button>
                 )}
                 {adjustWarnings.length > 0 && (
                   <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-primary-700">
