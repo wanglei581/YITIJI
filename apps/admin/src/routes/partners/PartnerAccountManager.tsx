@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyRoundIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { ApiHttpError } from '../../services/api/client'
 import {
   orgsAdminService,
   type AdminOrgAccount,
 } from '../../services/api/orgsAdmin'
-import { PartnerAccountDeletionDialog } from './PartnerAccountDeletionDialog'
+import { PartnerAccountActionDialog } from './PartnerAccountActionDialog'
+import { usePartnerAccountAction } from './usePartnerAccountAction'
 
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
@@ -62,7 +63,7 @@ function TwoStepButton({
   )
 }
 
-function messageForDeleteError(error: unknown): string {
+function messageForAccountError(error: unknown): string {
   if (error instanceof ApiHttpError && error.code === 'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED') {
     return '该操作会使机构没有有效登录账号。请先新增并启用接替账号后再移除。'
   }
@@ -87,16 +88,16 @@ export function PartnerAccountManager({
   const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '', phone: '' })
   const [resetTarget, setResetTarget] = useState<AdminOrgAccount | null>(null)
   const [resetPassword, setResetPassword] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<AdminOrgAccount | null>(null)
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const deleteButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({})
   const sectionRef = useRef<HTMLDivElement>(null)
 
-  const reloadAccounts = async () => {
+  const reloadAccounts = useCallback(async () => {
     await onReload()
     onChanged()
-  }
+  }, [onChanged, onReload])
+  const actionFlow = usePartnerAccountAction(orgId, reloadAccounts)
+  const securityActionOpen = actionFlow.state.step !== 'closed'
 
   const addAccount = async () => {
     setAccountBusy('create')
@@ -112,7 +113,7 @@ export function PartnerAccountManager({
       setNewAccount({ username: '', password: '', name: '', phone: '' })
       await reloadAccounts()
     } catch (caught) {
-      setError(messageForDeleteError(caught))
+      setError(messageForAccountError(caught))
     } finally {
       setAccountBusy(null)
     }
@@ -125,7 +126,7 @@ export function PartnerAccountManager({
       await orgsAdminService.setAccountStatus(orgId, account.id, account.enabled ? 'disable' : 'enable')
       await reloadAccounts()
     } catch (caught) {
-      setError(messageForDeleteError(caught))
+      setError(messageForAccountError(caught))
     } finally {
       setAccountBusy(null)
     }
@@ -140,30 +141,7 @@ export function PartnerAccountManager({
       setResetTarget(null)
       setResetPassword('')
     } catch (caught) {
-      setError(messageForDeleteError(caught))
-    } finally {
-      setAccountBusy(null)
-    }
-  }
-
-  const closeDeleteDialog = () => {
-    const targetId = deleteTarget?.id
-    setDeleteTarget(null)
-    if (targetId) requestAnimationFrame(() => deleteButtonRefs.current[targetId]?.focus())
-  }
-
-  const deleteAccount = async () => {
-    if (!deleteTarget || accountBusy !== null) return
-    setAccountBusy(deleteTarget.id)
-    setError(null)
-    try {
-      await orgsAdminService.deleteAccount(orgId, deleteTarget.id)
-      await onReload()
-      onChanged()
-      setDeleteTarget(null)
-      requestAnimationFrame(() => sectionRef.current?.focus())
-    } catch (caught) {
-      setError(messageForDeleteError(caught))
+      setError(messageForAccountError(caught))
     } finally {
       setAccountBusy(null)
     }
@@ -182,7 +160,7 @@ export function PartnerAccountManager({
         <button
           type="button"
           onClick={() => setShowNewAccount((value) => !value)}
-          disabled={accountBusy !== null}
+          disabled={accountBusy !== null || securityActionOpen}
           className="flex items-center gap-1 rounded-lg border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <UserPlusIcon className="h-3.5 w-3.5" />
@@ -230,8 +208,10 @@ export function PartnerAccountManager({
         <p className="rounded-lg bg-neutral-50 py-6 text-center text-xs text-neutral-400">该机构暂无后台账号</p>
       ) : (
         <div className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
-          {accounts.map((account) => (
-            <div key={account.id} className="flex items-center gap-3 px-3 py-2.5">
+          {accounts.map((account) => {
+            const actionsUnavailable = account.availableActionVerificationMethods.length === 0
+            return (
+            <div key={account.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-neutral-800">{account.name}</p>
                 <p className="font-mono text-xs text-neutral-400">{account.username}</p>
@@ -249,25 +229,40 @@ export function PartnerAccountManager({
               <button
                 type="button"
                 onClick={() => { setResetTarget(account); setResetPassword('') }}
-                disabled={accountBusy !== null}
+                disabled={accountBusy !== null || securityActionOpen}
                 className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <KeyRoundIcon className="h-3.5 w-3.5" />
                 重置密码
               </button>
-              <TwoStepButton account={account} busy={accountBusy !== null} onConfirm={() => void toggleAccount(account)} />
-              <button
-                ref={(element) => { deleteButtonRefs.current[account.id] = element }}
-                type="button"
-                onClick={() => setDeleteTarget(account)}
-                disabled={accountBusy !== null}
-                className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Trash2Icon className="h-3.5 w-3.5" />
-                移除
-              </button>
+              <TwoStepButton account={account} busy={accountBusy !== null || securityActionOpen} onConfirm={() => void toggleAccount(account)} />
+              <div className="flex flex-wrap items-center justify-end gap-1" aria-label={`${account.username} 账号安全操作`}>
+                <button
+                  type="button"
+                  onClick={(event) => actionFlow.open('rebind_phone', account, event.currentTarget)}
+                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <SmartphoneIcon className="h-3.5 w-3.5" />
+                  换绑手机号
+                </button>
+                <button
+                  type="button"
+                  onClick={(event) => actionFlow.open('delete_account', account, event.currentTarget)}
+                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Trash2Icon className="h-3.5 w-3.5" />
+                  删除账号
+                </button>
+              </div>
+              {actionsUnavailable && (
+                <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
+                  该账号安全验证未就绪，请让持有人在登录态完成自助改密；原手机也不可用时只能走独立线下核验，本系统不提供管理员绕过。
+                </p>
+              )}
             </div>
-          ))}
+          )})}
         </div>
       )}
 
@@ -283,11 +278,11 @@ export function PartnerAccountManager({
             onChange={(event) => setResetPassword(event.target.value)}
           />
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setResetTarget(null)} disabled={accountBusy !== null} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface disabled:opacity-50">取消</button>
+            <button type="button" onClick={() => setResetTarget(null)} disabled={accountBusy !== null || securityActionOpen} className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface disabled:opacity-50">取消</button>
             <button
               type="button"
               onClick={() => void resetAccountPassword()}
-              disabled={accountBusy !== null || resetPassword.length < 8}
+              disabled={accountBusy !== null || securityActionOpen || resetPassword.length < 8}
               className="rounded-lg bg-warning px-3 py-1.5 text-xs font-medium text-white hover:bg-warning/90 disabled:opacity-50"
             >
               {accountBusy === resetTarget.id ? '重置中…' : '确认重置'}
@@ -296,12 +291,7 @@ export function PartnerAccountManager({
         </div>
       )}
 
-      <PartnerAccountDeletionDialog
-        account={deleteTarget}
-        busy={accountBusy !== null}
-        onCancel={closeDeleteDialog}
-        onConfirm={() => void deleteAccount()}
-      />
+      <PartnerAccountActionDialog flow={actionFlow} fallbackFocusRef={sectionRef} />
     </div>
   )
 }
