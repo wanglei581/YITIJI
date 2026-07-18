@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-07-19 最新状态：合作机构账号双验证删除/换绑候选已推送并创建 [PR #308](https://github.com/wanglei581/YITIJI/pull/308)，当前等待最终 GitHub Actions；未合并、未部署、未执行生产 migration 或真实短信。
+2026-07-19 最新状态：合作机构账号双验证删除/换绑候选已推送并创建 [PR #308](https://github.com/wanglei581/YITIJI/pull/308)；GitHub Actions [run 29655900323](https://github.com/wanglei581/YITIJI/actions/runs/29655900323) 的 `build-and-verify`（7分41秒）与 `postgres-readiness`（2分33秒）均成功。PR 仍未合并、未部署，未执行生产 migration 或真实短信。
 
 2026-07-19 完成 **Admin 合作机构账号双验证删除与手机号换绑本地候选终审收口**（分支 `codex/partner-account-dual-auth-removal-design-20260718`，待 push / PR / CI，未 merge / deploy）：保留现有机构详情账号入口，删除与换绑均要求 Admin 当前会话近期验证，再由目标 Partner 使用原已验证手机 OTP 或 `owner_managed` 当前密码授权；换绑还必须验证新手机号。安全复审新发现并关闭了三条认证旁路：Partner 用 Admin 临时密码自助改密不再升级持有人证明；旧预录手机号 send/verify 入口对 `legacy/temporary` fail closed；首次绑号最终写入使用 `passwordProofState + tokenVersion` CAS 关闭 reset TOCTOU。新内部 JWT 带随机 `jti`，Admin 近期验证以 Bearer SHA-256 指纹按会话分区，`/auth/me` 不回显 `sessionId`。challenge/action/rebind ticket 继续绑定 Admin / 机构 / Partner / action / 双 `tokenVersion`，bearer ticket 使用 32-byte 随机值且 Redis 只存 SHA-256 摘要；删除保留墓碑、最后有效账号保护、Serializable 事务与会话版本失效。前端同步修复忙碌期到期中断、方式切换竞态、OTP/短信失败回退和 busy `alertdialog` 焦点承接。API/Admin typecheck、lint、build，18 项状态机与覆盖率门禁，内部认证/改密/OTP/SQLite 动作流，真实 Redis Lua，PostgreSQL 全新空库 34 个 migration + 并发删除/换绑，以及双库 schema 同步均通过；独立代码与安全子代理最终均 `APPROVE`，Critical 0、Warning 0。设计/较早实现阶段保留 Claude/Antigravity 有效报告；2026-07-19 最终差异的外部 CLI 均因账户状态未产生有效报告，不虚报批准。未发送真实短信、未改生产数据库/配置，未部署。
 

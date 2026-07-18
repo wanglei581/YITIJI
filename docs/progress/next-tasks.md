@@ -45,7 +45,7 @@
 
 ## P0：合作机构后台账号安全移除
 
-- [ ] **PR #308 最终 CI**：[secure partner account deletion and phone rebind](https://github.com/wanglei581/YITIJI/pull/308) 已创建；等待 `build-and-verify` 与 `postgres-readiness` 在最终文档提交上双绿。不自动合并，生产 migration、真实短信和部署仍需单独授权。
+- [x] **PR #308 最终 CI**：[secure partner account deletion and phone rebind](https://github.com/wanglei581/YITIJI/pull/308) 的 GitHub Actions [run 29655900323](https://github.com/wanglei581/YITIJI/actions/runs/29655900323) 已双绿：`build-and-verify` 与 `postgres-readiness` 均成功。PR 保持打开且不自动合并，生产 migration、真实短信和部署仍需单独授权。
 
 - [x] **双验证删除与手机号换绑本地候选终审（2026-07-19）**：现有 Admin 机构账号入口已升级为“Admin 当前会话近期验证 + Partner 原已验证手机 OTP / `owner_managed` 当前密码”的操作绑定状态机；换绑额外验证新手机号。最终安全收口已关闭自助改密证明升级、Admin 预录手机号旁路、首绑 reset TOCTOU 和同秒多登录近期验证共享；SQLite、真实 Redis、真实隔离 PostgreSQL 34 migrations + 并发/换绑、旧认证、API/Admin build/typecheck/lint 与 UI 状态机覆盖率门禁均通过，独立代码/安全复审均 `APPROVE`。用户已授权推送并走 PR/CI；当前待创建 PR 并等待两个 GitHub Actions job，仍未 merge / deploy，未发送真实短信；生产 migration、真实短信和线上操作仍须另行授权。
 - [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
