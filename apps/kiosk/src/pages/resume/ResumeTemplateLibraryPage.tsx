@@ -5,6 +5,7 @@ import type { ResumeTemplate } from '@ai-job-print/shared'
 import { ArrowRightIcon, BookOpenIcon, CheckIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import './resume-library-lightflow.css'
+import './resume-library-ext.css'
 import './resume-fusion-youth.css'
 
 const FILTERS = ['全部', '简历模板', '通用'] as const

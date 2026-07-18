@@ -15,6 +15,7 @@ import {
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
 import './resume-diagnosis-lightflow.css'
+import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'

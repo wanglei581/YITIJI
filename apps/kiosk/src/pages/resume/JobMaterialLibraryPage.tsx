@@ -18,6 +18,7 @@ import {
   type JobMaterialDraftForm,
 } from './jobMaterialDraft'
 import './resume-library-lightflow.css'
+import './resume-library-ext.css'
 import './resume-fusion-youth.css'
 
 const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const

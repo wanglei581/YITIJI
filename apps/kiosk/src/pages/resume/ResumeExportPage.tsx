@@ -3,6 +3,7 @@ import { Button, Card } from '@ai-job-print/ui'
 import { ArrowRightIcon, FileTextIcon, InfoIcon, PrinterIcon, SaveIcon, ShieldCheckIcon } from 'lucide-react'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import './resume-library-lightflow.css'
+import './resume-library-ext.css'
 import './resume-fusion-youth.css'
 
 const HOW_TO_PATHS = [

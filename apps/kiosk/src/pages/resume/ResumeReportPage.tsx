@@ -10,6 +10,7 @@ import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { readAiResumeSession } from './aiResumeSession'
 import './resume-diagnosis-lightflow.css'
+import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
 
 interface ReportState {
