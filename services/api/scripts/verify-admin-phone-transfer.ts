@@ -464,6 +464,12 @@ async function verifyOtpIsolationRetryAndReplay(context: TestContext): Promise<v
   const admin = await createAdmin(context, 'otp-isolation')
   await createPartner(context, 'otp-isolation', phone)
   await context.otp.sendCode({ phone, purpose: 'bind_phone', ip: '127.0.1.6', shouldDeliver: true })
+  await expectCode(
+    () => service.start(admin.id, context.adminPassword, phone, '127.0.1.7'),
+    'SMS_TOO_FREQUENT',
+    '6. bind_phone 与 transfer_phone 未共享全局发送冷却',
+  )
+  context.redis.advanceSeconds(60)
   const started = await service.start(admin.id, context.adminPassword, phone, '127.0.1.7')
   const transferCode = await requireTransferCode(context, phone, '6. transfer_phone OTP 未写入')
   const guaranteedWrongCode = transferCode === '000000' ? '111111' : '000000'
@@ -478,7 +484,7 @@ async function verifyOtpIsolationRetryAndReplay(context: TestContext): Promise<v
   await service.verify(admin.id, started.bindTicket, transferCode)
   await expectCode(() => service.verify(admin.id, started.bindTicket, transferCode), UNAVAILABLE, '6. 已消费 ticket 可以重放')
   ensure(context.redis.raw(bindCodeKey(phone)) === guaranteedWrongCode, '6. 完成转移错误清理了 bind_phone 命名空间')
-  pass('6. transfer_phone OTP 与 bind_phone 冷却/验证码隔离，错误 OTP 可重试且 ticket 不可重放')
+  pass('6. transfer_phone 与 bind_phone 共享冷却但验证码隔离，错误 OTP 可重试且 ticket 不可重放')
 }
 
 async function verifyDoubleVerifyAndAdminCompetition(context: TestContext): Promise<void> {

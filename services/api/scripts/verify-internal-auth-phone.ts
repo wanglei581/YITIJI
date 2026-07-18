@@ -317,6 +317,7 @@ function createIsolatedVerificationDatabase(): { cleanup: () => void } {
         "id" TEXT NOT NULL PRIMARY KEY,
         "username" TEXT NOT NULL,
         "passwordHash" TEXT NOT NULL,
+        "passwordProofState" TEXT NOT NULL DEFAULT 'legacy',
         "name" TEXT NOT NULL,
         "role" TEXT NOT NULL,
         "orgId" TEXT,
@@ -653,6 +654,7 @@ async function main() {
     await expectCode(() => auth.login(verified.username, passwordV1, 'partner'), 'AUTH_LOGIN_FAILED', '7. 机构停用后密码登录失败')
     await prisma.organization.update({ where: { id: orgId }, data: { enabled: true } })
     const oldToken = byUsername.token
+    redis.advanceSeconds(60)
     await auth.startPasswordReset(verifiedPhone, '127.0.0.1')
     const resetCode = await redis.get(`internal:sms:code:reset_password:${hashPhone(verifiedPhone)}`)
     if (!resetCode) fail('8. 未写入重置验证码')
@@ -836,7 +838,7 @@ async function main() {
     const lockedCode = await redis.get(`internal:sms:code:bind_phone:${hashPhone(lockedPhone)}`)
     if (!lockedCode) fail('12c. OTP 锁定场景未写入验证码')
     const lockedWrongCode = lockedCode === '000000' ? '111111' : '000000'
-    for (let attempt = 1; attempt <= 5; attempt += 1) {
+    for (let attempt = 1; attempt <= 4; attempt += 1) {
       await expectCode(
         () => adminInitialPhoneBind.verify(lockedAdmin.id, lockedStart.bindTicket, lockedWrongCode),
         'SMS_CODE_INVALID',
@@ -846,7 +848,7 @@ async function main() {
     await expectCode(
       () => adminInitialPhoneBind.verify(lockedAdmin.id, lockedStart.bindTicket, lockedWrongCode),
       unavailable,
-      '12c. 第六次错误 OTP 触发锁定并回到统一不可用错误',
+      '12c. 第五次错误 OTP 触发锁定并回到统一不可用错误',
     )
     if (redis.raw(strictTicketKey(lockedAdmin.id, lockedStart.bindTicket)) || redis.raw(strictActiveKey(lockedAdmin.id))) {
       fail('12c. OTP 锁定后 ticket 或活跃标记未清理')
