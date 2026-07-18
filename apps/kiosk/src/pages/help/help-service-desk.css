@@ -33,3 +33,7 @@
 .k1-help-center .k1-help-contact aside strong { display: block; margin-top: 4px; font-size: 18px; }
 .k1-help-center .k1-help-footer { flex: 0 0 auto; margin: 12px 0 0; padding: 12px 18px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-500); background: var(--color-neutral-50); font-size: 15px; line-height: 1.5; text-align: center; }
 @media (max-width: 760px) { .k1-help-center { padding-inline: 20px; } .k1-help-center .k1-help-faq-list { grid-template-columns: 1fr; } .k1-help-center .k1-help-row.is-open { grid-column: auto; } .k1-help-center .k1-help-contact aside { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

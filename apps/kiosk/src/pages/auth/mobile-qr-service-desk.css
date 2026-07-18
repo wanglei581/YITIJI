@@ -78,3 +78,7 @@
 }
 
 @keyframes k1-mobile-qr-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
