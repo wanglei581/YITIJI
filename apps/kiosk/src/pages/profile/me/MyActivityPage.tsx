@@ -155,7 +155,6 @@ export function MyActivityPage() {
                 icon="eye"
                 tone="slate"
                 title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
-                typeLabel={TYPE_LABEL[it.targetType]}
                 meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
                 onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
               />
@@ -172,7 +171,6 @@ export function MyActivityPage() {
               icon="external"
               tone="teal"
               title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
-              typeLabel={TYPE_LABEL[it.targetType]}
               meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
               onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
             />
@@ -189,14 +187,12 @@ function ActivityRow({
   icon,
   tone,
   title,
-  typeLabel,
   meta,
   onTap,
 }: {
   icon: KioskIconName
   tone: string
   title: string
-  typeLabel: string
   meta: string
   onTap: () => void
 }) {
@@ -210,10 +206,7 @@ function ActivityRow({
         <KIcon name={icon} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="me-activity-titleline">
-          <span className="me-row-title">{title}</span>
-          <span className="me-activity-type">{typeLabel}</span>
-        </span>
+        <span className="me-row-title">{title}</span>
         <span className="me-row-meta">{meta}</span>
       </span>
       <ChevronRightIcon className="me-row-arrow" aria-hidden="true" />
