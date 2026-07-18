@@ -1,221 +1,39 @@
-/* Help center is opt-in through KioskRoot's exact /help service-desk theme. */
 .k1-help-center {
-  --help-canvas: var(--sd-color-canvas);
-  --help-surface: var(--sd-color-surface);
-  --help-text: var(--sd-color-text-strong);
-  --help-copy: var(--sd-color-copy);
-  --help-muted: var(--sd-color-copy-muted);
-  --help-primary: var(--sd-color-primary);
-  --help-line: var(--sd-color-line);
-  --help-line-strong: var(--sd-color-line-strong);
-
-  min-height: 100%;
-  color: var(--help-text);
-  background: var(--help-canvas);
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  color: var(--color-neutral-900);
+  background: var(--color-canvas);
+  font-family: var(--font-sans);
 }
-
-.k1-help-center .k1-help-topbar {
-  flex: 0 0 auto;
-  padding: 4px 2px 0;
-}
-
-.k1-help-center .k1-help-topbar h1 {
-  color: var(--help-text);
-  font-size: clamp(28px, 3vw, 38px);
-  font-weight: 820;
-  letter-spacing: -0.035em;
-}
-
-.k1-help-center .k1-help-topbar p {
-  color: var(--help-copy);
-}
-
-.k1-help-center .k1-help-topbar button {
-  min-height: var(--sd-primary-control-min, 56px);
-  padding-inline: 20px;
-  color: var(--help-primary);
-  background: var(--help-surface);
-  border-color: var(--help-line-strong);
-  border-radius: 16px;
-  box-shadow: var(--sd-shadow-console);
-}
-
-.k1-help-center .k1-help-scroll {
-  min-height: 0;
-  padding-inline: 2px;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-}
-
-.k1-help-center .k1-help-section {
-  overflow: clip;
-  padding: 18px 22px;
-  background: var(--help-surface);
-  border-color: var(--help-line);
-  border-radius: var(--sd-card-radius, 26px);
-  box-shadow: var(--sd-shadow-console);
-}
-
-.k1-help-center .k1-help-section-heading {
-  min-height: var(--sd-control-min, 48px);
-}
-
-.k1-help-center .k1-help-section-icon {
-  width: 48px;
-  height: 48px;
-  border: 1px solid var(--help-line);
-  border-radius: 16px;
-}
-
-.k1-help-center .k1-help-section h2 {
-  color: var(--help-text);
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.k1-help-center .k1-help-row {
-  border-color: var(--help-line);
-}
-
-.k1-help-center .k1-help-toggle {
-  min-height: var(--sd-control-min, 48px);
-  padding-inline: 4px;
-  color: var(--help-text);
-  border-radius: 14px;
-  transition: background-color 150ms ease, color 150ms ease;
-}
-
+.k1-help-center .k1-help-topbar h1 { font-family: var(--font-serif); font-size: 38px; font-weight: 900; letter-spacing: .03em; }
+.k1-help-center .k1-help-topbar p { color: var(--color-neutral-500); font-size: 18px; }
+.k1-help-center .k1-help-topbar button { min-height: 58px; padding-inline: 22px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-700); background: var(--color-surface); font-size: 18px; }
+.k1-help-center .k1-help-filters { display: flex; flex: 0 0 auto; gap: 10px; margin-top: 16px; overflow-x: auto; padding-bottom: 2px; }
+.k1-help-center .k1-help-filters button { min-height: 58px; flex: 0 0 auto; padding: 0 22px; border: 1px solid var(--color-neutral-200); border-radius: 999px; color: var(--color-neutral-500); background: var(--color-surface); font-size: 18px; font-weight: 600; }
+.k1-help-center .k1-help-filters button.is-active { border-color: color-mix(in srgb, var(--color-primary-600) 48%, var(--color-neutral-200)); color: var(--color-primary-700); background: var(--color-primary-100); }
+.k1-help-center .k1-help-scroll { overscroll-behavior: contain; scrollbar-gutter: stable; }
+.k1-help-center .k1-help-faq-list { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.k1-help-center .k1-help-row { overflow: hidden; border: 1px solid var(--color-neutral-200); border-radius: 14px; background: var(--color-surface); box-shadow: 0 3px 10px rgba(16,48,43,.04); }
+.k1-help-center .k1-help-row.is-open { grid-column: 1 / -1; border-color: color-mix(in srgb, var(--color-primary-600) 45%, var(--color-neutral-200)); }
+.k1-help-center .k1-help-toggle { padding: 15px 18px; color: var(--color-neutral-900); background: transparent; }
 .k1-help-center .k1-help-toggle:hover,
-.k1-help-center .k1-help-toggle[aria-expanded='true'] {
-  background: var(--sd-category-blue-bg);
-}
-
-.k1-help-center .k1-help-toggle[aria-expanded='true'] {
-  color: var(--help-primary);
-}
-
-.k1-help-center .k1-help-toggle span {
-  color: inherit;
-  font-size: 16px;
-  line-height: 1.5;
-}
-
-.k1-help-center .k1-help-chevron {
-  color: var(--help-muted);
-}
-
-.k1-help-center .k1-help-toggle[aria-expanded='true'] .k1-help-chevron {
-  color: var(--help-primary);
-}
-
-.k1-help-center .k1-help-answer {
-  max-block-size: min(34vh, 360px);
-  padding: 0 8px 18px;
-  overflow-y: auto;
-  color: var(--help-copy);
-  scrollbar-color: var(--help-line-strong) transparent;
-}
-
-.k1-help-center .k1-help-answer p {
-  color: inherit;
-  font-size: 15px;
-  line-height: 1.75;
-}
-
-.k1-help-center .k1-help-link {
-  min-height: var(--sd-primary-control-min, 56px);
-  padding-inline: 16px;
-  color: var(--help-primary);
-  background: var(--help-surface);
-  border-color: var(--help-line-strong);
-  border-radius: 14px;
-  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
-}
-
-.k1-help-center .k1-help-link:hover {
-  background: var(--sd-category-blue-bg);
-  border-color: var(--help-primary);
-}
-
-.k1-help-center .k1-help-link:active {
-  transform: scale(0.98);
-}
-
-.k1-help-center .k1-help-footer {
-  margin: 6px 4px 0;
-  padding: 14px 18px;
-  color: var(--help-muted);
-  background: var(--help-surface);
-  border: 1px solid var(--help-line);
-  border-radius: 16px;
-}
-
-.k1-help-center :is(button, a):focus-visible {
-  outline: 3px solid var(--help-primary);
-  outline-offset: 3px;
-}
-
-/* 390x844: retain every question and destination while narrowing card padding. */
-@media (width: 390px) and (height: 844px) {
-  .k1-help-center {
-    padding: 16px 12px 20px;
-  }
-
-  .k1-help-center .k1-help-section {
-    padding: 15px 16px;
-    border-radius: 20px;
-  }
-}
-
-/* 390x700: the scroll region, not the content, absorbs the shorter viewport. */
-@media (width: 390px) and (max-height: 700px) {
-  .k1-help-center {
-    padding: 12px 12px 16px;
-  }
-
-  .k1-help-center .k1-help-topbar h1 {
-    font-size: 27px;
-  }
-
-  .k1-help-center .k1-help-scroll {
-    margin-top: 12px;
-  }
-
-  .k1-help-center .k1-help-section {
-    padding: 14px;
-  }
-}
-
-/* 1080x1920: preserve a readable, touch-first single-column service desk. */
-@media (width: 1080px) and (height: 1920px) {
-  .k1-help-center {
-    padding: 34px 48px 36px;
-  }
-
-  .k1-help-center .k1-help-scroll {
-    max-width: 984px;
-    width: 100%;
-    margin-inline: auto;
-  }
-
-  .k1-help-center .k1-help-section {
-    padding: 22px 28px;
-  }
-
-  .k1-help-center .k1-help-toggle span {
-    font-size: 18px;
-  }
-}
+.k1-help-center .k1-help-toggle[aria-expanded='true'] { background: var(--color-surface); }
+.k1-help-center .k1-help-question-mark { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: var(--color-primary-700); background: var(--color-primary-100); font-family: var(--font-serif); font-size: 24px; font-weight: 900; }
+.k1-help-center .k1-help-category { display: inline-flex; margin-bottom: 8px; padding: 3px 12px; border: 1px solid var(--color-neutral-200); border-radius: 999px; color: var(--color-neutral-500); background: var(--color-canvas); font-size: 14px; font-weight: 600; }
+.k1-help-center .k1-help-toggle strong { display: block; color: var(--color-neutral-900); font-size: 21px; line-height: 1.45; }
+.k1-help-center .k1-help-chevron { width: 26px; height: 26px; margin-top: 22px; color: var(--color-neutral-500); }
+.k1-help-center .k1-help-answer { padding: 0 76px 18px; }
+.k1-help-center .k1-help-answer > p { margin: 0; color: var(--color-neutral-500); font-size: 18px; line-height: 1.6; }
+.k1-help-center .k1-help-link { min-height: 56px; margin-top: 14px; padding-inline: 22px; border-color: color-mix(in srgb, var(--color-primary-600) 42%, var(--color-neutral-200)); border-radius: 12px; color: var(--color-primary-700); background: var(--color-canvas); font-size: 18px; }
+.k1-help-center .k1-help-contact { display: flex; flex: 0 0 auto; align-items: center; gap: 22px; margin-top: 12px; padding: 20px 24px; border: 1px solid var(--color-neutral-200); border-top: 4px solid var(--color-clay); border-radius: 18px; background: var(--color-surface); }
+.k1-help-center .k1-help-contact > span { display: grid; width: 76px; height: 76px; flex: 0 0 auto; place-items: center; border-radius: 18px; color: var(--color-clay); background: var(--color-clay-soft); }
+.k1-help-center .k1-help-contact > span svg { width: 40px; height: 40px; }
+.k1-help-center .k1-help-contact h2 { margin: 0; font-family: var(--font-serif); font-size: 25px; font-weight: 700; }
+.k1-help-center .k1-help-contact p { margin: 6px 0 0; color: var(--color-neutral-500); font-size: 17px; line-height: 1.5; }
+.k1-help-center .k1-help-contact aside { flex: 0 0 auto; padding: 12px 22px; border: 1px solid var(--color-neutral-200); border-radius: 14px; background: var(--color-canvas); text-align: center; }
+.k1-help-center .k1-help-contact aside small { display: block; color: var(--color-neutral-500); font-size: 14px; }
+.k1-help-center .k1-help-contact aside strong { display: block; margin-top: 4px; font-size: 18px; }
+.k1-help-center .k1-help-footer { flex: 0 0 auto; margin: 12px 0 0; padding: 12px 18px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-500); background: var(--color-neutral-50); font-size: 15px; line-height: 1.5; text-align: center; }
+@media (max-width: 760px) { .k1-help-center { padding-inline: 20px; } .k1-help-center .k1-help-faq-list { grid-template-columns: 1fr; } .k1-help-center .k1-help-row.is-open { grid-column: auto; } .k1-help-center .k1-help-contact aside { display: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .k1-help-center *,
-  .k1-help-center *::before,
-  .k1-help-center *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+  .k1-help-center * { animation: none !important; transition: none !important; }
 }

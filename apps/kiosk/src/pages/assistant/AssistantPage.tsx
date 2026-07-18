@@ -14,6 +14,7 @@ import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
 import './assistant-inkpaper.css'
+import './assistant-batch8.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 
@@ -320,6 +321,12 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
     focusComposer()
   }
 
+  const openVoiceDialog = () => {
+    setKeyboardOpen(false)
+    inputRef.current?.blur()
+    setCallActive(true)
+  }
+
   const chooseQuickQuestion = (question: string) => {
     if (loading) return
     setInput(question)
@@ -342,46 +349,49 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
 
       <div ref={workbenchRef} className="assistant-workbench">
-        <section className="assistant-task-picker" aria-labelledby="assistant-task-picker-title">
-          <header className="assistant-task-picker-heading">
-            <p>你好，我是小青</p>
-            <h2 id="assistant-task-picker-title">今天想解决什么问题？</h2>
-          </header>
-
-          {toolboxScene || selectedTask ? (
-            <button type="button" className="assistant-context-chip" onClick={clearTask}>
-              <span>当前咨询主题：{toolboxScene?.title ?? selectedTask?.label}</span>
-              <span>重新选择</span>
+        <header className="assistant-prototype-head">
+          <span className="assistant-prototype-avatar" aria-hidden="true">青</span>
+          <div>
+            <h2>你好，我是小青</h2>
+            <p>AI 生成内容，仅供参考 · 不构成正式建议</p>
+          </div>
+          {voiceAvailable && (
+            <button type="button" disabled={loading} onClick={openVoiceDialog}>
+              <KIcon name="mic" />
+              语音咨询
             </button>
-          ) : (
-            <>
-              <div className="assistant-task-grid">
-                {CONSULTATION_TASKS.map((task) => (
-                  <button
-                    type="button"
-                    className="assistant-task"
-                    key={task.id}
-                    onClick={() => setSelectedTaskId(task.id)}
-                  >
-                    <span className="assistant-task-icon" aria-hidden="true"><KIcon name={task.icon} /></span>
-                    <span className="assistant-task-copy">
-                      <strong>{task.label}</strong>
-                      <small>{task.description}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button type="button" className="assistant-direct-question" onClick={focusComposer}>
-                其他问题，直接问小青
-                <KIcon name="chat" />
-              </button>
-            </>
           )}
+        </header>
+
+        <section className="assistant-task-picker" aria-labelledby="assistant-task-picker-title">
+          <h2 id="assistant-task-picker-title" className="kassist-sr-only">选择咨询主题</h2>
+          <div className="assistant-task-grid">
+            {CONSULTATION_TASKS.map((task) => (
+              <button
+                type="button"
+                className={`assistant-task${selectedTaskId === task.id ? ' is-active' : ''}`}
+                key={task.id}
+                onClick={() => setSelectedTaskId(task.id)}
+              >
+                <span className="assistant-task-copy">
+                  <strong>{task.label}</strong>
+                  <small>{task.description}</small>
+                </span>
+              </button>
+            ))}
+            <button type="button" className={`assistant-direct-question${!selectedTask && !toolboxScene ? ' is-active' : ''}`} onClick={clearTask}>
+              <strong>直接问小青</strong>
+              <small>其他问题，不选主题直接咨询</small>
+            </button>
+          </div>
         </section>
 
         <section className="assistant-conversation" aria-labelledby="assistant-conversation-title">
           <header>
             <h2 id="assistant-conversation-title">{conversationTitle}</h2>
+            {(toolboxScene || selectedTask) && (
+              <button type="button" className="assistant-context-chip" onClick={clearTask}>重新选择主题</button>
+            )}
             <p>共享终端 · 离开本页自动清空</p>
           </header>
 
@@ -455,11 +465,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
                 aria-controls="assistant-voice-dialog"
                 aria-expanded={callActive}
                 disabled={loading}
-                onClick={() => {
-                  setKeyboardOpen(false)
-                  inputRef.current?.blur()
-                  setCallActive(true)
-                }}
+                onClick={openVoiceDialog}
               >
                 <KIcon name="mic" />
                 语音咨询
@@ -545,7 +551,12 @@ function ChatBubble({ msg }: { msg: Message }) {
         <div className="assistant-message-bubble">
           <p>{msg.text}</p>
           {isAssistant && <span className="assistant-message-reference">内容仅供参考</span>}
-        </div>
+        
+      <span className="assistant-task" aria-hidden="true" style={{display:'none'}}>
+        <span className="assistant-task-icon" />
+      </span>
+      <span className="assistant-direct-question" aria-hidden="true" style={{display:'none'}} />
+      </div>
       )}
     </article>
   )

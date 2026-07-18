@@ -1,55 +1,34 @@
-.k1-screensaver .screensaver-wake-prompt {
-  position: absolute;
-  right: clamp(20px, 5vw, 72px);
-  bottom: clamp(24px, 5vh, 64px);
-  left: clamp(20px, 5vw, 72px);
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
+.k1-screensaver { color: #f4f1e8; background: var(--color-dark, #10302b); font-family: var(--font-sans); }
+.k1-screensaver > img,
+.k1-screensaver > video { position: absolute; inset: 0; }
+.k1-screensaver .screensaver-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(16,48,43,.4) 0%, transparent 24%, transparent 66%, rgba(16,48,43,.66) 100%); }
+.k1-screensaver .screensaver-corner { position: absolute; z-index: 2; top: 36px; display: flex; align-items: center; gap: 12px; color: rgba(244,241,232,.88); font-size: 22px; letter-spacing: .04em; text-shadow: 0 2px 8px rgba(9,26,23,.45); }
+.k1-screensaver .screensaver-corner--left { left: 44px; }
+.k1-screensaver .screensaver-corner--right { right: 44px; font-variant-numeric: tabular-nums; }
+.k1-screensaver .screensaver-corner--left > span { width: 10px; height: 10px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 4px rgba(53,171,142,.18); }
+.k1-screensaver .screensaver-media-tag { position: absolute; z-index: 2; right: 44px; bottom: 296px; padding: 8px 18px; border: 1px solid rgba(244,241,232,.25); border-radius: 999px; color: rgba(244,241,232,.82); background: rgba(16,48,43,.26); font-size: 17px; letter-spacing: .03em; }
+.k1-screensaver .screensaver-dots { position: absolute; z-index: 2; right: 0; bottom: 240px; left: 0; display: flex; justify-content: center; gap: 18px; }
+.k1-screensaver .screensaver-dots i { width: 16px; height: 16px; border-radius: 999px; background: rgba(244,241,232,.35); transition: width .2s ease, background .2s ease; }
+.k1-screensaver .screensaver-dots i.is-active { width: 52px; background: #f4f1e8; }
+.k1-screensaver .screensaver-privacy { position: absolute; z-index: 2; right: 30px; bottom: 194px; left: 30px; display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; color: rgba(244,241,232,.84); font-size: 19px; letter-spacing: .03em; text-shadow: 0 2px 8px rgba(9,26,23,.45); }
+.k1-screensaver .screensaver-privacy svg { width: 22px; height: 22px; }
+.k1-screensaver .screensaver-wake-prompt { position: absolute; z-index: 3; right: 0; bottom: 0; left: 0; height: 172px; display: flex; align-items: center; justify-content: center; gap: 26px; padding: 0 34px; border-top: 1px solid rgba(244,241,232,.2); color: #f4f1e8; background: rgba(16,48,43,.58); backdrop-filter: blur(4px); pointer-events: none; animation: screensaver-breath 2.6s ease-in-out infinite; }
+.k1-screensaver .screensaver-wake-prompt > svg { width: 52px; height: 52px; }
+.k1-screensaver .screensaver-wake-prompt strong { font-family: var(--font-serif); font-size: 44px; font-weight: 700; letter-spacing: .12em; }
+.k1-screensaver .screensaver-wake-prompt span { color: rgba(244,241,232,.82); font-size: 23px; letter-spacing: .06em; }
+@keyframes screensaver-breath { 0%, 100% { opacity: 1; } 50% { opacity: .64; } }
+@media (max-width: 600px) {
+  .k1-screensaver .screensaver-corner { top: 20px; font-size: 14px; }
+  .k1-screensaver .screensaver-corner--left { left: 18px; }
+  .k1-screensaver .screensaver-corner--right { right: 18px; }
+  .k1-screensaver .screensaver-media-tag { right: 18px; bottom: 190px; font-size: 12px; }
+  .k1-screensaver .screensaver-dots { bottom: 150px; gap: 10px; }
+  .k1-screensaver .screensaver-dots i { width: 10px; height: 10px; }
+  .k1-screensaver .screensaver-dots i.is-active { width: 30px; }
+  .k1-screensaver .screensaver-privacy { bottom: 112px; font-size: 12px; text-align: center; }
+  .k1-screensaver .screensaver-wake-prompt { height: 94px; gap: 12px; }
+  .k1-screensaver .screensaver-wake-prompt > svg { width: 30px; height: 30px; }
+  .k1-screensaver .screensaver-wake-prompt strong { font-size: 24px; }
+  .k1-screensaver .screensaver-wake-prompt span { display: none; }
 }
-
-.k1-screensaver .screensaver-wake-prompt span {
-  min-height: var(--sd-control-min, 48px);
-  max-width: min(100%, 540px);
-  padding: 12px 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sd-color-surface);
-  background: color-mix(in srgb, var(--sd-color-text-strong) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--sd-color-surface) 32%, transparent);
-  border-radius: 999px;
-  box-shadow: var(--sd-shadow-console);
-  backdrop-filter: blur(12px);
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif);
-  font-size: clamp(15px, 2vw, 19px);
-  font-weight: 760;
-  letter-spacing: 0.01em;
-  line-height: 1.45;
-  text-align: center;
-}
-
-@media (max-width: 480px) {
-  .k1-screensaver .screensaver-wake-prompt {
-    right: 16px;
-    bottom: 24px;
-    left: 16px;
-  }
-
-  .k1-screensaver .screensaver-wake-prompt span {
-    width: 100%;
-    min-height: var(--sd-primary-control-min, 56px);
-    padding-inline: 18px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .k1-screensaver *,
-  .k1-screensaver *::before,
-  .k1-screensaver *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
+@media (prefers-reduced-motion: reduce) { .k1-screensaver .screensaver-wake-prompt { animation: none; } }

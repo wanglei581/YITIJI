@@ -29,6 +29,7 @@ import {
 } from './hooks/useMemberPhoneLogin'
 import { ScanQrLoginPanel } from './ScanQrLoginPanel'
 import './login.css'
+import './login-batch8.css'
 
 const DEFAULT_LOGIN_IDLE_SEC = 180
 const SUCCESS_OVERLAY_MS = 950
