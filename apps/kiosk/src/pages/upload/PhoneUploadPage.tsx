@@ -101,7 +101,7 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="k1-phone-upload service-desk grid min-h-[100svh] place-items-center bg-[#e9f1fb] px-0 py-0 font-sans text-neutral-900 sm:py-6" data-visual-theme="service-desk" data-ux-density="touch">
+    <main className="k1-phone-upload service-desk grid min-h-[100svh] place-items-center bg-[#2a2a26] px-0 py-0 font-sans text-neutral-900 sm:py-6" data-visual-theme="service-desk" data-ux-density="touch">
       {!ready ? (
         <div className="phone-upload-invalid flex flex-col items-center gap-4 px-6 text-center">
           <AlertCircleIcon className="h-12 w-12 text-red-400" />
@@ -133,8 +133,8 @@ export function PhoneUploadPage() {
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           className={[
-            'relative flex min-h-[150px] shrink-0 cursor-pointer flex-col items-center justify-center gap-2.5 rounded-lg border-2 border-dashed px-5 text-center text-primary-700 active:scale-[0.98]',
-            dragging ? 'border-primary-600 bg-primary-100' : 'border-primary-300 bg-primary-50',
+            'ph-up-pick relative flex min-h-[150px] shrink-0 cursor-pointer flex-col items-center justify-center gap-2.5 rounded-lg border-2 border-dashed px-5 text-center active:scale-[0.98]',
+            dragging ? 'ph-up-pick--drag' : '',
             state === 'uploading' ? 'pointer-events-none opacity-75' : '',
           ].join(' ')}
         >
@@ -183,7 +183,7 @@ export function PhoneUploadPage() {
             <div
               className={[
                 'h-full rounded-full',
-                state === 'success' ? 'w-full bg-success' : state === 'error' ? 'w-full bg-error' : state === 'uploading' ? 'w-2/3 animate-pulse bg-primary-600' : 'w-1/5 bg-neutral-300',
+                state === 'success' ? 'w-full bg-success' : state === 'error' ? 'w-full bg-error' : state === 'uploading' ? 'ph-up-progress-bar w-full' : 'w-1/5 bg-neutral-300',
               ].join(' ')}
             />
           </div>
@@ -193,8 +193,8 @@ export function PhoneUploadPage() {
           </div>
         </div>
 
-        <div className="mt-auto flex shrink-0 items-start gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3.5 py-3 text-[13px] leading-relaxed text-primary-800">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="mt-auto flex shrink-0 items-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-canvas px-3.5 py-3 text-[13px] leading-relaxed text-neutral-500">
+          <ShieldCheckIcon className="h-4 w-4 shrink-0 text-warning-fg" />
           本页使用一次性上传令牌，不会登录或读取你的账号；文件仅用于本次打印 / 简历服务，到期自动清理。
         </div>
       </section>
