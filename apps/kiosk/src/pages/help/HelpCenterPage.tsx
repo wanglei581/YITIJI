@@ -167,7 +167,7 @@ const SECTIONS: HelpSection[] = [
   },
 ]
 
-function QaRow({ item, answerId, onNavigate }) => void }) {
+function QaRow({ item, answerId, onNavigate }: { item: { q: string; a: string }; answerId?: string; onNavigate?: () => void }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className={`k1-help-row${open ? ' is-open' : ''}`}>
@@ -218,7 +218,7 @@ export function HelpCenterPage() {
     navigate(route)
   }
 
-  const allItems = SECTIONS.flatMap((section) => section.items.map((item, itemIndex) => ({ section, item })))
+  const allItems = SECTIONS.flatMap((section) => section.items.map((item) => ({ section, item })))
   const privacyLead = allItems.find(({ item }) => item.pin)
   const pinnedItems = [allItems[0], privacyLead].filter((entry, index, entries) => entry && entries.indexOf(entry) === index) as { section: HelpSection; item: QA }[]
   const orderedItems = activeSection === 'all'
@@ -251,7 +251,7 @@ export function HelpCenterPage() {
       <div className="k1-help-scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-4">
         <div className="k1-help-faq-list">
           {orderedItems.map(({ section, item }, index) => (
-            <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${itemIndex}`}
+            <QaRow key={item.q} item={item} answerId={`help-answer-${section.key}-${_idx}`}
               category={section.title}
               answerId={`help-answer-${section.key}-${section.items.indexOf(item)}`}
               defaultOpen={activeSection === 'all' && index < 2}
