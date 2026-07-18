@@ -52,7 +52,7 @@ export function FileTable({
           <thead>
             <tr>
               {headers.map((h) => (
-                <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                <th key={h} className="sticky top-0 whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500 backdrop-blur-sm">{h}</th>
               ))}
             </tr>
           </thead>
@@ -88,7 +88,7 @@ export function FileTable({
                 return (
                   <tr key={v.raw.id} className={`hover:bg-neutral-50 ${v.clean === 'cleaned' ? 'opacity-50' : ''}`}>
                     <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-neutral-700" title={v.name}>{v.name}</td>
-                    <td className="px-4 py-3"><span className={`rounded px-2 py-0.5 text-xs font-medium ${v.typeStyle}`}>{v.typeLabel}</span></td>
+                    <td className="whitespace-nowrap px-4 py-3"><span className={`rounded px-2 py-0.5 text-xs font-medium ${v.typeStyle}`}>{v.typeLabel}</span></td>
                     <td className="max-w-[140px] truncate whitespace-nowrap px-4 py-3 text-xs text-neutral-600" title={v.user}>{v.user}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.source}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{v.size}</td>

@@ -226,7 +226,7 @@ export function AdminInitialPhoneBindingCard({ onBound }: AdminInitialPhoneBindi
           </div>
           {message && <MessageNotice message={message} />}
           {cooldownSeconds > 0 && <p className="text-xs text-neutral-500">请等待 {cooldownSeconds} 秒后重试。</p>}
-          <Button type="submit" disabled={submitting || cooldownSeconds > 0} className="w-full">
+          <Button type="submit" disabled={submitting || cooldownSeconds > 0} className="min-w-[140px]">
             {submitting ? '发送中…' : cooldownSeconds > 0 ? '暂不可重新发送' : '获取验证码'}
           </Button>
         </form>

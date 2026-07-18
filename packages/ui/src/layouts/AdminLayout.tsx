@@ -289,7 +289,9 @@ export function AdminLayout({
 
         {/* Page content — scrollable */}
         <main className="ui-admin-content flex-1 overflow-y-auto px-7 pb-8 pt-6">
-          {children}
+          <div className="mx-auto w-full max-w-[1400px]">
+            {children}
+          </div>
         </main>
       </div>
     </div>

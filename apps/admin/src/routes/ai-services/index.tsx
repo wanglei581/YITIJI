@@ -91,14 +91,14 @@ interface MetricProps {
 
 function MetricCard({ label, value, note, icon: Icon, iconClass = 'text-primary-600 bg-primary-50' }: MetricProps) {
   return (
-    <Card className="flex items-start gap-4 p-5">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
-        <Icon className="h-5 w-5" aria-hidden="true" />
+    <Card className="flex items-start gap-3.5 p-4">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ${iconClass}`}>
+        <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-neutral-500">{label}</p>
-        <p className="mt-0.5 text-xl font-semibold text-neutral-900">{value}</p>
-        {note && <p className="mt-0.5 text-xs text-neutral-400">{note}</p>}
+        <p className="text-[11.5px] font-medium text-neutral-500">{label}</p>
+        <p className="mt-0.5 text-[1.35rem] font-bold tabular-nums leading-none text-neutral-900">{value}</p>
+        {note && <p className="mt-1 text-[11px] text-neutral-400">{note}</p>}
       </div>
     </Card>
   )
@@ -221,8 +221,11 @@ export default function AiServicesPage() {
 
       {/* ── 今日概览指标 ─────────────────────────────── */}
       <section aria-label="今日 AI 服务概览">
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">今日概览</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+          <h2 className="text-[13px] font-bold text-neutral-700">今日概览</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="AI 调用总次数"
             value={usage.totalCalls}
@@ -252,7 +255,7 @@ export default function AiServicesPage() {
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
           <MetricCard
             label="当前 Provider"
             value={usage.providerName}
@@ -291,9 +294,12 @@ export default function AiServicesPage() {
       </section>
 
       {/* ── 岗位 AI 运营 ─────────────────────────────── */}
-      <section aria-label="岗位 AI 运营" className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">岗位 AI 运营</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <section aria-label="岗位 AI 运营" className="mt-7">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+          <h2 className="text-[13px] font-bold text-neutral-700">岗位 AI 运营</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="岗位 AI 调用"
             value={jobAiCalls}
@@ -326,9 +332,12 @@ export default function AiServicesPage() {
       </section>
 
       {/* ── 岗位来源质量 ─────────────────────────────── */}
-      <section aria-label="岗位来源质量" className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-neutral-500">岗位来源质量</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <section aria-label="岗位来源质量" className="mt-7">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+          <h2 className="text-[13px] font-bold text-neutral-700">岗位来源质量</h2>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MetricCard
             label="来源岗位总量"
             value={qualityTotals.totalJobs}
@@ -361,8 +370,11 @@ export default function AiServicesPage() {
 
       {/* ── 失败原因统计 ──────────────────────────────── */}
       {usage.errorDistribution.length > 0 && (
-        <section aria-label="失败原因统计" className="mt-8">
-          <h2 className="mb-3 text-sm font-medium text-neutral-500">失败原因分布</h2>
+        <section aria-label="失败原因统计" className="mt-7">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+            <h2 className="text-[13px] font-bold text-neutral-700">失败原因分布</h2>
+          </div>
           <Card className="p-5">
             <div className="flex flex-wrap gap-3">
               {usage.errorDistribution.map((r) => (
@@ -381,9 +393,12 @@ export default function AiServicesPage() {
       )}
 
       {/* ── 最近调用日志 ──────────────────────────────── */}
-      <section aria-label="最近 AI 调用日志" className="mt-8">
+      <section aria-label="最近 AI 调用日志" className="mt-7">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h2 className="text-sm font-medium text-neutral-500">最近调用日志</h2>
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+            <h2 className="text-[13px] font-bold text-neutral-700">最近调用日志</h2>
+          </div>
           <div className="ml-auto flex flex-wrap gap-2">
             <div className="flex rounded-lg border border-neutral-200 bg-surface text-sm">
               {OP_FILTERS.map((f) => (

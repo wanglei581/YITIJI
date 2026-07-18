@@ -139,7 +139,7 @@ export default function ImportBatchesPage() {
               key={f}
               onClick={() => handleStatusChange(f)}
               className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                statusFlt === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                statusFlt === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -181,7 +181,7 @@ export default function ImportBatchesPage() {
               <thead>
                 <tr>
                   {['机构', '数据源', '文件名', '类型', '总行数', '有效', '无效', '重复', '状态', '创建时间', '确认时间', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
                       {h}
                     </th>
                   ))}

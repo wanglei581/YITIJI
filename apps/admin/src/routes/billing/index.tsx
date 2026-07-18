@@ -147,13 +147,13 @@ function PriceConfigSection() {
       {error && <div className="border-b border-error/20 bg-error-bg px-5 py-3 text-sm text-error-fg">{error}</div>}
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
-            <th className="px-5 py-3">价目项</th>
-            <th className="px-5 py-3">单价（元）</th>
-            <th className="px-5 py-3">说明</th>
-            <th className="px-5 py-3">状态</th>
-            <th className="px-5 py-3">更新时间</th>
-            <th className="px-5 py-3 text-right">操作</th>
+          <tr className="border-b border-neutral-900/10 bg-neutral-50/80 text-left text-[11.5px] text-neutral-500">
+            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">价目项</th>
+            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">单价（元）</th>
+            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">说明</th>
+            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">状态</th>
+            <th className="px-5 py-2.5 font-bold tracking-[0.04em]">更新时间</th>
+            <th className="px-5 py-2.5 text-right font-bold tracking-[0.04em]">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -299,10 +299,10 @@ function ReconciliationSection() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
-                <th className="px-5 py-3">差异类型</th>
-                <th className="px-5 py-3">订单号</th>
-                <th className="px-5 py-3">明细</th>
+              <tr className="border-b border-neutral-900/10 bg-neutral-50/80 text-left text-[11.5px] text-neutral-500">
+                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">差异类型</th>
+                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">订单号</th>
+                <th className="px-5 py-2.5 font-bold tracking-[0.04em]">明细</th>
               </tr>
             </thead>
             <tbody>

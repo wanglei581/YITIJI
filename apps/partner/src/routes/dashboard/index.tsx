@@ -88,26 +88,27 @@ function MetricsGrid({ data, onGo }: { data: PartnerDashboardData; onGo: (path: 
   ]
   return (
     <section aria-label="数据概览">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-400">
-        数据概览
-      </h2>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+        <h2 className="text-[13px] font-bold text-neutral-700">数据概览</h2>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {metrics.map((m) => {
           const Icon = m.icon
           return (
             <Card
               key={m.label}
-              className="cursor-pointer p-5 transition-shadow hover:shadow-md"
+              className="cursor-pointer p-4 transition-shadow hover:shadow-md"
               onClick={() => onGo(m.path)}
             >
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs text-neutral-500">{m.label}</p>
-                  <p className="mt-1.5 text-2xl font-bold tabular-nums text-neutral-900">{m.value}</p>
-                  <p className="mt-1 text-[10px] text-neutral-400">{m.note}</p>
+                  <p className="text-[11.5px] font-medium text-neutral-500">{m.label}</p>
+                  <p className="mt-1.5 text-[1.5rem] font-bold tabular-nums leading-none text-neutral-900">{m.value}</p>
+                  <p className="mt-1.5 text-[10.5px] text-neutral-400">{m.note}</p>
                 </div>
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${m.iconClass}`}>
-                  <Icon className="h-5 w-5" aria-hidden="true" />
+                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] ${m.iconClass}`}>
+                  <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                 </div>
               </div>
             </Card>
@@ -122,9 +123,10 @@ function SyncLogSection({ data, onGoLogs }: { data: PartnerDashboardData; onGoLo
   return (
     <section aria-label="最近同步记录">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
-          最近同步记录
-        </h2>
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
+          <h2 className="text-[13px] font-bold text-neutral-700">最近同步记录</h2>
+        </div>
         <button
           type="button"
           onClick={onGoLogs}

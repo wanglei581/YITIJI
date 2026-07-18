@@ -122,13 +122,13 @@ export default function CompaniesPage() {
               <thead>
                 <tr>
                   {['企业名称', '来源机构', '地区', '行业', '类型', '审核状态', '发布状态', '关联岗位', '操作'].map((h) => (
-                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                    <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-900/[0.06]">
                 {rows.map((c) => (
-                  <tr key={c.id} className="cursor-pointer hover:bg-neutral-50" onClick={() => setSelectedId(c.id)}>
+                  <tr key={c.id} className="cursor-pointer hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500" onClick={() => setSelectedId(c.id)} tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(c.id) } }} aria-label={`查看企业 ${c.name}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Building2Icon className="h-4 w-4 shrink-0 text-neutral-400" />

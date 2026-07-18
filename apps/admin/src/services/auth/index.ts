@@ -11,7 +11,17 @@
  *   versioned key 方便未来 schema 迁移直接 clearAuth。
  */
 
-import { API_BASE_URL } from '../api/client'
+import { API_BASE_URL, API_MODE } from '../api/client'
+
+// ─── Dev-only mock bypass ────────────────────────────────────────────────────
+// 仅在 VITE_API_MODE !== 'http'（即 mock 模式）时生效，用于本地预览无后端场景。
+// 生产构建时 VITE_API_MODE=http，此分支永不执行。
+const MOCK_ADMIN_USER: AuthedUser = {
+  id:   'mock-admin-001',
+  name: '系统管理员（预览）',
+  role: 'admin',
+  orgId: null,
+}
 
 const STORAGE_KEY = 'admin_auth_v1'
 
@@ -289,6 +299,12 @@ function ensureAdminSession(data: { token: string; user: AuthedUser }): LoginRes
 }
 
 export async function login(loginId: string, password: string): Promise<LoginResult> {
+  // mock 旁路：无后端时任意账号/密码均可进入，仅用于本地 UI 预览
+  if (API_MODE === 'mock') {
+    const mockUser = { ...MOCK_ADMIN_USER, name: loginId || MOCK_ADMIN_USER.name }
+    writeState({ token: 'mock-token', user: mockUser })
+    return { ok: true, user: mockUser }
+  }
   const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login', { loginId, password, portal: 'admin' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return ensureAdminSession(r.data)
@@ -461,6 +477,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
  */
 export async function verifyToken(): Promise<AuthedUser | null> {
   if (!getToken()) return null
+  // mock 旁路：直接信任本地存储的用户，不调 /auth/me
+  if (API_MODE === 'mock') {
+    const u = getUser()
+    return u?.role === 'admin' ? u : null
+  }
   const r = await getJson<AuthedUser>('/auth/me')
   if (r.ok) {
     // /auth/me 返回 { userId, role, orgId },字段名与 LoginResult.user 略异,

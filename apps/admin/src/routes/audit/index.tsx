@@ -167,7 +167,7 @@ export default function AuditPage() {
             <thead>
               <tr>
                 {COLUMNS.map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">
                     {h}
                   </th>
                 ))}

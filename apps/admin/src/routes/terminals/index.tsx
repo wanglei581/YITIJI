@@ -86,6 +86,7 @@ export default function TerminalsPage() {
   const [bindCodeTerminal, setBindCodeTerminal] = useState<AdminTerminalRecord | null>(null)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
+  const [orgLoadError, setOrgLoadError] = useState<string | null>(null)
 
   const {
     data: terminalData,
@@ -137,7 +138,9 @@ export default function TerminalsPage() {
 
   // 机构下拉选项（绑定用）。失败不阻断页面，仍可解绑。
   useEffect(() => {
-    getOrgOptions().then((r) => setOrgOptions(r.organizations)).catch(() => { /* ignore */ })
+    getOrgOptions().then((r) => setOrgOptions(r.organizations)).catch(() => {
+      setOrgLoadError('机构列表加载失败，请刷新页面重试')
+    })
   }, [])
 
   useEffect(() => {
@@ -366,7 +369,7 @@ export default function TerminalsPage() {
             <thead>
               <tr>
                 {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -498,7 +501,11 @@ export default function TerminalsPage() {
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.macAddress ?? '—'}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs">
                         {editingId === t.id ? (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col gap-1">
+                            {orgLoadError && (
+                              <p className="text-xs text-error-fg">{orgLoadError}</p>
+                            )}
+                            <div className="flex items-center gap-1.5">
                             <select
                               value={editValue}
                               onChange={(e) => setEditValue(e.target.value)}
@@ -531,6 +538,7 @@ export default function TerminalsPage() {
                             >
                               <XIcon className="h-3.5 w-3.5" />
                             </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
