@@ -334,6 +334,8 @@
   background: rgba(255, 255, 255, .82);
   border: 1px solid var(--resume-lightflow-line, #d7e7f5);
 }
+
+@media (max-width: 768px) {
   :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__workspace { grid-template-columns: 1fr; }
   :is(.resume-templates-lightflow, .resume-materials-lightflow, .resume-export-lightflow) .resume-lightflow__detail { position: static; }
 }
