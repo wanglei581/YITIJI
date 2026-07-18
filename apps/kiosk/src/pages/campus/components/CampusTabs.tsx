@@ -177,7 +177,7 @@ export function OverviewTab({
             { icon: NavigationIcon, title: '招聘会导览图', sub: '展位地图 / 日程', tab: 'map' as TabKey },
             { icon: BriefcaseIcon, title: 'AI智能求职', sub: '简历 / 面试 / 准备单', tab: 'ai' as TabKey },
             { icon: PrinterIcon, title: '自助打印服务', sub: '简历 / 活动资料', tab: 'print' as TabKey },
-          ].map(({ icon: _icon, title, sub, tab }) => (
+          ].map(({ title, sub, tab }) => (
             <button
               key={tab}
               type="button"
