@@ -16,8 +16,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
-import { AlertCircleIcon, InfoIcon, ScanLineIcon } from 'lucide-react'
+import { Button } from '@ai-job-print/ui'
+import { AlertCircleIcon, CreditCardIcon, FileTextIcon, InfoIcon, QrCodeIcon, ScanLineIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
@@ -401,143 +401,177 @@ export function PrintCashierPage() {
   const canReissue = view?.canReissue ?? false
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <div className="print-proto flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="订单支付"
-        subtitle="请选择支付方式并完成付款"
+        subtitle="请完成支付后开始打印；支付结果由系统自动确认"
         step={6}
         backLabel="返回确认"
         onBack={() => navigate('/print/confirm', { state })}
       />
 
-      <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 价目明细 */}
-        <Card className="overflow-hidden p-0">
-          <table className="w-full">
-            <tbody>
-              {priceLines.length === 0 ? (
-                <tr>
-                  <td className="px-5 py-3.5 text-sm text-neutral-500">打印费用</td>
-                  <td className="px-5 py-3.5 text-right text-sm font-medium text-neutral-900">{total}</td>
-                </tr>
-              ) : (
-                priceLines.map((line, i) => (
-                  <tr key={`${line.serviceKey}-${i}`} className={i % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
-                    <td className="border-b border-neutral-100 px-5 py-3 text-sm text-neutral-500">
-                      {lineLabel(line)}
-                      <span className="ml-2 text-xs text-neutral-400">
-                        {formatCents(line.unitCents)} × {line.quantity}
-                      </span>
-                    </td>
-                    <td className="border-b border-neutral-100 px-5 py-3 text-right text-sm font-medium text-neutral-900">
-                      {formatCents(line.subtotalCents)}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-          <div className="flex items-baseline justify-between px-5 py-4">
-            <span className="text-sm font-medium text-neutral-700">应付金额</span>
-            <span className="text-2xl font-bold text-neutral-900">{total}</span>
+      <div className="cashier-split mt-4 flex-1">
+        {/* ── 左列：价目明细 + 规则 + 提示 ── */}
+        <div className="cashier-left">
+          {/* 价目明细 */}
+          <div className="cashier-detail-card">
+            <div className="cashier-card-head">
+              <span className="cashier-card-icon">
+                <FileTextIcon aria-hidden="true" />
+              </span>
+              <div>
+                <div className="cashier-card-title">价目明细</div>
+                <div className="cashier-card-sub">
+                  {state.orderNo ? `订单号 ${state.orderNo}` : orderId ? `订单 ${orderId}` : '打印订单'}
+                </div>
+              </div>
+            </div>
+            {priceLines.length === 0 ? (
+              <div className="cashier-sum-row">
+                <span className="cashier-sum-key">打印费用</span>
+                <span className="cashier-sum-val">{total}</span>
+              </div>
+            ) : (
+              priceLines.map((line, i) => (
+                <div key={`${line.serviceKey}-${i}`} className="cashier-sum-row">
+                  <span className="cashier-sum-key">
+                    {lineLabel(line)}
+                    <small>
+                      {formatCents(line.unitCents)} × {line.quantity}
+                    </small>
+                  </span>
+                  <span className="cashier-sum-val">{formatCents(line.subtotalCents)}</span>
+                </div>
+              ))
+            )}
+            <div className="cashier-amount-row">
+              <span className="cashier-amount-label">
+                应付金额
+                <br />
+                示例金额 · 以现场公示价为准
+              </span>
+              <span className="cashier-amount-num">
+                <small>¥</small>
+                {total.replace('¥', '')}
+              </span>
+            </div>
           </div>
-        </Card>
 
-        {/* 支付通道选择（多通道时显式选择；触控目标 ≥56px） */}
-        {channels !== null && channels.length > 1 && (
-          <div className="flex gap-3">
-            {channels.map((ch) => (
-              <button
-                key={ch}
-                onClick={() => switchChannel(ch)}
-                disabled={issuing || codeSubmitting || hasActivePaymentAttempt}
-                className={[
-                  'min-h-[56px] flex-1 rounded-xl border-2 px-4 text-base font-semibold transition-colors',
-                  displayedChannel === ch
-                    ? 'border-primary-600 bg-primary-50 text-primary-700'
-                    : 'border-neutral-200 bg-white text-neutral-600',
-                ].join(' ')}
-              >
-                {PAY_CHANNEL_LABEL[ch] ?? ch}
-              </button>
-            ))}
+          {/* 支付与退款规则 */}
+          <div className="cashier-rule-card">
+            <h3>支付与退款规则</h3>
+            <ul>
+              <li>屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。</li>
+              <li>付款码支付如提示待核实，请勿重复扫码，等待系统查单。</li>
+              <li>订单超时未支付将自动关闭，不会扣款。</li>
+              <li>如需退款请联系现场工作人员协助处理，本机不提供自助退款。</li>
+            </ul>
           </div>
-        )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => selectPaymentMethod('qr')}
-            disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
-            className={[
-              'min-h-[56px] rounded-lg border-2 px-4 text-base font-semibold transition-colors',
-              displayedPaymentMethod === 'qr' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
-            ].join(' ')}
-          >
-            屏上收款码
-          </button>
-          <button
-            type="button"
-            onClick={() => selectPaymentMethod('code')}
-            disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
-            className={[
-              'flex min-h-[56px] items-center justify-center gap-2 rounded-lg border-2 px-4 text-base font-semibold transition-colors',
-              displayedPaymentMethod === 'code' ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600',
-            ].join(' ')}
-          >
-            <ScanLineIcon className="h-5 w-5" />
-            扫付款码
-          </button>
+          {/* 提示条 */}
+          <div className="cashier-notice">
+            <InfoIcon aria-hidden="true" />
+            支付完成后自动进入打印，请勿离开；若长时间未响应，请联系现场工作人员。
+          </div>
         </div>
 
-        <CashierPaymentPanel
-          paymentMethod={paymentMethod}
-          attemptPaymentMethod={attemptPaymentMethod}
-          snapshot={snapshot}
-          view={view}
-          channelsLoading={channels === null}
-          issuing={issuing}
-          codeSubmitting={codeSubmitting}
-          authCode={authCode}
-          qrContent={qrContent}
-          remainSec={remainSec}
-          reconciling={reconciling}
-          canReissue={canReissue}
-          isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
-          canProceed={canProceed}
-          onAuthCodeChange={setAuthCode}
-          onSubmitCode={(code) => void submitCodePayment(code)}
-          onReconcile={() => void handleReconcile()}
-          onReissue={handleReissue}
-          onSimulateSandbox={(result) => void devSimulate(result)}
-        />
-
-        {/* 退款 / 重试规则（静态说明；不自助退款，C5-4）*/}
-        <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3 text-xs leading-relaxed text-neutral-500">
-          <InfoIcon className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。付款码支付如提示待核实，请勿重复扫码，等待系统查单。
-            订单超时未支付将自动关闭；如需退款请联系现场工作人员协助处理。
-          </span>
-        </div>
-
-        {issueError && (
-          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">
-            <AlertCircleIcon className="h-4 w-4 shrink-0" />
-            <span>{issueError}</span>
+        {/* ── 右列：通道 + 方式 + 收款码 ── */}
+        <div className="cashier-pay-card">
+          <div className="cashier-card-head">
+            <span className="cashier-card-icon">
+              <CreditCardIcon aria-hidden="true" />
+            </span>
+            <div>
+              <div className="cashier-card-title">选择支付方式</div>
+              <div className="cashier-card-sub">先选通道，再选扫码方式</div>
+            </div>
           </div>
-        )}
 
+          {/* 通道切换（全部已启用通道均展示） */}
+          {channels !== null && channels.length > 0 && (
+            <div className="cashier-ch-row">
+              {channels.map((ch) => (
+                <button
+                  key={ch}
+                  type="button"
+                  data-active={displayedChannel === ch ? 'true' : undefined}
+                  onClick={() => switchChannel(ch)}
+                  disabled={issuing || codeSubmitting || hasActivePaymentAttempt}
+                  className="cashier-ch-btn"
+                >
+                  {PAY_CHANNEL_LABEL[ch] ?? ch}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 支付方式 */}
+          <div className="cashier-mode-row">
+            <button
+              type="button"
+              data-active={displayedPaymentMethod === 'qr' ? 'true' : undefined}
+              onClick={() => selectPaymentMethod('qr')}
+              disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
+              className="cashier-mode-btn"
+            >
+              <QrCodeIcon aria-hidden="true" />
+              屏上收款码
+            </button>
+            <button
+              type="button"
+              data-active={displayedPaymentMethod === 'code' ? 'true' : undefined}
+              onClick={() => selectPaymentMethod('code')}
+              disabled={!selectedChannel || issuing || codeSubmitting || hasActivePaymentAttempt}
+              className="cashier-mode-btn"
+            >
+              <ScanLineIcon aria-hidden="true" />
+              扫付款码
+            </button>
+          </div>
+
+          <CashierPaymentPanel
+            paymentMethod={paymentMethod}
+            attemptPaymentMethod={attemptPaymentMethod}
+            snapshot={snapshot}
+            view={view}
+            channelsLoading={channels === null}
+            issuing={issuing}
+            codeSubmitting={codeSubmitting}
+            authCode={authCode}
+            qrContent={qrContent}
+            remainSec={remainSec}
+            reconciling={reconciling}
+            canReissue={canReissue}
+            isDevSandbox={import.meta.env.DEV && snapshot?.attempt?.channel === 'sandbox'}
+            canProceed={canProceed}
+            onAuthCodeChange={setAuthCode}
+            onSubmitCode={(code) => void submitCodePayment(code)}
+            onReconcile={() => void handleReconcile()}
+            onReissue={handleReissue}
+            onSimulateSandbox={(result) => void devSimulate(result)}
+          />
+
+          {issueError && (
+            <div className="cashier-error-strip">
+              <AlertCircleIcon aria-hidden="true" />
+              <span>{issueError}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* 底部动作 */}
-      <div className="mt-4 flex gap-3">
-        <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
-          取消
-        </Button>
-        <Button size="lg" className="flex-1" disabled={!canProceed} onClick={proceedToPrint}>
+      {/* 底部行动条 */}
+      <div className="cashier-actionbar">
+        <button type="button" className="cashier-btn-ghost" onClick={() => navigate('/')}>
+          <XCircleIcon aria-hidden="true" />
+          退出支付
+        </button>
+        <span className="cashier-bar-note">
+          支付确认到账后自动进入打印；退出后订单超时未支付将自动关闭，不会扣款
+        </span>
+        <button type="button" className="cashier-btn-primary" disabled={!canProceed} onClick={proceedToPrint}>
           {canProceed ? '开始打印' : '等待支付…'}
-        </Button>
+        </button>
       </div>
     </div>
   )

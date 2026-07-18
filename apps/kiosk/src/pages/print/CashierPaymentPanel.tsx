@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
-import { Button, Card } from '@ai-job-print/ui'
+import { Button } from '@ai-job-print/ui'
 import { PAY_CHANNEL_LABEL, type AttemptPaymentMethod, type CashierView } from './cashierStatus'
 
 // 生产包不能含 DEV 沙箱按钮文案或模拟支付入口；Vite 会在 production 将此分支完全裁掉。
@@ -18,13 +18,6 @@ export interface CashierSnapshot {
     qrCodeContent: string | null
     expiresAt: string | null
   } | null
-}
-
-const TONE_BOX: Record<CashierView['tone'], string> = {
-  info: 'border-primary-200 bg-primary-50 text-primary-700',
-  success: 'border-success/30 bg-success-bg text-success-fg',
-  warning: 'border-warning/30 bg-warning-bg text-warning-fg',
-  error: 'border-error/30 bg-error-bg text-error-fg',
 }
 
 interface CashierPaymentPanelProps {
@@ -79,98 +72,120 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     snapshot?.attempt?.channel !== undefined &&
     snapshot.attempt.channel !== 'sandbox'
 
+  const inner = showCodeInput ? (
+    <form
+      className="cashier-code-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onSubmitCode()
+      }}
+    >
+      <div>
+        <p className="cashier-code-label-title">请扫描或输入手机付款码</p>
+        <p className="cashier-code-label-hint">扫码器会自动输入并提交；也可手动输入 18 位数字。</p>
+      </div>
+      <input
+        autoFocus
+        value={authCode}
+        onChange={(event) => {
+          const nextCode = event.target.value.replace(/\D/g, '').slice(0, 18)
+          onAuthCodeChange(nextCode)
+          if (nextCode.length === 18) onSubmitCode(nextCode)
+        }}
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={18}
+        aria-label="付款码"
+        placeholder="请输入 18 位付款码"
+        disabled={codeSubmitting}
+        className="cashier-code-input"
+      />
+      <button type="submit" disabled={codeSubmitting || authCode.length !== 18} className="cashier-code-submit">
+        {codeSubmitting ? '正在提交…' : '确认支付'}
+      </button>
+    </form>
+  ) : !view ? (
+    <div className="cashier-idle-panel">
+      <LoaderIcon style={{ width: 32, height: 32, animation: 'spin 1s linear infinite', color: 'var(--print-teal)' }} />
+      <p>
+        {channelsLoading
+          ? '正在获取支付通道…'
+          : issuing
+            ? '正在生成支付码…'
+            : paymentMethod === null
+              ? '请选择支付方式'
+              : '正在获取支付状态…'}
+      </p>
+    </div>
+  ) : (
+    <div className="cashier-qr-area">
+      <div className="cashier-qr-panel">
+        {view.title || view.hint ? (
+          <div style={{
+            width: '100%',
+            borderRadius: 12,
+            padding: '10px 16px',
+            textAlign: 'center',
+            fontSize: 16,
+            background: view.tone === 'success' ? 'var(--print-teal-soft)' : view.tone === 'error' ? 'rgb(193 74 52 / 8%)' : view.tone === 'warning' ? 'var(--print-wheat-soft)' : 'var(--print-slate-soft)',
+            color: view.tone === 'success' ? 'var(--print-teal-deep)' : view.tone === 'error' ? 'var(--print-error)' : view.tone === 'warning' ? 'var(--print-wheat-deep, #8a6219)' : 'var(--print-slate)',
+            border: `1px solid ${view.tone === 'success' ? 'rgb(31 158 134 / 30%)' : view.tone === 'error' ? 'rgb(193 74 52 / 30%)' : view.tone === 'warning' ? 'rgb(169 120 31 / 30%)' : 'rgb(63 104 176 / 25%)'}`,
+          }}>
+            <p style={{ fontWeight: 700 }}>{view.title}</p>
+            {view.hint && <p style={{ marginTop: 4, lineHeight: 1.5 }}>{view.hint}</p>}
+          </div>
+        ) : null}
+
+        {qrContent && (
+          <>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '1px solid var(--print-line)' }}>
+              <QRCodeSVG value={qrContent} size={240} level="M" marginSize={1} />
+            </div>
+            <div className="cashier-qr-title">
+              请使用{PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '手机'}扫码支付
+            </div>
+            <div className="cashier-qr-sub">支付主体与金额以手机端展示为准</div>
+            <div className="cashier-qr-badge">
+              <ShieldCheckIcon aria-hidden="true" />
+              {snapshot?.attempt?.channel === 'sandbox'
+                ? '测试支付通道 · 非真实收款'
+                : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
+            </div>
+            {remainSec !== null && (
+              <p className="cashier-countdown">
+                收款码 {String(Math.floor(remainSec / 60)).padStart(2, '0')}:{String(remainSec % 60).padStart(2, '0')} 后失效，过期请重新出码
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {canReconcile && (
+        <button
+          type="button"
+          onClick={onReconcile}
+          disabled={reconciling}
+          className="cashier-verify-btn"
+        >
+          <SearchCheckIcon style={{ animation: reconciling ? 'pulse 1.5s ease-in-out infinite' : undefined }} aria-hidden="true" />
+          {reconciling ? '正在向支付渠道核实…' : '已支付但未跳转？点此核实支付结果'}
+        </button>
+      )}
+
+      {canReissue && (
+        <Button variant="secondary" size="lg" style={{ width: '100%', marginTop: 8 }} disabled={issuing} onClick={onReissue}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <RefreshCwIcon style={{ width: 18, height: 18, animation: issuing ? 'spin 1s linear infinite' : undefined }} aria-hidden="true" />
+            {(attemptPaymentMethod ?? paymentMethod) === 'code' ? '重新扫码' : '重新出码'}
+          </span>
+        </Button>
+      )}
+    </div>
+  )
+
   return (
     <>
-      <Card className="flex flex-col items-center gap-4 p-6">
-      {showCodeInput ? (
-        <form
-          className="flex w-full max-w-md flex-col gap-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            onSubmitCode()
-          }}
-        >
-          <div className="text-center">
-            <p className="font-semibold text-neutral-900">请扫描或输入手机付款码</p>
-            <p className="mt-1 text-sm text-neutral-500">扫码器会自动输入并提交；也可手动输入 18 位数字。</p>
-          </div>
-          <input
-            autoFocus
-            value={authCode}
-            onChange={(event) => {
-              const nextCode = event.target.value.replace(/\D/g, '').slice(0, 18)
-              onAuthCodeChange(nextCode)
-              if (nextCode.length === 18) onSubmitCode(nextCode)
-            }}
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={18}
-            aria-label="付款码"
-            placeholder="请输入 18 位付款码"
-            disabled={codeSubmitting}
-            className="min-h-[56px] rounded-lg border border-neutral-300 px-4 text-center text-lg tracking-widest outline-none focus:border-primary-600"
-          />
-          <Button type="submit" size="lg" disabled={codeSubmitting || authCode.length !== 18}>
-            {codeSubmitting ? '正在提交…' : '确认支付'}
-          </Button>
-        </form>
-      ) : !view ? (
-        <div className="flex flex-col items-center gap-3 py-8 text-neutral-500">
-          <LoaderIcon className="h-8 w-8 animate-spin text-primary-600" />
-          <p className="text-sm">
-            {channelsLoading
-              ? '正在获取支付通道…'
-              : issuing
-                ? '正在生成支付码…'
-                : paymentMethod === null
-                  ? '请选择支付方式'
-                  : '正在获取支付状态…'}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className={['w-full rounded-lg border px-4 py-3 text-center text-sm', TONE_BOX[view.tone]].join(' ')}>
-            <p className="font-semibold">{view.title}</p>
-            <p className="mt-1 leading-relaxed">{view.hint}</p>
-          </div>
-
-          {qrContent && (
-            <div className="flex flex-col items-center gap-2">
-              <div className="rounded-xl border border-neutral-200 bg-white p-4">
-                <QRCodeSVG value={qrContent} size={220} level="M" marginSize={1} />
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-neutral-400">
-                <ShieldCheckIcon className="h-3.5 w-3.5" />
-                {snapshot?.attempt?.channel === 'sandbox'
-                  ? '测试支付通道 · 非真实收款'
-                  : `${PAY_CHANNEL_LABEL[snapshot?.attempt?.channel ?? ''] ?? '线上支付'} · 支付结果以服务端确认为准`}
-              </div>
-              {remainSec !== null && <p className="text-xs text-neutral-400">支付码有效期剩余 {remainSec} 秒</p>}
-            </div>
-          )}
-
-          {canReconcile && (
-            <button
-              onClick={onReconcile}
-              disabled={reconciling}
-              className="flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 px-4 text-sm text-neutral-600"
-            >
-              <SearchCheckIcon className={['h-4 w-4', reconciling ? 'animate-pulse' : ''].join(' ')} />
-              {reconciling ? '正在向支付渠道核实…' : '已完成支付但未跳转？点此核实'}
-            </button>
-          )}
-
-          {canReissue && (
-            <Button variant="secondary" size="lg" disabled={issuing} onClick={onReissue}>
-              <span className="flex items-center gap-2">
-                <RefreshCwIcon className={['h-4 w-4', issuing ? 'animate-spin' : ''].join(' ')} />
-                {(attemptPaymentMethod ?? paymentMethod) === 'code' ? '重新扫码' : '重新出码'}
-              </span>
-            </Button>
-          )}
-        </>
-      )}
-      </Card>
+      {inner}
       {isDevSandbox && !canProceed && DevSandboxControls && (
         <Suspense fallback={null}>
           <DevSandboxControls onSimulate={onSimulateSandbox} />
