@@ -103,6 +103,7 @@
     "verify:admin-orgs-delete-schema": "node -r @swc-node/register scripts/verify-admin-orgs-delete-schema.ts",
     "verify:internal-auth-phone": "node -r @swc-node/register scripts/verify-internal-auth-phone.ts",
     "verify:admin-phone-transfer": "node -r @swc-node/register scripts/verify-admin-phone-transfer.ts",
+    "verify:partner-account-action:schema": "node -r @swc-node/register scripts/verify-partner-account-action-schema.ts",
     "verify:partner-account-action:otp": "node -r @swc-node/register scripts/verify-partner-account-action-otp.ts",
     "verify:partner-account-action:redis": "node -r @swc-node/register scripts/verify-partner-account-action-redis.ts",
     "verify:internal-auth-phone:target-guard": "node -r @swc-node/register scripts/verify-internal-auth-phone-target-guard.ts",
