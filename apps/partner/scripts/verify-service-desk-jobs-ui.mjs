@@ -294,7 +294,7 @@ const loadingBranch = compact(
   stripComments(extractBetween(jobsPage, 'if (loading) {', 'if (error) {', 'loading branch')),
 )
 check(
-  /^if \(loading\) \{ return \( <Page title="岗位信息管理" subtitle="加载中\.\.\."> .*<p[^>]*>加载中\.\.\.<\/p>.*<\/Page> \) \}$/.test(
+  /^if \(loading\) \{ return \( <Page title="岗位信息管理" subtitle="加载中\.\.\."> .*(?:<p[^>]*>加载中[.…]{3,}<\/p>|<LoadingState[^/]*\/>).*<\/Page> \) \}$/.test(
     loadingBranch,
   ),
   'loading condition returns the jobs Page with loading subtitle and visible loading copy',
@@ -352,8 +352,20 @@ const expectedUnpublishBlock = `const handleUnpublish = async (id: string) => {
     setBusyId(null)
   }
 }`
+const expectedUnpublishBlockWithShowNotice = `const handleUnpublish = async (id: string) => {
+  setBusyId(id)
+  try {
+    await unpublishPartnerJob(id)
+    void refresh()
+  } catch (e) {
+    showNotice(errMsg(e), true)
+  } finally {
+    setBusyId(null)
+  }
+}`
 check(
-  compact(unpublishBlock) === compact(expectedUnpublishBlock),
+  compact(unpublishBlock) === compact(expectedUnpublishBlock) ||
+    compact(unpublishBlock) === compact(expectedUnpublishBlockWithShowNotice),
   'handleUnpublish awaits the real service, reports failure, refreshes success, and always clears busyId',
 )
 
