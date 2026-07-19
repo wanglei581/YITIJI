@@ -328,7 +328,8 @@ function main(): void {
   const webhookDto = readApi('src/sync/dto/webhook-payload.dto.ts')
   const excelDto = readApi('src/jobs/dto/excel-import.dto.ts')
   const workTypeUtil = readApi('src/jobs/work-type.ts')
-  const jobsService = readApi('src/jobs/jobs.service.ts')
+  // N1拆分后 Partner写入路径(refreshJobQualitySnapshots/skillsJson等)在jobs-partner.service.ts
+  const jobsService = readApi('src/jobs/jobs.service.ts') + '\n' + readApi('src/jobs/jobs-partner.service.ts')
   const jobSyncService = readApi('src/job-sync/job-sync.service.ts')
   const syncService = readApi('src/sync/sync.service.ts')
   const sharedJobTypes = readRepo('packages/shared/src/types/job.ts')
