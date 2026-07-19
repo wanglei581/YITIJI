@@ -69,6 +69,8 @@ const PATH_TO_KEY: Record<string, string> = {
   '/audit':        'audit',
   '/account-settings':  'account-settings',
   '/offline-agencies':  'offline-agencies',
+  '/legal-docs':        'legal-docs',
+  '/privacy-requests':  'privacy-requests',
 }
 
 // 反向映射:菜单 key → 落地路径。
@@ -115,6 +117,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'member-notifications', label: '消息通知', icon: MegaphoneIcon, href: KEY_TO_PATH['member-notifications'] },
   { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理', href: KEY_TO_PATH.permissions },
   { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon, href: KEY_TO_PATH.audit },
+  { key: 'privacy-requests', label: '数据权利工单', icon: ShieldIcon, href: KEY_TO_PATH['privacy-requests'] },
 ]
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {
