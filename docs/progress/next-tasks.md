@@ -13,8 +13,12 @@
 - [x] **60/61 会话超时/断网异常屏** CSS 精修 1:1 对齐原型。PR #312 已合入 main(commit `0891b5b5`,2026-07-19)
 - [x] **Wave 1-C Admin 数据权利工单处理 UI**——PrivacyRequestsPage + API adapter + 路由。PR #313 已合入 main(commit `4282bb38`,2026-07-19)
 - [x] **Wave 1-B 数据权利执行器** — 核心已在 main；PR #314 补齐 .env.example 配置项 + verify 扩展至7项(commit `fae8cd51`,2026-07-19)
-- [x] **N5 AdminFairsService 拆分** — 829→321行，拆出 FairCompanyZoneService/FairMaterialService/FairVenueGuideService。PR #315(commit `a7aed13f`,2026-07-19)
-- [ ] **Wave 1-B 异步导出执行** — BullMQ job 真实触发导出并生成一次性下载链接（下一轮，数据权利执行开关 DATA_DELETION_ENABLED 目前默认关闭）
+- [x] **N5 AdminFairsService 拆分** — 829→321行。PR #315(commit `a7aed13f`,2026-07-19)
+- [x] **N3 terminals.service.ts 拆分** — 1182行 → 子服务 + 薄facade。PR #316/#320(2026-07-19，commit `04c3838f`/`70011240`)
+- [x] **Admin 历史 pending 打印任务受控废弃入口** — POST /admin/print-jobs/:id/abandon。PR #317/#319(2026-07-19，commit `e47a36f8`/`07cd7de5`)
+- [x] **N1 jobs.service.ts 拆分** — 2498→219行 facade + 4子服务。PR #318(commit `619c6dc1`,2026-07-19)
+- [ ] **Wave 2 账号换绑+资产一致性** — 旧号step-up + 新号验证 + 冲突人工处理（下一轮）
+- [ ] **Wave 3 打印售后+权益核销闭环** — 收费模式开启前（下一轮）
 
 **开工前注意事项(2026-07-17)**:
 
