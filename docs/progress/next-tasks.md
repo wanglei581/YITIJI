@@ -9,7 +9,7 @@
 - [x] **G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台。PR #305 已合入 main(commit `e92abb56`,2026-07-17)
 - [x] **存量页面按原型逐屏换装对齐**——75 屏全量视觉对齐。PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳
 - [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
-- [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
+- [x] **G6 法务文档版本管理最小版**(LegalDocVersion + Admin 管理 + Kiosk 接真 + AuditLog + verify:legal-doc-version)。PR #310 已合入 main(commit `a809a811`,2026-07-19)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
 **开工前注意事项(2026-07-17)**:
