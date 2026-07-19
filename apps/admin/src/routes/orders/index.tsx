@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Drawer, EmptyState, ErrorState, LoadingState, StatusBadge } from '@ai-job-print/ui'
 import { Page } from '../Page'
@@ -9,6 +9,7 @@ import {
   type AdminOrderReadonlyDetail,
   type AdminOrderReadonlyItem,
 } from '../../services/api/adminOrdersReadonly'
+import { ApiHttpError } from '../../services/api/client'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
 
@@ -21,10 +22,12 @@ const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'inf
 }
 
 const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
-  unpaid:   { badge: 'warning', label: '未支付' },
-  paid:     { badge: 'success', label: '已支付' },
-  refunded: { badge: 'default', label: '已退款记录' },
-  failed:   { badge: 'error',   label: '支付失败' },
+  unpaid:           { badge: 'warning', label: '未支付' },
+  paid:             { badge: 'success', label: '已支付' },
+  refunding:        { badge: 'warning', label: '退款中' },
+  refunded:         { badge: 'default', label: '已退款' },
+  partial_refunded: { badge: 'default', label: '部分退款' },
+  failed:           { badge: 'error',   label: '支付失败' },
 }
 
 const STATUS_FILTERS = [
@@ -40,7 +43,8 @@ const PAY_FILTERS = [
   { label: '全部支付状态', value: '' },
   { label: '未支付', value: 'unpaid' },
   { label: '已支付', value: 'paid' },
-  { label: '已退款记录', value: 'refunded' },
+  { label: '退款中', value: 'refunding' },
+  { label: '已退款', value: 'refunded' },
   { label: '支付失败', value: 'failed' },
 ] as const
 
@@ -81,6 +85,12 @@ export default function OrdersPage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const pageSize = 20
+
+  // 退款对话框状态
+  const [refundOpen, setRefundOpen] = useState(false)
+  const [refundReason, setRefundReason] = useState('')
+  const [refundSubmitting, setRefundSubmitting] = useState(false)
+  const [refundError, setRefundError] = useState<string | null>(null)
   const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${search}:${page}:${pageSize}`
 
   const {
@@ -144,12 +154,35 @@ export default function OrdersPage() {
   const closeDetail = () => {
     setDetail(null)
     setDetailState('idle')
+    setRefundOpen(false)
+    setRefundReason('')
+    setRefundError(null)
   }
+
+  const handleRefund = useCallback(async () => {
+    if (!detail || !refundReason.trim()) return
+    setRefundSubmitting(true)
+    setRefundError(null)
+    try {
+      await adminOrdersReadonlyService.refundOrder(detail.id, refundReason.trim())
+      // 退款成功：刷新列表，重新加载详情（payStatus 已变为 refunding/refunded）
+      void refresh()
+      const updated = await adminOrdersReadonlyService.getById(detail.id)
+      setDetail(updated)
+      setRefundOpen(false)
+      setRefundReason('')
+    } catch (err) {
+      const code = err instanceof ApiHttpError ? err.code : '操作失败，请重试'
+      setRefundError(code)
+    } finally {
+      setRefundSubmitting(false)
+    }
+  }, [detail, refundReason, refresh])
 
   return (
     <Page
       title="订单管理"
-      subtitle={`打印 / 扫描订单只读视图 · 状态由 Terminal Agent 回报落库 · 共 ${total} 条`}
+      subtitle={`打印 / 扫描订单 · 状态由 Terminal Agent 回报落库 · 共 ${total} 条`}
       actions={
         <button
           type="button"
@@ -161,9 +194,9 @@ export default function OrdersPage() {
         </button>
       }
     >
-      {/* 诚实说明:只读订单视图 */}
+      {/* 说明横幅 */}
       <div className="mb-4 rounded-[9px] border border-info/20 bg-info-bg px-4 py-2.5 text-[13px] text-info-fg">
-        当前展示真实订单与打印任务安全元数据。支付 / 退款 / 对账域尚未上线，本页只读展示金额、支付状态和任务状态，不提供标记支付、退款或改状态操作。
+        展示真实订单与打印任务安全元数据。已支付订单可由管理员发起全额退款；退款渠道由订单支付来源决定。
       </div>
 
       <section className="overflow-hidden rounded-lg border border-neutral-900/[0.06] bg-surface shadow-sm">
@@ -294,7 +327,6 @@ export default function OrdersPage() {
         {detailState === 'error' && <ErrorState className="py-16" onRetry={closeDetail} />}
         {detailState === 'ready' && detail && (
           <>
-            <p className="text-xs text-neutral-500">只读详情，不提供支付、退款或任务状态写入。</p>
             <div className="my-4 grid grid-cols-2 gap-x-4 gap-y-3">
               <Info label="订单类型" value={detail.type} />
               <Info label="金额" value={amountText(detail.amountCents, detail.currency)} />
@@ -315,6 +347,12 @@ export default function OrdersPage() {
                   ].filter(Boolean).join(' · ') || '—'
                 }
               />
+              {detail.refundedAt && (
+                <Info label="退款时间" value={fmt(detail.refundedAt)} />
+              )}
+              {detail.refundReason && (
+                <Info label="退款原因" value={detail.refundReason} />
+              )}
             </div>
 
             <h3 className="mb-2 mt-5 text-[12.5px] font-extrabold text-neutral-700 [font-family:var(--font-heading,inherit)]">
@@ -336,6 +374,62 @@ export default function OrdersPage() {
                     <span className="ml-2 tabular-nums text-neutral-500">{fmt(log.createdAt)}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* 退款操作区：仅 payStatus===paid 显示 */}
+            {detail.payStatus === 'paid' && (
+              <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
+                {!refundOpen ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-bold text-neutral-800">发起全额退款</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        退款 {amountText(detail.amountCents, detail.currency)}，操作不可撤销，仅 admin 可执行
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setRefundOpen(true); setRefundError(null) }}
+                      className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] bg-warning px-4 text-[13px] font-bold text-white transition-colors hover:bg-warning/90"
+                    >
+                      退款
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-[13px] font-bold text-neutral-800">确认全额退款</p>
+                    <textarea
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      placeholder="请填写退款原因（必填）"
+                      rows={3}
+                      maxLength={500}
+                      className="w-full resize-none rounded-[9px] border border-neutral-900/10 bg-surface px-3 py-2 text-[13px] text-neutral-900 outline-none placeholder:text-neutral-400 focus:border-primary-600/50"
+                    />
+                    {refundError && (
+                      <p className="text-xs font-semibold text-error-fg">{refundError}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!refundReason.trim() || refundSubmitting}
+                        onClick={() => void handleRefund()}
+                        className="inline-flex h-9 items-center rounded-[9px] bg-error px-4 text-[13px] font-bold text-white transition-colors hover:bg-error/90 disabled:opacity-40"
+                      >
+                        {refundSubmitting ? '处理中…' : '确认退款'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={refundSubmitting}
+                        onClick={() => { setRefundOpen(false); setRefundReason(''); setRefundError(null) }}
+                        className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>

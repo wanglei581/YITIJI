@@ -172,6 +172,7 @@
     "verify:payment-real-channels": "node -r @swc-node/register scripts/verify-payment-real-channels.ts",
     "verify:refund-real-channels": "node -r @swc-node/register scripts/verify-refund-real-channels.ts",
     "verify:admin-billing": "node -r @swc-node/register scripts/verify-admin-billing.ts",
+    "verify:admin-orders-refund": "node -r @swc-node/register scripts/verify-admin-orders-refund.ts",
     "verify:reconciliation": "node -r @swc-node/register scripts/verify-reconciliation.ts",
     "verify:refund-convergence": "node -r @swc-node/register scripts/verify-refund-convergence.ts",
     "verify:wechat-refund-notify": "node -r @swc-node/register scripts/verify-wechat-refund-notify.ts",
