@@ -234,7 +234,7 @@ function runStaticChecks(): void {
   )
 
   const publicConfigService = section(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-admin.service.ts',
     'async getKioskTerminalConfig',
     '/**\n   * Admin 打印机页真实数据源。',
   )
@@ -244,7 +244,7 @@ function runStaticChecks(): void {
     'G. 公开 Kiosk config service 不返回设备档案/机构字段',
   )
   const publicConfigLookup = section(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-agent.service.ts',
     'private async findSmartCampusConfigByTerminalRef',
     'private async resetExpiredClaims',
   )
@@ -269,12 +269,12 @@ function runStaticChecks(): void {
     'J. Kiosk 本地 OFF_CONFIG 不声明公开配置外字段',
   )
   contains(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-admin.service.ts',
     ['allowDisabled: true', 'TERMINAL_DISABLED', 'tryNormalizeMacAddress(dto.macAddress)'],
     'K. 停用终端禁止任务操作,心跳仍可上报且坏 MAC 不打挂心跳',
   )
   const updateProfileLookup = section(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-admin.service.ts',
     'async updateTerminalProfile',
     'async getKioskTerminalConfig',
   )
