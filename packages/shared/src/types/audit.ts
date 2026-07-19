@@ -51,6 +51,7 @@ export type AuditAction =
   | 'user.disable'
   | 'system.login'
   | 'system.config_change'
+  | 'print_job.admin_abandon'
 
 export type AuditTargetType =
   | 'auth'
@@ -65,6 +66,7 @@ export type AuditTargetType =
   | 'smart_campus_config'
   | 'toolbox_config'
   | 'terminal'
+  | 'print_task'
 
 /** 单条审计返回。actorRole 冗余,actor 被禁用后仍可追溯。 */
 export interface AuditLogRecord {

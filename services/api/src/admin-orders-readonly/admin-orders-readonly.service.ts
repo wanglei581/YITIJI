@@ -142,6 +142,7 @@ export class AdminOrdersReadonlyService {
       ...item,
       refundedAt: row.refundedAt ? row.refundedAt.toISOString() : null,
       refundReason: row.refundReason,
+      printTaskId: row.printTaskId ?? null,
       print: row.printTask && summary
         ? {
             ...summary,
