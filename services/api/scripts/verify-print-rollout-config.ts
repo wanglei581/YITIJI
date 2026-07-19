@@ -72,10 +72,10 @@ function sectionAny(source: string, starts: readonly string[], end: string, labe
 function main(): void {
   console.log('\n=== Print rollout safety static guard ===')
 
-  const terminals = readSource(
-    'TerminalsService',
-    join(apiRoot, 'src/terminals/terminals.service.ts'),
-  )
+  const terminals =
+    readSource('TerminalsService', join(apiRoot, 'src/terminals/terminals.service.ts')) +
+    '\n' +
+    readSource('TerminalsAgentService', join(apiRoot, 'src/terminals/terminals-agent.service.ts'))
   const paymentProviderFactory = readSource(
     'PaymentProviderFactory',
     join(apiRoot, 'src/payment/payment-provider.factory.ts'),
