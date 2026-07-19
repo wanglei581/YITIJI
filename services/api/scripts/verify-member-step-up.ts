@@ -47,7 +47,7 @@ async function execute(capturedOutput: string[]): Promise<void> {
 
   assert(
     JSON.stringify(MEMBER_STEP_UP_ACTIONS) === JSON.stringify([
-      'export_data_request', 'export_data_download', 'close_account',
+      'export_data_request', 'export_data_download', 'close_account', 'phone_rebind',
     ]),
     'shared member step-up action allowlist drifted',
   )
