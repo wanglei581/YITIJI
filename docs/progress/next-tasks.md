@@ -8,9 +8,11 @@
 
 - [x] **G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台。PR #305 已合入 main(commit `e92abb56`,2026-07-17)
 - [x] **存量页面按原型逐屏换装对齐**——75 屏全量视觉对齐。PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳
-- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
+- [x] **G5 Admin 订单退款入口**——前端接线(后端由 C5-4 RefundService 已实现)。PR #311 已合入 main(commit `b58ddbe9`,2026-07-19)
 - [x] **G6 法务文档版本管理最小版**(LegalDocVersion + Admin 管理 + Kiosk 接真 + AuditLog + verify:legal-doc-version)。PR #310 已合入 main(commit `a809a811`,2026-07-19)
-- [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
+- [x] **60/61 会话超时/断网异常屏** CSS 精修 1:1 对齐原型。PR #312 已合入 main(commit `0891b5b5`,2026-07-19)
+- [x] **Wave 1-C Admin 数据权利工单处理 UI**——PrivacyRequestsPage + API adapter + 路由。PR #313 已合入 main(commit `4282bb38`,2026-07-19)
+- [ ] **Wave 1-B 数据权利执行器**——异步数据导出、一次性下载链接 + 中断 reconciler（下一轮）
 
 **开工前注意事项(2026-07-17)**:
 
