@@ -289,6 +289,8 @@ export function PrintProgressPage() {
   const orderNo = typeof state?.orderNo === 'string' ? state.orderNo
                 : typeof state?.orderId === 'string' ? state.orderId
                 : null
+  // amountCents=0（免费单 / PAYMENT_PROVIDER=sandbox 默认路径）→ 不展示支付相关文案。
+  const isFreeOrder = (typeof state?.amountCents === 'number' ? state.amountCents : 1) === 0
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const submitTimeFormatted = useMemo(() => formatSubmitTime(new Date()), [])
@@ -366,7 +368,11 @@ export function PrintProgressPage() {
 
   // ── 4步时间线定义 ──────────────────────────────────────────────────────────
   const TL_ITEMS = [
-    { key: 'submit',  label: '提交任务', desc: '已创建打印任务并完成支付确认' },
+    {
+      key: 'submit',
+      label: '提交任务',
+      desc: isFreeOrder ? '已创建打印任务，无需支付，正在排队' : '已创建打印任务并完成支付确认',
+    },
     { key: 'queue',   label: '排队等待', desc: '终端已接收任务，文件校验通过' },
     { key: 'print',   label: '打印中',   desc: '打印机正在出纸，请在出纸口等候' },
     { key: 'pickup',  label: '完成取件', desc: '完成后自动跳转，凭取件码核对文件' },
@@ -500,7 +506,10 @@ export function PrintProgressPage() {
               <div className="pp-faq-item">
                 <CreditCardIcon className="pp-faq-icon" aria-hidden="true" />
                 <p className="pp-faq-text">
-                  <b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。
+                  {isFreeOrder
+                    ? <><b>打印失败</b>：任务记录已保存，可在「我的 · 打印订单」查看详情并联系工作人员确认。</>
+                    : <><b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。</>
+                  }
                 </p>
               </div>
             </section>
