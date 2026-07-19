@@ -96,6 +96,8 @@ class SpyProvider implements PaymentProvider {
 async function main(): Promise<void> {
   console.log('\n=== C5-4 退款域 verification ===')
   const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+  const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -110,7 +112,7 @@ async function main(): Promise<void> {
   const adminPrintScan = new AdminPrintScanService(prisma)
   const printJobs = new PrintJobsService(prisma, audit, new PrintPageCountService(prisma, storage), pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const redemption = new BenefitRedemptionService(prisma, audit, orderStatus)
-  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma))) })()
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_refund_${suffix}`

@@ -39,6 +39,8 @@ import { SCENE_DEFAULT_MODULES, MODULE_LABELS } from '../../../packages/shared/s
 import { PrismaService } from '../src/prisma/prisma.service'
 import { SmartCampusService } from '../src/smart-campus/smart-campus.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
+import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { AuditService } from '../src/audit/audit.service'
@@ -142,7 +144,7 @@ async function main(): Promise<void> {
   const toolbox = new TerminalToolboxService(prisma)
   const audit = new AuditService(prisma)
   const svc = new SmartCampusService(prisma, toolbox)
-  const terminals = new TerminalsService(prisma, toolbox, audit) // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, toolbox)) })() // 仅用 assignTerminalOrg，不调 onModuleInit（避免播种打印任务）
   const adminOrgs = new AdminOrgsService(prisma, audit) // 高校版模板联动：smart_campus 白名单保存验证
 
   let ok = true

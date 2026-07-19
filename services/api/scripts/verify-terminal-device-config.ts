@@ -291,6 +291,8 @@ function runStaticChecks(): void {
 
 async function runServiceChecks(): Promise<void> {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+  const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
   const { AdminTerminalsController } = await import('../src/terminals/admin-terminals.controller')
   const { TerminalCapabilitiesService } = await import('../src/terminals/terminal-capabilities.service')
   const { SmartCampusService } = await import('../src/smart-campus/smart-campus.service')
@@ -302,7 +304,7 @@ async function runServiceChecks(): Promise<void> {
   const audit = new AuditService(prisma)
   const toolbox = new TerminalToolboxService(prisma)
   const smartCampus = new SmartCampusService(prisma, toolbox)
-  const terminals = new TerminalsService(prisma, toolbox, audit)
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, toolbox)) })()
   const capabilities = new TerminalCapabilitiesService(prisma)
   const adminController = new AdminTerminalsController(terminals, capabilities, audit)
 
