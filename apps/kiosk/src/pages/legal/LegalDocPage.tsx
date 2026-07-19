@@ -6,13 +6,33 @@
 // （见 docs/compliance/）。Kiosk 模式：大字号、可滚动、无外链。
 // ============================================================
 
-import { useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button, PageHeader } from '@ai-job-print/ui'
 import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
+import { API_BASE_URL } from '../../services/api'
 import './legal-service-desk.css'
 
-const UPDATED_AT = '2026 年 6 月 22 日'
+const FALLBACK_UPDATED_AT = '2026 年 6 月 22 日'
+
+/** Kiosk URL param → API docType */
+const DOC_TYPE_MAP: Record<string, string> = {
+  terms: 'terms_of_service',
+  privacy: 'privacy_policy',
+}
+
+interface ApiDocContent {
+  content: string
+  publishedAt: string | null
+}
+
+/** 将 Markdown 纯文本按段落分行（不引入新依赖，仅分段落渲染） */
+function splitToParagraphs(content: string): string[] {
+  return content
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+}
 
 interface Section {
   title: string
@@ -118,6 +138,36 @@ export function LegalDocPage() {
   const [activeSection, setActiveSection] = useState(0)
   const sectionRefs = useRef<(HTMLElement | null)[]>([])
 
+  // API-fetched live content; null = loading or failed (fallback to hardcoded)
+  const [apiDocs, setApiDocs] = useState<Record<string, ApiDocContent | null>>({})
+
+  useEffect(() => {
+    const types = ['terms_of_service', 'privacy_policy']
+    types.forEach((docType) => {
+      fetch(`${API_BASE_URL}/kiosk/legal/${docType}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((json: { success?: boolean; data?: ApiDocContent | null } | null) => {
+          if (json?.success && json.data) {
+            setApiDocs((prev) => ({ ...prev, [docType]: json.data ?? null }))
+          }
+        })
+        .catch(() => {
+          // 网络失败时保持兜底内容，不报错
+        })
+    })
+  }, [])
+
+  const currentDocType = DOC_TYPE_MAP[doc ?? 'terms'] ?? 'terms_of_service'
+  const apiContent = apiDocs[currentDocType] ?? null
+
+  const displayedAt = apiContent?.publishedAt
+    ? new Date(apiContent.publishedAt).toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    : FALLBACK_UPDATED_AT
+
   const selectSection = (index: number) => {
     setActiveSection(index)
     sectionRefs.current[index]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -129,7 +179,7 @@ export function LegalDocPage() {
         <PageHeader
           className="legal-doc-page-header"
           title={meta.title}
-          subtitle={`更新日期：${UPDATED_AT}`}
+          subtitle={`更新日期：${displayedAt}`}
           actions={
             <div className="legal-doc-tools">
               <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.max(90, value - 10))} aria-label="缩小字号">A−</button>
@@ -145,29 +195,51 @@ export function LegalDocPage() {
         </div>
 
         <article className="legal-doc-card" style={{ '--legal-font-scale': fontPercent / 100 } as CSSProperties}>
-          <aside className="legal-doc-toc" aria-label="章节目录">
-            {meta.sections.map((section, index) => (
-              <button key={section.title} type="button" className={activeSection === index ? 'is-active' : ''} onClick={() => selectSection(index)}>
-                {section.title}
-              </button>
-            ))}
-          </aside>
+          {/* 有 API 内容时：隐藏目录侧边栏，全宽显示内容 */}
+          {!apiContent && (
+            <aside className="legal-doc-toc" aria-label="章节目录">
+              {meta.sections.map((section, index) => (
+                <button key={section.title} type="button" className={activeSection === index ? 'is-active' : ''} onClick={() => selectSection(index)}>
+                  {section.title}
+                </button>
+              ))}
+            </aside>
+          )}
 
           <div className="legal-doc-body">
             <h2>AI求职打印服务终端 · {meta.title}</h2>
-            <p className="legal-doc-meta">更新日期 {UPDATED_AT} · 全文共 {meta.sections.length} 章</p>
-            <div className="legal-doc-intro">
-              <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
-              <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
-            </div>
-            <div className="legal-doc-sections">
-              {meta.sections.map((section, index) => (
-                <section key={section.title} ref={(node) => { sectionRefs.current[index] = node }}>
-                  <h3>{section.title}</h3>
-                  {section.paragraphs.map((para, paragraphIndex) => <p key={paragraphIndex}>{para}</p>)}
-                </section>
-              ))}
-            </div>
+            {apiContent ? (
+              <>
+                <p className="legal-doc-meta">更新日期 {displayedAt}</p>
+                <div className="legal-doc-intro">
+                  <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
+                  <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
+                </div>
+                <div className="legal-doc-sections">
+                  <section>
+                    {splitToParagraphs(apiContent.content).map((para, idx) => (
+                      <p key={idx}>{para}</p>
+                    ))}
+                  </section>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="legal-doc-meta">更新日期 {displayedAt} · 全文共 {meta.sections.length} 章</p>
+                <div className="legal-doc-intro">
+                  <span className="legal-doc-icon"><Icon aria-hidden="true" /></span>
+                  <p>请在使用服务前仔细阅读。继续登录或使用本终端服务，即视为您已阅读并同意本{meta.title}。</p>
+                </div>
+                <div className="legal-doc-sections">
+                  {meta.sections.map((section, index) => (
+                    <section key={section.title} ref={(node) => { sectionRefs.current[index] = node }}>
+                      <h3>{section.title}</h3>
+                      {section.paragraphs.map((para, paragraphIndex) => <p key={paragraphIndex}>{para}</p>)}
+                    </section>
+                  ))}
+                </div>
+              </>
+            )}
             <p className="legal-doc-endmark">— 全文完 · 可上下滑动回看 —</p>
           </div>
         </article>
