@@ -11,10 +11,23 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
-import { encryptPhone, hashPhone, maskPhoneFromEnc, normalizePhone } from '../common/crypto/phone-identity'
+import { encryptPhone, hashPhone, normalizePhone } from '../common/crypto/phone-identity'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
 import { Prisma } from '../generated/prisma/client'
+import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
+import {
+  ADMIN_ORG_ACCOUNT_SELECT,
+  mapAdminOrgAccount,
+  type AdminOrgAccount,
+} from './admin-org-account-view'
+import {
+  loadTrustedAccountForDeletion,
+  type TrustedAccountActionBinding,
+} from './admin-org-account-security'
+
+export type { AdminOrgAccount } from './admin-org-account-view'
 
 // ============================================================
 // AdminOrgsService — 阶段1B:Admin 合作机构管理
@@ -117,16 +130,6 @@ const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
   },
 }
 
-export interface AdminOrgAccount {
-  id: string
-  username: string
-  name: string
-  enabled: boolean
-  phoneMasked: string | null
-  phoneVerifiedAt: string | null
-  createdAt: string
-}
-
 export interface AdminOrgListItem {
   id: string
   name: string
@@ -200,26 +203,6 @@ function mapOrg(
   }
 }
 
-function mapAccount(u: {
-  id: string
-  username: string
-  name: string
-  enabled: boolean
-  phoneEnc: string | null
-  phoneVerifiedAt: Date | null
-  createdAt: Date
-}): AdminOrgAccount {
-  return {
-    id: u.id,
-    username: u.username,
-    name: u.name,
-    enabled: u.enabled,
-    phoneMasked: u.phoneEnc ? maskPhoneFromEnc(u.phoneEnc) : null,
-    phoneVerifiedAt: u.phoneVerifiedAt?.toISOString() ?? null,
-    createdAt: u.createdAt.toISOString(),
-  }
-}
-
 @Injectable()
 export class AdminOrgsService {
   private readonly logger = new Logger(AdminOrgsService.name)
@@ -272,15 +255,7 @@ export class AdminOrgsService {
         users: {
           where: { role: 'partner', deletedAt: null },
           orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            enabled: true,
-            phoneEnc: true,
-            phoneVerifiedAt: true,
-            createdAt: true,
-          },
+          select: ADMIN_ORG_ACCOUNT_SELECT,
         },
       },
     })
@@ -292,7 +267,7 @@ export class AdminOrgsService {
         jobs: o._count.jobs,
         fairs: o._count.jobFairs,
       }),
-      accounts: o.users.map(mapAccount),
+      accounts: o.users.map(mapAdminOrgAccount),
     }
   }
 
@@ -332,6 +307,7 @@ export class AdminOrgsService {
         data: {
           username: dto.account.username,
           passwordHash,
+          passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
           name: dto.account.name,
           role: 'partner',
           orgId,
@@ -343,7 +319,7 @@ export class AdminOrgsService {
       await this.writeAudit(admin, 'org.account.create', orgId, {
         accountId: account.id,
         username: account.username,
-        phoneMasked: mapAccount(account).phoneMasked,
+        phoneMasked: mapAdminOrgAccount(account).phoneMasked,
       })
     }
 
@@ -425,6 +401,7 @@ export class AdminOrgsService {
       data: {
         username: input.username,
         passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
         name: input.name,
         role: 'partner',
         orgId,
@@ -432,7 +409,7 @@ export class AdminOrgsService {
         phoneEnc: encryptPhone(normalizedPhone),
       },
     })
-    const mapped = mapAccount(account)
+    const mapped = mapAdminOrgAccount(account)
     await this.writeAudit(admin, 'org.account.create', orgId, {
       accountId: account.id,
       username: account.username,
@@ -465,7 +442,7 @@ export class AdminOrgsService {
       })
       await this.invalidateAccountSession(accountId)
     }
-    return mapAccount(updated)
+    return mapAdminOrgAccount(updated)
   }
 
   async resetAccountPassword(
@@ -478,7 +455,11 @@ export class AdminOrgsService {
     const passwordHash = await bcrypt.hash(password, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
     await this.invalidateAccountSession(accountId)
@@ -495,14 +476,18 @@ export class AdminOrgsService {
     orgId: string,
     accountId: string,
     admin: AuthedUser,
+    trustedBinding: TrustedAccountActionBinding,
   ): Promise<{ success: true }> {
     const tombstonePasswordHash = await bcrypt.hash(randomUUID(), 10)
     const deleted = await this.withSerializableRetry(() => this.prisma.$transaction(
       async (tx) => {
-        const account = await tx.user.findFirst({
-          where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-        })
-        if (!account) this.throwAccountNotFound(orgId, accountId)
+        const account = await loadTrustedAccountForDeletion(
+          tx,
+          orgId,
+          accountId,
+          admin.userId,
+          trustedBinding,
+        )
 
         const activeCount = await tx.user.count({
           where: { orgId, role: 'partner', enabled: true, deletedAt: null },
@@ -525,6 +510,7 @@ export class AdminOrgsService {
             tokenVersion: { increment: 1 },
             username: `deleted:${account.id}`,
             passwordHash: tombstonePasswordHash,
+            passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
             name: '已移除账号',
             phoneHash: null,
             phoneEnc: null,
@@ -686,7 +672,7 @@ export class AdminOrgsService {
     try {
       await this.redis.setJsonIfVersionNotOlder(
         this.sessionStateKey(user.id),
-        60,
+        INTERNAL_SESSION_CACHE_TTL_SECONDS,
         JSON.stringify({
           userId: user.id,
           role: user.role,

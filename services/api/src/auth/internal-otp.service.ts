@@ -1,12 +1,13 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common'
-import { randomInt } from 'crypto'
+import { randomBytes, randomInt } from 'crypto'
 import { hashPhone } from '../common/crypto/phone-identity'
 import { RedisService } from '../common/redis/redis.service'
 import { SMS_SENDER, type SmsSender } from '../member-auth/sms/sms-sender'
+import type { InternalOtpPurpose, InternalOtpVerificationDescriptor } from './internal-otp.types'
 
 type SmsProviderFailure = Error & { providerCode?: string }
 
-export type InternalOtpPurpose = 'login' | 'reset_password' | 'bind_phone' | 'transfer_phone'
+export type { InternalOtpPurpose } from './internal-otp.types'
 
 export interface InternalSendCodeResult {
   sent: true
@@ -20,6 +21,7 @@ const PHONE_DAILY_MAX = 10
 const IP_HOURLY_MAX = 30
 const DEVICE_HOURLY_MAX = 20
 const VERIFY_MAX_ATTEMPTS = 5
+const VERIFY_LOCK_SECONDS = INTERNAL_OTP_CODE_TTL_SECONDS
 
 @Injectable()
 export class InternalOtpService {
@@ -36,7 +38,14 @@ export class InternalOtpService {
     shouldDeliver: boolean
   }): Promise<InternalSendCodeResult> {
     const phoneHash = hashPhone(input.phone)
-    const fresh = await this.redis.setNxEx(this.k.cooldown(input.purpose, phoneHash), '1', COOLDOWN)
+    const lockedKey = this.k.locked(input.purpose, phoneHash)
+    if (await this.redis.get(lockedKey)) {
+      throw this.tooMany('SMS_CODE_LOCKED', '验证码尝试次数过多,请稍后重试')
+    }
+
+    const cooldownKey = this.k.cooldown(phoneHash)
+    const cooldownRequestId = randomBytes(16).toString('base64url')
+    const fresh = await this.redis.setNxEx(cooldownKey, cooldownRequestId, COOLDOWN)
     if (!fresh) {
       throw this.tooMany('SMS_TOO_FREQUENT', '验证码发送过于频繁,请 60 秒后再试')
     }
@@ -72,7 +81,7 @@ export class InternalOtpService {
       await this.sms.sendCode(input.phone, code)
     } catch (error) {
       await this.redis.del(codeKey)
-      await this.redis.del(this.k.cooldown(input.purpose, phoneHash))
+      await this.redis.getAndDelIfEquals(cooldownKey, cooldownRequestId)
       throw this.toSmsSendException(error)
     }
 
@@ -83,11 +92,9 @@ export class InternalOtpService {
     const phoneHash = hashPhone(phone)
     const codeKey = this.k.code(purpose, phoneHash)
     const attemptKey = this.k.attempt(purpose, phoneHash)
-    const attempts = await this.redis.incrWithTtl(attemptKey, INTERNAL_OTP_CODE_TTL_SECONDS)
-    if (attempts > VERIFY_MAX_ATTEMPTS) {
-      await this.redis.del(codeKey)
-      await this.redis.del(attemptKey)
-      throw this.invalid('SMS_CODE_LOCKED', '验证码尝试次数过多,请重新获取')
+    const lockedKey = this.k.locked(purpose, phoneHash)
+    if (await this.redis.get(lockedKey)) {
+      throw this.tooMany('SMS_CODE_LOCKED', '验证码尝试次数过多,请稍后重试')
     }
 
     const codeStatus = await this.redis.getAndDelIfEquals(codeKey, code)
@@ -95,15 +102,39 @@ export class InternalOtpService {
       throw this.invalid('SMS_CODE_EXPIRED', '验证码已过期或不存在,请重新获取')
     }
     if (codeStatus === 'mismatched') {
+      const attempts = await this.redis.incrWithTtl(attemptKey, INTERNAL_OTP_CODE_TTL_SECONDS)
+      if (attempts >= VERIFY_MAX_ATTEMPTS) {
+        await this.redis.setEx(lockedKey, VERIFY_LOCK_SECONDS, '1')
+        await this.redis.del(codeKey)
+        await this.redis.del(attemptKey)
+        throw this.tooMany('SMS_CODE_LOCKED', '验证码尝试次数过多,请稍后重试')
+      }
       throw this.invalid('SMS_CODE_INVALID', '验证码不正确')
     }
     await this.redis.del(attemptKey)
   }
 
+  verificationDescriptor(
+    phone: string,
+    purpose: InternalOtpPurpose,
+    submittedCode: string,
+  ): InternalOtpVerificationDescriptor {
+    const phoneHash = hashPhone(phone)
+    return {
+      codeKey: this.k.code(purpose, phoneHash),
+      attemptKey: this.k.attempt(purpose, phoneHash),
+      lockedKey: this.k.locked(purpose, phoneHash),
+      submittedCode,
+      maxAttempts: VERIFY_MAX_ATTEMPTS,
+      lockSeconds: VERIFY_LOCK_SECONDS,
+    }
+  }
+
   private readonly k = {
     code: (purpose: string, h: string) => `internal:sms:code:${purpose}:${h}`,
     attempt: (purpose: string, h: string) => `internal:sms:attempt:${purpose}:${h}`,
-    cooldown: (purpose: string, h: string) => `internal:sms:cooldown:${purpose}:${h}`,
+    locked: (purpose: string, h: string) => `internal:sms:locked:${purpose}:${h}`,
+    cooldown: (h: string) => `internal:sms:cooldown:global:${h}`,
     phoneDaily: (h: string, day: string) => `internal:sms:daily:${h}:${day}`,
     ipHourly: (ip: string, hour: string) => `internal:sms:ip:${ip}:${hour}`,
     deviceHourly: (d: string, hour: string) => `internal:sms:device:${d}:${hour}`,

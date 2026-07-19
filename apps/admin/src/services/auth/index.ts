@@ -488,8 +488,19 @@ export async function verifyToken(): Promise<AuthedUser | null> {
   return null
 }
 
-/** 主动登出:清 token + 跳 /login */
+/**
+ * 主动登出：best-effort 撤销 Admin 近期高风险验证，然后立即清理本地会话。
+ * 服务端端点不声称撤销当前无 jti 的 JWT；网络失败也绝不阻止本地退出。
+ */
 export function logout(): void {
+  const token = getToken()
+  if (token) {
+    void fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    }).catch(() => undefined)
+  }
   clearAuth()
   if (typeof window !== 'undefined') {
     window.location.href = '/login'

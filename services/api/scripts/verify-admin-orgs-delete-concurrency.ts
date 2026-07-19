@@ -104,6 +104,11 @@ class SerializedMemoryPrisma {
     },
   }
 
+  readonly organization = {
+    findUnique: async ({ where }: { where: { id: string } }) =>
+      where.id === 'org-concurrency' ? { id: where.id } : null,
+  }
+
   readonly auditLog = {
     create: async ({ data }: { data: { payloadJson: string } }) => {
       this.audits.push({ payloadJson: data.payloadJson })
@@ -147,18 +152,35 @@ function account(id: string, username: string): UserRow {
   }
 }
 
+function adminAccount(): UserRow {
+  return {
+    ...account('admin-concurrency', 'admin-concurrency'),
+    role: 'admin',
+    orgId: null,
+    phoneHash: null,
+    phoneEnc: null,
+    phoneVerifiedAt: null,
+  }
+}
+
 async function main(): Promise<void> {
   console.log('\n=== Admin 合作机构账号安全移除并发验证 ===')
   const first = account('account-concurrent-a', 'concurrent_a')
   const second = account('account-concurrent-b', 'concurrent_b')
-  const prisma = new SerializedMemoryPrisma([first, second])
+  const prisma = new SerializedMemoryPrisma([first, second, adminAccount()])
   const redis = new VersionedMemoryRedis()
   const service = new AdminOrgsService(prisma as never, {} as never, redis as never)
   const admin = { userId: 'admin-concurrency', role: 'admin' as const, orgId: null }
 
   const results = await Promise.allSettled([
-    service.deleteAccount('org-concurrency', first.id, admin),
-    service.deleteAccount('org-concurrency', second.id, admin),
+    service.deleteAccount('org-concurrency', first.id, admin, {
+      adminTokenVersion: 0,
+      partnerTokenVersion: first.tokenVersion,
+    }),
+    service.deleteAccount('org-concurrency', second.id, admin, {
+      adminTokenVersion: 0,
+      partnerTokenVersion: second.tokenVersion,
+    }),
   ])
   const succeeded = results.filter((result) => result.status === 'fulfilled')
   const failureCodes = results

@@ -199,6 +199,8 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:admin-device-fleet-overview-ui
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
+          pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
+          pnpm --filter @ai-job-print/admin verify:partner-account-action-state
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
@@ -258,6 +260,12 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-info-fields
           pnpm --filter @ai-job-print/api verify:fair-company-positions
           pnpm --filter @ai-job-print/api verify:admin-orgs
+          pnpm --filter @ai-job-print/api verify:admin-orgs-delete-schema
+          pnpm --filter @ai-job-print/api verify:admin-orgs-delete-concurrency
+          pnpm --filter @ai-job-print/api verify:partner-account-action:schema
+          pnpm --filter @ai-job-print/api verify:partner-account-action:otp
+          pnpm --filter @ai-job-print/api verify:partner-account-action:redis
+          pnpm --filter @ai-job-print/api verify:partner-account-action
           pnpm --filter @ai-job-print/api verify:resume-generate
           pnpm --filter @ai-job-print/api verify:resume-export-formats
           pnpm --filter @ai-job-print/api verify:resume-layout-export
@@ -419,5 +427,6 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-rollout-config
           pnpm --filter @ai-job-print/api verify:job-review
           pnpm --filter @ai-job-print/api verify:audit-logs
+          pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files

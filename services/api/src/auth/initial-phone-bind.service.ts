@@ -14,6 +14,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuthService } from './auth.service'
 import { InternalOtpService } from './internal-otp.service'
+import { PASSWORD_PROOF_STATE } from './password-proof-state'
 
 const INITIAL_PHONE_BIND_TICKET_TTL = 600
 const CURRENT_PASSWORD_FAILURE_TTL = 300
@@ -44,6 +45,7 @@ export class InitialPhoneBindService {
   ): Promise<{ bindTicket: string; cooldownSeconds: number; expiresInSeconds: number }> {
     const user = await this.authService.findUsableSelfPhoneUser(userId)
     if (user.phoneEnc) throw this.selfPhoneAlreadyBound()
+    this.assertPartnerPasswordProofReady(user)
 
     await this.reserveCurrentPasswordAttempt(user.id)
     let currentPasswordMatches: boolean
@@ -85,6 +87,7 @@ export class InitialPhoneBindService {
     if (!encryptedPhone) throw this.ticketInvalid()
 
     const user = await this.authService.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     const phone = this.decryptTicketPhone(encryptedPhone)
     await this.otp.verifyCode(phone, 'bind_phone', code)
 
@@ -94,7 +97,18 @@ export class InitialPhoneBindService {
     let updated: { count: number }
     try {
       updated = await this.prisma.user.updateMany({
-        where: { id: user.id, enabled: true, deletedAt: null, phoneEnc: null },
+        where: {
+          id: user.id,
+          enabled: true,
+          deletedAt: null,
+          phoneEnc: null,
+          ...(user.role === 'partner'
+            ? {
+                passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
+                tokenVersion: user.tokenVersion,
+              }
+            : {}),
+        },
         data: { phoneHash, phoneEnc, phoneVerifiedAt: new Date() },
       })
     } catch (error) {
@@ -112,6 +126,16 @@ export class InitialPhoneBindService {
   private async assertPhoneAvailable(phoneHash: string, userId: string): Promise<void> {
     const existing = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
     if (existing && existing.id !== userId) throw this.phoneAlreadyBound()
+  }
+
+  private assertPartnerPasswordProofReady(user: { role: string; passwordProofState: string }): void {
+    if (user.role !== 'partner' || user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED) return
+    throw new HttpException({
+      error: {
+        code: 'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+        message: '该机构账号尚无独立持有人证明，请先完成线下核验恢复',
+      },
+    }, HttpStatus.CONFLICT)
   }
 
   private decryptTicketPhone(encryptedPhone: string): string {

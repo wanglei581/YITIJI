@@ -337,7 +337,7 @@ async function verifyOtpTerminalFailuresCleanup(context: AdminPhoneTransferSecur
   const lockedStarted = await service.start(lockedAdmin.id, context.adminPassword, lockedPhone, '127.0.1.20')
   const lockedCode = await requireTransferCode(context, lockedPhone, '11. OTP locked 场景未生成验证码')
   const wrongCode = differentOtp(lockedCode)
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     await expectCode(
       () => service.verify(lockedAdmin.id, lockedStarted.bindTicket, wrongCode),
       'SMS_CODE_INVALID',
@@ -350,7 +350,7 @@ async function verifyOtpTerminalFailuresCleanup(context: AdminPhoneTransferSecur
     '11. OTP locked 未统一失败',
   )
   assertTemporaryTransferStateCleared(context, lockedAdmin.id, lockedStarted.bindTicket, '11. OTP locked 未清理 ticket/active')
-  pass('11. OTP expired/locked 均清理 ticket/active，锁定前错误仍可重试')
+  pass('11. OTP expired/locked 均清理 ticket/active，第五次错误即锁定')
 }
 
 async function verifyLockContentionSkipsOtp(context: AdminPhoneTransferSecurityContext): Promise<void> {
@@ -709,6 +709,7 @@ async function verifyPartnerAuthenticationFallbacks(context: AdminPhoneTransferS
   const passwordLogin = await authService.login(partner.username, context.partnerPassword, 'partner')
   ensure(passwordLogin.user.id === partner.id && passwordLogin.user.role === 'partner', '19. Partner 用户名密码登录未保留')
 
+  context.redis.advanceSeconds(60)
   const deliveriesBeforeSmsLogin = context.sms.deliveries
   await authService.sendSmsCode({ phone, purpose: 'login', portal: 'partner' }, '127.0.1.34')
   ensure(context.sms.deliveries === deliveriesBeforeSmsLogin, '19. Partner 转移后短信登录仍发送验证码')
@@ -718,6 +719,7 @@ async function verifyPartnerAuthenticationFallbacks(context: AdminPhoneTransferS
     '19. Partner 转移后短信登录未失败',
   )
 
+  context.redis.advanceSeconds(60)
   const deliveriesBeforeReset = context.sms.deliveries
   await authService.startPasswordReset(partner.username, '127.0.1.35')
   ensure(context.sms.deliveries === deliveriesBeforeReset, '19. Partner 转移后短信找回仍发送验证码')

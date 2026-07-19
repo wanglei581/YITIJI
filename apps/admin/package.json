@@ -20,7 +20,9 @@
     "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",
     "verify:admin-account-settings-ui": "node scripts/verify-admin-account-settings-ui.mjs",
     "verify:admin-phone-transfer-ui": "node scripts/verify-admin-phone-transfer-ui.mjs",
-    "verify:partner-account-delete-ui": "node scripts/verify-partner-account-delete-ui.mjs",
+    "verify:partner-account-action-ui": "node scripts/verify-partner-account-action-ui.mjs",
+    "verify:partner-account-action-state": "pnpm --filter @ai-job-print/api exec node --import tsx --experimental-test-coverage --test-coverage-lines=97 --test-coverage-functions=100 --test-coverage-branches=80 --test ../../apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
+    "verify:partner-account-delete-ui": "node scripts/verify-partner-account-action-ui.mjs",
     "verify:admin-device-fleet-overview-ui": "node scripts/verify-admin-device-fleet-overview-ui.mjs",
     "preview": "vite preview --port 5174"
   },

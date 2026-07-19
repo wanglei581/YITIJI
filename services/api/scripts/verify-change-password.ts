@@ -255,6 +255,7 @@ async function main() {
     // 并发改密:两个请求都用同一个正确的旧密码,但改成不同的新密码。
     // 期望恰好一个成功、一个因乐观并发冲突失败,数据库最终落地的密码必须是
     // "成功那一侧"提交的值,不能出现两边都返回 success 但静默覆盖的丢失更新。
+    const beforeRace = await prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
     const concurrentA = `ConcurrentA_${suffix}`
     const concurrentB = `ConcurrentB_${suffix}`
     const [resA, resB] = await Promise.allSettled([
@@ -271,6 +272,20 @@ async function main() {
     pass('2. 并发改密:一个成功、一个正确报 AUTH_CHANGE_PASSWORD_CONFLICT')
     const winningPassword = resA.status === 'fulfilled' ? concurrentA : concurrentB
     const losingPassword = resA.status === 'fulfilled' ? concurrentB : concurrentA
+    const changedAfterRace = await prisma.user.findUniqueOrThrow({ where: { id: admin.id } })
+    if (
+      (changedAfterRace as typeof changedAfterRace & { passwordProofState?: string }).passwordProofState
+        !== 'owner_managed'
+    ) {
+      fail('2a-1. Admin 登录态自助改密必须将 passwordProofState 原子设为 owner_managed')
+    }
+    if (changedAfterRace.tokenVersion !== beforeRace.tokenVersion + 1) {
+      fail(
+        `2a-2. 并发自助改密只能让 tokenVersion 原子递增一次,`
+        + `改密前 ${beforeRace.tokenVersion},改密后 ${changedAfterRace.tokenVersion}`,
+      )
+    }
+    pass('2a-1. Admin 自助改密原子写入 owner_managed 并且 tokenVersion + 1')
     await expectCode(() => auth.login(admin.username, losingPassword, 'admin'), 'AUTH_LOGIN_FAILED', '2a. 落败一侧的新密码不可登录')
     const loginAfterRace = await auth.login(admin.username, winningPassword, 'admin')
     if (!loginAfterRace.token) fail('2b. 获胜一侧的新密码应可登录')
@@ -427,12 +442,21 @@ async function main() {
         name: '改密验证机构账号',
         role: 'partner',
         orgId,
+        passwordProofState: 'temporary',
       },
     })
     await auth.changePassword(partner.id, passwordV1, passwordV2)
+    const changedPartner = await prisma.user.findUniqueOrThrow({ where: { id: partner.id } })
+    if (
+      (changedPartner as typeof changedPartner & { passwordProofState?: string }).passwordProofState
+        !== 'temporary'
+      || changedPartner.tokenVersion !== partner.tokenVersion + 1
+    ) {
+      fail('10. Admin 已知的 temporary 密码自助改密后不得升级为 owner_managed，且 tokenVersion 必须 + 1')
+    }
     const partnerLogin = await auth.login(partner.username, passwordV2, 'partner')
     if (!partnerLogin.token) fail('10. partner 账号改密后应可用新密码登录')
-    pass('10. partner 账号同样可用登录态自助改密')
+    pass('10. partner 可自助改密，但 temporary 证明状态不会被管理员已知密码升级')
 
     const changePasswordRoles = Reflect.getMetadata(ROLES_KEY, AuthController.prototype.changePassword) as string[] | undefined
     if (JSON.stringify(changePasswordRoles) !== JSON.stringify(['admin', 'partner'])) {
@@ -496,6 +520,28 @@ async function main() {
       fail('12b. 找回密码完成接口不得绕过商用强密码规则')
     }
     pass('12b. 找回密码完成接口与登录态改密使用同一商用强密码规则')
+
+    const recoveryUser = await prisma.user.create({
+      data: {
+        username: `changepw_recovery_${suffix}`,
+        passwordHash: await bcrypt.hash(passwordV1, 10),
+        name: '找回密码状态验证账号',
+        role: 'partner',
+        orgId,
+      },
+    })
+    const resetTicket = randomUUID()
+    await redis.setEx(`internal:password-reset:ticket:${resetTicket}`, 600, recoveryUser.id)
+    await auth.completePasswordReset(resetTicket, `Recovered_${suffix}`)
+    const recovered = await prisma.user.findUniqueOrThrow({ where: { id: recoveryUser.id } })
+    if (
+      (recovered as typeof recovered & { passwordProofState?: string }).passwordProofState
+        !== 'owner_managed'
+      || recovered.tokenVersion !== recoveryUser.tokenVersion + 1
+    ) {
+      fail('12c. 验证手机找回密码必须原子写入 owner_managed 并且 tokenVersion + 1')
+    }
+    pass('12c. 找回密码原子写入 owner_managed 并且 tokenVersion + 1')
 
     if (auditRow.payloadJson !== '{}') {
       fail('13. 改密审计 payload 必须为空对象,不得记录密码或派生信息')

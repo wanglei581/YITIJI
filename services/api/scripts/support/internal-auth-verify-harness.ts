@@ -289,6 +289,7 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
           "id" TEXT NOT NULL PRIMARY KEY,
           "username" TEXT NOT NULL,
           "passwordHash" TEXT NOT NULL,
+          "passwordProofState" TEXT NOT NULL DEFAULT 'legacy',
           "name" TEXT NOT NULL,
           "role" TEXT NOT NULL,
           "orgId" TEXT,

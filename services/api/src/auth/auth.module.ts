@@ -46,6 +46,6 @@ const JWT_TTL = '24h'
     RolesGuard,
     { provide: SMS_SENDER, useFactory: createSmsSender },
   ],
-  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService],
+  exports:     [JwtModule, JwtAuthGuard, RolesGuard, AuthService, InternalOtpService],
 })
 export class AuthModule {}

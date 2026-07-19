@@ -14,6 +14,7 @@
  */
 import 'dotenv/config'
 import { createPrismaClient } from '../src/prisma/create-client'
+import { PASSWORD_PROOF_STATE, passwordProofState } from '../src/auth/password-proof-state'
 import * as bcrypt from 'bcryptjs'
 
 const url = process.env['DATABASE_URL']
@@ -57,18 +58,60 @@ async function main() {
 
   await prisma.user.upsert({
     where: { username: 'admin' },
-    update: { passwordHash: adminHash, name: '系统管理员', role: 'admin', orgId: null, enabled: true },
-    create: { username: 'admin',    passwordHash: adminHash,    name: '系统管理员',         role: 'admin',   orgId: null },
+    update: {
+      passwordHash: adminHash,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '系统管理员',
+      role: 'admin',
+      orgId: null,
+      enabled: true,
+    },
+    create: {
+      username: 'admin',
+      passwordHash: adminHash,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '系统管理员',
+      role: 'admin',
+      orgId: null,
+    },
   })
   await prisma.user.upsert({
     where: { username: 'partner1' },
-    update: { passwordHash: partnerHash1, name: '高校就业指导中心', role: 'partner', orgId: uniOrg.id, enabled: true },
-    create: { username: 'partner1', passwordHash: partnerHash1, name: '高校就业指导中心', role: 'partner', orgId: uniOrg.id },
+    update: {
+      passwordHash: partnerHash1,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '高校就业指导中心',
+      role: 'partner',
+      orgId: uniOrg.id,
+      enabled: true,
+    },
+    create: {
+      username: 'partner1',
+      passwordHash: partnerHash1,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '高校就业指导中心',
+      role: 'partner',
+      orgId: uniOrg.id,
+    },
   })
   await prisma.user.upsert({
     where: { username: 'partner2' },
-    update: { passwordHash: partnerHash2, name: '市人才交流中心',   role: 'partner', orgId: hrOrg.id, enabled: true },
-    create: { username: 'partner2', passwordHash: partnerHash2, name: '市人才交流中心',   role: 'partner', orgId: hrOrg.id },
+    update: {
+      passwordHash: partnerHash2,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '市人才交流中心',
+      role: 'partner',
+      orgId: hrOrg.id,
+      enabled: true,
+    },
+    create: {
+      username: 'partner2',
+      passwordHash: partnerHash2,
+      passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+      name: '市人才交流中心',
+      role: 'partner',
+      orgId: hrOrg.id,
+    },
   })
   console.log(`✓ users: admin / partner1 / partner2`)
 
