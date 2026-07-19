@@ -125,3 +125,75 @@ export function fetchMemberMe(token: string): Promise<MemberUser> {
 export function memberLogout(token: string): Promise<{ loggedOut: true }> {
   return call<{ loggedOut: true }>('/member/auth/logout', 'POST', { token })
 }
+
+// ── 换绑相关类型 ───────────────────────────────────────────────
+
+export interface StepUpChallengeResult {
+  challengeId: string
+  phoneMasked: string
+  expiresInSeconds: number
+  cooldownSeconds: number
+}
+
+export interface StepUpGrantResult {
+  stepUpToken: string
+  action: string
+  expiresInSeconds: number
+}
+
+export interface PhoneRebindResult {
+  newPhoneMasked: string
+  sessionsRevoked: number
+}
+
+/**
+ * 为旧号发起 step-up 挑战（换绑用）。
+ * 后端向当前注册手机号发送 OTP，返回 challengeId。
+ */
+export function sendPhoneRebindStepUpCode(
+  token: string,
+  deviceId?: string,
+): Promise<StepUpChallengeResult> {
+  return call<StepUpChallengeResult>('/member/auth/step-up/sms-code', 'POST', {
+    token,
+    body: deviceId ? { action: 'phone_rebind', deviceId } : { action: 'phone_rebind' },
+  })
+}
+
+/**
+ * 校验旧号 step-up OTP，获取一次性 stepUpToken（action=phone_rebind）。
+ */
+export function verifyPhoneRebindStepUp(
+  token: string,
+  challengeId: string,
+  code: string,
+  deviceId?: string,
+): Promise<StepUpGrantResult> {
+  return call<StepUpGrantResult>('/member/auth/step-up/verify', 'POST', {
+    token,
+    body: deviceId ? { challengeId, code, deviceId } : { challengeId, code },
+  })
+}
+
+/**
+ * 提交换绑。需同时提供：
+ * - stepUpToken：旧号 step-up 验证后签发的一次性凭证
+ * - newPhone：新手机号
+ * - newPhoneCode：已发送到新号的 6 位验证码（先调 sendSmsCode 获取）
+ *
+ * 成功后所有旧会话失效，前端应清除内存 token 并提示用新号重新登录。
+ */
+export function submitPhoneRebind(
+  token: string,
+  stepUpToken: string,
+  newPhone: string,
+  newPhoneCode: string,
+  deviceId?: string,
+): Promise<PhoneRebindResult> {
+  return call<PhoneRebindResult>('/member/phone/rebind', 'POST', {
+    token,
+    body: deviceId
+      ? { stepUpToken, newPhone, newPhoneCode, deviceId }
+      : { stepUpToken, newPhone, newPhoneCode },
+  })
+}

@@ -262,6 +262,27 @@ const USER_CENTER_WAVE0_CHANGED = new Set([
   'services/api/scripts/verify-member-data-request-truth.ts',
 ])
 
+// Wave 2 账号换绑批次：手机号换绑服务、step-up类型扩展、资产删除、Kiosk 换绑 UI
+const WAVE2_ACCOUNT_REBIND_CHANGED = new Set([
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+  'apps/kiosk/scripts/verify-user-center-wave0.mjs',
+  'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/services/auth/memberAuthApi.ts',
+  'packages/shared/src/types/member-privacy.ts',
+  'services/api/scripts/verify-member-step-up.ts',
+  'services/api/scripts/verify-wave2-account-rebind.ts',
+  'services/api/src/member-assets/member-assets.controller.ts',
+  'services/api/src/member-assets/member-assets.service.ts',
+  'services/api/src/member-auth/dto/phone-rebind.dto.ts',
+  'services/api/src/member-auth/member-auth.controller.ts',
+  'services/api/src/member-auth/member-auth.module.ts',
+  'services/api/src/member-auth/member-phone-rebind.service.ts',
+  'services/api/src/member-auth/member-step-up.types.ts',
+  'docs/progress/current-progress.md',
+  'docs/progress/next-tasks.md',
+  'docs/progress/today-claude.md',
+])
+
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
 // 仅当 diff 实际触碰本守卫负责的 /me 第一批明细页时，才强制 P0a allowlist 范围检查。
@@ -276,7 +297,8 @@ const unexpectedChanged = touchesProtectedPages
         !PRINT_URL_CONTRACT_CHANGED.has(file) &&
         !JOB_FIT_M1_5_CHANGED.has(file) &&
         !SIGN_STAMP_CHANGED.has(file) &&
-        !USER_CENTER_WAVE0_CHANGED.has(file),
+        !USER_CENTER_WAVE0_CHANGED.has(file) &&
+        !WAVE2_ACCOUNT_REBIND_CHANGED.has(file),
     )
   : []
 if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')

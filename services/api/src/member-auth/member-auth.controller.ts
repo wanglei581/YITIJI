@@ -5,6 +5,7 @@ import { CurrentEndUser, type AuthedEndUser } from '../common/decorators/current
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { MemberLoginDto } from './dto/member-login.dto'
+import { PhoneRebindDto } from './dto/phone-rebind.dto'
 import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-step-up.dto'
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
 import { SendSmsCodeDto } from './dto/send-sms-code.dto'
@@ -14,6 +15,7 @@ import {
   type MemberLoginResult,
   type SendCodeResult,
 } from './member-auth.service'
+import { MemberPhoneRebindService, type PhoneRebindResult } from './member-phone-rebind.service'
 import {
   MemberQrLoginService,
   type ConfirmQrLoginResult,
@@ -45,6 +47,7 @@ export class MemberAuthController {
     private readonly service: MemberAuthService,
     private readonly qrLogin: MemberQrLoginService,
     private readonly stepUp: MemberStepUpService,
+    private readonly phoneRebind: MemberPhoneRebindService,
   ) {}
 
   /** 发送验证码。IP 维度再加一层粗限流(细粒度多维频控在 service 内走 Redis)。 */
@@ -136,6 +139,36 @@ export class MemberAuthController {
   async logout(@CurrentEndUser() user: AuthedEndUser): Promise<ApiResponse<{ loggedOut: true }>> {
     await this.service.logout(user.endUserId, user.sessionId)
     return ApiResponse.ok({ loggedOut: true })
+  }
+
+  /**
+   * 手机号换绑（Wave 2）。
+   *
+   * 前置：
+   *   1. 旧号 step-up: POST /member/auth/step-up/sms-code { action: "phone_rebind" }
+   *   2. 旧号验证:      POST /member/auth/step-up/verify → stepUpToken
+   *   3. 新号验证码:    POST /member/auth/sms-code { phone: newPhone }
+   * 本接口：POST /member/phone/rebind { stepUpToken, newPhone, newPhoneCode }
+   *
+   * 成功后所有旧会话立即失效，前端应清除内存 token 并提示用新号重新登录。
+   */
+  @Post('phone/rebind')
+  @UseGuards(EndUserAuthGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  @Header('Cache-Control', 'no-store')
+  async rebindPhone(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Body() dto: PhoneRebindDto,
+  ): Promise<ApiResponse<PhoneRebindResult>> {
+    return ApiResponse.ok(
+      await this.phoneRebind.rebind(
+        user.endUserId,
+        dto.stepUpToken,
+        dto.newPhone,
+        dto.newPhoneCode,
+        dto.deviceId,
+      ),
+    )
   }
 
   /** 当前登录用户(前端 boot / 刷新时校验会话)。 */

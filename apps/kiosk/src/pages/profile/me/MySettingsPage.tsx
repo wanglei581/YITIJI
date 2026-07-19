@@ -1,17 +1,16 @@
 // ============================================================
-// 账号设置（轻量版）— /me/settings。
+// 账号设置（Wave 2）— /me/settings。
 //
-// 范围（P0a）：只读账号状态 + 会话说明 + 协议/隐私入口 + 退出登录 / 切换账号。
-// 明确不做：昵称修改、手机号换绑、账号注销、账号合并、多角色切换。
+// 范围（Wave 2）：只读账号状态 + 手机号换绑 + 会话说明 + 协议/隐私入口 + 退出/切换账号。
+// 明确不做：昵称修改、账号注销、账号合并、多角色切换。
 //
 // 诚实化与合规：
 // - 登录态只展示后端已脱敏手机号（phoneMasked），绝不展示原始号码。
 // - 公共终端：登录态仅存内存，刷新/超时/退出即清除，不写任何浏览器存储。
-// - 「切换账号」= 退出当前账号后用另一手机号重新登录；退出会清空内存会话，
-//   不会把上一账号数据带入下一账号，避免数据串号。
+// - 换绑成功后旧会话全部失效，前端主动清除内存 token，用新号重新登录。
 // ============================================================
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, PageHeader } from '@ai-job-print/ui'
 import {
@@ -20,6 +19,7 @@ import {
   FileTextIcon,
   LogInIcon,
   LogOutIcon,
+  PhoneIcon,
   RepeatIcon,
   ShieldCheckIcon,
   ShieldQuestionIcon,
@@ -29,6 +29,13 @@ import { useAuth } from '../../../auth/useAuth'
 import { KIcon } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { getJobAiConsentStatus, revokeJobAiConsent } from '../../../services/api/jobAi'
+import {
+  sendSmsCode,
+  sendPhoneRebindStepUpCode,
+  verifyPhoneRebindStepUp,
+  submitPhoneRebind,
+  type StepUpChallengeResult,
+} from '../../../services/auth/memberAuthApi'
 import './me-detail-inkpaper.css'
 
 // 退出 / 切换账号确认弹层：公共终端二次确认，避免误触清空会话。
@@ -65,6 +72,125 @@ function ConfirmOverlay({
             {confirmLabel}
           </Button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 手机号换绑四步弹层 ─────────────────────────────────────────
+type RebindStep = 'send_old' | 'verify_old' | 'send_new' | 'verify_new' | 'done'
+
+function PhoneRebindOverlay({
+  phoneMasked,
+  token,
+  onDone,
+  onCancel,
+}: {
+  phoneMasked: string
+  token: string
+  onDone: () => void
+  onCancel: () => void
+}) {
+  const [step, setStep] = useState<RebindStep>('send_old')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const [challenge, setChallenge] = useState<StepUpChallengeResult | null>(null)
+  const [oldOtp, setOldOtp] = useState('')
+  const [stepUpToken, setStepUpToken] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newOtp, setNewOtp] = useState('')
+  const newPhoneRef = useRef<HTMLInputElement>(null)
+
+  const handle = async (fn: () => Promise<void>) => {
+    setErr(null); setBusy(true)
+    try { await fn() } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : '操作失败，请重试')
+    } finally { setBusy(false) }
+  }
+
+  const step1 = () => handle(async () => {
+    const c = await sendPhoneRebindStepUpCode(token)
+    setChallenge(c); setStep('verify_old')
+  })
+
+  const step2 = () => handle(async () => {
+    if (!challenge || oldOtp.length !== 6) { setErr('请输入6位验证码'); return }
+    const g = await verifyPhoneRebindStepUp(token, challenge.challengeId, oldOtp)
+    setStepUpToken(g.stepUpToken); setStep('send_new')
+    setTimeout(() => newPhoneRef.current?.focus(), 50)
+  })
+
+  const step3 = () => handle(async () => {
+    if (!/^1[3-9]\d{9}$/.test(newPhone)) { setErr('请输入有效的大陆手机号'); return }
+    await sendSmsCode(newPhone)
+    setStep('verify_new')
+  })
+
+  const step4 = () => handle(async () => {
+    if (newOtp.length !== 6) { setErr('请输入6位验证码'); return }
+    await submitPhoneRebind(token, stepUpToken, newPhone, newOtp)
+    setStep('done')
+  })
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={step === 'done' ? onDone : onCancel}>
+      <div role="dialog" aria-modal="true" className="me-dialog w-[22rem] max-w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <p className="text-base font-semibold text-neutral-900">换绑手机号</p>
+
+        {step === 'send_old' && (
+          <>
+            <p className="mt-2 text-sm text-neutral-500">将向当前手机号 <b>{phoneMasked}</b> 发送验证码，确认是本人操作后才能换绑。</p>
+            <div className="mt-5 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
+              <Button className="flex-1" disabled={busy} onClick={step1}>{busy ? '发送中…' : '发送验证码'}</Button>
+            </div>
+          </>
+        )}
+
+        {step === 'verify_old' && (
+          <>
+            <p className="mt-2 text-sm text-neutral-500">已发送至 {phoneMasked}，输入6位验证码继续</p>
+            <input type="tel" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={oldOtp} onChange={(e) => setOldOtp(e.target.value.replace(/\D/g, ''))}
+              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400" autoFocus />
+            <div className="mt-4 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
+              <Button className="flex-1" disabled={busy || oldOtp.length !== 6} onClick={step2}>{busy ? '验证中…' : '下一步'}</Button>
+            </div>
+          </>
+        )}
+
+        {step === 'send_new' && (
+          <>
+            <p className="mt-2 text-sm text-neutral-500">请输入新手机号，我们将发送验证码</p>
+            <input ref={newPhoneRef} type="tel" inputMode="numeric" maxLength={11} placeholder="新手机号" value={newPhone} onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, ''))}
+              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-lg outline-none focus:border-primary-400" />
+            <div className="mt-4 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
+              <Button className="flex-1" disabled={busy || newPhone.length !== 11} onClick={step3}>{busy ? '发送中…' : '发送验证码'}</Button>
+            </div>
+          </>
+        )}
+
+        {step === 'verify_new' && (
+          <>
+            <p className="mt-2 text-sm text-neutral-500">已发送至 {newPhone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')}，输入6位验证码确认换绑</p>
+            <input type="tel" inputMode="numeric" maxLength={6} placeholder="6位验证码" value={newOtp} onChange={(e) => setNewOtp(e.target.value.replace(/\D/g, ''))}
+              className="mt-3 w-full rounded-xl border border-neutral-200 bg-white px-4 py-3 text-center text-2xl tracking-widest outline-none focus:border-primary-400" autoFocus />
+            <div className="mt-4 flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={onCancel}>取消</Button>
+              <Button className="flex-1" disabled={busy || newOtp.length !== 6} onClick={step4}>{busy ? '换绑中…' : '确认换绑'}</Button>
+            </div>
+          </>
+        )}
+
+        {step === 'done' && (
+          <>
+            <p className="mt-2 text-sm text-neutral-500">换绑成功！当前会话已退出，请用新手机号重新登录。</p>
+            <Button className="mt-5 w-full" onClick={onDone}>去登录</Button>
+          </>
+        )}
+
+        {err && <p role="alert" className="mt-3 text-sm text-error-fg">{err}</p>}
       </div>
     </div>
   )
@@ -109,6 +235,7 @@ export function MySettingsPage() {
   const navigate = useNavigate()
   const { user, isLoggedIn, getToken, logout } = useAuth()
   const [confirm, setConfirm] = useState<'logout' | 'switch' | 'revokeJobAi' | null>(null)
+  const [showRebind, setShowRebind] = useState(false)
   const [jobAiGranted, setJobAiGranted] = useState<boolean | null>(null)
   const [jobAiLoading, setJobAiLoading] = useState(false)
   const [jobAiBusy, setJobAiBusy] = useState(false)
@@ -166,6 +293,13 @@ export function MySettingsPage() {
     setConfirm(null)
     logout()
     navigate('/login', { state: { from: '/profile' } })
+  }
+
+  // 换绑成功：旧会话已由后端踢出，前端清除内存会话并跳转登录页。
+  const handleRebindDone = () => {
+    setShowRebind(false)
+    logout()
+    navigate('/login', { state: { from: '/profile', hint: '换绑成功，请用新手机号登录' } })
   }
 
   const handleRevokeJobAiConsent = async () => {
@@ -314,6 +448,14 @@ export function MySettingsPage() {
           {isLoggedIn && (
             <section aria-label="账号操作" className={`${cardSurface} py-1`}>
               <LinkRow
+                icon={PhoneIcon}
+                iconBg="bg-amber-50"
+                iconColor="text-amber-600"
+                label="换绑手机号"
+                desc="旧号验证 + 新号验证，双重确认"
+                onClick={() => setShowRebind(true)}
+              />
+              <LinkRow
                 icon={RepeatIcon}
                 iconBg="bg-plum-soft"
                 iconColor="text-plum"
@@ -339,7 +481,7 @@ export function MySettingsPage() {
           <div className="me-note flex items-start gap-3 px-5 py-4">
             <ShieldQuestionIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
             <p className="text-xs leading-relaxed text-neutral-500">
-              手机号换绑、账号注销和数据导出尚未开放；相关能力完成安全验证与运营闭环后将在本页提供。如需协助，请联系现场工作人员。
+              账号注销和数据导出尚未开放；相关能力完成安全验证与运营闭环后将在本页提供。如需协助，请联系现场工作人员。
             </p>
           </div>
         </div>
@@ -370,6 +512,14 @@ export function MySettingsPage() {
           confirmLabel="确认撤回"
           onConfirm={() => void handleRevokeJobAiConsent()}
           onCancel={() => setConfirm(null)}
+        />
+      )}
+      {showRebind && isLoggedIn && getToken() && (
+        <PhoneRebindOverlay
+          phoneMasked={phoneMasked}
+          token={getToken()!}
+          onDone={handleRebindDone}
+          onCancel={() => setShowRebind(false)}
         />
       )}
     </div>

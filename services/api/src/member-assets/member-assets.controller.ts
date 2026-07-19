@@ -104,4 +104,36 @@ export class MemberAssetsController {
     })
     return ApiResponse.ok({ deleted: true, deletedCount: result.deletedCount })
   }
+
+  /**
+   * 删除本人一条简历记录（Wave 2）。
+   * kind 限定 parse/generate；parse 行级联删同任务所有派生行和 JobAiSession。
+   * 删他人 / 不存在统一 404；动作写审计日志。
+   */
+  @Delete('resumes/:id')
+  async deleteResume(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param('id') id: string,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<{ deleted: true; deletedCount: number }>> {
+    const result = await this.assets.deleteResume(user.endUserId, id)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'enduser',
+      action: 'member.resume_delete',
+      targetType: 'ai_resume_result',
+      targetId: id,
+      payload: {
+        endUserId: user.endUserId,
+        taskId: result.taskId,
+        kind: result.kind,
+        deletedCount: result.deletedCount,
+        cascade: result.kind === 'parse',
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ deleted: true, deletedCount: result.deletedCount })
+  }
 }
