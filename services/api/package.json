@@ -55,6 +55,7 @@
     "verify:print-rollout-config": "node -r @swc-node/register scripts/verify-print-rollout-config.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
+    "verify:admin-pending-dispose": "node -r @swc-node/register scripts/verify-admin-pending-dispose.ts",
     "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",
     "maintenance:dispose-legacy-pending-print-tasks": "node -r @swc-node/register scripts/dispose-legacy-pending-print-tasks.ts",
     "verify:closed-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-closed-pending-print-task-disposition.ts",

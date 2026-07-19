@@ -9,6 +9,7 @@ import {
   type AdminOrderReadonlyDetail,
   type AdminOrderReadonlyItem,
 } from '../../services/api/adminOrdersReadonly'
+import { adminPrintJobsService } from '../../services/api/adminPrintJobs'
 import { ApiHttpError } from '../../services/api/client'
 
 // ─── Display maps ─────────────────────────────────────────────────────────────
@@ -19,6 +20,7 @@ const STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'inf
   printing:  { badge: 'info',    label: '打印中' },
   completed: { badge: 'success', label: '已完成' },
   failed:    { badge: 'error',   label: '失败' },
+  abandoned: { badge: 'default', label: '已废弃' },
 }
 
 const PAY_STATUS_MAP: Record<string, { badge: 'success' | 'error' | 'warning' | 'default'; label: string }> = {
@@ -91,6 +93,11 @@ export default function OrdersPage() {
   const [refundReason, setRefundReason] = useState('')
   const [refundSubmitting, setRefundSubmitting] = useState(false)
   const [refundError, setRefundError] = useState<string | null>(null)
+
+  // 废弃孤单对话框状态（仅 pending + claimedAt=null 任务可见）
+  const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false)
+  const [abandonSubmitting, setAbandonSubmitting] = useState(false)
+  const [abandonError, setAbandonError] = useState<string | null>(null)
   const ordersKey = `admin:orders:${statusFilter}:${payStatus}:${search}:${page}:${pageSize}`
 
   const {
@@ -157,6 +164,8 @@ export default function OrdersPage() {
     setRefundOpen(false)
     setRefundReason('')
     setRefundError(null)
+    setAbandonConfirmOpen(false)
+    setAbandonError(null)
   }
 
   const handleRefund = useCallback(async () => {
@@ -178,6 +187,24 @@ export default function OrdersPage() {
       setRefundSubmitting(false)
     }
   }, [detail, refundReason, refresh])
+
+  const handleAbandon = useCallback(async () => {
+    if (!detail?.printTaskId) return
+    setAbandonSubmitting(true)
+    setAbandonError(null)
+    try {
+      await adminPrintJobsService.abandonPending(detail.printTaskId)
+      void refresh()
+      const updated = await adminOrdersReadonlyService.getById(detail.id)
+      setDetail(updated)
+      setAbandonConfirmOpen(false)
+    } catch (err) {
+      const msg = err instanceof ApiHttpError ? err.message : '操作失败，请重试'
+      setAbandonError(msg)
+    } finally {
+      setAbandonSubmitting(false)
+    }
+  }, [detail, refresh])
 
   return (
     <Page
@@ -374,6 +401,57 @@ export default function OrdersPage() {
                     <span className="ml-2 tabular-nums text-neutral-500">{fmt(log.createdAt)}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* 废弃孤单操作区：仅 taskStatus===pending（未被 Agent 领取的历史孤单）显示 */}
+            {detail.taskStatus === 'pending' && detail.printTaskId && (
+              <div className="mt-6 rounded-[9px] border border-neutral-900/10 bg-neutral-50 px-4 py-3.5">
+                {!abandonConfirmOpen ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[13px] font-bold text-neutral-800">处置历史孤单</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">
+                        该任务尚未被 Terminal Agent 领取，可由管理员受控废弃。操作不可撤销。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setAbandonConfirmOpen(true); setAbandonError(null) }}
+                      className="ml-4 inline-flex h-9 shrink-0 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-100"
+                    >
+                      废弃
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <p className="text-[13px] font-bold text-neutral-800">确认废弃此打印孤单？</p>
+                    <p className="text-xs text-neutral-500">
+                      打印任务将标记为 <span className="font-mono font-semibold text-neutral-700">abandoned</span>，写入审计日志，操作不可撤销。
+                    </p>
+                    {abandonError && (
+                      <p className="text-xs font-semibold text-error-fg">{abandonError}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={abandonSubmitting}
+                        onClick={() => void handleAbandon()}
+                        className="inline-flex h-9 items-center rounded-[9px] bg-neutral-800 px-4 text-[13px] font-bold text-white transition-colors hover:bg-neutral-700 disabled:opacity-40"
+                      >
+                        {abandonSubmitting ? '处理中…' : '确认废弃'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={abandonSubmitting}
+                        onClick={() => { setAbandonConfirmOpen(false); setAbandonError(null) }}
+                        className="inline-flex h-9 items-center rounded-[9px] border border-neutral-900/10 bg-surface px-4 text-[13px] font-bold text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-40"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
