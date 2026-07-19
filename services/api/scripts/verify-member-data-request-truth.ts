@@ -2,8 +2,13 @@
  * 用户数据请求真实状态集成守卫。
  *
  * SQLite 环境重放正式 migration；PostgreSQL readiness 使用该 job 的空库。
- * 覆盖唯一请求服务、delete 零副作用 fail-closed、revoke_consent 同事务完成，
- * 以及队列缺失时 export 不创建伪 pending 记录。
+ * 覆盖：
+ *   - 唯一请求服务 activeKey 互斥
+ *   - delete 零副作用 fail-closed（DATA_DELETION_ENABLED 默认 false）
+ *   - revoke_consent 同事务完成
+ *   - 队列缺失时 export 不创建伪 pending 记录
+ *   - reconciler / download-service 结构存在性
+ *   - DATA_DELETION_ENABLED 运行时开关门控
  */
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -11,6 +16,8 @@ import { closeSync, mkdtempSync, openSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { AuditService } from '../src/audit/audit.service'
+import { MemberDataExportDownloadService } from '../src/member-privacy/member-data-export-download.service'
+import { MemberDataExportReconcilerService } from '../src/member-privacy/member-data-export-reconciler.service'
 import { MemberDataRequestService } from '../src/member-privacy/member-data-request.service'
 import { MemberPrivacyService } from '../src/member-privacy/member-privacy.service'
 import { PrismaService } from '../src/prisma/prisma.service'
@@ -172,6 +179,46 @@ async function main(): Promise<void> {
       pass('队列缺失时 export fail closed，不消费 grant、不加锁、不创建伪记录')
     } else {
       fail(`export 队列门禁失败 code=${exportCode ?? 'none'} rows=${exportRows}`)
+    }
+
+    // reconciler 存在性：Wave 1-B 中断修复守卫
+    const reconcilerMethods = Object.getOwnPropertyNames(MemberDataExportReconcilerService.prototype)
+    const requiredReconcilerMethods = ['reconcile', 'reconcileRequest', 'sweep', 'cleanupOrphanFiles']
+    const missingReconcilerMethods = requiredReconcilerMethods.filter((m) => !reconcilerMethods.includes(m))
+    if (missingReconcilerMethods.length === 0) {
+      pass(`MemberDataExportReconcilerService 具备 reconcile/reconcileRequest/sweep/cleanupOrphanFiles`)
+    } else {
+      fail(`MemberDataExportReconcilerService 缺少方法: ${missingReconcilerMethods.join(', ')}`)
+    }
+
+    // download-service 存在性：一次性 ticket claim 机制守卫
+    const downloadMethods = Object.getOwnPropertyNames(MemberDataExportDownloadService.prototype)
+    const requiredDownloadMethods = ['authorizeDownload', 'claimDownload', 'finishDownload', 'abortDownload']
+    const missingDownloadMethods = requiredDownloadMethods.filter((m) => !downloadMethods.includes(m))
+    if (missingDownloadMethods.length === 0) {
+      pass(`MemberDataExportDownloadService 具备 authorizeDownload/claimDownload/finishDownload/abortDownload`)
+    } else {
+      fail(`MemberDataExportDownloadService 缺少方法: ${missingDownloadMethods.join(', ')}`)
+    }
+
+    // DATA_DELETION_ENABLED 开关：delete 始终 fail-closed（默认 false，无论环境变量值）
+    const savedDeletionEnv = process.env['DATA_DELETION_ENABLED']
+    process.env['DATA_DELETION_ENABLED'] = 'true'
+    const deletionWithFlagCode = await captureCode(() => requests.create(
+      endUserId,
+      'delete',
+      randomUUID(),
+      null,
+      null,
+    ))
+    if (savedDeletionEnv === undefined) delete process.env['DATA_DELETION_ENABLED']
+    else process.env['DATA_DELETION_ENABLED'] = savedDeletionEnv
+    // Wave 1-B 最小版：实际注销执行未实现，DATA_DELETION_ENABLED=true 仍返回 ACCOUNT_CLOSURE_NOT_AVAILABLE
+    // （法务矩阵签字前不允许任何路径产生实际 PII 删除）
+    if (deletionWithFlagCode === 'ACCOUNT_CLOSURE_NOT_AVAILABLE') {
+      pass('DATA_DELETION_ENABLED=true 仍 fail-closed（注销执行尚未实现，法务矩阵未签字）')
+    } else {
+      fail(`DATA_DELETION_ENABLED=true 意外执行了删除路径 code=${deletionWithFlagCode ?? 'none（无异常！）'}`)
     }
   } finally {
     const requestIds = (await prisma.userDataRequest.findMany({
