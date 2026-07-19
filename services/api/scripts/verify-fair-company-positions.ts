@@ -30,6 +30,10 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import { FairCompanyZoneService } from '../src/jobs/fair-company-zone.service'
+import { FairMaterialService } from '../src/jobs/fair-material.service'
+import { FairVenueGuideService } from '../src/jobs/fair-venue-guide.service'
+import { JobQualityService } from '../src/job-ai/job-quality.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
 import { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
 import { JobsService } from '../src/jobs/jobs.service'
@@ -64,8 +68,12 @@ async function main() {
   const storage = new StorageService()
   const files = new FilesService(prisma, audit, storage)
   const bridge = new FairMaterialPrintBridgeService(prisma, storage, files)
-  const svc = new AdminFairsService(prisma, audit, storage, bridge)
-  const jobs = new JobsService(prisma, audit)
+  // N5 拆分后 AdminFairsService 需要三个子服务
+  const companyZone = new FairCompanyZoneService(prisma, audit)
+  const material = new FairMaterialService(prisma, audit, storage, bridge)
+  const venueGuide = new FairVenueGuideService(prisma, audit)
+  const svc = new AdminFairsService(prisma, audit, companyZone, material, venueGuide)
+  const jobs = new JobsService(prisma, audit, new JobQualityService(prisma))
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)

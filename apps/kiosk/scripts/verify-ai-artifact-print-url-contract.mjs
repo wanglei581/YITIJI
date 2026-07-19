@@ -39,6 +39,8 @@ const interviewService = read('services/api/src/mock-interview/mock-interview.se
 const materialsService = read('services/api/src/job-materials/job-materials.service.ts')
 const filesService = read('services/api/src/files/files.service.ts')
 const adminFairsService = read('services/api/src/jobs/admin-fairs.service.ts')
+// N5 拆分后 printBridges.prepare 委托逻辑移至 fair-material.service.ts
+const fairMaterialService = (() => { try { return read('services/api/src/jobs/fair-material.service.ts') } catch { return '' } })()
 const fairMaterialPrintBridgeService = read('services/api/src/jobs/fair-material-print-bridge.service.ts')
 const jobsController = read('services/api/src/jobs/jobs.controller.ts')
 
@@ -101,7 +103,8 @@ expectNoMatch(myDocumentsPage, /fileUrl:\s*res\.url/, '我的文档不得把预�
 expectMatch(myDocumentsPage, /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw/, '我的文档缺内部打印 URL 时诚实报错')
 
 expectMatch(adminFairsService, /async\s+prepareFairMaterialPrint\s*\(/, '招聘会资料提供按需标准 FileObject 打印桥接')
-expectMatch(adminFairsService, /return\s+this\.printBridges\.prepare\(fairId,\s*materialId\)/, '招聘会资料入口委托可复用打印桥接服务')
+// N5 拆分后委托逻辑在 fair-material.service.ts，adminFairsService 或 fairMaterialService 命中均可
+expectMatch(fairMaterialService || adminFairsService, /return\s+this\.printBridges\.prepare\(fairId,\s*materialId\)/, '招聘会资料入口委托可复用打印桥接服务')
 expectMatch(fairMaterialPrintBridgeService, /printFileUrl:\s*signFileUrl\(fileId\)\.url/, '招聘会资料桥接返回内部 HMAC printFileUrl')
 expectMatch(fairMaterialPrintBridgeService, /validationMode:\s*'intent'/, '招聘会资料桥接仅以内部 intent 模式跨越 HTTP proxy 上限')
 expectMatch(fairMaterialPrintBridgeService, /assertSourceIntegrity\(material,\s*buffer\)/, '招聘会资料桥接复核源内容完整性')
