@@ -75,7 +75,11 @@ function main(): void {
   const terminals =
     readSource('TerminalsService', join(apiRoot, 'src/terminals/terminals.service.ts')) +
     '\n' +
-    readSource('TerminalsAgentService', join(apiRoot, 'src/terminals/terminals-agent.service.ts'))
+    readSource('TerminalsAgentService', join(apiRoot, 'src/terminals/terminals-agent.service.ts')) +
+    '\n' +
+    readSource('TerminalsAdminService', join(apiRoot, 'src/terminals/terminals-admin.service.ts')) +
+    '\n' +
+    readSource('TerminalUtils', join(apiRoot, 'src/terminals/terminal-utils.ts'))
   const paymentProviderFactory = readSource(
     'PaymentProviderFactory',
     join(apiRoot, 'src/payment/payment-provider.factory.ts'),

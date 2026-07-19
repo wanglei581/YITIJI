@@ -139,7 +139,9 @@ function main(): void {
   const terminalsService =
     read('src/terminals/terminals.service.ts') +
     '\n' +
-    read('src/terminals/terminals-agent.service.ts')
+    read('src/terminals/terminals-agent.service.ts') +
+    '\n' +
+    read('src/terminals/terminals-admin.service.ts')
   const printJobsApi = read('../../apps/kiosk/src/services/print/printJobsApi.ts')
   const prismaSchema = read('prisma/schema.prisma')
   const adminTypes = read('../../apps/admin/src/services/api/types.ts')
