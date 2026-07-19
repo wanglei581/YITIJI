@@ -1,15 +1,15 @@
 # 下一步任务
 
-> 最后更新：2026-07-18
+> 最后更新：2026-07-19
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 
 设计基准:`docs/design/kiosk-proto-2026-07/`(75 屏 + shared.css token + README 开发规则);后台配套规划:`docs/product/console-plan-for-kiosk-proto-2026-07.md`。
 
-- [ ] **首批立项:G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台,同批开发,合规口径见原型 README §五
+- [x] **G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台。PR #305 已合入 main(commit `e92abb56`,2026-07-17)
+- [x] **存量页面按原型逐屏换装对齐**——75 屏全量视觉对齐。PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳
 - [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
 - [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
-- [ ] 存量页面按原型逐屏换装对齐(±4px 截图比对验收),批次顺序建议:首页 → 打印扫描线 → 简历线 → 岗位招聘会线 → 我的 → 系统屏
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
 **开工前注意事项(2026-07-17)**:
@@ -45,9 +45,6 @@
 
 ## P0：合作机构后台账号安全移除
 
-- [x] **PR #308 最终 CI**：[secure partner account deletion and phone rebind](https://github.com/wanglei581/YITIJI/pull/308) 的 GitHub Actions [run 29655900323](https://github.com/wanglei581/YITIJI/actions/runs/29655900323) 已双绿：`build-and-verify` 与 `postgres-readiness` 均成功。PR 保持打开且不自动合并，生产 migration、真实短信和部署仍需单独授权。
-
-- [x] **双验证删除与手机号换绑本地候选终审（2026-07-19）**：现有 Admin 机构账号入口已升级为“Admin 当前会话近期验证 + Partner 原已验证手机 OTP / `owner_managed` 当前密码”的操作绑定状态机；换绑额外验证新手机号。最终安全收口已关闭自助改密证明升级、Admin 预录手机号旁路、首绑 reset TOCTOU 和同秒多登录近期验证共享；SQLite、真实 Redis、真实隔离 PostgreSQL 34 migrations + 并发/换绑、旧认证、API/Admin build/typecheck/lint 与 UI 状态机覆盖率门禁均通过，独立代码/安全复审均 `APPROVE`。用户已授权推送并走 PR/CI；当前待创建 PR 并等待两个 GitHub Actions job，仍未 merge / deploy，未发送真实短信；生产 migration、真实短信和线上操作仍须另行授权。
 - [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
 - [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：等待 PR CI；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
 
@@ -63,12 +60,6 @@
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
 ## P0/P1：用户中心商用级闭环
-
-> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案已由 PR #259 合入；Wave 0 已由 PR #261（`0c4cdd57`）合入；授权撤回终态保护已由 PR #263（`4f8084d1`）合入；Wave 1-A 账户安全底座已由 PR #265 合入当前 `origin/main@f69bf1b7`。最终 GitHub CI `29504775805` 的 `build-and-verify` 与 `postgres-readiness` 均成功。以上均未部署，且不表示 Wave 1-B、Wave 1-C、真实导出或不可逆注销已经完成。
-> 下一波只能从当前干净主线新建独立 worktree：先实施 Wave 1-B 数据权利执行器；不可逆注销 handler 必须继续等待法务版本化分类留存矩阵、冷静期与执行开关同时获准。随后才可按已合入契约实施 Wave 1-C Kiosk/Admin 隐私运营 UI；不得提前展示注销入口、伪写工单终态或在主工作区堆叠。
-- [x] **Wave 0 授权撤回终态保护（已合入）**：`codex/user-center-wave0-data-truth-20260716` 新增 `revoke_consent→rejected` 的 fail-closed 保护：授权已在请求创建时真实撤回，拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。该补丁已由 [PR #263](https://github.com/wanglei581/YITIJI/pull/263) 合入 `origin/main@4f8084d1`；此前 RED→GREEN、SQLite/PostgreSQL 空库复验与双 CI 均通过。未部署。
-- [x] **Wave 1-A 账户安全底座（已合入）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已由 [PR #265](https://github.com/wanglei581/YITIJI/pull/265) 合入当前 `origin/main@f69bf1b7`；最终 GitHub CI `29504775805` 两个 job 均成功。未新增 Kiosk/Admin UI，未实现数据权利执行器，未部署。
-- [ ] **Wave 1-B 数据权利执行器**：在 Wave 1-A 合入并通过 CI 后，补 export/delete 请求互斥、导出包异步生成、单次下载租约/finish/reconciler、服务端 auditRef、closing 最小回执和注销分类 fail-closed gate；法务分类留存矩阵未签字前不得执行不可逆删除。
 
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
 
