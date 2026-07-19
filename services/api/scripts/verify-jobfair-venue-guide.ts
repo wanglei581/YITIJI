@@ -32,6 +32,9 @@ import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
+import { FairCompanyZoneService } from '../src/jobs/fair-company-zone.service'
+import { FairMaterialService } from '../src/jobs/fair-material.service'
+import { FairVenueGuideService } from '../src/jobs/fair-venue-guide.service'
 import { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
@@ -69,7 +72,10 @@ async function main(): Promise<void> {
   const storage = new StorageService()
   const files = new FilesService(prisma, audit, storage)
   const bridge = new FairMaterialPrintBridgeService(prisma, storage, files)
-  const svc = new AdminFairsService(prisma, audit, storage, bridge)
+  const companyZone = new FairCompanyZoneService(prisma, audit)
+  const materialSvc = new FairMaterialService(prisma, audit, storage, bridge)
+  const venueGuide = new FairVenueGuideService(prisma, audit)
+  const svc = new AdminFairsService(prisma, audit, companyZone, materialSvc, venueGuide)
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)

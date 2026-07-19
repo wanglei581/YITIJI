@@ -22,6 +22,7 @@ import { randomBytes } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
+import { JobQualityService } from '../src/job-ai/job-quality.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
 
@@ -62,7 +63,7 @@ async function main() {
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
-  const jobs = new JobsService(prisma, new AuditService(prisma))
+  const jobs = new JobsService(prisma, new AuditService(prisma), new JobQualityService(prisma))
 
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
 
