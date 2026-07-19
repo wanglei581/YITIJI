@@ -5,13 +5,13 @@
 .k8-system-dim { position: absolute; z-index: 1; inset: 0; background: rgba(16,48,43,.62); backdrop-filter: blur(3px); }
 .k8-timeout-wrap { position: absolute; z-index: 2; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; padding: 40px 90px; }
 .k8-timeout-card { width: 100%; max-height: calc(100dvh - 170px); overflow-y: auto; padding: 54px 72px 50px; border: 1px solid var(--color-neutral-200); border-radius: 18px; background: var(--color-surface); box-shadow: 0 30px 80px rgba(9,26,23,.45); text-align: center; }
-.k8-timeout-ring { position: relative; width: 260px; height: 260px; margin: 0 auto; }
+.k8-timeout-ring { position: relative; width: 300px; height: 300px; margin: 0 auto; }
 .k8-timeout-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .k8-timeout-ring circle { fill: none; stroke-width: 14; }
 .k8-timeout-ring-bg { stroke: var(--color-neutral-200); }
 .k8-timeout-ring-value { stroke: var(--color-clay); stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
 .k8-timeout-ring > div { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
-.k8-timeout-ring strong { color: var(--color-clay); font-family: var(--font-serif); font-size: 96px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.k8-timeout-ring strong { color: var(--color-clay); font-family: var(--font-serif); font-size: 110px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
 .k8-timeout-ring span { color: var(--color-neutral-500); font-size: 21px; letter-spacing: .06em; }
 .k8-timeout-card h1 { margin: 32px 0 0; font-family: var(--font-serif); font-size: 44px; font-weight: 900; letter-spacing: .04em; }
 .k8-timeout-description { margin: 16px 0 0; color: var(--color-neutral-500); font-size: 22px; line-height: 1.65; }
@@ -26,7 +26,7 @@
 .k8-timeout-actions { display: flex; flex-direction: column; gap: 16px; margin-top: 32px; }
 .k8-timeout-actions button,
 .k8-offline-actions button { display: flex; min-height: 82px; align-items: center; justify-content: center; gap: 12px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-800); background: var(--color-surface); font-size: 22px; font-weight: 700; }
-.k8-timeout-actions button.is-primary { min-height: 104px; border-color: var(--color-primary-600); color: var(--color-surface); background: var(--color-primary-600); font-size: 30px; letter-spacing: .08em; }
+.k8-timeout-actions button.is-primary { min-height: 118px; border-color: var(--color-primary-600); color: var(--color-surface); background: var(--color-primary-600); font-size: 30px; letter-spacing: .08em; }
 .k8-timeout-actions svg,
 .k8-offline-actions svg { width: 28px; height: 28px; }
 .k8-system-notice { display: flex; width: 100%; min-height: 58px; align-items: center; justify-content: center; gap: 10px; margin: 0; padding: 12px 18px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-500); background: rgba(255,253,248,.92); font-size: 16px; line-height: 1.5; text-align: center; }
@@ -41,8 +41,8 @@
 .k8-offline-topbar > p > span { width: 9px; height: 9px; border-radius: 50%; background: var(--color-clay); }
 .k8-offline-wrap { display: flex; min-height: 0; flex: 1 1 auto; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 36px 90px; }
 .k8-offline-card { width: 100%; max-height: calc(100dvh - 190px); overflow-y: auto; padding: 50px 70px; border: 1px solid var(--color-neutral-200); border-radius: 18px; background: var(--color-surface); box-shadow: 0 6px 18px rgba(16,48,43,.06); text-align: center; }
-.k8-offline-icon { display: grid; width: 132px; height: 132px; margin: 0 auto; place-items: center; border: 1px solid color-mix(in srgb, var(--color-clay) 30%, transparent); border-radius: 36px; color: var(--color-clay); background: var(--color-clay-soft); }
-.k8-offline-icon svg { width: 70px; height: 70px; }
+.k8-offline-icon { display: grid; width: 148px; height: 148px; margin: 0 auto; place-items: center; border: 1px solid color-mix(in srgb, var(--color-clay) 30%, transparent); border-radius: 40px; color: var(--color-clay); background: var(--color-clay-soft); }
+.k8-offline-icon svg { width: 78px; height: 78px; }
 .k8-offline-card h1 { margin: 28px 0 0; font-family: var(--font-serif); font-size: 46px; font-weight: 900; letter-spacing: .04em; }
 .k8-offline-description { margin: 16px 0 0; color: var(--color-neutral-500); font-size: 22px; line-height: 1.65; }
 .k8-offline-check { display: inline-flex; align-items: center; gap: 9px; margin: 18px 0 0; padding: 9px 20px; border: 1px solid var(--color-neutral-200); border-radius: 999px; color: var(--color-neutral-500); background: var(--color-canvas); font-size: 16px; }
@@ -57,8 +57,8 @@
 .k8-offline-impact em.is-warn { border-color: color-mix(in srgb, var(--color-clay) 30%, transparent); color: var(--color-clay); background: var(--color-clay-soft); }
 .k8-offline-impact em.is-ok { border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent); color: var(--color-primary-700); background: var(--color-primary-100); }
 .k8-offline-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 30px; }
-.k8-offline-actions button { min-height: 92px; font-size: 21px; }
-.k8-offline-actions button.is-primary { border-color: var(--color-primary-600); color: var(--color-surface); background: var(--color-primary-600); font-size: 27px; }
+.k8-offline-actions button { min-height: 104px; font-size: 21px; }
+.k8-offline-actions button.is-primary { border-color: var(--color-primary-600); color: var(--color-surface); background: var(--color-primary-600); font-size: 30px; letter-spacing: .08em; }
 .k8-offline-actions button:disabled { opacity: .65; }
 .k8-offline-actions .is-spinning { animation: k8-system-spin 1s linear infinite; }
 .k8-system-notice.is-warning { border-color: color-mix(in srgb, var(--color-clay) 28%, var(--color-neutral-200)); color: var(--color-clay); background: var(--color-clay-soft); }
