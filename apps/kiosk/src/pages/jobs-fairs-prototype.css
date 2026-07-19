@@ -364,6 +364,13 @@
   color: var(--ink);
   text-align: left;
   box-shadow: 0 3px 14px rgba(16, 48, 43, .035);
+  cursor: pointer;
+  transition: box-shadow .15s, background .15s;
+}
+
+.jf-row:hover {
+  background: var(--paper);
+  box-shadow: 0 6px 20px rgba(16, 48, 43, .07);
 }
 
 .jf-row.align-start {
@@ -476,6 +483,35 @@
   border-color: rgba(169, 120, 31, .45);
   background: var(--wheat-soft);
   color: var(--wheat);
+}
+
+/* 详情页收藏 chip（默认中性，已收藏 wheat 配色） */
+.jf-fav-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 0 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 21px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.jf-fav-chip svg {
+  width: 24px;
+  height: 24px;
+}
+
+.jf-fav-chip.on {
+  border-color: rgba(169, 120, 31, .4);
+  background: var(--wheat-soft);
+  color: var(--wheat-deep);
 }
 
 .jf-arrow {
@@ -1317,4 +1353,288 @@
     padding: 14px 22px 18px;
     flex-wrap: wrap;
   }
+}
+
+/* ── Scale tag (neutral, no accent colour) ────────────────────── */
+.jf-scale-tag {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: 3px 12px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+/* ── Booth label in company row meta ─────────────────────────── */
+.jf-booth-label {
+  color: var(--wheat-deep);
+  font-weight: 700;
+}
+
+/* ── Material type chips (coloured per type) ─────────────────── */
+.jf-mtype {
+  flex: none;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.jf-mtype.sch  { color: var(--slate-deep); background: var(--slate-soft);  border: 1px solid rgba(63,104,176,.3); }
+.jf-mtype.map  { color: var(--teal-deep);  background: var(--teal-soft);   border: 1px solid rgba(31,158,134,.3); }
+.jf-mtype.co   { color: var(--plum-deep);  background: var(--plum-soft);   border: 1px solid rgba(122,90,134,.3); }
+.jf-mtype.pos  { color: var(--clay-deep);  background: var(--clay-soft);   border: 1px solid rgba(184,104,60,.3); }
+.jf-mtype.bro  { color: var(--wheat-deep); background: var(--wheat-soft);  border: 1px solid rgba(169,120,31,.3); }
+
+/* ── Zone stats strip (map page) ─────────────────────────────── */
+.jf-zone-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.jf-zs {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  padding: 16px 20px;
+}
+
+.jf-zs b {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.jf-zs-nums {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Priority company pick cards (visit plan) ───────────────── */
+.jf-co-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.jf-cp {
+  border: 1px solid rgba(169,120,31,.3);
+  border-radius: var(--r-sm);
+  background: var(--wheat-soft);
+  padding: 16px 20px;
+}
+
+.jf-cp-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jf-cp-top b {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--wheat-deep);
+}
+
+.jf-cp p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .jf-zone-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Global wheat CSS variables (available outside .jf-proto scope) ─────── */
+:root {
+  --wheat: #a9781f;
+  --wheat-deep: #8a6219;
+  --wheat-soft: #f2ead6;
+}
+
+/* ── FairsList page ─────────────────────────────────────────────────────── */
+.jf-fair-aside {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.jf-qr-go {
+  min-height: 56px;
+  padding: 0 16px;
+  font-size: 19px;
+  white-space: nowrap;
+  gap: 8px;
+}
+
+.jf-qr-go svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Overview grid (2-col info/map in detail page) ───────────────────────── */
+.ov-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 26px;
+}
+
+@media (max-width: 900px) {
+  .ov-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Key-value pair ──────────────────────────────────────────────────────── */
+.jf-kv { }
+.jf-kv .k {
+  color: var(--muted);
+  font-size: 18px;
+}
+.jf-kv .v {
+  font-size: 23px;
+  font-weight: 700;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Pill row (venue/attendance/company stats) ───────────────────────────── */
+.jf-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* ── Traffic info section ────────────────────────────────────────────────── */
+.jf-traffic {
+  margin-top: 18px;
+  font-size: 19px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.jf-traffic b {
+  display: block;
+  font-size: 20px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+/* ── Mini map placeholder ────────────────────────────────────────────────── */
+.jf-mini-map {
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper, #f4f1e8);
+  position: relative;
+  min-height: 280px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--muted);
+}
+
+.jf-mini-map .grid-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px),
+    repeating-linear-gradient(90deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px);
+}
+
+/* ── Featured zones grid (3-col) ─────────────────────────────────────────── */
+.jf-zones3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .jf-zones3 { grid-template-columns: 1fr; }
+}
+
+/* ── Zone card ───────────────────────────────────────────────────────────── */
+.jf-zone-card {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper, #f4f1e8);
+  padding: 20px 22px;
+  position: relative;
+}
+
+.jf-zone-card .city-badge {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent-deep, var(--wheat-deep));
+}
+
+.jf-zone-card .z-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft, var(--wheat-soft));
+  color: var(--accent-deep, var(--wheat-deep));
+}
+
+.jf-zone-card .z-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.jf-zone-card b {
+  display: block;
+  font-size: 23px;
+  font-weight: 700;
+  margin-top: 14px;
+}
+
+.jf-zone-card span.desc {
+  display: block;
+  font-size: 17px;
+  color: var(--muted);
+  margin-top: 8px;
+  line-height: 1.45;
+}
+
+/* ── Service tiles (4-col) ───────────────────────────────────────────────── */
+.jf-svc-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .jf-svc-tiles { grid-template-columns: repeat(2, 1fr); }
+}
+
+.jf-svc-tiles .jf-tile {
+  min-height: 108px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+}
+
+.jf-svc-tiles .jf-tile .cnt {
+  font-size: 15px;
+  color: var(--muted);
 }

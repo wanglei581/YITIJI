@@ -2,18 +2,35 @@
   width: min(980px, calc(100% - 100px));
   margin: 0 auto;
 }
-
 .khome .home-service-catalog {
   display: grid;
   min-width: 0;
   gap: 26px;
 }
-
+.khome .lf-reference-panel {
+  position: relative;
+}
+.khome .lf-reference-panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 6px 0 0 6px;
+  background: var(--cat-accent, var(--home-primary));
+  pointer-events: none;
+}
+.khome .lf-reference-panel[data-accent="teal"]  { --cat-accent: var(--home-primary, #35ab8e); }
+.khome .lf-reference-panel[data-accent="clay"]  { --cat-accent: #b8683c; }
+.khome .lf-reference-panel[data-accent="wheat"] { --cat-accent: #a9781f; }
+.khome .lf-reference-panel[data-accent="plum"]  { --cat-accent: #7a5a86; }
+.khome .lf-reference-panel[data-accent="slate"] { --cat-accent: #3f68b0; }
+.khome .lf-reference-panel[data-accent="tool"]  { --cat-accent: var(--home-primary); }
 .khome .home-reference-panel {
   min-width: 0;
   scroll-margin-top: 112px;
 }
-
 .khome .home-reference-group-copy {
   flex: 1;
   min-width: 0;
@@ -25,11 +42,9 @@
   font: inherit;
   text-align: left;
 }
-
 .khome .home-reference-group-copy:disabled {
   cursor: default;
 }
-
 .khome .home-reference-group-copy strong,
 .khome .home-reference-group-copy span,
 .khome .home-reference-entry-copy strong,
@@ -38,84 +53,69 @@
 .khome .home-extension-copy span {
   display: block;
 }
-
 .khome .home-reference-group-copy strong {
   font-size: 26px;
   font-weight: 820;
   letter-spacing: -0.02em;
 }
-
 .khome .home-reference-group-copy span {
   margin-top: 4px;
   color: var(--home-muted);
   font-size: 15px;
   line-height: 1.45;
 }
-
 .khome .home-reference-group-copy:not(:disabled):hover strong,
 .khome .home-reference-group-copy:not(:disabled):focus-visible strong {
   color: var(--home-primary);
 }
-
 .khome .home-reference-group-copy:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--home-primary) 34%, transparent);
   outline-offset: 4px;
 }
-
 .khome .home-reference-icon svg {
   width: 30px;
   height: 30px;
 }
-
 .khome .lf-reference-group-head .home-reference-icon.wheat {
   color: var(--sd-category-sand-fg);
   background: var(--sd-category-sand-bg);
 }
-
 .khome .lf-reference-group-head .home-reference-icon.plum {
   color: var(--sd-category-lavender-fg);
   background: var(--sd-category-lavender-bg);
 }
-
 .khome .lf-reference-primary .home-reference-icon svg {
   width: 38px;
   height: 38px;
 }
-
 .khome .home-reference-entry-copy {
   flex: 1;
   min-width: 0;
 }
-
 .khome .home-reference-entry-copy strong {
   font-size: 18px;
   font-weight: 780;
   line-height: 1.35;
 }
-
 .khome .lf-reference-primary .home-reference-entry-copy strong {
   font-size: 21px;
 }
-
 .khome .home-reference-entry-copy span {
   margin-top: 4px;
   color: var(--home-muted);
   font-size: 14px;
   line-height: 1.45;
 }
-
 .khome .home-reference-arrow {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
   color: var(--home-muted);
 }
-
 .khome .home-reference-arrow svg {
   width: 20px;
   height: 20px;
 }
-
 .khome .home-reference-state {
   flex: 0 0 auto;
   padding: 7px 10px;
@@ -125,35 +125,29 @@
   font-size: 12px;
   font-weight: 720;
 }
-
 .khome .home-reference-primary-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin: 0 20px 12px;
 }
-
 .khome .home-reference-panel--half .home-reference-primary-list {
   grid-template-columns: 1fr;
 }
-
 .khome .home-reference-secondary-list {
   display: grid;
   min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-
 .khome .home-reference-secondary-list--only {
   grid-template-columns: 1fr;
 }
-
 .khome .home-extension-group {
   min-width: 0;
   padding: 28px 0;
   background: var(--home-surface);
   border-top: 1px solid var(--home-line);
 }
-
 .khome .home-extension-heading {
   width: 100%;
   min-height: 72px;
@@ -163,7 +157,6 @@
   font: inherit;
   text-align: left;
 }
-
 .khome .home-extension-heading {
   min-height: 72px;
   gap: 16px;
@@ -171,17 +164,14 @@
   border: 0;
   background: transparent;
 }
-
 .khome button.home-extension-heading {
   cursor: pointer;
 }
-
 .khome .home-extension-heading:focus-visible,
 .khome .home-extension-action:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--home-primary) 34%, transparent);
   outline-offset: -3px;
 }
-
 .khome .home-extension-icon {
   width: 56px;
   height: 56px;
@@ -192,29 +182,24 @@
   background: var(--sd-category-blue-bg);
   border-radius: 12px;
 }
-
 .khome .home-extension-icon svg {
   width: 30px;
   height: 30px;
 }
-
 .khome .home-extension-copy {
   flex: 1;
   min-width: 0;
 }
-
 .khome .home-extension-copy strong {
   font-size: 20px;
   font-weight: 800;
 }
-
 .khome .home-extension-copy span {
   margin-top: 5px;
   color: var(--home-muted);
   font-size: 14px;
   line-height: 1.45;
 }
-
 .khome .home-extension-badge {
   flex: 0 0 auto;
   padding: 7px 10px;
@@ -224,12 +209,10 @@
   font-size: 12px;
   font-weight: 760;
 }
-
 .khome .home-extension-list {
   display: grid;
   min-width: 0;
 }
-
 .khome .home-extension-action {
   position: relative;
   width: 100%;
@@ -248,22 +231,18 @@
   font: inherit;
   text-align: left;
 }
-
 .khome .home-extension-action:hover {
   background: color-mix(in srgb, var(--sd-category-blue-bg) 55%, var(--home-surface));
 }
-
 .khome .home-extension-action:disabled {
   color: var(--home-muted);
   background: color-mix(in srgb, var(--home-canvas) 72%, var(--home-surface));
   cursor: not-allowed;
 }
-
 .khome .home-extension-action:disabled .home-extension-icon {
   color: var(--home-muted);
   background: color-mix(in srgb, var(--home-line) 55%, var(--home-surface));
 }
-
 .khome .home-extension-empty {
   min-height: 88px;
   padding: 18px 20px;
@@ -271,17 +250,14 @@
   border-top: 1px solid var(--home-line);
   background: color-mix(in srgb, var(--home-canvas) 72%, var(--home-surface));
 }
-
 .khome .home-extension-empty strong {
   color: var(--home-text);
   font-size: 17px;
 }
-
 .khome .home-extension-empty p {
   margin: 5px 0 0;
   font-size: 14px;
 }
-
 .khome .lf-reference-primary,
 .khome .lf-reference-secondary,
 .khome .home-extension-action {

@@ -188,9 +188,9 @@ export function ConvertImagesPage() {
       </div>
 
       <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-lg leading-relaxed text-info-fg">
-          <InfoIcon className="h-6 w-6 shrink-0" />
-          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时；生成后直接进入确认打印。
+        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-base leading-relaxed text-info-fg">
+          <InfoIcon className="h-5 w-5 shrink-0" />
+          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限；生成后直接进入确认打印。
         </div>
 
         {error && (
@@ -201,7 +201,7 @@ export function ConvertImagesPage() {
         )}
 
         <div className="flex min-h-0 flex-1 gap-5">
-          <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-info/30 bg-surface p-5 shadow-sm">
+          <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-info/30 border-t-4 border-t-info bg-surface p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-info-bg text-info-fg">
                 <ImageIcon className="h-6 w-6" />
@@ -215,13 +215,16 @@ export function ConvertImagesPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               {images.map((img, index) => (
                 <div key={img.fileId} className="flex flex-1 items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
-                  <span className="flex aspect-[210/297] h-[96px] shrink-0 flex-col gap-1 rounded border border-neutral-200 bg-white p-2 shadow-sm">
-                    <i className="h-2 w-3/5 rounded-full bg-info-bg ring-1 ring-info/20" />
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
+                  <span className="flex aspect-[210/297] h-[108px] shrink-0 flex-col gap-1.5 rounded border border-neutral-200 bg-white p-2.5 shadow-sm">
+                    <i className="h-2.5 w-3/5 rounded bg-info-bg ring-1 ring-info/25" />
                     <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
+                  </span>
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] bg-info-bg text-info-fg">
+                    <ImageIcon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <b className="block break-all text-[22px] font-bold">{img.name}</b>

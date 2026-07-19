@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ArrowLeftIcon } from 'lucide-react'
 import { getTerminalId } from '../../services/api/terminalConfig'
 import { useHomeDeviceStatus } from '../home/hooks/useHomeDeviceStatus'
@@ -49,23 +50,28 @@ interface PrintPrototypeHeaderProps {
   title: string
   subtitle: string
   step: PrintFlowStep
-  backLabel: string
-  onBack: () => void
+  backLabel?: string
+  onBack?: () => void
+  /** 替代返回按钮，显示在标题右侧（如"任务进行中"徽章） */
+  aside?: ReactNode
 }
 
-export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack }: PrintPrototypeHeaderProps) {
+export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack, aside }: PrintPrototypeHeaderProps) {
   return (
     <>
       <PrintKioskTopBar />
       <div className="print-pagehead">
-        <button type="button" className="print-back-button" onClick={onBack}>
-          <ArrowLeftIcon aria-hidden="true" />
-          {backLabel}
-        </button>
+        {backLabel && onBack && (
+          <button type="button" className="print-back-button" onClick={onBack}>
+            <ArrowLeftIcon aria-hidden="true" />
+            {backLabel}
+          </button>
+        )}
         <div>
           <h1>{title}</h1>
           <p>{subtitle}</p>
         </div>
+        {aside && <div style={{ marginLeft: 'auto' }}>{aside}</div>}
       </div>
       <nav className="print-flow-steps" aria-label="打印流程">
         {PRINT_STEPS.map((label, index) => {

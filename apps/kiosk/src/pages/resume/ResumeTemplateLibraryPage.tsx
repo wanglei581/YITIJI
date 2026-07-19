@@ -2,12 +2,84 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ResumeTemplate } from '@ai-job-print/shared'
-import { ArrowRightIcon, BookOpenIcon, CheckIcon, LayoutTemplateIcon } from 'lucide-react'
+import { ArrowRightIcon, BookOpenIcon, CheckIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import './resume-library-lightflow.css'
+import './resume-library-ext.css'
 import './resume-fusion-youth.css'
 
 const FILTERS = ['全部', '简历模板', '通用'] as const
+
+type TemplateLayout = 'single' | 'double' | 'side'
+
+function guessLayout(template: ResumeTemplate): TemplateLayout {
+  const t = template.title ?? ''
+  if (t.includes('双栏') || t.includes('项目')) return 'double'
+  if (t.includes('侧栏') || t.includes('侧边')) return 'side'
+  return 'single'
+}
+
+function TemplateThumbnail({ layout }: { layout: TemplateLayout }) {
+  const tl = (extra?: string) => (
+    <span className={['rp-tl', extra].filter(Boolean).join(' ')} />
+  )
+  if (layout === 'side') {
+    return (
+      <div className="rp-thumb">
+        <span className="rp-thumb__side" />
+        <div className="rp-thumb__col">
+          {tl('rp-tl--title')}
+          {tl('rp-tl--w5')}
+          {tl('rp-tl--accent')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w7')}
+          {tl('rp-tl--accent')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w5')}
+        </div>
+      </div>
+    )
+  }
+  if (layout === 'double') {
+    return (
+      <div className="rp-thumb">
+        <div className="rp-thumb__col">
+          {tl('rp-tl--title')}
+          {tl('rp-tl--accent')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w7')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w5')}
+        </div>
+        <div className="rp-thumb__col">
+          {tl('rp-tl--accent')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w7')}
+          {tl('rp-tl--accent')}
+          {tl('rp-tl--w9')}
+          {tl('rp-tl--w5')}
+        </div>
+      </div>
+    )
+  }
+  // single
+  return (
+    <div className="rp-thumb">
+      <div className="rp-thumb__col">
+        {tl('rp-tl--title')}
+        {tl('rp-tl--w5')}
+        {tl('rp-tl--accent')}
+        {tl('rp-tl--w9')}
+        {tl('rp-tl--w9')}
+        {tl('rp-tl--w7')}
+        {tl('rp-tl--accent')}
+        {tl('rp-tl--w9')}
+        {tl('rp-tl--w7')}
+        {tl('rp-tl--w5')}
+      </div>
+    </div>
+  )
+}
 
 function matchesFilter(template: ResumeTemplate, filter: (typeof FILTERS)[number]): boolean {
   if (filter === '全部') return true
@@ -136,12 +208,11 @@ export function ResumeTemplateLibraryPage() {
                       aria-pressed={selected?.id === template.id}
                       onClick={() => selectTemplate(template)}
                     >
-                      <span className="resume-lightflow__item-icon"><LayoutTemplateIcon aria-hidden="true" /></span>
+                      <TemplateThumbnail layout={guessLayout(template)} />
                       <span className="resume-lightflow__item-copy">
-                        <strong>{template.title}</strong>
+                        <strong>{template.title}{active && <CheckIcon style={{ width: 16, height: 16, display: 'inline', marginLeft: 6, verticalAlign: 'middle' }} aria-label="当前选择" />}</strong>
                         <span>简历模板</span>
                       </span>
-                      {active && <CheckIcon className="resume-lightflow__selected-mark" aria-label="当前选择" />}
                     </button>
                     <p>{template.description}</p>
                     <small>{template.recommendedFor}</small>
@@ -165,8 +236,12 @@ export function ResumeTemplateLibraryPage() {
                   <h2>{selected.title}</h2>
                   <p>{selected.description}</p>
                   <div className="resume-lightflow__boundary">
+                    <strong>选择仅代表版式参考</strong>
+                    <span>不会自动生成或应用简历；正式简历需要在后续流程结合你的真实内容生成。</span>
+                  </div>
+                  <div className="rp-boundary-2">
                     <strong>下一步会发生什么</strong>
-                    <span>进入 AI 简历优化后，系统会基于你的内容生成正式简历；本页不会保存或应用模板。</span>
+                    <span>进入 AI 简历优化后，系统会基于你的内容生成正式简历，模板在优化页重新确认；本页不会保存或应用模板。</span>
                   </div>
                   <Button size="lg" className="resume-lightflow__primary-action" onClick={handleUseResumeTemplate}>
                     进入简历优化 <ArrowRightIcon aria-hidden="true" />

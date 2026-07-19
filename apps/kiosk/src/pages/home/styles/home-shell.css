@@ -1,5 +1,12 @@
 .khome {
-  --home-sticky-top: 88px;
+  --home-sticky-top: 96px;
+  /* UI-0 语义 token 绑定 */
+  --home-cat-bg-cyan: var(--sd-category-cyan-bg, #e0f4ff);
+  --home-cat-bg-blue: var(--sd-category-blue-bg, #e8f3ff);
+  --home-cat-bg-mint: var(--sd-category-mint-bg, #e6f6f0);
+  --home-cat-bg-orange: var(--sd-category-orange-bg, #fff3e8);
+  --home-cat-bg-lavender: var(--sd-category-lavender-bg, #f0edff);
+  --home-cat-bg-sand: var(--sd-category-sand-bg, #f5efe6);
   --home-canvas: var(--sd-color-canvas);
   --home-canvas-outer: var(--sd-color-canvas-outer);
   --home-surface: var(--sd-color-surface);
@@ -11,7 +18,6 @@
   --home-line: var(--sd-color-line);
   --home-line-strong: var(--sd-color-line-strong);
   --home-shadow: var(--sd-shadow-touch);
-
   position: relative;
   width: min(1080px, 100%);
   min-height: 100%;
@@ -19,7 +25,7 @@
   padding-bottom: 44px;
   color: var(--home-text);
   background: linear-gradient(180deg, var(--home-canvas-outer) 0, var(--home-canvas) 360px);
-  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif);
+  font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-);
 }
 
 .khome .khome-inner {
@@ -31,15 +37,14 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  min-height: 88px;
+  height: 96px;
+  min-height: 96px;
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 40px;
+  padding: 0 44px;
   color: var(--home-text);
   background: color-mix(in srgb, var(--home-surface) 94%, transparent);
-  border-bottom: 1px solid var(--home-line);
-  box-shadow: 0 8px 28px rgba(30, 71, 124, 0.06);
   backdrop-filter: blur(16px);
 }
 
@@ -49,6 +54,19 @@
   font-weight: 820;
   line-height: 1.15;
   letter-spacing: -0.02em;
+}
+.khome .k-brand strong {
+  display: block;
+  font-size: 26px;
+  font-weight: 700;
+  font-family: var(--font-, var(--font-ui, system-ui), var(--font-ui, system-ui));
+  letter-spacing: 0.04em;
+}
+.khome .k-brand span {
+  display: block;
+  font-size: 20px;
+  font-weight: 400;
+  opacity: 0.55;
 }
 .khome .k-status {
   margin-left: auto;
@@ -60,18 +78,18 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 0 16px;
+  padding: 8px 18px;
   color: var(--home-copy);
   background: var(--home-canvas);
   border: 1px solid var(--home-line);
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 19px;
   font-weight: 700;
   white-space: nowrap;
 }
 .khome .k-device-status i {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: currentColor;
@@ -98,8 +116,8 @@
   border-color: color-mix(in srgb, var(--sd-category-blue-fg) 18%, var(--home-line));
 }
 .khome .k-dot {
-  width: 9px;
-  height: 9px;
+  width: 11px;
+  height: 11px;
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--sd-category-mint-fg);
@@ -109,26 +127,17 @@
 .khome .service-value {
   position: relative;
   overflow: hidden;
-  margin-top: 26px;
-  min-height: 248px;
-  padding: 42px 50px;
+  margin-top: 12px;
+  padding: 12px 48px 8px;
   color: var(--home-text);
-  background: var(--home-surface);
-  border: 1px solid var(--home-line);
-  border-radius: 32px;
-  box-shadow: var(--home-shadow);
+  background: transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 30px;
 }
 .khome .service-value::before {
-  content: '';
-  position: absolute;
-  width: 320px;
-  height: 320px;
-  top: -214px;
-  right: -96px;
-  border-radius: 50%;
-  background: var(--sd-category-blue-bg);
-  box-shadow: 0 0 0 48px color-mix(in srgb, var(--sd-category-cyan-bg) 52%, transparent);
-  pointer-events: none;
+  display: none;
 }
 .khome .service-value-tag {
   position: relative;
@@ -148,20 +157,26 @@
   position: relative;
   z-index: 1;
   max-width: 660px;
-  margin: 20px 0 0;
-  font-size: clamp(42px, 4vw, 58px);
-  line-height: 1.13;
-  font-weight: 850;
-  letter-spacing: -0.045em;
+  margin: 10px 0 0;
+  font-family: var(--font-, var(--font-ui, system-ui), var(--font-ui, system-ui));
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  line-height: 1.22;
+}
+.khome .service-value h1 em {
+  font-style: normal;
+  color: var(--sd-category-mint-fg, var(--home-primary, #35ab8e));
 }
 .khome .service-value p {
   position: relative;
   z-index: 1;
   max-width: 690px;
-  margin: 18px 0 0;
+  margin: 10px 0 0;
   color: var(--home-copy);
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1.72;
+  letter-spacing: 1px;
 }
 
 .khome .identity {

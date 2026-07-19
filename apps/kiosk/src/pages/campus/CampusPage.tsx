@@ -266,33 +266,34 @@ export function CampusPage() {
         <div className="flex items-center gap-4"><span>校园招聘专区</span><span className="rounded-full border border-[rgba(31,158,134,.45)] bg-[rgba(31,158,134,.18)] px-4 py-2">打印机正常 · A4纸充足</span></div>
       </header>
 
-      <div className="campus-hero relative shrink-0 bg-gradient-to-br from-primary-600 via-primary-600 to-primary-500 px-5 pb-5 pt-6 text-white">
-        <div className="flex items-center justify-between gap-3">
+      <div className="campus-hero">
+        <div className="flex items-center justify-between">
           <button
             onClick={() => navigate('/')}
-            className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15"
+            className="flex items-center gap-2"
             aria-label="返回首页"
           >
             <ChevronLeftIcon className="h-6 w-6" />
+            返回首页
           </button>
-          <span className="campus-date rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium tabular-nums">
+          <span className="campus-date tabular-nums">
             {fmtDateBadge(fair.startTime, fair.endTime)}
           </span>
         </div>
-        <div className="mt-2 flex items-start gap-2">
-          <h1 className="flex-1 text-xl font-bold leading-snug">{fair.name}</h1>
-          <span className={`campus-status mt-1 shrink-0 rounded-full px-4 py-1 text-lg font-semibold ${sc.bg} ${sc.text}`}>{sc.label}</span>
+        <div className="mt-5 flex items-start gap-3">
+          <h1 className="flex-1 leading-snug">{fair.name}</h1>
+          <span className="campus-status shrink-0">{sc.label}</span>
         </div>
-        {fair.tagline && <p className="mt-1 text-sm text-white/80">{fair.tagline}</p>}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/90">
-          <span className="inline-flex items-center gap-1">
-            <MapPinIcon className="h-4 w-4" />{fair.venue}
+        {fair.tagline && <p className="mt-2 opacity-75">{fair.tagline}</p>}
+        <div className="mt-4 flex flex-wrap items-center gap-x-7 gap-y-2">
+          <span className="inline-flex items-center gap-2">
+            <MapPinIcon className="h-5 w-5 opacity-80" />{fair.venue}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <BuildingIcon className="h-4 w-4" />参展企业 {companyCount} 家
+          <span className="inline-flex items-center gap-2">
+            <BuildingIcon className="h-5 w-5 opacity-80" />参展企业 {companyCount} 家
           </span>
-          <span className="inline-flex items-center gap-1">
-            <BriefcaseIcon className="h-4 w-4" />招聘岗位 {jobCount}+
+          <span className="inline-flex items-center gap-2">
+            <BriefcaseIcon className="h-5 w-5 opacity-80" />招聘岗位 {jobCount}+
           </span>
         </div>
       </div>

@@ -3,15 +3,42 @@
 .k8-activities .k8-activities-header p { font-size: 18px; }
 .k8-activities .k8-activities-header button { min-height: 58px; padding-inline: 20px; border-radius: 14px; font-size: 18px; }
 .k8-activities-scroll { overscroll-behavior: contain; scrollbar-gutter: stable; }
+
+/* 活动卡片 */
 .k8-activity-card { overflow: hidden; border: 1px solid var(--color-neutral-200); border-radius: 18px; background: var(--color-surface); box-shadow: 0 3px 14px rgba(16, 48, 43, .05); }
 .k8-activity-card[data-ended='true'] { opacity: .62; }
+
+/* 图标按活动类型着色 */
+.k8-activity-icon { border-radius: 14px; }
 .k8-activity-card[data-benefit-type='coupon'] .k8-activity-icon { color: var(--color-clay); background: var(--color-clay-soft); }
 .k8-activity-card[data-benefit-type='free_quota'] .k8-activity-icon { color: var(--color-primary-700); background: var(--color-primary-100); }
 .k8-activity-card[data-benefit-type='package_entitlement'] .k8-activity-icon { color: var(--color-wheat); background: var(--color-wheat-soft); }
 .k8-activity-card[data-benefit-type='subsidy_eligibility_hint'] .k8-activity-icon { color: var(--color-info-fg); background: var(--color-info-bg); }
+
+/* 来源类型 chip — 原型口径为 clay 橙色标注 */
+.k8-activity-src-chip {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+  font-size: 15px; font-weight: 600;
+  background: var(--color-clay-soft); border: 1px solid color-mix(in srgb, var(--color-clay) 30%, transparent);
+  color: var(--color-clay-deep, var(--color-clay));
+}
+
+/* 权益类型 chip — 中性标注 */
+.k8-activity-type-chip {
+  display: inline-flex; align-items: center;
+  padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+  font-size: 15px; font-weight: 600;
+  background: var(--color-canvas); border: 1px solid var(--color-neutral-200);
+  color: var(--color-neutral-500);
+}
+
+/* 库存/状态 badge */
 .k8-activity-stock { display: inline-flex; min-height: 30px; align-items: center; padding: 3px 11px; border: 1px solid; border-radius: 999px; white-space: nowrap; font-size: 15px; font-weight: 650; }
 .k8-activity-stock.is-ok { border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent); color: var(--color-primary-700); background: var(--color-primary-100); }
 .k8-activity-stock.is-low { border-color: color-mix(in srgb, var(--color-wheat) 30%, transparent); color: var(--color-wheat); background: var(--color-wheat-soft); }
 .k8-activity-stock.is-off { border-color: var(--color-neutral-200); color: var(--color-neutral-500); background: var(--color-canvas); }
+
 .k8-activity-action { border-radius: 14px; }
+.k8-activities-notice { border-style: dashed; }
 @media (max-width: 760px) { .k8-activities { padding-inline: 20px; } .k8-activities-grid { grid-template-columns: 1fr; } }

@@ -156,6 +156,9 @@ export function CareerPlanPage() {
             <p className="career-plan-lightflow__eyebrow">已生成的规划</p>
             <h2 id="career-plan-summary-title">先看结论，再安排下一步</h2>
             <p>{plan.summary}</p>
+            <div className="career-plan-lightflow__meta-chips">
+              <span className="career-plan-lightflow__chip">已存入 AI服务记录</span>
+            </div>
           </section>
           <ComplianceBanner tone="info">本建议仅供本人职业发展参考，不构成任何就业、薪资或录用承诺；行动请基于真实经历，不要虚构。</ComplianceBanner>
 

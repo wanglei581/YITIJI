@@ -5,6 +5,7 @@ import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivit
 import {
   ChevronRightIcon,
   GiftIcon,
+  InfoIcon,
   LandmarkIcon,
   PackageIcon,
   TicketIcon,
@@ -129,13 +130,13 @@ export function BenefitActivitiesPage() {
                 <Card key={item.id} className="k8-activity-card p-0" data-benefit-type={item.benefitType} data-ended={item.ended || undefined}>
                   <div className="flex h-full flex-col gap-3 p-[22px_24px]">
                     <div className="flex items-start gap-3.5">
-                      <div className={['k8-activity-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px]', meta.bg].join(' ')}>
-                        <Icon className={['h-[30px] w-[30px]', meta.color].join(' ')} aria-hidden="true" />
+                      <div className="k8-activity-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-[14px]">
+                        <Icon className="h-[30px] w-[30px]" aria-hidden="true" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[15px] font-medium text-neutral-500">{SOURCE_LABEL[item.sourceType]}</span>
-                          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[15px] font-medium text-neutral-500">{meta.label}</span>
+                          <span className="k8-activity-src-chip">{SOURCE_LABEL[item.sourceType]}</span>
+                          <span className="k8-activity-type-chip">{meta.label}</span>
                           <span className={`k8-activity-stock ml-auto ${item.ended || item.soldOut ? 'is-off' : item.stockRemaining !== null && item.stockRemaining <= 5 ? 'is-low' : 'is-ok'}`}>
                             {stockLabel(item)}
                           </span>
@@ -174,7 +175,8 @@ export function BenefitActivitiesPage() {
         )}
       </div>
 
-      <p className="k8-activities-notice shrink-0 rounded-[14px] border border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[15px] leading-relaxed text-neutral-500">
+      <p className="k8-activities-notice shrink-0 flex items-center gap-3 rounded-[14px] border border-dashed border-neutral-200 bg-neutral-50 px-5 py-3 text-[15px] leading-relaxed text-neutral-500">
+        <InfoIcon className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
         活动发布后才会在这里展示；未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。
       </p>
     </div>

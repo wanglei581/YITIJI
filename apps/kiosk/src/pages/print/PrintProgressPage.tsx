@@ -15,21 +15,78 @@
 //   failed              → navigate to /print/done (failure)
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircleIcon,
+  AlertTriangleIcon,
   CheckIcon,
   CircleDotIcon,
   ClockIcon,
+  CreditCardIcon,
+  FileTextIcon,
+  InfoIcon,
   PrinterIcon,
   XCircleIcon,
 } from 'lucide-react'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
+import type { PrintJobParams } from '@ai-job-print/shared'
+import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
 import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+
+// ── Display helpers ────────────────────────────────────────────────────────────
+
+const DUPLEX_LABELS: Record<string, string> = {
+  simplex: '单面',
+  duplex_long_edge: '双面(长边)',
+  duplex_short_edge: '双面(短边)',
+}
+
+function formatParams(params: Partial<PrintJobParams> | null | undefined): string {
+  if (!params) return '—'
+  const color = params.colorMode === 'color' ? '彩色' : '黑白'
+  const duplex = DUPLEX_LABELS[params.duplex ?? ''] ?? '单面'
+  const copies = params.copies ? `${params.copies} 份` : ''
+  return [color, duplex, copies].filter(Boolean).join(' · ')
+}
+
+function expectedSheets(file: Pick<PrintFileState, 'pages'> | null, params: Partial<PrintJobParams> | null | undefined): string {
+  if (!file || file.pages == null || !params) return '待识别'
+  const pps = params.pagesPerSheet ?? 1
+  const copies = params.copies ?? 1
+  const facesPerCopy = Math.ceil(file.pages / pps)
+  const isDouble = params.duplex !== 'simplex'
+  const sheetsPerCopy = isDouble ? Math.ceil(facesPerCopy / 2) : facesPerCopy
+  const totalFaces = facesPerCopy * copies
+  const totalSheets = sheetsPerCopy * copies
+  return `${totalSheets} 张（${totalFaces} 面）`
+}
+
+function formatSubmitTime(d: Date): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(d)
+}
+
+/** 返回 tl-done | tl-active | '' */
+function tlItemClass(tlIdx: number, currentIdx: number, isRealApi: boolean): string {
+  // 0 = 提交任务, 1 = 排队等待, 2 = 打印中, 3 = 完成取件(永远pending)
+  if (tlIdx === 3) return ''
+  if (tlIdx === 0) {
+    return isRealApi || currentIdx > 0 ? 'tl-done' : 'tl-active'
+  }
+  if (tlIdx < currentIdx) return 'tl-done'
+  if (tlIdx === currentIdx) return 'tl-active'
+  return ''
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -226,6 +283,16 @@ export function PrintProgressPage() {
 
   const currentIdx = stepIndex(current)
 
+  // 任务信息展示字段
+  const file   = (state?.file  as PrintFileState | undefined) ?? null
+  const params = (state?.params as PrintJobParams | undefined) ?? null
+  const orderNo = typeof state?.orderNo === 'string' ? state.orderNo
+                : typeof state?.orderId === 'string' ? state.orderId
+                : null
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const submitTimeFormatted = useMemo(() => formatSubmitTime(new Date()), [])
+
   // Guard：直达 /print/progress（无任务上下文）—— 不展示进度/不伪造成功，引导重新上传。
   if (!hasContext) {
     return (
@@ -269,7 +336,7 @@ export function PrintProgressPage() {
     )
   }
 
-  // Timeout screen — Agent never responded within 5 minutes
+  // Timeout screen — Agent never responded within 10 minutes
   if (timedOut) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
@@ -297,124 +364,184 @@ export function PrintProgressPage() {
     )
   }
 
+  // ── 4步时间线定义 ──────────────────────────────────────────────────────────
+  const TL_ITEMS = [
+    { key: 'submit',  label: '提交任务', desc: '已创建打印任务并完成支付确认' },
+    { key: 'queue',   label: '排队等待', desc: '终端已接收任务，文件校验通过' },
+    { key: 'print',   label: '打印中',   desc: '打印机正在出纸，请在出纸口等候' },
+    { key: 'pickup',  label: '完成取件', desc: '完成后自动跳转，凭取件码核对文件' },
+  ] as const
+
+  // ── 主体：两栏布局 ─────────────────────────────────────────────────────────
   return (
     <div className="print-proto flex min-h-full flex-col">
       <PrintPrototypeHeader
-        title="正在打印"
-        subtitle="任务已提交，正在等待终端处理"
+        title="正在处理"
+        subtitle="任务已提交，正在等待终端处理，请留在机器旁"
         step={7}
-        backLabel="返回首页"
-        onBack={() => navigate('/')}
+        aside={
+          <span className="pp-running-badge" role="status" aria-live="polite">
+            <ClockIcon aria-hidden="true" />
+            任务进行中
+          </span>
+        }
       />
-      <main className="relative flex flex-1 flex-col items-center justify-center p-8">
-      {/* 状态图标 */}
-      <div
-        className={[
-          'mb-10 flex h-24 w-24 items-center justify-center rounded-full',
-          failed ? 'bg-error-bg' : 'bg-primary-50',
-        ].join(' ')}
-      >
-        {failed ? (
-          <XCircleIcon className="h-12 w-12 text-error-fg" />
-        ) : (
-          <PrinterIcon className="h-12 w-12 text-primary-600" />
-        )}
-      </div>
 
-      <h1 className="text-2xl font-bold text-neutral-900">
-        {failed ? '处理出错' : '正在处理'}
-      </h1>
-      <p className="mt-2 text-base text-neutral-500">
-        {failed
-          ? '任务遇到问题，即将跳转…'
-          : useRealApi
-          ? '任务已提交，正在等待终端处理…'
-          : '请勿离开，任务处理中…'}
-      </p>
-      <div className="mt-4 flex min-h-[48px] items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-4 text-sm font-medium text-primary-700">
-        <span className="h-2.5 w-2.5 rounded-full bg-primary-600" aria-hidden="true" />
-        Terminal Agent：{useRealApi ? '正在接收打印状态' : '演示模式'}
-      </div>
+      {/* 主内容 */}
+      <div className="pp-main-content">
+        <div className="pp-split">
 
-      {/* 步骤列表 */}
-      <div className="mt-12 w-full max-w-sm space-y-4">
-        {STEPS.map((step, idx) => {
-          // In real mode, step 0 ("提交任务") is always done on arrival.
-          const done   = useRealApi ? (idx === 0 || idx < currentIdx) : idx < currentIdx
-          const active = useRealApi ? (idx === currentIdx && idx > 0) : idx === currentIdx
-          const isFailed = failed && active
-
-          return (
-            <div key={step.key} className="flex items-center gap-4">
-              <div
-                className={[
-                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
-                  isFailed
-                    ? 'border-error-fg bg-error text-white'
-                    : done
-                    ? 'border-primary-600 bg-primary-600 text-white'
-                    : active
-                    ? 'border-primary-600 bg-white text-primary-600'
-                    : 'border-neutral-200 bg-white text-neutral-300',
-                ].join(' ')}
-              >
-                {isFailed ? (
-                  <AlertCircleIcon className="h-5 w-5" />
-                ) : done ? (
-                  <CheckIcon className="h-5 w-5" />
-                ) : active ? (
-                  <CircleDotIcon className="h-5 w-5" />
-                ) : (
-                  <ClockIcon className="h-5 w-5" />
-                )}
+          {/* 左：状态时间线卡片 */}
+          <div className="pp-left-col">
+            <div className="pp-stage-card">
+              {/* 大图标 */}
+              <div className="pp-stage-icon" aria-hidden="true">
+                {failed
+                  ? <XCircleIcon />
+                  : <PrinterIcon />
+                }
+              </div>
+              <div className="pp-stage-title">
+                {failed ? '处理出错' : '正在打印'}
+              </div>
+              <div className="pp-stage-sub">
+                {failed
+                  ? '任务遇到问题，即将跳转至结果页'
+                  : '状态每秒自动刷新，完成后自动进入取件页'}
               </div>
 
-              <div className="flex-1">
-                <p
-                  className={[
-                    'text-base font-medium',
-                    isFailed
-                      ? 'text-error-fg'
-                      : done || active
-                      ? 'text-neutral-900'
-                      : 'text-neutral-400',
-                  ].join(' ')}
-                >
-                  {step.label}
-                </p>
-                {active && !failed && (
-                  <p className="mt-0.5 animate-pulse text-sm text-primary-600">
-                    {useRealApi ? '等待终端响应…' : '处理中…'}
-                  </p>
-                )}
-                {isFailed && (
-                  <p className="mt-0.5 text-sm text-error-fg">任务中断</p>
-                )}
+              {/* 时间线 */}
+              <div className="pp-tl" role="list" aria-label="打印进度">
+                {TL_ITEMS.map((item, tlIdx) => {
+                  const cls = tlItemClass(tlIdx, currentIdx, useRealApi)
+                  const isDone   = cls === 'tl-done'
+                  const isActive = cls === 'tl-active'
+                  return (
+                    <div key={item.key} className={`pp-tl-item ${cls}`} role="listitem">
+                      <span className="pp-t-rail">
+                        <span className="pp-t-dot">
+                          {isDone
+                            ? <CheckIcon />
+                            : isActive
+                              ? <CircleDotIcon />
+                              : <ClockIcon />
+                          }
+                        </span>
+                        <span className="pp-t-line" aria-hidden="true" />
+                      </span>
+                      <span className="pp-t-body">
+                        <b>{item.label}</b>
+                        <span>{item.desc}</span>
+                        {isActive && !failed && (
+                          <span className="animate-pulse" style={{ fontSize: 16, color: 'var(--print-teal-deep)', marginTop: 4, display: 'block' }}>
+                            {useRealApi ? '等待终端响应…' : '处理中…'}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-          )
-        })}
+          </div>
+
+          {/* 右：任务信息 + 常见情况 + 提示 */}
+          <div className="pp-side-col">
+            {/* 任务信息 */}
+            <section className="pp-info-card" aria-label="任务信息">
+              <b className="pp-info-hd">任务信息</b>
+              <div className="pp-i-row">
+                <span className="pp-i-k">文件名</span>
+                <span className="pp-i-v">{file?.name ?? '—'}</span>
+              </div>
+              <div className="pp-i-row">
+                <span className="pp-i-k">打印参数</span>
+                <span className="pp-i-v">{formatParams(params)}</span>
+              </div>
+              <div className="pp-i-row">
+                <span className="pp-i-k">任务号</span>
+                <span className="pp-i-v">{taskId ?? '—'}</span>
+              </div>
+              <div className="pp-i-row">
+                <span className="pp-i-k">订单号</span>
+                <span className="pp-i-v">{orderNo ?? '—'}</span>
+              </div>
+              <div className="pp-i-row">
+                <span className="pp-i-k">提交时间</span>
+                <span className="pp-i-v">{submitTimeFormatted}</span>
+              </div>
+              <div className="pp-i-row">
+                <span className="pp-i-k">预计出纸</span>
+                <span className="pp-i-v">{expectedSheets(file, params)}</span>
+              </div>
+            </section>
+
+            {/* 常见情况 */}
+            <section className="pp-faq-card" aria-label="常见情况处理">
+              <b className="pp-faq-hd">遇到这些情况怎么办</b>
+              <div className="pp-faq-item">
+                <AlertTriangleIcon className="pp-faq-icon" aria-hidden="true" />
+                <p className="pp-faq-text">
+                  <b>打印机缺纸 / 卡纸</b>：任务会提示失败原因，请联系现场工作人员处理后重试。
+                </p>
+              </div>
+              <div className="pp-faq-item">
+                <ClockIcon className="pp-faq-icon" aria-hidden="true" />
+                <p className="pp-faq-text">
+                  <b>长时间无响应</b>：超过 10 分钟未响应将提示处理超时，凭任务号联系工作人员确认。
+                </p>
+              </div>
+              <div className="pp-faq-item">
+                <FileTextIcon className="pp-faq-icon" aria-hidden="true" />
+                <p className="pp-faq-text">
+                  <b>文件校验未通过</b>：上传可能中断或文件已变化，请返回重新上传后再打印。
+                </p>
+              </div>
+              <div className="pp-faq-item">
+                <CreditCardIcon className="pp-faq-icon" aria-hidden="true" />
+                <p className="pp-faq-text">
+                  <b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。
+                </p>
+              </div>
+            </section>
+
+            {/* 提示条 */}
+            <div className="pp-notice" role="note">
+              <InfoIcon className="pp-notice-icon" aria-hidden="true" />
+              请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* DEV 专用：模拟失败按钮（sim 模式 + 生产构建自动移除） */}
+      {/* 底部行动条 */}
+      <footer className="pp-actionbar">
+        <span className="pp-actionbar-note">
+          打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员协助处理
+        </span>
+        <span className="pp-status-chip" role="status" aria-live="polite">
+          <i aria-hidden="true" />
+          状态自动刷新中
+        </span>
+      </footer>
+
+      {/* DEV 专用：模拟失败按钮 */}
       {import.meta.env.DEV && canSimulate && !failed && (
-        <div className="absolute bottom-24 right-6">
-          <button
-            onClick={handleDevFail}
-            className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
-          >
-            [DEV] 模拟失败
-          </button>
-        </div>
+        <button
+          onClick={handleDevFail}
+          style={{ position: 'fixed', bottom: 100, right: 16, zIndex: 50 }}
+          className="rounded-md border border-error/30 bg-error-bg px-3 py-1.5 text-xs text-error-fg hover:bg-error/20"
+        >
+          [DEV] 模拟失败
+        </button>
       )}
 
-      {/* DEV 专用：显示当前任务 ID（real 模式） */}
+      {/* DEV 专用：任务 ID */}
       {import.meta.env.DEV && useRealApi && taskId && (
-        <div className="absolute bottom-6 left-0 right-0 text-center">
+        <div style={{ position: 'fixed', bottom: 60, left: 0, right: 0, textAlign: 'center', pointerEvents: 'none' }}>
           <p className="text-xs text-neutral-400">taskId: {taskId}</p>
         </div>
       )}
-      </main>
     </div>
   )
 }

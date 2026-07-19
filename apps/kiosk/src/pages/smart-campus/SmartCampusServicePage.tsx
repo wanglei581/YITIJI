@@ -21,6 +21,7 @@ import {
   MapPinIcon,
   PackageIcon,
   PartyPopperIcon,
+  PrinterIcon,
   ScanFaceIcon,
   ShieldCheckIcon,
   WifiIcon,
@@ -201,10 +202,41 @@ export function SmartCampusServicePage() {
             </div>
           </section>
 
-          <div className="kproto-notice">
+          <div className="kproto-notice warn">
             <ShieldCheckIcon aria-hidden="true" />
             <p>{info.note}</p>
           </div>
+
+          {/* 本机可办（仅校园卡页展示：证件照打印即将上线 + 入学材料打印可用） */}
+          {key === 'campus-card' && (
+            <div className="kproto-grid-2">
+              <button
+                type="button"
+                disabled
+                className="kproto-tile flex cursor-not-allowed items-center gap-4 opacity-55"
+                style={{ borderStyle: 'dashed', background: 'var(--kp-surface)' }}
+              >
+                <span className="kproto-icon shrink-0"><ScanFaceIcon aria-hidden="true" /></span>
+                <span className="flex-1 text-left">
+                  <b className="block text-[23px] font-semibold">证件照排版打印</b>
+                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">功能即将上线；当前可用手机照片在打印扫描页打印</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-[14px] text-[var(--kp-muted)]">即将上线</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/print')}
+                className="kproto-tile flex items-center gap-4"
+                style={{ background: 'var(--kp-teal-soft)', borderColor: 'rgba(31,158,134,.35)' }}
+              >
+                <span className="kproto-icon shrink-0" style={{ background: 'var(--kp-teal)', color: '#fffdf8' }}><PrinterIcon aria-hidden="true" /></span>
+                <span className="flex-1 text-left">
+                  <b className="block text-[23px] font-semibold">入学材料 / 表格打印</b>
+                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">报到表、申请表等自助打印</span>
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="kproto-actionbar">
             <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>

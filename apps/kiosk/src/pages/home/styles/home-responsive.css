@@ -86,9 +86,9 @@
   .khome { --home-sticky-top: 96px; }
   .khome .khome-inner { width: min(984px, calc(100% - 64px)); }
   .khome .home-service-track { width: 980px; }
-  .khome .k-top { min-height: 96px; padding-inline: 48px; }
-  .khome .service-value { min-height: 280px; margin-top: 30px; padding: 48px 54px; }
-  .khome .service-value h1 { font-size: 54px; }
+  .khome .k-top { height: 96px; min-height: 96px; padding-inline: 44px; }
+  .khome .service-value { margin-top: 12px; padding: 12px 48px 8px; }
+  .khome .service-value h1 { font-size: 46px; }
   .khome .identity { margin-inline: 20px; }
 }
 

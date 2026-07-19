@@ -32,6 +32,7 @@ import { ScanResultPage } from '../pages/scan/ScanResultPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
 import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
 import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
+import { PrintParamsPage } from '../pages/print/PrintParamsPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
@@ -150,6 +151,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
+      { path: 'print/params',      element: <PrintParamsPage /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },

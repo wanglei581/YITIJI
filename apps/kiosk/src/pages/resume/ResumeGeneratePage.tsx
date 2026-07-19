@@ -20,6 +20,7 @@ import type {
 import {
   GraduationCapIcon,
   BriefcaseIcon,
+  CheckIcon,
   FolderGitIcon,
   PlusIcon,
   ShieldCheckIcon,
@@ -43,6 +44,61 @@ const STEPS = [
   { title: '项目经历', description: '可选' },
   { title: '技能证书', description: '技能与自我评价' },
 ] as const
+
+/** 右侧进度侧栏——展示6个填写阶段的完成状态 */
+function ProgressSidebar({ currentStep }: { currentStep: number }) {
+  return (
+    <div className="flex w-[330px] flex-none flex-col gap-4">
+      <div className="resume-lightflow__work-card rounded-2xl border p-5">
+        <p className="mb-4 font-serif text-xl font-bold tracking-wide text-neutral-900">填写进度</p>
+        <div className="flex flex-col gap-2">
+          {STEPS.map((s, idx) => {
+            const done = idx < currentStep
+            const now = idx === currentStep
+            return (
+              <div
+                key={idx}
+                className={[
+                  'flex min-h-[52px] items-center gap-3 rounded-xl border px-4 transition-colors',
+                  now ? 'border-primary-300 bg-primary-50' : done ? 'border-neutral-100 bg-white' : 'border-neutral-100 bg-white',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'flex h-9 w-9 flex-none items-center justify-center rounded-full border-2 text-sm font-bold',
+                    done ? 'border-primary-600 bg-primary-600 text-white' : now ? 'border-primary-600 bg-white text-primary-600' : 'border-neutral-200 bg-white text-neutral-400',
+                  ].join(' ')}
+                >
+                  {done ? <CheckIcon className="h-4 w-4" /> : idx + 1}
+                </span>
+                <span className={['text-base font-semibold', done || now ? 'text-neutral-900' : 'text-neutral-400'].join(' ')}>
+                  {s.title}
+                </span>
+                <span className="ml-auto text-sm text-neutral-400">
+                  {done ? '已填' : now ? '填写中' : s.description}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="resume-lightflow__work-card rounded-2xl border p-5">
+        <p className="mb-3 font-serif text-xl font-bold tracking-wide text-neutral-900">生成说明</p>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-3 text-xs leading-relaxed text-primary-800">
+            <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。
+          </div>
+          <div className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-3 text-xs leading-relaxed text-neutral-600">
+            <SparklesIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+            本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const inputCls =
   'resume-lightflow__field w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
@@ -215,27 +271,22 @@ export function ResumeGeneratePage() {
             </Button>
           }
         />
-        {/* 防编造 + 隐私说明(合规) */}
-        <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-800">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <p>
-            AI 只润色你填写的真实信息，<b>不会替你编造</b>学历、证书、公司或项目经历；没填的内容会提示你补充。
-            本机为公共设备：填写内容仅用于本次生成，离开页面即清除，生成结果与导出文件按既定策略短期保留后自动清理。
-          </p>
-        </div>
         <div className="resume-lightflow__stepper mt-4">
           <Stepper steps={[...STEPS]} currentIndex={step} />
         </div>
       </div>
 
-      <div className="resume-lightflow__content mt-4 flex-1 overflow-y-auto px-6 pb-6">
-        <Card className="resume-lightflow__work-card p-5">
-          <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
-              <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-            </span>
-            <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
-          </div>
+      <div className="resume-lightflow__content mt-4 flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+        <div className="flex min-h-full gap-5">
+          {/* 左：当前步骤表单 */}
+          <div className="flex flex-1 min-w-0 flex-col gap-4">
+            <Card className="resume-lightflow__work-card p-5">
+              <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
+                  <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
+                </span>
+                <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
+              </div>
 
           {step === 0 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -413,9 +464,15 @@ export function ResumeGeneratePage() {
           )}
         </Card>
 
-        {error && (
-          <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
-        )}
+            {error && (
+              <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
+            )}
+          </div>
+
+          {/* 右：填写进度 + 生成说明 */}
+          <ProgressSidebar currentStep={step} />
+
+        </div>
       </div>
 
       {/* 底部操作条 */}
@@ -432,7 +489,7 @@ export function ResumeGeneratePage() {
           </Button>
           {step < STEPS.length - 1 ? (
             <Button size="lg" className="flex-[2]" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
-              下一步
+              下一步：{STEPS[step + 1].title}
             </Button>
           ) : (
             <Button size="lg" className="flex flex-[2] items-center justify-center gap-2" disabled={generating} onClick={() => void handleGenerate()}>

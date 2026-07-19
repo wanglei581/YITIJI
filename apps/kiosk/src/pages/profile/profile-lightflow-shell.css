@@ -57,26 +57,26 @@
 
 .kprofile.kprofile-lightflow .p-ava {
   display: grid;
-  inline-size: 72px;
-  block-size: 72px;
+  inline-size: 84px;
+  block-size: 84px;
   place-items: center;
-  border: 1px solid var(--lf-blue);
-  border-radius: 16px;
-  color: #ffffff;
-  background: var(--lf-blue);
-  font-size: 23px;
-  font-weight: 800;
+  border: 2px solid rgba(31, 158, 134, 0.35);
+  border-radius: 50%;
+  color: #246556;
+  background: #dceee6;
+  font-size: 40px;
+  font-weight: 700;
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest {
-  border-color: transparent;
-  color: var(--lf-blue-strong);
-  background: var(--lf-blue-soft);
+  border-color: rgba(31, 158, 134, 0.2);
+  color: #246556;
+  background: #dceee6;
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest svg {
-  inline-size: 30px;
-  block-size: 30px;
+  inline-size: 32px;
+  block-size: 32px;
 }
 
 .kprofile.kprofile-lightflow .p-id {
@@ -188,26 +188,30 @@
 }
 
 .kprofile.kprofile-lightflow .p-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
   border-top: 1px solid var(--lf-line);
 }
 
 .kprofile.kprofile-lightflow .p-stat {
-  min-inline-size: 0;
-  padding: 14px 16px;
-  border-inline-end: 1px solid var(--lf-line);
+  min-inline-size: 108px;
+  padding: 12px 18px;
+  text-align: center;
+  border: 1px solid var(--lf-line);
+  border-radius: 16px;
+  background: var(--lf-surface);
 }
 
 .kprofile.kprofile-lightflow .p-stat:last-child {
-  border-inline-end: 0;
+  border-inline-end: 1px solid var(--lf-line);
 }
 
 .kprofile.kprofile-lightflow .p-stat b {
   display: block;
   color: var(--lf-ink);
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 28px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
@@ -220,7 +224,7 @@
   margin-block-start: 4px;
   overflow: hidden;
   color: var(--lf-ink-muted);
-  font-size: 12px;
+  font-size: 17px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

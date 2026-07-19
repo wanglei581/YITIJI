@@ -2,6 +2,36 @@
 .k1-phone-upload.service-desk { min-height: 100svh; }
 .k1-phone-upload .phone-upload-invalid { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1.5rem; text-align: center; }
 
+/* 上传区：主色调 teal（primary-100 背景 + primary-600 边框色调） */
+.k1-phone-upload .ph-up-pick {
+  background-color: var(--color-primary-100, #e2f2ec);
+  border-color: rgba(31, 158, 134, 0.45);
+  color: var(--color-primary-700, #157a67);
+}
+.k1-phone-upload .ph-up-pick--drag {
+  background-color: var(--color-primary-100, #e2f2ec);
+  border-color: var(--color-primary-600, #1f9e86);
+}
+
+/* 上传进度条：不定长滑动渐变动画（模拟传输感）；接口无逐字节进度，不显示百分比 */
+@keyframes ph-up-slide {
+  0%   { background-position: -90% 0; }
+  100% { background-position: 190% 0; }
+}
+.k1-phone-upload .ph-up-progress-bar {
+  background: linear-gradient(
+    90deg,
+    rgba(31, 158, 134, 0)   0%,
+    var(--color-primary-600, #1f9e86) 42%,
+    #35ab8e 58%,
+    rgba(31, 158, 134, 0)   100%
+  );
+  background-size: 45% 100%;
+  background-repeat: no-repeat;
+  animation: ph-up-slide 1.4s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .k1-phone-upload * { animation: none !important; transition: none !important; }
+  .k1-phone-upload .ph-up-progress-bar { background-position: 0 0; }
 }

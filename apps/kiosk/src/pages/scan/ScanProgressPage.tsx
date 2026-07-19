@@ -65,7 +65,6 @@ export function ScanProgressPage() {
   const controlToken = state.controlToken
 
   const [error, setError] = useState<string | null>(null)
-  const [statusLabel, setStatusLabel] = useState('等待扫描回传')
   const [elapsed, setElapsed] = useState('00:00')
   const startedAtRef = useRef(Date.now())
   const cancellingRef = useRef(false)
@@ -96,15 +95,6 @@ export function ScanProgressPage() {
       try {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
         if (stopped) return
-        setStatusLabel(
-          status.status === 'completed'
-            ? '扫描已完成'
-            : status.status === 'failed'
-              ? '扫描失败'
-              : status.status === 'expired'
-                ? '任务已超时'
-                : '等待扫描回传',
-        )
         if (status.status === 'completed' && status.file) {
           navigate('/scan/result', {
             replace: true,
@@ -243,7 +233,6 @@ export function ScanProgressPage() {
               ['扫描类型', SCAN_TYPE_LABELS[scanType]],
               ['任务编号', scanTaskId ?? '未创建'],
               ['开始等待', `已等待 ${elapsed}`],
-              ['当前状态', statusLabel],
               ['输出格式', 'PDF（自动生成）'],
             ].map(([key, value]) => (
               <div key={key} className="flex items-baseline justify-between gap-3 border-b border-dashed border-neutral-200 py-2.5 last:border-b-0">

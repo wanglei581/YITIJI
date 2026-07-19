@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
-import { AlertCircleIcon, ArrowUpRightIcon, CheckCircleIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
+import { AlertCircleIcon, ArrowUpRightIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
@@ -10,6 +10,7 @@ import { getResumeRecord } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
 import { readAiResumeSession } from './aiResumeSession'
 import './resume-diagnosis-lightflow.css'
+import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
 
 interface ReportState {
@@ -212,24 +213,21 @@ export function ResumeReportPage() {
 
       <div className="resume-report-content mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
         {/* 总分卡片 */}
-        <Card className="resume-report-summary p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-3xl font-bold text-neutral-900">{totalScore}</span>
-                <span className="text-xl text-neutral-400">/{totalMax}</span>
-              </div>
-              <p className="mt-1 text-xs text-neutral-400">参考评分，由当前 AI 报告分项汇总，不代表真实招聘结果</p>
-              {summary && (
-                <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                  <TargetIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  目标方向：{summary}
-                </p>
-              )}
+        <Card className="resume-report-summary p-4">
+          <div className="fy-score-block flex h-full flex-col items-center justify-center gap-2 text-center">
+            <div className="flex items-baseline gap-1">
+              <span className="fy-score-num">{totalScore}</span>
+              <span className="fy-score-denom">/{totalMax}</span>
             </div>
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50">
-              <CheckCircleIcon className="h-8 w-8 text-primary-600" />
-            </div>
+            <p className="max-w-[160px] text-xs leading-snug text-neutral-500">
+              参考评分，由 6 个分项汇总<br />不代表真实招聘结果
+            </p>
+            {summary && (
+              <p className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                <TargetIcon className="h-3 w-3" aria-hidden="true" />
+                {summary}
+              </p>
+            )}
           </div>
         </Card>
 
@@ -265,7 +263,10 @@ export function ResumeReportPage() {
                       aria-valuenow={section.score}
                       aria-valuemin={0}
                       aria-valuemax={section.maxScore}
-                      className="h-full rounded-full bg-primary-500 transition-all"
+                      className={[
+                        'h-full rounded-full bg-primary-500 transition-all',
+                        pct < 70 ? 'fy-progress-low' : '',
+                      ].join(' ')}
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -285,13 +286,13 @@ export function ResumeReportPage() {
             <p className="mb-3 text-xs text-neutral-400">按重要性排序，供本人修改简历参考</p>
             <div className="space-y-2.5">
               {llmPriorities.map((item, i) => (
-                <div key={i} className="flex gap-3 rounded-lg bg-warning-bg/60 px-3 py-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xs font-semibold text-warning-fg">
+                <div key={i} className="fy-pri-item flex gap-3">
+                  <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
                     {i + 1}
                   </span>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-neutral-800">{item.focus}</p>
-                    {item.reason && <p className="mt-0.5 text-xs text-neutral-500">{item.reason}</p>}
+                    <p className="text-sm font-bold text-neutral-800">{item.focus}</p>
+                    {item.reason && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.reason}</p>}
                   </div>
                 </div>
               ))}
@@ -306,12 +307,12 @@ export function ResumeReportPage() {
             <p className="mb-3 text-xs text-neutral-400">得分率偏低的分项，建议优先调整表达与内容结构</p>
             <div className="space-y-2.5">
               {priorityItems.map((item, i) => (
-                <div key={item.key} className="flex items-center gap-3 rounded-lg bg-warning-bg/60 px-3 py-2.5">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xs font-semibold text-warning-fg">
+                <div key={item.key} className="fy-pri-item flex items-center gap-3">
+                  <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
                     {i + 1}
                   </span>
                   <span className="flex-1 text-sm font-medium text-neutral-800">{item.label}</span>
-                  <span className="text-sm font-semibold text-warning-fg">{item.pct}%</span>
+                  <span className="text-sm font-bold text-neutral-500">{item.pct}%</span>
                 </div>
               ))}
             </div>
@@ -329,7 +330,7 @@ export function ResumeReportPage() {
             <ul className="space-y-2">
               {riskNotes.map((note, i) => (
                 <li key={i} className="flex gap-2 text-sm text-neutral-600">
-                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-warning" aria-hidden="true" />
+                  <span className="fy-dot-clay mt-2 h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
                   <span>{note}</span>
                 </li>
               ))}
@@ -343,10 +344,10 @@ export function ResumeReportPage() {
           <ol className="space-y-3">
             {report.suggestions.map((tip, i) => (
               <li key={i} className="flex gap-3 text-sm text-neutral-600">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-medium text-primary-700">
+                <span className="fy-sug-no flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
                   {i + 1}
                 </span>
-                <span>{tip}</span>
+                <span className="flex-1 leading-relaxed">{tip}</span>
               </li>
             ))}
           </ol>

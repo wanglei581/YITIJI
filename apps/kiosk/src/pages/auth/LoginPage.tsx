@@ -246,7 +246,7 @@ export function LoginPage() {
                 onClick={() => switchTab('phone')}
               >
                 <SmartphoneIcon size={22} aria-hidden="true" />
-                手机号
+                手机号登录
               </button>
               <button
                 type="button"
@@ -254,7 +254,7 @@ export function LoginPage() {
                 onClick={() => switchTab('scan')}
               >
                 <ScanLineIcon size={22} aria-hidden="true" />
-                扫码登录
+                手机扫码登录
               </button>
             </div>
 

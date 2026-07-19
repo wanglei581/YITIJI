@@ -17,7 +17,7 @@ import {
   Loader2Icon,
   PrinterIcon,
   SparklesIcon,
-  type LucideIcon,
+
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -34,14 +34,6 @@ function formatSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function Section({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) {
-  return (
-    <section className="jf-card">
-      <CardHead icon={Icon} title={title} />
-      {children}
-    </section>
-  )
-}
 
 export function FairVisitPlanPage() {
   const navigate = useNavigate()
@@ -182,57 +174,69 @@ export function FairVisitPlanPage() {
           </ProtoNotice>
 
           <section className="jf-card accented">
-            <CardHead icon={FileTextIcon} title="总览" />
+            <CardHead icon={FileTextIcon} title="总览" subtitle={`结合你的简历方向与本场公开信息`} />
             <p className="text-[20px] leading-relaxed text-[var(--ink)]">{plan.summary}</p>
           </section>
 
-          <Section icon={FileTextIcon} title="本场看点">
-            <ul className="jf-bullets">
-              {(plan.fairHighlights ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
-            </ul>
-          </Section>
+          {/* 两列：优先企业 + 准备清单 */}
+          <div className="jf-two-col">
+            <section className="jf-card">
+              <CardHead icon={BuildingIcon} title="现场优先了解企业" subtitle="按与简历方向匹配程度排序" />
+              {(plan.priorityCompanies ?? []).length === 0 ? (
+                <p className="text-[20px] text-[var(--muted)]">本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。</p>
+              ) : (
+                <div className="jf-co-pick">
+                  {(plan.priorityCompanies ?? []).map((company) => (
+                    <div key={company.companyName} className="jf-cp">
+                      <div className="jf-cp-top">
+                        <b>{company.companyName}</b>
+                      </div>
+                      <p>{company.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-          <Section icon={BuildingIcon} title="现场优先了解企业">
-            {(plan.priorityCompanies ?? []).length === 0 ? (
-              <p className="text-[20px] text-[var(--muted)]">本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。</p>
-            ) : (
-              <div className="jf-two-col">
-                {(plan.priorityCompanies ?? []).map((company) => (
-                  <div key={company.companyName} className="jf-tile">
-                    <span className="jf-tile-icon"><BuildingIcon aria-hidden="true" /></span>
-                    <span>
-                      <b>{company.companyName}</b>
-                      <span>{company.reason}</span>
-                      {company.sourceUrl && <span>来源平台：{company.sourceUrl}</span>}
-                    </span>
-                  </div>
+            <section className="jf-card">
+              <CardHead icon={ClipboardListIcon} title="参会前准备清单" subtitle="出发前逐项核对" />
+              <ul className="jf-checklist">
+                {(plan.preparationChecklist ?? []).map((item) => (
+                  <li key={item} className="jf-check">
+                    <span className="box" aria-hidden="true" />
+                    {item}
+                  </li>
                 ))}
-              </div>
-            )}
-          </Section>
+              </ul>
+            </section>
+          </div>
 
-          <Section icon={ClipboardListIcon} title="参会前准备清单">
-            <ul className="jf-checklist">
-              {(plan.preparationChecklist ?? []).map((item) => (
-                <li key={item} className="jf-check">
-                  <span className="box" aria-hidden="true" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
+          {/* 两列：本场看点 + 可咨询问题 */}
+          <div className="jf-two-col">
+            <section className="jf-card">
+              <CardHead icon={SparklesIcon} title="本场看点" />
+              <ul className="jf-bullets">
+                {(plan.fairHighlights ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
+              </ul>
+            </section>
 
-          <Section icon={HelpCircleIcon} title="现场可咨询问题">
-            <ul className="jf-bullets">
-              {(plan.questionsToAsk ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
-            </ul>
-          </Section>
+            <section className="jf-card">
+              <CardHead icon={HelpCircleIcon} title="现场可咨询问题" />
+              <ul className="jf-bullets">
+                {(plan.questionsToAsk ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
+              </ul>
+            </section>
+          </div>
 
-          <Section icon={SparklesIcon} title="现场提醒">
-            <ul className="jf-tips-row">
-              {(plan.onsiteTips ?? []).map((item) => <li key={item} className="jf-tip">{item}</li>)}
-            </ul>
-          </Section>
+          {/* 现场提醒（横跨全宽） */}
+          {(plan.onsiteTips ?? []).length > 0 && (
+            <section className="jf-card">
+              <CardHead icon={SparklesIcon} title="现场提醒" subtitle="AI 生成，仅供参考" />
+              <ul className="jf-tips-row">
+                {(plan.onsiteTips ?? []).map((item) => <li key={item} className="jf-tip"><i className="inline-block w-3 h-3 flex-none mt-2 rounded bg-[var(--wheat)]" />{item}</li>)}
+              </ul>
+            </section>
+          )}
 
           {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
       </ProtoPage>

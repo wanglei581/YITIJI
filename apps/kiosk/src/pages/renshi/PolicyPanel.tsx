@@ -85,9 +85,10 @@ export function PolicyPanel({
                   className={[
                     'flex shrink-0 items-start gap-3 rounded-[14px] border p-[18px_20px] transition-colors',
                     active
-                      ? 'border-warning/50 bg-warning-bg shadow-[0_3px_14px_rgba(169,120,31,.12)]'
+                      ? 'bg-wheat-bg shadow-[0_3px_14px_rgba(169,120,31,.12)]'
                       : 'border-neutral-200 bg-surface hover:border-neutral-300',
                   ].join(' ')}
+                  style={active ? { borderColor: 'rgba(169,120,31,.55)' } : undefined}
                 >
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => selectItem(item)}>
                     <span className={`inline-flex rounded-full px-3 py-1 text-[15px] font-semibold ${TAG_TONE[item.tagTone]}`}>
@@ -116,7 +117,7 @@ export function PolicyPanel({
           </div>
 
           {selected && (
-            <section className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[18px] border border-neutral-200 border-t-4 border-t-warning bg-surface p-6 shadow-sm">
+            <section className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[18px] border border-neutral-200 border-t-4 bg-surface p-6 shadow-sm" style={{ borderTopColor: 'var(--wheat, #a9781f)' }}>
               <h2 className="font-serif text-[29px] font-bold leading-snug tracking-wide text-neutral-900">{selected.title}</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-3 py-1 text-[15px] font-semibold ${TAG_TONE[selected.tagTone]}`}>{selected.tagLabel}</span>
@@ -125,9 +126,9 @@ export function PolicyPanel({
                 </span>
               </div>
 
-              {selected.conditions && <DetailList icon={BadgeCheckIcon} iconColor="text-warning-fg" title="先看是否符合" items={selected.conditions} />}
-              {selected.materials && <DetailList icon={ListChecksIcon} iconColor="text-warning-fg" title="需要准备材料" items={selected.materials} />}
-              {selected.steps && <DetailList icon={ChevronRightIcon} iconColor="text-warning-fg" title="建议办理路径" items={selected.steps} ordered />}
+              {selected.conditions && <DetailList icon={BadgeCheckIcon} iconColor="text-wheat-fg" title="先看是否符合" items={selected.conditions} />}
+              {selected.materials && <DetailList icon={ListChecksIcon} iconColor="text-wheat-fg" title="需要准备材料" items={selected.materials} />}
+              {selected.steps && <DetailList icon={ChevronRightIcon} iconColor="text-wheat-fg" title="建议办理路径" items={selected.steps} ordered />}
               {!selected.conditions && !selected.materials && !selected.steps && selected.content && (
                 <p className="whitespace-pre-wrap rounded-[14px] border border-neutral-200 bg-neutral-50 p-5 text-[19px] leading-relaxed text-neutral-700">
                   {selected.content}

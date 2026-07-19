@@ -265,42 +265,18 @@ function CheckStep({
   label: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-neutral-100 bg-white px-4 py-3">
+    <div className="flex items-center gap-[14px] rounded-[14px] border border-neutral-100 bg-white px-5 py-4">
       <div
         className={[
-          'flex h-9 w-9 items-center justify-center rounded-full',
+          'flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full',
           done ? 'bg-success-bg text-success-fg' : active ? 'bg-primary-50 text-primary-600' : 'bg-neutral-50 text-neutral-400',
         ].join(' ')}
       >
-        {done ? <CheckCircleIcon className="h-5 w-5" /> : active ? <LoaderIcon className="h-5 w-5 animate-spin" /> : <ShieldCheckIcon className="h-5 w-5" />}
+        {done ? <CheckCircleIcon className="h-6 w-6" /> : active ? <LoaderIcon className="h-6 w-6 animate-spin" /> : <ShieldCheckIcon className="h-6 w-6" />}
       </div>
-      <span className="text-sm font-medium text-neutral-800">{label}</span>
-    </div>
-  )
-}
-
-function FlowStep({
-  done,
-  active,
-  label,
-}: {
-  done?: boolean
-  active?: boolean
-  label: string
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
-      <div
-        className={[
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold',
-          done ? 'bg-success text-white' : active ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-400',
-        ].join(' ')}
-      >
-        {done ? <CheckCircleIcon className="h-4 w-4" /> : ''}
+      <div>
+        <span className="text-[20px] font-bold text-neutral-900">{label}</span>
       </div>
-      <span className={['truncate text-sm font-medium', active ? 'text-primary-700' : done ? 'text-success-fg' : 'text-neutral-400'].join(' ')}>
-        {label}
-      </span>
     </div>
   )
 }
@@ -546,34 +522,25 @@ export function PrintMaterialCheckPage() {
     <div className="print-proto flex min-h-full flex-col p-6">
       <PrintPrototypeHeader
         title="打印前材料检查"
-        subtitle="文件体检、A4 规范化与隐私检查"
+        subtitle="仅用于本次打印前确认；扫描件 / 图片可能通过第三方 OCR 服务识别文字"
         step={2}
         backLabel="重新上传"
         onBack={() => navigate(uploadPath)}
       />
 
-      <Card className="mt-5 p-4">
-        <div className="flex items-center gap-3">
-          <FlowStep label="上传文件" done />
-          <div className="h-px w-6 bg-neutral-200" />
-          <FlowStep label="材料检查" active />
-          <div className="h-px w-6 bg-neutral-200" />
-          <FlowStep label="打印设置" />
-          <div className="h-px w-6 bg-neutral-200" />
-          <FlowStep label="确认打印" />
-        </div>
-      </Card>
-
-      <div className="mt-5 grid flex-1 grid-cols-[300px_1fr] gap-6 overflow-hidden">
+      <div className="mt-5 grid flex-1 grid-cols-[360px_1fr] gap-6 overflow-hidden">
         <div className="flex flex-col gap-4">
           <Card className="p-5">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-                <FileTextIcon className="h-6 w-6 text-primary-600" />
+            <div className="flex items-center gap-4">
+              <div
+                className="flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded-[14px]"
+                style={{ background: 'var(--print-slate-soft)', color: 'var(--print-slate-deep)' }}
+              >
+                <FileTextIcon className="h-[30px] w-[30px]" />
               </div>
               <div className="min-w-0">
-                <p className="break-all text-sm font-semibold text-neutral-900">{file.name}</p>
-                <p className="mt-1 text-sm text-neutral-500">
+                <p className="break-all text-[22px] font-bold text-neutral-900">{file.name}</p>
+                <p className="mt-1 text-[17px] text-neutral-500">
                   {file.size} · {file.pages === null ? '页数识别中' : `${file.pages} 页`}
                 </p>
               </div>
@@ -584,8 +551,15 @@ export function PrintMaterialCheckPage() {
           <CheckStep label="A4 规范化评估" active={stage === 'normalize_a4'} done={!!normalizeTask} />
           <CheckStep label="隐私片段检查" active={stage === 'pii_scan'} done={!!piiTask} />
 
-          <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-3 text-sm leading-relaxed text-primary-800">
-            仅用于本次打印前确认；文档文字层可本地读取，扫描件/图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
+          <div
+            className="rounded-[14px] border px-5 py-4 text-[16.5px] leading-relaxed"
+            style={{
+              background: 'var(--print-teal-soft)',
+              borderColor: 'rgba(31,158,134,.3)',
+              color: 'var(--print-teal-deep)',
+            }}
+          >
+            文档文字层可本地读取；扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
           </div>
         </div>
 
@@ -625,26 +599,32 @@ export function PrintMaterialCheckPage() {
           {stage === 'review' && (
             <div className="flex flex-1 flex-col overflow-hidden">
               <div
-                className={[
-                  'mb-4 flex items-center justify-between rounded-lg border px-5 py-4',
-                  piiModeCopy ? 'border-warning/30 bg-warning-bg' : 'border-success-bg bg-success-bg',
-                ].join(' ')}
+                className="mb-4 flex items-center justify-between rounded-[14px] border px-5 py-4"
+                style={piiModeCopy
+                  ? { background: 'var(--print-clay-soft)', borderColor: 'rgba(184,104,60,.35)' }
+                  : { background: 'var(--print-teal-soft)', borderColor: 'rgba(31,158,134,.35)' }}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-[14px]">
                   {piiModeCopy ? (
-                    <AlertCircleIcon className="h-6 w-6 text-warning-fg" />
+                    <AlertCircleIcon className="h-8 w-8 shrink-0 text-warning-fg" />
                   ) : (
-                    <CheckCircleIcon className="h-6 w-6 text-success-fg" />
+                    <CheckCircleIcon className="h-8 w-8 shrink-0 text-success-fg" />
                   )}
                   <div>
-                    <p className={['font-semibold', piiModeCopy ? 'text-warning-fg' : 'text-success-fg'].join(' ')}>
+                    <p
+                      className="text-[22px] font-bold"
+                      style={{ color: piiModeCopy ? 'var(--print-clay)' : 'var(--print-teal-deep)' }}
+                    >
                       {piiModeCopy ? piiModeCopy.label : '检查完成'}
                     </p>
-                    <p className={['mt-0.5 text-sm', piiModeCopy ? 'text-warning-fg' : 'text-success-fg'].join(' ')}>
+                    <p
+                      className="mt-[3px] text-[17px]"
+                      style={{ color: piiModeCopy ? 'var(--print-clay)' : 'var(--print-teal-deep)', opacity: 0.85 }}
+                    >
                       {piiModeCopy
                         ? '如文件包含隐私信息，请打印前自行确认'
                         : findings.length > 0
-                          ? `发现 ${findings.length} 个需确认片段`
+                          ? `发现 ${findings.length} 个需确认片段，请逐项选择保留或遮挡`
                           : '未发现需要确认的隐私片段'}
                     </p>
                   </div>
@@ -778,7 +758,12 @@ export function PrintMaterialCheckPage() {
                     <div className="flex gap-3">
                       <button
                         type="button"
-                        className="min-h-[56px] rounded-lg border border-warning/30 bg-warning-bg px-5 text-base font-semibold text-warning-fg"
+                        className="min-h-[56px] rounded-[12px] border px-5 text-[18px] font-semibold"
+                        style={{
+                          background: 'var(--print-wheat-soft)',
+                          borderColor: 'rgba(169,120,31,.35)',
+                          color: 'var(--print-wheat-deep)',
+                        }}
                         onClick={applySuggestedDecisions}
                       >
                         按建议处理
@@ -798,21 +783,27 @@ export function PrintMaterialCheckPage() {
                     return (
                       <Card key={finding.id} className="p-5">
                         <div className="flex gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-warning-bg">
-                            <EyeOffIcon className="h-5 w-5 text-warning-fg" />
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
+                            style={{ background: 'var(--print-wheat-soft)', color: 'var(--print-wheat-deep)' }}
+                          >
+                            <EyeOffIcon className="h-5 w-5" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-base font-semibold text-neutral-900">{finding.label || finding.type}</span>
                               <span
                                 className={[
-                                  'rounded-full px-2.5 py-1 text-xs font-semibold',
+                                  'rounded-full px-2.5 py-1 text-[16px] font-semibold',
                                   risk === 'high'
                                     ? 'bg-error-bg text-error-fg'
-                                    : risk === 'medium'
-                                      ? 'bg-warning-bg text-warning-fg'
-                                      : 'bg-primary-50 text-primary-700',
+                                    : risk === 'low'
+                                      ? 'bg-primary-50 text-primary-700'
+                                      : '',
                                 ].join(' ')}
+                                style={risk === 'medium' ? {
+                                  background: 'var(--print-wheat-soft)',
+                                  color: 'var(--print-wheat-deep)',
+                                } : undefined}
                               >
                                 {RISK_LABEL[risk]}
                               </span>
@@ -821,7 +812,7 @@ export function PrintMaterialCheckPage() {
                               <span className="text-neutral-500">片段</span>
                               <span className="font-medium text-neutral-900">{maskSnippet(finding.type, finding.snippet)}</span>
                               <span className="text-neutral-500">建议</span>
-                              <span className="font-medium text-warning-fg">{suggestionForFinding(finding)}</span>
+                              <span className="font-medium" style={{ color: 'var(--print-wheat-deep)' }}>{suggestionForFinding(finding)}</span>
                             </div>
                             <div className="mt-4 grid grid-cols-2 gap-3">
                               {(['redact', 'keep'] as const).map((action) => (
@@ -830,13 +821,18 @@ export function PrintMaterialCheckPage() {
                                   type="button"
                                   onClick={() => setDecision(finding.id, action)}
                                   className={[
-                                    'min-h-[72px] rounded-lg border px-4 text-base font-semibold transition-colors',
+                                    'min-h-[72px] rounded-[12px] border px-4 text-[18px] font-bold transition-colors',
                                     selected === action
-                                      ? action === 'redact'
-                                        ? 'border-warning bg-warning-bg text-warning-fg'
-                                        : 'border-primary-600 bg-primary-50 text-primary-700'
+                                      ? action === 'keep'
+                                        ? 'border-primary-600 bg-primary-50 text-primary-700'
+                                        : ''
                                       : 'border-neutral-200 bg-white text-neutral-600 active:bg-neutral-50',
                                   ].join(' ')}
+                                  style={selected === action && action === 'redact' ? {
+                                    background: 'var(--print-wheat-soft)',
+                                    borderColor: 'var(--print-wheat)',
+                                    color: 'var(--print-wheat-deep)',
+                                  } : undefined}
                                 >
                                   {ACTION_LABEL[action]}
                                 </button>

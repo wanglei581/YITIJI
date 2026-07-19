@@ -18,6 +18,7 @@ import {
   type JobMaterialDraftForm,
 } from './jobMaterialDraft'
 import './resume-library-lightflow.css'
+import './resume-library-ext.css'
 import './resume-fusion-youth.css'
 
 const FILTERS = ['全部', '求职信', '感谢信', '作品集', '材料清单', '校招', '社招', '通用'] as const
@@ -239,7 +240,12 @@ export function JobMaterialLibraryPage() {
                     <div className="resume-lightflow__tags">
                       {template.tags.map((tag) => <span key={tag}>{tag}</span>)}
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => selectTemplate(template)}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className={['rp-state-badge', active ? '' : ''].join(' ').trim()}
+                      onClick={() => selectTemplate(template)}
+                    >
                       {active ? '正在填写' : '选择并填写'}
                     </Button>
                   </Card>

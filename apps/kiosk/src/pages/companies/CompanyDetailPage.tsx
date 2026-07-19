@@ -22,7 +22,7 @@ import {
 import {
   AwardIcon,
   BriefcaseIcon,
-  Building2Icon,
+
   BuildingIcon,
   ChevronRightIcon,
   ExternalLinkIcon,
@@ -419,28 +419,56 @@ export function CompanyDetailPage() {
           </button>
         </Card>
 
-        {/* 来源信息 */}
-        <Card className="kproto-card">
-          <p className="mb-3 flex items-center gap-2 text-[24px] font-bold text-[var(--kp-ink)]">
-            <Building2Icon className="h-6 w-6 text-[var(--kp-muted)]" aria-hidden="true" />
-            数据来源
-          </p>
-          <div className="kproto-grid-3 text-[20px]">
-            <div><div className="text-[var(--kp-muted)]">来源机构</div><b>{company.sourceName}</b></div>
-            <div><div className="text-[var(--kp-muted)]">外部ID</div><b>{company.externalId}</b></div>
-            <div><div className="text-[var(--kp-muted)]">同步时间</div><b>{company.syncTime.slice(0, 10)}</b></div>
-          </div>
-          {sourceCanOpen && (
-            <button
-              type="button"
-              onClick={openSourceQr}
-              className="kproto-btn sm primary mt-4"
-            >
-              <ExternalLinkIcon aria-hidden="true" />
-              去来源平台查看
-            </button>
+        {/* 来源信息 + 二维码（src-zone：左侧数据来源卡 + 右侧扫码面板） */}
+        <div className="grid gap-[18px]" style={{ gridTemplateColumns: '1fr 320px' }}>
+          <section className="kproto-card kproto-wheat accented">
+            <div className="kproto-card-head" style={{ marginBottom: 12 }}>
+              <span className="kproto-icon"><ShieldCheckIcon aria-hidden="true" /></span>
+              <div>
+                <h2 className="font-serif text-[28px] font-bold tracking-[1px]">数据来源</h2>
+                <p className="mt-1 text-[18px] text-[var(--kp-muted)]">第三方来源信息，请核对后前往查看</p>
+              </div>
+            </div>
+            <div className="kproto-grid-3 text-[20px]">
+              <div><div className="text-[18px] text-[var(--kp-muted)]">来源机构</div><div className="mt-1.5 text-[22px] font-bold">{company.sourceName}</div></div>
+              <div><div className="text-[18px] text-[var(--kp-muted)]">同步时间</div><div className="mt-1.5 text-[22px] font-bold">{company.syncTime.slice(0, 10)}</div></div>
+              <div><div className="text-[18px] text-[var(--kp-muted)]">外部ID</div><div className="mt-1.5 text-[22px] font-bold">{company.externalId}</div></div>
+            </div>
+            <div className="kproto-notice mt-3">
+              <ShieldCheckIcon aria-hidden="true" />
+              <p>企业与岗位信息由第三方来源同步，本终端仅提供信息导览与跳转，不参与招聘流程，内容以来源平台为准。</p>
+            </div>
+          </section>
+          {sourceCanOpen ? (
+            <div className="flex flex-col items-center gap-3 rounded-[18px] border border-[var(--kp-line)] bg-[var(--kp-surface)] p-5 shadow-sm">
+              <p className="text-[22px] font-bold text-[var(--kp-ink)]">扫码查看企业主页</p>
+              <div className="flex flex-1 items-center justify-center">
+                <SourceUrlQr value={company.sourceUrl!} size={160} />
+              </div>
+              <p className="text-center text-[16px] leading-snug text-[var(--kp-muted)]">手机扫码前往来源平台查看完整企业信息与全部岗位</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-[18px] border border-dashed border-[var(--kp-line)] bg-[var(--kp-surface)] p-5">
+              <QrCodeIcon className="h-12 w-12 text-[var(--kp-muted)] opacity-40" aria-hidden="true" />
+              <p className="text-center text-[16px] text-[var(--kp-muted)]">暂无来源链接</p>
+            </div>
           )}
-        </Card>
+        </div>
+      </div>
+
+      {/* 底部行动条 */}
+      <div className="flex shrink-0 items-center gap-5 border-t border-[var(--kp-line)] bg-[var(--kp-surface)] px-12 py-6">
+        <button type="button" className="kproto-btn" onClick={() => navigate('/companies')}>
+          <ChevronRightIcon className="h-6 w-6 rotate-180" aria-hidden="true" />
+          返回列表
+        </button>
+        <div className="flex-1" />
+        {sourceCanOpen && (
+          <button type="button" className="kproto-btn primary" onClick={openSourceQr}>
+            <ExternalLinkIcon aria-hidden="true" />
+            去来源平台查看
+          </button>
+        )}
       </div>
     </div>
   )
