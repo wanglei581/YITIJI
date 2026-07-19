@@ -229,7 +229,7 @@ export function JobFairsPage() {
       {qrFair && <BookingQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
 
       {/* 页头 */}
-      <div className="jf-pagehead">
+      <div className="jf-pagehead bg-gradient-to-r from-transparent via-transparent to-transparent">
         <button type="button" className="jf-back" onClick={() => navigate('/')}>
           <ArrowLeftIcon aria-hidden="true" />
           返回
