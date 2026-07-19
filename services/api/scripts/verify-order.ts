@@ -63,10 +63,12 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
-  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma))) })()
+  const _ag = new TerminalAgentService(prisma, audit)
+  const terminals = new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma)))
+  // N3拆分后 resetExpiredClaims 在 TerminalAgentService（private），通过类型断言调用
   const resetExpiredClaims = (
-    terminals as unknown as { resetExpiredClaims: () => Promise<void> }
-  ).resetExpiredClaims.bind(terminals)
+    _ag as unknown as { resetExpiredClaims: () => Promise<void> }
+  ).resetExpiredClaims.bind(_ag)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_order_${suffix}`
