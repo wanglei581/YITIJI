@@ -33,15 +33,6 @@ const TYPE_LABEL: Record<ActivityTargetType, string> = {
   fair_company: '参展企业',
 }
 
-// 原型各类型对应的 accent 色调（me-tone-* 系列）
-const TYPE_TONE: Record<ActivityTargetType, string> = {
-  job: 'teal',
-  job_fair: 'wheat',
-  policy: 'slate',
-  company_profile: 'clay',
-  fair_company: 'wheat',
-}
-
 // 跳转动作 → 中性「入口」措辞（不出现投递 / 预约 / 凭证）。
 const ACTION_LABEL: Record<ActivityJumpAction, string> = {
   external_apply: '岗位来源入口',
@@ -162,8 +153,7 @@ export function MyActivityPage() {
               <ActivityRow
                 key={it.id}
                 icon="eye"
-                tone={TYPE_TONE[it.targetType]}
-                typeLabel={TYPE_LABEL[it.targetType]}
+                tone="slate"
                 title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
                 meta={`浏览 · ${TYPE_LABEL[it.targetType]}${it.sourceName ? ` · ${it.sourceName}` : ''} · ${formatTime(it.createdAt)}`}
                 onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
@@ -179,8 +169,7 @@ export function MyActivityPage() {
             <ActivityRow
               key={it.id}
               icon="external"
-              tone={TYPE_TONE[it.targetType]}
-              typeLabel={TYPE_LABEL[it.targetType]}
+              tone="teal"
               title={it.targetTitle ?? `${TYPE_LABEL[it.targetType]}详情`}
               meta={`打开${actionLabel(it.action, it.targetType)} · ${TYPE_LABEL[it.targetType]} · ${formatTime(it.createdAt)}`}
               onTap={() => navigate(detailRoute(it.targetType, it.targetId, it.externalId))}
@@ -199,14 +188,12 @@ function ActivityRow({
   tone,
   title,
   meta,
-  typeLabel,
   onTap,
 }: {
   icon: KioskIconName
   tone: string
   title: string
   meta: string
-  typeLabel?: string
   onTap: () => void
 }) {
   return (
@@ -222,7 +209,6 @@ function ActivityRow({
         <span className="me-row-title">{title}</span>
         <span className="me-row-meta">{meta}</span>
       </span>
-      {typeLabel && <span className="me-type-chip" aria-label={`类型：${typeLabel}`}>{typeLabel}</span>}
       <ChevronRightIcon className="me-row-arrow" aria-hidden="true" />
     </button>
   )

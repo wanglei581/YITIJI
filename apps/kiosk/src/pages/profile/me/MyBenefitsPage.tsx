@@ -78,7 +78,7 @@ export function MyBenefitsPage() {
         onRetry={() => setReloadKey((k) => k + 1)}
       >
         <section className="me-detail-summary" aria-label="权益概览">
-          <span className="me-summary-icon me-tone-plum" aria-hidden="true">
+          <span className="me-summary-icon me-tone-clay" aria-hidden="true">
             <KIcon name="ticket" />
           </span>
           <div className="min-w-0 flex-1">

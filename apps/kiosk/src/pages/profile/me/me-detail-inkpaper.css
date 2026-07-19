@@ -109,14 +109,14 @@
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > p {
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--ink-2);
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > strong {
   margin-top: 2px;
-  font-size: 36px;
+  font-size: 30px;
   line-height: 1;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -124,23 +124,10 @@
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > span {
-  margin-top: 6px;
-  font-size: 17px;
-  line-height: 1.5;
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.55;
   color: var(--muted);
-}
-
-/* 按页面类型设置 summary 数字大小 */
-.me-inkdetail-resumes .me-detail-summary strong {
-  font-size: 40px;
-}
-
-.me-inkdetail-documents .me-detail-summary strong {
-  font-size: 38px;
-}
-
-.me-inkdetail-print-orders .me-detail-summary strong {
-  font-size: 36px;
 }
 
 .me-summary-icon,
@@ -164,44 +151,20 @@
   height: 30px;
 }
 
-/* 按页面类型覆盖摘要图标尺寸 */
-.me-inkdetail-resumes .me-summary-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-}
-
-.me-inkdetail-resumes .me-summary-icon svg {
-  width: 34px;
-  height: 34px;
-}
-
-.me-inkdetail-documents .me-summary-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
-}
-
-.me-inkdetail-documents .me-summary-icon svg {
-  width: 32px;
-  height: 32px;
-}
-
 .me-summary-mini {
   display: grid;
-  min-width: 120px;
-  gap: 8px;
+  min-width: 112px;
+  gap: 6px;
 }
 
 .me-summary-mini span {
   display: block;
   margin: 0;
   border-radius: 999px;
-  background: rgba(255, 253, 248, 0.9);
-  border: 1px solid rgba(16, 48, 43, 0.15);
-  padding: 8px 18px;
+  background: rgba(16, 48, 43, 0.07);
+  padding: 6px 10px;
   text-align: center;
-  font-size: 18px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
@@ -216,14 +179,14 @@
 
 .me-tab {
   position: relative;
-  min-height: 56px;
+  min-height: 44px;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 999px;
   border: 1px solid rgba(16, 48, 43, 0.12);
   background: rgba(255, 253, 248, 0.82);
-  padding: 0 22px;
-  font-size: 19px;
+  padding: 0 16px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink-2);
   transition: transform 180ms ease, background 180ms ease, color 180ms ease;
@@ -249,13 +212,12 @@
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 16px;
-  min-height: 104px;
+  gap: 14px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: rgba(255, 253, 248, 0.88);
-  padding: 20px 24px;
+  padding: 16px;
   text-align: left;
   box-shadow: 0 10px 24px rgba(39, 55, 49, 0.08);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
@@ -276,8 +238,8 @@
 
 .me-row-icon,
 .me-account-avatar {
-  width: 52px;
-  height: 52px;
+  width: 48px;
+  height: 48px;
   border-radius: 18px;
 }
 
@@ -289,50 +251,26 @@
 
 .me-row-icon svg,
 .me-account-avatar svg {
-  width: 27px;
-  height: 27px;
-}
-
-/* 简历页行图标更大 */
-.me-inkdetail-resumes .me-row-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 14px;
-}
-
-.me-inkdetail-resumes .me-row-icon svg {
-  width: 30px;
-  height: 30px;
-}
-
-/* 文档页行图标 */
-.me-inkdetail-documents .me-row-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 13px;
-}
-
-.me-inkdetail-documents .me-row-icon svg {
-  width: 28px;
-  height: 28px;
+  width: 25px;
+  height: 25px;
 }
 
 .me-row-title {
   display: block;
   overflow: hidden;
   color: var(--ink);
-  font-size: 21px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .me-row-meta {
-  margin-top: 6px;
+  margin-top: 4px;
   display: block;
   overflow: hidden;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -346,22 +284,19 @@
 
 .me-benefit-card,
 .me-empty-card {
-  padding: 20px 22px;
+  padding: 18px;
 }
 
 .me-inkdetail .me-section-copy h2 {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
-  font-size: 22px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 800;
   color: var(--ink);
-  letter-spacing: 0.5px;
-  border-left: 5px solid var(--ink);
-  padding-left: 12px;
+  letter-spacing: 0;
 }
 
 .me-inkdetail .me-section-copy p {
-  margin-top: 5px;
-  font-size: 15px;
+  margin-top: 4px;
+  font-size: 12px;
   line-height: 1.6;
   color: var(--muted);
 }
@@ -371,9 +306,9 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 5px 13px;
-  font-size: 15px;
-  font-weight: 700;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .me-chip {
@@ -392,21 +327,13 @@
 }
 
 .me-status.is-warning {
-  background: rgba(241, 223, 183, 0.9);
+  background: rgba(195, 142, 48, 0.16);
   color: #85611f;
-  border: 1px solid rgba(169, 120, 31, 0.28);
 }
 
 .me-status.is-danger {
   background: rgba(168, 65, 62, 0.14);
   color: #9a3d3a;
-}
-
-/* 已取消等中性"关闭"状态 */
-.me-status.is-off {
-  background: rgba(255, 253, 248, 0.9);
-  color: var(--muted);
-  border: 1px solid rgba(16, 48, 43, 0.14);
 }
 
 .me-link-row {
@@ -510,7 +437,7 @@
 .me-inkdetail-documents .me-dialog-button {
   position: relative;
   display: inline-flex;
-  min-height: 54px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -518,15 +445,15 @@
   border-radius: 999px;
   background: rgba(255, 253, 248, 0.8);
   color: var(--ink-2);
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 800;
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
 }
 
 .me-inkdetail-documents .me-doc-retention-toggle {
-  min-height: 38px;
-  padding: 0 14px;
-  font-size: 15px;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 
 .me-inkdetail-documents .me-doc-retention-toggle:hover,
@@ -583,13 +510,13 @@
 }
 
 .me-inkdetail-documents .me-doc-action {
-  gap: 7px;
-  padding: 0 18px;
+  gap: 6px;
+  padding: 0 15px;
 }
 
 .me-inkdetail-documents .me-doc-action svg {
-  width: 19px;
-  height: 19px;
+  width: 17px;
+  height: 17px;
 }
 
 .me-inkdetail-documents .me-retention-dialog {
@@ -705,7 +632,7 @@
 .me-inkdetail-print-orders .me-print-document-action {
   position: relative;
   display: inline-flex;
-  min-height: 54px;
+  min-height: 48px;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -714,7 +641,7 @@
   border-radius: 16px;
   background: rgba(255, 253, 248, 0.8);
   color: var(--ink-2);
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 800;
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, color 180ms ease;
 }
@@ -738,8 +665,8 @@
 }
 
 .me-inkdetail-print-orders .me-print-order-action svg {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 
@@ -872,63 +799,6 @@
   font-size: 14px;
   font-weight: 700;
   box-shadow: 0 16px 30px rgba(16, 48, 43, 0.2);
-}
-
-/* 类型芯片：原型 .t-chip（岗位 / 招聘会 / 企业 / 政策 / 参展企业） */
-.me-type-chip {
-  flex-shrink: 0;
-  border-radius: 999px;
-  border: 1px solid rgba(16, 48, 43, 0.14);
-  background: rgba(255, 253, 248, 0.88);
-  padding: 5px 13px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-/* 通知未读指示点 */
-.me-noti-dot {
-  width: 12px;
-  height: 12px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: #c14a34;
-  box-shadow: 0 0 0 4px rgba(193, 74, 52, 0.15);
-  margin-top: 6px;
-}
-
-.me-noti-dot.is-read {
-  background: rgba(16, 48, 43, 0.2);
-  box-shadow: none;
-}
-
-/* 通知操作按钮列 */
-.me-noti-ops {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-/* 设置页双列协议入口 */
-.me-settings-duo {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.me-settings-duo .me-link-row {
-  border: 1px solid rgba(16, 48, 43, 0.1);
-  border-radius: 20px;
-  padding: 16px;
-  background: rgba(255, 253, 248, 0.88);
-  box-shadow: 0 6px 16px rgba(39, 55, 49, 0.06);
-  border-top: 1px solid rgba(16, 48, 43, 0.1);
-}
-
-.me-settings-duo .me-link-row:first-child {
-  border-top: 1px solid rgba(16, 48, 43, 0.1);
 }
 
 .me-ripple {
