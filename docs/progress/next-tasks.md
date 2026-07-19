@@ -17,8 +17,8 @@
 - [x] **N3 terminals.service.ts 拆分** — 1182行 → 子服务 + 薄facade。PR #316/#320(2026-07-19，commit `04c3838f`/`70011240`)
 - [x] **Admin 历史 pending 打印任务受控废弃入口** — POST /admin/print-jobs/:id/abandon。PR #317/#319(2026-07-19，commit `e47a36f8`/`07cd7de5`)
 - [x] **N1 jobs.service.ts 拆分** — 2498→219行 facade + 4子服务。PR #318(commit `619c6dc1`,2026-07-19)
-- [ ] **Wave 2 账号换绑+资产一致性** — 旧号step-up + 新号验证 + 冲突人工处理（下一轮）
-- [ ] **Wave 3 打印售后+权益核销闭环** — 收费模式开启前（下一轮）
+- [x] **Wave 2 账号换绑+资产一致性** — 手机换绑双OTP、冲突拒绝、资产删除端点。PR #321(commit `6fb1ac62`,2026-07-19)
+- [x] **Wave 3 打印售后+权益核销基础** — 核销列表端点、打印售后诚实引导、FREE_MODE文案收口。PR #322(commit `f09b374d`,2026-07-19)
 
 **开工前注意事项(2026-07-17)**:
 
