@@ -236,7 +236,7 @@ function runStaticChecks(): void {
   const publicConfigService = section(
     'src/terminals/terminals-admin.service.ts',
     'async getKioskTerminalConfig',
-    '/**\n   * Admin 打印机页真实数据源。',
+    'async listPrintersForAdmin',  // N3拆分后 end marker 改为下一个方法
   )
   notContainsSource(
     publicConfigService,
@@ -245,8 +245,8 @@ function runStaticChecks(): void {
   )
   const publicConfigLookup = section(
     'src/terminals/terminals-agent.service.ts',
-    'private async findSmartCampusConfigByTerminalRef',
-    'private async resetExpiredClaims',
+    'async findSmartCampusConfigByTerminalRef',  // N3拆分后为 async 非 private async
+    '// ── Private helpers',  // 紧接着的注释，不包含后续 MAC 处理方法
   )
   notContainsSource(
     publicConfigLookup,
@@ -269,7 +269,7 @@ function runStaticChecks(): void {
     'J. Kiosk 本地 OFF_CONFIG 不声明公开配置外字段',
   )
   contains(
-    'src/terminals/terminals-admin.service.ts',
+    'src/terminals/terminals-agent.service.ts',  // N3拆分后这些模式在 agent service
     ['allowDisabled: true', 'TERMINAL_DISABLED', 'tryNormalizeMacAddress(dto.macAddress)'],
     'K. 停用终端禁止任务操作,心跳仍可上报且坏 MAC 不打挂心跳',
   )
