@@ -58,9 +58,48 @@ export interface ListAdminOrdersReadonlyParams {
   pageSize: number
 }
 
+export interface AdminOrderRefundResult {
+  refund: {
+    refundNo: string
+    amountCents: number
+    status: string
+    channel: string
+    channelRefundNo: string | null
+    reason: string | null
+    createdAt: string
+  }
+  order: { orderNo: string; payStatus: string; refundedAmountCents: number; refundedAt: string | null }
+  idempotent: boolean
+}
+
 interface AdminOrdersReadonlyService {
   list(params: ListAdminOrdersReadonlyParams): Promise<AdminOrderReadonlyPage>
   getById(id: string): Promise<AdminOrderReadonlyDetail>
+  refundOrder(id: string, refundReason: string): Promise<AdminOrderRefundResult>
+}
+
+async function post<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...authHeader() },
+    credentials: 'include',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let code = `HTTP_${res.status}`
+    let message = res.statusText
+    try {
+      const body2 = (await res.json()) as { error?: { code?: string; message?: string } }
+      if (body2.error?.code) code = body2.error.code
+      if (body2.error?.message) message = body2.error.message
+    } catch { /* keep defaults */ }
+    if (res.status === 401) {
+      redirectToLogin()
+      throw new ApiHttpError(code || 'AUTH_REQUIRED', '登录已过期', res.status)
+    }
+    throw new ApiHttpError(code, message, res.status)
+  }
+  return res.json() as Promise<T>
 }
 
 async function get<T>(path: string, params?: Record<string, string | undefined>): Promise<T> {
@@ -101,6 +140,8 @@ const httpAdapter: AdminOrdersReadonlyService = {
       pageSize: String(params.pageSize),
     }),
   getById: (id) => get<AdminOrderReadonlyDetail>(`/admin/orders/${encodeURIComponent(id)}`),
+  refundOrder: (id, refundReason) =>
+    post<AdminOrderRefundResult>(`/admin/orders/${encodeURIComponent(id)}/refund`, { refundReason }),
 }
 
 const now = () => new Date().toISOString()
@@ -152,6 +193,21 @@ const mockAdapter: AdminOrdersReadonlyService = {
   },
   async getById() {
     return MOCK_DETAIL
+  },
+  async refundOrder(_id, refundReason) {
+    return {
+      refund: {
+        refundNo: `RFD-${MOCK_DETAIL.orderNo}`,
+        amountCents: 0,
+        status: 'success',
+        channel: 'offline',
+        channelRefundNo: null,
+        reason: refundReason,
+        createdAt: now(),
+      },
+      order: { orderNo: MOCK_DETAIL.orderNo, payStatus: 'refunded', refundedAmountCents: 0, refundedAt: now() },
+      idempotent: false,
+    }
   },
 }
 
