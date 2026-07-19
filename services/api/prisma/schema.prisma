@@ -2051,15 +2051,17 @@ model HelpItem {
 
 model LegalDocVersion {
   id          String    @id @default(cuid())
-  docType     String
-  version     String
-  content     String
-  publishedAt DateTime?
+  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer"
+  version     String    // "v1.0", "v1.1" 等
+  title       String    @default("")
+  content     String    // Markdown 格式全文
   isActive    Boolean   @default(false)
+  publishedAt DateTime?
+  publishedBy String?   // adminId
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([docType, version])
+  @@index([docType, isActive])
 }
 
 model OfflineAgency {
