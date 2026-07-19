@@ -14,7 +14,12 @@
 import 'dotenv/config'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { JobsService } from '../src/jobs/jobs.service'
-import type { AuditService } from '../src/audit/audit.service'
+import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
+import { JobsAdminService } from '../src/jobs/jobs-admin.service'
+import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
+import { JobsExcelService } from '../src/jobs/jobs-excel.service'
+import { AuditService } from '../src/audit/audit.service'
+import { JobQualityService } from '../src/job-ai/job-quality.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 
 const TAG = 't1-fmr-verify'
@@ -33,8 +38,13 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
 
   // getMappingRule 不使用 audit;传最小 stub 即可
-  const fakeAudit = { write: async () => {} } as unknown as AuditService
-  const jobs = new JobsService(prisma, fakeAudit)
+  const audit = new AuditService(prisma)
+  const jobQuality = new JobQualityService(prisma)
+  const kiosk = new JobsKioskService(prisma)
+  const admin = new JobsAdminService(prisma, audit)
+  const partner = new JobsPartnerService(prisma, audit, jobQuality)
+  const excel = new JobsExcelService(prisma, audit, jobQuality)
+  const jobs = new JobsService(kiosk, admin, partner, excel)
 
   // ── 准备隔离测试数据：临时 Org + JobSource ────────────────────────────────
   const org = await prisma.organization.create({

@@ -37,6 +37,10 @@ import { JobQualityService } from '../src/job-ai/job-quality.service'
 import { AdminFairsService } from '../src/jobs/admin-fairs.service'
 import { FairMaterialPrintBridgeService } from '../src/jobs/fair-material-print-bridge.service'
 import { JobsService } from '../src/jobs/jobs.service'
+import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
+import { JobsAdminService } from '../src/jobs/jobs-admin.service'
+import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
+import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import { SaveFairCompanyDto } from '../src/jobs/dto/admin-fair.dto'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
@@ -73,7 +77,12 @@ async function main() {
   const material = new FairMaterialService(prisma, audit, storage, bridge)
   const venueGuide = new FairVenueGuideService(prisma, audit)
   const svc = new AdminFairsService(prisma, audit, companyZone, material, venueGuide)
-  const jobs = new JobsService(prisma, audit, new JobQualityService(prisma))
+  const _jobQuality = new JobQualityService(prisma)
+  const _kiosk = new JobsKioskService(prisma)
+  const _admin = new JobsAdminService(prisma, audit)
+  const _partner = new JobsPartnerService(prisma, audit, _jobQuality)
+  const _excel = new JobsExcelService(prisma, audit, _jobQuality)
+  const jobs = new JobsService(_kiosk, _admin, _partner, _excel)
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)
