@@ -328,7 +328,14 @@ function main(): void {
   const webhookDto = readApi('src/sync/dto/webhook-payload.dto.ts')
   const excelDto = readApi('src/jobs/dto/excel-import.dto.ts')
   const workTypeUtil = readApi('src/jobs/work-type.ts')
-  const jobsService = readApi('src/jobs/jobs.service.ts')
+  // N1拆分后各业务域写入路径分散到4个子服务 + jobs-shared.ts + work-type.ts
+  // jobsService 扫描变量覆盖所有写入路径文件，以便 mustContain 静态检查不遗漏
+  const jobsService =
+    readApi('src/jobs/jobs.service.ts') +
+    '\n' + readApi('src/jobs/jobs-partner.service.ts') +
+    '\n' + readApi('src/jobs/jobs-excel.service.ts') +
+    '\n' + readApi('src/jobs/jobs-shared.ts') +
+    '\n' + readApi('src/jobs/work-type.ts')
   const jobSyncService = readApi('src/job-sync/job-sync.service.ts')
   const syncService = readApi('src/sync/sync.service.ts')
   const sharedJobTypes = readRepo('packages/shared/src/types/job.ts')
