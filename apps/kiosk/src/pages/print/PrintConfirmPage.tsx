@@ -329,7 +329,7 @@ export function PrintConfirmPage() {
             <ol className="print-rules-list">
               <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
               <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
-              <li>提交后请留在机器旁，支付完成后自动开始打印。</li>
+              <li>提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。</li>
               <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
             </ol>
           </div>
