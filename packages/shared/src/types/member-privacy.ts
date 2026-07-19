@@ -5,6 +5,7 @@ export const MEMBER_STEP_UP_ACTIONS = [
   'export_data_request',
   'export_data_download',
   'close_account',
+  'phone_rebind',
 ] as const
 export type MemberStepUpAction = (typeof MEMBER_STEP_UP_ACTIONS)[number]
 

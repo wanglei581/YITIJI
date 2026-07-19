@@ -177,4 +177,47 @@ export class MemberAssetsService {
       deletedCount: deletion.deletedCount,
     }
   }
+
+  /**
+   * 删除本人一条简历记录（Wave 2，硬删）。
+   *
+   * 简历 = AiResumeResult（kind='parse' 或 'generate'）。
+   * - 删 parse 行时，同 taskId 的全部派生行及 JobAiSession 一并物理删除（与 deleteAiRecord 一致）。
+   * - 删 generate 行时只删自身。
+   * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404。
+   * - 与 deleteAiRecord 共享相同的事务策略，不新增 DB schema。
+   */
+  async deleteResume(
+    endUserId: string,
+    recordId: string,
+  ): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
+    const deletion = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.aiResumeResult.findFirst({
+        where: { id: recordId, endUserId, kind: { in: ['parse', 'generate'] } },
+        select: { id: true, taskId: true, kind: true },
+      })
+      if (!row) return null
+      const results = await tx.aiResumeResult.deleteMany({
+        where: row.kind === 'parse'
+          ? { endUserId, taskId: row.taskId }
+          : { endUserId, id: row.id },
+      })
+      if (results.count === 0) return null
+      if (row.kind === 'parse') {
+        await tx.jobAiSession.deleteMany({ where: { endUserId, resumeTaskId: row.taskId } })
+      }
+      return { row, deletedCount: results.count }
+    })
+    if (!deletion) {
+      throw new NotFoundException({
+        error: { code: 'MEMBER_RECORD_NOT_FOUND', message: '简历记录不存在或已删除' },
+      })
+    }
+    return {
+      deleted: true,
+      taskId: deletion.row.taskId,
+      kind: deletion.row.kind,
+      deletedCount: deletion.deletedCount,
+    }
+  }
 }
