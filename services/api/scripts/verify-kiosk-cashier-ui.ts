@@ -78,6 +78,8 @@ async function main(): Promise<void> {
   console.log('\n=== C5-3 Kiosk 收银 / 出纸门控 verification ===')
 
   const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+  const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
 
   const prisma = new PrismaService()
   await prisma.onModuleInit()
@@ -89,7 +91,7 @@ async function main(): Promise<void> {
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const provider = new SandboxPaymentProvider(SANDBOX_SECRET)
   const payment = new OnlinePaymentService(prisma, audit, orderStatus, new PaymentProviderRegistry([provider]))
-  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit) // 不调 onModuleInit（避免 seed + 定时器）
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma))) })() // 不调 onModuleInit（避免 seed + 定时器）
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_cashier_${suffix}`

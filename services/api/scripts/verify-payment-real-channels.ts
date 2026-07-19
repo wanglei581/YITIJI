@@ -67,6 +67,8 @@ import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
+import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 
 // ── 断言基建 ────────────────────────────────────────────────────────────────
 let passCount = 0
@@ -374,7 +376,7 @@ async function main(): Promise<void> {
     orderStatus,
     new PaymentProviderRegistry([wechatProvider, alipayProvider]),
   )
-  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma))) })()
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_realpay_${suffix}`
