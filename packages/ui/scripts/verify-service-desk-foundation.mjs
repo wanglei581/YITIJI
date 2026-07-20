@@ -117,7 +117,7 @@ includesAll(ciWorkflow, [
   'otherTracked=$(git ls-files .ccg/commander .product-pm .workbuddy .superpowers .worktrees opc-doc)',
   "tracked=\"$tracked${tracked:+$'\\n'}$otherTracked\"",
   'pnpm --filter @ai-job-print/ui verify:service-desk-foundation',
-  'pnpm --filter @ai-job-print/kiosk verify:home-service-desk',
+  'pnpm --filter @ai-job-print/kiosk verify:home-prototype-v1',
   'pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui',
   'pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui',
 ], 'CI workflow')

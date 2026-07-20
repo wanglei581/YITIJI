@@ -115,14 +115,18 @@ expect(!home.includes('ReferenceServiceNav'), '首页停止渲染 ReferenceServi
 expect(!existsSync(join(root, 'src/components/lightflow/ReferenceServiceNav.tsx')), 'ReferenceServiceNav 孤儿组件已删除（全仓零引用）')
 expect(!existsSync(join(root, 'src/components/lightflow/reference-service-nav.css')), 'reference-service-nav.css 孤儿样式已删除')
 expect(!existsSync(join(root, 'src/components/lightflow/reference-layout.css')), 'reference-layout.css 孤儿样式已删除（唯一 importer 已随组件删除）')
-// home-prototype.css 中旧 ReferenceServiceNav 的 lf-reference-* 选择器已清除。
-// 注：home-services.css 链（home-service-desk.css @import 链，整条零引用孤儿）仍含
-// lf-reference-* 选择器，属更大范围的旧 .khome 首页资产，本次未纳入删除，另行评估。
-expect(
-  !existsSync(join(root, 'src/pages/home/styles/home-prototype.css')) ||
-    !/lf-reference-/.test(read('src/pages/home/styles/home-prototype.css')),
-  'home-prototype.css 不再含 lf-reference-* 遗留选择器',
-)
+// 旧 .khome 首页样式链整条删除（home-service-desk.css @import 的 shell/services/
+// responsive/continuation，及独立孤儿 home-prototype.css）；首页样式唯一来源为 prototype-v1.css。
+for (const legacy of [
+  'src/pages/home/home-service-desk.css',
+  'src/pages/home/styles/home-shell.css',
+  'src/pages/home/styles/home-services.css',
+  'src/pages/home/styles/home-responsive.css',
+  'src/pages/home/styles/home-continuation.css',
+  'src/pages/home/styles/home-prototype.css',
+]) {
+  expect(!existsSync(join(root, legacy)), `旧 .khome 首页样式已删除：${legacy}`)
+}
 expect(/className="kpv1"/.test(home), '首页根节点使用 .kpv1 作用域')
 expect(/<main className="groups"/.test(home), '首页服务区用原型 .groups 网格容器')
 expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
@@ -219,7 +223,6 @@ expect(kioskRoot.includes("const SERVICE_DESK_EXACT_ROUTES: readonly string[] = 
 // ── CI / package.json 接线 ──────────────────────────────────────
 expect(pkg.includes('"verify:home-prototype-v1": "node scripts/verify-home-prototype-v1.mjs"'), 'package.json 注册 verify:home-prototype-v1')
 expect(!pkg.includes('verify:home-service-desk'), 'package.json 已退役 verify:home-service-desk（首页重建为 prototype-v1）')
-expect(!existsSync(join(root, 'src/pages/home/home-service-desk.css')) || !home.includes('home-service-desk'), '首页不再引用退役的 service-desk 样式聚合')
 
 if (failures > 0) {
   console.error(`\nFAIL ${failures} 项 — 首页 prototype-v1 合同未满足\n`)
