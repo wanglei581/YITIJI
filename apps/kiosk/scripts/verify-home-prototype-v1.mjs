@@ -113,6 +113,16 @@ expect(!home.includes('home-service-desk.css'), 'HomePage 不再导入旧 servic
 expect(!home.includes('ReferenceServicePanel'), '首页废弃旧 ReferenceServicePanel 两级模型')
 expect(!home.includes('ReferenceServiceNav'), '首页停止渲染 ReferenceServiceNav')
 expect(!existsSync(join(root, 'src/components/lightflow/ReferenceServiceNav.tsx')), 'ReferenceServiceNav 孤儿组件已删除（全仓零引用）')
+expect(!existsSync(join(root, 'src/components/lightflow/reference-service-nav.css')), 'reference-service-nav.css 孤儿样式已删除')
+expect(!existsSync(join(root, 'src/components/lightflow/reference-layout.css')), 'reference-layout.css 孤儿样式已删除（唯一 importer 已随组件删除）')
+// home-prototype.css 中旧 ReferenceServiceNav 的 lf-reference-* 选择器已清除。
+// 注：home-services.css 链（home-service-desk.css @import 链，整条零引用孤儿）仍含
+// lf-reference-* 选择器，属更大范围的旧 .khome 首页资产，本次未纳入删除，另行评估。
+expect(
+  !existsSync(join(root, 'src/pages/home/styles/home-prototype.css')) ||
+    !/lf-reference-/.test(read('src/pages/home/styles/home-prototype.css')),
+  'home-prototype.css 不再含 lf-reference-* 遗留选择器',
+)
 expect(/className="kpv1"/.test(home), '首页根节点使用 .kpv1 作用域')
 expect(/<main className="groups"/.test(home), '首页服务区用原型 .groups 网格容器')
 expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
