@@ -159,20 +159,34 @@ function runStaticChecks(): void {
     ['toolbox: { enabled: true, items: [] }', 'getCachedKioskTerminalConfig'],
     'E2. Kiosk 统一配置本地默认启用百宝箱空占位并复用缓存',
   )
+  // prototype-v1（2026-07-20）：首页按 01-home.html 重写为聚合 zone-card，百宝箱完整能力
+  // （config 驱动 / 启动 / 离场确认 / 占位文案）移入承载页 /toolbox（ToolboxZonePage）；
+  // 统一配置缓存复用下沉到 useToolboxConfig hook。以下 E3* / E4 断言随职责位置重定向，
+  // 契约（仅显式关闭才隐藏、空配置不隐藏而是占位、复用缓存、保留占位文案）保持不放宽。
+  contains(
+    '../../apps/kiosk/src/hooks/useToolboxConfig.ts',
+    ['getCachedKioskTerminalConfig(terminalId)'],
+    'E3. Kiosk 百宝箱复用统一终端配置缓存（useToolboxConfig）',
+  )
   contains(
     '../../apps/kiosk/src/pages/home/HomePage.tsx',
-    ['if (!config.enabled) return null', 'getCachedKioskTerminalConfig(terminalId)'],
-    'E3. Kiosk 百宝箱仅显式关闭时整块隐藏且复用统一配置缓存',
+    ['toolbox.enabled'],
+    'E3a. Kiosk 首页百宝箱入口仅由 toolbox.enabled 控制显隐',
+  )
+  contains(
+    '../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
+    ['config.enabled ?', ': []'],
+    'E3c. /toolbox 页在配置关闭时不暴露可启动扩展项（enabled 门控 items）',
   )
   notContainsSource(
-    read('../../apps/kiosk/src/pages/home/HomePage.tsx'),
-    ['items.length === 0) return null'],
-    'E3b. Kiosk 百宝箱空配置不得作为整块隐藏条件',
+    read('../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx'),
+    ['items.length === 0) return null', 'items.length === 0 ? null'],
+    'E3b. /toolbox 空配置不得作为整块隐藏条件（应回落占位）',
   )
   contains(
-    '../../apps/kiosk/src/pages/home/HomePage.tsx',
+    '../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
     ['待配置', '后续功能上线后将在这里展示'],
-    'E4. Kiosk 首页保留百宝箱空配置占位文案',
+    'E4. /toolbox 承载页保留百宝箱空配置占位文案',
   )
   contains(
     'src/terminals/terminal-toolbox.service.ts',
