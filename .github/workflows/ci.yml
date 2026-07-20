@@ -122,7 +122,7 @@ jobs:
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
-          pnpm --filter @ai-job-print/kiosk verify:home-service-desk
+          pnpm --filter @ai-job-print/kiosk verify:home-prototype-v1
           pnpm --filter @ai-job-print/kiosk verify:member-login-dialog
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2c-interview
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2a-career
@@ -130,7 +130,6 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k2b-ai-resume
           pnpm --filter @ai-job-print/kiosk verify:resume-diagnosis-flow-ui
           pnpm --filter @ai-job-print/kiosk verify:job-material-library-ui
-          pnpm --filter @ai-job-print/kiosk verify:lightflow-4188-layout-parity
           pnpm --filter @ai-job-print/admin verify:service-desk-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:service-desk-jobs-ui
           pnpm --filter @ai-job-print/kiosk verify:lightflow-k1-public-entry

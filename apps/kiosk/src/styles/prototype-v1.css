@@ -1,0 +1,375 @@
+/* ============================================================
+ * prototype-v1 · Kiosk 前台设计系统（作用域主题）
+ *
+ * 唯一视觉基准：docs/design/kiosk-proto-2026-07/（fusion-youth 青绿米纸 V1 定稿）
+ * 最高真值：shared.css 基类 + 各页面 HTML 局部覆写后的“最终渲染结果”；
+ *          页面局部覆写 > 通用基类 > 旧报告。
+ *
+ * 作用域：token 定义在 :root（文档级），但全部以 --pv-* 命名空间隔离，
+ *        与 fusion-youth @theme 无碰撞、无值泄漏；所有组件/元素类均挂在 .kpv1
+ *        根下作用域，不改 service-desk / inkpaper 既有语义，
+ *        不影响其余未迁移页面与共享 KioskLayout。
+ *
+ * 本文件当前只承载 01-home 试点所需的 token 与公共组件；
+ * 首页人工验收通过、公共组件 API 冻结后，再按页面家族分批扩充
+ * （steps / pagehead / row-item / qr-panel / progress / actionbar 等）。
+ * ============================================================ */
+
+/* ── 设计 token（迁移自 shared.css :root，取原型精确 hex） ── */
+:root {
+  --pv-paper: #f4f1e8;
+  --pv-surface: #fffdf8;
+  --pv-ink: #10302b;
+  --pv-muted: #5d6b63;
+  --pv-line: #e2dccb;
+  --pv-teal: #1f9e86;
+  --pv-teal-deep: #157a67;
+  --pv-teal-soft: #e2f2ec;
+  --pv-clay: #b8683c;
+  --pv-clay-deep: #9e5330;
+  --pv-clay-soft: #f4e8dd;
+  --pv-wheat: #a9781f;
+  --pv-wheat-deep: #8a6219;
+  --pv-wheat-soft: #f2ead6;
+  --pv-plum: #7a5a86;
+  --pv-plum-deep: #63466f;
+  --pv-plum-soft: #efe7f1;
+  --pv-slate: #3f68b0;
+  --pv-slate-deep: #35608f;
+  --pv-slate-soft: #e5edf4;
+  --pv-dark: #10302b;
+  --pv-r-sm: 14px;
+  --pv-r-md: 18px;
+  --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --pv-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+/* ── 品类色映射（shared.css .a-* → .kpv1 作用域） ── */
+.kpv1 .a-teal  { --pv-accent: var(--pv-teal);  --pv-accent-deep: var(--pv-teal-deep);  --pv-accent-soft: var(--pv-teal-soft); }
+.kpv1 .a-clay  { --pv-accent: var(--pv-clay);  --pv-accent-deep: var(--pv-clay-deep);  --pv-accent-soft: var(--pv-clay-soft); }
+.kpv1 .a-wheat { --pv-accent: var(--pv-wheat); --pv-accent-deep: var(--pv-wheat-deep); --pv-accent-soft: var(--pv-wheat-soft); }
+.kpv1 .a-plum  { --pv-accent: var(--pv-plum);  --pv-accent-deep: var(--pv-plum-deep);  --pv-accent-soft: var(--pv-plum-soft); }
+.kpv1 .a-slate { --pv-accent: var(--pv-slate); --pv-accent-deep: var(--pv-slate-deep); --pv-accent-soft: var(--pv-slate-soft); }
+
+/* ── 1080×1920 舞台外壳（shared.css #stage） ── */
+.kpv1 {
+  width: min(1080px, 100%);
+  min-height: 1920px;
+  margin: 0 auto;
+  background:
+    radial-gradient(1200px 600px at 85% -5%, rgb(31 158 134 / 6%), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgb(184 104 60 / 5%), transparent 55%),
+    var(--pv-paper);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--pv-sans);
+  color: var(--pv-ink);
+  position: relative;
+  /* 原型 shared.css #stage 及全部文本继承浏览器默认 line-height:normal；
+     本 app 全局 Tailwind Preflight 注入 line-height:1.5（root/h2/tile 文本均 1.5×），
+     会令每个未显式设行高的元素比原型高约 10px/卡，逐区向下累积漂移（CDP 实测峰值 ~35px）。
+     在 .kpv1 子树恢复 normal，逐区锚点 Δ≤4px。显式设行高处（welcome h1 / .t-text span 等）不受影响。 */
+  line-height: normal;
+}
+.kpv1 *,
+.kpv1 *::before,
+.kpv1 *::after { box-sizing: border-box; }
+
+/* ── 顶部状态栏（shared.css .topbar，height:76px） ── */
+.kpv1 .topbar {
+  height: 76px;
+  flex: none;
+  background: var(--pv-dark);
+  color: #f4f1e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 44px;
+}
+.kpv1 .topbar .brand { display: flex; align-items: baseline; gap: 18px; }
+.kpv1 .topbar .brand b { font-family: var(--pv-serif); font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+.kpv1 .topbar .brand span { font-size: 20px; opacity: .55; }
+.kpv1 .topbar .right { display: flex; align-items: center; gap: 28px; font-size: 20px; }
+.kpv1 .topbar .clock { opacity: .85; font-variant-numeric: tabular-nums; }
+.kpv1 .status-chip {
+  display: flex; align-items: center; gap: 10px;
+  background: rgb(31 158 134 / 18%); border: 1px solid rgb(31 158 134 / 45%);
+  padding: 8px 18px; border-radius: 999px; font-size: 19px;
+}
+.kpv1 .status-chip .dot { width: 11px; height: 11px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 4px rgb(53 171 142 / 20%); }
+.kpv1 .status-chip.warn { background: rgb(184 104 60 / 18%); border-color: rgb(184 104 60 / 45%); }
+.kpv1 .status-chip.warn .dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
+.kpv1 .status-chip.neutral { background: rgb(139 150 142 / 18%); border-color: rgb(139 150 142 / 45%); }
+.kpv1 .status-chip.neutral .dot { background: #8b968e; box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
+/* ── 欢迎区（01-home.html .welcome） ── */
+.kpv1 .welcome {
+  flex: none; padding: 12px 48px 8px;
+  display: flex; justify-content: space-between; align-items: flex-end; gap: 30px;
+}
+.kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 46px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
+.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); }
+.kpv1 .welcome p { margin-top: 10px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
+
+/* ── 登录按钮（01-home.html .login-btn，min-height:88px，r-md 圆角） ── */
+.kpv1 .login-btn {
+  flex: none; display: flex; align-items: center; gap: 16px;
+  min-height: 88px; padding: 0 38px;
+  background: var(--pv-dark); color: #f4f1e8;
+  border: none; border-radius: var(--pv-r-md); cursor: pointer;
+  font-family: var(--pv-sans); font-size: 27px; font-weight: 600; letter-spacing: 1px;
+  box-shadow: 0 6px 18px rgb(16 48 43 / 18%);
+}
+.kpv1 .login-btn:active { transform: scale(.98); }
+.kpv1 .login-btn svg { width: 38px; height: 38px; }
+.kpv1 .login-btn small { display: block; font-size: 16px; font-weight: 400; opacity: .62; margin-top: 4px; text-align: left; letter-spacing: 0; }
+.kpv1 .login-btn .lb-text { text-align: left; }
+
+/* ── 服务分组容器（01-home.html .groups，两列网格） ── */
+.kpv1 .groups {
+  flex: 1; padding: 0 48px; min-height: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px;
+  align-content: start;
+  /* 与 01-home.html .groups 完全一致（shared.css #stage 1080×1920 flex 列，.groups flex:1）。
+     align-content:start：4 行按自然高度贴顶排布，富余空间统一沉到 groups 盒底部（zone-row 之上），
+     zone-row/notice/navbar 依次紧随、navbar 落在 1920 底边。逐区锚点相对原型 Δ≤4px（CDP 实测）。 */
+}
+
+/* ── 卡片（shared.css .card + 01-home 覆写：品类色左侧 6px 竖条） ── */
+.kpv1 .card {
+  background: var(--pv-surface);
+  border: 1px solid var(--pv-line);
+  border-radius: var(--pv-r-md);
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+  position: relative; overflow: hidden;
+}
+.kpv1 .card.wide { grid-column: span 2; }
+.kpv1 .groups .card { padding: 18px 24px 20px; }
+.kpv1 .groups .card-head { margin-bottom: 10px; }
+/* V1 首页识别：品类色左侧描边（01-home 覆写 shared.css 的 .card::before content:none） */
+.kpv1 .groups .card::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: 6px;
+  background: var(--pv-accent, var(--pv-teal)); border-radius: 6px 0 0 6px;
+}
+.kpv1 .card-head { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.kpv1 .card-head .g-icon {
+  width: 56px; height: 56px; flex: none; border-radius: 14px;
+  display: grid; place-items: center;
+  background: var(--pv-accent-soft, var(--pv-teal-soft)); color: var(--pv-accent-deep, var(--pv-teal-deep));
+}
+.kpv1 .card-head .g-icon svg { width: 32px; height: 32px; }
+.kpv1 .card-head h2 { font-family: var(--pv-serif); font-size: 32px; font-weight: 700; letter-spacing: 1px; }
+/* 分组标题聚合入口：继承 h2 字体，去按钮默认样式，仅加箭头暗示可点（不改原型排版） */
+.kpv1 .card-head h2 .g-title-link {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; letter-spacing: inherit; color: inherit;
+}
+.kpv1 .card-head h2 .g-title-link:active { transform: scale(.99); }
+.kpv1 .card-head h2 .g-title-link svg { width: 24px; height: 24px; color: var(--pv-muted); }
+.kpv1 .card-head .sub { font-size: 19px; color: var(--pv-muted); margin-top: 4px; }
+.kpv1 .card-head .badge {
+  display: inline-flex; align-items: center; gap: 7px; margin-left: auto;
+  font-size: 18px; font-weight: 600; color: var(--pv-teal-deep);
+  background: var(--pv-teal-soft); border: 1px solid rgb(31 158 134 / 30%);
+  padding: 7px 16px; border-radius: 999px;
+}
+.kpv1 .card-head .badge svg { width: 18px; height: 18px; }
+/* ── 磁贴网格（01-home.html .tiles.c1/c2/c3/c5） ── */
+.kpv1 .tiles { display: grid; gap: 10px; }
+.kpv1 .tiles.c3 { grid-template-columns: repeat(3, 1fr); }
+.kpv1 .tiles.c2 { grid-template-columns: repeat(2, 1fr); }
+.kpv1 .tiles.c5 { grid-template-columns: repeat(5, 1fr); }
+.kpv1 .tiles.c1 { grid-template-columns: 1fr; }
+
+/* ── 磁贴（shared.css .tile 基类 + 01-home 覆写高度） ── */
+.kpv1 .tile {
+  display: flex; align-items: center; gap: 15px;
+  min-height: 96px; padding: 14px 18px;
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line); border-radius: var(--pv-r-sm);
+  cursor: pointer; text-align: left; font-family: var(--pv-sans); color: var(--pv-ink);
+  transition: transform .08s ease;
+}
+.kpv1 .tile:active { transform: scale(.975); }
+.kpv1 .tile:disabled { cursor: not-allowed; }
+/* 01-home 覆写：.groups 内磁贴 76px，c1/c2 70px，col 90px */
+.kpv1 .groups .tile { min-height: 76px; padding: 10px 14px; }
+.kpv1 .groups .tile .t-text span { margin-top: 2px; }
+.kpv1 .tiles.c2 .tile, .kpv1 .tiles.c1 .tile { min-height: 70px; padding: 8px 14px; }
+.kpv1 .tile.col {
+  flex-direction: column; text-align: center; gap: 8px;
+  padding: 12px 8px; min-height: 90px; justify-content: center;
+}
+.kpv1 .tile.col .t-text { text-align: center; }
+.kpv1 .tile.col .tag-soon { margin: 0 auto; }
+.kpv1 .tile .t-icon {
+  width: 46px; height: 46px; flex: none; border-radius: 12px;
+  display: grid; place-items: center;
+  background: var(--pv-surface); border: 1px solid var(--pv-line);
+  color: var(--pv-accent-deep, var(--pv-teal-deep));
+}
+.kpv1 .tile .t-icon svg { width: 26px; height: 26px; }
+.kpv1 .tile .t-text b { display: block; font-size: 23px; font-weight: 600; letter-spacing: .5px; }
+.kpv1 .tile .t-text span { display: block; font-size: 16.5px; color: var(--pv-muted); margin-top: 4px; line-height: 1.35; }
+.kpv1 .tile.primary {
+  background: var(--pv-accent-soft, var(--pv-teal-soft));
+  border-color: color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 35%, transparent);
+}
+.kpv1 .tile.primary .t-icon { background: var(--pv-accent, var(--pv-teal)); border: none; color: #fffdf8; }
+.kpv1 .tile.disabled { opacity: .55; cursor: not-allowed; background: var(--pv-surface); border-style: dashed; }
+.kpv1 .tag-soon {
+  flex: none; margin-left: auto;
+  font-size: 14px; color: var(--pv-muted);
+  border: 1px solid var(--pv-line); border-radius: 999px; padding: 4px 10px;
+  background: var(--pv-paper); white-space: nowrap;
+}
+/* ── 动态专区（01-home.html .zone-row / .zone-card；后台开关驱动） ── */
+.kpv1 .zone-row {
+  flex: none; margin: 8px 48px 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.kpv1 .zone-card {
+  display: flex; flex-direction: column; align-items: stretch; gap: 12px;
+  min-height: 136px; padding: 16px 22px;
+  border-radius: var(--pv-r-md);
+  cursor: pointer; text-align: left; font-family: var(--pv-sans); color: var(--pv-ink);
+  box-shadow: 0 3px 12px rgb(16 48 43 / 5%);
+  transition: transform .08s ease;
+}
+.kpv1 .zone-card:active { transform: scale(.98); }
+.kpv1 .zone-card.z-plum { background: var(--pv-plum-soft); border: 1px solid color-mix(in srgb, var(--pv-plum) 38%, transparent); }
+.kpv1 .zone-card.z-teal { background: var(--pv-teal-soft); border: 1px solid color-mix(in srgb, var(--pv-teal) 38%, transparent); }
+.kpv1 .zone-card .z-icon {
+  width: 58px; height: 58px; flex: none; border-radius: 14px;
+  display: grid; place-items: center; color: #fffdf8;
+}
+.kpv1 .zone-card.z-plum .z-icon { background: var(--pv-plum); }
+.kpv1 .zone-card.z-teal .z-icon { background: var(--pv-teal); }
+.kpv1 .zone-card .z-icon svg { width: 31px; height: 31px; }
+.kpv1 .zone-card .z-top { display: flex; align-items: center; gap: 18px; }
+.kpv1 .zone-card .z-text { flex: 1; min-width: 0; }
+.kpv1 .zone-card .z-text b { display: block; font-family: var(--pv-serif); font-size: 27px; font-weight: 700; letter-spacing: 1px; }
+.kpv1 .zone-card .z-text .z-sub { display: block; font-size: 16.5px; color: var(--pv-muted); margin-top: 4px; line-height: 1.3; }
+.kpv1 .zone-card .z-chips { display: flex; gap: 8px; flex-wrap: nowrap; overflow: hidden; }
+/* 动态专区规则：某一专区被后台关闭（不渲染）时，剩余一张卡自动通栏并多露预览签 */
+.kpv1 .zone-row .zone-card:only-child { grid-column: 1 / -1; }
+.kpv1 .zone-card .z-chips i.more { display: none; }
+.kpv1 .zone-card:only-child .z-chips i.more { display: inline-flex; }
+.kpv1 .zone-card .z-chips i {
+  font-style: normal; font-size: 14.5px; white-space: nowrap;
+  padding: 4px 11px; border-radius: 999px;
+  background: rgb(255 253 248 / 85%); border: 1px solid var(--pv-line); color: var(--pv-muted);
+}
+.kpv1 .zone-card .z-side { flex: none; display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.kpv1 .zone-card .z-tag {
+  font-size: 14.5px; color: var(--pv-muted); white-space: nowrap;
+  border: 1px solid var(--pv-line); border-radius: 999px; padding: 4px 12px; background: rgb(255 253 248 / 85%);
+}
+/* 原型里 .arrow 直接是 <svg>；React 用 <span class="arrow"> 包 ProtoIcon，
+   故 span 定尺寸 + 内层 svg 显式定尺寸（对齐 z-icon/t-icon/g-icon 的 svg 规则），
+   避免无 width/height 的 svg 回退到 300×150 默认尺寸把箭头撑爆。 */
+.kpv1 .zone-card .arrow { display: inline-flex; width: 24px; height: 24px; color: var(--pv-muted); opacity: .55; }
+.kpv1 .zone-card .arrow svg { width: 24px; height: 24px; }
+.kpv1 .zone-card .z-empty { font-size: 16.5px; color: var(--pv-muted); }
+
+/* ── 合规提示条（01-home.html .notice） ── */
+.kpv1 .notice {
+  margin: 6px 48px 0;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 17px; color: var(--pv-muted); line-height: 1.5;
+  padding: 12px 20px;
+  background: rgb(255 253 248 / 70%); border: 1px dashed var(--pv-line); border-radius: 12px;
+}
+.kpv1 .notice svg { width: 20px; height: 20px; flex: none; color: var(--pv-wheat); }
+
+/* ── 继续上次（原型外生产动态状态：仅登录且确有可恢复任务时由 ContinuePanel 渲染，
+      标准原型验收态该区不出现，故不破坏 01-home 1:1） ── */
+.kpv1 .continue {
+  margin: 6px 48px 0;
+  display: flex; align-items: center; gap: 20px;
+  padding: 22px 30px;
+  background: var(--pv-teal-soft);
+  border: 1px solid var(--pv-line); border-radius: var(--pv-r-md);
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.kpv1 .continue .c-icon {
+  width: 58px; height: 58px; flex: none; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pv-surface); color: var(--pv-teal-deep);
+}
+.kpv1 .continue .c-icon svg { width: 30px; height: 30px; }
+.kpv1 .continue .c-copy { flex: 1; min-width: 0; }
+.kpv1 .continue .c-copy strong { font-size: 24px; font-weight: 700; color: var(--pv-ink); letter-spacing: 1px; }
+.kpv1 .continue .c-copy p { margin-top: 4px; font-size: 18px; color: var(--pv-muted); letter-spacing: .5px; }
+.kpv1 .continue .btn {
+  flex: none; display: inline-flex; align-items: center; gap: 10px;
+  min-height: 64px; padding: 0 28px; cursor: pointer;
+  border: none; border-radius: var(--pv-r-sm);
+  font-family: var(--pv-sans); font-size: 21px; font-weight: 600; letter-spacing: 1px;
+}
+.kpv1 .continue .btn.primary { background: var(--pv-teal); color: #f4f1e8; box-shadow: 0 6px 18px rgb(16 48 43 / 18%); }
+.kpv1 .continue .btn:active { transform: scale(.98); }
+.kpv1 .continue .btn svg { width: 26px; height: 26px; }
+
+/* ── 底部导航（shared.css .navbar，height:116px；01-home margin-top:8px） ── */
+.kpv1 .navbar {
+  height: 116px; flex: none; margin-top: 8px;
+  background: var(--pv-dark);
+  display: grid; grid-template-columns: repeat(3, 1fr);
+}
+.kpv1 .nav-item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  background: none; border: none; cursor: pointer;
+  color: rgb(244 241 232 / 55%); font-size: 21px; letter-spacing: 2px; font-family: var(--pv-sans);
+  position: relative;
+}
+.kpv1 .nav-item svg { width: 34px; height: 34px; }
+.kpv1 .nav-item.active { color: #f4f1e8; }
+.kpv1 .nav-item.active::after {
+  content: ''; position: absolute; bottom: 14px;
+  width: 36px; height: 5px; border-radius: 3px; background: var(--pv-teal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kpv1 .tile, .kpv1 .zone-card, .kpv1 .login-btn { transition: none; }
+  .kpv1 .tile:active, .kpv1 .zone-card:active, .kpv1 .login-btn:active { transform: none; }
+}
+
+/* ============================================================
+ * 原型外响应式扩展（NON-prototype）：
+ * 01-home 原型只定义 1080×1920 一体机画布，无手机版。以下断点仅为
+ * 生产在手机 / 桌面窄屏下不横向溢出（CLAUDE.md §17），不属于原型 1:1，
+ * 验收报告需标注为“原型外动态适配”。1080×1920 主画布不受影响。
+ * ============================================================ */
+/* 边界用 1079.98px 而非 1080px：max-width 含端点，若写 1080px 则在一体机真值
+   画布(width:1080)也会命中，把原型 48px 内边距压成 24px（横向偏移 24px、卡片宽 +48px，
+   叠图实测）。原型只有 1080 一档且无媒体查询，故 1:1 画布必须走基础 48px 规则；
+   本断点只服务 <1080 的窄屏，不得触及 1080 主画布。 */
+@media (max-width: 1079.98px) {
+  .kpv1 .topbar { padding: 0 24px; }
+  .kpv1 .welcome { padding: 12px 24px 8px; }
+  .kpv1 .groups { padding: 0 24px; }
+  .kpv1 .zone-row { margin: 8px 24px 0; }
+  .kpv1 .notice { margin: 6px 24px 0; }
+}
+@media (max-width: 760px) {
+  .kpv1 .welcome { flex-direction: column; align-items: stretch; gap: 16px; }
+  .kpv1 .welcome h1 { font-size: 34px; }
+  .kpv1 .login-btn { justify-content: center; }
+  .kpv1 .groups { grid-template-columns: 1fr; }
+  .kpv1 .card.wide { grid-column: auto; }
+  .kpv1 .tiles.c5 { grid-template-columns: repeat(2, 1fr); }
+  .kpv1 .zone-row { grid-template-columns: 1fr; }
+}
+@media (max-width: 420px) {
+  .kpv1 .topbar { padding: 0 14px; }
+  .kpv1 .welcome, .kpv1 .groups { padding-left: 14px; padding-right: 14px; }
+  .kpv1 .zone-row, .kpv1 .notice { margin-left: 14px; margin-right: 14px; }
+  .kpv1 .tiles.c3 { grid-template-columns: repeat(2, 1fr); }
+  .kpv1 .welcome h1 { font-size: 30px; }
+}
+
+/* 一体机主画布：显式锁定 1080×1920 语义（原型真值画布） */
+@media (width: 1080px) and (height: 1920px) {
+  .kpv1 { width: 1080px; min-height: 1920px; }
+}

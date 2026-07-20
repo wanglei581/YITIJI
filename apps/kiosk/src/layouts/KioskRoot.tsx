@@ -86,8 +86,11 @@ function KioskShell() {
       density="touch"
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
+      // prototype-v1 首页（.kpv1）自绘 116px 原型底部导航，故隐藏共享 KioskLayout 底栏；
+      // 其余路由仍使用共享底栏。下方 visualTheme 三元与路由白名单保持不变——
+      // 首页内容全部 .kpv1 作用域，主题 token 不作用于其内部（该属性对首页为 vestigial）。
       hideHeader={pathname === '/' || isCampusZone}
-      hideBottomNav={isCampusZone}
+      hideBottomNav={pathname === '/' || isCampusZone}
       headerRight={<StatusBadge status={statusVariant} label={statusLabel} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），

@@ -58,6 +58,7 @@ test-results/
 # Temp
 .tmp
 /tmp/
+.cache/
 mavis-workspace/
 .mavis/
 .opencode/
