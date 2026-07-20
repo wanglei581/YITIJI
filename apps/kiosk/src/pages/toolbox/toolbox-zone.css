@@ -1,0 +1,47 @@
+/* 百宝箱区页样式（/toolbox）
+ * pagehead/back-btn 取自 shared.css，暂 scope 在 .kpv1 .ktoolbox 页内，
+ * 待首页公共组件 API 冻结后再提升为 prototype-v1 共享层。 */
+
+.kpv1.ktoolbox { padding-bottom: 40px; }
+
+.kpv1 .pagehead {
+  flex: none;
+  padding: 34px 48px 26px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+.kpv1 .back-btn {
+  display: flex; align-items: center; gap: 12px; flex: none; white-space: nowrap;
+  min-height: 72px; padding: 0 30px;
+  background: var(--pv-surface); color: var(--pv-ink);
+  border: 1px solid var(--pv-line); border-radius: var(--pv-r-sm);
+  font-size: 24px; font-weight: 600; cursor: pointer; font-family: var(--pv-sans);
+  box-shadow: 0 3px 10px rgb(16 48 43 / 5%);
+}
+.kpv1 .back-btn:active { transform: scale(.97); }
+.kpv1 .back-btn svg { width: 26px; height: 26px; }
+.kpv1 .pagehead .titles h1 { font-family: var(--pv-serif); font-size: 44px; font-weight: 900; letter-spacing: 2px; }
+.kpv1 .pagehead .titles p { margin-top: 8px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
+
+.kpv1 .tb-content {
+  flex: 1; padding: 0 48px; min-height: 0;
+  display: flex; flex-direction: column; gap: 24px;
+}
+.kpv1 .ktoolbox .tiles.c3 { grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.kpv1 .ktoolbox .tile { min-height: 110px; }
+
+.kpv1 .tb-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  padding: 80px 20px; color: var(--pv-muted); text-align: center;
+  background: var(--pv-surface); border: 1px dashed var(--pv-line); border-radius: var(--pv-r-md);
+}
+.kpv1 .tb-empty svg { width: 72px; height: 72px; opacity: .35; }
+.kpv1 .tb-empty b { font-size: 24px; color: var(--pv-ink); font-weight: 600; }
+.kpv1 .tb-empty span { font-size: 19px; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .kpv1 .pagehead { padding: 24px; }
+  .kpv1 .tb-content { padding: 0 24px; }
+  .kpv1 .ktoolbox .tiles.c3 { grid-template-columns: 1fr; }
+}

@@ -572,8 +572,8 @@ expect(
 )
 expectMatches(
   workflow,
-  /pnpm --filter @ai-job-print\/kiosk verify:home-service-desk\s*\n\s*pnpm --filter @ai-job-print\/kiosk verify:member-login-dialog/,
-  'CI 在 verify:home-service-desk 后紧跟登录弹窗合同',
+  /pnpm --filter @ai-job-print\/kiosk verify:home-prototype-v1\s*\n\s*pnpm --filter @ai-job-print\/kiosk verify:member-login-dialog/,
+  'CI 在 verify:home-prototype-v1 后紧跟登录弹窗合同（首页重建为 prototype-v1，守卫更名）',
 )
 
 if (failures > 0) {

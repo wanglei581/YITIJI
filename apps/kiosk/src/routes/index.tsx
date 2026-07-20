@@ -135,6 +135,7 @@ export const kioskRouter = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
       },
       // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
+      { path: 'toolbox',                         lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
       { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
       { path: 'smart-campus/welcome',            element: <SmartCampusWelcomePage /> },
       { path: 'smart-campus/freshman-insights',  element: <FreshmanInsightsPage /> },
