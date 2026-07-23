@@ -225,18 +225,19 @@ export function findSensitivePrototypeInputValues(html) {
   return issues
 }
 
-async function listFiles(root) {
+export async function listRegularFilesRecursively(root) {
   const entries = await readdir(root, { withFileTypes: true })
   const nested = await Promise.all(entries.map(async (entry) => {
     const absolute = resolve(root, entry.name)
-    if (entry.isDirectory()) return await listFiles(absolute)
+    if (entry.isDirectory()) return await listRegularFilesRecursively(absolute)
     return entry.isFile() ? [absolute] : []
   }))
-  return nested.flat()
+  return nested.flat().sort()
 }
 
 export async function findForbiddenFusionReferences(srcRoot) {
-  const files = (await listFiles(srcRoot)).filter((file) => /\.[cm]?[jt]sx?$/.test(file))
+  const files = (await listRegularFilesRecursively(srcRoot))
+    .filter((file) => /\.[cm]?[jt]sx?$/.test(file))
   const offenders = []
   for (const file of files) {
     if ((await readFile(file, 'utf8')).includes(FUSION_MARKER)) {

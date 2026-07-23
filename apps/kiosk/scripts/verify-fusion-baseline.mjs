@@ -9,6 +9,7 @@ import {
   extractManifestRoutePatterns,
   findSensitivePrototypeInputValues,
   findForbiddenFusionReferences,
+  listRegularFilesRecursively,
   sha256File,
 } from './lib/fusion-baseline-contract.mjs'
 
@@ -49,6 +50,7 @@ const routerPath = resolve(repoRoot, 'apps/kiosk/src/routes/index.tsx')
 const manifestPath = resolve(repoRoot, 'apps/kiosk/tests/visual/route-manifest.ts')
 const matrixPath = resolve(repoRoot, 'docs/design/kiosk-proto-2026-07-migration-matrix.md')
 const srcRoot = resolve(repoRoot, 'apps/kiosk/src')
+const sourcesRoot = resolve(fusionRoot, 'sources')
 const results = []
 
 function displayPath(filePath) {
@@ -83,6 +85,50 @@ async function readDeclaredRoutes(fail) {
   const source = await readRequired(routerPath, fail)
   return source === null ? null : extractDeclaredRoutePatterns(source)
 }
+
+function reportInventoryDifferences(fail, label, expectedPaths, actualPaths) {
+  const expected = new Set(expectedPaths)
+  const actual = new Set(actualPaths)
+  const missing = expectedPaths.filter((filePath) => !actual.has(filePath))
+  const unexpected = actualPaths.filter((filePath) => !expected.has(filePath))
+  if (missing.length > 0) {
+    fail(`${label}: missing expected regular files ${missing.join(', ')}`)
+  }
+  if (unexpected.length > 0) {
+    fail(`${label}: unexpected regular files ${unexpected.join(', ')}`)
+  }
+}
+
+await runGroup('immutable fusion source inventory', async (fail) => {
+  const expectedPaths = Object.keys(EXPECTED_SOURCES).sort()
+  if (expectedPaths.length !== 15) {
+    fail(`expected exactly 15 frozen source paths, received ${expectedPaths.length}`)
+  }
+  try {
+    const actualPaths = (await listRegularFilesRecursively(sourcesRoot))
+      .map((filePath) => relative(fusionRoot, filePath))
+      .sort()
+    reportInventoryDifferences(fail, displayPath(sourcesRoot), expectedPaths, actualPaths)
+  } catch (error) {
+    fail(`${displayPath(sourcesRoot)}: unable to list regular files (${describeError(error)})`)
+  }
+})
+
+await runGroup('derived fusion HTML inventory', async (fail) => {
+  const expectedPaths = [...DERIVED_HTML_FILES].sort()
+  if (expectedPaths.length !== 9) {
+    fail(`expected exactly 9 derived root HTML paths, received ${expectedPaths.length}`)
+  }
+  try {
+    const actualPaths = (await listRegularFilesRecursively(fusionRoot))
+      .filter((filePath) => dirname(filePath) === fusionRoot && filePath.endsWith('.html'))
+      .map((filePath) => relative(fusionRoot, filePath))
+      .sort()
+    reportInventoryDifferences(fail, displayPath(fusionRoot), expectedPaths, actualPaths)
+  } catch (error) {
+    fail(`${displayPath(fusionRoot)}: unable to list regular files (${describeError(error)})`)
+  }
+})
 
 await runGroup('immutable fusion source hashes', async (fail) => {
   const sourceEntries = Object.entries(EXPECTED_SOURCES)

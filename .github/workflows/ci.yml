@@ -456,6 +456,14 @@ jobs:
           pnpm --filter @ai-job-print/shared typecheck
           pnpm --filter @ai-job-print/ui typecheck
 
+      - name: Run Kiosk fusion contract tests with coverage gates
+        run: |
+          node --experimental-test-coverage --test \
+            --test-coverage-lines=80 \
+            --test-coverage-functions=80 \
+            --test-coverage-branches=80 \
+            apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs
+
       - name: Verify Kiosk fusion baseline
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
 
