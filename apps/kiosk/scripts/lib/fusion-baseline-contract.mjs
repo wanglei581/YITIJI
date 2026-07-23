@@ -8,7 +8,6 @@ const HTML_COMMENT = /<!--[\s\S]*?-->/g
 const HTML_TAG = /<([a-z][\w:-]*)\b([^<>]*?)>/gi
 const HTML_REFERENCE_ATTRIBUTE = /(?:^|\s)(href|src)\s*=\s*(["'])(.*?)\2/gi
 const HTML_VALUE_ATTRIBUTE = /(?:^|\s)value\s*=\s*(["'])(.*?)\1/i
-const ROUTE_MANIFEST = /export const productionRoutePatterns = \[([\s\S]*?)\] as const/
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
 
 export async function sha256File(filePath) {
@@ -164,12 +163,41 @@ export function extractManifestRedirects(source) {
 }
 
 export function extractManifestRoutePatterns(source) {
-  const body = source.match(ROUTE_MANIFEST)?.[1]
-  if (!body) return []
-  return [...body.matchAll(/(['"])(.*?)\1/g)]
-    .map((match) => match[2])
-    .filter((routePath, index, routes) => routes.indexOf(routePath) === index)
-    .sort()
+  const sourceFile = ts.createSourceFile(
+    'route-manifest.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  )
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      !statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      continue
+    }
+    const declaration = statement.declarationList.declarations.find((candidate) =>
+      ts.isIdentifier(candidate.name) && candidate.name.text === 'productionRoutePatterns',
+    )
+    if (!declaration) continue
+    if (!declaration.initializer) {
+      throw new Error('productionRoutePatterns must initialize an array literal')
+    }
+    const initializer = unwrapExpression(declaration.initializer)
+    if (!ts.isArrayLiteralExpression(initializer)) {
+      throw new Error('productionRoutePatterns must initialize an array literal')
+    }
+    return initializer.elements.map((element) => {
+      if (ts.isStringLiteral(element) || ts.isNoSubstitutionTemplateLiteral(element)) {
+        return element.text
+      }
+      throw new Error(
+        `productionRoutePatterns accepts only string literal elements; received ${ts.SyntaxKind[element.kind]}`,
+      )
+    }).sort()
+  }
+  return []
 }
 
 export async function collectMissingLocalReferences(htmlPath) {

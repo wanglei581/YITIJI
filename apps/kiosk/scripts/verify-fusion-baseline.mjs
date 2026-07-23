@@ -99,6 +99,15 @@ function reportInventoryDifferences(fail, label, expectedPaths, actualPaths) {
   }
 }
 
+function listDuplicateValues(values) {
+  const counts = new Map()
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1)
+  return [...counts.entries()]
+    .filter(([, count]) => count > 1)
+    .map(([value, count]) => `${value} (${count}x)`)
+    .sort()
+}
+
 await runGroup('immutable fusion source inventory', async (fail) => {
   const expectedPaths = Object.keys(EXPECTED_SOURCES).sort()
   if (expectedPaths.length !== 15) {
@@ -148,10 +157,16 @@ await runGroup('immutable fusion source hashes', async (fail) => {
   }
 })
 
-await runGroup('router route count', async (fail) => {
+await runGroup('router route inventory', async (fail) => {
   const routes = await readDeclaredRoutes(fail)
   if (routes !== null && routes.length !== 86) {
     fail(`${displayPath(routerPath)}: expected exactly 86 normalized routes, received ${routes.length}`)
+  }
+  if (routes !== null) {
+    const duplicates = listDuplicateValues(routes)
+    if (duplicates.length > 0) {
+      fail(`${displayPath(routerPath)}: duplicate normalized routes ${duplicates.join(', ')}`)
+    }
   }
 })
 
@@ -161,6 +176,13 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   if (routes === null || manifestSource === null) return
 
   const manifestRoutes = extractManifestRoutePatterns(manifestSource)
+  if (manifestRoutes.length !== 86) {
+    fail(`${displayPath(manifestPath)}: expected exactly 86 route patterns, received ${manifestRoutes.length}`)
+  }
+  const manifestDuplicates = listDuplicateValues(manifestRoutes)
+  if (manifestDuplicates.length > 0) {
+    fail(`${displayPath(manifestPath)}: duplicate route patterns ${manifestDuplicates.join(', ')}`)
+  }
   const missingFromManifest = routes.filter((routePath) => !manifestRoutes.includes(routePath))
   const missingFromRouter = manifestRoutes.filter((routePath) => !routes.includes(routePath))
   if (missingFromManifest.length > 0 || missingFromRouter.length > 0) {

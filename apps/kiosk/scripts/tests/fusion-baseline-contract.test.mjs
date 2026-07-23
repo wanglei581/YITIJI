@@ -40,9 +40,40 @@ test('extractDeclaredRoutePatterns normalizes absolute and nested route strings'
 })
 
 test('extractManifestRoutePatterns reads the exported Playwright route array', () => {
-  const source = `export const productionRoutePatterns = ['/', '/jobs/:id'] as const`
-  assert.deepEqual(extractManifestRoutePatterns(source), ['/', '/jobs/:id'])
+  const source = `
+    export const productionRoutePatterns = (([
+      '/',
+      // '/comment-only',
+      '/jobs/:id',
+      \`/login\`,
+      '/jobs/:id',
+    ] as const) satisfies readonly string[])
+  `
+  assert.deepEqual(
+    extractManifestRoutePatterns(source),
+    ['/', '/jobs/:id', '/jobs/:id', '/login'],
+  )
   assert.deepEqual(extractManifestRoutePatterns('export const other = []'), [])
+  assert.throws(
+    () => extractManifestRoutePatterns(`
+      const dynamicRoute = '/dynamic'
+      export const productionRoutePatterns = ['/', dynamicRoute] as const
+    `),
+    /productionRoutePatterns.*string literal/i,
+  )
+  assert.throws(
+    () => extractManifestRoutePatterns(`
+      const extraRoutes = ['/spread'] as const
+      export const productionRoutePatterns = ['/', ...extraRoutes] as const
+    `),
+    /productionRoutePatterns.*string literal/i,
+  )
+  assert.throws(
+    () => extractManifestRoutePatterns(`
+      export const productionRoutePatterns = ['/', 42] as const
+    `),
+    /productionRoutePatterns.*string literal/i,
+  )
 })
 
 test('extractDeclaredRedirects reads five literal Navigate redirects from router objects', () => {

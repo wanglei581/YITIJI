@@ -45,7 +45,8 @@ for (const scenario of kioskScenarios) {
 }
 
 for (const scenario of mobileScenarios) {
-  test(`${scenario.path} renders the fusion state @mobile`, async ({ page }) => {
+  test(`${scenario.path} renders the fusion state @mobile`, async ({ page, api }) => {
+    void api
     expect(productionRoutePatterns).toContain(scenario.path)
     const runtimeErrors = collectRuntimeErrors(page)
 
