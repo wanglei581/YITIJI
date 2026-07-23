@@ -7,6 +7,7 @@ import {
   collectMissingLocalReferences,
   extractDeclaredRoutePatterns,
   extractManifestRoutePatterns,
+  findSensitivePrototypeInputValues,
   findForbiddenFusionReferences,
   sha256File,
 } from '../lib/fusion-baseline-contract.mjs'
@@ -58,6 +59,50 @@ test('collectMissingLocalReferences ignores external links and reports local mis
   assert.deepEqual(
     await collectMissingLocalReferences(join(root, 'index.html')),
     ['/assets/missing-root.png', '/assets/missing.css', 'missing.png'].sort(),
+  )
+})
+
+test('findSensitivePrototypeInputValues reports only safe labels for complete credentials', () => {
+  const sensitiveValues = [
+    '13955550101',
+    '139 5555 0101',
+    '139-5555-0101',
+    '654321',
+  ]
+  const html = sensitiveValues.map((value) => `<input type="text" value="${value}">`).join('')
+
+  const issues = findSensitivePrototypeInputValues(html)
+
+  assert.deepEqual(issues, [
+    'complete-mainland-mobile-number-input-value',
+    'complete-mainland-mobile-number-input-value',
+    'complete-mainland-mobile-number-input-value',
+    'complete-six-digit-code-input-value',
+  ])
+  for (const issue of issues) {
+    for (const value of sensitiveValues) assert.equal(issue.includes(value), false)
+  }
+})
+
+test('findSensitivePrototypeInputValues normalizes spaces and hyphens in six-digit codes', () => {
+  assert.deepEqual(
+    findSensitivePrototypeInputValues(
+      '<input value="6 5 4 3 2 1"><input value="654-321"><input value="已脱敏">',
+    ),
+    [
+      'complete-six-digit-code-input-value',
+      'complete-six-digit-code-input-value',
+    ],
+  )
+})
+
+test('findSensitivePrototypeInputValues ignores non-value attributes and ordinary text', () => {
+  assert.deepEqual(
+    findSensitivePrototypeInputValues(
+      '<input placeholder="139 5555 0101" data-value="654321">' +
+        '<div value="139-5555-0101">654321</div>',
+    ),
+    [],
   )
 })
 

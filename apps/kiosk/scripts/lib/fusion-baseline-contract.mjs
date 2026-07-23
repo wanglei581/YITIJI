@@ -7,6 +7,7 @@ import ts from 'typescript'
 const HTML_COMMENT = /<!--[\s\S]*?-->/g
 const HTML_TAG = /<([a-z][\w:-]*)\b([^<>]*?)>/gi
 const HTML_REFERENCE_ATTRIBUTE = /(?:^|\s)(href|src)\s*=\s*(["'])(.*?)\2/gi
+const HTML_VALUE_ATTRIBUTE = /(?:^|\s)value\s*=\s*(["'])(.*?)\1/i
 const ROUTE_MANIFEST = /export const productionRoutePatterns = \[([\s\S]*?)\] as const/
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
 
@@ -83,6 +84,22 @@ export async function collectMissingLocalReferences(htmlPath) {
     }
   }
   return [...new Set(missing)].sort()
+}
+
+export function findSensitivePrototypeInputValues(html) {
+  const issues = []
+  for (const tagMatch of html.replace(HTML_COMMENT, '').matchAll(HTML_TAG)) {
+    if (tagMatch[1].toLowerCase() !== 'input') continue
+    const value = tagMatch[2].match(HTML_VALUE_ATTRIBUTE)?.[2]
+    if (value === undefined) continue
+    const normalizedValue = value.replace(/[\s-]/g, '')
+    if (/^1[3-9][0-9]{9}$/.test(normalizedValue)) {
+      issues.push('complete-mainland-mobile-number-input-value')
+    } else if (/^[0-9]{6}$/.test(normalizedValue)) {
+      issues.push('complete-six-digit-code-input-value')
+    }
+  }
+  return issues
 }
 
 async function listFiles(root) {

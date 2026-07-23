@@ -5,6 +5,7 @@ import {
   collectMissingLocalReferences,
   extractDeclaredRoutePatterns,
   extractManifestRoutePatterns,
+  findSensitivePrototypeInputValues,
   findForbiddenFusionReferences,
   sha256File,
 } from './lib/fusion-baseline-contract.mjs'
@@ -140,6 +141,17 @@ await runGroup('derived HTML local references', async (fail) => {
     } catch (error) {
       fail(`${displayPath(htmlPath)}: missing or unreadable derived artifact (${describeError(error)})`)
     }
+  }
+})
+
+await runGroup('derived HTML sensitive input privacy', async (fail) => {
+  // Frozen sources/** are immutable evidence and intentionally excluded from this scan.
+  for (const filename of DERIVED_HTML_FILES) {
+    const htmlPath = resolve(fusionRoot, filename)
+    const html = await readRequired(htmlPath, fail)
+    if (html === null) continue
+    const issues = findSensitivePrototypeInputValues(html)
+    for (const issue of issues) fail(`${displayPath(htmlPath)}: ${issue}`)
   }
 })
 
