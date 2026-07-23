@@ -40,6 +40,118 @@ export function extractDeclaredRoutePatterns(source) {
   return routes.sort()
 }
 
+function getPropertyAssignment(objectLiteral, propertyName) {
+  return objectLiteral.properties.find((property) =>
+    ts.isPropertyAssignment(property) &&
+    (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+    property.name.text === propertyName,
+  )
+}
+
+function unwrapExpression(expression) {
+  let current = expression
+  while (
+    ts.isAsExpression(current) ||
+    ts.isParenthesizedExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isTypeAssertionExpression(current)
+  ) {
+    current = current.expression
+  }
+  return current
+}
+
+function hasReplaceAttribute(element) {
+  const replace = element.attributes.properties.find((attribute) =>
+    ts.isJsxAttribute(attribute) && attribute.name.text === 'replace',
+  )
+  if (!replace || !ts.isJsxAttribute(replace)) return false
+  if (replace.initializer === undefined) return true
+  return (
+    ts.isJsxExpression(replace.initializer) &&
+    replace.initializer.expression?.kind === ts.SyntaxKind.TrueKeyword
+  )
+}
+
+export function extractDeclaredRedirects(source) {
+  const sourceFile = ts.createSourceFile('routes.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const redirects = []
+  const visit = (node) => {
+    if (ts.isObjectLiteralExpression(node)) {
+      const pathProperty = getPropertyAssignment(node, 'path')
+      const elementProperty = getPropertyAssignment(node, 'element')
+      if (
+        pathProperty &&
+        elementProperty &&
+        ts.isStringLiteral(pathProperty.initializer)
+      ) {
+        const element = unwrapExpression(elementProperty.initializer)
+        if (
+          ts.isJsxSelfClosingElement(element) &&
+          ts.isIdentifier(element.tagName) &&
+          element.tagName.text === 'Navigate' &&
+          hasReplaceAttribute(element)
+        ) {
+          const toAttribute = element.attributes.properties.find((attribute) =>
+            ts.isJsxAttribute(attribute) && attribute.name.text === 'to',
+          )
+          if (
+            toAttribute &&
+            ts.isJsxAttribute(toAttribute) &&
+            toAttribute.initializer &&
+            ts.isStringLiteral(toAttribute.initializer)
+          ) {
+            const routePath = pathProperty.initializer.text
+            redirects.push([
+              routePath === '/' || routePath.startsWith('/') ? routePath : `/${routePath}`,
+              toAttribute.initializer.text,
+            ])
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return Object.fromEntries(redirects.sort(([left], [right]) => left.localeCompare(right)))
+}
+
+export function extractManifestRedirects(source) {
+  const sourceFile = ts.createSourceFile(
+    'route-manifest.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  )
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      !statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      continue
+    }
+    const declaration = statement.declarationList.declarations.find((candidate) =>
+      ts.isIdentifier(candidate.name) && candidate.name.text === 'compatibilityRedirects',
+    )
+    if (!declaration?.initializer) continue
+    const initializer = unwrapExpression(declaration.initializer)
+    if (!ts.isObjectLiteralExpression(initializer)) return {}
+    const redirects = initializer.properties.flatMap((property) => {
+      if (
+        !ts.isPropertyAssignment(property) ||
+        !ts.isStringLiteral(property.name) ||
+        !ts.isStringLiteral(property.initializer)
+      ) {
+        return []
+      }
+      return [[property.name.text, property.initializer.text]]
+    })
+    return Object.fromEntries(redirects.sort(([left], [right]) => left.localeCompare(right)))
+  }
+  return {}
+}
+
 export function extractManifestRoutePatterns(source) {
   const body = source.match(ROUTE_MANIFEST)?.[1]
   if (!body) return []

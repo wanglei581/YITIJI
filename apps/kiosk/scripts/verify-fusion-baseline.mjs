@@ -3,7 +3,9 @@ import { dirname, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   collectMissingLocalReferences,
+  extractDeclaredRedirects,
   extractDeclaredRoutePatterns,
+  extractManifestRedirects,
   extractManifestRoutePatterns,
   findSensitivePrototypeInputValues,
   findForbiddenFusionReferences,
@@ -116,6 +118,35 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   if (missingFromManifest.length > 0 || missingFromRouter.length > 0) {
     fail(`router -> manifest missing: ${missingFromManifest.join(', ') || '(none)'}`)
     fail(`manifest -> router missing: ${missingFromRouter.join(', ') || '(none)'}`)
+  }
+})
+
+await runGroup('compatibility redirect target parity', async (fail) => {
+  const routerSource = await readRequired(routerPath, fail)
+  const manifestSource = await readRequired(manifestPath, fail)
+  if (routerSource === null || manifestSource === null) return
+
+  const routerRedirects = extractDeclaredRedirects(routerSource)
+  const manifestRedirects = extractManifestRedirects(manifestSource)
+  const routerSources = Object.keys(routerRedirects)
+  const manifestSources = Object.keys(manifestRedirects)
+  if (manifestSources.length !== 5) {
+    fail(`${displayPath(manifestPath)}: expected exactly 5 compatibility redirects, actual ${manifestSources.length}`)
+  }
+
+  const missingFromManifest = routerSources.filter((sourcePath) => !(sourcePath in manifestRedirects))
+  const missingFromRouter = manifestSources.filter((sourcePath) => !(sourcePath in routerRedirects))
+  if (missingFromManifest.length > 0 || missingFromRouter.length > 0) {
+    fail(`router -> manifest redirect source missing: ${missingFromManifest.join(', ') || '(none)'}`)
+    fail(`manifest -> router redirect source missing: ${missingFromRouter.join(', ') || '(none)'}`)
+  }
+
+  for (const sourcePath of manifestSources.filter((candidate) => candidate in routerRedirects)) {
+    const expectedTarget = manifestRedirects[sourcePath]
+    const actualTarget = routerRedirects[sourcePath]
+    if (actualTarget !== expectedTarget) {
+      fail(`${sourcePath}: expected target ${expectedTarget}, actual ${actualTarget}`)
+    }
   }
 })
 

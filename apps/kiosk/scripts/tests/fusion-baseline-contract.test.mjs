@@ -5,7 +5,9 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   collectMissingLocalReferences,
+  extractDeclaredRedirects,
   extractDeclaredRoutePatterns,
+  extractManifestRedirects,
   extractManifestRoutePatterns,
   findSensitivePrototypeInputValues,
   findForbiddenFusionReferences,
@@ -41,6 +43,78 @@ test('extractManifestRoutePatterns reads the exported Playwright route array', (
   const source = `export const productionRoutePatterns = ['/', '/jobs/:id'] as const`
   assert.deepEqual(extractManifestRoutePatterns(source), ['/', '/jobs/:id'])
   assert.deepEqual(extractManifestRoutePatterns('export const other = []'), [])
+})
+
+test('extractDeclaredRedirects reads five literal Navigate redirects from router objects', () => {
+  const source = `
+    const routes = createBrowserRouter([{
+      path: '/',
+      children: [
+        // { path: 'commented', element: <Navigate to="/wrong" replace /> },
+        { path: 'print/scan-convert', element: <Navigate to="/print-scan/convert" replace /> },
+        { path: 'print/scan-sign', element: <Navigate to='/print-scan/sign' replace /> },
+        { path: 'print/scan-feature', element: <Navigate to="/print-scan/feature/id-photo" replace /> },
+        { path: 'resume', element: <Navigate to="/resume/source" replace /> },
+        { path: '/resume/upload', element: <Navigate to="/resume/source" replace /> },
+        { path: 'ordinary', element: <OrdinaryPage /> },
+        { path: 'dynamic-target', element: <Navigate to={redirectTarget} replace /> },
+        { path: 'push-navigation', element: <Navigate to="/wrong" /> },
+        { path: 'different-component', element: <Redirect to="/wrong" replace /> },
+      ],
+    }])
+  `
+
+  assert.deepEqual(extractDeclaredRedirects(source), {
+    '/print/scan-convert': '/print-scan/convert',
+    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-sign': '/print-scan/sign',
+    '/resume': '/resume/source',
+    '/resume/upload': '/resume/source',
+  })
+})
+
+test('extractManifestRedirects reads the exported map and exposes target mismatches', () => {
+  const source = `
+    const compatibilityRedirects = { '/ignored': '/not-exported' } as const
+    export const compatibilityRedirects = {
+      '/resume/upload' : '/resume/source',
+      "/print/scan-sign": "/print-scan/sign-v2",
+      '/print/scan-convert': '/print-scan/convert',
+      '/print/scan-feature': '/print-scan/feature/id-photo',
+      '/resume': '/resume/source',
+      [dynamicSource]: '/ignored',
+    } as const
+  `
+  const manifestRedirects = extractManifestRedirects(source)
+  const routerRedirects = {
+    '/print/scan-convert': '/print-scan/convert',
+    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-sign': '/print-scan/sign',
+    '/resume': '/resume/source',
+    '/resume/upload': '/resume/source',
+  }
+
+  assert.deepEqual(manifestRedirects, {
+    '/print/scan-convert': '/print-scan/convert',
+    '/print/scan-feature': '/print-scan/feature/id-photo',
+    '/print/scan-sign': '/print-scan/sign-v2',
+    '/resume': '/resume/source',
+    '/resume/upload': '/resume/source',
+  })
+  assert.deepEqual(
+    Object.keys(routerRedirects)
+      .filter((sourcePath) => routerRedirects[sourcePath] !== manifestRedirects[sourcePath])
+      .map((sourcePath) => ({
+        source: sourcePath,
+        expected: manifestRedirects[sourcePath],
+        actual: routerRedirects[sourcePath],
+      })),
+    [{
+      source: '/print/scan-sign',
+      expected: '/print-scan/sign-v2',
+      actual: '/print-scan/sign',
+    }],
+  )
 })
 
 test('collectMissingLocalReferences ignores external links and reports local misses', async () => {
