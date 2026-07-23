@@ -258,3 +258,47 @@
 - 阻塞上线:**否**(有兜底,不阻断)
 
 > 说明:B 类不涉及前端代码缺口,均为"外部前置 / 真机 / 第三方 / 授权"到位问题。A 类(03/05/06 双栏视觉对齐)才是当前可纯前端推进的开发项,方案见 `next-tasks.md`。
+
+---
+
+## 八、8177 / 5299 fusion baseline（2026-07-23）
+
+本节从 2026-07-23 起取代文首“75 屏原型目录”为当前视觉 authority：
+
+- `docs/design/kiosk-proto-2026-07-fusion/` 根部派生文件负责融合裁决，其中 5299 是布局与信息架构 authority，8177 是 loading / empty / error / offline / failure / legal state authority。
+- 未在 fusion 根部重复派生的页面继续使用 `docs/design/kiosk-proto-2026-07/` 下的既有 base 文件；`sources/**` 只保存 immutable evidence，不是直接验收页面。
+- 本文档仍是唯一 route-to-screen contract；fusion 目录不另建平行矩阵，也不向生产 runtime 增加路由。
+
+### 8.1 新增屏号与状态映射
+
+| 原型 / 状态屏 | 生产落点 | 契约说明 |
+| --- | --- | --- |
+| 15A 登录验证失败 | `/login` | `LoginPage` 的验证码错误 / 短信失败分支，不是新路由。 |
+| 22B 意见反馈 | `/me/feedback` | `MyFeedbackPage` 的反馈提交与工单分支，不是 `/me/notifications` 的复制路由。 |
+| 32A 支付未成功 | `/print/cashier` | `PrintCashierPage` 的失败 / 关闭 / 失败或过期 attempt 分支，不是新支付页面。 |
+| 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 当前扫描设备状态驱动的 offline 分支，不创建另一条扫描路由。 |
+| 76 百宝箱主态 | `/toolbox` | `ToolboxZonePage` 的已配置服务区。 |
+| 76A 百宝箱待配置 | `/toolbox` | 同一页面的 disabled / empty 分支，不是新路由。 |
+| 77 文档打印上传 | `/print/upload` | 打印七步流程第一步；纸质扫描 CTA 独立导航到 `/scan/start`。 |
+| 73 语音咨询中 | `/assistant` 内 call state | `AssistantCallPanel` 通话态，不是独立 route。 |
+
+`/campus`、`/campus/welcome`、`/campus/freshman-insights` 与 `/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key` 保留各自语义：前者是校园招聘专区及其直达容错页面，后者是智慧校园正式能力；它们不是互为同义重定向。
+
+### 8.2 生产路由全集（86 个 normalized patterns）
+
+- 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/career-plan`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
+- 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
+- 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
+- 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`。
+- AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
+- 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
+
+### 8.3 Compatibility redirects（不是重复屏）
+
+以下五条只保留旧入口兼容，不生成重复视觉页面：
+
+- `/print/scan-convert` → `/print-scan/convert`
+- `/print/scan-sign` → `/print-scan/sign`
+- `/print/scan-feature` → `/print-scan/feature/id-photo`
+- `/resume` → `/resume/source`
+- `/resume/upload` → `/resume/source`
