@@ -73,6 +73,15 @@ function hasReplaceAttribute(element) {
   )
 }
 
+function assertUniqueRedirectSources(entries) {
+  const sources = entries.map(([source]) => source)
+  if (entries.length === new Set(sources).size) return
+  const duplicateSources = [...new Set(
+    sources.filter((source, index) => sources.indexOf(source) !== index),
+  )].sort()
+  throw new Error(`duplicate redirect source: ${duplicateSources.join(', ')}`)
+}
+
 export function extractDeclaredRedirects(source) {
   const sourceFile = ts.createSourceFile('routes.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
   const redirects = []
@@ -113,6 +122,7 @@ export function extractDeclaredRedirects(source) {
     ts.forEachChild(node, visit)
   }
   visit(sourceFile)
+  assertUniqueRedirectSources(redirects)
   return Object.fromEntries(redirects.sort(([left], [right]) => left.localeCompare(right)))
 }
 
@@ -147,6 +157,7 @@ export function extractManifestRedirects(source) {
       }
       return [[property.name.text, property.initializer.text]]
     })
+    assertUniqueRedirectSources(redirects)
     return Object.fromEntries(redirects.sort(([left], [right]) => left.localeCompare(right)))
   }
   return {}

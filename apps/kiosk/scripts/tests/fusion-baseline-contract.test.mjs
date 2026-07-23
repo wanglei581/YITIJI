@@ -71,6 +71,15 @@ test('extractDeclaredRedirects reads five literal Navigate redirects from router
     '/resume': '/resume/source',
     '/resume/upload': '/resume/source',
   })
+  assert.throws(
+    () => extractDeclaredRedirects(`
+      const routes = [
+        { path: 'resume', element: <Navigate to="/resume/source" replace /> },
+        { path: '/resume', element: <Navigate to="/resume/duplicate" replace /> },
+      ]
+    `),
+    /duplicate redirect source: \/resume/,
+  )
 })
 
 test('extractManifestRedirects reads the exported map and exposes target mismatches', () => {
@@ -114,6 +123,15 @@ test('extractManifestRedirects reads the exported map and exposes target mismatc
       expected: '/print-scan/sign-v2',
       actual: '/print-scan/sign',
     }],
+  )
+  assert.throws(
+    () => extractManifestRedirects(`
+      export const compatibilityRedirects = {
+        '/resume': '/resume/source',
+        '/resume': '/resume/duplicate',
+      } as const
+    `),
+    /duplicate redirect source: \/resume/,
   )
 })
 
