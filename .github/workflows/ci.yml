@@ -429,3 +429,45 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
+
+  kiosk-browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
+
+      - name: Typecheck Kiosk workspace-source dependencies
+        run: |
+          pnpm --filter @ai-job-print/shared typecheck
+          pnpm --filter @ai-job-print/ui typecheck
+
+      - name: Verify Kiosk fusion baseline
+        run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
+
+      - name: Run Kiosk browser smoke
+        run: pnpm --filter @ai-job-print/kiosk test:browser:smoke
+
+      - name: Upload Kiosk browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-browser-smoke-failure
+          path: |
+            test-results/kiosk-fusion/**
+            test-results/kiosk-fusion-report/**
+          if-no-files-found: ignore
