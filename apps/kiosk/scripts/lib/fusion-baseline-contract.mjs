@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs'
 import { access, readdir, readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 
-const LOCAL_REFERENCE = /(?:href|src)=["']([^"']+)["']/g
+const LOCAL_REFERENCE = /(href|src)=["']([^"']+)["']/g
 const ROUTE_PATH = /(?:^|[{,]\s*)path:\s*(['"])(.*?)\1/gm
 const ROUTE_MANIFEST = /export const productionRoutePatterns = \[([\s\S]*?)\] as const/
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
@@ -37,8 +37,12 @@ export function extractManifestRoutePatterns(source) {
 
 export async function collectMissingLocalReferences(htmlPath) {
   const html = await readFile(htmlPath, 'utf8')
-  const references = [...html.matchAll(LOCAL_REFERENCE)].map((match) => match[1])
-  const localReferences = references.filter((reference) =>
+  const references = [...html.matchAll(LOCAL_REFERENCE)].map((match) => ({
+    attribute: match[1],
+    reference: match[2],
+  }))
+  const localReferences = references.filter(({ attribute, reference }) =>
+    !(attribute === 'href' && reference.startsWith('/')) &&
     !reference.startsWith('#') &&
     !reference.startsWith('data:') &&
     !reference.startsWith('http://') &&
@@ -47,7 +51,7 @@ export async function collectMissingLocalReferences(htmlPath) {
     !reference.startsWith('javascript:'),
   )
   const missing = []
-  for (const reference of localReferences) {
+  for (const { reference } of localReferences) {
     const pathOnly = reference.split('#')[0].split('?')[0]
     if (!pathOnly) continue
     try {

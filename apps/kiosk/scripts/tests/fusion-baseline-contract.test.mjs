@@ -43,9 +43,13 @@ test('collectMissingLocalReferences ignores external links and reports local mis
   await writeFile(join(root, 'ok.html'), '<a href="https://example.com">外部</a>')
   await writeFile(
     join(root, 'index.html'),
-    '<a href="ok.html">正常</a><img src="missing.png"><a href="#top">锚点</a>',
+    '<a href="ok.html">正常</a><a href="/scan/start">应用路由</a>' +
+      '<img src="missing.png"><img src="/missing-root.png"><a href="#top">锚点</a>',
   )
-  assert.deepEqual(await collectMissingLocalReferences(join(root, 'index.html')), ['missing.png'])
+  assert.deepEqual(
+    await collectMissingLocalReferences(join(root, 'index.html')),
+    ['/missing-root.png', 'missing.png'],
+  )
 })
 
 test('findForbiddenFusionReferences reports runtime imports of the docs baseline', async () => {
