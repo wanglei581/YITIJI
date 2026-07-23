@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>文档打印 · 上传文件</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .up-tabs { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .up-tab {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    min-height: 92px; border-radius: var(--r-sm); cursor: pointer;
+    font-family: var(--sans); font-size: 21px; font-weight: 600;
+    background: var(--surface); border: 2px solid var(--line); color: var(--muted);
+  }
+  .up-tab svg { width: 30px; height: 30px; }
+  .up-tab .t-note {
+    font-size: 15px; font-weight: 500; color: var(--muted);
+    background: var(--paper); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 12px; white-space: nowrap;
+  }
+  .up-tab.active { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); }
+  .up-tab.active .t-note { background: var(--surface); border-color: rgba(31,158,134,.4); color: var(--teal-deep); }
+  .up-tab.disabled { opacity: .55; cursor: not-allowed; }
+  .a2-banner {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    padding: 14px 22px; border-radius: 12px;
+    background: var(--wheat-soft); border: 1px solid rgba(169,120,31,.35);
+    font-size: 17px; line-height: 1.5; color: var(--wheat-deep);
+  }
+  .a2-banner svg { width: 24px; height: 24px; flex: none; }
+  .dropzone {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 22px;
+    border: 3px dashed var(--line); border-radius: var(--r-md);
+    background: var(--surface);
+  }
+  .dropzone .dz-icon {
+    width: 108px; height: 108px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--paper); color: var(--teal-deep);
+  }
+  .dropzone .dz-icon svg { width: 54px; height: 54px; }
+  .dropzone h3 { font-family: var(--serif); font-size: 32px; font-weight: 700; letter-spacing: 1px; }
+  .dropzone p { font-size: 19px; color: var(--muted); text-align: center; line-height: 1.5; }
+  .recent {
+    flex: none; display: flex; flex-direction: column; gap: 12px;
+    padding: 20px 24px;
+  }
+  .recent .r-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .recent .r-head b { font-family: var(--serif); font-size: 22px; font-weight: 700; letter-spacing: 1px; }
+  .recent .r-head span { font-size: 16px; color: var(--muted); }
+  .recent .r-row {
+    display: flex; align-items: center; gap: 14px; min-height: 60px;
+    background: var(--paper); border-radius: 12px; padding: 0 18px;
+  }
+  .recent .r-row svg { width: 26px; height: 26px; flex: none; color: var(--teal-deep); }
+  .recent .r-row b { flex: 1; min-width: 0; font-size: 19px; font-weight: 600; }
+  .recent .r-row .r-status { font-size: 16px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回首页
+    </button>
+    <div class="titles">
+      <h1>文档打印</h1>
+      <p>通用文档、求职材料或图片上传后打印</p>
+    </div>
+  </div>
+
+  <!-- 步骤条(7 步打印流程,当前第 1 步) -->
+  <div class="steps">
+    <div class="step active"><span class="s-dot">1</span><span class="s-label">上传</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">2</span><span class="s-label">材料检查</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">预览</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">参数</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">5</span><span class="s-label">确认</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">6</span><span class="s-label">支付</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">7</span><span class="s-label">打印</span></div>
+  </div>
+
+  <main class="content">
+
+    <!-- 上传方式:选择文件 / 扫码上传 / U盘导入 / 扫描原件 -->
+    <div class="up-tabs">
+      <div class="up-tab active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v4M15 3v4M8 12h8M8 16h5"/></svg>
+        选择文件<span class="t-note">桌面验证</span>
+      </div>
+      <div class="up-tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 20h.01M17 20h.01M20 17h.01"/></svg>
+        扫码上传<span class="t-note">手机/浏览器</span>
+      </div>
+      <div class="up-tab disabled">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="9" width="8" height="12" rx="2"/><path d="M12 9V3M9 6l3-3 3 3M10 13h.01M14 13h.01"/></svg>
+        U盘导入<span class="t-note">本机未配置</span>
+      </div>
+      <div class="up-tab">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg>
+        扫描原件
+      </div>
+    </div>
+
+    <!-- A2 桌面浏览器验证提示 -->
+    <div class="a2-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      桌面浏览器验证模式 — 生产 Kiosk 将切换为 Terminal Agent 文件中转(A1);U 盘导入需本机配置后启用。
+    </div>
+
+    <!-- 上传区(初始空态) -->
+    <div class="dropzone">
+      <span class="dz-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V5M8 9l4-4 4 4"/><path d="M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3"/></svg></span>
+      <div>
+        <h3 style="text-align:center;">点击选择文件</h3>
+        <p style="margin-top:10px;">支持 PDF、图片格式,上传后将先做材料检查<br>单文件不超过 20MB</p>
+      </div>
+    </div>
+
+    <!-- 最近文件(登录后可见) -->
+    <section class="card recent">
+      <div class="r-head">
+        <b>最近文件</b>
+        <span>登录后展示最近 3 份 · 未登录时不显示</span>
+      </div>
+      <div class="r-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+        <b>个人简历_王同学.pdf</b>
+        <span class="r-status">已完成</span>
+      </div>
+      <div class="r-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4"/></svg>
+        <b>三方协议扫描件.pdf</b>
+        <span class="r-status">待取件</span>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">取消</button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 420px; opacity:.5;">
+      下一步 · 请先选择文件
+    </button>
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>
