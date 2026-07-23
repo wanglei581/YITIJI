@@ -1,5 +1,15 @@
 import { defineConfig } from '@playwright/test'
 
+const proxyBypass = new Set(
+  [process.env.NO_PROXY, process.env.no_proxy, '127.0.0.1', 'localhost']
+    .flatMap((value) => value?.split(',') ?? [])
+    .map((value) => value.trim())
+    .filter(Boolean),
+)
+const mergedProxyBypass = [...proxyBypass].join(',')
+process.env.NO_PROXY = mergedProxyBypass
+process.env.no_proxy = mergedProxyBypass
+
 export default defineConfig({
   testDir: './tests',
   outputDir: '../../test-results/kiosk-fusion',
