@@ -83,15 +83,15 @@
 <body>
 <header>
   <h1>Kiosk 8177 / 5299 融合原型总览</h1>
-  <p>AI求职打印服务终端 · 1080×1920 竖屏(62/63 屏为手机尺寸)· 青绿米纸 V1 定稿风格 · 零外部依赖,断网可用<br>此页为「先完成并审查完整原型基准，再改生产 Kiosk」的单一基准入口:75 张核心原型 + 生产额外 12 条路由(含 5 条纯重定向,不重复出图),对齐 <code>apps/kiosk/src/routes/index.tsx</code> 全部 <b>86/86</b> 路由。</p>
+  <p>AI求职打印服务终端 · 1080×1920 竖屏(62/63 屏为手机尺寸)· 青绿米纸 V1 定稿风格 · 零外部依赖,断网可用<br>此页为「先完成并审查完整原型基准，再改生产 Kiosk」的单一基准入口:75 张核心原型 + 生产额外 12 条路由(含 5 条纯重定向,不重复出图),另列 5 个 8177 流程与异常状态证据,对齐 <code>apps/kiosk/src/routes/index.tsx</code> 全部 <b>86/86</b> 路由。</p>
 
   <div class="dash">
     <div class="dash-item"><span class="dv">75</span><span class="dl">核心原型屏</span></div>
     <div class="dash-item"><span class="dv">12</span><span class="dl">生产额外路由</span></div>
     <div class="dash-item"><span class="dv">86 / 86</span><span class="dl">总路径覆盖</span></div>
-    <div class="dash-item"><span class="dv">77</span><span class="dl">独立原型文件</span></div>
+    <div class="dash-item"><span class="dv">77</span><span class="dl">主体原型文件(不含 5 个状态参考)</span></div>
     <div class="dash-item"><span class="dv">5</span><span class="dl">纯重定向(不出图)</span></div>
-    <div class="dash-item"><span class="dv">1</span><span class="dl">路由级状态变体</span></div>
+    <div class="dash-item"><span class="dv">1</span><span class="dl">生产拆页路由</span></div>
     <div class="dash-item"><span class="dv">5</span><span class="dl">8177 状态参考</span></div>
   </div>
 </header>
@@ -103,8 +103,8 @@
     <a class="card" href="../kiosk-proto-2026-07/01-home.html"><span class="num">01</span><b>首页</b><span>六大服务分组 + 扫码登录</span></a>
     <a class="card" href="../kiosk-proto-2026-07/15-login.html"><span class="num">15</span><b>扫码登录</b><span>微信扫码 + 手机号登录 + 游客模式</span></a>
     <a class="card" href="../kiosk-proto-2026-07/57-screensaver.html"><span class="num">57</span><b>待机宣传屏</b><span>轮播 + 触摸唤醒提示</span></a>
-    <a class="card" href="../kiosk-proto-2026-07/60-session-timeout.html"><span class="num">60</span><b>会话超时提醒</b><span>倒计时 + 自动清理会话(商用补缺)</span></a>
-    <a class="card" href="../kiosk-proto-2026-07/61-error-offline.html"><span class="num">61</span><b>网络/设备异常</b><span>断网降级说明,诚实状态(商用补缺)</span></a>
+    <a class="card" href="../kiosk-proto-2026-07/60-session-timeout.html"><span class="num">60</span><b>会话超时提醒</b><span>倒计时 + 继续 / 退出 + 会话清理(已实现)</span></a>
+    <a class="card" href="../kiosk-proto-2026-07/61-error-offline.html"><span class="num">61</span><b>网络/设备异常</b><span>health check + 自动重试 + 状态 UI(已实现)</span></a>
     <a class="card" href="../kiosk-proto-2026-07/58-help.html"><span class="num">58</span><b>帮助中心</b><span>FAQ + 现场协助</span></a>
     <a class="card" href="../kiosk-proto-2026-07/59-legal.html"><span class="num">59</span><b>法务文档</b><span>用户协议/隐私政策 + 字号调节</span></a>
     <a class="card" href="../kiosk-proto-2026-07/62-phone-upload.html"><span class="num">62</span><b>手机上传落地页</b><span>390×844 手机尺寸</span></a>
@@ -242,19 +242,19 @@
     </a>
   </div>
 
-  <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--plum);">② 路由级状态变体(1)· 复用既有屏,不新出图</h3>
+  <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--plum);">② 生产拆页路由(1)· 对应融合状态参考</h3>
   <div class="rt-grid">
-    <a class="rt-card" href="../kiosk-proto-2026-07/22-me-notifications.html">
-      <div class="rt-head"><code>/me/feedback</code><span class="badge b-sub">状态变体 · 22-B</span></div>
+    <a class="rt-card" href="22B-me-feedback.html">
+      <div class="rt-head"><code>/me/feedback</code><span class="badge b-sub">生产拆页 · 22B</span></div>
       <div class="rt-row"><span class="k">组件</span><span class="v">MyFeedbackPage</span></div>
-      <div class="rt-row"><span class="k">对应</span><span class="v">复用原型 <b>22 通知与反馈</b>的「反馈工单」子面板(标记为 22-B 状态,不复制 HTML)</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">融合状态参考 <b>22B 意见反馈</b>;生产仍由独立的 MyFeedbackPage 承载</span></div>
       <div class="rt-row"><span class="k">前置</span><span class="v">需登录本人;未登录引导登录</span></div>
       <div class="rt-row"><span class="k">主按钮</span><span class="v">提交反馈工单 / 查看工单详情与回复;无法提交时显示诚实错误态</span></div>
     </a>
   </div>
 
   <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--wheat);">③ 待开发容错页(4)· 生产渲染「待开发」占位,映射到规范实现原型</h3>
-  <div class="s-sub" style="padding-left:0; margin-bottom:12px;">这 4 条为路由容错/旧别名,生产当前渲染诚实的「待开发 — XxxPage」占位符。规范能力已在下方对应原型实现,原型即其目标视觉基准(不为占位符单独出图)。</div>
+  <div class="s-sub" style="padding-left:0; margin-bottom:12px;">这 4 条为直达容错或独立语义页面,生产当前渲染诚实的「待开发 — XxxPage」占位符;不得把不同业务域的路由当作同义别名。</div>
   <div class="rt-grid">
     <a class="rt-card" href="../kiosk-proto-2026-07/22-me-notifications.html">
       <div class="rt-head"><code>/notifications</code><span class="badge b-fall">待开发容错</span></div>
@@ -268,17 +268,17 @@
       <div class="rt-row"><span class="k">对应</span><span class="v">回到 <b>浏览与跳转记录(原型 71)</b>列表口径</span></div>
       <div class="rt-row"><span class="k">最终态</span><span class="v">记录明细详情页占位;当前只展示动作,不造假数据</span></div>
     </a>
-    <a class="rt-card" href="../kiosk-proto-2026-07/69-smart-campus-welcome.html">
+    <a class="rt-card" href="../kiosk-proto-2026-07/50-campus.html">
       <div class="rt-head"><code>/campus/welcome</code><span class="badge b-fall">待开发容错</span></div>
       <div class="rt-row"><span class="k">组件</span><span class="v">CampusWelcomePage(占位:待开发)</span></div>
-      <div class="rt-row"><span class="k">对应</span><span class="v">规范实现见 <b>/smart-campus/welcome(原型 69 迎新系统)</b></span></div>
-      <div class="rt-row"><span class="k">最终态</span><span class="v">旧 campus 别名兜底;正式迎新走 smart-campus</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v"><b>/campus 招聘专区</b>自身的迎新直达容错,当前待开发</span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">独立语义占位;<b>/smart-campus/welcome</b> 属于另一套智慧校园正式能力</span></div>
     </a>
-    <a class="rt-card" href="../kiosk-proto-2026-07/70-freshman-insights.html">
+    <a class="rt-card" href="../kiosk-proto-2026-07/50-campus.html">
       <div class="rt-head"><code>/campus/freshman-insights</code><span class="badge b-fall">待开发容错</span></div>
       <div class="rt-row"><span class="k">组件</span><span class="v">FreshmanInsightsPage(占位:待开发)</span></div>
-      <div class="rt-row"><span class="k">对应</span><span class="v">规范实现见 <b>/smart-campus/freshman-insights(原型 70)</b>,未开放锁定态</span></div>
-      <div class="rt-row"><span class="k">最终态</span><span class="v">旧 campus 别名兜底;正式页为合规锁定态</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v"><b>/campus 招聘专区</b>自身的新生信息直达容错,当前待开发</span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">独立语义占位;<b>/smart-campus/freshman-insights</b> 属于另一套智慧校园正式能力</span></div>
     </a>
   </div>
 
@@ -410,20 +410,6 @@
     <a class="card" href="34A-scan-offline.html"><span class="num">34A</span><b>扫描仪暂不可用</b><span><code>/scan/start</code> 与 <code>/scan/settings</code> 的离线分支</span></a>
     <a class="card" href="76A-toolbox-empty.html"><span class="num">76A</span><b>百宝箱待配置</b><span><code>/toolbox</code> 的空分支</span></a>
   </div>
-</div>
-
-<div class="section s-plum">
-  <h2>状态变体 · 说明</h2>
-  <div class="s-sub">「路由级状态变体」指同一页面组件因不同路由/入口呈现的子面板态,用「原屏号 + 字母」编号,不单独出图。</div>
-  <div class="rt-grid">
-    <a class="rt-card" href="../kiosk-proto-2026-07/22-me-notifications.html">
-      <div class="rt-head"><span><b>22-B</b> · 反馈工单态</span><span class="badge b-sub">状态变体</span></div>
-      <div class="rt-row"><span class="k">来源</span><span class="v">路由 <code>/me/feedback</code> 直达原型 22 的「反馈工单」子面板</span></div>
-      <div class="rt-row"><span class="k">与 22 差异</span><span class="v">默认展开反馈提交表单 + 工单列表,而非消息通知 Tab</span></div>
-    </a>
-  </div>
-  <div class="s-sub" style="padding-left:0; margin-top:14px;">另:多张核心原型已内含合规必需的<b>内联状态</b>(已直接画在各自文件内,不计入上方路由级变体):27/36 加载等待态、42/70 空态与未开放锁定态、61 断网降级态、68 即将上线态、77 未选文件禁用态。</div>
-</div>
 </div>
 
 <div class="tip">

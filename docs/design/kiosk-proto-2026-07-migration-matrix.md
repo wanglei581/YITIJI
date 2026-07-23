@@ -71,8 +71,8 @@
 | 57 | 57-screensaver.html | 待机宣传屏 | 首页登录系统 | `/screensaver` (顶级全屏) | ScreensaverPage | src/pages/screensaver/ScreensaverPage.tsx | screensaver.getScreensaverPlaylist+getTerminalId / screensaverCache.prefetchAsset+resolveAssetUrl | 轮播、触摸唤醒 | loading / empty(无素材) / 离线缓存 | (无专项) |
 | 58 | 58-help.html | 帮助中心 | 首页登录系统 | `/help` | HelpCenterPage | src/pages/help/HelpCenterPage.tsx | 静态 FAQ(仅样式 import) | FAQ 浏览、现场协助 | 静态 | verify-legal-retention-copy |
 | 59 | 59-legal.html | 法务文档 | 首页登录系统 | `/legal/:doc` (顶级全屏) | LegalDocPage | src/pages/legal/LegalDocPage.tsx | api.API_BASE_URL(拉取文档) | 用户协议/隐私政策、字号调节 | loading / error | verify-legal-retention-copy |
-| 60 | 60-session-timeout.html | 会话超时提醒 | 首页登录系统 | `/session-timeout` (顶级,lazy) | SessionTimeoutPage(placeholder) | src/pages/placeholders/SessionTimeoutPage.tsx | 静态(占位实现) | 倒计时、自动清理会话 | 静态占位 | (无专项) |
-| 61 | 61-error-offline.html | 网络/设备异常 | 首页登录系统 | `/error-offline` (顶级,lazy) | ErrorOfflinePage(placeholder) | src/pages/placeholders/ErrorOfflinePage.tsx | 静态(占位实现) | 断网降级说明、诚实状态 | 静态占位 / 离线 | (无专项) |
+| 60 | 60-session-timeout.html | 会话超时提醒 | 首页登录系统 | `/session-timeout` (顶级,lazy) | SessionTimeoutPage | src/pages/placeholders/SessionTimeoutPage.tsx | useAuth / useLocation / useNavigate / 1 秒倒计时 | 继续原页面、立即退出并清理、倒计时结束自动退出 | 倒计时 / 继续 / 退出与会话清理 | (无专项) |
+| 61 | 61-error-offline.html | 网络/设备异常 | 首页登录系统 | `/error-offline` (顶级,lazy) | ErrorOfflinePage | src/pages/placeholders/ErrorOfflinePage.tsx | navigator.onLine / `GET /api/v1/health` / 10 秒轮询与 online 事件 | 手动重试、自动健康检查、恢复后返回原页面、查看当前功能状态 | offline / checking / 自动重试 / 恢复跳转 | (无专项) |
 | 62 | 62-phone-upload.html | 手机上传落地页 | 首页登录系统 | `/upload/phone` (顶级全屏,手机尺寸) | PhoneUploadPage | src/pages/upload/PhoneUploadPage.tsx | uploadSessions.uploadPhoneSessionFile / UploadSessionQrPanel | 手机端上传文件到会话 | loading / error | verify-resume-phone-upload-ui |
 | 63 | 63-qr-login-mobile.html | 手机登录确认页 | 首页登录系统 | `/member/qr-login` (顶级全屏,手机尺寸) | MobileQrLoginPage | src/pages/auth/MobileQrLoginPage.tsx | memberAuthApi.sendSmsCode / memberQrLoginApi.confirmQrLogin+fetchQrLoginStatus | 手机确认扫码登录、短信验证 | loading / error / 登录态 | verify-qr-login-ui |
 | 64 | 64-print-preview.html | 打印预览 | 打印扫描 | `/print/preview` | PrintPreviewPage | src/pages/print/PrintPreviewPage.tsx | priceConfigApi / sessionStorage 流转 | 单页放大、缩略图、页面范围 | loading / error / 文件不可用兜底 | verify-price-single-source / verify-legal-retention-copy / verify-print-entry-source-split |
@@ -103,8 +103,8 @@
 | `/print/scan-sign` | Navigate → `/print-scan/sign` | routes/index.tsx | 旧入口重定向 |
 | `/print/scan-feature` | Navigate → `/print-scan/feature/id-photo` | routes/index.tsx | 旧入口重定向 |
 | `/resume` `/resume/upload` | Navigate → `/resume/source` | routes/index.tsx | 旧入口重定向(中间服务页已移除) |
-| `/campus/welcome` | CampusWelcomePage(placeholder) | src/pages/placeholders/CampusWelcomePage.tsx | 直达兜底占位;智慧校园正式实现在 `/smart-campus/welcome`(=69) |
-| `/campus/freshman-insights` | FreshmanInsightsPage(placeholder) | src/pages/placeholders/FreshmanInsightsPage.tsx | 直达兜底占位;正式实现在 `/smart-campus/freshman-insights`(=70) |
+| `/campus/welcome` | CampusWelcomePage(待开发容错) | src/pages/placeholders/CampusWelcomePage.tsx | 校园招聘专区自身的迎新直达容错,语义独立于 `/smart-campus/welcome` |
+| `/campus/freshman-insights` | FreshmanInsightsPage(待开发容错) | src/pages/placeholders/FreshmanInsightsPage.tsx | 校园招聘专区自身的新生信息直达容错,语义独立于 `/smart-campus/freshman-insights` |
 | `/me/activity/:id` | MeActivityDetailPage(placeholder) | src/pages/placeholders/MeActivityDetailPage.tsx | 浏览记录明细占位,原型 71 只有列表 |
 | `/notifications` | NotificationsPage(placeholder) | src/pages/placeholders/NotificationsPage.tsx | 顶层通知占位(与 `/me/notifications` 不同层级) |
 
@@ -115,11 +115,11 @@
 ## 三、数据覆盖度小结(75 屏)
 
 - **有完整生产页面(真实 service/API 接入)**:约 **60 屏**。覆盖首页、打印七步、扫描四步、AI简历全链路、岗位/企业/招聘会/校园、面试全链路、政策、AI助手、「我的」全部明细页、权益活动、手机上传/扫码登录、线下机构双轨等。
-- **静态/占位/未开放(无真实数据接入)**:约 **15 屏**。
+- **已真实实现的系统状态页**:**2 屏**。60 会话超时已包含倒计时、继续使用、退出与会话清理;61 断网异常已包含 health check、10 秒自动重试、在线恢复监听和功能状态 UI。两文件仍位于历史命名的 `pages/placeholders/`,目录名不代表当前实现完整度。
+- **静态/占位/未开放(无真实数据接入)**:约 **13 屏**。
   - 纯静态信息屏(设计即为静态):41 面试技巧、52 校园卡办理、58 帮助中心、68 功能介绍、69 迎新系统、70 校园大数据(未开放锁定态,合规兜底)。
-  - placeholder 占位实现:60 会话超时、61 断网异常(routes 中 lazy 加载 `placeholders/`,商用补缺屏,功能待补齐)。
   - 依赖上游 state 流转、无独立 service import(功能真实但数据来自流程上下文):28 导出、37 扫描结果、31 材料检查、64 打印预览(部分)。
-- **缺 verify 脚本**:约 **17 屏**无专项验收脚本。包括 34/35/36 扫描三步、37 扫描结果、46 场馆导览、49 现场数据、54 企业详情、57 待机屏、60/61 系统补缺屏、66 格式转换、72 权益活动详情、74/75 线下机构双轨等(部分被 lightflow/commercial-closure 等宽口径脚本间接覆盖)。
+- **缺 verify 脚本**:约 **17 屏**无专项验收脚本。包括 34/35/36 扫描三步、37 扫描结果、46 场馆导览、49 现场数据、54 企业详情、57 待机屏、60/61 已实现系统状态页、66 格式转换、72 权益活动详情、74/75 线下机构双轨等(部分被 lightflow/commercial-closure 等宽口径脚本间接覆盖)。
 
 ---
 
@@ -127,8 +127,8 @@
 
 1. **73 语音咨询屏无独立路由**:原型 73「语音咨询中」是独立一屏,但生产实现为 `/assistant` 页面内的 `AssistantCallPanel` 组件(通话态子面板),不是单独路由。迁移/截图对比时需在 AssistantPage 内触发通话态,不能按独立页处理。
 2. **12 政策服务 ↔ `/renshi` 语义错位**:原型 12 屏名「政策服务」,生产路由是 `/renshi`(人社),组件 RenshiPage 含 Policy/Social/Register/Notice 多面板,范围比原型单屏「政策服务」更宽。原型未覆盖社保/登记/公告等子面板。
-3. **69/70 一屏对多路由(智慧校园 vs 占位重定向)**:迎新(69)与校园大数据(70)各有两条路由——正式实现 `/smart-campus/welcome`、`/smart-campus/freshman-insights`,以及直达兜底占位 `/campus/welcome`、`/campus/freshman-insights`(placeholders/)。迁移须以 smart-campus 版为准,campus 版仅容错。
-4. **60/61 商用补缺屏为 placeholder,尚未真实实现**:会话超时、断网异常在 index.html 与 README 均标注"项目路由中尚无对应实现/商用补缺",生产确以 `placeholders/SessionTimeoutPage`、`placeholders/ErrorOfflinePage` lazy 占位。1:1 迁移这两屏属**新增功能**,需按正常任务流程立项,不能视为"已实现待还原"。
+3. **`/campus/*` 与 `/smart-campus/*` 是两套独立语义**:`/campus/welcome`、`/campus/freshman-insights` 是校园招聘专区自身的直达容错页面,当前仍诚实显示待开发;`/smart-campus/welcome`、`/smart-campus/freshman-insights` 是另一套智慧校园正式能力。二者不是别名或重定向关系,迁移时不可互相替代。
+4. **60/61 已真实实现,仅目录保留历史命名**:`SessionTimeoutPage` 已实现倒计时、继续使用、退出和会话清理;`ErrorOfflinePage` 已实现 `/api/v1/health` 检查、10 秒自动重试、online 恢复监听与功能状态 UI。它们通过 lazy route 加载自 `pages/placeholders/`,但不再是功能占位页。
 5. **22 通知与反馈原型合屏、生产拆两页**:原型 22 单屏合并"通知+反馈",生产拆为 `/me/notifications`(MyNotificationsPage)与 `/me/feedback`(MyFeedbackPage)两条路由两个组件。矩阵已在 22 行合并标注,迁移时注意是两个落点。
 
 ---
