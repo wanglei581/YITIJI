@@ -26,6 +26,7 @@ const EXPECTED_SOURCES = {
   'sources/8177/22B-me-feedback.html': '895f186906db07a8bc2900924f70af65e56d669653c5d4315694ecd8d24e774d',
   'sources/8177/32A-cashier-failed.html': 'a47d4549e19494db6be9b91d9478793c16fa6b9ef61631f75c89bd86c2d4c700',
   'sources/8177/34A-scan-offline.html': '8b0d6abfbe2b5ec36317a0615c5e98943f55f22c906f600cded556ecc85db976',
+  'sources/8177/76-toolbox-zone.html': '450ecdc03483178d5e615824ad59717e9f4a11a71bc7607910662f7ca275f3ed',
   'sources/8177/76A-toolbox-empty.html': '9b00b902feed6004a1d4c778ebdf5a5d7144db57db5b9c8c726776fa6ea814d1',
   'sources/8177/FREEZE.md': 'cb4990a6309c593f06340a0af949aee69aeffa66a74cb605ebf8acfe943d8c33',
   'sources/8177/WAVE-P-CLOSURE.md': '44601f45e00edf6b72d51e71d3f26f708334f8d29952224ea1d650ee30ed2397',
@@ -40,6 +41,7 @@ const DERIVED_HTML_FILES = [
   '22B-me-feedback.html',
   '32A-cashier-failed.html',
   '34A-scan-offline.html',
+  '76-toolbox-zone.html',
   '76A-toolbox-empty.html',
 ]
 
@@ -84,8 +86,8 @@ async function readDeclaredRoutes(fail) {
 
 await runGroup('immutable fusion source hashes', async (fail) => {
   const sourceEntries = Object.entries(EXPECTED_SOURCES)
-  if (sourceEntries.length !== 14) {
-    fail(`expected exactly 14 frozen source entries, received ${sourceEntries.length}`)
+  if (sourceEntries.length !== 15) {
+    fail(`expected exactly 15 frozen source entries, received ${sourceEntries.length}`)
   }
   for (const [relativePath, expectedHash] of sourceEntries) {
     const sourcePath = resolve(fusionRoot, relativePath)
