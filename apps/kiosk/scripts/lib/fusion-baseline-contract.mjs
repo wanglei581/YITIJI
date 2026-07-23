@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, readdir, readFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
+import ts from 'typescript'
 
-const LOCAL_REFERENCE = /(href|src)=["']([^"']+)["']/g
-const ROUTE_PATH = /(?:^|[{,]\s*)path:\s*(['"])(.*?)\1/gm
+const HTML_COMMENT = /<!--[\s\S]*?-->/g
+const HTML_TAG = /<([a-z][\w:-]*)\b([^<>]*?)>/gi
+const HTML_REFERENCE_ATTRIBUTE = /(?:^|\s)(href|src)\s*=\s*(["'])(.*?)\2/gi
 const ROUTE_MANIFEST = /export const productionRoutePatterns = \[([\s\S]*?)\] as const/
 const FUSION_MARKER = 'docs/design/kiosk-proto-2026-07-fusion'
 
@@ -19,11 +21,22 @@ export async function sha256File(filePath) {
 }
 
 export function extractDeclaredRoutePatterns(source) {
-  return [...source.matchAll(ROUTE_PATH)]
-    .map((match) => match[2])
-    .map((routePath) => routePath === '/' || routePath.startsWith('/') ? routePath : `/${routePath}`)
-    .filter((routePath, index, routes) => routes.indexOf(routePath) === index)
-    .sort()
+  const sourceFile = ts.createSourceFile('routes.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const routes = []
+  const visit = (node) => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) &&
+      node.name.text === 'path' &&
+      ts.isStringLiteral(node.initializer)
+    ) {
+      const routePath = node.initializer.text
+      routes.push(routePath === '/' || routePath.startsWith('/') ? routePath : `/${routePath}`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return routes.sort()
 }
 
 export function extractManifestRoutePatterns(source) {
@@ -37,12 +50,20 @@ export function extractManifestRoutePatterns(source) {
 
 export async function collectMissingLocalReferences(htmlPath) {
   const html = await readFile(htmlPath, 'utf8')
-  const references = [...html.matchAll(LOCAL_REFERENCE)].map((match) => ({
-    attribute: match[1],
-    reference: match[2],
-  }))
-  const localReferences = references.filter(({ attribute, reference }) =>
-    !(attribute === 'href' && reference.startsWith('/')) &&
+  const references = []
+  for (const tagMatch of html.replace(HTML_COMMENT, '').matchAll(HTML_TAG)) {
+    const tag = tagMatch[1].toLowerCase()
+    for (const attributeMatch of tagMatch[2].matchAll(HTML_REFERENCE_ATTRIBUTE)) {
+      references.push({
+        tag,
+        attribute: attributeMatch[1].toLowerCase(),
+        reference: attributeMatch[3],
+      })
+    }
+  }
+  const localReferences = references.filter(({ tag, attribute, reference }) =>
+    !reference.startsWith('//') &&
+    !(tag === 'a' && attribute === 'href' && reference.startsWith('/')) &&
     !reference.startsWith('#') &&
     !reference.startsWith('data:') &&
     !reference.startsWith('http://') &&
@@ -54,8 +75,9 @@ export async function collectMissingLocalReferences(htmlPath) {
   for (const { reference } of localReferences) {
     const pathOnly = reference.split('#')[0].split('?')[0]
     if (!pathOnly) continue
+    const localPath = pathOnly.startsWith('/') ? `.${pathOnly}` : pathOnly
     try {
-      await access(resolve(dirname(htmlPath), pathOnly))
+      await access(resolve(dirname(htmlPath), localPath))
     } catch {
       missing.push(reference)
     }
@@ -67,7 +89,8 @@ async function listFiles(root) {
   const entries = await readdir(root, { withFileTypes: true })
   const nested = await Promise.all(entries.map(async (entry) => {
     const absolute = resolve(root, entry.name)
-    return entry.isDirectory() ? await listFiles(absolute) : [absolute]
+    if (entry.isDirectory()) return await listFiles(absolute)
+    return entry.isFile() ? [absolute] : []
   }))
   return nested.flat()
 }

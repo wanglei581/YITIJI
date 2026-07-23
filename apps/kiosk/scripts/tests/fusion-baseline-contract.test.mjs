@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -23,13 +23,17 @@ test('sha256File returns the SHA-256 digest for exact bytes', async () => {
 
 test('extractDeclaredRoutePatterns normalizes absolute and nested route strings', () => {
   const source = `
-    { path: '/login', element: <LoginPage /> },
-    { path: '/', children: [
-      { index: true, element: <HomePage /> },
-      { path: 'jobs/:id', element: <JobPage /> },
-    ] }
+    const routes = [
+      // { path: '/commented', element: <CommentedPage /> },
+      { path : '/login', element: <LoginPage /> },
+      { path: '/', children: [
+        { index: true, element: <HomePage /> },
+        { path: 'jobs/:id', element: <JobPage /> },
+        { path: 'jobs/:id', element: <DuplicateJobPage /> },
+      ] },
+    ]
   `
-  assert.deepEqual(extractDeclaredRoutePatterns(source), ['/', '/jobs/:id', '/login'])
+  assert.deepEqual(extractDeclaredRoutePatterns(source), ['/', '/jobs/:id', '/jobs/:id', '/login'])
 })
 
 test('extractManifestRoutePatterns reads the exported Playwright route array', () => {
@@ -40,15 +44,20 @@ test('extractManifestRoutePatterns reads the exported Playwright route array', (
 
 test('collectMissingLocalReferences ignores external links and reports local misses', async () => {
   const root = await mkdtemp(join(tmpdir(), 'fusion-links-'))
+  await mkdir(join(root, 'assets'))
   await writeFile(join(root, 'ok.html'), '<a href="https://example.com">外部</a>')
+  await writeFile(join(root, 'assets/ok.png'), '')
   await writeFile(
     join(root, 'index.html'),
     '<a href="ok.html">正常</a><a href="/scan/start">应用路由</a>' +
-      '<img src="missing.png"><img src="/missing-root.png"><a href="#top">锚点</a>',
+      '<img src="missing.png"><img src = "/assets/missing-root.png">' +
+      '<img src="/assets/ok.png"><link href="/assets/missing.css">' +
+      '<img data-src="ghost.png"><img src="//cdn.example.com/logo.png">' +
+      '<a href="#top">锚点</a>',
   )
   assert.deepEqual(
     await collectMissingLocalReferences(join(root, 'index.html')),
-    ['/missing-root.png', 'missing.png'],
+    ['/assets/missing-root.png', '/assets/missing.css', 'missing.png'].sort(),
   )
 })
 
@@ -58,6 +67,16 @@ test('findForbiddenFusionReferences reports runtime imports of the docs baseline
   await mkdir(src, { recursive: true })
   await writeFile(join(src, 'safe.ts'), "export const safe = true\n")
   assert.deepEqual(await findForbiddenFusionReferences(src), [])
+  const outside = join(root, 'outside.ts')
+  await writeFile(outside, "import './docs/design/kiosk-proto-2026-07-fusion/index.html'\n")
+  let symlinkCreated = true
+  try {
+    await symlink(outside, join(src, 'linked.ts'))
+  } catch (error) {
+    if (!['EACCES', 'ENOSYS', 'EPERM'].includes(error.code)) throw error
+    symlinkCreated = false
+  }
+  if (symlinkCreated) assert.deepEqual(await findForbiddenFusionReferences(src), [])
   await writeFile(join(src, 'bad.ts'), "import '../../../docs/design/kiosk-proto-2026-07-fusion/index.html'\n")
   assert.deepEqual(await findForbiddenFusionReferences(src), ['bad.ts'])
 })
