@@ -91,7 +91,7 @@ function assertPresentationOnly(component, source) {
   for (const [, importSource] of imports) {
     assert.equal(
       /(?:^|\/)(?:apps|services)(?:\/|$)/i.test(importSource)
-        || /(?:^|\/)(?:stores?|hooks?)\/[^/]*(?:auth|member|job|resume|order|print|device|payment|profile|campus|fair)/i.test(importSource),
+        || (/^\.\.?\//.test(importSource) && /(?:^|\/)(?:stores?|hooks?)(?:\/|$)/i.test(importSource)),
       false,
       `${component} must not import app-owned services or business store/hook modules: ${importSource}`,
     )
@@ -140,7 +140,7 @@ function assertModalBehavior(source) {
   const handlerBody = (name) => new RegExp(`(?:const\\s+${name}\\s*=\\s*\\([^)]*\\)\\s*=>|function\\s+${name}\\s*\\([^)]*\\))\\s*\\{([\\s\\S]*?)\\n\\s*\\}`).exec(source)?.[1]
   const keydown = /addEventListener\s*\(\s*['"]keydown['"]\s*,\s*(\w+)/.exec(source)?.[1]
   assert.match(source, /addEventListener\s*\(\s*['"]keydown['"]/, 'KioskModal must register keydown')
-  if (keydown) assert.match(source, new RegExp(`removeEventListener\\s*\\(\\s*['"]keydown['"]\\s*,\\s*${keydown}`))
+  assert.ok(keydown, 'KioskModal keydown listener must be a stable local reference')
   const keyBody = handlerBody(keydown) ?? ''
   assert.match(keyBody || source, /closeOnEscape[\s\S]*(?:Escape|code)[\s\S]*onClose\s*\(\)/)
   const backdropStart = source.indexOf('ui-kiosk-modal-backdrop')
@@ -148,7 +148,7 @@ function assertModalBehavior(source) {
   assert.match(backdropBody, /onClick\s*=\s*\{[\s\S]*closeOnBackdrop[\s\S]*onClose/)
   const cleanup = /return\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\n\s*\}/.exec(source)?.[1]
   assert.ok(cleanup, 'KioskModal effect must return cleanup')
-  assert.match(cleanup, /removeEventListener\s*\(\s*['"]keydown['"]/)
+  assert.match(cleanup, new RegExp(`removeEventListener\\s*\\(\\s*['"]keydown['"]\\s*,\\s*${keydown}`))
   const overflow = /const\s+(\w+)\s*=\s*document\.body\.style\.overflow/.exec(source)?.[1]
   const focused = /const\s+(\w+)\s*=\s*document\.activeElement/.exec(source)?.[1]
   assert.ok(overflow && focused, 'KioskModal must capture overflow and prior focus')
