@@ -1,0 +1,477 @@
+.resume-source-lightflow {
+  padding: 34px 48px 0 !important;
+}
+
+.resume-source-lightflow .resume-source-privacy {
+  display: none;
+}
+
+.resume-source-lightflow .resume-source-content {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: auto;
+  overflow: hidden !important;
+  padding-bottom: 0 !important;
+}
+
+.resume-source-lightflow .resume-source-intro {
+  display: none;
+}
+
+.resume-source-lightflow .resume-source-alternative {
+  grid-column: 1 / -1;
+  min-height: 88px !important;
+  padding: 14px 26px !important;
+  border: 2px dashed rgba(31, 158, 134, .45) !important;
+  border-radius: var(--fy-r-md) !important;
+  color: var(--fy-ink) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: none !important;
+}
+
+.resume-source-lightflow .resume-source-methods {
+  grid-column: 1;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  padding: 26px 28px 0;
+  border: 1px solid var(--fy-line);
+  border-bottom: 0;
+  border-radius: var(--fy-r-md) var(--fy-r-md) 0 0;
+  background: var(--fy-surface);
+}
+
+.resume-source-lightflow .resume-source-methods::before {
+  content: '上传简历文件';
+  grid-column: 1 / -1;
+  color: var(--fy-ink);
+  font-family: var(--fy-serif);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.resume-source-lightflow .resume-source-methods > button {
+  min-height: 104px !important;
+  padding: 14px 8px !important;
+  align-items: center;
+  text-align: center;
+  border: 2px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-sm) !important;
+  background: var(--fy-paper) !important;
+  box-shadow: none !important;
+}
+
+.resume-source-lightflow .resume-source-methods > button[class*='border-primary-500'] {
+  border-color: var(--fy-teal) !important;
+  background: var(--fy-teal-soft) !important;
+  box-shadow: none !important;
+}
+
+.resume-source-lightflow .resume-source-methods > button > div:first-child {
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* icon container inside method card */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:first-child {
+  width: 54px !important;
+  height: 54px !important;
+  border-radius: 14px !important;
+  flex: none;
+}
+
+/* checkmark hidden in column layout */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > svg:last-child {
+  display: none;
+}
+
+/* label text: center, right size */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:last-of-type > p:first-child {
+  text-align: center;
+  font-size: 20px !important;
+}
+
+/* description text below label */
+.resume-source-lightflow .resume-source-methods > button > div:first-child > div:last-of-type > p:last-child {
+  text-align: center;
+  font-size: 14.5px !important;
+  color: var(--fy-muted) !important;
+  line-height: 1.3;
+  display: block !important;
+}
+
+/* helper text at bottom of button hidden (already shown in description slot above) */
+.resume-source-lightflow .resume-source-methods > button > p:last-child {
+  display: none;
+}
+
+.resume-source-lightflow .resume-source-dropzone,
+.resume-source-lightflow .resume-source-phone-session {
+  grid-column: 1;
+  min-height: 250px !important;
+  margin-top: -20px;
+  padding: 20px !important;
+  border: 1px solid var(--fy-line) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 var(--fy-r-md) var(--fy-r-md) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: none !important;
+}
+
+.resume-source-lightflow .resume-source-dropzone > div:first-child {
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+.resume-source-lightflow .resume-source-direction {
+  grid-column: 2;
+  grid-row: 2 / span 2;
+}
+
+.resume-source-lightflow .resume-source-direction > * {
+  height: 100%;
+  padding: 26px 28px !important;
+}
+
+.resume-source-lightflow .resume-source-direction button {
+  min-height: 58px;
+  border-radius: var(--fy-r-sm) !important;
+}
+
+.resume-source-lightflow .resume-source-context {
+  grid-column: 2;
+  padding: 18px 22px !important;
+}
+
+.resume-source-lightflow .resume-source-evidence {
+  grid-column: 1 / -1;
+  padding: 22px 26px !important;
+}
+
+.resume-report-lightflow {
+  padding: 34px 48px 0 !important;
+}
+
+.resume-report-lightflow .resume-report-content {
+  display: grid !important;
+  grid-template-columns: minmax(220px, .78fr) minmax(320px, 1.1fr) minmax(300px, 1fr);
+  align-items: stretch;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.resume-report-lightflow .resume-report-summary {
+  grid-column: 1;
+  padding: 18px !important;
+}
+
+.resume-report-lightflow .resume-report-summary > div {
+  height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  background: var(--fy-paper);
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+}
+
+.resume-report-lightflow .resume-report-summary span:first-child {
+  color: var(--fy-teal-deep) !important;
+  font-family: var(--fy-serif);
+  font-size: 56px !important;
+  line-height: 1;
+}
+
+.resume-report-lightflow .resume-report-radar {
+  grid-column: 2;
+  padding: 18px !important;
+}
+
+.resume-report-lightflow .resume-report-notice {
+  grid-column: 3;
+  padding: 18px !important;
+}
+
+.resume-report-lightflow .resume-report-evidence,
+.resume-report-lightflow .resume-report-priorities,
+.resume-report-lightflow .resume-report-risks,
+.resume-report-lightflow .resume-report-suggestions {
+  padding: 22px 24px !important;
+}
+
+.resume-report-lightflow .resume-report-evidence {
+  grid-column: 1 / 2;
+}
+
+.resume-report-lightflow .resume-report-priorities {
+  grid-column: 2 / 4;
+  background: var(--fy-surface) !important;
+}
+
+.resume-report-lightflow .resume-report-risks {
+  grid-column: 1 / 2;
+}
+
+.resume-report-lightflow .resume-report-suggestions {
+  grid-column: 2 / 4;
+}
+
+.resume-report-lightflow [role='progressbar'] {
+  background: linear-gradient(90deg, var(--fy-teal), #35ab8e) !important;
+}
+
+.resume-report-lightflow .resume-report-priorities [class*='bg-warning'] {
+  background: var(--fy-wheat-soft) !important;
+  border: 1px solid rgba(169, 120, 31, .25);
+}
+
+.resume-report-lightflow .resume-report-risks li {
+  background: var(--fy-clay-soft) !important;
+  color: var(--fy-clay-deep) !important;
+}
+
+.resume-report-lightflow .resume-report-suggestions li {
+  background: var(--fy-paper) !important;
+  border: 1px solid var(--fy-line);
+}
+
+.resume-parse-lightflow {
+  padding: 34px 48px !important;
+  justify-content: center;
+}
+
+.resume-parse-lightflow .resume-parse-status-mark {
+  width: 250px !important;
+  height: 250px !important;
+  margin-bottom: 26px !important;
+  border: 13px solid var(--fy-line);
+  background:
+    conic-gradient(var(--fy-teal) 0 75%, transparent 75% 100%),
+    var(--fy-surface) !important;
+  box-shadow: none;
+}
+
+.resume-parse-lightflow .resume-parse-status-mark svg {
+  width: 72px;
+  height: 72px;
+  color: var(--fy-teal-deep) !important;
+}
+
+.resume-parse-lightflow h1 {
+  font-size: 34px !important;
+}
+
+.resume-parse-lightflow .resume-parse-dimensions {
+  max-width: 760px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.resume-parse-lightflow .resume-parse-dimensions > div {
+  min-height: 58px;
+  border: 1px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-sm) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-muted) !important;
+  font-size: 17px !important;
+}
+
+.resume-parse-lightflow .resume-parse-dimensions > div[class*='primary'] {
+  border-color: rgba(31, 158, 134, .35) !important;
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+}
+
+.resume-parse-lightflow .resume-parse-steps {
+  max-width: 760px !important;
+  padding: 20px 24px !important;
+  border: 1px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-md) !important;
+  background: var(--fy-surface) !important;
+}
+
+/* ─── Screen06: 诊断报告 ─────────────────────────────────── */
+
+/* 总评分卡:大分数块居中, paper 背景 */
+.resume-report-lightflow .resume-report-summary > div {
+  display: flex !important;
+}
+
+.resume-report-lightflow .fy-score-block {
+  height: 100%;
+  padding: 20px 12px;
+  background: var(--fy-paper);
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+}
+
+/* 大分数数字 */
+.resume-report-lightflow .fy-score-num {
+  display: block;
+  font-family: var(--fy-serif) !important;
+  font-size: 64px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  color: var(--fy-teal-deep) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 分母 */
+.resume-report-lightflow .fy-score-denom {
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  color: var(--fy-muted) !important;
+}
+
+/* 低分进度条 → clay 渐变 */
+.resume-report-lightflow [role='progressbar'].fy-progress-low {
+  background: linear-gradient(90deg, var(--fy-clay), #c97b4e) !important;
+}
+
+/* 风险提醒列表项:clay 背景 + 内边距 + 圆角 */
+.resume-report-lightflow .resume-report-risks li {
+  padding: 12px 16px;
+  border-radius: var(--fy-r-sm) !important;
+}
+
+/* clay 子弹点 */
+.resume-report-lightflow .fy-dot-clay {
+  background: var(--fy-clay) !important;
+  opacity: .7;
+}
+
+/* 可执行建议列表项:paper 背景 + 边框 + 内边距 */
+.resume-report-lightflow .resume-report-suggestions li {
+  padding: 13px 16px;
+  border-radius: var(--fy-r-sm) !important;
+}
+
+/* 建议序号圆圈 */
+.resume-report-lightflow .fy-sug-no {
+  background: var(--fy-teal-soft) !important;
+  color: var(--fy-teal-deep) !important;
+  flex: none;
+}
+
+/* 修改优先级建议:wheat 背景 */
+.resume-report-lightflow .resume-report-priorities .fy-pri-item {
+  background: var(--fy-wheat-soft) !important;
+  border: 1px solid rgba(169, 120, 31, .25) !important;
+  border-radius: var(--fy-r-sm) !important;
+  padding: 14px 18px;
+}
+
+.resume-report-lightflow .resume-report-priorities .fy-pri-no {
+  background: rgba(169, 120, 31, .18) !important;
+  color: var(--fy-wheat-deep) !important;
+  flex: none;
+}
+
+/* 进度条高度 → 匹配原型 15px */
+.resume-report-lightflow .h-2 {
+  height: 14px !important;
+  border-radius: 999px;
+}
+
+/* ─── Screen05: 来源 / QR 面板 ──────────────────────────── */
+
+/* 手机扫码面板内层 Card → 去掉双重边框 */
+.resume-source-lightflow .resume-source-phone-session > * {
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+}
+
+/* QR 码容器:圆角边框 */
+.resume-source-lightflow .resume-source-phone-session .fy-qr-box {
+  border: 1px solid var(--fy-line);
+  border-radius: var(--fy-r-sm);
+  background: #fff;
+}
+
+/* 手机扫码面板: 内层 grid 改为单列居中，QR 大图在上、信息在下 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 18px !important;
+}
+
+/* QR 图片区域: 固定220×220、居中显示、白底圆角 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:first-child {
+  width: 220px !important;
+  height: 220px !important;
+  flex: none !important;
+  border: 1px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-sm) !important;
+  background: #fff !important;
+}
+
+/* 信息区: 宽度撑满，去掉背景色，文字居中 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:last-child {
+  width: 100%;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* 操作按钮排为行 */
+.resume-source-lightflow .resume-source-phone-session [class*='grid-cols-'] > div:last-child > div:last-child {
+  justify-content: center;
+}
+
+/* 面板头部 (icon + title + desc) */
+.resume-source-lightflow .resume-source-phone-session > * > div:first-child {
+  display: none !important;
+}
+
+/* ─── Screen05: 诊断报告包含内容 — 最后两项(风险/优先级)用 wheat 色 ── */
+.resume-source-lightflow .resume-source-evidence [class*='grid'] > div:nth-child(n+7) {
+  background: var(--fy-wheat-soft) !important;
+  border-color: rgba(169, 120, 31, .3) !important;
+  color: var(--fy-wheat-deep) !important;
+}
+
+/* DiagnosisDirectionForm 内 dimension 按钮尺寸 */
+.resume-source-lightflow .resume-source-direction .fy-dim-chip {
+  min-height: 58px !important;
+  border-radius: var(--fy-r-sm) !important;
+  font-size: 17.5px !important;
+}
+
+/* 诊断方向表单字段高度 */
+.resume-source-lightflow .resume-source-direction :is(input, select) {
+  min-height: 62px !important;
+  font-size: 20px !important;
+  border-radius: var(--fy-r-sm) !important;
+  padding: 0 18px !important;
+}
+
+/* 诊断方向 label */
+.resume-source-lightflow .resume-source-direction label > span:first-child {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: var(--fy-ink) !important;
+}
+
+@media (max-width: 900px) {
+  .resume-source-lightflow .resume-source-content,
+  .resume-report-lightflow .resume-report-content {
+    display: flex !important;
+    flex-direction: column;
+    overflow-y: auto !important;
+  }
+
+  .resume-source-lightflow .resume-source-methods,
+  .resume-source-lightflow .resume-source-dropzone,
+  .resume-source-lightflow .resume-source-phone-session,
+  .resume-source-lightflow .resume-source-direction,
+  .resume-source-lightflow .resume-source-context,
+  .resume-source-lightflow .resume-source-evidence {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}

@@ -17,8 +17,11 @@
 }
 
 .k1-mobile-qr-login .k1-mobile-qr-content {
+  box-sizing: border-box;
   display: flex;
   width: min(390px, 100%);
+  min-width: 0;
+  max-width: 100%;
   min-height: min(844px, calc(100dvh - 40px));
   flex-direction: column;
   gap: 12px;
@@ -48,7 +51,7 @@
 .k1-mobile-qr-login .k1-mobile-qr-code-label { margin-top: 12px; }
 .k1-mobile-qr-login .k1-mobile-qr-field { display: flex; min-height: 54px; align-items: center; overflow: hidden; border: 1px solid var(--m-line); border-radius: 14px; background: var(--m-surface); }
 .k1-mobile-qr-login .k1-mobile-qr-prefix { padding: 0 12px; border-right: 1px solid var(--m-line); color: var(--m-muted); font-size: 14px; font-weight: 700; }
-.k1-mobile-qr-login .k1-mobile-qr-input { min-width: 0; flex: 1; padding: 0 14px; border: 0; outline: 0; color: var(--m-ink); background: transparent; font-size: 17px; }
+.k1-mobile-qr-login .k1-mobile-qr-input { min-width: 0; min-height: 48px; flex: 1; padding: 0 14px; border: 0; outline: 0; color: var(--m-ink); background: transparent; font-size: 17px; }
 .k1-mobile-qr-login .k1-mobile-qr-code-row { display: flex; gap: 10px; }
 .k1-mobile-qr-login .k1-mobile-qr-code-field { min-width: 0; flex: 1; }
 .k1-mobile-qr-login .k1-mobile-qr-code-field svg { width: 20px; height: 20px; margin-left: 12px; color: var(--m-muted); }

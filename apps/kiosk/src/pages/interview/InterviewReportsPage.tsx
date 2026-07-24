@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageFrame, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
@@ -69,7 +69,8 @@ export function InterviewReportsPage() {
   }
 
   return (
-    <div className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-reports" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader
         className="interview-pagehead"
@@ -172,6 +173,7 @@ export function InterviewReportsPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

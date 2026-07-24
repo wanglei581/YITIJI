@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, PageHeader, ResumeRadarChart } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, ResumeRadarChart } from '@ai-job-print/ui'
 import type { ResumeRadarDimension } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
@@ -125,7 +125,7 @@ export function ResumeReportPage() {
 
   if (!success) {
     return (
-      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-error-bg">
           <AlertCircleIcon className="h-14 w-14 text-error-fg" />
         </div>
@@ -141,24 +141,24 @@ export function ResumeReportPage() {
             重新解析
           </Button>
         </div>
-      </div>
+      </section></KioskPageFrame>
     )
   }
 
   if (loading) {
     return (
-      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
         </div>
         <p className="text-base text-neutral-500">正在恢复诊断报告…</p>
-      </div>
+      </section></KioskPageFrame>
     )
   }
 
   if (!report || loadError) {
     return (
-      <div className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <FileSearchIcon className="h-10 w-10 text-primary-600" />
         </div>
@@ -174,7 +174,7 @@ export function ResumeReportPage() {
             开始简历诊断
           </Button>
         </div>
-      </div>
+      </section></KioskPageFrame>
     )
   }
 
@@ -200,15 +200,13 @@ export function ResumeReportPage() {
   const summary = targetSummary(state.targetContext)
 
   return (
-    <div className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
-      <PageHeader
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
+      <KioskPageHeader
         title="诊断报告"
-        subtitle="基于已有内容的 AI 分析结果（仅供参考）"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-        }
+        description="基于已有内容的 AI 分析结果（仅供参考）"
+        onBack={() => navigate('/')}
+        backLabel="返回首页"
       />
 
       <div className="resume-report-content mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
@@ -369,7 +367,7 @@ export function ResumeReportPage() {
       )}
 
       {/* 操作按钮 */}
-      <div className="resume-report-actions mt-6 flex gap-3">
+      <KioskActionBar className="resume-report-actions mt-6 flex gap-3">
         <Button
           size="lg"
           variant="secondary"
@@ -386,7 +384,7 @@ export function ResumeReportPage() {
           <SparklesIcon className="h-4 w-4" />
           {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
         </Button>
-      </div>
+      </KioskActionBar>
       {/* 2D:目标岗位定向参考(仅参考,引导去来源平台投递) */}
       <Button
         size="lg"
@@ -397,6 +395,7 @@ export function ResumeReportPage() {
         <TargetIcon className="h-4 w-4" />
         目标岗位匹配参考（仅供参考）
       </Button>
-    </div>
+    </section>
+    </KioskPageFrame>
   )
 }

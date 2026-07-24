@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -290,7 +290,21 @@ const files = [...new Set(changedFiles())]
 // 不再以「触碰守卫脚本」为触发条件误伤一切后端/支付 PR；防回退由上方静态断言 + 人工评审兜底。
 const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
 const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
-const unexpectedChanged = touchesProtectedPages
+const fusionW5VerifierPath = join(root, 'scripts/verify-fusion-w5.mjs')
+const fusionW5OwnsScope = existsSync(fusionW5VerifierPath)
+if (touchesProtectedPages && fusionW5OwnsScope) {
+  try {
+    execFileSync(process.execPath, [fusionW5VerifierPath], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    pass('融合 W5 合同接管 /profile 与 /me/* 精确范围检查')
+  } catch (error) {
+    fail(`融合 W5 范围合同未通过：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+const unexpectedChanged = touchesProtectedPages && !fusionW5OwnsScope
   ? files.filter(
       (file) =>
         !allowedChanged.has(file) &&
@@ -301,7 +315,13 @@ const unexpectedChanged = touchesProtectedPages
         !WAVE2_ACCOUNT_REBIND_CHANGED.has(file),
     )
   : []
-if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
+if (unexpectedChanged.length === 0) pass(
+  touchesProtectedPages && fusionW5OwnsScope
+    ? 'diff 范围已由融合 W5 精确合同验证'
+    : touchesProtectedPages
+      ? 'diff 仅触碰 P0a 守卫、注册和进度文档'
+      : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言',
+)
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)
 
 if (failures > 0) {

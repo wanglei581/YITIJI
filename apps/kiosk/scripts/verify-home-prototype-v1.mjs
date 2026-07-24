@@ -128,7 +128,8 @@ for (const legacy of [
   expect(!existsSync(join(root, legacy)), `旧 .khome 首页样式已删除：${legacy}`)
 }
 expect(/className="kpv1"/.test(home), '首页根节点使用 .kpv1 作用域')
-expect(/<main className="groups"/.test(home), '首页服务区用原型 .groups 网格容器')
+expect(/<div className="groups"[^>]*aria-label="当前可使用功能"/.test(home), '首页服务区用中性 .groups 网格容器并保留可访问名称')
+expect(!/<main className="groups"/.test(home), '首页服务区不在 KioskLayout 主地标内嵌套 main')
 expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
 expect(!/home-reference-primary-list|home-reference-secondary-list/.test(home), '首页不再使用 primary/secondary 双列表结构')
 

@@ -10,6 +10,7 @@
 // 文字改「进入我的」，不显示原型没有的统计。ContinuePanel 业务逻辑已抽到
 // components/ContinuePanel.tsx 保留（首页按 1:1 不渲染，未删除）。
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
+import { KioskPageFrame } from '@ai-job-print/ui'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
@@ -361,23 +362,21 @@ export function HomePage() {
   const groups = SERVICE_GROUPS
 
   return (
-    <div className="kpv1">
-      <KioskTopBar />
+    <KioskPageFrame className="kpv1" header={<KioskTopBar />} footer={<HomeNavbar />}>
       <HomeWelcome />
       {/* 继续上次：原型外生产动态状态。ContinuePanel 自门控——仅登录且确有可恢复任务
           （进行中打印/已诊断未优化简历）时渲染；无任务或匿名 → 返回 null，首页与原型 1:1。 */}
       <ContinuePanel />
-      <main className="groups" aria-label="当前可使用功能">
+      <div className="groups" aria-label="当前可使用功能">
         {groups.map((group) => (
           <ServiceCard key={group.id} group={group} />
         ))}
-      </main>
+      </div>
       <ZoneRow />
       <div className="notice">
         <ProtoIcon name="info" />
         岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。
       </div>
-      <HomeNavbar />
-    </div>
+    </KioskPageFrame>
   )
 }

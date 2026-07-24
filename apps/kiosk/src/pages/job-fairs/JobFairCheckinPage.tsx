@@ -8,7 +8,7 @@ import { getJobFairs, getTerminalId } from '../../services/api'
 import { recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
 import { isValidSourceUrl } from '../../lib/url'
-import { ProtoBadge, ProtoNotice, ProtoPage, ProtoStepStrip } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 function formatDateTime(iso: string): string {
   const date = new Date(iso)
@@ -160,13 +160,13 @@ export function JobFairCheckinPage() {
   if (loading) return <LoadingState className="h-full" />
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="来源平台入场入口"
       subtitle="展示招聘会官方 / 第三方来源签到二维码，本系统不记录签到结果"
       backLabel="返回"
       onBack={() => navigate('/')}
-      badge={<ProtoBadge icon={QrCodeIcon}>{availableFairs.length} 场可签到</ProtoBadge>}
+      badge={<FusionBadge icon={QrCodeIcon}>{availableFairs.length} 场可签到</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate('/')}>
@@ -204,7 +204,7 @@ export function JobFairCheckinPage() {
             <div className="sub">三步完成来源平台现场签到</div>
           </div>
         </div>
-        <ProtoStepStrip
+        <FusionStepStrip
           steps={[
             { title: '手机扫描签到码', desc: '扫描上方对应场次的二维码' },
             { title: '来源平台完成签到', desc: '在来源平台页面按提示办理' },
@@ -212,7 +212,7 @@ export function JobFairCheckinPage() {
           ]}
         />
       </section>
-      <ProtoNotice>签到与入场由主办方管理，本系统不记录签到结果、不接收报名信息或简历。</ProtoNotice>
-    </ProtoPage>
+      <FusionNotice>签到与入场由主办方管理，本系统不记录签到结果、不接收报名信息或简历。</FusionNotice>
+    </KioskPageFrame>
   )
 }

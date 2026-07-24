@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
+import { Button, Card, KioskPageFrame } from '@ai-job-print/ui'
 import { ArrowRightIcon, FileTextIcon, InfoIcon, PrinterIcon, SaveIcon, ShieldCheckIcon } from 'lucide-react'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import './resume-library-lightflow.css'
@@ -28,7 +28,8 @@ export function ResumeExportPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="resume-lightflow resume-export-lightflow">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-export" className="resume-lightflow resume-export-lightflow">
       <div className="resume-lightflow__shell resume-lightflow__shell--narrow">
         <header className="resume-lightflow__header">
           <div>
@@ -89,6 +90,7 @@ export function ResumeExportPage() {
 
         <p className="resume-lightflow__compliance">{COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}</p>
       </div>
-    </div>
+    </section>
+    </KioskPageFrame>
   )
 }

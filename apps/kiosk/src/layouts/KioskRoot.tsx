@@ -84,6 +84,8 @@ function KioskShell() {
       onTabChange={(tab) => navigate(tabToPath(tab))}
       visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
       density="touch"
+      presentation="fusion-youth"
+      viewport="kiosk"
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
       // prototype-v1 首页（.kpv1）自绘 116px 原型底部导航，故隐藏共享 KioskLayout 底栏；

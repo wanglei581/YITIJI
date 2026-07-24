@@ -6,7 +6,7 @@ import {
   getOfflineJobDetail,
   type OfflineJobDetailDTO,
 } from '../../services/api/offlineAgencies'
-import { ProtoPage, ProtoNotice } from '../jobs-fairs-prototype'
+import { FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 export default function OfflineJobDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -34,7 +34,7 @@ export default function OfflineJobDetailPage() {
   const jobTypeLabel = job.jobType === 'fulltime' ? '全职' : job.jobType === 'parttime' ? '兼职' : '实习'
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="clay"
       title="线下机构岗位"
       subtitle={job.agencyName}
@@ -158,16 +158,16 @@ export default function OfflineJobDetailPage() {
                 <span>营业时间：{job.agencyHours}</span>
               </div>
             )}
-            <ProtoNotice>到店咨询，服务费用以现场公示为准</ProtoNotice>
+            <FusionNotice>到店咨询，服务费用以现场公示为准</FusionNotice>
           </div>
         </div>
       </div>
 
       {/* 合规说明 */}
-      <ProtoNotice>
+      <FusionNotice>
         本页面仅展示来源机构发布的岗位信息与到店指引，本系统不代收简历、不代投递。
         如需了解岗位详情，请直接前往该机构咨询。
-      </ProtoNotice>
+      </FusionNotice>
 
       {/* 底部操作栏 */}
       <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
@@ -179,11 +179,11 @@ export default function OfflineJobDetailPage() {
         </button>
         <button
           style={{ flex: 1, minHeight: 64, background: 'var(--clay)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', fontSize: 24, fontWeight: 700, cursor: 'pointer' }}
-          onClick={() => alert('打印功能即将上线')}
+          onClick={() => navigate('/print/upload')}
         >
-          打印岗位信息带走
+          上传自备材料打印
         </button>
       </div>
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }

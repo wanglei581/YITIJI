@@ -429,3 +429,83 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-account-action:postgres
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:cos:files
+
+  kiosk-browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @ai-job-print/kiosk exec playwright install --with-deps chromium
+
+      - name: Typecheck Kiosk workspace-source dependencies
+        run: |
+          pnpm --filter @ai-job-print/shared typecheck
+          pnpm --filter @ai-job-print/ui typecheck
+
+      - name: Verify Kiosk fusion static contracts
+        run: |
+          pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
+          pnpm --filter @ai-job-print/kiosk verify:fusion-shell
+          pnpm --filter @ai-job-print/kiosk verify:fusion-home
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w2
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w3
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w4
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w5
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w6
+
+      - name: Run Kiosk fusion contract tests with coverage gates
+        run: |
+          node --experimental-test-coverage --test \
+            --test-coverage-lines=80 \
+            --test-coverage-functions=80 \
+            --test-coverage-branches=80 \
+            apps/kiosk/scripts/tests/fusion-baseline-contract.test.mjs
+
+      - name: Verify Kiosk fusion baseline
+        run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
+
+      - name: Run Kiosk browser smoke
+        run: |
+          pnpm --filter @ai-job-print/kiosk test:browser:smoke
+          pnpm --filter @ai-job-print/kiosk test:browser:w1
+          pnpm --filter @ai-job-print/kiosk test:browser:w2
+          pnpm --filter @ai-job-print/kiosk test:browser:w3
+          pnpm --filter @ai-job-print/kiosk test:browser:w4
+          pnpm --filter @ai-job-print/kiosk test:browser:w5
+          pnpm --filter @ai-job-print/kiosk test:browser:w6
+
+      - name: Upload Kiosk browser failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-browser-smoke-failure
+          path: |
+            test-results/kiosk-fusion/**
+            test-results/kiosk-fusion-report/**
+            test-results/kiosk-fusion-w1/**
+            test-results/kiosk-fusion-w1-report/**
+            test-results/kiosk-fusion-w2/**
+            test-results/kiosk-fusion-w2-report/**
+            test-results/kiosk-fusion-w3/**
+            test-results/kiosk-fusion-w3-report/**
+            test-results/kiosk-fusion-w4/**
+            test-results/kiosk-fusion-w4-report/**
+            test-results/kiosk-fusion-w5/**
+            test-results/kiosk-fusion-w5-report/**
+            test-results/kiosk-fusion-w6/**
+            test-results/kiosk-fusion-w6-report/**
+          if-no-files-found: ignore

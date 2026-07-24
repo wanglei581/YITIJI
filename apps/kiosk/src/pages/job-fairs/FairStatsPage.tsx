@@ -13,7 +13,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { getFairStats } from '../../services/api'
-import { CardHead, ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, FusionSectionHead, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 function BigStat({
   label,
@@ -92,13 +92,13 @@ export function FairStatsPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="现场数据"
       subtitle={`${stats.fairName} · 更新于 ${formatTime(stats.lastUpdated)}`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<ProtoBadge icon={ActivityIcon}>准实时数据</ProtoBadge>}
+      badge={<FusionBadge icon={ActivityIcon}>准实时数据</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
@@ -129,7 +129,7 @@ export function FairStatsPage() {
         </div>
 
         <section className="jf-card accented">
-          <CardHead icon={TrendingUpIcon} title="服务数据统计" subtitle="本终端服务行为统计 · 不含求职者个人信息" />
+          <FusionSectionHead icon={TrendingUpIcon} title="服务数据统计" subtitle="本终端服务行为统计 · 不含求职者个人信息" />
           <div className="jf-service4">
             <div className="jf-sv">
               <ScanIcon aria-hidden="true" />
@@ -194,7 +194,7 @@ export function FairStatsPage() {
         {/* 参展企业行业分布（真实聚合已录企业，柱状图；无数据不渲染，不伪造） */}
         {stats.industryDistribution.length > 0 && (
           <section className="jf-card">
-            <CardHead icon={BuildingIcon} title="参展企业行业分布" subtitle={`按已录 ${stats.totalCompanies} 家企业聚合`} />
+            <FusionSectionHead icon={BuildingIcon} title="参展企业行业分布" subtitle={`按已录 ${stats.totalCompanies} 家企业聚合`} />
             <div className="jf-bar-rows">
               {(() => {
                 const maxCount = Math.max(...stats.industryDistribution.map((slice) => slice.count), 1)
@@ -215,7 +215,7 @@ export function FairStatsPage() {
         {/* 求职意向分布（机构录入预计值，横向占比；标注来源口径，非实时） */}
         {stats.seekerIntent.length > 0 && (
           <section className="jf-card">
-            <CardHead
+            <FusionSectionHead
               icon={UsersIcon}
               title="求职意向分布"
               subtitle={`${stats.dataSourceLabel}${stats.expectedAttendance != null ? ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人` : ''}`}
@@ -234,7 +234,7 @@ export function FairStatsPage() {
           </section>
         )}
 
-      <ProtoNotice>系统仅记录服务数据，不记录求职者个人信息；活动办理结果以来源平台和现场为准。</ProtoNotice>
-    </ProtoPage>
+      <FusionNotice>系统仅记录服务数据，不记录求职者个人信息；活动办理结果以来源平台和现场为准。</FusionNotice>
+    </KioskPageFrame>
   )
 }

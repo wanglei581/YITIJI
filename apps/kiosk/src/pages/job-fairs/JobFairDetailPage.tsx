@@ -24,7 +24,7 @@ import { FairDataScreen } from './components/FairDataScreen'
 import { DetailsTab, CompaniesTab, VenueGuideTab } from './components/JobFairDetailTabs'
 import { useFavorites } from '../../favorites/useFavorites'
 import { useAuth } from '../../auth/useAuth'
-import { ProtoPage } from '../jobs-fairs-prototype'
+import { KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const STATUS_CONFIG = {
   upcoming: { label: '未开始', bg: 'bg-primary-50',  text: 'text-primary-600' },
@@ -195,7 +195,7 @@ export function JobFairDetailPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title={fair.name}
       subtitle={`来源 · ${fair.sourceName} · 信息以来源平台为准`}
@@ -312,6 +312,6 @@ export function JobFairDetailPage() {
           <EmptyState icon={InfoIcon} title="暂无真实统计数据" description="该招聘会暂未接入真实来源数据，页面不会展示模拟统计" className="py-12" />
         )
       )}
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }

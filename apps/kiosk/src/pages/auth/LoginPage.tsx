@@ -180,7 +180,7 @@ export function LoginPage() {
   const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
 
   return (
-    <div className="service-desk k1-login" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
+    <div className="fusion-w5 fusion-w5--auth service-desk k1-login" data-kiosk-screen="login" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
       <header className="topbar">
         <span className="brand-mark">AI</span>
         <div className="brand-copy">

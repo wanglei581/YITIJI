@@ -133,7 +133,7 @@ export function BenefitActivityDetailPage() {
   const primaryDisabled = claiming || Boolean(isLoggedIn && item && !item.claimed && (item.soldOut || item.ended))
 
   return (
-    <div className="k8-act-detail">
+    <div className="fusion-w5 fusion-w5--profile k8-act-detail" data-kiosk-screen="activity-detail">
       <div className="k8-act-header">
         <PageHeader
           title="权益活动详情"

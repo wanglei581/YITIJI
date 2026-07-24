@@ -54,6 +54,8 @@ pnpm-debug.log*
 # Browser verification artifacts
 .playwright-cli/
 test-results/
+playwright-report/
+blob-report/
 
 # Temp
 .tmp

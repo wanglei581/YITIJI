@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar } from '@ai-job-print/ui'
 import { AlertCircleIcon, CreditCardIcon, FileTextIcon, InfoIcon, QrCodeIcon, ScanLineIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
@@ -39,7 +39,7 @@ import {
 } from './cashierStatus'
 import { CashierPaymentPanel, type CashierSnapshot, type PaymentMethod } from './CashierPaymentPanel'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 interface CashierLocationState {
   orderId?: string
@@ -401,7 +401,8 @@ export function PrintCashierPage() {
   const canReissue = view?.canReissue ?? false
 
   return (
-    <div className="print-proto flex min-h-full flex-col">
+    <PrintPageFrame>
+    <div data-w2-page="print-cashier" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="订单支付"
         subtitle="请完成支付后开始打印；支付结果由系统自动确认"
@@ -561,7 +562,7 @@ export function PrintCashierPage() {
       </div>
 
       {/* 底部行动条 */}
-      <div className="cashier-actionbar">
+      <KioskActionBar className="cashier-actionbar">
         <button type="button" className="cashier-btn-ghost" onClick={() => navigate('/')}>
           <XCircleIcon aria-hidden="true" />
           退出支付
@@ -572,8 +573,9 @@ export function PrintCashierPage() {
         <button type="button" className="cashier-btn-primary" disabled={!canProceed} onClick={proceedToPrint}>
           {canProceed ? '开始打印' : '等待支付…'}
         </button>
-      </div>
+      </KioskActionBar>
     </div>
+    </PrintPageFrame>
   )
 }
 

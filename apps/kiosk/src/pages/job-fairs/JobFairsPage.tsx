@@ -3,11 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
-  ArrowLeftIcon,
   Building2Icon,
   CalendarIcon,
   ChevronRightIcon,
-  InfoIcon,
   MapPinIcon,
   QrCodeIcon,
   RefreshCwIcon,
@@ -24,7 +22,7 @@ import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { FairCalendarPopover } from './components/FairCalendarPopover'
 import { RegionPicker } from './components/RegionPicker'
 import { matchesRegion, type RegionSelection } from '../../lib/regions'
-import { ProtoListSteps } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionListSteps, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 // ─── 状态标签配置 ───────────────────────────────────────────────────────────────
 const STATUS_DOT = {
@@ -225,26 +223,17 @@ export function JobFairsPage() {
   const ongoingCount  = useMemo(() => visible.filter(f => f.status === 'ongoing').length, [visible])
 
   return (
+    <KioskPageFrame
+      tone="wheat"
+      title="招聘会"
+      subtitle="第三方平台与官方机构来源信息，预约请前往来源平台"
+      backLabel="返回首页"
+      onBack={() => navigate('/')}
+      badge={<FusionBadge icon={RefreshCwIcon}>每日同步更新</FusionBadge>}
+      actionBar={<span className="jf-action-note">本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台。</span>}
+    >
     <div className="flex h-full flex-col bg-canvas" style={WHEAT_ACCENT}>
       {qrFair && <BookingQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
-
-      {/* 页头 */}
-      <div className="jf-pagehead bg-gradient-to-r from-transparent via-transparent to-transparent">
-        <button type="button" className="jf-back" onClick={() => navigate('/')}>
-          <ArrowLeftIcon aria-hidden="true" />
-          返回
-        </button>
-        <div className="jf-titlebox flex-1">
-          <h1>招聘会</h1>
-          <p>来源：第三方平台 · 官方机构，预约请前往来源平台</p>
-        </div>
-        <div className="jf-pagehead-aside">
-          <span className="jf-badge">
-            <RefreshCwIcon aria-hidden="true" />
-            每日同步更新
-          </span>
-        </div>
-      </div>
 
       {/* 搜索 + 地区筛选 + 日期 */}
       <div className="jf-toolrow px-12">
@@ -286,7 +275,7 @@ export function JobFairsPage() {
 
       {/* 步骤条 */}
       <div className="px-12 pt-3">
-        <ProtoListSteps />
+        <FusionListSteps />
       </div>
 
       {/* 列表内容 */}
@@ -327,11 +316,7 @@ export function JobFairsPage() {
         )}
       </div>
 
-      {/* 合规底注 */}
-      <div className="jf-notice mx-12 mb-4">
-        <InfoIcon aria-hidden="true" />
-        <span>本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台。</span>
-      </div>
     </div>
+    </KioskPageFrame>
   )
 }

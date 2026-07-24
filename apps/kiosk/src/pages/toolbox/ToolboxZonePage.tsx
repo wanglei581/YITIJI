@@ -65,7 +65,7 @@ export function ToolboxZonePage() {
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
   return (
-    <div className="kpv1 ktoolbox">
+    <div className="fusion-w5 fusion-w5--system kpv1 ktoolbox" data-kiosk-screen="toolbox">
       <div className="pagehead">
         <button type="button" className="back-btn" onClick={() => navigate('/')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
@@ -79,7 +79,7 @@ export function ToolboxZonePage() {
         </div>
       </div>
 
-      <main className="tb-content">
+      <section className="tb-content">
         {items.length > 0 ? (
           <div className="tiles c3">
             {items.map((item) => (
@@ -97,7 +97,7 @@ export function ToolboxZonePage() {
           <ProtoIcon name="info" />
           扩展服务由运营方审核后上架；进入第三方服务前会有明确提示，本终端不记录你在第三方页面的办理结果。
         </div>
-      </main>
+      </section>
 
       <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />

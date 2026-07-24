@@ -174,7 +174,7 @@ export function LegalDocPage() {
   }
 
   return (
-    <div className="service-desk k1-legal-doc" data-visual-theme="service-desk" data-ux-density="touch">
+    <div className="fusion-w5 fusion-w5--system service-desk k1-legal-doc" data-kiosk-screen="legal-doc" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch">
       <div className="legal-doc-shell">
         <PageHeader
           className="legal-doc-page-header"

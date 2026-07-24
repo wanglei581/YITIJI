@@ -131,7 +131,11 @@ expectIncludes(
 )
 
 expectNotIncludes(profile, 'ReferenceServiceNav', 'ProfilePage removes the homepage-only reference navigation')
-expectIncludes(profile, 'className="kprofile kprofile-lightflow"', 'ProfilePage binds the LightFlow root on its page shell')
+expectMatches(
+  profile,
+  /className="[^"]*\bkprofile\s+kprofile-lightflow\b[^"]*"/,
+  'ProfilePage binds the LightFlow root on its page shell',
+)
 expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage keeps an accessible-only page heading without visible 我的 copy')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
 expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage renders all five real sections from the existing entry configuration')
@@ -311,7 +315,21 @@ for (const marker of [
   expectNotIncludes(combinedProfileCss, marker, `Profile CSS removes InkPaper marker ${marker}`)
 }
 
-const allowedMeChanges = new Set(['apps/kiosk/src/pages/profile/me/MySettingsPage.tsx'])
+// W5 keeps the LightFlow profile landing contract while migrating the owned /me/*
+// presentation surfaces to the shared fusion frame. Keep this allowlist explicit so
+// unrelated member pages still fail closed.
+const allowedMeChanges = new Set([
+  'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
+  'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+  'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
+  'apps/kiosk/src/pages/profile/me/styles/me-assets.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-detail-base.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-records.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),
 )

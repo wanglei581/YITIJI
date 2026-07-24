@@ -319,7 +319,7 @@ export function MySettingsPage() {
   }
 
   return (
-    <div className="me-inkdetail me-inkdetail-settings flex h-full flex-col">
+    <div className="fusion-w5 fusion-w5--profile me-inkdetail me-inkdetail-settings flex h-full flex-col" data-kiosk-screen="member-settings">
       {hint && (
         <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
           {hint}

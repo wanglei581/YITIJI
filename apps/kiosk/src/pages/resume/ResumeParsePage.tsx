@@ -7,6 +7,7 @@ import {
   XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { KioskPageFrame } from '@ai-job-print/ui'
 import { submitResumeParse } from '../../services/api'
 import { saveAiResumeSession } from './aiResumeSession'
 import {
@@ -174,7 +175,8 @@ export function ResumeParsePage() {
   const FLOW_ACTIVE = 1 // 第 2 步，0-indexed
 
   return (
-    <div className="resume-lightflow resume-parse-lightflow" role="status" aria-live="polite">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow" role="status" aria-live="polite">
       {/* 顶部流程步骤条 */}
       <nav className="rp-flow-steps" aria-label="AI简历服务进度">
         {FLOW_STEPS.map((step, i) => {
@@ -314,6 +316,7 @@ export function ResumeParsePage() {
           </button>
         </div>
       )}
-    </div>
+    </section>
+    </KioskPageFrame>
   )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageFrame, LoadingState } from '@ai-job-print/ui'
 import type {
   JobMaterialDocumentTemplate,
   JobMaterialGenerateResponse,
@@ -174,14 +174,15 @@ export function JobMaterialLibraryPage() {
 
   if (loading) {
     return (
-      <div className="resume-lightflow resume-materials-lightflow">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-materials" className="resume-lightflow resume-materials-lightflow">
         <LoadingState className="resume-lightflow__state" />
-      </div>
+      </section></KioskPageFrame>
     )
   }
 
   return (
-    <div className="resume-lightflow resume-materials-lightflow">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-materials" className="resume-lightflow resume-materials-lightflow">
       <div className="resume-lightflow__shell">
         <header className="resume-lightflow__header">
           <div>
@@ -220,7 +221,7 @@ export function JobMaterialLibraryPage() {
             <EmptyState icon={FileTextIcon} title="该分类暂无求职材料" description="请切换其他分类查看" />
           </div>
         ) : (
-          <main className="resume-lightflow__workspace">
+          <div className="resume-lightflow__workspace">
             <section className="resume-lightflow__catalog" aria-label="可选求职材料">
               {visible.map((template) => {
                 const meta = TYPE_META[template.type]
@@ -327,11 +328,12 @@ export function JobMaterialLibraryPage() {
                 </>
               )}
             </aside>
-          </main>
+          </div>
         )}
 
         <p className="resume-lightflow__compliance">素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。</p>
       </div>
-    </div>
+    </section>
+    </KioskPageFrame>
   )
 }

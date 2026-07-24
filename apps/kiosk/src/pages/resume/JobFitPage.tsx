@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobFitRequest, JobFitResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -144,24 +144,24 @@ export function JobFitPage() {
 
   if (!taskId) {
     return (
-      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="alert">
           <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
           <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
           <Button size="lg" className="job-fit-primary-action" onClick={() => navigate('/resume/source?intent=diagnose')}>去上传简历</Button>
         </div>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   if (loadingLatest) {
     return (
-      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="status" aria-live="polite">
           <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
           <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
         </div>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
@@ -289,12 +289,13 @@ export function JobFitPage() {
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
     return (
-      <div className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-header">
-          <PageHeader
+          <KioskPageHeader
             title="岗位匹配参考"
-            subtitle={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
-            actions={<Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>}
+            description={`目标岗位：${result.job?.title ?? ''}${result.job?.company ? ` · ${result.job.company}` : ''}`}
+            onBack={() => navigate('/')}
+            backLabel="返回首页"
           />
         </div>
         <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
@@ -331,7 +332,7 @@ export function JobFitPage() {
           {error && <p className="job-fit-alert rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg" role="alert">{error}</p>}
         </div>
 
-        <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+        <KioskActionBar className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
           <div className="job-fit-action-grid grid grid-cols-3 gap-2">
             <Button
               size="lg"
@@ -369,14 +370,15 @@ export function JobFitPage() {
               </Button>
             )}
           </div>
-        </div>
-      </div>
+        </KioskActionBar>
+      </main></KioskPageFrame>
     )
   }
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <div className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
       {showAnonymousConsent && (
         <AnonymousJobFitConsentDialog
           busy={analyzing}
@@ -386,10 +388,11 @@ export function JobFitPage() {
         />
       )}
       <div className="job-fit-header">
-        <PageHeader
+        <KioskPageHeader
           title="岗位匹配参考"
-          subtitle="选择目标岗位，基于本人简历生成定向参考与优化建议"
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回</Button>}
+          description="选择目标岗位，基于本人简历生成定向参考与优化建议"
+          onBack={() => navigate(-1)}
+          backLabel="返回"
         />
       </div>
       <div className="job-fit-content mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pb-28">
@@ -492,7 +495,7 @@ export function JobFitPage() {
         )}
       </div>
 
-      <div className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
+      <KioskActionBar className="job-fit-action-bar absolute inset-x-0 bottom-0 border-t border-neutral-100 bg-white/95 px-6 py-4 backdrop-blur">
         <Button size="lg" className="job-fit-primary-action h-14 w-full text-base" disabled={analyzing} aria-busy={analyzing} onClick={() => void handleAnalyze()}>
           {analyzing ? (
             <>
@@ -506,7 +509,8 @@ export function JobFitPage() {
             </>
           )}
         </Button>
-      </div>
-    </div>
+      </KioskActionBar>
+    </main>
+    </KioskPageFrame>
   )
 }

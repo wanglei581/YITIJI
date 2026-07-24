@@ -8,7 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskPageFrame } from '@ai-job-print/ui'
 import { AlertCircleIcon } from 'lucide-react'
 import { answerInterview, endInterview, fetchQuestionAudio, getVoiceCapability, transcribeAnswer } from '../../services/api/interview'
 import { startWavRecorder, type WavRecorder } from '../../utils/wavRecorder'
@@ -156,7 +156,7 @@ export function InterviewSessionPage() {
 
   if (!state?.sessionId) {
     return (
-      <div className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
           <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
         </div>
@@ -167,7 +167,7 @@ export function InterviewSessionPage() {
         <Button size="lg" className="h-14 px-10 text-base" onClick={() => navigate('/interview/setup')}>
           重新开始练习
         </Button>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
@@ -312,7 +312,8 @@ export function InterviewSessionPage() {
   const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
 
   return (
-    <div className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
         advisorPortrait={advisorPortrait}
         interviewerLabel={interviewerLabel}
@@ -371,6 +372,7 @@ export function InterviewSessionPage() {
         onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
       />
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

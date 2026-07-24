@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { KioskActionBar } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -35,7 +36,7 @@ import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/p
 import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 // ── Display helpers ────────────────────────────────────────────────────────────
 
@@ -292,7 +293,6 @@ export function PrintProgressPage() {
   // amountCents=0（免费单 / PAYMENT_PROVIDER=sandbox 默认路径）→ 不展示支付相关文案。
   const isFreeOrder = (typeof state?.amountCents === 'number' ? state.amountCents : 1) === 0
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const submitTimeFormatted = useMemo(() => formatSubmitTime(new Date()), [])
 
   // Guard：直达 /print/progress（无任务上下文）—— 不展示进度/不伪造成功，引导重新上传。
@@ -380,7 +380,8 @@ export function PrintProgressPage() {
 
   // ── 主体：两栏布局 ─────────────────────────────────────────────────────────
   return (
-    <div className="print-proto flex min-h-full flex-col">
+    <PrintPageFrame>
+    <div data-w2-page="print-progress" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="正在处理"
         subtitle="任务已提交，正在等待终端处理，请留在机器旁"
@@ -524,7 +525,7 @@ export function PrintProgressPage() {
       </div>
 
       {/* 底部行动条 */}
-      <footer className="pp-actionbar">
+      <KioskActionBar className="pp-actionbar">
         <span className="pp-actionbar-note">
           打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员协助处理
         </span>
@@ -532,7 +533,7 @@ export function PrintProgressPage() {
           <i aria-hidden="true" />
           状态自动刷新中
         </span>
-      </footer>
+      </KioskActionBar>
 
       {/* DEV 专用：模拟失败按钮 */}
       {import.meta.env.DEV && canSimulate && !failed && (
@@ -552,5 +553,6 @@ export function PrintProgressPage() {
         </div>
       )}
     </div>
+    </PrintPageFrame>
   )
 }

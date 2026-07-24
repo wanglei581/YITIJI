@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type {
   ResumeGenEducation,
   ResumeGenExperience,
@@ -260,16 +260,14 @@ export function ResumeGeneratePage() {
   const StepIcon = stepIcon
 
   return (
-    <div className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
       <div className="resume-lightflow__header px-6 pt-6">
-        <PageHeader
+        <KioskPageHeader
           title="AI 简历生成"
-          subtitle="填写你的真实信息，AI 帮你润色成一份结构化简历"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/resume/source')}>
-              返回简历服务
-            </Button>
-          }
+          description="填写你的真实信息，AI 帮你润色成一份结构化简历"
+          onBack={() => navigate('/resume/source')}
+          backLabel="返回简历服务"
         />
         <div className="resume-lightflow__stepper mt-4">
           <Stepper steps={[...STEPS]} currentIndex={step} />
@@ -476,7 +474,7 @@ export function ResumeGeneratePage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
+      <KioskActionBar className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           <Button
             size="lg"
@@ -498,7 +496,8 @@ export function ResumeGeneratePage() {
             </Button>
           )}
         </div>
-      </div>
-    </div>
+      </KioskActionBar>
+    </section>
+    </KioskPageFrame>
   )
 }

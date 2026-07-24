@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -239,13 +239,13 @@ export function ResumeSourcePage() {
   }
 
   return (
-    <div className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
-      <PageHeader
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
+      <KioskPageHeader
         title={copy.title}
-        subtitle={copy.subtitle}
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
-        }
+        description={copy.subtitle}
+        onBack={() => navigate('/')}
+        backLabel="返回首页"
       />
 
       <div className="resume-source-privacy mt-4">
@@ -466,7 +466,7 @@ export function ResumeSourcePage() {
         <div className="resume-source-status mt-4 text-center text-sm font-medium text-primary-700">上传中，请稍候…</div>
       )}
 
-      <div className="resume-source-actions mt-6">
+      <KioskActionBar className="resume-source-actions mt-6">
         <Button
           size="lg"
           className="resume-primary-action min-h-[64px] w-full text-lg"
@@ -475,7 +475,8 @@ export function ResumeSourcePage() {
         >
           {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
         </Button>
-      </div>
-    </div>
+      </KioskActionBar>
+    </section>
+    </KioskPageFrame>
   )
 }

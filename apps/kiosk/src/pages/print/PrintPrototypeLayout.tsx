@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeftIcon } from 'lucide-react'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { getTerminalId } from '../../services/api/terminalConfig'
 import { useHomeDeviceStatus } from '../home/hooks/useHomeDeviceStatus'
 import './print-prototype.css'
@@ -60,19 +60,7 @@ export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack,
   return (
     <>
       <PrintKioskTopBar />
-      <div className="print-pagehead">
-        {backLabel && onBack && (
-          <button type="button" className="print-back-button" onClick={onBack}>
-            <ArrowLeftIcon aria-hidden="true" />
-            {backLabel}
-          </button>
-        )}
-        <div>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-        </div>
-        {aside && <div style={{ marginLeft: 'auto' }}>{aside}</div>}
-      </div>
+      <KioskPageHeader title={title} description={subtitle} onBack={onBack} backLabel={backLabel} aside={aside} className="print-pagehead" />
       <nav className="print-flow-steps" aria-label="打印流程">
         {PRINT_STEPS.map((label, index) => {
           const indexStep = (index + 1) as PrintFlowStep
@@ -90,4 +78,8 @@ export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack,
       </nav>
     </>
   )
+}
+
+export function PrintPageFrame(props: { children: ReactNode; className?: string }) {
+  return <KioskPageFrame className={['print-proto', props.className].filter(Boolean).join(' ')}>{props.children}</KioskPageFrame>
 }

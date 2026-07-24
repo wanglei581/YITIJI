@@ -1,0 +1,673 @@
+
+/* ── Screen 32: Cashier / Payment ─────────────────────────── */
+:root {
+  --print-slate-deep: #35608f;
+  --print-wheat-deep: #8a6219;
+}
+
+.cashier-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 22px;
+  padding: 0 48px;
+  overflow: hidden;
+}
+.cashier-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+.cashier-pay-card {
+  width: 470px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--print-slate);
+  border-radius: 18px;
+  padding: 26px 28px 28px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+  overflow-y: auto;
+}
+
+/* Price detail card */
+.cashier-detail-card {
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--print-slate);
+  border-radius: 18px;
+  padding: 26px 28px 28px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.cashier-card-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.cashier-card-icon {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--print-slate-soft);
+  color: var(--print-slate-deep, #35608f);
+}
+.cashier-card-icon svg { width: 32px; height: 32px; }
+.cashier-card-title { font-family: var(--print-serif); font-size: 32px; font-weight: 700; letter-spacing: 1px; }
+.cashier-card-sub { font-size: 19px; color: var(--print-muted); margin-top: 4px; }
+
+.cashier-sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 4px;
+  border-bottom: 1px dashed var(--print-line);
+}
+.cashier-sum-row:last-of-type { border-bottom: none; }
+.cashier-sum-key { font-size: 19px; color: var(--print-muted); }
+.cashier-sum-key small { display: block; font-size: 15px; margin-top: 3px; opacity: .85; }
+.cashier-sum-val { font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.cashier-amount-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--print-line);
+}
+.cashier-amount-label { font-size: 19px; color: var(--print-muted); line-height: 1.45; }
+.cashier-amount-num {
+  font-family: var(--print-serif);
+  font-size: 62px;
+  font-weight: 900;
+  color: var(--print-slate-deep, #35608f);
+  line-height: 1;
+}
+.cashier-amount-num small { font-size: 28px; font-weight: 700; margin-right: 4px; }
+
+/* Rule card */
+.cashier-rule-card {
+  flex: 1;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.cashier-rule-card h3 { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
+.cashier-rule-card ul { flex: 1; padding-left: 22px; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
+.cashier-rule-card li { font-size: 17.5px; line-height: 1.55; color: var(--print-muted); }
+
+/* Notice strip */
+.cashier-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 17px;
+  color: var(--print-muted);
+  line-height: 1.5;
+  padding: 12px 20px;
+  background: rgb(255 253 248 / 70%);
+  border: 1px dashed var(--print-line);
+  border-radius: 12px;
+}
+.cashier-notice svg { width: 20px; height: 20px; flex: none; color: var(--print-wheat); }
+
+/* Channel toggle buttons */
+.cashier-ch-row { display: flex; gap: 12px; margin-bottom: 14px; }
+.cashier-ch-btn {
+  flex: 1;
+  justify-content: center;
+  min-height: 68px;
+  font-size: 21px;
+  display: inline-flex;
+  align-items: center;
+  background: var(--print-surface);
+  border: 2px solid var(--print-line);
+  border-radius: 14px;
+  font-family: var(--print-sans);
+  color: var(--print-ink);
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cashier-ch-btn[data-active='true'] {
+  border-color: var(--print-teal);
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+  font-weight: 700;
+}
+.cashier-ch-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Mode toggle buttons */
+.cashier-mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.cashier-mode-btn {
+  justify-content: center;
+  min-height: 64px;
+  font-size: 19px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--print-surface);
+  border: 2px solid var(--print-line);
+  border-radius: 14px;
+  font-family: var(--print-sans);
+  color: var(--print-ink);
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.cashier-mode-btn[data-active='true'] {
+  border-color: var(--print-teal);
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+  font-weight: 700;
+}
+.cashier-mode-btn:disabled { opacity: .5; cursor: not-allowed; }
+.cashier-mode-btn svg { width: 22px; height: 22px; flex: none; }
+
+/* QR / code area inside pay card */
+.cashier-qr-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+}
+.cashier-qr-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--print-line);
+  border-radius: 18px;
+  padding: 26px 20px;
+  gap: 16px;
+  background: var(--print-surface);
+  min-height: 200px;
+}
+.cashier-qr-title { font-size: 24px; font-weight: 700; text-align: center; }
+.cashier-qr-sub { font-size: 18px; color: var(--print-muted); text-align: center; line-height: 1.5; }
+.cashier-countdown {
+  font-size: 17.5px;
+  color: var(--print-wheat-deep, #8a6219);
+  font-weight: 600;
+  text-align: center;
+}
+.cashier-qr-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--print-muted);
+}
+.cashier-qr-badge svg { width: 14px; height: 14px; }
+
+.cashier-verify-btn {
+  margin-top: 12px;
+  width: 100%;
+  min-height: 60px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-family: var(--print-sans);
+  font-size: 18px;
+  font-weight: 600;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  color: var(--print-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.cashier-verify-btn:hover:not(:disabled) { background: var(--print-paper); }
+.cashier-verify-btn:active:not(:disabled) { transform: scale(.98); }
+.cashier-verify-btn:disabled { opacity: .5; cursor: not-allowed; }
+.cashier-verify-btn svg { width: 18px; height: 18px; flex: none; }
+
+/* Placeholder idle panel */
+.cashier-idle-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed var(--print-line);
+  border-radius: 18px;
+  padding: 40px 20px;
+  color: var(--print-muted);
+  font-size: 20px;
+  min-height: 200px;
+}
+
+/* Error strip in pay card */
+.cashier-error-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgb(193 74 52 / 30%);
+  background: rgb(193 74 52 / 6%);
+  color: var(--print-error);
+  font-size: 16px;
+  margin-top: 8px;
+}
+.cashier-error-strip svg { width: 16px; height: 16px; flex: none; }
+
+/* Bottom action bar */
+.cashier-actionbar {
+  flex: none;
+  padding: 26px 48px 34px;
+  background: var(--print-surface);
+  border-top: 1px solid var(--print-line);
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-top: 22px;
+}
+.cashier-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 88px;
+  padding: 0 40px;
+  border: 1px solid var(--print-line);
+  border-radius: 18px;
+  background: var(--print-surface);
+  font: 600 24px var(--print-sans);
+  color: var(--print-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  letter-spacing: .5px;
+}
+.cashier-btn-ghost svg { width: 28px; height: 28px; }
+.cashier-btn-ghost:active { transform: scale(.98); }
+.cashier-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 88px;
+  min-width: 320px;
+  padding: 0 48px;
+  border: none;
+  border-radius: 18px;
+  background: var(--print-teal);
+  font: 600 27px var(--print-sans);
+  color: var(--print-surface);
+  cursor: pointer;
+  letter-spacing: 1px;
+  box-shadow: 0 6px 18px rgb(31 158 134 / 25%);
+}
+.cashier-btn-primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.cashier-btn-primary:not(:disabled):active { transform: scale(.98); }
+.cashier-bar-note {
+  flex: 1;
+  font-size: 17.5px;
+  color: var(--print-muted);
+  line-height: 1.5;
+  text-align: right;
+}
+
+/* Code input inside qr area */
+.cashier-code-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+.cashier-code-label-title { font-size: 22px; font-weight: 700; color: var(--print-ink); text-align: center; }
+.cashier-code-label-hint { font-size: 17px; color: var(--print-muted); text-align: center; margin-top: 4px; }
+.cashier-code-input {
+  width: 100%;
+  min-height: 72px;
+  border-radius: 14px;
+  border: 1px solid var(--print-line);
+  background: var(--print-surface);
+  font: 700 26px/1 var(--print-sans);
+  color: var(--print-ink);
+  text-align: center;
+  letter-spacing: 6px;
+  padding: 0 20px;
+  outline: none;
+}
+.cashier-code-input:focus { outline: 3px solid rgb(31 158 134 / 45%); border-color: transparent; }
+.cashier-code-submit {
+  width: 100%;
+  min-height: 72px;
+  border: none;
+  border-radius: 14px;
+  background: var(--print-teal);
+  font: 600 22px var(--print-sans);
+  color: var(--print-surface);
+  cursor: pointer;
+  letter-spacing: .5px;
+}
+.cashier-code-submit:disabled { opacity: .5; cursor: not-allowed; }
+
+@media (max-width: 900px) {
+  .cashier-split { flex-direction: column; padding: 0 20px; gap: 16px; overflow-y: auto; }
+  .cashier-pay-card { width: 100%; }
+  .cashier-actionbar { padding: 18px 22px 26px; gap: 12px; }
+  .cashier-btn-ghost { min-height: 64px; padding: 0 24px; font-size: 18px; }
+  .cashier-btn-primary { min-height: 64px; min-width: 180px; padding: 0 28px; font-size: 20px; }
+  .cashier-amount-num { font-size: 44px; }
+  .cashier-amount-num small { font-size: 20px; }
+  .cashier-bar-note { display: none; }
+}
+
+/* ── 屏65 打印确认 专属布局 ──────────────────────────────── */
+
+/* 两栏分列 */
+.print-confirm-split {
+  display: flex;
+  gap: 22px;
+  flex: 1;
+  min-height: 0;
+}
+.print-confirm-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.print-confirm-side {
+  width: 400px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .print-confirm-split { flex-direction: column; }
+  .print-confirm-side { width: 100%; }
+}
+
+/* 文件条 */
+.print-file-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-file-icon {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--print-slate-soft);
+  color: var(--print-slate);
+}
+.print-file-icon svg { width: 30px; height: 30px; }
+.print-file-name {
+  font-size: 23px;
+  font-weight: 700;
+  word-break: break-all;
+  color: var(--print-ink);
+  display: block;
+}
+.print-file-meta {
+  display: block;
+  font-size: 17px;
+  color: var(--print-muted);
+  margin-top: 4px;
+}
+.print-file-chip {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  color: var(--print-teal-deep);
+  background: var(--print-teal-soft);
+  border: 1px solid rgb(31 158 134 / 30%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* 参数摘要卡 (a-slate) */
+.print-sum-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 26px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-sum-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--print-ink);
+  display: block;
+  margin-bottom: 8px;
+}
+.print-sum-table { display: flex; flex-direction: column; }
+.print-sum-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 4px;
+  border-bottom: 1px dashed var(--print-line);
+}
+.print-sum-row:last-child { border-bottom: none; }
+.print-sum-row .k { font-size: 19px; color: var(--print-muted); flex: none; }
+.print-sum-row .v { font-size: 21px; font-weight: 600; text-align: right; color: var(--print-ink); }
+
+/* 隐私摘要卡 (wheat) */
+.print-priv-card {
+  padding: 18px 22px;
+  background: #f2ead6;
+  border: 1px solid rgba(169, 120, 31, .35);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-priv-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.print-priv-head svg { width: 26px; height: 26px; flex: none; color: #8a6219; }
+.print-priv-head b { font-size: 20px; font-weight: 700; color: #8a6219; }
+.print-priv-body {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.55;
+  color: #8a6219;
+}
+
+/* 费用卡 (a-teal) */
+.print-cost-card {
+  padding: 18px 22px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-top: 4px solid var(--print-teal);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-est-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px dashed var(--print-line);
+  font-size: 18px;
+}
+.print-est-row:last-of-type { border-bottom: none; }
+.print-est-row .k { color: var(--print-muted); }
+.print-est-row .v { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--print-ink); }
+.print-cost-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--print-line);
+}
+.print-cost-label {
+  font-size: 17px;
+  color: var(--print-muted);
+  line-height: 1.5;
+}
+.print-cost-num {
+  font-family: var(--print-serif);
+  font-size: 44px;
+  font-weight: 900;
+  color: var(--print-ink);
+  font-variant-numeric: tabular-nums;
+}
+.print-cost-num small { font-size: 22px; font-weight: 700; margin-right: 2px; }
+
+/* 后续流程卡 */
+.print-flow-card {
+  padding: 18px 22px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-flow-title {
+  font-size: 20px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 12px;
+  color: var(--print-ink);
+}
+.print-flow-title span {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--print-muted);
+  margin-left: 8px;
+}
+.print-flow-row { display: flex; align-items: center; gap: 8px; }
+.print-flow-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: var(--print-paper);
+  border: 1px solid var(--print-line);
+  border-radius: 12px;
+  padding: 12px 8px;
+}
+.print-flow-step svg { width: 26px; height: 26px; color: var(--print-teal-deep); }
+.print-flow-step span { font-size: 16px; font-weight: 600; color: var(--print-ink); }
+.print-flow-arrow { flex: none; width: 20px; height: 20px; color: var(--print-muted); }
+
+/* 打印须知卡 */
+.print-rules-card {
+  padding: 18px 22px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-radius: 18px;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+}
+.print-rules-title {
+  font-size: 20px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 6px;
+  color: var(--print-ink);
+}
+.print-rules-list {
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.print-rules-list li {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--print-muted);
+}
+
+/* 底部行动条 */
+.print-confirm-actionbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0 0;
+  flex: none;
+}
+.print-confirm-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 0 28px;
+  background: var(--print-surface);
+  border: 1px solid var(--print-line);
+  border-radius: 14px;
+  font: 600 22px var(--print-sans);
+  color: var(--print-ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.print-confirm-back svg { width: 22px; height: 22px; }
+.print-confirm-back:disabled { opacity: .45; cursor: not-allowed; }
+.print-confirm-primary {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 88px;
+  padding: 0 36px;
+  background: var(--print-teal);
+  color: #fffdf8;
+  border: none;
+  border-radius: 18px;
+  font: 600 26px var(--print-sans);
+  letter-spacing: .5px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgb(31 158 134 / 25%);
+  white-space: nowrap;
+}
+.print-confirm-primary svg { width: 28px; height: 28px; }
+.print-confirm-primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.print-confirm-primary:not(:disabled):active { transform: scale(.98); }
+
+/* 错误条 */
+.print-submit-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: rgb(193 74 52 / 8%);
+  border: 1px solid rgb(193 74 52 / 30%);
+  border-radius: 12px;
+  font-size: 16px;
+  color: var(--print-error);
+}
+.print-submit-error svg { width: 18px; height: 18px; flex: none; }

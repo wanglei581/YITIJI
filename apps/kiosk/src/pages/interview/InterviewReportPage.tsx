@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, ErrorState, KioskPageFrame, LoadingState, PageHeader } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -120,17 +120,18 @@ export function InterviewReportPage() {
   if (loading) return <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch"><LoadingState className="py-24" /></div>
   if (loadError || !data) {
     return (
-      <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <ErrorState message="报告不存在或已过期" className="py-4" />
         <Button size="lg" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
 
   return (
-    <div className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader
         className="interview-pagehead"
@@ -143,7 +144,7 @@ export function InterviewReportPage() {
 
       <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
-          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
+          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。练习结果仅供本人复盘，不会发送给任何企业。
         </ComplianceBanner>
 
         {/* 综合表现 */}
@@ -226,6 +227,7 @@ export function InterviewReportPage() {
           </Button>
         </div>
       </div>
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

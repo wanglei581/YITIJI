@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>百宝箱 · 扩展服务区</title>
+<link rel="stylesheet" href="../kiosk-proto-2026-07/shared.css">
+<style>
+  .tb-content { flex: 1; min-height: 0; padding: 0 48px; display: flex; flex-direction: column; gap: 24px; overflow: hidden; }
+  .tb-tiles { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 1fr; gap: 20px; }
+  .tb-tile {
+    display: flex; flex-direction: column; gap: 12px; text-align: left;
+    padding: 26px 28px; cursor: pointer; position: relative;
+  }
+  .tb-tile:active { transform: scale(.99); }
+  .tb-tile .c-top { display: flex; align-items: center; gap: 16px; }
+  .tb-tile .c-icon {
+    width: 64px; height: 64px; flex: none; border-radius: 16px;
+    display: grid; place-items: center;
+    background: var(--accent-soft, var(--plum-soft)); color: var(--accent-deep, var(--plum-deep));
+  }
+  .tb-tile .c-icon svg { width: 34px; height: 34px; }
+  .tb-tile h3 { font-family: var(--serif); font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .tb-tile p { font-size: 18px; color: var(--muted); line-height: 1.5; }
+  .tb-tile .c-go {
+    margin-top: auto; display: inline-flex; align-items: center; gap: 8px;
+    font-size: 19px; font-weight: 600; color: var(--accent-deep, var(--plum-deep));
+  }
+  .tb-tile .c-go svg { width: 20px; height: 20px; }
+  .launch-tag {
+    position: absolute; top: 22px; right: 24px;
+    font-size: 15px; color: var(--muted); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; white-space: nowrap;
+  }
+  .tb-tile.disabled { opacity: .6; }
+  .tb-tile.disabled .c-go { color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>终端在线</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>百宝箱</h1>
+      <p>本机已配置的扩展服务,经运营方审核后上架</p>
+    </div>
+  </div>
+
+  <main class="tb-content">
+    <div class="tb-tiles">
+
+      <div class="card accented a-plum tb-tile">
+        <span class="launch-tag">站内服务</span>
+        <div class="c-top">
+          <span class="c-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 7l-1.5-1.5a2 2 0 00-3 0L4 11l3 3 5.5-5.5M14 7l3 3M14 7l3-3 4 4-3 3M17 10l-6.5 6.5a2 2 0 01-3 0L4 14"/></svg></span>
+          <div><h3>证件照排版</h3></div>
+        </div>
+        <p>标准证件照尺寸排版与打印(能力就绪后开放),经审核后在此上架。</p>
+        <span class="c-go">进入服务<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+
+      <div class="card accented a-teal tb-tile">
+        <span class="launch-tag">外部 H5</span>
+        <div class="c-top">
+          <span class="c-icon" style="background:var(--teal-soft);color:var(--teal-deep)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1"/></svg></span>
+          <div><h3>政务办事导航</h3></div>
+        </div>
+        <p>跳转合作政务平台前会明确提示;本终端不记录你在第三方页面的办理结果。</p>
+        <span class="c-go" style="color:var(--teal-deep)">打开(离场提示)<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+
+      <div class="card accented a-wheat tb-tile">
+        <span class="launch-tag">扫码带走</span>
+        <div class="c-top">
+          <span class="c-icon" style="background:var(--wheat-soft);color:var(--wheat-deep)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M20 20h.01M17 20h.01M20 17h.01"/></svg></span>
+          <div><h3>求职手册下载</h3></div>
+        </div>
+        <p>扫码将电子版求职资料带到手机;二维码为示意,实际由运营方配置。</p>
+        <span class="c-go" style="color:var(--wheat-deep)">扫码获取<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 5l7 7-7 7"/></svg></span>
+      </div>
+
+      <div class="card tb-tile disabled">
+        <span class="launch-tag">即将上线</span>
+        <div class="c-top">
+          <span class="c-icon" style="background:var(--paper);color:var(--muted)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+          <div><h3>更多服务</h3></div>
+        </div>
+        <p>扩展服务由运营方陆续接入并审核上架,敬请期待。</p>
+        <span class="c-go">待配置</span>
+      </div>
+
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      扩展服务由运营方审核后上架;是否显示本区由学校 / 终端后台开关控制。进入第三方服务前会有明确提示,本终端不记录你在第三方页面的办理结果。
+    </div>
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="../kiosk-proto-2026-07/shared.js"></script>
+</body>
+</html>

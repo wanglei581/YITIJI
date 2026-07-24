@@ -30,7 +30,7 @@ import type { KioskToolboxItem, SmartCampusModuleKey } from '@ai-job-print/share
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { itemBadge, itemLaunchable, launchKioskAppItem } from '../home/components/kioskAppLaunch'
 import { ExternalLaunchModal, QrLaunchModal } from '../home/components/ToolboxLaunchModals'
-import '../prototype/kiosk-prototype.css'
+import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 interface SmartCampusCard {
   key: string
@@ -154,22 +154,15 @@ export function SmartCampusHomePage() {
     : []
 
   return (
-    <div className="kproto kproto-teal">
-      <div className="kproto-shell">
-        <div className="kproto-pagehead">
-          <button type="button" className="kproto-back" onClick={() => navigate('/')}>
-            返回首页
-          </button>
-          <div className="kproto-title">
-            <h1>智慧校园</h1>
-            <p>校园场景服务专区 · 本机已开启校园模式</p>
-          </div>
-          <div className="kproto-aside">
-            <span className="kproto-badge">本校已开通 {cards.length + extensionItems.length} 项服务</span>
-          </div>
-        </div>
-
-        <main className="kproto-content">
+    <KioskPageFrame
+      tone="wheat"
+      title="智慧校园"
+      subtitle="校园场景服务专区 · 本机校园模式按校方配置开放"
+      backLabel="返回首页"
+      onBack={() => navigate('/')}
+      badge={<FusionBadge>本校已开通 {cards.length + extensionItems.length} 项服务</FusionBadge>}
+    >
+        <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>
@@ -231,18 +224,12 @@ export function SmartCampusHomePage() {
             </section>
           )}
 
-          <div className="kproto-notice mt-auto">
-            <ShieldCheckIcon aria-hidden="true" />
-            <p>
-              实际办理请前往现场服务窗口或学校官方自助平台；校园大数据模块暂未开放，开放前不展示任何统计数据。
-            </p>
-          </div>
-        </main>
-      </div>
+          <FusionNotice>实际办理请前往现场服务窗口或学校官方自助平台；校园大数据模块暂未开放，开放前不展示任何统计数据。</FusionNotice>
+        </div>
 
       {/* 扩展应用启动弹窗：placement=smart_campus，二维码/外链离场确认与匿名上报复用 toolbox 同款。 */}
       <QrLaunchModal item={qrItem} placement="smart_campus" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="smart_campus" onClose={() => setExternalItem(null)} />
-    </div>
+    </KioskPageFrame>
   )
 }

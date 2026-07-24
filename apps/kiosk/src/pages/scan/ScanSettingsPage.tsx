@@ -1,20 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import {
-  AlertCircleIcon,
-  ArrowLeftIcon,
   CheckIcon,
   ClockIcon,
-  LoaderIcon,
   PrinterIcon,
-  TriangleAlertIcon,
 } from 'lucide-react'
 import type { ScanSessionCreateResponse } from '@ai-job-print/shared'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
 
@@ -159,161 +156,53 @@ export function ScanSettingsPage() {
     : GUIDE_STEPS
 
   return (
-    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
-      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
-        <div>
-          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
-          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-base text-neutral-100">2026年7月17日 10:25</span>
-          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
-            <span className="h-2.5 w-2.5 rounded-full bg-current" />
-            扫描仪就绪
-          </span>
-        </div>
-      </header>
+    <KioskPageFrame className="w2-scan-page">
+      <div data-w2-page="scan-settings" className="w2-scan-shell">
+        <KioskPageHeader title="扫描指引" description="扫描任务已创建，请按本机下发的指引在打印机上操作" onBack={handleBack} backLabel="上一步（取消任务）" aside={<span className="w2-scan-status-chip is-ready"><span />扫描任务已创建</span>} />
 
-      <div className="mt-5 flex shrink-0 items-center gap-5">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700"
-        >
-          <ArrowLeftIcon className="h-5 w-5" />
-          上一步
-        </button>
-        <div>
-          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">扫描指引</h1>
-          <p className="mt-1 text-xl text-neutral-500">扫描任务已创建，请按下方指引在打印机上操作</p>
+        <div className="w2-scan-steps" aria-label="扫描流程">
+          {(['选择类型', '扫描指引', '扫描中', '完成'] as const).map((label, index) => (
+            <div key={label} className={index < 1 ? 'is-done' : index === 1 ? 'is-active' : ''}><span>{index < 1 ? <CheckIcon /> : index + 1}</span>{label}</div>
+          ))}
         </div>
-      </div>
 
-      <div className="mt-5 flex shrink-0 items-center pb-1">
-        {(['选择类型', '扫描指引', '扫描中', '完成'] as const).map((label, index) => (
-          <div key={label} className="contents">
-            <div className={['flex items-center gap-3', index === 1 ? 'text-neutral-900' : index < 1 ? 'text-primary-700' : 'text-neutral-500'].join(' ')}>
-              <span className={[
-                'grid h-11 w-11 shrink-0 place-items-center rounded-full text-xl font-bold',
-                index < 1
-                  ? 'border border-primary-600 bg-primary-100 text-primary-700'
-                  : index === 1
-                  ? 'bg-primary-600 text-surface'
-                  : 'border border-neutral-200 bg-surface text-neutral-500',
-              ].join(' ')}>
-                {index < 1 ? <CheckIcon className="h-5 w-5" /> : index + 1}
-              </span>
-              <span className={['text-xl', index === 1 ? 'font-semibold' : ''].join(' ')}>{label}</span>
-            </div>
-            {index < 3 && (
-              <div className={['mx-4 h-0.5 flex-1', index < 1 ? 'bg-primary-600' : 'bg-neutral-200'].join(' ')} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      <main className="mt-4 flex min-h-0 flex-1 gap-5">
-        <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-primary-200 bg-surface p-6 shadow-sm [border-top:4px_solid_theme(colors.primary.600)]">
-          <div className="mb-4 flex items-center gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-md bg-primary-100 text-primary-700">
-              <PrinterIcon className="h-8 w-8" />
-            </span>
-            <div>
-              <h2 className="font-serif text-[32px] font-bold leading-tight tracking-wide">请到打印机操作面板依次操作</h2>
-              <p className="mt-1 text-[19px] text-neutral-500">以下步骤以本机实际下发的指引为准，操作完成后回到屏幕前等待</p>
-            </div>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col justify-center">
+        <section className="w2-scan-content w2-scan-two-column">
+          <section className="w2-scan-primary-card">
+            <div className="w2-scan-card-title"><span><PrinterIcon /></span><div><h2>请到打印机操作面板依次操作</h2><p>以下内容来自当前扫描任务的服务端指引。</p></div></div>
+            <div className="w2-scan-guide-list">
             {guideRows.map(([title, copy], index) => (
-              <div key={title} className="flex flex-1 items-center gap-5 border-b border-dashed border-neutral-200 py-4 last:border-b-0">
-                <span className="grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full bg-primary-50 text-2xl font-bold text-primary-700">{index + 1}</span>
-                <div>
-                  <b className="block text-[23px] font-bold">{title}</b>
-                  <p className="mt-1 text-lg leading-relaxed text-neutral-500">{copy}</p>
-                </div>
+              <div key={`${title}-${index}`} className="w2-scan-guide-row">
+                <span>{index + 1}</span><div><b>{title}</b><p>{copy}</p></div>
               </div>
             ))}
-          </div>
-        </section>
-
-        <aside className="flex w-[420px] shrink-0 flex-col gap-4">
-          <section className="rounded-lg border border-primary-200 bg-surface p-5 shadow-sm [border-top:4px_solid_theme(colors.primary.600)]">
-            <div className="mb-3 flex items-center gap-3">
-              <span className="h-3.5 w-3.5 rounded-full bg-primary-600 shadow-[0_0_0_5px_rgba(31,158,134,0.18)]" />
-              <b className="text-xl font-bold text-primary-700">
-                {loading ? '正在创建扫描任务…' : error ? '扫描任务创建失败' : '扫描任务已创建，等待打印机端操作'}
-              </b>
             </div>
-            {loading && (
-              <div className="mb-3 flex items-center gap-2 rounded-md bg-primary-50 px-3 py-2 text-base text-primary-700">
-                <LoaderIcon className="h-5 w-5 animate-spin" />
-                正在向设备下发扫描任务
-              </div>
-            )}
-            {error && (
-              <div className="mb-3 flex items-start gap-2 rounded-md bg-error-bg px-3 py-2 text-base text-error-fg">
-                <AlertCircleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                {error}
-              </div>
-            )}
+          </section>
+
+          <aside className="w2-scan-sidebar">
+            {loading && <KioskStatePanel compact tone="loading" title="正在创建扫描任务" description="正在向设备下发当前任务，请稍候。" />}
+            {error && <KioskStatePanel compact tone="error" title="扫描任务创建失败" description={error} />}
+            <section className="w2-scan-info-card">
+              <h2>任务信息</h2>
             {[
               ['扫描类型', SCAN_TYPE_LABELS[scanType]],
               ['任务编号', scanTaskId ?? '创建中'],
               ['剩余时间', countdown],
               ['输出格式', 'PDF（自动生成）'],
             ].map(([key, value]) => (
-              <div key={key} className="flex items-baseline justify-between gap-3 border-b border-dashed border-neutral-200 py-2.5 last:border-b-0">
-                <span className="text-[17.5px] text-neutral-500">{key}</span>
-                <span className="text-right text-[18.5px] font-semibold text-neutral-900">{value}</span>
-              </div>
+              <div key={key}><span>{key}</span><b>{value}</b></div>
             ))}
-          </section>
+            </section>
+            <p className="w2-scan-warning">扫描前请取下订书钉、回形针并抚平折角。点击返回会取消本次任务。</p>
+          </aside>
+        </section>
 
-          <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
-            <b className="mb-3 block text-xl font-bold">原件放置位置</b>
-            <div className="flex gap-3">
-              <div className="flex-1 rounded-md border border-neutral-200 bg-canvas p-4">
-                <b className="text-lg font-bold">输稿器（多页）</b>
-                <p className="mt-2 text-[15.5px] leading-relaxed text-neutral-500">正面朝上放入顶部输稿器，一次最多 50 页</p>
-              </div>
-              <div className="flex-1 rounded-md border border-neutral-200 bg-canvas p-4">
-                <b className="text-lg font-bold">玻璃板（单页）</b>
-                <p className="mt-2 text-[15.5px] leading-relaxed text-neutral-500">正面朝下对齐左上角，适合证书、证件</p>
-              </div>
-            </div>
-          </section>
-
-          <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
-            <b className="mb-2 block text-xl font-bold">注意事项</b>
-            {([
-              { icon: TriangleAlertIcon, text: '扫描前请取下订书钉、回形针并抚平折角，避免卡纸或图像歪斜。' },
-              { icon: ClockIcon,         text: '任务超时未收到扫描结果会自动结束，可返回重新创建。' },
-              { icon: ArrowLeftIcon,     text: '点击「返回」将取消本次扫描任务，不会保留任何文件。' },
-            ] as const).map(({ icon: Icon, text }) => (
-              <div key={text} className="flex flex-1 items-center gap-3 border-b border-dashed border-neutral-200 py-2 last:border-b-0">
-                <Icon className="h-5 w-5 shrink-0 text-wheat" />
-                <p className="text-[16.5px] leading-relaxed text-neutral-500">{text}</p>
-              </div>
-            ))}
-          </section>
-        </aside>
-      </main>
-
-      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
-        <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={handleBack}>
-          <ArrowLeftIcon className="mr-2 h-5 w-5" />
-          返回（取消任务）
-        </Button>
-        <span className="flex-1" />
-        <Button size="lg" className="h-14 min-w-[500px] text-lg" disabled={!scanTaskId || !controlToken || starting} onClick={handleConfirm}>
-          <CheckIcon className="mr-2 h-5 w-5" />
-          {starting ? '正在进入等待…' : '我已在打印机上操作，开始等待'}
-        </Button>
-        <span className="inline-flex items-center gap-2 text-lg font-semibold text-neutral-500">
-          <ClockIcon className="h-5 w-5" />
-          {countdown}
-        </span>
+        <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />任务剩余 {countdown}</span>}>
+          <Button variant="secondary" size="lg" onClick={handleBack}>返回（取消任务）</Button>
+          <Button size="lg" disabled={!scanTaskId || !controlToken || starting} onClick={handleConfirm}>
+            <CheckIcon />{starting ? '正在进入等待…' : '我已操作，开始等待'}
+          </Button>
+        </KioskActionBar>
       </div>
-    </div>
+    </KioskPageFrame>
   )
 }

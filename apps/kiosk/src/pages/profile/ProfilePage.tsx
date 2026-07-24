@@ -120,7 +120,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="kprofile kprofile-lightflow">
+    <div className="kprofile kprofile-lightflow fusion-w5 fusion-w5--profile" data-kiosk-screen="profile">
       <div className="kp-inner">
         <h1 className="kprofile-sr-only">我的</h1>
         <ProfileHeader

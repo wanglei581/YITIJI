@@ -94,7 +94,7 @@ expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继
 expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')
 expectMatches(
   assistantPage,
-  /<main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI助手<\/h1>/,
+  /<section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI助手<\/h1>/,
   '页面名称仅以无障碍标题保留',
 )
 expect(

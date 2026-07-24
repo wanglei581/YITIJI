@@ -25,11 +25,10 @@ import {
   Loader2Icon,
   MapPinIcon,
   SearchIcon,
-  ShieldCheckIcon,
 } from 'lucide-react'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
-import '../prototype/kiosk-prototype.css'
+import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
 
@@ -249,18 +248,15 @@ export function CompaniesPage() {
   )
 
   return (
-    <div className="kproto kproto-clay">
-      <div className="kproto-shell">
-        <div className="kproto-pagehead">
-          <button type="button" className="kproto-back" onClick={() => navigate('/jobs')}>返回</button>
-          <div className="kproto-title">
-            <h1>找企业</h1>
-            <p>来源企业与岗位导览 · 按地区 / 类型 / 行业浏览</p>
-          </div>
-          <div className="kproto-aside"><span className="kproto-badge">最近更新 · 实时数据</span></div>
-        </div>
-
-        <main className="kproto-content gap-3">
+    <KioskPageFrame
+      tone="clay"
+      title="找企业"
+      subtitle="来源企业与岗位导览 · 按地区 / 类型 / 行业浏览"
+      backLabel="返回岗位信息"
+      onBack={() => navigate('/jobs')}
+      badge={<FusionBadge>最近更新 · 实时数据</FusionBadge>}
+    >
+        <div className="kproto kproto-clay kproto-content gap-3">
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <ChipRow label="类型" options={typeOpts.slice(0, 3)} active={companyType} onChange={setCompanyType} />
@@ -270,7 +266,7 @@ export function CompaniesPage() {
                   value={keywordInput}
                   onChange={(e) => setKeywordInput(e.target.value)}
                   placeholder="搜索企业 / 岗位"
-                  className="min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
+                  className="min-h-12 min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
                 />
               </label>
             </div>
@@ -337,12 +333,8 @@ export function CompaniesPage() {
             </>
           )}
 
-          <div className="kproto-notice mt-auto">
-            <ShieldCheckIcon aria-hidden="true" />
-            <p>企业与岗位信息由来源机构提供、审核发布后展示；投递请进入岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理。</p>
-          </div>
-        </main>
-      </div>
-    </div>
+          <FusionNotice>企业与岗位信息由来源机构提供、审核发布后展示；投递请进入岗位详情，通过「去来源平台投递 / 扫码投递」在来源平台办理。</FusionNotice>
+        </div>
+    </KioskPageFrame>
   )
 }

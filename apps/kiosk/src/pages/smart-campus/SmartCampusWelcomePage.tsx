@@ -17,7 +17,7 @@ import {
   UserSquareIcon,
   type LucideIcon,
 } from 'lucide-react'
-import '../prototype/kiosk-prototype.css'
+import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const FLOW_STEPS = [
   { title: '线上预报到', sub: '前往学校迎新官网 / 公众号完成信息确认' },
@@ -54,18 +54,15 @@ export function SmartCampusWelcomePage() {
   const navigate = useNavigate()
 
   return (
-    <div className="kproto kproto-teal">
-      <div className="kproto-shell">
-        <div className="kproto-pagehead">
-          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
-          <div className="kproto-title">
-            <h1>迎新系统</h1>
-            <p>报到指引与入学准备 · 校方官方信息入口</p>
-          </div>
-          <div className="kproto-aside"><span className="kproto-badge">校方官方指引</span></div>
-        </div>
-
-        <main className="kproto-content">
+    <KioskPageFrame
+      tone="wheat"
+      title="迎新系统"
+      subtitle="报到指引与入学准备 · 校方官方信息入口"
+      backLabel="返回智慧校园"
+      onBack={() => navigate('/smart-campus')}
+      badge={<FusionBadge>校方官方指引</FusionBadge>}
+    >
+        <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；报到登记请前往学校官方系统办理。</p>
@@ -151,8 +148,7 @@ export function SmartCampusWelcomePage() {
             <div className="kproto-spacer" />
             <button type="button" className="kproto-btn dark" onClick={() => navigate('/smart-campus/service/campus-card')}>校园卡办理指引</button>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+    </KioskPageFrame>
   )
 }
