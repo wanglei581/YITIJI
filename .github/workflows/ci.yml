@@ -456,11 +456,16 @@ jobs:
           pnpm --filter @ai-job-print/shared typecheck
           pnpm --filter @ai-job-print/ui typecheck
 
-      - name: Verify Kiosk W1 fusion static contracts
+      - name: Verify Kiosk fusion static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
           pnpm --filter @ai-job-print/kiosk verify:fusion-shell
           pnpm --filter @ai-job-print/kiosk verify:fusion-home
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w2
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w3
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w4
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w5
+          pnpm --filter @ai-job-print/kiosk verify:fusion-w6
 
       - name: Run Kiosk fusion contract tests with coverage gates
         run: |
@@ -477,6 +482,10 @@ jobs:
         run: |
           pnpm --filter @ai-job-print/kiosk test:browser:smoke
           pnpm --filter @ai-job-print/kiosk test:browser:w1
+          pnpm --filter @ai-job-print/kiosk test:browser:w2
+          pnpm --filter @ai-job-print/kiosk test:browser:w3
+          pnpm --filter @ai-job-print/kiosk test:browser:w4
+          pnpm --filter @ai-job-print/kiosk test:browser:w5
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -488,4 +497,12 @@ jobs:
             test-results/kiosk-fusion-report/**
             test-results/kiosk-fusion-w1/**
             test-results/kiosk-fusion-w1-report/**
+            test-results/kiosk-fusion-w2/**
+            test-results/kiosk-fusion-w2-report/**
+            test-results/kiosk-fusion-w3/**
+            test-results/kiosk-fusion-w3-report/**
+            test-results/kiosk-fusion-w4/**
+            test-results/kiosk-fusion-w4-report/**
+            test-results/kiosk-fusion-w5/**
+            test-results/kiosk-fusion-w5-report/**
           if-no-files-found: ignore
