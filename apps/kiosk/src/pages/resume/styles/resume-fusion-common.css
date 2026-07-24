@@ -1,0 +1,212 @@
+.resume-lightflow {
+  --fy-paper: #f4f1e8;
+  --fy-surface: #fffdf8;
+  --fy-ink: #10302b;
+  --fy-muted: #5d6b63;
+  --fy-line: #e2dccb;
+  --fy-teal: #1f9e86;
+  --fy-teal-deep: #157a67;
+  --fy-teal-soft: #e2f2ec;
+  --fy-clay: #b8683c;
+  --fy-clay-deep: #9e5330;
+  --fy-clay-soft: #f4e8dd;
+  --fy-wheat: #a9781f;
+  --fy-wheat-deep: #8a6219;
+  --fy-wheat-soft: #f2ead6;
+  --fy-plum: #7a5a86;
+  --fy-plum-deep: #63466f;
+  --fy-plum-soft: #efe7f1;
+  --fy-slate: #3f68b0;
+  --fy-slate-deep: #35608f;
+  --fy-slate-soft: #e5edf4;
+  --fy-error: #c14a34;
+  --fy-error-soft: #f6e3de;
+  --fy-dark: #10302b;
+  --fy-r-sm: 14px;
+  --fy-r-md: 18px;
+  --fy-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
+  --fy-sans: var(--font-sans, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif);
+  min-height: 100%;
+  color: var(--fy-ink);
+  font-family: var(--fy-sans);
+  background:
+    radial-gradient(780px 420px at 92% 0%, rgba(31, 158, 134, .06), transparent 62%),
+    radial-gradient(620px 360px at 0% 28%, rgba(184, 104, 60, .05), transparent 58%),
+    var(--fy-paper) !important;
+}
+
+.resume-lightflow *,
+.resume-lightflow *::before,
+.resume-lightflow *::after {
+  box-sizing: border-box;
+}
+
+.resume-lightflow button {
+  min-height: 56px;
+  touch-action: manipulation;
+}
+
+.resume-lightflow button:active {
+  transform: scale(.98);
+}
+
+.resume-lightflow :is(input, select, textarea) {
+  border-color: var(--fy-line) !important;
+  color: var(--fy-ink) !important;
+  background: var(--fy-surface) !important;
+}
+
+.resume-lightflow :is(input, select, textarea):focus,
+.resume-lightflow :is(button, input, select, textarea):focus-visible {
+  outline: 3px solid rgba(31, 158, 134, .28) !important;
+  outline-offset: 3px;
+  border-color: var(--fy-teal) !important;
+  box-shadow: none !important;
+}
+
+.resume-lightflow :is(.text-primary-600, .text-primary-700) {
+  color: var(--fy-teal-deep) !important;
+}
+
+.resume-lightflow :is(.bg-primary-50, .bg-primary-100) {
+  background-color: var(--fy-teal-soft) !important;
+}
+
+.resume-lightflow :is(.border-primary-100, .border-primary-200, .border-primary-300, .border-primary-500) {
+  border-color: rgba(31, 158, 134, .35) !important;
+}
+
+.resume-lightflow .bg-warning-bg {
+  background-color: var(--fy-wheat-soft) !important;
+}
+
+.resume-lightflow .text-warning-fg,
+.resume-lightflow .text-warning {
+  color: var(--fy-wheat-deep) !important;
+}
+
+.resume-lightflow :is(.bg-error-bg, .bg-error-bg\/40) {
+  background-color: var(--fy-error-soft) !important;
+}
+
+.resume-lightflow .text-error-fg {
+  color: var(--fy-error) !important;
+}
+
+.resume-lightflow .bg-success-bg,
+.resume-lightflow .bg-success-bg\/60 {
+  background-color: var(--fy-teal-soft) !important;
+}
+
+.resume-lightflow .text-success-fg {
+  color: var(--fy-teal-deep) !important;
+}
+
+.resume-lightflow :is(.rounded-2xl, .rounded-3xl, .rounded-xl, .rounded-lg) {
+  border-radius: var(--fy-r-md);
+}
+
+.resume-lightflow :is(.shadow-sm, .shadow-xl) {
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
+}
+
+.resume-lightflow :is(.resume-lightflow__header, .resume-source-lightflow > .flex:first-child, .resume-report-lightflow > .flex:first-child) {
+  width: 100%;
+}
+
+.resume-lightflow [class*='PageHeader'],
+.resume-lightflow .resume-lightflow__header > .flex,
+.resume-source-lightflow > .flex:first-child,
+.resume-report-lightflow > .flex:first-child {
+  border-bottom: 0 !important;
+}
+
+.resume-lightflow h1,
+.resume-lightflow h2,
+.resume-lightflow h3,
+.resume-lightflow .resume-lightflow__header h1 {
+  color: var(--fy-ink) !important;
+  font-family: var(--fy-serif);
+  letter-spacing: 1px;
+}
+
+.resume-lightflow h1,
+.resume-lightflow .resume-lightflow__header h1 {
+  font-size: 44px !important;
+  font-weight: 900 !important;
+  line-height: 1.15;
+}
+
+.resume-lightflow h2 {
+  font-size: 30px !important;
+  font-weight: 800 !important;
+}
+
+.resume-lightflow h3 {
+  font-size: 24px !important;
+  font-weight: 750 !important;
+}
+
+.resume-lightflow :is(.resume-source-content, .resume-report-content, .resume-lightflow__content, .resume-lightflow__shell) {
+  max-width: 984px !important;
+  margin-inline: auto;
+}
+
+.resume-lightflow :is(.resume-source-content, .resume-report-content) {
+  padding-inline: 0;
+  gap: 20px !important;
+}
+
+.resume-lightflow :is(.resume-source-intro, .resume-source-evidence, .resume-source-context, .resume-source-phone-session > *, .resume-source-direction > *, .resume-report-summary, .resume-report-radar, .resume-report-notice, .resume-report-evidence, .resume-report-priorities, .resume-report-risks, .resume-report-suggestions, .resume-lightflow__work-card, .resume-lightflow__comparison-card, .resume-lightflow__export-card, .resume-lightflow__leave-dialog, .resume-lightflow__item, .resume-lightflow__detail, .resume-lightflow__empty-export) {
+  border: 1px solid var(--fy-line) !important;
+  border-radius: var(--fy-r-md) !important;
+  background: var(--fy-surface) !important;
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05) !important;
+}
+
+.resume-lightflow .resume-primary-action,
+.resume-lightflow .resume-lightflow__primary-action,
+.resume-lightflow button:not([disabled]).bg-primary-600,
+.resume-lightflow .resume-lightflow__action-bar button:not([data-variant='secondary']):not([disabled]) {
+  border: 0 !important;
+  border-radius: var(--fy-r-md) !important;
+  color: var(--fy-surface) !important;
+  background: var(--fy-teal) !important;
+  box-shadow: 0 6px 18px rgba(31, 158, 134, .25) !important;
+  font-weight: 700;
+}
+
+.resume-lightflow .resume-lightflow__action-bar,
+.resume-lightflow .resume-source-actions,
+.resume-lightflow .resume-report-actions {
+  border-top: 1px solid var(--fy-line) !important;
+  background: linear-gradient(to bottom, rgba(244, 241, 232, .2), rgba(255, 253, 248, .94) 32%) !important;
+}
+
+.resume-lightflow :is(.resume-lightflow__notice, .resume-report-next, .resume-source-privacy > *) {
+  border: 1px dashed var(--fy-line) !important;
+  border-radius: 12px !important;
+  color: var(--fy-muted) !important;
+  background: rgba(255, 253, 248, .7) !important;
+  box-shadow: none !important;
+}
+
+.resume-lightflow .resume-lightflow__notice svg,
+.resume-lightflow .resume-source-privacy svg {
+  color: var(--fy-wheat) !important;
+}
+
+@media (max-width: 640px) {
+  .resume-lightflow {
+    padding: 18px 16px !important;
+  }
+
+  .resume-lightflow h1,
+  .resume-lightflow .resume-lightflow__header h1 {
+    font-size: 32px !important;
+  }
+
+  .resume-lightflow :is(.resume-lightflow__header, .resume-lightflow__content) {
+    padding-inline: 0 !important;
+  }
+}

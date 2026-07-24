@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import type {
   GeneratedResume,
@@ -101,20 +101,20 @@ export function ResumeGeneratePreviewPage() {
 
   if (restoring) {
     return (
-      <div className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
         <p className="text-base">正在读取生成结果…</p>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   if (!result || !resume) {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
-      <div className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
         <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <p className="text-base text-neutral-500">生成结果已清除(公共设备不保留个人信息)</p>
         <Button size="lg" onClick={() => navigate('/resume/generate')}>重新填写生成</Button>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
@@ -154,16 +154,14 @@ export function ResumeGeneratePreviewPage() {
   }
 
   return (
-    <div className="resume-lightflow resume-generate-preview-lightflow flex h-full flex-col">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow flex h-full flex-col">
       <div className="resume-lightflow__header px-6 pt-6">
-        <PageHeader
+        <KioskPageHeader
           title="简历预览"
-          subtitle="轻触段落进入编辑；内容修改后需重新生成 PDF 再打印"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/resume/generate')}>
-              重新填写
-            </Button>
-          }
+          description="轻触段落进入编辑；内容修改后需重新生成 PDF 再打印"
+          onBack={() => navigate('/resume/generate')}
+          backLabel="重新填写"
         />
         {isMock && (
           <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
@@ -361,7 +359,7 @@ export function ResumeGeneratePreviewPage() {
       </div>
 
       {/* 底部操作条 */}
-      <div className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
+      <KioskActionBar className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           {!exported ? (
             <Button
@@ -390,7 +388,8 @@ export function ResumeGeneratePreviewPage() {
             </>
           )}
         </div>
-      </div>
-    </div>
+      </KioskActionBar>
+    </main>
+    </KioskPageFrame>
   )
 }

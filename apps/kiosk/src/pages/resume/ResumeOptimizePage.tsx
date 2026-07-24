@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
-import { Button, Card, PageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskPageFrame, PageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
@@ -236,7 +236,7 @@ export function ResumeOptimizePage() {
 
   if (loading) {
     return (
-      <div className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
         <PageHeader title="优化建议" subtitle="基于已有内容优化表达"
           actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>} />
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
@@ -245,13 +245,13 @@ export function ResumeOptimizePage() {
           </div>
           <p className="text-base text-neutral-500">正在生成优化建议…</p>
         </div>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   if (failMsg) {
     return (
-      <div className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
         <PageHeader title="优化建议" subtitle="基于已有内容优化表达"
           actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>} />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
@@ -259,14 +259,15 @@ export function ResumeOptimizePage() {
           <p className="text-base text-neutral-500">{failMsg}</p>
           <Button size="lg" onClick={() => navigate('/resume/source?intent=optimize')}>重新上传简历</Button>
         </div>
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   const { strong, quantify, trim } = countModuleTypes(modules)
 
   return (
-    <div className="resume-lightflow resume-optimize-lightflow flex h-full flex-col p-6">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow flex h-full flex-col p-6">
       <div className="resume-lightflow__header">
         <PageHeader
           title="优化建议"
@@ -489,6 +490,7 @@ export function ResumeOptimizePage() {
           </div>
         </div>
       )}
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

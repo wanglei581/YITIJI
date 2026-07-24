@@ -1,0 +1,293 @@
+.resume-templates-lightflow,
+.resume-materials-lightflow,
+.resume-export-lightflow {
+  padding: 34px 48px 0 !important;
+  overflow: hidden !important;
+}
+
+.resume-templates-lightflow .resume-lightflow__shell,
+.resume-materials-lightflow .resume-lightflow__shell,
+.resume-export-lightflow .resume-lightflow__shell {
+  width: 100%;
+  max-width: 984px !important;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.resume-templates-lightflow .resume-lightflow__header,
+.resume-materials-lightflow .resume-lightflow__header,
+.resume-export-lightflow .resume-lightflow__header {
+  padding: 0 0 26px !important;
+  align-items: center;
+  border-bottom: 0;
+}
+
+.resume-templates-lightflow .resume-lightflow__eyebrow,
+.resume-materials-lightflow .resume-lightflow__eyebrow,
+.resume-export-lightflow .resume-lightflow__eyebrow,
+.resume-lightflow__detail-label {
+  color: var(--fy-muted) !important;
+  font-size: 15px !important;
+  letter-spacing: 1px !important;
+  text-transform: none !important;
+}
+
+.resume-templates-lightflow .resume-lightflow__notice,
+.resume-materials-lightflow .resume-lightflow__notice {
+  order: 5;
+  margin-top: 16px;
+}
+
+.resume-lightflow__filters {
+  gap: 14px !important;
+  margin: 0 0 20px !important;
+}
+
+.resume-lightflow__filters button {
+  min-height: 64px !important;
+  padding: 0 30px !important;
+  border: 1px solid var(--fy-line) !important;
+  border-radius: 999px !important;
+  color: var(--fy-muted) !important;
+  background: var(--fy-surface) !important;
+  font-size: 20px !important;
+}
+
+.resume-lightflow__filters button.is-active {
+  color: var(--fy-surface) !important;
+  background: var(--fy-dark) !important;
+  border-color: var(--fy-dark) !important;
+  box-shadow: none !important;
+}
+
+.resume-templates-lightflow .resume-lightflow__workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid !important;
+  grid-template-columns: 1fr 340px !important;
+  gap: 20px !important;
+}
+
+.resume-templates-lightflow .resume-lightflow__catalog {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  grid-auto-rows: 1fr;
+  gap: 18px !important;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.resume-templates-lightflow .resume-lightflow__item {
+  position: relative;
+  min-height: 0;
+  display: grid !important;
+  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-rows: auto auto auto 1fr;
+  gap: 8px 18px !important;
+  padding: 18px 20px !important;
+  overflow: hidden;
+}
+
+.resume-templates-lightflow .resume-lightflow__item::before {
+  content: '';
+  grid-row: 1 / -1;
+  width: 150px;
+  align-self: center;
+  aspect-ratio: 210 / 297;
+  border: 1px solid var(--fy-line);
+  border-radius: 6px;
+  background:
+    linear-gradient(var(--fy-ink), var(--fy-ink)) 18px 18px / 58px 10px no-repeat,
+    linear-gradient(var(--fy-teal), var(--fy-teal)) 18px 44px / 54px 7px no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 18px, var(--fy-line) 18px 24px) 18px 64px / 112px 130px no-repeat,
+    #fff;
+  box-shadow: 0 4px 12px rgba(16, 48, 43, .08);
+}
+
+.resume-templates-lightflow .resume-lightflow__item > button {
+  grid-column: 2;
+}
+
+.resume-templates-lightflow .resume-lightflow__item-icon {
+  display: none !important;
+}
+
+.resume-templates-lightflow .resume-lightflow__item > p,
+.resume-templates-lightflow .resume-lightflow__item > small,
+.resume-templates-lightflow .resume-lightflow__tags,
+.resume-templates-lightflow .resume-lightflow__item > .resume-lightflow__button {
+  grid-column: 2;
+}
+
+.resume-templates-lightflow .resume-lightflow__item-copy strong,
+.resume-materials-lightflow .resume-lightflow__item-copy strong {
+  color: var(--fy-ink) !important;
+  font-family: var(--fy-serif);
+  font-size: 24px !important;
+  font-weight: 750;
+}
+
+.resume-templates-lightflow .resume-lightflow__detail,
+.resume-materials-lightflow .resume-lightflow__detail {
+  position: static !important;
+  height: 100%;
+  padding: 22px !important;
+}
+
+.resume-lightflow__boundary {
+  border: 1px solid var(--fy-line) !important;
+  border-radius: 12px !important;
+  background: var(--fy-paper) !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid !important;
+  grid-template-columns: 1fr 400px !important;
+  gap: 20px !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__catalog {
+  display: flex !important;
+  flex-direction: column;
+  gap: 16px !important;
+  min-height: 0;
+}
+
+.resume-materials-lightflow .resume-lightflow__item {
+  flex: 1;
+  display: grid !important;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: 8px 18px !important;
+  align-items: center;
+  padding: 20px 22px !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__item > button {
+  grid-column: 1 / 3;
+}
+
+.resume-materials-lightflow .resume-lightflow__item-icon {
+  width: 62px !important;
+  height: 62px !important;
+  border-radius: 16px !important;
+  color: var(--fy-teal-deep) !important;
+  background: var(--fy-teal-soft) !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__item > p,
+.resume-materials-lightflow .resume-lightflow__item > small,
+.resume-materials-lightflow .resume-lightflow__tags {
+  grid-column: 2 / 4;
+}
+
+.resume-materials-lightflow .resume-lightflow__item > .resume-lightflow__button {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.resume-materials-lightflow .resume-lightflow__form input {
+  min-height: 58px !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__form textarea {
+  min-height: 84px !important;
+  resize: none !important;
+}
+
+.resume-materials-lightflow .resume-lightflow__result {
+  color: var(--fy-teal-deep) !important;
+  background: var(--fy-teal-soft) !important;
+  border: 1px solid rgba(31, 158, 134, .35) !important;
+}
+
+.resume-export-lightflow .resume-lightflow__empty-export {
+  flex: 1;
+  min-height: 0;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding: 40px 60px !important;
+  text-align: center;
+}
+
+.resume-export-lightflow .resume-lightflow__empty-icon {
+  width: 108px !important;
+  height: 108px !important;
+  border-radius: 28px !important;
+  color: var(--fy-teal-deep) !important;
+  background: var(--fy-teal-soft) !important;
+}
+
+.resume-export-lightflow .resume-lightflow__empty-export h2 {
+  font-size: 38px !important;
+}
+
+.resume-export-lightflow .resume-lightflow__empty-export > p:not(.resume-lightflow__detail-label) {
+  max-width: 760px;
+  color: var(--fy-muted) !important;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.resume-export-lightflow .resume-lightflow__empty-export .resume-lightflow__primary-action {
+  max-width: 460px !important;
+}
+
+.resume-lightflow__tags span {
+  border: 1px solid var(--fy-line) !important;
+  color: var(--fy-muted) !important;
+  background: var(--fy-paper) !important;
+}
+
+.resume-lightflow__item.is-selected {
+  border-color: var(--fy-teal) !important;
+  box-shadow: 0 0 0 3px rgba(31, 158, 134, .15) !important;
+}
+
+/* ─── 屏29:隐藏 card 内 React 缩略图（::before CSS 版已提供）─ */
+.resume-templates-lightflow .resume-lightflow__item .rp-thumb {
+  display: none !important;
+}
+
+/* ─── 屏30:素材卡片选中状态徽章 ──────────────────────────── */
+.resume-materials-lightflow .resume-lightflow__item .rp-state-badge {
+  flex: none;
+  align-self: center;
+  grid-column: 3;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+  min-height: 0 !important;
+  border: 1px solid var(--fy-line);
+  color: var(--fy-muted);
+  background: var(--fy-surface);
+}
+
+.resume-materials-lightflow .resume-lightflow__item.is-selected .rp-state-badge {
+  color: var(--fy-teal-deep);
+  background: var(--fy-teal-soft);
+  border-color: rgba(31, 158, 134, .35);
+}
+
+@media (max-width: 900px) {
+  .resume-templates-lightflow .resume-lightflow__workspace,
+  .resume-materials-lightflow .resume-lightflow__workspace {
+    display: flex !important;
+    flex-direction: column;
+    overflow-y: auto !important;
+  }
+
+  .resume-templates-lightflow .resume-lightflow__catalog,
+  .resume-materials-lightflow .resume-lightflow__catalog {
+    overflow: visible;
+  }
+}

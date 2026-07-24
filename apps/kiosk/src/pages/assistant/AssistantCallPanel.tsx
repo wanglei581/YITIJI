@@ -119,6 +119,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText }: AssistantCallPan
     <div className="assistant-voice-backdrop">
       <section
         id="assistant-voice-dialog"
+        data-kiosk-screen="assistant-call"
         ref={dialogRef}
         className="assistant-voice-dialog"
         role="dialog"

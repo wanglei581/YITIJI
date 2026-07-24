@@ -1,7 +1,7 @@
 // 职业规划：真实规划读回、生成与打印逻辑保持在本页；LightFlow 仅重组视觉与状态层级。
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { CareerPlanResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -113,7 +113,7 @@ export function CareerPlanPage() {
 
   if (!taskId) {
     return (
-      <main className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" aria-labelledby="career-plan-gate-title">
           <span className="career-plan-lightflow__state-icon" aria-hidden="true"><CompassIcon /></span>
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
@@ -123,31 +123,32 @@ export function CareerPlanPage() {
             去上传简历<ArrowRightIcon aria-hidden="true" />
           </Button>
         </section>
-      </main>
+      </main></KioskPageFrame>
     )
   }
 
   if (loading) {
     return (
-      <main className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" role="status" aria-live="polite" aria-label="正在恢复职业规划">
           <Loader2Icon className="career-plan-lightflow__spinner" aria-hidden="true" />
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
           <h1>正在读取你的职业规划</h1>
           <p>正在确认是否存在可继续查看的真实规划结果。</p>
         </section>
-      </main>
+      </main></KioskPageFrame>
     )
   }
 
   if (plan) {
     return (
-      <main className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
         <header className="career-plan-lightflow__header">
-          <PageHeader
+          <KioskPageHeader
             title="职业规划建议"
-            subtitle={`依据：本人简历${plan.basedOn?.jobFit ? ` + 岗位匹配参考（${plan.basedOn.jobFit}）` : ''}${plan.basedOn?.interview ? ` + 模拟面试表现（${plan.basedOn.interview}）` : ''}`}
-            actions={<Button size="sm" variant="secondary" className="career-plan-lightflow__header-action" onClick={() => navigate('/')}>返回首页</Button>}
+            description={`依据：本人简历${plan.basedOn?.jobFit ? ` + 岗位匹配参考（${plan.basedOn.jobFit}）` : ''}${plan.basedOn?.interview ? ` + 模拟面试表现（${plan.basedOn.interview}）` : ''}`}
+            onBack={() => navigate('/')}
+            backLabel="返回首页"
           />
         </header>
 
@@ -216,7 +217,7 @@ export function CareerPlanPage() {
           {error && <p className="career-plan-lightflow__alert" role="alert">{error}</p>}
         </div>
 
-        <footer className="career-plan-lightflow__action-bar">
+        <KioskActionBar className="career-plan-lightflow__action-bar">
           <Button size="lg" className="career-plan-lightflow__print-action" disabled={printing} onClick={() => void handlePrint()}>
             {printing ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : <PrinterIcon aria-hidden="true" />}
             {printing ? '正在生成建议单…' : '打印建议单'}
@@ -224,18 +225,20 @@ export function CareerPlanPage() {
           <Button size="lg" variant="secondary" className="career-plan-lightflow__secondary-action" disabled={generating} onClick={() => void handleGenerate()}>
             {generating ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : '重新生成'}
           </Button>
-        </footer>
-      </main>
+        </KioskActionBar>
+      </main></KioskPageFrame>
     )
   }
 
   return (
-    <main className="service-desk career-plan-lightflow career-plan-lightflow--guide" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--guide" data-visual-theme="service-desk" data-ux-density="touch">
       <header className="career-plan-lightflow__header">
-        <PageHeader
+        <KioskPageHeader
           title="职业规划建议"
-          subtitle="基于你的真实简历，生成发展方向与行动计划"
-          actions={<Button size="sm" variant="secondary" className="career-plan-lightflow__header-action" onClick={() => navigate('/')}>返回首页</Button>}
+          description="基于你的真实简历，生成发展方向与行动计划"
+          onBack={() => navigate('/')}
+          backLabel="返回首页"
         />
       </header>
 
@@ -255,11 +258,12 @@ export function CareerPlanPage() {
         {error && <p className="career-plan-lightflow__alert" role="alert">{error}</p>}
       </div>
 
-      <footer className="career-plan-lightflow__action-bar">
+      <KioskActionBar className="career-plan-lightflow__action-bar">
         <Button size="lg" className="career-plan-lightflow__primary-action" disabled={generating} onClick={() => void handleGenerate()} aria-live="polite">
           {generating ? <><Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" />正在生成（约 15–30 秒）…</> : <>生成职业规划建议<ArrowRightIcon aria-hidden="true" /></>}
         </Button>
-      </footer>
+      </KioskActionBar>
     </main>
+    </KioskPageFrame>
   )
 }

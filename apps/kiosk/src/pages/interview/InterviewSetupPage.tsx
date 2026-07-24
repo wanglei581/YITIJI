@@ -7,7 +7,7 @@
 
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskPageFrame, PageHeader } from '@ai-job-print/ui'
 import type {
   CreateInterviewInput,
   InterviewDifficulty,
@@ -190,7 +190,8 @@ export function InterviewSetupPage() {
   }
 
   return (
-    <div className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-setup" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader
         className="interview-pagehead"
@@ -366,6 +367,7 @@ export function InterviewSetupPage() {
           ) : positionReady ? '开始模拟面试' : '填写目标岗位后开始'}
         </Button>
       </div>
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

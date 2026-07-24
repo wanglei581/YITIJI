@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageFrame, LoadingState } from '@ai-job-print/ui'
 import type { ResumeTemplate } from '@ai-job-print/shared'
 import { ArrowRightIcon, BookOpenIcon, CheckIcon } from 'lucide-react'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
@@ -145,14 +145,15 @@ export function ResumeTemplateLibraryPage() {
 
   if (loading) {
     return (
-      <div className="resume-lightflow resume-templates-lightflow">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
         <LoadingState className="resume-lightflow__state" />
-      </div>
+      </main></KioskPageFrame>
     )
   }
 
   return (
-    <div className="resume-lightflow resume-templates-lightflow">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <main data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
       <div className="resume-lightflow__shell">
         <header className="resume-lightflow__header">
           <div>
@@ -254,6 +255,7 @@ export function ResumeTemplateLibraryPage() {
 
         <p className="resume-lightflow__compliance">素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。</p>
       </div>
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }

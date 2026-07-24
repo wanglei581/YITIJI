@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskPageFrame, PageHeader } from '@ai-job-print/ui'
 import {
   CheckSquareIcon,
   ChevronDownIcon,
@@ -117,7 +117,8 @@ export function InterviewTipsPage() {
   }
 
   return (
-    <div className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-tips" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader
         className="interview-pagehead"
@@ -279,6 +280,7 @@ export function InterviewTipsPage() {
         {/* 打印准备清单：完成模拟面试后报告自带准备清单且可打印，此处不放未接线的死按钮 */}
         <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
       </div>
-    </div>
+    </main>
+    </KioskPageFrame>
   )
 }
