@@ -42,7 +42,7 @@ import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
-import '../prototype/kiosk-prototype.css'
+import { KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const CATEGORY_LABEL: Record<string, string> = {
   fulltime: '全职', intern: '实习', campus: '校招', parttime: '兼职',
@@ -189,6 +189,13 @@ export function CompanyDetailPage() {
   }
 
   return (
+    <KioskPageFrame
+      tone="clay"
+      title="企业详情"
+      subtitle={`来源企业与岗位导览 · ${company.sourceName} · 信息以来源平台为准`}
+      backLabel="返回企业列表"
+      onBack={() => navigate('/companies')}
+    >
     <div className="kproto kproto-clay flex h-full flex-col">
       {qr?.kind === 'source' && company.sourceUrl && (
         <QrModal
@@ -208,15 +215,6 @@ export function CompanyDetailPage() {
           onClose={() => setQr(null)}
         />
       )}
-
-      {/* 头部 */}
-      <div className="kproto-pagehead px-12 pb-4 pt-8">
-        <button type="button" className="kproto-back" onClick={() => navigate('/companies')}>返回列表</button>
-        <div className="kproto-title min-w-0">
-          <h1>企业详情</h1>
-          <p>信息来源：{company.sourceName} · 以来源平台为准</p>
-        </div>
-      </div>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-12 pb-6">
         {/* 封面 / 宣传片（仅真实媒体；无媒体不放占位假视频） */}
@@ -471,5 +469,6 @@ export function CompanyDetailPage() {
         )}
       </div>
     </div>
+    </KioskPageFrame>
   )
 }

@@ -27,7 +27,7 @@ import {
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
-import '../prototype/kiosk-prototype.css'
+import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 type ServiceKey = 'campus-card' | 'all-in-one' | 'campus-network' | 'luggage' | 'panorama'
 
@@ -133,18 +133,15 @@ export function SmartCampusServicePage() {
   const Icon = info.icon
 
   return (
-    <div className="kproto kproto-teal">
-      <div className="kproto-shell">
-        <div className="kproto-pagehead">
-          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
-          <div className="kproto-title">
-            <h1>{info.title}</h1>
-            <p>{info.subtitle} · 智慧校园自助服务指引</p>
-          </div>
-          <div className="kproto-aside"><span className="kproto-badge">办理指引 · 未接线上办理</span></div>
-        </div>
-
-        <main className="kproto-content">
+    <KioskPageFrame
+      tone="wheat"
+      title={info.title}
+      subtitle={`${info.subtitle} · 智慧校园自助服务指引`}
+      backLabel="返回智慧校园"
+      onBack={() => navigate('/smart-campus')}
+      badge={<FusionBadge>办理指引 · 未接线上办理</FusionBadge>}
+    >
+        <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；实际办理请前往现场服务窗口或学校官方自助平台。</p>
@@ -225,7 +222,7 @@ export function SmartCampusServicePage() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/print')}
+                onClick={() => navigate('/print/upload')}
                 className="kproto-tile flex items-center gap-4"
                 style={{ background: 'var(--kp-teal-soft)', borderColor: 'rgba(31,158,134,.35)' }}
               >
@@ -245,8 +242,7 @@ export function SmartCampusServicePage() {
               查看迎新报到指引<ChevronRightIcon aria-hidden="true" />
             </button>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+    </KioskPageFrame>
   )
 }

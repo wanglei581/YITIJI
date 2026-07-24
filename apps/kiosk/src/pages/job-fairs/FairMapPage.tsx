@@ -5,7 +5,7 @@ import type { FairBoothDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-prin
 import { BOOTH_STATUS_LABELS } from '../../types/fair'
 import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import { getFairMap, getJobFairById } from '../../services/api'
-import { ProtoNotice, ProtoPage, SourceMetaChips } from '../jobs-fairs-prototype'
+import { FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export function FairMapPage() {
     : null
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="场馆导览"
       subtitle={
@@ -231,16 +231,16 @@ export function FairMapPage() {
       )}
 
       {fair && (
-        <SourceMetaChips
+        <FusionSourceMeta
           sourceName={fair.sourceName}
           syncTime={fair.syncTime ?? fair.startTime}
           externalId={fair.externalId}
         />
       )}
 
-      <ProtoNotice>
+      <FusionNotice>
         场馆导览信息由主办方提供，仅供现场参考；岗位投递请前往来源平台办理。
-      </ProtoNotice>
-    </ProtoPage>
+      </FusionNotice>
+    </KioskPageFrame>
   )
 }

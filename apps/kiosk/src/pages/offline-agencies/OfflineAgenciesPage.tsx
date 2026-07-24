@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
-import { BuildingIcon, ChevronRightIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
+import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
 import {
   getOfflineAgencies,
   type OfflineAgencyDTO,
   type OfflineAgencyListResult,
 } from '../../services/api/offlineAgencies'
-import { ProtoPage, ProtoBadge, ProtoNotice } from '../jobs-fairs-prototype'
-import '../jobs-fairs-prototype.css'
+import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
 
@@ -43,10 +42,10 @@ function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
 }
 
 // ── 机构卡片 ─────────────────────────────────────────────────
-function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () => void }) {
+function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
   const isOpen = agency.status === 'open'
   return (
-    <button type="button" className="jf-row oa-agency-row" onClick={onClick} aria-label={`查看${agency.name}`}>
+    <article className="jf-row oa-agency-row" aria-label={agency.name}>
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
@@ -80,9 +79,9 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
       <div className="oa-r-aside">
         <div className="oa-jobs-n">{agency.jobCount}</div>
         <div className="oa-jobs-t">在招岗位</div>
+        <div className="oa-jobs-t">岗位咨询请到店办理</div>
       </div>
-      <ChevronRightIcon className="jf-arrow" aria-hidden="true" />
-    </button>
+    </article>
   )
 }
 
@@ -130,13 +129,13 @@ export function OfflineAgenciesPage() {
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="clay"
       title="线下招聘机构"
       subtitle="合作人力资源机构门店 · 岗位咨询与应聘到店办理"
       backLabel="返回岗位信息"
       onBack={() => navigate('/jobs')}
-      badge={<ProtoBadge icon={ShieldCheckIcon}>机构资质核验后收录</ProtoBadge>}
+      badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
     >
       {/* 区域筛选 */}
       <div className="jf-filter-bar">
@@ -195,11 +194,7 @@ export function OfflineAgenciesPage() {
           ) : (
             <div className="jf-list">
               {data.items.map((agency) => (
-                <AgencyRow
-                  key={agency.id}
-                  agency={agency}
-                  onClick={() => navigate(`/offline-agencies/${agency.id}`)}
-                />
+                <AgencyRow key={agency.id} agency={agency} />
               ))}
             </div>
           )}
@@ -228,12 +223,12 @@ export function OfflineAgenciesPage() {
           )}
 
           {/* 合规提示 */}
-          <ProtoNotice>
+          <FusionNotice>
             线下机构岗位的咨询与应聘请前往机构门店办理；本终端不代收简历、不代收任何费用，机构服务项目与收费以门店依法公示为准，请勿支付押金或未公示费用。
-          </ProtoNotice>
+          </FusionNotice>
         </>
       )}
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }
 

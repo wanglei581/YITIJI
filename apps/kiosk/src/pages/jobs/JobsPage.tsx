@@ -17,9 +17,18 @@ import { JobAiResultPanel } from './components/JobAiResultPanel'
 import { ResumeSelectModal } from './components/ResumeSelectModal'
 import { JobResultsSection } from './components/JobResultsSection'
 import { buildSourceCards, buildTopTags, uniqueSorted } from './utils/jobDisplay'
-import { ProtoBadge, ProtoNotice, ProtoPage, formatDate } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, KioskPageFrame } from './components/W4Presentation'
 
 const VALID_CATEGORIES = new Set(['fulltime', 'intern', 'campus', 'parttime'])
+
+function formatW4Date(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '暂无同步时间'
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date)
+}
 
 export function JobsPage() {
   const navigate = useNavigate()
@@ -165,7 +174,7 @@ export function JobsPage() {
       .map((job) => Date.parse(job.syncTime))
       .filter((value) => !Number.isNaN(value))
     if (times.length === 0) return '暂无'
-    return formatDate(new Date(Math.max(...times)).toISOString())
+    return formatW4Date(new Date(Math.max(...times)).toISOString())
   }, [displayedJobs])
 
   function requireToken(): string | null {
@@ -259,13 +268,13 @@ export function JobsPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="clay"
       title="岗位信息"
       subtitle="第三方 / 官方来源岗位入口，去来源平台投递"
       backLabel="返回"
       onBack={() => navigate('/')}
-      badge={<ProtoBadge icon={RefreshCwIcon}>按来源定时同步</ProtoBadge>}
+      badge={<FusionBadge icon={RefreshCwIcon}>按来源定时同步</FusionBadge>}
       tight
       actionBar={
         <>
@@ -408,12 +417,12 @@ export function JobsPage() {
             </button>
           </div>
 
-          <ProtoNotice>
+          <FusionNotice>
             本系统仅展示客户接入并经审核发布的岗位信息，不接收简历、不参与招聘流程，请前往来源平台办理。{hasAnyFilter && activeSourceName ? ` 当前来源：${activeSourceName}。` : ''}
-          </ProtoNotice>
+          </FusionNotice>
         </>
       )}
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }
 

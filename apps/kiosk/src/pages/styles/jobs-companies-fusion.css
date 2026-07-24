@@ -1,0 +1,33 @@
+.w4-jobs-page,
+.w4-company-page {
+  min-height: 100%;
+}
+
+.w4-page-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(20px, 2.4vw, 36px);
+}
+
+.w4-source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+}
+
+.w4-source-meta > div {
+  border: 1px solid color-mix(in srgb, var(--ink, #17211b) 16%, transparent);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.w4-source-meta dt,
+.w4-source-meta dd {
+  display: inline;
+  margin: 0;
+}
+
+.w4-source-meta dt::after {
+  content: ' ';
+}

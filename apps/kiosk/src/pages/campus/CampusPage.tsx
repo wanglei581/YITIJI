@@ -34,7 +34,7 @@ import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
-import '../prototype/kiosk-prototype.css'
+import { KioskPageFrame } from '../jobs/components/W4Presentation'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
 
@@ -236,6 +236,13 @@ export function CampusPage() {
   }
 
   return (
+    <KioskPageFrame
+      tone="clay"
+      title="校园招聘专区"
+      subtitle={`${fair.name} · 招聘会与来源平台信息`}
+      backLabel="返回首页"
+      onBack={() => navigate('/')}
+    >
     <div className="campus-proto flex h-full flex-col">
       {qr?.kind === 'book' && (
         <QrModal
@@ -346,5 +353,6 @@ export function CampusPage() {
         )}
       </div>
     </div>
+    </KioskPageFrame>
   )
 }

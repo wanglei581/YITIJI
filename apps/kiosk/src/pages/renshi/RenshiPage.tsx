@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import { getPublishedPolicies, type PolicyPostView } from '../../services/api/policies'
 import { recordBrowse, recordExternalJump } from '../../services/api/activity'
 import { useAuth } from '../../auth/useAuth'
@@ -103,9 +103,12 @@ export function RenshiPage() {
   }
 
   return (
+    <KioskPageFrame
+      className="w4-policy-page"
+      header={<KioskPageHeader title="政策服务" description="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" onBack={() => navigate('/')} backLabel="返回首页" />}
+    >
     <div className="k8-policy flex h-full min-h-0 flex-col gap-[18px] px-12 py-5">
       {qrEntry && <OfficialEntryQrOverlay title={qrEntry.title} url={qrEntry.url} onClose={() => setQrEntry(null)} />}
-      <PageHeader className="shrink-0" title="政策服务" subtitle="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" />
 
       {/* 合规边界：仅信息指引 + 直达 AI 助手政策问答 */}
       <div className="flex shrink-0 items-center gap-4 rounded-[14px] border bg-wheat-bg px-[22px] py-4" style={{ borderColor: 'rgba(169,120,31,.35)' }}>
@@ -141,5 +144,6 @@ export function RenshiPage() {
         政策与公告内容仅作展示说明，具体以官方发布为准。如需办理具体业务，请前往对应窗口或扫码访问官方平台。
       </p>
     </div>
+    </KioskPageFrame>
   )
 }

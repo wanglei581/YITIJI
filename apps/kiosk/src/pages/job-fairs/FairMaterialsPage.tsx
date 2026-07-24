@@ -8,7 +8,7 @@ import { FAIR_MATERIAL_TYPE_LABELS } from '../../types/fair'
 import { BriefcaseIcon, CalendarIcon, FileTextIcon, MapIcon, MapPinIcon, NewspaperIcon, PrinterIcon } from 'lucide-react'
 import { getFairMaterials, getJobFairById, prepareFairMaterialPrint } from '../../services/api'
 import { API_MODE } from '../../services/api/client'
-import { CardHead, ProtoBadge, ProtoNotice, ProtoPage, ProtoStepStrip, SourceMetaChips } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, FusionSectionHead, FusionSourceMeta, FusionStepStrip, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 function formatSize(kb: number) {
   return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
@@ -99,13 +99,13 @@ export function FairMaterialsPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="活动资料"
       subtitle={fair ? `${fair.name} · ${materials.length} 份资料` : `${materials.length} 份资料`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<ProtoBadge icon={FileTextIcon}>免费打印</ProtoBadge>}
+      badge={<FusionBadge icon={FileTextIcon}>免费打印</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
@@ -190,8 +190,8 @@ export function FairMaterialsPage() {
         )}
 
       <section className="jf-card accented">
-        <CardHead icon={PrinterIcon} title="如何打印" subtitle="三步完成，免费出纸" />
-        <ProtoStepStrip
+        <FusionSectionHead icon={PrinterIcon} title="如何打印" subtitle="三步完成，免费出纸" />
+        <FusionStepStrip
           steps={[
             { title: '选择一份资料', desc: '点击对应资料的「免费打印」' },
             { title: '确认打印参数', desc: '黑白 / 双面等参数已按推荐预设' },
@@ -201,16 +201,16 @@ export function FairMaterialsPage() {
       </section>
 
       {fair && (
-        <SourceMetaChips
+        <FusionSourceMeta
           sourceName={fair.sourceName}
           syncTime={fair.syncTime ?? fair.startTime}
           externalId={fair.externalId}
         />
       )}
 
-      <ProtoNotice>
+      <FusionNotice>
         资料由主办方 / 机构上传，标记为可打印的资料均可免费打印；实际页数以文件为准。
-      </ProtoNotice>
-    </ProtoPage>
+      </FusionNotice>
+    </KioskPageFrame>
   )
 }

@@ -5,7 +5,7 @@ import type { FairCompanyDTO, FairZoneDTO, ExternalJobFairDTO } from '@ai-job-pr
 import { COMPANY_SCALE_SHORT } from '../../types/fair'
 import { BriefcaseIcon, BuildingIcon, ChevronRightIcon, SearchIcon } from 'lucide-react'
 import { getFairCompanies, getFairZones, getJobFairById } from '../../services/api'
-import { ProtoBadge, ProtoNotice, ProtoPage, SourceMetaChips } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, FusionSourceMeta, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const CHECKIN_LABELS = {
   checked_in: '已签到',
@@ -77,13 +77,13 @@ export function FairCompaniesPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="参会企业"
       subtitle={fair ? `${fair.name} · ${companies.length} 家企业` : `${companies.length} 家企业`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<ProtoBadge icon={BuildingIcon}>{filtered.length} 家匹配</ProtoBadge>}
+      badge={<FusionBadge icon={BuildingIcon}>{filtered.length} 家匹配</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/map`)}>
@@ -166,16 +166,16 @@ export function FairCompaniesPage() {
       </section>
 
       {fair && (
-        <SourceMetaChips
+        <FusionSourceMeta
           sourceName={fair.sourceName}
           syncTime={fair.syncTime ?? fair.startTime}
           externalId={fair.externalId}
         />
       )}
 
-      <ProtoNotice>
+      <FusionNotice>
         系统仅展示参展企业信息，如需办理请扫码前往来源平台，系统不参与招聘闭环。
-      </ProtoNotice>
-    </ProtoPage>
+      </FusionNotice>
+    </KioskPageFrame>
   )
 }
