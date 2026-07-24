@@ -17,10 +17,13 @@ function codeView(source) {
 }
 
 function extractFunctionBody(source, name) {
+  source = codeView(source)
   const start = source.search(new RegExp(`(?:export\\s+)?function\\s+${name}\\b`))
   assert.ok(start >= 0, `${name} must be an exported function`)
-  const opening = source.indexOf('{', start)
-  const closing = findMatchingBrace(source, opening)
+  const parameters = source.indexOf('(', start)
+  const parametersEnd = findMatching(source, parameters, '(', ')')
+  const opening = source.indexOf('{', parametersEnd)
+  const closing = findMatching(source, opening, '{', '}')
   assert.ok(closing > opening, `${name} must have a balanced function body`)
   return source.slice(opening + 1, closing)
 }
@@ -144,7 +147,8 @@ function assertModalBehavior(source) {
   const keyBody = handlerBody(keydown) ?? ''
   assert.match(keyBody || source, /closeOnEscape[\s\S]*(?:Escape|code)[\s\S]*onClose\s*\(\)/)
   const backdropStart = source.indexOf('ui-kiosk-modal-backdrop')
-  const backdropBody = backdropStart >= 0 ? source.slice(backdropStart) : ''
+  const backdropName = /onClick\s*=\s*\{\s*(\w+)\s*\}/.exec(source.slice(backdropStart))?.[1]
+  const backdropBody = handlerBody(backdropName) ?? (backdropStart >= 0 ? source.slice(backdropStart) : '')
   assert.match(backdropBody, /onClick\s*=\s*\{[\s\S]*closeOnBackdrop[\s\S]*onClose/)
   const cleanup = /return\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\n\s*\}/.exec(source)?.[1]
   assert.ok(cleanup, 'KioskModal effect must return cleanup')
@@ -176,18 +180,19 @@ function assertModalBehavior(source) {
 
 function extractCssSelectors(source) {
   const css = source.replace(/\/\*[\s\S]*?\*\//g, '')
-  const selectors = []
-  let preludeStart = 0
-  let depth = 0
+  const selectors = []; let preludeStart = 0; let depth = 0; let quote = ''
 
   for (let index = 0; index < css.length; index += 1) {
-    if (css[index] === '{') {
+    const char = css[index]
+    if (quote) { if (char === quote && css[index - 1] !== '\\') quote = ''; continue }
+    if (char === '"' || char === "'") { quote = char; continue }
+    if (char === '{') {
       const prelude = css.slice(preludeStart, index).trim()
       if (prelude && !prelude.startsWith('@') && depth <= 1) selectors.push(prelude)
       depth += 1
-      depth = Math.max(0, depth - 1)
       preludeStart = index + 1
-    } else if (css[index] === '}') {
+    } else if (char === '}') {
+      depth = Math.max(0, depth - 1)
       preludeStart = index + 1
     }
   }
@@ -210,14 +215,14 @@ function extractCssRule(source, selectorPattern, label) {
   assert.ok(match, `fusion-youth.css must define ${label}`)
   return match[1]
 }
-function findMatchingBrace(source, openingBraceIndex) {
-  let depth = 0
-  for (let index = openingBraceIndex; index < source.length; index += 1) {
-    if (source[index] === '{') depth += 1
-    if (source[index] === '}') {
-      depth -= 1
-      if (depth === 0) return index
-    }
+function findMatching(source, start, open, close) {
+  let depth = 0; let quote = ''
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index]
+    if (quote) { if (char === quote && source[index - 1] !== '\\') quote = ''; continue }
+    if (char === '"' || char === "'" || char === '`') { quote = char; continue }
+    if (char === open) depth += 1
+    else if (char === close && --depth === 0) return index
   }
   return -1
 }
@@ -226,7 +231,7 @@ function extractAtRuleBlocks(source, atRulePattern, label) {
   for (const match of source.matchAll(new RegExp(atRulePattern, 'g'))) {
     const openingBrace = source.indexOf('{', match.index)
     assert.ok(openingBrace >= 0, `${label} must open a block`)
-    const closingBrace = findMatchingBrace(source, openingBrace)
+    const closingBrace = findMatching(source, openingBrace, '{', '}')
     assert.ok(closingBrace >= 0, `${label} must close its block`)
     blocks.push(source.slice(openingBrace + 1, closingBrace))
   }
@@ -263,7 +268,7 @@ assert.equal(
   'package.json must expose the exact verify:fusion-youth-foundation command',
 )
 
-const theme = await read('src/theme/visualTheme.ts')
+const theme = codeView(await read('src/theme/visualTheme.ts'))
 assert.deepEqual(
   extractStringLiteralUnion(theme, 'VisualTheme'),
   ['legacy', 'service-desk'],
@@ -329,7 +334,7 @@ const componentContracts = {
 
 const componentSources = new Map()
 for (const [component, props] of Object.entries(componentContracts)) {
-  const source = await read(`src/components/${component}.tsx`)
+  const source = codeView(await read(`src/components/${component}.tsx`))
   componentSources.set(component, source)
   assertExactInterface(source, `${component}Props`, props)
   assert.match(source, new RegExp(`export\\s+function\\s+${component}\\b`), `${component} must be exported`)
@@ -396,7 +401,7 @@ assert.match(modalBody, /aria-modal\s*=\s*['"]true['"]/)
 assert.match(modalBody, /aria-label\s*=\s*\{closeLabel\}/)
 assertModalBehavior(modal)
 
-const publicIndex = await read('src/index.ts')
+const publicIndex = codeView(await read('src/index.ts'))
 for (const component of Object.keys(componentContracts)) {
   assert.match(
     publicIndex,
