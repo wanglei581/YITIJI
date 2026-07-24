@@ -148,8 +148,9 @@ function assertModalBehavior(source) {
   assert.match(keyBody || source, /closeOnEscape[\s\S]*(?:Escape|code)[\s\S]*onClose\s*\(\)/)
   const backdropStart = source.indexOf('ui-kiosk-modal-backdrop')
   const backdropName = /onClick\s*=\s*\{\s*(\w+)\s*\}/.exec(source.slice(backdropStart))?.[1]
-  const backdropBody = handlerBody(backdropName) ?? (backdropStart >= 0 ? source.slice(backdropStart) : '')
-  assert.match(backdropBody, /onClick\s*=\s*\{[\s\S]*closeOnBackdrop[\s\S]*onClose/)
+  const backdropBody = backdropStart >= 0 ? source.slice(backdropStart) : ''
+  if (backdropName) assert.match(handlerBody(backdropName) ?? '', /closeOnBackdrop[\s\S]*onClose/)
+  else assert.match(backdropBody, /onClick\s*=\s*\{[\s\S]*closeOnBackdrop[\s\S]*onClose/)
   const cleanup = /return\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\n\s*\}/.exec(source)?.[1]
   assert.ok(cleanup, 'KioskModal effect must return cleanup')
   assert.match(cleanup, new RegExp(`removeEventListener\\s*\\(\\s*['"]keydown['"]\\s*,\\s*${keydown}`))
