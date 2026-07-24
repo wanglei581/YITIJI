@@ -367,11 +367,11 @@ export function HomePage() {
       {/* 继续上次：原型外生产动态状态。ContinuePanel 自门控——仅登录且确有可恢复任务
           （进行中打印/已诊断未优化简历）时渲染；无任务或匿名 → 返回 null，首页与原型 1:1。 */}
       <ContinuePanel />
-      <main className="groups" aria-label="当前可使用功能">
+      <div className="groups" aria-label="当前可使用功能">
         {groups.map((group) => (
           <ServiceCard key={group.id} group={group} />
         ))}
-      </main>
+      </div>
       <ZoneRow />
       <div className="notice">
         <ProtoIcon name="info" />

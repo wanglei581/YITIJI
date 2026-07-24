@@ -221,7 +221,7 @@ const pageStart = home.indexOf('export function HomePage()')
 const page = pageStart >= 0 ? home.slice(pageStart) : ''
 const homePageBody = extractFunctionBody(home, 'HomePage')
 const frameTag = extractReturnedRootTag(homePageBody)
-const mainTag = extractJsxOpeningTag(page, 'main')
+const groupsTag = extractJsxOpeningTag(page, 'div')
 
 expect(
   /import\s*\{[^}]*\bKioskPageFrame\b[^}]*\}\s*from\s*['"]@ai-job-print\/ui['"]/.test(home),
@@ -236,16 +236,17 @@ expect(
 )
 expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
 expect(
-  /^<main\b/.test(mainTag) &&
-    /\bclassName\s*=\s*['"]groups['"]/.test(mainTag) &&
-    /\baria-label\s*=\s*['"]当前可使用功能['"]/.test(mainTag),
-  '主服务区保留 groups 与可访问名称',
+  /^<div\b/.test(groupsTag) &&
+    /\bclassName\s*=\s*['"]groups['"]/.test(groupsTag) &&
+    /\baria-label\s*=\s*['"]当前可使用功能['"]/.test(groupsTag),
+  '主服务区使用中性 div 并保留 groups 与可访问名称',
 )
+expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
 const bodyIndexes = [
   page.indexOf(frameTag),
   page.search(/<HomeWelcome\s*\/>/),
   page.search(/<ContinuePanel\s*\/>/),
-  page.indexOf(mainTag),
+  page.indexOf(groupsTag),
   page.search(/<ZoneRow\s*\/>/),
   page.search(/<div\s+[^>]*className\s*=\s*['"]notice['"][^>]*>/),
   page.indexOf('</KioskPageFrame>'),
