@@ -122,6 +122,15 @@ W1 is serial. It owns and freezes the shared API consumed by W2–W5.
 - `apps/kiosk/src/styles/prototype-v1.css`
 - `apps/kiosk/package.json`
 
+**W1 test-only acceptance scope (planning reconciliation, 2026-07-24):**
+
+- Create `apps/kiosk/playwright.w1.config.ts` and the isolated `apps/kiosk/tests/visual/fixtures/fusion-w1/**` component preview, including a fixture-local Vite config with React and Tailwind v4 plugins. The preview is served only by the W1 Playwright command and is never added to production routes or the Vite production build.
+- Create `apps/kiosk/tests/visual/fusion-w1.spec.ts` so `KioskStatePanel` and `KioskModal` can be exercised in a real browser before W2–W5 consume them. The W1 Playwright config must use a file-level `testMatch` so it cannot collect W0 specs.
+- Modify `.github/workflows/ci.yml` to run the W1 static contracts and isolated browser acceptance in the existing `kiosk-browser-smoke` job.
+- Modify `docs/progress/current-progress.md` and `docs/progress/next-tasks.md` with truthful W1 status.
+
+This test-only expansion closes the original W1 acceptance/file-budget mismatch. It does not authorize a test-only production route, production demo flag, static mock page in `public/`, or business-state changes.
+
 **Modify only if the fusion prototype proves a missing icon/input state:**
 
 - `apps/kiosk/src/components/kiosk-icon/index.tsx`
