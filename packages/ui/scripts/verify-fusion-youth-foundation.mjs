@@ -161,7 +161,7 @@ function assertModalBehavior(source) {
   assert.match(cleanup, new RegExp(`${focused}[^;\n]*\\.focus\\s*\\(`))
   assert.match(source, /document\.body\.style\.overflow\s*=\s*['"]hidden['"]/)
   const dialogRef = /ref\s*=\s*\{\s*(\w+)\s*\}/.exec(source)?.[1]
-  assert.ok(dialogRef && new RegExp(`${dialogRef}\\.current(?:\\?\\.)?\\.focus\\s*\\(`).test(source), 'open dialog must receive focus')
+  assert.ok(dialogRef && new RegExp(`${dialogRef}\\.current(?:\\.focus|\\?\\.focus)\\s*\\(`).test(source), 'open dialog must receive focus')
   const baseId = /const\s+(\w+)\s*=\s*useId\s*\(\s*\)/.exec(source)?.[1]
   assert.ok(baseId, 'KioskModal must derive stable IDs with useId')
   const titleId = /const\s+(\w+)\s*=\s*`[^`]*\$\{(\w+)\}[^`]*`/.exec(source)
