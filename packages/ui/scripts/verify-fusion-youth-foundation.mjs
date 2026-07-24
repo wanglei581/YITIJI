@@ -212,9 +212,9 @@ function splitSelectorList(value) {
   parts.push(value.slice(start).trim()); return parts.filter(Boolean)
 }
 function extractCssRule(source, selectorPattern, label) {
-  const match = new RegExp(`${selectorPattern}\\s*\\{([^{}]*)\\}`, 'm').exec(source)
+  const match = new RegExp(`${selectorPattern}\\s*\\{(?<body>[^{}]*)\\}`, 'm').exec(source)
   assert.ok(match, `fusion-youth.css must define ${label}`)
-  return match[1]
+  return match.groups.body
 }
 function findMatching(source, start, open, close) {
   let depth = 0; let quote = ''
