@@ -282,7 +282,7 @@ export function SignStampPage() {
       <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
       <KioskPageHeader title="签名盖章" description="在 PDF 上叠加签名 / 印章图片（版式合成）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+      <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-5 py-4 text-lg leading-relaxed text-warning-fg">
           <InfoIcon className="h-6 w-6 shrink-0" />
           {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
@@ -474,7 +474,7 @@ export function SignStampPage() {
             </section>
           </aside>
         </div>
-      </main>
+      </section>
 
       <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>

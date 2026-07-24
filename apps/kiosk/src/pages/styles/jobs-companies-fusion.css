@@ -4,9 +4,10 @@
 }
 
 .w4-page-content {
+  --w4-page-inset: clamp(20px, 2.4vw, 36px);
   min-height: 0;
   overflow-y: auto;
-  padding: clamp(20px, 2.4vw, 36px);
+  padding: var(--w4-page-inset);
 }
 
 .w4-source-meta {

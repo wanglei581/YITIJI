@@ -347,7 +347,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--assistant">
-    <main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
+    <section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
 
       <div ref={workbenchRef} data-kiosk-domain="assistant" data-kiosk-screen="assistant" className="assistant-workbench">
@@ -524,7 +524,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           inputRef.current?.blur()
         }}
       />
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

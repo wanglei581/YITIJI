@@ -29,7 +29,7 @@ export function ResumeExportPage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-export" className="resume-lightflow resume-export-lightflow">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-export" className="resume-lightflow resume-export-lightflow">
       <div className="resume-lightflow__shell resume-lightflow__shell--narrow">
         <header className="resume-lightflow__header">
           <div>
@@ -90,7 +90,7 @@ export function ResumeExportPage() {
 
         <p className="resume-lightflow__compliance">{COMPLIANCE_COPY.KIOSK_RESUME_NO_SEND_ENTERPRISE}</p>
       </div>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

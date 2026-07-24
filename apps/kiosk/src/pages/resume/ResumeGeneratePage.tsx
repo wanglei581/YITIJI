@@ -261,7 +261,7 @@ export function ResumeGeneratePage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
       <div className="resume-lightflow__header px-6 pt-6">
         <KioskPageHeader
           title="AI 简历生成"
@@ -497,7 +497,7 @@ export function ResumeGeneratePage() {
           )}
         </div>
       </KioskActionBar>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

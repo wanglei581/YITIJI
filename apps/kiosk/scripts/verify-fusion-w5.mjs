@@ -100,6 +100,9 @@ const notifications = read('src/pages/placeholders/NotificationsPage.tsx')
 const activityDetail = read('src/pages/placeholders/MeActivityDetailPage.tsx')
 const meShell = read('src/pages/profile/me/MeListShell.tsx')
 const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
+const benefitActivityDetailCss = read('src/pages/activities/activities-detail-inkpaper.css')
+const mobileQrCss = read('src/pages/auth/mobile-qr-service-desk.css')
+const toolbox = read('src/pages/toolbox/ToolboxZonePage.tsx')
 
 assert.match(notifications, /MyNotificationsPage/, '/notifications reuses the canonical member capability')
 assert.doesNotMatch(notifications, /services\//, '/notifications adds no second data source')
@@ -109,6 +112,27 @@ assert.match(activityDetail, /nextCursor/, 'activity detail follows cursor pagin
 assert.doesNotMatch(activityDetail, /benefitActivities|claimBenefitActivity/, 'activity detail stays separate from benefits')
 assert.match(meShell, /KioskPageFrame/, 'member list shell uses the frozen W1 frame')
 assert.match(meShell, /KioskStatePanel/, 'member list shell uses the frozen W1 state panel')
+assert.match(meShell, /<section data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">/, 'member list content keeps its exact neutral wrapper')
+assert.doesNotMatch(meShell, /<\/?main\b/, 'member list shell leaves the main landmark to KioskLayout')
+assert.match(activityDetail, /<section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">/, 'activity detail keeps its exact neutral wrapper')
+assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
+assert.match(toolbox, /<section className="tb-content">/, 'toolbox keeps its exact neutral content wrapper')
+assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
+assert.match(
+  benefitActivityDetailCss,
+  /\.k8-act-back-btn\s*\{[\s\S]*?min-height:\s*48px;/,
+  'benefit activity detail back action keeps the kiosk 48px touch target',
+)
+assert.match(
+  mobileQrCss,
+  /\.k1-mobile-qr-login \.k1-mobile-qr-content\s*\{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+  'mobile QR shell includes padding and can shrink inside the 390px viewport width',
+)
+assert.match(
+  mobileQrCss,
+  /\.k1-mobile-qr-login \.k1-mobile-qr-input\s*\{[^}]*?min-height:\s*48px;/,
+  'mobile QR inputs keep a 48px direct touch target',
+)
 
 for (const leaf of [
   'me-detail-base.css', 'me-assets.css', 'me-orders.css', 'me-records.css', 'me-settings-feedback.css',

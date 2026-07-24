@@ -65,7 +65,7 @@ export function MeListShell({
         }
       />}
     >
-      <main data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">
+      <section data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">
 
       <div className="mt-4 flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
@@ -93,7 +93,7 @@ export function MeListShell({
           <div className="flex flex-col gap-3">{children}</div>
         )}
       </div>
-      </main>
+      </section>
     </KioskPageFrame>
   )
 }

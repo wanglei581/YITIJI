@@ -125,7 +125,7 @@ export function ResumeReportPage() {
 
   if (!success) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-error-bg">
           <AlertCircleIcon className="h-14 w-14 text-error-fg" />
         </div>
@@ -141,24 +141,24 @@ export function ResumeReportPage() {
             重新解析
           </Button>
         </div>
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
   if (loading) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
         </div>
         <p className="text-base text-neutral-500">正在恢复诊断报告…</p>
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
   if (!report || loadError) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow resume-report-state flex h-full flex-col items-center justify-center p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
           <FileSearchIcon className="h-10 w-10 text-primary-600" />
         </div>
@@ -174,7 +174,7 @@ export function ResumeReportPage() {
             开始简历诊断
           </Button>
         </div>
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
@@ -201,7 +201,7 @@ export function ResumeReportPage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-report" className="resume-lightflow resume-report-lightflow flex h-full flex-col p-6">
       <KioskPageHeader
         title="诊断报告"
         description="基于已有内容的 AI 分析结果（仅供参考）"
@@ -395,7 +395,7 @@ export function ResumeReportPage() {
         <TargetIcon className="h-4 w-4" />
         目标岗位匹配参考（仅供参考）
       </Button>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

@@ -432,7 +432,7 @@ jobs:
 
   kiosk-browser-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -486,6 +486,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w3
           pnpm --filter @ai-job-print/kiosk test:browser:w4
           pnpm --filter @ai-job-print/kiosk test:browser:w5
+          pnpm --filter @ai-job-print/kiosk test:browser:w6
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -505,4 +506,6 @@ jobs:
             test-results/kiosk-fusion-w4-report/**
             test-results/kiosk-fusion-w5/**
             test-results/kiosk-fusion-w5-report/**
+            test-results/kiosk-fusion-w6/**
+            test-results/kiosk-fusion-w6-report/**
           if-no-files-found: ignore

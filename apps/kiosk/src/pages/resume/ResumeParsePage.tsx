@@ -176,7 +176,7 @@ export function ResumeParsePage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow" role="status" aria-live="polite">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow" role="status" aria-live="polite">
       {/* 顶部流程步骤条 */}
       <nav className="rp-flow-steps" aria-label="AI简历服务进度">
         {FLOW_STEPS.map((step, i) => {
@@ -316,7 +316,7 @@ export function ResumeParsePage() {
           </button>
         </div>
       )}
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

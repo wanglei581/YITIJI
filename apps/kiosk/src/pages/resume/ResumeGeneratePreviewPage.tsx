@@ -101,20 +101,20 @@ export function ResumeGeneratePreviewPage() {
 
   if (restoring) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-3 px-6 text-neutral-400">
         <p className="text-base">正在读取生成结果…</p>
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
   if (!result || !resume) {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
         <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
         <p className="text-base text-neutral-500">生成结果已清除(公共设备不保留个人信息)</p>
         <Button size="lg" onClick={() => navigate('/resume/generate')}>重新填写生成</Button>
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
@@ -155,7 +155,7 @@ export function ResumeGeneratePreviewPage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow flex h-full flex-col">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow flex h-full flex-col">
       <div className="resume-lightflow__header px-6 pt-6">
         <KioskPageHeader
           title="简历预览"
@@ -389,7 +389,7 @@ export function ResumeGeneratePreviewPage() {
           )}
         </div>
       </KioskActionBar>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

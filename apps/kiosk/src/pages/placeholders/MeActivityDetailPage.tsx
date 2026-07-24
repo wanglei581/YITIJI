@@ -81,7 +81,7 @@ export default function MeActivityDetailPage() {
       className="fusion-w5 fusion-w5--profile me-inkdetail me-activity-detail"
       header={<KioskPageHeader title="记录详情" description="本人浏览与打开来源入口的记录" onBack={() => navigate('/me/activity')} backLabel="返回浏览与跳转记录" />}
     >
-      <main data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">
+      <section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">
         {!isLoggedIn ? (
           <KioskStatePanel
             tone="permission"
@@ -111,7 +111,7 @@ export default function MeActivityDetailPage() {
             <p>这里只记录浏览与打开来源入口动作；投递或预约结果以来源平台为准，本系统不记录。</p>
           </section>
         )}
-      </main>
+      </section>
     </KioskPageFrame>
   )
 }

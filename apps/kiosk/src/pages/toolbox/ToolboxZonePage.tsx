@@ -79,7 +79,7 @@ export function ToolboxZonePage() {
         </div>
       </div>
 
-      <main className="tb-content">
+      <section className="tb-content">
         {items.length > 0 ? (
           <div className="tiles c3">
             {items.map((item) => (
@@ -97,7 +97,7 @@ export function ToolboxZonePage() {
           <ProtoIcon name="info" />
           扩展服务由运营方审核后上架；进入第三方服务前会有明确提示，本终端不记录你在第三方页面的办理结果。
         </div>
-      </main>
+      </section>
 
       <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />

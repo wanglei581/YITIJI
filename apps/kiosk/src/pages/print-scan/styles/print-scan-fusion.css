@@ -8,6 +8,6 @@
   min-height: 100%;
 }
 
-[data-kiosk-presentation='fusion-youth'] .w2-print-scan-shell > main {
+[data-kiosk-presentation='fusion-youth'] .w2-print-scan-shell > :is(main, section) {
   isolation: isolate;
 }

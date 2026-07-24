@@ -35,6 +35,57 @@ function directString(object, name) {
   return property && ts.isStringLiteralLike(property.initializer) ? property.initializer.text : null
 }
 
+function directBoolean(object, name) {
+  const property = directProperty(object, name)
+  if (!property) return null
+  if (property.initializer.kind === ts.SyntaxKind.TrueKeyword) return true
+  if (property.initializer.kind === ts.SyntaxKind.FalseKeyword) return false
+  return null
+}
+
+function unwrapExpression(node) {
+  let current = node
+  while (current && (ts.isAsExpression(current) || ts.isSatisfiesExpression(current) || ts.isParenthesizedExpression(current))) {
+    current = current.expression
+  }
+  return current
+}
+
+function variableInitializer(source, name) {
+  let result = null
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name) {
+      result = unwrapExpression(node.initializer)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return result
+}
+
+function findTestSource(path, titleSource) {
+  const source = parseTsx(path)
+  let result = null
+  const visit = (node) => {
+    if (ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'test'
+      && node.arguments[0]
+      && node.arguments[0].getText(source) === titleSource) result = node.getText(source)
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  assert.ok(result, `${path} missing test ${titleSource}`)
+  return result
+}
+
+function assertExactEvidence(path, titleSource, evidence) {
+  const testSource = findTestSource(path, titleSource)
+  for (const token of evidence) {
+    assert.ok(testSource.includes(token), `${path} ${titleSource} missing exact evidence: ${token}`)
+  }
+}
+
 function jsxName(node) {
   if (ts.isJsxElement(node)) return node.openingElement.tagName.getText()
   if (ts.isJsxSelfClosingElement(node)) return node.tagName.getText()
@@ -301,10 +352,11 @@ check('package scripts', () => {
     'test:browser:w3': 'playwright test --config=playwright.w3.config.ts',
     'test:browser:w4': 'playwright test --config=playwright.w4.config.ts',
     'test:browser:w5': 'playwright test --config=playwright.w5.config.ts',
+    'test:browser:w6': 'playwright test --config=playwright.w6.config.ts',
   }
   for (const [name, command] of Object.entries(expected)) assert.equal(scripts[name], command, name)
   const serial = scripts['test:browser:fusion'] ?? ''
-  const expectedOrder = ['test:browser:smoke', 'test:browser:w1', 'test:browser:w2', 'test:browser:w3', 'test:browser:w4', 'test:browser:w5']
+  const expectedOrder = ['test:browser:smoke', 'test:browser:w1', 'test:browser:w2', 'test:browser:w3', 'test:browser:w4', 'test:browser:w5', 'test:browser:w6']
   let cursor = -1
   for (const command of expectedOrder) {
     const next = serial.indexOf(command)
@@ -317,7 +369,7 @@ check('package scripts', () => {
 check('CI wiring', () => {
   const ci = readFileSync(join(workspaceRoot, '.github/workflows/ci.yml'), 'utf8')
   const staticCommands = ['verify:fusion-w2', 'verify:fusion-w3', 'verify:fusion-w4', 'verify:fusion-w5', 'verify:fusion-w6']
-  const browserCommands = ['test:browser:w2', 'test:browser:w3', 'test:browser:w4', 'test:browser:w5']
+  const browserCommands = ['test:browser:w2', 'test:browser:w3', 'test:browser:w4', 'test:browser:w5', 'test:browser:w6']
   for (const commands of [staticCommands, browserCommands]) {
     let cursor = -1
     for (const command of commands) {
@@ -330,7 +382,7 @@ check('CI wiring', () => {
 
 check('production fixture isolation', () => {
   const violations = []
-  const fixturePattern = /(?:tests\/visual\/fixtures|tests\/fixtures)[^'"`]*fusion-w[2-5]|fusion-w[2-5][^'"`]*fixture/i
+  const fixturePattern = /(?:tests\/visual\/fixtures|tests\/fixtures)[^'"`]*fusion-w[2-6]|fusion-w[2-6][^'"`]*fixture/i
   for (const path of productionFiles) {
     const source = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
     const visit = (node) => {
@@ -346,6 +398,119 @@ check('production fixture isolation', () => {
     visit(source)
   }
   assert.deepEqual(violations, [], violations.join('\n'))
+})
+
+check('W2-W5 state coverage', () => {
+  assertExactEvidence('tests/visual/fusion-w2-scan.spec.ts', "'scan settings uses server instructions and waiting-to-completed polling reaches result @w2'", [
+    "scanStatus(polls++ === 0 ? 'waiting' : 'completed')",
+    "page.waitForURL('**/scan/result'",
+    "page.getByText('w2-scan.pdf', { exact: true })",
+  ])
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'resumes expose authenticated API error and recovered empty states through visible login @w5-kiosk'", [
+    "registerMemberLogin(api)",
+    "loginThroughVisibleUi(page, '/me/resumes')",
+    "status: 503",
+    "page.getByRole('heading', { name: '暂时无法加载' })",
+    "json: { success: true, data: { items: [], nextCursor: null, total: 0 } }",
+    "page.getByText('还没有登录后保存的简历', { exact: true })",
+  ])
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'offline page retains the 8177 state after an aborted health request @w5-kiosk'", [
+    "api.abort('GET', '/api/v1/health', 'internetdisconnected')",
+    "page.getByRole('button', { name: '重试连接', exact: true }).click()",
+    "page.getByText(/已重试 1 次/)",
+  ])
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'profile permission state uses the canonical fusion shell @w5-kiosk'", [
+    "page.goto('/profile')",
+    "page.getByRole('button', { name: '手机号登录', exact: true })",
+    "page.getByRole('region', { name: '我的资产' })",
+  ])
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'mobile QR login renders a real API error and touch-safe retry @w5-mobile'", [
+    "status: 410",
+    "code: 'QR_LOGIN_EXPIRED'",
+    "page.goto('/member/qr-login?ticketId=w5-expired-ticket')",
+    "root.getByRole('button', { name: '重新检查二维码', exact: true })",
+  ])
+  assertExactEvidence('tests/visual/fusion-w5.spec.ts', "'phone upload keeps the explicit expired-link state at 390x844 @w5-mobile'", [
+    "page.goto('/upload/phone')",
+    "root.getByText('上传链接已失效', { exact: true })",
+  ])
+
+  const paymentSource = readKiosk('tests/visual/fusion-w2-print.spec.ts')
+  for (const evidence of [
+    "name: 'failed attempt', status: 'unpaid', attempt: { attemptId: 'w2-failed', channel: 'wechat', status: 'failed'",
+    "name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired'",
+    "name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success'",
+    "test(`cashier keeps ${scenario.name} out of print fulfillment @w2`",
+    "page.getByText(scenario.copy, { exact: true })",
+    "expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()",
+  ]) assert.ok(paymentSource.includes(evidence), `payment state coverage missing exact evidence: ${evidence}`)
+})
+
+check('W6 route acceptance contract', () => {
+  const source = parseTsx('tests/visual/fixtures/fusion-w6-route-cases.ts')
+  const routeArray = variableInitializer(source, 'w6RouteDefinitions')
+  assert.ok(routeArray && ts.isArrayLiteralExpression(routeArray), 'w6RouteDefinitions must remain a static array')
+  const fixtureSource = readKiosk('tests/visual/fixtures/fusion-w6-route-cases.ts')
+  const touchExemptions = variableInitializer(source, 'TOUCH_TARGET_EXEMPTIONS')
+  assert.ok(touchExemptions && ts.isArrayLiteralExpression(touchExemptions), 'TOUCH_TARGET_EXEMPTIONS must remain a static array')
+  const touchExemptionPaths = touchExemptions.elements.map((element) => {
+    assert.ok(ts.isStringLiteralLike(element), 'touch-target exemption must be a string literal')
+    return element.text
+  })
+  assert.deepEqual(touchExemptionPaths.sort(), ['/screensaver', '/upload/phone'], 'touch-target exemptions must stay on the explicit allowlist')
+  for (const field of ['viewport', 'landmark', 'requiresFusionRoot', 'requiresTouchTargets']) {
+    assert.ok(fixtureSource.includes(`${field}:`), `route builder must materialize ${field}`)
+  }
+  assert.match(fixtureSource, /export const w6RouteCases[^\n]*w6RouteDefinitions\.map\(createRouteCase\)/, 'every route definition must materialize through createRouteCase')
+  const routes = routeArray.elements.map((element) => {
+    assert.ok(ts.isObjectLiteralExpression(element), 'every W6 route definition must be a direct object')
+    const object = element
+    const pattern = directString(object, 'pattern')
+    assert.ok(pattern, 'W6 route pattern must be a direct string')
+    const viewport = ['/member/qr-login', '/upload/phone'].includes(pattern) ? 'mobile' : 'kiosk'
+    const landmark = directString(object, 'landmark') ?? 'main'
+    const requiresFusionRoot = directBoolean(object, 'requiresFusionRoot') ?? true
+    const explicitTouchTargets = directBoolean(object, 'requiresTouchTargets')
+    if (explicitTouchTargets === false) assert.ok(touchExemptionPaths.includes(pattern), `${pattern} must be on the touch-target exemption allowlist`)
+    const requiresTouchTargets = explicitTouchTargets ?? !touchExemptionPaths.includes(pattern)
+    assert.ok(['main', 'presentation', 'none'].includes(landmark), `${pattern} has invalid landmark ${landmark}`)
+    assert.equal(typeof requiresFusionRoot, 'boolean', `${pattern} requiresFusionRoot`)
+    assert.equal(typeof requiresTouchTargets, 'boolean', `${pattern} requiresTouchTargets`)
+    const marker = directString(object, 'marker')
+    assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
+    return { pattern, viewport }
+  })
+  assert.equal(routes.length, 86, 'W6 route cases must total 86')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 86, 'W6 route cases must be unique')
+  assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 84, 'W6 kiosk allocation')
+  assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
+})
+
+check('W6 browser collection contract', () => {
+  const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')
+  const config = readKiosk('playwright.w6.config.ts')
+  assert.match(spec, /for \(const route of w6KioskCases\)/, 'kiosk tests must only collect w6KioskCases')
+  assert.match(spec, /for \(const route of w6MobileCases\)/, 'mobile tests must only collect w6MobileCases')
+  assert.match(config, /name: 'kiosk-1080x1920', grep: \/@w6-kiosk\$\//, 'kiosk project must own only @w6-kiosk tests')
+  assert.match(config, /name: 'mobile-390x844', grep: \/@w6-mobile\$\//, 'mobile project must own only @w6-mobile tests')
+})
+
+check('W6 legal and long-text fixture', () => {
+  const source = parseTsx('tests/visual/fixtures/fusion-w6-api.ts')
+  const longText = variableInitializer(source, 'W6_LONG_LEGAL_TEXT')
+  assert.ok(longText && ts.isStringLiteralLike(longText), 'W6_LONG_LEGAL_TEXT must be a static string fixture')
+  assert.ok(longText.text.length >= 240, `W6 long-text fixture is only ${longText.text.length} characters`)
+  const api = readKiosk('tests/visual/fixtures/fusion-w6-api.ts')
+  for (const endpoint of [
+    '/api/v1/kiosk/legal/terms_of_service',
+    '/api/v1/kiosk/legal/privacy_policy',
+  ]) assert.ok(api.includes(`get('${endpoint}'`), `missing real legal endpoint ${endpoint}`)
+  assert.doesNotMatch(api, /get\('\/api\/v1\/kiosk\/legal\/privacy'/, 'obsolete legal fixture path must not return')
+  const routes = readKiosk('tests/visual/fixtures/fusion-w6-route-cases.ts')
+  const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')
+  assert.match(routes, /pattern: '\/legal\/:doc'[\s\S]*longText: W6_LONG_LEGAL_TEXT/, 'legal route must own the long-text scenario')
+  assert.match(spec, /route\.longText[\s\S]*getByText\(route\.longText, \{ exact: true \}\)/, 'W6 spec must visibly assert the long-text fixture')
 })
 
 if (failures > 0) process.exitCode = 1

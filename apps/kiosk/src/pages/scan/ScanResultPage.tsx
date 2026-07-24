@@ -92,14 +92,14 @@ export function ScanResultPage() {
       <KioskPageFrame className="w2-scan-page">
         <div data-w2-page="scan-result" className="w2-scan-shell">
           <KioskPageHeader title="扫描未完成" description="本次没有生成可用的扫描文件" onBack={() => navigate('/scan/start')} backLabel="返回扫描首页" />
-          <main className="w2-scan-content w2-scan-result-state">
+          <section className="w2-scan-content w2-scan-result-state">
             <KioskStatePanel
               tone="error"
               title="扫描失败"
               description={reason ?? '扫描任务未能完成，请重试或联系工作人员'}
               actions={<><Button variant="secondary" size="lg" onClick={() => navigate('/')}>返回首页</Button><Button size="lg" onClick={handleRetry}>重试扫描</Button></>}
             />
-          </main>
+          </section>
         </div>
       </KioskPageFrame>
     )
@@ -116,7 +116,7 @@ export function ScanResultPage() {
         ))}
       </div>
 
-      <main className="w2-scan-content w2-scan-result-content">
+      <section className="w2-scan-content w2-scan-result-content">
         {file ? (
           <section className="w2-scan-file-card">
             <span className="w2-scan-file-icon"><FileTextIcon /></span>
@@ -148,7 +148,7 @@ export function ScanResultPage() {
             </button>
           </div>
         </section>
-      </main>
+      </section>
 
       <KioskActionBar leading={<span className="w2-scan-action-note">未选择去向的临时文件会按服务端策略清理</span>}>
         <Button variant="secondary" size="lg" onClick={handleRetry}>

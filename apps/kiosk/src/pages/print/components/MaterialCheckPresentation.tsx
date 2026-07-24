@@ -113,7 +113,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
           </p>
         </aside>
 
-        <main className="w2-material-main">
+        <section className="w2-material-main">
           {props.isWorking && (
             <KioskStatePanel tone="loading" title={workingTitle} description="请稍候，检查完成后需要您确认" />
           )}
@@ -214,7 +214,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
               )}
             </div>
           )}
-        </main>
+        </section>
       </div>
 
       {props.error && props.stage === 'review' && <p className="w2-material-inline-error">{props.error}</p>}

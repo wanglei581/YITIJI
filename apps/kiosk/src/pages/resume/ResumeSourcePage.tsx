@@ -240,7 +240,7 @@ export function ResumeSourcePage() {
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-source" className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-source" className="resume-lightflow resume-source-lightflow flex h-full flex-col p-6">
       <KioskPageHeader
         title={copy.title}
         description={copy.subtitle}
@@ -476,7 +476,7 @@ export function ResumeSourcePage() {
           {uploadedFile ? copy.buttonReady : copy.buttonEmpty}
         </Button>
       </KioskActionBar>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

@@ -174,7 +174,7 @@ export function ScanProgressPage() {
         ))}
       </div>
 
-      <main className="w2-scan-content w2-scan-two-column">
+      <section className="w2-scan-content w2-scan-two-column">
         <section className="w2-scan-waiting-card">
           <span className="w2-scan-pulse"><ScanIcon /></span>
           <h2>等待打印机端扫描完成</h2>
@@ -217,7 +217,7 @@ export function ScanProgressPage() {
 
           <p className="w2-scan-warning"><AlertCircleIcon />扫描中请勿翻动或抽拉原件；任务超时未收到结果会提示重新开始。</p>
         </aside>
-      </main>
+      </section>
 
       <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />已等待 {elapsed} · 系统会持续自动检查</span>}>
         <Button variant="secondary" size="lg" className="w2-scan-cancel" onClick={handleCancel}>

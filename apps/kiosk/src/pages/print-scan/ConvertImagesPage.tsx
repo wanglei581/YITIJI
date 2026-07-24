@@ -166,7 +166,7 @@ export function ConvertImagesPage() {
       <div data-w2-page="print-scan-convert" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
       <KioskPageHeader title="格式转换" description="多张图片合并为一份 PDF，仅支持 JPG / PNG" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+      <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-base leading-relaxed text-info-fg">
           <InfoIcon className="h-5 w-5 shrink-0" />
           转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限；生成后直接进入确认打印。
@@ -270,7 +270,7 @@ export function ConvertImagesPage() {
             </section>
           </aside>
         </div>
-      </main>
+      </section>
 
       <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>

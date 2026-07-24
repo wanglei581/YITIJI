@@ -166,7 +166,7 @@ export function ScanSettingsPage() {
           ))}
         </div>
 
-        <main className="w2-scan-content w2-scan-two-column">
+        <section className="w2-scan-content w2-scan-two-column">
           <section className="w2-scan-primary-card">
             <div className="w2-scan-card-title"><span><PrinterIcon /></span><div><h2>请到打印机操作面板依次操作</h2><p>以下内容来自当前扫描任务的服务端指引。</p></div></div>
             <div className="w2-scan-guide-list">
@@ -194,7 +194,7 @@ export function ScanSettingsPage() {
             </section>
             <p className="w2-scan-warning">扫描前请取下订书钉、回形针并抚平折角。点击返回会取消本次任务。</p>
           </aside>
-        </main>
+        </section>
 
         <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />任务剩余 {countdown}</span>}>
           <Button variant="secondary" size="lg" onClick={handleBack}>返回（取消任务）</Button>

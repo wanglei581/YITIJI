@@ -101,7 +101,7 @@ export function PrintScanFeatureInfoPage() {
       <div data-w2-page="print-scan-feature" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
       <KioskPageHeader title={info.title} description="功能说明（即将上线）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <main className="mt-4 flex min-h-0 flex-1 gap-5">
+      <section className="mt-4 flex min-h-0 flex-1 gap-5">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
           <section className="flex items-center gap-6 rounded-lg border border-warning/30 border-t-4 border-t-[#a9781f] bg-surface p-7 shadow-sm">
             <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-warning-bg text-warning-fg">
@@ -185,7 +185,7 @@ export function PrintScanFeatureInfoPage() {
             ))}
           </section>
         </aside>
-      </main>
+      </section>
 
       <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>

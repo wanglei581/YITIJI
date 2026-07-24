@@ -131,7 +131,7 @@ export function ScanStartPage() {
           ))}
         </div>
 
-        <main className="w2-scan-content">
+        <section className="w2-scan-content">
           <p className="w2-scan-notice">扫描在打印机设备上完成，本机只负责创建任务并接收扫描文件。</p>
           {scannerStatus === 'offline' && (
             <KioskStatePanel compact tone="offline" title="扫描仪当前离线" description="请检查设备连接或联系工作人员；设备恢复后本页会自动刷新。" />
@@ -172,7 +172,7 @@ export function ScanStartPage() {
               <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期，未选择去向的文件会自动清理。</div>
             </aside>
           </div>
-        </main>
+        </section>
 
         <KioskActionBar leading={<span className="w2-scan-action-note">只有扫描仪就绪时才能创建任务</span>}>
           <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回</Button>

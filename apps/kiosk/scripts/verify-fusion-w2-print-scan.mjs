@@ -138,6 +138,17 @@ for (const [path, marker] of printScanPages) {
   assert.match(body, new RegExp(`data-w2-page=["']${marker}["']`), `${path} exposes ${marker}`)
   assert.match(body, /\.\/styles\/print-scan-fusion\.css/, `${path} imports the scoped W2 stylesheet`)
 }
+const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,
+  'print-scan shell isolation must support both main and section content roots',
+)
+assert.doesNotMatch(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*>\s*main\s*\{/,
+  'print-scan shell isolation must not drift back to a main-only selector',
+)
 const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 for (const marker of ['getConfiguredCapabilities', 'CARD_CAPABILITY_KEY', 'CAPABILITY_STATUS_NOTES']) {
   assert.match(printScanHome, new RegExp(marker), `print-scan home retains ${marker}`)

@@ -145,15 +145,15 @@ export function ResumeTemplateLibraryPage() {
 
   if (loading) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
         <LoadingState className="resume-lightflow__state" />
-      </main></KioskPageFrame>
+      </section></KioskPageFrame>
     )
   }
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <main data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-templates" className="resume-lightflow resume-templates-lightflow">
       <div className="resume-lightflow__shell">
         <header className="resume-lightflow__header">
           <div>
@@ -198,7 +198,7 @@ export function ResumeTemplateLibraryPage() {
             <EmptyState icon={BookOpenIcon} title="该分类暂无简历素材" description="请切换其他分类查看" />
           </div>
         ) : (
-          <main className="resume-lightflow__workspace">
+          <div className="resume-lightflow__workspace">
             <section className="resume-lightflow__catalog" aria-label="可选简历素材">
               {visible.map((template) => {
                 const active = selected?.id === template.id
@@ -250,12 +250,12 @@ export function ResumeTemplateLibraryPage() {
                 </>
               )}
             </aside>
-          </main>
+          </div>
         )}
 
         <p className="resume-lightflow__compliance">素材仅供个人求职准备、查看和打印；系统不收取求职者简历给企业。</p>
       </div>
-    </main>
+    </section>
     </KioskPageFrame>
   )
 }

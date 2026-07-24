@@ -121,7 +121,7 @@ export function PrintDonePage() {
         onBack={() => navigate('/')}
       />
 
-      <main className="print-done-content">
+      <section className="print-done-content">
         <div className="print-done-split">
 
           {/* 左列：成功勾 + 取件凭证码 */}
@@ -285,7 +285,7 @@ export function PrintDonePage() {
           </svg>
           如遇卡纸或缺页，请联系现场工作人员，凭任务号与取件凭证码可协助核验补打；打印文件请妥善保管，勿遗留在机器旁。
         </div>
-      </main>
+      </section>
     </div></PrintPageFrame>
   )
 }

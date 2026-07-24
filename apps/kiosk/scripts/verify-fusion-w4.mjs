@@ -39,6 +39,13 @@ const PLANNED_TEST_FILES = new Set([
   'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
 ])
+const W6_INTEGRATION_FILES = new Set([
+  '.github/workflows/ci.yml',
+  'apps/kiosk/package.json',
+  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
+  'docs/progress/current-progress.md',
+  'docs/progress/next-tasks.md',
+])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
   /^apps\/kiosk\/src\/pages\/(?:jobs-fairs-prototype|prototype\/kiosk-prototype)\.css$/,
@@ -48,12 +55,12 @@ const ALLOWED_PRODUCTION_PATHS = [
 const OTHER_WAVE_PLAN = /^docs\/superpowers\/plans\/2026-07-24-kiosk-8177-5299-fusion-w(?:2|3|5|6)\.md$/
 const OTHER_WAVE_PATHS = [
   // W2: print/scan presentation and its isolated verification assets.
-  /^apps\/kiosk\/src\/pages\/print\//,
+  /^apps\/kiosk\/src\/pages\/(?:print|print-scan|scan)\//,
   /^apps\/kiosk\/scripts\/verify-fusion-w2-print-scan\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2\.spec\.ts)$/,
   // W3: resume, AI assistant and interview authoring surfaces.
   /^apps\/kiosk\/src\/pages\/(?:resume|assistant|interview)\//,
-  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w3\.config\.ts|tests\/visual\/(?:fixtures\/fusion-w3-states\.ts|fusion-w3\.spec\.ts))$/,
   // W5: system, profile, account, help and benefit surfaces.
   /^apps\/kiosk\/src\/pages\/(?:activities|auth|help|legal|profile|screensaver|toolbox|upload)\//,
@@ -63,6 +70,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
   // W6: integration verifier and its contract test are owned by the integration wave.
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
+  /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
 ]
 
 let failed = 0
@@ -162,10 +170,11 @@ check('exact 23-route ownership', () => {
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
   const changes = changedFiles()
-  const frozenHits = changes.filter((path) => FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
+  const frozenHits = changes.filter((path) => !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
   const scopeViolations = changes.filter((path) => {
+    if (W6_INTEGRATION_FILES.has(path)) return false
     if (OTHER_WAVE_PLAN.test(path)) return false
     if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
     if (PLANNED_TEST_FILES.has(path)) return false
@@ -178,16 +187,27 @@ const jobsPage = read('src/pages/jobs/JobsPage.tsx')
 const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const companyDetail = read('src/pages/companies/CompanyDetailPage.tsx')
+const companiesPage = read('src/pages/companies/CompaniesPage.tsx')
 const fairDetail = read('src/pages/job-fairs/JobFairDetailPage.tsx')
 const fairMaterials = read('src/pages/job-fairs/FairMaterialsPage.tsx')
 const fairStats = read('src/pages/job-fairs/FairStatsPage.tsx')
 const campusPage = read('src/pages/campus/CampusPage.tsx')
+const campusPolicyCss = read('src/pages/styles/campus-policy-fusion.css')
+const jobsFairsFoundationCss = read('src/pages/styles/jobs-fairs-foundation.css')
+const jobsCompaniesCss = read('src/pages/styles/jobs-companies-fusion.css')
+const fairCompanyDetailSections = read('src/pages/job-fairs/components/FairCompanyDetailSections.tsx')
 const campusWelcome = read('src/pages/placeholders/CampusWelcomePage.tsx')
 const campusInsights = read('src/pages/placeholders/FreshmanInsightsPage.tsx')
 const smartHome = read('src/pages/smart-campus/SmartCampusHomePage.tsx')
 const smartInsights = read('src/pages/smart-campus/FreshmanInsightsPage.tsx')
 const renshi = read('src/pages/renshi/RenshiPage.tsx')
 const jobsCss = read('src/pages/jobs-fairs-prototype.css')
+const w4Presentation = read('src/pages/jobs/components/W4Presentation.tsx')
+
+check('W4 shared frame keeps one shell-owned main landmark', () => {
+  assert.match(w4Presentation, /<section className=\{`jf-content w4-page-content\$\{tight \? ' tight' : ''\}`\}>\{children\}<\/section>/)
+  assert.doesNotMatch(w4Presentation, /<\/?main\b/)
+})
 
 check('jobs preserve source-only application contract', () => {
   assert.match(jobsPage, /KioskPageFrame/)
@@ -195,15 +215,23 @@ check('jobs preserve source-only application contract', () => {
   assert.match(jobDetail, /recordExternalJump[\s\S]*'external_apply'/)
   assert.match(jobDetail, /扫码投递/)
   assert.match(jobDetail, /去来源平台投递/)
+  assert.match(
+    jobsFairsFoundationCss,
+    /\.jf-searchbox input\s*\{[\s\S]*?min-height:\s*48px;/,
+    'job search input keeps the kiosk 48px touch target',
+  )
 })
 check('offline agency list does not invent a detail route', () => {
   assert.doesNotMatch(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('company detail retains browse and external jump records', () => {
+  assert.match(companiesPage, /className="min-h-12 min-w-0 flex-1 bg-transparent/, 'company search input keeps the kiosk 48px touch target')
   assert.match(companyDetail, /recordBrowse[\s\S]*'company_profile'/)
   assert.match(companyDetail, /recordExternalJump/)
 })
 check('fair source, mock-stat and print contracts remain intact', () => {
+  assert.match(jobsFairsFoundationCss, /button\.jf-chip\s*\{[\s\S]*?min-height:\s*48px;/, 'interactive fair chips keep the kiosk 48px touch target')
+  assert.match(fairCompanyDetailSections, /min-h-12 min-w-12 rounded-lg p-2 transition-colors/, 'fair company view toggles keep 48px touch targets')
   assert.match(fairDetail, /external_appointment/)
   assert.match(fairDetail, /external_checkin_open/)
   assert.match(fairDetail, /!stats\.isMockData/)
@@ -221,6 +249,21 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(smartInsights, /数据处理协议/)
   assert.match(smartInsights, /聚合脱敏统计/)
   assert.doesNotMatch(smartInsights, /示例数据|MOCK_FRESHMAN|topMajors|ageDistribution/)
+  assert.match(
+    campusPolicyCss,
+    /button\.kproto-badge\s*\{[\s\S]*?min-height:\s*48px;/,
+    'interactive campus badges keep the kiosk 48px touch target',
+  )
+  assert.match(
+    jobsCompaniesCss,
+    /\.w4-page-content\s*\{[\s\S]*?--w4-page-inset:\s*clamp\(20px,\s*2\.4vw,\s*36px\);[\s\S]*?padding:\s*var\(--w4-page-inset\);/,
+    'W4 page content exposes its responsive inset contract',
+  )
+  assert.match(
+    campusPolicyCss,
+    /\.kproto-actionbar\s*\{[\s\S]*?margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
+    'smart-campus action bars align with the W4 page inset',
+  )
 })
 check('policy builtin records remain server-safe', () => {
   assert.match(renshi, /if \(isBuiltin\(item\.id\)\) return/)

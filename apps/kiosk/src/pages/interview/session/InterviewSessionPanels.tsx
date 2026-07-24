@@ -90,7 +90,7 @@ export function InterviewSessionPanels({
         </div>
       </div>
 
-      <main className="interview-session__content">
+      <div className="interview-session__content">
         <section className="interview-session__progress-card">
           <span className="interview-session__question-count">第 {questionIndex} 题<small>/ 目标 {questionTarget} 题</small></span>
           <div className="interview-session__progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
@@ -151,7 +151,7 @@ export function InterviewSessionPanels({
             </div>
           )}
         </div>
-      </main>
+      </div>
     </>
   )
 }

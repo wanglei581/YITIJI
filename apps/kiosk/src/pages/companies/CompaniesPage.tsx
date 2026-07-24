@@ -266,7 +266,7 @@ export function CompaniesPage() {
                   value={keywordInput}
                   onChange={(e) => setKeywordInput(e.target.value)}
                   placeholder="搜索企业 / 岗位"
-                  className="min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
+                  className="min-h-12 min-w-0 flex-1 bg-transparent text-[19px] outline-none placeholder:text-[var(--kp-muted)]"
                 />
               </label>
             </div>

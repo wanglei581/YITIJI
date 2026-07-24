@@ -17,6 +17,11 @@
   flex-shrink: 0;
 }
 
+.k8-act-back-btn {
+  min-height: 48px;
+  padding: 0 18px;
+}
+
 .k8-act-scroll {
   flex: 1;
   overflow-y: auto;

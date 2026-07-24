@@ -43,7 +43,7 @@ export function KioskPageFrame({
       )}
       footer={actionBar ? <UiKioskActionBar>{actionBar}</UiKioskActionBar> : undefined}
     >
-      <main className={`jf-content w4-page-content${tight ? ' tight' : ''}`}>{children}</main>
+      <section className={`jf-content w4-page-content${tight ? ' tight' : ''}`}>{children}</section>
     </UiKioskPageFrame>
   )
 }
