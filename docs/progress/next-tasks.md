@@ -11,12 +11,11 @@
 - [x] 生成 W0 逐文件、逐测试 TDD 实施计划并完成审查。
 - [x] W0：冻结 `docs/design/kiosk-proto-2026-07-fusion/`，锁定 86 路由 / 5 兼容重定向 / 状态参考契约，建立 production-build Playwright smoke 与视觉验收 Runbook；W0 未修改 production runtime UI。
 - [x] **W1：shared presentation foundation + home/shell representative migration**——共享 token、五个 Kiosk-only 原语、壳层、首页与手机全屏路由已冻结于 `9999d022`；W0 browser smoke 4/4，W1 普通 / `CI=1` / 故障代理三环境各 6/6，static、typecheck、lint、production build 与配置守卫全量复验通过。实跑发现的 45px 聚合标题触控目标和漏接屏保请求已修复并复跑通过；内部、Antigravity 与 Claude 最终审查均 `APPROVE`。首页既有 nested `<main>` 语义债 deferred 到 W6。
-- [ ] **当前下一步**：编写并双审 W2–W5 四份详细 TDD 计划，锁定 85 条剩余生产路径的互斥 ownership、真实状态 fixture、分域 static verifier / Playwright 与 CSS 兼容聚合策略；计划通过后再并行实施。
-- [ ] W2–W5：按打印扫描、简历/AI/面试、岗位/企业/招聘会/校园、个人中心/系统页面分域实施；当前均 pending。
-- [ ] W6：全路由 1080×1920 / 390×844 视觉验收、关键真实流程回归、nested `<main>` 语义债、合规与安全回归、Antigravity + Claude 双模型终审。
-- [ ] 生产部署、Windows 一体机、打印扫描硬件与真机触控验收仍 pending，不因 W1 CI 接线改变。
+- [x] W2–W5：按打印扫描、简历 / AI / 面试、岗位 / 企业 / 招聘会 / 校园、个人中心 / 系统页面完成互斥分域融合；保持生产路由、服务和业务行为不变。
+- [x] W6：建立 86 条生产路由双视口验收（Kiosk 84 + Mobile 2），补齐语义 landmark、48px 触控、横向溢出、合规、fixture 隔离与生产构建门禁；最终浏览器 `86/86 PASS`，内部复审无 Critical/Warning。
+- [ ] **当前下一步：上线前 P0 真实验收**——完成生产部署、PostgreSQL 生产实例、Windows 一体机、Terminal Agent、奔图真机打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收和现场试运营；任何一项未完成都不得表述为正式商用上线。
 
-本任务吸收下方 03/05/06 等既有视觉挂账，但不改变原有真实功能和上线 P0 硬件/部署验收结论。当前 W0、W1 已冻结；**严禁表述为全 Kiosk 融合完成**。W2–W6 仍须独立计划、TDD、production-build 浏览器验收和行为回归。
+本任务已吸收下方 03/05/06 等既有视觉挂账，并完成 W0–W6 本地候选收口，但不改变原有真实功能和上线 P0 硬件 / 部署验收结论。**本地 86 路由验收通过不等于正式商用上线**。
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 

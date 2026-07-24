@@ -302,3 +302,13 @@
 - `/print/scan-feature` → `/print-scan/feature/id-photo`
 - `/resume` → `/resume/source`
 - `/resume/upload` → `/resume/source`
+
+### 8.4 W6 本地候选验收结论（2026-07-24）
+
+- 全集保持严格 **86 条 normalized production patterns**：Kiosk 84 条使用 `1080×1920`，`/member/qr-login` 与 `/upload/phone` 两条 Mobile 辅助页使用 `390×844`；每条路由只被一个 wave 拥有且只收集一次。
+- production-build Playwright 最终结果为 **86/86 PASS**。验收覆盖稳定页面 marker、fail-closed API fixture、脚本 / 样式 / 文档加载失败、页面错误、横向溢出、`main` landmark 三态和可见触控目标。
+- `landmark:'none'` 必须不存在可见 `<main>`；`presentation` 不允许 `<main>`；默认 `main` 路由必须恰好一个可见 `<main>`。触控豁免只允许 `/screensaver` 与 `/upload/phone`，非白名单显式关闭会直接失败。
+- 横向滚动仅在祖先为真实 `overflow-x:auto|scroll`、`scrollWidth > clientWidth` 且祖先自身位于视口内时豁免；`overflow:hidden`、普通负 margin 和未证明可滚动的容器不豁免。智慧校园 actionbar 已统一复用 `--w4-page-inset`，不再依赖旧固定 gutter。
+- W2–W6 verifier、shared / ui / kiosk typecheck、两种生产构建及配置守卫均通过；lint 为 0 error，仅保留 4 条既有 Fast Refresh warning。
+
+以上只证明当前分支的本地融合页面与 86 路由候选完成，不证明生产环境、Windows 一体机、奔图真实打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收或现场试运营已经通过。
