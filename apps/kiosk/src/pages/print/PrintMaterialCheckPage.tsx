@@ -1,15 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
-import {
-  AlertCircleIcon,
-  CheckCircleIcon,
-  EyeOffIcon,
-  FileTextIcon,
-  LoaderIcon,
-  RotateCcwIcon,
-  ShieldCheckIcon,
-} from 'lucide-react'
+import { Button } from '@ai-job-print/ui'
+import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
@@ -33,13 +25,16 @@ import {
   type PrintMaterialSession,
 } from './printMaterialSession'
 import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import {
+  MaterialCheckPresentation,
+  type MaterialCheckStage,
+} from './components/MaterialCheckPresentation'
 
 interface LocationState {
   file?: PrintFileState
   source?: PrintMaterialSource
 }
 
-type Stage = 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan' | 'review' | 'submitting' | 'done' | 'error'
 type InspectionMessageSeverity = 'info' | 'warning'
 const TASK_POLL_ATTEMPTS = 30
 const TASK_POLL_INTERVAL_MS = 1_000
@@ -61,17 +56,6 @@ interface PiiRedactionSummaryView {
   redactedFileId: string | null
   resultFileCreated: boolean
   message: string
-}
-
-const ACTION_LABEL: Record<PiiFindingDecisionAction, string> = {
-  keep: '保留',
-  redact: '遮挡',
-}
-
-const RISK_LABEL: Record<'high' | 'medium' | 'low', string> = {
-  high: '高风险',
-  medium: '中风险',
-  low: '低风险',
 }
 
 function isPendingStatus(task: DocumentProcessTaskView): boolean {
@@ -255,32 +239,6 @@ function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string;
   return { label: '本次隐私检查结果状态未知，请人工确认文件不含敏感信息', tone: 'warning' }
 }
 
-function CheckStep({
-  active,
-  done,
-  label,
-}: {
-  active: boolean
-  done: boolean
-  label: string
-}) {
-  return (
-    <div className="flex items-center gap-[14px] rounded-[14px] border border-neutral-100 bg-white px-5 py-4">
-      <div
-        className={[
-          'flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full',
-          done ? 'bg-success-bg text-success-fg' : active ? 'bg-primary-50 text-primary-600' : 'bg-neutral-50 text-neutral-400',
-        ].join(' ')}
-      >
-        {done ? <CheckCircleIcon className="h-6 w-6" /> : active ? <LoaderIcon className="h-6 w-6 animate-spin" /> : <ShieldCheckIcon className="h-6 w-6" />}
-      </div>
-      <div>
-        <span className="text-[20px] font-bold text-neutral-900">{label}</span>
-      </div>
-    </div>
-  )
-}
-
 export function PrintMaterialCheckPage() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -295,7 +253,7 @@ export function PrintMaterialCheckPage() {
   const source = state?.source ?? session?.source
   const uploadPath = printUploadPathForSource(source)
 
-  const [stage, setStage] = useState<Stage>('idle')
+  const [stage, setStage] = useState<MaterialCheckStage>('idle')
   const [inspectionTask, setInspectionTask] = useState<DocumentProcessTaskView | null>(null)
   const [normalizeTask, setNormalizeTask] = useState<DocumentProcessTaskView | null>(null)
   const [piiTask, setPiiTask] = useState<DocumentProcessTaskView | null>(null)
@@ -309,16 +267,18 @@ export function PrintMaterialCheckPage() {
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
   const inspectionSummary = useMemo(() => inspectionSummaryFromTask(inspectionTask), [inspectionTask])
   const normalizeSummary = useMemo(() => normalizeA4SummaryFromTask(normalizeTask), [normalizeTask])
-  const normalizeBadgeClass = normalizeSummary?.canNormalize === true ? 'bg-success-bg text-success-fg' : 'bg-warning-bg text-warning-fg'
-  const normalizeBadgeLabel = normalizeSummary?.canNormalize === true
-    ? '已完成评估'
-    : normalizeSummary?.canNormalize === false
-      ? '需核对版式'
-      : '评估信息不完整'
   const requiresFormatReview = inspectionSummary?.canPrint === false
   const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
+  const presentationFindings = findings.map((finding) => ({
+    id: finding.id,
+    label: finding.label || finding.type,
+    maskedSnippet: maskSnippet(finding.type, finding.snippet),
+    suggestion: suggestionForFinding(finding),
+    risk: riskLevelForFinding(finding),
+    selected: decisions[finding.id] ?? 'pending',
+  }))
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
     const nextFile = patch.file ?? file
@@ -528,359 +488,34 @@ export function PrintMaterialCheckPage() {
         onBack={() => navigate(uploadPath)}
       />
 
-      <div className="mt-5 grid flex-1 grid-cols-[360px_1fr] gap-6 overflow-hidden">
-        <div className="flex flex-col gap-4">
-          <Card className="p-5">
-            <div className="flex items-center gap-4">
-              <div
-                className="flex h-[56px] w-[56px] shrink-0 items-center justify-center rounded-[14px]"
-                style={{ background: 'var(--print-slate-soft)', color: 'var(--print-slate-deep)' }}
-              >
-                <FileTextIcon className="h-[30px] w-[30px]" />
-              </div>
-              <div className="min-w-0">
-                <p className="break-all text-[22px] font-bold text-neutral-900">{file.name}</p>
-                <p className="mt-1 text-[17px] text-neutral-500">
-                  {file.size} · {file.pages === null ? '页数识别中' : `${file.pages} 页`}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <CheckStep label="文件体检" active={stage === 'inspection'} done={!!inspectionTask} />
-          <CheckStep label="A4 规范化评估" active={stage === 'normalize_a4'} done={!!normalizeTask} />
-          <CheckStep label="隐私片段检查" active={stage === 'pii_scan'} done={!!piiTask} />
-
-          <div
-            className="rounded-[14px] border px-5 py-4 text-[16.5px] leading-relaxed"
-            style={{
-              background: 'var(--print-teal-soft)',
-              borderColor: 'rgba(31,158,134,.3)',
-              color: 'var(--print-teal-deep)',
-            }}
-          >
-            文档文字层可本地读取；扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-col overflow-hidden">
-          {isWorking && (
-            <Card className="flex flex-1 flex-col items-center justify-center gap-5 p-8">
-              <LoaderIcon className="h-12 w-12 animate-spin text-primary-500" />
-              <div className="text-center">
-                <p className="text-xl font-semibold text-neutral-900">
-                  {stage === 'inspection'
-                    ? '正在检查文件格式'
-                    : stage === 'normalize_a4'
-                      ? '正在评估 A4 规范化'
-                      : '正在检查隐私片段'}
-                </p>
-                <p className="mt-2 text-sm text-neutral-500">请稍候，检查完成后需要您确认</p>
-              </div>
-            </Card>
-          )}
-
-          {stage === 'error' && (
-            <Card className="flex flex-1 flex-col items-center justify-center gap-5 p-8">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg">
-                <AlertCircleIcon className="h-8 w-8 text-error-fg" />
-              </div>
-              <div className="max-w-md text-center">
-                <p className="text-xl font-semibold text-neutral-900">材料检查未完成</p>
-                <p className="mt-2 text-sm leading-relaxed text-neutral-500">{error}</p>
-              </div>
-              <Button size="lg" className="min-w-[180px]" onClick={() => void runChecks()}>
-                <RotateCcwIcon className="mr-2 h-5 w-5" />
-                重试检查
-              </Button>
-            </Card>
-          )}
-
-          {stage === 'review' && (
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <div
-                className="mb-4 flex items-center justify-between rounded-[14px] border px-5 py-4"
-                style={piiModeCopy
-                  ? { background: 'var(--print-clay-soft)', borderColor: 'rgba(184,104,60,.35)' }
-                  : { background: 'var(--print-teal-soft)', borderColor: 'rgba(31,158,134,.35)' }}
-              >
-                <div className="flex items-center gap-[14px]">
-                  {piiModeCopy ? (
-                    <AlertCircleIcon className="h-8 w-8 shrink-0 text-warning-fg" />
-                  ) : (
-                    <CheckCircleIcon className="h-8 w-8 shrink-0 text-success-fg" />
-                  )}
-                  <div>
-                    <p
-                      className="text-[22px] font-bold"
-                      style={{ color: piiModeCopy ? 'var(--print-clay)' : 'var(--print-teal-deep)' }}
-                    >
-                      {piiModeCopy ? piiModeCopy.label : '检查完成'}
-                    </p>
-                    <p
-                      className="mt-[3px] text-[17px]"
-                      style={{ color: piiModeCopy ? 'var(--print-clay)' : 'var(--print-teal-deep)', opacity: 0.85 }}
-                    >
-                      {piiModeCopy
-                        ? '如文件包含隐私信息，请打印前自行确认'
-                        : findings.length > 0
-                          ? `发现 ${findings.length} 个需确认片段，请逐项选择保留或遮挡`
-                          : '未发现需要确认的隐私片段'}
-                    </p>
-                  </div>
-                </div>
-                {(isDemoTask(inspectionTask) || isDemoTask(piiTask)) && (
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-neutral-500">
-                    流程演示
-                  </span>
-                )}
-              </div>
-
-              {inspectionSummary && (
-                <div className="mb-4 rounded-lg border border-neutral-100 bg-white px-5 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-neutral-900">文件体检摘要</p>
-                      <p className="mt-1 text-sm text-neutral-500">
-                        {inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准'}
-                      </p>
-                    </div>
-                    <span
-                      className={[
-                        'rounded-full px-3 py-1 text-xs font-semibold',
-                        requiresFormatReview ? 'bg-error-bg text-error-fg' : 'bg-success-bg text-success-fg',
-                      ].join(' ')}
-                    >
-                      {requiresFormatReview ? '需重新上传' : '可继续打印'}
-                    </span>
-                  </div>
-                  {inspectionSummary.messages.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {inspectionSummary.messages.map((message) => (
-                        <div
-                          key={`${message.code}:${message.text}`}
-                          className={[
-                            'flex items-center gap-2 rounded-md px-3 py-2 text-sm',
-                            message.severity === 'warning' ? 'bg-warning-bg text-warning-fg' : 'bg-neutral-50 text-neutral-700',
-                          ].join(' ')}
-                        >
-                          {message.severity === 'warning' ? (
-                            <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                          ) : (
-                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
-                          )}
-                          <span>{message.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {normalizeSummary && (
-                <div className="mb-4 rounded-lg border border-neutral-100 bg-white px-5 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="font-semibold text-neutral-900">A4 规范化摘要</p>
-                      <p className="mt-1 text-sm text-neutral-500">
-                        目标纸张：{normalizeSummary.targetPaperSize} · 当前版本仍使用原文件打印
-                      </p>
-                    </div>
-                    <span
-                      className={[
-                        'rounded-full px-3 py-1 text-xs font-semibold',
-                        normalizeBadgeClass,
-                      ].join(' ')}
-                    >
-                      {normalizeBadgeLabel}
-                    </span>
-                  </div>
-                  {normalizeSummary.messages.length > 0 && (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {normalizeSummary.messages.map((message) => (
-                        <div
-                          key={`${message.code}:${message.text}`}
-                          className={[
-                            'flex items-center gap-2 rounded-md px-3 py-2 text-sm',
-                            message.severity === 'warning' ? 'bg-warning-bg text-warning-fg' : 'bg-neutral-50 text-neutral-700',
-                          ].join(' ')}
-                        >
-                          {message.severity === 'warning' ? (
-                            <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                          ) : (
-                            <CheckCircleIcon className="h-4 w-4 shrink-0" />
-                          )}
-                          <span>{message.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {findings.length > 0 && (
-                <div className="mb-4 rounded-lg border border-warning/20 bg-warning-bg px-5 py-3 text-sm leading-relaxed text-warning-fg">
-                  当前版本会记录你的保留/遮挡选择并完成遮挡评估，但尚不生成遮挡后文件；进入确认页前会再次提示，打印仍使用原文件。
-                </div>
-              )}
-
-              {findings.length === 0 ? (
-                <Card className="flex flex-1 flex-col items-center justify-center gap-4 p-8">
-                  {requiresFormatReview || !piiModeCopy ? (
-                    <ShieldCheckIcon className="h-16 w-16 text-success" />
-                  ) : (
-                    <AlertCircleIcon className="h-16 w-16 text-warning-fg" />
-                  )}
-                  <div className="text-center">
-                    <p className="text-xl font-semibold text-neutral-900">
-                      {requiresFormatReview
-                        ? '请重新上传文件后继续'
-                        : piiModeCopy
-                          ? '该文件的隐私内容未能扫描，请人工确认后继续'
-                          : '可以继续设置打印参数'}
-                    </p>
-                    <p className="mt-2 text-sm text-neutral-500">
-                      {requiresFormatReview
-                        ? '材料体检提示当前文件暂不可继续打印，请返回上传页重新选择文件'
-                        : piiModeCopy
-                          ? piiModeCopy.label
-                          : '本次检查未发现需要确认的隐私片段，后续请继续核对打印参数'}
-                    </p>
-                  </div>
-                </Card>
-              ) : (
-                <div className="flex flex-1 flex-col gap-3 overflow-y-auto pb-2">
-                  <Card className="flex items-center justify-between gap-4 p-4">
-                    <div>
-                      <p className="font-semibold text-neutral-900">批量处理</p>
-                      <p className="mt-1 text-sm text-neutral-500">可先按建议处理，再逐项微调</p>
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        className="min-h-[56px] rounded-[12px] border px-5 text-[18px] font-semibold"
-                        style={{
-                          background: 'var(--print-wheat-soft)',
-                          borderColor: 'rgba(169,120,31,.35)',
-                          color: 'var(--print-wheat-deep)',
-                        }}
-                        onClick={applySuggestedDecisions}
-                      >
-                        按建议处理
-                      </button>
-                      <button
-                        type="button"
-                        className="min-h-[56px] rounded-lg border border-neutral-200 bg-white px-5 text-base font-semibold text-neutral-700"
-                        onClick={keepAll}
-                      >
-                        全部保留
-                      </button>
-                    </div>
-                  </Card>
-                  {findings.map((finding) => {
-                    const selected = decisions[finding.id]
-                    const risk = riskLevelForFinding(finding)
-                    return (
-                      <Card key={finding.id} className="p-5">
-                        <div className="flex gap-4">
-                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
-                            style={{ background: 'var(--print-wheat-soft)', color: 'var(--print-wheat-deep)' }}
-                          >
-                            <EyeOffIcon className="h-5 w-5" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-base font-semibold text-neutral-900">{finding.label || finding.type}</span>
-                              <span
-                                className={[
-                                  'rounded-full px-2.5 py-1 text-[16px] font-semibold',
-                                  risk === 'high'
-                                    ? 'bg-error-bg text-error-fg'
-                                    : risk === 'low'
-                                      ? 'bg-primary-50 text-primary-700'
-                                      : '',
-                                ].join(' ')}
-                                style={risk === 'medium' ? {
-                                  background: 'var(--print-wheat-soft)',
-                                  color: 'var(--print-wheat-deep)',
-                                } : undefined}
-                              >
-                                {RISK_LABEL[risk]}
-                              </span>
-                            </div>
-                            <div className="mt-3 grid grid-cols-[80px_1fr] gap-y-2 text-sm">
-                              <span className="text-neutral-500">片段</span>
-                              <span className="font-medium text-neutral-900">{maskSnippet(finding.type, finding.snippet)}</span>
-                              <span className="text-neutral-500">建议</span>
-                              <span className="font-medium" style={{ color: 'var(--print-wheat-deep)' }}>{suggestionForFinding(finding)}</span>
-                            </div>
-                            <div className="mt-4 grid grid-cols-2 gap-3">
-                              {(['redact', 'keep'] as const).map((action) => (
-                                <button
-                                  key={action}
-                                  type="button"
-                                  onClick={() => setDecision(finding.id, action)}
-                                  className={[
-                                    'min-h-[72px] rounded-[12px] border px-4 text-[18px] font-bold transition-colors',
-                                    selected === action
-                                      ? action === 'keep'
-                                        ? 'border-primary-600 bg-primary-50 text-primary-700'
-                                        : ''
-                                      : 'border-neutral-200 bg-white text-neutral-600 active:bg-neutral-50',
-                                  ].join(' ')}
-                                  style={selected === action && action === 'redact' ? {
-                                    background: 'var(--print-wheat-soft)',
-                                    borderColor: 'var(--print-wheat)',
-                                    color: 'var(--print-wheat-deep)',
-                                  } : undefined}
-                                >
-                                  {ACTION_LABEL[action]}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {error && stage === 'review' && (
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">
-          <AlertCircleIcon className="h-4 w-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      <div className="mt-6 flex gap-3">
-        <Button variant="secondary" size="lg" className="min-h-[72px] flex-1" disabled={isWorking} onClick={() => navigate(uploadPath)}>
-          返回上传
-        </Button>
-        <Button
-          size="lg"
-          className="min-h-[72px] flex-1"
-          disabled={!canContinue}
-          onClick={() => void handleContinue()}
-        >
-          {stage === 'submitting' ? (
-            <span className="flex items-center gap-2">
-              <LoaderIcon className="h-5 w-5 animate-spin" />
-              保存选择中…
-            </span>
-          ) : requiresFormatReview ? (
-            '请重新上传文件'
-          ) : findings.length > 0 && !allDecided ? (
-            '请先完成全部选择'
-          ) : (
-            `继续打印设置${findings.length > 0 ? ` · 遮挡 ${decisionCounts.redactedCount} 项` : ''}`
-          )}
-        </Button>
-      </div>
+      <MaterialCheckPresentation
+        stage={stage}
+        file={file}
+        error={error}
+        inspection={inspectionSummary ? {
+          pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
+          canPrint: inspectionSummary.canPrint,
+          messages: inspectionSummary.messages.map((message) => message.text),
+        } : null}
+        normalization={normalizeSummary ? {
+          targetPaperSize: normalizeSummary.targetPaperSize,
+          canNormalize: normalizeSummary.canNormalize,
+          messages: normalizeSummary.messages.map((message) => message.text),
+        } : null}
+        privacyModeWarning={piiModeCopy?.label ?? null}
+        demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
+        findings={presentationFindings}
+        requiresFormatReview={requiresFormatReview}
+        canContinue={canContinue}
+        isWorking={isWorking}
+        redactedCount={decisionCounts.redactedCount}
+        onRetry={() => void runChecks()}
+        onBack={() => navigate(uploadPath)}
+        onApplySuggested={applySuggestedDecisions}
+        onKeepAll={keepAll}
+        onDecision={setDecision}
+        onContinue={() => void handleContinue()}
+      />
     </div>
   )
 }

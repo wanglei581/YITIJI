@@ -12,6 +12,7 @@ import {
   PrinterIcon,
 } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
 import {
@@ -29,7 +30,7 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -156,7 +157,8 @@ export function PrintConfirmPage() {
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
   if (!state?.file && !restoredSession?.file) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+      <PrintPageFrame className="p-6">
+      <div data-w2-page="print-confirm" className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full" style={{ background: 'rgb(193 74 52 / 10%)' }}>
           <AlertCircleIcon className="h-10 w-10" style={{ color: '#c14a34' }} />
         </div>
@@ -173,6 +175,7 @@ export function PrintConfirmPage() {
           重新上传文件
         </button>
       </div>
+      </PrintPageFrame>
     )
   }
 
@@ -187,7 +190,8 @@ export function PrintConfirmPage() {
     && (materialCheck?.redactedCount ?? 0) > 0
 
   return (
-    <div className="print-proto flex min-h-full flex-col" style={{ padding: '0 0 0 0' }}>
+    <PrintPageFrame>
+    <div data-w2-page="print-confirm" className="flex min-h-full flex-col" style={{ padding: '0 0 0 0' }}>
       <div style={{ padding: '0 24px' }}>
         <PrintPrototypeHeader
           title="确认打印"
@@ -345,7 +349,7 @@ export function PrintConfirmPage() {
       )}
 
       {/* 底部行动条 */}
-      <div className="print-confirm-actionbar" style={{ padding: '16px 24px 24px' }}>
+      <KioskActionBar className="print-confirm-actionbar">
         <button
           type="button"
           className="print-confirm-back"
@@ -373,7 +377,8 @@ export function PrintConfirmPage() {
             </>
           )}
         </button>
-      </div>
+      </KioskActionBar>
     </div>
+    </PrintPageFrame>
   )
 }

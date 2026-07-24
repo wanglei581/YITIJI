@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { PAY_CHANNEL_LABEL, type AttemptPaymentMethod, type CashierView } from './cashierStatus'
 
 // 生产包不能含 DEV 沙箱按钮文案或模拟支付入口；Vite 会在 production 将此分支完全裁掉。
@@ -71,6 +71,17 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     (view?.phase === 'awaiting_scan' || view?.phase === 'awaiting_code_confirmation') &&
     snapshot?.attempt?.channel !== undefined &&
     snapshot.attempt.channel !== 'sandbox'
+  const terminalState = view && ['failed', 'closed', 'expired', 'refunded'].includes(view.phase)
+    ? (
+        <KioskStatePanel
+          compact
+          tone="error"
+          title={view.title}
+          description={view.hint}
+          actions={view.canReissue ? <Button variant="secondary" onClick={onReissue}>重新尝试</Button> : undefined}
+        />
+      )
+    : null
 
   const inner = showCodeInput ? (
     <form
@@ -117,7 +128,7 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
               : '正在获取支付状态…'}
       </p>
     </div>
-  ) : (
+  ) : terminalState ?? (
     <div className="cashier-qr-area">
       <div className="cashier-qr-panel">
         {view.title || view.hint ? (

@@ -5,7 +5,7 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { getPayStatus } from '../../services/print/paymentApi'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 interface PrintFile {
   name:     string
@@ -81,7 +81,7 @@ export function PrintDonePage() {
   /* ── 失败态 ── */
   if (!success) {
     return (
-      <div className="print-proto flex min-h-full flex-col">
+      <PrintPageFrame><div data-w2-page="print-done" className="flex min-h-full flex-col">
         <PrintPrototypeHeader
           title="打印失败"
           subtitle="请检查任务状态后重试"
@@ -106,13 +106,13 @@ export function PrintDonePage() {
             </button>
           </div>
         </div>
-      </div>
+      </div></PrintPageFrame>
     )
   }
 
   /* ── 成功态 ── */
   return (
-    <div className="print-proto flex min-h-full flex-col">
+    <PrintPageFrame><div data-w2-page="print-done" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="打印完成"
         subtitle="文件已从出纸口送出，请核对页数后取走"
@@ -286,6 +286,6 @@ export function PrintDonePage() {
           如遇卡纸或缺页，请联系现场工作人员，凭任务号与取件凭证码可协助核验补打；打印文件请妥善保管，勿遗留在机器旁。
         </div>
       </main>
-    </div>
+    </div></PrintPageFrame>
   )
 }

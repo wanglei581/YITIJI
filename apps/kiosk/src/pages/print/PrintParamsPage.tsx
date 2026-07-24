@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -34,7 +34,7 @@ import {
   unitCentsFor,
   usePrintPriceConfig,
 } from '../../services/print/priceConfigApi'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -241,7 +241,8 @@ export function PrintParamsPage() {
 
   if (!locationState?.file && !restoredSession?.file) {
     return (
-      <div className="print-proto flex min-h-full flex-col p-6">
+      <PrintPageFrame className="p-6">
+      <div data-w2-page="print-params" className="flex min-h-full flex-col">
         <PrintPrototypeHeader
           title="打印参数"
           subtitle="设置份数、颜色、单双面等打印参数"
@@ -260,11 +261,13 @@ export function PrintParamsPage() {
           <Button size="lg" onClick={() => navigate(uploadPath)}>重新上传文件</Button>
         </div>
       </div>
+      </PrintPageFrame>
     )
   }
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <PrintPageFrame className="p-6">
+    <div data-w2-page="print-params" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="打印参数"
         subtitle="设置份数、颜色、单双面等打印参数"
@@ -466,7 +469,7 @@ export function PrintParamsPage() {
       </div>
 
       {/* 底部操作 */}
-      <div className="mt-6 flex gap-3">
+      <KioskActionBar className="mt-6">
         <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
           返回预览
         </Button>
@@ -478,7 +481,8 @@ export function PrintParamsPage() {
         >
           {printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '确认参数'}
         </Button>
-      </div>
+      </KioskActionBar>
     </div>
+    </PrintPageFrame>
   )
 }

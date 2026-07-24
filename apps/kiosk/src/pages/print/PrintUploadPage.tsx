@@ -283,7 +283,7 @@ export function PrintUploadPage() {
   }
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <div className="print-proto flex min-h-full flex-col p-6" data-w2-page="print-upload">
       <PrintPrototypeHeader
         title={pageTitle}
         subtitle={pageSubtitle}
@@ -323,7 +323,7 @@ export function PrintUploadPage() {
       )}
 
       {/* Tab bar */}
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="w2-print-upload-source-grid mt-6 grid grid-cols-2 gap-3">
         {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
           <button
             key={key}

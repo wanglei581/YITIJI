@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar } from '@ai-job-print/ui'
 import {
   AlertTriangleIcon,
   CheckCircleIcon,
@@ -36,7 +36,7 @@ import {
   unitCentsFor,
   usePrintPriceConfig,
 } from '../../services/print/priceConfigApi'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -368,7 +368,8 @@ export function PrintPreviewPage() {
   // Guard: direct URL access without file state — all hooks have already run above
   if (!locationState?.file && !restoredSession?.file) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
+      <PrintPageFrame className="p-6">
+      <div data-w2-page="print-preview" className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
           <AlertTriangleIcon className="h-10 w-10 text-warning" />
         </div>
@@ -380,11 +381,13 @@ export function PrintPreviewPage() {
           重新上传文件
         </Button>
       </div>
+      </PrintPageFrame>
     )
   }
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <PrintPageFrame className="p-6">
+    <div data-w2-page="print-preview" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="打印设置"
         subtitle="预览文件内容并设置打印参数后进入确认"
@@ -727,7 +730,7 @@ export function PrintPreviewPage() {
       </div>
 
       {/* Bottom action */}
-      <div className="mt-6 flex gap-3">
+      <KioskActionBar className="mt-6">
         <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate(-1)}>
           返回
         </Button>
@@ -739,7 +742,8 @@ export function PrintPreviewPage() {
         >
           {printerLoading ? '设备检测中…' : hasBlockingWarning ? '打印机不可用' : '确认参数'}
         </Button>
-      </div>
+      </KioskActionBar>
     </div>
+    </PrintPageFrame>
   )
 }

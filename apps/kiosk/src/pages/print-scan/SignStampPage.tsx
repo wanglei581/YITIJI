@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   makePrintParams,
@@ -35,6 +35,7 @@ import { kioskUploadFile } from '../../services/api/files'
 import { getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
+import './styles/print-scan-fusion.css'
 
 const MAX_DOC_BYTES = 15 * 1024 * 1024
 const MAX_STAMP_BYTES = 10 * 1024 * 1024
@@ -277,43 +278,16 @@ export function SignStampPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
-      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
-        <div>
-          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
-          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
-          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
-            <span className="h-2.5 w-2.5 rounded-full bg-current" />
-            打印机正常 · A4纸充足
-          </span>
-        </div>
-      </header>
-
-      <div className="mt-5 flex shrink-0 items-center gap-5">
-        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
-          <ArrowLeftIcon className="h-5 w-5" />
-          返回打印扫描服务
-        </button>
-        <div>
-          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">签名盖章</h1>
-          <p className="mt-1 text-xl text-neutral-500">在 PDF 上叠加签名 / 印章图片（版式合成）</p>
-        </div>
-      </div>
+    <KioskPageFrame className="w2-print-scan-page">
+      <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <KioskPageHeader title="签名盖章" description="在 PDF 上叠加签名 / 印章图片（版式合成）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
       <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-5 py-4 text-lg leading-relaxed text-warning-fg">
           <InfoIcon className="h-6 w-6 shrink-0" />
           {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
         </div>
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-base text-error-fg">
-            <AlertCircleIcon className="h-5 w-5 shrink-0" />
-            {error}
-          </div>
-        )}
+        {error && <KioskStatePanel compact tone="error" title="签名盖章暂未完成" description={error} icon={<AlertCircleIcon />} />}
 
         <div className="flex min-h-0 flex-1 gap-5">
           <section className="flex min-w-0 flex-1 flex-col gap-4">
@@ -502,7 +476,7 @@ export function SignStampPage() {
         </div>
       </main>
 
-      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+      <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
           <ArrowLeftIcon className="mr-2 h-5 w-5" />
           返回
@@ -519,7 +493,8 @@ export function SignStampPage() {
             {busy ? '正在生成…' : authorized ? '生成合成 PDF' : '生成合成 PDF（请先确认授权）'}
           </Button>
         )}
+      </KioskActionBar>
       </div>
-    </div>
+    </KioskPageFrame>
   )
 }

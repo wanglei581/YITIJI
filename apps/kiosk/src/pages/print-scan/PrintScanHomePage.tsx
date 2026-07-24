@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, PageHeader } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
@@ -35,6 +35,7 @@ import {
   SmartphoneIcon,
   UserSquareIcon,
 } from 'lucide-react'
+import './styles/print-scan-fusion.css'
 
 interface Capability {
   key: string
@@ -235,11 +236,12 @@ export function PrintScanHomePage() {
   )
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-canvas px-12 pb-8">
-      <PageHeader
+    <KioskPageFrame className="w2-print-scan-page">
+      <div data-w2-page="print-scan-home" className="w2-print-scan-shell flex h-full flex-col overflow-y-auto bg-canvas px-12 pb-8">
+      <KioskPageHeader
         title="打印扫描服务"
-        subtitle="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"
-        actions={
+        description="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"
+        aside={
           <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
             返回首页
           </Button>
@@ -366,7 +368,10 @@ export function PrintScanHomePage() {
         </p>
       </div>
 
-      <div className="h-6" />
-    </div>
+      <KioskActionBar>
+        <Button variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
+      </KioskActionBar>
+      </div>
+    </KioskPageFrame>
   )
 }
