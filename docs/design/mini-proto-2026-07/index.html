@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI求职打印终端 · 微信小程序原型（纯工具型首发）</title>
+<style>
+  :root{--teal:#1f9e86;--teal-deep:#157a67;--ink:#10302b;--muted:#5d6b63;--paper:#f4f1e8;--line:#e2dccb;--serif:'Noto Serif SC','Songti SC',serif;--clay:#b8683c;--wheat:#a9781f;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#e7ede9;color:var(--ink);padding:32px 24px 60px;line-height:1.6;}
+  .head{max-width:1180px;margin:0 auto 28px;}
+  .head h1{font-family:var(--serif);font-size:28px;font-weight:800;letter-spacing:1px;}
+  .head .sub{color:var(--muted);font-size:14px;margin-top:6px;max-width:760px;}
+  .tags{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .tag{font-size:12px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);}
+  .tag b{color:var(--teal-deep);}
+  .warn{margin-top:16px;background:#f6e7dd;border:1px solid #eccebc;color:#8a3d22;font-size:12.5px;padding:12px 15px;border-radius:12px;max-width:820px;}
+  .group{max-width:1180px;margin:0 auto 12px;}
+  .group h2{font-family:var(--serif);font-size:17px;margin:26px 0 4px;display:flex;align-items:center;gap:9px;}
+  .group h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--teal);}
+  .group h2 small{font-size:12px;color:var(--muted);font-weight:400;}
+  .grid{max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:20px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(16,48,43,.06);transition:transform .15s;}
+  .card:hover{transform:translateY(-3px);}
+  .thumb{height:300px;background:var(--paper);overflow:hidden;position:relative;border-bottom:1px solid var(--line);}
+  .thumb iframe{width:390px;height:844px;border:none;transform:scale(.545);transform-origin:top left;pointer-events:none;}
+  .cap{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .cap a{text-decoration:none;color:var(--ink);font-weight:600;font-size:13.5px;}
+  .cap .no{font-size:11px;color:var(--muted);font-family:var(--serif);}
+  .p{font-size:10px;padding:2px 7px;border-radius:6px;font-weight:600;}
+  .p0{background:#e2f2ec;color:var(--teal-deep);} .p1{background:#f5edd9;color:var(--wheat);} .p2{background:#efe6f2;color:#7a5a86;}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>微信小程序原型 · 纯工具型首发</h1>
+    <div class="sub">AI求职打印服务终端 移动端伴侣小程序。定位为「AI简历工具 + 文件打印 + 手机↔一体机协同」，<b>首发不含岗位 / 招聘会 / 企业信息</b>（规避《网络招聘服务管理规定》人力资源服务许可证前置门槛）。视觉延续一体机 fusion-youth 青绿米纸设计语言。</div>
+    <div class="tags">
+      <span class="tag">尺寸 <b>390 × 844</b></span>
+      <span class="tag">主色 <b>#1f9e86 青绿</b></span>
+      <span class="tag">标题字 <b>宋体</b></span>
+      <span class="tag"><b>P0</b> 极小 MVP</span>
+      <span class="tag"><b>P1</b> 远程打印+支付</span>
+      <span class="tag"><b>P2</b> AI 增强</span>
+    </div>
+    <div class="warn">⚠️ 仅设计原型，非生产代码。上线前须完成：微信服务类目书面确认、属地人社合规确认、AIGC生成内容标识、隐私弹窗与模型备案、支付资质开通。远程下单不即时建打印任务（到店核销才落 pending），避免被 Agent 提前 claim。</div>
+  </div>
+
+  <!-- 分组由脚本生成 -->
+  <div id="app"></div>
+
+<script>
+const PAGES = [
+  ["登录 / 授权","会话入口，微信授权 + 手机号绑定",[
+    ["01","启动授权","01-launch.html","p0"],
+    ["02","登录绑手机","02-login.html","p0"],
+  ]],
+  ["Tab1 · 首页","资产速览 + 附近一体机 + 功能入口",[
+    ["03","首页工作台","03-home.html","p0"],
+  ]],
+  ["Tab2 · 打印（核心差异化）","到店取件 / 扫码续传 / 远程下单",[
+    ["04","打印首页","04-print-hub.html","p0"],
+    ["05","上传选参","05-print-upload.html","p1"],
+    ["06","选门店 + 价格","06-print-store.html","p1"],
+    ["07","微信支付","07-print-pay.html","p1"],
+    ["08","取件凭证","08-print-pickup.html","p0"],
+    ["09","扫码续传到一体机","09-scan-upload.html","p0"],
+    ["10","扫码登录一体机","10-scan-login.html","p0"],
+  ]],
+  ["Tab3 · AI 工具","简历诊断 / 生成 / 优化 / 面试 / 助手",[
+    ["11","AI 工具首页","11-ai-hub.html","p0"],
+    ["12","简历上传","12-resume-upload.html","p0"],
+    ["13","诊断报告","13-resume-diagnosis.html","p0"],
+    ["14","简历生成","14-resume-generate.html","p2"],
+    ["15","简历优化","15-resume-optimize.html","p2"],
+    ["16","面试设置","16-interview-setup.html","p2"],
+    ["17","面试进行","17-interview-run.html","p2"],
+    ["18","AI 助手小青","18-assistant.html","p2"],
+  ]],
+  ["Tab4 · 我的","资产闭环：简历 / 文档 / 订单 / 记录 / 设置",[
+    ["19","我的概览","19-me.html","p0"],
+    ["20","我的简历","20-me-resumes.html","p0"],
+    ["21","我的文档","21-me-documents.html","p0"],
+    ["22","订单 + 取件码","22-me-orders.html","p0"],
+    ["23","AI 服务记录","23-me-ai-records.html","p1"],
+    ["24","账号设置","24-me-settings.html","p0"],
+  ]],
+  ["合规 / 支撑","协议 + 客服",[
+    ["25","隐私与协议","25-privacy.html","p0"],
+    ["26","帮助与客服","26-help.html","p0"],
+  ]],
+];
+const app = document.getElementById('app');
+PAGES.forEach(([title,desc,items])=>{
+  const g = document.createElement('div'); g.className='group';
+  g.innerHTML = `<h2><span class="dot"></span>${title} <small>${desc}</small></h2>`;
+  const grid = document.createElement('div'); grid.className='grid';
+  items.forEach(([no,name,href,p])=>{
+    const c = document.createElement('div'); c.className='card';
+    c.innerHTML = `<div class="thumb"><iframe src="${href}" loading="lazy" scrolling="no"></iframe></div>
+      <div class="cap"><a href="${href}" target="_blank"><span class="no">${no}</span> ${name}</a><span class="p ${p}">${p.toUpperCase()}</span></div>`;
+    grid.appendChild(c);
+  });
+  app.appendChild(g); app.appendChild(grid);
+});
+</script>
+</body>
+</html>

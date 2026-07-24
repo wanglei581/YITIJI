@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>25 隐私与协议</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">隐私与协议</span></div>
+
+  <div class="content">
+    <!-- 切换 tab -->
+    <div class="seg" style="margin:0 0 12px;">
+      <div class="s on" id="tab-privacy" onclick="switchTab('privacy')">隐私政策</div>
+      <div class="s" id="tab-tos" onclick="switchTab('tos')">用户协议</div>
+    </div>
+
+    <!-- 隐私政策内容 -->
+    <div id="pane-privacy">
+      <div class="card" style="gap:10px;">
+        <h3 class="serif" style="font-size:15px;">AI求职打印服务终端 隐私政策</h3>
+        <p class="fs12 muted">更新日期：2026-07-01 &nbsp;|&nbsp; 生效日期：2026-07-01</p>
+      </div>
+
+      <div class="section-t">我们收集哪些信息</div>
+      <div class="card">
+        <div class="row-item" style="align-items:flex-start;gap:10px;"><div class="ic" style="background:var(--teal-soft);color:var(--teal-deep);flex-shrink:0;">👤</div><div><h4 style="font-size:13px;margin-bottom:2px;">账号信息</h4><p style="font-size:12px;color:var(--muted);line-height:1.6;">微信昵称（可选）、绑定手机号（加密存储）、微信 openid（加密存储，不展示）</p></div></div>
+        <div class="row-item" style="align-items:flex-start;gap:10px;"><div class="ic" style="background:var(--clay-soft);color:var(--clay);flex-shrink:0;">📄</div><div><h4 style="font-size:13px;margin-bottom:2px;">文件与简历</h4><p style="font-size:12px;color:var(--muted);line-height:1.6;">你主动上传的简历、文档。使用临时签名链接保护，不向第三方共享。敏感文件（证件照、身份证）定期自动清理。</p></div></div>
+        <div class="row-item" style="align-items:flex-start;gap:10px;"><div class="ic" style="background:var(--wheat-soft,#fdf4d8);color:var(--wheat);flex-shrink:0;">🤖</div><div><h4 style="font-size:13px;margin-bottom:2px;">AI 服务内容</h4><p style="font-size:12px;color:var(--muted);line-height:1.6;">简历诊断报告、AI 生成内容，保存在你的账号下，不用于训练模型，不共享给第三方。</p></div></div>
+        <div class="row-item" style="align-items:flex-start;gap:10px;"><div class="ic" style="background:var(--surface-2);color:var(--muted);flex-shrink:0;">🖨️</div><div><h4 style="font-size:13px;margin-bottom:2px;">打印订单</h4><p style="font-size:12px;color:var(--muted);line-height:1.6;">订单号、门店、打印参数、支付状态。不保存打印文件内容副本。</p></div></div>
+      </div>
+
+      <div class="section-t">我们不收集什么</div>
+      <div class="notice info" style="border-radius:12px;">
+        <p>❌ 不收集岗位投递记录（本产品不做投递）</p>
+        <p style="margin-top:4px;">❌ 不收集企业招聘偏好、候选人匹配数据</p>
+        <p style="margin-top:4px;">❌ 不共享你的简历给任何企业或招聘平台</p>
+        <p style="margin-top:4px;">❌ 不将你的数据用于广告定向</p>
+      </div>
+
+      <div class="section-t">数据保留期限</div>
+      <div class="card" style="gap:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);"><span style="font-size:13px;">证件照 / 身份证扫描件</span><span class="chip" style="font-size:11px;">72 小时自动清理</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);"><span style="font-size:13px;">打印临时文件</span><span class="chip" style="font-size:11px;">订单完成后 24h</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line-soft);"><span style="font-size:13px;">简历与我的文档</span><span class="chip ok" style="font-size:11px;">账号存续期间</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;"><span style="font-size:13px;">订单与 AI 记录</span><span class="chip ok" style="font-size:11px;">账号存续期间</span></div>
+      </div>
+
+      <div class="section-t">你的权利</div>
+      <div class="card" style="gap:2px;">
+        <div class="row-item"><div class="rc"><h4>查阅数据</h4><p>「我的」页面随时查看全部数据</p></div></div>
+        <div class="row-item"><div class="rc"><h4>导出数据</h4><p>「账号设置 → 导出我的数据」</p></div></div>
+        <div class="row-item"><div class="rc"><h4>删除数据</h4><p>「账号设置 → 删除我的所有数据」</p></div></div>
+        <div class="row-item"><div class="rc"><h4>注销账号</h4><p>注销后 30 天内数据不可恢复后将按策略清理</p></div></div>
+      </div>
+    </div>
+
+    <!-- 用户协议内容（默认隐藏） -->
+    <div id="pane-tos" style="display:none;">
+      <div class="card" style="gap:10px;">
+        <h3 class="serif" style="font-size:15px;">AI求职打印服务终端 用户协议</h3>
+        <p class="fs12 muted">更新日期：2026-07-01</p>
+      </div>
+
+      <div class="section-t">产品定位与服务范围</div>
+      <div class="card"><p style="font-size:13px;line-height:1.8;color:var(--text-body);">本产品为「AI求职打印服务终端」，提供 AI 简历服务、打印扫描服务和求职材料服务。<br><br>本产品<strong>不是招聘平台</strong>，不提供岗位投递、不收取求职者简历给企业、不做候选人筛选、不提供面试邀约或 Offer 管理服务。</p></div>
+
+      <div class="section-t">用户行为规范</div>
+      <div class="card"><p style="font-size:13px;line-height:1.8;color:var(--text-body);">1. 不得上传违法内容、他人隐私资料（未经授权）<br>2. 不得利用 AI 功能生成虚假简历信息<br>3. 不得恶意占用打印资源<br>4. 不得通过技术手段绕过服务限制</p></div>
+
+      <div class="section-t">AI 生成内容声明</div>
+      <div class="notice warn" style="border-radius:12px;"><p style="font-size:13px;line-height:1.8;">本产品 AI 功能生成的所有内容（简历优化、诊断报告、面试题、职业规划）均标注「AI 生成」。生成内容仅供参考，不构成法律建议或就业承诺，用户应自行核实信息准确性。</p></div>
+
+      <div class="section-t">责任限制</div>
+      <div class="card"><p style="font-size:13px;line-height:1.8;color:var(--text-body);">本产品基于现有技术提供服务，对 AI 生成内容的准确性不作保证。因使用 AI 生成内容而导致的任何就业结果，本产品不承担责任。</p></div>
+    </div>
+
+    <div class="compliance-note">如有隐私相关问题，联系：privacy@example.com</div>
+  </div>
+</div>
+
+<script>
+function switchTab(t) {
+  ['privacy','tos'].forEach(k => {
+    document.getElementById('tab-'+k).classList.toggle('on', k===t);
+    document.getElementById('pane-'+k).style.display = k===t ? 'block' : 'none';
+  });
+}
+</script>
+</body>
+</html>

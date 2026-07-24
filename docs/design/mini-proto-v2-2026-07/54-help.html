@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>帮助与反馈 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .help-search { margin:14px 16px 4px; height:44px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r-full); display:flex; align-items:center; gap:9px; padding:0 16px; color:var(--faint); font-size:13.5px; box-shadow:var(--sh-xs); }
+    .hot-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; padding:14px 16px; }
+    .hot { background:var(--surface); border-radius:var(--r-md); padding:14px; box-shadow:var(--sh-xs); cursor:pointer; }
+    .hot-ic { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .hot-t { font-size:13.5px; font-weight:600; color:var(--ink); margin-top:9px; }
+    .hot-s { font-size:11px; color:var(--muted); margin-top:3px; }
+    .faq-item { padding:15px 16px; cursor:pointer; }
+    .faq-item + .faq-item { border-top:1px solid var(--line-faint); }
+    .faq-q { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--ink); font-weight:500; }
+    .faq-q .qm { color:var(--teal); font-weight:700; }
+    .faq-arrow { margin-left:auto; color:var(--faint); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">帮助与反馈</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="help-search">🔍 搜索问题，如「怎么打印」「取件码」</div>
+
+    <div class="section-t">常见问题</div>
+    <div class="hot-grid" style="padding-top:0">
+      <div class="hot">
+        <div class="hot-ic wash" style="color:var(--teal-deep)">🖨</div>
+        <div class="hot-t">如何打印文件</div>
+        <div class="hot-s">上传、扫码、到店取件</div>
+      </div>
+      <div class="hot">
+        <div class="hot-ic plum-wash" style="color:var(--plum-deep)">✦</div>
+        <div class="hot-t">AI 简历怎么用</div>
+        <div class="hot-s">诊断 · 优化 · 生成</div>
+      </div>
+      <div class="hot">
+        <div class="hot-ic clay-wash" style="color:var(--clay-deep)">🎫</div>
+        <div class="hot-t">取件码在哪看</div>
+        <div class="hot-s">订单与到店取件</div>
+      </div>
+      <div class="hot">
+        <div class="hot-ic wheat-wash" style="color:var(--wheat-deep)">💳</div>
+        <div class="hot-t">退款与发票</div>
+        <div class="hot-s">支付相关问题</div>
+      </div>
+    </div>
+
+    <div class="section-t">热门问答</div>
+    <div class="card">
+      <div class="faq-item">
+        <div class="faq-q"><span class="qm">Q</span>打印后多久能取件？<span class="faq-arrow">›</span></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span class="qm">Q</span>手机能直接读取 U 盘吗？<span class="faq-arrow">›</span></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span class="qm">Q</span>岗位可以在小程序内直接投递吗？<span class="faq-arrow">›</span></div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q"><span class="qm">Q</span>我的简历文件安全吗？<span class="faq-arrow">›</span></div>
+      </div>
+    </div>
+
+    <div class="notice info" style="margin:0 16px">
+      <span>💬</span>
+      <div>没找到答案？可以问问 AI 助手小青，或提交反馈由人工处理。</div>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">💬 问小青</button>
+    <button class="btn primary" style="flex:1.4">提交反馈</button>
+  </div>
+</div>
+</body>
+</html>

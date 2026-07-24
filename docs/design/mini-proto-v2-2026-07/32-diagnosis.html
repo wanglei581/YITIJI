@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>简历诊断报告 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .diag-hero { background:linear-gradient(155deg,#614870,#7a5a86); padding:22px 20px 54px; position:relative; overflow:hidden; }
+    .diag-hero::before { content:''; position:absolute; left:-40px; bottom:-50px; width:170px; height:170px; border-radius:50%; background:rgba(255,255,255,.05); }
+    .dh-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:rgba(255,255,255,.85); background:rgba(255,255,255,.14); padding:4px 10px; border-radius:var(--r-full); margin-bottom:12px; }
+    .dh-flex { display:flex; align-items:center; gap:18px; position:relative; }
+    .dh-ring { width:96px; height:96px; flex-shrink:0; position:relative; }
+    .dh-ring svg { transform:rotate(-90deg); }
+    .dh-ring-c { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .dh-score { font-family:var(--font-serif); font-size:32px; font-weight:700; color:#fff; line-height:1; }
+    .dh-sl { font-size:10px; color:rgba(255,255,255,.7); margin-top:2px; }
+    .dh-info { flex:1; }
+    .dh-lvl { font-family:var(--font-serif); font-size:19px; font-weight:700; color:#fff; }
+    .dh-desc { font-size:12.5px; color:rgba(255,255,255,.78); line-height:1.6; margin-top:6px; }
+    .dim-float { margin:-38px 16px 0; position:relative; }
+    .dim-row { display:flex; align-items:center; gap:12px; padding:12px 0; }
+    .dim-row + .dim-row { border-top:1px solid var(--line-faint); }
+    .dim-name { width:76px; font-size:13px; color:var(--ink-soft); flex-shrink:0; }
+    .dim-row .meter { flex:1; }
+    .dim-val { width:34px; text-align:right; font-family:var(--font-serif); font-size:15px; font-weight:700; flex-shrink:0; }
+    .issue-item { padding:14px 16px; }
+    .issue-item + .issue-item { border-top:1px solid var(--line-faint); }
+    .ii-head { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+    .ii-title { font-size:14.5px; font-weight:600; color:var(--ink); flex:1; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#614870"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light blur-bg">
+    <div class="nav-back" style="color:#fff">‹</div>
+    <div class="nav-title left" style="color:#fff">简历诊断报告</div>
+    <div class="nav-right"><span style="font-size:16px;color:rgba(255,255,255,.85)">⤴</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="diag-hero">
+      <div class="dh-badge">✦ AI 诊断 · 仅供参考</div>
+      <div class="dh-flex">
+        <div class="dh-ring">
+          <svg width="96" height="96" viewBox="0 0 96 96">
+            <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="7"/>
+            <circle cx="48" cy="48" r="42" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-dasharray="264" stroke-dashoffset="66"/>
+          </svg>
+          <div class="dh-ring-c"><div class="dh-score">75</div><div class="dh-sl">综合评分</div></div>
+        </div>
+        <div class="dh-info">
+          <div class="dh-lvl">良好，仍有提升空间</div>
+          <div class="dh-desc">简历整体结构完整，经历真实。项目量化与岗位匹配关键词偏弱，是最值得优化的两点。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 维度评分 -->
+    <div class="card dim-float">
+      <div class="card-inner">
+        <div class="dim-row">
+          <div class="dim-name">内容完整度</div>
+          <div class="meter"><i style="width:88%"></i></div>
+          <div class="dim-val teal">88</div>
+        </div>
+        <div class="dim-row">
+          <div class="dim-name">项目量化</div>
+          <div class="meter clay"><i style="width:52%"></i></div>
+          <div class="dim-val clay">52</div>
+        </div>
+        <div class="dim-row">
+          <div class="dim-name">岗位匹配</div>
+          <div class="meter wheat"><i style="width:61%"></i></div>
+          <div class="dim-val" style="color:var(--wheat-deep)">61</div>
+        </div>
+        <div class="dim-row">
+          <div class="dim-name">表达规范</div>
+          <div class="meter"><i style="width:84%"></i></div>
+          <div class="dim-val teal">84</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关键问题 -->
+    <div style="padding:0 16px">
+      <div class="section-t" style="padding-left:0">关键问题 · 3 项</div>
+
+      <div class="card">
+        <div class="issue-item">
+          <div class="ii-head">
+            <span class="risk-tier high">重要</span>
+            <div class="ii-title">项目经历缺少量化结果</div>
+          </div>
+          <div class="evidence-quote">
+            <div class="eq-label">简历原文</div>
+            <div class="eq-text">"负责后台管理系统的开发与维护，参与多个功能模块。"</div>
+          </div>
+          <div class="notice plum" style="margin-top:10px">
+            <span>✦</span>
+            <div>AI 建议：补充可衡量的结果，例如"独立开发 5 个核心模块，接口响应时间从 800ms 降至 220ms"。</div>
+          </div>
+        </div>
+
+        <div class="issue-item">
+          <div class="ii-head">
+            <span class="risk-tier mid">建议</span>
+            <div class="ii-title">缺少目标岗位关键词</div>
+          </div>
+          <div class="ii-body fs-13 muted" style="line-height:1.65">目标岗位「前端开发工程师」常见的 <b class="ink">React、性能优化、组件库</b> 等关键词在简历中出现较少，可能影响筛选匹配。</div>
+        </div>
+
+        <div class="issue-item">
+          <div class="ii-head">
+            <span class="risk-tier low">提示</span>
+            <div class="ii-title">自我评价略显笼统</div>
+          </div>
+          <div class="ii-body fs-13 muted" style="line-height:1.65">"工作认真负责、学习能力强"较为通用，可替换为具体事例支撑。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="compliance-note">诊断结果由 AI 生成，仅供参考，不代表任何招聘方的评价或录用标准。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">📄 打印报告</button>
+    <button class="btn plum" style="flex:1.6">✦ 一键优化简历</button>
+  </div>
+</div>
+</body>
+</html>

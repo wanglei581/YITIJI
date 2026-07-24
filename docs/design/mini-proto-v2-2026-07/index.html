@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 求职打印服务 · 小程序原型全集</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700;900&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+    :root{
+      --paper:#f4f1e8; --surface:#fffdf8; --ink:#2a2b28; --ink-soft:#4a4b46;
+      --muted:#7c7d75; --faint:#a8a89e; --line:#e6e2d6; --line-faint:#efece2;
+      --teal:#1f9e86; --teal-deep:#157a67; --clay:#b8683c; --wheat:#a9781f;
+      --plum:#7a5a86; --plum-deep:#5f4569; --slate:#3f68b0;
+      --font-serif:'Noto Serif SC',serif; --font-sans:'Noto Sans SC',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--paper);font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+    /* header */
+    .hero{background:linear-gradient(155deg,#157a67,#1f9e86);padding:44px 28px 40px;position:relative;overflow:hidden;}
+    .hero::before{content:'';position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.06);}
+    .hero::after{content:'';position:absolute;left:-40px;bottom:-80px;width:220px;height:220px;border-radius:50%;background:rgba(255,255,255,.05);}
+    .hero-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:rgba(255,255,255,.9);background:rgba(255,255,255,.15);padding:5px 13px;border-radius:99px;margin-bottom:16px;position:relative;}
+    .hero-t{font-family:var(--font-serif);font-size:34px;font-weight:900;color:#fff;position:relative;line-height:1.25;}
+    .hero-s{font-size:14px;color:rgba(255,255,255,.82);margin-top:12px;position:relative;max-width:560px;line-height:1.7;}
+    .hero-meta{display:flex;gap:26px;margin-top:22px;position:relative;}
+    .hm-n{font-family:var(--font-serif);font-size:26px;font-weight:700;color:#fff;}
+    .hm-l{font-size:11.5px;color:rgba(255,255,255,.7);margin-top:2px;}
+    /* design note */
+    .dnote{max-width:920px;margin:26px auto 0;padding:0 24px;}
+    .dnote-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 22px;box-shadow:0 2px 10px rgba(80,70,40,.05);}
+    .dn-t{font-family:var(--font-serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+    .dn-p{font-size:13px;color:var(--muted);line-height:1.75;}
+    .dn-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+    .dn-tag{font-size:11.5px;padding:4px 11px;border-radius:99px;background:var(--paper);color:var(--ink-soft);border:1px solid var(--line);}
+    /* sections */
+    .wrap{max-width:1240px;margin:0 auto;padding:8px 24px 60px;}
+    .sec-head{display:flex;align-items:center;gap:12px;margin:38px 0 18px;}
+    .sec-idx{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-family:var(--font-serif);font-weight:700;flex-shrink:0;}
+    .sec-t{font-family:var(--font-serif);font-size:20px;font-weight:700;color:var(--ink);}
+    .sec-c{font-size:12.5px;color:var(--faint);margin-left:2px;}
+    .sec-line{flex:1;height:1px;background:var(--line);}
+    /* grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:22px;}
+    .card{cursor:pointer;transition:transform .16s ease;}
+    .card:hover{transform:translateY(-4px);}
+    .frame{width:100%;aspect-ratio:390/720;border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 6px 20px rgba(80,70,40,.13);border:1px solid var(--line);position:relative;}
+    .frame iframe{width:390px;height:844px;border:0;transform-origin:top left;position:absolute;top:0;left:0;pointer-events:none;}
+    .card:hover .frame{box-shadow:0 12px 30px rgba(31,158,134,.2);border-color:var(--teal);}
+    .cap{display:flex;align-items:baseline;gap:7px;margin-top:11px;padding:0 2px;}
+    .cap-n{font-size:11px;color:var(--faint);font-family:var(--font-serif);font-weight:700;flex-shrink:0;}
+    .cap-t{font-size:13.5px;font-weight:500;color:var(--ink);line-height:1.4;}
+    .cap-s{font-size:11.5px;color:var(--faint);margin-top:3px;padding:0 2px;}
+    .foot{text-align:center;padding:40px 20px;color:var(--faint);font-size:12px;line-height:1.8;border-top:1px solid var(--line);margin-top:20px;}
+    @media(max-width:640px){.hero-t{font-size:26px;}.grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;}}
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="hero-badge">✦ 微信小程序 · 高保真原型全集</div>
+    <div class="hero-t">AI 求职打印服务 · 小程序</div>
+    <div class="hero-s">面向求职者的移动端全流程原型。以「青序」设计语言呈现，覆盖打印扫描、AI 简历服务、第三方求职信息、AI 工具与个人中心五大板块，可直接作为功能开发的视觉与交互基准。</div>
+    <div class="hero-meta">
+      <div><div class="hm-n">56</div><div class="hm-l">页面</div></div>
+      <div><div class="hm-n">5</div><div class="hm-l">功能板块</div></div>
+      <div><div class="hm-n">390×844</div><div class="hm-l">竖屏尺寸</div></div>
+    </div>
+  </div>
+
+  <div class="dnote">
+    <div class="dnote-card">
+      <div class="dn-t">设计说明</div>
+      <div class="dn-p">暖纸底色 + 青绿主色 + 宋体标题，克制使用蓝紫渐变与闪光图标，避免「AI 味」。AI 能力以专业顾问报告的形式呈现（评分、证据引用、风险分级），并统一标注「AI 生成 / 仅供参考」。岗位、招聘会、企业信息严格作为第三方 / 官方来源入口，不做平台内投递或招聘闭环。</div>
+      <div class="dn-tags">
+        <span class="dn-tag">青序设计语言</span>
+        <span class="dn-tag">合规信息入口</span>
+        <span class="dn-tag">诚实状态标注</span>
+        <span class="dn-tag">触控友好 ≥48px</span>
+        <span class="dn-tag">点击卡片查看完整页</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap" id="gallery"></div>
+
+  <div class="foot">
+    AI 求职打印服务终端 · 小程序原型 v2 · 2026-07<br>
+    共 56 个页面 · 点击任意卡片在新窗口打开完整原型
+  </div>
+
+  <script>
+    const SECTIONS = [
+      { idx:'0', color:'#3f68b0', title:'入口与登录', pages:[
+        ['01','launch','启动页'],['02','login','手机号登录'],['03','guest','游客快速开始'],
+      ]},
+      { idx:'1', color:'#157a67', title:'首页', pages:[
+        ['04','home','首页 · 综合入口'],
+      ]},
+      { idx:'2', color:'#b8683c', title:'打印扫描', pages:[
+        ['05','print-hub','打印中心'],['06','print-upload','上传文件'],['07','print-layout-ai','AI 排版建议'],
+        ['08','print-settings','打印参数'],['09','print-preview','打印预览'],['10','print-store','选择门店'],
+        ['11','print-pay','确认支付'],['12','print-pickup','取件码'],['13','print-done','打印完成'],
+        ['14','scan-continue','扫码接力打印'],['15','scan-doc','手机扫描成 PDF'],['16','usb-import','U 盘导入指引'],
+      ]},
+      { idx:'3', color:'#a9781f', title:'求职信息 · 第三方来源', pages:[
+        ['17','jobs-list','岗位列表'],['18','job-detail','岗位详情'],['19','job-fit','AI 岗位匹配'],
+        ['20','job-link-risk','外链风险提示'],['21','companies','企业列表'],['22','company-detail','企业详情'],
+        ['23','fairs-list','招聘会列表'],['24','fair-detail','招聘会详情'],['25','fair-map','展位导览图'],
+        ['26','policies','政策服务'],['27','policy-detail','政策详情'],['28','campus','校园招聘'],
+      ]},
+      { idx:'4', color:'#7a5a86', title:'AI 工具', pages:[
+        ['29','ai-hub','AI 服务中心'],['30','resume-source','简历来源选择'],['31','resume-parse','简历解析中'],
+        ['32','diagnosis','简历诊断报告'],['33','optimize','简历优化对比'],['34','generate','AI 生成简历'],
+        ['35','generate-result','生成结果'],['36','templates','简历模板'],['37','interview-setup','模拟面试设置'],
+        ['38','interview-run','面试进行中'],['39','interview-report','面试反馈报告'],['40','career-plan','职业规划输入'],
+        ['41','career-report','职业规划报告'],['42','assistant','AI 助手小青'],
+      ]},
+      { idx:'5', color:'#1f9e86', title:'个人中心', pages:[
+        ['43','me','我的'],['44','resumes','我的简历'],['45','documents','我的文档'],
+        ['46','orders','打印订单'],['47','ai-records','AI 服务记录'],['48','browse-history','浏览与跳转记录'],
+        ['49','favorites','我的收藏'],['50','membership','会员中心'],['51','settings','设置'],
+        ['52','profile-edit','个人资料'],['53','privacy','隐私设置'],['54','help','帮助与反馈'],
+        ['55','about','关于我们'],['56','notifications','消息通知'],
+      ]},
+    ];
+    const SCALE = 0.5;
+    const g = document.getElementById('gallery');
+    SECTIONS.forEach(sec=>{
+      const h = document.createElement('div');
+      h.className='sec-head';
+      const total = sec.pages.length;
+      h.innerHTML = `<div class="sec-idx" style="background:${sec.color}">${sec.idx}</div>
+        <div class="sec-t">${sec.title}</div><div class="sec-c">${total} 页</div><div class="sec-line"></div>`;
+      g.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className='grid';
+      sec.pages.forEach(([num,slug,label])=>{
+        const file = `${num}-${slug}.html`;
+        const card = document.createElement('div');
+        card.className='card';
+        card.onclick=()=>window.open(file,'_blank');
+        card.innerHTML = `
+          <div class="frame"><iframe src="${file}" scrolling="no" loading="lazy" style="transform:scale(${SCALE})"></iframe></div>
+          <div class="cap"><span class="cap-n">${num}</span><span class="cap-t">${label}</span></div>`;
+        grid.appendChild(card);
+      });
+      g.appendChild(grid);
+    });
+    // size iframes to fill scaled frame width
+    function fit(){
+      document.querySelectorAll('.frame').forEach(f=>{
+        const w=f.clientWidth; const s=w/390;
+        const ifr=f.querySelector('iframe');
+        ifr.style.transform=`scale(${s})`;
+      });
+    }
+    window.addEventListener('load',fit);
+    window.addEventListener('resize',fit);
+  </script>
+</body>
+</html>

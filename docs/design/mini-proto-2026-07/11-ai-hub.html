@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>11 AI 工具首页</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .ai-hero{background:linear-gradient(150deg,#2aa891,#157a67); border-radius:0 0 24px 24px; padding:8px 18px 20px; color:#fff;}
+  .ai-hero h1{font-family:var(--serif); font-size:22px; font-weight:800;}
+  .ai-hero p{font-size:12.5px; color:rgba(255,255,255,.85); margin-top:6px; line-height:1.5;}
+  .big-tool{display:flex; align-items:center; gap:14px; padding:16px; border-radius:var(--r-md); background:var(--surface); border:1px solid var(--line); box-shadow:var(--shadow-card);}
+  .big-tool .bt-ic{width:52px; height:52px; border-radius:14px; display:grid; place-items:center; font-size:26px; flex:none;}
+  .big-tool .btc{flex:1;} .big-tool .btc h3{font-family:var(--serif); font-size:16.5px; font-weight:700;}
+  .big-tool .btc p{font-size:12px; color:var(--muted); margin-top:3px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar" style="color:#fff;"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+
+  <div class="ai-hero">
+    <h1>AI 求职工具</h1>
+    <p>简历诊断 · 生成 · 优化 · 面试训练。结果均由 AI 生成，仅供参考。</p>
+  </div>
+
+  <div class="content has-tabbar">
+    <div class="big-tool" onclick="location.href='12-resume-upload.html'">
+      <div class="bt-ic" style="background:var(--teal-soft);color:var(--teal-deep);">🩺</div>
+      <div class="btc"><h3>简历诊断</h3><p>上传简历，AI 打分并给出逐条修改建议</p></div>
+      <span class="r-arrow">›</span>
+    </div>
+    <div class="big-tool" onclick="location.href='14-resume-generate.html'">
+      <div class="bt-ic" style="background:var(--wheat-soft);color:var(--wheat);">✍️</div>
+      <div class="btc"><h3>简历生成</h3><p>按引导填写经历，AI 帮你成稿</p></div>
+      <span class="r-arrow">›</span>
+    </div>
+    <div class="big-tool" onclick="location.href='15-resume-optimize.html'">
+      <div class="bt-ic" style="background:var(--clay-soft);color:var(--clay);">✨</div>
+      <div class="btc"><h3>简历优化</h3><p>针对目标岗位润色措辞与结构</p></div>
+      <span class="r-arrow">›</span>
+    </div>
+    <div class="big-tool" onclick="location.href='16-interview-setup.html'">
+      <div class="bt-ic" style="background:var(--plum-soft);color:var(--plum);">🎤</div>
+      <div class="btc"><h3>模拟面试</h3><p>AI 提问 + 语音作答 + 表现反馈</p></div>
+      <span class="r-arrow">›</span>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>最近记录</h3><span class="more" onclick="location.href='23-me-ai-records.html'">全部 ›</span></div>
+      <div class="row-item"><div class="ic a-teal">🩺</div><div class="rc"><h4>简历诊断 · 82 分</h4><p>今天 14:20</p></div><span class="r-arrow">›</span></div>
+      <div class="row-item"><div class="ic a-plum" style="background:var(--plum-soft);color:var(--plum);">🎤</div><div class="rc"><h4>模拟面试 · 产品经理</h4><p>昨天 19:05</p></div><span class="r-arrow">›</span></div>
+    </div>
+
+    <div class="compliance-note">AI 生成内容仅供参考，请自行核对。本工具不提供岗位投递与招聘服务。</div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab" onclick="location.href='03-home.html'"><div class="ti">⌂</div>首页</div>
+    <div class="tab" onclick="location.href='04-print-hub.html'"><div class="ti">🖨️</div>打印</div>
+    <div class="tab on"><div class="ti">✦</div>AI</div>
+    <div class="tab" onclick="location.href='19-me.html'"><div class="ti">◍</div>我的</div>
+  </div>
+</div>
+</body>
+</html>
