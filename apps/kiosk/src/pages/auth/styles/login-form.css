@@ -13,7 +13,7 @@
 .k1-login .k-agree.checked .box { background: var(--sd-color-primary); border-color: var(--sd-color-primary); }
 .k1-login .k-agree .box svg { opacity: 0; transform: scale(0.55); transition: opacity 150ms ease, transform 150ms ease; }
 .k1-login .k-agree.checked .box svg { opacity: 1; transform: scale(1); }
-.k1-login .k-agree .doclink { min-height: 44px; display: inline-flex; align-items: center; padding: 0; color: var(--sd-color-primary); background: transparent; border: 0; cursor: pointer; font: inherit; font-weight: 780; text-decoration: underline; text-underline-offset: 3px; }
+.k1-login .k-agree .doclink { min-height: var(--sd-control-min, 48px); display: inline-flex; align-items: center; padding: 0; color: var(--sd-color-primary); background: transparent; border: 0; cursor: pointer; font: inherit; font-weight: 780; text-decoration: underline; text-underline-offset: 3px; }
 .k1-login .k-agree-hint { margin: 2px 0 0 42px; color: var(--sd-color-copy-muted); font-size: 13px; font-weight: 650; line-height: 1.5; }
 
 .k1-login .k-pane { animation: k1-login-enter 220ms ease-out both; }

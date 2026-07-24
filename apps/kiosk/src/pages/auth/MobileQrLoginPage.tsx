@@ -110,7 +110,7 @@ export function MobileQrLoginPage() {
   const recoveryMessage = !ticketId ? '二维码缺少登录票据，请回到一体机刷新二维码后重新扫码。' : error
 
   return (
-    <main className="service-desk k1-mobile-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile">
+    <main className="fusion-w5 fusion-w5--auth service-desk k1-mobile-qr-login" data-kiosk-screen="member-qr-login" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile">
       <section className="k1-mobile-qr-content">
         <header className="k1-mobile-qr-brand">
           <span><QrCodeIcon aria-hidden="true" /></span>

@@ -10,7 +10,13 @@
 
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import {
+  Button,
+  Card,
+  KioskPageFrame,
+  KioskPageHeader,
+  KioskStatePanel,
+} from '@ai-job-print/ui'
 import { LogInIcon, type LucideIcon } from 'lucide-react'
 
 export type MeListState = 'loading' | 'error' | 'ready'
@@ -47,51 +53,47 @@ export function MeListShell({
 }: MeListShellProps) {
   const navigate = useNavigate()
   return (
-    <div className="flex h-full flex-col px-6 pt-6">
-      <PageHeader
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--profile me-list-shell h-full"
+      header={<KioskPageHeader
         title={title}
-        subtitle={subtitle}
-        actions={
+        description={subtitle}
+        aside={
           <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
             返回我的
           </Button>
         }
-      />
+      />}
+    >
+      <main data-kiosk-domain="profile" data-kiosk-screen="member-list" className="flex min-h-0 flex-1 flex-col px-6">
 
       <div className="mt-4 flex-1 overflow-y-auto pb-8">
         {!isLoggedIn ? (
-          <Card className="flex flex-col items-center gap-4 p-10 text-center">
-            <LogInIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
-            <div>
-              <p className="text-base font-semibold text-neutral-900">登录后查看本人记录</p>
-              <p className="mt-1 text-sm text-neutral-500">本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细</p>
-            </div>
-            <Button
-              size="lg"
-              className="h-14 px-8"
-              onClick={() => navigate('/login', { state: { from: loginFrom } })}
-            >
-              <LogInIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-              手机号登录
-            </Button>
-          </Card>
+          <KioskStatePanel
+            tone="permission"
+            title="登录后查看本人记录"
+            description="本人记录仅本人可见，登录后绑定；游客模式不留存跨会话明细"
+            icon={<LogInIcon aria-hidden="true" />}
+            actions={<Button size="lg" className="min-h-14 px-8" onClick={() => navigate('/login', { state: { from: loginFrom } })}>手机号登录</Button>}
+          />
         ) : state === 'loading' ? (
-          <LoadingState className="py-20" />
+          <KioskStatePanel tone="loading" title="正在加载本人记录" description="请稍候，不会展示其他账号的数据" />
         ) : state === 'error' ? (
-          <ErrorState className="py-20" onRetry={onRetry} />
+          <KioskStatePanel tone="error" title="暂时无法加载" description="请检查网络后重试" actions={<Button onClick={onRetry}>重新加载</Button>} />
         ) : isEmpty ? (
           <Card className="p-4">
-            <EmptyState
-              icon={emptyIcon}
+            <KioskStatePanel
+              tone="empty"
+              icon={emptyIcon ? (() => { const Icon = emptyIcon; return <Icon aria-hidden="true" /> })() : undefined}
               title={emptyTitle ?? '暂无记录'}
               description={emptyDescription ?? ''}
-              className="py-12"
             />
           </Card>
         ) : (
           <div className="flex flex-col gap-3">{children}</div>
         )}
       </div>
-    </div>
+      </main>
+    </KioskPageFrame>
   )
 }

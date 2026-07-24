@@ -143,7 +143,7 @@ export function ScreensaverPage() {
   const clock = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
   return (
-    <div className="service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black" data-visual-theme="service-desk" data-ux-density="touch" role="presentation">
+    <div className="fusion-w5 fusion-w5--system service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black" data-kiosk-screen="screensaver" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch" role="presentation">
       {current.type === 'video' ? (
         <video
           key={current.id}

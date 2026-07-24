@@ -53,7 +53,7 @@ export default function ErrorOfflinePage() {
   const timeLabel = `${String(lastChecked.getHours()).padStart(2, '0')}:${String(lastChecked.getMinutes()).padStart(2, '0')}`
 
   return (
-    <main className="k8-system-page k8-offline-page">
+    <main className="fusion-w5 fusion-w5--system k8-system-page k8-offline-page" data-kiosk-screen="error-offline" data-kiosk-presentation="fusion-youth">
       <header className="k8-offline-topbar">
         <div><strong>就业服务大厅</strong><span>AI求职打印服务终端</span></div>
         <p><span />网络中断 · 部分功能受限</p>

@@ -85,7 +85,7 @@ export function BenefitActivitiesPage() {
     : '领取平台服务权益、打印额度和政策信息提示'
 
   return (
-    <div className="k8-activities flex h-full min-h-0 flex-col px-12 py-5">
+    <div className="fusion-w5 fusion-w5--profile k8-activities flex h-full min-h-0 flex-col px-12 py-5" data-kiosk-screen="activities">
       <PageHeader
         className="k8-activities-header"
         title={title}

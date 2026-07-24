@@ -65,7 +65,7 @@ export function ToolboxZonePage() {
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
   return (
-    <div className="kpv1 ktoolbox">
+    <div className="fusion-w5 fusion-w5--system kpv1 ktoolbox" data-kiosk-screen="toolbox">
       <div className="pagehead">
         <button type="button" className="back-btn" onClick={() => navigate('/')}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>

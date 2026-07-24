@@ -41,7 +41,7 @@ export default function SessionTimeoutPage() {
   const ringOffset = RING_CIRCUMFERENCE * (1 - seconds / TIMEOUT_SECONDS)
 
   return (
-    <main className="k8-system-page k8-session-timeout">
+    <main className="fusion-w5 fusion-w5--system k8-system-page k8-session-timeout" data-kiosk-screen="session-timeout" data-kiosk-presentation="fusion-youth">
       <div className="k8-system-ghost" aria-hidden="true"><i /><i /><i /><i /><i /></div>
       <div className="k8-system-dim" aria-hidden="true" />
       <div className="k8-timeout-wrap">

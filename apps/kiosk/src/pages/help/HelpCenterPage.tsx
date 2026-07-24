@@ -150,7 +150,7 @@ export function HelpCenterPage() {
     : ALL_FAQ.filter((item) => item.categoryKey === activeFilter)
 
   return (
-    <div className="service-desk k1-help-center flex h-full flex-col px-6 pt-6">
+    <div className="fusion-w5 fusion-w5--system service-desk k1-help-center flex h-full flex-col px-6 pt-6" data-kiosk-screen="help">
       <div className="k1-help-topbar">
         <PageHeader
           title="帮助中心"
