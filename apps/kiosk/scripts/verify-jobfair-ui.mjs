@@ -64,6 +64,28 @@ function mustNotContain(rel, markers, label) {
   }
 }
 
+function readImportedCss(entryRel, expectedImports, label) {
+  const entry = read(entryRel)
+  if (entry === null) {
+    fail(`${label} — 文件缺失: ${entryRel}`)
+    return ''
+  }
+  const imports = [...entry.matchAll(/^@import\s+['"]([^'"]+)['"];\s*$/gm)].map((match) => match[1])
+  if (JSON.stringify(imports) !== JSON.stringify(expectedImports)) {
+    fail(`${label} — ${entryRel} 的显式 CSS imports 已变化: ${imports.join(' | ')}`)
+    return ''
+  }
+  const entryDir = dirname(entryRel)
+  const sources = imports.map((importPath) => read(join(entryDir, importPath)))
+  if (sources.some((source) => source === null)) {
+    const missing = imports.filter((_, index) => sources[index] === null)
+    fail(`${label} — 显式导入的 CSS 文件缺失: ${missing.join(' | ')}`)
+    return ''
+  }
+  pass(`${label} — 仅拼接聚合入口显式导入的 CSS`)
+  return sources.join('\n')
+}
+
 console.log('\n=== 阶段1F 招聘会/校园招聘新版 UI 防回退验证 ===')
 
 // ── A. 新版组件文件存在 ────────────────────────────────────────────────────
@@ -84,13 +106,25 @@ console.log('\n=== 阶段1F 招聘会/校园招聘新版 UI 防回退验证 ==='
 // ── B. /job-fairs 列表页 ──────────────────────────────────────────────────
 mustContain(
   'src/pages/job-fairs/JobFairsPage.tsx',
-  ['RegionPicker', 'FairCalendarPopover', 'bg-gradient-to', '扫码预约'],
-  'B1. 列表页保持新版结构(地区筛选+日历+渐变大卡+合规按钮)',
+  ['RegionPicker', 'FairCalendarPopover', 'function FairRow(', 'className={`jf-row', '扫码预约'],
+  'B1. 列表页保持新版结构(地区筛选+日历+招聘会行卡+合规按钮)',
 )
+const jobFairCss = readImportedCss(
+  'src/pages/jobs-fairs-prototype.css',
+  [
+    './styles/jobs-fairs-foundation.css',
+    './styles/jobs-companies-fusion.css',
+    './styles/job-fairs-fusion.css',
+    './styles/campus-policy-fusion.css',
+  ],
+  'B2. 招聘会样式聚合入口保持封闭',
+)
+if (/\.jf-row\s*\{/.test(jobFairCss)) pass('B3. 招聘会行卡保留 .jf-row 精确样式')
+else fail('B3. 招聘会行卡缺少 .jf-row 精确样式')
 mustNotContain(
   'src/pages/job-fairs/JobFairsPage.tsx',
   ["data/fairData"],
-  'B2. 列表页不直接引用 fairData mock(mock 只允许进 mockAdapter)',
+  'B4. 列表页不直接引用 fairData mock(mock 只允许进 mockAdapter)',
 )
 
 // ── C. /job-fairs/:id 详情页 ──────────────────────────────────────────────

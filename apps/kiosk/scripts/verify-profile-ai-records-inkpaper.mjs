@@ -25,12 +25,32 @@ function expectAbsent(source, pattern, message) {
   if (!pattern.test(source)) pass(message)
   else fail(`${message} — forbidden pattern ${pattern} matched`)
 }
+function readImportedCss(entryPath, expectedImports, message) {
+  const entry = read(entryPath)
+  const imports = [...entry.matchAll(/^@import\s+['"]([^'"]+)['"];\s*$/gm)].map((match) => match[1])
+  if (JSON.stringify(imports) !== JSON.stringify(expectedImports)) {
+    fail(`${message} — ${entryPath} 的显式 CSS imports 已变化: ${imports.join(' | ')}`)
+    return ''
+  }
+  pass(`${message} — 仅拼接聚合入口显式导入的 CSS`)
+  return imports.map((importPath) => read(join(dirname(entryPath), importPath))).join('\n')
+}
 
 console.log('\n=== /me/ai-records 墨青纸感换装守卫 ===')
 
 const aiRecords = read('src/pages/profile/me/MyAiRecordsPage.tsx')
 const jobAiRecords = read('src/pages/profile/me/JobAiSessionRecords.tsx')
-const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
+const detailCss = readImportedCss(
+  'src/pages/profile/me/me-detail-inkpaper.css',
+  [
+    './styles/me-detail-base.css',
+    './styles/me-assets.css',
+    './styles/me-orders.css',
+    './styles/me-records.css',
+    './styles/me-settings-feedback.css',
+  ],
+  '明细页 CSS 聚合入口保持封闭',
+)
 const routes = read('src/routes/index.tsx')
 const packageJson = read('package.json')
 
