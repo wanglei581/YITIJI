@@ -118,6 +118,8 @@ W1 is serial. It owns and freezes the shared API consumed by W2–W5.
 - `packages/ui/package.json`
 - `apps/kiosk/src/index.css`
 - `apps/kiosk/src/layouts/KioskRoot.tsx`
+- `apps/kiosk/src/pages/auth/MobileQrLoginPage.tsx`
+- `apps/kiosk/src/pages/upload/PhoneUploadPage.tsx`
 - `apps/kiosk/src/pages/home/HomePage.tsx`
 - `apps/kiosk/src/styles/prototype-v1.css`
 - `apps/kiosk/package.json`
@@ -130,6 +132,8 @@ W1 is serial. It owns and freezes the shared API consumed by W2–W5.
 - Modify `docs/progress/current-progress.md` and `docs/progress/next-tasks.md` with truthful W1 status.
 
 This test-only expansion closes the original W1 acceptance/file-budget mismatch. It does not authorize a test-only production route, production demo flag, static mock page in `public/`, or business-state changes.
+
+`/member/qr-login` and `/upload/phone` remain top-level full-screen routes outside `KioskRoot`; W1 may add only the fusion presentation/mobile viewport data attributes to their existing root elements. The W1 shell verifier must structurally prove that both route objects remain direct `createBrowserRouter` entries rather than `KioskRoot.children`, and must require each existing root `<main>` to retain its service-desk class/attributes and real helper service contract. They must not be moved under the Kiosk shell or have their service-desk/mobile business behavior rewritten.
 
 **Modify only if the fusion prototype proves a missing icon/input state:**
 
@@ -302,6 +306,8 @@ pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
 - `apps/kiosk/src/pages/placeholders/MeActivityDetailPage.tsx`
 - `apps/kiosk/src/pages/placeholders/NotificationsPage.tsx`
 - `apps/kiosk/src/pages/placeholders/system-pages-batch8.css`
+
+W1 has a narrow prerequisite exception for `MobileQrLoginPage.tsx` and `PhoneUploadPage.tsx`: it may add only `data-kiosk-presentation="fusion-youth"` and `data-kiosk-viewport="mobile"` to their existing root elements because both routes live outside `KioskRoot`. W5 retains exclusive ownership of every later visual, state, and behavior migration in these files and must preserve those attributes.
 
 **Excluded logic:**
 

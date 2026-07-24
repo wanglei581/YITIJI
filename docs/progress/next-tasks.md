@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-23
+> 最后更新：2026-07-24
 
 ## 当前执行：Kiosk 8177 / 5299 全量融合换装
 
@@ -10,11 +10,13 @@
 - [x] 全页面融合设计、状态契约、分波次边界和验收标准定稿。
 - [x] 生成 W0 逐文件、逐测试 TDD 实施计划并完成审查。
 - [x] W0：冻结 `docs/design/kiosk-proto-2026-07-fusion/`，锁定 86 路由 / 5 兼容重定向 / 状态参考契约，建立 production-build Playwright smoke 与视觉验收 Runbook；W0 未修改 production runtime UI。
-- [ ] **下一步 W1：shared presentation foundation + home/shell representative migration**——先以详细 TDD 计划收口融合 token、共享壳层、基础 UI / 状态原语，再迁移首页与壳层代表页面并执行 1080×1920 production-build 浏览器验收；通过代表性迁移后才允许分域推进。
-- [ ] W2–W5：按打印扫描、简历/AI/面试、岗位/企业/招聘会/校园、个人中心/系统页面分域实施。
-- [ ] W6：全路由 1080×1920 / 390×844 视觉验收、关键真实流程回归、合规与安全回归、Antigravity + Claude 双模型终审。
+- [ ] **当前 W1：shared presentation foundation + home/shell representative migration**——共享 token、五个 Kiosk-only 原语、壳层、首页与手机全屏路由候选均已完成；W0 browser smoke 4/4，W1 普通 / `CI=1` / 故障代理三环境各 6/6，static、typecheck、lint、production build 与配置守卫全量复验通过。实跑发现的 45px 聚合标题触控目标和漏接屏保请求已修复并复跑通过。当前只待 Claude + Antigravity 最终终审、提交与 W1 freeze；尚不代表后续页面已迁移。
+- [ ] **W1 下一门禁**：完成最终双模型审查并修复全部 Critical/Warning；提交冻结后才编写并双审 W2–W5 详细 TDD 计划。首页既有 nested `<main>` 语义债 deferred 到 W6，透明迁移阶段不重构。
+- [ ] W2–W5：按打印扫描、简历/AI/面试、岗位/企业/招聘会/校园、个人中心/系统页面分域实施；当前均 pending。
+- [ ] W6：全路由 1080×1920 / 390×844 视觉验收、关键真实流程回归、nested `<main>` 语义债、合规与安全回归、Antigravity + Claude 双模型终审。
+- [ ] 生产部署、Windows 一体机、打印扫描硬件与真机触控验收仍 pending，不因 W1 CI 接线改变。
 
-本任务吸收下方 03/05/06 等既有视觉挂账，但不改变原有真实功能和上线 P0 硬件/部署验收结论。当前只完成 W0 基准和测试底座，**严禁表述为全 Kiosk 融合完成**；W1 及后续每个波次仍须独立计划、TDD、production-build 浏览器验收和行为回归。
+本任务吸收下方 03/05/06 等既有视觉挂账，但不改变原有真实功能和上线 P0 硬件/部署验收结论。当前 W0 已冻结，W1 浏览器与全量工程门禁已通过、等待最终双模型审查和提交冻结；**严禁表述为全 Kiosk 融合完成**。W2–W6 仍须独立计划、TDD、production-build 浏览器验收和行为回归。
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 

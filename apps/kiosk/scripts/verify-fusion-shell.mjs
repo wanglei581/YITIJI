@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import ts from 'typescript'
 
 const packageRootUrl = new URL('../', import.meta.url)
 
@@ -44,6 +45,98 @@ function functionBody(source, name) {
   assert.fail(`${name} must have a balanced function body`)
 }
 
+function directProperty(objectLiteral, name) {
+  return objectLiteral.properties.find((property) =>
+    ts.isPropertyAssignment(property) &&
+    (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+    property.name.text === name,
+  )
+}
+
+function directStringProperty(objectLiteral, name) {
+  const property = directProperty(objectLiteral, name)
+  return property && ts.isStringLiteral(property.initializer) ? property.initializer.text : null
+}
+
+function directJsxComponentProperty(objectLiteral, name) {
+  const property = directProperty(objectLiteral, name)
+  if (!property || !ts.isJsxSelfClosingElement(property.initializer)) return null
+  return ts.isIdentifier(property.initializer.tagName) ? property.initializer.tagName.text : null
+}
+
+function topLevelRouteObjects(routes) {
+  const sourceFile = ts.createSourceFile('routes.tsx', routes, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let routeArray = null
+  const visit = (node) => {
+    if (
+      !routeArray &&
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'createBrowserRouter' &&
+      node.arguments.length === 1 &&
+      ts.isArrayLiteralExpression(node.arguments[0])
+    ) {
+      routeArray = node.arguments[0]
+      return
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  assert.ok(routeArray, 'routes must call createBrowserRouter with a direct array literal')
+  return routeArray.elements.filter(ts.isObjectLiteralExpression)
+}
+
+function assertTopLevelHelperRoutes(routes) {
+  const objects = topLevelRouteObjects(routes)
+  const rootRouteIndex = objects.findIndex((route) =>
+    directStringProperty(route, 'path') === '/' &&
+    directJsxComponentProperty(route, 'element') === 'KioskRoot',
+  )
+  assert.ok(rootRouteIndex >= 0, 'KioskRoot route must remain a direct createBrowserRouter entry')
+
+  for (const [path, component] of [
+    ['/member/qr-login', 'MobileQrLoginPage'],
+    ['/upload/phone', 'PhoneUploadPage'],
+  ]) {
+    const routeIndex = objects.findIndex((route) =>
+      directStringProperty(route, 'path') === path &&
+      directJsxComponentProperty(route, 'element') === component,
+    )
+    assert.ok(routeIndex >= 0, `${path} must remain a direct createBrowserRouter route`)
+    assert.ok(routeIndex < rootRouteIndex, `${path} must stay before the KioskRoot route instead of becoming a child route`)
+    const rootChildren = directProperty(objects[rootRouteIndex], 'children')
+    if (rootChildren && ts.isArrayLiteralExpression(rootChildren.initializer)) {
+      const nestedPaths = rootChildren.initializer.elements
+        .filter(ts.isObjectLiteralExpression)
+        .map((route) => directStringProperty(route, 'path'))
+      assert.ok(!nestedPaths.includes(path), `${path} must not be nested in KioskRoot children`)
+    }
+  }
+}
+
+function rootMainStartTag(page, label) {
+  const match = /return\s*\(\s*(<main\b[\s\S]*?>)/.exec(page)
+  assert.ok(match, `${label} must return an existing root main element`)
+  return match[1]
+}
+
+function assertMobilePageContract(page, { label, stylesheet, services }) {
+  const rootMain = rootMainStartTag(page, label)
+  for (const [attribute, pattern] of [
+    ['service-desk class', /className="[^"]*\bservice-desk\b[^"]*"/],
+    ['service-desk visual theme', /data-visual-theme="service-desk"/],
+    ['touch density', /data-ux-density="touch"/],
+    ['fusion presentation', /data-kiosk-presentation="fusion-youth"/],
+    ['mobile viewport', /data-kiosk-viewport="mobile"/],
+  ]) {
+    assert.match(rootMain, pattern, `${label} root main must preserve ${attribute}`)
+  }
+  assert.match(page, new RegExp(`import\\s+['"]${stylesheet.replace('.', '\\.')}['"]`), `${label} must retain its service-desk stylesheet`)
+  for (const service of services) {
+    assert.match(page, new RegExp(`\\b${service}\\s*\\(`), `${label} must retain ${service}`)
+  }
+}
+
 function assertImportOrder(css) {
   const imports = [...css.matchAll(/@import\s+["']([^"']+)["']\s*;/g)].map((match) => match[1])
   assert.deepEqual(imports, [
@@ -65,6 +158,9 @@ assert.equal(
 const layout = await read('../../packages/ui/src/layouts/KioskLayout.tsx')
 const root = await read('src/layouts/KioskRoot.tsx')
 const css = await read('src/index.css')
+const routes = await read('src/routes/index.tsx')
+const mobileQrLogin = await read('src/pages/auth/MobileQrLoginPage.tsx')
+const phoneUpload = await read('src/pages/upload/PhoneUploadPage.tsx')
 
 assert.match(layout, /\bpresentation\?:\s*KioskPresentation\b/, 'KioskLayout must expose presentation')
 assert.match(layout, /\bviewport\?:\s*KioskViewport\b/, 'KioskLayout must expose viewport')
@@ -81,22 +177,21 @@ assert.match(
   'KioskLayout must preserve visual theme attributes',
 )
 
-assert.match(
-  root,
-  /const\s+MOBILE_HELPER_ROUTES\s*=\s*new Set\(\s*\[\s*['"]\/member\/qr-login['"]\s*,\s*['"]\/upload\/phone['"]\s*\]\s*\)/,
-  'mobile helper route set must contain exactly the two frozen paths',
-)
-assert.match(
-  root,
-  /const\s+isMobileHelperRoute\s*=\s*MOBILE_HELPER_ROUTES\.has\(\s*pathname\s*\)/,
-  'KioskRoot must derive viewport from the current pathname',
-)
 assert.match(root, /presentation\s*=\s*['"]fusion-youth['"]/, 'KioskRoot must opt into fusion-youth')
-assert.match(
-  root,
-  /viewport\s*=\s*\{\s*isMobileHelperRoute\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/,
-  'KioskRoot must select the mobile viewport only for helper routes',
-)
+assert.match(root, /viewport\s*=\s*['"]kiosk['"]/, 'KioskRoot must always use the kiosk viewport')
+assert.doesNotMatch(root, /MOBILE_HELPER_ROUTES|isMobileHelperRoute/, 'KioskRoot must not try to classify routes it does not render')
+
+assertTopLevelHelperRoutes(routes)
+assertMobilePageContract(mobileQrLogin, {
+  label: 'MobileQrLoginPage',
+  stylesheet: './mobile-qr-service-desk.css',
+  services: ['fetchQrLoginStatus', 'sendSmsCode', 'confirmQrLogin'],
+})
+assertMobilePageContract(phoneUpload, {
+  label: 'PhoneUploadPage',
+  stylesheet: './phone-upload-service-desk.css',
+  services: ['uploadPhoneSessionFile'],
+})
 
 const shellBody = functionBody(root, 'KioskShell')
 for (const [label, pattern] of [

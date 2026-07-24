@@ -161,7 +161,7 @@
 /* 分组标题聚合入口：继承 h2 字体，去按钮默认样式，仅加箭头暗示可点（不改原型排版） */
 .kpv1 .card-head h2 .g-title-link {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 0; border: none; background: none; cursor: pointer;
+  min-height: 48px; padding: 0; border: none; background: none; cursor: pointer;
   font: inherit; letter-spacing: inherit; color: inherit;
 }
 .kpv1 .card-head h2 .g-title-link:active { transform: scale(.99); }

@@ -456,6 +456,12 @@ jobs:
           pnpm --filter @ai-job-print/shared typecheck
           pnpm --filter @ai-job-print/ui typecheck
 
+      - name: Verify Kiosk W1 fusion static contracts
+        run: |
+          pnpm --filter @ai-job-print/ui verify:fusion-youth-foundation
+          pnpm --filter @ai-job-print/kiosk verify:fusion-shell
+          pnpm --filter @ai-job-print/kiosk verify:fusion-home
+
       - name: Run Kiosk fusion contract tests with coverage gates
         run: |
           node --experimental-test-coverage --test \
@@ -468,7 +474,9 @@ jobs:
         run: pnpm --filter @ai-job-print/kiosk verify:fusion-baseline
 
       - name: Run Kiosk browser smoke
-        run: pnpm --filter @ai-job-print/kiosk test:browser:smoke
+        run: |
+          pnpm --filter @ai-job-print/kiosk test:browser:smoke
+          pnpm --filter @ai-job-print/kiosk test:browser:w1
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -478,4 +486,6 @@ jobs:
           path: |
             test-results/kiosk-fusion/**
             test-results/kiosk-fusion-report/**
+            test-results/kiosk-fusion-w1/**
+            test-results/kiosk-fusion-w1-report/**
           if-no-files-found: ignore

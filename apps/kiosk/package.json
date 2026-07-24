@@ -10,6 +10,7 @@
     "lint": "eslint src/",
     "test:browser": "playwright test",
     "test:browser:smoke": "playwright test fusion-smoke.spec.ts",
+    "test:browser:w1": "playwright test --config=playwright.w1.config.ts",
     "test:visual": "playwright test visual",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --port 5173",
@@ -59,7 +60,8 @@
     "verify:price-single-source": "node scripts/verify-price-single-source.mjs",
     "verify:renshi-policy-ui": "node scripts/verify-renshi-policy-ui.mjs",
     "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs",
-    "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs"
+    "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs",
+    "verify:fusion-home": "node scripts/verify-fusion-home.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

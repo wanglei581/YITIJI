@@ -101,7 +101,7 @@ export function PhoneUploadPage() {
   }
 
   return (
-    <main className="k1-phone-upload service-desk grid min-h-[100svh] place-items-center bg-[#2a2a26] px-0 py-0 font-sans text-neutral-900 sm:py-6" data-visual-theme="service-desk" data-ux-density="touch">
+    <main className="k1-phone-upload service-desk grid min-h-[100svh] place-items-center bg-[#2a2a26] px-0 py-0 font-sans text-neutral-900 sm:py-6" data-visual-theme="service-desk" data-ux-density="touch" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="mobile">
       {!ready ? (
         <div className="phone-upload-invalid flex flex-col items-center gap-4 px-6 text-center">
           <AlertCircleIcon className="h-12 w-12 text-red-400" />
