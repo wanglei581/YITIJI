@@ -58,7 +58,8 @@
     "verify:jobfair-checkin": "node scripts/verify-jobfair-checkin.mjs",
     "verify:price-single-source": "node scripts/verify-price-single-source.mjs",
     "verify:renshi-policy-ui": "node scripts/verify-renshi-policy-ui.mjs",
-    "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs"
+    "verify:fusion-baseline": "node scripts/verify-fusion-baseline.mjs",
+    "verify:fusion-shell": "node scripts/verify-fusion-shell.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

@@ -36,6 +36,8 @@ const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
   '/resume/export',
 ]
 
+const MOBILE_HELPER_ROUTES = new Set(['/member/qr-login', '/upload/phone'])
+
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
  * /screensaver 是顶级路由(全屏,不在此布局内),退出后回到本布局的首页。
@@ -73,6 +75,7 @@ function KioskShell() {
   const statusVariant = statusVariantByTone[deviceStatus.tone]
   const statusLabel = deviceStatus.label
   const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
+  const isMobileHelperRoute = MOBILE_HELPER_ROUTES.has(pathname)
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
@@ -84,6 +87,8 @@ function KioskShell() {
       onTabChange={(tab) => navigate(tabToPath(tab))}
       visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
       density="touch"
+      presentation="fusion-youth"
+      viewport={isMobileHelperRoute ? 'mobile' : 'kiosk'}
       // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
       // 其余页面继续使用全局头部 + 设备状态徽标。
       // prototype-v1 首页（.kpv1）自绘 116px 原型底部导航，故隐藏共享 KioskLayout 底栏；

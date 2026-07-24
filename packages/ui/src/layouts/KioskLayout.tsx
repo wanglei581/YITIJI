@@ -2,7 +2,10 @@ import { BotIcon, HomeIcon, UserIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '../lib/cn'
 import {
+  getKioskPresentationAttributes,
   getVisualThemeAttributes,
+  type KioskPresentation,
+  type KioskViewport,
   type UiDensity,
   type VisualTheme,
 } from '../theme/visualTheme'
@@ -35,6 +38,8 @@ export interface KioskLayoutProps {
   hideBottomNav?: boolean
   visualTheme?: VisualTheme
   density?: UiDensity
+  presentation?: KioskPresentation
+  viewport?: KioskViewport
   className?: string
 }
 
@@ -47,11 +52,14 @@ export function KioskLayout({
   hideBottomNav = false,
   visualTheme = 'legacy',
   density = 'touch',
+  presentation = 'legacy',
+  viewport = 'kiosk',
   className,
 }: KioskLayoutProps) {
   return (
     <div
       {...getVisualThemeAttributes(visualTheme, density)}
+      {...getKioskPresentationAttributes(presentation, viewport)}
       className={cn('ui-kiosk-shell flex h-screen flex-col overflow-hidden bg-canvas', className)}
     >
 
