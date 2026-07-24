@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-
 const packageRoot = fileURLToPath(new URL('../', import.meta.url))
 
 async function read(relativePath) {
@@ -75,12 +74,11 @@ function assertPresentationOnly(component, source) {
   ]) {
     assert.doesNotMatch(source, pattern, `${component} must not use ${label}`)
   }
-
-  const imports = [...source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"]([^'"]+)['"]/g)]
+  const imports = [...source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)['"]([^'"]+)['"]/g)]
   for (const [, importSource] of imports) {
     assert.equal(
       /(?:^|\/)(?:apps|services)(?:\/|$)/i.test(importSource)
-        || /(?:^|\/)(?:stores?|hooks?)\/(?:auth|member|job|resume|order|print|device|payment|profile|campus|fair)(?:\/|$)/i.test(importSource),
+        || /(?:^|\/)(?:stores?|hooks?)\/[^/]*(?:auth|member|job|resume|order|print|device|payment|profile|campus|fair)/i.test(importSource),
       false,
       `${component} must not import app-owned services or business store/hook modules: ${importSource}`,
     )
@@ -93,7 +91,6 @@ function assertKioskPresentationAttributes(source) {
   assert.match(match[1], /return\s*\{[\s\S]*?['"]data-kiosk-presentation['"]\s*:\s*presentation\b/)
   assert.match(match[1], /return\s*\{[\s\S]*?['"]data-kiosk-viewport['"]\s*:\s*viewport\b/)
 }
-
 function assertStatePanelLiveRegions(source) {
   const map = /const\s+(\w+)\s*(?::[^=]+)?=\s*\{([\s\S]*?)\n\}/g
   const candidate = [...source.matchAll(map)].find((entry) =>
@@ -107,7 +104,7 @@ function assertStatePanelLiveRegions(source) {
     [['error', 'offline', 'permission'], 'alert', 'assertive'],
   ]) {
     for (const tone of tones) {
-      assert.match(candidate[2], new RegExp(`\\b${tone}\\s*:\\s*\\{[^}]*role\\s*:\\s*['"]${role}['"][^}]*ariaLive\\s*:\\s*['"]${live}['"]`))
+      assert.match(candidate[2], new RegExp(`\\b${tone}\\s*:\\s*\\{(?=[^}]*role\\s*:\\s*['"]${role}['"])(?=[^}]*ariaLive\\s*:\\s*['"]${live}['"])[^}]*\\}`))
     }
   }
   assert.match(source, new RegExp(`const\\s+(\\w+)\\s*=\\s*${candidate[1]}\\s*\\[\\s*tone\\s*\\]`))
@@ -115,11 +112,16 @@ function assertStatePanelLiveRegions(source) {
   assert.match(source, new RegExp(`role\\s*=\\s*\\{\\s*${liveRegionName}\\.role\\s*\\}`))
   assert.match(source, new RegExp(`aria-live\\s*=\\s*\\{\\s*${liveRegionName}\\.ariaLive\\s*\\}`))
 }
-
 function assertModalBehavior(source) {
-  assert.match(source, /if\s*\([^)]*closeOnEscape[^)]*&&[^)]*key[^)]*===\s*['"]Escape['"][^)]*\)\s*(?:\{[^}]*onClose\s*\(\)|onClose\s*\(\))/)
-  assert.match(source, /onClick\s*=\s*\{[^}]*closeOnBackdrop[^}]*\?[^}:]*onClose/)
-
+  const handlerBody = (name) => new RegExp(`(?:const\\s+${name}\\s*=\\s*\\([^)]*\\)\\s*=>|function\\s+${name}\\s*\\([^)]*\\))\\s*\\{([\\s\\S]*?)\\n\\s*\\}`).exec(source)?.[1]
+  const keydown = /addEventListener\s*\(\s*['"]keydown['"]\s*,\s*(\w+)/.exec(source)?.[1]
+  assert.ok(keydown && new RegExp(`removeEventListener\\s*\\(\\s*['"]keydown['"]\\s*,\\s*${keydown}`).test(source))
+  const keyBody = handlerBody(keydown) ?? ''
+  assert.match(keyBody, /if\s*\((?=[^)]*closeOnEscape)(?=[^)]*(?:key|code)[^)]*['"]Escape['"])[^)]*\)[\s\S]*?onClose\s*\(\)/)
+  const backdrop = /ui-kiosk-modal-backdrop[\s\S]*?onClick\s*=\s*\{\s*(\w+)\s*\}/.exec(source)?.[1]
+  const backdropBody = backdrop ? handlerBody(backdrop) : undefined
+  assert.ok(backdropBody, 'backdrop must bind a local click handler')
+  assert.match(backdropBody, /if\s*\([^)]*closeOnBackdrop[^)]*\)[\s\S]*?onClose\s*\(\)/)
   const cleanup = /return\s*\(\s*\)\s*=>\s*\{([\s\S]*?)\n\s*\}/.exec(source)?.[1]
   assert.ok(cleanup, 'KioskModal effect must return cleanup')
   assert.match(cleanup, /removeEventListener\s*\(\s*['"]keydown['"]/)
@@ -128,7 +130,9 @@ function assertModalBehavior(source) {
   assert.ok(overflow && focused, 'KioskModal must capture overflow and prior focus')
   assert.match(cleanup, new RegExp(`document\\.body\\.style\\.overflow\\s*=\\s*${overflow}\\b`))
   assert.match(cleanup, new RegExp(`${focused}[^;\n]*\\.focus\\s*\\(`))
-
+  assert.match(source, /document\.body\.style\.overflow\s*=\s*['"]hidden['"]/)
+  const dialogRef = /ref\s*=\s*\{\s*(\w+)\s*\}/.exec(source)?.[1]
+  assert.ok(dialogRef && new RegExp(`${dialogRef}\\.current\\?*\\.focus\\s*\\(`).test(source), 'open dialog must receive focus')
   const baseId = /const\s+(\w+)\s*=\s*useId\s*\(\s*\)/.exec(source)?.[1]
   assert.ok(baseId, 'KioskModal must derive stable IDs with useId')
   const titleId = /const\s+(\w+)\s*=\s*`[^`]*\$\{(\w+)\}[^`]*`/.exec(source)
@@ -140,6 +144,7 @@ function assertModalBehavior(source) {
   for (const attribute of ['aria-labelledby', 'aria-describedby']) {
     const value = new RegExp(`${attribute}\\s*=\\s*\\{\\s*(\\w+)`).exec(source)?.[1]
     assert.ok(value && idVariables.has(value), `${attribute} must bind a useId-derived value`)
+    assert.match(source, new RegExp(`id\\s*=\\s*\\{\\s*${value}\\s*\\}`), `${attribute} must target a rendered node id`)
   }
 }
 
@@ -157,16 +162,13 @@ function extractCssSelectors(source) {
       preludeStart = index + 1
     }
   }
-
   return selectors.flatMap((selector) => selector.split(',').map((part) => part.trim()))
 }
-
 function extractCssRule(source, selectorPattern, label) {
   const match = new RegExp(`${selectorPattern}\\s*\\{([^{}]*)\\}`, 'm').exec(source)
   assert.ok(match, `fusion-youth.css must define ${label}`)
   return match[1]
 }
-
 function findMatchingBrace(source, openingBraceIndex) {
   let depth = 0
   for (let index = openingBraceIndex; index < source.length; index += 1) {
@@ -178,7 +180,6 @@ function findMatchingBrace(source, openingBraceIndex) {
   }
   return -1
 }
-
 function extractAtRuleBlocks(source, atRulePattern, label) {
   const blocks = []
   for (const match of source.matchAll(new RegExp(atRulePattern, 'g'))) {
@@ -190,7 +191,6 @@ function extractAtRuleBlocks(source, atRulePattern, label) {
   }
   return blocks
 }
-
 function assertReducedMotionContract(source) {
   const blocks = extractAtRuleBlocks(
     source,
@@ -210,7 +210,7 @@ function assertReducedMotionContract(source) {
   assert.ok(transitionDisabled, 'reduced-motion rules must disable transitions with none or zero duration')
   assert.doesNotMatch(
     declarations,
-    /\b(?:display\s*:\s*none|visibility\s*:\s*hidden|content-visibility\s*:\s*hidden)\b/i,
+    /\b(?:display\s*:\s*none|visibility\s*:\s*hidden|content-visibility\s*:\s*hidden|opacity\s*:\s*0\b|clip(?:-path)?\s*:|(?:width|height|max-width|max-height)\s*:\s*0\b)/i,
     'reduced-motion rules must not hide content',
   )
 }
@@ -362,12 +362,12 @@ for (const component of Object.keys(componentContracts)) {
   )
   assert.match(
     publicIndex,
-    new RegExp(`export\\s*\\{[^}]*\\b(?:type\\s+)?${component}Props\\b[^}]*\\}`),
+    new RegExp(`export\\s+(?:type\\s*)?\\{[^}]*\\b(?:type\\s+)?${component}Props\\b[^}]*\\}`),
     `public index must export ${component}Props`,
   )
 }
 for (const typeName of ['KioskStateTone', 'KioskPresentation', 'KioskViewport']) {
-  assert.match(publicIndex, new RegExp(`export\\s*\\{[^}]*\\b(?:type\\s+)?${typeName}\\b[^}]*\\}`))
+  assert.match(publicIndex, new RegExp(`export\\s+(?:type\\s*)?\\{[^}]*\\b(?:type\\s+)?${typeName}\\b[^}]*\\}`))
 }
 assert.match(publicIndex, /export\s*\{[^}]*\bgetKioskPresentationAttributes\b[^}]*\}/)
 
