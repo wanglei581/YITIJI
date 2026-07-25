@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 完成 **`WINDOWS_FIELD_RECHECK` F4 真机出纸**（用户确认已出纸；库/Admin 复核）。预发 `t_ksk_001` / KSK-001。代表性成功单：`ptask_kiosk_2a75352b81631efb`（`kiosk-test.pdf`）`ORD-20260725-9203A07D07`，`payStatus=paid` / `paymentSource=free` / `amountCents=0`，状态日志 `claimed→printing→completed`（约 22.5s，`errorCode` 空）；同窗另有 `ptask_kiosk_88b40165eea44c05`（14:28）与较早 `ptask_kiosk_e7df85c8ebcb4beb`（13:38 PNG）同为 completed+free。事后 `active=0`，printer `ready`/`isOnline`。反例：`ptask_kiosk_ed2582d186e13a32` docx → `UNSUPPORTED_FILE_TYPE`（预期失败，不计入 F4）。**Phase F 现可记全通过**（F1–F6）；未做 G5 退款冒烟 / close-unpaid Phase B / 收费切换。
+
 2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。**须合入 #369 后再全量部署**，否则会被再次覆盖。
 
 2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。

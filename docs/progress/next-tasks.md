@@ -21,7 +21,7 @@
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：✅ 已完成（2026-07-25 方案 C）——OCR/COS 沿用 2026-06-13；SMS/TRTC 确认当前生产密钥 + `.env` 同步、今日不换；§2.2 对应轮换项已勾。短信签名/模板审核与真实短信 E2E 仍独立开着
-- **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**。同日 Admin 浏览器：待领取空、能力未配置/未保存；SQL active=0
+   - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（2026-07-25）——F1–F6 齐；F4 证据 `ptask_kiosk_2a75352b81631efb` / `ORD-20260725-9203A07D07`（`kiosk-test.pdf`，free/0 元，`claimed→printing→completed`）
 
 - **7c `WINDOWS_FIELD_RECHECK`**：◐ **部分通过**（2026-07-25 回执）——F1 Agent Running/Automatic、F2 `printerName`=Windows 名、F3 `127.0.0.1:9527`、F5 断网 75s 自恢复、F6 竖屏全屏抽查；**F4 真机出纸跳过**（文件选择器未收 PDF，未建单）。配置实际在仓库 `apps/terminal-agent/config/agent-config.json`。**推荐下一步：补做 F4**（扫码/U盘/扫描入口打 1 页无个人信息样张）
 

@@ -4,6 +4,8 @@
 > 授权包名：`WINDOWS_FIELD_RECHECK`  
 > 终端：`t_ksk_001` / `KSK-001`  
 > API 预发：`DEPLOY_SOURCE=7e59243c`（以服务器 `DEPLOY_SOURCE.txt` 为准）
+>
+> **2026-07-25 状态**：Phase F **已通过**（含 F4：`ptask_kiosk_2a75352b81631efb` completed + 用户确认出纸）。
 
 ## 边界
 
