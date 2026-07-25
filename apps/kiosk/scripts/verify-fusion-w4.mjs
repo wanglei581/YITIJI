@@ -62,7 +62,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2\.spec\.ts)$/,
   // W3: resume, AI assistant and interview authoring surfaces.
   /^apps\/kiosk\/src\/pages\/(?:resume|assistant|interview)\//,
-  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career|verify-lightflow-k2c-interview)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w3\.config\.ts|tests\/visual\/(?:fixtures\/fusion-w3-states\.ts|fusion-w3\.spec\.ts))$/,
   // W5: system, profile, account, help and benefit surfaces.
   /^apps\/kiosk\/src\/pages\/(?:activities|auth|help|legal|profile|screensaver|toolbox|upload)\//,
@@ -78,6 +78,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
+  /^packages\/ui\/scripts\/verify-fusion-youth-foundation\.mjs$/,
 ]
 
 let failed = 0
