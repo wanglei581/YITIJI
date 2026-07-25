@@ -1,10 +1,10 @@
 # 当前开发进度
 
-<<<<<<< HEAD
+2026-07-25 完成 **close-unpaid 预生产 Phase A 只读预检**（用户授权 `CLOSE_UNPAID_PHASE_A_READONLY` / 环境预生产）：`DEPLOY_SOURCE=70ed8f6d`，health `ok/postgres`；`BEGIN READ ONLY` 统计 `PrintTask`：**pending=0，eligible close-unpaid=0**（无 ROW 样本）。分布（仅计数）：task `completed=20/cancelled=11/failed=4`；print 订单 `unpaid=19/paid=10/closed=4/refunded=1`；历史 `errorCode=ADMIN_UNPAID_PRINT_TASK_CLOSED` 计 3。路由 `POST …/close-unpaid` 无 token → `401 AUTH_MISSING_TOKEN`。**未**调用 close-unpaid POST、未造单、未改业务数据。按 Runbook：**不得进入 Phase B**（无合格候选）。若需 Phase B，须先出现真实合格 pending 未支付未领取任务，再单独书面点名 `taskId`。
+
+2026-07-25 完成 **close-unpaid 生产受控操作授权 Runbook**（分支 `ops/close-unpaid-runbook-20260725`）：落盘 `docs/device/close-unpaid-production-controlled-ops-runbook.md`，把「代码已合入 + 预生产已部署」与「生产写操作」拆成 Phase A 只读预检（`CLOSE_UNPAID_PHASE_A_READONLY`）与 Phase B 单笔关闭（`CLOSE_UNPAID_PHASE_B_SINGLE` + 点名 taskId）；写明资格 SSOT、CAS/审计口径、硬禁止与授权回复模板。
+
 2026-07-25 完成 **Partner 相对 API URL 解析修复**（分支 `fix/partner-relative-api-url-20260725`，隔离 worktree）：根因是 `partnerHttpAdapter.get()` 对 `VITE_API_BASE_URL=/api/v1` 使用单参数 `new URL()` 抛 Invalid URL。新增 `resolveApiUrl`（相对 base→页面 origin，绝对 base 保留 API host），GET 与 Excel 模板下载接入；`verify:partner-relative-api-url` 接入主 CI。仅改 `apps/partner` + CI/进度文档；**未部署、未动预生产**。
-=======
-2026-07-25 完成 **close-unpaid 生产受控操作授权 Runbook**（分支 `ops/close-unpaid-runbook-20260725`）：落盘 `docs/device/close-unpaid-production-controlled-ops-runbook.md`，把「代码已合入 + 预生产已部署」与「生产写操作」拆成 Phase A 只读预检（`CLOSE_UNPAID_PHASE_A_READONLY`）与 Phase B 单笔关闭（`CLOSE_UNPAID_PHASE_B_SINGLE` + 点名 taskId）；写明资格 SSOT、CAS/审计口径、硬禁止与授权回复模板。**本条不执行任何生产/预生产 close-unpaid POST，未收到书面授权前不得预检关闭或演练关闭。**
->>>>>>> 08ea6903 (docs: close-unpaid production controlled-ops runbook)
 
 2026-07-25 完成 **F1 平行 Genesis bootstrap D2 Docker 隔离演练**（分支 `ops/f1-d2-docker-drill-20260725`）：生产主机只读确认仍无 Docker、现网 PM2 仍为 `dist/main.js` 且 health `ok/postgres`（未改现网）。在本机 Colima Docker 隔离平面跑通真实 PM2：空 control root → Genesis `r1`（`PARALLEL_SERVING_R1`）→ `activate r2` post-switch health 失败 → `RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK` 且 current 仅回 verified `r1`；收窄 env 下 CANARY 未进入进程；缺失进程精确分类、其它 PM2 错误不伪装为 missing。演练中发现并修复：PM2 fork 下 `process.argv[1]` 为 `ProcessContainerFork.js`，launcher self-hash 改用 `__filename`。交付 `docs/device/f1-d2-docker-isolation-runbook.md`、`scripts/d2-docker-drill.mjs`、`drill:d2-docker`。脱敏证据：`release-d2-20260725-r1/r2`，`verdict=D2_PASS_ISOLATION`。**production F1 继续 NO-GO**；D3–D5（含切流）仍须独立授权；不得把隔离 D2 写成生产 provenance 已闭合。
 
