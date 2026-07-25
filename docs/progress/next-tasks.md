@@ -19,7 +19,7 @@
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：✅ 已完成（2026-07-25 方案 C）——OCR/COS 沿用 2026-06-13；SMS/TRTC 确认当前生产密钥 + `.env` 同步、今日不换；§2.2 对应轮换项已勾。短信签名/模板审核与真实短信 E2E 仍独立开着
-   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**
+   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**。同日 Admin 浏览器：待领取空、能力未配置/未保存；SQL active=0
    - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
    - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置

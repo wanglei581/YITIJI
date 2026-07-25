@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 追加：**WINDOWS Phase R + Admin 打印扫描只读复检（浏览器）**。预发 `DEPLOY_SOURCE=7e59243c`；health `ok/postgres`；`printer-status` → `ready` + `isOnline=true`（`lastSeenAt` 近实时）；SQL `active=0` / `pending=0`；`TerminalCapability` 对 `t_ksk_001` 仍 **0 行**。Admin（用户已登录 Playwright）：打印扫描「待领取」= **暂无任务**；设备能力页全部「未验收（未配置）」与空表一致（**未点保存**）；设备页此前已见 KSK-001 在线。设备能力页确认 Agent 在线/打印机 ready。**未改商业化控制**。**Phase F 仍须到场**；未造单、未退款、未改能力开关。
+
 2026-07-25 追加：**Admin 浏览器只读核对（Playwright 有头，用户已登录）**。设备管理：`KSK-001` **在线**、打印机状态 **ready**、心跳「刚刚」、Agent `0.3.0-production`。订单管理文案含全额退款；打开 `ORD-20260725-7D4AE0020A`（已支付/已完成/未计费）详情见 **「发起全额退款」**（**未**点确认、未发起退款）。法务文档版本页：**暂无版本**（与此前 API list:0 一致）。随后打开百度智能云登录页待用户登录（7b 方案 C 已在主线勾选，控制台仅为可选复验）。未动 FREE_MODE / F1 / close-unpaid Phase B。
 
 2026-07-25 追加：**G5 最小版 SSOT 纠偏 + Windows Phase F 授权交叉引用**。核对 PR #311（`b58ddbe9`）已合入：Admin 全额退款入口存在；`next-tasks` 旧「G5 待动工」已纠偏。授权交叉：`p0-auth-pack-windows-field-recheck.md` ↔ 现场清单 `windows-field-recheck-phase-f-runbook.md`。
