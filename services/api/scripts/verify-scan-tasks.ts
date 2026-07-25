@@ -396,7 +396,9 @@ async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | '
   const { client } = createPrismaClient(dbUrl)
   await client.$connect()
   try {
-    const realPrisma = { terminal: client.terminal, scanTask: client.scanTask } as never
+    // ScanTasksService.create 以真实事务 + Terminal no-op CAS 与退役串行；这里必须传
+    // 完整真实 client，不能再用只摘 terminal/scanTask 的旧局部 mock。
+    const realPrisma = client as never
     // create() 本身不触碰 this.files，真实 FilesService 在这里没有必要。
     const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
 
