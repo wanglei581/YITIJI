@@ -24,11 +24,13 @@ import {
   type AdminOrganizationOption,
   type AssignTerminalOrgResult,
   type TerminalBindCodeCreated,
+  type PlannedTerminalCreated,
   type UpdateTerminalProfileResult,
 } from './terminals.service'
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
+import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 
@@ -54,6 +56,36 @@ export class AdminTerminalsController {
   @Get()
   async list(): Promise<ApiResponse<{ terminals: AdminTerminalView[] }>> {
     return ApiResponse.ok(await this.terminalsService.listTerminalsForAdmin())
+  }
+
+  // POST /api/v1/admin/terminals
+  // Admin 先创建 planned 设备资产；此步骤不签发任何可用 Agent 凭证。
+  @Post()
+  async createPlannedTerminal(
+    @Body() dto: CreatePlannedTerminalDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<PlannedTerminalCreated>> {
+    const result = await this.terminalsService.createPlannedTerminal(dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'terminal.asset.create_planned',
+      targetType: 'terminal',
+      targetId: result.terminalCode,
+      payload: {
+        terminalCode: result.terminalCode,
+        displayName: result.displayName,
+        locationLabel: result.locationLabel,
+        orgId: result.orgId,
+        lifecycleStatus: result.lifecycleStatus,
+        credentialIssued: false,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
   }
 
   // GET /api/v1/admin/terminals/org-options

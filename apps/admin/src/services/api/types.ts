@@ -100,6 +100,7 @@ export interface AdminTerminalRecord {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+  lifecycleStatus: 'planned' | 'commissioning' | 'active' | 'maintenance' | 'suspended' | 'retired'
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
@@ -112,6 +113,24 @@ export interface AdminTerminalRecord {
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
+}
+
+export interface CreatePlannedTerminalInput {
+  terminalCode: string
+  displayName?: string
+  locationLabel?: string
+  orgId?: string
+}
+
+export interface PlannedTerminalCreated {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  orgId: string | null
+  orgName: string | null
+  enabled: boolean
+  lifecycleStatus: 'planned'
 }
 
 export interface AdminTerminalsResponse {

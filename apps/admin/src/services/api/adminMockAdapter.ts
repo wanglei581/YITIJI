@@ -12,6 +12,8 @@ import type {
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
+  CreatePlannedTerminalInput,
+  PlannedTerminalCreated,
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
@@ -158,6 +160,7 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
     enabled: true,
   },
 }
+const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
   const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
@@ -295,7 +298,7 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable'>> = [
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus'>> = [
       { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
       { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
       { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
@@ -306,14 +309,55 @@ export const adminMockAdapter = {
       { id: 't10', terminalCode: 'KSK-010', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
     ]
     return {
-      terminals: base.map((t) => ({
+      terminals: [...MOCK_PLANNED_TERMINALS.map((t) => ({
+        id: t.terminalId,
+        terminalCode: t.terminalCode,
+        displayName: t.displayName,
+        macAddress: null,
+        locationLabel: t.locationLabel,
+        enabled: t.enabled,
+        lifecycleStatus: t.lifecycleStatus,
+        orgId: t.orgId,
+        orgName: t.orgName,
+        registeredAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        online: false,
+        lastHeartbeatAt: null,
+        agentStatus: null,
+        localTaskDatabaseAvailable: null,
+        printerStatus: null,
+        agentVersion: null,
+        ipAddress: null,
+        diskFreeGb: null,
+      })), ...base.map((t) => ({
         ...t,
+        lifecycleStatus: 'active' as const,
         agentStatus: t.terminalCode === 'KSK-004' ? 'agent_degraded' : 'online',
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
         ...mockOrgFields(t.terminalCode),
-      })),
+      }))],
     }
+  },
+
+  async createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated> {
+    await delay()
+    if (MOCK_PLANNED_TERMINALS.some((t) => t.terminalCode === input.terminalCode)) {
+      throw new ApiHttpError('TERMINAL_CODE_ALREADY_EXISTS', '终端编号已存在', 400)
+    }
+    const org = input.orgId ? MOCK_ORG_OPTIONS.find((o) => o.id === input.orgId) : undefined
+    const created: PlannedTerminalCreated = {
+      terminalId: `mock-planned-${Date.now()}`,
+      terminalCode: input.terminalCode,
+      displayName: input.displayName?.trim() || null,
+      locationLabel: input.locationLabel?.trim() || null,
+      orgId: input.orgId || null,
+      orgName: org?.name ?? null,
+      enabled: true,
+      lifecycleStatus: 'planned',
+    }
+    MOCK_PLANNED_TERMINALS.unshift(created)
+    return created
   },
 
   // ── 终端机构归属（绑定/解绑）mock ─────────────────────────────────────────

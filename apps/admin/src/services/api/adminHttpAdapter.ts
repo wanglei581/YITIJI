@@ -11,6 +11,8 @@ import type {
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
+  CreatePlannedTerminalInput,
+  PlannedTerminalCreated,
   AuditLogListResponse,
   AuditLogListQuery,
   DeviceFleetOverview,
@@ -143,6 +145,9 @@ export const adminHttpAdapter = {
   // ── 设备管理 — 终端心跳(契约 C1)──────────────────────────────────────────
   getTerminals: () =>
     getData<AdminTerminalsResponse>('/admin/terminals'),
+
+  createPlannedTerminal: (input: CreatePlannedTerminalInput) =>
+    postData<PlannedTerminalCreated>('/admin/terminals', input),
 
   // ── 终端机构归属（绑定/解绑）──────────────────────────────────────────────
   getOrgOptions: () =>

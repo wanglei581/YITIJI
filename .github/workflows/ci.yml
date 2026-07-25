@@ -45,6 +45,7 @@ jobs:
       # terminals.service 在模块加载期 requireEnv 这两项（verify 启动完整 AppModule 需要）
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
+      TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -164,6 +165,13 @@ jobs:
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
 
+      - name: Install SQLite planned-terminal database guards
+        working-directory: services/api
+        # db push intentionally remains the shared SQLite CI baseline; triggers are
+        # migration-only objects, so install the exact production migration SQL before
+        # running provisioning verification.
+        run: sqlite3 prisma/dev.db ".read prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql"
+
       - name: Verify suites
         # ⚠ 必须串行(逐行顺序执行)。这些 verify 共享同一个 SQLite dev.db,
         # 并行(& / run-p / concurrently)会触发 SQLite 写锁超时,可能让脚本的
@@ -235,6 +243,9 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
+          pnpm --filter @ai-job-print/api verify:terminal-bind-code
+          pnpm --filter @ai-job-print/api verify:terminal-credentials
+          pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config
@@ -363,6 +374,7 @@ jobs:
       SMS_PROVIDER: log
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
+      TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -420,6 +432,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:terminal-bind-code
+          pnpm --filter @ai-job-print/api verify:terminal-credentials
+          pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion

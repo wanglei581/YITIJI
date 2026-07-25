@@ -27,6 +27,9 @@ const PROD_OK: Env = {
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
   // 反代可信跳数：生产必须显式声明 1..9（禁止 true）
   TRUST_PROXY_HOPS: '1',
+  // Gate 0 batch 2：生产必须关闭共享 adminSecret 旧注册面。
+  TERMINAL_LEGACY_REGISTER_ENABLED: 'false',
+  TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true',
 }
 const REQUIRED_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
@@ -304,6 +307,30 @@ function main(): void {
   expectAllowed(
     { ...PROD_OK, TRUST_PROXY_HOPS: '2' },
     '生产环境允许显式声明 hops=2',
+  )
+
+  expectRejected(
+    { ...PROD_OK, TERMINAL_LEGACY_REGISTER_ENABLED: undefined },
+    'PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN',
+    '生产环境拒绝未显式关闭 Terminal 共享密钥旧注册',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_LEGACY_REGISTER_ENABLED: 'true' },
+    'PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN',
+    '生产环境拒绝开启 Terminal 共享密钥旧注册',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: undefined },
+    'PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED',
+    '生产环境拒绝未显式声明 planned writer 状态',
+  )
+  expectAllowed(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: 'false' },
+    '生产滚动部署第一阶段允许显式关闭 planned writer',
+  )
+  expectAllowed(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true' },
+    '生产全实例升级后允许显式开启 planned writer',
   )
 
   console.log('\n=== ALL PASS ===')

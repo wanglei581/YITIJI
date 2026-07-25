@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
+> 最后更新：2026-07-25（补 Terminal planned 预创建两阶段发布与旧 binary 禁回滚门禁）；2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -94,6 +94,9 @@
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
 - [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
 - [ ] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。
+- [ ] `TERMINAL_LEGACY_REGISTER_ENABLED=false`；生产启动门禁必须拒绝缺省或 `true`，共享 `adminSecret` 不得再用于新设备注册。
+- [ ] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
+- [ ] 开启 planned writer 前已保存所有 API 实例的构建版本/commit、进程清单和健康检查证据；开启后禁止回滚到不认识 `lifecycleStatus` 的旧 binary。确需回滚时先把 planned writer 切回 `false` 并停止新设备预创建。
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
 
 ### 3.3 构建与静态资源
@@ -290,7 +293,9 @@ pnpm --filter ./services/api verify:activity-logs
 ### 5.4 终端注册与心跳
 
 - [ ] Agent 可访问生产/预生产 API。
-- [ ] 终端注册成功。
+- [ ] Admin 在既有「设备管理」页预创建唯一 `terminalCode`，设备状态为「待安装」，此时未签发日常设备凭证且不能认证。
+- [ ] Admin 生成一次性绑定码，安装程序使用绑定码激活；首次凭证 generation=1，设备进入 `commissioning`，绑定码不可重复使用；首次成功认证心跳后自动进入 `active`。
+- [ ] 终端激活成功；生产安装包、命令行、镜像和日志均不携带共享 `adminSecret` 或可复用明文 Token。
 - [ ] 心跳持续上报。
 - [ ] Admin 终端管理页显示在线。
 - [ ] 打印机状态/WMI 状态可上报。
