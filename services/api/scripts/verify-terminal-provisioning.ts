@@ -464,6 +464,15 @@ async function main(): Promise<void> {
       'pending print task blocks terminal retirement',
     )
     await prisma.printTask.update({ where: { id: pendingTaskId }, data: { status: 'cancelled' } })
+    const retiredScanTask = await prisma.scanTask.create({
+      data: {
+        terminalId: active.id,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      select: { id: true },
+    })
     const retired = await service.updateTerminalLifecycle(active.id, 'retired', {
       actorId, actorRole: 'admin', reason: 'verify permanent terminal retirement', confirmationText: activeCode,
     }, {
@@ -549,6 +558,16 @@ async function main(): Promise<void> {
       }),
       'retired terminal bind code is immutable',
       'database guard rejects reviving a retired terminal bind code',
+    )
+    await expectDatabaseRejected(
+      () => prisma.printTask.update({ where: { id: pendingTaskId }, data: { status: 'pending' } }),
+      'retired terminal cannot receive new work',
+      'database guard rejects reviving terminal print work after retirement',
+    )
+    await expectDatabaseRejected(
+      () => prisma.scanTask.update({ where: { id: retiredScanTask.id }, data: { status: 'waiting' } }),
+      'retired terminal cannot receive new work',
+      'database guard rejects reviving terminal scan work after retirement',
     )
 
     const controllerSource = readFileSync(join(process.cwd(), 'src/terminals/admin-terminals.controller.ts'), 'utf8')

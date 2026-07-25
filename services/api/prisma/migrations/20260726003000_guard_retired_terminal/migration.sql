@@ -109,9 +109,10 @@ BEGIN
   SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
 END;
 
-CREATE TRIGGER "Terminal_retired_print_task_move_guard"
-BEFORE UPDATE OF "terminalId" ON "PrintTask"
+CREATE TRIGGER "Terminal_retired_print_task_update_guard"
+BEFORE UPDATE OF "terminalId", "status" ON "PrintTask"
 WHEN NEW."terminalId" IS NOT NULL
+  AND NEW."status" IN ('pending', 'claimed', 'printing')
   AND EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
 BEGIN
   SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
@@ -124,9 +125,10 @@ BEGIN
   SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
 END;
 
-CREATE TRIGGER "Terminal_retired_scan_task_move_guard"
-BEFORE UPDATE OF "terminalId" ON "ScanTask"
-WHEN EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+CREATE TRIGGER "Terminal_retired_scan_task_update_guard"
+BEFORE UPDATE OF "terminalId", "status" ON "ScanTask"
+WHEN NEW."status" IN ('waiting', 'matched')
+  AND EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
 BEGIN
   SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
 END;

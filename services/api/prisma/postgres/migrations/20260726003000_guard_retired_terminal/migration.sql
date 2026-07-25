@@ -167,7 +167,12 @@ RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW."terminalId" IS NOT NULL THEN
     PERFORM 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" FOR UPDATE;
-    IF EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired') THEN
+    IF EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+      AND (
+        (TG_TABLE_NAME = 'PrintTask' AND NEW."status" IN ('pending', 'claimed', 'printing'))
+        OR (TG_TABLE_NAME = 'ScanTask' AND NEW."status" IN ('waiting', 'matched'))
+      )
+    THEN
       RAISE EXCEPTION 'retired terminal cannot receive new work' USING ERRCODE = 'check_violation';
     END IF;
   END IF;
@@ -179,14 +184,14 @@ CREATE TRIGGER "Terminal_retired_print_task_insert_guard"
 BEFORE INSERT ON "PrintTask"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
 
-CREATE TRIGGER "Terminal_retired_print_task_move_guard"
-BEFORE UPDATE OF "terminalId" ON "PrintTask"
+CREATE TRIGGER "Terminal_retired_print_task_update_guard"
+BEFORE UPDATE OF "terminalId", "status" ON "PrintTask"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
 
 CREATE TRIGGER "Terminal_retired_scan_task_insert_guard"
 BEFORE INSERT ON "ScanTask"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
 
-CREATE TRIGGER "Terminal_retired_scan_task_move_guard"
-BEFORE UPDATE OF "terminalId" ON "ScanTask"
+CREATE TRIGGER "Terminal_retired_scan_task_update_guard"
+BEFORE UPDATE OF "terminalId", "status" ON "ScanTask"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
