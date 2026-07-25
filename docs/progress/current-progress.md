@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 修复 **`docs/progress/current-progress.md` 误入 merge conflict 标记**（#343/#345 并入后残留 `<<<<<<<`）。并集保留 Partner #342 热更新与 G6 LegalDocVersion 两条事实；**无运行时改动**。
+
 2026-07-25 追加：**Partner #342 预生产浏览器冒烟（未登录）**。公网加载 `index-9Gb3kgQt.js`；`/sources` 未登录干净回跳 `/login`（无页面崩溃）；同页 Runtime 探针：单参数 `new URL('/api/v1/…')` 仍抛 `Invalid URL`（缺陷对照），`new URL(…, location.origin)` → `https://partner.zyidai.cn/api/v1/partner/…`。**未做**：Partner 账号登录后 data-sources/jobs GET（无本窗账号）。
 
 2026-07-25 追加：**预生产 Partner 热更新 #342**（仅 `apps/partner/dist`）。API 仍 pin `DEPLOY_SOURCE=70ed8f6d`（未重启 PM2）；Partner 公网产物 `index-PAu_zGlA.js` → `index-9Gb3kgQt.js`（相对 API URL 修复）；备份 `backups/partner-dist-before-342-*.tgz`；`DEPLOY_SOURCE.txt` 追加 `partner_hotfix_commit=6ed7ba7a` / `partner_hotfix_pr=342`。health `db=postgres`。**未做**：Partner 登录后 GET 冒烟（需账号）；全量 runtime 重部署。
