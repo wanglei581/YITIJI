@@ -30,7 +30,7 @@
 - [x] W6：建立 86 条生产路由双视口验收（Kiosk 84 + Mobile 2），补齐语义 landmark、48px 触控、横向溢出、合规、fixture 隔离与生产构建门禁；最终浏览器 `86/86 PASS`，内部复审无 Critical/Warning。
 - [ ] **上线前 P0 真实验收**——完成生产部署、PostgreSQL 生产实例、Windows 一体机、Terminal Agent、奔图真机打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收和现场试运营；任何一项未完成都不得表述为正式商用上线。
 
-本任务已吸收下方 03/05/06 等既有视觉挂账，并完成 W0–W6 本地候选收口，但不改变原有真实功能和上线 P0 硬件 / 部署验收结论。**本地 86 路由验收通过不等于正式商用上线**。
+融合 W0–W6 已随 [PR #325](https://github.com/wanglei581/YITIJI/pull/325) 合入 `main`（`09947a45`），**未部署**。本地 86 路由验收通过不等于正式商用上线。
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 
@@ -128,8 +128,9 @@
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
 - [x] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（已合入，未部署）**：PR #275 已 squash 合入 `main@0ae51289`，合并前和合并后双 CI 均成功。UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 已进入主线；不得据此声称真实导出、下载或注销已经开放。
-- [ ] **Wave 1-B Slice 2 导出执行器与恢复策略（PR #280，待 CI / Warning 决策）**：异步白名单 artifact、私有短期对象、下载租约/finish/reconciler、失败补偿与 required audit 已在 Slice 1 基线上整合并完成本地回归；已修复 Admin retry worker 抢先导致的误 503。双模型外部复审无 Critical；下一步完成 CI、确认历史非空幂等键重复预检、orphan 清理/发起审计粒度、下载单次成功交付语义与 step-up 设备匹配策略，再进行集成及上线前 PostgreSQL/Redis/COS 验收。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一事务更新 `statusChangedAt`。
-- [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
+- [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、`trust proxy` 真机确认。不得把「代码已合入」写成「用户可导出」。
+- [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook、与导出范围诚实文案对齐（见 C-04），不是「无页面」。
+- [x] **C-04 隐私导出范围文案对齐 Mapper（本地候选）**：shared / Kiosk / Admin 文案已改为披露元数据白名单；`verify:data-request-ui` 已加固。待合入后预生产走查 D4。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
@@ -139,16 +140,27 @@
 
 来源：2026-07-25 对 kiosk / admin / partner / services-api 的只读对齐审计，经 Gemini 与 team-reviewer 交叉评审后定稿。审计同时确认「已对齐基线」（岗位、企业展示、招聘会 / 校招、政策公告、权益活动、会员权益、消息通知、意见反馈、百宝箱、待机宣传屏、AI 简历主链路、模拟面试、职业规划、岗位匹配、收藏、浏览 / 外部跳转记录）不需要重做。
 
-- [x] **P0-1 第 1 步 自定义页码范围超收修复**：已完成（详见 `current-progress.md` 2026-07-25 条目）。`countPagesInRange` + 建单接入 + fail-closed + `verify:pricing` 16 条新断言；未合 main、未真机复验。
-- [x] **P0-1 第 2 步 报价端点 + Kiosk 去硬编码价**：已完成（详见 `current-progress.md` 2026-07-25 第 2 步条目）。`POST /orders/quote` + Confirm/Preview 去硬编码 + `verify:kiosk-cashier-ui` 33 checks / `verify:print-confirm-honest` 新断言；未合 main、未浏览器金额逐组核对。
-- [x] **P0-2 打印机与设备状态去伪**：已完成（详见 `current-progress.md` 2026-07-25 P0-2 条目）。公共 `useTerminalDeviceStatus` + `KioskDeviceStatusPills`；PrintPreview / HomePage / KioskRoot 三处统一消费 `GET /terminals/:id/printer-status`；`null`/`unknown`/心跳过期 fail-closed；`verify:device-status-honest` 已挂 CI；未合 main、未真机复验。
-- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已完成（详见 `current-progress.md` 2026-07-25 P0-3 条目）。Kiosk `/me/privacy-requests` + Admin `/member-privacy`；shared 诚实文案 SSOT；`verify:data-request-ui` 挂双端 CI；文案严格限定「岗位 AI 咨询会话与授权」。未合 main、未预生产浏览器走查。
-- [x] **P0-4 生产价目落库 SOP + seed 生产守卫**：已完成代码与文档侧（详见 `current-progress.md` 2026-07-25 P0-4 条目）。`seedDevDefaultPriceConfig` 在 `NODE_ENV=production` 抛 `DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION`；`docs/operations/price-config-production.md` 给出显式 upsert / FREE_MODE / 变更记录；`verify:pricing` + `verify:print-rollout-config` 锁住守卫与「不读 effectiveFrom」。**上线操作仍须人工**：按 SOP 在目标库写入拍板价并私有留痕（本波未连生产库写价）。
-- [x] **P1-1 Admin 岗位 / 招聘会信息源补「拒绝审核」**：已完成（详见 `current-progress.md` 2026-07-25 P1-1 条目）。照抄政策信息源拒绝交互；`AdminFairDto` 补回 `rejectReason`；`verify:job-review` / `verify:jobfair-review` PASS。
-- [x] **P1-2 Partner Excel 导入后刷新**：已完成（详见 `current-progress.md` 2026-07-25 P1-2 条目）。`onImported` 调 `fetchSources()` + 行内成功提示；删除过时「接入后端后」文案。
-- [ ] **P1-3 Admin 价目维护页**（含改价审计；从 P0 降级）
-- [x] **P1-4 Admin 用户管理只读版**：已完成（详见 `current-progress.md` 2026-07-25 P1-4 条目）。列表 + 详情 + 手机号搜索/详情审计；停用/写操作仍后置。`verify:admin-users` + `verify:admin-users-ui` 已挂 CI。
+- [x] **P0-1 第 1 步 自定义页码范围超收修复**：已完成并随 [PR #326](https://github.com/wanglei581/YITIJI/pull/326) squash 合入 `main@6b474051`（2026-07-25）。`countPagesInRange` + 建单接入 + fail-closed；预生产/真机出纸复验仍按下方冒烟清单执行。
+- [x] **P0-1 第 2 步 报价端点 + Kiosk 去硬编码价**：已完成并随 PR #326 合入。`POST /orders/quote` + Confirm/Preview 去硬编码；预生产须核对「确认页金额 == 建单 amountCents」。
+- [x] **P0-2 打印机与设备状态去伪**：已完成并随 PR #326 合入。`useTerminalDeviceStatus` fail-closed；真机 Agent 心跳/耗材上报仍待现场复验。
+- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已随 PR #326 合入。一体机仅开放撤回授权。**范围文案由 C-04 候选纠正为与 Mapper 一致的元数据披露**；预生产走查见下方 D4。
+- [x] **P0-4 生产价目落库 SOP + seed 生产守卫**：代码与文档已合入 main。**上线操作仍须人工**：按 `docs/operations/price-config-production.md` 在目标库写入拍板价并私有留痕（勿对生产库跑会 seed 的开发 verify）。
+- [x] **P1-1 Admin 岗位 / 招聘会信息源补「拒绝审核」**：已完成并随 PR #326 合入。
+- [x] **P1-2 Partner Excel 导入后刷新**：已完成并随 PR #326 合入。
+- [x] **P1-3 Admin 价目维护页**（含改价审计）：**代码侧已齐，勾掉**。W-C（PR #174）已交付 Admin `/billing` 改价/启停 + `price.updated` 审计；PR #247 / #255 已合入说明独立编辑。不新开「价目 CRUD」功能 PR（新建/删除价目仍故意不开放）。剩余仅生产授权改 FREE_MODE 两条 `description` 诚实化（见下）。
+- [x] **P1-4 Admin 用户管理只读版**：已完成并随 PR #326 合入。
 - [ ] **P1-5 法律文档版本号 + 生效日期**：真正的阻塞是法务定稿文本，不是加版本号（`LegalDocPage.tsx:1-13` 已有 `UPDATED_AT` 和「草拟版待法务审定」注释）。改文案必须重跑 `verify:legal-retention-copy`（锁了 6 个必含标记和 5 条负向正则）。
+
+### PR #326 合入后冒烟（预生产优先；生产须单独授权）
+
+部署目标：`main@ef37bd22`（含 #326 代码 + #327 文档；基线祖先 `6b474051`）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
+
+- [x] **D1 部署**（2026-07-25）：`DEPLOY_SOURCE deploy_commit=ef37bd22`；PM2 `ai-job-print-api` → `/srv/ai-job-print/services/api/dist/main.js`；本机/公网 health `db=postgres`；Kiosk/Admin/Partner HTTP 200；Kiosk 产物 `index-BmJkvkh1.js`；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`（tip 无此文件）；DB dump `/srv/ai-job-print-db-backups/pre-ef37bd22-20260725T172540+0800.dump`；回滚目录 `…/pre-ef37bd22-20260725T172540+0800`。
+- [x] **D2 报价诚实**（2026-07-25）：5 页 PDF `purpose=print_doc` → `POST /orders/quote` `pageRange=1-2` → `billablePages=2/amountCents=0`；同参建单 `ptask_kiosk_608db0c6a166e275` / `ORD-20260725-4B8570C048` 同为 `billablePages=2/amountCents=0`（未按 5 页超收）。FREE_MODE 下订单 `payStatus=paid`；Agent 侧打印机 offline，任务最终 `failed/PRINTER_OFFLINE`（未宣称物理出纸）。
+- [x] **D3 设备 fail-closed**（2026-07-25）：API `printerStatus=offline` + 心跳在线；浏览器首页/隐私页顶栏显示「打印机离线」「网络正常」，**未**伪造「打印机在线」或耗材 100%。未远程停 Windows Agent（现场 Agent 本已报 offline）。
+- [x] **D4 隐私 UI**（2026-07-25，部分）：公网 `/me/privacy-requests` 可达，未登录诚实门禁「请先登录」；产物含撤回授权文案与 Admin `member-privacy`/`rejectReason`。**未做**真实会员登录后的提交/Admin 列表操作（无本窗短信账号授权）。
+- [x] **D5 价目维护**（2026-07-25，只读）：Admin `/billing` 未登录跳转登录页；Admin 产物含 `/billing`；本窗**未改价、未改说明**。
+- [x] **D6 价目 SOP 只读**（2026-07-25）：active `print_bw_page=0` / `print_color_page=0`，`description` 已是「免费试运营：…0 元/页」。**无需再写**；未跑 seed、未 SQL 直改。
 
 ### 本轮明确冻结（不做，附理由）
 
@@ -203,7 +215,7 @@
 - [x] Windows 一体机下一次 probe 前置检查：`AIJobPrintAgent` 服务 Running/Automatic，`Pantum CM2800ADN Series` 由 Windows 与 terminal-agent 识别，`PrinterStatus=Normal`，PrintService Operational 已启用，公网 API health 正常。
 - [x] 服务器侧旧 active/pending 打印任务只读确认：`t_ksk_001` 的 `pending/claimed/printing` active 任务为 0 行；最近任务均为 `completed`，没有会被 Agent 抢走的旧 active 任务。
 - [x] 打印运营模式运行时复验：2026-07-15 已在现场人员确认 KSK-001 旁有人值守且 Windows 队列为空后，完成首台 `FREE_MODE` 唯一一笔生产零元验收。即时门禁确认 F1 active 0 元价目、F2 `PAYMENT_PROVIDER=disabled`、F3 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`、F4 同源 `/api/v1` 与内部 HMAC URL 防线均保持；866 B 单页无个人信息 PDF 经正式上传 / 建单链路得到任务 `ptask_kiosk_14d3c375051c87d5`、订单 `ORD-20260715-4BDFD88D74`，`amountCents=0`、`payStatus=paid`、数据库 `paymentSource=free`，任务 `claimed -> printing -> completed` 且无错误码；现场确认真实出纸，Windows 队列为空，事后 active task 回到 0、终端仍 `online/ready`、health 正常。未创建第二单、未重试、未直改数据库或修改生产配置。2026-07-08 正式生产微信小额支付/退款/业务打印与 2026-07-13 自动确认后真实出纸样本继续作为付费模式技术证据；支付宝仍未完成生产验收。生产仍不得直接做不付款取消/超时演练，未支付任务生命周期关闭路径继续按独立任务推进。
-- [ ] **FREE_MODE 价目说明文案诚实化**：本次零元订单的真实 `unitCents/amountCents` 均为 0，但生产 `priceLines.description` 仍保留旧的“非正式预生产验收价目 / 100 分每页”说明。Admin 说明独立编辑候选已完成双模型终审并创建 [PR #247](https://github.com/wanglei581/YITIJI/pull/247)；GitHub `build-and-verify` 与 `postgres-readiness` 当前运行中，下一道门禁为其通过与评审，部署仍需明确授权。部署后再经独立生产授权更新两条 `description`，保持 0 元和 active，复核 `price.updated` 审计、渠道为空、health、终端与活动任务；不得重复建单或出纸。当前候选未合并、未部署，生产旧说明未修改。
+- [ ] **FREE_MODE 价目说明文案诚实化**：[PR #247](https://github.com/wanglei581/YITIJI/pull/247) / #255 已合入 main（Admin 可独立编辑 `description`）。代码门禁已过；**卡点是生产部署含该能力的构建 + 明确生产写授权**。授权后只改两条 active 价目的说明为诚实免费试运营文案，保持 `unitCents=0` / `active=true`，复核 `price.updated`、渠道为空、health、终端与活动任务；不得重复建单或出纸、不得 SQL 直改。
 
 - [ ] **当前未支付任务受控关闭：**独立本地分支已实现 Admin 专用 `close-unpaid` 路径，条件为 pending、未领取、同一关联订单 `unpaid/pending` 且**不存在任何**支付尝试；事务内将订单原子关闭并审计，阻断迟到回调与新支付出码。外部 Antigravity + Claude 初审提出支付尝试读写窗口、审计请求元数据、中文阻断提示和 mock 错误码一致性问题，均已修复；订单 CAS 现同步要求 `paymentAttempts.none`，审计元数据同事务写入，二次双审均为 Critical/Warning 无。已通过 Admin / API typecheck、静态 UI verify、限定 API ESLint、由仓库 SQLite migrations 建立的临时数据库 `verify:admin-print-scan` 全量验证；临时库已删除。未合入、未部署、未执行生产任务关闭。下一步提交 PR 并等待 CI；合并、部署与生产只读预检 / 受控操作仍须用户另行授权；不得直接在生产以该功能演练或关闭任务。
 - [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。

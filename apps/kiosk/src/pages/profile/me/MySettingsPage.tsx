@@ -432,8 +432,8 @@ export function MySettingsPage() {
                 icon={ShieldQuestionIcon}
                 iconBg="bg-plum-soft"
                 iconColor="text-plum"
-                label="岗位 AI 隐私请求"
-                desc="仅限岗位 AI 咨询会话与授权，不删除简历或订单"
+                label="隐私与数据请求"
+                desc="撤回岗位 AI 授权；导出与注销暂未开放"
                 onClick={() => navigate('/me/privacy-requests')}
               />
             )}
@@ -492,7 +492,7 @@ export function MySettingsPage() {
           <div className="me-note flex items-start gap-3 px-5 py-4">
             <ShieldQuestionIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
             <p className="text-xs leading-relaxed text-neutral-500">
-              账号注销和数据导出尚未开放。岗位 AI 咨询会话与授权相关请求可在「岗位 AI 隐私请求」中提交；不会删除简历、文档、打印订单或收藏。如需其他协助，请联系现场工作人员。
+              账号注销和数据导出尚未开放。可在「隐私与数据请求」中撤回岗位 AI 授权；撤回不会删除简历、文档、打印订单或收藏。后台导出包若执行，包含业务元数据清单（含文件与订单等摘要），不是「仅岗位 AI」。如需其他协助，请联系现场工作人员。
             </p>
           </div>
         </div>

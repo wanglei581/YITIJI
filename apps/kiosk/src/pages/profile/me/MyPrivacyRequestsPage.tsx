@@ -1,7 +1,8 @@
 // ============================================================
-// 岗位 AI 隐私请求 — /me/privacy-requests
+// 隐私与数据请求 — /me/privacy-requests
 //
-// 与 main 后端对齐：仅开放撤回授权；导出需 step-up；账号注销暂未开放。
+// 与 main 后端对齐：仅开放撤回授权；导出需 step-up（一体机无提交）；账号注销暂未开放。
+// 范围文案须与 MemberDataExportMapper 元数据白名单一致，不得否认订单/文件分区。
 // ============================================================
 
 import { useEffect, useState } from 'react'
@@ -83,8 +84,8 @@ export function MyPrivacyRequestsPage() {
       <div className="fusion-w5 fusion-w5--profile me-inkdetail flex h-full flex-col p-6" data-kiosk-screen="member-privacy-requests">
         <PageHeader
           className="me-page-header"
-          title="岗位 AI 隐私请求"
-          subtitle="仅限岗位 AI 咨询会话与授权"
+          title="隐私与数据请求"
+          subtitle="撤回授权可用；导出与注销暂未在一体机开放"
           actions={
             <Button size="sm" variant="secondary" className="me-ripple" onClick={() => navigate('/me/settings')}>
               返回设置
@@ -94,7 +95,7 @@ export function MyPrivacyRequestsPage() {
         <EmptyState
           className="mt-10"
           title="请先登录"
-          description="登录后可提交或查看本人的岗位 AI 会话与授权相关请求。"
+          description="登录后可提交撤回岗位 AI 授权，或查看本人相关请求记录。"
           action={
             <Button size="lg" onClick={() => navigate('/login', { state: { from: '/me/privacy-requests' } })}>
               手机号登录
@@ -115,8 +116,8 @@ export function MyPrivacyRequestsPage() {
 
       <PageHeader
         className="me-page-header"
-        title="岗位 AI 隐私请求"
-        subtitle="仅限岗位 AI 咨询会话与授权"
+        title="隐私与数据请求"
+        subtitle="撤回授权可用；导出与注销暂未在一体机开放"
         actions={
           <Button size="sm" variant="secondary" className="me-ripple me-back-button" onClick={() => navigate('/me/settings')}>
             返回设置
