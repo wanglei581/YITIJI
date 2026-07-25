@@ -113,7 +113,20 @@ async function main(): Promise<void> {
     await service.assertAgentAuthorized(first.terminalId, `Bearer ${rotated.terminalToken}`)
     console.log('  PASS rotated credential authenticates')
 
-    const bindCode = await service.createBindCode(first.terminalId, null, 10)
+    const maintenance = await service.updateTerminalLifecycle(first.terminalId, 'maintenance', {
+      actorId: 'verify-admin',
+      actorRole: 'admin',
+      reason: 'verify replacement credential maintenance flow',
+    }, {
+      expectedStatus: 'active',
+      expectedVersion: terminal.lifecycleVersion,
+    })
+    assert(maintenance.newStatus === 'maintenance', 'replacement credential flow enters maintenance before bind-code creation')
+
+    const bindCode = await service.createBindCode(first.terminalId, 'verify-admin', 10, {
+      actorId: 'verify-admin',
+      actorRole: 'admin',
+    })
     const exchanged = await service.exchangeBindCode({
       bindCode: bindCode.bindCode,
       deviceFingerprint: `fp-bind-${suffix}`,
