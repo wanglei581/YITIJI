@@ -15,7 +15,8 @@
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
 6. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
-8. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检；`req.ip` 抽样确认
+8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
+9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
 
 ---
 
@@ -145,7 +146,7 @@
 - [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook；范围文案已由 C-04/#329 对齐。
 - [x] **C-04 隐私导出范围文案对齐 Mapper（已合入）**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) → `main@9e6c255d`。预生产走查见 D4；**未部署**。
 - [x] **TRUST_PROXY_HOPS 部署与真机确认（预生产）**：[PR #331](https://github.com/wanglei581/YITIJI/pull/331) 已合入；2026-07-25 预生产部署 `main@70ed8f6d`，`.env` 写入 `TRUST_PROXY_HOPS=1`（单层 nginx→3010），`resolveTrustProxyHops=1` + `assertProductionTrustProxyHops` 通过，API 启动/health `db=postgres`、三端 200。**生产实例若另机部署须单独授权复做**；禁止 `true`。
-- [ ] **TRUST_PROXY_HOPS `req.ip` 抽样确认**：择期核对客户端 IP 非反代地址；生产若另有 hops 数须单独改写。
+- [x] **TRUST_PROXY_HOPS `req.ip` 抽样确认**（2026-07-25）：公网伪造 XFF 探针 + nginx `remote_addr` + Express `trust proxy=1` 等价链复现通过；生产若另有 hops 数须单独改写。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
