@@ -11,6 +11,9 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  UpdateTerminalLifecycleInput,
+  UpdateTerminalLifecycleResult,
+  TerminalLifecycleStatus,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -161,6 +164,7 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
   },
 }
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
+const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
   const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
@@ -298,7 +302,7 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus'>> = [
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion'>> = [
       { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
       { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
       { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
@@ -317,6 +321,7 @@ export const adminMockAdapter = {
         locationLabel: t.locationLabel,
         enabled: t.enabled,
         lifecycleStatus: t.lifecycleStatus,
+        lifecycleVersion: 0,
         orgId: t.orgId,
         orgName: t.orgName,
         registeredAt: new Date().toISOString(),
@@ -331,7 +336,8 @@ export const adminMockAdapter = {
         diskFreeGb: null,
       })), ...base.map((t) => ({
         ...t,
-        lifecycleStatus: 'active' as const,
+        lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
+        lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,
         agentStatus: t.terminalCode === 'KSK-004' ? 'agent_degraded' : 'online',
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
@@ -400,17 +406,66 @@ export const adminMockAdapter = {
     return next
   },
 
+  async updateTerminalLifecycle(
+    terminalId: string,
+    input: UpdateTerminalLifecycleInput,
+  ): Promise<UpdateTerminalLifecycleResult> {
+    await delay()
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    const normalizedReason = input.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new ApiHttpError('LIFECYCLE_REASON_INVALID', '运维原因须为 8–500 个字符', 400)
+    }
+    if (terminal.lifecycleStatus !== input.expectedStatus || terminal.lifecycleVersion !== input.expectedVersion) {
+      throw new ApiHttpError('TERMINAL_LIFECYCLE_CONFLICT', '终端运维状态或版本已变化，请刷新后重试', 409)
+    }
+    if (terminal.lifecycleStatus === input.targetStatus) {
+      return {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        oldStatus: terminal.lifecycleStatus,
+        newStatus: input.targetStatus,
+        inFlightTaskCount: 0,
+        lifecycleVersion: terminal.lifecycleVersion,
+      }
+    }
+    const allowed =
+      (terminal.lifecycleStatus === 'active' && input.targetStatus === 'maintenance') ||
+      (terminal.lifecycleStatus === 'maintenance' && input.targetStatus === 'active')
+    if (!allowed) throw new ApiHttpError('TERMINAL_LIFECYCLE_TRANSITION_INVALID', '不允许的设备状态切换', 409)
+    MOCK_TERMINAL_LIFECYCLE[terminal.terminalCode] = {
+      status: input.targetStatus,
+      version: terminal.lifecycleVersion + 1,
+    }
+    return {
+      terminalId: terminal.id,
+      terminalCode: terminal.terminalCode,
+      oldStatus: terminal.lifecycleStatus,
+      newStatus: input.targetStatus,
+      inFlightTaskCount: 0,
+      lifecycleVersion: terminal.lifecycleVersion + 1,
+    }
+  },
+
   // ── mock：一次性绑定码（仅用于前端 demo，不模拟真实 agentToken 流转） ──
   async createTerminalBindCode(terminalId: string, ttlMinutes = 10): Promise<TerminalBindCodeCreated> {
     await delay()
-    const profile = MOCK_TERMINAL_PROFILE[terminalId]
-    const terminalCode = profile?.terminalCode ?? terminalId
-    if (profile && profile.enabled === false) {
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    if (!terminal.enabled) {
       throw new ApiHttpError('TERMINAL_DISABLED', '终端已停用，不能生成绑定码', 400)
+    }
+    if (terminal.lifecycleStatus !== 'planned' && terminal.lifecycleStatus !== 'maintenance') {
+      throw new ApiHttpError('TERMINAL_MAINTENANCE_REQUIRED', '已激活终端须先进入维护并排空任务', 400)
     }
     const bindCode = mockBindCode()
     const expiresAt = new Date(Date.now() + Math.max(1, Math.min(60, ttlMinutes)) * 60_000).toISOString()
-    return { terminalId, terminalCode, bindCode, expiresAt }
+    return { terminalId: terminal.id, terminalCode: terminal.terminalCode, bindCode, expiresAt }
   },
 
   async getPrinters(): Promise<AdminPrintersResponse> {

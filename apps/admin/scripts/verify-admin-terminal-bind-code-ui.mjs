@@ -24,6 +24,7 @@ const required = [
   'src/routes/terminals/index.tsx',
   'src/routes/terminals/TerminalBindCodeDialog.tsx',
   'src/routes/terminals/CreatePlannedTerminalDialog.tsx',
+  'src/routes/terminals/TerminalLifecycleActions.tsx',
   'src/services/api/devices.ts',
   'src/services/api/adminHttpAdapter.ts',
   'src/services/api/adminMockAdapter.ts',
@@ -41,6 +42,7 @@ for (const rel of required) {
 const { 'src/routes/terminals/index.tsx': page } = loaded
 const { 'src/routes/terminals/TerminalBindCodeDialog.tsx': dialog } = loaded
 const { 'src/routes/terminals/CreatePlannedTerminalDialog.tsx': plannedDialog } = loaded
+const { 'src/routes/terminals/TerminalLifecycleActions.tsx': lifecycleActions } = loaded
 const { 'src/services/api/devices.ts': devices } = loaded
 const { 'src/services/api/adminHttpAdapter.ts': http } = loaded
 const { 'src/services/api/adminMockAdapter.ts': mock } = loaded
@@ -137,6 +139,29 @@ if (
   pass('现有设备管理页接入 Admin 预创建设备，http/mock 双适配且不宣称签发凭证')
 } else {
   fail('Admin terminals page must expose planned-device creation through existing device management entry')
+}
+
+if (
+  page.includes('TerminalLifecycleActions') &&
+  page.includes("t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'") &&
+  page.includes('换机前请先进入维护') &&
+  lifecycleActions.includes('updateTerminalLifecycle') &&
+  lifecycleActions.includes('进入维护') &&
+  lifecycleActions.includes('恢复运行') &&
+  lifecycleActions.includes('操作原因（必填）') &&
+  lifecycleActions.includes('normalizedReason.length >= 8') &&
+  lifecycleActions.includes('expectedVersion: terminal.lifecycleVersion') &&
+  lifecycleActions.includes('请填写 8–500 个字符') &&
+  devices.includes('updateTerminalLifecycle') &&
+  http.includes('patchData<UpdateTerminalLifecycleResult>') &&
+  http.includes('/lifecycle') &&
+  mock.includes('TERMINAL_LIFECYCLE_TRANSITION_INVALID') &&
+  mock.includes('TERMINAL_MAINTENANCE_REQUIRED') &&
+  mock.includes('normalizedReason.length < 8')
+) {
+  pass('现有终端表接入 active/maintenance 运维动作，并将换机绑定码限制为 planned/maintenance')
+} else {
+  fail('terminal lifecycle actions and bind-code maintenance gate must stay wired through the existing terminals page')
 }
 
 console.log('\nALL PASS')

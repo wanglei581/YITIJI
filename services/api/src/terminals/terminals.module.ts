@@ -10,12 +10,14 @@ import { TerminalsService } from './terminals.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
 import { ToolboxGovernanceService } from './toolbox-governance.service'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { TerminalCredentialSecurityService } from './terminal-credential-security.service'
 
 @Module({
   imports: [JwtVerifierModule],
   controllers: [TerminalsController, AdminTerminalsController, AdminPrintersController, AdminToolboxController],
   providers: [
     TerminalAgentService,
+    TerminalCredentialSecurityService,
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,

@@ -12,12 +12,14 @@ import {
   updateTerminalProfile,
   type AdminTerminalRecord,
   type AdminOrganizationOption,
+  type TerminalLifecycleStatus,
   type UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
+import { TerminalLifecycleActions } from './TerminalLifecycleActions'
 
-const TABLE_COLS = 12
+const TABLE_COLS = 13
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
@@ -82,12 +84,14 @@ export default function TerminalsPage() {
   const [profileDraft, setProfileDraft] = useState<UpdateTerminalProfileInput>({})
   const [profileSaving, setProfileSaving] = useState(false)
   const [statusSavingId, setStatusSavingId] = useState<string | null>(null)
+  const [lifecycleSavingId, setLifecycleSavingId] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // 一次性绑定码弹窗状态；生成/倒计时/复制逻辑在 TerminalBindCodeDialog 内部。
   const [bindCodeTerminal, setBindCodeTerminal] = useState<AdminTerminalRecord | null>(null)
   const [creatingPlannedTerminal, setCreatingPlannedTerminal] = useState(false)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
+  const [localLifecyclePatch, setLocalLifecyclePatch] = useState<Record<string, { status: TerminalLifecycleStatus; version: number }>>({})
 
   const {
     data: terminalData,
@@ -111,13 +115,14 @@ export default function TerminalsPage() {
   )
 
   useInteractionLock(
-    editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null || creatingPlannedTerminal,
+    editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null || lifecycleSavingId !== null || creatingPlannedTerminal,
     [TERMINALS_REFRESH_KEY],
     'hard',
   )
 
   function openBindCodeModal(t: AdminTerminalRecord) {
-    if (statusSavingId !== null || !t.enabled) return
+    const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
+    if (statusSavingId !== null || lifecycleSavingId !== null || !t.enabled || !canCreateBindCode) return
     setBindCodeTerminal(t)
     setNotice(null)
   }
@@ -129,9 +134,15 @@ export default function TerminalsPage() {
     () => (terminalData?.terminals ?? []).map((terminal) => {
       const orgPatch = localOrgPatch[terminal.id]
       const profilePatch = localProfilePatch[terminal.id]
-      return { ...terminal, ...orgPatch, ...profilePatch }
+      const lifecyclePatch = localLifecyclePatch[terminal.id]
+      return {
+        ...terminal,
+        ...orgPatch,
+        ...profilePatch,
+        ...(lifecyclePatch ? { lifecycleStatus: lifecyclePatch.status, lifecycleVersion: lifecyclePatch.version } : {}),
+      }
     }),
-    [localOrgPatch, localProfilePatch, terminalData?.terminals],
+    [localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
   )
 
   const loading = status === 'loading' && terminals.length === 0
@@ -370,7 +381,7 @@ export default function TerminalsPage() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
+                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -403,6 +414,14 @@ export default function TerminalsPage() {
                 paginated.map((t) => {
                   const runtimeView = runtimeStatusView(t)
                   const printerView = printerStatusView(t.printerStatus ?? null)
+                  const canCreateBindCode = t.lifecycleStatus === 'planned' || t.lifecycleStatus === 'maintenance'
+                  const bindCodeTitle = !t.enabled
+                    ? '停用终端不可生成绑定码'
+                    : t.lifecycleStatus === 'active'
+                      ? '换机前请先进入维护，确认停止领取新任务后再生成绑定码'
+                      : canCreateBindCode
+                        ? t.lifecycleStatus === 'planned' ? '生成首次安装绑定码' : '生成换机绑定码'
+                        : `当前状态 ${t.lifecycleStatus} 不允许生成绑定码`
                   return (
                     <tr key={t.id} className="hover:bg-neutral-50">
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
@@ -481,8 +500,8 @@ export default function TerminalsPage() {
                               <button
                                 type="button"
                                 onClick={() => openBindCodeModal(t)}
-                                disabled={statusSavingId !== null || !t.enabled}
-                                title={t.enabled ? '生成一次性绑定码（用于 Windows 新主机授权）' : '停用终端不可生成绑定码'}
+                                disabled={statusSavingId !== null || lifecycleSavingId !== null || !t.enabled || !canCreateBindCode}
+                                title={bindCodeTitle}
                                 aria-label={`为 ${t.terminalCode} 生成一次性绑定码`}
                                 className="inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-md border border-primary-200 bg-primary-50 px-2 text-xs font-medium text-primary-700 hover:bg-primary-100 disabled:cursor-not-allowed disabled:opacity-50"
                               >
@@ -585,6 +604,28 @@ export default function TerminalsPage() {
                                 : t.enabled ? '停用' : '启用'}
                           </button>
                         </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <TerminalLifecycleActions
+                          terminal={t}
+                          disabled={statusSavingId !== null || lifecycleSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id}
+                          onBusyChange={(busy) => setLifecycleSavingId(busy ? t.id : null)}
+                          onUpdated={(result) => {
+                            setLocalLifecyclePatch((current) => ({
+                              ...current,
+                              [t.id]: { status: result.newStatus, version: result.lifecycleVersion },
+                            }))
+                            void refresh()
+                              .then(() => setLocalLifecyclePatch((current) => {
+                                if (!current[t.id]) return current
+                                const next = { ...current }
+                                delete next[t.id]
+                                return next
+                              }))
+                              .catch(() => undefined)
+                          }}
+                          onNotice={setNotice}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-col gap-1">

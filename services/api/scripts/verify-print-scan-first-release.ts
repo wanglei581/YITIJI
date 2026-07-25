@@ -210,20 +210,20 @@ function main(): void {
   const statusBlock = section(terminalsService, 'async patchTaskStatus', 'async validateTerminalToken')
   mustContain(
     statusBlock,
-    ['TASK_TERMINAL_MISSING', 'TASK_NOT_OWNED', 'await this.findAndValidate(terminalIdHeader, authHeader)'],
+    ['TASK_TERMINAL_MISSING', 'TASK_NOT_OWNED', 'await this.credentialSecurity.validateTerminalToken(terminalIdHeader, authHeader)'],
     'status patch must reject legacy unbound tasks and wrong terminal updates',
   )
 
-  const resetBlock = section(terminalsService, 'private async resetExpiredClaims', 'private async seedPrintTask')
+  const resetBlock = section(terminalsService, 'async resetExpiredClaims', 'private async seedPrintTask')
   mustNotContain(
     resetBlock,
     ['terminalId: null'],
-    'expired claim reset must preserve target terminalId for same-terminal retry',
+    'unconfirmed timeout handling must preserve target terminalId for investigation',
   )
   mustContain(
     resetBlock,
-    ["status: 'claimed'", 'claimExpiry: { lt: now }', "status: 'pending'"],
-    'claim TTL reset must keep lease recovery behavior',
+    ["status: 'claimed'", 'claimExpiry: { lt: now }', "status: 'failed'", "errorCode: 'PRINT_JOB_UNCONFIRMED'", 'autoRequeued: false'],
+    'claim timeout must fail closed and prohibit automatic redispatch',
   )
 
   mustContain(

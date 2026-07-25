@@ -9,6 +9,8 @@ import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.servic
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
@@ -52,14 +54,25 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const suffix = crypto.randomBytes(6).toString('hex')
   const terminalCode = `PLAN-${suffix}`
+  const actorId = `u_terminal_provisioning_${suffix}`
   const audit = new AuditService(prisma)
   const agent = new TerminalAgentService(prisma, audit)
   const admin = new TerminalAdminService(prisma, agent, new TerminalToolboxService(prisma))
   const service = new TerminalsService(agent, admin)
   const previousLegacyFlag = process.env['TERMINAL_LEGACY_REGISTER_ENABLED']
   const previousProvisioningFlag = process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED']
+  const taskIds: string[] = []
 
   try {
+    await prisma.user.create({
+      data: {
+        id: actorId,
+        username: `verify-terminal-provisioning-${suffix}`,
+        passwordHash: 'verify-only-not-a-login-secret',
+        name: 'Terminal provisioning verifier',
+        role: 'admin',
+      },
+    })
     process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED'] = 'false'
     await expectRejected(
       () => service.createPlannedTerminal({ terminalCode }),
@@ -211,7 +224,10 @@ async function main(): Promise<void> {
       'duplicate terminalCode is rejected',
     )
 
-    const bind = await service.createBindCode(planned.id, 'verify-admin', 10)
+    const bind = await service.createBindCode(planned.id, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
     const exchanged = await service.exchangeBindCode({
       bindCode: bind.bindCode,
       deviceFingerprint: `activated-${suffix}`,
@@ -250,26 +266,208 @@ async function main(): Promise<void> {
         lifecycleStatus: 'active',
       },
     })
-    const activeBind = await service.createBindCode(active.id, 'verify-admin', 10)
-    await service.exchangeBindCode({ bindCode: activeBind.bindCode, deviceFingerprint: `active-rebind-${suffix}` })
+    await expectRejected(
+      () => service.createBindCode(active.id, actorId, 10),
+      'TERMINAL_MAINTENANCE_REQUIRED',
+      'active terminal cannot mint a replacement bind code before maintenance',
+    )
+
+    const maintenance = await service.updateTerminalLifecycle(active.id, 'maintenance', {
+      actorId, actorRole: 'admin', reason: 'verify enter maintenance',
+    }, {
+      expectedStatus: 'active',
+      expectedVersion: active.lifecycleVersion,
+    })
+    assert(maintenance.newStatus === 'maintenance', 'Admin lifecycle transition enters maintenance')
+    await expectRejected(
+      () => service.updateTerminalLifecycle(active.id, 'active', {
+        actorId, actorRole: 'admin', reason: 'verify stale lifecycle request',
+      }, {
+        expectedStatus: 'maintenance',
+        expectedVersion: active.lifecycleVersion,
+      }),
+      'TERMINAL_LIFECYCLE_CONFLICT',
+      'stale lifecycle version cannot reopen a newer maintenance cycle',
+    )
+    await service.heartbeat(
+      active.id,
+      { status: 'online', agentVersion: 'verify-maintenance' },
+      `Bearer active-placeholder-${suffix}`,
+    )
+    console.log('  PASS maintenance terminal keeps heartbeat available')
+
+    const pendingTaskId = `ptask_maintenance_pending_${suffix}`
+    taskIds.push(pendingTaskId)
+    await prisma.printTask.create({
+      data: {
+        id: pendingTaskId,
+        terminalId: active.id,
+        fileUrl: '/verify/maintenance.pdf',
+        fileMd5: suffix,
+        status: 'pending',
+      },
+    })
+    const maintenanceClaim = await service.claimTasks(
+      active.id,
+      { maxTasks: 1 },
+      `Bearer active-placeholder-${suffix}`,
+    )
+    assert(maintenanceClaim.length === 0, 'maintenance terminal cannot claim a new task')
+    assert(
+      (await prisma.printTask.findUniqueOrThrow({ where: { id: pendingTaskId } })).status === 'pending',
+      'maintenance claim denial leaves pending task unchanged',
+    )
+
+    const inFlightTaskId = `ptask_maintenance_claimed_${suffix}`
+    taskIds.push(inFlightTaskId)
+    await prisma.printTask.create({
+      data: {
+        id: inFlightTaskId,
+        terminalId: active.id,
+        fileUrl: '/verify/in-flight.pdf',
+        fileMd5: suffix,
+        status: 'claimed',
+        claimedAt: new Date(),
+        claimExpiry: new Date(Date.now() + 60_000),
+      },
+    })
+    await expectRejected(
+      () => service.createBindCode(active.id, actorId, 10),
+      'TERMINAL_IN_FLIGHT_TASKS',
+      'maintenance terminal with claimed/printing work cannot mint a replacement bind code',
+    )
+    await service.patchTaskStatus(
+      inFlightTaskId,
+      { status: 'printing' },
+      `Bearer active-placeholder-${suffix}`,
+      active.id,
+    )
+    assert(
+      (await prisma.printTask.findUniqueOrThrow({ where: { id: inFlightTaskId } })).status === 'printing',
+      'maintenance terminal can report progress for already claimed work',
+    )
+    await service.patchTaskStatus(
+      inFlightTaskId,
+      { status: 'failed', errorCode: 'VERIFY_DRAINED' },
+      `Bearer active-placeholder-${suffix}`,
+      active.id,
+    )
+
+    const activeBind = await service.createBindCode(active.id, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
+    const replacement = await service.exchangeBindCode({
+      bindCode: activeBind.bindCode,
+      deviceFingerprint: `active-rebind-${suffix}`,
+    })
     const reboundActive = await prisma.terminal.findUniqueOrThrow({ where: { id: active.id } })
-    assert(reboundActive.lifecycleStatus === 'active', 'existing active terminal rebind preserves lifecycle')
+    assert(reboundActive.lifecycleStatus === 'maintenance', 'replacement bind preserves maintenance until explicit recommission')
+    await expectRejected(
+      () => service.assertAgentAuthorized(active.id, `Bearer active-placeholder-${suffix}`),
+      'AUTH_TOKEN_INVALID',
+      'replacement bind invalidates the old terminal token immediately',
+    )
+    await service.assertAgentAuthorized(active.id, `Bearer ${replacement.terminalToken}`)
+    console.log('  PASS replacement token authenticates')
+    const recommissioned = await service.updateTerminalLifecycle(active.id, 'active', {
+      actorId, actorRole: 'admin', reason: 'verify resume after maintenance',
+    }, {
+      expectedStatus: 'maintenance',
+      expectedVersion: maintenance.lifecycleVersion,
+    })
+    assert(recommissioned.newStatus === 'active', 'Admin lifecycle transition returns maintenance terminal to active')
+
+    const expiredClaimedId = `ptask_expired_claimed_${suffix}`
+    const expiredPrintingId = `ptask_expired_printing_${suffix}`
+    taskIds.push(expiredClaimedId, expiredPrintingId)
+    await prisma.printTask.createMany({
+      data: [
+        {
+          id: expiredClaimedId,
+          terminalId: active.id,
+          fileUrl: '/verify/expired-claimed.pdf',
+          fileMd5: suffix,
+          status: 'claimed',
+          claimedAt: new Date(Date.now() - 20 * 60_000),
+          claimExpiry: new Date(Date.now() - 60_000),
+        },
+        {
+          id: expiredPrintingId,
+          terminalId: active.id,
+          fileUrl: '/verify/expired-printing.pdf',
+          fileMd5: suffix,
+          status: 'printing',
+          claimedAt: new Date(Date.now() - 20 * 60_000),
+          updatedAt: new Date(Date.now() - 20 * 60_000),
+        },
+      ],
+    })
+    await prisma.order.createMany({
+      data: [
+        { orderNo: `VERIFY-CLAIMED-${suffix}`, printTaskId: expiredClaimedId, terminalId: active.id, taskStatus: 'claimed' },
+        { orderNo: `VERIFY-PRINTING-${suffix}`, printTaskId: expiredPrintingId, terminalId: active.id, taskStatus: 'printing' },
+      ],
+    })
+    await agent.resetExpiredClaims()
+    const timedOut = await prisma.printTask.findMany({ where: { id: { in: [expiredClaimedId, expiredPrintingId] } } })
+    assert(
+      timedOut.every((task) => task.status === 'failed' && task.errorCode === 'PRINT_JOB_UNCONFIRMED'),
+      'expired claimed/printing tasks fail as PRINT_JOB_UNCONFIRMED instead of returning pending',
+    )
+    const timeoutOrders = await prisma.order.findMany({ where: { printTaskId: { in: [expiredClaimedId, expiredPrintingId] } } })
+    assert(timeoutOrders.every((order) => order.taskStatus === 'failed'), 'timeout failure mirrors into Order.taskStatus')
+    assert(
+      await prisma.printTaskStatusLog.count({
+        where: { taskId: { in: [expiredClaimedId, expiredPrintingId] }, toStatus: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+      }) === 2,
+      'timeout failure writes status logs for claimed and printing tasks',
+    )
+    assert(
+      await prisma.auditLog.count({
+        where: { targetId: { in: [expiredClaimedId, expiredPrintingId] }, action: 'print_job.timeout_unconfirmed', actorId: null },
+      }) === 2,
+      'timeout failure writes system audit rows with null actorId',
+    )
+
+    const controllerSource = readFileSync(join(process.cwd(), 'src/terminals/admin-terminals.controller.ts'), 'utf8')
+    const lifecycleSource = readFileSync(join(process.cwd(), 'src/terminals/terminals-admin.service.ts'), 'utf8')
+    assert(
+      controllerSource.includes("@Patch(':terminalId/lifecycle')") &&
+        lifecycleSource.includes("action: 'terminal.lifecycle.update'") &&
+        lifecycleSource.includes('lifecycleVersion: { increment: 1 }'),
+      'Admin exposes one lifecycle endpoint and audits lifecycle changes',
+    )
     console.log('\nALL PASS')
   } finally {
     if (previousLegacyFlag === undefined) delete process.env['TERMINAL_LEGACY_REGISTER_ENABLED']
     else process.env['TERMINAL_LEGACY_REGISTER_ENABLED'] = previousLegacyFlag
     if (previousProvisioningFlag === undefined) delete process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED']
     else process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED'] = previousProvisioningFlag
-    await prisma.auditLog.deleteMany({ where: { targetId: terminalCode } })
+    await prisma.auditLog.deleteMany({
+      where: {
+        OR: [
+          { targetId: { in: [terminalCode, `ACTIVE-${suffix}`, `CREDENTIAL-SOURCE-${suffix}`] } },
+          { actorId },
+        ],
+      },
+    })
     const verifierTerminals = await prisma.terminal.findMany({
       where: { terminalCode: { in: [terminalCode, `ACTIVE-${suffix}`, `CREDENTIAL-SOURCE-${suffix}`] } },
       select: { id: true },
     })
+    if (taskIds.length > 0) {
+      await prisma.auditLog.deleteMany({ where: { targetId: { in: taskIds } } })
+      await prisma.order.deleteMany({ where: { printTaskId: { in: taskIds } } })
+      await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
+      await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
+    }
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: verifierTerminals.map((terminal) => terminal.id) } } })
     await prisma.terminal.deleteMany({ where: { terminalCode } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `ACTIVE-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `LEGACY-CLOSED-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `CREDENTIAL-SOURCE-${suffix}` } })
+    await prisma.user.deleteMany({ where: { id: actorId } })
     await prisma.onModuleDestroy()
   }
 }

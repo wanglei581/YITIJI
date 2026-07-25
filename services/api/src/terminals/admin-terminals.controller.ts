@@ -26,6 +26,7 @@ import {
   type TerminalBindCodeCreated,
   type PlannedTerminalCreated,
   type UpdateTerminalProfileResult,
+  type UpdateTerminalLifecycleResult,
 } from './terminals.service'
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
@@ -33,6 +34,7 @@ import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
 import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
 
 import { resolveClientIp } from '../common/client-ip'
 interface AuditReq {
@@ -104,19 +106,9 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<TerminalBindCodeCreated>> {
-    const result = await this.terminalsService.createBindCode(terminalId, user.userId, dto.ttlMinutes)
-    await this.audit.write({
+    const result = await this.terminalsService.createBindCode(terminalId, user.userId, dto.ttlMinutes, {
       actorId: user.userId,
       actorRole: user.role,
-      action: 'terminal.bind_code.create',
-      targetType: 'terminal',
-      targetId: result.terminalCode,
-      payload: {
-        terminalCode: result.terminalCode,
-        expiresAt: result.expiresAt,
-        // 绝不写 bindCode 明文到审计日志。
-        bindCodeReturnedOnce: true,
-      },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
@@ -216,6 +208,29 @@ export class AdminTerminalsController {
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
+  }
+
+  // PATCH /api/v1/admin/terminals/:terminalId/lifecycle
+  // Gate 0.3A 仅允许 active <-> maintenance：maintenance 停止新任务并保留排空回传。
+  @Patch(':terminalId/lifecycle')
+  async updateLifecycle(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalLifecycleDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<UpdateTerminalLifecycleResult>> {
+    const result = await this.terminalsService.updateTerminalLifecycle(terminalId, dto.targetStatus, {
+      actorId: user.userId,
+      actorRole: user.role,
+      reason: dto.reason,
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    }, {
+      expectedStatus: dto.expectedStatus,
+      expectedVersion: dto.expectedVersion,
     })
     return ApiResponse.ok(result)
   }

@@ -37,6 +37,7 @@ async function main(): Promise<void> {
   const suffix = crypto.randomBytes(6).toString('hex')
   const legacyId = `t_vcred_legacy_${suffix}`
   const managedCode = `VCRED-${suffix}`
+  const actorId = `u_vcred_admin_${suffix}`
   const legacyToken = `legacy-${crypto.randomBytes(20).toString('hex')}`
   const audit = new AuditService(prisma)
   const agent = new TerminalAgentService(prisma, audit)
@@ -46,6 +47,15 @@ async function main(): Promise<void> {
   process.env['TERMINAL_LEGACY_REGISTER_ENABLED'] = 'true'
 
   try {
+    await prisma.user.create({
+      data: {
+        id: actorId,
+        username: `verify-terminal-credentials-${suffix}`,
+        passwordHash: 'verify-only-not-a-login-secret',
+        name: 'Terminal credential verifier',
+        role: 'admin',
+      },
+    })
     await prisma.terminal.create({
       data: {
         id: legacyId,
@@ -113,7 +123,20 @@ async function main(): Promise<void> {
     await service.assertAgentAuthorized(first.terminalId, `Bearer ${rotated.terminalToken}`)
     console.log('  PASS rotated credential authenticates')
 
-    const bindCode = await service.createBindCode(first.terminalId, null, 10)
+    const maintenance = await service.updateTerminalLifecycle(first.terminalId, 'maintenance', {
+      actorId,
+      actorRole: 'admin',
+      reason: 'verify replacement credential maintenance flow',
+    }, {
+      expectedStatus: 'active',
+      expectedVersion: terminal.lifecycleVersion,
+    })
+    assert(maintenance.newStatus === 'maintenance', 'replacement credential flow enters maintenance before bind-code creation')
+
+    const bindCode = await service.createBindCode(first.terminalId, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
     const exchanged = await service.exchangeBindCode({
       bindCode: bindCode.bindCode,
       deviceFingerprint: `fp-bind-${suffix}`,
@@ -183,7 +206,8 @@ async function main(): Promise<void> {
     const managed = await prisma.terminal.findUnique({ where: { terminalCode: managedCode }, select: { id: true } })
     if (managed) await prisma.terminal.delete({ where: { id: managed.id } })
     await prisma.terminal.deleteMany({ where: { id: legacyId } })
-    await prisma.auditLog.deleteMany({ where: { targetId: managedCode } })
+    await prisma.auditLog.deleteMany({ where: { OR: [{ targetId: managedCode }, { actorId }] } })
+    await prisma.user.deleteMany({ where: { id: actorId } })
     await prisma.onModuleDestroy()
   }
 }
