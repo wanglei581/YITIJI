@@ -367,16 +367,8 @@ async function main() {
         deviceFingerprint: 'fp-retired',
       },
     })
-    await prisma.terminal.update({
-      where: { id: retiredTerminalId },
-      data: {
-        enabled: false,
-        lifecycleStatus: 'retired',
-        lifecycleVersion: { increment: 1 },
-        credentialGeneration: { increment: 1 },
-        agentToken: `cred$retired$${suffix}`,
-      },
-    })
+    // The failed task must predate retirement. Database guards correctly reject
+    // all new work attached after a terminal has become a permanent tombstone.
     await prisma.printTask.create({
       data: {
         id: retiredTaskId,
@@ -385,6 +377,16 @@ async function main() {
         fileMd5: 'retired-md5',
         status: 'failed',
         errorCode: 'printer_offline',
+      },
+    })
+    await prisma.terminal.update({
+      where: { id: retiredTerminalId },
+      data: {
+        enabled: false,
+        lifecycleStatus: 'retired',
+        lifecycleVersion: { increment: 1 },
+        credentialGeneration: { increment: 1 },
+        agentToken: `cred$retired$${suffix}`,
       },
     })
     await prisma.order.create({
