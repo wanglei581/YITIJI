@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 在 `source=resume` 时曾故意只保留「上传简历」单 Tab；现与文档打印共用三种通道（本机上传 / 扫码上传 / U盘导入），保留「我的简历记录」入口与文档打印独有的「扫描原件」。`verify:print-entry-source-split` 已加回归断言。未动支付/硬件/合规。
+
 2026-07-25 完成 **Partner Wave 1 登录邮箱别名候选**（分支 `codex/partner-email-login-alias-20260725` / [PR #356](https://github.com/wanglei581/YITIJI/pull/356)）：按商用方案 [`docs/reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md`](../reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md) 落地——`User.emailHash/emailEnc/emailVerifiedAt/emailVerifyMethod`（双 schema + 双轨 migration）；密码登录支持已验证邮箱别名；Admin `PUT /admin/orgs/:id/accounts/:accountId/email`（`confirmVerified` + `admin_manual`，无 SMTP）；Partner 登录文案三别名；`verify:partner-email-login-alias` 接入 CI；孤立 SQLite 夹具已同步 email 列。本地/CI 绿；**不做**邮箱 OTP/找回/Partner 自助绑邮箱；**未部署**；建议排在 P0 验收后合入。
 
 2026-07-25 固化 **预发两笔热修源码**（分支 `fix/preprod-hotfixes-20260725` / PR #366）：① `resolveOfflineListPage` 收紧 Kiosk/Admin 线下机构四处列表的 `page`/`pageSize`（string → 整数，封顶 100），新增 `verify:offline-agencies-page` 并接入双 CI；② `HttpExceptionFilter` 将 Throttler `429` 映射为 `RATE_LIMITED` /「尝试过于频繁，请稍后再试」，扩展 `verify:http-exception-filter`。本地 verify / API typecheck / lint 与 CI 三 job 通过；diff **不含** #355 依赖门禁回退。**预发仍 pin `DEPLOY_SOURCE=7e59243c` 且已热修 dist**——合入 main 后须另授全量部署才固化。
