@@ -16,10 +16,11 @@
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG `MemberLegalConsent`；P1-5 法务正文定稿仍开）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。仍须用户点名授权包后推进：
-   - **7a `SEED_PASSWORD_CONFIRM`**：确认 `admin`/`partner1`/`partner2` 已非 seed 默认口令（或禁用）；聊天不传密码，用户本机改密/确认即可勾选清单 §2.2
+   - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——`admin` 非默认；**`partner1`/`partner2` 仍 MATCH seed 默认**；§2.2 未勾选
+   - **7a2 `SEED_PASSWORD_ROTATE` 或 `SEED_PASSWORD_DISABLE`（阻塞）**：须用户点名后处理 partner1/partner2（改强密+tokenVersion++，或 `enabled=false`）；密码不进聊天
    - **7b `SECRETS_ROTATION_EVIDENCE`**：百度 OCR / COS / SMS / TRTC / LLM 控制台轮换截图或变更时间（密钥不进仓库/聊天）
    - **7c `WINDOWS_FIELD_RECHECK`**：一体机 Agent + 奔图驱动 + 断网恢复现场复验
-   - **7d（可选）`PARTNER_SMOKE_LOGIN`**：提供预发 Partner 测试号后做 data-sources/jobs 只读 GET
+   - **7d（可选）`PARTNER_SMOKE_LOGIN`**：口令轮换后再做；提供预发 Partner 测试号后 data-sources/jobs 只读 GET
    - **不在本包**：G5 退款、F1 Genesis、close-unpaid Phase B、切收费支付
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
