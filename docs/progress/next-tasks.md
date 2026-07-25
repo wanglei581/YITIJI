@@ -144,7 +144,8 @@
 - [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、部署后 `TRUST_PROXY_HOPS` 真机确认 `req.ip`。不得把「代码已合入」写成「用户可导出」。
 - [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook；范围文案已由 C-04/#329 对齐。
 - [x] **C-04 隐私导出范围文案对齐 Mapper（已合入）**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) → `main@9e6c255d`。预生产走查见 D4；**未部署**。
-- [ ] **TRUST_PROXY_HOPS 部署与真机确认**：代码门禁见本分支候选；合入后须在预生产/生产 `.env` 按真实 nginx 层数写入 `TRUST_PROXY_HOPS=1..9`（禁止 `true`），重启 API 后抽样确认 `req.ip` 为客户端而非反代地址。
+- [x] **TRUST_PROXY_HOPS 预生产部署**：`70ed8f6d` 已写 `TRUST_PROXY_HOPS=1`（nginx 单跳）；API 已重启且 health 正常。
+- [ ] **TRUST_PROXY_HOPS `req.ip` 抽样确认**：择期核对客户端 IP 非反代地址；生产若另有 hops 数须单独改写。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
