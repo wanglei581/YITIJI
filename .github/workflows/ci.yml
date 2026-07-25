@@ -119,6 +119,10 @@ jobs:
         # 仅验证临时 release/artifact 目录与 fake PM2/health；不得连接任何环境。
         run: pnpm --filter @ai-job-print/api verify:release-provenance
 
+      - name: Release Genesis fixture
+        # 仅使用临时目录、fake PM2、fake health、fake traffic controller；禁止连接网络、数据库、Redis、实例或真实 PM2。
+        run: pnpm --filter @ai-job-print/api verify:release-genesis
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
