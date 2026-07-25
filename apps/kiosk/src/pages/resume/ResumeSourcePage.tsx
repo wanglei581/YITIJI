@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
-import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
+import type { StepperStep } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -104,6 +105,13 @@ const INTENT_COPY: Record<ResumeIntent, {
 const OPTIMIZE_FLOW_STEPS = ['上传', '诊断', '优化', '新旧对比', '编辑', '导出 PDF', '打印']
 
 const SUPPORTED_FORMATS = ['PDF', 'DOC', 'DOCX', 'JPG', 'PNG', 'WEBP']
+
+const RESUME_FLOW_STEPS: StepperStep[] = [
+  { title: '上传与方向' },
+  { title: 'AI 解析' },
+  { title: '诊断报告' },
+  { title: '优化打印' },
+]
 
 const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp'
 const MAX_BYTES = 10 * 1024 * 1024
@@ -254,6 +262,10 @@ export function ResumeSourcePage() {
         </ComplianceBanner>
       </div>
 
+      <div className="resume-lightflow__stepper mt-4">
+        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={0} />
+      </div>
+
       <input
         ref={fileInputRef}
         type="file"
@@ -302,80 +314,132 @@ export function ResumeSourcePage() {
           <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
         </button>
 
-        <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
-          {UPLOAD_OPTIONS.map((option) => {
-          const isSelected = selected === option.type
-          const Icon = option.icon
-          const disabled = uploading
-          return (
-            <button
-              type="button"
-              key={option.type}
-              onClick={() => !disabled && handleSelect(option)}
-              disabled={disabled}
-              className={[
-                'flex min-h-[148px] w-full flex-col justify-between rounded-2xl border-2 px-5 py-5 text-left shadow-sm transition-colors',
-                'disabled:cursor-not-allowed disabled:opacity-60',
-                isSelected
-                  ? 'border-primary-500 bg-white ring-4 ring-primary-100'
-                  : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
-              ].join(' ')}
-            >
-              <div className="flex items-center gap-4">
-                <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-neutral-100'].join(' ')}>
-                  <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-neutral-500'].join(' ')} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{option.label}</p>
-                  <p className="mt-1 text-sm font-medium text-neutral-600">{option.description}</p>
-                </div>
-                {isSelected && <CheckCircleIcon className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />}
-              </div>
-              <p className="mt-4 text-xs leading-relaxed text-neutral-400">{option.helper}</p>
-            </button>
-          )
-          })}
-        </div>
+        <div className="resume-source-split flex min-w-0 flex-col gap-5 lg:flex-row">
+          <div className="resume-source-main flex min-w-0 flex-1 flex-col gap-5">
+            <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
+              {UPLOAD_OPTIONS.map((option) => {
+              const isSelected = selected === option.type
+              const Icon = option.icon
+              const disabled = uploading
+              return (
+                <button
+                  type="button"
+                  key={option.type}
+                  onClick={() => !disabled && handleSelect(option)}
+                  disabled={disabled}
+                  className={[
+                    'flex min-h-[148px] w-full flex-col justify-between rounded-2xl border-2 px-5 py-5 text-left shadow-sm transition-colors',
+                    'disabled:cursor-not-allowed disabled:opacity-60',
+                    isSelected
+                      ? 'border-primary-500 bg-white ring-4 ring-primary-100'
+                      : 'border-neutral-200 bg-white hover:border-primary-200 hover:bg-primary-50/30 active:bg-primary-50',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', isSelected ? 'bg-primary-100' : 'bg-neutral-100'].join(' ')}>
+                      <Icon className={['h-8 w-8', isSelected ? 'text-primary-600' : 'text-neutral-500'].join(' ')} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={['text-xl font-bold', isSelected ? 'text-primary-700' : 'text-neutral-900'].join(' ')}>{option.label}</p>
+                      <p className="mt-1 text-sm font-medium text-neutral-600">{option.description}</p>
+                    </div>
+                    {isSelected && <CheckCircleIcon className="h-6 w-6 shrink-0 text-primary-600" aria-hidden="true" />}
+                  </div>
+                  <p className="mt-4 text-xs leading-relaxed text-neutral-400">{option.helper}</p>
+                </button>
+              )
+              })}
+            </div>
 
-        {selected === 'phone' ? (
-          <div className="resume-source-phone-session">
-            <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+            {selected === 'phone' ? (
+              <div className="resume-source-phone-session">
+                <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={handleUploadBoxClick}
+                className={[
+                  'resume-source-dropzone flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
+                  uploadedFile
+                    ? 'border-primary-300 bg-primary-50/35'
+                    : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
+                  uploading ? 'cursor-not-allowed opacity-70' : '',
+                ].join(' ')}
+              >
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
+                  {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
+                </div>
+                <p className="mt-4 text-2xl font-extrabold text-neutral-900">
+                  {uploadedFile ? uploadedFile.name : '点击上传文件'}
+                </p>
+                <p className="mt-2 text-base font-medium text-neutral-500">
+                  {uploadedFile
+                    ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
+                      uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
+                    }`
+                    : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
+                </p>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  {SUPPORTED_FORMATS.map((format) => (
+                    <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
+                      {format}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            )}
           </div>
-        ) : (
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={handleUploadBoxClick}
-            className={[
-              'resume-source-dropzone flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
-              uploadedFile
-                ? 'border-primary-300 bg-primary-50/35'
-                : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
-              uploading ? 'cursor-not-allowed opacity-70' : '',
-            ].join(' ')}
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-600">
-              {uploadedFile ? <FileTextIcon className="h-8 w-8" aria-hidden="true" /> : <UploadCloudIcon className="h-8 w-8" aria-hidden="true" />}
+
+          <aside className="resume-source-side flex w-full flex-none flex-col gap-5 lg:w-[348px]">
+            <div className="resume-source-direction">
+              <DiagnosisDirectionForm
+                genericDiagnosis={genericDiagnosis}
+                selectedDimensions={selectedDimensions}
+                targetIndustry={targetIndustry}
+                targetJob={targetJob}
+                targetExperience={targetExperience}
+                targetScene={targetScene}
+                onGenericDiagnosisChange={setGenericDiagnosis}
+                onToggleDimension={toggleDimension}
+                onTargetIndustryChange={setTargetIndustry}
+                onTargetJobChange={setTargetJob}
+                onTargetExperienceChange={setTargetExperience}
+                onTargetSceneChange={setTargetScene}
+              />
             </div>
-            <p className="mt-4 text-2xl font-extrabold text-neutral-900">
-              {uploadedFile ? uploadedFile.name : '点击上传文件'}
-            </p>
-            <p className="mt-2 text-base font-medium text-neutral-500">
-              {uploadedFile
-                ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
-                  uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
-                }`
-                : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
-            </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {SUPPORTED_FORMATS.map((format) => (
-                <span key={format} className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-semibold text-neutral-500">
-                  {format}
-                </span>
-              ))}
-            </div>
-          </button>
-        )}
+
+            <Card className="resume-source-context p-5">
+              <p className="text-sm font-bold text-neutral-900">补充方向（可选）</p>
+              <p className="mt-1 text-xs leading-relaxed text-neutral-500">
+                补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
+              </p>
+              <div className="mt-3 grid gap-3">
+                <label className="block">
+                  <span className="text-xs font-semibold text-neutral-500">专业</span>
+                  <input
+                    value={targetMajor}
+                    disabled={genericDiagnosis}
+                    onChange={(e) => setTargetMajor(e.target.value.slice(0, 60))}
+                    placeholder="例如：计算机科学与技术"
+                    className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-neutral-500">学历</span>
+                  <input
+                    value={targetDegree}
+                    disabled={genericDiagnosis}
+                    onChange={(e) => setTargetDegree(e.target.value.slice(0, 30))}
+                    placeholder="例如：本科、硕士、大专"
+                    className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
+                  />
+                </label>
+              </div>
+            </Card>
+          </aside>
+        </div>
 
         <Card className="resume-source-evidence p-5">
           <div className="flex items-center gap-2">
@@ -406,52 +470,6 @@ export function ResumeSourcePage() {
           <div className="mt-4 flex items-start gap-2 rounded-2xl bg-warning-bg px-4 py-3 text-sm leading-relaxed text-warning-fg">
             <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>诊断维度以当前后端 AI 报告结构为准。系统不会编造「超过多少人」「必然提分」等无法验证的结论。</p>
-          </div>
-        </Card>
-
-        <div className="resume-source-direction">
-          <DiagnosisDirectionForm
-            genericDiagnosis={genericDiagnosis}
-            selectedDimensions={selectedDimensions}
-            targetIndustry={targetIndustry}
-            targetJob={targetJob}
-            targetExperience={targetExperience}
-            targetScene={targetScene}
-            onGenericDiagnosisChange={setGenericDiagnosis}
-            onToggleDimension={toggleDimension}
-            onTargetIndustryChange={setTargetIndustry}
-            onTargetJobChange={setTargetJob}
-            onTargetExperienceChange={setTargetExperience}
-            onTargetSceneChange={setTargetScene}
-          />
-        </div>
-
-        <Card className="resume-source-context p-5">
-          <p className="text-sm font-bold text-neutral-900">补充方向（可选）</p>
-          <p className="mt-1 text-xs leading-relaxed text-neutral-500">
-            补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
-          </p>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <label className="block">
-              <span className="text-xs font-semibold text-neutral-500">专业</span>
-              <input
-                value={targetMajor}
-                disabled={genericDiagnosis}
-                onChange={(e) => setTargetMajor(e.target.value.slice(0, 60))}
-                placeholder="例如：计算机科学与技术"
-                className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-neutral-500">学历</span>
-              <input
-                value={targetDegree}
-                disabled={genericDiagnosis}
-                onChange={(e) => setTargetDegree(e.target.value.slice(0, 30))}
-                placeholder="例如：本科、硕士、大专"
-                className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-              />
-            </label>
           </div>
         </Card>
       </div>

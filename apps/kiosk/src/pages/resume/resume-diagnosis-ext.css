@@ -246,7 +246,7 @@
 
 :is(.resume-source-lightflow, .resume-parse-lightflow, .resume-report-lightflow) .resume-parse-steps {
   padding: 20px;
-  border: 1px solid rgba(143, 178, 207, 0.52);
+  border: 1px solid rgba(226, 220, 203, 0.95);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 14px 32px rgba(35, 92, 137, 0.08);

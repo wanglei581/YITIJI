@@ -79,6 +79,7 @@ function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
       <div className="oa-r-aside">
         <div className="oa-jobs-n">{agency.jobCount}</div>
         <div className="oa-jobs-t">在招岗位</div>
+        <span className="oa-mini-btn" aria-hidden="true">查看门店信息</span>
         <div className="oa-jobs-t">岗位咨询请到店办理</div>
       </div>
     </article>
@@ -88,10 +89,10 @@ function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
 // ── 空态 ─────────────────────────────────────────────────────
 function EmptyState() {
   return (
-    <div className="jf-notice" style={{ justifyContent: 'center', padding: '48px 20px', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-      <BuildingIcon style={{ width: 56, height: 56, opacity: 0.3 }} aria-hidden="true" />
-      <b style={{ fontSize: 22, color: 'var(--ink)' }}>暂无线下招聘机构信息</b>
-      <span style={{ fontSize: 18 }}>尝试调整筛选条件，或稍后再查看</span>
+    <div className="oa-empty" role="status">
+      <BuildingIcon aria-hidden="true" />
+      <b>暂无线下招聘机构信息</b>
+      <span>尝试调整筛选条件，或稍后再查看</span>
     </div>
   )
 }

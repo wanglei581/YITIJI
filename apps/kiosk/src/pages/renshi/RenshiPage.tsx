@@ -12,8 +12,7 @@ import { PolicyPanel } from './PolicyPanel'
 import { SocialPanel } from './SocialPanel'
 import { RegisterPanel } from './RegisterPanel'
 import { NoticePanel } from './NoticePanel'
-
-// ── Page ───────────────────────────────────────────────────────────────────────
+import './renshi-policy-fusion.css'
 
 export function RenshiPage() {
   const navigate = useNavigate()
@@ -22,8 +21,6 @@ export function RenshiPage() {
   const [audience, setAudience] = useState<AudienceKey>('all')
   const { getToken } = useAuth()
 
-  // P1 浏览/跳转记录：fire-and-forget，失败不影响浏览与官方入口打开；匿名不上报。
-  // 内置指引（builtin-*）不在政策库中，服务端会拒绝记录，前端直接跳过。
   const [qrEntry, setQrEntry] = useState<{ title: string; url: string } | null>(null)
   const isBuiltin = (id: string) => id.startsWith('builtin-')
   const handlePolicyItemOpened = (item: PolicyItem) => {
@@ -44,7 +41,6 @@ export function RenshiPage() {
     setQrEntry({ title: policy.title, url: policy.externalUrl })
   }
 
-  // 政策内容（阶段1D 接真）：一次拉取，前端按 kind 拆分。
   const [policies, setPolicies] = useState<PolicyPostView[]>([])
   const [policyState, setPolicyState] = useState<'loading' | 'error' | 'ready'>('loading')
 
@@ -60,20 +56,17 @@ export function RenshiPage() {
 
   useEffect(() => { loadPolicies() }, [])
 
-  // 同一路由内 search params 变化时同步首页深链 Tab，非法值回退「就业政策」。
   useEffect(() => {
     setActiveTab(getInitialTab(searchParams))
   }, [searchParams])
 
   const notices = policies.filter((p) => p.kind === 'notice')
 
-  // 混合数据源：后端发布政策（审核为准）在前，内置办事指引模板在后。
   const policyItems = useMemo<PolicyItem[]>(
     () => [...policies.filter((p) => p.kind === 'policy_guide').map(fromPublished), ...BUILTIN_GUIDES],
     [policies],
   )
 
-  /** 数据来源说明：库内政策取真实来源机构名 + 最近同步时间；内置指引单独表述，避免被误认为同步内容。 */
   const sourceLine = (() => {
     if (policies.length === 0) return '当前展示内置办事指引（整理参考，以官方发布为准）；标注「政策发布」的为合作机构发布、管理员审核内容'
     const names = [...new Set(policies.map((p) => p.sourceName))].slice(0, 2).join('、')
@@ -104,46 +97,41 @@ export function RenshiPage() {
 
   return (
     <KioskPageFrame
-      className="w4-policy-page"
+      className="w4-policy-page k8-policy-shell h-full"
       header={<KioskPageHeader title="政策服务" description="就业政策 · 补贴指引 · 社保 · 就业登记 · 政策公告" onBack={() => navigate('/')} backLabel="返回首页" />}
     >
-    <div className="k8-policy flex h-full min-h-0 flex-col gap-[18px] px-12 py-5">
+      <div className="k8-policy">
       {qrEntry && <OfficialEntryQrOverlay title={qrEntry.title} url={qrEntry.url} onClose={() => setQrEntry(null)} />}
 
-      {/* 合规边界：仅信息指引 + 直达 AI 助手政策问答 */}
-      <div className="flex shrink-0 items-center gap-4 rounded-[14px] border bg-wheat-bg px-[22px] py-4" style={{ borderColor: 'rgba(169,120,31,.35)' }}>
+      <div className="k8-policy-banner">
         <ShieldCheckIcon className="h-[30px] w-[30px] shrink-0 text-wheat-fg" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[21px] font-semibold text-wheat-fg">仅信息指引 · 不代办</p>
-          <p className="mt-1 text-[17px] leading-relaxed text-wheat-fg/85">
+        <div className="k8-policy-banner__text min-w-0 flex-1">
+          <b>仅信息指引 · 不代办</b>
+          <span>
             只做政策说明、材料清单、官方入口与打印辅助；不代申请、不承诺补贴到账，不保存身份证 / 银行卡 / 社保等材料。
-          </p>
+          </span>
         </div>
         <button
           type="button"
           onClick={() => navigate('/assistant')}
-          className="flex min-h-[60px] shrink-0 items-center gap-2 rounded-[14px] border bg-surface px-5 text-[18px] font-semibold text-wheat-fg transition-colors hover:bg-wheat-soft active:scale-[.98]"
-          style={{ borderColor: 'rgba(169,120,31,.45)' }}
+          className="k8-policy-banner__action"
         >
           <MessageCircleQuestionIcon className="h-5 w-5" aria-hidden="true" />
           问 AI 助手
         </button>
       </div>
 
-      {/* Tab 导航 */}
       <TabBar active={activeTab} onChange={setActiveTab} />
 
-      {/* Tab 面板 */}
       {activeTab === 'policy' && renderPolicyTab()}
       {activeTab === 'notice' && renderNoticeTab()}
       {activeTab === 'social' && <SocialPanel onOfficialEntry={(title, url) => setQrEntry({ title, url })} />}
       {activeTab === 'register' && <RegisterPanel />}
 
-      {/* 合规页脚 */}
-      <p className="shrink-0 rounded-[14px] border border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[15px] leading-relaxed text-neutral-500">
+      <p className="k8-policy-footer">
         政策与公告内容仅作展示说明，具体以官方发布为准。如需办理具体业务，请前往对应窗口或扫码访问官方平台。
       </p>
-    </div>
+      </div>
     </KioskPageFrame>
   )
 }

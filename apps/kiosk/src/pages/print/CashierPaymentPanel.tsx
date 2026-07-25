@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
-import { LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
+import { CheckIcon, LoaderIcon, RefreshCwIcon, SearchCheckIcon, ShieldCheckIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
 import { PAY_CHANNEL_LABEL, type AttemptPaymentMethod, type CashierView } from './cashierStatus'
 
@@ -71,6 +71,25 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     (view?.phase === 'awaiting_scan' || view?.phase === 'awaiting_code_confirmation') &&
     snapshot?.attempt?.channel !== undefined &&
     snapshot.attempt.channel !== 'sandbox'
+  const failFacts = view?.phase === 'refunded'
+    ? [
+        { text: <> <b>未进入打印</b> · 该订单已进入退款流程 </> },
+        { text: <> <b>未产生新的打印任务</b> · 打印机不会出件 </> },
+        { text: <> <b>如需继续</b> · 请返回重新发起打印 </> },
+      ]
+    : view?.phase === 'closed'
+      ? [
+          { text: <> <b>未产生扣款</b> · 超时关闭不会扣费 </> },
+          { text: <> <b>未创建打印任务</b> · 打印机不会出件 </> },
+          { text: <> <b>文件仍在</b> · 重新支付即可继续打印 </> },
+        ]
+      : [
+          { text: <> <b>未产生扣款</b> · 如手机端未扣费即无需处理 </> },
+          { text: <> <b>未创建打印任务</b> · 打印机不会出件 </> },
+          { text: <> <b>文件仍在</b> · 重新支付即可继续打印 </> },
+        ]
+
+  // 终态走冻结的 KioskStatePanel（fusion-w2）；meta 补 32A 诚实事实，不伪造已支付/已出件。
   const terminalState = view && ['failed', 'closed', 'expired', 'refunded'].includes(view.phase)
     ? (
         <KioskStatePanel
@@ -78,7 +97,29 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
           tone="error"
           title={view.title}
           description={view.hint}
-          actions={view.canReissue ? <Button variant="secondary" onClick={onReissue}>重新尝试</Button> : undefined}
+          className="cashier-fail-card"
+          meta={view.phase === 'expired' ? undefined : (
+            <div className="cashier-fail-facts">
+              {failFacts.map((fact, index) => (
+                <div key={index} className="cashier-fail-fact">
+                  <CheckIcon aria-hidden="true" />
+                  <span>{fact.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          actions={view.canReissue ? (
+            <Button variant="secondary" size="lg" style={{ width: '100%' }} disabled={issuing} onClick={onReissue}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+                <RefreshCwIcon style={{ width: 18, height: 18, animation: issuing ? 'spin 1s linear infinite' : undefined }} aria-hidden="true" />
+                {view.phase === 'expired'
+                  ? '重新出码'
+                  : (attemptPaymentMethod ?? paymentMethod) === 'code'
+                    ? '重新扫码'
+                    : '重新支付'}
+              </span>
+            </Button>
+          ) : undefined}
         />
       )
     : null
@@ -132,24 +173,15 @@ export function CashierPaymentPanel(props: CashierPaymentPanelProps) {
     <div className="cashier-qr-area">
       <div className="cashier-qr-panel">
         {view.title || view.hint ? (
-          <div style={{
-            width: '100%',
-            borderRadius: 12,
-            padding: '10px 16px',
-            textAlign: 'center',
-            fontSize: 16,
-            background: view.tone === 'success' ? 'var(--print-teal-soft)' : view.tone === 'error' ? 'rgb(193 74 52 / 8%)' : view.tone === 'warning' ? 'var(--print-wheat-soft)' : 'var(--print-slate-soft)',
-            color: view.tone === 'success' ? 'var(--print-teal-deep)' : view.tone === 'error' ? 'var(--print-error)' : view.tone === 'warning' ? 'var(--print-wheat-deep, #8a6219)' : 'var(--print-slate)',
-            border: `1px solid ${view.tone === 'success' ? 'rgb(31 158 134 / 30%)' : view.tone === 'error' ? 'rgb(193 74 52 / 30%)' : view.tone === 'warning' ? 'rgb(169 120 31 / 30%)' : 'rgb(63 104 176 / 25%)'}`,
-          }}>
-            <p style={{ fontWeight: 700 }}>{view.title}</p>
-            {view.hint && <p style={{ marginTop: 4, lineHeight: 1.5 }}>{view.hint}</p>}
+          <div className="cashier-tone-banner" data-tone={view.tone}>
+            <b>{view.title}</b>
+            {view.hint && <p style={{ marginTop: 4 }}>{view.hint}</p>}
           </div>
         ) : null}
 
         {qrContent && (
           <>
-            <div style={{ background: '#fff', borderRadius: 12, padding: 16, border: '1px solid var(--print-line)' }}>
+            <div className="cashier-qr-frame">
               <QRCodeSVG value={qrContent} size={240} level="M" marginSize={1} />
             </div>
             <div className="cashier-qr-title">

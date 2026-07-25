@@ -76,6 +76,8 @@
   min-height: 0;
   background: transparent;
   flex: 1;
+  /* Clearance above shared 116px bottom nav (nav is outside this scroll root). */
+  padding-bottom: 24px;
 }
 .kpv1 *,
 .kpv1 *::before,

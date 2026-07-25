@@ -34,7 +34,7 @@ const CATEGORY_META: Record<string, { label: string; icon: KioskIconName; tone: 
   system: { label: '系统', icon: 'bell', tone: 'clay' },
 }
 
-export function MyNotificationsPage() {
+export function MyNotificationsPage({ loginFrom = '/me/notifications' }: { loginFrom?: string }) {
   const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberNotificationItem[]>([])
@@ -125,7 +125,7 @@ export function MyNotificationsPage() {
       <MeListShell
         title="消息通知"
         subtitle="本人设备、打印、文件与服务消息"
-        loginFrom="/me/notifications"
+        loginFrom={loginFrom}
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={refresh}

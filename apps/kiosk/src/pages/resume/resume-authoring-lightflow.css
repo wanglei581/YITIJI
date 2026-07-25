@@ -104,7 +104,7 @@
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__field:focus {
   border-color: var(--resume-primary);
   background: var(--k-surface, var(--color-surface));
-  box-shadow: 0 0 0 4px rgba(23, 105, 232, .12);
+  box-shadow: 0 0 0 4px rgba(31, 158, 134, .14);
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__entry-card {
@@ -181,7 +181,7 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar button:not([data-variant='secondary']) {
-  box-shadow: 0 12px 24px rgba(23, 105, 232, .2);
+  box-shadow: 0 12px 24px rgba(31, 158, 134, .18);
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__state {
@@ -203,7 +203,7 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow :is(button, input, textarea, select):focus-visible {
-  outline: 3px solid rgba(23, 105, 232, .34);
+  outline: 3px solid rgba(31, 158, 134, .34);
   outline-offset: 3px;
 }
 

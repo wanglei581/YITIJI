@@ -98,25 +98,25 @@ export function PrintScanFeatureInfoPage() {
 
   return (
     <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-feature" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <div data-w2-page="print-scan-feature" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
       <KioskPageHeader title={info.title} description="功能说明（即将上线）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
       <section className="mt-4 flex min-h-0 flex-1 gap-5">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <section className="flex items-center gap-6 rounded-lg border border-warning/30 border-t-4 border-t-[#a9781f] bg-surface p-7 shadow-sm">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-wheat flex items-center gap-6 p-7">
             <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-warning-bg text-warning-fg">
               <Icon className="h-12 w-12" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
               <h2 className="flex items-center gap-3 font-serif text-[36px] font-black tracking-normal">
                 {info.title}
-                <span className="rounded-full border border-neutral-200 bg-canvas px-4 py-1.5 font-sans text-base font-semibold text-neutral-500">即将上线</span>
+                <span className="w2-print-scan-soon-badge">即将上线</span>
               </h2>
               <p className="mt-2 text-[19px] leading-relaxed text-neutral-500">{info.summary}</p>
             </span>
           </section>
 
-          <section className="flex flex-1 flex-col rounded-lg border border-warning/30 border-t-4 border-t-[#a9781f] bg-surface p-6 shadow-sm">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-wheat flex flex-1 flex-col p-6">
             <b className="mb-2 block text-[22px] font-bold">计划支持</b>
             {PLAN_SUPPORT.map(([PlanIcon, title, copy]) => (
               <div key={String(title)} className="flex flex-1 items-center gap-4 border-b border-dashed border-neutral-200 py-3 last:border-b-0">
@@ -137,7 +137,7 @@ export function PrintScanFeatureInfoPage() {
           </div>
         </div>
 
-        <aside className="flex w-[420px] shrink-0 flex-col gap-4">
+        <aside className="w2-print-scan-side">
           <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
             <b className="mb-1 block text-xl font-bold">常见证件照规格参考</b>
             <p className="mb-3 text-[16.5px] text-neutral-500">仅供了解，实际以功能上线后支持的规格为准</p>

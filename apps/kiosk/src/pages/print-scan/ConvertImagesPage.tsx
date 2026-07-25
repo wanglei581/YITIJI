@@ -163,7 +163,7 @@ export function ConvertImagesPage() {
 
   return (
     <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-convert" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <div data-w2-page="print-scan-convert" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
       <KioskPageHeader title="格式转换" description="多张图片合并为一份 PDF，仅支持 JPG / PNG" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
       <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
@@ -174,8 +174,8 @@ export function ConvertImagesPage() {
 
         {error && <KioskStatePanel compact tone="error" title="转换暂未完成" description={error} icon={<AlertCircleIcon />} />}
 
-        <div className="flex min-h-0 flex-1 gap-5">
-          <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-info/30 border-t-4 border-t-info bg-surface p-5 shadow-sm">
+        <div className="w2-print-scan-split">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-info flex min-w-0 flex-1 flex-col p-5">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-info-bg text-info-fg">
                 <ImageIcon className="h-6 w-6" />
@@ -230,7 +230,7 @@ export function ConvertImagesPage() {
             </div>
           </section>
 
-          <aside className="flex w-[420px] shrink-0 flex-col gap-4">
+          <aside className="w2-print-scan-side">
             <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-3 block text-xl font-bold">继续添加图片</b>
               <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />

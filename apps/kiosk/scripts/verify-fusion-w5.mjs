@@ -102,6 +102,7 @@ const meShell = read('src/pages/profile/me/MeListShell.tsx')
 const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
 const benefitActivityDetailCss = read('src/pages/activities/activities-detail-inkpaper.css')
 const mobileQrCss = read('src/pages/auth/mobile-qr-service-desk.css')
+const phoneUploadCss = read('src/pages/upload/phone-upload-service-desk.css')
 const toolbox = read('src/pages/toolbox/ToolboxZonePage.tsx')
 
 assert.match(notifications, /MyNotificationsPage/, '/notifications reuses the canonical member capability')
@@ -132,6 +133,16 @@ assert.match(
   mobileQrCss,
   /\.k1-mobile-qr-login \.k1-mobile-qr-input\s*\{[^}]*?min-height:\s*48px;/,
   'mobile QR inputs keep a 48px direct touch target',
+)
+assert.match(
+  phoneUploadCss,
+  /\.k1-phone-upload \.k1-phone-upload-content\s*\{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+  'phone upload shell includes padding and can shrink inside the 390px viewport width',
+)
+assert.match(
+  phoneUploadCss,
+  /\.k1-phone-upload \.ph-up-remove\s*\{[^}]*?width:\s*48px;[^}]*?height:\s*48px;/,
+  'phone upload remove action keeps a 48px direct touch target',
 )
 
 for (const leaf of [

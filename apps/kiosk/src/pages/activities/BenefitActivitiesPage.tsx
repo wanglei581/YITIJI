@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
 import {
   ChevronRightIcon,
@@ -83,31 +83,36 @@ export function BenefitActivitiesPage() {
   const subtitle = source === 'fair'
     ? '仅展示招聘会相关服务权益，不代表报名、签到或投递结果'
     : '领取平台服务权益、打印额度和政策信息提示'
+  const countSuffix = state === 'ready' ? ` · 共 ${items.length} 个活动` : ''
 
   return (
-    <div className="fusion-w5 fusion-w5--profile k8-activities flex h-full min-h-0 flex-col px-12 py-5" data-kiosk-screen="activities">
-      <PageHeader
-        className="k8-activities-header"
-        title={title}
-        subtitle={`${subtitle}${state === 'ready' ? ` · 共 ${items.length} 个活动` : ''}`}
-        actions={
-          <div className="flex gap-3">
-            <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-              返回我的
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate('/me/benefits')}>
-              <TicketIcon className="mr-1 h-5 w-5" aria-hidden="true" />
-              我的权益
-            </Button>
-          </div>
-        }
-      />
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--profile k8-activities h-full"
+      header={
+        <KioskPageHeader
+          className="k8-activities-header"
+          title={title}
+          description={`${subtitle}${countSuffix}`}
+          onBack={() => navigate('/profile')}
+          backLabel="返回我的"
+          aside={
+            <div className="k8-activities-header-actions flex gap-3">
+              <Button size="sm" variant="secondary" onClick={() => navigate('/me/benefits')}>
+                <TicketIcon className="mr-1 h-5 w-5" aria-hidden="true" />
+                我的权益
+              </Button>
+            </div>
+          }
+        />
+      }
+    >
+      <section data-kiosk-domain="profile" data-kiosk-screen="activities" className="flex min-h-0 flex-1 flex-col gap-4">
 
-      <div className="k8-activities-compliance mt-4 rounded-xl border border-warning/30 bg-warning-bg px-[22px] py-3.5 text-[18px] leading-relaxed text-warning-fg">
+      <div className="k8-activities-compliance rounded-xl border border-warning/30 bg-warning-bg px-[22px] py-3.5 text-[18px] leading-relaxed text-warning-fg">
         权益活动只用于本终端服务与打印辅助。政策资格提示只提供官方入口和材料指引；招聘会相关活动不生成报名、签到或投递凭证。
       </div>
 
-      <div className="k8-activities-scroll mt-4 min-h-0 flex-1 overflow-y-auto pb-5">
+      <div className="k8-activities-scroll min-h-0 flex-1 overflow-y-auto pb-5">
         {state === 'loading' ? (
           <LoadingState className="py-20" />
         ) : state === 'error' ? (
@@ -179,6 +184,7 @@ export function BenefitActivitiesPage() {
         <InfoIcon className="h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
         活动发布后才会在这里展示；未发布、已结束或已下架活动不再可领。领取后进入本人「我的权益」。
       </p>
-    </div>
+      </section>
+    </KioskPageFrame>
   )
 }

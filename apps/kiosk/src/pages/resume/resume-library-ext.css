@@ -28,7 +28,7 @@
 .resume-materials-lightflow .rp-state-badge--active {
   color: var(--resume-lightflow-blue, var(--k-teal));
   background: var(--resume-lightflow-blue-soft, var(--k-teal-soft));
-  border: 1px solid rgba(22, 119, 255, .28);
+  border: 1px solid rgba(31, 158, 134, .28);
 }
 
 .resume-materials-lightflow .rp-state-badge--idle {

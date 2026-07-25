@@ -98,8 +98,9 @@
 .me-detail-summary {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px;
+  gap: 22px;
+  padding: 22px 24px;
+  min-height: 118px;
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > p,
@@ -109,14 +110,14 @@
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > p {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--ink-2);
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > strong {
-  margin-top: 2px;
-  font-size: 30px;
+  margin-top: 4px;
+  font-size: 40px;
   line-height: 1;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -124,8 +125,8 @@
 }
 
 .me-detail-summary > div:not(.me-summary-mini) > span {
-  margin-top: 5px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 14px;
   line-height: 1.55;
   color: var(--muted);
 }
@@ -152,21 +153,23 @@
 }
 
 .me-summary-mini {
-  display: grid;
-  min-width: 112px;
-  gap: 6px;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .me-summary-mini span {
   display: block;
   margin: 0;
   border-radius: 999px;
-  background: rgba(16, 48, 43, 0.07);
-  padding: 6px 10px;
+  border: 1px solid var(--line);
+  background: var(--paper, rgba(255, 253, 248, 0.82));
+  padding: 8px 18px;
   text-align: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-2);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
@@ -238,9 +241,9 @@
 
 .me-row-icon,
 .me-account-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 18px;
+  width: 58px;
+  height: 58px;
+  border-radius: 14px;
 }
 
 .me-account-avatar {
@@ -251,26 +254,26 @@
 
 .me-row-icon svg,
 .me-account-avatar svg {
-  width: 25px;
-  height: 25px;
+  width: 30px;
+  height: 30px;
 }
 
 .me-row-title {
   display: block;
   overflow: hidden;
   color: var(--ink);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 20px;
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .me-row-meta {
-  margin-top: 4px;
+  margin-top: 6px;
   display: block;
   overflow: hidden;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -284,7 +287,8 @@
 
 .me-benefit-card,
 .me-empty-card {
-  padding: 18px;
+  min-height: 118px;
+  padding: 20px 24px;
 }
 
 .me-inkdetail .me-section-copy h2 {

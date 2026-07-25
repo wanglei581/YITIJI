@@ -275,8 +275,16 @@
 }
 
 .kassist.kassist-lightflow .assistant-send {
-  border-color: var(--color-primary-600);
-  background: var(--color-primary-600);
+  border-color: var(--k-teal, var(--color-primary-600));
+  color: var(--k-surface, #fffdf8);
+  background: var(--k-teal, var(--color-primary-600));
+}
+
+.kassist.kassist-lightflow .assistant-send:disabled {
+  opacity: 1;
+  color: var(--k-muted, #5d6b63);
+  border-color: var(--k-line, #e2dccb);
+  background: var(--k-line, #e2dccb);
 }
 
 .kassist.kassist-lightflow .assistant-composer-privacy {

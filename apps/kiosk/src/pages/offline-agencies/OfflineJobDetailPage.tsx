@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, LoadingState } from '@ai-job-print/ui'
-import { ArrowLeftIcon, BuildingIcon, ClockIcon, MapPinIcon, PhoneIcon } from 'lucide-react'
+import { Button, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { BuildingIcon, MapPinIcon, PrinterIcon } from 'lucide-react'
 import {
   getOfflineJobDetail,
   type OfflineJobDetailDTO,
@@ -37,153 +37,111 @@ export default function OfflineJobDetailPage() {
     <KioskPageFrame
       tone="clay"
       title="线下机构岗位"
-      subtitle={job.agencyName}
+      subtitle="来源机构发布的岗位信息与到店指引 · 本系统不代收简历"
+      backLabel="返回"
       onBack={() => navigate(-1)}
+      actionBar={(
+        <>
+          <Button size="lg" variant="secondary" onClick={() => navigate('/offline-agencies')}>
+            <BuildingIcon aria-hidden="true" />
+            查看来源机构门店
+          </Button>
+          <Button size="lg" onClick={() => navigate('/print/upload')}>
+            <PrinterIcon aria-hidden="true" />
+            打印岗位信息带走
+          </Button>
+        </>
+      )}
     >
-      {/* 岗位基本信息 */}
-      <div className="card" style={{ padding: '24px 28px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 22 }}>
-          <div style={{ flex: 1 }}>
-            <h2 style={{ fontFamily: 'var(--serif)', fontSize: 36, fontWeight: 900 }}>{job.title}</h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 26px', marginTop: 12, fontSize: 21, color: 'var(--muted)' }}>
+      <section className="oa-job-sum" aria-label="岗位概要">
+        <div className="oa-job-sum-head">
+          <div className="min-w-0 flex-1">
+            <h2>{job.title}</h2>
+            <div className="oa-job-sum-meta">
               {job.location && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <MapPinIcon size={20} style={{ opacity: .7 }} /> {job.location}
-                </span>
+                <span><MapPinIcon aria-hidden="true" size={20} />{job.location}</span>
               )}
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                <BuildingIcon size={20} style={{ opacity: .7 }} /> {job.agencyName}
-              </span>
+              <span><BuildingIcon aria-hidden="true" size={20} />{job.agencyName}</span>
             </div>
           </div>
-          <span style={{
-            padding: '4px 18px', borderRadius: 999, fontSize: 18, fontWeight: 600,
-            background: 'var(--clay-soft)', color: 'var(--clay-deep)', border: '1px solid rgba(180,100,40,.2)'
-          }}>
-            {jobTypeLabel}
-          </span>
+          <span className="oa-job-type">{jobTypeLabel}</span>
         </div>
 
-        {/* 薪资等关键指标 */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginTop: 20 }}>
-          {[
-            { k: '薪资待遇', v: job.salary || '薪资面议', highlight: true },
-            { k: '工作地点', v: job.location || '以机构公示为准' },
-          ].map(({ k, v, highlight }) => (
-            <div key={k} style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 'var(--r-sm)', padding: '14px 18px' }}>
-              <div style={{ fontSize: 17, color: 'var(--muted)' }}>{k}</div>
-              <div style={{ fontSize: 24, fontWeight: 700, marginTop: 6, color: highlight ? 'var(--clay-deep)' : 'inherit' }}>{v}</div>
-            </div>
-          ))}
+        <div className="oa-metrics" aria-label="岗位指标">
+          <div className="is-accent"><span>薪资待遇</span><b>{job.salary || '薪资面议'}</b></div>
+          <div><span>工作地点</span><b>{job.location || '以机构公示为准'}</b></div>
+          <div><span>岗位类型</span><b>{jobTypeLabel}</b></div>
+          <div><span>来源机构</span><b>{job.agencyName}</b></div>
         </div>
 
-        {/* 标签 */}
         {job.tags && job.tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
-            {job.tags.map(tag => (
-              <span key={tag} style={{ padding: '3px 12px', borderRadius: 999, fontSize: 17, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
-                {tag}
-              </span>
+          <div className="jf-row-sub">
+            {job.tags.map((tag) => (
+              <span key={tag} className="jf-chip">{tag}</span>
             ))}
           </div>
         )}
+      </section>
 
-        {/* 任职要求 */}
-        {job.requirements && job.requirements.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, color: 'var(--clay-deep)' }}>任职要求</h3>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {job.requirements.map((req, i) => (
-                <li key={i} style={{ fontSize: 20, lineHeight: 1.5, color: 'var(--ink)', display: 'flex', gap: 10 }}>
-                  <span style={{ flex: 'none', width: 8, height: 8, borderRadius: '50%', background: 'var(--clay)', marginTop: 11 }} />
-                  {req}
-                </li>
+      <div className="oa-desc-grid">
+        <section className="oa-desc-card" aria-label="任职要求">
+          <h3>任职要求</h3>
+          {job.requirements && job.requirements.length > 0 ? (
+            <ul>
+              {job.requirements.map((req) => (
+                <li key={req}>{req}</li>
               ))}
             </ul>
-          </div>
-        )}
-
-        {/* 职责说明 */}
-        {job.responsibilities && job.responsibilities.length > 0 && (
-          <div style={{ marginTop: 24 }}>
-            <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 12, color: 'var(--clay-deep)' }}>工作职责</h3>
-            <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {job.responsibilities.map((r, i) => (
-                <li key={i} style={{ fontSize: 20, lineHeight: 1.5, color: 'var(--ink)', display: 'flex', gap: 10 }}>
-                  <span style={{ flex: 'none', width: 8, height: 8, borderRadius: '50%', background: 'var(--clay)', marginTop: 11 }} />
-                  {r}
-                </li>
+          ) : (
+            <p className="text-[color:var(--muted)]">暂无任职要求说明，请来源机构门店咨询。</p>
+          )}
+        </section>
+        <section className="oa-desc-card" aria-label="工作职责">
+          <h3>工作职责</h3>
+          {job.responsibilities && job.responsibilities.length > 0 ? (
+            <ul>
+              {job.responsibilities.map((item) => (
+                <li key={item}>{item}</li>
               ))}
             </ul>
-          </div>
-        )}
+          ) : (
+            <p className="text-[color:var(--muted)]">暂无职责说明，请来源机构门店咨询。</p>
+          )}
+        </section>
       </div>
 
-      {/* 发布机构 */}
-      <div className="card" style={{ padding: 28 }}>
-        <h3 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20, color: 'var(--clay-deep)' }}>发布机构</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 20, alignItems: 'stretch' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <section className="oa-agency-zone" aria-label="发布机构">
+        <div>
+          <h3>发布机构</h3>
+          <div className="oa-kv">
             {[
-              { k: '机构名称', v: job.agencyName },
-              { k: '机构类型', v: job.agencyType },
-              { k: '服务项目', v: services },
-              { k: '营业时间', v: job.agencyHours || '请来电咨询' },
-              { k: '联系电话', v: job.agencyPhone || '请至前台咨询' },
-              { k: '机构地址', v: job.agencyAddress },
-            ].map(({ k, v }) => (
-              <div key={k} style={{ display: 'flex', gap: 14, fontSize: 21, alignItems: 'baseline' }}>
-                <span style={{ flex: 'none', width: 128, color: 'var(--muted)', fontSize: 19 }}>{k}</span>
-                <span style={{ fontWeight: 600 }}>{v}</span>
-              </div>
+              ['机构名称', job.agencyName],
+              ['机构类型', job.agencyType],
+              ['服务项目', services],
+              ['营业时间', job.agencyHours || '请来电咨询'],
+              ['联系电话', job.agencyPhone || '请至前台咨询'],
+              ['机构地址', job.agencyAddress],
+            ].map(([k, v]) => (
+              <div key={k}><span>{k}</span><b>{v}</b></div>
             ))}
-          </div>
-
-          {/* 到店指引面板 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', padding: '24px 26px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-              <MapPinIcon size={22} style={{ color: 'var(--clay-deep)' }} />
-              <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--clay-deep)' }}>到店指引</span>
-            </div>
-            <p style={{ fontSize: 19, lineHeight: 1.6, color: 'var(--ink)' }}>{job.agencyAddress}</p>
-            {job.agencyPhone && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 19, color: 'var(--muted)', marginTop: 8 }}>
-                <PhoneIcon size={17} style={{ opacity: .7 }} />
-                <span>致电预约：<strong style={{ color: 'var(--ink)' }}>{job.agencyPhone}</strong></span>
-              </div>
-            )}
-            {job.agencyHours && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 19, color: 'var(--muted)' }}>
-                <ClockIcon size={17} style={{ opacity: .7 }} />
-                <span>营业时间：{job.agencyHours}</span>
-              </div>
-            )}
-            <FusionNotice>到店咨询，服务费用以现场公示为准</FusionNotice>
           </div>
         </div>
-      </div>
+        <aside className="oa-guide">
+          <h3>到店指引</h3>
+          <p>{job.agencyAddress}</p>
+          <ol className="oa-guide-steps">
+            <li><span>1</span>确认机构营业时间与联系电话</li>
+            <li><span>2</span>携带本人材料前往门店咨询岗位</li>
+            <li><span>3</span>服务费用以门店依法公示为准</li>
+          </ol>
+          <FusionNotice>到店咨询，服务费用以现场公示为准</FusionNotice>
+        </aside>
+      </section>
 
-      {/* 合规说明 */}
       <FusionNotice>
         本页面仅展示来源机构发布的岗位信息与到店指引，本系统不代收简历、不代投递。
         如需了解岗位详情，请直接前往该机构咨询。
       </FusionNotice>
-
-      {/* 底部操作栏 */}
-      <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-        <button
-          onClick={() => navigate(-1)}
-          style={{ minHeight: 64, padding: '0 32px', fontSize: 21, display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', cursor: 'pointer' }}
-        >
-          <ArrowLeftIcon size={22} /> 返回
-        </button>
-        <button
-          style={{ flex: 1, minHeight: 64, background: 'var(--clay)', color: '#fff', border: 'none', borderRadius: 'var(--r-md)', fontSize: 24, fontWeight: 700, cursor: 'pointer' }}
-          onClick={() => navigate('/print/upload')}
-        >
-          上传自备材料打印
-        </button>
-      </div>
     </KioskPageFrame>
   )
 }

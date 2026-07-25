@@ -1,9 +1,10 @@
 @import "@ai-job-print/ui/styles/tokens.css";
 /* Kiosk presentation styles remain attribute-scoped by data-kiosk-presentation. */
 @import "@ai-job-print/ui/styles/fusion-youth.css";
+/* service-desk 必须在 kiosk-shell 之前，否则冰蓝 --sd-color-primary 会盖住 fusion 青绿。 */
+@import "@ai-job-print/ui/styles/service-desk.css";
 @import "@ai-job-print/ui/styles/kiosk-shell.css";
 @import "@ai-job-print/ui/styles/kiosk-components.css";
-@import "@ai-job-print/ui/styles/service-desk.css";
 @import "./pages/jobs-fairs-prototype.css";
 @import "tailwindcss";
 @source "../../../packages/ui/src";

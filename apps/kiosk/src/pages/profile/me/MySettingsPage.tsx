@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
   BadgeCheckIcon,
   ChevronRightIcon,
@@ -319,58 +319,59 @@ export function MySettingsPage() {
   }
 
   return (
-    <div className="fusion-w5 fusion-w5--profile me-inkdetail me-inkdetail-settings flex h-full flex-col" data-kiosk-screen="member-settings">
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--profile me-inkdetail me-inkdetail-settings h-full"
+      header={
+        <KioskPageHeader
+          title="账号设置"
+          description="账号状态 · 会话说明 · 协议与隐私"
+          aside={
+            <Button size="sm" variant="secondary" className="me-ripple me-back-button min-h-12" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+          }
+        />
+      }
+    >
+    <section data-kiosk-domain="profile" data-kiosk-screen="member-settings" className="flex min-h-0 flex-1 flex-col px-6">
       {hint && (
         <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
           {hint}
         </div>
       )}
 
-      <PageHeader
-        className="me-page-header"
-        title="账号设置"
-        subtitle="账号状态 · 会话说明 · 协议与隐私"
-        actions={
-          <Button size="sm" variant="secondary" className="me-ripple me-back-button" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
-        }
-      />
-
       <div className="me-detail-scroll mt-4 flex-1 overflow-y-auto pb-8">
         <div className="flex flex-col gap-4">
           {/* 账号状态 */}
           {isLoggedIn ? (
-            <div className={`${cardSurface} py-5`}>
-              <div className="flex items-center gap-4">
-                <span className="me-account-avatar me-tone-teal">
-                  <KIcon name="phone" />
+            <div className={`${cardSurface} me-settings-acct py-5`}>
+              <div className="flex items-center gap-6">
+                <span className="me-account-avatar me-tone-teal" aria-hidden="true">
+                  {(phoneMasked.replace(/\D/g, '').slice(-1) || '会')}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-lg font-bold text-neutral-900">{phoneMasked || '已登录用户'}</p>
+                    <p className="text-[30px] font-bold tracking-wide text-neutral-900">{phoneMasked || '已登录用户'}</p>
                     <span className="inline-flex items-center gap-1 rounded-full bg-success-bg px-2.5 py-0.5 text-xs font-semibold text-success-fg">
                       <BadgeCheckIcon className="h-3.5 w-3.5" aria-hidden="true" />
                       已登录
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-neutral-500">会员账号 · 手机号已脱敏展示，仅本人可见</p>
+                  <p className="mt-2 text-base text-neutral-500">会员账号 · 手机号已脱敏展示，仅本人可见</p>
                 </div>
               </div>
             </div>
           ) : (
-            <div className={`${cardSurface} py-5`}>
-              <div className="flex items-center gap-4">
-                <span className="me-account-avatar me-tone-slate">
-                  <KIcon name="user" />
-                </span>
+            <div className={`${cardSurface} me-settings-acct py-5`}>
+              <div className="flex items-center gap-6">
+                <span className="me-account-avatar me-tone-slate" aria-hidden="true">游</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-lg font-bold text-neutral-900">游客</p>
-                  <p className="mt-1 text-sm text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
+                  <p className="text-[30px] font-bold text-neutral-900">游客</p>
+                  <p className="mt-2 text-base text-neutral-500">登录后用于绑定本人服务记录，仅本次会话有效</p>
                 </div>
                 <Button
                   size="lg"
-                  className="me-ripple flex h-12 shrink-0 items-center gap-1 px-4"
+                  className="me-ripple flex h-14 shrink-0 items-center gap-1 px-5"
                   onClick={() => navigate('/login', { state: { from: '/me/settings' } })}
                 >
                   <LogInIcon className="h-5 w-5" aria-hidden="true" />
@@ -522,6 +523,7 @@ export function MySettingsPage() {
           onCancel={() => setShowRebind(false)}
         />
       )}
-    </div>
+    </section>
+    </KioskPageFrame>
   )
 }

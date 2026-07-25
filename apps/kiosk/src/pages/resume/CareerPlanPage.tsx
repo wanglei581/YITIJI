@@ -18,6 +18,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
 import './careerPlan-lightflow.css'
+import './resume-fusion-youth.css'
 
 interface PageState {
   taskId?: string

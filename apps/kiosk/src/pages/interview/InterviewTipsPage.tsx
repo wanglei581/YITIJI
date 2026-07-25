@@ -9,7 +9,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskPageFrame, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
 import {
   CheckSquareIcon,
   ChevronDownIcon,
@@ -18,7 +18,7 @@ import {
   LightbulbIcon,
   MicIcon,
 } from 'lucide-react'
-import { InterviewTopbar } from './InterviewTopbar'
+import { InterviewShell } from './InterviewShell'
 import './interview-service-desk.css'
 
 const CHECKLIST: Array<{ title: string; desc: string }> = [
@@ -117,15 +117,14 @@ export function InterviewTipsPage() {
   }
 
   return (
-    <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview">
+    <InterviewShell>
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-tips" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
-      <InterviewTopbar />
-      <PageHeader
+      <KioskPageHeader
         className="interview-pagehead"
         title="面试技巧"
-        subtitle="面试前准备工具：清单逐项过一遍，再开始模拟练习（通用建议，仅供参考）"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
+        description="面试前准备工具：清单逐项过一遍，再开始模拟练习（通用建议，仅供参考）"
+        aside={
+          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
@@ -281,6 +280,6 @@ export function InterviewTipsPage() {
         <p className="mt-2 text-center text-[11px] text-neutral-400">完成一次模拟面试后，练习报告将附带个性化准备清单，可直接打印</p>
       </div>
     </main>
-    </KioskPageFrame>
+    </InterviewShell>
   )
 }

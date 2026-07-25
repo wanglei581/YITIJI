@@ -24,7 +24,7 @@ import {
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
@@ -463,6 +463,7 @@ export function PrintMaterialCheckPage() {
 
   if (!file) {
     return (
+      <PrintPageFrame className="p-6">
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
           <AlertCircleIcon className="h-10 w-10 text-warning" />
@@ -471,15 +472,17 @@ export function PrintMaterialCheckPage() {
           <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
           <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再进行材料检查</p>
         </div>
-        <Button size="lg" onClick={() => navigate(uploadPath)}>
+        <Button size="lg" className="min-h-14" onClick={() => navigate(uploadPath)}>
           重新上传文件
         </Button>
       </div>
+      </PrintPageFrame>
     )
   }
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <PrintPageFrame className="p-6">
+    <div className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="打印前材料检查"
         subtitle="仅用于本次打印前确认；扫描件 / 图片可能通过第三方 OCR 服务识别文字"
@@ -517,5 +520,6 @@ export function PrintMaterialCheckPage() {
         onContinue={() => void handleContinue()}
       />
     </div>
+    </PrintPageFrame>
   )
 }

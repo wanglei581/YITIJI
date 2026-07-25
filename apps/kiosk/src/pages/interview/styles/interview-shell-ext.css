@@ -5,6 +5,12 @@
   font-weight: 400;
 }
 
+.interview-resume-chip {
+  border-color: color-mix(in srgb, var(--interview-plum) 35%, var(--interview-line));
+  background: var(--interview-plum-soft);
+  color: var(--interview-plum-deep);
+}
+
 .interview-flow button:focus-visible,
 .interview-flow input:focus-visible,
 .interview-flow textarea:focus-visible {

@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import type { InterviewMessage, InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
-import { InterviewTopbar } from '../InterviewTopbar'
 
 type PillTone = 'gray' | 'blue' | 'red' | 'green'
 
@@ -74,8 +73,6 @@ export function InterviewSessionPanels({
 
   return (
     <>
-      <InterviewTopbar />
-
       <div className="interview-session__pagehead">
         <div className="interview-session__identity">
           <div className="interview-session__mark"><BotIcon aria-hidden="true" /></div>

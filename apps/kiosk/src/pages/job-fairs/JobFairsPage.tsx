@@ -232,7 +232,7 @@ export function JobFairsPage() {
       badge={<FusionBadge icon={RefreshCwIcon}>每日同步更新</FusionBadge>}
       actionBar={<span className="jf-action-note">本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台。</span>}
     >
-    <div className="flex h-full flex-col bg-canvas" style={WHEAT_ACCENT}>
+    <div className="w4-fair-page flex h-full flex-col bg-canvas" style={WHEAT_ACCENT}>
       {qrFair && <BookingQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
 
       {/* 搜索 + 地区筛选 + 日期 */}

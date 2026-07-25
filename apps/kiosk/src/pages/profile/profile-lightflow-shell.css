@@ -5,7 +5,8 @@
   --lf-ink: var(--k-ink);
   --lf-ink-muted: var(--k-muted);
   --lf-line: var(--k-line);
-  --lf-blue: var(--k-teal-soft);
+  /* Primary CTA fill — must be solid teal, not soft mint (white-on-mint fails contrast). */
+  --lf-blue: var(--k-teal);
   --lf-blue-strong: var(--k-teal-deep);
   --lf-blue-soft: var(--k-line);
   --lf-cyan-soft: var(--k-surface, var(--color-surface));

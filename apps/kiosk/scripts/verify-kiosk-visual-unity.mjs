@@ -55,6 +55,11 @@ expect(existsSync(join(repoRoot, 'packages/ui/src/styles/kiosk-components.css'))
 expect(indexCss.includes('@ai-job-print/ui/styles/kiosk-shell.css'), 'index.css 导入 kiosk-shell')
 expect(indexCss.includes('@ai-job-print/ui/styles/kiosk-components.css'), 'index.css 导入 kiosk-components')
 expect(indexCss.includes('@ai-job-print/ui/styles/fusion-youth.css'), 'index.css 导入 fusion-youth')
+{
+  const sd = indexCss.indexOf('@ai-job-print/ui/styles/service-desk.css')
+  const shell = indexCss.indexOf('@ai-job-print/ui/styles/kiosk-shell.css')
+  expect(sd >= 0 && shell >= 0 && sd < shell, 'index.css 中 service-desk 在 kiosk-shell 之前（fusion 可覆盖冰蓝）')
+}
 
 expect(/visualTheme="service-desk"/.test(root), 'KioskRoot 全路由固定 service-desk')
 expect(/presentation="fusion-youth"/.test(root), 'KioskRoot 全路由固定 fusion-youth')

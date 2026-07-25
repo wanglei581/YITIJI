@@ -298,6 +298,7 @@ export function PrintProgressPage() {
   // Guard：直达 /print/progress（无任务上下文）—— 不展示进度/不伪造成功，引导重新上传。
   if (!hasContext) {
     return (
+      <PrintPageFrame className="p-6">
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
           <AlertCircleIcon className="h-10 w-10 text-warning" />
@@ -313,6 +314,7 @@ export function PrintProgressPage() {
           重新上传文件
         </button>
       </div>
+      </PrintPageFrame>
     )
   }
 
@@ -320,6 +322,7 @@ export function PrintProgressPage() {
   // 没有 taskId 也不能回退到 SIM 动画并展示成功。
   if (isHttpMode && !taskId) {
     return (
+      <PrintPageFrame className="p-6">
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
           <AlertCircleIcon className="h-10 w-10 text-warning" />
@@ -335,12 +338,14 @@ export function PrintProgressPage() {
           返回确认页
         </button>
       </div>
+      </PrintPageFrame>
     )
   }
 
   // Timeout screen — Agent never responded within 10 minutes
   if (timedOut) {
     return (
+      <PrintPageFrame className="p-6">
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
         <div className="flex h-24 w-24 items-center justify-center rounded-full bg-warning-bg">
           <ClockIcon className="h-12 w-12 text-warning" />
@@ -363,6 +368,7 @@ export function PrintProgressPage() {
           返回首页
         </button>
       </div>
+      </PrintPageFrame>
     )
   }
 

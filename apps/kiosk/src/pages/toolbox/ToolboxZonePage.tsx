@@ -6,6 +6,7 @@
 // 首页 zone-card 点击 → /toolbox；能力（config 驱动 / 站内·外部H5·二维码启动 /
 // 离场确认 / sendBeacon 事件）由本页保留，零削减。
 import type { KioskToolboxItem } from '@ai-job-print/shared'
+import { ChevronRightIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
@@ -25,6 +26,18 @@ const TOOLBOX_ICONS: Record<string, KioskIconName> = {
   'help-circle': 'help',
 }
 
+function accentClass(item: KioskToolboxItem) {
+  if (item.launchMode === 'external_url') return 'a-teal'
+  if (item.launchMode === 'qr_code' || item.launchMode === 'mini_program_qr') return 'a-wheat'
+  return 'a-plum'
+}
+
+function goLabel(item: KioskToolboxItem) {
+  if (item.launchMode === 'qr_code' || item.launchMode === 'mini_program_qr') return '扫码获取'
+  if (item.launchMode === 'external_url') return '打开(离场提示)'
+  return '进入服务'
+}
+
 function ToolboxItemTile({
   item,
   onQr,
@@ -42,17 +55,23 @@ function ToolboxItemTile({
       type="button"
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
-      className="tile"
+      className={`tb-tile accented ${accentClass(item)}${disabled ? ' disabled' : ''}`}
       title={item.description}
     >
-      <span className="t-icon">
-        <KIcon name={TOOLBOX_ICONS[item.icon] ?? 'toolbox'} />
-      </span>
-      <span className="t-text">
-        <b>{item.title}</b>
-        {item.description && <span>{item.description}</span>}
-      </span>
-      {badge ? <span className="tag-soon">{badge}</span> : null}
+      {badge ? <span className="launch-tag">{badge}</span> : null}
+      <div className="c-top">
+        <span className="c-icon">
+          <KIcon name={TOOLBOX_ICONS[item.icon] ?? 'toolbox'} />
+        </span>
+        <div><h3>{item.title}</h3></div>
+      </div>
+      {item.description ? <p>{item.description}</p> : null}
+      {!disabled && (
+        <span className="c-go">
+          {goLabel(item)}
+          <ChevronRightIcon aria-hidden="true" />
+        </span>
+      )}
     </button>
   )
 }
@@ -81,7 +100,7 @@ export function ToolboxZonePage() {
 
       <section className="tb-content">
         {items.length > 0 ? (
-          <div className="tiles c3">
+          <div className="tb-tiles">
             {items.map((item) => (
               <ToolboxItemTile key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
             ))}

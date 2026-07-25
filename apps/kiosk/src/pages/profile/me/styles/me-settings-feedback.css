@@ -1,1 +1,36 @@
-/* W5 settings/feedback leaf. Existing scoped selectors remain in the compatibility base pending W6 capture. */
+/* W11: 账号设置信息架构对齐原型 23（触控行高 / 头像字标），不回退已验证功能。 */
+
+.me-inkdetail-settings .me-settings-acct {
+  padding: 26px 32px !important;
+}
+
+.me-inkdetail-settings .me-account-avatar {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(31, 158, 134, 0.35);
+  background: var(--color-primary-50, var(--fy-teal-soft));
+  color: var(--color-primary-700, var(--fy-teal-deep));
+  font-family: var(--fy-serif, 'Noto Serif SC', serif);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.me-inkdetail-settings .me-account-avatar.me-tone-slate {
+  border-color: rgba(16, 48, 43, 0.18);
+  background: rgba(16, 48, 43, 0.06);
+  color: var(--muted, #5b6f69);
+}
+
+.me-inkdetail-settings .me-link-row {
+  min-height: 96px;
+  gap: 20px;
+  padding: 18px 8px;
+}
+
+.me-inkdetail-settings .me-link-row .h-10 {
+  width: 54px;
+  height: 54px;
+}

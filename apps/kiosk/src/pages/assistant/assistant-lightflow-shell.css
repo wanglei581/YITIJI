@@ -11,8 +11,8 @@
   --sd-primary-strong: var(--sd-color-primary-strong, var(--k-teal-deep));
   --sd-line: var(--sd-color-line);
   --sd-line-strong: var(--sd-color-line-strong);
-  --sd-shadow-touch: 0 18px 60px rgba(30, 71, 124, 0.09);
-  --sd-shadow-soft: 0 9px 28px rgba(30, 71, 124, 0.07);
+  --sd-shadow-touch: 0 18px 60px rgba(16, 48, 43, 0.08);
+  --sd-shadow-soft: 0 9px 28px rgba(16, 48, 43, 0.06);
   --sd-control-min: 48px;
   --sd-primary-control-min: 56px;
   --kassist-control-min: 48px;

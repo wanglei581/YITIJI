@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import type {
   GeneratedResume,
@@ -110,11 +110,30 @@ export function ResumeGeneratePreviewPage() {
   if (!result || !resume) {
     // 刷新 / 待机后内存态丢失(公共设备隐私设计):引导重新生成
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-generate-preview" className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center gap-4 px-6">
-        <AlertCircleIcon className="h-10 w-10 text-neutral-300" aria-hidden="true" />
-        <p className="text-base text-neutral-500">生成结果已清除(公共设备不保留个人信息)</p>
-        <Button size="lg" onClick={() => navigate('/resume/generate')}>重新填写生成</Button>
-      </section></KioskPageFrame>
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+        <section
+          data-kiosk-domain="resume"
+          data-kiosk-screen="resume-generate-preview"
+          className="resume-lightflow resume-generate-preview-lightflow resume-lightflow__state flex h-full flex-col items-center justify-center px-6"
+        >
+          <KioskStatePanel
+            tone="empty"
+            icon={<AlertCircleIcon aria-hidden="true" />}
+            title="生成结果已清除"
+            description="公共设备不保留个人信息。请重新填写后生成简历预览。"
+            actions={
+              <div className="flex w-full max-w-sm gap-3">
+                <Button size="lg" variant="secondary" className="flex-1 min-h-14" onClick={() => navigate('/')}>
+                  返回首页
+                </Button>
+                <Button size="lg" className="resume-primary-action flex-1 min-h-14" onClick={() => navigate('/resume/generate')}>
+                  重新填写生成
+                </Button>
+              </div>
+            }
+          />
+        </section>
+      </KioskPageFrame>
     )
   }
 
@@ -162,6 +181,13 @@ export function ResumeGeneratePreviewPage() {
           description="轻触段落进入编辑；内容修改后需重新生成 PDF 再打印"
           onBack={() => navigate('/resume/generate')}
           backLabel="重新填写"
+          aside={
+            <span className="resume-preview-meta-chip">
+              {exported
+                ? `PDF 已就绪 · A4 · ${exported.pageCount} 页`
+                : '可编辑预览 · A4'}
+            </span>
+          }
         />
         {isMock && (
           <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-warning-bg px-4 py-3 text-sm text-warning-fg">
@@ -174,15 +200,13 @@ export function ResumeGeneratePreviewPage() {
         </div>
       </div>
 
-      <div className="resume-lightflow__content mt-4 min-h-0 flex-1 overflow-y-auto px-6 pb-6">
-        <div className="flex min-h-full gap-5">
-
-          {/* 左：可编辑简历纸面 */}
-          <div className="flex min-w-0 flex-1 flex-col gap-4">
-            <Card className="resume-lightflow__work-card resume-lightflow__paper p-6">
-              <div className="resume-lightflow__paper-header border-b-2 border-primary-600 pb-3">
-                <p className="text-2xl font-bold text-neutral-900">{resume.basic.name}</p>
-                <p className="mt-1 text-sm text-neutral-500">
+      <div className="resume-lightflow__content mt-4 min-h-0 flex-1 overflow-hidden px-6 pb-6">
+          {/* 左：可编辑 A4 纸面 */}
+          <div className="resume-lightflow__paper-col flex min-h-0 min-w-0 flex-col gap-3 overflow-y-auto">
+            <Card className="resume-lightflow__work-card resume-lightflow__paper">
+              <div className="resume-lightflow__paper-header border-b-[3px] border-primary-600 pb-3">
+                <p className="resume-lightflow__paper-name">{resume.basic.name}</p>
+                <p className="resume-lightflow__paper-meta mt-1">
                   {[
                     resume.intention.position ? `求职意向:${resume.intention.position}` : '',
                     resume.intention.city ? `意向城市:${resume.intention.city}` : '',
@@ -303,11 +327,11 @@ export function ResumeGeneratePreviewPage() {
           </div>
 
           {/* 右：建议补充 + PDF 状态 + 说明 */}
-          <div className="flex w-[340px] flex-none flex-col gap-4">
+          <aside className="resume-lightflow__sidebar">
             {hints.length > 0 && (
-              <Card className="resume-lightflow__work-card p-5">
-                <p className="mb-3 text-base font-semibold text-neutral-800">建议补充</p>
-                <p className="mb-2 text-xs text-neutral-400">AI 不会替你编造这些内容</p>
+              <Card className="resume-lightflow__work-card fy-side-card p-5">
+                <h3>建议补充</h3>
+                <p className="fy-side-sub">AI 不会替你编造这些内容</p>
                 <ul className="flex flex-col gap-2">
                   {hints.map((h, i) => (
                     <li key={i} className="flex items-start gap-2 rounded-xl border border-warning-bg bg-warning-bg px-3 py-2.5 text-sm text-warning-fg">
@@ -320,7 +344,7 @@ export function ResumeGeneratePreviewPage() {
             )}
 
             {exported && (
-              <Card className="resume-lightflow__export-card p-5">
+              <Card className="resume-lightflow__export-card fy-side-card p-5">
                 <p className="flex items-center gap-2 text-base font-semibold text-success-fg">
                   <CheckCircle2Icon className="h-5 w-5" aria-hidden="true" />
                   PDF 已生成
@@ -340,8 +364,8 @@ export function ResumeGeneratePreviewPage() {
               </Card>
             )}
 
-            <Card className="resume-lightflow__work-card p-5">
-              <p className="mb-3 text-base font-semibold text-neutral-800">说明</p>
+            <Card className="resume-lightflow__work-card fy-side-card p-5">
+              <h3>说明</h3>
               <div className="flex flex-col gap-3">
                 <div className="flex items-start gap-2 text-xs leading-relaxed text-neutral-500">
                   <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
@@ -353,9 +377,7 @@ export function ResumeGeneratePreviewPage() {
                 </div>
               </div>
             </Card>
-          </div>
-
-        </div>
+          </aside>
       </div>
 
       {/* 底部操作条 */}

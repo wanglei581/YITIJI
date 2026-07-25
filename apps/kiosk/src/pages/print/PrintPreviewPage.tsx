@@ -389,16 +389,16 @@ export function PrintPreviewPage() {
     <PrintPageFrame className="p-6">
     <div data-w2-page="print-preview" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
-        title="打印设置"
+        title="打印预览"
         subtitle="预览文件内容并设置打印参数后进入确认"
-        step={4}
+        step={3}
         backLabel="返回材料检查"
         onBack={() => navigate(-1)}
       />
 
-      <div className="mt-6 grid grid-cols-[18rem_minmax(0,1fr)] gap-6">
-        {/* ── Left: file preview ─────────────────────────────────────────── */}
-        <div className="flex flex-col gap-3">
+      <div className="mt-6 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-6">
+        {/* ── Left: A4 预览主区 ─────────────────────────────────────────── */}
+        <div className="flex min-h-0 flex-col gap-3">
           <FilePreviewPanel file={file} />
           <p className="text-center text-sm text-neutral-500">
             {formatPageCount(file.pages)} · {file.size}
@@ -418,8 +418,8 @@ export function PrintPreviewPage() {
           )}
         </div>
 
-        {/* ── Right: params (scrollable) ──────────────────────────────────── */}
-        <div className="flex min-w-0 flex-col gap-4 pb-6">
+        {/* ── Right: 参数侧栏 ──────────────────────────────────────────── */}
+        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-y-auto pb-6">
 
           {/* Printer status bar */}
           <Card className="flex items-center gap-3 p-4">

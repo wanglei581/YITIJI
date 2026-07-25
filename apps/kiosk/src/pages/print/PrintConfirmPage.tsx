@@ -157,24 +157,26 @@ export function PrintConfirmPage() {
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
   if (!state?.file && !restoredSession?.file) {
     return (
-      <PrintPageFrame className="p-6">
-      <div data-w2-page="print-confirm" className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full" style={{ background: 'rgb(193 74 52 / 10%)' }}>
-          <AlertCircleIcon className="h-10 w-10" style={{ color: '#c14a34' }} />
+      <PrintPageFrame>
+        <div data-w2-page="print-confirm" className="print-confirm-body">
+          <div className="print-confirm-guard">
+            <div className="print-confirm-guard-icon">
+              <AlertCircleIcon aria-hidden="true" />
+            </div>
+            <div>
+              <p className="print-confirm-guard-title">未找到文件信息</p>
+              <p className="print-confirm-guard-hint">请重新上传文件后再确认打印</p>
+            </div>
+            <button
+              type="button"
+              className="print-confirm-primary"
+              style={{ flex: 'none', minWidth: 200 }}
+              onClick={() => navigate(uploadPath)}
+            >
+              重新上传文件
+            </button>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold" style={{ color: 'var(--print-ink)' }}>未找到文件信息</p>
-          <p className="mt-2 text-sm" style={{ color: 'var(--print-muted)' }}>请重新上传文件后再确认打印</p>
-        </div>
-        <button
-          type="button"
-          className="print-confirm-primary"
-          style={{ flex: 'none', minWidth: 200 }}
-          onClick={() => navigate(uploadPath)}
-        >
-          重新上传文件
-        </button>
-      </div>
       </PrintPageFrame>
     )
   }
@@ -191,22 +193,16 @@ export function PrintConfirmPage() {
 
   return (
     <PrintPageFrame>
-    <div data-w2-page="print-confirm" className="flex min-h-full flex-col" style={{ padding: '0 0 0 0' }}>
-      <div style={{ padding: '0 24px' }}>
-        <PrintPrototypeHeader
-          title="确认打印"
-          subtitle="核对以下参数，确认无误后提交打印任务"
-          step={5}
-          backLabel="返回修改"
-          onBack={() => navigate(-1)}
-        />
-      </div>
+    <div data-w2-page="print-confirm" className="print-confirm-body">
+      <PrintPrototypeHeader
+        title="确认打印"
+        subtitle="核对以下参数，确认无误后提交打印任务"
+        step={5}
+        backLabel="返回修改"
+        onBack={() => navigate(-1)}
+      />
 
-      {/* 主内容区：两栏 */}
-      <div
-        className="print-confirm-split"
-        style={{ flex: 1, minHeight: 0, overflow: 'hidden', padding: '0 24px' }}
-      >
+      <div className="print-confirm-split" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* 左栏：文件条 + 参数摘要卡 */}
         <div className="print-confirm-left" style={{ overflowY: 'auto' }}>
 
@@ -283,7 +279,7 @@ export function PrintConfirmPage() {
             </div>
             {params.colorMode === 'color' && (
               <div className="print-est-row">
-                <span className="k" style={{ fontSize: 14, color: '#b8683c' }}>彩色效果以设备支持和当前耗材状态为准</span>
+                <span className="k print-color-hint">彩色效果以设备支持和当前耗材状态为准</span>
               </div>
             )}
             <div className="print-cost-total">
@@ -342,7 +338,7 @@ export function PrintConfirmPage() {
 
       {/* 提交错误提示 */}
       {submitError && (
-        <div className="print-submit-error" style={{ margin: '0 24px' }}>
+        <div className="print-submit-error">
           <AlertCircleIcon aria-hidden="true" />
           <span>{submitError}</span>
         </div>

@@ -605,13 +605,33 @@
 .pp-btn-primary:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .pp-btn-primary svg { width: 28px; height: 28px; }
 
-/* 参数页（step 4）卡片标题 */
+/* 参数页（step 4）双栏：左参数 / 右预估与须知 */
 .pp-params-content {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 16px;
   padding-bottom: 4px;
+}
+.pp-params-content > .pp-split {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.pp-params-left {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 4px;
+}
+@media (max-width: 900px) {
+  .pp-params-content > .pp-split {
+    flex-direction: column;
+    overflow-y: auto;
+    gap: 16px;
+  }
+  .pp-params-content .pp-side-col {
+    width: 100%;
+  }
 }

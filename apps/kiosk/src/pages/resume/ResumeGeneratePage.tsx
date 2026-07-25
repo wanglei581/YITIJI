@@ -48,55 +48,44 @@ const STEPS = [
 /** 右侧进度侧栏——展示6个填写阶段的完成状态 */
 function ProgressSidebar({ currentStep }: { currentStep: number }) {
   return (
-    <div className="flex w-[330px] flex-none flex-col gap-4">
-      <div className="resume-lightflow__work-card rounded-2xl border p-5">
-        <p className="mb-4 font-serif text-xl font-bold tracking-wide text-neutral-900">填写进度</p>
-        <div className="flex flex-col gap-2">
+    <aside className="resume-lightflow__sidebar" aria-label="填写进度">
+      <div className="fy-side-card">
+        <h3>填写进度</h3>
+        <p className="fy-side-sub">完成必填项后继续下一步</p>
+        <div className="fy-prog-list">
           {STEPS.map((s, idx) => {
             const done = idx < currentStep
             const now = idx === currentStep
             return (
               <div
                 key={idx}
-                className={[
-                  'flex min-h-[52px] items-center gap-3 rounded-xl border px-4 transition-colors',
-                  now ? 'border-primary-300 bg-primary-50' : done ? 'border-neutral-100 bg-white' : 'border-neutral-100 bg-white',
-                ].join(' ')}
+                className={['fy-prog-item', done ? 'done' : now ? 'now' : ''].filter(Boolean).join(' ')}
               >
-                <span
-                  className={[
-                    'flex h-9 w-9 flex-none items-center justify-center rounded-full border-2 text-sm font-bold',
-                    done ? 'border-primary-600 bg-primary-600 text-white' : now ? 'border-primary-600 bg-white text-primary-600' : 'border-neutral-200 bg-white text-neutral-400',
-                  ].join(' ')}
-                >
+                <span className="fy-prog-dot" aria-hidden="true">
                   {done ? <CheckIcon className="h-4 w-4" /> : idx + 1}
                 </span>
-                <span className={['text-base font-semibold', done || now ? 'text-neutral-900' : 'text-neutral-400'].join(' ')}>
-                  {s.title}
-                </span>
-                <span className="ml-auto text-sm text-neutral-400">
-                  {done ? '已填' : now ? '填写中' : s.description}
-                </span>
+                <span className="fy-prog-title">{s.title}</span>
+                <span className="fy-prog-status">{done ? '已填' : now ? '填写中' : s.description}</span>
               </div>
             )
           })}
         </div>
       </div>
 
-      <div className="resume-lightflow__work-card rounded-2xl border p-5">
-        <p className="mb-3 font-serif text-xl font-bold tracking-wide text-neutral-900">生成说明</p>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-start gap-2 rounded-xl border border-primary-100 bg-primary-50 px-3 py-3 text-xs leading-relaxed text-primary-800">
-            <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。
+      <div className="fy-side-card">
+        <h3>生成说明</h3>
+        <div className="fy-hint-list">
+          <div className="fy-hint-item">
+            <ShieldCheckIcon aria-hidden="true" />
+            <span>AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。</span>
           </div>
-          <div className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-neutral-50 px-3 py-3 text-xs leading-relaxed text-neutral-600">
-            <SparklesIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-            本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。
+          <div className="fy-hint-item">
+            <SparklesIcon aria-hidden="true" />
+            <span>本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。</span>
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   )
 }
 
@@ -274,10 +263,8 @@ export function ResumeGeneratePage() {
         </div>
       </div>
 
-      <div className="resume-lightflow__content mt-4 flex-1 min-h-0 overflow-y-auto px-6 pb-6">
-        <div className="flex min-h-full gap-5">
-          {/* 左：当前步骤表单 */}
-          <div className="flex flex-1 min-w-0 flex-col gap-4">
+      <div className="resume-lightflow__content mt-4 flex-1 min-h-0 px-6 pb-6">
+        <div className="resume-lightflow__form-col">
             <Card className="resume-lightflow__work-card p-5">
               <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
@@ -465,12 +452,9 @@ export function ResumeGeneratePage() {
             {error && (
               <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
             )}
-          </div>
-
-          {/* 右：填写进度 + 生成说明 */}
-          <ProgressSidebar currentStep={step} />
-
         </div>
+
+        <ProgressSidebar currentStep={step} />
       </div>
 
       {/* 底部操作条 */}

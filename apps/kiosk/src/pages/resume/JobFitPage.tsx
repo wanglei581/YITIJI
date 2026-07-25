@@ -45,6 +45,7 @@ import { AnonymousJobFitConsentDialog } from './jobFit/AnonymousJobFitConsentDia
 import { MemberJobFitConsentCard } from './jobFit/MemberJobFitConsentCard'
 import './jobFit-inkpaper.css'
 import './jobFit-inkpaper-ext.css'
+import './resume-fusion-youth.css'
 
 interface PageState {
   taskId?: string

@@ -15,6 +15,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { cancelScanSession, getScanSessionStatus } from '../../services/api/scanTasks'
 import { ApiHttpError } from '../../services/api/httpAdapter'
+import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -168,11 +169,7 @@ export function ScanProgressPage() {
       <div data-w2-page="scan-progress" className="w2-scan-shell">
         <KioskPageHeader title="等待扫描完成" description="请在打印机上完成操作，本页每 3 秒自动检测结果" aside={<span className="w2-scan-status-chip is-busy"><span />任务进行中</span>} />
 
-      <div className="w2-scan-steps" aria-label="扫描流程">
-        {['选择类型', '扫描指引', '扫描中', '完成'].map((label, index) => (
-          <div key={label} className={index < 2 ? 'is-done' : index === 2 ? 'is-active' : ''}><span>{index < 2 ? <CheckIcon /> : index + 1}</span>{label}</div>
-        ))}
-      </div>
+      <ScanFlowSteps activeIndex={2} />
 
       <section className="w2-scan-content w2-scan-two-column">
         <section className="w2-scan-waiting-card">

@@ -110,28 +110,26 @@ function CampusExtensionTile({
       disabled={disabled}
       onClick={() => !disabled && launchKioskAppItem(item, navigate, onQr, onExternal)}
       title={item.description}
-      className={`flex min-h-[220px] flex-col rounded-[18px] border bg-[var(--kp-surface)] p-7 text-left shadow-sm ${disabled ? 'cursor-not-allowed opacity-60' : 'active:scale-[.985]'}`}
+      className="sc-mod"
     >
-      <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
+      <span className="sc-mod-icon">
         {isQr ? (
-          <QrCodeIcon className="h-8 w-8" aria-hidden="true" />
+          <QrCodeIcon aria-hidden="true" />
         ) : isExternal ? (
-          <ExternalLinkIcon className="h-8 w-8" aria-hidden="true" />
+          <ExternalLinkIcon aria-hidden="true" />
         ) : (
-          <PartyPopperIcon className="h-8 w-8" aria-hidden="true" />
+          <PartyPopperIcon aria-hidden="true" />
         )}
       </span>
-      <span className="mt-5 flex items-center gap-3">
-        <b className="font-serif text-[28px] font-bold tracking-[1px]">{item.title}</b>
-        {badge && <span className="kproto-chip">{badge}</span>}
+      <span className="sc-mod-title">
+        <b>{item.title}</b>
+        {badge && <span className="sc-mod-tag">{badge}</span>}
       </span>
-      {item.description && (
-        <span className="mt-2 flex-1 text-[19px] leading-normal text-[var(--kp-muted)]">{item.description}</span>
-      )}
+      {item.description && <p>{item.description}</p>}
       {!disabled && (
-        <span className="mt-3 inline-flex items-center gap-2 text-[20px] font-bold text-[var(--kp-accent-deep)]">
+        <span className="sc-mod-go">
           {isQr ? '扫码进入' : isExternal ? '前往办理' : '进入'}
-          <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+          <ChevronRightIcon aria-hidden="true" />
         </span>
       )}
     </button>
@@ -177,7 +175,7 @@ export function SmartCampusHomePage() {
               <Button size="lg" onClick={() => navigate('/')}>返回首页</Button>
             </Card>
           ) : (
-            <div className="grid grid-cols-2 gap-5">
+            <div className="sc-mod-grid">
               {cards.map((entry) => {
                 const Icon = entry.icon
                 const disabled = !entry.to
@@ -187,19 +185,20 @@ export function SmartCampusHomePage() {
                     type="button"
                     disabled={disabled}
                     onClick={() => entry.to && navigate(entry.to)}
-                    className={`flex min-h-[220px] flex-col rounded-[18px] border bg-[var(--kp-surface)] p-7 text-left shadow-sm ${disabled ? 'cursor-not-allowed opacity-60' : 'active:scale-[.985]'}`}
+                    className="sc-mod"
                   >
-                    <span className="grid h-16 w-16 place-items-center rounded-2xl bg-[var(--kp-accent-soft)] text-[var(--kp-accent-deep)]">
-                      <Icon className="h-8 w-8" aria-hidden="true" />
+                    <span className="sc-mod-icon">
+                      <Icon aria-hidden="true" />
                     </span>
-                    <span className="mt-5 flex items-center gap-3">
-                      <b className="font-serif text-[28px] font-bold tracking-[1px]">{entry.title}</b>
-                      {disabled && <span className="kproto-chip">即将上线</span>}
+                    <span className="sc-mod-title">
+                      <b>{entry.title}</b>
+                      {disabled && <span className="sc-mod-tag">即将上线</span>}
                     </span>
-                    <span className="mt-2 flex-1 text-[19px] leading-normal text-[var(--kp-muted)]">{entry.description}</span>
+                    <p>{entry.description}</p>
                     {!disabled && (
-                      <span className="mt-3 inline-flex items-center gap-2 text-[20px] font-bold text-[var(--kp-accent-deep)]">
-                        进入<ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+                      <span className="sc-mod-go">
+                        进入
+                        <ChevronRightIcon aria-hidden="true" />
                       </span>
                     )}
                   </button>
@@ -211,12 +210,12 @@ export function SmartCampusHomePage() {
           {/* 原型外生产动态状态：仅当后台以 smart_campus 投放了扩展应用时渲染。
               无投放项时本区整体不出现，页面与原型 51 保持 1:1。 */}
           {config.enabled && extensionItems.length > 0 && (
-            <section className="mt-2" aria-label="校园扩展应用">
-              <div className="mb-4 flex items-baseline gap-3">
-                <h2 className="font-serif text-[26px] font-bold tracking-[1px]">扩展应用</h2>
-                <span className="text-[17px] text-[var(--kp-muted)]">校方审核后上架的校园服务，进入第三方前会有明确提示</span>
+            <section aria-label="校园扩展应用">
+              <div className="sc-ext-head">
+                <h2>扩展应用</h2>
+                <span>校方审核后上架的校园服务，进入第三方前会有明确提示</span>
               </div>
-              <div className="grid grid-cols-2 gap-5">
+              <div className="sc-mod-grid">
                 {extensionItems.map((item) => (
                   <CampusExtensionTile key={item.key} item={item} onQr={setQrItem} onExternal={setExternalItem} />
                 ))}

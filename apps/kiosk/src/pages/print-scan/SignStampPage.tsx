@@ -279,7 +279,7 @@ export function SignStampPage() {
 
   return (
     <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
+      <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
       <KioskPageHeader title="签名盖章" description="在 PDF 上叠加签名 / 印章图片（版式合成）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
       <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
@@ -289,7 +289,7 @@ export function SignStampPage() {
         </div>
         {error && <KioskStatePanel compact tone="error" title="签名盖章暂未完成" description={error} icon={<AlertCircleIcon />} />}
 
-        <div className="flex min-h-0 flex-1 gap-5">
+        <div className="w2-print-scan-split">
           <section className="flex min-w-0 flex-1 flex-col gap-4">
             <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
@@ -408,7 +408,7 @@ export function SignStampPage() {
             </div>
           </section>
 
-          <aside className="flex w-[400px] shrink-0 flex-col gap-4">
+          <aside className="w2-print-scan-side w-[400px]">
             <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
                 <b className="text-xl font-bold">{result ? '合成 PDF 预览' : '叠加效果示意'}</b>
