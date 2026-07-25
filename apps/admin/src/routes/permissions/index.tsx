@@ -7,8 +7,8 @@ export default function PermissionsPage() {
     <Page title="权限管理" subtitle="管理员角色与操作权限">
       <EmptyState
         icon={ShieldIcon}
-        title="功能建设中"
-        description="该模块正在开发中，上线前暂不开放，敬请期待。"
+        title="账号与角色由平台侧统一管理"
+        description="当前为粗粒度管理员 / 合作机构角色，不提供自助 RBAC 配置。开账号或调整角色请联系平台运营，本页不开放细粒度权限编辑。"
       />
     </Page>
   )

@@ -68,9 +68,9 @@ expectMatches(
   'http 模式无真实 fileUrl 时先 setSubmitError 并 return,不伪造打印成功',
 )
 
-// 位置断言:定位关键锚点
+// 位置断言:定位关键锚点（fileUrl 守卫必须紧跟 setSubmitError，排除 useEffect 报价分支）
 const httpIndex = confirmSrc.search(httpBranch)
-const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)/)
+const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)\s*\{\s*setSubmitError/)
 
 // SIM 跳转 = 无 taskId 的 /print/progress 导航(仅非 http mock 模式使用)
 const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*source\s*\}\s*\}\)/
@@ -151,6 +151,47 @@ expectMatches(
   doneSrc,
   /setPickupCodeError\('取件凭证暂时无法读取，请联系工作人员核验订单'\)/,
   'PrintDonePage 取件码查询失败时显式提示工作人员核验，不静默隐藏',
+)
+
+// 8) P0-1：确认页 / 预览页不得硬编码单价；确认页改读后端报价。
+const PREVIEW = 'src/pages/print/PrintPreviewPage.tsx'
+const PRINT_JOBS_API = 'src/services/print/printJobsApi.ts'
+const previewSrc = read(PREVIEW)
+const printJobsApiSrc = read(PRINT_JOBS_API)
+expectMatches(
+  printJobsApiSrc,
+  /export\s+async\s+function\s+quotePrintOrder/,
+  'printJobsApi 提供 quotePrintOrder（POST /orders/quote）',
+)
+expectMatches(
+  printJobsApiSrc,
+  /\$\{API_BASE_URL\}\/orders\/quote/,
+  'quotePrintOrder 请求 /orders/quote',
+)
+expectMatches(
+  confirmSrc,
+  /import\s*\{[^}]*quotePrintOrder[^}]*\}\s*from\s*'\.\.\/\.\.\/services\/print\/printJobsApi'/,
+  'PrintConfirmPage 引入 quotePrintOrder',
+)
+expectMatches(
+  confirmSrc,
+  /quotePrintOrder\(\{\s*fileUrl:\s*file\.fileUrl,\s*params\s*\}\)/,
+  'PrintConfirmPage 用真实 fileUrl + params 请求后端报价',
+)
+if (!/PRICE_BW|PRICE_COLOR/.test(confirmSrc)) {
+  pass('PrintConfirmPage 无硬编码 PRICE_BW / PRICE_COLOR')
+} else {
+  fail('PrintConfirmPage 仍含硬编码 PRICE_BW / PRICE_COLOR')
+}
+if (!/PRICE_BW|PRICE_COLOR|¥0\.20|¥0\.50/.test(previewSrc)) {
+  pass('PrintPreviewPage 无硬编码单价 / 0.20 / 0.50 展示')
+} else {
+  fail('PrintPreviewPage 仍含硬编码单价文案')
+}
+expectMatches(
+  confirmSrc,
+  /演示模式不显示金额|页数待服务端确认，以最终计费为准|打印文件尚未就绪，无法报价/,
+  'PrintConfirmPage 在无可靠报价时不展示具体金额',
 )
 
 // 7) PrintProgressPage:生产 http 模式无 taskId 时也不能走 SIM 动画 / 成功页

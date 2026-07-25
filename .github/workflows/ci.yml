@@ -169,6 +169,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:device-status-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
           pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
           pnpm --filter @ai-job-print/kiosk verify:legal-retention-copy
@@ -192,6 +193,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:renshi-policy-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-ui
           pnpm --filter @ai-job-print/kiosk verify:job-ai-history-privacy-ui
+          pnpm --filter @ai-job-print/kiosk verify:data-request-ui
           pnpm --filter @ai-job-print/admin verify:admin-billing-ui
           pnpm --filter @ai-job-print/admin verify:admin-print-scan-ui
           pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
@@ -201,6 +203,10 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
           pnpm --filter @ai-job-print/admin verify:job-ai-ops-dashboard-ui
+          pnpm --filter @ai-job-print/admin verify:data-request-ui
+          pnpm --filter @ai-job-print/admin verify:admin-users-ui
+          pnpm --filter @ai-job-print/admin verify:honest-placeholders
+          pnpm --filter @ai-job-print/api verify:admin-users
           pnpm --filter @ai-job-print/partner verify:job-quality-dashboard-ui
           pnpm --filter @ai-job-print/partner verify:excel-template-download-ui
           pnpm --filter @ai-job-print/kiosk verify:jobfair-ui

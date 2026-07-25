@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircleIcon,
@@ -15,13 +15,8 @@ import type { PrintJobParams } from '@ai-job-print/shared'
 import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
-import {
-  estimatePrintCents,
-  formatPriceCents,
-  unitCentsFor,
-  usePrintPriceConfig,
-} from '../../services/print/priceConfigApi'
-import { createPrintJob } from '../../services/print/printJobsApi'
+import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
+import { formatCents } from './cashierStatus'
 import {
   clearPrintMaterialSession,
   printUploadPathForSource,
@@ -40,6 +35,12 @@ interface LocationState {
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
 }
+
+type QuoteView =
+  | { status: 'demo' }
+  | { status: 'loading' }
+  | { status: 'ready'; amountCents: number; billablePages: number; unitCents: number; quantity: number }
+  | { status: 'unavailable'; reason: string }
 
 const DUPLEX_LABEL: Record<string, string> = {
   simplex: '单面',
@@ -79,6 +80,9 @@ export function PrintConfirmPage() {
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [quote, setQuote] = useState<QuoteView>(
+    API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
+  )
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(effectivePages / params.pagesPerSheet)
@@ -87,15 +91,51 @@ export function PrintConfirmPage() {
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
   }, [effectivePages, params])
 
-  // 展示价（唯一来源=服务端价目；估价口径与服务端一致=单价×内容页×份数）
-  // 实际扣款金额由服务端建单时计算（绝不信任前端）；付费单进收银台必见真实金额。
-  const priceCfg = usePrintPriceConfig()
-  const unitCents = unitCentsFor(priceCfg.config, params.colorMode)
-  const estimateCents = estimatePrintCents(priceCfg.config, {
-    pages: file.pages,
-    copies: params.copies,
-    colorMode: params.colorMode,
-  })
+  // P0-1：应付金额只读后端 POST /orders/quote；无 fileUrl / 报价失败时不显示具体金额。
+  useEffect(() => {
+    if (API_MODE !== 'http') {
+      setQuote({ status: 'demo' })
+      return
+    }
+    if (!file.fileUrl) {
+      setQuote({ status: 'unavailable', reason: '打印文件尚未就绪，无法报价' })
+      return
+    }
+    let cancelled = false
+    setQuote({ status: 'loading' })
+    void quotePrintOrder({ fileUrl: file.fileUrl, params })
+      .then((q) => {
+        if (cancelled) return
+        const line = q.priceLines[0]
+        setQuote({
+          status: 'ready',
+          amountCents: q.amountCents,
+          billablePages: q.billablePages,
+          unitCents: line?.unitCents ?? 0,
+          quantity: line?.quantity ?? q.billablePages * params.copies,
+        })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setQuote({ status: 'unavailable', reason: '页数待服务端确认，以最终计费为准' })
+      })
+    return () => {
+      cancelled = true
+    }
+    // params 字段逐项列出，避免对象引用变化导致重复报价；与后端计费相关的字段均已覆盖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional field-level deps
+  }, [
+    file.fileUrl,
+    params.copies,
+    params.colorMode,
+    params.pageRange,
+    params.pagesPerSheet,
+    params.duplex,
+    params.orientation,
+    params.quality,
+    params.scale,
+    params.paperSize,
+  ])
 
   const summaryRows = [
     { label: '文件名称', value: file.name },
@@ -179,12 +219,16 @@ export function PrintConfirmPage() {
     )
   }
 
-  // 费用展示字符串
-  const costCalcLabel = priceCfg.status === 'error' || unitCents === null
-    ? '价格暂不可用，实付以收银台显示为准'
-    : file.pages === null
-      ? `${formatPriceCents(unitCents)}/页 × 页数待识别 × ${params.copies} 份`
-      : `${formatPriceCents(unitCents)}/页 × ${file.pages} 页 × ${params.copies} 份`
+  const costCalcLabel =
+    quote.status === 'ready'
+      ? `${formatCents(quote.unitCents)}/页 × ${quote.quantity} 页`
+      : quote.status === 'loading'
+        ? '正在向服务端确认页数与价目…'
+        : quote.status === 'demo'
+          ? '演示模式不显示金额'
+          : quote.status === 'unavailable'
+            ? quote.reason
+            : '页数待服务端确认，以最终计费为准'
 
   const privWarnState = materialCheck?.redaction?.resultFileCreated === false
     && (materialCheck?.redactedCount ?? 0) > 0
@@ -294,7 +338,11 @@ export function PrintConfirmPage() {
               </span>
               <span className="print-cost-num">
                 <small>¥</small>
-                {estimateCents === null ? '—' : formatPriceCents(estimateCents)}
+                {quote.status === 'ready'
+                  ? formatCents(quote.amountCents).replace(/^¥/, '')
+                  : quote.status === 'loading'
+                    ? '…'
+                    : '—'}
               </span>
             </div>
           </div>

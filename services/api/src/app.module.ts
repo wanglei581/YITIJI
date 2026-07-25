@@ -15,6 +15,7 @@ import { AdminOpsModule } from './admin-ops/admin-ops.module'
 import { AdminOrderActionsModule } from './payment/admin-order-actions.module'
 import { AdminOrdersReadonlyModule } from './admin-orders-readonly/admin-orders-readonly.module'
 import { AdminPrintScanModule } from './admin-print-scan/admin-print-scan.module'
+import { AdminUsersModule } from './admin-users/admin-users.module'
 import { MemberAuthModule } from './member-auth/member-auth.module'
 import { HealthController } from './common/health.controller'
 import { ActivityModule } from './activity/activity.module'
@@ -112,6 +113,7 @@ const redisUrl = process.env['REDIS_URL']
     AdminOpsModule,
     AdminOrdersReadonlyModule,
     AdminPrintScanModule,
+    AdminUsersModule,
     AdminOrderActionsModule,
     SyncModule,
     TerminalsModule,

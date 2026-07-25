@@ -160,6 +160,44 @@ function main(): void {
     'PrintCashierPage must gate sandbox simulate controls behind import.meta.env.DEV',
   )
 
+  // ── P0-4：开发价 seed 生产禁跑 + effectiveFrom 假能力字段锁 ─────────────────
+  const priceSeed = readSource('PriceConfigSeed', join(apiRoot, 'src/payment/price-config.seed.ts'))
+  const pricingService = readSource('PricingService', join(apiRoot, 'src/payment/pricing.service.ts'))
+  const priceOpsDoc = readSource(
+    'PriceConfigProductionOps',
+    join(repoRoot, 'docs/operations/price-config-production.md'),
+  )
+
+  check(
+    /DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION/.test(priceSeed)
+      && /assertDevPriceSeedAllowed/.test(priceSeed)
+      && /NODE_ENV/.test(priceSeed)
+      && /production/.test(priceSeed)
+      && /seedDevDefaultPriceConfig[\s\S]{0,400}assertDevPriceSeedAllowed\(/.test(priceSeed),
+    'dev price seed refuses NODE_ENV=production before upsert',
+    'price-config.seed must call assertDevPriceSeedAllowed and define DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION',
+  )
+  check(
+    /update:\s*\{[\s\S]{0,200}unitCents:\s*p\.unitCents/.test(priceSeed),
+    'dev seed update branch still overwrites unitCents (guarded by production ban)',
+    'seed update branch must still set unitCents (verify relies on reset); production ban is the safety net',
+  )
+  check(
+    !/\.effectiveFrom\b/.test(pricingService)
+      && !/effectiveFrom\s*:/.test(pricingService)
+      && /config\.active/.test(pricingService),
+    'PricingService quotes by active only (does not query effectiveFrom)',
+    'PricingService must gate on config.active and must not read effectiveFrom for scheduling',
+  )
+  check(
+    /seedDevDefaultPriceConfig/.test(priceOpsDoc)
+      && /DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION/.test(priceOpsDoc)
+      && /effectiveFrom/.test(priceOpsDoc)
+      && /FREE_MODE/.test(priceOpsDoc),
+    'ops doc covers production price upsert + seed ban + FREE_MODE',
+    'docs/operations/price-config-production.md must document seed ban and explicit upsert',
+  )
+
   if (failures > 0) {
     console.error(`\nFAIL verify-print-rollout-config (${failures} failed checks)`)
     process.exit(1)

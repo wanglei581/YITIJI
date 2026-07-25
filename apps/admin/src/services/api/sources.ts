@@ -36,12 +36,12 @@ export const publishFairSourceRecord = (id: string, action: PublishAction)      
 // ─── Wrapper exports (preserve existing page component API, no page changes needed) ─
 
 export const approveJobSource   = (id: string) => adapter.reviewJobSource(id, 'approve')
-export const rejectJobSource    = (id: string) => adapter.reviewJobSource(id, 'reject')
+export const rejectJobSource    = (id: string, reason: string) => adapter.reviewJobSource(id, 'reject', reason)
 export const publishJobSource   = (id: string) => adapter.publishJobSourceRecord(id, 'publish')
 export const unpublishJobSource = (id: string) => adapter.publishJobSourceRecord(id, 'unpublish')
 
 export const approveFairSource   = (id: string) => adapter.reviewFairSource(id, 'approve')
-export const rejectFairSource    = (id: string) => adapter.reviewFairSource(id, 'reject')
+export const rejectFairSource    = (id: string, reason: string) => adapter.reviewFairSource(id, 'reject', reason)
 export const publishFairSource   = (id: string) => adapter.publishFairSourceRecord(id, 'publish')
 export const unpublishFairSource = (id: string) => adapter.publishFairSourceRecord(id, 'unpublish')
 

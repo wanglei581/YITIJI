@@ -4,8 +4,8 @@ import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
+import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
 import { useIdleLogout } from '../auth/useIdleLogout'
-import { useHomeDeviceStatus } from '../pages/home/hooks/useHomeDeviceStatus'
 
 function getActiveTab(pathname: string): KioskTab {
   if (pathname.startsWith('/assistant')) return 'assistant'
@@ -54,7 +54,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const deviceStatus = useHomeDeviceStatus(pathname !== '/')
+  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus()
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。
@@ -64,14 +64,14 @@ function KioskShell() {
   useIdleLogout(screensaverActive)
 
   const activeTab = getActiveTab(pathname)
-  const statusVariantByTone = {
-    positive: 'success',
-    warning: 'warning',
-    negative: 'error',
-    neutral: 'default',
-  } as const
-  const statusVariant = statusVariantByTone[deviceStatus.tone]
-  const statusLabel = deviceStatus.label
+  const statusVariant = loading
+    ? 'info'
+    : printerReady
+      ? 'success'
+      : kind === 'unknown'
+        ? 'warning'
+        : 'error'
+  const statusLabel = loading ? '设备检查中' : printerLabel
   const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
 
   // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，

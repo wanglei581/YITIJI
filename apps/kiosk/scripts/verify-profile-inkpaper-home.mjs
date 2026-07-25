@@ -172,8 +172,7 @@ expectIncludes(header, 'className="kp-profile-boundary"', 'ProfileHeader 展示�
 expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
 expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
 expectIncludes(section, 'className={`kp-entry-grid kp-entry-grid--${section.layout}`}', 'ProfileEntrySection 使用等权入口网格')
-expectIncludes(section, "const disabled = entry.tag === '建设中'", 'ProfileEntrySection 仅将建设中入口识别为禁用态')
-expectIncludes(section, 'disabled={disabled}', 'ProfileEntrySection 使用原生 disabled 阻止未开放能力办理')
+expectAbsent(section, /disabled=\{disabled\}/, 'ProfileEntrySection 不再使用建设中禁用态')
 expectAbsent(section, /primaryEntry|lf-reference-/, 'ProfileEntrySection 不再放大首项或复用首页卡骨架')
 expectIncludes(records, 'className="kp-session-records"', 'ProfileSessionRecords 使用当前服务记录区块')
 expectIncludes(records, 'className="kp-section-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
@@ -252,7 +251,11 @@ for (const [label, route] of expectedEntries) {
   )
 }
 expectMatches(entries, /label:\s*'权益活动'[\s\S]{0,180}?route:\s*'\/activities'/, '权益活动只保留真实入口')
-expectAbsent(entries, /招聘会扫码凭证|招聘会权益活动|求职打印套餐|AI服务套餐|\/activities\?source=fair/, 'Profile 不展示重复或占位入口')
+expectMatches(entries, /label:\s*'招聘会签到预约'[\s\S]{0,120}?route:\s*'\/job-fairs'/, '招聘会签到预约须跳转既有招聘会页，不做平台内凭证')
+expectAbsent(entries, /招聘会扫码凭证|tag:\s*'建设中'/, '不得保留扫码凭证建设中占位或「建设中」标签')
+expectMatches(entries, /label:\s*'求职打印套餐'[\s\S]{0,120}?tag:\s*'不提供'/, '求职打印套餐须诚实标注不提供，不接支付')
+expectMatches(entries, /label:\s*'AI服务套餐'[\s\S]{0,120}?tag:\s*'不提供'/, 'AI服务套餐须诚实标注不提供，不接支付')
+expectAbsent(entries, /\/activities\?source=fair/, 'Profile 不展示重复权益活动入口')
 expectAbsent(entries, /label:\s*'身份切换'/, 'Profile 不重复暴露账号设置入口')
 for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益与政策', '账户与支持']) {
   expectMatches(entries, new RegExp(`title:\\s*'${title}'`), `Profile 保留五区边界：${title}`)
@@ -392,12 +395,22 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
 ])
+/** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
+const allowedHonestCopyChanged = new Set([
+  'apps/kiosk/src/pages/profile/ProfilePage.tsx',
+  'apps/kiosk/src/pages/profile/profileEntries.ts',
+  'apps/kiosk/src/pages/profile/profileTypes.ts',
+  'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+])
 const allowedChanged = new Set([
   'apps/kiosk/src/layouts/KioskRoot.tsx',
   ...allowedProfileLandingChanged,
   ...allowedLowRiskInkpaperChanged,
   ...allowedPrintOrderRefreshChanged,
   ...allowedPrintOrdersInkpaperChanged,
+  ...allowedHonestCopyChanged,
 ])
 const profileRelatedChanged = changedFiles.filter(
   (file) => file.startsWith('apps/kiosk/src/pages/profile/') || file.startsWith('apps/kiosk/scripts/verify-profile-inkpaper-home'),
@@ -415,6 +428,33 @@ if (delegatesMeBoundary) {
   pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖；LightFlow 本批 /me/* 禁入已委托给同一 CI 中的 verify:lightflow-profile-entry')
 } else {
   fail('LightFlow 本批 /me/* 禁入委托缺失或未与 Profile 主守卫共同接入 CI')
+}
+
+const forbiddenMeChanged = changedFiles.filter((file) => {
+  if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  if (/^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file)) {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  return false
+})
+if (forbiddenMeChanged.length === 0) {
+  pass('/me/print-orders 状态刷新小步仍在允许范围内')
+} else {
+  fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
+}
+
+const forbiddenProfileChanged = changedFiles.filter(
+  (file) =>
+    /^apps\/kiosk\/src\/pages\/profile\/(ProfilePage|profileEntries|profile-inkpaper|components\/Profile)/.test(file)
+    && !allowedHonestCopyChanged.has(file)
+    && !allowedProfileLandingChanged.has(file),
+)
+if (forbiddenProfileChanged.length === 0) {
+  pass('ProfilePage 主入口仅允许诚实文案 / 合规标签收口，未做未声明换装')
+} else {
+  fail(`本批禁止触碰 ProfilePage 主入口：${forbiddenProfileChanged.join(', ')}`)
 }
 
 // 5) 不能引入旧 MyPrintOrdersPage 的回退口径。

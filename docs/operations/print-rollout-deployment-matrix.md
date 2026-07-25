@@ -38,6 +38,14 @@
 | production + sandbox | runtime should reject startup | 禁止混用；生产运行时不应以 sandbox 支付配置启动。 |
 | Missing PriceConfig treated as free | wrong, it fail-closes | 禁止按免费处理；缺少有效价格配置时应 fail-close，不进入打印。 |
 
+## 价目落库
+
+显式写入 / 核对运营价、开发 seed 生产禁跑与变更记录模板见：
+
+→ [`docs/operations/price-config-production.md`](./price-config-production.md)
+
+**禁止**对生产库跑会调用 `seedDevDefaultPriceConfig` 的 verify（其 `update` 会覆盖 `unitCents`；代码侧已在 `NODE_ENV=production` 拒绝，但仍不得拿生产 `DATABASE_URL` 做开发 verify）。
+
 ## 当前推荐
 
 首台终端试运营使用免费模式：

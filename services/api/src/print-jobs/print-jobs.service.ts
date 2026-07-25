@@ -9,6 +9,7 @@ import { assertPaymentSessionSecretConfigured, createPaymentSessionToken } from 
 import { PricingService } from '../payment/pricing.service'
 import type { OrderPayStatus, PrintPriceLine } from '../payment/payment.types'
 import type { CreatePrintJobDto } from './dto/create-print-job.dto'
+import { countPagesInRange } from './page-range.util'
 import { PrintPageCountService } from './print-page-count.service'
 import type { BillingPageSource } from './print-page-count.types'
 
@@ -30,7 +31,7 @@ export interface PrintJobCreated {
   payStatus: OrderPayStatus
   /** 计费明细快照（收银页「价目明细」展示用；即 Order.itemsJson 内容）。 */
   priceLines: PrintPriceLine[]
-  /** 后端识别的计费页数（绝不信任前端）。 */
+  /** 后端识别的计费页数（绝不信任前端）；已按 pageRange 取实际出纸页数。 */
   billablePages: number
   /** 计费页数来源。 */
   billingPageSource: BillingPageSource
@@ -264,7 +265,18 @@ export class PrintJobsService {
 
     // 计费页数：后端从签名 fileUrl 识别真实内容页数（**绝不信任前端 pages**）；
     // 未知 MIME / 识别失败 / 0 页 / 签名无效 / 文件缺失 → fail-closed 抛错，拒绝建（付费）订单。
-    const { billablePages, billingPageSource } = await this.pageCount.resolveBillablePages(dto.fileUrl)
+    const { billablePages: documentPages, billingPageSource } = await this.pageCount.resolveBillablePages(dto.fileUrl)
+    // 页码范围：Agent 只打印 pageRange 选中页，计费必须与实际出纸一致，否则按整份文件收费即超收。
+    // 选中页数为 0 / 范围非法 → fail-closed，绝不回退成整份文件页数。
+    const billablePages = countPagesInRange(dto.params?.pageRange, documentPages)
+    if (billablePages === null) {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_PAGE_RANGE_INVALID',
+          message: '页码范围无效或未选中任何页面',
+        },
+      })
+    }
     // 报价：金额只由 PricingService 依 PriceConfig 计算（**不信任前端 amount**）；无 active 价目 / 异常 → fail-closed。
     const copies = dto.params?.copies ?? DEFAULT_PARAMS.copies
     const colorMode: 'black_white' | 'color' = dto.params?.colorMode ?? 'black_white'

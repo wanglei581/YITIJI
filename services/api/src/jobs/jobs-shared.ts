@@ -105,6 +105,7 @@ export interface AdminFairDto {
   status: FairStatus; description?: string; boothCount?: number
   sourceOrgId: string; externalId: string; sourceName: string; sourceUrl: string; checkinUrl?: string; syncTime: string
   reviewStatus: ReviewStatus; publishStatus: PublishStatus
+  rejectReason?: string | null
 }
 
 export interface PartnerJobDto {
@@ -487,6 +488,7 @@ export function prismaFairToAdminDto(f: PrismaJobFairRow): AdminFairDto {
     syncTime: fmtSyncTime(f.syncTime),
     reviewStatus: f.reviewStatus as ReviewStatus,
     publishStatus: f.publishStatus as PublishStatus,
+    rejectReason: f.rejectReason,
   }
 }
 
