@@ -1,6 +1,8 @@
 @import "@ai-job-print/ui/styles/tokens.css";
 /* Kiosk presentation styles remain attribute-scoped by data-kiosk-presentation. */
 @import "@ai-job-print/ui/styles/fusion-youth.css";
+@import "@ai-job-print/ui/styles/kiosk-shell.css";
+@import "@ai-job-print/ui/styles/kiosk-components.css";
 @import "@ai-job-print/ui/styles/service-desk.css";
 @import "./pages/jobs-fairs-prototype.css";
 @import "tailwindcss";
