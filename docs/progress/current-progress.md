@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 完成 **P1 依赖 remediation**（分支 `fix/p1-dep-remediation-20260725` / [PR #355](https://github.com/wanglei581/YITIJI/pull/355)）：升级三端 `react-router-dom@7.18.1`、Terminal Agent `axios@1.18.1`、Kiosk Playwright `1.55.1`；双份 overrides 抬 `shell-quote@1.9.0` / Hono pins / `js-yaml` / `fast-uri` / `postcss`，`brace-expansion` **按 major** 钉 `1.1.16` / `2.1.2` / `5.0.8`（禁止全局 5.x）。根门禁 `verify:dependency-security`（RSC `GHSA-qwww-vcr4-c8h2` + 过宽 `GHSA-mh99` 条件接受 + SPA 守卫）已接 CI。**不得伪称 audit=0**；**未部署**。
+
 2026-07-25 启动 **`WINDOWS_FIELD_RECHECK` 现场 Phase F**：新增 `docs/device/windows-field-recheck-phase-f-runbook.md`（F1 Agent 服务 / F2 printerName / F3 本机桥接 / F4 受控出纸 / F5 断网恢复 / F6 全屏抽查 + 回执模板）。同日远程 Phase R 再复检：health `ok/postgres`；`t_ksk_001` `printerStatus=ready` + `isOnline=true`；近 30min 心跳有多条；active PrintTask=0。**Phase F 未完成、未宣称 §五通过**；未造打印单、未 close-unpaid、未改 G5/FREE_MODE/F1。阻塞：须人到一体机执行清单并回执。
 
 2026-07-25 完成 **`SECRETS_ROTATION_EVIDENCE`（方案 C，用户确认「可以，继续」）**：不新轮换、不读密钥值。书面口径：OCR/COS **沿用 2026-06-13** 控制台轮换 + 当时 live 复验；SMS/TRTC 为**当前生产密钥**且预发 `.env` 已同步，今日无需再换。已勾选清单 §2.2 百度 OCR、COS CAM、ASR/TTS/SMS/TRTC CAM 最小权限三项；「密钥只写入服务器环境变量」此前已勾。**未勾**：短信签名/模板审核、真实短信 E2E、COS 生命周期截图等独立项。未改 `.env`、未重启 PM2、未动 G5 / FREE_MODE / F1 Genesis。下一步：7c 现场 Phase F，或短信审核类阻塞项。

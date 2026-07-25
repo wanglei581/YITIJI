@@ -76,6 +76,10 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
+      - name: Dependency security gate
+        # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
+        run: pnpm verify:dependency-security
+
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
         run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
@@ -145,6 +149,8 @@ jobs:
         # 放在 SQLite db 准备之前即可跑。
         working-directory: apps/terminal-agent
         run: |
+          pnpm run verify:direct-http-agents
+          pnpm run verify:form-data-security
           pnpm run verify:agent-profile-guard
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
