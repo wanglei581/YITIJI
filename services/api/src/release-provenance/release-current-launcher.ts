@@ -106,7 +106,9 @@ if (require.main === module) {
     printError(new ReleaseProvenanceError('RELEASE_PROVENANCE_LAUNCHER_ARGUMENT_INVALID'))
     process.exitCode = 1
   } else {
-    runCurrentLauncher({ currentLink: args[1], artifactRoot: args[3], launcherPath: realpathSync(process.argv[1]), launcherSha256: args[5] }).then(
+    // PM2 fork wraps the entry with ProcessContainerFork.js, so process.argv[1] is not this file.
+    // __filename remains the stable launcher path under both direct node and PM2.
+    runCurrentLauncher({ currentLink: args[1], artifactRoot: args[3], launcherPath: realpathSync(__filename), launcherSha256: args[5] }).then(
       (code) => {
         process.exitCode = code
       },

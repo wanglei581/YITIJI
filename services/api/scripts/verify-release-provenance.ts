@@ -157,6 +157,13 @@ async function verifyCurrentLauncherSelfHash(): Promise<void> {
   }
 }
 
+function verifyLauncherCliUsesFilenameUnderPm2(): void {
+  const source = readFileSync(join(__dirname, '../src/release-provenance/release-current-launcher.ts'), 'utf8')
+  assert.match(source, /realpathSync\(__filename\)/)
+  assert.equal(source.includes('realpathSync(process.argv[1])'), false)
+  console.log('  PASS stable launcher CLI resolves self via __filename (PM2-safe)')
+}
+
 function pm2Snapshot(cwd: string, execPath: string, currentLink: string, artifactRoot: string, launcherSha256: string): Pm2ProcessSnapshot {
   return {
     name: 'fixture-api',
@@ -612,6 +619,7 @@ async function main(): Promise<void> {
   await verifyGuardLaunch()
   await verifyCurrentLauncher()
   await verifyCurrentLauncherSelfHash()
+  verifyLauncherCliUsesFilenameUnderPm2()
   await verifyActivationRuntimeEnvironmentContract()
   await verifyActivationCliRejectsLegacyArgumentCount()
   await verifyActivationFixtures()
