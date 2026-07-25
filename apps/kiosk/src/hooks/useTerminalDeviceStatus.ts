@@ -177,7 +177,7 @@ function unknownView(partial: Partial<TerminalDeviceStatusView> = {}): TerminalD
   }
 }
 
-export function useTerminalDeviceStatus(): TerminalDeviceStatusView {
+export function useTerminalDeviceStatus(enabled = true): TerminalDeviceStatusView {
   const terminalId = getTerminalId()
   const [view, setView] = useState<TerminalDeviceStatusView>(() =>
     terminalId
@@ -207,6 +207,9 @@ export function useTerminalDeviceStatus(): TerminalDeviceStatusView {
   )
 
   useEffect(() => {
+    // 首页自有顶栏轮询时，壳层 header 停用，避免双请求。
+    if (!enabled) return
+
     if (!terminalId) {
       setView(
         unknownView({
@@ -279,7 +282,7 @@ export function useTerminalDeviceStatus(): TerminalDeviceStatusView {
       ac.abort()
       window.clearInterval(timer)
     }
-  }, [terminalId])
+  }, [enabled, terminalId])
 
   return view
 }

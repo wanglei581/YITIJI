@@ -131,6 +131,17 @@ expectMatches(
 expectNotMatches(pillsSrc, /\/admin\//, '状态药丸组件禁止 /admin/*')
 
 expectMatches(rootSrc, /useTerminalDeviceStatus/, 'KioskRoot 消费 useTerminalDeviceStatus')
+expectMatches(
+  rootSrc,
+  /useTerminalDeviceStatus\(\s*pathname\s*!==\s*['"]\/['"]\s*\)/,
+  'KioskRoot 非首页停用壳层轮询（避免与首页顶栏双请求）',
+)
+expectMatches(
+  hookSrc,
+  /export function useTerminalDeviceStatus\(enabled = true\)/,
+  'hook 支持 enabled 门控',
+)
+expectMatches(hookSrc, /if\s*\(\s*!enabled\s*\)\s*return/, 'hook 停用时不发请求')
 expectNotMatches(
   rootSrc,
   /useState<\s*DeviceStatus\s*>\(\s*['"]idle['"]\s*\)/,

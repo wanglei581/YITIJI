@@ -149,10 +149,17 @@ export function PrintConfirmPage() {
     { label: '页面范围', value: params.pageRange ?? '全部页面' },
   ]
 
+  const confirmBlocked =
+    submitting || (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+
   const handleConfirm = async () => {
     if (API_MODE === 'http') {
       if (!file.fileUrl) {
         setSubmitError('打印文件尚未就绪，无法提交打印。请返回重新上传或重新生成文件后再试。')
+        return
+      }
+      if (quote.status !== 'ready') {
+        setSubmitError(quote.status === 'unavailable' ? quote.reason : '报价尚未就绪，请稍后再试')
         return
       }
       setSubmitting(true)
@@ -410,7 +417,7 @@ export function PrintConfirmPage() {
         <button
           type="button"
           className="print-confirm-primary"
-          disabled={submitting}
+          disabled={confirmBlocked}
           onClick={() => void handleConfirm()}
         >
           {submitting ? (

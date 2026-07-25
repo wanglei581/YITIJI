@@ -54,7 +54,8 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus()
+  // 首页隐藏壳层 header，由 HomePage 顶栏自行轮询；此处停用避免双请求。
+  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(pathname !== '/')
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。

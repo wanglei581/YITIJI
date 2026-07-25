@@ -169,7 +169,7 @@ export default function MemberPrivacyPage() {
                     重试导出
                   </Button>
                 )}
-                {(item.status === 'pending' || item.status === 'handling' || item.status === 'failed') && (
+                {item.requestType === 'export' && (item.status === 'pending' || item.status === 'failed') && (
                   <Button
                     size="sm"
                     variant="secondary"

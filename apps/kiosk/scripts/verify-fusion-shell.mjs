@@ -197,7 +197,7 @@ const shellBody = functionBody(root, 'KioskShell')
 for (const [label, pattern] of [
   ['screensaver controller', /useScreensaverController\(\s*\)/],
   ['idle logout', /useIdleLogout\(\s*screensaverActive\s*\)/],
-  ['device status route guard', /useHomeDeviceStatus\(\s*pathname\s*!==\s*['"]\/['"]\s*\)/],
+  ['device status route guard', /useTerminalDeviceStatus\(\s*pathname\s*!==\s*['"]\/['"]\s*\)/],
   ['favorites provider', /<FavoritesProvider>/],
   ['active tab derivation', /getActiveTab\(\s*pathname\s*\)/],
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
