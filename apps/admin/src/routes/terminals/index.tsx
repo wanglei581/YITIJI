@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
 import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
-import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon, SearchIcon, KeyRoundIcon } from 'lucide-react'
+import { MonitorIcon, RefreshCwIcon, PencilIcon, CheckIcon, XIcon, Building2Icon, SearchIcon, KeyRoundIcon, PlusIcon } from 'lucide-react'
 import { Pagination, useTableState } from '../components/DataTable'
 import { FilterChip } from '../components/FilterChip'
 import { API_MODE } from '../../services/api/client'
@@ -15,6 +15,7 @@ import {
   type UpdateTerminalProfileInput,
 } from '../../services/api/devices'
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
+import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 
 const TABLE_COLS = 12
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
@@ -84,6 +85,7 @@ export default function TerminalsPage() {
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   // 一次性绑定码弹窗状态；生成/倒计时/复制逻辑在 TerminalBindCodeDialog 内部。
   const [bindCodeTerminal, setBindCodeTerminal] = useState<AdminTerminalRecord | null>(null)
+  const [creatingPlannedTerminal, setCreatingPlannedTerminal] = useState(false)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
 
@@ -109,7 +111,7 @@ export default function TerminalsPage() {
   )
 
   useInteractionLock(
-    editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null,
+    editingId !== null || saving || profileEditingId !== null || profileSaving || statusSavingId !== null || creatingPlannedTerminal,
     [TERMINALS_REFRESH_KEY],
     'hard',
   )
@@ -336,6 +338,9 @@ export default function TerminalsPage() {
         ))}
         <div className="ml-auto flex items-center gap-2">
           <span className="text-[12.5px] text-neutral-500">共 {total} 台终端</span>
+          <button type="button" onClick={() => { setCreatingPlannedTerminal(true); setNotice(null) }} className="inline-flex h-[30px] items-center gap-1.5 rounded-[9px] bg-primary-600 px-3 text-xs font-bold text-white transition-colors hover:bg-primary-700">
+            <PlusIcon className="h-3.5 w-3.5" aria-hidden="true" />预创建设备
+          </button>
           <button
             type="button"
             onClick={() => void refresh()}
@@ -400,7 +405,11 @@ export default function TerminalsPage() {
                   const printerView = printerStatusView(t.printerStatus ?? null)
                   return (
                     <tr key={t.id} className="hover:bg-neutral-50">
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">{t.terminalCode}</td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-700">
+                        {t.terminalCode}
+                        {t.lifecycleStatus === 'planned' ? <span className="ml-2 rounded bg-warning-bg px-1.5 py-0.5 font-sans text-[10px] font-bold text-warning-fg">待安装</span> : null}
+                        {t.lifecycleStatus === 'commissioning' ? <span className="ml-2 rounded bg-primary-50 px-1.5 py-0.5 font-sans text-[10px] font-bold text-primary-700">安装中</span> : null}
+                      </td>
                       <td className="min-w-[260px] px-4 py-3 text-xs">
                         {profileEditingId === t.id ? (
                           <div className="space-y-2">
@@ -617,6 +626,18 @@ export default function TerminalsPage() {
           terminal={bindCodeTerminal}
           onClose={closeBindCodeModal}
           onNotice={setNotice}
+        />
+      ) : null}
+      {creatingPlannedTerminal ? (
+        <CreatePlannedTerminalDialog
+          organizations={orgOptions}
+          onClose={() => setCreatingPlannedTerminal(false)}
+          onCreated={(terminalCode) => {
+            setCreatingPlannedTerminal(false)
+            setNotice({ type: 'success', text: `已预创建设备 ${terminalCode}；请在设备列表中生成一次性绑定码完成安装。` })
+            void refresh()
+          }}
+          onError={(message) => setNotice({ type: 'error', text: message })}
         />
       ) : null}
     </>

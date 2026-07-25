@@ -12,6 +12,8 @@ import type {
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
+  CreatePlannedTerminalInput,
+  PlannedTerminalCreated,
   TerminalPrinterStatus,
   DeviceFleetOverview,
   DeviceFleetTerminal,
@@ -33,6 +35,8 @@ export type {
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
   TerminalBindCodeCreated,
+  CreatePlannedTerminalInput,
+  PlannedTerminalCreated,
   TerminalPrinterStatus,
   DeviceFleetOverview,
   DeviceFleetTerminal,
@@ -51,6 +55,7 @@ interface AdminDeviceServiceInterface {
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
   updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
+  createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
 }
 
 const adapter: AdminDeviceServiceInterface =
@@ -79,3 +84,7 @@ export const updateTerminalProfile = (terminalId: string, input: UpdateTerminalP
 /** 生成一次性终端绑定码(POST /admin/terminals/:id/bind-code)。明文只在响应里返回一次。 */
 export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) =>
   adapter.createTerminalBindCode(terminalId, ttlMinutes)
+
+/** Admin 预创建 planned 设备资产；不签发 Agent 凭证。 */
+export const createPlannedTerminal = (input: CreatePlannedTerminalInput) =>
+  adapter.createPlannedTerminal(input)

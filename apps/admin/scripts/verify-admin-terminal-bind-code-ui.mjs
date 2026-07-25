@@ -23,6 +23,7 @@ function fail(message) {
 const required = [
   'src/routes/terminals/index.tsx',
   'src/routes/terminals/TerminalBindCodeDialog.tsx',
+  'src/routes/terminals/CreatePlannedTerminalDialog.tsx',
   'src/services/api/devices.ts',
   'src/services/api/adminHttpAdapter.ts',
   'src/services/api/adminMockAdapter.ts',
@@ -39,6 +40,7 @@ for (const rel of required) {
 
 const { 'src/routes/terminals/index.tsx': page } = loaded
 const { 'src/routes/terminals/TerminalBindCodeDialog.tsx': dialog } = loaded
+const { 'src/routes/terminals/CreatePlannedTerminalDialog.tsx': plannedDialog } = loaded
 const { 'src/services/api/devices.ts': devices } = loaded
 const { 'src/services/api/adminHttpAdapter.ts': http } = loaded
 const { 'src/services/api/adminMockAdapter.ts': mock } = loaded
@@ -122,5 +124,19 @@ for (const token of suspect) {
   }
 }
 pass('页面对 plaintext bindCode 没有出现日志或审计旁路')
+
+if (
+  page.includes('预创建设备') &&
+  page.includes('CreatePlannedTerminalDialog') &&
+  plannedDialog.includes('createPlannedTerminal') &&
+  plannedDialog.includes('这里只创建设备资产，不签发凭证') &&
+  devices.includes('createPlannedTerminal') &&
+  http.includes("postData<PlannedTerminalCreated>('/admin/terminals', input)") &&
+  mock.includes('createPlannedTerminal')
+) {
+  pass('现有设备管理页接入 Admin 预创建设备，http/mock 双适配且不宣称签发凭证')
+} else {
+  fail('Admin terminals page must expose planned-device creation through existing device management entry')
+}
 
 console.log('\nALL PASS')

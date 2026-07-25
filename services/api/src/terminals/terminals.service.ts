@@ -17,6 +17,7 @@ import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
+import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 
 // Re-export all types so existing import paths remain valid
 export type {
@@ -39,6 +40,7 @@ export type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileResult,
   AdminPrinterView,
+  PlannedTerminalCreated,
 } from './terminals-admin.service'
 
 @Injectable()
@@ -99,6 +101,10 @@ export class TerminalsService {
 
   listTerminalsForAdmin() {
     return this.admin.listTerminalsForAdmin()
+  }
+
+  createPlannedTerminal(dto: CreatePlannedTerminalDto) {
+    return this.admin.createPlannedTerminal(dto)
   }
 
   listOrganizationOptions() {

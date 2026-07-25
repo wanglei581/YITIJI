@@ -8,10 +8,12 @@
 // Agent 生命周期见 TerminalAgentService。
 // ============================================================
 
+import crypto from 'crypto'
 import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -24,7 +26,12 @@ import {
   tryNormalizeMacAddress,
   parseSmartCampusModules,
   CONFIG_REFRESH_INTERVAL_MS,
+  PLANNED_CREDENTIAL_PREFIX,
+  isUniqueConstraintError,
+  normalizeLifecycleStatus,
+  type TerminalLifecycleStatus,
 } from './terminal-utils'
+import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '../smart-campus/smart-campus.types'
 
 // ── Admin view types ───────────────────────────────────────────────────────────
@@ -36,6 +43,7 @@ export interface AdminTerminalView {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+  lifecycleStatus: TerminalLifecycleStatus
   orgId: string | null
   orgName: string | null
   registeredAt: string
@@ -71,6 +79,17 @@ export interface UpdateTerminalProfileResult {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+}
+
+export interface PlannedTerminalCreated {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  orgId: string | null
+  orgName: string | null
+  enabled: boolean
+  lifecycleStatus: 'planned'
 }
 
 export interface AdminPrinterView {
@@ -128,6 +147,67 @@ export class TerminalAdminService {
     return this.prisma.terminal.findMany({ orderBy: { registeredAt: 'desc' } })
   }
 
+  async createPlannedTerminal(dto: CreatePlannedTerminalDto): Promise<PlannedTerminalCreated> {
+    if (process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED'] !== 'true') {
+      throw new ForbiddenException({
+        error: {
+          code: 'TERMINAL_PLANNED_PROVISIONING_DISABLED',
+          message: 'planned 设备预创建尚未启用；请先完成所有 API 实例升级并关闭旧注册',
+        },
+      })
+    }
+    const terminalCode = dto.terminalCode.trim()
+    const orgId = dto.orgId?.trim() || null
+    let orgName: string | null = null
+    if (orgId) {
+      const org = await this.prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { name: true, enabled: true },
+      })
+      if (!org) {
+        throw new NotFoundException({ error: { code: 'ORG_NOT_FOUND', message: '机构不存在' } })
+      }
+      if (!org.enabled) {
+        throw new BadRequestException({ error: { code: 'ORG_DISABLED', message: '机构已停用，不能预创建设备' } })
+      }
+      orgName = org.name
+    }
+
+    const placeholder = `${PLANNED_CREDENTIAL_PREFIX}${crypto.randomBytes(32).toString('hex')}`
+    try {
+      const terminal = await this.prisma.terminal.create({
+        data: {
+          id: `t_${crypto.randomBytes(8).toString('hex')}`,
+          terminalCode,
+          agentToken: placeholder,
+          credentialGeneration: 0,
+          lifecycleStatus: 'planned',
+          deviceFingerprint: `planned:${crypto.randomBytes(16).toString('hex')}`,
+          displayName: cleanNullable(dto.displayName),
+          locationLabel: cleanNullable(dto.locationLabel),
+          orgId,
+        },
+      })
+      return {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        displayName: terminal.displayName ?? null,
+        locationLabel: terminal.locationLabel ?? null,
+        orgId: terminal.orgId,
+        orgName,
+        enabled: terminal.enabled,
+        lifecycleStatus: 'planned',
+      }
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new BadRequestException({
+          error: { code: 'TERMINAL_CODE_ALREADY_EXISTS', message: '终端编号已存在' },
+        })
+      }
+      throw error
+    }
+  }
+
   async listTerminalsForAdmin(): Promise<{ terminals: AdminTerminalView[] }> {
     const ONLINE_WINDOW_MS = 3 * 60 * 1000
     const now = Date.now()
@@ -163,11 +243,12 @@ export class TerminalAdminService {
         macAddress: t.macAddress ?? null,
         locationLabel: t.locationLabel ?? null,
         enabled: t.enabled,
+        lifecycleStatus: normalizeLifecycleStatus(t.lifecycleStatus),
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
         lastSeenAt: lastSeen.toISOString(),
-        online: now - lastSeen.getTime() < ONLINE_WINDOW_MS,
+        online: !!lastHeartbeatAt && now - lastSeen.getTime() < ONLINE_WINDOW_MS,
         lastHeartbeatAt: lastHeartbeatAt ? lastHeartbeatAt.toISOString() : null,
         agentStatus: hb?.status ?? null,
         localTaskDatabaseAvailable: hb?.localTaskDatabaseAvailable ?? null,

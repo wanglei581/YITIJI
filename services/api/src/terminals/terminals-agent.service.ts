@@ -17,6 +17,7 @@ import {
   Logger,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import type { PrismaTransactionClient } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
@@ -38,6 +39,11 @@ import {
   inferMimeFromFileName,
   requireEnv,
   DEFAULT_BIND_CODE_TTL_MINUTES,
+  DEFAULT_AGENT_CREDENTIAL_TTL_MS,
+  CREDENTIAL_SENTINEL_PREFIX,
+  hashAgentToken,
+  makeCredentialId,
+  type CredentialIssueSource,
   DEFAULT_PARAMS,
   type PrintJobParams,
 } from './terminal-utils'
@@ -87,6 +93,8 @@ export interface TerminalBindCodeExchangeResult {
   terminalCode: string
   terminalToken: string
   expiresAt: string
+  credentialId: string
+  generation: number
 }
 
 // ── Sample files ───────────────────────────────────────────────────────────────
@@ -201,7 +209,17 @@ export class TerminalAgentService implements OnModuleInit {
     terminalId: string
     terminalToken: string
     expiresAt: string
+    credentialId: string
+    generation: number
   }> {
+    if (process.env['TERMINAL_LEGACY_REGISTER_ENABLED'] !== 'true') {
+      throw new ForbiddenException({
+        error: {
+          code: 'TERMINAL_LEGACY_REGISTER_DISABLED',
+          message: '共享密钥注册已关闭，请由管理员预创建设备并使用一次性绑定码激活',
+        },
+      })
+    }
     if (dto.adminSecret !== ADMIN_SECRET) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_INVALID_CREDENTIALS', message: 'adminSecret 无效' },
@@ -209,36 +227,75 @@ export class TerminalAgentService implements OnModuleInit {
     }
 
     const agentToken = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+    const credentialId = makeCredentialId()
+    const expiresAt = new Date(Date.now() + DEFAULT_AGENT_CREDENTIAL_TTL_MS)
     const macAddress = normalizeMacAddress(dto.macAddress)
     if (macAddress) {
       await this.assertMacAvailable(macAddress, dto.terminalCode)
     }
 
-    const terminal = await this.writeWithMacConflictMapping(() =>
-      this.prisma.terminal.upsert({
+    const existing = await this.prisma.terminal.findUnique({
+      where: { terminalCode: dto.terminalCode },
+      select: { lifecycleStatus: true },
+    })
+    if (existing?.lifecycleStatus === 'planned') {
+      throw new ForbiddenException({
+        error: { code: 'TERMINAL_BIND_CODE_REQUIRED', message: '该终端已由管理员预创建，必须使用一次性绑定码激活' },
+      })
+    }
+    const terminal = await this.writeWithMacConflictMapping(() => this.prisma.$transaction(async (tx) => {
+      const current = await tx.terminal.findUnique({
+        where: { terminalCode: dto.terminalCode },
+        select: { lifecycleStatus: true },
+      })
+      if (current?.lifecycleStatus === 'planned') {
+        throw new ForbiddenException({
+          error: { code: 'TERMINAL_BIND_CODE_REQUIRED', message: '该终端已由管理员预创建，必须使用一次性绑定码激活' },
+        })
+      }
+      const row = await tx.terminal.upsert({
         where: { terminalCode: dto.terminalCode },
         update: {
           agentToken,
+          credentialGeneration: { increment: 1 },
           deviceFingerprint: dto.deviceFingerprint,
           displayName: cleanNullable(dto.displayName),
           macAddress,
           locationLabel: cleanNullable(dto.locationLabel),
+          lifecycleStatus: 'active',
         },
         create: {
           id: `t_${crypto.randomBytes(8).toString('hex')}`,
           terminalCode: dto.terminalCode,
           agentToken,
+          credentialGeneration: 1,
           deviceFingerprint: dto.deviceFingerprint,
           displayName: cleanNullable(dto.displayName),
           macAddress,
           locationLabel: cleanNullable(dto.locationLabel),
+          lifecycleStatus: 'active',
         },
-      }),
-    ) as { id: string; terminalCode: string }
+        select: { id: true, terminalCode: true, credentialGeneration: true },
+      })
+      await this.persistIssuedCredential(tx, {
+        credentialId,
+        terminalId: row.id,
+        token: agentToken,
+        generation: row.credentialGeneration,
+        issueSource: 'legacy_register',
+        expiresAt,
+      })
+      return row
+    }))
 
     this.logger.log(`register: terminalId=${terminal.id} code=${dto.terminalCode}`)
-    return { terminalId: terminal.id, terminalToken: agentToken, expiresAt }
+    return {
+      terminalId: terminal.id,
+      terminalToken: agentToken,
+      expiresAt: expiresAt.toISOString(),
+      credentialId,
+      generation: terminal.credentialGeneration,
+    }
   }
 
   /**
@@ -251,13 +308,18 @@ export class TerminalAgentService implements OnModuleInit {
   ): Promise<TerminalBindCodeCreated> {
     const terminal = await this.prisma.terminal.findFirst({
       where: this.terminalRefWhere(terminalRef),
-      select: { id: true, terminalCode: true, enabled: true },
+      select: { id: true, terminalCode: true, enabled: true, lifecycleStatus: true },
     })
     if (!terminal) {
       throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
     }
     if (!terminal.enabled) {
       throw new BadRequestException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能生成绑定码' } })
+    }
+    if (terminal.lifecycleStatus === 'suspended' || terminal.lifecycleStatus === 'retired') {
+      throw new BadRequestException({
+        error: { code: 'TERMINAL_LIFECYCLE_BIND_FORBIDDEN', message: '已暂停或已退役的终端不能生成绑定码' },
+      })
     }
 
     const ttl = Math.min(60, Math.max(1, Math.round(ttlMinutes || DEFAULT_BIND_CODE_TTL_MINUTES)))
@@ -305,7 +367,8 @@ export class TerminalAgentService implements OnModuleInit {
     const codeHash = hashBindCode(dto.bindCode)
     const now = new Date()
     const agentToken = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+    const credentialId = makeCredentialId()
+    const expiresAt = new Date(Date.now() + DEFAULT_AGENT_CREDENTIAL_TTL_MS)
     const macAddress = normalizeMacAddress(dto.macAddress)
     const locationLabel = cleanNullable(dto.locationLabel)
     const displayName = cleanNullable(dto.displayName)
@@ -313,7 +376,7 @@ export class TerminalAgentService implements OnModuleInit {
     const result = await this.prisma.$transaction(async (tx) => {
       const bind = await tx.terminalBindCode.findUnique({
         where: { codeHash },
-        include: { terminal: { select: { id: true, terminalCode: true, enabled: true } } },
+        include: { terminal: { select: { id: true, terminalCode: true, enabled: true, lifecycleStatus: true } } },
       })
       if (!bind) {
         throw new UnauthorizedException({ error: { code: 'BIND_CODE_INVALID', message: '绑定码无效' } })
@@ -329,6 +392,11 @@ export class TerminalAgentService implements OnModuleInit {
       }
       if (!bind.terminal.enabled) {
         throw new ForbiddenException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能绑定' } })
+      }
+      if (bind.terminal.lifecycleStatus === 'suspended' || bind.terminal.lifecycleStatus === 'retired') {
+        throw new ForbiddenException({
+          error: { code: 'TERMINAL_LIFECYCLE_BIND_FORBIDDEN', message: '已暂停或已退役的终端不能绑定' },
+        })
       }
       if (macAddress) {
         const found = await tx.terminal.findFirst({ where: { macAddress }, select: { id: true, terminalCode: true } })
@@ -347,12 +415,22 @@ export class TerminalAgentService implements OnModuleInit {
         where: { id: bind.terminalId },
         data: {
           agentToken,
+          credentialGeneration: { increment: 1 },
           deviceFingerprint: dto.deviceFingerprint,
           ...(displayName !== undefined ? { displayName } : {}),
           ...(macAddress !== undefined ? { macAddress } : {}),
           ...(locationLabel !== undefined ? { locationLabel } : {}),
+          ...(bind.terminal.lifecycleStatus === 'planned' ? { lifecycleStatus: 'commissioning' } : {}),
         },
-        select: { id: true, terminalCode: true },
+        select: { id: true, terminalCode: true, credentialGeneration: true },
+      })
+      await this.persistIssuedCredential(tx, {
+        credentialId,
+        terminalId: terminal.id,
+        token: agentToken,
+        generation: terminal.credentialGeneration,
+        issueSource: 'bind_code',
+        expiresAt,
       })
       return terminal
     })
@@ -371,13 +449,18 @@ export class TerminalAgentService implements OnModuleInit {
         locationLabel,
         agentVersion: cleanNullable(dto.agentVersion) ?? null,
         deviceFingerprintPrefix: dto.deviceFingerprint.slice(0, 12),
+        credentialId,
+        credentialGeneration: result.credentialGeneration,
+        credentialExpiresAt: expiresAt.toISOString(),
       },
     })
     return {
       terminalId: result.id,
       terminalCode: result.terminalCode,
       terminalToken: agentToken,
-      expiresAt,
+      expiresAt: expiresAt.toISOString(),
+      credentialId,
+      generation: result.credentialGeneration,
     }
   }
 
@@ -425,6 +508,11 @@ export class TerminalAgentService implements OnModuleInit {
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
       },
+    })
+
+    await this.prisma.terminal.updateMany({
+      where: { id: terminalId, lifecycleStatus: 'commissioning' },
+      data: { lifecycleStatus: 'active' },
     })
 
     return { acknowledged: true }
@@ -686,17 +774,72 @@ export class TerminalAgentService implements OnModuleInit {
     authHeader: string | undefined,
     options: { allowDisabled?: boolean } = {},
   ): Promise<void> {
-    const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId } })
+    const terminal = await this.prisma.terminal.findUnique({
+      where: { id: terminalId },
+      select: { id: true, agentToken: true, credentialGeneration: true, enabled: true, lifecycleStatus: true },
+    })
     if (!terminal) {
       throw new NotFoundException({ error: { code: 'TERMINAL_NOT_REGISTERED', message: '终端未注册' } })
     }
     const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-    if (!token || !constantTimeEquals(token, terminal.agentToken)) {
+    if (!token) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
+    }
+    if (terminal.lifecycleStatus === 'planned') {
+      throw new UnauthorizedException({ error: { code: 'TERMINAL_NOT_ACTIVATED', message: '终端尚未激活' } })
+    }
+    const isLegacyCarrier = !terminal.agentToken.startsWith(CREDENTIAL_SENTINEL_PREFIX)
+    if (isLegacyCarrier && !constantTimeEquals(token, terminal.agentToken)) {
+      throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
+    }
+    const credential = await this.prisma.terminalCredential.findUnique({
+      where: { tokenHash: hashAgentToken(token) },
+      select: { terminalId: true, generation: true, expiresAt: true, revokedAt: true },
+    })
+    if (credential) {
+      if (credential.terminalId !== terminal.id || credential.generation !== terminal.credentialGeneration) {
+        throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
+      }
+      if (credential.revokedAt) {
+        throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_REVOKED', message: '设备凭证已吊销' } })
+      }
+      if (credential.expiresAt <= new Date()) {
+        throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_EXPIRED', message: '设备凭证已过期' } })
+      }
+    } else if (!isLegacyCarrier) {
       throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
     }
     if (!options.allowDisabled && !terminal.enabled) {
       throw new ForbiddenException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用' } })
     }
+  }
+
+  private async persistIssuedCredential(
+    tx: PrismaTransactionClient,
+    args: {
+      credentialId: string
+      terminalId: string
+      token: string
+      generation: number
+      issueSource: CredentialIssueSource
+      expiresAt: Date
+    },
+  ): Promise<void> {
+    const now = new Date()
+    await tx.terminalCredential.updateMany({
+      where: { terminalId: args.terminalId, revokedAt: null },
+      data: { revokedAt: now },
+    })
+    await tx.terminalCredential.create({
+      data: {
+        id: args.credentialId,
+        terminalId: args.terminalId,
+        tokenHash: hashAgentToken(args.token),
+        generation: args.generation,
+        issueSource: args.issueSource,
+        expiresAt: args.expiresAt,
+      },
+    })
   }
 
   private async buildDeviceProfilePatch(

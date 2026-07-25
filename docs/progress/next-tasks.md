@@ -99,6 +99,18 @@
 
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
 
+## P0-P2：多终端云管与商业化部署（方案批准后执行）
+
+> 权威方案：`docs/product/terminal-fleet-commercial-deployment-plan-2026-07.md`。不另建并列标准；沿用现有 Admin 设备管理、Terminal Agent、终端/任务 API 和生产 onboarding。管理员后台仍为服务器上的中心化 Web 控制台，不安装到每台 Windows 主机。
+
+- [x] **现状审计与商业化方案**：Codex、两项专项子代理和本地 Claude CLI 已完成只读复审并有条件批准；已盘点一次性绑定码、DPAPI、Windows 服务、心跳、按终端原子 claim、本地幂等/离线补报、Admin 终端/打印机/任务运维能力，明确设备激活码、日常设备凭证、商业授权 entitlement 三者分离，并补齐责任矩阵、合同附件、RBAC/租户隔离、三态承诺和量化放量门禁。本项只完成文档，不代表运行时实现或批量验收。
+- [ ] **P0 设备身份安全收口**：按四批推进；第 1 批 expand 底座和第 2 批 Admin 预创建/一次性激活/生产旧注册关闭均已完成本地代码、隔离 SQLite 动态验证和专项安全终审（Critical=0、High=0）。第 2 批复用现有 Admin 设备页，`planned → commissioning` 首次签发 generation=1；planned 生命周期无条件拒绝认证；SQLite/PostgreSQL guard 阻止旧 writer 覆盖、直接转 active、非法凭证插入/转移；SQLite 主 CI 在 `db push` 后安装同一 guard SQL，PostgreSQL job 通过 `migrate deploy` 安装。生产两阶段 runbook 已写入正式部署清单。边界：仍保留 `Terminal.agentToken` raw carrier，未执行生产 migration/backfill/部署，未取得本次 PG CI 运行结果或 Windows 真机验收。后续独立批次：③ maintenance/drain、真实到期运维、轮换、吊销、换机/退役、防重复出纸和可靠审计；④ ProgramData ACL、移除长期 Token 命令行输入、Agent unauthorized/degraded 状态和 Windows 真机验收。存在 `claimed` / `printing` 任务时默认拒绝换绑；不得克隆凭证。
+- [ ] **P0 多实例与相邻安全前置**：启用多 worker、多实例或真实支付前，将 Webhook/支付 nonce 防重放从进程内存迁移到 Redis `SET NX EX`；Partner API 拉取自助开放前，为 endpoint 增加 HTTPS、私网/环回/元数据地址及重定向 SSRF 防护；同步核对可信反代和密钥轮换 runbook。不得混入新的业务入口。
+- [ ] **P0 单机商业基线**：完成 Windows 服务可靠性、断网/重启、Agent 降级恢复、失败任务、真实出纸、敏感文件清理与当前生产模式验收；未通过前不得进入批量安装。
+- [ ] **P1 签名 Bootstrapper/MSI**：使用独立分支设计可复现构建、私有 Node runtime、Authenticode、SBOM、交互/静默安装、repair/uninstall、配置/凭证保留矩阵；打印机驱动仅检查和引导，不在无授权情况下随包分发，不硬编码打印机型号。
+- [ ] **P1 5 台试点云管**：在现有设备管理页内补设备生命周期、标签/设备组、策略版本与应用回执、告警工单、脱敏诊断包和白名单远程动作；禁止任意 shell、文件浏览、静默远程桌面、绕过支付打印和远程发起扫描。
+- [ ] **P2 Agent 灰度升级**：独立更新助手、签名 manifest、drain、维护窗口、internal/pilot/canary/stable 通道、暂停和自动回滚；先完成 20 台灰度升级与真实回滚演练，再评估 100 台容量和 SLA。
+
 ## P0：项目规范化治理
 
 - [x] **P0 治理基线**：保留现有 monorepo，不新建仓库；已新增 `docs/project-structure.md` 与 `.ccg/spec/guides/index.md`。
