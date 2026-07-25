@@ -105,4 +105,4 @@ Playwright / postcss / shell-quote / 部分 brace-expansion tooling 路径主要
 
 评估当时：未改依赖或 lockfile、未部署。
 
-**同日 remediation（`fix/p1-dep-remediation-20260725`）已执行 Rem-1…3**：直接依赖与 overrides 已抬；`brace-expansion` 因 GHSA-mh99 过宽范围（`<=5.0.7`）改为全局钉 `5.0.8`；`verify:dependency-security` 已落地并仅精确接受 `GHSA-qwww-vcr4-c8h2`。仍**未部署**；上游 `react-router>=8.3.0` 可用后须移除该例外。
+**同日 remediation（`fix/p1-dep-remediation-20260725`）已执行 Rem-1…3**：直接依赖与 overrides 已抬；`brace-expansion` **必须按 major** 钉安全底线（全局强制 5.x 会弄坏 `minimatch@3`/ESLint）。`verify:dependency-security` 接受：① RSC `GHSA-qwww-vcr4-c8h2`；② `GHSA-mh99` 仅当 findings 版本已满足 1.1.16 / 2.1.2 / 5.0.8。仍**未部署**；上游 `react-router>=8.3.0` 可用后须移除 RSC 例外。

@@ -3,7 +3,9 @@
  * Dependency security gate:
  * - fail closed on audit/network/JSON errors
  * - allow at most one accepted-unreachable high: GHSA-qwww-vcr4-c8h2 (React Router RSC)
- * - require SPA architecture guard for that exception
+ * - allow GHSA-mh99-v99m-4gvg only when every finding is already on per-major patched brace-expansion
+ *   (npm range `<=5.0.7` over-flags 1.x/2.x; forcing 5.x globally breaks minimatch@3 / ESLint)
+ * - require SPA architecture guard for the RSC exception
  * - keep package.json pnpm.overrides and pnpm-workspace.yaml overrides in sync
  */
 import assert from 'node:assert/strict'
@@ -15,6 +17,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const ACCEPTED_UNREACHABLE_HIGH = 'GHSA-qwww-vcr4-c8h2'
+const OVERBROAD_BRACE_EXPANSION_HIGH = 'GHSA-mh99-v99m-4gvg'
 const FRONTENDS = ['admin', 'kiosk', 'partner']
 
 function readJson(filePath) {
@@ -63,7 +66,9 @@ function assertOverridesSync() {
   assert.ok(workspaceBlock, 'pnpm-workspace.yaml must declare overrides')
   const workspaceMap = {}
   for (const line of workspaceBlock[1].split('\n')) {
-    const match = /^\s+('([^']+)'|([^:]+)):\s*(.+)\s*$/.exec(line)
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const match = /^\s+('([^']+)'|([^:#]+)):\s*(.+)\s*$/.exec(line)
     if (!match) continue
     const key = match[2] || match[3]
     workspaceMap[key.trim()] = match[4].trim()
@@ -136,14 +141,44 @@ function assertSpaArchitectureGuard() {
   }
 }
 
+function parseSemver(version) {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(String(version || ''))
+  if (!match) return null
+  return { major: Number(match[1]), minor: Number(match[2]), patch: Number(match[3]) }
+}
+
+function isPatchedBraceExpansion(version) {
+  const parsed = parseSemver(version)
+  if (!parsed) return false
+  // Per-major floors from GHSA-3jxr-9vmj-r5cp + GHSA-mh99 5.x floor.
+  if (parsed.major === 1) return parsed.minor > 1 || (parsed.minor === 1 && parsed.patch >= 16)
+  if (parsed.major === 2) return parsed.minor > 1 || (parsed.minor === 1 && parsed.patch >= 2)
+  if (parsed.major === 5) return parsed.minor > 0 || parsed.patch >= 8
+  return false
+}
+
+function isAcceptedOverbroadBraceExpansion(item) {
+  if (advisoryId(item) !== OVERBROAD_BRACE_EXPANSION_HIGH || item.module_name !== 'brace-expansion') {
+    return false
+  }
+  const versions = (item.findings || []).map((finding) => finding.version).filter(Boolean)
+  if (versions.length === 0) return false
+  return versions.every((version) => isPatchedBraceExpansion(version))
+}
+
 function assertAuditAcceptable(label, auditJson) {
   const highs = highAdvisories(auditJson)
   const unexpected = []
-  let accepted = 0
+  let acceptedRsc = 0
+  let acceptedBrace = 0
   for (const item of highs) {
     const id = advisoryId(item)
     if (id === ACCEPTED_UNREACHABLE_HIGH && item.module_name === 'react-router') {
-      accepted += 1
+      acceptedRsc += 1
+      continue
+    }
+    if (isAcceptedOverbroadBraceExpansion(item)) {
+      acceptedBrace += 1
       continue
     }
     unexpected.push(`${item.severity} ${item.module_name} ${id || item.url || item.title}`)
@@ -151,10 +186,12 @@ function assertAuditAcceptable(label, auditJson) {
   if (unexpected.length > 0) {
     fail(`${label}: unaccepted critical/high advisories remain:\n- ${unexpected.join('\n- ')}`)
   }
-  if (accepted > 1) {
-    fail(`${label}: accepted unreachable high counted ${accepted} times; expected at most one advisory object`)
+  if (acceptedRsc > 1) {
+    fail(`${label}: accepted unreachable high counted ${acceptedRsc} times; expected at most one advisory object`)
   }
-  console.log(`OK: ${label} — unaccepted critical/high = 0; accepted-unreachable high (${ACCEPTED_UNREACHABLE_HIGH}) = ${accepted}`)
+  console.log(
+    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; accepted-overbroad brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}) = ${acceptedBrace}`,
+  )
 }
 
 console.log('\n=== verify dependency security ===')
