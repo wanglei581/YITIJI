@@ -64,5 +64,6 @@
 ## 当前状态（2026-07-25）
 
 - close-unpaid Phase A：预生产 `DEPLOY_SOURCE=7e59243c` 复检仍 **`pending=0` / `eligible=0`** → 不进 Phase B
-- 7a / 7b：**等待用户书面授权确认**
-- 7c Windows 现场、7d Partner 登录冒烟：另包
+- 7a `SEED_PASSWORD_CONFIRM` + 7a2 `SEED_PASSWORD_ROTATE`：**已完成**（partner1/partner2 已离 seed 默认；清单 §2.2 seed 项已勾选）
+- 7b `SECRETS_ROTATION_EVIDENCE`：**等待用户书面授权 + 控制台轮换举证**
+- 7c Windows 现场、7d Partner 登录冒烟：另包（7d 可用轮换后口令，用户本机从服务器 secret 文件读取，勿贴聊天）
