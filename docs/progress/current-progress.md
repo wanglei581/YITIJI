@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 推进 **`SECRETS_ROTATION_EVIDENCE`**：远程仅能确认预发 `.env` 已配置 OCR/COS/SMS/TRTC 等**名称级**项且 health 正常；历史清单附录曾记 2026-06-13 OCR/COS 轮换 live 复验，**不能自动勾选今日 §2.2 密钥项**。7b 阻塞于用户书面确认或打码截图（模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`）。同步更新该 runbook 状态（7d 已完成；secret 文件仍提醒 shred）。远程旁证：`t_ksk_001` printer-status `ready`/`isOnline=true`（不替代 7c 现场）。
+
 2026-07-25 完成 **`PARTNER_SMOKE_LOGIN` + Admin 只读 GET（预发，用户提供本窗凭据）**：`DEPLOY_SOURCE=7e59243c`。登录：`portal=admin` 用户名 `admin` → 201；`portal=partner` 用户名 `wanglei` → 201（DB 角色 `partner`，非 admin）。Partner 只读：`/partner/profile` `/dashboard` `/data-sources` `/jobs` `/sync-logs` `/fairs` 均为 200（该机构 data-sources/jobs/fairs/sync-logs 当前均为空列表）。Admin 只读：`/admin/legal-doc-versions` 200（list:0）、`/admin/terminals` 200。**未**写业务数据；凭据未写入仓库；因曾出现在聊天，建议用户事后自行改密。partner1/partner2 轮换 secret 文件仍须用户 SSH 取后 shred（若尚未删）。
 
 2026-07-25 追加：**P0 授权包 Runbook 落盘 + close-unpaid Phase A 复检记录**。`docs/device/p0-auth-packs-seed-and-secrets-runbook.md`（`SEED_PASSWORD_CONFIRM` / `SECRETS_ROTATION_EVIDENCE` 模板）。G6 部署后只读复检仍 **`pending=0` / `eligible=0`**（未 POST close-unpaid、未造单）。Admin dist「初始密码」仅为设密表单 label。**未**进 Phase B；**未**轮换云密钥（7b 仍开）。
