@@ -15,7 +15,7 @@
 - [x] W6：建立 86 条生产路由双视口验收（Kiosk 84 + Mobile 2），补齐语义 landmark、48px 触控、横向溢出、合规、fixture 隔离与生产构建门禁；最终浏览器 `86/86 PASS`，内部复审无 Critical/Warning。
 - [ ] **当前下一步：上线前 P0 真实验收**——完成生产部署、PostgreSQL 生产实例、Windows 一体机、Terminal Agent、奔图真机打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收和现场试运营；任何一项未完成都不得表述为正式商用上线。
 
-本任务已吸收下方 03/05/06 等既有视觉挂账，并完成 W0–W6 本地候选收口，但不改变原有真实功能和上线 P0 硬件 / 部署验收结论。**本地 86 路由验收通过不等于正式商用上线**。
+融合 W0–W6 已随 [PR #325](https://github.com/wanglei581/YITIJI/pull/325) 合入 `main`（`09947a45`），**未部署**。本地 86 路由验收通过不等于正式商用上线。
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 
@@ -114,8 +114,9 @@
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
 - [x] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（已合入，未部署）**：PR #275 已 squash 合入 `main@0ae51289`，合并前和合并后双 CI 均成功。UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 已进入主线；不得据此声称真实导出、下载或注销已经开放。
-- [ ] **Wave 1-B Slice 2 导出执行器与恢复策略（PR #280，待 CI / Warning 决策）**：异步白名单 artifact、私有短期对象、下载租约/finish/reconciler、失败补偿与 required audit 已在 Slice 1 基线上整合并完成本地回归；已修复 Admin retry worker 抢先导致的误 503。双模型外部复审无 Critical；下一步完成 CI、确认历史非空幂等键重复预检、orphan 清理/发起审计粒度、下载单次成功交付语义与 step-up 设备匹配策略，再进行集成及上线前 PostgreSQL/Redis/COS 验收。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一事务更新 `statusChangedAt`。
-- [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
+- [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、`trust proxy` 真机确认。不得把「代码已合入」写成「用户可导出」。
+- [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook、与导出范围诚实文案对齐（见 C-04），不是「无页面」。
+- [x] **C-04 隐私导出范围文案对齐 Mapper（本地候选）**：shared / Kiosk / Admin 文案已改为披露元数据白名单；`verify:data-request-ui` 已加固。待合入后预生产走查 D4。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
@@ -128,7 +129,7 @@
 - [x] **P0-1 第 1 步 自定义页码范围超收修复**：已完成并随 [PR #326](https://github.com/wanglei581/YITIJI/pull/326) squash 合入 `main@6b474051`（2026-07-25）。`countPagesInRange` + 建单接入 + fail-closed；预生产/真机出纸复验仍按下方冒烟清单执行。
 - [x] **P0-1 第 2 步 报价端点 + Kiosk 去硬编码价**：已完成并随 PR #326 合入。`POST /orders/quote` + Confirm/Preview 去硬编码；预生产须核对「确认页金额 == 建单 amountCents」。
 - [x] **P0-2 打印机与设备状态去伪**：已完成并随 PR #326 合入。`useTerminalDeviceStatus` fail-closed；真机 Agent 心跳/耗材上报仍待现场复验。
-- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已完成并随 PR #326 合入。Kiosk `/me/privacy-requests` + Admin `/member-privacy`；预生产浏览器走查见下方冒烟清单。
+- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已随 PR #326 合入。一体机仅开放撤回授权。**范围文案由 C-04 候选纠正为与 Mapper 一致的元数据披露**；预生产走查见下方 D4。
 - [x] **P0-4 生产价目落库 SOP + seed 生产守卫**：代码与文档已合入 main。**上线操作仍须人工**：按 `docs/operations/price-config-production.md` 在目标库写入拍板价并私有留痕（勿对生产库跑会 seed 的开发 verify）。
 - [x] **P1-1 Admin 岗位 / 招聘会信息源补「拒绝审核」**：已完成并随 PR #326 合入。
 - [x] **P1-2 Partner Excel 导入后刷新**：已完成并随 PR #326 合入。
@@ -143,7 +144,7 @@
 - [ ] **D1 部署**：API / Kiosk / Admin 产物指向该 commit；`DEPLOY_SOURCE` 与运行中 dist 一致；三端 health `db=postgres`。
 - [ ] **D2 报价诚实**：Kiosk 上传 PDF → 预览选 `1-2` 页 → 确认页金额来自 `POST /orders/quote` → 建单 `amountCents` / `billablePages` 与确认页一致（不得按整份页数超收）。
 - [ ] **D3 设备 fail-closed**：停 Agent 或断心跳后，首页/预览不得显示伪造「打印机在线」；恢复后显示真实就绪态。
-- [ ] **D4 隐私 UI**：登录后 `/me/privacy-requests` 仅可提交撤回授权；导出/注销为诚实不可用说明；Admin `/member-privacy` 可列表，驳回仅对 export+pending/failed。
+- [ ] **D4 隐私 UI**：登录后 `/me/privacy-requests` 仅可提交撤回授权；导出/注销为诚实不可用说明；范围横幅须披露后台导出会含文件/订单等元数据（不得再出现「不导出订单/文件」）；Admin `/member-privacy` 可列表，驳回仅对 export+pending/failed。
 - [ ] **D5 价目维护**：Admin `/billing` 可读 active 价目；**无部署授权时只读**；改价/改说明须另授权并核对 `price.updated` 审计。
 - [ ] **D6 生产价目 SOP（可选同窗）**：只读核对应 `PriceConfig`；FREE_MODE 保持 0 分时，经 Admin 合法路径把两条 `description` 改成诚实免费说明（勿 SQL 直改、勿跑 seed）。
 

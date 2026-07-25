@@ -104,7 +104,7 @@ export default function MemberPrivacyPage() {
   return (
     <Page
       title="会员隐私请求"
-      subtitle="仅处理岗位 AI 咨询会话与授权相关请求"
+      subtitle="撤回授权可即时完成；导出为后台元数据包；账号注销未开放"
       actions={
         <Button size="sm" variant="secondary" onClick={() => void loadList()} disabled={listState === 'loading'}>
           <RefreshCwIcon className="mr-1.5 h-4 w-4" aria-hidden="true" />

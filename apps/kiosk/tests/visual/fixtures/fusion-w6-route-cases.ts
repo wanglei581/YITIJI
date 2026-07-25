@@ -89,7 +89,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/me/notifications', url: '/me/notifications', marker: member, featureText: '消息通知' },
   { pattern: '/me/feedback', url: '/me/feedback', marker: member, featureText: '意见反馈' },
   { pattern: '/me/settings', url: '/me/settings', marker: screen('member-settings'), featureText: '账号设置' },
-  { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '岗位 AI 隐私请求' },
+  { pattern: '/me/privacy-requests', url: '/me/privacy-requests', marker: screen('member-privacy-requests'), featureText: '隐私与数据请求' },
   { pattern: '/help', url: '/help', marker: screen('help'), featureText: '帮助中心' },
   { pattern: '/activities', url: '/activities', marker: screen('activities'), featureText: '权益活动' },
   { pattern: '/activities/:id', url: '/activities/activity-001', marker: screen('activity-detail'), featureText: '权益活动详情' },
