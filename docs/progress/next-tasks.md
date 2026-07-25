@@ -2,22 +2,33 @@
 
 > 最后更新：2026-07-25
 
-## 当前执行：Kiosk 86 屏视觉 1:1（方案 B）
+## 当前执行：上线前 P0 收口（视觉候选已进主干）
 
-用户已确认：视觉/排版对齐 86 原型 + 生产诚实态（不伪造）。规格与计划见 `docs/superpowers/specs/2026-07-25-kiosk-86-proto-visual-1to1-design.md`、`docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md`。
+视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
 
-- [x] W7–W11（对比度 / fusion primary / lightflow 冰蓝 / A 类双栏 / VISUAL_DIFF 21·23·26）
-- [x] W12 打印子流程壳统一（Upload/MaterialCheck/Progress 空态进 `PrintPageFrame`；上传 Tab 92px；预览步=3 + 主区预览/侧栏参数）
-- [x] W13 面试域全屏壳（`InterviewShell`=`KioskFullscreenShell`；去掉页内重复顶栏；保留原型 plum 选中态）
-- [x] W14 Profile /me inkpaper 细对齐（`/profile` 进 `KioskPageFrame`；资产 3 列 / 服务·账户 4 列 / 招聘会·权益 duo；`/me/resumes` 页头「去上传简历」；明细密度贴近原型 16）
-- [x] W15 扫描四步 + 34A（共享 `ScanFlowSteps`；就绪态类型卡/400px 侧栏对齐 34–37；离线/忙碌切 34A 双栏诚实态，不创建任务）
-- [x] W16–W22 余下页面方案 B 细对齐候选（岗位企业线下 / 招聘会 / 校园·百宝箱 / 活动帮助人事 / 简历余页 / 打印收尾+print-scan / 系统·手机全屏）——壳+栏位+诚实态；**不宣称** 86 屏像素级全部封板
-- [ ] 上线前 P0 真机 / 支付 / 部署验收（整机商用，不在本视觉任务宣称范围）
-- [ ] （可选）像素级抽检与真机验收前的视觉回归——壳/token/细对齐候选 ≠ 86 屏全部 1:1 已封板
+推荐顺序（2026-07-25）：
+
+1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
+2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
+3. [ ] **close-unpaid 部署 + 生产受控操作授权**：部署含该能力的构建后，仅在用户书面授权下做只读预检 / 受控关闭；禁止未授权演练
+4. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
+5. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
+6. [ ] **预生产 / Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
+7. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
 
 ---
 
-## 当前执行（归档）：Kiosk 8177 / 5299 全量融合换装
+## 归档：Kiosk 86 屏视觉 1:1（方案 B）
+
+用户已确认：视觉/排版对齐 86 原型 + 生产诚实态（不伪造）。规格与计划见 `docs/superpowers/specs/2026-07-25-kiosk-86-proto-visual-1to1-design.md`、`docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md`。
+
+- [x] W7–W22 方案 B 细对齐候选——已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`
+- [ ] （可选）像素级抽检与真机验收前的视觉回归——壳/token/细对齐候选 ≠ 86 屏全部 1:1 已封板
+- [ ] 上线前 P0 真机 / 支付 / 部署验收（整机商用，不在视觉任务宣称范围）→ **上移至「当前执行」**
+
+---
+
+## 归档：Kiosk 8177 / 5299 全量融合换装
 
 用户已确认对 `apps/kiosk` 全部用户可见页面进行融合换装：5299 作为完整视觉与信息组织主体，8177 补齐任务流程、异常/空/离线/支付失败状态和法律入口；现有真实路由、接口、数据库、认证、支付、文件、订单、打印、扫描及硬件行为必须保持不变。正式设计见 `docs/superpowers/specs/2026-07-23-kiosk-8177-5299-fusion-design.md`。
 
@@ -39,7 +50,8 @@
 - [x] **G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台。PR #305 已合入 main(commit `e92abb56`,2026-07-17)
 - [x] **存量页面按原型主题换装与主要结构接入**——PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳的主题换装与主要结构接入。**注**:非"75 屏全量视觉对齐"——2026-07-20 只读审计(见迁移矩阵第六节)证明 03/05/06 仍为单列、未达原型双栏布局,详见下方 A 类挂账项
 - [x] **【P1】A 类:03/05/06 双栏布局对齐**——已在视觉 1:1 分支 W10 落地（有内容时双栏；无上下文诚实空态）；05 保留「云端上传」与 `/scan` 分流
-- [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
+- [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿
+- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
 - [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
@@ -218,7 +230,8 @@
 - [x] 打印运营模式运行时复验：2026-07-15 已在现场人员确认 KSK-001 旁有人值守且 Windows 队列为空后，完成首台 `FREE_MODE` 唯一一笔生产零元验收。即时门禁确认 F1 active 0 元价目、F2 `PAYMENT_PROVIDER=disabled`、F3 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`、F4 同源 `/api/v1` 与内部 HMAC URL 防线均保持；866 B 单页无个人信息 PDF 经正式上传 / 建单链路得到任务 `ptask_kiosk_14d3c375051c87d5`、订单 `ORD-20260715-4BDFD88D74`，`amountCents=0`、`payStatus=paid`、数据库 `paymentSource=free`，任务 `claimed -> printing -> completed` 且无错误码；现场确认真实出纸，Windows 队列为空，事后 active task 回到 0、终端仍 `online/ready`、health 正常。未创建第二单、未重试、未直改数据库或修改生产配置。2026-07-08 正式生产微信小额支付/退款/业务打印与 2026-07-13 自动确认后真实出纸样本继续作为付费模式技术证据；支付宝仍未完成生产验收。生产仍不得直接做不付款取消/超时演练，未支付任务生命周期关闭路径继续按独立任务推进。
 - [ ] **FREE_MODE 价目说明文案诚实化**：[PR #247](https://github.com/wanglei581/YITIJI/pull/247) / #255 已合入 main（Admin 可独立编辑 `description`）。代码门禁已过；**卡点是生产部署含该能力的构建 + 明确生产写授权**。授权后只改两条 active 价目的说明为诚实免费试运营文案，保持 `unitCents=0` / `active=true`，复核 `price.updated`、渠道为空、health、终端与活动任务；不得重复建单或出纸、不得 SQL 直改。
 
-- [ ] **当前未支付任务受控关闭：**独立本地分支已实现 Admin 专用 `close-unpaid` 路径，条件为 pending、未领取、同一关联订单 `unpaid/pending` 且**不存在任何**支付尝试；事务内将订单原子关闭并审计，阻断迟到回调与新支付出码。外部 Antigravity + Claude 初审提出支付尝试读写窗口、审计请求元数据、中文阻断提示和 mock 错误码一致性问题，均已修复；订单 CAS 现同步要求 `paymentAttempts.none`，审计元数据同事务写入，二次双审均为 Critical/Warning 无。已通过 Admin / API typecheck、静态 UI verify、限定 API ESLint、由仓库 SQLite migrations 建立的临时数据库 `verify:admin-print-scan` 全量验证；临时库已删除。未合入、未部署、未执行生产任务关闭。下一步提交 PR 并等待 CI；合并、部署与生产只读预检 / 受控操作仍须用户另行授权；不得直接在生产以该功能演练或关闭任务。
+- [x] **当前未支付任务受控关闭（代码）**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入 `main@e2b3858d`（Admin `POST .../close-unpaid` + 详情资格字段 + `CloseUnpaidPrintTaskForm` + `verify:admin-print-scan`）。条件：pending、未领取、关联订单 `unpaid/pending` 且不存在任何 `PaymentAttempt`；事务内关任务/关订单并审计。
+- [ ] **当前未支付任务受控关闭（部署与生产操作）**：部署含该能力的构建后，仅在用户书面授权下做只读预检 / 受控关闭；**未授权不得对生产任务演练关闭**。
 - [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。
 - [x] 下一次 Kiosk 打印 probe：已完成且只创建 1 个任务 `ptask_kiosk_dd4a9a4210a8dc17`；后端最终 `completed`，`orderId=cmr7uffju022aaoa8jyn0ltba`、`orderNo=ORD-20260705-09B19C1DC9`；PrintService 目标时间附近记录 `Job 21`、`21:45:08`、`Pantum USB001`、`1 页`、`Win32 0x0`；最终打印队列为空，未见错误作业。实际提交走正式 API 链路 `/files/kiosk-upload` + `/print/jobs`，未改 DB、未清队列、未删 Agent 本地 DB、未重启 Agent。当前预生产价目仍是非正式验收价，且任务为 unpaid 完成，不能按商用收费口径宣称通过。
 - [x] G4/G5 复测后续处理：2026-07-06 `PS-G4-20260706-105325` 首次上传成功但 `/print/jobs` 返回 400；服务器只读缩圈已排除 active 价目缺失、COS 读取失败和 G4 PDF 轻量页数识别失败。`HttpExceptionFilter` 诊断热修已部署预生产并验证：缺失文件签名诊断请求返回 `PRINT_PAGE_COUNT_UNAVAILABLE` + `requestId=c6892d6d-17b1-43c8-a5d8-0779eedeeff5`，不再遮蔽机器码。热修后真实复测曾成功建单 `ptask_kiosk_74ee1da48ed051e1` / `ORD-20260706-2F2B3DF20E`，但因 `t_ksk_001` 在 11:48 后停止 heartbeat/claim，恢复时文件 URL 已过期，最终回传 `failed/PRINT_COMMAND_FAILED`（401）。该 G4 任务已冻结为诊断样本，禁止重试、手动 claim、清理或继续作为出纸复验对象。随后受控 G5 在 Agent 在线且 active 任务为 0 时新建 `ptask_kiosk_f05cd3c160ec55c6` / `ORD-20260706-DFC018281B`，已由 `t_ksk_001` claim 并回传 `completed`；现场补证目录 `C:\ai-job-print-evidence\PS-G5-EVIDENCE-20260706-130544` 显示 `AIJobPrintAgent` Running / Automatic，`Pantum CM2800ADN Series` Normal、USB001、JobCount=0、队列无残留，PrintService Event 307 / 842 记录 Job 26、1 页、Win32 `0x0`，且现场确认有纸。本项已闭环为本轮新增物理出纸证据；剩余不再是打印链路问题，而是打印运营模式决策 + FREE_MODE / 有人值守 mark-paid 运行时复验。
