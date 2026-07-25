@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-26 追加：**Gate 0.3B PR #376 合并前 CI 已全绿（run `30168571581`，未部署）**。修复提交 `2ff0324b` 的 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项均为 Success；SQLite fresh DB 实际安装 planned/retired 两批 terminal guards 后，终端凭证、生命周期、退役终态、Admin 打印扫描等共享 verifier 全部通过，PostgreSQL job 再次完成真实 migration deploy 与核心动态验证。当前仅待本次进度文档提交重新通过同三项 CI 后 squash 合并 PR #376。此结论只代表代码候选与 CI 通过；未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
+
 2026-07-26 追加：**Gate 0.3B SQLite CI 安装遗漏修复（PR #376，未部署）**。最新真实 PostgreSQL `postgres-readiness` 已成功，证明本批 PostgreSQL migration 与退役终态 guard 动态路径通过；SQLite `build-and-verify` 失败定位为 fresh DB 使用 `prisma db push` 后仅手工安装了既有 planned-terminal trigger，未安装本批 `20260726003000_guard_retired_terminal` migration SQL，导致 direct retired restoration 负向用例未触发数据库拒绝。CI 现已在 verify 前依次安装两批 SQLite terminal guards；未弱化 verifier、未绕过 migration、未修改运行时业务语义。待修复提交的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 三项全绿后再 squash 合并。未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
 
 2026-07-26 追加：**Gate 0.3B retired retry verifier 夹具顺序修复（PR #376，未部署）**。SQLite retired guard 安装后，`verify:admin-print-scan` 暴露原夹具先退役终端、再向 retired tombstone 新增 failed 任务；数据库按设计拒绝退役后新增任何工作。夹具已改为先创建历史 failed 任务、再退役、最后验证 retry fail-closed，测试意图与生产状态机一致；未放宽数据库 guard，未修改运行时业务语义。本轮 `postgres-readiness` 与 `kiosk-browser-smoke` 已成功，仍待修复提交重新跑齐三项 CI。未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
