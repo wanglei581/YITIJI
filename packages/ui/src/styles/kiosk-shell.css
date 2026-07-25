@@ -159,12 +159,20 @@
   gap: 0;
   padding: 0 var(--k-page-inset) 24px;
   flex: none;
+  /* 窄于设计宽度时整条横向滚动，不让步骤文案换行破版 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-steps::-webkit-scrollbar {
+  display: none;
 }
 
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-step {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: none;
 }
 
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-step__dot {
@@ -183,6 +191,7 @@
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-step__label {
   font-size: 20px;
   color: var(--k-muted);
+  white-space: nowrap;
 }
 
 [data-kiosk-presentation='fusion-youth'] .ui-kiosk-step[data-state='done'] .ui-kiosk-step__dot {
