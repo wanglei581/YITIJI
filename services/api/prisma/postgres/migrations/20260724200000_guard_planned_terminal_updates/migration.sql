@@ -66,17 +66,6 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  IF NEW."lifecycleStatus" = 'planned'
-    AND (
-      NEW."agentToken" NOT LIKE 'planned$%'
-      OR NEW."credentialGeneration" <> 0
-      OR EXISTS (SELECT 1 FROM "TerminalCredential" c WHERE c."terminalId" = NEW."id")
-    )
-  THEN
-    RAISE EXCEPTION 'invalid planned terminal credential state'
-      USING ERRCODE = 'check_violation';
-  END IF;
-
   IF OLD."lifecycleStatus" = 'planned'
     AND (
       NEW."agentToken" IS DISTINCT FROM OLD."agentToken"
@@ -90,6 +79,17 @@ BEGIN
     )
   THEN
     RAISE EXCEPTION 'planned terminal requires bind-code exchange'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW."lifecycleStatus" = 'planned'
+    AND (
+      NEW."agentToken" NOT LIKE 'planned$%'
+      OR NEW."credentialGeneration" <> 0
+      OR EXISTS (SELECT 1 FROM "TerminalCredential" c WHERE c."terminalId" = NEW."id")
+    )
+  THEN
+    RAISE EXCEPTION 'invalid planned terminal credential state'
       USING ERRCODE = 'check_violation';
   END IF;
   RETURN NEW;
