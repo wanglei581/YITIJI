@@ -155,7 +155,57 @@ async function main(): Promise<void> {
     await service.assertAgentAuthorized(first.terminalId, `Bearer ${exchanged.terminalToken}`)
     console.log('  PASS bind-code exchanged hash-only credential authenticates')
 
-    await prisma.terminalCredential.update({ where: { id: exchanged.credentialId }, data: { expiresAt: new Date(0) } })
+    const beforeEmergency = await prisma.terminal.findUniqueOrThrow({ where: { id: first.terminalId } })
+    const pendingBindCode = await service.createBindCode(first.terminalId, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
+    const emergency = await service.emergencyRevokeCredentials(first.terminalId, {
+      actorId,
+      actorRole: 'admin',
+      reason: 'verify emergency credential revocation',
+    }, {
+      expectedStatus: 'maintenance',
+      expectedVersion: beforeEmergency.lifecycleVersion,
+      expectedCredentialGeneration: beforeEmergency.credentialGeneration,
+      confirmationText: `吊销 ${managedCode}`,
+    })
+    assert(
+      emergency.lifecycleVersion === beforeEmergency.lifecycleVersion + 1 &&
+        emergency.credentialGeneration === beforeEmergency.credentialGeneration + 1,
+      'emergency revoke atomically increments lifecycle and credential generations',
+    )
+    assert(
+      await prisma.terminalCredential.count({ where: { terminalId: first.terminalId, revokedAt: null } }) === 0,
+      'emergency revoke revokes every active credential',
+    )
+    const pendingBindRow = await prisma.terminalBindCode.findUniqueOrThrow({
+      where: { codeHash: crypto.createHash('sha256').update(pendingBindCode.bindCode).digest('hex') },
+    })
+    assert(pendingBindRow.revokedAt !== null, 'emergency revoke revokes every unused bind code')
+    await expectUnauthorized(
+      () => service.assertAgentAuthorized(first.terminalId, `Bearer ${exchanged.terminalToken}`),
+      'AUTH_TOKEN_INVALID',
+      'emergency revoke invalidates the previous token immediately',
+    )
+    const emergencyAudit = await prisma.auditLog.findFirstOrThrow({
+      where: { targetId: managedCode, action: 'terminal.credential.emergency_revoke' },
+      orderBy: { createdAt: 'desc' },
+    })
+    assert(
+      !emergencyAudit.payloadJson.includes(exchanged.terminalToken) &&
+        !emergencyAudit.payloadJson.includes(pendingBindCode.bindCode),
+      'emergency audit contains no raw credential or bind code',
+    )
+
+    await prisma.terminalCredential.update({
+      where: { id: exchanged.credentialId },
+      data: { expiresAt: new Date(0), revokedAt: null },
+    })
+    await prisma.terminal.update({
+      where: { id: first.terminalId },
+      data: { agentToken: `cred$${exchanged.credentialId}`, credentialGeneration: exchanged.generation },
+    })
     await expectUnauthorized(
       () => service.assertAgentAuthorized(first.terminalId, `Bearer ${exchanged.terminalToken}`),
       'AUTH_TOKEN_EXPIRED',

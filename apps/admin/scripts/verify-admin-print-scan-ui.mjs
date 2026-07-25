@@ -43,6 +43,18 @@ if (service.includes('/admin/print-scan/tasks') && service.includes('applyTaskAc
 } else {
   fail('service must call /admin/print-scan/tasks endpoints')
 }
+if (
+  page.includes("detail.errorCode === 'PRINT_JOB_UNCONFIRMED'") &&
+  page.includes("detail.status === 'failed' && !isUnconfirmed") &&
+  page.includes('打印结果未确认，禁止重试，避免重复出纸') &&
+  page.includes('<Link to="/orders"') &&
+  service.includes("item.errorCode === 'PRINT_JOB_UNCONFIRMED'") &&
+  service.includes("'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN'")
+) {
+  pass('unconfirmed print tasks hide retry, guide to orders, and mock mode mirrors the backend hard rejection')
+} else {
+  fail('PRINT_JOB_UNCONFIRMED retry suppression and orders guidance must stay aligned')
+}
 for (const forbidden of ['release', 'forceRelease', '强制释放', '标记已支付', '标记退款', 'DELETE']) {
   if (service.includes(forbidden)) fail(`service contains forbidden operation: ${forbidden}`)
 }

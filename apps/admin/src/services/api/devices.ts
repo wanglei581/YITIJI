@@ -14,6 +14,8 @@ import type {
   UpdateTerminalProfileResult,
   UpdateTerminalLifecycleInput,
   UpdateTerminalLifecycleResult,
+  EmergencyRevokeTerminalInput,
+  EmergencyRevokeTerminalResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -40,6 +42,8 @@ export type {
   UpdateTerminalProfileResult,
   UpdateTerminalLifecycleInput,
   UpdateTerminalLifecycleResult,
+  EmergencyRevokeTerminalInput,
+  EmergencyRevokeTerminalResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -61,6 +65,7 @@ interface AdminDeviceServiceInterface {
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
   updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
   updateTerminalLifecycle(terminalId: string, input: UpdateTerminalLifecycleInput): Promise<UpdateTerminalLifecycleResult>
+  emergencyRevokeTerminal(terminalId: string, input: EmergencyRevokeTerminalInput): Promise<EmergencyRevokeTerminalResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
   createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
 }
@@ -91,6 +96,10 @@ export const updateTerminalProfile = (terminalId: string, input: UpdateTerminalP
 /** 设备运维状态切换：active ↔ maintenance，原因会进入审计。 */
 export const updateTerminalLifecycle = (terminalId: string, input: UpdateTerminalLifecycleInput) =>
   adapter.updateTerminalLifecycle(terminalId, input)
+
+/** 紧急吊销当前设备凭证并原子转为 suspended。 */
+export const emergencyRevokeTerminal = (terminalId: string, input: EmergencyRevokeTerminalInput) =>
+  adapter.emergencyRevokeTerminal(terminalId, input)
 
 /** 生成一次性终端绑定码(POST /admin/terminals/:id/bind-code)。明文只在响应里返回一次。 */
 export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) =>

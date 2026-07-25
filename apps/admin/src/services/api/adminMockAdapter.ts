@@ -14,6 +14,8 @@ import type {
   UpdateTerminalLifecycleInput,
   UpdateTerminalLifecycleResult,
   TerminalLifecycleStatus,
+  EmergencyRevokeTerminalInput,
+  EmergencyRevokeTerminalResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -165,6 +167,7 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
 }
 const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
 const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
+const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
   const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
@@ -302,7 +305,7 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion'>> = [
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion' | 'credentialGeneration' | 'hasActiveCredential'>> = [
       { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
       { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
       { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
@@ -322,6 +325,8 @@ export const adminMockAdapter = {
         enabled: t.enabled,
         lifecycleStatus: t.lifecycleStatus,
         lifecycleVersion: 0,
+        credentialGeneration: 0,
+        hasActiveCredential: false,
         orgId: t.orgId,
         orgName: t.orgName,
         registeredAt: new Date().toISOString(),
@@ -338,6 +343,8 @@ export const adminMockAdapter = {
         ...t,
         lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
         lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,
+        credentialGeneration: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.generation ?? 1,
+        hasActiveCredential: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.active ?? true,
         agentStatus: t.terminalCode === 'KSK-004' ? 'agent_degraded' : 'online',
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
@@ -387,9 +394,16 @@ export const adminMockAdapter = {
 
   async updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult> {
     await delay()
-    const existing = MOCK_TERMINAL_PROFILE[terminalId] ?? {
-      terminalId,
-      terminalCode: terminalId,
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    const terminalCode = terminal?.terminalCode ?? terminalId
+    if (input.enabled === true && MOCK_TERMINAL_LIFECYCLE[terminalCode]?.status === 'retired') {
+      throw new ApiHttpError('TERMINAL_RETIRED', '终端已永久退役，不能重新启用', 400)
+    }
+    const existing = MOCK_TERMINAL_PROFILE[terminalCode] ?? {
+      terminalId: terminal?.id ?? terminalId,
+      terminalCode,
       displayName: null,
       macAddress: null,
       locationLabel: null,
@@ -402,7 +416,7 @@ export const adminMockAdapter = {
       locationLabel: input.locationLabel === undefined ? existing.locationLabel : input.locationLabel,
       enabled: input.enabled === undefined ? existing.enabled : input.enabled,
     }
-    MOCK_TERMINAL_PROFILE[terminalId] = next
+    MOCK_TERMINAL_PROFILE[terminalCode] = next
     return next
   },
 
@@ -434,11 +448,32 @@ export const adminMockAdapter = {
     }
     const allowed =
       (terminal.lifecycleStatus === 'active' && input.targetStatus === 'maintenance') ||
-      (terminal.lifecycleStatus === 'maintenance' && input.targetStatus === 'active')
+      (terminal.lifecycleStatus === 'maintenance' && input.targetStatus === 'active') ||
+      (['commissioning', 'active', 'maintenance'].includes(terminal.lifecycleStatus) && input.targetStatus === 'suspended') ||
+      (terminal.lifecycleStatus === 'suspended' && input.targetStatus === 'maintenance') ||
+      (['commissioning', 'maintenance', 'suspended'].includes(terminal.lifecycleStatus) && input.targetStatus === 'retired')
     if (!allowed) throw new ApiHttpError('TERMINAL_LIFECYCLE_TRANSITION_INVALID', '不允许的设备状态切换', 409)
+    if (input.targetStatus === 'retired' && input.confirmationText !== terminal.terminalCode) {
+      throw new ApiHttpError('TERMINAL_RETIRE_CONFIRMATION_INVALID', '请输入完整终端编号确认永久退役', 400)
+    }
     MOCK_TERMINAL_LIFECYCLE[terminal.terminalCode] = {
       status: input.targetStatus,
       version: terminal.lifecycleVersion + 1,
+    }
+    if (input.targetStatus === 'retired') {
+      const profile = MOCK_TERMINAL_PROFILE[terminal.terminalCode] ?? {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        displayName: terminal.displayName,
+        macAddress: terminal.macAddress,
+        locationLabel: terminal.locationLabel,
+        enabled: terminal.enabled,
+      }
+      MOCK_TERMINAL_PROFILE[terminal.terminalCode] = { ...profile, enabled: false }
+      MOCK_TERMINAL_CREDENTIAL_STATE[terminal.terminalCode] = {
+        generation: terminal.credentialGeneration + 1,
+        active: false,
+      }
     }
     return {
       terminalId: terminal.id,
@@ -447,6 +482,53 @@ export const adminMockAdapter = {
       newStatus: input.targetStatus,
       inFlightTaskCount: 0,
       lifecycleVersion: terminal.lifecycleVersion + 1,
+    }
+  },
+
+  async emergencyRevokeTerminal(
+    terminalId: string,
+    input: EmergencyRevokeTerminalInput,
+  ): Promise<EmergencyRevokeTerminalResult> {
+    await delay()
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    if (terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'retired') {
+      throw new ApiHttpError('TERMINAL_EMERGENCY_REVOKE_FORBIDDEN', '当前状态不允许紧急吊销', 409)
+    }
+    const normalizedReason = input.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new ApiHttpError('LIFECYCLE_REASON_INVALID', '运维原因须为 8–500 个字符', 400)
+    }
+    if (
+      terminal.lifecycleStatus !== input.expectedStatus ||
+      terminal.lifecycleVersion !== input.expectedVersion ||
+      terminal.credentialGeneration !== input.expectedCredentialGeneration
+    ) {
+      throw new ApiHttpError('TERMINAL_LIFECYCLE_CONFLICT', '终端状态、版本或凭证代次已变化，请刷新后重试', 409)
+    }
+    if (input.confirmationText !== `吊销 ${terminal.terminalCode}`) {
+      throw new ApiHttpError('TERMINAL_REVOKE_CONFIRMATION_INVALID', '请输入指定文字确认紧急吊销', 400)
+    }
+    MOCK_TERMINAL_LIFECYCLE[terminal.terminalCode] = {
+      status: 'suspended',
+      version: terminal.lifecycleVersion + 1,
+    }
+    MOCK_TERMINAL_CREDENTIAL_STATE[terminal.terminalCode] = {
+      generation: terminal.credentialGeneration + 1,
+      active: false,
+    }
+    return {
+      terminalId: terminal.id,
+      terminalCode: terminal.terminalCode,
+      oldStatus: terminal.lifecycleStatus,
+      newStatus: 'suspended',
+      lifecycleVersion: terminal.lifecycleVersion + 1,
+      credentialGeneration: terminal.credentialGeneration + 1,
+      revokedCredentialCount: terminal.hasActiveCredential ? 1 : 0,
+      revokedBindCodeCount: 0,
+      inFlightTaskCount: 0,
     }
   },
 

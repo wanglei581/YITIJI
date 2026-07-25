@@ -12,6 +12,8 @@ import type {
   UpdateTerminalProfileResult,
   UpdateTerminalLifecycleInput,
   UpdateTerminalLifecycleResult,
+  EmergencyRevokeTerminalInput,
+  EmergencyRevokeTerminalResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -164,6 +166,12 @@ export const adminHttpAdapter = {
   updateTerminalLifecycle: (terminalId: string, input: UpdateTerminalLifecycleInput) =>
     patchData<UpdateTerminalLifecycleResult>(
       `/admin/terminals/${encodeURIComponent(terminalId)}/lifecycle`,
+      input,
+    ),
+
+  emergencyRevokeTerminal: (terminalId: string, input: EmergencyRevokeTerminalInput) =>
+    postData<EmergencyRevokeTerminalResult>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/emergency-revoke`,
       input,
     ),
 

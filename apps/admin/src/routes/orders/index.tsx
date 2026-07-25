@@ -261,6 +261,11 @@ export default function OrdersPage() {
                 onClick={() => { setPayStatus(f.value); setPage(1) }}
               />
             ))}
+            <FilterChip
+              active={statusFilter === 'failed' && payStatus === 'paid'}
+              label="已支付失败待核查"
+              onClick={() => { setStatusFilter('failed'); setPayStatus('paid'); setPage(1) }}
+            />
           </div>
         </div>
 
@@ -382,6 +387,15 @@ export default function OrdersPage() {
               )}
             </div>
 
+            {detail.aftercareStatus === 'manual_check_required' && (
+              <div className="mt-4 rounded-[9px] border border-error/30 bg-error-bg px-4 py-3 text-[12.5px] leading-relaxed text-error-fg">
+                <p className="font-extrabold">高风险：打印结果未确认</p>
+                <p className="mt-1">
+                  系统已禁止重新排队，避免重复出纸。请先核查现场出纸情况，再决定是否使用下方既有入口发起全额退款。
+                </p>
+              </div>
+            )}
+
             <h3 className="mb-2 mt-5 text-[12.5px] font-extrabold text-neutral-700 [font-family:var(--font-heading,inherit)]">
               状态流转
             </h3>
@@ -455,8 +469,8 @@ export default function OrdersPage() {
               </div>
             )}
 
-            {/* 退款操作区：仅 payStatus===paid 显示 */}
-            {detail.payStatus === 'paid' && (
+            {/* Gate 0.3B 售后退款入口：资格由服务端只读派生，执行仍复用 canonical RefundService。 */}
+            {detail.refundEligible && (
               <div className="mt-6 rounded-[9px] border border-warning/30 bg-warning-bg px-4 py-3.5">
                 {!refundOpen ? (
                   <div className="flex items-center justify-between">

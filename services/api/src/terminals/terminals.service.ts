@@ -24,6 +24,7 @@ export type {
   ClaimTaskResponse,
   TerminalBindCodeCreated,
   TerminalBindCodeExchangeResult,
+  EmergencyCredentialRevokeResult,
 } from './terminals-agent.service'
 
 export {
@@ -68,6 +69,14 @@ export class TerminalsService {
 
   exchangeBindCode(dto: ExchangeTerminalBindCodeDto) {
     return this.agent.exchangeBindCode(dto)
+  }
+
+  emergencyRevokeCredentials(
+    terminalRef: string,
+    auditContext: Parameters<TerminalAgentService['emergencyRevokeCredentials']>[1],
+    expected: Parameters<TerminalAgentService['emergencyRevokeCredentials']>[2],
+  ) {
+    return this.agent.emergencyRevokeCredentials(terminalRef, auditContext, expected)
   }
 
   heartbeat(terminalId: string, dto: HeartbeatDto, authHeader: string | undefined) {
@@ -127,7 +136,7 @@ export class TerminalsService {
 
   updateTerminalLifecycle(
     terminalId: string,
-    lifecycleStatus: 'active' | 'maintenance',
+    lifecycleStatus: Parameters<TerminalAdminService['updateTerminalLifecycle']>[1],
     auditContext: Parameters<TerminalAdminService['updateTerminalLifecycle']>[2],
     expected: Parameters<TerminalAdminService['updateTerminalLifecycle']>[3],
   ) {

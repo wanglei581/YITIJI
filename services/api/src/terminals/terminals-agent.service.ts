@@ -45,6 +45,7 @@ import {
   type TerminalBindCodeCreated,
   type TerminalBindCodeExchangeResult,
   type TerminalBindCodeAuditContext,
+  type EmergencyCredentialRevokeResult,
 } from './terminal-credential-security.service'
 
 // ── Task status type ───────────────────────────────────────────────────────────
@@ -80,7 +81,7 @@ export interface ClaimTaskResponse {
 
 // ── Bind code response types ───────────────────────────────────────────────────
 
-export type { TerminalBindCodeCreated, TerminalBindCodeExchangeResult } from './terminal-credential-security.service'
+export type { TerminalBindCodeCreated, TerminalBindCodeExchangeResult, EmergencyCredentialRevokeResult } from './terminal-credential-security.service'
 
 // ── Sample files ───────────────────────────────────────────────────────────────
 
@@ -303,6 +304,14 @@ export class TerminalAgentService implements OnModuleInit {
   /** Agent 用一次性绑定码换取 terminalToken。成功后旧 token 立即失效。 */
   async exchangeBindCode(dto: ExchangeTerminalBindCodeDto): Promise<TerminalBindCodeExchangeResult> {
     return this.credentialSecurity.exchangeBindCode(dto)
+  }
+
+  emergencyRevokeCredentials(
+    terminalRef: string,
+    auditContext: Parameters<TerminalCredentialSecurityService['emergencyRevoke']>[1],
+    expected: Parameters<TerminalCredentialSecurityService['emergencyRevoke']>[2],
+  ): Promise<EmergencyCredentialRevokeResult> {
+    return this.credentialSecurity.emergencyRevoke(terminalRef, auditContext, expected)
   }
 
   // ── 2. Heartbeat ─────────────────────────────────────────────────────────────

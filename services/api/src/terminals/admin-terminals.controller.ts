@@ -27,6 +27,7 @@ import {
   type PlannedTerminalCreated,
   type UpdateTerminalProfileResult,
   type UpdateTerminalLifecycleResult,
+  type EmergencyCredentialRevokeResult,
 } from './terminals.service'
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
@@ -35,6 +36,7 @@ import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
+import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
 
 import { resolveClientIp } from '../common/client-ip'
 interface AuditReq {
@@ -228,9 +230,33 @@ export class AdminTerminalsController {
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
+      confirmationText: dto.confirmationText,
     }, {
       expectedStatus: dto.expectedStatus,
       expectedVersion: dto.expectedVersion,
+    })
+    return ApiResponse.ok(result)
+  }
+
+  @Post(':terminalId/emergency-revoke')
+  async emergencyRevoke(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: EmergencyRevokeTerminalCredentialsDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<EmergencyCredentialRevokeResult>> {
+    const result = await this.terminalsService.emergencyRevokeCredentials(terminalId, {
+      actorId: user.userId,
+      actorRole: user.role,
+      reason: dto.reason,
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    }, {
+      expectedStatus: dto.expectedStatus,
+      expectedVersion: dto.expectedVersion,
+      expectedCredentialGeneration: dto.expectedCredentialGeneration,
+      confirmationText: dto.confirmationText,
     })
     return ApiResponse.ok(result)
   }

@@ -430,6 +430,146 @@ async function main(): Promise<void> {
       'timeout failure writes system audit rows with null actorId',
     )
 
+    const suspended = await service.updateTerminalLifecycle(active.id, 'suspended', {
+      actorId, actorRole: 'admin', reason: 'verify suspend preserves drain access',
+    }, {
+      expectedStatus: 'active',
+      expectedVersion: recommissioned.lifecycleVersion,
+    })
+    assert(suspended.newStatus === 'suspended', 'active terminal can be suspended with lifecycle CAS')
+    await service.heartbeat(
+      active.id,
+      { status: 'online', agentVersion: 'verify-suspended' },
+      `Bearer ${replacement.terminalToken}`,
+    )
+    console.log('  PASS suspended terminal preserves credential for heartbeat and drain reporting')
+    assert(
+      (await service.claimTasks(active.id, { maxTasks: 1 }, `Bearer ${replacement.terminalToken}`)).length === 0,
+      'suspended terminal cannot claim a new print task',
+    )
+    const retirementReady = await service.updateTerminalLifecycle(active.id, 'maintenance', {
+      actorId, actorRole: 'admin', reason: 'verify prepare terminal retirement',
+    }, {
+      expectedStatus: 'suspended',
+      expectedVersion: suspended.lifecycleVersion,
+    })
+    await expectRejected(
+      () => service.updateTerminalLifecycle(active.id, 'retired', {
+        actorId, actorRole: 'admin', reason: 'verify retirement task guard', confirmationText: activeCode,
+      }, {
+        expectedStatus: 'maintenance',
+        expectedVersion: retirementReady.lifecycleVersion,
+      }),
+      'TERMINAL_ACTIVE_TASKS',
+      'pending print task blocks terminal retirement',
+    )
+    await prisma.printTask.update({ where: { id: pendingTaskId }, data: { status: 'cancelled' } })
+    const retiredScanTask = await prisma.scanTask.create({
+      data: {
+        terminalId: active.id,
+        scanType: 'document',
+        status: 'failed',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+      select: { id: true },
+    })
+    const retired = await service.updateTerminalLifecycle(active.id, 'retired', {
+      actorId, actorRole: 'admin', reason: 'verify permanent terminal retirement', confirmationText: activeCode,
+    }, {
+      expectedStatus: 'maintenance',
+      expectedVersion: retirementReady.lifecycleVersion,
+    })
+    const retiredRow = await prisma.terminal.findUniqueOrThrow({ where: { id: active.id } })
+    assert(retired.newStatus === 'retired' && !retiredRow.enabled, 'retirement is persisted and disables the terminal')
+    await expectRejected(
+      () => service.assertAgentAuthorized(active.id, `Bearer ${replacement.terminalToken}`),
+      'TERMINAL_RETIRED',
+      'retired terminal rejects Agent authentication even with the prior token',
+    )
+    await expectRejected(
+      () => service.updateTerminalLifecycle(active.id, 'maintenance', {
+        actorId, actorRole: 'admin', reason: 'verify retired is irreversible',
+      }, {
+        expectedStatus: 'maintenance',
+        expectedVersion: retired.lifecycleVersion,
+      }),
+      'TERMINAL_RETIRED',
+      'retired lifecycle is irreversible',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.update({
+        where: { id: active.id },
+        data: { lifecycleStatus: 'maintenance', enabled: true },
+      }),
+      'retired terminal is irreversible',
+      'database guard rejects direct retired lifecycle restoration',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.update({
+        where: { id: active.id },
+        data: { agentToken: `cred$retired$rewritten_${suffix}` },
+      }),
+      'retired terminal is irreversible',
+      'database guard rejects retired carrier rewrites even with the sentinel prefix',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.update({
+        where: { id: active.id },
+        data: {
+          terminalCode: `RELEASED-${suffix}`,
+          deviceFingerprint: `released-fingerprint-${suffix}`,
+          macAddress: `02:00:00:${suffix.slice(0, 2)}:${suffix.slice(2, 4)}:${suffix.slice(4, 6)}`,
+        },
+      }),
+      'retired terminal is irreversible',
+      'database guard freezes retired terminal identity fields',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.delete({ where: { id: active.id } }),
+      'retired terminal cannot be deleted',
+      'database guard preserves the retired row as a permanent identity tombstone',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.create({
+        data: {
+          id: `malformed_retired_${suffix}`,
+          terminalCode: `MALFORMED-RETIRED-${suffix}`,
+          agentToken: `cred$retired$${suffix}`,
+          deviceFingerprint: `malformed-retired-fp-${suffix}`,
+          lifecycleStatus: 'retired',
+          enabled: false,
+        },
+      }),
+      'retired terminal identity cannot be inserted',
+      'database guard rejects direct retired inserts',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminalCredential.updateMany({
+        where: { terminalId: active.id },
+        data: { revokedAt: null },
+      }),
+      'retired terminal credential is immutable',
+      'database guard rejects reviving a retired terminal credential',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminalBindCode.updateMany({
+        where: { terminalId: active.id },
+        data: { revokedAt: null },
+      }),
+      'retired terminal bind code is immutable',
+      'database guard rejects reviving a retired terminal bind code',
+    )
+    await expectDatabaseRejected(
+      () => prisma.printTask.update({ where: { id: pendingTaskId }, data: { status: 'pending' } }),
+      'retired terminal cannot receive new work',
+      'database guard rejects reviving terminal print work after retirement',
+    )
+    await expectDatabaseRejected(
+      () => prisma.scanTask.update({ where: { id: retiredScanTask.id }, data: { status: 'waiting' } }),
+      'retired terminal cannot receive new work',
+      'database guard rejects reviving terminal scan work after retirement',
+    )
+
     const controllerSource = readFileSync(join(process.cwd(), 'src/terminals/admin-terminals.controller.ts'), 'utf8')
     const lifecycleSource = readFileSync(join(process.cwd(), 'src/terminals/terminals-admin.service.ts'), 'utf8')
     assert(
@@ -464,7 +604,7 @@ async function main(): Promise<void> {
     }
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: verifierTerminals.map((terminal) => terminal.id) } } })
     await prisma.terminal.deleteMany({ where: { terminalCode } })
-    await prisma.terminal.deleteMany({ where: { terminalCode: `ACTIVE-${suffix}` } })
+    // ACTIVE fixture 已永久退役，数据库 guard 将其保留为不可删除的身份 tombstone。
     await prisma.terminal.deleteMany({ where: { terminalCode: `LEGACY-CLOSED-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `CREDENTIAL-SOURCE-${suffix}` } })
     await prisma.user.deleteMany({ where: { id: actorId } })
