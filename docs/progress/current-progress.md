@@ -1,8 +1,10 @@
 # 当前开发进度
 
-2026-07-25 完成 **隐私导出范围诚实文案收口（C-04，本地候选）**（分支 `codex/fix-privacy-export-scope-copy-20260725`，基线 `origin/main@ef37bd22`）：`MEMBER_DATA_REQUEST_SCOPE` 曾声称「不导出简历/文档/打印订单/收藏」，与已合入的 `MemberDataExportMapper` 元数据白名单冲突。已改写 shared 范围横幅 / 导出标签与 HINT / Admin 导出说明；Kiosk 页与设置入口改称「隐私与数据请求」；`verify:data-request-ui` 锁定 mapper 字段并禁止过时「不导出订单/文件」用户可见文案。本地双端 `verify:data-request-ui`、`verify:user-center-wave0`、`verify:fusion-w5`、shared/kiosk/admin typecheck 均通过。**未改导出执行器、未开放一体机导出提交、未部署**；账号注销仍 fail-closed。
+2026-07-25 完成 **Express `TRUST_PROXY_HOPS` 可信跳数门禁（本地候选）**（分支 `codex/api-trust-proxy-hops-20260725`，基线 `origin/main@9e6c255d`）：`main.ts` 按 `TRUST_PROXY_HOPS=1..9` 配置 Express trust proxy；生产启动门禁强制显式声明并**禁止 `true/false`**；新增 `resolveClientIp` 统一只信 `req.ip`，清理多处手解析 `X-Forwarded-For`；`verify:trust-proxy` + 扩展 `verify:production-runtime-gates` 已本地通过，并接入 CI / `verify:member-login-data-closure`。`.env.example` 已文档化。**未部署**；部署时须按真实 nginx 层数写入 hops 并真机确认 `req.ip`。
 
-2026-07-25 **SSOT 纠偏（只读核对 GitHub）**：[PR #325](https://github.com/wanglei581/YITIJI/pull/325) 已 MERGED（`09947a45`）；[PR #326](https://github.com/wanglei581/YITIJI/pull/326) 已 MERGED（`6b474051`）；[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已 MERGED（`69eb63c6`）；[PR #327](https://github.com/wanglei581/YITIJI/pull/327) 已将冒烟清单合入 `main@ef37bd22`。上述运行时能力均**未证明已部署到生产**。下方历史「#325 尚未合并」条目保留为当时记录。
+2026-07-25 **隐私导出范围诚实文案收口（C-04）已合入**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) squash 合入 `main@9e6c255d`。`MEMBER_DATA_REQUEST_SCOPE` 与 `MemberDataExportMapper` 元数据白名单对齐；一体机仍不开放导出提交；账号注销仍 fail-closed。**未部署**。
+
+2026-07-25 **SSOT 纠偏（只读核对 GitHub）**：[PR #325](https://github.com/wanglei581/YITIJI/pull/325) 已 MERGED（`09947a45`）；[PR #326](https://github.com/wanglei581/YITIJI/pull/326) 已 MERGED（`6b474051`）；[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已 MERGED（`69eb63c6`）；[PR #327](https://github.com/wanglei581/YITIJI/pull/327) 已将冒烟清单合入 `main@ef37bd22`；[PR #329](https://github.com/wanglei581/YITIJI/pull/329) 已合入 `main@9e6c255d`。上述运行时能力均**未证明已部署到生产**。下方历史「#325 尚未合并」条目保留为当时记录。
 
 2026-07-25 **Kiosk 8177 / 5299 融合候选已提交 [PR #325](https://github.com/wanglei581/YITIJI/pull/325)**：创建 PR 前刷新 `origin/main`，分支为 `0 behind / 46 ahead` 且 merge-tree 无冲突；再次新鲜执行 W6 浏览器 **86/86 PASS**、W6 contract 1/1、shared/ui/kiosk typecheck、W2–W6 verifier、TRTC production build/config guard 与 `git diff --check`，全部通过，lint 为 0 error / 4 条既有 Fast Refresh warning。**历史记录**：本条撰写时尚未合并；现已合入 main（见上方 SSOT 纠偏），仍未部署。
 

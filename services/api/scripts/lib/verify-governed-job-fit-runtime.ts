@@ -272,15 +272,17 @@ async function checkControllerQuota(rootDir: string, governedRel: string, report
     })
     const controller = new Controller(...dependencies)
     const dto = { taskId: 'runtime-job-fit', jobId: 'runtime-job' }
-    const request = (headers: Record<string, string>) => controller.analyze(dto, { headers })
+    // 模拟 Express trust proxy 已填充 req.ip；伪造 XFF 不得覆盖。
+    const request = (headers: Record<string, string>, ip: string) =>
+      controller.analyze(dto, { headers, ip })
     const anonymous = await request({
       'x-resume-access-token': 'runtime-resume-token', 'x-terminal-id': 'runtime-terminal',
-      'x-forwarded-for': '198.51.100.10, 198.51.100.11',
-    })
+      'x-forwarded-for': '203.0.113.9, 198.51.100.11',
+    }, '198.51.100.10')
     const member = await request({
       authorization: `Bearer ${memberToken}`, 'x-terminal-id': 'runtime-terminal',
-      'x-forwarded-for': '198.51.100.10, 198.51.100.11',
-    })
+      'x-forwarded-for': '203.0.113.9, 198.51.100.11',
+    }, '198.51.100.10')
     const valid = (index: number, endUserId: string | null, accessToken: string | null): boolean => {
       const [input, requester, quota] = calls[index] ?? []
       const context = quota as { member?: unknown; terminal?: unknown; ip?: unknown } | undefined
@@ -288,12 +290,15 @@ async function checkControllerQuota(rootDir: string, governedRel: string, report
         && requester !== null && typeof requester === 'object'
         && (requester as { endUserId?: unknown }).endUserId === endUserId
         && (requester as { accessToken?: unknown }).accessToken === accessToken
-        && context?.member === endUserId && context.terminal === 'runtime-terminal' && context.ip === '198.51.100.10'
+        && context?.member === endUserId
+        && context.terminal === 'runtime-terminal'
+        && context.ip === '198.51.100.10'
+        && context.ip !== '203.0.113.9'
     }
     if (anonymous !== expected || member !== expected || calls.length !== 2 || !valid(0, null, 'runtime-resume-token') || !valid(1, 'runtime-member', null)) {
-      reporter.fail('JobFitController runtime spy 未保留匿名/会员 requester 与 member/terminal/XFF 首地址 quota context')
+      reporter.fail('JobFitController runtime spy 未保留匿名/会员 requester 与 member/terminal/req.ip quota context')
     } else {
-      reporter.pass('JobFitController runtime spy 保留匿名/会员 requester 与同策略三维 quota context')
+      reporter.pass('JobFitController runtime spy 保留匿名/会员 requester 与同策略三维 quota context（IP 只信 req.ip）')
     }
   } catch (error) {
     reporter.fail(`JobFitController quota context 内存验证失败: ${error instanceof Error ? error.message : String(error)}`)
