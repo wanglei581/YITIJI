@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import {
   existsSync,
-  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
