@@ -80,7 +80,7 @@ export function MyPrivacyRequestsPage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="me-inkdetail flex h-full flex-col p-6">
+      <div className="fusion-w5 fusion-w5--profile me-inkdetail flex h-full flex-col p-6" data-kiosk-screen="member-privacy-requests">
         <PageHeader
           className="me-page-header"
           title="岗位 AI 隐私请求"
@@ -106,7 +106,7 @@ export function MyPrivacyRequestsPage() {
   }
 
   return (
-    <div className="me-inkdetail flex h-full flex-col">
+    <div className="fusion-w5 fusion-w5--profile me-inkdetail flex h-full flex-col" data-kiosk-screen="member-privacy-requests">
       {message && (
         <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
           {message}
