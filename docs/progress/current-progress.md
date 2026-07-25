@@ -12,6 +12,8 @@
 2026-07-25 追加：**WINDOWS Phase R + Admin 打印扫描只读复检（浏览器）**。预发 `DEPLOY_SOURCE=7e59243c`；health `ok/postgres`；`printer-status` → `ready` + `isOnline=true`（`lastSeenAt` 近实时）；SQL `active=0` / `pending=0`；`TerminalCapability` 对 `t_ksk_001` 仍 **0 行**。Admin（用户已登录 Playwright）：打印扫描「待领取」= **暂无任务**；设备能力页全部「未验收（未配置）」与空表一致（**未点保存**）；设备页此前已见 KSK-001 在线。设备能力页确认 Agent 在线/打印机 ready。**未改商业化控制**。**Phase F 仍须到场**；未造单、未退款、未改能力开关。
 
 
+2026-07-25 完成 **Kiosk W16–W22 方案 B 细对齐候选收口补强**（分支 `codex/kiosk-w16-w22-visual-closeout-20260725`）：在 #328 已合入的 W0–W22 候选基础上，将仍用旧 `PageHeader`/自绘 pagehead 的 `/activities/:id`、`/legal/*`、`/toolbox` 迁入 `KioskPageFrame`+`KioskPageHeader`（保留 W5 `tb-content` 契约与法务 retention 文案）。门禁：`typecheck`、`lint`（0 error）、`verify:kiosk-visual-unity`、`verify:fusion-w2/w3/w4/w5`、`verify:home-toolbox-ui`、`verify:smart-campus-ui`、`verify:legal-retention-copy` PASS。迁移矩阵 §六 VISUAL_DIFF 说明已标注方案 B 后状态。**可写：余下页面细对齐候选完成（壳+栏位+诚实态）。不得写：86 屏像素级全部封板或整机商用。**
+
 2026-07-25 记录 **`WINDOWS_FIELD_RECHECK` Phase F 现场回执（部分通过）**：预生产 `t_ksk_001`。F1 `AIJobPrintAgent` Running/Automatic（`aijobprintagent.exe`）；F2 `printerName` 与 Windows「Pantum CM2800ADN Series」一致；F3 `127.0.0.1:9527`；F5 WLAN 断 75s 后无需重启 Agent、Kiosk「打印机在线」；F6 1080×1920 主路径无系统弹窗阻断（未覆盖 Assigned Access）。**F4 跳过**（浏览器文件选择器未接收测试 PDF；未绕过 Kiosk、未建单；队列 0；临时 PDF 已删）。补充：服务从仓库目录跑，配置为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\config.json`）。已勾清单 §五中已举证子项；**§5.6 真机打印与整包 Phase F 仍开**。未执行 G5 冒烟 / close-unpaid / 收费切换。下一步：补做 F4。
 
 

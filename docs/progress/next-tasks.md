@@ -38,7 +38,7 @@
 
 用户已确认：视觉/排版对齐 86 原型 + 生产诚实态（不伪造）。规格与计划见 `docs/superpowers/specs/2026-07-25-kiosk-86-proto-visual-1to1-design.md`、`docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md`。
 
-- [x] W7–W22 方案 B 细对齐候选——已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`
+- [x] W7–W22 方案 B 细对齐候选——已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`；2026-07-25 补强活动详情/法务/百宝箱统一页壳（见 `current-progress`）
 - [ ] （可选）像素级抽检与真机验收前的视觉回归——壳/token/细对齐候选 ≠ 86 屏全部 1:1 已封板
 - [ ] 上线前 P0 真机 / 支付 / 部署验收（整机商用，不在视觉任务宣称范围）→ **上移至「当前执行」**
 

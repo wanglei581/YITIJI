@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { BenefitActivityListItem, BenefitActivitySourceType, BenefitActivityType } from '@ai-job-print/shared'
 import {
   CheckCircleIcon,
@@ -133,25 +133,19 @@ export function BenefitActivityDetailPage() {
   const primaryDisabled = claiming || Boolean(isLoggedIn && item && !item.claimed && (item.soldOut || item.ended))
 
   return (
-    <div className="fusion-w5 fusion-w5--profile k8-act-detail" data-kiosk-screen="activity-detail">
-      <div className="k8-act-header">
-        <PageHeader
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--profile k8-act-detail h-full"
+      header={
+        <KioskPageHeader
+          className="k8-act-header"
           title="权益活动详情"
-          subtitle="领取后会进入本人「我的权益」"
-          actions={
-            <button
-              type="button"
-              className="k8-act-back-btn"
-              onClick={() => navigate('/activities')}
-              aria-label="返回活动列表"
-            >
-              返回活动
-            </button>
-          }
+          description="领取后会进入本人「我的权益」"
+          onBack={() => navigate('/activities')}
+          backLabel="返回活动"
         />
-      </div>
-
-      <div className="k8-act-scroll">
+      }
+    >
+      <section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="k8-act-scroll flex min-h-0 flex-1 flex-col">
         {state === 'loading' ? (
           <LoadingState className="py-20" />
         ) : state === 'error' || !item ? (
@@ -267,7 +261,7 @@ export function BenefitActivityDetailPage() {
             </p>
           </>
         )}
-      </div>
-    </div>
+      </section>
+    </KioskPageFrame>
   )
 }
