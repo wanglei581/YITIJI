@@ -26,6 +26,7 @@ model Terminal {
   agentToken        String   @unique
   credentialGeneration Int  @default(0)
   lifecycleStatus   String   @default("active")
+  lifecycleVersion  Int      @default(0)
   deviceFingerprint String
   displayName       String?
   macAddress        String?  @unique

@@ -14,6 +14,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { TerminalToolboxService } from './terminal-toolbox.service'
@@ -44,6 +45,7 @@ export interface AdminTerminalView {
   locationLabel: string | null
   enabled: boolean
   lifecycleStatus: TerminalLifecycleStatus
+  lifecycleVersion: number
   orgId: string | null
   orgName: string | null
   registeredAt: string
@@ -90,6 +92,15 @@ export interface PlannedTerminalCreated {
   orgName: string | null
   enabled: boolean
   lifecycleStatus: 'planned'
+}
+
+export interface UpdateTerminalLifecycleResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: 'active' | 'maintenance'
+  newStatus: 'active' | 'maintenance'
+  inFlightTaskCount: number
+  lifecycleVersion: number
 }
 
 export interface AdminPrinterView {
@@ -244,6 +255,7 @@ export class TerminalAdminService {
         locationLabel: t.locationLabel ?? null,
         enabled: t.enabled,
         lifecycleStatus: normalizeLifecycleStatus(t.lifecycleStatus),
+        lifecycleVersion: t.lifecycleVersion,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
@@ -364,6 +376,133 @@ export class TerminalAdminService {
       locationLabel: saved.locationLabel ?? null,
       enabled: saved.enabled,
     }
+  }
+
+  async updateTerminalLifecycle(
+    terminalRef: string,
+    lifecycleStatus: 'active' | 'maintenance',
+    auditContext: {
+      actorId: string
+      actorRole: string
+      reason: string
+      ipAddress?: string | null
+      userAgent?: string | null
+      requestId?: string | null
+    },
+    expected: {
+      expectedStatus: 'active' | 'maintenance'
+      expectedVersion: number
+    },
+  ): Promise<UpdateTerminalLifecycleResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const terminal = await tx.terminal.findFirst({
+        where: this.agent.terminalRefWhere(terminalRef),
+        select: { id: true, terminalCode: true, lifecycleStatus: true, lifecycleVersion: true },
+      })
+      if (!terminal) {
+        throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+      }
+      if (terminal.lifecycleStatus !== 'active' && terminal.lifecycleStatus !== 'maintenance') {
+        throw new BadRequestException({
+          error: {
+            code: 'TERMINAL_LIFECYCLE_TRANSITION_INVALID',
+            message: `终端当前状态 ${terminal.lifecycleStatus} 不允许进入 ${lifecycleStatus}`,
+          },
+        })
+      }
+      if (
+        terminal.lifecycleStatus !== expected.expectedStatus || terminal.lifecycleVersion !== expected.expectedVersion
+      ) {
+        throw new ConflictException({
+          error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态或版本已变化，请刷新后重试' },
+        })
+      }
+      if (terminal.lifecycleStatus === lifecycleStatus) {
+        const inFlightTaskCount = await tx.printTask.count({
+          where: { terminalId: terminal.id, status: { in: ['claimed', 'printing'] } },
+        })
+        return {
+          terminalId: terminal.id,
+          terminalCode: terminal.terminalCode,
+          oldStatus: lifecycleStatus,
+          newStatus: lifecycleStatus,
+          inFlightTaskCount,
+          lifecycleVersion: terminal.lifecycleVersion,
+        }
+      }
+
+      // 两个方向均先取得与建单/claim 相同的 no-op CAS 行锁。
+      const lifecycleLock = await tx.terminal.updateMany({
+        where: {
+          id: terminal.id,
+          lifecycleStatus: terminal.lifecycleStatus,
+          lifecycleVersion: terminal.lifecycleVersion,
+        },
+        data: { lifecycleStatus: terminal.lifecycleStatus },
+      })
+      if (lifecycleLock.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
+        })
+      }
+      const inFlightTaskCount = await tx.printTask.count({
+        where: { terminalId: terminal.id, status: { in: ['claimed', 'printing'] } },
+      })
+      if (terminal.lifecycleStatus === 'maintenance' && lifecycleStatus === 'active' && inFlightTaskCount > 0) {
+        throw new BadRequestException({
+          error: { code: 'TERMINAL_IN_FLIGHT_TASKS', message: '终端仍有在途任务，排空前不能恢复 active' },
+        })
+      }
+      const updated = await tx.terminal.updateMany({
+        where: {
+          id: terminal.id,
+          lifecycleStatus: terminal.lifecycleStatus,
+          lifecycleVersion: terminal.lifecycleVersion,
+        },
+        data: { lifecycleStatus, lifecycleVersion: { increment: 1 } },
+      })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
+        })
+      }
+      // 每次维护轮次切换都撤销未使用绑定码，防止旧 maintenance 轮次的换机码在 ABA 后复活。
+      const revokedBindCodes = await tx.terminalBindCode.updateMany({
+        where: { terminalId: terminal.id, usedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        data: { revokedAt: new Date() },
+      })
+      const result: UpdateTerminalLifecycleResult = {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        oldStatus: terminal.lifecycleStatus,
+        newStatus: lifecycleStatus,
+        inFlightTaskCount,
+        lifecycleVersion: terminal.lifecycleVersion + 1,
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: auditContext.actorId,
+          actorRole: auditContext.actorRole,
+          action: 'terminal.lifecycle.update',
+          targetType: 'terminal',
+          targetId: terminal.terminalCode,
+          payloadJson: JSON.stringify({
+            terminalCode: terminal.terminalCode,
+            oldStatus: terminal.lifecycleStatus,
+            newStatus: lifecycleStatus,
+            inFlightTaskCount,
+            oldLifecycleVersion: terminal.lifecycleVersion,
+            newLifecycleVersion: terminal.lifecycleVersion + 1,
+            revokedBindCodeCount: revokedBindCodes.count,
+            reason: auditContext.reason.trim(),
+          }),
+          ipAddress: auditContext.ipAddress ?? null,
+          userAgent: auditContext.userAgent ?? null,
+          requestId: auditContext.requestId ?? null,
+        },
+      })
+      return result
+    })
   }
 
   async getKioskTerminalConfig(terminalRef: string): Promise<KioskTerminalConfigView> {

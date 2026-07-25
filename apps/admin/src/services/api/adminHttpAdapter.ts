@@ -10,6 +10,8 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  UpdateTerminalLifecycleInput,
+  UpdateTerminalLifecycleResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -158,6 +160,12 @@ export const adminHttpAdapter = {
 
   updateTerminalProfile: (terminalId: string, input: UpdateTerminalProfileInput) =>
     patchData<UpdateTerminalProfileResult>(`/admin/terminals/${encodeURIComponent(terminalId)}/profile`, input),
+
+  updateTerminalLifecycle: (terminalId: string, input: UpdateTerminalLifecycleInput) =>
+    patchData<UpdateTerminalLifecycleResult>(
+      `/admin/terminals/${encodeURIComponent(terminalId)}/lifecycle`,
+      input,
+    ),
 
   // ── 一次性终端绑定码（admin only，明文只返回一次）──────────────────────────
   createTerminalBindCode: (terminalId: string, ttlMinutes?: number) =>

@@ -239,7 +239,7 @@ export class PrintJobsService {
     }
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
-      select: { id: true, enabled: true },
+      select: { id: true, enabled: true, lifecycleStatus: true },
     })
     if (!terminal) {
       throw new BadRequestException({
@@ -254,6 +254,14 @@ export class PrintJobsService {
         error: {
           code: 'PRINT_TERMINAL_DISABLED',
           message: '目标终端已停用',
+        },
+      })
+    }
+    if (terminal.lifecycleStatus !== 'active') {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_TERMINAL_NOT_ACTIVE',
+          message: '目标终端当前不接收新打印任务',
         },
       })
     }
@@ -293,6 +301,16 @@ export class PrintJobsService {
 
     const orderNo = makeOrderNo()
     const { task, order } = await this.prisma.$transaction(async (tx) => {
+      // 与 active -> maintenance 转换共用 Terminal 行锁，防止排空开始后仍建入新任务。
+      const activeLock = await tx.terminal.updateMany({
+        where: { id: targetTerminalId, enabled: true, lifecycleStatus: 'active' },
+        data: { lifecycleStatus: 'active' },
+      })
+      if (activeLock.count !== 1) {
+        throw new BadRequestException({
+          error: { code: 'PRINT_TERMINAL_NOT_ACTIVE', message: '目标终端已进入维护状态，不再接收新打印任务' },
+        })
+      }
       const task = await tx.printTask.create({
         data: {
           id:         taskId,

@@ -93,6 +93,14 @@ export type TerminalPrinterStatus =
   | 'error'
   | 'not_found'
 
+export type TerminalLifecycleStatus =
+  | 'planned'
+  | 'commissioning'
+  | 'active'
+  | 'maintenance'
+  | 'suspended'
+  | 'retired'
+
 export interface AdminTerminalRecord {
   id: string
   terminalCode: string
@@ -100,7 +108,8 @@ export interface AdminTerminalRecord {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
-  lifecycleStatus: 'planned' | 'commissioning' | 'active' | 'maintenance' | 'suspended' | 'retired'
+  lifecycleStatus: TerminalLifecycleStatus
+  lifecycleVersion: number
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
@@ -173,6 +182,22 @@ export interface UpdateTerminalProfileResult {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+}
+
+export interface UpdateTerminalLifecycleInput {
+  targetStatus: 'active' | 'maintenance'
+  expectedStatus: 'active' | 'maintenance'
+  expectedVersion: number
+  reason: string
+}
+
+export interface UpdateTerminalLifecycleResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: TerminalLifecycleStatus
+  newStatus: 'active' | 'maintenance'
+  inFlightTaskCount: number
+  lifecycleVersion: number
 }
 
 // ── 终端授权绑定码（一次性）────────────────────────────────────────────────────

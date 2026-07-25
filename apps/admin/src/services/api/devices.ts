@@ -6,11 +6,14 @@ import type {
   AdminPrinterRecord,
   AdminTerminalsResponse,
   AdminTerminalRecord,
+  TerminalLifecycleStatus,
   AdminOrgOptionsResponse,
   AdminOrganizationOption,
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  UpdateTerminalLifecycleInput,
+  UpdateTerminalLifecycleResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -29,11 +32,14 @@ export type {
   AdminPrinterRecord,
   AdminTerminalsResponse,
   AdminTerminalRecord,
+  TerminalLifecycleStatus,
   AdminOrgOptionsResponse,
   AdminOrganizationOption,
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  UpdateTerminalLifecycleInput,
+  UpdateTerminalLifecycleResult,
   TerminalBindCodeCreated,
   CreatePlannedTerminalInput,
   PlannedTerminalCreated,
@@ -54,6 +60,7 @@ interface AdminDeviceServiceInterface {
   getOrgOptions(): Promise<AdminOrgOptionsResponse>
   assignTerminalOrg(terminalId: string, orgId: string | null): Promise<AssignTerminalOrgResult>
   updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult>
+  updateTerminalLifecycle(terminalId: string, input: UpdateTerminalLifecycleInput): Promise<UpdateTerminalLifecycleResult>
   createTerminalBindCode(terminalId: string, ttlMinutes?: number): Promise<TerminalBindCodeCreated>
   createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated>
 }
@@ -80,6 +87,10 @@ export const assignTerminalOrg = (terminalId: string, orgId: string | null) =>
 /** 更新终端设备档案/MAC/启停状态(PATCH /admin/terminals/:id/profile)。 */
 export const updateTerminalProfile = (terminalId: string, input: UpdateTerminalProfileInput) =>
   adapter.updateTerminalProfile(terminalId, input)
+
+/** 设备运维状态切换：active ↔ maintenance，原因会进入审计。 */
+export const updateTerminalLifecycle = (terminalId: string, input: UpdateTerminalLifecycleInput) =>
+  adapter.updateTerminalLifecycle(terminalId, input)
 
 /** 生成一次性终端绑定码(POST /admin/terminals/:id/bind-code)。明文只在响应里返回一次。 */
 export const createTerminalBindCode = (terminalId: string, ttlMinutes?: number) =>

@@ -44,6 +44,7 @@ const terminalController = read('src/terminals/terminals.controller.ts')
 const service = [
   read('src/terminals/terminals.service.ts'),
   read('src/terminals/terminals-agent.service.ts'),
+  read('src/terminals/terminal-credential-security.service.ts'),
   read('src/terminals/terminal-utils.ts'),
 ].join('\n')
 const createDto = read('src/terminals/dto/create-terminal-bind-code.dto.ts')
@@ -68,8 +69,8 @@ assert(pgRepairMigration.includes("source_column.attname = 'terminalId'") && pgR
 assert(pgRepairMigration.includes('orphan terminalId'), 'PostgreSQL repair migration rejects orphan rows before adding the foreign key')
 
 assert(adminController.includes("@Post(':terminalId/bind-code')"), 'admin controller exposes POST /admin/terminals/:terminalId/bind-code')
-assert(adminController.includes("action: 'terminal.bind_code.create'"), 'admin controller writes bind-code create audit action')
-assert(adminController.includes('bindCodeReturnedOnce: true'), 'admin audit payload records one-time return marker')
+assert(service.includes("action: 'terminal.bind_code.create'"), 'bind-code service writes create audit action in its transaction')
+assert(service.includes('bindCodeReturnedOnce: true'), 'bind-code audit payload records one-time return marker')
 assert(!/payload:\s*{[\s\S]{0,500}bindCode\s*:/m.test(adminController), 'admin audit payload does not write plaintext bindCode')
 
 assert(terminalController.includes("@Post('auth/terminal/exchange-bind-code')"), 'terminal auth controller exposes exchange-bind-code')
@@ -92,6 +93,7 @@ assert(service.includes('BIND_CODE_REVOKED') && service.includes('BIND_CODE_USED
 assert(service.includes('const consumed = await tx.terminalBindCode.updateMany') && service.includes('consumed.count !== 1'), 'exchange consumes bind code with a conditional update for one-time race safety')
 assert(service.includes('agentToken') && service.includes('usedAt: now'), 'exchange rotates terminal token and marks code used')
 assert(service.includes("action: 'terminal.bind_code.exchange'"), 'exchange writes a terminal bind-code exchange audit action')
+assert(service.includes('await this.audit.writeRequired(tx'), 'bind-code create/exchange audits are required transaction participants')
 assert(!/terminal\.bind_code\.exchange[\s\S]{0,800}bindCode\s*:/m.test(service), 'exchange audit payload does not write plaintext bindCode')
 
 assert(installer.includes('[string]$BindCode') && installer.includes('/auth/terminal/exchange-bind-code'), 'installer supports -BindCode exchange path')

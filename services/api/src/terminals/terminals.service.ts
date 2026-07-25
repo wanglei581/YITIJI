@@ -41,6 +41,7 @@ export type {
   UpdateTerminalProfileResult,
   AdminPrinterView,
   PlannedTerminalCreated,
+  UpdateTerminalLifecycleResult,
 } from './terminals-admin.service'
 
 @Injectable()
@@ -56,8 +57,13 @@ export class TerminalsService {
     return this.agent.register(dto)
   }
 
-  createBindCode(terminalRef: string, actorId: string | null, ttlMinutes?: number) {
-    return this.agent.createBindCode(terminalRef, actorId, ttlMinutes)
+  createBindCode(
+    terminalRef: string,
+    actorId: string | null,
+    ttlMinutes?: number,
+    auditContext?: Parameters<TerminalAgentService['createBindCode']>[3],
+  ) {
+    return this.agent.createBindCode(terminalRef, actorId, ttlMinutes, auditContext)
   }
 
   exchangeBindCode(dto: ExchangeTerminalBindCodeDto) {
@@ -117,6 +123,15 @@ export class TerminalsService {
 
   updateTerminalProfile(terminalId: string, dto: UpdateTerminalProfileDto) {
     return this.admin.updateTerminalProfile(terminalId, dto)
+  }
+
+  updateTerminalLifecycle(
+    terminalId: string,
+    lifecycleStatus: 'active' | 'maintenance',
+    auditContext: Parameters<TerminalAdminService['updateTerminalLifecycle']>[2],
+    expected: Parameters<TerminalAdminService['updateTerminalLifecycle']>[3],
+  ) {
+    return this.admin.updateTerminalLifecycle(terminalId, lifecycleStatus, auditContext, expected)
   }
 
   getKioskTerminalConfig(terminalRef: string) {
