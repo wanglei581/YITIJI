@@ -44,6 +44,15 @@ assert(
   'PrintUploadPage 根据 source=resume 展示简历打印语义与我的简历记录入口',
 )
 
+// 简历打印与文档打印共用三种上传通道；不得再把 source=resume 收成单一「上传简历」Tab。
+assert(
+  uploadPage.includes("label: isResumePrint ? '上传简历' : '选择文件'") &&
+    uploadPage.includes("label: '扫码上传'") &&
+    uploadPage.includes("label: 'U盘导入'") &&
+    !/isResumePrint\s*\?\s*\[[\s\S]*?key:\s*'file'[\s\S]*?\]\s*:\s*\[/.test(uploadPage),
+  'PrintUploadPage 简历打印同样提供本机上传 / 扫码上传 / U盘导入',
+)
+
 assert(
   uploadPage.includes("source === 'document'") &&
     uploadPage.includes('文档打印') &&
