@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+/**
+ * verify:kiosk-visual-unity — 视觉统一防回归守卫（W6）
+ *
+ * 锁定 2026-07-25 视觉统一结论：
+ * 1) 唯一共享壳：KioskLayout + kiosk-shell/components + KioskPageFrame
+ * 2) 全路由 service-desk + fusion-youth，无 legacy 主题分叉
+ * 3) 首页不再自绘顶栏/底栏
+ * 4) 页面 CSS 不得再散落裸 hex（token 定义文件除外）
+ */
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join, relative } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const kioskRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = join(kioskRoot, '..', '..')
+const read = (absOrRel, base = kioskRoot) => {
+  const full = absOrRel.startsWith('/') ? absOrRel : join(base, absOrRel)
+  return existsSync(full) ? readFileSync(full, 'utf8') : ''
+}
+
+let failed = 0
+const pass = (m) => console.log(`  PASS ${m}`)
+const fail = (m) => {
+  failed += 1
+  console.error(`  FAIL ${m}`)
+}
+const expect = (cond, m) => (cond ? pass(m) : fail(m))
+
+function walkCss(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name)
+    const st = statSync(full)
+    if (st.isDirectory()) walkCss(full, out)
+    else if (name.endsWith('.css')) out.push(full)
+  }
+  return out
+}
+
+console.log('\n=== Kiosk visual unity 防回归合同 ===\n')
+
+const pkg = read('package.json')
+const root = read('src/layouts/KioskRoot.tsx')
+const home = read('src/pages/home/HomePage.tsx')
+const indexCss = read('src/index.css')
+const shellCss = read(join(repoRoot, 'packages/ui/src/styles/kiosk-shell.css'), '/')
+const frame = read(join(repoRoot, 'packages/ui/src/components/KioskPageFrame.tsx'), '/')
+const topbar = read(join(repoRoot, 'packages/ui/src/components/KioskTopbar.tsx'), '/')
+const layout = read(join(repoRoot, 'packages/ui/src/layouts/KioskLayout.tsx'), '/')
+
+expect(pkg.includes('"verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs"'), 'package.json 注册 verify:kiosk-visual-unity')
+
+expect(existsSync(join(repoRoot, 'packages/ui/src/styles/kiosk-shell.css')), '共享 kiosk-shell.css 存在')
+expect(existsSync(join(repoRoot, 'packages/ui/src/styles/kiosk-components.css')), '共享 kiosk-components.css 存在')
+expect(indexCss.includes('@ai-job-print/ui/styles/kiosk-shell.css'), 'index.css 导入 kiosk-shell')
+expect(indexCss.includes('@ai-job-print/ui/styles/kiosk-components.css'), 'index.css 导入 kiosk-components')
+expect(indexCss.includes('@ai-job-print/ui/styles/fusion-youth.css'), 'index.css 导入 fusion-youth')
+
+expect(/visualTheme="service-desk"/.test(root), 'KioskRoot 全路由固定 service-desk')
+expect(/presentation="fusion-youth"/.test(root), 'KioskRoot 全路由固定 fusion-youth')
+expect(!root.includes('SERVICE_DESK_EXACT_ROUTES'), '无 SERVICE_DESK 路由白名单分叉')
+expect(!/visualTheme=\{isServiceDeskRoute/.test(root), '无 legacy/service-desk 三元切换')
+expect(/hideHeader=\{isCampusZone\}/.test(root) && /hideBottomNav=\{isCampusZone\}/.test(root), '仅校园专区隐藏共享顶栏/底栏')
+expect(/useHomeDeviceStatus\(\s*true\s*\)/.test(root), '共享顶栏始终拉取真实设备状态')
+expect(root.includes('<KioskTopbarStatus'), '共享顶栏注入时钟+设备状态胶囊')
+
+expect(!/function KioskTopBar/.test(home) && !/function HomeNavbar/.test(home), '首页不再自绘顶栏/底栏组件')
+expect(home.includes('kpv1--content-only'), '首页内容区声明 content-only')
+expect(home.includes('KioskPageFrame'), '首页使用 KioskPageFrame')
+
+expect(layout.includes('ui-kiosk-topbar') || topbar.includes('ui-kiosk-topbar'), '共享顶栏类名存在')
+expect(layout.includes('ui-kiosk-nav'), '共享底栏类名存在')
+expect(frame.includes('ui-kiosk-page-frame'), 'KioskPageFrame 使用统一 page-frame')
+expect(shellCss.includes("[data-kiosk-presentation='fusion-youth']"), 'kiosk-shell 作用域绑定 fusion-youth')
+
+// 页面 CSS 不得再散落裸 hex（允许 var(..., #hex) 仅出现在 packages/ui token 定义；kiosk 页面侧已剥离）
+const pageCssFiles = walkCss(join(kioskRoot, 'src'))
+const hexRe = /#[0-9a-fA-F]{3,8}\b/g
+let nakedHex = 0
+const offenders = []
+for (const file of pageCssFiles) {
+  const text = readFileSync(file, 'utf8')
+  for (const match of text.matchAll(hexRe)) {
+    const look = text.slice(Math.max(0, match.index - 40), match.index)
+    if (/var\([^)]*,\s*$/.test(look)) continue
+    nakedHex += 1
+    if (offenders.length < 8) offenders.push(`${relative(kioskRoot, file)}:${match[0]}`)
+  }
+}
+expect(nakedHex === 0, `apps/kiosk 页面 CSS 无裸 hex（实际 ${nakedHex}${offenders.length ? `；例 ${offenders.join(', ')}` : ''}）`)
+
+// token 定义文件必须继续持有原型色真值
+const fusionYouth = read(join(repoRoot, 'packages/ui/src/styles/fusion-youth.css'), '/')
+expect(fusionYouth.includes('#1f9e86') && fusionYouth.includes('#10302b'), 'fusion-youth 仍定义青绿/墨绿真值')
+expect(shellCss.includes('--k-teal') && shellCss.includes('--k-ink'), 'kiosk-shell 暴露 --k-* 语义别名')
+
+if (failed > 0) {
+  console.error(`\nFAIL ${failed} 项 — kiosk visual unity 合同未满足\n`)
+  process.exit(1)
+}
+console.log('\nALL PASS — kiosk visual unity 合同满足\n')

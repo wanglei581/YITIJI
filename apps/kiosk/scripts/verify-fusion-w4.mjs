@@ -48,7 +48,7 @@ const W6_INTEGRATION_FILES = new Set([
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
-  /^apps\/kiosk\/src\/pages\/(?:jobs-fairs-prototype|prototype\/kiosk-prototype)\.css$/,
+  /^apps\/kiosk\/src\/pages\/jobs-fairs-prototype\.css$/,
   /^apps\/kiosk\/src\/pages\/styles\/(?:jobs-fairs-foundation|jobs-companies-fusion|job-fairs-fusion|campus-policy-fusion)\.css$/,
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:CampusWelcomePage|FreshmanInsightsPage)\.tsx$/,
 ]
