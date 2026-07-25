@@ -54,6 +54,7 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const suffix = crypto.randomBytes(6).toString('hex')
   const terminalCode = `PLAN-${suffix}`
+  const actorId = `u_terminal_provisioning_${suffix}`
   const audit = new AuditService(prisma)
   const agent = new TerminalAgentService(prisma, audit)
   const admin = new TerminalAdminService(prisma, agent, new TerminalToolboxService(prisma))
@@ -63,6 +64,15 @@ async function main(): Promise<void> {
   const taskIds: string[] = []
 
   try {
+    await prisma.user.create({
+      data: {
+        id: actorId,
+        username: `verify-terminal-provisioning-${suffix}`,
+        passwordHash: 'verify-only-not-a-login-secret',
+        name: 'Terminal provisioning verifier',
+        role: 'admin',
+      },
+    })
     process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED'] = 'false'
     await expectRejected(
       () => service.createPlannedTerminal({ terminalCode }),
@@ -214,7 +224,10 @@ async function main(): Promise<void> {
       'duplicate terminalCode is rejected',
     )
 
-    const bind = await service.createBindCode(planned.id, 'verify-admin', 10)
+    const bind = await service.createBindCode(planned.id, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
     const exchanged = await service.exchangeBindCode({
       bindCode: bind.bindCode,
       deviceFingerprint: `activated-${suffix}`,
@@ -254,13 +267,13 @@ async function main(): Promise<void> {
       },
     })
     await expectRejected(
-      () => service.createBindCode(active.id, 'verify-admin', 10),
+      () => service.createBindCode(active.id, actorId, 10),
       'TERMINAL_MAINTENANCE_REQUIRED',
       'active terminal cannot mint a replacement bind code before maintenance',
     )
 
     const maintenance = await service.updateTerminalLifecycle(active.id, 'maintenance', {
-      actorId: 'verify-admin', actorRole: 'admin', reason: 'verify enter maintenance',
+      actorId, actorRole: 'admin', reason: 'verify enter maintenance',
     }, {
       expectedStatus: 'active',
       expectedVersion: active.lifecycleVersion,
@@ -268,7 +281,7 @@ async function main(): Promise<void> {
     assert(maintenance.newStatus === 'maintenance', 'Admin lifecycle transition enters maintenance')
     await expectRejected(
       () => service.updateTerminalLifecycle(active.id, 'active', {
-        actorId: 'verify-admin', actorRole: 'admin', reason: 'verify stale lifecycle request',
+        actorId, actorRole: 'admin', reason: 'verify stale lifecycle request',
       }, {
         expectedStatus: 'maintenance',
         expectedVersion: active.lifecycleVersion,
@@ -319,7 +332,7 @@ async function main(): Promise<void> {
       },
     })
     await expectRejected(
-      () => service.createBindCode(active.id, 'verify-admin', 10),
+      () => service.createBindCode(active.id, actorId, 10),
       'TERMINAL_IN_FLIGHT_TASKS',
       'maintenance terminal with claimed/printing work cannot mint a replacement bind code',
     )
@@ -340,7 +353,10 @@ async function main(): Promise<void> {
       active.id,
     )
 
-    const activeBind = await service.createBindCode(active.id, 'verify-admin', 10)
+    const activeBind = await service.createBindCode(active.id, actorId, 10, {
+      actorId,
+      actorRole: 'admin',
+    })
     const replacement = await service.exchangeBindCode({
       bindCode: activeBind.bindCode,
       deviceFingerprint: `active-rebind-${suffix}`,
@@ -355,7 +371,7 @@ async function main(): Promise<void> {
     await service.assertAgentAuthorized(active.id, `Bearer ${replacement.terminalToken}`)
     console.log('  PASS replacement token authenticates')
     const recommissioned = await service.updateTerminalLifecycle(active.id, 'active', {
-      actorId: 'verify-admin', actorRole: 'admin', reason: 'verify resume after maintenance',
+      actorId, actorRole: 'admin', reason: 'verify resume after maintenance',
     }, {
       expectedStatus: 'maintenance',
       expectedVersion: maintenance.lifecycleVersion,
@@ -429,7 +445,12 @@ async function main(): Promise<void> {
     if (previousProvisioningFlag === undefined) delete process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED']
     else process.env['TERMINAL_PLANNED_PROVISIONING_ENABLED'] = previousProvisioningFlag
     await prisma.auditLog.deleteMany({
-      where: { targetId: { in: [terminalCode, `ACTIVE-${suffix}`, `CREDENTIAL-SOURCE-${suffix}`] } },
+      where: {
+        OR: [
+          { targetId: { in: [terminalCode, `ACTIVE-${suffix}`, `CREDENTIAL-SOURCE-${suffix}`] } },
+          { actorId },
+        ],
+      },
     })
     const verifierTerminals = await prisma.terminal.findMany({
       where: { terminalCode: { in: [terminalCode, `ACTIVE-${suffix}`, `CREDENTIAL-SOURCE-${suffix}`] } },
@@ -446,6 +467,7 @@ async function main(): Promise<void> {
     await prisma.terminal.deleteMany({ where: { terminalCode: `ACTIVE-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `LEGACY-CLOSED-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `CREDENTIAL-SOURCE-${suffix}` } })
+    await prisma.user.deleteMany({ where: { id: actorId } })
     await prisma.onModuleDestroy()
   }
 }
