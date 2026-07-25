@@ -139,12 +139,12 @@
 
 ### PR #326 合入后冒烟（预生产优先；生产须单独授权）
 
-部署目标：`main@ef37bd22`（含 #326 代码 + #327 文档；基线祖先 `6b474051`）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
+部署目标：先 `main@ef37bd22`（#326+#327），后跟进 `main@bffc7220`（+#329+#330）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
 
-- [x] **D1 部署**（2026-07-25）：`DEPLOY_SOURCE deploy_commit=ef37bd22`；PM2 `ai-job-print-api` → `/srv/ai-job-print/services/api/dist/main.js`；本机/公网 health `db=postgres`；Kiosk/Admin/Partner HTTP 200；Kiosk 产物 `index-BmJkvkh1.js`；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`（tip 无此文件）；DB dump `/srv/ai-job-print-db-backups/pre-ef37bd22-20260725T172540+0800.dump`；回滚目录 `…/pre-ef37bd22-20260725T172540+0800`。
+- [x] **D1 部署**（2026-07-25）：首发 `DEPLOY_SOURCE=ef37bd22`（Kiosk `index-BmJkvkh1.js`）；同日跟进 `DEPLOY_SOURCE=bffc7220`（Kiosk `index-D2cndxbU.js`，含 #329）。PM2 → `/srv/ai-job-print/services/api/dist/main.js`；health `db=postgres`；三端 200；保留 `20260722090000_pg_foundation_batch_tables`。备份/回滚：`pre-ef37bd22-…` 与 `pre-bffc7220-20260725T174423+0800`。
 - [x] **D2 报价诚实**（2026-07-25）：5 页 PDF `purpose=print_doc` → `POST /orders/quote` `pageRange=1-2` → `billablePages=2/amountCents=0`；同参建单 `ptask_kiosk_608db0c6a166e275` / `ORD-20260725-4B8570C048` 同为 `billablePages=2/amountCents=0`（未按 5 页超收）。FREE_MODE 下订单 `payStatus=paid`；Agent 侧打印机 offline，任务最终 `failed/PRINTER_OFFLINE`（未宣称物理出纸）。
 - [x] **D3 设备 fail-closed**（2026-07-25）：API `printerStatus=offline` + 心跳在线；浏览器首页/隐私页顶栏显示「打印机离线」「网络正常」，**未**伪造「打印机在线」或耗材 100%。未远程停 Windows Agent（现场 Agent 本已报 offline）。
-- [x] **D4 隐私 UI**（2026-07-25，部分）：公网 `/me/privacy-requests` 可达，未登录诚实门禁「请先登录」；产物含撤回授权文案与 Admin `member-privacy`/`rejectReason`。**未做**真实会员登录后的提交/Admin 列表操作（无本窗短信账号授权）。
+- [x] **D4 隐私 UI**（2026-07-25，部分 → 文案复验）：公网 `/me/privacy-requests` 可达；`main@bffc7220`（含 #329）部署后浏览器见「隐私与数据请求 / 撤回授权可用；导出与注销暂未在一体机开放」，旧「仅限岗位 AI 咨询会话」已消失；产物含「文件清单」且无「不导出订单」。**仍未做**真实会员登录后的撤回提交 / Admin 列表（无本窗短信账号授权）。
 - [x] **D5 价目维护**（2026-07-25，只读）：Admin `/billing` 未登录跳转登录页；Admin 产物含 `/billing`；本窗**未改价、未改说明**。
 - [x] **D6 价目 SOP 只读**（2026-07-25）：active `print_bw_page=0` / `print_color_page=0`，`description` 已是「免费试运营：…0 元/页」。**无需再写**；未跑 seed、未 SQL 直改。
 
