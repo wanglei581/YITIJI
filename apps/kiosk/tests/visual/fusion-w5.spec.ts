@@ -56,6 +56,15 @@ async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void
 }
 
 function registerMemberLogin(api: ApiRouter): void {
+  // G6: 登录前拉取当前协议版本；无激活版本时前端回落草拟哨兵，fixture 返回 null 即可。
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: { success: true, data: null },
+  })
   api.respond('POST', '/api/v1/member/auth/sms-code', {
     status: 200,
     json: { success: true, data: { sent: true, cooldownSeconds: 60, expiresInSeconds: 300 } },
