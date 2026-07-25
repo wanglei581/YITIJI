@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 追加：**预生产部署 G6 `main@7e59243c`（#343 MemberLegalConsent）**。用户授权后续部署：pin `7e59243c`（含 Partner #342 相对 API 修复；树内有 F1 源码但**未**跑 Genesis）；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`；`.env` 仍 `TRUST_PROXY_HOPS=1`；DB dump `pre-7e59243c-20260725T201825+0800.dump`；`db:pg:deploy` 已应用 `20260725120000_add_member_legal_consent`，表 `MemberLegalConsent` 存在（行数 0）；回滚目录 `…/pre-7e59243c-20260725T201825+0800`。PM2 online / health `db=postgres` / 三端 HTTP 200；Kiosk `index-BrRJoDt1.js`；Admin bundle 含 `legal-docs`；`GET /kiosk/legal/*` 200（当前无激活正文 → `data:null`，fallback 版本 `draft-pending-legal-review`）；`POST /member/auth/login` 缺版本 → `VALIDATION_FAILED`，错版本 → `LEGAL_VERSION_STALE`，fallback 版本 → `SMS_CODE_EXPIRED`（已过法务校验）；`GET /admin/legal-doc-versions` 无 token → `401`。此前 Partner-only 热更已被本轮全量 rebuild 覆盖。**未做**：法务正文定稿/激活（P1-5）、G5 退款、F1 Genesis、live 支付/SMS、close-unpaid Phase B。
+
 2026-07-25 修复 **`docs/progress/current-progress.md` 误入 merge conflict 标记**（#343/#345 并入后残留 `<<<<<<<`）。并集保留 Partner #342 热更新与 G6 LegalDocVersion 两条事实；**无运行时改动**。
 
 2026-07-25 追加：**Partner #342 预生产浏览器冒烟（未登录）**。公网加载 `index-9Gb3kgQt.js`；`/sources` 未登录干净回跳 `/login`（无页面崩溃）；同页 Runtime 探针：单参数 `new URL('/api/v1/…')` 仍抛 `Invalid URL`（缺陷对照），`new URL(…, location.origin)` → `https://partner.zyidai.cn/api/v1/partner/…`。**未做**：Partner 账号登录后 data-sources/jobs GET（无本窗账号）。
