@@ -11,7 +11,7 @@
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署含 close-unpaid / #328 / #331**：`DEPLOY_SOURCE=70ed8f6d`，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线（401 无 token）
-4. [ ] **close-unpaid 生产受控操作授权**：仅在用户书面授权下做只读预检 / 受控关闭；**禁止未授权演练关闭**
+4. [ ] **close-unpaid 生产受控操作授权**：Runbook 已就绪（`docs/device/close-unpaid-production-controlled-ops-runbook.md`）。须用户书面回复 `CLOSE_UNPAID_PHASE_A_READONLY` 后才做只读预检；合格候选后再单独授权 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名单笔 taskId）。**禁止未授权演练关闭**
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
 6. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
@@ -236,6 +236,7 @@
 - [x] **FREE_MODE 价目说明文案诚实化**：按 D6 只读证据（2026-07-25）关闭——生产 active `print_bw_page` / `print_color_page` 的 `description` 已是「免费试运营：…0 元/页」；[PR #247](https://github.com/wanglei581/YITIJI/pull/247) / #255 能力已在部署路径可用。无需再写库；未跑 seed、未 SQL 直改。
 
 - [x] **当前未支付任务受控关闭（代码）**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入 `main@e2b3858d`（Admin `POST .../close-unpaid` + 详情资格字段 + `CloseUnpaidPrintTaskForm` + `verify:admin-print-scan`）。条件：pending、未领取、关联订单 `unpaid/pending` 且不存在任何 `PaymentAttempt`；事务内关任务/关订单并审计。
+- [x] **close-unpaid 受控操作 Runbook（文档）**：`docs/device/close-unpaid-production-controlled-ops-runbook.md`（2026-07-25）。执行仍卡在用户书面 Phase A / Phase B 授权。
 - [x] **当前未支付任务受控关闭（预生产部署）**：已随 `DEPLOY_SOURCE=70ed8f6d` 上线；无 token 调用返回 `401 AUTH_MISSING_TOKEN`（证明路由在线）。
 - [ ] **当前未支付任务受控关闭（生产受控操作）**：仅在用户书面授权下做只读预检 / 受控关闭；**未授权不得对生产任务演练关闭**。
 - [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。
