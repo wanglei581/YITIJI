@@ -1,0 +1,124 @@
+# WINDOWS_FIELD_RECHECK — 现场 Phase F 核对清单
+
+> 最后更新：2026-07-25  
+> 授权包名：`WINDOWS_FIELD_RECHECK`  
+> 终端：`t_ksk_001` / `KSK-001`  
+> API 预发：`DEPLOY_SOURCE=7e59243c`（以服务器 `DEPLOY_SOURCE.txt` 为准）
+
+## 边界
+
+| 阶段 | 谁做 | 内容 |
+|------|------|------|
+| **Phase R（远程）** | 可 SSH 预发 API 的人/AI | health、printer-status、心跳、active 任务计数 |
+| **Phase F（现场）** | **必须人在一体机旁** | Agent 服务、驱动名、`printerName`、真机出纸、断网恢复、Kiosk 全屏 |
+
+禁止：未授权造打印单「只为验收」；未授权 close-unpaid；把 Agent token / 桥接 token 贴进聊天或仓库。
+
+关联总清单：`docs/device/production-deployment-and-windows-host-checklist.md` §五。
+
+---
+
+## Phase R — 远程旁证（2026-07-25 复检）
+
+在预发 API 主机只读确认（**不替代 Phase F**）：
+
+| 检查 | 结果 |
+|------|------|
+| `GET /api/v1/health` | `ok` / `db=postgres` |
+| `GET /api/v1/terminals/t_ksk_001/printer-status` | `printerStatus=ready`，`isOnline=true`，`lastSeenAt` 近实时 |
+| `Terminal` `t_ksk_001` | `enabled=true`，有 mac，`lastSeenAt` 近实时 |
+| 近 30 分钟 `TerminalHeartbeat` | 有多条（Agent 在上报） |
+| 该终端 active `pending/claimed/printing` | 0 |
+| `TerminalCapability` 行数 | 0（`PRINT_SCAN_CAPABILITY_MODE=managed` 下空表可接受，**不**证明扫描/USB 已验） |
+
+结论：云端侧认为终端在线且打印机 ready；**现场驱动、服务、出纸、断网仍须 Phase F**。
+
+---
+
+## Phase F — 现场步骤（一体机 Windows）
+
+在一体机上用 **管理员 PowerShell** 执行；把结果记在下方「回执」里（可打码路径）。
+
+### F1. Agent 服务
+
+```powershell
+Get-Service AIJobPrintAgent | Format-List Name, Status, StartType
+# 期望：Status=Running，StartType=Automatic（或符合现场策略）
+```
+
+若服务名不同，用：
+
+```powershell
+Get-Service | Where-Object { $_.Name -match 'AIJob|PrintAgent|Terminal' }
+```
+
+### F2. 打印机驱动名（勿硬编码进仓库；只对照 Agent 配置）
+
+```powershell
+Get-Printer | Select-Object Name, DriverName, PortName, PrinterStatus | Format-Table -AutoSize
+```
+
+打开 Agent 配置 `%ProgramData%\AIJobPrintAgent\config.json`（仅管理员可读；**勿**把 `agent.token` 贴出），确认：
+
+- `printerName` **等于** Windows「打印机名称」列（不是随便写型号字符串）
+- API base URL 指向当前预发/生产
+- `terminalId` / 注册身份对应 `t_ksk_001` 或现场实际终端
+
+### F3. 本机桥接仅监听本机（若启用 local API）
+
+```powershell
+netstat -ano | findstr LISTENING | findstr ":9527"
+# 若 localApiPort 不是 9527，换成实际端口
+# 期望：只见 127.0.0.1，不要 0.0.0.0（按现场设计核对）
+```
+
+### F4. 真机出纸（受控 1 页）
+
+前提：现场有人值守、纸仓有纸、队列为空。
+
+1. 打开 Kiosk 预发/生产域名全屏页  
+2. 走既有「上传/打印」路径打 **1 页无个人信息** 测试 PDF（FREE_MODE 下可为 0 元）  
+3. 确认：任务 `pending → printing → completed`，纸张实际出来，Windows 打印队列空  
+4. **不要**为验收故意造未支付 pending 单去练 close-unpaid  
+
+若今日不便出纸：在回执写「F4 跳过：原因 ____」，Phase F 不得标完全通过。
+
+### F5. 断网恢复（约 3 分钟）
+
+1. 拔网线或断 Wi‑Fi（按现场接入方式）约 60–90 秒  
+2. 观察 Admin/API：`isOnline` 应变差或 lastSeen 停更（允许短暂延迟）  
+3. 恢复网络后等待心跳：`isOnline=true` / `printerStatus=ready` 恢复  
+4. 回执记录断网时长与恢复是否自动（无需手动重启 Agent）
+
+### F6. Kiosk 全屏（抽查）
+
+- Edge/Chrome Kiosk 全屏无系统弹窗阻断主路径  
+- 首页设备状态与「在线/就绪」不长期打架（允许首帧轮询「检查中」）
+
+---
+
+## 授权与回执模板
+
+现场做完后回复（**不要**贴 token / 密钥）：
+
+```text
+授权 WINDOWS_FIELD_RECHECK Phase F 回执
+环境：预生产 / 终端 t_ksk_001
+F1 Agent 服务：Running / Automatic = 是|否（实际名：____）
+F2 printerName 与 Windows 打印机名一致：是|否（打印机显示名可打码后 4 字）
+F3 local API 仅 127.0.0.1：是|否|未启用
+F4 真机出纸 1 页：通过|跳过（原因）
+F5 断网恢复自动上线：通过|失败|未做
+F6 Kiosk 全屏抽查：通过|问题简述
+说明：未造未支付关单；未贴 Agent token
+```
+
+收到完整回执后，可将本包 Phase F 记为完成，并勾总清单 §五中已覆盖项；未做的子项保持打开。
+
+---
+
+## 当前状态
+
+- Phase R：✅ 2026-07-25（见上表）  
+- Phase F：⏳ 等待现场回执  
+- 与本包无关：G5、F1 Genesis、close-unpaid Phase B、密钥再轮换  

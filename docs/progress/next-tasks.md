@@ -15,11 +15,11 @@
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`（预发 `7e59243c` 祖先）：Admin `/orders` 对 `paid` 全额退款 UI + 放宽 readonly 仅 `refundOrder`。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏入口、预发/生产真实退款冒烟（须另授 `G5_REFUND_SMOKE`）
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG `MemberLegalConsent`；P1-5 法务正文定稿仍开）
-7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包：`p0-auth-packs-seed-and-secrets-runbook.md`（7a/7b）+ `p0-auth-pack-windows-field-recheck.md`（7c）。仍须用户点名后推进：
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包：`p0-auth-packs-seed-and-secrets-runbook.md`（7a/7b）+ `windows-field-recheck-phase-f-runbook.md` / `p0-auth-pack-windows-field-recheck.md`（7c）。仍须用户点名后推进：
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
-   - **7b `SECRETS_ROTATION_EVIDENCE`**：⏳ 阻塞——用户已确认密钥在预发 `.env`（名称级 OCR/COS/SMS/TRTC=`SET`）；**.env 有密钥 ≠ 控制台轮换证据**。须书面轮换日期/打码截图后才能勾选 §2.2 密钥项（模板见 `p0-auth-packs-seed-and-secrets-runbook.md`；勿贴密钥值）
-   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 旁证已记；**现场 Phase F** 授权模板见 `docs/device/p0-auth-pack-windows-field-recheck.md`
+   - **7b `SECRETS_ROTATION_EVIDENCE`**：✅ 已完成（2026-07-25 方案 C）——OCR/COS 沿用 2026-06-13；SMS/TRTC 确认当前生产密钥 + `.env` 同步、今日不换；§2.2 对应轮换项已勾。短信签名/模板审核与真实短信 E2E 仍独立开着
+   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**
    - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
    - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置

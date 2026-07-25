@@ -2,7 +2,7 @@
 
 > 最后更新：2026-07-25  
 > 对应 `docs/progress/next-tasks.md` 当前执行 §7c。  
-> 操作细则见 [windows-host-acceptance-runbook.md](./windows-host-acceptance-runbook.md)；验收勾选项见 checklist §五。
+> 现场逐步清单见 [windows-field-recheck-phase-f-runbook.md](./windows-field-recheck-phase-f-runbook.md)；换机操作细则见 [windows-host-acceptance-runbook.md](./windows-host-acceptance-runbook.md)；验收勾选项见 checklist §五。
 
 ## 边界
 
