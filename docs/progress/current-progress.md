@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 在 `source=resume` 时曾故意只保留「上传简历」单 Tab；现与文档打印共用三种通道（本机上传 / 扫码上传 / U盘导入），保留「我的简历记录」入口与文档打印独有的「扫描原件」。`verify:print-entry-source-split` 已加回归断言。未动支付/硬件/合规。
+2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 在 `source=resume` 时曾故意只保留「上传简历」单 Tab；现与文档打印共用三种通道（本机上传 / 扫码上传 / U盘导入），保留「我的简历记录」入口与文档打印独有的「扫描原件」。`verify:print-entry-source-split` 已加回归断言。**预发已 Kiosk-only 热更**：`index-BrRJoDt1.js` → `index-BsEVTsnj.js`，`DEPLOY_SOURCE` 仍 pin `7e59243c` 并追加 `kiosk_hotfix_commit=e4e1597b`；备份 `/srv/ai-job-print-kiosk-dist-backups/pre-resume-print-20260725T220722+0800/dist.tgz`。未重启 PM2、未动 API/DB/密钥/支付。全量 rebuild 前须合入 main。
 
 2026-07-25 完成 **Partner Wave 1 登录邮箱别名候选**（分支 `codex/partner-email-login-alias-20260725` / [PR #356](https://github.com/wanglei581/YITIJI/pull/356)）：按商用方案 [`docs/reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md`](../reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md) 落地——`User.emailHash/emailEnc/emailVerifiedAt/emailVerifyMethod`（双 schema + 双轨 migration）；密码登录支持已验证邮箱别名；Admin `PUT /admin/orgs/:id/accounts/:accountId/email`（`confirmVerified` + `admin_manual`，无 SMTP）；Partner 登录文案三别名；`verify:partner-email-login-alias` 接入 CI；孤立 SQLite 夹具已同步 email 列。本地/CI 绿；**不做**邮箱 OTP/找回/Partner 自助绑邮箱；**未部署**；建议排在 P0 验收后合入。
 
