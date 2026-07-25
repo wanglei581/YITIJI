@@ -35,6 +35,12 @@ export interface KioskPageFrameProps {
   className?: string
   /** 内容区附加类名，用于页面级栅格。 */
   contentClassName?: string
+  /**
+   * 顶级全屏路由专用：本组件即页面最外层，不在 KioskLayout 之内。
+   * 开启后自带 fusion-youth 呈现属性，使 kiosk-shell.css 生效，
+   * 避免出现没有主题作用域的孤岛页面。
+   */
+  standalone?: boolean
 }
 
 /**
@@ -56,12 +62,16 @@ export function KioskPageFrame({
   footer,
   className,
   contentClassName,
+  standalone = false,
 }: KioskPageFrameProps) {
   const hasStandardHead = Boolean(title || subtitle || onBack || headerAside)
 
   return (
     <section
       data-kiosk-component="page-frame"
+      {...(standalone
+        ? { 'data-kiosk-presentation': 'fusion-youth', 'data-kiosk-viewport': 'kiosk' }
+        : {})}
       className={cn('ui-kiosk-page-frame flex min-h-0 flex-1 flex-col', className)}
     >
       {header}

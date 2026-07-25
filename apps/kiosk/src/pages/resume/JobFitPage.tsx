@@ -144,7 +144,7 @@ export function JobFitPage() {
 
   if (!taskId) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--gate flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="alert">
           <AlertCircleIcon className="h-10 w-10 text-primary-600" aria-hidden="true" />
           <p className="text-base text-neutral-500">请先完成简历上传与诊断，再做岗位匹配参考</p>
@@ -156,7 +156,7 @@ export function JobFitPage() {
 
   if (loadingLatest) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--loading flex h-full flex-col items-center justify-center gap-4 px-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-state-card" role="status" aria-live="polite">
           <Loader2Icon className="h-10 w-10 animate-spin text-primary-600" aria-hidden="true" />
           <p className="text-base text-neutral-500">正在恢复岗位匹配报告…</p>
@@ -289,7 +289,7 @@ export function JobFitPage() {
   // ── 结果视图 ──────────────────────────────────────────────────────────────
   if (result) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--result flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="job-fit-header">
           <KioskPageHeader
             title="岗位匹配参考"
@@ -377,7 +377,7 @@ export function JobFitPage() {
 
   // ── 选择视图 ──────────────────────────────────────────────────────────────
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume">
     <main data-kiosk-domain="resume" data-kiosk-screen="resume-job-fit" className="service-desk job-fit-inkpaper job-fit-inkpaper--form flex h-full flex-col px-6 pt-6" data-visual-theme="service-desk" data-ux-density="touch">
       {showAnonymousConsent && (
         <AnonymousJobFitConsentDialog

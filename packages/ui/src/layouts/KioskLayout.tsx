@@ -1,5 +1,6 @@
 import { BotIcon, HomeIcon, UserIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { KioskTopbar } from '../components/KioskTopbar'
 import { cn } from '../lib/cn'
 import {
   getKioskPresentationAttributes,
@@ -71,13 +72,7 @@ export function KioskLayout({
 
       {/* ── Top status bar：原型 topbar（76px 墨绿，品牌 + 状态） ── */}
       {!hideHeader && (
-        <header className="ui-kiosk-topbar">
-          <div className="ui-kiosk-topbar__brand">
-            <b>{brandTitle}</b>
-            <span>{brandSubtitle}</span>
-          </div>
-          {headerRight && <div className="ui-kiosk-topbar__right">{headerRight}</div>}
-        </header>
+        <KioskTopbar brandTitle={brandTitle} brandSubtitle={brandSubtitle} right={headerRight} />
       )}
 
       {/* ── Main content — scrollable ────────────────────── */}

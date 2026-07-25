@@ -117,7 +117,7 @@ export function InterviewTipsPage() {
   }
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview">
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-tips" className="interview-flow interview-tips" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader

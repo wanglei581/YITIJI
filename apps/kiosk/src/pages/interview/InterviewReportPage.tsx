@@ -120,7 +120,7 @@ export function InterviewReportPage() {
   if (loading) return <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch"><LoadingState className="py-24" /></div>
   if (loadError || !data) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <ErrorState message="报告不存在或已过期" className="py-4" />
         <Button size="lg" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
       </main></KioskPageFrame>
@@ -130,7 +130,7 @@ export function InterviewReportPage() {
   const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview">
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewTopbar />
       <PageHeader

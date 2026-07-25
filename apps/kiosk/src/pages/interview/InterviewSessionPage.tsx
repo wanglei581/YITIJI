@@ -156,7 +156,7 @@ export function InterviewSessionPage() {
 
   if (!state?.sessionId) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview"><main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
           <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
         </div>
@@ -312,7 +312,7 @@ export function InterviewSessionPage() {
   const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <KioskPageFrame standalone className="fusion-w3 fusion-w3--interview">
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
         advisorPortrait={advisorPortrait}

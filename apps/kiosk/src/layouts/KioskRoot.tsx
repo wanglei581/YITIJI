@@ -1,6 +1,6 @@
 import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
-import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { KioskTopbarStatus } from '../components/kiosk-shell/KioskAppTopbar'
 import { getTerminalId } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
@@ -53,35 +53,6 @@ export function KioskRoot() {
   )
 }
 
-/** 顶栏右侧：实时时钟 + 真实设备状态胶囊（原型 topbar .right）。 */
-function TopbarRight({ tone, label }: { tone: string; label: string }) {
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const clock = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now)
-
-  return (
-    <>
-      <span className="ui-kiosk-topbar__clock">{clock}</span>
-      <span className="k-status-chip" data-tone={tone} role="status" aria-live="polite">
-        <span className="k-status-chip__dot" aria-hidden="true" />
-        {label}
-      </span>
-    </>
-  )
-}
-
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -120,7 +91,7 @@ function KioskShell() {
       hideBottomNav={pathname === '/' || isCampusZone}
       brandTitle={`就业服务大厅 · ${terminalId}`}
       brandSubtitle="AI求职打印服务终端"
-      headerRight={<TopbarRight tone={deviceStatus.tone} label={statusLabel} />}
+      headerRight={<KioskTopbarStatus tone={deviceStatus.tone} label={statusLabel} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
