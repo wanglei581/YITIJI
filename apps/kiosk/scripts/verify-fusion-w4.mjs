@@ -59,7 +59,7 @@ const OTHER_WAVE_PATHS = [
   // W2: print/scan presentation and its isolated verification assets.
   /^apps\/kiosk\/src\/pages\/(?:print|print-scan|scan)\//,
   /^apps\/kiosk\/scripts\/verify-fusion-w2-print-scan\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2\.spec\.ts)$/,
+  /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2(?:|-print|-scan|-tools)\.spec\.ts)$/,
   // W3: resume, AI assistant and interview authoring surfaces.
   /^apps\/kiosk\/src\/pages\/(?:resume|assistant|interview)\//,
   /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career|verify-lightflow-k2c-interview)\.mjs$/,
@@ -69,7 +69,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:ErrorOfflinePage|MeActivityDetailPage|NotificationsPage|SessionTimeoutPage)\.tsx$/,
   /^apps\/kiosk\/src\/pages\/placeholders\/system-pages-batch8\.css$/,
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w5|verify-profile-activity-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
   // W6: integration verifier and its contract test are owned by the integration wave.
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,

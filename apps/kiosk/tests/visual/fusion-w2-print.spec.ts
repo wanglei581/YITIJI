@@ -284,9 +284,11 @@ test('cashier renders a pending QR without exposing its session token @w2', asyn
 })
 
 for (const scenario of [
-  { name: 'failed attempt', status: 'unpaid', attempt: { attemptId: 'w2-failed', channel: 'wechat', status: 'failed', qrCodeContent: null, expiresAt: null }, copy: '付款码支付未完成' },
-  { name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired', qrCodeContent: null, expiresAt: null }, copy: '订单已超时关闭' },
-  { name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success', qrCodeContent: null, expiresAt: null }, copy: '订单已退款' },
+  // unpaid + attempt.failed → canReissue：主按钮是「重新支付」，不得出现可点的「开始打印」。
+  { name: 'failed attempt', status: 'unpaid', attempt: { attemptId: 'w2-failed', channel: 'wechat', status: 'failed', qrCodeContent: null, expiresAt: null }, copy: '付款码支付未完成', primary: 'reissue' as const },
+  // 订单终态 closed/refunded → canReissue=false：主按钮保持禁用的「等待支付…」。
+  { name: 'closed order', status: 'closed', attempt: { attemptId: 'w2-closed', channel: 'wechat', status: 'expired', qrCodeContent: null, expiresAt: null }, copy: '订单已超时关闭', primary: 'waiting' as const },
+  { name: 'refunded order', status: 'refunded', attempt: { attemptId: 'w2-refunded', channel: 'wechat', status: 'success', qrCodeContent: null, expiresAt: null }, copy: '订单已退款', primary: 'waiting' as const },
 ] as const) {
   test(`cashier keeps ${scenario.name} out of print fulfillment @w2`, async ({ page, api }) => {
     const errors = collectRuntimeErrors(page)
@@ -301,7 +303,12 @@ for (const scenario of [
     await setReactRouterState(page, '/print/cashier', cashierState)
     await expect(page.getByText(scenario.copy, { exact: true })).toBeVisible()
     await expect(page).toHaveURL(/\/print\/cashier$/)
-    await expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '开始打印' })).toHaveCount(0)
+    if (scenario.primary === 'reissue') {
+      await expect(page.getByRole('button', { name: '重新支付' }).first()).toBeVisible()
+    } else {
+      await expect(page.getByRole('button', { name: '等待支付…' })).toBeDisabled()
+    }
     await expectHealthy(page, errors, 'print-cashier')
   })
 }
