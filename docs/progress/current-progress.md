@@ -1,6 +1,11 @@
 # 当前开发进度
 
-2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。**须合入 #369 后再全量部署**，否则会被再次覆盖。
+2026-07-25 纠偏：**`next-tasks` §7c 重复条目合并**。以现场回执为准：F1–F3/F5/F6 已过、**仅欠 F4 真机出纸**；远程 Phase R / Admin 待领取空为旁证。未宣称 §五整包通过。
+
+2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。**源码已合入 main**；下次全量部署须 pin 含 `4b32f7e9` 的 tip，否则 rebuild 可能再次盖回旧 dist。
+
+2026-07-25 完成 **Partner Wave 1 登录邮箱别名候选**（分支 `codex/partner-email-login-alias-20260725` / [PR #356](https://github.com/wanglei581/YITIJI/pull/356)）：按商用方案 [`docs/reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md`](../reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md) 落地——`User.emailHash/emailEnc/emailVerifiedAt/emailVerifyMethod`（双 schema + 双轨 migration）；密码登录支持已验证邮箱别名；Admin `PUT /admin/orgs/:id/accounts/:accountId/email`（`confirmVerified` + `admin_manual`，无 SMTP）；Partner 登录文案三别名；`verify:partner-email-login-alias` 接入 CI；孤立 SQLite 夹具已同步 email 列。本地/CI 绿；**不做**邮箱 OTP/找回/Partner 自助绑邮箱；**未部署**；建议排在 P0 验收后合入。
+
 
 2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。
 
