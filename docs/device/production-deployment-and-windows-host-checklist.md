@@ -268,14 +268,14 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 自动登录/开机启动策略符合现场 kiosk 使用方式。
 - [ ] Edge/Chrome 已安装并可进入全屏 Kiosk 模式。
 - [ ] Windows 更新策略不会在营业时段强制重启。
-- [ ] 本机防火墙允许 Agent 访问后端 API；Agent 本地端口只监听 `127.0.0.1`。
+- [x] 本机防火墙允许 Agent 访问后端 API；Agent 本地端口只监听 `127.0.0.1`。（2026-07-25 Phase F：`127.0.0.1:9527`；Agent 可达预发 API 旁证）
 
 ### 5.2 打印机驱动与配置
 
-- [ ] 奔图 CM2800/CM2820 系列驱动已安装。
-- [ ] Windows 打印机列表中真实驱动名已记录。
-- [ ] Agent 配置使用 `printerName`，不得硬编码具体型号字符串。
-- [ ] `printerName` 与 Windows 实际识别名一致。
+- [x] 奔图 CM2800/CM2820 系列驱动已安装。（2026-07-25 Phase F：队列名存在）
+- [x] Windows 打印机列表中真实驱动名已记录。（`Pantum CM2800ADN Series`）
+- [x] Agent 配置使用 `printerName`，不得硬编码具体型号字符串。（对照 `agent-config.json`）
+- [x] `printerName` 与 Windows 实际识别名一致。（2026-07-25 Phase F）
 - [ ] 打印机通过 USB 或有线网络连接稳定。
 - [ ] 默认纸张为 A4，不假设 A3。
 - [ ] 彩色、黑白、份数、双面参数在本机驱动下实测。
@@ -284,28 +284,28 @@ pnpm --filter ./services/api verify:activity-logs
 
 - [ ] Agent 版本与服务器 API 版本匹配。
 - [ ] Agent 配置包含 API base URL、terminalId/注册凭据、printerName、扫描目录、日志路径。
-- [ ] Token/凭据使用 Windows DPAPI 或设计文档要求的方式加密保存。
-- [ ] Agent Windows Service 安装成功。
-- [ ] Service 可开机自启。
+- [ ] Token/凭据使用 Windows DPAPI 或设计文档要求的方式加密保存。（现场现为仓库目录配置，正式安装口径仍开）
+- [x] Agent Windows Service 安装成功。（2026-07-25：`AIJobPrintAgent` Running）
+- [x] Service 可开机自启。（StartType=Automatic）
 - [ ] 单实例保护有效，重复启动不会产生双 Agent。
 - [ ] Agent 日志路径固定，日志不含用户文件正文/密钥。
 
 ### 5.4 终端注册与心跳
 
-- [ ] Agent 可访问生产/预生产 API。
+- [x] Agent 可访问生产/预生产 API。（2026-07-25：预发心跳 / printer ready）
 - [ ] Admin 在既有「设备管理」页预创建唯一 `terminalCode`，设备状态为「待安装」，此时未签发日常设备凭证且不能认证。
 - [ ] Admin 生成一次性绑定码，安装程序使用绑定码激活；首次凭证 generation=1，设备进入 `commissioning`，绑定码不可重复使用；首次成功认证心跳后自动进入 `active`。
 - [ ] 终端激活成功；生产安装包、命令行、镜像和日志均不携带共享 `adminSecret` 或可复用明文 Token。
-- [ ] 心跳持续上报。
-- [ ] Admin 终端管理页显示在线。
-- [ ] 打印机状态/WMI 状态可上报。
-- [ ] 断网后状态变离线；恢复网络后自动重新在线。
+- [x] 心跳持续上报。（远程 Phase R + 现场在线）
+- [x] Admin 终端管理页显示在线。（同日浏览器只读旁证）
+- [x] 打印机状态/WMI 状态可上报。（`printerStatus=ready`）
+- [x] 断网后状态变离线；恢复网络后自动重新在线。（2026-07-25 F5：WLAN 75s，恢复无需重启 Agent）
 
 ### 5.5 本地 Kiosk 与 Agent 通信
 
 - [ ] Kiosk 页面可从生产域名打开。
-- [ ] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。
-- [ ] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。
+- [x] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。（2026-07-25 F6：1080×1920；未覆盖 Assigned Access）
+- [x] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。（2026-07-25 F3）
 - [ ] QR 登录本地桥接端口与 Kiosk 构建变量一致：Agent `localApiPort` / `localApiAllowedOrigins` 与 Kiosk `VITE_TERMINAL_AGENT_LOCAL_URL`、实际 Kiosk Origin 完全匹配。
 - [ ] 如 Kiosk 使用 HTTPS 页面，已实测浏览器不会因 mixed content / Private Network Access 阻断 `http://127.0.0.1:<localApiPort>`；若被阻断，扫码登录不得宣称可用，需改为受信本地桥接方案或现场允许的本地访问策略。
 - [ ] U 盘导入本地桥接令牌一致：Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 完全一致（安装时一起生成/下发，不走网络协商）；未配置时 `/local/usb/*` 全部路由 fail-closed 403，Kiosk `usb` tab 应保持禁用并显示"本机未配置"，不得强行放行。

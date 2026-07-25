@@ -58,7 +58,14 @@ Get-Service | Where-Object { $_.Name -match 'AIJob|PrintAgent|Terminal' }
 Get-Printer | Select-Object Name, DriverName, PortName, PrinterStatus | Format-Table -AutoSize
 ```
 
-打开 Agent 配置 `%ProgramData%\AIJobPrintAgent\config.json`（仅管理员可读；**勿**把 `agent.token` 贴出），确认：
+打开 Agent 配置（**勿**把 `agent.token` / bridge token 贴出），按现场安装方式二选一：
+
+| 安装方式 | 常见配置路径 |
+|----------|----------------|
+| 正式 Windows 服务安装 | `%ProgramData%\AIJobPrintAgent\config.json` |
+| 从仓库目录跑服务（预发/开发一体机） | `apps/terminal-agent/config/agent-config.json`（相对仓库根） |
+
+确认：
 
 - `printerName` **等于** Windows「打印机名称」列（不是随便写型号字符串）
 - API base URL 指向当前预发/生产
@@ -113,12 +120,32 @@ F6 Kiosk 全屏抽查：通过|问题简述
 说明：未造未支付关单；未贴 Agent token
 ```
 
-收到完整回执后，可将本包 Phase F 记为完成，并勾总清单 §五中已覆盖项；未做的子项保持打开。
+收到回执后：勾总清单 §五中**已举证**子项；**F4 未真机出纸则本包不得标「Phase F 全部完成」**，§5.6 保持打开。
+
+---
+
+## Phase F 回执记录（2026-07-25，预生产 / `t_ksk_001`）
+
+| 项 | 结果 | 备注 |
+|----|------|------|
+| F1 | ✅ | 显示名 `AIJobPrintAgent`，进程 `aijobprintagent.exe`；Running + Automatic |
+| F2 | ✅ | `printerName` = Windows 名 `Pantum CM2800ADN Series`（配置项对照，非代码硬编码） |
+| F3 | ✅ | `127.0.0.1:9527` |
+| F4 | ⏭ 跳过 | 浏览器文件选择器未成功接收测试 PDF；**未**绕过 Kiosk、**未**建单；队列最终 0；临时 PDF 已删 |
+| F5 | ✅ | WLAN 断 75s；恢复后无需重启 Agent；Kiosk 显示「打印机在线」 |
+| F6 | ✅（有限） | 1080×1920 竖屏主路径无 JS/系统弹窗阻断；**未**覆盖 Windows Assigned Access 专用会话 |
+
+补充：当前服务从**仓库目录**运行，配置实际为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\config.json`）。正式换机交付仍须按 ProgramData/DPAPI 安装口径验收。
+
+**结论：Phase F 部分通过；因 F4 未出纸，不得宣称 §五 / 整机商用通过。**  
+未执行：G5 退款冒烟、close-unpaid、收费切换、生产配置修改。
+
+**建议补做 F4：** 改用扫码上传 / U 盘导入 / 扫描原件等**不依赖本机文件选择器**的既有入口，打 1 页无个人信息样张；成功后另发「F4 补做回执」（含脱敏 taskId）。
 
 ---
 
 ## 当前状态
 
 - Phase R：✅ 2026-07-25（见上表）  
-- Phase F：⏳ 等待现场回执  
-- 与本包无关：G5、F1 Genesis、close-unpaid Phase B、密钥再轮换  
+- Phase F：◐ **部分通过**（F1/F2/F3/F5/F6；**F4 待补**）  
+- 与本包无关：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、密钥再轮换  
