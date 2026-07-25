@@ -43,21 +43,33 @@
 
 ### 范围（名称级，不读值）
 
-预发已配置名称级项（2026-07-25 盘点）：百度 OCR、COS、SMS（tencent）、TRTC、以及 LLM 相关（若启用）。  
-上线前须证明**曾在控制台轮换**（尤其历史有聊天暴露风险的百度 OCR）。
+预发已配置名称级项（2026-07-25 盘点；同日用户口头确认「密钥在 .env」后复核仍成立）：百度 OCR、腾讯 COS（`TENCENT_COS_*`）、SMS（tencent）、TRTC（含 `TRTC_SDK_SECRET_KEY` 等），health `ok/postgres`。  
+**重要区分**：服务器 `.env` 已写入密钥名/值 = **运行时已配置**；**不等于**控制台「暴露后已轮换」的举证。清单 §2.2 密钥项要求的是后者。
+
+上线前须证明**曾在控制台轮换**（尤其历史有聊天暴露风险的百度 OCR）。历史附录（2026-06-13）曾记 OCR/COS live 复验通过，**默认不能自动勾选今日 §2.2**；若用户书面接受该历史清关仍适用于当前预发，也只能覆盖 OCR/COS，SMS/TRTC/LLM 仍须另确认。
 
 ### 用户提供（任选其一形态）
 
 - 控制台「密钥已重置 / 更新时间」截图（密钥打码）
 - 或书面：`OCR/COS/SMS/TRTC 已于 <日期> 在控制台轮换，运行时 .env 已同步且服务已验证健康`
 
-### 授权回复模板
+### 授权回复模板（请原样粘贴后填日期）
 
 ```text
 授权 SECRETS_ROTATION_EVIDENCE
 环境：预生产
-证据：<截图路径在仓库外 / 或书面轮换日期列表>
-范围：百度 OCR、COS、SMS、TRTC（及已启用的 LLM）
+证据：OCR 控制台轮换日期 ____；COS 控制台轮换日期 ____；SMS 控制台轮换日期 ____；TRTC 控制台轮换日期 ____；（可选 LLM ____）
+说明：密钥明文不进聊天；仅确认控制台已轮换且 .env 已同步
+禁止：密钥明文进仓库或聊天
+```
+
+若只想沿用历史 OCR/COS（2026-06-13）清关、其余稍后补：
+
+```text
+授权 SECRETS_ROTATION_EVIDENCE（部分）
+环境：预生产
+确认：接受清单附录 2026-06-13 OCR/COS 控制台轮换结论仍适用于当前预发 .env
+未覆盖：SMS / TRTC / LLM 仍待书面轮换日期或打码截图
 禁止：密钥明文进仓库或聊天
 ```
 
@@ -66,6 +78,8 @@
 - close-unpaid Phase A：预生产 `DEPLOY_SOURCE=7e59243c` 复检仍 **`pending=0` / `eligible=0`** → 不进 Phase B
 - 7a `SEED_PASSWORD_CONFIRM` + 7a2 `SEED_PASSWORD_ROTATE`：**已完成**（partner1/partner2 已离 seed 默认；清单 §2.2 seed 项已勾选）
 - 7d `PARTNER_SMOKE_LOGIN`：**已完成**（partner `wanglei` + admin `admin` 只读 GET 200；凭据不入库）
-- 7b `SECRETS_ROTATION_EVIDENCE`：**阻塞**——仅名称级确认预发已配置 OCR/COS/SMS/TRTC；历史附录曾记 2026-06-13 OCR/COS 轮换复验，**不能自动等同今日仍有效**。须用户按上方模板书面确认或提供打码截图后才能勾选清单 §2.2 密钥项
-- 7c `WINDOWS_FIELD_RECHECK`：未做现场；远程可见 `t_ksk_001` printer-status `ready` + `isOnline=true`（现场项另包）
+- 7b `SECRETS_ROTATION_EVIDENCE`：**仍阻塞 / 未完整勾选**——用户已说明「密钥在 .env」；同日名称级复核 OCR/COS/SMS/TRTC 均为 `SET`，health 正常。**.env 有密钥 ≠ 控制台轮换证据**。历史 2026-06-13 OCR/COS 附录**未**因本句自动勾选。须按上方模板书面确认（或打码截图）后才能勾选清单 §2.2 对应密钥项
+- 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 旁证已记**（见下）；**现场 Phase F 未做**
+  - R：`GET /api/v1/terminals/t_ksk_001/printer-status` → `printerStatus=ready`、`isOnline=true`；`Terminal` `enabled` + 近期 `lastSeenAt`；`TerminalCapability` 对 `t_ksk_001` **0 行**（managed 模式下空表不代表现场能力已验）
+  - F：一体机 Agent 服务、奔图驱动出纸/扫描、断网恢复等仍须到场
 - 提醒：`/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`

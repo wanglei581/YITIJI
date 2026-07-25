@@ -44,7 +44,7 @@
 - [ ] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。
 - [ ] LLM/DeepSeek 或其他模型 API Key 已使用生产专用 Key。
 - [ ] 短信签名/模板审核通过后再启用真实短信。
-- [ ] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。
+- [x] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。（**2026-07-25**：用户确认「密钥在 .env」；预发 `services/api/.env` 名称级复核 OCR/COS/SMS/TRTC 相关项为 `SET`，值未读出。本项仅表示落点正确，**不**表示控制台已轮换。）
 - [x] 生产/预生产环境的 seed 内部账号默认口令（`admin` / `partner1` / `partner2`，明文写在 `services/api/prisma/seed.ts`）已全部轮换为强密码或直接禁用账号；公网可达的后台登录页不得挂任何仓库内可见的默认口令（2026-07-12 发现风险；**2026-07-25**：bcrypt 确认后执行 `SEED_PASSWORD_ROTATE`——admin 本已非默认，partner1/partner2 已轮换强随机口令且 `tokenVersion++`；seed 默认登录 `partner1`→`401 AUTH_LOGIN_FAILED`；明文仅服务器 root `0600` 文件，取后 shred。**注意**：勿再对预发跑会重置口令的 `db:seed` upsert）。
 
 ### 2.3 合规前置

@@ -18,8 +18,8 @@
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`。仍须用户点名后推进：
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
-   - **7b `SECRETS_ROTATION_EVIDENCE`**：百度 OCR / COS / SMS / TRTC / LLM 控制台轮换截图或变更时间（密钥不进仓库/聊天）
-   - **7c `WINDOWS_FIELD_RECHECK`**：一体机 Agent + 奔图驱动 + 断网恢复现场复验
+   - **7b `SECRETS_ROTATION_EVIDENCE`**：⏳ 阻塞——用户已确认密钥在预发 `.env`（名称级 OCR/COS/SMS/TRTC=`SET`）；**.env 有密钥 ≠ 控制台轮换证据**。须书面轮换日期/打码截图后才能勾选 §2.2 密钥项（模板见 `p0-auth-packs-seed-and-secrets-runbook.md`；勿贴密钥值）
+   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 旁证已记（`t_ksk_001` printer `ready`/`isOnline`；`TerminalCapability` 空）；**现场 Phase F**（Agent + 奔图驱动 + 断网恢复）仍须到场授权后执行
    - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
    - **不在本包**：G5 退款、F1 Genesis、close-unpaid Phase B、切收费支付
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置

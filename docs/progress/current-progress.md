@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 澄清 **`SECRETS_ROTATION_EVIDENCE` vs `.env`**：用户回复「密钥在 .env 文件里面」。解读：运行时密钥落点已符合预期，**不能**据此勾选 §2.2「控制台轮换」项。同日预发名称级复核（**不读值**）：`BAIDU_OCR_*` / `TENCENT_COS_*` / `TENCENT_SMS_*` / `TRTC_*`（含 `TRTC_SDK_SECRET_KEY`）均为 `SET`，health `ok/postgres`。清单仅勾选「密钥只写入服务器环境变量」；OCR/COS/SMS/TRTC/LLM **控制台轮换项仍未勾选**。历史附录 2026-06-13 OCR/COS 清关**未**自动等同今日。7b 仍待用户粘贴 runbook 授权模板（或打码截图）。同步完成 **WINDOWS_FIELD_RECHECK 远程 Phase R**：`GET /terminals/t_ksk_001/printer-status` → `ready` + `isOnline=true`；`TerminalCapability` 对 `t_ksk_001` 为 0 行（managed 空表）；**现场 Phase F 未做**。未动 G5 / FREE_MODE / F1 Genesis / close-unpaid Phase B；未输出任何密钥值。
+
 2026-07-25 推进 **`SECRETS_ROTATION_EVIDENCE`**：远程仅能确认预发 `.env` 已配置 OCR/COS/SMS/TRTC 等**名称级**项且 health 正常；历史清单附录曾记 2026-06-13 OCR/COS 轮换 live 复验，**不能自动勾选今日 §2.2 密钥项**。7b 阻塞于用户书面确认或打码截图（模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`）。同步更新该 runbook 状态（7d 已完成；secret 文件仍提醒 shred）。远程旁证：`t_ksk_001` printer-status `ready`/`isOnline=true`（不替代 7c 现场）。
 
 2026-07-25 完成 **`PARTNER_SMOKE_LOGIN` + Admin 只读 GET（预发，用户提供本窗凭据）**：`DEPLOY_SOURCE=7e59243c`。登录：`portal=admin` 用户名 `admin` → 201；`portal=partner` 用户名 `wanglei` → 201（DB 角色 `partner`，非 admin）。Partner 只读：`/partner/profile` `/dashboard` `/data-sources` `/jobs` `/sync-logs` `/fairs` 均为 200（该机构 data-sources/jobs/fairs/sync-logs 当前均为空列表）。Admin 只读：`/admin/legal-doc-versions` 200（list:0）、`/admin/terminals` 200。**未**写业务数据；凭据未写入仓库；因曾出现在聊天，建议用户事后自行改密。partner1/partner2 轮换 secret 文件仍须用户 SSH 取后 shred（若尚未删）。
