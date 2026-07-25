@@ -288,6 +288,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-info-fields
           pnpm --filter @ai-job-print/api verify:fair-company-positions
           pnpm --filter @ai-job-print/api verify:admin-orgs
+          pnpm --filter @ai-job-print/api verify:partner-email-login-alias
           pnpm --filter @ai-job-print/api verify:admin-orgs-delete-schema
           pnpm --filter @ai-job-print/api verify:admin-orgs-delete-concurrency
           pnpm --filter @ai-job-print/api verify:partner-account-action:schema

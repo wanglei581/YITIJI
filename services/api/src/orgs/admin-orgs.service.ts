@@ -11,6 +11,14 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import {
+  EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+  encryptEmail,
+  hashEmail,
+  isValidEmail,
+  maskEmail,
+  normalizeEmail,
+} from '../common/crypto/email-identity'
 import { encryptPhone, hashPhone, normalizePhone } from '../common/crypto/phone-identity'
 import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
@@ -470,6 +478,56 @@ export class AdminOrgsService {
   }
 
   /**
+   * Admin 代绑/换绑 Partner 登录邮箱。
+   * confirmVerified 必须为 true；写入 emailVerifiedAt + emailVerifyMethod=admin_manual（无 SMTP）。
+   */
+  async bindAccountEmail(
+    orgId: string,
+    accountId: string,
+    input: { email: string; confirmVerified: true },
+    admin: AuthedUser,
+  ): Promise<AdminOrgAccount> {
+    if (input.confirmVerified !== true) {
+      throw new BadRequestException({
+        error: { code: 'EMAIL_CONFIRM_REQUIRED', message: '必须确认已人工核验该邮箱归属' },
+      })
+    }
+    const account = await this.assertAccountInOrg(orgId, accountId)
+    const normalized = normalizeEmail(input.email)
+    if (!isValidEmail(normalized)) {
+      throw new BadRequestException({
+        error: { code: 'EMAIL_INVALID', message: '邮箱格式无效' },
+      })
+    }
+    await this.assertEmailAvailable(normalized, accountId)
+    const emailVerifiedAt = new Date()
+    const updated = await this.prisma.user.updateMany({
+      where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+      data: {
+        emailHash: hashEmail(normalized),
+        emailEnc: encryptEmail(normalized),
+        emailVerifiedAt,
+        emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+        tokenVersion: { increment: 1 },
+      },
+    })
+    if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
+    await this.invalidateAccountSession(accountId)
+    const refreshed = await this.prisma.user.findFirstOrThrow({
+      where: { id: accountId },
+      select: ADMIN_ORG_ACCOUNT_SELECT,
+    })
+    const mapped = mapAdminOrgAccount(refreshed)
+    await this.writeAudit(admin, 'org.account.bind_email', orgId, {
+      accountId,
+      username: account.username,
+      emailMasked: maskEmail(normalized),
+      emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+    })
+    return mapped
+  }
+
+  /**
    * 安全移除机构成员账号：保留 User 主键与历史关联，但撤销访问并释放可复用凭据。
    * 最后有效账号判断、墓碑更新和审计必须在同一可串行化事务内完成。
    */
@@ -516,6 +574,10 @@ export class AdminOrgsService {
             phoneHash: null,
             phoneEnc: null,
             phoneVerifiedAt: null,
+            emailHash: null,
+            emailEnc: null,
+            emailVerifiedAt: null,
+            emailVerifyMethod: null,
             lastLoginAt: null,
           },
         })
@@ -629,6 +691,19 @@ export class AdminOrgsService {
     const exists = await this.prisma.user.findFirst({ where: { phoneHash: hashPhone(phone), deletedAt: null } })
     if (exists) {
       throw new ConflictException({ error: { code: 'PHONE_ALREADY_BOUND', message: '该手机号已绑定其他账号' } })
+    }
+  }
+
+  private async assertEmailAvailable(email: string, exceptUserId?: string): Promise<void> {
+    const exists = await this.prisma.user.findFirst({
+      where: {
+        emailHash: hashEmail(email),
+        deletedAt: null,
+        ...(exceptUserId ? { NOT: { id: exceptUserId } } : {}),
+      },
+    })
+    if (exists) {
+      throw new ConflictException({ error: { code: 'EMAIL_ALREADY_BOUND', message: '该邮箱已绑定其他账号' } })
     }
   }
 
