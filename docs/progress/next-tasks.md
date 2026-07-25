@@ -30,6 +30,7 @@
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
+10. [ ] （可选 P1，P0 后）**Partner 登录邮箱别名 Wave 1**——本地候选已在 `codex/partner-email-login-alias-20260725`；审阅后 push/PR；**不做**邮箱 OTP/SMTP
 
 ---
 

@@ -468,6 +468,11 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  emailHash    String?       @unique
+  emailEnc     String?
+  emailVerifiedAt DateTime?
+  /// Wave 1: admin_manual（Admin 受托核验）；预留 otp
+  emailVerifyMethod String?
   tokenVersion Int           @default(0)
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
@@ -482,6 +487,7 @@ model User {
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
+  @@index([emailVerifiedAt])
   @@index([orgId, role, enabled, deletedAt])
 }
 

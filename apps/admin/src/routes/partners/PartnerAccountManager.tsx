@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { KeyRoundIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { KeyRoundIcon, MailIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
 import { ApiHttpError } from '../../services/api/client'
 import {
   orgsAdminService,
@@ -88,6 +88,9 @@ export function PartnerAccountManager({
   const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '', phone: '' })
   const [resetTarget, setResetTarget] = useState<AdminOrgAccount | null>(null)
   const [resetPassword, setResetPassword] = useState('')
+  const [emailTarget, setEmailTarget] = useState<AdminOrgAccount | null>(null)
+  const [emailValue, setEmailValue] = useState('')
+  const [emailConfirmVerified, setEmailConfirmVerified] = useState(false)
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const sectionRef = useRef<HTMLDivElement>(null)
@@ -140,6 +143,30 @@ export function PartnerAccountManager({
       await orgsAdminService.resetAccountPassword(orgId, resetTarget.id, resetPassword)
       setResetTarget(null)
       setResetPassword('')
+      await reloadAccounts()
+    } catch (caught) {
+      setError(messageForAccountError(caught))
+    } finally {
+      setAccountBusy(null)
+    }
+  }
+
+  const bindAccountEmail = async () => {
+    if (!emailTarget || !emailConfirmVerified) return
+    const confirmed = window.confirm(
+      '请确认该邮箱为该合作机构官方指定管理员邮箱。管理员对其准确性负责，确认后该邮箱将立即作为登录凭证生效（人工核验，系统不发送验证邮件）。',
+    )
+    if (!confirmed) return
+    setAccountBusy(emailTarget.id)
+    setError(null)
+    try {
+      await orgsAdminService.bindAccountEmail(orgId, emailTarget.id, {
+        email: emailValue.trim(),
+        confirmVerified: true,
+      })
+      setEmailTarget(null)
+      setEmailValue('')
+      setEmailConfirmVerified(false)
       await reloadAccounts()
     } catch (caught) {
       setError(messageForAccountError(caught))
@@ -220,12 +247,19 @@ export function PartnerAccountManager({
                   <SmartphoneIcon className="h-3.5 w-3.5" />
                   {account.phoneMasked ?? '未绑定手机号'}
                 </p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-neutral-500">
+                  <MailIcon className="h-3.5 w-3.5" />
+                  {account.emailMasked ?? '未绑定登录邮箱'}
+                </p>
               </div>
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.enabled ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-600'}`}>
                 {account.enabled ? '启用' : '已停用'}
               </span>
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.phoneVerifiedAt ? 'bg-success-bg text-success-fg' : 'bg-warning-bg text-warning-fg'}`}>
                 {account.phoneVerifiedAt ? '手机号已验证' : '待验证'}
+              </span>
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.emailVerifiedAt ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-600'}`}>
+                {account.emailVerifiedAt ? '邮箱可登录' : '邮箱未绑'}
               </span>
               <button
                 type="button"
@@ -238,6 +272,20 @@ export function PartnerAccountManager({
               </button>
               <TwoStepButton account={account} busy={accountBusy !== null || securityActionOpen} onConfirm={() => void toggleAccount(account)} />
               <div className="flex flex-wrap items-center justify-end gap-1" aria-label={`${account.username} 账号安全操作`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailTarget(account)
+                    setEmailValue('')
+                    setEmailConfirmVerified(false)
+                    setResetTarget(null)
+                  }}
+                  disabled={accountBusy !== null || securityActionOpen}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MailIcon className="h-3.5 w-3.5" />
+                  {account.emailMasked ? '换绑登录邮箱' : '绑定登录邮箱'}
+                </button>
                 <button
                   type="button"
                   onClick={(event) => actionFlow.open('rebind_phone', account, event.currentTarget)}
@@ -287,6 +335,61 @@ export function PartnerAccountManager({
               className="rounded-lg bg-warning px-3 py-1.5 text-xs font-medium text-white hover:bg-warning/90 disabled:opacity-50"
             >
               {accountBusy === resetTarget.id ? '重置中…' : '确认重置'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {emailTarget && (
+        <div className="space-y-3 rounded-lg border border-primary-200 bg-primary-50/40 p-3">
+          <p className="text-xs font-medium text-neutral-800">
+            {emailTarget.emailMasked ? '换绑' : '绑定'}「{emailTarget.name}（{emailTarget.username}）」的登录邮箱
+          </p>
+          <p className="text-xs leading-5 text-neutral-500">
+            此为账号登录别名，不是机构对外联系邮箱。系统不发送验证邮件；须管理员人工核验归属后才能用于密码登录。
+          </p>
+          <input
+            type="email"
+            autoComplete="off"
+            className={inputCls}
+            placeholder="例如 teacher@university.edu.cn"
+            value={emailValue}
+            onChange={(event) => setEmailValue(event.target.value)}
+          />
+          <label className="flex items-start gap-2 text-xs leading-5 text-neutral-700">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={emailConfirmVerified}
+              onChange={(event) => setEmailConfirmVerified(event.target.checked)}
+            />
+            <span>我已人工核实该邮箱属于该机构官方指定管理员，并设为已验证登录别名（admin_manual）</span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmailTarget(null)
+                setEmailValue('')
+                setEmailConfirmVerified(false)
+              }}
+              disabled={accountBusy !== null || securityActionOpen}
+              className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void bindAccountEmail()}
+              disabled={
+                accountBusy !== null
+                || securityActionOpen
+                || !emailConfirmVerified
+                || !emailValue.includes('@')
+              }
+              className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {accountBusy === emailTarget.id ? '保存中…' : '确认绑定'}
             </button>
           </div>
         </div>

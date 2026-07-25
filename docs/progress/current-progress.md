@@ -1,12 +1,16 @@
 # 当前开发进度
 
+2026-07-25 完成 **Partner Wave 1 登录邮箱别名候选**（分支 `codex/partner-email-login-alias-20260725` / [PR #356](https://github.com/wanglei581/YITIJI/pull/356)）：按商用方案 [`docs/reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md`](../reviews/partner-account-email-bind-commercial-proposal-2026-07-25.md) 落地——`User.emailHash/emailEnc/emailVerifiedAt/emailVerifyMethod`（双 schema + 双轨 migration）；密码登录支持已验证邮箱别名；Admin `PUT /admin/orgs/:id/accounts/:accountId/email`（`confirmVerified` + `admin_manual`，无 SMTP）；Partner 登录文案三别名；`verify:partner-email-login-alias` 接入 CI；孤立 SQLite 夹具已同步 email 列。本地/CI 绿；**不做**邮箱 OTP/找回/Partner 自助绑邮箱；**未部署**；建议排在 P0 验收后合入。
+
 2026-07-25 固化 **预发两笔热修源码**（分支 `fix/preprod-hotfixes-20260725` / PR #366）：① `resolveOfflineListPage` 收紧 Kiosk/Admin 线下机构四处列表的 `page`/`pageSize`（string → 整数，封顶 100），新增 `verify:offline-agencies-page` 并接入双 CI；② `HttpExceptionFilter` 将 Throttler `429` 映射为 `RATE_LIMITED` /「尝试过于频繁，请稍后再试」，扩展 `verify:http-exception-filter`。本地 verify / API typecheck / lint 与 CI 三 job 通过；diff **不含** #355 依赖门禁回退。**预发仍 pin `DEPLOY_SOURCE=7e59243c` 且已热修 dist**——合入 main 后须另授全量部署才固化。
 
 2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归（见上条 PR 分支）。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。
 
 2026-07-25 修复 **Kiosk 线下机构列表 500（预生产热修 + 源码）**：`GET /api/v1/kiosk/offline-agencies?pageSize=5` 返回 `INTERNAL_SERVER_ERROR`；无 `pageSize` 则 200。根因是 HTTP query 的 `page`/`pageSize` 为 string，Prisma `take` 拒收；`HttpExceptionFilter` 对非 HttpException 不落日志故 PM2 err 无对应堆栈。预发已对 `dist/offline-agencies/offline-agencies.service.js` 热补 `resolvePage` 并 `pm2 reload`；公网同路径复验 200。源码已迁入 `fix/preprod-hotfixes-20260725`（见文首固化条）。**未**动 DB/密钥/支付；热修在合入正式部署前会被全量 rebuild 覆盖，须合入 main 后随下次部署固化。
 
+
 2026-07-25 追加：**WINDOWS Phase R + Admin 打印扫描只读复检（浏览器）**。预发 `DEPLOY_SOURCE=7e59243c`；health `ok/postgres`；`printer-status` → `ready` + `isOnline=true`（`lastSeenAt` 近实时）；SQL `active=0` / `pending=0`；`TerminalCapability` 对 `t_ksk_001` 仍 **0 行**。Admin（用户已登录 Playwright）：打印扫描「待领取」= **暂无任务**；设备能力页全部「未验收（未配置）」与空表一致（**未点保存**）；设备页此前已见 KSK-001 在线。设备能力页确认 Agent 在线/打印机 ready。**未改商业化控制**。**Phase F 仍须到场**；未造单、未退款、未改能力开关。
+
 
 2026-07-25 记录 **`WINDOWS_FIELD_RECHECK` Phase F 现场回执（部分通过）**：预生产 `t_ksk_001`。F1 `AIJobPrintAgent` Running/Automatic（`aijobprintagent.exe`）；F2 `printerName` 与 Windows「Pantum CM2800ADN Series」一致；F3 `127.0.0.1:9527`；F5 WLAN 断 75s 后无需重启 Agent、Kiosk「打印机在线」；F6 1080×1920 主路径无系统弹窗阻断（未覆盖 Assigned Access）。**F4 跳过**（浏览器文件选择器未接收测试 PDF；未绕过 Kiosk、未建单；队列 0；临时 PDF 已删）。补充：服务从仓库目录跑，配置为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\config.json`）。已勾清单 §五中已举证子项；**§5.6 真机打印与整包 Phase F 仍开**。未执行 G5 冒烟 / close-unpaid / 收费切换。下一步：补做 F4。
 
