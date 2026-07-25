@@ -20,8 +20,9 @@ import type { CreateOfflineAgencyDto, UpdateOfflineAgencyDto } from './dto/creat
 import type { CreateOfflineJobDto, UpdateOfflineJobDto } from './dto/create-offline-job.dto'
 
 export interface PaginationQuery {
-  page?: number
-  pageSize?: number
+  /** HTTP query 可能是 string；须经 resolveOfflineListPage 后再交给 Prisma take/skip */
+  page?: number | string
+  pageSize?: number | string
 }
 
 export interface AgencyListQuery extends PaginationQuery {
@@ -35,6 +36,16 @@ export interface JobListQuery extends PaginationQuery {
   keyword?: string
 }
 
+/** 将 query 分页参数收成 Prisma 可用的整数（缺省/非法 → page=1, pageSize=20；封顶 100）。 */
+export function resolveOfflineListPage(query: PaginationQuery): { page: number; pageSize: number } {
+  const pageNum = Number(query.page)
+  const pageSizeNum = Number(query.pageSize)
+  const page = Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1
+  const pageSize =
+    Number.isFinite(pageSizeNum) && pageSizeNum >= 1 ? Math.min(100, Math.floor(pageSizeNum)) : 20
+  return { page, pageSize }
+}
+
 @Injectable()
 export class OfflineAgenciesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -42,7 +53,8 @@ export class OfflineAgenciesService {
   // ─── Kiosk 公开端点（只查已审核已发布）─────────────────────────────────────
 
   async findAll(query: AgencyListQuery) {
-    const { page = 1, pageSize = 20, district, orgType, keyword } = query
+    const { district, orgType, keyword } = query
+    const { page, pageSize } = resolveOfflineListPage(query)
     const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = {
@@ -102,7 +114,8 @@ export class OfflineAgenciesService {
     })
     if (!agency) throw new NotFoundException(`线下机构 ${agencyId} 不存在或未发布`)
 
-    const { page = 1, pageSize = 20, jobType, keyword } = query
+    const { jobType, keyword } = query
+    const { page, pageSize } = resolveOfflineListPage(query)
     const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = { agencyId, status: 'active' }
@@ -151,7 +164,8 @@ export class OfflineAgenciesService {
   // ─── Admin 管理端点（无状态过滤）────────────────────────────────────────────
 
   async adminFindAll(query: AgencyListQuery) {
-    const { page = 1, pageSize = 20, district, orgType, keyword } = query
+    const { district, orgType, keyword } = query
+    const { page, pageSize } = resolveOfflineListPage(query)
     const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = {}
@@ -283,7 +297,8 @@ export class OfflineAgenciesService {
 
   async adminFindJobsByAgency(agencyId: string, query: JobListQuery) {
     await this._assertAgencyExists(agencyId)
-    const { page = 1, pageSize = 20, jobType, keyword } = query
+    const { jobType, keyword } = query
+    const { page, pageSize } = resolveOfflineListPage(query)
     const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = { agencyId }
