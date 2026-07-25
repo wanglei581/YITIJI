@@ -13,15 +13,15 @@
 3. [x] **预生产部署含 close-unpaid / #328 / #331**：先 `DEPLOY_SOURCE=70ed8f6d`；2026-07-25 已跟进至 **`DEPLOY_SOURCE=7e59243c`（G6 #343）**，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
-5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
+5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`（预发 `7e59243c` 祖先）：Admin `/orders` 对 `paid` 全额退款 UI + 放宽 readonly 仅 `refundOrder`。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏入口、预发/生产真实退款冒烟（须另授 `G5_REFUND_SMOKE`）
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG `MemberLegalConsent`；P1-5 法务正文定稿仍开）
-7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`。仍须用户点名后推进：
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包：`p0-auth-packs-seed-and-secrets-runbook.md`（7a/7b）+ `windows-field-recheck-phase-f-runbook.md` / `p0-auth-pack-windows-field-recheck.md`（7c）。仍须用户点名后推进：
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：✅ 已完成（2026-07-25 方案 C）——OCR/COS 沿用 2026-06-13；SMS/TRTC 确认当前生产密钥 + `.env` 同步、今日不换；§2.2 对应轮换项已勾。短信签名/模板审核与真实短信 E2E 仍独立开着
-   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**（`ready`/`isOnline`，近 30min 心跳多条，active=0）；现场清单见 `docs/device/windows-field-recheck-phase-f-runbook.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**
+   - **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**
    - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
-   - **不在本包**：G5 退款、F1 Genesis、close-unpaid Phase B、切收费支付
+   - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
@@ -61,14 +61,14 @@
 - [x] **存量页面按原型主题换装与主要结构接入**——PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳的主题换装与主要结构接入。**注**:非"75 屏全量视觉对齐"——2026-07-20 只读审计(见迁移矩阵第六节)证明 03/05/06 仍为单列、未达原型双栏布局,详见下方 A 类挂账项
 - [x] **【P1】A 类:03/05/06 双栏布局对齐**——已在视觉 1:1 分支 W10 落地（有内容时双栏；无上下文诚实空态）；05 保留「云端上传」与 `/scan` 分流
 - [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿
-- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
+- [x] **G5 Admin 订单退款入口（最小版）**——PR #311/`b58ddbe9` 已合入；见上方「当前执行」§5。缺口（部分退款 / FREE_MODE 隐藏 / 真实退款冒烟）另立项
 - [x] **G6 法务文档版本管理最小版**([PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG migrate；P1-5 正文定稿仍开)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
-**开工前注意事项(2026-07-17)**:
+**开工前注意事项(2026-07-17；部分已过时，以「当前执行」为准)**:
 
 1. 本任务池及原型归档、后台规划三个 commit(`26ab2711`/`7c7421ac`/`93bc7181`)在工作分支 `claude/lucid-kilby-0199ed` 上,**尚未合入 main**;开工前应先发 PR 合入,后续开发分支一律从合入后的 main 拉取
-2. G5 退款入口动工前置:修订 Admin orders 页 readonly 守卫,**必须先经用户确认**(与既有记录口径一致)
+2. G5 最小版入口已合入；再改 readonly 守卫或做真实退款冒烟须另授 `G5_REFUND_SMOKE` / 书面确认
 3. `docs/product/console-plan-for-kiosk-proto-2026-07.md` 末尾 4 条「待核实」(门店距离来源/待机屏素材审核字段/job_fit 模型凭证来源/超时可配诉求),开发到对应模块时先核实再实现
 4. 原型是设计定稿而非代码:60/61/74/75 无路由实现;74/75 需先落 G1 数据底座(hr_company 线下轨)否则前台无数据
 5. 开发验收口径:与原型同屏截图对比,布局偏差 >±4px 打回;禁止硬编码色值,一律走 token(规则全文见 `docs/design/kiosk-proto-2026-07/README.md`)

@@ -79,7 +79,7 @@
 - 7a `SEED_PASSWORD_CONFIRM` + 7a2 `SEED_PASSWORD_ROTATE`：**已完成**（partner1/partner2 已离 seed 默认；清单 §2.2 seed 项已勾选）
 - 7d `PARTNER_SMOKE_LOGIN`：**已完成**（partner `wanglei` + admin `admin` 只读 GET 200；凭据不入库）
 - 7b `SECRETS_ROTATION_EVIDENCE`：**已完成（方案 C，2026-07-25）**——用户确认「可以，继续」：OCR/COS 沿用 2026-06-13；SMS/TRTC 为当前生产密钥且 `.env` 同步、今日不换。已勾 §2.2 OCR/COS/ASR·TTS·SMS·TRTC CAM 项；短信签名审核等仍开
-- 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 已复检**；**现场 Phase F 未做**——清单 `docs/device/windows-field-recheck-phase-f-runbook.md`——**推荐下一步（须人到场）**
-  - R（2026-07-25）：`printer-status` → `ready` + `isOnline=true`；`Terminal` enabled + 近实时 `lastSeenAt`；近 30min 心跳多条；active PrintTask=0；`TerminalCapability` 0 行（managed 空表不证明扫描/USB）
-  - F：一体机上按该 runbook 做 F1–F6，回执模板见该文；**未完成不得勾总清单 §五全部通过**
+- 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 已复检**；**现场 Phase F 未做**——清单 [windows-field-recheck-phase-f-runbook.md](./windows-field-recheck-phase-f-runbook.md) + 授权摘要 [p0-auth-pack-windows-field-recheck.md](./p0-auth-pack-windows-field-recheck.md)
+  - R（2026-07-25）：`printer-status` → `ready` + `isOnline=true`；近 30min 心跳多条；active PrintTask=0；`TerminalCapability` 0 行
+  - F：一体机上按 Phase F runbook 做 F1–F6；**未完成不得勾总清单 §五全部通过**
 - 提醒：`/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`

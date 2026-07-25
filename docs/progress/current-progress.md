@@ -1,6 +1,11 @@
 # 当前开发进度
 
+2026-07-25 追加：**Admin 浏览器只读核对（Playwright 有头，用户已登录）**。设备管理：`KSK-001` **在线**、打印机状态 **ready**、心跳「刚刚」、Agent `0.3.0-production`。订单管理文案含全额退款；打开 `ORD-20260725-7D4AE0020A`（已支付/已完成/未计费）详情见 **「发起全额退款」**（**未**点确认、未发起退款）。法务文档版本页：**暂无版本**（与此前 API list:0 一致）。随后打开百度智能云登录页待用户登录（7b 方案 C 已在主线勾选，控制台仅为可选复验）。未动 FREE_MODE / F1 / close-unpaid Phase B。
+
+2026-07-25 追加：**G5 最小版 SSOT 纠偏 + Windows Phase F 授权交叉引用**。核对 PR #311（`b58ddbe9`）已合入：Admin 全额退款入口存在；`next-tasks` 旧「G5 待动工」已纠偏。授权交叉：`p0-auth-pack-windows-field-recheck.md` ↔ 现场清单 `windows-field-recheck-phase-f-runbook.md`。
+
 2026-07-25 完成 **P1 依赖 remediation**（分支 `fix/p1-dep-remediation-20260725` / [PR #355](https://github.com/wanglei581/YITIJI/pull/355)）：升级三端 `react-router-dom@7.18.1`、Terminal Agent `axios@1.18.1`、Kiosk Playwright `1.55.1`；双份 overrides 抬 `shell-quote@1.9.0` / Hono pins / `js-yaml` / `fast-uri` / `postcss`，`brace-expansion` **按 major** 钉 `1.1.16` / `2.1.2` / `5.0.8`（禁止全局 5.x）。根门禁 `verify:dependency-security`（RSC `GHSA-qwww-vcr4-c8h2` + 过宽 `GHSA-mh99` 条件接受 + SPA 守卫）已接 CI。**不得伪称 audit=0**；**未部署**。
+
 
 2026-07-25 启动 **`WINDOWS_FIELD_RECHECK` 现场 Phase F**：新增 `docs/device/windows-field-recheck-phase-f-runbook.md`（F1 Agent 服务 / F2 printerName / F3 本机桥接 / F4 受控出纸 / F5 断网恢复 / F6 全屏抽查 + 回执模板）。同日远程 Phase R 再复检：health `ok/postgres`；`t_ksk_001` `printerStatus=ready` + `isOnline=true`；近 30min 心跳有多条；active PrintTask=0。**Phase F 未完成、未宣称 §五通过**；未造打印单、未 close-unpaid、未改 G5/FREE_MODE/F1。阻塞：须人到一体机执行清单并回执。
 
