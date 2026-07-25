@@ -139,14 +139,14 @@
 
 ### PR #326 合入后冒烟（预生产优先；生产须单独授权）
 
-部署目标：`main@6b474051`（或含该 commit 的后续 main）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
+部署目标：`main@ef37bd22`（含 #326 代码 + #327 文档；基线祖先 `6b474051`）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
 
-- [ ] **D1 部署**：API / Kiosk / Admin 产物指向该 commit；`DEPLOY_SOURCE` 与运行中 dist 一致；三端 health `db=postgres`。
-- [ ] **D2 报价诚实**：Kiosk 上传 PDF → 预览选 `1-2` 页 → 确认页金额来自 `POST /orders/quote` → 建单 `amountCents` / `billablePages` 与确认页一致（不得按整份页数超收）。
-- [ ] **D3 设备 fail-closed**：停 Agent 或断心跳后，首页/预览不得显示伪造「打印机在线」；恢复后显示真实就绪态。
-- [ ] **D4 隐私 UI**：登录后 `/me/privacy-requests` 仅可提交撤回授权；导出/注销为诚实不可用说明；范围横幅须披露后台导出会含文件/订单等元数据（不得再出现「不导出订单/文件」）；Admin `/member-privacy` 可列表，驳回仅对 export+pending/failed。
-- [ ] **D5 价目维护**：Admin `/billing` 可读 active 价目；**无部署授权时只读**；改价/改说明须另授权并核对 `price.updated` 审计。
-- [ ] **D6 生产价目 SOP（可选同窗）**：只读核对应 `PriceConfig`；FREE_MODE 保持 0 分时，经 Admin 合法路径把两条 `description` 改成诚实免费说明（勿 SQL 直改、勿跑 seed）。
+- [x] **D1 部署**（2026-07-25）：`DEPLOY_SOURCE deploy_commit=ef37bd22`；PM2 `ai-job-print-api` → `/srv/ai-job-print/services/api/dist/main.js`；本机/公网 health `db=postgres`；Kiosk/Admin/Partner HTTP 200；Kiosk 产物 `index-BmJkvkh1.js`；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`（tip 无此文件）；DB dump `/srv/ai-job-print-db-backups/pre-ef37bd22-20260725T172540+0800.dump`；回滚目录 `…/pre-ef37bd22-20260725T172540+0800`。
+- [x] **D2 报价诚实**（2026-07-25）：5 页 PDF `purpose=print_doc` → `POST /orders/quote` `pageRange=1-2` → `billablePages=2/amountCents=0`；同参建单 `ptask_kiosk_608db0c6a166e275` / `ORD-20260725-4B8570C048` 同为 `billablePages=2/amountCents=0`（未按 5 页超收）。FREE_MODE 下订单 `payStatus=paid`；Agent 侧打印机 offline，任务最终 `failed/PRINTER_OFFLINE`（未宣称物理出纸）。
+- [x] **D3 设备 fail-closed**（2026-07-25）：API `printerStatus=offline` + 心跳在线；浏览器首页/隐私页顶栏显示「打印机离线」「网络正常」，**未**伪造「打印机在线」或耗材 100%。未远程停 Windows Agent（现场 Agent 本已报 offline）。
+- [x] **D4 隐私 UI**（2026-07-25，部分）：公网 `/me/privacy-requests` 可达，未登录诚实门禁「请先登录」；产物含撤回授权文案与 Admin `member-privacy`/`rejectReason`。**未做**真实会员登录后的提交/Admin 列表操作（无本窗短信账号授权）。
+- [x] **D5 价目维护**（2026-07-25，只读）：Admin `/billing` 未登录跳转登录页；Admin 产物含 `/billing`；本窗**未改价、未改说明**。
+- [x] **D6 价目 SOP 只读**（2026-07-25）：active `print_bw_page=0` / `print_color_page=0`，`description` 已是「免费试运营：…0 元/页」。**无需再写**；未跑 seed、未 SQL 直改。
 
 ### 本轮明确冻结（不做，附理由）
 
