@@ -9,7 +9,7 @@
 | Phase | 允许 | 禁止 |
 |-------|------|------|
 | **R 远程旁证**（已做，2026-07-25） | 只读查终端心跳 / printer-status / Capability 行数 | 伪造现场出纸或扫描通过 |
-| **F 现场复验**（待授权） | 到场核对 Agent 服务、驱动、真机出纸/扫描、断网恢复；脱敏写证据 | 未授权新建生产打印单；密钥/token 进聊天或仓库 |
+| **F 现场复验**（2026-07-25 回执：部分通过） | 到场核对 Agent 服务、驱动、真机出纸/扫描、断网恢复；脱敏写证据 | 未授权新建生产打印单；密钥/token 进聊天或仓库；F4 未出纸不得标整包完成 |
 
 与本包无关：7b 密钥控制台轮换举证、G5 退款冒烟、F1 Genesis、close-unpaid Phase B、切 live 支付。
 
@@ -21,13 +21,13 @@
 
 ## Phase F 现场最小清单（到场执行）
 
-1. Windows：`AIJobPrintAgent` Running + Automatic；`Get-Printer` 记录真实名 → Agent `printerName` 一致（禁止硬编码型号）
-2. 本机队列清空；Admin/API 确认该终端无 active `pending/claimed/printing`（避免抢旧单）
-3. 受控样张：无个人信息 PDF **或** 用户明确授权的试运营单 → 真机出纸；记录 `taskId` / 页数 / PrintService 事件（脱敏）
-4. 断网：拔线后终端应变离线/不可伪造成功；恢复后心跳与 claim 恢复
-5. 扫描或 U 盘：若本期宣称可用则真机走通；否则诚实记录「未验收 / 能力关闭」
+1. Windows：`AIJobPrintAgent` Running + Automatic；`Get-Printer` 记录真实名 → Agent `printerName` 一致（禁止硬编码型号）— **✅ 2026-07-25**
+2. 本机队列清空；Admin/API 确认该终端无 active `pending/claimed/printing`（避免抢旧单）— **✅ 队列最终 0**
+3. 受控样张：无个人信息 PDF **或** 用户明确授权的试运营单 → 真机出纸；记录 `taskId` / 页数 — **⏭ 跳过**（文件选择器未接收 PDF；未建单）。**待补**
+4. 断网：拔线后终端应变离线/不可伪造成功；恢复后心跳与 claim 恢复 — **✅ WLAN 75s，恢复无需重启 Agent**
+5. 扫描或 U 盘：若本期宣称可用则真机走通；否则诚实记录「未验收 / 能力关闭」— **未做**
 
-详细步骤：`windows-host-acceptance-runbook.md` §1–§5；勾选映射：checklist §5.3–§5.7。
+详细步骤与回执表：`windows-field-recheck-phase-f-runbook.md`；勾选映射：checklist §5.3–§5.7（仅勾已举证项）。
 
 ## 授权回复模板
 
