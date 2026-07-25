@@ -172,7 +172,8 @@ expectIncludes(header, 'className="kp-profile-boundary"', 'ProfileHeader 展示�
 expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
 expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
 expectIncludes(section, 'className={`kp-entry-grid kp-entry-grid--${section.layout}`}', 'ProfileEntrySection 使用等权入口网格')
-expectAbsent(section, /disabled=\{disabled\}/, 'ProfileEntrySection 不再使用建设中禁用态')
+expectIncludes(section, "const disabled = entry.tag === '建设中'", 'ProfileEntrySection 仅将建设中入口识别为禁用态')
+expectIncludes(section, 'disabled={disabled}', 'ProfileEntrySection 使用原生 disabled 阻止未开放能力办理')
 expectAbsent(section, /primaryEntry|lf-reference-/, 'ProfileEntrySection 不再放大首项或复用首页卡骨架')
 expectIncludes(records, 'className="kp-session-records"', 'ProfileSessionRecords 使用当前服务记录区块')
 expectIncludes(records, 'className="kp-section-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
@@ -251,11 +252,7 @@ for (const [label, route] of expectedEntries) {
   )
 }
 expectMatches(entries, /label:\s*'权益活动'[\s\S]{0,180}?route:\s*'\/activities'/, '权益活动只保留真实入口')
-expectMatches(entries, /label:\s*'招聘会签到预约'[\s\S]{0,120}?route:\s*'\/job-fairs'/, '招聘会签到预约须跳转既有招聘会页，不做平台内凭证')
-expectAbsent(entries, /招聘会扫码凭证|tag:\s*'建设中'/, '不得保留扫码凭证建设中占位或「建设中」标签')
-expectMatches(entries, /label:\s*'求职打印套餐'[\s\S]{0,120}?tag:\s*'不提供'/, '求职打印套餐须诚实标注不提供，不接支付')
-expectMatches(entries, /label:\s*'AI服务套餐'[\s\S]{0,120}?tag:\s*'不提供'/, 'AI服务套餐须诚实标注不提供，不接支付')
-expectAbsent(entries, /\/activities\?source=fair/, 'Profile 不展示重复权益活动入口')
+expectAbsent(entries, /招聘会扫码凭证|招聘会权益活动|求职打印套餐|AI服务套餐|\/activities\?source=fair/, 'Profile 不展示重复或占位入口')
 expectAbsent(entries, /label:\s*'身份切换'/, 'Profile 不重复暴露账号设置入口')
 for (const title of ['我的资产', '常用服务', '招聘会与活动', '权益与政策', '账户与支持']) {
   expectMatches(entries, new RegExp(`title:\\s*'${title}'`), `Profile 保留五区边界：${title}`)

@@ -2,8 +2,10 @@ import { KIcon } from '../../../components/kiosk-icon'
 import type { Entry, EntrySectionData } from '../profileTypes'
 
 function ProfileEntry({ entry, onTap }: { entry: Entry; onTap: (entry: Entry) => void }) {
+  const disabled = entry.tag === '建设中'
+
   return (
-    <button type="button" className="kp-entry" onClick={() => onTap(entry)}>
+    <button type="button" className="kp-entry" disabled={disabled} onClick={() => onTap(entry)}>
       <span className={`kp-entry-icon ${entry.tone}`}>
         <KIcon name={entry.icon} />
       </span>

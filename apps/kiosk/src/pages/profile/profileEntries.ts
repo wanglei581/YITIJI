@@ -1,8 +1,6 @@
 import type { Entry, EntrySectionData } from './profileTypes'
 
 // 「我的」页入口配置。只展示已接真能力，不保留重复入口或建设中占位。
-// 入口稳定：只做已有入口真实化与诚实标签；不新增重复入口 / 同义卡片。
-// 合规：不做平台内招聘会凭证核销，不做招聘向「服务套餐」售卖闭环。
 
 // 1. 我的资产
 const ASSETS: Entry[] = [
@@ -28,18 +26,15 @@ const SERVICES: Entry[] = [
 
 // 3. 来源与活动（外部来源信息入口 / 记录）
 // 浏览 / 外部跳转记录跨类型（岗位/招聘会/政策/企业），由 /me/activity 两 Tab 页承载。
-// 签到预约只引导至招聘会信息页 → 来源平台 / 官方入口，不做平台内凭证核销。
+// 来源平台后续动作与结果以来源平台为准，本系统不记录。
 const FAIRS: Entry[] = [
   { icon: 'eye', tone: 'slate', label: '浏览记录', desc: '岗位、招聘会、政策、企业', route: '/me/activity' },
   { icon: 'external', tone: 'teal', label: '外部跳转记录', desc: '本人离场跳转记录', route: '/me/activity?tab=jump' },
-  { icon: 'qr', tone: 'plum', label: '招聘会签到预约', desc: '前往来源平台或官方入口', route: '/job-fairs' },
 ]
 
-// 4. 权益与政策（均为既有真实入口；套餐类入口诚实标注「不提供」）
+// 4. 权益与政策（均为既有真实入口）
 const BENEFITS: Entry[] = [
   { icon: 'ticket', tone: 'rose', label: '权益活动', desc: '查看正式活动入口', route: '/activities' },
-  { icon: 'receipt', tone: 'wheat', label: '求职打印套餐', tag: '不提供' },
-  { icon: 'sparkle', tone: 'plum', label: 'AI服务套餐', tag: '不提供' },
   // 政策补贴指引：跳转既有政策服务页「就业政策」Tab（info-only 政策说明 / 材料清单 / 官方入口），不代办、不承诺到账。
   { icon: 'policy', tone: 'wheat', label: '政策补贴指引', desc: '政策说明与官方入口', route: '/renshi?tab=policy' },
 ]
@@ -57,6 +52,6 @@ export const SECTIONS: EntrySectionData[] = [
   { title: '我的资产', subtitle: '本人简历、文档、订单与收藏。', layout: 'grid', rail: 'teal', entries: ASSETS },
   { title: '常用服务', subtitle: '直达既有功能页。', layout: 'chips', rail: 'slate', entries: SERVICES },
   { title: '招聘会与活动', subtitle: '外部来源信息入口与本人记录。', layout: 'chips', rail: 'wheat', entries: FAIRS },
-  { title: '权益与政策', subtitle: '权益活动可查看；招聘向套餐商品不提供。', layout: 'chips', rail: 'plum', entries: BENEFITS },
+  { title: '权益与政策', subtitle: '查看本人权益、真实活动和官方政策入口。', layout: 'chips', rail: 'plum', entries: BENEFITS },
   { title: '账户与支持', subtitle: '本人消息、账号、帮助与反馈入口。', layout: 'account', rail: 'teal', entries: ACCOUNT },
 ]

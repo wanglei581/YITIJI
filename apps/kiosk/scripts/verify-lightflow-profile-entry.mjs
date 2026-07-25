@@ -320,6 +320,7 @@ for (const marker of [
 // unrelated member pages still fail closed.
 const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',

@@ -1,6 +1,6 @@
 import type { KioskIconName } from '../../components/kiosk-icon'
 
-export type EntryTag = '本次记录' | '不提供'
+export type EntryTag = '建设中' | '本次记录'
 
 /** 墨青纸感图标 tone（对应 profile-inkpaper.css 的 .ei.* 类） */
 export type EntryTone = 'teal' | 'slate' | 'plum' | 'clay' | 'wheat' | 'rose' | 'ink'
@@ -11,7 +11,7 @@ export interface Entry {
   label: string
   /** 一句话说明（entry-grid 卡片展示；chip/account 布局忽略） */
   desc?: string
-  /** 可跳转的既有功能页；缺省则按 tag 走「不提供 / 本次记录」提示 */
+  /** 可跳转的既有功能页；缺省则按 tag 走「建设中 / 本次记录」提示 */
   route?: string
   tag?: EntryTag
 }
