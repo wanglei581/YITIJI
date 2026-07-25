@@ -23,8 +23,9 @@ export const LLM_PRESETS: Record<LlmVendor, LlmPreset> = {
     vendor:       'deepseek',
     label:        'DeepSeek 深度求索',
     baseURL:      'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
-    models:       ['deepseek-chat', 'deepseek-reasoner'],
+    // 2026-07-24 起官方停用 deepseek-chat / deepseek-reasoner；生产只认 v4 模型名。
+    defaultModel: 'deepseek-v4-flash',
+    models:       ['deepseek-v4-flash', 'deepseek-v4-pro'],
     docsUrl:      'https://platform.deepseek.com',
   },
   qwen: {

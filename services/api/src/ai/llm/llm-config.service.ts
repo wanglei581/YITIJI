@@ -228,9 +228,11 @@ export class LlmConfigService {
     const vendor: LlmVendor = 'deepseek'
     const preset = LLM_PRESETS[vendor]
     const envKey = process.env['AI_LLM_API_KEY'] || process.env['TRTC_LLM_API_KEY'] || ''
+    // 只读 AI_LLM_MODEL；TRTC_LLM_MODEL 是数字人专用，不跨路由
+    const envModel = (process.env['AI_LLM_MODEL'] || '').trim()
     return {
       vendor,
-      model:           preset.defaultModel,
+      model:           envModel || preset.defaultModel,
       baseURL:         preset.baseURL,
       systemPrompt:    DEFAULT_SYSTEM_PROMPT,
       roleScope:       normalizeConfigText(process.env['AI_ASSISTANT_ROLE_SCOPE'], DEFAULT_ROLE_SCOPE, MAX_ROLE_SCOPE_CHARS),

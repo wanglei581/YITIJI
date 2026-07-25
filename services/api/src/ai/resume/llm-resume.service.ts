@@ -209,7 +209,8 @@ export class LlmResumeService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ model, messages, temperature, stream: false }),
+        // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空 / JSON 诊断失败。
+        body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
       })
     } catch {
       // 不记请求/响应正文（可能回显简历文本），只抛明确错误

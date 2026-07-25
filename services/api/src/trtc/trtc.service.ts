@@ -102,7 +102,7 @@ export class TrtcService {
 
     // ── LLM 配置 ─────────────────────────────────────────────
     const llmApiKey = process.env['TRTC_LLM_API_KEY']
-    const llmModel  = process.env['TRTC_LLM_MODEL']   ?? 'deepseek-chat'
+    const llmModel  = process.env['TRTC_LLM_MODEL']   ?? 'deepseek-v4-flash'
     const llmType   = process.env['TRTC_LLM_TYPE']    ?? 'openai'
     const llmApiUrl = process.env['TRTC_LLM_API_URL'] ?? 'https://api.deepseek.com/v1/chat/completions'
 

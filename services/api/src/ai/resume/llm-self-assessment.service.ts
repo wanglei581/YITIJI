@@ -228,6 +228,8 @@ export class LlmSelfAssessmentService {
           ],
           temperature: cfg.temperature,
           stream: false,
+          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
+          ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
         }),
       })
     } catch {

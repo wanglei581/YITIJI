@@ -188,7 +188,7 @@ export class LlmChatService {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ model, messages, temperature, stream: false }),
+        body: JSON.stringify({ model, messages, temperature, stream: false, ...(model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}) }),
       })
     } catch {
       this.logger.error(
