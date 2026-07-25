@@ -218,9 +218,10 @@ test('direct params restore real printer and server price fixtures @w2', async (
   await seedMaterialSession(page)
 
   await page.goto('/print/params')
-  await expect(page.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(page.getByText('打印机在线', { exact: true })).toBeVisible()
-  await expect(page.getByText('¥2.00', { exact: true })).toHaveCount(2)
+  const params = page.locator('[data-w2-page="print-params"]')
+  await expect(params.getByText('已配置打印机', { exact: true })).toBeVisible()
+  await expect(params.getByText('打印机在线', { exact: true })).toBeVisible()
+  await expect(params.getByText('¥2.00', { exact: true })).toHaveCount(2)
   await expectHealthy(page, errors, 'print-params')
 })
 
