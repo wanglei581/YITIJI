@@ -245,6 +245,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.userAiConsent
   }
 
+  get memberLegalConsent() {
+    return this.client.memberLegalConsent
+  }
+
   get userDataRequest() {
     return this.client.userDataRequest
   }

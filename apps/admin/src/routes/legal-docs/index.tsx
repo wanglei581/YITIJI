@@ -56,6 +56,17 @@ export default function LegalDocsPage() {
   }, [tab])
 
   const handleActivate = async (id: string) => {
+    const row = rows.find((r) => r.id === id)
+    const label = row
+      ? `${DOC_TYPE_LABELS[row.docType] ?? row.docType}（${row.version}）`
+      : '该版本'
+    if (
+      !window.confirm(
+        `确认激活 ${label} 为当前有效版本？\n激活后，会员登录同意记录将关联此版本号；同类型其它版本将同时失活。`,
+      )
+    ) {
+      return
+    }
     setActivating(id)
     try {
       await legalDocsService.activate(id)

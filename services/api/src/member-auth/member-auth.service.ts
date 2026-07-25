@@ -9,9 +9,17 @@ import {
 } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { encryptPhone, hashPhone, maskPhone, maskPhoneFromEnc } from '../common/crypto/phone-identity'
+import { LEGAL_DRAFT_FALLBACK_VERSION } from '../legal/legal-constants'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
+
+export type LegalConsentSource = 'sms_login' | 'qr_login'
+
+export interface LegalConsentVersions {
+  termsVersion: string
+  privacyVersion: string
+}
 
 type SmsProviderFailure = Error & { providerCode?: string }
 
@@ -105,15 +113,120 @@ export class MemberAuthService {
     return { sent: true, cooldownSeconds: COOLDOWN, expiresInSeconds: CODE_TTL }
   }
 
-  /** 校验验证码 → upsert EndUser → 建立 Redis 会话 → 签发 JWT。 */
-  async login(phone: string, code: string, deviceId: string | undefined, ip: string): Promise<MemberLoginResult> {
-    return this.loginWithSmsCode(phone, code, deviceId, ip)
+  /** 校验验证码 → upsert EndUser → 落库协议同意版本 → 建立 Redis 会话 → 签发 JWT。 */
+  async login(
+    phone: string,
+    code: string,
+    _deviceId: string | undefined,
+    ip: string,
+    consent: LegalConsentVersions,
+  ): Promise<MemberLoginResult> {
+    const resolved = await this.resolveActiveLegalVersions()
+    this.assertConsentMatches(consent, resolved)
+    const user = await this.verifySmsCodeForUser(phone, code)
+    await this.persistLegalConsent({
+      endUserId: user.id,
+      termsVersion: resolved.termsVersion,
+      privacyVersion: resolved.privacyVersion,
+      termsDocVersionId: resolved.termsDocVersionId,
+      privacyDocVersionId: resolved.privacyDocVersionId,
+      source: 'sms_login',
+      ipAddress: ip,
+    })
+    return this.issueLoginForUser(user)
   }
 
   /** 供手机号登录与 QR 确认共用同一套验证码校验、账号创建与会话签发逻辑。 */
   async loginWithSmsCode(phone: string, code: string, _deviceId: string | undefined, _ip: string): Promise<MemberLoginResult> {
     const user = await this.verifySmsCodeForUser(phone, code)
     return this.issueLoginForUser(user)
+  }
+
+  /**
+   * QR claim 路径：一体机已勾选协议后创建票据，claim 时按服务端当前有效版本落库同意快照。
+   * 不信任客户端传版本号（经 Terminal Agent 转发时字段易丢）。
+   */
+  async persistResolvedLegalConsent(
+    endUserId: string,
+    source: LegalConsentSource,
+    ipAddress?: string,
+  ): Promise<void> {
+    const resolved = await this.resolveActiveLegalVersions()
+    await this.persistLegalConsent({
+      endUserId,
+      termsVersion: resolved.termsVersion,
+      privacyVersion: resolved.privacyVersion,
+      termsDocVersionId: resolved.termsDocVersionId,
+      privacyDocVersionId: resolved.privacyDocVersionId,
+      source,
+      ipAddress,
+    })
+  }
+
+  async resolveActiveLegalVersions(): Promise<{
+    termsVersion: string
+    privacyVersion: string
+    termsDocVersionId: string | null
+    privacyDocVersionId: string | null
+  }> {
+    const [terms, privacy] = await Promise.all([
+      this.prisma.legalDocVersion.findFirst({
+        where: { docType: 'terms_of_service', isActive: true },
+        select: { id: true, version: true },
+      }),
+      this.prisma.legalDocVersion.findFirst({
+        where: { docType: 'privacy_policy', isActive: true },
+        select: { id: true, version: true },
+      }),
+    ])
+    return {
+      termsVersion: terms?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
+      privacyVersion: privacy?.version ?? LEGAL_DRAFT_FALLBACK_VERSION,
+      termsDocVersionId: terms?.id ?? null,
+      privacyDocVersionId: privacy?.id ?? null,
+    }
+  }
+
+  private assertConsentMatches(
+    submitted: LegalConsentVersions,
+    expected: { termsVersion: string; privacyVersion: string },
+  ): void {
+    if (
+      submitted.termsVersion !== expected.termsVersion ||
+      submitted.privacyVersion !== expected.privacyVersion
+    ) {
+      throw new HttpException(
+        {
+          error: {
+            code: 'LEGAL_VERSION_STALE',
+            message: '协议版本已更新，请重新阅读并勾选后再登录',
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      )
+    }
+  }
+
+  private async persistLegalConsent(input: {
+    endUserId: string
+    termsVersion: string
+    privacyVersion: string
+    termsDocVersionId: string | null
+    privacyDocVersionId: string | null
+    source: LegalConsentSource
+    ipAddress?: string
+  }): Promise<void> {
+    await this.prisma.memberLegalConsent.create({
+      data: {
+        endUserId: input.endUserId,
+        termsVersion: input.termsVersion,
+        privacyVersion: input.privacyVersion,
+        termsDocVersionId: input.termsDocVersionId,
+        privacyDocVersionId: input.privacyDocVersionId,
+        source: input.source,
+        ipAddress: input.ipAddress ?? null,
+      },
+    })
   }
 
   /** 原子消费短信验证码并创建/更新 EndUser；不签发 token，供 QR 确认阶段使用。 */

@@ -454,7 +454,8 @@ expectPattern(
 expect((kioskRoot.match(/visualTheme="service-desk"/g) ?? []).length === 1, 'KioskRoot 只有一处 visualTheme 赋值')
 
 for (const [source, marker, label] of [
-  [memberPhoneLoginHook, 'memberLogin(phone, code, deviceId)', '共享手机号控制器真实登录'],
+  [memberPhoneLoginHook, 'fetchLegalConsentVersions', '登录前拉取协议版本'],
+  [memberPhoneLoginHook, 'memberLogin(phone, code, consent, deviceId)', '共享手机号控制器真实登录（含协议版本）'],
   [memberPhoneLoginHook, 'sendSmsCode(phone, deviceId)', '共享手机号控制器真实发送验证码'],
   [memberPhoneLoginHook, 'getMemberAuthDeviceId()', '共享手机号控制器使用稳定 deviceId'],
   [loginPage, 'clearKioskSensitiveSession(', 'LoginPage 公共终端清会话'],

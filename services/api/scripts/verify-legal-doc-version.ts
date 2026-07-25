@@ -139,8 +139,81 @@ async function main() {
     pass('PG 迁移文件存在且包含 CREATE TABLE LegalDocVersion')
   }
 
+  // ── 9. MemberLegalConsent 模型 + 双轨迁移 ────────────────────────────────
+  {
+    const schema = readFile('services/api/prisma/schema.prisma')
+    const pgSchema = readFile('services/api/prisma/postgres/schema.prisma')
+    if (!schema.includes('model MemberLegalConsent') || !pgSchema.includes('model MemberLegalConsent')) {
+      fail('schema 缺少 model MemberLegalConsent（SQLite / PG 双轨）')
+    }
+    if (!schema.includes('legalConsents') || !pgSchema.includes('legalConsents')) {
+      fail('EndUser 缺少 legalConsents 关系')
+    }
+    const sqliteMig = 'services/api/prisma/migrations/20260725120000_add_member_legal_consent'
+    const pgMig = 'services/api/prisma/postgres/migrations/20260725120000_add_member_legal_consent'
+    if (!dirExists(sqliteMig) || !dirExists(pgMig)) {
+      fail('MemberLegalConsent 迁移目录缺失', `${sqliteMig} / ${pgMig}`)
+    }
+    const sqliteSql = readFile(`${sqliteMig}/migration.sql`)
+    const pgSql = readFile(`${pgMig}/migration.sql`)
+    if (!sqliteSql.includes('CREATE TABLE "MemberLegalConsent"') || !pgSql.includes('CREATE TABLE "MemberLegalConsent"')) {
+      fail('MemberLegalConsent 迁移未 CREATE TABLE')
+    }
+    pass('MemberLegalConsent 模型 + SQLite/PG 迁移存在')
+  }
+
+  // ── 10. 登录 DTO / 服务落库同意版本 ──────────────────────────────────────
+  {
+    const dto = readFile('services/api/src/member-auth/dto/member-login.dto.ts')
+    if (!dto.includes('termsVersion') || !dto.includes('privacyVersion')) {
+      fail('MemberLoginDto 缺少 termsVersion / privacyVersion')
+    }
+    const service = readFile('services/api/src/member-auth/member-auth.service.ts')
+    if (!service.includes('persistLegalConsent') || !service.includes('LEGAL_VERSION_STALE')) {
+      fail('member-auth.service 缺少同意落库或 LEGAL_VERSION_STALE')
+    }
+    if (!service.includes("source: 'sms_login'")) {
+      fail('member-auth.service 未以 sms_login 来源落库同意')
+    }
+    const qr = readFile('services/api/src/member-auth/member-qr-login.service.ts')
+    if (!qr.includes('persistResolvedLegalConsent') || !qr.includes("'qr_login'")) {
+      fail('QR claim 未调用 persistResolvedLegalConsent(qr_login)')
+    }
+    pass('登录 / QR claim 路径关联 LegalDocVersion 同意记录')
+  }
+
+  // ── 11. Kiosk 提交版本号 + Admin 侧栏 / 激活确认 ─────────────────────────
+  {
+    const api = readFile('apps/kiosk/src/services/auth/memberAuthApi.ts')
+    if (!api.includes('termsVersion') || !api.includes('privacyVersion')) {
+      fail('memberAuthApi.memberLogin 未提交协议版本号')
+    }
+    const hook = readFile('apps/kiosk/src/pages/auth/hooks/useMemberPhoneLogin.ts')
+    if (!hook.includes('fetchLegalConsentVersions')) {
+      fail('useMemberPhoneLogin 未拉取当前协议版本')
+    }
+    const fetchUtil = readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts')
+    if (!fetchUtil.includes('LEGAL_DRAFT_FALLBACK_VERSION') || !fetchUtil.includes('kiosk/legal/')) {
+      fail('legalConsentVersions 未对接 kiosk/legal 或草拟哨兵')
+    }
+    const nav = readFile('apps/admin/src/layouts/AdminLayoutWrapper.tsx')
+    if (!nav.includes("key: 'legal-docs'") || !nav.includes('法务文档版本')) {
+      fail('Admin 侧栏缺少法务文档版本入口')
+    }
+    const page = readFile('apps/admin/src/routes/legal-docs/index.tsx')
+    if (!page.includes('window.confirm') || !page.includes('激活')) {
+      fail('Admin 法务文档激活缺少二次确认')
+    }
+    const shared = readFile('packages/shared/src/types/legalDocs.ts')
+    const apiConst = readFile('services/api/src/legal/legal-constants.ts')
+    if (!shared.includes("draft-pending-legal-review") || !apiConst.includes("draft-pending-legal-review")) {
+      fail('shared / api 草拟哨兵版本号不一致或缺失')
+    }
+    pass('Kiosk 提交版本号 + Admin 侧栏入口与激活确认')
+  }
+
   // ── 完成 ─────────────────────────────────────────────────────────────────
-  console.log('\n=== G6 法务文档版本管理验证通过（8/8 项） ===\n')
+  console.log('\n=== G6 法务文档版本管理验证通过（11/11 项） ===\n')
 }
 
 main().catch((e: unknown) => {

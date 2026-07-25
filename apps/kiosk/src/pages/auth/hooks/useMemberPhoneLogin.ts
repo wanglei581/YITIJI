@@ -6,6 +6,7 @@ import {
   sendSmsCode,
 } from '../../../services/auth/memberAuthApi'
 import { getMemberAuthDeviceId } from '../../../services/auth/memberAuthDevice'
+import { fetchLegalConsentVersions } from '../../../services/auth/legalConsentVersions'
 
 export type { LoginResult } from '../../../services/auth/memberAuthApi'
 
@@ -239,7 +240,9 @@ export function useMemberPhoneLogin(
     setNotice(null)
     try {
       const deviceId = getMemberAuthDeviceId()
-      const result = await memberLogin(phone, code, deviceId)
+      const consent = await fetchLegalConsentVersions()
+      if (!isCurrentRequest(requestGeneration)) return
+      const result = await memberLogin(phone, code, consent, deviceId)
       if (!isCurrentRequest(requestGeneration)) return
       await options.onAuthenticated(result)
     } catch (cause) {

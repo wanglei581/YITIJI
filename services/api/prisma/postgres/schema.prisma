@@ -494,6 +494,7 @@ model EndUser {
   jobAiSessions   JobAiSession[]
   aiServiceLogs   AiServiceLog[]
   aiConsents      UserAiConsent[]
+  legalConsents   MemberLegalConsent[]
   dataRequests    UserDataRequest[]
   scanTasks       ScanTask[]
 
@@ -1420,6 +1421,24 @@ model UserAiConsent {
 
   @@index([endUserId, scope])
   @@index([revokedAt])
+}
+
+// G6: 会员登录时对《用户服务协议》《隐私政策》的同意快照（只追加，不改写）。
+// termsDocVersionId / privacyDocVersionId 指向当时有效的 LegalDocVersion.id；
+// 若当时尚无已激活版本，则 version 落 LEGAL_DRAFT_FALLBACK_VERSION，ID 为空。
+model MemberLegalConsent {
+  id                  String   @id @default(cuid())
+  endUserId           String
+  endUser             EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  termsVersion        String
+  privacyVersion      String
+  termsDocVersionId   String?
+  privacyDocVersionId String?
+  source              String   // "sms_login" | "qr_login"
+  ipAddress           String?
+  createdAt           DateTime @default(now())
+
+  @@index([endUserId, createdAt])
 }
 
 model UserDataRequest {

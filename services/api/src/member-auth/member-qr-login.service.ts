@@ -155,6 +155,8 @@ export class MemberQrLoginService {
       throw new UnauthorizedException({ error: { code: 'QR_LOGIN_CLAIM_INVALID', message: '扫码登录凭证无效' } })
     }
 
+    // 勾选发生在一体机创建票据前；claim 时按服务端当前有效版本落库同意快照。
+    await this.memberAuth.persistResolvedLegalConsent(current.user.id, 'qr_login')
     return this.memberAuth.issueLoginForUser(current.user)
   }
 
