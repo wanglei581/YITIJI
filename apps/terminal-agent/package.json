@@ -23,7 +23,7 @@
     "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs"
   },
   "dependencies": {
-    "axios": "^1.7.0",
+    "axios": "1.18.1",
     "better-sqlite3": "^12.10.0",
     "chokidar": "^4.0.0",
     "commander": "^12.1.0",
