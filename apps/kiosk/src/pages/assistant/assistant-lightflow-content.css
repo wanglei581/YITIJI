@@ -46,14 +46,14 @@
   place-items: center;
   border-radius: 12px;
   color: var(--sd-primary-strong);
-  background: var(--k-teal-soft, #e2f2ec);
+  background: var(--k-teal-soft);
 }
 
 .kassist.kassist-lightflow .assistant-task-icon svg { width: 30px; height: 30px; }
 .kassist.kassist-lightflow .assistant-task-copy { display: grid; min-width: 0; gap: 7px; }
 .kassist.kassist-lightflow .assistant-task-copy strong { color: var(--sd-text-strong); font-size: 20px; line-height: 1.25; }
 .kassist.kassist-lightflow .assistant-task-copy small { color: var(--sd-copy); font-size: 14px; line-height: 1.55; }
-.kassist.kassist-lightflow .assistant-task:active { transform: scale(0.985); background: var(--k-teal-soft, #e2f2ec); }
+.kassist.kassist-lightflow .assistant-task:active { transform: scale(0.985); background: var(--k-teal-soft); }
 
 .kassist.kassist-lightflow .assistant-direct-question,
 .kassist.kassist-lightflow .assistant-context-chip {
@@ -64,10 +64,10 @@
   gap: 8px;
   justify-self: start;
   padding: 0 18px;
-  border: 1px solid var(--k-teal-soft, #e2f2ec);
+  border: 1px solid var(--k-teal-soft);
   border-radius: 12px;
   color: var(--sd-primary-strong);
-  background: var(--k-teal-soft, #e2f2ec);
+  background: var(--k-teal-soft);
   font-weight: 650;
   cursor: pointer;
 }

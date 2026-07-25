@@ -6,22 +6,22 @@
 .kproto {
   --kp-paper: var(--k-paper, var(--color-canvas));
   --kp-surface: var(--k-surface, var(--color-surface));
-  --kp-ink: var(--k-ink, #10302b);
-  --kp-muted: var(--k-muted, #5d6b63);
-  --kp-line: var(--k-line, #e2dccb);
-  --kp-teal: var(--k-teal, #1f9e86);
-  --kp-teal-deep: var(--k-teal-deep, #157a67);
-  --kp-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --kp-ink: var(--k-ink);
+  --kp-muted: var(--k-muted);
+  --kp-line: var(--k-line);
+  --kp-teal: var(--k-teal);
+  --kp-teal-deep: var(--k-teal-deep);
+  --kp-teal-soft: var(--k-teal-soft);
   --kp-clay: var(--color-warning);
   --kp-clay-deep: var(--color-warning-fg);
   --kp-clay-soft: var(--color-warning-bg);
-  --kp-wheat: var(--color-wheat, #a9781f);
-  --kp-wheat-deep: var(--color-wheat-deep, #8a6219);
-  --kp-wheat-soft: var(--color-wheat-soft, #f2ead6);
-  --kp-plum: var(--color-plum, #7a5a86);
-  --kp-plum-deep: var(--color-plum-deep, #63466f);
-  --kp-plum-soft: var(--color-plum-soft, #efe7f1);
-  --kp-dark: var(--k-ink, #10302b);
+  --kp-wheat: var(--color-wheat);
+  --kp-wheat-deep: var(--color-wheat-deep);
+  --kp-wheat-soft: var(--color-wheat-soft);
+  --kp-plum: var(--color-plum);
+  --kp-plum-deep: var(--color-plum-deep);
+  --kp-plum-soft: var(--color-plum-soft);
+  --kp-dark: var(--k-ink);
   --kp-accent: var(--kp-teal);
   --kp-accent-deep: var(--kp-teal-deep);
   --kp-accent-soft: var(--kp-teal-soft);
@@ -487,7 +487,7 @@ button.kproto-badge {
 
 .campus-proto .campus-status {
   background: rgba(169, 120, 31, .4) !important;
-  color: var(--color-wheat-soft, #f2ead6) !important;
+  color: var(--color-wheat-soft) !important;
 }
 
 .campus-proto .campus-tabs {

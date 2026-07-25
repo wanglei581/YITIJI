@@ -5,18 +5,18 @@
   --sd-color-primary: var(--color-warning);
   --sd-color-primary-strong: var(--color-warning-fg);
   --sd-color-primary-soft: var(--color-warning-bg);
-  --sd-color-teal: var(--k-teal, #1f9e86);
-  --sd-color-teal-deep: var(--k-teal-deep, #157a67);
-  --sd-color-teal-soft: var(--k-teal-soft, #e2f2ec);
-  --sd-color-wheat: var(--color-wheat, #a9781f);
-  --sd-color-wheat-deep: var(--color-wheat-deep, #8a6219);
-  --sd-color-wheat-soft: var(--color-wheat-soft, #f2ead6);
-  --sd-color-text-strong: var(--k-ink, #10302b);
-  --sd-color-text: var(--k-ink, #10302b);
-  --sd-color-text-muted: var(--k-muted, #5d6b63);
-  --sd-color-line: var(--k-line, #e2dccb);
-  --sd-color-success-soft: var(--k-teal-soft, #e2f2ec);
-  --sd-color-warning-soft: var(--color-wheat-soft, #f2ead6);
+  --sd-color-teal: var(--k-teal);
+  --sd-color-teal-deep: var(--k-teal-deep);
+  --sd-color-teal-soft: var(--k-teal-soft);
+  --sd-color-wheat: var(--color-wheat);
+  --sd-color-wheat-deep: var(--color-wheat-deep);
+  --sd-color-wheat-soft: var(--color-wheat-soft);
+  --sd-color-text-strong: var(--k-ink);
+  --sd-color-text: var(--k-ink);
+  --sd-color-text-muted: var(--k-muted);
+  --sd-color-line: var(--k-line);
+  --sd-color-success-soft: var(--k-teal-soft);
+  --sd-color-warning-soft: var(--color-wheat-soft);
   --sd-control-min: 56px;
   --sd-primary-control-min: 72px;
   --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
@@ -32,7 +32,7 @@
 .job-fit-inkpaper .job-fit-content {
   width: min(100%, 984px);
   margin-inline: auto;
-  scrollbar-color: var(--k-line, #e2dccb) transparent;
+  scrollbar-color: var(--k-line) transparent;
 }
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary,
@@ -58,7 +58,7 @@
   color: var(--sd-color-primary);
 }
 .job-fit-inkpaper .job-fit-summary {
-  border-color: var(--k-line, #e2dccb);
+  border-color: var(--k-line);
   border-top: 4px solid var(--sd-color-primary);
   background: var(--sd-color-surface);
   box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
@@ -76,11 +76,11 @@
   letter-spacing: .02em;
 }
 .job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
-  border-left: 3px solid var(--k-teal, #1f9e86);
+  border-left: 3px solid var(--k-teal);
   background: var(--sd-color-success-soft);
 }
 .job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
-  border-left: 3px solid var(--color-wheat, #a9781f);
+  border-left: 3px solid var(--color-wheat);
   background: var(--sd-color-warning-soft);
 }
 .job-fit-inkpaper .job-fit-source {

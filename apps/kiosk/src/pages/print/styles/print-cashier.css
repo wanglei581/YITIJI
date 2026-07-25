@@ -2,7 +2,7 @@
 /* ── Screen 32: Cashier / Payment ─────────────────────────── */
 :root {
   --print-slate-deep: var(--color-info-fg);
-  --print-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --print-wheat-deep: var(--color-wheat-deep);
 }
 
 .cashier-split {
@@ -203,7 +203,7 @@
 .cashier-qr-sub { font-size: 18px; color: var(--print-muted); text-align: center; line-height: 1.5; }
 .cashier-countdown {
   font-size: 17.5px;
-  color: var(--print-wheat-deep, var(--color-wheat-deep, #8a6219));
+  color: var(--print-wheat-deep, var(--color-wheat-deep));
   font-weight: 600;
   text-align: center;
 }
@@ -486,7 +486,7 @@
 /* 隐私摘要卡 (wheat) */
 .print-priv-card {
   padding: 18px 22px;
-  background: var(--color-wheat-soft, #f2ead6);
+  background: var(--color-wheat-soft);
   border: 1px solid rgba(169, 120, 31, .35);
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
@@ -496,13 +496,13 @@
   align-items: center;
   gap: 12px;
 }
-.print-priv-head svg { width: 26px; height: 26px; flex: none; color: var(--color-wheat-deep, #8a6219); }
-.print-priv-head b { font-size: 20px; font-weight: 700; color: var(--color-wheat-deep, #8a6219); }
+.print-priv-head svg { width: 26px; height: 26px; flex: none; color: var(--color-wheat-deep); }
+.print-priv-head b { font-size: 20px; font-weight: 700; color: var(--color-wheat-deep); }
 .print-priv-body {
   margin-top: 8px;
   font-size: 17px;
   line-height: 1.55;
-  color: var(--color-wheat-deep, #8a6219);
+  color: var(--color-wheat-deep);
 }
 
 /* 费用卡 (a-teal) */

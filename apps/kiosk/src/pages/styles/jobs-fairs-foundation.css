@@ -1,27 +1,27 @@
 .jf-proto {
   --paper: var(--k-paper, var(--color-canvas));
   --surface: var(--k-surface, var(--color-surface));
-  --ink: var(--k-ink, #10302b);
-  --muted: var(--k-muted, #5d6b63);
-  --line: var(--k-line, #e2dccb);
-  --teal: var(--k-teal, #1f9e86);
-  --teal-deep: var(--k-teal-deep, #157a67);
-  --teal-soft: var(--k-teal-soft, #e2f2ec);
+  --ink: var(--k-ink);
+  --muted: var(--k-muted);
+  --line: var(--k-line);
+  --teal: var(--k-teal);
+  --teal-deep: var(--k-teal-deep);
+  --teal-soft: var(--k-teal-soft);
   --clay: var(--color-warning);
   --clay-deep: var(--color-warning-fg);
   --clay-soft: var(--color-warning-bg);
-  --wheat: var(--color-wheat, #a9781f);
-  --wheat-deep: var(--color-wheat-deep, #8a6219);
-  --wheat-soft: var(--color-wheat-soft, #f2ead6);
-  --plum: var(--color-plum, #7a5a86);
-  --plum-deep: var(--color-plum-deep, #63466f);
-  --plum-soft: var(--color-plum-soft, #efe7f1);
+  --wheat: var(--color-wheat);
+  --wheat-deep: var(--color-wheat-deep);
+  --wheat-soft: var(--color-wheat-soft);
+  --plum: var(--color-plum);
+  --plum-deep: var(--color-plum-deep);
+  --plum-soft: var(--color-plum-soft);
   --slate: var(--color-info);
   --slate-deep: var(--color-info-fg);
   --slate-soft: var(--color-info-bg);
   --error: var(--color-error);
   --error-soft: var(--color-error-bg);
-  --dark: var(--k-ink, #10302b);
+  --dark: var(--k-ink);
   --r-sm: 14px;
   --r-md: 18px;
   --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
@@ -302,7 +302,7 @@ button.jf-chip {
   border-radius: 999px;
   background: var(--surface);
   padding: 0 24px;
-  color: var(--k-muted, #5d6b63);
+  color: var(--k-muted);
   font-size: 22px;
 }
 

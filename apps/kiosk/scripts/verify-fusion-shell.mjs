@@ -142,10 +142,12 @@ function assertImportOrder(css) {
   assert.deepEqual(imports, [
     '@ai-job-print/ui/styles/tokens.css',
     '@ai-job-print/ui/styles/fusion-youth.css',
+    '@ai-job-print/ui/styles/kiosk-shell.css',
+    '@ai-job-print/ui/styles/kiosk-components.css',
     '@ai-job-print/ui/styles/service-desk.css',
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
-  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> local CSS -> Tailwind import order')
+  ], 'index.css must preserve tokens -> fusion-youth -> kiosk-shell/components -> service-desk -> local CSS -> Tailwind import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))
@@ -197,18 +199,20 @@ const shellBody = functionBody(root, 'KioskShell')
 for (const [label, pattern] of [
   ['screensaver controller', /useScreensaverController\(\s*\)/],
   ['idle logout', /useIdleLogout\(\s*screensaverActive\s*\)/],
-  ['device status route guard', /useHomeDeviceStatus\(\s*pathname\s*!==\s*['"]\/['"]\s*\)/],
   ['favorites provider', /<FavoritesProvider>/],
   ['active tab derivation', /getActiveTab\(\s*pathname\s*\)/],
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
-  ['exact service-desk selection', /SERVICE_DESK_EXACT_ROUTES\.includes\(\s*pathname\s*\)/],
-  ['visual theme selection', /visualTheme\s*=\s*\{\s*isServiceDeskRoute\s*\?\s*['"]service-desk['"]\s*:\s*['"]legacy['"]\s*\}/],
+  ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
+  ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
+  ['device status always on', /useHomeDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
-  ['campus-aware header visibility', /hideHeader\s*=\s*\{\s*pathname\s*===\s*['"]\/['"]\s*\|\|\s*isCampusZone\s*\}/],
-  ['campus-aware navigation visibility', /hideBottomNav\s*=\s*\{\s*pathname\s*===\s*['"]\/['"]\s*\|\|\s*isCampusZone\s*\}/],
+  ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
+  ['campus-only nav hide', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\}/],
 ]) {
   assert.match(shellBody, pattern, `KioskShell must preserve ${label}`)
 }
+assert.equal(shellBody.includes('SERVICE_DESK_EXACT_ROUTES'), false, 'KioskShell must remove SERVICE_DESK_EXACT_ROUTES theme fork')
+assert.equal(shellBody.includes("'legacy'"), false, 'KioskShell must not select legacy visualTheme')
 
 const activeTabBody = functionBody(root, 'getActiveTab')
 for (const [pathContract, pattern] of [
@@ -232,8 +236,13 @@ for (const [tabContract, pattern] of [
 
 assert.doesNotMatch(
   root,
-  /(?:from\s*|import\s*\(\s*)['"][^'"]*(?:\/routes?(?:\/|['"])|\/services?(?:\/|['"]))|\b(?:fetch|axios)\s*\(|['"]\/api\//i,
-  'KioskRoot must not gain route-definition, service, or API dependencies',
+  /(?:from\s*|import\s*\(\s*)['"][^'"]*(?:\/routes?(?:\/|['"]))|\b(?:fetch|axios)\s*\(|['"]\/api\//i,
+  'KioskRoot must not gain route-definition or raw API dependencies',
+)
+assert.match(
+  root,
+  /from\s+['"]\.\.\/services\/api\/terminalConfig['"]/,
+  'KioskRoot may import terminalConfig only for brand/device identity',
 )
 assert.doesNotMatch(
   layout,

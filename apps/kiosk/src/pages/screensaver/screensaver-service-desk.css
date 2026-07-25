@@ -1,4 +1,4 @@
-.k1-screensaver { color: var(--k-paper, var(--color-canvas)); background: var(--color-dark, var(--k-ink, #10302b)); font-family: var(--font-sans); }
+.k1-screensaver { color: var(--k-paper, var(--color-canvas)); background: var(--color-dark, var(--k-ink)); font-family: var(--font-sans); }
 .k1-screensaver > img,
 .k1-screensaver > video { position: absolute; inset: 0; }
 .k1-screensaver .screensaver-shade { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(16,48,43,.4) 0%, transparent 24%, transparent 66%, rgba(16,48,43,.66) 100%); }

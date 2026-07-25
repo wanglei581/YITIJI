@@ -21,26 +21,12 @@ function tabToPath(tab: KioskTab): string {
   return '/'
 }
 
-const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
-  '/',
-  '/help',
-  '/assistant',
-  // 用户已明确将「我的」主入口纳入青序 LightFlow；/me/* 明细页仍保留原独立范围。
-  '/profile',
-  '/resume/source',
-  '/resume/parse',
-  '/resume/report',
-  '/resume/generate',
-  '/resume/generate/preview',
-  '/resume/optimize',
-  '/resume/templates',
-  '/resume/materials',
-  '/resume/export',
-]
-
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
  * /screensaver 是顶级路由(全屏,不在此布局内),退出后回到本布局的首页。
+ *
+ * 视觉统一（2026-07-25）：全部布局内路由统一 service-desk + fusion-youth 呈现，
+ * 不再按路由白名单切换 legacy 主题；首页也不再自绘顶栏/底栏。
  */
 export function KioskRoot() {
   return (
@@ -56,7 +42,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const deviceStatus = useHomeDeviceStatus(pathname !== '/')
+  const deviceStatus = useHomeDeviceStatus(true)
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。
@@ -67,28 +53,22 @@ function KioskShell() {
 
   const activeTab = getActiveTab(pathname)
   const statusLabel = deviceStatus.label
-  const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
   const terminalId = getTerminalId() || '01号机'
 
-  // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
-  // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
+  // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
+  // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
 
   return (
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
+      visualTheme="service-desk"
       density="touch"
       presentation="fusion-youth"
       viewport="kiosk"
-      // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
-      // 其余页面继续使用全局头部 + 设备状态徽标。
-      // prototype-v1 首页（.kpv1）自绘 116px 原型底部导航，故隐藏共享 KioskLayout 底栏；
-      // 其余路由仍使用共享底栏。下方 visualTheme 三元与路由白名单保持不变——
-      // 首页内容全部 .kpv1 作用域，主题 token 不作用于其内部（该属性对首页为 vestigial）。
-      hideHeader={pathname === '/' || isCampusZone}
-      hideBottomNav={pathname === '/' || isCampusZone}
+      hideHeader={isCampusZone}
+      hideBottomNav={isCampusZone}
       brandTitle={`就业服务大厅 · ${terminalId}`}
       brandSubtitle="AI求职打印服务终端"
       headerRight={<KioskTopbarStatus tone={deviceStatus.tone} label={statusLabel} />}

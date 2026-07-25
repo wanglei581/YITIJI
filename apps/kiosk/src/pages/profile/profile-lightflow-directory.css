@@ -68,7 +68,7 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled {
-  color: var(--k-muted, #5d6b63);
+  color: var(--k-muted);
   background: var(--k-surface, var(--color-surface));
   cursor: not-allowed;
 }
@@ -89,8 +89,8 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-icon {
-  color: var(--k-muted, #5d6b63);
-  background: var(--k-line, #e2dccb);
+  color: var(--k-muted);
+  background: var(--k-line);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-content {
@@ -116,14 +116,14 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-content span {
-  color: var(--k-muted, #5d6b63);
+  color: var(--k-muted);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  color: var(--k-muted, #5d6b63);
+  color: var(--k-muted);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow svg {
@@ -136,15 +136,15 @@
   padding: 3px 8px;
   border: 1px solid var(--lf-line);
   border-radius: 999px;
-  color: var(--k-muted, #5d6b63);
-  background: var(--k-line, #e2dccb);
+  color: var(--k-muted);
+  background: var(--k-line);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.3;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-tag.session {
-  border-color: var(--k-teal-soft, #e2f2ec);
+  border-color: var(--k-teal-soft);
   color: var(--lf-blue-strong);
   background: var(--lf-blue-soft);
 }

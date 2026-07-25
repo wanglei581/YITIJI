@@ -19,25 +19,25 @@
 :root {
   --pv-paper: var(--k-paper, var(--color-canvas));
   --pv-surface: var(--k-surface, var(--color-surface));
-  --pv-ink: var(--k-ink, #10302b);
-  --pv-muted: var(--k-muted, #5d6b63);
-  --pv-line: var(--k-line, #e2dccb);
-  --pv-teal: var(--k-teal, #1f9e86);
-  --pv-teal-deep: var(--k-teal-deep, #157a67);
-  --pv-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --pv-ink: var(--k-ink);
+  --pv-muted: var(--k-muted);
+  --pv-line: var(--k-line);
+  --pv-teal: var(--k-teal);
+  --pv-teal-deep: var(--k-teal-deep);
+  --pv-teal-soft: var(--k-teal-soft);
   --pv-clay: var(--color-warning);
   --pv-clay-deep: var(--color-warning-fg);
   --pv-clay-soft: var(--color-warning-bg);
-  --pv-wheat: var(--color-wheat, #a9781f);
-  --pv-wheat-deep: var(--color-wheat-deep, #8a6219);
-  --pv-wheat-soft: var(--color-wheat-soft, #f2ead6);
-  --pv-plum: var(--color-plum, #7a5a86);
-  --pv-plum-deep: var(--color-plum-deep, #63466f);
-  --pv-plum-soft: var(--color-plum-soft, #efe7f1);
+  --pv-wheat: var(--color-wheat);
+  --pv-wheat-deep: var(--color-wheat-deep);
+  --pv-wheat-soft: var(--color-wheat-soft);
+  --pv-plum: var(--color-plum);
+  --pv-plum-deep: var(--color-plum-deep);
+  --pv-plum-soft: var(--color-plum-soft);
   --pv-slate: var(--color-info);
   --pv-slate-deep: var(--color-info-fg);
   --pv-slate-soft: var(--color-info-bg);
-  --pv-dark: var(--k-ink, #10302b);
+  --pv-dark: var(--k-ink);
   --pv-r-sm: 14px;
   --pv-r-md: 18px;
   --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
@@ -51,15 +51,10 @@
 .kpv1 .a-plum  { --pv-accent: var(--pv-plum);  --pv-accent-deep: var(--pv-plum-deep);  --pv-accent-soft: var(--pv-plum-soft); }
 .kpv1 .a-slate { --pv-accent: var(--pv-slate); --pv-accent-deep: var(--pv-slate-deep); --pv-accent-soft: var(--pv-slate-soft); }
 
-/* ── 1080×1920 舞台外壳（shared.css #stage） ── */
+/* ── 首页内容舞台（顶栏/底栏由共享 KioskLayout 提供） ── */
 .kpv1 {
   width: min(1080px, 100%);
-  min-height: 1920px;
   margin: 0 auto;
-  background:
-    radial-gradient(1200px 600px at 85% -5%, rgb(31 158 134 / 6%), transparent 60%),
-    radial-gradient(900px 500px at -10% 30%, rgb(184 104 60 / 5%), transparent 55%),
-    var(--pv-paper);
   display: flex;
   flex-direction: column;
   font-family: var(--pv-sans);
@@ -70,6 +65,13 @@
      会令每个未显式设行高的元素比原型高约 10px/卡，逐区向下累积漂移（CDP 实测峰值 ~35px）。
      在 .kpv1 子树恢复 normal，逐区锚点 Δ≤4px。显式设行高处（welcome h1 / .t-text span 等）不受影响。 */
   line-height: normal;
+}
+
+/* 内容-only：背景交给 ui-kiosk-shell，避免与共享壳双层径向光晕叠加 */
+.kpv1.kpv1--content-only {
+  min-height: 0;
+  background: transparent;
+  flex: 1;
 }
 .kpv1 *,
 .kpv1 *::before,

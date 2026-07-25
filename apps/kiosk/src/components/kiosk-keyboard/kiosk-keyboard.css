@@ -15,14 +15,14 @@
   --paper: var(--k-paper, var(--color-canvas));
   --surface: var(--k-surface, var(--color-surface));
   --surface-2: var(--color-neutral-50);
-  --ink: var(--k-ink, #10302b);
-  --ink-2: var(--k-ink, #10302b);
-  --muted: var(--k-muted, #5d6b63);
+  --ink: var(--k-ink);
+  --ink-2: var(--k-ink);
+  --muted: var(--k-muted);
   --line: rgba(16, 48, 43, 0.1);
   --line-2: rgba(16, 48, 43, 0.06);
-  --teal: var(--k-teal, #1f9e86);
-  --teal-deep: var(--k-teal-deep, #157a67);
-  --teal-soft: var(--k-teal-soft, #e2f2ec);
+  --teal: var(--k-teal);
+  --teal-deep: var(--k-teal-deep);
+  --teal-soft: var(--k-teal-soft);
 
   position: fixed;
   left: 50%;

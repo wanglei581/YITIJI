@@ -2,12 +2,12 @@
   --lf-canvas: var(--k-surface, var(--color-surface));
   --lf-surface: var(--k-surface, var(--color-surface));
   --lf-surface-soft: var(--k-surface, var(--color-surface));
-  --lf-ink: var(--k-ink, #10302b);
-  --lf-ink-muted: var(--k-muted, #5d6b63);
-  --lf-line: var(--k-line, #e2dccb);
-  --lf-blue: var(--k-teal-soft, #e2f2ec);
-  --lf-blue-strong: var(--k-teal-deep, #157a67);
-  --lf-blue-soft: var(--k-line, #e2dccb);
+  --lf-ink: var(--k-ink);
+  --lf-ink-muted: var(--k-muted);
+  --lf-line: var(--k-line);
+  --lf-blue: var(--k-teal-soft);
+  --lf-blue-strong: var(--k-teal-deep);
+  --lf-blue-soft: var(--k-line);
   --lf-cyan-soft: var(--k-surface, var(--color-surface));
   --lf-lavender-soft: var(--k-surface, var(--color-surface));
   --lf-sand-soft: var(--k-paper, var(--color-canvas));
@@ -62,16 +62,16 @@
   place-items: center;
   border: 2px solid rgba(31, 158, 134, 0.35);
   border-radius: 50%;
-  color: var(--k-teal-deep, #157a67);
-  background: var(--k-teal-soft, #e2f2ec);
+  color: var(--k-teal-deep);
+  background: var(--k-teal-soft);
   font-size: 40px;
   font-weight: 700;
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest {
   border-color: rgba(31, 158, 134, 0.2);
-  color: var(--k-teal-deep, #157a67);
-  background: var(--k-teal-soft, #e2f2ec);
+  color: var(--k-teal-deep);
+  background: var(--k-teal-soft);
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest svg {
@@ -96,7 +96,7 @@
   inline-size: 7px;
   block-size: 7px;
   border-radius: 50%;
-  background: var(--k-teal, #1f9e86);
+  background: var(--k-teal);
 }
 
 .kprofile.kprofile-lightflow .p-name {
@@ -216,7 +216,7 @@
 }
 
 .kprofile.kprofile-lightflow .p-stat b.unloaded {
-  color: var(--k-muted, #5d6b63);
+  color: var(--k-muted);
 }
 
 .kprofile.kprofile-lightflow .p-stat span {

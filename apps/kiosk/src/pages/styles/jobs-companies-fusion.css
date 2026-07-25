@@ -18,7 +18,7 @@
 }
 
 .w4-source-meta > div {
-  border: 1px solid color-mix(in srgb, var(--ink, #17211b) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent);
   border-radius: 999px;
   padding: 8px 14px;
 }

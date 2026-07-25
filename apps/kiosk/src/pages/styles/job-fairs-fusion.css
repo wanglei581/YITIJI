@@ -19,7 +19,7 @@
 
 .w4-step-number {
   align-items: center;
-  background: var(--ink, #17211b);
+  background: var(--ink);
   border-radius: 50%;
   color: var(--k-surface, var(--color-surface));
   display: inline-flex;
@@ -29,7 +29,7 @@
 }
 
 /* Recruitment-fair domain extensions moved intact from the legacy entry. */
-:root { --wheat: var(--color-wheat, #a9781f); --wheat-deep: var(--color-wheat-deep, #8a6219); --wheat-soft: var(--color-wheat-soft, #f2ead6); }
+:root { --wheat: var(--color-wheat); --wheat-deep: var(--color-wheat-deep); --wheat-soft: var(--color-wheat-soft); }
 .jf-scale-tag { display: inline-flex; align-items: center; flex: none; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px 12px; color: var(--muted); font-size: 16px; }
 .jf-booth-label { color: var(--wheat-deep); font-weight: 700; }
 .jf-mtype { flex: none; border-radius: 999px; padding: 3px 12px; font-size: 15px; font-weight: 600; }

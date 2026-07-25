@@ -1,25 +1,19 @@
-// 首页 · prototype-v1 视觉（docs/design/kiosk-proto-2026-07/01-home.html 的 1:1 React 实现）
+// 首页 · prototype-v1 内容区（docs/design/kiosk-proto-2026-07/01-home.html）
 //
-// 最高真值：shared.css 基类 + 01-home.html 局部覆写后的最终渲染结果。
-// 结构按原型逐节点移植：topbar(76) → welcome + login-btn(88) → groups(统一 .tile 网格,
-// c3/c2/c1/c5) → zone-row(动态专区) → notice(合规) → navbar(116)。
-// 废弃旧 primary/secondary 两级模型，改用原型统一 .tile（emphasis→.tile.primary）。
+// 顶栏(76) + 底栏(116) 由共享 KioskLayout 提供；本页只渲染欢迎区 / 磁贴组 /
+// 动态专区 / 合规提示。最高真值仍是原型 shared.css + 01-home 内容节点。
 //
-// 保留的真实能力：真实路由(serviceGroups)、真实登录弹窗、真实设备状态、
-// 百宝箱/智慧校园后台动态开关。登录态为「原型外动态状态」：复用 88px 登录框，
-// 文字改「进入我的」，不显示原型没有的统计。ContinuePanel 业务逻辑已抽到
-// components/ContinuePanel.tsx 保留（首页按 1:1 不渲染，未删除）。
+// 保留的真实能力：真实路由(serviceGroups)、真实登录弹窗、百宝箱/智慧校园
+// 后台动态开关。登录态为「原型外动态状态」：复用 88px 登录框，文字改「进入我的」。
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
 import { KioskPageFrame } from '@ai-job-print/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import { useToolboxConfig } from '../../hooks/useToolboxConfig'
 import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { ContinuePanel } from './components/ContinuePanel'
-import { getTerminalId } from '../../services/api/terminalConfig'
-import { useHomeDeviceStatus } from './hooks/useHomeDeviceStatus'
 import { ProtoIcon } from './prototypeIcons'
 import { SERVICE_GROUPS, type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import '../../styles/prototype-v1.css'
@@ -78,45 +72,6 @@ const ACCENT_CLASS: Record<Accent, string> = {
   tool: 'a-teal',
 }
 
-/* ── 顶部状态栏（真实设备状态 → status-chip；实时时钟） ── */
-function KioskTopBar() {
-  const deviceStatus = useHomeDeviceStatus()
-  const [now, setNow] = useState(() => new Date())
-  const terminalId = getTerminalId() || '01号机'
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  const clock = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now)
-
-  const chipTone =
-    deviceStatus.tone === 'positive' ? '' : deviceStatus.tone === 'neutral' ? 'neutral' : 'warn'
-
-  return (
-    <header className="topbar">
-      <div className="brand">
-        <b>就业服务大厅 · {terminalId}</b>
-        <span>AI求职打印服务终端</span>
-      </div>
-      <div className="right">
-        <span className="clock">{clock}</span>
-        <span className={`status-chip ${chipTone}`.trim()} role="status" aria-live="polite">
-          <span className="dot" aria-hidden="true" />
-          {deviceStatus.label}
-        </span>
-      </div>
-    </header>
-  )
-}
 /* ── 欢迎区 + 登录/进入我的（原型 .welcome）──
  * 未登录：88px .login-btn「登录 / 注册」→ 打开真实登录弹窗（弹窗内含游客体验）。
  * 已登录：原型外动态状态——复用同一 88px 框，文字改「进入我的」→ /profile；
@@ -337,32 +292,11 @@ function ZoneRow() {
   )
 }
 
-/* ── 底部导航（原型 116px 三 Tab；首页 hideBottomNav 后由本组件自绘） ── */
-function HomeNavbar() {
-  const navigate = useNavigate()
-  return (
-    <nav className="navbar">
-      <button type="button" className="nav-item active" aria-current="page">
-        <ProtoIcon name="nav-home" />
-        首页
-      </button>
-      <button type="button" className="nav-item" onClick={() => navigate('/assistant')}>
-        <ProtoIcon name="nav-assistant" />
-        AI助手
-      </button>
-      <button type="button" className="nav-item" onClick={() => navigate('/profile')}>
-        <ProtoIcon name="user" />
-        我的
-      </button>
-    </nav>
-  )
-}
-
 export function HomePage() {
   const groups = SERVICE_GROUPS
 
   return (
-    <KioskPageFrame className="kpv1" header={<KioskTopBar />} footer={<HomeNavbar />}>
+    <KioskPageFrame className="kpv1 kpv1--content-only">
       <HomeWelcome />
       {/* 继续上次：原型外生产动态状态。ContinuePanel 自门控——仅登录且确有可恢复任务
           （进行中打印/已诊断未优化简历）时渲染；无任务或匿名 → 返回 null，首页与原型 1:1。 */}

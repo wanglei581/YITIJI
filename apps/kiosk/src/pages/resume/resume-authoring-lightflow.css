@@ -1,11 +1,11 @@
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow).resume-lightflow {
-  --resume-canvas: var(--sd-color-canvas-outer, #eaf3ff);
+  --resume-canvas: var(--sd-color-canvas-outer);
   --resume-surface: var(--sd-color-surface, var(--k-surface, var(--color-surface)));
-  --resume-ink: var(--sd-color-text-strong, var(--k-ink, #10302b));
-  --resume-copy: var(--sd-color-copy, #5d6f87);
-  --resume-line: var(--sd-color-line, #d9e6f6);
-  --resume-primary: var(--sd-color-primary, var(--k-teal, #1f9e86));
-  --resume-primary-soft: var(--k-teal-soft, #e2f2ec);
+  --resume-ink: var(--sd-color-text-strong, var(--k-ink));
+  --resume-copy: var(--sd-color-copy);
+  --resume-line: var(--sd-color-line);
+  --resume-primary: var(--sd-color-primary, var(--k-teal));
+  --resume-primary-soft: var(--k-teal-soft);
   min-height: 100%;
   overflow: hidden;
   color: var(--resume-ink);
@@ -84,7 +84,7 @@
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__section-heading > span {
   width: 44px;
   height: 44px;
-  border: 1px solid var(--k-teal-soft, #e2f2ec);
+  border: 1px solid var(--k-teal-soft);
   background: var(--resume-primary-soft);
 }
 
@@ -121,7 +121,7 @@
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__add-entry {
   min-height: var(--sd-primary-control-min, 56px);
-  border-color: var(--k-teal-soft, #e2f2ec);
+  border-color: var(--k-teal-soft);
   background: var(--k-paper, var(--color-canvas));
 }
 
@@ -139,7 +139,7 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__export-card {
-  border-color: var(--k-teal-soft, #e2f2ec);
+  border-color: var(--k-teal-soft);
   background: linear-gradient(135deg, var(--k-surface, var(--color-surface)), var(--k-surface, var(--color-surface)));
 }
 
