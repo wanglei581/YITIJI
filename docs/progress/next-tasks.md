@@ -8,8 +8,9 @@
 
 推荐顺序（2026-07-25）：
 
-0. [x] **预发事故：offline-agencies `pageSize` string → 500**（2026-07-25）：预发已热修；源码分支 `fix/preprod-hotfixes-20260725`（含 `resolveOfflineListPage` + `verify:offline-agencies-page`）**PR 中**——合入后仍须下次全量部署才固化，否则 rebuild 会冲掉热修
-0b. [x] **预发事故：登录页「服务器内部错误」实为 429 限流误报**（2026-07-25）：预发 filter 已热修 `RATE_LIMITED`；同源 PR 固化 `HttpExceptionFilter` + verify；限流已清；口令错仍是 401——须正确口令登录；**仍待下次部署固化**
+0. [x] **预发事故：offline-agencies `pageSize` string → 500**（2026-07-25）：预发已热修；源码已随 #366 合入 main（下次全量部署固化）
+0b. [x] **预发事故：登录页「服务器内部错误」实为 429 限流误报**（2026-07-25）：预发 filter 已热修 `RATE_LIMITED`；源码已随 #366 合入 main
+0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；预发已热更 `index-DpMlugdV.js`）
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署含 close-unpaid / #328 / #331**：先 `DEPLOY_SOURCE=70ed8f6d`；2026-07-25 已跟进至 **`DEPLOY_SOURCE=7e59243c`（G6 #343）**，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线
@@ -21,9 +22,7 @@
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：✅ 已完成（2026-07-25 方案 C）——OCR/COS 沿用 2026-06-13；SMS/TRTC 确认当前生产密钥 + `.env` 同步、今日不换；§2.2 对应轮换项已勾。短信签名/模板审核与真实短信 E2E 仍独立开着
-- **7c `WINDOWS_FIELD_RECHECK`**：远程 Phase R 2026-07-25 **再复检通过**；现场清单 `windows-field-recheck-phase-f-runbook.md` + 授权摘要 `p0-auth-pack-windows-field-recheck.md`。**现场 Phase F 仍待回执**——**推荐下一步（须人到一体机）**。同日 Admin 浏览器：待领取空、能力未配置/未保存；SQL active=0
-
-- **7c `WINDOWS_FIELD_RECHECK`**：◐ **部分通过**（2026-07-25 回执）——F1 Agent Running/Automatic、F2 `printerName`=Windows 名、F3 `127.0.0.1:9527`、F5 断网 75s 自恢复、F6 竖屏全屏抽查；**F4 真机出纸跳过**（文件选择器未收 PDF，未建单）。配置实际在仓库 `apps/terminal-agent/config/agent-config.json`。**推荐下一步：补做 F4**（扫码/U盘/扫描入口打 1 页无个人信息样张）
+   - **7c `WINDOWS_FIELD_RECHECK`**：◐ **部分通过**（2026-07-25 回执）——F1 Agent Running/Automatic、F2 `printerName`=Windows 名、F3 `127.0.0.1:9527`、F5 断网 75s 自恢复、F6 竖屏全屏抽查；**F4 真机出纸跳过**（文件选择器未收 PDF，未建单）。配置实际在仓库 `apps/terminal-agent/config/agent-config.json`。**推荐下一步：补做 F4**（可用刚修好的简历打印「扫码上传 / U盘导入」打 1 页无个人信息样张）
 
    - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
    - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付

@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369)）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。**须合入 #369 后再全量部署**，否则会被再次覆盖。
+2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`，CI 三 job 全绿后 squash 合入）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。源码已进主干，后续全量部署不会再被盖掉。
 
 2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。
 
