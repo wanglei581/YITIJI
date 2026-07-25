@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 追加：**G5 最小版 SSOT 纠偏 + Windows Phase F 授权包**。核对 [PR #311](https://github.com/wanglei581/YITIJI/pull/311)（`b58ddbe9`）已合入且为预发 `7e59243c` 祖先：Admin 订单全额退款入口已存在；`next-tasks`「G5 待动工」为文档滞后，已改为最小版完成并挂账缺口（部分退款 / FREE_MODE 隐藏 / `G5_REFUND_SMOKE`）。新落盘 `docs/device/p0-auth-pack-windows-field-recheck.md`（现场 Phase F 模板）。顺手清除 `docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 残留 conflict 标记（保留含 #270/#275 的较新状态行）。**未**到场执行 Windows Phase F、未勾选 §五整机通过、未动 7b 密钥控制台轮换勾选。
+
 2026-07-25 澄清 **`SECRETS_ROTATION_EVIDENCE` vs `.env`**：用户回复「密钥在 .env 文件里面」。解读：运行时密钥落点已符合预期，**不能**据此勾选 §2.2「控制台轮换」项。同日预发名称级复核（**不读值**）：`BAIDU_OCR_*` / `TENCENT_COS_*` / `TENCENT_SMS_*` / `TRTC_*`（含 `TRTC_SDK_SECRET_KEY`）均为 `SET`，health `ok/postgres`。清单仅勾选「密钥只写入服务器环境变量」；OCR/COS/SMS/TRTC/LLM **控制台轮换项仍未勾选**。历史附录 2026-06-13 OCR/COS 清关**未**自动等同今日。7b 仍待用户粘贴 runbook 授权模板（或打码截图）。同步完成 **WINDOWS_FIELD_RECHECK 远程 Phase R**：`GET /terminals/t_ksk_001/printer-status` → `ready` + `isOnline=true`；`TerminalCapability` 对 `t_ksk_001` 为 0 行（managed 空表）；**现场 Phase F 未做**。未动 G5 / FREE_MODE / F1 Genesis / close-unpaid Phase B；未输出任何密钥值。
 
 2026-07-25 推进 **`SECRETS_ROTATION_EVIDENCE`**：远程仅能确认预发 `.env` 已配置 OCR/COS/SMS/TRTC 等**名称级**项且 health 正常；历史清单附录曾记 2026-06-13 OCR/COS 轮换 live 复验，**不能自动勾选今日 §2.2 密钥项**。7b 阻塞于用户书面确认或打码截图（模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`）。同步更新该 runbook 状态（7d 已完成；secret 文件仍提醒 shred）。远程旁证：`t_ksk_001` printer-status `ready`/`isOnline=true`（不替代 7c 现场）。
