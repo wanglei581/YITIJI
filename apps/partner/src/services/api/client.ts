@@ -23,6 +23,23 @@ export const API_ORIGIN: string = (() => {
   }
 })()
 
+/**
+ * 把 API 路径解析成可交给 `fetch` / `URL` 的绝对地址。
+ * - 相对 `VITE_API_BASE_URL`（如 `/api/v1`）→ 相对当前页面 origin（同源 nginx 部署）
+ * - 绝对 base → 保留该 host，不误用页面 origin
+ * 禁止单参数 `new URL('/api/v1/...')`：相对 URL 会抛 Invalid URL。
+ */
+export function resolveApiUrl(path: string, searchParams?: Record<string, string>): string {
+  const fallback = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+  const url = new URL(`${API_BASE_URL}${path}`, fallback)
+  if (searchParams) {
+    for (const [key, value] of Object.entries(searchParams)) {
+      url.searchParams.set(key, value)
+    }
+  }
+  return url.toString()
+}
+
 export class ApiHttpError extends Error {
   constructor(
     public readonly code: string,
