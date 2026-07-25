@@ -60,6 +60,12 @@
   font-size: 17px;
 }
 
+/* 可点击 chip（收藏等）必须 ≥48px；展示用 span 可保持 44px 信息密度 */
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside button.jf-chip {
+  min-height: 48px;
+  padding: 8px 18px;
+}
+
 .jf-proto.tone-wheat .ui-kiosk-page-header-aside .jf-badge {
   min-height: 44px;
   padding: 0 18px;
