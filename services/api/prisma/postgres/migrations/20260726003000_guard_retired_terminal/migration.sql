@@ -23,6 +23,10 @@ BEGIN
       OR NEW."agentToken" !~ '^cred\$retired\$.+'
       OR NEW."credentialGeneration" IS DISTINCT FROM OLD."credentialGeneration" + 1
       OR NEW."lifecycleVersion" IS DISTINCT FROM OLD."lifecycleVersion" + 1
+      OR NEW."id" IS DISTINCT FROM OLD."id"
+      OR NEW."terminalCode" IS DISTINCT FROM OLD."terminalCode"
+      OR NEW."deviceFingerprint" IS DISTINCT FROM OLD."deviceFingerprint"
+      OR NEW."macAddress" IS DISTINCT FROM OLD."macAddress"
       OR EXISTS (SELECT 1 FROM "TerminalCredential" c WHERE c."terminalId" = OLD."id" AND c."revokedAt" IS NULL)
       OR EXISTS (SELECT 1 FROM "TerminalBindCode" b WHERE b."terminalId" = OLD."id" AND b."usedAt" IS NULL AND b."revokedAt" IS NULL)
       OR EXISTS (SELECT 1 FROM "PrintTask" p WHERE p."terminalId" = OLD."id" AND p."status" IN ('pending', 'claimed', 'printing'))
@@ -38,6 +42,10 @@ BEGIN
       OR NEW."agentToken" IS DISTINCT FROM OLD."agentToken"
       OR NEW."credentialGeneration" IS DISTINCT FROM OLD."credentialGeneration"
       OR NEW."lifecycleVersion" IS DISTINCT FROM OLD."lifecycleVersion"
+      OR NEW."id" IS DISTINCT FROM OLD."id"
+      OR NEW."terminalCode" IS DISTINCT FROM OLD."terminalCode"
+      OR NEW."deviceFingerprint" IS DISTINCT FROM OLD."deviceFingerprint"
+      OR NEW."macAddress" IS DISTINCT FROM OLD."macAddress"
     )
   THEN
     RAISE EXCEPTION 'retired terminal is irreversible' USING ERRCODE = 'check_violation';
@@ -47,7 +55,7 @@ END;
 $$;
 
 CREATE TRIGGER "Terminal_retired_update_guard"
-BEFORE UPDATE OF "lifecycleStatus", "enabled", "agentToken", "credentialGeneration", "lifecycleVersion" ON "Terminal"
+BEFORE UPDATE ON "Terminal"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_update"();
 
 CREATE OR REPLACE FUNCTION "guard_retired_terminal_delete"()
@@ -151,3 +159,34 @@ $$;
 CREATE TRIGGER "Terminal_retired_bind_code_delete_guard"
 BEFORE DELETE ON "TerminalBindCode"
 FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_bind_code_delete"();
+
+-- Legacy writers that do not use the application no-op CAS still serialize new work
+-- with retirement and fail closed once the Terminal row is retired.
+CREATE OR REPLACE FUNCTION "guard_retired_terminal_task_write"()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW."terminalId" IS NOT NULL THEN
+    PERFORM 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" FOR UPDATE;
+    IF EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired') THEN
+      RAISE EXCEPTION 'retired terminal cannot receive new work' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER "Terminal_retired_print_task_insert_guard"
+BEFORE INSERT ON "PrintTask"
+FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
+
+CREATE TRIGGER "Terminal_retired_print_task_move_guard"
+BEFORE UPDATE OF "terminalId" ON "PrintTask"
+FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
+
+CREATE TRIGGER "Terminal_retired_scan_task_insert_guard"
+BEFORE INSERT ON "ScanTask"
+FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();
+
+CREATE TRIGGER "Terminal_retired_scan_task_move_guard"
+BEFORE UPDATE OF "terminalId" ON "ScanTask"
+FOR EACH ROW EXECUTE FUNCTION "guard_retired_terminal_task_write"();

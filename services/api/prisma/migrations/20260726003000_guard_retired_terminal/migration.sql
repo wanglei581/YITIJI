@@ -9,7 +9,7 @@ END;
 
 -- The first transition must atomically establish the complete retired invariant.
 CREATE TRIGGER "Terminal_retired_entry_guard"
-BEFORE UPDATE OF "lifecycleStatus", "enabled", "agentToken", "credentialGeneration", "lifecycleVersion" ON "Terminal"
+BEFORE UPDATE ON "Terminal"
 WHEN OLD."lifecycleStatus" <> 'retired'
   AND NEW."lifecycleStatus" = 'retired'
   AND (
@@ -17,6 +17,10 @@ WHEN OLD."lifecycleStatus" <> 'retired'
     OR NEW."agentToken" NOT GLOB 'cred$retired$?*'
     OR NEW."credentialGeneration" <> OLD."credentialGeneration" + 1
     OR NEW."lifecycleVersion" <> OLD."lifecycleVersion" + 1
+    OR NEW."id" <> OLD."id"
+    OR NEW."terminalCode" <> OLD."terminalCode"
+    OR NEW."deviceFingerprint" <> OLD."deviceFingerprint"
+    OR NEW."macAddress" IS NOT OLD."macAddress"
     OR EXISTS (SELECT 1 FROM "TerminalCredential" c WHERE c."terminalId" = OLD."id" AND c."revokedAt" IS NULL)
     OR EXISTS (SELECT 1 FROM "TerminalBindCode" b WHERE b."terminalId" = OLD."id" AND b."usedAt" IS NULL AND b."revokedAt" IS NULL)
     OR EXISTS (SELECT 1 FROM "PrintTask" p WHERE p."terminalId" = OLD."id" AND p."status" IN ('pending', 'claimed', 'printing'))
@@ -28,7 +32,7 @@ END;
 
 -- Once retired, the identity carrier and lifecycle fields are immutable.
 CREATE TRIGGER "Terminal_retired_update_guard"
-BEFORE UPDATE OF "lifecycleStatus", "enabled", "agentToken", "credentialGeneration", "lifecycleVersion" ON "Terminal"
+BEFORE UPDATE ON "Terminal"
 WHEN OLD."lifecycleStatus" = 'retired'
   AND (
     NEW."lifecycleStatus" <> OLD."lifecycleStatus"
@@ -36,6 +40,10 @@ WHEN OLD."lifecycleStatus" = 'retired'
     OR NEW."agentToken" <> OLD."agentToken"
     OR NEW."credentialGeneration" <> OLD."credentialGeneration"
     OR NEW."lifecycleVersion" <> OLD."lifecycleVersion"
+    OR NEW."id" <> OLD."id"
+    OR NEW."terminalCode" <> OLD."terminalCode"
+    OR NEW."deviceFingerprint" <> OLD."deviceFingerprint"
+    OR NEW."macAddress" IS NOT OLD."macAddress"
   )
 BEGIN
   SELECT RAISE(ABORT, 'retired terminal is irreversible');
@@ -91,4 +99,34 @@ BEFORE DELETE ON "TerminalBindCode"
 WHEN EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = OLD."terminalId" AND t."lifecycleStatus" = 'retired')
 BEGIN
   SELECT RAISE(ABORT, 'retired terminal bind code is immutable');
+END;
+
+CREATE TRIGGER "Terminal_retired_print_task_insert_guard"
+BEFORE INSERT ON "PrintTask"
+WHEN NEW."terminalId" IS NOT NULL
+  AND EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+BEGIN
+  SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
+END;
+
+CREATE TRIGGER "Terminal_retired_print_task_move_guard"
+BEFORE UPDATE OF "terminalId" ON "PrintTask"
+WHEN NEW."terminalId" IS NOT NULL
+  AND EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+BEGIN
+  SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
+END;
+
+CREATE TRIGGER "Terminal_retired_scan_task_insert_guard"
+BEFORE INSERT ON "ScanTask"
+WHEN EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+BEGIN
+  SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
+END;
+
+CREATE TRIGGER "Terminal_retired_scan_task_move_guard"
+BEFORE UPDATE OF "terminalId" ON "ScanTask"
+WHEN EXISTS (SELECT 1 FROM "Terminal" t WHERE t."id" = NEW."terminalId" AND t."lifecycleStatus" = 'retired')
+BEGIN
+  SELECT RAISE(ABORT, 'retired terminal cannot receive new work');
 END;

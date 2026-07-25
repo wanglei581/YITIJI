@@ -504,6 +504,18 @@ async function main(): Promise<void> {
       'database guard rejects retired carrier rewrites even with the sentinel prefix',
     )
     await expectDatabaseRejected(
+      () => prisma.terminal.update({
+        where: { id: active.id },
+        data: {
+          terminalCode: `RELEASED-${suffix}`,
+          deviceFingerprint: `released-fingerprint-${suffix}`,
+          macAddress: `02:00:00:${suffix.slice(0, 2)}:${suffix.slice(2, 4)}:${suffix.slice(4, 6)}`,
+        },
+      }),
+      'retired terminal is irreversible',
+      'database guard freezes retired terminal identity fields',
+    )
+    await expectDatabaseRejected(
       () => prisma.terminal.delete({ where: { id: active.id } }),
       'retired terminal cannot be deleted',
       'database guard preserves the retired row as a permanent identity tombstone',
