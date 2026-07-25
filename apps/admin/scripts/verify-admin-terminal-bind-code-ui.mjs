@@ -164,10 +164,14 @@ if (
   lifecycleActions.includes('不可逆操作') &&
   lifecycleActions.includes('error.status === 409') &&
   lifecycleActions.includes('expectedCredentialGeneration: terminal.credentialGeneration') &&
+  lifecycleActions.includes("actions.push('emergency-revoke')") &&
+  !lifecycleActions.includes("if (hasActiveCredential) actions.push('emergency-revoke')") &&
   devices.includes('emergencyRevokeTerminal') &&
   http.includes('/emergency-revoke') &&
   mock.includes('TERMINAL_REVOKE_CONFIRMATION_INVALID') &&
   mock.includes('MOCK_TERMINAL_CREDENTIAL_STATE') &&
+  mock.includes('item.id === terminalId || item.terminalCode === terminalId') &&
+  mock.includes("['commissioning', 'maintenance', 'suspended']") &&
   mock.includes('active: false')
 ) {
   pass('现有终端表接入完整运维动作、紧急吊销强确认与 409 刷新，换机绑定码仅限 planned/maintenance')

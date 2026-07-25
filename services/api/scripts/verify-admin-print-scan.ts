@@ -103,6 +103,7 @@ async function main() {
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `term_vps_${suffix}`
+  const retiredTerminalId = `term_vps_retired_${suffix}`
   const createdPrintTaskIds: string[] = []
   const createdScanTaskIds: string[] = []
   const createdOrderIds: string[] = []
@@ -351,6 +352,63 @@ async function main() {
       fail('PRINT_JOB_UNCONFIRMED retry 拒绝后 PrintTask、Order、状态日志和任务总数必须完全不变')
     }
     pass('PRINT_JOB_UNCONFIRMED retry 拒绝路径零副作用（任务/订单/日志/任务总数不变）')
+
+    // 退役与 retry 必须争用同一 Terminal 行：已退役终端的 failed 任务不能重新进入 pending，
+    // 否则凭证已吊销且 claim 门禁为 active 的终端会留下永久无法领取的任务。
+    const retiredTaskId = `pt_vps_retired_${suffix}`
+    const retiredOrderId = `order_vps_retired_${suffix}`
+    createdPrintTaskIds.push(retiredTaskId)
+    createdOrderIds.push(retiredOrderId)
+    await prisma.terminal.create({
+      data: {
+        id: retiredTerminalId,
+        terminalCode: `VPS-RETIRED-${suffix}`,
+        agentToken: `cred$retired$${suffix}`,
+        deviceFingerprint: 'fp-retired',
+        enabled: false,
+        lifecycleStatus: 'retired',
+      },
+    })
+    await prisma.printTask.create({
+      data: {
+        id: retiredTaskId,
+        terminalId: retiredTerminalId,
+        fileUrl: signFileUrl(fileId, 60_000).url,
+        fileMd5: 'retired-md5',
+        status: 'failed',
+        errorCode: 'printer_offline',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: retiredOrderId,
+        orderNo: `NO-VPS-RETIRED-${suffix}`,
+        type: 'print',
+        printTaskId: retiredTaskId,
+        payStatus: 'paid',
+        taskStatus: 'failed',
+        amountCents: 100,
+      },
+    })
+    await expectHttpErrorCode(
+      () => printScan.applyAction('print', retiredTaskId, 'retry'),
+      409,
+      'PRINT_SCAN_RETRY_TERMINAL_RETIRED',
+      '已退役终端 failed 任务 retry → 409 + 精确业务错误码',
+    )
+    const [retiredTaskAfterRetry, retiredOrderAfterRetry, retiredRetryLogCount] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: retiredTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: retiredOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: retiredTaskId } }),
+    ])
+    if (
+      retiredTaskAfterRetry.status !== 'failed' ||
+      retiredOrderAfterRetry.taskStatus !== 'failed' ||
+      retiredRetryLogCount !== 0
+    ) {
+      fail('已退役终端 retry 拒绝后任务、订单和状态日志必须保持不变')
+    }
+    pass('退役终端 retry fail-closed，且与退役共用 Terminal 行串行点')
 
     const retried = await printScan.applyAction('print', failedTaskId, 'retry')
     if (retried.fromStatus !== 'failed' || retried.toStatus !== 'pending') fail('retry 应 failed → pending')
@@ -770,6 +828,7 @@ async function main() {
     await prisma.scanTask.deleteMany({ where: { id: { in: createdScanTaskIds } } }).catch(() => undefined)
     await prisma.fileObject.deleteMany({ where: { id: { in: [`file_vps_${suffix}`, `file_vps_gone_${suffix}`] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
+    await prisma.terminal.deleteMany({ where: { id: retiredTerminalId } }).catch(() => undefined)
     await prisma.user.deleteMany({ where: { id: { startsWith: `admin_close_${suffix}` } } }).catch(() => undefined)
     await prisma.onModuleDestroy()
   }

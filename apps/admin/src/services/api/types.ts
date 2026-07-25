@@ -188,7 +188,7 @@ export interface UpdateTerminalProfileResult {
 
 export interface UpdateTerminalLifecycleInput {
   targetStatus: 'active' | 'maintenance' | 'suspended' | 'retired'
-  expectedStatus: TerminalLifecycleStatus
+  expectedStatus: Exclude<TerminalLifecycleStatus, 'planned' | 'retired'>
   expectedVersion: number
   reason: string
   confirmationText?: string

@@ -39,14 +39,16 @@ interface TerminalLifecycleActionsProps {
   onNotice: (notice: Notice) => void
 }
 
-function availableActions(status: TerminalLifecycleStatus, hasActiveCredential: boolean): LifecycleAction[] {
+function availableActions(status: TerminalLifecycleStatus): LifecycleAction[] {
   if (status === 'retired' || status === 'planned') return []
   const actions: LifecycleAction[] = []
   if (status === 'active') actions.push('maintenance')
   if (status === 'maintenance' || status === 'suspended') actions.push('resume')
   if (status === 'commissioning' || status === 'active' || status === 'maintenance') actions.push('suspend')
   if (status === 'maintenance' || status === 'suspended') actions.push('retire')
-  if (hasActiveCredential) actions.push('emergency-revoke')
+  // 紧急吊销同时失效 legacy agentToken、未使用绑定码与结构化凭证；不能只按
+  // hasActiveCredential 隐藏入口，否则恰好会漏掉最需要应急处置的兼容终端。
+  actions.push('emergency-revoke')
   return actions
 }
 
@@ -63,7 +65,7 @@ export function TerminalLifecycleActions({
   const [confirmationText, setConfirmationText] = useState('')
   const [saving, setSaving] = useState(false)
   const view = LIFECYCLE_VIEW[terminal.lifecycleStatus]
-  const actions = availableActions(terminal.lifecycleStatus, terminal.hasActiveCredential)
+  const actions = availableActions(terminal.lifecycleStatus)
   const normalizedReason = reason.trim()
   const reasonIsValid = normalizedReason.length >= 8 && normalizedReason.length <= 500
   const requiredConfirmation = action === 'retire'
@@ -102,7 +104,7 @@ export function TerminalLifecycleActions({
             : action === 'suspend' ? 'suspended' : 'retired'
         const result = await updateTerminalLifecycle(terminal.terminalCode, {
           targetStatus,
-          expectedStatus: terminal.lifecycleStatus,
+          expectedStatus: terminal.lifecycleStatus as Exclude<TerminalLifecycleStatus, 'planned' | 'retired'>,
           expectedVersion: terminal.lifecycleVersion,
           reason: normalizedReason,
           ...(action === 'retire' ? { confirmationText } : {}),

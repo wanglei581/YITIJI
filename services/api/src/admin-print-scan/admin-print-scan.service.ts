@@ -435,7 +435,7 @@ export class AdminPrintScanService {
   private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true, fileUrl: true, errorCode: true },
+      select: { id: true, terminalId: true, status: true, fileUrl: true, errorCode: true },
     })
     if (!task) {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
@@ -466,6 +466,27 @@ export class AdminPrintScanService {
     const { url: freshFileUrl } = signFileUrl(fileId, RETRY_FILE_URL_TTL_MS)
 
     await this.prisma.$transaction(async (tx) => {
+      // retry 会把 failed 重新放回待领取队列，语义上等同于创建新任务：仅 active + enabled
+      // 终端允许执行。与 retire/create/claim 共用 Terminal 行 no-op CAS，使 retry 与退役串行：
+      // retry 先取得锁时，退役会看到新的 pending；退役先提交时，retry 会在这里明确失败。
+      const activeTerminalLock = task.terminalId
+        ? await tx.terminal.updateMany({
+            where: { id: task.terminalId, enabled: true, lifecycleStatus: 'active' },
+            data: { lifecycleStatus: 'active' },
+          })
+        : null
+      if (activeTerminalLock && activeTerminalLock.count !== 1) {
+        const terminal = await tx.terminal.findUnique({
+          where: { id: task.terminalId! },
+          select: { lifecycleStatus: true },
+        })
+        throw new ConflictException({
+          error: terminal?.lifecycleStatus === 'retired'
+            ? { code: 'PRINT_SCAN_RETRY_TERMINAL_RETIRED', message: '终端已永久退役，不能重新排队' }
+            : { code: 'PRINT_SCAN_RETRY_TERMINAL_NOT_ACTIVE', message: '终端不在 active 状态，不能重新排队' },
+        })
+      }
+
       const file = await tx.fileObject.findUnique({ where: { id: fileId }, select: { deletedAt: true } })
       if (!file || file.deletedAt) {
         throw new ConflictException({

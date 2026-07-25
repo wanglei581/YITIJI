@@ -394,12 +394,16 @@ export const adminMockAdapter = {
 
   async updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult> {
     await delay()
-    if (input.enabled === true && MOCK_TERMINAL_LIFECYCLE[terminalId]?.status === 'retired') {
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    const terminalCode = terminal?.terminalCode ?? terminalId
+    if (input.enabled === true && MOCK_TERMINAL_LIFECYCLE[terminalCode]?.status === 'retired') {
       throw new ApiHttpError('TERMINAL_RETIRED', '终端已永久退役，不能重新启用', 400)
     }
-    const existing = MOCK_TERMINAL_PROFILE[terminalId] ?? {
-      terminalId,
-      terminalCode: terminalId,
+    const existing = MOCK_TERMINAL_PROFILE[terminalCode] ?? {
+      terminalId: terminal?.id ?? terminalId,
+      terminalCode,
       displayName: null,
       macAddress: null,
       locationLabel: null,
@@ -412,7 +416,7 @@ export const adminMockAdapter = {
       locationLabel: input.locationLabel === undefined ? existing.locationLabel : input.locationLabel,
       enabled: input.enabled === undefined ? existing.enabled : input.enabled,
     }
-    MOCK_TERMINAL_PROFILE[terminalId] = next
+    MOCK_TERMINAL_PROFILE[terminalCode] = next
     return next
   },
 
@@ -447,7 +451,7 @@ export const adminMockAdapter = {
       (terminal.lifecycleStatus === 'maintenance' && input.targetStatus === 'active') ||
       (['commissioning', 'active', 'maintenance'].includes(terminal.lifecycleStatus) && input.targetStatus === 'suspended') ||
       (terminal.lifecycleStatus === 'suspended' && input.targetStatus === 'maintenance') ||
-      (['maintenance', 'suspended'].includes(terminal.lifecycleStatus) && input.targetStatus === 'retired')
+      (['commissioning', 'maintenance', 'suspended'].includes(terminal.lifecycleStatus) && input.targetStatus === 'retired')
     if (!allowed) throw new ApiHttpError('TERMINAL_LIFECYCLE_TRANSITION_INVALID', '不允许的设备状态切换', 409)
     if (input.targetStatus === 'retired' && input.confirmationText !== terminal.terminalCode) {
       throw new ApiHttpError('TERMINAL_RETIRE_CONFIRMATION_INVALID', '请输入完整终端编号确认永久退役', 400)
