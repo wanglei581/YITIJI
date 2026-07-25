@@ -11,6 +11,8 @@
  *  5. 免费单（amountCents=0，已 paid+free）在门控开启下即可 claim；免费单出码被拒（PAY_NOT_REQUIRED）。
  *  6. 门控**默认关闭**回归：flag 关时未支付单可 claim（与 C5-3 前一致，证明零静默回归）。
  *  7. pay-status 取件码可见性：paid 才回 pickupCode；未支付一律 null。
+ *  8. P0-1 报价：POST /orders/quote 同口径 service 不落库；报价金额 == 建单金额；
+ *     pageRange 计费与超收修复一致；外部 fileUrl fail-closed。
  *
  * 支付回调只改支付域，绝不改 PrintTask.status（门控只读 payStatus）——本脚本一并回归。
  * 运行：pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
@@ -37,6 +39,7 @@ import { AuditService } from '../src/audit/audit.service'
 import { signFileUrl } from '../src/files/signing'
 import { OnlinePaymentService } from '../src/payment/online-payment.service'
 import { PaymentProviderRegistry } from '../src/payment/payment-provider.factory'
+import { OrderQuoteService } from '../src/payment/order-quote.service'
 import { OrderStatusService } from '../src/payment/order-status.service'
 import { createPaymentSessionToken } from '../src/payment/payment-session-token'
 import { PricingService } from '../src/payment/pricing.service'
@@ -87,6 +90,7 @@ async function main(): Promise<void> {
   const storage = new StorageService()
   const pageCount = new PrintPageCountService(prisma, storage)
   const pricing = new PricingService(prisma)
+  const orderQuote = new OrderQuoteService(pageCount, pricing)
   const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const provider = new SandboxPaymentProvider(SANDBOX_SECRET)
@@ -256,6 +260,39 @@ async function main(): Promise<void> {
     taskIds.push(unpaid.taskId)
     const unpaidStatus = await payment.getPayStatus(unpaid.orderId, unpaid.paymentSessionToken)
     assert(unpaidStatus.pickupCode === null && unpaidStatus.payStatus === 'unpaid', '7c. 未支付订单 pay-status 不返回 pickupCode')
+
+    // ── (8) P0-1 报价：与建单同口径、不落库、页码范围不超收 ──────────────────
+    const quoteFileUrl = await seedPdf('quote50', 50)
+    const ordersBeforeQuote = await prisma.order.count({ where: { terminalId } })
+    const quoteAll = await orderQuote.quote({
+      fileUrl: quoteFileUrl,
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1 },
+    })
+    assert(quoteAll.amountCents === 1000 && quoteAll.billablePages === 50, `8a. 50 页全文报价 1000 分（实际 ${quoteAll.amountCents}/${quoteAll.billablePages}）`)
+    const quoteRange = await orderQuote.quote({
+      fileUrl: quoteFileUrl,
+      params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1, pageRange: '1-2' },
+    })
+    assert(quoteRange.amountCents === 40 && quoteRange.billablePages === 2, `8b. 50 页打 1-2 报价 40 分而非 1000（实际 ${quoteRange.amountCents}/${quoteRange.billablePages}）`)
+    const createdFromQuote = await printJobs.create(
+      {
+        fileUrl: quoteFileUrl,
+        fileMd5: 'sha256-quote-range',
+        fileName: '报价对齐.pdf',
+        params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1, pageRange: '1-2' },
+      },
+      { terminalId },
+    )
+    taskIds.push(createdFromQuote.taskId)
+    assert(
+      createdFromQuote.amountCents === quoteRange.amountCents && createdFromQuote.billablePages === quoteRange.billablePages,
+      `8c. 报价金额/页数与建单一致（quote=${quoteRange.amountCents}/${quoteRange.billablePages} create=${createdFromQuote.amountCents}/${createdFromQuote.billablePages}）`,
+    )
+    const ordersAfterQuote = await prisma.order.count({ where: { terminalId } })
+    assert(ordersAfterQuote === ordersBeforeQuote + 1, '8d. quote 本身不落 Order（仅建单 +1）')
+    await expectCode('8e. 外部 fileUrl 报价 fail-closed', 'PRINT_PAGE_COUNT_UNAVAILABLE', () =>
+      orderQuote.quote({ fileUrl: 'https://evil.example/file.pdf', params: { copies: 1, colorMode: 'black_white', duplex: 'simplex', paperSize: 'A4', orientation: 'auto', quality: 'standard', scale: 'fit', pagesPerSheet: 1 } }),
+    )
 
     console.log(`\n  ✅ verify:kiosk-cashier-ui 全部通过（${passed} checks）`)
   } finally {

@@ -46,6 +46,7 @@ import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
 import { MyAiRecordsPage } from '../pages/profile/me/MyAiRecordsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
+import { MyPrivacyRequestsPage } from '../pages/profile/me/MyPrivacyRequestsPage'
 import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
 import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
 import { HelpCenterPage } from '../pages/help/HelpCenterPage'
@@ -119,6 +120,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/feedback',       element: <MyFeedbackPage /> },
       // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
       { path: 'me/settings',       element: <MySettingsPage /> },
+      { path: 'me/privacy-requests', element: <MyPrivacyRequestsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）
       { path: 'help',              element: <HelpCenterPage /> },
       // 权益活动中心（活动领取后生成 BenefitGrant，进入 /me/benefits；不含支付/套餐购买/招聘会凭证）

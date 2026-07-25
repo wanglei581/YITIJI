@@ -114,6 +114,7 @@
 - [x] **面试重设计候选取舍**：已完成只读深审并由 #100 收口唯一可迁移的旧 `/interview/setup-preview` 清理点；正式 `/interview/setup` 真实链路保留，旧分叉本体不迁，fair verify residue guard 已由当前 `main` 更新版覆盖。
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
+
 ## P0/P1：用户中心商用级闭环
 
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
@@ -134,6 +135,33 @@
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
 - [ ] **Wave 5 商用预生产与真机验收**：同一提交完成 PostgreSQL、Redis、COS、短信、Windows 一体机、真实打印、弱网、会话过期、键盘/读屏和隐私工单演练；收费模式另跑真实小额支付、退款和对账。
 
+## P0：前后端对齐与计价收口（2026-07-25 三端审计 + 双评审定稿）
+
+来源：2026-07-25 对 kiosk / admin / partner / services-api 的只读对齐审计，经 Gemini 与 team-reviewer 交叉评审后定稿。审计同时确认「已对齐基线」（岗位、企业展示、招聘会 / 校招、政策公告、权益活动、会员权益、消息通知、意见反馈、百宝箱、待机宣传屏、AI 简历主链路、模拟面试、职业规划、岗位匹配、收藏、浏览 / 外部跳转记录）不需要重做。
+
+- [x] **P0-1 第 1 步 自定义页码范围超收修复**：已完成（详见 `current-progress.md` 2026-07-25 条目）。`countPagesInRange` + 建单接入 + fail-closed + `verify:pricing` 16 条新断言；未合 main、未真机复验。
+- [x] **P0-1 第 2 步 报价端点 + Kiosk 去硬编码价**：已完成（详见 `current-progress.md` 2026-07-25 第 2 步条目）。`POST /orders/quote` + Confirm/Preview 去硬编码 + `verify:kiosk-cashier-ui` 33 checks / `verify:print-confirm-honest` 新断言；未合 main、未浏览器金额逐组核对。
+- [x] **P0-2 打印机与设备状态去伪**：已完成（详见 `current-progress.md` 2026-07-25 P0-2 条目）。公共 `useTerminalDeviceStatus` + `KioskDeviceStatusPills`；PrintPreview / HomePage / KioskRoot 三处统一消费 `GET /terminals/:id/printer-status`；`null`/`unknown`/心跳过期 fail-closed；`verify:device-status-honest` 已挂 CI；未合 main、未真机复验。
+- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已完成（详见 `current-progress.md` 2026-07-25 P0-3 条目）。Kiosk `/me/privacy-requests` + Admin `/member-privacy`；shared 诚实文案 SSOT；`verify:data-request-ui` 挂双端 CI；文案严格限定「岗位 AI 咨询会话与授权」。未合 main、未预生产浏览器走查。
+- [x] **P0-4 生产价目落库 SOP + seed 生产守卫**：已完成代码与文档侧（详见 `current-progress.md` 2026-07-25 P0-4 条目）。`seedDevDefaultPriceConfig` 在 `NODE_ENV=production` 抛 `DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION`；`docs/operations/price-config-production.md` 给出显式 upsert / FREE_MODE / 变更记录；`verify:pricing` + `verify:print-rollout-config` 锁住守卫与「不读 effectiveFrom」。**上线操作仍须人工**：按 SOP 在目标库写入拍板价并私有留痕（本波未连生产库写价）。
+- [x] **P1-1 Admin 岗位 / 招聘会信息源补「拒绝审核」**：已完成（详见 `current-progress.md` 2026-07-25 P1-1 条目）。照抄政策信息源拒绝交互；`AdminFairDto` 补回 `rejectReason`；`verify:job-review` / `verify:jobfair-review` PASS。
+- [x] **P1-2 Partner Excel 导入后刷新**：已完成（详见 `current-progress.md` 2026-07-25 P1-2 条目）。`onImported` 调 `fetchSources()` + 行内成功提示；删除过时「接入后端后」文案。
+- [ ] **P1-3 Admin 价目维护页**（含改价审计；从 P0 降级）
+- [x] **P1-4 Admin 用户管理只读版**：已完成（详见 `current-progress.md` 2026-07-25 P1-4 条目）。列表 + 详情 + 手机号搜索/详情审计；停用/写操作仍后置。`verify:admin-users` + `verify:admin-users-ui` 已挂 CI。
+- [ ] **P1-5 法律文档版本号 + 生效日期**：真正的阻塞是法务定稿文本，不是加版本号（`LegalDocPage.tsx:1-13` 已有 `UPDATED_AT` 和「草拟版待法务审定」注释）。改文案必须重跑 `verify:legal-retention-copy`（锁了 6 个必含标记和 5 条负向正则）。
+
+### 本轮明确冻结（不做，附理由）
+
+- [x] **冻结项诚实文案收口**（2026-07-25）：Admin 外设 / 权限、Partner 终端数据 / 统计 / 账号权限已去掉「功能建设中」；Kiosk Profile 继续遵守 Wave 0——**不展示**求职打印套餐 / AI服务套餐 / 招聘会扫码凭证占位（只保留 22 个已接真目的地）。`verify:honest-placeholders` 与 `verify:user-center-wave0` / fusion-w5 哈希合同已对齐。仍不做 RBAC / 统计报表 / 外设配置 / 套餐售卖。
+- **Admin 权限管理 / Partner 账号权限**：现状是粗粒度 `@Roles('admin'|'partner')` 散布 50+ 控制器，做 RBAC 需动全站鉴权面，收口期风险不可承受，且不阻塞任何业务闭环。占位页文案已改为诚实说明（「账号与角色由平台侧统一管理」），不做半套 RBAC。
+- **服务套餐 / 商品体系**（`profileEntries.ts`）：合规红线——若设计成招聘套餐 / 简历推荐包会触碰人力资源服务许可证边界。入口保持隐藏（Wave 0），不恢复「建设中 / 不提供」占位卡。
+- **招聘会自营扫码凭证**：合规红线——平台内发券 / 核销会使本系统成为招聘会主办承办方。Profile 不展示该占位；招聘会信息继续走 `/job-fairs` 来源平台 / 官方入口。
+- **求职材料模板后台化**：`JOB_MATERIAL_TEMPLATES` 放 `packages/shared` 常量符合预期，不是缺陷。
+- **智慧校园内容 CMS、政策社保 / 就业登记 Tab 后台化**：降 P2。`RenshiPage.tsx` 已 **944 行**，动它之前必须先拆分。
+
+### 未纳入 CI 的相关守卫（改动对应文件必须本地手跑）
+
+`verify:terminal-device-config`、`verify:legal-retention-copy`、`verify:home-toolbox-ui`、`verify:print-entry-source-split` 均不在 `ci.yml:128-179`，CI 不会兜底。
 
 ## P0：上线前真实验收
 

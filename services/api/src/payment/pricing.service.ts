@@ -21,6 +21,7 @@ export interface PrintPriceInput {
  * - **绝不信任前端金额**：金额只由本 service 依据 PriceConfig 计算。
  * - **fail-closed**：无 active 价目 / 价目异常 / 非法页数或份数 → 抛错拒绝，**绝不默认 0 元**。
  * - 本批按内容页计价，duplex / pagesPerSheet 不影响单价（见 price-config.seed 说明）。
+ * - **不读 `effectiveFrom`**：该列当前无调度语义；改价靠直接改 `unitCents`/`active`。
  *
  * 注：本 service 只计算报价，不落库、不改 Order 状态机、不接建单（接线留 Task 6）。
  */

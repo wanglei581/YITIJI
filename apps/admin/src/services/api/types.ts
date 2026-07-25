@@ -212,6 +212,7 @@ export interface AdminJobSourceRecord {
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
+  rejectReason?: string | null
 }
 
 // R1: Added sourceOrgId, sourceUrl, description
@@ -233,6 +234,7 @@ export interface AdminFairSourceRecord {
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
+  rejectReason?: string | null
 }
 
 // ─── Admin AI 服务管理类型 ─────────────────────────────────────

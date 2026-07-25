@@ -142,12 +142,13 @@ function assertImportOrder(css) {
   assert.deepEqual(imports, [
     '@ai-job-print/ui/styles/tokens.css',
     '@ai-job-print/ui/styles/fusion-youth.css',
+    // service-desk 在 kiosk-shell 之前：避免冰蓝 --sd-color-primary 盖住 fusion 青绿。
+    '@ai-job-print/ui/styles/service-desk.css',
     '@ai-job-print/ui/styles/kiosk-shell.css',
     '@ai-job-print/ui/styles/kiosk-components.css',
-    '@ai-job-print/ui/styles/service-desk.css',
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
-  ], 'index.css must preserve tokens -> fusion-youth -> kiosk-shell/components -> service-desk -> local CSS -> Tailwind import order')
+  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> local CSS -> Tailwind import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))
@@ -204,7 +205,7 @@ for (const [label, pattern] of [
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
-  ['device status always on', /useHomeDeviceStatus\(\s*true\s*\)/],
+  ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
   ['campus-only nav hide', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\}/],

@@ -6,6 +6,7 @@ export const productionRoutePatterns = [
   '/assistant', '/profile', '/me/resumes', '/me/print-orders', '/me/documents',
   '/me/favorites', '/me/ai-records', '/me/benefits', '/me/activity',
   '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
+  '/me/privacy-requests',
   '/help', '/activities', '/activities/:id', '/renshi', '/campus',
   '/campus/welcome', '/campus/freshman-insights', '/toolbox', '/smart-campus',
   '/smart-campus/welcome', '/smart-campus/freshman-insights',

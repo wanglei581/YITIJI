@@ -18,6 +18,8 @@ export interface DrawerProps {
   open: boolean
   onClose: () => void
   title?: string
+  /** 无 title 时（自定义标题区）仍可提供准确 dialog 名称。 */
+  ariaLabel?: string
   /** 默认 480px,可传 'sm' | 'md' | 'lg'。 */
   size?: 'sm' | 'md' | 'lg'
   /** 是否点击遮罩关闭。默认 true。 */
@@ -39,6 +41,7 @@ export function Drawer({
   open,
   onClose,
   title,
+  ariaLabel,
   size = 'md',
   closeOnBackdrop = true,
   children,
@@ -64,7 +67,7 @@ export function Drawer({
       className="fixed inset-0 z-50 flex justify-end"
       role="dialog"
       aria-modal="true"
-      aria-label={title ?? '抽屉'}
+      aria-label={ariaLabel ?? title ?? '抽屉'}
     >
       {/* 遮罩 */}
       <div

@@ -1,11 +1,12 @@
-// 打印单价常量。
+// 打印单价常量（**仅开发 seed 源**）。
 //
-// 当前订单底座不计算总价、不接真实支付;amountCents 暂保持 0。
-// 这里仅作为后续报价/支付流程的单价真相源,与 Kiosk 预览页展示价保持一致。
+// 运行期价目真相源是数据库 `PriceConfig`；Kiosk 展示/确认价走 `POST /orders/quote`。
+// 本常量只供 `price-config.seed` 写入本地 / 临时库的开发默认价，非正式对外价。
+// 生产写入见 `docs/operations/price-config-production.md`。
 
 type ColorMode = 'black_white' | 'color'
 
-/** 每「面」单价,单位为分。黑白 0.20 元 = 20 分;彩色 0.50 元 = 50 分。 */
+/** 每「面」开发默认单价，单位为分。黑白 0.20 元 = 20 分;彩色 0.50 元 = 50 分。 */
 export const PRINT_UNIT_PRICE_CENTS: Record<ColorMode, number> = {
   black_white: 20,
   color: 50,

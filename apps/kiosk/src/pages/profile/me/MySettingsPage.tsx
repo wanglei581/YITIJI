@@ -427,6 +427,16 @@ export function MySettingsPage() {
 
           {/* 协议 / 隐私入口 */}
           <section aria-label="协议与隐私" className={`${cardSurface} py-1`}>
+            {isLoggedIn && (
+              <LinkRow
+                icon={ShieldQuestionIcon}
+                iconBg="bg-plum-soft"
+                iconColor="text-plum"
+                label="岗位 AI 隐私请求"
+                desc="仅限岗位 AI 咨询会话与授权，不删除简历或订单"
+                onClick={() => navigate('/me/privacy-requests')}
+              />
+            )}
             <LinkRow
               icon={FileTextIcon}
               iconBg="bg-primary-50"
@@ -482,7 +492,7 @@ export function MySettingsPage() {
           <div className="me-note flex items-start gap-3 px-5 py-4">
             <ShieldQuestionIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
             <p className="text-xs leading-relaxed text-neutral-500">
-              账号注销和数据导出尚未开放；相关能力完成安全验证与运营闭环后将在本页提供。如需协助，请联系现场工作人员。
+              账号注销和数据导出尚未开放。岗位 AI 咨询会话与授权相关请求可在「岗位 AI 隐私请求」中提交；不会删除简历、文档、打印订单或收藏。如需其他协助，请联系现场工作人员。
             </p>
           </div>
         </div>

@@ -14,7 +14,7 @@ const W5_ROUTES = [
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
-  '/me/notifications', '/me/feedback', '/me/settings', '/help',
+  '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
   '/activities', '/activities/:id', '/toolbox', '/notifications',
 ]
 
@@ -89,8 +89,8 @@ function regularFiles(root) {
 
 const routes = extractRoutes(read('src/routes/index.tsx'))
 const owned = routes.filter((route) => W5_ROUTES.includes(route))
-assert.deepEqual(owned, W5_ROUTES, 'W5 must own exactly the ordered 24 route patterns')
-assert.equal(new Set(owned).size, 24, 'W5 route inventory must be unique')
+assert.deepEqual(owned, W5_ROUTES, 'W5 must own exactly the ordered 25 route patterns')
+assert.equal(new Set(owned).size, 25, 'W5 route inventory must be unique')
 
 for (const [path, expected] of FROZEN) {
   assert.equal(sha256(path), expected, `frozen W5 dependency changed: ${path}`)

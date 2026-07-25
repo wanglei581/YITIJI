@@ -231,7 +231,7 @@ model Order {
   paidAt            DateTime?
   paidBy            String? // 'self' | 操作员标识（manual 时记录）
   pickupCode        String?   @unique // 取件凭证码，paid 时生成
-  billablePages     Int? // 后端识别的计费页数（绝不信任前端 file.pages）
+  billablePages     Int? // 实际计费页数：后端识别的文档页数 ∩ pageRange 选中页（绝不信任前端 file.pages）
   billingPageSource String? // 'pdf_lightweight_scan' | 'image_single_page'
 
   // ── C5-2 线上支付 additive 补列（沙箱通道，无 live 网关）─────────

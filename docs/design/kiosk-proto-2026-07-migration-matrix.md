@@ -34,7 +34,7 @@
 | 20 | 20-me-favorites.html | 我的收藏 | 我的 | `/me/favorites` | MyFavoritesPage | src/pages/profile/me/MyFavoritesPage.tsx | memberFavorites.getAllMyFavorites / useInkRipple | 岗位/招聘会/政策收藏浏览 | loading / empty / error / 未登录 | verify-profile-feedback-inkpaper(间接) |
 | 21 | 21-me-benefits.html | 我的权益 | 我的 | `/me/benefits` | MyBenefitsPage | src/pages/profile/me/MyBenefitsPage.tsx | memberFavorites.getMyBenefits / useInkRipple | 券/免费次数/额度/政策资格 | loading / empty / error / 未登录 | verify-profile-feedback-inkpaper(间接) |
 | 22 | 22-me-notifications.html | 通知与反馈 | 我的 | `/me/notifications` (+ `/me/feedback`) | MyNotificationsPage (+ MyFeedbackPage) | src/pages/profile/me/MyNotificationsPage.tsx | API_MODE / useInkRipple (通知);MyFeedbackPage 走反馈工单 | 消息分类/已读/删除、反馈工单 | loading / empty / 未登录 | verify-profile-resumes-notifications-inkpaper / verify-profile-feedback-inkpaper |
-| 23 | 23-me-settings.html | 账号设置 | 我的 | `/me/settings` | MySettingsPage | src/pages/profile/me/MySettingsPage.tsx | jobAi.getJobAiConsentStatus+revokeJobAiConsent / useInkRipple | 会话说明、AI授权撤销、退出登录 | loading / 登录态 | verify-user-center-wave0 |
+| 23 | 23-me-settings.html | 账号设置 | 我的 | `/me/settings` (+ `/me/privacy-requests`) | MySettingsPage (+ MyPrivacyRequestsPage) | src/pages/profile/me/MySettingsPage.tsx | jobAi.getJobAiConsentStatus+revokeJobAiConsent / useInkRipple；隐私请求页接 `/me/data-requests` | 会话说明、AI授权撤销、退出登录；隐私请求仅撤回授权 | loading / 登录态 | verify-user-center-wave0 / verify-data-request-ui |
 | 24 | 24-activities.html | 权益活动 | 我的 | `/activities` | BenefitActivitiesPage | src/pages/activities/BenefitActivitiesPage.tsx | benefitActivities.listBenefitActivities | 领取型活动列表、库存状态 | loading / empty / error | verify-user-center-wave0(间接) |
 | 25 | 25-resume-generate.html | AI简历生成 | AI简历 | `/resume/generate` | ResumeGeneratePage | src/pages/resume/ResumeGeneratePage.tsx | api.submitResumeGenerate | 信息表单、提交生成 | loading / error | verify-resume-diagnosis-flow-ui |
 | 26 | 26-resume-generate-preview.html | 生成预览 | AI简历 | `/resume/generate/preview` | ResumeGeneratePreviewPage | src/pages/resume/ResumeGeneratePreviewPage.tsx | api.getResumeGenerate+exportGeneratedResume | A4 缩略预览、分段重生成、导出 | loading / error | verify-profile-resumes-notifications-inkpaper |
@@ -284,10 +284,10 @@
 
 `/campus`、`/campus/welcome`、`/campus/freshman-insights` 与 `/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key` 保留各自语义：前者是校园招聘专区及其直达容错页面，后者是智慧校园正式能力；它们不是互为同义重定向。
 
-### 8.2 生产路由全集（86 个 normalized patterns）
+### 8.2 生产路由全集（87 个 normalized patterns）
 
 - 系统与顶级页面：`/`、`/login`、`/member/qr-login`、`/upload/phone`、`/legal/:doc`、`/resume/job-fit`、`/resume/career-plan`、`/interview/setup`、`/interview/session`、`/interview/report`、`/interview/tips`、`/interview/reports`、`/screensaver`、`/session-timeout`、`/error-offline`。
-- 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
+- 助手、我的与公共入口：`/assistant`、`/profile`、`/me/resumes`、`/me/print-orders`、`/me/documents`、`/me/favorites`、`/me/ai-records`、`/me/benefits`、`/me/activity`、`/me/activity/:id`、`/me/notifications`、`/me/feedback`、`/me/settings`、`/me/privacy-requests`、`/help`、`/activities`、`/activities/:id`、`/renshi`。
 - 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。

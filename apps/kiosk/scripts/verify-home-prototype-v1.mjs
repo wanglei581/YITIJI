@@ -174,11 +174,12 @@ expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, '
 expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按取舍决策删除')
 expect(/disabled=\{disabled\}/.test(home) && /tile\.disabled \|\| !tile\.to/.test(home), '磁贴禁用态由真实 disabled/to 驱动')
 
-// ── 真实设备状态：由共享 KioskLayout 顶栏消费 hook，首页不再自绘 topbar ──
-expect(existsSync(join(root, 'src/pages/home/hooks/useHomeDeviceStatus.ts')), '真实设备状态 hook 存在')
-expect(/useHomeDeviceStatus\(\s*true\s*\)/.test(kioskRoot), 'KioskRoot 始终拉取真实设备状态')
+// ── 真实设备状态：由共享 KioskLayout 顶栏消费 fail-closed hook，首页不再自绘 topbar ──
+expect(existsSync(join(root, 'src/hooks/useTerminalDeviceStatus.ts')), '真实设备状态 hook 存在')
+expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(kioskRoot), 'KioskRoot 始终拉取真实设备状态')
 expect(kioskRoot.includes('<KioskTopbarStatus'), '共享顶栏注入真实设备状态胶囊')
 expect(!/function KioskTopBar/.test(home), '首页不再自绘 KioskTopBar')
+expect(!/>\s*打印机在线\s*</.test(home) && !home.includes('网络正常'), '首页不硬编码「打印机在线」/「网络正常」字面量')
 
 // ── 真实登录弹窗 + 动态专区开关（承接旧守卫）──────────────────────
 expect(home.includes('<MemberLoginDialog'), '首页挂载真实登录弹窗 MemberLoginDialog')

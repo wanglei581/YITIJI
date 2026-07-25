@@ -201,22 +201,35 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
     status: 200,
     json: { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] },
   })
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents: 200,
+      billablePages: 2,
+      billingPageSource: 'detected',
+      priceLines: [
+        {
+          serviceKey: 'print_bw_page',
+          description: '黑白打印',
+          unitCents: 100,
+          quantity: 2,
+          amountCents: 200,
+        },
+      ],
+    },
+  })
 
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
-  const priceResponse = page.waitForResponse((response) =>
-    response.request().method() === 'GET'
-      && new URL(response.url()).pathname === '/api/v1/print/price-config',
-  )
-  const printerResponse = page.waitForResponse((response) =>
-    response.request().method() === 'GET'
-      && new URL(response.url()).pathname === '/api/v1/terminals/KSK-001/printer-status',
+  const quoteResponse = page.waitForResponse((response) =>
+    response.request().method() === 'POST'
+      && new URL(response.url()).pathname === '/api/v1/orders/quote',
   )
   await page.getByRole('button', { name: /直接打印/ }).click()
   await page.waitForURL('**/print/confirm')
-  await Promise.all([priceResponse, printerResponse])
+  await quoteResponse
   await expect(page.locator('[data-w2-page="print-confirm"]')).toBeVisible()
-  await expect(page.getByText('¥1.00/页 × 2 页 × 1 份', { exact: true })).toBeVisible()
+  await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
   await expect(page.locator('[data-w2-page="print-confirm"] .print-file-name')).toHaveText('w2-scan.pdf')
   await expectHealthy(page, errors)
 })

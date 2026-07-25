@@ -1,7 +1,7 @@
 import { KioskTopbar } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
 import { getTerminalId } from '../../services/api/terminalConfig'
-import { useHomeDeviceStatus } from '../../pages/home/hooks/useHomeDeviceStatus'
+import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 
 /** 顶栏右侧：实时时钟 + 真实设备状态胶囊（原型 topbar .right）。 */
 export function KioskTopbarStatus({ tone, label }: { tone: string; label: string }) {
@@ -39,14 +39,21 @@ export function KioskTopbarStatus({ tone, label }: { tone: string; label: string
  * 否则会出现双顶栏。页面禁止自建第三套顶栏实现。
  */
 export function KioskAppTopbar() {
-  const deviceStatus = useHomeDeviceStatus()
+  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
   const terminalId = getTerminalId() || '01号机'
+  const tone = loading
+    ? 'neutral'
+    : printerReady
+      ? 'positive'
+      : kind === 'unknown' || kind === 'low_paper'
+        ? 'warning'
+        : 'negative'
 
   return (
     <KioskTopbar
       brandTitle={`就业服务大厅 · ${terminalId}`}
       brandSubtitle="AI求职打印服务终端"
-      right={<KioskTopbarStatus tone={deviceStatus.tone} label={deviceStatus.label} />}
+      right={<KioskTopbarStatus tone={tone} label={loading ? '设备检查中' : printerLabel} />}
     />
   )
 }

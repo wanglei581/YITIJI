@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Card, KioskActionBar } from '@ai-job-print/ui'
 import {
@@ -15,7 +15,6 @@ import type {
   DuplexMode,
   PagesPerSheet,
   PrintJobParams,
-  PrinterStatus,
   PrintOrientation,
   PrintQuality,
   PrintScale,
@@ -34,6 +33,8 @@ import {
   unitCentsFor,
   usePrintPriceConfig,
 } from '../../services/print/priceConfigApi'
+import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
+import { countPagesInRange } from './pageRange'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
@@ -43,55 +44,6 @@ interface LocationState {
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
   pageRange?: string
-}
-
-const PRINTER_OFFLINE: PrinterStatus = {
-  isOnline: false,
-  hasPaper: true,
-  tonerLevels: { black: 0, cyan: 0, magenta: 0, yellow: 0 },
-}
-
-function mapPrinterStatus(raw: string | null | undefined): PrinterStatus {
-  switch (raw) {
-    case 'ready':     return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 } }
-    case 'offline':   return PRINTER_OFFLINE
-    case 'error':     return { isOnline: true,  hasPaper: false, tonerLevels: { black: 0, cyan: 0, magenta: 0, yellow: 0 }, errorCode: 'hardwareError' }
-    case 'low_paper': return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 }, errorCode: 'lowPaper' }
-    default:          return { isOnline: true,  hasPaper: true,  tonerLevels: { black: 100, cyan: 100, magenta: 100, yellow: 100 } }
-  }
-}
-
-function usePrinterStatus(): { printerName: string; printer: PrinterStatus; loading: boolean } {
-  const terminalId  = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
-  const printerName = (import.meta.env['VITE_PRINTER_NAME'] ?? '').trim() || '已配置打印机'
-  const [printer, setPrinter] = useState<PrinterStatus>(PRINTER_OFFLINE)
-  const [loading, setLoading] = useState(!!terminalId)
-  const cancelledRef = useRef(false)
-
-  useEffect(() => {
-    if (!terminalId) {
-      setLoading(false)
-      return
-    }
-    cancelledRef.current = false
-    const ac = new AbortController()
-    fetch(`/api/v1/terminals/${terminalId}/printer-status`, { signal: ac.signal })
-      .then((r) => r.json())
-      .then((data: { printerStatus?: string | null }) => {
-        if (cancelledRef.current) return
-        setPrinter(mapPrinterStatus(data.printerStatus))
-        setLoading(false)
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') return
-        if (cancelledRef.current) return
-        setPrinter(PRINTER_OFFLINE)
-        setLoading(false)
-      })
-    return () => { cancelledRef.current = true; ac.abort() }
-  }, [terminalId])
-
-  return { printerName, printer, loading }
 }
 
 function SectionHead({ children }: { children: React.ReactNode }) {
@@ -179,9 +131,22 @@ export function PrintParamsPage() {
   const uploadPath = printUploadPathForSource(source)
   // Page range passed from preview step
   const incomingPageRange = locationState?.pageRange ?? (restoredPrintParams?.pageRange && restoredPrintParams.pageRange !== 'all' ? restoredPrintParams.pageRange : 'all')
-  const effectivePages = file.pages ?? 1
+  // 用量与估价按 pageRange 交集；未知页数时退回 1 仅用于纸张预估，不作为实付依据。
+  const billablePages =
+    file.pages === null
+      ? null
+      : countPagesInRange(incomingPageRange === 'all' ? 'all' : incomingPageRange, file.pages)
+  const effectivePages = billablePages ?? (file.pages ?? 1)
 
-  const { printerName, printer, loading: printerLoading } = usePrinterStatus()
+  const {
+    printerName,
+    printer,
+    printerLabel,
+    printerReady,
+    tonerKnown,
+    kind: printerKind,
+    loading: printerLoading,
+  } = useTerminalDeviceStatus()
 
   const [copies, setCopies] = useState(restoredPrintParams?.copies ?? 1)
   const [colorMode, setColorMode] = useState<ColorMode>(restoredPrintParams?.colorMode ?? 'black_white')
@@ -191,12 +156,17 @@ export function PrintParamsPage() {
   const quality: PrintQuality = 'standard'
   const pagesPerSheet: PagesPerSheet = 1
 
-  const colorTonerLow = printer.tonerLevels.cyan < 25 || printer.tonerLevels.magenta < 25 || printer.tonerLevels.yellow < 25
+  const colorTonerLow =
+    tonerKnown &&
+    (printer.tonerLevels.cyan < 25 || printer.tonerLevels.magenta < 25 || printer.tonerLevels.yellow < 25)
 
   const warnings = useMemo(() => {
     const w: { id: string; level: 'error' | 'warn' | 'info'; text: string }[] = []
-    if (!printer.isOnline)
+    if (printerKind === 'unknown' || printer.errorCode === 'statusUnknown') {
+      w.push({ id: 'unknown', level: 'error', text: '打印机状态未知，请稍候或联系工作人员' })
+    } else if (!printerReady) {
       w.push({ id: 'offline', level: 'error', text: '打印机离线，请联系工作人员' })
+    }
     if (printer.errorCode === 'paperJam')
       w.push({ id: 'jam', level: 'error', text: '打印机卡纸，请联系工作人员处理后再打印' })
     if (!printer.hasPaper)
@@ -206,9 +176,9 @@ export function PrintParamsPage() {
     if (file.pages !== null && file.pages > 8 && duplex === 'simplex')
       w.push({ id: 'duplex-hint', level: 'info', text: `文件共 ${file.pages} 页，建议开启双面打印节省用纸` })
     return w
-  }, [printer, colorTonerLow, colorMode, duplex, file.pages])
+  }, [printer, printerReady, printerKind, colorTonerLow, colorMode, duplex, file.pages])
 
-  const hasBlockingWarning = warnings.some((w) => w.level === 'error')
+  const hasBlockingWarning = warnings.some((w) => w.level === 'error') || !printerReady
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(effectivePages / pagesPerSheet)
@@ -221,7 +191,10 @@ export function PrintParamsPage() {
   const unitCents = unitCentsFor(priceCfg.config, colorMode)
   const bwUnitCents = unitCentsFor(priceCfg.config, 'black_white')
   const colorUnitCents = unitCentsFor(priceCfg.config, 'color')
-  const estimateCents = estimatePrintCents(priceCfg.config, { pages: file.pages, copies, colorMode })
+  const estimateCents =
+    billablePages === null
+      ? null
+      : estimatePrintCents(priceCfg.config, { pages: billablePages, copies, colorMode })
 
   const handleNext = () => {
     const params: PrintJobParams = {
@@ -359,18 +332,18 @@ export function PrintParamsPage() {
           <aside className="pp-side-col">
             {/* 打印机状态 */}
             <Card className="flex items-center gap-3 p-4">
-              <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-full', printer.isOnline ? 'bg-success-bg' : 'bg-error-bg'].join(' ')}>
-                {printer.isOnline
+              <div className={['flex h-9 w-9 shrink-0 items-center justify-center rounded-full', printerReady ? 'bg-success-bg' : 'bg-error-bg'].join(' ')}>
+                {printerReady
                   ? <PrinterIcon className="h-5 w-5 text-success-fg" />
                   : <WifiOffIcon className="h-5 w-5 text-error-fg" />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-neutral-900">{printerLoading ? '检测设备中…' : printerName}</p>
-                <p className={['text-xs', printer.isOnline ? 'text-success-fg' : 'text-error-fg'].join(' ')}>
-                  {printerLoading ? '请稍候' : printer.isOnline ? '在线' : '离线'}
+                <p className={['text-xs', printerReady ? 'text-success-fg' : 'text-error-fg'].join(' ')}>
+                  {printerLoading ? '请稍候' : printerLabel}
                 </p>
               </div>
-              {!printerLoading && printer.isOnline && <CheckCircleIcon className="h-5 w-5 shrink-0 text-success" />}
+              {!printerLoading && printerReady && <CheckCircleIcon className="h-5 w-5 shrink-0 text-success" />}
             </Card>
 
             {/* 警告/提示 */}
@@ -419,10 +392,17 @@ export function PrintParamsPage() {
               ) : (
                 <>
                   <InfoRow label="单价" value={unitCents === null ? '获取中…' : `${formatPriceCents(unitCents)} / 页（${colorMode === 'color' ? '彩色' : '黑白'}）`} />
-                  <InfoRow label="计费页数 × 份数" value={file.pages === null ? '页数待识别，以实际识别为准' : `${file.pages} 页 × ${copies} 份`} />
-                  <InfoRow label="打印费用" value={estimateCents === null ? '以收银台金额为准' : formatPriceCents(estimateCents)} />
+                  <InfoRow
+                    label="计费页数 × 份数"
+                    value={
+                      billablePages === null
+                        ? '页数待识别，以确认页报价为准'
+                        : `${billablePages} 页 × ${copies} 份`
+                    }
+                  />
+                  <InfoRow label="打印费用" value={estimateCents === null ? '以确认页报价为准' : formatPriceCents(estimateCents)} />
                   <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
-                    <p className="text-sm text-neutral-500">按内容页计费；实付以收银台为准</p>
+                    <p className="text-sm text-neutral-500">预估含页范围；实付以确认页报价为准</p>
                     <div className="flex items-baseline gap-1">
                       <span className="text-xs font-medium text-neutral-500">预估金额</span>
                       <span className="text-xl font-bold text-neutral-900">

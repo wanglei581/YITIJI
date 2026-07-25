@@ -54,6 +54,7 @@
     "verify:kiosk-upload-print-contract": "node -r @swc-node/register scripts/verify-kiosk-upload-print-contract.ts",
     "verify:print-rollout-config": "node -r @swc-node/register scripts/verify-print-rollout-config.ts",
     "verify:admin-orders-readonly": "node -r @swc-node/register scripts/verify-admin-orders-readonly.ts",
+    "verify:admin-users": "node -r @swc-node/register scripts/verify-admin-users.ts",
     "verify:print-jobs": "node -r @swc-node/register scripts/verify-print-jobs.ts",
     "verify:admin-pending-dispose": "node -r @swc-node/register scripts/verify-admin-pending-dispose.ts",
     "verify:legacy-pending-print-task-disposition": "node -r @swc-node/register scripts/verify-legacy-pending-print-task-disposition.ts",

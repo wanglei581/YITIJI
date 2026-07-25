@@ -306,7 +306,7 @@ expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile[
 expect(welcome.includes('<MemberLoginDialog'), '保留 MemberLoginDialog')
 expect(/onClick=\{\(\)\s*=>\s*setLoginOpen\(true\)\}/.test(welcome), '游客保留打开登录弹窗回调')
 expect(/onContinueAsGuest=\{\(\)\s*=>\s*\{\s*continueAsGuest\(\)/.test(welcome), '保留真实继续游客回调')
-expect(/useHomeDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
+expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
 expect(read('src/layouts/KioskRoot.tsx').includes('<KioskTopbarStatus'), '共享顶栏注入设备状态')
 expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '保留百宝箱/智慧校园真实配置 hooks')
@@ -326,13 +326,15 @@ expect(read('src/layouts/KioskRoot.tsx').includes("tabToPath") && read('src/layo
 const rootSrc = read('src/layouts/KioskRoot.tsx')
 const tabPathBody = (() => {
   const start = rootSrc.indexOf('function tabToPath')
-  const end = rootSrc.indexOf('export function KioskRoot', start)
+  // tabToPath 之后可能紧跟 statusToneFor 等辅助函数；只截取到下一函数边界。
+  const nextFn = rootSrc.slice(start + 1).search(/\nfunction |\nexport function /)
+  const end = nextFn >= 0 ? start + 1 + nextFn : rootSrc.indexOf('export function KioskRoot', start)
   return start >= 0 && end > start ? rootSrc.slice(start, end) : ''
 })()
 const declaredRoutes = new Set([
   ...[...serviceGroups.matchAll(/(?:to|titleTo)\s*:\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
   ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
-  ...[...tabPathBody.matchAll(/return\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
+  ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
 ])
 const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
 expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')

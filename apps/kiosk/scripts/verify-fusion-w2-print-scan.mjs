@@ -194,11 +194,24 @@ for (const [path, marker] of printSetupPages) {
 }
 for (const path of ['src/pages/print/PrintPreviewPage.tsx', 'src/pages/print/PrintParamsPage.tsx']) {
   const body = read(path)
+  const isPreview = path.includes('PrintPreviewPage')
   for (const marker of [
-    'readPrintMaterialSession', 'printer-status', 'usePrintPriceConfig',
-    'estimatePrintCents', 'pageRange', 'patchPrintMaterialSession',
-  ]) assert.match(body, new RegExp(marker), `${path} retains ${marker}`)
+    'readPrintMaterialSession',
+    'useTerminalDeviceStatus',
+    'pageRange',
+    'patchPrintMaterialSession',
+    ...(isPreview ? [] : ['usePrintPriceConfig', 'estimatePrintCents']),
+  ]) {
+    assert.match(body, new RegExp(marker), `${path} retains ${marker}`)
+  }
 }
+assert.match(read('src/pages/print/PrintParamsPage.tsx'), /countPagesInRange/, 'PrintParamsPage estimates with pageRange')
+assert.match(read('src/hooks/useTerminalDeviceStatus.ts'), /printer-status/, 'device status hook hits printer-status')
+assert.match(
+  read('src/pages/print/PrintConfirmPage.tsx'),
+  /quotePrintOrder/,
+  'PrintConfirmPage quotes via backend',
+)
 const printConfirm = read('src/pages/print/PrintConfirmPage.tsx')
 for (const marker of [
   'createPrintJob', 'fileUrl', 'fileMd5', 'paymentSessionToken', 'amountCents > 0',

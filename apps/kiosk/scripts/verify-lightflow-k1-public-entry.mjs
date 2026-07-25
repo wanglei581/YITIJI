@@ -89,7 +89,8 @@ function componentRenderRoot(source, componentName) {
     if (/[$\w]/.test(body[index - 1] ?? '') || /[$\w]/.test(body[index + 6] ?? '')) continue
 
     const afterReturn = body.slice(index + 'return'.length)
-    const root = afterReturn.match(/^\s*\(\s*<(?:div|main|section)\b([\s\S]*?)>/)
+    // W19+ 部分公共页根节点改为共享 KioskPageFrame（主题由 KioskLayout 提供）。
+    const root = afterReturn.match(/^\s*\(\s*<(?:div|main|section|KioskPageFrame)\b([\s\S]*?)>/)
     if (root) return root[0]
   }
   return ''
@@ -98,11 +99,14 @@ function componentRenderRoot(source, componentName) {
 function expectPageRootClasses(source, componentName, rootClass, label) {
   const root = componentRenderRoot(source, componentName)
   const rootMatch = root.match(/className\s*=\s*(["'])([^"']*)\1/)
-  expect(rootMatch !== null, `${label}: 未找到 ${componentName} 实际 render 根节点的静态 div/main/section className`)
+  expect(rootMatch !== null, `${label}: 未找到 ${componentName} 实际 render 根节点的静态 div/main/section/KioskPageFrame className`)
   if (!rootMatch) return root
 
-  const classes = rootMatch[2].split(/\s+/)
-  expect(classes.includes('service-desk'), `${label}: 顶层 UI 缺少 service-desk class`)
+  const classes = rootMatch[2].split(/\s+/).filter(Boolean)
+  const usesSharedFrame = /<KioskPageFrame\b/.test(root)
+  if (!usesSharedFrame) {
+    expect(classes.includes('service-desk'), `${label}: 顶层 UI 缺少 service-desk class`)
+  }
   expect(classes.includes(rootClass), `${label}: 顶层 UI 缺少 ${rootClass} root class`)
   return root
 }
@@ -393,7 +397,7 @@ expectCssScopeSelfCheck()
 const packageJson = read('package.json')
 const routes = read('src/routes/index.tsx')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
-const homeDeviceStatusHook = read('src/pages/home/hooks/useHomeDeviceStatus.ts')
+const terminalDeviceStatusHook = read('src/hooks/useTerminalDeviceStatus.ts')
 const loginPage = read('src/pages/auth/LoginPage.tsx')
 const memberPhoneLoginHook = read('src/pages/auth/hooks/useMemberPhoneLogin.ts')
 const memberPhoneLoginPane = read('src/pages/auth/components/MemberPhoneLoginPane.tsx')
@@ -495,13 +499,13 @@ expect(
 )
 
 expectNotIncludes(kioskRoot, 'label={deviceStatus}', 'KioskRoot 不得直接展示内部 deviceStatus')
-expectIncludes(kioskRoot, 'useHomeDeviceStatus(true)', 'KioskRoot 全路由共享顶栏必须读取真实设备状态')
+expectIncludes(kioskRoot, 'useTerminalDeviceStatus(true)', 'KioskRoot 全路由共享顶栏必须读取真实设备状态')
 expectNotIncludes(kioskRoot, "useState<DeviceStatus>('idle')", 'KioskRoot 不得把未知设备状态硬编码为 idle')
-expectIncludes(kioskRoot, 'const statusLabel = deviceStatus.label', 'KioskRoot 必须展示真实或中性的设备状态文案')
+expectPattern(kioskRoot, /const statusLabel = loading \? '设备检查中' : printerLabel/, 'KioskRoot 必须展示真实或中性的设备状态文案')
 expectIncludes(kioskRoot, '<KioskTopbarStatus', 'KioskRoot 通过共享状态胶囊展示设备状态')
-expectIncludes(kioskRoot, 'tone={deviceStatus.tone}', 'KioskRoot 状态胶囊 tone 来自真实 deviceStatus')
-expectPattern(homeDeviceStatusHook, /export function useHomeDeviceStatus\(enabled = true\)/, '设备状态 hook 保留 enabled 门控能力')
-expectIncludes(homeDeviceStatusHook, 'if (!enabled) return', '设备状态 hook 停用时不得发起重复请求')
+expectPattern(kioskRoot, /kind\s*===\s*['"]unknown['"]\s*\|\|\s*kind\s*===\s*['"]low_paper['"]/, 'KioskRoot 未知/低纸状态映射 warning tone（fail-closed）')
+expectPattern(terminalDeviceStatusHook, /export function useTerminalDeviceStatus\(enabled = true\)/, '设备状态 hook 保留 enabled 门控能力')
+expectIncludes(terminalDeviceStatusHook, 'if (!enabled) return', '设备状态 hook 停用时不得发起重复请求')
 
 expectIncludes(mobileQrPage, 'k1-mobile-qr-invalid', 'MobileQrLoginPage 缺票据或失效时必须使用单一恢复状态')
 expectPattern(

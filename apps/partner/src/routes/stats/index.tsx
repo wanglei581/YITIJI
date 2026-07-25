@@ -7,8 +7,8 @@ export default function StatsPage() {
     <Page title="数据统计" subtitle="岗位与招聘会数据统计">
       <EmptyState
         icon={BarChart2Icon}
-        title="功能建设中"
-        description="该模块正在开发中，上线前暂不开放，敬请期待。"
+        title="统计报表本阶段不开放"
+        description="岗位与招聘会请在「数据源 / 同步日志 / 工作台」查看真实业务数据。本页不做假报表或演示图表。"
       />
     </Page>
   )

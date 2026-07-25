@@ -66,7 +66,7 @@ expect(/presentation="fusion-youth"/.test(root), 'KioskRoot 全路由固定 fusi
 expect(!root.includes('SERVICE_DESK_EXACT_ROUTES'), '无 SERVICE_DESK 路由白名单分叉')
 expect(!/visualTheme=\{isServiceDeskRoute/.test(root), '无 legacy/service-desk 三元切换')
 expect(/hideHeader=\{isCampusZone\}/.test(root) && /hideBottomNav=\{isCampusZone\}/.test(root), '仅校园专区隐藏共享顶栏/底栏')
-expect(/useHomeDeviceStatus\(\s*true\s*\)/.test(root), '共享顶栏始终拉取真实设备状态')
+expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(root), '共享顶栏始终拉取真实设备状态')
 expect(root.includes('<KioskTopbarStatus'), '共享顶栏注入时钟+设备状态胶囊')
 
 expect(!/function KioskTopBar/.test(home) && !/function HomeNavbar/.test(home), '首页不再自绘顶栏/底栏组件')
