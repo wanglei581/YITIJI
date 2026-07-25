@@ -116,7 +116,8 @@
 
 - [x] **critical/high 审计与运行时防护（已合入）**：[PR #271](https://github.com/wanglei581/YITIJI/pull/271) 已 squash merge 到 `main@f8b8f1ec`。`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0`、三端 `vite@6.4.3` 通过 override/direct manifest/lockfile 收敛，Nest 间接 Multer 同样为 2.2.0。10 个 API `FileInterceptor` 显式 `fieldNestingDepth: 0`，保留已有 `fileSize`、不擅自改变其余四处文件大小语义；AST + 真实 loopback multipart verify 证明 flat 204、`meta[nested]` 400 且为 `LIMIT_FIELD_NESTING`，已接入 SQLite CI。冻结安装、audit、依赖树、全 workspace typecheck、四端 build、相关上传回归均通过；未部署。
 - [x] **PR CI 验证（已完成）**：GitHub Actions [`29552724252`](https://github.com/wanglei581/YITIJI/actions/runs/29552724252) 的 `build-and-verify` 与 `postgres-readiness` 均成功；前者在 Linux fresh SQLite schema 后实际运行新增 `verify:multipart-field-nesting` 与既有 `verify:print-jobs`。本机临时 SQLite 的 Prisma Schema Engine 通用错误未被 schema/migration 或生产环境绕过。
-- [ ] **P1 低/中危依赖评估**：当前完整 audit 仍有 `esbuild`（low）、`@babel/core`（low）和 `js-yaml`（moderate），但没有 high/critical；另起最小升级/兼容性任务处理，不与本 P0 补丁混合，也不得据此倒推出生产已部署。
+- [x] **P1 依赖审计评估（只读，2026-07-25）**：对锁文件 tip `9b869d0d`（其后 #350 仅 docs）重跑 `pnpm audit` / `--prod`。基线已相对 #271 漂移为完整树 **0 critical / 13 high / 19 moderate / 3 low**，`--prod` **0 / 9 / 19 / 1**；旧「仅剩 esbuild/babel/js-yaml 且无 high」表述作废。报告：`docs/reviews/dependency-audit-p1-2026-07-25.md`。**未升级、未改 lockfile、未部署**。
+- [ ] **P1 依赖 remediation（另开代码 PR）**：按评估报告 Rem-1…4 最小升级（`react-router-dom≥7.18`、`axios≥1.18`、Playwright≥1.55.1、overrides：`shell-quote@1.9.0` / brace-expansion 分 major / `js-yaml@4.3` / `fast-uri@3.1.4` / `postcss@8.5.18`，并评估抬 Hono pins）+ `verify:dependency-security`；React Router RSC `GHSA-qwww-vcr4-c8h2` 仅允许精确 URL + 架构守卫的限时例外。不与业务/schema/支付/硬件混改；不得伪称 audit=0。
 
 ## P0：合作机构后台账号安全移除
 
@@ -212,9 +213,9 @@
 
 - [x] **F1 future-only provenance clean-main 候选迁移（已合并，未部署）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。该候选已随 [PR #262](https://github.com/wanglei581/YITIJI/pull/262) 合入 `main`（merge commit `4b3c9887`，head `b7a365da`；`build-and-verify` 与 `postgres-readiness` 均成功）。不得将该合并、本地 fixture 或 CI 接线写作 production 来源一致性通过：未部署、未安装 launcher、未改 PM2，当前 production 继续 **NO-GO**，不得执行首次启用；首次启用与回滚演练仍须单独生产授权。
 
-- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已 squash 合入 `main@cec65d9c`，合并后 GitHub Actions `29503789983` 的 `build-and-verify` / `postgres-readiness` 均成功，代码集成与主线 CI 已完成。尚未部署、发送真实短信或执行真实转移；当前下一步是单独清零依赖审计 P0，再取得部署授权并由用户本人完成 OTP。生产执行仍需另行授权，依赖阻塞未清除前不得部署或宣称可部署。
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已 squash 合入 `main@cec65d9c`，合并后 GitHub Actions `29503789983` 的 `build-and-verify` / `postgres-readiness` 均成功，代码集成与主线 CI 已完成。尚未部署、发送真实短信或执行真实转移；依赖侧须先完成 [P1 remediation](../reviews/dependency-audit-p1-2026-07-25.md)（或书面接受当前 high 基线），再取得部署授权并由用户本人完成 OTP。生产执行仍需另行授权，不得宣称可部署。
   1. **PR / CI（已完成）**：候选已合入主线；Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁已在共享 SQLite suite 中保持逐行串行，合并后双 job 成功。
-  2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
+  2. **部署授权**：先按 `docs/reviews/dependency-audit-p1-2026-07-25.md` 处理当前 high 基线（旧文「`shell-quote` critical」已过时；#271 后 critical 已清，但 2026-07-25 完整树仍有 13 high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；阻塞未清除或未书面接受前不得部署。
   3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
