@@ -12,17 +12,17 @@
 }
 
 .kkb {
-  --paper: #f4f1e8;
-  --surface: #fffdf8;
-  --surface-2: #f7f4ec;
-  --ink: #10302b;
-  --ink-2: #2c4a43;
-  --muted: #5d6b63;
+  --paper: var(--k-paper, var(--color-canvas));
+  --surface: var(--k-surface, var(--color-surface));
+  --surface-2: var(--color-neutral-50);
+  --ink: var(--k-ink, #10302b);
+  --ink-2: var(--k-ink, #10302b);
+  --muted: var(--k-muted, #5d6b63);
   --line: rgba(16, 48, 43, 0.1);
   --line-2: rgba(16, 48, 43, 0.06);
-  --teal: #1f9e86;
-  --teal-deep: #157a67;
-  --teal-soft: #e2f2ec;
+  --teal: var(--k-teal, #1f9e86);
+  --teal-deep: var(--k-teal-deep, #157a67);
+  --teal-soft: var(--k-teal-soft, #e2f2ec);
 
   position: fixed;
   left: 50%;
@@ -31,7 +31,7 @@
   z-index: 61;
   width: min(1040px, 100%);
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, #efeadd, #e6e0d1);
+  background: linear-gradient(180deg, var(--k-paper, var(--color-canvas)), var(--k-paper, var(--color-canvas)));
   border-top: 1px solid var(--line);
   box-shadow: 0 -18px 48px rgba(16, 48, 43, 0.16);
   border-radius: 22px 22px 0 0;
@@ -197,7 +197,7 @@
   gap: 8px;
   font-size: 17px;
   font-weight: 800;
-  color: #fff;
+  color: var(--k-surface, var(--color-surface));
   background: linear-gradient(150deg, var(--teal) 0%, var(--teal-deep));
   border-color: transparent;
   box-shadow: 0 6px 14px rgba(21, 122, 103, 0.24);

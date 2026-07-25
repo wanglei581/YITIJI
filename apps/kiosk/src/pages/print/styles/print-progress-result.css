@@ -274,7 +274,7 @@
 .print-done-tile.primary .print-done-tile-icon {
   background: var(--print-teal);
   border: none;
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 /* 底部提示条 */
@@ -354,7 +354,7 @@
 }
 .print-done-action-btn.primary {
   background: var(--print-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   box-shadow: 0 6px 18px rgb(31 158 134 / 25%);
 }
 
@@ -504,7 +504,7 @@
 .pp-tl-item.tl-done .pp-t-dot {
   background: var(--print-teal);
   border-color: var(--print-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 .pp-tl-item.tl-done .pp-t-line { background: var(--print-teal); }
 

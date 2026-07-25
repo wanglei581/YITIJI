@@ -219,7 +219,7 @@
 }
 
 .resume-report-lightflow [role='progressbar'] {
-  background: linear-gradient(90deg, var(--fy-teal), #35ab8e) !important;
+  background: linear-gradient(90deg, var(--fy-teal), var(--color-primary-500)) !important;
 }
 
 .resume-report-lightflow .resume-report-priorities [class*='bg-warning'] {
@@ -326,7 +326,7 @@
 
 /* 低分进度条 → clay 渐变 */
 .resume-report-lightflow [role='progressbar'].fy-progress-low {
-  background: linear-gradient(90deg, var(--fy-clay), #c97b4e) !important;
+  background: linear-gradient(90deg, var(--fy-clay), var(--color-warning)) !important;
 }
 
 /* 风险提醒列表项:clay 背景 + 内边距 + 圆角 */
@@ -389,7 +389,7 @@
 .resume-source-lightflow .resume-source-phone-session .fy-qr-box {
   border: 1px solid var(--fy-line);
   border-radius: var(--fy-r-sm);
-  background: #fff;
+  background: var(--k-surface, var(--color-surface));
 }
 
 /* 手机扫码面板: 内层 grid 改为单列居中，QR 大图在上、信息在下 */
@@ -407,7 +407,7 @@
   flex: none !important;
   border: 1px solid var(--fy-line) !important;
   border-radius: var(--fy-r-sm) !important;
-  background: #fff !important;
+  background: var(--k-surface, var(--color-surface)) !important;
 }
 
 /* 信息区: 宽度撑满，去掉背景色，文字居中 */

@@ -17,10 +17,10 @@
   width: min(940px, 100%);
   max-height: min(1720px, calc(100dvh - 84px));
   overflow: hidden;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 22px;
-  color: #10302b;
-  background: #fffdf8;
+  color: var(--k-ink, #10302b);
+  background: var(--k-surface, var(--color-surface));
   box-shadow: 0 28px 80px rgba(16, 48, 43, 0.28);
   animation: kassist-lightflow-voice-dialog-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -31,8 +31,8 @@
   align-items: flex-start;
   justify-content: space-between;
   padding: 34px 38px 28px;
-  border-bottom: 1px solid #e2dccb;
-  background: #f4f1e8;
+  border-bottom: 1px solid var(--k-line, #e2dccb);
+  background: var(--k-paper, var(--color-canvas));
 }
 
 .kassist-lightflow .assistant-voice-header > div {
@@ -41,7 +41,7 @@
 }
 
 .kassist-lightflow .assistant-voice-header span {
-  color: #5d6b63;
+  color: var(--k-muted, #5d6b63);
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -49,7 +49,7 @@
 
 .kassist-lightflow .assistant-voice-header h2 {
   margin: 0;
-  color: #10302b;
+  color: var(--k-ink, #10302b);
   font-family: var(--font-serif, 'Noto Serif SC', serif);
   font-size: 32px;
   font-weight: 900;
@@ -62,10 +62,10 @@
   justify-content: center;
   width: 52px;
   height: 52px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 50%;
-  color: #5d6b63;
-  background: #fffdf8;
+  color: var(--k-muted, #5d6b63);
+  background: var(--k-surface, var(--color-surface));
   cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
@@ -76,8 +76,8 @@
 }
 
 .kassist-lightflow .assistant-voice-close:hover {
-  border-color: #1f9e86;
-  color: #157a67;
+  border-color: var(--k-teal, #1f9e86);
+  color: var(--k-teal-deep, #157a67);
   transform: translateY(-1px);
 }
 
@@ -100,10 +100,10 @@
 .kassist-lightflow .assistant-voice-loading {
   min-width: 280px;
   padding: 34px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 18px;
-  color: #10302b;
-  background: #fffdf8;
+  color: var(--k-ink, #10302b);
+  background: var(--k-surface, var(--color-surface));
   box-shadow: 0 24px 60px rgba(16, 48, 43, 0.16);
   font-size: 18px;
   font-weight: 700;

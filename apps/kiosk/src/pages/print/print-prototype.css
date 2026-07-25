@@ -5,24 +5,24 @@
 @import "./styles/print-progress-result.css";
 
 :root {
-  --print-paper: #f4f1e8;
-  --print-surface: #fffdf8;
-  --print-ink: #10302b;
-  --print-muted: #5d6b63;
-  --print-line: #e2dccb;
-  --print-teal: #1f9e86;
-  --print-teal-deep: #157a67;
-  --print-teal-soft: #e2f2ec;
-  --print-clay: #b8683c;
-  --print-clay-soft: #f4e8dd;
-  --print-wheat: #a9781f;
-  --print-wheat-deep: #8a6219;
-  --print-wheat-soft: #f2ead6;
-  --print-slate: #3f68b0;
-  --print-slate-deep: #35608f;
-  --print-slate-soft: #e5edf4;
-  --print-plum: #7a5a86;
-  --print-error: #c14a34;
+  --print-paper: var(--k-paper, var(--color-canvas));
+  --print-surface: var(--k-surface, var(--color-surface));
+  --print-ink: var(--k-ink, #10302b);
+  --print-muted: var(--k-muted, #5d6b63);
+  --print-line: var(--k-line, #e2dccb);
+  --print-teal: var(--k-teal, #1f9e86);
+  --print-teal-deep: var(--k-teal-deep, #157a67);
+  --print-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --print-clay: var(--color-warning);
+  --print-clay-soft: var(--color-warning-bg);
+  --print-wheat: var(--color-wheat, #a9781f);
+  --print-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --print-wheat-soft: var(--color-wheat-soft, #f2ead6);
+  --print-slate: var(--color-info);
+  --print-slate-deep: var(--color-info-fg);
+  --print-slate-soft: var(--color-info-bg);
+  --print-plum: var(--color-plum, #7a5a86);
+  --print-error: var(--color-error);
   --print-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
   --print-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 }

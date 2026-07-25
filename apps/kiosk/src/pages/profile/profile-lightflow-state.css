@@ -46,7 +46,7 @@
   gap: 4px;
   min-block-size: 48px;
   padding-inline: 12px;
-  border: 1px solid #9ec8ff;
+  border: 1px solid var(--k-teal-soft, #e2f2ec);
   border-radius: 12px;
   color: var(--lf-blue-strong);
   background: var(--lf-surface);
@@ -63,7 +63,7 @@
 
 .kprofile.kprofile-lightflow .kp-pending-action:hover {
   border-color: var(--lf-blue);
-  background: #cde7ff;
+  background: var(--k-teal-soft, #e2f2ec);
 }
 
 .kprofile.kprofile-lightflow .kp-session-records {
@@ -109,12 +109,12 @@
 }
 
 .kprofile.kprofile-lightflow .kp-session-icon.scan {
-  color: #0e789e;
+  color: var(--k-teal, #1f9e86);
   background: var(--lf-cyan-soft);
 }
 
 .kprofile.kprofile-lightflow .kp-session-icon.ai {
-  color: #6550ad;
+  color: var(--k-teal, #1f9e86);
   background: var(--lf-lavender-soft);
 }
 
@@ -159,7 +159,7 @@
   max-inline-size: calc(100% - 24px);
   padding: 12px 16px;
   border-radius: 12px;
-  color: #ffffff;
+  color: var(--k-surface, var(--color-surface));
   background: var(--lf-ink);
   font-size: 13px;
   font-weight: 700;
@@ -170,7 +170,7 @@
   inline-size: 18px;
   block-size: 18px;
   flex: 0 0 auto;
-  color: #80b8ff;
+  color: var(--k-teal-soft, #e2f2ec);
 }
 
 .kprofile.kprofile-lightflow .kp-toast .close {

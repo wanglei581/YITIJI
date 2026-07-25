@@ -1,8 +1,8 @@
 
 /* ── Screen 32: Cashier / Payment ─────────────────────────── */
 :root {
-  --print-slate-deep: #35608f;
-  --print-wheat-deep: #8a6219;
+  --print-slate-deep: var(--color-info-fg);
+  --print-wheat-deep: var(--color-wheat-deep, #8a6219);
 }
 
 .cashier-split {
@@ -60,7 +60,7 @@
   display: grid;
   place-items: center;
   background: var(--print-slate-soft);
-  color: var(--print-slate-deep, #35608f);
+  color: var(--print-slate-deep, var(--color-info-fg));
 }
 .cashier-card-icon svg { width: 32px; height: 32px; }
 .cashier-card-title { font-family: var(--print-serif); font-size: 32px; font-weight: 700; letter-spacing: 1px; }
@@ -92,7 +92,7 @@
   font-family: var(--print-serif);
   font-size: 62px;
   font-weight: 900;
-  color: var(--print-slate-deep, #35608f);
+  color: var(--print-slate-deep, var(--color-info-fg));
   line-height: 1;
 }
 .cashier-amount-num small { font-size: 28px; font-weight: 700; margin-right: 4px; }
@@ -203,7 +203,7 @@
 .cashier-qr-sub { font-size: 18px; color: var(--print-muted); text-align: center; line-height: 1.5; }
 .cashier-countdown {
   font-size: 17.5px;
-  color: var(--print-wheat-deep, #8a6219);
+  color: var(--print-wheat-deep, var(--color-wheat-deep, #8a6219));
   font-weight: 600;
   text-align: center;
 }
@@ -408,7 +408,7 @@
   padding: 18px 24px;
   background: var(--print-surface);
   border: 1px solid var(--print-line);
-  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-top: 4px solid var(--print-slate, var(--color-info));
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
 }
@@ -459,7 +459,7 @@
   padding: 20px 26px;
   background: var(--print-surface);
   border: 1px solid var(--print-line);
-  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-top: 4px solid var(--print-slate, var(--color-info));
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
 }
@@ -486,7 +486,7 @@
 /* 隐私摘要卡 (wheat) */
 .print-priv-card {
   padding: 18px 22px;
-  background: #f2ead6;
+  background: var(--color-wheat-soft, #f2ead6);
   border: 1px solid rgba(169, 120, 31, .35);
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
@@ -496,13 +496,13 @@
   align-items: center;
   gap: 12px;
 }
-.print-priv-head svg { width: 26px; height: 26px; flex: none; color: #8a6219; }
-.print-priv-head b { font-size: 20px; font-weight: 700; color: #8a6219; }
+.print-priv-head svg { width: 26px; height: 26px; flex: none; color: var(--color-wheat-deep, #8a6219); }
+.print-priv-head b { font-size: 20px; font-weight: 700; color: var(--color-wheat-deep, #8a6219); }
 .print-priv-body {
   margin-top: 8px;
   font-size: 17px;
   line-height: 1.55;
-  color: #8a6219;
+  color: var(--color-wheat-deep, #8a6219);
 }
 
 /* 费用卡 (a-teal) */
@@ -644,7 +644,7 @@
   min-height: 88px;
   padding: 0 36px;
   background: var(--print-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   border: none;
   border-radius: 18px;
   font: 600 26px var(--print-sans);

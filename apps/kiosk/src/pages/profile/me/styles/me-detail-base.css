@@ -4,12 +4,12 @@
  */
 
 .me-inkdetail {
-  --paper: #f4f1e8;
-  --paper-2: #efeadd;
-  --card: #fffdf8;
-  --ink: #10302b;
-  --ink-2: #2c4a43;
-  --muted: #789088;
+  --paper: var(--k-paper, var(--color-canvas));
+  --paper-2: var(--k-paper, var(--color-canvas));
+  --card: var(--k-surface, var(--color-surface));
+  --ink: var(--k-ink, #10302b);
+  --ink-2: var(--k-ink, #10302b);
+  --muted: var(--k-muted, #5d6b63);
   --line: rgba(27, 69, 60, 0.14);
   --shadow: 0 18px 42px rgba(39, 55, 49, 0.12);
   position: relative;
@@ -200,7 +200,7 @@
 
 .me-tab.is-active {
   background: var(--ink);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   transform: translateY(-1px);
 }
 
@@ -318,7 +318,7 @@
 
 .me-status.is-active {
   background: rgba(45, 132, 97, 0.13);
-  color: #236f52;
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-status.is-muted {
@@ -328,12 +328,12 @@
 
 .me-status.is-warning {
   background: rgba(195, 142, 48, 0.16);
-  color: #85611f;
+  color: var(--color-wheat-deep, #8a6219);
 }
 
 .me-status.is-danger {
   background: rgba(168, 65, 62, 0.14);
-  color: #9a3d3a;
+  color: var(--color-error);
 }
 
 .me-link-row {
@@ -387,7 +387,7 @@
 .me-inkdetail .me-delete-button.is-confirm {
   border-color: rgba(168, 65, 62, 0.28);
   background: rgba(168, 65, 62, 0.12);
-  color: #9a3d3a;
+  color: var(--color-error);
 }
 
 .me-inkdetail .me-delete-button:active {
@@ -428,7 +428,7 @@
 
 .me-inkdetail-documents .me-chip.is-danger {
   background: rgba(168, 65, 62, 0.14);
-  color: #9a3d3a;
+  color: var(--color-error);
 }
 
 .me-inkdetail-documents .me-doc-retention-toggle,
@@ -498,7 +498,7 @@
 .me-inkdetail-documents .me-doc-retention-option.is-active {
   border-color: rgba(42, 111, 98, 0.24);
   background: rgba(45, 132, 97, 0.13);
-  color: #236f52;
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-inkdetail-documents .me-doc-actions {
@@ -532,12 +532,12 @@
 .me-inkdetail-documents .me-dialog-button.primary {
   border-color: transparent;
   background: var(--ink);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .me-inkdetail-documents .me-dialog-button.primary:hover {
-  background: #164239;
-  color: #fffdf8;
+  background: var(--k-teal-deep, #157a67);
+  color: var(--k-surface, var(--color-surface));
 }
 
 .me-inkdetail-print-orders .me-tab {
@@ -559,7 +559,7 @@
   width: 16px;
   height: 16px;
   flex-shrink: 0;
-  color: #236f52;
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-inkdetail-print-orders .me-print-live-dot {
@@ -567,7 +567,7 @@
   height: 9px;
   flex-shrink: 0;
   border-radius: 999px;
-  background: #2d8461;
+  background: var(--k-teal, #1f9e86);
   box-shadow: 0 0 0 5px rgba(45, 132, 97, 0.12);
 }
 
@@ -611,7 +611,7 @@
 .me-inkdetail-print-orders .me-print-pickup-chip {
   gap: 4px;
   background: rgba(45, 132, 97, 0.13);
-  color: #236f52;
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-inkdetail-print-orders .me-print-pickup-chip svg {
@@ -746,7 +746,7 @@
   align-items: center;
   justify-content: center;
   gap: 7px;
-  color: #236f52;
+  color: var(--k-teal-deep, #157a67);
   font-size: 12px;
   font-weight: 800;
 }
@@ -795,7 +795,7 @@
 .me-toast {
   border-radius: 999px;
   background: rgba(16, 48, 43, 0.94);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   font-size: 14px;
   font-weight: 700;
   box-shadow: 0 16px 30px rgba(16, 48, 43, 0.2);
@@ -823,28 +823,28 @@
 }
 
 .me-tone-teal {
-  background: #dceee6;
-  color: #246556;
+  background: var(--k-teal-soft, #e2f2ec);
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-tone-slate {
-  background: #e5e8e4;
-  color: #4d655d;
+  background: var(--k-line, #e2dccb);
+  color: var(--k-teal-deep, #157a67);
 }
 
 .me-tone-wheat {
-  background: #f1dfb7;
-  color: #85611f;
+  background: var(--color-warning-bg);
+  color: var(--color-wheat-deep, #8a6219);
 }
 
 .me-tone-rose {
-  background: #edd6d0;
-  color: #9a4e45;
+  background: var(--k-paper, var(--color-canvas));
+  color: var(--color-error);
 }
 
 .me-tone-clay {
-  background: #ead7bd;
-  color: #8a5d2b;
+  background: var(--k-paper, var(--color-canvas));
+  color: var(--color-warning-fg);
 }
 
 @media (max-width: 720px) {

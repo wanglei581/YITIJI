@@ -7,7 +7,7 @@
 
 .resume-materials-lightflow .rp-gen-ok__sub {
   font-size: 13.5px;
-  color: var(--resume-lightflow-copy, #52677d);
+  color: var(--resume-lightflow-copy, var(--k-muted, #5d6b63));
   line-height: 1.55;
 }
 
@@ -26,15 +26,15 @@
 }
 
 .resume-materials-lightflow .rp-state-badge--active {
-  color: var(--resume-lightflow-blue, #1677ff);
-  background: var(--resume-lightflow-blue-soft, #e8f3ff);
+  color: var(--resume-lightflow-blue, var(--k-teal, #1f9e86));
+  background: var(--resume-lightflow-blue-soft, var(--k-teal-soft, #e2f2ec));
   border: 1px solid rgba(22, 119, 255, .28);
 }
 
 .resume-materials-lightflow .rp-state-badge--idle {
-  color: var(--resume-lightflow-copy, #52677d);
+  color: var(--resume-lightflow-copy, var(--k-muted, #5d6b63));
   background: rgba(255, 255, 255, .82);
-  border: 1px solid var(--resume-lightflow-line, #d7e7f5);
+  border: 1px solid var(--resume-lightflow-line, var(--k-teal-soft, #e2f2ec));
 }
 
 @media (max-width: 768px) {

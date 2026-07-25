@@ -1,22 +1,22 @@
 .job-fit-inkpaper {
-  --sd-color-canvas-outer: #f4f1e8;
-  --sd-color-canvas: #f4f1e8;
-  --sd-color-surface: #ffffff;
-  --sd-color-primary: #b8683c;
-  --sd-color-primary-strong: #9e5330;
-  --sd-color-primary-soft: #f4e8dd;
-  --sd-color-teal: #1f9e86;
-  --sd-color-teal-deep: #157a67;
-  --sd-color-teal-soft: #e2f2ec;
-  --sd-color-wheat: #a9781f;
-  --sd-color-wheat-deep: #8a6219;
-  --sd-color-wheat-soft: #f2ead6;
-  --sd-color-text-strong: #10302b;
-  --sd-color-text: #10302b;
-  --sd-color-text-muted: #5d6b63;
-  --sd-color-line: #e2dccb;
-  --sd-color-success-soft: #e2f2ec;
-  --sd-color-warning-soft: #f2ead6;
+  --sd-color-canvas-outer: var(--k-paper, var(--color-canvas));
+  --sd-color-canvas: var(--k-paper, var(--color-canvas));
+  --sd-color-surface: var(--k-surface, var(--color-surface));
+  --sd-color-primary: var(--color-warning);
+  --sd-color-primary-strong: var(--color-warning-fg);
+  --sd-color-primary-soft: var(--color-warning-bg);
+  --sd-color-teal: var(--k-teal, #1f9e86);
+  --sd-color-teal-deep: var(--k-teal-deep, #157a67);
+  --sd-color-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --sd-color-wheat: var(--color-wheat, #a9781f);
+  --sd-color-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --sd-color-wheat-soft: var(--color-wheat-soft, #f2ead6);
+  --sd-color-text-strong: var(--k-ink, #10302b);
+  --sd-color-text: var(--k-ink, #10302b);
+  --sd-color-text-muted: var(--k-muted, #5d6b63);
+  --sd-color-line: var(--k-line, #e2dccb);
+  --sd-color-success-soft: var(--k-teal-soft, #e2f2ec);
+  --sd-color-warning-soft: var(--color-wheat-soft, #f2ead6);
   --sd-control-min: 56px;
   --sd-primary-control-min: 72px;
   --sd-serif: "Noto Serif SC", "Source Han Serif SC", serif;
@@ -32,7 +32,7 @@
 .job-fit-inkpaper .job-fit-content {
   width: min(100%, 984px);
   margin-inline: auto;
-  scrollbar-color: #d7ccb8 transparent;
+  scrollbar-color: var(--k-line, #e2dccb) transparent;
 }
 .job-fit-inkpaper .job-fit-card,
 .job-fit-inkpaper .job-fit-summary,
@@ -58,7 +58,7 @@
   color: var(--sd-color-primary);
 }
 .job-fit-inkpaper .job-fit-summary {
-  border-color: #e2dccb;
+  border-color: var(--k-line, #e2dccb);
   border-top: 4px solid var(--sd-color-primary);
   background: var(--sd-color-surface);
   box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
@@ -76,24 +76,24 @@
   letter-spacing: .02em;
 }
 .job-fit-inkpaper .job-fit-fit-map .bg-success-bg\/60 {
-  border-left: 3px solid #1f9e86;
+  border-left: 3px solid var(--k-teal, #1f9e86);
   background: var(--sd-color-success-soft);
 }
 .job-fit-inkpaper .job-fit-gap-actions .bg-warning-bg\/60 {
-  border-left: 3px solid #a9781f;
+  border-left: 3px solid var(--color-wheat, #a9781f);
   background: var(--sd-color-warning-soft);
 }
 .job-fit-inkpaper .job-fit-source {
   border-style: dashed;
 }
 .job-fit-inkpaper .job-fit-notice {
-  border: 1px solid #d8c5ac;
+  border: 1px solid var(--color-warning);
   background: var(--sd-color-primary-soft);
   color: var(--sd-color-text-strong);
 }
 .job-fit-inkpaper .job-fit-alert {
-  border: 1px solid #f3c4c7;
-  background: #fff1f2;
+  border: 1px solid var(--color-error-bg);
+  background: var(--k-surface, var(--color-surface));
 }
 .job-fit-inkpaper .job-fit-action-bar {
   border-color: var(--sd-color-line);

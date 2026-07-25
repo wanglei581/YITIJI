@@ -1,22 +1,22 @@
 /* service-desk tokens: --sd-surface --sd-text --sd-line --sd-primary-strong */
 .interview-flow {
-  --interview-paper: var(--color-canvas, #f4f1e8);
-  --interview-surface: var(--color-surface, #fffdf8);
-  --interview-ink: var(--color-text-strong, #10302b);
-  --interview-muted: var(--color-neutral-600, #5d6b63);
-  --interview-line: var(--color-neutral-200, #e2dccb);
-  --interview-teal: var(--color-primary-600, #1f9e86);
-  --interview-teal-deep: var(--color-primary-700, #157a67);
-  --interview-teal-soft: var(--color-primary-100, #e2f2ec);
-  --interview-plum: var(--color-plum, #7a5a86);
-  --interview-plum-deep: #63466f;
-  --interview-plum-soft: var(--color-plum-soft, #efe7f1);
-  --interview-wheat: var(--color-wheat, #a9781f);
-  --interview-wheat-deep: #8a6219;
-  --interview-wheat-soft: var(--color-wheat-soft, #f2ead6);
-  --interview-error: var(--color-error-600, #c14a34);
-  --interview-error-soft: #f6e3de;
-  --interview-dark: #10302b;
+  --interview-paper: var(--color-canvas, var(--k-paper, var(--color-canvas)));
+  --interview-surface: var(--color-surface, var(--k-surface, var(--color-surface)));
+  --interview-ink: var(--color-text-strong, var(--k-ink, #10302b));
+  --interview-muted: var(--color-neutral-600, var(--k-muted, #5d6b63));
+  --interview-line: var(--color-neutral-200, var(--k-line, #e2dccb));
+  --interview-teal: var(--color-primary-600, var(--k-teal, #1f9e86));
+  --interview-teal-deep: var(--color-primary-700, var(--k-teal-deep, #157a67));
+  --interview-teal-soft: var(--color-primary-100, var(--k-teal-soft, #e2f2ec));
+  --interview-plum: var(--color-plum, var(--color-plum, #7a5a86));
+  --interview-plum-deep: var(--color-plum-deep, #63466f);
+  --interview-plum-soft: var(--color-plum-soft, var(--color-plum-soft, #efe7f1));
+  --interview-wheat: var(--color-wheat, var(--color-wheat, #a9781f));
+  --interview-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --interview-wheat-soft: var(--color-wheat-soft, var(--color-wheat-soft, #f2ead6));
+  --interview-error: var(--color-error-600, var(--color-error));
+  --interview-error-soft: var(--color-error-bg);
+  --interview-dark: var(--k-ink, #10302b);
   --interview-radius-sm: 14px;
   --interview-radius-md: 18px;
   --interview-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif);
@@ -74,7 +74,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #35ab8e;
+  background: var(--color-primary-500);
   box-shadow: 0 0 0 4px rgba(53, 171, 142, .2);
 }
 .interview-topbar__status[data-tone='warning'] {

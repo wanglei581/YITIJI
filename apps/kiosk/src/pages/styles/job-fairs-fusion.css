@@ -21,7 +21,7 @@
   align-items: center;
   background: var(--ink, #17211b);
   border-radius: 50%;
-  color: #fff;
+  color: var(--k-surface, var(--color-surface));
   display: inline-flex;
   height: 36px;
   justify-content: center;
@@ -29,7 +29,7 @@
 }
 
 /* Recruitment-fair domain extensions moved intact from the legacy entry. */
-:root { --wheat: #a9781f; --wheat-deep: #8a6219; --wheat-soft: #f2ead6; }
+:root { --wheat: var(--color-wheat, #a9781f); --wheat-deep: var(--color-wheat-deep, #8a6219); --wheat-soft: var(--color-wheat-soft, #f2ead6); }
 .jf-scale-tag { display: inline-flex; align-items: center; flex: none; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px 12px; color: var(--muted); font-size: 16px; }
 .jf-booth-label { color: var(--wheat-deep); font-weight: 700; }
 .jf-mtype { flex: none; border-radius: 999px; padding: 3px 12px; font-size: 15px; font-weight: 600; }
@@ -56,10 +56,10 @@
 .jf-pill-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
 .jf-traffic { margin-top: 18px; font-size: 19px; color: var(--muted); line-height: 1.55; }
 .jf-traffic b { display: block; font-size: 20px; color: var(--ink); margin-bottom: 6px; }
-.jf-mini-map { border-radius: 12px; border: 1px solid var(--line); background: var(--paper, #f4f1e8); position: relative; min-height: 280px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+.jf-mini-map { border-radius: 12px; border: 1px solid var(--line); background: var(--paper, var(--k-paper, var(--color-canvas))); position: relative; min-height: 280px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
 .jf-mini-map .grid-bg { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px), repeating-linear-gradient(90deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px); }
 .jf-zones3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.jf-zone-card { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper, #f4f1e8); padding: 20px 22px; position: relative; }
+.jf-zone-card { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper, var(--k-paper, var(--color-canvas))); padding: 20px 22px; position: relative; }
 .jf-zone-card .city-badge { position: absolute; right: 20px; top: 20px; font-size: 17px; font-weight: 600; color: var(--accent-deep, var(--wheat-deep)); }
 .jf-zone-card .z-icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft, var(--wheat-soft)); color: var(--accent-deep, var(--wheat-deep)); }
 .jf-zone-card .z-icon svg { width: 28px; height: 28px; }

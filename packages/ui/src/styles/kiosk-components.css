@@ -10,33 +10,33 @@
 
 /* ── 品类色映射（挂在任意容器上，供其内组件取 accent） ───── */
 [data-kiosk-presentation='fusion-youth'] .k-a-teal {
-  --k-accent: #1f9e86;
-  --k-accent-deep: #157a67;
-  --k-accent-soft: #e2f2ec;
+  --k-accent: var(--k-teal, #1f9e86);
+  --k-accent-deep: var(--k-teal-deep, #157a67);
+  --k-accent-soft: var(--k-teal-soft, #e2f2ec);
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-a-clay {
-  --k-accent: #b8683c;
-  --k-accent-deep: #9e5330;
-  --k-accent-soft: #f4e8dd;
+  --k-accent: var(--color-warning);
+  --k-accent-deep: var(--color-warning-fg);
+  --k-accent-soft: var(--color-warning-bg);
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-a-wheat {
-  --k-accent: #a9781f;
-  --k-accent-deep: #8a6219;
-  --k-accent-soft: #f2ead6;
+  --k-accent: var(--color-wheat, #a9781f);
+  --k-accent-deep: var(--color-wheat-deep, #8a6219);
+  --k-accent-soft: var(--color-wheat-soft, #f2ead6);
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-a-plum {
-  --k-accent: #7a5a86;
-  --k-accent-deep: #63466f;
-  --k-accent-soft: #efe7f1;
+  --k-accent: var(--color-plum, #7a5a86);
+  --k-accent-deep: var(--color-plum-deep, #63466f);
+  --k-accent-soft: var(--color-plum-soft, #efe7f1);
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-a-slate {
-  --k-accent: #3f68b0;
-  --k-accent-deep: #35608f;
-  --k-accent-soft: #e5edf4;
+  --k-accent: var(--color-info);
+  --k-accent-deep: var(--color-info-fg);
+  --k-accent-soft: var(--color-info-bg);
 }
 
 /* ── 卡片 ───────────────────────────────────────────────── */
@@ -157,7 +157,7 @@
 [data-kiosk-presentation='fusion-youth'] .k-tile[data-variant='primary'] .k-tile__icon {
   background: var(--k-accent, var(--k-teal));
   border: none;
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-tile:disabled,
@@ -207,13 +207,13 @@
 
 [data-kiosk-presentation='fusion-youth'] .k-btn[data-variant='primary'] {
   background: var(--k-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   box-shadow: 0 6px 18px rgba(31, 158, 134, 0.25);
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-btn[data-variant='dark'] {
   background: var(--k-dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
   box-shadow: 0 6px 18px rgba(16, 48, 43, 0.18);
 }
 
@@ -313,7 +313,7 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #35ab8e;
+  background: var(--color-primary-500);
   box-shadow: 0 0 0 4px rgba(53, 171, 142, 0.2);
   flex: none;
 }
@@ -326,7 +326,7 @@
 
 [data-kiosk-presentation='fusion-youth'] .k-status-chip[data-tone='warning'] .k-status-chip__dot,
 [data-kiosk-presentation='fusion-youth'] .k-status-chip[data-tone='neutral'] .k-status-chip__dot {
-  background: #b8683c;
+  background: var(--color-warning);
   box-shadow: 0 0 0 4px rgba(184, 104, 60, 0.2);
 }
 
@@ -336,7 +336,7 @@
 }
 
 [data-kiosk-presentation='fusion-youth'] .k-status-chip[data-tone='negative'] .k-status-chip__dot {
-  background: #c14a34;
+  background: var(--color-error);
   box-shadow: 0 0 0 4px rgba(193, 74, 52, 0.2);
 }
 

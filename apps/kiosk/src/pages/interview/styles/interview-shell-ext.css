@@ -166,7 +166,7 @@
 .interview-tips__ck-item[aria-pressed='true'] .interview-tips__ck-box {
   background: var(--interview-plum);
   border-color: var(--interview-plum);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 .interview-tips__ck-box svg { width: 16px; height: 16px; }
 .interview-tips__ck-title {
@@ -205,7 +205,7 @@
   font-size: 20px;
   font-weight: 800;
   background: var(--interview-plum);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 .interview-tips__star-name {
   font-size: 17.5px;

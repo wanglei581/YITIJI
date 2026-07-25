@@ -60,7 +60,7 @@
   grid-column: 1;
   max-width: none !important;
   padding: 30px 34px !important;
-  background: #fff !important;
+  background: var(--k-surface, var(--color-surface)) !important;
   border-radius: 8px !important;
   box-shadow: 0 8px 24px rgba(16, 48, 43, .08) !important;
 }
@@ -232,7 +232,7 @@
 .fy-prog-item.now .fy-prog-dot {
   background: var(--fy-teal);
   border-color: var(--fy-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .fy-prog-title {
@@ -390,7 +390,7 @@
 .resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="removed"],
 .resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="wordRemoved"] {
   background: rgba(193, 74, 52, .08) !important;
-  color: #8a4433 !important;
+  color: var(--color-error) !important;
 }
 
 /* 增加行 */

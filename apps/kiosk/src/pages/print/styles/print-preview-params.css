@@ -23,7 +23,7 @@
   display: grid;
   place-items: center;
   background: var(--print-slate-soft);
-  color: #35608f;
+  color: var(--color-info-fg);
 }
 .print-params-head-icon svg { width: 28px; height: 28px; }
 .print-params-head h2 {
@@ -139,7 +139,7 @@
   font-family: var(--print-serif);
   font-size: 38px;
   font-weight: 900;
-  color: #35608f;
+  color: var(--color-info-fg);
 }
 .print-cost-total-num small { font-size: 18px; font-weight: 700; margin-right: 2px; }
 
@@ -235,7 +235,7 @@
 .pp-sheet {
   width: min(100%, 440px);
   aspect-ratio: 210 / 297;
-  background: #fff;
+  background: var(--k-surface, var(--color-surface));
   border: 1px solid var(--print-line);
   border-radius: 6px;
   box-shadow: 0 10px 28px rgb(16 48 43 / 12%);
@@ -353,7 +353,7 @@
   aspect-ratio: 210 / 297;
   cursor: pointer;
   position: relative;
-  background: #fff;
+  background: var(--k-surface, var(--color-surface));
   border: 2px solid var(--print-line);
   border-radius: 6px;
   padding: 10px 8px;
@@ -382,7 +382,7 @@
   white-space: nowrap;
 }
 .pp-thumb.on .pp-thumb-pg {
-  color: var(--print-slate-deep, #35608f);
+  color: var(--print-slate-deep, var(--color-info-fg));
   border-color: var(--print-slate);
   font-weight: 600;
 }
@@ -432,7 +432,7 @@
 .pp-opt + .pp-opt { border-left: 1px solid var(--print-line); }
 .pp-opt.on {
   background: var(--print-slate);
-  color: #fff;
+  color: var(--k-surface, var(--color-surface));
   font-weight: 600;
 }
 .pp-range-input {
@@ -593,7 +593,7 @@
   border-radius: 14px;
   font-size: 26px;
   font-weight: 600;
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   cursor: pointer;
   font-family: var(--print-sans);
   box-shadow: 0 6px 18px rgb(31 158 134 / 25%);

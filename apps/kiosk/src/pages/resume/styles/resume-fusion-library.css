@@ -101,7 +101,7 @@
     linear-gradient(var(--fy-ink), var(--fy-ink)) 18px 18px / 58px 10px no-repeat,
     linear-gradient(var(--fy-teal), var(--fy-teal)) 18px 44px / 54px 7px no-repeat,
     repeating-linear-gradient(to bottom, transparent 0 18px, var(--fy-line) 18px 24px) 18px 64px / 112px 130px no-repeat,
-    #fff;
+    var(--k-surface, var(--color-surface));
   box-shadow: 0 4px 12px rgba(16, 48, 43, .08);
 }
 

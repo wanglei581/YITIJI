@@ -17,27 +17,27 @@
 
 /* ── 设计 token（迁移自 shared.css :root，取原型精确 hex） ── */
 :root {
-  --pv-paper: #f4f1e8;
-  --pv-surface: #fffdf8;
-  --pv-ink: #10302b;
-  --pv-muted: #5d6b63;
-  --pv-line: #e2dccb;
-  --pv-teal: #1f9e86;
-  --pv-teal-deep: #157a67;
-  --pv-teal-soft: #e2f2ec;
-  --pv-clay: #b8683c;
-  --pv-clay-deep: #9e5330;
-  --pv-clay-soft: #f4e8dd;
-  --pv-wheat: #a9781f;
-  --pv-wheat-deep: #8a6219;
-  --pv-wheat-soft: #f2ead6;
-  --pv-plum: #7a5a86;
-  --pv-plum-deep: #63466f;
-  --pv-plum-soft: #efe7f1;
-  --pv-slate: #3f68b0;
-  --pv-slate-deep: #35608f;
-  --pv-slate-soft: #e5edf4;
-  --pv-dark: #10302b;
+  --pv-paper: var(--k-paper, var(--color-canvas));
+  --pv-surface: var(--k-surface, var(--color-surface));
+  --pv-ink: var(--k-ink, #10302b);
+  --pv-muted: var(--k-muted, #5d6b63);
+  --pv-line: var(--k-line, #e2dccb);
+  --pv-teal: var(--k-teal, #1f9e86);
+  --pv-teal-deep: var(--k-teal-deep, #157a67);
+  --pv-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --pv-clay: var(--color-warning);
+  --pv-clay-deep: var(--color-warning-fg);
+  --pv-clay-soft: var(--color-warning-bg);
+  --pv-wheat: var(--color-wheat, #a9781f);
+  --pv-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --pv-wheat-soft: var(--color-wheat-soft, #f2ead6);
+  --pv-plum: var(--color-plum, #7a5a86);
+  --pv-plum-deep: var(--color-plum-deep, #63466f);
+  --pv-plum-soft: var(--color-plum-soft, #efe7f1);
+  --pv-slate: var(--color-info);
+  --pv-slate-deep: var(--color-info-fg);
+  --pv-slate-soft: var(--color-info-bg);
+  --pv-dark: var(--k-ink, #10302b);
   --pv-r-sm: 14px;
   --pv-r-md: 18px;
   --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
@@ -80,7 +80,7 @@
   height: 76px;
   flex: none;
   background: var(--pv-dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,11 +96,11 @@
   background: rgb(31 158 134 / 18%); border: 1px solid rgb(31 158 134 / 45%);
   padding: 8px 18px; border-radius: 999px; font-size: 19px;
 }
-.kpv1 .status-chip .dot { width: 11px; height: 11px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 4px rgb(53 171 142 / 20%); }
+.kpv1 .status-chip .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--color-primary-500); box-shadow: 0 0 0 4px rgb(53 171 142 / 20%); }
 .kpv1 .status-chip.warn { background: rgb(184 104 60 / 18%); border-color: rgb(184 104 60 / 45%); }
-.kpv1 .status-chip.warn .dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
+.kpv1 .status-chip.warn .dot { background: var(--color-warning); box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
 .kpv1 .status-chip.neutral { background: rgb(139 150 142 / 18%); border-color: rgb(139 150 142 / 45%); }
-.kpv1 .status-chip.neutral .dot { background: #8b968e; box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
+.kpv1 .status-chip.neutral .dot { background: var(--color-neutral-400); box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
 /* ── 欢迎区（01-home.html .welcome） ── */
 .kpv1 .welcome {
   flex: none; padding: 12px 48px 8px;
@@ -114,7 +114,7 @@
 .kpv1 .login-btn {
   flex: none; display: flex; align-items: center; gap: 16px;
   min-height: 88px; padding: 0 38px;
-  background: var(--pv-dark); color: #f4f1e8;
+  background: var(--pv-dark); color: var(--k-paper, var(--color-canvas));
   border: none; border-radius: var(--pv-r-md); cursor: pointer;
   font-family: var(--pv-sans); font-size: 27px; font-weight: 600; letter-spacing: 1px;
   box-shadow: 0 6px 18px rgb(16 48 43 / 18%);
@@ -215,7 +215,7 @@
   background: var(--pv-accent-soft, var(--pv-teal-soft));
   border-color: color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 35%, transparent);
 }
-.kpv1 .tile.primary .t-icon { background: var(--pv-accent, var(--pv-teal)); border: none; color: #fffdf8; }
+.kpv1 .tile.primary .t-icon { background: var(--pv-accent, var(--pv-teal)); border: none; color: var(--k-surface, var(--color-surface)); }
 .kpv1 .tile.disabled { opacity: .55; cursor: not-allowed; background: var(--pv-surface); border-style: dashed; }
 .kpv1 .tag-soon {
   flex: none; margin-left: auto;
@@ -241,7 +241,7 @@
 .kpv1 .zone-card.z-teal { background: var(--pv-teal-soft); border: 1px solid color-mix(in srgb, var(--pv-teal) 38%, transparent); }
 .kpv1 .zone-card .z-icon {
   width: 58px; height: 58px; flex: none; border-radius: 14px;
-  display: grid; place-items: center; color: #fffdf8;
+  display: grid; place-items: center; color: var(--k-surface, var(--color-surface));
 }
 .kpv1 .zone-card.z-plum .z-icon { background: var(--pv-plum); }
 .kpv1 .zone-card.z-teal .z-icon { background: var(--pv-teal); }
@@ -307,7 +307,7 @@
   border: none; border-radius: var(--pv-r-sm);
   font-family: var(--pv-sans); font-size: 21px; font-weight: 600; letter-spacing: 1px;
 }
-.kpv1 .continue .btn.primary { background: var(--pv-teal); color: #f4f1e8; box-shadow: 0 6px 18px rgb(16 48 43 / 18%); }
+.kpv1 .continue .btn.primary { background: var(--pv-teal); color: var(--k-paper, var(--color-canvas)); box-shadow: 0 6px 18px rgb(16 48 43 / 18%); }
 .kpv1 .continue .btn:active { transform: scale(.98); }
 .kpv1 .continue .btn svg { width: 26px; height: 26px; }
 
@@ -324,7 +324,7 @@
   position: relative;
 }
 .kpv1 .nav-item svg { width: 34px; height: 34px; }
-.kpv1 .nav-item.active { color: #f4f1e8; }
+.kpv1 .nav-item.active { color: var(--k-paper, var(--color-canvas)); }
 .kpv1 .nav-item.active::after {
   content: ''; position: absolute; bottom: 14px;
   width: 36px; height: 5px; border-radius: 3px; background: var(--pv-teal);

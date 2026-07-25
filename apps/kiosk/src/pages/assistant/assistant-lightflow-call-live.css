@@ -16,8 +16,8 @@
   padding: 10px 28px;
   border: 1px solid rgba(31, 158, 134, 0.35);
   border-radius: 999px;
-  color: #157a67;
-  background: #e2f2ec;
+  color: var(--k-teal-deep, #157a67);
+  background: var(--k-teal-soft, #e2f2ec);
   font-size: 20px;
 }
 
@@ -25,12 +25,12 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #8a9e98;
+  background: var(--k-muted, #5d6b63);
   flex-shrink: 0;
 }
 
 .kassist-lightflow .assistant-voice-live-status > span.is-live {
-  background: #35ab8e;
+  background: var(--color-primary-500);
   box-shadow: 0 0 0 5px rgba(53, 171, 142, 0.2);
   animation: kassist-lf-pulse 1.6s ease-in-out infinite;
 }
@@ -43,11 +43,11 @@
 .kassist-lightflow .assistant-voice-live-status strong {
   font-size: 20px;
   font-weight: 700;
-  color: #157a67;
+  color: var(--k-teal-deep, #157a67);
 }
 
 .kassist-lightflow .assistant-voice-live-status time {
-  color: #5d6b63;
+  color: var(--k-muted, #5d6b63);
   font-size: 18px;
   font-variant-numeric: tabular-nums;
 }
@@ -57,8 +57,8 @@
   width: 240px;
   height: 240px;
   border-radius: 50%;
-  border: 4px solid #fffdf8;
-  box-shadow: 0 0 0 8px #e2f2ec, 0 20px 48px rgba(16, 48, 43, 0.18);
+  border: 4px solid var(--k-surface, var(--color-surface));
+  box-shadow: 0 0 0 8px var(--k-teal-soft, #e2f2ec), 0 20px 48px rgba(16, 48, 43, 0.18);
   position: relative;
   overflow: visible;
 }
@@ -94,7 +94,7 @@
 .kassist-lightflow .assistant-voice-wave i {
   width: 9px;
   border-radius: 999px;
-  background: #1f9e86;
+  background: var(--k-teal, #1f9e86);
   animation: kassist-lf-wave 1s ease-in-out infinite;
 }
 
@@ -130,8 +130,8 @@
   padding: 0 22px;
   border: 1px solid rgba(31, 158, 134, 0.45);
   border-radius: 999px;
-  color: #157a67;
-  background: #e2f2ec;
+  color: var(--k-teal-deep, #157a67);
+  background: var(--k-teal-soft, #e2f2ec);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -142,9 +142,9 @@
   width: min(720px, 100%);
   min-height: 120px;
   padding: 20px 26px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 18px;
-  background: #f4f1e8;
+  background: var(--k-paper, var(--color-canvas));
 }
 
 .kassist-lightflow .assistant-voice-caption > div {
@@ -155,20 +155,20 @@
 }
 
 .kassist-lightflow .assistant-voice-caption strong {
-  color: #10302b;
+  color: var(--k-ink, #10302b);
   font-size: 16px;
   font-weight: 800;
   font-family: var(--font-serif, 'Noto Serif SC', serif);
 }
 
 .kassist-lightflow .assistant-voice-caption > div span {
-  color: #5d6b63;
+  color: var(--k-muted, #5d6b63);
   font-size: 14px;
 }
 
 .kassist-lightflow .assistant-voice-caption > p {
   margin: 12px 0 0;
-  color: #10302b;
+  color: var(--k-ink, #10302b);
   font-size: 20px;
   line-height: 1.65;
 }
@@ -177,8 +177,8 @@
   margin-top: 12px;
   padding: 10px 12px;
   border-radius: 10px;
-  color: #8a6219;
-  background: #f2ead6;
+  color: var(--color-wheat-deep, #8a6219);
+  background: var(--color-wheat-soft, #f2ead6);
   font-size: 14px;
 }
 
@@ -189,9 +189,9 @@
   width: min(720px, 100%);
   gap: 14px;
   padding: 16px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 18px;
-  background: #fffdf8;
+  background: var(--k-surface, var(--color-surface));
   box-shadow: 0 8px 24px rgba(16, 48, 43, 0.07);
 }
 
@@ -202,10 +202,10 @@
   justify-content: center;
   min-height: 120px;
   gap: 10px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 14px;
-  color: #10302b;
-  background: #f4f1e8;
+  color: var(--k-ink, #10302b);
+  background: var(--k-paper, var(--color-canvas));
   font-size: 20px;
   font-weight: 600;
   cursor: pointer;
@@ -213,7 +213,7 @@
 }
 
 .kassist-lightflow .assistant-voice-control:hover {
-  background: #e2f2ec;
+  background: var(--k-teal-soft, #e2f2ec);
   border-color: rgba(31, 158, 134, 0.35);
   transform: translateY(-1px);
 }
@@ -224,9 +224,9 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
   border-radius: 50%;
-  background: #fffdf8;
+  background: var(--k-surface, var(--color-surface));
 }
 
 .kassist-lightflow .assistant-voice-control svg {
@@ -235,28 +235,28 @@
 }
 
 .kassist-lightflow .assistant-voice-control.is-active {
-  color: #157a67;
-  background: #e2f2ec;
+  color: var(--k-teal-deep, #157a67);
+  background: var(--k-teal-soft, #e2f2ec);
   border-color: rgba(31, 158, 134, 0.45);
 }
 
 .kassist-lightflow .assistant-voice-control.is-active > span {
-  background: #1f9e86;
-  border-color: #1f9e86;
-  color: #fffdf8;
+  background: var(--k-teal, #1f9e86);
+  border-color: var(--k-teal, #1f9e86);
+  color: var(--k-surface, var(--color-surface));
 }
 
 /* 挂断按钮 — 红色 */
 .kassist-lightflow .assistant-voice-control--hangup {
-  color: #c14a34;
-  background: #f6e3de;
+  color: var(--color-error);
+  background: var(--color-error-bg);
   border-color: rgba(193, 74, 52, 0.35);
 }
 
 .kassist-lightflow .assistant-voice-control--hangup > span {
   border-color: rgba(193, 74, 52, 0.5);
-  color: #ffffff;
-  background: #c14a34;
+  color: var(--k-surface, var(--color-surface));
+  background: var(--color-error);
 }
 
 .kassist-lightflow .assistant-voice-control--hangup svg {
@@ -286,13 +286,13 @@
   height: 210px;
   margin-bottom: 28px;
   border-radius: 24px;
-  border: 1px solid #e2dccb;
+  border: 1px solid var(--k-line, #e2dccb);
 }
 
 .kassist-lightflow .assistant-voice-error-message {
   max-width: 620px;
   margin: 18px 0 0;
-  color: #5d6b63;
+  color: var(--k-muted, #5d6b63);
   font-size: 17px;
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -313,23 +313,23 @@
   padding: 0 28px;
   border: 1px solid rgba(31, 158, 134, 0.4);
   border-radius: 14px;
-  color: #157a67;
-  background: #e2f2ec;
+  color: var(--k-teal-deep, #157a67);
+  background: var(--k-teal-soft, #e2f2ec);
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
 }
 
 .kassist-lightflow .assistant-voice-error-actions button:last-child {
-  color: #fffdf8;
-  background: #1f9e86;
-  border-color: #1f9e86;
+  color: var(--k-surface, var(--color-surface));
+  background: var(--k-teal, #1f9e86);
+  border-color: var(--k-teal, #1f9e86);
 }
 
 /* 隐私提示 */
 .kassist-lightflow .assistant-voice-privacy {
   margin: 0;
-  color: #5d6b63;
+  color: var(--k-muted, #5d6b63);
   font-size: 15px;
   line-height: 1.65;
   text-align: center;

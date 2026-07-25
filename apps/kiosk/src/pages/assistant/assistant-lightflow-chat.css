@@ -37,7 +37,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: #c6dcf4 transparent;
+  scrollbar-color: var(--k-teal-soft, #e2f2ec) transparent;
 }
 
 .kassist.kassist-lightflow .assistant-message {
@@ -57,9 +57,9 @@
   flex: 0 0 auto;
   overflow: hidden;
   place-items: center;
-  border: 1px solid #cfe4ff;
+  border: 1px solid var(--k-teal-soft, #e2f2ec);
   border-radius: 14px;
-  background: #eaf4ff;
+  background: var(--k-teal-soft, #e2f2ec);
 }
 
 .kassist.kassist-lightflow .assistant-message-avatar img {
@@ -80,14 +80,14 @@
 .kassist.kassist-lightflow .assistant-message--user .assistant-message-bubble {
   border-color: var(--sd-primary);
   border-radius: 12px 8px 12px 12px;
-  color: #ffffff;
+  color: var(--k-surface, var(--color-surface));
   background: var(--sd-primary);
 }
 
 .kassist.kassist-lightflow .assistant-message-bubble--error {
-  border-color: #f0c5c3;
-  color: #ad302d;
-  background: #fff3f2;
+  border-color: var(--color-error-bg);
+  color: var(--color-error);
+  background: var(--color-error-bg);
 }
 
 .kassist.kassist-lightflow .assistant-message-bubble strong { display: block; margin-bottom: 4px; font-size: 14px; }
@@ -110,7 +110,7 @@
 .kassist.kassist-lightflow .assistant-thinking-dots i:nth-child(3) { animation-delay: 300ms; }
 
 .kassist.kassist-lightflow .action-chips { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.kassist.kassist-lightflow .action-chip { min-height: var(--kassist-control-min); padding: 0 18px; border: 1px solid #b9d9ff; border-radius: 12px; color: var(--sd-primary-strong); background: #edf6ff; font-size: 14px; font-weight: 700; cursor: pointer; }
+.kassist.kassist-lightflow .action-chip { min-height: var(--kassist-control-min); padding: 0 18px; border: 1px solid var(--k-teal-soft, #e2f2ec); border-radius: 12px; color: var(--sd-primary-strong); background: var(--k-teal-soft, #e2f2ec); font-size: 14px; font-weight: 700; cursor: pointer; }
 
 .kassist.kassist-lightflow .assistant-composer {
   padding: 20px;
@@ -164,12 +164,12 @@
   cursor: pointer;
 }
 
-.kassist.kassist-lightflow .assistant-tool-button { border: 1px solid #cfe3fb; color: var(--sd-primary-strong); background: #eaf4ff; }
+.kassist.kassist-lightflow .assistant-tool-button { border: 1px solid var(--k-teal-soft, #e2f2ec); color: var(--sd-primary-strong); background: var(--k-teal-soft, #e2f2ec); }
 .kassist.kassist-lightflow .assistant-tool-button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px rgba(7, 88, 215, 0.35); }
-.kassist.kassist-lightflow .assistant-send { border: 1px solid var(--sd-primary); color: #ffffff; background: var(--sd-primary); }
+.kassist.kassist-lightflow .assistant-send { border: 1px solid var(--sd-primary); color: var(--k-surface, var(--color-surface)); background: var(--sd-primary); }
 .kassist.kassist-lightflow .assistant-tool-button svg,
 .kassist.kassist-lightflow .assistant-send svg { width: 22px; height: 22px; }
-.kassist.kassist-lightflow .assistant-composer :is(button, textarea):disabled { color: var(--sd-copy-muted); border-color: var(--sd-line); background: #eef2f7; cursor: not-allowed; opacity: 0.68; }
+.kassist.kassist-lightflow .assistant-composer :is(button, textarea):disabled { color: var(--sd-copy-muted); border-color: var(--sd-line); background: var(--k-line, #e2dccb); cursor: not-allowed; opacity: 0.68; }
 .kassist.kassist-lightflow .assistant-composer textarea:disabled { resize: none; }
 .kassist.kassist-lightflow .assistant-composer-privacy { margin: 10px 0 0; color: var(--sd-copy); font-size: 12px; line-height: 1.55; text-align: center; }
 
