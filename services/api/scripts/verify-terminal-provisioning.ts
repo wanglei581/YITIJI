@@ -495,6 +495,49 @@ async function main(): Promise<void> {
       'retired terminal is irreversible',
       'database guard rejects direct retired lifecycle restoration',
     )
+    await expectDatabaseRejected(
+      () => prisma.terminal.update({
+        where: { id: active.id },
+        data: { agentToken: `cred$retired$rewritten_${suffix}` },
+      }),
+      'retired terminal is irreversible',
+      'database guard rejects retired carrier rewrites even with the sentinel prefix',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.delete({ where: { id: active.id } }),
+      'retired terminal cannot be deleted',
+      'database guard preserves the retired row as a permanent identity tombstone',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminal.create({
+        data: {
+          id: `malformed_retired_${suffix}`,
+          terminalCode: `MALFORMED-RETIRED-${suffix}`,
+          agentToken: `cred$retired$${suffix}`,
+          deviceFingerprint: `malformed-retired-fp-${suffix}`,
+          lifecycleStatus: 'retired',
+          enabled: false,
+        },
+      }),
+      'retired terminal identity cannot be inserted',
+      'database guard rejects direct retired inserts',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminalCredential.updateMany({
+        where: { terminalId: active.id },
+        data: { revokedAt: null },
+      }),
+      'retired terminal credential is immutable',
+      'database guard rejects reviving a retired terminal credential',
+    )
+    await expectDatabaseRejected(
+      () => prisma.terminalBindCode.updateMany({
+        where: { terminalId: active.id },
+        data: { revokedAt: null },
+      }),
+      'retired terminal bind code is immutable',
+      'database guard rejects reviving a retired terminal bind code',
+    )
 
     const controllerSource = readFileSync(join(process.cwd(), 'src/terminals/admin-terminals.controller.ts'), 'utf8')
     const lifecycleSource = readFileSync(join(process.cwd(), 'src/terminals/terminals-admin.service.ts'), 'utf8')
@@ -530,7 +573,7 @@ async function main(): Promise<void> {
     }
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId: { in: verifierTerminals.map((terminal) => terminal.id) } } })
     await prisma.terminal.deleteMany({ where: { terminalCode } })
-    await prisma.terminal.deleteMany({ where: { terminalCode: `ACTIVE-${suffix}` } })
+    // ACTIVE fixture 已永久退役，数据库 guard 将其保留为不可删除的身份 tombstone。
     await prisma.terminal.deleteMany({ where: { terminalCode: `LEGACY-CLOSED-${suffix}` } })
     await prisma.terminal.deleteMany({ where: { terminalCode: `CREDENTIAL-SOURCE-${suffix}` } })
     await prisma.user.deleteMany({ where: { id: actorId } })

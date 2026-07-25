@@ -363,10 +363,18 @@ async function main() {
       data: {
         id: retiredTerminalId,
         terminalCode: `VPS-RETIRED-${suffix}`,
-        agentToken: `cred$retired$${suffix}`,
+        agentToken: `tok_retired_source_${suffix}`,
         deviceFingerprint: 'fp-retired',
+      },
+    })
+    await prisma.terminal.update({
+      where: { id: retiredTerminalId },
+      data: {
         enabled: false,
         lifecycleStatus: 'retired',
+        lifecycleVersion: { increment: 1 },
+        credentialGeneration: { increment: 1 },
+        agentToken: `cred$retired$${suffix}`,
       },
     })
     await prisma.printTask.create({
@@ -828,7 +836,7 @@ async function main() {
     await prisma.scanTask.deleteMany({ where: { id: { in: createdScanTaskIds } } }).catch(() => undefined)
     await prisma.fileObject.deleteMany({ where: { id: { in: [`file_vps_${suffix}`, `file_vps_gone_${suffix}`] } } }).catch(() => undefined)
     await prisma.terminal.deleteMany({ where: { id: terminalId } }).catch(() => undefined)
-    await prisma.terminal.deleteMany({ where: { id: retiredTerminalId } }).catch(() => undefined)
+    // retired 行是数据库永久 tombstone，按设计不可删除；验证库使用随机编号避免冲突。
     await prisma.user.deleteMany({ where: { id: { startsWith: `admin_close_${suffix}` } } }).catch(() => undefined)
     await prisma.onModuleDestroy()
   }

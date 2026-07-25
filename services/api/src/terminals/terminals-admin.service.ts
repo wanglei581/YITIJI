@@ -526,6 +526,20 @@ export class TerminalAdminService {
       }
       const now = new Date()
       let revokedCredentialCount = 0
+      // 先在已持有 Terminal 行锁的同一事务内撤销身份材料，再进入 retired。
+      // 数据库 entry guard 会验证不存在有效凭证/未使用绑定码；子表 retired guard
+      // 则使进入 retired 后的身份材料永久不可改写。
+      if (lifecycleStatus === 'retired') {
+        const revokedCredentials = await tx.terminalCredential.updateMany({
+          where: { terminalId: terminal.id, revokedAt: null },
+          data: { revokedAt: now },
+        })
+        revokedCredentialCount = revokedCredentials.count
+      }
+      const revokedBindCodes = await tx.terminalBindCode.updateMany({
+        where: { terminalId: terminal.id, usedAt: null, revokedAt: null },
+        data: { revokedAt: now },
+      })
       const updated = await tx.terminal.updateMany({
         where: {
           id: terminal.id,
@@ -549,18 +563,7 @@ export class TerminalAdminService {
           error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
         })
       }
-      if (lifecycleStatus === 'retired') {
-        const revokedCredentials = await tx.terminalCredential.updateMany({
-          where: { terminalId: terminal.id, revokedAt: null },
-          data: { revokedAt: now },
-        })
-        revokedCredentialCount = revokedCredentials.count
-      }
       // 每次维护轮次切换都撤销未使用绑定码，防止旧 maintenance 轮次的换机码在 ABA 后复活。
-      const revokedBindCodes = await tx.terminalBindCode.updateMany({
-        where: { terminalId: terminal.id, usedAt: null, revokedAt: null },
-        data: { revokedAt: now },
-      })
       const result: UpdateTerminalLifecycleResult = {
         terminalId: terminal.id,
         terminalCode: terminal.terminalCode,
