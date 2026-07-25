@@ -7,6 +7,7 @@ import helmet from 'helmet'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
+import { resolveTrustProxyHops } from './config/trust-proxy'
 
 // rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
 // 防真实入口与测试口径漂移 —— C5-6 双模型审查修复的守护点）。
@@ -46,6 +47,12 @@ async function bootstrap(): Promise<void> {
     // express 接管 json body parser,带 verify 回调写入 req.rawBody
     bodyParser: false,
   })
+  // 可信反代跳数：生产必须显式 TRUST_PROXY_HOPS=1..9；禁止 true。
+  // 配置后 Express 填充 req.ip，控制器只读 req.ip，不得手解析 X-Forwarded-For。
+  const trustProxyHops = resolveTrustProxyHops()
+  if (trustProxyHops !== false) {
+    app.set('trust proxy', trustProxyHops)
+  }
   // 手动装 json + urlencoded parser：对 sync webhook 与支付回调路径保留 rawBody（alipay notify
   // 是 form-urlencoded，两个 parser 都必须挂 verify —— C5-6 双模型审查修复）。装配实现与
   // verify 脚本共用 config/body-parsers.ts，防真实入口与测试口径漂移。

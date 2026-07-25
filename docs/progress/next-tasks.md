@@ -128,9 +128,10 @@
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
 - [x] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（已合入，未部署）**：PR #275 已 squash 合入 `main@0ae51289`，合并前和合并后双 CI 均成功。UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 已进入主线；不得据此声称真实导出、下载或注销已经开放。
-- [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、`trust proxy` 真机确认。不得把「代码已合入」写成「用户可导出」。
-- [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook、与导出范围诚实文案对齐（见 C-04），不是「无页面」。
-- [x] **C-04 隐私导出范围文案对齐 Mapper（本地候选）**：shared / Kiosk / Admin 文案已改为披露元数据白名单；`verify:data-request-ui` 已加固。待合入后预生产走查 D4。
+- [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、部署后 `TRUST_PROXY_HOPS` 真机确认 `req.ip`。不得把「代码已合入」写成「用户可导出」。
+- [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook；范围文案已由 C-04/#329 对齐。
+- [x] **C-04 隐私导出范围文案对齐 Mapper（已合入）**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) → `main@9e6c255d`。预生产走查见 D4；**未部署**。
+- [ ] **TRUST_PROXY_HOPS 部署与真机确认**：代码门禁见本分支候选；合入后须在预生产/生产 `.env` 按真实 nginx 层数写入 `TRUST_PROXY_HOPS=1..9`（禁止 `true`），重启 API 后抽样确认 `req.ip` 为客户端而非反代地址。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
@@ -153,12 +154,12 @@
 
 ### PR #326 合入后冒烟（预生产优先；生产须单独授权）
 
-部署目标：`main@ef37bd22`（含 #326 代码 + #327 文档；基线祖先 `6b474051`）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
+部署目标：先 `main@ef37bd22`（#326+#327），后跟进 `main@bffc7220`（+#329+#330）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
 
-- [x] **D1 部署**（2026-07-25）：`DEPLOY_SOURCE deploy_commit=ef37bd22`；PM2 `ai-job-print-api` → `/srv/ai-job-print/services/api/dist/main.js`；本机/公网 health `db=postgres`；Kiosk/Admin/Partner HTTP 200；Kiosk 产物 `index-BmJkvkh1.js`；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`（tip 无此文件）；DB dump `/srv/ai-job-print-db-backups/pre-ef37bd22-20260725T172540+0800.dump`；回滚目录 `…/pre-ef37bd22-20260725T172540+0800`。
+- [x] **D1 部署**（2026-07-25）：首发 `DEPLOY_SOURCE=ef37bd22`（Kiosk `index-BmJkvkh1.js`）；同日跟进 `DEPLOY_SOURCE=bffc7220`（Kiosk `index-D2cndxbU.js`，含 #329）。PM2 → `/srv/ai-job-print/services/api/dist/main.js`；health `db=postgres`；三端 200；保留 `20260722090000_pg_foundation_batch_tables`。备份/回滚：`pre-ef37bd22-…` 与 `pre-bffc7220-20260725T174423+0800`。
 - [x] **D2 报价诚实**（2026-07-25）：5 页 PDF `purpose=print_doc` → `POST /orders/quote` `pageRange=1-2` → `billablePages=2/amountCents=0`；同参建单 `ptask_kiosk_608db0c6a166e275` / `ORD-20260725-4B8570C048` 同为 `billablePages=2/amountCents=0`（未按 5 页超收）。FREE_MODE 下订单 `payStatus=paid`；Agent 侧打印机 offline，任务最终 `failed/PRINTER_OFFLINE`（未宣称物理出纸）。
 - [x] **D3 设备 fail-closed**（2026-07-25）：API `printerStatus=offline` + 心跳在线；浏览器首页/隐私页顶栏显示「打印机离线」「网络正常」，**未**伪造「打印机在线」或耗材 100%。未远程停 Windows Agent（现场 Agent 本已报 offline）。
-- [x] **D4 隐私 UI**（2026-07-25，部分）：公网 `/me/privacy-requests` 可达，未登录诚实门禁「请先登录」；产物含撤回授权文案与 Admin `member-privacy`/`rejectReason`。**未做**真实会员登录后的提交/Admin 列表操作（无本窗短信账号授权）。
+- [x] **D4 隐私 UI**（2026-07-25，部分 → 文案复验）：公网 `/me/privacy-requests` 可达；`main@bffc7220`（含 #329）部署后浏览器见「隐私与数据请求 / 撤回授权可用；导出与注销暂未在一体机开放」，旧「仅限岗位 AI 咨询会话」已消失；产物含「文件清单」且无「不导出订单」。**仍未做**真实会员登录后的撤回提交 / Admin 列表（无本窗短信账号授权）。
 - [x] **D5 价目维护**（2026-07-25，只读）：Admin `/billing` 未登录跳转登录页；Admin 产物含 `/billing`；本窗**未改价、未改说明**。
 - [x] **D6 价目 SOP 只读**（2026-07-25）：active `print_bw_page=0` / `print_color_page=0`，`description` 已是「免费试运营：…0 元/页」。**无需再写**；未跑 seed、未 SQL 直改。
 

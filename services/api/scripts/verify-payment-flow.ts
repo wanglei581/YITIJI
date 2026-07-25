@@ -806,6 +806,7 @@ async function main(): Promise<void> {
       PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
       PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true', // C5-6：生产必须显式声明
       PRINT_SCAN_CAPABILITY_MODE: 'managed', // Task 11：生产必须显式声明能力开关模式
+      TRUST_PROXY_HOPS: '1',
     }
     expectThrowSync('production runtime gates reject missing PAYMENT_SESSION_SECRET', 'PRODUCTION_PAYMENT_SESSION_SECRET_INVALID', () =>
       assertProductionRuntimeGates({ ...prodEnvBase, PAYMENT_SESSION_SECRET: undefined }),

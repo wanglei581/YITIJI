@@ -51,6 +51,7 @@ import type {
   FileLifecycleSummaryResponse,
 } from './file.types'
 
+import { resolveClientIp } from '../common/client-ip'
 /** 本地代理直传单文件上限(防内存打爆;COS 直传不经此路径)。 */
 const RAW_UPLOAD_MAX_BYTES = 200 * 1024 * 1024
 /** Kiosk 上传响应需覆盖“上传→预览→确认打印”触控窗口，本次取 30 分钟签名 TTL。 */
@@ -457,12 +458,9 @@ type ReqLike = Express.Request & {
   headers: Record<string, string | string[] | undefined>
 }
 
-/** Helper:从请求里取 IP(支持 X-Forwarded-For,生产应配 trust proxy)。 */
-function extractIp(req: { headers: Record<string, string | string[] | undefined>; ip?: string; socket?: { remoteAddress?: string } }): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+/** Helper: 只信 Express trust proxy 填充的 req.ip。 */
+function extractIp(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function extractUa(req: { headers: Record<string, string | string[] | undefined> }): string | null {

@@ -7,16 +7,15 @@ import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MemberAssetsService } from './member-assets.service'
 import type { MemberAiRecordItem, MemberAssetPage, MemberDocumentItem, MemberResumeItem } from './member-assets.types'
 
+import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
   requestId?: string
 }
 
-function ipOf(req: ReqLike): string | null {
-  const fwd = req.headers?.['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim()
-  return req.ip ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: ReqLike): string | null {

@@ -27,6 +27,7 @@ import {
   type TrustedAccountActionBinding,
 } from './admin-org-account-security'
 
+import { resolveClientIp } from '../common/client-ip'
 export type { AdminOrgAccount } from './admin-org-account-view'
 
 // ============================================================
@@ -767,9 +768,7 @@ export class AdminOrgsService {
       targetType: 'organization',
       targetId: user.orgId,
       payload: { fields: Object.keys(data) },
-      ipAddress: typeof req.headers?.['x-forwarded-for'] === 'string'
-        ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
-        : (req.ip ?? null),
+      ipAddress: resolveClientIp(req),
       userAgent: typeof req.headers?.['user-agent'] === 'string' ? req.headers['user-agent'] : null,
       requestId: req.requestId ?? null,
     })
