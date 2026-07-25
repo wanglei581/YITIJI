@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 追加：**预生产 Partner 热更新 #342**（仅 `apps/partner/dist`）。API 仍 pin `DEPLOY_SOURCE=70ed8f6d`（未重启 PM2）；Partner 公网产物 `index-PAu_zGlA.js` → `index-9Gb3kgQt.js`（相对 API URL 修复）；备份 `backups/partner-dist-before-342-*.tgz`；`DEPLOY_SOURCE.txt` 追加 `partner_hotfix_commit=6ed7ba7a` / `partner_hotfix_pr=342`。health `db=postgres`。**未做**：Partner 登录后 GET 冒烟（需账号）；全量 runtime 重部署。
+
 2026-07-25 完成 **close-unpaid 预生产 Phase A 只读预检**（用户授权 `CLOSE_UNPAID_PHASE_A_READONLY` / 环境预生产）：`DEPLOY_SOURCE=70ed8f6d`，health `ok/postgres`；`BEGIN READ ONLY` 统计 `PrintTask`：**pending=0，eligible close-unpaid=0**（无 ROW 样本）。分布（仅计数）：task `completed=20/cancelled=11/failed=4`；print 订单 `unpaid=19/paid=10/closed=4/refunded=1`；历史 `errorCode=ADMIN_UNPAID_PRINT_TASK_CLOSED` 计 3。路由 `POST …/close-unpaid` 无 token → `401 AUTH_MISSING_TOKEN`。**未**调用 close-unpaid POST、未造单、未改业务数据。按 Runbook：**不得进入 Phase B**（无合格候选）。若需 Phase B，须先出现真实合格 pending 未支付未领取任务，再单独书面点名 `taskId`。
 
 2026-07-25 完成 **close-unpaid 生产受控操作授权 Runbook**（分支 `ops/close-unpaid-runbook-20260725`）：落盘 `docs/device/close-unpaid-production-controlled-ops-runbook.md`，把「代码已合入 + 预生产已部署」与「生产写操作」拆成 Phase A 只读预检（`CLOSE_UNPAID_PHASE_A_READONLY`）与 Phase B 单笔关闭（`CLOSE_UNPAID_PHASE_B_SINGLE` + 点名 taskId）；写明资格 SSOT、CAS/审计口径、硬禁止与授权回复模板。
