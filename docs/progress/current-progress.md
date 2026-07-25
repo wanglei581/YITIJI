@@ -1,10 +1,21 @@
 # 当前开发进度
 
-2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`，CI 三 job 全绿后 squash 合入）：`PrintUploadPage` 恢复三种上传通道。首次热更后被全量部署（`index-DRWxpJC3.js`，未含 #369）盖回单 Tab；已再热更 `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。源码已进主干，后续全量部署不会再被盖掉。
+2026-07-25 完成 **预生产全量部署 `main@0924a09b`（#366 热修固化 + #355 deps + #357 终端凭证）**：用户授权后续部署。pin `DEPLOY_SOURCE=0924a09b`（`scope=preprod-hotfixes-355-366-20260725`）；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`；`.env` 仍 `TRUST_PROXY_HOPS=1`；`db:pg:deploy` 已应用 `20260724165000`/`…170000`/`…190000`/`…200000`（TerminalBindCode 修复 + TerminalCredential/lifecycle/guard）；DB dump `pre-0924a09b-20260725T220753+0800.dump`；回滚目录 `/srv/ai-job-print-prev-0924a09b-20260725T220753+0800`。PM2 online / health `db=postgres` / 三端 HTTPS 200；Kiosk 全量产物曾为 `index-DRWxpJC3.js`（构建 `VITE_TERMINAL_ID=KSK-001`）。冒烟：公网 `GET /api/v1/kiosk/offline-agencies?pageSize=5` → **200** 且 `pageSize=5`；runtime dist 含 `resolveOfflineListPage` 与 `RATE_LIMITED`。`DEPLOY_SOURCE` 注明 `terminal_legacy_register_enabled=false` / `terminal_planned_provisioning_enabled=false`；**未**跑 F1 Genesis；**未**含 #356 邮箱别名 / #369 简历上传三通道（后者见下条热更）。
 
-2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。
+2026-07-25 修复 **简历打印缺少扫码上传 / U盘导入**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`）：`PrintUploadPage` 恢复三种上传通道。全量 `0924a09b`（`index-DRWxpJC3.js`）未含本提交；已再热更 Kiosk `index-DpMlugdV.js`，浏览器复核可见「扫码上传 / U盘导入」（桌面未配 Agent 时 U 盘显示「本机未配置」）。源码已进主干，下次全量部署即可固化。
 
-2026-07-25 修复 **Kiosk 线下机构列表 500（预生产热修 + 源码）**：`GET /api/v1/kiosk/offline-agencies?pageSize=5` 返回 `INTERNAL_SERVER_ERROR`；无 `pageSize` 则 200。根因是 HTTP query 的 `page`/`pageSize` 为 string，Prisma `take` 拒收；`HttpExceptionFilter` 对非 HttpException 不落日志故 PM2 err 无对应堆栈。预发已对 `dist/offline-agencies/offline-agencies.service.js` 热补 `resolvePage` 并 `pm2 reload`；公网同路径复验 200。源码分支 `fix/offline-agencies-pagesize-coerce-20260725`：抽出 `resolveOfflineListPage`，Kiosk/Admin 四处列表共用；`verify:offline-agencies-page` 接入双 CI。**未**动 DB/密钥/支付；热修在合入正式部署前会被全量 rebuild 覆盖，须合入 main 后随下次部署固化。
+2026-07-25 完成 **Partner Wave 1 登录邮箱别名**（[PR #356](https://github.com/wanglei581/YITIJI/pull/356) 已合入 `main`）：`User.emailHash/emailEnc/emailVerifiedAt/emailVerifyMethod`；密码登录支持已验证邮箱别名；Admin 手动绑定邮箱；`verify:partner-email-login-alias` 进 CI。**预发仍 pin `0924a09b`，尚未含本 tip**；下次部署前须 PG migration。**不做**邮箱 OTP/找回/Partner 自助绑邮箱。
+
+2026-07-25 固化 **预发两笔热修源码**（[PR #366](https://github.com/wanglei581/YITIJI/pull/366) → `main@0924a09b`）：① `resolveOfflineListPage`；② Throttler `429` → `RATE_LIMITED`。本地/CI 绿后 squash 合入；**预发已随 `DEPLOY_SOURCE=0924a09b` 全量部署固化**（见文首部署条）。
+
+2026-07-25 修复 **Admin/Partner 登录页误报「服务器内部错误」**：nginx 显示连续 `POST /auth/login` 先为 `401 AUTH_LOGIN_FAILED`（口令不对），超过 5 次/分钟后为 `429`；`HttpExceptionFilter` 未识别 Throttler 429 body，把文案塌成 `INTERNAL_SERVER_ERROR`/「服务器内部错误」。预发热修 filter → `RATE_LIMITED`/「尝试过于频繁，请稍后再试」，并 reload 清内存限流；源码与 `verify:http-exception-filter` 已补回归。登录本身未 500；须用正确口令（今日已轮换 partner1/partner2 seed）。现已随 `0924a09b` 进正式 dist。
+
+2026-07-25 修复 **Kiosk 线下机构列表 500（预生产热修 + 源码）**：`GET /api/v1/kiosk/offline-agencies?pageSize=5` 曾因 query `pageSize` 为 string → Prisma `take` 500。预发曾热补 dist；源码 [PR #366](https://github.com/wanglei581/YITIJI/pull/366) 抽出 `resolveOfflineListPage`；**已随 `DEPLOY_SOURCE=0924a09b` 全量固化**，公网复验 200 / `pageSize=5`。
+
+2026-07-25 追加：**WINDOWS Phase R + Admin 打印扫描只读复检（浏览器）**。当时预发 pin 仍为 `7e59243c`；health `ok/postgres`；`printer-status` → `ready` + `isOnline=true`；SQL `active=0` / `pending=0`；`TerminalCapability` 对 `t_ksk_001` 仍 **0 行**。Admin（用户已登录 Playwright）：打印扫描「待领取」= **暂无任务**；设备能力页全部「未验收（未配置）」与空表一致（**未点保存**）。**未改商业化控制**。
+
+2026-07-25 记录 **`WINDOWS_FIELD_RECHECK` Phase F 现场回执（部分通过）**：预生产 `t_ksk_001`。F1 `AIJobPrintAgent` Running/Automatic；F2 `printerName` 与 Windows「Pantum CM2800ADN Series」一致；F3 `127.0.0.1:9527`；F5 WLAN 断 75s 自恢复；F6 1080×1920 主路径无系统弹窗阻断（未覆盖 Assigned Access）。**F4 跳过**（浏览器文件选择器未接收测试 PDF；未建单）。配置在仓库 `apps/terminal-agent/config/agent-config.json`。**§5.6 真机打印与整包 Phase F 仍开**。下一步：补做 F4（可用简历打印「扫码上传 / U盘导入」）。
+
 
 2026-07-25 启动 **`WINDOWS_FIELD_RECHECK` 现场 Phase F**：新增 `docs/device/windows-field-recheck-phase-f-runbook.md`（F1 Agent 服务 / F2 printerName / F3 本机桥接 / F4 受控出纸 / F5 断网恢复 / F6 全屏抽查 + 回执模板）。同日远程 Phase R 再复检：health `ok/postgres`；`t_ksk_001` `printerStatus=ready` + `isOnline=true`；近 30min 心跳有多条；active PrintTask=0。**Phase F 未完成、未宣称 §五通过**；未造打印单、未 close-unpaid、未改 G5/FREE_MODE/F1。阻塞：须人到一体机执行清单并回执。
 
