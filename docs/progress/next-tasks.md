@@ -10,11 +10,12 @@
 
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [ ] **close-unpaid 部署 + 生产受控操作授权**：部署含该能力的构建后，仅在用户书面授权下做只读预检 / 受控关闭；禁止未授权演练
-4. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
-5. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
-6. [ ] **预生产 / Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
-7. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
+3. [x] **预生产部署含 close-unpaid / #328 / #331**：`DEPLOY_SOURCE=70ed8f6d`，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线（401 无 token）
+4. [ ] **close-unpaid 生产受控操作授权**：仅在用户书面授权下做只读预检 / 受控关闭；**禁止未授权演练关闭**
+5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
+6. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
+8. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检；`req.ip` 抽样确认
 
 ---
 
@@ -143,7 +144,8 @@
 - [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、部署后 `TRUST_PROXY_HOPS` 真机确认 `req.ip`。不得把「代码已合入」写成「用户可导出」。
 - [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook；范围文案已由 C-04/#329 对齐。
 - [x] **C-04 隐私导出范围文案对齐 Mapper（已合入）**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) → `main@9e6c255d`。预生产走查见 D4；**未部署**。
-- [ ] **TRUST_PROXY_HOPS 部署与真机确认**：代码门禁见本分支候选；合入后须在预生产/生产 `.env` 按真实 nginx 层数写入 `TRUST_PROXY_HOPS=1..9`（禁止 `true`），重启 API 后抽样确认 `req.ip` 为客户端而非反代地址。
+- [x] **TRUST_PROXY_HOPS 预生产部署**：`70ed8f6d` 已写 `TRUST_PROXY_HOPS=1`（nginx 单跳）；API 已重启且 health 正常。
+- [ ] **TRUST_PROXY_HOPS `req.ip` 抽样确认**：择期核对客户端 IP 非反代地址；生产若另有 hops 数须单独改写。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
@@ -232,7 +234,8 @@
 - [x] **FREE_MODE 价目说明文案诚实化**：按 D6 只读证据（2026-07-25）关闭——生产 active `print_bw_page` / `print_color_page` 的 `description` 已是「免费试运营：…0 元/页」；[PR #247](https://github.com/wanglei581/YITIJI/pull/247) / #255 能力已在部署路径可用。无需再写库；未跑 seed、未 SQL 直改。
 
 - [x] **当前未支付任务受控关闭（代码）**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入 `main@e2b3858d`（Admin `POST .../close-unpaid` + 详情资格字段 + `CloseUnpaidPrintTaskForm` + `verify:admin-print-scan`）。条件：pending、未领取、关联订单 `unpaid/pending` 且不存在任何 `PaymentAttempt`；事务内关任务/关订单并审计。
-- [ ] **当前未支付任务受控关闭（部署与生产操作）**：部署含该能力的构建后，仅在用户书面授权下做只读预检 / 受控关闭；**未授权不得对生产任务演练关闭**。
+- [x] **当前未支付任务受控关闭（预生产部署）**：已随 `DEPLOY_SOURCE=70ed8f6d` 上线；无 token 调用返回 `401 AUTH_MISSING_TOKEN`（证明路由在线）。
+- [ ] **当前未支付任务受控关闭（生产受控操作）**：仅在用户书面授权下做只读预检 / 受控关闭；**未授权不得对生产任务演练关闭**。
 - [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。
 - [x] 下一次 Kiosk 打印 probe：已完成且只创建 1 个任务 `ptask_kiosk_dd4a9a4210a8dc17`；后端最终 `completed`，`orderId=cmr7uffju022aaoa8jyn0ltba`、`orderNo=ORD-20260705-09B19C1DC9`；PrintService 目标时间附近记录 `Job 21`、`21:45:08`、`Pantum USB001`、`1 页`、`Win32 0x0`；最终打印队列为空，未见错误作业。实际提交走正式 API 链路 `/files/kiosk-upload` + `/print/jobs`，未改 DB、未清队列、未删 Agent 本地 DB、未重启 Agent。当前预生产价目仍是非正式验收价，且任务为 unpaid 完成，不能按商用收费口径宣称通过。
 - [x] G4/G5 复测后续处理：2026-07-06 `PS-G4-20260706-105325` 首次上传成功但 `/print/jobs` 返回 400；服务器只读缩圈已排除 active 价目缺失、COS 读取失败和 G4 PDF 轻量页数识别失败。`HttpExceptionFilter` 诊断热修已部署预生产并验证：缺失文件签名诊断请求返回 `PRINT_PAGE_COUNT_UNAVAILABLE` + `requestId=c6892d6d-17b1-43c8-a5d8-0779eedeeff5`，不再遮蔽机器码。热修后真实复测曾成功建单 `ptask_kiosk_74ee1da48ed051e1` / `ORD-20260706-2F2B3DF20E`，但因 `t_ksk_001` 在 11:48 后停止 heartbeat/claim，恢复时文件 URL 已过期，最终回传 `failed/PRINT_COMMAND_FAILED`（401）。该 G4 任务已冻结为诊断样本，禁止重试、手动 claim、清理或继续作为出纸复验对象。随后受控 G5 在 Agent 在线且 active 任务为 0 时新建 `ptask_kiosk_f05cd3c160ec55c6` / `ORD-20260706-DFC018281B`，已由 `t_ksk_001` claim 并回传 `completed`；现场补证目录 `C:\ai-job-print-evidence\PS-G5-EVIDENCE-20260706-130544` 显示 `AIJobPrintAgent` Running / Automatic，`Pantum CM2800ADN Series` Normal、USB001、JobCount=0、队列无残留，PrintService Event 307 / 842 记录 Job 26、1 页、Win32 `0x0`，且现场确认有纸。本项已闭环为本轮新增物理出纸证据；剩余不再是打印链路问题，而是打印运营模式决策 + FREE_MODE / 有人值守 mark-paid 运行时复验。

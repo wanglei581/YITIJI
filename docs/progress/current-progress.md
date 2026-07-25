@@ -1,12 +1,14 @@
 # 当前开发进度
 
+2026-07-25 追加：**预生产部署 `main@70ed8f6d`（含 #328 视觉 / #331 TRUST_PROXY / close-unpaid 运行时）**。用户授权后 pin 该提交（**故意不含**随后合入的 F1 Genesis `#334`/`68c5323f`）。归档 sha256 `4e240a9b…`；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`；`.env` 写入 `TRUST_PROXY_HOPS=1`（只读确认 nginx 单跳反代到 `:3010`）；DB dump `pre-70ed8f6d-20260725T190052+0800.dump`；回滚 `…/pre-70ed8f6d-20260725T190052+0800`。PM2 online / health `db=postgres` / 三端 HTTP 200；Kiosk 产物 `index-B1PLyV9Q.js`（含 fusion-youth / 隐私「文件清单」）；Admin bundle 含 `close-unpaid`；`POST /admin/print-scan/tasks/print/:id/close-unpaid` 无 token → `401 AUTH_MISSING_TOKEN`（路由在线）。打印机 API `ready`+`isOnline`；公网首页短暂「设备检查中」为轮询首帧。**未做**：生产受控关闭未支付任务、G5 退款、F1 Genesis、live 支付。
+
 2026-07-25 完成 **F1 平行 Genesis bootstrap D1 Task 3–6 本地代码与离线门禁**（分支 `codex/f1-genesis-d1-offline-20260725`，rebase 最新 `origin/main`）：在 Task 1–2 已合入 main 的 runtime contract / fixture 之上，新增一次性不可重入 `runReleaseGenesis`、窄 CLI（11 flag / 22 args）、脱敏 control records（`GENESIS_INTENT` / `SUCCESS` / `FAILURE` / lock）、system runner 固定 launcher args + narrowed env，以及离线 `verify:release-genesis`（场景 1–9：fake PM2/health/traffic，零网络/真实 PM2）。CI 在 Release provenance fixture 后接入 Genesis fixture。本地 `verify:release-provenance`、`verify:release-genesis`、API typecheck/lint/build、无参 CLI → `RELEASE_PROVENANCE_GENESIS_ARGUMENT_INVALID`、`git diff --check` 均通过。**本条只陈述本地代码与离线/CI 事实；未 SSH、未跑 `release:genesis` 连任何实例、未改 PM2/Nginx/负载层；production F1 继续 NO-GO。** D2 镜像演练与 D3–D6 仍须独立具名限时授权。
 
 2026-07-25 **SSOT 收口（只读核对 GitHub）**：[PR #328](https://github.com/wanglei581/YITIJI/pull/328) 已 squash 合入 `main@5843cafa`（方案 B 视觉统一与余下页面细对齐候选 W0–W22；CI `build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness` 全绿）。**可写：前端方案 B 视觉统一候选已进主干。不得写：86 屏像素级全部封板，或生产已部署该提交，或真机打印/扫描/支付/SMS/TRTC/整机商用已验收。**同日核对：[PR #223](https://github.com/wanglei581/YITIJI/pull/223)（Admin `close-unpaid` 未支付任务受控关闭）早已于 2026-07-13 合入 `main@e2b3858d`；旧进度里「下一步提交 PR」为过时表述，代码侧已合入，**卡点仅剩部署与生产受控操作授权**（不得在未授权时对生产任务演练关闭）。
 
 2026-07-25 完成 **Kiosk 方案 B 余下页面细对齐候选 W16–W22**（分支 `codex/kiosk-visual-unification-20260725`，已随 #328 合入）：在已批准的方案 B 下，把 W0–W15 未细对齐的生产路由分波收口——**W16** 岗位/企业/线下机构；**W17** 招聘会套件；**W18** 校园/智慧校园/百宝箱；**W19** 活动/帮助/`renshi`；**W20** 简历余页；**W21** 打印确认/收银/完成 + print-scan 附属；**W22** 系统全屏与手机页。**可写：前端方案 B 余下页面细对齐候选完成（壳+栏位+诚实态）。不得写：86 屏像素级全部封板，或真机打印/扫描/支付/SMS/TRTC 已验收，或整机商用上线。**
 
-2026-07-25 完成 **Express `TRUST_PROXY_HOPS` 可信跳数门禁**（已合入 main）：`main.ts` 按 `TRUST_PROXY_HOPS=1..9` 配置 Express trust proxy；生产启动门禁强制显式声明并**禁止 `true/false`**；新增 `resolveClientIp` 统一只信 `req.ip`；`verify:trust-proxy` 已接入 CI。**未部署**；部署时须按真实 nginx 层数写入 hops 并真机确认 `req.ip`。
+2026-07-25 完成 **Express `TRUST_PROXY_HOPS` 可信跳数门禁**（已合入 main，预生产已随 `70ed8f6d` 部署）：`main.ts` 按 `TRUST_PROXY_HOPS=1..9` 配置 Express trust proxy；生产启动门禁强制显式声明并**禁止 `true/false`**；新增 `resolveClientIp` 统一只信 `req.ip`；`verify:trust-proxy` 已接入 CI。预生产 `.env` 已写 `TRUST_PROXY_HOPS=1`；`req.ip` 抽样确认可择期补做。
 
 2026-07-25 **隐私导出范围诚实文案收口（C-04）已合入**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) squash 合入 `main@9e6c255d`。`MEMBER_DATA_REQUEST_SCOPE` 与 `MemberDataExportMapper` 元数据白名单对齐；一体机仍不开放导出提交；账号注销仍 fail-closed。**未部署**。
 
