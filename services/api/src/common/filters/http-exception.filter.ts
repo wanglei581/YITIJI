@@ -58,6 +58,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     }
 
+    // Nest Throttler 429 的 body.message 含空格/非机器码（如 "ThrottlerException: Too Many Requests"），
+    // 旧逻辑会把页面文案塌成「服务器内部错误」，登录页误报为宕机。
+    if (
+      status === HttpStatus.TOO_MANY_REQUESTS &&
+      (code === 'INTERNAL_SERVER_ERROR' || code === 'Too Many Requests')
+    ) {
+      code = 'RATE_LIMITED'
+      message = '尝试过于频繁，请稍后再试'
+    }
+
     const errorBody: ErrorResponseBody = {
       success: false,
       error: details ? { code, message, details } : { code, message },

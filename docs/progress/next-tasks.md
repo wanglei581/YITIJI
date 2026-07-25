@@ -8,6 +8,8 @@
 
 推荐顺序（2026-07-25）：
 
+0. [x] **预发事故：offline-agencies `pageSize` string → 500**（2026-07-25）：预发已热修；源码分支 `fix/preprod-hotfixes-20260725`（含 `resolveOfflineListPage` + `verify:offline-agencies-page`）**PR 中**——合入后仍须下次全量部署才固化，否则 rebuild 会冲掉热修
+0b. [x] **预发事故：登录页「服务器内部错误」实为 429 限流误报**（2026-07-25）：预发 filter 已热修 `RATE_LIMITED`；同源 PR 固化 `HttpExceptionFilter` + verify；限流已清；口令错仍是 401——须正确口令登录；**仍待下次部署固化**
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署含 close-unpaid / #328 / #331**：先 `DEPLOY_SOURCE=70ed8f6d`；2026-07-25 已跟进至 **`DEPLOY_SOURCE=7e59243c`（G6 #343）**，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线

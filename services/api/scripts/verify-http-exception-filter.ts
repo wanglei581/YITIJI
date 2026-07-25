@@ -4,6 +4,7 @@
  * Run: pnpm --filter @ai-job-print/api verify:http-exception-filter
  */
 import { ArgumentsHost, BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
+import { ThrottlerException } from '@nestjs/throttler'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 
 function fail(message: string): never {
@@ -92,6 +93,11 @@ function main(): void {
   assert(unstructuredInternal.statusCode === 500, 'unstructured internal error keeps HTTP 500')
   assert(unstructuredInternal.body.error.code === 'INTERNAL_SERVER_ERROR', 'unstructured internal error keeps generic error code')
   assert(unstructuredInternal.body.error.message === '服务器内部错误', 'unstructured internal error does not expose raw message')
+
+  const throttled = capture(new ThrottlerException())
+  assert(throttled.statusCode === 429, 'ThrottlerException keeps HTTP 429')
+  assert(throttled.body.error.code === 'RATE_LIMITED', 'ThrottlerException maps to RATE_LIMITED (not INTERNAL_SERVER_ERROR)')
+  assert(throttled.body.error.message === '尝试过于频繁，请稍后再试', 'ThrottlerException shows friendly rate-limit message')
 
   console.log('\nALL PASS')
 }
