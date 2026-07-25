@@ -15,13 +15,14 @@
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG `MemberLegalConsent`；P1-5 法务正文定稿仍开）
-7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。仍须用户点名授权包后推进：
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；2026-07-25 预发**远程只读盘点**已做（见 `current-progress.md`）。授权包模板见 `docs/device/p0-auth-packs-seed-and-secrets-runbook.md`。仍须用户点名后推进：
    - **7a `SEED_PASSWORD_CONFIRM`**：✅ 已核验（2026-07-25）——当时 `admin` 非默认；`partner1`/`partner2` 曾 MATCH
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：百度 OCR / COS / SMS / TRTC / LLM 控制台轮换截图或变更时间（密钥不进仓库/聊天）
    - **7c `WINDOWS_FIELD_RECHECK`**：一体机 Agent + 奔图驱动 + 断网恢复现场复验
    - **7d（可选）`PARTNER_SMOKE_LOGIN`**：用轮换后口令（用户本机从 secret 文件读取）做 data-sources/jobs 只读 GET
    - **不在本包**：G5 退款、F1 Genesis、close-unpaid Phase B、切收费支付
+   - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
 
