@@ -54,4 +54,21 @@ if (
   fail('page must include orderNo, payStatus, taskStatus fields')
 }
 
+if (
+  service.includes('aftercareStatus: AdminOrderAftercareStatus') &&
+  service.includes('refundEligible: boolean') &&
+  service.includes('retryForbidden: boolean') &&
+  page.includes('已支付失败待核查') &&
+  page.includes("setStatusFilter('failed')") &&
+  page.includes("setPayStatus('paid')") &&
+  page.includes("detail.aftercareStatus === 'manual_check_required'") &&
+  page.includes('系统已禁止重新排队，避免重复出纸') &&
+  page.includes('detail.refundEligible') &&
+  page.includes('adminOrdersReadonlyService.refundOrder')
+) {
+  pass('paid+failed unconfirmed orders expose server-derived aftercare, quick filter, risk warning and canonical refund entry')
+} else {
+  fail('Gate 0.3B orders aftercare UI/service contract is incomplete')
+}
+
 console.log('\nALL PASS')

@@ -157,9 +157,20 @@ if (
   http.includes('/lifecycle') &&
   mock.includes('TERMINAL_LIFECYCLE_TRANSITION_INVALID') &&
   mock.includes('TERMINAL_MAINTENANCE_REQUIRED') &&
-  mock.includes('normalizedReason.length < 8')
+  mock.includes('normalizedReason.length < 8') &&
+  lifecycleActions.includes("status === 'suspended'") &&
+  lifecycleActions.includes("'retired'") &&
+  lifecycleActions.includes('`吊销 ${terminal.terminalCode}`') &&
+  lifecycleActions.includes('不可逆操作') &&
+  lifecycleActions.includes('error.status === 409') &&
+  lifecycleActions.includes('expectedCredentialGeneration: terminal.credentialGeneration') &&
+  devices.includes('emergencyRevokeTerminal') &&
+  http.includes('/emergency-revoke') &&
+  mock.includes('TERMINAL_REVOKE_CONFIRMATION_INVALID') &&
+  mock.includes('MOCK_TERMINAL_CREDENTIAL_STATE') &&
+  mock.includes('active: false')
 ) {
-  pass('现有终端表接入 active/maintenance 运维动作，并将换机绑定码限制为 planned/maintenance')
+  pass('现有终端表接入完整运维动作、紧急吊销强确认与 409 刷新，换机绑定码仅限 planned/maintenance')
 } else {
   fail('terminal lifecycle actions and bind-code maintenance gate must stay wired through the existing terminals page')
 }

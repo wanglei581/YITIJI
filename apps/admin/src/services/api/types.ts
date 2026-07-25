@@ -110,6 +110,8 @@ export interface AdminTerminalRecord {
   enabled: boolean
   lifecycleStatus: TerminalLifecycleStatus
   lifecycleVersion: number
+  credentialGeneration: number
+  hasActiveCredential: boolean
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
@@ -185,19 +187,44 @@ export interface UpdateTerminalProfileResult {
 }
 
 export interface UpdateTerminalLifecycleInput {
-  targetStatus: 'active' | 'maintenance'
-  expectedStatus: 'active' | 'maintenance'
+  targetStatus: 'active' | 'maintenance' | 'suspended' | 'retired'
+  expectedStatus: TerminalLifecycleStatus
   expectedVersion: number
   reason: string
+  confirmationText?: string
 }
 
 export interface UpdateTerminalLifecycleResult {
   terminalId: string
   terminalCode: string
   oldStatus: TerminalLifecycleStatus
-  newStatus: 'active' | 'maintenance'
+  newStatus: TerminalLifecycleStatus
   inFlightTaskCount: number
   lifecycleVersion: number
+  activePrintTaskCount?: number
+  activeScanTaskCount?: number
+  revokedCredentialCount?: number
+  revokedBindCodeCount?: number
+}
+
+export interface EmergencyRevokeTerminalInput {
+  expectedStatus: Exclude<TerminalLifecycleStatus, 'planned' | 'retired'>
+  expectedVersion: number
+  expectedCredentialGeneration: number
+  reason: string
+  confirmationText: string
+}
+
+export interface EmergencyRevokeTerminalResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: TerminalLifecycleStatus
+  newStatus: 'suspended'
+  lifecycleVersion: number
+  credentialGeneration: number
+  revokedCredentialCount: number
+  revokedBindCodeCount: number
+  inFlightTaskCount: number
 }
 
 // ── 终端授权绑定码（一次性）────────────────────────────────────────────────────

@@ -179,13 +179,19 @@ export class ScanTasksService {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
-      select: { id: true, enabled: true },
+      select: { id: true, enabled: true, lifecycleStatus: true },
     })
     if (!terminal) {
       throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_NOT_FOUND', message: '目标终端不存在' } })
     }
     if (!terminal.enabled) {
       throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_DISABLED', message: '目标终端已停用' } })
+    }
+
+    if (terminal.lifecycleStatus !== 'active') {
+      throw new BadRequestException({
+        error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端当前不可创建新扫描任务' },
+      })
     }
 
     // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
@@ -200,15 +206,26 @@ export class ScanTasksService {
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
     let task: { id: string }
     try {
-      task = await this.prisma.scanTask.create({
-        data: {
-          terminalId: terminal.id,
-          scanType: dto.scanType,
-          endUserId,
-          expiresAt,
-          controlTokenHash,
-        },
-        select: { id: true },
+      task = await this.prisma.$transaction(async (tx) => {
+        const activeLock = await tx.terminal.updateMany({
+          where: { id: terminal.id, enabled: true, lifecycleStatus: 'active' },
+          data: { lifecycleStatus: 'active' },
+        })
+        if (activeLock.count !== 1) {
+          throw new BadRequestException({
+            error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端状态已变化，当前不可创建新扫描任务' },
+          })
+        }
+        return tx.scanTask.create({
+          data: {
+            terminalId: terminal.id,
+            scanType: dto.scanType,
+            endUserId,
+            expiresAt,
+            controlTokenHash,
+          },
+          select: { id: true },
+        })
       })
     } catch (e) {
       if (isScanTaskActiveSessionConflict(e)) {

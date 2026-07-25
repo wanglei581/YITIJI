@@ -1,9 +1,6 @@
-import { IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator'
+import { IsIn, IsInt, IsString, Matches, MaxLength, Min, MinLength } from 'class-validator'
 
-export class UpdateTerminalLifecycleDto {
-  @IsIn(['active', 'maintenance', 'suspended', 'retired'])
-  targetStatus!: 'active' | 'maintenance' | 'suspended' | 'retired'
-
+export class EmergencyRevokeTerminalCredentialsDto {
   @IsIn(['commissioning', 'active', 'maintenance', 'suspended'])
   expectedStatus!: 'commissioning' | 'active' | 'maintenance' | 'suspended'
 
@@ -11,14 +8,17 @@ export class UpdateTerminalLifecycleDto {
   @Min(0)
   expectedVersion!: number
 
+  @IsInt()
+  @Min(0)
+  expectedCredentialGeneration!: number
+
   @IsString()
   @MinLength(8)
   @MaxLength(500)
   @Matches(/\S/, { message: 'reason 不能为空白' })
   reason!: string
 
-  @IsOptional()
   @IsString()
   @MaxLength(128)
-  confirmationText?: string
+  confirmationText!: string
 }

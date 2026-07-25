@@ -1,6 +1,8 @@
 import { API_BASE_URL, API_MODE, ApiHttpError } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 
+export type AdminOrderAftercareStatus = 'manual_check_required' | null
+
 export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
@@ -17,6 +19,9 @@ export interface AdminOrderReadonlyItem {
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
   errorCode: string | null
+  aftercareStatus: AdminOrderAftercareStatus
+  refundEligible: boolean
+  retryForbidden: boolean
   createdAt: string
   updatedAt: string
 }
@@ -164,6 +169,9 @@ const MOCK_DETAIL: AdminOrderReadonlyDetail = {
   colorMode: 'black_white',
   paperSize: 'A4',
   errorCode: null,
+  aftercareStatus: null,
+  refundEligible: false,
+  retryForbidden: false,
   createdAt: now(),
   updatedAt: now(),
   refundedAt: null,

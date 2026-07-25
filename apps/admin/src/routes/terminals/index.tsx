@@ -91,7 +91,12 @@ export default function TerminalsPage() {
   const [creatingPlannedTerminal, setCreatingPlannedTerminal] = useState(false)
   const [localOrgPatch, setLocalOrgPatch] = useState<Record<string, { orgId: string | null; orgName: string | null }>>({})
   const [localProfilePatch, setLocalProfilePatch] = useState<Record<string, UpdateTerminalProfileInput>>({})
-  const [localLifecyclePatch, setLocalLifecyclePatch] = useState<Record<string, { status: TerminalLifecycleStatus; version: number }>>({})
+  const [localLifecyclePatch, setLocalLifecyclePatch] = useState<Record<string, {
+    status: TerminalLifecycleStatus
+    version: number
+    credentialGeneration?: number
+    hasActiveCredential?: boolean
+  }>>({})
 
   const {
     data: terminalData,
@@ -139,7 +144,16 @@ export default function TerminalsPage() {
         ...terminal,
         ...orgPatch,
         ...profilePatch,
-        ...(lifecyclePatch ? { lifecycleStatus: lifecyclePatch.status, lifecycleVersion: lifecyclePatch.version } : {}),
+        ...(lifecyclePatch ? {
+          lifecycleStatus: lifecyclePatch.status,
+          lifecycleVersion: lifecyclePatch.version,
+          ...(lifecyclePatch.credentialGeneration === undefined
+            ? {}
+            : { credentialGeneration: lifecyclePatch.credentialGeneration }),
+          ...(lifecyclePatch.hasActiveCredential === undefined
+            ? {}
+            : { hasActiveCredential: lifecyclePatch.hasActiveCredential }),
+        } : {}),
       }
     }),
     [localLifecyclePatch, localOrgPatch, localProfilePatch, terminalData?.terminals],
@@ -461,7 +475,7 @@ export default function TerminalsPage() {
                                   type="checkbox"
                                   checked={profileDraft.enabled ?? true}
                                   onChange={(e) => setProfileDraft((d) => ({ ...d, enabled: e.target.checked }))}
-                                  disabled={profileSaving}
+                                  disabled={profileSaving || t.lifecycleStatus === 'retired'}
                                   className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600"
                                 />
                                 启用终端
@@ -589,7 +603,7 @@ export default function TerminalsPage() {
                           <button
                             type="button"
                             onClick={() => toggleTerminalStatus(t)}
-                            disabled={statusSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id}
+                            disabled={statusSavingId !== null || profileSaving || saving || profileEditingId === t.id || editingId === t.id || t.lifecycleStatus === 'retired'}
                             aria-label={`${t.enabled ? '停用' : '启用'} ${t.terminalCode}`}
                             className={`inline-flex h-7 items-center whitespace-nowrap rounded-md border px-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
                               t.enabled
@@ -613,7 +627,16 @@ export default function TerminalsPage() {
                           onUpdated={(result) => {
                             setLocalLifecyclePatch((current) => ({
                               ...current,
-                              [t.id]: { status: result.newStatus, version: result.lifecycleVersion },
+                              [t.id]: {
+                                status: result.newStatus,
+                                version: result.lifecycleVersion,
+                                ...('credentialGeneration' in result
+                                  ? {
+                                      credentialGeneration: result.credentialGeneration,
+                                      hasActiveCredential: false,
+                                    }
+                                  : {}),
+                              },
                             }))
                             void refresh()
                               .then(() => setLocalLifecyclePatch((current) => {
@@ -624,6 +647,7 @@ export default function TerminalsPage() {
                               }))
                               .catch(() => undefined)
                           }}
+                          onConflict={() => { void refresh().catch(() => undefined) }}
                           onNotice={setNotice}
                         />
                       </td>

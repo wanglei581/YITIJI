@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -47,6 +48,18 @@ export interface TerminalBindCodeAuditContext {
   ipAddress?: string | null
   userAgent?: string | null
   requestId?: string | null
+}
+
+export interface EmergencyCredentialRevokeResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: 'commissioning' | 'active' | 'maintenance' | 'suspended'
+  newStatus: 'suspended'
+  lifecycleVersion: number
+  credentialGeneration: number
+  revokedCredentialCount: number
+  revokedBindCodeCount: number
+  inFlightTaskCount: number
 }
 
 @Injectable()
@@ -294,6 +307,9 @@ export class TerminalCredentialSecurityService {
     if (terminal.lifecycleStatus === 'planned') {
       throw new UnauthorizedException({ error: { code: 'TERMINAL_NOT_ACTIVATED', message: '终端尚未激活' } })
     }
+    if (terminal.lifecycleStatus === 'retired') {
+      throw new UnauthorizedException({ error: { code: 'TERMINAL_RETIRED', message: '终端已退役' } })
+    }
     const isLegacyCarrier = !terminal.agentToken.startsWith(CREDENTIAL_SENTINEL_PREFIX)
     if (isLegacyCarrier && !constantTimeEquals(token, terminal.agentToken)) {
       throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
@@ -341,6 +357,125 @@ export class TerminalCredentialSecurityService {
         issueSource: args.issueSource,
         expiresAt: args.expiresAt,
       },
+    })
+  }
+
+  async emergencyRevoke(
+    terminalRef: string,
+    auditContext: TerminalBindCodeAuditContext & { reason: string },
+    expected: {
+      expectedStatus: 'commissioning' | 'active' | 'maintenance' | 'suspended'
+      expectedVersion: number
+      expectedCredentialGeneration: number
+      confirmationText: string
+    },
+  ): Promise<EmergencyCredentialRevokeResult> {
+    const normalizedReason = auditContext.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new BadRequestException({
+        error: { code: 'LIFECYCLE_REASON_INVALID', message: '运维原因须为 8–500 个有效字符' },
+      })
+    }
+    const now = new Date()
+    return this.prisma.$transaction(async (tx) => {
+      const terminal = await tx.terminal.findFirst({
+        where: this.terminalRefWhere(terminalRef),
+        select: {
+          id: true,
+          terminalCode: true,
+          lifecycleStatus: true,
+          lifecycleVersion: true,
+          credentialGeneration: true,
+        },
+      })
+      if (!terminal) throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
+      if (terminal.lifecycleStatus === 'retired') {
+        throw new BadRequestException({ error: { code: 'TERMINAL_RETIRED', message: '终端已退役' } })
+      }
+      if (expected.confirmationText !== `吊销 ${terminal.terminalCode}`) {
+        throw new BadRequestException({
+          error: { code: 'TERMINAL_REVOKE_CONFIRMATION_INVALID', message: '请输入指定文字确认紧急吊销' },
+        })
+      }
+      if (
+        terminal.lifecycleStatus !== expected.expectedStatus ||
+        terminal.lifecycleVersion !== expected.expectedVersion ||
+        terminal.credentialGeneration !== expected.expectedCredentialGeneration
+      ) {
+        throw new ConflictException({
+          error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端状态、版本或凭证代次已变化，请刷新后重试' },
+        })
+      }
+      const allowed = ['commissioning', 'active', 'maintenance', 'suspended']
+      if (!allowed.includes(terminal.lifecycleStatus)) {
+        throw new BadRequestException({
+          error: { code: 'TERMINAL_LIFECYCLE_TRANSITION_INVALID', message: '当前状态不能执行应急凭证吊销' },
+        })
+      }
+      const updated = await tx.terminal.updateMany({
+        where: {
+          id: terminal.id,
+          lifecycleStatus: terminal.lifecycleStatus,
+          lifecycleVersion: terminal.lifecycleVersion,
+          credentialGeneration: terminal.credentialGeneration,
+        },
+        data: {
+          lifecycleStatus: 'suspended',
+          lifecycleVersion: { increment: 1 },
+          credentialGeneration: { increment: 1 },
+          agentToken: `${CREDENTIAL_SENTINEL_PREFIX}revoked$${crypto.randomBytes(32).toString('hex')}`,
+        },
+      })
+      if (updated.count !== 1) {
+        throw new ConflictException({
+          error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端状态或凭证代次已变化，请刷新后重试' },
+        })
+      }
+      const revokedCredentials = await tx.terminalCredential.updateMany({
+        where: { terminalId: terminal.id, revokedAt: null },
+        data: { revokedAt: now },
+      })
+      const revokedBindCodes = await tx.terminalBindCode.updateMany({
+        where: { terminalId: terminal.id, usedAt: null, revokedAt: null },
+        data: { revokedAt: now },
+      })
+      const inFlightTaskCount = await tx.printTask.count({
+        where: { terminalId: terminal.id, status: { in: ['claimed', 'printing'] } },
+      })
+      await this.audit.writeRequired(tx, {
+          actorId: auditContext.actorId,
+          actorRole: auditContext.actorRole,
+          action: 'terminal.credential.emergency_revoke',
+          targetType: 'terminal',
+          targetId: terminal.terminalCode,
+          payload: {
+            terminalCode: terminal.terminalCode,
+            oldStatus: terminal.lifecycleStatus,
+            newStatus: 'suspended',
+            oldLifecycleVersion: terminal.lifecycleVersion,
+            newLifecycleVersion: terminal.lifecycleVersion + 1,
+            oldCredentialGeneration: terminal.credentialGeneration,
+            newCredentialGeneration: terminal.credentialGeneration + 1,
+            revokedCredentialCount: revokedCredentials.count,
+            revokedBindCodeCount: revokedBindCodes.count,
+            reason: normalizedReason,
+            inFlightTaskCount,
+          },
+          ipAddress: auditContext.ipAddress ?? null,
+          userAgent: auditContext.userAgent ?? null,
+          requestId: auditContext.requestId ?? null,
+      })
+      return {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        oldStatus: terminal.lifecycleStatus as EmergencyCredentialRevokeResult['oldStatus'],
+        newStatus: 'suspended',
+        lifecycleVersion: terminal.lifecycleVersion + 1,
+        credentialGeneration: terminal.credentialGeneration + 1,
+        revokedCredentialCount: revokedCredentials.count,
+        revokedBindCodeCount: revokedBindCodes.count,
+        inFlightTaskCount,
+      }
     })
   }
 

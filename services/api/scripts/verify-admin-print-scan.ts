@@ -294,6 +294,64 @@ async function main() {
       '订单 taskStatus 非 failed 的任务 retry → 409',
     )
 
+    // PRINT_JOB_UNCONFIRMED 表示 Agent 无法确认是否已经出纸；必须在任何重签/事务写入前硬拒绝，
+    // 否则一次“运维重试”可能导致同一份付费材料重复出纸。
+    const unconfirmedTaskId = `pt_vps_unconfirmed_${suffix}`
+    const unconfirmedOrderId = `order_vps_unconfirmed_${suffix}`
+    createdPrintTaskIds.push(unconfirmedTaskId)
+    createdOrderIds.push(unconfirmedOrderId)
+    await prisma.printTask.create({
+      data: {
+        id: unconfirmedTaskId,
+        terminalId,
+        fileUrl: signFileUrl(fileId, 60_000).url,
+        fileMd5: 'unconfirmed-md5',
+        status: 'failed',
+        errorCode: 'PRINT_JOB_UNCONFIRMED',
+        errorMessage: 'Agent restarted before the local spool result could be confirmed',
+        completedAt: new Date(),
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: unconfirmedOrderId,
+        orderNo: `NO-VPSU-${suffix}`,
+        type: 'print',
+        printTaskId: unconfirmedTaskId,
+        payStatus: 'paid',
+        taskStatus: 'failed',
+        amountCents: 100,
+      },
+    })
+    const [unconfirmedTaskBefore, unconfirmedOrderBefore, unconfirmedLogCountBefore, unconfirmedTaskCountBefore] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: unconfirmedTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: unconfirmedOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: unconfirmedTaskId } }),
+      prisma.printTask.count(),
+    ])
+    await expectHttpErrorCode(
+      () => printScan.applyAction('print', unconfirmedTaskId, 'retry'),
+      409,
+      'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
+      'PRINT_JOB_UNCONFIRMED retry → 409 + 精确业务错误码',
+    )
+    const [unconfirmedTaskAfter, unconfirmedOrderAfter, unconfirmedLogCountAfter, unconfirmedTaskCountAfter] = await Promise.all([
+      prisma.printTask.findUniqueOrThrow({ where: { id: unconfirmedTaskId } }),
+      prisma.order.findUniqueOrThrow({ where: { id: unconfirmedOrderId } }),
+      prisma.printTaskStatusLog.count({ where: { taskId: unconfirmedTaskId } }),
+      prisma.printTask.count(),
+    ])
+    if (
+      JSON.stringify(unconfirmedTaskAfter) !== JSON.stringify(unconfirmedTaskBefore) ||
+      unconfirmedOrderAfter.payStatus !== unconfirmedOrderBefore.payStatus ||
+      unconfirmedOrderAfter.taskStatus !== unconfirmedOrderBefore.taskStatus ||
+      unconfirmedLogCountAfter !== unconfirmedLogCountBefore ||
+      unconfirmedTaskCountAfter !== unconfirmedTaskCountBefore
+    ) {
+      fail('PRINT_JOB_UNCONFIRMED retry 拒绝后 PrintTask、Order、状态日志和任务总数必须完全不变')
+    }
+    pass('PRINT_JOB_UNCONFIRMED retry 拒绝路径零副作用（任务/订单/日志/任务总数不变）')
+
     const retried = await printScan.applyAction('print', failedTaskId, 'retry')
     if (retried.fromStatus !== 'failed' || retried.toStatus !== 'pending') fail('retry 应 failed → pending')
     const afterRetry = await prisma.printTask.findUnique({ where: { id: failedTaskId } })

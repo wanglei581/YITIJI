@@ -28,6 +28,7 @@ import type {
 } from './admin-print-scan.types'
 
 export const ADMIN_UNPAID_PRINT_TASK_CLOSED_ERROR_CODE = 'ADMIN_UNPAID_PRINT_TASK_CLOSED'
+export const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
 const ADMIN_UNPAID_PRINT_TASK_CLOSED_ACTION = 'print_task.admin_unpaid_closed'
 
 type CloseUnpaidBlockReason = Exclude<Extract<AdminPrintScanTaskDetail, { type: 'print' }>['closeUnpaidBlockReason'], null>
@@ -434,7 +435,7 @@ export class AdminPrintScanService {
   private async retryPrintTask(taskId: string): Promise<AdminPrintScanActionResult> {
     const task = await this.prisma.printTask.findUnique({
       where: { id: taskId },
-      select: { id: true, status: true, fileUrl: true },
+      select: { id: true, status: true, fileUrl: true, errorCode: true },
     })
     if (!task) {
       throw new NotFoundException({ error: { code: 'PRINT_SCAN_TASK_NOT_FOUND', message: '任务不存在' } })
@@ -442,6 +443,16 @@ export class AdminPrintScanService {
     if (task.status !== 'failed') {
       throw new ConflictException({
         error: { code: 'PRINT_SCAN_ACTION_INVALID_STATE', message: '仅失败状态的打印任务可以重试' },
+      })
+    }
+    // Agent 已经把任务归档为“可能出纸但结果无法确认”时，重排会造成重复出纸风险。
+    // 门禁必须位于文件重签和任何事务写入之前，拒绝路径保持任务、订单和状态日志完全不变。
+    if (task.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE) {
+      throw new ConflictException({
+        error: {
+          code: 'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
+          message: '打印结果未确认，禁止重新排队；请前往订单管理核查并按需退款',
+        },
       })
     }
     // 失败任务多半已超过 30 分钟签名 TTL，原 fileUrl 重排后 Agent 必然下载失败：

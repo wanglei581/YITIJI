@@ -35,19 +35,22 @@ async function main(): Promise<void> {
   const endUserId = `eu_aor_${suffix}`
   const taskId = `ptask_aor_${suffix}`
   const brokenTaskId = `ptask_aor_broken_${suffix}`
+  const unconfirmedTaskId = `ptask_aor_unconfirmed_${suffix}`
   const orderId = `ord_aor_${suffix}`
   const brokenOrderId = `ord_aor_broken_${suffix}`
+  const unconfirmedOrderId = `ord_aor_unconfirmed_${suffix}`
   const orderNo = `ORD-READ-${suffix.toUpperCase()}`
   const brokenOrderNo = `ORD-READ-B-${suffix.toUpperCase()}`
+  const unconfirmedOrderNo = `ORD-READ-U-${suffix.toUpperCase()}`
 
   async function cleanup(): Promise<void> {
     const leftoverTasks = await prisma.printTask.findMany({
       where: { id: { startsWith: 'ptask_aor_' } },
       select: { id: true },
     })
-    const taskIds = [...new Set([taskId, brokenTaskId, ...leftoverTasks.map((task) => task.id)])]
+    const taskIds = [...new Set([taskId, brokenTaskId, unconfirmedTaskId, ...leftoverTasks.map((task) => task.id)])]
     await prisma.order.deleteMany({
-      where: { OR: [{ id: { in: [orderId, brokenOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
+      where: { OR: [{ id: { in: [orderId, brokenOrderId, unconfirmedOrderId] } }, { orderNo: { startsWith: 'ORD-READ' } }] },
     })
     await prisma.printTaskStatusLog.deleteMany({ where: { taskId: { in: taskIds } } })
     await prisma.printTask.deleteMany({ where: { id: { in: taskIds } } })
@@ -116,6 +119,29 @@ async function main(): Promise<void> {
         taskStatus: 'completed',
       },
     })
+    await prisma.printTask.create({
+      data: {
+        id: unconfirmedTaskId,
+        fileUrl: 'https://internal.example/unconfirmed',
+        fileMd5: 'sha256-unconfirmed',
+        paramsJson: JSON.stringify({ fileName: '待人工核查.pdf', copies: 1, colorMode: 'black_white', paperSize: 'A4' }),
+        status: 'failed',
+        errorCode: 'PRINT_JOB_UNCONFIRMED',
+        errorMessage: 'internal unconfirmed trace must not leak',
+      },
+    })
+    await prisma.order.create({
+      data: {
+        id: unconfirmedOrderId,
+        orderNo: unconfirmedOrderNo,
+        type: 'print',
+        printTaskId: unconfirmedTaskId,
+        amountCents: 300,
+        currency: 'CNY',
+        payStatus: 'paid',
+        taskStatus: 'failed',
+      },
+    })
 
     await prisma.printTask.create({
       data: {
@@ -169,6 +195,28 @@ async function main(): Promise<void> {
       fail(`filter mismatch: ${JSON.stringify(failedOnly)}`)
     }
 
+    const unconfirmedItem = (await service.list({ payStatus: 'paid', taskStatus: 'failed', search: unconfirmedOrderNo, page: 1, pageSize: 10 })).items[0]
+    if (
+      unconfirmedItem?.id !== unconfirmedOrderId ||
+      unconfirmedItem.aftercareStatus !== 'manual_check_required' ||
+      unconfirmedItem.refundEligible !== true ||
+      unconfirmedItem.retryForbidden !== true
+    ) {
+      fail(`paid+failed+PRINT_JOB_UNCONFIRMED 必须派生人工核查/可退款/禁重试：${JSON.stringify(unconfirmedItem)}`)
+    }
+    const unconfirmedDetail = await service.getById(unconfirmedOrderId)
+    if (
+      unconfirmedDetail.aftercareStatus !== 'manual_check_required' ||
+      !unconfirmedDetail.refundEligible ||
+      !unconfirmedDetail.retryForbidden
+    ) {
+      fail(`订单详情派生售后字段不一致：${JSON.stringify(unconfirmedDetail)}`)
+    }
+    if (item?.aftercareStatus !== null || item?.refundEligible || item?.retryForbidden) {
+      fail('普通未支付订单不得误派生 Gate 0.3B 售后资格')
+    }
+    pass('list/detail 服务端派生 paid+failed+unconfirmed 售后字段，其他订单 fail-closed')
+
     const detail = await service.getById(orderId)
     if (
       detail.id === orderId &&
@@ -193,6 +241,7 @@ async function main(): Promise<void> {
       'errorMessage',
       'internal error details',
       'printer internal trace',
+      'internal unconfirmed trace',
       'must-not-leak',
       endUserId,
       terminalId,

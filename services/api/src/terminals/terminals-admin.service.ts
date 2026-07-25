@@ -30,6 +30,7 @@ import {
   PLANNED_CREDENTIAL_PREFIX,
   isUniqueConstraintError,
   normalizeLifecycleStatus,
+  CREDENTIAL_SENTINEL_PREFIX,
   type TerminalLifecycleStatus,
 } from './terminal-utils'
 import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
@@ -46,6 +47,8 @@ export interface AdminTerminalView {
   enabled: boolean
   lifecycleStatus: TerminalLifecycleStatus
   lifecycleVersion: number
+  credentialGeneration: number
+  hasActiveCredential: boolean
   orgId: string | null
   orgName: string | null
   registeredAt: string
@@ -97,10 +100,22 @@ export interface PlannedTerminalCreated {
 export interface UpdateTerminalLifecycleResult {
   terminalId: string
   terminalCode: string
-  oldStatus: 'active' | 'maintenance'
-  newStatus: 'active' | 'maintenance'
+  oldStatus: TerminalLifecycleStatus
+  newStatus: 'active' | 'maintenance' | 'suspended' | 'retired'
   inFlightTaskCount: number
+  activeScanTaskCount: number
+  revokedCredentialCount: number
+  revokedBindCodeCount: number
   lifecycleVersion: number
+}
+
+const ALLOWED_LIFECYCLE_TRANSITIONS: Record<TerminalLifecycleStatus, readonly TerminalLifecycleStatus[]> = {
+  planned: [],
+  commissioning: ['suspended', 'retired'],
+  active: ['maintenance', 'suspended'],
+  maintenance: ['active', 'suspended', 'retired'],
+  suspended: ['maintenance', 'retired'],
+  retired: [],
 }
 
 export interface AdminPrinterView {
@@ -227,6 +242,11 @@ export class TerminalAdminService {
       orderBy: { registeredAt: 'desc' },
       include: {
         org: { select: { id: true, name: true } },
+        credentials: {
+          where: { revokedAt: null, expiresAt: { gt: new Date(now) } },
+          take: 1,
+          select: { id: true },
+        },
         heartbeats: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -256,6 +276,8 @@ export class TerminalAdminService {
         enabled: t.enabled,
         lifecycleStatus: normalizeLifecycleStatus(t.lifecycleStatus),
         lifecycleVersion: t.lifecycleVersion,
+        credentialGeneration: t.credentialGeneration,
+        hasActiveCredential: t.credentials.length > 0,
         orgId: t.orgId,
         orgName: t.org?.name ?? null,
         registeredAt: t.registeredAt.toISOString(),
@@ -332,7 +354,7 @@ export class TerminalAdminService {
 
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: terminalRefClauses },
-      select: { id: true, terminalCode: true },
+      select: { id: true, terminalCode: true, lifecycleStatus: true },
     })
     if (!terminal) {
       throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
@@ -344,6 +366,11 @@ export class TerminalAdminService {
       locationLabel?: string | null
       enabled?: boolean
     } = {}
+    if (dto.enabled === true && normalizeLifecycleStatus(terminal.lifecycleStatus) === 'retired') {
+      throw new BadRequestException({
+        error: { code: 'TERMINAL_RETIRED', message: '终端已永久退役，不能重新启用' },
+      })
+    }
     if ('displayName' in dto) data.displayName = cleanNullable(dto.displayName)
     if ('locationLabel' in dto) data.locationLabel = cleanNullable(dto.locationLabel)
     if ('enabled' in dto && dto.enabled !== undefined) data.enabled = dto.enabled
@@ -380,7 +407,7 @@ export class TerminalAdminService {
 
   async updateTerminalLifecycle(
     terminalRef: string,
-    lifecycleStatus: 'active' | 'maintenance',
+    lifecycleStatus: 'active' | 'maintenance' | 'suspended' | 'retired',
     auditContext: {
       actorId: string
       actorRole: string
@@ -388,12 +415,19 @@ export class TerminalAdminService {
       ipAddress?: string | null
       userAgent?: string | null
       requestId?: string | null
+      confirmationText?: string
     },
     expected: {
-      expectedStatus: 'active' | 'maintenance'
+      expectedStatus: Exclude<TerminalLifecycleStatus, 'retired'>
       expectedVersion: number
     },
   ): Promise<UpdateTerminalLifecycleResult> {
+    const normalizedReason = auditContext.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new BadRequestException({
+        error: { code: 'LIFECYCLE_REASON_INVALID', message: '运维原因须为 8–500 个有效字符' },
+      })
+    }
     return this.prisma.$transaction(async (tx) => {
       const terminal = await tx.terminal.findFirst({
         where: this.agent.terminalRefWhere(terminalRef),
@@ -402,24 +436,33 @@ export class TerminalAdminService {
       if (!terminal) {
         throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
       }
-      if (terminal.lifecycleStatus !== 'active' && terminal.lifecycleStatus !== 'maintenance') {
+      const currentStatus = normalizeLifecycleStatus(terminal.lifecycleStatus)
+      if (currentStatus === 'retired') {
         throw new BadRequestException({
           error: {
-            code: 'TERMINAL_LIFECYCLE_TRANSITION_INVALID',
-            message: `终端当前状态 ${terminal.lifecycleStatus} 不允许进入 ${lifecycleStatus}`,
+            code: 'TERMINAL_RETIRED',
+            message: '终端已退役，生命周期不可恢复',
           },
         })
       }
       if (
-        terminal.lifecycleStatus !== expected.expectedStatus || terminal.lifecycleVersion !== expected.expectedVersion
+        currentStatus !== expected.expectedStatus || terminal.lifecycleVersion !== expected.expectedVersion
       ) {
         throw new ConflictException({
           error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态或版本已变化，请刷新后重试' },
         })
       }
-      if (terminal.lifecycleStatus === lifecycleStatus) {
+      if (lifecycleStatus === 'retired' && auditContext.confirmationText !== terminal.terminalCode) {
+        throw new BadRequestException({
+          error: { code: 'TERMINAL_RETIRE_CONFIRMATION_INVALID', message: '请输入完整终端编号确认永久退役' },
+        })
+      }
+      if (currentStatus === lifecycleStatus) {
         const inFlightTaskCount = await tx.printTask.count({
           where: { terminalId: terminal.id, status: { in: ['claimed', 'printing'] } },
+        })
+        const activeScanTaskCount = await tx.scanTask.count({
+          where: { terminalId: terminal.id, status: { in: ['waiting', 'matched'] } },
         })
         return {
           terminalId: terminal.id,
@@ -427,15 +470,27 @@ export class TerminalAdminService {
           oldStatus: lifecycleStatus,
           newStatus: lifecycleStatus,
           inFlightTaskCount,
+          activeScanTaskCount,
+          revokedCredentialCount: 0,
+          revokedBindCodeCount: 0,
           lifecycleVersion: terminal.lifecycleVersion,
         }
+      }
+
+      if (!ALLOWED_LIFECYCLE_TRANSITIONS[currentStatus].includes(lifecycleStatus)) {
+        throw new BadRequestException({
+          error: {
+            code: 'TERMINAL_LIFECYCLE_TRANSITION_INVALID',
+            message: `终端当前状态 ${currentStatus} 不允许进入 ${lifecycleStatus}`,
+          },
+        })
       }
 
       // 两个方向均先取得与建单/claim 相同的 no-op CAS 行锁。
       const lifecycleLock = await tx.terminal.updateMany({
         where: {
           id: terminal.id,
-          lifecycleStatus: terminal.lifecycleStatus,
+          lifecycleStatus: currentStatus,
           lifecycleVersion: terminal.lifecycleVersion,
         },
         data: { lifecycleStatus: terminal.lifecycleStatus },
@@ -448,35 +503,73 @@ export class TerminalAdminService {
       const inFlightTaskCount = await tx.printTask.count({
         where: { terminalId: terminal.id, status: { in: ['claimed', 'printing'] } },
       })
-      if (terminal.lifecycleStatus === 'maintenance' && lifecycleStatus === 'active' && inFlightTaskCount > 0) {
+      const activeScanTaskCount = await tx.scanTask.count({
+        where: { terminalId: terminal.id, status: { in: ['waiting', 'matched'] } },
+      })
+      if (currentStatus === 'maintenance' && lifecycleStatus === 'active' && inFlightTaskCount > 0) {
         throw new BadRequestException({
           error: { code: 'TERMINAL_IN_FLIGHT_TASKS', message: '终端仍有在途任务，排空前不能恢复 active' },
         })
       }
+      if (lifecycleStatus === 'retired') {
+        const nonTerminalPrintTaskCount = await tx.printTask.count({
+          where: { terminalId: terminal.id, status: { in: ['pending', 'claimed', 'printing'] } },
+        })
+        if (nonTerminalPrintTaskCount > 0 || activeScanTaskCount > 0) {
+          throw new BadRequestException({
+            error: {
+              code: 'TERMINAL_ACTIVE_TASKS',
+              message: '终端仍有未终结打印或扫描任务，不能退役',
+            },
+          })
+        }
+      }
+      const now = new Date()
+      let revokedCredentialCount = 0
       const updated = await tx.terminal.updateMany({
         where: {
           id: terminal.id,
-          lifecycleStatus: terminal.lifecycleStatus,
+          lifecycleStatus: currentStatus,
           lifecycleVersion: terminal.lifecycleVersion,
         },
-        data: { lifecycleStatus, lifecycleVersion: { increment: 1 } },
+        data: {
+          lifecycleStatus,
+          lifecycleVersion: { increment: 1 },
+          ...(lifecycleStatus === 'retired'
+            ? {
+                enabled: false,
+                credentialGeneration: { increment: 1 },
+                agentToken: `${CREDENTIAL_SENTINEL_PREFIX}retired$${crypto.randomBytes(32).toString('hex')}`,
+              }
+            : {}),
+        },
       })
       if (updated.count !== 1) {
         throw new ConflictException({
           error: { code: 'TERMINAL_LIFECYCLE_CONFLICT', message: '终端运维状态已变化，请刷新后重试' },
         })
       }
+      if (lifecycleStatus === 'retired') {
+        const revokedCredentials = await tx.terminalCredential.updateMany({
+          where: { terminalId: terminal.id, revokedAt: null },
+          data: { revokedAt: now },
+        })
+        revokedCredentialCount = revokedCredentials.count
+      }
       // 每次维护轮次切换都撤销未使用绑定码，防止旧 maintenance 轮次的换机码在 ABA 后复活。
       const revokedBindCodes = await tx.terminalBindCode.updateMany({
-        where: { terminalId: terminal.id, usedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
-        data: { revokedAt: new Date() },
+        where: { terminalId: terminal.id, usedAt: null, revokedAt: null },
+        data: { revokedAt: now },
       })
       const result: UpdateTerminalLifecycleResult = {
         terminalId: terminal.id,
         terminalCode: terminal.terminalCode,
-        oldStatus: terminal.lifecycleStatus,
+        oldStatus: currentStatus,
         newStatus: lifecycleStatus,
         inFlightTaskCount,
+        activeScanTaskCount,
+        revokedCredentialCount,
+        revokedBindCodeCount: revokedBindCodes.count,
         lifecycleVersion: terminal.lifecycleVersion + 1,
       }
       await tx.auditLog.create({
@@ -488,13 +581,15 @@ export class TerminalAdminService {
           targetId: terminal.terminalCode,
           payloadJson: JSON.stringify({
             terminalCode: terminal.terminalCode,
-            oldStatus: terminal.lifecycleStatus,
+            oldStatus: currentStatus,
             newStatus: lifecycleStatus,
             inFlightTaskCount,
+            activeScanTaskCount,
             oldLifecycleVersion: terminal.lifecycleVersion,
             newLifecycleVersion: terminal.lifecycleVersion + 1,
             revokedBindCodeCount: revokedBindCodes.count,
-            reason: auditContext.reason.trim(),
+            revokedCredentialCount,
+            reason: normalizedReason,
           }),
           ipAddress: auditContext.ipAddress ?? null,
           userAgent: auditContext.userAgent ?? null,
