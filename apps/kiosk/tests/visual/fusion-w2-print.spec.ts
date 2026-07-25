@@ -44,6 +44,30 @@ function registerPrice(api: ApiRouter): void {
   })
 }
 
+/** 确认页 POST /orders/quote；金额与 W2_ORDER / 价目夹具对齐。 */
+function registerQuote(api: ApiRouter, opts?: { amountCents?: number; billablePages?: number; unitCents?: number }): void {
+  const billablePages = opts?.billablePages ?? 2
+  const unitCents = opts?.unitCents ?? 100
+  const amountCents = opts?.amountCents ?? billablePages * unitCents
+  api.respond('POST', '/api/v1/orders/quote', {
+    status: 200,
+    json: {
+      amountCents,
+      billablePages,
+      billingPageSource: 'detected',
+      priceLines: [
+        {
+          serviceKey: 'print_bw_page',
+          description: '黑白打印',
+          unitCents,
+          quantity: billablePages,
+          amountCents,
+        },
+      ],
+    },
+  })
+}
+
 async function expectHealthy(page: Page, errors: string[], marker?: string): Promise<void> {
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]').first()).toBeVisible()
   if (marker) await expect(page.locator(`[data-w2-page="${marker}"]`)).toBeVisible()
@@ -194,9 +218,10 @@ test('direct params restore real printer and server price fixtures @w2', async (
   await seedMaterialSession(page)
 
   await page.goto('/print/params')
-  await expect(page.getByText('已配置打印机', { exact: true })).toBeVisible()
-  await expect(page.getByText('在线', { exact: true })).toBeVisible()
-  await expect(page.getByText('¥2.00', { exact: true })).toHaveCount(2)
+  const params = page.locator('[data-w2-page="print-params"]')
+  await expect(params.getByText('已配置打印机', { exact: true })).toBeVisible()
+  await expect(params.getByText('打印机在线', { exact: true })).toBeVisible()
+  await expect(params.getByText('¥2.00', { exact: true })).toHaveCount(2)
   await expectHealthy(page, errors, 'print-params')
 })
 
@@ -204,6 +229,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerPrice(api)
+  registerQuote(api, { amountCents: W2_ORDER.amountCents, billablePages: 2, unitCents: 100 })
   api.respond('POST', '/api/v1/print/jobs', {
     status: 200,
     json: {
@@ -225,6 +251,7 @@ test('paid print-job amount routes confirmation to cashier @w2', async ({ page, 
   await seedMaterialSession(page)
 
   await page.goto('/print/confirm')
+  await expect(page.getByText('¥1.00/页 × 2 页', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: /按以上设置打印原文件/ }).click()
   await page.waitForURL('**/print/cashier')
   await expect(page.getByText('¥2.00', { exact: true }).first()).toBeVisible()

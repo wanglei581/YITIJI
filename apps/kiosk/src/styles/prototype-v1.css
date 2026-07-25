@@ -101,6 +101,34 @@
 .kpv1 .status-chip.warn .dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
 .kpv1 .status-chip.neutral { background: rgb(139 150 142 / 18%); border-color: rgb(139 150 142 / 45%); }
 .kpv1 .status-chip.neutral .dot { background: #8b968e; box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
+.kpv1 .k-status { display: flex; align-items: center; gap: 10px; }
+.kpv1 .k-pill {
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 0 15px;
+  color: var(--pv-ink);
+  background: rgb(255 255 255 / 72%);
+  border: 1px solid rgb(16 48 43 / 12%);
+  font-size: 15px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.kpv1 .k-pill svg { width: 15px; height: 15px; color: var(--pv-teal); }
+.kpv1 .k-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #35ab8e;
+  box-shadow: 0 0 0 4px rgb(53 171 142 / 20%);
+  flex: 0 0 auto;
+}
+.kpv1 .k-pill--warn .k-dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
+.kpv1 .k-pill--bad .k-dot { background: #c14a34; box-shadow: 0 0 0 4px rgb(193 74 52 / 20%); }
+.kpv1 .k-pill--warn svg { color: #b8683c; }
+.kpv1 .k-pill--bad svg { color: #c14a34; }
 /* ── 欢迎区（01-home.html .welcome） ── */
 .kpv1 .welcome {
   flex: none; padding: 12px 48px 8px;

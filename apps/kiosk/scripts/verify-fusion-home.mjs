@@ -305,7 +305,7 @@ expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile[
 expect(welcome.includes('<MemberLoginDialog'), '保留 MemberLoginDialog')
 expect(/onClick=\{\(\)\s*=>\s*setLoginOpen\(true\)\}/.test(welcome), '游客保留打开登录弹窗回调')
 expect(/onContinueAsGuest=\{\(\)\s*=>\s*\{\s*continueAsGuest\(\)/.test(welcome), '保留真实继续游客回调')
-expect(/const deviceStatus = useHomeDeviceStatus\(\)/.test(home) && home.includes('{deviceStatus.label}'), '保留真实设备状态')
+expect(/KioskDeviceStatusPills/.test(home), '保留真实设备状态（KioskDeviceStatusPills）')
 expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '保留百宝箱/智慧校园真实配置 hooks')
 expect(/const showToolbox = toolbox\.enabled/.test(home) && /const showCampus = campus\.enabled/.test(home) && /if \(!showToolbox && !showCampus\) return null/.test(home), '保留百宝箱/智慧校园诚实门控')

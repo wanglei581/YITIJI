@@ -392,12 +392,22 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
 ])
+/** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
+const allowedHonestCopyChanged = new Set([
+  'apps/kiosk/src/pages/profile/ProfilePage.tsx',
+  'apps/kiosk/src/pages/profile/profileEntries.ts',
+  'apps/kiosk/src/pages/profile/profileTypes.ts',
+  'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+])
 const allowedChanged = new Set([
   'apps/kiosk/src/layouts/KioskRoot.tsx',
   ...allowedProfileLandingChanged,
   ...allowedLowRiskInkpaperChanged,
   ...allowedPrintOrderRefreshChanged,
   ...allowedPrintOrdersInkpaperChanged,
+  ...allowedHonestCopyChanged,
 ])
 const profileRelatedChanged = changedFiles.filter(
   (file) => file.startsWith('apps/kiosk/src/pages/profile/') || file.startsWith('apps/kiosk/scripts/verify-profile-inkpaper-home'),
@@ -415,6 +425,33 @@ if (delegatesMeBoundary) {
   pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖；LightFlow 本批 /me/* 禁入已委托给同一 CI 中的 verify:lightflow-profile-entry')
 } else {
   fail('LightFlow 本批 /me/* 禁入委托缺失或未与 Profile 主守卫共同接入 CI')
+}
+
+const forbiddenMeChanged = changedFiles.filter((file) => {
+  if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  if (/^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file)) {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  return false
+})
+if (forbiddenMeChanged.length === 0) {
+  pass('/me/print-orders 状态刷新小步仍在允许范围内')
+} else {
+  fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
+}
+
+const forbiddenProfileChanged = changedFiles.filter(
+  (file) =>
+    /^apps\/kiosk\/src\/pages\/profile\/(ProfilePage|profileEntries|profile-inkpaper|components\/Profile)/.test(file)
+    && !allowedHonestCopyChanged.has(file)
+    && !allowedProfileLandingChanged.has(file),
+)
+if (forbiddenProfileChanged.length === 0) {
+  pass('ProfilePage 主入口仅允许诚实文案 / 合规标签收口，未做未声明换装')
+} else {
+  fail(`本批禁止触碰 ProfilePage 主入口：${forbiddenProfileChanged.join(', ')}`)
 }
 
 // 5) 不能引入旧 MyPrintOrdersPage 的回退口径。

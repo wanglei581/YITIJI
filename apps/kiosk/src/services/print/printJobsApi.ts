@@ -70,6 +70,52 @@ export interface PrintJobStatusResult {
   completedAt?:  string
 }
 
+/** POST /orders/quote 响应（与后端 PrintPriceQuote 对齐；金额为分）。 */
+export interface PrintOrderQuote {
+  amountCents: number
+  billablePages: number
+  billingPageSource: BillingPageSource
+  priceLines: PrintPriceLine[]
+}
+
+export interface QuotePrintOrderInput {
+  fileUrl: string
+  params: PrintJobParams
+}
+
+/** DTO 只接受数字页码范围；'all' / 空串统一成 undefined，与建单口径一致。 */
+function normalizePrintParams(params: PrintJobParams): PrintJobParams {
+  const pageRange =
+    !params.pageRange || params.pageRange === 'all' ? undefined : params.pageRange
+  return { ...params, pageRange }
+}
+
+/**
+ * 打印计价预览（不落库）。金额 / 计费页数以后端为准，绝不信任本地估算。
+ * 仅 API_MODE=http 且有真实签名 fileUrl 时调用。
+ */
+export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<PrintOrderQuote> {
+  const res = await fetch(`${API_BASE_URL}/orders/quote`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileUrl: input.fileUrl, params: normalizePrintParams(input.params) }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`quotePrintOrder failed: ${res.status} ${text}`)
+  }
+  const body = (await res.json()) as PrintOrderQuote & { lines?: PrintPriceLine[]; data?: PrintOrderQuote & { lines?: PrintPriceLine[] } }
+  // 兼容裸对象与偶发 ApiResponse 包装；契约字段为 lines（后端）→ 前端统一成 priceLines。
+  const raw = body.data ?? body
+  const lines = raw.priceLines ?? raw.lines ?? []
+  return {
+    amountCents: raw.amountCents,
+    billablePages: raw.billablePages,
+    billingPageSource: raw.billingPageSource,
+    priceLines: lines,
+  }
+}
+
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
   const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
@@ -83,7 +129,7 @@ export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJ
       'X-Terminal-Id': terminalId,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body:    JSON.stringify(body),
+    body:    JSON.stringify({ ...body, params: normalizePrintParams(body.params) }),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')

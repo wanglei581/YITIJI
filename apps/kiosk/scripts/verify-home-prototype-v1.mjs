@@ -173,12 +173,12 @@ expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, '
 expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按取舍决策删除')
 expect(/disabled=\{disabled\}/.test(home) && /tile\.disabled \|\| !tile\.to/.test(home), '磁贴禁用态由真实 disabled/to 驱动')
 
-// ── 真实设备状态：topbar 消费 hook，不硬编码在线/网络正常 ──────────
+// ── 真实设备状态：topbar 消费 fail-closed 组件，不硬编码在线/网络正常 ──────────
 const topBar = home.slice(home.indexOf('function KioskTopBar'), home.indexOf('function HomeWelcome'))
-expect(/const deviceStatus = useHomeDeviceStatus\(\)/.test(topBar), '顶栏消费真实 useHomeDeviceStatus')
-expect(/\{deviceStatus\.label\}/.test(topBar), '顶栏状态文案来自真实 deviceStatus.label')
+expect(/<KioskDeviceStatusPills\s*\/>/.test(topBar), '顶栏消费真实 KioskDeviceStatusPills')
 expect(!/>\s*打印机在线\s*</.test(topBar) && !topBar.includes('网络正常'), '顶栏不硬编码「打印机在线」/「网络正常」字面量')
-expect(existsSync(join(root, 'src/pages/home/hooks/useHomeDeviceStatus.ts')), '真实设备状态 hook 存在')
+expect(existsSync(join(root, 'src/hooks/useTerminalDeviceStatus.ts')), '真实设备状态 hook 存在')
+expect(existsSync(join(root, 'src/components/KioskDeviceStatusPills.tsx')), '设备状态药丸组件存在')
 
 // ── 真实登录弹窗 + 动态专区开关（承接旧守卫）──────────────────────
 expect(home.includes('<MemberLoginDialog'), '首页挂载真实登录弹窗 MemberLoginDialog')

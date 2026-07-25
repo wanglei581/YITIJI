@@ -215,18 +215,17 @@ export const adminMockAdapter = {
     return [...JOB_SOURCES]
   },
 
-  async reviewJobSource(id: string, action: ReviewAction): Promise<AdminJobSourceRecord> {
+  async reviewJobSource(id: string, action: ReviewAction, reason?: string): Promise<AdminJobSourceRecord> {
     await delay()
     JOB_SOURCES = JOB_SOURCES.map((s) => {
       if (s.id !== id) return s
-      const reviewStatus =
-        action === 'approve' ? 'approved' as const :
-        action === 'reject'  ? 'rejected' as const : 'reviewing' as const
-      return {
-        ...s,
-        reviewStatus,
-        publishStatus: action === 'approve' ? 'draft' as const : s.publishStatus,
+      if (action === 'approve') {
+        return { ...s, reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null }
       }
+      if (action === 'reject') {
+        return { ...s, reviewStatus: 'rejected', publishStatus: 'draft', rejectReason: reason?.trim() || '' }
+      }
+      return { ...s, reviewStatus: 'reviewing' }
     })
     return JOB_SOURCES.find((s) => s.id === id)!
   },
@@ -246,18 +245,17 @@ export const adminMockAdapter = {
     return [...FAIR_SOURCES]
   },
 
-  async reviewFairSource(id: string, action: ReviewAction): Promise<AdminFairSourceRecord> {
+  async reviewFairSource(id: string, action: ReviewAction, reason?: string): Promise<AdminFairSourceRecord> {
     await delay()
     FAIR_SOURCES = FAIR_SOURCES.map((s) => {
       if (s.id !== id) return s
-      const reviewStatus =
-        action === 'approve' ? 'approved' as const :
-        action === 'reject'  ? 'rejected' as const : 'reviewing' as const
-      return {
-        ...s,
-        reviewStatus,
-        publishStatus: action === 'approve' ? 'draft' as const : s.publishStatus,
+      if (action === 'approve') {
+        return { ...s, reviewStatus: 'approved', publishStatus: 'draft', rejectReason: null }
       }
+      if (action === 'reject') {
+        return { ...s, reviewStatus: 'rejected', publishStatus: 'draft', rejectReason: reason?.trim() || '' }
+      }
+      return { ...s, reviewStatus: 'reviewing' }
     })
     return FAIR_SOURCES.find((s) => s.id === id)!
   },

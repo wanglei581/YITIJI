@@ -11,7 +11,8 @@
 import 'dotenv/config'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { PricingService } from '../src/payment/pricing.service'
-import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
+import { seedDevDefaultPriceConfig, DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION } from '../src/payment/price-config.seed'
+import { countPagesInRange } from '../src/print-jobs/page-range.util'
 import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 
 function pass(message: string): void {
@@ -21,6 +22,47 @@ function pass(message: string): void {
 function fail(message: string): never {
   console.error(`  FAIL ${message}`)
   process.exit(1)
+}
+
+function assertPageCount(
+  label: string,
+  pageRange: string | null | undefined,
+  documentPages: number,
+  expected: number | null,
+): void {
+  const actual = countPagesInRange(pageRange, documentPages)
+  if (actual === expected) {
+    pass(label)
+  } else {
+    fail(`${label} — expected ${String(expected)}, got ${String(actual)}`)
+  }
+}
+
+/**
+ * P0-1 超收修复：计费页数必须等于 Agent 实际出纸页数（pageRange 选中页），
+ * 而不是整份文件页数。纯函数断言，无需 DB。
+ */
+function verifyPageRangeBilling(): void {
+  console.log('\n-- pageRange billing (P0-1 overcharge fix) --')
+
+  assertPageCount('undefined pageRange bills the whole document', undefined, 50, 50)
+  assertPageCount('"all" bills the whole document', 'all', 50, 50)
+  assertPageCount('single page "3" bills 1 page', '3', 10, 1)
+  // 回归本体：打 50 页 PDF 的第 1-2 页，出纸 2 页，历史实现按 50 页收费。
+  assertPageCount('"1-2" of a 50-page document bills 2 pages, not 50', '1-2', 50, 2)
+  assertPageCount('"1-3,5,7-9" bills 7 distinct pages', '1-3,5,7-9', 20, 7)
+  assertPageCount('overlapping "1-3,2-4" bills 4 distinct pages, not 7', '1-3,2-4', 20, 4)
+  assertPageCount('whitespace-tolerant " 1 - 3 , 5 " bills 4 pages', ' 1 - 3 , 5 ', 20, 4)
+  assertPageCount('range beyond last page is clamped to document length', '1-100', 5, 5)
+  assertPageCount('partially out-of-document "4-8" on 5 pages bills 2 pages', '4-8', 5, 2)
+
+  // fail-closed：非法 / 空选择一律 null，由建单路径拒绝，绝不回退成整份文件页数。
+  assertPageCount('fully out-of-document "50-60" on 5 pages is rejected', '50-60', 5, null)
+  assertPageCount('page 0 is rejected', '0', 10, null)
+  assertPageCount('reversed range "5-3" is rejected', '5-3', 10, null)
+  assertPageCount('non-numeric range is rejected', 'abc', 10, null)
+  assertPageCount('trailing comma is rejected', '1-3,', 10, null)
+  assertPageCount('zero-page document is rejected', 'all', 0, null)
 }
 
 async function assertThrows(label: string, fn: () => Promise<unknown>): Promise<void> {
@@ -35,9 +77,32 @@ async function assertThrows(label: string, fn: () => Promise<unknown>): Promise<
 async function main(): Promise<void> {
   console.log('\n=== PricingService + PriceConfig verification ===')
 
+  verifyPageRangeBilling()
+
+  console.log('\n-- PriceConfig + quotePrint --')
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const pricing = new PricingService(prisma)
+
+  // P0-4：开发 seed 在 NODE_ENV=production 必须拒绝（防 verify 误连生产库覆盖运营价）
+  {
+    const envBackup = process.env['NODE_ENV']
+    process.env['NODE_ENV'] = 'production'
+    try {
+      await seedDevDefaultPriceConfig(prisma)
+      fail('seedDevDefaultPriceConfig must refuse when NODE_ENV=production')
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message === DEV_PRICE_SEED_FORBIDDEN_IN_PRODUCTION) {
+        pass('seedDevDefaultPriceConfig refuses NODE_ENV=production (no silent overwrite)')
+      } else {
+        fail(`production seed guard wrong error: ${message}`)
+      }
+    } finally {
+      if (envBackup === undefined) delete process.env['NODE_ENV']
+      else process.env['NODE_ENV'] = envBackup
+    }
+  }
 
   async function cleanup(): Promise<void> {
     await prisma.priceConfig.deleteMany({
@@ -99,6 +164,21 @@ async function main(): Promise<void> {
       pass('quotePrint bw 5 pages × 1 copy = 100 cents; billingPageSource passthrough')
     } else {
       fail(`bw quote mismatch: ${JSON.stringify(q2)}`)
+    }
+
+    // 4b) 端到端计费口径：50 页 PDF 只打第 1-2 页 → 20 × 2 = 40 分（修复前为 20 × 50 = 1000 分）。
+    const rangedPages = countPagesInRange('1-2', 50)
+    if (rangedPages === null) fail('countPagesInRange returned null for a valid range')
+    const q3 = await pricing.quotePrint({
+      billablePages: rangedPages,
+      billingPageSource: 'pdf_lightweight_scan',
+      copies: 1,
+      colorMode: 'black_white',
+    })
+    if (q3.amountCents === 40 && q3.billablePages === 2) {
+      pass('pages 1-2 of a 50-page document quote 40 cents, not 1000 (no overcharge)')
+    } else {
+      fail(`ranged quote mismatch (expected 40 cents / 2 pages): ${JSON.stringify(q3)}`)
     }
 
     // 5) fail-closed：非法页数 / 份数

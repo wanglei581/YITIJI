@@ -19,7 +19,7 @@ import { useToolboxConfig } from '../../hooks/useToolboxConfig'
 import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { ContinuePanel } from './components/ContinuePanel'
 import { getTerminalId } from '../../services/api/terminalConfig'
-import { useHomeDeviceStatus } from './hooks/useHomeDeviceStatus'
+import { KioskDeviceStatusPills } from '../../components/KioskDeviceStatusPills'
 import { ProtoIcon } from './prototypeIcons'
 import { SERVICE_GROUPS, type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import '../../styles/prototype-v1.css'
@@ -80,7 +80,6 @@ const ACCENT_CLASS: Record<Accent, string> = {
 
 /* ── 顶部状态栏（真实设备状态 → status-chip；实时时钟） ── */
 function KioskTopBar() {
-  const deviceStatus = useHomeDeviceStatus()
   const [now, setNow] = useState(() => new Date())
   const terminalId = getTerminalId() || '01号机'
 
@@ -98,9 +97,6 @@ function KioskTopBar() {
     hour12: false,
   }).format(now)
 
-  const chipTone =
-    deviceStatus.tone === 'positive' ? '' : deviceStatus.tone === 'neutral' ? 'neutral' : 'warn'
-
   return (
     <header className="topbar">
       <div className="brand">
@@ -109,10 +105,7 @@ function KioskTopBar() {
       </div>
       <div className="right">
         <span className="clock">{clock}</span>
-        <span className={`status-chip ${chipTone}`.trim()} role="status" aria-live="polite">
-          <span className="dot" aria-hidden="true" />
-          {deviceStatus.label}
-        </span>
+        <KioskDeviceStatusPills />
       </div>
     </header>
   )
