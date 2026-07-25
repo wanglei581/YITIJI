@@ -23,6 +23,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 
+import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
@@ -30,11 +31,8 @@ interface ReqLike {
   socket?: { remoteAddress?: string }
 }
 
-function ipOf(req: ReqLike): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: ReqLike): string | null {

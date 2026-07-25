@@ -4,6 +4,7 @@ import { ApiResponse } from '../common/dto/api-response.dto'
 import { SyncService } from './sync.service'
 import { WebhookPayloadDto } from './dto/webhook-payload.dto'
 
+import { resolveClientIp } from '../common/client-ip'
 interface RawReq {
   rawBody?: Buffer
   requestId?: string
@@ -12,11 +13,8 @@ interface RawReq {
   socket?: { remoteAddress?: string }
 }
 
-function ipOf(req: RawReq): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: RawReq): string | null {

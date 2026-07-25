@@ -34,6 +34,7 @@ import { UpdateAdAssetDto } from './dto/update-ad-asset.dto'
 import { SavePlaylistDto } from './dto/save-playlist.dto'
 import { SaveScreensaverConfigDto } from './dto/save-config.dto'
 
+import { resolveClientIp } from '../common/client-ip'
 // FileInterceptor 的 fileSize 是硬上限(防 OOM/DoS),比业务上限留出余量,
 // 让"略微超限"的正常视频也能到达 service 拿到友好的 AD_ASSET_TOO_LARGE 提示。
 const UPLOAD_HARD_LIMIT = getMediaLimits().maxVideoBytes + 4 * 1024 * 1024
@@ -312,11 +313,8 @@ interface AuditReq {
   socket?: { remoteAddress?: string }
 }
 
-function extractIp(req: AuditReq): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function extractIp(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function extractUa(req: AuditReq): string | null {

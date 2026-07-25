@@ -19,10 +19,12 @@
  *   - PRINT_SCAN_CAPABILITY_MODE 必须显式声明 managed|strict（Task 11：打印扫描能力开关
  *     是每终端 × 能力键的 DB 配置，未配置行在 managed 模式放行既有闭环、strict 模式
  *     fail-closed 拒绝；选哪种是显式部署决策，生产不允许沉默缺省）
+ *   - TRUST_PROXY_HOPS 必须显式声明 1..9（nginx 等反代可信跳数；禁止 true/false）
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
+import { assertProductionTrustProxyHops } from './trust-proxy'
 
 export interface ProductionRuntimeEnv {
   NODE_ENV?: string
@@ -46,6 +48,7 @@ export interface ProductionRuntimeEnv {
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
   PRINT_SCAN_CAPABILITY_MODE?: string
+  TRUST_PROXY_HOPS?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -180,4 +183,7 @@ export function assertProductionRuntimeGates(
       'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED: NODE_ENV=production 时必须显式设置 PRINT_SCAN_CAPABILITY_MODE=managed|strict（print-scan 能力开关未配置行的放行/拒绝语义必须是显式部署决策）',
     )
   }
+
+  // 反代可信跳数：生产必须显式声明，禁止 trust proxy=true。
+  assertProductionTrustProxyHops(env)
 }

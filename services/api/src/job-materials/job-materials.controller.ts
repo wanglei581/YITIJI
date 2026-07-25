@@ -11,16 +11,15 @@ import { GenerateJobMaterialDto } from './dto/generate-job-material.dto'
 import { JobMaterialsService } from './job-materials.service'
 import type { JobMaterialAdminSummaryView, JobMaterialGenerateView, JobMaterialTemplateView } from './job-materials.types'
 
+import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
   requestId?: string
 }
 
-function ipOf(req: ReqLike): string | null {
-  const fwd = req.headers?.['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim()
-  return req.ip ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: ReqLike): string | null {

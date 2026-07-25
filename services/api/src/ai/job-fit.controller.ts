@@ -10,6 +10,7 @@ import { JobFitService } from './resume/job-fit.service'
 import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'
 import type { JobAiQuotaContext } from '../job-ai/job-ai-quota.service'
 
+import { resolveClientIp } from '../common/client-ip'
 // ── DTO（全局 forbidNonWhitelisted）─────────────────────────────────────────
 
 class ManualJobDto {
@@ -53,10 +54,8 @@ function terminalIdOf(req: ReqLike): string | null {
   return headerOf(req, 'x-terminal-id')?.slice(0, 64) ?? null
 }
 
-function ipOf(req: ReqLike): string | null {
-  const forwarded = headerOf(req, 'x-forwarded-for')
-  if (forwarded) return forwarded.split(',')[0]?.trim().slice(0, 64) ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function quotaContextOf(req: ReqLike, requester: { endUserId: string | null }): JobAiQuotaContext {

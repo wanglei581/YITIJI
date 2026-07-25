@@ -28,13 +28,14 @@ import {
   type VerifyStepUpChallengeResult,
 } from './member-step-up.service'
 
+import { resolveClientIpOrUnknown } from '../common/client-ip'
 /**
  * 只使用 Express 解析后的客户端 IP。
  * 默认不信任客户端直传的 X-Forwarded-For；若生产经反代，必须在应用入口显式配置可信代理后，
  * 由 Express 根据可信链路填充 req.ip，控制器不得自行解析未受信请求头。
  */
 function clientIp(req: Request): string {
-  return req.ip || req.socket.remoteAddress || 'unknown'
+  return resolveClientIpOrUnknown(req)
 }
 
 /**
