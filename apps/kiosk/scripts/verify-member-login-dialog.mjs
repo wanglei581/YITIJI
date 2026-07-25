@@ -326,6 +326,11 @@ expectMatches(
 )
 expectMatches(
   memberHook,
+  /import\s*\{\s*fetchLegalConsentVersions\s*\}\s*from\s*['"][^'"]*services\/auth\/legalConsentVersions['"]/,
+  '共享 hook 从 legalConsentVersions 拉取协议版本',
+)
+expectMatches(
+  memberHook,
   /import\s*\{(?=[^}]*getMemberAuthDeviceId)[^}]*\}\s*from\s*['"][^'"]*services\/auth\/memberAuthDevice['"]/,
   '共享 hook 从真实 memberAuthDevice 导入 getMemberAuthDeviceId',
 )
@@ -366,7 +371,8 @@ expectGuardBeforeUpdate(
 expectMatches(handleLogin, /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/, 'handleLogin 使用稳定会员登录 deviceId')
 expect(Boolean(loginGeneration), 'handleLogin 生成并捕获 request generation')
 expect(loginTry.length > 0 && loginCatch.length > 0 && loginFinally.length > 0, 'handleLogin 分别包含 try/catch/finally')
-expectMatches(loginTry, /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*deviceId\)/, 'handleLogin try 调用真实登录 API')
+expectMatches(loginTry, /fetchLegalConsentVersions\s*\(/, 'handleLogin try 先拉取协议版本')
+expectMatches(loginTry, /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*consent,\s*deviceId\)/, 'handleLogin try 调用真实登录 API（含协议版本）')
 expectGuardBeforeUpdate(
   loginTry,
   generationGuardPattern(loginGeneration),

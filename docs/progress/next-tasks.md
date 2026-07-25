@@ -14,7 +14,7 @@
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
-6. [ ] **G6 法务文档版本管理最小版**（可与部署并行，不挡 FREE_MODE）
+6. [x] **G6 法务文档版本管理最小版**（LegalDocVersion + 发布审计 + 同意记录关联版本号；代码候选，待合入/部署）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
@@ -55,7 +55,7 @@
 - [x] **【P1】A 类:03/05/06 双栏布局对齐**——已在视觉 1:1 分支 W10 落地（有内容时双栏；无上下文诚实空态）；05 保留「云端上传」与 `/scan` 分流
 - [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿
 - [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
-- [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
+- [x] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号；分支 `codex/g6-legal-consent-version-20260725`)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
 **开工前注意事项(2026-07-17)**:

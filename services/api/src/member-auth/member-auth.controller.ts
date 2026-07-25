@@ -62,7 +62,12 @@ export class MemberAuthController {
   @Post('auth/login')
   @Throttle({ default: { ttl: 60_000, limit: 10 } })
   async login(@Body() dto: MemberLoginDto, @Req() req: Request): Promise<ApiResponse<MemberLoginResult>> {
-    return ApiResponse.ok(await this.service.login(dto.phone, dto.code, dto.deviceId, clientIp(req)))
+    return ApiResponse.ok(
+      await this.service.login(dto.phone, dto.code, dto.deviceId, clientIp(req), {
+        termsVersion: dto.termsVersion,
+        privacyVersion: dto.privacyVersion,
+      }),
+    )
   }
 
   /** 已登录会员为数据导出/账号注销等敏感动作发送二次验证短信。 */

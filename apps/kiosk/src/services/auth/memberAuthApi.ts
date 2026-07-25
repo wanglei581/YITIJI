@@ -103,10 +103,22 @@ export function sendSmsCode(phone: string, deviceId?: string): Promise<SendCodeR
 /**
  * 手机号 + 验证码登录。
  * 成功后返回 token 和脱敏用户信息，token 由调用方注入内存 Context，不在此处存储。
+ * termsVersion / privacyVersion 为勾选同意时展示的协议版本（与服务端当前有效版本对齐）。
  */
-export function memberLogin(phone: string, code: string, deviceId?: string): Promise<LoginResult> {
+export function memberLogin(
+  phone: string,
+  code: string,
+  consent: { termsVersion: string; privacyVersion: string },
+  deviceId?: string,
+): Promise<LoginResult> {
   return call<LoginResult>('/member/auth/login', 'POST', {
-    body: deviceId ? { phone, code, deviceId } : { phone, code },
+    body: {
+      phone,
+      code,
+      termsVersion: consent.termsVersion,
+      privacyVersion: consent.privacyVersion,
+      ...(deviceId ? { deviceId } : {}),
+    },
   })
 }
 

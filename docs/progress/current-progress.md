@@ -1,6 +1,10 @@
 # 当前开发进度
 
+<<<<<<< HEAD
 2026-07-25 追加：**预生产 Partner 热更新 #342**（仅 `apps/partner/dist`）。API 仍 pin `DEPLOY_SOURCE=70ed8f6d`（未重启 PM2）；Partner 公网产物 `index-PAu_zGlA.js` → `index-9Gb3kgQt.js`（相对 API URL 修复）；备份 `backups/partner-dist-before-342-*.tgz`；`DEPLOY_SOURCE.txt` 追加 `partner_hotfix_commit=6ed7ba7a` / `partner_hotfix_pr=342`。health `db=postgres`。**未做**：Partner 登录后 GET 冒烟（需账号）；全量 runtime 重部署。
+=======
+2026-07-25 追加：**G6 同意记录关联 LegalDocVersion（最小闭环）**。分支 `codex/g6-legal-consent-version-20260725` / [PR #343](https://github.com/wanglei581/YITIJI/pull/343)。既有 PR #310 已落地 `LegalDocVersion` / Admin CRUD / Kiosk 公开读取 / `legal_doc.activate` 审计；本波补缺口：① `MemberLegalConsent`（SQLite+PG 双轨迁移）只追加落库 `termsVersion`/`privacyVersion`（及当时有效 `LegalDocVersion.id`）；② 短信登录 DTO 必传版本号，与服务端当前有效版本（无激活则 `draft-pending-legal-review`）不一致 → `LEGAL_VERSION_STALE`；③ QR claim 按服务端当前有效版本落库 `source=qr_login`；④ Kiosk 登录前 `GET /kiosk/legal/*` 取版本并提交；⑤ Admin 侧栏「法务文档版本」+ 激活 `window.confirm`；⑥ `verify:legal-doc-version` 扩至 11 项。**不代表**法务正文已定稿（P1-5 仍开）；**未**动 G5 / FREE_MODE / 生产部署。
+>>>>>>> c8009ee6 (feat(g6): persist member legal consent against LegalDocVersion)
 
 2026-07-25 完成 **close-unpaid 预生产 Phase A 只读预检**（用户授权 `CLOSE_UNPAID_PHASE_A_READONLY` / 环境预生产）：`DEPLOY_SOURCE=70ed8f6d`，health `ok/postgres`；`BEGIN READ ONLY` 统计 `PrintTask`：**pending=0，eligible close-unpaid=0**（无 ROW 样本）。分布（仅计数）：task `completed=20/cancelled=11/failed=4`；print 订单 `unpaid=19/paid=10/closed=4/refunded=1`；历史 `errorCode=ADMIN_UNPAID_PRINT_TASK_CLOSED` 计 3。路由 `POST …/close-unpaid` 无 token → `401 AUTH_MISSING_TOKEN`。**未**调用 close-unpaid POST、未造单、未改业务数据。按 Runbook：**不得进入 Phase B**（无合格候选）。若需 Phase B，须先出现真实合格 pending 未支付未领取任务，再单独书面点名 `taskId`。
 

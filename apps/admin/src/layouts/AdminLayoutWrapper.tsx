@@ -120,6 +120,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'member-privacy', label: '会员隐私请求', icon: ShieldCheckIcon, href: KEY_TO_PATH['member-privacy'] },
   { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理', href: KEY_TO_PATH.permissions },
   { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon, href: KEY_TO_PATH.audit },
+  { key: 'legal-docs',   label: '法务文档版本', icon: FileTextIcon, href: KEY_TO_PATH['legal-docs'] },
   { key: 'privacy-requests', label: '数据权利工单', icon: ShieldIcon, href: KEY_TO_PATH['privacy-requests'] },
 ]
 

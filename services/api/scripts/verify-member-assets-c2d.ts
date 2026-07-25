@@ -146,9 +146,9 @@ async function main() {
       if (sent.status !== 200 && sent.status !== 201) fail(`发送验证码失败 status=${sent.status} ${JSON.stringify(sent.body)}`)
       const code = await redis.get(`member:sms:code:${hash}`)
       if (!code) fail('Redis 中未找到验证码（SMS_PROVIDER=log 通道）')
-      const wrong = await http('POST', '/member/auth/login', { body: { phone, code: '000000' === code ? '111111' : '000000' } })
+      const wrong = await http('POST', '/member/auth/login', { body: { phone, code: '000000' === code ? '111111' : '000000' , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' } })
       if (wrong.status !== 401) fail(`错误验证码应 401，实际 ${wrong.status}`)
-      const ok = await http('POST', '/member/auth/login', { body: { phone, code } })
+      const ok = await http('POST', '/member/auth/login', { body: { phone, code , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' } })
       if (ok.status !== 200 && ok.status !== 201) fail(`登录失败 status=${ok.status} ${JSON.stringify(ok.body)}`)
       const token = ok.body?.data?.token
       if (typeof token !== 'string' || !token) fail('登录响应缺少 token')
