@@ -256,6 +256,8 @@ pnpm --filter ./services/api verify:activity-logs
 
 换 Windows 主机时，必须按本节重新验收。不要因为旧机器通过就默认新机器通过。
 
+预发终端 `t_ksk_001` 的**远程 Phase R / 现场 Phase F** 执行清单与回执模板：`docs/device/windows-field-recheck-phase-f-runbook.md`（远程旁证不能替代本节勾选）。
+
 ### 5.1 Windows 环境
 
 - [ ] Windows 10/11 x64，版本记录清楚。

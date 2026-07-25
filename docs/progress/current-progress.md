@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 启动 **`WINDOWS_FIELD_RECHECK` 现场 Phase F**：新增 `docs/device/windows-field-recheck-phase-f-runbook.md`（F1 Agent 服务 / F2 printerName / F3 本机桥接 / F4 受控出纸 / F5 断网恢复 / F6 全屏抽查 + 回执模板）。同日远程 Phase R 再复检：health `ok/postgres`；`t_ksk_001` `printerStatus=ready` + `isOnline=true`；近 30min 心跳有多条；active PrintTask=0。**Phase F 未完成、未宣称 §五通过**；未造打印单、未 close-unpaid、未改 G5/FREE_MODE/F1。阻塞：须人到一体机执行清单并回执。
+
 2026-07-25 完成 **`SECRETS_ROTATION_EVIDENCE`（方案 C，用户确认「可以，继续」）**：不新轮换、不读密钥值。书面口径：OCR/COS **沿用 2026-06-13** 控制台轮换 + 当时 live 复验；SMS/TRTC 为**当前生产密钥**且预发 `.env` 已同步，今日无需再换。已勾选清单 §2.2 百度 OCR、COS CAM、ASR/TTS/SMS/TRTC CAM 最小权限三项；「密钥只写入服务器环境变量」此前已勾。**未勾**：短信签名/模板审核、真实短信 E2E、COS 生命周期截图等独立项。未改 `.env`、未重启 PM2、未动 G5 / FREE_MODE / F1 Genesis。下一步：7c 现场 Phase F，或短信审核类阻塞项。
 
 2026-07-25 澄清 **`SECRETS_ROTATION_EVIDENCE` vs `.env`**：用户回复「密钥在 .env 文件里面」。解读：运行时密钥落点已符合预期，**不能**据此勾选 §2.2「控制台轮换」项。同日预发名称级复核（**不读值**）：`BAIDU_OCR_*` / `TENCENT_COS_*` / `TENCENT_SMS_*` / `TRTC_*`（含 `TRTC_SDK_SECRET_KEY`）均为 `SET`，health `ok/postgres`。清单仅勾选「密钥只写入服务器环境变量」；OCR/COS/SMS/TRTC/LLM **控制台轮换项仍未勾选**。历史附录 2026-06-13 OCR/COS 清关**未**自动等同今日。7b 仍待用户粘贴 runbook 授权模板（或打码截图）。同步完成 **WINDOWS_FIELD_RECHECK 远程 Phase R**：`GET /terminals/t_ksk_001/printer-status` → `ready` + `isOnline=true`；`TerminalCapability` 对 `t_ksk_001` 为 0 行（managed 空表）；**现场 Phase F 未做**。未动 G5 / FREE_MODE / F1 Genesis / close-unpaid Phase B；未输出任何密钥值。
