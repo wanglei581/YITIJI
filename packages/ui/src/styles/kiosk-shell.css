@@ -15,9 +15,12 @@
  */
 
 [data-kiosk-presentation='fusion-youth'] {
-  /* 原型 shared.css :root 的语义别名，供本层与组件层引用 */
-  --k-paper: var(--color-canvas);
-  --k-surface: var(--color-surface);
+  /* 覆盖 service-desk 冰蓝画布，恢复 fusion 米纸真值 */
+  --color-canvas: #f4f1e8;
+  --color-surface: #fffdf8;
+  /* 原型 shared.css :root 的语义别名，供本层与组件层引用。 */
+  --k-paper: #f4f1e8;
+  --k-surface: #fffdf8;
   --k-ink: #10302b;
   --k-muted: #5d6b63;
   --k-line: #e2dccb;

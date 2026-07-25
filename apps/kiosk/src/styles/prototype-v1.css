@@ -15,29 +15,33 @@
  * （steps / pagehead / row-item / qr-panel / progress / actionbar 等）。
  * ============================================================ */
 
-/* ── 设计 token（迁移自 shared.css :root，取原型精确 hex） ── */
-:root {
-  --pv-paper: var(--k-paper, var(--color-canvas));
-  --pv-surface: var(--k-surface, var(--color-surface));
-  --pv-ink: var(--k-ink);
-  --pv-muted: var(--k-muted);
-  --pv-line: var(--k-line);
-  --pv-teal: var(--k-teal);
-  --pv-teal-deep: var(--k-teal-deep);
-  --pv-teal-soft: var(--k-teal-soft);
-  --pv-clay: var(--color-warning);
-  --pv-clay-deep: var(--color-warning-fg);
-  --pv-clay-soft: var(--color-warning-bg);
-  --pv-wheat: var(--color-wheat);
-  --pv-wheat-deep: var(--color-wheat-deep);
-  --pv-wheat-soft: var(--color-wheat-soft);
-  --pv-plum: var(--color-plum);
-  --pv-plum-deep: var(--color-plum-deep);
-  --pv-plum-soft: var(--color-plum-soft);
-  --pv-slate: var(--color-info);
-  --pv-slate-deep: var(--color-info-fg);
-  --pv-slate-soft: var(--color-info-bg);
-  --pv-dark: var(--k-ink);
+/* ── 设计 token：挂在 fusion 作用域，勿放 :root ───────────────
+ * --k-* 只在 [data-kiosk-presentation='fusion-youth'] 上定义。
+ * 若写在 :root 且无 hex 回退，var(--k-ink) 在 :root 计算时会变成
+ * guaranteed-invalid，子树继承空值 → 登录按钮背景透明、文字发白。
+ */
+[data-kiosk-presentation='fusion-youth'] {
+  --pv-paper: var(--k-paper, #f4f1e8);
+  --pv-surface: var(--k-surface, #fffdf8);
+  --pv-ink: var(--k-ink, #10302b);
+  --pv-muted: var(--k-muted, #5d6b63);
+  --pv-line: var(--k-line, #e2dccb);
+  --pv-teal: var(--k-teal, #1f9e86);
+  --pv-teal-deep: var(--k-teal-deep, #157a67);
+  --pv-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --pv-clay: var(--color-warning, #b8683c);
+  --pv-clay-deep: var(--color-warning-fg, #9e5330);
+  --pv-clay-soft: var(--color-warning-bg, #f4e8dd);
+  --pv-wheat: var(--color-wheat, #a9781f);
+  --pv-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --pv-wheat-soft: var(--color-wheat-soft, #f2ead6);
+  --pv-plum: var(--color-plum, #7a5a86);
+  --pv-plum-deep: var(--color-plum-deep, #63466f);
+  --pv-plum-soft: var(--color-plum-soft, #efe7f1);
+  --pv-slate: var(--color-info, #3f68b0);
+  --pv-slate-deep: var(--color-info-fg, #35608f);
+  --pv-slate-soft: var(--color-info-bg, #e5edf4);
+  --pv-dark: var(--k-dark, #10302b);
   --pv-r-sm: 14px;
   --pv-r-md: 18px;
   --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
@@ -116,7 +120,7 @@
 .kpv1 .login-btn {
   flex: none; display: flex; align-items: center; gap: 16px;
   min-height: 88px; padding: 0 38px;
-  background: var(--pv-dark); color: var(--k-paper, var(--color-canvas));
+  background: var(--pv-dark, #10302b); color: var(--pv-paper, #f4f1e8);
   border: none; border-radius: var(--pv-r-md); cursor: pointer;
   font-family: var(--pv-sans); font-size: 27px; font-weight: 600; letter-spacing: 1px;
   box-shadow: 0 6px 18px rgb(16 48 43 / 18%);
