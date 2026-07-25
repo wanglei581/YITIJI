@@ -78,8 +78,8 @@
 - close-unpaid Phase A：预生产 `DEPLOY_SOURCE=7e59243c` 复检仍 **`pending=0` / `eligible=0`** → 不进 Phase B
 - 7a `SEED_PASSWORD_CONFIRM` + 7a2 `SEED_PASSWORD_ROTATE`：**已完成**（partner1/partner2 已离 seed 默认；清单 §2.2 seed 项已勾选）
 - 7d `PARTNER_SMOKE_LOGIN`：**已完成**（partner `wanglei` + admin `admin` 只读 GET 200；凭据不入库）
-- 7b `SECRETS_ROTATION_EVIDENCE`：**仍阻塞 / 未完整勾选**——用户已说明「密钥在 .env」；同日名称级复核 OCR/COS/SMS/TRTC 均为 `SET`，health 正常。**.env 有密钥 ≠ 控制台轮换证据**。历史 2026-06-13 OCR/COS 附录**未**因本句自动勾选。须按上方模板书面确认（或打码截图）后才能勾选清单 §2.2 对应密钥项
-- 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 旁证已记**（见下）；**现场 Phase F 未做**
+- 7b `SECRETS_ROTATION_EVIDENCE`：**已完成（方案 C，2026-07-25）**——用户确认「可以，继续」：OCR/COS 沿用 2026-06-13；SMS/TRTC 为当前生产密钥且 `.env` 同步、今日不换。已勾 §2.2 OCR/COS/ASR·TTS·SMS·TRTC CAM 项；短信签名审核等仍开
+- 7c `WINDOWS_FIELD_RECHECK`：**远程 Phase R 旁证已记**（见下）；**现场 Phase F 未做**——**推荐下一步**
   - R：`GET /api/v1/terminals/t_ksk_001/printer-status` → `printerStatus=ready`、`isOnline=true`；`Terminal` `enabled` + 近期 `lastSeenAt`；`TerminalCapability` 对 `t_ksk_001` **0 行**（managed 模式下空表不代表现场能力已验）
   - F：一体机 Agent 服务、奔图驱动出纸/扫描、断网恢复等仍须到场
 - 提醒：`/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`
