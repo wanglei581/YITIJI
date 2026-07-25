@@ -65,5 +65,7 @@
 
 - close-unpaid Phase A：预生产 `DEPLOY_SOURCE=7e59243c` 复检仍 **`pending=0` / `eligible=0`** → 不进 Phase B
 - 7a `SEED_PASSWORD_CONFIRM` + 7a2 `SEED_PASSWORD_ROTATE`：**已完成**（partner1/partner2 已离 seed 默认；清单 §2.2 seed 项已勾选）
-- 7b `SECRETS_ROTATION_EVIDENCE`：**等待用户书面授权 + 控制台轮换举证**
-- 7c Windows 现场、7d Partner 登录冒烟：另包（7d 可用轮换后口令，用户本机从服务器 secret 文件读取，勿贴聊天）
+- 7d `PARTNER_SMOKE_LOGIN`：**已完成**（partner `wanglei` + admin `admin` 只读 GET 200；凭据不入库）
+- 7b `SECRETS_ROTATION_EVIDENCE`：**阻塞**——仅名称级确认预发已配置 OCR/COS/SMS/TRTC；历史附录曾记 2026-06-13 OCR/COS 轮换复验，**不能自动等同今日仍有效**。须用户按上方模板书面确认或提供打码截图后才能勾选清单 §2.2 密钥项
+- 7c `WINDOWS_FIELD_RECHECK`：未做现场；远程可见 `t_ksk_001` printer-status `ready` + `isOnline=true`（现场项另包）
+- 提醒：`/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt` 若仍在，请用户 SSH 取密后 `shred -u`
