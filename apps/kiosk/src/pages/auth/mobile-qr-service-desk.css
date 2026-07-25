@@ -1,12 +1,12 @@
 .k1-mobile-qr-login {
-  --m-paper: var(--color-canvas, #f4f1e8);
-  --m-surface: var(--color-surface, #fffdf8);
-  --m-ink: var(--color-neutral-900, #10302b);
-  --m-muted: var(--color-neutral-500, #5d6b63);
-  --m-line: var(--color-neutral-200, #e2dccb);
-  --m-teal: var(--color-primary-600, #1f9e86);
-  --m-teal-deep: var(--color-primary-700, #157a67);
-  --m-teal-soft: var(--color-primary-100, #e2f2ec);
+  --m-paper: var(--color-canvas, var(--k-paper, var(--color-canvas)));
+  --m-surface: var(--color-surface, var(--k-surface, var(--color-surface)));
+  --m-ink: var(--color-neutral-900, var(--k-ink));
+  --m-muted: var(--color-neutral-500, var(--k-muted));
+  --m-line: var(--color-neutral-200, var(--k-line));
+  --m-teal: var(--color-primary-600, var(--k-teal));
+  --m-teal-deep: var(--color-primary-700, var(--k-teal-deep));
+  --m-teal-soft: var(--color-primary-100, var(--k-teal-soft));
   min-height: 100dvh;
   display: grid;
   place-items: center;

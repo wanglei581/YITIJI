@@ -7,7 +7,8 @@ import {
   XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
-import { KioskPageFrame } from '@ai-job-print/ui'
+import { KioskPageFrame, Stepper } from '@ai-job-print/ui'
+import type { StepperStep } from '@ai-job-print/ui'
 import { submitResumeParse } from '../../services/api'
 import { saveAiResumeSession } from './aiResumeSession'
 import {
@@ -20,6 +21,13 @@ import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
 
 type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
+
+const RESUME_FLOW_STEPS: StepperStep[] = [
+  { title: '上传与方向' },
+  { title: 'AI 解析' },
+  { title: '诊断报告' },
+  { title: '优化打印' },
+]
 
 const STEPS: { key: Step; label: string; hint: string }[] = [
   { key: 'reading',    label: '读取上传文件',    hint: '校验格式与页数' },
@@ -165,46 +173,14 @@ export function ResumeParsePage() {
     : current === 'extracting' ? '正在提取简历结构…'
     :                            '正在生成诊断报告…'
 
-  /* ── 顶部流程步骤条：整个 AI 简历服务 4 步 ──────────────── */
-  const FLOW_STEPS = [
-    { label: '上传与方向' },
-    { label: 'AI解析' },
-    { label: '诊断报告' },
-    { label: '优化打印' },
-  ] as const
-  const FLOW_ACTIVE = 1 // 第 2 步，0-indexed
+  /* ── 顶部流程步骤条：与上传/报告/优化页共用 Stepper ── */
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow" role="status" aria-live="polite">
-      {/* 顶部流程步骤条 */}
-      <nav className="rp-flow-steps" aria-label="AI简历服务进度">
-        {FLOW_STEPS.map((step, i) => {
-          const done = i < FLOW_ACTIVE
-          const active = i === FLOW_ACTIVE
-          return (
-            <span key={step.label} className="rp-flow-steps__item">
-              <span
-                className={[
-                  'rp-flow-steps__dot',
-                  done ? 'rp-flow-steps__dot--done' : active ? 'rp-flow-steps__dot--active' : '',
-                ].filter(Boolean).join(' ')}
-                aria-hidden="true"
-              >
-                {done
-                  ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12l5 5 9-10"/></svg>
-                  : i + 1}
-              </span>
-              <span className={['rp-flow-steps__label', active ? 'rp-flow-steps__label--active' : ''].filter(Boolean).join(' ')}>
-                {step.label}
-              </span>
-              {i < FLOW_STEPS.length - 1 && (
-                <span className={['rp-flow-steps__line', done ? 'rp-flow-steps__line--done' : ''].filter(Boolean).join(' ')} aria-hidden="true" />
-              )}
-            </span>
-          )
-        })}
-      </nav>
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6" role="status" aria-live="polite">
+      <div className="resume-lightflow__stepper">
+        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
+      </div>
 
       {/* 中心卡片 */}
       <div className="rp-center">

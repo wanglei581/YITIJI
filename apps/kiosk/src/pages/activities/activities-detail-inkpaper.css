@@ -312,7 +312,7 @@
 
 .k8-act-btn.primary {
   background: var(--color-primary-600);
-  color: #fff;
+  color: var(--k-surface, var(--color-surface));
   box-shadow: 0 12px 28px rgba(31, 158, 134, 0.3);
 }
 

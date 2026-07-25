@@ -1,50 +1,10 @@
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
-import { getTerminalId } from '../../services/api/terminalConfig'
-import { useHomeDeviceStatus } from '../home/hooks/useHomeDeviceStatus'
 import './print-prototype.css'
 
 export type PrintFlowStep = 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 const PRINT_STEPS = ['上传', '材料检查', '预览', '参数', '确认', '支付', '打印']
-
-function formatClock(now: Date): string {
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(now)
-}
-
-export function PrintKioskTopBar() {
-  const deviceStatus = useHomeDeviceStatus()
-  const [now, setNow] = useState(() => new Date())
-  const terminalId = getTerminalId() || '01号机'
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1_000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  return (
-    <header className="print-kiosk-topbar">
-      <div className="print-kiosk-brand">
-        <b>就业服务大厅 · {terminalId}</b>
-        <span>AI求职打印服务终端</span>
-      </div>
-      <div className="print-kiosk-status">
-        <time>{formatClock(now)}</time>
-        <span className="print-device-chip" data-tone={deviceStatus.tone} role="status" aria-live="polite">
-          <i aria-hidden="true" />
-          {deviceStatus.label} · {deviceStatus.paperLabel}
-        </span>
-      </div>
-    </header>
-  )
-}
 
 interface PrintPrototypeHeaderProps {
   title: string
@@ -56,23 +16,38 @@ interface PrintPrototypeHeaderProps {
   aside?: ReactNode
 }
 
+/**
+ * 打印流程页头：统一页头 + 七步指示器。
+ *
+ * 顶栏（品牌 / 时钟 / 设备状态）由 KioskLayout 全局提供，本组件不得自建，
+ * 否则会出现双顶栏。步骤条复用 kiosk-shell.css 的 .ui-kiosk-steps 规范。
+ */
 export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack, aside }: PrintPrototypeHeaderProps) {
   return (
     <>
-      <PrintKioskTopBar />
-      <KioskPageHeader title={title} description={subtitle} onBack={onBack} backLabel={backLabel} aside={aside} className="print-pagehead" />
-      <nav className="print-flow-steps" aria-label="打印流程">
+      <KioskPageHeader title={title} description={subtitle} onBack={onBack} backLabel={backLabel} aside={aside} />
+      <nav className="ui-kiosk-steps" aria-label="打印流程">
         {PRINT_STEPS.map((label, index) => {
           const indexStep = (index + 1) as PrintFlowStep
-          const state = indexStep < step ? 'done' : indexStep === step ? 'active' : 'pending'
+          const state = indexStep < step ? 'done' : indexStep === step ? 'active' : 'todo'
           return (
-            <div key={label} className="print-flow-step-wrap">
-              <div className="print-flow-step" data-state={state}>
-                <span>{index + 1}</span>
-                <b>{label}</b>
-              </div>
-              {index < PRINT_STEPS.length - 1 && <i data-done={indexStep < step} aria-hidden="true" />}
-            </div>
+            <Fragment key={label}>
+              {index > 0 && (
+                <span
+                  className="ui-kiosk-step-line"
+                  data-state={indexStep <= step ? 'done' : 'todo'}
+                  aria-hidden="true"
+                />
+              )}
+              <span
+                className="ui-kiosk-step"
+                data-state={state}
+                aria-current={state === 'active' ? 'step' : undefined}
+              >
+                <span className="ui-kiosk-step__dot">{index + 1}</span>
+                <span className="ui-kiosk-step__label">{label}</span>
+              </span>
+            </Fragment>
           )
         })}
       </nav>

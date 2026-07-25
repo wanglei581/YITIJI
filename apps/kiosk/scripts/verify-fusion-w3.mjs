@@ -147,9 +147,17 @@ const screens = new Map([
   ['src/pages/interview/InterviewReportsPage.tsx', 'interview-reports'],
 ])
 for (const [path, screen] of screens) {
-  includes(path, 'KioskPageFrame', `${screen} consumes the frozen W1 frame`)
+  const isInterview = path.includes('/interview/')
+  includes(
+    path,
+    isInterview ? 'InterviewShell' : 'KioskPageFrame',
+    `${screen} consumes the frozen W1 frame`,
+  )
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
+includes('src/pages/interview/InterviewShell.tsx', 'KioskFullscreenShell', 'interview shell uses shared fullscreen chrome')
+includes('src/pages/interview/InterviewShell.tsx', 'KioskPageFrame', 'interview shell still wraps KioskPageFrame')
+
 
 includes('src/pages/resume/ResumeSourcePage.tsx', 'UploadSessionQrPanel', 'resume source keeps the shared upload session')
 includes('src/pages/resume/ResumeParsePage.tsx', 'submitResumeParse(', 'resume parse keeps the real AI/OCR request')

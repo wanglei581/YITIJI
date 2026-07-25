@@ -1,8 +1,8 @@
 
 /* ── Screen 32: Cashier / Payment ─────────────────────────── */
 :root {
-  --print-slate-deep: #35608f;
-  --print-wheat-deep: #8a6219;
+  --print-slate-deep: var(--color-info-fg);
+  --print-wheat-deep: var(--color-wheat-deep);
 }
 
 .cashier-split {
@@ -36,6 +36,11 @@
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
   overflow-y: auto;
 }
+.cashier-pay-card--failed {
+  border-color: rgb(193 74 52 / 40%);
+  border-top-color: var(--print-error);
+  justify-content: center;
+}
 
 /* Price detail card */
 .cashier-detail-card {
@@ -60,7 +65,7 @@
   display: grid;
   place-items: center;
   background: var(--print-slate-soft);
-  color: var(--print-slate-deep, #35608f);
+  color: var(--print-slate-deep, var(--color-info-fg));
 }
 .cashier-card-icon svg { width: 32px; height: 32px; }
 .cashier-card-title { font-family: var(--print-serif); font-size: 32px; font-weight: 700; letter-spacing: 1px; }
@@ -92,7 +97,7 @@
   font-family: var(--print-serif);
   font-size: 62px;
   font-weight: 900;
-  color: var(--print-slate-deep, #35608f);
+  color: var(--print-slate-deep, var(--color-info-fg));
   line-height: 1;
 }
 .cashier-amount-num small { font-size: 28px; font-weight: 700; margin-right: 4px; }
@@ -203,7 +208,7 @@
 .cashier-qr-sub { font-size: 18px; color: var(--print-muted); text-align: center; line-height: 1.5; }
 .cashier-countdown {
   font-size: 17.5px;
-  color: var(--print-wheat-deep, #8a6219);
+  color: var(--print-wheat-deep, var(--color-wheat-deep));
   font-weight: 600;
   text-align: center;
 }
@@ -302,6 +307,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-height: 88px;
   min-width: 320px;
   padding: 0 48px;
@@ -408,7 +414,7 @@
   padding: 18px 24px;
   background: var(--print-surface);
   border: 1px solid var(--print-line);
-  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-top: 4px solid var(--print-slate, var(--color-info));
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
 }
@@ -459,7 +465,7 @@
   padding: 20px 26px;
   background: var(--print-surface);
   border: 1px solid var(--print-line);
-  border-top: 4px solid var(--print-slate, #3f68b0);
+  border-top: 4px solid var(--print-slate, var(--color-info));
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
 }
@@ -486,7 +492,7 @@
 /* 隐私摘要卡 (wheat) */
 .print-priv-card {
   padding: 18px 22px;
-  background: #f2ead6;
+  background: var(--color-wheat-soft);
   border: 1px solid rgba(169, 120, 31, .35);
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
@@ -496,13 +502,13 @@
   align-items: center;
   gap: 12px;
 }
-.print-priv-head svg { width: 26px; height: 26px; flex: none; color: #8a6219; }
-.print-priv-head b { font-size: 20px; font-weight: 700; color: #8a6219; }
+.print-priv-head svg { width: 26px; height: 26px; flex: none; color: var(--color-wheat-deep); }
+.print-priv-head b { font-size: 20px; font-weight: 700; color: var(--color-wheat-deep); }
 .print-priv-body {
   margin-top: 8px;
   font-size: 17px;
   line-height: 1.55;
-  color: #8a6219;
+  color: var(--color-wheat-deep);
 }
 
 /* 费用卡 (a-teal) */
@@ -644,7 +650,7 @@
   min-height: 88px;
   padding: 0 36px;
   background: var(--print-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   border: none;
   border-radius: 18px;
   font: 600 26px var(--print-sans);
@@ -671,3 +677,164 @@
   color: var(--print-error);
 }
 .print-submit-error svg { width: 18px; height: 18px; flex: none; }
+
+/* ── 确认页 / 收银页共用：守卫空态 ─────────────────────────── */
+.print-confirm-guard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 32px 48px;
+}
+.print-confirm-guard-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgb(193 74 52 / 10%);
+  color: var(--print-error);
+}
+.print-confirm-guard-icon svg { width: 40px; height: 40px; }
+.print-confirm-guard-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--print-ink);
+  text-align: center;
+}
+.print-confirm-guard-hint {
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--print-muted);
+  text-align: center;
+}
+.print-color-hint { font-size: 14px; color: var(--print-wheat-deep); }
+
+/* ── 确认页主体区内边距 ───────────────────────────────────── */
+.print-confirm-body { padding: 0 48px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ── 收银：支付状态 tone 条 ───────────────────────────────── */
+.cashier-tone-banner {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 16px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.cashier-tone-banner b { display: block; font-weight: 700; }
+.cashier-tone-banner[data-tone='success'] {
+  background: var(--print-teal-soft);
+  color: var(--print-teal-deep);
+  border: 1px solid rgb(31 158 134 / 30%);
+}
+.cashier-tone-banner[data-tone='error'] {
+  background: rgb(193 74 52 / 8%);
+  color: var(--print-error);
+  border: 1px solid rgb(193 74 52 / 30%);
+}
+.cashier-tone-banner[data-tone='warning'] {
+  background: var(--print-wheat-soft);
+  color: var(--print-wheat-deep);
+  border: 1px solid rgb(169 120 31 / 30%);
+}
+.cashier-tone-banner[data-tone='info'] {
+  background: var(--print-slate-soft);
+  color: var(--print-slate-deep, var(--color-info-fg));
+  border: 1px solid rgb(63 104 176 / 25%);
+}
+
+.cashier-qr-frame {
+  background: var(--print-surface);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid var(--print-line);
+}
+
+/* ── 32A 支付未成功诚实态 ─────────────────────────────────── */
+.cashier-fail-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 20px;
+  padding: 34px 30px;
+  border-color: rgb(193 74 52 / 40%);
+}
+.cashier-fail-icon {
+  width: 128px;
+  height: 128px;
+  border-radius: 34px;
+  display: grid;
+  place-items: center;
+  background: rgb(193 74 52 / 8%);
+  color: var(--print-error);
+  border: 1px solid rgb(193 74 52 / 30%);
+}
+.cashier-fail-icon svg { width: 66px; height: 66px; }
+.cashier-fail-title {
+  font-family: var(--print-serif);
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: var(--print-ink);
+}
+.cashier-fail-sub {
+  font-size: 19px;
+  color: var(--print-muted);
+  line-height: 1.6;
+}
+.cashier-fail-facts {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.cashier-fail-fact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font-size: 18px;
+  background: var(--print-paper);
+  border: 1px solid var(--print-line);
+  border-radius: 12px;
+  padding: 13px 18px;
+  color: var(--print-ink);
+}
+.cashier-fail-fact svg { width: 22px; height: 22px; flex: none; color: var(--print-teal-deep); }
+.cashier-fail-fact b { font-weight: 600; }
+
+.cashier-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--print-error);
+  background: rgb(193 74 52 / 8%);
+  border: 1px solid rgb(193 74 52 / 40%);
+  padding: 7px 16px;
+  border-radius: 999px;
+  flex: none;
+}
+.cashier-status-badge svg { width: 18px; height: 18px; }
+
+.cashier-notice-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 17px;
+  color: var(--print-muted);
+  line-height: 1.5;
+  padding: 12px 20px;
+  background: var(--print-wheat-soft);
+  border: 1px dashed rgb(169 120 31 / 35%);
+  border-radius: 12px;
+}
+.cashier-notice-warn svg { width: 20px; height: 20px; flex: none; margin-top: 2px; color: var(--print-wheat-deep); }

@@ -7,12 +7,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, KioskPageFrame, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
-import { InterviewTopbar } from './InterviewTopbar'
+import { InterviewShell } from './InterviewShell'
 import './interview-service-desk.css'
 
 function formatTime(iso: string) {
@@ -69,21 +69,20 @@ export function InterviewReportsPage() {
   }
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <InterviewShell>
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-reports" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
-      <InterviewTopbar />
-      <PageHeader
+      <KioskPageHeader
         className="interview-pagehead"
         title="面试报告"
-        subtitle="模拟面试练习的历史报告，仅本人可见 · 模拟练习，仅供参考"
-        actions={
-          <div className="flex gap-2">
+        description="模拟面试练习的历史报告，仅本人可见 · 模拟练习，仅供参考"
+        aside={
+          <div className="flex flex-wrap gap-2">
             {isLoggedIn && (
-              <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+              <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/profile')}>
                 AI服务记录
               </Button>
             )}
-            <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
+            <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
           </div>
         }
       />
@@ -174,6 +173,6 @@ export function InterviewReportsPage() {
         )}
       </div>
     </main>
-    </KioskPageFrame>
+    </InterviewShell>
   )
 }

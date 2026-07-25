@@ -42,35 +42,43 @@ const PLANNED_TEST_FILES = new Set([
 const W6_INTEGRATION_FILES = new Set([
   '.github/workflows/ci.yml',
   'apps/kiosk/package.json',
+  // W8+ visual-unity：service-desk 须在 kiosk-shell 之前，避免冰蓝盖住 fusion 青绿。
+  'apps/kiosk/src/index.css',
   'docs/design/kiosk-proto-2026-07-migration-matrix.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
-  /^apps\/kiosk\/src\/pages\/(?:jobs-fairs-prototype|prototype\/kiosk-prototype)\.css$/,
+  /^apps\/kiosk\/src\/pages\/jobs-fairs-prototype\.css$/,
   /^apps\/kiosk\/src\/pages\/styles\/(?:jobs-fairs-foundation|jobs-companies-fusion|job-fairs-fusion|campus-policy-fusion)\.css$/,
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:CampusWelcomePage|FreshmanInsightsPage)\.tsx$/,
 ]
-const OTHER_WAVE_PLAN = /^docs\/superpowers\/plans\/2026-07-24-kiosk-8177-5299-fusion-w(?:2|3|5|6)\.md$/
+const OTHER_WAVE_PLAN = /^docs\/superpowers\/(?:plans|specs)\/2026-07-(?:24-kiosk-8177-5299-fusion-w(?:2|3|5|6)|25-kiosk-86-proto-visual-1to1(?:-design)?)\.md$/
 const OTHER_WAVE_PATHS = [
   // W2: print/scan presentation and its isolated verification assets.
   /^apps\/kiosk\/src\/pages\/(?:print|print-scan|scan)\//,
   /^apps\/kiosk\/scripts\/verify-fusion-w2-print-scan\.mjs$/,
-  /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2\.spec\.ts)$/,
+  /^apps\/kiosk\/(?:playwright\.w2\.config\.ts|tests\/visual\/fusion-w2(?:|-print|-scan|-tools)\.spec\.ts)$/,
   // W3: resume, AI assistant and interview authoring surfaces.
   /^apps\/kiosk\/src\/pages\/(?:resume|assistant|interview)\//,
-  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:tests\/fusion-w3-contract\.test|verify-fusion-w3|verify-job-fit-m1-5-ui|verify-lightflow-k2a-ai-career|verify-lightflow-k2c-interview)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w3\.config\.ts|tests\/visual\/(?:fixtures\/fusion-w3-states\.ts|fusion-w3\.spec\.ts))$/,
   // W5: system, profile, account, help and benefit surfaces.
   /^apps\/kiosk\/src\/pages\/(?:activities|auth|help|legal|profile|screensaver|toolbox|upload)\//,
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:ErrorOfflinePage|MeActivityDetailPage|NotificationsPage|SessionTimeoutPage)\.tsx$/,
+  /^apps\/kiosk\/src\/pages\/placeholders\/system-pages-batch8\.css$/,
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w5|verify-profile-activity-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
   // W6: integration verifier and its contract test are owned by the integration wave.
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
+  // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
+  /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
+  /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
+  /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
+  /^packages\/ui\/scripts\/verify-fusion-youth-foundation\.mjs$/,
 ]
 
 let failed = 0

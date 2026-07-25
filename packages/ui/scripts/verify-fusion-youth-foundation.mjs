@@ -288,11 +288,21 @@ assert.deepEqual(
 assertKioskPresentationAttributes(theme)
 
 const componentContracts = {
+  // W0+ 统一页壳：标准 pagehead / steps / actionbar + 可选自定义 header/footer。
   KioskPageFrame: [
     'children: ReactNode',
+    'title?: ReactNode',
+    'subtitle?: ReactNode',
+    'onBack?: () => void',
+    'backLabel?: string',
+    'headerAside?: ReactNode',
+    'steps?: readonly KioskPageStep[]',
+    'actionbar?: ReactNode',
     'header?: ReactNode',
     'footer?: ReactNode',
     'className?: string',
+    'contentClassName?: string',
+    'standalone?: boolean',
   ],
   KioskPageHeader: [
     'title: string',
@@ -345,8 +355,15 @@ for (const [component, props] of Object.entries(componentContracts)) {
 const pageFrame = componentSources.get('KioskPageFrame')
 assert.match(pageFrame, /<section\b/, 'KioskPageFrame must render a semantic section')
 assert.match(pageFrame, /data-kiosk-component\s*=\s*['"]page-frame['"]/)
-assertIncludes(pageFrame, ['ui-kiosk-page-frame'], 'KioskPageFrame')
-assert.match(pageFrame, /header[\s\S]*children[\s\S]*footer/, 'KioskPageFrame must preserve header, children, footer order')
+assertIncludes(pageFrame, ['ui-kiosk-page-frame', 'ui-kiosk-page-content'], 'KioskPageFrame')
+assert.match(
+  pageFrame,
+  /\{header\}[\s\S]*ui-kiosk-page-content[\s\S]*\{footer\}/,
+  'KioskPageFrame must preserve header → content(children) → footer order',
+)
+assert.match(pageFrame, /ui-kiosk-pagehead/, 'KioskPageFrame must support standard pagehead')
+assert.match(pageFrame, /ui-kiosk-steps/, 'KioskPageFrame must support flow steps')
+assert.match(pageFrame, /ui-kiosk-actionbar/, 'KioskPageFrame must support actionbar')
 
 const pageHeader = componentSources.get('KioskPageHeader')
 assertIncludes(pageHeader, ['ui-kiosk-page-header', 'ui-kiosk-back-button'], 'KioskPageHeader')

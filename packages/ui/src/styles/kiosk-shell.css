@@ -1,0 +1,389 @@
+/*
+ * Kiosk Shell — 一体机统一页壳（唯一基准）
+ *
+ * 视觉基准：docs/design/kiosk-proto-2026-07/shared.css（fusion 融合原型定稿）
+ * 逐值对齐 topbar / pagehead / steps / content / navbar / actionbar 六层结构。
+ *
+ * 作用域：全部规则挂在 [data-kiosk-presentation='fusion-youth'] 下，
+ * 不影响 Admin / Partner，也不影响 presentation='legacy' 的历史渲染。
+ *
+ * Import AFTER fusion-youth.css 与 service-desk.css（需要覆盖冰蓝 primary）：
+ *   @import "@ai-job-print/ui/styles/fusion-youth.css";
+ *   @import "@ai-job-print/ui/styles/service-desk.css";
+ *   @import "@ai-job-print/ui/styles/kiosk-shell.css";
+ *
+ * 页面禁止自建 topbar / pagehead / 底部导航；一律经 KioskLayout + KioskPageFrame。
+ */
+
+/*
+ * Token 覆写作用域：
+ * 1) fusion-youth 根节点
+ * 2) 同节点同时带 service-desk（登录等全屏页）
+ * 3) 根内嵌套的 [data-visual-theme=service-desk]（面试/简历 main 会二次声明，否则冰蓝盖回）
+ * 选择器特异性 ≥ (0,2,0)，保证压过 service-desk.css 的 (0,1,0)。
+ */
+[data-kiosk-presentation='fusion-youth'],
+[data-kiosk-presentation='fusion-youth'][data-visual-theme='service-desk'],
+[data-kiosk-presentation='fusion-youth'] [data-visual-theme='service-desk'] {
+  /* 覆盖 service-desk 冰蓝画布，恢复 fusion 米纸真值 */
+  --color-canvas: #f4f1e8;
+  --color-surface: #fffdf8;
+  /* 原型 shared.css :root 的语义别名，供本层与组件层引用。 */
+  --k-paper: #f4f1e8;
+  --k-surface: #fffdf8;
+  --k-ink: #10302b;
+  --k-muted: #5d6b63;
+  --k-line: #e2dccb;
+  --k-teal: #1f9e86;
+  --k-teal-deep: #157a67;
+  --k-teal-soft: #e2f2ec;
+  --k-dark: #10302b;
+  --k-r-sm: 14px;
+  --k-r-md: 18px;
+  --k-serif: var(--font-heading, 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif);
+  --k-page-inset: 48px;
+
+  /*
+   * W8：visualTheme=service-desk 仍注入冰蓝 --sd-color-primary (#1769e8)。
+   * 在 fusion 作用域内把 service-desk / Tailwind primary 阶全部钉到青绿，
+   * 消除打印 / 登录 / 面试 / 我的 等主 CTA 色裂，且不改 Admin/Partner。
+   */
+  --sd-color-canvas-outer: #f4f1e8;
+  --sd-color-canvas: #f4f1e8;
+  --sd-color-surface: #fffdf8;
+  --sd-color-text-strong: #10302b;
+  --sd-color-text: #10302b;
+  --sd-color-copy: #5d6b63;
+  --sd-color-copy-muted: #5d6b63;
+  --sd-color-primary: #1f9e86;
+  --sd-color-primary-strong: #157a67;
+  --sd-color-line: #e2dccb;
+  --sd-color-line-strong: #d4cdb8;
+  --sd-shadow-touch: 0 18px 60px rgba(16, 48, 43, 0.08);
+  --sd-shadow-console: 0 10px 34px rgba(16, 48, 43, 0.06);
+  --sd-category-blue-bg: #e2f2ec;
+  --sd-category-blue-fg: #157a67;
+
+  --color-primary-50: #f0faf7;
+  --color-primary-100: #e2f2ec;
+  --color-primary-200: #c5e6dc;
+  --color-primary-300: #8fd0c0;
+  --color-primary-400: #4fb39c;
+  --color-primary-500: #2aa88f;
+  --color-primary-600: #1f9e86;
+  --color-primary-700: #157a67;
+  --color-primary-800: #0f5c4d;
+  --color-primary-900: #0a2f28;
+  --color-neutral-50: #f7f5ef;
+  --color-neutral-100: #efebe0;
+  --color-neutral-200: #e2dccb;
+  --color-neutral-300: #d4cdb8;
+  --color-neutral-400: #9aa396;
+  --color-neutral-500: #5d6b63;
+  --color-neutral-600: #5d6b63;
+  --color-neutral-700: #3d4a44;
+  --color-neutral-800: #10302b;
+  --color-neutral-900: #10302b;
+}
+
+/* ── 舞台（1080×1920 纸面 + 双径向光晕） ─────────────────── */
+[data-kiosk-presentation='fusion-youth'].ui-kiosk-shell {
+  background:
+    radial-gradient(1200px 600px at 85% -5%, rgba(31, 158, 134, 0.06), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(184, 104, 60, 0.05), transparent 55%),
+    var(--k-paper);
+}
+
+/* ── 顶部状态栏 76px ─────────────────────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar {
+  height: 76px;
+  flex: none;
+  background: var(--k-dark);
+  color: #f4f1e8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 44px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-width: 0;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__brand b {
+  font-family: var(--k-serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__brand span {
+  font-size: 20px;
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 20px;
+  flex: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar__clock {
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── 页头：返回键 + 标题（二级页） ───────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-pagehead {
+  flex: none;
+  padding: 34px var(--k-page-inset) 26px;
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  white-space: nowrap;
+  min-height: 72px;
+  padding: 0 30px;
+  background: var(--k-surface);
+  color: var(--k-ink);
+  border: 1px solid var(--k-line);
+  border-radius: var(--k-r-sm);
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(16, 48, 43, 0.05);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-back-btn:active {
+  transform: scale(0.97);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-back-btn svg {
+  width: 26px;
+  height: 26px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-pagehead__titles {
+  min-width: 0;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-pagehead__titles h1 {
+  font-family: var(--k-serif);
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: var(--k-ink);
+  line-height: 1.2;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-pagehead__titles p {
+  margin-top: 8px;
+  font-size: 22px;
+  color: var(--k-muted);
+  letter-spacing: 1px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-pagehead__aside {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+}
+
+/* ── 步骤指示器（流程页） ────────────────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 var(--k-page-inset) 24px;
+  flex: none;
+  /* 窄于设计宽度时整条横向滚动，不让步骤文案换行破版 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-steps::-webkit-scrollbar {
+  display: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step__dot {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  font-weight: 700;
+  background: var(--k-surface);
+  border: 2px solid var(--k-line);
+  color: var(--k-muted);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step__label {
+  font-size: 20px;
+  color: var(--k-muted);
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step[data-state='done'] .ui-kiosk-step__dot {
+  background: var(--k-teal-soft);
+  border-color: var(--k-teal);
+  color: var(--k-teal-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step[data-state='active'] .ui-kiosk-step__dot {
+  background: var(--k-teal);
+  border-color: var(--k-teal);
+  color: #fffdf8;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step[data-state='active'] .ui-kiosk-step__label {
+  color: var(--k-ink);
+  font-weight: 600;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step-line {
+  flex: 1;
+  height: 2px;
+  background: var(--k-line);
+  margin: 0 16px;
+  min-width: 40px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-step-line[data-state='done'] {
+  background: var(--k-teal);
+}
+
+/* ── 内容区 ──────────────────────────────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-page-content {
+  flex: 1;
+  padding: 0 var(--k-page-inset);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+}
+
+/* ── 底部导航 116px（三 Tab） ───────────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav {
+  height: 116px;
+  flex: none;
+  margin-top: 22px;
+  background: var(--k-dark);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(244, 241, 232, 0.55);
+  font-size: 21px;
+  letter-spacing: 2px;
+  position: relative;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav__item svg {
+  width: 34px;
+  height: 34px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav__item[aria-current='page'] {
+  color: #f4f1e8;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav__item[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  bottom: 14px;
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--k-teal);
+}
+
+/* ── 底部行动条（流程页替代导航） ───────────────────────── */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-actionbar {
+  flex: none;
+  margin-top: 22px;
+  padding: 26px var(--k-page-inset) 34px;
+  background: var(--k-surface);
+  border-top: 1px solid var(--k-line);
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-actionbar__spacer {
+  flex: 1;
+}
+
+/* ── 手机辅助页（390×844）：收窄内边距与字号 ─────────────── */
+[data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'],
+[data-kiosk-presentation='fusion-youth'] [data-kiosk-viewport='mobile'] {
+  --k-page-inset: 20px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-topbar {
+  height: 56px;
+  padding: 0 20px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand b {
+  font-size: 18px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand span,
+[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__right {
+  font-size: 14px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-pagehead {
+  padding: 20px var(--k-page-inset) 16px;
+  gap: 14px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-pagehead__titles h1 {
+  font-size: 26px;
+  letter-spacing: 1px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-pagehead__titles p {
+  font-size: 15px;
+}
+
+[data-kiosk-viewport='mobile'] .ui-kiosk-back-btn {
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 16px;
+}

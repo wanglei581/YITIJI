@@ -11,7 +11,7 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, PageHeader } from '@ai-job-print/ui'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { ChevronRightIcon, HeadphonesIcon } from 'lucide-react'
 import './help-service-desk.css'
 
@@ -150,20 +150,19 @@ export function HelpCenterPage() {
     : ALL_FAQ.filter((item) => item.categoryKey === activeFilter)
 
   return (
-    <div className="fusion-w5 fusion-w5--system service-desk k1-help-center flex h-full flex-col px-6 pt-6" data-kiosk-screen="help">
-      <div className="k1-help-topbar">
-        <PageHeader
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--system k1-help-center h-full"
+      header={
+        <KioskPageHeader
           title="帮助中心"
-          subtitle="常见问题与使用说明"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-              返回我的
-            </Button>
-          }
+          description="常见问题与使用说明"
+          onBack={() => navigate('/profile')}
+          backLabel="返回我的"
         />
-      </div>
+      }
+    >
+      <section data-kiosk-screen="help" className="flex min-h-0 flex-1 flex-col gap-4">
 
-      {/* 分类过滤 chips */}
       <div className="k1-help-filters">
         {FILTER_KEYS.map(({ key, label }) => (
           <button
@@ -177,10 +176,9 @@ export function HelpCenterPage() {
         ))}
       </div>
 
-      <div className="k1-help-scroll mt-4 flex-1 overflow-y-auto pb-8">
+      <div className="k1-help-scroll min-h-0 flex-1 overflow-y-auto pb-8">
         <div className="flex flex-col gap-4">
 
-          {/* FAQ 列表 — 2列网格，展开项占满宽度 */}
           <div className="k1-help-faq-list" aria-label="常见问题">
             {[{ key: activeFilter === 'all' ? 'all' : activeFilter, items: visibleFaq }].map(section => (
               section.items.map((item, itemIndex) => (
@@ -189,7 +187,6 @@ export function HelpCenterPage() {
             ))}
           </div>
 
-          {/* 联系现场工作人员 */}
           <div className="k1-help-contact">
             <span>
               <HeadphonesIcon aria-hidden="true" />
@@ -209,6 +206,7 @@ export function HelpCenterPage() {
           </p>
         </div>
       </div>
-    </div>
+      </section>
+    </KioskPageFrame>
   )
 }

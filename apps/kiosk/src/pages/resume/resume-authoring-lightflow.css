@@ -1,11 +1,11 @@
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow).resume-lightflow {
-  --resume-canvas: var(--sd-color-canvas-outer, #eaf3ff);
-  --resume-surface: var(--sd-color-surface, #ffffff);
-  --resume-ink: var(--sd-color-text-strong, #071a43);
-  --resume-copy: var(--sd-color-copy, #5d6f87);
-  --resume-line: var(--sd-color-line, #d9e6f6);
-  --resume-primary: var(--sd-color-primary, #1769e8);
-  --resume-primary-soft: #edf6ff;
+  --resume-canvas: var(--sd-color-canvas-outer);
+  --resume-surface: var(--sd-color-surface, var(--k-surface, var(--color-surface)));
+  --resume-ink: var(--sd-color-text-strong, var(--k-ink));
+  --resume-copy: var(--sd-color-copy);
+  --resume-line: var(--sd-color-line);
+  --resume-primary: var(--sd-color-primary, var(--k-teal));
+  --resume-primary-soft: var(--k-teal-soft);
   min-height: 100%;
   overflow: hidden;
   color: var(--resume-ink);
@@ -84,7 +84,7 @@
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__section-heading > span {
   width: 44px;
   height: 44px;
-  border: 1px solid #cfe5ff;
+  border: 1px solid var(--k-teal-soft);
   background: var(--resume-primary-soft);
 }
 
@@ -97,20 +97,20 @@
   min-height: var(--sd-control-min, 48px);
   border-color: var(--resume-line);
   border-radius: 15px;
-  background: #fbfdff;
+  background: var(--k-surface, var(--color-surface));
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__field:focus {
   border-color: var(--resume-primary);
-  background: #fff;
-  box-shadow: 0 0 0 4px rgba(23, 105, 232, .12);
+  background: var(--k-surface, var(--color-surface));
+  box-shadow: 0 0 0 4px rgba(31, 158, 134, .14);
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__entry-card {
   border: 1px solid var(--resume-line);
   border-radius: 20px;
-  background: linear-gradient(145deg, #fff, #f8fbff);
+  background: linear-gradient(145deg, var(--k-surface, var(--color-surface)), var(--k-paper, var(--color-canvas)));
   box-shadow: none;
 }
 
@@ -121,8 +121,8 @@
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__add-entry {
   min-height: var(--sd-primary-control-min, 56px);
-  border-color: #b9d8ff;
-  background: #f7fbff;
+  border-color: var(--k-teal-soft);
+  background: var(--k-paper, var(--color-canvas));
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__paper {
@@ -139,14 +139,14 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__export-card {
-  border-color: #bfe7d2;
-  background: linear-gradient(135deg, #f3fff8, #fff);
+  border-color: var(--k-teal-soft);
+  background: linear-gradient(135deg, var(--k-surface, var(--color-surface)), var(--k-surface, var(--color-surface)));
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__comparison-card > div:first-child {
   min-height: var(--sd-control-min, 48px);
   border-color: var(--resume-line);
-  background: #f8fbff;
+  background: var(--k-paper, var(--color-canvas));
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__template-card button,
@@ -181,7 +181,7 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__action-bar button:not([data-variant='secondary']) {
-  box-shadow: 0 12px 24px rgba(23, 105, 232, .2);
+  box-shadow: 0 12px 24px rgba(31, 158, 134, .18);
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow__state {
@@ -203,7 +203,7 @@
 }
 
 :is(.resume-generate-lightflow, .resume-generate-preview-lightflow, .resume-optimize-lightflow) .resume-lightflow :is(button, input, textarea, select):focus-visible {
-  outline: 3px solid rgba(23, 105, 232, .34);
+  outline: 3px solid rgba(31, 158, 134, .34);
   outline-offset: 3px;
 }
 

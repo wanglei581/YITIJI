@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import {
-  CheckIcon,
   ClockIcon,
   PrinterIcon,
 } from 'lucide-react'
@@ -11,6 +10,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { getTerminalId } from '../../services/api/screensaver'
 import { cancelScanSession, createScanSession } from '../../services/api/scanTasks'
+import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -160,11 +160,7 @@ export function ScanSettingsPage() {
       <div data-w2-page="scan-settings" className="w2-scan-shell">
         <KioskPageHeader title="扫描指引" description="扫描任务已创建，请按本机下发的指引在打印机上操作" onBack={handleBack} backLabel="上一步（取消任务）" aside={<span className="w2-scan-status-chip is-ready"><span />扫描任务已创建</span>} />
 
-        <div className="w2-scan-steps" aria-label="扫描流程">
-          {(['选择类型', '扫描指引', '扫描中', '完成'] as const).map((label, index) => (
-            <div key={label} className={index < 1 ? 'is-done' : index === 1 ? 'is-active' : ''}><span>{index < 1 ? <CheckIcon /> : index + 1}</span>{label}</div>
-          ))}
-        </div>
+        <ScanFlowSteps activeIndex={1} />
 
         <section className="w2-scan-content w2-scan-two-column">
           <section className="w2-scan-primary-card">
@@ -199,7 +195,7 @@ export function ScanSettingsPage() {
         <KioskActionBar leading={<span className="w2-scan-action-note"><ClockIcon />任务剩余 {countdown}</span>}>
           <Button variant="secondary" size="lg" onClick={handleBack}>返回（取消任务）</Button>
           <Button size="lg" disabled={!scanTaskId || !controlToken || starting} onClick={handleConfirm}>
-            <CheckIcon />{starting ? '正在进入等待…' : '我已操作，开始等待'}
+            {starting ? '正在进入等待…' : '我已操作，开始等待'}
           </Button>
         </KioskActionBar>
       </div>

@@ -60,35 +60,10 @@ expectIncludes(
   'package.json 注册 K2a 静态 verify',
 )
 
-const serviceDeskRouteList = kioskRoot.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
-const expectedServiceDeskRoutes = [
-  '/',
-  '/help',
-  '/assistant',
-  '/profile',
-  '/resume/source',
-  '/resume/parse',
-  '/resume/report',
-  '/resume/generate',
-  '/resume/generate/preview',
-  '/resume/optimize',
-  '/resume/templates',
-  '/resume/materials',
-  '/resume/export',
-]
-const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1])
-expectIncludes(kioskRoot, 'const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [', '服务台页壳声明精确路由白名单')
-expect(
-  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
-    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
-    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  '服务台页壳白名单严格等于已批准的 13 条 LightFlow 路由（含我的主入口）',
-)
-for (const route of expectedServiceDeskRoutes) {
-  expectIncludes(serviceDeskRouteList, `'${route}'`, `服务台页壳保留 ${route}`)
-}
+expectIncludes(kioskRoot, 'visualTheme="service-desk"', '服务台页壳全路由统一 service-desk')
+expectIncludes(kioskRoot, 'presentation="fusion-youth"', '服务台页壳全路由统一 fusion-youth')
+expect(!kioskRoot.includes('SERVICE_DESK_EXACT_ROUTES'), '服务台页壳已拆除精确路由白名单分叉')
 expect(!kioskRoot.includes("startsWith('/resume')"), '服务台页壳不宽泛匹配简历路径')
-expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), '服务台页壳不包含 /me/* 资料明细页')
 
 expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继续导入局部样式')
 expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')

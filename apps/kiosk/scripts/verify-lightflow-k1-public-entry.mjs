@@ -89,7 +89,8 @@ function componentRenderRoot(source, componentName) {
     if (/[$\w]/.test(body[index - 1] ?? '') || /[$\w]/.test(body[index + 6] ?? '')) continue
 
     const afterReturn = body.slice(index + 'return'.length)
-    const root = afterReturn.match(/^\s*\(\s*<(?:div|main|section)\b([\s\S]*?)>/)
+    // W19+ 部分公共页根节点改为共享 KioskPageFrame（主题由 KioskLayout 提供）。
+    const root = afterReturn.match(/^\s*\(\s*<(?:div|main|section|KioskPageFrame)\b([\s\S]*?)>/)
     if (root) return root[0]
   }
   return ''
@@ -98,11 +99,14 @@ function componentRenderRoot(source, componentName) {
 function expectPageRootClasses(source, componentName, rootClass, label) {
   const root = componentRenderRoot(source, componentName)
   const rootMatch = root.match(/className\s*=\s*(["'])([^"']*)\1/)
-  expect(rootMatch !== null, `${label}: 未找到 ${componentName} 实际 render 根节点的静态 div/main/section className`)
+  expect(rootMatch !== null, `${label}: 未找到 ${componentName} 实际 render 根节点的静态 div/main/section/KioskPageFrame className`)
   if (!rootMatch) return root
 
-  const classes = rootMatch[2].split(/\s+/)
-  expect(classes.includes('service-desk'), `${label}: 顶层 UI 缺少 service-desk class`)
+  const classes = rootMatch[2].split(/\s+/).filter(Boolean)
+  const usesSharedFrame = /<KioskPageFrame\b/.test(root)
+  if (!usesSharedFrame) {
+    expect(classes.includes('service-desk'), `${label}: 顶层 UI 缺少 service-desk class`)
+  }
   expect(classes.includes(rootClass), `${label}: 顶层 UI 缺少 ${rootClass} root class`)
   return root
 }
@@ -438,41 +442,16 @@ const externalHelpEntries = helpRouteEntries.filter(({ index }) => !childrenRang
 expect(nestedHelpEntries.length === 1 && nestedHelpEntries[0].value === 'help', '/help 只能有一个 nested path: help 精确入口')
 expect(externalHelpEntries.length === 0, 'routes 不得添加顶级 /help、/help/* 或 /help/:param 入口')
 
-const serviceDeskRouteList = kioskRoot.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
-const expectedServiceDeskRoutes = [
-  '/',
-  '/help',
-  '/assistant',
-  '/profile',
-  '/resume/source',
-  '/resume/parse',
-  '/resume/report',
-  '/resume/generate',
-  '/resume/generate/preview',
-  '/resume/optimize',
-  '/resume/templates',
-  '/resume/materials',
-  '/resume/export',
-]
-const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['\"]([^'\"]+)['\"]/g)].map((match) => match[1])
-expectIncludes(kioskRoot, 'const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [', 'KioskRoot 精确服务台白名单')
-expect(
-  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
-    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
-    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  'KioskRoot 白名单严格等于已批准的 13 条 LightFlow 路由（含我的主入口）',
-)
-for (const path of expectedServiceDeskRoutes) {
-  expectIncludes(serviceDeskRouteList, `'${path}'`, `KioskRoot 白名单保留 ${path}`)
-}
+expectIncludes(kioskRoot, 'visualTheme="service-desk"', 'KioskRoot 全路由统一 service-desk')
+expectIncludes(kioskRoot, 'presentation="fusion-youth"', 'KioskRoot 全路由统一 fusion-youth')
+expectNotIncludes(kioskRoot, 'SERVICE_DESK_EXACT_ROUTES', 'KioskRoot 已拆除服务台精确白名单分叉')
 expectNotIncludes(kioskRoot, "startsWith('/resume')", 'KioskRoot 不得宽泛匹配简历路由')
-expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), 'KioskRoot 白名单不得包含 /me/* 资料明细页')
 expectPattern(
   kioskRoot,
-  /visualTheme=\{isServiceDeskRoute\s*\?\s*'service-desk'\s*:\s*'legacy'\}/,
-  'KioskRoot visualTheme 必须只由 isServiceDeskRoute 切换',
+  /visualTheme="service-desk"/,
+  'KioskRoot visualTheme 固定为 service-desk',
 )
-expect((kioskRoot.match(/service-desk/g) ?? []).length === 1, 'KioskRoot 只能有一个 service-desk opt-in')
+expect((kioskRoot.match(/visualTheme="service-desk"/g) ?? []).length === 1, 'KioskRoot 只有一处 visualTheme 赋值')
 
 for (const [source, marker, label] of [
   [memberPhoneLoginHook, 'memberLogin(phone, code, deviceId)', '共享手机号控制器真实登录'],
@@ -520,11 +499,12 @@ expect(
 )
 
 expectNotIncludes(kioskRoot, 'label={deviceStatus}', 'KioskRoot 不得直接展示内部 deviceStatus')
-expectIncludes(kioskRoot, "useTerminalDeviceStatus(pathname !== '/')", 'KioskRoot 非首页头部必须读取真实设备状态')
+expectIncludes(kioskRoot, 'useTerminalDeviceStatus(true)', 'KioskRoot 全路由共享顶栏必须读取真实设备状态')
 expectNotIncludes(kioskRoot, "useState<DeviceStatus>('idle')", 'KioskRoot 不得把未知设备状态硬编码为 idle')
 expectPattern(kioskRoot, /const statusLabel = loading \? '设备检查中' : printerLabel/, 'KioskRoot 必须展示真实或中性的设备状态文案')
-expectPattern(kioskRoot, /kind\s*===\s*['"]unknown['"]\s*\?\s*['"]warning['"]/, 'KioskRoot 未知设备状态必须使用 warning 徽标（fail-closed）')
-expectPattern(terminalDeviceStatusHook, /export function useTerminalDeviceStatus\(enabled = true\)/, '设备状态 hook 支持首页隐藏头部时停用重复轮询')
+expectIncludes(kioskRoot, '<KioskTopbarStatus', 'KioskRoot 通过共享状态胶囊展示设备状态')
+expectPattern(kioskRoot, /kind\s*===\s*['"]unknown['"]\s*\|\|\s*kind\s*===\s*['"]low_paper['"]/, 'KioskRoot 未知/低纸状态映射 warning tone（fail-closed）')
+expectPattern(terminalDeviceStatusHook, /export function useTerminalDeviceStatus\(enabled = true\)/, '设备状态 hook 保留 enabled 门控能力')
 expectIncludes(terminalDeviceStatusHook, 'if (!enabled) return', '设备状态 hook 停用时不得发起重复请求')
 
 expectIncludes(mobileQrPage, 'k1-mobile-qr-invalid', 'MobileQrLoginPage 缺票据或失效时必须使用单一恢复状态')

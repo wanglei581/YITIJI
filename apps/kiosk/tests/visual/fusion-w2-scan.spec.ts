@@ -126,8 +126,10 @@ test('scan start blocks continuation while the device is offline @w2', async ({ 
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText('扫描仪离线', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /下一步 · 查看扫描指引/ })).toBeDisabled()
+  // 方案 B 诚实离线态：文案「扫描仪暂不可用」；设备未就绪时不渲染「下一步」履约入口。
+  await expect(page.getByText('扫描仪暂不可用', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /下一步 · 查看扫描指引/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
   await expectHealthy(page, errors)
 })
 

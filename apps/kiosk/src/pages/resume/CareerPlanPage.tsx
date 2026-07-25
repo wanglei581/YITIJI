@@ -18,6 +18,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { readAiResumeSession } from './aiResumeSession'
 import './careerPlan-lightflow.css'
+import './resume-fusion-youth.css'
 
 interface PageState {
   taskId?: string
@@ -113,7 +114,7 @@ export function CareerPlanPage() {
 
   if (!taskId) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" aria-labelledby="career-plan-gate-title">
           <span className="career-plan-lightflow__state-icon" aria-hidden="true"><CompassIcon /></span>
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
@@ -129,7 +130,7 @@ export function CareerPlanPage() {
 
   if (loading) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" role="status" aria-live="polite" aria-label="正在恢复职业规划">
           <Loader2Icon className="career-plan-lightflow__spinner" aria-hidden="true" />
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
@@ -142,7 +143,7 @@ export function CareerPlanPage() {
 
   if (plan) {
     return (
-      <KioskPageFrame className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
         <header className="career-plan-lightflow__header">
           <KioskPageHeader
             title="职业规划建议"
@@ -231,7 +232,7 @@ export function CareerPlanPage() {
   }
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume">
     <main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--guide" data-visual-theme="service-desk" data-ux-density="touch">
       <header className="career-plan-lightflow__header">
         <KioskPageHeader

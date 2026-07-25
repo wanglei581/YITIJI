@@ -7,10 +7,10 @@ import { fileURLToPath } from 'node:url'
 //
 // 硬约束（CLAUDE.md §9 不伪造能力）：
 // 1) PrintPreview 不得再内联 mapPrinterStatus / 假耗材 100% / fail-open default
-// 2) 三处 UI 统一消费 useTerminalDeviceStatus
+// 2) PrintPreview / KioskRoot /（可选）KioskDeviceStatusPills 统一消费 useTerminalDeviceStatus
 // 3) hook 必须走 API_BASE_URL + /terminals/:id/printer-status，禁止 /admin/*
 // 4) mapTerminalPrinterStatus 的 default 不得返回 isOnline:true
-// 5) HomePage 不得硬编码「打印机在线」「网络正常」
+// 5) HomePage 不得硬编码「打印机在线」「网络正常」（设备态由共享顶栏展示）
 // 6) KioskRoot 不得 useState('idle') 英文徽标
 // ============================================================
 
@@ -112,29 +112,25 @@ expectMatches(
 expectMatches(previewSrc, /tonerKnown/, 'PrintPreview 以 tonerKnown 门控耗材告警')
 expectMatches(previewSrc, /printerReady/, 'PrintPreview 以 printerReady 门控放行')
 
-expectMatches(
-  homeSrc,
-  /KioskDeviceStatusPills/,
-  'HomePage 使用 KioskDeviceStatusPills 组件',
-)
 expectNotMatches(
   homeSrc,
   /打印机在线[\s\S]{0,80}网络正常/,
   'HomePage 不得硬编码「打印机在线」+「网络正常」静态药丸',
 )
+expectNotMatches(homeSrc, /function KioskTopBar/, 'HomePage 不再自绘顶栏（设备态由共享壳展示）')
 
 expectMatches(
   pillsSrc,
   /useTerminalDeviceStatus/,
-  'KioskDeviceStatusPills 消费 useTerminalDeviceStatus',
+  'KioskDeviceStatusPills 仍消费 useTerminalDeviceStatus（备用组件）',
 )
 expectNotMatches(pillsSrc, /\/admin\//, '状态药丸组件禁止 /admin/*')
 
 expectMatches(rootSrc, /useTerminalDeviceStatus/, 'KioskRoot 消费 useTerminalDeviceStatus')
 expectMatches(
   rootSrc,
-  /useTerminalDeviceStatus\(\s*pathname\s*!==\s*['"]\/['"]\s*\)/,
-  'KioskRoot 非首页停用壳层轮询（避免与首页顶栏双请求）',
+  /useTerminalDeviceStatus\(\s*true\s*\)/,
+  'KioskRoot 共享顶栏始终轮询真实设备状态（首页不再自绘顶栏）',
 )
 expectMatches(
   hookSrc,
@@ -147,7 +143,7 @@ expectNotMatches(
   /useState<\s*DeviceStatus\s*>\(\s*['"]idle['"]\s*\)/,
   'KioskRoot 不得 useState(idle) 伪状态',
 )
-expectMatches(rootSrc, /printerLabel/, 'KioskRoot StatusBadge 使用中文 printerLabel')
+expectMatches(rootSrc, /printerLabel/, 'KioskRoot 顶栏使用中文 printerLabel')
 expectNotMatches(
   rootSrc,
   /label=\{deviceStatus\}/,

@@ -7,7 +7,7 @@
 
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, KioskPageFrame, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
 import type {
   CreateInterviewInput,
   InterviewDifficulty,
@@ -30,7 +30,7 @@ import { createInterview, startInterview } from '../../services/api/interview'
 import { kioskUploadFile } from '../../services/api/files'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { InterviewTopbar } from './InterviewTopbar'
+import { InterviewShell } from './InterviewShell'
 import './interview-service-desk.css'
 
 const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }> = [
@@ -190,15 +190,14 @@ export function InterviewSetupPage() {
   }
 
   return (
-    <KioskPageFrame className="fusion-w3 fusion-w3--interview">
+    <InterviewShell>
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-setup" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
-      <InterviewTopbar />
-      <PageHeader
+      <KioskPageHeader
         className="interview-pagehead"
         title="模拟面试"
-        subtitle="模拟练习，仅供参考 · 配置本次练习场景，进入 AI 面试间"
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
+        description="模拟练习，仅供参考 · 配置本次练习场景，进入 AI 面试间"
+        aside={
+          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
@@ -291,9 +290,8 @@ export function InterviewSetupPage() {
             <Card className="interview-card p-5">
               <SectionTitle icon={FileTextIcon} title="简历（可选）" desc="上传后面试官会结合经历提问；不上传则按通用问题练习。" />
               {resumeFile ? (
-                <div className="flex items-center justify-between rounded-xl border px-4 py-3"
-                  style={{ borderColor: 'rgba(122,90,134,.35)', background: 'var(--interview-plum-soft, #efe7f1)' }}>
-                  <span className="truncate text-sm font-medium" style={{ color: 'var(--interview-plum-deep, #63466f)' }}>{resumeFile.name}</span>
+                <div className="interview-resume-chip flex items-center justify-between rounded-xl border px-4 py-3">
+                  <span className="truncate text-sm font-medium">{resumeFile.name}</span>
                   <button
                     type="button"
                     onClick={() => setResumeFile(null)}
@@ -368,6 +366,6 @@ export function InterviewSetupPage() {
         </Button>
       </div>
     </main>
-    </KioskPageFrame>
+    </InterviewShell>
   )
 }

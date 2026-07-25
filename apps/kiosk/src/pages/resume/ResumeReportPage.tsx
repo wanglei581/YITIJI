@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, ResumeRadarChart } from '@ai-job-print/ui'
-import type { ResumeRadarDimension } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, ResumeRadarChart, Stepper } from '@ai-job-print/ui'
+import type { ResumeRadarDimension, StepperStep } from '@ai-job-print/ui'
 import { AlertCircleIcon, ArrowUpRightIcon, FileSearchIcon, SparklesIcon, TargetIcon } from 'lucide-react'
 import type { ResumeReport, ResumeTargetContext } from '@ai-job-print/shared'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -31,6 +31,13 @@ interface ReportState {
 }
 
 const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason', 'report', 'taskId', 'accessToken', 'providerName'])
+
+const RESUME_FLOW_STEPS: StepperStep[] = [
+  { title: '上传与方向' },
+  { title: 'AI 解析' },
+  { title: '诊断报告' },
+  { title: '优化打印' },
+]
 
 // 目标方向摘要文本（无方向时返回 null）
 function targetSummary(tc?: ResumeTargetContext): string | null {
@@ -209,147 +216,172 @@ export function ResumeReportPage() {
         backLabel="返回首页"
       />
 
+      <div className="resume-lightflow__stepper mt-4">
+        <Stepper steps={RESUME_FLOW_STEPS} currentIndex={2} />
+      </div>
+
       <div className="resume-report-content mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* 总分卡片 */}
-        <Card className="resume-report-summary p-4">
-          <div className="fy-score-block flex h-full flex-col items-center justify-center gap-2 text-center">
-            <div className="flex items-baseline gap-1">
-              <span className="fy-score-num">{totalScore}</span>
-              <span className="fy-score-denom">/{totalMax}</span>
-            </div>
-            <p className="max-w-[160px] text-xs leading-snug text-neutral-500">
-              参考评分，由 6 个分项汇总<br />不代表真实招聘结果
-            </p>
-            {summary && (
-              <p className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
-                <TargetIcon className="h-3 w-3" aria-hidden="true" />
-                {summary}
+        <div className="resume-report-score-row flex flex-col gap-4 lg:flex-row">
+          {/* 总分卡片 */}
+          <Card className="resume-report-summary p-4 lg:w-[220px] lg:flex-none">
+            <div className="fy-score-block flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="flex items-baseline gap-1">
+                <span className="fy-score-num">{totalScore}</span>
+                <span className="fy-score-denom">/{totalMax}</span>
+              </div>
+              <p className="max-w-[160px] text-xs leading-snug text-neutral-500">
+                参考评分，由 6 个分项汇总<br />不代表真实招聘结果
               </p>
-            )}
+              {summary && (
+                <p className="inline-flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700">
+                  <TargetIcon className="h-3 w-3" aria-hidden="true" />
+                  {summary}
+                </p>
+              )}
+            </div>
+          </Card>
+
+          {/* 能力雷达图 */}
+          <Card className="resume-report-radar min-w-0 flex-1 p-5">
+            <p className="mb-2 text-sm font-medium text-neutral-700">能力雷达图</p>
+            <ResumeRadarChart dimensions={radarDimensions} height={280} />
+          </Card>
+
+          <div className="resume-report-notice lg:w-[300px] lg:flex-none">
+            <ReportNoticePanel
+              isDemoReport={API_MODE !== 'http' || providerName === 'mock'}
+              extractionNotice={extractionNotice}
+            />
           </div>
-        </Card>
+        </div>
 
-        {/* 能力雷达图 */}
-        <Card className="resume-report-radar p-5">
-          <p className="mb-2 text-sm font-medium text-neutral-700">能力雷达图</p>
-          <ResumeRadarChart dimensions={radarDimensions} height={280} />
-        </Card>
+        <div className="resume-report-grid-a grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* 分项得分 */}
+          <Card className="resume-report-evidence p-5">
+            <p className="mb-4 text-sm font-medium text-neutral-700">分项评估</p>
+            <div className="space-y-3">
+              {report.sections.map((section) => {
+                const pct = Math.round((section.score / section.maxScore) * 100)
+                return (
+                  <div key={section.key}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-neutral-700">{section.label}</span>
+                      <span className="font-medium text-neutral-900">
+                        {section.score}/{section.maxScore}
+                      </span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
+                      <div
+                        role="progressbar"
+                        aria-label={`${section.label}得分`}
+                        aria-valuenow={section.score}
+                        aria-valuemin={0}
+                        aria-valuemax={section.maxScore}
+                        className={[
+                          'h-full rounded-full bg-primary-500 transition-all',
+                          pct < 70 ? 'fy-progress-low' : '',
+                        ].join(' ')}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
 
-        <ReportNoticePanel
-          isDemoReport={API_MODE !== 'http' || providerName === 'mock'}
-          extractionNotice={extractionNotice}
-        />
-
-        {/* 分项得分 */}
-        <Card className="resume-report-evidence p-5">
-          <p className="mb-4 text-sm font-medium text-neutral-700">分项评估</p>
-          <div className="space-y-3">
-            {report.sections.map((section) => {
-              const pct = Math.round((section.score / section.maxScore) * 100)
-              return (
-                <div key={section.key}>
-                  <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-neutral-700">{section.label}</span>
-                    <span className="font-medium text-neutral-900">
-                      {section.score}/{section.maxScore}
+          {/* 修改优先级建议：优先用真实报告 priorities；缺失（含旧 5-section 报告）回退按低分分项派生 */}
+          {llmPriorities.length > 0 ? (
+            <Card className="resume-report-priorities p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+                <p className="text-sm font-medium text-neutral-700">修改优先级建议</p>
+              </div>
+              <p className="mb-3 text-xs text-neutral-400">按重要性排序，供本人修改简历参考</p>
+              <div className="space-y-2.5">
+                {llmPriorities.map((item, i) => (
+                  <div key={i} className="fy-pri-item flex gap-3">
+                    <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {i + 1}
                     </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-neutral-800">{item.focus}</p>
+                      {item.reason && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.reason}</p>}
+                    </div>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-neutral-100">
-                    <div
-                      role="progressbar"
-                      aria-label={`${section.label}得分`}
-                      aria-valuenow={section.score}
-                      aria-valuemin={0}
-                      aria-valuemax={section.maxScore}
-                      className={[
-                        'h-full rounded-full bg-primary-500 transition-all',
-                        pct < 70 ? 'fy-progress-low' : '',
-                      ].join(' ')}
-                      style={{ width: `${pct}%` }}
-                    />
+                ))}
+              </div>
+            </Card>
+          ) : priorityItems.length > 0 ? (
+            <Card className="resume-report-priorities p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+                <p className="text-sm font-medium text-neutral-700">优先修改项</p>
+              </div>
+              <p className="mb-3 text-xs text-neutral-400">得分率偏低的分项，建议优先调整表达与内容结构</p>
+              <div className="space-y-2.5">
+                {priorityItems.map((item, i) => (
+                  <div key={item.key} className="fy-pri-item flex items-center gap-3">
+                    <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {i + 1}
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-neutral-800">{item.label}</span>
+                    <span className="text-sm font-bold text-neutral-500">{item.pct}%</span>
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        </Card>
-
-        {/* 修改优先级建议：优先用真实报告 priorities；缺失（含旧 5-section 报告）回退按低分分项派生 */}
-        {llmPriorities.length > 0 ? (
-          <Card className="resume-report-priorities p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <Card className="resume-report-priorities p-5">
               <p className="text-sm font-medium text-neutral-700">修改优先级建议</p>
-            </div>
-            <p className="mb-3 text-xs text-neutral-400">按重要性排序，供本人修改简历参考</p>
-            <div className="space-y-2.5">
-              {llmPriorities.map((item, i) => (
-                <div key={i} className="fy-pri-item flex gap-3">
-                  <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold text-neutral-800">{item.focus}</p>
-                    {item.reason && <p className="mt-1 text-xs leading-relaxed text-neutral-500">{item.reason}</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : priorityItems.length > 0 ? (
-          <Card className="resume-report-priorities p-5">
-            <div className="mb-3 flex items-center gap-2">
-              <ArrowUpRightIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-              <p className="text-sm font-medium text-neutral-700">优先修改项</p>
-            </div>
-            <p className="mb-3 text-xs text-neutral-400">得分率偏低的分项，建议优先调整表达与内容结构</p>
-            <div className="space-y-2.5">
-              {priorityItems.map((item, i) => (
-                <div key={item.key} className="fy-pri-item flex items-center gap-3">
-                  <span className="fy-pri-no flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold">
-                    {i + 1}
-                  </span>
-                  <span className="flex-1 text-sm font-medium text-neutral-800">{item.label}</span>
-                  <span className="text-sm font-bold text-neutral-500">{item.pct}%</span>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : null}
+              <p className="mt-2 text-sm text-neutral-500">当前报告未给出独立优先级清单，可参考分项评估中的低分项。</p>
+            </Card>
+          )}
+        </div>
 
-        {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染 */}
-        {riskNotes.length > 0 && (
-          <Card className="resume-report-risks p-5">
-            <div className="mb-2 flex items-center gap-2">
-              <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-              <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
-            </div>
-            <p className="mb-3 text-xs text-neutral-400">仅针对简历文本表达，不涉及身份信息判断；供本人修改参考</p>
-            <ul className="space-y-2">
-              {riskNotes.map((note, i) => (
-                <li key={i} className="flex gap-2 text-sm text-neutral-600">
-                  <span className="fy-dot-clay mt-2 h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
-                  <span>{note}</span>
+        <div className="resume-report-grid-b grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染 */}
+          {riskNotes.length > 0 ? (
+            <Card className="resume-report-risks p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+                <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
+              </div>
+              <p className="mb-3 text-xs text-neutral-400">仅针对简历文本表达，不涉及身份信息判断；供本人修改参考</p>
+              <ul className="space-y-2">
+                {riskNotes.map((note, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-neutral-600">
+                    <span className="fy-dot-clay mt-2 h-2 w-2 shrink-0 rounded-full" aria-hidden="true" />
+                    <span>{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : (
+            <Card className="resume-report-risks p-5">
+              <div className="mb-2 flex items-center gap-2">
+                <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
+                <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
+              </div>
+              <p className="text-sm text-neutral-500">本报告未单独列出风险表述项。</p>
+            </Card>
+          )}
+
+          {/* 优化建议 */}
+          <Card className="resume-report-suggestions p-5">
+            <p className="mb-4 text-sm font-medium text-neutral-700">可执行建议</p>
+            <ol className="space-y-3">
+              {report.suggestions.map((tip, i) => (
+                <li key={i} className="flex gap-3 text-sm text-neutral-600">
+                  <span className="fy-sug-no flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
+                    {i + 1}
+                  </span>
+                  <span className="flex-1 leading-relaxed">{tip}</span>
                 </li>
               ))}
-            </ul>
+            </ol>
           </Card>
-        )}
-
-        {/* 优化建议 */}
-        <Card className="resume-report-suggestions p-5">
-          <p className="mb-4 text-sm font-medium text-neutral-700">可执行建议</p>
-          <ol className="space-y-3">
-            {report.suggestions.map((tip, i) => (
-              <li key={i} className="flex gap-3 text-sm text-neutral-600">
-                <span className="fy-sug-no flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-100 text-xs font-semibold text-primary-700">
-                  {i + 1}
-                </span>
-                <span className="flex-1 leading-relaxed">{tip}</span>
-              </li>
-            ))}
-          </ol>
-        </Card>
+        </div>
 
         {/* 合规声明 */}
         <p className="px-1 pb-1 text-center text-xs leading-relaxed text-neutral-400">

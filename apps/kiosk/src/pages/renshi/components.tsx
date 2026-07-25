@@ -46,20 +46,14 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
   ]
 
   return (
-    <div className="flex shrink-0 gap-3">
+    <div className="k8-policy-tabs">
       {tabs.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           type="button"
           onClick={() => onChange(key)}
           aria-pressed={active === key}
-          className={[
-            'flex min-h-[58px] flex-1 items-center justify-center gap-2 rounded-full border px-5 text-[20px] transition-colors active:scale-[.98]',
-            active === key
-              ? 'font-semibold text-wheat-fg bg-wheat-bg'
-              : 'border-neutral-200 bg-surface font-medium text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
-          ].join(' ')}
-          style={active === key ? { borderColor: 'rgba(169,120,31,.50)' } : undefined}
+          className="k8-policy-tab"
         >
           <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
           {label}
@@ -73,32 +67,23 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (k: Tab
 export function AudienceFilter({ value, onChange }: { value: AudienceKey; onChange: (k: AudienceKey) => void }) {
   return (
     <div className="shrink-0">
-      <p className="text-[20px] font-semibold text-neutral-900">
+      <p className="k8-policy-aud-cap">
         先选你的情况
-        <span className="ml-3 text-[16px] font-normal text-neutral-500">选择身份后自动筛出更相关的政策事项，通用事项始终展示</span>
+        <small>选择身份后自动筛出更相关的政策事项，通用事项始终展示</small>
       </p>
-      <div className="mt-3 flex flex-wrap gap-2.5">
-        {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => {
-          const activeChip = value === key
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onChange(key)}
-              aria-pressed={activeChip}
-              className={[
-                'flex min-h-[56px] items-center justify-center gap-2 rounded-full border px-6 text-[19px] transition-colors active:scale-[.98]',
-                activeChip
-                  ? 'font-semibold text-wheat-fg bg-wheat-bg'
-                  : 'border-neutral-200 bg-white font-medium text-neutral-600 hover:border-neutral-300',
-              ].join(' ')}
-              style={activeChip ? { borderColor: 'rgba(169,120,31,.50)' } : undefined}
-            >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-              {label}
-            </button>
-          )
-        })}
+      <div className="k8-policy-aud-chips">
+        {AUDIENCE_CHIPS.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onChange(key)}
+            aria-pressed={value === key}
+            className="k8-policy-aud-chip"
+          >
+            <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   )

@@ -18,7 +18,6 @@ import {
   MicIcon,
   NavigationIcon,
   PenToolIcon,
-  PrinterIcon,
   QrCodeIcon,
   SparklesIcon,
 } from 'lucide-react'
@@ -118,18 +117,17 @@ export function OverviewTab({
   )
 
   return (
-    <div className="flex flex-col gap-[18px] px-12 py-[22px]">
-      {/* 数据 band — 4格 wheat-soft */}
-      <div className="kproto-grid-4">
+    <div className="campus-tab-pane">
+      <div className="kproto-grid-4 campus-band4">
         {[
           { v: String(companyCount), l: '参展企业' },
           { v: `${jobCount}+`, l: '招聘岗位' },
           { v: THEME_STAT_LABELS[fair.theme ?? ''] ?? '综合', l: '活动类型' },
           { v: industryCount > 0 ? `${industryCount}+` : '—', l: '行业覆盖' },
         ].map(({ v, l }) => (
-          <div key={l} className="rounded-[14px] border border-[rgba(169,120,31,.3)] bg-[var(--kp-wheat-soft)] p-[18px] text-center">
-            <b className="block font-serif text-[34px] font-black text-[var(--kp-wheat-deep)] tabular-nums">{v}</b>
-            <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">{l}</span>
+          <div key={l} className="campus-band-cell">
+            <b>{v}</b>
+            <span>{l}</span>
           </div>
         ))}
       </div>
@@ -171,22 +169,21 @@ export function OverviewTab({
           <span className="kproto-icon"><LayersIcon aria-hidden="true" /></span>
           <div><h2>现场服务快捷入口</h2></div>
         </div>
-        <div className="kproto-grid-4">
+        <div className="kproto-grid-4 campus-qk4">
           {[
-            { icon: BuildingIcon, title: '参展企业查询', sub: `${companyCount} 家企业`, tab: 'companies' as TabKey },
-            { icon: NavigationIcon, title: '招聘会导览图', sub: '展位地图 / 日程', tab: 'map' as TabKey },
-            { icon: BriefcaseIcon, title: 'AI智能求职', sub: '简历 / 面试 / 准备单', tab: 'ai' as TabKey },
-            { icon: PrinterIcon, title: '自助打印服务', sub: '简历 / 活动资料', tab: 'print' as TabKey },
+            { title: '参展企业查询', sub: `${companyCount} 家企业`, tab: 'companies' as TabKey },
+            { title: '招聘会导览图', sub: '展位地图 / 日程', tab: 'map' as TabKey },
+            { title: 'AI智能求职', sub: '简历 / 面试 / 准备单', tab: 'ai' as TabKey },
+            { title: '自助打印服务', sub: '简历 / 活动资料', tab: 'print' as TabKey },
           ].map(({ title, sub, tab }) => (
             <button
               key={tab}
               type="button"
               onClick={() => onGoTab(tab)}
-              className="kproto-tile flex flex-col items-start justify-center gap-2"
-              style={{ background: 'var(--kp-wheat-soft)', borderColor: 'rgba(169,120,31,.3)', minHeight: 112 }}
+              className="kproto-tile"
             >
-              <b className="text-[23px] font-semibold">{title}</b>
-              <span className="text-[17px] text-[var(--kp-muted)]">{sub}</span>
+              <b>{title}</b>
+              <span>{sub}</span>
             </button>
           ))}
         </div>
@@ -208,18 +205,20 @@ export function OverviewTab({
                 key={c.id}
                 type="button"
                 onClick={() => navigate(`/job-fairs/${fair.id}/companies/${c.id}`)}
-                className="flex min-h-[92px] items-center gap-4 rounded-[14px] border border-[var(--kp-line)] bg-[var(--kp-paper)] px-5 py-3.5 text-left"
+                className="campus-hot-row"
               >
-                <span className="grid h-[58px] w-[58px] shrink-0 place-items-center rounded-[12px] bg-[var(--kp-wheat-soft)] font-serif text-[26px] font-bold text-[var(--kp-wheat-deep)]">
+                <span className="campus-hot-logo">
                   {c.companyName.slice(0, 1)}
                 </span>
-                <div className="min-w-0 flex-1">
+                <span className="min-w-0 flex-1">
                   <b className="block text-[22px] font-bold">{c.companyName}</b>
                   <span className="mt-1 block truncate text-[17px] text-[var(--kp-muted)]">
-                    {c.positions.slice(0, 3).map((p) => p.title).join(' · ') || industryLabel(c.industry)}
+                    {c.positions.slice(0, 3).map((p) => p.title).join(' · ')}
                   </span>
-                </div>
-                <span className="shrink-0 text-[18px] font-bold text-[var(--kp-wheat-deep)] tabular-nums">{c.positions.length} 个岗位</span>
+                </span>
+                <span className="shrink-0 text-[18px] font-bold tabular-nums text-[var(--kp-wheat-deep)]">
+                  {c.positions.length} 个岗位
+                </span>
               </button>
             ))}
           </div>
@@ -390,7 +389,7 @@ export function MapTab({
   const boothZones = zones.filter((z) => z.category !== 'innovation')
 
   return (
-    <div className="space-y-4 px-5 py-4">
+    <div className="campus-tab-pane space-y-4">
       {/* 场馆地图 */}
       <Card className="overflow-hidden p-0">
         <div className="h-48 w-full">
@@ -473,7 +472,7 @@ function AiFeatureCard({
 export function AiJobTab() {
   const navigate = useNavigate()
   return (
-    <div className="space-y-4 px-5 py-4">
+    <div className="campus-tab-pane space-y-4">
       <div className="rounded-2xl bg-gradient-to-br from-plum to-plum p-5 text-white">
         <p className="text-lg font-bold">AI智能求职助手</p>
         <p className="mt-1 text-sm text-white/80">四大 AI 功能，全方位助力你的求职之路</p>
@@ -493,7 +492,7 @@ export function AiJobTab() {
 export function PrintTab({ onPrintMaterial }: { onPrintMaterial: () => void }) {
   const navigate = useNavigate()
   return (
-    <div className="space-y-4 px-5 py-4">
+    <div className="campus-tab-pane space-y-4">
       <div className="rounded-2xl bg-gradient-to-br from-success-fg to-success p-5 text-white">
         <p className="text-lg font-bold">自助打印服务</p>
         <p className="mt-1 text-sm text-white/80">简历、通知单、活动资料，现场快速打印。</p>

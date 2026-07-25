@@ -192,7 +192,12 @@ else fail('profile-inkpaper.css 必须只保留 shell/directory/state 三份局�
 for (let index = 0; index < profileCssPaths.length; index += 1) {
   checkScopedCss(profileCssPaths[index], profileCss[index])
 }
-expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*#eaf5ff/, 'CSS 定义冰蓝服务台底色变量')
+// 方案 B：Profile 画布绑定 fusion 语义 token（--k-surface），不再锁定冰蓝裸 hex。
+expectMatches(
+  combinedProfileCss,
+  /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*var\(--k-surface/,
+  'CSS 定义融合壳画布底色变量（绑定 --k-surface）',
+)
 expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s+\.k-ripple/, 'CSS 定义局部点击涟漪')
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS 保留 56px 主操作触控高度')
 expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS 保留 48px 次操作触控高度')
@@ -280,7 +285,12 @@ for (const [label, source] of [
   expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
 }
 
-expectMatches(detailCss, /\.me-inkdetail\s*\{[\s\S]*--paper:\s*#f4f1e8/, '明细页 CSS 定义米纸底色变量')
+// 方案 B：明细页纸面绑定 --k-paper / --color-canvas，不再锁定米纸裸 hex。
+expectMatches(
+  detailCss,
+  /\.me-inkdetail\s*\{[\s\S]*--paper:\s*var\(--k-paper/,
+  '明细页 CSS 定义融合壳纸面底色变量（绑定 --k-paper）',
+)
 expectMatches(detailCss, /\.me-inkdetail::before/, '明细页 CSS 使用局部纸纹层')
 expectMatches(detailCss, /\.me-inkdetail \.k-ripple/, '明细页 CSS 定义局部墨水涟漪')
 expectAbsent(detailCss, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '明细页 CSS 不污染其他墨青页面作用域')

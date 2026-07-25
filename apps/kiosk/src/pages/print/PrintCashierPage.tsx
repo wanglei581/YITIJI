@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, KioskActionBar } from '@ai-job-print/ui'
-import { AlertCircleIcon, CreditCardIcon, FileTextIcon, InfoIcon, QrCodeIcon, ScanLineIcon, XCircleIcon } from 'lucide-react'
+import { AlertCircleIcon, CreditCardIcon, FileTextIcon, InfoIcon, QrCodeIcon, RefreshCwIcon, ScanLineIcon, XCircleIcon } from 'lucide-react'
 import type { PrintJobParams, PrintPriceLine } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
@@ -399,16 +399,23 @@ export function PrintCashierPage() {
   const total = formatCents(amountCents)
   const canProceed = view?.canProceed ?? false
   const canReissue = view?.canReissue ?? false
+  const isPaymentFailed = view != null && ['failed', 'closed', 'refunded'].includes(view.phase)
 
   return (
     <PrintPageFrame>
     <div data-w2-page="print-cashier" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
         title="订单支付"
-        subtitle="请完成支付后开始打印；支付结果由系统自动确认"
+        subtitle={isPaymentFailed ? '本次支付未成功；未产生扣款，也未创建打印任务' : '请完成支付后开始打印；支付结果由系统自动确认'}
         step={6}
         backLabel="返回确认"
         onBack={() => navigate('/print/confirm', { state })}
+        aside={isPaymentFailed ? (
+          <span className="cashier-status-badge">
+            <XCircleIcon aria-hidden="true" />
+            支付未成功
+          </span>
+        ) : undefined}
       />
 
       <div className="cashier-split mt-4 flex-1">
@@ -460,24 +467,44 @@ export function PrintCashierPage() {
 
           {/* 支付与退款规则 */}
           <div className="cashier-rule-card">
-            <h3>支付与退款规则</h3>
+            <h3>{isPaymentFailed ? '为什么支付会失败？' : '支付与退款规则'}</h3>
             <ul>
-              <li>屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。</li>
-              <li>付款码支付如提示待核实，请勿重复扫码，等待系统查单。</li>
-              <li>订单超时未支付将自动关闭，不会扣款。</li>
-              <li>如需退款请联系现场工作人员协助处理，本机不提供自助退款。</li>
+              {isPaymentFailed ? (
+                <>
+                  <li>收款码超过 5 分钟有效期未完成支付，或中途取消。</li>
+                  <li>手机网络中断、余额不足，或支付平台返回失败。</li>
+                  <li>支付平台提示「待核实」时请勿重复扫码，可点「重新支付」重新出码。</li>
+                  <li>如手机已扣款但此处仍显示未成功，请勿再次支付，立即联系现场工作人员核实。</li>
+                </>
+              ) : (
+                <>
+                  <li>屏上收款码有效期 5 分钟；到期后重新出码或切换支付方式会先关闭旧码。</li>
+                  <li>付款码支付如提示待核实，请勿重复扫码，等待系统查单。</li>
+                  <li>订单超时未支付将自动关闭，不会扣款。</li>
+                  <li>如需退款请联系现场工作人员协助处理，本机不提供自助退款。</li>
+                </>
+              )}
             </ul>
           </div>
 
           {/* 提示条 */}
-          <div className="cashier-notice">
-            <InfoIcon aria-hidden="true" />
-            支付完成后自动进入打印，请勿离开；若长时间未响应，请联系现场工作人员。
-          </div>
+          {isPaymentFailed ? (
+            <div className="cashier-notice-warn">
+              <InfoIcon aria-hidden="true" />
+              支付未完成前不会开始打印；你的文件仍保留在本次会话中，可重新支付或退出。
+            </div>
+          ) : (
+            <div className="cashier-notice">
+              <InfoIcon aria-hidden="true" />
+              支付完成后自动进入打印，请勿离开；若长时间未响应，请联系现场工作人员。
+            </div>
+          )}
         </div>
 
         {/* ── 右列：通道 + 方式 + 收款码 ── */}
-        <div className="cashier-pay-card">
+        <div className={`cashier-pay-card${isPaymentFailed ? ' cashier-pay-card--failed' : ''}`}>
+          {!isPaymentFailed && (
+            <>
           <div className="cashier-card-head">
             <span className="cashier-card-icon">
               <CreditCardIcon aria-hidden="true" />
@@ -529,6 +556,8 @@ export function PrintCashierPage() {
               扫付款码
             </button>
           </div>
+            </>
+          )}
 
           <CashierPaymentPanel
             paymentMethod={paymentMethod}
@@ -565,14 +594,23 @@ export function PrintCashierPage() {
       <KioskActionBar className="cashier-actionbar">
         <button type="button" className="cashier-btn-ghost" onClick={() => navigate('/')}>
           <XCircleIcon aria-hidden="true" />
-          退出支付
+          {isPaymentFailed ? '退出 · 不打印' : '退出支付'}
         </button>
         <span className="cashier-bar-note">
-          支付确认到账后自动进入打印；退出后订单超时未支付将自动关闭，不会扣款
+          {isPaymentFailed
+            ? '退出后订单自动关闭，不会扣款；文件在本次会话结束后清理'
+            : '支付确认到账后自动进入打印；退出后订单超时未支付将自动关闭，不会扣款'}
         </span>
-        <button type="button" className="cashier-btn-primary" disabled={!canProceed} onClick={proceedToPrint}>
-          {canProceed ? '开始打印' : '等待支付…'}
-        </button>
+        {canReissue ? (
+          <button type="button" className="cashier-btn-primary" onClick={handleReissue}>
+            <RefreshCwIcon aria-hidden="true" style={{ width: 24, height: 24 }} />
+            重新支付
+          </button>
+        ) : (
+          <button type="button" className="cashier-btn-primary" disabled={!canProceed} onClick={proceedToPrint}>
+            {canProceed ? '开始打印' : '等待支付…'}
+          </button>
+        )}
       </KioskActionBar>
     </div>
     </PrintPageFrame>
@@ -582,17 +620,21 @@ export function PrintCashierPage() {
 // ── 守卫 / 直达占位屏 ──
 function GuardScreen(props: { title: string; hint: string; actionLabel: string; onAction: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-        <AlertCircleIcon className="h-10 w-10 text-warning" />
+    <PrintPageFrame>
+      <div data-w2-page="print-cashier" className="print-confirm-body">
+        <div className="print-confirm-guard">
+          <div className="print-confirm-guard-icon">
+            <AlertCircleIcon aria-hidden="true" />
+          </div>
+          <div>
+            <p className="print-confirm-guard-title">{props.title}</p>
+            <p className="print-confirm-guard-hint">{props.hint}</p>
+          </div>
+          <Button size="lg" onClick={props.onAction}>
+            {props.actionLabel}
+          </Button>
+        </div>
       </div>
-      <div className="text-center">
-        <p className="text-lg font-semibold text-neutral-900">{props.title}</p>
-        <p className="mt-2 text-sm text-neutral-500">{props.hint}</p>
-      </div>
-      <Button size="lg" onClick={props.onAction}>
-        {props.actionLabel}
-      </Button>
-    </div>
+    </PrintPageFrame>
   )
 }

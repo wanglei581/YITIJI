@@ -115,6 +115,16 @@ export function MyResumesPage() {
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
+        aside={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/resume/source')}>
+              去上传简历
+            </Button>
+            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+          </div>
+        }
       >
         <section className="me-detail-summary" aria-label="简历记录概览">
           <span className="me-summary-icon me-tone-teal" aria-hidden="true">

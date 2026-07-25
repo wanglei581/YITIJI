@@ -122,8 +122,6 @@ const profileCssFiles = [
 const profileCss = profileCssFiles.map((path) => read(path))
 const combinedProfileCss = profileCss.join('\n')
 const kioskRootSource = read('src/layouts/KioskRoot.tsx')
-const serviceDeskRouteList = kioskRootSource.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
-
 expectIncludes(
   packageJson,
   '"verify:lightflow-profile-entry": "node scripts/verify-lightflow-profile-entry.mjs"',
@@ -144,8 +142,9 @@ expectNotIncludes(header, 'lf-reference-', 'ProfileHeader does not reuse homepag
 expectNotIncludes(section, 'lf-reference-', 'ProfileEntrySection does not reuse homepage service-card primitives')
 expectNotIncludes(sessionRecords, 'lf-reference-', 'ProfileSessionRecords does not reuse homepage service-card primitives')
 expectNotIncludes(header, '<h1>我的', 'ProfileHeader does not render a visible 我的 page title')
-expectIncludes(serviceDeskRouteList, "'/profile'", 'KioskRoot opts the /profile landing page into the LightFlow shell')
-expectNotIncludes(serviceDeskRouteList, "'/me'", 'KioskRoot does not opt /me/* detail routes into LightFlow')
+expectIncludes(kioskRootSource, 'visualTheme="service-desk"', 'KioskRoot keeps /profile on the unified service-desk shell')
+expectIncludes(kioskRootSource, 'presentation="fusion-youth"', 'KioskRoot keeps fusion-youth presentation for profile')
+expectNotIncludes(kioskRootSource, 'SERVICE_DESK_EXACT_ROUTES', 'KioskRoot no longer maintains a LightFlow route whitelist')
 
 const profileHeaderMountIndex = profile.indexOf('<ProfileHeader')
 const pendingTaskMountIndex = profile.indexOf('{isLoggedIn && hasSessionRecords && <PendingTaskBanner')
@@ -323,6 +322,10 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
+  // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
+  'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',

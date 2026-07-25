@@ -4,24 +4,24 @@
 }
 
 .kproto {
-  --kp-paper: #f4f1e8;
-  --kp-surface: #fffdf8;
-  --kp-ink: #10302b;
-  --kp-muted: #5d6b63;
-  --kp-line: #e2dccb;
-  --kp-teal: #1f9e86;
-  --kp-teal-deep: #157a67;
-  --kp-teal-soft: #e2f2ec;
-  --kp-clay: #b8683c;
-  --kp-clay-deep: #9e5330;
-  --kp-clay-soft: #f4e8dd;
-  --kp-wheat: #a9781f;
-  --kp-wheat-deep: #8a6219;
-  --kp-wheat-soft: #f2ead6;
-  --kp-plum: #7a5a86;
-  --kp-plum-deep: #63466f;
-  --kp-plum-soft: #efe7f1;
-  --kp-dark: #10302b;
+  --kp-paper: var(--k-paper, var(--color-canvas));
+  --kp-surface: var(--k-surface, var(--color-surface));
+  --kp-ink: var(--k-ink);
+  --kp-muted: var(--k-muted);
+  --kp-line: var(--k-line);
+  --kp-teal: var(--k-teal);
+  --kp-teal-deep: var(--k-teal-deep);
+  --kp-teal-soft: var(--k-teal-soft);
+  --kp-clay: var(--color-warning);
+  --kp-clay-deep: var(--color-warning-fg);
+  --kp-clay-soft: var(--color-warning-bg);
+  --kp-wheat: var(--color-wheat);
+  --kp-wheat-deep: var(--color-wheat-deep);
+  --kp-wheat-soft: var(--color-wheat-soft);
+  --kp-plum: var(--color-plum);
+  --kp-plum-deep: var(--color-plum-deep);
+  --kp-plum-soft: var(--color-plum-soft);
+  --kp-dark: var(--k-ink);
   --kp-accent: var(--kp-teal);
   --kp-accent-deep: var(--kp-teal-deep);
   --kp-accent-soft: var(--kp-teal-soft);
@@ -277,7 +277,7 @@ button.kproto-badge {
   min-height: 72px;
   border-color: var(--kp-accent);
   background: var(--kp-accent);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   box-shadow: 0 6px 18px color-mix(in srgb, var(--kp-accent) 25%, transparent);
 }
 
@@ -285,7 +285,7 @@ button.kproto-badge {
   min-height: 72px;
   border-color: var(--kp-dark);
   background: var(--kp-dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
 }
 
 .kproto-btn.sm {
@@ -354,7 +354,7 @@ button.kproto-badge {
 .kproto-tile.primary .tile-icon {
   border: 0;
   background: var(--kp-accent);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .kproto-tile b {
@@ -418,42 +418,38 @@ button.kproto-badge {
   }
 }
 
+/* Campus (/campus) immersive layout: bleed under KioskPageFrame, single chrome above hero. */
+.w4-page-content:has(.campus-proto) {
+  min-height: 0;
+  flex: 1;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.jf-proto.w4-page-frame:has(.campus-proto) .ui-kiosk-pagehead {
+  padding-bottom: 18px;
+}
+
 .campus-proto {
   --kp-accent: var(--kp-wheat);
   --kp-accent-deep: var(--kp-wheat-deep);
   --kp-accent-soft: var(--kp-wheat-soft);
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
   background: var(--kp-paper);
   color: var(--kp-ink);
-}
-
-.campus-proto .campus-topbar {
-  display: flex;
-  height: 76px;
-  flex: none;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--kp-dark);
-  color: #f4f1e8;
-  padding: 0 44px;
-}
-
-.campus-proto .campus-topbar b {
-  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
-  font-size: 26px;
-  letter-spacing: 1px;
-}
-
-.campus-proto .campus-topbar span {
-  opacity: .65;
 }
 
 .campus-proto .campus-hero {
   flex: none;
   overflow: hidden;
   position: relative;
-  background: var(--kp-dark) !important;
-  color: #f4f1e8;
-  padding: 26px 48px 30px;
+  background: var(--kp-dark);
+  color: var(--k-paper, var(--color-canvas));
+  padding: 16px 48px 30px;
 }
 
 .campus-proto .campus-hero::after {
@@ -467,48 +463,112 @@ button.kproto-badge {
   background: radial-gradient(circle, rgba(169, 120, 31, .35), transparent 70%);
 }
 
-.campus-proto .campus-hero button,
 .campus-proto .campus-hero .campus-date {
+  display: inline-flex;
+  align-items: center;
   min-height: 56px;
   border: 1px solid rgba(244, 241, 232, .25);
-  border-radius: 14px;
+  border-radius: 999px;
   background: rgba(244, 241, 232, .12);
-  color: #f4f1e8;
-  padding: 0 22px;
+  color: var(--k-paper, var(--color-canvas));
+  padding: 10px 22px;
   font-size: 21px;
+  font-variant-numeric: tabular-nums;
 }
 
 .campus-proto .campus-hero h1 {
+  margin-top: 20px;
   font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
   font-size: 40px;
   font-weight: 900;
   letter-spacing: 2px;
+  line-height: 1.22;
+  position: relative;
 }
 
 .campus-proto .campus-status {
-  background: rgba(169, 120, 31, .4) !important;
-  color: #f2ead6 !important;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 16px;
+  border: 1px solid rgba(169, 120, 31, .6);
+  border-radius: 999px;
+  background: rgba(169, 120, 31, .4);
+  color: var(--color-wheat-soft);
+  padding: 5px 16px;
+  font-size: 18px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.campus-proto .campus-hero .tagline {
+  margin-top: 10px;
+  font-size: 21px;
+  opacity: .75;
+}
+
+.campus-proto .campus-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 30px;
+  margin-top: 16px;
+  font-size: 20px;
+  opacity: .9;
+}
+
+.campus-proto .campus-hero-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.campus-proto .campus-hero-meta svg {
+  width: 20px;
+  height: 20px;
+  opacity: .8;
 }
 
 .campus-proto .campus-tabs {
+  display: flex;
   flex: none;
   background: var(--kp-surface);
   border-bottom: 2px solid var(--kp-line);
 }
 
-.campus-proto .campus-tabs button {
+.campus-proto .campus-tab {
+  position: relative;
+  display: flex;
   min-height: 86px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: none;
   color: var(--kp-muted);
+  font-family: var(--kp-sans, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif);
   font-size: 19px;
+  cursor: pointer;
 }
 
-.campus-proto .campus-tabs button[aria-pressed="true"] {
+.campus-proto .campus-tab svg {
+  width: 26px;
+  height: 26px;
+}
+
+.campus-proto .campus-tab[aria-pressed="true"] {
   color: var(--kp-wheat-deep);
-  font-weight: 800;
+  font-weight: 700;
 }
 
-.campus-proto .campus-tabs button[aria-pressed="true"] span:last-child {
+.campus-proto .campus-tab[aria-pressed="true"]::after {
+  content: "";
+  position: absolute;
+  right: 26%;
+  bottom: -2px;
+  left: 26%;
   height: 4px;
+  border-radius: 3px;
   background: var(--kp-wheat);
 }
 
@@ -516,4 +576,209 @@ button.kproto-badge {
   flex: 1 1 auto;
   overflow-y: auto;
   background: var(--kp-paper);
+}
+
+.campus-proto .campus-tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 48px 28px;
+}
+
+.campus-proto .campus-band4 .campus-band-cell {
+  border: 1px solid rgba(169, 120, 31, .3);
+  border-radius: var(--kp-r-sm, 14px);
+  background: var(--kp-wheat-soft);
+  padding: 18px;
+  text-align: center;
+}
+
+.campus-proto .campus-band4 .campus-band-cell b {
+  display: block;
+  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-size: 34px;
+  font-weight: 900;
+  color: var(--kp-wheat-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.campus-proto .campus-band4 .campus-band-cell span {
+  display: block;
+  margin-top: 4px;
+  color: var(--kp-muted);
+  font-size: 17px;
+}
+
+.campus-proto .campus-qk4 .kproto-tile {
+  min-height: 112px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+  border-color: rgba(169, 120, 31, .3);
+  background: var(--kp-wheat-soft);
+}
+
+.campus-proto .campus-qk4 .kproto-tile b {
+  display: block;
+  font-size: 23px;
+  font-weight: 600;
+}
+
+.campus-proto .campus-qk4 .kproto-tile span {
+  display: block;
+  margin-top: 4px;
+  color: var(--kp-muted);
+  font-size: 17px;
+}
+
+.campus-proto .campus-hot-row {
+  display: flex;
+  min-height: 92px;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid var(--kp-line);
+  border-radius: var(--kp-r-sm, 14px);
+  background: var(--kp-paper);
+  padding: 14px 20px;
+  color: var(--kp-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.campus-proto .campus-hot-logo {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  flex: none;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--kp-wheat-soft);
+  color: var(--kp-wheat-deep);
+  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+/* Smart campus (/smart-campus) — proto 51 mod grid density */
+.sc-mod-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.sc-mod {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--kp-line);
+  border-radius: var(--kp-r-md, 18px);
+  background: var(--kp-surface);
+  padding: 26px 28px;
+  color: var(--kp-ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 14px rgba(16, 48, 43, .05);
+}
+
+.sc-mod:active:not(:disabled) {
+  transform: scale(.985);
+}
+
+.sc-mod:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.sc-mod-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--kp-accent-soft);
+  color: var(--kp-accent-deep);
+}
+
+.sc-mod-icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+.sc-mod-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.sc-mod-title b {
+  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.sc-mod-tag {
+  border: 1px solid color-mix(in srgb, var(--kp-accent) 30%, transparent);
+  border-radius: 999px;
+  background: var(--kp-accent-soft);
+  color: var(--kp-accent-deep);
+  padding: 3px 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sc-mod p {
+  flex: 1;
+  margin-top: 4px;
+  color: var(--kp-muted);
+  font-size: 19px;
+  line-height: 1.5;
+}
+
+.sc-mod-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--kp-accent-deep);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sc-mod-go svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sc-ext-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sc-ext-head h2 {
+  font-family: var(--kp-serif, "Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.sc-ext-head span {
+  color: var(--kp-muted);
+  font-size: 17px;
+}
+
+@media (max-width: 720px) {
+  .campus-proto .campus-hero,
+  .campus-proto .campus-tab-pane {
+    padding-inline: 20px;
+  }
+
+  .sc-mod-grid {
+    grid-template-columns: 1fr;
+  }
 }

@@ -2,7 +2,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
-  CheckIcon,
   FileTextIcon,
   FolderIcon,
   HomeIcon,
@@ -10,6 +9,7 @@ import {
   RotateCcwIcon,
   SparklesIcon,
 } from 'lucide-react'
+import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
@@ -110,11 +110,7 @@ export function ScanResultPage() {
       <div data-w2-page="scan-result" className="w2-scan-shell">
       <KioskPageHeader title="扫描完成" description="请核对文件信息，选择下一步操作" aside={<span className="w2-scan-status-chip is-ready"><span />扫描已完成</span>} />
 
-      <div className="w2-scan-steps" aria-label="扫描流程">
-        {['选择类型', '扫描指引', '扫描中', '完成'].map((label, index) => (
-          <div key={label} className={index < 3 ? 'is-done' : 'is-active'}><span><CheckIcon /></span>{label}</div>
-        ))}
-      </div>
+      <ScanFlowSteps activeIndex={3} />
 
       <section className="w2-scan-content w2-scan-result-content">
         {file ? (

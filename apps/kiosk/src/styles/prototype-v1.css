@@ -15,29 +15,33 @@
  * （steps / pagehead / row-item / qr-panel / progress / actionbar 等）。
  * ============================================================ */
 
-/* ── 设计 token（迁移自 shared.css :root，取原型精确 hex） ── */
-:root {
-  --pv-paper: #f4f1e8;
-  --pv-surface: #fffdf8;
-  --pv-ink: #10302b;
-  --pv-muted: #5d6b63;
-  --pv-line: #e2dccb;
-  --pv-teal: #1f9e86;
-  --pv-teal-deep: #157a67;
-  --pv-teal-soft: #e2f2ec;
-  --pv-clay: #b8683c;
-  --pv-clay-deep: #9e5330;
-  --pv-clay-soft: #f4e8dd;
-  --pv-wheat: #a9781f;
-  --pv-wheat-deep: #8a6219;
-  --pv-wheat-soft: #f2ead6;
-  --pv-plum: #7a5a86;
-  --pv-plum-deep: #63466f;
-  --pv-plum-soft: #efe7f1;
-  --pv-slate: #3f68b0;
-  --pv-slate-deep: #35608f;
-  --pv-slate-soft: #e5edf4;
-  --pv-dark: #10302b;
+/* ── 设计 token：挂在 fusion 作用域，勿放 :root ───────────────
+ * --k-* 只在 [data-kiosk-presentation='fusion-youth'] 上定义。
+ * 若写在 :root 且无 hex 回退，var(--k-ink) 在 :root 计算时会变成
+ * guaranteed-invalid，子树继承空值 → 登录按钮背景透明、文字发白。
+ */
+[data-kiosk-presentation='fusion-youth'] {
+  --pv-paper: var(--k-paper, #f4f1e8);
+  --pv-surface: var(--k-surface, #fffdf8);
+  --pv-ink: var(--k-ink, #10302b);
+  --pv-muted: var(--k-muted, #5d6b63);
+  --pv-line: var(--k-line, #e2dccb);
+  --pv-teal: var(--k-teal, #1f9e86);
+  --pv-teal-deep: var(--k-teal-deep, #157a67);
+  --pv-teal-soft: var(--k-teal-soft, #e2f2ec);
+  --pv-clay: var(--color-warning, #b8683c);
+  --pv-clay-deep: var(--color-warning-fg, #9e5330);
+  --pv-clay-soft: var(--color-warning-bg, #f4e8dd);
+  --pv-wheat: var(--color-wheat, #a9781f);
+  --pv-wheat-deep: var(--color-wheat-deep, #8a6219);
+  --pv-wheat-soft: var(--color-wheat-soft, #f2ead6);
+  --pv-plum: var(--color-plum, #7a5a86);
+  --pv-plum-deep: var(--color-plum-deep, #63466f);
+  --pv-plum-soft: var(--color-plum-soft, #efe7f1);
+  --pv-slate: var(--color-info, #3f68b0);
+  --pv-slate-deep: var(--color-info-fg, #35608f);
+  --pv-slate-soft: var(--color-info-bg, #e5edf4);
+  --pv-dark: var(--k-dark, #10302b);
   --pv-r-sm: 14px;
   --pv-r-md: 18px;
   --pv-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
@@ -51,15 +55,10 @@
 .kpv1 .a-plum  { --pv-accent: var(--pv-plum);  --pv-accent-deep: var(--pv-plum-deep);  --pv-accent-soft: var(--pv-plum-soft); }
 .kpv1 .a-slate { --pv-accent: var(--pv-slate); --pv-accent-deep: var(--pv-slate-deep); --pv-accent-soft: var(--pv-slate-soft); }
 
-/* ── 1080×1920 舞台外壳（shared.css #stage） ── */
+/* ── 首页内容舞台（顶栏/底栏由共享 KioskLayout 提供） ── */
 .kpv1 {
   width: min(1080px, 100%);
-  min-height: 1920px;
   margin: 0 auto;
-  background:
-    radial-gradient(1200px 600px at 85% -5%, rgb(31 158 134 / 6%), transparent 60%),
-    radial-gradient(900px 500px at -10% 30%, rgb(184 104 60 / 5%), transparent 55%),
-    var(--pv-paper);
   display: flex;
   flex-direction: column;
   font-family: var(--pv-sans);
@@ -71,6 +70,15 @@
      在 .kpv1 子树恢复 normal，逐区锚点 Δ≤4px。显式设行高处（welcome h1 / .t-text span 等）不受影响。 */
   line-height: normal;
 }
+
+/* 内容-only：背景交给 ui-kiosk-shell，避免与共享壳双层径向光晕叠加 */
+.kpv1.kpv1--content-only {
+  min-height: 0;
+  background: transparent;
+  flex: 1;
+  /* Clearance above shared 116px bottom nav (nav is outside this scroll root). */
+  padding-bottom: 24px;
+}
 .kpv1 *,
 .kpv1 *::before,
 .kpv1 *::after { box-sizing: border-box; }
@@ -80,7 +88,7 @@
   height: 76px;
   flex: none;
   background: var(--pv-dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -96,39 +104,11 @@
   background: rgb(31 158 134 / 18%); border: 1px solid rgb(31 158 134 / 45%);
   padding: 8px 18px; border-radius: 999px; font-size: 19px;
 }
-.kpv1 .status-chip .dot { width: 11px; height: 11px; border-radius: 50%; background: #35ab8e; box-shadow: 0 0 0 4px rgb(53 171 142 / 20%); }
+.kpv1 .status-chip .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--color-primary-500); box-shadow: 0 0 0 4px rgb(53 171 142 / 20%); }
 .kpv1 .status-chip.warn { background: rgb(184 104 60 / 18%); border-color: rgb(184 104 60 / 45%); }
-.kpv1 .status-chip.warn .dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
+.kpv1 .status-chip.warn .dot { background: var(--color-warning); box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
 .kpv1 .status-chip.neutral { background: rgb(139 150 142 / 18%); border-color: rgb(139 150 142 / 45%); }
-.kpv1 .status-chip.neutral .dot { background: #8b968e; box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
-.kpv1 .k-status { display: flex; align-items: center; gap: 10px; }
-.kpv1 .k-pill {
-  height: 38px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  border-radius: 999px;
-  padding: 0 15px;
-  color: var(--pv-ink);
-  background: rgb(255 255 255 / 72%);
-  border: 1px solid rgb(16 48 43 / 12%);
-  font-size: 15px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-.kpv1 .k-pill svg { width: 15px; height: 15px; color: var(--pv-teal); }
-.kpv1 .k-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #35ab8e;
-  box-shadow: 0 0 0 4px rgb(53 171 142 / 20%);
-  flex: 0 0 auto;
-}
-.kpv1 .k-pill--warn .k-dot { background: #b8683c; box-shadow: 0 0 0 4px rgb(184 104 60 / 20%); }
-.kpv1 .k-pill--bad .k-dot { background: #c14a34; box-shadow: 0 0 0 4px rgb(193 74 52 / 20%); }
-.kpv1 .k-pill--warn svg { color: #b8683c; }
-.kpv1 .k-pill--bad svg { color: #c14a34; }
+.kpv1 .status-chip.neutral .dot { background: var(--color-neutral-400); box-shadow: 0 0 0 4px rgb(139 150 142 / 20%); }
 /* ── 欢迎区（01-home.html .welcome） ── */
 .kpv1 .welcome {
   flex: none; padding: 12px 48px 8px;
@@ -142,7 +122,7 @@
 .kpv1 .login-btn {
   flex: none; display: flex; align-items: center; gap: 16px;
   min-height: 88px; padding: 0 38px;
-  background: var(--pv-dark); color: #f4f1e8;
+  background: var(--pv-dark, #10302b); color: var(--pv-paper, #f4f1e8);
   border: none; border-radius: var(--pv-r-md); cursor: pointer;
   font-family: var(--pv-sans); font-size: 27px; font-weight: 600; letter-spacing: 1px;
   box-shadow: 0 6px 18px rgb(16 48 43 / 18%);
@@ -243,7 +223,7 @@
   background: var(--pv-accent-soft, var(--pv-teal-soft));
   border-color: color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 35%, transparent);
 }
-.kpv1 .tile.primary .t-icon { background: var(--pv-accent, var(--pv-teal)); border: none; color: #fffdf8; }
+.kpv1 .tile.primary .t-icon { background: var(--pv-accent, var(--pv-teal)); border: none; color: var(--k-surface, var(--color-surface)); }
 .kpv1 .tile.disabled { opacity: .55; cursor: not-allowed; background: var(--pv-surface); border-style: dashed; }
 .kpv1 .tag-soon {
   flex: none; margin-left: auto;
@@ -269,7 +249,7 @@
 .kpv1 .zone-card.z-teal { background: var(--pv-teal-soft); border: 1px solid color-mix(in srgb, var(--pv-teal) 38%, transparent); }
 .kpv1 .zone-card .z-icon {
   width: 58px; height: 58px; flex: none; border-radius: 14px;
-  display: grid; place-items: center; color: #fffdf8;
+  display: grid; place-items: center; color: var(--k-surface, var(--color-surface));
 }
 .kpv1 .zone-card.z-plum .z-icon { background: var(--pv-plum); }
 .kpv1 .zone-card.z-teal .z-icon { background: var(--pv-teal); }
@@ -335,7 +315,7 @@
   border: none; border-radius: var(--pv-r-sm);
   font-family: var(--pv-sans); font-size: 21px; font-weight: 600; letter-spacing: 1px;
 }
-.kpv1 .continue .btn.primary { background: var(--pv-teal); color: #f4f1e8; box-shadow: 0 6px 18px rgb(16 48 43 / 18%); }
+.kpv1 .continue .btn.primary { background: var(--pv-teal); color: var(--k-paper, var(--color-canvas)); box-shadow: 0 6px 18px rgb(16 48 43 / 18%); }
 .kpv1 .continue .btn:active { transform: scale(.98); }
 .kpv1 .continue .btn svg { width: 26px; height: 26px; }
 
@@ -352,7 +332,7 @@
   position: relative;
 }
 .kpv1 .nav-item svg { width: 34px; height: 34px; }
-.kpv1 .nav-item.active { color: #f4f1e8; }
+.kpv1 .nav-item.active { color: var(--k-paper, var(--color-canvas)); }
 .kpv1 .nav-item.active::after {
   content: ''; position: absolute; bottom: 14px;
   width: 36px; height: 5px; border-radius: 3px; background: var(--pv-teal);

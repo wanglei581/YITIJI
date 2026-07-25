@@ -50,7 +50,7 @@ import {
   type PrintMaterialContentCategory,
   type PrintMaterialSource,
 } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import type { MemberPrintOrderItem } from '@ai-job-print/shared'
 
 type UploadTab = 'file' | 'qr' | 'usb'
@@ -283,7 +283,8 @@ export function PrintUploadPage() {
   }
 
   return (
-    <div className="print-proto flex min-h-full flex-col p-6" data-w2-page="print-upload">
+    <PrintPageFrame className="p-6">
+    <div className="flex min-h-full flex-col" data-w2-page="print-upload">
       <PrintPrototypeHeader
         title={pageTitle}
         subtitle={pageSubtitle}
@@ -574,5 +575,6 @@ export function PrintUploadPage() {
         </Button>
       </div>
     </div>
+    </PrintPageFrame>
   )
 }

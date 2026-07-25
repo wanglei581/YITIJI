@@ -237,7 +237,7 @@ export function PrintScanHomePage() {
 
   return (
     <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-home" className="w2-print-scan-shell flex h-full flex-col overflow-y-auto bg-canvas px-12 pb-8">
+      <div data-w2-page="print-scan-home" className="w2-print-scan-shell flex h-full flex-col overflow-y-auto bg-canvas">
       <KioskPageHeader
         title="打印扫描服务"
         description="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"

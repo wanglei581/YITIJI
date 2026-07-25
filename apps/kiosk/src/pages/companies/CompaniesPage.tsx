@@ -281,13 +281,13 @@ export function CompaniesPage() {
           </div>
 
           {state === 'ready' && stats && (
-            <div className="flex items-center gap-5 rounded-[18px] bg-[var(--kp-dark)] px-8 py-3 text-[#f4f1e8]">
-              <Building2Icon className="h-9 w-9 shrink-0 opacity-80" aria-hidden="true" />
-              <div className="grid flex-1 grid-cols-4 text-center">
-                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.companyCount}</div><div className="text-[17px] opacity-70">来源企业</div></div>
-                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.openJobCount}</div><div className="text-[17px] opacity-70">在招岗位</div></div>
-                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.todayNewJobCount}</div><div className="text-[17px] opacity-70">今日新增岗位</div></div>
-                <div><div className="font-serif text-[34px] font-bold tabular-nums">{stats.fairCompanyCount}</div><div className="text-[17px] opacity-70">招聘会参展</div></div>
+            <div className="oa-stats-band" aria-label="企业概览">
+              <Building2Icon aria-hidden="true" />
+              <div className="oa-stats-cells">
+                <div><div className="oa-n">{stats.companyCount}</div><div className="oa-t">来源企业</div></div>
+                <div><div className="oa-n">{stats.openJobCount}</div><div className="oa-t">在招岗位</div></div>
+                <div><div className="oa-n">{stats.todayNewJobCount}</div><div className="oa-t">今日新增岗位</div></div>
+                <div><div className="oa-n">{stats.fairCompanyCount}</div><div className="oa-t">招聘会参展</div></div>
               </div>
             </div>
           )}

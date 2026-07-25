@@ -74,7 +74,8 @@
     "verify:fusion-w3": "node scripts/verify-fusion-w3.mjs",
     "verify:fusion-w4": "node scripts/verify-fusion-w4.mjs",
     "verify:fusion-w5": "node scripts/verify-fusion-w5.mjs",
-    "verify:fusion-w6": "node scripts/verify-fusion-w6.mjs"
+    "verify:fusion-w6": "node scripts/verify-fusion-w6.mjs",
+    "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

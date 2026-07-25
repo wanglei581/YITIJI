@@ -1,5 +1,7 @@
-import { KioskLayout, StatusBadge, type KioskTab } from '@ai-job-print/ui'
+import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { KioskTopbarStatus } from '../components/kiosk-shell/KioskAppTopbar'
+import { getTerminalId } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
@@ -19,26 +21,20 @@ function tabToPath(tab: KioskTab): string {
   return '/'
 }
 
-const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [
-  '/',
-  '/help',
-  '/assistant',
-  // 用户已明确将「我的」主入口纳入青序 LightFlow；/me/* 明细页仍保留原独立范围。
-  '/profile',
-  '/resume/source',
-  '/resume/parse',
-  '/resume/report',
-  '/resume/generate',
-  '/resume/generate/preview',
-  '/resume/optimize',
-  '/resume/templates',
-  '/resume/materials',
-  '/resume/export',
-]
+function statusToneFor(kind: string, printerReady: boolean, loading: boolean): string {
+  if (loading) return 'neutral'
+  if (printerReady) return 'positive'
+  if (kind === 'unknown' || kind === 'low_paper') return 'warning'
+  return 'negative'
+}
 
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
  * /screensaver 是顶级路由(全屏,不在此布局内),退出后回到本布局的首页。
+ *
+ * 视觉统一（2026-07-25）：全部布局内路由统一 service-desk + fusion-youth 呈现，
+ * 不再按路由白名单切换 legacy 主题；首页也不再自绘顶栏/底栏。
+ * 设备状态统一消费 useTerminalDeviceStatus（P0-2 去伪）。
  */
 export function KioskRoot() {
   return (
@@ -54,8 +50,8 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  // 首页隐藏壳层 header，由 HomePage 顶栏自行轮询；此处停用避免双请求。
-  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(pathname !== '/')
+  // 共享顶栏始终轮询；首页不再自绘顶栏，故不再按 pathname 停用。
+  const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
 
   // 全局无操作待机宣传屏:忙碌态自动暂停,空闲达阈值跳 /screensaver。
   // 返回 active(屏保是否已配置且有素材),用于与下面的公共空闲重置按 active 互斥。
@@ -65,36 +61,27 @@ function KioskShell() {
   useIdleLogout(screensaverActive)
 
   const activeTab = getActiveTab(pathname)
-  const statusVariant = loading
-    ? 'info'
-    : printerReady
-      ? 'success'
-      : kind === 'unknown'
-        ? 'warning'
-        : 'error'
   const statusLabel = loading ? '设备检查中' : printerLabel
-  const isServiceDeskRoute = SERVICE_DESK_EXACT_ROUTES.includes(pathname)
+  const statusTone = statusToneFor(kind, printerReady, loading)
+  const terminalId = getTerminalId() || '01号机'
 
-  // 校园招聘专区（/campus）做成沉浸式 5-Tab 页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
-  // 由页面自带蓝色 Hero 顶栏 + 返回箭头承载导航。
+  // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
+  // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
 
   return (
     <KioskLayout
       activeTab={activeTab}
       onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme={isServiceDeskRoute ? 'service-desk' : 'legacy'}
+      visualTheme="service-desk"
       density="touch"
       presentation="fusion-youth"
       viewport="kiosk"
-      // 首页自带顶栏（一体机名 + 状态栏 + 实时时间，见 HomePage/§15.2），隐藏全局细头部避免重复；
-      // 其余页面继续使用全局头部 + 设备状态徽标。
-      // prototype-v1 首页（.kpv1）自绘 116px 原型底部导航，故隐藏共享 KioskLayout 底栏；
-      // 其余路由仍使用共享底栏。下方 visualTheme 三元与路由白名单保持不变——
-      // 首页内容全部 .kpv1 作用域，主题 token 不作用于其内部（该属性对首页为 vestigial）。
-      hideHeader={pathname === '/' || isCampusZone}
-      hideBottomNav={pathname === '/' || isCampusZone}
-      headerRight={<StatusBadge status={statusVariant} label={statusLabel} />}
+      hideHeader={isCampusZone}
+      hideBottomNav={isCampusZone}
+      brandTitle={`就业服务大厅 · ${terminalId}`}
+      brandSubtitle="AI求职打印服务终端"
+      headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}

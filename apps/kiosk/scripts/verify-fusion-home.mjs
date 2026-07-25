@@ -229,10 +229,11 @@ expect(
 )
 expect(
   /^<KioskPageFrame\b/.test(frameTag) &&
-    /\bclassName\s*=\s*['"]kpv1['"]/.test(frameTag) &&
-    /\bheader\s*=\s*\{\s*<KioskTopBar\s*\/>\s*\}/.test(frameTag) &&
-    /\bfooter\s*=\s*\{\s*<HomeNavbar\s*\/>\s*\}/.test(frameTag),
-  'HomePage return 的首个 JSX 根节点是 KioskPageFrame + kpv1 + KioskTopBar/HomeNavbar',
+    /kpv1/.test(frameTag) &&
+    /kpv1--content-only/.test(frameTag) &&
+    !/\bheader\s*=/.test(frameTag) &&
+    !/\bfooter\s*=/.test(frameTag),
+  'HomePage return 的首个 JSX 根节点是 KioskPageFrame + kpv1--content-only（共享壳提供顶栏/底栏）',
 )
 expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
 expect(
@@ -252,8 +253,8 @@ const bodyIndexes = [
   page.indexOf('</KioskPageFrame>'),
 ]
 expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保留 HomeWelcome、ContinuePanel、groups、ZoneRow、notice 原有顺序')
-expect((page.match(/<KioskTopBar\s*\/>/g) ?? []).length === 1, 'KioskTopBar 仅通过 frame header 渲染一次')
-expect((page.match(/<HomeNavbar\s*\/>/g) ?? []).length === 1, 'HomeNavbar 仅通过 frame footer 渲染一次')
+expect(!/<KioskTopBar\b/.test(page), '首页不再自绘 KioskTopBar')
+expect(!/<HomeNavbar\b/.test(page) && !/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
 
 const groupsArray = extractAssignedArray(serviceGroups, 'export const SERVICE_GROUPS')
 const groupObjects = directObjectBlocks(groupsArray)
@@ -305,7 +306,8 @@ expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile[
 expect(welcome.includes('<MemberLoginDialog'), '保留 MemberLoginDialog')
 expect(/onClick=\{\(\)\s*=>\s*setLoginOpen\(true\)\}/.test(welcome), '游客保留打开登录弹窗回调')
 expect(/onContinueAsGuest=\{\(\)\s*=>\s*\{\s*continueAsGuest\(\)/.test(welcome), '保留真实继续游客回调')
-expect(/KioskDeviceStatusPills/.test(home), '保留真实设备状态（KioskDeviceStatusPills）')
+expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
+expect(read('src/layouts/KioskRoot.tsx').includes('<KioskTopbarStatus'), '共享顶栏注入设备状态')
 expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '保留百宝箱/智慧校园真实配置 hooks')
 expect(/const showToolbox = toolbox\.enabled/.test(home) && /const showCampus = campus\.enabled/.test(home) && /if \(!showToolbox && !showCampus\) return null/.test(home), '保留百宝箱/智慧校园诚实门控')
@@ -316,25 +318,36 @@ const complianceSurface = `${home}\n${serviceGroups}\n${css}`
 expect(!/一键投递|立即投递/.test(complianceSurface), '拒绝「一键投递」/「立即投递」')
 expect(!/(?<!来源)平台投递/.test(complianceSurface), '「平台投递」仅允许「来源平台投递」语境')
 
-const navbar = home.slice(home.indexOf('function HomeNavbar'), home.indexOf('export function HomePage'))
-expect((navbar.match(/className="nav-item/g) ?? []).length === 3, '底部导航保留三个 Tab')
-expect(/nav-item active/.test(navbar) && /aria-current="page"/.test(navbar), '首页 Tab 保留 / 的当前页语义')
-expect(navbar.includes("navigate('/assistant')") && navbar.includes("navigate('/profile')"), '导航目标保留 /assistant 与 /profile')
+const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
+expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI助手'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三个 Tab')
+expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
+expect(read('src/layouts/KioskRoot.tsx').includes("tabToPath") && read('src/layouts/KioskRoot.tsx').includes("'/assistant'") && read('src/layouts/KioskRoot.tsx').includes("'/profile'"), '导航目标保留 /assistant 与 /profile')
 
+const rootSrc = read('src/layouts/KioskRoot.tsx')
+const tabPathBody = (() => {
+  const start = rootSrc.indexOf('function tabToPath')
+  // tabToPath 之后可能紧跟 statusToneFor 等辅助函数；只截取到下一函数边界。
+  const nextFn = rootSrc.slice(start + 1).search(/\nfunction |\nexport function /)
+  const end = nextFn >= 0 ? start + 1 + nextFn : rootSrc.indexOf('export function KioskRoot', start)
+  return start >= 0 && end > start ? rootSrc.slice(start, end) : ''
+})()
 const declaredRoutes = new Set([
   ...[...serviceGroups.matchAll(/(?:to|titleTo)\s*:\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
   ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
+  ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
 ])
-const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/profile', '/toolbox', '/smart-campus', '/assistant'])
-expect(declaredRoutes.size === allowedRoutes.size && [...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
+const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
+expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
 expect(!/\bfetch\s*\(/.test(home + serviceGroups), '首页未新增 fetch')
 const productionIdentifiers = stripCommentsAndStrings(`${home}\n${serviceGroups}`).match(/\b[A-Za-z_$][\w$]*\b/g) ?? []
 const demoMockIdentifiers = productionIdentifiers.filter((identifier) => /^(?:demo|mock|useDemo|useMock)/i.test(identifier))
 expect(demoMockIdentifiers.length === 0, '首页生产代码未新增 demo*/mock*/useDemo*/useMock* 标识符')
 
 const kpv1RootRule = cssRule(css, '.kpv1')
+const kpv1ContentRule = cssRule(css, '.kpv1.kpv1--content-only')
 expect(/^\.kpv1\s*\{/m.test(css) && !/(?:div|section|main)\.kpv1\s*\{/.test(css), '.kpv1 根规则非 tag-specific，兼容 section 根')
-expect(/width:\s*min\(1080px,\s*100%\)/.test(kpv1RootRule) && /min-height:\s*1920px/.test(kpv1RootRule) && /display:\s*flex/.test(kpv1RootRule) && /flex-direction:\s*column/.test(kpv1RootRule), '.kpv1 保留关键根布局规则')
+expect(/width:\s*min\(1080px,\s*100%\)/.test(kpv1RootRule) && /display:\s*flex/.test(kpv1RootRule) && /flex-direction:\s*column/.test(kpv1RootRule), '.kpv1 保留关键根布局规则')
+expect(/background:\s*transparent/.test(kpv1ContentRule) && /min-height:\s*0/.test(kpv1ContentRule), '.kpv1--content-only 交给共享壳承载舞台背景')
 console.log('  INFO Task 4 的 prototype-v1.css no-diff 由 review diff allowlist 负责；本脚本只验证 section 根兼容合同')
 
 expect(packageJson.includes('"verify:fusion-home": "node scripts/verify-fusion-home.mjs"'), 'package.json 精确注册 verify:fusion-home')

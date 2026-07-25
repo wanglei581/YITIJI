@@ -53,16 +53,56 @@
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 356px;
   gap: 22px;
+  align-items: stretch;
   overflow: hidden !important;
+}
+
+.resume-generate-preview-lightflow .resume-lightflow__paper-col {
+  grid-column: 1;
+  min-height: 0;
+}
+
+.resume-generate-preview-lightflow .resume-lightflow__sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  width: 356px;
 }
 
 .resume-generate-preview-lightflow .resume-lightflow__paper {
   grid-column: 1;
   max-width: none !important;
   padding: 30px 34px !important;
-  background: #fff !important;
+  background: var(--fy-paper) !important;
+  border: 1px solid var(--fy-line) !important;
   border-radius: 8px !important;
   box-shadow: 0 8px 24px rgba(16, 48, 43, .08) !important;
+}
+
+.resume-generate-preview-lightflow .resume-lightflow__paper-name {
+  font-family: var(--fy-serif);
+  font-size: 34px !important;
+  font-weight: 900 !important;
+  letter-spacing: 2px;
+  color: var(--fy-ink) !important;
+}
+
+.resume-generate-preview-lightflow .resume-lightflow__paper-meta {
+  font-size: 16.5px !important;
+  color: var(--fy-muted) !important;
+  letter-spacing: .5px;
+}
+
+.resume-generate-preview-lightflow .resume-preview-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  border: 1px solid rgba(31, 158, 134, .35);
+  border-radius: 999px;
+  background: var(--fy-teal-soft);
+  padding: 8px 16px;
+  color: var(--fy-teal-deep);
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .resume-generate-preview-lightflow .resume-lightflow__content > .text-xs {
@@ -77,20 +117,34 @@
 .resume-optimize-lightflow .resume-lightflow__optimize-content {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) 348px;
-  gap: 14px 20px !important;
+  gap: 22px !important;
   overflow: hidden !important;
+}
+
+.resume-optimize-lightflow .resume-lightflow__form-col {
+  grid-column: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.resume-optimize-lightflow .resume-lightflow__sidebar {
+  grid-column: 2;
+  grid-row: 1 / -1;
 }
 
 .resume-optimize-lightflow .resume-lightflow__work-card:first-child,
 .resume-optimize-lightflow .resume-lightflow__comparison-card,
 .resume-optimize-lightflow .resume-lightflow__editor-region {
-  grid-column: 1;
+  grid-column: auto;
 }
 
 .resume-optimize-lightflow .resume-lightflow__template-card,
 .resume-optimize-lightflow .resume-lightflow__assistant-card,
 .resume-optimize-lightflow .resume-lightflow__work-card:has(+ .resume-lightflow__assistant-card) {
-  grid-column: 2;
+  grid-column: auto;
 }
 
 .resume-optimize-lightflow .resume-lightflow__comparison-card {
@@ -162,7 +216,7 @@
 /* --- 屏25 生成页: 两栏布局 --------------------------------- */
 .resume-generate-lightflow .resume-lightflow__content {
   display: grid !important;
-  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-columns: minmax(0, 1fr) 348px;
   gap: 22px;
   align-items: start;
   overflow: hidden !important;
@@ -232,7 +286,7 @@
 .fy-prog-item.now .fy-prog-dot {
   background: var(--fy-teal);
   border-color: var(--fy-teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .fy-prog-title {
@@ -390,7 +444,7 @@
 .resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="removed"],
 .resume-optimize-lightflow .resume-lightflow__comparison-card tr[class*="wordRemoved"] {
   background: rgba(193, 74, 52, .08) !important;
-  color: #8a4433 !important;
+  color: var(--color-error) !important;
 }
 
 /* 增加行 */
@@ -483,12 +537,19 @@
 
 /* --- 响应式: ≤900px 还原单列 ----------------------------- */
 @media (max-width: 900px) {
-  .resume-generate-preview-lightflow .resume-lightflow__content,
   .resume-optimize-lightflow .resume-lightflow__optimize-content {
     display: flex !important;
     flex-direction: column;
     overflow-y: auto !important;
   }
+
+  .resume-optimize-lightflow .resume-lightflow__form-col,
+  .resume-optimize-lightflow .resume-lightflow__sidebar {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .resume-generate-preview-lightflow .resume-lightflow__content,
 
   .resume-generate-lightflow .resume-lightflow__content {
     grid-template-columns: 1fr !important;

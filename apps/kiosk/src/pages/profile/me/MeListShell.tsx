@@ -34,6 +34,8 @@ interface MeListShellProps {
   emptyIcon?: LucideIcon
   emptyTitle?: string
   emptyDescription?: string
+  /** 页头右侧操作区；默认「返回我的」。可覆盖为多按钮（如权益页「去权益活动领取」） */
+  aside?: ReactNode
   /** ready 且非空时渲染（列表 / Tab 内容） */
   children: ReactNode
 }
@@ -49,6 +51,7 @@ export function MeListShell({
   emptyIcon,
   emptyTitle,
   emptyDescription,
+  aside,
   children,
 }: MeListShellProps) {
   const navigate = useNavigate()
@@ -59,9 +62,11 @@ export function MeListShell({
         title={title}
         description={subtitle}
         aside={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
-            返回我的
-          </Button>
+          aside ?? (
+            <Button size="sm" variant="secondary" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+          )
         }
       />}
     >

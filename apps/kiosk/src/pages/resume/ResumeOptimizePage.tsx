@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
-import { Button, Card, KioskPageFrame, PageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
@@ -237,8 +237,7 @@ export function ResumeOptimizePage() {
   if (loading) {
     return (
       <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
-        <PageHeader title="优化建议" subtitle="基于已有内容优化表达"
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>} />
+        <KioskPageHeader title="优化建议" description="基于已有内容优化表达" onBack={() => navigate(-1)} backLabel="返回报告" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-50">
             <SparklesIcon className="h-10 w-10 animate-pulse text-primary-600" />
@@ -252,8 +251,7 @@ export function ResumeOptimizePage() {
   if (failMsg) {
     return (
       <KioskPageFrame className="fusion-w3 fusion-w3--resume"><section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow resume-lightflow__state flex h-full flex-col p-6">
-        <PageHeader title="优化建议" subtitle="基于已有内容优化表达"
-          actions={<Button size="sm" variant="secondary" onClick={() => navigate(-1)}>返回报告</Button>} />
+        <KioskPageHeader title="优化建议" description="基于已有内容优化表达" onBack={() => navigate(-1)} backLabel="返回报告" />
         <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
           <AlertCircleIcon className="h-14 w-14 text-neutral-300" />
           <p className="text-base text-neutral-500">{failMsg}</p>
@@ -269,10 +267,11 @@ export function ResumeOptimizePage() {
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-optimize" className="resume-lightflow resume-optimize-lightflow flex h-full flex-col p-6">
       <div className="resume-lightflow__header">
-        <PageHeader
+        <KioskPageHeader
           title="优化建议"
-          subtitle="基于已有内容优化表达(仅供参考)，只重组原文事实，不补充虚构信息"
-          actions={<Button size="sm" variant="secondary" onClick={() => requestLeave(() => navigate(-1))}>返回报告</Button>}
+          description="基于已有内容优化表达(仅供参考)，只重组原文事实，不补充虚构信息"
+          onBack={() => requestLeave(() => navigate(-1))}
+          backLabel="返回报告"
         />
         <div className="resume-lightflow__stepper mt-4">
           <Stepper steps={OPTIMIZE_STEPS} currentIndex={3} />
@@ -291,10 +290,7 @@ export function ResumeOptimizePage() {
         'resume-lightflow__content resume-lightflow__optimize-content mt-4 flex-1',
         confirmLeave ? 'overflow-hidden' : 'overflow-y-auto',
       ].join(' ')}>
-        <div className="flex min-h-full gap-5">
-
-          {/* 左：信息条 + 概览 + diff 对照 + 编辑区 + 导出状态 */}
-          <div className="flex flex-1 min-w-0 flex-col gap-4">
+        <div className="resume-lightflow__form-col">
             <div className="flex items-center gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-4 py-2.5">
               <InfoIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
               <p className="text-xs text-neutral-400">
@@ -365,42 +361,40 @@ export function ResumeOptimizePage() {
                 <p className="mt-1 text-xs text-success-fg/80">文件短期保留后自动清理，本机不长期保存你的简历。</p>
               </Card>
             )}
-          </div>
+        </div>
 
-          {/* 右：排版调整 + 模板 + AI辅助 + 导出格式 + 导出/打印 */}
           {optimizedResume && (
-            <div className="flex w-[348px] flex-none flex-col gap-4">
-              <Card className="resume-lightflow__work-card p-5">
-                <p className="mb-1 font-serif text-xl font-bold tracking-wide text-neutral-900">排版调整</p>
-                <p className="mb-4 text-xs text-neutral-400">调整后编辑区实时预览，导出 PDF 按此排版</p>
+            <aside className="resume-lightflow__sidebar" aria-label="排版与导出">
+              <div className="fy-side-card">
+                <h3>排版调整</h3>
+                <p className="fy-side-sub">调整后编辑区实时预览，导出 PDF 按此排版</p>
                 <ResumeLayoutControls layout={layout} onChange={handleLayoutChange} disabled={exporting} />
-              </Card>
+              </div>
 
               {resumeTemplates.length > 0 && (
-                <Card className="resume-lightflow__work-card resume-lightflow__template-card p-5">
-                  <p className="mb-1 font-serif text-xl font-bold tracking-wide text-neutral-900">简历模板</p>
-                  <p className="mb-3 text-xs text-neutral-400">PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出</p>
+                <div className="fy-side-card resume-lightflow__template-card">
+                  <h3>简历模板</h3>
+                  <p className="fy-side-sub">PDF 导出按所选模板自动填充版式；Word/TXT/Markdown 保持内容格式导出</p>
                   <div className="flex flex-col gap-2">
                     {resumeTemplates.map((template) => (
                       <button key={template.id} type="button" aria-pressed={selectedTemplateId === template.id}
                         disabled={exporting} onClick={() => handleTemplateChange(template.id)}
-                        className={['min-h-[56px] rounded-xl border-2 px-4 text-left transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
-                          selectedTemplateId === template.id ? 'border-primary-500 bg-primary-50' : 'border-neutral-200 bg-white'].join(' ')}>
-                        <span className="block text-base font-bold text-neutral-900">{template.title}</span>
-                        <span className="mt-0.5 block text-sm text-neutral-500">{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
+                        className="fy-tpl-btn">
+                        <b>{template.title}</b>
+                        <span>{template.resumeLayoutPreset.style} · {template.recommendedFor}</span>
                       </button>
                     ))}
                   </div>
                   {selectedTemplate && (
                     <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-500">已选择：{selectedTemplate.title}。</p>
                   )}
-                </Card>
+                </div>
               )}
 
-              <Card className="resume-lightflow__work-card resume-lightflow__assistant-card p-5">
-                <p className="mb-1 font-serif text-xl font-bold tracking-wide text-neutral-900">AI 辅助调整</p>
-                <p className="mb-3 text-xs text-neutral-400">仅基于当前简历和原文做表达密度调整，不新增经历或事实</p>
-                <div className="grid grid-cols-2 gap-2">
+              <div className="fy-side-card resume-lightflow__assistant-card">
+                <h3>AI 辅助调整</h3>
+                <p className="fy-side-sub">仅基于当前简历和原文做表达密度调整，不新增经历或事实</p>
+                <div className="fy-ai-grid">
                   <Button size="sm" variant="secondary" disabled={aiAdjustDisabled} onClick={() => void handleAiAdjust('condense')}>
                     {adjusting === 'condense' ? '正在精简…' : 'AI 精简'}
                   </Button>
@@ -409,7 +403,7 @@ export function ResumeOptimizePage() {
                   </Button>
                 </div>
                 {lastResumeBeforeAiAdjust && (
-                  <Button size="sm" variant="secondary" className="mt-3 w-full" onClick={handleUndoAiAdjust}>撤销 AI 调整</Button>
+                  <button type="button" className="fy-undo-btn" onClick={handleUndoAiAdjust}>撤销 AI 调整</button>
                 )}
                 {adjustWarnings.length > 0 && (
                   <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-xs leading-relaxed text-primary-700">
@@ -417,22 +411,20 @@ export function ResumeOptimizePage() {
                   </div>
                 )}
                 {adjustError && <p className="mt-3 rounded-lg bg-error-bg px-3 py-2 text-xs leading-relaxed text-error-fg">{adjustError}</p>}
-              </Card>
+              </div>
 
-              <Card className="resume-lightflow__work-card p-5">
-                <p className="mb-3 font-serif text-xl font-bold tracking-wide text-neutral-900">导出格式</p>
-                <div className="grid grid-cols-4 gap-2">
+              <div className="fy-side-card">
+                <h3>导出格式</h3>
+                <div className="fy-fmt-grid">
                   {EXPORT_FORMAT_OPTIONS.map((option) => (
                     <button key={option.value} type="button" aria-pressed={exportFormat === option.value}
-                      disabled={exporting} onClick={() => handleExportFormatChange(option.value)}
-                      className={['min-h-[48px] rounded-xl border px-2 text-sm font-bold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50',
-                        exportFormat === option.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 bg-white text-neutral-600'].join(' ')}>
+                      disabled={exporting} onClick={() => handleExportFormatChange(option.value)}>
                       {option.label}
                     </button>
                   ))}
                 </div>
-                <p className="mt-3 text-xs leading-relaxed text-neutral-400">PDF 直接打印；Word/TXT/Markdown 供下载编辑。导出成功后才会出现下载与打印入口。</p>
-              </Card>
+                <p className="fy-side-sub">PDF 直接打印；Word/TXT/Markdown 供下载编辑。导出成功后才会出现下载与打印入口。</p>
+              </div>
 
               {!exported && (
                 <Button size="lg" className="flex w-full items-center justify-center gap-2" disabled={exporting} onClick={() => void handleExport()}>
@@ -457,10 +449,9 @@ export function ResumeOptimizePage() {
                   </Button>
                 </div>
               )}
-            </div>
+            </aside>
           )}
 
-        </div>
       </div>
 
       <div className="resume-lightflow__action-bar mt-6 flex gap-3">

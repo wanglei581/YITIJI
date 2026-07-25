@@ -1,27 +1,27 @@
 .jf-proto {
-  --paper: #f4f1e8;
-  --surface: #fffdf8;
-  --ink: #10302b;
-  --muted: #5d6b63;
-  --line: #e2dccb;
-  --teal: #1f9e86;
-  --teal-deep: #157a67;
-  --teal-soft: #e2f2ec;
-  --clay: #b8683c;
-  --clay-deep: #9e5330;
-  --clay-soft: #f4e8dd;
-  --wheat: #a9781f;
-  --wheat-deep: #8a6219;
-  --wheat-soft: #f2ead6;
-  --plum: #7a5a86;
-  --plum-deep: #63466f;
-  --plum-soft: #efe7f1;
-  --slate: #3f68b0;
-  --slate-deep: #35608f;
-  --slate-soft: #e5edf4;
-  --error: #c14a34;
-  --error-soft: #f6e3de;
-  --dark: #10302b;
+  --paper: var(--k-paper, var(--color-canvas));
+  --surface: var(--k-surface, var(--color-surface));
+  --ink: var(--k-ink);
+  --muted: var(--k-muted);
+  --line: var(--k-line);
+  --teal: var(--k-teal);
+  --teal-deep: var(--k-teal-deep);
+  --teal-soft: var(--k-teal-soft);
+  --clay: var(--color-warning);
+  --clay-deep: var(--color-warning-fg);
+  --clay-soft: var(--color-warning-bg);
+  --wheat: var(--color-wheat);
+  --wheat-deep: var(--color-wheat-deep);
+  --wheat-soft: var(--color-wheat-soft);
+  --plum: var(--color-plum);
+  --plum-deep: var(--color-plum-deep);
+  --plum-soft: var(--color-plum-soft);
+  --slate: var(--color-info);
+  --slate-deep: var(--color-info-fg);
+  --slate-soft: var(--color-info-bg);
+  --error: var(--color-error);
+  --error-soft: var(--color-error-bg);
+  --dark: var(--k-ink);
   --r-sm: 14px;
   --r-md: 18px;
   --serif: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
@@ -288,7 +288,7 @@ button.jf-chip {
 .jf-f-chip.on {
   border-color: var(--dark);
   background: var(--dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
   font-weight: 600;
 }
 
@@ -302,7 +302,7 @@ button.jf-chip {
   border-radius: 999px;
   background: var(--surface);
   padding: 0 24px;
-  color: #7d8880;
+  color: var(--k-muted);
   font-size: 22px;
 }
 
@@ -549,13 +549,13 @@ button.jf-chip {
 
 .jf-btn.primary {
   background: var(--teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
   box-shadow: 0 6px 18px rgba(31, 158, 134, .25);
 }
 
 .jf-btn.dark {
   background: var(--dark);
-  color: #f4f1e8;
+  color: var(--k-paper, var(--color-canvas));
   box-shadow: 0 6px 18px rgba(16, 48, 43, .18);
 }
 
@@ -611,7 +611,7 @@ button.jf-chip {
 .jf-tile.tinted .jf-tile-icon {
   border: 0;
   background: var(--accent);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .jf-tile b {
@@ -733,7 +733,7 @@ button.jf-chip {
 .jf-step.active .jf-step-dot {
   border-color: var(--teal);
   background: var(--teal);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 
 .jf-step-label {

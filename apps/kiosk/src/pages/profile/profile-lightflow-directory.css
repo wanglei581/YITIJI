@@ -1,5 +1,14 @@
 .kprofile.kprofile-lightflow .kp-service-directory {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+/* Full-width bands: assets / services / account. Duo halves: fairs + benefits. */
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(1),
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(2),
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(5) {
+  grid-column: 1 / -1;
 }
 
 .kprofile.kprofile-lightflow .kp-section {
@@ -14,12 +23,30 @@
 
 .kprofile.kprofile-lightflow .kp-section-head {
   margin-block-end: 14px;
+  padding-inline-start: 14px;
+  border-inline-start: 3px solid var(--k-teal);
+}
+
+.kprofile.kprofile-lightflow .kp-section[data-rail='teal'] .kp-section-head {
+  border-inline-start-color: var(--k-teal);
+}
+
+.kprofile.kprofile-lightflow .kp-section[data-rail='slate'] .kp-section-head {
+  border-inline-start-color: var(--k-muted);
+}
+
+.kprofile.kprofile-lightflow .kp-section[data-rail='wheat'] .kp-section-head {
+  border-inline-start-color: var(--color-wheat);
+}
+
+.kprofile.kprofile-lightflow .kp-section[data-rail='plum'] .kp-section-head {
+  border-inline-start-color: var(--color-plum);
 }
 
 .kprofile.kprofile-lightflow .kp-section-head h2 {
   margin: 0;
   color: var(--lf-ink);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.3;
@@ -28,7 +55,7 @@
 .kprofile.kprofile-lightflow .kp-section-head p {
   margin: 3px 0 0;
   color: var(--lf-ink-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -36,6 +63,28 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 16px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-grid--grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-grid--chips {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-grid--account {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Duo halves keep a single-column list (proto 14). */
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(3) .kp-entry-grid--chips,
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(4) .kp-entry-grid--chips {
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .kprofile.kprofile-lightflow .kp-entry {
@@ -57,6 +106,25 @@
   font: inherit;
 }
 
+.kprofile.kprofile-lightflow .kp-entry-grid--grid .kp-entry,
+.kprofile.kprofile-lightflow .kp-entry-grid--chips .kp-entry,
+.kprofile.kprofile-lightflow .kp-entry-grid--account .kp-entry {
+  border: 1px solid var(--lf-line);
+  border-radius: 16px;
+  padding: 16px 14px;
+}
+
+.kprofile.kprofile-lightflow .kp-entry-grid--grid .kp-entry-arrow,
+.kprofile.kprofile-lightflow .kp-entry-grid--chips .kp-entry-arrow,
+.kprofile.kprofile-lightflow .kp-entry-grid--account .kp-entry-arrow {
+  display: none;
+}
+
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(3) .kp-entry-arrow,
+.kprofile.kprofile-lightflow .kp-service-directory > .kp-section:nth-child(4) .kp-entry-arrow {
+  display: grid;
+}
+
 .kprofile.kprofile-lightflow .kp-entry:not(:disabled):active {
   transform: scale(0.985);
 }
@@ -68,8 +136,8 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled {
-  color: #7b8899;
-  background: #f2f5f9;
+  color: var(--k-muted);
+  background: var(--k-surface, var(--color-surface));
   cursor: not-allowed;
 }
 
@@ -89,8 +157,8 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-icon {
-  color: #7b8899;
-  background: #e6ebf1;
+  color: var(--k-muted);
+  background: var(--k-line);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-content {
@@ -116,14 +184,14 @@
 }
 
 .kprofile.kprofile-lightflow .kp-entry:disabled .kp-entry-content span {
-  color: #667386;
+  color: var(--k-muted);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  color: #7d99b7;
+  color: var(--k-muted);
 }
 
 .kprofile.kprofile-lightflow .kp-entry-arrow svg {
@@ -136,15 +204,15 @@
   padding: 3px 8px;
   border: 1px solid var(--lf-line);
   border-radius: 999px;
-  color: #667386;
-  background: #e6ebf1;
+  color: var(--k-muted);
+  background: var(--k-line);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.3;
 }
 
 .kprofile.kprofile-lightflow .kp-entry-tag.session {
-  border-color: #9ec8ff;
+  border-color: var(--k-teal-soft);
   color: var(--lf-blue-strong);
   background: var(--lf-blue-soft);
 }
@@ -156,6 +224,10 @@
 }
 
 @media (max-width: 520px) {
+  .kprofile.kprofile-lightflow .kp-service-directory {
+    grid-template-columns: 1fr;
+  }
+
   .kprofile.kprofile-lightflow .kp-section {
     padding: 20px 0;
   }
@@ -169,6 +241,12 @@
   }
 
   .kprofile.kprofile-lightflow .kp-entry-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kprofile.kprofile-lightflow .kp-entry-grid--grid,
+  .kprofile.kprofile-lightflow .kp-entry-grid--chips,
+  .kprofile.kprofile-lightflow .kp-entry-grid--account {
     grid-template-columns: 1fr;
   }
 

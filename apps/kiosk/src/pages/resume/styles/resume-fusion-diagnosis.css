@@ -3,15 +3,16 @@
 }
 
 .resume-source-lightflow .resume-source-privacy {
-  display: none;
+  /* Keep privacy banner visible for honesty; only tighten spacing. */
+  margin-top: 12px !important;
 }
 
 .resume-source-lightflow .resume-source-content {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr;
-  grid-auto-rows: auto;
-  overflow: hidden !important;
-  padding-bottom: 0 !important;
+  display: flex !important;
+  flex-direction: column;
+  gap: 20px !important;
+  overflow-y: auto !important;
+  padding-bottom: 8px !important;
 }
 
 .resume-source-lightflow .resume-source-intro {
@@ -19,7 +20,6 @@
 }
 
 .resume-source-lightflow .resume-source-alternative {
-  grid-column: 1 / -1;
   min-height: 88px !important;
   padding: 14px 26px !important;
   border: 2px dashed rgba(31, 158, 134, .45) !important;
@@ -29,8 +29,15 @@
   box-shadow: none !important;
 }
 
+.resume-source-lightflow .resume-source-split {
+  align-items: stretch;
+}
+
+.resume-source-lightflow .resume-source-main {
+  min-width: 0;
+}
+
 .resume-source-lightflow .resume-source-methods {
-  grid-column: 1;
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 12px !important;
@@ -109,9 +116,8 @@
 
 .resume-source-lightflow .resume-source-dropzone,
 .resume-source-lightflow .resume-source-phone-session {
-  grid-column: 1;
   min-height: 250px !important;
-  margin-top: -20px;
+  margin-top: 0;
   padding: 20px !important;
   border: 1px solid var(--fy-line) !important;
   border-top: 0 !important;
@@ -125,9 +131,8 @@
   color: var(--fy-teal-deep) !important;
 }
 
-.resume-source-lightflow .resume-source-direction {
-  grid-column: 2;
-  grid-row: 2 / span 2;
+.resume-source-lightflow .resume-source-side {
+  min-width: 0;
 }
 
 .resume-source-lightflow .resume-source-direction > * {
@@ -141,12 +146,10 @@
 }
 
 .resume-source-lightflow .resume-source-context {
-  grid-column: 2;
   padding: 18px 22px !important;
 }
 
 .resume-source-lightflow .resume-source-evidence {
-  grid-column: 1 / -1;
   padding: 22px 26px !important;
 }
 
@@ -155,15 +158,18 @@
 }
 
 .resume-report-lightflow .resume-report-content {
-  display: grid !important;
-  grid-template-columns: minmax(220px, .78fr) minmax(320px, 1.1fr) minmax(300px, 1fr);
-  align-items: stretch;
+  display: flex !important;
+  flex-direction: column;
+  gap: 16px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
 }
 
+.resume-report-lightflow .resume-report-score-row {
+  align-items: stretch;
+}
+
 .resume-report-lightflow .resume-report-summary {
-  grid-column: 1;
   padding: 18px !important;
 }
 
@@ -185,13 +191,11 @@
 }
 
 .resume-report-lightflow .resume-report-radar {
-  grid-column: 2;
   padding: 18px !important;
 }
 
 .resume-report-lightflow .resume-report-notice {
-  grid-column: 3;
-  padding: 18px !important;
+  padding: 0 !important;
 }
 
 .resume-report-lightflow .resume-report-evidence,
@@ -201,25 +205,12 @@
   padding: 22px 24px !important;
 }
 
-.resume-report-lightflow .resume-report-evidence {
-  grid-column: 1 / 2;
-}
-
 .resume-report-lightflow .resume-report-priorities {
-  grid-column: 2 / 4;
   background: var(--fy-surface) !important;
 }
 
-.resume-report-lightflow .resume-report-risks {
-  grid-column: 1 / 2;
-}
-
-.resume-report-lightflow .resume-report-suggestions {
-  grid-column: 2 / 4;
-}
-
 .resume-report-lightflow [role='progressbar'] {
-  background: linear-gradient(90deg, var(--fy-teal), #35ab8e) !important;
+  background: linear-gradient(90deg, var(--fy-teal), var(--color-primary-500)) !important;
 }
 
 .resume-report-lightflow .resume-report-priorities [class*='bg-warning'] {
@@ -326,7 +317,7 @@
 
 /* 低分进度条 → clay 渐变 */
 .resume-report-lightflow [role='progressbar'].fy-progress-low {
-  background: linear-gradient(90deg, var(--fy-clay), #c97b4e) !important;
+  background: linear-gradient(90deg, var(--fy-clay), var(--color-warning)) !important;
 }
 
 /* 风险提醒列表项:clay 背景 + 内边距 + 圆角 */
@@ -389,7 +380,7 @@
 .resume-source-lightflow .resume-source-phone-session .fy-qr-box {
   border: 1px solid var(--fy-line);
   border-radius: var(--fy-r-sm);
-  background: #fff;
+  background: var(--k-surface, var(--color-surface));
 }
 
 /* 手机扫码面板: 内层 grid 改为单列居中，QR 大图在上、信息在下 */
@@ -407,7 +398,7 @@
   flex: none !important;
   border: 1px solid var(--fy-line) !important;
   border-radius: var(--fy-r-sm) !important;
-  background: #fff !important;
+  background: var(--k-surface, var(--color-surface)) !important;
 }
 
 /* 信息区: 宽度撑满，去掉背景色，文字居中 */
@@ -455,6 +446,21 @@
   font-size: 18px !important;
   font-weight: 600 !important;
   color: var(--fy-ink) !important;
+}
+
+/* 屏27 解析页：与上传/报告共用 Stepper 壳 */
+.resume-parse-lightflow .resume-lightflow__stepper {
+  width: min(100%, 980px);
+  margin-inline: auto;
+  padding: 0 0 16px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.resume-parse-lightflow .rp-center {
+  flex: 1;
+  min-height: 0;
 }
 
 @media (max-width: 900px) {

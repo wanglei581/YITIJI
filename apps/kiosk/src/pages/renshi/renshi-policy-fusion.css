@@ -1,0 +1,290 @@
+/* 政策服务 /renshi — 原型 12-policy.html 密度对齐（wheat 品类） */
+
+.w4-policy-page.k8-policy-shell {
+  min-height: 100%;
+}
+
+.w4-policy-page .ui-kiosk-page-header {
+  padding-bottom: 18px;
+}
+
+.w4-policy-page .k8-policy {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 8px;
+}
+
+.k8-policy-banner {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-wheat) 35%, transparent);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-wheat-soft);
+  padding: 16px 22px;
+}
+
+.k8-policy-banner__text b {
+  display: block;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+}
+
+.k8-policy-banner__text span {
+  display: block;
+  margin-top: 4px;
+  font-size: 17px;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--color-wheat-fg) 85%, transparent);
+}
+
+.k8-policy-banner__action {
+  display: inline-flex;
+  min-height: 60px;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-wheat) 45%, transparent);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-surface);
+  padding: 0 20px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+  transition: background 160ms ease, transform 80ms ease;
+}
+
+.k8-policy-banner__action:active {
+  transform: scale(0.98);
+}
+
+.k8-policy-tabs {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.k8-policy-tab {
+  display: inline-flex;
+  min-height: 58px;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 0 20px;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--color-neutral-500);
+  transition: border-color 160ms ease, background 160ms ease, transform 80ms ease;
+}
+
+.k8-policy-tab[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--color-wheat) 50%, transparent);
+  background: var(--color-wheat-soft);
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+}
+
+.k8-policy-tab:active {
+  transform: scale(0.98);
+}
+
+.k8-policy-aud-cap {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.k8-policy-aud-cap small {
+  margin-left: 14px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--color-neutral-500);
+}
+
+.k8-policy-aud-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.k8-policy-aud-chip {
+  display: inline-flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 999px;
+  background: var(--color-surface);
+  padding: 0 24px;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--color-neutral-600);
+  transition: border-color 160ms ease, background 160ms ease, transform 80ms ease;
+}
+
+.k8-policy-aud-chip[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--color-wheat) 55%, transparent);
+  background: var(--color-wheat-soft);
+  font-weight: 600;
+  color: var(--color-wheat-fg);
+}
+
+.k8-policy-aud-chip:active {
+  transform: scale(0.98);
+}
+
+.k8-policy-src-line {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--color-neutral-500);
+}
+
+.k8-policy-grid {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 430px minmax(0, 1fr);
+  gap: 22px;
+}
+
+.k8-policy-list {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.k8-policy-list-item {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-surface);
+  padding: 18px 20px;
+  transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.k8-policy-list-item.is-active {
+  border-color: color-mix(in srgb, var(--color-wheat) 55%, transparent);
+  background: var(--color-wheat-soft);
+  box-shadow: 0 3px 14px color-mix(in srgb, var(--color-wheat) 12%, transparent);
+}
+
+.k8-policy-list-item b {
+  display: block;
+  font-size: 22px;
+  line-height: 1.35;
+  color: var(--color-neutral-900);
+}
+
+.k8-policy-list-item .k8-policy-list-sub {
+  display: block;
+  margin-top: 8px;
+  font-size: 16px;
+  line-height: 1.35;
+  color: var(--color-neutral-500);
+}
+
+.k8-policy-list-item .k8-policy-list-updated {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  color: var(--color-neutral-400);
+}
+
+.k8-policy-detail {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  border: 1px solid var(--color-neutral-200);
+  border-top: 4px solid var(--color-wheat);
+  border-radius: var(--k-r-md, 18px);
+  background: var(--color-surface);
+  padding: 24px;
+  box-shadow: 0 3px 14px rgba(16, 48, 43, 0.05);
+}
+
+.k8-policy-detail h2 {
+  font-family: var(--font-serif);
+  font-size: 29px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 1px;
+  color: var(--color-neutral-900);
+}
+
+.k8-policy-detail-note {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+}
+
+.k8-policy-detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.k8-policy-detail-actions .k8-policy-detail-btn {
+  min-height: 78px;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.k8-policy-footer {
+  flex-shrink: 0;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--k-r-sm, 14px);
+  background: var(--color-neutral-50);
+  padding: 12px 20px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .k8-policy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .k8-policy-tabs {
+    flex-direction: column;
+  }
+
+  .k8-policy-tab {
+    flex: 1 1 auto;
+  }
+
+  .k8-policy-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .k8-policy-detail-actions {
+    grid-template-columns: 1fr;
+  }
+}

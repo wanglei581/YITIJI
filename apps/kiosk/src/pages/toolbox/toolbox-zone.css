@@ -1,6 +1,5 @@
-/* 百宝箱区页样式（/toolbox）
- * pagehead/back-btn 取自 shared.css，暂 scope 在 .kpv1 .ktoolbox 页内，
- * 待首页公共组件 API 冻结后再提升为 prototype-v1 共享层。 */
+/* 百宝箱区页样式（/toolbox）— fusion 76 tb-tiles 密度与品类 accent
+ * pagehead/back-btn 取自 prototype-v1，scope 在 .kpv1 .ktoolbox 页内。 */
 
 .kpv1.ktoolbox { padding-bottom: 40px; }
 
@@ -28,20 +27,113 @@
   flex: 1; padding: 0 48px; min-height: 0;
   display: flex; flex-direction: column; gap: 24px;
 }
-.kpv1 .ktoolbox .tiles.c3 { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.kpv1 .ktoolbox .tile { min-height: 110px; }
+
+.kpv1 .tb-tiles {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 20px;
+}
+
+.kpv1 .tb-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--pv-line);
+  border-radius: var(--pv-r-md);
+  background: var(--pv-surface);
+  padding: 26px 28px;
+  color: var(--pv-ink);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
+  font-family: var(--pv-sans);
+}
+
+.kpv1 .tb-tile.accented {
+  border-top: 4px solid var(--pv-accent, var(--pv-plum));
+}
+
+.kpv1 .tb-tile.a-plum { --pv-accent: var(--pv-plum); --pv-accent-deep: var(--pv-plum-deep); --pv-accent-soft: var(--pv-plum-soft); }
+.kpv1 .tb-tile.a-teal { --pv-accent: var(--pv-teal); --pv-accent-deep: var(--pv-teal-deep); --pv-accent-soft: var(--pv-teal-soft); }
+.kpv1 .tb-tile.a-wheat { --pv-accent: var(--pv-wheat); --pv-accent-deep: var(--pv-wheat-deep); --pv-accent-soft: var(--pv-wheat-soft); }
+
+.kpv1 .tb-tile:active:not(:disabled) { transform: scale(.99); }
+.kpv1 .tb-tile:disabled,
+.kpv1 .tb-tile.disabled { opacity: .6; cursor: not-allowed; }
+
+.kpv1 .tb-tile .c-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.kpv1 .tb-tile .c-icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--pv-accent-soft, var(--pv-plum-soft));
+  color: var(--pv-accent-deep, var(--pv-plum-deep));
+}
+
+.kpv1 .tb-tile .c-icon svg { width: 34px; height: 34px; }
+
+.kpv1 .tb-tile h3 {
+  font-family: var(--pv-serif);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.kpv1 .tb-tile p {
+  font-size: 18px;
+  color: var(--pv-muted);
+  line-height: 1.5;
+}
+
+.kpv1 .tb-tile .c-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  color: var(--pv-accent-deep, var(--pv-plum-deep));
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.kpv1 .tb-tile .c-go svg { width: 20px; height: 20px; }
+.kpv1 .tb-tile.disabled .c-go { color: var(--pv-muted); }
+
+.kpv1 .tb-tile .launch-tag {
+  position: absolute;
+  top: 22px;
+  right: 24px;
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  background: var(--pv-paper);
+  color: var(--pv-muted);
+  padding: 5px 14px;
+  font-size: 15px;
+  white-space: nowrap;
+}
 
 .kpv1 .tb-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
   padding: 80px 20px; color: var(--pv-muted); text-align: center;
   background: var(--pv-surface); border: 1px dashed var(--pv-line); border-radius: var(--pv-r-md);
 }
 .kpv1 .tb-empty svg { width: 72px; height: 72px; opacity: .35; }
 .kpv1 .tb-empty b { font-size: 24px; color: var(--pv-ink); font-weight: 600; }
-.kpv1 .tb-empty span { font-size: 19px; line-height: 1.5; }
+.kpv1 .tb-empty span { font-size: 19px; line-height: 1.5; max-width: 640px; }
 
 @media (max-width: 760px) {
   .kpv1 .pagehead { padding: 24px; }
   .kpv1 .tb-content { padding: 0 24px; }
-  .kpv1 .ktoolbox .tiles.c3 { grid-template-columns: 1fr; }
+  .kpv1 .tb-tiles { grid-template-columns: 1fr; }
 }

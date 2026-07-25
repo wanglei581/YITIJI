@@ -5,6 +5,12 @@
   font-weight: 400;
 }
 
+.interview-resume-chip {
+  border-color: color-mix(in srgb, var(--interview-plum) 35%, var(--interview-line));
+  background: var(--interview-plum-soft);
+  color: var(--interview-plum-deep);
+}
+
 .interview-flow button:focus-visible,
 .interview-flow input:focus-visible,
 .interview-flow textarea:focus-visible {
@@ -166,7 +172,7 @@
 .interview-tips__ck-item[aria-pressed='true'] .interview-tips__ck-box {
   background: var(--interview-plum);
   border-color: var(--interview-plum);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 .interview-tips__ck-box svg { width: 16px; height: 16px; }
 .interview-tips__ck-title {
@@ -205,7 +211,7 @@
   font-size: 20px;
   font-weight: 800;
   background: var(--interview-plum);
-  color: #fffdf8;
+  color: var(--k-surface, var(--color-surface));
 }
 .interview-tips__star-name {
   font-size: 17.5px;

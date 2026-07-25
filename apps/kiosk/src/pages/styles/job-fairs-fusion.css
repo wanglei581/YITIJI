@@ -1,5 +1,107 @@
+/* ── W17: job-fairs proto 10/11 density (Scheme B — chrome only) ── */
+
 .w4-fair-page {
-  min-height: 100%;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* List + materials rows: proto 10 min-height ~116–130 */
+.jf-proto.tone-wheat .jf-row {
+  min-height: 122px;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 26px;
+}
+
+.jf-proto.tone-wheat .jf-row.align-start {
+  align-items: flex-start;
+  min-height: 124px;
+  padding-top: 20px;
+  padding-bottom: 20px;
+}
+
+.jf-proto.tone-wheat .jf-list {
+  gap: 14px;
+}
+
+.jf-proto.tone-wheat .jf-row-info {
+  margin-top: 7px;
+  gap: 8px 20px;
+}
+
+.jf-proto.tone-wheat .jf-row-sub {
+  margin-top: 8px;
+}
+
+.jf-proto.tone-wheat .jf-fair-aside {
+  gap: 10px;
+  min-width: 148px;
+}
+
+/* Pagehead aside: status / badge chips (proto 11) */
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: min(42vw, 420px);
+}
+
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside .jf-meta-chips {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside .jf-chip {
+  min-height: 44px;
+  padding: 6px 16px;
+  font-size: 17px;
+}
+
+/* 可点击 chip（收藏等）必须 ≥48px；展示用 span 可保持 44px 信息密度 */
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside button.jf-chip {
+  min-height: 48px;
+  padding: 8px 18px;
+}
+
+.jf-proto.tone-wheat .ui-kiosk-page-header-aside .jf-badge {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 17px;
+}
+
+/* Subpages: consistent card rhythm under W4 content shell */
+.jf-proto.tone-wheat .w4-page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.jf-proto.tone-wheat .w4-page-content > .jf-card {
+  padding: 24px 26px 26px;
+}
+
+.jf-proto.tone-wheat .w4-page-content > .jf-card.compact {
+  padding: 20px 24px 22px;
+}
+
+.jf-proto.tone-wheat .w4-page-content > .jf-card .jf-card-head {
+  margin-bottom: 18px;
+}
+
+.jf-proto.tone-wheat .w4-page-content > .jf-card.compact .jf-card-head {
+  margin-bottom: 14px;
+}
+
+.jf-proto.tone-wheat .w4-page-content > .jf-two-col,
+.jf-proto.tone-wheat .w4-page-content > .jf-stat-grid {
+  gap: 20px;
+}
+
+.jf-proto.tone-wheat .w4-page-content.tight {
+  gap: 16px;
 }
 
 .w4-ordered-steps {
@@ -19,9 +121,9 @@
 
 .w4-step-number {
   align-items: center;
-  background: var(--ink, #17211b);
+  background: var(--ink);
   border-radius: 50%;
-  color: #fff;
+  color: var(--k-surface, var(--color-surface));
   display: inline-flex;
   height: 36px;
   justify-content: center;
@@ -29,7 +131,7 @@
 }
 
 /* Recruitment-fair domain extensions moved intact from the legacy entry. */
-:root { --wheat: #a9781f; --wheat-deep: #8a6219; --wheat-soft: #f2ead6; }
+:root { --wheat: var(--color-wheat); --wheat-deep: var(--color-wheat-deep); --wheat-soft: var(--color-wheat-soft); }
 .jf-scale-tag { display: inline-flex; align-items: center; flex: none; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); padding: 3px 12px; color: var(--muted); font-size: 16px; }
 .jf-booth-label { color: var(--wheat-deep); font-weight: 700; }
 .jf-mtype { flex: none; border-radius: 999px; padding: 3px 12px; font-size: 15px; font-weight: 600; }
@@ -50,16 +152,26 @@
 .jf-fair-aside { display: flex; flex: none; flex-direction: column; align-items: center; gap: 8px; }
 .jf-qr-go { min-height: 56px; padding: 0 16px; font-size: 19px; white-space: nowrap; gap: 8px; }
 .jf-qr-go svg { width: 20px; height: 20px; }
-.ov-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 26px; }
+.ov-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 22px 24px;
+  align-items: start;
+}
+
+.jf-proto.tone-wheat .ov-grid .jf-kv + .jf-kv {
+  margin-top: 14px;
+}
+
 .jf-kv .k { color: var(--muted); font-size: 18px; }
 .jf-kv .v { font-size: 23px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
-.jf-pill-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
-.jf-traffic { margin-top: 18px; font-size: 19px; color: var(--muted); line-height: 1.55; }
+.jf-pill-row { display: flex; flex-wrap: wrap; gap: 10px 12px; margin-top: 14px; }
+.jf-traffic { margin-top: 16px; font-size: 19px; color: var(--muted); line-height: 1.55; }
 .jf-traffic b { display: block; font-size: 20px; color: var(--ink); margin-bottom: 6px; }
-.jf-mini-map { border-radius: 12px; border: 1px solid var(--line); background: var(--paper, #f4f1e8); position: relative; min-height: 280px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+.jf-mini-map { border-radius: 12px; border: 1px solid var(--line); background: var(--paper, var(--k-paper, var(--color-canvas))); position: relative; min-height: 280px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
 .jf-mini-map .grid-bg { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px), repeating-linear-gradient(90deg, transparent 0 43px, rgba(16,48,43,.06) 43px 44px); }
 .jf-zones3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.jf-zone-card { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper, #f4f1e8); padding: 20px 22px; position: relative; }
+.jf-zone-card { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--paper, var(--k-paper, var(--color-canvas))); padding: 20px 22px; position: relative; }
 .jf-zone-card .city-badge { position: absolute; right: 20px; top: 20px; font-size: 17px; font-weight: 600; color: var(--accent-deep, var(--wheat-deep)); }
 .jf-zone-card .z-icon { width: 52px; height: 52px; border-radius: 12px; display: grid; place-items: center; background: var(--accent-soft, var(--wheat-soft)); color: var(--accent-deep, var(--wheat-deep)); }
 .jf-zone-card .z-icon svg { width: 28px; height: 28px; }

@@ -1,5 +1,17 @@
 .w2-print-upload-source-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 16px;
+}
+
+.w2-print-upload-source-grid > button {
+  min-height: 92px !important;
+  border-radius: var(--fy-r-sm, 14px) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+}
+
+.w2-print-upload-source-grid > button svg {
+  width: 28px;
+  height: 28px;
 }

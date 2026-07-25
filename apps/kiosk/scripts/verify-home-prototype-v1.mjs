@@ -64,7 +64,8 @@ expect(shared.length > 0, '原型 shared.css 可读（真值锚点存在）')
 // [1] Topbar 高度：shared.css .topbar { height: N px }
 const protoTopbar = pxProp(cssRule(shared, '.topbar'), 'height')
 expect(protoTopbar === 76, `原型 shared.css .topbar 高度真值=76（实测 ${protoTopbar}）`)
-expect(pxProp(cssRule(pv, '.kpv1 .topbar'), 'height') === protoTopbar, `实现 .kpv1 .topbar 高度对齐原型 ${protoTopbar}px`)
+const shellCss = read('../../packages/ui/src/styles/kiosk-shell.css')
+expect(pxProp(cssRule(shellCss, "[data-kiosk-presentation='fusion-youth'] .ui-kiosk-topbar"), 'height') === protoTopbar, `共享壳 .ui-kiosk-topbar 高度对齐原型 ${protoTopbar}px`)
 
 // [2] 登录按钮：01-home .login-btn { min-height:88; border-radius:var(--r-md) }，shared --r-md=18
 const protoLogin = pxProp(cssRule(proto, '.login-btn'), 'min-height')
@@ -105,7 +106,7 @@ for (const [cls, cols] of [['c3', 'repeat(3, 1fr)'], ['c2', 'repeat(2, 1fr)'], [
 // [6] 底部导航高度：shared .navbar { height:116px }
 const protoNav = pxProp(cssRule(shared, '.navbar'), 'height')
 expect(protoNav === 116, `原型 shared .navbar 高度真值=116（实测 ${protoNav}）`)
-expect(pxProp(cssRule(pv, '.kpv1 .navbar'), 'height') === protoNav, `实现 .kpv1 .navbar 高度对齐原型 ${protoNav}px`)
+expect(pxProp(cssRule(shellCss, "[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav"), 'height') === protoNav, `共享壳 .ui-kiosk-nav 高度对齐原型 ${protoNav}px`)
 
 // ── 结构：统一 .tile 网格，废弃 primary/secondary 两级模型 ──────────
 expect(home.includes("import '../../styles/prototype-v1.css'"), 'HomePage 导入 prototype-v1 作用域样式')
@@ -127,7 +128,7 @@ for (const legacy of [
 ]) {
   expect(!existsSync(join(root, legacy)), `旧 .khome 首页样式已删除：${legacy}`)
 }
-expect(/className="kpv1"/.test(home), '首页根节点使用 .kpv1 作用域')
+expect(/className="kpv1 kpv1--content-only"/.test(home), '首页根节点使用 .kpv1 作用域（content-only）')
 expect(/<div className="groups"[^>]*aria-label="当前可使用功能"/.test(home), '首页服务区用中性 .groups 网格容器并保留可访问名称')
 expect(!/<main className="groups"/.test(home), '首页服务区不在 KioskLayout 主地标内嵌套 main')
 expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
@@ -173,12 +174,12 @@ expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, '
 expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按取舍决策删除')
 expect(/disabled=\{disabled\}/.test(home) && /tile\.disabled \|\| !tile\.to/.test(home), '磁贴禁用态由真实 disabled/to 驱动')
 
-// ── 真实设备状态：topbar 消费 fail-closed 组件，不硬编码在线/网络正常 ──────────
-const topBar = home.slice(home.indexOf('function KioskTopBar'), home.indexOf('function HomeWelcome'))
-expect(/<KioskDeviceStatusPills\s*\/>/.test(topBar), '顶栏消费真实 KioskDeviceStatusPills')
-expect(!/>\s*打印机在线\s*</.test(topBar) && !topBar.includes('网络正常'), '顶栏不硬编码「打印机在线」/「网络正常」字面量')
+// ── 真实设备状态：由共享 KioskLayout 顶栏消费 fail-closed hook，首页不再自绘 topbar ──
 expect(existsSync(join(root, 'src/hooks/useTerminalDeviceStatus.ts')), '真实设备状态 hook 存在')
-expect(existsSync(join(root, 'src/components/KioskDeviceStatusPills.tsx')), '设备状态药丸组件存在')
+expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(kioskRoot), 'KioskRoot 始终拉取真实设备状态')
+expect(kioskRoot.includes('<KioskTopbarStatus'), '共享顶栏注入真实设备状态胶囊')
+expect(!/function KioskTopBar/.test(home), '首页不再自绘 KioskTopBar')
+expect(!/>\s*打印机在线\s*</.test(home) && !home.includes('网络正常'), '首页不硬编码「打印机在线」/「网络正常」字面量')
 
 // ── 真实登录弹窗 + 动态专区开关（承接旧守卫）──────────────────────
 expect(home.includes('<MemberLoginDialog'), '首页挂载真实登录弹窗 MemberLoginDialog')
@@ -188,12 +189,12 @@ expect(/if \(!showToolbox && !showCampus\) return null/.test(home), '两专区�
 expect(/\.kpv1 \.zone-row \.zone-card:only-child\s*\{[^}]*grid-column:\s*1 \/ -1/.test(pv), '单专区启用时 :only-child 自动通栏（对齐原型规则）')
 expect(proto.includes('zone-card:only-child'), '原型定义 :only-child 通栏规则（真值）')
 
-// ── 底部三 Tab（原型 nav-item 首页/AI助手/我的）──────────────────
-for (const [label] of [['首页'], ['AI助手'], ['我的']]) {
-  expect(new RegExp(`nav-item[^>]*>[\\s\\S]{0,120}?${label}`).test(home), `底部导航保留 Tab：${label}`)
-}
-expect(/nav-item active/.test(home) && /aria-current="page"/.test(home), '首页 Tab 高亮 active 且 aria-current')
-expect((home.match(/className="nav-item/g) ?? []).length === 3, '底部导航为三项')
+// ── 底部三 Tab：改由共享 KioskLayout.ui-kiosk-nav 提供 ────────────
+expect(!/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
+expect(/hideBottomNav=\{isCampusZone\}/.test(kioskRoot), '首页使用共享底栏（仅校园专区隐藏）')
+const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
+expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI助手'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
+expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
 
 // ── 合规：禁用文案 + 合规提示条 ──────────────────────────────────
 for (const [re, label] of [[/一键投递/, '一键投递'], [/立即投递/, '立即投递'], [/(?<!来源)平台投递/, '脱离来源语境的平台投递']]) {
@@ -216,10 +217,12 @@ expect(/getMyPrintOrders|getMyResumes/.test(continuePanel), 'ContinuePanel 保�
 expect(/viewBox="0 0 24 24"/.test(icons) && /strokeWidth=\{1\.6\}/.test(icons), 'prototype 图标为 24×24 stroke 1.6 内联 SVG')
 expect(!/KIcon/.test(home), '首页图标不复用 KIcon sprite（用原型内联 ProtoIcon 保证图标形式 1:1）')
 
-// ── KioskRoot：首页隐藏共享底栏；service-desk 白名单/主题三元不变 ──────
-expect(/hideBottomNav=\{pathname === '\/' \|\| isCampusZone\}/.test(kioskRoot), '首页隐藏共享 KioskLayout 底栏（改由 .kpv1 自绘 116px 原型导航）')
-expect(/visualTheme=\{isServiceDeskRoute \? 'service-desk' : 'legacy'\}/.test(kioskRoot), 'KioskRoot visualTheme 三元保持不变（不动 service-desk 语义）')
-expect(kioskRoot.includes("const SERVICE_DESK_EXACT_ROUTES: readonly string[] = ["), 'KioskRoot 保留 service-desk 精确白名单（k1/k2a/k2b/profile-entry 依赖）')
+// ── KioskRoot：统一 service-desk + fusion-youth；首页接入共享壳 ──────
+expect(/visualTheme="service-desk"/.test(kioskRoot), 'KioskRoot 全路由统一 service-desk')
+expect(/presentation="fusion-youth"/.test(kioskRoot), 'KioskRoot 全路由统一 fusion-youth')
+expect(!kioskRoot.includes('SERVICE_DESK_EXACT_ROUTES'), '已拆除 SERVICE_DESK_EXACT_ROUTES 主题分叉')
+expect(/hideHeader=\{isCampusZone\}/.test(kioskRoot) && /hideBottomNav=\{isCampusZone\}/.test(kioskRoot), '仅校园专区隐藏共享顶栏/底栏')
+expect(/className="kpv1 kpv1--content-only"/.test(home) || /className=\{'kpv1 kpv1--content-only'\}/.test(home) || home.includes('kpv1--content-only'), '首页内容区使用 kpv1--content-only')
 
 // ── CI / package.json 接线 ──────────────────────────────────────
 expect(pkg.includes('"verify:home-prototype-v1": "node scripts/verify-home-prototype-v1.mjs"'), 'package.json 注册 verify:home-prototype-v1')
