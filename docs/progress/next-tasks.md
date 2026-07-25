@@ -20,7 +20,7 @@
    - **7a2 `SEED_PASSWORD_ROTATE`**：✅ 已执行（2026-07-25）——partner1/partner2 强随机口令 + `tokenVersion++`；§2.2 seed 默认口令项可勾选；明文仅服务器 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（取后 shred）
    - **7b `SECRETS_ROTATION_EVIDENCE`**：百度 OCR / COS / SMS / TRTC / LLM 控制台轮换截图或变更时间（密钥不进仓库/聊天）
    - **7c `WINDOWS_FIELD_RECHECK`**：一体机 Agent + 奔图驱动 + 断网恢复现场复验
-   - **7d（可选）`PARTNER_SMOKE_LOGIN`**：用轮换后口令（用户本机从 secret 文件读取）做 data-sources/jobs 只读 GET
+   - **7d `PARTNER_SMOKE_LOGIN`**：✅ 已做（2026-07-25）——partner `wanglei` 登录后 profile/dashboard/data-sources/jobs/sync-logs/fairs 只读 200；顺带 admin `admin` → legal-doc-versions/terminals 200。凭据不入库；建议聊天暴露后改密
    - **不在本包**：G5 退款、F1 Genesis、close-unpaid Phase B、切收费支付
    - **close-unpaid Phase A 复检（7e59243c）**：仍 `eligible=0`，Phase B 继续搁置
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`

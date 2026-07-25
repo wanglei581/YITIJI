@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-25 完成 **`PARTNER_SMOKE_LOGIN` + Admin 只读 GET（预发，用户提供本窗凭据）**：`DEPLOY_SOURCE=7e59243c`。登录：`portal=admin` 用户名 `admin` → 201；`portal=partner` 用户名 `wanglei` → 201（DB 角色 `partner`，非 admin）。Partner 只读：`/partner/profile` `/dashboard` `/data-sources` `/jobs` `/sync-logs` `/fairs` 均为 200（该机构 data-sources/jobs/fairs/sync-logs 当前均为空列表）。Admin 只读：`/admin/legal-doc-versions` 200（list:0）、`/admin/terminals` 200。**未**写业务数据；凭据未写入仓库；因曾出现在聊天，建议用户事后自行改密。partner1/partner2 轮换 secret 文件仍须用户 SSH 取后 shred（若尚未删）。
+
 2026-07-25 追加：**P0 授权包 Runbook 落盘 + close-unpaid Phase A 复检记录**。`docs/device/p0-auth-packs-seed-and-secrets-runbook.md`（`SEED_PASSWORD_CONFIRM` / `SECRETS_ROTATION_EVIDENCE` 模板）。G6 部署后只读复检仍 **`pending=0` / `eligible=0`**（未 POST close-unpaid、未造单）。Admin dist「初始密码」仅为设密表单 label。**未**进 Phase B；**未**轮换云密钥（7b 仍开）。
 
 2026-07-25 完成 **`SEED_PASSWORD_ROTATE`（预发 partner1/partner2）**：用户授权后续执行。前置 bcrypt 确认二者仍 MATCH seed 默认后，服务器生成强随机口令并 `UPDATE`：`passwordHash` 轮换、`passwordProofState=temporary`、`tokenVersion` 0→1（使旧会话失效）。复验：admin/partner1/partner2 对 seed 默认均为 `MISMATCH`（`section22Pass=true`）；`POST /auth/login` + seed 默认口令对 `partner1` → `401 AUTH_LOGIN_FAILED`。明文口令**仅**落在服务器 `0600` 文件 `/root/ai-job-print-seed-password-rotate-20260725T205537+0800.txt`（不进聊天/仓库）；请用户 SSH 取阅后 `shred -u` 删除。清单 §2.2 seed 默认口令项可勾选。未动 G5 / FREE_MODE / F1 Genesis / 真实短信。
