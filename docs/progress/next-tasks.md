@@ -10,11 +10,11 @@
 
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署含 close-unpaid / #328 / #331**：`DEPLOY_SOURCE=70ed8f6d`，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线（401 无 token）
+3. [x] **预生产部署含 close-unpaid / #328 / #331**：先 `DEPLOY_SOURCE=70ed8f6d`；2026-07-25 已跟进至 **`DEPLOY_SOURCE=7e59243c`（G6 #343）**，`TRUST_PROXY_HOPS=1`，三端 200；路由 `POST …/tasks/print/:id/close-unpaid` 在线
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [ ] **G5 Admin 订单退款入口**（收费启用前阻塞）——须用户确认后才改 orders readonly 守卫
-6. [x] **G6 法务文档版本管理最小版**（LegalDocVersion + 发布审计 + 同意记录关联版本号；代码候选，待合入/部署）
+6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG `MemberLegalConsent`；P1-5 法务正文定稿仍开）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——按 `docs/device/production-deployment-and-windows-host-checklist.md`；须现场执行
 8. [x] **`req.ip` 抽样确认**（2026-07-25）：伪造 XFF 不被 nginx/`trust proxy=1` 采信；见 `current-progress.md`
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
@@ -55,7 +55,7 @@
 - [x] **【P1】A 类:03/05/06 双栏布局对齐**——已在视觉 1:1 分支 W10 落地（有内容时双栏；无上下文诚实空态）；05 保留「云端上传」与 `/scan` 分流
 - [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿
 - [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
-- [x] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号；分支 `codex/g6-legal-consent-version-20260725`)
+- [x] **G6 法务文档版本管理最小版**([PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG migrate；P1-5 正文定稿仍开)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
 **开工前注意事项(2026-07-17)**:
@@ -350,7 +350,7 @@
 ## P1：青序 LightFlow 用户前台迁移与双后台暖色边界
 
 - [x] **暖色边界的持久发布集成（2026-07-16）**：暖色候选已以代码提交 `189a035c` 经 PR #257 合入 `main`（merge commit `bb9c7efb`），GitHub `build-and-verify` / `postgres-readiness` 与 Antigravity + Claude 完整 diff 终审均通过；生产 release `frontend-bb9c7efb-20260716T090846Z` 已更新 Admin / Partner 源码与静态产物，公网入口加载新哈希并通过服务器静态门禁、产物 SHA-256 和完全拦截生产 API 的浏览器视觉验收。Kiosk、API、数据库、环境、支付、终端、打印、扫描、账号状态、nginx / PM2 与 `CLOSED_MODE` 均未修改；环境文件哈希前后一致，回滚包已保留。
-- [x] **Partner 相对 API URL 解析独立修复**（2026-07-25）：[PR #342](https://github.com/wanglei581/YITIJI/pull/342) → `main@6ed7ba7a`；同日预生产 **仅热更** Partner `dist` → `index-9Gb3kgQt.js`（API 仍 `70ed8f6d`）。未登录浏览器冒烟已做；**剩余**登录后 data-sources/jobs GET（需 Partner 账号）。
+- [x] **Partner 相对 API URL 解析独立修复**（2026-07-25）：[PR #342](https://github.com/wanglei581/YITIJI/pull/342) → `main@6ed7ba7a`；曾预生产热更 Partner `dist`；同日已随 G6 全量部署 `7e59243c` 重建 Partner。未登录浏览器冒烟已做；**剩余**登录后 data-sources/jobs GET（需 Partner 账号）。
 - [x] **视觉边界修正（2026-07-15）**：用户确认 Kiosk 用户前台继续青序 LightFlow 蓝白服务台，Admin 与 Partner 恢复并固定为暖色 Inkpaper 运营后台。双后台已移除 `service-desk.css` 导入和路由级 opt-in，Admin 告警 CTA 回到墨绿投影，Partner 岗位分类改用现有低饱和分类工具类并继续与审核/发布状态语义分离；未改路由、真实数据、权限、API、支付、打印、扫描或数据库。三份既有 CI 静态 verify 已改为断言该边界，其中基础门禁递归扫描双后台运行时源码；本地 TDD RED→GREEN、两端 lint/typecheck、带 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 的 production build，以及 Admin 工作台 / Partner 岗位页 1440×1024 本地 mock 浏览器视觉验收均通过。2026-07-15 仅替换 Admin / Partner `dist` 的首轮发布属于历史临时验证，随后被 `main=e62a9789` 全量发布覆盖；最终持久化集成、正式发布、线上静态与浏览器证据以上一条已完成任务为准。
 - [x] **规范、命名与全页面事实盘点**：4188 亮蓝白服务台仍命名为「青序 LightFlow」，工程内部保留 `service-desk` 主题命名；112 个正式页面组件、5 条重定向和 3 个路由壳层的三端事实盘点保留在 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。LightFlow 后续只迁移用户前台，不代表双后台需要蓝白换装。
 - [x] **UI-0 / UI-1 代表页实施（历史本地候选，后台部分已被本次边界修正取代）**：该候选曾在 Kiosk 首页、Admin 工作台、Partner 岗位管理建立服务台 opt-in。Kiosk 首页的 LightFlow 结果保留；Admin / Partner 的服务台 opt-in、蓝色投影和服务台专用分类变量已由本次暖色 Inkpaper 恢复替代。既有静态 verify 与 CI 接线继续保留，但现在锁定 Kiosk 蓝白、后台暖色的分流规则。
