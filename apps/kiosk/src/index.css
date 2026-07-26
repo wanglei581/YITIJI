@@ -5,6 +5,8 @@
 @import "@ai-job-print/ui/styles/service-desk.css";
 @import "@ai-job-print/ui/styles/kiosk-shell.css";
 @import "@ai-job-print/ui/styles/kiosk-components.css";
+/* 设计稿舞台等比适配：仅 KioskRoot 布局路由；手机页/屏保不套用。 */
+@import "./styles/kiosk-stage-fit.css";
 @import "./pages/jobs-fairs-prototype.css";
 @import "tailwindcss";
 @source "../../../packages/ui/src";

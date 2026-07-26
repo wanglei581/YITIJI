@@ -146,9 +146,10 @@ function assertImportOrder(css) {
     '@ai-job-print/ui/styles/service-desk.css',
     '@ai-job-print/ui/styles/kiosk-shell.css',
     '@ai-job-print/ui/styles/kiosk-components.css',
+    './styles/kiosk-stage-fit.css',
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
-  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> local CSS -> Tailwind import order')
+  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))
