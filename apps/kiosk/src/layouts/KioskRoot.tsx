@@ -97,7 +97,7 @@ function KioskShell() {
   const isCampusZone = pathname === '/campus'
   const usesPageActionbar = routeUsesPageActionbar(pathname)
   const isResponsiveHome =
-    pathname === '/' && (viewportW <= 760 || (viewportW <= 960 && viewportH <= 760))
+    pathname === '/' && (viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH))
 
   const shell = (
     <KioskLayout
