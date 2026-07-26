@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-25
+> 最后更新：2026-07-26
 
 ## 当前执行：上线前 P0 收口（视觉候选已进主干）
 
@@ -12,6 +12,7 @@
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
 0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
 0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
+0e. [~] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新与公网受控 mock 浏览器走查已通过；仍待真实 Admin 登录、真实短信下发和受控账号转移 E2E。未获得测试手机号、管理员凭据和明确写操作授权前不得执行真实转移。
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`** + Kiosk hotfix #379（`index-Dn7fbWN6.js`）；含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis
