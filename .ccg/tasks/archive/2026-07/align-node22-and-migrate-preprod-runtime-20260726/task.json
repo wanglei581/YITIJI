@@ -1,0 +1,12 @@
+{
+  "id": "align-node22-and-migrate-preprod-runtime-20260726",
+  "title": "对齐 Node 22 仓库契约并受控迁移预生产 PM2 运行时",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend-operations",
+  "currentPhase": "completed",
+  "nextAction": "已完成并归档",
+  "createdAt": "2026-07-26T12:14:39Z",
+  "branch": "codex/preprod-pnpm1122-upgrade-20260726"
+}
