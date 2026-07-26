@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyRoundIcon, MailIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ApiHttpError } from '../../services/api/client'
 import {
   orgsAdminService,
@@ -101,6 +102,7 @@ export function PartnerAccountManager({
   }, [onChanged, onReload])
   const actionFlow = usePartnerAccountAction(orgId, reloadAccounts)
   const securityActionOpen = actionFlow.state.step !== 'closed'
+  const enabledAccountCount = accounts.filter((account) => account.enabled).length
 
   const addAccount = async () => {
     setAccountBusy('create')
@@ -196,6 +198,16 @@ export function PartnerAccountManager({
         </button>
       </div>
 
+      <div className="rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs leading-5 text-primary-800">
+        <p>只有一个手机号，且希望绑定到管理员账号？请勿删除机构账号或使用普通换绑。</p>
+        <p className="mt-1">
+          <Link to="/account-settings" className="font-medium text-primary-700 underline underline-offset-2">
+            前往账号设置安全转移
+          </Link>
+          <span>；转移后机构账号仍可使用用户名和密码登录。</span>
+        </p>
+      </div>
+
       {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
 
       {showNewAccount && (
@@ -238,6 +250,7 @@ export function PartnerAccountManager({
         <div className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
           {accounts.map((account) => {
             const actionsUnavailable = account.availableActionVerificationMethods.length === 0
+            const isLastEnabledAccount = account.enabled && enabledAccountCount <= 1
             return (
             <div key={account.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -298,7 +311,7 @@ export function PartnerAccountManager({
                 <button
                   type="button"
                   onClick={(event) => actionFlow.open('delete_account', account, event.currentTarget)}
-                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable}
+                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable || isLastEnabledAccount}
                   className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2Icon className="h-3.5 w-3.5" />
@@ -308,6 +321,11 @@ export function PartnerAccountManager({
               {actionsUnavailable && (
                 <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
                   该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过。
+                </p>
+              )}
+              {isLastEnabledAccount && (
+                <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
+                  该账号是机构最后一个启用账号，不能删除。请先创建并启用接替账号；如目的是把手机号绑定给管理员，请使用账号设置中的安全转移。
                 </p>
               )}
             </div>
