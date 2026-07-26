@@ -1,0 +1,12 @@
+{
+  "id": "merge-deploy-admin-phone-transfer-proof-state",
+  "title": "合并并预生产部署管理员手机号转移密码证明门禁",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "release",
+  "currentPhase": "completed",
+  "nextAction": "已合并并完成预生产 API-only 部署；归档任务",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/admin-phone-transfer-proof-state-guard-20260726"
+}

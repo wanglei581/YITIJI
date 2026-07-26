@@ -12,7 +12,7 @@
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
 0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
 0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
-0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言候选已提交 [PR #393](https://github.com/wanglei581/YITIJI/pull/393)，首轮三项 CI 全绿，**尚未合并或部署**；下一步仅在用户另行授权后合并并安排 API 预生产部署。
+0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言已由 [PR #393](https://github.com/wanglei581/YITIJI/pull/393) 合入 `main@50cbca15` 并完成预生产 API-only overlay；本机/公网 health `ok/postgres`，前端、环境、数据库、Redis 与短信配置未变。后续仅需随下一次正式全量发布固化 overlay provenance，不再重复真实手机号转移。
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`** + Kiosk hotfix #379（`index-Dn7fbWN6.js`）；含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis
