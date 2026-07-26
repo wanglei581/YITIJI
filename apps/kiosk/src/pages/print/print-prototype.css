@@ -10,9 +10,10 @@
   --print-ink: var(--k-ink);
   --print-muted: var(--k-muted);
   --print-line: var(--k-line);
-  --print-teal: var(--k-teal);
-  --print-teal-deep: var(--k-teal-deep);
-  --print-teal-soft: var(--k-teal-soft);
+  /* Fallbacks required: --k-teal lives on fusion-youth, not :root. Bare var(--k-teal) freezes as empty. */
+  --print-teal: var(--k-teal, #1f9e86);
+  --print-teal-deep: var(--k-teal-deep, #157a67);
+  --print-teal-soft: var(--k-teal-soft, #e2f2ec);
   --print-clay: var(--color-warning);
   --print-clay-soft: var(--color-warning-bg);
   --print-wheat: var(--color-wheat);

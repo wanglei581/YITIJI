@@ -82,7 +82,10 @@
     "verify:scan-session-truth": "node scripts/verify-scan-session-truth.mjs",
     "verify:visible-actions-truth": "node scripts/verify-kiosk-visible-actions-truth.mjs",
     "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",
-    "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs"
+    "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs",
+    "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
+    "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
+    "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

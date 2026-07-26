@@ -649,8 +649,8 @@
   gap: 12px;
   min-height: 88px;
   padding: 0 36px;
-  background: var(--print-teal);
-  color: var(--k-surface, var(--color-surface));
+  background: var(--print-teal, var(--k-teal, #1f9e86));
+  color: var(--k-surface, var(--color-surface, #fffdf8));
   border: none;
   border-radius: 18px;
   font: 600 26px var(--print-sans);
