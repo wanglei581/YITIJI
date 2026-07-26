@@ -207,7 +207,7 @@ for (const [label, pattern] of [
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
   ['responsive viewport size binding', /const\s*\{\s*viewportW\s*,\s*viewportH\s*\}\s*=\s*useKioskStageFit\(\s*\)/],
-  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*\(\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportH\s*<=\s*760\s*\)\s*\)/],
+  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*\(\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)\s*\)/],
   ['responsive home viewport', /viewport\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
   ['responsive home stable class', /className\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]\s*\}/],
   ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!isResponsiveHome\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
@@ -219,8 +219,11 @@ for (const [label, pattern] of [
   assert.match(shellBody, pattern, `KioskShell must preserve ${label}`)
 }
 const responsiveHomeFor = (viewportW, viewportH) =>
-  viewportW <= 760 || (viewportW <= 960 && viewportH <= 760)
+  viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
 assert.equal(responsiveHomeFor(932, 430), true, '932x430 must preserve the mobile home shell')
+assert.equal(responsiveHomeFor(932, 800), true, '932x800 must not depend on visual viewport height')
+assert.equal(responsiveHomeFor(800, 932), false, '800x932 portrait must preserve the staged kiosk shell')
+assert.equal(responsiveHomeFor(961, 760), false, '961x760 must preserve the staged kiosk shell')
 assert.equal(responsiveHomeFor(1024, 768), false, '1024x768 must preserve the staged kiosk shell')
 assert.equal(shellBody.includes('SERVICE_DESK_EXACT_ROUTES'), false, 'KioskShell must remove SERVICE_DESK_EXACT_ROUTES theme fork')
 assert.equal(shellBody.includes("'legacy'"), false, 'KioskShell must not select legacy visualTheme')

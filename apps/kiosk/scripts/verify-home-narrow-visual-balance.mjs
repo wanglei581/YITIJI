@@ -575,6 +575,16 @@ const isLessThanOrEqual = (node, name, value) => {
     expression.right.text === String(value),
   )
 }
+const isGreaterThan = (node, leftName, rightName) => {
+  const expression = unwrapParentheses(node)
+  return Boolean(
+    expression &&
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.GreaterThanToken &&
+    isIdentifierNamed(expression.left, leftName) &&
+    isIdentifierNamed(expression.right, rightName),
+  )
+}
 
 function kioskShellContract(sourceFile) {
   const shellFunction = findNamedFunction(sourceFile, 'KioskShell')
@@ -615,7 +625,7 @@ function kioskShellContract(sourceFile) {
     ts.isBinaryExpression(landscapeSizes) &&
     landscapeSizes.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
     isLessThanOrEqual(landscapeSizes.left, 'viewportW', 960) &&
-    isLessThanOrEqual(landscapeSizes.right, 'viewportH', 760),
+    isGreaterThan(landscapeSizes.right, 'viewportW', 'viewportH'),
   )
   const shell = findVariable(shellFunction, 'shell')?.initializer
   let shellExpression = shell
@@ -841,18 +851,18 @@ expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 
 
 const shellContract = kioskShellContract(kioskRootAst)
 expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW/viewportH')
-expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏<=760 与手机横屏<=960x760')
+expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏宽<=760 与横屏宽<=960')
 expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
 expect(shellContract.responsiveHeight, 'mobile 首页使用 kiosk-home-mobile 稳定类，其余 staged 页保持 h-full')
 expect(!shellContract.directHome, 'mobile 首页不再 direct-return shell 更换根节点')
 expect(shellContract.stableStage, 'KioskRoot 始终用 KioskStageFit 包裹并传 enabled={!isResponsiveHome}')
 
 const responsiveHomeFor = (viewportW, viewportH) =>
-  viewportW <= 760 || (viewportW <= 960 && viewportH <= 760)
-for (const [viewportW, viewportH] of [[390, 844], [430, 932], [760, 1024], [844, 390], [932, 430]]) {
+  viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+for (const [viewportW, viewportH] of [[390, 844], [430, 932], [760, 1024], [844, 390], [932, 430], [932, 800]]) {
   expect(responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 mobile 首页壳`)
 }
-for (const [viewportW, viewportH] of [[961, 760], [1024, 768], [1080, 1920]]) {
+for (const [viewportW, viewportH] of [[800, 932], [961, 760], [1024, 768], [1080, 1920]]) {
   expect(!responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 staged kiosk 壳`)
 }
 
