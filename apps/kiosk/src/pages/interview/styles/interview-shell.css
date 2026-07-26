@@ -203,6 +203,13 @@
 /* service-desk tokens: --sd-surface --sd-text */
   font-weight: 700;
 }
+
+.interview-setup__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 /* Touch target contracts */
 .interview-btn, .interview-option, [role="button"] {
   min-block-size: var(--sd-control-min, 48px);

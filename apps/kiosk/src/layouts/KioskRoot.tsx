@@ -29,6 +29,30 @@ function statusToneFor(kind: string, printerReady: boolean, loading: boolean): s
   return 'negative'
 }
 
+const ACTIONBAR_ROUTES = new Set([
+  '/print/upload',
+  '/print/material-check',
+  '/print/preview',
+  '/print/params',
+  '/print/confirm',
+  '/print/cashier',
+  '/print/progress',
+  '/scan/start',
+  '/scan/settings',
+  '/scan/progress',
+  '/scan/result',
+  '/print-scan/convert',
+  '/print-scan/sign',
+  '/resume/source',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/report',
+])
+
+function routeUsesPageActionbar(pathname: string): boolean {
+  return ACTIONBAR_ROUTES.has(pathname) || pathname.startsWith('/print-scan/feature/')
+}
+
 /**
  * KioskRoot 外层挂 KioskBusyProvider,内层 KioskShell 才能用忙碌态 + 屏保控制器。
  * /screensaver 是顶级路由(全屏,不在此布局内),退出后回到本布局的首页。
@@ -69,6 +93,7 @@ function KioskShell() {
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
+  const usesPageActionbar = routeUsesPageActionbar(pathname)
 
   return (
     // 舞台适配仅包布局内路由；/member/qr-login、/upload/phone、/screensaver 在布局外，不缩放。
@@ -81,7 +106,7 @@ function KioskShell() {
         presentation="fusion-youth"
         viewport="kiosk"
         hideHeader={isCampusZone}
-        hideBottomNav={isCampusZone}
+        hideBottomNav={isCampusZone || usesPageActionbar}
         brandTitle={`就业服务大厅 · ${terminalId}`}
         brandSubtitle="AI求职打印服务终端"
         headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}

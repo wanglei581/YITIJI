@@ -77,7 +77,17 @@ const visit = (node) => {
 }
 visit(source)
 assert.ok(routerArray, 'createBrowserRouter array must exist')
-const root = routerArray.elements.find((item) => (
+const routeObjects = []
+const collectRoutes = (array) => {
+  for (const item of array.elements) {
+    if (!ts.isObjectLiteralExpression(item)) continue
+    routeObjects.push(item)
+    const nestedChildren = property(item, 'children')?.initializer
+    if (nestedChildren && ts.isArrayLiteralExpression(nestedChildren)) collectRoutes(nestedChildren)
+  }
+}
+collectRoutes(routerArray)
+const root = routeObjects.find((item) => (
   ts.isObjectLiteralExpression(item)
   && stringValue(item, 'path') === '/'
   && jsxName(property(item, 'element')?.initializer) === 'KioskRoot'
@@ -165,6 +175,31 @@ const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 for (const marker of ['getConfiguredCapabilities', 'CARD_CAPABILITY_KEY', 'CAPABILITY_STATUS_NOTES']) {
   assert.match(printScanHome, new RegExp(marker), `print-scan home retains ${marker}`)
 }
+assert.match(
+  printScanHome,
+  /<KioskPageHeader[\s\S]*?onBack=\{\(\) => navigate\('\/'\)\}[\s\S]*?backLabel=["']返回["'][\s\S]*?\/>/,
+  'print-scan home exposes the prototype back button on the left of its page heading',
+)
+assert.doesNotMatch(
+  printScanHome,
+  /<KioskPageHeader[\s\S]*?aside=\{/,
+  'print-scan home must not move its primary back action into a narrow heading aside',
+)
+assert.doesNotMatch(
+  printScanHome,
+  /<KioskActionBar\b/,
+  'print-scan hub uses the prototype global navbar and must not render a second bottom action bar',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*\{[^}]*padding:\s*0\s+48px\s+32px\s*;/,
+  'print-scan shell uses the prototype 48px content gutter without adding top padding to the pagehead',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*>\s*\.ui-kiosk-page-header\s*\{[^}]*margin-inline:\s*-48px\s*;/,
+  'print-scan pagehead bleeds through the content gutter so its back button starts at 48px',
+)
 const convertImages = read('src/pages/print-scan/ConvertImagesPage.tsx')
 for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
@@ -179,8 +214,46 @@ assert.match(printUpload, /type UploadTab = 'file' \| 'qr' \| 'usb'/, 'print upl
 assert.match(printUpload, /navigate\('\/scan\/start'\)/, 'print upload keeps scan as an independent CTA')
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
+assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
 assert.match(read('src/pages/print/styles/print-upload.css'), /\.w2-print-upload-source-grid\b/, 'print upload stylesheet owns the live source grid selector')
 assert.equal((printUpload.match(/<UploadSessionQrPanel\b/g) ?? []).length, 1, 'print upload renders one QR session panel')
+const printPrototypeLayout = read('src/pages/print/PrintPrototypeLayout.tsx')
+assert.match(
+  printPrototypeLayout,
+  /classNames\.includes\(["']p-6["']\)/,
+  'shared print frame recognizes legacy p-6 callers that need the unified gutter',
+)
+assert.match(
+  printPrototypeLayout,
+  /className\s*!==\s*["']p-6["']/,
+  'shared print frame removes legacy outer padding instead of stacking it around the pagehead',
+)
+assert.match(
+  printPrototypeLayout,
+  /contentClassName=\{usesUnifiedGutter\s*\?\s*["']print-proto-content--guttered["']\s*:\s*undefined\}/,
+  'shared print frame moves legacy callers onto its content gutter contract',
+)
+const printPrototypeCss = read('src/pages/print/print-prototype.css')
+assert.match(
+  printPrototypeCss,
+  /--print-page-gutter:\s*48px\s*;/,
+  'print flow declares the prototype 48px gutter once',
+)
+assert.match(
+  printPrototypeCss,
+  /\.print-proto\s*>\s*\.ui-kiosk-page-content\.print-proto-content--guttered\s*\{[^}]*padding-inline:\s*var\(--print-page-gutter\)\s*;/,
+  'legacy print callers receive the shared 48px content gutter',
+)
+assert.match(
+  printPrototypeCss,
+  /\.print-proto-content--guttered[\s\S]*?>\s*:is\(\.ui-kiosk-page-header,\s*\.ui-kiosk-steps,\s*\.ui-kiosk-action-bar\)\s*\{[^}]*margin-inline:\s*calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s*;/,
+  'pagehead, steps and actionbar bleed through the content gutter without absolute positioning',
+)
+assert.match(
+  printPrototypeCss,
+  /\[data-w2-page=["']print-upload["']\]\s*>\s*\.print-upload-footer\s*\{[^}]*margin:\s*22px\s+calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s+0\s*;[^}]*padding:\s*26px\s+var\(--print-page-gutter\)\s+34px\s*;[^}]*border-top:\s*1px\s+solid\s+var\(--print-line\)\s*;/,
+  'print upload ordinary footer buttons follow the prototype actionbar geometry',
+)
 const materialPresentation = read('src/pages/print/components/MaterialCheckPresentation.tsx')
 assert.match(materialPresentation, /data-w2-page=["']print-material-check["']/, 'material presentation exposes its W2 marker')
 assert.match(materialPresentation, /aria-pressed=\{finding\.selected === action\}/, 'material privacy decisions expose their selected state accessibly')

@@ -56,5 +56,16 @@ export function PrintPrototypeHeader({ title, subtitle, step, backLabel, onBack,
 }
 
 export function PrintPageFrame(props: { children: ReactNode; className?: string }) {
-  return <KioskPageFrame className={['print-proto', props.className].filter(Boolean).join(' ')}>{props.children}</KioskPageFrame>
+  const classNames = props.className?.split(/\s+/).filter(Boolean) ?? []
+  const usesUnifiedGutter = classNames.includes('p-6')
+  const retainedClassNames = classNames.filter((className) => className !== 'p-6')
+
+  return (
+    <KioskPageFrame
+      className={['print-proto', ...retainedClassNames].join(' ')}
+      contentClassName={usesUnifiedGutter ? 'print-proto-content--guttered' : undefined}
+    >
+      {props.children}
+    </KioskPageFrame>
+  )
 }

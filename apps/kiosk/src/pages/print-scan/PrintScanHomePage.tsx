@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   canCreateFormalPrintScanTask,
@@ -241,11 +241,8 @@ export function PrintScanHomePage() {
       <KioskPageHeader
         title="打印扫描服务"
         description="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"
-        aside={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>
-            返回首页
-          </Button>
-        }
+        onBack={() => navigate('/')}
+        backLabel="返回"
       />
 
       {/* 隐私保护提示 */}
@@ -368,9 +365,6 @@ export function PrintScanHomePage() {
         </p>
       </div>
 
-      <KioskActionBar>
-        <Button variant="secondary" onClick={() => navigate('/')}>返回首页</Button>
-      </KioskActionBar>
       </div>
     </KioskPageFrame>
   )

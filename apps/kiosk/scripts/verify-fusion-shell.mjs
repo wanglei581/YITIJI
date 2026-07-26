@@ -209,7 +209,7 @@ for (const [label, pattern] of [
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
-  ['campus-only nav hide', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\}/],
+  ['campus/actionbar nav replacement', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\|\|\s*usesPageActionbar\s*\}/],
 ]) {
   assert.match(shellBody, pattern, `KioskShell must preserve ${label}`)
 }

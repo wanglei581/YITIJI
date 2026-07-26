@@ -47,6 +47,7 @@
     "verify:profile-print-orders-login-smoke": "node scripts/verify-profile-print-orders-login-smoke.mjs",
     "verify:profile-commercial-first-batch": "node scripts/verify-profile-commercial-first-batch.mjs",
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
+    "verify:kiosk-runtime-error-boundary": "node scripts/verify-kiosk-runtime-error-boundary.mjs",
     "verify:home-prototype-v1": "node scripts/verify-home-prototype-v1.mjs",
     "verify:member-login-dialog": "node scripts/verify-member-login-dialog.mjs",
     "verify:lightflow-k2c-interview": "node scripts/verify-lightflow-k2c-interview.mjs",

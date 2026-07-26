@@ -569,7 +569,7 @@ export function PrintUploadPage() {
       </div>
 
       {/* Bottom action */}
-      <div className="mt-6 flex gap-3">
+      <div className="print-upload-footer mt-6 flex gap-3">
         <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
           取消
         </Button>

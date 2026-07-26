@@ -35,15 +35,19 @@ export function registerW6Api(api: ApiRouter): void {
   get('/api/v1/job-materials/templates', success([]))
 
   const offlineJob = {
-    id: 'offline-job-001', title: '现场咨询岗位', salary: '薪资面议', jobType: 'fulltime', location: '青岛市',
-    tags: ['现场咨询'], responsibilities: ['了解公开岗位信息'], requirements: ['携带本人材料到店咨询'],
-    agencyId: 'agency-001', agencyName: '青岛合规人力服务机构', agencyType: '人力资源服务机构',
-    agencyAddress: '市南区示例路1号', agencyHours: '09:00–17:00', agencyPhone: '0532-00000000',
-    agencyServices: ['岗位咨询'], sourceName: '线下机构公开信息', sourceType: 'offline_agency',
-    syncTime: '2026-07-24T08:00:00.000Z', externalId: 'offline-ext-001',
-    agency: { id: 'agency-001', name: '青岛合规人力服务机构', orgType: '人力资源服务机构', address: '市南区示例路1号', phone: '0532-00000000', openHours: '09:00–17:00', services: '岗位咨询', status: 'open' },
+    id: 'offline-job-001', agencyId: 'agency-001', title: '现场咨询岗位', jobType: 'fulltime',
+    salaryMin: 8000, salaryMax: 12000, salaryUnit: 'month',
+    requirements: '携带本人材料到店咨询', description: '了解公开岗位信息', headcount: 1,
+    location: '青岛市', education: null, experience: null, externalUrl: null,
+    externalId: 'offline-ext-001', status: 'active',
+    createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
+    agency: {
+      id: 'agency-001', name: '青岛合规人力服务机构', orgType: 'recruitment',
+      address: '市南区示例路1号', district: '市南区', phone: '0532-00000000',
+      openHours: '09:00–17:00', website: null, reviewStatus: 'approved', publishStatus: 'published',
+    },
   }
-  get('/api/v1/kiosk/offline-jobs/offline-job-001', success(offlineJob))
+  get('/api/v1/kiosk/offline-jobs/offline-job-001', offlineJob)
 
   const fairCompany = {
     id: 'fair-company-001', jobFairId: 'fair-001', name: '青岛示例制造有限公司', industry: '智能制造',

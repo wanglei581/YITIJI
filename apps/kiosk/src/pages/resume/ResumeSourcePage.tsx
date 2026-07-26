@@ -314,7 +314,7 @@ export function ResumeSourcePage() {
           <span className="shrink-0 rounded-full bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700">去生成</span>
         </button>
 
-        <div className="resume-source-split flex min-w-0 flex-col gap-5 lg:flex-row">
+        <div className="resume-source-split grid min-w-0 grid-cols-1 gap-5">
           <div className="resume-source-main flex min-w-0 flex-1 flex-col gap-5">
             <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
               {UPLOAD_OPTIONS.map((option) => {
@@ -392,7 +392,7 @@ export function ResumeSourcePage() {
             )}
           </div>
 
-          <aside className="resume-source-side flex w-full flex-none flex-col gap-5 lg:w-[348px]">
+          <aside className="resume-source-side flex min-w-0 w-full flex-col gap-5">
             <div className="resume-source-direction">
               <DiagnosisDirectionForm
                 genericDiagnosis={genericDiagnosis}
