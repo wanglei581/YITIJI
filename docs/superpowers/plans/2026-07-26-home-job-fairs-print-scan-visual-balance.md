@@ -4,7 +4,7 @@
 
 **Goal:** 在 390×844 与 390×700 窄屏下压缩首页“打印扫描”的视觉体量并弱化“招聘会”重复色块，同时保持 1080×1920 一体机、全部真实入口和动态专区不退化。
 
-**Architecture:** `ServiceCard` 只增加稳定的 `data-group-id` 结构作用域，避免招聘会与政策服务共享 `wheat` token 时串组。所有视觉调整只追加到 `@media (max-width: 760px)`，原型派生基础规则保持不动；窄屏规格使用独立静态 verifier，和现有 1080 原型真值合同并列。
+**Architecture:** `ServiceCard` 增加稳定的 `data-group-id` 结构作用域，避免招聘会与政策服务共享 `wheat` token 时串组。首页以 `.kiosk-home-mobile` 作为连续移动规则作用域；手机竖屏 `width <= 760px` 及手机横屏 `width <= 960px && width > height` 关闭舞台缩放，但 `KioskStageFit` 始终保留相同的 host/scaler/stage DOM。方向判定不依赖会随浏览器地址栏变化的固定高度阈值；窄屏规格使用独立静态 verifier，并与 1080 原型真值和 fusion shell 合同并列。
 
 **Tech Stack:** React 18、TypeScript、CSS Media Queries、Node.js 静态 verifier、Vite、真实浏览器视口验收
 
@@ -14,13 +14,15 @@
 
 **真实功能闭环：** 首页现有招聘会和打印扫描入口在手机窄屏下保持可发现、可点击、状态诚实，且不挤压动态专区和底栏。
 
-**允许修改的生产/验证文件（5 个）：**
+**允许修改的生产/验证文件（7 个）：**
 
 - Create: `apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs` — 原型外窄屏视觉合同。
 - Modify: `apps/kiosk/package.json` — 注册新 verifier 脚本。
 - Modify: `apps/kiosk/src/pages/home/HomePage.tsx` — 为服务组增加稳定作用域属性。
 - Modify: `apps/kiosk/src/styles/prototype-v1.css` — 添加严格限定的窄屏覆写。
-- Modify: `apps/kiosk/src/layouts/KioskRoot.tsx` — 仅首页且视口不大于 760px 时使用真实手机壳层，不套固定舞台缩放。
+- Modify: `apps/kiosk/src/layouts/KioskRoot.tsx` — 计算首页竖屏/横屏响应条件并切换稳定舞台开关。
+- Modify: `apps/kiosk/src/components/kiosk-shell/KioskStageFit.tsx` — 增加默认开启的 `enabled`，关闭时保留同一 DOM 并使用物理视口。
+- Modify: `apps/kiosk/scripts/verify-fusion-shell.mjs` — 锁定稳定舞台 wrapper 合同。
 - Modify: `docs/progress/current-progress.md` — 记录本地验证事实和未完成边界。
 
 **治理文件（不计入产品文件预算）：**
@@ -253,7 +255,7 @@ git add apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs apps/kiosk/pack
 git commit -m "fix: balance home service sections on narrow screens"
 ```
 
-### Task 3: 真实浏览器三视口验收
+### Task 3: 真实浏览器十视口验收
 
 **Files:**
 
@@ -271,15 +273,15 @@ git commit -m "fix: balance home service sections on narrow screens"
 
 - [ ] **Step 1: 先扩充 verifier 并取得第二轮 RED**
 
-锁定以下合同：仅 `/` 且视口不大于 760px 时，KioskLayout 使用 `viewport="mobile"` 语义并绕过 `KioskStageFit`；其他路由和 1080×1920 首页仍使用原舞台。打印扫描禁用磁贴在窄屏下显式覆写 `opacity: 1`，并使用可读的明确中性色，而不是依赖父级透明度。
+锁定以下合同：仅 `/` 且处于手机竖屏（`width <= 760px`）或手机横屏（`width <= 960px && width > height`）时，KioskLayout 使用 `viewport="mobile"` 语义，`KioskStageFit` 保持同一 DOM 并切换为 `off`；其他路由、800×932、1024×768 和 1080×1920 首页仍使用原舞台。打印扫描禁用磁贴在移动首页显式覆写 `opacity: 1`，并使用可读的明确中性色，而不是依赖父级透明度。
 
 - [ ] **Step 2: 最小实现**
 
-在 `KioskShell` 复用 `useKioskStageFit()` 返回的 `viewportW`，计算首页窄屏状态；只在该状态下直接渲染 `KioskLayout`，其余状态继续由 `KioskStageFit` 包裹。不得改变路由、页面功能、状态轮询或其他布局内页面。窄屏禁用磁贴显式使用不透明的纸色/中性色背景、边界和文字。
+在 `KioskShell` 复用 `useKioskStageFit()` 返回的 `viewportW/viewportH` 计算首页响应状态；无论开关状态都由 `KioskStageFit` 包裹，响应状态只通过 `enabled={false}` 使用 `100vw/100dvh` 与 `transform:none`。不得改变路由、页面功能、状态轮询或其他布局内页面。移动首页紧凑规则统一绑定 `.kiosk-home-mobile`，窄屏禁用磁贴显式使用不透明的纸色/中性色背景、边界和文字。
 
 - [ ] **Step 3: 第二轮 GREEN 与浏览器测量**
 
-运行专项 verifier、首页原型 verifier、typecheck、targeted lint 和 `git diff --check`。随后在 390×844、390×700 实测打印扫描可用磁贴物理高度不低于 56px、文字可读、禁用状态明确；在 1080×1920 确认 `.kiosk-stage` 仍为 scale(1) 且五列布局不变。
+运行专项 verifier、fusion shell、首页原型 verifier、typecheck、targeted lint 和 `git diff --check`。随后在 390×844、390×700、430×932、760×1024、844×390、932×430、932×800 实测打印扫描五卡物理高度均为 80px、文字可读、禁用状态明确；在 800×932、961×760、1024×768、1080×1920 确认 `.kiosk-stage` 仍启用并等比缩放/scale(1)，且五列基础布局不变。
 
 - [ ] **Step 1: 检查并启动本地预览**
 
@@ -308,6 +310,10 @@ Expected: `curl --noproxy '*' -I http://127.0.0.1:58245/` 返回 200。
 - [ ] **Step 4: 验收 1080×1920**
 
 使用真实浏览器设置 1080×1920，确认打印扫描仍为五列、磁贴仍是 90px 竖排；动态专区、合规提示和底栏锚点无可见位移。
+
+- [ ] **Step 4.1: 补充连续断点与旋转验收**
+
+依次检查 430×932、760×1024、844×390、932×430、932×800、800×932、1024×768；前五者保持 `.kiosk-home-mobile` 和物理移动壳，后两者保持 staged kiosk 壳。从 390×844 旋转到 844×390 再返回，确认滚动位置与路由状态不重置。
 
 - [ ] **Step 5: 检查动效与无障碍状态**
 
