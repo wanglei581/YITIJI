@@ -20,6 +20,7 @@
 - Modify: `apps/kiosk/package.json` — 注册新 verifier 脚本。
 - Modify: `apps/kiosk/src/pages/home/HomePage.tsx` — 为服务组增加稳定作用域属性。
 - Modify: `apps/kiosk/src/styles/prototype-v1.css` — 添加严格限定的窄屏覆写。
+- Modify: `apps/kiosk/src/layouts/KioskRoot.tsx` — 仅首页且视口不大于 760px 时使用真实手机壳层，不套固定舞台缩放。
 - Modify: `docs/progress/current-progress.md` — 记录本地验证事实和未完成边界。
 
 **治理文件（不计入产品文件预算）：**
@@ -257,6 +258,28 @@ git commit -m "fix: balance home service sections on narrow screens"
 **Files:**
 
 - No tracked files; use the running local preview and save evidence outside tracked product sources.
+
+### Task 2.5: 审查纠偏——真实手机热区与禁用态对比度
+
+质量审查与 390×844 浏览器实测确认：原 GREEN 在 CSS 逻辑值上提供了 68px 热区，但 `KioskStageFit` 会先按 1080×1920 排版，再以约 0.361 倍缩放到手机，最终物理热区仅约 25px；同时基础 `.tile.disabled { opacity: .55 }` 会把禁用态文字与标签对比度降到目标以下。
+
+**Files:**
+
+- Modify: `apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs`
+- Modify: `apps/kiosk/src/layouts/KioskRoot.tsx`
+- Modify: `apps/kiosk/src/styles/prototype-v1.css`
+
+- [ ] **Step 1: 先扩充 verifier 并取得第二轮 RED**
+
+锁定以下合同：仅 `/` 且视口不大于 760px 时，KioskLayout 使用 `viewport="mobile"` 语义并绕过 `KioskStageFit`；其他路由和 1080×1920 首页仍使用原舞台。打印扫描禁用磁贴在窄屏下显式覆写 `opacity: 1`，并使用可读的明确中性色，而不是依赖父级透明度。
+
+- [ ] **Step 2: 最小实现**
+
+在 `KioskShell` 复用 `useKioskStageFit()` 返回的 `viewportW`，计算首页窄屏状态；只在该状态下直接渲染 `KioskLayout`，其余状态继续由 `KioskStageFit` 包裹。不得改变路由、页面功能、状态轮询或其他布局内页面。窄屏禁用磁贴显式使用不透明的纸色/中性色背景、边界和文字。
+
+- [ ] **Step 3: 第二轮 GREEN 与浏览器测量**
+
+运行专项 verifier、首页原型 verifier、typecheck、targeted lint 和 `git diff --check`。随后在 390×844、390×700 实测打印扫描可用磁贴物理高度不低于 56px、文字可读、禁用状态明确；在 1080×1920 确认 `.kiosk-stage` 仍为 scale(1) 且五列布局不变。
 
 - [ ] **Step 1: 检查并启动本地预览**
 
