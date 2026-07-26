@@ -10,10 +10,11 @@
 
 0. [x] **预发事故：offline-agencies `pageSize` string → 500**：#366；现网 **`DEPLOY_SOURCE=83f2117f`** 仍固化；公网 `?pageSize=5` → 200
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
-0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化（Kiosk `index-_FiZHKg3.js`，含「扫码上传 / U盘导入」）
+0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
+0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`**（含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis）
+3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`** + Kiosk hotfix #379（`index-Dn7fbWN6.js`）；含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`：Admin `/orders` 对 `paid` 全额退款 UI。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏、`G5_REFUND_SMOKE`
@@ -37,7 +38,7 @@
 用户已确认：视觉/排版对齐 86 原型 + 生产诚实态（不伪造）。规格与计划见 `docs/superpowers/specs/2026-07-25-kiosk-86-proto-visual-1to1-design.md`、`docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md`。
 
 - [x] W7–W22 方案 B 细对齐候选——已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`
-- [x] **多分辨率舞台适配（stage-fit）**——布局路由 1080×1920 等比缩放居中；手机页/屏保除外（见 `current-progress` 2026-07-26）
+- [x] **多分辨率舞台适配（stage-fit）**——[PR #379](https://github.com/wanglei581/YITIJI/pull/379) 已合入并预发热更；布局路由 1080×1920 等比缩放居中；手机页/屏保除外（见 `current-progress` 2026-07-26）
 - [ ] （可选）像素级抽检与真机验收前的视觉回归——壳/token/细对齐候选 ≠ 86 屏全部 1:1 已封板
 - [ ] 上线前 P0 真机 / 支付 / 部署验收（整机商用，不在视觉任务宣称范围）→ **上移至「当前执行」**
 
