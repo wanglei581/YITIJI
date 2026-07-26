@@ -1,0 +1,12 @@
+{
+  "id": "upgrade-preprod-node22-toolchain-20260726",
+  "title": "预生产 Node 22 LTS 与 pnpm 11.2.2 受控工具链升级",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations-security",
+  "currentPhase": "completed",
+  "nextAction": "归档并提交文档记录",
+  "createdAt": "2026-07-26T11:40:00Z",
+  "branch": "codex/preprod-pnpm1122-upgrade-20260726"
+}
