@@ -211,13 +211,27 @@ assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must de
 for (const code of allowedDiagnosticCodes) {
   assertIncludes(diagnosis, code, `diagnosis whitelist must include ${code}`)
 }
-const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\n\$service\s*=/)
+const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\nfunction Get-ProgramDataAclStatus\(/)
 assert.match(startupDiagnosticReader, /\$diagnostic\.schemaVersion\s+-ne\s+1/, 'diagnosis must validate diagnostic schemaVersion')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic state type')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-notin\s+@\("ready",\s*"failed"\)/, 'diagnosis must validate diagnostic state')
 assert.match(startupDiagnosticReader, /\$diagnostic\.code\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic code type')
 assert.match(startupDiagnosticReader, /IsNullOrWhiteSpace\(\[string\]\$diagnostic\.code\)/, 'diagnosis must reject empty diagnostic codes')
 assert.match(startupDiagnosticReader, /\$allowedDiagnosticCodes\s+-notcontains\s+\$diagnostic\.code/, 'diagnosis must reject codes outside the whitelist')
+
+assert.match(diagnosis, /function Get-ProgramDataAclStatus\(/, 'diagnosis must expose a closed ProgramData ACL inspector')
+const aclInspector = sourceBetween(diagnosis, /function Get-ProgramDataAclStatus\(/, /\n\$service\s*=/)
+assert.match(aclInspector, /Get-Acl\s+-LiteralPath/, 'ACL inspector must use Get-Acl')
+assert.match(aclInspector, /AreAccessRulesProtected/, 'ACL inspector must require inheritance disabled')
+assert.match(aclInspector, /S-1-5-18/, 'ACL inspector must require SYSTEM')
+assert.match(aclInspector, /S-1-5-32-544/, 'ACL inspector must require Administrators')
+assert.match(aclInspector, /S-1-1-0/, 'ACL inspector must detect Everyone')
+assert.match(aclInspector, /S-1-5-11/, 'ACL inspector must detect Authenticated Users')
+assert.match(aclInspector, /S-1-5-32-545/, 'ACL inspector must detect BUILTIN\\Users')
+for (const status of ['missing', 'ok', 'too_permissive', 'unexpected', 'unavailable']) {
+  assertIncludes(aclInspector, `"${status}"`, `ACL inspector vocabulary must include ${status}`)
+}
+assert.doesNotMatch(aclInspector, /Set-Acl|SetAccessRuleProtection|AddAccessRule/, 'ACL inspector must remain read-only')
 
 const configStatusStart = diagnosis.lastIndexOf('$configFieldStatus = [pscustomobject]@{')
 assert.notEqual(configStatusStart, -1, 'diagnosis must calculate field status through a PSCustomObject')
@@ -243,6 +257,8 @@ for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 
 }
 assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
 assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
+assert.match(diagnosisOutput, /^\s*programDataAclStatus\s*=\s*\$programDataAclStatus\s*$/m, 'diagnosis output must map ProgramData ACL status')
+assert.match(diagnosisOutput, /^\s*tokenFileAclStatus\s*=\s*\$tokenFileAclStatus\s*$/m, 'diagnosis output must map token file ACL status')
 assert.match(diagnosisOutput, /^\s*serviceName\s*=\s*\$resolvedServiceName\s*$/m, 'diagnosis must report the resolved SCM service Name')
 assert.match(diagnosisOutput, /^\s*serviceDisplayName\s*=\s*\$resolvedServiceDisplayName\s*$/m, 'diagnosis must report the resolved service DisplayName')
 assert.match(diagnosisOutput, /^\s*serviceAmbiguous\s*=\s*\$serviceAmbiguous\s*$/m, 'diagnosis must report whether service resolution was ambiguous')

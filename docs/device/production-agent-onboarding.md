@@ -52,6 +52,21 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 `agent_degraded`（本地 SQLite 不可用）与 `AGENT_UNAUTHORIZED`（云端凭证失效）是两条独立路径，不得互相冒充。
 
+### Gate 0.4 11c：Windows 真机验收清单（须另授写操作）
+
+静态 verify / 安装脚本合同**不能**替代本表。执行前确认目标终端空队列（无 `pending/claimed/printing` 打印任务、无 `waiting/matched` 扫描任务），且已取得用户点名授权（含是否允许紧急吊销演练）。
+
+| # | 步骤 | 通过标准 | 证据 |
+|---|---|---|---|
+| 1 | 只读诊断 | `diagnose-production-agent.ps1` 可运行；服务 `AIJobPrintAgent` Running / Auto | 命令输出截图 |
+| 2 | ProgramData ACL | `diagnose-production-agent.ps1` 输出 `programDataAclStatus=ok` 且 `tokenFileAclStatus=ok`（继承已禁用，仅 SYSTEM `S-1-5-18` + Administrators `S-1-5-32-544`）；普通用户读目录失败 | 诊断对象 + `icacls` 佐证 |
+| 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken`；仅 `-BindCode` 或 `-UseExistingToken` | 安装记录 |
+| 4 | 紧急吊销（另授） | Admin 对目标终端执行紧急吊销后，Agent 停止 claim；本地诊断出现 `AGENT_UNAUTHORIZED`；云端不得仅凭“心跳 unauthorized 态”判定（401 无法上报） | Admin 审计 + 本地 `last-startup-diagnostic.json` |
+| 5 | BindCode 恢复（另授） | 新一次性 BindCode + 安装脚本换发后 latch 清除，心跳恢复，可再 claim | 心跳时间 + 一笔受控打印（若另授出纸） |
+| 6 | 回归 | 吊销/恢复后打印机 `ready`、无残留 active 任务 | DB/Admin 只读 |
+
+禁止：未授权吊销生产终端；把静态 `verify:agent-unauthorized` 写成现场完成；把 `agent_degraded` 与 `AGENT_UNAUTHORIZED` 混记。
+
 ## 可靠性 P0：安装、诊断与恢复
 
 本轮可靠性 P0 已在本地代码与静态门禁层完成以下收口：配置文件开头的 UTF-8 BOM 会被兼容；启动时会分类报告无效配置或 token；这两类异常均不得领取打印任务或触发打印。配置与 token 写入采用原子替换；last-known-good 只保留为人工恢复候选，**不会**自动回退覆盖当前配置。启动诊断保持非阻塞，且本地诊断脚本只读。

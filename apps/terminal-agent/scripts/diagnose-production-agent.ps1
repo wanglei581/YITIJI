@@ -74,6 +74,66 @@ function Get-StartupDiagnosticCode([string]$Path) {
   }
 }
 
+function Get-ProgramDataAclStatus([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    return "unavailable"
+  }
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return "missing"
+  }
+
+  try {
+    $acl = Get-Acl -LiteralPath $Path
+    if (-not $acl.AreAccessRulesProtected) {
+      return "too_permissive"
+    }
+
+    $required = @("S-1-5-18", "S-1-5-32-544")
+    $forbidden = @("S-1-1-0", "S-1-5-11", "S-1-5-32-545")
+    $allowSids = New-Object "System.Collections.Generic.HashSet[string]"
+
+    foreach ($rule in $acl.Access) {
+      if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
+        continue
+      }
+
+      try {
+        $sid = ([System.Security.Principal.NTAccount]$rule.IdentityReference).Translate(
+          [System.Security.Principal.SecurityIdentifier]
+        ).Value
+      } catch {
+        if ($rule.IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
+          $sid = [string]$rule.IdentityReference.Value
+        } else {
+          return "unexpected"
+        }
+      }
+
+      [void]$allowSids.Add($sid)
+      if ($forbidden -contains $sid) {
+        return "too_permissive"
+      }
+    }
+
+    foreach ($sid in $required) {
+      if (-not $allowSids.Contains($sid)) {
+        return "unexpected"
+      }
+    }
+
+    foreach ($sid in $allowSids) {
+      if ($required -notcontains $sid) {
+        return "unexpected"
+      }
+    }
+
+    return "ok"
+  } catch {
+    return "unavailable"
+  }
+}
+
 $service = $null
 $serviceResolution = "not_found"
 try {
@@ -129,6 +189,8 @@ if ($configExists) {
 $tokenPath = Join-Path $ProgramDataDir "agent.token"
 $encryptedTokenFile = Test-Path -LiteralPath $tokenPath -PathType Leaf
 $lastStartupDiagnosticCode = Get-StartupDiagnosticCode (Join-Path $ProgramDataDir "last-startup-diagnostic.json")
+$programDataAclStatus = Get-ProgramDataAclStatus $ProgramDataDir
+$tokenFileAclStatus = if ($encryptedTokenFile) { Get-ProgramDataAclStatus $tokenPath } else { "missing" }
 $scmFailurePolicy = $null
 
 if ($serviceExists) {
@@ -161,5 +223,7 @@ if ($serviceExists) {
   agentVersion = $configFieldStatus.agentVersion
   encryptedTokenFile = $encryptedTokenFile
   lastStartupDiagnosticCode = $lastStartupDiagnosticCode
+  programDataAclStatus = $programDataAclStatus
+  tokenFileAclStatus = $tokenFileAclStatus
   scmFailurePolicy = $scmFailurePolicy
 }
