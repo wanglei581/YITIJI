@@ -79,7 +79,10 @@
   /* Clearance above shared 116px bottom nav (nav is outside this scroll root). */
   padding-bottom: 24px;
 }
-[data-kiosk-presentation='fusion-youth'] .kpv1--content-only > .ui-kiosk-page-content { padding: 0; }
+[data-kiosk-presentation='fusion-youth'] .kpv1--content-only > .ui-kiosk-page-content {
+  padding: 0;
+  gap: 0;
+}
 .kpv1 *,
 .kpv1 *::before,
 .kpv1 *::after { box-sizing: border-box; }
@@ -234,7 +237,9 @@
 }
 /* ── 动态专区（01-home.html .zone-row / .zone-card；后台开关驱动） ── */
 .kpv1 .zone-row {
-  flex: none; margin: 8px 48px 0;
+  /* 共享 KioskLayout 的内容轨比独立 1920px 原型舞台少 10px 可用高度；
+     这里把原型的 8px 间距补偿为 18px，使专区/合规条的最终渲染锚点与 01-home 完全一致。 */
+  flex: none; margin: 18px 48px 0;
   display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
 }
 .kpv1 .zone-card {
@@ -380,5 +385,5 @@
 
 /* 一体机主画布：显式锁定 1080×1920 语义（原型真值画布） */
 @media (width: 1080px) and (height: 1920px) {
-  .kpv1 { width: 1080px; min-height: 1920px; }
+  .kpv1 { width: 1080px; min-height: 0; }
 }

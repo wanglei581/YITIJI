@@ -1,25 +1,34 @@
+[data-kiosk-presentation='fusion-youth'] .fusion-w5--profile-entry > .ui-kiosk-page-content {
+  padding: 0;
+}
+
 .kprofile.kprofile-lightflow {
-  --lf-canvas: var(--k-surface, var(--color-surface));
+  --lf-canvas: var(--k-paper, var(--color-canvas));
+  --lf-paper: var(--k-paper, var(--color-canvas));
   --lf-surface: var(--k-surface, var(--color-surface));
   --lf-surface-soft: var(--k-surface, var(--color-surface));
   --lf-ink: var(--k-ink);
   --lf-ink-muted: var(--k-muted);
   --lf-line: var(--k-line);
-  /* Primary CTA fill — must be solid teal, not soft mint (white-on-mint fails contrast). */
   --lf-blue: var(--k-teal);
   --lf-blue-strong: var(--k-teal-deep);
-  --lf-blue-soft: var(--k-line);
-  --lf-cyan-soft: var(--k-surface, var(--color-surface));
-  --lf-lavender-soft: var(--k-surface, var(--color-surface));
-  --lf-sand-soft: var(--k-paper, var(--color-canvas));
-  --lf-orange-soft: var(--k-surface, var(--color-surface));
-  --lf-rose-soft: var(--k-surface, var(--color-surface));
+  --lf-blue-soft: var(--k-teal-soft);
+  --lf-cyan-soft: var(--k-teal-soft);
+  --lf-lavender-soft: var(--color-plum-soft);
+  --lf-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
   min-block-size: 100%;
-  padding-block-end: 56px;
+  padding-block-end: 24px;
   overflow-x: clip;
   color: var(--lf-ink);
   background: var(--lf-canvas);
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  line-height: normal;
+}
+
+.kprofile.kprofile-lightflow *,
+.kprofile.kprofile-lightflow *::before,
+.kprofile.kprofile-lightflow *::after {
+  box-sizing: border-box;
 }
 
 .kprofile.kprofile-lightflow .kprofile-sr-only {
@@ -36,163 +45,86 @@
 
 .kprofile.kprofile-lightflow .kp-inner {
   display: grid;
-  width: min(980px, calc(100% - 100px));
-  gap: 0;
-  margin: 18px auto 0;
+  width: min(984px, calc(100% - 96px));
+  gap: 18px;
+  margin: 26px auto 0;
 }
 
 .kprofile.kprofile-lightflow .kp-profile-header {
-  border-bottom: 1px solid var(--lf-line);
+  overflow: hidden;
+  border: 1px solid var(--lf-line);
+  border-top: 4px solid var(--lf-blue);
+  border-radius: 18px;
   color: var(--lf-ink);
-  background: transparent;
+  background: var(--lf-surface);
+  box-shadow: 0 3px 14px rgba(16, 48, 43, 0.05);
 }
 
 .kprofile.kprofile-lightflow .kp-profile-main {
   display: grid;
-  min-block-size: 160px;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 20px;
+  min-block-size: 166px;
+  grid-template-columns: auto minmax(150px, 1fr) auto auto;
+  gap: 22px;
   align-items: center;
-  padding: 24px 0;
+  padding: 22px 30px;
 }
 
 .kprofile.kprofile-lightflow .p-ava {
   display: grid;
   inline-size: 84px;
   block-size: 84px;
+  flex: none;
   place-items: center;
   border: 2px solid rgba(31, 158, 134, 0.35);
   border-radius: 50%;
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+  font-family: var(--lf-serif);
   font-size: 40px;
   font-weight: 700;
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest {
-  border-color: rgba(31, 158, 134, 0.2);
-  color: var(--k-teal-deep);
-  background: var(--k-teal-soft);
+  border-color: rgba(31, 158, 134, 0.25);
 }
 
 .kprofile.kprofile-lightflow .p-ava.guest svg {
-  inline-size: 32px;
-  block-size: 32px;
+  inline-size: 36px;
+  block-size: 36px;
 }
 
 .kprofile.kprofile-lightflow .p-id {
   min-inline-size: 0;
 }
 
-.kprofile.kprofile-lightflow .p-kicker {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--lf-blue-strong);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.kprofile.kprofile-lightflow .p-kicker .dot {
-  inline-size: 7px;
-  block-size: 7px;
-  border-radius: 50%;
-  background: var(--k-teal);
-}
-
 .kprofile.kprofile-lightflow .p-name {
   display: block;
-  margin-block-start: 6px;
+  overflow: hidden;
   color: var(--lf-ink);
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 1px;
   line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.kprofile.kprofile-lightflow .p-id p {
-  margin: 6px 0 0;
+.kprofile.kprofile-lightflow .p-kicker {
+  display: block;
+  margin-block-start: 6px;
+  overflow: hidden;
   color: var(--lf-ink-muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.kprofile.kprofile-lightflow .p-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline-start: auto;
-}
-
-.kprofile.kprofile-lightflow .p-iconbtn {
-  position: relative;
-  display: grid;
-  min-inline-size: 48px;
-  min-block-size: 48px;
-  place-items: center;
-  border: 1px solid var(--lf-line);
-  border-radius: 12px;
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface);
-  cursor: pointer;
-}
-
-.kprofile.kprofile-lightflow .p-iconbtn svg {
-  inline-size: 21px;
-  block-size: 21px;
-}
-
-.kprofile.kprofile-lightflow .p-btn {
-  position: relative;
-  display: inline-flex;
-  min-block-size: 56px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding-inline: 18px;
-  border: 1px solid var(--lf-line);
-  border-radius: 12px;
-  color: var(--lf-ink-muted);
-  background: var(--lf-surface);
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.kprofile.kprofile-lightflow .p-btn.primary {
-  border-color: var(--lf-blue);
-  color: var(--k-surface, var(--color-surface));
-  background: var(--lf-blue);
-}
-
-.kprofile.kprofile-lightflow .p-btn svg {
-  inline-size: 18px;
-  block-size: 18px;
-}
-
-.kprofile.kprofile-lightflow .p-iconbtn:hover,
-.kprofile.kprofile-lightflow .p-btn.ghost:hover {
-  border-color: var(--lf-blue);
-  color: var(--lf-blue);
-  background: var(--lf-blue-soft);
-}
-
-.kprofile.kprofile-lightflow .p-btn.primary:hover {
-  background: var(--lf-blue-strong);
-}
-
-.kprofile.kprofile-lightflow .p-iconbtn:focus-visible,
-.kprofile.kprofile-lightflow .p-btn:focus-visible {
-  outline: 2px solid var(--lf-blue);
-  outline-offset: 2px;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .kprofile.kprofile-lightflow .p-stats {
   display: flex;
-  gap: 12px;
-  padding: 16px 0;
-  border-top: 1px solid var(--lf-line);
+  gap: 14px;
+  margin-inline-start: auto;
 }
 
 .kprofile.kprofile-lightflow .p-stat {
@@ -200,12 +132,8 @@
   padding: 12px 18px;
   text-align: center;
   border: 1px solid var(--lf-line);
-  border-radius: 16px;
-  background: var(--lf-surface);
-}
-
-.kprofile.kprofile-lightflow .p-stat:last-child {
-  border-inline-end: 1px solid var(--lf-line);
+  border-radius: 14px;
+  background: var(--lf-paper);
 }
 
 .kprofile.kprofile-lightflow .p-stat b {
@@ -217,7 +145,7 @@
 }
 
 .kprofile.kprofile-lightflow .p-stat b.unloaded {
-  color: var(--k-muted);
+  color: var(--lf-ink-muted);
 }
 
 .kprofile.kprofile-lightflow .p-stat span {
@@ -230,34 +158,108 @@
   white-space: nowrap;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-boundary {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px 0;
-  border-top: 1px solid var(--lf-line);
-}
-
-.kprofile.kprofile-lightflow .kp-profile-boundary > svg {
-  inline-size: 24px;
-  block-size: 24px;
-  flex: 0 0 auto;
-  color: var(--lf-blue-strong);
-}
-
-.kprofile.kprofile-lightflow .kp-profile-boundary > span {
+.kprofile.kprofile-lightflow .p-actions {
   display: grid;
-  gap: 3px;
+  grid-template-columns: repeat(2, 56px);
+  gap: 10px;
+  margin-inline-start: -4px;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-boundary strong {
-  font-size: 15px;
+.kprofile.kprofile-lightflow .p-actions--guest {
+  display: flex;
+  margin-inline-start: 0;
 }
 
-.kprofile.kprofile-lightflow .kp-profile-boundary small {
-  color: var(--lf-ink-muted);
-  font-size: 12px;
-  line-height: 1.5;
+.kprofile.kprofile-lightflow .p-actions--member .p-btn.ghost {
+  padding-inline: 16px;
+}
+
+.kprofile.kprofile-lightflow .p-iconbtn {
+  position: relative;
+  display: grid;
+  min-inline-size: 56px;
+  min-block-size: 56px;
+  place-items: center;
+  border: 1px solid var(--lf-line);
+  border-radius: 14px;
+  color: var(--lf-blue-strong);
+  background: var(--lf-surface);
+  cursor: pointer;
+}
+
+.kprofile.kprofile-lightflow .p-iconbtn svg {
+  inline-size: 26px;
+  block-size: 26px;
+}
+
+.kprofile.kprofile-lightflow .p-btn {
+  position: relative;
+  display: inline-flex;
+  min-block-size: 56px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-inline: 22px;
+  border: 1px solid var(--lf-line);
+  border-radius: 14px;
+  color: var(--lf-ink);
+  background: var(--lf-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kprofile.kprofile-lightflow .p-btn.ghost,
+.kprofile.kprofile-lightflow .p-btn.primary {
+  grid-column: 1 / -1;
+}
+
+.kprofile.kprofile-lightflow .p-btn.primary {
+  min-inline-size: 176px;
+  border-color: var(--lf-blue);
+  color: var(--lf-surface);
+  background: var(--lf-blue);
+}
+
+.kprofile.kprofile-lightflow .p-btn svg {
+  inline-size: 22px;
+  block-size: 22px;
+}
+
+.kprofile.kprofile-lightflow .p-iconbtn:hover,
+.kprofile.kprofile-lightflow .p-btn.ghost:hover {
+  border-color: var(--lf-blue);
+  color: var(--lf-blue-strong);
+  background: var(--lf-blue-soft);
+}
+
+.kprofile.kprofile-lightflow .p-btn.primary:hover {
+  background: var(--lf-blue-strong);
+}
+
+.kprofile.kprofile-lightflow .p-iconbtn:focus-visible,
+.kprofile.kprofile-lightflow .p-btn:focus-visible {
+  outline: 3px solid var(--lf-blue);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .kprofile.kprofile-lightflow .kp-profile-main {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .kprofile.kprofile-lightflow .p-stats {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    margin-inline-start: 0;
+  }
+
+  .kprofile.kprofile-lightflow .p-stat {
+    flex: 1;
+  }
 }
 
 @media (max-width: 760px) {
@@ -267,11 +269,13 @@
 
   .kprofile.kprofile-lightflow .p-actions {
     grid-column: 1 / -1;
+    display: flex;
     width: 100%;
     margin-inline-start: 0;
   }
 
-  .kprofile.kprofile-lightflow .p-btn.primary {
+  .kprofile.kprofile-lightflow .p-btn.primary,
+  .kprofile.kprofile-lightflow .p-btn.ghost {
     flex: 1;
   }
 }
@@ -279,34 +283,45 @@
 @media (max-width: 520px) {
   .kprofile.kprofile-lightflow .kp-inner {
     width: calc(100% - 24px);
+    gap: 12px;
     margin-block-start: 14px;
   }
 
   .kprofile.kprofile-lightflow .kp-profile-main {
     min-block-size: 0;
     gap: 13px;
-    padding: 18px 0;
+    padding: 18px;
   }
 
   .kprofile.kprofile-lightflow .p-ava {
     inline-size: 60px;
     block-size: 60px;
-    border-radius: 12px;
+    border-radius: 50%;
+    font-size: 30px;
   }
 
   .kprofile.kprofile-lightflow .p-name {
     font-size: 24px;
   }
 
-  .kprofile.kprofile-lightflow .p-id p {
+  .kprofile.kprofile-lightflow .p-kicker {
+    font-size: 14px;
+  }
+
+  .kprofile.kprofile-lightflow .p-stats {
+    gap: 8px;
+  }
+
+  .kprofile.kprofile-lightflow .p-stat {
+    min-inline-size: 0;
+    padding: 10px 6px;
+  }
+
+  .kprofile.kprofile-lightflow .p-stat span {
     font-size: 13px;
   }
 
   .kprofile.kprofile-lightflow .p-actions {
     flex-wrap: wrap;
-  }
-
-  .kprofile.kprofile-lightflow .p-btn.ghost {
-    flex: 1;
   }
 }

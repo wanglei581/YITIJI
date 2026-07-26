@@ -346,10 +346,20 @@ expect(demoMockIdentifiers.length === 0, '首页生产代码未新增 demo*/mock
 const kpv1RootRule = cssRule(css, '.kpv1')
 const kpv1ContentRule = cssRule(css, '.kpv1.kpv1--content-only')
 const kpv1ContentWrapperRule = cssRule(css, "[data-kiosk-presentation='fusion-youth'] .kpv1--content-only > .ui-kiosk-page-content")
+const zoneRowRule = cssRule(css, '.kpv1 .zone-row')
 expect(/^\.kpv1\s*\{/m.test(css) && !/(?:div|section|main)\.kpv1\s*\{/.test(css), '.kpv1 根规则非 tag-specific，兼容 section 根')
 expect(/width:\s*min\(1080px,\s*100%\)/.test(kpv1RootRule) && /display:\s*flex/.test(kpv1RootRule) && /flex-direction:\s*column/.test(kpv1RootRule), '.kpv1 保留关键根布局规则')
 expect(/background:\s*transparent/.test(kpv1ContentRule) && /min-height:\s*0/.test(kpv1ContentRule), '.kpv1--content-only 交给共享壳承载舞台背景')
-expect(/padding:\s*0\s*(?:;|})/.test(kpv1ContentWrapperRule), '.kpv1--content-only 精确消除共享 content padding，避免首页 gutter 双 inset')
+expect(
+  /padding:\s*0\s*(?:;|})/.test(kpv1ContentWrapperRule) && /gap:\s*0\s*(?:;|})/.test(kpv1ContentWrapperRule),
+  '.kpv1--content-only 精确消除共享 content padding/gap，避免双 inset 并确保百宝箱、智慧校园及合规提示在首屏可见',
+)
+expect(/margin:\s*18px\s+48px\s+0/.test(zoneRowRule), '共享壳内首页补偿 10px 可用高度差，专区与合规提示锚点对齐 01-home 原型')
+expect(
+  /@media\s*\(width:\s*1080px\)\s*and\s*\(height:\s*1920px\)\s*\{[\s\S]*?\.kpv1\s*\{[^}]*width:\s*1080px;[^}]*min-height:\s*0;/.test(css),
+  '1080×1920 共享壳内首页使用可收缩内容高度，不把 1920px 整机高度重复塞进内容区',
+)
+expect(!/\.kpv1\s*\{[^}]*min-height:\s*1920px;/.test(css), '首页禁止用 1920px 内容高度把专区和提示压到底栏下方')
 console.log('  INFO Task 4 的 prototype-v1.css no-diff 由 review diff allowlist 负责；本脚本只验证 section 根兼容合同')
 
 expect(packageJson.includes('"verify:fusion-home": "node scripts/verify-fusion-home.mjs"'), 'package.json 精确注册 verify:fusion-home')

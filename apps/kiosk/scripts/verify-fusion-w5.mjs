@@ -108,6 +108,11 @@ const legalDoc = read('src/pages/legal/LegalDocPage.tsx')
 const legalDocCss = read('src/pages/legal/legal-service-desk.css')
 const toolbox = read('src/pages/toolbox/ToolboxZonePage.tsx')
 const toolboxCss = read('src/pages/toolbox/toolbox-zone.css')
+const profileCss = [
+  read('src/pages/profile/profile-lightflow-shell.css'),
+  read('src/pages/profile/profile-lightflow-directory.css'),
+  read('src/pages/profile/profile-lightflow-state.css'),
+].join('\n')
 
 function assertSharedPageShell(source, path) {
   assert.match(source, /<KioskPageFrame\b/, `${path} uses the shared KioskPageFrame`)
@@ -171,6 +176,11 @@ assertSinglePaddingNeutralizer(
 )
 assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/)
 assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
+assert.match(
+  profileCss,
+  /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,
+  'profile entry neutralizes shared content padding so prototype 48px gutters are not doubled',
+)
 assert.match(
   mobileQrCss,
   /\.k1-mobile-qr-login \.k1-mobile-qr-content\s*\{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
