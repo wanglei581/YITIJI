@@ -1,0 +1,12 @@
+{
+  "id": "upgrade-preprod-pnpm-1122-20260726",
+  "title": "预生产服务器 pnpm 11.2.2 受控升级",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations-security",
+  "currentPhase": "completed",
+  "nextAction": "由独立 Node 22 工具链任务解除阻塞并归档",
+  "createdAt": "2026-07-26T11:26:45Z",
+  "branch": "codex/preprod-pnpm1122-upgrade-20260726"
+}
