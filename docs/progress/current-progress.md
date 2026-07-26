@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-07-26 完成 **Gate 0.4 Wave B（Agent unauthorized 本地 fail-closed）**：[PR #384](https://github.com/wanglei581/YITIJI/pull/384) squash 合入 `main@645e19e0`。API 401 → 进程 latch，停止 claim/打印/offline 重试；诊断码 `AGENT_UNAUTHORIZED`；`persistRegistration` 清 latch。不新增云端 heartbeat `unauthorized` 态（401 无法上报）。新增 `verify:agent-unauthorized` 进 CI。**未**做 Windows 真机吊销演练、**未**部署 Agent 到一体机。
+
+2026-07-26 完成 **Gate 0.4 Wave A（代码已合入，未部署 Agent）**：[PR #384](https://github.com/wanglei581/YITIJI/pull/384) squash 合入 `main@645e19e0`。生产安装脚本 `install-production-agent.ps1` **移除长期 `-AgentToken` CLI**（仅 `-BindCode` / `-UseExistingToken`）；新增 `Set-ProgramDataAcl`，将 `%ProgramData%\AIJobPrintAgent` 与 `agent.token` ACL 收紧为 SYSTEM + Administrators 并禁用继承；`verify-windows-service-recovery` / `verify-terminal-bind-code` / `production-agent-onboarding.md` 已同步。**未**做 Windows 真机 ACL 验收、**未**部署预发。冲突文档 PR #383 已关闭（由已合入 #381 覆盖）。
+
 2026-07-26 预发 **Kiosk-only 热更 stage-fit（#379 → `main@60faec5a`）**：API pin 仍为 `DEPLOY_SOURCE=83f2117f`（未改 PM2/DB/Admin/Partner）。备份 `backups/kiosk-dist-before-stage-fit-20260726124155.tgz`；现网 Kiosk `index-Dn7fbWN6.js`（`VITE_TERMINAL_ID=KSK-001`）；`DEPLOY_SOURCE.txt` 追加 `kiosk_hotfix_pr=379` / `kiosk_hotfix_commit=60faec5a`。公网复验：1920×1080 → `.kiosk-stage-host` + `scale(0.5625)`，底栏与「岗位大师」在视口内；1080×1920 → `scale(1)`；`/member/qr-login` 无舞台壳。**未**全量重部署、未跑 F1 Genesis、未切收费。
 
 2026-07-26 完成 **Kiosk 设计稿舞台多分辨率自动适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`）：布局路由外包 `KioskStageFit`（`useKioskStageFit` 按视口算 `scale=min(vw/1080,vh/1920)`），1080×1920 纸面等比缩放居中；一体机竖屏全屏 scale≈1；电脑 1920×1080 横屏实测 scale=0.5625、底栏与「岗位大师」均在视口内。`/member/qr-login`、`/upload/phone`、`/screensaver` 在布局外不套舞台。门禁：typecheck、lint（0 error）、`verify:kiosk-visual-unity`、`verify:fusion-shell`、`verify:fusion-w5`、`verify:home-prototype-v1` PASS；合并前 CI `30187988629` 三项全绿。顺带修 `verify:print-scan-first-release` 对「未宣称…U盘…完成」的误伤（豁免「未宣称」）。**可写：异分辨率预览不再被底栏裁死。不得写：全站流体响应式重排已完成。**
