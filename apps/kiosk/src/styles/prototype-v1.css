@@ -414,15 +414,23 @@
       'icon status';
     column-gap: 8px;
     row-gap: 2px;
+    opacity: 1;
+    background: var(--pv-surface);
+    border-color: var(--pv-line);
   }
   .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-icon { grid-area: icon; }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text { grid-area: text; }
+  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text {
+    grid-area: text;
+  }
+  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text b { color: var(--pv-ink); }
+  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text span { color: var(--pv-muted); }
   .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon {
     grid-area: status;
     justify-self: start;
     margin: 0;
     padding: 2px 7px;
     font-size: 11px;
+    color: var(--pv-muted);
   }
   .kpv1 .card[data-group-id='print-scan'] .tile:last-child { grid-column: 1 / -1; }
   .kpv1 .zone-row { grid-template-columns: 1fr; }

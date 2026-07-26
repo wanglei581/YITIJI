@@ -7,6 +7,7 @@ import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
+import { useKioskStageFit } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
 import { useIdleLogout } from '../auth/useIdleLogout'
 
@@ -75,6 +76,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { viewportW } = useKioskStageFit()
   // 共享顶栏始终轮询；首页不再自绘顶栏，故不再按 pathname 停用。
   const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
 
@@ -94,30 +96,33 @@ function KioskShell() {
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
   const usesPageActionbar = routeUsesPageActionbar(pathname)
+  const isResponsiveHome = pathname === '/' && viewportW <= 760
 
-  return (
-    // 舞台适配仅包布局内路由；/member/qr-login、/upload/phone、/screensaver 在布局外，不缩放。
-    <KioskStageFit>
-      <KioskLayout
-        activeTab={activeTab}
-        onTabChange={(tab) => navigate(tabToPath(tab))}
-        visualTheme="service-desk"
-        density="touch"
-        presentation="fusion-youth"
-        viewport="kiosk"
-        hideHeader={isCampusZone}
-        hideBottomNav={isCampusZone || usesPageActionbar}
-        brandTitle={`就业服务大厅 · ${terminalId}`}
-        brandSubtitle="AI求职打印服务终端"
-        headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-        className="h-full"
-      >
-        {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
-            为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
-        <FavoritesProvider>
-          <Outlet />
-        </FavoritesProvider>
-      </KioskLayout>
-    </KioskStageFit>
+  const shell = (
+    <KioskLayout
+      activeTab={activeTab}
+      onTabChange={(tab) => navigate(tabToPath(tab))}
+      visualTheme="service-desk"
+      density="touch"
+      presentation="fusion-youth"
+      viewport={isResponsiveHome ? 'mobile' : 'kiosk'}
+      hideHeader={isCampusZone}
+      hideBottomNav={isCampusZone || usesPageActionbar}
+      brandTitle={`就业服务大厅 · ${terminalId}`}
+      brandSubtitle="AI求职打印服务终端"
+      headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
+      className="h-full"
+    >
+      {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
+          为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
+      <FavoritesProvider>
+        <Outlet />
+      </FavoritesProvider>
+    </KioskLayout>
   )
+
+  if (isResponsiveHome) return shell
+
+  // 舞台适配仅包布局内路由；首页手机窄屏使用真实视口排版，不缩放触控热区。
+  return <KioskStageFit>{shell}</KioskStageFit>
 }
