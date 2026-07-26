@@ -1,0 +1,12 @@
+{
+  "id": "backfill-pg-foundation-migration-and-restore-smoke-20260726",
+  "title": "回填 PostgreSQL 基础批次迁移并执行隔离恢复冒烟",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并等待 PR CI",
+  "createdAt": "2026-07-26T09:17:49Z",
+  "branch": "codex/pg-migration-history-20260726"
+}
