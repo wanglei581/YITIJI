@@ -95,16 +95,21 @@ expect(normalizeCssValue(property(printText, 'text-align')) === 'left', '窄屏�
 const printLast = scopedRule(narrow, { group: 'print-scan', selector: '.tile:last-child' })
 expect(normalizeCssValue(property(printLast, 'grid-column')) === '1/-1', '窄屏打印扫描最后一项通栏')
 
-const jobFairPrimary = scopedRule(css, { group: 'job-fairs', selector: '.tile.primary' })
+const jobFairPrimary = scopedRule(narrow, { group: 'job-fairs', selector: '.tile.primary' })
 const jobFairBackground = property(jobFairPrimary, 'background')
+const jobFairBorder = property(jobFairPrimary, 'border-color')
 expect(jobFairPrimary.length > 0, '招聘会 primary 使用 data-group-id 精确作用域')
 expect(
-  /color-mix\([^;{}]*var\(--pv-wheat-soft\)[^;{}]*\)/.test(jobFairBackground),
-  '招聘会 primary 使用含 --pv-wheat-soft 的 color-mix 轻背景',
+  normalizeCssValue(jobFairBackground) === 'color-mix(insrgb,var(--pv-wheat-soft)72%,var(--pv-paper))',
+  '窄屏招聘会 primary 使用批准的 --pv-wheat-soft 72% 轻背景',
+)
+expect(
+  normalizeCssValue(jobFairBorder) === 'color-mix(insrgb,var(--pv-wheat)24%,transparent)',
+  '窄屏招聘会 primary 使用批准的 --pv-wheat 24% 边框',
 )
 
 expect(!/:nth-child\s*\(/.test(narrow), '窄屏业务样式不使用 :nth-child 定位')
-expect(!/\.a-wheat(?=[\s.#:[,{])/.test(narrow), '窄屏业务样式不使用裸 .a-wheat 定位')
+expect(!narrow.includes('.a-wheat'), '窄屏业务样式不使用任何裸 .a-wheat 选择器定位')
 
 const beforeResponsive = css.slice(0, css.indexOf('@media (prefers-reduced-motion: reduce)'))
 const baseC5 = cssRule(beforeResponsive, '.kpv1 .tiles.c5')
