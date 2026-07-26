@@ -344,12 +344,27 @@ for (const [path, marker] of scanPages) {
 }
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
-assert.match(scanStart, /fetchScannerStatus/, 'scan start retains real scanner status loading')
-assert.match(scanStart, /30_000/, 'scan start retains its 30 second device refresh')
-for (const status of ['ready', 'busy', 'offline']) {
-  assert.match(scanStart, new RegExp(`["']${status}["']`), `scan start retains normalized ${status} state`)
-}
-assert.match(scanStart, /KioskStatePanel[\s\S]*tone=["']offline["']/, 'scan start renders an honest offline state')
+assert.doesNotMatch(
+  scanStart,
+  /fetchScannerStatus|\/kiosk\/device\/status|setInterval\s*\(/,
+  'scan start must not pretend an unavailable scanner-status source exists',
+)
+assert.match(scanStart, /下一步会创建真实扫描会话/, 'scan start explains when the real session is created')
+assert.match(
+  scanStart,
+  /navigate\(["']\/scan\/settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
+  'scan start carries a validated scan type into settings',
+)
+const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
+assert.match(scanSettings, /if\s*\(!scanType\)\s*return/, 'invalid direct access cannot create a session')
+assert.match(scanSettings, /instructions\.map\(/, 'success renders only server instructions')
+assert.match(
+  scanSettings,
+  /const cancellationCredentials = getCancellationCredentials\(created\)[\s\S]*if \(!isValidCreatedSession\(created\)\)[\s\S]*cancelSessionOnce\(/,
+  'malformed created sessions with usable credentials are not left active',
+)
+assert.doesNotMatch(scanSettings, /const GUIDE_STEPS|localStorage|sessionStorage/, 'settings does not invent guides or persist control tokens')
 
 const assertNoStorageAccess = (path) => {
   const scanSource = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
@@ -363,7 +378,6 @@ const assertNoStorageAccess = (path) => {
   assert.deepEqual(hits, [], `${path} must not access browser storage`)
 }
 
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
 for (const marker of ['createScanSession', 'sessionPromiseRef', 'confirmedRef', 'controlToken', 'instructions']) {
   assert.match(scanSettings, new RegExp(marker), `scan settings retains ${marker}`)
 }

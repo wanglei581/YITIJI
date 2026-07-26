@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
@@ -10,8 +10,6 @@ import {
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
-
-const DISTRICTS = ['全部', '城东区', '城南区', '城北区', '高新区']
 
 // ── 机构卡片 ─────────────────────────────────────────────────
 function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
@@ -71,7 +69,8 @@ export function OfflineAgenciesPage() {
   const [data, setData] = useState<OfflineAgencyListResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [district, setDistrict] = useState('全部')
+  const [searchInput, setSearchInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [retryKey, setRetryKey] = useState(0)
 
@@ -80,7 +79,7 @@ export function OfflineAgenciesPage() {
     setLoading(true)
     setError(null)
     getOfflineAgencies({
-      district: district === '全部' ? undefined : district,
+      keyword: keyword || undefined,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -91,7 +90,24 @@ export function OfflineAgenciesPage() {
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [district, page, retryKey])
+  }, [keyword, page, retryKey])
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextKeyword = searchInput.trim()
+    setPage(1)
+    if (nextKeyword === keyword) {
+      setRetryKey((value) => value + 1)
+      return
+    }
+    setKeyword(nextKeyword)
+  }
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setKeyword('')
+    setPage(1)
+  }
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0
 
@@ -104,23 +120,27 @@ export function OfflineAgenciesPage() {
       onBack={() => navigate('/jobs')}
       badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
     >
-      {/* 区域筛选 */}
+      {/* 机构搜索：只使用后端已有 keyword 能力，不虚构区域选项。 */}
       <div className="jf-filter-bar">
         <span className="jf-filter-label">区域</span>
-        {DISTRICTS.map((d) => (
-          <button
-            key={d}
-            type="button"
-            className={`jf-f-chip${district === d ? ' on' : ''}`}
-            onClick={() => { setDistrict(d); setPage(1) }}
-          >
-            {d}
-          </button>
-        ))}
-        <button type="button" className="oa-search-btn">
+        <span className="jf-f-chip on">全部区域</span>
+        <form className="oa-search-btn flex-wrap" role="search" onSubmit={handleSearch}>
           <SearchIcon aria-hidden="true" />
-          搜索机构名称
-        </button>
+          <input
+            type="search"
+            aria-label="搜索机构名称"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="输入机构名称"
+            className="min-h-12 w-[230px] min-w-[140px] flex-1 bg-transparent text-[21px] outline-none placeholder:text-[var(--muted)]"
+          />
+          {keyword && (
+            <button type="button" className="jf-btn ghost sm" onClick={clearSearch}>
+              清除搜索
+            </button>
+          )}
+          <button type="submit" className="jf-btn dark sm">搜索</button>
+        </form>
       </div>
 
       {loading ? (
@@ -131,7 +151,10 @@ export function OfflineAgenciesPage() {
         <>
           {/* 列表元信息 */}
           <div className="jf-list-meta">
-            <span>共 <b>{data.total}</b> 家合作机构 · 机构资质核验后收录</span>
+            <span>
+              共 <b>{data.total}</b> 家合作机构 · 机构资质核验后收录
+              {keyword && <> · 当前搜索“{keyword}”</>}
+            </span>
             <span style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--muted)' }}>
               服务项目与时间由机构提供，以机构公示为准
             </span>

@@ -276,7 +276,7 @@
 | 15A 登录验证失败 | `/login` | `LoginPage` 的验证码错误 / 短信失败分支，不是新路由。 |
 | 22B 意见反馈 | `/me/feedback` | `MyFeedbackPage` 的反馈提交与工单分支，不是 `/me/notifications` 的复制路由。 |
 | 32A 支付未成功 | `/print/cashier` | `PrintCashierPage` 的失败 / 关闭 / 失败或过期 attempt 分支，不是新支付页面。 |
-| 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 当前扫描设备状态驱动的 offline 分支，不创建另一条扫描路由。 |
+| 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 生产端没有可核验的实时扫描仪状态源：`/scan/start` 仅对应会话创建前边界，`/scan/settings` 仅对应真实创建会话失败；不得把任一状态宣称为已确认真机离线，也不创建另一条扫描路由。 |
 | 76 百宝箱主态 | `/toolbox` | `ToolboxZonePage` 的已配置服务区。 |
 | 76A 百宝箱待配置 | `/toolbox` | 同一页面的 disabled / empty 分支，不是新路由。 |
 | 77 文档打印上传 | `/print/upload` | 打印七步流程第一步；纸质扫描 CTA 独立导航到 `/scan/start`。 |
