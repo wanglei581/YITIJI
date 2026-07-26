@@ -161,6 +161,7 @@ assert.equal(
 
 const layout = await read('../../packages/ui/src/layouts/KioskLayout.tsx')
 const root = await read('src/layouts/KioskRoot.tsx')
+const stageFit = await read('src/components/kiosk-shell/KioskStageFit.tsx')
 const css = await read('src/index.css')
 const routes = await read('src/routes/index.tsx')
 const mobileQrLogin = await read('src/pages/auth/MobileQrLoginPage.tsx')
@@ -205,10 +206,11 @@ for (const [label, pattern] of [
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
-  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*viewportW\s*<=\s*760/],
+  ['responsive viewport size binding', /const\s*\{\s*viewportW\s*,\s*viewportH\s*\}\s*=\s*useKioskStageFit\(\s*\)/],
+  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*\(\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*900\s*&&\s*viewportH\s*<=\s*760\s*\)\s*\)/],
   ['responsive home viewport', /viewport\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
-  ['responsive home direct shell', /if\s*\(\s*isResponsiveHome\s*\)\s*return\s+shell/],
-  ['staged KioskStageFit fallback', /return\s*<KioskStageFit>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
+  ['responsive home stable class', /className\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]\s*\}/],
+  ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!isResponsiveHome\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
@@ -218,6 +220,12 @@ for (const [label, pattern] of [
 }
 assert.equal(shellBody.includes('SERVICE_DESK_EXACT_ROUTES'), false, 'KioskShell must remove SERVICE_DESK_EXACT_ROUTES theme fork')
 assert.equal(shellBody.includes("'legacy'"), false, 'KioskShell must not select legacy visualTheme')
+assert.doesNotMatch(shellBody, /if\s*\(\s*isResponsiveHome\s*\)\s*return\s+shell/, 'KioskShell must not replace the stage root across rotation')
+
+assert.match(stageFit, /enabled\?:\s*boolean/, 'KioskStageFit must expose optional enabled')
+assert.match(stageFit, /enabled\s*=\s*true/, 'KioskStageFit enabled must default to true')
+assert.match(stageFit, /data-kiosk-stage-fit=\{enabled\s*\?\s*['"]on['"]\s*:\s*['"]off['"]\}/, 'KioskStageFit must expose on/off state')
+assert.match(stageFit, /transform:\s*enabled\s*\?\s*`scale\(\$\{scale\}\)`\s*:\s*['"]none['"]/, 'KioskStageFit off state must disable transforms')
 
 const activeTabBody = functionBody(root, 'getActiveTab')
 for (const [pathContract, pattern] of [

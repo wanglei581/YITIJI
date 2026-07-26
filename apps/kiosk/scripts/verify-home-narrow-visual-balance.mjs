@@ -273,13 +273,13 @@ function cascadedRules(rules, targetSelectors) {
 }
 const cascadedRule = (source, targetSelectors) => cascadedRules(cssRules(source), targetSelectors)
 const scopedSelectors = (group, selector) => [
-  `.kpv1 .card[data-group-id='${group}'] ${selector}`,
-  `.kpv1 .card[data-group-id="${group}"] ${selector}`,
+  `.kiosk-home-mobile .kpv1 .card[data-group-id='${group}'] ${selector}`,
+  `.kiosk-home-mobile .kpv1 .card[data-group-id="${group}"] ${selector}`,
 ]
 
 const CONTRACT = {
   printGrid: { group: 'print-scan', accent: 'a-slate', selector: '.tiles.c5', kind: 'grid', expected: { 'grid-template-columns': ['repeat(2,1fr)', 'repeat(2,minmax(0,1fr))'], gap: ['8px'] } },
-  printTile: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col', kind: 'tile-col', expected: { 'flex-direction': ['row'], 'min-height': ['68px'], 'text-align': ['left'] } },
+  printTile: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col', kind: 'tile-col', expected: { 'flex-direction': ['row'], height: ['80px'], 'min-height': ['80px'], 'text-align': ['left'] } },
   printText: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col .t-text', kind: 'tile-text', expected: { 'text-align': ['left'] } },
   printDisabled: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col.disabled', kind: 'tile-disabled', expected: { opacity: ['1'], background: ['var(--pv-surface)'], 'border-color': ['var(--pv-line)'] } },
   printLast: { group: 'print-scan', accent: 'a-slate', selector: '.tile:last-child', kind: 'tile-last', expected: { 'grid-column': ['1/-1'] } },
@@ -297,6 +297,7 @@ const hasGroup = (selector, group) => new RegExp(
 ).test(selector)
 
 function selectorCouldAffect(selector, contract) {
+  if (!contract.group && hasClass(selector, 'kiosk-home-mobile')) return false
   const scoped = Boolean(
     (contract.group && hasGroup(selector, contract.group)) ||
     (contract.accent && hasClass(selector, contract.accent)),
@@ -558,6 +559,22 @@ function findVariable(functionNode, name) {
 
 const isIdentifierNamed = (node, name) => Boolean(node && ts.isIdentifier(node) && node.text === name)
 const isStringNamed = (node, value) => Boolean(node && ts.isStringLiteralLike(node) && node.text === value)
+const unwrapParentheses = (node) => {
+  let expression = node
+  while (expression && ts.isParenthesizedExpression(expression)) expression = expression.expression
+  return expression
+}
+const isLessThanOrEqual = (node, name, value) => {
+  const expression = unwrapParentheses(node)
+  return Boolean(
+    expression &&
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken &&
+    isIdentifierNamed(expression.left, name) &&
+    ts.isNumericLiteral(expression.right) &&
+    expression.right.text === String(value),
+  )
+}
 
 function kioskShellContract(sourceFile) {
   const shellFunction = findNamedFunction(sourceFile, 'KioskShell')
@@ -567,25 +584,38 @@ function kioskShellContract(sourceFile) {
     .flatMap((statement) => [...statement.declarationList.declarations])
     .find((declaration) =>
       ts.isObjectBindingPattern(declaration.name) &&
-      declaration.name.elements.some((element) => element.name.text === 'viewportW') &&
+      ['viewportW', 'viewportH'].every((name) =>
+        declaration.name.elements.some((element) => element.name.text === name),
+      ) &&
       declaration.initializer &&
       ts.isCallExpression(declaration.initializer) &&
       isIdentifierNamed(declaration.initializer.expression, 'useKioskStageFit'),
     )
   const responsive = findVariable(shellFunction, 'isResponsiveHome')?.initializer
+  const responsiveRoot = unwrapParentheses(responsive)
+  const responsiveSizes = responsiveRoot && ts.isBinaryExpression(responsiveRoot)
+    ? unwrapParentheses(responsiveRoot.right)
+    : null
+  const landscapeSizes = responsiveSizes && ts.isBinaryExpression(responsiveSizes)
+    ? unwrapParentheses(responsiveSizes.right)
+    : null
   const responsiveBoundary = Boolean(
-    responsive &&
-    ts.isBinaryExpression(responsive) &&
-    responsive.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-    ts.isBinaryExpression(responsive.left) &&
-    responsive.left.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
-    isIdentifierNamed(responsive.left.left, 'pathname') &&
-    isStringNamed(responsive.left.right, '/') &&
-    ts.isBinaryExpression(responsive.right) &&
-    responsive.right.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken &&
-    isIdentifierNamed(responsive.right.left, 'viewportW') &&
-    ts.isNumericLiteral(responsive.right.right) &&
-    responsive.right.right.text === '760',
+    responsiveRoot &&
+    ts.isBinaryExpression(responsiveRoot) &&
+    responsiveRoot.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    ts.isBinaryExpression(responsiveRoot.left) &&
+    responsiveRoot.left.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
+    isIdentifierNamed(responsiveRoot.left.left, 'pathname') &&
+    isStringNamed(responsiveRoot.left.right, '/') &&
+    responsiveSizes &&
+    ts.isBinaryExpression(responsiveSizes) &&
+    responsiveSizes.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
+    isLessThanOrEqual(responsiveSizes.left, 'viewportW', 760) &&
+    landscapeSizes &&
+    ts.isBinaryExpression(landscapeSizes) &&
+    landscapeSizes.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    isLessThanOrEqual(landscapeSizes.left, 'viewportW', 900) &&
+    isLessThanOrEqual(landscapeSizes.right, 'viewportH', 760),
   )
   const shell = findVariable(shellFunction, 'shell')?.initializer
   let shellExpression = shell
@@ -611,7 +641,7 @@ function kioskShellContract(sourceFile) {
     classNameExpression &&
     ts.isConditionalExpression(classNameExpression) &&
     isIdentifierNamed(classNameExpression.condition, 'isResponsiveHome') &&
-    isIdentifierNamed(classNameExpression.whenTrue, 'undefined') &&
+    isStringNamed(classNameExpression.whenTrue, 'kiosk-home-mobile') &&
     isStringNamed(classNameExpression.whenFalse, 'h-full'),
   )
   const directHome = statements.some((statement) =>
@@ -620,16 +650,26 @@ function kioskShellContract(sourceFile) {
     ts.isReturnStatement(statement.thenStatement) &&
     isIdentifierNamed(statement.thenStatement.expression, 'shell'),
   )
-  const stagedFallback = statements.some((statement) => {
+  const stableStage = statements.some((statement) => {
     if (!ts.isReturnStatement(statement)) return false
     let expression = statement.expression
     while (expression && ts.isParenthesizedExpression(expression)) expression = expression.expression
     if (!expression || !ts.isJsxElement(expression) || expression.openingElement.tagName.getText(sourceFile) !== 'KioskStageFit') return false
-    return expression.children.some((child) =>
+    const enabled = jsxAttribute(expression.openingElement, 'enabled', sourceFile)
+    const enabledExpression = enabled?.initializer && ts.isJsxExpression(enabled.initializer)
+      ? enabled.initializer.expression
+      : null
+    const disablesForMobile = Boolean(
+      enabledExpression &&
+      ts.isPrefixUnaryExpression(enabledExpression) &&
+      enabledExpression.operator === ts.SyntaxKind.ExclamationToken &&
+      isIdentifierNamed(enabledExpression.operand, 'isResponsiveHome'),
+    )
+    return disablesForMobile && expression.children.some((child) =>
       ts.isJsxExpression(child) && isIdentifierNamed(child.expression, 'shell'),
     )
   })
-  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, responsiveHeight, directHome, stagedFallback }
+  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, responsiveHeight, directHome, stableStage }
 }
 
 function jsxAttribute(opening, name, sourceFile) {
@@ -781,6 +821,7 @@ console.log('\n=== 首页原型外窄屏视觉合同 ===')
 
 const home = read('src/pages/home/HomePage.tsx')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
+const kioskStageFit = read('src/components/kiosk-shell/KioskStageFit.tsx')
 const css = read('src/styles/prototype-v1.css')
 const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const pkg = read('package.json')
@@ -793,26 +834,40 @@ const packageJson = (() => {
 
 expect(home.length > 0 && homeAst.parseDiagnostics.length === 0, 'HomePage.tsx 可读且可解析')
 expect(kioskRoot.length > 0 && kioskRootAst.parseDiagnostics.length === 0, 'KioskRoot.tsx 可读且可解析')
+expect(kioskStageFit.length > 0, 'KioskStageFit.tsx 可读')
 expect(css.length > 0, 'prototype-v1.css 可读')
 expect(serviceGroups.length > 0 && groupsAst.parseDiagnostics.length === 0, 'serviceGroups.ts 可读且可解析')
 expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 暴露 data-group-id={group.id}')
 
 const shellContract = kioskShellContract(kioskRootAst)
-expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW')
-expect(shellContract.responsiveBoundary, '仅 pathname===\'/\' 且 viewportW<=760 进入首页手机分支')
+expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW/viewportH')
+expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏<=760 与手机横屏<=900x760')
 expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
-expect(shellContract.responsiveHeight, '首页手机分支不传 h-full，其余 staged 页保持 h-full')
-expect(shellContract.directHome, '首页手机分支直接返回 KioskLayout shell')
-expect(shellContract.stagedFallback, '其余路由与 1080 首页继续使用 KioskStageFit')
+expect(shellContract.responsiveHeight, 'mobile 首页使用 kiosk-home-mobile 稳定类，其余 staged 页保持 h-full')
+expect(!shellContract.directHome, 'mobile 首页不再 direct-return shell 更换根节点')
+expect(shellContract.stableStage, 'KioskRoot 始终用 KioskStageFit 包裹并传 enabled={!isResponsiveHome}')
 
-const narrowMedia = mediaBlocks(css, 'max-width:760px')
-const narrow = narrowMedia.map((block) => block.body).join('\n')
-const narrowRules = cssRules(narrow)
-const rules390 = rulesForViewport(css, 390, 844)
-expect(narrowMedia.length > 0, '可按词法安全块扫描提取 @media (max-width: 760px)')
+const responsiveHomeFor = (viewportW, viewportH) =>
+  viewportW <= 760 || (viewportW <= 900 && viewportH <= 760)
+for (const [viewportW, viewportH] of [[390, 844], [430, 932], [760, 1024], [844, 390]]) {
+  expect(responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 mobile 首页壳`)
+}
+for (const [viewportW, viewportH] of [[1024, 768], [1080, 1920]]) {
+  expect(!responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 staged kiosk 壳`)
+}
 
-const printGrid = cascadedRules(narrowRules, contractSelectors(CONTRACT.printGrid))
-expect(printGrid.count > 0, '窄屏打印扫描网格使用 data-group-id 精确作用域')
+expect(/enabled\s*=\s*true/.test(kioskStageFit) && /enabled\?:\s*boolean/.test(kioskStageFit), 'KioskStageFit enabled 为可选且默认 true')
+expect(/data-kiosk-stage-fit=\{enabled\s*\?\s*['"]on['"]\s*:\s*['"]off['"]\}/.test(kioskStageFit), 'KioskStageFit 显式标记 on/off')
+expect(/width:\s*enabled\s*\?\s*stageW\s*\*\s*scale\s*:\s*['"]100vw['"]/.test(kioskStageFit), 'KioskStageFit scaler off 宽度使用 100vw，on 保持数值缩放')
+expect(/height:\s*enabled\s*\?\s*stageH\s*\*\s*scale\s*:\s*['"]100dvh['"]/.test(kioskStageFit), 'KioskStageFit scaler off 高度使用 100dvh，on 保持数值缩放')
+expect(/width:\s*enabled\s*\?\s*stageW\s*:\s*['"]100vw['"]/.test(kioskStageFit), 'KioskStageFit stage off 宽度使用 100vw')
+expect(/height:\s*enabled\s*\?\s*stageH\s*:\s*['"]100dvh['"]/.test(kioskStageFit), 'KioskStageFit stage off 高度使用 100dvh')
+expect(/transform:\s*enabled\s*\?\s*`scale\(\$\{scale\}\)`\s*:\s*['"]none['"]/.test(kioskStageFit), 'KioskStageFit stage off 使用 transform:none')
+
+const mobileRules = cssRules(css)
+
+const printGrid = cascadedRules(mobileRules, contractSelectors(CONTRACT.printGrid))
+expect(printGrid.count > 0, 'mobile 打印扫描网格使用稳定类 + data-group-id 精确作用域')
 expect(
   ['repeat(2,1fr)', 'repeat(2,minmax(0,1fr))'].includes(
     normalizeCssKeywordValue(printGrid.property('grid-template-columns')),
@@ -820,35 +875,37 @@ expect(
   '窄屏打印扫描网格最终值为两列',
 )
 expect(normalizeCssValue(printGrid.property('gap')) === '8px', '窄屏打印扫描网格最终 gap=8px')
-expect(contractWinnersMatch(rules390, CONTRACT.printGrid), '390px 级联 winner 保持打印扫描两列与 8px gap')
+expect(contractWinnersMatch(mobileRules, CONTRACT.printGrid), 'mobile 级联 winner 保持打印扫描两列与 8px gap')
 
-const printTile = cascadedRules(narrowRules, contractSelectors(CONTRACT.printTile))
-expect(normalizeCssKeywordValue(printTile.property('flex-direction')) === 'row', '窄屏打印扫描 .tile.col 最终为横向排列')
-expect(normalizeCssValue(printTile.property('min-height')) === '68px', '窄屏打印扫描 .tile.col 最终 min-height=68px')
-expect(normalizeCssKeywordValue(printTile.property('text-align')) === 'left', '窄屏打印扫描 .tile.col 最终文字左对齐')
-expect(contractWinnersMatch(rules390, CONTRACT.printTile), '390px 级联 winner 保持 tile.col 横向、68px、左对齐')
+const printTile = cascadedRules(mobileRules, contractSelectors(CONTRACT.printTile))
+expect(normalizeCssKeywordValue(printTile.property('flex-direction')) === 'row', 'mobile 打印扫描 .tile.col 最终为横向排列')
+expect(normalizeCssValue(printTile.property('height')) === '80px', 'mobile 打印扫描全部磁贴 height=80px')
+expect(normalizeCssValue(printTile.property('min-height')) === '80px', 'mobile 打印扫描全部磁贴 min-height=80px')
+expect(normalizeCssKeywordValue(printTile.property('text-align')) === 'left', 'mobile 打印扫描 .tile.col 最终文字左对齐')
+expect(contractWinnersMatch(mobileRules, CONTRACT.printTile), 'mobile 级联 winner 保持 tile.col 横向、80px 等高、左对齐')
 
-const printText = cascadedRules(narrowRules, contractSelectors(CONTRACT.printText))
+const printText = cascadedRules(mobileRules, contractSelectors(CONTRACT.printText))
 expect(normalizeCssKeywordValue(printText.property('text-align')) === 'left', '窄屏打印扫描 .t-text 最终明确左对齐')
-expect(contractWinnersMatch(rules390, CONTRACT.printText), '390px 级联 winner 保持打印扫描文字左对齐')
+expect(contractWinnersMatch(mobileRules, CONTRACT.printText), 'mobile 级联 winner 保持打印扫描文字左对齐')
 
-const printDisabled = cascadedRules(narrowRules, contractSelectors(CONTRACT.printDisabled))
+const printDisabled = cascadedRules(mobileRules, contractSelectors(CONTRACT.printDisabled))
 expect(normalizeCssValue(printDisabled.property('opacity')) === '1', '窄屏打印扫描 disabled 显式覆写 opacity=1')
 expect(normalizeCssValue(printDisabled.property('background')) === 'var(--pv-surface)', '窄屏打印扫描 disabled 使用明确中性背景')
 expect(normalizeCssValue(printDisabled.property('border-color')) === 'var(--pv-line)', '窄屏打印扫描 disabled 使用明确中性边界')
-expect(contractWinnersMatch(rules390, CONTRACT.printDisabled), '390px 级联 winner 保持 disabled 不透明中性态')
-const disabledTitle = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text b'))
-const disabledDescription = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text span'))
-const disabledStatus = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .tag-soon'))
+expect(normalizeCssKeywordValue(printDisabled.property('overflow')) === 'hidden', 'mobile 打印扫描 disabled 内容不溢出 80px 磁贴')
+expect(contractWinnersMatch(mobileRules, CONTRACT.printDisabled), 'mobile 级联 winner 保持 disabled 不透明中性态')
+const disabledTitle = cascadedRules(mobileRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text b'))
+const disabledDescription = cascadedRules(mobileRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text span'))
+const disabledStatus = cascadedRules(mobileRules, scopedSelectors('print-scan', '.tile.col.disabled .tag-soon'))
 expect(normalizeCssValue(disabledTitle.property('color')) === 'var(--pv-ink)', 'disabled 标题显式使用可读中性色')
 expect(normalizeCssValue(disabledDescription.property('color')) === 'var(--pv-muted)', 'disabled 说明显式使用可读中性色')
 expect(normalizeCssValue(disabledStatus.property('color')) === 'var(--pv-muted)', 'disabled 状态标签显式使用可读中性色')
 
-const printLast = cascadedRules(narrowRules, contractSelectors(CONTRACT.printLast))
+const printLast = cascadedRules(mobileRules, contractSelectors(CONTRACT.printLast))
 expect(normalizeCssValue(printLast.property('grid-column')) === '1/-1', '窄屏打印扫描最后一项最终通栏')
-expect(contractWinnersMatch(rules390, CONTRACT.printLast), '390px 级联 winner 保持打印扫描末项通栏')
+expect(contractWinnersMatch(mobileRules, CONTRACT.printLast), 'mobile 级联 winner 保持打印扫描末项通栏')
 
-const jobFairPrimary = cascadedRules(narrowRules, contractSelectors(CONTRACT.jobPrimary))
+const jobFairPrimary = cascadedRules(mobileRules, contractSelectors(CONTRACT.jobPrimary))
 expect(jobFairPrimary.count > 0, '窄屏招聘会 primary 使用 data-group-id 精确作用域')
 expect(
   normalizeCssValue(jobFairPrimary.property('background')) ===
@@ -860,62 +917,61 @@ expect(
     'color-mix(insrgb,var(--pv-wheat)24%,transparent)',
   '窄屏招聘会 primary 使用批准的 --pv-wheat 24% 边框',
 )
-expect(contractWinnersMatch(rules390, CONTRACT.jobPrimary), '390px 级联 winner 保持招聘会批准配色')
+expect(contractWinnersMatch(mobileRules, CONTRACT.jobPrimary), 'mobile 级联 winner 保持招聘会批准配色')
 
-const narrowSelectors = narrowRules.flatMap((rule) => rule.selectors)
-expect(!narrowSelectors.some((selector) => /:nth-child\s*\(/i.test(selector)), '窄屏业务选择器不使用 :nth-child 定位')
-expect(!narrowSelectors.some((selector) => selector.includes('.a-wheat')), '窄屏业务选择器不使用任何裸 .a-wheat 定位')
+const stableMobileSelectors = mobileRules.flatMap((rule) => rule.selectors).filter((selector) => selector.includes('.kiosk-home-mobile'))
+expect(stableMobileSelectors.length > 0, 'mobile 紧凑规则绑定 kiosk-home-mobile 稳定类')
+expect(!stableMobileSelectors.some((selector) => /:nth-child\s*\(/i.test(selector)), 'mobile 业务选择器不使用 :nth-child 定位')
+expect(!stableMobileSelectors.some((selector) => selector.includes('.a-wheat')), 'mobile 业务选择器不使用裸 .a-wheat 定位')
 
 const mobileMedia = mediaBlocks(css, 'max-width:420px')
-const lastNarrowIndex = narrowMedia.at(-1)?.open ?? -1
 expect(mobileMedia.length > 0, '可按词法安全块扫描提取 @media (max-width: 420px)')
-expect(mobileMedia.every((block) => block.open > lastNarrowIndex), '420px media 位于 760px media 之后')
 const compact = mobileMedia.map((block) => block.body).join('\n')
 const compactRules = cssRules(compact)
-const compactRule = (...selectors) => cascadedRules(compactRules, selectors)
+const compactRule = (...selectors) => cascadedRules(mobileRules, selectors)
 const compactValue = (rule, property) => normalizeCssValue(rule.property(property))
 
-const mobileTopbar = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar")
+const mobileTopbar = compactRule('.kiosk-home-mobile .ui-kiosk-topbar')
 expect(compactValue(mobileTopbar, 'padding') === '014px', '420px mobile 顶栏 padding=0 14px')
 expect(compactValue(mobileTopbar, 'gap') === '8px', '420px mobile 顶栏 gap=8px')
-const mobileBrand = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand")
+const mobileBrand = compactRule('.kiosk-home-mobile .ui-kiosk-topbar__brand')
 expect(compactValue(mobileBrand, 'flex') === '1', '420px mobile 品牌区 flex=1')
 expect(compactValue(mobileBrand, 'min-width') === '0', '420px mobile 品牌区允许文字收缩')
-const mobileBrandTitle = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand b")
+const mobileBrandTitle = compactRule('.kiosk-home-mobile .ui-kiosk-topbar__brand b')
 expect(compactValue(mobileBrandTitle, 'font-size') === '16px', '420px mobile 主标题字号=16px')
 expect(compactValue(mobileBrandTitle, 'overflow') === 'hidden', '420px mobile 主标题隐藏溢出')
 expect(compactValue(mobileBrandTitle, 'text-overflow') === 'ellipsis', '420px mobile 主标题使用 ellipsis')
 expect(compactValue(mobileBrandTitle, 'white-space') === 'nowrap', '420px mobile 主标题不换行')
-const mobileBrandSubtitle = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand span")
-const mobileClock = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__clock")
+const mobileBrandSubtitle = compactRule('.kiosk-home-mobile .ui-kiosk-topbar__brand span')
+const mobileClock = compactRule('.kiosk-home-mobile .ui-kiosk-topbar__clock')
 expect(compactValue(mobileBrandSubtitle, 'display') === 'none', '420px mobile 隐藏品牌副标题')
 expect(compactValue(mobileClock, 'display') === 'none', '420px mobile 隐藏时钟')
-const mobileRight = compactRule("[data-kiosk-viewport='mobile'] .ui-kiosk-topbar__right")
+const mobileRight = compactRule('.kiosk-home-mobile .ui-kiosk-topbar__right')
 expect(compactValue(mobileRight, 'flex') === 'none', '420px mobile 顶栏右侧 flex=none')
 expect(compactValue(mobileRight, 'gap') === '0', '420px mobile 顶栏右侧 gap=0')
-const mobileStatus = compactRule("[data-kiosk-viewport='mobile'] .k-status-chip")
+const mobileStatus = compactRule('.kiosk-home-mobile .k-status-chip')
 expect(compactValue(mobileStatus, 'font-size') === '13px', '420px mobile 设备状态字号=13px')
 expect(compactValue(mobileStatus, 'padding') === '6px10px', '420px mobile 设备状态 padding=6px 10px')
-const mobileStatusDot = compactRule("[data-kiosk-viewport='mobile'] .k-status-chip__dot")
+const mobileStatusDot = compactRule('.kiosk-home-mobile .k-status-chip__dot')
 expect(compactValue(mobileStatusDot, 'width') === '8px' && compactValue(mobileStatusDot, 'height') === '8px', '420px mobile 设备状态点=8px')
 
-const compactCard = compactRule('.kpv1 .groups .card')
+const compactCard = compactRule('.kiosk-home-mobile .kpv1 .groups .card')
 expect(compactValue(compactCard, 'padding') === '16px', '420px 首页分组卡 padding=16px')
-const compactCardHead = compactRule('.kpv1 .groups .card-head')
+const compactCardHead = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head')
 expect(compactValue(compactCardHead, 'gap') === '10px', '420px 首页组头 gap=10px')
-const compactGroupIcon = compactRule('.kpv1 .groups .card-head .g-icon')
+const compactGroupIcon = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head .g-icon')
 expect(compactValue(compactGroupIcon, 'width') === '44px' && compactValue(compactGroupIcon, 'height') === '44px', '420px 首页组头图标=44px')
-const compactGroupTitle = compactRule('.kpv1 .groups .card-head h2')
+const compactGroupTitle = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head h2')
 expect(compactValue(compactGroupTitle, 'font-size') === '24px', '420px 首页组标题=24px')
-const compactGroupSubtitle = compactRule('.kpv1 .groups .card-head .sub')
+const compactGroupSubtitle = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head .sub')
 expect(compactValue(compactGroupSubtitle, 'font-size') === '15px', '420px 首页组副标题=15px')
-const compactGroupCopy = compactRule('.kpv1 .groups .card-head > div')
+const compactGroupCopy = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head > div')
 expect(compactValue(compactGroupCopy, 'flex') === '1' && compactValue(compactGroupCopy, 'min-width') === '0', '420px 首页组标题容器可收缩')
-const compactBadge = compactRule('.kpv1 .groups .card-head .badge')
+const compactBadge = compactRule('.kiosk-home-mobile .kpv1 .groups .card-head .badge')
 expect(compactValue(compactBadge, 'font-size') === '13px' && compactValue(compactBadge, 'white-space') === 'nowrap', '420px 首页徽标=13px 且不换行')
 
 for (const group of ['resume', 'jobs']) {
-  const scope = `.kpv1 .card[data-group-id='${group}']`
+  const scope = `.kiosk-home-mobile .kpv1 .card[data-group-id='${group}']`
   const grid = compactRule(`${scope} .tiles`)
   const tile = compactRule(`${scope} .tile`)
   const icon = compactRule(`${scope} .tile .t-icon`)
@@ -930,27 +986,46 @@ for (const group of ['resume', 'jobs']) {
   expect(compactValue(description, 'font-size') === '12px', `420px ${group} 磁贴说明=12px`)
   expect(compactValue(text, 'min-width') === '0', `420px ${group} 磁贴文字可收缩`)
 }
+for (const group of ['interview', 'policy']) {
+  const scope = `.kiosk-home-mobile .kpv1 .card[data-group-id='${group}']`
+  const grid = compactRule(`${scope} .tiles`)
+  const tile = compactRule(`${scope} .tile`)
+  const title = compactRule(`${scope} .tile .t-text b`)
+  const description = compactRule(`${scope} .tile .t-text span`)
+  const text = compactRule(`${scope} .tile .t-text`)
+  expect(compactValue(grid, 'grid-template-columns') === 'repeat(2,1fr)', `mobile ${group} 保持两列`)
+  expect(Number.parseFloat(tile.property('min-height')) >= 72, `mobile ${group} 磁贴高度不低于 72px`)
+  expect(compactValue(tile, 'padding') === '8px' && compactValue(tile, 'gap') === '8px', `mobile ${group} 磁贴 padding/gap=8px`)
+  expect(compactValue(title, 'font-size') === '17px', `mobile ${group} 磁贴标题=17px`)
+  expect(compactValue(description, 'font-size') === '12px', `mobile ${group} 磁贴说明=12px`)
+  expect(compactValue(text, 'min-width') === '0', `mobile ${group} 磁贴文字可收缩`)
+}
 const compactSelectors = compactRules.flatMap((rule) => rule.selectors)
 expect(!compactSelectors.includes('.kpv1 .tiles.c3'), '420px 两列规则不使用会串组的裸 .tiles.c3')
 
-const compactContinue = compactRule('.kpv1 .continue')
+const compactContinue = compactRule('.kiosk-home-mobile .kpv1 .continue')
 expect(compactValue(compactContinue, 'margin-left') === '14px' && compactValue(compactContinue, 'margin-right') === '14px', '420px continue 左右 margin=14px')
 expect(compactValue(compactContinue, 'display') === 'grid', '420px continue 改为 grid')
 expect(compactValue(compactContinue, 'grid-template-columns') === '48pxminmax(0,1fr)', '420px continue 使用 48px+弹性文字列')
-const compactContinueIcon = compactRule('.kpv1 .continue .c-icon')
+const compactContinueIcon = compactRule('.kiosk-home-mobile .kpv1 .continue .c-icon')
 expect(compactValue(compactContinueIcon, 'width') === '48px' && compactValue(compactContinueIcon, 'height') === '48px', '420px continue 图标=48px')
-const compactContinueCopy = compactRule('.kpv1 .continue .c-copy')
+const compactContinueCopy = compactRule('.kiosk-home-mobile .kpv1 .continue .c-copy')
 expect(compactValue(compactContinueCopy, 'min-width') === '0', '420px continue 文字列可收缩')
-const compactContinueTitle = compactRule('.kpv1 .continue .c-copy strong')
-const compactContinueDescription = compactRule('.kpv1 .continue .c-copy p')
+const compactContinueTitle = compactRule('.kiosk-home-mobile .kpv1 .continue .c-copy strong')
+const compactContinueDescription = compactRule('.kiosk-home-mobile .kpv1 .continue .c-copy p')
 expect(compactValue(compactContinueTitle, 'font-size') === '18px', '420px continue 标题=18px')
 expect(compactValue(compactContinueDescription, 'font-size') === '14px', '420px continue 正文=14px')
-const compactContinueButton = compactRule('.kpv1 .continue .btn')
+const compactContinueButton = compactRule('.kiosk-home-mobile .kpv1 .continue .btn')
 expect(compactValue(compactContinueButton, 'grid-column') === '1/-1', '420px continue 按钮下移后通栏')
 expect(Number.parseFloat(compactContinueButton.property('min-height')) >= 56, '420px continue 按钮高度不低于 56px')
 
-const compactPrintSoon = compactRule(".kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon")
+const compactPrintSoon = compactRule(".kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon")
 expect(Number.parseFloat(compactPrintSoon.property('font-size')) >= 12, '420px 打印扫描即将上线标签字号不低于 12px')
+
+const breakpointCritical = compactSelectors.some((selector) =>
+  /ui-kiosk-topbar|card-head|data-group-id|\.continue|print-scan/.test(selector),
+)
+expect(!breakpointCritical, '420px 仅保留超窄边距/字号，不承载稳定 mobile 关键规则')
 
 const rules1080 = rulesForViewport(css, 1080, 1920)
 const baseC5 = cascadedRules(rules1080, contractSelectors(CONTRACT.baseGrid))
