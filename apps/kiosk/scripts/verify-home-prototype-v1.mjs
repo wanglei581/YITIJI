@@ -191,7 +191,7 @@ expect(proto.includes('zone-card:only-child'), '原型定义 :only-child 通栏�
 
 // ── 底部三 Tab：改由共享 KioskLayout.ui-kiosk-nav 提供 ────────────
 expect(!/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
-expect(/hideBottomNav=\{isCampusZone\}/.test(kioskRoot), '首页使用共享底栏（仅校园专区隐藏）')
+expect(kioskRoot.includes('hideBottomNav={isCampusZone || usesPageActionbar}'), '首页使用共享底栏（校园专区或页面自带 actionbar 时隐藏）')
 const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
 expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI助手'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
 expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
@@ -221,7 +221,7 @@ expect(!/KIcon/.test(home), '首页图标不复用 KIcon sprite（用原型内�
 expect(/visualTheme="service-desk"/.test(kioskRoot), 'KioskRoot 全路由统一 service-desk')
 expect(/presentation="fusion-youth"/.test(kioskRoot), 'KioskRoot 全路由统一 fusion-youth')
 expect(!kioskRoot.includes('SERVICE_DESK_EXACT_ROUTES'), '已拆除 SERVICE_DESK_EXACT_ROUTES 主题分叉')
-expect(/hideHeader=\{isCampusZone\}/.test(kioskRoot) && /hideBottomNav=\{isCampusZone\}/.test(kioskRoot), '仅校园专区隐藏共享顶栏/底栏')
+expect(/hideHeader=\{isCampusZone\}/.test(kioskRoot) && kioskRoot.includes('hideBottomNav={isCampusZone || usesPageActionbar}'), '共享顶栏仅校园专区隐藏；共享底栏在校园专区或页面自带 actionbar 时隐藏')
 expect(/className="kpv1 kpv1--content-only"/.test(home) || /className=\{'kpv1 kpv1--content-only'\}/.test(home) || home.includes('kpv1--content-only'), '首页内容区使用 kpv1--content-only')
 
 // ── CI / package.json 接线 ──────────────────────────────────────
