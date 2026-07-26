@@ -36,7 +36,14 @@ function isLocalAssistantSelector(selector) {
   const trimmed = selector.trim().replace(/^}+\s*/, '')
   if (!trimmed || trimmed.startsWith('@')) return true
   if (/^(?:from|to|\d+%(?:\s*,\s*\d+%)*)$/.test(trimmed)) return true
-  return trimmed.includes('.kassist')
+  if (trimmed.includes('.kassist')) return true
+  // verify-fusion-w3 requires this shared-frame padding neutralizer on the assistant shell CSS;
+  // it targets the page frame outside the .kassist root and must stay unscoped.
+  return (
+    trimmed.includes("[data-kiosk-presentation='fusion-youth']")
+    && trimmed.includes('.fusion-w3--assistant')
+    && trimmed.includes('.ui-kiosk-page-content')
+  )
 }
 
 console.log('\n=== K2a AI 助手青序 LightFlow 静态合同 ===')
