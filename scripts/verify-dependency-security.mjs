@@ -79,6 +79,11 @@ function assertPnpmToolchain() {
     `pnpm@${REQUIRED_PNPM_VERSION}`,
     'packageManager must pin the CI/deployment pnpm version'
   )
+  assert.equal(
+    pkg.engines?.node,
+    '>=22.13 <23',
+    'engines.node must match the supported Node 22 LTS line required by pnpm 11.2.2'
+  )
   assert.equal(pkg.engines?.pnpm, '>=11.2.2 <12', 'engines.pnpm must reject unsupported pnpm lines')
   assert.equal(
     pkg.pnpm,
