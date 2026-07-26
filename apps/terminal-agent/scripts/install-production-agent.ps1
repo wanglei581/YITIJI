@@ -7,13 +7,6 @@
 #   to avoid local/remote print-task conflicts.
 #
 # Usage examples:
-#   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
-#     -ApiBaseUrl "https://api.example.com/api/v1" `
-#     -TerminalCode "KSK-001" `
-#     -TerminalId "t_ksk_001" `
-#     -AgentToken "<terminal-token>" `
-#     -PrinterName "Pantum CM2800ADN Series"
-#
 #   # Preferred commercial flow: use an admin-generated one-time bind code.
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
 #     -ApiBaseUrl "https://api.example.com/api/v1" `
@@ -29,6 +22,9 @@
 #     -TerminalId "t_ksk_001" `
 #     -PrinterName "Pantum CM2800ADN Series" `
 #     -UseExistingToken
+#
+# Gate 0.4: long-lived -AgentToken CLI input is intentionally removed. Tokens must
+# arrive via BindCode exchange or an existing DPAPI file (not process argv/history).
 
 [CmdletBinding()]
 param(
@@ -43,9 +39,6 @@ param(
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
   [string]$TerminalId,
-
-  [Parameter(Mandatory = $false)]
-  [string]$AgentToken,
 
   [Parameter(Mandatory = $false)]
   [string]$BindCode,
@@ -205,9 +198,44 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
   return $trimmed
 }
 
+function Set-ProgramDataAcl([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) {
+    throw "Set-ProgramDataAcl requires a non-empty path"
+  }
+
+  $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+  $isContainer = [bool]$item.PSIsContainer
+  if ($isContainer) {
+    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $inherit = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
+      [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+  } else {
+    $acl = New-Object System.Security.AccessControl.FileSecurity
+    $inherit = [System.Security.AccessControl.InheritanceFlags]::None
+  }
+
+  $acl.SetAccessRuleProtection($true, $false)
+  $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
+  $propagation = [System.Security.AccessControl.PropagationFlags]::None
+  $allow = [System.Security.AccessControl.AccessControlType]::Allow
+  foreach ($sidValue in @("S-1-5-18", "S-1-5-32-544")) {
+    $sid = New-Object System.Security.Principal.SecurityIdentifier($sidValue)
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+      $sid,
+      $rights,
+      $inherit,
+      $propagation,
+      $allow
+    )
+    $acl.AddAccessRule($rule)
+  }
+
+  Set-Acl -LiteralPath $Path -AclObject $acl
+}
+
 function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   if ([string]::IsNullOrWhiteSpace($Token)) {
-    throw "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
+    throw "A terminal token is required for DPAPI persistence. Use -BindCode or -UseExistingToken."
   }
   Add-Type -AssemblyName System.Security
   $bytes = [System.Text.Encoding]::UTF8.GetBytes($Token.Trim())
@@ -219,7 +247,9 @@ function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   $b64 = [Convert]::ToBase64String($encrypted)
   $dir = Split-Path -Parent $TokenPath
   New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  Set-ProgramDataAcl -Path $dir
   Write-TextAtomically -Path $TokenPath -Text $b64
+  Set-ProgramDataAcl -Path $TokenPath
 }
 
 function Test-TokenFile([string]$TokenPath) {
@@ -380,6 +410,11 @@ $config = [ordered]@{
 
 $configJson = Test-GeneratedConfig -Config $config
 
+Write-Step "Hardening ProgramData ACL"
+New-Item -ItemType Directory -Path $programDataDir -Force | Out-Null
+Set-ProgramDataAcl -Path $programDataDir
+Write-Ok "ProgramData ACL restricted to SYSTEM + Administrators: $programDataDir"
+
 Write-Step "Preparing token"
 $tokenToPersist = $null
 if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
@@ -398,11 +433,9 @@ if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
 } elseif ($UseExistingToken) {
   if (-not (Test-TokenFile $tokenPath)) { Fail "-UseExistingToken passed, but token file is missing or empty: $tokenPath" }
   Write-Ok "Using existing DPAPI token: $tokenPath"
+  Set-ProgramDataAcl -Path $tokenPath
 } else {
-  if ([string]::IsNullOrWhiteSpace($AgentToken)) {
-    Fail "AgentToken is required unless -UseExistingToken is passed. Do not use adminSecret on Windows hosts."
-  }
-  $tokenToPersist = $AgentToken.Trim()
+  Fail "Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
 }
 
 Write-Step "Writing production config and token"
@@ -416,11 +449,9 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out
 Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
 Write-Ok "Production config written: $configPath"
 if ($null -ne $tokenToPersist) {
-  if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
-    Write-Ok "BindCode exchanged and token protected with DPAPI"
-  } else {
-    Write-Ok "Agent token protected with DPAPI LocalMachine"
-  }
+  Write-Ok "BindCode exchanged; token protected with DPAPI + ProgramData ACL"
+} elseif ($UseExistingToken) {
+  Write-Ok "Existing DPAPI token retained; ProgramData ACL reapplied"
 }
 
 Write-Step "Stopping old Agent processes"

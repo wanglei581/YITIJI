@@ -103,6 +103,17 @@ assert(
     installer.includes('Protect-AgentToken -Token $TokenToPersist'),
   'installer routes exchanged terminalToken through the DPAPI persistence wrapper',
 )
+assert(!/\[string\]\$AgentToken\b/.test(installer), 'installer must not accept long-lived -AgentToken CLI input')
+assert(
+  installer.includes('Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted.'),
+  'installer fail-closes when neither BindCode nor UseExistingToken is provided',
+)
+assert(
+  installer.includes('function Set-ProgramDataAcl') &&
+    installer.includes('Set-ProgramDataAcl -Path $programDataDir') &&
+    installer.includes('Set-ProgramDataAcl -Path $TokenPath'),
+  'installer hardens ProgramData / token ACL for SYSTEM + Administrators',
+)
 
 assert(credentialBackfill.includes('TERMINAL_CREDENTIAL_BACKFILL_CONFIRM'), 'legacy credential backfill requires an explicit confirmation value')
 assert(credentialBackfill.includes('TERMINAL_CREDENTIAL_READERS_READY'), 'legacy credential backfill requires an all-readers-ready checkpoint')

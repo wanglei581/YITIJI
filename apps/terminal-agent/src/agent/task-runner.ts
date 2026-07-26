@@ -37,7 +37,9 @@ import os from 'os'
 import axios from 'axios'
 import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } from './types'
 import type { PrintJobParams } from '../printer/types'
-import { createApiClient, createDirectHttpAgents, axiosErrorMessage } from './api-client'
+import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print } from '../printer/print'
 import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
@@ -623,6 +625,10 @@ async function runClaimCycle(
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
+  if (isUnauthorized()) {
+    warn('task-runner: credential unauthorized; claim skipped (re-bind required)')
+    return
+  }
   if (!isDatabaseAvailable(db)) {
     warn('task-runner: local task database unavailable; printing disabled')
     return
@@ -638,6 +644,12 @@ async function runClaimCycle(
     )
     tasks = Array.isArray(resp.data) ? resp.data : []
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      err('task-runner: claim unauthorized — credential revoked/invalid; printing stopped')
+      return
+    }
     const status = axios.isAxiosError(e) ? e.response?.status : undefined
     if (status !== 404 && status !== 204) {
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)

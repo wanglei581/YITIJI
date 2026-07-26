@@ -11,20 +11,12 @@
 - 固定 `apiBaseUrl` 为生产云端 `/api/v1`；
 - 固定 `terminalCode` / `terminalId`；
 - 校验 Windows 打印机名；
+- 通过一次性 `-BindCode` 换发 token（推荐），或复用已有 DPAPI token 文件（`-UseExistingToken`）；
+- **不再接受**长期 `-AgentToken` 命令行入参（Gate 0.4：避免 token 进入进程 argv / PowerShell 历史）；
 - 使用 Windows DPAPI LocalMachine 加密保存 `agentToken`；
+- 将 `%ProgramData%\AIJobPrintAgent`（及 `agent.token`）ACL 收紧为 **SYSTEM + Administrators**，并禁用继承；
 - 安装/启动 `AIJobPrintAgent` Windows 服务，并设置开机自启；
 - 校验远程心跳在线。
-
-示例：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-production-agent.ps1 `
-  -ApiBaseUrl "https://api.example.com/api/v1" `
-  -TerminalCode "KSK-001" `
-  -TerminalId "t_ksk_001" `
-  -AgentToken "<terminal-token>" `
-  -PrinterName "Pantum CM2800ADN Series"
-```
 
 使用后台一次性绑定码（推荐商用流程）：
 
@@ -47,6 +39,18 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
   -PrinterName "Pantum CM2800ADN Series" `
   -UseExistingToken
 ```
+
+> Gate 0.4 Wave A 说明：静态门禁可证明安装脚本移除了 CLI token 入参并写入 ACL 逻辑；Windows 真机 ACL / 服务仍需另行授权验收，不得仅凭静态 verify 宣称现场完成。
+
+### Gate 0.4 Wave B：凭证失效本地 fail-closed
+
+API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再通过心跳上报云端“unauthorized”状态（该请求本身会被拒）。因此：
+
+- 进程内 latch：停止 claim / 新打印 / offline status 重试；
+- 本地诊断码：`AGENT_UNAUTHORIZED`（`%ProgramData%\AIJobPrintAgent\last-startup-diagnostic.json`）；
+- 恢复：Admin 重新签发 BindCode → 安装脚本 `-BindCode` 换发并重启服务（或成功 `persistRegistration` 后清除 latch）。
+
+`agent_degraded`（本地 SQLite 不可用）与 `AGENT_UNAUTHORIZED`（云端凭证失效）是两条独立路径，不得互相冒充。
 
 ## 可靠性 P0：安装、诊断与恢复
 
