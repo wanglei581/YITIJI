@@ -1,0 +1,12 @@
+{
+  "id": "diagnose-antigravity-backend-20260726",
+  "title": "诊断 Antigravity 后端调用失败",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "tooling",
+  "currentPhase": "completed",
+  "nextAction": "等待用户确认是否实施只读 reviewer agent 与 shim 诊断修复",
+  "createdAt": "2026-07-26T12:53:55Z",
+  "branch": "codex/preprod-pnpm1122-upgrade-20260726"
+}

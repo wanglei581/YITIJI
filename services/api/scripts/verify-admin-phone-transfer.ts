@@ -14,6 +14,7 @@ import type { AuditService } from '../src/audit/audit.service'
 import { AdminInitialPhoneBindService } from '../src/auth/admin-initial-phone-bind.service'
 import { InternalOtpService } from '../src/auth/internal-otp.service'
 import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify-target'
+import { PASSWORD_PROOF_STATE } from '../src/auth/password-proof-state'
 import { encryptPhone, hashPhone, maskPhone } from '../src/common/crypto/phone-identity'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
@@ -163,6 +164,7 @@ async function createAdmin(context: TestContext, label: string, tokenVersion = 0
       passwordHash: context.adminPasswordHash,
       name: `转移验证管理员_${label}`,
       role: 'admin',
+      passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
       tokenVersion,
     },
   })

@@ -1,0 +1,12 @@
+{
+  "id": "full-preprod-main-absorb-auth-overlay-20260726",
+  "title": "合并部署记录并评估、执行预生产完整 API 发布吸收认证覆盖",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "已完成，归档并提交部署记录",
+  "createdAt": "2026-07-26T08:39:23Z",
+  "branch": "codex/record-full-api-deploy-20260726"
+}

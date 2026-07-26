@@ -1,0 +1,12 @@
+{
+  "id": "record-admin-sms-login-user-acceptance",
+  "title": "记录管理员手机号短信登录用户侧验收",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "归档验收回执",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/preprod-admin-phone-transfer-acceptance-20260726"
+}

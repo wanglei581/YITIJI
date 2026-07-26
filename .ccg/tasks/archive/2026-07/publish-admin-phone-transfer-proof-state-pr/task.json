@@ -1,0 +1,12 @@
+{
+  "id": "publish-admin-phone-transfer-proof-state-pr",
+  "title": "推送管理员手机号转移密码证明门禁并创建 PR",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "delivery",
+  "currentPhase": "completed",
+  "nextAction": "PR #393 已创建，首轮 CI 全绿；归档发布任务",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/admin-phone-transfer-proof-state-guard-20260726"
+}

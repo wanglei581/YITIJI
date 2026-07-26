@@ -289,8 +289,11 @@ pnpm --filter @ai-job-print/api release:activate -- \
 ```
 
 Worker 若为独立进程，仍按其实际入口单独守护；它不得复用 API launcher。每次受控切换后再执行
-`pm2 save`，并把 releaseId、commit、manifest/tree/launcher SHA-256、PM2 launcher 路径与 health
-结果写入脱敏部署记录。
+`pm2 save`，并立即把 `<PM2_HOME>/dump.pm2` 收紧为 `0600` 后复核；当前 root 运行账户的实际路径为
+`/root/.pm2/dump.pm2`。PM2 默认可能在重写 dump 后恢复为 `0644`，因此权限修正是**每一次**
+`pm2 save` 的固定后置步骤，不能只在首次部署执行。随后把 releaseId、commit、
+manifest/tree/launcher SHA-256、PM2 launcher 路径、目标应用 `exec_interpreter` 与 health 结果写入
+脱敏部署记录；不得输出 dump 全文或环境变量值。
 
 ---
 
@@ -347,6 +350,12 @@ curl -s https://api.example.com/api/v1/health
 ## 9. 回滚
 
 - **代码回滚**：保留上一版本构建产物 / git tag；`pm2 reload` 切回。
+- **Node 运行时回滚顺序**：若目标应用的 PM2 dump 已将 `exec_interpreter` 固化为
+  `/usr/local/bin/node`，禁止先删除或改写该链接。必须先在同一授权窗口内用 `/usr/bin/node`
+  重建/重启同名应用，确认原 script/cwd、health 与真实 `/proc/<pid>/exe` 均正确，再执行
+  `pm2 save`、`chmod 0600 /root/.pm2/dump.pm2`，并脱敏确认 dump 已不再引用
+  `/usr/local/bin/node`；完成这些步骤后，才可回滚 `/usr/local/bin/node`、Corepack 或 `/opt` 工具链。
+  任一步失败都停止工具链清理并保留当前可启动解释器，避免 reboot/resurrect 时找不到 Node。
 - **数据库**：破坏性变更前先 `pg_dump -F c` 备份（见 postgres-operations.md §4）；
   PG→SQLite 退路见 postgres-operations.md §5（改 `DATABASE_URL=file:...` 重启，代码不改）。
 - **对象存储**：COS 文件不随代码回滚丢失（独立于代码）。

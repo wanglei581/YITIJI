@@ -18,6 +18,10 @@ overrides:
   brace-expansion@2.1.1: 2.1.2
   brace-expansion@5.0.6: 5.0.8
 
+patchedDependencies:
+  brace-expansion@1.1.16: d449dd8556ca8318089e04af56b7e1407a2d4952eedcfa6d4523b5455eedfe82
+  brace-expansion@2.1.2: 73e58ac5f84afe68b3d9105733101297d9b268e6c63d53220a34a37b7c099095
+
 importers:
 
   .:
@@ -6218,12 +6222,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  brace-expansion@1.1.16:
+  brace-expansion@1.1.16(patch_hash=d449dd8556ca8318089e04af56b7e1407a2d4952eedcfa6d4523b5455eedfe82):
     dependencies:
       balanced-match: 1.0.2
       concat-map: 0.0.1
 
-  brace-expansion@2.1.2:
+  brace-expansion@2.1.2(patch_hash=73e58ac5f84afe68b3d9105733101297d9b268e6c63d53220a34a37b7c099095):
     dependencies:
       balanced-match: 1.0.2
 
@@ -7529,11 +7533,11 @@ snapshots:
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 1.1.16
+      brace-expansion: 1.1.16(patch_hash=d449dd8556ca8318089e04af56b7e1407a2d4952eedcfa6d4523b5455eedfe82)
 
   minimatch@5.1.9:
     dependencies:
-      brace-expansion: 2.1.2
+      brace-expansion: 2.1.2(patch_hash=73e58ac5f84afe68b3d9105733101297d9b268e6c63d53220a34a37b7c099095)
 
   minimist@1.2.8: {}
 
