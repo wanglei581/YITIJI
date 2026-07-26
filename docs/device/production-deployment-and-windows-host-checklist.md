@@ -318,7 +318,7 @@ pnpm --filter ./services/api verify:activity-logs
 
 至少执行以下测试并留存结果：
 
-- [x] 打印测试 PDF。（**2026-07-25 F4**：`ptask_kiosk_2a75352b81631efb` / `kiosk-test.pdf` → completed；用户确认出纸）
+- [x] 打印测试 PDF。（**2026-07-25 F4**：`ptask_kiosk_2a75352b81631efb` 等旁证；**补做** `ptask_kiosk_e0fe379299af7c50` 简历打印扫码上传 → completed；用户确认「有出纸」）
 - [ ] 打印测试图片。
 - [ ] 打印简历 PDF。
 - [ ] 份数控制。

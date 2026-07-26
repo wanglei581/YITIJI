@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-26 确认 **`WINDOWS_FIELD_RECHECK` F4 补做真机出纸**：用户回复「有出纸」。远程盯到 `ptask_kiosk_e0fe379299af7c50`（简历打印 → 扫码上传）`claimed→printing→completed`（约 18s，无 errorCode），订单 `paid`/`amountCents=0`，事后 active=0、printer `ready`/`isOnline`。Phase F 回执表 / 授权包 / checklist §5.6 已同步为 F4 ✅；Phase F 标通过（F6 仍为有限全屏抽查）。未宣称扫描/U盘整机或商用全部验收完成。
+
 2026-07-26 追加：**Gate 0.3B 已由 PR #376 squash 合入 `main@d106ac39`（未部署）**。合并前最终提交 `5383144e` 的 GitHub Actions run `30168881855` 中 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项全绿；合并后主线 SHA 已只读确认。Gate 0.3B 代码集成完成，后续转入 Gate 0.4（ProgramData ACL、移除长期 Token 命令行输入、Agent unauthorized/degraded 状态及 Windows 真机验收）。本项未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
 
 2026-07-26 追加：**Gate 0.3B PR #376 合并前 CI 已全绿（run `30168571581`，未部署）**。修复提交 `2ff0324b` 的 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项均为 Success；SQLite fresh DB 实际安装 planned/retired 两批 terminal guards 后，终端凭证、生命周期、退役终态、Admin 打印扫描等共享 verifier 全部通过，PostgreSQL job 再次完成真实 migration deploy 与核心动态验证。当前仅待本次进度文档提交重新通过同三项 CI 后 squash 合并 PR #376。此结论只代表代码候选与 CI 通过；未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。

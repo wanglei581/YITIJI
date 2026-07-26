@@ -133,21 +133,20 @@ F6 Kiosk 全屏抽查：通过|问题简述
 | F1 | ✅ | 显示名 `AIJobPrintAgent`，进程 `aijobprintagent.exe`；Running + Automatic |
 | F2 | ✅ | `printerName` = Windows 名 `Pantum CM2800ADN Series`（配置项对照，非代码硬编码） |
 | F3 | ✅ | `127.0.0.1:9527` |
-| F4 | ⏭ 跳过 | 浏览器文件选择器未成功接收测试 PDF；**未**绕过 Kiosk、**未**建单；队列最终 0；临时 PDF 已删 |
+| F4 | ✅ 补做通过 | 首次因本机文件选择器跳过；**2026-07-25 22:37 补做**：简历打印 → 扫码上传 → `ptask_kiosk_e0fe379299af7c50`，`claimed→printing→completed`（约 18s，无 errorCode），订单 `paid`/`amountCents=0`；用户确认「有出纸」；事后 active=0、printer ready |
 | F5 | ✅ | WLAN 断 75s；恢复后无需重启 Agent；Kiosk 显示「打印机在线」 |
 | F6 | ✅（有限） | 1080×1920 竖屏主路径无 JS/系统弹窗阻断；**未**覆盖 Windows Assigned Access 专用会话 |
 
 补充：当前服务从**仓库目录**运行，配置实际为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\config.json`）。正式换机交付仍须按 ProgramData/DPAPI 安装口径验收。
 
-**结论：Phase F 部分通过；因 F4 未出纸，不得宣称 §五 / 整机商用通过。**  
-未执行：G5 退款冒烟、close-unpaid、收费切换、生产配置修改。
-
-**建议补做 F4：** 改用扫码上传 / U 盘导入 / 扫描原件等**不依赖本机文件选择器**的既有入口，打 1 页无个人信息样张；成功后另发「F4 补做回执」（含脱敏 taskId）。
+**结论：Phase F 通过**（F1–F6；F6 为有限全屏抽查）。同日另有完成单 `ptask_kiosk_2a75352b81631efb` 等旁证。  
+未执行：G5 退款冒烟、close-unpaid Phase B、收费切换、生产配置修改。  
+不得据此宣称整机商用全部验收完成（扫描/U盘整机、彩色/双面参数、Assigned Access 等仍可另开）。
 
 ---
 
 ## 当前状态
 
 - Phase R：✅ 2026-07-25（见上表）  
-- Phase F：◐ **部分通过**（F1/F2/F3/F5/F6；**F4 待补**）  
+- Phase F：✅ **通过**（含 F4 扫码上传补做出纸，`ptask_kiosk_e0fe379299af7c50`）  
 - 与本包无关：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、密钥再轮换  
