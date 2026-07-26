@@ -15,7 +15,7 @@ const errorMessages: Record<string, string> = {
   ACCOUNT_ACTION_CHALLENGE_UNAVAILABLE: '安全验证已过期或被替换，请重新开始。',
   ACCOUNT_ACTION_STEP_UP_REQUIRED: '安全授权已失效，请重新开始验证。',
   ACCOUNT_COMMIT_CONFLICT: '机构账号正在被其他管理员修改，请在授权有效期内稍后重试。',
-  PHONE_TAKEN: '新手机号已被使用，请更换手机号并重新完成旧因子验证。',
+  PHONE_TAKEN: '新手机号已被其他账号使用。若要把机构账号当前手机号绑定给管理员，请关闭当前弹窗，前往“账号设置”使用安全转移。',
   LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED: '该机构必须保留至少一个已启用账号，请先新增并启用接替账号。',
   ACCOUNT_NOT_FOUND: '账号已不存在或已被其他操作更新，机构详情已刷新。',
   NETWORK_ERROR: '网络状态异常，未自动重试最终操作；请以刷新后的机构详情为准。',

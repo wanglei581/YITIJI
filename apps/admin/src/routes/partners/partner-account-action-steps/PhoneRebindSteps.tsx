@@ -45,6 +45,9 @@ export function PhoneRebindSteps({ flow }: { flow: UsePartnerAccountActionResult
         }}
       >
         <p className="text-sm text-neutral-600">旧因子已验证，操作授权剩余 {ticketRemaining} 秒。</p>
+        <p className="rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
+          新手机号必须未被任何账号占用。本流程只更改机构账号绑定；如需把当前手机号绑定给管理员，请退出并在“账号设置”使用“从机构账号安全转移手机号”。
+        </p>
         <label className="block text-sm font-medium text-neutral-700" htmlFor="partner-action-new-phone">新手机号</label>
         <input
           id="partner-action-new-phone"
