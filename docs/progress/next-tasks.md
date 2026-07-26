@@ -21,8 +21,8 @@
 
 推荐顺序（2026-07-27 更新）：
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
-0j. [~] **Gate 0.4 11c**：诊断脚本已补 ProgramData/token ACL 只读字段（本地 verify 绿，待合入）；**Windows 真机** ACL / 吊销停领 / BindCode 恢复仍须另授——见 `docs/device/production-agent-onboarding.md`
-0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；预发另有 1 条过期 `waiting` ScanTask 惰性过期未落盘，现场前可只读确认或另授清理
+0j. [~] **Gate 0.4 11c**：[PR #401](https://github.com/wanglei581/YITIJI/pull/401) 诊断脚本已补 ProgramData/token ACL 只读字段；预发队列已空（过期 ScanTask 已落盘 `expired`）。**Windows 真机** ACL / 吊销停领 / BindCode 恢复仍须在一体机另授执行——见 `docs/device/production-agent-onboarding.md`
+0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；UI 通道已在现网，不得宣称硬件闭环
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：
