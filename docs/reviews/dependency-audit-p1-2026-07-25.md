@@ -13,7 +13,7 @@
 | 既有 P0 收口 | [PR #271](https://github.com/wanglei581/YITIJI/pull/271) → `main@f8b8f1ec`（当时 high/critical 清零；multipart 限深保留） |
 | 当前 overrides | `pnpm-workspace.yaml` + 根 `package.json#pnpm.overrides` 双份同步意图：`qs@6.15.2`、`@hono/node-server@2.0.4`、`uuid@14.0.0`、`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0` |
 
-说明：本机 pnpm 11 会警告根 `package.json` 的 `pnpm.overrides` **不再被读取**；有效 overrides 以 `pnpm-workspace.yaml` 为准。后续升级 PR 应继续保持双份一致（兼容服务器 pnpm 9）。
+说明（2026-07-26 纠偏）：本机与 CI 使用 pnpm 11，项目设置以 `pnpm-workspace.yaml` 为准。引入 `patchedDependencies` 后，强制 clean install 证明 pnpm 9 与 pnpm 11 的补丁锁哈希格式不兼容，原“双份配置兼容服务器 pnpm 9”方案已终止；项目统一固定 pnpm 11.2.2，部署候选前必须先升级仍使用 pnpm 9 的服务器。
 
 ## 2. 总量（相对 #271 已漂移）
 
