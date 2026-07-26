@@ -51,6 +51,12 @@ function expectPattern(source, pattern, label) {
   expect(pattern.test(source), `${label}: 未匹配 ${pattern}`)
 }
 
+function expectMinHeightAtLeast(source, selectorPattern, minimum, label) {
+  const block = selectorPattern.exec(source)
+  const minHeight = block?.[1] ? Number(block[1]) : Number.NaN
+  expect(Number.isFinite(minHeight) && minHeight >= minimum, `${label}: min-height 必须至少为 ${minimum}px`)
+}
+
 function balancedBlock(source, openIndex, openCharacter, closeCharacter) {
   let depth = 0
   for (let index = openIndex; index < source.length; index += 1) {
@@ -406,6 +412,7 @@ const mobileQrPage = read('src/pages/auth/MobileQrLoginPage.tsx')
 const scanQrPanel = read('src/pages/auth/ScanQrLoginPanel.tsx')
 const phoneUploadPage = read('src/pages/upload/PhoneUploadPage.tsx')
 const legalDocPage = read('src/pages/legal/LegalDocPage.tsx')
+const legalDocCss = read('src/pages/legal/legal-service-desk.css')
 const screensaverPage = read('src/pages/screensaver/ScreensaverPage.tsx')
 const helpCenterPage = read('src/pages/help/HelpCenterPage.tsx')
 
@@ -468,6 +475,13 @@ for (const [source, marker, label] of [
 ]) {
   expectIncludes(source, marker, label)
 }
+expectIncludes(legalDocPage, '<KioskPageFrame', 'LegalDocPage 必须使用共享 KioskPageFrame')
+expectIncludes(legalDocPage, '<KioskPageHeader', 'LegalDocPage 必须使用共享 KioskPageHeader')
+expectPattern(
+  legalDocPage,
+  /<KioskPageHeader\b[\s\S]{0,800}?onBack=\{\(\)\s*=>\s*navigate\(-1\)\}/,
+  'LegalDocPage 共享页头必须返回上一页',
+)
 expectPattern(loginPage, /isSafeInternalPath\s*\(\s*(?:queryFrom|fromState)\s*\)/, 'LoginPage returnTo 安全校验必须实际调用 isSafeInternalPath')
 expectIncludes(loginPage, 'useMemberPhoneLogin({', 'LoginPage 必须消费共享手机号控制器')
 expectIncludes(loginPage, '<MemberPhoneLoginPane {...phoneLogin.paneProps} />', 'LoginPage 必须挂载共享手机号面板')
@@ -574,6 +588,43 @@ for (const [componentName, label] of [
   const root = pageRoots.get(componentName) ?? ''
   expectStandaloneServiceDeskAttributes(root, label)
 }
+
+const legalRoot = pageRoots.get('LegalDocPage') ?? ''
+for (const [attribute, value] of [
+  ['data-kiosk-screen', 'legal-doc'],
+  ['data-kiosk-presentation', 'fusion-youth'],
+  ['data-visual-theme', 'service-desk'],
+  ['data-ux-density', 'touch'],
+]) {
+  expectPattern(
+    legalRoot,
+    new RegExp(`\\b${escapeRegExp(attribute)}\\s*=\\s*(['"])${escapeRegExp(value)}\\1`),
+    `LegalDocPage 实际 render 根节点必须保留 ${attribute}=${value}`,
+  )
+}
+expectPattern(
+  legalDocCss,
+  /\.k1-legal-doc\s+\.legal-doc-body\s*\{[^}]*\boverflow-y:\s*auto\s*;/,
+  'LegalDocPage 长正文区必须可纵向滚动',
+)
+expectMinHeightAtLeast(
+  legalDocCss,
+  /\.k1-legal-doc\s+\.legal-doc-font(?:\s*,[^{}]+)?\s*\{[^}]*\bmin-height:\s*(\d+(?:\.\d+)?)px\s*;/,
+  48,
+  'LegalDocPage 字号控件',
+)
+expectMinHeightAtLeast(
+  legalDocCss,
+  /\.k1-legal-doc\s+\.legal-doc-tabs\s+button\s*\{[^}]*\bmin-height:\s*(\d+(?:\.\d+)?)px\s*;/,
+  48,
+  'LegalDocPage 法务文档切换控件',
+)
+expectMinHeightAtLeast(
+  legalDocCss,
+  /\.k1-legal-doc\s+\.legal-doc-toc\s+button\s*\{[^}]*\bmin-height:\s*(\d+(?:\.\d+)?)px\s*;/,
+  48,
+  'LegalDocPage 章节导航控件',
+)
 
 const loginAggregatePath = 'src/pages/auth/login.css'
 const loginStylePaths = [

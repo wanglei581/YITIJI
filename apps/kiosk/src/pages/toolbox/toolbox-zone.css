@@ -1,27 +1,8 @@
-/* 百宝箱区页样式（/toolbox）— fusion 76 tb-tiles 密度与品类 accent
- * pagehead/back-btn 取自 prototype-v1，scope 在 .kpv1 .ktoolbox 页内。 */
+/* 百宝箱区页样式（/toolbox）— fusion 76 tb-tiles 密度与品类 accent */
 
 .kpv1.ktoolbox { padding-bottom: 40px; }
 
-.kpv1 .pagehead {
-  flex: none;
-  padding: 34px 48px 26px;
-  display: flex;
-  align-items: center;
-  gap: 26px;
-}
-.kpv1 .back-btn {
-  display: flex; align-items: center; gap: 12px; flex: none; white-space: nowrap;
-  min-height: 72px; padding: 0 30px;
-  background: var(--pv-surface); color: var(--pv-ink);
-  border: 1px solid var(--pv-line); border-radius: var(--pv-r-sm);
-  font-size: 24px; font-weight: 600; cursor: pointer; font-family: var(--pv-sans);
-  box-shadow: 0 3px 10px rgb(16 48 43 / 5%);
-}
-.kpv1 .back-btn:active { transform: scale(.97); }
-.kpv1 .back-btn svg { width: 26px; height: 26px; }
-.kpv1 .pagehead .titles h1 { font-family: var(--pv-serif); font-size: 44px; font-weight: 900; letter-spacing: 2px; }
-.kpv1 .pagehead .titles p { margin-top: 8px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
+.kpv1.ktoolbox > .ui-kiosk-page-content { padding: 0; }
 
 .kpv1 .tb-content {
   flex: 1; padding: 0 48px; min-height: 0;
@@ -133,7 +114,6 @@
 .kpv1 .tb-empty span { font-size: 19px; line-height: 1.5; max-width: 640px; }
 
 @media (max-width: 760px) {
-  .kpv1 .pagehead { padding: 24px; }
   .kpv1 .tb-content { padding: 0 24px; }
   .kpv1 .tb-tiles { grid-template-columns: 1fr; }
 }

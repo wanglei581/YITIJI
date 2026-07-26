@@ -101,9 +101,26 @@ const activityDetail = read('src/pages/placeholders/MeActivityDetailPage.tsx')
 const meShell = read('src/pages/profile/me/MeListShell.tsx')
 const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
 const benefitActivityDetailCss = read('src/pages/activities/activities-detail-inkpaper.css')
+const benefitActivityDetail = read('src/pages/activities/BenefitActivityDetailPage.tsx')
 const mobileQrCss = read('src/pages/auth/mobile-qr-service-desk.css')
 const phoneUploadCss = read('src/pages/upload/phone-upload-service-desk.css')
+const legalDoc = read('src/pages/legal/LegalDocPage.tsx')
+const legalDocCss = read('src/pages/legal/legal-service-desk.css')
 const toolbox = read('src/pages/toolbox/ToolboxZonePage.tsx')
+const toolboxCss = read('src/pages/toolbox/toolbox-zone.css')
+
+function assertSharedPageShell(source, path) {
+  assert.match(source, /<KioskPageFrame\b/, `${path} uses the shared KioskPageFrame`)
+  assert.match(source, /<KioskPageHeader\b/, `${path} uses the shared KioskPageHeader`)
+}
+
+function assertSinglePaddingNeutralizer(source, path, scopePattern) {
+  const blocks = [...source.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((match) => match[1].includes('.ui-kiosk-page-content'))
+  assert.equal(blocks.length, 1, `${path} declares exactly one shared-content padding neutralizer`)
+  assert.match(blocks[0][1], scopePattern, `${path} scopes the shared-content padding neutralizer to its page`)
+  assert.match(blocks[0][2], /\bpadding:\s*0(?:px)?\s*;/, `${path} neutralizes the shared content padding`)
+}
 
 assert.match(notifications, /MyNotificationsPage/, '/notifications reuses the canonical member capability')
 assert.doesNotMatch(notifications, /services\//, '/notifications adds no second data source')
@@ -117,13 +134,43 @@ assert.match(meShell, /<section data-kiosk-domain="profile" data-kiosk-screen="m
 assert.doesNotMatch(meShell, /<\/?main\b/, 'member list shell leaves the main landmark to KioskLayout')
 assert.match(activityDetail, /<section data-kiosk-domain="profile" data-kiosk-screen="activity-detail" className="me-detail-scroll">/, 'activity detail keeps its exact neutral wrapper')
 assert.doesNotMatch(activityDetail, /<\/?main\b/, 'activity detail leaves the main landmark to KioskLayout')
-assert.match(toolbox, /<section className="tb-content">/, 'toolbox keeps its exact neutral content wrapper')
-assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
+assertSharedPageShell(benefitActivityDetail, 'BenefitActivityDetailPage')
 assert.match(
-  benefitActivityDetailCss,
-  /\.k8-act-back-btn\s*\{[\s\S]*?min-height:\s*48px;/,
-  'benefit activity detail back action keeps the kiosk 48px touch target',
+  benefitActivityDetail,
+  /<section\b(?=[^>]*\bdata-kiosk-domain="profile")(?=[^>]*\bdata-kiosk-screen="activity-detail")(?=[^>]*\bclassName="k8-act-scroll")[^>]*>/,
+  'benefit activity detail keeps its profile/activity-detail marker on the real scroll section',
 )
+for (const marker of [
+  'getBenefitActivity(id, getToken())',
+  "state === 'loading'",
+  "state === 'error' || !item",
+  'claimBenefitActivity(id, getToken())',
+  'BenefitActivitiesApiError',
+  'message &&',
+]) {
+  assert.match(benefitActivityDetail, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `benefit activity detail keeps real branch ${marker}`)
+}
+assertSharedPageShell(toolbox, 'ToolboxZonePage')
+assert.match(
+  toolbox,
+  /<section\b(?=[^>]*\bdata-kiosk-screen="toolbox")(?=[^>]*\bclassName="tb-content")[^>]*>/,
+  'toolbox keeps its stable screen marker on the real content section',
+)
+for (const marker of ['config.enabled', 'items.length > 0', '<QrLaunchModal', '<ExternalLaunchModal']) {
+  assert.match(toolbox, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `toolbox keeps real branch/modal ${marker}`)
+}
+assert.doesNotMatch(toolbox, /<\/?main\b/, 'toolbox leaves the main landmark to KioskLayout')
+assertSharedPageShell(legalDoc, 'LegalDocPage')
+assert.match(legalDoc, /data-kiosk-screen="legal-doc"/, 'legal document keeps its stable screen marker')
+assert.match(legalDoc, /apiContent\s*\?\s*\(/, 'legal document keeps the real API-content branch')
+assert.match(legalDoc, /!apiContent\s*&&\s*\(/, 'legal document keeps the audited fallback branch')
+assertSinglePaddingNeutralizer(
+  benefitActivityDetailCss,
+  'activities-detail-inkpaper.css',
+  /\.k8-act-detail\b/,
+)
+assertSinglePaddingNeutralizer(legalDocCss, 'legal-service-desk.css', /\.k1-legal-doc\b/)
+assertSinglePaddingNeutralizer(toolboxCss, 'toolbox-zone.css', /\.kpv1\.ktoolbox\b/)
 assert.match(
   mobileQrCss,
   /\.k1-mobile-qr-login \.k1-mobile-qr-content\s*\{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
@@ -172,6 +219,7 @@ const concretePages = [
   'src/pages/profile/me/MyNotificationsPage.tsx',
   'src/pages/profile/me/MyFeedbackPage.tsx',
   'src/pages/profile/me/MySettingsPage.tsx',
+  'src/pages/profile/me/MyPrivacyRequestsPage.tsx',
   'src/pages/auth/LoginPage.tsx',
   'src/pages/auth/MobileQrLoginPage.tsx',
   'src/pages/upload/PhoneUploadPage.tsx',
