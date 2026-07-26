@@ -50,6 +50,7 @@
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
     "verify:kiosk-runtime-error-boundary": "node scripts/verify-kiosk-runtime-error-boundary.mjs",
     "verify:home-prototype-v1": "node scripts/verify-home-prototype-v1.mjs",
+    "verify:home-narrow-visual-balance": "node scripts/verify-home-narrow-visual-balance.mjs",
     "verify:member-login-dialog": "node scripts/verify-member-login-dialog.mjs",
     "verify:lightflow-k2c-interview": "node scripts/verify-lightflow-k2c-interview.mjs",
     "verify:lightflow-k2a-career": "node scripts/verify-lightflow-k2a-career.mjs",
