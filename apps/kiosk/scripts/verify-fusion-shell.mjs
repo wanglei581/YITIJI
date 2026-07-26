@@ -161,6 +161,7 @@ assert.equal(
 
 const layout = await read('../../packages/ui/src/layouts/KioskLayout.tsx')
 const root = await read('src/layouts/KioskRoot.tsx')
+const stageFit = await read('src/components/kiosk-shell/KioskStageFit.tsx')
 const css = await read('src/index.css')
 const routes = await read('src/routes/index.tsx')
 const mobileQrLogin = await read('src/pages/auth/MobileQrLoginPage.tsx')
@@ -182,7 +183,6 @@ assert.match(
 )
 
 assert.match(root, /presentation\s*=\s*['"]fusion-youth['"]/, 'KioskRoot must opt into fusion-youth')
-assert.match(root, /viewport\s*=\s*['"]kiosk['"]/, 'KioskRoot must always use the kiosk viewport')
 assert.doesNotMatch(root, /MOBILE_HELPER_ROUTES|isMobileHelperRoute/, 'KioskRoot must not try to classify routes it does not render')
 
 assertTopLevelHelperRoutes(routes)
@@ -206,15 +206,33 @@ for (const [label, pattern] of [
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
+  ['responsive viewport size binding', /const\s*\{\s*viewportW\s*,\s*viewportH\s*\}\s*=\s*useKioskStageFit\(\s*\)/],
+  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*\(\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)\s*\)/],
+  ['responsive home viewport', /viewport\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
+  ['responsive home stable class', /className\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]\s*\}/],
+  ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!isResponsiveHome\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
-  ['campus-only nav hide', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\}/],
+  ['campus/actionbar nav replacement', /hideBottomNav\s*=\s*\{\s*isCampusZone\s*\|\|\s*usesPageActionbar\s*\}/],
 ]) {
   assert.match(shellBody, pattern, `KioskShell must preserve ${label}`)
 }
+const responsiveHomeFor = (viewportW, viewportH) =>
+  viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)
+assert.equal(responsiveHomeFor(932, 430), true, '932x430 must preserve the mobile home shell')
+assert.equal(responsiveHomeFor(932, 800), true, '932x800 must not depend on visual viewport height')
+assert.equal(responsiveHomeFor(800, 932), false, '800x932 portrait must preserve the staged kiosk shell')
+assert.equal(responsiveHomeFor(961, 760), false, '961x760 must preserve the staged kiosk shell')
+assert.equal(responsiveHomeFor(1024, 768), false, '1024x768 must preserve the staged kiosk shell')
 assert.equal(shellBody.includes('SERVICE_DESK_EXACT_ROUTES'), false, 'KioskShell must remove SERVICE_DESK_EXACT_ROUTES theme fork')
 assert.equal(shellBody.includes("'legacy'"), false, 'KioskShell must not select legacy visualTheme')
+assert.doesNotMatch(shellBody, /if\s*\(\s*isResponsiveHome\s*\)\s*return\s+shell/, 'KioskShell must not replace the stage root across rotation')
+
+assert.match(stageFit, /enabled\?:\s*boolean/, 'KioskStageFit must expose optional enabled')
+assert.match(stageFit, /enabled\s*=\s*true/, 'KioskStageFit enabled must default to true')
+assert.match(stageFit, /data-kiosk-stage-fit=\{enabled\s*\?\s*['"]on['"]\s*:\s*['"]off['"]\}/, 'KioskStageFit must expose on/off state')
+assert.match(stageFit, /transform:\s*enabled\s*\?\s*`scale\(\$\{scale\}\)`\s*:\s*['"]none['"]/, 'KioskStageFit off state must disable transforms')
 
 const activeTabBody = functionBody(root, 'getActiveTab')
 for (const [pathContract, pattern] of [

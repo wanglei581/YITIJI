@@ -1,7 +1,7 @@
 .w2-material-page { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 20px; padding: 20px 48px 30px; }
-.w2-material-grid { display: grid; min-height: 0; flex: 1; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; }
-.w2-material-aside, .w2-material-review, .w2-material-findings { display: flex; min-height: 0; flex-direction: column; gap: 14px; }
-.w2-material-main { min-width: 0; overflow-y: auto; }
+.w2-material-grid { display: grid; min-height: 0; flex: 1; align-items: stretch; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; }
+.w2-material-aside, .w2-material-review, .w2-material-findings { display: flex; min-height: 0; height: 100%; flex-direction: column; gap: 14px; }
+.w2-material-main { min-width: 0; height: 100%; overflow-y: auto; }
 .w2-material-file { display: flex; align-items: center; gap: 16px; padding: 20px; }
 .w2-material-file > svg { width: 48px; color: var(--print-slate-deep); }
 .w2-material-file div { display: flex; min-width: 0; flex-direction: column; gap: 5px; }

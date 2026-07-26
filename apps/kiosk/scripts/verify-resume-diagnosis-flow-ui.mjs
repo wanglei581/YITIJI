@@ -96,6 +96,17 @@ assertIncludes(source, 'targetDegree', 'source page tracks degree input')
 assertIncludes(source, 'major: targetMajor', 'source page merges major into target context')
 assertIncludes(source, 'degree: targetDegree', 'source page merges degree into target context')
 
+// ── Commercial density Wave 1: merge optional context into direction form ──
+assertIncludes(diagnosisForm, '专业', 'diagnosis form includes optional major field')
+assertIncludes(diagnosisForm, '学历', 'diagnosis form includes optional degree field')
+assertIncludes(diagnosisForm, 'targetMajor', 'diagnosis form receives major props')
+assertIncludes(diagnosisForm, 'targetDegree', 'diagnosis form receives degree props')
+assertNotIncludes(source, '补充方向（可选）', 'source page no longer uses orphan context card that creates L-shaped void')
+assertNotIncludes(source, 'resume-source-context', 'source page removes separate context card class')
+assertIncludes(source, '更换文件', 'source action bar exposes change-file when a resume is staged')
+assertIncludes(source, 'resume-source-dropzone flex flex-1', 'upload dropzone stretches to balance the direction column')
+assertIncludes(source, 'resume-source-main flex min-w-0 flex-1 flex-col', 'upload column stays a stretch column')
+
 assertIncludes(report, "navigate('/resume/optimize'", 'report page navigates to optimize page')
 assertIncludes(report, 'targetContext: state.targetContext', 'report page forwards targetContext into optimize navigate state')
 

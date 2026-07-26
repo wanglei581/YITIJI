@@ -7,6 +7,7 @@ import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useScreensaverController } from '../hooks/useScreensaverController'
+import { useKioskStageFit } from '../hooks/useKioskStageFit'
 import { useTerminalDeviceStatus } from '../hooks/useTerminalDeviceStatus'
 import { useIdleLogout } from '../auth/useIdleLogout'
 
@@ -27,6 +28,30 @@ function statusToneFor(kind: string, printerReady: boolean, loading: boolean): s
   if (printerReady) return 'positive'
   if (kind === 'unknown' || kind === 'low_paper') return 'warning'
   return 'negative'
+}
+
+const ACTIONBAR_ROUTES = new Set([
+  '/print/upload',
+  '/print/material-check',
+  '/print/preview',
+  '/print/params',
+  '/print/confirm',
+  '/print/cashier',
+  '/print/progress',
+  '/scan/start',
+  '/scan/settings',
+  '/scan/progress',
+  '/scan/result',
+  '/print-scan/convert',
+  '/print-scan/sign',
+  '/resume/source',
+  '/resume/generate',
+  '/resume/generate/preview',
+  '/resume/report',
+])
+
+function routeUsesPageActionbar(pathname: string): boolean {
+  return ACTIONBAR_ROUTES.has(pathname) || pathname.startsWith('/print-scan/feature/')
 }
 
 /**
@@ -51,6 +76,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { viewportW, viewportH } = useKioskStageFit()
   // 共享顶栏始终轮询；首页不再自绘顶栏，故不再按 pathname 停用。
   const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
 
@@ -69,30 +95,33 @@ function KioskShell() {
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
+  const usesPageActionbar = routeUsesPageActionbar(pathname)
+  const isResponsiveHome =
+    pathname === '/' && (viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH))
 
-  return (
-    // 舞台适配仅包布局内路由；/member/qr-login、/upload/phone、/screensaver 在布局外，不缩放。
-    <KioskStageFit>
-      <KioskLayout
-        activeTab={activeTab}
-        onTabChange={(tab) => navigate(tabToPath(tab))}
-        visualTheme="service-desk"
-        density="touch"
-        presentation="fusion-youth"
-        viewport="kiosk"
-        hideHeader={isCampusZone}
-        hideBottomNav={isCampusZone}
-        brandTitle={`就业服务大厅 · ${terminalId}`}
-        brandSubtitle="AI求职打印服务终端"
-        headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-        className="h-full"
-      >
-        {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
-            为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
-        <FavoritesProvider>
-          <Outlet />
-        </FavoritesProvider>
-      </KioskLayout>
-    </KioskStageFit>
+  const shell = (
+    <KioskLayout
+      activeTab={activeTab}
+      onTabChange={(tab) => navigate(tabToPath(tab))}
+      visualTheme="service-desk"
+      density="touch"
+      presentation="fusion-youth"
+      viewport={isResponsiveHome ? 'mobile' : 'kiosk'}
+      hideHeader={isCampusZone}
+      hideBottomNav={isCampusZone || usesPageActionbar}
+      brandTitle={`就业服务大厅 · ${terminalId}`}
+      brandSubtitle="AI求职打印服务终端"
+      headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
+      className={isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'}
+    >
+      {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
+          为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
+      <FavoritesProvider>
+        <Outlet />
+      </FavoritesProvider>
+    </KioskLayout>
   )
+
+  // 手机首页关闭舞台缩放，但保留相同的 host/scaler/stage DOM，避免旋转时替换布局根。
+  return <KioskStageFit enabled={!isResponsiveHome}>{shell}</KioskStageFit>
 }

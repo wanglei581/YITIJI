@@ -98,38 +98,35 @@ async function routeExact(
   })
 }
 
-test('scan start reflects a ready device and allows continuation @w2', async ({ page, api }) => {
+test('scan start creates only after explicit continuation @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerCreatedScan(api)
-  api.respond('GET', '/api/v1/kiosk/device/status', {
-    status: 200,
-    json: { data: { scanner: { status: 'ready', online: true, busy: false } } },
+  let legacyDeviceRequests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/kiosk/device/status') legacyDeviceRequests += 1
   })
 
   await page.goto('/scan/start')
-  await expect(page.getByText('扫描仪就绪', { exact: true })).toBeVisible()
-  const next = page.getByRole('button', { name: /下一步 · 查看扫描指引/ })
+  await expect(page.getByText(/下一步会创建真实扫描会话/).first()).toBeVisible()
+  const next = page.getByRole('button', { name: /下一步 · 创建扫描会话/ })
   await expect(next).toBeEnabled()
+  expect(legacyDeviceRequests).toBe(0)
   await next.click()
   await page.waitForURL('**/scan/settings')
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
   await expectHealthy(page, errors)
 })
 
-test('scan start blocks continuation while the device is offline @w2', async ({ page, api }) => {
+test('direct scan settings access does not create a session @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
-  api.respond('GET', '/api/v1/kiosk/device/status', {
-    status: 200,
-    json: { data: { scanner: { status: 'offline', online: false, busy: false } } },
-  })
 
-  await page.goto('/scan/start')
-  // 方案 B 诚实离线态：文案「扫描仪暂不可用」；设备未就绪时不渲染「下一步」履约入口。
-  await expect(page.getByText('扫描仪暂不可用', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: /下一步 · 查看扫描指引/ })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
+  await page.goto('/scan/settings')
+  await expect(page.getByText('未创建扫描任务', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /安全返回扫描首页/ }).first()).toBeVisible()
   await expectHealthy(page, errors)
 })
 

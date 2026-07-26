@@ -16,6 +16,7 @@
     "test:browser:w4": "playwright test --config=playwright.w4.config.ts",
     "test:browser:w5": "playwright test --config=playwright.w5.config.ts",
     "test:browser:w6": "playwright test --config=playwright.w6.config.ts",
+    "test:browser:truth": "playwright test tests/visual/print-done-truth.spec.ts tests/visual/scan-session-truth.spec.ts tests/visual/kiosk-visible-actions-truth.spec.ts --project=kiosk-1080x1920",
     "test:browser:fusion": "pnpm test:browser:smoke && pnpm test:browser:w1 && pnpm test:browser:w2 && pnpm test:browser:w3 && pnpm test:browser:w4 && pnpm test:browser:w5 && pnpm test:browser:w6",
     "test:visual": "playwright test visual",
     "typecheck": "tsc --noEmit",
@@ -47,7 +48,9 @@
     "verify:profile-print-orders-login-smoke": "node scripts/verify-profile-print-orders-login-smoke.mjs",
     "verify:profile-commercial-first-batch": "node scripts/verify-profile-commercial-first-batch.mjs",
     "verify:kiosk-shell-active-nav": "node scripts/verify-kiosk-shell-active-nav.mjs",
+    "verify:kiosk-runtime-error-boundary": "node scripts/verify-kiosk-runtime-error-boundary.mjs",
     "verify:home-prototype-v1": "node scripts/verify-home-prototype-v1.mjs",
+    "verify:home-narrow-visual-balance": "node scripts/verify-home-narrow-visual-balance.mjs",
     "verify:member-login-dialog": "node scripts/verify-member-login-dialog.mjs",
     "verify:lightflow-k2c-interview": "node scripts/verify-lightflow-k2c-interview.mjs",
     "verify:lightflow-k2a-career": "node scripts/verify-lightflow-k2a-career.mjs",
@@ -75,7 +78,14 @@
     "verify:fusion-w4": "node scripts/verify-fusion-w4.mjs",
     "verify:fusion-w5": "node scripts/verify-fusion-w5.mjs",
     "verify:fusion-w6": "node scripts/verify-fusion-w6.mjs",
-    "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs"
+    "verify:print-done-truth": "node scripts/verify-print-done-truth.mjs",
+    "verify:scan-session-truth": "node scripts/verify-scan-session-truth.mjs",
+    "verify:visible-actions-truth": "node scripts/verify-kiosk-visible-actions-truth.mjs",
+    "verify:visual-evidence-manifest": "node scripts/verify-visual-evidence-manifest.mjs",
+    "verify:kiosk-visual-unity": "node scripts/verify-kiosk-visual-unity.mjs",
+    "test:browser:p1-evidence": "playwright test --config=playwright.p1-evidence.config.ts",
+    "verify:print-cta-contrast": "node scripts/verify-print-cta-contrast.mjs",
+    "verify:screensaver-empty-shell": "node scripts/verify-screensaver-empty-shell.mjs"
   },
   "dependencies": {
     "@ai-job-print/refresh": "workspace:*",

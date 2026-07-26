@@ -431,14 +431,16 @@ for (const [path, component] of [
 ]) {
   expectPattern(
     routes,
-    new RegExp(`\\{\\s*path:\\s*'${escapeRegExp(path)}'\\s*,\\s*element:\\s*<${component}\\s*/>\\s*\\}`),
+    new RegExp(
+      `\\{\\s*path:\\s*'${escapeRegExp(path)}'\\s*,\\s*element:\\s*<${component}\\s*/>\\s*(?:,\\s*errorElement:\\s*<KioskRouteErrorPage\\s*/>\\s*)?\\}`,
+    ),
     `${path} 必须保留精确顶级路由`,
   )
 }
 
 expectPattern(
   routes,
-  /\{\s*path\s*:\s*(['"`])\/\1\s*,\s*element\s*:\s*<KioskRoot\s*\/>\s*,\s*children\s*:\s*\[[\s\S]*?\{\s*path\s*:\s*(['"`])help\2\s*,\s*element\s*:\s*<HelpCenterPage\s*\/>\s*\}/,
+  /\{\s*path\s*:\s*(['"`])\/\1\s*,\s*element\s*:\s*<KioskRoot\s*\/>\s*(?:,\s*errorElement\s*:\s*<KioskRouteErrorPage\s*\/>\s*)?,\s*children\s*:\s*\[[\s\S]*?\{\s*path\s*:\s*(['"`])help\2\s*,\s*element\s*:\s*<HelpCenterPage\s*\/>\s*\}/,
   '/help 必须有唯一 KioskRoot nested 精确路由',
 )
 const childrenRange = kioskRootChildrenRange(routes)

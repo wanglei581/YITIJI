@@ -35,7 +35,21 @@ test('/offline-agencies 不导航到不存在的详情 @w4', async ({ page, api 
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/offline-agencies')
   await expect(page.getByText('青岛合规人力服务机构')).toBeVisible()
+  await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
+  await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
+  await expect(page.getByText(/营业中|今日服务|在招岗位|距本机|按直线距离/)).toHaveCount(0)
   await expect(page.locator('a[href^="/offline-agencies/"], button[aria-label^="查看青岛合规"]')).toHaveCount(0)
+  await verifyPage(page, errors)
+})
+
+test('/jobs/:id/offline 适配 raw 岗位与字符串字段 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/jobs/offline-job-001/offline')
+  await expect(page.getByRole('heading', { name: '现场咨询岗位' })).toBeVisible()
+  await expect(page.getByText('8,000–12,000 元/月')).toBeVisible()
+  await expect(page.getByText('熟悉 TypeScript')).toBeVisible()
+  await expect(page.getByText('以机构公示为准', { exact: true })).toBeVisible()
+  await expect(page.getByText(/到店咨询/).first()).toBeVisible()
   await verifyPage(page, errors)
 })
 

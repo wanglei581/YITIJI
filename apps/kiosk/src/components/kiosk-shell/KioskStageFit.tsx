@@ -3,25 +3,30 @@ import { useKioskStageFit } from '../../hooks/useKioskStageFit'
 
 /**
  * 把一体机壳装进 1080×1920 舞台，按视口等比缩放居中。
- * 仅包裹 KioskRoot 布局路由；手机页 / 屏保路由在布局外，不会套此组件。
+ * 仅包裹 KioskRoot 布局路由；手机首页保留同一 DOM，通过 enabled 关闭缩放。
  */
-export function KioskStageFit({ children }: { children: ReactNode }) {
+interface KioskStageFitProps {
+  children: ReactNode
+  enabled?: boolean
+}
+
+export function KioskStageFit({ children, enabled = true }: KioskStageFitProps) {
   const { stageW, stageH, scale } = useKioskStageFit()
 
   const scalerStyle: CSSProperties = {
-    width: stageW * scale,
-    height: stageH * scale,
+    width: enabled ? stageW * scale : '100vw',
+    height: enabled ? stageH * scale : '100dvh',
   }
 
   const stageStyle: CSSProperties = {
-    width: stageW,
-    height: stageH,
-    transform: `scale(${scale})`,
+    width: enabled ? stageW : '100vw',
+    height: enabled ? stageH : '100dvh',
+    transform: enabled ? `scale(${scale})` : 'none',
     transformOrigin: 'top left',
   }
 
   return (
-    <div className="kiosk-stage-host" data-kiosk-stage-fit="on">
+    <div className="kiosk-stage-host" data-kiosk-stage-fit={enabled ? 'on' : 'off'}>
       <div className="kiosk-stage-scaler" style={scalerStyle}>
         <div className="kiosk-stage" style={stageStyle}>
           {children}

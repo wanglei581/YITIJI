@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
@@ -11,39 +11,8 @@ import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4
 
 const PAGE_SIZE = 10
 
-const DISTRICTS = ['全部', '城东区', '城南区', '城北区', '高新区']
-const SERVICES = ['全部', '岗位推荐', '用工咨询', '劳务派遣']
-
-// ── 统计带 ──────────────────────────────────────────────────
-function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
-  return (
-    <div className="oa-stats-band">
-      <BuildingIcon aria-hidden="true" />
-      <div className="oa-stats-cells">
-        <div>
-          <div className="oa-n">{stats.totalAgencies}</div>
-          <div className="oa-t">合作机构</div>
-        </div>
-        <div>
-          <div className="oa-n">{stats.openAgencies}</div>
-          <div className="oa-t">今日服务</div>
-        </div>
-        <div>
-          <div className="oa-n">{stats.totalJobs}</div>
-          <div className="oa-t">在招岗位</div>
-        </div>
-        <div>
-          <div className="oa-n">{stats.districts}</div>
-          <div className="oa-t">覆盖区域</div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── 机构卡片 ─────────────────────────────────────────────────
 function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
-  const isOpen = agency.status === 'open'
   return (
     <article className="jf-row oa-agency-row" aria-label={agency.name}>
       <span className="oa-ag-logo" aria-hidden="true">
@@ -52,35 +21,32 @@ function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{agency.name}</b>
-          <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
-            <i className="oa-dot" aria-hidden="true" />
-            {isOpen ? agency.statusLabel : agency.statusLabel || '机构临时休息 · 以门店公告为准'}
+          <span className="oa-st rest">
+            机构信息已发布
           </span>
         </div>
         <div className="jf-row-info">
           <span>
             <MapPinIcon aria-hidden="true" />
             {agency.address}
-            {agency.distanceKm !== undefined ? ` · 距本机约${agency.distanceKm}km(直线)` : ''}
           </span>
           <span>
             <ClockIcon aria-hidden="true" />
-            {agency.hours}
+            {agency.hours || '服务时间以机构公示为准'}
           </span>
         </div>
         <div className="jf-row-sub">
           {agency.services.map((svc) => (
             <span key={svc} className="jf-chip">{svc}</span>
           ))}
-          <span className="jf-chip src">来源机构编号 {agency.orgCode}</span>
-          <span className="jf-chip ok">岗位信息已审核</span>
+          {agency.services.length === 0 && <span className="jf-chip">服务项目以机构公示为准</span>}
+          {agency.orgCode && <span className="jf-chip src">来源机构编号 {agency.orgCode}</span>}
         </div>
       </div>
       <div className="oa-r-aside">
-        <div className="oa-jobs-n">{agency.jobCount}</div>
-        <div className="oa-jobs-t">在招岗位</div>
-        <span className="oa-mini-btn" aria-hidden="true">查看门店信息</span>
+        <div className="oa-jobs-t">到店咨询</div>
         <div className="oa-jobs-t">岗位咨询请到店办理</div>
+        <div className="oa-jobs-t">服务时间以机构公示为准</div>
       </div>
     </article>
   )
@@ -103,8 +69,8 @@ export function OfflineAgenciesPage() {
   const [data, setData] = useState<OfflineAgencyListResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [district, setDistrict] = useState('全部')
-  const [service, setService] = useState('全部')
+  const [searchInput, setSearchInput] = useState('')
+  const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [retryKey, setRetryKey] = useState(0)
 
@@ -113,8 +79,7 @@ export function OfflineAgenciesPage() {
     setLoading(true)
     setError(null)
     getOfflineAgencies({
-      district: district === '全部' ? undefined : district,
-      service: service === '全部' ? undefined : service,
+      keyword: keyword || undefined,
       page,
       pageSize: PAGE_SIZE,
     })
@@ -125,9 +90,26 @@ export function OfflineAgenciesPage() {
         setLoading(false)
       })
     return () => { cancelled = true }
-  }, [district, service, page, retryKey])
+  }, [keyword, page, retryKey])
 
-  const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 0
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextKeyword = searchInput.trim()
+    setPage(1)
+    if (nextKeyword === keyword) {
+      setRetryKey((value) => value + 1)
+      return
+    }
+    setKeyword(nextKeyword)
+  }
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setKeyword('')
+    setPage(1)
+  }
+
+  const totalPages = data ? Math.ceil(data.total / data.pageSize) : 0
 
   return (
     <KioskPageFrame
@@ -138,38 +120,27 @@ export function OfflineAgenciesPage() {
       onBack={() => navigate('/jobs')}
       badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
     >
-      {/* 区域筛选 */}
+      {/* 机构搜索：只使用后端已有 keyword 能力，不虚构区域选项。 */}
       <div className="jf-filter-bar">
         <span className="jf-filter-label">区域</span>
-        {DISTRICTS.map((d) => (
-          <button
-            key={d}
-            type="button"
-            className={`jf-f-chip${district === d ? ' on' : ''}`}
-            onClick={() => { setDistrict(d); setPage(1) }}
-          >
-            {d}
-          </button>
-        ))}
-        <button type="button" className="oa-search-btn">
+        <span className="jf-f-chip on">全部区域</span>
+        <form className="oa-search-btn flex-wrap" role="search" onSubmit={handleSearch}>
           <SearchIcon aria-hidden="true" />
-          搜索机构名称
-        </button>
-      </div>
-
-      {/* 服务类型筛选 */}
-      <div className="jf-filter-bar">
-        <span className="jf-filter-label">服务</span>
-        {SERVICES.map((s) => (
-          <button
-            key={s}
-            type="button"
-            className={`jf-f-chip${service === s ? ' on' : ''}`}
-            onClick={() => { setService(s); setPage(1) }}
-          >
-            {s}
-          </button>
-        ))}
+          <input
+            type="search"
+            aria-label="搜索机构名称"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="输入机构名称"
+            className="min-h-12 w-[230px] min-w-[140px] flex-1 bg-transparent text-[21px] outline-none placeholder:text-[var(--muted)]"
+          />
+          {keyword && (
+            <button type="button" className="jf-btn ghost sm" onClick={clearSearch}>
+              清除搜索
+            </button>
+          )}
+          <button type="submit" className="jf-btn dark sm">搜索</button>
+        </form>
       </div>
 
       {loading ? (
@@ -178,14 +149,14 @@ export function OfflineAgenciesPage() {
         <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
       ) : !data ? null : (
         <>
-          {/* 统计带 */}
-          <StatsBand stats={data.stats} />
-
           {/* 列表元信息 */}
           <div className="jf-list-meta">
-            <span>共 <b>{data.total}</b> 家合作机构 · 机构资质核验后收录</span>
+            <span>
+              共 <b>{data.total}</b> 家合作机构 · 机构资质核验后收录
+              {keyword && <> · 当前搜索“{keyword}”</>}
+            </span>
             <span style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--muted)' }}>
-              按直线距离由近到远 · 服务时间由机构提供，节假日可能调整
+              服务项目与时间由机构提供，以机构公示为准
             </span>
           </div>
 

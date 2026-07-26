@@ -30,7 +30,7 @@ export function ResumeExportPage() {
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
     <section data-kiosk-domain="resume" data-kiosk-screen="resume-export" className="resume-lightflow resume-export-lightflow">
-      <div className="resume-lightflow__shell resume-lightflow__shell--narrow">
+      <div className="resume-lightflow__shell">
         <header className="resume-lightflow__header">
           <div>
             <p className="resume-lightflow__eyebrow">AI 简历服务 · 输出物</p>

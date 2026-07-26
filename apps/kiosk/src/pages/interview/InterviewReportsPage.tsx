@@ -7,12 +7,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
+import { Button, Card, EmptyState, ErrorState, KioskPageFrame, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { MemberInterviewItem } from '@ai-job-print/shared'
 import { EyeIcon, FileSearchIcon, LogInIcon, Trash2Icon } from 'lucide-react'
 import { deleteMyInterview, getMyInterviews } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
-import { InterviewShell } from './InterviewShell'
+import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import './interview-service-desk.css'
 
 function formatTime(iso: string) {
@@ -69,7 +69,8 @@ export function InterviewReportsPage() {
   }
 
   return (
-    <InterviewShell>
+    <KioskFullscreenShell showBottomNav activeTab="profile">
+    <KioskPageFrame className="fusion-w3 fusion-w3--interview h-full min-h-0 flex-1">
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-reports" className="interview-flow interview-reports" data-visual-theme="service-desk" data-ux-density="touch">
       <KioskPageHeader
         className="interview-pagehead"
@@ -173,6 +174,7 @@ export function InterviewReportsPage() {
         )}
       </div>
     </main>
-    </InterviewShell>
+    </KioskPageFrame>
+    </KioskFullscreenShell>
   )
 }

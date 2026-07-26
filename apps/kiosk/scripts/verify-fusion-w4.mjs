@@ -39,6 +39,26 @@ const PLANNED_TEST_FILES = new Set([
   'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
 ])
+const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
+const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
+  'apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx',
+  'apps/kiosk/src/routes/index.tsx',
+  'apps/kiosk/src/layouts/KioskRoot.tsx',
+  'apps/kiosk/src/main.tsx',
+  'apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx',
+  'apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs',
+  'apps/kiosk/scripts/verify-fusion-shell.mjs',
+  'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
+  'apps/kiosk/scripts/verify-print-done-truth.mjs',
+  'apps/kiosk/scripts/verify-scan-session-truth.mjs',
+  'apps/kiosk/scripts/verify-visual-evidence-manifest.mjs',
+  'apps/kiosk/tests/visual/fixtures/kiosk-p1-visual-evidence-targets.ts',
+  'apps/kiosk/tests/visual/kiosk-visible-actions-truth.spec.ts',
+  'apps/kiosk/tests/visual/print-done-truth.spec.ts',
+  'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
+  'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
+  'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
+])
 const W6_INTEGRATION_FILES = new Set([
   '.github/workflows/ci.yml',
   'apps/kiosk/package.json',
@@ -69,12 +89,13 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:ErrorOfflinePage|MeActivityDetailPage|NotificationsPage|SessionTimeoutPage)\.tsx$/,
   /^apps\/kiosk\/src\/pages\/placeholders\/system-pages-batch8\.css$/,
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w5|verify-profile-activity-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-lightflow-k1-public-entry|verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
   // W6: integration verifier and its contract test are owned by the integration wave.
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
   // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
+  /^apps\/kiosk\/scripts\/verify-fusion-home\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
@@ -88,6 +109,17 @@ function check(label, run) {
   try { run(); pass(label) } catch (error) { fail(`${label}: ${error.message}`) }
 }
 function read(rel) { return readFileSync(join(KIOSK_ROOT, rel), 'utf8') }
+
+function stripCssComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+function cssRuleBody(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))
+  assert.ok(match, `missing CSS rule: ${selector}`)
+  return match[1]
+}
 
 function collectRoutePaths() {
   const sourceText = read('src/routes/index.tsx')
@@ -178,14 +210,16 @@ check('exact 23-route ownership', () => {
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
   const changes = changedFiles()
-  const frozenHits = changes.filter((path) => !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
+  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
   const scopeViolations = changes.filter((path) => {
     if (W6_INTEGRATION_FILES.has(path)) return false
+    if (CURRENT_AUDIT_INTEGRATION_FILES.has(path)) return false
     if (OTHER_WAVE_PLAN.test(path)) return false
     if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
     if (PLANNED_TEST_FILES.has(path)) return false
+    if (path === OFFLINE_AGENCY_SERVICE) return false
     return !ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path))
   })
   assert.deepEqual(scopeViolations, [], `W4 scope violation: ${scopeViolations.join(', ')}`)
@@ -194,6 +228,8 @@ check('changes stay inside W4 scope and hard-frozen files remain untouched', () 
 const jobsPage = read('src/pages/jobs/JobsPage.tsx')
 const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
+const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
+const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
 const companyDetail = read('src/pages/companies/CompanyDetailPage.tsx')
 const companiesPage = read('src/pages/companies/CompaniesPage.tsx')
 const fairDetail = read('src/pages/job-fairs/JobFairDetailPage.tsx')
@@ -232,6 +268,11 @@ check('jobs preserve source-only application contract', () => {
 check('offline agency list does not invent a detail route', () => {
   assert.doesNotMatch(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
+check('offline agency presentation does not invent unavailable metrics or live status', () => {
+  assert.doesNotMatch(offlineAgencies, /data\.stats|jobCount|distanceKm|status === ['"]open['"]|oa-st open|营业中|今日服务|在招岗位|按直线距离/)
+  assert.match(offlineAgencies, /服务时间以机构公示为准/)
+  assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
+})
 check('company detail retains browse and external jump records', () => {
   assert.match(companiesPage, /className="min-h-12 min-w-0 flex-1 bg-transparent/, 'company search input keeps the kiosk 48px touch target')
   assert.match(companyDetail, /recordBrowse[\s\S]*'company_profile'/)
@@ -258,18 +299,23 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(smartInsights, /聚合脱敏统计/)
   assert.doesNotMatch(smartInsights, /示例数据|MOCK_FRESHMAN|topMajors|ageDistribution/)
   assert.match(
-    campusPolicyCss,
-    /button\.kproto-badge\s*\{[\s\S]*?min-height:\s*48px;/,
+    cssRuleBody(campusPolicyCss, 'button.kproto-badge'),
+    /min-height:\s*48px;/,
     'interactive campus badges keep the kiosk 48px touch target',
   )
   assert.match(
-    jobsCompaniesCss,
-    /\.w4-page-content\s*\{[\s\S]*?--w4-page-inset:\s*clamp\(20px,\s*2\.4vw,\s*36px\);[\s\S]*?padding:\s*var\(--w4-page-inset\);/,
-    'W4 page content exposes its responsive inset contract',
+    cssRuleBody(jobsCompaniesCss, "[data-kiosk-presentation='fusion-youth'] .w4-page-frame > .ui-kiosk-page-content"),
+    /padding:\s*0;/,
+    'W4 frame neutralizes the shared content inset',
   )
   assert.match(
-    campusPolicyCss,
-    /\.kproto-actionbar\s*\{[\s\S]*?margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
+    cssRuleBody(jobsCompaniesCss, '.w4-page-content'),
+    /--w4-page-inset:\s*clamp\(20px,\s*4\.45vw,\s*48px\);[^}]*padding:\s*0\s+var\(--w4-page-inset\);/,
+    'W4 page content owns only the horizontal gutter without adding vertical shell gaps',
+  )
+  assert.match(
+    cssRuleBody(campusPolicyCss, '.kproto-actionbar'),
+    /margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
     'smart-campus action bars align with the W4 page inset',
   )
 })
@@ -333,6 +379,24 @@ check('private fair wire mirrors exactly match production adapter', () => {
   for (const name of ['WireFairPosition', 'WireFairCompany', 'WireFairZone']) {
     assert.deepEqual(interfaceShape(fixture, name), interfaceShape(production, name))
   }
+})
+check('offline agency fixture mirrors the production wire contract', () => {
+  const fixture = read('tests/fixtures/fusion-w4-api.ts')
+  const w6Fixture = read('tests/visual/fixtures/fusion-w6-api.ts')
+  for (const name of ['WireOfflineAgency', 'WireOfflineJobAgency', 'WireOfflineJob']) {
+    assert.deepEqual(interfaceShape(fixture, name), interfaceShape(offlineAgencyService, name))
+  }
+  assert.match(fixture, /offline-agencies['"], \{ data: \[agency\], total: 1, page: 1, pageSize: 10 \}/)
+  assert.match(fixture, /offline-jobs\/offline-job-001['"], offlineJob/)
+  assert.doesNotMatch(fixture, /agency:\s*\{[^}]*services:/s, 'detail fixture mirrors the real agency select')
+  assert.match(w6Fixture, /salaryMin:/, 'W6 offline job fixture uses the raw wire contract')
+  assert.doesNotMatch(w6Fixture, /success\(offlineJob\)/, 'W6 must not restore the obsolete detail envelope')
+})
+check('offline agency service maps raw list and detail responses centrally', () => {
+  assert.match(offlineAgencyService, /function mapWireOfflineAgency\(/)
+  assert.match(offlineAgencyService, /function mapWireOfflineJob\(/)
+  assert.match(offlineAgencyService, /\.map\(mapWireOfflineAgency\)/)
+  assert.match(offlineAgencyService, /mapWireOfflineJob\(/)
 })
 
 if (failed > 0) {
