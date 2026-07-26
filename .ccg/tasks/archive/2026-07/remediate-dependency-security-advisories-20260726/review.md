@@ -27,6 +27,7 @@
 - 全 workspace typecheck、lint（0 error，4 条既有 Fast Refresh warning）、build 通过。
 - pnpm 11.2.2 强制 frozen clean install 通过；pnpm 9.15.9 被 `ERR_PNPM_UNSUPPORTED_ENGINE` 按预期拒绝。
 - 排除统一补丁文件自身 diff context 后，`git diff --check` 通过；补丁文件由 pnpm 生成并以 lockfile patch hash 锁定。
+- PR #397 CI run `30199110501`：`build-and-verify`、`kiosk-browser-smoke` 与重跑后的 `postgres-readiness` 均通过。PostgreSQL 首跑在既有 `verify:member-step-up` 的随机敏感子串扫描处误报；同一提交的 SQLite 套件和 PostgreSQL 干净重跑均通过，且失败发生在本任务未修改的 verifier，因此未扩大本 PR 范围。
 
 ## 剩余边界
 
