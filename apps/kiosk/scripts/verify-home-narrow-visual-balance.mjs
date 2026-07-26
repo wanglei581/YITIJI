@@ -603,6 +603,17 @@ function kioskShellContract(sourceFile) {
     isStringNamed(viewportExpression.whenTrue, 'mobile') &&
     isStringNamed(viewportExpression.whenFalse, 'kiosk'),
   )
+  const classNameAttribute = layoutOpening ? jsxAttribute(layoutOpening, 'className', sourceFile) : null
+  const classNameExpression = classNameAttribute?.initializer && ts.isJsxExpression(classNameAttribute.initializer)
+    ? classNameAttribute.initializer.expression
+    : null
+  const responsiveHeight = Boolean(
+    classNameExpression &&
+    ts.isConditionalExpression(classNameExpression) &&
+    isIdentifierNamed(classNameExpression.condition, 'isResponsiveHome') &&
+    isIdentifierNamed(classNameExpression.whenTrue, 'undefined') &&
+    isStringNamed(classNameExpression.whenFalse, 'h-full'),
+  )
   const directHome = statements.some((statement) =>
     ts.isIfStatement(statement) &&
     isIdentifierNamed(statement.expression, 'isResponsiveHome') &&
@@ -618,7 +629,7 @@ function kioskShellContract(sourceFile) {
       ts.isJsxExpression(child) && isIdentifierNamed(child.expression, 'shell'),
     )
   })
-  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, directHome, stagedFallback }
+  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, responsiveHeight, directHome, stagedFallback }
 }
 
 function jsxAttribute(opening, name, sourceFile) {
@@ -790,6 +801,7 @@ const shellContract = kioskShellContract(kioskRootAst)
 expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW')
 expect(shellContract.responsiveBoundary, '仅 pathname===\'/\' 且 viewportW<=760 进入首页手机分支')
 expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
+expect(shellContract.responsiveHeight, '首页手机分支不传 h-full，其余 staged 页保持 h-full')
 expect(shellContract.directHome, '首页手机分支直接返回 KioskLayout shell')
 expect(shellContract.stagedFallback, '其余路由与 1080 首页继续使用 KioskStageFit')
 
