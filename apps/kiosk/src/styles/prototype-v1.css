@@ -346,7 +346,11 @@
 
 @media (prefers-reduced-motion: reduce) {
   .kpv1 .tile, .kpv1 .zone-card, .kpv1 .login-btn { transition: none; }
-  .kpv1 .tile:active, .kpv1 .zone-card:active, .kpv1 .login-btn:active { transform: none; }
+  .kpv1 .tile:active,
+  .kpv1 .zone-card:active,
+  .kpv1 .login-btn:active,
+  .kpv1 .card-head h2 .g-title-link:active,
+  .kpv1 .continue .btn:active { transform: none; }
 }
 
 /* ============================================================
