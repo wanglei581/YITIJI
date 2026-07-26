@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-26 完成 **机构账号删除 / 普通换绑 / 管理员单手机号安全转移 UX 澄清**（分支 `codex/partner-account-phone-transfer-ux`，未部署）：仅修改 Admin 既有合作机构账号管理 UI 与专项静态合同，不改后端接口、数据库、手机号唯一约束或安全 ticket。机构账号区新增单手机号场景说明并直达既有 `/account-settings` 安全转移；最后一个启用机构账号的删除按钮提前禁用并就地说明接替账号要求；密码验证不可用时明确管理员创建/重置密码不能作为目标持有人证明；删除旧手机验证、普通换绑新号码、`PHONE_TAKEN` 与最终删除确认均补充“删除/换绑不等于转移”的可执行下一步。TDD 先新增 13 条 UI 合同并确认 RED，实施后 `verify:partner-account-action-ui`、`verify:admin-phone-transfer-ui`、18 项状态机测试、Admin typecheck、lint（0 error）、HTTP production build 与 `git diff --check` 通过；本地 Playwright mock 只读走查确认唯一启用账号删除禁用、安全转移链接到达 `/account-settings`、转移表单可打开且控制台 0 error。**未连接预生产、未发送短信、未修改真实账号、未执行手机号转移、未部署。**
+
 2026-07-26 完成 **Gate 0.4 Wave B（Agent unauthorized 本地 fail-closed）**：[PR #384](https://github.com/wanglei581/YITIJI/pull/384) squash 合入 `main@645e19e0`。API 401 → 进程 latch，停止 claim/打印/offline 重试；诊断码 `AGENT_UNAUTHORIZED`；`persistRegistration` 清 latch。不新增云端 heartbeat `unauthorized` 态（401 无法上报）。新增 `verify:agent-unauthorized` 进 CI。**未**做 Windows 真机吊销演练、**未**部署 Agent 到一体机。
 
 2026-07-26 完成 **Gate 0.4 Wave A（代码已合入，未部署 Agent）**：[PR #384](https://github.com/wanglei581/YITIJI/pull/384) squash 合入 `main@645e19e0`。生产安装脚本 `install-production-agent.ps1` **移除长期 `-AgentToken` CLI**（仅 `-BindCode` / `-UseExistingToken`）；新增 `Set-ProgramDataAcl`，将 `%ProgramData%\AIJobPrintAgent` 与 `agent.token` ACL 收紧为 SYSTEM + Administrators 并禁用继承；`verify-windows-service-recovery` / `verify-terminal-bind-code` / `production-agent-onboarding.md` 已同步。**未**做 Windows 真机 ACL 验收、**未**部署预发。冲突文档 PR #383 已关闭（由已合入 #381 覆盖）。

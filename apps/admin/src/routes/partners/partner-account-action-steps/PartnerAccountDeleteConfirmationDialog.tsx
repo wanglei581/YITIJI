@@ -65,6 +65,9 @@ export function PartnerAccountDeleteConfirmationDialog({
         <p id="partner-account-final-delete-description" className="mt-2 text-sm leading-6 text-neutral-600">
           所属机构「{organizationName}」，机构账号姓名「{account.name}」，登录账号名「{account.username}」。删除后不可直接恢复，现有会话将失效，原用户名和手机号可重新使用。
         </p>
+        <p className="mt-2 rounded-lg bg-error-bg px-3 py-2 text-xs leading-5 text-error-fg">
+          删除账号不会把该手机号绑定到管理员账号。只有一个手机号时，请取消删除并前往账号设置使用安全转移。
+        </p>
         <p className="mt-2 rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
           机构必须保留至少一个已启用账号。当前操作授权剩余 {ticketSeconds} 秒，提交失败不会自动重试。
         </p>

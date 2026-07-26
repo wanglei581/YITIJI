@@ -86,6 +86,11 @@ export function ActionCredentialSteps({ flow }: { flow: UsePartnerAccountActionR
             手机号无法接收？使用账号密码
           </button>
         </div>
+        {!methods.includes('password') && (
+          <p className="rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
+            该账号密码由管理员创建或重置，或尚未完成持有人证明，因此不能用于本次高风险操作。请使用账号已验证手机号；若手机号无法接收，只能先完成线下核验恢复。
+          </p>
+        )}
       </div>
     )
   }
@@ -136,6 +141,11 @@ export function ActionCredentialSteps({ flow }: { flow: UsePartnerAccountActionR
         }}
       >
         <p className="text-sm text-neutral-600">验证码已发送至 {flow.phoneMasked ?? '账号已验证手机号'}，剩余 {remaining} 秒。</p>
+        <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs leading-5 text-neutral-600">
+          {state.action === 'delete_account'
+            ? '本次验证只授权删除该机构账号；删除会释放手机号，但不会自动绑定到管理员账号。'
+            : '本次验证只授权机构账号普通换绑；通过后还需要验证另一个未被占用的新手机号。'}
+        </p>
         <label className="block text-sm font-medium text-neutral-700" htmlFor="partner-action-old-phone-code">原手机号验证码</label>
         <input
           id="partner-action-old-phone-code"

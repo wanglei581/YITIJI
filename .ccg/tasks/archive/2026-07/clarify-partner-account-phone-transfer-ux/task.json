@@ -1,0 +1,12 @@
+{
+  "id": "clarify-partner-account-phone-transfer-ux",
+  "title": "完善机构账号删除、换绑与管理员手机号安全转移引导",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已完成并归档",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/partner-account-phone-transfer-ux"
+}
