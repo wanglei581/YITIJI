@@ -35,6 +35,9 @@
 
 .resume-source-lightflow .resume-source-main {
   min-width: 0;
+  display: flex !important;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .resume-source-lightflow .resume-source-methods {
@@ -116,7 +119,8 @@
 
 .resume-source-lightflow .resume-source-dropzone,
 .resume-source-lightflow .resume-source-phone-session {
-  min-height: 250px !important;
+  min-height: 320px !important;
+  flex: 1 1 auto;
   margin-top: 0;
   padding: 20px !important;
   border: 1px solid var(--fy-line) !important;
@@ -126,6 +130,10 @@
   box-shadow: none !important;
 }
 
+.resume-source-lightflow .resume-source-upload-hint {
+  padding: 0 4px;
+}
+
 .resume-source-lightflow .resume-source-dropzone > div:first-child {
   background: var(--fy-teal-soft) !important;
   color: var(--fy-teal-deep) !important;
@@ -133,6 +141,16 @@
 
 .resume-source-lightflow .resume-source-side {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.resume-source-lightflow .resume-source-direction {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .resume-source-lightflow .resume-source-direction > * {
@@ -145,12 +163,26 @@
   border-radius: var(--fy-r-sm) !important;
 }
 
-.resume-source-lightflow .resume-source-context {
-  padding: 18px 22px !important;
-}
-
 .resume-source-lightflow .resume-source-evidence {
   padding: 22px 26px !important;
+}
+
+.resume-source-lightflow .resume-source-actions {
+  display: flex !important;
+  align-items: center;
+  gap: 16px !important;
+  padding-top: 12px !important;
+  padding-bottom: 24px !important;
+}
+
+.resume-source-lightflow .resume-change-file {
+  border-color: var(--fy-line) !important;
+  background: var(--fy-surface) !important;
+  color: var(--fy-ink) !important;
+}
+
+.resume-source-lightflow .resume-primary-action:disabled {
+  opacity: 0.72;
 }
 
 .resume-report-lightflow {

@@ -315,7 +315,7 @@ export function ResumeSourcePage() {
         </button>
 
         <div className="resume-source-split grid min-w-0 grid-cols-1 gap-5">
-          <div className="resume-source-main flex min-w-0 flex-1 flex-col gap-5">
+          <div className="resume-source-main flex min-w-0 flex-1 flex-col">
             <div className="resume-source-methods grid grid-cols-1 gap-4 md:grid-cols-3">
               {UPLOAD_OPTIONS.map((option) => {
               const isSelected = selected === option.type
@@ -352,7 +352,7 @@ export function ResumeSourcePage() {
             </div>
 
             {selected === 'phone' ? (
-              <div className="resume-source-phone-session">
+              <div className="resume-source-phone-session flex-1">
                 <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
               </div>
             ) : (
@@ -361,7 +361,7 @@ export function ResumeSourcePage() {
                 disabled={uploading}
                 onClick={handleUploadBoxClick}
                 className={[
-                  'resume-source-dropzone flex min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
+                  'resume-source-dropzone flex flex-1 min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
                   uploadedFile
                     ? 'border-primary-300 bg-primary-50/35'
                     : 'border-neutral-200 hover:border-primary-300 hover:bg-primary-50/30 active:bg-primary-50',
@@ -378,7 +378,7 @@ export function ResumeSourcePage() {
                   {uploadedFile
                     ? `${uploadedFile.size} · ${uploadedFile.format.toUpperCase()} · ${
                       uploadedFile.channel === 'usb' ? 'U盘上传' : uploadedFile.channel === 'phone' ? '手机扫码上传' : '云端上传'
-                    }`
+                    } · 已就绪`
                     : '支持 PDF / DOC / DOCX / 图片格式，单个文件最大 10MB'}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -390,10 +390,13 @@ export function ResumeSourcePage() {
                 </div>
               </button>
             )}
+            <p className="resume-source-upload-hint mt-3 text-sm leading-relaxed text-neutral-500">
+              再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
+            </p>
           </div>
 
-          <aside className="resume-source-side flex min-w-0 w-full flex-col gap-5">
-            <div className="resume-source-direction">
+          <aside className="resume-source-side flex min-w-0 w-full flex-col">
+            <div className="resume-source-direction flex min-h-0 flex-1 flex-col">
               <DiagnosisDirectionForm
                 genericDiagnosis={genericDiagnosis}
                 selectedDimensions={selectedDimensions}
@@ -401,43 +404,18 @@ export function ResumeSourcePage() {
                 targetJob={targetJob}
                 targetExperience={targetExperience}
                 targetScene={targetScene}
+                targetMajor={targetMajor}
+                targetDegree={targetDegree}
                 onGenericDiagnosisChange={setGenericDiagnosis}
                 onToggleDimension={toggleDimension}
                 onTargetIndustryChange={setTargetIndustry}
                 onTargetJobChange={setTargetJob}
                 onTargetExperienceChange={setTargetExperience}
                 onTargetSceneChange={setTargetScene}
+                onTargetMajorChange={setTargetMajor}
+                onTargetDegreeChange={setTargetDegree}
               />
             </div>
-
-            <Card className="resume-source-context p-5">
-              <p className="text-sm font-bold text-neutral-900">补充方向（可选）</p>
-              <p className="mt-1 text-xs leading-relaxed text-neutral-500">
-                补充专业和学历，仅用于本人简历表达诊断/优化重点参考，不影响是否可以诊断。
-              </p>
-              <div className="mt-3 grid gap-3">
-                <label className="block">
-                  <span className="text-xs font-semibold text-neutral-500">专业</span>
-                  <input
-                    value={targetMajor}
-                    disabled={genericDiagnosis}
-                    onChange={(e) => setTargetMajor(e.target.value.slice(0, 60))}
-                    placeholder="例如：计算机科学与技术"
-                    className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-neutral-500">学历</span>
-                  <input
-                    value={targetDegree}
-                    disabled={genericDiagnosis}
-                    onChange={(e) => setTargetDegree(e.target.value.slice(0, 30))}
-                    placeholder="例如：本科、硕士、大专"
-                    className="mt-1 h-12 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-                  />
-                </label>
-              </div>
-            </Card>
           </aside>
         </div>
 
@@ -485,9 +463,26 @@ export function ResumeSourcePage() {
       )}
 
       <KioskActionBar className="resume-source-actions mt-6">
+        {uploadedFile ? (
+          <Button
+            size="lg"
+            variant="outline"
+            className="resume-change-file min-h-[64px] min-w-[200px] text-lg"
+            disabled={uploading}
+            onClick={() => {
+              setUploadedFile(null)
+              setError(null)
+              if (fileInputRef.current) fileInputRef.current.value = ''
+              handleUploadBoxClick()
+            }}
+          >
+            更换文件
+          </Button>
+        ) : null}
+        <span className="flex-1" aria-hidden="true" />
         <Button
           size="lg"
-          className="resume-primary-action min-h-[64px] w-full text-lg"
+          className="resume-primary-action min-h-[64px] min-w-[280px] flex-1 text-lg sm:flex-none sm:min-w-[460px]"
           disabled={!uploadedFile || uploading}
           onClick={handleStartDiagnosis}
         >

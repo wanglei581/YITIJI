@@ -17,12 +17,16 @@ interface DiagnosisDirectionFormProps {
   targetJob: string
   targetExperience: ResumeTargetContext['experience']
   targetScene: ResumeTargetContext['scene']
+  targetMajor: string
+  targetDegree: string
   onGenericDiagnosisChange: (value: boolean) => void
   onToggleDimension: (key: ResumeScoringDimensionKey) => void
   onTargetIndustryChange: (value: string) => void
   onTargetJobChange: (value: string) => void
   onTargetExperienceChange: (value: ResumeTargetContext['experience']) => void
   onTargetSceneChange: (value: ResumeTargetContext['scene']) => void
+  onTargetMajorChange: (value: string) => void
+  onTargetDegreeChange: (value: string) => void
 }
 
 export function DiagnosisDirectionForm({
@@ -32,16 +36,19 @@ export function DiagnosisDirectionForm({
   targetJob,
   targetExperience,
   targetScene,
+  targetMajor,
+  targetDegree,
   onGenericDiagnosisChange,
   onToggleDimension,
   onTargetIndustryChange,
   onTargetJobChange,
   onTargetExperienceChange,
   onTargetSceneChange,
+  onTargetMajorChange,
+  onTargetDegreeChange,
 }: DiagnosisDirectionFormProps) {
   return (
-    <Card className="p-5">
-      {/* card-head: g-icon 方块 + 标题 + 切换按钮，对应原型 .card-head 结构 */}
+    <Card className="flex h-full flex-col p-5">
       <div className="mb-4 flex items-center gap-4">
         <span
           className="fy-g-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600"
@@ -68,7 +75,12 @@ export function DiagnosisDirectionForm({
         </button>
       </div>
 
-      {/* 重点维度 chips */}
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <p className="text-sm font-semibold text-neutral-700">
+          重点关注维度 <span className="font-medium text-neutral-400">(默认 3 项，可增减)</span>
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         {RESUME_SCORING_DIMENSIONS.map((item) => {
           const checked = !genericDiagnosis && selectedDimensions.includes(item.key)
@@ -90,8 +102,7 @@ export function DiagnosisDirectionForm({
         })}
       </div>
 
-      {/* 目标岗位 / 行业方向 / 经验级别 / 求职场景 */}
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
+      <div className="mt-4 grid flex-1 content-start gap-3 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-sm font-semibold text-neutral-700">目标岗位</span>
           <input
@@ -135,7 +146,31 @@ export function DiagnosisDirectionForm({
             {RESUME_TARGET_SCENE_OPTIONS.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-700">专业（选填）</span>
+          <input
+            value={targetMajor}
+            disabled={genericDiagnosis}
+            onChange={(e) => onTargetMajorChange(e.target.value.slice(0, 60))}
+            placeholder="例如：计算机科学与技术"
+            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
+          />
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-neutral-700">学历（选填）</span>
+          <input
+            value={targetDegree}
+            disabled={genericDiagnosis}
+            onChange={(e) => onTargetDegreeChange(e.target.value.slice(0, 30))}
+            placeholder="例如：本科、硕士、大专"
+            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
+          />
+        </label>
       </div>
+
+      <p className="mt-3 text-xs leading-relaxed text-neutral-500">
+        专业与学历仅用于本人简历表达的诊断重点参考，不影响是否可以诊断。
+      </p>
     </Card>
   )
 }
