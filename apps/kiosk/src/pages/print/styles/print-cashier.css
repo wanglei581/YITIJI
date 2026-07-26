@@ -25,7 +25,6 @@
 .cashier-pay-card {
   width: 470px;
   flex: none;
-  align-self: stretch;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -105,17 +104,17 @@
 
 /* Rule card */
 .cashier-rule-card {
+  flex: 1;
   padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   background: var(--print-surface);
   border: 1px solid var(--print-line);
   border-radius: 18px;
   box-shadow: 0 3px 14px rgb(16 48 43 / 5%);
 }
 .cashier-rule-card h3 { font-size: 20px; font-weight: 700; display: block; margin-bottom: 6px; }
-.cashier-rule-card ul { padding-left: 22px; display: flex; flex-direction: column; gap: 10px; }
+.cashier-rule-card ul { flex: 1; padding-left: 22px; display: flex; flex-direction: column; justify-content: space-around; gap: 8px; }
 .cashier-rule-card li { font-size: 17.5px; line-height: 1.55; color: var(--print-muted); }
 
 /* Notice strip */
@@ -394,8 +393,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  align-self: stretch;
-  min-height: 0;
 }
 .print-confirm-side {
   width: 400px;
@@ -403,9 +400,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  align-self: stretch;
-  min-height: 0;
-  overflow-y: auto;
 }
 @media (max-width: 900px) {
   .print-confirm-split { flex-direction: column; }
@@ -466,7 +460,6 @@
 /* 参数摘要卡 (a-slate) */
 .print-sum-card {
   flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 20px 26px;

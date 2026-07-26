@@ -350,8 +350,8 @@ export function PrintConfirmPage() {
             </div>
           </div>
 
-          {/* 提交后流程 + 打印须知（合并，避免右栏碎卡堆叠） */}
-          <div className="print-flow-card print-rules-card">
+          {/* 提交后流程卡 */}
+          <div className="print-flow-card">
             <b className="print-flow-title">
               提交后流程
               <span>免费订单自动跳过支付</span>
@@ -376,7 +376,11 @@ export function PrintConfirmPage() {
                 <span>取件核对</span>
               </div>
             </div>
-            <b className="print-rules-title" style={{ marginTop: 16 }}>打印须知</b>
+          </div>
+
+          {/* 打印须知卡 */}
+          <div className="print-rules-card">
+            <b className="print-rules-title">打印须知</b>
             <ol className="print-rules-list">
               <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
               <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>

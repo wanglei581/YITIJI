@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import ReactDiffViewer from 'react-diff-viewer-continued'
-import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
@@ -454,7 +454,7 @@ export function ResumeOptimizePage() {
 
       </div>
 
-      <KioskActionBar className="resume-lightflow__action-bar mt-6 flex gap-3">
+      <div className="resume-lightflow__action-bar mt-6 flex gap-3">
         <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleSaveAdvice)}>
           保存优化建议
         </Button>
@@ -463,7 +463,7 @@ export function ResumeOptimizePage() {
           <FileDownIcon className="h-5 w-5" />
           {exporting ? '正在生成文件…' : `确认优化版，导出 ${EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'}`}
         </Button>
-      </KioskActionBar>
+      </div>
 
       {confirmLeave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-6">
