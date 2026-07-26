@@ -9,33 +9,39 @@
 - [x] **运行时乱码与代表性错版第一轮修复**：全顶层路由中文错误恢复页、线下机构/岗位 raw wire 映射、打印上传双底栏、W2 打印页头/gutter、W3 简历来源/面试设置/顶级舞台均按 TDD 收口；W6 浏览器 87/87、用户当前浏览器 87 URL、三端 typecheck/lint/build 通过。Antigravity 服务端仍未返回有效审查报告，不能写成双模型完成。
 - [x] **P0 功能真实性第二批**：`/print/done` 已改为仅后端 `completed` 显示成功；`/resume/export` 保留诚实守门，不新建第二套假产物状态；扫描不再请求不存在的设备状态端点，直达不建会话，只接受服务端真实指引，不伪造离线/就绪态，停留期间过期会话也禁止继续并执行一次取消；场馆导览、打印完成反馈/帮助、线下机构搜索已接到既有真实路径/API。新增真实性浏览器 23/23 和相关静态门禁。
 - [x] **P1 逐屏证据合同与口径**：已固定 77 个主视觉目标 + 5 个状态参考、87 条路由处置、精确视口、状态、重定向/复用/无独立原型标记与 ignored 证据根；门禁会与真实 router AST 交叉校验。
-- [x] **首页招聘会 / 打印扫描视觉平衡候选**：手机竖屏及 932×430 横屏使用物理移动壳，打印扫描五卡 80px 等高、末项通栏，招聘会浅麦金层级、禁用态和降动效已收口；1024×768、1080×1920 舞台保护不变。已推送；PR #400；未部署。
-- [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1（诊断上传）+ Wave 2（generate/optimize/report + print confirm/preview/cashier）+ Wave 3（签名盖章/扫描双栏/格式转换/材料检查网格）已完成。后续仅做抽检回归，不碰 `/me/*`、API、支付、TRTC。
-- [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65**（打印 CTA）与 **57**（screensaver 唤醒壳），合同夹具复拍原 CAPTURE_FAIL 14/15 OK。当前人工判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** 通话弹层需 TRTC，未改 AI/TRTC）。证据 `test-results/kiosk-p1-visual-evidence/cf23f19b/JUDGMENT.md`。现有 W6 只证明路由可达，不是像素 diff；不等于预生产/硬件验收。
-- [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC/SMS、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
-- [~] **PR #400 合入**：已与 `main` 解冲突；待 CI 绿后合并。
+- [x] **首页招聘会 / 打印扫描视觉平衡候选**：手机竖屏及 932×430 横屏使用物理移动壳，打印扫描五卡 80px 等高、末项通栏，招聘会浅麦金层级、禁用态和降动效已收口；1024×768、1080×1920 舞台保护不变。已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。
+- [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；预发 Kiosk-only 热更为 `index-CPD4lg4F.js`。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
+- [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65** / **57**；判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** TRTC）。不等于像素封板或硬件验收。
+- [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
+- [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；预发仅热更 Kiosk → `index-CPD4lg4F.js`（API pin / PM2 / DB / Admin / Partner 未动）。
 
 ## 当前执行：上线前 P0 收口（视觉候选已进主干）
 
-视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
+视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`；商用密度与融合收口已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
+
+推荐顺序（2026-07-27 更新）：
+0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
+0j. [~] **Gate 0.4 11c**：诊断脚本已补 ProgramData/token ACL 只读字段（本地 verify 绿，待合入）；**Windows 真机** ACL / 吊销停领 / BindCode 恢复仍须另授——见 `docs/device/production-agent-onboarding.md`
+0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；预发另有 1 条过期 `waiting` ScanTask 惰性过期未落盘，现场前可只读确认或另授清理
+0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：
 
 0. [x] **预发事故：offline-agencies `pageSize` string → 500**：#366；现网 **`DEPLOY_SOURCE=83f2117f`** 仍固化；公网 `?pageSize=5` → 200
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
-0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
-0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
+0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379** → `index-Dn7fbWN6.js`，再被 **#400** 热更覆盖为 `index-CPD4lg4F.js`（仍含「扫码上传 / U盘导入」）
+0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发曾热更；现网 Kiosk 已为 #400 `index-CPD4lg4F.js`，仍含 stage-fit）
 0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言已由 [PR #393](https://github.com/wanglei581/YITIJI/pull/393) 合入 `main@50cbca15`；其 API-only overlay 已由完整 API 发布 `main@1812ba54` 正式吸收，本机/公网 health `ok/postgres`，前端、环境、数据库业务数据、Redis 与短信配置未变。手机号转移闭环已完成，不再重复真实转移。
 0f. [x] **P1 PostgreSQL migration 履历回补**（[PR #396](https://github.com/wanglei581/YITIJI/pull/396)）：`20260722090000_pg_foundation_batch_tables` 已按服务器原始字节回填，服务器文件、历史 Git 对象与数据库 checksum 三方 SHA-256 `40ea789…944` 一致；本机隔离空库 44 个迁移全链 deploy、status、10 表/checksum 断言与二次 deploy 幂等均通过，临时库已销毁。未修改 SQL，未在预生产执行 `migrate reset` 或 `migrate resolve`。
 0g. [x] **P1 预生产备份真实 restore 冒烟**（用户已授权）：full API 发布前 custom-format dump 已校验远端/本机 SHA-256 一致，仅恢复到本机唯一 scratch PostgreSQL；`pg_restore --no-owner --no-privileges --exit-on-error` 通过，摘要为 public 表 81、finished migration 44、目标 10 表与 checksum 均匹配，scratch 已销毁并反查不存在。未覆盖、恢复或写入现有预生产库。
 0h. [x] **预生产 Node 22 应用运行时迁移**：PM2 应用保持原 `full_api_commit=1812ba54`、原脚本/原 cwd，仅将解释器固化为 `/usr/local/bin/node`；最终 `node_version=22.23.1`、`unstable=0`、dump `0600`，本机/公网 health `ok/postgres`、三端 200。Node 契约 `>=22.13 <23` 已通过 [PR #398](https://github.com/wanglei581/YITIJI/pull/398) squash 合入 `main@895630c1`，PR CI 与 main push CI `30205451885` 三项全绿；隔离 release 已完成 Node 22 frozen install/build/native/migration-status/manifest 验证但未激活。后续只剩：在 F1 Genesis production 门禁和具名授权完成后，才可把隔离候选作为正式 `current` 切流；当前不得把“候选已验证”写成“新业务版本已部署”。
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：完整应用基线仍为 `83f2117f`，API 已用完整候选 **`full_api_commit=1812ba54`** 吸收 #393 overlay；Kiosk hotfix #379 为 `index-Dn7fbWN6.js`，Admin hotfix #391 为 `index-D85Q5xcv.js`；`TRUST_PROXY_HOPS=1`，未改 env/前端/业务数据，**未**跑 F1 Genesis。
-0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；已随全量 **`DEPLOY_SOURCE=83f2117f`** 固化 `index-_FiZHKg3.js`；不代表 U 盘真机验收完成）
+3. [x] **预生产部署**：完整应用基线仍为 `83f2117f`，API 完整候选 **`full_api_commit=1812ba54`**；Admin hotfix #391 为 `index-D85Q5xcv.js`；Kiosk 现网热更为 **#400 `index-CPD4lg4F.js`**（含 #379 stage-fit + 商用密度）；`TRUST_PROXY_HOPS=1`，**未**跑 F1 Genesis。
+0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；已随全量 **`DEPLOY_SOURCE=83f2117f`** 固化；现网 Kiosk #400 仍含通道；不代表 U 盘真机验收完成）
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：完整应用基线 `83f2117f`（#369+#356+#375+#376；含 #366/#355/#357），API 完整候选已更新为 `1812ba54`；`TRUST_PROXY_HOPS=1`；Kiosk 后续 #379 热更为 `index-Dn7fbWN6.js`（扫码/U盘 UI 通道仍在；不代表 U 盘真机验收完成）。
+3. [x] **预生产部署**：完整应用基线 `83f2117f`（#369+#356+#375+#376；含 #366/#355/#357），API 完整候选 `1812ba54`；Kiosk 现网 **#400 `index-CPD4lg4F.js`**。
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`：Admin `/orders` 对 `paid` 全额退款 UI。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏、`G5_REFUND_SMOKE`
