@@ -132,7 +132,10 @@ function ServiceCard({ group }: { group: ServiceGroup }) {
   }
 
   return (
-    <section className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`.trim().replace(/\s+/g, ' ')}>
+    <section
+      className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`.trim().replace(/\s+/g, ' ')}
+      data-group-id={group.id}
+    >
       <div className="card-head">
         <span className="g-icon">
           <ProtoIcon name={GROUP_ICON[group.id] ?? 'group-resume'} />
