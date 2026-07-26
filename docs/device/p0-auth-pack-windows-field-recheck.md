@@ -23,7 +23,7 @@
 
 1. Windows：`AIJobPrintAgent` Running + Automatic；`Get-Printer` 记录真实名 → Agent `printerName` 一致（禁止硬编码型号）— **✅ 2026-07-25**
 2. 本机队列清空；Admin/API 确认该终端无 active `pending/claimed/printing`（避免抢旧单）— **✅ 队列最终 0**
-3. 受控样张：无个人信息 PDF **或** 用户明确授权的试运营单 → 真机出纸；记录 `taskId` / 页数 — **✅ 2026-07-25 F4 补做**：简历打印扫码上传 → `ptask_kiosk_e0fe379299af7c50` completed；用户确认出纸
+3. 受控样张：无个人信息 PDF **或** 用户明确授权的试运营单 → 真机出纸；记录 `taskId` / 页数 — **✅ 2026-07-25 F4 补做**：`ptask_kiosk_e0fe379299af7c50` completed；**2026-07-26 再确认** `ptask_kiosk_f9587c2439e1855a` completed，用户回「是」
 4. 断网：拔线后终端应变离线/不可伪造成功；恢复后心跳与 claim 恢复 — **✅ WLAN 75s，恢复无需重启 Agent**
 5. 扫描或 U 盘：若本期宣称可用则真机走通；否则诚实记录「未验收 / 能力关闭」— **未做**（诚实记录；U 盘桌面「本机未配置」）
 

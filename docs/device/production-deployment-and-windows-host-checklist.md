@@ -41,9 +41,9 @@
 - [x] 腾讯云 COS CAM 子用户密钥已轮换，权限最小化到私有桶所需动作。（同上：沿用 2026-06-13 轮换 + live；今日未再轮换。最小权限以当时配置为准，若 CAM 策略有变须另验。）
 - [ ] 腾讯云 COS 生命周期已人工验收：禁止配置 Bucket 全局过期规则；任何规则不得覆盖 `users/`、会员简历、AI 成果物或 `long_term` 长期保存对象。
 - [ ] 如启用 COS 生命周期兜底规则，仅允许作用于 `tmp/` 临时前缀；规则名称、作用前缀、过期天数和启用状态已截图存档。
-- [x] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。（**2026-07-25 方案 C**：用户确认 SMS/TRTC 为当前生产密钥且预发 `.env` 已同步、今日无需再换；未读密钥值。**不等于**短信签名/模板审核已通过。）
+- [x] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。（**2026-07-25 方案 C**：用户确认 SMS/TRTC 为当前生产密钥且预发 `.env` 已同步、今日无需再换；未读密钥值。）
 - [ ] LLM/DeepSeek 或其他模型 API Key 已使用生产专用 Key。
-- [ ] 短信签名/模板审核通过后再启用真实短信。
+- [x] 短信签名/模板审核通过后再启用真实短信。（**2026-07-26 真号 E2E**：预发 `SMS_PROVIDER=tencent`，签名/模板名称级 `青岛智磊信创` / `2661213`；`sms-code` 201 + Tencent 下发成功日志；用户回填验证码后会员登录 201，`183****1921`。完整手机号/验证码/JWT 不入库。）
 - [x] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。（**2026-07-25**：用户确认「密钥在 .env」；预发名称级复核 OCR/COS/SMS/TRTC 为 `SET`，值未读出。）
 - [x] 生产/预生产环境的 seed 内部账号默认口令（`admin` / `partner1` / `partner2`，明文写在 `services/api/prisma/seed.ts`）已全部轮换为强密码或直接禁用账号；公网可达的后台登录页不得挂任何仓库内可见的默认口令（2026-07-12 发现风险；**2026-07-25**：bcrypt 确认后执行 `SEED_PASSWORD_ROTATE`——admin 本已非默认，partner1/partner2 已轮换强随机口令且 `tokenVersion++`；seed 默认登录 `partner1`→`401 AUTH_LOGIN_FAILED`；明文仅服务器 root `0600` 文件，取后 shred。**注意**：勿再对预发跑会重置口令的 `db:seed` upsert）。
 
@@ -89,7 +89,7 @@
 - [ ] OCR provider 与百度密钥正确。
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
-- [ ] SMS provider 在短信审核前不得误设为真实生产发送。
+- [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
 - [ ] `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false（生产缺省会拒启动；启用真实支付通道时必须 true）。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
 - [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
@@ -318,7 +318,7 @@ pnpm --filter ./services/api verify:activity-logs
 
 至少执行以下测试并留存结果：
 
-- [x] 打印测试 PDF。（**2026-07-25 F4**：`ptask_kiosk_2a75352b81631efb` 等旁证；**补做** `ptask_kiosk_e0fe379299af7c50` 简历打印扫码上传 → completed；用户确认「有出纸」）
+- [x] 打印测试 PDF。（**2026-07-25 F4**：`ptask_kiosk_2a75352b81631efb` 等旁证；**补做** `ptask_kiosk_e0fe379299af7c50` 简历打印扫码上传 → completed；用户确认「有出纸」。**2026-07-26 再确认** `ptask_kiosk_f9587c2439e1855a` completed，用户回「是」）
 - [ ] 打印测试图片。
 - [ ] 打印简历 PDF。
 - [ ] 份数控制。
@@ -519,7 +519,7 @@ typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify
 - Gate 4 **剩余浏览器证据**补齐（Admin 生命周期、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要；API 级和会员路径已过，完整截图待补）。
 - **百度 OCR Key 预生产 live**、**AI / TRTC / ASR / TTS 按启用范围 live**（本地已验，预生产 live 待补）。
 - **正式域名 + 正式 HTTPS**（当前仅 30 天临时自签）。
-- **腾讯短信审核**通过后**真实手机号 E2E**（预生产仍 `SMS_PROVIDER=tencent`，真实发送待审核）。
-- **Windows 真机 / Terminal Agent / 奔图打印·扫描 / 断网恢复 / 真实出纸**（§五，需真机）。
+- ~~**腾讯短信审核**通过后**真实手机号 E2E**~~ → **2026-07-26 已完成**（见 §2.2）。
+- **Windows 真机 / Terminal Agent / 奔图打印·扫描 / 断网恢复 / 真实出纸**（§五；Phase F 含 F4 出纸已过；扫描/U盘整机与彩色/双面参数等仍可另开）。
 - **法务**用户协议 / 隐私政策审定（§2.3，当前为试运营文本）。
 - **小范围试运营**（§六）未开始。

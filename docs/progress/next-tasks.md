@@ -20,8 +20,8 @@
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343)；P1-5 法务正文定稿仍开）
 7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发 pin **`0924a09b`**：
    - **7a / 7a2 seed**：✅
-   - **7b 密钥举证（方案 C）**：✅；短信签名/模板审核与真实短信 E2E 仍开
-   - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（F4 补做：`ptask_kiosk_e0fe379299af7c50` 扫码上传出纸，用户确认；旁证 `ptask_kiosk_2a75352b81631efb`）
+   - **7b 密钥举证（方案 C）**：✅；**真实短信 E2E**：✅（2026-07-26，`183****1921` 下发+登录 201；签名/模板 live 可用）
+   - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（F4：`ptask_kiosk_e0fe379299af7c50`；2026-07-26 再确认 `ptask_kiosk_f9587c2439e1855a`，用户回「是」；旁证 `ptask_kiosk_2a75352b81631efb`）
    - **7d Partner 冒烟**：✅
    - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
 8. [x] **`req.ip` 抽样确认**（2026-07-25）
