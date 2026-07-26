@@ -257,21 +257,17 @@ function topLevelDeclarations(body) {
 // selector 必须是选择器列表中的完整成员；所有同名规则/声明按源码顺序合并取最终值。
 function cascadedRules(rules, targetSelectors) {
   const targets = new Set(targetSelectors.map(normalizeSelector))
-  const matchingIndexes = []
+  let count = 0
   const properties = new Map()
-  const importantProperties = new Set()
-  rules.forEach((rule, index) => {
+  rules.forEach((rule) => {
     if (!rule.selectors.some((selector) => targets.has(selector))) return
-    matchingIndexes.push(index)
+    count += 1
     for (const declaration of topLevelDeclarations(rule.body)) {
       properties.set(declaration.name.toLowerCase(), declaration.value)
-      if (/!\s*important\s*$/i.test(declaration.value)) importantProperties.add(declaration.name.toLowerCase())
     }
   })
   return {
-    count: matchingIndexes.length,
-    matchingIndexes,
-    importantProperties,
+    count,
     property: (name) => properties.get(name.toLowerCase()) ?? '',
   }
 }
@@ -280,16 +276,15 @@ const scopedSelectors = (group, selector) => [
   `.kpv1 .card[data-group-id='${group}'] ${selector}`,
   `.kpv1 .card[data-group-id="${group}"] ${selector}`,
 ]
-const scopedRule = (source, group, selector) => cascadedRule(source, scopedSelectors(group, selector))
 
 const CONTRACT = {
-  printGrid: { group: 'print-scan', accent: 'a-slate', selector: '.tiles.c5', kind: 'grid', properties: ['grid-template-columns', 'gap'] },
-  printTile: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col', kind: 'tile-col', properties: ['flex-direction', 'min-height', 'text-align'] },
-  printText: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col .t-text', kind: 'tile-text', properties: ['text-align'] },
-  printLast: { group: 'print-scan', accent: 'a-slate', selector: '.tile:last-child', kind: 'tile-last', properties: ['grid-column'] },
-  jobPrimary: { group: 'job-fairs', accent: 'a-wheat', selector: '.tile.primary', kind: 'tile-primary', properties: ['background', 'border-color'] },
-  baseGrid: { group: null, accent: null, selector: '.kpv1 .tiles.c5', kind: 'grid', properties: ['grid-template-columns'] },
-  baseCol: { group: null, accent: null, selector: '.kpv1 .tile.col', kind: 'tile-col', properties: ['min-height'] },
+  printGrid: { group: 'print-scan', accent: 'a-slate', selector: '.tiles.c5', kind: 'grid', expected: { 'grid-template-columns': ['repeat(2,1fr)', 'repeat(2,minmax(0,1fr))'], gap: ['8px'] } },
+  printTile: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col', kind: 'tile-col', expected: { 'flex-direction': ['row'], 'min-height': ['68px'], 'text-align': ['left'] } },
+  printText: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col .t-text', kind: 'tile-text', expected: { 'text-align': ['left'] } },
+  printLast: { group: 'print-scan', accent: 'a-slate', selector: '.tile:last-child', kind: 'tile-last', expected: { 'grid-column': ['1/-1'] } },
+  jobPrimary: { group: 'job-fairs', accent: 'a-wheat', selector: '.tile.primary', kind: 'tile-primary', expected: { background: ['color-mix(insrgb,var(--pv-wheat-soft)72%,var(--pv-paper))'], 'border-color': ['color-mix(insrgb,var(--pv-wheat)24%,transparent)'] } },
+  baseGrid: { group: null, accent: null, selector: '.kpv1 .tiles.c5', kind: 'grid', expected: { 'grid-template-columns': ['repeat(5,1fr)'] } },
+  baseCol: { group: null, accent: null, selector: '.kpv1 .tile.col', kind: 'tile-col', expected: { 'min-height': ['90px'] } },
 }
 
 const contractSelectors = (contract) => contract.group
@@ -316,27 +311,125 @@ function selectorCouldAffect(selector, contract) {
   }
 }
 
-function potentialOverrides(rules, contract, cascade = null) {
-  const exactIndexes = new Set(cascade?.matchingIndexes ?? [])
-  const firstTarget = cascade?.matchingIndexes[0] ?? -1
-  const properties = new Set(contract.properties.map((name) => name.toLowerCase()))
-  return rules.flatMap((rule, index) => {
-    if (exactIndexes.has(index)) return []
-    if (!rule.selectors.some((selector) => selectorCouldAffect(selector, contract))) return []
-    const declarations = topLevelDeclarations(rule.body).filter((declaration) =>
-      properties.has(declaration.name.toLowerCase()) &&
-      (index > firstTarget || /!\s*important\s*$/i.test(declaration.value)),
-    )
-    return declarations.map((declaration) => ({ rule, declaration }))
-  })
+function matchingPair(source, open, opening, closing) {
+  if (source[open] !== opening) return -1
+  let depth = 1
+  let index = open + 1
+  while (index < source.length) {
+    if (source.startsWith('/*', index)) { index = skipComment(source, index); continue }
+    if (source[index] === '"' || source[index] === "'") { index = skipString(source, index); continue }
+    if (source[index] === '\\') { index += 2; continue }
+    if (source[index] === opening) depth += 1
+    if (source[index] === closing && --depth === 0) return index
+    index += 1
+  }
+  return -1
+}
+const addSpecificity = (left, right) => left.map((value, index) => value + right[index])
+const maxSpecificity = (values) => values.reduce(
+  (best, value) => compareSpecificity(value, best) > 0 ? value : best,
+  [0, 0, 0],
+)
+const compareSpecificity = (left, right) => {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index]
+  }
+  return 0
+}
+function consumeIdentifier(source, start) {
+  let index = start
+  while (index < source.length) {
+    if (source[index] === '\\') { index += 2; continue }
+    if (!/[\w-]/.test(source[index]) && source.charCodeAt(index) < 128) break
+    index += 1
+  }
+  return index
+}
+// 当前合同所需的 Selectors Level 4 specificity：ID / class+attr+pseudo / type+pseudo-element。
+// :is()/:not()/:has() 取参数列表最大值，:where() 为零。
+function selectorSpecificity(selector) {
+  const source = stripCssComments(selector)
+  let specificity = [0, 0, 0]
+  let index = 0
+  while (index < source.length) {
+    if (source[index] === '\\') { index += 2; continue }
+    if (source[index] === '#') { specificity[0] += 1; index = consumeIdentifier(source, index + 1); continue }
+    if (source[index] === '.') { specificity[1] += 1; index = consumeIdentifier(source, index + 1); continue }
+    if (source[index] === '[') {
+      specificity[1] += 1
+      const close = matchingPair(source, index, '[', ']')
+      index = close < 0 ? source.length : close + 1
+      continue
+    }
+    if (source[index] === ':') {
+      const pseudoElement = source[index + 1] === ':'
+      const nameStart = index + (pseudoElement ? 2 : 1)
+      const nameEnd = consumeIdentifier(source, nameStart)
+      const name = source.slice(nameStart, nameEnd).toLowerCase()
+      const legacyElement = ['before', 'after', 'first-line', 'first-letter'].includes(name)
+      if (source[nameEnd] === '(') {
+        const close = matchingPair(source, nameEnd, '(', ')')
+        const args = close < 0 ? '' : source.slice(nameEnd + 1, close)
+        if (name !== 'where' && ['is', 'not', 'has'].includes(name)) {
+          specificity = addSpecificity(specificity, maxSpecificity(splitSelectorList(args).map(selectorSpecificity)))
+        } else if (name !== 'where') {
+          specificity[pseudoElement || legacyElement ? 2 : 1] += 1
+        }
+        index = close < 0 ? source.length : close + 1
+        continue
+      }
+      specificity[pseudoElement || legacyElement ? 2 : 1] += 1
+      index = nameEnd
+      continue
+    }
+    if (/[A-Za-z_\u0080-\uFFFF-]/.test(source[index])) {
+      specificity[2] += 1
+      index = consumeIdentifier(source, index)
+      continue
+    }
+    index += 1
+  }
+  return specificity
+}
+const declarationImportance = (value) => ({
+  important: /!\s*important\s*$/i.test(value),
+  value: value.replace(/!\s*important\s*$/i, '').trim(),
+})
+function candidateWins(candidate, winner) {
+  if (!winner) return true
+  if (candidate.important !== winner.important) return candidate.important
+  const specificityOrder = compareSpecificity(candidate.specificity, winner.specificity)
+  return specificityOrder > 0 || (specificityOrder === 0 && candidate.order > winner.order)
 }
 
-const contractOverrideSafe = (rules, contract, cascade = null) =>
-  !(cascade && contract.properties.some((name) => cascade.importantProperties.has(name.toLowerCase()))) &&
-  potentialOverrides(rules, contract, cascade).length === 0
+function cascadeWinner(rules, contract, property) {
+  let winner = null
+  let order = 0
+  for (const rule of rules) {
+    const selectors = rule.selectors.filter((selector) => selectorCouldAffect(selector, contract))
+    for (const declaration of topLevelDeclarations(rule.body)) {
+      order += 1
+      if (declaration.name.toLowerCase() !== property.toLowerCase()) continue
+      const parsed = declarationImportance(declaration.value)
+      for (const selector of selectors) {
+        const candidate = { ...parsed, selector, specificity: selectorSpecificity(selector), order }
+        if (candidateWins(candidate, winner)) winner = candidate
+      }
+    }
+  }
+  return winner
+}
+
+const winnerValue = (rules, contract, property) => cascadeWinner(rules, contract, property)?.value ?? ''
+const contractWinnersMatch = (rules, contract) => Object.entries(contract.expected).every(
+  ([property, approved]) => approved.includes(normalizeCssValue(winnerValue(rules, contract, property))),
+)
 
 function mediaAppliesAt(block, width, height) {
   const query = block.prelude.replace(/\s+/g, '').toLowerCase()
+  if (/^@media(?:only)?print(?:and|\(|$)/.test(query) || /^@medianotscreen(?:and|\(|$)/.test(query)) return false
+  if (query.includes('orientation:portrait') && width > height) return false
+  if (query.includes('orientation:landscape') && height > width) return false
   const maxWidth = query.match(/max-width:(\d+(?:\.\d+)?)px/)
   const minWidth = query.match(/min-width:(\d+(?:\.\d+)?)px/)
   const exactWidth = query.match(/(?:@media|\()width:(\d+(?:\.\d+)?)px/)
@@ -364,28 +457,20 @@ function runHelperSelfChecks() {
   const target = contractSelectors(contract)[0]
   const lexical = cascadedRule(`/* } { */ ${target} { content: "} {"; gap: 8px; }`, [target])
   helperAssert(lexical.count === 1 && normalizeCssValue(lexical.property('gap')) === '8px', 'comment/string braces')
-
-  const repeated = cascadedRule(`${target} { gap: 10px } ${target}\n{ gap: 8px }`, [target])
-  helperAssert(repeated.count === 2 && normalizeCssValue(repeated.property('gap')) === '8px', 'repeated rules use final value')
-
-  for (const suffix of ['.wide { gap: 20px }', '.wide { gap: 20px !important }']) {
-    const rules = cssRules(`${target} { gap: 8px } ${target}${suffix}`)
-    const cascade = cascadedRules(rules, [target])
-    helperAssert(potentialOverrides(rules, contract, cascade).length === 1, `more-specific override ${suffix}`)
-  }
-  const importantRules = cssRules(`${target} { gap: 8px } ${target} { gap: 20px !important }`)
-  const important = cascadedRules(importantRules, [target])
-  helperAssert(!contractOverrideSafe(importantRules, contract, important), 'same-selector important override')
-  const earlierImportantRules = cssRules(`${target}.wide { gap: 20px !important } ${target} { gap: 8px }`)
-  const earlierImportant = cascadedRules(earlierImportantRules, [target])
-  helperAssert(!contractOverrideSafe(earlierImportantRules, contract, earlierImportant), 'earlier important override')
-
-  const unrelated420 = cssRules(`[data-group-id='print-scan'] .t-text span { font-size: 11px }`)
-  helperAssert(
-    Object.values(CONTRACT).every((item) => potentialOverrides(unrelated420, item).length === 0),
-    '420 unrelated property is allowed',
-  )
-  pass('CSS helper 内建自检：词法、重复规则、specific/important 覆盖与无关属性')
+  const gapWinner = (source) => normalizeCssValue(winnerValue(cssRules(source), contract, 'gap'))
+  helperAssert(gapWinner(`${target} { gap: 10px } ${target}\n{ gap: 8px }`) === '8px', 'same specificity later wins')
+  helperAssert(gapWinner(`${target}.wide { gap: 20px } ${target} { gap: 8px }`) === '20px', 'earlier more-specific wins')
+  helperAssert(gapWinner(`${target} { gap: 8px } .kpv1 .tiles.c5 { gap: 20px }`) === '8px', 'later lower-specificity loses')
+  for (const source of [
+    `.kpv1 .tiles.c5 { gap: 20px !important } ${target} { gap: 8px }`,
+    `${target} { gap: 8px } .kpv1 .tiles.c5 { gap: 20px !important }`,
+  ]) helperAssert(gapWinner(source) === '20px', 'important wins in both source directions')
+  helperAssert(gapWinner(`${target}.wide { gap: 20px } ${target} { gap: 8px !important }`) === '8px', 'important beats specificity')
+  helperAssert(compareSpecificity(selectorSpecificity("section[data-x] .tile:last-child"), [0, 3, 1]) === 0, 'attribute/class/pseudo specificity')
+  helperAssert(compareSpecificity(selectorSpecificity('section:not(.x, #winner)'), [1, 0, 1]) === 0, ':not() max specificity')
+  helperAssert(compareSpecificity(selectorSpecificity('section:is(.x, [data-x])'), [0, 1, 1]) === 0, ':is() max specificity')
+  helperAssert(gapWinner(`${target} { gap: 8px } [data-group-id='print-scan'] .t-text span { font-size: 11px }`) === '8px', '420 unrelated property allowed')
+  pass('CSS helper 内建自检：词法、specificity、source order、important 与无关属性')
 }
 
 function propertyName(node, sourceFile) {
@@ -623,6 +708,7 @@ expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 
 const narrowMedia = mediaBlocks(css, 'max-width:760px')
 const narrow = narrowMedia.map((block) => block.body).join('\n')
 const narrowRules = cssRules(narrow)
+const rules390 = rulesForViewport(css, 390, 844)
 expect(narrowMedia.length > 0, '可按词法安全块扫描提取 @media (max-width: 760px)')
 
 const printGrid = cascadedRules(narrowRules, contractSelectors(CONTRACT.printGrid))
@@ -634,21 +720,21 @@ expect(
   '窄屏打印扫描网格最终值为两列',
 )
 expect(normalizeCssValue(printGrid.property('gap')) === '8px', '窄屏打印扫描网格最终 gap=8px')
-expect(contractOverrideSafe(narrowRules, CONTRACT.printGrid, printGrid), '760px 后写/important 规则不覆盖打印扫描网格合同属性')
+expect(contractWinnersMatch(rules390, CONTRACT.printGrid), '390px 级联 winner 保持打印扫描两列与 8px gap')
 
 const printTile = cascadedRules(narrowRules, contractSelectors(CONTRACT.printTile))
 expect(normalizeCssKeywordValue(printTile.property('flex-direction')) === 'row', '窄屏打印扫描 .tile.col 最终为横向排列')
 expect(normalizeCssValue(printTile.property('min-height')) === '68px', '窄屏打印扫描 .tile.col 最终 min-height=68px')
 expect(normalizeCssKeywordValue(printTile.property('text-align')) === 'left', '窄屏打印扫描 .tile.col 最终文字左对齐')
-expect(contractOverrideSafe(narrowRules, CONTRACT.printTile, printTile), '760px 后写/important 规则不覆盖打印扫描 tile.col 合同属性')
+expect(contractWinnersMatch(rules390, CONTRACT.printTile), '390px 级联 winner 保持 tile.col 横向、68px、左对齐')
 
 const printText = cascadedRules(narrowRules, contractSelectors(CONTRACT.printText))
 expect(normalizeCssKeywordValue(printText.property('text-align')) === 'left', '窄屏打印扫描 .t-text 最终明确左对齐')
-expect(contractOverrideSafe(narrowRules, CONTRACT.printText, printText), '760px 后写/important 规则不覆盖打印扫描文字对齐')
+expect(contractWinnersMatch(rules390, CONTRACT.printText), '390px 级联 winner 保持打印扫描文字左对齐')
 
 const printLast = cascadedRules(narrowRules, contractSelectors(CONTRACT.printLast))
 expect(normalizeCssValue(printLast.property('grid-column')) === '1/-1', '窄屏打印扫描最后一项最终通栏')
-expect(contractOverrideSafe(narrowRules, CONTRACT.printLast, printLast), '760px 后写/important 规则不覆盖打印扫描末项通栏')
+expect(contractWinnersMatch(rules390, CONTRACT.printLast), '390px 级联 winner 保持打印扫描末项通栏')
 
 const jobFairPrimary = cascadedRules(narrowRules, contractSelectors(CONTRACT.jobPrimary))
 expect(jobFairPrimary.count > 0, '窄屏招聘会 primary 使用 data-group-id 精确作用域')
@@ -662,29 +748,24 @@ expect(
     'color-mix(insrgb,var(--pv-wheat)24%,transparent)',
   '窄屏招聘会 primary 使用批准的 --pv-wheat 24% 边框',
 )
-expect(contractOverrideSafe(narrowRules, CONTRACT.jobPrimary, jobFairPrimary), '760px 后写/important 规则不覆盖招聘会 primary 配色')
+expect(contractWinnersMatch(rules390, CONTRACT.jobPrimary), '390px 级联 winner 保持招聘会批准配色')
 
 const narrowSelectors = narrowRules.flatMap((rule) => rule.selectors)
 expect(!narrowSelectors.some((selector) => /:nth-child\s*\(/i.test(selector)), '窄屏业务选择器不使用 :nth-child 定位')
 expect(!narrowSelectors.some((selector) => selector.includes('.a-wheat')), '窄屏业务选择器不使用任何裸 .a-wheat 定位')
 
 const mobileMedia = mediaBlocks(css, 'max-width:420px')
-const mobile = mobileMedia.map((block) => block.body).join('\n')
-const mobileRules = cssRules(mobile)
 const lastNarrowIndex = narrowMedia.at(-1)?.open ?? -1
 expect(mobileMedia.length > 0, '可按词法安全块扫描提取 @media (max-width: 420px)')
 expect(mobileMedia.every((block) => block.open > lastNarrowIndex), '420px media 位于 760px media 之后')
-for (const [name, contract] of Object.entries(CONTRACT).filter(([name]) => !name.startsWith('base'))) {
-  expect(contractOverrideSafe(mobileRules, contract), `390px 核心视口合同属性不被 420px media 覆盖：${name}`)
-}
 
 const rules1080 = rulesForViewport(css, 1080, 1920)
 const baseC5 = cascadedRules(rules1080, contractSelectors(CONTRACT.baseGrid))
 const baseCol = cascadedRules(rules1080, contractSelectors(CONTRACT.baseCol))
 expect(normalizeCssKeywordValue(baseC5.property('grid-template-columns')) === 'repeat(5,1fr)', '1080 基础 .tiles.c5 保持五列')
 expect(normalizeCssValue(baseCol.property('min-height')) === '90px', '1080 基础 .tile.col 保持 90px')
-expect(contractOverrideSafe(rules1080, CONTRACT.baseGrid, baseC5), '1080 后写/important 适用规则不覆盖 c5 五列')
-expect(contractOverrideSafe(rules1080, CONTRACT.baseCol, baseCol), '1080 后写/important 适用规则不覆盖 tile.col 90px')
+expect(contractWinnersMatch(rules1080, CONTRACT.baseGrid), '1080 级联 winner 保持 c5 五列')
+expect(contractWinnersMatch(rules1080, CONTRACT.baseCol), '1080 级联 winner 保持 tile.col 90px')
 
 const serviceGroupsArray = findServiceGroupsArray(groupsAst)
 const groups = serviceGroupsArray?.elements.filter(ts.isObjectLiteralExpression) ?? []
