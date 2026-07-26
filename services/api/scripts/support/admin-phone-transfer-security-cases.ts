@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto'
 import { AuditService } from '../../src/audit/audit.service'
 import { AuthService } from '../../src/auth/auth.service'
 import { InternalOtpService } from '../../src/auth/internal-otp.service'
+import { PASSWORD_PROOF_STATE } from '../../src/auth/password-proof-state'
 import { hashPhone } from '../../src/common/crypto/phone-identity'
 import type { RedisService } from '../../src/common/redis/redis.service'
 import { AdminOrgsService } from '../../src/orgs/admin-orgs.service'
@@ -464,6 +465,42 @@ async function verifyTransactionAuditFailuresRollback(context: AdminPhoneTransfe
   pass('14. complete/released_by_admin 任一事务审计失败均回滚，并记录脱敏分类日志')
 }
 
+async function verifyPasswordProofStateGate(context: AdminPhoneTransferSecurityContext): Promise<void> {
+  const rejectedStates = [
+    PASSWORD_PROOF_STATE.TEMPORARY,
+    PASSWORD_PROOF_STATE.LEGACY,
+    'unknown_state',
+  ] as const
+
+  for (const state of rejectedStates) {
+    const phone = context.nextPhone()
+    const admin = await context.createAdmin(`password-proof-${state}`)
+    await context.createPartner(`password-proof-${state}`, phone)
+    await context.prisma.user.update({
+      where: { id: admin.id },
+      data: { passwordProofState: state },
+    })
+
+    const deliveriesBefore = context.sms.deliveries
+    const auditsBefore = context.audit.entries.length
+    await expectCode(
+      () => context.createService().start(admin.id, context.adminPassword, phone, '127.0.1.240'),
+      UNAVAILABLE,
+      `14a. ${state} 密码即使正确也启动了手机号转移`,
+    )
+    ensure(context.sms.deliveries === deliveriesBefore, `14a. ${state} 门禁失败后仍发送短信`)
+    ensure(context.audit.entries.length === auditsBefore, `14a. ${state} 门禁失败后仍写启动审计`)
+    ensure(context.redis.raw(activeTicketKey(admin.id)) === null, `14a. ${state} 门禁失败后遗留 active ticket`)
+    ensure(
+      context.redis.keysWithPrefix(`internal:admin:phone-transfer:ticket:${admin.id}:`).length === 0,
+      `14a. ${state} 门禁失败后遗留 ticket`,
+    )
+    ensure(context.redis.raw(transferCodeKey(phone)) === null, `14a. ${state} 门禁失败后遗留 OTP`)
+  }
+
+  pass('14a. temporary/legacy/unknown 密码证明状态均在 ticket、短信和审计前 fail-closed')
+}
+
 async function verifyAdminReadsUseMinimalSelects(context: AdminPhoneTransferSecurityContext): Promise<void> {
   const phone = context.nextPhone()
   const admin = await context.createAdmin('minimal-admin-selects', 3)
@@ -478,14 +515,14 @@ async function verifyAdminReadsUseMinimalSelects(context: AdminPhoneTransferSecu
   const eligibilityFields = ['id', 'role', 'enabled', 'phoneHash', 'phoneEnc', 'phoneVerifiedAt', 'tokenVersion'] as const
   ensure(recordedSelects.length === 2, '14b. Admin start/verify 精简读取次数不正确')
   ensure(
-    hasExactFields(recordedSelects[0]!, [...eligibilityFields, 'passwordHash']),
-    '14b. start 未精确选择资格字段与 passwordHash',
+    hasExactFields(recordedSelects[0]!, [...eligibilityFields, 'passwordHash', 'passwordProofState']),
+    '14b. start 未精确选择资格字段、passwordHash 与 passwordProofState',
   )
   ensure(
     hasExactFields(recordedSelects[1]!, eligibilityFields),
     '14b. verify 读取了 passwordHash 或其他非必要 Admin 字段',
   )
-  pass('14b. start 仅额外读取 passwordHash，verify 不读取密码摘要或其他非必要字段')
+  pass('14b. start 仅额外读取密码摘要/证明状态，verify 不读取密码字段或其他非必要字段')
 }
 
 async function verifyBestEffortAuditFailuresAreSafe(context: AdminPhoneTransferSecurityContext): Promise<void> {
@@ -758,6 +795,7 @@ export async function verifyAdminPhoneTransferSecurityCases(
   await verifyLockContentionSkipsOtp(context)
   await verifyActiveTicketMismatchFailsClosed(context)
   await verifyTransactionAuditFailuresRollback(context)
+  await verifyPasswordProofStateGate(context)
   await verifyAdminReadsUseMinimalSelects(context)
   await verifyBestEffortAuditFailuresAreSafe(context)
   await verifySourceDeletionAndPasswordChanges(context)
