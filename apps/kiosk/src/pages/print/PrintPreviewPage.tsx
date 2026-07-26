@@ -136,8 +136,8 @@ function FilePreviewPanel({ file }: { file: PrintFile }) {
   const previewKind = previewKindForFile(file)
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative flex h-56 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="relative flex min-h-[420px] flex-1 overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
         {previewKind === 'pdf' && (
           <iframe
             title={`${file.name} 预览`}
@@ -353,7 +353,7 @@ export function PrintPreviewPage() {
 
       <div className="mt-6 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] gap-6">
         {/* ── Left: A4 预览主区 ─────────────────────────────────────────── */}
-        <div className="flex min-h-0 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           <FilePreviewPanel file={file} />
           <p className="text-center text-sm text-neutral-500">
             {formatPageCount(file.pages)} · {file.size}
