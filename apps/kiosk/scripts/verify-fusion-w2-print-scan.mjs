@@ -399,4 +399,32 @@ for (const target of ['/print/confirm', '/me/documents', '/resume/parse']) {
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
 
+const scanFusionCss = read('src/pages/scan/styles/scan-fusion.css')
+assert.match(
+  scanFusionCss,
+  /\.w2-scan-two-column\s*,[\s\S]*?align-items:\s*stretch/,
+  'scan dual columns stretch to equal height',
+)
+assert.match(
+  scanFusionCss,
+  /\.w2-scan-progress-list\s*>\s*div\s*\{[^}]*flex:\s*0\s+0\s+auto/,
+  'scan progress rows do not vertically explode empty space',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-split\s*\{[^}]*align-items:\s*stretch/,
+  'print-scan split columns stretch to equal height',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-preview-frame\s*\{[^}]*min-height:\s*360px/,
+  'sign-stamp preview frame grows instead of a fixed short box',
+)
+assert.match(signStamp, /w2-print-scan-preview/, 'sign-stamp uses the densified preview shell')
+assert.doesNotMatch(
+  convertImages,
+  /justify-around/,
+  'convert rules must not space-around empty vertical room',
+)
+
 console.log('ALL PASS fusion W2 print/scan contract')
