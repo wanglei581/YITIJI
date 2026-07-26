@@ -1,12 +1,14 @@
 # 当前开发进度
 
+2026-07-26 完成 **预生产全量部署 `main@83f2117f`**（用户「同意，继续」后推进；并行会话完成切换，本窗复验）。pin `DEPLOY_SOURCE=83f2117f`（`scope=preprod-369-356-375-376-20260726`）；保留 `20260722090000_pg_foundation_batch_tables`；`.env` 仍 `TRUST_PROXY_HOPS=1`；`db:pg:deploy` 后 schema **up to date**（含 `20260725180000` 邮箱别名、`…210000` lifecycleVersion、`…003000` retired guard）。回滚 `/srv/ai-job-print-prev-83f2117f-20260726T121722+0800` + dump 同时间戳。PM2 online / health `db=postgres` / 三端 200；Kiosk `index-_FiZHKg3.js`（`KSK-001` +「扫码上传/U盘导入」）；Partner/Admin bundle 含邮箱文案与 maintenance/retired/suspended。冒烟：`offline-agencies?pageSize=5` → 200/`pageSize=5`；dist 含 `RATE_LIMITED` / `resolveOfflineListPage` / `email-identity`。**未**跑 F1 Genesis；未切 live 支付 / G5 退款冒烟 / close-unpaid Phase B。
+
 2026-07-26 再确认 **`WINDOWS_FIELD_RECHECK` F4 真机出纸**：用户现场回「是」（纸已出）。远程盯到 `ptask_kiosk_f9587c2439e1855a`（预发 `t_ksk_001`）`claimed→printing→completed`（约 37s，无 errorCode），事后 active=0、printer `ready`/`isOnline`。与同日已记录的 `ptask_kiosk_e0fe379299af7c50` 一并作为 F4 证据；Phase F 维持通过。未宣称扫描/U盘整机或商用全部验收完成。
 
 2026-07-26 完成 **真实短信会员登录 E2E（预发，用户授权测试号）**：`SMS_PROVIDER=tencent`，签名/模板已在用（名称级：`青岛智磊信创` / `2661213`）。`POST /member/auth/sms-code` → 201/`sent`；PM2 日志 `SMS 下发成功 phone=183****1921` + Tencent `requestId`；用户回填验证码后 `POST /member/auth/login` → 201，`phoneMasked=183****1921`，`endUserId=cmqorsqvb0000iwa8k1qo7xa8`；`MemberLegalConsent` `source=sms_login` / `draft-pending-legal-review`；验证码 Redis 已消费，重放 → `401 SMS_CODE_EXPIRED`。未写完整手机号/验证码/JWT 入仓库；未动支付/FREE_MODE/G5。清单 §2.2 短信审核项与真实短信 E2E 可勾。
 
 2026-07-26 确认 **`WINDOWS_FIELD_RECHECK` F4 补做真机出纸**：用户回复「有出纸」。远程盯到 `ptask_kiosk_e0fe379299af7c50`（简历打印 → 扫码上传）`claimed→printing→completed`（约 18s，无 errorCode），订单 `paid`/`amountCents=0`，事后 active=0、printer `ready`/`isOnline`。Phase F 回执表 / 授权包 / checklist §5.6 已同步为 F4 ✅；Phase F 标通过（F6 仍为有限全屏抽查）。未宣称扫描/U盘整机或商用全部验收完成。
 
-2026-07-26 追加：**Gate 0.3B 已由 PR #376 squash 合入 `main@d106ac39`（未部署）**。合并前最终提交 `5383144e` 的 GitHub Actions run `30168881855` 中 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项全绿；合并后主线 SHA 已只读确认。Gate 0.3B 代码集成完成，后续转入 Gate 0.4（ProgramData ACL、移除长期 Token 命令行输入、Agent unauthorized/degraded 状态及 Windows 真机验收）。本项未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
+2026-07-26 追加：**Gate 0.3B 已由 PR #376 squash 合入 `main@d106ac39`**（代码已随预发 **`DEPLOY_SOURCE=83f2117f`** 部署；见文首部署条。Gate 0.4 / 本批 Windows 真机验收仍开）。合并前最终提交 `5383144e` 的 GitHub Actions run `30168881855` 中 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项全绿；合并后主线 SHA 已只读确认。Gate 0.3B 代码集成完成，后续转入 Gate 0.4（ProgramData ACL、移除长期 Token 命令行输入、Agent unauthorized/degraded 状态及 Windows 真机验收）。本项未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
 
 2026-07-26 追加：**Gate 0.3B PR #376 合并前 CI 已全绿（run `30168571581`，未部署）**。修复提交 `2ff0324b` 的 `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项均为 Success；SQLite fresh DB 实际安装 planned/retired 两批 terminal guards 后，终端凭证、生命周期、退役终态、Admin 打印扫描等共享 verifier 全部通过，PostgreSQL job 再次完成真实 migration deploy 与核心动态验证。当前仅待本次进度文档提交重新通过同三项 CI 后 squash 合并 PR #376。此结论只代表代码候选与 CI 通过；未生产部署、未执行生产 migration、未做本批 Windows/Pantum 真机验收。
 
