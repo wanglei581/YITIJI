@@ -12,7 +12,7 @@
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
 0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
 0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
-0e. [~] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新与公网受控 mock 浏览器走查已通过；`admin` 管理员密码登录已于 2026-07-26 使用强随机临时密码恢复并通过真实接口验证。下一步须由用户从本机钥匙串取出临时密码登录，并在账号设置中自行改为长期合规密码；完成后再发送真实短信并执行受控转移 E2E。双模型复核发现转移路径当前只校验密码哈希，未强制检查 `passwordProofState`；在补上代码门禁前必须继续执行“先自助改密、再转移”的人工安全门禁。
+0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。后续代码加固项：在转移服务中把 `passwordProofState=owner_managed` 从人工门禁固化为服务端断言。
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
 3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`** + Kiosk hotfix #379（`index-Dn7fbWN6.js`）；含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis
