@@ -12,19 +12,21 @@
 0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
 0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379 stage-fit 热更**为 `index-Dn7fbWN6.js`（仍含「扫码上传 / U盘导入」）
 0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发仅热更 Kiosk，API pin 仍 `83f2117f`）
-0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言已由 [PR #393](https://github.com/wanglei581/YITIJI/pull/393) 合入 `main@50cbca15` 并完成预生产 API-only overlay；本机/公网 health `ok/postgres`，前端、环境、数据库、Redis 与短信配置未变。后续仅需随下一次正式全量发布固化 overlay provenance，不再重复真实手机号转移。
+0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言已由 [PR #393](https://github.com/wanglei581/YITIJI/pull/393) 合入 `main@50cbca15`；其 API-only overlay 已由完整 API 发布 `main@1812ba54` 正式吸收，本机/公网 health `ok/postgres`，前端、环境、数据库业务数据、Redis 与短信配置未变。手机号转移闭环已完成，不再重复真实转移。
+0f. [ ] **P1 PostgreSQL migration 履历回补**：预生产独有 `20260722090000_pg_foundation_batch_tables` 已只读确认 finished、未回滚，数据库 checksum 与服务器文件 SHA-256 `40ea789…944` 一致，但文件缺于 Git main。须另起独立任务按线上字节原样回补 `services/api/prisma/postgres/migrations/`，先在隔离 PostgreSQL 验证 `prisma migrate status/deploy` 幂等；不得修改 SQL、不得在预生产执行 `migrate reset`，checksum 已对齐时不得擅自 `migrate resolve`。
+0g. [ ] **P1 预生产备份真实 restore 冒烟（另行授权）**：当前 full API 发布 dump 已完成 `pg_restore -l`，尚未在一次性 scratch PostgreSQL 数据库做完整 restore。须明确授权后创建隔离 scratch DB，restore、做最小 schema/行数摘要核对并销毁 scratch；禁止覆盖或恢复到现有预生产库。
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`** + Kiosk hotfix #379（`index-Dn7fbWN6.js`）；含 #369/#356/#375/#376/#366/#355/#357；`TRUST_PROXY_HOPS=1`；PG migration 至 retired guard；**未**跑 F1 Genesis
+3. [x] **预生产部署**：完整应用基线仍为 `83f2117f`，API 已用完整候选 **`full_api_commit=1812ba54`** 吸收 #393 overlay；Kiosk hotfix #379 为 `index-Dn7fbWN6.js`，Admin hotfix #391 为 `index-D85Q5xcv.js`；`TRUST_PROXY_HOPS=1`，未改 env/前端/业务数据，**未**跑 F1 Genesis。
 0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；已随全量 **`DEPLOY_SOURCE=83f2117f`** 固化 `index-_FiZHKg3.js`；不代表 U 盘真机验收完成）
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`**（#369+#356+#375+#376；含 #366/#355/#357）；`TRUST_PROXY_HOPS=1`；Kiosk 全量 `index-_FiZHKg3.js`（扫码/U盘 UI 通道已进产物；不代表 U 盘真机验收完成）
+3. [x] **预生产部署**：完整应用基线 `83f2117f`（#369+#356+#375+#376；含 #366/#355/#357），API 完整候选已更新为 `1812ba54`；`TRUST_PROXY_HOPS=1`；Kiosk 后续 #379 热更为 `index-Dn7fbWN6.js`（扫码/U盘 UI 通道仍在；不代表 U 盘真机验收完成）。
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`：Admin `/orders` 对 `paid` 全额退款 UI。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏、`G5_REFUND_SMOKE`
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343)；P1-5 法务正文定稿仍开）
-7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发 pin **`83f2117f`**：
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发完整应用基线 `83f2117f`，API 完整候选 `1812ba54`：
    - **7a / 7a2 seed**：✅
    - **7b 密钥举证（方案 C）**：✅；**真实短信 E2E**：✅（2026-07-26，`183****1921` 下发+登录 201；签名/模板 live 可用）
    - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（F4：`ptask_kiosk_e0fe379299af7c50`；2026-07-26 再确认 `ptask_kiosk_f9587c2439e1855a`，用户回「是」；旁证 `ptask_kiosk_2a75352b81631efb`）
