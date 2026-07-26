@@ -1,21 +1,12 @@
 # 当前开发进度
 
-<<<<<<< HEAD
 2026-07-26 预发 **Kiosk-only 热更 stage-fit（#379 → `main@60faec5a`）**：API pin 仍为 `DEPLOY_SOURCE=83f2117f`（未改 PM2/DB/Admin/Partner）。备份 `backups/kiosk-dist-before-stage-fit-20260726124155.tgz`；现网 Kiosk `index-Dn7fbWN6.js`（`VITE_TERMINAL_ID=KSK-001`）；`DEPLOY_SOURCE.txt` 追加 `kiosk_hotfix_pr=379` / `kiosk_hotfix_commit=60faec5a`。公网复验：1920×1080 → `.kiosk-stage-host` + `scale(0.5625)`，底栏与「岗位大师」在视口内；1080×1920 → `scale(1)`；`/member/qr-login` 无舞台壳。**未**全量重部署、未跑 F1 Genesis、未切收费。
 
 2026-07-26 完成 **Kiosk 设计稿舞台多分辨率自动适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`）：布局路由外包 `KioskStageFit`（`useKioskStageFit` 按视口算 `scale=min(vw/1080,vh/1920)`），1080×1920 纸面等比缩放居中；一体机竖屏全屏 scale≈1；电脑 1920×1080 横屏实测 scale=0.5625、底栏与「岗位大师」均在视口内。`/member/qr-login`、`/upload/phone`、`/screensaver` 在布局外不套舞台。门禁：typecheck、lint（0 error）、`verify:kiosk-visual-unity`、`verify:fusion-shell`、`verify:fusion-w5`、`verify:home-prototype-v1` PASS；合并前 CI `30187988629` 三项全绿。顺带修 `verify:print-scan-first-release` 对「未宣称…U盘…完成」的误伤（豁免「未宣称」）。**可写：异分辨率预览不再被底栏裁死。不得写：全站流体响应式重排已完成。**
-=======
-<<<<<<< HEAD
 2026-07-26 完成 **Kiosk 设计稿舞台多分辨率自动适配（stage-fit）**（分支 `codex/kiosk-stage-fit-20260726` / PR #379）：布局路由外包 `KioskStageFit`（`useKioskStageFit` 按视口算 `scale=min(vw/1080,vh/1920)`），1080×1920 纸面等比缩放居中；一体机竖屏全屏 scale≈1；电脑 1920×1080 横屏实测 scale=0.5625、底栏与「岗位大师」均在视口内。`/member/qr-login`、`/upload/phone`、`/screensaver` 在布局外不套舞台。门禁：typecheck、lint（0 error）、`verify:kiosk-visual-unity`、`verify:fusion-shell`、`verify:fusion-w5`、`verify:home-prototype-v1` PASS。**可写：异分辨率预览不再被底栏裁死。不得写：全站流体响应式重排已完成。**
->>>>>>> c4dc14cf (docs: record preprod deploy 83f2117f without USB overclaim wording)
 
-2026-07-26 完成 **预生产全量部署 `main@83f2117f`**（用户「同意，继续」后推进；并行会话完成切换，本窗复验）。pin `DEPLOY_SOURCE=83f2117f`（`scope=preprod-369-356-375-376-20260726`）；保留 `20260722090000_pg_foundation_batch_tables`；`.env` 仍 `TRUST_PROXY_HOPS=1`；`db:pg:deploy` 后 schema **up to date**（含 `20260725180000` 邮箱别名、`…210000` lifecycleVersion、`…003000` retired guard）。回滚 `/srv/ai-job-print-prev-83f2117f-20260726T121722+0800` + dump 同时间戳。PM2 online / health `db=postgres` / 三端 200；Kiosk `index-_FiZHKg3.js`（`KSK-001` +「扫码上传/U盘导入」）；Partner/Admin bundle 含邮箱文案与 maintenance/retired/suspended。冒烟：`offline-agencies?pageSize=5` → 200/`pageSize=5`；dist 含 `RATE_LIMITED` / `resolveOfflineListPage` / `email-identity`。**未**跑 F1 Genesis；未切 live 支付 / G5 退款冒烟 / close-unpaid Phase B。
-
-=======
 2026-07-26 完成 **预生产全量部署 `main@83f2117f`（#369 简历上传三通道固化 + #356 Partner 邮箱别名 + #375/#376 终端维护/退役）**：用户「继续」后执行。pin `DEPLOY_SOURCE=83f2117f`（`scope=preprod-369-356-375-376-20260726`）；保留服务器独有 PG migration `20260722090000_pg_foundation_batch_tables`；`.env` 仍 `TRUST_PROXY_HOPS=1`；`db:pg:deploy` 已应用 `20260725180000`（User emailHash/emailEnc）/`20260725210000`（lifecycleVersion）/`20260726003000`（retired guard）。DB dump `pre-83f2117f-20260726T122610+0800.dump`；回滚 `/srv/ai-job-print-prev-83f2117f-20260726T122610+0800`。PM2 online / health `ok/postgres` / 三端 HTTPS 200；Kiosk 全量产物 `index-_FiZHKg3.js`（`VITE_TERMINAL_ID=KSK-001`，UI 可见「扫码上传 / U盘导入」通道）；公网 `offline-agencies?pageSize=5` → 200；库列 `User.emailHash` / `Terminal.lifecycleVersion` 已存在。API dist 含 emailIdentity / lifecycleVersion / RATE_LIMITED / resolveOfflineListPage。**未**跑 F1 Genesis；**未**改支付/FREE_MODE；**未**执行 close-unpaid Phase B / G5 退款冒烟。本项不代表 U 盘真机验收或扫描整机商用验收完成。
 
-
->>>>>>> c83e8abe (docs: record preprod deploy 83f2117f without USB overclaim wording)
 2026-07-26 再确认 **`WINDOWS_FIELD_RECHECK` F4 真机出纸**：用户现场回「是」（纸已出）。远程盯到 `ptask_kiosk_f9587c2439e1855a`（预发 `t_ksk_001`）`claimed→printing→completed`（约 37s，无 errorCode），事后 active=0、printer `ready`/`isOnline`。与同日已记录的 `ptask_kiosk_e0fe379299af7c50` 一并作为 F4 证据；Phase F 维持通过。不代表真实扫描、U 盘整机或商用全部验收已完成。
 
 2026-07-26 完成 **真实短信会员登录 E2E（预发，用户授权测试号）**：`SMS_PROVIDER=tencent`，签名/模板已在用（名称级：`青岛智磊信创` / `2661213`）。`POST /member/auth/sms-code` → 201/`sent`；PM2 日志 `SMS 下发成功 phone=183****1921` + Tencent `requestId`；用户回填验证码后 `POST /member/auth/login` → 201，`phoneMasked=183****1921`，`endUserId=cmqorsqvb0000iwa8k1qo7xa8`；`MemberLegalConsent` `source=sms_login` / `draft-pending-legal-review`；验证码 Redis 已消费，重放 → `401 SMS_CODE_EXPIRED`。未写完整手机号/验证码/JWT 入仓库；未动支付/FREE_MODE/G5。清单 §2.2 短信审核项与真实短信 E2E 可勾。
@@ -53,7 +44,6 @@
 2026-07-25 追加：**WINDOWS Phase R + Admin 打印扫描只读复检（浏览器）**。当时预发 pin 仍为 `7e59243c`；health `ok/postgres`；`printer-status` → `ready` + `isOnline=true`；SQL `active=0` / `pending=0`；`TerminalCapability` 对 `t_ksk_001` 仍 **0 行**。Admin（用户已登录 Playwright）：打印扫描「待领取」= **暂无任务**；设备能力页全部「未验收（未配置）」与空表一致（**未点保存**）。**未改商业化控制**。
 
 2026-07-25 记录 **`WINDOWS_FIELD_RECHECK` Phase F 现场回执（部分通过）**：预生产 `t_ksk_001`。F1 `AIJobPrintAgent` Running/Automatic；F2 `printerName` 与 Windows「Pantum CM2800ADN Series」一致；F3 `127.0.0.1:9527`；F5 WLAN 断 75s 自恢复；F6 1080×1920 主路径无系统弹窗阻断（未覆盖 Assigned Access）。**F4 跳过**（浏览器文件选择器未接收测试 PDF；未建单）。配置在仓库 `apps/terminal-agent/config/agent-config.json`。**§5.6 真机打印与整包 Phase F 仍开**。下一步：补做 F4（可用简历打印「扫码上传 / U盘导入」）。
-
 
 2026-07-25 启动 **`WINDOWS_FIELD_RECHECK` 现场 Phase F**：新增 `docs/device/windows-field-recheck-phase-f-runbook.md`（F1 Agent 服务 / F2 printerName / F3 本机桥接 / F4 受控出纸 / F5 断网恢复 / F6 全屏抽查 + 回执模板）。同日远程 Phase R 再复检：health `ok/postgres`；`t_ksk_001` `printerStatus=ready` + `isOnline=true`；近 30min 心跳有多条；active PrintTask=0。**Phase F 未完成、未宣称 §五通过**；未造打印单、未 close-unpaid、未改 G5/FREE_MODE/F1。阻塞：须人到一体机执行清单并回执。
 
