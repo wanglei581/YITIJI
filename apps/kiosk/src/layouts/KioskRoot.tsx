@@ -76,7 +76,7 @@ export function KioskRoot() {
 function KioskShell() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { viewportW } = useKioskStageFit()
+  const { viewportW, viewportH } = useKioskStageFit()
   // 共享顶栏始终轮询；首页不再自绘顶栏，故不再按 pathname 停用。
   const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
 
@@ -96,7 +96,8 @@ function KioskShell() {
   // 由页面自带顶栏 + 返回箭头承载导航。
   const isCampusZone = pathname === '/campus'
   const usesPageActionbar = routeUsesPageActionbar(pathname)
-  const isResponsiveHome = pathname === '/' && viewportW <= 760
+  const isResponsiveHome =
+    pathname === '/' && (viewportW <= 760 || (viewportW <= 900 && viewportH <= 760))
 
   const shell = (
     <KioskLayout
@@ -111,7 +112,7 @@ function KioskShell() {
       brandTitle={`就业服务大厅 · ${terminalId}`}
       brandSubtitle="AI求职打印服务终端"
       headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-      className={isResponsiveHome ? undefined : 'h-full'}
+      className={isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
@@ -121,8 +122,6 @@ function KioskShell() {
     </KioskLayout>
   )
 
-  if (isResponsiveHome) return shell
-
-  // 舞台适配仅包布局内路由；首页手机窄屏使用真实视口排版，不缩放触控热区。
-  return <KioskStageFit>{shell}</KioskStageFit>
+  // 手机首页关闭舞台缩放，但保留相同的 host/scaler/stage DOM，避免旋转时替换布局根。
+  return <KioskStageFit enabled={!isResponsiveHome}>{shell}</KioskStageFit>
 }

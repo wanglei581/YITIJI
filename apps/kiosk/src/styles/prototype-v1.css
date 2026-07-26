@@ -366,152 +366,170 @@
   .kpv1 .zone-row { margin: 8px 24px 0; }
   .kpv1 .notice { margin: 6px 24px 0; }
 }
-@media (max-width: 760px) {
-  .kpv1 .welcome { flex-direction: column; align-items: stretch; gap: 16px; }
-  .kpv1 .welcome h1 { font-size: 34px; }
-  .kpv1 .login-btn { justify-content: center; }
-  .kpv1 .groups { grid-template-columns: 1fr; }
-  .kpv1 .card.wide { grid-column: auto; }
-  .kpv1 .card[data-group-id='job-fairs'] .tile.primary {
-    background: color-mix(in srgb, var(--pv-wheat-soft) 72%, var(--pv-paper));
-    border-color: color-mix(in srgb, var(--pv-wheat) 24%, transparent);
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tiles.c5 {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col {
-    flex-direction: row;
-    justify-content: flex-start;
-    gap: 8px;
-    min-height: 68px;
-    padding: 6px 8px;
-    text-align: left;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text {
-    min-width: 0;
-    text-align: left;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col .t-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col .t-icon svg {
-    width: 22px;
-    height: 22px;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text b { font-size: 17px; }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text span {
-    font-size: 12px;
-    line-height: 1.25;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled {
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr);
-    grid-template-areas:
-      'icon text'
-      'icon status';
-    column-gap: 8px;
-    row-gap: 2px;
-    opacity: 1;
-    background: var(--pv-surface);
-    border-color: var(--pv-line);
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-icon { grid-area: icon; }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text {
-    grid-area: text;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text b { color: var(--pv-ink); }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text span { color: var(--pv-muted); }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon {
-    grid-area: status;
-    justify-self: start;
-    margin: 0;
-    padding: 2px 7px;
-    font-size: 11px;
-    color: var(--pv-muted);
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile:last-child { grid-column: 1 / -1; }
-  .kpv1 .zone-row { grid-template-columns: 1fr; }
+.kiosk-home-mobile .ui-kiosk-topbar {
+  padding: 0 14px;
+  gap: 8px;
+}
+.kiosk-home-mobile .ui-kiosk-topbar__brand {
+  flex: 1;
+  min-width: 0;
+}
+.kiosk-home-mobile .ui-kiosk-topbar__brand b {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+.kiosk-home-mobile .ui-kiosk-topbar__brand span,
+.kiosk-home-mobile .ui-kiosk-topbar__clock { display: none; }
+.kiosk-home-mobile .ui-kiosk-topbar__right {
+  flex: none;
+  gap: 0;
+}
+.kiosk-home-mobile .k-status-chip {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+.kiosk-home-mobile .k-status-chip__dot {
+  width: 8px;
+  height: 8px;
+}
+.kiosk-home-mobile .kpv1 .welcome {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+}
+.kiosk-home-mobile .kpv1 .welcome h1 { font-size: 34px; }
+.kiosk-home-mobile .kpv1 .login-btn { justify-content: center; }
+.kiosk-home-mobile .kpv1 .groups { grid-template-columns: 1fr; }
+.kiosk-home-mobile .kpv1 .card.wide { grid-column: auto; }
+.kiosk-home-mobile .kpv1 .groups .card { padding: 16px; }
+.kiosk-home-mobile .kpv1 .groups .card-head { gap: 10px; }
+.kiosk-home-mobile .kpv1 .groups .card-head .g-icon { width: 44px; height: 44px; }
+.kiosk-home-mobile .kpv1 .groups .card-head h2 { font-size: 24px; }
+.kiosk-home-mobile .kpv1 .groups .card-head .sub { font-size: 15px; }
+.kiosk-home-mobile .kpv1 .groups .card-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.kiosk-home-mobile .kpv1 .groups .card-head .badge {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='job-fairs'] .tile.primary {
+  background: color-mix(in srgb, var(--pv-wheat-soft) 72%, var(--pv-paper));
+  border-color: color-mix(in srgb, var(--pv-wheat) 24%, transparent);
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tiles,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tiles,
+.kiosk-home-mobile .kpv1 .card[data-group-id='interview'] .tiles,
+.kiosk-home-mobile .kpv1 .card[data-group-id='policy'] .tiles {
+  grid-template-columns: repeat(2, 1fr);
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tile,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tile,
+.kiosk-home-mobile .kpv1 .card[data-group-id='interview'] .tile,
+.kiosk-home-mobile .kpv1 .card[data-group-id='policy'] .tile {
+  min-height: 72px;
+  padding: 8px;
+  gap: 8px;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tile .t-icon,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tile .t-icon {
+  width: 38px;
+  height: 38px;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tile .t-text,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tile .t-text,
+.kiosk-home-mobile .kpv1 .card[data-group-id='interview'] .tile .t-text,
+.kiosk-home-mobile .kpv1 .card[data-group-id='policy'] .tile .t-text { min-width: 0; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tile .t-text b,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tile .t-text b,
+.kiosk-home-mobile .kpv1 .card[data-group-id='interview'] .tile .t-text b,
+.kiosk-home-mobile .kpv1 .card[data-group-id='policy'] .tile .t-text b { font-size: 17px; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='resume'] .tile .t-text span,
+.kiosk-home-mobile .kpv1 .card[data-group-id='jobs'] .tile .t-text span,
+.kiosk-home-mobile .kpv1 .card[data-group-id='interview'] .tile .t-text span,
+.kiosk-home-mobile .kpv1 .card[data-group-id='policy'] .tile .t-text span { font-size: 12px; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tiles.c5 {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 8px;
+  height: 80px;
+  min-height: 80px;
+  padding: 6px 8px;
+  text-align: left;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text {
+  min-width: 0;
+  text-align: left;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .t-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .t-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text b { font-size: 17px; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col .t-text span {
+  font-size: 12px;
+  line-height: 1.25;
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-areas:
+    'icon text'
+    'icon status';
+  column-gap: 8px;
+  row-gap: 2px;
+  overflow: hidden;
+  opacity: 1;
+  background: var(--pv-surface);
+  border-color: var(--pv-line);
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-icon { grid-area: icon; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text { grid-area: text; }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text b { color: var(--pv-ink); }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .t-text span { color: var(--pv-muted); }
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon {
+  grid-area: status;
+  justify-self: start;
+  margin: 0;
+  padding: 2px 7px;
+  font-size: 12px;
+  color: var(--pv-muted);
+}
+.kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile:last-child { grid-column: 1 / -1; }
+.kiosk-home-mobile .kpv1 .zone-row { grid-template-columns: 1fr; }
+.kiosk-home-mobile .kpv1 .continue {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  margin-left: 14px;
+  margin-right: 14px;
+}
+.kiosk-home-mobile .kpv1 .continue .c-icon { width: 48px; height: 48px; }
+.kiosk-home-mobile .kpv1 .continue .c-copy { min-width: 0; }
+.kiosk-home-mobile .kpv1 .continue .c-copy strong { font-size: 18px; }
+.kiosk-home-mobile .kpv1 .continue .c-copy p { font-size: 14px; }
+.kiosk-home-mobile .kpv1 .continue .btn {
+  grid-column: 1 / -1;
+  min-height: 56px;
 }
 @media (max-width: 420px) {
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar {
-    padding: 0 14px;
-    gap: 8px;
-  }
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand {
-    flex: 1;
-    min-width: 0;
-  }
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand b {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 16px;
-  }
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar__brand span,
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar__clock { display: none; }
-  [data-kiosk-viewport='mobile'] .ui-kiosk-topbar__right {
-    flex: none;
-    gap: 0;
-  }
-  [data-kiosk-viewport='mobile'] .k-status-chip {
-    padding: 6px 10px;
-    font-size: 13px;
-  }
-  [data-kiosk-viewport='mobile'] .k-status-chip__dot {
-    width: 8px;
-    height: 8px;
-  }
-  .kpv1 .welcome, .kpv1 .groups { padding-left: 14px; padding-right: 14px; }
-  .kpv1 .zone-row, .kpv1 .notice { margin-left: 14px; margin-right: 14px; }
-  .kpv1 .welcome h1 { font-size: 30px; }
-  .kpv1 .groups .card { padding: 16px; }
-  .kpv1 .groups .card-head { gap: 10px; }
-  .kpv1 .groups .card-head .g-icon { width: 44px; height: 44px; }
-  .kpv1 .groups .card-head h2 { font-size: 24px; }
-  .kpv1 .groups .card-head .sub { font-size: 15px; }
-  .kpv1 .groups .card-head > div {
-    flex: 1;
-    min-width: 0;
-  }
-  .kpv1 .groups .card-head .badge {
-    font-size: 13px;
-    white-space: nowrap;
-  }
-  .kpv1 .card[data-group-id='resume'] .tiles,
-  .kpv1 .card[data-group-id='jobs'] .tiles { grid-template-columns: repeat(2, 1fr); }
-  .kpv1 .card[data-group-id='resume'] .tile,
-  .kpv1 .card[data-group-id='jobs'] .tile {
-    min-height: 72px;
-    padding: 8px;
-    gap: 8px;
-  }
-  .kpv1 .card[data-group-id='resume'] .tile .t-icon,
-  .kpv1 .card[data-group-id='jobs'] .tile .t-icon { width: 38px; height: 38px; }
-  .kpv1 .card[data-group-id='resume'] .tile .t-text,
-  .kpv1 .card[data-group-id='jobs'] .tile .t-text { min-width: 0; }
-  .kpv1 .card[data-group-id='resume'] .tile .t-text b,
-  .kpv1 .card[data-group-id='jobs'] .tile .t-text b { font-size: 17px; }
-  .kpv1 .card[data-group-id='resume'] .tile .t-text span,
-  .kpv1 .card[data-group-id='jobs'] .tile .t-text span { font-size: 12px; }
-  .kpv1 .continue {
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr);
-    margin-left: 14px;
-    margin-right: 14px;
-  }
-  .kpv1 .continue .c-icon { width: 48px; height: 48px; }
-  .kpv1 .continue .c-copy { min-width: 0; }
-  .kpv1 .continue .c-copy strong { font-size: 18px; }
-  .kpv1 .continue .c-copy p { font-size: 14px; }
-  .kpv1 .continue .btn {
-    grid-column: 1 / -1;
-    min-height: 56px;
-  }
-  .kpv1 .card[data-group-id='print-scan'] .tile.col.disabled .tag-soon { font-size: 12px; }
+  .kiosk-home-mobile .kpv1 .welcome,
+  .kiosk-home-mobile .kpv1 .groups { padding-left: 14px; padding-right: 14px; }
+  .kiosk-home-mobile .kpv1 .zone-row,
+  .kiosk-home-mobile .kpv1 .notice { margin-left: 14px; margin-right: 14px; }
+  .kiosk-home-mobile .kpv1 .welcome h1 { font-size: 30px; }
 }
 
 /* 一体机主画布：显式锁定 1080×1920 语义（原型真值画布） */
