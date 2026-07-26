@@ -614,7 +614,7 @@ function kioskShellContract(sourceFile) {
     landscapeSizes &&
     ts.isBinaryExpression(landscapeSizes) &&
     landscapeSizes.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-    isLessThanOrEqual(landscapeSizes.left, 'viewportW', 900) &&
+    isLessThanOrEqual(landscapeSizes.left, 'viewportW', 960) &&
     isLessThanOrEqual(landscapeSizes.right, 'viewportH', 760),
   )
   const shell = findVariable(shellFunction, 'shell')?.initializer
@@ -841,18 +841,18 @@ expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 
 
 const shellContract = kioskShellContract(kioskRootAst)
 expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW/viewportH')
-expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏<=760 与手机横屏<=900x760')
+expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏<=760 与手机横屏<=960x760')
 expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
 expect(shellContract.responsiveHeight, 'mobile 首页使用 kiosk-home-mobile 稳定类，其余 staged 页保持 h-full')
 expect(!shellContract.directHome, 'mobile 首页不再 direct-return shell 更换根节点')
 expect(shellContract.stableStage, 'KioskRoot 始终用 KioskStageFit 包裹并传 enabled={!isResponsiveHome}')
 
 const responsiveHomeFor = (viewportW, viewportH) =>
-  viewportW <= 760 || (viewportW <= 900 && viewportH <= 760)
-for (const [viewportW, viewportH] of [[390, 844], [430, 932], [760, 1024], [844, 390]]) {
+  viewportW <= 760 || (viewportW <= 960 && viewportH <= 760)
+for (const [viewportW, viewportH] of [[390, 844], [430, 932], [760, 1024], [844, 390], [932, 430]]) {
   expect(responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 mobile 首页壳`)
 }
-for (const [viewportW, viewportH] of [[1024, 768], [1080, 1920]]) {
+for (const [viewportW, viewportH] of [[961, 760], [1024, 768], [1080, 1920]]) {
   expect(!responsiveHomeFor(viewportW, viewportH), `${viewportW}x${viewportH} 保持 staged kiosk 壳`)
 }
 
@@ -863,6 +863,23 @@ expect(/height:\s*enabled\s*\?\s*stageH\s*\*\s*scale\s*:\s*['"]100dvh['"]/.test(
 expect(/width:\s*enabled\s*\?\s*stageW\s*:\s*['"]100vw['"]/.test(kioskStageFit), 'KioskStageFit stage off 宽度使用 100vw')
 expect(/height:\s*enabled\s*\?\s*stageH\s*:\s*['"]100dvh['"]/.test(kioskStageFit), 'KioskStageFit stage off 高度使用 100dvh')
 expect(/transform:\s*enabled\s*\?\s*`scale\(\$\{scale\}\)`\s*:\s*['"]none['"]/.test(kioskStageFit), 'KioskStageFit stage off 使用 transform:none')
+
+const reducedMotionBlocks = mediaBlocks(css, 'prefers-reduced-motion:reduce')
+expect(reducedMotionBlocks.length > 0, '首页样式保留 prefers-reduced-motion: reduce 合同')
+const reducedMotionRules = cssRules(reducedMotionBlocks.map((block) => block.body).join('\n'))
+for (const [selector, label] of [
+  ['.kpv1 .tile:active', '磁贴'],
+  ['.kpv1 .zone-card:active', '专区卡片'],
+  ['.kpv1 .login-btn:active', '登录按钮'],
+  ['.kpv1 .card-head h2 .g-title-link:active', '分组标题按钮'],
+  ['.kpv1 .continue .btn:active', '继续任务按钮'],
+]) {
+  const reducedActive = cascadedRules(reducedMotionRules, [selector])
+  expect(
+    normalizeCssKeywordValue(reducedActive.property('transform')) === 'none',
+    `reduced-motion 下${label} active 不执行缩放`,
+  )
+}
 
 const mobileRules = cssRules(css)
 
