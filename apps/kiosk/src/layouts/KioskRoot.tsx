@@ -111,7 +111,7 @@ function KioskShell() {
       brandTitle={`就业服务大厅 · ${terminalId}`}
       brandSubtitle="AI求职打印服务终端"
       headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-      className="h-full"
+      className={isResponsiveHome ? undefined : 'h-full'}
     >
       {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
           为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
