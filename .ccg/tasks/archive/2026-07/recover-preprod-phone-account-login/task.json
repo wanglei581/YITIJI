@@ -1,0 +1,12 @@
+{
+  "id": "recover-preprod-phone-account-login",
+  "title": "诊断并恢复预生产手机号账号登录",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "用户从钥匙串读取临时密码登录，并在账号设置中自行改为长期合规密码",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/preprod-admin-phone-transfer-acceptance-20260726"
+}
