@@ -1,4 +1,6 @@
 /* service-desk tokens: --sd-surface --sd-text --sd-line --sd-primary-strong */
+[data-kiosk-presentation='fusion-youth'] .fusion-w3--interview > .ui-kiosk-page-content { padding: 0; }
+
 .interview-flow {
   --interview-paper: var(--color-canvas, var(--k-paper, var(--color-canvas)));
   --interview-surface: var(--color-surface, var(--k-surface, var(--color-surface)));

@@ -79,6 +79,7 @@
   /* Clearance above shared 116px bottom nav (nav is outside this scroll root). */
   padding-bottom: 24px;
 }
+[data-kiosk-presentation='fusion-youth'] .kpv1--content-only > .ui-kiosk-page-content { padding: 0; }
 .kpv1 *,
 .kpv1 *::before,
 .kpv1 *::after { box-sizing: border-box; }

@@ -139,6 +139,18 @@ for (const [path, marker] of printScanPages) {
   assert.match(body, /\.\/styles\/print-scan-fusion\.css/, `${path} imports the scoped W2 stylesheet`)
 }
 const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
+const frameContentPaddingContracts = new Map([
+  ['src/pages/print-scan/styles/print-scan-fusion.css', 'w2-print-scan-page'],
+  ['src/pages/scan/styles/scan-fusion.css', 'w2-scan-page'],
+  ['src/pages/print/print-prototype.css', 'print-proto'],
+])
+for (const [path, frameClass] of frameContentPaddingContracts) {
+  assert.match(
+    read(path),
+    new RegExp(`\\[data-kiosk-presentation=['"]fusion-youth['"]\\]\\s+\\.${frameClass}\\s*>\\s*\\.ui-kiosk-page-content\\s*\\{[^}]*padding:\\s*0\\s*;`),
+    `${frameClass} neutralizes direct kiosk page content padding`,
+  )
+}
 assert.match(
   printScanFusionCss,
   /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,

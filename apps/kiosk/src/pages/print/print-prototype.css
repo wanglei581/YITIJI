@@ -37,6 +37,10 @@
   font-family: var(--print-sans);
 }
 
+[data-kiosk-presentation='fusion-youth'] .print-proto > .ui-kiosk-page-content {
+  padding: 0;
+}
+
 /* 顶栏、页头与流程步骤条已统一到 KioskLayout / KioskPageHeader /
    kiosk-shell.css 的 .ui-kiosk-steps；此处不再重复定义，避免双顶栏
    与 .print-flow-step 同名冲突（确认页流程卡由 print-cashier.css 负责）。 */

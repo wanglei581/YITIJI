@@ -3,6 +3,10 @@
   background: var(--fy-paper);
 }
 
+[data-kiosk-presentation='fusion-youth'] .w2-scan-page > .ui-kiosk-page-content {
+  padding: 0;
+}
+
 [data-kiosk-presentation='fusion-youth'] .w2-scan-shell {
   display: flex;
   min-height: 100%;

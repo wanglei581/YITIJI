@@ -17,6 +17,11 @@ function stripCssComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '')
 }
 
+function cssRuleBody(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+}
+
 function splitSelectorList(source) {
   const selectors = []
   let current = ''
@@ -124,8 +129,29 @@ for (const path of cssFiles) {
 for (const [selector, owners] of selectorOwners) check(owners.size === 1, `selector has one owner: ${selector}`)
 const jobFitSelectors = collectCssSelectors(read('src/pages/resume/styles/resume-fusion-job-fit.css'))
 check(jobFitSelectors.every((selector) => selector.startsWith('.job-fit-inkpaper')), 'job-fit selectors are fully scoped')
-check(read('src/pages/resume/resume-fusion-youth.css') === "@import './styles/resume-fusion-common.css';\n@import './styles/resume-fusion-diagnosis.css';\n@import './styles/resume-fusion-authoring.css';\n@import './styles/resume-fusion-library.css';\n", 'resume compatibility entrypoint is import-only')
+const resumeEntrypoint = stripCssComments(read('src/pages/resume/resume-fusion-youth.css'))
+const expectedResumeImports = [
+  './styles/resume-fusion-common.css',
+  './styles/resume-fusion-diagnosis.css',
+  './styles/resume-fusion-authoring.css',
+  './styles/resume-fusion-library.css',
+]
+const actualResumeImports = [...resumeEntrypoint.matchAll(/@import\s+['"]([^'"]+)['"]\s*;/g)].map((match) => match[1])
+check(JSON.stringify(actualResumeImports) === JSON.stringify(expectedResumeImports), 'resume compatibility entrypoint retains exactly four ordered imports')
+check(
+  JSON.stringify(collectCssSelectors(resumeEntrypoint)) === JSON.stringify(["[data-kiosk-presentation='fusion-youth'] .fusion-w3--resume > .ui-kiosk-page-content"]),
+  'resume compatibility entrypoint permits only the scoped frame neutralizer rule',
+)
 check(read('src/pages/resume/jobFit-inkpaper.css') === "@import './styles/resume-fusion-job-fit.css';\n", 'job-fit compatibility entrypoint is import-only')
+
+for (const [path, frameClass] of [
+  ['src/pages/resume/resume-fusion-youth.css', 'resume'],
+  ['src/pages/assistant/assistant-lightflow-shell.css', 'assistant'],
+  ['src/pages/interview/styles/interview-shell.css', 'interview'],
+]) check(
+  /(?:^|;)\s*padding:\s*0\s*;?/.test(cssRuleBody(read(path), `[data-kiosk-presentation='fusion-youth'] .fusion-w3--${frameClass} > .ui-kiosk-page-content`)),
+  `${frameClass} frame neutralizes the shared content gutter`,
+)
 
 const screens = new Map([
   ['src/pages/resume/ResumeSourcePage.tsx', 'resume-source'],

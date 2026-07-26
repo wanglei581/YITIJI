@@ -75,6 +75,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
   // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
+  /^apps\/kiosk\/scripts\/verify-fusion-home\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
@@ -88,6 +89,17 @@ function check(label, run) {
   try { run(); pass(label) } catch (error) { fail(`${label}: ${error.message}`) }
 }
 function read(rel) { return readFileSync(join(KIOSK_ROOT, rel), 'utf8') }
+
+function stripCssComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+function cssRuleBody(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))
+  assert.ok(match, `missing CSS rule: ${selector}`)
+  return match[1]
+}
 
 function collectRoutePaths() {
   const sourceText = read('src/routes/index.tsx')
@@ -258,18 +270,23 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(smartInsights, /聚合脱敏统计/)
   assert.doesNotMatch(smartInsights, /示例数据|MOCK_FRESHMAN|topMajors|ageDistribution/)
   assert.match(
-    campusPolicyCss,
-    /button\.kproto-badge\s*\{[\s\S]*?min-height:\s*48px;/,
+    cssRuleBody(campusPolicyCss, 'button.kproto-badge'),
+    /min-height:\s*48px;/,
     'interactive campus badges keep the kiosk 48px touch target',
   )
   assert.match(
-    jobsCompaniesCss,
-    /\.w4-page-content\s*\{[\s\S]*?--w4-page-inset:\s*clamp\(20px,\s*2\.4vw,\s*36px\);[\s\S]*?padding:\s*var\(--w4-page-inset\);/,
-    'W4 page content exposes its responsive inset contract',
+    cssRuleBody(jobsCompaniesCss, "[data-kiosk-presentation='fusion-youth'] .w4-page-frame > .ui-kiosk-page-content"),
+    /padding:\s*0;/,
+    'W4 frame neutralizes the shared content inset',
   )
   assert.match(
-    campusPolicyCss,
-    /\.kproto-actionbar\s*\{[\s\S]*?margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
+    cssRuleBody(jobsCompaniesCss, '.w4-page-content'),
+    /--w4-page-inset:\s*clamp\(20px,\s*4\.45vw,\s*48px\);[^}]*padding:\s*0\s+var\(--w4-page-inset\);/,
+    'W4 page content owns only the horizontal gutter without adding vertical shell gaps',
+  )
+  assert.match(
+    cssRuleBody(campusPolicyCss, '.kproto-actionbar'),
+    /margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
     'smart-campus action bars align with the W4 page inset',
   )
 })
