@@ -1,6 +1,7 @@
 import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskTopbarStatus } from '../components/kiosk-shell/KioskAppTopbar'
+import { KioskStageFit } from '../components/kiosk-shell/KioskStageFit'
 import { getTerminalId } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { KioskBusyProvider } from '../contexts/KioskBusyContext'
@@ -70,24 +71,28 @@ function KioskShell() {
   const isCampusZone = pathname === '/campus'
 
   return (
-    <KioskLayout
-      activeTab={activeTab}
-      onTabChange={(tab) => navigate(tabToPath(tab))}
-      visualTheme="service-desk"
-      density="touch"
-      presentation="fusion-youth"
-      viewport="kiosk"
-      hideHeader={isCampusZone}
-      hideBottomNav={isCampusZone}
-      brandTitle={`就业服务大厅 · ${terminalId}`}
-      brandSubtitle="AI求职打印服务终端"
-      headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
-    >
-      {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
-          为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
-      <FavoritesProvider>
-        <Outlet />
-      </FavoritesProvider>
-    </KioskLayout>
+    // 舞台适配仅包布局内路由；/member/qr-login、/upload/phone、/screensaver 在布局外，不缩放。
+    <KioskStageFit>
+      <KioskLayout
+        activeTab={activeTab}
+        onTabChange={(tab) => navigate(tabToPath(tab))}
+        visualTheme="service-desk"
+        density="touch"
+        presentation="fusion-youth"
+        viewport="kiosk"
+        hideHeader={isCampusZone}
+        hideBottomNav={isCampusZone}
+        brandTitle={`就业服务大厅 · ${terminalId}`}
+        brandSubtitle="AI求职打印服务终端"
+        headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
+        className="h-full"
+      >
+        {/* FavoritesProvider 在 AuthProvider 内（KioskRoot 处于 RouterProvider 树），
+            为岗位列表/详情提供登录态门控的收藏状态；匿名沿用本机 localStorage。 */}
+        <FavoritesProvider>
+          <Outlet />
+        </FavoritesProvider>
+      </KioskLayout>
+    </KioskStageFit>
   )
 }

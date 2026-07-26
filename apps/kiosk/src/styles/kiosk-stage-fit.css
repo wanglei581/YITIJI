@@ -1,0 +1,42 @@
+/**
+ * Kiosk 设计稿舞台适配（letterbox / stage-fit）
+ * 逻辑纸面固定 1080×1920；外层按视口等比缩放居中。
+ * 一体机全屏竖屏时 scale≈1，观感与改造前一致。
+ */
+
+.kiosk-stage-host {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 与 kiosk-shell 舞台底一致，仅用 token / 已有 shell 背景，避免裸 hex 破 visual-unity */
+  background: var(--k-paper, var(--color-canvas));
+}
+
+.kiosk-stage-scaler {
+  flex: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.kiosk-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* 壳内用满舞台，勿再用 100vh（否则横屏会按浏览器高算错） */
+}
+
+.kiosk-stage .ui-kiosk-shell {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-stage {
+    transition: none;
+  }
+}
