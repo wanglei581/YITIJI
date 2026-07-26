@@ -353,7 +353,7 @@ test('capture all P1 visual evidence pairs', async ({ browser }) => {
     }
 
     // Screenshot files existing counts as evidence even when ready marker missed.
-    const hasFiles = true
+    const hasFiles = existsSync(prototypeScreenshot) && existsSync(productionScreenshot)
     const nextRecord: CaptureRecord = {
       targetId: target.targetId,
       captureKey: pair.captureKey,
