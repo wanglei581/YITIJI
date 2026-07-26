@@ -182,7 +182,6 @@ assert.match(
 )
 
 assert.match(root, /presentation\s*=\s*['"]fusion-youth['"]/, 'KioskRoot must opt into fusion-youth')
-assert.match(root, /viewport\s*=\s*['"]kiosk['"]/, 'KioskRoot must always use the kiosk viewport')
 assert.doesNotMatch(root, /MOBILE_HELPER_ROUTES|isMobileHelperRoute/, 'KioskRoot must not try to classify routes it does not render')
 
 assertTopLevelHelperRoutes(routes)
@@ -206,6 +205,10 @@ for (const [label, pattern] of [
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
+  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*viewportW\s*<=\s*760/],
+  ['responsive home viewport', /viewport\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
+  ['responsive home direct shell', /if\s*\(\s*isResponsiveHome\s*\)\s*return\s+shell/],
+  ['staged KioskStageFit fallback', /return\s*<KioskStageFit>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],
