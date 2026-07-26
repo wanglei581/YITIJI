@@ -1,0 +1,12 @@
+{
+  "id": "admin-phone-transfer-proof-state-guard",
+  "title": "手机号转移强制长期密码证明状态",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "已完成；归档并提交本地候选",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/admin-phone-transfer-proof-state-guard-20260726"
+}
