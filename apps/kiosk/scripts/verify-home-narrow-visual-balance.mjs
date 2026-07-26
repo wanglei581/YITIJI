@@ -281,6 +281,7 @@ const CONTRACT = {
   printGrid: { group: 'print-scan', accent: 'a-slate', selector: '.tiles.c5', kind: 'grid', expected: { 'grid-template-columns': ['repeat(2,1fr)', 'repeat(2,minmax(0,1fr))'], gap: ['8px'] } },
   printTile: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col', kind: 'tile-col', expected: { 'flex-direction': ['row'], 'min-height': ['68px'], 'text-align': ['left'] } },
   printText: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col .t-text', kind: 'tile-text', expected: { 'text-align': ['left'] } },
+  printDisabled: { group: 'print-scan', accent: 'a-slate', selector: '.tile.col.disabled', kind: 'tile-disabled', expected: { opacity: ['1'], background: ['var(--pv-surface)'], 'border-color': ['var(--pv-line)'] } },
   printLast: { group: 'print-scan', accent: 'a-slate', selector: '.tile:last-child', kind: 'tile-last', expected: { 'grid-column': ['1/-1'] } },
   jobPrimary: { group: 'job-fairs', accent: 'a-wheat', selector: '.tile.primary', kind: 'tile-primary', expected: { background: ['color-mix(insrgb,var(--pv-wheat-soft)72%,var(--pv-paper))'], 'border-color': ['color-mix(insrgb,var(--pv-wheat)24%,transparent)'] } },
   baseGrid: { group: null, accent: null, selector: '.kpv1 .tiles.c5', kind: 'grid', expected: { 'grid-template-columns': ['repeat(5,1fr)'] } },
@@ -305,6 +306,7 @@ function selectorCouldAffect(selector, contract) {
     case 'grid': return (hasClass(selector, 'tiles') && hasClass(selector, 'c5')) || (scoped && (hasClass(selector, 'tiles') || hasClass(selector, 'c5')))
     case 'tile-col': return (tile && hasClass(selector, 'col')) || (scoped && (tile || hasClass(selector, 'col')))
     case 'tile-text': return hasClass(selector, 't-text') && ((tile && hasClass(selector, 'col')) || scoped)
+    case 'tile-disabled': return (tile && hasClass(selector, 'disabled')) || (scoped && (tile || hasClass(selector, 'disabled')))
     case 'tile-last': return /:last-child(?![\w-])/.test(selector) && (tile || scoped)
     case 'tile-primary': return (tile && hasClass(selector, 'primary')) || (scoped && (tile || hasClass(selector, 'primary')))
     default: return false
@@ -543,6 +545,82 @@ function findNamedFunction(sourceFile, name) {
   return result
 }
 
+function findVariable(functionNode, name) {
+  for (const statement of functionNode?.body?.statements ?? []) {
+    if (!ts.isVariableStatement(statement)) continue
+    const match = statement.declarationList.declarations.find(
+      (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
+    )
+    if (match) return match
+  }
+  return null
+}
+
+const isIdentifierNamed = (node, name) => Boolean(node && ts.isIdentifier(node) && node.text === name)
+const isStringNamed = (node, value) => Boolean(node && ts.isStringLiteralLike(node) && node.text === value)
+
+function kioskShellContract(sourceFile) {
+  const shellFunction = findNamedFunction(sourceFile, 'KioskShell')
+  const statements = shellFunction?.body?.statements ?? []
+  const viewportBinding = statements
+    .filter(ts.isVariableStatement)
+    .flatMap((statement) => [...statement.declarationList.declarations])
+    .find((declaration) =>
+      ts.isObjectBindingPattern(declaration.name) &&
+      declaration.name.elements.some((element) => element.name.text === 'viewportW') &&
+      declaration.initializer &&
+      ts.isCallExpression(declaration.initializer) &&
+      isIdentifierNamed(declaration.initializer.expression, 'useKioskStageFit'),
+    )
+  const responsive = findVariable(shellFunction, 'isResponsiveHome')?.initializer
+  const responsiveBoundary = Boolean(
+    responsive &&
+    ts.isBinaryExpression(responsive) &&
+    responsive.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    ts.isBinaryExpression(responsive.left) &&
+    responsive.left.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
+    isIdentifierNamed(responsive.left.left, 'pathname') &&
+    isStringNamed(responsive.left.right, '/') &&
+    ts.isBinaryExpression(responsive.right) &&
+    responsive.right.operatorToken.kind === ts.SyntaxKind.LessThanEqualsToken &&
+    isIdentifierNamed(responsive.right.left, 'viewportW') &&
+    ts.isNumericLiteral(responsive.right.right) &&
+    responsive.right.right.text === '760',
+  )
+  const shell = findVariable(shellFunction, 'shell')?.initializer
+  let shellExpression = shell
+  while (shellExpression && ts.isParenthesizedExpression(shellExpression)) shellExpression = shellExpression.expression
+  const layoutOpening = shellExpression && ts.isJsxElement(shellExpression) ? shellExpression.openingElement : null
+  const viewportAttribute = layoutOpening ? jsxAttribute(layoutOpening, 'viewport', sourceFile) : null
+  const viewportExpression = viewportAttribute?.initializer && ts.isJsxExpression(viewportAttribute.initializer)
+    ? viewportAttribute.initializer.expression
+    : null
+  const responsiveViewport = Boolean(
+    layoutOpening?.tagName.getText(sourceFile) === 'KioskLayout' &&
+    viewportExpression &&
+    ts.isConditionalExpression(viewportExpression) &&
+    isIdentifierNamed(viewportExpression.condition, 'isResponsiveHome') &&
+    isStringNamed(viewportExpression.whenTrue, 'mobile') &&
+    isStringNamed(viewportExpression.whenFalse, 'kiosk'),
+  )
+  const directHome = statements.some((statement) =>
+    ts.isIfStatement(statement) &&
+    isIdentifierNamed(statement.expression, 'isResponsiveHome') &&
+    ts.isReturnStatement(statement.thenStatement) &&
+    isIdentifierNamed(statement.thenStatement.expression, 'shell'),
+  )
+  const stagedFallback = statements.some((statement) => {
+    if (!ts.isReturnStatement(statement)) return false
+    let expression = statement.expression
+    while (expression && ts.isParenthesizedExpression(expression)) expression = expression.expression
+    if (!expression || !ts.isJsxElement(expression) || expression.openingElement.tagName.getText(sourceFile) !== 'KioskStageFit') return false
+    return expression.children.some((child) =>
+      ts.isJsxExpression(child) && isIdentifierNamed(child.expression, 'shell'),
+    )
+  })
+  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, directHome, stagedFallback }
+}
+
 function jsxAttribute(opening, name, sourceFile) {
   return opening.attributes.properties.find(
     (attribute) => ts.isJsxAttribute(attribute) && attribute.name.getText(sourceFile) === name,
@@ -691,19 +769,29 @@ runAstHelperSelfChecks()
 console.log('\n=== 首页原型外窄屏视觉合同 ===')
 
 const home = read('src/pages/home/HomePage.tsx')
+const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const css = read('src/styles/prototype-v1.css')
 const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const pkg = read('package.json')
 const homeAst = ts.createSourceFile('HomePage.tsx', home, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const kioskRootAst = ts.createSourceFile('KioskRoot.tsx', kioskRoot, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const groupsAst = ts.createSourceFile('serviceGroups.ts', serviceGroups, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 const packageJson = (() => {
   try { return JSON.parse(pkg) } catch { return null }
 })()
 
 expect(home.length > 0 && homeAst.parseDiagnostics.length === 0, 'HomePage.tsx 可读且可解析')
+expect(kioskRoot.length > 0 && kioskRootAst.parseDiagnostics.length === 0, 'KioskRoot.tsx 可读且可解析')
 expect(css.length > 0, 'prototype-v1.css 可读')
 expect(serviceGroups.length > 0 && groupsAst.parseDiagnostics.length === 0, 'serviceGroups.ts 可读且可解析')
 expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 暴露 data-group-id={group.id}')
+
+const shellContract = kioskShellContract(kioskRootAst)
+expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW')
+expect(shellContract.responsiveBoundary, '仅 pathname===\'/\' 且 viewportW<=760 进入首页手机分支')
+expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
+expect(shellContract.directHome, '首页手机分支直接返回 KioskLayout shell')
+expect(shellContract.stagedFallback, '其余路由与 1080 首页继续使用 KioskStageFit')
 
 const narrowMedia = mediaBlocks(css, 'max-width:760px')
 const narrow = narrowMedia.map((block) => block.body).join('\n')
@@ -731,6 +819,18 @@ expect(contractWinnersMatch(rules390, CONTRACT.printTile), '390px 级联 winner 
 const printText = cascadedRules(narrowRules, contractSelectors(CONTRACT.printText))
 expect(normalizeCssKeywordValue(printText.property('text-align')) === 'left', '窄屏打印扫描 .t-text 最终明确左对齐')
 expect(contractWinnersMatch(rules390, CONTRACT.printText), '390px 级联 winner 保持打印扫描文字左对齐')
+
+const printDisabled = cascadedRules(narrowRules, contractSelectors(CONTRACT.printDisabled))
+expect(normalizeCssValue(printDisabled.property('opacity')) === '1', '窄屏打印扫描 disabled 显式覆写 opacity=1')
+expect(normalizeCssValue(printDisabled.property('background')) === 'var(--pv-surface)', '窄屏打印扫描 disabled 使用明确中性背景')
+expect(normalizeCssValue(printDisabled.property('border-color')) === 'var(--pv-line)', '窄屏打印扫描 disabled 使用明确中性边界')
+expect(contractWinnersMatch(rules390, CONTRACT.printDisabled), '390px 级联 winner 保持 disabled 不透明中性态')
+const disabledTitle = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text b'))
+const disabledDescription = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .t-text span'))
+const disabledStatus = cascadedRules(narrowRules, scopedSelectors('print-scan', '.tile.col.disabled .tag-soon'))
+expect(normalizeCssValue(disabledTitle.property('color')) === 'var(--pv-ink)', 'disabled 标题显式使用可读中性色')
+expect(normalizeCssValue(disabledDescription.property('color')) === 'var(--pv-muted)', 'disabled 说明显式使用可读中性色')
+expect(normalizeCssValue(disabledStatus.property('color')) === 'var(--pv-muted)', 'disabled 状态标签显式使用可读中性色')
 
 const printLast = cascadedRules(narrowRules, contractSelectors(CONTRACT.printLast))
 expect(normalizeCssValue(printLast.property('grid-column')) === '1/-1', '窄屏打印扫描最后一项最终通栏')
