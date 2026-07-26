@@ -8,17 +8,17 @@
 
 推荐顺序（2026-07-25）：
 
-0. [x] **预发事故：offline-agencies `pageSize` string → 500**（2026-07-25）：[PR #366](https://github.com/wanglei581/YITIJI/pull/366) → `main@0924a09b`；预发 **`DEPLOY_SOURCE=0924a09b`** 已固化；公网 `?pageSize=5` → 200
-0b. [x] **预发事故：登录页「服务器内部错误」实为 429 限流误报**（2026-07-25）：#366 → `RATE_LIMITED`；已随 **`0924a09b`** 进 runtime dist
-0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；预发热更 `index-DpMlugdV.js`，下次全量固化）
+0. [x] **预发事故：offline-agencies `pageSize` string → 500**（2026-07-25）：[PR #366](https://github.com/wanglei581/YITIJI/pull/366)；已随 **`DEPLOY_SOURCE=83f2117f`** 固化；公网 `?pageSize=5` → 200
+0b. [x] **预发事故：登录页「服务器内部错误」实为 429 限流误报**（2026-07-25）：#366 → `RATE_LIMITED`；已随 **`83f2117f`** 进 runtime dist
+0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；已随全量 **`DEPLOY_SOURCE=83f2117f`** 固化 `index-_FiZHKg3.js`）
 1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
 2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
-3. [x] **预生产部署**：经 `70ed8f6d` → `7e59243c`（G6）→ 现网 **`DEPLOY_SOURCE=0924a09b`（#366/#355/#357）** + Kiosk #369 热更；`TRUST_PROXY_HOPS=1`；**未**含 #356 邮箱别名 runtime
+3. [x] **预生产部署**：现网 **`DEPLOY_SOURCE=83f2117f`**（#369+#356+#375+#376；含 #366/#355/#357）；`TRUST_PROXY_HOPS=1`；Kiosk 全量 `index-_FiZHKg3.js`（扫码/U盘已固化，不再依赖热更）
 4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
 4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
 5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`：Admin `/orders` 对 `paid` 全额退款 UI。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏、`G5_REFUND_SMOKE`
 6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343)；P1-5 法务正文定稿仍开）
-7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发 pin **`0924a09b`**：
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发 pin **`83f2117f`**：
    - **7a / 7a2 seed**：✅
    - **7b 密钥举证（方案 C）**：✅；**真实短信 E2E**：✅（2026-07-26，`183****1921` 下发+登录 201；签名/模板 live 可用）
    - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（F4：`ptask_kiosk_e0fe379299af7c50`；2026-07-26 再确认 `ptask_kiosk_f9587c2439e1855a`，用户回「是」；旁证 `ptask_kiosk_2a75352b81631efb`）
@@ -26,7 +26,7 @@
    - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
 8. [x] **`req.ip` 抽样确认**（2026-07-25）
 9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
-10. [x] **Partner 登录邮箱别名 Wave 1**——[PR #356](https://github.com/wanglei581/YITIJI/pull/356) 已合入 main；**预发尚未部署**（下次全量须 PG migration）
+10. [x] **Partner 登录邮箱别名 Wave 1**——[PR #356](https://github.com/wanglei581/YITIJI/pull/356) 已合入；**预发已随 `DEPLOY_SOURCE=83f2117f` 部署并完成 PG migration**（`User.emailHash` 列存在）
 
 
 ---
