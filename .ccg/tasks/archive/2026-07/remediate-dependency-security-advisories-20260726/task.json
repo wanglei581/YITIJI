@@ -1,0 +1,12 @@
+{
+  "id": "remediate-dependency-security-advisories-20260726",
+  "title": "治理 React Router 与 brace-expansion 依赖安全告警",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "dependency-security",
+  "currentPhase": "completed",
+  "nextAction": "等待用户确认是否合并 PR #397；部署前必须先把预生产服务器 pnpm 升级到 11.2.2",
+  "createdAt": "2026-07-26T10:04:00Z",
+  "branch": "codex/dependency-security-remediation-20260726"
+}

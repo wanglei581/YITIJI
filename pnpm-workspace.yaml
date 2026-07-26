@@ -2,8 +2,8 @@ packages:
   - 'apps/*'
   - 'packages/*'
   - 'services/*'
-# Keep in sync with package.json pnpm.overrides. Server pnpm 9 reads package.json,
-# while local/newer pnpm reads this workspace-level overrides block.
+# pnpm 11 is the single supported package-manager line. Keep all project settings here.
+engineStrict: true
 overrides:
   qs: 6.15.2
   '@hono/node-server': 2.0.10
@@ -26,3 +26,6 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
+patchedDependencies:
+  brace-expansion@1.1.16: patches/brace-expansion@1.1.16.patch
+  brace-expansion@2.1.2: patches/brace-expansion@2.1.2.patch
