@@ -62,10 +62,13 @@ assert.match(generatedConfig, /Fail /, 'Test-GeneratedConfig must use the instal
 
 const configValidationCall = installer.indexOf('Test-GeneratedConfig -Config $config')
 const configBackup = installer.indexOf('Copy-Item $configPath $backup -Force')
+const programDataAclStep = installer.indexOf('Write-Step "Hardening ProgramData ACL"')
 const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
 const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
 const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
-const providedTokenSource = installer.indexOf('$tokenToPersist = $AgentToken.Trim()')
+const failClosedTokenSource = installer.indexOf(
+  'Fail "Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
+)
 const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
 const resolvedServiceName = installer.indexOf('$serviceName = [string]$service.Name')
@@ -73,10 +76,11 @@ const serviceStart = installer.indexOf('Start-Service -Name $serviceName')
 const serviceRestart = installer.indexOf('Restart-Service -Name $serviceName -Force')
 assert.notEqual(configValidationCall, -1, 'installer must validate the generated config')
 for (const [label, index] of [
+  ['ProgramData ACL hardening', programDataAclStep],
   ['token preparation', tokenPreparation],
   ['BindCode exchange', bindCodeExchange],
   ['existing token validation', existingTokenCheck],
-  ['provided token validation', providedTokenSource],
+  ['fail-closed token source', failClosedTokenSource],
   ['config backup', configBackup],
   ['config/token commit', configCommit],
   ['stale process stop', processStop],
@@ -86,11 +90,15 @@ for (const [label, index] of [
 ]) {
   assert.notEqual(index, -1, `installer must retain ${label}`)
 }
+assert.doesNotMatch(installer, /\[string\]\$AgentToken\b/, 'installer must not accept a long-lived -AgentToken CLI parameter')
+assert.doesNotMatch(installer, /\$tokenToPersist\s*=\s*\$AgentToken\.Trim\(\)/, 'installer must not persist tokens from CLI argv')
+assert.ok(configValidationCall < programDataAclStep, 'generated config validation must happen before ProgramData ACL hardening')
+assert.ok(programDataAclStep < tokenPreparation, 'ProgramData ACL hardening must happen before token preparation')
 assert.ok(configValidationCall < tokenPreparation, 'generated config validation must happen before token preparation')
 assert.ok(tokenPreparation < bindCodeExchange, 'BindCode exchange must happen during token preparation')
 assert.ok(bindCodeExchange < configCommit, 'BindCode exchange must finish before the local commit')
 assert.ok(existingTokenCheck < configCommit, 'existing token validation must finish before the local commit')
-assert.ok(providedTokenSource < configCommit, 'provided token validation must finish before the local commit')
+assert.ok(failClosedTokenSource < configCommit, 'fail-closed token source must finish before the local commit')
 assert.ok(configBackup < configCommit, 'the user-recoverable config backup must precede the local commit')
 assert.ok(configCommit < processStop, 'the local commit must finish before stopping Agent processes')
 assert.ok(resolvedServiceName < serviceStart, 'installer must resolve the SCM service name before starting it')
@@ -118,8 +126,17 @@ assert.match(atomicConfigWriter, /finally/, 'config atomic writer must clean up 
 assert.match(atomicConfigWriter, /Remove-Item\s+-LiteralPath\s+\$tempPath\s+-Force/, 'config atomic writer must remove its temporary file in finally cleanup')
 assert.doesNotMatch(installer, /\[System\.IO\.File\]::WriteAllText\(\$configPath/, 'config writes must not use WriteAllText directly')
 
+const programDataAcl = sourceBetween(installer, /function Set-ProgramDataAcl\(/, /\nfunction /)
+assert.match(programDataAcl, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'ProgramData ACL must disable inheritance without copying inherited ACEs')
+assert.match(programDataAcl, /S-1-5-18/, 'ProgramData ACL must grant SYSTEM')
+assert.match(programDataAcl, /S-1-5-32-544/, 'ProgramData ACL must grant Administrators')
+assert.match(programDataAcl, /Set-Acl\s+-LiteralPath\s+\$Path\s+-AclObject\s+\$acl/, 'ProgramData ACL must apply via Set-Acl')
+assert.doesNotMatch(programDataAcl, /Everyone|Authenticated Users|BUILTIN\\Users|S-1-5-11|S-1-1-0/i, 'ProgramData ACL must not grant broad interactive users')
+
 const protectToken = sourceBetween(installer, /function Protect-AgentToken\(/, /\nfunction /)
+assert.match(protectToken, /Set-ProgramDataAcl\s+-Path\s+\$dir/, 'DPAPI token writes must harden the ProgramData directory ACL')
 assert.match(protectToken, /Write-TextAtomically\s+-Path\s+\$TokenPath\s+-Text\s+\$b64/, 'DPAPI token writes must use the atomic writer')
+assert.match(protectToken, /Set-ProgramDataAcl\s+-Path\s+\$TokenPath/, 'DPAPI token writes must harden the token file ACL')
 assert.doesNotMatch(protectToken, /WriteAllText/, 'DPAPI token writes must not use WriteAllText directly')
 
 const productionCommit = sourceBetween(installer, /function Commit-ProductionConfigAndToken\(/, /\nfunction /)
@@ -187,6 +204,7 @@ const allowedDiagnosticCodes = [
   'AGENT_PROFILE_REJECTED',
   'AGENT_REGISTRATION_FAILED',
   'AGENT_STARTUP_FAILED',
+  'AGENT_UNAUTHORIZED',
   'AGENT_READY',
 ]
 assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must define an explicit startup diagnostic code whitelist')

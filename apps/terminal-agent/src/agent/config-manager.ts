@@ -9,6 +9,7 @@
 import fs from 'fs'
 import path from 'path'
 import { log } from '../logger'
+import { clearUnauthorized } from './auth-state'
 import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
 
@@ -26,6 +27,7 @@ export type AgentStartupErrorCode =
   | 'AGENT_PROFILE_REJECTED'
   | 'AGENT_REGISTRATION_FAILED'
   | 'AGENT_STARTUP_FAILED'
+  | 'AGENT_UNAUTHORIZED'
   | 'AGENT_READY'
 
 export class AgentStartupError extends Error {
@@ -225,6 +227,7 @@ export function persistRegistration(
   agentToken: string,
 ): AgentConfig {
   saveAgentToken(agentToken)
+  clearUnauthorized()
 
   const updated: AgentConfig = {
     ...config,

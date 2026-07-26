@@ -114,3 +114,9 @@ export function axiosErrorMessage(e: unknown): string {
   }
   return e instanceof Error ? e.message : String(e)
 }
+
+/** True when the API rejected the Agent credential (revoked / expired / invalid). */
+export function isUnauthorizedHttpError(e: unknown): boolean {
+  if (!axios.isAxiosError(e)) return false
+  return e.response?.status === 401
+}

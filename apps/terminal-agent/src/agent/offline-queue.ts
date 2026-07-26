@@ -14,7 +14,9 @@
  */
 
 import axios from 'axios'
-import { createApiClient, axiosErrorMessage } from './api-client'
+import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import {
   getPendingPatches,
   markPatchAttempt,
@@ -61,6 +63,13 @@ async function processPatch(
     // Not yet registered; skip this cycle — will retry after registration completes
     return
   }
+  if (isUnauthorized()) {
+    warn(
+      `offline-queue: skipping patch id=${patch.id} task=${patch.taskId}` +
+        ' — credential unauthorized (re-bind required)',
+    )
+    return
+  }
 
   const client = createApiClient(apiBaseUrl, agentToken, terminalId)
   const payload: Record<string, string> = { status: patch.status }
@@ -75,6 +84,17 @@ async function processPatch(
     )
     markPatchAttempt(db, patch.id, /* success */ true)
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      warn(
+        `offline-queue: abandoning patch id=${patch.id} task=${patch.taskId}` +
+          ' — unauthorized (credential revoked/invalid)',
+      )
+      markPatchAttempt(db, patch.id, false, undefined, /* abandon */ true)
+      return
+    }
+
     const httpStatus = axios.isAxiosError(e) ? e.response?.status : undefined
 
     if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
