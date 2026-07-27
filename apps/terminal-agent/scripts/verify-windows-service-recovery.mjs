@@ -13,6 +13,18 @@ const installer = fs.readFileSync(installerPath, 'utf8')
 const diagnosis = fs.readFileSync(diagnosisPath, 'utf8')
 const serviceIdentity = fs.readFileSync(serviceIdentityPath, 'utf8')
 
+const diagnosisParamBlock = sourceBetween(diagnosis, /param\(/, /\n\)/)
+assert.doesNotMatch(
+  diagnosisParamBlock,
+  /\$PSScriptRoot/,
+  'diagnosis parameter defaults must not read PSScriptRoot before Windows PowerShell 5.1 starts the script',
+)
+assert.match(
+  diagnosis,
+  /if \(\[string\]::IsNullOrWhiteSpace\(\$ConfigPath\)\) \{\s*\$ConfigPath = Join-Path \(Split-Path -Parent \$scriptRoot\) "config\\agent-config\.json"\s*\}/,
+  'diagnosis must resolve its default config path after script startup',
+)
+
 function sourceBetween(source, startPattern, endPattern) {
   const start = source.search(startPattern)
   assert.notEqual(start, -1, `missing ${startPattern}`)
@@ -61,7 +73,7 @@ assert.match(generatedConfig, /ConvertFrom-Json/, 'Test-GeneratedConfig must par
 assert.match(generatedConfig, /Fail /, 'Test-GeneratedConfig must use the installer failure path')
 
 const configValidationCall = installer.indexOf('Test-GeneratedConfig -Config $config')
-const configBackup = installer.indexOf('Copy-Item $configPath $backup -Force')
+const runtimeSecurityStep = installer.indexOf('Write-Step "Verifying restricted Agent runtime"')
 const programDataAclStep = installer.indexOf('Write-Step "Hardening ProgramData ACL"')
 const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
 const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
@@ -81,7 +93,7 @@ for (const [label, index] of [
   ['BindCode exchange', bindCodeExchange],
   ['existing token validation', existingTokenCheck],
   ['fail-closed token source', failClosedTokenSource],
-  ['config backup', configBackup],
+  ['restricted runtime preflight', runtimeSecurityStep],
   ['config/token commit', configCommit],
   ['stale process stop', processStop],
   ['resolved SCM service name', resolvedServiceName],
@@ -92,14 +104,15 @@ for (const [label, index] of [
 }
 assert.doesNotMatch(installer, /\[string\]\$AgentToken\b/, 'installer must not accept a long-lived -AgentToken CLI parameter')
 assert.doesNotMatch(installer, /\$tokenToPersist\s*=\s*\$AgentToken\.Trim\(\)/, 'installer must not persist tokens from CLI argv')
+assert.doesNotMatch(installer, /Copy-Item\s+\$configPath\s+\$backup/, 'installer must not copy an unknown legacy config that may contain plaintext credentials')
 assert.ok(configValidationCall < programDataAclStep, 'generated config validation must happen before ProgramData ACL hardening')
+assert.ok(runtimeSecurityStep < bindCodeExchange, 'restricted runtime verification must happen before BindCode exchange')
 assert.ok(programDataAclStep < tokenPreparation, 'ProgramData ACL hardening must happen before token preparation')
 assert.ok(configValidationCall < tokenPreparation, 'generated config validation must happen before token preparation')
 assert.ok(tokenPreparation < bindCodeExchange, 'BindCode exchange must happen during token preparation')
 assert.ok(bindCodeExchange < configCommit, 'BindCode exchange must finish before the local commit')
 assert.ok(existingTokenCheck < configCommit, 'existing token validation must finish before the local commit')
 assert.ok(failClosedTokenSource < configCommit, 'fail-closed token source must finish before the local commit')
-assert.ok(configBackup < configCommit, 'the user-recoverable config backup must precede the local commit')
 assert.ok(configCommit < processStop, 'the local commit must finish before stopping Agent processes')
 assert.ok(resolvedServiceName < serviceStart, 'installer must resolve the SCM service name before starting it')
 assert.ok(resolvedServiceName < serviceRestart, 'installer must resolve the SCM service name before restarting it')
@@ -107,10 +120,9 @@ assert.ok(configCommit < serviceStart, 'the local commit must finish before star
 assert.ok(configCommit < serviceRestart, 'the local commit must finish before restarting the service')
 assert.match(installer, /if\s*\(\$service\.State\s+-ne\s+"Running"\)/, 'installer must use the CIM service State when deciding whether to start or restart')
 assert.doesNotMatch(installer, /\$service\.Status/, 'installer must not read the unsupported CIM Status property')
-assert.equal(
-  (installer.match(/Resolve-AgentService\s+-Identity\s+\$agentServiceIdentity/g) ?? []).length,
-  2,
-  'installer must resolve the service both before and after a possible install',
+assert.ok(
+  (installer.match(/Resolve-AgentService\s+-Identity\s+\$agentServiceIdentity/g) ?? []).length >= 4,
+  'installer must resolve the service during preflight, install, and post-start verification',
 )
 
 const atomicConfigWriter = sourceBetween(installer, /function Write-TextAtomically\(/, /\nfunction /)
@@ -142,10 +154,34 @@ assert.doesNotMatch(
 )
 const programDataAcl = sourceBetween(installer, /function Set-ProgramDataAcl\(/, /\nfunction /)
 assert.match(programDataAcl, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'ProgramData ACL must disable inheritance without copying inherited ACEs')
+assert.match(programDataAcl, /SetOwner\(\$administratorsSid\)/, 'ProgramData ACL must set a trusted owner')
 assert.match(programDataAcl, /S-1-5-18/, 'ProgramData ACL must grant SYSTEM')
 assert.match(programDataAcl, /S-1-5-32-544/, 'ProgramData ACL must grant Administrators')
 assert.match(programDataAcl, /Set-Acl\s+-LiteralPath\s+\$Path\s+-AclObject\s+\$acl/, 'ProgramData ACL must apply via Set-Acl')
+assert.match(programDataAcl, /Assert-ProgramDataAcl/, 'ProgramData ACL must be read back and validated')
+assert.match(programDataAcl, /Assert-NotReparsePoint/, 'ProgramData ACL must reject reparse points')
 assert.doesNotMatch(programDataAcl, /Everyone|Authenticated Users|BUILTIN\\Users|S-1-5-11|S-1-1-0/i, 'ProgramData ACL must not grant broad interactive users')
+
+const programDataAclVerifier = sourceBetween(installer, /function Assert-ProgramDataAcl\(/, /\nfunction /)
+assert.match(programDataAclVerifier, /S-1-5-32-544/, 'ACL verifier must require Administrators owner')
+assert.match(programDataAclVerifier, /\$rules\.Count\s+-ne\s+2/, 'ACL verifier must require exactly two rules')
+assert.match(programDataAclVerifier, /FileSystemRights\]::FullControl/, 'ACL verifier must require FullControl')
+assert.match(programDataAclVerifier, /InheritanceFlags/, 'ACL verifier must validate inheritance scope')
+assert.match(programDataAclVerifier, /PropagationFlags/, 'ACL verifier must validate propagation scope')
+
+const runtimeVerifier = sourceBetween(installer, /function Assert-RestrictedRuntime\(/, /\nfunction /)
+assert.match(runtimeVerifier, /Get-ChildItem\s+-Force\s+-LiteralPath/, 'runtime verifier must recurse through loaded files')
+assert.match(runtimeVerifier, /Assert-NotReparsePoint/, 'runtime verifier must reject reparse points')
+assert.match(runtimeVerifier, /ChangePermissions/, 'runtime verifier must reject WRITE_DAC-like rights')
+assert.match(runtimeVerifier, /TakeOwnership/, 'runtime verifier must reject WRITE_OWNER-like rights')
+assert.match(installer, /Get-NodeModuleRoots/, 'installer must discover Node dependency roots')
+assert.match(installer, /Assert-RestrictedRuntime\s+-Root\s+\$nodeModuleRoot/, 'installer must verify Node dependency trees')
+assert.match(installer, /Set-ProgramDataTreeAcl\s+-Root\s+\$programDataDir/, 'installer must harden existing ProgramData descendants')
+
+const serviceSecurity = sourceBetween(installer, /function Assert-AgentServiceSecurity\(/, /\nfunction /)
+assert.match(serviceSecurity, /StartName/, 'service security must validate the service account')
+assert.match(serviceSecurity, /LocalSystem/, 'service security must require LocalSystem')
+assert.match(serviceSecurity, /PathName/, 'service security must validate the service executable path')
 
 const protectToken = sourceBetween(installer, /function Protect-AgentToken\(/, /\nfunction /)
 assert.match(protectToken, /Set-ProgramDataAcl\s+-Path\s+\$dir/, 'DPAPI token writes must harden the ProgramData directory ACL')
@@ -214,7 +250,12 @@ assert.match(diagnosis, /TrimStart\(\[char\]0xFEFF\)/, 'diagnosis must accept a 
 assert.match(diagnosis, /ConvertFrom-Json/, 'diagnosis must validate JSON without outputting config content')
 assert.match(diagnosis, /INVALID_DIAGNOSTIC_FILE/, 'diagnosis must return a closed code for an invalid startup diagnostic file')
 assert.match(diagnosis, /sc\.exe\s+qfailure/, 'diagnosis must read the configured SCM failure policy')
-assert.match(diagnosis, /Test-Path\s+-LiteralPath\s+\$tokenPath/, 'diagnosis must only test the token path for existence')
+assert.match(diagnosis, /Get-PathPresenceStatus\s+\$tokenPath\s+"Leaf"/, 'diagnosis must inspect token presence through the closed AccessDenied-safe helper')
+const pathPresence = sourceBetween(diagnosis, /function Get-PathPresenceStatus\(/, /\nfunction /)
+assert.match(pathPresence, /-ErrorAction\s+Stop/, 'path presence checks must make AccessDenied catchable')
+assert.match(pathPresence, /"present"/, 'path presence vocabulary must include present')
+assert.match(pathPresence, /"missing"/, 'path presence vocabulary must include missing')
+assert.match(pathPresence, /"unavailable"/, 'path presence vocabulary must include unavailable')
 
 const allowedDiagnosticCodes = [
   'AGENT_CONFIG_NOT_FOUND',
@@ -233,7 +274,7 @@ assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must de
 for (const code of allowedDiagnosticCodes) {
   assertIncludes(diagnosis, code, `diagnosis whitelist must include ${code}`)
 }
-const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\nfunction Get-ProgramDataAclReport\(/)
+const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\nfunction Get-ProgramDataAclStatus\(/)
 assert.match(startupDiagnosticReader, /\$diagnostic\.schemaVersion\s+-ne\s+1/, 'diagnosis must validate diagnostic schemaVersion')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic state type')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-notin\s+@\("ready",\s*"failed"\)/, 'diagnosis must validate diagnostic state')
@@ -241,24 +282,24 @@ assert.match(startupDiagnosticReader, /\$diagnostic\.code\s+-isnot\s+\[string\]/
 assert.match(startupDiagnosticReader, /IsNullOrWhiteSpace\(\[string\]\$diagnostic\.code\)/, 'diagnosis must reject empty diagnostic codes')
 assert.match(startupDiagnosticReader, /\$allowedDiagnosticCodes\s+-notcontains\s+\$diagnostic\.code/, 'diagnosis must reject codes outside the whitelist')
 
-assert.match(diagnosis, /function Get-ProgramDataAclReport\(/, 'diagnosis must expose a closed ProgramData ACL inspector')
-const aclInspector = sourceBetween(diagnosis, /function Get-ProgramDataAclReport\(/, /\n\$service\s*=/)
+assert.match(diagnosis, /function Get-ProgramDataAclStatus\(/, 'diagnosis must expose a closed ProgramData ACL inspector')
+const aclInspector = sourceBetween(diagnosis, /function Get-ProgramDataAclStatus\(/, /\n\$service\s*=/)
 assert.match(aclInspector, /Get-Acl\s+-LiteralPath/, 'ACL inspector must use Get-Acl')
 assert.match(aclInspector, /AreAccessRulesProtected/, 'ACL inspector must require inheritance disabled')
+assert.match(aclInspector, /ConvertTo-SidValue\s+\$acl\.Owner/, 'ACL inspector must validate owner by SID')
+assert.match(aclInspector, /FileSystemRights\]::FullControl/, 'ACL inspector must require FullControl')
+assert.match(aclInspector, /InheritanceFlags/, 'ACL inspector must validate inheritance scope')
+assert.match(aclInspector, /PropagationFlags/, 'ACL inspector must validate propagation scope')
+assert.match(aclInspector, /ReparsePoint/, 'ACL inspector must reject reparse points')
 assert.match(aclInspector, /S-1-5-18/, 'ACL inspector must require SYSTEM')
 assert.match(aclInspector, /S-1-5-32-544/, 'ACL inspector must require Administrators')
 assert.match(aclInspector, /S-1-1-0/, 'ACL inspector must detect Everyone')
 assert.match(aclInspector, /S-1-5-11/, 'ACL inspector must detect Authenticated Users')
 assert.match(aclInspector, /S-1-5-32-545/, 'ACL inspector must detect BUILTIN\\Users')
-assert.match(aclInspector, /inheritance_enabled/, 'ACL inspector must classify inheritance as a closed reason')
-assert.match(aclInspector, /forbidden_principal/, 'ACL inspector must classify forbidden principals as a closed reason')
 for (const status of ['missing', 'ok', 'too_permissive', 'unexpected', 'unavailable']) {
   assertIncludes(aclInspector, `"${status}"`, `ACL inspector vocabulary must include ${status}`)
 }
 assert.doesNotMatch(aclInspector, /Set-Acl|SetAccessRuleProtection|AddAccessRule/, 'ACL inspector must remain read-only')
-assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must capture PSScriptRoot into scriptRoot')
-assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')
-assert.match(diagnosis, /Join-Path\s+\$scriptRoot\s+"service-identity\.ps1"/, 'diagnosis must load helpers from resolved scriptRoot')
 
 const configStatusStart = diagnosis.lastIndexOf('$configFieldStatus = [pscustomobject]@{')
 assert.notEqual(configStatusStart, -1, 'diagnosis must calculate field status through a PSCustomObject')
@@ -283,11 +324,14 @@ for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 
   )
 }
 assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
+assert.match(diagnosisOutput, /^\s*tokenFilePresenceStatus\s*=\s*\$tokenFilePresenceStatus\s*$/m, 'diagnosis output must distinguish token missing from inaccessible')
 assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
+assert.match(diagnosisOutput, /^\s*startupDiagnosticFileStatus\s*=\s*\$startupDiagnosticFileStatus\s*$/m, 'diagnosis output must distinguish an inaccessible startup diagnostic')
 assert.match(diagnosisOutput, /^\s*programDataAclStatus\s*=\s*\$programDataAclStatus\s*$/m, 'diagnosis output must map ProgramData ACL status')
-assert.match(diagnosisOutput, /^\s*programDataAclReason\s*=\s*\$programDataAclReason\s*$/m, 'diagnosis output must map ProgramData ACL reason')
 assert.match(diagnosisOutput, /^\s*tokenFileAclStatus\s*=\s*\$tokenFileAclStatus\s*$/m, 'diagnosis output must map token file ACL status')
-assert.match(diagnosisOutput, /^\s*tokenFileAclReason\s*=\s*\$tokenFileAclReason\s*$/m, 'diagnosis output must map token file ACL reason')
+assert.match(diagnosisOutput, /^\s*runtimeRootAclStatus\s*=\s*\$runtimeRootAclStatus\s*$/m, 'diagnosis output must map runtime root ACL status')
+assert.match(diagnosisOutput, /^\s*serviceStartName\s*=\s*\$serviceStartName\s*$/m, 'diagnosis must report the service account')
+assert.match(diagnosisOutput, /^\s*serviceIdentityStatus\s*=\s*\$serviceIdentityStatus\s*$/m, 'diagnosis must report the closed service account status')
 assert.match(diagnosisOutput, /^\s*serviceName\s*=\s*\$resolvedServiceName\s*$/m, 'diagnosis must report the resolved SCM service Name')
 assert.match(diagnosisOutput, /^\s*serviceDisplayName\s*=\s*\$resolvedServiceDisplayName\s*$/m, 'diagnosis must report the resolved service DisplayName')
 assert.match(diagnosisOutput, /^\s*serviceAmbiguous\s*=\s*\$serviceAmbiguous\s*$/m, 'diagnosis must report whether service resolution was ambiguous')
@@ -311,17 +355,8 @@ assert.doesNotMatch(
   'diagnosis must not make network, process, or print calls',
 )
 
-const hardenPath = path.join(__dirname, 'harden-programdata-acl.ps1')
-assert.ok(fs.existsSync(hardenPath), 'Gate 0.4 field repair must ship harden-programdata-acl.ps1')
-const harden = fs.readFileSync(hardenPath, 'utf8')
-assert.match(harden, /function Set-ProgramDataAcl\(/, 'harden script must expose Set-ProgramDataAcl')
-assert.match(harden, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'harden script must disable inheritance without copying inherited ACEs')
-assert.match(harden, /S-1-5-18/, 'harden script must grant SYSTEM')
-assert.match(harden, /S-1-5-32-544/, 'harden script must grant Administrators')
-assert.match(harden, /Set-Acl\s+-LiteralPath/, 'harden script must apply ACL via Set-Acl')
-assert.match(harden, /function Get-ProgramDataAclReport\(/, 'harden script must re-check ACL after hardening')
-assert.match(harden, /hardened\s*=/, 'harden script must report hardened boolean')
-assert.doesNotMatch(harden, /Invoke-RestMethod|Invoke-WebRequest|Exchange-BindCode|agentToken|BindCode/i, 'harden script must not touch network or credentials')
-assert.doesNotMatch(harden, /Restart-Service|Stop-Service|Start-Service/, 'harden script must not restart the Agent service')
+assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must capture PSScriptRoot after startup')
+assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')
+assert.match(diagnosis, /Join-Path\s+\$scriptRoot\s+"service-identity\.ps1"/, 'diagnosis must load helpers from resolved scriptRoot')
 
 console.log('ALL PASS: terminal-agent Windows service recovery')

@@ -7,6 +7,8 @@
 param(
   [string]$ConfigPath,
 
+  [string]$AgentRoot,
+
   [string]$ServiceName = "AIJobPrintAgent",
 
   [string]$ProgramDataDir = (Join-Path $env:ProgramData "AIJobPrintAgent")
@@ -14,8 +16,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# When invoked via some hosts/pipelines, $PSScriptRoot can be empty; resolve from
-# MyInvocation so defaults and shared helpers still load under -File.
+# Windows PowerShell 5.1 does not reliably expose $PSScriptRoot while binding
+# parameter defaults. Resolve the repository-relative defaults after startup.
 $scriptRoot = $PSScriptRoot
 if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
   $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -25,6 +27,9 @@ if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
   $ConfigPath = Join-Path (Split-Path -Parent $scriptRoot) "config\agent-config.json"
+}
+if ([string]::IsNullOrWhiteSpace($AgentRoot)) {
+  $AgentRoot = Split-Path -Parent $scriptRoot
 }
 
 . (Join-Path $scriptRoot "service-identity.ps1")
@@ -63,11 +68,33 @@ function Get-Utf8BomState([string]$Path) {
   }
 }
 
-function Get-StartupDiagnosticCode([string]$Path) {
-  if (-not (Test-Path $Path -PathType Leaf)) {
-    return $null
+function Get-PathPresenceStatus([string]$Path, [string]$PathType = "Any") {
+  try {
+    $exists = if ($PathType -eq "Leaf") {
+      Test-Path -LiteralPath $Path -PathType Leaf -ErrorAction Stop
+    } elseif ($PathType -eq "Container") {
+      Test-Path -LiteralPath $Path -PathType Container -ErrorAction Stop
+    } else {
+      Test-Path -LiteralPath $Path -ErrorAction Stop
+    }
+    return $(if ($exists) { "present" } else { "missing" })
+  } catch {
+    return "unavailable"
   }
+}
 
+function ConvertTo-SidValue([object]$IdentityReference) {
+  if ($IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
+    return [string]$IdentityReference.Value
+  }
+  $value = [string]$IdentityReference
+  if ($value -match '^S-\d-(?:\d+-)+\d+$') { return $value }
+  return [string]([System.Security.Principal.NTAccount]$value).Translate(
+    [System.Security.Principal.SecurityIdentifier]
+  ).Value
+}
+
+function Get-StartupDiagnosticCode([string]$Path) {
   try {
     $diagnosticText = [System.IO.File]::ReadAllText($Path, [System.Text.UTF8Encoding]::new($false))
     $diagnostic = $diagnosticText.TrimStart([char]0xFEFF) | ConvertFrom-Json -ErrorAction Stop
@@ -87,28 +114,44 @@ function Get-StartupDiagnosticCode([string]$Path) {
   }
 }
 
-function Get-ProgramDataAclReport([string]$Path) {
+function Get-ProgramDataAclStatus([string]$Path) {
   if ([string]::IsNullOrWhiteSpace($Path)) {
-    return [pscustomobject]@{ status = "unavailable"; reason = "unavailable" }
+    return "unavailable"
   }
 
-  if (-not (Test-Path -LiteralPath $Path)) {
-    return [pscustomobject]@{ status = "missing"; reason = "missing" }
+  $presence = Get-PathPresenceStatus $Path
+  if ($presence -eq "missing") {
+    return "missing"
   }
+  if ($presence -ne "present") { return "unavailable" }
 
   try {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      return "unexpected"
+    }
+
     $acl = Get-Acl -LiteralPath $Path
     if (-not $acl.AreAccessRulesProtected) {
-      return [pscustomobject]@{ status = "too_permissive"; reason = "inheritance_enabled" }
+      return "too_permissive"
     }
 
     $required = @("S-1-5-18", "S-1-5-32-544")
     $forbidden = @("S-1-1-0", "S-1-5-11", "S-1-5-32-545")
     $allowSids = New-Object "System.Collections.Generic.HashSet[string]"
+    $ownerSid = ConvertTo-SidValue $acl.Owner
+    if ($required -notcontains $ownerSid) { return "unexpected" }
+
+    $expectedInheritance = if ($item.PSIsContainer) {
+      [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
+        [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    } else {
+      [System.Security.AccessControl.InheritanceFlags]::None
+    }
 
     foreach ($rule in $acl.Access) {
       if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
-        continue
+        return "unexpected"
       }
 
       try {
@@ -119,31 +162,71 @@ function Get-ProgramDataAclReport([string]$Path) {
         if ($rule.IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
           $sid = [string]$rule.IdentityReference.Value
         } else {
-          return [pscustomobject]@{ status = "unexpected"; reason = "unexpected_principal" }
+          return "unexpected"
         }
       }
 
       [void]$allowSids.Add($sid)
       if ($forbidden -contains $sid) {
-        return [pscustomobject]@{ status = "too_permissive"; reason = "forbidden_principal" }
+        return "too_permissive"
+      }
+      if ($required -notcontains $sid) { return "too_permissive" }
+      if ($rule.IsInherited) { return "unexpected" }
+      if ($rule.FileSystemRights -ne [System.Security.AccessControl.FileSystemRights]::FullControl) {
+        return "unexpected"
+      }
+      if ($rule.InheritanceFlags -ne $expectedInheritance) { return "unexpected" }
+      if ($rule.PropagationFlags -ne [System.Security.AccessControl.PropagationFlags]::None) {
+        return "unexpected"
       }
     }
 
     foreach ($sid in $required) {
       if (-not $allowSids.Contains($sid)) {
-        return [pscustomobject]@{ status = "unexpected"; reason = "missing_required" }
+        return "unexpected"
       }
     }
 
     foreach ($sid in $allowSids) {
       if ($required -notcontains $sid) {
-        return [pscustomobject]@{ status = "unexpected"; reason = "unexpected_principal" }
+        return "unexpected"
       }
     }
 
-    return [pscustomobject]@{ status = "ok"; reason = "ok" }
+    return "ok"
   } catch {
-    return [pscustomobject]@{ status = "unavailable"; reason = "unavailable" }
+    return "unavailable"
+  }
+}
+
+function Get-RuntimeRootAclStatus([string]$Path) {
+  $presence = Get-PathPresenceStatus $Path "Container"
+  if ($presence -ne "present") { return $presence }
+
+  try {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+      return "unexpected"
+    }
+    $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+    $trustedOwners = @("S-1-5-18", "S-1-5-32-544")
+    $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor `
+      [System.Security.AccessControl.FileSystemRights]::Modify -bor `
+      [System.Security.AccessControl.FileSystemRights]::Delete -bor `
+      [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
+      [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+    foreach ($rule in $acl.Access) {
+      if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
+      $sid = ConvertTo-SidValue $rule.IdentityReference
+      if ($trustedOwners -notcontains $sid -and ($rule.FileSystemRights -band $writeMask) -ne 0) {
+        return "too_permissive"
+      }
+    }
+    $ownerSid = ConvertTo-SidValue $acl.Owner
+    if ($trustedOwners -notcontains $ownerSid) { return "unexpected" }
+    return "ok"
+  } catch {
+    return "unavailable"
   }
 }
 
@@ -169,8 +252,17 @@ $resolvedServiceDisplayName = if ($serviceExists) { [string]$service.DisplayName
 $serviceState = if ($serviceExists) { [string]$service.State } else { $null }
 $startMode = if ($serviceExists) { [string]$service.StartMode } else { $null }
 $processId = if ($serviceExists) { [int]$service.ProcessId } else { $null }
+$serviceStartName = if ($serviceExists) { [string]$service.StartName } else { $null }
+$serviceIdentityStatus = if (-not $serviceExists) {
+  "missing"
+} elseif ($serviceStartName -in @("LocalSystem", "NT AUTHORITY\SYSTEM")) {
+  "ok"
+} else {
+  "unexpected"
+}
 
-$configExists = Test-Path $ConfigPath -PathType Leaf
+$configFilePresenceStatus = Get-PathPresenceStatus $ConfigPath "Leaf"
+$configExists = $configFilePresenceStatus -eq "present"
 $configHasUtf8Bom = $false
 $configValidJson = $false
 $configFieldStatus = [pscustomobject]@{
@@ -200,14 +292,22 @@ if ($configExists) {
 }
 
 $tokenPath = Join-Path $ProgramDataDir "agent.token"
-$encryptedTokenFile = Test-Path -LiteralPath $tokenPath -PathType Leaf
-$lastStartupDiagnosticCode = Get-StartupDiagnosticCode (Join-Path $ProgramDataDir "last-startup-diagnostic.json")
-$programDataAclReport = Get-ProgramDataAclReport $ProgramDataDir
-$tokenFileAclReport = if ($encryptedTokenFile) { Get-ProgramDataAclReport $tokenPath } else { [pscustomobject]@{ status = "missing"; reason = "missing" } }
-$programDataAclStatus = [string]$programDataAclReport.status
-$programDataAclReason = [string]$programDataAclReport.reason
-$tokenFileAclStatus = [string]$tokenFileAclReport.status
-$tokenFileAclReason = [string]$tokenFileAclReport.reason
+$tokenFilePresenceStatus = Get-PathPresenceStatus $tokenPath "Leaf"
+$encryptedTokenFile = $tokenFilePresenceStatus -eq "present"
+$startupDiagnosticPath = Join-Path $ProgramDataDir "last-startup-diagnostic.json"
+$startupDiagnosticFileStatus = Get-PathPresenceStatus $startupDiagnosticPath "Leaf"
+$lastStartupDiagnosticCode = if ($startupDiagnosticFileStatus -eq "present") {
+  Get-StartupDiagnosticCode $startupDiagnosticPath
+} else {
+  $null
+}
+$programDataAclStatus = Get-ProgramDataAclStatus $ProgramDataDir
+$tokenFileAclStatus = if ($tokenFilePresenceStatus -eq "present") {
+  Get-ProgramDataAclStatus $tokenPath
+} else {
+  $tokenFilePresenceStatus
+}
+$runtimeRootAclStatus = Get-RuntimeRootAclStatus $AgentRoot
 $scmFailurePolicy = $null
 
 if ($serviceExists) {
@@ -230,7 +330,10 @@ if ($serviceExists) {
   serviceState = $serviceState
   startMode = $startMode
   processId = $processId
+  serviceStartName = $serviceStartName
+  serviceIdentityStatus = $serviceIdentityStatus
   configExists = $configExists
+  configFilePresenceStatus = $configFilePresenceStatus
   configHasUtf8Bom = $configHasUtf8Bom
   configValidJson = $configValidJson
   apiBaseUrl = $configFieldStatus.apiBaseUrl
@@ -239,10 +342,11 @@ if ($serviceExists) {
   printerName = $configFieldStatus.printerName
   agentVersion = $configFieldStatus.agentVersion
   encryptedTokenFile = $encryptedTokenFile
+  tokenFilePresenceStatus = $tokenFilePresenceStatus
   lastStartupDiagnosticCode = $lastStartupDiagnosticCode
+  startupDiagnosticFileStatus = $startupDiagnosticFileStatus
   programDataAclStatus = $programDataAclStatus
-  programDataAclReason = $programDataAclReason
   tokenFileAclStatus = $tokenFileAclStatus
-  tokenFileAclReason = $tokenFileAclReason
+  runtimeRootAclStatus = $runtimeRootAclStatus
   scmFailurePolicy = $scmFailurePolicy
 }

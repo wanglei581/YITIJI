@@ -23,13 +23,23 @@ import { join } from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import FormData from 'form-data'
 import type { AgentConfig } from './types'
-import { createApiClient, axiosErrorMessage, NO_RETRY_CONFIG } from './api-client'
+import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError, NO_RETRY_CONFIG } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { log, warn, err } from '../logger'
 
 const STABILITY_CHECK_INTERVAL_MS = 500
 const STABILITY_MAX_CHECKS = 10
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000
 const UNCLAIMED_DIRNAME = '_unclaimed'
+
+/** Returns true when a 401 requires preserving the source file for re-bind. */
+export function preserveScanFileForUnauthorized(error: unknown): boolean {
+  if (!isUnauthorizedHttpError(error)) return false
+  markUnauthorized()
+  writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+  return true
+}
 /**
  * `_unclaimed` 隔离目录里的文件超过这个时长（按文件 mtime 计算）就会被周期清理
  * 删除。24 小时——给现场人工核查留出一个完整工作日的窗口，同时不让身份证/简历
@@ -105,7 +115,9 @@ export async function processCandidate(
   filePath: string,
   filename: string,
   config: AgentConfig,
+  deliverFile?: () => Promise<void>,
 ): Promise<void> {
+  if (isUnauthorized()) return
   if (inFlightPaths.has(filePath)) {
     // 已经在被实时监听或另一轮清点处理，跳过，避免同一文件并发投递两次。
     return
@@ -139,13 +151,21 @@ export async function processCandidate(
       // 请求 end 事件永不触发——真实 5xx 场景下会让每次重试都卡满 30s 超时
       // （3 次共 100+ 秒）。失败已由本函数自身的 sweep 重试机制兜底，禁用
       // axios 层重试不影响最终投递成功率。
-      await client.post(`/terminals/${config.terminalId}/scan-sessions/deliver`, form, {
-        headers: form.getHeaders(),
-        ...NO_RETRY_CONFIG,
-      })
+      if (deliverFile) {
+        await deliverFile()
+      } else {
+        await client.post(`/terminals/${config.terminalId}/scan-sessions/deliver`, form, {
+          headers: form.getHeaders(),
+          ...NO_RETRY_CONFIG,
+        })
+      }
       unlinkSync(filePath)
       log(`scan-watcher: delivered and removed source file — ${filename}`)
     } catch (e) {
+      if (preserveScanFileForUnauthorized(e)) {
+        warn(`scan-watcher: unauthorized; preserving file for retry after re-bind — ${filename}`)
+        return
+      }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
         const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
@@ -264,6 +284,7 @@ export function sweepUnclaimedDir(scanWatchFolder: string): void {
 /** 目录清点：处理当前已存在、不在 _unclaimed 子目录里的文件；同时清理 _unclaimed 里的过期文件。 */
 export async function sweepFolder(scanWatchFolder: string, config: AgentConfig): Promise<void> {
   sweepUnclaimedDir(scanWatchFolder)
+  if (isUnauthorized()) return
 
   let entries: string[]
   try {

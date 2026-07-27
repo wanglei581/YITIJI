@@ -157,12 +157,11 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
  *
  * @returns NodeJS.Timeout — pass to clearInterval() to stop.
  */
-export function startHeartbeat(options: HeartbeatOptions): NodeJS.Timeout {
+export function startHeartbeat(options: HeartbeatOptions, sendImmediately = true): NodeJS.Timeout {
   const interval = options.config.heartbeatIntervalMs ?? 30_000
   log(`heartbeat: starting — interval=${interval}ms`)
 
-  // First heartbeat immediately
-  sendHeartbeat(options).catch(() => undefined)
+  if (sendImmediately) sendHeartbeat(options).catch(() => undefined)
 
   return setInterval(() => {
     sendHeartbeat(options).catch(() => undefined)

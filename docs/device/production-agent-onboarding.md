@@ -40,6 +40,8 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
   -UseExistingToken
 ```
 
+> 生产安装不得从可被 Kiosk 用户或普通登录用户写入的 Git checkout 运行。安装脚本会在兑换 BindCode 前递归校验 Agent runtime、Node 依赖树和 `node.exe` 的 owner、写权限与 reparse point；校验失败会拒绝启动服务。请先由受控发布流程把完整 runtime 放入受保护目录（通常为 `Program Files` 下的签名发布目录），再执行下列命令。
+
 > Gate 0.4 Wave A 说明：静态门禁可证明安装脚本移除了 CLI token 入参并写入 ACL 逻辑；Windows 真机 ACL / 服务仍需另行授权验收，不得仅凭静态 verify 宣称现场完成。
 
 ### Gate 0.4 Wave B：凭证失效本地 fail-closed
@@ -59,31 +61,13 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 | # | 步骤 | 通过标准 | 证据 |
 |---|---|---|---|
 | 1 | 只读诊断 | `diagnose-production-agent.ps1` 可运行；服务 `AIJobPrintAgent` Running / Auto | 命令输出截图 |
-| 2 | ProgramData ACL | `diagnose-production-agent.ps1` 输出 `programDataAclStatus=ok` 且 `tokenFileAclStatus=ok`（继承已禁用，仅 SYSTEM `S-1-5-18` + Administrators `S-1-5-32-544`）；普通用户读目录失败 | 诊断对象 + `icacls` 佐证 |
+| 2 | ProgramData / runtime ACL | `diagnose-production-agent.ps1` 输出 `programDataAclStatus=ok`、`tokenFileAclStatus=ok` 且 `runtimeRootAclStatus=ok`（ProgramData 继承已禁用，仅 SYSTEM `S-1-5-18` + Administrators `S-1-5-32-544`；服务加载的 Agent runtime、Node 依赖树和配置目录不得被普通用户写入）；普通用户读 token 失败 | 诊断对象 + `icacls` 佐证 |
 | 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken`；仅 `-BindCode` 或 `-UseExistingToken` | 安装记录 |
 | 4 | 紧急吊销（另授） | Admin 对目标终端执行紧急吊销后，Agent 停止 claim；本地诊断出现 `AGENT_UNAUTHORIZED`；云端不得仅凭“心跳 unauthorized 态”判定（401 无法上报） | Admin 审计 + 本地 `last-startup-diagnostic.json` |
 | 5 | BindCode 恢复（另授） | 新一次性 BindCode + 安装脚本换发后 latch 清除，心跳恢复，可再 claim | 心跳时间 + 一笔受控打印（若另授出纸） |
 | 6 | 回归 | 吊销/恢复后打印机 `ready`、无残留 active 任务 | DB/Admin 只读 |
 
-禁止：未授权吊销生产终端；把静态 `verify:agent-unauthorized` 写成现场完成；把 `agent_degraded` 与 `AGENT_UNAUTHORIZED` 混记。
-
-**恢复顺序（吊销后必须按此）**：紧急吊销会把终端打成 `suspended`；绑定码**只能**在 `planned` / `maintenance` 签发。故恢复为：`suspended → maintenance` → 签发 BindCode → Windows `-BindCode` 换发 → `maintenance → active`。
-
-**ACL 未通过（`too_permissive`）时先加固，再吊销**：常见原因是 Gate 0.4 之前安装仍开启继承。管理员 PowerShell：
-
-```powershell
-cd <本机仓库根目录>
-git fetch origin
-# 取本修复分支或合入后的 main：
-git checkout origin/codex/gate04-harden-programdata-acl -- `
-  apps/terminal-agent/scripts/harden-programdata-acl.ps1 `
-  apps/terminal-agent/scripts/diagnose-production-agent.ps1
-powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\harden-programdata-acl.ps1
-powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1 |
-  Select-Object serviceState, programDataAclStatus, programDataAclReason, tokenFileAclStatus, tokenFileAclReason, lastStartupDiagnosticCode
-```
-
-通过标准：`programDataAclStatus=ok`、`tokenFileAclStatus=ok`（reason 均为 `ok`）。`inheritance_enabled` 表示仍继承父目录 ACE。诊断脚本请始终用 `powershell -File`（避免 `$PSScriptRoot` 为空）。
+禁止：未授权吊销生产终端；把静态 `verify:agent-unauthorized` 写成现场完成；把 `agent_degraded` 与 `AGENT_UNAUTHORIZED` 混记；把 `runtimeRootAclStatus=too_permissive` 的仓库目录注册为 LocalSystem 商用 runtime。
 
 ## 可靠性 P0：安装、诊断与恢复
 
