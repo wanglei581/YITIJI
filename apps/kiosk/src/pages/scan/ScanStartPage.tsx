@@ -21,7 +21,7 @@ import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
-/** 能力门禁态：禁止伪装「硬件已就绪」类文案。 */
+/** 能力门禁态：禁止伪装硬件已就绪。 */
 type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
 
 interface ScanTypeOption {
@@ -57,18 +57,11 @@ const SCAN_TYPES: ScanTypeOption[] = [
 ]
 
 const FLOW_STEPS = [
-  ['选择扫描类型', '点击下方「下一步」创建扫描任务'],
-  ['按屏幕指引', '到打印机放好原件，在操作面板上扫描到本机接收目录'],
-  ['本机自动检测', '扫描结果，期间请勿关闭页面'],
+  ['选择扫描类型', '下一步会创建真实扫描会话'],
+  ['获取服务端指引', '只在会话创建成功后显示；含面板扫描到本机接收目录'],
+  ['在设备上扫描', '按当前会话的服务端指引在打印机面板操作'],
   ['选择文件去向', '打印、前往我的文档或 AI 简历识别'],
 ] as const
-
-const ALT_PATHS = [
-  { title: '上传文件打印', desc: '手机 / U盘里的现成文件仍可打印', tone: 'ok' as const, chip: '可使用' },
-  { title: 'U盘直插打印', desc: '打印机自带能力，U盘插打印机即可', tone: 'ok' as const, chip: '可尝试' },
-  { title: '扫描到 U盘', desc: '打印机面板自带，以设备现场提示为准', tone: 'ok' as const, chip: '可尝试' },
-  { title: '本机扫描任务', desc: '当前终端扫描能力未开放或状态未知', tone: 'warn' as const, chip: '暂不可用' },
-]
 
 const CAPABILITY_STATUS_NOTES: Record<string, string> = {
   testing: '测试中，暂未对用户开放',
@@ -132,7 +125,7 @@ export function ScanStartPage() {
           description={
             blocked
               ? '当前无法创建扫描任务，请查看说明或改用其他方式'
-              : '请选择扫描类型；扫描在打印机面板完成，本机负责接收文件'
+              : '请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话'
           }
           onBack={() => navigate('/print-scan')}
           backLabel="返回打印扫描服务"
@@ -149,7 +142,7 @@ export function ScanStartPage() {
                   ? '正在确认本终端是否开放扫描服务，请稍候。'
                   : gate === 'unknown'
                     ? '暂时无法确认扫描能力状态，不会创建扫描任务；请重试或联系工作人员。'
-                    : `扫描能力暂未开放${blockedNote ? `：${blockedNote}` : ''}。请改用下方仍可用的方式，或联系工作人员。`}
+                    : `扫描能力暂未开放${blockedNote ? `：${blockedNote}` : ''}。`}
               </p>
               <div className="w2-scan-off-wrap">
                 <section className="w2-scan-off-main" aria-label="扫描能力不可用">
@@ -160,7 +153,7 @@ export function ScanStartPage() {
                       gate === 'loading'
                         ? '正在读取本终端的扫描服务配置。'
                         : gate === 'unknown'
-                          ? '本机未能读取扫描能力配置。恢复后可继续创建扫描任务（仍需在打印机面板操作）。'
+                          ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
                           : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')
                     }
                     icon={<ScanIcon aria-hidden="true" />}
@@ -181,15 +174,20 @@ export function ScanStartPage() {
                 <aside className="w2-scan-side-card w2-scan-alt-card">
                   <h2>你现在还能做什么</h2>
                   <ul className="w2-scan-alt-list">
-                    {ALT_PATHS.map((item) => (
-                      <li key={item.title}>
-                        <span className="w2-scan-alt-copy">
-                          <b>{item.title}</b>
-                          <span>{item.desc}</span>
-                        </span>
-                        <small data-tone={item.tone}>{item.chip}</small>
-                      </li>
-                    ))}
+                    <li>
+                      <span className="w2-scan-alt-copy">
+                        <b>上传文件打印</b>
+                        <span>手机 / U盘里的现成文件仍可打印</span>
+                      </span>
+                      <small data-tone="ok">可使用</small>
+                    </li>
+                    <li>
+                      <span className="w2-scan-alt-copy">
+                        <b>本机扫描任务</b>
+                        <span>当前终端扫描能力未开放或状态未知</span>
+                      </span>
+                      <small data-tone="warn">暂不可用</small>
+                    </li>
                   </ul>
                   <div className="w2-scan-privacy">
                     <ShieldCheckIcon aria-hidden="true" />
@@ -201,7 +199,7 @@ export function ScanStartPage() {
           ) : (
             <>
               <p className="w2-scan-notice">
-                扫描说明：请在打印机操作面板完成扫描，并选择扫描到本机已配置的网络接收目录；本机创建任务后自动检测文件，不会远程替你按下扫描键。
+                下一步会创建真实扫描会话。只有服务端成功返回会话后，下一页才会显示任务编号和设备操作指引（在打印机面板扫描到本机已配置的网络接收目录）。
               </p>
               <div className="w2-scan-start-grid">
                 <section className="w2-scan-type-list" aria-label="扫描类型">
@@ -252,10 +250,10 @@ export function ScanStartPage() {
             </Button>
           </KioskActionBar>
         ) : (
-          <KioskActionBar leading={<span className="w2-scan-action-note">创建后请到打印机面板操作</span>}>
+          <KioskActionBar leading={<span className="w2-scan-action-note">进入下一步后才会向服务端创建真实会话</span>}>
             <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回</Button>
             <Button size="lg" onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}>
-              下一步 · 查看扫描指引 <ArrowRightIcon />
+              下一步 · 创建扫描会话 <ArrowRightIcon />
             </Button>
           </KioskActionBar>
         )}

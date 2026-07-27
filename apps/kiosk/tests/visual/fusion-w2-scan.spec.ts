@@ -28,6 +28,11 @@ function registerShell(api: ApiRouter): void {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  // ScanStart 深链/取消回退可能拉取能力；默认空覆盖 = managed 未配置放行。
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
 }
 
 function registerScanCapability(
@@ -119,16 +124,22 @@ async function routeExact(
   })
 }
 
-test('scan start reflects an allowed capability and allows continuation @w2', async ({ page, api }) => {
+test('scan start creates only after explicit continuation @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
   registerScanCapability(api, 'available')
   registerCreatedScan(api)
+  let legacyDeviceRequests = 0
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/v1/kiosk/device/status') legacyDeviceRequests += 1
+  })
 
   await page.goto('/scan/start')
+  await expect(page.getByText(/下一步会创建真实扫描会话/).first()).toBeVisible()
   await expect(page.getByText('可创建扫描任务 · 需面板操作', { exact: true })).toBeVisible()
-  const next = page.getByRole('button', { name: /下一步 · 查看扫描指引/ })
+  const next = page.getByRole('button', { name: /下一步 · 创建扫描会话/ })
   await expect(next).toBeEnabled()
+  expect(legacyDeviceRequests).toBe(0)
   await next.click()
   await page.waitForURL('**/scan/settings')
   await expect(page.getByText('在打印机面板开始扫描', { exact: true })).toBeVisible()
@@ -141,10 +152,21 @@ test('scan start blocks continuation while scan capability is unavailable @w2', 
   registerScanCapability(api, 'maintenance', '扫描仪正在保养')
 
   await page.goto('/scan/start')
-  // 方案 B：能力未开放时不渲染「下一步」履约入口，也不伪装扫描仪硬件就绪。
   await expect(page.getByText('扫描能力暂未开放', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: /下一步 · 查看扫描指引/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /下一步 · 创建扫描会话/ })).toHaveCount(0)
   await expect(page.getByRole('button', { name: '改用上传文件打印' })).toBeVisible()
+  await expectHealthy(page, errors)
+})
+
+test('direct scan settings access does not create a session @w2', async ({ page, api }) => {
+  const errors = collectRuntimeErrors(page)
+  registerShell(api)
+
+  await page.goto('/scan/settings')
+  await expect(page.getByText('未创建扫描任务', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('任务编号', { exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /安全返回扫描首页/ }).first()).toBeVisible()
   await expectHealthy(page, errors)
 })
 
@@ -171,7 +193,6 @@ test('scan settings uses server instructions and waiting-to-completed polling re
 test('cancel-completed race rechecks status and recovers the real scan file @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
-  registerScanCapability(api, 'available')
   let cancelled = false
   await routeExact(page, 'GET', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
     const body = scanStatus(cancelled ? 'completed' : 'waiting')
@@ -270,7 +291,6 @@ test('successful scan exposes the real documents destination @w2', async ({ page
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
   await page.getByRole('button', { name: /登录后管理文件|前往我的文档/ }).click()
-  // 未登录时引导登录；已登录则进我的文档。浏览器 fixture 默认游客。
   await page.waitForURL(/\/(login|me\/documents)/)
   await expectHealthy(page, errors)
 })
