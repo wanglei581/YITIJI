@@ -113,6 +113,12 @@ assert.equal(
   'installer must resolve the service both before and after a possible install',
 )
 
+const atomicFileReplacer = sourceBetween(installer, /function Replace-FileAtomically\(/, /\nfunction /)
+assert.match(atomicFileReplacer, /File\]::Replace\(\$SourcePath,\s*\$DestinationPath,\s*\$backupPath\)/, 'atomic replacement must use an explicit backup path for Windows PowerShell 5.1')
+assert.match(atomicFileReplacer, /replace-backup\.tmp/, 'atomic replacement backup must be a scoped temporary file')
+assert.match(atomicFileReplacer, /\$replaceSucceeded\s*=\s*\$true/, 'atomic replacement must track successful replacement before cleanup')
+assert.match(atomicFileReplacer, /Remove-Item\s+-LiteralPath\s+\$backupPath\s+-Force\s+-ErrorAction\s+SilentlyContinue/, 'atomic replacement must clean up a successful replacement backup without converting cleanup failure into a commit failure')
+
 const atomicConfigWriter = sourceBetween(installer, /function Write-TextAtomically\(/, /\nfunction /)
 assert.match(atomicConfigWriter, /UTF8Encoding\]::new\(\$false\)/, 'config atomic writer must use UTF-8 without a BOM')
 assert.match(atomicConfigWriter, /FileStream/, 'config atomic writer must use FileStream')
@@ -120,12 +126,7 @@ assert.match(atomicConfigWriter, /CreateNew/, 'config atomic writer must create 
 assert.match(atomicConfigWriter, /\.GetBytes\(/, 'config atomic writer must encode the complete text before writing')
 assert.match(atomicConfigWriter, /\.Write\(/, 'config atomic writer must write encoded bytes')
 assert.match(atomicConfigWriter, /\.Flush\(\$true\)/, 'config atomic writer must flush file content to disk')
-assert.match(atomicConfigWriter, /File\]::Replace/, 'config atomic writer must replace an existing config atomically')
-assert.match(
-  atomicConfigWriter,
-  /File\]::Replace\(\$tempPath,\s*\$Path,\s*\[NullString\]::Value\)/,
-  'config atomic writer must pass [NullString]::Value for PS 5.1 File.Replace backup path',
-)
+assert.match(atomicConfigWriter, /Replace-FileAtomically\s+-SourcePath\s+\$tempPath\s+-DestinationPath\s+\$Path/, 'config atomic writer must replace an existing config through the explicit-backup helper')
 assert.match(atomicConfigWriter, /File\]::Move/, 'config atomic writer must move a new config into place atomically')
 assert.match(atomicConfigWriter, /finally/, 'config atomic writer must clean up temporary files')
 assert.match(atomicConfigWriter, /Remove-Item\s+-LiteralPath\s+\$tempPath\s+-Force/, 'config atomic writer must remove its temporary file in finally cleanup')
@@ -140,6 +141,7 @@ assert.doesNotMatch(
   /File\]::Replace\([^)\n]*,\s*\$null\s*\)/,
   'installer must not pass bare $null to File.Replace (PowerShell 5.1 rejects it)',
 )
+assert.doesNotMatch(installer, /\[NullString\]::Value/, 'installer must use an explicit backup path rather than an implicit null backup path')
 const programDataAcl = sourceBetween(installer, /function Set-ProgramDataAcl\(/, /\nfunction /)
 assert.match(programDataAcl, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'ProgramData ACL must disable inheritance without copying inherited ACEs')
 assert.match(programDataAcl, /S-1-5-18/, 'ProgramData ACL must grant SYSTEM')
@@ -165,8 +167,8 @@ assert.ok(
 )
 assert.match(
   productionCommit,
-  /File\]::Replace\(\$tokenRollbackPath,\s*\$TokenPath,\s*\[NullString\]::Value\)/,
-  'local commit must restore an existing token via PS 5.1-safe File.Replace',
+  /Replace-FileAtomically\s+-SourcePath\s+\$tokenRollbackPath\s+-DestinationPath\s+\$TokenPath/,
+  'local commit must restore an existing token via the explicit-backup helper',
 )
 assert.match(productionCommit, /File\]::Move\(\$tokenRollbackPath,\s*\$TokenPath\)/, 'local commit must restore when the token destination is absent')
 assert.match(productionCommit, /Remove-Item\s+-LiteralPath\s+\$tokenRollbackPath\s+-Force/, 'local commit must clean up its rollback temporary file')
@@ -179,6 +181,7 @@ assert.match(productionCommit, /Could not commit production config and terminal 
 const invokeSc = sourceBetween(installer, /function Invoke-Sc\(/, /\nfunction /)
 assertIncludes(invokeSc, '& sc.exe @Arguments 2>&1', 'Invoke-Sc must execute sc.exe through its argument array')
 assert.match(invokeSc, /\$LASTEXITCODE/, 'Invoke-Sc must check sc.exe exit status')
+assert.match(invokeSc, /\$\{LASTEXITCODE\}:/, 'Invoke-Sc failure text must parse in Windows PowerShell 5.1')
 assert.match(invokeSc, /Fail /, 'Invoke-Sc must fail on a non-zero sc.exe exit status')
 
 const serviceRecovery = sourceBetween(installer, /function Set-AgentServiceRecovery\(/, /\n\$repoRoot/)
@@ -189,6 +192,7 @@ assert.match(serviceRecovery, /actions=/, 'service recovery must configure actio
 assertIncludes(serviceRecovery, 'restart/60000/restart/300000/""/0', 'service recovery must use two finite restarts and a no-action third failure')
 assert.match(serviceRecovery, /failureflag/, 'service recovery must enable failure handling for non-crash failures')
 assert.match(serviceRecovery, /qfailure/, 'service recovery must read back the configured policy')
+assert.match(serviceRecovery, /\$\{ServiceName\}:/, 'service recovery status text must parse in Windows PowerShell 5.1')
 assert.match(serviceRecovery, /Write-Host/, 'service recovery must display the qfailure output to the operator')
 
 const automaticStartup = installer.indexOf('Set-Service -Name $serviceName -StartupType Automatic')

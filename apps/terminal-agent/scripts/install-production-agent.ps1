@@ -124,6 +124,23 @@ function Test-GeneratedConfig([System.Collections.IDictionary]$Config) {
   return $configJson
 }
 
+function Replace-FileAtomically([string]$SourcePath, [string]$DestinationPath) {
+  $directory = Split-Path -Parent $DestinationPath
+  $fileName = Split-Path -Leaf $DestinationPath
+  $backupPath = Join-Path $directory ".${fileName}.${PID}.$([System.Guid]::NewGuid().ToString('N')).replace-backup.tmp"
+  $replaceSucceeded = $false
+
+  try {
+    [System.IO.File]::Replace($SourcePath, $DestinationPath, $backupPath)
+    $replaceSucceeded = $true
+  } finally {
+    if ($replaceSucceeded -and (Test-Path -LiteralPath $backupPath)) {
+      # Replacement is durable at this point. A locked backup is evidence, not a commit failure.
+      Remove-Item -LiteralPath $backupPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Write-TextAtomically([string]$Path, [string]$Text) {
   $directory = Split-Path -Parent $Path
   $fileName = Split-Path -Leaf $Path
@@ -146,8 +163,7 @@ function Write-TextAtomically([string]$Path, [string]$Text) {
     }
 
     if ([System.IO.File]::Exists($Path)) {
-      # PS 5.1 rejects bare $null for the backup-path parameter; NullString maps to a true null.
-      [System.IO.File]::Replace($tempPath, $Path, [NullString]::Value)
+      Replace-FileAtomically -SourcePath $tempPath -DestinationPath $Path
     } else {
       [System.IO.File]::Move($tempPath, $Path)
     }
@@ -167,7 +183,7 @@ function Invoke-Sc([string[]]$Arguments) {
 
   if ($LASTEXITCODE -ne 0) {
     $detail = ($output | Out-String).Trim()
-    Fail "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE: $detail"
+    Fail "sc.exe $($Arguments -join ' ') failed with exit code ${LASTEXITCODE}: $detail"
   }
 
   return ($output | Out-String).Trim()
@@ -178,7 +194,7 @@ function Set-AgentServiceRecovery([string]$ServiceName) {
   Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", 'restart/60000/restart/300000/""/0') | Out-Null
   Invoke-Sc @("failureflag", $ServiceName, "1") | Out-Null
   $policy = Invoke-Sc @("qfailure", $ServiceName)
-  Write-Host "SCM failure policy for $ServiceName:"
+  Write-Host "SCM failure policy for ${ServiceName}:"
   Write-Host $policy
 }
 
@@ -293,7 +309,7 @@ function Commit-ProductionConfigAndToken(
       if ($shouldWriteToken) {
         if ($hadExistingToken -and $null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
           if ([System.IO.File]::Exists($TokenPath)) {
-            [System.IO.File]::Replace($tokenRollbackPath, $TokenPath, [NullString]::Value)
+            Replace-FileAtomically -SourcePath $tokenRollbackPath -DestinationPath $TokenPath
           } else {
             [System.IO.File]::Move($tokenRollbackPath, $TokenPath)
           }
