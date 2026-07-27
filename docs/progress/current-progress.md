@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-27 推进 **Gate 0.4 PS 5.1 显式 backup-path 原子写入候选**（分支 `codex/gate04-powershell51`，未合入/未部署）：现场复现裸 `$null` 的 `File.Replace` 在 Windows PowerShell 5.1 失败；`[NullString]::Value` 与显式 backup path 均经无敏感临时文件探针验证可用。候选将生产配置写入与 token rollback 统一为 `Replace-FileAtomically`（显式临时 backup、成功后清理），并修正 `${LASTEXITCODE}:` / `${ServiceName}:` 的 PS 5.1 解析歧义。`verify:windows-service-recovery`、真实 PS 5.1 ParseFile、`verify:agent-unauthorized` 行为回归与 `git diff --check` 均 PASS；未生成 BindCode、未改生产 Agent/云端/终端生命周期或打印任务。待 review 合入后，按单独授权安排正式脚本部署。
+
 2026-07-27 推进 **Gate 0k 扫描/U 盘整机准备（只读）**：Mac 静态 `verify:scan-watcher` / `verify:usb-import-agent` PASS（真机 CIM/chokidar 长驻仍须 Windows）。预发 `KSK-001` 现为 `lifecycleStatus=maintenance`（`lifecycleVersion=5`、`credentialGeneration=5`，心跳曾 online/`printerStatus=ready`）；`scan`/`usb_import` 能力行均为未配置（`managed` 模式仍允许 API）。公网 Kiosk bundle `index-CPD4lg4F.js` **未注入** `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（存在 `X-Local-Bridge-Token` 与「未配置」文案，无非空 token 字面量）→ U 盘导入现网会 fail-closed。扫描生产路径为 SMB/`scanWatchFolder` watcher（非 TWAIN）。**未**切 active、未改 Agent 配置、未宣称硬件闭环。
 
 2026-07-27 完成 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 合入**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`）：`Write-TextAtomically` / token rollback 使用 `[NullString]::Value`；`verify:windows-service-recovery` 锁定契约。CI 三项全绿后 squash 合并。不改云端、不部署 Agent。

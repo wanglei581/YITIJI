@@ -23,6 +23,7 @@
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
 0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；现场后续又进入 `maintenance`（当前 `lifecycleVersion=5`/`credentialGeneration=5`）——整机扫描前须确认是否再切 `active`
 0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
+0j3. [~] **PS 5.1 显式 backup-path 收口候选**（`codex/gate04-powershell51`）：配置写入与 token rollback 统一使用显式 backup 的 `Replace-FileAtomically`，并锁定两处冒号插值的 PS 5.1 解析；本机探针、ParseFile、服务恢复门禁与 Wave B unauthorized 回归均通过。待 review/合入；未部署到 Windows 终端。
 0k. [~] **扫描 / U 盘整机**：静态 verify 已绿；阻塞：① 终端现为 `maintenance`（建扫描会话需 `active`）② Agent 须配置 `scanWatchFolder` + SMB 投递 ③ 公网 Kiosk **无** bridge token → U 盘 fail-closed，需 Kiosk-only 热更注入与 Agent `localApiBridgeToken` 一致的 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（另授）
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
