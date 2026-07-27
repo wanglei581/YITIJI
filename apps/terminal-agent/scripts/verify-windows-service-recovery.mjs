@@ -21,9 +21,10 @@ assert.doesNotMatch(
 )
 assert.match(
   diagnosis,
-  /if \(\[string\]::IsNullOrWhiteSpace\(\$ConfigPath\)\) \{\s*\$ConfigPath = Join-Path \(Split-Path -Parent \$scriptRoot\) "config\\agent-config\.json"\s*\}/,
-  'diagnosis must resolve its default config path after script startup',
+  /if \(\[string\]::IsNullOrWhiteSpace\(\$ConfigPath\)\) \{\s*\$ConfigPath = Join-Path \$ProgramDataDir "agent-config\.json"\s*\}/,
+  'diagnosis must resolve its default config path under ProgramData after script startup',
 )
+assert.match(diagnosis, /legacy_pending_migration/, 'diagnosis must report a legacy config that awaits first-start migration')
 
 function sourceBetween(source, startPattern, endPattern) {
   const start = source.search(startPattern)

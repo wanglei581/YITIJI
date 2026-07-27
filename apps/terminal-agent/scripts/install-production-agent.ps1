@@ -568,8 +568,8 @@ function Exchange-BindCode([string]$ApiBase, [string]$Code) {
 
 $repoRoot = Resolve-RepoRoot
 $agentRoot = Join-Path $repoRoot "apps\terminal-agent"
-$configPath = Join-Path $agentRoot "config\agent-config.json"
 $programDataDir = Join-Path $env:ProgramData "AIJobPrintAgent"
+$configPath = Join-Path $programDataDir "agent-config.json"
 $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
