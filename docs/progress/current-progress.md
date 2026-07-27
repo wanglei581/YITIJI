@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-27 推进 **P1 Terminal Agent 配置根迁移候选**（分支 `codex/terminal-agent-config-programdata`，未合入/未部署）：新 Windows 运行时和生产安装脚本改为 `%ProgramData%\AIJobPrintAgent\agent-config.json`；首次启动仅在新路径缺失、旧安装根主配置合法且 ProgramData ACL 已复核为受保护状态时迁移，last-known-good 损坏不会阻断主配置迁移。旧 JSON 含 `adminSecret`，或含明文 token 但无既有 DPAPI token 时 fail-closed，要求重新使用一次性 BindCode，避免运行时复制管理员密钥或明文 token；只读诊断会标出 `legacy_pending_migration` 而不会迁移。未触及 API、数据库、Admin/Kiosk、打印任务或现场服务；待 Node 22 验证、代码审查和 Windows 无打印迁移验收。
+
 2026-07-27 完成 **P1 Windows Terminal Agent MSI 实施设计**：在干净 `origin/main` 的独立 `codex/terminal-agent-msi-design` worktree 中，确定 WiX MSI、`Program Files` 二进制与 `%ProgramData%` 状态分离、实际 SCM 服务名、签名与 staging 信任链、Repair/卸载/升级/回滚边界和 Windows VM/真机验收矩阵。审查发现当前主配置/last-known-good 仍可能在安装根 `config/`，与 ProgramData 保留目标冲突；因此“配置根可重定位 + 一次性迁移兼容”被设为 MSI 的第一实施前置，未通过前 WiX 构建和发布均 NO-GO。BindCode 明确不得作为 MSI 属性或命令行参数；安装与激活必须分离，升级前仍须 maintenance/drain 且活动任务为 0。本轮只改设计文档，未修改 Agent/API/Admin/数据库、未构建 MSI、未签名、未部署、未改现场配置或打印。受机队 F2 真机换机验收前置限制，MSI 只能做非生产构建准备，不能向在役终端发布。
 
 2026-07-27 推进 **Gate 0.4 PS 5.1 显式 backup-path 原子写入候选**（分支 `codex/gate04-powershell51`，未合入/未部署）：现场复现裸 `$null` 的 `File.Replace` 在 Windows PowerShell 5.1 失败；`[NullString]::Value` 与显式 backup path 均经无敏感临时文件探针验证可用。候选将生产配置写入与 token rollback 统一为 `Replace-FileAtomically`（显式临时 backup、成功后清理），并修正 `${LASTEXITCODE}:` / `${ServiceName}:` 的 PS 5.1 解析歧义。`verify:windows-service-recovery`、真实 PS 5.1 ParseFile、`verify:agent-unauthorized` 行为回归与 `git diff --check` 均 PASS；未生成 BindCode、未改生产 Agent/云端/终端生命周期或打印任务。待 review 合入后，按单独授权安排正式脚本部署。

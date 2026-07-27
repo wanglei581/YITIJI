@@ -7,6 +7,8 @@
 param(
   [string]$ConfigPath,
 
+  [string]$LegacyConfigPath,
+
   [string]$AgentRoot,
 
   [string]$ServiceName = "AIJobPrintAgent",
@@ -26,10 +28,13 @@ if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
   throw "Unable to resolve diagnose script directory; run with powershell -File <path-to-diagnose-production-agent.ps1>"
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
-  $ConfigPath = Join-Path (Split-Path -Parent $scriptRoot) "config\agent-config.json"
+  $ConfigPath = Join-Path $ProgramDataDir "agent-config.json"
 }
 if ([string]::IsNullOrWhiteSpace($AgentRoot)) {
   $AgentRoot = Split-Path -Parent $scriptRoot
+}
+if ([string]::IsNullOrWhiteSpace($LegacyConfigPath)) {
+  $LegacyConfigPath = Join-Path $AgentRoot "config\agent-config.json"
 }
 
 . (Join-Path $scriptRoot "service-identity.ps1")
@@ -40,6 +45,8 @@ $allowedDiagnosticCodes = @(
   "AGENT_CONFIG_INVALID_SHAPE",
   "AGENT_CONFIG_REQUIRED_FIELD_MISSING",
   "AGENT_CONFIG_INVALID_FIELD",
+  "AGENT_CONFIG_MIGRATION_REQUIRES_REBIND",
+  "AGENT_CONFIG_PROGRAM_DATA_ACL_UNSAFE",
   "AGENT_TOKEN_DECRYPT_FAILED",
   "AGENT_PROFILE_REJECTED",
   "AGENT_REGISTRATION_FAILED",
@@ -261,7 +268,15 @@ $serviceIdentityStatus = if (-not $serviceExists) {
   "unexpected"
 }
 
-$configFilePresenceStatus = Get-PathPresenceStatus $ConfigPath "Leaf"
+$configuredConfigPath = $ConfigPath
+$legacyConfigFilePresenceStatus = Get-PathPresenceStatus $LegacyConfigPath "Leaf"
+$configFilePresenceStatus = Get-PathPresenceStatus $configuredConfigPath "Leaf"
+$configSource = "program_data"
+if ($configFilePresenceStatus -ne "present" -and $legacyConfigFilePresenceStatus -eq "present") {
+  $ConfigPath = $LegacyConfigPath
+  $configFilePresenceStatus = $legacyConfigFilePresenceStatus
+  $configSource = "legacy_pending_migration"
+}
 $configExists = $configFilePresenceStatus -eq "present"
 $configHasUtf8Bom = $false
 $configValidJson = $false
@@ -333,7 +348,11 @@ if ($serviceExists) {
   serviceStartName = $serviceStartName
   serviceIdentityStatus = $serviceIdentityStatus
   configExists = $configExists
+  configPath = $ConfigPath
+  configuredProgramDataConfigPath = $configuredConfigPath
+  configSource = $configSource
   configFilePresenceStatus = $configFilePresenceStatus
+  legacyConfigFilePresenceStatus = $legacyConfigFilePresenceStatus
   configHasUtf8Bom = $configHasUtf8Bom
   configValidJson = $configValidJson
   apiBaseUrl = $configFieldStatus.apiBaseUrl

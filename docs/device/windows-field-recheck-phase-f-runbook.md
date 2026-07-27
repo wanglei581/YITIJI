@@ -64,7 +64,7 @@ Get-Printer | Select-Object Name, DriverName, PortName, PrinterStatus | Format-T
 
 | 安装方式 | 常见配置路径 |
 |----------|----------------|
-| 正式 Windows 服务安装 | `%ProgramData%\AIJobPrintAgent\config.json` |
+| 正式 Windows 服务安装 | `%ProgramData%\AIJobPrintAgent\agent-config.json` |
 | 从仓库目录跑服务（预发/开发一体机） | `apps/terminal-agent/config/agent-config.json`（相对仓库根） |
 
 确认：
