@@ -26,6 +26,15 @@
 
 视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`；商用密度与融合收口已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
 
+### 多主机部署：运行时终端身份
+
+- [~] **候选代码收口**：`codex/kiosk-runtime-terminal-identity` 已让共享 Kiosk 从本机 Agent 读取 `terminalId` / `terminalCode`；生产不再使用构建期 `VITE_TERMINAL_ID` 路由终端任务。候选尚未合入或部署。
+- [ ] **先部署新版 Agent**：全机队空队列并留存可回滚的 Agent runtime/config/token 后，依次在 `KSK-001`、`KSK-002` 安装/升级；确认升级保留 `scanWatchFolder` / `localApiBridgeToken` / `localApiAllowedOrigins`，服务为 Automatic/Running、local API 只监听 `127.0.0.1`，且实际 Kiosk Origin 存在于白名单。若 Kiosk 与 API 不同域，首次安装时使用 `-KioskOrigins`；后续升级会从 ACL 受保护配置合并保留。下线或误配 Origin 使用 `-ReplaceKioskOrigins` 按本次列表重建，禁止部署后手改配置。
+- [ ] **再部署共享 Kiosk**：确认所有在役 Agent 均支持 identity endpoint 后，使用同一份不设置 `VITE_TERMINAL_ID` 的 production build 并强制刷新终端缓存；保留上一版静态包回滚点。不得为每台主机分别构建或继续把 `KSK-001` 写入 bundle。
+- [ ] **双机隔离验收**：在两台 Windows 主机分别核对页面显示的 `terminalCode`、Agent 心跳、管理员设备在线状态；向 `KSK-001`、`KSK-002` 各下发一笔可识别任务，确认仅目标主机领取，且另一台不领取；每台至少完成一次真实打印出纸并保留任务 ID/Agent 日志。
+- [ ] **浏览器 loopback 验收**：在实际 Edge/Chrome Kiosk 模式确认 `https://zyidai.cn` 可访问 `http://127.0.0.1:9527/local/terminal-identity`，没有 mixed content / Private Network Access 阻断；未通过时禁止宣称多主机批量部署完成。
+- [ ] **QR/U 盘多主机凭证决策**：当前 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 仍是构建期静态值。若每机 token 唯一，需先实现运行期本地会话凭证，才能让同一共享 Kiosk 同时启用 QR/U 盘；禁止为省事改成全机长期共享 token。该项不阻塞运行时身份与远程打印隔离，但阻塞“共享构建覆盖全部本地桥接能力”的宣称。
+
 推荐顺序（2026-07-28 更新）：
 0i. [x] **Kiosk-only 热更链路**：#400 → USB bridge `index-DmcUs_Nb.js` → 备案 [PR #424](https://github.com/wanglei581/YITIJI/pull/424) 现网 **`index-DEJ0O4c6.js`**（仍含 bridge token；明文未入仓）
 0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；SMB 旁证时点为 `lifecycleVersion=10`/`credentialGeneration=8`（`next-tasks` 旧写 v5 已过时，现场前以 DB 只读为准）

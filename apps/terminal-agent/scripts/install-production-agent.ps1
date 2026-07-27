@@ -13,7 +13,20 @@
 #     -TerminalCode "KSK-001" `
 #     -TerminalId "t_ksk_001" `
 #     -BindCode "ABCD1234EFGH5678" `
-#     -PrinterName "Pantum CM2800ADN Series"
+#     -PrinterName "Pantum CM2800ADN Series" `
+#     -KioskOrigins "https://kiosk.example.com"
+#
+#   # Replace previously preserved cross-origin Kiosk entries. Passing the
+#   # switch with no -KioskOrigins removes all historical extra origins while
+#   # retaining the API origin and loopback development origins.
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
+#     -ApiBaseUrl "https://api.example.com/api/v1" `
+#     -TerminalCode "KSK-001" `
+#     -TerminalId "t_ksk_001" `
+#     -PrinterName "Pantum CM2800ADN Series" `
+#     -UseExistingToken `
+#     -ReplaceKioskOrigins `
+#     -KioskOrigins "https://new-kiosk.example.com"
 #
 #   # If the token was already stored in %ProgramData%\AIJobPrintAgent\agent.token:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
@@ -46,6 +59,12 @@ param(
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
   [string]$PrinterName,
+
+  [Parameter(Mandatory = $false)]
+  [string[]]$KioskOrigins = @(),
+
+  [Parameter(Mandatory = $false)]
+  [switch]$ReplaceKioskOrigins,
 
   [Parameter(Mandatory = $false)]
   [int]$ClaimIntervalMs = 1000,
@@ -213,6 +232,65 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
     Fail "ApiBaseUrl must include /api/v1, e.g. https://api.example.com/api/v1"
   }
   return $trimmed
+}
+
+function ConvertTo-CanonicalOrigin([string]$Value) {
+  $trimmed = $Value.Trim().TrimEnd("/")
+  try {
+    $uri = [System.Uri]$trimmed
+  } catch {
+    Fail "KioskOrigins contains an invalid URL: $Value"
+  }
+  if (-not $uri.IsAbsoluteUri -or @("http", "https") -notcontains $uri.Scheme) {
+    Fail "KioskOrigins must contain only absolute http:// or https:// origins"
+  }
+  $origin = $uri.GetLeftPart([System.UriPartial]::Authority)
+  if ($trimmed -ne $origin) {
+    Fail "KioskOrigins entries must not contain a path, query, or fragment: $Value"
+  }
+  return $origin
+}
+
+function Get-PreservedLocalSettings(
+  [string]$ConfigPath,
+  [string]$ProgramDataDir,
+  [bool]$SkipOrigins = $false
+) {
+  $preserved = [ordered]@{}
+  if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { return $preserved }
+
+  try {
+    Assert-ProgramDataAcl -Path $ProgramDataDir -IsContainer $true
+    Assert-ProgramDataAcl -Path $ConfigPath -IsContainer $false
+    $existing = Get-Content -Raw -LiteralPath $ConfigPath -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    Fail "Existing Agent config is not protected or valid JSON; refusing to overwrite local settings: $($_.Exception.Message)"
+  }
+
+  foreach ($field in @("scanWatchFolder", "localApiBridgeToken")) {
+    $property = $existing.PSObject.Properties[$field]
+    if ($null -eq $property) { continue }
+    if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+      Fail "Existing Agent config has an invalid $field; refusing to discard or rewrite it"
+    }
+    $preserved[$field] = [string]$property.Value
+  }
+  $originProperty = $existing.PSObject.Properties["localApiAllowedOrigins"]
+  if (-not $SkipOrigins -and $null -ne $originProperty) {
+    if ($originProperty.Value -is [string] -or $originProperty.Value -isnot [System.Collections.IEnumerable]) {
+      Fail "Existing Agent config has invalid localApiAllowedOrigins; refusing to discard or rewrite it"
+    }
+    $preservedOrigins = New-Object "System.Collections.Generic.List[string]"
+    foreach ($origin in @($originProperty.Value)) {
+      if ($origin -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$origin)) {
+        Fail "Existing Agent config has invalid localApiAllowedOrigins; refusing to discard or rewrite it"
+      }
+      $canonicalOrigin = ConvertTo-CanonicalOrigin ([string]$origin)
+      if (-not $preservedOrigins.Contains($canonicalOrigin)) { $preservedOrigins.Add($canonicalOrigin) }
+    }
+    $preserved["localApiAllowedOrigins"] = @($preservedOrigins)
+  }
+  return $preserved
 }
 
 function ConvertTo-SidValue([object]$IdentityReference) {
@@ -573,6 +651,21 @@ $configPath = Join-Path $programDataDir "agent-config.json"
 $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
+$apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
+$preservedLocalSettings = Get-PreservedLocalSettings `
+  -ConfigPath $configPath `
+  -ProgramDataDir $programDataDir `
+  -SkipOrigins ([bool]$ReplaceKioskOrigins)
+$localApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
+$preservedOrigins = if (-not $ReplaceKioskOrigins -and $preservedLocalSettings.Contains("localApiAllowedOrigins")) {
+  @($preservedLocalSettings["localApiAllowedOrigins"])
+} else {
+  @()
+}
+foreach ($origin in @($apiOrigin) + @($KioskOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) {
+  $canonicalOrigin = ConvertTo-CanonicalOrigin $origin
+  if (-not $localApiAllowedOrigins.Contains($canonicalOrigin)) { $localApiAllowedOrigins.Add($canonicalOrigin) }
+}
 
 Write-Step "Production Agent hardening"
 Write-Host "Repo root    : $repoRoot"
@@ -639,10 +732,10 @@ $config = [ordered]@{
   heartbeatIntervalMs    = $HeartbeatIntervalMs
   claimIntervalMs        = $ClaimIntervalMs
   localApiPort           = 9527
-  localApiAllowedOrigins = @(
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
-  )
+  localApiAllowedOrigins = @($localApiAllowedOrigins)
+}
+foreach ($field in @("scanWatchFolder", "localApiBridgeToken")) {
+  if ($preservedLocalSettings.Contains($field)) { $config[$field] = $preservedLocalSettings[$field] }
 }
 
 $configJson = Test-GeneratedConfig -Config $config

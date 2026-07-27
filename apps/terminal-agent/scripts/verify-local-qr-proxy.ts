@@ -109,6 +109,18 @@ async function postJson<T>(
   return { status: response.status, json: (await response.json()) as T }
 }
 
+async function getJson<T>(
+  url: string,
+  origin = ALLOWED_ORIGIN,
+): Promise<{ status: number; json: T; headers: Headers }> {
+  const response = await fetch(url, { method: 'GET', headers: { Origin: origin } })
+  return {
+    status: response.status,
+    json: (await response.json()) as T,
+    headers: response.headers,
+  }
+}
+
 async function preflight(url: string, origin = ALLOWED_ORIGIN): Promise<Response> {
   return fetch(url, {
     method: 'OPTIONS',
@@ -141,9 +153,29 @@ async function main(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 50))
   const address = handle.server.address()
   assert.ok(typeof address === 'object' && address, 'local QR server must expose an address')
+  assert.equal(address.address, '127.0.0.1', 'local API must bind only to IPv4 loopback')
   const localBase = `http://127.0.0.1:${address.port}`
 
   try {
+    const deniedIdentity = await getJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/terminal-identity`,
+      DENIED_ORIGIN,
+    )
+    assert.equal(deniedIdentity.status, 403, 'terminal identity must reject a non-allowlisted Origin')
+    assert.equal(deniedIdentity.json.error.code, 'LOCAL_QR_ORIGIN_FORBIDDEN')
+
+    const identity = await getJson<{
+      success: true
+      data: Record<string, unknown>
+    }>(`${localBase}/local/terminal-identity`)
+    assert.equal(identity.status, 200, 'allowlisted Kiosk may read its local terminal identity')
+    assert.equal(identity.headers.get('access-control-allow-origin'), ALLOWED_ORIGIN)
+    assert.deepEqual(Object.keys(identity.json.data).sort(), ['terminalCode', 'terminalId'])
+    assert.deepEqual(identity.json.data, {
+      terminalId: 'terminal-qr-1',
+      terminalCode: 'T-LOCAL-QR',
+    })
+
     const denied = await postJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
       { returnTo: '/me' },
@@ -251,9 +283,19 @@ async function verifyUnconfiguredTokenFailClosed(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 50))
   const address = handle.server.address()
   assert.ok(typeof address === 'object' && address, 'local QR server must expose an address')
+  assert.equal(address.address, '127.0.0.1', 'unconfigured-token local API must remain loopback-only')
   const localBase = `http://127.0.0.1:${address.port}`
 
   try {
+    const identity = await getJson<{ success: true; data: { terminalId: string; terminalCode: string } }>(
+      `${localBase}/local/terminal-identity`,
+    )
+    assert.equal(identity.status, 200, 'read-only identity does not depend on the optional bridge token')
+    assert.deepEqual(identity.json.data, {
+      terminalId: 'terminal-qr-2',
+      terminalCode: 'T-LOCAL-QR-NOTOKEN',
+    })
+
     const denied = await postJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/qr-login/create`,
       { returnTo: '/me' },

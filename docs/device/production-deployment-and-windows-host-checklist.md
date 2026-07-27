@@ -306,6 +306,9 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] Kiosk 页面可从生产域名打开。
 - [x] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。（2026-07-25 F6：1080×1920；未覆盖 Assigned Access）
 - [x] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。（2026-07-25 F3）
+- [ ] `GET /local/terminal-identity` 在允许 Origin 下只返回 `terminalId` / `terminalCode`，错误 Origin 返回 403；不得返回 Agent token、API URL、打印机名或本地路径。
+- [ ] 不设置 `VITE_TERMINAL_ID` 的同一份 production Kiosk 在 `KSK-001` / `KSK-002` 分别显示本机 `terminalCode`；Agent 未启动时显示“设备未绑定”且终端动作 fail-closed，不得伪装为“01号机”。
+- [ ] 浏览器早于 Agent 启动以及 Agent 服务重启后，Kiosk 无需人工刷新即可恢复本机身份；重新绑定为另一终端后不得继续使用旧 `terminalId`。
 - [ ] QR 登录本地桥接端口与 Kiosk 构建变量一致：Agent `localApiPort` / `localApiAllowedOrigins` 与 Kiosk `VITE_TERMINAL_AGENT_LOCAL_URL`、实际 Kiosk Origin 完全匹配。
 - [ ] 如 Kiosk 使用 HTTPS 页面，已实测浏览器不会因 mixed content / Private Network Access 阻断 `http://127.0.0.1:<localApiPort>`；若被阻断，扫码登录不得宣称可用，需改为受信本地桥接方案或现场允许的本地访问策略。
 - [ ] U 盘导入本地桥接令牌一致：Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 完全一致（安装时一起生成/下发，不走网络协商）；未配置时 `/local/usb/*` 全部路由 fail-closed 403，Kiosk `usb` tab 应保持禁用并显示"本机未配置"，不得强行放行。
@@ -313,6 +316,7 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] U 盘 `safeId` 一次性消费有效：同一 `safeId` 二次调用 `/local/usb/upload` 返回 410（`LOCAL_USB_FILE_EXPIRED`），刷新文件列表后旧 `safeId` 全部失效。
 - [ ] 真实插入 U 盘后 `detectRemovableDrive()` 能正确识别盘符与卷标（win32 CIM/PowerShell 路径，未在开发环境验证过，属本清单新增待验收项）。
 - [ ] 页面展示设备状态与 Agent 上报一致。
+- [ ] 分别向 `KSK-001` / `KSK-002` 下发带唯一标识的任务，仅目标 Agent 可领取；交叉观察窗口内另一台不得领取，结果保留两端任务 ID 与 Agent 日志。
 
 ### 5.6 真机打印验收
 
