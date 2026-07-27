@@ -144,9 +144,19 @@ function payStatus(payStatus: string, attempt: null | Record<string, unknown> = 
 test('print intake keeps three upload sources and a separate scan CTA @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
   registerShell(api)
-  api.respond('GET', '/api/v1/kiosk/device/status', {
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
     status: 200,
-    json: { data: { scanner: { status: 'ready', online: true, busy: false } } },
+    json: {
+      capabilities: [
+        {
+          capabilityKey: 'scan',
+          status: 'available',
+          note: null,
+          configured: true,
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    },
   })
 
   await page.goto('/print/upload?source=document')

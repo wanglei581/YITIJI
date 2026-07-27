@@ -14,7 +14,6 @@ export function registerW6Api(api: ApiRouter): void {
 
   get('/api/v1/terminals/KSK-001/capabilities', { capabilities: [] })
   get('/api/v1/terminals/KSK-001/smart-campus', { enabled: true, modules: { welcome: true, bigdata: false, luggage: true, panorama: true }, items: [] })
-  get('/api/v1/kiosk/device/status', { data: { scanner: { status: 'ready', online: true, busy: false } } })
   get('/api/v1/print/price-config', { billingEnabled: true, items: [{ serviceKey: 'print_bw_page', unitCents: 100, unit: 'page', description: '黑白打印' }] })
   get('/api/v1/kiosk/legal/terms_of_service', success({
     content: 'W6 用户服务协议验收文本。本终端不提供平台内投递，岗位与招聘会仅作为来源信息入口。',
