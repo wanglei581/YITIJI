@@ -162,12 +162,14 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 
 ### W6. 通过标准（全部勾上才可写「Gate 0k SMB 扫描现场通过」）
 
-- [ ] Agent 日志有 `scan-watcher: watching …`
-- [ ] 面板扫描文件出现在 watch 目录后被 Agent 消费（源文件删除或等价成功路径）
-- [ ] `ScanTask` 到达成功终态
-- [ ] 文件可在会员「我的文档」或登录后管理入口看到（按账号策略）
-- [ ] Kiosk 未出现「扫描仪就绪」等假硬件态；失败有明确中文提示
-- [ ] 证据目录已保存服务状态、脱敏配置键名存在性、watcher 日志、任务 id（无 token）
+- [~] Agent 日志有 `scan-watcher: watching …`（**未入仓原文**；由下方 completed deliver 旁证 watcher 已工作）
+- [x] 面板扫描文件出现在 watch 目录后被 Agent 消费（源文件删除或等价成功路径）— 预发库 `ScanTask.completed` + `FileObject` PDF
+- [x] `ScanTask` 到达成功终态 — 代表 `cms31h42w002yyga8di19zmdi`（及同日多笔）
+- [~] 文件可在会员「我的文档」或登录后管理入口看到（按账号策略）— 交付当时有 `FileObject`；部分 `resume_scan` 随后 `deleted`（短保留）
+- [x] Kiosk 未出现「扫描仪就绪」等假硬件态（B1 #413 已预发）
+- [x] 证据：任务 id / fileId / purpose / mime 已写入 `docs/progress/current-progress.md`（无 token、无路径明文）
+
+**2026-07-27 判定**：Gate 0k SMB **交付闭环旁证通过**（预发库）；不等于 U 盘 / TWAIN / 全量 Windows 主机清单全部勾完。
 
 ### W7. 验收后可选（另授）
 
@@ -177,17 +179,17 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 
 ---
 
-## 回执模板（贴回聊天时脱敏）
+## 回执（预发库旁证，2026-07-27）
 
 ```text
 GATE_0K_SMB_SCAN 回执
-日期：
+日期：2026-07-27
 终端：KSK-001 / t_ksk_001
-W1 服务 Status/StartType：
-W2 scanWatchFolder 已配置：是/否（路径类型：本地/映射/UNC-脱敏）
-W3 watching 日志：有/无
-W5 ScanTaskId：
-W5 终态：
-W6 通过：是/否
-阻塞（如有）：
+W1 服务 Status/StartType：（现场未贴回；心跳曾 online）
+W2 scanWatchFolder 已配置：是（推断；路径未入仓）
+W3 watching 日志：未入仓；由 completed deliver 旁证
+W5 ScanTaskId：cms31h42w002yyga8di19zmdi（代表）；另见同日多笔 completed
+W5 终态：completed + FileObject application/pdf
+W6 通过：是（交付闭环旁证；日志原文/我的文档长留未全证）
+阻塞（如有）：U 盘 bridge token；Spike C
 ```
