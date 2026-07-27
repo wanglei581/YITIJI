@@ -1,9 +1,20 @@
 # AI Job Print Terminal — Gate 0k local bridge token field configure
 #
-# Admin-only. Reads the bridge token from a local file (e.g. scp'd from
+# Admin-only. Reads the bridge token from a local file (USB / offline copy of
 # /root/ai-job-print-secrets/kiosk-local-bridge-token), writes
-# localApiBridgeToken + merges localApiAllowedOrigins into
-# %ProgramData%\AIJobPrintAgent\agent-config.json, never prints the token.
+# localApiBridgeToken + merges localApiAllowedOrigins into agent-config.json,
+# never prints the token.
+#
+# Config location (pick one):
+#   - Formal ProgramData install (default):
+#       %ProgramData%\AIJobPrintAgent\agent-config.json
+#   - Repo-directory / legacy install (KSK-001 field):
+#       -ConfigDir "...\apps\terminal-agent\config"
+#       (or -ProgramDataDir with the same config directory)
+#
+# Service identity: node-windows may register SCM Name as aijobprintagent.exe
+# while DisplayName is AIJobPrintAgent. Pass either via -ServiceName; resolution
+# uses service-identity.ps1 (Name or DisplayName).
 #
 # Does not contact the cloud API, rewrite agent.token, or claim/print tasks.
 
@@ -12,6 +23,10 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$TokenFile,
 
+  # Preferred: directory that contains agent-config.json
+  [string]$ConfigDir = "",
+
+  # Backward-compatible alias used by early field notes (may point at config dir)
   [string]$ProgramDataDir = (Join-Path $env:ProgramData "AIJobPrintAgent"),
 
   [string[]]$AllowedOrigins = @(
@@ -22,12 +37,24 @@ param(
 
   [switch]$RestartService,
 
+  # Prefer SCM Name when known (e.g. aijobprintagent.exe); DisplayName also works
   [string]$ServiceName = "AIJobPrintAgent",
 
   [switch]$WhatIfCheck
 )
 
 $ErrorActionPreference = "Stop"
+
+$scriptRoot = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptRoot) -and $MyInvocation.MyCommand.Path) {
+  $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+$serviceIdentityPath = Join-Path $scriptRoot "service-identity.ps1"
+if (-not (Test-Path -LiteralPath $serviceIdentityPath)) {
+  Write-Host "FAIL: missing service-identity.ps1 next to this script" -ForegroundColor Red
+  exit 1
+}
+. $serviceIdentityPath
 
 function Fail([string]$Message) {
   Write-Host "FAIL: $Message" -ForegroundColor Red
@@ -131,10 +158,27 @@ function Merge-AllowedOrigins([object]$Existing, [string[]]$Required) {
   return , @($set.ToArray())
 }
 
-$configPath = Join-Path $ProgramDataDir "agent-config.json"
+$resolvedConfigDir = if (-not [string]::IsNullOrWhiteSpace($ConfigDir)) { $ConfigDir.Trim() } else { $ProgramDataDir.Trim() }
+if ([string]::IsNullOrWhiteSpace($resolvedConfigDir)) {
+  Fail "ConfigDir / ProgramDataDir is required"
+}
+# Allow passing either the config directory or the agent-config.json file path.
+if ((Test-Path -LiteralPath $resolvedConfigDir) -and -not (Get-Item -LiteralPath $resolvedConfigDir).PSIsContainer) {
+  if ((Split-Path -Leaf $resolvedConfigDir) -ieq "agent-config.json") {
+    $configPath = $resolvedConfigDir
+    $resolvedConfigDir = Split-Path -Parent $configPath
+  } else {
+    Fail "ConfigDir must be a directory or an agent-config.json file path"
+  }
+} else {
+  $configPath = Join-Path $resolvedConfigDir "agent-config.json"
+}
+
 Write-Step "Gate 0k local bridge token configure"
+Write-Host "ConfigDir:  $resolvedConfigDir"
 Write-Host "ConfigPath: $configPath"
 Write-Host "TokenFile:  $TokenFile"
+Write-Host "ServiceId:  $ServiceName"
 Write-Host "Restart:    $RestartService"
 Write-Host "WhatIf:     $WhatIfCheck"
 
@@ -204,14 +248,20 @@ if (-not $verifyOriginOk) {
 Write-Ok "Post-write verification passed (presence + origin only)"
 
 if ($RestartService) {
-  Write-Step "Restarting service $ServiceName"
-  $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-  if (-not $svc) {
-    Fail "Service not found: $ServiceName"
+  Write-Step "Restarting service identity '$ServiceName'"
+  try {
+    $resolved = Resolve-AgentService -Identity $ServiceName
+  } catch {
+    Fail "Service identity resolution failed: $($_.Exception.Message)"
   }
-  Restart-Service -Name $ServiceName -Force
+  if (-not $resolved) {
+    Fail "Service not found for identity: $ServiceName (try SCM Name aijobprintagent.exe or DisplayName AIJobPrintAgent)"
+  }
+  $scmName = [string]$resolved.Name
+  Write-Host ("Resolved SCM Name={0} DisplayName={1}" -f $scmName, $resolved.DisplayName)
+  Restart-Service -Name $scmName -Force
   Start-Sleep -Seconds 3
-  $svc = Get-Service -Name $ServiceName
+  $svc = Get-Service -Name $scmName
   Write-Host ("Service Status={0} StartType={1}" -f $svc.Status, $svc.StartType)
   if ($svc.Status -ne "Running") {
     Fail "Service is not Running after restart"

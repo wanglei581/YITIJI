@@ -368,10 +368,14 @@ const bridgeConfigurePath = path.join(__dirname, 'configure-local-bridge-token.p
 const bridgeConfigure = fs.readFileSync(bridgeConfigurePath, 'utf8')
 assert.match(bridgeConfigure, /param\(/, 'Gate 0k bridge configure script must declare parameters')
 assert.match(bridgeConfigure, /\$TokenFile/, 'Gate 0k bridge configure must require TokenFile')
+assert.match(bridgeConfigure, /\$ConfigDir/, 'Gate 0k bridge configure must accept ConfigDir for repo-directory installs')
 assert.match(bridgeConfigure, /localApiBridgeToken/, 'Gate 0k bridge configure must write localApiBridgeToken')
 assert.match(bridgeConfigure, /https:\/\/zyidai\.cn/, 'Gate 0k bridge configure must allow the production Kiosk origin')
 assert.match(bridgeConfigure, /Write-TextAtomically/, 'Gate 0k bridge configure must persist config atomically')
 assert.match(bridgeConfigure, /WhatIfCheck/, 'Gate 0k bridge configure must support a no-write presence check')
+assert.match(bridgeConfigure, /Resolve-AgentService/, 'Gate 0k bridge configure must resolve SCM Name or DisplayName via service-identity helper')
+assert.match(bridgeConfigure, /service-identity\.ps1/, 'Gate 0k bridge configure must load service-identity.ps1')
+assert.match(bridgeConfigure, /aijobprintagent\.exe/, 'Gate 0k bridge configure docs must mention node-windows SCM Name aijobprintagent.exe')
 assert.doesNotMatch(
   bridgeConfigure,
   /Write-Host\s+\$token\b|Write-Output\s+\$token\b|Write-Host\s+\$existingToken\b/,
