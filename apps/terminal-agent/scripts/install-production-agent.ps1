@@ -146,7 +146,8 @@ function Write-TextAtomically([string]$Path, [string]$Text) {
     }
 
     if ([System.IO.File]::Exists($Path)) {
-      [System.IO.File]::Replace($tempPath, $Path, $null)
+      # PS 5.1 rejects bare $null for the backup-path parameter; NullString maps to a true null.
+      [System.IO.File]::Replace($tempPath, $Path, [NullString]::Value)
     } else {
       [System.IO.File]::Move($tempPath, $Path)
     }
@@ -292,7 +293,7 @@ function Commit-ProductionConfigAndToken(
       if ($shouldWriteToken) {
         if ($hadExistingToken -and $null -ne $tokenRollbackPath -and (Test-Path -LiteralPath $tokenRollbackPath -PathType Leaf)) {
           if ([System.IO.File]::Exists($TokenPath)) {
-            [System.IO.File]::Replace($tokenRollbackPath, $TokenPath, $null)
+            [System.IO.File]::Replace($tokenRollbackPath, $TokenPath, [NullString]::Value)
           } else {
             [System.IO.File]::Move($tokenRollbackPath, $TokenPath)
           }

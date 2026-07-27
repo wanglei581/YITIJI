@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-07-27 回填 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 兼容**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405)）：`Write-TextAtomically` / token rollback 将 `File.Replace(..., $null)` 改为 `[NullString]::Value`；`verify:windows-service-recovery` 锁定该契约并禁止裸 `$null`；临时文件名继续要求 `${fileName}` / `${PID}` 花括号定界。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。不改云端、不部署 Agent。
+
+2026-07-27 完成 **Gate 0.4 11c 现场吊销演练闭环（KSK-001）**：紧急吊销 → `suspended` → `maintenance` → BindCode 换发 → 本地 DPAPI Token/生产配置提交 → 服务 Running/`AGENT_READY`/ACL `ok`/心跳 `online`+`printerStatus=ready` → 云端 `maintenance→active`（`lifecycleVersion` 2→3，`credentialGeneration=3`，在途打印/扫描均为 0）。中间踩坑：① PS 5.1 不接受 `File.Replace(..., $null)` 导致本地原子提交失败（BindCode 已消费）；② 过期码 `BIND_CODE_EXPIRED`；现场已用兼容脚本恢复，本条之上游回填见上。Token/BindCode 明文未入仓。本项不等于扫描/U 盘硬件闭环或收费支付验收。
+
 2026-07-27 推进 **Gate 0.4 11c ACL 现场修复**：一体机诊断服务 Running/Auto、`AGENT_READY`、加密 token 存在，但 `programDataAclStatus=tokenFileAclStatus=too_permissive`（Gate 0.4 前安装常见：继承未关）。新增只加固 ACL 的 `harden-programdata-acl.ps1`（不换 Token、不重启服务、不触网）；诊断脚本补 `programDataAclReason`/`tokenFileAclReason` 与 `$PSScriptRoot` 空值回退。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。**未**执行紧急吊销。
 
 2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
