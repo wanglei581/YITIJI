@@ -110,9 +110,9 @@ assert(
 )
 assert(
   installer.includes('function Set-ProgramDataAcl') &&
-    installer.includes('Set-ProgramDataAcl -Path $programDataDir') &&
+    installer.includes('Set-ProgramDataTreeAcl -Root $programDataDir') &&
     installer.includes('Set-ProgramDataAcl -Path $TokenPath'),
-  'installer hardens ProgramData / token ACL for SYSTEM + Administrators',
+  'installer hardens the ProgramData tree and token ACL for SYSTEM + Administrators',
 )
 
 assert(credentialBackfill.includes('TERMINAL_CREDENTIAL_BACKFILL_CONFIRM'), 'legacy credential backfill requires an explicit confirmation value')
