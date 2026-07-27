@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy to agent-config.json. Optional scanWatchFolder = Pantum SMB drop path; empty skips watcher. Key is scanWatchFolder (not smbScanDir).",
+  "_comment": "Copy to %ProgramData%/AIJobPrintAgent/agent-config.json. Optional scanWatchFolder = Pantum SMB drop path; empty skips watcher. Key is scanWatchFolder (not smbScanDir).",
   "apiBaseUrl": "http://localhost:3000/api/v1",
   "terminalCode": "T-001",
   "adminSecret": "change-me-before-deploy",
