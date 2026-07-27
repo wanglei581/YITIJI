@@ -337,7 +337,7 @@
 
 - [x] **Windows Agent MSI / 可修复安装包设计**（2026-07-27）：WiX MSI、签名信任链、二进制/状态目录分离、BindCode 激活隔离、Repair/卸载/升级/回滚边界与验收矩阵已定稿，见 `docs/device/windows-agent-msi-design.md`。未实施、未构建、未签名、未部署。
 - [ ] **Windows Agent MSI / 可修复安装包实施**：先完成配置根可重定位与一次性迁移兼容，再建立 staging 与 WiX 非生产构建；前置为机队 F2 安全换机真机验收通过。范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收；不得与可靠性 P0 或现网发布合并验收。
-- [ ] **配置根可重定位与迁移兼容**：候选分支 `codex/terminal-agent-config-programdata` 已将 Windows 主配置目标改为 `%ProgramData%\AIJobPrintAgent`，并增加旧安装根的一次性去敏迁移；迁移前必须复核 ProgramData ACL，含明文 token 但无既有 DPAPI token 的旧配置必须重新 BindCode。待 Node 22 验证、审查和 Windows 无打印迁移验收后方可合入。未完成前 MSI 构建 / 发布继续 NO-GO。
+- [x] **配置根可重定位与迁移兼容（代码收口）**：[PR #411](https://github.com/wanglei581/YITIJI/pull/411) 已合入 `main@511b9d35`；Windows 主配置目标为 `%ProgramData%\AIJobPrintAgent\agent-config.json`，并保留旧安装根的一次性去敏迁移。迁移前必须复核 ProgramData ACL，含明文 token 但无既有 DPAPI token 的旧配置必须重新 BindCode。GitHub Node 22 CI 已通过；**Windows 无打印迁移验收仍未执行**，未通过前 MSI staging / 发布继续 NO-GO。
 
 ## P1：Windows 终端机队管理与安全换机
 

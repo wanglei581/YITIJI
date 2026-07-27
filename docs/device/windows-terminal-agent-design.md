@@ -849,7 +849,7 @@ Agent 内部捕获 `uncaughtException` / `unhandledRejection`，写日志后 `pr
 
 ### 8.5 本地配置文件
 
-路径：`%ProgramData%\AIJobPrintAgent\config.json`（仅 Agent 服务账号/管理员可读写）
+路径：`%ProgramData%\AIJobPrintAgent\agent-config.json`（仅 Agent 服务账号/管理员可读写）
 
 ```json
 {
