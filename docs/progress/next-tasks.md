@@ -60,7 +60,7 @@
    - **11a Wave A**：✅ 移除长期 `-AgentToken` CLI + ProgramData ACL（SYSTEM/Administrators）+ 静态 verify/文档（[PR #384](https://github.com/wanglei581/YITIJI/pull/384) → `main@645e19e0`）
    - **11b Wave B**：✅ Agent 401 本地 unauthorized latch + `AGENT_UNAUTHORIZED` 诊断（`verify:agent-unauthorized`）；不新增云端 heartbeat unauthorized 态
    - **11c**：✅ 现场 ACL + 吊销停领 + BindCode 恢复 + `maintenance→active`（2026-07-27）
-   - **11c-fix**：[~] [PR #405](https://github.com/wanglei581/YITIJI/pull/405) PS 5.1 `File.Replace` → `[NullString]::Value`
+   - **11c-fix**：✅ [PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`
 
 
 ---
