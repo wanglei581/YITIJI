@@ -122,20 +122,23 @@ Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「lo
 ## 通过标准
 
 - [x] Kiosk 热更自含 #413 的 `main`，且注入 bridge token（`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`；bundle `index-DmcUs_Nb.js`）
-- [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`（`configure-local-bridge-token.ps1`）
-- [ ] U 盘 tab 可用；枚举 + 上传一笔成功
-- [ ] 进度文档已记旁证；**无** token 明文入仓
+- [x] Agent `localApiBridgeToken` 已写；`localApiAllowedOrigins` 含 `https://zyidai.cn`；服务 Running + `127.0.0.1:9527`；同 Origin `/local/usb/status` 200（2026-07-27 脱敏回执）
+- [ ] U 盘 tab 在**一体机 Edge/Chrome** 下枚举 + 上传一笔成功（当时 `UsbPresent=false`；内置浏览器拦截 loopback 不作数）
+- [x] 进度文档已记旁证；**无** token 明文入仓
 
-## 回执模板（脱敏）
+## 回执（脱敏，2026-07-27）
 
 ```text
 GATE_0K_USB_BRIDGE 回执
-日期：
-Kiosk bundle：
-usb_bridge_token=injected：是/否
-Agent localApiBridgeToken 已写：是/否
-allowedOrigins 含 zyidai.cn：是/否
-U 盘枚举：通过/失败
-U 盘上传 fileId：（可打码）
-阻塞：
+日期：2026-07-27
+Kiosk bundle：index-DmcUs_Nb.js
+usb_bridge_token=injected：是
+Agent localApiBridgeToken 已写：是
+allowedOrigins 含 zyidai.cn：是
+服务/端口：AIJobPrintAgent Running；127.0.0.1:9527
+/local/usb/status：同 Origin 200；CORS/PNA 预检通过
+U 盘枚举：未做（UsbPresent=false，未插介质）
+U 盘上传：未做
+阻塞：仍需一体机 Edge/Chrome + 真实介质（含测试 PDF/图片）做枚举与上传；内置浏览器 loopback 拦截不作数
+安全：令牌临时文件与配置备份已删；SCP 主机私钥 ACL 已收紧
 ```
