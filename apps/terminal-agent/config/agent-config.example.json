@@ -1,9 +1,10 @@
 {
-  "_comment": "Copy this file to agent-config.json and fill in real values before starting the agent.",
+  "_comment": "Copy to agent-config.json. Optional scanWatchFolder = Pantum SMB drop path; empty skips watcher. Key is scanWatchFolder (not smbScanDir).",
   "apiBaseUrl": "http://localhost:3000/api/v1",
   "terminalCode": "T-001",
   "adminSecret": "change-me-before-deploy",
   "printerName": "",
+  "scanWatchFolder": "",
   "agentVersion": "0.2.0",
   "heartbeatIntervalMs": 30000,
   "claimIntervalMs": 5000,
