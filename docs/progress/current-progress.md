@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-27 推进 **Gate 0.4 11c ACL 现场修复**：一体机诊断服务 Running/Auto、`AGENT_READY`、加密 token 存在，但 `programDataAclStatus=tokenFileAclStatus=too_permissive`（Gate 0.4 前安装常见：继承未关）。新增只加固 ACL 的 `harden-programdata-acl.ps1`（不换 Token、不重启服务、不触网）；诊断脚本补 `programDataAclReason`/`tokenFileAclReason` 与 `$PSScriptRoot` 空值回退。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。**未**执行紧急吊销。
+
 2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
 
 2026-07-27 完成 **预发过期 ScanTask 落盘清理（用户授权「同意继续」）**：只处理点名任务 `cms1knaqr000is3a8by8p1mas`（`t_ksk_001`，原 `waiting` 且 `expiresAt` 已过），事务内 `FOR UPDATE` 后更新为 `expired`；清理后 `active_scan=0`、`active_print=0`。未改其它任务/终端/凭证，未触碰打印链路。为 Gate 0.4 11c / 扫描整机空队列前置。

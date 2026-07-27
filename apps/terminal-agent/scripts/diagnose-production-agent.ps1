@@ -5,7 +5,7 @@
 
 [CmdletBinding()]
 param(
-  [string]$ConfigPath = (Join-Path (Split-Path -Parent $PSScriptRoot) "config\agent-config.json"),
+  [string]$ConfigPath,
 
   [string]$ServiceName = "AIJobPrintAgent",
 
@@ -14,7 +14,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "service-identity.ps1")
+# When invoked via some hosts/pipelines, $PSScriptRoot can be empty; resolve from
+# MyInvocation so defaults and shared helpers still load under -File.
+$scriptRoot = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+  $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
+  throw "Unable to resolve diagnose script directory; run with powershell -File <path-to-diagnose-production-agent.ps1>"
+}
+if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+  $ConfigPath = Join-Path (Split-Path -Parent $scriptRoot) "config\agent-config.json"
+}
+
+. (Join-Path $scriptRoot "service-identity.ps1")
 
 $allowedDiagnosticCodes = @(
   "AGENT_CONFIG_NOT_FOUND",
@@ -74,19 +87,19 @@ function Get-StartupDiagnosticCode([string]$Path) {
   }
 }
 
-function Get-ProgramDataAclStatus([string]$Path) {
+function Get-ProgramDataAclReport([string]$Path) {
   if ([string]::IsNullOrWhiteSpace($Path)) {
-    return "unavailable"
+    return [pscustomobject]@{ status = "unavailable"; reason = "unavailable" }
   }
 
   if (-not (Test-Path -LiteralPath $Path)) {
-    return "missing"
+    return [pscustomobject]@{ status = "missing"; reason = "missing" }
   }
 
   try {
     $acl = Get-Acl -LiteralPath $Path
     if (-not $acl.AreAccessRulesProtected) {
-      return "too_permissive"
+      return [pscustomobject]@{ status = "too_permissive"; reason = "inheritance_enabled" }
     }
 
     $required = @("S-1-5-18", "S-1-5-32-544")
@@ -106,31 +119,31 @@ function Get-ProgramDataAclStatus([string]$Path) {
         if ($rule.IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
           $sid = [string]$rule.IdentityReference.Value
         } else {
-          return "unexpected"
+          return [pscustomobject]@{ status = "unexpected"; reason = "unexpected_principal" }
         }
       }
 
       [void]$allowSids.Add($sid)
       if ($forbidden -contains $sid) {
-        return "too_permissive"
+        return [pscustomobject]@{ status = "too_permissive"; reason = "forbidden_principal" }
       }
     }
 
     foreach ($sid in $required) {
       if (-not $allowSids.Contains($sid)) {
-        return "unexpected"
+        return [pscustomobject]@{ status = "unexpected"; reason = "missing_required" }
       }
     }
 
     foreach ($sid in $allowSids) {
       if ($required -notcontains $sid) {
-        return "unexpected"
+        return [pscustomobject]@{ status = "unexpected"; reason = "unexpected_principal" }
       }
     }
 
-    return "ok"
+    return [pscustomobject]@{ status = "ok"; reason = "ok" }
   } catch {
-    return "unavailable"
+    return [pscustomobject]@{ status = "unavailable"; reason = "unavailable" }
   }
 }
 
@@ -189,8 +202,12 @@ if ($configExists) {
 $tokenPath = Join-Path $ProgramDataDir "agent.token"
 $encryptedTokenFile = Test-Path -LiteralPath $tokenPath -PathType Leaf
 $lastStartupDiagnosticCode = Get-StartupDiagnosticCode (Join-Path $ProgramDataDir "last-startup-diagnostic.json")
-$programDataAclStatus = Get-ProgramDataAclStatus $ProgramDataDir
-$tokenFileAclStatus = if ($encryptedTokenFile) { Get-ProgramDataAclStatus $tokenPath } else { "missing" }
+$programDataAclReport = Get-ProgramDataAclReport $ProgramDataDir
+$tokenFileAclReport = if ($encryptedTokenFile) { Get-ProgramDataAclReport $tokenPath } else { [pscustomobject]@{ status = "missing"; reason = "missing" } }
+$programDataAclStatus = [string]$programDataAclReport.status
+$programDataAclReason = [string]$programDataAclReport.reason
+$tokenFileAclStatus = [string]$tokenFileAclReport.status
+$tokenFileAclReason = [string]$tokenFileAclReport.reason
 $scmFailurePolicy = $null
 
 if ($serviceExists) {
@@ -224,6 +241,8 @@ if ($serviceExists) {
   encryptedTokenFile = $encryptedTokenFile
   lastStartupDiagnosticCode = $lastStartupDiagnosticCode
   programDataAclStatus = $programDataAclStatus
+  programDataAclReason = $programDataAclReason
   tokenFileAclStatus = $tokenFileAclStatus
+  tokenFileAclReason = $tokenFileAclReason
   scmFailurePolicy = $scmFailurePolicy
 }

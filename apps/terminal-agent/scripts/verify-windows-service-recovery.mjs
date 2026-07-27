@@ -211,7 +211,7 @@ assert.match(diagnosis, /\$allowedDiagnosticCodes\s*=\s*@\(/, 'diagnosis must de
 for (const code of allowedDiagnosticCodes) {
   assertIncludes(diagnosis, code, `diagnosis whitelist must include ${code}`)
 }
-const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\nfunction Get-ProgramDataAclStatus\(/)
+const startupDiagnosticReader = sourceBetween(diagnosis, /function Get-StartupDiagnosticCode\(/, /\nfunction Get-ProgramDataAclReport\(/)
 assert.match(startupDiagnosticReader, /\$diagnostic\.schemaVersion\s+-ne\s+1/, 'diagnosis must validate diagnostic schemaVersion')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-isnot\s+\[string\]/, 'diagnosis must validate diagnostic state type')
 assert.match(startupDiagnosticReader, /\$diagnostic\.state\s+-notin\s+@\("ready",\s*"failed"\)/, 'diagnosis must validate diagnostic state')
@@ -219,8 +219,8 @@ assert.match(startupDiagnosticReader, /\$diagnostic\.code\s+-isnot\s+\[string\]/
 assert.match(startupDiagnosticReader, /IsNullOrWhiteSpace\(\[string\]\$diagnostic\.code\)/, 'diagnosis must reject empty diagnostic codes')
 assert.match(startupDiagnosticReader, /\$allowedDiagnosticCodes\s+-notcontains\s+\$diagnostic\.code/, 'diagnosis must reject codes outside the whitelist')
 
-assert.match(diagnosis, /function Get-ProgramDataAclStatus\(/, 'diagnosis must expose a closed ProgramData ACL inspector')
-const aclInspector = sourceBetween(diagnosis, /function Get-ProgramDataAclStatus\(/, /\n\$service\s*=/)
+assert.match(diagnosis, /function Get-ProgramDataAclReport\(/, 'diagnosis must expose a closed ProgramData ACL inspector')
+const aclInspector = sourceBetween(diagnosis, /function Get-ProgramDataAclReport\(/, /\n\$service\s*=/)
 assert.match(aclInspector, /Get-Acl\s+-LiteralPath/, 'ACL inspector must use Get-Acl')
 assert.match(aclInspector, /AreAccessRulesProtected/, 'ACL inspector must require inheritance disabled')
 assert.match(aclInspector, /S-1-5-18/, 'ACL inspector must require SYSTEM')
@@ -228,10 +228,15 @@ assert.match(aclInspector, /S-1-5-32-544/, 'ACL inspector must require Administr
 assert.match(aclInspector, /S-1-1-0/, 'ACL inspector must detect Everyone')
 assert.match(aclInspector, /S-1-5-11/, 'ACL inspector must detect Authenticated Users')
 assert.match(aclInspector, /S-1-5-32-545/, 'ACL inspector must detect BUILTIN\\Users')
+assert.match(aclInspector, /inheritance_enabled/, 'ACL inspector must classify inheritance as a closed reason')
+assert.match(aclInspector, /forbidden_principal/, 'ACL inspector must classify forbidden principals as a closed reason')
 for (const status of ['missing', 'ok', 'too_permissive', 'unexpected', 'unavailable']) {
   assertIncludes(aclInspector, `"${status}"`, `ACL inspector vocabulary must include ${status}`)
 }
 assert.doesNotMatch(aclInspector, /Set-Acl|SetAccessRuleProtection|AddAccessRule/, 'ACL inspector must remain read-only')
+assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must capture PSScriptRoot into scriptRoot')
+assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')
+assert.match(diagnosis, /Join-Path\s+\$scriptRoot\s+"service-identity\.ps1"/, 'diagnosis must load helpers from resolved scriptRoot')
 
 const configStatusStart = diagnosis.lastIndexOf('$configFieldStatus = [pscustomobject]@{')
 assert.notEqual(configStatusStart, -1, 'diagnosis must calculate field status through a PSCustomObject')
@@ -258,7 +263,9 @@ for (const field of ['apiBaseUrl', 'terminalCode', 'terminalId', 'printerName', 
 assert.match(diagnosisOutput, /^\s*encryptedTokenFile\s*=\s*\$encryptedTokenFile\s*$/m, 'diagnosis output must map encryptedTokenFile from its safe path check')
 assert.match(diagnosisOutput, /^\s*lastStartupDiagnosticCode\s*=\s*\$lastStartupDiagnosticCode\s*$/m, 'diagnosis output must map the closed startup diagnostic code')
 assert.match(diagnosisOutput, /^\s*programDataAclStatus\s*=\s*\$programDataAclStatus\s*$/m, 'diagnosis output must map ProgramData ACL status')
+assert.match(diagnosisOutput, /^\s*programDataAclReason\s*=\s*\$programDataAclReason\s*$/m, 'diagnosis output must map ProgramData ACL reason')
 assert.match(diagnosisOutput, /^\s*tokenFileAclStatus\s*=\s*\$tokenFileAclStatus\s*$/m, 'diagnosis output must map token file ACL status')
+assert.match(diagnosisOutput, /^\s*tokenFileAclReason\s*=\s*\$tokenFileAclReason\s*$/m, 'diagnosis output must map token file ACL reason')
 assert.match(diagnosisOutput, /^\s*serviceName\s*=\s*\$resolvedServiceName\s*$/m, 'diagnosis must report the resolved SCM service Name')
 assert.match(diagnosisOutput, /^\s*serviceDisplayName\s*=\s*\$resolvedServiceDisplayName\s*$/m, 'diagnosis must report the resolved service DisplayName')
 assert.match(diagnosisOutput, /^\s*serviceAmbiguous\s*=\s*\$serviceAmbiguous\s*$/m, 'diagnosis must report whether service resolution was ambiguous')
@@ -281,5 +288,18 @@ assert.doesNotMatch(
   /Invoke-RestMethod|Invoke-WebRequest|Test-Connection|\bcurl(?:\.exe)?\b|Start-BitsTransfer|WebClient|HttpClient|System\.Net\.WebRequest|Start-Process|\/print|POST/i,
   'diagnosis must not make network, process, or print calls',
 )
+
+const hardenPath = path.join(__dirname, 'harden-programdata-acl.ps1')
+assert.ok(fs.existsSync(hardenPath), 'Gate 0.4 field repair must ship harden-programdata-acl.ps1')
+const harden = fs.readFileSync(hardenPath, 'utf8')
+assert.match(harden, /function Set-ProgramDataAcl\(/, 'harden script must expose Set-ProgramDataAcl')
+assert.match(harden, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'harden script must disable inheritance without copying inherited ACEs')
+assert.match(harden, /S-1-5-18/, 'harden script must grant SYSTEM')
+assert.match(harden, /S-1-5-32-544/, 'harden script must grant Administrators')
+assert.match(harden, /Set-Acl\s+-LiteralPath/, 'harden script must apply ACL via Set-Acl')
+assert.match(harden, /function Get-ProgramDataAclReport\(/, 'harden script must re-check ACL after hardening')
+assert.match(harden, /hardened\s*=/, 'harden script must report hardened boolean')
+assert.doesNotMatch(harden, /Invoke-RestMethod|Invoke-WebRequest|Exchange-BindCode|agentToken|BindCode/i, 'harden script must not touch network or credentials')
+assert.doesNotMatch(harden, /Restart-Service|Stop-Service|Start-Service/, 'harden script must not restart the Agent service')
 
 console.log('ALL PASS: terminal-agent Windows service recovery')

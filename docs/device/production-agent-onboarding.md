@@ -67,6 +67,24 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 禁止：未授权吊销生产终端；把静态 `verify:agent-unauthorized` 写成现场完成；把 `agent_degraded` 与 `AGENT_UNAUTHORIZED` 混记。
 
+**恢复顺序（吊销后必须按此）**：紧急吊销会把终端打成 `suspended`；绑定码**只能**在 `planned` / `maintenance` 签发。故恢复为：`suspended → maintenance` → 签发 BindCode → Windows `-BindCode` 换发 → `maintenance → active`。
+
+**ACL 未通过（`too_permissive`）时先加固，再吊销**：常见原因是 Gate 0.4 之前安装仍开启继承。管理员 PowerShell：
+
+```powershell
+cd <本机仓库根目录>
+git fetch origin
+# 取本修复分支或合入后的 main：
+git checkout origin/codex/gate04-harden-programdata-acl -- `
+  apps/terminal-agent/scripts/harden-programdata-acl.ps1 `
+  apps/terminal-agent/scripts/diagnose-production-agent.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\harden-programdata-acl.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1 |
+  Select-Object serviceState, programDataAclStatus, programDataAclReason, tokenFileAclStatus, tokenFileAclReason, lastStartupDiagnosticCode
+```
+
+通过标准：`programDataAclStatus=ok`、`tokenFileAclStatus=ok`（reason 均为 `ok`）。`inheritance_enabled` 表示仍继承父目录 ACE。诊断脚本请始终用 `powershell -File`（避免 `$PSScriptRoot` 为空）。
+
 ## 可靠性 P0：安装、诊断与恢复
 
 本轮可靠性 P0 已在本地代码与静态门禁层完成以下收口：配置文件开头的 UTF-8 BOM 会被兼容；启动时会分类报告无效配置或 token；这两类异常均不得领取打印任务或触发打印。配置与 token 写入采用原子替换；last-known-good 只保留为人工恢复候选，**不会**自动回退覆盖当前配置。启动诊断保持非阻塞，且本地诊断脚本只读。
