@@ -169,11 +169,11 @@ scan-watcher: scanWatchFolder 未配置，跳过扫描监听
 - [x] Kiosk 未出现「扫描仪就绪」等假硬件态（B1 #413 已预发）
 - [x] 证据：任务 id / fileId / purpose / mime 已写入 `docs/progress/current-progress.md`（无 token、无路径明文）
 
-**2026-07-27 判定**：Gate 0k SMB **交付闭环旁证通过**（预发库）；不等于 U 盘 / TWAIN / 全量 Windows 主机清单全部勾完。
+**2026-07-27 判定**：Gate 0k SMB **交付闭环旁证成立**（预发库）；不等于 U 盘导入、TWAIN 或全量 Windows 主机清单全部勾完。
 
 ### W7. 验收后可选（另授）
 
-- Admin 将 `TerminalCapability.scan` 设为 `available` 并写备注「Gate 0k SMB 现场通过 + 日期」——仅在 W6 全过之后。
+- Admin 将 `TerminalCapability.scan` 设为 `available` 并写备注「Gate 0k SMB 现场交付旁证 + 日期」——仅在 W6 旁证成立之后。
 - U 盘：另授注入 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 与 Agent `localApiBridgeToken` 一致后的 Kiosk-only 热更。
 - Spike C（TWAIN）：另开，不在本包。
 
@@ -190,6 +190,6 @@ W2 scanWatchFolder 已配置：是（推断；路径未入仓）
 W3 watching 日志：未入仓；由 completed deliver 旁证
 W5 ScanTaskId：cms31h42w002yyga8di19zmdi（代表）；另见同日多笔 completed
 W5 终态：completed + FileObject application/pdf
-W6 通过：是（交付闭环旁证；日志原文/我的文档长留未全证）
+W6 旁证：成立（交付闭环；日志原文/我的文档长留未全证）
 阻塞（如有）：U 盘 bridge token；Spike C
 ```
