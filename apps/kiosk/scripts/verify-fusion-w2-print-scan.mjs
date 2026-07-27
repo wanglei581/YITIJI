@@ -349,7 +349,10 @@ assert.doesNotMatch(
   /fetchScannerStatus|\/kiosk\/device\/status|setInterval\s*\(/,
   'scan start must not pretend an unavailable scanner-status source exists',
 )
+assert.match(scanStart, /loadConfiguredCapabilities/, 'scan start gates on terminal scan capability')
 assert.match(scanStart, /下一步会创建真实扫描会话/, 'scan start explains when the real session is created')
+assert.match(scanStart, /可创建扫描任务/, 'scan start uses task-creation copy instead of hardware ready')
+assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not claim scanner hardware ready')
 assert.match(
   scanStart,
   /navigate\(["']\/scan\/settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
@@ -396,8 +399,11 @@ const scanResult = read('src/pages/scan/ScanResultPage.tsx')
 for (const target of ['/print/confirm', '/me/documents', '/resume/parse']) {
   assert.match(scanResult, new RegExp(target.replaceAll('/', '\\\/')), `scan result retains ${target} action`)
 }
+assert.match(scanResult, /loginPathForCurrentLocation/, 'scan result guides guests to login before documents')
+assert.match(scanResult, /登录后管理文件|前往我的文档/, 'scan result uses honest documents destination copy')
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
+assert.doesNotMatch(scanResult, /保存到我的文档/, 'scan result must not imply a completed save action')
 
 const scanFusionCss = read('src/pages/scan/styles/scan-fusion.css')
 assert.match(

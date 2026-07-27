@@ -91,7 +91,7 @@ const CAPABILITIES: Capability[] = [
     iconColor: 'text-primary-700',
     goColor: 'text-primary-700',
     title: '材料扫描',
-    description: '纸质材料扫描成 PDF / 图片，可存档、打印或做简历识别',
+    description: '纸质材料扫描成 PDF，可打印、做简历识别；登录后可在「我的文档」管理',
     to: '/scan/start',
     available: true,
   },
@@ -316,7 +316,7 @@ export function PrintScanHomePage() {
               '彩色 / 黑白激光打印 · A4 幅面',
               '自动双面打印，省纸更环保',
               '输稿器连续扫描，一次最多 50 页',
-              '扫描支持 PDF / JPG / PNG 格式',
+              '材料扫描固定输出 PDF（面板扫描到本机接收目录）',
             ].map((item) => (
               <span key={item} className="flex items-center gap-2.5">
                 <CheckIcon className="h-[18px] w-[18px] shrink-0 text-primary-700" aria-hidden="true" />

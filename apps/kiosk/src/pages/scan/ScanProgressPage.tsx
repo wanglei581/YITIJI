@@ -167,7 +167,7 @@ export function ScanProgressPage() {
   return (
     <KioskPageFrame className="w2-scan-page">
       <div data-w2-page="scan-progress" className="w2-scan-shell">
-        <KioskPageHeader title="等待扫描完成" description="请在打印机上完成操作，本页每 3 秒自动检测结果" aside={<span className="w2-scan-status-chip is-busy"><span />任务进行中</span>} />
+        <KioskPageHeader title="等待扫描完成" description="请在打印机面板完成扫描到本机接收目录；本页每 3 秒自动检测结果" aside={<span className="w2-scan-status-chip is-busy"><span />等待面板回传</span>} />
 
       <ScanFlowSteps activeIndex={2} />
 

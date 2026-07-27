@@ -88,7 +88,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     tiles: [
       { title: '文档打印', description: '上传文档后本机打印', icon: 'printer', to: '/print/upload?source=document', emphasis: 'primary' },
       { title: '证件复印', description: '待设备能力开放', icon: 'files', disabled: Boolean(true) },
-      { title: '纸质扫描', description: '扫描纸质文件后保存', icon: 'scan', to: '/scan/start', emphasis: 'primary' },
+      { title: '纸质扫描', description: '面板扫描生成 PDF，本机自动接收', icon: 'scan', to: '/scan/start', emphasis: 'primary' },
       // 2026-07-12：「云打印」磁贴按正式取舍决策删除（能力归位文档打印+手机扫码上传；
       // 远程提交·到店取件记入商用二期候选），见 docs/reviews/2026-07-12-cloud-print-decision.md
       { title: '格式转换', description: '常用文件格式转换', icon: 'swap', to: '/print-scan/convert' },
