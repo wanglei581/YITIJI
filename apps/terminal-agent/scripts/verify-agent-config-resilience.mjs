@@ -16,7 +16,9 @@ const agentRoot = resolve(__dirname, '..')
 
 const {
   AgentStartupError,
+  migrateLegacyConfigIfNeeded,
   parseConfigText,
+  resolveAgentConfigPaths,
   serializePersistedConfig,
   writeValidatedConfigAt,
 } = require(join(agentRoot, 'src/agent/config-manager.ts'))
@@ -77,6 +79,22 @@ assert.notEqual(primaryWriteIndex, -1, 'must write the primary config through th
 assert.ok(primaryParseIndex < backupWriteIndex, 'must parse primary config before writing its backup')
 assert.ok(backupWriteIndex < primaryWriteIndex, 'must write the backup before replacing the primary config')
 
+assert.match(
+  configManagerSource,
+  /configFile:\s*path\.join\(dataDir, 'config\.json'\)/,
+  'the primary configuration must live in the ProgramData state root',
+)
+assert.match(
+  configManagerSource,
+  /lastKnownGoodFile:\s*path\.join\(dataDir, 'config\.last-known-good\.json'\)/,
+  'the last-known-good configuration must live in the ProgramData state root',
+)
+assert.match(
+  configManagerSource,
+  /if \(fs\.existsSync\(paths\.configFile\) \|\| !fs\.existsSync\(paths\.legacyConfigFile\)\) return false/,
+  'an existing ProgramData configuration must prevent legacy fallback',
+)
+
 const failStartupMatch = indexSource.match(/function failStartup\([\s\S]*?\n}\n/s)
 assert.ok(failStartupMatch, 'agent entrypoint must define failStartup')
 const failStartupSource = failStartupMatch[0]
@@ -116,6 +134,9 @@ try {
   const configPath = join(tempDir, 'agent-config.json')
   const backupPath = join(tempDir, 'agent-config.backup.json')
   const diagnosticPath = join(tempDir, 'last-startup-diagnostic.json')
+  const programDataDir = join(tempDir, 'ProgramData', 'AIJobPrintAgent')
+  const legacyConfigDir = join(tempDir, 'legacy-config')
+  const migrationPaths = resolveAgentConfigPaths({ dataDir: programDataDir, legacyConfigDir })
 
   assert.equal(
     parseConfigText(`\uFEFF${JSON.stringify(valid)}`).terminalCode,
@@ -205,6 +226,49 @@ try {
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
   )
   assert.equal(readFileSync(configPath, 'utf8'), primaryBeforeInvalidWrite, 'must not alter primary config after validation fails')
+
+  assert.equal(migrateLegacyConfigIfNeeded(migrationPaths), false, 'missing legacy configuration must not create ProgramData state')
+  assert.equal(fs.existsSync(migrationPaths.configFile), false, 'missing legacy configuration must leave ProgramData config absent')
+
+  fs.mkdirSync(legacyConfigDir, { recursive: true })
+  writeFileSync(migrationPaths.legacyConfigFile, `\uFEFF${JSON.stringify(valid)}`, 'utf8')
+  writeFileSync(
+    migrationPaths.legacyLastKnownGoodFile,
+    `\uFEFF${JSON.stringify({ ...valid, terminalCode: 'KSK-LEGACY-BACKUP' })}`,
+    'utf8',
+  )
+  assert.equal(migrateLegacyConfigIfNeeded(migrationPaths), true, 'a valid legacy configuration must migrate once')
+  assert.equal(
+    JSON.parse(readFileSync(migrationPaths.configFile, 'utf8')).terminalCode,
+    'KSK-001',
+    'migration must preserve a valid UTF-8 BOM legacy primary configuration',
+  )
+  assert.equal(
+    JSON.parse(readFileSync(migrationPaths.lastKnownGoodFile, 'utf8')).terminalCode,
+    'KSK-LEGACY-BACKUP',
+    'migration must preserve a valid UTF-8 BOM legacy last-known-good configuration',
+  )
+
+  writeFileSync(migrationPaths.legacyConfigFile, '{', 'utf8')
+  writeFileSync(migrationPaths.configFile, serializePersistedConfig({ ...valid, terminalCode: 'KSK-PROGRAMDATA' }), 'utf8')
+  assert.equal(migrateLegacyConfigIfNeeded(migrationPaths), false, 'ProgramData configuration must take priority over legacy config')
+  assert.equal(
+    JSON.parse(readFileSync(migrationPaths.configFile, 'utf8')).terminalCode,
+    'KSK-PROGRAMDATA',
+    'legacy config must never overwrite an existing ProgramData configuration',
+  )
+
+  const invalidMigrationPaths = resolveAgentConfigPaths({
+    dataDir: join(tempDir, 'invalid-program-data'),
+    legacyConfigDir: join(tempDir, 'invalid-legacy-config'),
+  })
+  fs.mkdirSync(dirname(invalidMigrationPaths.legacyConfigFile), { recursive: true })
+  writeFileSync(invalidMigrationPaths.legacyConfigFile, '{', 'utf8')
+  assertStartupError(
+    () => migrateLegacyConfigIfNeeded(invalidMigrationPaths),
+    'AGENT_CONFIG_INVALID_JSON',
+  )
+  assert.equal(fs.existsSync(invalidMigrationPaths.configFile), false, 'invalid legacy config must not create ProgramData state')
 
   assert.equal(basename(diagnosticPath), 'last-startup-diagnostic.json')
   let diagnosticFailureObserved = false

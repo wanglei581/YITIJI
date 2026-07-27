@@ -2,7 +2,7 @@
  * agent/types.ts — Phase 8.1C
  *
  * Types for the Agent runtime:
- *   - AgentConfig   : persisted to config/agent-config.json
+ *   - AgentConfig   : persisted to %ProgramData%/AIJobPrintAgent/config.json
  *   - HeartbeatPayload / HeartbeatResponse : PUT /terminals/:id/heartbeat
  *   - ClaimTask     : response item from POST /terminals/:id/tasks/claim
  *   - PatchStatusPayload : PATCH /print-tasks/:taskId/status
@@ -53,7 +53,7 @@ export type ScanInputCandidateClassification =
 // ── Config ──────────────────────────────────────────────────────────────────
 
 /**
- * Persisted agent configuration (config/agent-config.json).
+ * Persisted agent configuration (%ProgramData%/AIJobPrintAgent/config.json).
  * Fields with ? are optional or written on first registration.
  *
  * Security note (Phase 8.1C):

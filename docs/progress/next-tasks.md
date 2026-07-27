@@ -1,5 +1,11 @@
 # 下一步任务
 
+## P0：Terminal Agent 配置根迁移候选收口（2026-07-27）
+
+- [ ] 审查并合入 `codex/terminal-agent-runtime-packaging`：确认 `%ProgramData%\AIJobPrintAgent\config.json` 为唯一运行时配置根，安装根仅保留一次性兼容迁移源。
+- [ ] 合入后在隔离 Windows VM 执行迁移回归：旧配置（含 UTF-8 BOM）、last-known-good、ProgramData 既有配置优先、缺失/损坏旧配置、DPAPI token/SQLite/诊断状态保留和服务启动诊断；不得创建或领取打印任务。
+- [ ] 仅在单独生产授权下安排 `t_ksk_001` 现场部署与 F1–F6 复验；当前授权不包含部署、服务重启、BindCode、lifecycle 或出纸。
+
 > 最后更新：2026-07-27
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”

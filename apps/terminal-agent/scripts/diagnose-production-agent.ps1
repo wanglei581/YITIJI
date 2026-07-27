@@ -26,7 +26,7 @@ if ([string]::IsNullOrWhiteSpace($scriptRoot)) {
   throw "Unable to resolve diagnose script directory; run with powershell -File <path-to-diagnose-production-agent.ps1>"
 }
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
-  $ConfigPath = Join-Path (Split-Path -Parent $scriptRoot) "config\agent-config.json"
+  $ConfigPath = Join-Path $ProgramDataDir "config.json"
 }
 if ([string]::IsNullOrWhiteSpace($AgentRoot)) {
   $AgentRoot = Split-Path -Parent $scriptRoot

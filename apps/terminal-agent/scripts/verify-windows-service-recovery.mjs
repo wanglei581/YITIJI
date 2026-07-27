@@ -21,8 +21,8 @@ assert.doesNotMatch(
 )
 assert.match(
   diagnosis,
-  /if \(\[string\]::IsNullOrWhiteSpace\(\$ConfigPath\)\) \{\s*\$ConfigPath = Join-Path \(Split-Path -Parent \$scriptRoot\) "config\\agent-config\.json"\s*\}/,
-  'diagnosis must resolve its default config path after script startup',
+  /if \(\[string\]::IsNullOrWhiteSpace\(\$ConfigPath\)\) \{\s*\$ConfigPath = Join-Path \$ProgramDataDir "config\.json"\s*\}/,
+  'diagnosis must resolve its default config path from ProgramData after script startup',
 )
 
 function sourceBetween(source, startPattern, endPattern) {
@@ -87,6 +87,7 @@ const resolvedServiceName = installer.indexOf('$serviceName = [string]$service.N
 const serviceStart = installer.indexOf('Start-Service -Name $serviceName')
 const serviceRestart = installer.indexOf('Restart-Service -Name $serviceName -Force')
 assert.notEqual(configValidationCall, -1, 'installer must validate the generated config')
+assert.match(installer, /\$configPath\s*=\s*Join-Path \$programDataDir "config\.json"/, 'installer must write configuration into ProgramData')
 for (const [label, index] of [
   ['ProgramData ACL hardening', programDataAclStep],
   ['token preparation', tokenPreparation],

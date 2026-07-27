@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy this file to agent-config.json and fill in real values before starting the agent.",
+  "_comment": "Copy this file to %ProgramData%/AIJobPrintAgent/config.json and fill in real values before starting the agent.",
   "apiBaseUrl": "http://localhost:3000/api/v1",
   "terminalCode": "T-001",
   "adminSecret": "change-me-before-deploy",

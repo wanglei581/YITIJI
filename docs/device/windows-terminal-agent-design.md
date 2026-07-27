@@ -236,10 +236,12 @@ apps/terminal-agent/
     local-api-server/    # 127.0.0.1:9527；localAuthToken + actionToken 验证
     named-pipe/          # Named Pipe 服务端（Service）+ 客户端（Helper）封装
     logger/              # 结构化 JSON 日志、敏感字段脱敏
-  config/
-    agent-config.json    # 终端配置（API 地址、打印机名、轮询间隔、Named Pipe 名称）
-  data/
-    agent.db             # SQLite（任务幂等、nonce 去重、待上报状态）
+  # 可执行程序目录不保存可变终端状态
+
+%ProgramData%/AIJobPrintAgent/
+  config.json            # 终端配置（API 地址、打印机名、轮询间隔、Named Pipe 名称）
+  config.last-known-good.json
+  agent.db               # SQLite（任务幂等、nonce 去重、待上报状态）
 ```
 
 ### 模块职责说明
@@ -1064,7 +1066,7 @@ Mutex 随进程终止（正常退出或崩溃）自动由 Windows 释放，后�
 | **主方案不变** | Phase 8.1 主方案始终是 `LocalAgentDispatchProvider` + Windows Terminal Agent 本地打印，不要在 Phase 8.1 切换为奔图云打印 |
 | **appSecret 隔离** | `PantumCloudDispatchProvider` 的 appKey/appSecret 只保存在后端，Kiosk / Agent / 前端不得持有 |
 | **color mode TODO** | `PantumCloudDispatchProvider` 中 `color` → Pantum API mode 取值**待厂家确认**，未确认前禁止假设为 `"color"` |
-| **打印机名可配置** | Agent 打印机名称通过 `config/agent-config.json` 中 `printerName` 字段传入；默认值 `"Pantum CM2800ADN Series"`；严禁硬编码到执行器内部 |
+| **打印机名可配置** | Agent 打印机名称通过 `%ProgramData%\AIJobPrintAgent\config.json` 中 `printerName` 字段传入；默认值 `"Pantum CM2800ADN Series"`；严禁硬编码到执行器内部 |
 | **能力待验证字段** | collate / paperType / feeder 为可选预留字段，CM2800ADN/CM2820ADN 实际支持情况需 Phase 8.2 真机验证后确认 |
 
 ### 12.3 Pantum 开放打印 API 状态码

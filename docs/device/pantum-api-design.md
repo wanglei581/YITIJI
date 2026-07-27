@@ -34,7 +34,7 @@
 | Windows 驱动识别名称 | `Pantum CM2800ADN Series`（真机确认） |
 | 硬件能力 | 黑白打印 ✅ / 彩色打印 ✅ / 自动双面 ✅ / A4 ✅ / ADF 50页 ✅ |
 | 网络 | 有线网络（无 WiFi，无云端打印能力） |
-| 配置项（Agent） | `printerName`（`config/agent-config.json`），禁止硬编码 |
+| 配置项（Agent） | `printerName`（`%ProgramData%\AIJobPrintAgent\config.json`），禁止硬编码 |
 
 ---
 

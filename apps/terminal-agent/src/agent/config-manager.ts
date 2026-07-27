@@ -7,15 +7,45 @@
  */
 
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { log } from '../logger'
 import { clearUnauthorized } from './auth-state'
 import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
 
-const CONFIG_FILE = path.resolve(__dirname, '../../config/agent-config.json')
-const LAST_KNOWN_GOOD_FILE = path.resolve(__dirname, '../../config/agent-config.last-known-good.json')
 const PERSISTED_SECRET_KEYS = new Set(['_comment', 'agentToken', 'adminSecret', 'bindCode'])
+
+export interface AgentConfigPaths {
+  configFile: string
+  lastKnownGoodFile: string
+  legacyConfigFile: string
+  legacyLastKnownGoodFile: string
+}
+
+function getProgramDataDir(): string {
+  return process.env['PROGRAMDATA']
+    ? path.join(process.env['PROGRAMDATA'], 'AIJobPrintAgent')
+    : path.join(os.tmpdir(), 'AIJobPrintAgent')
+}
+
+/**
+ * Keep mutable configuration with the other machine-local Agent state.
+ * The installation root remains a one-time migration source only.
+ */
+export function resolveAgentConfigPaths(options?: {
+  dataDir?: string
+  legacyConfigDir?: string
+}): AgentConfigPaths {
+  const dataDir = options?.dataDir ?? getProgramDataDir()
+  const legacyConfigDir = options?.legacyConfigDir ?? path.resolve(__dirname, '../../config')
+  return {
+    configFile: path.join(dataDir, 'config.json'),
+    lastKnownGoodFile: path.join(dataDir, 'config.last-known-good.json'),
+    legacyConfigFile: path.join(legacyConfigDir, 'agent-config.json'),
+    legacyLastKnownGoodFile: path.join(legacyConfigDir, 'agent-config.last-known-good.json'),
+  }
+}
 
 export type AgentStartupErrorCode =
   | 'AGENT_CONFIG_NOT_FOUND'
@@ -179,18 +209,45 @@ export function writeValidatedConfigAt(
 }
 
 /**
+ * Import a validated, credential-free configuration from a pre-relocation
+ * installation only when ProgramData has no primary configuration. This is
+ * intentionally one-way: no write ever targets the legacy installation root.
+ */
+export function migrateLegacyConfigIfNeeded(paths: AgentConfigPaths = resolveAgentConfigPaths()): boolean {
+  if (fs.existsSync(paths.configFile) || !fs.existsSync(paths.legacyConfigFile)) return false
+
+  const legacyConfig = parseConfigText(fs.readFileSync(paths.legacyConfigFile, 'utf8'))
+  writeTextAtomically(paths.configFile, serializePersistedConfig(legacyConfig))
+
+  if (fs.existsSync(paths.legacyLastKnownGoodFile)) {
+    try {
+      const legacyLastKnownGood = parseConfigText(fs.readFileSync(paths.legacyLastKnownGoodFile, 'utf8'))
+      writeTextAtomically(paths.lastKnownGoodFile, serializePersistedConfig(legacyLastKnownGood))
+    } catch (error) {
+      const code = isAgentStartupError(error) ? error.code : 'unknown error'
+      log(`config: legacy last-known-good was not migrated (${code})`)
+    }
+  }
+
+  log('config: migrated legacy configuration to ProgramData')
+  return true
+}
+
+/**
  * Load configuration, optionally migrating the legacy plaintext token only
  * after the primary configuration has passed validation.
  */
 export function loadConfig(): AgentConfig {
-  if (!fs.existsSync(CONFIG_FILE)) {
+  const paths = resolveAgentConfigPaths()
+  migrateLegacyConfigIfNeeded(paths)
+  if (!fs.existsSync(paths.configFile)) {
     throw new AgentStartupError(
       'AGENT_CONFIG_NOT_FOUND',
       'Agent configuration was not found. Repair the terminal configuration before starting the Agent.',
     )
   }
 
-  const parsed = parseConfigText(fs.readFileSync(CONFIG_FILE, 'utf8'))
+  const parsed = parseConfigText(fs.readFileSync(paths.configFile, 'utf8'))
 
   if (parsed.agentToken) {
     log('config: legacy plaintext agentToken detected — migrating to DPAPI encrypted storage')
@@ -214,7 +271,8 @@ export function loadConfig(): AgentConfig {
 
 /** Persist a credential-free, validated configuration and keep a manual recovery candidate. */
 export function saveConfig(config: AgentConfig): void {
-  writeValidatedConfigAt(CONFIG_FILE, LAST_KNOWN_GOOD_FILE, config)
+  const paths = resolveAgentConfigPaths()
+  writeValidatedConfigAt(paths.configFile, paths.lastKnownGoodFile, config)
 }
 
 /**
