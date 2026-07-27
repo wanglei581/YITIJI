@@ -137,7 +137,7 @@ F6 Kiosk 全屏抽查：通过|问题简述
 | F5 | ✅ | WLAN 断 75s；恢复后无需重启 Agent；Kiosk 显示「打印机在线」 |
 | F6 | ✅（有限） | 1080×1920 竖屏主路径无 JS/系统弹窗阻断；**未**覆盖 Windows Assigned Access 专用会话 |
 
-补充：当前服务从**仓库目录**运行，配置实际为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\config.json`）。正式换机交付仍须按 ProgramData/DPAPI 安装口径验收。
+补充：当前服务从**仓库目录**运行，配置实际为 `apps/terminal-agent/config/agent-config.json`（非 `%ProgramData%\AIJobPrintAgent\agent-config.json`）。正式换机交付仍须按 ProgramData/DPAPI 安装口径验收。
 
 **结论：Phase F 通过**（F1–F6；F6 为有限全屏抽查）。旁证含 `ptask_kiosk_2a75352b81631efb`；2026-07-26 再确认 `ptask_kiosk_f9587c2439e1855a`。  
 未执行：G5 退款冒烟、close-unpaid Phase B、收费切换、生产配置修改。  

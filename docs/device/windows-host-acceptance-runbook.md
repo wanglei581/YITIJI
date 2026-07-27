@@ -48,7 +48,7 @@ Get-PrintJob -PrinterName "Pantum CM2800ADN Series"   # 改成上一步记录的
 
 Agent 打包为单文件可执行（目标机不要求预装 Node.js，设计文档 §8.1）。
 
-**配置文件路径**：`%ProgramData%\AIJobPrintAgent\config.json`
+**配置文件路径**：`%ProgramData%\AIJobPrintAgent\agent-config.json`
 （仅 Agent 服务账号 / 管理员可读写）
 
 ```json
