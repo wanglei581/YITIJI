@@ -1,0 +1,18 @@
+<service>
+  <id>aijobprintagent.exe</id>
+  <name>AIJobPrintAgent</name>
+  <description>AI Job Print Terminal Agent</description>
+  <executable>%BASE%\..\node\node.exe</executable>
+  <arguments>%BASE%\..\app\dist\index.js agent</arguments>
+  <workingdirectory>%BASE%\..\app</workingdirectory>
+  <stoptimeout>15 sec</stoptimeout>
+  <onfailure action="restart" delay="60 sec" />
+  <onfailure action="restart" delay="300 sec" />
+  <onfailure action="none" />
+  <resetfailure>1 day</resetfailure>
+  <logpath>%ProgramData%\AIJobPrintAgent\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>5</keepFiles>
+  </log>
+</service>
