@@ -1,6 +1,12 @@
 # 当前开发进度
 
-2026-07-27 推进 **Gate 0.4 11c Windows 一体机只读验收（部分通过）**：目标主机 `DESKTOP-DDD6FCO` 上 `AIJobPrintAgent`（SCM Name=`aijobprintagent.exe`）以 `LocalSystem`、`Running`、`Auto` 运行，奔图 `Pantum CM2800ADN Series` 通过 `USB001` 可见且状态正常；使用服务实际配置路径复核 `configValidJson=true`、五项必填配置均存在、`encryptedTokenFile=true`、`lastStartupDiagnosticCode=AGENT_READY`、`programDataAclStatus=ok`、`tokenFileAclStatus=ok`，受限普通上下文读取 `agent.token` 被拒绝。严格诊断同时报告 `runtimeRootAclStatus=too_permissive`：当前服务仍从仓库 runtime 运行，不能作为商用安全安装通过。现场还发现 SCM 恢复策略为旧的 `10s/60s/300s` 三次重启，与当前 `60s/300s/停止` 合同不一致。`diagnose-production-agent.ps1` 的 Windows PowerShell 5.1 `powershell -File` 默认路径兼容已在本分支修复并真实复测通过；Agent 401 本地闸门亦补齐持久 marker、出纸前二次检查、离线回传保留和扫描文件保留。**仍开**：迁移到受保护发布 runtime、修复服务策略、紧急吊销、BindCode 恢复及受控出纸均属后续写操作，尚未执行。本轮未修改服务、凭证、队列或打印机状态。
+2026-07-27 推进 **Gate 0k 扫描/U 盘整机准备（只读）**：Mac 静态 `verify:scan-watcher` / `verify:usb-import-agent` PASS（真机 CIM/chokidar 长驻仍须 Windows）。预发 `KSK-001` 现为 `lifecycleStatus=maintenance`（`lifecycleVersion=5`、`credentialGeneration=5`，心跳曾 online/`printerStatus=ready`）；`scan`/`usb_import` 能力行均为未配置（`managed` 模式仍允许 API）。公网 Kiosk bundle `index-CPD4lg4F.js` **未注入** `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（存在 `X-Local-Bridge-Token` 与「未配置」文案，无非空 token 字面量）→ U 盘导入现网会 fail-closed。扫描生产路径为 SMB/`scanWatchFolder` watcher（非 TWAIN）。**未**切 active、未改 Agent 配置、未宣称硬件闭环。
+
+2026-07-27 完成 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 合入**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`）：`Write-TextAtomically` / token rollback 使用 `[NullString]::Value`；`verify:windows-service-recovery` 锁定契约。CI 三项全绿后 squash 合并。不改云端、不部署 Agent。
+
+2026-07-27 完成 **Gate 0.4 11c 现场吊销演练闭环（KSK-001）**：紧急吊销 → `suspended` → `maintenance` → BindCode 换发 → 本地 DPAPI Token/生产配置提交 → 服务 Running/`AGENT_READY`/ACL `ok`/心跳 `online`+`printerStatus=ready` → 云端 `maintenance→active`（`lifecycleVersion` 2→3，`credentialGeneration=3`，在途打印/扫描均为 0）。中间踩坑：① PS 5.1 不接受 `File.Replace(..., $null)` 导致本地原子提交失败（BindCode 已消费）；② 过期码 `BIND_CODE_EXPIRED`；现场已用兼容脚本恢复，本条之上游回填见上。Token/BindCode 明文未入仓。本项不等于扫描/U 盘硬件闭环或收费支付验收。
+
+2026-07-27 推进 **Gate 0.4 11c ACL 现场修复**：一体机诊断服务 Running/Auto、`AGENT_READY`、加密 token 存在，但 `programDataAclStatus=tokenFileAclStatus=too_permissive`（Gate 0.4 前安装常见：继承未关）。新增只加固 ACL 的 `harden-programdata-acl.ps1`（不换 Token、不重启服务、不触网）；诊断脚本补 `programDataAclReason`/`tokenFileAclReason` 与 `$PSScriptRoot` 空值回退。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。**未**执行紧急吊销。
 
 2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
 

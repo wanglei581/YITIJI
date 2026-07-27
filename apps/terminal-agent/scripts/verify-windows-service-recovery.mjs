@@ -133,11 +133,25 @@ assert.match(atomicConfigWriter, /\.GetBytes\(/, 'config atomic writer must enco
 assert.match(atomicConfigWriter, /\.Write\(/, 'config atomic writer must write encoded bytes')
 assert.match(atomicConfigWriter, /\.Flush\(\$true\)/, 'config atomic writer must flush file content to disk')
 assert.match(atomicConfigWriter, /File\]::Replace/, 'config atomic writer must replace an existing config atomically')
+assert.match(
+  atomicConfigWriter,
+  /File\]::Replace\(\$tempPath,\s*\$Path,\s*\[NullString\]::Value\)/,
+  'config atomic writer must pass [NullString]::Value for PS 5.1 File.Replace backup path',
+)
 assert.match(atomicConfigWriter, /File\]::Move/, 'config atomic writer must move a new config into place atomically')
 assert.match(atomicConfigWriter, /finally/, 'config atomic writer must clean up temporary files')
 assert.match(atomicConfigWriter, /Remove-Item\s+-LiteralPath\s+\$tempPath\s+-Force/, 'config atomic writer must remove its temporary file in finally cleanup')
+assertIncludes(
+  atomicConfigWriter,
+  '.${fileName}.${PID}.',
+  'config atomic temp name must brace-delimit $fileName and $PID before trailing dots',
+)
 assert.doesNotMatch(installer, /\[System\.IO\.File\]::WriteAllText\(\$configPath/, 'config writes must not use WriteAllText directly')
-
+assert.doesNotMatch(
+  installer,
+  /File\]::Replace\([^)\n]*,\s*\$null\s*\)/,
+  'installer must not pass bare $null to File.Replace (PowerShell 5.1 rejects it)',
+)
 const programDataAcl = sourceBetween(installer, /function Set-ProgramDataAcl\(/, /\nfunction /)
 assert.match(programDataAcl, /SetAccessRuleProtection\(\$true,\s*\$false\)/, 'ProgramData ACL must disable inheritance without copying inherited ACEs')
 assert.match(programDataAcl, /SetOwner\(\$administratorsSid\)/, 'ProgramData ACL must set a trusted owner')
@@ -185,11 +199,19 @@ assert.ok(
   productionCommit.indexOf('Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath') < productionCommit.indexOf('Write-TextAtomically -Path $ConfigPath -Text $ConfigText'),
   'local commit must write token before config',
 )
-assert.match(productionCommit, /File\]::Replace\(\$tokenRollbackPath,\s*\$TokenPath,\s*\$null\)/, 'local commit must restore an existing token from rollback')
+assert.match(
+  productionCommit,
+  /File\]::Replace\(\$tokenRollbackPath,\s*\$TokenPath,\s*\[NullString\]::Value\)/,
+  'local commit must restore an existing token via PS 5.1-safe File.Replace',
+)
 assert.match(productionCommit, /File\]::Move\(\$tokenRollbackPath,\s*\$TokenPath\)/, 'local commit must restore when the token destination is absent')
 assert.match(productionCommit, /Remove-Item\s+-LiteralPath\s+\$tokenRollbackPath\s+-Force/, 'local commit must clean up its rollback temporary file')
+assertIncludes(
+  productionCommit,
+  '.agent.token.rollback.${PID}.',
+  'token rollback temp name must brace-delimit $PID before the trailing dot',
+)
 assert.match(productionCommit, /Could not commit production config and terminal token locally/, 'local commit failures must use a fixed non-secret recovery message')
-
 const invokeSc = sourceBetween(installer, /function Invoke-Sc\(/, /\nfunction /)
 assertIncludes(invokeSc, '& sc.exe @Arguments 2>&1', 'Invoke-Sc must execute sc.exe through its argument array')
 assert.match(invokeSc, /\$LASTEXITCODE/, 'Invoke-Sc must check sc.exe exit status')
