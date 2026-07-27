@@ -24,9 +24,10 @@
 0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；现场后续又进入 `maintenance`（当前 `lifecycleVersion=5`/`credentialGeneration=5`）——整机扫描前须确认是否再切 `active`
 0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
 0j3. [~] **PS 5.1 显式 backup-path 收口候选**（`codex/gate04-powershell51`）：配置写入与 token rollback 统一使用显式 backup 的 `Replace-FileAtomically`，并锁定两处冒号插值的 PS 5.1 解析；本机探针、ParseFile、服务恢复门禁与 Wave B unauthorized 回归均通过。待 review/合入；未部署到 Windows 终端。
-0k. [~] **扫描 / U 盘整机**：SMB 面板扫描预发库旁证成立（见 0k2）；U 盘仍缺公网 bridge token（另授）；Spike C（TWAIN）另开
-0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413) → `main@942c695a`；预发 Kiosk + `scan-tasks` instructions overlay 已切
-0k2. [x] **Gate 0k SMB 现场交付旁证**：预发 `ScanTask` 多笔 `completed`+PDF `FileObject`（代表 `cms31h42w002yyga8di19zmdi`）；现场包见 `docs/device/gate-0k-smb-scan-field-acceptance.md`。Agent 原文 watching 日志未入仓；未宣称 USB/TWAIN 整机验收
+0k. [~] **扫描 / U 盘整机**：SMB 旁证成立；Kiosk 已注入 bridge token（`index-DmcUs_Nb.js`）并恢复 B1；**待 Windows** 写 `localApiBridgeToken` + `allowedOrigins` 含 `https://zyidai.cn` 后插盘冒烟；Spike C 另开
+0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413)；曾被覆盖，已随 USB bridge 热更自 `main@20a462e3` 恢复
+0k2. [x] **Gate 0k SMB 现场交付旁证**：预发 `ScanTask` 多笔 `completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）
+0k3. [~] **Gate 0k U 盘 bridge**：Kiosk-only 热更已注入 token（`usb_bridge_token=injected`）；Agent 侧与真机冒烟待回执（包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`）
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：
