@@ -21,9 +21,9 @@
 
 推荐顺序（2026-07-27 更新）：
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
-0j. [~] **Gate 0.4 11c**：[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac` 已合入；预发队列已空。**下一步仅 Windows 一体机**：只读诊断（ACL `ok`）→（另授）吊销停领 → BindCode 恢复——见 `docs/device/production-agent-onboarding.md`
+0j. [~] **Gate 0.4 11c**：#401/#402 已合入；预发队列空、Agent online。**卡在一体机**：先跑 diagnose 贴回 ACL=`ok`，再回复「开始吊销」（恢复：suspended→maintenance→BindCode→active）——见 `production-agent-onboarding.md`
 0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；UI 通道已在现网，不得宣称硬件闭环
-0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
+0l. [~] **清单剩余只读/配置项**：COS 生命周期——业务子账号 `GetBucketLifecycle=AccessDenied`，须控制台人工截图；法务正文 / 支付收费切换仍开
 
 推荐顺序（2026-07-25）：
 

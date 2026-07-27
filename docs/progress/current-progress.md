@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-27 完成 **进度补记 PR #402 合入**（`main@626fa708`）。同期 Gate 0.4 11c 前置再确认：`KSK-001` 心跳仍 online（`agentVersion=0.3.0-production`、`printerStatus=ready`，`lastSeenAt≈2026-07-27 03:16Z`），`active_print=0`/`active_scan=0`。COS `GetBucketLifecycle` 用预发业务子账号返回 `AccessDenied`（符合对象读写最小权限，不能代替控制台生命周期人工截图）。用户已原则同意吊销演练，但**未**执行紧急吊销：须一体机先跑 ACL 诊断并把输出贴回，再点名「开始吊销」；恢复链为 suspended→maintenance→BindCode→active。
+
 2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
 
 2026-07-27 完成 **预发过期 ScanTask 落盘清理（用户授权「同意继续」）**：只处理点名任务 `cms1knaqr000is3a8by8p1mas`（`t_ksk_001`，原 `waiting` 且 `expiresAt` 已过），事务内 `FOR UPDATE` 后更新为 `expired`；清理后 `active_scan=0`、`active_print=0`。未改其它任务/终端/凭证，未触碰打印链路。为 Gate 0.4 11c / 扫描整机空队列前置。

@@ -67,6 +67,26 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 禁止：未授权吊销生产终端；把静态 `verify:agent-unauthorized` 写成现场完成；把 `agent_degraded` 与 `AGENT_UNAUTHORIZED` 混记。
 
+**恢复顺序（吊销后必须按此）**：紧急吊销会把终端打成 `suspended`；绑定码**只能**在 `planned` / `maintenance` 签发。故恢复为：
+
+1. Admin：`suspended → maintenance`（队列须仍为空）
+2. Admin：签发一次性 BindCode（TTL 建议 ≤30 分钟）
+3. Windows：用最新安装脚本 `-BindCode` 换发（禁止 `-AgentToken`）
+4. Admin：`maintenance → active`
+5. 复核心跳 / `printerStatus=ready` / 可选受控出纸
+
+**一体机只读诊断（先做，再吊销）**：仓库需含 `main@772fd7ac` 及之后的 `diagnose-production-agent.ps1`。
+
+```powershell
+cd <本机仓库根目录>
+git fetch origin main
+git checkout origin/main -- apps/terminal-agent/scripts/diagnose-production-agent.ps1
+powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\diagnose-production-agent.ps1 |
+  Select-Object serviceState, startMode, programDataAclStatus, tokenFileAclStatus, lastStartupDiagnosticCode, encryptedTokenFile
+```
+
+通过：`programDataAclStatus=ok` 且 `tokenFileAclStatus=ok`，服务 Running。把该对象输出贴回对话后，再回复「开始吊销」才会执行云端紧急吊销与 BindCode 恢复编排。
+
 ## 可靠性 P0：安装、诊断与恢复
 
 本轮可靠性 P0 已在本地代码与静态门禁层完成以下收口：配置文件开头的 UTF-8 BOM 会被兼容；启动时会分类报告无效配置或 token；这两类异常均不得领取打印任务或触发打印。配置与 token 写入采用原子替换；last-known-good 只保留为人工恢复候选，**不会**自动回退覆盖当前配置。启动诊断保持非阻塞，且本地诊断脚本只读。
