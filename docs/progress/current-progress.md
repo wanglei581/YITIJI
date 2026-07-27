@@ -1,6 +1,8 @@
 # 当前开发进度
 
-2026-07-27 回填 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 兼容**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405)）：`Write-TextAtomically` / token rollback 将 `File.Replace(..., $null)` 改为 `[NullString]::Value`；`verify:windows-service-recovery` 锁定该契约并禁止裸 `$null`；临时文件名继续要求 `${fileName}` / `${PID}` 花括号定界。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。不改云端、不部署 Agent。
+2026-07-27 推进 **Gate 0k 扫描/U 盘整机准备（只读）**：Mac 静态 `verify:scan-watcher` / `verify:usb-import-agent` PASS（真机 CIM/chokidar 长驻仍须 Windows）。预发 `KSK-001` 现为 `lifecycleStatus=maintenance`（`lifecycleVersion=5`、`credentialGeneration=5`，心跳曾 online/`printerStatus=ready`）；`scan`/`usb_import` 能力行均为未配置（`managed` 模式仍允许 API）。公网 Kiosk bundle `index-CPD4lg4F.js` **未注入** `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（存在 `X-Local-Bridge-Token` 与「未配置」文案，无非空 token 字面量）→ U 盘导入现网会 fail-closed。扫描生产路径为 SMB/`scanWatchFolder` watcher（非 TWAIN）。**未**切 active、未改 Agent 配置、未宣称硬件闭环。
+
+2026-07-27 完成 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 合入**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`）：`Write-TextAtomically` / token rollback 使用 `[NullString]::Value`；`verify:windows-service-recovery` 锁定契约。CI 三项全绿后 squash 合并。不改云端、不部署 Agent。
 
 2026-07-27 完成 **Gate 0.4 11c 现场吊销演练闭环（KSK-001）**：紧急吊销 → `suspended` → `maintenance` → BindCode 换发 → 本地 DPAPI Token/生产配置提交 → 服务 Running/`AGENT_READY`/ACL `ok`/心跳 `online`+`printerStatus=ready` → 云端 `maintenance→active`（`lifecycleVersion` 2→3，`credentialGeneration=3`，在途打印/扫描均为 0）。中间踩坑：① PS 5.1 不接受 `File.Replace(..., $null)` 导致本地原子提交失败（BindCode 已消费）；② 过期码 `BIND_CODE_EXPIRED`；现场已用兼容脚本恢复，本条之上游回填见上。Token/BindCode 明文未入仓。本项不等于扫描/U 盘硬件闭环或收费支付验收。
 
