@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
+
 2026-07-27 完成 **预发过期 ScanTask 落盘清理（用户授权「同意继续」）**：只处理点名任务 `cms1knaqr000is3a8by8p1mas`（`t_ksk_001`，原 `waiting` 且 `expiresAt` 已过），事务内 `FOR UPDATE` 后更新为 `expired`；清理后 `active_scan=0`、`active_print=0`。未改其它任务/终端/凭证，未触碰打印链路。为 Gate 0.4 11c / 扫描整机空队列前置。
 
 2026-07-27 推进 **Gate 0.4 11c 现场准备：诊断脚本 ProgramData ACL 只读验收**（分支 `codex/gate04-diagnose-acl-20260727` / [PR #401](https://github.com/wanglei581/YITIJI/pull/401)）：`diagnose-production-agent.ps1` 新增 `Get-ProgramDataAclStatus`，对 `%ProgramData%\AIJobPrintAgent` 与 `agent.token` 报告封闭词汇 `missing|ok|too_permissive|unexpected|unavailable`（要求继承禁用且仅 SYSTEM+Administrators；检测 Everyone/Authenticated Users/Users）；输出字段 `programDataAclStatus` / `tokenFileAclStatus`。`verify:windows-service-recovery` 先 RED 后 GREEN；`verify:agent-unauthorized` 回归 PASS。仍为只读、无网络；**不等于** Windows 真机 ACL/吊销已验收。同步：预发 Kiosk #400 热更记录、`production-agent-onboarding.md` 11c 表。
