@@ -35,11 +35,13 @@
 
 | 检查 | 结果 |
 |------|------|
-| 公网 / 本机 nginx Kiosk bundle | `index-BJahFNHZ.js`（**已覆盖**此前 #413 的 `index-DeG21wry.js`） |
-| bundle 内 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` | 仅构建键名引用；**无**非空字面量 → `isUsbImportConfigured()=false` → UI「本机未配置」 |
-| B1 诚实文案「可创建扫描任务」 | **当前 live 包缺失**（被后续热更冲掉）→ 本包热更须从含 #413 的 `main` 重建，一并恢复 |
+| 公网 / 本机 nginx Kiosk bundle | **已热更** `index-DmcUs_Nb.js`（`usb_bridge_token=injected`；备份 `kiosk-dist-before-usb-bridge-20260727T221505+0800`） |
+| bundle 内 bridge token | 已注入非空字面量（**勿**在聊天/文档回显）；产物含 `X-Local-Bridge-Token` 路径与 B1「可创建扫描任务」 |
+| 预发 secret 文件 | `/root/ai-job-print-secrets/kiosk-local-bridge-token` 存在（`chmod 600`，64 字节级） |
 | API health | `ok/postgres` |
 | `PRINT_SCAN_CAPABILITY_MODE` | `managed`（`usb_import` 能力行空表不挡 API） |
+
+> Phase R 已完成。半开风险只剩：Windows Agent 尚未写入同一 token / Origin。
 
 ---
 
@@ -62,37 +64,47 @@
 
 ## Phase W — Windows Agent
 
-配置路径（二选一）：
+配置路径（正式服务）：`%ProgramData%\AIJobPrintAgent\agent-config.json`  
+（仓库目录跑才用 `<repo>\apps\terminal-agent\config\agent-config.json`。）
 
-| 安装方式 | 配置 |
-|----------|------|
-| 正式服务 | `%ProgramData%\AIJobPrintAgent\agent-config.json` |
-| 仓库目录跑 | `<repo>\apps\terminal-agent\config\agent-config.json` |
+推荐用脚本（**不打印 token**）：`apps/terminal-agent/scripts/configure-local-bridge-token.ps1`
 
-必填：
+### W1 取令牌（一体机或运维机，勿贴输出）
+
+```powershell
+# 示例：从预发 scp 到本机临时文件（自行替换主机；不要把 token 回贴聊天）
+scp root@120.48.13.190:/root/ai-job-print-secrets/kiosk-local-bridge-token $env:TEMP\kiosk-bridge.token
+```
+
+### W2 写入配置并重启服务（管理员 PowerShell）
+
+在已拉取含本脚本的仓库目录，或把该 `.ps1` 拷到一体机后执行：
+
+```powershell
+cd <repo>\apps\terminal-agent\scripts
+
+# 只读检查（不改文件）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\configure-local-bridge-token.ps1 `
+  -TokenFile $env:TEMP\kiosk-bridge.token -WhatIfCheck
+
+# 写入 + 重启服务
+powershell -NoProfile -ExecutionPolicy Bypass -File .\configure-local-bridge-token.ps1 `
+  -TokenFile $env:TEMP\kiosk-bridge.token -RestartService
+
+Remove-Item -LiteralPath $env:TEMP\kiosk-bridge.token -Force -ErrorAction SilentlyContinue
+Get-Service AIJobPrintAgent | Format-List Status, StartType
+netstat -ano | findstr "9527"
+```
+
+必填语义（脚本会合并 Origin，不覆盖其它已有 Origin）：
 
 ```json
 "localApiBridgeToken": "<与 Kiosk 构建同一值>",
 "localApiAllowedOrigins": [
   "https://zyidai.cn",
-  "http://127.0.0.1:5173"
+  "http://127.0.0.1:5173",
+  "http://localhost:5173"
 ]
-```
-
-从预发主机取令牌（在一体机或运维机执行，勿贴输出）：
-
-```powershell
-# 示例：scp 后写入配置（自行替换路径；不要把 token 回贴聊天）
-# scp root@<preprod>:/root/ai-job-print-secrets/kiosk-local-bridge-token $env:TEMP\kiosk-bridge.token
-```
-
-然后：
-
-```powershell
-Restart-Service AIJobPrintAgent
-Start-Sleep -Seconds 3
-Get-Service AIJobPrintAgent | Format-List Status, StartType
-netstat -ano | findstr "9527"
 ```
 
 Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「localApiBridgeToken not configured」。
@@ -109,8 +121,8 @@ Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「lo
 
 ## 通过标准
 
-- [ ] Kiosk 热更自含 #413 的 `main`，且注入 bridge token（`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`）
-- [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`
+- [x] Kiosk 热更自含 #413 的 `main`，且注入 bridge token（`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`；bundle `index-DmcUs_Nb.js`）
+- [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`（`configure-local-bridge-token.ps1`）
 - [ ] U 盘 tab 可用；枚举 + 上传一笔成功
 - [ ] 进度文档已记旁证；**无** token 明文入仓
 

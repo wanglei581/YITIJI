@@ -27,7 +27,7 @@
 0k. [~] **扫描 / U 盘整机**：SMB 旁证成立；Kiosk 已注入 bridge token（`index-DmcUs_Nb.js`）并恢复 B1；**待 Windows** 写 `localApiBridgeToken` + `allowedOrigins` 含 `https://zyidai.cn` 后插盘冒烟；Spike C 另开
 0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413)；曾被覆盖，已随 USB bridge 热更自 `main@20a462e3` 恢复
 0k2. [x] **Gate 0k SMB 现场交付旁证**：预发 `ScanTask` 多笔 `completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）
-0k3. [~] **Gate 0k U 盘 bridge**：Kiosk-only 热更已注入 token（`usb_bridge_token=injected`）；Agent 侧与真机冒烟待回执（包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`）
+0k3. [~] **Gate 0k U 盘 bridge**：Kiosk Phase R 已热更注入（`index-DmcUs_Nb.js` + `usb_bridge_token=injected`）；已补 `configure-local-bridge-token.ps1`（待合入）。**待 Windows**：scp 令牌 → 写 Agent + 重启 → 插盘枚举/上传回执（包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`）。不代表 U 盘真机验收已通过。
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：

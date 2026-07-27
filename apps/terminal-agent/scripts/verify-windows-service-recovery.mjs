@@ -364,4 +364,23 @@ assert.match(diagnosis, /\$scriptRoot\s*=\s*\$PSScriptRoot/, 'diagnosis must cap
 assert.match(diagnosis, /MyInvocation\.MyCommand\.Path/, 'diagnosis must fall back to MyInvocation when PSScriptRoot is empty')
 assert.match(diagnosis, /Join-Path\s+\$scriptRoot\s+"service-identity\.ps1"/, 'diagnosis must load helpers from resolved scriptRoot')
 
+const bridgeConfigurePath = path.join(__dirname, 'configure-local-bridge-token.ps1')
+const bridgeConfigure = fs.readFileSync(bridgeConfigurePath, 'utf8')
+assert.match(bridgeConfigure, /param\(/, 'Gate 0k bridge configure script must declare parameters')
+assert.match(bridgeConfigure, /\$TokenFile/, 'Gate 0k bridge configure must require TokenFile')
+assert.match(bridgeConfigure, /localApiBridgeToken/, 'Gate 0k bridge configure must write localApiBridgeToken')
+assert.match(bridgeConfigure, /https:\/\/zyidai\.cn/, 'Gate 0k bridge configure must allow the production Kiosk origin')
+assert.match(bridgeConfigure, /Write-TextAtomically/, 'Gate 0k bridge configure must persist config atomically')
+assert.match(bridgeConfigure, /WhatIfCheck/, 'Gate 0k bridge configure must support a no-write presence check')
+assert.doesNotMatch(
+  bridgeConfigure,
+  /Write-Host\s+\$token\b|Write-Output\s+\$token\b|Write-Host\s+\$existingToken\b/,
+  'Gate 0k bridge configure must never print the bridge token value',
+)
+assert.doesNotMatch(
+  bridgeConfigure,
+  /Invoke-RestMethod|Invoke-WebRequest|Test-Connection|\bcurl(?:\.exe)?\b|Start-BitsTransfer|WebClient|HttpClient|System\.Net\.WebRequest/,
+  'Gate 0k bridge configure must not contact the network',
+)
+
 console.log('ALL PASS: terminal-agent Windows service recovery')
