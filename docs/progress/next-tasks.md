@@ -23,7 +23,7 @@
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
 0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；现场后续又进入 `maintenance`（当前 `lifecycleVersion=5`/`credentialGeneration=5`）——整机扫描前须确认是否再切 `active`
 0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
-0k. [~] **扫描 / U 盘整机**：静态 verify 已绿；阻塞：① 终端现为 `maintenance`（建扫描会话需 `active`）② Agent 须配置 `scanWatchFolder` + SMB 投递 ③ 公网 Kiosk **无** bridge token → U 盘 fail-closed，需 Kiosk-only 热更注入与 Agent `localApiBridgeToken` 一致的 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（另授）
+0k. [~] **扫描 / U 盘整机**：方案 A——`KSK-001` 已切回 `active`（v6）；现场待 SMB/`scanWatchFolder` 真实交付一笔。U 盘仍阻塞于公网 Kiosk 未注入 bridge token（另授热更）
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：

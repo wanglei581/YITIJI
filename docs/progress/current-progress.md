@@ -1,6 +1,8 @@
 # 当前开发进度
 
-2026-07-27 推进 **Gate 0k 扫描/U 盘整机准备（只读）**：Mac 静态 `verify:scan-watcher` / `verify:usb-import-agent` PASS（真机 CIM/chokidar 长驻仍须 Windows）。预发 `KSK-001` 现为 `lifecycleStatus=maintenance`（`lifecycleVersion=5`、`credentialGeneration=5`，心跳曾 online/`printerStatus=ready`）；`scan`/`usb_import` 能力行均为未配置（`managed` 模式仍允许 API）。公网 Kiosk bundle `index-CPD4lg4F.js` **未注入** `VITE_TERMINAL_AGENT_BRIDGE_TOKEN`（存在 `X-Local-Bridge-Token` 与「未配置」文案，无非空 token 字面量）→ U 盘导入现网会 fail-closed。扫描生产路径为 SMB/`scanWatchFolder` watcher（非 TWAIN）。**未**切 active、未改 Agent 配置、未宣称硬件闭环。
+2026-07-27 推进 **Gate 0k 方案 A（先 SMB 扫描）**：用户确认后云端将 `KSK-001` `maintenance→active`（`lifecycleVersion` 5→6，在途打印/扫描 0；`credentialGeneration` 仍为 5）。U 盘/Kiosk bridge token 热更仍另授。现场待跑：确认 `scanWatchFolder` + 奔图扫到 SMB → Kiosk `/scan/start` 一笔真实交付。
+
+2026-07-27 推进 **Gate 0k 扫描/U 盘整机准备（只读）**：Mac 静态 `verify:scan-watcher` / `verify:usb-import-agent` PASS（真机 CIM/chokidar 长驻仍须 Windows）。当时预发 `KSK-001` 为 `maintenance`（v5）；公网 Kiosk bundle `index-CPD4lg4F.js` **未注入** bridge token → U 盘 fail-closed。扫描生产路径为 SMB/`scanWatchFolder` watcher（非 TWAIN）。
 
 2026-07-27 完成 **Gate 0.4 安装脚本 PS 5.1 `File.Replace` 合入**（[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`）：`Write-TextAtomically` / token rollback 使用 `[NullString]::Value`；`verify:windows-service-recovery` 锁定契约。CI 三项全绿后 squash 合并。不改云端、不部署 Agent。
 
