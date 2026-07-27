@@ -120,6 +120,8 @@ created → activation_issued → preflighting → ready_for_acceptance
 
 首选 WiX MSI（而非 MSIX），以适配 Windows Service、Node 运行时、SumatraPDF 和 repair/uninstall：
 
+具体的包结构、激活隔离、数据保留、签名与验收矩阵见[《Windows Terminal Agent MSI 实施设计》](./windows-agent-msi-design.md)。
+
 - 安装目录：签名程序和依赖位于 `Program Files`，不可由 Kiosk 用户修改。
 - 数据目录：配置、DPAPI token、SQLite、日志和临时文件位于 `%ProgramData%\\AIJobPrintAgent`，安装程序显式设置 NTFS ACL。
 - 安装过程不携带 `TERMINAL_ADMIN_SECRET`，只能输入短时一次性激活码。

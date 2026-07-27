@@ -335,7 +335,8 @@
 
 ## P1：Windows Agent MSI / 可修复安装包
 
-- [ ] **Windows Agent MSI / 可修复安装包**：独立设计与分支处理；范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收。不在当前可靠性 P0 中开始，也不得与其合并验收结论混用。
+- [x] **Windows Agent MSI / 可修复安装包设计**（2026-07-27）：WiX MSI、签名信任链、二进制/状态目录分离、BindCode 激活隔离、Repair/卸载/升级/回滚边界与验收矩阵已定稿，见 `docs/device/windows-agent-msi-design.md`。未实施、未构建、未签名、未部署。
+- [ ] **Windows Agent MSI / 可修复安装包实施**：先完成配置根可重定位与一次性迁移兼容，再建立 staging 与 WiX 非生产构建；前置为机队 F2 安全换机真机验收通过。范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收；不得与可靠性 P0 或现网发布合并验收。
 
 ## P1：Windows 终端机队管理与安全换机
 
