@@ -21,7 +21,8 @@
 
 推荐顺序（2026-07-27 更新）：
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
-0j. [~] **Gate 0.4 11c**：[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac` 已合入；预发队列已空。**下一步仅 Windows 一体机**：只读诊断（ACL `ok`）→（另授）吊销停领 → BindCode 恢复——见 `docs/device/production-agent-onboarding.md`
+0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 云端 `active`（KSK-001，`lifecycleVersion=3`/`credentialGeneration=3`，心跳 online）
+0j2. [~] **PS 5.1 安装脚本原子写入回填**：分支 `codex/gate04-ps51-file-replace-20260727`（`[NullString]::Value` + verify 门禁）；合入后现场可用上游脚本对齐。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
 0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；UI 通道已在现网，不得宣称硬件闭环
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
@@ -58,7 +59,8 @@
 11. [~] **Gate 0.4**——0.3A/0.3B 已在预发 `83f2117f`：
    - **11a Wave A**：✅ 移除长期 `-AgentToken` CLI + ProgramData ACL（SYSTEM/Administrators）+ 静态 verify/文档（[PR #384](https://github.com/wanglei581/YITIJI/pull/384) → `main@645e19e0`）
    - **11b Wave B**：✅ Agent 401 本地 unauthorized latch + `AGENT_UNAUTHORIZED` 诊断（`verify:agent-unauthorized`）；不新增云端 heartbeat unauthorized 态
-   - **11c（另授）**：Windows 真机 ACL / 吊销后停领 / 重新 BindCode 恢复；不得仅凭静态 verify 宣称现场完成
+   - **11c**：✅ 现场 ACL + 吊销停领 + BindCode 恢复 + `maintenance→active`（2026-07-27）
+   - **11c-fix**：[~] PS 5.1 `File.Replace(..., $null)` → `[NullString]::Value` 上游回填（`codex/gate04-ps51-file-replace-20260727`）
 
 
 ---
