@@ -21,7 +21,7 @@
 
 推荐顺序（2026-07-27 更新）：
 0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
-0j. [~] **Gate 0.4 11c**：[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac` 已合入；预发队列已空。**下一步仅 Windows 一体机**：只读诊断（ACL `ok`）→（另授）吊销停领 → BindCode 恢复——见 `docs/device/production-agent-onboarding.md`
+0j. [~] **Gate 0.4 11c**：[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac` 已合入；预发队列已空。Windows 一体机只读诊断已取得服务 `Running/Auto/LocalSystem`、奔图 `USB001` 正常、`AGENT_READY`、ProgramData/token ACL `ok`，但严格诊断报告 `runtimeRootAclStatus=too_permissive`，当前仓库 runtime 不能作为商用 LocalSystem 发布目录；本分支已加入受保护 runtime/依赖树 fail-closed 安装门禁，并修复 Windows PowerShell 5.1 `powershell -File` 默认路径兼容。**下一步写操作仍须点名授权**：先迁移到受保护发布 runtime 并把现机旧 SCM `10s/60s/300s` 三次重启策略修复为当前有限 `60s/300s/停止`，再分别授权吊销停领与 BindCode 恢复；不得把本次只读通过写成完整 11c 完成——见 `docs/device/production-agent-onboarding.md`
 0k. [ ] **扫描 / U 盘整机**：真机 SMB 扫描投递 + U 盘枚举导入；UI 通道已在现网，不得宣称硬件闭环
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
@@ -58,7 +58,7 @@
 11. [~] **Gate 0.4**——0.3A/0.3B 已在预发 `83f2117f`：
    - **11a Wave A**：✅ 移除长期 `-AgentToken` CLI + ProgramData ACL（SYSTEM/Administrators）+ 静态 verify/文档（[PR #384](https://github.com/wanglei581/YITIJI/pull/384) → `main@645e19e0`）
    - **11b Wave B**：✅ Agent 401 本地 unauthorized latch + `AGENT_UNAUTHORIZED` 诊断（`verify:agent-unauthorized`）；不新增云端 heartbeat unauthorized 态
-   - **11c（另授）**：Windows 真机 ACL / 吊销后停领 / 重新 BindCode 恢复；不得仅凭静态 verify 宣称现场完成
+   - **11c（部分只读通过，写操作另授）**：Windows 真机服务/打印机/配置/ACL 只读检查通过；现机 SCM 恢复策略仍待修复，吊销后停领与重新 BindCode 恢复尚未执行。不得把只读诊断或静态 verify 宣称为现场全部完成
 
 
 ---

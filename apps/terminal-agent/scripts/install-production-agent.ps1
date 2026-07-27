@@ -166,7 +166,7 @@ function Invoke-Sc([string[]]$Arguments) {
 
   if ($LASTEXITCODE -ne 0) {
     $detail = ($output | Out-String).Trim()
-    Fail "sc.exe $($Arguments -join ' ') failed with exit code $LASTEXITCODE: $detail"
+    Fail "sc.exe $($Arguments -join ' ') failed with exit code ${LASTEXITCODE}: $detail"
   }
 
   return ($output | Out-String).Trim()
@@ -177,7 +177,7 @@ function Set-AgentServiceRecovery([string]$ServiceName) {
   Invoke-Sc @("failure", $ServiceName, "reset=", "86400", "actions=", 'restart/60000/restart/300000/""/0') | Out-Null
   Invoke-Sc @("failureflag", $ServiceName, "1") | Out-Null
   $policy = Invoke-Sc @("qfailure", $ServiceName)
-  Write-Host "SCM failure policy for $ServiceName:"
+  Write-Host "SCM failure policy for ${ServiceName}:"
   Write-Host $policy
 }
 
@@ -198,12 +198,81 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
   return $trimmed
 }
 
+function ConvertTo-SidValue([object]$IdentityReference) {
+  if ($IdentityReference -is [System.Security.Principal.SecurityIdentifier]) {
+    return [string]$IdentityReference.Value
+  }
+
+  $account = if ($IdentityReference -is [System.Security.Principal.NTAccount]) {
+    $IdentityReference
+  } else {
+    New-Object System.Security.Principal.NTAccount([string]$IdentityReference)
+  }
+  return [string]$account.Translate(
+    [System.Security.Principal.SecurityIdentifier]
+  ).Value
+}
+
+function Assert-NotReparsePoint([System.IO.FileSystemInfo]$Item) {
+  if (($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+    throw "Refusing filesystem reparse point: $($Item.FullName)"
+  }
+}
+
+function Assert-ProgramDataAcl([string]$Path, [bool]$IsContainer) {
+  $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+  $ownerSid = ConvertTo-SidValue $acl.Owner
+  if ($ownerSid -ne "S-1-5-32-544") {
+    throw "ProgramData ACL owner is not Administrators: $Path"
+  }
+  if (-not $acl.AreAccessRulesProtected) {
+    throw "ProgramData ACL inheritance is not disabled: $Path"
+  }
+
+  $expectedInheritance = if ($IsContainer) {
+    [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor `
+      [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+  } else {
+    [System.Security.AccessControl.InheritanceFlags]::None
+  }
+  $rules = @($acl.Access)
+  if ($rules.Count -ne 2) {
+    throw "ProgramData ACL must contain exactly two access rules: $Path"
+  }
+
+  $requiredSids = @("S-1-5-18", "S-1-5-32-544")
+  $seenSids = New-Object "System.Collections.Generic.HashSet[string]"
+  foreach ($rule in $rules) {
+    $sid = ConvertTo-SidValue $rule.IdentityReference
+    if (
+      $rule.IsInherited -or
+      $rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or
+      $requiredSids -notcontains $sid -or
+      $rule.FileSystemRights -ne [System.Security.AccessControl.FileSystemRights]::FullControl -or
+      $rule.InheritanceFlags -ne $expectedInheritance -or
+      $rule.PropagationFlags -ne [System.Security.AccessControl.PropagationFlags]::None
+    ) {
+      throw "ProgramData ACL contains an inherited, denied, extra, or incorrectly scoped rule: $Path"
+    }
+    if (-not $seenSids.Add($sid)) {
+      throw "ProgramData ACL contains a duplicate access rule: $Path"
+    }
+  }
+
+  foreach ($sid in $requiredSids) {
+    if (-not $seenSids.Contains($sid)) {
+      throw "ProgramData ACL is missing a required principal: $Path"
+    }
+  }
+}
+
 function Set-ProgramDataAcl([string]$Path) {
   if ([string]::IsNullOrWhiteSpace($Path)) {
     throw "Set-ProgramDataAcl requires a non-empty path"
   }
 
-  $item = Get-Item -LiteralPath $Path -ErrorAction Stop
+  $item = Get-Item -Force -LiteralPath $Path -ErrorAction Stop
+  Assert-NotReparsePoint $item
   $isContainer = [bool]$item.PSIsContainer
   if ($isContainer) {
     $acl = New-Object System.Security.AccessControl.DirectorySecurity
@@ -215,6 +284,8 @@ function Set-ProgramDataAcl([string]$Path) {
   }
 
   $acl.SetAccessRuleProtection($true, $false)
+  $administratorsSid = New-Object System.Security.Principal.SecurityIdentifier("S-1-5-32-544")
+  $acl.SetOwner($administratorsSid)
   $rights = [System.Security.AccessControl.FileSystemRights]::FullControl
   $propagation = [System.Security.AccessControl.PropagationFlags]::None
   $allow = [System.Security.AccessControl.AccessControlType]::Allow
@@ -231,6 +302,118 @@ function Set-ProgramDataAcl([string]$Path) {
   }
 
   Set-Acl -LiteralPath $Path -AclObject $acl
+  Assert-ProgramDataAcl -Path $Path -IsContainer $isContainer
+}
+
+function Assert-RestrictedRuntime([string]$Root) {
+  if ([string]::IsNullOrWhiteSpace($Root)) {
+    throw "Restricted runtime check requires a non-empty path"
+  }
+
+  $rootItem = Get-Item -Force -LiteralPath $Root -ErrorAction Stop
+  $pending = New-Object "System.Collections.Generic.Queue[System.IO.FileSystemInfo]"
+  $pending.Enqueue($rootItem)
+  $allowedSids = @("S-1-5-18", "S-1-5-32-544")
+  $dangerousRights = [System.Security.AccessControl.FileSystemRights]::Write -bor `
+    [System.Security.AccessControl.FileSystemRights]::Modify -bor `
+    [System.Security.AccessControl.FileSystemRights]::Delete -bor `
+    [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor `
+    [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
+    [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+
+  while ($pending.Count -gt 0) {
+    $item = $pending.Dequeue()
+    Assert-NotReparsePoint $item
+
+    $acl = Get-Acl -LiteralPath $item.FullName -ErrorAction Stop
+    $ownerSid = ConvertTo-SidValue $acl.Owner
+    if ($allowedSids -notcontains $ownerSid) {
+      throw "Runtime owner must be SYSTEM or Administrators: $($item.FullName)"
+    }
+
+    foreach ($rule in @($acl.Access)) {
+      if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) {
+        continue
+      }
+      $sid = ConvertTo-SidValue $rule.IdentityReference
+      if (
+        $allowedSids -notcontains $sid -and
+        (($rule.FileSystemRights -band $dangerousRights) -ne 0)
+      ) {
+        throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName)"
+      }
+    }
+
+    if ($item.PSIsContainer) {
+      foreach ($child in @(Get-ChildItem -Force -LiteralPath $item.FullName -ErrorAction Stop)) {
+        $pending.Enqueue($child)
+      }
+    }
+  }
+}
+
+function Get-NodeModuleRoots([string]$StartPath) {
+  $roots = New-Object "System.Collections.Generic.List[string]"
+  $current = Get-Item -Force -LiteralPath $StartPath -ErrorAction Stop
+  if (-not $current.PSIsContainer) { $current = $current.Directory }
+
+  while ($null -ne $current) {
+    $candidate = Join-Path $current.FullName "node_modules"
+    if (Test-Path -LiteralPath $candidate -PathType Container) {
+      $resolved = (Resolve-Path -LiteralPath $candidate -ErrorAction Stop).Path
+      if (-not $roots.Contains($resolved)) { $roots.Add($resolved) }
+    }
+    $current = $current.Parent
+  }
+
+  return $roots.ToArray()
+}
+
+function Set-ProgramDataTreeAcl([string]$Root) {
+  Set-ProgramDataAcl -Path $Root
+  foreach ($item in @(Get-ChildItem -Force -Recurse -LiteralPath $Root -ErrorAction Stop)) {
+    Assert-NotReparsePoint $item
+    Set-ProgramDataAcl -Path $item.FullName
+  }
+}
+
+function Get-ServiceExecutablePath([object]$Service) {
+  $rawPath = ([string]$Service.PathName).Trim()
+  if ([string]::IsNullOrWhiteSpace($rawPath)) {
+    throw "Windows service PathName is empty"
+  }
+
+  if ($rawPath.StartsWith('"')) {
+    $closingQuote = $rawPath.IndexOf('"', 1)
+    if ($closingQuote -le 1) {
+      throw "Windows service PathName has invalid quoting"
+    }
+    $candidate = $rawPath.Substring(1, $closingQuote - 1)
+    if (-not [string]::IsNullOrWhiteSpace($rawPath.Substring($closingQuote + 1))) {
+      throw "Windows service PathName must not include arguments outside the verified runtime executable"
+    }
+  } else {
+    $pathParts = @($rawPath -split "\s+", 2)
+    if ($pathParts.Count -ne 1) {
+      throw "Windows service PathName with spaces must quote the executable and must not include arguments"
+    }
+    $candidate = $pathParts[0]
+  }
+
+  return (Resolve-Path -LiteralPath $candidate -ErrorAction Stop).Path
+}
+
+function Assert-AgentServiceSecurity([object]$Service, [string]$AgentRoot) {
+  if ([string]$Service.StartName -ne "LocalSystem") {
+    throw "AIJobPrintAgent must run as LocalSystem"
+  }
+
+  $resolvedRoot = (Resolve-Path -LiteralPath $AgentRoot -ErrorAction Stop).Path.TrimEnd("\")
+  $rootPrefix = $resolvedRoot + "\"
+  $serviceExecutable = Get-ServiceExecutablePath $Service
+  if (-not $serviceExecutable.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "AIJobPrintAgent PathName is outside the verified Agent runtime"
+  }
 }
 
 function Protect-AgentToken([string]$Token, [string]$TokenPath) {
@@ -248,12 +431,18 @@ function Protect-AgentToken([string]$Token, [string]$TokenPath) {
   $dir = Split-Path -Parent $TokenPath
   New-Item -ItemType Directory -Path $dir -Force | Out-Null
   Set-ProgramDataAcl -Path $dir
+  if (Test-Path -LiteralPath $TokenPath) {
+    $existingToken = Get-Item -Force -LiteralPath $TokenPath -ErrorAction Stop
+    Assert-NotReparsePoint $existingToken
+  }
   Write-TextAtomically -Path $TokenPath -Text $b64
   Set-ProgramDataAcl -Path $TokenPath
 }
 
 function Test-TokenFile([string]$TokenPath) {
   if (-not (Test-Path $TokenPath)) { return $false }
+  $item = Get-Item -Force -LiteralPath $TokenPath -ErrorAction Stop
+  Assert-NotReparsePoint $item
   $content = [System.IO.File]::ReadAllText($TokenPath).Trim()
   return -not [string]::IsNullOrWhiteSpace($content)
 }
@@ -277,8 +466,11 @@ function Commit-ProductionConfigAndToken(
       New-Item -ItemType Directory -Path $tokenDirectory -Force | Out-Null
 
       if ($hadExistingToken) {
+        $existingToken = Get-Item -Force -LiteralPath $TokenPath -ErrorAction Stop
+        Assert-NotReparsePoint $existingToken
         $tokenRollbackPath = Join-Path $tokenDirectory ".agent.token.rollback.${PID}.$([System.Guid]::NewGuid().ToString('N')).tmp"
         Copy-Item -LiteralPath $TokenPath -Destination $tokenRollbackPath -Force
+        Set-ProgramDataAcl -Path $tokenRollbackPath
       }
 
       Protect-AgentToken -Token $TokenToPersist -TokenPath $TokenPath
@@ -296,6 +488,7 @@ function Commit-ProductionConfigAndToken(
           } else {
             [System.IO.File]::Move($tokenRollbackPath, $TokenPath)
           }
+          Set-ProgramDataAcl -Path $TokenPath
         } elseif (-not $hadExistingToken -and (Test-Path -LiteralPath $TokenPath -PathType Leaf)) {
           Remove-Item -LiteralPath $TokenPath -Force
         }
@@ -361,6 +554,7 @@ $agentRoot = Join-Path $repoRoot "apps\terminal-agent"
 $configPath = Join-Path $agentRoot "config\agent-config.json"
 $programDataDir = Join-Path $env:ProgramData "AIJobPrintAgent"
 $tokenPath = Join-Path $programDataDir "agent.token"
+$unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 
 Write-Step "Production Agent hardening"
@@ -383,6 +577,32 @@ if (-not (Test-Path (Join-Path $agentRoot "dist\index.js"))) {
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) { Fail "node.exe not found in PATH" }
 Write-Ok "Node found: $($node.Source)"
+
+Write-Step "Verifying restricted Agent runtime"
+try {
+  Assert-RestrictedRuntime -Root $agentRoot
+  Assert-RestrictedRuntime -Root $node.Source
+  $nodeModuleRoots = @(Get-NodeModuleRoots -StartPath $agentRoot)
+  if ($nodeModuleRoots.Count -eq 0) {
+    throw "No node_modules dependency root is available to the Agent runtime"
+  }
+  foreach ($nodeModuleRoot in $nodeModuleRoots) {
+    Assert-RestrictedRuntime -Root $nodeModuleRoot
+  }
+} catch {
+  Fail "Agent runtime, dependency tree, or node.exe is not restricted to SYSTEM/Administrators: $($_.Exception.Message)"
+}
+Write-Ok "Agent runtime, dependency tree, and node.exe permissions are restricted"
+
+$preflightService = $null
+try {
+  $preflightService = Resolve-AgentService -Identity $agentServiceIdentity
+  if ($null -ne $preflightService) {
+    Assert-AgentServiceSecurity -Service $preflightService -AgentRoot $agentRoot
+  }
+} catch {
+  Fail "Existing Windows service failed the LocalSystem/runtime-path security check: $($_.Exception.Message)"
+}
 
 $printer = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
 if (-not $printer) {
@@ -412,7 +632,7 @@ $configJson = Test-GeneratedConfig -Config $config
 
 Write-Step "Hardening ProgramData ACL"
 New-Item -ItemType Directory -Path $programDataDir -Force | Out-Null
-Set-ProgramDataAcl -Path $programDataDir
+Set-ProgramDataTreeAcl -Root $programDataDir
 Write-Ok "ProgramData ACL restricted to SYSTEM + Administrators: $programDataDir"
 
 Write-Step "Preparing token"
@@ -439,17 +659,29 @@ if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
 }
 
 Write-Step "Writing production config and token"
-if (Test-Path $configPath) {
-  $backup = "$configPath.before-production-hardening-$(Get-Date -Format 'yyyyMMddHHmmss')"
-  Copy-Item $configPath $backup -Force
-  Write-Ok "Config backup: $backup"
-}
-
 New-Item -ItemType Directory -Path (Split-Path -Parent $configPath) -Force | Out-Null
 Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist
+try {
+  Assert-RestrictedRuntime -Root $configPath
+} catch {
+  Fail "Production config was written but its runtime permissions are unsafe; service will not be started: $($_.Exception.Message)"
+}
 Write-Ok "Production config written: $configPath"
 if ($null -ne $tokenToPersist) {
   Write-Ok "BindCode exchanged; token protected with DPAPI + ProgramData ACL"
+  try {
+    if (Test-Path -LiteralPath $unauthorizedMarkerPath) {
+      $markerItem = Get-Item -Force -LiteralPath $unauthorizedMarkerPath -ErrorAction Stop
+      Assert-NotReparsePoint $markerItem
+      Remove-Item -LiteralPath $unauthorizedMarkerPath -Force -ErrorAction Stop
+    }
+    if (Test-Path -LiteralPath $unauthorizedMarkerPath) {
+      throw "Persistent unauthorized latch still exists after removal"
+    }
+    Write-Ok "Persistent unauthorized latch cleared after successful credential replacement"
+  } catch {
+    Fail "Replacement credential was persisted, but unauthorized latch could not be cleared: $($_.Exception.Message)"
+  }
 } elseif ($UseExistingToken) {
   Write-Ok "Existing DPAPI token retained; ProgramData ACL reapplied"
 }
@@ -488,6 +720,13 @@ if (-not $SkipServiceInstall) {
     }
 
     if ($null -ne $service) {
+      try {
+        Assert-RestrictedRuntime -Root $agentRoot
+        Assert-AgentServiceSecurity -Service $service -AgentRoot $agentRoot
+      } catch {
+        Stop-Service -Name ([string]$service.Name) -Force -ErrorAction SilentlyContinue
+        Fail "Windows service failed the LocalSystem/runtime-path security check and was stopped: $($_.Exception.Message)"
+      }
       $serviceName = [string]$service.Name
       Set-Service -Name $serviceName -StartupType Automatic
       Set-AgentServiceRecovery $serviceName
@@ -495,6 +734,16 @@ if (-not $SkipServiceInstall) {
         Start-Service -Name $serviceName
       } else {
         Restart-Service -Name $serviceName -Force
+      }
+      try {
+        $service = Resolve-AgentService -Identity $agentServiceIdentity
+        if ($null -eq $service) {
+          throw "AIJobPrintAgent disappeared after start"
+        }
+        Assert-AgentServiceSecurity -Service $service -AgentRoot $agentRoot
+      } catch {
+        Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+        Fail "Windows service failed its post-start security check and was stopped: $($_.Exception.Message)"
       }
       Write-Ok "Service running with Automatic startup: $serviceName"
     } else {

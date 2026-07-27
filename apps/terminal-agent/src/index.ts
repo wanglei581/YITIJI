@@ -16,7 +16,7 @@ import {
 } from './agent/config-manager'
 import { assertAgentProfileAllowsApiBaseUrl } from './agent/profile-guard'
 import { registerOrLoad } from './agent/registration'
-import { startHeartbeat } from './agent/heartbeat'
+import { sendHeartbeat, startHeartbeat } from './agent/heartbeat'
 import { startScanWatcher } from './agent/scan-watcher'
 import { startTaskRunner } from './agent/task-runner'
 import type { AgentConfig } from './agent/types'
@@ -85,22 +85,29 @@ program
     } catch (error) {
       failStartup(error, 'AGENT_REGISTRATION_FAILED')
     }
-    writeStartupDiagnosticSafely('AGENT_READY', {
-      onFailure: () => {
-        err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
-      },
-    })
-    log(`agent ready — terminalId=${config.terminalId!}`)
-
     // ── Step 5: Start heartbeat ───────────────────────────────────────────
-    const heartbeatTimer = startHeartbeat({
+    const heartbeatOptions: Parameters<typeof sendHeartbeat>[0] = {
       config,
       localTaskDatabaseAvailable,
       onConfigUpdate: (patch) => {
         if (patch.heartbeatIntervalMs) config.heartbeatIntervalMs = patch.heartbeatIntervalMs
         if (patch.claimIntervalMs) config.claimIntervalMs = patch.claimIntervalMs
       },
-    })
+    }
+    const authenticatedAtStartup = await sendHeartbeat(heartbeatOptions)
+    if (authenticatedAtStartup) {
+      writeStartupDiagnosticSafely('AGENT_READY', {
+        onFailure: () => {
+          err('AGENT_DIAGNOSTIC_UNAVAILABLE: startup diagnostic could not be written.')
+        },
+      })
+    }
+    if (authenticatedAtStartup) {
+      log(`agent authenticated and ready — terminalId=${config.terminalId!}`)
+    } else {
+      warn(`agent started but cloud authentication is not ready — terminalId=${config.terminalId!}`)
+    }
+    const heartbeatTimer = startHeartbeat(heartbeatOptions, false)
     const scanWatcherHandle = startScanWatcher(config)
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────

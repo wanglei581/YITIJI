@@ -227,7 +227,6 @@ export function persistRegistration(
   agentToken: string,
 ): AgentConfig {
   saveAgentToken(agentToken)
-  clearUnauthorized()
 
   const updated: AgentConfig = {
     ...config,
@@ -236,6 +235,7 @@ export function persistRegistration(
     agentToken: undefined,
   }
   saveConfig(updated)
+  clearUnauthorized()
   log(`config: registration persisted — terminalId=${terminalId}, adminSecret cleared`)
 
   return { ...updated, agentToken }

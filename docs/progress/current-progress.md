@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-07-27 推进 **Gate 0.4 11c ACL 现场修复**：一体机诊断服务 Running/Auto、`AGENT_READY`、加密 token 存在，但 `programDataAclStatus=tokenFileAclStatus=too_permissive`（Gate 0.4 前安装常见：继承未关）。新增只加固 ACL 的 `harden-programdata-acl.ps1`（不换 Token、不重启服务、不触网）；诊断脚本补 `programDataAclReason`/`tokenFileAclReason` 与 `$PSScriptRoot` 空值回退。本地 `verify:windows-service-recovery` / `verify:agent-unauthorized` PASS。**未**执行紧急吊销。
+2026-07-27 推进 **Gate 0.4 11c Windows 一体机只读验收（部分通过）**：目标主机 `DESKTOP-DDD6FCO` 上 `AIJobPrintAgent`（SCM Name=`aijobprintagent.exe`）以 `LocalSystem`、`Running`、`Auto` 运行，奔图 `Pantum CM2800ADN Series` 通过 `USB001` 可见且状态正常；使用服务实际配置路径复核 `configValidJson=true`、五项必填配置均存在、`encryptedTokenFile=true`、`lastStartupDiagnosticCode=AGENT_READY`、`programDataAclStatus=ok`、`tokenFileAclStatus=ok`，受限普通上下文读取 `agent.token` 被拒绝。严格诊断同时报告 `runtimeRootAclStatus=too_permissive`：当前服务仍从仓库 runtime 运行，不能作为商用安全安装通过。现场还发现 SCM 恢复策略为旧的 `10s/60s/300s` 三次重启，与当前 `60s/300s/停止` 合同不一致。`diagnose-production-agent.ps1` 的 Windows PowerShell 5.1 `powershell -File` 默认路径兼容已在本分支修复并真实复测通过；Agent 401 本地闸门亦补齐持久 marker、出纸前二次检查、离线回传保留和扫描文件保留。**仍开**：迁移到受保护发布 runtime、修复服务策略、紧急吊销、BindCode 恢复及受控出纸均属后续写操作，尚未执行。本轮未修改服务、凭证、队列或打印机状态。
 
 2026-07-27 完成 **Gate 0.4 诊断 ACL 字段合入**（[PR #401](https://github.com/wanglei581/YITIJI/pull/401) → `main@772fd7ac`）：CI 三项全绿后 squash 合并。现场仍须在 Windows 一体机跑 `diagnose-production-agent.ps1` 取得 `programDataAclStatus=ok` / `tokenFileAclStatus=ok`；吊销/BindCode 另授。
 
