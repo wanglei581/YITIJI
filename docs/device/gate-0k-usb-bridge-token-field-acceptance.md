@@ -35,11 +35,13 @@
 
 | 检查 | 结果 |
 |------|------|
-| 公网 / 本机 nginx Kiosk bundle | `index-BJahFNHZ.js`（**已覆盖**此前 #413 的 `index-DeG21wry.js`） |
-| bundle 内 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` | 仅构建键名引用；**无**非空字面量 → `isUsbImportConfigured()=false` → UI「本机未配置」 |
-| B1 诚实文案「可创建扫描任务」 | **当前 live 包缺失**（被后续热更冲掉）→ 本包热更须从含 #413 的 `main` 重建，一并恢复 |
+| 公网 / 本机 nginx Kiosk bundle | **现网** `index-DEJ0O4c6.js`（备案 #424；沿用 bridge token 注入；历史 USB 热更曾为 `index-DmcUs_Nb.js`） |
+| bundle 内 bridge token | 已注入非空字面量（**勿**在聊天/文档回显）；产物含 `X-Local-Bridge-Token` 路径与 B1「可创建扫描任务」 |
+| 预发 secret 文件 | `/root/ai-job-print-secrets/kiosk-local-bridge-token` 存在（`chmod 600`，64 字节级） |
 | API health | `ok/postgres` |
 | `PRINT_SCAN_CAPABILITY_MODE` | `managed`（`usb_import` 能力行空表不挡 API） |
+
+> Phase R 已完成。半开风险只剩：Windows Agent 尚未写入同一 token / Origin。
 
 ---
 
@@ -62,44 +64,81 @@
 
 ## Phase W — Windows Agent
 
-配置路径（二选一）：
+### KSK-001 现场实况（2026-07-27 用户回执）
 
-| 安装方式 | 配置 |
-|----------|------|
-| 正式服务 | `%ProgramData%\AIJobPrintAgent\agent-config.json` |
-| 仓库目录跑 | `<repo>\apps\terminal-agent\config\agent-config.json` |
+| 项 | 值 |
+|----|-----|
+| 实际配置目录 | `F:\AI数字一体机项目文件\AI求职打印终端\apps\terminal-agent\config`（**不是** `%ProgramData%\AIJobPrintAgent`） |
+| 实际 SCM 服务名 | `aijobprintagent.exe`（node-windows；DisplayName 可能仍是 `AIJobPrintAgent`） |
+| 本地网桥 | `127.0.0.1:9527` **已监听** |
+| 本轮结果 | 策略拦截一体机直连远端 secrets 的 `scp` → **未取令牌、未写入、未重启、未插盘** |
 
-必填：
+配置路径两种形态：
+
+| 安装方式 | `-ConfigDir` |
+|----------|----------------|
+| 正式 ProgramData | `%ProgramData%\AIJobPrintAgent`（默认） |
+| **KSK-001 仓库目录跑** | `F:\AI数字一体机项目文件\AI求职打印终端\apps\terminal-agent\config` |
+
+推荐脚本（**不打印 token**）：`apps/terminal-agent/scripts/configure-local-bridge-token.ps1`  
+（支持 `-ConfigDir`；`-ServiceName aijobprintagent.exe` 经 `service-identity.ps1` 解析 SCM Name/DisplayName。）
+
+### W1 取令牌（一体机禁止直连 secrets 时）
+
+一体机策略若拦截对 `/root/ai-job-print-secrets/...` 的 `scp`，**不要**在一体机上硬跑 scp。改用离线搬运（令牌仍勿贴聊天）：
+
+1. 在**允许 SSH 的运维机**（Mac/跳板）执行：  
+   `scp root@120.48.13.190:/root/ai-job-print-secrets/kiosk-local-bridge-token ./kiosk-bridge.token`
+2. 将 `kiosk-bridge.token` 拷到 U 盘或加密通道，带到一体机，例如：  
+   `F:\temp\kiosk-bridge.token`（用完即删）
+3. 一体机只读本地文件，不访问预发 secrets 路径。
+
+### W2 写入配置并重启（KSK-001 修正命令）
+
+在已更新脚本的仓库目录（管理员 PowerShell）：
+
+```powershell
+cd "F:\AI数字一体机项目文件\AI求职打印终端\apps\terminal-agent\scripts"
+
+$TokenFile = "F:\temp\kiosk-bridge.token"   # 改为你的本地令牌文件
+$ConfigDir = "F:\AI数字一体机项目文件\AI求职打印终端\apps\terminal-agent\config"
+
+# 只读检查（不改文件）
+powershell -NoProfile -ExecutionPolicy Bypass -File .\configure-local-bridge-token.ps1 `
+  -TokenFile $TokenFile `
+  -ConfigDir $ConfigDir `
+  -ServiceName "aijobprintagent.exe" `
+  -WhatIfCheck
+
+# 写入 + 按 SCM Name 重启
+powershell -NoProfile -ExecutionPolicy Bypass -File .\configure-local-bridge-token.ps1 `
+  -TokenFile $TokenFile `
+  -ConfigDir $ConfigDir `
+  -ServiceName "aijobprintagent.exe" `
+  -RestartService
+
+Remove-Item -LiteralPath $TokenFile -Force -ErrorAction SilentlyContinue
+netstat -ano | findstr "9527"
+```
+
+兼容旧参数名时，`-ProgramDataDir` 也可指向上述 **config 目录**（与 `-ConfigDir` 等价）。
+
+必填语义（脚本会合并 Origin，不覆盖其它已有 Origin）：
 
 ```json
 "localApiBridgeToken": "<与 Kiosk 构建同一值>",
 "localApiAllowedOrigins": [
   "https://zyidai.cn",
-  "http://127.0.0.1:5173"
+  "http://127.0.0.1:5173",
+  "http://localhost:5173"
 ]
-```
-
-从预发主机取令牌（在一体机或运维机执行，勿贴输出）：
-
-```powershell
-# 示例：scp 后写入配置（自行替换路径；不要把 token 回贴聊天）
-# scp root@<preprod>:/root/ai-job-print-secrets/kiosk-local-bridge-token $env:TEMP\kiosk-bridge.token
-```
-
-然后：
-
-```powershell
-Restart-Service AIJobPrintAgent
-Start-Sleep -Seconds 3
-Get-Service AIJobPrintAgent | Format-List Status, StartType
-netstat -ano | findstr "9527"
 ```
 
 Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「localApiBridgeToken not configured」。
 
 ### W 冒烟
 
-1. 一体机全屏打开 `https://zyidai.cn/print/upload`（或简历打印同源上传）
+1. 一体机 **Edge/Chrome** 全屏打开 `https://zyidai.cn/print/upload`（内置浏览器若拦截 loopback **不作数**）
 2. U 盘 tab：**不是**「本机未配置」
 3. 插入含 PDF/JPG/PNG（≤15MB）的 U 盘 → 列表出现文件名（无绝对路径）
 4. 选文件上传 → 进入后续打印预览/确认（真实 `fileId`）
@@ -109,21 +148,25 @@ Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「lo
 
 ## 通过标准
 
-- [ ] Kiosk 热更自含 #413 的 `main`，且注入 bridge token（`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`）
-- [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`
-- [ ] U 盘 tab 可用；枚举 + 上传一笔成功
+- [x] Kiosk 热更自含 bridge token（现网备案包 `index-DEJ0O4c6.js`；历史 `index-DmcUs_Nb.js`；`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`）
+- [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`（KSK-001：`-ConfigDir` 仓库 config + `-ServiceName aijobprintagent.exe`）
+- [ ] U 盘 tab 在一体机 Edge/Chrome 下枚举 + 上传一笔成功
 - [ ] 进度文档已记旁证；**无** token 明文入仓
 
-## 回执模板（脱敏）
+## 回执（脱敏，2026-07-27 — 用户本轮）
 
 ```text
 GATE_0K_USB_BRIDGE 回执
-日期：
-Kiosk bundle：
-usb_bridge_token=injected：是/否
-Agent localApiBridgeToken 已写：是/否
-allowedOrigins 含 zyidai.cn：是/否
-U 盘枚举：通过/失败
-U 盘上传 fileId：（可打码）
-阻塞：
+日期：2026-07-27
+Kiosk bundle：当时 index-DmcUs_Nb.js（现网已覆盖为 index-DEJ0O4c6.js，仍含 token）
+usb_bridge_token=injected：是（Phase R）
+Agent localApiBridgeToken 已写：否
+allowedOrigins 含 zyidai.cn：未验证
+U 盘枚举：未执行
+U 盘上传：未执行
+fileId：无
+阻塞：一体机策略拦截对远端 secrets 的 scp；须离线搬运令牌后再用修正参数写入
+现场修正参数：-ConfigDir "...\apps\terminal-agent\config"；-ServiceName aijobprintagent.exe；9527 已监听
 ```
+
+> 说明：仓库内曾短暂出现「配置侧已写 / status 200」条目；与用户本轮明确回执冲突，**以本回执为准**，不得继续宣称 Agent 侧已配置完成。

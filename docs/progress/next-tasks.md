@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-27
+> 最后更新：2026-07-28
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 
@@ -10,24 +10,24 @@
 - [x] **P0 功能真实性第二批**：`/print/done` 已改为仅后端 `completed` 显示成功；`/resume/export` 保留诚实守门，不新建第二套假产物状态；扫描不再请求不存在的设备状态端点，直达不建会话，只接受服务端真实指引，不伪造离线/就绪态，停留期间过期会话也禁止继续并执行一次取消；场馆导览、打印完成反馈/帮助、线下机构搜索已接到既有真实路径/API。新增真实性浏览器 23/23 和相关静态门禁。
 - [x] **P1 逐屏证据合同与口径**：已固定 77 个主视觉目标 + 5 个状态参考、87 条路由处置、精确视口、状态、重定向/复用/无独立原型标记与 ignored 证据根；门禁会与真实 router AST 交叉校验。
 - [x] **首页招聘会 / 打印扫描视觉平衡候选**：手机竖屏及 932×430 横屏使用物理移动壳，打印扫描五卡 80px 等高、末项通栏，招聘会浅麦金层级、禁用态和降动效已收口；1024×768、1080×1920 舞台保护不变。已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。
-- [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；预发 Kiosk-only 热更为 `index-CPD4lg4F.js`。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
+- [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；其后热更为 `index-CPD4lg4F.js`，再经 USB bridge / 备案包覆盖。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
 - [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65** / **57**；判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** TRTC）。不等于像素封板或硬件验收。
 - [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
-- [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；预发仅热更 Kiosk → `index-CPD4lg4F.js`（API pin / PM2 / DB / Admin / Partner 未动）。
+- [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；其后现网 Kiosk 以备案包为准（见下）。
 
 ## 当前执行：上线前 P0 收口（视觉候选已进主干）
 
 视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`；商用密度与融合收口已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
 
-推荐顺序（2026-07-27 更新）：
-0i. [x] **Kiosk-only 热更 #400**（`main@f9195e96` → 预发 `index-CPD4lg4F.js`）：已完成；回滚点 `dist-before-400-20260727012348` / `backups/kiosk-dist-before-400-20260727012348.tgz`
-0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；现场后续又进入 `maintenance`（当前 `lifecycleVersion=5`/`credentialGeneration=5`）——整机扫描前须确认是否再切 `active`
+推荐顺序（2026-07-28 更新）：
+0i. [x] **Kiosk-only 热更链路**：#400 → USB bridge `index-DmcUs_Nb.js` → 备案 [PR #424](https://github.com/wanglei581/YITIJI/pull/424) 现网 **`index-DEJ0O4c6.js`**（仍含 bridge token；明文未入仓）
+0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；SMB 旁证时点为 `lifecycleVersion=10`/`credentialGeneration=8`（`next-tasks` 旧写 v5 已过时，现场前以 DB 只读为准）
 0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
 0j3. [~] **PS 5.1 显式 backup-path 收口候选**（`codex/gate04-powershell51`）：配置写入与 token rollback 统一使用显式 backup 的 `Replace-FileAtomically`，并锁定两处冒号插值的 PS 5.1 解析；本机探针、ParseFile、服务恢复门禁与 Wave B unauthorized 回归均通过。待 review/合入；未部署到 Windows 终端。
-0k. [~] **扫描 / U 盘整机**：SMB 旁证成立；Kiosk 已注入 bridge token（`index-DmcUs_Nb.js`）并恢复 B1；**待 Windows** 写 `localApiBridgeToken` + `allowedOrigins` 含 `https://zyidai.cn` 后插盘冒烟；Spike C 另开
-0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413)；曾被覆盖，已随 USB bridge 热更自 `main@20a462e3` 恢复
+0k. [~] **扫描 / USB 整机**：SMB 旁证成立；Kiosk Phase R 已注入（现网备案包仍含 token）；Agent Phase W **未写入**（scp 策略拦截 + 须用仓库 `config` / `aijobprintagent.exe`）；插盘冒烟未做；Spike C 另开
+0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413)；曾被覆盖，已随 USB bridge / 备案构建恢复
 0k2. [x] **Gate 0k SMB 现场交付旁证**：预发 `ScanTask` 多笔 `completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）
-0k3. [~] **Gate 0k U 盘 bridge**：Kiosk-only 热更已注入 token（`usb_bridge_token=injected`）；Agent 侧与真机冒烟待回执（包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`）
+0k3. [~] **Gate 0k USB bridge**：工具 PR #423 合入后，仍须离线令牌 + `-ConfigDir` 仓库 config + `-ServiceName aijobprintagent.exe` + 一体机 Edge/Chrome 插盘。包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`。不代表 USB 真机验收已通过。
 0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
 
 推荐顺序（2026-07-25）：
