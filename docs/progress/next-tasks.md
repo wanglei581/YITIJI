@@ -6,7 +6,7 @@
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
-- [x] **S0-C 简历解析阶段真值本地候选已完成**：已移除固定延时与伪 OCR/提取/诊断阶段，立即提交真实请求，只展示明确的非实时处理内容说明；无 `fileId` 直达 fail-closed，返回不冒充撤回服务端任务；真实性门禁、W3 6/6、W6 聚焦 1/1、typecheck/lint/build 和三模型终审通过。当前待 PR、GitHub 三项 CI 与最终合并；未部署。
+- [x] **S0-C 简历解析阶段真值已合入**：[PR #429](https://github.com/wanglei581/YITIJI/pull/429) → `main@5fcc4a50`；已移除固定延时与伪 OCR/提取/诊断阶段，立即提交真实请求，只展示明确的非实时处理内容说明；无 `fileId` 直达 fail-closed，返回不冒充撤回服务端任务；真实性门禁、W3 6/6、W6 聚焦 1/1、typecheck/lint/build、GitHub 三项 CI 和三模型终审均通过。未部署。
 - [ ] **Phase 0 最终 GO/NO-GO**：S0-B/S0-C 完成后再汇总真实 API、1080×1920、390×844 与必要真机证据；不得把 S0-A 候选写成整个 AI 操作系统或商业上线已完成。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
