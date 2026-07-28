@@ -122,7 +122,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/generate', url: '/resume/generate', marker: screen('resume-generate'), featureText: 'AI 简历生成' },
   { pattern: '/resume/generate/preview', url: '/resume/generate/preview', marker: screen('resume-generate-preview'), featureText: '生成结果已清除' },
-  { pattern: '/resume/parse', url: '/resume/parse', marker: screen('resume-parse'), featureText: '正在读取上传文件' },
+  { pattern: '/resume/parse', url: '/resume/parse', marker: screen('resume-parse'), featureText: '未找到简历文件' },
   { pattern: '/resume/report', url: '/resume/report', marker: screen('resume-report'), featureText: '还没有诊断报告' },
   { pattern: '/resume/optimize', url: '/resume/optimize', marker: screen('resume-optimize'), featureText: '请先上传简历完成诊断' },
   { pattern: '/resume/export', url: '/resume/export', marker: screen('resume-export'), featureText: '导出与打印' },

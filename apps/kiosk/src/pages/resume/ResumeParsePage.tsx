@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  AlertCircleIcon,
   CheckIcon,
   SparklesIcon,
   XCircleIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskPageFrame, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import { submitResumeParse } from '../../services/api'
@@ -20,8 +20,6 @@ import './resume-diagnosis-lightflow.css'
 import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
 
-type Step = 'reading' | 'ocr' | 'extracting' | 'diagnosing'
-
 const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '上传与方向' },
   { title: 'AI 解析' },
@@ -29,23 +27,14 @@ const RESUME_FLOW_STEPS: StepperStep[] = [
   { title: '优化打印' },
 ]
 
-const STEPS: { key: Step; label: string; hint: string }[] = [
+const STEPS = [
   { key: 'reading',    label: '读取上传文件',    hint: '校验格式与页数' },
   { key: 'ocr',        label: '识别可解析文字',  hint: '图片 / 扫描件经 OCR 识别' },
   { key: 'extracting', label: '提取简历结构',    hint: '识别教育、经历、技能等分区' },
   { key: 'diagnosing', label: '生成诊断报告',    hint: '6 个评分维度 + 风险表述 + 优先级建议' },
 ]
 
-const RING_CIRCUMFERENCE = 2 * Math.PI * 88  // ≈ 552.9
-
 const DIMENSIONS = RESUME_SCORING_DIMENSIONS.map((item) => item.label)
-const MIN_STEP_MS = 420
-const DIMENSION_PROGRESS_BY_STEP: Record<Step, number> = {
-  reading: 1,
-  ocr: 2,
-  extracting: 4,
-  diagnosing: DIMENSIONS.length,
-}
 
 const FAIL_REASONS = [
   '文件格式不支持，请重新上传',
@@ -54,38 +43,34 @@ const FAIL_REASONS = [
   'AI 诊断服务暂时不可用，请稍后重试',
 ]
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
 export function ResumeParsePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
   const state = location.state as Record<string, unknown> | null
 
-  const shouldFail = state?.simulateFailure === true
-  const failReason = typeof state?.failReason === 'string' ? (state.failReason as string) : FAIL_REASONS[1]
+  const file = state?.file as { name?: string; format?: string; size?: number | string } | undefined
+  const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
 
-  const [current, setCurrent] = useState<Step>('reading')
   const [failed, setFailed] = useState(false)
   const cancelRef = useRef(false)
+  const startedRef = useRef(false)
+  const failTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useBusyLock(Boolean(fileId) && !failed)
 
   const navigateFail = useCallback(
     (reason: string) => {
       setFailed(true)
-      setTimeout(() => {
+      failTimerRef.current = setTimeout(() => {
         navigate('/resume/report', { state: { ...state, success: false, reason } })
       }, 700)
     },
     [navigate, state],
   )
 
-  const navigateSuccess = useCallback(async () => {
-    const file = state?.file as { name?: string; format?: string } | undefined
-    const fileId = typeof state?.fileId === 'string' ? state.fileId : ''
+  const submitAndWait = useCallback(async () => {
     if (!fileId) {
-      navigateFail('请先上传简历文件，再开始 AI 诊断')
       return
     }
     const selectedDimensions = Array.isArray(state?.selectedDimensions)
@@ -93,7 +78,6 @@ export function ResumeParsePage() {
       : undefined
     const targetContext = state?.targetContext as ResumeTargetContext | undefined
     try {
-      setCurrent('diagnosing')
       const result = await submitResumeParse(
         {
           fileId,
@@ -106,8 +90,8 @@ export function ResumeParsePage() {
         getToken(),
       )
       if (cancelRef.current) return
-      if (result.status === 'failed') {
-        navigateFail(result.failReason ?? 'AI 服务解析失败，请重试')
+      if (result.status !== 'completed') {
+        navigateFail(result.failReason ?? 'AI 服务尚未返回最终解析结果，请稍后重试')
         return
       }
       // Phase C-2A：匿名 parse 会返回一次性 accessToken；连同 taskId 写入最小会话，
@@ -120,7 +104,7 @@ export function ResumeParsePage() {
       if (cancelRef.current) return
       navigateFail('AI 服务暂时不可用，请稍后重试')
     }
-  }, [getToken, navigate, navigateFail, state])
+  }, [file, fileId, getToken, navigate, navigateFail, state])
 
   const handleDevFail = useCallback(() => {
     cancelRef.current = true
@@ -129,36 +113,17 @@ export function ResumeParsePage() {
 
   useEffect(() => {
     cancelRef.current = false
-    const run = async () => {
-      setCurrent('reading')
-      await delay(MIN_STEP_MS)
-      if (cancelRef.current) return
-      setCurrent('ocr')
-      if (shouldFail) {
-        navigateFail(failReason)
-        return
-      }
-      await delay(MIN_STEP_MS)
-      if (cancelRef.current) return
-      setCurrent('extracting')
-      await delay(MIN_STEP_MS)
-      if (!cancelRef.current) await navigateSuccess()
+    const cleanup = () => {
+      cancelRef.current = true
+      if (failTimerRef.current) clearTimeout(failTimerRef.current)
     }
-    void run()
-    return () => { cancelRef.current = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const currentIdx = STEPS.findIndex((s) => s.key === current)
-  const completedDimensionCount = DIMENSION_PROGRESS_BY_STEP[current]
-  const stepNum = currentIdx + 1
-
-  // Ring SVG: r=88, circumference≈552.9
-  const ringFill = failed ? 0 : Math.round((stepNum / STEPS.length) * RING_CIRCUMFERENCE)
-  const ringDash = `${ringFill} ${RING_CIRCUMFERENCE}`
+    if (!fileId || startedRef.current) return cleanup
+    startedRef.current = true
+    void submitAndWait()
+    return cleanup
+  }, [fileId, submitAndWait])
 
   // File meta from navigation state
-  const file = state?.file as { name?: string; size?: number | string } | undefined
   const fileName = file?.name ?? '简历文件'
   const fileSize = typeof file?.size === 'number'
     ? file.size < 1024 * 1024 ? `${Math.round(file.size / 1024)} KB` : `${(file.size / 1024 / 1024).toFixed(1)} MB`
@@ -166,18 +131,41 @@ export function ResumeParsePage() {
   const source = typeof state?.source === 'string' ? state.source : 'upload'
   const sourceLabel = source === 'scan' ? '扫描件' : source === 'manual' ? '手动填写' : '云端上传'
 
-  const parseTitle = failed
-    ? '解析出错'
-    : current === 'reading'    ? '正在读取上传文件…'
-    : current === 'ocr'        ? '正在识别文字内容…'
-    : current === 'extracting' ? '正在提取简历结构…'
-    :                            '正在生成诊断报告…'
-
   /* ── 顶部流程步骤条：与上传/报告/优化页共用 Stepper ── */
+
+  if (!fileId) {
+    return (
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+        <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
+          <div className="resume-lightflow__stepper">
+            <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
+          </div>
+          <div className="rp-center">
+            <section className="rp-card text-center">
+              <div className="rp-ring-box" aria-hidden="true">
+                <span className="rp-ring-num">
+                  <XCircleIcon style={{ width: 44, height: 44 }} />
+                </span>
+              </div>
+              <h1 className="rp-title">未找到简历文件</h1>
+              <p className="mt-3 text-base text-neutral-600">请从上传简历页面选择文件后，再开始 AI 诊断。</p>
+              <button
+                type="button"
+                className="rp-cancel mt-6 min-h-[56px] px-8"
+                onClick={() => navigate('/resume/source')}
+              >
+                返回上传简历
+              </button>
+            </section>
+          </div>
+        </section>
+      </KioskPageFrame>
+    )
+  }
 
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--resume">
-    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6" role="status" aria-live="polite">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-parse" className="resume-lightflow resume-parse-lightflow flex h-full flex-col p-6">
       <div className="resume-lightflow__stepper">
         <Stepper steps={RESUME_FLOW_STEPS} currentIndex={1} />
       </div>
@@ -186,7 +174,7 @@ export function ResumeParsePage() {
       <div className="rp-center">
         <section className="rp-card">
 
-          {/* 环形进度 */}
+          {/* 装饰性处理标识：不表达百分比或服务端阶段 */}
           <div className="rp-ring-box" aria-hidden="true">
             <svg viewBox="0 0 200 200" width="200" height="200">
               <circle cx="100" cy="100" r="88" fill="none" stroke="var(--fy-line)" strokeWidth="13" />
@@ -194,65 +182,54 @@ export function ResumeParsePage() {
                 cx="100" cy="100" r="88" fill="none"
                 stroke={failed ? 'var(--fy-error)' : 'var(--fy-teal)'}
                 strokeWidth="13" strokeLinecap="round"
-                strokeDasharray={ringDash}
-                transform="rotate(-90 100 100)"
-                style={{ transition: 'stroke-dasharray .4s ease' }}
               />
             </svg>
             <span className="rp-ring-num">
-              {failed ? <XCircleIcon style={{ width: 44, height: 44 }} /> : <>{stepNum}<small>/{STEPS.length} 步</small></>}
+              {failed
+                ? <XCircleIcon style={{ width: 44, height: 44 }} />
+                : <SparklesIcon style={{ width: 44, height: 44 }} />}
             </span>
           </div>
 
-          <div className="rp-title">{parseTitle}</div>
+          <div className="rp-title" role="status" aria-live="polite">
+            {failed ? '解析出错' : '正在等待真实解析结果…'}
+          </div>
 
           {/* 文件信息 chips */}
           {!failed && (
             <div className="rp-chips">
               <span className="rp-chip">{fileName}</span>
               {fileSize && <span className="rp-chip">{fileSize} · {sourceLabel}</span>}
+              <span className="rp-chip">处理内容说明 · 非实时阶段</span>
             </div>
           )}
 
-          {/* 步骤列表 */}
+          <div className="rp-notice" role="note">
+            <SparklesIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
+            当前服务仅返回最终解析结果。以下为本次处理内容说明，不代表服务端实时阶段。
+          </div>
+
+          {/* 处理内容说明：API 不提供分阶段状态，不渲染完成/进行中 */}
           <div className="rp-steps">
             {STEPS.map((step, idx) => {
-              const done = idx < currentIdx
-              const active = idx === currentIdx
-              const isFailed = failed && active
-
-              const stateLabel = isFailed ? '任务中断' : done ? '已完成' : active ? '进行中…' : '待处理'
-              const dotClass = ['rp-step__dot',
-                isFailed ? 'rp-step__dot--error' : done ? 'rp-step__dot--done' : active ? 'rp-step__dot--active' : '',
-              ].filter(Boolean).join(' ')
-              const rowClass = ['rp-step', done ? 'rp-step--done' : active ? 'rp-step--active' : 'rp-step--todo'].join(' ')
-
               return (
-                <div key={step.key} className={rowClass}>
-                  <span className={dotClass} aria-hidden="true">
-                    {isFailed
-                      ? <AlertCircleIcon style={{ width: 20, height: 20 }} />
-                      : done
-                      ? <CheckIcon style={{ width: 20, height: 20 }} />
-                      : idx + 1}
-                  </span>
+                <div key={step.key} className="rp-step rp-step--todo">
+                  <span className="rp-step__dot" aria-hidden="true">{idx + 1}</span>
                   <strong className="rp-step__label">{step.label}</strong>
                   <em className="rp-step__hint">{step.hint}</em>
-                  <span className="rp-step__state">{stateLabel}</span>
+                  <span className="rp-step__state">处理内容</span>
                 </div>
               )
             })}
           </div>
 
-          {/* 维度点亮 */}
+          {/* 结果维度说明：不冒充实时准备进度 */}
           {!failed && (
             <div className="rp-dims">
-              <p className="rp-dims__title">评分维度准备进度（逐项点亮）</p>
+              <p className="rp-dims__title">报告将评估的维度</p>
               <div className="rp-dims__grid">
-                {DIMENSIONS.map((item, idx) => (
-                  <span key={item} className={['rp-dim', idx < completedDimensionCount ? 'rp-dim--lit' : ''].join(' ')}>
-                    {item}
-                  </span>
+                {DIMENSIONS.map((item) => (
+                  <span key={item} className="rp-dim">{item}</span>
                 ))}
               </div>
             </div>
@@ -269,7 +246,7 @@ export function ResumeParsePage() {
       <div className="rp-actionbar">
         <div className="rp-actionbar__notice">
           <CheckIcon style={{ width: 18, height: 18, flexShrink: 0 }} aria-hidden="true" />
-          简历原文仅用于本次解析和诊断，不会发送给任何企业，也不作为平台简历库沉淀。
+          返回仅停止本机等待，不会撤回已提交的服务请求；简历原文不会发送给企业，也不进入平台候选人简历库。
         </div>
         <button
           type="button"
@@ -277,12 +254,12 @@ export function ResumeParsePage() {
           onClick={() => { cancelRef.current = true; navigate(-1) }}
         >
           <XCircleIcon style={{ width: 20, height: 20 }} aria-hidden="true" />
-          取消解析
+          返回上一步
         </button>
       </div>
 
       {/* DEV 专用 */}
-      {import.meta.env.DEV && !failed && (
+      {import.meta.env.DEV && Boolean(fileId) && !failed && (
         <div className="absolute bottom-24 right-6">
           <button
             onClick={handleDevFail}
