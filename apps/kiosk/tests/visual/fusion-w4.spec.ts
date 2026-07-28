@@ -95,6 +95,15 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   await verifyPage(page, errors)
 })
 
+test('/campus AI求职「开始模拟」进入 /interview/setup @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/campus')
+  await page.getByRole('button', { name: 'AI求职' }).click()
+  await page.getByRole('button', { name: '开始模拟' }).click()
+  await expect(page).toHaveURL(/\/interview\/setup$/)
+  await verifyPage(page, errors)
+})
+
 test('campus 两个直达容错页诚实返回 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/campus/welcome')
