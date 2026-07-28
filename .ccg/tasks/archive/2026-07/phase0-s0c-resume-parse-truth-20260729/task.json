@@ -1,0 +1,25 @@
+{
+  "id": "phase0-s0c-resume-parse-truth-20260729",
+  "title": "Phase 0 S0-C 简历解析阶段真值收口",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "Phase 0 最终 GO/NO-GO 单独执行",
+  "createdAt": "2026-07-29T00:38:00+08:00",
+  "completedAt": "2026-07-29T01:26:22+08:00",
+  "branch": "codex/phase0-s0c-resume-parse-truth-20260729",
+  "baseSha": "f7677a773f78c108dbad1a18ec3b4a1896894b8d",
+  "pullRequest": 429,
+  "mergeSha": "5fcc4a5085a394909965869f3c992db0f63c0712",
+  "deployed": false,
+  "touches": {
+    "pii": true,
+    "ai": true,
+    "database": false,
+    "hardware": false,
+    "secrets": false,
+    "production": false
+  }
+}
