@@ -35,7 +35,7 @@
 
 | 检查 | 结果 |
 |------|------|
-| 公网 / 本机 nginx Kiosk bundle | **已热更** `index-DmcUs_Nb.js`（`usb_bridge_token=injected`；备份 `kiosk-dist-before-usb-bridge-20260727T221505+0800`） |
+| 公网 / 本机 nginx Kiosk bundle | **现网** `index-DEJ0O4c6.js`（备案 #424；沿用 bridge token 注入；历史 USB 热更曾为 `index-DmcUs_Nb.js`） |
 | bundle 内 bridge token | 已注入非空字面量（**勿**在聊天/文档回显）；产物含 `X-Local-Bridge-Token` 路径与 B1「可创建扫描任务」 |
 | 预发 secret 文件 | `/root/ai-job-print-secrets/kiosk-local-bridge-token` 存在（`chmod 600`，64 字节级） |
 | API health | `ok/postgres` |
@@ -148,7 +148,7 @@ Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「lo
 
 ## 通过标准
 
-- [x] Kiosk 热更自含 #413 的 `main`，且注入 bridge token（`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`；bundle `index-DmcUs_Nb.js`）
+- [x] Kiosk 热更自含 bridge token（现网备案包 `index-DEJ0O4c6.js`；历史 `index-DmcUs_Nb.js`；`DEPLOY_SOURCE` 有 `usb_bridge_token=injected`）
 - [ ] Agent `localApiBridgeToken` 与 Kiosk 一致；`localApiAllowedOrigins` 含 `https://zyidai.cn`（KSK-001：`-ConfigDir` 仓库 config + `-ServiceName aijobprintagent.exe`）
 - [ ] U 盘 tab 在一体机 Edge/Chrome 下枚举 + 上传一笔成功
 - [ ] 进度文档已记旁证；**无** token 明文入仓
@@ -158,7 +158,7 @@ Agent 日志期望：本地网桥监听 `127.0.0.1:9527`；**不应**再刷「lo
 ```text
 GATE_0K_USB_BRIDGE 回执
 日期：2026-07-27
-Kiosk bundle：index-DmcUs_Nb.js
+Kiosk bundle：当时 index-DmcUs_Nb.js（现网已覆盖为 index-DEJ0O4c6.js，仍含 token）
 usb_bridge_token=injected：是（Phase R）
 Agent localApiBridgeToken 已写：否
 allowedOrigins 含 zyidai.cn：未验证

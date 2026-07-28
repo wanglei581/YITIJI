@@ -1,0 +1,14 @@
+{
+  "id": "deploy-home-filing-info",
+  "title": "首页备案信息与职易达AI生产部署",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend-operations",
+  "currentPhase": "completed",
+  "nextAction": "无；生产部署与线上只读复验已完成",
+  "createdAt": "2026-07-28T08:46:00Z",
+  "completedAt": "2026-07-28T09:31:09Z",
+  "branch": "codex/deploy-home-filing-20260728",
+  "mergeCommit": "f2be9a75e521ca95cc96c8b7e8bfa8b7e54ff386"
+}

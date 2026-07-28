@@ -296,6 +296,37 @@
 }
 .kpv1 .notice svg { width: 20px; height: 20px; flex: none; color: var(--pv-wheat); }
 
+/* ── 网站备案信息（首页最后一个内容节点） ── */
+.kpv1 .filing-info {
+  margin: 8px 48px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  column-gap: 8px;
+  row-gap: 2px;
+  color: var(--pv-muted);
+  font-size: 15px;
+  line-height: 1.5;
+  text-align: center;
+}
+.kpv1 .filing-info a {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 4px;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+}
+.kpv1 .filing-info a:hover,
+.kpv1 .filing-info a:focus-visible {
+  color: var(--pv-teal-deep);
+  text-decoration-color: currentColor;
+}
+.kpv1 .filing-brand { font-weight: 600; }
+
 /* ── 继续上次（原型外生产动态状态：仅登录且确有可恢复任务时由 ContinuePanel 渲染，
       标准原型验收态该区不出现，故不破坏 01-home 1:1） ── */
 .kpv1 .continue {
@@ -369,6 +400,7 @@
   .kpv1 .groups { padding: 0 24px; }
   .kpv1 .zone-row { margin: 8px 24px 0; }
   .kpv1 .notice { margin: 6px 24px 0; }
+  .kpv1 .filing-info { margin: 8px 24px 0; }
 }
 .kiosk-home-mobile .ui-kiosk-topbar {
   padding: 0 14px;
@@ -532,7 +564,8 @@
   .kiosk-home-mobile .kpv1 .welcome,
   .kiosk-home-mobile .kpv1 .groups { padding-left: 14px; padding-right: 14px; }
   .kiosk-home-mobile .kpv1 .zone-row,
-  .kiosk-home-mobile .kpv1 .notice { margin-left: 14px; margin-right: 14px; }
+  .kiosk-home-mobile .kpv1 .notice,
+  .kiosk-home-mobile .kpv1 .filing-info { margin-left: 14px; margin-right: 14px; }
   .kiosk-home-mobile .kpv1 .welcome h1 { font-size: 30px; }
 }
 
