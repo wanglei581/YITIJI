@@ -5,7 +5,7 @@
 ## Phase 0 真值收口后续（S0-B 候选之后）
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
-- [x] **S0-B 打印 SIM 演示真值本地候选**：`PrintProgressPage` 的 SIM 路径固定展示“演示模式·非真实打印”，成功/失败均不进入真实结果页；真实 HTTP/Agent 路径保持不变。真实性守卫、typecheck、生产 build、W2 print 13/13 与 1080×1920 mock 浏览器验收通过；分支 `codex/phase0-s0b-print-sim-truth-20260728` 尚未合并/部署。
+- [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
 - [ ] **S0-C 简历解析阶段真值**：`ResumeParsePage` 固定延时动画不得冒充 OCR/提取/诊断的后端真实阶段；首选接真实状态，做不到时明确标为等待动画/非实时阶段，并补回归。
 - [ ] **Phase 0 最终 GO/NO-GO**：S0-B/S0-C 完成后再汇总真实 API、1080×1920、390×844 与必要真机证据；不得把 S0-A 候选写成整个 AI 操作系统或商业上线已完成。
 
