@@ -123,6 +123,28 @@ mustContain(
   'E5 ToolboxZonePage 亦从共享助手导入（两侧同源不发散）',
 )
 
+// ── F. Phase 0 S0-A A2：「已开通」口径真实性 ────────────────────────────────
+// 静态指引 cards（迎新/行李/VR/校园卡等）只是说明页，不得计为「本校已开通服务」。
+// 仅 config.items → extensionItems 中经校方配置且真实可启动的项可称「已配置入口」；
+// 无扩展项时不得暗示系统已接通。
+mustNotContain(
+  CAMPUS_PAGE,
+  ['本校已开通', 'cards.length + extensionItems.length'],
+  'F1 不得用 cards.length + extensionItems.length 生成「本校已开通 X 项服务」',
+)
+mustContain(
+  CAMPUS_PAGE,
+  ['可查看指引', '已配置入口'],
+  'F2 静态页称「可查看指引」、扩展项称「已配置入口」须区分',
+)
+// F3. enabled===false 时不得展示「可查看指引 0 项」徽章（与页面「本机暂未开启」空态重复）。
+// 要求：statusBadge 在 !config.enabled 时为 null，且 badge 仅在 statusBadge 有值时渲染。
+mustContain(
+  CAMPUS_PAGE,
+  ['!config.enabled', '? null', 'badge={statusBadge ?'],
+  'F3 enabled===false 时 statusBadge 为 null，不渲染 header badge（避免「可查看指引 0 项」）',
+)
+
 console.log('')
 if (failed > 0) {
   console.error(`❌ ${failed} 项失败 — 智慧校园 bigdata 冻结校验未通过\n`)
