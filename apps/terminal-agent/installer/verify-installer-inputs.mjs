@@ -11,6 +11,10 @@ const wix = read('Agent.wxs')
 const project = read('AIJobPrintAgent.wixproj')
 const staging = read('build-staging.ps1')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
+const workflow = fs.readFileSync(
+  path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
+  'utf8',
+)
 
 console.log('\n=== verify Windows Agent installer inputs ===')
 
@@ -71,5 +75,24 @@ assert.match(lifecycle, /catch \{\s*# An unprovisioned Agent[\s\S]*\$startServic
 assert.match(lifecycle, /AGENT_CONFIG_NOT_FOUND/)
 assert.match(lifecycle, /LocalSystem service launch did not produce a startup diagnostic/)
 assert.match(lifecycle, /Unprovisioned service did not return to Stopped/)
+assert.match(lifecycle, /finally \{\s*Export-LifecycleEvidence -Phase "final"/)
+assert.match(lifecycle, /Export-LifecycleEvidence -Phase "post-install"/)
+assert.match(lifecycle, /Export-LifecycleEvidence -Phase "post-start"/)
+assert.match(lifecycle, /sc\.exe" \$verb \$serviceName/)
+assert.match(lifecycle, /@\("qc", "queryex"\)/)
+assert.match(lifecycle, /Get-WinEvent -FilterHashtable/)
+assert.match(lifecycle, /ProviderName = "Service Control Manager"/)
+assert.match(lifecycle, /Copy-Item -LiteralPath \$diagnosticPath -Destination/)
+assert.match(lifecycle, /bootstrap\\aijobprintagent\.exe/)
+assert.match(lifecycle, /bootstrap\\aijobprintagent\.xml/)
+assert.match(lifecycle, /node\\node\.exe/)
+assert.match(lifecycle, /app\\dist\\index\.js/)
+assert.match(lifecycle, /Get-FileHash -LiteralPath \$fullPath -Algorithm SHA256/)
+assert.match(lifecycle, /VersionInfo\.FileVersion/)
+assert.match(lifecycle, /& \$nodePath --version/)
+assert.match(lifecycle, /Join-Path \$stateRoot "logs"/)
+assert.match(lifecycle, /Copy-Item -LiteralPath \$item\.FullName -Destination \$copiedLogRoot -Recurse -Force/)
+assert.match(workflow, /artifacts\/msi\/lifecycle-logs\//)
+assert.doesNotMatch(workflow, /lifecycle-logs\/\*\.log/)
 
 console.log('ALL PASS: Windows Agent installer inputs')

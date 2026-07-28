@@ -58,7 +58,7 @@ jobs:
           name: terminal-agent-unsigned-msi-candidate
           path: |
             apps/terminal-agent/installer/artifacts/msi/*.msi
-            apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/*.log
+            apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/
             apps/terminal-agent/installer/artifacts/staging/manifest.json
           if-no-files-found: warn
           retention-days: 7
