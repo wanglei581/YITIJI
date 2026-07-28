@@ -140,9 +140,6 @@ function backendStatusToStep(status: BackendJobStatus): Step {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function PrintProgressPage() {
-  // 打印进行中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(true)
-
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as Record<string, unknown> | null
@@ -158,6 +155,8 @@ export function PrintProgressPage() {
   const hasFileContext = Boolean((state as { file?: unknown } | null)?.file)
   const hasContext = Boolean(taskId) || hasFileContext
   const canSimulate = !isHttpMode && hasFileContext
+  // isSim：严格对应非真实 API / SIM 演示路径（与 canSimulate 同义）
+  const isSim = canSimulate
 
   // simulateFailure — dev/mock only
   const shouldFail = canSimulate && state?.simulateFailure === true
@@ -166,19 +165,33 @@ export function PrintProgressPage() {
   const [current, setCurrent]   = useState<Step>(useRealApi ? 'queuing' : 'submitting')
   const [failed, setFailed]     = useState(false)
   const [timedOut, setTimedOut] = useState(false)
+  const [simDone, setSimDone]   = useState(false)
   const cancelRef               = useRef(false)
+  const simTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 真实打印和演示进行中禁止进入待机；SIM 演示结束后恢复待机能力。
+  useBusyLock(!isSim || !simDone)
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
   const navigateFail = useCallback(
     (reason: string) => {
       setFailed(true)
-      setTimeout(() => {
+      if (isSim) {
+        setSimDone(true)
+        return
+      }
+      failTimerRef.current = setTimeout(() => {
         navigate('/print/done', { state: { ...state, success: false, reason } })
       }, 700)
     },
-    [navigate, state],
+    [isSim, navigate, state],
   )
+
+  useEffect(() => () => {
+    if (failTimerRef.current) clearTimeout(failTimerRef.current)
+  }, [])
 
   const navigateSuccess = useCallback(() => {
     navigate('/print/done', { state: { ...state, success: true } })
@@ -190,6 +203,40 @@ export function PrintProgressPage() {
     cancelRef.current = true
     navigateFail(FAIL_REASONS[0])
   }, [navigateFail])
+
+  // ── SIM mode: setTimeout animation（演示结束停留本页，不跳转成功页）────────
+
+  useEffect(() => {
+    if (useRealApi || !canSimulate) return
+
+    cancelRef.current = false
+
+    const advance = (idx: number) => {
+      if (idx >= STEPS.length) {
+        if (!cancelRef.current) setSimDone(true)
+        return
+      }
+      const step = STEPS[idx]
+      const duration = shouldFail && step.key === 'printing' ? 1200 : step.duration
+
+      simTimerRef.current = setTimeout(() => {
+        if (cancelRef.current) return
+        if (shouldFail && step.key === 'printing') {
+          navigateFail(failReason)
+          return
+        }
+        const next = STEPS[idx + 1]
+        if (next) setCurrent(next.key)
+        advance(idx + 1)
+      }, duration)
+    }
+
+    advance(0)
+    return () => {
+      cancelRef.current = true
+      if (simTimerRef.current) clearTimeout(simTimerRef.current)
+    }
+  }, [useRealApi, canSimulate, navigateFail, shouldFail, failReason])
 
   // ── REAL mode: poll backend ───────────────────────────────────────────────
 
@@ -249,37 +296,6 @@ export function PrintProgressPage() {
     }
   }, [useRealApi, taskId, navigateFail, navigateSuccess])
 
-  // ── SIM mode: setTimeout animation ───────────────────────────────────────
-
-  useEffect(() => {
-    if (useRealApi || !canSimulate) return
-
-    cancelRef.current = false
-
-    const advance = (idx: number) => {
-      if (idx >= STEPS.length) {
-        if (!cancelRef.current) navigateSuccess()
-        return
-      }
-      const step = STEPS[idx]
-      const duration = shouldFail && step.key === 'printing' ? 1200 : step.duration
-
-      setTimeout(() => {
-        if (cancelRef.current) return
-        if (shouldFail && step.key === 'printing') {
-          navigateFail(failReason)
-          return
-        }
-        const next = STEPS[idx + 1]
-        if (next) setCurrent(next.key)
-        advance(idx + 1)
-      }, duration)
-    }
-
-    advance(0)
-    return () => { cancelRef.current = true }
-  }, [useRealApi, canSimulate, navigateFail, navigateSuccess, shouldFail, failReason])
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   const currentIdx = stepIndex(current)
@@ -296,7 +312,7 @@ export function PrintProgressPage() {
   const submitTimeFormatted = useMemo(() => formatSubmitTime(new Date()), [])
 
   // Guard：直达 /print/progress（无任务上下文）—— 不展示进度/不伪造成功，引导重新上传。
-  if (!hasContext) {
+  if (!hasContext || (!isHttpMode && !canSimulate)) {
     return (
       <PrintPageFrame className="p-6">
       <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
@@ -372,16 +388,38 @@ export function PrintProgressPage() {
     )
   }
 
-  // ── 4步时间线定义 ──────────────────────────────────────────────────────────
+  // ── 4步时间线定义（isSim 隔离真实话术；演示分支明确未建单/未支付/未出纸）──
   const TL_ITEMS = [
     {
       key: 'submit',
       label: '提交任务',
-      desc: isFreeOrder ? '已创建打印任务，无需支付，正在排队' : '已创建打印任务并完成支付确认',
+      desc: isSim
+        ? '演示：未建单、未支付，仅流程演示'
+        : isFreeOrder
+          ? '已创建打印任务，无需支付，正在排队'
+          : '已创建打印任务并完成支付确认',
     },
-    { key: 'queue',   label: '排队等待', desc: '终端已接收任务，文件校验通过' },
-    { key: 'print',   label: '打印中',   desc: '打印机正在出纸，请在出纸口等候' },
-    { key: 'pickup',  label: '完成取件', desc: '完成后自动跳转，凭取件码核对文件' },
+    {
+      key: 'queue',
+      label: '排队等待',
+      desc: isSim
+        ? '演示：终端未接收、未校验'
+        : '终端已接收任务，文件校验通过',
+    },
+    {
+      key: 'print',
+      label: isSim ? '打印演示' : '打印中',
+      desc: isSim
+        ? '演示：未出纸，无真实打印动作'
+        : '打印机正在出纸，请在出纸口等候',
+    },
+    {
+      key: 'pickup',
+      label: isSim ? '演示结束' : '完成取件',
+      desc: isSim
+        ? '演示：无真实取件结果'
+        : '完成后自动跳转，凭取件码核对文件',
+    },
   ] as const
 
   // ── 主体：两栏布局 ─────────────────────────────────────────────────────────
@@ -389,16 +427,39 @@ export function PrintProgressPage() {
     <PrintPageFrame>
     <div data-w2-page="print-progress" className="flex min-h-full flex-col">
       <PrintPrototypeHeader
-        title="正在处理"
-        subtitle="任务已提交，正在等待终端处理，请留在机器旁"
+        title={isSim ? (simDone ? '演示流程已结束' : '流程演示中') : '正在处理'}
+        subtitle={
+          isSim
+            ? (simDone
+              ? '未真实打印，未创建打印任务'
+              : '当前为演示模式，不会建单、支付或出纸')
+            : '任务已提交，正在等待终端处理，请留在机器旁'
+        }
         step={7}
         aside={
-          <span className="pp-running-badge" role="status" aria-live="polite">
-            <ClockIcon aria-hidden="true" />
-            任务进行中
-          </span>
+          isSim ? (
+            <span className="pp-running-badge" role="note">
+              <InfoIcon aria-hidden="true" />
+              演示模式·非真实打印
+            </span>
+          ) : (
+            <span className="pp-running-badge" role="status" aria-live="polite">
+              <ClockIcon aria-hidden="true" />
+              任务进行中
+            </span>
+          )
         }
       />
+
+      {/* SIM 常驻提示：演示模式·非真实打印 */}
+      {isSim && (
+        <div
+          className="mx-6 mt-3 rounded-xl border border-warning/40 bg-warning-bg px-4 py-3 text-center text-base font-semibold text-warning"
+          role="note"
+        >
+          演示模式·非真实打印
+        </div>
+      )}
 
       {/* 主内容 */}
       <div className="pp-main-content">
@@ -411,29 +472,62 @@ export function PrintProgressPage() {
               <div className="pp-stage-icon" aria-hidden="true">
                 {failed
                   ? <XCircleIcon />
-                  : <PrinterIcon />
+                  : isSim && simDone
+                    ? <InfoIcon />
+                    : <PrinterIcon />
                 }
               </div>
               <div className="pp-stage-title">
-                {failed ? '处理出错' : '正在打印'}
+                {failed
+                  ? (isSim ? '演示失败场景已触发' : '处理出错')
+                  : isSim
+                    ? (simDone ? '演示流程已结束' : '流程演示中')
+                    : '正在打印'}
               </div>
               <div className="pp-stage-sub">
                 {failed
-                  ? '任务遇到问题，即将跳转至结果页'
-                  : '状态每秒自动刷新，完成后自动进入取件页'}
+                  ? (isSim
+                    ? '仅模拟异常处理，未创建任务、未扣费、未发送打印'
+                    : '任务遇到问题，即将跳转至结果页')
+                  : isSim
+                    ? (simDone
+                      ? '未真实打印，可返回首页或重新上传'
+                      : '仅演示进度步骤，未建单、未支付、未出纸')
+                    : '状态自动刷新，完成后自动进入取件页'}
               </div>
+
+              {/* SIM 结束：停留本页，提供触控操作 */}
+              {isSim && simDone && (
+                <div className="mt-6 flex flex-col gap-3">
+                  <p className="text-center text-base font-semibold text-neutral-700">未真实打印</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/')}
+                    className="rounded-xl bg-primary-600 px-8 py-4 text-base font-semibold text-white hover:bg-primary-700 min-h-[56px]"
+                  >
+                    返回首页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(uploadPath)}
+                    className="rounded-xl border border-neutral-300 bg-white px-8 py-4 text-base font-semibold text-neutral-800 hover:bg-neutral-50 min-h-[56px]"
+                  >
+                    重新上传
+                  </button>
+                </div>
+              )}
 
               {/* 时间线 */}
               <div className="pp-tl" role="list" aria-label="打印进度">
                 {TL_ITEMS.map((item, tlIdx) => {
-                  const cls = tlItemClass(tlIdx, currentIdx, useRealApi)
+                  const cls = isSim && simDone && !failed ? 'tl-done' : tlItemClass(tlIdx, currentIdx, useRealApi)
                   const isDone   = cls === 'tl-done'
                   const isActive = cls === 'tl-active'
                   return (
                     <div key={item.key} className={`pp-tl-item ${cls}`} role="listitem">
                       <span className="pp-t-rail">
                         <span className="pp-t-dot">
-                          {isDone
+                          {isDone || (isSim && simDone)
                             ? <CheckIcon />
                             : isActive
                               ? <CircleDotIcon />
@@ -447,7 +541,7 @@ export function PrintProgressPage() {
                         <span>{item.desc}</span>
                         {isActive && !failed && (
                           <span className="animate-pulse" style={{ fontSize: 16, color: 'var(--print-teal-deep)', marginTop: 4, display: 'block' }}>
-                            {useRealApi ? '等待终端响应…' : '处理中…'}
+                            {useRealApi ? '等待终端响应…' : '演示中…'}
                           </span>
                         )}
                       </span>
@@ -460,7 +554,20 @@ export function PrintProgressPage() {
 
           {/* 右：任务信息 + 常见情况 + 提示 */}
           <div className="pp-side-col">
-            {/* 任务信息 */}
+            {/* SIM：独立演示说明区（不承诺真实任务） */}
+            {isSim && (
+              <section className="pp-info-card" aria-label="演示说明">
+                <b className="pp-info-hd">演示说明</b>
+                <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-neutral-700">
+                  <li>未创建真实打印任务</li>
+                  <li>未产生订单或费用</li>
+                  <li>未向打印机发送文件</li>
+                  <li>不会产生取件码</li>
+                </ul>
+              </section>
+            )}
+
+            {/* 任务信息（SIM 可展示演示输入；预计出纸仅真实任务） */}
             <section className="pp-info-card" aria-label="任务信息">
               <b className="pp-info-hd">任务信息</b>
               <div className="pp-i-row">
@@ -483,49 +590,55 @@ export function PrintProgressPage() {
                 <span className="pp-i-k">提交时间</span>
                 <span className="pp-i-v">{submitTimeFormatted}</span>
               </div>
-              <div className="pp-i-row">
-                <span className="pp-i-k">预计出纸</span>
-                <span className="pp-i-v">{expectedSheets(file, params)}</span>
-              </div>
+              {!isSim && (
+                <div className="pp-i-row">
+                  <span className="pp-i-k">预计出纸</span>
+                  <span className="pp-i-v">{expectedSheets(file, params)}</span>
+                </div>
+              )}
             </section>
 
-            {/* 常见情况 */}
-            <section className="pp-faq-card" aria-label="常见情况处理">
-              <b className="pp-faq-hd">遇到这些情况怎么办</b>
-              <div className="pp-faq-item">
-                <AlertTriangleIcon className="pp-faq-icon" aria-hidden="true" />
-                <p className="pp-faq-text">
-                  <b>打印机缺纸 / 卡纸</b>：任务会提示失败原因，请联系现场工作人员处理后重试。
-                </p>
-              </div>
-              <div className="pp-faq-item">
-                <ClockIcon className="pp-faq-icon" aria-hidden="true" />
-                <p className="pp-faq-text">
-                  <b>长时间无响应</b>：超过 10 分钟未响应将提示处理超时，凭任务号联系工作人员确认。
-                </p>
-              </div>
-              <div className="pp-faq-item">
-                <FileTextIcon className="pp-faq-icon" aria-hidden="true" />
-                <p className="pp-faq-text">
-                  <b>文件校验未通过</b>：上传可能中断或文件已变化，请返回重新上传后再打印。
-                </p>
-              </div>
-              <div className="pp-faq-item">
-                <CreditCardIcon className="pp-faq-icon" aria-hidden="true" />
-                <p className="pp-faq-text">
-                  {isFreeOrder
-                    ? <><b>打印失败</b>：任务记录已保存，可在「我的 · 打印订单」查看详情并联系工作人员确认。</>
-                    : <><b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。</>
-                  }
-                </p>
-              </div>
-            </section>
+            {/* 常见情况：仅真实任务 */}
+            {!isSim && (
+              <section className="pp-faq-card" aria-label="常见情况处理">
+                <b className="pp-faq-hd">遇到这些情况怎么办</b>
+                <div className="pp-faq-item">
+                  <AlertTriangleIcon className="pp-faq-icon" aria-hidden="true" />
+                  <p className="pp-faq-text">
+                    <b>打印机缺纸 / 卡纸</b>：任务会提示失败原因，请联系现场工作人员处理后重试。
+                  </p>
+                </div>
+                <div className="pp-faq-item">
+                  <ClockIcon className="pp-faq-icon" aria-hidden="true" />
+                  <p className="pp-faq-text">
+                    <b>长时间无响应</b>：超过 10 分钟未响应将提示处理超时，凭任务号联系工作人员确认。
+                  </p>
+                </div>
+                <div className="pp-faq-item">
+                  <FileTextIcon className="pp-faq-icon" aria-hidden="true" />
+                  <p className="pp-faq-text">
+                    <b>文件校验未通过</b>：上传可能中断或文件已变化，请返回重新上传后再打印。
+                  </p>
+                </div>
+                <div className="pp-faq-item">
+                  <CreditCardIcon className="pp-faq-icon" aria-hidden="true" />
+                  <p className="pp-faq-text">
+                    {isFreeOrder
+                      ? <><b>打印失败</b>：任务记录已保存，可在「我的 · 打印订单」查看详情并联系工作人员确认。</>
+                      : <><b>已支付但打印失败</b>：订单与支付记录已保存，可在「我的 · 打印订单」查看并联系退款。</>
+                    }
+                  </p>
+                </div>
+              </section>
+            )}
 
-            {/* 提示条 */}
-            <div className="pp-notice" role="note">
-              <InfoIcon className="pp-notice-icon" aria-hidden="true" />
-              请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。
-            </div>
+            {/* 提示条：仅真实任务 */}
+            {!isSim && (
+              <div className="pp-notice" role="note">
+                <InfoIcon className="pp-notice-icon" aria-hidden="true" />
+                请勿离开，打印完成后请及时取走文件，避免个人材料遗留在出纸口。
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -533,11 +646,13 @@ export function PrintProgressPage() {
       {/* 底部行动条 */}
       <KioskActionBar className="pp-actionbar">
         <span className="pp-actionbar-note">
-          打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员协助处理
+          {isSim
+            ? (simDone ? '演示流程已结束 · 未真实打印' : '演示模式·非真实打印；动画结束后停留本页')
+            : '打印中无法取消任务；如遇卡纸或缺纸，请联系现场工作人员协助处理'}
         </span>
         <span className="pp-status-chip" role="status" aria-live="polite">
           <i aria-hidden="true" />
-          状态自动刷新中
+          {isSim ? (simDone ? '演示已结束' : '演示进行中') : '状态自动刷新中'}
         </span>
       </KioskActionBar>
 
