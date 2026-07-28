@@ -1,6 +1,8 @@
 # 当前开发进度
 
-2026-07-28 完成 **Phase 0 S0-A 用户可见真实性收口本地候选**（分支 `codex/phase0-s0a-truthfulness-20260728`，未合并/未部署）：招聘会五个无可靠来源指标改为 `null/unsupported`，不再用浏览量或固定 `0` 冒充现场统计；统计时间改为记录真实 `updatedAt`，Kiosk 两个统计界面使用明确空态。智慧校园区分“可查看指引”与真实可启动的“已配置入口”，关闭时不显示虚假数量。校园“AI模拟面试”已从错误 `/assistant` 修到 `/interview/setup`，并补真实按钮点击回归。API 真值 verify 31/31、Kiosk 两项静态门禁、两端 typecheck/build、Kiosk lint、W4 13/13（含新增点击回归）、W6 聚焦 8/8 均通过；Claude 最终 `APPROVE`，Cursor Grok 4.5 High Fast 为 `CONDITIONAL PASS`，Antigravity 全分支终审因配额限制无有效报告（此前 A2 聚焦复审 100/100）。A4 另识别既有打印 SIM 假进度/真实出纸支付话术和简历解析固定阶段动画，已拆为后续真值任务；本项不代表生产、数据库、Windows 真机、打印扫描硬件或完整 Phase 0 已验收。
+2026-07-29 完成 **Phase 0 S0-B 打印 SIM 演示真值本地候选**（分支 `codex/phase0-s0b-print-sim-truth-20260728`，未合并/未部署）：非 HTTP/mock 打印进度固定标识“演示模式·非真实打印”，明确未建单、未扣费、未向打印机发送文件、不会产生取件码；演示成功或失败均停留本页并提供“返回首页 / 重新上传”，不再进入真实成功页。SIM 与真实话术、右栏提示、时间线、busy lock、定时器和非法上下文均已隔离；真实 HTTP 轮询、支付、失败安全与取件码链路未改。真实性守卫、W2 print/scan 合约、typecheck、lint（仅 4 条既有 Fast Refresh warning）、生产 HTTP build 和打印 W2 Playwright 13/13 均通过；1080×1920 mock 浏览器复验无横向溢出、四个时间线节点完成态一致、触控按钮 56/58px、禁用真实话术计数为 0。Cursor Grok 4.5 High Fast、Claude、Antigravity 终审均无 Critical，复核意见已全部收口。未修改后端、Terminal Agent、支付、数据库、密钥、硬件或生产环境；S0-C 与 Phase 0 最终 GO/NO-GO 仍未完成。
+
+2026-07-28 完成 **Phase 0 S0-A 用户可见真实性收口并合入主干**（[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`，未部署）：招聘会五个无可靠来源指标改为 `null/unsupported`，不再用浏览量或固定 `0` 冒充现场统计；统计时间改为记录真实 `updatedAt`，Kiosk 两个统计界面使用明确空态。智慧校园区分“可查看指引”与真实可启动的“已配置入口”，关闭时不显示虚假数量。校园“AI模拟面试”已从错误 `/assistant` 修到 `/interview/setup`，并补真实按钮点击回归。API 真值 verify 31/31、Kiosk 两项静态门禁、两端 typecheck/build、Kiosk lint、W4 13/13（含新增点击回归）、W6 聚焦 8/8 均通过；GitHub CI 三项全绿后 squash 合入。A4 另识别的打印 SIM 假进度已由 S0-B 本地候选收口，简历解析固定阶段动画仍归 S0-C；本项不代表生产、数据库、Windows 真机、打印扫描硬件或完整 Phase 0 已验收。
 
 2026-07-28 推进 **Gate 0k USB bridge PR #423 合入准备**：已与 `main`（含首页备案部署 `index-DEJ0O4c6.js`）解冲突；工具脚本 + 现场包进入主干后**仍不等于** Agent 写入或插盘验收。下一步：一体机 `git pull` 后按现场包离线令牌写入 + Edge/Chrome 插盘冒烟。
 
