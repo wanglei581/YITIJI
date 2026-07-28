@@ -189,7 +189,7 @@ export interface FairZoneBreakdown {
 }
 
 /**
- * 招聘会现场准实时统计 DTO（服务端缓存 30s）。
+ * 招聘会统计 DTO。数据来源：主办方录入 / 来源聚合，非实时。
  * 合规说明：只含系统服务行为数据，不含求职者个人信息，不含招聘闭环数据。
  */
 export interface FairLiveStatsDTO {
@@ -198,15 +198,19 @@ export interface FairLiveStatsDTO {
   fairName: string
 
   totalCompanies: number
-  checkedInCompanies: number
+  /** null 表示无可证明统计源，前端须渲染「暂无数据」而非 0 */
+  checkedInCompanies: number | null
   totalPositions: number
   totalHeadcount: number
 
-  /** 系统服务行为统计，不含求职者个人信息 */
-  browseCount: number
-  scanCount: number
-  printCount: number
-  checkinCount: number
+  /** 系统服务行为统计；null 表示无可证明统计源 */
+  browseCount: number | null
+  /** null 表示无可证明统计源 */
+  scanCount: number | null
+  /** null 表示无可证明统计源 */
+  printCount: number | null
+  /** null 表示无可证明统计源 */
+  checkinCount: number | null
 
   zoneBreakdown: FairZoneBreakdown[]
   lastUpdated: string

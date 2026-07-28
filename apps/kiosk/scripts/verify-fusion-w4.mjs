@@ -288,6 +288,80 @@ check('fair source, mock-stat and print contracts remain intact', () => {
   assert.doesNotMatch(fairMaterials, /fileUrl:\s*material\.fileUrl/)
   assert.match(fairStats, /stats\.isMockData/)
 })
+
+// Phase 0 S0-A A1b：招聘会统计 Kiosk 消费面诚实化（nullable metrics）
+const fairDataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')
+const FAIR_STATS_NULLABLE_FIELDS = [
+  'checkedInCompanies',
+  'browseCount',
+  'scanCount',
+  'printCount',
+  'checkinCount',
+]
+
+check('fair stats kiosk surfaces reject misleading live/system-truth copy', () => {
+  assert.doesNotMatch(fairStats, /准实时数据|系统真实服务数据/)
+  assert.doesNotMatch(fairDataScreen, /准实时数据|系统真实服务数据/)
+})
+
+check('fair stats nullable metrics have explicit null branches and are not rendered unconditionally', () => {
+  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+    assert.match(
+      fairStats,
+      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+      `FairStatsPage must guard ${field} with explicit != null / !== null`,
+    )
+  }
+  for (const field of ['browseCount', 'scanCount', 'printCount']) {
+    assert.match(
+      fairDataScreen,
+      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+      `FairDataScreen must guard ${field} with explicit != null / !== null`,
+    )
+  }
+  // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
+  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+    assert.doesNotMatch(
+      fairStats,
+      new RegExp(`\\{stats\\.${field}\\}`),
+      `FairStatsPage must not unconditionally render {stats.${field}}`,
+    )
+  }
+  for (const field of ['browseCount', 'scanCount', 'printCount']) {
+    assert.doesNotMatch(
+      fairDataScreen,
+      new RegExp(`\\{stats\\.${field}\\}`),
+      `FairDataScreen must not unconditionally render {stats.${field}}`,
+    )
+  }
+})
+
+check('fair checkinCount is labeled 现场签到, not 外部跳转', () => {
+  // checkinCount 与「外部跳转」不得同块出现；正向标签须为现场签到
+  assert.match(
+    fairStats,
+    /checkinCount\s*(?:!==|!=)\s*null[\s\S]*?现场签到/,
+    'checkinCount tile must be labeled 现场签到',
+  )
+  assert.doesNotMatch(
+    fairStats,
+    /checkinCount\s*(?:!==|!=)\s*null[\s\S]{0,400}?外部跳转/,
+    'checkinCount must not be mislabeled as 外部跳转',
+  )
+})
+
+check('fair check-in progress UI requires checkedInCompanies != null and totalCompanies > 0', () => {
+  assert.match(
+    fairStats,
+    /checkedInCompanies\s*(?:!==|!=)\s*null\s*&&\s*stats\.totalCompanies\s*>\s*0[\s\S]*?企业签到进度/,
+    '企业签到进度 must gate on checkedInCompanies != null && totalCompanies > 0',
+  )
+  assert.doesNotMatch(
+    fairStats,
+    /已签到 \$\{stats\.checkedInCompanies\}/,
+    'must not interpolate 已签到 N 家 from nullable checkedInCompanies unconditionally',
+  )
+})
 check('campus and smart-campus stay honest and distinct', () => {
   assert.match(campusPage, /getJobFairs\(terminalId \? \{ terminalId \} : undefined\)/)
   assert.doesNotMatch(campusWelcome, /待开发/)
@@ -317,6 +391,21 @@ check('campus and smart-campus stay honest and distinct', () => {
     cssRuleBody(campusPolicyCss, '.kproto-actionbar'),
     /margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
     'smart-campus action bars align with the W4 page inset',
+  )
+})
+
+// Phase 0 S0-A A3：校园 AI 模拟面试错跳（须进 /interview/setup，禁止 /assistant）
+const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+check('campus AI模拟面试 navigates to /interview/setup, not /assistant', () => {
+  assert.match(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/interview\/setup'\)/,
+    'AI模拟面试 must target /interview/setup',
+  )
+  assert.doesNotMatch(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/assistant'\)/,
+    'AI模拟面试 must not target /assistant',
   )
 })
 check('policy builtin records remain server-safe', () => {

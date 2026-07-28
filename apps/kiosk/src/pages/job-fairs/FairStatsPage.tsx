@@ -41,6 +41,10 @@ function BigStat({
   )
 }
 
+function formatMetric(value: number): string {
+  return value.toLocaleString()
+}
+
 export function FairStatsPage() {
   const navigate = useNavigate()
   const { id }   = useParams<{ id: string }>()
@@ -82,23 +86,38 @@ export function FairStatsPage() {
     )
   }
 
-  const checkinRate = stats.totalCompanies > 0
-    ? Math.round((stats.checkedInCompanies / stats.totalCompanies) * 100)
-    : 0
+  const {
+    checkedInCompanies,
+    browseCount,
+    scanCount,
+    printCount,
+    checkinCount,
+    dataSourceLabel,
+  } = stats
 
   const formatTime = (iso: string) => {
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
 
+  const companyNote = checkedInCompanies != null
+    ? `已签到 ${checkedInCompanies} 家 · ${dataSourceLabel}`
+    : dataSourceLabel
+
+  const hasServiceStats =
+    browseCount != null
+    || scanCount != null
+    || printCount != null
+    || checkinCount != null
+
   return (
     <KioskPageFrame
       tone="wheat"
       title="现场数据"
-      subtitle={`${stats.fairName} · 更新于 ${formatTime(stats.lastUpdated)}`}
+      subtitle={`${stats.fairName} · ${dataSourceLabel}`}
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<FusionBadge icon={ActivityIcon}>准实时数据</FusionBadge>}
+      badge={<FusionBadge icon={ActivityIcon}>{dataSourceLabel}</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
@@ -115,86 +134,122 @@ export function FairStatsPage() {
           <BigStat
             label="参展企业"
             value={stats.totalCompanies}
-            note={`已签到 ${stats.checkedInCompanies} 家 · 主办方同步`}
+            note={companyNote}
             icon={BuildingIcon}
             accent="bg-primary-50 text-primary-600"
           />
           <BigStat
             label="招聘岗位"
             value={stats.totalPositions}
-            note={`计划招聘 ${stats.totalHeadcount.toLocaleString()} 人 · 主办方提供`}
+            note={`计划招聘 ${stats.totalHeadcount.toLocaleString()} 人 · ${dataSourceLabel}`}
             icon={BriefcaseIcon}
             accent="bg-success-bg text-success-fg"
           />
         </div>
 
-        <section className="jf-card accented">
-          <FusionSectionHead icon={TrendingUpIcon} title="服务数据统计" subtitle="本终端服务行为统计 · 不含求职者个人信息" />
-          <div className="jf-service4">
-            <div className="jf-sv">
-              <ScanIcon aria-hidden="true" />
-              <b>{stats.browseCount}</b>
-              <span>信息浏览</span>
+        {hasServiceStats ? (
+          <section className="jf-card accented">
+            <FusionSectionHead
+              icon={TrendingUpIcon}
+              title="服务数据统计"
+              subtitle="本终端可证明的服务行为 · 不含求职者个人信息"
+            />
+            <div className="jf-service4">
+              {browseCount != null && (
+                <div className="jf-sv">
+                  <ScanIcon aria-hidden="true" />
+                  <b>{formatMetric(browseCount)}</b>
+                  <span>信息浏览</span>
+                </div>
+              )}
+              {scanCount != null && (
+                <div className="jf-sv">
+                  <QrCodeIcon aria-hidden="true" />
+                  <b>{formatMetric(scanCount)}</b>
+                  <span>二维码展示</span>
+                </div>
+              )}
+              {printCount != null && (
+                <div className="jf-sv">
+                  <PrinterIcon aria-hidden="true" />
+                  <b>{formatMetric(printCount)}</b>
+                  <span>资料打印</span>
+                </div>
+              )}
+              {checkinCount != null && (
+                <div className="jf-sv">
+                  <UsersIcon aria-hidden="true" />
+                  <b>{formatMetric(checkinCount)}</b>
+                  <span>现场签到</span>
+                </div>
+              )}
             </div>
-            <div className="jf-sv">
-              <QrCodeIcon aria-hidden="true" />
-              <b>{stats.scanCount}</b>
-              <span>二维码展示</span>
-            </div>
-            <div className="jf-sv">
-              <PrinterIcon aria-hidden="true" />
-              <b>{stats.printCount}</b>
-              <span>资料打印</span>
-            </div>
-            <div className="jf-sv">
-              <UsersIcon aria-hidden="true" />
-              <b>{stats.checkinCount}</b>
-              <span>外部跳转</span>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="jf-card accented">
+            <FusionSectionHead
+              icon={TrendingUpIcon}
+              title="服务数据统计"
+              subtitle="本终端服务行为 · 不含求职者个人信息"
+            />
+            <p className="py-8 text-center text-base text-neutral-500">暂无统计 · 未接入可证明的服务数据源</p>
+          </section>
+        )}
 
-        <section className="jf-card">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="jf-card-head mb-0">
-              <span className="jf-g-icon">
-                <BuildingIcon aria-hidden="true" />
-              </span>
-              <div>
-                <h2>企业签到进度</h2>
-                <div className="sub">{stats.checkedInCompanies} / {stats.totalCompanies} 家企业已签到入场</div>
+        {checkedInCompanies != null && stats.totalCompanies > 0 && (
+          <section className="jf-card">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="jf-card-head mb-0">
+                <span className="jf-g-icon">
+                  <BuildingIcon aria-hidden="true" />
+                </span>
+                <div>
+                  <h2>企业签到进度</h2>
+                  <div className="sub">{checkedInCompanies} / {stats.totalCompanies} 家企业已签到入场</div>
+                </div>
               </div>
+              <span className="text-[32px] font-bold text-[var(--teal-deep)]">
+                {Math.round((checkedInCompanies / stats.totalCompanies) * 100)}%
+              </span>
             </div>
-            <span className="text-[32px] font-bold text-[var(--teal-deep)]">{checkinRate}%</span>
-          </div>
-          <div className="jf-progress">
-            <div className="jf-progress-fill" style={{ width: `${checkinRate}%` }} />
-          </div>
+            <div className="jf-progress">
+              <div
+                className="jf-progress-fill"
+                style={{
+                  width: `${Math.round((checkedInCompanies / stats.totalCompanies) * 100)}%`,
+                }}
+              />
+            </div>
 
-          {stats.zoneBreakdown.length > 0 && (
-            <div className="jf-zone-rows mt-5">
-              {stats.zoneBreakdown.map((zone) => {
-                const rate = zone.boothCount > 0
-                  ? Math.round((zone.checkedInCount / zone.boothCount) * 100)
-                  : 0
-                return (
-                  <div key={zone.id} className="jf-zone-row">
-                    <span>{zone.zoneName}</span>
-                    <div className="jf-progress">
-                      <div className="jf-progress-fill" style={{ width: `${rate}%` }} />
+            {stats.zoneBreakdown.length > 0 && (
+              <div className="jf-zone-rows mt-5">
+                {stats.zoneBreakdown.map((zone) => {
+                  const rate = zone.boothCount > 0
+                    ? Math.round((zone.checkedInCount / zone.boothCount) * 100)
+                    : 0
+                  return (
+                    <div key={zone.id} className="jf-zone-row">
+                      <span>{zone.zoneName}</span>
+                      <div className="jf-progress">
+                        <div className="jf-progress-fill" style={{ width: `${rate}%` }} />
+                      </div>
+                      <span className="n">{zone.checkedInCount}/{zone.boothCount}</span>
                     </div>
-                    <span className="n">{zone.checkedInCount}/{zone.boothCount}</span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* 参展企业行业分布（真实聚合已录企业，柱状图；无数据不渲染，不伪造） */}
         {stats.industryDistribution.length > 0 && (
           <section className="jf-card">
-            <FusionSectionHead icon={BuildingIcon} title="参展企业行业分布" subtitle={`按已录 ${stats.totalCompanies} 家企业聚合`} />
+            <FusionSectionHead
+              icon={BuildingIcon}
+              title="参展企业行业分布"
+              subtitle={`按已录 ${stats.totalCompanies} 家企业聚合 · ${dataSourceLabel}`}
+            />
             <div className="jf-bar-rows">
               {(() => {
                 const maxCount = Math.max(...stats.industryDistribution.map((slice) => slice.count), 1)
@@ -218,7 +273,7 @@ export function FairStatsPage() {
             <FusionSectionHead
               icon={UsersIcon}
               title="求职意向分布"
-              subtitle={`${stats.dataSourceLabel}${stats.expectedAttendance != null ? ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人` : ''}`}
+              subtitle={`${dataSourceLabel}${stats.expectedAttendance != null ? ` · 预计参会 ${stats.expectedAttendance.toLocaleString()} 人` : ''}`}
             />
             <div className="jf-bar-rows">
               {stats.seekerIntent.map((slice) => (
@@ -234,7 +289,10 @@ export function FairStatsPage() {
           </section>
         )}
 
-      <FusionNotice>系统仅记录服务数据，不记录求职者个人信息；活动办理结果以来源平台和现场为准。</FusionNotice>
+      <FusionNotice>
+        {dataSourceLabel}；系统仅记录可证明的服务行为，不记录求职者个人信息；活动办理结果以来源平台和现场为准。
+        {stats.lastUpdated ? ` 数据同步时间 ${formatTime(stats.lastUpdated)}。` : ''}
+      </FusionNotice>
     </KioskPageFrame>
   )
 }

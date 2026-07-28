@@ -150,6 +150,18 @@ export function SmartCampusHomePage() {
   const extensionItems: KioskToolboxItem[] = config.enabled
     ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
     : []
+  // 口径真实性：静态指引 cards 只称「可查看指引」；仅校方配置且可启动的扩展项称「已配置入口」。
+  // 无扩展项时不宣称「已开通」，避免暗示系统已接通。
+  // enabled===false：不显示 header badge，避免与「本机暂未开启」空态重复「可查看指引 0 项」。
+  const configuredEntries = extensionItems.filter(
+    (item) => !item.disabled && itemLaunchable(item),
+  )
+  const statusBadge =
+    !config.enabled
+      ? null
+      : configuredEntries.length > 0
+        ? `可查看指引 ${cards.length} 项 · 已配置入口 ${configuredEntries.length} 项`
+        : `可查看指引 ${cards.length} 项`
 
   return (
     <KioskPageFrame
@@ -158,7 +170,7 @@ export function SmartCampusHomePage() {
       subtitle="校园场景服务专区 · 本机校园模式按校方配置开放"
       backLabel="返回首页"
       onBack={() => navigate('/')}
-      badge={<FusionBadge>本校已开通 {cards.length + extensionItems.length} 项服务</FusionBadge>}
+      badge={statusBadge ? <FusionBadge>{statusBadge}</FusionBadge> : undefined}
     >
         <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
