@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
+import type { ApiRouter } from '../fixtures/api-router'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
@@ -22,6 +23,65 @@ function collectRuntimeErrors(page: Page): string[] {
     }
   })
   return errors
+}
+
+function registerHomeShellApi(api: ApiRouter) {
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: {
+      smartCampus: {
+        enabled: false,
+        modules: { welcome: false, bigdata: false, luggage: false, panorama: false },
+        items: [],
+      },
+      toolbox: { enabled: false, items: [] },
+      configVersion: 'filing-smoke-fixture',
+      refreshIntervalMs: 300000,
+      serverTime: '2026-07-28T00:00:00.000Z',
+    },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
+    status: 200,
+    json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200,
+    json: { enabled: false, idleTimeoutSec: 180, items: [] },
+  })
+  api.respond('GET', '/api/v1/terminals/KSK-001/smart-campus', {
+    status: 200,
+    json: {
+      enabled: false,
+      modules: { welcome: false, bigdata: false, luggage: false, panorama: false },
+      items: [],
+    },
+  })
+}
+
+async function assertHomeFilingInfo(page: Page) {
+  const filingInfo = page.locator('footer[aria-label="网站备案信息"]')
+  await expect(filingInfo).toBeVisible()
+  await expect(filingInfo.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute(
+    'href',
+    'https://beian.miit.gov.cn/',
+  )
+  await expect(filingInfo.getByRole('link', { name: '鲁公网安备37021402007308号' })).toHaveAttribute(
+    'href',
+    'https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308',
+  )
+  await expect(filingInfo.getByText('职易达AI', { exact: true })).toBeVisible()
+}
+
+for (const projectTag of ['@kiosk', '@mobile'] as const) {
+  test(`home renders filing information ${projectTag}`, async ({ page, api }) => {
+    registerHomeShellApi(api)
+    const runtimeErrors = collectRuntimeErrors(page)
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' })
+    await assertHomeFilingInfo(page)
+    await assertNoHorizontalOverflow(page)
+    expect(runtimeErrors).toEqual([])
+  })
 }
 
 for (const scenario of kioskScenarios) {

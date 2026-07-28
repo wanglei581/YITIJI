@@ -202,6 +202,30 @@ for (const [re, label] of [[/一键投递/, '一键投递'], [/立即投递/, '�
 }
 expect(/className="notice"/.test(home) && home.includes('本终端仅提供信息展示与跳转'), '首页保留合规提示条（第三方来源 + 跳转办理）')
 
+// ── 网站备案信息：首页最后一个内容节点，两个官方查询链接 + 纯文本品牌 ──────────────
+const filingOrder = [
+  '鲁ICP备2026023517号-2',
+  '鲁公网安备37021402007308号',
+  '职易达AI',
+]
+const filingBlock = home.match(/<footer className="filing-info"[\s\S]*?<\/footer>/)?.[0] ?? ''
+expect(filingOrder.every((text) => filingBlock.includes(text)), '首页展示 ICP、公安备案与「职易达AI」')
+expect(
+  filingOrder.every(
+    (text, index) => index === 0 || filingBlock.indexOf(filingOrder[index - 1]) < filingBlock.indexOf(text),
+  ),
+  '备案与品牌文字顺序稳定',
+)
+expect(/href="https:\/\/beian\.miit\.gov\.cn\/"[\s\S]*?鲁ICP备2026023517号-2/.test(filingBlock), 'ICP 备案号链接工信部备案系统')
+expect(
+  /href="https:\/\/beian\.mps\.gov\.cn\/#\/query\/webSearch\?code=37021402007308"[\s\S]*?鲁公网安备37021402007308号/.test(filingBlock),
+  '公安备案号链接公安部备案查询',
+)
+expect(/<span className="filing-brand">职易达AI<\/span>/.test(filingBlock), '「职易达AI」保持纯文本，不新增外链')
+expect(/<footer className="filing-info"[\s\S]*?<\/footer>\s*<\/KioskPageFrame>/.test(home), '备案信息是首页最后一个内容节点')
+expect(/\.kpv1 \.filing-info\s*\{[^}]*flex-wrap:\s*wrap/.test(pv), '备案信息允许窄屏换行')
+expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*48px/.test(pv), '备案链接符合一体机 48px 最小触控高度')
+
 // ── ContinuePanel：原型外生产动态状态，条件挂载 + 自门控 ──────────────
 // 决策(2026-07-20)：登录且确有可恢复任务(进行中打印/已诊断未优化简历)时渲染；
 // 匿名或无任务 → 组件返回 null，标准原型验收态首页与 01-home 1:1。故断言：
