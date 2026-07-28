@@ -393,6 +393,21 @@ check('campus and smart-campus stay honest and distinct', () => {
     'smart-campus action bars align with the W4 page inset',
   )
 })
+
+// Phase 0 S0-A A3：校园 AI 模拟面试错跳（须进 /interview/setup，禁止 /assistant）
+const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+check('campus AI模拟面试 navigates to /interview/setup, not /assistant', () => {
+  assert.match(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/interview\/setup'\)/,
+    'AI模拟面试 must target /interview/setup',
+  )
+  assert.doesNotMatch(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/assistant'\)/,
+    'AI模拟面试 must not target /assistant',
+  )
+})
 check('policy builtin records remain server-safe', () => {
   assert.match(renshi, /if \(isBuiltin\(item\.id\)\) return/)
   assert.match(renshi, /if \(!isBuiltin\(item\.id\)\) recordExternalJump/)
