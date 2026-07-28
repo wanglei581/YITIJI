@@ -74,9 +74,18 @@ export interface FairListItemDto {
 
 export interface FairStatsDto {
   fairId: string; fairName: string
-  totalCompanies: number; checkedInCompanies: number
+  totalCompanies: number
+  /** null 表示无可证明统计源 */
+  checkedInCompanies: number | null
   totalPositions: number; totalHeadcount: number
-  browseCount: number; scanCount: number; printCount: number; checkinCount: number
+  /** null 表示无可证明统计源 */
+  browseCount: number | null
+  /** null 表示无可证明统计源 */
+  scanCount: number | null
+  /** null 表示无可证明统计源 */
+  printCount: number | null
+  /** null 表示无可证明统计源 */
+  checkinCount: number | null
   zoneBreakdown: { id: string; zoneName: string; boothCount: number; checkedInCount: number }[]
   lastUpdated: string
   expectedAttendance?: number
@@ -621,6 +630,7 @@ export interface PrismaJobFairRow {
   reviewedAt: Date | null
   rejectReason: string | null
   syncTime: Date
+  updatedAt: Date
   latitude: number | null
   longitude: number | null
   trafficInfo: string | null
