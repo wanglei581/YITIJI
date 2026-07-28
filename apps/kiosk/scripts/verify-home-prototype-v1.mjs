@@ -224,7 +224,7 @@ expect(
 expect(/<span className="filing-brand">职易达AI<\/span>/.test(filingBlock), '「职易达AI」保持纯文本，不新增外链')
 expect(/<footer className="filing-info"[\s\S]*?<\/footer>\s*<\/KioskPageFrame>/.test(home), '备案信息是首页最后一个内容节点')
 expect(/\.kpv1 \.filing-info\s*\{[^}]*flex-wrap:\s*wrap/.test(pv), '备案信息允许窄屏换行')
-expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*32px/.test(pv), '备案链接具有可触控点按高度')
+expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*48px/.test(pv), '备案链接符合一体机 48px 最小触控高度')
 
 // ── ContinuePanel：原型外生产动态状态，条件挂载 + 自门控 ──────────────
 // 决策(2026-07-20)：登录且确有可恢复任务(进行中打印/已诊断未优化简历)时渲染；
