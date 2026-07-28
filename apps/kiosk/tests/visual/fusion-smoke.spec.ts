@@ -25,7 +25,7 @@ function collectRuntimeErrors(page: Page): string[] {
 }
 
 async function assertHomeFilingInfo(page: Page) {
-  const filingInfo = page.getByRole('contentinfo', { name: '网站备案信息' })
+  const filingInfo = page.locator('footer[aria-label="网站备案信息"]')
   await expect(filingInfo).toBeVisible()
   await expect(filingInfo.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute(
     'href',
