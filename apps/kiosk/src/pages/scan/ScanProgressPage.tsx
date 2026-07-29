@@ -153,11 +153,11 @@ export function ScanProgressPage() {
       setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     } catch (err) {
-      // 取消请求送达时任务恰好已经完成(Agent 并发投递刚好抢先完成，后端会返回
-      // SCAN_TASK_ALREADY_COMPLETED)：不能静默当作"已取消"丢弃这份真实扫描出的文件——
-      // 尤其匿名会话下，这是找回它的唯一机会。补查一次真实状态，能拿到文件就直接进
+      // 取消请求送达时任务恰好已经完成（Agent 并发投递刚好抢先完成，后端会返回
+      // SCAN_TASK_ALREADY_COMPLETED）：补查一次真实状态，能拿到文件就直接进
       // 结果页；查不到、或补查本身失败、或是网络错误等其它取消失败原因，则退回默认
-      // 路径，不阻塞用户。
+      // 路径，不阻塞用户。busy 在每个分支都释放；之所以放在 navigate 之前调用，是为
+      // 了让用户在「结果页 / /scan/start」上一落地，privacy 计时器就能立即开始计 idle。
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
@@ -171,10 +171,9 @@ export function ScanProgressPage() {
             return
           }
         } catch {
-          // 补查状态也失败了，退回默认路径，不阻塞用户
+          // 补查状态也失败了，落到下面的默认 fallback
         }
       }
-      // DELETE 失败时已跳出 try/catch;这里走 fallback 也要释放 busy 才能 navigate。
       setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     }

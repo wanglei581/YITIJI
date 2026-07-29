@@ -240,7 +240,7 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
 
 const SCAN_TASK_ID = 'scan-busy-task'
 const SCAN_CONTROL_TOKEN = 'scan-busy-control-token'
-const SCAN_OBSERVATION_MS = 6_000
+const SCAN_OBSERVATION_MS = 3_000
 
 interface ScanBusyOptions {
   scanTaskId?: string
@@ -256,10 +256,20 @@ interface ScanBusyOptions {
   }
 }
 
+interface ScanBusyRecorder {
+  statusRequests: () => number
+  deleteRequests: () => number
+}
+
 async function installScanProgressRoute(
   page: Page,
   options: ScanBusyOptions = {},
-): Promise<{ statusRequests: () => number; deleteRequests: () => number }> {
+): Promise<ScanBusyRecorder> {
+  // 每次新装一个 recorder 之前,先把上一个 endpoint handler 卸掉,避免 page.route
+  // 默认 LIFO 把旧 closure 留在栈顶——旧 closure 里 if (status === 'completed')
+  // 永远先匹配,新 status 永远到不了。
+  await page.unroute(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`).catch(() => undefined)
+
   let statusReq = 0
   let deleteReq = 0
   await page.route(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
@@ -338,21 +348,45 @@ async function expectNoWarningWithin(
   await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
 }
 
-test('scan busy stays released when the scan identity is missing @scan-busy @warning-kiosk', async ({
+test('scan busy stays released when the scan task id is missing @scan-busy @warning-kiosk', async ({
   page,
   api,
 }) => {
   registerKioskShell(api)
-  await page.evaluate(() => undefined)
-
   await page.goto('/')
-  await page.evaluate(() => {
-    window.history.pushState(
-      { usr: { scanType: 'resume' }, key: 'scan-busy-missing', idx: 1 },
-      '',
-      '/scan/progress',
-    )
-  })
+  await page.evaluate(
+    ({ token }) => {
+      window.history.pushState(
+        { usr: { scanType: 'resume', controlToken: token }, key: 'scan-busy-missing-id', idx: 1 },
+        '',
+        '/scan/progress',
+      )
+    },
+    { token: SCAN_CONTROL_TOKEN },
+  )
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  // 缺少 scanTaskId 时,组件第一时间 navigate('/scan/start')——这一步必须能成:
+  // 如果 busy 还拿着,这条 replace 会被路由守卫拦下来,/session-timeout 永远不会弹。
+  await expectWarningWithinThreeSeconds(page)
+})
+
+test('scan busy stays released when the scan control token is missing @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  await page.goto('/')
+  await page.evaluate(
+    ({ taskId }) => {
+      window.history.pushState(
+        { usr: { scanType: 'resume', scanTaskId: taskId }, key: 'scan-busy-missing-token', idx: 1 },
+        '',
+        '/scan/progress',
+      )
+    },
+    { taskId: SCAN_TASK_ID },
+  )
   await page.reload({ waitUntil: 'domcontentloaded' })
 
   await expectWarningWithinThreeSeconds(page)
@@ -376,8 +410,12 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   await expect.poll(() => waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
 
+  // 3000ms 落在 status poll 间隔 3000ms 之内,保证观察窗口里至少发生过一次进入
+  // active busy 的状态:如果 lock 失效,这窗口内必然弹 /session-timeout。
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
-  expect(waitingCount.statusRequests()).toBeGreaterThanOrEqual(2)
+  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  expect(waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(waitingCount.deleteRequests()).toBe(0)
 
   // Switch the backend to a 5xx-equivalent status path that mirrors the network retry branch,
@@ -388,6 +426,8 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
     status: 'processing',
   })
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
+  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(processingCount.statusRequests()).toBeGreaterThanOrEqual(1)
 
   const networkRetryCount = await installScanProgressRoute(page, {
@@ -396,35 +436,18 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
     networkError: true,
   })
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
+  await expect(page).toHaveURL(/\/scan\/progress$/)
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(networkRetryCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(networkRetryCount.deleteRequests()).toBe(0)
 })
 
-test('scan busy releases before navigating away on terminal status or user cancel @scan-busy @warning-kiosk', async ({
+test('completed poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
   page,
   api,
 }) => {
   registerKioskShell(api)
   const counts = await installScanProgressRoute(page, {
-    scanTaskId: SCAN_TASK_ID,
-    controlToken: SCAN_CONTROL_TOKEN,
-    status: 'waiting',
-    resultFile: {
-      fileId: 'scan-busy-result-file',
-      fileUrl: 'https://scan-busy.invalid/result.pdf',
-      filename: 'scan-busy-result.pdf',
-      sizeBytes: 4096,
-      mimeType: 'application/pdf',
-    },
-  })
-  await gotoScanProgressWithHistory(page, {
-    scanTaskId: SCAN_TASK_ID,
-    controlToken: SCAN_CONTROL_TOKEN,
-  })
-  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
-  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
-
-  await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
     status: 'completed',
@@ -436,13 +459,78 @@ test('scan busy releases before navigating away on terminal status or user cance
       mimeType: 'application/pdf',
     },
   })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
   await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
-  // Once we land on the result page the busy lock has been released by the time of navigate,
-  // so the next idle window on the destination should surface the ordinary warning.
+  await expectWarningWithinThreeSeconds(page)
+  // 终态由 poll 触发,页面走 unmount 而非 handleCancel,DELETE 不应被发送。
+  expect(counts.deleteRequests()).toBe(0)
+})
+
+test('expired poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'expired',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
   expect(counts.deleteRequests()).toBe(0)
+})
 
-  await page.goto('http://127.0.0.1:4188/')
+test('failed poll status navigates to /scan/result without sending DELETE @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'failed',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
+  await expectWarningWithinThreeSeconds(page)
+  expect(counts.deleteRequests()).toBe(0)
+})
+
+test('server-cancelled poll status navigates back to /scan/start without sending DELETE @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'cancelled',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expectWarningWithinThreeSeconds(page)
+  expect(counts.deleteRequests()).toBe(0)
+})
+
+test('explicit user cancel sends exactly one DELETE before navigating away @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
   const cancelCounts = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -453,9 +541,14 @@ test('scan busy releases before navigating away on terminal status or user cance
     controlToken: SCAN_CONTROL_TOKEN,
   })
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expect.poll(() => cancelCounts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  const deleteBefore = cancelCounts.deleteRequests()
   await page.getByRole('button', { name: '取消扫描', exact: true }).click()
 
   await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
-  expect(cancelCounts.deleteRequests()).toBeGreaterThanOrEqual(1)
+  // 用 installScanProgressRoute 内部 uninstall 过的 endpoint-wide recorder 拿到
+  // 准确计数,排除 LIFO 路由残留造成的统计漂移。
+  expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
 })
