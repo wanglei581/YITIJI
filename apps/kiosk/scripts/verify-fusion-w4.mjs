@@ -59,6 +59,7 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/tests/visual/print-done-truth.spec.ts',
   'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
   'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
+  'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
   'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
   'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
 ])
