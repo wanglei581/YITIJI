@@ -17,6 +17,7 @@
     "test:browser:w5": "playwright test --config=playwright.w5.config.ts",
     "test:browser:w6": "playwright test --config=playwright.w6.config.ts",
     "test:browser:privacy": "playwright test --config=playwright.privacy.config.ts",
+    "test:browser:warning": "playwright test --config=playwright.privacy-warning.config.ts",
     "test:browser:truth": "playwright test tests/visual/print-done-truth.spec.ts tests/visual/scan-session-truth.spec.ts tests/visual/kiosk-visible-actions-truth.spec.ts --project=kiosk-1080x1920",
     "test:browser:fusion": "pnpm test:browser:smoke && pnpm test:browser:w1 && pnpm test:browser:w2 && pnpm test:browser:w3 && pnpm test:browser:w4 && pnpm test:browser:w5 && pnpm test:browser:w6",
     "test:visual": "playwright test visual",
