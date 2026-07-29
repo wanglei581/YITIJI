@@ -1,0 +1,12 @@
+{
+  "id": "p0-kiosk-privacy-integration-20260729",
+  "title": "P0 Kiosk 公共终端隐私超时三模型终审与 PR 集成",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "frontend-security",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并推送候选分支创建 PR，等待 GitHub CI",
+  "createdAt": "2026-07-29T05:58:23Z",
+  "branch": "codex/p0-kiosk-privacy-timeout-20260729"
+}

@@ -24,7 +24,7 @@ test('sha256File returns the SHA-256 digest for exact bytes', async () => {
   )
 })
 
-test('extractDeclaredRoutePatterns normalizes absolute and nested route strings', () => {
+test('extractDeclaredRoutePatterns normalizes navigable routes and excludes the catch-all boundary', () => {
   const source = `
     const routes = [
       // { path: '/commented', element: <CommentedPage /> },
@@ -33,6 +33,7 @@ test('extractDeclaredRoutePatterns normalizes absolute and nested route strings'
         { index: true, element: <HomePage /> },
         { path: 'jobs/:id', element: <JobPage /> },
         { path: 'jobs/:id', element: <DuplicateJobPage /> },
+        { path: '*', element: <RouteErrorPage /> },
       ] },
     ]
   `

@@ -529,6 +529,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w4
           pnpm --filter @ai-job-print/kiosk test:browser:w5
           pnpm --filter @ai-job-print/kiosk test:browser:w6
+          pnpm --filter @ai-job-print/kiosk test:browser:privacy
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -550,4 +551,5 @@ jobs:
             test-results/kiosk-fusion-w5-report/**
             test-results/kiosk-fusion-w6/**
             test-results/kiosk-fusion-w6-report/**
+            test-results/kiosk-privacy-timeout/**
           if-no-files-found: ignore

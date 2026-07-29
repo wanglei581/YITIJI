@@ -52,7 +52,7 @@ interface Envelope<T> {
 async function call<T>(
   path: string,
   method: 'GET' | 'POST',
-  options: { body?: unknown; token?: string } = {},
+  options: { body?: unknown; token?: string; keepalive?: boolean } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
@@ -65,6 +65,7 @@ async function call<T>(
       headers,
       credentials: 'include',
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      keepalive: options.keepalive,
     })
   } catch {
     throw new MemberApiError('NETWORK_ERROR', '网络连接失败，请检查网络后重试', 0)
@@ -135,7 +136,7 @@ export function fetchMemberMe(token: string): Promise<MemberUser> {
  * token 由调用方显式传入。后端失败时调用方应保证本地状态已清（见 AuthContext.logout）。
  */
 export function memberLogout(token: string): Promise<{ loggedOut: true }> {
-  return call<{ loggedOut: true }>('/member/auth/logout', 'POST', { token })
+  return call<{ loggedOut: true }>('/member/auth/logout', 'POST', { token, keepalive: true })
 }
 
 // ── 换绑相关类型 ───────────────────────────────────────────────

@@ -7,7 +7,12 @@
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
 - [x] **S0-C 简历解析阶段真值已合入**：[PR #429](https://github.com/wanglei581/YITIJI/pull/429) → `main@5fcc4a50`；已移除固定延时与伪 OCR/提取/诊断阶段，立即提交真实请求，只展示明确的非实时处理内容说明；无 `fileId` 直达 fail-closed，返回不冒充撤回服务端任务；真实性门禁、W3 6/6、W6 聚焦 1/1、typecheck/lint/build、GitHub 三项 CI 和三模型终审均通过。未部署。
-- [ ] **Phase 0 最终 GO/NO-GO**：S0-B/S0-C 完成后再汇总真实 API、1080×1920、390×844 与必要真机证据；不得把 S0-A 候选写成整个 AI 操作系统或商业上线已完成。
+- [x] **Phase 0 最终 GO/NO-GO 已完成（2026-07-29）**：正式商业上线与当前软件候选均为 **NO-GO**。完整证据见 `docs/reviews/phase0-final-go-no-go-2026-07-29.md`。
+- [x] **P0-1 公共终端硬性隐私超时与全路由清场（PR/CI 候选完成）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已建立 Router 级安全根、普通 idle + 不受 busy 抑制的硬截止、fail-closed 遮罩/清场、keepalive logout、history back/forward 与 BFCache 防恢复、屏保跨刷新/唤醒边界、手机辅助页豁免和有界 busy；法律页逃逸与扫描设置清场误取消已按 RED→GREEN 修复，打印/扫描后台任务不取消。已同步 `origin/main@beade4af`，同步后 privacy **18/18**、truth **23/23**、smoke **6/6**、W1 **7/7** 及相关静态/Agent 回归通过；GitHub Actions [`30434676211`](https://github.com/wanglei581/YITIJI/actions/runs/30434676211) 对同步头 `e4a8b488` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。仍未合并 / deploy。
+- [x] **P1-A 浏览器 truth 夹具收口（本地候选完成）**：`scan-session-truth.spec.ts` 已补终端 capabilities 诚实 fixture，独立 truth 恢复 **23/23**；W5/W6 路由门禁已适配 pathless runtime root，公共隐私套件已纳入 `kiosk-browser-smoke` 常规 CI。
+- [x] **P0-1 PR/CI 集成门禁（完成，待人工决定是否合并）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已同步最新 `main` 候选并通过同步头三项 GitHub CI；Claude 同步后最终只读审查 `APPROVE`（Critical 0、Warning 0），Cursor Grok 4.5 High/Fast 此前最终 `APPROVE`（Critical 0、High 0）。Antigravity 同步后调用因 quota/resource limit 未形成有效报告，不记作通过。当前按授权保持未合并、未部署；如后续合入，须先记录精确 main 提交与发布来源。
+- [ ] **P0-1B 清场预警与任务感知文案**：P0-1 安全候选合入后，复用既有 `/session-timeout` 30 秒倒计时页接入普通 idle / 屏保清场路径；硬隐私截止仍保持 fail-closed，不允许被 busy 无限抑制。打印 / 扫描须明确“后台任务继续，终端页面将清除”，AI / 面试须明确未保存内容会清除；补 27 寸触控、继续使用、立即退出和匿名任务不可恢复验收。不得在 P0-1 安全 PR 中混入。
+- [ ] **P0-2～P0-6 上线门禁**：P0-1 合入并冻结单一候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 

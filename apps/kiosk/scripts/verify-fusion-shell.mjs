@@ -60,8 +60,13 @@ function directStringProperty(objectLiteral, name) {
 
 function directJsxComponentProperty(objectLiteral, name) {
   const property = directProperty(objectLiteral, name)
-  if (!property || !ts.isJsxSelfClosingElement(property.initializer)) return null
-  return ts.isIdentifier(property.initializer.tagName) ? property.initializer.tagName.text : null
+  if (!property) return null
+  const tagName = ts.isJsxSelfClosingElement(property.initializer)
+    ? property.initializer.tagName
+    : ts.isJsxElement(property.initializer)
+      ? property.initializer.openingElement.tagName
+      : null
+  return tagName && ts.isIdentifier(tagName) ? tagName.text : null
 }
 
 function topLevelRouteObjects(routes) {
@@ -86,13 +91,43 @@ function topLevelRouteObjects(routes) {
   return routeArray.elements.filter(ts.isObjectLiteralExpression)
 }
 
+function descendantRouteObjects(route) {
+  const descendants = []
+  const children = directProperty(route, 'children')
+  if (!children || !ts.isArrayLiteralExpression(children.initializer)) return descendants
+
+  for (const child of children.initializer.elements.filter(ts.isObjectLiteralExpression)) {
+    descendants.push(child, ...descendantRouteObjects(child))
+  }
+  return descendants
+}
+
 function assertTopLevelHelperRoutes(routes) {
   const objects = topLevelRouteObjects(routes)
-  const rootRouteIndex = objects.findIndex((route) =>
-    directStringProperty(route, 'path') === '/' &&
-    directJsxComponentProperty(route, 'element') === 'KioskRoot',
+  const runtimeRootIndex = objects.findIndex((route) =>
+    directJsxComponentProperty(route, 'element') === 'KioskRuntimeRoot',
   )
-  assert.ok(rootRouteIndex >= 0, 'KioskRoot route must remain a direct createBrowserRouter entry')
+  assert.ok(runtimeRootIndex >= 0, 'KioskRuntimeRoot must remain a direct createBrowserRouter entry')
+
+  const runtimeRoutes = descendantRouteObjects(objects[runtimeRootIndex])
+  assert.ok(
+    runtimeRoutes.some((route) =>
+      directStringProperty(route, 'path') === '/' &&
+      directJsxComponentProperty(route, 'element') === 'KioskRoot',
+    ),
+    'KioskRoot must remain nested inside KioskRuntimeRoot',
+  )
+
+  for (const path of ['/login', '/legal/:doc', '*']) {
+    assert.ok(
+      runtimeRoutes.some((route) => directStringProperty(route, 'path') === path),
+      `${path} must remain protected inside KioskRuntimeRoot`,
+    )
+    assert.ok(
+      !objects.some((route) => directStringProperty(route, 'path') === path),
+      `${path} must not escape to a top-level route`,
+    )
+  }
 
   for (const [path, component] of [
     ['/member/qr-login', 'MobileQrLoginPage'],
@@ -103,14 +138,11 @@ function assertTopLevelHelperRoutes(routes) {
       directJsxComponentProperty(route, 'element') === component,
     )
     assert.ok(routeIndex >= 0, `${path} must remain a direct createBrowserRouter route`)
-    assert.ok(routeIndex < rootRouteIndex, `${path} must stay before the KioskRoot route instead of becoming a child route`)
-    const rootChildren = directProperty(objects[rootRouteIndex], 'children')
-    if (rootChildren && ts.isArrayLiteralExpression(rootChildren.initializer)) {
-      const nestedPaths = rootChildren.initializer.elements
-        .filter(ts.isObjectLiteralExpression)
-        .map((route) => directStringProperty(route, 'path'))
-      assert.ok(!nestedPaths.includes(path), `${path} must not be nested in KioskRoot children`)
-    }
+    assert.ok(routeIndex < runtimeRootIndex, `${path} must stay before KioskRuntimeRoot instead of becoming a child route`)
+    assert.ok(
+      !runtimeRoutes.some((route) => directStringProperty(route, 'path') === path),
+      `${path} must not be nested inside KioskRuntimeRoot`,
+    )
   }
 }
 
@@ -161,6 +193,8 @@ assert.equal(
 
 const layout = await read('../../packages/ui/src/layouts/KioskLayout.tsx')
 const root = await read('src/layouts/KioskRoot.tsx')
+const runtimeRoot = await read('src/layouts/KioskRuntimeRoot.tsx')
+const privacyGuard = await read('src/auth/KioskPrivacyGuard.tsx')
 const stageFit = await read('src/components/kiosk-shell/KioskStageFit.tsx')
 const css = await read('src/index.css')
 const routes = await read('src/routes/index.tsx')
@@ -184,6 +218,20 @@ assert.match(
 
 assert.match(root, /presentation\s*=\s*['"]fusion-youth['"]/, 'KioskRoot must opt into fusion-youth')
 assert.doesNotMatch(root, /MOBILE_HELPER_ROUTES|isMobileHelperRoute/, 'KioskRoot must not try to classify routes it does not render')
+assert.match(runtimeRoot, /<KioskBusyProvider>/, 'KioskRuntimeRoot must provide unified busy state')
+assert.match(runtimeRoot, /<KioskPrivacyGuard>/, 'KioskRuntimeRoot must preserve the privacy guard')
+assert.match(runtimeRoot, /<Outlet\s*\/>/, 'KioskRuntimeRoot must render protected terminal routes')
+
+assert.match(
+  withoutComments(privacyGuard),
+  /useScreensaverController\(\s*establishPrivacyBoundary\s*\)/,
+  'KioskPrivacyGuard must preserve the screensaver controller',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /useIdleLogout\(\s*screensaverActive\s*,\s*hardClear\s*\)/,
+  'KioskPrivacyGuard must preserve idle logout',
+)
 
 assertTopLevelHelperRoutes(routes)
 assertMobilePageContract(mobileQrLogin, {
@@ -199,8 +247,6 @@ assertMobilePageContract(phoneUpload, {
 
 const shellBody = functionBody(root, 'KioskShell')
 for (const [label, pattern] of [
-  ['screensaver controller', /useScreensaverController\(\s*\)/],
-  ['idle logout', /useIdleLogout\(\s*screensaverActive\s*\)/],
   ['favorites provider', /<FavoritesProvider>/],
   ['active tab derivation', /getActiveTab\(\s*pathname\s*\)/],
   ['tab navigation', /navigate\(\s*tabToPath\(\s*tab\s*\)\s*\)/],

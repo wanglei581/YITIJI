@@ -68,9 +68,6 @@ function lineLabel(line: PrintPriceLine): string {
 }
 
 export function PrintCashierPage() {
-  // 收银进行中：禁止进入待机宣传屏（与打印进度一致）。
-  useBusyLock(true)
-
   const navigate = useNavigate()
   const location = useLocation()
   const state = useMemo(() => (location.state ?? {}) as CashierLocationState, [location.state])
@@ -297,6 +294,8 @@ export function PrintCashierPage() {
     () => (snapshot && (paymentMethod !== null || snapshot.attempt) ? deriveCashierView(snapshot, nowMs) : null),
     [snapshot, paymentMethod, nowMs],
   )
+  const isPaymentPending = view?.phase === 'awaiting_scan' || view?.phase === 'awaiting_code_confirmation'
+  useBusyLock(issuing || codeSubmitting || reconciling || isPaymentPending)
 
   const qrContent = view?.showQr ? snapshot?.attempt?.qrCodeContent ?? null : null
   const expiresAt = snapshot?.attempt?.expiresAt ?? null

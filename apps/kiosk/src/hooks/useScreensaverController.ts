@@ -8,7 +8,7 @@ import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensav
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 
 /**
- * 屏保控制器(挂在 KioskRoot,全局生效)。
+ * 屏保控制器(挂在 KioskPrivacyGuard,覆盖全部终端路由)。
  *
  * 职责:
  *   1. 周期拉取本终端屏保配置(enabled / idleTimeoutSec / items),并预缓存素材
@@ -22,7 +22,15 @@ import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 const REFRESH_MS = 5 * 60 * 1000
 const DEFAULT_TIMEOUT_SEC = 180
 
-export function useScreensaverController(): { active: boolean } {
+export interface KioskSessionBoundaryMetadata {
+  token: string
+  minHistoryIndex: number
+  createdAt: number
+}
+
+export function useScreensaverController(
+  onSessionBoundary?: () => KioskSessionBoundaryMetadata,
+): { active: boolean } {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const busy = useKioskBusy()
@@ -65,8 +73,11 @@ export function useScreensaverController(): { active: boolean } {
     const p = playlistRef.current
     if (!p?.enabled || p.items.length === 0) return
     clearKioskSensitiveSession()
-    navigate('/screensaver', { state: { playlist: p } })
-  }, [navigate])
+    const privacyBoundary = onSessionBoundary?.()
+    // push 会截断用户已后退后残留的 forward 敏感历史；PrivacyGuard 的 boundary
+    // 负责阻止再后退到屏保前页面，退出屏保仍 replace 回首页。
+    navigate('/screensaver', { state: { playlist: p, privacyBoundary } })
+  }, [navigate, onSessionBoundary])
 
   useIdleTimer({
     timeoutMs,

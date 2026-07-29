@@ -24,7 +24,12 @@ export function ScreensaverPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useAuth()
-  const statePlaylist = (location.state as { playlist?: KioskScreensaverPlaylist } | null)?.playlist
+  const routeState = location.state as {
+    playlist?: KioskScreensaverPlaylist
+    privacyBoundary?: { token: string; minHistoryIndex: number; createdAt: number }
+  } | null
+  const statePlaylist = routeState?.playlist
+  const privacyBoundary = routeState?.privacyBoundary
 
   // 进入待机宣传屏即重置（Phase C-1 + C-2A）：屏保意味着用户已离开，
   // 清会员登录态 + 打印材料 / AI 简历最小会话（含匿名 accessToken），
@@ -44,7 +49,13 @@ export function ScreensaverPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  const exit = useCallback(() => navigate('/', { replace: true }), [navigate])
+  const exit = useCallback(
+    () => navigate('/', {
+      replace: true,
+      state: privacyBoundary ? { privacyBoundary } : undefined,
+    }),
+    [navigate, privacyBoundary],
+  )
 
   const advance = useCallback(() => {
     setIndex((i) => (items.length > 0 ? (i + 1) % items.length : 0))
