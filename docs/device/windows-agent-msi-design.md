@@ -1,6 +1,6 @@
 # Windows Terminal Agent MSI 实施设计
 
-> 状态：设计已审查，尚未实施。
+> 状态：B1 未签名候选已实施，尚未完成签名、Provisioner、Windows CI 生命周期结果和真机发布验收。
 > 适用范围：Windows Terminal Agent 的首次安装、修复、卸载和同机升级。
 > 上位设计：[终端机队管理与安全换机设计](./terminal-fleet-management-design.md)。
 
@@ -108,3 +108,9 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 5. 在已完成 maintenance/drain 的单台预生产终端验收，再按机队设计的分批策略扩展。
 
 每一步独立分支、独立 PR、独立 Windows 验收；任一步失败都停止后续批次。
+
+## 8. B1 候选实现（2026-07-27）
+
+`apps/terminal-agent/installer/` 现已提供固定输入清单、Node 22 x64 staging、生产依赖裁剪、原生 ABI 探针、WiX v4 工程、install/repair/uninstall Windows CI 和未签名 MSI 构建。MSI 直接拥有 WinSW wrapper、配置和 SCM 注册，不调用 `node-windows install-service`；未激活服务为 Manual/Stopped，避免无配置主机反复失败重启。`%ProgramData%\AIJobPrintAgent` 作为永久状态目录保留，二进制安装到 `%ProgramFiles%\AIJobPrintAgent`。
+
+当前仍是 **NO-GO 发布候选**：WinSW 与 MSI 未经本企业 Authenticode 签名；本机因已有在役同名服务未执行 MSI 生命周期测试，必须由干净 Windows CI/VM 提供 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 结果；安全交互式 Provisioner 与签名发布 manifest 仍在后续批次。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。

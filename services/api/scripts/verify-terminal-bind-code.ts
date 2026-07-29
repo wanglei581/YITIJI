@@ -105,8 +105,10 @@ assert(
 )
 assert(!/\[string\]\$AgentToken\b/.test(installer), 'installer must not accept long-lived -AgentToken CLI input')
 assert(
-  installer.includes('Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted.'),
-  'installer fail-closes when neither BindCode nor UseExistingToken is provided',
+  installer.includes(
+    'Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted.',
+  ),
+  'installer fail-closes when no supported credential source is provided',
 )
 assert(
   installer.includes('function Set-ProgramDataAcl') &&

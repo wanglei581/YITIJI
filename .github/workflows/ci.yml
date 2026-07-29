@@ -157,6 +157,7 @@ jobs:
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
           pnpm run verify:agent-unauthorized
+          pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
           pnpm run verify:local-qr-proxy

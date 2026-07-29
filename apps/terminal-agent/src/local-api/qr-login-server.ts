@@ -11,6 +11,7 @@ import type {
   LocalApiError,
   LocalQrClaimRequest,
   LocalQrCreateRequest,
+  LocalTerminalIdentityResponse,
   LocalUsbFileItem,
   LocalUsbListResponse,
   LocalUsbStatusResponse,
@@ -62,7 +63,7 @@ export function startQrLoginLocalServer(config: AgentConfig): LocalQrServerHandl
 
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin
-    void handleRequest({ req, res, origins, claims, client, bridgeToken }).catch((error) => {
+    void handleRequest({ req, res, origins, claims, client, bridgeToken, config }).catch((error) => {
       const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
       const mapped = localExceptionFromUnknown(error, isUsbRoute ? 'usb' : 'qr')
       if (mapped.status >= 500) warn(`local-qr: unexpected request error — ${safeErrorMessage(error)}`)
@@ -102,8 +103,9 @@ async function handleRequest(input: {
   claims: Map<string, StoredClaim>
   client: ReturnType<typeof createApiClient>
   bridgeToken: string | undefined
+  config: AgentConfig
 }): Promise<void> {
-  const { req, res, origins, claims, client, bridgeToken } = input
+  const { req, res, origins, claims, client, bridgeToken, config } = input
   const origin = req.headers.origin
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
@@ -121,6 +123,15 @@ async function handleRequest(input: {
 
   if (req.method === 'OPTIONS') {
     sendEmpty(res, 204, origin)
+    return
+  }
+
+  if (req.method === 'GET' && url.pathname === '/local/terminal-identity') {
+    const identity: LocalTerminalIdentityResponse = {
+      terminalId: config.terminalId!.trim(),
+      terminalCode: config.terminalCode.trim(),
+    }
+    sendEnvelope(res, 200, identity, origin)
     return
   }
 

@@ -12,15 +12,29 @@
 #     -ApiBaseUrl "https://api.example.com/api/v1" `
 #     -TerminalCode "KSK-001" `
 #     -TerminalId "t_ksk_001" `
-#     -BindCode "ABCD1234EFGH5678" `
-#     -PrinterName "Pantum CM2800ADN Series"
+#     -PromptForBindCode `
+#     -PrinterName "<exact Get-Printer name>" `
+#     -LocalApiAllowedOrigins "https://kiosk.example.com" `
+#     -ScanWatchFolder "C:\AIJobPrint\scan-inbox"
+#
+#   # Replace previously preserved cross-origin Kiosk entries. Passing the
+#   # switch with no -LocalApiAllowedOrigins removes all historical extra
+#   # origins while retaining the API origin and loopback development origins.
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
+#     -ApiBaseUrl "https://api.example.com/api/v1" `
+#     -TerminalCode "KSK-001" `
+#     -TerminalId "t_ksk_001" `
+#     -PrinterName "<exact Get-Printer name>" `
+#     -UseExistingToken `
+#     -ReplaceLocalApiAllowedOrigins `
+#     -LocalApiAllowedOrigins "https://new-kiosk.example.com"
 #
 #   # If the token was already stored in %ProgramData%\AIJobPrintAgent\agent.token:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install-production-agent.ps1 `
 #     -ApiBaseUrl "https://api.example.com/api/v1" `
 #     -TerminalCode "KSK-001" `
 #     -TerminalId "t_ksk_001" `
-#     -PrinterName "Pantum CM2800ADN Series" `
+#     -PrinterName "<exact Get-Printer name>" `
 #     -UseExistingToken
 #
 # Gate 0.4: long-lived -AgentToken CLI input is intentionally removed. Tokens must
@@ -43,6 +57,9 @@ param(
   [Parameter(Mandatory = $false)]
   [string]$BindCode,
 
+  [Parameter(Mandatory = $false)]
+  [switch]$PromptForBindCode,
+
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
   [string]$PrinterName,
@@ -55,6 +72,24 @@ param(
 
   [Parameter(Mandatory = $false)]
   [string]$AgentVersion = "0.3.0-production",
+
+  [Parameter(Mandatory = $false)]
+  [string]$ScanWatchFolder,
+
+  [Parameter(Mandatory = $false)]
+  [Alias("KioskOrigins")]
+  [string[]]$LocalApiAllowedOrigins,
+
+  [Parameter(Mandatory = $false)]
+  [Alias("ReplaceKioskOrigins")]
+  [switch]$ReplaceLocalApiAllowedOrigins,
+
+  [Parameter(Mandatory = $false)]
+  [ValidateRange(1, 65535)]
+  [int]$LocalApiPort = 9527,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$PromptForLocalApiBridgeToken,
 
   [Parameter(Mandatory = $false)]
   [switch]$UseExistingToken,
@@ -87,6 +122,18 @@ function Write-WarnLine([string]$Message) {
 function Fail([string]$Message) {
   Write-Host "[FAIL] $Message" -ForegroundColor Red
   exit 1
+}
+
+function ConvertFrom-SecureStringToPlainText([System.Security.SecureString]$Value) {
+  $pointer = [IntPtr]::Zero
+  try {
+    $pointer = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Value)
+    return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
+  } finally {
+    if ($pointer -ne [IntPtr]::Zero) {
+      [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+    }
+  }
 }
 
 function Test-GeneratedConfig([System.Collections.IDictionary]$Config) {
@@ -213,6 +260,84 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
     Fail "ApiBaseUrl must include /api/v1, e.g. https://api.example.com/api/v1"
   }
   return $trimmed
+}
+
+function ConvertTo-CanonicalOrigin([string]$Value) {
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    Fail "Local API allowed origin cannot be empty"
+  }
+  $trimmed = $Value.Trim().TrimEnd("/")
+  try {
+    $uri = [System.Uri]$trimmed
+  } catch {
+    Fail "Local API allowed origin is not an absolute URL: $Value"
+  }
+  if (-not $uri.IsAbsoluteUri -or @("http", "https") -notcontains $uri.Scheme -or -not [string]::IsNullOrEmpty($uri.UserInfo)) {
+    Fail "Local API allowed origin must use http/https and must not contain user info"
+  }
+  $origin = $uri.GetLeftPart([System.UriPartial]::Authority)
+  if ($trimmed -ne $origin) {
+    Fail "Local API allowed origin must contain only scheme, host, and optional port: $Value"
+  }
+  return $origin
+}
+
+function Get-PreservedLocalSettings(
+  [string]$ConfigPath,
+  [string]$ProgramDataDir,
+  [bool]$SkipOrigins = $false
+) {
+  $preserved = [ordered]@{}
+  if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { return $preserved }
+
+  try {
+    Assert-ProgramDataAcl -Path $ProgramDataDir -IsContainer $true
+    Assert-ProgramDataAcl -Path $ConfigPath -IsContainer $false
+    $existing = Get-Content -Raw -LiteralPath $ConfigPath -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    Fail "Existing Agent config is not protected or valid JSON; refusing to overwrite local settings: $($_.Exception.Message)"
+  }
+
+  foreach ($field in @("scanWatchFolder", "localApiBridgeToken")) {
+    $property = $existing.PSObject.Properties[$field]
+    if ($null -eq $property) { continue }
+    if ($property.Value -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+      Fail "Existing Agent config has an invalid $field; refusing to discard or rewrite it"
+    }
+    $preserved[$field] = [string]$property.Value
+  }
+  $portProperty = $existing.PSObject.Properties["localApiPort"]
+  if ($null -ne $portProperty) {
+    if ($portProperty.Value -is [string] -or $portProperty.Value -is [bool]) {
+      Fail "Existing Agent config has an invalid localApiPort; refusing to discard or rewrite it"
+    }
+    try {
+      $portDecimal = [decimal]$portProperty.Value
+      $port = [int]$portProperty.Value
+    } catch {
+      Fail "Existing Agent config has an invalid localApiPort; refusing to discard or rewrite it"
+    }
+    if ($portDecimal -ne [decimal]$port -or $port -lt 1 -or $port -gt 65535) {
+      Fail "Existing Agent config has an invalid localApiPort; refusing to discard or rewrite it"
+    }
+    $preserved["localApiPort"] = $port
+  }
+  $originProperty = $existing.PSObject.Properties["localApiAllowedOrigins"]
+  if (-not $SkipOrigins -and $null -ne $originProperty) {
+    if ($originProperty.Value -is [string] -or $originProperty.Value -isnot [System.Collections.IEnumerable]) {
+      Fail "Existing Agent config has invalid localApiAllowedOrigins; refusing to discard or rewrite it"
+    }
+    $preservedOrigins = New-Object "System.Collections.Generic.List[string]"
+    foreach ($origin in @($originProperty.Value)) {
+      if ($origin -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$origin)) {
+        Fail "Existing Agent config has invalid localApiAllowedOrigins; refusing to discard or rewrite it"
+      }
+      $canonicalOrigin = ConvertTo-CanonicalOrigin ([string]$origin)
+      if (-not $preservedOrigins.Contains($canonicalOrigin)) { $preservedOrigins.Add($canonicalOrigin) }
+    }
+    $preserved["localApiAllowedOrigins"] = @($preservedOrigins)
+  }
+  return $preserved
 }
 
 function ConvertTo-SidValue([object]$IdentityReference) {
@@ -573,6 +698,21 @@ $configPath = Join-Path $programDataDir "agent-config.json"
 $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
+$apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
+$preservedLocalSettings = Get-PreservedLocalSettings `
+  -ConfigPath $configPath `
+  -ProgramDataDir $programDataDir `
+  -SkipOrigins ([bool]$ReplaceLocalApiAllowedOrigins)
+$localApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
+$preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocalSettings.Contains("localApiAllowedOrigins")) {
+  @($preservedLocalSettings["localApiAllowedOrigins"])
+} else {
+  @()
+}
+foreach ($origin in @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) {
+  $canonicalOrigin = ConvertTo-CanonicalOrigin $origin
+  if (-not $localApiAllowedOrigins.Contains($canonicalOrigin)) { $localApiAllowedOrigins.Add($canonicalOrigin) }
+}
 
 Write-Step "Production Agent hardening"
 Write-Host "Repo root    : $repoRoot"
@@ -630,6 +770,37 @@ if (-not $printer) {
 }
 Write-Ok "Printer found: $($printer.Name) on $($printer.PortName)"
 
+$effectiveScanWatchFolder = $null
+if ($PSBoundParameters.ContainsKey("ScanWatchFolder")) {
+  if ([string]::IsNullOrWhiteSpace($ScanWatchFolder)) {
+    Fail "ScanWatchFolder cannot be empty when explicitly provided"
+  }
+  $scanFolderItem = Get-Item -Force -LiteralPath $ScanWatchFolder -ErrorAction Stop
+  Assert-NotReparsePoint $scanFolderItem
+  if (-not $scanFolderItem.PSIsContainer) {
+    Fail "ScanWatchFolder must be an existing directory"
+  }
+  $effectiveScanWatchFolder = $scanFolderItem.FullName
+} elseif ($preservedLocalSettings.Contains("scanWatchFolder")) {
+  $effectiveScanWatchFolder = $preservedLocalSettings["scanWatchFolder"]
+}
+
+$effectiveBridgeToken = $null
+if ($PromptForLocalApiBridgeToken) {
+  $secureBridgeToken = Read-Host "Local bridge token" -AsSecureString
+  $effectiveBridgeToken = ConvertFrom-SecureStringToPlainText $secureBridgeToken
+  if ([string]::IsNullOrWhiteSpace($effectiveBridgeToken)) {
+    Fail "Local bridge token cannot be empty"
+  }
+} elseif ($preservedLocalSettings.Contains("localApiBridgeToken")) {
+  $effectiveBridgeToken = $preservedLocalSettings["localApiBridgeToken"]
+}
+
+$effectiveLocalApiPort = $LocalApiPort
+if (-not $PSBoundParameters.ContainsKey("LocalApiPort") -and $preservedLocalSettings.Contains("localApiPort")) {
+  $effectiveLocalApiPort = $preservedLocalSettings["localApiPort"]
+}
+
 $config = [ordered]@{
   apiBaseUrl             = $apiBase
   terminalId             = $TerminalId.Trim()
@@ -638,11 +809,14 @@ $config = [ordered]@{
   agentVersion           = $AgentVersion.Trim()
   heartbeatIntervalMs    = $HeartbeatIntervalMs
   claimIntervalMs        = $ClaimIntervalMs
-  localApiPort           = 9527
-  localApiAllowedOrigins = @(
-    "http://localhost:5173",
-    "http://127.0.0.1:5173"
-  )
+  localApiPort           = $effectiveLocalApiPort
+  localApiAllowedOrigins = @($localApiAllowedOrigins)
+}
+if ($null -ne $effectiveScanWatchFolder) {
+  $config.scanWatchFolder = $effectiveScanWatchFolder
+}
+if ($null -ne $effectiveBridgeToken) {
+  $config.localApiBridgeToken = $effectiveBridgeToken
 }
 
 $configJson = Test-GeneratedConfig -Config $config
@@ -654,9 +828,23 @@ Write-Ok "ProgramData ACL restricted to SYSTEM + Administrators: $programDataDir
 
 Write-Step "Preparing token"
 $tokenToPersist = $null
-if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
+if ($PromptForBindCode -and -not [string]::IsNullOrWhiteSpace($BindCode)) {
+  Fail "Use either -PromptForBindCode or -BindCode, not both"
+}
+if ($UseExistingToken -and ($PromptForBindCode -or -not [string]::IsNullOrWhiteSpace($BindCode))) {
+  Fail "Use either a BindCode flow or -UseExistingToken, not both"
+}
+$effectiveBindCode = $BindCode
+if ($PromptForBindCode) {
+  $secureBindCode = Read-Host "One-time terminal bind code" -AsSecureString
+  $effectiveBindCode = ConvertFrom-SecureStringToPlainText $secureBindCode
+}
+if (-not [string]::IsNullOrWhiteSpace($effectiveBindCode)) {
   Write-Ok "Exchanging one-time bind code with cloud API"
-  $exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode
+  $exchange = Exchange-BindCode -ApiBase $apiBase -Code $effectiveBindCode
+  $effectiveBindCode = $null
+  $secureBindCode = $null
+  $BindCode = $null
   if ([string]::IsNullOrWhiteSpace([string]$exchange.terminalId) -or $exchange.terminalId -ne $TerminalId) {
     Fail "BindCode exchange terminalId does not match the requested TerminalId"
   }
@@ -672,7 +860,7 @@ if (-not [string]::IsNullOrWhiteSpace($BindCode)) {
   Write-Ok "Using existing DPAPI token: $tokenPath"
   Set-ProgramDataAcl -Path $tokenPath
 } else {
-  Fail "Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
+  Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."
 }
 
 Write-Step "Writing production config and token"

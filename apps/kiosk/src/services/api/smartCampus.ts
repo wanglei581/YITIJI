@@ -5,7 +5,7 @@
 //   API_MODE=mock → smartCampusMockAdapter（无后端，返回 enabled:false）
 //   API_MODE=http → smartCampusHttpAdapter（真实 /terminals/:id/smart-campus）
 //
-// 终端 id 复用 screensaver 的 getTerminalId（读 VITE_TERMINAL_ID）。
+// 终端 id 复用 screensaver 的 getTerminalId（生产读取本机 Agent 身份）。
 // ============================================================
 
 import type { KioskSmartCampusConfig } from '@ai-job-print/shared'

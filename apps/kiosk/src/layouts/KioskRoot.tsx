@@ -2,7 +2,7 @@ import { KioskLayout, type KioskTab } from '@ai-job-print/ui'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { KioskTopbarStatus } from '../components/kiosk-shell/KioskAppTopbar'
 import { KioskStageFit } from '../components/kiosk-shell/KioskStageFit'
-import { getTerminalId } from '../services/api/terminalConfig'
+import { getTerminalCode } from '../services/api/terminalConfig'
 import { KioskIconSprite } from '../components/kiosk-icon'
 import { FavoritesProvider } from '../favorites/FavoritesProvider'
 import { useKioskStageFit } from '../hooks/useKioskStageFit'
@@ -80,7 +80,7 @@ function KioskShell() {
   const activeTab = getActiveTab(pathname)
   const statusLabel = loading ? '设备检查中' : printerLabel
   const statusTone = statusToneFor(kind, printerReady, loading)
-  const terminalId = getTerminalId() || '01号机'
+  const terminalCode = getTerminalCode() || '设备未绑定'
 
   // 校园招聘专区（/campus）做成沉浸式页：隐藏全局头部 + 「首页/AI助手/我的」底部导航，
   // 由页面自带顶栏 + 返回箭头承载导航。
@@ -99,7 +99,7 @@ function KioskShell() {
       viewport={isResponsiveHome ? 'mobile' : 'kiosk'}
       hideHeader={isCampusZone}
       hideBottomNav={isCampusZone || usesPageActionbar}
-      brandTitle={`就业服务大厅 · ${terminalId}`}
+      brandTitle={`就业服务大厅 · ${terminalCode}`}
       brandSubtitle="AI求职打印服务终端"
       headerRight={<KioskTopbarStatus tone={statusTone} label={statusLabel} />}
       className={isResponsiveHome ? 'kiosk-home-mobile' : 'h-full'}
