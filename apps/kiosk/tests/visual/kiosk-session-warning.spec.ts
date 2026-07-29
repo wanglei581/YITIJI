@@ -237,3 +237,225 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_500 }).toBe('/')
   await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toHaveCount(0)
 })
+
+const SCAN_TASK_ID = 'scan-busy-task'
+const SCAN_CONTROL_TOKEN = 'scan-busy-control-token'
+const SCAN_OBSERVATION_MS = 6_000
+
+interface ScanBusyOptions {
+  scanTaskId?: string
+  controlToken?: string
+  status?: 'waiting' | 'processing' | 'completed' | 'expired' | 'failed' | 'cancelled'
+  networkError?: boolean
+  resultFile?: {
+    fileId: string
+    fileUrl: string
+    filename: string
+    sizeBytes: number
+    mimeType: string
+  }
+}
+
+async function installScanProgressRoute(
+  page: Page,
+  options: ScanBusyOptions = {},
+): Promise<{ statusRequests: () => number; deleteRequests: () => number }> {
+  let statusReq = 0
+  let deleteReq = 0
+  await page.route(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`, async (route) => {
+    const request = route.request()
+    if (request.method() === 'DELETE') {
+      deleteReq += 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' },
+        }),
+      })
+      return
+    }
+    if (request.method() !== 'GET') {
+      await route.fallback()
+      return
+    }
+    statusReq += 1
+    if (options.networkError) {
+      await route.abort('internetdisconnected')
+      return
+    }
+    const status = options.status ?? 'waiting'
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          scanTaskId: SCAN_TASK_ID,
+          scanType: 'resume',
+          status,
+          file: status === 'completed' ? options.resultFile ?? null : null,
+          errorCode: null,
+          errorMessage: null,
+          expiresAt: '2026-07-29T02:00:00.000Z',
+        },
+      }),
+    })
+  })
+  return {
+    statusRequests: () => statusReq,
+    deleteRequests: () => deleteReq,
+  }
+}
+
+async function gotoScanProgressWithHistory(
+  page: Page,
+  options: ScanBusyOptions,
+): Promise<void> {
+  await page.goto('/')
+  await page.evaluate(
+    ({ state }) => {
+      window.history.pushState({ usr: state, key: 'scan-busy-route', idx: 1 }, '', '/scan/progress')
+    },
+    {
+      state: {
+        scanTaskId: options.scanTaskId,
+        scanType: 'resume',
+        controlToken: options.controlToken,
+      },
+    },
+  )
+  await page.reload({ waitUntil: 'domcontentloaded' })
+}
+
+async function expectNoWarningWithin(
+  page: Page,
+  ms: number,
+): Promise<void> {
+  await page.waitForTimeout(ms)
+  await expect(page).not.toHaveURL(/\/session-timeout$/)
+  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
+}
+
+test('scan busy stays released when the scan identity is missing @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  await page.evaluate(() => undefined)
+
+  await page.goto('/')
+  await page.evaluate(() => {
+    window.history.pushState(
+      { usr: { scanType: 'resume' }, key: 'scan-busy-missing', idx: 1 },
+      '',
+      '/scan/progress',
+    )
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+
+  await expectWarningWithinThreeSeconds(page)
+})
+
+test('scan busy blocks the idle warning while polling is waiting, processing, or retrying @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+
+  const waitingCount = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expect.poll(() => waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
+  expect(waitingCount.statusRequests()).toBeGreaterThanOrEqual(2)
+  expect(waitingCount.deleteRequests()).toBe(0)
+
+  // Switch the backend to a 5xx-equivalent status path that mirrors the network retry branch,
+  // and confirm the busy lock still blocks the warning while poll() schedules the next attempt.
+  const processingCount = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'processing',
+  })
+  await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
+  expect(processingCount.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  const networkRetryCount = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    networkError: true,
+  })
+  await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
+  expect(networkRetryCount.statusRequests()).toBeGreaterThanOrEqual(1)
+  expect(networkRetryCount.deleteRequests()).toBe(0)
+})
+
+test('scan busy releases before navigating away on terminal status or user cancel @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const counts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+    resultFile: {
+      fileId: 'scan-busy-result-file',
+      fileUrl: 'https://scan-busy.invalid/result.pdf',
+      filename: 'scan-busy-result.pdf',
+      sizeBytes: 4096,
+      mimeType: 'application/pdf',
+    },
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expect.poll(() => counts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'completed',
+    resultFile: {
+      fileId: 'scan-busy-result-file',
+      fileUrl: 'https://scan-busy.invalid/result.pdf',
+      filename: 'scan-busy-result.pdf',
+      sizeBytes: 4096,
+      mimeType: 'application/pdf',
+    },
+  })
+  await expect(page).toHaveURL(/\/scan\/result$/, { timeout: 6_000 })
+  // Once we land on the result page the busy lock has been released by the time of navigate,
+  // so the next idle window on the destination should surface the ordinary warning.
+  await expectWarningWithinThreeSeconds(page)
+  expect(counts.deleteRequests()).toBe(0)
+
+  await page.goto('http://127.0.0.1:4188/')
+  const cancelCounts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expectWarningWithinThreeSeconds(page)
+  expect(cancelCounts.deleteRequests()).toBeGreaterThanOrEqual(1)
+})

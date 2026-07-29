@@ -19,6 +19,7 @@ import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
+type ScanBusyPhase = 'active' | 'terminal'
 
 interface LocationState {
   scanTaskId?: string
@@ -55,7 +56,6 @@ function buildResultFileState(file: ScanSessionFileView) {
 }
 
 export function ScanProgressPage() {
-  useBusyLock(true)
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -66,10 +66,16 @@ export function ScanProgressPage() {
   // 刷新本页会丢失、必须回 /scan/start 重新发起——这是刻意的，见 B1-8 任务说明。
   const controlToken = state.controlToken
 
+  const hasTaskIdentity = Boolean(scanTaskId && controlToken)
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState('00:00')
+  const [busyPhase, setBusyPhase] = useState<ScanBusyPhase>('active')
   const startedAtRef = useRef(Date.now())
   const cancellingRef = useRef(false)
+
+  // 无身份时直接不持 busy；终态(完成/超时/失败/取消)切换到 terminal,在 navigate 前释放。
+  // 网络错误保持 active,等待下次 poll。
+  useBusyLock(hasTaskIdentity && busyPhase === 'active')
 
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed(formatElapsed(startedAtRef.current)), 1000)
@@ -98,6 +104,7 @@ export function ScanProgressPage() {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
         if (stopped) return
         if (status.status === 'completed' && status.file) {
+          setBusyPhase('terminal')
           navigate('/scan/result', {
             replace: true,
             state: { scanType, success: true, file: buildResultFileState(status.file) },
@@ -105,14 +112,17 @@ export function ScanProgressPage() {
           return
         }
         if (status.status === 'expired') {
+          setBusyPhase('terminal')
           navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
           return
         }
         if (status.status === 'failed') {
+          setBusyPhase('terminal')
           navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: status.errorMessage ?? '扫描处理失败，请重试' } })
           return
         }
         if (status.status === 'cancelled') {
+          setBusyPhase('terminal')
           navigate('/scan/start', { replace: true })
           return
         }
@@ -138,6 +148,9 @@ export function ScanProgressPage() {
     cancellingRef.current = true
     try {
       await cancelScanSession(scanTaskId, controlToken, getToken())
+      // 只有 DELETE 真正成功后才释放 busy。若抛错则任务仍在服务端 active,
+      // busy 必须保持,直到下一次 poll 拿到终态或用户重试取消。
+      setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     } catch (err) {
       // 取消请求送达时任务恰好已经完成(Agent 并发投递刚好抢先完成，后端会返回
@@ -150,6 +163,7 @@ export function ScanProgressPage() {
         try {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
           if (latest.status === 'completed' && latest.file) {
+            setBusyPhase('terminal')
             navigate('/scan/result', {
               replace: true,
               state: { scanType, success: true, file: buildResultFileState(latest.file) },
@@ -160,6 +174,8 @@ export function ScanProgressPage() {
           // 补查状态也失败了，退回默认路径，不阻塞用户
         }
       }
+      // DELETE 失败时已跳出 try/catch;这里走 fallback 也要释放 busy 才能 navigate。
+      setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     }
   }
