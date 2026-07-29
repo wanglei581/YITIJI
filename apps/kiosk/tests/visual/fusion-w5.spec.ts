@@ -436,15 +436,30 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   await expectFusionAcceptance(page, errors)
 })
 
-test('session timeout exposes continue, logout and countdown controls @w5-kiosk', async ({ page, api }) => {
+test('direct visit to /session-timeout without a pending warning fails closed to a clean home page @w5-kiosk', async ({
+  page,
+  api,
+}) => {
   const errors = runtimeErrors(page)
   registerKioskShell(api)
+  // Home page reads smartCampus + toolbox out of the terminal config; registerKioskShell
+  // already covers screensaver/printer-status.
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfig({ enabled: false, items: [] }),
+  })
+
   await page.goto('/session-timeout')
-  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toBeVisible()
-  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toBeVisible()
-  await expect(page.getByText('秒后自动退出', { exact: true })).toBeVisible()
-  await expectFusionAcceptance(page, errors)
+
+  await expect(page).toHaveURL('http://127.0.0.1:4185/', { timeout: 5_000 })
+  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toHaveCount(0)
+  await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
+  await expect(page.locator('main [data-kiosk-component="page-frame"]')).toBeVisible()
+  await expect(page.getByLabel('当前可使用功能')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  expect(errors).toEqual([])
 })
 
 test('offline page retains the 8177 state after an aborted health request @w5-kiosk', async ({ page, api }) => {
