@@ -30,28 +30,10 @@ function env(name) {
   return (process.env[name] ?? loadedEnv[name] ?? '').trim()
 }
 
-function isPlaceholder(value) {
-  return (
-    !value ||
-    value.includes('<') ||
-    value.includes('>') ||
-    /^(todo|placeholder|your_|example)/i.test(value) ||
-    value.includes('注册后的') ||
-    value.toLowerCase().includes('terminal id')
-  )
-}
-
 function mustEqual(name, expected, label) {
   const actual = env(name)
   if (actual === expected) pass(label)
   else fail(`${label} — ${name} 应为 ${expected}, 当前为 ${actual || '未设置'}`)
-}
-
-function mustBeConfigured(name, label) {
-  const actual = env(name)
-  if (!isPlaceholder(actual)) pass(label)
-  else fail(`${label} — ${name} 未配置或仍是占位符`)
-  return actual
 }
 
 function readRequired(file, label) {
@@ -85,9 +67,7 @@ if (allowTextOnly) {
 } else {
   mustEqual('VITE_USE_TRTC_CALL', 'true', 'A3 生产构建启用 TRTC 数字人入口')
 }
-// A4 终端 ID：打印/扫描任务创建强依赖 X-Terminal-Id（print-scan 首期 Task 11 门禁），
-// 与是否启用数字人无关 —— 文字助手模式（VITE_ALLOW_TEXT_ONLY_ASSISTANT）不豁免本项。
-const terminalId = mustBeConfigured('VITE_TERMINAL_ID', 'A4 生产构建注入真实终端 ID（print-scan 必需，文字助手模式不豁免）')
+pass('A4 生产终端身份由本机 Agent 运行时提供，不要求构建期 VITE_TERMINAL_ID')
 
 const indexHtml = readRequired(join(DIST, 'index.html'), 'B1 dist/index.html 已生成')
 if (indexHtml.includes('assets/index-') && indexHtml.includes('.js')) {
@@ -103,6 +83,22 @@ if (!existsSync(ASSETS)) {
   const jsAssets = readdirSync(ASSETS)
     .filter((name) => name.endsWith('.js'))
     .map((name) => ({ name, src: readFileSync(join(ASSETS, name), 'utf8') }))
+
+  const runtimeIdentityAsset = jsAssets.find(({ src }) => src.includes('/local/terminal-identity'))
+  if (runtimeIdentityAsset) pass(`B4 本机 Agent 运行时身份探测已生成 (${runtimeIdentityAsset.name})`)
+  else fail('B4 生产产物未包含 /local/terminal-identity，终端身份会不可用')
+
+  const terminalConsumerSources = [
+    'src/services/print/printJobsApi.ts',
+    'src/services/api/printScanCapabilities.ts',
+    'src/hooks/useAiAdvisorCallSession.ts',
+    'src/pages/home/hooks/useHomeDeviceStatus.ts',
+  ].map((relativePath) => readRequired(join(ROOT, relativePath), `B5 ${relativePath} 已纳入运行时身份检查`))
+  if (terminalConsumerSources.every((source) => !source.includes('VITE_TERMINAL_ID'))) {
+    pass('B5 终端敏感请求未直接读取构建期终端 ID')
+  } else {
+    fail('B5 终端敏感请求仍直接读取 VITE_TERMINAL_ID，可能把多台主机错误路由到同一终端')
+  }
 
   if (allowTextOnly) {
     pass('C1 文字助手模式不要求数字人通话产物')
@@ -129,8 +125,8 @@ if (!existsSync(ASSETS)) {
       if (aiAdvisorAsset.src.includes('X-Terminal-Id')) pass('C4 数字人产物携带 X-Terminal-Id header')
       else fail('C4 数字人产物未包含 X-Terminal-Id header')
 
-      if (terminalId && aiAdvisorAsset.src.includes(terminalId)) pass('C5 终端 ID 已写入数字人产物')
-      else fail('C5 数字人产物未包含当前 VITE_TERMINAL_ID，可能检查的不是本次构建产物')
+      if (runtimeIdentityAsset) pass('C5 数字人会话复用本机 Agent 运行时终端身份')
+      else fail('C5 数字人会话缺少本机 Agent 运行时终端身份来源')
     }
   }
 }

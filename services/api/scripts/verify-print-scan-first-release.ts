@@ -145,6 +145,8 @@ function main(): void {
     '\n' +
     read('src/terminals/terminals-admin.service.ts')
   const printJobsApi = read('../../apps/kiosk/src/services/print/printJobsApi.ts')
+  const runtimeTerminalIdentity = read('../../apps/kiosk/src/services/api/screensaver.ts')
+  const terminalConfigApi = read('../../apps/kiosk/src/services/api/terminalConfig.ts')
   const prismaSchema = read('prisma/schema.prisma')
   const adminTypes = read('../../apps/admin/src/services/api/types.ts')
   const adminTerminalsPage = read('../../apps/admin/src/routes/terminals/index.tsx')
@@ -163,8 +165,28 @@ function main(): void {
 
   mustContain(
     printJobsApi,
-    ["'X-Terminal-Id': terminalId", 'VITE_TERMINAL_ID', 'missing terminal id'],
-    'Kiosk print API must send configured terminal id and fail closed when missing',
+    [
+      "import { getTerminalId } from '../api/screensaver'",
+      'const terminalId = getTerminalId()',
+      "'X-Terminal-Id': terminalId",
+      'missing terminal id',
+    ],
+    'Kiosk print API must send the runtime terminal id and fail closed when missing',
+  )
+  mustNotContain(
+    printJobsApi,
+    ['VITE_TERMINAL_ID'],
+    'Kiosk print API must not fall back to a build-time terminal id',
+  )
+  mustContain(
+    runtimeTerminalIdentity,
+    ['/local/terminal-identity', 'if (import.meta.env.DEV)', "resolvedIdentity?.terminalId ?? ''"],
+    'Kiosk terminal identity must come from the local Agent with development-only fallback',
+  )
+  mustContain(
+    terminalConfigApi,
+    ["if (!terminalId.trim())", 'missing terminal id'],
+    'Kiosk terminal config must reject a missing runtime identity before requesting the API',
   )
 
   mustContain(

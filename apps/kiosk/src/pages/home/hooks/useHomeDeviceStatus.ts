@@ -1,4 +1,5 @@
 import { type MutableRefObject, useEffect, useRef, useState } from 'react'
+import { getTerminalId } from '../../../services/api/screensaver'
 
 export type HomeDeviceTone = 'positive' | 'warning' | 'negative' | 'neutral'
 
@@ -55,7 +56,7 @@ function initialDeviceStatus(terminalId: string): HomeDeviceStatusView {
 }
 
 export function useHomeDeviceStatus(enabled = true): HomeDeviceStatusView {
-  const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+  const terminalId = getTerminalId()
   const [deviceStatus, setDeviceStatus] = useState<HomeDeviceStatusView>(() => initialDeviceStatus(terminalId))
   const abortControllerRef = useRef<AbortController | null>(null)
   const requestGenerationRef: MutableRefObject<number> = useRef(0)

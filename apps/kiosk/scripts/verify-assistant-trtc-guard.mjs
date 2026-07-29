@@ -141,7 +141,7 @@ expectMatches(
 expectIncludes(callHook, 'sessionEpochRef', 'in-flight TRTC starts are guarded by a session epoch')
 expectIncludes(
   callHook,
-  'stopBackendTask(activeTaskId)',
+  'stopBackendTask(activeTaskId, terminalId)',
   'stale connecting sessions are stopped when they return late',
 )
 expectIncludes(

@@ -17,18 +17,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useBusyLock } from '../contexts/KioskBusyContext'
 import { API_BASE_URL } from '../services/api/client'
-
-const TERMINAL_ID = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+import { getTerminalId } from '../services/api/screensaver'
 
 // 通知后端结束腾讯云 AI 会话（StopAIConversation），立即停止按分钟计费。
 //  - keepalive：保证在组件卸载 / 切走页面 / 关闭标签页时请求仍能发出
 //  - X-Terminal-Id：满足后端鉴权（缺失会 401，导致会话停不掉持续计费）
 // 纯函数、模块级：可在 cleanup、startCall 中途离开、pagehide 三处复用。
-function stopBackendTask(taskId: string): void {
-  if (!taskId) return
+function stopBackendTask(taskId: string, terminalId: string): void {
+  if (!taskId || !terminalId) return
   fetch(`${API_BASE_URL}/trtc/session/stop`, {
     method:    'POST',
-    headers:   { 'Content-Type': 'application/json', 'X-Terminal-Id': TERMINAL_ID },
+    headers:   { 'Content-Type': 'application/json', 'X-Terminal-Id': terminalId },
     body:      JSON.stringify({ taskId }),
     keepalive: true,
   }).catch(() => {})
@@ -92,6 +91,7 @@ export function useAiAdvisorCallSession() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const trtcRef       = useRef<any>(null)
   const taskIdRef     = useRef<string>('')
+  const taskTerminalIdRef = useRef<string>('')
   const destroyedRef  = useRef(false)
   const startedRef    = useRef(false) // 防重复进房
   const sessionEpochRef = useRef(0)
@@ -112,8 +112,9 @@ export function useAiAdvisorCallSession() {
     // 用 keepalive fetch 补发 stop，避免关页后机器人留在房间继续计费。
     // 注意只挂 pagehide，不挂 visibilitychange——切后台 tab 不应结束通话。
     const onPageHide = () => {
-      stopBackendTask(taskIdRef.current)
+      stopBackendTask(taskIdRef.current, taskTerminalIdRef.current)
       taskIdRef.current = ''
+      taskTerminalIdRef.current = ''
     }
     window.addEventListener('pagehide', onPageHide)
     return () => {
@@ -141,8 +142,9 @@ export function useAiAdvisorCallSession() {
   // ── 清理 ─────────────────────────────────────────────────
   const cleanup = useCallback(async () => {
     if (taskIdRef.current) {
-      stopBackendTask(taskIdRef.current)
+      stopBackendTask(taskIdRef.current, taskTerminalIdRef.current)
       taskIdRef.current = ''
+      taskTerminalIdRef.current = ''
     }
     // 同步取出并立即置空：handleExit 直接调 cleanup 后又切走触发卸载再调一次，
     // 两个并发 cleanup 若都读到非空 trtc，会把 exitRoom/destroy 各跑两遍（SDK 报
@@ -174,6 +176,12 @@ export function useAiAdvisorCallSession() {
   // ── 启动通话（用户点击后调用，满足自动播放策略）──────────
   const startCall = useCallback(async () => {
     if (startedRef.current) return
+    const terminalId = getTerminalId()
+    if (!terminalId) {
+      setErrMsg('当前设备身份不可用，请联系现场工作人员')
+      setPhase('error')
+      return
+    }
     startedRef.current = true
     const sessionEpoch = sessionEpochRef.current + 1
     sessionEpochRef.current = sessionEpoch
@@ -192,7 +200,7 @@ export function useAiAdvisorCallSession() {
           method:  'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Terminal-Id': (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim(),
+            'X-Terminal-Id': terminalId,
           },
           body:    JSON.stringify({}),
           signal:  ac.signal,
@@ -214,10 +222,11 @@ export function useAiAdvisorCallSession() {
       // 用户在「连接中」就离开了：cleanup 已先于 fetch 返回跑过（当时 taskId 还为空，
       // 没发 stop），但后端机器人此刻已进房计费 —— 必须立即补发 stop，防止漏到 60s 超时。
       if (!isCurrentSession()) {
-        stopBackendTask(activeTaskId)
+        stopBackendTask(activeTaskId, terminalId)
         return
       }
       taskIdRef.current = activeTaskId
+      taskTerminalIdRef.current = terminalId
 
       // 2. 加载 TRTC SDK
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -229,8 +238,11 @@ export function useAiAdvisorCallSession() {
         throw new Error('trtc-sdk-v5 未安装')
       }
       if (!isCurrentSession()) {
-        stopBackendTask(activeTaskId)
-        if (taskIdRef.current === activeTaskId) taskIdRef.current = ''
+        stopBackendTask(activeTaskId, terminalId)
+        if (taskIdRef.current === activeTaskId) {
+          taskIdRef.current = ''
+          taskTerminalIdRef.current = ''
+        }
         return
       }
 
@@ -299,8 +311,11 @@ export function useAiAdvisorCallSession() {
       await restoreRemoteAudio('*')
 
       if (!isCurrentSession()) {
-        stopBackendTask(activeTaskId)
-        if (taskIdRef.current === activeTaskId) taskIdRef.current = ''
+        stopBackendTask(activeTaskId, terminalId)
+        if (taskIdRef.current === activeTaskId) {
+          taskIdRef.current = ''
+          taskTerminalIdRef.current = ''
+        }
         try {
           await trtc.stopLocalAudio?.()
           await trtc.exitRoom?.()

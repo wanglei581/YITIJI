@@ -1,10 +1,15 @@
-import { StrictMode, type ComponentProps } from 'react'
+import { StrictMode, type ComponentProps, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { RefreshProvider } from '@ai-job-print/refresh'
 import './index.css'
 import { kioskRouter } from './routes'
 import { AuthProvider } from './auth/AuthContext'
+import {
+  initializeTerminalIdentity,
+  startTerminalIdentityRecovery,
+  subscribeTerminalIdentity,
+} from './services/api/screensaver'
 
 type RouterErrorHandler = NonNullable<ComponentProps<typeof RouterProvider>['onError']>
 
@@ -19,12 +24,30 @@ const handleRouterError: RouterErrorHandler = (error, info) => {
   })
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <AuthProvider>
+export function KioskApp() {
+  const [identityRevision, setIdentityRevision] = useState(0)
+
+  useEffect(() => {
+    const unsubscribe = subscribeTerminalIdentity(() => setIdentityRevision((revision) => revision + 1))
+    startTerminalIdentityRecovery()
+    return unsubscribe
+  }, [])
+
+  return (
+    <AuthProvider key={identityRevision}>
       <RefreshProvider>
         <RouterProvider router={kioskRouter} onError={handleRouterError} />
       </RefreshProvider>
     </AuthProvider>
-  </StrictMode>,
-)
+  )
+}
+
+function renderKiosk(): void {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <KioskApp />
+    </StrictMode>,
+  )
+}
+
+void initializeTerminalIdentity().finally(renderKiosk)

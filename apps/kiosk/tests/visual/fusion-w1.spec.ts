@@ -99,6 +99,22 @@ test('production home exposes the fusion frame and touch-safe real controls @w1-
   expect(runtimeErrors).toEqual([])
 })
 
+test('production home does not request terminal config without a local identity @w1-kiosk', async ({ page, api }) => {
+  void api
+  const emptyIdentityRequests: string[] = []
+  await page.route('**/local/terminal-identity', (route) => route.abort('connectionrefused'))
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname.includes('/api/v1/terminals//')) {
+      emptyIdentityRequests.push(request.url())
+    }
+  })
+
+  await page.goto('/', { waitUntil: 'domcontentloaded' })
+
+  await expect(page.locator('.ui-kiosk-shell[data-kiosk-presentation="fusion-youth"]')).toBeVisible()
+  expect(emptyIdentityRequests).toEqual([])
+})
+
 test('fixture exposes all six state roles with scoped computed styles @w1-kiosk', async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page)
   await page.goto(FIXTURE_KIOSK_URL, { waitUntil: 'domcontentloaded' })

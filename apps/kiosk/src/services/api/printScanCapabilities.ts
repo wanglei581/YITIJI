@@ -6,6 +6,7 @@
 // ScanStart 等深链门禁应使用 loadConfiguredCapabilities，把失败与「未配置」区分开。
 import type { PrintScanCapabilityKey, PrintScanCapabilityStatus, TerminalCapabilityView } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
+import { getTerminalId } from './screensaver'
 
 export interface ConfiguredCapability {
   status: PrintScanCapabilityStatus
@@ -34,7 +35,7 @@ function toMap(capabilities: TerminalCapabilityView[] | undefined): ConfiguredCa
 /** 深链门禁用：区分拉取成功 / 跳过 / 失败，避免把失败当成「未配置可放行」。 */
 export async function loadConfiguredCapabilities(): Promise<CapabilitiesLoadResult> {
   if (API_MODE !== 'http') return { status: 'skipped', map: emptyMap() }
-  const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+  const terminalId = getTerminalId()
   if (!terminalId) return { status: 'error', map: emptyMap() }
 
   try {
