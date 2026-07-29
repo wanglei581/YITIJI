@@ -36,7 +36,8 @@
 - [ ] **QR/U 盘多主机凭证决策**：当前 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 仍是构建期静态值。若每机 token 唯一，需先实现运行期本地会话凭证，才能让同一共享 Kiosk 同时启用 QR/U 盘；禁止为省事改成全机长期共享 token。该项不阻塞运行时身份与远程打印隔离，但阻塞“共享构建覆盖全部本地桥接能力”的宣称。
 
 推荐顺序（2026-07-28 更新）：
-0m. [~] **新主机 Provisioning 配置完整性候选**：安装脚本已补安全交互式 BindCode、真实 Kiosk Origin、`scanWatchFolder` 与桥接令牌，并在重装时保留既有可选配置；待 PR/CI 后在 `KSK-002` 受保护 runtime 上验收，不能替代 MSI、驱动或真机出纸/扫描。
+0m. [x] **新主机 Provisioning 配置完整性**：[PR #421](https://github.com/wanglei581/YITIJI/pull/421) 已合入；安装脚本已补安全交互式 BindCode、真实 Kiosk Origin、`scanWatchFolder` 与桥接令牌，并在重装时保留既有可选配置。该项只关闭代码与 CI，仍须在 `KSK-002` 受保护 runtime 上验收，不能替代 MSI、驱动或真机出纸/扫描。
+0n. [x] **Windows Agent MSI B1 未签名 CI 候选**：[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 的 staging、WiX、fresh install、LocalSystem fail-closed 启动、repair、uninstall 与共享 CI 已全绿，Claude Sonnet `APPROVE`；该项只关闭 B1 CI 候选，不代表正式安装包。发布仍缺企业 Authenticode 签名、受控 manifest、Provisioning 集成复核和 `KSK-002` 真机验收。
 0i. [x] **Kiosk-only 热更链路**：#400 → USB bridge `index-DmcUs_Nb.js` → 备案 [PR #424](https://github.com/wanglei581/YITIJI/pull/424) 现网 **`index-DEJ0O4c6.js`**（仍含 bridge token；明文未入仓）
 0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；SMB 旁证时点为 `lifecycleVersion=10`/`credentialGeneration=8`（`next-tasks` 旧写 v5 已过时，现场前以 DB 只读为准）
 0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384

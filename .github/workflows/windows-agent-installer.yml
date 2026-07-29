@@ -1,0 +1,64 @@
+name: windows-agent-installer
+
+on:
+  pull_request:
+    paths:
+      - "apps/terminal-agent/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/windows-agent-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-msi-candidate:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.1
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Enable locked pnpm
+        shell: pwsh
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.2.2 --activate
+
+      - name: Verify installer source contract
+        shell: pwsh
+        run: node apps/terminal-agent/installer/verify-installer-inputs.mjs
+
+      - name: Build reproducible staging
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-staging.ps1
+
+      - name: Build unsigned WiX MSI
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1
+
+      - name: Exercise install, repair, and uninstall
+        shell: powershell
+        run: |
+          $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-msi-lifecycle.ps1 -MsiPath $msi.FullName
+
+      - name: Upload unsigned test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terminal-agent-unsigned-msi-candidate
+          path: |
+            apps/terminal-agent/installer/artifacts/msi/*.msi
+            apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/staging/manifest.json
+          if-no-files-found: warn
+          retention-days: 7
