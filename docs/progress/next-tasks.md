@@ -7,7 +7,10 @@
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
 - [x] **S0-C 简历解析阶段真值已合入**：[PR #429](https://github.com/wanglei581/YITIJI/pull/429) → `main@5fcc4a50`；已移除固定延时与伪 OCR/提取/诊断阶段，立即提交真实请求，只展示明确的非实时处理内容说明；无 `fileId` 直达 fail-closed，返回不冒充撤回服务端任务；真实性门禁、W3 6/6、W6 聚焦 1/1、typecheck/lint/build、GitHub 三项 CI 和三模型终审均通过。未部署。
-- [ ] **Phase 0 最终 GO/NO-GO**：S0-B/S0-C 完成后再汇总真实 API、1080×1920、390×844 与必要真机证据；不得把 S0-A 候选写成整个 AI 操作系统或商业上线已完成。
+- [x] **Phase 0 最终 GO/NO-GO 已完成（2026-07-29）**：正式商业上线与当前软件候选均为 **NO-GO**。完整证据见 `docs/reviews/phase0-final-go-no-go-2026-07-29.md`。
+- [ ] **P0-1 公共终端硬性隐私超时与全路由清场**：把不受 busy 抑制的安全清场守卫提升到 Router 根层，覆盖顶级岗位匹配/职业规划/全部面试路由，以及收银、材料检查、打印进度、扫描设置/进度；后台任务可继续，但超时必须遮罩、登出、清敏感 session 并回干净入口。补跨用户浏览器回归，证明下一位用户不能查看/删除上一位面试记录或继续操作其支付、文件与任务。
+- [ ] **P1-A 浏览器 truth 夹具收口**：`scan-session-truth.spec.ts` 的 shell fixture 补 `GET /api/v1/terminals/KSK-001/capabilities`，并将公共终端硬清场套件纳入常规 CI；当前独立 truth 为 15/23，不得写成全绿。夹具缺口本身不是上线 P0，但 P0-1 的新增安全回归必须作为关闭证据通过。
+- [ ] **P0-2～P0-6 上线门禁**：P0-1 修复后冻结单一候选，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 
