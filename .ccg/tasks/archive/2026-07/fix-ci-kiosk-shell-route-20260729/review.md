@@ -45,5 +45,6 @@ K1 公共入口合同同样仍要求 `LoginPage` 局部调用敏感会话清理�
 - `pnpm --filter @ai-job-print/kiosk test:browser:privacy`：18/18 PASS
 - `pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest`：PASS
 - `git diff --check`：PASS
+- GitHub Actions `30432157270`：`build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 全部 PASS
 
-最终结论：允许推送 PR #432 复跑 CI；不授权合并或部署。
+最终结论：PR #432 已通过三项 CI；保持未合并、未部署。
