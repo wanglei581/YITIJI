@@ -1,8 +1,6 @@
-import { useCallback } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useIdleTimer } from '../hooks/useIdleTimer'
 import { useKioskBusy } from '../contexts/KioskBusyContext'
-import { clearKioskSensitiveSession } from './kioskSensitiveSession'
 import { useAuth } from './useAuth'
 
 /**
@@ -24,10 +22,10 @@ import { useAuth } from './useAuth'
  * 忙碌态豁免（CLAUDE.md §11 §17）：打印 / 扫描 / AI / 上传中（KioskBusyContext 引用计数锁）
  * 或 AuthContext.busy 预留位任一为真 → 立即暂停计时，绝不打断业务流程。
  *
- * idle 触发动作：清打印材料 + AI 简历 session（含匿名 accessToken），登出（幂等，匿名为 no-op），
- * 非首页则 replace 回首页，确保下一位用户从干净首页开始。
+ * idle 触发动作由 KioskPrivacyGuard 注入，统一执行 fail-closed 清场与 hard replace。
  *
- * 仅清内存态 + sessionStorage（由 clear 函数负责）；**不读写也不新增 localStorage / cookie / IndexedDB**。
+ * 用户数据只清内存态 + sessionStorage；持久化 privacy boundary 仅含随机代次和 history idx，
+ * 不包含 token、手机号、材料或其他用户数据。
  *
  * 阈值默认 180s，可经 VITE_KIOSK_LOGOUT_IDLE_SEC 覆盖。
  */
@@ -39,27 +37,18 @@ function resolveLogoutIdleMs(): number {
   return sec * 1000
 }
 
-export function useIdleLogout(screensaverActive: boolean): void {
-  const { busy: authBusy, logout } = useAuth()
+export function useIdleLogout(screensaverActive: boolean, onIdle: () => void): void {
+  const { busy: authBusy } = useAuth()
   const kioskBusy = useKioskBusy()
   const { pathname } = useLocation()
-  const navigate = useNavigate()
 
   const busy = kioskBusy || authBusy
   const onScreensaverRoute = pathname === '/screensaver'
-
-  const handleIdle = useCallback(() => {
-    // 非忙碌、屏保未接管时的 idle：先清敏感 session（打印材料 + AI 简历，含匿名 accessToken）
-    // 和登录前求职材料草稿，再清内存会话（登出幂等，匿名为 no-op），最后 replace 回首页。
-    clearKioskSensitiveSession()
-    logout()
-    if (pathname !== '/') navigate('/', { replace: true })
-  }, [logout, navigate, pathname])
 
   useIdleTimer({
     timeoutMs: resolveLogoutIdleMs(),
     // 覆盖登录 + 匿名；屏保接管（screensaverActive）时关闭，避免与 useScreensaverController 双触发。
     enabled: !busy && !onScreensaverRoute && !screensaverActive,
-    onIdle: handleIdle,
+    onIdle,
   })
 }

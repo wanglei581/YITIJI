@@ -87,11 +87,15 @@ assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'readJobMaterialDr
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', 'clearJobMaterialDraft', 'Job material page clears login draft after generation')
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', /items\.some\(\(item\) => item\.id === prev\)/, 'Job material page drops stale draft template selections')
 assertContains('src/auth/AuthContext.tsx', 'clearKioskSensitiveSession', 'Auth logout clears sensitive sessions for all manual logout callers')
-assertContains('src/auth/useIdleLogout.ts', 'clearKioskSensitiveSession', 'Idle logout uses unified sensitive session cleanup')
+assertContains('src/auth/KioskPrivacyGuard.tsx', 'clearKioskSensitiveSession()', 'Privacy guard performs unified sensitive session cleanup')
+assertContains('src/auth/KioskPrivacyGuard.tsx', 'useIdleLogout(screensaverActive, hardClear)', 'Idle logout delegates to the privacy guard hard-clear path')
 assertContains('src/hooks/useScreensaverController.ts', 'clearKioskSensitiveSession', 'Screensaver idle controller uses unified sensitive session cleanup')
 assertContains('src/pages/screensaver/ScreensaverPage.tsx', 'clearKioskSensitiveSession', 'Screensaver page mount uses unified sensitive session cleanup')
-assertContains('src/pages/auth/LoginPage.tsx', 'useIdleTimer', 'Login page has its own idle guard outside KioskRoot')
-assertContains('src/pages/auth/LoginPage.tsx', 'clearKioskSensitiveSession', 'Login page idle guard clears sensitive sessions')
+assertNotContains(
+  'src/pages/auth/LoginPage.tsx',
+  ['useIdleTimer', 'clearKioskSensitiveSession'],
+  'Login relies on the shared privacy guard instead of a route-local idle escape hatch',
+)
 assertContains('src/pages/resume/JobMaterialLibraryPage.tsx', "navigate('/print/confirm'", 'Job material page can enter print confirm with generated file')
 assertNotContains(
   'src/pages/resume/JobMaterialLibraryPage.tsx',

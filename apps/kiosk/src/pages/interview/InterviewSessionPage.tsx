@@ -77,7 +77,13 @@ export function InterviewSessionPage() {
   const [recordSec, setRecordSec] = useState(0)
   const questionShownAtRef = useRef(Date.now())
 
-  useBusyLock(true)
+  useBusyLock(
+    phase === 'thinking' ||
+    phase === 'finishing' ||
+    voice.kind === 'requesting_permission' ||
+    voice.kind === 'recording' ||
+    voice.kind === 'transcribing',
+  )
 
   const access = useMemo(
     () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),

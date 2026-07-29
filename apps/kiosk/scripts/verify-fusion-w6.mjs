@@ -140,7 +140,7 @@ function routerInventory() {
       const redirect = tag === 'Navigate'
         ? { to: jsxAttribute(routeElement, 'to'), replace: jsxAttribute(routeElement, 'replace') }
         : null
-      if (normalized !== null && !(indexProperty && normalized === '/' && routes.some((route) => route.path === '/'))) {
+      if (normalized !== null && rawPath !== '*' && !(indexProperty && normalized === '/' && routes.some((route) => route.path === '/'))) {
         routes.push({ path: normalized, depth, tag, redirect })
       }
 
@@ -286,8 +286,15 @@ check('mobile routes', () => {
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
-    assert.equal(routeInventory.find((route) => route.path === path)?.depth, 0, `${path} must remain full-screen`)
+    const expectedDepth = ['/member/qr-login', '/upload/phone'].includes(path) ? 0 : 2
+    assert.equal(
+      routeInventory.find((route) => route.path === path)?.depth,
+      expectedDepth,
+      `${path} must remain outside the KioskRoot visual shell`,
+    )
   }
+  const routesSource = readKiosk('src/routes/index.tsx')
+  assert.match(routesSource, /element:\s*<KioskRuntimeRoot\s*\/>/, 'terminal full-screen routes retain the non-visual security root')
   for (const path of mobile) {
     const page = path === '/member/qr-login' ? 'src/pages/auth/MobileQrLoginPage.tsx' : 'src/pages/upload/PhoneUploadPage.tsx'
     const source = readKiosk(page)

@@ -137,3 +137,15 @@
 - 后端迁移必须覆盖 SQLite 主验证和 PostgreSQL readiness。
 - Terminal Agent 迁移必须先在旧路径卸载 Windows 服务，再在新路径安装服务。
 - 完成后必须运行相关 typecheck、build、verify、本地启动验证，并做 Claude + 前端模型双模型审查。
+
+## 八、公共终端浏览器会话安全
+
+Kiosk 作为多人轮换使用的公共终端，不能只依赖组件卸载、SPA `replace` 或受 busy 抑制的 idle timer。涉及登录态、匿名 access token、文件、支付、面试、打印或扫描上下文时必须满足：
+
+- 所有终端业务路由、unknown route 和 error boundary 共享同一非视觉安全根；手机辅助页必须显式分组豁免，不能靠偶然路由层级。
+- 普通 idle / 屏保可以尊重真实短时 busy，但必须另有不受 busy 抑制的硬隐私截止；可见性恢复与 BFCache `pageshow.persisted` 必须按真实时间或 fail-closed 清场。
+- 清场顺序必须是：先阻断交互并同步清本地敏感状态，再尽力服务端登出，最后处理 history 和硬刷新；Storage、Cookie 或网络失败不得跳过本地清场。
+- `history.replaceState` 不能删除旧 forward/back。安全边界必须截断 forward，并在 Outlet 渲染前拒绝旧 back；屏保进入、刷新和唤醒首页都要延续同一无 PII boundary。
+- 多种边界载体存在时必须按显式代次选最新，不能无条件信任当前 landing；不得把可被第三方同标签页修改的 `window.name` 当可信边界。
+- 后台已创建的打印/扫描任务不因页面隐私清场而取消；只停止本地轮询和清除上一位用户的操作上下文。
+- 浏览器回归至少覆盖会员/匿名、back/forward、旧 landing、新旧边界冲突、持久化拒绝、屏保刷新/唤醒、BFCache、unknown route、真实 busy 任务和手机豁免。

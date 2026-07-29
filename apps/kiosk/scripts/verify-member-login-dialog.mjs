@@ -241,7 +241,7 @@ const loginDialog = readRequired('src/pages/auth/components/MemberLoginDialog.ts
 const loginPage = readRequired('src/pages/auth/LoginPage.tsx')
 const home = readRequired('src/pages/home/HomePage.tsx')
 const loginDialogCss = readRequired('src/pages/auth/styles/login-dialog.css')
-const kioskRoot = readRequired('src/layouts/KioskRoot.tsx')
+const privacyGuard = readRequired('src/auth/KioskPrivacyGuard.tsx')
 const packageJson = readRequired('package.json')
 const workflow = readRequired('../../.github/workflows/ci.yml')
 const handleSendCode = extractConstFunction(memberHook, 'handleSendCode')
@@ -553,7 +553,11 @@ expectNoMatches(agreement, /href="#"|to="#"/, '共享协议组件不使用占位
 
 expectMatches(home, /<MemberLoginDialog/, '首页挂载 MemberLoginDialog')
 expectNoMatches(home, /\b(?:sendSmsCode|memberLogin)\s*\(/, '首页不复制认证 API')
-expectMatches(kioskRoot, /useIdleLogout\(/, 'KioskRoot 保持全局 useIdleLogout 空闲清场')
+expectMatches(
+  privacyGuard,
+  /useIdleLogout\(\s*screensaverActive\s*,\s*hardClear\s*\)/,
+  'KioskPrivacyGuard 保持全局 useIdleLogout 硬隐私清场',
+)
 
 expect(loginDialogCss.includes('.member-login-dialog::backdrop'), '弹窗样式定义原生 ::backdrop')
 expectMatches(loginDialogCss, /\.member-login-dialog\s*\{/, '弹窗样式定义 1080 居中容器基础规则')

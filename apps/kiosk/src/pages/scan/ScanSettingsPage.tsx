@@ -61,8 +61,6 @@ function formatCountdown(expiresAt: string): string {
 }
 
 export function ScanSettingsPage() {
-  useBusyLock(true)
-
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -84,7 +82,10 @@ export function ScanSettingsPage() {
   const sessionPromiseRef = useRef<Promise<ScanSessionCreateResponse> | null>(null)
   const generationRef = useRef(0)
   const cancelRequestedRef = useRef(false)
+  const explicitCancelRequestedRef = useRef(false)
   const expiryHandledRef = useRef(false)
+
+  useBusyLock(phase === 'loading' || phase === 'success' || starting)
 
   const cancelSessionOnce = (id: string, token: string) => {
     if (cancelRequestedRef.current) return
@@ -117,7 +118,11 @@ export function ScanSettingsPage() {
         }
 
         if (cancelled) {
-          if (generationRef.current === myGeneration && !confirmedRef.current) {
+          if (
+            generationRef.current === myGeneration
+            && explicitCancelRequestedRef.current
+            && !confirmedRef.current
+          ) {
             cancelSessionOnce(created.scanTaskId, created.controlToken)
           }
           return
@@ -146,12 +151,8 @@ export function ScanSettingsPage() {
 
     return () => {
       cancelled = true
-      // cleanup 需要对比最新代际，故意读取 ref 当前值而非 effect 创建时快照。
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      if (generationRef.current !== myGeneration) return
-      if (createdIdRef.current && controlTokenRef.current && !confirmedRef.current) {
-        cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
-      }
+      // 路由卸载可能来自公共终端隐私清场；卸载本身绝不取消已创建的后台扫描任务。
+      // 只有用户明确点击返回、服务端响应无效或会话自然过期时才发送取消请求。
     }
     // StrictMode 需要在同一组 refs 上复用唯一创建 promise，不按渲染重发。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,6 +183,7 @@ export function ScanSettingsPage() {
   }, [expiresAt])
 
   const handleSafeReturn = () => {
+    explicitCancelRequestedRef.current = true
     if (createdIdRef.current && controlTokenRef.current && !confirmedRef.current) {
       cancelSessionOnce(createdIdRef.current, controlTokenRef.current)
     }

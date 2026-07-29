@@ -31,7 +31,10 @@ export function extractDeclaredRoutePatterns(source) {
       ts.isStringLiteral(node.initializer)
     ) {
       const routePath = node.initializer.text
-      routes.push(routePath === '/' || routePath.startsWith('/') ? routePath : `/${routePath}`)
+      // Catch-all 是受保护的错误边界，不是可导航、可截图的生产页面 pattern。
+      if (routePath !== '*') {
+        routes.push(routePath === '/' || routePath.startsWith('/') ? routePath : `/${routePath}`)
+      }
     }
     ts.forEachChild(node, visit)
   }

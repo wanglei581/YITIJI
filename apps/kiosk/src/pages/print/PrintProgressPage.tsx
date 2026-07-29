@@ -170,8 +170,11 @@ export function PrintProgressPage() {
   const simTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 真实打印和演示进行中禁止进入待机；SIM 演示结束后恢复待机能力。
-  useBusyLock(!isSim || !simDone)
+  // 仅真实任务或 SIM 演示仍在执行时抑制普通待机；非法、失败、超时和结束态释放。
+  useBusyLock(
+    (useRealApi && !failed && !timedOut) ||
+    (isSim && !failed && !simDone),
+  )
 
   // ── Navigation helpers ────────────────────────────────────────────────────
 
