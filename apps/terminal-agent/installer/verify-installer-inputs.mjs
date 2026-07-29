@@ -43,7 +43,11 @@ assert.match(wix, /NeverOverwrite="yes"/)
 assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
 
 assert.match(serviceXml, /<executable>%BASE%\\\.\.\\node\\node\.exe<\/executable>/)
-assert.match(serviceXml, /<arguments>%BASE%\\\.\.\\app\\dist\\index\.js agent<\/arguments>/)
+assert.match(
+  serviceXml,
+  /<arguments>"%BASE%\\\.\.\\app\\dist\\index\.js" agent<\/arguments>/,
+  'WinSW must quote the Agent entrypoint under Program Files',
+)
 assert.match(serviceXml, /delay="60 sec"/)
 assert.match(serviceXml, /delay="300 sec"/)
 

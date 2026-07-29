@@ -3,7 +3,7 @@
   <name>AIJobPrintAgent</name>
   <description>AI Job Print Terminal Agent</description>
   <executable>%BASE%\..\node\node.exe</executable>
-  <arguments>%BASE%\..\app\dist\index.js agent</arguments>
+  <arguments>"%BASE%\..\app\dist\index.js" agent</arguments>
   <workingdirectory>%BASE%\..\app</workingdirectory>
   <stoptimeout>15 sec</stoptimeout>
   <onfailure action="restart" delay="60 sec" />
