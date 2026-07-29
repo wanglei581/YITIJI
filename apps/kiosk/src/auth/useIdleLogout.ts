@@ -37,6 +37,9 @@ export interface KioskIdleWarningRequest {
  */
 const DEFAULT_LOGOUT_IDLE_SEC = 180
 const MAX_BROWSER_TIMER_MS = 2_147_483_647
+// Keep at least 1s before the warning when the total idle window permits it.
+// The outer clamp below still prevents extending the configured privacy deadline.
+const MIN_TRIGGER_MS = 1_000
 
 function resolveLogoutIdleMs(): number {
   const raw = Number(import.meta.env.VITE_KIOSK_LOGOUT_IDLE_SEC)
@@ -49,8 +52,9 @@ export function resolveWarningWindow(totalMs: number): { triggerMs: number; warn
     Number.isFinite(totalMs) && totalMs > 0 && totalMs <= MAX_BROWSER_TIMER_MS ? totalMs : 1
   const raw = Number(import.meta.env.VITE_KIOSK_SESSION_WARNING_SEC)
   const configuredMs = (Number.isFinite(raw) && raw > 0 ? raw : 30) * 1000
-  const desiredWarningMs = Math.min(configuredMs, safeTotalMs)
-  const triggerMs = Math.max(1, safeTotalMs - desiredWarningMs)
+  // 触发延时 = min(safeTotalMs, max(MIN_TRIGGER_MS, safeTotalMs - configuredMs)):
+  // 外层 min 防止触发延时超过配置的总阈值,守住"triggerMs + warningMs === safeTotalMs"不变量。
+  const triggerMs = Math.min(safeTotalMs, Math.max(MIN_TRIGGER_MS, safeTotalMs - configuredMs))
   return { triggerMs, warningMs: Math.max(0, safeTotalMs - triggerMs) }
 }
 
