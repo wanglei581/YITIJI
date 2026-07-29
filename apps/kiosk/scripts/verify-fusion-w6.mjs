@@ -286,7 +286,7 @@ check('mobile routes', () => {
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
-    const expectedDepth = ['/member/qr-login', '/upload/phone', '/legal/:doc'].includes(path) ? 0 : 2
+    const expectedDepth = ['/member/qr-login', '/upload/phone'].includes(path) ? 0 : 2
     assert.equal(
       routeInventory.find((route) => route.path === path)?.depth,
       expectedDepth,

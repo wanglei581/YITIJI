@@ -6,6 +6,7 @@ const MEMBER_TOKEN = 'privacy-member-memory-token'
 const MEMBER_PHONE = '13800138000'
 const MEMBER_CODE = '123456'
 const MEMBER_REPORT_POSITION = '隐私回归高级前端工程师'
+const PRINT_TASK_ID = 'privacy-print-task'
 const SCAN_TASK_ID = 'privacy-scan-task'
 const SCAN_CONTROL_TOKEN = 'privacy-scan-control-token'
 const HARD_PRIVACY_SETTLE_MS = 3_800
@@ -204,6 +205,23 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   expect.soft(requests.reportRequestCount()).toBe(1)
   await expect.soft(page.getByText(MEMBER_REPORT_POSITION, { exact: false })).toHaveCount(0)
   await expect.soft(page.getByText('登录后可保存练习报告', { exact: true })).toBeVisible()
+})
+
+test('legal documents cannot suspend an authenticated kiosk privacy deadline @privacy-kiosk', async ({ page, api }) => {
+  const requests = await openAuthenticatedMemberReport(page, api)
+  await page.evaluate(() => {
+    window.history.pushState({ usr: null, key: 'privacy-legal', idx: 2 }, '', '/legal/privacy')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+  })
+  await expect(page.locator('[data-kiosk-screen="legal-doc"]')).toBeVisible()
+  await markCurrentDocument(page, 'authenticated-legal-document')
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect(new URL(page.url()).pathname).toBe('/')
+  expect(await readDocumentMarker(page)).toBeNull()
+  expect(requests.logoutAuthorization()).toEqual([`Bearer ${MEMBER_TOKEN}`])
+  await expect(page.getByRole('button', { name: /登录 \/ 注册/ })).toBeVisible()
 })
 
 test('anonymous interview state is hard-cleared and browser back cannot restore it @privacy-kiosk', async ({ page, api }) => {
@@ -468,6 +486,93 @@ test('hard clear stops active scan polling without cancelling the backend task @
   await page.waitForTimeout(POLL_CLEANUP_OBSERVATION_MS)
   expect.soft(pollRequests).toBe(pollsAfterClear)
   expect(cancelRequests).toBe(0)
+})
+
+test('hard clear does not cancel a created scan settings session @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  let cancelRequests = 0
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === `/api/v1/scan/sessions/${SCAN_TASK_ID}` && request.method() === 'DELETE') {
+      cancelRequests += 1
+    }
+  })
+  api.respond('POST', '/api/v1/scan/sessions', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        scanTaskId: SCAN_TASK_ID,
+        controlToken: SCAN_CONTROL_TOKEN,
+        status: 'waiting',
+        scanType: 'resume',
+        instructions: ['请在本机放好材料，并按设备面板指引开始扫描。'],
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      },
+    },
+  })
+  api.respond('DELETE', `/api/v1/scan/sessions/${SCAN_TASK_ID}`, {
+    status: 200,
+    json: { success: true, data: { scanTaskId: SCAN_TASK_ID, status: 'cancelled' } },
+  })
+
+  await page.goto('/')
+  await page.evaluate(() => {
+    window.history.pushState(
+      { usr: { scanType: 'resume' }, key: 'privacy-scan-settings', idx: 1 },
+      '',
+      '/scan/settings',
+    )
+  })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('扫描任务已创建', { exact: true })).toBeVisible()
+  expect(cancelRequests).toBe(0)
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect.soft(new URL(page.url()).pathname).toBe('/')
+  await page.waitForTimeout(300)
+  expect(cancelRequests).toBe(0)
+})
+
+test('hard clear stops active print polling without cancelling the backend task @privacy-kiosk', async ({ page, api }) => {
+  registerKioskShell(api)
+  let pollRequests = 0
+  let mutationRequests = 0
+  page.on('request', (request) => {
+    const url = new URL(request.url())
+    if (url.pathname === `/api/v1/print/jobs/${PRINT_TASK_ID}` && request.method() !== 'GET') {
+      mutationRequests += 1
+    }
+  })
+  await routeExact(page, 'GET', `/api/v1/print/jobs/${PRINT_TASK_ID}`, async (route) => {
+    pollRequests += 1
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ taskId: PRINT_TASK_ID, status: 'pending' }),
+    })
+  })
+
+  await page.goto('/')
+  await page.evaluate((taskId) => {
+    window.history.pushState(
+      { usr: { taskId, amountCents: 0 }, key: 'privacy-print', idx: 1 },
+      '',
+      '/print/progress',
+    )
+  }, PRINT_TASK_ID)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await expect(page.getByText('任务已提交，正在等待终端处理，请留在机器旁', { exact: true })).toBeVisible()
+  await expect.poll(() => pollRequests).toBeGreaterThan(0)
+
+  await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
+
+  expect.soft(new URL(page.url()).pathname).toBe('/')
+  const pollsAfterClear = pollRequests
+  await page.waitForTimeout(POLL_CLEANUP_OBSERVATION_MS)
+  expect.soft(pollRequests).toBe(pollsAfterClear)
+  expect(mutationRequests).toBe(0)
 })
 
 test('entering screensaver clears the session and establishes a history boundary @privacy-kiosk', async ({ page, api }) => {

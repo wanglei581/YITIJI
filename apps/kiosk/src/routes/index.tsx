@@ -77,10 +77,9 @@ import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
 
 export const kioskRouter = createBrowserRouter([
-  // 手机辅助入口与共享法律页不套用 27 寸公共终端的运行时超时策略。
+  // 只有明确的手机辅助入口豁免 27 寸公共终端运行时超时。
   { path: '/member/qr-login', element: <MobileQrLoginPage />, errorElement: <KioskRouteErrorPage /> },
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
   {
     element: <KioskRuntimeRoot />,
     children: [
@@ -90,6 +89,8 @@ export const kioskRouter = createBrowserRouter([
         children: [
       // 全屏终端路由：进入安全根，但不嵌套 KioskRoot 的视觉壳。
       { path: '/login', element: <LoginPage />, errorElement: <KioskRouteErrorPage /> },
+      // 法律文档可从已登录终端会话进入，不能成为暂停硬隐私截止的逃逸路由。
+      { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },

@@ -12,7 +12,7 @@
 - 后端 logout 使用 `fetch keepalive` 尽力送达，但本地清场绝不依赖网络成功。
 - 普通 idle 与硬隐私截止都统一进入硬清场；屏保使用 push 截断用户已后退后残留的 forward 栈，并在进入、刷新、唤醒首页时持续携带无 PII 的 boundary。旧 back 项在 Outlet 渲染前 fail-closed，BFCache 恢复也立即清场；不新增 resetBusy API。
 - 打印和扫描只停止当前页面轮询，不调用取消接口；后台已创建任务继续运行。
-- `/member/qr-login`、`/upload/phone` 是手机辅助入口，不套 27 寸终端硬超时；共享法律页也留在终端安全根之外。
+- `/member/qr-login`、`/upload/phone` 是手机辅助入口，不套 27 寸终端硬超时；法律页可能从已登录终端会话进入，必须留在安全根内，不能成为暂停硬截止的逃逸路由。
 
 ## 二、路由与运行时结构
 
@@ -52,7 +52,7 @@
 
 1. `KioskRuntimeRoot` 只负责 `KioskBusyProvider`、`KioskPrivacyGuard` 和 `<Outlet />`，不增加视觉容器。
 2. React Router 增加 pathless route，把 `/login`、简历定向页、全部面试页、`/screensaver`、会话超时/离线页和现有 `/` KioskRoot 子树统一放入该安全根。
-3. 手机扫码登录、手机上传与法律页保持顶级、明确不进入安全根。
+3. 手机扫码登录、手机上传保持顶级并明确不进入安全根；法律页作为无视觉全屏路由进入安全根，但不嵌套 `KioskRoot` 视觉壳。
 4. `KioskRoot` 退回纯视觉职责，删除 provider、screensaver 与 idle 控制器，避免重复计时器。
 5. `KioskPrivacyGuard` 统一挂普通 idle、屏保和硬截止；硬截止始终启用，普通 idle/屏保可以在更短阈值先行结束会话。
 6. 硬截止使用真实时间戳并监听 `visibilitychange`，避免系统休眠/后台节流绕过上限。
