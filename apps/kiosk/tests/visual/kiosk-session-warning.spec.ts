@@ -247,6 +247,7 @@ interface ScanBusyOptions {
   controlToken?: string
   status?: 'waiting' | 'processing' | 'completed' | 'expired' | 'failed' | 'cancelled'
   networkError?: boolean
+  deleteFailure?: 'abort' | 'server-error'
   resultFile?: {
     fileId: string
     fileUrl: string
@@ -269,7 +270,7 @@ async function installScanProgressRoute(
   // 个 endpoint,如果不显式 unroute,多个 closure 会并存,后续 route.fulfill 的
   // 行为变得不可预测——recorder 计数也会跟着漂。直接清掉旧 handler 让本次
   // install 成为唯一所有者。
-  await page.unroute(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`).catch(() => undefined)
+  await page.unroute(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`)
 
   let statusReq = 0
   let deleteReq = 0
@@ -277,6 +278,21 @@ async function installScanProgressRoute(
     const request = route.request()
     if (request.method() === 'DELETE') {
       deleteReq += 1
+      if (options.deleteFailure === 'abort') {
+        await route.abort('internetdisconnected')
+        return
+      }
+      if (options.deleteFailure === 'server-error') {
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            error: { code: 'SCAN_INTERNAL', message: 'injected cancel failure' },
+          }),
+        })
+        return
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -368,9 +384,10 @@ test('scan busy stays released when the scan task id is missing @scan-busy @warn
   await page.reload({ waitUntil: 'domcontentloaded' })
 
   // 缺少 scanTaskId 时,组件第一时间 navigate('/scan/start');busy 的作用是
-  // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。这条断言要
-  // 证明的是:active===false 让 useBusyLock 退出 active 持锁分支,本页的
-  // 隐私计时器能正常运行,/session-timeout 能在 3s 内弹。
+  // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。E2E 这一组测试
+  // 要锁住的是用户可见的承诺:身份不完整时,idle 计时器继续工作,提示用户在
+  // 3s 内弹出 /session-timeout。不去对内部 active===false 这种实现细节
+  // 做断言——它属于 hook 单测的职责范围。
   await expectWarningWithinThreeSeconds(page)
 })
 
@@ -556,5 +573,34 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
   await expectWarningWithinThreeSeconds(page)
   // 每次 install 都 unroute 旧 handler,所以 cancelCounts 严格只数这一次
   // install 内收到的 DELETE 流量;不需要再去手工减去历史基准。
+  expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
+})
+
+test('user cancel with a failing DELETE sends exactly one attempt and falls back to /scan/start @scan-busy @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+  const cancelCounts = await installScanProgressRoute(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+    status: 'waiting',
+    deleteFailure: 'abort',
+  })
+  await gotoScanProgressWithHistory(page, {
+    scanTaskId: SCAN_TASK_ID,
+    controlToken: SCAN_CONTROL_TOKEN,
+  })
+  await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
+  await expect.poll(() => cancelCounts.statusRequests()).toBeGreaterThanOrEqual(1)
+
+  const deleteBefore = cancelCounts.deleteRequests()
+  await page.getByRole('button', { name: '取消扫描', exact: true }).click()
+
+  // DELETE 抛错 → catch 走默认 fallback,busy 在 effect 渲染后释放,
+  // 落地到 /scan/start。/scan/start 上 idle 计时器重新开始,3s 内
+  // /session-timeout 弹出。
+  await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
+  await expectWarningWithinThreeSeconds(page)
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
 })
