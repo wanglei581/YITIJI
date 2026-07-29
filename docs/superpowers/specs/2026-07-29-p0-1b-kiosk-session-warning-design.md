@@ -33,13 +33,13 @@
 ### 3.1 普通 idle
 
 1. `VITE_KIOSK_LOGOUT_IDLE_SEC` 表示从最后一次操作到自动清场的总时长。
-2. 正常配置的有效预警时长为 `min(30 秒, ordinary idle 总时长)`。为避免 0ms timer 早于 Guard mount，trigger 至少为 1ms；配置值不大于 30 秒时在下一个宏任务近似立即显示预警，倒计时使用 `总时长 - trigger`，最终截止仍严格等于配置总时长。
+2. 有效预警时长 `effectiveWarningMs = min(配置预警时长, totalMs)`。`useIdleLogout.resolveWarningWindow` 计算触发延时 `triggerMs = min(totalMs, max(MIN_TRIGGER_MS, totalMs - configuredMs))`，其中 `MIN_TRIGGER_MS = 1_000` ms 是为了让预警页在挂载与一帧渲染后还能看到非零倒计时；外层 `min(totalMs, ...)` 是硬约束——当配置总时长小于 1 秒（例如测试场景里 idle 总时长仅 500 ms）时，触发延时以总时长为上限，倒计时收敛到 0，预警页几乎立即清场。绝不允许 `triggerMs > totalMs` 把硬隐私截止往后拖。配置值不大于 30 秒时在下一个宏任务近似立即显示预警，倒计时使用 `totalMs - triggerMs`，最终截止仍严格等于配置总时长。
 3. 通用 `useIdleTimer` 在回调中提供原计划触发时间；Guard 据此计算最终绝对截止 `deadlineAt = plannedWarningAt + effectiveWarningMs`。若后台节流导致回调恢复时已越过 `deadlineAt`，直接清场，不重新赠送完整倒计时。
 4. 预警页只依据 `deadlineAt - Date.now()` 计算剩余秒数，避免 React Strict Mode 或后台节流造成双倍/漂移。
 5. Guard 发起预警前记录当前 history entry 的 index，仅在内存 ref 中保存恢复信息；预警路由不携带该 state。React Router 的 `history.state.idx` 是既有内部耦合，任何非 number 或不相邻情况都必须 fail-closed，不能猜测恢复路径。
 6. 点击“继续使用”只在确认当前 warning 与原 entry 相邻、内存 ref 仍有效时执行 `navigate(-1)` 回到原 entry，因此扫描 controlToken、面试 accessToken 等既有 router state 不被复制也不丢失。
-7. 预警页刷新、直接访问、history index 不匹配或内存 ref 丢失时，不尝试恢复来源页面，fail-closed 清场回首页。
-8. 点击“立即退出”或倒计时归零调用 Guard `hardClear()`，最终得到干净首页与新的 privacy boundary。
+7. 预警页刷新、直接访问、history index 不匹配或内存 ref 丢失时，不尝试恢复来源页面，fail-closed 清场回首页；首帧渲染只挂 `PrivacyClearingOverlay`，不露出 SessionTimeoutPage 的标题、按钮、当前登录或掩码手机号，effect 紧接着执行 `hardClear()` 并 reload 到干净首页。
+8. 点击“立即退出”始终调用 Guard `hardClear()`——即使预警配置为 `exitTo: 'screensaver'`，按钮共享倒计时分支会把用户带进屏保，这是错的；倒计时自然结束仍按 `exitTo` 分支（screensaver 走 `clearToScreensaver()`，普通 idle 走 `hardClear()`）。
 
 ### 3.2 屏保 idle
 

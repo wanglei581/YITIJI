@@ -392,6 +392,12 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
 
   const onScreensaverRoute = pathname === '/screensaver'
   const onSessionTimeoutRoute = pathname === '/session-timeout'
+  // 首帧 fail-closed：路由进入 /session-timeout 但 pendingWarning 缺失(直接访问、刷新、
+  // history index 不匹配、刷新后丢失 ref)时,渲染阶段直接认定本次为清场中,只挂遮罩;
+  // 后续 effect 负责真正执行 hardClear 并推回首页,避免出现"先看到会话页,再被替换"
+  // 的中间帧。会话页的标题、按钮、当前登录 / 掩码手机号都是 PII,绝不允许这种闪现。
+  const isOrphanSessionTimeoutRoute =
+    onSessionTimeoutRoute && pendingWarningRef.current === null
 
   useEffect(() => {
     if (!onSessionTimeoutRoute || pendingWarningRef.current !== null) return
@@ -516,7 +522,11 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
 
   return (
     <KioskSessionControlProvider value={sessionControlValue}>
-      {clearing || isStaleHistoryEntry ? <PrivacyClearingOverlay /> : children}
+      {clearing || isStaleHistoryEntry || isOrphanSessionTimeoutRoute ? (
+        <PrivacyClearingOverlay />
+      ) : (
+        children
+      )}
     </KioskSessionControlProvider>
   )
 }

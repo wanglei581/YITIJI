@@ -238,6 +238,168 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   await expect(page.locator('[data-kiosk-screen="interview-tips"]')).toHaveCount(0)
 })
 
+test('screensaver-mode immediate exit always hard-clears and never falls into the screensaver route @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api, { screensaverEnabled: true, idleTimeoutSec: 4 })
+  await page.goto('/interview/tips')
+  await expect(page).toHaveURL(/\/interview\/tips$/)
+  await page.evaluate(({ key, value }) => window.sessionStorage.setItem(key, value), {
+    key: SENSITIVE_SESSION_KEY,
+    value: 'screensaver-exit-sensitive',
+  })
+
+  await expectWarningWithinThreeSeconds(page)
+  // 屏保模式预警倒计时自然结束应进 /screensaver,但用户点击"立即退出并清除本机会话"
+  // 必须立即 hardClear 回干净首页——按钮共享倒计时动作会把用户带进屏保。
+  await page.getByRole('button', { name: '立即退出并清除本机会话', exact: true }).click()
+
+  await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
+  await expect
+    .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY))
+    .toBeNull()
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_500 }).toBe('/')
+  await expect(page.locator('[data-kiosk-screen="screensaver"]')).toHaveCount(0)
+  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
+})
+
+test('orphan /session-timeout shows the clearing overlay on first frame and never renders the warning page DOM @warning-kiosk', async ({
+  page,
+  api,
+}) => {
+  registerKioskShell(api)
+
+  // addInitScript 会在 hard reload(window.location.reload)后再次执行,startObserver
+  // 必须先从 sessionStorage 读回已有的聚合快照并在此基础上继续合并,而不是清空后重
+  // 写——否则 hardClear 触发的 reload 会把首帧的 overlay 证据抹掉。每次 MutationObserver
+  // 回调都把"是否见过 Overlay"和"是否见过 SessionTimeoutPage 的 PII"取 max 后落盘,
+  // 跨导航 / 跨 reload 单调累积,测试在最终导航落地后从 sessionStorage 读回结论。
+  await page.addInitScript(() => {
+    const STORAGE_KEY = 'kiosk-orphan-snapshot:v1'
+    type OrphanSnapshot = {
+      sessionCount: number
+      headingCount: number
+      exitButtonCount: number
+      continueButtonCount: number
+      accountLabelCount: number
+      clearingCount: number
+    }
+    const empty: OrphanSnapshot = {
+      sessionCount: 0,
+      headingCount: 0,
+      exitButtonCount: 0,
+      continueButtonCount: 0,
+      accountLabelCount: 0,
+      clearingCount: 0,
+    }
+    const readAggregate = (): OrphanSnapshot => {
+      try {
+        const raw = window.sessionStorage.getItem(STORAGE_KEY)
+        if (!raw) return { ...empty }
+        const parsed = JSON.parse(raw) as Partial<OrphanSnapshot>
+        return {
+          sessionCount: typeof parsed.sessionCount === 'number' ? parsed.sessionCount : 0,
+          headingCount: typeof parsed.headingCount === 'number' ? parsed.headingCount : 0,
+          exitButtonCount:
+            typeof parsed.exitButtonCount === 'number' ? parsed.exitButtonCount : 0,
+          continueButtonCount:
+            typeof parsed.continueButtonCount === 'number' ? parsed.continueButtonCount : 0,
+          accountLabelCount:
+            typeof parsed.accountLabelCount === 'number' ? parsed.accountLabelCount : 0,
+          clearingCount: typeof parsed.clearingCount === 'number' ? parsed.clearingCount : 0,
+        }
+      } catch {
+        return { ...empty }
+      }
+    }
+    const mergeAggregate = (current: OrphanSnapshot, next: OrphanSnapshot): OrphanSnapshot => ({
+      sessionCount: Math.max(current.sessionCount, next.sessionCount),
+      headingCount: Math.max(current.headingCount, next.headingCount),
+      exitButtonCount: Math.max(current.exitButtonCount, next.exitButtonCount),
+      continueButtonCount: Math.max(current.continueButtonCount, next.continueButtonCount),
+      accountLabelCount: Math.max(current.accountLabelCount, next.accountLabelCount),
+      clearingCount: Math.max(current.clearingCount, next.clearingCount),
+    })
+    const writeAggregate = (snapshot: OrphanSnapshot): void => {
+      try {
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot))
+      } catch {
+        // sessionStorage 不可写时聚合结论无法落盘;测试会拿到 null,自然判失败。
+      }
+    }
+    const computeSnapshot = (): OrphanSnapshot => {
+      const clearing = document.querySelector('[data-kiosk-privacy-clearing="true"]')
+      const session = document.querySelector('[data-kiosk-screen="session-timeout"]')
+      const heading = document.querySelector('#session-timeout-title')
+      const buttons = Array.from(document.querySelectorAll('button'))
+      const exitButton = buttons.find((button) =>
+        /立即退出并清除本机会话/.test(button.textContent ?? '')
+      )
+      const continueButton = buttons.find((button) =>
+        /继续使用|返回首页并清除本机会话/.test(button.textContent ?? '')
+      )
+      const accountLabel = Array.from(document.querySelectorAll('p, span, b')).find((el) =>
+        /当前登录：|当前会话：/.test(el.textContent ?? '')
+      )
+      return {
+        sessionCount: session ? 1 : 0,
+        headingCount: heading ? 1 : 0,
+        exitButtonCount: exitButton ? 1 : 0,
+        continueButtonCount: continueButton ? 1 : 0,
+        accountLabelCount: accountLabel ? 1 : 0,
+        clearingCount: clearing ? 1 : 0,
+      }
+    }
+    const startObserver = (): void => {
+      if (!document.documentElement) return
+      const observer = new MutationObserver(() => {
+        const next = computeSnapshot()
+        const merged = mergeAggregate(readAggregate(), next)
+        writeAggregate(merged)
+      })
+      observer.observe(document.documentElement, { childList: true, subtree: true })
+      // 把当前帧的观察结果立刻合并进去,确保 commit 同步完成也能落盘。
+      const merged = mergeAggregate(readAggregate(), computeSnapshot())
+      writeAggregate(merged)
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startObserver, { once: true })
+    } else {
+      startObserver()
+    }
+  })
+
+  // hard reload 后 home 页继承下来的聚合快照可能仍带上次测试的残留——清空只针对本测试
+  // 在目标 fixture 加载前。cleanup 必须在 fixture 路由加载完成后再做,以免脚本自身也参与
+  // 聚合,但 addInitScript 同步 install,本页脚本在 main bundle 之前执行;只有当脚本
+  // 加载 / 执行发生在新 history entry 上时,这段清理才属于"新一次观察"。我们用
+  // uniqueStorageKey 区分:每个测试一个 key 不会污染其他用例。
+  await page.goto('/session-timeout')
+  await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 5_000 })
+
+  const snapshot = await page.evaluate(() => {
+    const raw = window.sessionStorage.getItem('kiosk-orphan-snapshot:v1')
+    if (!raw) return null
+    return JSON.parse(raw) as {
+      sessionCount: number
+      headingCount: number
+      exitButtonCount: number
+      continueButtonCount: number
+      accountLabelCount: number
+      clearingCount: number
+    }
+  })
+
+  expect(snapshot).not.toBeNull()
+  expect(snapshot!.sessionCount).toBe(0)
+  expect(snapshot!.headingCount).toBe(0)
+  expect(snapshot!.exitButtonCount).toBe(0)
+  expect(snapshot!.continueButtonCount).toBe(0)
+  expect(snapshot!.accountLabelCount).toBe(0)
+  expect(snapshot!.clearingCount).toBe(1)
+})
+
 const SCAN_TASK_ID = 'scan-busy-task'
 const SCAN_CONTROL_TOKEN = 'scan-busy-control-token'
 const SCAN_OBSERVATION_MS = 3_000

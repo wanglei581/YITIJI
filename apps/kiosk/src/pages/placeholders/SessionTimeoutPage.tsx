@@ -24,7 +24,7 @@ export default function SessionTimeoutPage() {
     Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000))
   )
 
-  const exitSession = useCallback(() => {
+  const expireFromCountdown = useCallback(() => {
     if (warning?.exitTo === 'screensaver') {
       clearToScreensaver()
       return
@@ -36,13 +36,13 @@ export default function SessionTimeoutPage() {
     const updateCountdown = (): void => {
       const remainingSeconds = Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000))
       setSeconds(remainingSeconds)
-      if (remainingSeconds === 0) exitSession()
+      if (remainingSeconds === 0) expireFromCountdown()
     }
 
     updateCountdown()
     const timer = window.setInterval(updateCountdown, 1000)
     return () => window.clearInterval(timer)
-  }, [deadlineAt, exitSession])
+  }, [deadlineAt, expireFromCountdown])
 
   const sourcePath = warning?.sourcePath ?? ''
   const isHardware = sourcePath.startsWith('/print/') || sourcePath.startsWith('/scan/')
@@ -174,7 +174,7 @@ export default function SessionTimeoutPage() {
               <CheckIcon />
               {canContinue ? '继续使用' : '返回首页并清除本机会话'}
             </button>
-            <button type="button" onClick={exitSession}>
+            <button type="button" onClick={hardClear}>
               <LogOutIcon />
               立即退出并清除本机会话
             </button>
