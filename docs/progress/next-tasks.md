@@ -10,7 +10,7 @@
 - [x] **Phase 0 最终 GO/NO-GO 已完成（2026-07-29）**：正式商业上线与当前软件候选均为 **NO-GO**。完整证据见 `docs/reviews/phase0-final-go-no-go-2026-07-29.md`。
 - [x] **P0-1 公共终端硬性隐私超时与全路由清场（本地集成候选完成）**：`codex/p0-kiosk-privacy-timeout-20260729` 已建立 Router 级安全根、普通 idle + 不受 busy 抑制的硬截止、fail-closed 遮罩/清场、keepalive logout、history back/forward 与 BFCache 防恢复、屏保跨刷新/唤醒边界、手机辅助页豁免和有界 busy；法律页逃逸与扫描设置清场误取消已按 RED→GREEN 修复，打印/扫描后台任务不取消。privacy **18/18** 及全套相关回归通过，隐私套件已接入 CI；修复后模型终审与 GitHub CI 尚未完成，未 push / PR / merge / deploy。
 - [x] **P1-A 浏览器 truth 夹具收口（本地候选完成）**：`scan-session-truth.spec.ts` 已补终端 capabilities 诚实 fixture，独立 truth 恢复 **23/23**；W5/W6 路由门禁已适配 pathless runtime root，公共隐私套件已纳入 `kiosk-browser-smoke` 常规 CI。
-- [ ] **P0-1 集成门禁**：用户确认后 push 候选分支、创建 PR，补 GitHub CI 与可用的 Claude / Antigravity 独立复核；不得因 Antigravity 额度或 Claude CLI 异常伪造双模型完成。合入后仍保持未部署，先更新精确发布来源。
+- [ ] **P0-1 集成门禁**：本地修复与回归完成，Cursor Grok 4.5 High/Fast 最终 `APPROVE`；下一步 push 候选分支、创建 PR 并等待 GitHub CI。Claude / Antigravity 外部调用分别因上游 502 与 quota/resource limit 未形成有效报告，不得伪造双模型完成。合入后仍保持未部署，先更新精确发布来源。
 - [ ] **P0-1B 清场预警与任务感知文案**：P0-1 安全候选合入后，复用既有 `/session-timeout` 30 秒倒计时页接入普通 idle / 屏保清场路径；硬隐私截止仍保持 fail-closed，不允许被 busy 无限抑制。打印 / 扫描须明确“后台任务继续，终端页面将清除”，AI / 面试须明确未保存内容会清除；补 27 寸触控、继续使用、立即退出和匿名任务不可恢复验收。不得在 P0-1 安全 PR 中混入。
 - [ ] **P0-2～P0-6 上线门禁**：P0-1 合入并冻结单一候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
 
