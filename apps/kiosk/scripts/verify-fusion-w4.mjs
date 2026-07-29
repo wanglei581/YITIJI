@@ -48,6 +48,8 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx',
   'apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs',
   'apps/kiosk/scripts/verify-fusion-shell.mjs',
+  'apps/kiosk/scripts/verify-member-login-dialog.mjs',
+  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
   'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
   'apps/kiosk/scripts/verify-print-done-truth.mjs',
   'apps/kiosk/scripts/verify-scan-session-truth.mjs',
