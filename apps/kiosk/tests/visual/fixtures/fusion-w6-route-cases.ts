@@ -74,7 +74,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/interview/tips', url: '/interview/tips', marker: screen('interview-tips'), featureText: '面试', requiresFusionRoot: false },
   { pattern: '/interview/reports', url: '/interview/reports', marker: screen('interview-reports'), featureText: '面试报告', requiresFusionRoot: false },
   { pattern: '/screensaver', url: '/screensaver', marker: screen('screensaver'), featureText: '触摸屏幕开始使用', landmark: 'presentation', seed: seedScreensaver },
-  { pattern: '/session-timeout', url: '/session-timeout', marker: screen('session-timeout'), featureText: '还在使用吗？' },
+  { pattern: '/session-timeout', url: '/session-timeout', expectedPath: '/', marker: '.kpv1', featureText: '简历、打印、岗位信息' },
   { pattern: '/error-offline', url: '/error-offline', marker: screen('error-offline'), featureText: '网络连接中断' },
   { pattern: '/assistant', url: '/assistant', marker: screen('assistant'), featureText: '小青' },
   { pattern: '/profile', url: '/profile', marker: screen('profile'), featureText: '我的' },

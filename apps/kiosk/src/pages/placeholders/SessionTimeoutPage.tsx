@@ -1,76 +1,190 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
-import { CheckIcon, FileTextIcon, LogOutIcon, MessageCircleIcon, ShieldCheckIcon, UserRoundIcon } from 'lucide-react'
-import { isSafeInternalPath } from '../../auth/returnPath'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  CheckIcon,
+  FileTextIcon,
+  LogOutIcon,
+  MessageCircleIcon,
+  ShieldCheckIcon,
+  UserRoundIcon,
+} from 'lucide-react'
+import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { useAuth } from '../../auth/useAuth'
 import './system-pages-batch8.css'
 
-const TIMEOUT_SECONDS = 30
 const RING_RADIUS = 135
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 export default function SessionTimeoutPage() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const { user, logout } = useAuth()
-  const [seconds, setSeconds] = useState(TIMEOUT_SECONDS)
-  const returnTo = useMemo(() => {
-    const candidate = (location.state as { from?: unknown } | null)?.from
-    return typeof candidate === 'string' && candidate !== '/session-timeout' && isSafeInternalPath(candidate)
-      ? candidate
-      : '/'
-  }, [location.state])
+  const { user } = useAuth()
+  const { warning, continueSession, hardClear, clearToScreensaver } = useKioskSessionControl()
+  const [fallbackDeadlineAt] = useState(() => Date.now() + 30 * 1000)
+  const deadlineAt = warning?.deadlineAt ?? fallbackDeadlineAt
+  const [initialDuration] = useState(() => Math.max(1, Math.ceil((deadlineAt - Date.now()) / 1000)))
+  const [seconds, setSeconds] = useState(() =>
+    Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000))
+  )
 
-  const exitSession = useCallback(() => {
-    logout()
-    navigate('/', { replace: true })
-  }, [logout, navigate])
+  const expireFromCountdown = useCallback(() => {
+    if (warning?.exitTo === 'screensaver') {
+      clearToScreensaver()
+      return
+    }
+    hardClear()
+  }, [clearToScreensaver, hardClear, warning?.exitTo])
 
   useEffect(() => {
-    if (seconds <= 0) {
-      exitSession()
-      return undefined
+    const updateCountdown = (): void => {
+      const remainingSeconds = Math.max(0, Math.ceil((deadlineAt - Date.now()) / 1000))
+      setSeconds(remainingSeconds)
+      if (remainingSeconds === 0) expireFromCountdown()
     }
-    const timer = window.setTimeout(() => setSeconds((value) => Math.max(0, value - 1)), 1000)
-    return () => window.clearTimeout(timer)
-  }, [exitSession, seconds])
 
+    updateCountdown()
+    const timer = window.setInterval(updateCountdown, 1000)
+    return () => window.clearInterval(timer)
+  }, [deadlineAt, expireFromCountdown])
+
+  const sourcePath = warning?.sourcePath ?? ''
+  const isHardware = sourcePath.startsWith('/print/') || sourcePath.startsWith('/scan/')
+  const isAiWork =
+    sourcePath === '/assistant' ||
+    sourcePath.startsWith('/resume/') ||
+    sourcePath.startsWith('/interview/')
+  const sessionImpact = isHardware
+    ? '已创建的打印/扫描任务会继续运行，终端页面将清除'
+    : isAiWork
+      ? '未保存的填写内容或练习内容会清除'
+      : '登录状态和本机临时会话将清除'
+  const canContinue = warning?.canContinue === true
+
+  const isAnonymous = user === null
   const accountLabel = user
     ? [user.nickname, user.phoneMasked].filter(Boolean).join(' · ')
     : '当前临时会话'
-  const ringOffset = RING_CIRCUMFERENCE * (1 - seconds / TIMEOUT_SECONDS)
+  const ringRatio = Math.min(1, Math.max(0, seconds / initialDuration))
+  const ringOffset = RING_CIRCUMFERENCE * (1 - ringRatio)
 
   return (
-    <main className="fusion-w5 fusion-w5--system k8-system-page k8-session-timeout" data-kiosk-screen="session-timeout" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="kiosk">
-      <div className="k8-system-ghost" aria-hidden="true"><i /><i /><i /><i /><i /></div>
+    <main
+      className="fusion-w5 fusion-w5--system k8-system-page k8-session-timeout"
+      data-kiosk-screen="session-timeout"
+      data-kiosk-presentation="fusion-youth"
+      data-kiosk-viewport="kiosk"
+    >
+      <div className="k8-system-ghost" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+        <i />
+        <i />
+      </div>
       <div className="k8-system-dim" aria-hidden="true" />
       <div className="k8-timeout-wrap">
-        <section className="k8-timeout-card" role="dialog" aria-modal="true" aria-labelledby="session-timeout-title">
+        <section
+          className="k8-timeout-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="session-timeout-title"
+        >
           <div className="k8-timeout-ring">
             <svg viewBox="0 0 300 300" aria-hidden="true">
               <circle className="k8-timeout-ring-bg" cx="150" cy="150" r={RING_RADIUS} />
-              <circle className="k8-timeout-ring-value" cx="150" cy="150" r={RING_RADIUS} strokeDasharray={RING_CIRCUMFERENCE} strokeDashoffset={ringOffset} />
+              <circle
+                className="k8-timeout-ring-value"
+                cx="150"
+                cy="150"
+                r={RING_RADIUS}
+                strokeDasharray={RING_CIRCUMFERENCE}
+                strokeDashoffset={ringOffset}
+              />
             </svg>
-            <div><strong>{seconds}</strong><span>秒后自动退出</span></div>
+            <div>
+              <strong>{seconds}</strong>
+              <span>秒后自动退出</span>
+            </div>
           </div>
 
           <h1 id="session-timeout-title">还在使用吗？</h1>
-          <p className="k8-timeout-description">长时间未操作，即将退出登录并清除本机临时会话；<br />已保存到你账号的数据不受影响。如需继续，请点击下方按钮。</p>
-          <p className="k8-timeout-account"><UserRoundIcon /><span>当前登录：<b>{accountLabel}</b></span></p>
+          <p className="k8-timeout-description">
+            长时间未操作，公共终端将进行隐私清场。
+            <br />
+            <strong>{sessionImpact}</strong>
+            {isHardware ? (
+              <>
+                <br />
+                <span>清场不会取消已创建的打印/扫描任务</span>
+              </>
+            ) : null}
+            <br />
+            {user === null ? (
+              <span>匿名任务退出后无法恢复</span>
+            ) : (
+              <span>账号中已保存的数据不受本次终端清场影响</span>
+            )}
+          </p>
+          <p className="k8-timeout-account">
+            <UserRoundIcon />
+            <span>
+              {isAnonymous ? '当前会话：' : '当前登录：'}
+              <b>{accountLabel}</b>
+            </span>
+          </p>
 
           <ul className="k8-timeout-clean-list">
-            <li><LogOutIcon /><span><b>登录状态</b><small>退出账号，下次需重新验证</small></span></li>
-            <li><FileTextIcon /><span><b>本次上传文件缓存</b><small>已保存到「我的」的不受影响</small></span></li>
-            <li><MessageCircleIcon /><span><b>AI 助手对话</b><small>共享终端对话不留存</small></span></li>
+            <li>
+              <LogOutIcon />
+              <span>
+                {isAnonymous ? (
+                  <>
+                    <b>匿名使用</b>
+                    <small>清除本次匿名会话</small>
+                  </>
+                ) : (
+                  <>
+                    <b>登录状态</b>
+                    <small>退出账号，下次需重新验证</small>
+                  </>
+                )}
+              </span>
+            </li>
+            <li>
+              <FileTextIcon />
+              <span>
+                <b>本次上传文件缓存</b>
+                <small>
+                  {user ? '账号中已保存的数据不受影响' : '匿名会话清场后不保留恢复入口'}
+                </small>
+              </span>
+            </li>
+            <li>
+              <MessageCircleIcon />
+              <span>
+                <b>AI 助手对话</b>
+                <small>共享终端未保存内容不留存</small>
+              </span>
+            </li>
           </ul>
 
           <div className="k8-timeout-actions">
-            <button type="button" className="is-primary" onClick={() => navigate(returnTo, { replace: true })}><CheckIcon />继续使用</button>
-            <button type="button" onClick={exitSession}><LogOutIcon />立即退出并清除本机会话</button>
+            <button
+              type="button"
+              className="is-primary"
+              onClick={canContinue ? continueSession : hardClear}
+            >
+              <CheckIcon />
+              {canContinue ? '继续使用' : '返回首页并清除本机会话'}
+            </button>
+            <button type="button" onClick={hardClear}>
+              <LogOutIcon />
+              立即退出并清除本机会话
+            </button>
           </div>
         </section>
 
-        <p className="k8-system-notice"><ShieldCheckIcon />为保护您的隐私，公共设备将在超时后自动退出登录并清理本机会话；打印、扫描或 AI 任务进行中不会弹出本提醒。</p>
+        <p className="k8-system-notice">
+          <ShieldCheckIcon />
+          任务处理中会暂缓普通提醒，但达到最长安全时限后仍会自动清场；已创建的后台打印/扫描任务继续运行。
+        </p>
       </div>
     </main>
   )

@@ -19,6 +19,7 @@ import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
+type ScanBusyPhase = 'active' | 'terminal'
 
 interface LocationState {
   scanTaskId?: string
@@ -55,7 +56,6 @@ function buildResultFileState(file: ScanSessionFileView) {
 }
 
 export function ScanProgressPage() {
-  useBusyLock(true)
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -66,10 +66,18 @@ export function ScanProgressPage() {
   // 刷新本页会丢失、必须回 /scan/start 重新发起——这是刻意的，见 B1-8 任务说明。
   const controlToken = state.controlToken
 
+  const hasTaskIdentity = Boolean(scanTaskId && controlToken)
   const [error, setError] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState('00:00')
+  const [busyPhase, setBusyPhase] = useState<ScanBusyPhase>('active')
   const startedAtRef = useRef(Date.now())
   const cancellingRef = useRef(false)
+
+  // 锁只在 active 阶段持有。终态（completed/expired/failed/cancelled）切换到
+  // terminal 之后 useBusyLock 的依赖 active=false,下一次 effect render 时
+  // 不再申请新锁;旧锁随组件卸载或 effect cleanup 释放给 busy context。
+  // 网络错误保持 active,等下一次 poll 重新拿到状态。
+  useBusyLock(hasTaskIdentity && busyPhase === 'active')
 
   useEffect(() => {
     const timer = window.setInterval(() => setElapsed(formatElapsed(startedAtRef.current)), 1000)
@@ -98,6 +106,7 @@ export function ScanProgressPage() {
         const status = await getScanSessionStatus(scanTaskId, controlToken, getToken())
         if (stopped) return
         if (status.status === 'completed' && status.file) {
+          setBusyPhase('terminal')
           navigate('/scan/result', {
             replace: true,
             state: { scanType, success: true, file: buildResultFileState(status.file) },
@@ -105,14 +114,17 @@ export function ScanProgressPage() {
           return
         }
         if (status.status === 'expired') {
+          setBusyPhase('terminal')
           navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: '扫描超时，请返回重新开始' } })
           return
         }
         if (status.status === 'failed') {
+          setBusyPhase('terminal')
           navigate('/scan/result', { replace: true, state: { scanType, success: false, reason: status.errorMessage ?? '扫描处理失败，请重试' } })
           return
         }
         if (status.status === 'cancelled') {
+          setBusyPhase('terminal')
           navigate('/scan/start', { replace: true })
           return
         }
@@ -138,18 +150,23 @@ export function ScanProgressPage() {
     cancellingRef.current = true
     try {
       await cancelScanSession(scanTaskId, controlToken, getToken())
+      // 离开本页：标记 terminal,后续 React effect 渲染 busyPhase==='terminal'
+      // 时 useBusyLock 不会再向 busy context 申请一把新锁;旧的锁在组件卸载 /
+      // effect cleanup 时释放到 busy context,目的页挂载即重新进入 idle 计时。
+      setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     } catch (err) {
-      // 取消请求送达时任务恰好已经完成(Agent 并发投递刚好抢先完成，后端会返回
-      // SCAN_TASK_ALREADY_COMPLETED)：不能静默当作"已取消"丢弃这份真实扫描出的文件——
-      // 尤其匿名会话下，这是找回它的唯一机会。补查一次真实状态，能拿到文件就直接进
-      // 结果页；查不到、或补查本身失败、或是网络错误等其它取消失败原因，则退回默认
-      // 路径，不阻塞用户。
+      // 取消请求送达时任务恰好已经完成（Agent 并发投递刚好抢先完成,后端会返回
+      // SCAN_TASK_ALREADY_COMPLETED）：补查一次真实状态,能拿到文件就直接进
+      // 结果页;查不到、或补查本身失败、或是网络错误等其它取消失败原因,则退回默认
+      // 路径,不阻塞用户。所有离开分支都走 setBusyPhase('terminal') + navigate,
+      // 锁的释放由 unmount / effect cleanup 接手,不在 catch 这里手动调度。
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
           const latest = await getScanSessionStatus(scanTaskId, controlToken, getToken())
           if (latest.status === 'completed' && latest.file) {
+            setBusyPhase('terminal')
             navigate('/scan/result', {
               replace: true,
               state: { scanType, success: true, file: buildResultFileState(latest.file) },
@@ -157,9 +174,10 @@ export function ScanProgressPage() {
             return
           }
         } catch {
-          // 补查状态也失败了，退回默认路径，不阻塞用户
+          // 补查状态也失败了,落到下面的默认 fallback
         }
       }
+      setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     }
   }

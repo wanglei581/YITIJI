@@ -222,15 +222,27 @@ assert.match(runtimeRoot, /<KioskBusyProvider>/, 'KioskRuntimeRoot must provide 
 assert.match(runtimeRoot, /<KioskPrivacyGuard>/, 'KioskRuntimeRoot must preserve the privacy guard')
 assert.match(runtimeRoot, /<Outlet\s*\/>/, 'KioskRuntimeRoot must render protected terminal routes')
 
+// P0-1B: warning handler 进入 Guard；最终清场仍走 hardClear + clearKioskSensitiveSession，
+// 安全根 fail-closed 与硬隐私截止不受 busy 抑制保持不变。
 assert.match(
   withoutComments(privacyGuard),
-  /useScreensaverController\(\s*establishPrivacyBoundary\s*\)/,
-  'KioskPrivacyGuard must preserve the screensaver controller',
+  /useScreensaverController\(\s*handleScreensaverWarning\s*\)/,
+  'KioskPrivacyGuard must wire screensaver controller into the warning handler',
 )
 assert.match(
   withoutComments(privacyGuard),
-  /useIdleLogout\(\s*screensaverActive\s*,\s*hardClear\s*\)/,
-  'KioskPrivacyGuard must preserve idle logout',
+  /useIdleLogout\(\s*screensaverActive\s*,\s*handleOrdinaryWarning\s*\)/,
+  'KioskPrivacyGuard must wire idle logout into the warning handler',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /clearKioskSensitiveSession\(\)/,
+  'KioskPrivacyGuard must clear sensitive session through the unified helper',
+)
+assert.match(
+  withoutComments(privacyGuard),
+  /\bhardClear\b/,
+  'KioskPrivacyGuard must keep a fail-closed hard-clear path',
 )
 
 assertTopLevelHelperRoutes(routes)

@@ -48,6 +48,8 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx',
   'apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs',
   'apps/kiosk/scripts/verify-fusion-shell.mjs',
+  'apps/kiosk/scripts/verify-member-login-dialog.mjs',
+  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
   'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
   'apps/kiosk/scripts/verify-print-done-truth.mjs',
   'apps/kiosk/scripts/verify-scan-session-truth.mjs',
@@ -56,6 +58,8 @@ const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/tests/visual/kiosk-visible-actions-truth.spec.ts',
   'apps/kiosk/tests/visual/print-done-truth.spec.ts',
   'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
+  'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
+  'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
   'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
   'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
 ])

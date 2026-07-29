@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
 import { useKioskBusy } from '../contexts/KioskBusyContext'
+import { resolveWarningWindow, type KioskIdleWarningRequest } from '../auth/useIdleLogout'
 import { useIdleTimer } from './useIdleTimer'
-import { clearKioskSensitiveSession } from '../auth/kioskSensitiveSession'
 import { getScreensaverPlaylist, getTerminalId } from '../services/api/screensaver'
 import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 
@@ -12,7 +12,7 @@ import { prefetchAsset, pruneCache } from '../services/screensaverCache'
  *
  * 职责:
  *   1. 周期拉取本终端屏保配置(enabled / idleTimeoutSec / items),并预缓存素材
- *   2. 无操作达阈值 → 跳 /screensaver(全屏路由),携带 playlist 避免二次拉取
+ *   2. 无操作达预警阈值 → 上报绝对截止与 playlist
  *   3. 忙碌态(打印/扫描/AI/上传)或已在屏保页时,暂停 idle 计时(评审 bug #1)
  *
  * 返回 active(屏保是否已配置且有素材)。KioskShell 据此让 useIdleLogout
@@ -22,16 +22,13 @@ import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 const REFRESH_MS = 5 * 60 * 1000
 const DEFAULT_TIMEOUT_SEC = 180
 
-export interface KioskSessionBoundaryMetadata {
-  token: string
-  minHistoryIndex: number
-  createdAt: number
+export interface ScreensaverWarningRequest extends KioskIdleWarningRequest {
+  playlist: KioskScreensaverPlaylist
 }
 
-export function useScreensaverController(
-  onSessionBoundary?: () => KioskSessionBoundaryMetadata,
-): { active: boolean } {
-  const navigate = useNavigate()
+export function useScreensaverController(onWarning: (request: ScreensaverWarningRequest) => void): {
+  active: boolean
+} {
   const { pathname } = useLocation()
   const busy = useKioskBusy()
   const [playlist, setPlaylist] = useState<KioskScreensaverPlaylist | null>(null)
@@ -67,21 +64,26 @@ export function useScreensaverController(
 
   const active = !!playlist?.enabled && (playlist?.items.length ?? 0) > 0
   const onScreensaverRoute = pathname === '/screensaver'
+  const onSessionTimeoutRoute = pathname === '/session-timeout'
   const timeoutMs = (playlist?.idleTimeoutSec ?? DEFAULT_TIMEOUT_SEC) * 1000
+  const { triggerMs, warningMs } = resolveWarningWindow(timeoutMs)
 
-  const handleIdle = useCallback(() => {
-    const p = playlistRef.current
-    if (!p?.enabled || p.items.length === 0) return
-    clearKioskSensitiveSession()
-    const privacyBoundary = onSessionBoundary?.()
-    // push 会截断用户已后退后残留的 forward 敏感历史；PrivacyGuard 的 boundary
-    // 负责阻止再后退到屏保前页面，退出屏保仍 replace 回首页。
-    navigate('/screensaver', { state: { playlist: p, privacyBoundary } })
-  }, [navigate, onSessionBoundary])
+  const handleIdle = useCallback(
+    (scheduledAt: number) => {
+      const current = playlistRef.current
+      if (!current?.enabled || current.items.length === 0) return
+      onWarning({
+        playlist: current,
+        deadlineAt: scheduledAt + warningMs,
+        warningMs,
+      })
+    },
+    [onWarning, warningMs]
+  )
 
   useIdleTimer({
-    timeoutMs,
-    enabled: active && !busy && !onScreensaverRoute,
+    timeoutMs: triggerMs,
+    enabled: active && !busy && !onScreensaverRoute && !onSessionTimeoutRoute,
     onIdle: handleIdle,
   })
 

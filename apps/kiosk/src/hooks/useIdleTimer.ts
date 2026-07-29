@@ -16,7 +16,13 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'wheel',
 ]
 
-export function useIdleTimer(opts: { timeoutMs: number; enabled: boolean; onIdle: () => void }): void {
+export type IdleCallback = (scheduledAt: number) => void
+
+export function useIdleTimer(opts: {
+  timeoutMs: number
+  enabled: boolean
+  onIdle: IdleCallback
+}): void {
   const { timeoutMs, enabled, onIdle } = opts
   const onIdleRef = useRef(onIdle)
   onIdleRef.current = onIdle
@@ -27,7 +33,8 @@ export function useIdleTimer(opts: { timeoutMs: number; enabled: boolean; onIdle
     let timer: number | undefined
     const reset = (): void => {
       if (timer !== undefined) window.clearTimeout(timer)
-      timer = window.setTimeout(() => onIdleRef.current(), timeoutMs)
+      const scheduledAt = Date.now() + timeoutMs
+      timer = window.setTimeout(() => onIdleRef.current(scheduledAt), timeoutMs)
     }
 
     ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, reset, { passive: true }))
