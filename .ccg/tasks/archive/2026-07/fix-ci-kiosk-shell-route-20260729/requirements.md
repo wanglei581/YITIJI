@@ -32,3 +32,4 @@
 - Fusion smoke 的运行时安全根页面使用明确 disabled 屏保夹具，不放行未处理请求
 - 打印进度门禁验证仅执行中的真实任务或 SIM 演示持有 busy lock；失败、超时和结束态释放
 - PR #432 GitHub Actions `30432157270` 三项 CI 全绿；保持未合并、未部署
+- 同步 `origin/main@beade4af` 后，本地隐私/真实性/Fusion/运行时身份/Terminal Agent 回归继续通过，GitHub Actions `30434676211` 对 head `e4a8b488` 三项 CI 全绿

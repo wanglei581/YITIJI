@@ -47,4 +47,12 @@ K1 公共入口合同同样仍要求 `LoginPage` 局部调用敏感会话清理�
 - `git diff --check`：PASS
 - GitHub Actions `30432157270`：`build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 全部 PASS
 
+## 同步最新 main 后的最终复核
+
+- 已合并同步 `origin/main@beade4af`，合并提交为 `e4a8b488`；唯一文本冲突位于 `docs/progress/current-progress.md`，隐私候选、Phase 0 审计与 Windows MSI B1 三方事实均保留。
+- 同步后本地验证：privacy 18/18、truth 23/23、smoke 6/6、W1 7/7、Fusion W4/W5/W6/baseline、Kiosk 与 Terminal Agent typecheck、运行时终端身份、local QR proxy、生产 Provisioning 全部 PASS。
+- Claude 同步后最终只读审查：`APPROVE`，Critical 0、Warning 0；覆盖安全根与运行时身份嵌套、手机辅助豁免、login/legal/catch-all 归属、打印扫描后台任务不取消及文档冲突保真。
+- Antigravity 同步后调用因 quota/resource limit 未返回有效报告，不记作通过。
+- GitHub Actions `30434676211`（head `e4a8b488`）：`build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 全部 PASS。
+
 最终结论：PR #432 已通过三项 CI；保持未合并、未部署。
