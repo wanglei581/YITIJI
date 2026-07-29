@@ -22,13 +22,6 @@ import { prefetchAsset, pruneCache } from '../services/screensaverCache'
 const REFRESH_MS = 5 * 60 * 1000
 const DEFAULT_TIMEOUT_SEC = 180
 
-// Guard Task 3 适配前保留边界值类型导出；控制器本身不再创建或写入边界。
-export interface KioskSessionBoundaryMetadata {
-  token: string
-  minHistoryIndex: number
-  createdAt: number
-}
-
 export interface ScreensaverWarningRequest extends KioskIdleWarningRequest {
   playlist: KioskScreensaverPlaylist
 }

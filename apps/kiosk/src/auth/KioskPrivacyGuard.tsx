@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import type { KioskScreensaverPlaylist } from '@ai-job-print/shared'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   useScreensaverController,
-  type KioskSessionBoundaryMetadata,
+  type ScreensaverWarningRequest,
 } from '../hooks/useScreensaverController'
 import { clearKioskSensitiveSession } from './kioskSensitiveSession'
+import {
+  KioskSessionControlProvider,
+  type KioskSessionControlValue,
+  type KioskWarningDescriptor,
+  type KioskWarningExitTo,
+} from './KioskSessionControlContext'
 import { useAuth } from './useAuth'
-import { useIdleLogout } from './useIdleLogout'
+import { useIdleLogout, type KioskIdleWarningRequest } from './useIdleLogout'
 
 const DEFAULT_PRIVACY_IDLE_SEC = 300
 const PRIVACY_BOUNDARY_STORAGE_KEY = 'ai-job-print:kiosk-privacy-boundary:v1'
@@ -22,7 +29,19 @@ const ACTIVITY_EVENTS: (keyof WindowEventMap)[] = [
   'wheel',
 ]
 
-type PrivacyBoundary = KioskSessionBoundaryMetadata
+interface PrivacyBoundary {
+  token: string
+  minHistoryIndex: number
+  createdAt: number
+}
+
+interface PendingWarning {
+  sourceHistoryIndex: number | null
+  sourcePath: string
+  exitTo: KioskWarningExitTo
+  deadlineAt: number
+  playlist: KioskScreensaverPlaylist | null
+}
 
 interface KioskHistoryState {
   usr?: unknown
@@ -42,6 +61,10 @@ function readHistoryState(): KioskHistoryState {
   return (window.history.state ?? {}) as KioskHistoryState
 }
 
+function readSafeHistoryIndex(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+
 function readPrivacyBoundary(): PrivacyBoundary | null {
   const state = readHistoryState()
   const parsedCandidates: PrivacyBoundary[] = []
@@ -49,17 +72,18 @@ function readPrivacyBoundary(): PrivacyBoundary | null {
     parsedCandidates.push({
       token: state[PRIVACY_BOUNDARY_STATE_KEY],
       minHistoryIndex: state.idx,
-      createdAt: typeof state[PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY] === 'number'
-        ? state[PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY]
-        : 0,
+      createdAt:
+        typeof state[PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY] === 'number'
+          ? state[PRIVACY_BOUNDARY_CREATED_AT_STATE_KEY]
+          : 0,
     })
   }
   if (state.usr && typeof state.usr === 'object' && 'privacyBoundary' in state.usr) {
     const nested = (state.usr as { privacyBoundary?: Partial<PrivacyBoundary> }).privacyBoundary
     if (
-      typeof nested?.token === 'string'
-      && typeof nested.minHistoryIndex === 'number'
-      && typeof nested.createdAt === 'number'
+      typeof nested?.token === 'string' &&
+      typeof nested.minHistoryIndex === 'number' &&
+      typeof nested.createdAt === 'number'
     ) {
       parsedCandidates.push({
         token: nested.token,
@@ -185,27 +209,39 @@ function PrivacyClearingOverlay() {
  */
 export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { logout } = useAuth()
   const [clearing, setClearing] = useState(false)
-  const clearingRef = useRef(false)
+  const [warning, setWarning] = useState<KioskWarningDescriptor | null>(null)
+  const pendingWarningRef = useRef<PendingWarning | null>(null)
+  const returningWarningRef = useRef(false)
+  const clearingModeRef = useRef<null | 'hard' | 'screensaver'>(null)
   const boundaryRef = useRef<PrivacyBoundary | null>(null)
 
   if (boundaryRef.current === null) boundaryRef.current = readPrivacyBoundary()
   const boundary = boundaryRef.current
   const historyState = readHistoryState()
-  const historyIndex = typeof historyState.idx === 'number' ? historyState.idx : null
-  const nestedBoundary = historyState.usr && typeof historyState.usr === 'object'
-    && 'privacyBoundary' in historyState.usr
-    ? (historyState.usr as { privacyBoundary?: Partial<PrivacyBoundary> }).privacyBoundary
-    : null
-  const isSanitizedBoundaryEntry = boundary !== null
-    && (
-      historyState[PRIVACY_BOUNDARY_STATE_KEY] === boundary.token
-      || nestedBoundary?.token === boundary.token
-    )
-  const isStaleHistoryEntry = boundary !== null
-    && !isSanitizedBoundaryEntry
-    && (historyIndex === null || historyIndex <= boundary.minHistoryIndex)
+  const historyIndex = readSafeHistoryIndex(historyState.idx)
+  const nestedBoundary =
+    historyState.usr &&
+    typeof historyState.usr === 'object' &&
+    'privacyBoundary' in historyState.usr
+      ? (historyState.usr as { privacyBoundary?: Partial<PrivacyBoundary> }).privacyBoundary
+      : null
+  const isSanitizedBoundaryEntry =
+    boundary !== null &&
+    (historyState[PRIVACY_BOUNDARY_STATE_KEY] === boundary.token ||
+      nestedBoundary?.token === boundary.token)
+  const isStaleHistoryEntry =
+    boundary !== null &&
+    !isSanitizedBoundaryEntry &&
+    (historyIndex === null || historyIndex <= boundary.minHistoryIndex)
+
+  const claimClearing = useCallback((mode: 'hard' | 'screensaver'): boolean => {
+    if (clearingModeRef.current !== null) return false
+    clearingModeRef.current = mode
+    return true
+  }, [])
 
   const establishPrivacyBoundary = useCallback(() => {
     const nextBoundary = writePrivacyBoundary()
@@ -214,21 +250,131 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   }, [])
 
   const hardClear = useCallback(() => {
-    if (clearingRef.current) return
-    clearingRef.current = true
+    if (!claimClearing('hard')) return
+    returningWarningRef.current = false
 
     // 先 fail-closed 阻断交互；本地敏感状态同步清除，不等待网络。
     setClearing(true)
     clearKioskSensitiveSession()
     logout()
     const nextBoundary = establishPrivacyBoundary()
+    pendingWarningRef.current = null
+    setWarning(null)
 
     // 留一帧让遮罩提交到 DOM，再新增干净 entry、截断 forward 并硬刷新 React 树。
     window.requestAnimationFrame(() => pushSanitizedHome(nextBoundary))
-  }, [establishPrivacyBoundary, logout])
+  }, [claimClearing, establishPrivacyBoundary, logout])
 
-  const { active: screensaverActive } = useScreensaverController(establishPrivacyBoundary)
-  useIdleLogout(screensaverActive, hardClear)
+  const startWarning = useCallback(
+    (
+      request: KioskIdleWarningRequest,
+      exitTo: KioskWarningExitTo,
+      playlist: KioskScreensaverPlaylist | null
+    ): void => {
+      if (
+        pendingWarningRef.current !== null ||
+        returningWarningRef.current ||
+        clearingModeRef.current !== null
+      ) {
+        return
+      }
+      if (Date.now() >= request.deadlineAt) {
+        hardClear()
+        return
+      }
+
+      const state = readHistoryState()
+      const safeSourceHistoryIndex = readSafeHistoryIndex(state.idx)
+      const sourceHistoryIndex =
+        safeSourceHistoryIndex !== null && safeSourceHistoryIndex < Number.MAX_SAFE_INTEGER
+          ? safeSourceHistoryIndex
+          : null
+      const pendingWarning: PendingWarning = {
+        sourceHistoryIndex,
+        sourcePath: pathname,
+        exitTo,
+        deadlineAt: request.deadlineAt,
+        playlist,
+      }
+      pendingWarningRef.current = pendingWarning
+      setWarning({
+        sourcePath: pendingWarning.sourcePath,
+        exitTo: pendingWarning.exitTo,
+        deadlineAt: pendingWarning.deadlineAt,
+        canContinue: sourceHistoryIndex !== null,
+      })
+      navigate('/session-timeout')
+    },
+    [hardClear, navigate, pathname]
+  )
+
+  const handleOrdinaryWarning = useCallback(
+    (request: KioskIdleWarningRequest): void => {
+      startWarning(request, 'home', null)
+    },
+    [startWarning]
+  )
+
+  const handleScreensaverWarning = useCallback(
+    (request: ScreensaverWarningRequest): void => {
+      startWarning(request, 'screensaver', request.playlist)
+    },
+    [startWarning]
+  )
+
+  const continueSession = useCallback((): void => {
+    if (returningWarningRef.current) return
+    const pendingWarning = pendingWarningRef.current
+    const currentState = readHistoryState()
+    const currentHistoryIndex = readSafeHistoryIndex(currentState.idx)
+    if (
+      pendingWarning === null ||
+      Date.now() >= pendingWarning.deadlineAt ||
+      pendingWarning.sourceHistoryIndex === null ||
+      currentHistoryIndex === null ||
+      currentHistoryIndex !== pendingWarning.sourceHistoryIndex + 1
+    ) {
+      hardClear()
+      return
+    }
+
+    returningWarningRef.current = true
+    void Promise.resolve(navigate(-1)).catch(() => {
+      returningWarningRef.current = false
+      hardClear()
+    })
+  }, [hardClear, navigate])
+
+  const clearToScreensaver = useCallback((): void => {
+    if (returningWarningRef.current) {
+      hardClear()
+      return
+    }
+    const pendingWarning = pendingWarningRef.current
+    const playlist = pendingWarning?.exitTo === 'screensaver' ? pendingWarning.playlist : null
+    if (!playlist?.enabled || playlist.items.length === 0) {
+      hardClear()
+      return
+    }
+    if (!claimClearing('screensaver')) return
+    returningWarningRef.current = false
+
+    setClearing(true)
+    clearKioskSensitiveSession()
+    logout()
+    const nextBoundary = establishPrivacyBoundary()
+    pendingWarningRef.current = null
+    setWarning(null)
+    navigate('/screensaver', {
+      state: {
+        playlist,
+        privacyBoundary: nextBoundary,
+      },
+    })
+  }, [claimClearing, establishPrivacyBoundary, hardClear, logout, navigate])
+
+  const { active: screensaverActive } = useScreensaverController(handleScreensaverWarning)
+  useIdleLogout(screensaverActive, handleOrdinaryWarning)
 
   useEffect(() => {
     if (!isStaleHistoryEntry) return
@@ -245,6 +391,70 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
   }, [hardClear])
 
   const onScreensaverRoute = pathname === '/screensaver'
+  const onSessionTimeoutRoute = pathname === '/session-timeout'
+
+  useEffect(() => {
+    if (!onSessionTimeoutRoute || pendingWarningRef.current !== null) return
+    hardClear()
+  }, [hardClear, onSessionTimeoutRoute])
+
+  useEffect(() => {
+    if (!returningWarningRef.current || onSessionTimeoutRoute) return
+
+    const pendingWarning = pendingWarningRef.current
+    const currentHistoryIndex = readSafeHistoryIndex(readHistoryState().idx)
+    returningWarningRef.current = false
+    if (
+      pendingWarning !== null &&
+      pendingWarning.sourceHistoryIndex !== null &&
+      currentHistoryIndex === pendingWarning.sourceHistoryIndex
+    ) {
+      pendingWarningRef.current = null
+      setWarning(null)
+      return
+    }
+
+    hardClear()
+  }, [hardClear, onSessionTimeoutRoute, pathname])
+
+  useEffect(() => {
+    if (warning === null) return
+    const expireWarning = (): void => {
+      if (warning.exitTo === 'screensaver') {
+        clearToScreensaver()
+        return
+      }
+      hardClear()
+    }
+    const remainingMs = warning.deadlineAt - Date.now()
+    if (remainingMs <= 0) {
+      expireWarning()
+      return
+    }
+    const timer = window.setTimeout(expireWarning, remainingMs)
+    return () => window.clearTimeout(timer)
+  }, [clearToScreensaver, hardClear, warning])
+
+  useEffect(() => {
+    if (!onScreensaverRoute || clearingModeRef.current !== 'screensaver') return
+    const state = readHistoryState()
+    const routeBoundary =
+      state.usr && typeof state.usr === 'object' && 'privacyBoundary' in state.usr
+        ? (state.usr as { privacyBoundary?: Partial<PrivacyBoundary> }).privacyBoundary
+        : null
+    const expectedBoundary = boundaryRef.current
+
+    if (expectedBoundary !== null && routeBoundary?.token === expectedBoundary.token) {
+      clearingModeRef.current = null
+      setClearing(false)
+      return
+    }
+
+    clearingModeRef.current = null
+    setClearing(false)
+    hardClear()
+  }, [hardClear, onScreensaverRoute])
+
   useEffect(() => {
     if (onScreensaverRoute || isStaleHistoryEntry) return
 
@@ -281,7 +491,9 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
       checkDeadline()
     }
 
-    ACTIVITY_EVENTS.forEach((event) => window.addEventListener(event, markActivity, { passive: true }))
+    ACTIVITY_EVENTS.forEach((event) =>
+      window.addEventListener(event, markActivity, { passive: true })
+    )
     document.addEventListener('visibilitychange', handleVisibilityChange)
     scheduleFromNow()
 
@@ -292,5 +504,19 @@ export function KioskPrivacyGuard({ children }: { children: ReactNode }) {
     }
   }, [hardClear, isStaleHistoryEntry, onScreensaverRoute])
 
-  return clearing || isStaleHistoryEntry ? <PrivacyClearingOverlay /> : children
+  const sessionControlValue = useMemo<KioskSessionControlValue>(
+    () => ({
+      warning,
+      continueSession,
+      hardClear,
+      clearToScreensaver,
+    }),
+    [clearToScreensaver, continueSession, hardClear, warning]
+  )
+
+  return (
+    <KioskSessionControlProvider value={sessionControlValue}>
+      {clearing || isStaleHistoryEntry ? <PrivacyClearingOverlay /> : children}
+    </KioskSessionControlProvider>
+  )
 }
