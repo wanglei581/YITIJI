@@ -211,7 +211,7 @@ Review the exact `git diff` for correctness, CI ordering, false external-service
 
 Maximum three repair rounds. Each round must change one hypothesis, re-run the affected gate, and request focused re-review. Three failed rounds stop for architectural/user review.
 
-- [ ] **Step 3: Archive and commit**
+- [x] **Step 3: Archive and commit**
 
 After all required gates pass and Critical/High are zero:
 

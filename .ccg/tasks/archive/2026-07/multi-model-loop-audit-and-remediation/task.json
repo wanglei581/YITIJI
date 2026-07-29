@@ -1,0 +1,13 @@
+{
+  "id": "multi-model-loop-audit-and-remediation",
+  "title": "多模型审计并用自主 Loop 收口 CI 离线守卫",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "ci-governance",
+  "currentPhase": "completed",
+  "nextAction": "已归档；等待用户决定是否 push、创建 PR 或合并",
+  "createdAt": "2026-07-29T17:57:12Z",
+  "branch": "codex/loop-ci-gates-20260730",
+  "baselineCommit": "b1d681f7"
+}
