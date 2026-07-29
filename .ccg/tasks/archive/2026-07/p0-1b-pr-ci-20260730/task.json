@@ -1,0 +1,12 @@
+{
+  "id": "p0-1b-pr-ci-20260730",
+  "title": "P0-1B 推送、PR 与 CI 集成验收",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "delivery",
+  "currentPhase": "completed",
+  "nextAction": "等待用户明确授权合并 PR #434；其后仍须独立完成 Windows 真机验收",
+  "createdAt": "2026-07-30T00:00:00+08:00",
+  "branch": "codex/p0-1b-kiosk-session-warning-20260729"
+}

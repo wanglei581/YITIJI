@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-29
+> 最后更新：2026-07-30
 
 ## Phase 0 真值收口后续
 
@@ -11,7 +11,7 @@
 - [x] **P0-1 公共终端硬性隐私超时与全路由清场（已合入主干）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已建立 Router 级安全根、普通 idle + 不受 busy 抑制的硬截止、fail-closed 遮罩/清场、keepalive logout、history back/forward 与 BFCache 防恢复、屏保跨刷新/唤醒边界、手机辅助页豁免和有界 busy；法律页逃逸与扫描设置清场误取消已按 RED→GREEN 修复，打印/扫描后台任务不取消。已同步 `origin/main@beade4af`，同步后 privacy **18/18**、truth **23/23**、smoke **6/6**、W1 **7/7** 及相关静态/Agent 回归通过；GitHub Actions [`30434676211`](https://github.com/wanglei581/YITIJI/actions/runs/30434676211) 对同步头 `e4a8b488` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。已合入 `main@59171851`，未 deploy。
 - [x] **P1-A 浏览器 truth 夹具收口（本地候选完成）**：`scan-session-truth.spec.ts` 已补终端 capabilities 诚实 fixture，独立 truth 恢复 **23/23**；W5/W6 路由门禁已适配 pathless runtime root，公共隐私套件已纳入 `kiosk-browser-smoke` 常规 CI。
 - [x] **P0-1 PR/CI 集成门禁（完成并合入主干）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已同步最新 `main` 候选并通过同步头三项 GitHub CI；Claude 同步后最终只读审查 `APPROVE`（Critical 0、Warning 0），Cursor Grok 4.5 High/Fast 此前最终 `APPROVE`（Critical 0、High 0）。Antigravity 同步后调用因 quota/resource limit 未形成有效报告，不记作通过。已按授权合入 `main@59171851`，未部署；发布来源已记录，后续仍须按 P0 门禁继续验收。
-- [x] **P0-1B 清场预警与任务感知文案（本地候选完成）**：分支 `codex/p0-1b-kiosk-session-warning-20260729` 已把普通 idle / 屏保 idle 接入既有 `/session-timeout`，保持硬隐私截止 fail-closed 且不受 busy 抑制；任务感知文案、继续使用、立即退出、匿名不可恢复、扫描 busy 终态释放与“不误取消后台任务”均有回归。首轮质量审查发现的屏保“立即退出”动作错误与孤立超时路由首帧暴露风险已由 Cursor **Grok 4.5 High/Fast** 按 RED→GREEN 修复；最终 warning **19/19**、privacy **18/18**，其余全套门禁与 Codex 独立两项最终回归 **2/2**、typecheck、生产 build、静态契约复核均通过，两名追加只读质量审查均 `APPROVE`（Critical 0、Warning 0）。**仍未推送、未提 PR、未跑 GitHub CI、未部署**；下一步先推送并完成 PR/三项 CI，再做 1080×1920 真机触控、Edge/Chrome Kiosk 与 Windows 现场验收。
+- [x] **P0-1B 清场预警与任务感知文案（PR/CI 候选完成，待合并授权）**：[PR #434](https://github.com/wanglei581/YITIJI/pull/434) 已把普通 idle / 屏保 idle 接入既有 `/session-timeout`，保持硬隐私截止 fail-closed 且不受 busy 抑制；任务感知文案、继续使用、立即退出、匿名不可恢复、扫描 busy 终态释放与“不误取消后台任务”均有回归。首轮质量审查发现的屏保“立即退出”动作错误与孤立超时路由首帧暴露风险已由 Cursor **Grok 4.5 High/Fast** 按 RED→GREEN 修复；PR 集成阶段同步收口旧静态合同、孤立超时 smoke 与 privacy 首页回退 fixture。最终 warning **19/19**、privacy **18/18**，其余全套门禁、typecheck、生产 build 与静态契约复核均通过；GitHub Actions [`30475948226`](https://github.com/wanglei581/YITIJI/actions/runs/30475948226) 对 `0797dcf1` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。**仍未合并、未部署**；下一步须用户明确授权后才可合并，再做 1080×1920 真机触控、Edge/Chrome Kiosk 与 Windows 现场验收。
 - [ ] **P0-2～P0-6 上线门禁**：P0-1 合入并冻结单一候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
