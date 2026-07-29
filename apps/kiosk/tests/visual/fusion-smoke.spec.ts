@@ -5,7 +5,6 @@ import { assertNoHorizontalOverflow } from './assert-layout'
 import { productionRoutePatterns } from './route-manifest'
 
 const kioskScenarios = [
-  { path: '/session-timeout', landmark: '还在使用吗？' },
   { path: '/error-offline', landmark: '网络连接中断', registerHealthProbe: true },
 ] as const
 
@@ -78,6 +77,29 @@ async function assertHomeFilingInfo(page: Page) {
   )
   await expect(filingInfo.getByText('职易达AI', { exact: true })).toBeVisible()
 }
+
+test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ page, api }) => {
+  expect(productionRoutePatterns).toContain('/session-timeout')
+  registerHomeShellApi(api)
+  const runtimeErrors = collectRuntimeErrors(page)
+
+  await page.goto('/session-timeout', { waitUntil: 'domcontentloaded' })
+
+  await expect(page).toHaveURL(/\/$/)
+  const homeMain = page.locator('main').first()
+  await expect(homeMain).toBeVisible()
+  await expect(
+    page.getByText('简历、打印、岗位信息', { exact: false }).first()
+  ).toBeVisible()
+  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })
+  ).toHaveCount(0)
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
 
 for (const projectTag of ['@kiosk', '@mobile'] as const) {
   test(`home renders filing information ${projectTag}`, async ({ page, api }) => {
