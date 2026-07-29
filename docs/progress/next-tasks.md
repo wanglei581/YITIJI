@@ -28,14 +28,14 @@
 
 ### 多主机部署：运行时终端身份
 
-- [~] **候选代码收口**：`codex/kiosk-runtime-terminal-identity` 已让共享 Kiosk 从本机 Agent 读取 `terminalId` / `terminalCode`；生产不再使用构建期 `VITE_TERMINAL_ID` 路由终端任务。候选尚未合入或部署。
+- [x] **代码与 CI 收口**：[PR #420](https://github.com/wanglei581/YITIJI/pull/420)（`main@bcb24062`）、[PR #421](https://github.com/wanglei581/YITIJI/pull/421)（`main@6221e1a0`）、[PR #422](https://github.com/wanglei581/YITIJI/pull/422)（`main@beade4af`）均已合入。共享 Kiosk 从本机 Agent 读取 `terminalId` / `terminalCode`，生产不再使用构建期 `VITE_TERMINAL_ID` 路由终端任务；新主机 Provisioning 与未签名 MSI B1 生命周期 CI 已收口。尚未部署到 `KSK-002`，也不代表正式签名安装包或双机真机验收完成。
 - [ ] **先部署新版 Agent**：全机队空队列并留存可回滚的 Agent runtime/config/token 后，依次在 `KSK-001`、`KSK-002` 安装/升级；确认升级保留 `scanWatchFolder` / `localApiBridgeToken` / `localApiAllowedOrigins` / `localApiPort`，服务为 Automatic/Running、local API 只监听 `127.0.0.1`，且实际 Kiosk Origin 存在于白名单。若 Kiosk 与 API 不同域，首次安装时使用 `-LocalApiAllowedOrigins`；后续升级会从 ACL 受保护配置合并保留。下线或误配 Origin 使用 `-ReplaceLocalApiAllowedOrigins` 按本次列表重建，禁止部署后手改配置。
 - [ ] **再部署共享 Kiosk**：确认所有在役 Agent 均支持 identity endpoint 后，使用同一份不设置 `VITE_TERMINAL_ID` 的 production build 并强制刷新终端缓存；保留上一版静态包回滚点。不得为每台主机分别构建或继续把 `KSK-001` 写入 bundle。
 - [ ] **双机隔离验收**：在两台 Windows 主机分别核对页面显示的 `terminalCode`、Agent 心跳、管理员设备在线状态；向 `KSK-001`、`KSK-002` 各下发一笔可识别任务，确认仅目标主机领取，且另一台不领取；每台至少完成一次真实打印出纸并保留任务 ID/Agent 日志。
 - [ ] **浏览器 loopback 验收**：在实际 Edge/Chrome Kiosk 模式确认 `https://zyidai.cn` 可访问 `http://127.0.0.1:9527/local/terminal-identity`，没有 mixed content / Private Network Access 阻断；未通过时禁止宣称多主机批量部署完成。
-- [ ] **QR/U 盘多主机凭证决策**：当前 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 仍是构建期静态值。若每机 token 唯一，需先实现运行期本地会话凭证，才能让同一共享 Kiosk 同时启用 QR/U 盘；禁止为省事改成全机长期共享 token。该项不阻塞运行时身份与远程打印隔离，但阻塞“共享构建覆盖全部本地桥接能力”的宣称。
+- [ ] **QR/U 盘多主机凭证决策**：当前 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 会进入前端 bundle，只是本地 bridge 防护值，不是设备注册码或云端 Agent 认证凭据。当前共享 Kiosk 若启用 QR/U 盘，只能由同一发布批次使用同一个 bridge token；若要求每机不同，需先实现运行时本机会话凭证，才能让同一共享 Kiosk 同时启用这两类本地桥接能力。不得把 bridge token 当作每机注册码，也不得把“远程打印已按运行时终端身份隔离”扩大表述为“共享构建已覆盖每机独立 bridge token”。
 
-推荐顺序（2026-07-28 更新）：
+推荐顺序（2026-07-29 更新）：
 0m. [x] **新主机 Provisioning 配置完整性**：[PR #421](https://github.com/wanglei581/YITIJI/pull/421) 已合入；安装脚本已补安全交互式 BindCode、真实 Kiosk Origin、`scanWatchFolder` 与桥接令牌，并在重装时保留既有可选配置。该项只关闭代码与 CI，仍须在 `KSK-002` 受保护 runtime 上验收，不能替代 MSI、驱动或真机出纸/扫描。
 0n. [x] **Windows Agent MSI B1 未签名 CI 候选**：[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 的 staging、WiX、fresh install、LocalSystem fail-closed 启动、repair、uninstall 与共享 CI 已全绿，Claude Sonnet `APPROVE`；该项只关闭 B1 CI 候选，不代表正式安装包。发布仍缺企业 Authenticode 签名、受控 manifest、Provisioning 集成复核和 `KSK-002` 真机验收。
 0i. [x] **Kiosk-only 热更链路**：#400 → USB bridge `index-DmcUs_Nb.js` → 备案 [PR #424](https://github.com/wanglei581/YITIJI/pull/424) 现网 **`index-DEJ0O4c6.js`**（仍含 bridge token；明文未入仓）
@@ -358,8 +358,8 @@
 
 ## P1：Windows Agent MSI / 可修复安装包
 
-- [x] **Windows Agent MSI / 可修复安装包设计**（2026-07-27）：WiX MSI、签名信任链、二进制/状态目录分离、BindCode 激活隔离、Repair/卸载/升级/回滚边界与验收矩阵已定稿，见 `docs/device/windows-agent-msi-design.md`。未实施、未构建、未签名、未部署。
-- [ ] **Windows Agent MSI / 可修复安装包实施**：先完成配置根可重定位与一次性迁移兼容，再建立 staging 与 WiX 非生产构建；前置为机队 F2 安全换机真机验收通过。范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收；不得与可靠性 P0 或现网发布合并验收。
+- [x] **Windows Agent MSI / 可修复安装包设计与未签名 B1 候选**（2026-07-29）：设计见 `docs/device/windows-agent-msi-design.md`；[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 已合入 `main@beade4af`，固定输入 staging、WiX 构建、fresh install、未 Provisioning fail-closed、repair、uninstall 与 `%ProgramData%\AIJobPrintAgent` 保留已在 Windows CI 通过。当前 artifact 明确为未签名、7 天保留的候选，尚未部署。
+- [ ] **Windows Agent 正式签名与受控发布**：使用企业 Authenticode 完成 installer/相关二进制签名，独立复核固定输入哈希，生成受控发布 manifest/SBOM，并在干净 Windows 主机验证签名链、安装、Provisioning、upgrade/rollback、repair、uninstall 和退役清理。打印机驱动只检查和引导，不在无授权情况下随包分发；不得把未签名 B1 artifact 当作正式安装包。
 - [x] **配置根可重定位与迁移兼容（代码/运维口径收口）**：[PR #411](https://github.com/wanglei581/YITIJI/pull/411) 已合入 `main@511b9d35`；Windows 主配置目标为 `%ProgramData%\AIJobPrintAgent\agent-config.json`，并保留旧安装根的一次性去敏迁移。迁移前必须复核 ProgramData ACL，含明文 token 但无既有 DPAPI token 的旧配置必须重新 BindCode。GitHub Node 22 CI 已通过；示例、Windows 主机验收和设备文档已同步该路径。**Windows 无打印迁移验收仍未执行**，未通过前 MSI staging / 发布继续 NO-GO。
 
 ## P1：Windows 终端机队管理与安全换机
