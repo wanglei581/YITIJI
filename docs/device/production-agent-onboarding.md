@@ -11,7 +11,8 @@
 - 固定 `apiBaseUrl` 为生产云端 `/api/v1`；
 - 固定 `terminalCode` / `terminalId`；
 - 校验 Windows 打印机名；
-- 通过一次性 `-BindCode` 换发 token（推荐），或复用已有 DPAPI token 文件（`-UseExistingToken`）；
+- 通过 `-PromptForBindCode` 安全交互输入一次性绑定码（推荐），或复用已有 DPAPI token 文件（`-UseExistingToken`）；兼容参数 `-BindCode` 仅用于受控旧流程，因为它会进入进程命令行；
+- 写入真实 Kiosk Origin、可选 SMB 扫描目录和本地桥接配置；重装未显式传入时保留现有可选配置；
 - **不再接受**长期 `-AgentToken` 命令行入参（Gate 0.4：避免 token 进入进程 argv / PowerShell 历史）；
 - 使用 Windows DPAPI LocalMachine 加密保存 `agentToken`；
 - 将 `%ProgramData%\AIJobPrintAgent`（及 `agent.token`）ACL 收紧为 **SYSTEM + Administrators**，并禁用继承；
@@ -25,9 +26,15 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
   -ApiBaseUrl "https://api.example.com/api/v1" `
   -TerminalCode "KSK-001" `
   -TerminalId "t_ksk_001" `
-  -BindCode "<一次性绑定码>" `
-  -PrinterName "Pantum CM2800ADN Series"
+  -PromptForBindCode `
+  -PrinterName "<Get-Printer 返回的准确名称>" `
+  -LocalApiAllowedOrigins "https://kiosk.example.com" `
+  -ScanWatchFolder "C:\AIJobPrint\scan-inbox"
 ```
+
+如启用 QR / U 盘本地桥接，再增加 `-PromptForLocalApiBridgeToken`，并在提示中输入与受控 Kiosk 发布配置一致的令牌。绑定码和桥接令牌均不得直接写入命令、聊天、工单或安装日志。`ScanWatchFolder` 必须是现存本地目录且不能是 reparse point；LocalSystem 服务不要使用当前登录用户的映射盘符。
+
+重装未显式传值时，脚本只从 ACL 已受保护的现有配置保留 `scanWatchFolder`、`localApiAllowedOrigins`、`localApiPort` 与 `localApiBridgeToken`。需要撤销已下线、失控或误配的历史 Origin 时，增加 `-ReplaceLocalApiAllowedOrigins` 并传入新的完整额外 Origin 列表；仅传替换开关而不传列表，可清除全部历史额外 Origin，但仍固定保留 API 同源 Origin 与本机开发 Origin。`-KioskOrigins` / `-ReplaceKioskOrigins` 仅为旧命令兼容别名，新运维记录统一使用正式参数，禁止直接编辑受保护配置。
 
 如果 token 已经保存在 `%ProgramData%\AIJobPrintAgent\agent.token`：
 
@@ -36,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-p
   -ApiBaseUrl "https://api.example.com/api/v1" `
   -TerminalCode "KSK-001" `
   -TerminalId "t_ksk_001" `
-  -PrinterName "Pantum CM2800ADN Series" `
+  -PrinterName "<Get-Printer 返回的准确名称>" `
   -UseExistingToken
 ```
 
@@ -50,7 +57,7 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 - 进程内 latch：停止 claim / 新打印 / offline status 重试；
 - 本地诊断码：`AGENT_UNAUTHORIZED`（`%ProgramData%\AIJobPrintAgent\last-startup-diagnostic.json`）；
-- 恢复：Admin 重新签发 BindCode → 安装脚本 `-BindCode` 换发并重启服务（或成功 `persistRegistration` 后清除 latch）。
+- 恢复：Admin 重新签发 BindCode → 安装脚本 `-PromptForBindCode` 换发并重启服务（或成功 `persistRegistration` 后清除 latch）。
 
 `agent_degraded`（本地 SQLite 不可用）与 `AGENT_UNAUTHORIZED`（云端凭证失效）是两条独立路径，不得互相冒充。
 
@@ -62,7 +69,7 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 |---|---|---|---|
 | 1 | 只读诊断 | `diagnose-production-agent.ps1` 可运行；服务 `AIJobPrintAgent` Running / Auto | 命令输出截图 |
 | 2 | ProgramData / runtime ACL | `diagnose-production-agent.ps1` 输出 `programDataAclStatus=ok`、`tokenFileAclStatus=ok` 且 `runtimeRootAclStatus=ok`（ProgramData 继承已禁用，仅 SYSTEM `S-1-5-18` + Administrators `S-1-5-32-544`；服务加载的 Agent runtime、Node 依赖树和配置目录不得被普通用户写入）；普通用户读 token 失败 | 诊断对象 + `icacls` 佐证 |
-| 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken`；仅 `-BindCode` 或 `-UseExistingToken` | 安装记录 |
+| 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken`；新流程使用 `-PromptForBindCode` 或 `-UseExistingToken` | 安装记录 |
 | 4 | 紧急吊销（另授） | Admin 对目标终端执行紧急吊销后，Agent 停止 claim；本地诊断出现 `AGENT_UNAUTHORIZED`；云端不得仅凭“心跳 unauthorized 态”判定（401 无法上报） | Admin 审计 + 本地 `last-startup-diagnostic.json` |
 | 5 | BindCode 恢复（另授） | 新一次性 BindCode + 安装脚本换发后 latch 清除，心跳恢复，可再 claim | 心跳时间 + 一笔受控打印（若另授出纸） |
 | 6 | 回归 | 吊销/恢复后打印机 `ready`、无残留 active 任务 | DB/Admin 只读 |

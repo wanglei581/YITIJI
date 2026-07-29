@@ -53,15 +53,15 @@ assert.match(diagnosis, /service-identity\.ps1/, 'diagnosis must use the shared 
 assert.doesNotMatch(installer, /Get-Service\s+-Name\s+"AIJobPrintAgent"/, 'installer must not assume the display name is the SCM service Name')
 assert.doesNotMatch(diagnosis, /Win32_Service\s+-Filter\s+"Name\s*=\s+'\$serviceNameForFilter'/, 'diagnosis must not query only the SCM service Name')
 assert.match(installer, /\$apiOrigin\s*=\s*\(\[System\.Uri\]\$apiBase\)\.GetLeftPart/, 'installer must derive the same-origin production Kiosk Origin')
-assert.match(installer, /\[string\[\]\]\$KioskOrigins/, 'installer must accept explicit cross-origin Kiosk origins')
-assert.match(installer, /\[switch\]\$ReplaceKioskOrigins/, 'installer must support revoking preserved cross-origin Kiosk origins')
+assert.match(installer, /\[Alias\("KioskOrigins"\)\][\s\S]{0,80}?\[string\[\]\]\$LocalApiAllowedOrigins/, 'installer must expose one canonical origins parameter with the legacy KioskOrigins alias')
+assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\][\s\S]{0,80}?\[switch\]\$ReplaceLocalApiAllowedOrigins/, 'installer must expose one canonical replacement switch with the legacy alias')
 assert.match(installer, /ConvertTo-CanonicalOrigin/, 'installer must validate every local API origin')
 assert.match(installer, /localApiAllowedOrigins\s*=\s*@\(\$localApiAllowedOrigins\)/, 'installer must persist the production Kiosk origins')
 assert.match(installer, /Get-PreservedLocalSettings/, 'installer upgrades must inspect existing local-only settings')
 assert.match(installer, /@\("scanWatchFolder", "localApiBridgeToken"\)/, 'installer upgrades must preserve scan and local bridge settings')
 assert.match(
   installer,
-  /Get-PreservedLocalSettings[\s\S]{0,220}?-SkipOrigins \(\[bool\]\$ReplaceKioskOrigins\)/,
+  /Get-PreservedLocalSettings[\s\S]{0,220}?-SkipOrigins \(\[bool\]\$ReplaceLocalApiAllowedOrigins\)/,
   'origin replacement must skip invalid historical origins while retaining other protected local settings',
 )
 assert.match(
@@ -72,7 +72,7 @@ assert.match(
 assert.match(installer, /\$preservedOrigins/, 'installer must merge protected existing origins with explicit Kiosk origins')
 assert.match(
   installer,
-  /-not \$ReplaceKioskOrigins -and \$preservedLocalSettings\.Contains\("localApiAllowedOrigins"\)/,
+  /-not \$ReplaceLocalApiAllowedOrigins -and \$preservedLocalSettings\.Contains\("localApiAllowedOrigins"\)/,
   'installer must ignore preserved origins when the operator requests replacement',
 )
 assert.match(installer, /Assert-ProgramDataAcl -Path \$ConfigPath -IsContainer \$false/, 'installer must only preserve settings from protected config')
@@ -101,10 +101,10 @@ const configValidationCall = installer.indexOf('Test-GeneratedConfig -Config $co
 const runtimeSecurityStep = installer.indexOf('Write-Step "Verifying restricted Agent runtime"')
 const programDataAclStep = installer.indexOf('Write-Step "Hardening ProgramData ACL"')
 const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
-const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $BindCode')
+const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $effectiveBindCode')
 const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
 const failClosedTokenSource = installer.indexOf(
-  'Fail "Provide -BindCode (preferred) or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
+  'Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
 )
 const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
 const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
