@@ -260,8 +260,6 @@ export function PrintMaterialCheckPage() {
   const [decisions, setDecisions] = useState<Record<string, PiiFindingAction>>({})
   const [error, setError] = useState<string | null>(null)
 
-  useBusyLock(Boolean(file))
-
   const findings = piiTask?.piiFindings ?? []
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
@@ -271,6 +269,7 @@ export function PrintMaterialCheckPage() {
   const piiModeCopy = useMemo(() => piiScanModeCopy(piiTask), [piiTask])
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
+  useBusyLock(isWorking)
   const presentationFindings = findings.map((finding) => ({
     id: finding.id,
     label: finding.label || finding.type,

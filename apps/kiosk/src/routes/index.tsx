@@ -1,5 +1,6 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
+import { KioskRuntimeRoot } from '../layouts/KioskRuntimeRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
@@ -76,35 +77,42 @@ import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
 
 export const kioskRouter = createBrowserRouter([
-  // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
-  { path: '/login', element: <LoginPage />, errorElement: <KioskRouteErrorPage /> },
+  // 手机辅助入口与共享法律页不套用 27 寸公共终端的运行时超时策略。
   { path: '/member/qr-login', element: <MobileQrLoginPage />, errorElement: <KioskRouteErrorPage /> },
   { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
   { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/interview/tips', element: <InterviewTipsPage />, errorElement: <KioskRouteErrorPage /> },
-  { path: '/interview/reports', element: <InterviewReportsPage />, errorElement: <KioskRouteErrorPage /> },
-  // 待机宣传屏:顶级路由,全屏渲染(不套 KioskLayout 头部/底部导航)
-  { path: '/screensaver', element: <ScreensaverPage />, errorElement: <KioskRouteErrorPage /> },
   {
-    path: '/session-timeout',
-    errorElement: <KioskRouteErrorPage />,
-    lazy: async () => ({ Component: (await import('../pages/placeholders/SessionTimeoutPage')).default }),
-  },
-  {
-    path: '/error-offline',
-    errorElement: <KioskRouteErrorPage />,
-    lazy: async () => ({ Component: (await import('../pages/placeholders/ErrorOfflinePage')).default }),
-  },
-  {
-    path: '/',
-    element: <KioskRoot />,
-    errorElement: <KioskRouteErrorPage />,
+    element: <KioskRuntimeRoot />,
     children: [
+      {
+        element: <Outlet />,
+        errorElement: <KioskRouteErrorPage />,
+        children: [
+      // 全屏终端路由：进入安全根，但不嵌套 KioskRoot 的视觉壳。
+      { path: '/login', element: <LoginPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/tips', element: <InterviewTipsPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/reports', element: <InterviewReportsPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/screensaver', element: <ScreensaverPage />, errorElement: <KioskRouteErrorPage /> },
+      {
+        path: '/session-timeout',
+        errorElement: <KioskRouteErrorPage />,
+        lazy: async () => ({ Component: (await import('../pages/placeholders/SessionTimeoutPage')).default }),
+      },
+      {
+        path: '/error-offline',
+        errorElement: <KioskRouteErrorPage />,
+        lazy: async () => ({ Component: (await import('../pages/placeholders/ErrorOfflinePage')).default }),
+      },
+      {
+        path: '/',
+        element: <KioskRoot />,
+        errorElement: <KioskRouteErrorPage />,
+        children: [
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
@@ -208,6 +216,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
       { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
+        ],
+      },
+      { path: '*', element: <KioskRouteErrorPage /> },
+        ],
+      },
     ],
   },
 ])

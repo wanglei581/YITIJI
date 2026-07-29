@@ -434,8 +434,9 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
   await expectFusionAcceptance(page, errors)
 })
 
-test('session timeout exposes continue, logout and countdown controls @w5-kiosk', async ({ page }) => {
+test('session timeout exposes continue, logout and countdown controls @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
+  registerKioskShell(api)
   await page.goto('/session-timeout')
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toBeVisible()
   await expect(page.getByRole('button', { name: '继续使用', exact: true })).toBeVisible()
@@ -446,6 +447,7 @@ test('session timeout exposes continue, logout and countdown controls @w5-kiosk'
 
 test('offline page retains the 8177 state after an aborted health request @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
+  registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.goto('/error-offline')
   await page.getByRole('button', { name: '重试连接', exact: true }).click()

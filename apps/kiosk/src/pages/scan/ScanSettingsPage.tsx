@@ -61,8 +61,6 @@ function formatCountdown(expiresAt: string): string {
 }
 
 export function ScanSettingsPage() {
-  useBusyLock(true)
-
   const navigate = useNavigate()
   const location = useLocation()
   const { getToken } = useAuth()
@@ -85,6 +83,8 @@ export function ScanSettingsPage() {
   const generationRef = useRef(0)
   const cancelRequestedRef = useRef(false)
   const expiryHandledRef = useRef(false)
+
+  useBusyLock(phase === 'loading' || phase === 'success' || starting)
 
   const cancelSessionOnce = (id: string, token: string) => {
     if (cancelRequestedRef.current) return

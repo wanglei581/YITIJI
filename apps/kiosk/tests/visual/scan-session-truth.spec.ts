@@ -15,6 +15,10 @@ function registerShell(api: ApiRouter): void {
     status: 200,
     json: { printerStatus: 'ready', paperLevel: 'sufficient', isOnline: true },
   })
+  api.respond('GET', '/api/v1/terminals/KSK-001/capabilities', {
+    status: 200,
+    json: { capabilities: [] },
+  })
 }
 
 function registerLegacyReadyDevice(api: ApiRouter): void {
