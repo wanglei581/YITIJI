@@ -58,6 +58,13 @@ function registerHomeShellApi(api: ApiRouter) {
   })
 }
 
+function registerPrivacyRuntimeApi(api: ApiRouter) {
+  api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
+    status: 200,
+    json: { enabled: false, idleTimeoutSec: 180, items: [] },
+  })
+}
+
 async function assertHomeFilingInfo(page: Page) {
   const filingInfo = page.locator('footer[aria-label="网站备案信息"]')
   await expect(filingInfo).toBeVisible()
@@ -87,6 +94,7 @@ for (const projectTag of ['@kiosk', '@mobile'] as const) {
 for (const scenario of kioskScenarios) {
   test(`${scenario.path} renders the fusion state @kiosk`, async ({ page, api }) => {
     expect(productionRoutePatterns).toContain(scenario.path)
+    registerPrivacyRuntimeApi(api)
     const runtimeErrors = collectRuntimeErrors(page)
 
     if ('registerHealthProbe' in scenario && scenario.registerHealthProbe) {

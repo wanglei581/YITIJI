@@ -5,7 +5,7 @@ import { KioskBusyProvider } from '../contexts/KioskBusyContext'
 /**
  * Kiosk 终端业务路由的非视觉运行时根。
  *
- * 手机辅助页与共享法律页不挂在这里，避免套用 27 寸公共终端的 idle 策略。
+ * 仅手机扫码登录与上传辅助页豁免；法律页仍在安全根内，避免成为暂停硬隐私截止的逃逸路径。
  */
 export function KioskRuntimeRoot() {
   return (

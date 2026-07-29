@@ -1,0 +1,13 @@
+{
+  "id": "fix-ci-kiosk-shell-route-20260729",
+  "title": "修复 Kiosk shell 静态路由门禁与统一隐私运行时根冲突",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "等待 PR #432 GitHub CI 复跑",
+  "createdAt": "2026-07-29T14:43:00+08:00",
+  "completedAt": "2026-07-29T14:50:00+08:00",
+  "branch": "codex/p0-kiosk-privacy-timeout-20260729"
+}

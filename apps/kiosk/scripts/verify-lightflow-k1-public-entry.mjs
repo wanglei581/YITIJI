@@ -403,6 +403,7 @@ expectCssScopeSelfCheck()
 const packageJson = read('package.json')
 const routes = read('src/routes/index.tsx')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
+const privacyGuard = read('src/auth/KioskPrivacyGuard.tsx')
 const terminalDeviceStatusHook = read('src/hooks/useTerminalDeviceStatus.ts')
 const loginPage = read('src/pages/auth/LoginPage.tsx')
 const memberPhoneLoginHook = read('src/pages/auth/hooks/useMemberPhoneLogin.ts')
@@ -467,7 +468,7 @@ for (const [source, marker, label] of [
   [memberPhoneLoginHook, 'memberLogin(phone, code, consent, deviceId)', '共享手机号控制器真实登录（含协议版本）'],
   [memberPhoneLoginHook, 'sendSmsCode(phone, deviceId)', '共享手机号控制器真实发送验证码'],
   [memberPhoneLoginHook, 'getMemberAuthDeviceId()', '共享手机号控制器使用稳定 deviceId'],
-  [loginPage, 'clearKioskSensitiveSession(', 'LoginPage 公共终端清会话'],
+  [privacyGuard, 'clearKioskSensitiveSession(', 'KioskPrivacyGuard 统一公共终端清会话'],
   [scanQrPanel, 'claimingRef.current = true', 'ScanQrLoginPanel 防重复认领'],
   [mobileQrPage, 'fetchQrLoginStatus(', 'MobileQrLoginPage 查询二维码状态'],
   [mobileQrPage, 'confirmQrLogin(', 'MobileQrLoginPage 确认二维码登录'],

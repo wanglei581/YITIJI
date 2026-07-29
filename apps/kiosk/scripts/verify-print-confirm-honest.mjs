@@ -540,11 +540,17 @@ if (!simDoneCheckCutsLast && simDoneChecksAllItems && simDoneClassifiesAllItems)
   )
 }
 
-// 10) 演示结束后须释放待机 busy lock；进行中仍保持锁定
-if (/useBusyLock\s*\(\s*!isSim\s*\|\|\s*!simDone\s*\)/.test(progressCode)) {
-  pass('SIM 演示结束释放 busy lock，真实任务与演示进行中继续持锁')
+// 10) 仅执行中的真实任务或 SIM 演示保持 busy lock；失败、超时和结束态须释放
+const activeTaskBusyLock =
+  /useBusyLock\s*\(\s*\(\s*useRealApi\s*&&\s*!failed\s*&&\s*!timedOut\s*\)\s*\|\|\s*\(\s*isSim\s*&&\s*!failed\s*&&\s*!simDone\s*\)\s*,?\s*\)/.test(
+    progressCode,
+  )
+if (activeTaskBusyLock) {
+  pass('真实任务执行中与 SIM 演示进行中保持 busy lock，失败、超时和结束态释放')
 } else {
-  fail('useBusyLock 须以 !isSim || !simDone 控制，避免 SIM 演示结束后永久阻止待机')
+  fail(
+    'useBusyLock 须仅覆盖执行中的真实任务或 SIM 演示，并在失败、超时和结束态释放',
+  )
 }
 
 // 11) SIM / 失败跳转定时器须可清理，避免离页后回调继续执行

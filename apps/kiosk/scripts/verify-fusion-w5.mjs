@@ -10,7 +10,7 @@ const read = (path) => readFileSync(join(ROOT, path), 'utf8')
 const sha256 = (path) => createHash('sha256').update(read(path)).digest('hex')
 
 const W5_ROUTES = [
-  '/member/qr-login', '/upload/phone', '/legal/:doc', '/login',
+  '/member/qr-login', '/upload/phone', '/login', '/legal/:doc',
   '/screensaver', '/session-timeout', '/error-offline', '/profile',
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
