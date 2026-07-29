@@ -73,8 +73,10 @@ export function ScanProgressPage() {
   const startedAtRef = useRef(Date.now())
   const cancellingRef = useRef(false)
 
-  // 无身份时直接不持 busy；终态(完成/超时/失败/取消)切换到 terminal,在 navigate 前释放。
-  // 网络错误保持 active,等待下次 poll。
+  // 锁只在 active 阶段持有。终态（completed/expired/failed/cancelled）切换到
+  // terminal 之后 useBusyLock 的依赖 active=false,下一次 effect render 时
+  // 不再申请新锁;旧锁随组件卸载或 effect cleanup 释放给 busy context。
+  // 网络错误保持 active,等下一次 poll 重新拿到状态。
   useBusyLock(hasTaskIdentity && busyPhase === 'active')
 
   useEffect(() => {
@@ -148,16 +150,17 @@ export function ScanProgressPage() {
     cancellingRef.current = true
     try {
       await cancelScanSession(scanTaskId, controlToken, getToken())
-      // 只有 DELETE 真正成功后才释放 busy。若抛错则任务仍在服务端 active,
-      // busy 必须保持,直到下一次 poll 拿到终态或用户重试取消。
+      // 离开本页：标记 terminal,后续 React effect 渲染 busyPhase==='terminal'
+      // 时 useBusyLock 不会再向 busy context 申请一把新锁;旧的锁在组件卸载 /
+      // effect cleanup 时释放到 busy context,目的页挂载即重新进入 idle 计时。
       setBusyPhase('terminal')
       navigate('/scan/start', { replace: true })
     } catch (err) {
-      // 取消请求送达时任务恰好已经完成（Agent 并发投递刚好抢先完成，后端会返回
-      // SCAN_TASK_ALREADY_COMPLETED）：补查一次真实状态，能拿到文件就直接进
-      // 结果页；查不到、或补查本身失败、或是网络错误等其它取消失败原因，则退回默认
-      // 路径，不阻塞用户。busy 在每个分支都释放；之所以放在 navigate 之前调用，是为
-      // 了让用户在「结果页 / /scan/start」上一落地，privacy 计时器就能立即开始计 idle。
+      // 取消请求送达时任务恰好已经完成（Agent 并发投递刚好抢先完成,后端会返回
+      // SCAN_TASK_ALREADY_COMPLETED）：补查一次真实状态,能拿到文件就直接进
+      // 结果页;查不到、或补查本身失败、或是网络错误等其它取消失败原因,则退回默认
+      // 路径,不阻塞用户。所有离开分支都走 setBusyPhase('terminal') + navigate,
+      // 锁的释放由 unmount / effect cleanup 接手,不在 catch 这里手动调度。
       const code = err instanceof ApiHttpError ? err.code : undefined
       if (code === 'SCAN_TASK_ALREADY_COMPLETED') {
         try {
@@ -171,7 +174,7 @@ export function ScanProgressPage() {
             return
           }
         } catch {
-          // 补查状态也失败了，落到下面的默认 fallback
+          // 补查状态也失败了,落到下面的默认 fallback
         }
       }
       setBusyPhase('terminal')

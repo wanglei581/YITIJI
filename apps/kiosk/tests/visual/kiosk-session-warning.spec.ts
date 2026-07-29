@@ -265,9 +265,10 @@ async function installScanProgressRoute(
   page: Page,
   options: ScanBusyOptions = {},
 ): Promise<ScanBusyRecorder> {
-  // 每次新装一个 recorder 之前,先把上一个 endpoint handler 卸掉,避免 page.route
-  // 默认 LIFO 把旧 closure 留在栈顶——旧 closure 里 if (status === 'completed')
-  // 永远先匹配,新 status 永远到不了。
+  // 每次新装一个 recorder 之前,先把上一个 endpoint handler 卸掉。每个测试用同一
+  // 个 endpoint,如果不显式 unroute,多个 closure 会并存,后续 route.fulfill 的
+  // 行为变得不可预测——recorder 计数也会跟着漂。直接清掉旧 handler 让本次
+  // install 成为唯一所有者。
   await page.unroute(`**/api/v1/scan/sessions/${SCAN_TASK_ID}`).catch(() => undefined)
 
   let statusReq = 0
@@ -366,8 +367,10 @@ test('scan busy stays released when the scan task id is missing @scan-busy @warn
   )
   await page.reload({ waitUntil: 'domcontentloaded' })
 
-  // 缺少 scanTaskId 时,组件第一时间 navigate('/scan/start')——这一步必须能成:
-  // 如果 busy 还拿着,这条 replace 会被路由守卫拦下来,/session-timeout 永远不会弹。
+  // 缺少 scanTaskId 时,组件第一时间 navigate('/scan/start');busy 的作用是
+  // 抑制空闲警告(suppresses idle warning),不会拦截路由跳转。这条断言要
+  // 证明的是:active===false 让 useBusyLock 退出 active 持锁分支,本页的
+  // 隐私计时器能正常运行,/session-timeout 能在 3s 内弹。
   await expectWarningWithinThreeSeconds(page)
 })
 
@@ -410,16 +413,19 @@ test('scan busy blocks the idle warning while polling is waiting, processing, or
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   await expect.poll(() => waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
 
-  // 3000ms 落在 status poll 间隔 3000ms 之内,保证观察窗口里至少发生过一次进入
-  // active busy 的状态:如果 lock 失效,这窗口内必然弹 /session-timeout。
+  // 3000ms 的观察窗口覆盖到至少一次完整 poll 周期,如果 lock 在中途失效,
+  // /session-timeout 必然在这窗口内弹。窗口长度是回归测试粒度的选择,
+  // 跟组件里 POLL_INTERVAL_MS=3000 没有一一对应关系。
   await expectNoWarningWithin(page, SCAN_OBSERVATION_MS)
   await expect(page).toHaveURL(/\/scan\/progress$/)
   await expect(page.getByText('等待打印机端扫描完成', { exact: true })).toBeVisible()
   expect(waitingCount.statusRequests()).toBeGreaterThanOrEqual(1)
   expect(waitingCount.deleteRequests()).toBe(0)
 
-  // Switch the backend to a 5xx-equivalent status path that mirrors the network retry branch,
-  // and confirm the busy lock still blocks the warning while poll() schedules the next attempt.
+  // Switch the backend to 'processing'——这是 ScanSessionStatus 的合法 active
+  // 取值,代表 Agent 端已经上传完成、正在后端生成 PDF。和后续 networkError
+  // 分支对应的「服务端正常但本次 fetch 抛错,触发 scheduleNext 重试」是两条
+  // 不同的执行路径,需要分别覆盖到。
   const processingCount = await installScanProgressRoute(page, {
     scanTaskId: SCAN_TASK_ID,
     controlToken: SCAN_CONTROL_TOKEN,
@@ -548,7 +554,7 @@ test('explicit user cancel sends exactly one DELETE before navigating away @scan
 
   await expect(page).toHaveURL(/\/scan\/start$/, { timeout: 6_000 })
   await expectWarningWithinThreeSeconds(page)
-  // 用 installScanProgressRoute 内部 uninstall 过的 endpoint-wide recorder 拿到
-  // 准确计数,排除 LIFO 路由残留造成的统计漂移。
+  // 每次 install 都 unroute 旧 handler,所以 cancelCounts 严格只数这一次
+  // install 内收到的 DELETE 流量;不需要再去手工减去历史基准。
   expect(cancelCounts.deleteRequests() - deleteBefore).toBe(1)
 })
