@@ -18,7 +18,7 @@
 
 ### 方案 A：路由预警 + Guard Context（采用）
 
-复用既有页面和视觉锚点，清场动作集中在安全根；location state 只传安全来源路径、清场目标和屏保公开播放列表，不传 token、文件内容或个人数据。
+复用既有页面和视觉锚点，清场动作集中在安全根。预警 history entry 不复制任何来源 location state；Guard 只在当前 React 内存 ref 中保留原 history entry 和屏保播放列表，不把 token、文件内容、controlToken 或个人数据写入新的 history state。
 
 ### 方案 B：SessionTimeoutPage 自行 logout/navigate（否决）
 
@@ -33,16 +33,18 @@
 ### 3.1 普通 idle
 
 1. `VITE_KIOSK_LOGOUT_IDLE_SEC` 表示从最后一次操作到自动清场的总时长。
-2. 有效预警时长为 `min(30 秒, ordinary idle 总时长)`；在 `总时长 - 有效预警时长` 时导航到 `/session-timeout`。配置值不大于 30 秒时立即显示预警，但倒计时只使用该配置值，绝不额外延长 30 秒。
+2. 正常配置的有效预警时长为 `min(30 秒, ordinary idle 总时长)`。为避免 0ms timer 早于 Guard mount，trigger 至少为 1ms；配置值不大于 30 秒时在下一个宏任务近似立即显示预警，倒计时使用 `总时长 - trigger`，最终截止仍严格等于配置总时长。
 3. 通用 `useIdleTimer` 在回调中提供原计划触发时间；Guard 据此计算最终绝对截止 `deadlineAt = plannedWarningAt + effectiveWarningMs`。若后台节流导致回调恢复时已越过 `deadlineAt`，直接清场，不重新赠送完整倒计时。
 4. 预警页只依据 `deadlineAt - Date.now()` 计算剩余秒数，避免 React Strict Mode 或后台节流造成双倍/漂移。
-5. 点击“继续使用”以 `replace` 返回经 `isSafeInternalPath` 校验的来源路径。
-6. 点击“立即退出”或倒计时归零调用 Guard `hardClear()`，最终得到干净首页与新的 privacy boundary。
+5. Guard 发起预警前记录当前 history entry 的 index，仅在内存 ref 中保存恢复信息；预警路由不携带该 state。React Router 的 `history.state.idx` 是既有内部耦合，任何非 number 或不相邻情况都必须 fail-closed，不能猜测恢复路径。
+6. 点击“继续使用”只在确认当前 warning 与原 entry 相邻、内存 ref 仍有效时执行 `navigate(-1)` 回到原 entry，因此扫描 controlToken、面试 accessToken 等既有 router state 不被复制也不丢失。
+7. 预警页刷新、直接访问、history index 不匹配或内存 ref 丢失时，不尝试恢复来源页面，fail-closed 清场回首页。
+8. 点击“立即退出”或倒计时归零调用 Guard `hardClear()`，最终得到干净首页与新的 privacy boundary。
 
 ### 3.2 屏保 idle
 
 1. `idleTimeoutSec` 同样表示从最后一次操作到进入屏保的总时长。
-2. 在 `idleTimeoutSec - 30 秒` 时进入同一预警页，state 标记 `exitTo: screensaver` 并携带当前公开播放列表。
+2. 在 `idleTimeoutSec - 30 秒` 时进入同一预警页；清场目标和当前公开播放列表只保存在 Guard 内存中，不复制到 warning history state。
 3. 继续使用返回来源页面；结束时执行 `clearToScreensaver()`。
 4. `clearToScreensaver()` 与硬清场共用一次性 claim，避免倒计时与硬截止双触发；清场后建立 boundary，再导航屏保。
 5. claim 与现有 `clearingRef` 合并为唯一的 `clearingModeRef: null | 'hard' | 'screensaver'`，所有清场入口先原子 claim；不存在第二个可绕过 claim 的 clearing ref。屏保清场 claim 后先显示最高层清场遮罩，同步清本地状态与会员态，写入 boundary，并在同一事件交接中用携带该 boundary 的 route state 导航；过渡期间 stale-history 与硬截止都只能观察同一 claim，不能启动第二次清场。
@@ -57,7 +59,7 @@
 
 ## 4. 任务感知文案
 
-预警页根据经校验的来源 pathname 选择辅助说明：
+Guard 向预警 Context 只暴露不含敏感数据的展示 descriptor（来源 pathname 分类、exitTo、deadlineAt）；预警页据此选择辅助说明：
 
 - `/print/*`、`/scan/*`：`后台任务继续，终端页面将清除`；补充“清场不会取消已创建的打印/扫描任务”。
 - `/assistant`、`/resume/*`、`/interview/*`：`未保存的填写内容或练习内容会清除`。
@@ -87,7 +89,7 @@
 ## 7. 组件边界
 
 - `KioskPrivacyGuard.tsx`：保留 boundary/hardClear，新增软预警导航、屏保清场与一次性 claim。
-- `KioskSessionControlContext.tsx`：只暴露 `hardClear`、`clearToScreensaver`；缺 Provider 时 fail-closed，不静默降级为普通导航。
+- `KioskSessionControlContext.tsx`：只暴露非敏感 warning descriptor、`continueSession`、`hardClear`、`clearToScreensaver`；来源完整 location 与 playlist 保留在 Guard 私有 ref 中。缺 Provider、ref 丢失或 history index 不匹配时 fail-closed，不静默恢复路径。
 - `useIdleTimer.ts`：回调提供原计划触发时间，使上层能在节流恢复后按绝对时间 fail-closed；现有无参数回调保持兼容。
 - `useIdleLogout.ts`：按“总 idle 时长减有效预警时长”触发，排除 `/session-timeout` 与 `/screensaver`。
 - `useScreensaverController.ts`：只负责配置、缓存和 idle 信号，把播放列表交给 Guard；不自行清场导航。
@@ -115,11 +117,11 @@
 
 ## 9. 风险与约束
 
-- 路由 state 丢失或直接访问 `/session-timeout`：来源默认 `/`，清场目标默认 hardClear，倒计时使用不超过 30 秒的安全默认值。
+- 预警页刷新、直接访问或 Guard 内存恢复 ref 丢失：不把 pathname 恢复冒充为原任务，清场目标默认 hardClear，倒计时使用不超过 30 秒的安全默认值。
 - 警告倒计时与硬截止同时到达：Guard 的单一 `clearingModeRef` claim 幂等；尚未 claim 时硬截止直接执行，已有屏保 claim 时由已开始的同步清场继续完成，不等待页面动画也不重复清场。
 - 屏保配置在预警期间变化：使用触发预警时的已验证播放列表；若列表无效，fail-closed 回干净首页。
 - 不以“优化体验”为由延长硬截止、保留匿名 access token 或恢复未保存匿名任务。
-- 来源 pathname 即使被篡改最多影响提示文案；所有返回路径仍必须经 `isSafeInternalPath`，清场动作和 boundary 不信任该值。
+- 来源 pathname 只用于内存中的提示分类，不用于重建任务或导航；继续使用只能返回 Guard 记录且 history index 匹配的原 entry，清场动作和 boundary 不信任展示 descriptor。
 
 ## 10. 双模型意见处理
 
