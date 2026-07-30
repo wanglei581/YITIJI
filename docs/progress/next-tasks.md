@@ -15,6 +15,8 @@
 - [x] **P0-2B F1 D3 真实审批资料受限采集准备（本地候选，未部署）**：已完成技术 SSOT、审批治理包、D3 预检报告与 runbook 的一致性盘点，并形成 `docs/reviews/f1-d3-approval-intake-readiness-2026-07-30.md` 引用式快照；只路由字段 ID 的责任和采集位置，不填写或复制 managed 值、状态及签批结论。当时的三方签批前提已由下一条 P0-2C 双模式治理纠正；managed 资产记录和限时 D3 只读窗口仍未提供，F1 保持 **NO-GO**，不得连接生产或申请 D4–D6。
 - [x] **P0-2C 单一负责人治理模式真实化（本地候选，未部署）**：当前一人公司使用 `single-owner`，不再要求或虚构机构/运维/安全三名员工；未来客户现场仍可切换 `institutional`。角色可以合并，但 B1–B9、部署/运行账户分离及 D3 / 锁处置 / D4 / D5 / D6 五个授权闸门不合并；AI 技术核对不是审批，普通聊天回复不是生产授权。下一步由业主负责人先在仓库外建立一条仅限 `D3_READONLY_PRECHECK` 的变更记录，固定 managed 输入引用、负责人、候选、证据摘要和 RFC3339 窗口，再对该窗口单独明确授权；此前 production F1 保持 **NO-GO**。
 - [ ] **P0-2～P0-6 上线门禁**：P0-1 与 P0-1B 已合入主干；冻结单一软件候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
+- [x] **F1 同机双端口设计与 D1′/D2′ 实施计划**：设计与可执行计划已由 Codex、Claude、Antigravity、Cursor 交叉审查并收口；计划见 `docs/superpowers/plans/2026-07-30-f1-same-host-dual-port-d1-prime-implementation.md`。本项只完成计划，未改代码、CI、runbook 或生产环境。
+- [ ] **F1 下一步只执行 D1′ + D2′**：取得实施确认后，先按 RED→GREEN 把 future-only managed health 精确切到 `3011` 并同步 fixtures/CI/SSOT，再在具备 cgroup v2、systemd delegation、真实 Nginx 的非生产 Linux 环境运行同 namespace 双端口 D2′。任一前置缺失即 NO-GO；不得使用 production 服务器补做 D2′，不得进入 D3–D6。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 
