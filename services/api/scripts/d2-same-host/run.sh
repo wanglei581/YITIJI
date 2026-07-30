@@ -22,13 +22,17 @@ for path_part in "${approved_path_parts[@]}"; do
 done
 export PATH="$APPROVED_PATH"
 
-required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run tr)
+required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
 for required_command in "${required_commands[@]}"; do
   command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 done
 node --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 pnpm --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+NODE_BIN="$(command -v node)"
+PM2_BIN="$(command -v pm2)"
+NGINX_BIN="$(command -v nginx)"
+SYSTEMCTL_BIN="$(command -v systemctl)"
 
 production_variables=(
   DATABASE_URL DIRECT_URL
@@ -147,21 +151,125 @@ NONCE="$(tr -d '-' < /proc/sys/kernel/random/uuid)"
 RUN_DIR="$WORK_DIR/$NONCE"
 mkdir -m 700 "$RUN_DIR" || no_go "D2_PRIME_NO_GO_WORKSPACE"
 
-early_cleanup() {
+bootstrap_cleanup() {
   local original_status=$?
   set +e
-  if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
-    rm -rf -- "$RUN_DIR"
+  [[ "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]] && rm -rf -- "$RUN_DIR"
+  if [[ -n "${PM2_CONTROL_ROOT:-}" && "$PM2_CONTROL_ROOT" == "${PM2_RUNTIME_ROOT:-}/d2p-"* ]]; then
+    rm -rf -- "$PM2_CONTROL_ROOT"
   fi
+  return "$original_status"
+}
+trap bootstrap_cleanup EXIT
+
+PM2_RUNTIME_ROOT="/run/user/$(id -u)"
+[[ -d "$PM2_RUNTIME_ROOT" && -O "$PM2_RUNTIME_ROOT" && ! -L "$PM2_RUNTIME_ROOT" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+[[ "$(stat -c '%a' "$PM2_RUNTIME_ROOT")" == "700" && "$(realpath "$PM2_RUNTIME_ROOT")" == "$PM2_RUNTIME_ROOT" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+PM2_CONTROL_ROOT="$PM2_RUNTIME_ROOT/d2p-$NONCE"
+[[ ! -e "$PM2_CONTROL_ROOT" && ! -L "$PM2_CONTROL_ROOT" ]] || no_go "D2_PRIME_NO_GO_WORKSPACE"
+mkdir -m 700 "$PM2_CONTROL_ROOT" || no_go "D2_PRIME_NO_GO_WORKSPACE"
+
+LEGACY_HOME="$RUN_DIR/legacy-home"
+MANAGED_HOME="$RUN_DIR/managed-home"
+PREFLIGHT_HOME="$RUN_DIR/preflight-home"
+PREFLIGHT_PM2_HOME="$PM2_CONTROL_ROOT/p"
+LEGACY_PM2_HOME="$PM2_CONTROL_ROOT/l"
+MANAGED_PM2_HOME="$PM2_CONTROL_ROOT/m"
+mkdir -m 700 \
+  "$LEGACY_HOME" "$MANAGED_HOME" "$PREFLIGHT_HOME" \
+  "$PREFLIGHT_PM2_HOME" "$LEGACY_PM2_HOME" "$MANAGED_PM2_HOME" \
+  || no_go "D2_PRIME_NO_GO_WORKSPACE"
+for isolated_dir in \
+  "$PM2_CONTROL_ROOT" "$PREFLIGHT_PM2_HOME" "$LEGACY_PM2_HOME" "$MANAGED_PM2_HOME"; do
+  [[ -O "$isolated_dir" && ! -L "$isolated_dir" && "$(stat -c '%a' "$isolated_dir")" == "700" ]] \
+    && [[ "$(realpath "$isolated_dir")" == "$isolated_dir" ]] \
+    || no_go "D2_PRIME_NO_GO_PATH"
+done
+
+pm2_home_has_state() {
+  local pm2_home="$1"
+  [[ -e "$pm2_home/pm2.pid" || -e "$pm2_home/pub.sock" || -e "$pm2_home/rpc.sock" ]]
+}
+
+read_pm2_daemon_pid() {
+  local pm2_home="$1"
+  local pid_file="$pm2_home/pm2.pid"
+  [[ ! -e "$pid_file" && ! -L "$pid_file" ]] && return 1
+  [[ -f "$pid_file" && -O "$pid_file" && ! -L "$pid_file" ]] || return 2
+  [[ "$(stat -c '%s' "$pid_file")" =~ ^[0-9]+$ ]] || return 2
+  (( $(stat -c '%s' "$pid_file") <= 32 )) || return 2
+  local daemon_pid
+  daemon_pid="$(<"$pid_file")"
+  [[ "$daemon_pid" =~ ^[1-9][0-9]{0,9}$ ]] || return 2
+  printf '%s' "$daemon_pid"
+}
+
+bounded_pm2_kill() {
+  local home="$1"
+  local pm2_home="$2"
+  local daemon_pid=""
+  local pid_status=0
+  [[ ! -e "$home" && ! -e "$pm2_home" ]] && return 0
+  [[ -d "$home" && -O "$home" && ! -L "$home" ]] || return 1
+  [[ -d "$pm2_home" && -O "$pm2_home" && ! -L "$pm2_home" ]] || return 1
+  if daemon_pid="$(read_pm2_daemon_pid "$pm2_home")"; then
+    :
+  else
+    pid_status=$?
+    (( pid_status == 1 )) || return 1
+    daemon_pid=""
+  fi
+  timeout --signal=TERM --kill-after=3s 8s \
+    env -i PATH="$APPROVED_PATH" HOME="$home" PM2_HOME="$pm2_home" \
+    "$PM2_BIN" kill >/dev/null 2>&1 || true
+  for _ in {1..20}; do
+    pm2_home_has_state "$pm2_home" || return 0
+    if [[ -z "$daemon_pid" ]]; then
+      if daemon_pid="$(read_pm2_daemon_pid "$pm2_home")"; then
+        break
+      else
+        pid_status=$?
+        (( pid_status == 1 )) || return 1
+        daemon_pid=""
+      fi
+    fi
+    sleep 0.1
+  done
+  [[ -n "$daemon_pid" ]] || return 1
+  if kill -0 "$daemon_pid" 2>/dev/null; then
+    env -i PATH="$APPROVED_PATH" HOME="$home" \
+      "$NODE_BIN" "$SCRIPT_DIR/control-plane.mjs" --terminate-daemon "$pm2_home" "$daemon_pid" \
+      || return 1
+  fi
+  kill -0 "$daemon_pid" 2>/dev/null && return 1
+  return 0
+}
+
+early_cleanup() {
+  local original_status=$?
+  local cleanup_failed=0
+  set +e
+  bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
+  bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
+  bounded_pm2_kill "$MANAGED_HOME" "$MANAGED_PM2_HOME" || cleanup_failed=1
+  if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
+    (( cleanup_failed == 0 )) && rm -rf -- "$RUN_DIR"
+  fi
+  if [[ -n "${PM2_CONTROL_ROOT:-}" && "$PM2_CONTROL_ROOT" == "$PM2_RUNTIME_ROOT/d2p-"* ]]; then
+    (( cleanup_failed == 0 )) && rm -rf -- "$PM2_CONTROL_ROOT"
+  fi
+  (( cleanup_failed == 0 )) || return 2
   return "$original_status"
 }
 trap early_cleanup EXIT
 
-LEGACY_HOME="$RUN_DIR/legacy-home"
-LEGACY_PM2_HOME="$RUN_DIR/legacy-pm2"
-MANAGED_HOME="$RUN_DIR/managed-home"
-MANAGED_PM2_HOME="$RUN_DIR/managed-pm2"
-mkdir -m 700 "$LEGACY_HOME" "$LEGACY_PM2_HOME" "$MANAGED_HOME" "$MANAGED_PM2_HOME"
+env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
+  "$NODE_BIN" "$SCRIPT_DIR/control-plane.mjs" --assert-layout \
+  "$PM2_RUNTIME_ROOT" "$NONCE" "$PM2_CONTROL_ROOT" \
+  "$PREFLIGHT_PM2_HOME" "$LEGACY_PM2_HOME" "$MANAGED_PM2_HOME" \
+  || no_go "D2_PRIME_NO_GO_PATH"
 
 MANAGED_PM2_HOME_HASH="$(printf '%s' "$MANAGED_PM2_HOME" | sha256sum)"
 MANAGED_PM2_HOME_ID="${MANAGED_PM2_HOME_HASH%% *}"
@@ -173,20 +281,15 @@ EVIDENCE_OUT="${D2_EVIDENCE_OUT:-$EVIDENCE_DIR/d2-prime-evidence-$(date -u +%Y%m
   || no_go "D2_PRIME_NO_GO_EVIDENCE_PATH"
 [[ ! -e "$EVIDENCE_OUT" && ! -L "$EVIDENCE_OUT" ]] || no_go "D2_PRIME_NO_GO_EVIDENCE_EXISTS"
 
-NODE_BIN="$(command -v node)"
-PM2_BIN="$(command -v pm2)"
-NGINX_BIN="$(command -v nginx)"
-SYSTEMCTL_BIN="$(command -v systemctl)"
 KEEPER_STARTED=0
 
-PREFLIGHT_HOME="$RUN_DIR/preflight-home"
-PREFLIGHT_PM2_HOME="$RUN_DIR/preflight-pm2"
-mkdir -m 700 "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME"
-env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
+timeout --signal=TERM --kill-after=2s 5s \
+  env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
   "$PM2_BIN" -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
+timeout --signal=TERM --kill-after=3s 8s \
+  env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
   "$PM2_BIN" kill >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-rm -rf -- "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME"
+pm2_home_has_state "$PREFLIGHT_PM2_HOME" && no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 
 cleanup() {
   local original_status=$?
@@ -203,6 +306,9 @@ cleanup() {
     systemctl --user stop "$UNIT_NAME" >/dev/null 2>&1 || true
     systemctl --user reset-failed "$UNIT_NAME" >/dev/null 2>&1 || true
   fi
+  bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
+  bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
+  bounded_pm2_kill "$MANAGED_HOME" "$MANAGED_PM2_HOME" || cleanup_failed=1
   local nginx_pid_file="${RUN_DIR:-}/nginx/nginx.pid"
   if [[ -f "$nginx_pid_file" && -O "$nginx_pid_file" && ! -L "$nginx_pid_file" ]]; then
     local nginx_pid
@@ -219,6 +325,9 @@ cleanup() {
   if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
     (( cleanup_failed == 0 )) && rm -rf -- "$RUN_DIR"
   fi
+  if [[ -n "${PM2_CONTROL_ROOT:-}" && "$PM2_CONTROL_ROOT" == "$PM2_RUNTIME_ROOT/d2p-"* ]]; then
+    (( cleanup_failed == 0 )) && rm -rf -- "$PM2_CONTROL_ROOT"
+  fi
   (( cleanup_failed == 0 )) || return 2
   return "$original_status"
 }
@@ -232,6 +341,7 @@ systemd-run --user \
   --setenv "PM2_HOME=$MANAGED_PM2_HOME" \
   --setenv "PATH=$APPROVED_PATH" \
   --setenv "D2_RUN_DIR=$RUN_DIR" \
+  --setenv "D2_CONTROL_ROOT=$PM2_CONTROL_ROOT" \
   --setenv "D2_NONCE=$NONCE" \
   --setenv "D2_PM2_HOME_ID=$MANAGED_PM2_HOME_ID" \
   --setenv "D2_PM2_BIN=$PM2_BIN" \
@@ -252,6 +362,7 @@ env -i \
   D2_API_DIR="$API_DIR" \
   D2_ROOT="$ROOT" \
   D2_RUN_DIR="$RUN_DIR" \
+  D2_CONTROL_ROOT="$PM2_CONTROL_ROOT" \
   D2_NONCE="$NONCE" \
   D2_UNIT_NAME="$UNIT_NAME" \
   D2_READY_MARKER="$READY_MARKER" \

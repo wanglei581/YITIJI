@@ -11,6 +11,11 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
+import {
+  assertPm2SocketPathBudget,
+  createSpawnAttemptTracker,
+  derivePm2ControlPaths,
+} from './control-plane.mjs'
 
 const READY_FILE = 'managed-ready.json'
 const STOP_FILE = 'managed-stop'
@@ -36,12 +41,12 @@ function assertOwnedDirectory(path) {
   return realpathSync(path)
 }
 
-function runPm2(pm2Bin, args, environment) {
+function runPm2(pm2Bin, args, environment, timeout) {
   const result = spawnSync(pm2Bin, args, {
     encoding: 'utf8',
     env: environment,
     stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 10_000,
+    timeout,
   })
   if (result.error || result.status !== 0) fail('MANAGED_SCOPE_PM2_FAILED')
 }
@@ -84,6 +89,7 @@ async function main() {
   const runDir = assertOwnedDirectory(requiredEnvironment('D2_RUN_DIR'))
   const home = assertOwnedDirectory(requiredEnvironment('HOME'))
   const pm2Home = assertOwnedDirectory(requiredEnvironment('PM2_HOME'))
+  const controlRoot = assertOwnedDirectory(requiredEnvironment('D2_CONTROL_ROOT'))
   const nonce = requiredEnvironment('D2_NONCE')
   const expectedPm2HomeId = requiredEnvironment('D2_PM2_HOME_ID')
   const pm2Bin = requiredEnvironment('D2_PM2_BIN')
@@ -91,9 +97,14 @@ async function main() {
   if (!NONCE.test(nonce) || !SHA256.test(expectedPm2HomeId) || !isAbsolute(pm2Bin)) {
     fail('MANAGED_SCOPE_ENV_INVALID')
   }
-  if (home !== join(runDir, 'managed-home') || pm2Home !== join(runDir, 'managed-pm2')) {
+  const controlPaths = derivePm2ControlPaths(join('/run/user', String(process.getuid())), nonce)
+  if (
+    home !== join(runDir, 'managed-home') || controlRoot !== controlPaths.root ||
+    pm2Home !== controlPaths.managed
+  ) {
     fail('MANAGED_SCOPE_PATH_INVALID')
   }
+  assertPm2SocketPathBudget(pm2Home)
   const actualPm2HomeId = createHash('sha256').update(pm2Home, 'utf8').digest('hex')
   if (actualPm2HomeId !== expectedPm2HomeId) fail('MANAGED_SCOPE_HOME_MISMATCH')
 
@@ -106,7 +117,7 @@ async function main() {
     HOME: home,
     PM2_HOME: pm2Home,
   }))
-  let daemonStarted = false
+  const daemon = createSpawnAttemptTracker()
   let stopping = false
   const requestStop = () => {
     stopping = true
@@ -115,8 +126,9 @@ async function main() {
   process.once('SIGTERM', requestStop)
 
   try {
-    runPm2(pm2Bin, ['ping'], pm2Environment)
-    daemonStarted = true
+    daemon.recordAttempt()
+    runPm2(pm2Bin, ['ping'], pm2Environment, 5_000)
+    daemon.markStarted()
     const daemonPid = await readDaemonPid(pm2Home)
     writeReady(readyPath, {
       schemaVersion: 1,
@@ -130,9 +142,9 @@ async function main() {
     }
     if (existsSync(stopPath)) assertStopMarker(stopPath)
   } finally {
-    if (daemonStarted) {
+    if (daemon.shouldKill()) {
       try {
-        runPm2(pm2Bin, ['kill'], pm2Environment)
+        runPm2(pm2Bin, ['kill'], pm2Environment, 8_000)
       } catch {
         process.exitCode = 2
       }
