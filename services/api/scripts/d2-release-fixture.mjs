@@ -104,7 +104,6 @@ export function createD2ReleaseFixture({
   }
 
   return {
-    artifactRoot,
     buildRelease,
     controlRoot: realpathSync(controlRoot),
     launcherCwd: canonicalLauncherCwd,
