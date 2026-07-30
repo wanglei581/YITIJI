@@ -1,0 +1,13 @@
+{
+  "id": "pr435-merge-status",
+  "title": "同步 PR #435 合并与 CI 全绿状态",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "low",
+  "domain": "documentation",
+  "currentPhase": "completed",
+  "nextAction": "归档并通过文档 PR 合入主干",
+  "createdAt": "2026-07-30T02:22:00Z",
+  "branch": "codex/pr435-merge-status",
+  "baselineCommit": "b03af066"
+}
