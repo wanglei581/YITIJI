@@ -188,6 +188,16 @@ function verifyEvidenceContract() {
   expectEvidenceMutationFailure(evidence, (value) => { value.productionF1 = 'GO' })
   expectEvidenceMutationFailure(evidence, (value) => { value.environment = { DATABASE_URL: 'secret' } })
   expectEvidenceMutationFailure(evidence, (value) => { value.logBody = 'sensitive log' })
+  expectEvidenceMutationFailure(evidence, (value) => { value.recordedAt = 'not-an-instant' })
+  expectEvidenceMutationFailure(evidence, (value) => {
+    value.nginx.observedTargetsAfterInvalidCandidate = ['legacy', { log: 'must-not-survive' }]
+    value.nginx.allOrNoneObserved = false
+    value.verdict = 'D2_PRIME_NO_GO'
+  })
+  expectEvidenceMutationFailure(evidence, (value) => {
+    value.nginx.binaryVersion = `nginx/${'x'.repeat(500)}`
+    value.verdict = 'D2_PRIME_NO_GO'
+  })
   expectEvidenceMutationFailure(evidence, (value) => { delete value.healthContract })
 
   for (const [section, booleanField, rawMutation] of [
