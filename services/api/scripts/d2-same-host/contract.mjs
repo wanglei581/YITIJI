@@ -4,9 +4,9 @@ const LEGACY_ENDPOINT = '127.0.0.1:3010'
 const MANAGED_ENDPOINT = '127.0.0.1:3011'
 const MANAGED_HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
 const DRILL_LIMITS = Object.freeze({
-  memoryMaxBytes: 67_108_864,
+  memoryMaxBytes: 268_435_456,
   cpuQuotaPerSecUSec: 250_000,
-  tasksMax: 16,
+  tasksMax: 64,
   limitNOFILE: 256,
 })
 const SHA256 = /^[0-9a-f]{64}$/
@@ -65,8 +65,8 @@ function hasExactKeys(value, expected) {
 
 function assertSafePath(value) {
   if (
-    typeof value !== 'string' || !isAbsolute(value) || value.length > 512 ||
-    !/^\/[A-Za-z0-9._/-]+$/.test(value) || value.split('/').includes('..')
+    typeof value !== 'string' || !isAbsolute(value) || Buffer.byteLength(value, 'utf8') > 1024 ||
+    /[\u0000-\u001f\u007f"'`;{}#$\\]/u.test(value) || value.split('/').includes('..')
   ) fail()
 }
 
@@ -174,11 +174,11 @@ export function renderNginxConfig({ target, listenPort, pidPath, accessLogPath, 
   const endpoint = target === 'legacy' ? LEGACY_ENDPOINT : MANAGED_ENDPOINT
   return [
     'worker_processes 1;',
-    `pid ${pidPath};`,
-    `error_log ${errorLogPath} notice;`,
+    `pid "${pidPath}";`,
+    `error_log "${errorLogPath}" notice;`,
     'events { worker_connections 64; }',
     'http {',
-    `  access_log ${accessLogPath};`,
+    `  access_log "${accessLogPath}";`,
     '  server {',
     `    listen 127.0.0.1:${listenPort};`,
     '    location / {',
@@ -209,6 +209,38 @@ export function transitionCutover(state, event) {
   const next = TRANSITIONS[state]?.[event]
   if (!next) fail()
   return next
+}
+
+export function createFailureMeasurements(recordedAt) {
+  if (!isRecordedAt(recordedAt)) fail('EVIDENCE')
+  const zero = '0'.repeat(64)
+  return {
+    recordedAt,
+    topology: { legacyNetNamespaceInode: '1', managedNetNamespaceInode: '2', nginxNetNamespaceInode: '3' },
+    controlIsolation: {
+      legacyPm2HomeId: zero, managedPm2HomeId: zero, legacyDaemonId: 'unknown-daemon', managedDaemonId: 'unknown-daemon',
+      legacyNameId: 'unknown-name', managedNameId: 'unknown-name', legacyReleasePathsId: zero, managedReleasePathsId: zero,
+      legacyLogPathsId: zero, managedLogPathsId: zero,
+    },
+    healthContract: { managedHealthUrl: MANAGED_HEALTH_URL, legacyHealthProbeCountByReleaseTools: 0 },
+    nginx: {
+      binaryVersion: 'nginx/unknown', invalidCandidateTestExitCode: 0, invalidCandidateReloadAttempted: false,
+      observedTargetsAfterInvalidCandidate: ['legacy'], targetAfterInvalidCandidate: 'legacy', validCandidateTestExitCode: 1,
+      observedTargetsAfterValidReload: ['legacy'], targetAfterReload: 'managed',
+    },
+    releaseChain: {
+      genesisStatus: 'PARALLEL_SERVING_R1', activatedReleaseId: 'unknown-r2',
+      failedReleaseError: 'RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK', currentAfterRollback: 'unknown-r1',
+      rollbackTarget: 'managed-previous-only', legacyFallbackAttempted: false,
+    },
+    resourceIsolation: {
+      cgroupVersion: 'v2', engine: 'systemd', managedControlGroupId: zero, managedDaemonControlGroupId: zero,
+      managedAppControlGroupId: zero, effectiveMemoryMaxBytes: 1, effectiveCpuQuotaPerSecUSec: 1,
+      effectiveTasksMax: 1, effectiveLimitNOFILE: 1, nrThrottledBefore: 0, nrThrottledAfter: 0,
+      legacyProbeFailuresUnderLoad: 1,
+    },
+    dataSafety: Object.fromEntries(DATA_SAFETY_KEYS.map((key) => [key, false])),
+  }
 }
 
 export function buildEvidence(input) {

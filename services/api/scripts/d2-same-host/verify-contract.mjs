@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
+import { lstatSync, readFileSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import {
   buildEvidence,
+  createFailureMeasurements,
   renderNginxConfig,
   transitionCutover,
   validateEvidence,
@@ -71,9 +74,9 @@ function measurements() {
       managedControlGroupId: SHA_A,
       managedDaemonControlGroupId: SHA_A,
       managedAppControlGroupId: SHA_A,
-      effectiveMemoryMaxBytes: 67_108_864,
+      effectiveMemoryMaxBytes: 268_435_456,
       effectiveCpuQuotaPerSecUSec: 250_000,
-      effectiveTasksMax: 16,
+      effectiveTasksMax: 64,
       effectiveLimitNOFILE: 256,
       nrThrottledBefore: 10,
       nrThrottledAfter: 11,
@@ -110,12 +113,20 @@ function verifyNginxRenderer() {
   assert.equal((managed.match(/proxy_pass/g) ?? []).length, 1)
   assert.equal(/weight=|backup;|split_clients|upstream\s+\w+\s*\{[^}]*server[^}]*server/s.test(managed), false)
 
+  const unicodePath = renderNginxConfig({
+    ...common,
+    target: 'managed',
+    pidPath: '/tmp/求职终端/d2 prime/nginx.pid',
+  })
+  assert.match(unicodePath, /pid "\/tmp\/求职终端\/d2 prime\/nginx\.pid";/)
+
   for (const target of ['', 'mixed', '127.0.0.1:3011']) {
     expectContractFailure(() => renderNginxConfig({ ...common, target }))
   }
   expectContractFailure(() => renderNginxConfig({ ...common, target: 'legacy', listenPort: 80 }))
   expectContractFailure(() => renderNginxConfig({ ...common, target: 'legacy', pidPath: 'relative.pid' }))
   expectContractFailure(() => renderNginxConfig({ ...common, target: 'legacy', errorLogPath: '/tmp/x\nuser root;' }))
+  expectContractFailure(() => renderNginxConfig({ ...common, target: 'legacy', errorLogPath: '/tmp/x"; user root;' }))
   console.log('  PASS Nginx renderer emits one loopback target and rejects mixed/unsafe inputs')
 }
 
@@ -162,6 +173,9 @@ function verifyEvidenceContract() {
   assert.equal(noGo.verdict, 'D2_PRIME_NO_GO')
   assert.equal(noGo.topology.sameNetworkNamespace, false)
   assert.equal(validateEvidence(noGo).verdict, 'D2_PRIME_NO_GO')
+  const failureEvidence = buildEvidence(createFailureMeasurements('2026-07-30T08:01:00.000Z'))
+  assert.equal(failureEvidence.verdict, 'D2_PRIME_NO_GO')
+  assert.equal(validateEvidence(failureEvidence).verdict, 'D2_PRIME_NO_GO')
 
   expectEvidenceMutationFailure(evidence, (value) => { value.topology.managedEndpoint = '127.0.0.1:3010' })
   expectEvidenceMutationFailure(evidence, (value) => { value.topology.managedNetNamespaceInode = '4026531999' })
@@ -214,12 +228,40 @@ function verifyEvidenceContract() {
   console.log('  PASS evidence schema derives verdict from raw measurements and rejects spoofing')
 }
 
-function main() {
+function verifyEvidenceFile(args) {
+  if (args.length === 0) return
+  if (args.length !== 2 || args[0] !== '--evidence' || !isAbsolute(args[1])) {
+    throw new Error('D2_PRIME_EVIDENCE_ARGUMENT_INVALID')
+  }
+  const evidencePath = args[1]
+  const stat = lstatSync(evidencePath)
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== process.getuid() || stat.size > 256 * 1024) {
+    throw new Error('D2_PRIME_EVIDENCE_FILE_INVALID')
+  }
+  const evidence = validateEvidence(JSON.parse(readFileSync(evidencePath, 'utf8')))
+  console.log(`evidenceVerdict=${evidence.verdict}`)
+  console.log(`productionF1=${evidence.productionF1}`)
+  if (evidence.verdict !== 'D2_PRIME_PASS') {
+    throw new Error('D2_PRIME_EVIDENCE_NO_GO')
+  }
+  console.log('D2_PRIME_EVIDENCE_PASS')
+}
+
+function main(args = process.argv.slice(2)) {
   console.log('=== D2 prime offline contract ===')
   verifyNginxRenderer()
   verifyCutoverStateMachine()
   verifyEvidenceContract()
   console.log('D2_PRIME_CONTRACT_ALL_PASS')
+  verifyEvidenceFile(args)
 }
 
-main()
+try {
+  main()
+} catch (error) {
+  const code = error instanceof Error && /^D2_PRIME_[A-Z0-9_]+$/.test(error.message)
+    ? error.message
+    : 'D2_PRIME_EVIDENCE_REJECTED'
+  console.error(code)
+  process.exitCode = 2
+}
