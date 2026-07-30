@@ -223,7 +223,7 @@ function createActivationFixture(): ActivationFixture {
   const previous = createFixture({ workspace, releaseName: 'previous', sourceArchiveName: 'previous.tar.gz' })
   const candidate = createFixture({ workspace, releaseName: 'candidate', sourceArchiveName: 'candidate.tar.gz' })
   const currentLink = join(workspace, 'current')
-  const healthUrl = LEGACY_HEALTH_URL
+  const healthUrl = MANAGED_HEALTH_URL
   const launcherCwd = join(workspace, 'launcher')
   const launcherPath = join(launcherCwd, 'release-current-launcher.js')
   writeFixtureFile(launcherPath, 'console.log("fixture launcher")\n')
@@ -392,7 +392,7 @@ async function verifyActivationRuntimeEnvironmentContract(): Promise<void> {
 async function verifyActivationCliRejectsLegacyArgumentCount(): Promise<void> {
   const output = { write: () => undefined }
   await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID', () =>
-    runReleaseActivationCli(['--candidate-root', 'relative', '--current-link', '/current', '--artifact-root', '/artifacts', '--pm2-name', 'fixture-api', '--health-url', 'http://127.0.0.1:3010/api/v1/health', '--launcher-cwd', '/launcher', '--launcher-path', '/launcher/release-current-launcher.js', '--launcher-sha256', '0'.repeat(64)], output),
+    runReleaseActivationCli(['--candidate-root', 'relative', '--current-link', '/current', '--artifact-root', '/artifacts', '--pm2-name', 'fixture-api', '--health-url', MANAGED_HEALTH_URL, '--launcher-cwd', '/launcher', '--launcher-path', '/launcher/release-current-launcher.js', '--launcher-sha256', '0'.repeat(64)], output),
   )
   console.log('  PASS activation CLI rejects the legacy 16-argument contract')
 }

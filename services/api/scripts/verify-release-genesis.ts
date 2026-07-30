@@ -36,7 +36,7 @@ const R2_RELEASE_ID = 'release-20260716-genesis-r2'
 const PM2_NAME = 'fixture-genesis-api'
 const MANAGED_HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
 const LEGACY_HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
-const HEALTH_URL = LEGACY_HEALTH_URL
+const HEALTH_URL = MANAGED_HEALTH_URL
 const REJECTED_HEALTH_URLS = [
   LEGACY_HEALTH_URL, 'http://127.0.0.1:3012/api/v1/health',
   'http://localhost:3011/api/v1/health', 'http://0.0.0.0:3011/api/v1/health',
