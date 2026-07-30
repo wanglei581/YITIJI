@@ -18,8 +18,9 @@ import {
 import { TerminalBindCodeDialog } from './TerminalBindCodeDialog'
 import { CreatePlannedTerminalDialog } from './CreatePlannedTerminalDialog'
 import { TerminalLifecycleActions } from './TerminalLifecycleActions'
+import { TerminalNetworkDiagnostics } from './TerminalNetworkDiagnostics'
 
-const TABLE_COLS = 13
+const TABLE_COLS = 14
 const TERMINALS_REFRESH_KEY = 'admin:terminals'
 
 // ─── 打印机状态映射(契约 C1 printerStatus 枚举)──────────────────────────────
@@ -395,7 +396,7 @@ export default function TerminalsPage() {
           <table className="w-full border-collapse text-[13px]">
             <thead>
               <tr>
-                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
+                {['终端编号', '设备档案', 'MAC', '所属机构', '启停', '生命周期', '运行状态', '链路诊断', '打印机状态', '最近心跳', 'Agent 版本', 'IP 地址', '磁盘可用', '注册时间'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-3 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -659,6 +660,13 @@ export default function TerminalsPage() {
                           )}
                         </div>
                       </td>
+                      <td className="px-4 py-3">
+                        <TerminalNetworkDiagnostics
+                          online={t.online}
+                          wiredNetworkStatus={t.wiredNetworkStatus}
+                          printerNetworkStatus={t.printerNetworkStatus}
+                        />
+                      </td>
                       <td className="px-4 py-3"><StatusBadge dot status={printerView.badge} label={printerView.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">{relativeTime(t.lastHeartbeatAt ?? t.lastSeenAt)}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-500">{t.agentVersion ?? '—'}</td>
@@ -676,7 +684,7 @@ export default function TerminalsPage() {
       </Card>
 
       <p className="mt-3 text-xs text-neutral-500">
-        终端在线状态、打印机状态、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报
+        终端在线状态、链路诊断、打印机状态、版本、IP、磁盘均来自 Windows Terminal Agent 的心跳上报；链路诊断不展示 WiFi 名称、密码、网关或打印机地址
         {API_MODE !== 'http' && '（当前为 mock 演示数据，归属变更不写数据库）'}
       </p>
       <p className="mt-1 text-xs text-neutral-500">

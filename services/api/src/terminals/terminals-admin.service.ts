@@ -58,6 +58,8 @@ export interface AdminTerminalView {
   agentStatus: string | null
   localTaskDatabaseAvailable: boolean | null
   printerStatus: string | null
+  wiredNetworkStatus: string | null
+  printerNetworkStatus: string | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
@@ -253,6 +255,8 @@ export class TerminalAdminService {
           select: {
             status: true,
             printerStatus: true,
+            wiredNetworkStatus: true,
+            printerNetworkStatus: true,
             localTaskDatabaseAvailable: true,
             agentVersion: true,
             ipAddress: true,
@@ -287,6 +291,8 @@ export class TerminalAdminService {
         agentStatus: hb?.status ?? null,
         localTaskDatabaseAvailable: hb?.localTaskDatabaseAvailable ?? null,
         printerStatus: hb?.printerStatus ?? null,
+        wiredNetworkStatus: hb?.wiredNetworkStatus ?? null,
+        printerNetworkStatus: hb?.printerNetworkStatus ?? null,
         agentVersion: hb?.agentVersion ?? null,
         ipAddress: hb?.ipAddress ?? null,
         diskFreeGb: hb?.diskFreeGb ?? null,

@@ -160,6 +160,7 @@ jobs:
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
+          pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
 
@@ -221,6 +222,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
           pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:admin-device-fleet-overview-ui
+          pnpm --filter @ai-job-print/admin verify:admin-terminal-network-diagnostics-ui
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
@@ -250,6 +252,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config

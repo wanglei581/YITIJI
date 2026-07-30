@@ -26,6 +26,7 @@ import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './a
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { getPrinterStatus, getDiskFreeGB } from './wmi'
+import { collectNetworkDiagnostics } from './network-diagnostics'
 import { log, warn, err } from '../logger'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -97,9 +98,10 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
-  const [printerStatus, diskFreeGB] = await Promise.all([
+  const [printerStatus, diskFreeGB, networkDiagnostics] = await Promise.all([
     getPrinterStatus(config.printerName),
     getDiskFreeGB(),
+    collectNetworkDiagnostics(config.printerName),
   ])
 
   const payload: HeartbeatPayload = {
@@ -111,6 +113,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     macAddress: getMacAddress(),
     reportedAt: new Date().toISOString(),
     localTaskDatabaseAvailable,
+    ...networkDiagnostics,
   }
 
   try {
