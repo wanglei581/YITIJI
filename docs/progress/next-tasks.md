@@ -16,7 +16,7 @@
 - [x] **P0-2C 单一负责人治理模式真实化（本地候选，未部署）**：当前一人公司使用 `single-owner`，不再要求或虚构机构/运维/安全三名员工；未来客户现场仍可切换 `institutional`。角色可以合并，但 B1–B9、部署/运行账户分离及 D3 / 锁处置 / D4 / D5 / D6 五个授权闸门不合并；AI 技术核对不是审批，普通聊天回复不是生产授权。下一步由业主负责人先在仓库外建立一条仅限 `D3_READONLY_PRECHECK` 的变更记录，固定 managed 输入引用、负责人、候选、证据摘要和 RFC3339 窗口，再对该窗口单独明确授权；此前 production F1 保持 **NO-GO**。
 - [ ] **P0-2～P0-6 上线门禁**：P0-1 与 P0-1B 已合入主干；冻结单一软件候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
 - [x] **F1 D1′ + D2′ offline contract / 候选演练器**：D1′ 精确 managed `3011`、fixtures、旧 D2 兼容、offline evidence contract、CI 与同机双端口 SSOT 已按 RED→GREEN 收口；本地 verifier/typecheck/lint/build 通过。macOS full drill 按设计 NO-GO；候选代码与文档不等于 D2′ PASS，也未部署。
-- [ ] **F1 下一步只完成 D2′ 合格 Linux full drill**：在具备 cgroup v2、user systemd delegation + linger、真实 PM2/Nginx 且不含生产凭据的非生产 Linux，按 `docs/device/f1-d2-same-host-dual-port-runbook.md` 生成 fresh evidence，并用 `verify-contract.mjs --evidence` 独立复核。只有 `D2_PRIME_PASS` + `D2_PRIME_EVIDENCE_PASS` 才关闭 D2′；否则继续 NO-GO。不得使用当前 production 服务器补做演练，不得进入 D3–D6，也不需要新增云主机。
+- [ ] **F1 下一步只完成 D2′ 合格 Linux full drill**：现有 Colima 已完成 PREP-only：Ubuntu 24.04.4 ARM64、systemd/linger/cgroup v2、Node `v22.23.1`、pnpm `11.2.2`、PM2 `6.0.13`、真实 Nginx 与 guest 本地 `313d358d` fresh build/offline contract 均已验证；尚未执行 full drill 或生成 fresh evidence。下一次须单独授权后按 `docs/device/f1-d2-same-host-dual-port-runbook.md` 在该非生产 Linux 生成 fresh evidence，并用 `verify-contract.mjs --evidence` 独立复核。只有 `D2_PRIME_PASS` + `D2_PRIME_EVIDENCE_PASS` 才关闭 D2′；否则继续 NO-GO。不得使用当前 production 服务器补做演练，不得进入 D3–D6，也不需要新增云主机。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 
