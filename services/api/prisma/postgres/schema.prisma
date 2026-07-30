@@ -190,6 +190,8 @@ model TerminalHeartbeat {
   terminal                   Terminal @relation(fields: [terminalId], references: [id])
   status                     String?
   printerStatus              String?
+  wiredNetworkStatus         String?
+  printerNetworkStatus       String?
   localTaskDatabaseAvailable Boolean?
   agentVersion               String?
   ipAddress                  String?

@@ -1,5 +1,8 @@
-import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsBoolean, IsIn, IsNumber, IsOptional, IsString } from 'class-validator'
 import { Type } from 'class-transformer'
+
+const WIRED_NETWORK_STATUSES = ['connected', 'disconnected', 'unknown'] as const
+const PRINTER_NETWORK_STATUSES = ['reachable', 'unreachable', 'not_network_printer', 'unknown'] as const
 
 /**
  * HeartbeatDto — Phase 8.1B
@@ -57,4 +60,12 @@ export class HeartbeatDto {
   @IsBoolean()
   @IsOptional()
   localTaskDatabaseAvailable?: boolean
+
+  @IsIn(WIRED_NETWORK_STATUSES)
+  @IsOptional()
+  wiredNetworkStatus?: (typeof WIRED_NETWORK_STATUSES)[number]
+
+  @IsIn(PRINTER_NETWORK_STATUSES)
+  @IsOptional()
+  printerNetworkStatus?: (typeof PRINTER_NETWORK_STATUSES)[number]
 }

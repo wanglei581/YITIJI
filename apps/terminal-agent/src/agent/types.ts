@@ -134,6 +134,10 @@ export interface HeartbeatPayload {
   macAddress?: string
   reportedAt: string
   localTaskDatabaseAvailable?: boolean
+  /** Enum-only local link diagnosis; never includes SSID, IP, gateway, or credentials. */
+  wiredNetworkStatus?: 'connected' | 'disconnected' | 'unknown'
+  /** TCP reachability of a configured Windows network-printer port, when discoverable. */
+  printerNetworkStatus?: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown'
 }
 
 export interface HeartbeatResponse {

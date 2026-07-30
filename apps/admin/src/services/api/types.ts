@@ -121,6 +121,8 @@ export interface AdminTerminalRecord {
   agentStatus: 'online' | 'offline' | 'error' | 'agent_degraded' | string | null
   localTaskDatabaseAvailable: boolean | null
   printerStatus: TerminalPrinterStatus | string | null
+  wiredNetworkStatus: 'connected' | 'disconnected' | 'unknown' | string | null
+  printerNetworkStatus: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown' | string | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
