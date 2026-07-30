@@ -1,0 +1,12 @@
+{
+  "id": "f1-same-host-dual-port-d1-prime-plan",
+  "title": "F1 同机双端口 D1′/D2′ 实施计划",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "等待用户确认后按计划执行 D1′，再在合格非生产 Linux 环境执行 D2′",
+  "createdAt": "2026-07-30T06:59:03Z",
+  "branch": "codex/f1-same-host-dual-port-design-20260730"
+}
