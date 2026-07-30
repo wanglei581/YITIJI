@@ -1,8 +1,13 @@
 # F1 Genesis D2 — Docker 隔离演练 Runbook
 
 > 最后更新：2026-07-25  
-> 范围：真实 PM2 + loopback `:3010` health 的 **隔离平面** rollback 证明。  
+> 范围：真实 PM2 + loopback `:3011` health 的 **隔离平面** rollback 证明。
 > **不**授权生产 Genesis、切流、改生产 PM2 / Nginx / 负载层。
+
+> **与 D2′ 的关系：** 本 runbook 仍是 provenance、真实 PM2 与 managed previous rollback 的基线，
+> 但隔离容器内只有 managed `3011`，没有同一 network namespace 的 legacy `3010` + managed `3011`、
+> 双 PM2 daemon、真实 Nginx 原子切换或 managed systemd/cgroup 证据，因此不能形成 D2′ PASS，也不能
+> 替代 [同机双端口 D2′ runbook](./f1-d2-same-host-dual-port-runbook.md)。
 
 ## 边界
 

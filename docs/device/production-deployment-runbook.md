@@ -245,14 +245,22 @@ D6 稳态发布中使用 `release:activate`。上一层通过不自动授权下�
 [`f1-d3-managed-topology-approval-package.md`](./f1-d3-managed-topology-approval-package.md)。后者只引用
 前者的 B1–B9 状态，不建立第二套技术输入。
 
-每层审批必须先确认部署账户可写、API 运行账户只读，并固定以下非秘密标识：
-`<MANAGED_HOST_ID>`、`<MANAGED_PM2_NAME>`、`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、
+每层审批必须先确认部署账户可写、legacy 与 managed API 运行账户相互独立且只读，并固定以下非秘密标识：
+`<MANAGED_HOST_ROLE_ID>`、`<MANAGED_PM2_HOME>`、`<MANAGED_PM2_DAEMON_ID>`、
+`<MANAGED_PM2_NAME>`、`<MANAGED_LOG_ROOT>`、`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、
 `<MANAGED_CURRENT_LINK>`、`<DEPLOYMENT_CONTROL_ROOT>`、`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`、
 `<RECORDED_LAUNCHER_SHA256>`、`<RUNTIME_ENV_CONTRACT_PATH>`、
 `<RECORDED_RUNTIME_ENV_CONTRACT_SHA256>`，以及代码固定的
-`http://127.0.0.1:3010/api/v1/health`。managed 实例必须独占该 loopback 端口；禁止在 legacy
-主机私增端口或用 legacy PM2 名称代替。release 根不得含 `.env`、日志、storage、uploads 或运行时
-缓存；这些目录必须位于 release 根外。
+`http://127.0.0.1:3011/api/v1/health`。`<MANAGED_HOST_ROLE_ID>` 表示现有同一台 production host
+上的 managed 角色，不表示新增云主机；legacy 固定 loopback `3010`，managed 固定 loopback `3011`，
+两者必须同时存在且都不得对外网监听。managed 必须使用独立 Linux account、`PM2_HOME`、daemon、
+应用名、dump、日志、current、artifact、control root、launcher 与 runtime contract；不得复用 legacy
+控制面。release 根不得含 `.env`、日志、storage、uploads 或运行时缓存；这些目录必须位于 release 根外。
+
+D5 确认前，批准的 Nginx 配置必须保持 `100% legacy / managed 0%`，并在 D3 固定该 legacy 配置的
+SHA-256，作为尚未确认切流时唯一允许的恢复目标。D5 确认后不得把 legacy 当 fallback；后续 activation
+失败只能回到再次验证通过的 managed previous。shared PostgreSQL/Redis/对象存储的副作用预算、连接
+预算，以及同机 capacity/cgroup 方案都必须先在 B8 只读关闭，D1′/D2′ 不替代生产容量批准。
 
 runtime-env contract 只列 PM2 编排命令允许继承的最小环境变量**名称与用途**，不得包含值；未经
 批准的部署账户、CI、调试或管理凭据不得进入 PM2 ecosystem。该 contract 收窄的是激活器传给
@@ -298,7 +306,7 @@ pnpm --filter @ai-job-print/api release:activate -- \
   --current-link <MANAGED_CURRENT_LINK> \
   --artifact-root <ARTIFACT_ROOT> \
   --pm2-name <MANAGED_PM2_NAME> \
-  --health-url http://127.0.0.1:3010/api/v1/health \
+  --health-url http://127.0.0.1:3011/api/v1/health \
   --launcher-cwd <LAUNCHER_CWD> \
   --launcher-path <LAUNCHER_PATH> \
   --launcher-sha256 <RECORDED_LAUNCHER_SHA256> \
