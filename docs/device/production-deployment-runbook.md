@@ -1,6 +1,6 @@
 # 生产服务器部署 Runbook（可复制粘贴执行版）
 
-> 最后更新：2026-06-13（Claude，上线前 P0 准备物，未真机执行）
+> 最后更新：2026-07-30（F1 activation 参数契约对齐，未生产执行）
 > 性质：本文是「**怎么做**」的执行手册；「**验收什么 / 通过标准**」见
 > [production-deployment-and-windows-host-checklist.md](./production-deployment-and-windows-host-checklist.md)。
 > 两份配套使用：先按本 runbook 执行，再回到 checklist §三 / §四逐项打勾。
@@ -237,8 +237,11 @@ manifest/hash/archive、替换 PM2、reload、重启或修改 ecosystem。当前
 
 仅在用户明确授权的未来部署窗口执行。先确认部署账户可写、API 运行账户只读，且以下绝对路径
 已经在审批单中固定：`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、`<CURRENT_LINK>`、
-`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`。release 根不得含 `.env`、日志、storage、uploads 或
+`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`、`<RUNTIME_ENV_CONTRACT_PATH>`。审批输入与三方签批要求见
+[f1-d3-managed-topology-approval-package.md](./f1-d3-managed-topology-approval-package.md)。空模板、未签批表单、
+示例值或 legacy 实例信息都不是 D3 通过证据。release 根不得含 `.env`、日志、storage、uploads 或
 运行时缓存；这些目录必须位于 release 根外。
+本 runbook 的 `<CURRENT_LINK>` 与审批包的 `<MANAGED_CURRENT_LINK>` 是同一个已批准的 managed current 路径，不是两条路径。
 
 在首次启用审批中，必须逐项列出 PM2 运行账户可继承的**最小环境变量名称**与用途；未经批准的
 部署账户、CI、调试或管理凭据不得进入 PM2 ecosystem。launcher/guard 必须继承运行账户的既有
@@ -281,12 +284,20 @@ pnpm --filter @ai-job-print/api release:activate -- \
   --candidate-root <CANDIDATE_RELEASE_ROOT> \
   --current-link <CURRENT_LINK> \
   --artifact-root <ARTIFACT_ROOT> \
-  --pm2-name api \
+  --pm2-name <MANAGED_PM2_NAME> \
   --health-url http://127.0.0.1:3010/api/v1/health \
   --launcher-cwd <LAUNCHER_CWD> \
   --launcher-path <LAUNCHER_PATH> \
-  --launcher-sha256 <RECORDED_LAUNCHER_SHA256>
+  --launcher-sha256 <RECORDED_LAUNCHER_SHA256> \
+  --runtime-env-contract-path <RUNTIME_ENV_CONTRACT_PATH> \
+  --runtime-env-contract-sha256 <RUNTIME_ENV_CONTRACT_SHA256>
 ```
+
+上例是 activation 的 **10 个 flag / 20 个 CLI 参数**契约。`<MANAGED_PM2_NAME>` 必须来自具名审批且
+不得复用 legacy PM2 名称。Genesis 使用 `--runtime-env-contract`，activation 使用
+`--runtime-env-contract-path`，两套模板不得混用。runtime-env contract 只列变量名与用途，不得
+包含值；它收窄的是 activation 调用的 PM2 reload/describe 编排子进程环境，不代表 API
+主进程环境已被完全收窄。
 
 Worker 若为独立进程，仍按其实际入口单独守护；它不得复用 API launcher。每次受控切换后再执行
 `pm2 save`，并立即把 `<PM2_HOME>/dump.pm2` 收紧为 `0600` 后复核；当前 root 运行账户的实际路径为
