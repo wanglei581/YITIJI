@@ -1,0 +1,12 @@
+{
+  "id": "p0-2-f1-d3-precheck-20260730",
+  "title": "P0-2 精确候选冻结与 F1 D3 生产只读预检",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "补齐具名 managed 拓扑与治理输入后重新申请 D3",
+  "createdAt": "2026-07-30T03:00:00Z",
+  "branch": "codex/p0-2-f1-d3-precheck-20260730"
+}
