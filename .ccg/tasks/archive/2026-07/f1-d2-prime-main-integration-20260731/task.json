@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-main-integration-20260731",
+  "title": "在最新 origin/main 上形成 D2 Prime 加固与 D3 门禁的本地集成候选",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "deployment-governance",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并生成仅本地提交；不推送、不部署",
+  "createdAt": "2026-07-31T00:00:00+08:00",
+  "branch": "codex/f1-d2-prime-main-integration-20260731"
+}
