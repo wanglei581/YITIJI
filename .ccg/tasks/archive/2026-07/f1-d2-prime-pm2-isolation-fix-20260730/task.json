@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-pm2-isolation-fix-20260730",
+  "title": "修复 D2′ PM2 Unix socket 路径、超时与异常清理",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并保留本地候选，等待用户选择整合方式",
+  "createdAt": "2026-07-30T12:55:00Z",
+  "branch": "codex/f1-d2-prime-pm2-isolation-fix-20260730"
+}

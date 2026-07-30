@@ -14,6 +14,11 @@ import { createD2ReleaseFixture } from '../d2-release-fixture.mjs'
 import {
   buildEvidence, createFailureMeasurements, renderNginxConfig, transitionCutover, validateEvidence,
 } from './contract.mjs'
+import {
+  assertPm2SocketPathBudget,
+  createSpawnAttemptTracker,
+  derivePm2ControlPaths,
+} from './control-plane.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -215,6 +220,7 @@ async function main() {
   const legacyHome = ownedDirectory(requiredEnvironment('D2_LEGACY_HOME'))
   const legacyPm2Home = ownedDirectory(requiredEnvironment('D2_LEGACY_PM2_HOME'))
   const managedPm2Home = ownedDirectory(requiredEnvironment('D2_MANAGED_PM2_HOME'))
+  const controlRoot = ownedDirectory(requiredEnvironment('D2_CONTROL_ROOT'))
   const nonce = requiredEnvironment('D2_NONCE')
   const unitName = requiredEnvironment('D2_UNIT_NAME')
   const readyMarker = requiredEnvironment('D2_READY_MARKER')
@@ -228,6 +234,13 @@ async function main() {
   const managedHome = ownedDirectory(requiredEnvironment('HOME'))
   const nginxPort = Number(requiredEnvironment('D2_NGINX_PORT'))
   if (!NONCE.test(nonce) || !SAFE_UNIT.test(unitName) || !SHA256.test(managedPm2HomeId)) fail('ENV_INVALID')
+  const controlPaths = derivePm2ControlPaths(join('/run/user', String(process.getuid())), nonce)
+  if (
+    controlRoot !== controlPaths.root || legacyPm2Home !== controlPaths.legacy ||
+    managedPm2Home !== controlPaths.managed
+  ) fail('PATH_INVALID')
+  assertPm2SocketPathBudget(legacyPm2Home)
+  assertPm2SocketPathBudget(managedPm2Home)
   if (readyMarker !== join(runDir, 'managed-ready.json') || stopMarker !== join(runDir, 'managed-stop')) fail('MARKER_PATH_INVALID')
   const evidenceParent = lstatSync(dirname(evidenceOut))
   if (
@@ -254,15 +267,16 @@ async function main() {
   writeFileSync(legacyMain, legacySource(), { mode: 0o600 })
 
   let nginxStarted = false
-  let legacyDaemonStarted = false
+  const legacyDaemon = createSpawnAttemptTracker()
   let managedDaemonReady = false
   let evidenceWritten = false
   let measurements = createFailureMeasurements(new Date().toISOString())
   try {
     const managedDaemonPid = await waitForManagedReady(readyMarker, nonce, managedPm2HomeId)
     managedDaemonReady = true
-    run(pm2Bin, ['ping'], { environment: legacyEnvironment })
-    legacyDaemonStarted = true
+    legacyDaemon.recordAttempt()
+    run(pm2Bin, ['ping'], { environment: legacyEnvironment, timeout: 5_000 })
+    legacyDaemon.markStarted()
     run(pm2Bin, ['start', legacyMain, '--name', legacyName, '--cwd', legacyRoot,
       '--output', join(legacyLogs, 'out.log'), '--error', join(legacyLogs, 'error.log')], { environment: legacyEnvironment })
     const legacyDaemonPid = readPidFile(join(legacyPm2Home, 'pm2.pid'))
@@ -445,11 +459,17 @@ async function main() {
     if (nginxStarted) {
       try { run(nginxBin, ['-s', 'quit', '-p', `${nginxRoot}/`, '-c', nginxActive], { allowFailure: true }) } catch { /* wrapper removes only this nonce workspace */ }
     }
-    if (legacyDaemonStarted) {
-      try { run(pm2Bin, ['delete', legacyName], { environment: legacyEnvironment, allowFailure: true }) } catch { /* continue to isolated daemon kill */ }
-      try { run(pm2Bin, ['kill'], { environment: legacyEnvironment, allowFailure: true }) } catch { /* wrapper removes only this nonce workspace */ }
+    if (legacyDaemon.shouldKill()) {
+      if (legacyDaemon.hasStarted()) {
+        try { run(pm2Bin, ['delete', legacyName], { environment: legacyEnvironment, allowFailure: true }) } catch { /* continue to isolated daemon kill */ }
+      }
+      try { run(pm2Bin, ['kill'], { environment: legacyEnvironment, allowFailure: true, timeout: 8_000 }) } catch { /* wrapper keeps the exact control root on cleanup failure */ }
     }
-    if (!existsSync(stopMarker)) writeExclusive(stopMarker, '')
+    try {
+      if (!existsSync(stopMarker)) writeExclusive(stopMarker, '')
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error
+    }
   }
   process.stdout.write('D2_PRIME_PASS\nproductionF1=NO-GO\n')
 }
