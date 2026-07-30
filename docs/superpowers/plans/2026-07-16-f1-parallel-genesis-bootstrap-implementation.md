@@ -1,5 +1,11 @@
 # F1 平行 Genesis Bootstrap 本地实现计划
 
+> **Superseded topology note（2026-07-30）：** 本文保留为 D1/旧 D2 历史实现记录；其中 managed
+> 独占 `3010`、独立主机/隔离实例和禁止同机第二端口的拓扑约束，已由
+> [同机双端口设计](../specs/2026-07-30-f1-same-host-dual-port-managed-topology-design.md) 与
+> [D1′/D2′ 实施计划](./2026-07-30-f1-same-host-dual-port-d1-prime-implementation.md) 取代。新口径为同一
+> production host 上 legacy `3010` + managed `3011`，但仍需 D3–D6 独立授权；下文不逐段改写。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在不触碰历史 F1、生产主机、PM2、负载层或业务流量的前提下，新增一次性、不可重入的平行 Genesis 原语和离线 RED→GREEN 门禁：它只建立零流量 managed `r1`；之后复用既有 `activateRelease` 验证 `r1 → r2` 的 managed previous/rollback 语义。

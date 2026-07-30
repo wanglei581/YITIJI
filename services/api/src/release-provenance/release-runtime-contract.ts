@@ -3,7 +3,7 @@ import { closeSync, constants as fsConstants, fstatSync, lstatSync, openSync, re
 import { isAbsolute, join } from 'node:path'
 import { ReleaseProvenanceError } from './release-provenance'
 
-const LOCAL_HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
+const LOCAL_HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
 const SAFE_PM2_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const SHA256 = /^[0-9a-f]{64}$/
 const ENVIRONMENT_VARIABLE_NAME = /^[A-Z][A-Z0-9_]{0,127}$/

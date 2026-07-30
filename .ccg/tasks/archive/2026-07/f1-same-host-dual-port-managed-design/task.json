@@ -1,0 +1,12 @@
+{
+  "id": "f1-same-host-dual-port-managed-design",
+  "title": "F1 同机双端口 managed 发布拓扑设计",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "用户审阅正式设计规格；确认后另立 D1′ 实施计划任务",
+  "createdAt": "2026-07-30T06:41:23Z",
+  "branch": "codex/f1-same-host-dual-port-design-20260730"
+}

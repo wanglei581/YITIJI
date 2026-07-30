@@ -21,7 +21,7 @@ import {
 } from '../src/release-provenance/release-genesis'
 import { parseGenesisArgs, runReleaseGenesisCli } from '../src/release-provenance/release-genesis-cli'
 import { ReleaseProvenanceError } from '../src/release-provenance/release-provenance'
-import type { ApprovedRuntimeEnvironment, HealthProbe, Pm2ProcessSnapshot } from '../src/release-provenance/release-runtime-contract'
+import { assertLocalHealthUrl, type ApprovedRuntimeEnvironment, type HealthProbe, type Pm2ProcessSnapshot } from '../src/release-provenance/release-runtime-contract'
 import {
   createFixture,
   createManifest,
@@ -34,7 +34,18 @@ import {
 const R1_RELEASE_ID = 'release-20260716-genesis-r1'
 const R2_RELEASE_ID = 'release-20260716-genesis-r2'
 const PM2_NAME = 'fixture-genesis-api'
-const HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
+const MANAGED_HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
+const LEGACY_HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
+const HEALTH_URL = MANAGED_HEALTH_URL
+const REJECTED_HEALTH_URLS = [
+  LEGACY_HEALTH_URL, 'http://127.0.0.1:3012/api/v1/health',
+  'http://localhost:3011/api/v1/health', 'http://0.0.0.0:3011/api/v1/health',
+  'http://[::1]:3011/api/v1/health', 'http://api.local:3011/api/v1/health',
+  'https://127.0.0.1:3011/api/v1/health', 'http://127.0.0.1:3011/health',
+  'http://127.0.0.1:3011/api/v1/health/', 'http://user:pass@127.0.0.1:3011/api/v1/health',
+  'http://127.0.0.1:3011/api/v1/health?probe=1', 'http://127.0.0.1:3011/api/v1/health#probe',
+  'http://169.254.169.254/latest/meta-data/',
+] as const
 
 type TrafficTarget = 'legacy' | 'managed'
 
@@ -82,6 +93,19 @@ async function expectCodeAsync(expectedCode: string, action: () => Promise<unkno
     assert.ok(error instanceof ReleaseProvenanceError)
     assert.equal(error.code, expectedCode)
   }
+}
+
+function verifyManagedHealthUrlContract(): void {
+  assert.doesNotThrow(() => assertLocalHealthUrl(MANAGED_HEALTH_URL))
+  for (const value of REJECTED_HEALTH_URLS) {
+    assert.throws(
+      () => assertLocalHealthUrl(value),
+      (error: unknown) =>
+        error instanceof ReleaseProvenanceError &&
+        error.code === 'RELEASE_PROVENANCE_HEALTH_URL_INVALID',
+    )
+  }
+  console.log('  PASS managed health URL accepts only exact loopback port 3011')
 }
 
 function pm2Snapshot(
@@ -199,6 +223,37 @@ function genesisOptions(
     runtimeEnvContractSha256: fixture.runtimeEnvContractSha256,
     runner,
     healthProbe,
+  }
+}
+
+async function verifyLegacyHealthUrlFailsBeforeGenesisSideEffects(): Promise<void> {
+  const fixture = createGenesisFixture()
+  try {
+    fixture.healthUrl = LEGACY_HEALTH_URL
+    const runner = createFakeGenesisRunner(fixture)
+    let healthChecks = 0
+    const healthProbe: HealthProbe = async () => {
+      healthChecks += 1
+      return true
+    }
+
+    await expectCodeAsync('RELEASE_PROVENANCE_HEALTH_URL_INVALID', () =>
+      runReleaseGenesis(genesisOptions(fixture, runner, healthProbe)),
+    )
+
+    assert.equal(runner.inspections, 0)
+    assert.equal(runner.starts.length, 0)
+    assert.equal(runner.stops.length, 0)
+    assert.equal(healthChecks, 0)
+    assert.equal(existsSync(fixture.managedCurrentLink), false)
+    assert.equal(existsSync(join(fixture.controlRoot, 'GENESIS.lock')), false)
+    assert.equal(existsSync(join(fixture.controlRoot, 'GENESIS_INTENT.json')), false)
+    assert.equal(existsSync(join(fixture.controlRoot, 'GENESIS_SUCCESS.json')), false)
+    assert.equal(existsSync(join(fixture.controlRoot, 'GENESIS_FAILURE.json')), false)
+    assertLegacyUntouched(fixture)
+    console.log('  PASS legacy health URL fails before Genesis side effects')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
   }
 }
 
@@ -722,6 +777,8 @@ async function scenario9TrafficFake(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log('=== Release Genesis fixture ===')
+  verifyManagedHealthUrlContract()
+  await verifyLegacyHealthUrlFailsBeforeGenesisSideEffects()
   await scenario1TamperedProvenance()
   await scenario2PreexistingState()
   await scenario3PostStartMismatchCleanup()

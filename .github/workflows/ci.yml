@@ -128,6 +128,10 @@ jobs:
         # 仅使用临时目录、fake PM2、fake health、fake traffic controller；禁止连接网络、数据库、Redis、实例或真实 PM2。
         run: pnpm --filter @ai-job-print/api verify:release-genesis
 
+      - name: D2 prime offline contract fixture
+        # Pure renderer/state/evidence checks only; no PM2, Nginx, systemd, network, or production data plane.
+        run: pnpm --filter @ai-job-print/api verify:d2-same-host-contract
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation

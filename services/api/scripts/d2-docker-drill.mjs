@@ -12,31 +12,24 @@
  * outside the drill workspace basename markers.
  */
 import assert from 'node:assert/strict'
-import { createHash, randomBytes } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import {
-  copyFileSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
   rmSync,
-  symlinkSync,
-  writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { get } from 'node:http'
+import { createD2ReleaseFixture } from './d2-release-fixture.mjs'
 
 const require = createRequire(import.meta.url)
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
-const {
-  createReleaseManifest,
-  ReleaseProvenanceError,
-} = require(join(apiRoot, 'dist/release-provenance/release-provenance.js'))
+const { ReleaseProvenanceError } = require(join(apiRoot, 'dist/release-provenance/release-provenance.js'))
 const { runReleaseGenesis } = require(join(apiRoot, 'dist/release-provenance/release-genesis.js'))
 const { activateRelease } = require(join(apiRoot, 'dist/release-provenance/release-activation.js'))
 const { readCurrentRelease } = require(join(apiRoot, 'dist/release-provenance/release-runtime-contract.js'))
@@ -44,8 +37,7 @@ const { readCurrentRelease } = require(join(apiRoot, 'dist/release-provenance/re
 const R1_ID = `release-d2-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-r1`
 const R2_ID = `release-d2-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-r2`
 const PM2_NAME = 'd2-genesis-api'
-const HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
-const GIT_COMMIT = 'b'.repeat(40)
+const HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
 const CANARY_NAME = 'D2_ENV_CANARY'
 const CANARY_VALUE = `canary-${randomBytes(8).toString('hex')}`
 
@@ -56,15 +48,6 @@ const evidence = {
   pm2Name: PM2_NAME,
   healthUrl: HEALTH_URL,
   steps: [],
-}
-
-function sha256File(path) {
-  return createHash('sha256').update(readFileSync(path)).digest('hex')
-}
-
-function writeFile(path, content) {
-  mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, content)
 }
 
 function healthyMain() {
@@ -81,7 +64,7 @@ http.createServer((req,res)=>{
     return;
   }
   res.writeHead(404); res.end("not found");
-}).listen(3010,"127.0.0.1");
+}).listen(3011,"127.0.0.1");
 `
 }
 
@@ -94,59 +77,8 @@ http.createServer((req,res)=>{
     return;
   }
   res.writeHead(404); res.end("not found");
-}).listen(3010,"127.0.0.1");
+}).listen(3011,"127.0.0.1");
 `
-}
-
-function buildRelease(workspace, releaseName, releaseId, mainSource) {
-  const releaseRoot = join(workspace, releaseName)
-  const artifactRoot = join(workspace, 'artifacts')
-  const sourceArchivePath = join(workspace, `${releaseName}.tar.gz`)
-  for (const path of [
-    'services/api/dist/release-provenance',
-    'services/api/node_modules',
-    'node_modules/.pnpm',
-    'apps/kiosk/dist',
-    'apps/admin/dist',
-    'apps/partner/dist',
-  ]) {
-    mkdirSync(join(releaseRoot, path), { recursive: true })
-  }
-  writeFile(join(releaseRoot, 'services/api/dist/main.js'), mainSource)
-  copyFileSync(
-    join(apiRoot, 'dist/release-provenance/release-guard.js'),
-    join(releaseRoot, 'services/api/dist/release-provenance/release-guard.js'),
-  )
-  copyFileSync(
-    join(apiRoot, 'dist/release-provenance/release-provenance.js'),
-    join(releaseRoot, 'services/api/dist/release-provenance/release-provenance.js'),
-  )
-  writeFile(join(releaseRoot, 'apps/kiosk/dist/index.html'), '<main>kiosk</main>\n')
-  writeFile(join(releaseRoot, 'apps/admin/dist/index.html'), '<main>admin</main>\n')
-  writeFile(join(releaseRoot, 'apps/partner/dist/index.html'), '<main>partner</main>\n')
-  const pnpmPkg = join(releaseRoot, 'node_modules/.pnpm/fixture@1.0.0/node_modules/@fixture/pkg')
-  const linkPath = join(releaseRoot, 'services/api/node_modules/@fixture/pkg')
-  writeFile(join(pnpmPkg, 'index.js'), 'module.exports="fixture"\n')
-  mkdirSync(dirname(linkPath), { recursive: true })
-  symlinkSync(relative(dirname(linkPath), pnpmPkg), linkPath)
-  writeFileSync(sourceArchivePath, `${releaseName} source archive\n`)
-  createReleaseManifest({
-    releaseRoot,
-    artifactRoot,
-    releaseId,
-    gitCommit: GIT_COMMIT,
-    previousReleaseId: null,
-    sourceArchivePath,
-    createdAt: new Date().toISOString(),
-    toolchain: { node: process.version, pnpm: 'd2-drill' },
-  })
-  return {
-    releaseRoot: realpathSync(releaseRoot),
-    artifactRoot: realpathSync(artifactRoot),
-    releaseId,
-    mainSha256: sha256File(join(releaseRoot, 'services/api/dist/main.js')),
-    guardSha256: sha256File(join(releaseRoot, 'services/api/dist/release-provenance/release-guard.js')),
-  }
 }
 
 function httpGetJson(url) {
@@ -197,7 +129,7 @@ async function expectCode(expected, action) {
   }
 }
 
-/** Retrying probe for cold PM2 start only; still hits real loopback :3010 health. */
+/** Retrying probe for cold PM2 start only; still hits real loopback :3011 health. */
 function createRetryHealthProbe(attempts = 20, delayMs = 250) {
   return async (healthUrl) => {
     for (let i = 0; i < attempts; i += 1) {
@@ -225,32 +157,28 @@ async function main() {
   process.env[CANARY_NAME] = CANARY_VALUE
 
   const workspace = mkdtempSync(join(tmpdir(), 'f1-d2-'))
-  const controlRoot = join(workspace, 'deployment-control')
-  const managedCurrentLink = join(workspace, 'managed-current')
-  const launcherCwd = join(workspace, 'launcher')
-  mkdirSync(controlRoot, { recursive: true })
-  mkdirSync(launcherCwd, { recursive: true })
-
-  const launcherPath = join(launcherCwd, 'release-current-launcher.js')
-  copyFileSync(join(apiRoot, 'dist/release-provenance/release-current-launcher.js'), launcherPath)
-  copyFileSync(join(apiRoot, 'dist/release-provenance/release-provenance.js'), join(launcherCwd, 'release-provenance.js'))
-  const launcherSha256 = sha256File(launcherPath)
-
-  const contractPath = join(workspace, 'runtime-env-contract.json')
-  const contractBody = `${JSON.stringify({
-    schemaVersion: 1,
-    variables: [
+  const releaseFixture = createD2ReleaseFixture({
+    workspace,
+    runtimeEnvironmentVariables: [
       { name: 'PATH', purpose: 'Resolve Node.js and PM2 commands.' },
       { name: 'HOME', purpose: 'Stable PM2 home resolution for the drill daemon.' },
     ],
-  })}\n`
-  writeFileSync(contractPath, contractBody)
-  const contractSha256 = createHash('sha256').update(contractBody, 'utf8').digest('hex')
+  })
+  const {
+    buildRelease,
+    controlRoot,
+    launcherCwd,
+    launcherPath,
+    launcherSha256,
+    managedCurrentLink,
+    runtimeEnvContractPath: contractPath,
+    runtimeEnvContractSha256: contractSha256,
+  } = releaseFixture
   assert.ok(process.env.PATH)
   assert.ok(process.env.HOME)
 
-  const r1 = buildRelease(workspace, 'r1', R1_ID, healthyMain())
-  const r2 = buildRelease(workspace, 'r2', R2_ID, unhealthyMain())
+  const r1 = buildRelease({ releaseName: 'r1', releaseId: R1_ID, mainSource: healthyMain() })
+  const r2 = buildRelease({ releaseName: 'r2', releaseId: R2_ID, mainSource: unhealthyMain() })
   evidence.r1MainSha256 = r1.mainSha256
   evidence.r2MainSha256 = r2.mainSha256
   evidence.launcherSha256 = launcherSha256
@@ -296,8 +224,8 @@ async function main() {
     deploymentControlRoot: controlRoot,
     pm2Name: PM2_NAME,
     healthUrl: HEALTH_URL,
-    launcherCwd: realpathSync(launcherCwd),
-    launcherPath: realpathSync(launcherPath),
+    launcherCwd,
+    launcherPath,
     launcherSha256,
     runtimeEnvContractPath: contractPath,
     runtimeEnvContractSha256: contractSha256,
@@ -311,7 +239,7 @@ async function main() {
   assert.equal(health1.body?.success, true)
   assert.equal(health1.body?.data?.status, 'ok')
   assert.equal(health1.body?.data?.db, 'postgres')
-  const env1 = await httpGetJson('http://127.0.0.1:3010/__d2/env')
+  const env1 = await httpGetJson('http://127.0.0.1:3011/__d2/env')
   assert.equal(env1.body?.canary, null, 'CANARY must not enter managed process env')
   assert.equal(env1.body?.hasPath, true)
   evidence.steps.push({
@@ -331,8 +259,8 @@ async function main() {
       artifactRoot: r1.artifactRoot,
       pm2Name: PM2_NAME,
       healthUrl: HEALTH_URL,
-      launcherCwd: realpathSync(launcherCwd),
-      launcherPath: realpathSync(launcherPath),
+      launcherCwd,
+      launcherPath,
       launcherSha256,
       runtimeEnvContractPath: contractPath,
       runtimeEnvContractSha256: contractSha256,
@@ -345,7 +273,7 @@ async function main() {
   assert.equal(health2.statusCode, 200)
   assert.equal(health2.body?.data?.status, 'ok')
   assert.equal(health2.body?.data?.db, 'postgres')
-  const env2 = await httpGetJson('http://127.0.0.1:3010/__d2/env')
+  const env2 = await httpGetJson('http://127.0.0.1:3011/__d2/env')
   assert.equal(env2.body?.canary, null)
   evidence.steps.push({
     name: 'activate-r2-health-fail-rollback-r1',

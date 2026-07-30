@@ -100,10 +100,10 @@ OTP、环境变量值、连接串、Cookie、完整 PM2 dump、日志正文、�
 
 | 范围 | `single-owner` | `institutional` 主责 / 联合复核 |
 | --- | --- | --- |
-| B1–B4：主机、PM2、current、control root | 业主负责人 | 运维负责人 / 机构、安全负责人 |
+| B1–B4：同机角色/双端口、PM2、current、control root | 业主负责人 | 运维负责人 / 安全负责人联合复核，机构负责人确认资产范围 |
 | B5、B9：长期留存、权限、残留锁 SOP | 业主负责人 | 安全负责人 / 运维负责人 |
 | B6–B7：launcher 与 runtime contract | 业主负责人 | 运维负责人 / 安全负责人 |
-| B8：零流量证明 | 业主负责人 | 运维负责人 / D3 只读核验人 |
+| B8：零流量、pre-cutover Nginx SHA、数据/连接预算、资源门禁 | 业主负责人 | 运维负责人 / 安全负责人联合复核，D3 只读核验人登记证据 |
 
 任一字段缺失、拒绝、为占位符，或状态仍为 `UNSET`、`NOT_VERIFIED`、`BLOCKED`，均不得签出 D3 PASS。
 
