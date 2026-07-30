@@ -1,0 +1,12 @@
+{
+  "id": "p0-2c-single-owner-governance-20260730",
+  "title": "P0-2C F1 D3 单一负责人治理模式",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations-governance",
+  "currentPhase": "completed",
+  "nextAction": "由业主负责人建立 D3_READONLY_PRECHECK 单一用途记录后另行授权 D3",
+  "createdAt": "2026-07-30T06:20:00Z",
+  "branch": "codex/p0-2c-single-owner-governance"
+}
