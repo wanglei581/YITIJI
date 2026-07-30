@@ -277,7 +277,7 @@
 
 ### 未纳入 CI 的相关守卫（改动对应文件必须本地手跑）
 
-`verify:terminal-device-config` 与 `verify:legal-retention-copy` 已在主 CI；`verify:home-toolbox-ui`、`verify:print-entry-source-split` 仍未纳入，改动对应文件时必须本地手跑。`codex/loop-ci-gates-20260730` 候选把 `verify:admin-orders-refund`、`verify:member-data-retention`、`verify:trtc-ownership`、`verify:file-retention`、`verify:job-materials` 五项补入 SQLite 串行套件，并只把前述真正涉及数据库行为的退款与求职材料两项补入 PostgreSQL readiness；在合入且 GitHub Actions 全绿前，不把候选视为主线兜底。
+`verify:terminal-device-config` 与 `verify:legal-retention-copy` 已在主 CI；`verify:home-toolbox-ui`、`verify:print-entry-source-split` 仍未纳入，改动对应文件时必须本地手跑。[PR #435](https://github.com/wanglei581/YITIJI/pull/435) 已把 `verify:admin-orders-refund`、`verify:member-data-retention`、`verify:trtc-ownership`、`verify:file-retention`、`verify:job-materials` 五项补入 SQLite 串行套件，并只把前述真正涉及数据库行为的退款与求职材料两项补入 PostgreSQL readiness；三项 GitHub Actions 全绿后已 squash 合入 `main@b03af066`，现为主线 CI 兜底，但不代表部署、生产、外部服务或真机验收完成。
 
 ## P0：上线前真实验收
 
