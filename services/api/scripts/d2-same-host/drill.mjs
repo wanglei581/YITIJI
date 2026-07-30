@@ -232,9 +232,14 @@ async function main() {
   const managedPm2HomeId = requiredEnvironment('D2_MANAGED_PM2_HOME_ID')
   const approvedPath = requiredEnvironment('PATH')
   const managedHome = ownedDirectory(requiredEnvironment('HOME'))
+  const xdgRuntimeDir = ownedDirectory(requiredEnvironment('XDG_RUNTIME_DIR'))
   const nginxPort = Number(requiredEnvironment('D2_NGINX_PORT'))
   if (!NONCE.test(nonce) || !SAFE_UNIT.test(unitName) || !SHA256.test(managedPm2HomeId)) fail('ENV_INVALID')
-  const controlPaths = derivePm2ControlPaths(join('/run/user', String(process.getuid())), nonce)
+  if (
+    xdgRuntimeDir !== join('/run/user', String(process.getuid())) ||
+    (lstatSync(xdgRuntimeDir).mode & 0o777) !== 0o700
+  ) fail('PATH_INVALID')
+  const controlPaths = derivePm2ControlPaths(xdgRuntimeDir, nonce)
   if (
     controlRoot !== controlPaths.root || legacyPm2Home !== controlPaths.legacy ||
     managedPm2Home !== controlPaths.managed
@@ -251,7 +256,10 @@ async function main() {
 
   const managedEnvironment = pm2Environment(managedHome, managedPm2Home, approvedPath)
   const legacyEnvironment = pm2Environment(legacyHome, legacyPm2Home, approvedPath)
-  const systemEnvironment = Object.freeze(Object.assign(Object.create(null), { PATH: approvedPath, HOME: managedHome }))
+  const systemEnvironment = Object.freeze(Object.assign(
+    Object.create(null),
+    { PATH: approvedPath, HOME: managedHome, XDG_RUNTIME_DIR: xdgRuntimeDir },
+  ))
   const legacyName = `d2-legacy-${nonce.slice(0, 12)}`
   const managedName = `d2-managed-${nonce.slice(0, 12)}`
   const workspace = join(runDir, 'release-workspace')
