@@ -1,0 +1,12 @@
+{
+  "id": "p0-2b-f1-d3-approval-intake-20260730",
+  "title": "P0-2B F1 D3 真实审批资料盘点与受限采集准备",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations-governance",
+  "currentPhase": "completed",
+  "nextAction": "等待真实组织审批资料后另行申请 D3 只读窗口",
+  "createdAt": "2026-07-30T05:12:00Z",
+  "branch": "codex/p0-2b-f1-d3-approval-intake-20260730"
+}
