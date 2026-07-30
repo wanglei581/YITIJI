@@ -1,0 +1,12 @@
+{
+  "id": "p0-2a-f1-d3-unblock-package-20260730",
+  "title": "P0-2A F1 D3 managed 拓扑与治理解阻审批包",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "提交文档候选并等待具名审批输入",
+  "createdAt": "2026-07-30T03:40:00Z",
+  "branch": "codex/p0-2a-f1-d3-unblock-package-20260730"
+}
