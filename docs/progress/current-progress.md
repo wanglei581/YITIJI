@@ -1,5 +1,45 @@
 # 当前开发进度
 
+2026-07-31 完成 **F1 D2′ latest-main 本地集成候选安全修复（未推送、未部署、未重跑 full
+drill）**：代码质量审查后，当前候选在历史 Lima PASS 候选
+`166fe9dc3f612d8b6780951261d23540568a456b` 基础上，又增加 user-systemd CLI `env -i` 和
+transient unit `env -i` 白名单及 `systemd-run --expand-environment=no` 安全修复。这些修复与离线合同已
+GREEN，语法、build 与 lint 也已通过，但均不是 full drill 验证。当前仍待完成本地候选及
+双模型审查，也尚未对其重跑 full drill。历史 `166fe9dc`
+Lima PASS、evidence/log SHA 和清理结论仍真实且不改写，但旧 evidence 不得作为这个新精确候选
+的 D2′ PASS。因此 D2′ 对“历史 `166fe9dc`”已关闭，对“当前待推送集成候选”重新保持
+**NO-GO / 待验证**。后续顺序必须是：完成本地候选与双模型审查 → 用户决定是否授权推送
+→ 固定精确 commit/CI → 用户另行授权新非生产 retake（新 nonce/evidence/RFC3339 窗口）→
+该精确候选 fresh PASS 后才可另行授权 D3。当前 **D3 未授权**，未 SSH、未读取生产值/凭据、
+未迁移、未切流、未部署，`productionF1` 始终 **NO-GO**。
+
+2026-07-31 完成 **F1 D2′ / D3 主线文档增量协调（本地集成候选，未推送、未部署）**：以
+`origin/main@7b33447d38f16c9e251802052d2c95e9fe6df0d9` 为基线，保留现有 Colima fresh retake
+NO-GO 及旧 evidence 的全部历史事实，只增量补入后续 Lima PASS、宿主 wrapper exit 归因与
+D3 预授权门禁。该次协调后候选又增加安全修复，所以当前 D2′ 状态以上一条最新记录为准，
+不得把历史 `166fe9dc` evidence 平移到新候选。未固定可追溯集成 commit 及其精确 CI 前，M1 继续
+`UNSET`。当前 **D3 未授权**，
+未 SSH、未读取生产值/凭据、未迁移、未切流、未部署，`productionF1` 继续 **NO-GO**。
+
+2026-07-31 完成 **F1 D2′ 宿主 wrapper exit 归因复核（非生产、未重跑 full drill）**：在同一
+Lima `2.1.4` 上用无副作用命令确认 `limactl shell` 对 guest `0/1/2` 精确透传；主任务成功后
+裸接返回 `1` 的探针，可稳定复现“guest/main `0`、host 最终 `1`”。这排除了 Lima 普遍退出码
+传播缺陷，并将当时外层 `1` 收敛为 host shell / `tee` / pipeline / 后置探针独立状态未正确
+保留的强行为推定；因原始 host 命令未持久化，不伪装为字面直证。Runbook 已固化
+`primary_rc` / `tee_rc` / `probe_rc` 分离记录与显式返回模板。D2′ 结论仍以 guest drill exit `0`
+和磁盘 evidence verifier PASS 为准；已解释的 host exit 不再是 D3 阻塞。
+
+2026-07-30 完成 **F1 D2′ 后续独立非生产 Lima fresh drill（PASS，未部署）**：候选
+`166fe9dc3f612d8b6780951261d23540568a456b` 在新授权窗口、新 nonce/evidence 下完成唯一一次
+full drill；legacy `3010` 与 managed `3011` 同 network namespace 并存，控制面隔离、真实 Nginx
+invalid/valid 切换、managed-only rollback、cgroup v2 限额/throttling 与 legacy 零失败均通过。guest
+drill exit `0` 并输出 `D2_PRIME_PASS` / `productionF1=NO-GO`；evidence SHA-256 为
+`7ff420424937c191f9485bb31e666ec3cbeb4a8f41db6411c2f94e0bf1327a2f`，drill log SHA-256 为
+`0e14e99f8b4aa20f7db80ae8aa3f6526aac1def403f3e1da5d97ac4b5648f5ba`，独立磁盘 verifier 输出
+`D2_PRIME_EVIDENCE_PASS`。演练后 `3010/3011/18080`、D2 units/processes/control roots/work entries 与
+默认 PM2 daemon 复核全零。此 PASS 不读取、覆盖或改写更早 Colima NO-GO evidence，不授权
+production F1 或 D3–D6。
+
 2026-07-30 完成 **F1 D2′ `main@e721f87a` fresh retake（现有非生产 Colima，结果：NO-GO，未部署）**：在用户单独授权的 `2026-07-30T23:00:00+08:00`–`2026-07-31T00:30:00+08:00` 窗口内，复用本机现有 Colima，不新增云主机或第二台虚拟机；guest 全新 detached clone 的 `HEAD` / `origin/main` 均精确为 `e721f87a866525726ab83add248631b5940a0f34`，无实际 `.env`，frozen install、API fresh build 与四项 offline contract 均通过。`23:04:25+08:00` 最终闸门确认 evidence/work 目录为 owner `wanglei`、mode `0700`，精确 evidence 文件不存在，`3010/3011/18080` 空闲且无 D2 unit、进程或 runtime root；随后按授权仅调用一次 `drill:d2-same-host`。脚本在生成 32 位 nonce、创建 D2 资源或写 evidence 前立即输出 `D2_PRIME_NO_GO_ENVIRONMENT`，full drill exit `2`；精确 evidence 文件保持不存在，独立 verifier 因 evidence absent 记 exit `2`，本窗口未重跑。只读差分确认 Colima user systemd/linger 正常：同一净化环境未传 `XDG_RUNTIME_DIR` 时 `systemctl --user show-environment` exit `1`，加入可信固定值 `/run/user/501` 后 exit `0`；候选 `run.sh` 入口依赖 caller 环境，且其后启动 `drill.mjs` 的第二层 `env -i` 与 `drill.mjs` 的 `systemEnvironment` 仍未贯穿 XDG，因此只改下次命令会把失败推迟到资源创建后，下一步必须先以独立代码任务自派生、校验并端到端传递 `/run/user/<uid>`，补 RED→GREEN 合同和三模型复审，再申请新的 nonce/evidence/窗口授权。演练后 `3010/3011/18080`、D2/preflight units、D2/PM2 进程与 socket/pidfile、runtime roots、work entries 均为 0，fresh clone 干净；未连接 production、未 SSH、未访问生产数据或密钥、未部署、未进入 D3–D6。旧 NO-GO evidence 未读取或改写；`productionF1` 继续 **NO-GO**。
 
 2026-07-30 完成 **F1 D2′ PM2 隔离演练器修复（本地候选，未重跑 full drill、未部署）**：针对唯一一次 Colima full drill 锁定的 Unix socket 超长与失败清理缺口，按 RED→GREEN 新增独立控制面合同；PM2 控制根固定为 `/run/user/<uid>/d2p-<32位nonce>/{p,l,m}`，`pub.sock` / `rpc.sock` 以 UTF-8 字节执行 103-byte 上限，精确覆盖 103 通过、104 拒绝、中文多字节与 NUL 拒绝。`run.sh` 的 PM2 预检和清理均有 TERM/KILL 有界 timeout，managed / legacy 在 `ping` 前记录 spawn attempt，父 CLI 失败但 daemon 已派生时也进入清理。外层兜底只读取当前 0700 控制根内、owner/非 symlink/长度/格式均通过的 `pm2.pid`；仅当 `/proc/<pid>` 的 UID、精确 `PM2_HOME` 环境和 `PM2 vX.Y.Z: God Daemon (<PM2_HOME>)` 进程标题全部匹配时才允许 SIGTERM，并在 SIGKILL 前重新验证身份，PID 复用或身份不可读时 fail-closed、保留现场且不误杀。离线合同、Shell/Node 语法、API typecheck/lint/build、`git diff --check` 全部通过；Claude、Antigravity、Cursor 最终均 `APPROVE`，无 Critical，Claude 的 SIGTERM 后 `/proc` ENOENT 竞态 Warning 已修复并复验。此次未运行真实 PM2/systemd/Nginx、未重跑或改写既有 NO-GO evidence、未连接 production；因此修复完成不等于 D2′ PASS，production F1 与 D3–D6 继续 **NO-GO**。下一步只能在用户对新 nonce、新 evidence 路径和新窗口单独授权后，复用现有非生产 Colima 做一次 fresh retake。

@@ -1,5 +1,21 @@
 # F1 D3 生产只读预检（2026-07-30）
 
+> **Superseded / clarified（2026-07-31 注）**：本文是 2026-07-30 的历史预检快照，下文当时的
+> NO-GO 结果与未连接生产事实完整保留，不做回溯改写。§3 的“独立 managed 主机 / `3010`”
+> 属于当时已过时假设；现行拓扑为同一 production host 上 legacy `3010` + managed `3011`，
+> 以 [managed 输入清单](../device/f1-d3-managed-topology-inputs.md) 为唯一技术基线。本报告的旧候选、
+> 旧 CI 和当时授权窗口均不得复用于新 D3。历史 `166fe9dc` Lima PASS/evidence 保持真实，
+> 但当前 latest-main 本地集成候选已增加 user-systemd CLI / transient unit `env -i` 白名单安全修复，
+> 以及 `systemd-run --expand-environment=no` 安全修复；这些修复与离线合同已 GREEN，但新精确候选
+> 尚未重跑 full drill，
+> 故旧 evidence 不得作为它的 D2′ PASS。当前候选仍待本地/双模型审查与“是否授权推送”
+> 的单独决策，尚无固定的精确集成 commit/CI，M1 必须保持 `UNSET`。即使候选推送与 CI
+> 后续完成，仍必须由用户另行授权新非生产 retake（新 nonce/evidence/RFC3339 窗口）；只有
+> 该精确候选 fresh PASS 后才可另行申请 D3。已解释的 D2′ host wrapper exit 不再是 D3 阻塞。
+> 当前 `productionF1` **NO-GO**、
+> **D3 未授权**；未取得新的单一用途 `D3_READONLY_PRECHECK` 限时明确授权前，不得 SSH、
+> 读取生产值/凭据、部署、切流、迁移或执行 D4–D6。
+
 > 结论：**NO-GO，停止在 D3，未连接生产主机。**
 > 本轮授权仅包含候选冻结与 D3 只读预检；不包含 D4 Genesis、D5 切流、D6 稳态发布、部署、进程操作或生产写入。
 

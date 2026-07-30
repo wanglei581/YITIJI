@@ -24,6 +24,7 @@ const SHA_B = 'b'.repeat(64)
 const SHA_C = 'c'.repeat(64)
 const SHA_D = 'd'.repeat(64)
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const procfsRuntime = await import('./procfs.mjs').catch(() => Object.freeze({}))
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
@@ -34,6 +35,20 @@ function expectContractFailure(action) {
     action,
     (error) => error instanceof Error && /^D2_PRIME_(?:CONTRACT|EVIDENCE)_INVALID$/.test(error.message),
   )
+}
+
+function expectRuntimeFailure(action, code, forbiddenFragments = []) {
+  let capturedError
+  assert.throws(
+    action,
+    (error) => {
+      capturedError = error
+      return error instanceof Error && error.message === `D2_PRIME_${code}`
+    },
+  )
+  for (const fragment of forbiddenFragments) {
+    assert.ok(!capturedError.message.includes(fragment), `runtime failure leaked ${fragment}`)
+  }
 }
 
 function measurements() {
@@ -257,6 +272,133 @@ function verifyPm2ControlPlane() {
   console.log('  PASS PM2 control plane enforces short sockets, bounded commands, and attempted-start cleanup')
 }
 
+function verifyLinuxRuntimeHardening() {
+  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
+  const drillSource = readFileSync(join(SCRIPT_DIR, 'drill.mjs'), 'utf8')
+
+  if (typeof procfsRuntime.parseControlGroup !== 'function' || typeof procfsRuntime.controlGroup !== 'function') {
+    throw new Error('D2_PRIME_PROCFS_HELPER_MISSING')
+  }
+  assert.strictEqual(
+    procfsRuntime.parseControlGroup('11:memory:/legacy\n0::/user.slice/test.scope\n'),
+    '/user.slice/test.scope',
+  )
+  for (const invalid of [undefined, '', '1:name:/legacy\n', '0::\n', '0::relative\n']) {
+    expectRuntimeFailure(() => procfsRuntime.parseControlGroup(invalid), 'CGROUP_INVALID')
+  }
+
+  let observedProcPath = ''
+  assert.strictEqual(
+    procfsRuntime.controlGroup(123, {
+      readFile: (path) => {
+        observedProcPath = path
+        return '0::/user.slice/test.scope\n'
+      },
+    }),
+    '/user.slice/test.scope',
+  )
+  assert.strictEqual(observedProcPath, '/proc/123/cgroup')
+  for (const invalidPid of [0, -1, 1.5, '123']) {
+    expectRuntimeFailure(() => procfsRuntime.controlGroup(invalidPid), 'CGROUP_PID_INVALID')
+  }
+  for (const errorCode of ['ENOENT', 'EACCES']) {
+    expectRuntimeFailure(
+      () => procfsRuntime.controlGroup(123, {
+        readFile: () => {
+          throw Object.assign(new Error(`${errorCode} /private/secret/proc/123/cgroup`), { code: errorCode })
+        },
+      }),
+      'CGROUP_UNREADABLE',
+      [errorCode, '/private/secret', '/proc/123/cgroup'],
+    )
+  }
+
+  assert.match(runSource, /XDG_RUNTIME_DIR_PATH="\/run\/user\/\$\(id -u\)"/)
+  assert.match(
+    runSource,
+    /\[\[ -d "\$XDG_RUNTIME_DIR_PATH" && -O "\$XDG_RUNTIME_DIR_PATH" && ! -L "\$XDG_RUNTIME_DIR_PATH" \]\]/,
+  )
+  assert.match(runSource, /\[\[ "\$\(stat -c '%a' "\$XDG_RUNTIME_DIR_PATH"\)" == "700" \]\]/)
+  assert.match(
+    runSource,
+    /\[\[ -S "\$XDG_RUNTIME_DIR_PATH\/bus" && -O "\$XDG_RUNTIME_DIR_PATH\/bus" && ! -L "\$XDG_RUNTIME_DIR_PATH\/bus" \]\]/,
+  )
+  assert.match(runSource, /ENV_BIN="\$\(command -v env\)"/, 'run.sh must capture the absolute env binary')
+  assert.match(runSource, /SLEEP_BIN="\$\(command -v sleep\)"/, 'run.sh must capture the absolute sleep binary')
+  assert.match(runSource, /SYSTEMD_RUN_BIN="\$\(command -v systemd-run\)"/)
+  assert.match(
+    runSource,
+    /\[\[ "\$ENV_BIN" == \/\* && "\$SLEEP_BIN" == \/\* && "\$SYSTEMCTL_BIN" == \/\* && "\$SYSTEMD_RUN_BIN" == \/\* \]\] \\\s*\|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT"/,
+  )
+  assert.match(
+    runSource,
+    /user_systemctl\(\) \{\s*"\$ENV_BIN" -i \\\s*PATH="\$APPROVED_PATH" \\\s*XDG_RUNTIME_DIR="\$XDG_RUNTIME_DIR_PATH" \\\s*"\$SYSTEMCTL_BIN" --user "\$@"\s*\}/,
+  )
+  assert.match(
+    runSource,
+    /user_systemd_run\(\) \{\s*"\$ENV_BIN" -i \\\s*PATH="\$APPROVED_PATH" \\\s*XDG_RUNTIME_DIR="\$XDG_RUNTIME_DIR_PATH" \\\s*"\$SYSTEMD_RUN_BIN" --user "\$@"\s*\}/,
+  )
+  assert.strictEqual((runSource.match(/"\$SYSTEMCTL_BIN" --user/g) ?? []).length, 1)
+  assert.strictEqual((runSource.match(/"\$SYSTEMD_RUN_BIN" --user/g) ?? []).length, 1)
+  assert.doesNotMatch(runSource, /(^|\n)[ \t]*(?:systemctl|systemd-run)[ \t]+--user\b/m)
+  assert.doesNotMatch(runSource, /\s--setenv\b/)
+  assert.match(
+    runSource,
+    /user_systemctl show-environment/,
+  )
+  const preflightStart = runSource.indexOf('PREFLIGHT_UNIT=')
+  const preflightEnd = runSource.indexOf('NGINX_PORT=', preflightStart)
+  assert.ok(preflightStart >= 0 && preflightEnd > preflightStart, 'preflight source boundaries')
+  const preflightSource = runSource.slice(preflightStart, preflightEnd)
+  assert.match(
+    preflightSource,
+    /user_systemd_run \\\s*--expand-environment=no \\\s*--collect \\\s*--unit "\$PREFLIGHT_UNIT"[\s\S]*?"\$ENV_BIN" -i \\\s*PATH="\$APPROVED_PATH" \\\s*"\$SLEEP_BIN" 30/,
+    'preflight must disable systemd expansion and execute sleep with only the approved PATH',
+  )
+  assert.doesNotMatch(preflightSource, /(^|[\s;])\/usr\/bin\/sleep(?:[\s;]|$)/m)
+  assert.match(
+    runSource,
+    /user_systemd_run \\\s*--expand-environment=no \\\s*--unit "\$UNIT_NAME"[\s\S]*?--collect \\\s*"\$ENV_BIN" -i \\\s*PATH="\$APPROVED_PATH" \\\s*HOME="\$MANAGED_HOME" \\\s*PM2_HOME="\$MANAGED_PM2_HOME" \\\s*D2_RUN_DIR="\$RUN_DIR" \\\s*D2_CONTROL_ROOT="\$PM2_CONTROL_ROOT" \\\s*D2_NONCE="\$NONCE" \\\s*D2_PM2_HOME_ID="\$MANAGED_PM2_HOME_ID" \\\s*D2_PM2_BIN="\$PM2_BIN" \\\s*"\$NODE_BIN" "\$SCRIPT_DIR\/managed-scope\.mjs"/,
+  )
+  assert.match(runSource, /export XDG_RUNTIME_DIR="\$XDG_RUNTIME_DIR_PATH"/)
+  assert.match(
+    runSource,
+    /env -i[\s\S]*?XDG_RUNTIME_DIR="\$XDG_RUNTIME_DIR_PATH"[\s\S]*?"\$NODE_BIN" "\$SCRIPT_DIR\/drill\.mjs"/,
+  )
+  assert.match(drillSource, /ownedDirectory\(requiredEnvironment\('XDG_RUNTIME_DIR'\)\)/)
+  assert.match(
+    drillSource,
+    /systemEnvironment = Object\.freeze\(Object\.assign\(Object\.create\(null\), \{[\s\S]*?XDG_RUNTIME_DIR: xdgRuntimeDir[\s\S]*?\}\)\)/,
+  )
+
+  const snapshot = 'const managedAppControlGroupBeforeRollback = controlGroup(managedAppPidBeforeRollback)'
+  const rollback = "await activateRelease({ candidateRoot: r3.releaseRoot"
+  const snapshotIndex = drillSource.indexOf(snapshot)
+  const rollbackIndex = drillSource.indexOf(rollback)
+  assert.ok(snapshotIndex >= 0 && rollbackIndex > snapshotIndex, 'managed cgroup snapshot must precede rollback')
+  assert.strictEqual((drillSource.match(/controlGroup\(managedAppPidBeforeRollback\)/g) ?? []).length, 1)
+  assert.doesNotMatch(drillSource.slice(rollbackIndex), /\bmanagedAppPidBeforeRollback\b/)
+  assert.match(drillSource, /managedAppControlGroupBeforeRollback !== managedControlGroup/)
+  assert.match(
+    drillSource,
+    /managedAppControlGroupId:\s*sha\(controlGroup\(managedAppPid\)\)/,
+  )
+  assert.doesNotMatch(drillSource, /\bassert\.equal\s*\(/)
+
+  const stageIndices = []
+  for (const stage of ['POST_CUTOVER', 'POST_ROLLBACK', 'EVIDENCE_VALIDATION']) {
+    const stagePattern = new RegExp(`D2_PRIME_STAGE ${stage}\\\\n`, 'g')
+    const matches = drillSource.match(stagePattern) ?? []
+    assert.strictEqual(matches.length, 1, `${stage} stage marker count`)
+    stageIndices.push(drillSource.indexOf(matches[0]))
+  }
+  assert.ok(
+    stageIndices[0] < stageIndices[1] && stageIndices[1] < stageIndices[2],
+    'stage markers must follow cutover, rollback, evidence order',
+  )
+  console.log('  PASS Linux runtime validates XDG, snapshots cgroups, and emits stable stages')
+}
+
 function expectEvidenceMutationFailure(evidence, mutate) {
   const candidate = clone(evidence)
   mutate(candidate)
@@ -365,6 +507,7 @@ function main(args = process.argv.slice(2)) {
   verifyNginxRenderer()
   verifyCutoverStateMachine()
   verifyPm2ControlPlane()
+  verifyLinuxRuntimeHardening()
   verifyEvidenceContract()
   console.log('D2_PRIME_CONTRACT_ALL_PASS')
   verifyEvidenceFile(args)

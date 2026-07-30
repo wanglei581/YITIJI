@@ -22,7 +22,7 @@ for path_part in "${approved_path_parts[@]}"; do
 done
 export PATH="$APPROVED_PATH"
 
-required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
+required_commands=(date dirname env git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
 for required_command in "${required_commands[@]}"; do
   command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 done
@@ -32,7 +32,35 @@ nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 NODE_BIN="$(command -v node)"
 PM2_BIN="$(command -v pm2)"
 NGINX_BIN="$(command -v nginx)"
+ENV_BIN="$(command -v env)"
+SLEEP_BIN="$(command -v sleep)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
+SYSTEMD_RUN_BIN="$(command -v systemd-run)"
+[[ "$ENV_BIN" == /* && "$SLEEP_BIN" == /* && "$SYSTEMCTL_BIN" == /* && "$SYSTEMD_RUN_BIN" == /* ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+
+XDG_RUNTIME_DIR_PATH="/run/user/$(id -u)"
+[[ -d "$XDG_RUNTIME_DIR_PATH" && -O "$XDG_RUNTIME_DIR_PATH" && ! -L "$XDG_RUNTIME_DIR_PATH" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+[[ "$(stat -c '%a' "$XDG_RUNTIME_DIR_PATH")" == "700" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+[[ -S "$XDG_RUNTIME_DIR_PATH/bus" && -O "$XDG_RUNTIME_DIR_PATH/bus" && ! -L "$XDG_RUNTIME_DIR_PATH/bus" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR_PATH"
+
+user_systemctl() {
+  "$ENV_BIN" -i \
+    PATH="$APPROVED_PATH" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR_PATH" \
+    "$SYSTEMCTL_BIN" --user "$@"
+}
+
+user_systemd_run() {
+  "$ENV_BIN" -i \
+    PATH="$APPROVED_PATH" \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR_PATH" \
+    "$SYSTEMD_RUN_BIN" --user "$@"
+}
 
 production_variables=(
   DATABASE_URL DIRECT_URL
@@ -56,24 +84,28 @@ for build_input in \
   [[ -r "$build_input" ]] || no_go "D2_PRIME_NO_GO_BUILD_INPUT"
 done
 
-systemctl --user show-environment >/dev/null 2>&1 \
+user_systemctl show-environment >/dev/null 2>&1 \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == "yes" ]] \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 
 PREFLIGHT_UNIT="f1-d2-preflight-$(tr -d '-' < /proc/sys/kernel/random/uuid)"
 PREFLIGHT_OK=1
-systemd-run --user --collect \
+user_systemd_run \
+  --expand-environment=no \
+  --collect \
   --unit "$PREFLIGHT_UNIT" \
   --property MemoryMax=256M \
   --property CPUQuota=25% \
   --property TasksMax=64 \
   --property LimitNOFILE=256 \
-  /usr/bin/sleep 30 >/dev/null 2>&1 || PREFLIGHT_OK=0
+  "$ENV_BIN" -i \
+  PATH="$APPROVED_PATH" \
+  "$SLEEP_BIN" 30 >/dev/null 2>&1 || PREFLIGHT_OK=0
 PREFLIGHT_CONTROL_GROUP=""
 if (( PREFLIGHT_OK == 1 )); then
   for _ in {1..50}; do
-    PREFLIGHT_CONTROL_GROUP="$(systemctl --user show "$PREFLIGHT_UNIT" -p ControlGroup --value 2>/dev/null || true)"
+    PREFLIGHT_CONTROL_GROUP="$(user_systemctl show "$PREFLIGHT_UNIT" -p ControlGroup --value 2>/dev/null || true)"
     [[ "$PREFLIGHT_CONTROL_GROUP" == /* ]] && break
     sleep 0.1
   done
@@ -96,13 +128,13 @@ if (( PREFLIGHT_OK == 1 )); then
   fi
   [[ "$(<"$PREFLIGHT_CGROUP/memory.max")" == "268435456" ]] || PREFLIGHT_OK=0
   [[ "$(<"$PREFLIGHT_CGROUP/pids.max")" == "64" ]] || PREFLIGHT_OK=0
-  PREFLIGHT_NOFILE="$(systemctl --user show "$PREFLIGHT_UNIT" -p LimitNOFILE --value 2>/dev/null || true)"
+  PREFLIGHT_NOFILE="$(user_systemctl show "$PREFLIGHT_UNIT" -p LimitNOFILE --value 2>/dev/null || true)"
   [[ "${PREFLIGHT_NOFILE%%:*}" == "256" ]] || PREFLIGHT_OK=0
 fi
-systemctl --user stop "$PREFLIGHT_UNIT" >/dev/null 2>&1 || PREFLIGHT_OK=0
+user_systemctl stop "$PREFLIGHT_UNIT" >/dev/null 2>&1 || PREFLIGHT_OK=0
 PREFLIGHT_STOPPED=0
 for _ in {1..50}; do
-  PREFLIGHT_STATE="$(systemctl --user show "$PREFLIGHT_UNIT" -p ActiveState --value 2>/dev/null || true)"
+  PREFLIGHT_STATE="$(user_systemctl show "$PREFLIGHT_UNIT" -p ActiveState --value 2>/dev/null || true)"
   if [[ -z "$PREFLIGHT_STATE" || "$PREFLIGHT_STATE" == "inactive" || "$PREFLIGHT_STATE" == "failed" ]]; then
     PREFLIGHT_STOPPED=1
     break
@@ -110,7 +142,7 @@ for _ in {1..50}; do
   sleep 0.1
 done
 (( PREFLIGHT_STOPPED == 1 )) || PREFLIGHT_OK=0
-systemctl --user reset-failed "$PREFLIGHT_UNIT" >/dev/null 2>&1 || true
+user_systemctl reset-failed "$PREFLIGHT_UNIT" >/dev/null 2>&1 || true
 (( PREFLIGHT_OK == 1 )) || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 
 NGINX_PORT="${D2_NGINX_PORT:-18080}"
@@ -300,11 +332,11 @@ cleanup() {
   fi
   if (( KEEPER_STARTED == 1 )); then
     for _ in {1..150}; do
-      systemctl --user is-active --quiet "$UNIT_NAME" || break
+      user_systemctl is-active --quiet "$UNIT_NAME" || break
       sleep 0.1
     done
-    systemctl --user stop "$UNIT_NAME" >/dev/null 2>&1 || true
-    systemctl --user reset-failed "$UNIT_NAME" >/dev/null 2>&1 || true
+    user_systemctl stop "$UNIT_NAME" >/dev/null 2>&1 || true
+    user_systemctl reset-failed "$UNIT_NAME" >/dev/null 2>&1 || true
   fi
   bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
@@ -334,22 +366,24 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 2' INT TERM
 
-systemd-run --user \
+user_systemd_run \
+  --expand-environment=no \
   --unit "$UNIT_NAME" \
   --working-directory "$API_DIR" \
-  --setenv "HOME=$MANAGED_HOME" \
-  --setenv "PM2_HOME=$MANAGED_PM2_HOME" \
-  --setenv "PATH=$APPROVED_PATH" \
-  --setenv "D2_RUN_DIR=$RUN_DIR" \
-  --setenv "D2_CONTROL_ROOT=$PM2_CONTROL_ROOT" \
-  --setenv "D2_NONCE=$NONCE" \
-  --setenv "D2_PM2_HOME_ID=$MANAGED_PM2_HOME_ID" \
-  --setenv "D2_PM2_BIN=$PM2_BIN" \
   --property MemoryMax=268435456 \
   --property CPUQuota=25% \
   --property TasksMax=64 \
   --property LimitNOFILE=256 \
   --collect \
+  "$ENV_BIN" -i \
+  PATH="$APPROVED_PATH" \
+  HOME="$MANAGED_HOME" \
+  PM2_HOME="$MANAGED_PM2_HOME" \
+  D2_RUN_DIR="$RUN_DIR" \
+  D2_CONTROL_ROOT="$PM2_CONTROL_ROOT" \
+  D2_NONCE="$NONCE" \
+  D2_PM2_HOME_ID="$MANAGED_PM2_HOME_ID" \
+  D2_PM2_BIN="$PM2_BIN" \
   "$NODE_BIN" "$SCRIPT_DIR/managed-scope.mjs" >/dev/null \
   || no_go "D2_PRIME_NO_GO_MANAGED_SCOPE"
 KEEPER_STARTED=1
@@ -357,6 +391,7 @@ KEEPER_STARTED=1
 set +e
 env -i \
   PATH="$APPROVED_PATH" \
+  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR_PATH" \
   HOME="$MANAGED_HOME" \
   PM2_HOME="$MANAGED_PM2_HOME" \
   D2_API_DIR="$API_DIR" \

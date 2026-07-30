@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
@@ -19,6 +18,7 @@ import {
   createSpawnAttemptTracker,
   derivePm2ControlPaths,
 } from './control-plane.mjs'
+import { controlGroup } from './procfs.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -84,12 +84,6 @@ function pm2AppPid(pm2Bin, name, environment) {
 
 function networkNamespaceInode(pid) {
   return statSync(`/proc/${pid}/ns/net`, { bigint: true }).ino.toString()
-}
-
-function controlGroup(pid) {
-  const line = readFileSync(`/proc/${pid}/cgroup`, 'utf8').split('\n').find((entry) => entry.startsWith('0::/'))
-  if (!line) fail('CGROUP_INVALID')
-  return line.slice(3)
 }
 
 function exactRecord(value, keys) {
@@ -232,6 +226,20 @@ async function main() {
   const managedPm2HomeId = requiredEnvironment('D2_MANAGED_PM2_HOME_ID')
   const approvedPath = requiredEnvironment('PATH')
   const managedHome = ownedDirectory(requiredEnvironment('HOME'))
+  let xdgRuntimeDir
+  try {
+    xdgRuntimeDir = ownedDirectory(requiredEnvironment('XDG_RUNTIME_DIR'))
+    const runtimeStat = lstatSync(xdgRuntimeDir)
+    const busStat = lstatSync(join(xdgRuntimeDir, 'bus'))
+    if (
+      xdgRuntimeDir !== join('/run/user', String(process.getuid())) ||
+      (runtimeStat.mode & 0o777) !== 0o700 ||
+      !busStat.isSocket() || busStat.isSymbolicLink() || busStat.uid !== process.getuid()
+    ) fail('XDG_RUNTIME_INVALID')
+  } catch (error) {
+    if (error instanceof Error && error.message === 'D2_PRIME_XDG_RUNTIME_INVALID') throw error
+    fail('XDG_RUNTIME_INVALID')
+  }
   const nginxPort = Number(requiredEnvironment('D2_NGINX_PORT'))
   if (!NONCE.test(nonce) || !SAFE_UNIT.test(unitName) || !SHA256.test(managedPm2HomeId)) fail('ENV_INVALID')
   const controlPaths = derivePm2ControlPaths(join('/run/user', String(process.getuid())), nonce)
@@ -251,7 +259,9 @@ async function main() {
 
   const managedEnvironment = pm2Environment(managedHome, managedPm2Home, approvedPath)
   const legacyEnvironment = pm2Environment(legacyHome, legacyPm2Home, approvedPath)
-  const systemEnvironment = Object.freeze(Object.assign(Object.create(null), { PATH: approvedPath, HOME: managedHome }))
+  const systemEnvironment = Object.freeze(Object.assign(Object.create(null), {
+    PATH: approvedPath, HOME: managedHome, XDG_RUNTIME_DIR: xdgRuntimeDir,
+  }))
   const legacyName = `d2-legacy-${nonce.slice(0, 12)}`
   const managedName = `d2-managed-${nonce.slice(0, 12)}`
   const workspace = join(runDir, 'release-workspace')
@@ -308,11 +318,12 @@ async function main() {
       candidateRoot: r1.releaseRoot, managedCurrentLink: fixture.managedCurrentLink,
       deploymentControlRoot: fixture.controlRoot, ...commonReleaseOptions,
     })
-    assert.equal(genesis.status, 'parallel-serving-r1')
+    if (genesis.status !== 'parallel-serving-r1') fail('GENESIS_STATUS_INVALID')
     const activation = await activateRelease({ candidateRoot: r2.releaseRoot, currentLink: fixture.managedCurrentLink, ...commonReleaseOptions })
-    assert.equal(activation.releaseId, r2Id)
+    if (activation.releaseId !== r2Id) fail('ACTIVATION_RELEASE_INVALID')
 
     const managedAppPidBeforeRollback = pm2AppPid(pm2Bin, managedName, managedEnvironment)
+    const managedAppControlGroupBeforeRollback = controlGroup(managedAppPidBeforeRollback)
     if (!isAbsolute(systemctlBin)) fail('SYSTEMCTL_INVALID')
     const managedControlGroup = systemdValue(systemctlBin, unitName, 'ControlGroup', systemEnvironment)
     if (!managedControlGroup.startsWith('/')) fail('CGROUP_INVALID')
@@ -383,8 +394,9 @@ async function main() {
     const observedAfterReload = await observeTargets(nginxPort, 20)
     if (!observedAfterReload.targets.every((target) => target === 'managed')) fail('NGINX_MIXED_TARGETS')
     cutoverState = transitionCutover(cutoverState, 'confirm')
-    assert.equal(cutoverState, 'CUTOVER_CONFIRMED')
+    if (cutoverState !== 'CUTOVER_CONFIRMED') fail('CUTOVER_STATE_INVALID')
     const legacyCountAtCutover = (await httpJson('http://127.0.0.1:3010/__d2/count')).body.count
+    process.stdout.write('D2_PRIME_STAGE POST_CUTOVER\n')
 
     let failedReleaseError = ''
     try {
@@ -394,14 +406,16 @@ async function main() {
       if (!(error instanceof ReleaseProvenanceError)) throw error
       failedReleaseError = error.code
     }
-    assert.equal(failedReleaseError, 'RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK')
-    assert.equal(readCurrentRelease(fixture.managedCurrentLink), r2.releaseRoot)
+    if (failedReleaseError !== 'RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK') fail('ROLLBACK_ERROR_INVALID')
+    if (readCurrentRelease(fixture.managedCurrentLink) !== r2.releaseRoot) fail('ROLLBACK_RELEASE_INVALID')
     cutoverState = transitionCutover(cutoverState, 'bad_managed_release')
-    assert.equal(cutoverState, 'MANAGED_PREVIOUS_ONLY')
+    if (cutoverState !== 'MANAGED_PREVIOUS_ONLY') fail('ROLLBACK_STATE_INVALID')
     const afterRollbackTargets = await observeTargets(nginxPort, 10)
     if (!afterRollbackTargets.targets.every((target) => target === 'managed')) fail('ROLLBACK_LEFT_MANAGED')
     const legacyCountAfterRollback = (await httpJson('http://127.0.0.1:3010/__d2/count')).body.count
     if (legacyCountAfterRollback !== legacyCountAtCutover) fail('LEGACY_FALLBACK_DETECTED')
+    if (managedAppControlGroupBeforeRollback !== managedControlGroup) fail('CGROUP_ISOLATION_INVALID')
+    process.stdout.write('D2_PRIME_STAGE POST_ROLLBACK\n')
 
     const managedAppPid = pm2AppPid(pm2Bin, managedName, managedEnvironment)
     const nginxVersionOutput = run(nginxBin, ['-v'], { allowFailure: true })
@@ -439,9 +453,9 @@ async function main() {
       },
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
-    assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)
     const evidence = validateEvidence(buildEvidence(measurements))
     if (evidence.verdict !== 'D2_PRIME_PASS') fail('EVIDENCE_NO_GO')
+    process.stdout.write('D2_PRIME_STAGE EVIDENCE_VALIDATION\n')
     writeExclusive(evidenceOut, `${JSON.stringify(evidence, null, 2)}\n`)
     evidenceWritten = true
   } catch (error) {
