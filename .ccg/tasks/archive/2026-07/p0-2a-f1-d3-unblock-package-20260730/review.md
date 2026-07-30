@@ -31,3 +31,12 @@
 ## Spec evolution
 
 不追加 `.ccg/spec/`：本任务已将发布治理经验收口到正式 runbook 和 D3 审批包，不需要再建并行规范。
+
+## PR #441 合入后的冲突复审
+
+- `origin/main@3cabc0e5` 已通过 PR #441 新增 B1–B9 managed 技术输入清单并对齐 runbook；本分支不再维护第二套技术字段。
+- 冲突解决后，`f1-d3-managed-topology-inputs.md` 是 B1–B9 唯一 SSOT，审批包只保留职责分离、签批索引、两把锁治理和输出白名单。
+- 重新验证：provenance 24/24、Genesis 9/9、API typecheck/lint/build、activation 10 flag/20 参数、B1–B9 静态门禁、秘密赋值扫描和 `git diff --check` 全部 PASS。
+- Claude 只读复审：`APPROVE`，Critical 0、Warning 0。
+- Antigravity 只读复审：`APPROVE`，Critical 0、Warning 0。
+- 复审未连接生产、未读取秘密、未执行 Genesis/activation/PM2/Nginx/切流；production F1 继续 **NO-GO**。

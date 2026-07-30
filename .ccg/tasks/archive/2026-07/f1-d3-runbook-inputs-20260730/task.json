@@ -1,0 +1,12 @@
+{
+  "id": "f1-d3-runbook-inputs-20260730",
+  "title": "修正 F1 activation runbook 并建立 D3 managed 输入清单",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交文档变更",
+  "createdAt": "2026-07-30T03:36:00Z",
+  "branch": "codex/f1-d3-runbook-inputs-20260730"
+}
