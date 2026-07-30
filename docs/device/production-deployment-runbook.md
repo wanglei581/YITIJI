@@ -1,6 +1,6 @@
 # 生产服务器部署 Runbook（可复制粘贴执行版）
 
-> 最后更新：2026-06-13（Claude，上线前 P0 准备物，未真机执行）
+> 最后更新：2026-07-30（F1 activation 参数契约对齐，未生产执行）
 > 性质：本文是「**怎么做**」的执行手册；「**验收什么 / 通过标准**」见
 > [production-deployment-and-windows-host-checklist.md](./production-deployment-and-windows-host-checklist.md)。
 > 两份配套使用：先按本 runbook 执行，再回到 checklist §三 / §四逐项打勾。
@@ -240,7 +240,10 @@ manifest/hash/archive、替换 PM2、reload、重启或修改 ecosystem。当前
 Genesis；D4 证据复核通过后才可申请 D5 负载层切流；只有 managed 链已建立且 D5 完成后，才可在
 D6 稳态发布中使用 `release:activate`。上一层通过不自动授权下一层，`release:activate` 不得用于
 首次建链。D3 非秘密输入、状态和硬停止条件统一登记在
-[`f1-d3-managed-topology-inputs.md`](./f1-d3-managed-topology-inputs.md)。
+[`f1-d3-managed-topology-inputs.md`](./f1-d3-managed-topology-inputs.md)；职责分离、审批记录索引与具名
+签批要求见
+[`f1-d3-managed-topology-approval-package.md`](./f1-d3-managed-topology-approval-package.md)。后者只引用
+前者的 B1–B9 状态，不建立第二套技术输入。
 
 每层审批必须先确认部署账户可写、API 运行账户只读，并固定以下非秘密标识：
 `<MANAGED_HOST_ID>`、`<MANAGED_PM2_NAME>`、`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、
