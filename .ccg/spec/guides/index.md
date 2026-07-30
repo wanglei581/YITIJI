@@ -116,6 +116,15 @@
 - 相关 typecheck、lint、build、verify 或浏览器验收已执行。
 - `docs/progress/current-progress.md` 和 `docs/progress/next-tasks.md` 已按实际结果同步。
 
+### Linux / PM2 隔离演练补充
+
+- 临时 `PM2_HOME` 必须在启动 daemon 前计算 `pub.sock` / `rpc.sock` 的绝对路径字节数，并为 Linux
+  `AF_UNIX sun_path` 预留余量；不得把仓库深路径直接当作默认控制面路径。
+- 所有可能派生 daemon 的 PM2 预检与清理命令都必须有有界 timeout，并在测试中覆盖“父 CLI 退出但
+  daemon 仍存活”的路径；清理只能按 nonce、owner、进程身份和精确 socket 路径执行。
+- Full drill 首次失败必须保留原始 NO-GO evidence，不得原地修脚本后 retake；修复与新演练分成两个
+  独立任务，新演练仍需新的 nonce、evidence 路径和明确授权。
+
 ## 七、目录治理与物理迁移规则
 
 当前仓库目录职责以 `docs/project-structure.md` 为准。`apps/`、`services/`、`packages/` 是标准 monorepo 结构，不因“看起来不分类”而直接物理迁移。
