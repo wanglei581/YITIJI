@@ -57,6 +57,21 @@ async function expectWarningWithinThreeSeconds(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toBeVisible()
 }
 
+async function readSensitiveSession(page: Page): Promise<string | null | undefined> {
+  try {
+    return await page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY)
+  } catch (error) {
+    // The hard-clear contract deliberately reloads the document. A navigation can
+    // begin between a URL assertion and evaluate; retry once its new context exists.
+    if (error instanceof Error && error.message.includes('Execution context was destroyed')) return undefined
+    throw error
+  }
+}
+
+async function expectSensitiveSessionCleared(page: Page): Promise<void> {
+  await expect.poll(() => readSensitiveSession(page)).toBeNull()
+}
+
 test('hardware warning tells anonymous users that background work continues without recovery', async ({
   page,
   api,
@@ -142,9 +157,7 @@ test('warning expiry clears sensitive session state and returns home', async ({ 
 
   await expectWarningWithinThreeSeconds(page)
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
-  await expect
-    .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY))
-    .toBeNull()
+  await expectSensitiveSessionCleared(page)
 })
 
 test('screensaver idle warns before expiry and wakes to a clean homepage', async ({
@@ -204,9 +217,7 @@ test('refreshing a warning fails closed instead of restoring the previous task',
   await page.reload({ waitUntil: 'domcontentloaded' })
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
-  await expect
-    .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY))
-    .toBeNull()
+  await expectSensitiveSessionCleared(page)
   await expect(page.getByText('未保存的填写内容或练习内容会清除', { exact: true })).toHaveCount(0)
 })
 
@@ -225,9 +236,7 @@ test('immediate exit hard-clears the session and blocks back-forward task recove
   await page.getByRole('button', { name: '立即退出并清除本机会话', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
-  await expect
-    .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY))
-    .toBeNull()
+  await expectSensitiveSessionCleared(page)
 
   await page.goBack({ waitUntil: 'domcontentloaded' })
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_500 }).toBe('/')
@@ -256,9 +265,7 @@ test('screensaver-mode immediate exit always hard-clears and never falls into th
   await page.getByRole('button', { name: '立即退出并清除本机会话', exact: true }).click()
 
   await expect(page).toHaveURL('http://127.0.0.1:4188/', { timeout: 3_500 })
-  await expect
-    .poll(() => page.evaluate((key) => window.sessionStorage.getItem(key), SENSITIVE_SESSION_KEY))
-    .toBeNull()
+  await expectSensitiveSessionCleared(page)
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 1_500 }).toBe('/')
   await expect(page.locator('[data-kiosk-screen="screensaver"]')).toHaveCount(0)
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
