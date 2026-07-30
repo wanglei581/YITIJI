@@ -1,0 +1,13 @@
+{
+  "id": "f1-same-host-dual-port-d1-d2-implementation",
+  "title": "实施 F1 同机双端口 D1′ 与 D2′ 非生产门禁",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "后续单独任务在合格非生产 Linux 生成并独立复核 D2′ fresh evidence；此前保持 NO-GO",
+  "createdAt": "2026-07-30T07:55:37Z",
+  "completedAt": "2026-07-30T10:15:22Z",
+  "branch": "codex/f1-same-host-dual-port-design-20260730"
+}
