@@ -1,5 +1,16 @@
 # 当前开发进度
 
+2026-07-31 完成 **F1 D2′ latest-main 候选分支推送（未建 PR、未部署）**：用户在“先授权推送并
+确认精确提交 CI”的明确建议后回复“可以，继续”；远端 `origin/main` 复核仍为集成基线
+`7b33447d38f16c9e251802052d2c95e9fe6df0d9`，本地提交后门禁与 Antigravity / Claude 最终审查均
+通过（Critical 0、Warning 0），候选分支
+`codex/f1-d2-prime-main-integration-20260731` 已推送，运行时集成提交为 `ca39c135`，首次远端审计头为
+`289c029c`。现有 `CI` workflow 只响应 `main` push 或 `pull_request`，因此分支 push 后对该提交查询
+Actions 结果为空；这是“未触发”，不是 CI PASS 或 FAIL，也未通过建 PR / 推 main 绕过授权边界。
+下一步须由用户另行决定是否授权建 PR 以取得精确 head CI。当前候选尚无自身 fresh full-drill
+evidence，D2′ 继续 **NO-GO / 待验证**；`productionF1` 始终 **NO-GO**，D3 未授权，未 SSH、
+未读取生产值/凭据、未迁移、未切流、未部署。
+
 2026-07-31 完成 **F1 D2′ latest-main 本地集成候选安全修复（未推送、未部署、未重跑 full
 drill）**：代码质量审查后，当前候选在历史 Lima PASS 候选
 `166fe9dc3f612d8b6780951261d23540568a456b` 基础上，又增加 user-systemd CLI `env -i` 和
