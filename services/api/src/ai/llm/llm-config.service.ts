@@ -92,14 +92,18 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     allowCustomSystemPrompt: false,
   },
   // ⚠️ 共用键警示（2026-07-31 审计登记，见 docs/product/console-plan-for-kiosk-proto-2026-07.md §六）
-  // 下列 6 个用户可见能力目前全部读取 `resume_optimize` 的凭证与模型配置：
-  //   1. AI 简历优化      llm-resume-optimize.service.ts:171,213
-  //   2. 岗位大师/岗位匹配 llm-job-fit.service.ts:327
-  //   3. 职业规划          llm-career-plan.service.ts:206
-  //   4. 招聘会拜访计划    llm-fair-visit-plan.service.ts:166
-  //   5. 岗位推荐          job-ai-llm.service.ts:142（callLlm 'jobRecommend'）
-  //   6. 岗位解释          job-ai-llm.service.ts:142（callLlm 'jobExplain'）
-  // 后果：在 Admin「AI大模型」里关闭本功能或改错凭证，会一并静默影响上述全部 6 项。
+  // 下列 6 个用户可见能力目前全部读取 `resume_optimize` 的凭证与模型配置。
+  // 权威清单请用以下检索命令复核（不写行号，避免注释自身改动导致行号漂移）：
+  //   grep -rn --include='*.ts' -E "get(ApiKey|Config)\('resume_optimize'\)" services/api/src
+  //   1. AI 简历优化       llm-resume-optimize.service.ts（本键的名义归属）
+  //   2. 岗位大师/岗位匹配  llm-job-fit.service.ts
+  //   3. 职业规划          llm-career-plan.service.ts（callLlm）
+  //   4. 招聘会拜访计划     llm-fair-visit-plan.service.ts（callLlm）
+  //   5. 岗位推荐          job-ai-llm.service.ts（callLlm 'jobRecommend'）
+  //   6. 岗位解释          job-ai-llm.service.ts（callLlm 'jobExplain'）
+  // 后果：在 Admin「AI大模型」里关闭本功能或改错凭证，会一并停掉上述全部 6 项。
+  // 运行端不会说明这层依赖（各能力只会表现为"未配置/不可用"）；Admin 配置页已在
+  // 下方 runtimeNote 里展示共用清单，运营动开关时可见。
   // 治理方向：为 2–6 各自建独立 feature key（默认继承本键配置以保持行为不变），
   // 使开关与成本归属按能力隔离。新增能力请勿继续复用本键。
   {

@@ -411,12 +411,14 @@ async function initFallbackDb(): Promise<void> {
       `CREATE UNIQUE INDEX "User_emailHash_key" ON "User"("emailHash")`,
       `CREATE TABLE "EndUser" (
         "id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT,
+        "wxOpenId" TEXT,
         "enabled" BOOLEAN NOT NULL DEFAULT true, "status" TEXT NOT NULL DEFAULT 'active',
         "statusChangedAt" DATETIME, "closingRequestedAt" DATETIME, "anonymizedAt" DATETIME,
         "lastLoginAt" DATETIME,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
+      `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE "FileObject" (
         "id" TEXT NOT NULL PRIMARY KEY, "storageKey" TEXT NOT NULL,
         "bucket" TEXT NOT NULL DEFAULT 'local-fs', "region" TEXT NOT NULL DEFAULT 'local',

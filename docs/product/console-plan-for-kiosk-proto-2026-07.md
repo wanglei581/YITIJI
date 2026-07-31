@@ -182,24 +182,30 @@ Kiosk 已按 6 个 AI 服务组组织(`apps/kiosk/src/pages/home/serviceGroups.t
 
 ### 6.2 共用功能键:6 项能力挂在一个开关上(P0 隐蔽风险)
 
-读 `getApiKey('resume_optimize')` 的全部位置:
+读 `getApiKey('resume_optimize')` 的全部位置(共 6 处,无第 7 处;**不写行号**,因为加注释本身就会让行号漂移。权威清单用检索命令复核):
+
+```bash
+grep -rn --include='*.ts' -E "get(ApiKey|Config)\('resume_optimize'\)" services/api/src
+```
 
 | 用户可见能力 | 位置 |
 |---|---|
-| AI 简历优化 | `llm-resume-optimize.service.ts:171,213` |
-| 岗位大师 / 岗位匹配 | `llm-job-fit.service.ts:327` |
-| 职业规划 | `llm-career-plan.service.ts:206` |
-| 招聘会拜访计划 | `llm-fair-visit-plan.service.ts:166` |
-| 岗位推荐(`jobRecommend`) | `job-ai-llm.service.ts:142` |
-| 岗位解释(`jobExplain`) | `job-ai-llm.service.ts:142` |
+| AI 简历优化 | `llm-resume-optimize.service.ts`(两处,本键的名义归属) |
+| 岗位大师 / 岗位匹配 | `llm-job-fit.service.ts` |
+| 职业规划 | `llm-career-plan.service.ts`(`callLlm`) |
+| 招聘会拜访计划 | `llm-fair-visit-plan.service.ts`(`callLlm`) |
+| 岗位推荐(`jobRecommend`) | `job-ai-llm.service.ts`(`callLlm`) |
+| 岗位解释(`jobExplain`) | `job-ai-llm.service.ts`(同一 `callLlm`) |
 
-在 Admin「AI大模型」关掉「AI简历优化」或改错凭证,**上述 6 项同时静默失效**,界面无任何提示。已在代码就地加警示注释,并把提示写进 `AI_MODEL_FEATURES` 的 `runtimeNote`(该字段渲染在 `apps/admin/src/routes/ai-config/index.tsx:207,210`,运营在动开关时能直接看到)。
+在 Admin「AI大模型」关掉「AI简历优化」或改错凭证,**上述 6 项同时失效**。运行端不会说明这层依赖(各能力只表现为「未配置 / 不可用」)。已在代码就地加警示注释,并把共用清单写进 `AI_MODEL_FEATURES` 的 `runtimeNote`——该字段渲染在 `apps/admin/src/routes/ai-config/index.tsx:207,210`,**因此 Admin 配置页现在有提示**,运营动开关时能直接看到。
 
 治理方向:为后 5 项各建独立 feature key,**默认继承 `resume_optimize` 配置**(行为不变、可回滚),使开关与成本归属按能力隔离。
 
 ### 6.3 AI 成本可见性缺口(修正原判断)
 
-`AiServiceLog` 已记的 `operation` 取值:`optimizeResume` / `jobMatch` / `jobRecommend` / `explain` / `chatAssistant` / `generateResume` / `parseResume` / `adjustResumeLayout` / `match` / `recommend`。
+`AiServiceLog` 的 `operation` 取值(后端 `AiOperation` 联合类型,9 个):`parseResume` / `optimizeResume` / `adjustResumeLayout` / `generateResume` / `chatAssistant` / `classifyIntent` / `jobRecommend` / `jobExplain` / `jobMatch`。
+
+⚠️ 不要把这一组和 `JobAiSession.operation` 混为一谈——后者是另一张表的取值(`match` / `recommend` / `explain`,见 `job-ai/job-ai.service.ts`、`governed-job-fit.service.ts`),二者不同源。**已发现一处真实类型漂移**:前端 `apps/admin/src/services/api/types.ts:316` 的 `AiOperation` 只有 8 个值,漏了后端已有的 `adjustResumeLayout`,而 `costByOperation` 是 `Record<AiOperation, number>`——即「简历排版调整」的成本在 Admin 侧类型上无处归属。A-6 统一枚举时一并修。
 
 **未写日志的能力**(`grep -c "aiLog|AiLogService"` 全为 0):
 
@@ -211,16 +217,30 @@ Kiosk 已按 6 个 AI 服务组组织(`apps/kiosk/src/pages/home/serviceGroups.t
 
 另两处已确认的口径与覆盖问题:
 
-- **「今日」标签错**:`ai-log.service.ts:100` 是 `AI_USAGE_WINDOW_MS = 24 * 60 * 60 * 1000`(滚动 24 小时),但 `apps/admin/src/routes/ai-services/index.tsx:223,229` 写「今日概览」「今日累计」。
+- **「今日」标签错**:`ai-log.service.ts:100` 是 `AI_USAGE_WINDOW_MS = 24 * 60 * 60 * 1000`(滚动 24 小时),但 `apps/admin/src/routes/ai-services/index.tsx` 写「今日概览」(标题 :224、`aria-label` :223)与「今日累计」(:229)——共 3 处文案需一起改。
 - **限流覆盖不全**:`ai.controller.ts` 11 条路由仅 4 条有 `@Throttle`;`mock-interview.controller.ts` 12 条仅 7 条。且限流值并不统一(全仓 `limit:` 分布 5/6/10/12/20/30/60)。限流是**防滥用**,不是商业额度。
 
 ### 6.4 商业化闸门缺失
 
-`ai.controller.ts:170-200` 的实际时序是:**调 LLM(成本已发生)→ 结果落库 → 客户端若传了可选 `@Query benefitGrantId` 且 `completed` 才扣次数**。即权益核销是事后可选记账,不存在服务端强制的事前额度闸门。
+`ai.controller.ts:170-200` + `ai.service.ts:320-380` 的实际时序是:
+
+```
+查缓存(loadAuthorizedResult 'optimize')→ 命中即直接返回
+  ↓ 未命中
+parse 行门禁 → 取简历原文 → 调 LLM(成本在此发生)→ 仅 completed 才落库
+  ↓ 回到 controller
+客户端若显式传了可选 @Query benefitGrantId 且 status === 'completed' → 事后核销权益
+```
+
+三点结论:
+
+1. **不存在服务端强制的事前额度闸门**——权益核销是事后、可选、由客户端参数触发。
+2. **缓存命中也满足 `completed`**,同样会走核销分支;真正防止重复扣费的是幂等键 `hash(grant:resume_optimize:taskId)`,不是时序。
+3. 因此后续做真实计费时,「缓存命中不重复扣费」必须显式设计,不能依赖当前偶然正确的幂等键。
 
 `price-config.seed.ts` 只有 `print_bw_page` / `print_color_page` 两个键,**无任何 AI 价目键**(注:`serviceKey` 是开放字符串,种子只有 2 条不等于生产库只有 2 条,上线前需核实际配置)。
 
-`PriceConfig.effectiveFrom` 是假能力字段(seed 文件注释自承认,`PricingService` 只读 `active`)。**不宜直接物理删除**:要动两套 Prisma schema + migration + DTO + 测试;且 `serviceKey @unique` 本身就存不了价格历史版本,真要做定时生效需先解开唯一约束。当前处置=UI 标注「尚未启用」+ 保留字段。
+`PriceConfig.effectiveFrom` 是**无调度语义**的字段。准确表述:它由 `@default(now())` 自动填(两套 schema 均如此),`docs/operations/price-config-production.md:57` 的人工 SQL 也显式写 `NOW()`,Admin DTO(`admin-billing.service.ts:25,46,100`)与 mock 都带该字段——**并非「只由 seed 写入」**;真正缺的是读取方:`PricingService` 只按 `active` 报价,完全不读它。该状态**已被 verify 守卫锁定**(`verify-print-rollout-config.ts:186-195` 断言 `PricingService` 不得读 `effectiveFrom`),所以这不是失控项,而是已登记的「保留字段 + 禁用调度语义」。**不宜物理删除**:要动两套 Prisma schema + migration + DTO + 测试;且 `serviceKey @unique` 本身就存不了价格历史版本,真要做定时生效需先解开唯一约束。当前处置=Admin UI 标注「尚未启用」+ 保留字段与既有守卫。
 
 **关键结论:`AiServiceLog` 不能当计费账本。** 它是 best-effort 写入(`ai-log.service.ts:152` 只 `.catch()` 打 warn 不阻断),且 `estimatedCostCny` 是估算值。适合运维观测,不适合做不可丢失的收入 / 履约 / 退款依据。
 
@@ -285,7 +305,18 @@ Kiosk 已按 6 个 AI 服务组组织(`apps/kiosk/src/pages/home/serviceGroups.t
 | **B 商业化** | SKU 与价目版本(先解 `serviceKey @unique`)、原子履约账本(`reserve → LLM → commit`,失败 `release`,请求幂等 / 缓存命中不重复扣费 / 超时退款 / 匿名转会员归属)、合同生命周期、机构结算、完整 RBAC | **上线后独立立项**。不得在现有 AI GET 接口前直接挂扣费——那些接口兼具读取 / 生成 / 缓存 / 扣权益副作用 |
 | **C Partner 自助** | 服务端 capability 投影 + API 路由双重校验 → 再按能力下发侧栏;Partner 聚合曝光统计(需动 schema) | 服务端授权必须先于动态侧栏 |
 
-顺序:**P0 上线验收(部署 / Windows 真机 / 打印扫描 / 密钥轮换 / 法务)→ A → A+ → 上线 → B、C 独立立项。**
+**顺序(2026-07-31 二次修订 —— 原写法有验收失效错误)**
+
+原写的「P0 最终验收 → A → A+ → 上线」**是错的**:A / A+ 会改路由、导航、feature key、日志、限流与预算,若发生在最终验收之后,P0 证据就不再对应实际上线候选(候选已变,证据失效),违反本项目「冻结单一软件候选后再验收」的门禁口径。
+
+只能二选一:
+
+| 方案 | 顺序 | 适用 |
+|---|---|---|
+| **① 保持当前上线冻结(推荐)** | 完成剩余 P0(含 F1 D2′ / D3–D6、法务正文、PG/COS/真实服务、Windows 真机、试运营)→ **上线** → A → A+ → B、C | 后台 IA 与 AI 治理都不是上线阻塞项,不值得为它们推迟发布或作废已通过的 P0 证据 |
+| **② A/A+ 随首发** | P0 前置检查 → A → A+ → **重新执行完整 P0 最终验收** → 上线 → B、C | 仅当业务上必须首发就交付新后台 IA 时才选;代价是完整重跑一次最终验收 |
+
+依赖关系(两方案都成立):A-6 必须先于 A-8(无日志则运营页无数据);C 的服务端 capability 投影必须先于动态侧栏;**B 与 C 还有一个共同前置——先完成招聘信息发布 / 内容接入 / 曝光收费的许可边界审查**(见 compliance-boundary.md §8.8.1),许可结论未明确前不得实施任何按招聘内容计价的收费。
 
 ### 6.9 Partner 曝光统计的实现约束
 
