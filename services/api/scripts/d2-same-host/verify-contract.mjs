@@ -18,6 +18,16 @@ import {
   derivePm2ControlPaths,
   isExpectedPm2DaemonIdentity,
 } from './control-plane.mjs'
+import {
+  DRILL_ERROR_CLASSES,
+  DRILL_PHASES,
+  FAILURE_EVIDENCE_CODE,
+  classifyDrillFailure,
+  createDrillDiagnosticError,
+  formatDrillFailure,
+  resolveDrillDiagnostic,
+  withFailureEvidenceWriteFailure,
+} from './diagnostics.mjs'
 
 const SHA_A = 'a'.repeat(64)
 const SHA_B = 'b'.repeat(64)
@@ -448,6 +458,214 @@ function verifyEvidenceContract() {
   console.log('  PASS evidence schema derives verdict from raw measurements and rejects spoofing')
 }
 
+function verifyDrillDiagnosticContract() {
+  assert.deepEqual(Object.values(DRILL_PHASES), [
+    'SETUP', 'CUTOVER', 'ROLLBACK', 'MEASURE', 'EVIDENCE', 'CLEANUP',
+  ])
+  assert.deepEqual(Object.values(DRILL_ERROR_CLASSES), [
+    'NAMED', 'ASSERTION', 'SYSTEM', 'SYNTAX', 'TYPE', 'ERROR', 'UNKNOWN',
+  ])
+  assert.equal(Object.isFrozen(DRILL_PHASES), true)
+  assert.equal(Object.isFrozen(DRILL_ERROR_CLASSES), true)
+
+  const named = classifyDrillFailure(
+    new Error('RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK'),
+    DRILL_PHASES.ROLLBACK,
+  )
+  assert.deepEqual(named, {
+    phase: 'ROLLBACK', errorClass: 'NAMED', code: 'RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK',
+    failureEvidenceCode: null,
+  })
+  assert.equal(formatDrillFailure(named),
+    'D2_PRIME_NO_GO phase=ROLLBACK class=NAMED code=RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK')
+
+  const injectedSecret = 'db-password-must-not-survive'
+  const injectedPath = '/var/lib/private/runtime/secret.json'
+  const injectedNonce = 'aabbccddaabbccddaabbccddaabbccdd'
+  const injectedHostname = 'production-db-01.internal.example'
+  const injectedPid = 'pid=424242'
+  const injectedEvidence = '{"DATABASE_URL":"postgres://admin:secret@production-db-01"}'
+  const injectedStack = `Error: ${injectedSecret}\n    at ${injectedPath}:42:7`
+  const injectedCause = new Error(`${injectedHostname} ${injectedEvidence}`)
+  const unknown = classifyDrillFailure(
+    Object.assign(new Error(`${injectedSecret} ${injectedPath} ${injectedNonce}`), {
+      stack: injectedStack,
+      cause: injectedCause,
+      hostname: injectedHostname,
+      pid: injectedPid,
+      evidence: injectedEvidence,
+    }),
+    DRILL_PHASES.CUTOVER,
+  )
+  const unknownOutput = formatDrillFailure(unknown)
+  assert.equal(unknownOutput, 'D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED')
+  for (const forbidden of [
+    injectedSecret, injectedPath, injectedNonce, injectedHostname, injectedPid, injectedEvidence,
+  ]) {
+    assert.doesNotMatch(unknownOutput, new RegExp(forbidden.replaceAll('/', '\\/')))
+  }
+
+  const prefixShapedSecret = 'D2_PRIME_DATABASE_PASSWORD_SUPERSECRET'
+  const prefixOutput = formatDrillFailure(classifyDrillFailure(
+    new Error(prefixShapedSecret),
+    DRILL_PHASES.SETUP,
+  ))
+  assert.equal(prefixOutput, 'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED')
+  assert.doesNotMatch(prefixOutput, /DATABASE_PASSWORD|SUPERSECRET/)
+
+  const throwingGetter = Object.create(Error.prototype, {
+    message: { get() { throw new Error(injectedSecret) } },
+    code: { get() { throw new Error(injectedPath) } },
+  })
+  assert.doesNotThrow(() => classifyDrillFailure(throwingGetter, DRILL_PHASES.SETUP))
+  assert.equal(classifyDrillFailure(throwingGetter, DRILL_PHASES.SETUP).code, 'D2_PRIME_DRILL_FAILED')
+  const revoked = Proxy.revocable({}, {})
+  revoked.revoke()
+  assert.doesNotThrow(() => classifyDrillFailure(revoked.proxy, DRILL_PHASES.SETUP))
+  assert.equal(classifyDrillFailure(revoked.proxy, DRILL_PHASES.SETUP).errorClass, 'UNKNOWN')
+  assert.doesNotThrow(() => resolveDrillDiagnostic(revoked.proxy, DRILL_PHASES.CLEANUP))
+
+  const assertion = classifyDrillFailure(new assert.AssertionError({
+    message: `${injectedPath}:${injectedNonce}`,
+    actual: injectedSecret,
+    expected: 'safe',
+    operator: 'strictEqual',
+  }), DRILL_PHASES.MEASURE)
+  assert.equal(assertion.errorClass, 'ASSERTION')
+  assert.doesNotMatch(formatDrillFailure(assertion), /secret|private|aabbccdd/)
+
+  const systemError = Object.assign(new Error(`${injectedSecret}:${injectedPath}`), {
+    code: 'EPERM', path: injectedPath, syscall: 'open',
+  })
+  assert.equal(classifyDrillFailure(systemError, DRILL_PHASES.EVIDENCE).errorClass, 'SYSTEM')
+  const arbitraryErrno = Object.assign(new Error(injectedSecret), { code: `E_${injectedNonce}` })
+  assert.equal(classifyDrillFailure(arbitraryErrno, DRILL_PHASES.EVIDENCE).errorClass, 'ERROR')
+
+  const evidenceFailure = withFailureEvidenceWriteFailure(unknown)
+  assert.equal(evidenceFailure.failureEvidenceCode, FAILURE_EVIDENCE_CODE)
+  assert.equal(
+    formatDrillFailure(evidenceFailure),
+    `D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED evidence=${FAILURE_EVIDENCE_CODE}`,
+  )
+  const wrapped = createDrillDiagnosticError(evidenceFailure)
+  assert.deepEqual(resolveDrillDiagnostic(wrapped, DRILL_PHASES.CLEANUP), evidenceFailure)
+  assert.equal(resolveDrillDiagnostic(new TypeError(injectedSecret), DRILL_PHASES.CLEANUP).errorClass, 'TYPE')
+
+  for (const invalid of [
+    { ...unknown, phase: 'SECRET' },
+    { ...unknown, errorClass: injectedSecret },
+    { ...unknown, code: injectedNonce },
+    { ...unknown, errorClass: 'NAMED', code: prefixShapedSecret },
+    { ...unknown, errorClass: 'NAMED', code: 'RELEASE_PROVENANCE_PASSWORD_SUPERSECRET' },
+    { ...unknown, failureEvidenceCode: 'EACCES' },
+    { ...unknown, extra: injectedPath },
+  ]) assert.throws(() => formatDrillFailure(invalid), /D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID/)
+  const accessorDiagnostic = Object.defineProperties({}, {
+    phase: { enumerable: true, get() { return `SETUP\n${injectedSecret}` } },
+    errorClass: { enumerable: true, value: 'ERROR' },
+    code: { enumerable: true, value: 'D2_PRIME_DRILL_FAILED' },
+    failureEvidenceCode: { enumerable: true, value: null },
+  })
+  assert.throws(
+    () => formatDrillFailure(accessorDiagnostic),
+    /D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID/,
+  )
+  const revokedDiagnostic = Proxy.revocable({ ...unknown }, {})
+  revokedDiagnostic.revoke()
+  assert.throws(
+    () => formatDrillFailure(revokedDiagnostic.proxy),
+    /D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID/,
+  )
+  let phaseDescriptorReads = 0
+  const changingDiagnostic = new Proxy({ ...unknown, phase: 'SETUP' }, {
+    getOwnPropertyDescriptor(target, property) {
+      if (property !== 'phase') return Reflect.getOwnPropertyDescriptor(target, property)
+      phaseDescriptorReads += 1
+      return {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: phaseDescriptorReads >= 3 ? `SETUP\n${injectedSecret}` : 'SETUP',
+      }
+    },
+  })
+  assert.equal(
+    formatDrillFailure(changingDiagnostic),
+    'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED',
+  )
+
+  const genericEvidence = JSON.stringify(buildEvidence({
+    ...createFailureMeasurements('2026-07-31T03:30:00.000Z'),
+    message: injectedSecret,
+    path: injectedPath,
+    nonce: injectedNonce,
+    hostname: injectedHostname,
+    pid: injectedPid,
+    stack: injectedStack,
+    cause: injectedCause,
+    evidence: injectedEvidence,
+  }))
+  for (const forbidden of [
+    injectedSecret, injectedPath, injectedNonce, injectedHostname, injectedPid, injectedEvidence,
+  ]) assert.equal(genericEvidence.includes(forbidden), false)
+  console.log('  PASS drill diagnostics preserve fixed phase/class/code without sensitive-value leakage')
+}
+
+function assertDrillDiagnosticWiring(source) {
+  assert.match(source, /from '\.\/diagnostics\.mjs'/)
+  assert.match(source, /let currentPhase = DRILL_PHASES\.SETUP/)
+  for (const [phase, anchor] of [
+    ['CUTOVER', "let cutoverState = 'LEGACY_ACTIVE'"],
+    ['ROLLBACK', "let failedReleaseError = ''"],
+    ['MEASURE', 'const managedAppPid = pm2AppPid'],
+    ['EVIDENCE', 'const evidence = validateEvidence'],
+    ['CLEANUP', 'if (managedDaemonReady)'],
+  ]) {
+    const assignment = source.indexOf(`currentPhase = DRILL_PHASES.${phase}`)
+    const operation = source.indexOf(anchor)
+    assert.ok(assignment >= 0 && operation > assignment, `${phase} phase must precede ${anchor}`)
+  }
+  const innerCatch = source.slice(source.indexOf('  } catch (error) {'), source.indexOf('  } finally {'))
+  assert.match(innerCatch, /let diagnostic = classifyDrillFailure\(error, currentPhase\)/)
+  const partialEvidenceBranch = innerCatch.slice(
+    innerCatch.indexOf('if (existsSync(evidenceOut)) {'),
+    innerCatch.indexOf('} else {'),
+  )
+  assert.match(partialEvidenceBranch, /diagnostic = withFailureEvidenceWriteFailure\(diagnostic\)/)
+  const writeFailureCatch = innerCatch.slice(
+    innerCatch.indexOf('        } catch {'),
+    innerCatch.indexOf('        }\n      }', innerCatch.indexOf('        } catch {')),
+  )
+  assert.match(writeFailureCatch, /diagnostic = withFailureEvidenceWriteFailure\(diagnostic\)/)
+  assert.match(innerCatch, /throw createDrillDiagnosticError\(diagnostic\)/)
+  const topLevelCatch = source.slice(source.lastIndexOf('main().catch'))
+  assert.match(topLevelCatch, /formatDrillFailure\(resolveDrillDiagnostic\(error, currentPhase\)\)/)
+  assert.doesNotMatch(topLevelCatch, /error\.(?:message|stack|cause|code|path|syscall)/)
+  assert.doesNotMatch(topLevelCatch, /JSON\.stringify\(error|String\(error\)/)
+}
+
+function verifyDrillDiagnosticWiring() {
+  const source = readFileSync(join(SCRIPT_DIR, 'drill.mjs'), 'utf8')
+  assertDrillDiagnosticWiring(source)
+  for (const unsafeMutation of [
+    source.replace('currentPhase = DRILL_PHASES.CUTOVER', '// phase removed'),
+    source.replace('if (existsSync(evidenceOut)) {', 'if (false) {'),
+    source.replace(
+      /if \(existsSync\(evidenceOut\)\) \{\s*diagnostic = withFailureEvidenceWriteFailure\(diagnostic\)/,
+      'if (existsSync(evidenceOut)) { // partial marker removed',
+    ),
+    source.replace(
+      /} catch \{\s*diagnostic = withFailureEvidenceWriteFailure\(diagnostic\)/,
+      '} catch { // write marker removed',
+    ),
+    source.replace(
+      'process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase))}\\n`)',
+      'process.stderr.write(`${error.message}\\n`)',
+    ),
+  ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))
+  console.log('  PASS drill wiring captures phases before cleanup and emits only the fixed diagnostic contract')
+}
+
 function verifyEvidenceFile(args) {
   if (args.length === 0) return
   if (args.length !== 2 || args[0] !== '--evidence' || !isAbsolute(args[1])) {
@@ -478,6 +696,8 @@ function main(args = process.argv.slice(2)) {
     throw new Error('D2_PRIME_USER_SYSTEMD_CONTRACT_INVALID')
   }
   verifyEvidenceContract()
+  verifyDrillDiagnosticContract()
+  verifyDrillDiagnosticWiring()
   console.log('D2_PRIME_CONTRACT_ALL_PASS')
   verifyEvidenceFile(args)
 }
