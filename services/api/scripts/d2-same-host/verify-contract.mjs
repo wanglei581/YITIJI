@@ -236,7 +236,7 @@ function verifyPm2ControlPlane() {
   assert.match(runSource, /required_commands=\([^\n]*\btimeout\b/)
   assert.match(runSource, /timeout --signal=TERM --kill-after=2s 5s[\s\S]*?\"\$PM2_BIN\" -v/)
   assert.match(runSource, /timeout --signal=TERM --kill-after=3s 8s[\s\S]*?\"\$PM2_BIN\" kill/)
-  assert.match(runSource, /PM2_RUNTIME_ROOT=\"\/run\/user\/\$\(id -u\)\"/)
+  assert.match(runSource, /PM2_RUNTIME_ROOT="\$XDG_RUNTIME_DIR"/)
   assert.match(runSource, /D2_CONTROL_ROOT=\"\$PM2_CONTROL_ROOT\"/)
   assert.match(runSource, /\[\[ ! -e \"\$home\" && ! -e \"\$pm2_home\" \]\] && return 0/)
   assert.match(runSource, /control-plane\.mjs\" --terminate-daemon \"\$pm2_home\" \"\$daemon_pid\"/)
@@ -255,6 +255,113 @@ function verifyPm2ControlPlane() {
     /try \{\s*if \(!existsSync\(stopMarker\)\) writeExclusive\(stopMarker, ''\)\s*\} catch \(error\) \{\s*if \(error\?\.code !== 'EEXIST'\) throw error\s*\}/,
   )
   console.log('  PASS PM2 control plane enforces short sockets, bounded commands, and attempted-start cleanup')
+}
+
+function assertUserSystemdEnvironmentContract(runSource, drillSource) {
+  const deriveXdg = runSource.match(/^XDG_RUNTIME_DIR="\/run\/user\/\$\(id -u\)"$/m)?.index ?? -1
+  const directoryCheck = runSource.match(
+    /^\[\[ -d "\$XDG_RUNTIME_DIR" && -O "\$XDG_RUNTIME_DIR" && ! -L "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT"$/m,
+  )
+  const modeCheck = runSource.match(
+    /^\[\[ "\$\(stat -c '%a' "\$XDG_RUNTIME_DIR"\)" == "700" && "\$\(realpath "\$XDG_RUNTIME_DIR"\)" == "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT"$/m,
+  )
+  const exportXdg = runSource.match(/^export XDG_RUNTIME_DIR$/m)?.index ?? -1
+  const firstUserSystemd = runSource.match(/^[ \t]*(?:systemctl|systemd-run)[ \t]+--user\b/m)?.index ?? -1
+  assert.ok(
+    deriveXdg >= 0 &&
+      directoryCheck?.index > deriveXdg &&
+      modeCheck?.index > directoryCheck.index &&
+      exportXdg > modeCheck.index &&
+      firstUserSystemd > exportXdg,
+    'run.sh must derive, validate, and export trusted XDG before its first user-systemd call',
+  )
+  assert.match(runSource, /^PM2_RUNTIME_ROOT="\$XDG_RUNTIME_DIR"$/m)
+
+  const drillInvocationStart = runSource.indexOf('set +e\nenv -i')
+  const drillInvocationEnd = runSource.indexOf('DRILL_STATUS=$?', drillInvocationStart)
+  assert.ok(
+    drillInvocationStart >= 0 && drillInvocationEnd > drillInvocationStart,
+    'run.sh must retain a bounded env -i drill invocation',
+  )
+  const drillInvocation = runSource.slice(drillInvocationStart, drillInvocationEnd)
+  assert.match(drillInvocation, /^  XDG_RUNTIME_DIR="\$XDG_RUNTIME_DIR" \\$/m)
+  assert.match(drillInvocation, /^  "\$NODE_BIN" "\$SCRIPT_DIR\/drill\.mjs"$/m)
+
+  assert.match(
+    drillSource,
+    /^  const xdgRuntimeDir = ownedDirectory\(requiredEnvironment\('XDG_RUNTIME_DIR'\)\)$/m,
+  )
+  assert.match(
+    drillSource,
+    /xdgRuntimeDir !== join\('\/run\/user', String\(process\.getuid\(\)\)\)/,
+  )
+  assert.match(drillSource, /\(lstatSync\(xdgRuntimeDir\)\.mode & 0o777\) !== 0o700/)
+  assert.match(
+    drillSource,
+    /systemEnvironment = Object\.freeze\(Object\.assign\(\s*Object\.create\(null\),\s*\{ PATH: approvedPath, HOME: managedHome, XDG_RUNTIME_DIR: xdgRuntimeDir \},?\s*\)\)/,
+  )
+  const systemdValueCalls = drillSource
+    .split('\n')
+    .filter((line) => line.includes('systemdValue(') && !line.trimStart().startsWith('function '))
+  assert.equal(systemdValueCalls.length, 5)
+  for (const call of systemdValueCalls) assert.match(call, /,\s*systemEnvironment\)/)
+
+  const forbiddenBusCoupling = /DBUS_SESSION_BUS_ADDRESS|\/run\/user\/[^"'\n]*\/bus\b|["']bus["']/
+  assert.doesNotMatch(runSource, forbiddenBusCoupling)
+  assert.doesNotMatch(drillSource, forbiddenBusCoupling)
+}
+
+function verifyUserSystemdEnvironmentContract() {
+  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
+  const drillSource = readFileSync(join(SCRIPT_DIR, 'drill.mjs'), 'utf8')
+  assertUserSystemdEnvironmentContract(runSource, drillSource)
+
+  const commentDecoy = runSource.replace(
+    'XDG_RUNTIME_DIR="/run/user/$(id -u)"',
+    '# XDG_RUNTIME_DIR="/run/user/$(id -u)"\nXDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}"',
+  )
+  assert.throws(() => assertUserSystemdEnvironmentContract(commentDecoy, drillSource))
+
+  for (const command of [
+    '  systemctl --user status >/dev/null',
+    'systemctl  --user status >/dev/null',
+    'systemctl\t--user status >/dev/null',
+  ]) {
+    const earlySystemdCall = runSource.replace(
+      'XDG_RUNTIME_DIR="/run/user/$(id -u)"',
+      `${command}\nXDG_RUNTIME_DIR="/run/user/$(id -u)"`,
+    )
+    assert.throws(() => assertUserSystemdEnvironmentContract(earlySystemdCall, drillSource))
+  }
+
+  const validationStart = runSource.indexOf('[[ -d "$XDG_RUNTIME_DIR"')
+  const validationEnd = runSource.indexOf('export XDG_RUNTIME_DIR')
+  const validationBlock = runSource.slice(validationStart, validationEnd)
+  const checksAfterSystemd = runSource
+    .replace(validationBlock, '')
+    .replace(
+      /^(systemctl --user show-environment >\/dev\/null 2>&1 \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT")$/m,
+      `$1\n${validationBlock.trimEnd()}`,
+    )
+  assert.throws(() => assertUserSystemdEnvironmentContract(checksAfterSystemd, drillSource))
+
+  const missingInnerXdg = runSource.replace('  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \\\n', '')
+  assert.throws(() => assertUserSystemdEnvironmentContract(missingInnerXdg, drillSource))
+
+  const wrongSystemEnvironment = drillSource.replace(
+    "'ControlGroup', systemEnvironment",
+    "'ControlGroup', managedEnvironment",
+  )
+  assert.throws(() => assertUserSystemdEnvironmentContract(runSource, wrongSystemEnvironment))
+
+  for (const busCoupling of [
+    '\nDBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"\n',
+    '\nBUS_PATH="/run/user/1000/bus"\n',
+    '\nBUS_PATH="/run/user/$(id -u)/bus"\n',
+  ]) {
+    assert.throws(() => assertUserSystemdEnvironmentContract(`${runSource}${busCoupling}`, drillSource))
+  }
+  console.log('  PASS user-systemd environment derives and propagates trusted XDG without DBUS coupling')
 }
 
 function expectEvidenceMutationFailure(evidence, mutate) {
@@ -365,6 +472,11 @@ function main(args = process.argv.slice(2)) {
   verifyNginxRenderer()
   verifyCutoverStateMachine()
   verifyPm2ControlPlane()
+  try {
+    verifyUserSystemdEnvironmentContract()
+  } catch {
+    throw new Error('D2_PRIME_USER_SYSTEMD_CONTRACT_INVALID')
+  }
   verifyEvidenceContract()
   console.log('D2_PRIME_CONTRACT_ALL_PASS')
   verifyEvidenceFile(args)

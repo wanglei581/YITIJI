@@ -56,6 +56,13 @@ for build_input in \
   [[ -r "$build_input" ]] || no_go "D2_PRIME_NO_GO_BUILD_INPUT"
 done
 
+XDG_RUNTIME_DIR="/run/user/$(id -u)"
+[[ -d "$XDG_RUNTIME_DIR" && -O "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+[[ "$(stat -c '%a' "$XDG_RUNTIME_DIR")" == "700" && "$(realpath "$XDG_RUNTIME_DIR")" == "$XDG_RUNTIME_DIR" ]] \
+  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+export XDG_RUNTIME_DIR
+
 systemctl --user show-environment >/dev/null 2>&1 \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == "yes" ]] \
@@ -162,11 +169,7 @@ bootstrap_cleanup() {
 }
 trap bootstrap_cleanup EXIT
 
-PM2_RUNTIME_ROOT="/run/user/$(id -u)"
-[[ -d "$PM2_RUNTIME_ROOT" && -O "$PM2_RUNTIME_ROOT" && ! -L "$PM2_RUNTIME_ROOT" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-[[ "$(stat -c '%a' "$PM2_RUNTIME_ROOT")" == "700" && "$(realpath "$PM2_RUNTIME_ROOT")" == "$PM2_RUNTIME_ROOT" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+PM2_RUNTIME_ROOT="$XDG_RUNTIME_DIR"
 PM2_CONTROL_ROOT="$PM2_RUNTIME_ROOT/d2p-$NONCE"
 [[ ! -e "$PM2_CONTROL_ROOT" && ! -L "$PM2_CONTROL_ROOT" ]] || no_go "D2_PRIME_NO_GO_WORKSPACE"
 mkdir -m 700 "$PM2_CONTROL_ROOT" || no_go "D2_PRIME_NO_GO_WORKSPACE"
@@ -358,6 +361,7 @@ set +e
 env -i \
   PATH="$APPROVED_PATH" \
   HOME="$MANAGED_HOME" \
+  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
   PM2_HOME="$MANAGED_PM2_HOME" \
   D2_API_DIR="$API_DIR" \
   D2_ROOT="$ROOT" \
