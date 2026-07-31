@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-31
+> 最后更新：2026-08-01
 
 ## Phase 0 真值收口后续
 
@@ -25,7 +25,9 @@
 - [x] **F1 D2′ `MEASURE` step 诊断细化（本地候选，未部署）**：固定六个实际采样 step 与非采样 `NONE`，严格绑定 phase-step 关系；演练器在每个采样操作前设置 step，并把 topology/control/resource 三组采样拆为顺序局部量，evidence schema 不变。离线合同、三份 Node 语法、API lint/typecheck/build 与差异门禁通过；未启动 Colima、未执行 full drill、未生成新 evidence、未连接 production。
 - [x] **F1 D2′ `main@b2cf461d` fresh retake 执行前审查已硬停止（未执行）**：Claude、Antigravity、Cursor 客户端与独立 Codex reviewer 一致确认 cleanup 退出语义可产生假 PASS、user systemd 未复核 inactive，且 production secret denylist 不完整；因此未启动 Colima、未创建 guest clone、未生成 nonce/evidence，full drill 调用计数为 `0`。本次授权窗口与路径作废，`productionF1` 继续 **NO-GO**。
 - [x] **F1 D2′ cleanup / production-secret 合同修复（已本地合入 `main@f4f5ab49`，未 push、未部署）**：早期与最终 cleanup 失败均强制 exit `2`，PASS 仅在显式 cleanup 成功后输出；preflight/final 共用严格 inactive 证明；真实凭据 denylist、TTS 样板 SSOT 与恶意 mutation 合同已按两轮 RED→GREEN 完成。offline contract、Shell/Node 语法、API lint/typecheck/build、差异门禁及 Claude/Antigravity/Cursor 终审通过，合并后同套门禁复验通过；未运行 full drill、连接 production 或进入 D3–D6。
-- [ ] **F1 D2′ 后续 fresh retake（两项修复合入后须另行授权）**：仅在 cleanup / production-secret 修复与 `MEASURE` step 诊断候选均通过多模型审查并合入主干后，重新确定一套全新的 baseline、fresh clone、evidence 路径和 RFC3339 时间窗；不得复用 `b2cf461d` 本次执行包。继续复用现有非生产 Colima，不新增云主机，不连接 production，不进入 D3–D6；当前旧 evidence 与 `productionF1` 继续 **NO-GO**。
+- [x] **F1 D2′ `main@5b251e5f` fresh retake 已按独立授权执行一次（NO-GO）**：唯一一次 full drill 返回 `phase=MEASURE class=SYSTEM code=D2_PRIME_DRILL_FAILED step=CGROUP_CONSISTENCY` / exit `2`；独立 verifier 为 `D2_PRIME_EVIDENCE_NO_GO`、`productionF1=NO-GO`，evidence mode `0600`、SHA-256 `71933100cca77ea37764d4d09839b3f49824e1a1ed86b6b28f225895438a7812`。本任务未重跑；活动 unit、端口与进程已清除，nonce workspace/control root 因 cleanup fail-closed 保留。未连接 production 或进入 D3–D6。
+- [ ] **F1 D2′ stale-PID / cleanup 语义修复（下一步，独立代码任务）**：先用 TDD 复现回滚后旧 managed PID 已退出、`CGROUP_CONSISTENCY` 再读 `/proc/<旧PID>/cgroup` 的竞态，并改为基于回滚后受验证的当前 PID/cgroup 或明确的生命周期不变量；同时收紧“unit 已被收集为 not-found”与 cleanup 成功/法证保留的合同。须完成 offline mutation、API build/typecheck/lint 与 Claude + Antigravity + Cursor 审查；本任务不授权修改或重跑。
+- [ ] **F1 D2′ 后续 fresh retake（修复合入后须重新授权）**：修复经多模型审查并合入主干后，重新确定全新的 baseline、fresh clone、evidence 路径和 RFC3339 时间窗；不得复用 `5b251e5f` 执行包、nonce 或 evidence。继续复用现有非生产 Colima，不新增云主机，不连接 production，不进入 D3–D6；当前 evidence 与 `productionF1` 继续 **NO-GO**。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 

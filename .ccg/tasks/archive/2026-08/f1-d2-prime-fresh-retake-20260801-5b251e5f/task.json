@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-fresh-retake-20260801-5b251e5f",
+  "title": "基于 origin/main@5b251e5f 重建 D2′ fresh retake 精确执行包",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "high",
+  "domain": "release",
+  "currentPhase": "completed",
+  "nextAction": "另立 stale-PID/cgroup consistency 与 cleanup unit-collected 语义修复任务；本任务禁止重跑",
+  "createdAt": "2026-07-31T16:39:47Z",
+  "branch": "codex/f1-d2-prime-retake-20260801"
+}
