@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-measure-diagnostics-20260731",
+  "title": "细分 D2′ MEASURE 阶段安全诊断",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "release-tooling",
+  "currentPhase": "completed",
+  "nextAction": "等待用户选择候选分支整合方式",
+  "createdAt": "2026-07-31T21:55:00+08:00",
+  "branch": "codex/f1-d2-measure-diagnostics-20260731"
+}

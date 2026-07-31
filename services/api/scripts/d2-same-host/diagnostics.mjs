@@ -9,6 +9,16 @@ export const DRILL_PHASES = Object.freeze({
   CLEANUP: 'CLEANUP',
 })
 
+export const MEASURE_STEPS = Object.freeze({
+  NONE: 'NONE',
+  MANAGED_PID: 'MANAGED_PID',
+  NGINX_VERSION: 'NGINX_VERSION',
+  TOPOLOGY: 'TOPOLOGY',
+  CONTROL_ISOLATION: 'CONTROL_ISOLATION',
+  RESOURCE_ISOLATION: 'RESOURCE_ISOLATION',
+  CGROUP_CONSISTENCY: 'CGROUP_CONSISTENCY',
+})
+
 export const DRILL_ERROR_CLASSES = Object.freeze({
   NAMED: 'NAMED',
   ASSERTION: 'ASSERTION',
@@ -137,7 +147,9 @@ const SYSTEM_CODES = new Set([
   'EACCES', 'EEXIST', 'EIO', 'EISDIR', 'EMFILE', 'ENFILE', 'ENOENT', 'ENOSPC',
   'ENOTDIR', 'EPERM', 'EROFS',
 ])
-const DIAGNOSTIC_KEYS = Object.freeze(['phase', 'errorClass', 'code', 'failureEvidenceCode'])
+const DIAGNOSTIC_KEYS = Object.freeze([
+  'phase', 'errorClass', 'code', 'measureStep', 'failureEvidenceCode',
+])
 const DIAGNOSTIC = Symbol('d2-prime-diagnostic')
 
 function hasExactKeys(value, keys) {
@@ -177,6 +189,7 @@ function validateDiagnostic(diagnostic) {
   const phase = ownDataValue(diagnostic, 'phase')
   const errorClass = ownDataValue(diagnostic, 'errorClass')
   const code = ownDataValue(diagnostic, 'code')
+  const measureStep = ownDataValue(diagnostic, 'measureStep')
   const failureEvidenceCode = ownDataValue(diagnostic, 'failureEvidenceCode')
   const trustedNamedCode = TRUSTED_NAMED_CODES.has(code)
   if (
@@ -184,6 +197,8 @@ function validateDiagnostic(diagnostic) {
     !isKnownValue(DRILL_PHASES, phase) ||
     !isKnownValue(DRILL_ERROR_CLASSES, errorClass) ||
     !(code === FALLBACK_CODE || (trustedNamedCode && NAMED_CODE.test(code))) ||
+    !isKnownValue(MEASURE_STEPS, measureStep) ||
+    (phase === DRILL_PHASES.MEASURE) !== (measureStep !== MEASURE_STEPS.NONE) ||
     ![null, FAILURE_EVIDENCE_CODE].includes(failureEvidenceCode)
   ) throw new Error('D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID')
   if (
@@ -192,7 +207,7 @@ function validateDiagnostic(diagnostic) {
   ) {
     throw new Error('D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID')
   }
-  return Object.freeze({ phase, errorClass, code, failureEvidenceCode })
+  return Object.freeze({ phase, errorClass, code, measureStep, failureEvidenceCode })
 }
 
 function classifyError(error) {
@@ -206,14 +221,16 @@ function classifyError(error) {
   return DRILL_ERROR_CLASSES.UNKNOWN
 }
 
-export function classifyDrillFailure(error, phase) {
+export function classifyDrillFailure(error, phase, measureStep = MEASURE_STEPS.NONE) {
   if (!isKnownValue(DRILL_PHASES, phase)) throw new Error('D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID')
   const message = ownDataValue(error, 'message')
   const namedCode = typeof message === 'string' && TRUSTED_NAMED_CODES.has(message) ? message : null
+  const normalizedMeasureStep = phase === DRILL_PHASES.MEASURE ? measureStep : MEASURE_STEPS.NONE
   const diagnostic = {
     phase,
     errorClass: namedCode ? DRILL_ERROR_CLASSES.NAMED : classifyError(error),
     code: namedCode ?? FALLBACK_CODE,
+    measureStep: normalizedMeasureStep,
     failureEvidenceCode: null,
   }
   return validateDiagnostic(diagnostic)
@@ -231,16 +248,16 @@ export function createDrillDiagnosticError(diagnostic) {
   return Object.freeze(error)
 }
 
-export function resolveDrillDiagnostic(error, fallbackPhase) {
+export function resolveDrillDiagnostic(error, fallbackPhase, fallbackMeasureStep = MEASURE_STEPS.NONE) {
   const diagnostic = ownDataValue(error, DIAGNOSTIC)
   if (diagnostic !== undefined) return validateDiagnostic(diagnostic)
-  return classifyDrillFailure(error, fallbackPhase)
+  return classifyDrillFailure(error, fallbackPhase, fallbackMeasureStep)
 }
 
 export function formatDrillFailure(diagnostic) {
-  const { phase, errorClass, code, failureEvidenceCode } = validateDiagnostic(diagnostic)
+  const { phase, errorClass, code, measureStep, failureEvidenceCode } = validateDiagnostic(diagnostic)
   const evidence = failureEvidenceCode === null
     ? ''
     : ` evidence=${failureEvidenceCode}`
-  return `D2_PRIME_NO_GO phase=${phase} class=${errorClass} code=${code}${evidence}`
+  return `D2_PRIME_NO_GO phase=${phase} class=${errorClass} code=${code} step=${measureStep}${evidence}`
 }
