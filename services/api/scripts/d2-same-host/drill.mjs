@@ -19,6 +19,14 @@ import {
   createSpawnAttemptTracker,
   derivePm2ControlPaths,
 } from './control-plane.mjs'
+import {
+  DRILL_PHASES,
+  classifyDrillFailure,
+  createDrillDiagnosticError,
+  formatDrillFailure,
+  resolveDrillDiagnostic,
+  withFailureEvidenceWriteFailure,
+} from './diagnostics.mjs'
 
 const require = createRequire(import.meta.url)
 const scriptDir = dirname(fileURLToPath(import.meta.url))
@@ -32,6 +40,7 @@ const HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
 const NONCE = /^[0-9a-f]{32}$/
 const SHA256 = /^[0-9a-f]{64}$/
 const SAFE_UNIT = /^f1-d2-managed-[0-9a-f]{20}$/
+let currentPhase = DRILL_PHASES.SETUP
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 const sha = (value) => createHash('sha256').update(String(value), 'utf8').digest('hex')
 
@@ -369,6 +378,7 @@ async function main() {
     const nrThrottledAfter = throttledCount(managedCgroupRoot)
     process.stdout.write(`D2_PRIME_LATENCY baseline_p50_ms=${percentile(baseline.latencies, 0.5).toFixed(2)} baseline_p95_ms=${percentile(baseline.latencies, 0.95).toFixed(2)} load_p50_ms=${percentile(loadLatencies, 0.5).toFixed(2)} load_p95_ms=${percentile(loadLatencies, 0.95).toFixed(2)}\n`)
 
+    currentPhase = DRILL_PHASES.CUTOVER
     let cutoverState = 'LEGACY_ACTIVE'
     writeFileSync(nginxCandidate, renderNginxConfig({
       target: 'managed', listenPort: nginxPort, pidPath: nginxPidPath,
@@ -394,6 +404,7 @@ async function main() {
     assert.equal(cutoverState, 'CUTOVER_CONFIRMED')
     const legacyCountAtCutover = (await httpJson('http://127.0.0.1:3010/__d2/count')).body.count
 
+    currentPhase = DRILL_PHASES.ROLLBACK
     let failedReleaseError = ''
     try {
       await activateRelease({ candidateRoot: r3.releaseRoot, currentLink: fixture.managedCurrentLink, ...commonReleaseOptions })
@@ -411,6 +422,7 @@ async function main() {
     const legacyCountAfterRollback = (await httpJson('http://127.0.0.1:3010/__d2/count')).body.count
     if (legacyCountAfterRollback !== legacyCountAtCutover) fail('LEGACY_FALLBACK_DETECTED')
 
+    currentPhase = DRILL_PHASES.MEASURE
     const managedAppPid = pm2AppPid(pm2Bin, managedName, managedEnvironment)
     const nginxVersionOutput = run(nginxBin, ['-v'], { allowFailure: true })
     const nginxVersion = /nginx\/(\S+)/.exec(`${nginxVersionOutput.stderr}${nginxVersionOutput.stdout}`)?.[1]
@@ -448,19 +460,30 @@ async function main() {
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
     assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)
+    currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))
     if (evidence.verdict !== 'D2_PRIME_PASS') fail('EVIDENCE_NO_GO')
     writeExclusive(evidenceOut, `${JSON.stringify(evidence, null, 2)}\n`)
     evidenceWritten = true
   } catch (error) {
-    if (!evidenceWritten && !existsSync(evidenceOut)) {
-      const noGoEvidence = validateEvidence(buildEvidence(createFailureMeasurements(new Date().toISOString())))
-      if (noGoEvidence.verdict !== 'D2_PRIME_NO_GO') fail('FAILURE_EVIDENCE_INVALID')
-      writeExclusive(evidenceOut, `${JSON.stringify(noGoEvidence, null, 2)}\n`)
-      evidenceWritten = true
+    let diagnostic = classifyDrillFailure(error, currentPhase)
+    if (!evidenceWritten) {
+      if (existsSync(evidenceOut)) {
+        diagnostic = withFailureEvidenceWriteFailure(diagnostic)
+      } else {
+        try {
+          const noGoEvidence = validateEvidence(buildEvidence(createFailureMeasurements(new Date().toISOString())))
+          if (noGoEvidence.verdict !== 'D2_PRIME_NO_GO') fail('FAILURE_EVIDENCE_INVALID')
+          writeExclusive(evidenceOut, `${JSON.stringify(noGoEvidence, null, 2)}\n`)
+          evidenceWritten = true
+        } catch {
+          diagnostic = withFailureEvidenceWriteFailure(diagnostic)
+        }
+      }
     }
-    throw error
+    throw createDrillDiagnosticError(diagnostic)
   } finally {
+    currentPhase = DRILL_PHASES.CLEANUP
     if (managedDaemonReady) {
       try { run(pm2Bin, ['delete', managedName], { environment: managedEnvironment, allowFailure: true }) } catch { /* keeper owns final daemon cleanup */ }
     }
@@ -483,9 +506,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  const code = error instanceof Error && /^(?:D2_PRIME|RELEASE_PROVENANCE)_[A-Z0-9_]+$/.test(error.message)
-    ? error.message
-    : 'D2_PRIME_DRILL_FAILED'
-  process.stderr.write(`D2_PRIME_NO_GO ${code}\n`)
+  process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase))}\n`)
   process.exitCode = 2
 })
