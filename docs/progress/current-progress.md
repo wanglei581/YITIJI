@@ -1,5 +1,21 @@
 # 当前开发进度
 
+2026-07-31 完成 **F1 D2′ latest-main Draft PR 与运行时集成头 CI（未合并、未部署）**：
+建 PR 前发现 `origin/main` 已前进到 `06c7fe00357533fbcd91928a3abf2ed8c2933dec`，故在已发布分支上以
+普通 merge（无 rebase / force-push）同步主线。三方语义合并保留 main 的 XDG owner / non-symlink /
+`0700` / realpath 契约，以及候选的 CLI / transient unit `env -i`、`--expand-environment=no`、
+cgroup snapshot 与 stage markers，并移除 DBUS / bus socket 拓扑依赖。离线合同、Shell/Node
+语法、API typecheck/build/lint 与差异门禁全绿；Claude 首轮唯一非阻塞 Warning
+已修复，Claude / Antigravity 复审均 `APPROVE`（Critical 0、Warning 0）。Draft
+[PR #449](https://github.com/wanglei581/YITIJI/pull/449) 已创建；运行时合并头
+`aab7673b174a252fc999ddfb5f9f5887c5bce59e` 对应 Actions run
+[`30599423203`](https://github.com/wanglei581/YITIJI/actions/runs/30599423203) 的
+`build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。后续仅追加
+进度/CCG 归档元数据，其最终 PR HEAD 仍须重跑同一 CI 才可收口。本轮未运行
+full drill、未生成新 nonce/evidence、未 SSH、未读取生产值/凭据、未合并、未部署、
+未迁移、未切流。历史 `166fe9dc` PASS 仍只属于该历史候选；当前精确候选 D2′ 继续
+**NO-GO / 待 fresh retake**，`productionF1` 继续 **NO-GO**，D3 未授权。
+
 2026-07-31 完成 **F1 D2′ latest-main 候选分支推送（未建 PR、未部署）**：用户在“先授权推送并
 确认精确提交 CI”的明确建议后回复“可以，继续”；远端 `origin/main` 复核仍为集成基线
 `7b33447d38f16c9e251802052d2c95e9fe6df0d9`，本地提交后门禁与 Antigravity / Claude 最终审查均
