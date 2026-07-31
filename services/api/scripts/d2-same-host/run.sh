@@ -42,9 +42,7 @@ SYSTEMD_RUN_BIN="$(command -v systemd-run)"
 XDG_RUNTIME_DIR_PATH="/run/user/$(id -u)"
 [[ -d "$XDG_RUNTIME_DIR_PATH" && -O "$XDG_RUNTIME_DIR_PATH" && ! -L "$XDG_RUNTIME_DIR_PATH" ]] \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-[[ "$(stat -c '%a' "$XDG_RUNTIME_DIR_PATH")" == "700" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-[[ -S "$XDG_RUNTIME_DIR_PATH/bus" && -O "$XDG_RUNTIME_DIR_PATH/bus" && ! -L "$XDG_RUNTIME_DIR_PATH/bus" ]] \
+[[ "$(stat -c '%a' "$XDG_RUNTIME_DIR_PATH")" == "700" && "$(realpath "$XDG_RUNTIME_DIR_PATH")" == "$XDG_RUNTIME_DIR_PATH" ]] \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 export XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR_PATH"
 
@@ -194,11 +192,7 @@ bootstrap_cleanup() {
 }
 trap bootstrap_cleanup EXIT
 
-PM2_RUNTIME_ROOT="/run/user/$(id -u)"
-[[ -d "$PM2_RUNTIME_ROOT" && -O "$PM2_RUNTIME_ROOT" && ! -L "$PM2_RUNTIME_ROOT" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-[[ "$(stat -c '%a' "$PM2_RUNTIME_ROOT")" == "700" && "$(realpath "$PM2_RUNTIME_ROOT")" == "$PM2_RUNTIME_ROOT" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+PM2_RUNTIME_ROOT="$XDG_RUNTIME_DIR_PATH"
 PM2_CONTROL_ROOT="$PM2_RUNTIME_ROOT/d2p-$NONCE"
 [[ ! -e "$PM2_CONTROL_ROOT" && ! -L "$PM2_CONTROL_ROOT" ]] || no_go "D2_PRIME_NO_GO_WORKSPACE"
 mkdir -m 700 "$PM2_CONTROL_ROOT" || no_go "D2_PRIME_NO_GO_WORKSPACE"

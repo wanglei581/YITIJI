@@ -23,6 +23,7 @@
 - [x] **F1 latest-main 集成候选已审查并推送（D2′ 仍 NO-GO）**：候选分支 `codex/f1-d2-prime-main-integration-20260731` 已推送；运行时集成提交 `ca39c135`、首次远端审计头 `289c029c`。user-systemd CLI / preflight / managed transient unit 的 `env -i` 最小白名单和 `--expand-environment=no` 合同已 GREEN，语法、API typecheck/build/lint、差异门禁和提交后门禁通过；Antigravity 与 Claude 最终均 APPROVE（Critical 0、Warning 0）。这些结果不是当前候选的 full-drill evidence，旧 `166fe9dc` PASS evidence 不得平移，故当前 D2′ 继续 NO-GO。
 - [ ] **F1 严格下一步：PR/CI 决策、新 retake，不得跳到 D3**：现有 CI 只在 `main` push 或 `pull_request` 触发，候选分支 push 对精确提交没有 Actions run，因此不得写成 CI PASS/FAIL。下一步先由用户另行决定是否授权建 PR；获得精确 PR head CI 后，再由用户对同一候选另行授权一次新非生产 retake，必须使用新 nonce、新 evidence 路径和新 RFC3339 窗口。在该精确候选 fresh PASS 前不得进入 D3；该顺序不授权合并、部署、切流、迁移、SSH 或任何生产操作。
 - [ ] **F1 D3 仍未授权，且只能在当前精确候选 fresh PASS 后单独申请**：只有上一步的新非生产 retake 对该精确候选 PASS 后，单一业主才可在仓库外建立唯一负责人、单一用途 `D3_READONLY_PRECHECK` 记录，固定受控 managed 输入引用与 RFC3339 窗口，并由用户对该窗口另行明确授权。当前 **D3 未授权**；授权前不得 SSH、读取生产值/凭据、部署、切流、迁移或执行 D4–D6。`productionF1` 始终 **NO-GO**。
+- [x] **F1 D2′ XDG user-systemd 执行契约修复（本地候选，未部署）**：`run.sh` 已在首个 user-systemd 前自派生并严格校验 exact `/run/user/$(id -u)`，内层 `env -i` 与 `drill.mjs` 的 5 个 systemd 查询均显式使用受信 XDG；离线合同以恶意变体锁定执行顺序、真实数据流及 DBUS/bus 拓扑禁令。Shell/Node 语法、offline contract、API lint/typecheck/build 与差异门禁通过，Claude、Antigravity、Cursor、独立 reviewer 最终均 `NO FINDINGS`。修复代码仍不等于 D2′ PASS，旧 retake 继续 **NO-GO**。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 
