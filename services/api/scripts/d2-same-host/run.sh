@@ -35,11 +35,29 @@ NGINX_BIN="$(command -v nginx)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
 
 production_variables=(
-  DATABASE_URL DIRECT_URL
+  DATABASE_URL DIRECT_URL POSTGRES_URL
   REDIS_URL REDIS_HOST REDIS_PASSWORD
   OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET
-  COS_SECRET_ID COS_SECRET_KEY
+  COS_SECRET_ID COS_SECRET_KEY TENCENT_COS_SECRET_ID TENCENT_COS_SECRET_KEY
   TENCENTCLOUD_SECRET_ID TENCENTCLOUD_SECRET_KEY
+  TENCENT_SECRET_ID TENCENT_SECRET_KEY
+  TENCENT_SMS_SECRET_ID TENCENT_SMS_SECRET_KEY TENCENT_SMS_SDK_APP_ID
+  TENCENT_SMS_SIGN_NAME TENCENT_SMS_TEMPLATE_ID
+  TENCENT_ASR_SECRET_ID TENCENT_ASR_SECRET_KEY
+  TENCENT_TTS_SECRET_ID TENCENT_TTS_SECRET_KEY
+  TENCENT_OCR_SECRET_ID TENCENT_OCR_SECRET_KEY
+  TRTC_SDK_APP_ID TRTC_SDK_SECRET_KEY TRTC_LLM_API_KEY TRTC_TTS_APP_ID
+  AI_LLM_API_KEY AI_IMAGE_API_KEY
+  BAIDU_OCR_API_KEY BAIDU_OCR_SECRET_KEY BAIDU_ASR_API_KEY BAIDU_ASR_SECRET_KEY
+  JWT_SECRET TERMINAL_ADMIN_SECRET TERMINAL_ACTION_TOKEN_SECRET
+  FILE_SIGNING_SECRET SECRET_ENCRYPTION_KEY
+  PAYMENT_SESSION_SECRET SANDBOX_PAYMENT_SECRET
+  WECHAT_PAY_MCHID WECHAT_PAY_APPID WECHAT_PAY_MCH_SERIAL_NO
+  WECHAT_PAY_PRIVATE_KEY_PEM WECHAT_PAY_PRIVATE_KEY_PATH WECHAT_PAY_APIV3_KEY
+  WECHAT_PAY_PUBLIC_KEY_PEM WECHAT_PAY_PUBLIC_KEY_PATH WECHAT_PAY_PUBLIC_KEY_ID
+  WECHAT_PAY_CODEPAY_STORE_OUT_ID
+  ALIPAY_APP_ID ALIPAY_APP_PRIVATE_KEY_PEM ALIPAY_APP_PRIVATE_KEY_PATH
+  ALIPAY_PUBLIC_KEY_PEM ALIPAY_PUBLIC_KEY_PATH
   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
   MINIO_ROOT_USER MINIO_ROOT_PASSWORD
 )
@@ -62,6 +80,23 @@ XDG_RUNTIME_DIR="/run/user/$(id -u)"
 [[ "$(stat -c '%a' "$XDG_RUNTIME_DIR")" == "700" && "$(realpath "$XDG_RUNTIME_DIR")" == "$XDG_RUNTIME_DIR" ]] \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 export XDG_RUNTIME_DIR
+
+stop_user_unit_and_prove_inactive() {
+  local unit_name="$1"
+  local unit_state=""
+  systemctl --user stop "$unit_name" >/dev/null 2>&1 || return 1
+  for _ in {1..50}; do
+    if ! unit_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"; then
+      return 1
+    fi
+    [[ "$unit_state" == "inactive" ]] && return 0
+    case "$unit_state" in
+      active|activating|deactivating|reloading) sleep 0.1 ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
 
 systemctl --user show-environment >/dev/null 2>&1 \
   || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
@@ -106,18 +141,7 @@ if (( PREFLIGHT_OK == 1 )); then
   PREFLIGHT_NOFILE="$(systemctl --user show "$PREFLIGHT_UNIT" -p LimitNOFILE --value 2>/dev/null || true)"
   [[ "${PREFLIGHT_NOFILE%%:*}" == "256" ]] || PREFLIGHT_OK=0
 fi
-systemctl --user stop "$PREFLIGHT_UNIT" >/dev/null 2>&1 || PREFLIGHT_OK=0
-PREFLIGHT_STOPPED=0
-for _ in {1..50}; do
-  PREFLIGHT_STATE="$(systemctl --user show "$PREFLIGHT_UNIT" -p ActiveState --value 2>/dev/null || true)"
-  if [[ -z "$PREFLIGHT_STATE" || "$PREFLIGHT_STATE" == "inactive" || "$PREFLIGHT_STATE" == "failed" ]]; then
-    PREFLIGHT_STOPPED=1
-    break
-  fi
-  sleep 0.1
-done
-(( PREFLIGHT_STOPPED == 1 )) || PREFLIGHT_OK=0
-systemctl --user reset-failed "$PREFLIGHT_UNIT" >/dev/null 2>&1 || true
+stop_user_unit_and_prove_inactive "$PREFLIGHT_UNIT" || PREFLIGHT_OK=0
 (( PREFLIGHT_OK == 1 )) || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 
 NGINX_PORT="${D2_NGINX_PORT:-18080}"
@@ -251,22 +275,30 @@ bounded_pm2_kill() {
 }
 
 early_cleanup() {
-  local original_status=$?
   local cleanup_failed=0
   set +e
   bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$MANAGED_HOME" "$MANAGED_PM2_HOME" || cleanup_failed=1
   if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
-    (( cleanup_failed == 0 )) && rm -rf -- "$RUN_DIR"
+    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1
   fi
   if [[ -n "${PM2_CONTROL_ROOT:-}" && "$PM2_CONTROL_ROOT" == "$PM2_RUNTIME_ROOT/d2p-"* ]]; then
-    (( cleanup_failed == 0 )) && rm -rf -- "$PM2_CONTROL_ROOT"
+    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1
   fi
   (( cleanup_failed == 0 )) || return 2
-  return "$original_status"
+  return 0
 }
-trap early_cleanup EXIT
+
+early_cleanup_on_exit() {
+  local original_status=$?
+  trap - EXIT
+  if ! early_cleanup; then
+    exit 2
+  fi
+  exit "$original_status"
+}
+trap early_cleanup_on_exit EXIT
 
 env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
   "$NODE_BIN" "$SCRIPT_DIR/control-plane.mjs" --assert-layout \
@@ -295,19 +327,17 @@ timeout --signal=TERM --kill-after=3s 8s \
 pm2_home_has_state "$PREFLIGHT_PM2_HOME" && no_go "D2_PRIME_NO_GO_ENVIRONMENT"
 
 cleanup() {
-  local original_status=$?
   local cleanup_failed=0
   set +e
   if [[ -n "${STOP_MARKER:-}" && -d "${RUN_DIR:-}" && ! -e "$STOP_MARKER" ]]; then
-    (umask 077; set -o noclobber; : > "$STOP_MARKER") 2>/dev/null
+    (umask 077; set -o noclobber; : > "$STOP_MARKER") 2>/dev/null || cleanup_failed=1
   fi
   if (( KEEPER_STARTED == 1 )); then
     for _ in {1..150}; do
       systemctl --user is-active --quiet "$UNIT_NAME" || break
       sleep 0.1
     done
-    systemctl --user stop "$UNIT_NAME" >/dev/null 2>&1 || true
-    systemctl --user reset-failed "$UNIT_NAME" >/dev/null 2>&1 || true
+    stop_user_unit_and_prove_inactive "$UNIT_NAME" || cleanup_failed=1
   fi
   bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
@@ -326,15 +356,24 @@ cleanup() {
     fi
   fi
   if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
-    (( cleanup_failed == 0 )) && rm -rf -- "$RUN_DIR"
+    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1
   fi
   if [[ -n "${PM2_CONTROL_ROOT:-}" && "$PM2_CONTROL_ROOT" == "$PM2_RUNTIME_ROOT/d2p-"* ]]; then
-    (( cleanup_failed == 0 )) && rm -rf -- "$PM2_CONTROL_ROOT"
+    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1
   fi
   (( cleanup_failed == 0 )) || return 2
-  return "$original_status"
+  return 0
 }
-trap cleanup EXIT
+
+cleanup_on_exit() {
+  local original_status=$?
+  trap - EXIT
+  if ! cleanup; then
+    exit 2
+  fi
+  exit "$original_status"
+}
+trap cleanup_on_exit EXIT
 trap 'exit 2' INT TERM
 
 systemd-run --user \
@@ -389,4 +428,6 @@ env -i PATH="$APPROVED_PATH" HOME="$MANAGED_HOME" \
   "$NODE_BIN" "$SCRIPT_DIR/verify-contract.mjs" --evidence "$EVIDENCE_OUT" \
   || no_go "D2_PRIME_EVIDENCE_REJECTED"
 
+trap - EXIT
+cleanup || no_go "D2_PRIME_CLEANUP_FAILED"
 printf 'D2_PRIME_PASS\nproductionF1=NO-GO\n'

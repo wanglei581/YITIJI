@@ -78,6 +78,121 @@ function expectContractFailure(action) {
   )
 }
 
+function shellFunctionSource(source, name) {
+  const marker = `\n${name}() {\n`
+  const markerStart = source.indexOf(marker)
+  const start = markerStart + 1
+  assert.ok(markerStart >= 0, `${name} function must exist`)
+  const end = source.indexOf('\n}\n', start)
+  assert.ok(end > start, `${name} function must have a bounded body`)
+  return source.slice(start, end + 2)
+}
+
+function productionEnvironmentNames(envExampleSource) {
+  const configuredNames = new Set(
+    [...envExampleSource.matchAll(/^#?([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]),
+  )
+  for (const runtimeCredentialName of ['TENCENT_TTS_SECRET_ID', 'TENCENT_TTS_SECRET_KEY']) {
+    assert.ok(configuredNames.has(runtimeCredentialName), `.env.example must declare ${runtimeCredentialName}`)
+  }
+  const dataPlaneNames = new Set([
+    'DATABASE_URL',
+    'DIRECT_URL',
+    'POSTGRES_URL',
+    'REDIS_URL',
+    'REDIS_HOST',
+    'REDIS_PASSWORD',
+  ])
+  const credentialName = /(?:SECRET|PASSWORD|PRIVATE_KEY|PUBLIC_KEY|APIV3_KEY|MCH_SERIAL_NO|ACCESS_KEY|API_KEY|APP_ID$|APPID$|MCHID$|SIGN_NAME$|TEMPLATE_ID$|CODEPAY_STORE_OUT_ID$)/
+  return [...configuredNames].filter((name) => dataPlaneNames.has(name) || credentialName.test(name))
+}
+
+function assertProductionEnvironmentContract(runSource, envExampleSource) {
+  const productionBlock = runSource.match(/production_variables=\(\n([\s\S]*?)\n\)/)?.[1]
+  assert.ok(productionBlock, 'production_variables must be a multiline shell array')
+  const productionNames = new Set(productionBlock.split(/\s+/).filter(Boolean))
+  for (const name of productionEnvironmentNames(envExampleSource)) {
+    assert.ok(productionNames.has(name), `production_variables must include ${name}`)
+  }
+  for (const legacyName of [
+    'OSS_ACCESS_KEY_ID',
+    'OSS_ACCESS_KEY_SECRET',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_SESSION_TOKEN',
+    'MINIO_ROOT_USER',
+    'MINIO_ROOT_PASSWORD',
+    'TENCENTCLOUD_SECRET_ID',
+    'TENCENTCLOUD_SECRET_KEY',
+  ]) assert.ok(productionNames.has(legacyName), `production_variables must retain ${legacyName}`)
+
+  const environmentGuard = runSource.slice(
+    runSource.indexOf('for variable_name in "${production_variables[@]}"'),
+    runSource.indexOf('done', runSource.indexOf('for variable_name in "${production_variables[@]}"')) + 4,
+  )
+  assert.match(environmentGuard, /\[\[ -z "\$\{!variable_name\+x\}" \]\]/)
+  assert.doesNotMatch(environmentGuard, /(?:echo|printf|export|printenv|env|set)[^\n]*\$\{!variable_name\}/)
+}
+
+function assertCleanupContract(runSource) {
+  const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
+  assert.match(stopHelper, /systemctl --user stop "\$unit_name"[^\n]*\|\| return 1/)
+  assert.match(stopHelper, /systemctl --user show "\$unit_name" -p ActiveState --value/)
+  assert.match(stopHelper, /\[\[ "\$unit_state" == "inactive" \]\] && return 0/)
+  assert.doesNotMatch(stopHelper, /\|\| true|failed|-z "\$unit_state"/)
+  assert.ok(
+    (runSource.match(/stop_user_unit_and_prove_inactive "\$(?:PREFLIGHT_UNIT|UNIT_NAME)"/g) ?? []).length >= 2,
+    'preflight and final cleanup must share the strict inactive helper',
+  )
+
+  const earlyCleanup = shellFunctionSource(runSource, 'early_cleanup')
+  assert.equal((earlyCleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
+  const earlyExitHandler = shellFunctionSource(runSource, 'early_cleanup_on_exit')
+  assert.match(earlyExitHandler, /local original_status=\$\?/)
+  assert.match(earlyExitHandler, /trap - EXIT/)
+  assert.match(earlyExitHandler, /if ! early_cleanup; then[\s\S]*exit 2[\s\S]*fi/)
+  assert.match(earlyExitHandler, /exit "\$original_status"/)
+  assert.match(runSource, /^trap early_cleanup_on_exit EXIT$/m)
+
+  const cleanup = shellFunctionSource(runSource, 'cleanup')
+  assert.match(cleanup, /stop_user_unit_and_prove_inactive "\$UNIT_NAME" \|\| cleanup_failed=1/)
+  assert.match(cleanup, /: > "\$STOP_MARKER"\) 2>\/dev\/null \|\| cleanup_failed=1/)
+  assert.equal((cleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
+
+  const exitHandler = shellFunctionSource(runSource, 'cleanup_on_exit')
+  assert.match(exitHandler, /local original_status=\$\?/)
+  assert.match(exitHandler, /trap - EXIT/)
+  assert.match(exitHandler, /if ! cleanup; then[\s\S]*exit 2[\s\S]*fi/)
+  assert.match(exitHandler, /exit "\$original_status"/)
+  assert.match(runSource, /^trap cleanup_on_exit EXIT$/m)
+
+  const evidenceVerified = runSource.lastIndexOf('"$SCRIPT_DIR/verify-contract.mjs" --evidence "$EVIDENCE_OUT"')
+  const finalTrapDisarm = runSource.lastIndexOf('trap - EXIT')
+  const finalCleanup = runSource.lastIndexOf('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"')
+  const pass = runSource.lastIndexOf("printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'")
+  assert.ok(evidenceVerified >= 0 && finalTrapDisarm > evidenceVerified)
+  assert.ok(finalCleanup > finalTrapDisarm && pass > finalCleanup)
+}
+
+function verifyCleanupContract() {
+  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
+  const envExampleSource = readFileSync(join(SCRIPT_DIR, '../../.env.example'), 'utf8')
+  assertProductionEnvironmentContract(runSource, envExampleSource)
+  assertCleanupContract(runSource)
+
+  const unsafeMutations = [
+    runSource.replace('[[ "$unit_state" == "inactive" ]] && return 0', '[[ -z "$unit_state" || "$unit_state" == "inactive" ]] && return 0'),
+    runSource.replace('trap - EXIT\ncleanup || no_go "D2_PRIME_CLEANUP_FAILED"', 'cleanup || no_go "D2_PRIME_CLEANUP_FAILED"'),
+    runSource.replace('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"', "printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'"),
+  ]
+  for (const mutation of unsafeMutations) assert.throws(() => assertCleanupContract(mutation))
+
+  const requiredName = productionEnvironmentNames(envExampleSource)[0]
+  const missingCredential = runSource.replace(new RegExp(`\\b${requiredName}\\b`), '')
+  assert.throws(() => assertProductionEnvironmentContract(missingCredential, envExampleSource))
+  console.log('  PASS cleanup, user systemd inactive proof, and production environment denylist fail closed')
+}
+
 function measurements() {
   return {
     recordedAt: '2026-07-30T08:00:00.000Z',
@@ -773,6 +888,11 @@ function main(args = process.argv.slice(2)) {
     verifyUserSystemdEnvironmentContract()
   } catch {
     throw new Error('D2_PRIME_USER_SYSTEMD_CONTRACT_INVALID')
+  }
+  try {
+    verifyCleanupContract()
+  } catch {
+    throw new Error('D2_PRIME_CLEANUP_CONTRACT_INVALID')
   }
   verifyEvidenceContract()
   verifyDrillDiagnosticContract()
