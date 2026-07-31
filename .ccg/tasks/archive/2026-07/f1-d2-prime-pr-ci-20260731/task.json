@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-pr-ci-20260731",
+  "title": "创建 D2 Prime Draft PR 并核对精确 HEAD CI",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "ci-governance",
+  "currentPhase": "completed",
+  "nextAction": "归档并推送元数据最终 HEAD，然后监控该 HEAD 三项 CI；不合并、不部署",
+  "createdAt": "2026-07-31T00:00:00+08:00",
+  "branch": "codex/f1-d2-prime-main-integration-20260731"
+}
