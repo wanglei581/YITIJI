@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-push-ci-20260731",
+  "title": "推送 D2 Prime 本地候选并核对精确提交 CI",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "medium",
+  "domain": "ci-governance",
+  "currentPhase": "completed",
+  "nextAction": "归档任务；等待用户另行决定是否授权创建 PR",
+  "createdAt": "2026-07-31T00:00:00+08:00",
+  "branch": "codex/f1-d2-prime-main-integration-20260731"
+}
