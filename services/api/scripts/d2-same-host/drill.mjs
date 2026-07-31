@@ -21,6 +21,7 @@ import {
 } from './control-plane.mjs'
 import {
   DRILL_PHASES,
+  MEASURE_STEPS,
   classifyDrillFailure,
   createDrillDiagnosticError,
   formatDrillFailure,
@@ -41,6 +42,7 @@ const NONCE = /^[0-9a-f]{32}$/
 const SHA256 = /^[0-9a-f]{64}$/
 const SAFE_UNIT = /^f1-d2-managed-[0-9a-f]{20}$/
 let currentPhase = DRILL_PHASES.SETUP
+let currentMeasureStep = MEASURE_STEPS.NONE
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 const sha = (value) => createHash('sha256').update(String(value), 'utf8').digest('hex')
 
@@ -423,23 +425,36 @@ async function main() {
     if (legacyCountAfterRollback !== legacyCountAtCutover) fail('LEGACY_FALLBACK_DETECTED')
 
     currentPhase = DRILL_PHASES.MEASURE
+    currentMeasureStep = MEASURE_STEPS.MANAGED_PID
     const managedAppPid = pm2AppPid(pm2Bin, managedName, managedEnvironment)
+    currentMeasureStep = MEASURE_STEPS.NGINX_VERSION
     const nginxVersionOutput = run(nginxBin, ['-v'], { allowFailure: true })
     const nginxVersion = /nginx\/(\S+)/.exec(`${nginxVersionOutput.stderr}${nginxVersionOutput.stdout}`)?.[1]
     if (!nginxVersion) fail('NGINX_VERSION_INVALID')
+    currentMeasureStep = MEASURE_STEPS.TOPOLOGY
+    const topology = {
+      legacyNetNamespaceInode: networkNamespaceInode(legacyAppPid),
+      managedNetNamespaceInode: networkNamespaceInode(managedAppPid),
+      nginxNetNamespaceInode: networkNamespaceInode(nginxPid),
+    }
+    currentMeasureStep = MEASURE_STEPS.CONTROL_ISOLATION
+    const controlIsolation = {
+      legacyPm2HomeId: sha(legacyPm2Home), managedPm2HomeId, legacyDaemonId: `daemon-${sha(legacyDaemonPid).slice(0, 16)}`,
+      managedDaemonId: `daemon-${sha(managedDaemonPid).slice(0, 16)}`, legacyNameId: legacyName, managedNameId: managedName,
+      legacyReleasePathsId: sha(legacyRoot), managedReleasePathsId: sha([r1.artifactRoot, fixture.controlRoot, fixture.launcherCwd, fixture.managedCurrentLink, fixture.runtimeEnvContractPath].join('\n')),
+      legacyLogPathsId: sha(legacyLogs), managedLogPathsId: sha(join(managedPm2Home, 'logs')),
+    }
+    currentMeasureStep = MEASURE_STEPS.RESOURCE_ISOLATION
+    const resourceIsolation = {
+      cgroupVersion: 'v2', engine: 'systemd', managedControlGroupId: sha(managedControlGroup),
+      managedDaemonControlGroupId: sha(controlGroup(managedDaemonPid)), managedAppControlGroupId: sha(controlGroup(managedAppPid)),
+      effectiveMemoryMaxBytes, effectiveCpuQuotaPerSecUSec, effectiveTasksMax, effectiveLimitNOFILE,
+      nrThrottledBefore, nrThrottledAfter, legacyProbeFailuresUnderLoad,
+    }
     measurements = {
       recordedAt: new Date().toISOString(),
-      topology: {
-        legacyNetNamespaceInode: networkNamespaceInode(legacyAppPid),
-        managedNetNamespaceInode: networkNamespaceInode(managedAppPid),
-        nginxNetNamespaceInode: networkNamespaceInode(nginxPid),
-      },
-      controlIsolation: {
-        legacyPm2HomeId: sha(legacyPm2Home), managedPm2HomeId, legacyDaemonId: `daemon-${sha(legacyDaemonPid).slice(0, 16)}`,
-        managedDaemonId: `daemon-${sha(managedDaemonPid).slice(0, 16)}`, legacyNameId: legacyName, managedNameId: managedName,
-        legacyReleasePathsId: sha(legacyRoot), managedReleasePathsId: sha([r1.artifactRoot, fixture.controlRoot, fixture.launcherCwd, fixture.managedCurrentLink, fixture.runtimeEnvContractPath].join('\n')),
-        legacyLogPathsId: sha(legacyLogs), managedLogPathsId: sha(join(managedPm2Home, 'logs')),
-      },
+      topology,
+      controlIsolation,
       healthContract: { managedHealthUrl: HEALTH_URL, legacyHealthProbeCountByReleaseTools: releaseProbeCounter.legacy },
       nginx: {
         binaryVersion: `nginx/${nginxVersion}`, invalidCandidateTestExitCode: invalidTest.status,
@@ -451,14 +466,10 @@ async function main() {
         genesisStatus: 'PARALLEL_SERVING_R1', activatedReleaseId: r2Id, failedReleaseError,
         currentAfterRollback: r2Id, rollbackTarget: 'managed-previous-only', legacyFallbackAttempted: false,
       },
-      resourceIsolation: {
-        cgroupVersion: 'v2', engine: 'systemd', managedControlGroupId: sha(managedControlGroup),
-        managedDaemonControlGroupId: sha(controlGroup(managedDaemonPid)), managedAppControlGroupId: sha(controlGroup(managedAppPid)),
-        effectiveMemoryMaxBytes, effectiveCpuQuotaPerSecUSec, effectiveTasksMax, effectiveLimitNOFILE,
-        nrThrottledBefore, nrThrottledAfter, legacyProbeFailuresUnderLoad,
-      },
+      resourceIsolation,
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
+    currentMeasureStep = MEASURE_STEPS.CGROUP_CONSISTENCY
     assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)
     currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))
@@ -466,7 +477,7 @@ async function main() {
     writeExclusive(evidenceOut, `${JSON.stringify(evidence, null, 2)}\n`)
     evidenceWritten = true
   } catch (error) {
-    let diagnostic = classifyDrillFailure(error, currentPhase)
+    let diagnostic = classifyDrillFailure(error, currentPhase, currentMeasureStep)
     if (!evidenceWritten) {
       if (existsSync(evidenceOut)) {
         diagnostic = withFailureEvidenceWriteFailure(diagnostic)
@@ -506,6 +517,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase))}\n`)
+  process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase, currentMeasureStep))}\n`)
   process.exitCode = 2
 })

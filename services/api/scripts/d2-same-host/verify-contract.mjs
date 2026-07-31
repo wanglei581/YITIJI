@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process'
 import { lstatSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
+import * as diagnosticModule from './diagnostics.mjs'
 import {
   buildEvidence,
   createFailureMeasurements,
@@ -34,6 +36,36 @@ const SHA_B = 'b'.repeat(64)
 const SHA_C = 'c'.repeat(64)
 const SHA_D = 'd'.repeat(64)
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+
+function executableSource(source) {
+  const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source)
+  const noise = new Set([
+    ts.SyntaxKind.SingleLineCommentTrivia, ts.SyntaxKind.MultiLineCommentTrivia,
+    ts.SyntaxKind.StringLiteral, ts.SyntaxKind.RegularExpressionLiteral,
+    ts.SyntaxKind.NoSubstitutionTemplateLiteral, ts.SyntaxKind.TemplateHead,
+    ts.SyntaxKind.TemplateMiddle, ts.SyntaxKind.TemplateTail,
+  ])
+  const templateBraceDepths = []
+  let result = ''
+  for (let token = scanner.scan(); token !== ts.SyntaxKind.EndOfFileToken; token = scanner.scan()) {
+    if (templateBraceDepths.length > 0 && token === ts.SyntaxKind.OpenBraceToken) {
+      templateBraceDepths[templateBraceDepths.length - 1] += 1
+    } else if (templateBraceDepths.length > 0 && token === ts.SyntaxKind.CloseBraceToken) {
+      const templateIndex = templateBraceDepths.length - 1
+      if (templateBraceDepths[templateIndex] === 0) {
+        token = scanner.reScanTemplateToken(false)
+        if (token === ts.SyntaxKind.TemplateTail) templateBraceDepths.pop()
+      } else {
+        templateBraceDepths[templateIndex] -= 1
+      }
+    }
+    const text = scanner.getTokenText()
+    result += noise.has(token) ? text.replace(/[^\r\n]/g, ' ') : text
+    if (token === ts.SyntaxKind.TemplateHead) templateBraceDepths.push(0)
+  }
+  assert.equal(templateBraceDepths.length, 0)
+  return result
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
@@ -574,6 +606,12 @@ function verifyEvidenceContract() {
 }
 
 function verifyDrillDiagnosticContract() {
+  const { MEASURE_STEPS } = diagnosticModule
+  assert.deepEqual(Object.values(MEASURE_STEPS ?? {}), [
+    'NONE', 'MANAGED_PID', 'NGINX_VERSION', 'TOPOLOGY', 'CONTROL_ISOLATION',
+    'RESOURCE_ISOLATION', 'CGROUP_CONSISTENCY',
+  ])
+  assert.equal(Object.isFrozen(MEASURE_STEPS), true)
   assert.deepEqual(Object.values(DRILL_PHASES), [
     'SETUP', 'CUTOVER', 'ROLLBACK', 'MEASURE', 'EVIDENCE', 'CLEANUP',
   ])
@@ -589,10 +627,10 @@ function verifyDrillDiagnosticContract() {
   )
   assert.deepEqual(named, {
     phase: 'ROLLBACK', errorClass: 'NAMED', code: 'RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK',
-    failureEvidenceCode: null,
+    measureStep: 'NONE', failureEvidenceCode: null,
   })
   assert.equal(formatDrillFailure(named),
-    'D2_PRIME_NO_GO phase=ROLLBACK class=NAMED code=RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK')
+    'D2_PRIME_NO_GO phase=ROLLBACK class=NAMED code=RELEASE_PROVENANCE_ACTIVATION_ROLLED_BACK step=NONE')
 
   const injectedSecret = 'db-password-must-not-survive'
   const injectedPath = '/var/lib/private/runtime/secret.json'
@@ -613,7 +651,7 @@ function verifyDrillDiagnosticContract() {
     DRILL_PHASES.CUTOVER,
   )
   const unknownOutput = formatDrillFailure(unknown)
-  assert.equal(unknownOutput, 'D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED')
+  assert.equal(unknownOutput, 'D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED step=NONE')
   for (const forbidden of [
     injectedSecret, injectedPath, injectedNonce, injectedHostname, injectedPid, injectedEvidence,
   ]) {
@@ -625,7 +663,7 @@ function verifyDrillDiagnosticContract() {
     new Error(prefixShapedSecret),
     DRILL_PHASES.SETUP,
   ))
-  assert.equal(prefixOutput, 'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED')
+  assert.equal(prefixOutput, 'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED step=NONE')
   assert.doesNotMatch(prefixOutput, /DATABASE_PASSWORD|SUPERSECRET/)
 
   const throwingGetter = Object.create(Error.prototype, {
@@ -645,14 +683,29 @@ function verifyDrillDiagnosticContract() {
     actual: injectedSecret,
     expected: 'safe',
     operator: 'strictEqual',
-  }), DRILL_PHASES.MEASURE)
+  }), DRILL_PHASES.MEASURE, MEASURE_STEPS.CGROUP_CONSISTENCY)
   assert.equal(assertion.errorClass, 'ASSERTION')
+  assert.equal(assertion.measureStep, 'CGROUP_CONSISTENCY')
   assert.doesNotMatch(formatDrillFailure(assertion), /secret|private|aabbccdd/)
 
   const systemError = Object.assign(new Error(`${injectedSecret}:${injectedPath}`), {
     code: 'EPERM', path: injectedPath, syscall: 'open',
   })
   assert.equal(classifyDrillFailure(systemError, DRILL_PHASES.EVIDENCE).errorClass, 'SYSTEM')
+  const measuredSystem = classifyDrillFailure(
+    systemError, DRILL_PHASES.MEASURE, MEASURE_STEPS.RESOURCE_ISOLATION,
+  )
+  assert.equal(measuredSystem.measureStep, 'RESOURCE_ISOLATION')
+  assert.equal(formatDrillFailure(measuredSystem),
+    'D2_PRIME_NO_GO phase=MEASURE class=SYSTEM code=D2_PRIME_DRILL_FAILED step=RESOURCE_ISOLATION')
+  assert.throws(
+    () => classifyDrillFailure(systemError, DRILL_PHASES.MEASURE),
+    /D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID/,
+  )
+  assert.equal(
+    classifyDrillFailure(systemError, DRILL_PHASES.EVIDENCE, injectedPath).measureStep,
+    MEASURE_STEPS.NONE,
+  )
   const arbitraryErrno = Object.assign(new Error(injectedSecret), { code: `E_${injectedNonce}` })
   assert.equal(classifyDrillFailure(arbitraryErrno, DRILL_PHASES.EVIDENCE).errorClass, 'ERROR')
 
@@ -660,7 +713,7 @@ function verifyDrillDiagnosticContract() {
   assert.equal(evidenceFailure.failureEvidenceCode, FAILURE_EVIDENCE_CODE)
   assert.equal(
     formatDrillFailure(evidenceFailure),
-    `D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED evidence=${FAILURE_EVIDENCE_CODE}`,
+    `D2_PRIME_NO_GO phase=CUTOVER class=ERROR code=D2_PRIME_DRILL_FAILED step=NONE evidence=${FAILURE_EVIDENCE_CODE}`,
   )
   const wrapped = createDrillDiagnosticError(evidenceFailure)
   assert.deepEqual(resolveDrillDiagnostic(wrapped, DRILL_PHASES.CLEANUP), evidenceFailure)
@@ -672,6 +725,9 @@ function verifyDrillDiagnosticContract() {
     { ...unknown, code: injectedNonce },
     { ...unknown, errorClass: 'NAMED', code: prefixShapedSecret },
     { ...unknown, errorClass: 'NAMED', code: 'RELEASE_PROVENANCE_PASSWORD_SUPERSECRET' },
+    { ...unknown, measureStep: injectedNonce },
+    { ...unknown, phase: 'MEASURE' },
+    { ...unknown, measureStep: 'TOPOLOGY' },
     { ...unknown, failureEvidenceCode: 'EACCES' },
     { ...unknown, extra: injectedPath },
   ]) assert.throws(() => formatDrillFailure(invalid), /D2_PRIME_DIAGNOSTIC_CONTRACT_INVALID/)
@@ -679,6 +735,7 @@ function verifyDrillDiagnosticContract() {
     phase: { enumerable: true, get() { return `SETUP\n${injectedSecret}` } },
     errorClass: { enumerable: true, value: 'ERROR' },
     code: { enumerable: true, value: 'D2_PRIME_DRILL_FAILED' },
+    measureStep: { enumerable: true, get() { return injectedNonce } },
     failureEvidenceCode: { enumerable: true, value: null },
   })
   assert.throws(
@@ -706,7 +763,7 @@ function verifyDrillDiagnosticContract() {
   })
   assert.equal(
     formatDrillFailure(changingDiagnostic),
-    'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED',
+    'D2_PRIME_NO_GO phase=SETUP class=ERROR code=D2_PRIME_DRILL_FAILED step=NONE',
   )
 
   const genericEvidence = JSON.stringify(buildEvidence({
@@ -723,25 +780,40 @@ function verifyDrillDiagnosticContract() {
   for (const forbidden of [
     injectedSecret, injectedPath, injectedNonce, injectedHostname, injectedPid, injectedEvidence,
   ]) assert.equal(genericEvidence.includes(forbidden), false)
-  console.log('  PASS drill diagnostics preserve fixed phase/class/code without sensitive-value leakage')
+  console.log('  PASS drill diagnostics preserve fixed phase/class/code/step without sensitive-value leakage')
 }
 
 function assertDrillDiagnosticWiring(source) {
   assert.match(source, /from '\.\/diagnostics\.mjs'/)
-  assert.match(source, /let currentPhase = DRILL_PHASES\.SETUP/)
+  const executable = executableSource(source)
+  assert.match(executable, /let currentPhase = DRILL_PHASES\.SETUP/)
+  assert.match(executable, /let currentMeasureStep = MEASURE_STEPS\.NONE/)
   for (const [phase, anchor] of [
-    ['CUTOVER', "let cutoverState = 'LEGACY_ACTIVE'"],
-    ['ROLLBACK', "let failedReleaseError = ''"],
+    ['CUTOVER', 'let cutoverState ='],
+    ['ROLLBACK', 'let failedReleaseError ='],
     ['MEASURE', 'const managedAppPid = pm2AppPid'],
     ['EVIDENCE', 'const evidence = validateEvidence'],
     ['CLEANUP', 'if (managedDaemonReady)'],
   ]) {
-    const assignment = source.indexOf(`currentPhase = DRILL_PHASES.${phase}`)
-    const operation = source.indexOf(anchor)
+    const assignment = executable.indexOf(`currentPhase = DRILL_PHASES.${phase}`)
+    const operation = executable.indexOf(anchor)
     assert.ok(assignment >= 0 && operation > assignment, `${phase} phase must precede ${anchor}`)
   }
-  const innerCatch = source.slice(source.indexOf('  } catch (error) {'), source.indexOf('  } finally {'))
-  assert.match(innerCatch, /let diagnostic = classifyDrillFailure\(error, currentPhase\)/)
+  for (const [step, anchor] of [
+    ['MANAGED_PID', 'const managedAppPid = pm2AppPid'],
+    ['NGINX_VERSION', 'const nginxVersionOutput = run'],
+    ['TOPOLOGY', 'const topology = {'],
+    ['CONTROL_ISOLATION', 'const controlIsolation = {'],
+    ['RESOURCE_ISOLATION', 'const resourceIsolation = {'],
+    ['CGROUP_CONSISTENCY', 'assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)'],
+  ]) {
+    const assignment = `currentMeasureStep = MEASURE_STEPS.${step}`
+    assert.equal(executable.split(assignment).length - 1, 1)
+    const adjacency = `${assignment}\n    ${anchor}`
+    assert.ok(executable.includes(adjacency), `${step} must immediately precede ${anchor}`)
+  }
+  const innerCatch = executable.slice(executable.indexOf('  } catch (error) {'), executable.indexOf('  } finally {'))
+  assert.match(innerCatch, /let diagnostic = classifyDrillFailure\(error, currentPhase, currentMeasureStep\)/)
   const partialEvidenceBranch = innerCatch.slice(
     innerCatch.indexOf('if (existsSync(evidenceOut)) {'),
     innerCatch.indexOf('} else {'),
@@ -753,8 +825,8 @@ function assertDrillDiagnosticWiring(source) {
   )
   assert.match(writeFailureCatch, /diagnostic = withFailureEvidenceWriteFailure\(diagnostic\)/)
   assert.match(innerCatch, /throw createDrillDiagnosticError\(diagnostic\)/)
-  const topLevelCatch = source.slice(source.lastIndexOf('main().catch'))
-  assert.match(topLevelCatch, /formatDrillFailure\(resolveDrillDiagnostic\(error, currentPhase\)\)/)
+  const topLevelCatch = executable.slice(executable.lastIndexOf('main().catch'))
+  assert.match(topLevelCatch, /formatDrillFailure\(resolveDrillDiagnostic\(error, currentPhase, currentMeasureStep\)\)/)
   assert.doesNotMatch(topLevelCatch, /error\.(?:message|stack|cause|code|path|syscall)/)
   assert.doesNotMatch(topLevelCatch, /JSON\.stringify\(error|String\(error\)/)
 }
@@ -774,11 +846,18 @@ function verifyDrillDiagnosticWiring() {
       '} catch { // write marker removed',
     ),
     source.replace(
-      'process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase))}\\n`)',
+      'process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase, currentMeasureStep))}\\n`)',
       'process.stderr.write(`${error.message}\\n`)',
     ),
   ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))
-  console.log('  PASS drill wiring captures phases before cleanup and emits only the fixed diagnostic contract')
+  const assignment = 'currentMeasureStep = MEASURE_STEPS.TOPOLOGY'
+  const anchor = 'const topology = {'
+  for (const unsafeMutation of [
+    source.replace(assignment, `// ${assignment}`),
+    source.replace(assignment, 'currentMeasureStep = process.env.D2_MEASURE_STEP'),
+    source.replace(`${assignment}\n    ${anchor}`, `${anchor}\n    ${assignment}`),
+  ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))
+  console.log('  PASS drill wiring captures phases and fixed measure steps before cleanup')
 }
 
 function verifyEvidenceFile(args) {
