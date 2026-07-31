@@ -41,9 +41,108 @@ function cssRule(source, selector) {
   }
   return ''
 }
+function cssRuleBlocks(source) {
+  const blocks = []
+  const stack = []
+  let boundary = 0
+  let quote = ''
+  let escaped = false
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]
+    if (quote) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === quote) quote = ''
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      continue
+    }
+    if (char === ';') {
+      boundary = index + 1
+      continue
+    }
+    if (char === '{') {
+      stack.push({ prelude: source.slice(boundary, index).trim(), open: index })
+      boundary = index + 1
+      continue
+    }
+    if (char === '}') {
+      const block = stack.pop()
+      if (block) blocks.push({ prelude: block.prelude, body: source.slice(block.open + 1, index) })
+      boundary = index + 1
+    }
+  }
+  return blocks
+}
+function cssSelectorList(prelude) {
+  const selectors = []
+  let start = 0
+  let squareDepth = 0
+  let parenDepth = 0
+  let quote = ''
+  let escaped = false
+
+  for (let index = 0; index < prelude.length; index += 1) {
+    const char = prelude[index]
+    if (quote) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === quote) quote = ''
+      continue
+    }
+    if (char === '"' || char === "'") quote = char
+    else if (char === '[') squareDepth += 1
+    else if (char === ']') squareDepth = Math.max(0, squareDepth - 1)
+    else if (char === '(') parenDepth += 1
+    else if (char === ')') parenDepth = Math.max(0, parenDepth - 1)
+    else if (char === ',' && squareDepth === 0 && parenDepth === 0) {
+      selectors.push(prelude.slice(start, index).trim())
+      start = index + 1
+    }
+  }
+  selectors.push(prelude.slice(start).trim())
+  return selectors.filter(Boolean)
+}
+function cssSelectorsEquivalent(candidate, expected) {
+  const fusionScope = /^\[\s*data-kiosk-presentation\s*=\s*(?:"fusion-youth"|'fusion-youth'|fusion-youth)\s*\]$/
+  if (fusionScope.test(candidate.trim()) && fusionScope.test(expected.trim())) return true
+  return candidate.trim() === expected.trim()
+}
+function cssRules(source, selector) {
+  return cssRuleBlocks(source)
+    .filter(({ prelude }) => cssSelectorList(prelude).some((candidate) => cssSelectorsEquivalent(candidate, selector)))
+    .map(({ prelude, body }) => `${prelude} {${body}}`)
+}
 function pxProp(rule, prop) {
   const m = rule.match(new RegExp(`(?:^|[\\n{;])\\s*${escapeRegExp(prop)}:\\s*(\\d+)px`))
   return m ? Number(m[1]) : null
+}
+function cssCustomPropertyValues(source, selector, property) {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  return cssRules(withoutComments, selector).flatMap((rule) => {
+    const open = rule.indexOf('{')
+    const close = rule.lastIndexOf('}')
+    if (open < 0 || close <= open) return []
+
+    return rule
+      .slice(open + 1, close)
+      .split(';')
+      .map((declaration) => declaration.trim())
+      .filter(Boolean)
+      .flatMap((declaration) => {
+        const colon = declaration.indexOf(':')
+        if (colon < 0 || declaration.slice(0, colon).trim() !== property) return []
+        const value = declaration.slice(colon + 1).trim()
+        return [value]
+      })
+  })
+}
+function hasUniqueCssCustomProperty(source, selector, property, expectedValue) {
+  const values = cssCustomPropertyValues(source, selector, property)
+  return values.length === 1 && values[0] === expectedValue
 }
 
 console.log('\n=== 首页 prototype-v1 静态合同（真值：01-home.html + shared.css）===')
@@ -56,6 +155,7 @@ const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const icons = read('src/pages/home/prototypeIcons.tsx')
 const pkg = read('package.json')
+const paletteScope = "[data-kiosk-presentation='fusion-youth']"
 
 expect(proto.length > 0, '原型 01-home.html 可读（真值锚点存在）')
 expect(shared.length > 0, '原型 shared.css 可读（真值锚点存在）')
@@ -111,6 +211,75 @@ expect(pxProp(cssRule(shellCss, "[data-kiosk-presentation='fusion-youth'] .ui-ki
 // ── 结构：统一 .tile 网格，废弃 primary/secondary 两级模型 ──────────
 expect(home.includes("import '../../styles/prototype-v1.css'"), 'HomePage 导入 prototype-v1 作用域样式')
 expect(!home.includes('home-service-desk.css'), 'HomePage 不再导入旧 service-desk 首页样式')
+expect(!home.includes('home-fusion-youth-override.css'), 'HomePage 不得重新导入旧 fusion-youth override')
+expect(
+  !existsSync(join(root, 'src/pages/home/home-fusion-youth-override.css')),
+  '旧 fusion-youth override 已删除，首页样式保持 prototype-v1 单一来源',
+)
+expect(
+  hasUniqueCssCustomProperty(pv, paletteScope, '--pv-paper', 'var(--k-paper, #f4f1e8)'),
+  'prototype-v1 fusion 作用域唯一保留米白 paper 语义色',
+)
+expect(
+  hasUniqueCssCustomProperty(pv, paletteScope, '--pv-ink', 'var(--k-ink, #10302b)'),
+  'prototype-v1 fusion 作用域唯一保留深绿 ink 语义色',
+)
+expect(
+  hasUniqueCssCustomProperty(pv, paletteScope, '--pv-teal', 'var(--k-teal, #1f9e86)'),
+  'prototype-v1 fusion 作用域唯一保留青绿 teal 语义色',
+)
+expect(
+  !hasUniqueCssCustomProperty(
+    `${paletteScope} { /* --pv-paper: var(--k-paper, #f4f1e8); */ }`,
+    paletteScope,
+    '--pv-paper',
+    'var(--k-paper, #f4f1e8)',
+  ),
+  'palette 守卫拒绝仅存在于注释的声明',
+)
+expect(
+  !hasUniqueCssCustomProperty(
+    `${paletteScope} { --pv-ink: var(--k-ink, #10302b) BROKEN; }`,
+    paletteScope,
+    '--pv-ink',
+    'var(--k-ink, #10302b)',
+  ),
+  'palette 守卫拒绝带非法尾缀的声明',
+)
+expect(
+  !hasUniqueCssCustomProperty(
+    `${paletteScope} { --pv-teal: var(--k-teal, #1f9e86); --pv-teal: hotpink; }`,
+    paletteScope,
+    '--pv-teal',
+    'var(--k-teal, #1f9e86)',
+  ),
+  'palette 守卫拒绝后续覆盖的重复声明',
+)
+expect(
+  !hasUniqueCssCustomProperty(
+    `${paletteScope} { --pv-paper: var(--k-paper, #f4f1e8); } ${paletteScope} { --pv-paper: hotpink; }`,
+    paletteScope,
+    '--pv-paper',
+    'var(--k-paper, #f4f1e8)',
+  ),
+  'palette 守卫拒绝后续同选择器规则块覆盖',
+)
+for (const [label, overridingRule] of [
+  ['换行与 Tab 空白', `${paletteScope}\n\t{ --pv-paper: hotpink; }`],
+  ['双引号等价属性选择器', '[data-kiosk-presentation="fusion-youth"] { --pv-paper: hotpink; }'],
+  ['selector list', `.unrelated, ${paletteScope} { --pv-paper: hotpink; }`],
+  ['空值自定义属性', `${paletteScope} { --pv-paper: ; }`],
+]) {
+  expect(
+    !hasUniqueCssCustomProperty(
+      `${paletteScope} { --pv-paper: var(--k-paper, #f4f1e8); } ${overridingRule}`,
+      paletteScope,
+      '--pv-paper',
+      'var(--k-paper, #f4f1e8)',
+    ),
+    `palette 守卫拒绝合法 CSS 跨块覆盖：${label}`,
+  )
+}
 expect(!home.includes('ReferenceServicePanel'), '首页废弃旧 ReferenceServicePanel 两级模型')
 expect(!home.includes('ReferenceServiceNav'), '首页停止渲染 ReferenceServiceNav')
 expect(!existsSync(join(root, 'src/components/lightflow/ReferenceServiceNav.tsx')), 'ReferenceServiceNav 孤儿组件已删除（全仓零引用）')
