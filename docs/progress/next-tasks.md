@@ -624,6 +624,37 @@
 - [x] **①双读映射 + ③Admin 弃用告警（2026-07-13，分支 `docs/cloud-upload-phone-upload-consolidation`，本地验证级）**：核实全仓仅 4 处引用 `cloud_upload`（`packages/shared/src/types/printScanCapability.ts`、`services/api/src/terminals/terminal-capabilities.types.ts`、`apps/admin/src/routes/print-scan/index.tsx`、`apps/admin/src/services/api/printScan.ts`），Kiosk 前端零引用。新增 `DEPRECATED_CAPABILITY_ALIAS`（`{ cloud_upload: 'phone_upload' }`，shared + 后端镜像 + Admin 本地镜像三处同步，`verify-admin-print-scan.ts` 新增契约防漂移断言）。`TerminalCapabilitiesService.listForTerminal`/`assertUserTaskAllowed` 读取 `phone_upload` 时，若其自身未配置而存在历史 `cloud_upload` 配置，回退读取后者状态/备注（仅只读兼容，不写库；`phone_upload` 一旦有自身配置则优先，不再回退）；Admin 能力页 `cloud_upload` 行加"已弃用，等同「手机扫码上传」"提示，mock 数据 note 同步更新。**验证**：`verify:admin-print-scan` 新增 5 条断言（回退读取/enforcement 回退/优先级覆盖，均 PASS）+ 全量 ALL PASS；shared/API/Admin typecheck 与 lint 全绿；真实浏览器 E2E（本地起 API + Admin 真实登录 admin/admin，对终端 `KSK-001` 手工把 `cloud_upload` 设为 `maintenance`+备注，刷新页面确认 `phone_upload` 行同步显示该状态/备注/更新时间，且弃用徽章正确渲染；测试数据已用只读盘点脚本确认清零并删除）。`.claude/launch.json` 新增 `api` dev server 预览配置（此前只有 kiosk/admin/partner，无 API，供本地验证时可通过 preview 工具直接起后端）。
 - [ ] **②盘点存量配置 + ④确认无引用后移除旧键**：已提供只读盘点脚本 `pnpm --filter @ai-job-print/api audit:cloud-upload-capability-usage`（新增 `services/api/scripts/audit-cloud-upload-capability-usage.ts`，纯 `SELECT`，不写库，读取 `.env`/`DATABASE_URL` 指向的目标库），需由有生产/预生产 PostgreSQL 访问权限的人对目标库运行；若报告 0 行且确认代码引用已清零，再另起独立任务执行④物理移除 `cloud_upload` 键本身（本任务窗口不具备生产库访问权限，未执行②③执行结果、未移除旧键）。未来「远程提交·到店取件」若立项应新增准确能力键（如 `remote_submit`/`terminal_release`），不复用 `cloud_upload`。依据与背景：`docs/reviews/2026-07-12-cloud-print-decision.md` §六 D4。
 
+## P1：双后台 IA 减法与 AI 治理（2026-07-31 审计登记，方案见 console-plan §六）
+
+> 全部依据与行号见 [console-plan-for-kiosk-proto-2026-07.md](../product/console-plan-for-kiosk-proto-2026-07.md) §六。执行顺序：P0 上线验收 → 轨道 A → 轨道 A+ → 上线 → 轨道 B/C 独立立项。
+
+### 已完成（本轮只做警示，不改行为）
+
+- [x] **`resume_optimize` 共用键警示落地（2026-07-31）**：核实 6 项用户可见能力共用该功能位——AI 简历优化（`llm-resume-optimize.service.ts:171,213`）、岗位大师 / 岗位匹配（`llm-job-fit.service.ts:327`）、职业规划（`llm-career-plan.service.ts:206`）、招聘会拜访计划（`llm-fair-visit-plan.service.ts:166`）、岗位推荐与岗位解释（`job-ai-llm.service.ts:142`）。在 Admin「AI大模型」关掉「AI简历优化」或改错凭证会一并静默停掉全部 6 项。已在 `llm-config.service.ts` 的 `resume_optimize` 条目上方加治理注释、在 4 个借用点各加就地指针注释，并把警示写入 `runtimeNote`（渲染于 `apps/admin/src/routes/ai-config/index.tsx:207,210`，运营动开关时可直接看到）。**本项只是警示与登记，未拆键、未改任何运行行为。**
+
+### 轨道 A：后台 IA 减法（可逆、零新功能，属上线前收口）
+
+- [ ] **A-1 隐私工单页去重**：`apps/admin/src/routes/member-privacy/index.tsx`（213 行）与 `privacy-requests/index.tsx`（457 行）打同一端点 `GET /admin/member-privacy/data-requests`，重试 / 驳回动作与 8 状态 × 3 类型映射表各有两份。保留功能更完整的 `/privacy-requests`，**必须保留 `/member-privacy` 旧 URL 重定向**，避免书签 / 测试 / 文档链接失效。
+- [ ] **A-2 摘掉 stub 导航项**：Admin `/permissions`（15 行 stub）、Partner `/stats`、`/terminals`（各 15 行 stub）从侧栏移除，**页面保留不删**。Partner 12 项导航里 3 项通向「本阶段未开放」，对付费机构是直接可信度损失。**不把空页内容并入工作台**——工作台现有真实数据，没有真实聚合指标前不加空面板。
+- [ ] **A-3 Admin 六域导航重组**：32 → 25 项，只动 `AdminLayoutWrapper.tsx` 的 `NAV_ITEMS` / `PATH_TO_KEY` / `KEY_TO_PATH` + 路由 + Tab 容器，**不合并后端服务与状态机**。注意 `KEY_TO_PATH` 是 first-write-wins，调顺序会改 active 高亮；全部路由变更保留旧 URL 重定向。三处收窄：内容审核中心只统一入口 / 状态词汇 / SLA 展示（岗位 / 招聘会 / 政策的校验、发布、审计语义不同，不抽通用状态机）；数据接入按「数据源 / 文件导入 / 同步记录」三类而非 Excel+API 两 Tab（`AccessMode` 有 6 个值）；订单与计费、权益运营、会员沟通只合 IA 不合权限与状态。面试运营入口等 A-8 有数据后再挂，不提前放空页。
+- [ ] **A-4 `PriceConfig.effectiveFrom` 标注「尚未启用」**：该字段是假能力（seed 注释自承认，`PricingService` 只读 `active`）。**不物理删除**——要动两套 Prisma schema + migration + DTO + 测试，且 `serviceKey @unique` 本身存不了价格历史版本。本轮只在 Admin UI 加「尚未启用」标注 + 代码注释；真做定时生效需先解开唯一约束，属轨道 B。
+
+### 轨道 A+：AI 治理（属收口，成本看不见就无法定价）
+
+- [ ] **A-5 拆独立 feature key**：为岗位大师 / 职业规划 / 招聘会拜访计划 / 岗位推荐 / 岗位解释各建独立 key，**默认继承 `resume_optimize` 配置**（行为不变、可回滚），使开关与成本归属按能力隔离。
+- [ ] **A-6 补 AI 成本日志覆盖**：职业规划（`llm-career-plan.service.ts`）、招聘会拜访计划（`llm-fair-visit-plan.service.ts`）、模拟面试全链路（`mock-interview/*.service.ts`，含按时长计费的语音转写）当前 `grep -c "aiLog|AiLogService"` 全为 0，**这几项 AI 成本完全不可见**。同步统一前后端 `operation` 枚举。
+- [ ] **A-7 修「今日」口径 + 补限流覆盖**：`ai-log.service.ts:100` 是 `AI_USAGE_WINDOW_MS = 24h` 滚动窗，但 `apps/admin/src/routes/ai-services/index.tsx:223,229` 标「今日概览」「今日累计」，口径标错。另 `ai.controller.ts` 11 条路由仅 4 条有 `@Throttle`、`mock-interview.controller.ts` 12 条仅 7 条，需补覆盖；并加超时 / 熔断 / 日预算。注意限流是防滥用，**不是**商业额度。
+- [ ] **A-8 面试训练运营页**：`mock-interview.controller.ts` 有 12 条路由（含语音转写 / 报告 / 打印），Admin 无任何业务页面。这是前后台核对后**唯一真正缺失的运营页**。须在 A-6 有数据后做才有意义；内容边界沿用「只见用量不见内容明细」（console-plan §四.2）。
+
+### 轨道 B：商业化（上线后独立立项，不塞进本轮收口）
+
+- [ ] **AI 商业化闸门**：`ai.controller.ts:170-200` 现状是「调 LLM（成本已发生）→ 落库 → 客户端若传可选 `@Query benefitGrantId` 且 completed 才扣次数」，即事后可选记账，无服务端强制事前额度闸门。`price-config.seed.ts` 只有 `print_bw_page` / `print_color_page` 两键，无任何 AI 价目键（注：`serviceKey` 是开放字符串，上线前需核实际生产库配置）。**不得在现有 AI GET 接口前直接挂扣费**——那些接口兼具读取 / 生成 / 缓存 / 扣权益副作用，直接加会产生不可审计扣费。需独立建：SKU 与价目版本（先解 `serviceKey @unique`）、原子履约账本（`reserve → LLM → commit`，失败 `release`，含请求幂等 / 缓存命中不重复扣费 / 超时退款 / 匿名转会员归属）、合同生命周期、机构结算、完整 RBAC。**`AiServiceLog` 不能当计费账本**（`ai-log.service.ts:152` best-effort 写入 + 估算成本，见 compliance-boundary §8.8.3）。
+
+### 轨道 C：Partner 自助（服务端授权必须先于动态侧栏）
+
+- [ ] **Partner capability 投影**：`Organization.type` 才是真实字段（`partnerType` 只是共享类型标识符），运行时 14 处使用。存在两套不可互换的概念：`ORG_TYPE_MATRIX`（`admin-orgs.service.ts:88-140`，管该机构**终端**开放哪些 Kiosk 能力）vs `partner-permission-matrix.md`（管该机构在 **Partner 后台**能管什么）。实证：`licensed_hr_agency` 的 `allowedModules` 含 `job_fair`，但权限矩阵 §三招聘会管理对 `hr_agency` 整行 ❌，二者同时成立。因此**不能直接复用 `ORG_TYPE_MATRIX` 下发侧栏**（它还是 service 内部常量，前端拿不到）。正确顺序：建服务端权威 capability 投影 → API 与路由双重校验 → 侧栏只作展示结果。**隐藏导航不等于权限控制。** 开工前需先定唯一事实源，并确认：`fair_organizer` 企业资料限定为招聘会关联企业；`enterprise_source` 只管本企业来源信息、不得演变为企业招聘后台；「校园招聘」目前无独立 Partner 页面、新增入口须过入口冻结规则；`fair_organizer` / `enterprise_source` 的 `allowedModules` 当前是空数组（需确认有意还是漏配）。
+- [ ] **Partner 聚合曝光统计（需动 schema，单独排期）**：`BrowseLog` / `ExternalJumpLog` 有 `targetType` + `targetId`，但无 `sourceOrgId` 字段与索引；要么 join 回 job / fair / policy（大数据量下慢），要么冗余一列 + 批量聚合。另需解决归因快照不可变性（内容换来源机构会致历史统计漂移）。隐私与计费边界强制遵守 compliance-boundary §8.8：只给聚合数据 + 最小样本阈值（建议 N=5），不暴露 endUser 明细，曝光 / 跳转不得表述为投递或预约成功。
+
 ## P2：商用二期候选（候选未立项，过门槛后才可立项）
 
 - **远程提交·到店取件（含 follow-me 跨终端释放形态）**（2026-07-12 记录，D2 拍板"是"）：用户不在终端旁时经手机 H5/小程序上传下单、（可选）在线支付、获取取件码，到店输码确认后本机出纸；follow-me 形态为"文件存入我的文档、到任一允许终端登录释放"。**候选，未立项，未承诺交付**。准入门槛（全部满足后才可启动立项评估）：① Phase 0 上线收口验收完成；② 支付与退款链路生产稳定；③ 释放状态机通过安全设计评审。**硬性架构约束（立项时不可绕过）**：Agent 会自动 claim 目标终端 pending 任务（`terminals.service.ts` claimTasks 按 `{status:'pending', terminalId}` 认领），远程订单**不得直接落成 pending `PrintTask`**，必须有 `awaiting_release` 类状态或"到店输码后才创建 PrintTask"的编排；远程只入队等待释放，出纸必须到店确认（`print-scan-commercial-plan.md` "不能公网远程直控打印机"）；须绑定会员手机号防匿名滥用、取件码防爆破、释放幂等。follow-me 形态以多网点部署需求成立为前提，比到店取件更后置。完整评估见 `docs/reviews/2026-07-12-cloud-print-decision.md` §三候选 C/E。立项时按 CLAUDE.md §8.1 先写范围声明再动代码，入口命名按真实能力定（不叫"云打印"）。

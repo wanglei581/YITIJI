@@ -91,12 +91,23 @@ export const AI_MODEL_FEATURES: AiModelFeatureMeta[] = [
     runtimeNote: '已被 AI 简历生成运行链路消费；生成结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与生成。',
     allowCustomSystemPrompt: false,
   },
+  // ⚠️ 共用键警示（2026-07-31 审计登记，见 docs/product/console-plan-for-kiosk-proto-2026-07.md §六）
+  // 下列 6 个用户可见能力目前全部读取 `resume_optimize` 的凭证与模型配置：
+  //   1. AI 简历优化      llm-resume-optimize.service.ts:171,213
+  //   2. 岗位大师/岗位匹配 llm-job-fit.service.ts:327
+  //   3. 职业规划          llm-career-plan.service.ts:206
+  //   4. 招聘会拜访计划    llm-fair-visit-plan.service.ts:166
+  //   5. 岗位推荐          job-ai-llm.service.ts:142（callLlm 'jobRecommend'）
+  //   6. 岗位解释          job-ai-llm.service.ts:142（callLlm 'jobExplain'）
+  // 后果：在 Admin「AI大模型」里关闭本功能或改错凭证，会一并静默影响上述全部 6 项。
+  // 治理方向：为 2–6 各自建独立 feature key（默认继承本键配置以保持行为不变），
+  // 使开关与成本归属按能力隔离。新增能力请勿继续复用本键。
   {
     key: 'resume_optimize',
     label: 'AI简历优化',
     status: 'active',
     description: '用于基于简历原文与诊断报告生成优化版简历与新旧对比。AI 只优化表达，不编造经历；事实信息须出现在简历原文中。',
-    runtimeNote: '已被 AI 简历优化运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。',
+    runtimeNote: '已被 AI 简历优化运行链路消费；优化结构化 System Prompt 由服务端强制（防编造契约），管理员自定义 System Prompt 不参与优化。⚠️ 本键当前被 6 项能力共用（简历优化 / 岗位大师 / 职业规划 / 招聘会拜访计划 / 岗位推荐 / 岗位解释），停用或改错凭证会一并影响全部 6 项。',
     allowCustomSystemPrompt: false,
   },
   {
