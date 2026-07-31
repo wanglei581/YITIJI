@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-30
+> 最后更新：2026-07-31
 
 ## Phase 0 真值收口后续
 
@@ -19,7 +19,8 @@
 - [x] **F1 D2′ 演练器 PM2 隔离修复（本地候选，未部署）**：短 `/run/user/<uid>/d2p-<nonce>` 控制根、UTF-8 socket 预算、PM2 有界 timeout、spawn-attempt 清理、受 UID + 精确 `PM2_HOME` + God Daemon title 约束的 PID TERM/KILL 兜底及行为回归均按 RED→GREEN 完成；offline contract、API typecheck/lint/build、Shell/Node 语法和差异门禁通过，Claude + Antigravity + Cursor 最终均 `APPROVE`。修复代码本身不等于 D2′ PASS，唯一一次旧 full drill/evidence 继续锁定 **NO-GO**。
 - [x] **F1 D2′ `main@e721f87a` Linux fresh retake 已按独立授权执行一次（NO-GO）**：现有非生产 Colima 的 fresh clone、frozen install、API build 与 offline contract 均通过；唯一 full drill 在生成 nonce 或 evidence 前因净化调用环境缺少 user systemd 所需 `XDG_RUNTIME_DIR` 返回 `D2_PRIME_NO_GO_ENVIRONMENT` / exit `2`，精确 evidence 文件未生成，独立 verifier 因 evidence absent 记 exit `2`。本窗口未重跑，旧 NO-GO evidence 未改写，清理检查全零，未连接 production 或进入 D3–D6。
 - [x] **F1 D2′ XDG user-systemd 执行契约修复（本地候选，未部署）**：`run.sh` 已在首个 user-systemd 前自派生并严格校验 exact `/run/user/$(id -u)`，内层 `env -i` 与 `drill.mjs` 的 5 个 systemd 查询均显式使用受信 XDG；离线合同以恶意变体锁定执行顺序、真实数据流及 DBUS/bus 拓扑禁令。Shell/Node 语法、offline contract、API lint/typecheck/build 与差异门禁通过，Claude、Antigravity、Cursor、独立 reviewer 最终均 `NO FINDINGS`。修复代码仍不等于 D2′ PASS，旧 retake 继续 **NO-GO**。
-- [ ] **F1 D2′ 新 fresh retake（仅在再次独立授权后）**：不得沿用旧窗口、nonce 或 evidence 路径，也不得把代码门禁全绿当成执行授权。只有用户另行点名新的非生产 Colima retake、给出新 nonce/evidence 路径和新 RFC3339 窗口后，才可执行一次；仍不借用 production 服务器、不新增云主机、不进入 D3–D6。
+- [x] **F1 D2′ `main@06c7fe00` 新 fresh retake 已按独立授权执行一次（NO-GO）**：现有非生产 Colima 的修正路径 fresh clone、frozen install、API build、offline contract 与 pre-nonce 门禁均通过；唯一 full drill 在输出 latency 后返回 `D2_PRIME_DRILL_FAILED` / `D2_PRIME_RUNTIME_FAILURE`、exit `2`，本窗口未重跑。独立 verifier 确认 evidence 为 `D2_PRIME_NO_GO`、`productionF1=NO-GO`、exit `2`，mode `0600`，SHA-256 `9ec390733185016981ddc46a03dcf0893e224e8fd21ba39329afdf7c2488f7b3`；cleanup 全零且 Colima 已停止。当前只能把失败定位在 `drill.mjs` latency 后、成功 evidence 写入前约 371–454 行，具体根因因顶层错误泛化与安全失败 evidence 缺少 phase/error class 而不可证明。
+- [ ] **F1 D2′ post-latency 诊断合同修复（下一独立代码任务）**：先以 TDD 复现顶层 catch 把原生 assertion / fs / HTTP 异常统一降为 `D2_PRIME_DRILL_FAILED` 的诊断缺口，为 post-latency 各阶段建立脱敏、稳定的显式 error code/phase，并确保失败 evidence 不泄露路径、环境或敏感信息；通过 offline contract、API lint/typecheck/build 与 Claude + Antigravity + Cursor 审查后单独合入。完成前不得申请或执行新 retake；完成后仍须用户另行授权新的 RFC3339 窗口、fresh clone 与 evidence 路径，精确执行一次，不连接 production、不新增云主机、不进入 D3–D6。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 

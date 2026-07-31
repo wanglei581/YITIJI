@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-fresh-retake-20260731",
+  "title": "在现有既定环境执行 D2′ fresh retake 并形成 GO/NO-GO 证据",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "PR #450 已创建；等待用户独立授权合并，后续另立 post-latency 诊断合同任务",
+  "createdAt": "2026-07-31T02:04:00Z",
+  "branch": "codex/f1-d2-prime-fresh-retake-20260731"
+}
