@@ -9,7 +9,10 @@ import {
   ForbiddenException,
   InternalServerErrorException,
 } from '@nestjs/common'
+import { plainToInstance } from 'class-transformer'
+import { validate } from 'class-validator'
 import { LegalService, LEGAL_DOC_TYPES } from '../../legal/legal.service'
+import { MemberPrivacyController } from '../../member-privacy/member-privacy.controller'
 import {
   CONSENT_VERSION_BY_SCOPE,
   CURRENT_JOB_AI_CONSENT_VERSION,
@@ -226,6 +229,27 @@ test('contract review has an isolated consent version in API and shared contract
   assert.match(sharedPrivacyTypes, /export interface MemberAiConsentStatus/)
   assert.equal(consentVersionForScope('contract_review'), CONTRACT_VERSION)
   assert.notEqual(consentVersionForScope('contract_review'), consentVersionForScope('job_ai'))
+})
+
+test('GrantAiConsentDto accepts only job_ai and contract_review at runtime', async () => {
+  const parameterTypes = Reflect.getMetadata(
+    'design:paramtypes',
+    MemberPrivacyController.prototype,
+    'grantConsent'
+  ) as Array<new () => object>
+  const GrantAiConsentDto = parameterTypes[1]
+  assert.ok(GrantAiConsentDto, 'grantConsent body DTO metadata must exist')
+
+  for (const scope of ['job_ai', 'contract_review']) {
+    const errors = await validate(plainToInstance(GrantAiConsentDto, { scope }))
+    assert.equal(errors.length, 0, `${scope} must remain accepted by the HTTP DTO`)
+  }
+
+  for (const scope of ['unknown_scope', undefined]) {
+    const errors = await validate(plainToInstance(GrantAiConsentDto, { scope }))
+    assert.equal(errors.length, 1)
+    assert.ok(errors[0]?.constraints?.isIn)
+  }
 })
 
 test('getConsentStatus returns independent job and contract review status entries', async () => {
