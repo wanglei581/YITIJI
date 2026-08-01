@@ -72,3 +72,29 @@
 ## 当前结论
 
 正式设计和 14 个任务的逐步实施计划均已完成，无已知阻断项。当前仅等待用户选择执行方式；在用户明确选择前不进入业务代码、数据库或页面实现。
+
+## Wave A Task 1：Gate 0 发布门禁实施审查
+
+审查范围：`d77bf144..62621535`，仅包含：
+
+- `docs/compliance/contract-review-release-gate.md`
+- `services/api/scripts/verify-contract-review-gate0.ts`
+- `services/api/package.json`
+
+实施采用 RED→GREEN：先证明缺失门禁记录会失败，再建立默认 `blocked`、`production_default: false`、`fail_closed: true` 的记录与 package verifier。后续针对审查发现的重复键、错误 YAML 类型、非法状态、伪批准人、自动化代签、批准生命周期和正文状态漂移逐项补充回归 fixture。
+
+### 本地双阶段审查
+
+- 规格符合性：`APPROVE`。
+- 代码质量：`APPROVE`，无 Critical、Important、Minor。
+- 实测覆盖：当前 blocked、六种部分批准、最终 approved 生命周期；重复/未知键；错误布尔值；非法 RFC3339；三角色独立 stable ID；占位与自动化身份；正文动态状态镜像；ES2021 严格 TypeScript；ESLint；`git diff --check`。
+
+### 外部双模型交叉审查
+
+- Antigravity：最终 `APPROVE`，无 Critical、无 Warning。
+- Claude：最终 `APPROVE`。其两轮 Warning 已处理：bare `ci` 合法身份误报，以及 `office-ci-agent` 一类中段组合漏检。
+- Claude 保留一项可接受的 fail-closed 取舍：极少数自然人姓名在移除分隔符后可能偶然形成 `ci+automation-term`，从而被拒绝。该情况不会放行自动化代签，只要求批准人改用另一稳定目录 ID，因此不阻断 P0。
+
+### 结论
+
+Task 1 已封板。Gate 0 静态验证通过只代表记录格式和状态一致性有效，不代表 Gate 已获批准，也不构成生产上线授权；当前正式记录仍为 `blocked`，真实合同 AI 调用和生产入口保持关闭。
