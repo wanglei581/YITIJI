@@ -238,11 +238,12 @@ export class ContractReviewService {
     if (
       active.length !== 1 ||
       !disclaimer ||
-      !disclaimer.id ||
-      !disclaimer.version ||
-      !disclaimer.content ||
+      disclaimer.id.trim().length === 0 ||
+      disclaimer.version.trim().length === 0 ||
+      disclaimer.content.trim().length === 0 ||
       !(disclaimer.publishedAt instanceof Date) ||
-      !Number.isFinite(disclaimer.publishedAt.getTime())
+      !Number.isFinite(disclaimer.publishedAt.getTime()) ||
+      disclaimer.publishedAt.getTime() > Date.now()
     ) {
       throw new ServiceUnavailableException({
         error: {

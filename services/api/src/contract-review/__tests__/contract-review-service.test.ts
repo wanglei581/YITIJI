@@ -68,6 +68,18 @@ interface LegalDocRow {
   publishedAt: Date | null
 }
 
+interface LegalDocFindManyQuery {
+  where: { docType: string; isActive: boolean }
+  orderBy: { id: 'asc' }
+  take: number
+  select: {
+    id: boolean
+    version: boolean
+    content: boolean
+    publishedAt: boolean
+  }
+}
+
 interface TaskRow extends Record<string, unknown> {
   id: string
   endUserId: string | null
@@ -112,6 +124,7 @@ function makeHarness(options: HarnessOptions = {}) {
   const failures = [...(options.transactionFailures ?? [])]
   const transactionOptions: unknown[] = []
   const operations: string[][] = []
+  const legalDocFindManyQueries: LegalDocFindManyQuery[] = []
   let transactionCalls = 0
   let createCalls = 0
 
@@ -135,8 +148,9 @@ function makeHarness(options: HarnessOptions = {}) {
           },
         },
         legalDocVersion: {
-          findMany: async () => {
+          findMany: async (query: LegalDocFindManyQuery) => {
             txOperations.push('legal.findMany')
+            legalDocFindManyQueries.push(query)
             return legalDocs.slice(0, 2).map(cloneLegalDoc)
           },
         },
@@ -236,6 +250,12 @@ function makeHarness(options: HarnessOptions = {}) {
       transactionCalls,
       transactionOptions: [...transactionOptions],
       operations: operations.map((items) => [...items]),
+      legalDocFindManyQueries: legalDocFindManyQueries.map((query) => ({
+        ...query,
+        where: { ...query.where },
+        orderBy: { ...query.orderBy },
+        select: { ...query.select },
+      })),
       tasks: tasks.map(cloneTask),
       consents: consents.map(cloneConsent),
       createCalls,
@@ -508,6 +528,19 @@ test('member create reads consent then inserts in one PostgreSQL Serializable tr
   assert.deepEqual(state.operations, [
     ['file.find', 'legal.findMany', 'consent.find', 'task.create'],
   ])
+  assert.deepEqual(state.legalDocFindManyQueries, [
+    {
+      where: { docType: 'contract_review_disclaimer', isActive: true },
+      orderBy: { id: 'asc' },
+      take: 2,
+      select: {
+        id: true,
+        version: true,
+        content: true,
+        publishedAt: true,
+      },
+    },
+  ])
   assert.deepEqual(state.transactionOptions, [{ isolationLevel: 'Serializable' }])
   assert.equal(state.tasks[0]?.consentVersion, CURRENT_CONSENT_VERSION)
   assert.equal(
@@ -644,8 +677,12 @@ test('create fails closed unless exactly one fully published disclaimer is activ
     [activeDisclaimer(), activeDisclaimer({ id: 'duplicate-active-doc' })],
     [activeDisclaimer({ publishedAt: null })],
     [activeDisclaimer({ id: '' })],
+    [activeDisclaimer({ id: ' \t\n' })],
     [activeDisclaimer({ version: '' })],
+    [activeDisclaimer({ version: ' \t\n' })],
     [activeDisclaimer({ content: '' })],
+    [activeDisclaimer({ content: ' \t\n' })],
+    [activeDisclaimer({ publishedAt: new Date(Date.now() + 59_000) })],
   ]
 
   for (const legalDocs of invalidLegalDocs) {
