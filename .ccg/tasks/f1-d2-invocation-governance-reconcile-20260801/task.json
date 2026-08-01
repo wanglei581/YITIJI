@@ -5,8 +5,8 @@
   "complexity": "L+",
   "risk": "high",
   "domain": "backend",
-  "currentPhase": "implementation",
-  "nextAction": "并行移植治理内核、run.sh wiring 与旧 contract 增量适配",
+  "currentPhase": "review",
+  "nextAction": "执行最新主干终审、归档并推送创建 PR",
   "createdAt": "2026-08-01T13:48:15Z",
   "branch": "codex/f1-d2-invocation-governance-reconcile-20260801"
 }
