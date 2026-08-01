@@ -20,7 +20,11 @@
  *
  * 静态不可判定的形态一律**抛错**（fail-closed），绝不放行。共四类：
  *   ① upsert 实参 / update 值不是对象字面量（常量引用、函数调用、三元…）；
- *   ② 第一层出现展开 `...`（可能把状态覆写回已审已发布）；
+ *   ② 第一层出现展开 `...`，且方向不同规则不同：
+ *      · 正向断言（checkMustReset）：必填字段在展开之前时 fail-closed
+ *        （展开可能把它们覆写回已审；在展开之后则安全，后写的字段胜）；
+ *      · 反向断言（checkMustNotReset）：任何第一层展开一律 fail-closed
+ *        （静态无法证明展开对象不携带 reviewStatus/publishStatus）；
  *   ③ 第一层出现计算属性名 `[expr]:`（键名运行时才定）；
  *   ④ 第一层出现重复键（JS 后者覆盖前者，静态取哪个都不安全）。
  *
@@ -66,8 +70,9 @@ const EXPECTED_SITES = {
   'job-sync.service.ts': ['upsertJobs·job', 'upsertFairs·jobFair'], // 反向断言
 }
 
-/** 自测用例总数（写死：用例数组被清空时 total=0 会让 17 项断言静默消失，须由此常量兜住） */
-const EXPECTED_SELFTEST_CASES = 24
+/** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
+ * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34 */
+const EXPECTED_SELFTEST_CASES = 34
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -226,15 +231,65 @@ function memberName(node) {
  * 原实现只认 `a.b.upsert(...)` 一种形态，其余一律 null：于是新增一处
  * `prisma['job'].upsert({...})`（不写重置）对门禁完全不可见——库存核对也抓不到，
  * 因为它只比对「已登记站点是否都在」，凭空多出的隐形站点不在集合里。
+ *
+ * 第 7 轮修正（codex High 2）：原实现未 unwrap callee，导致三种调用形态静默跳过：
+ *   · `(this.prisma.job.upsert)({})`       —— ParenthesizedExpression，memberName 返回 null
+ *   · `this.prisma.job.upsert.call(...)`   —— 方法名变成 'call'，跳过 upsert 检查
+ *   · `this.prisma.job['up'+'sert']({})`   —— 动态下标，memberName 返回 null
+ * 均已实测复现门禁 exit 0。现改为先 unwrap，再分三路处理。
+ *
+ * 已知宽容：`getUnrelatedRepository().upsert({})` 仍会因取不到模型名而抛错。
+ * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有此类调用模式，
+ * 宽容误报的代价（一次门禁报错）远小于漏报的代价（审核状态绕过），故保留。
  */
 function upsertModelOf(call, where) {
-  const callee = call.expression
+  const callee = unwrap(call.expression) // FIX(round7): 先 unwrap，修括号包裹的静默跳过
+
+  // ── .call / .apply / .bind 形态：x.upsert.call(ctx, {...}) ──────────────────
+  // callee 是 PropertyAccessExpression，方法名是 call/apply/bind，
+  // 真实函数是 callee.expression。无法静态确定第二个参数（data）形态，fail-closed。
+  if (ts.isPropertyAccessExpression(callee)) {
+    const indirect = callee.name.text
+    if (indirect === 'call' || indirect === 'apply' || indirect === 'bind') {
+      const innerFn = unwrap(callee.expression)
+      if (memberName(innerFn) === 'upsert') {
+        throw new Error(
+          `${where} 出现通过 .${indirect}() 间接调用 upsert 的形态——\n` +
+            '      无法静态分析实际传入的 data 参数，按失败处理。\n' +
+            '      请改成 `tx.job.upsert(...)` 等可静态分析的直接调用写法。'
+        )
+      }
+      return null // call/apply/bind 但内部不是 upsert — 与本门禁无关，跳过
+    }
+  }
+
+  // ── 动态下标形态：model['up'+'sert']({}) ─────────────────────────────────────
+  // callee 是 ElementAccessExpression，下标是非字符串字面量（运行时才知方法名）。
+  // 只在 owner 是已追踪模型时 fail-closed（防止误报无关对象的同名动态调用）。
+  if (ts.isElementAccessExpression(callee)) {
+    const subscript = callee.argumentExpression
+    if (!subscript || !ts.isStringLiteralLike(subscript)) {
+      const dynOwner = unwrap(callee.expression)
+      const dynModel = memberName(dynOwner) ?? (ts.isIdentifier(dynOwner) ? dynOwner.text : null)
+      if (dynModel === 'job' || dynModel === 'jobFair') {
+        throw new Error(
+          `${where} 出现动态方法名调用 \`${dynModel}[expr]()\`——\n` +
+            '      下标运行时才确定，无法静态证明它不是 upsert，按失败处理。\n' +
+            '      请改成 `tx.job.upsert(...)` 等静态写法。'
+        )
+      }
+      return null // 动态下标但 owner 不是已追踪模型 — 与本门禁无关，跳过
+    }
+  }
+
+  // ── 正常形态：`.upsert` / `['upsert']` ──────────────────────────────────────
   if (memberName(callee) !== 'upsert') return null
 
   // owner 形态：`tx.job` / `prisma['job']` / 解构后的裸 `job`
-  const owner = ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
-    ? callee.expression
-    : null
+  const owner =
+    ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+      ? callee.expression
+      : null
   let model = owner ? memberName(owner) : null
   if (model === null && owner && ts.isIdentifier(owner)) model = owner.text // `const { job } = tx`
 
@@ -320,6 +375,11 @@ function checkMustReset(blocks, label) {
       fail++
     }
   }
+  // 内部健全性守卫：任何 break/continue/return 遗漏都会在这里被发现
+  if (pass + fail !== blocks.length)
+    throw new Error(`checkMustReset 内部错误: pass(${pass})+fail(${fail}) ≠ blocks.length(${blocks.length})`)
+  if (failures.length !== fail)
+    throw new Error(`checkMustReset 内部错误: failures.length(${failures.length}) ≠ fail(${fail})`)
   return { pass, fail, failures }
 }
 
@@ -328,6 +388,23 @@ function checkMustNotReset(blocks, label) {
     fail = 0
   const failures = []
   for (const b of blocks) {
+    // FIX(round7 High 1): 第一层含展开 → 无法静态证明展开对象不含审核字段 → fail-closed
+    // hasKey 只可见「明确写出的属性」，spread-carried 键（update: { ...RESET }）
+    // 对它完全不可见，会令反向断言假绿（门禁 exit 0 但实际重置字段存在）。
+    // 已实测复现：probe 脚本确认 `hasKey(reviewStatus)=false` 且 exit 0。
+    // job-sync.service.ts 的 3 个注册 update 块不含第一层展开（已 Read 确认），
+    // 故 fail-closed 策略对线上代码零误报。
+    if (b.props.lastSpreadIdx >= 0) {
+      console.error(
+        `  ❌  ${label} · ${b.site} · update 块第一层含展开（lastSpreadIdx=${b.props.lastSpreadIdx}），` +
+          '静态无法证明展开对象不携带 reviewStatus/publishStatus — fail-closed\n' +
+          '      请把展开内容展开为逐字段写法，或拆分不含审核字段的展开到独立变量。'
+      )
+      failures.push({ site: b.site, spreadClosed: true, keys: [] })
+      fail++
+      continue
+    }
+
     // 反向断言同样只看第一层：嵌套里的字段对 Prisma 无效，不构成"无条件重置"
     //
     // ⚠️ 判据是「键在不在」，不是「值等不等于 'pending'」——方向与正向断言相反，这是刻意的：
@@ -362,6 +439,11 @@ function checkMustNotReset(blocks, label) {
       fail++
     }
   }
+  // 内部健全性守卫（continue 路径也被计入 fail，确保计数完整）
+  if (pass + fail !== blocks.length)
+    throw new Error(`checkMustNotReset 内部错误: pass(${pass})+fail(${fail}) ≠ blocks.length(${blocks.length})`)
+  if (failures.length !== fail)
+    throw new Error(`checkMustNotReset 内部错误: failures.length(${failures.length}) ≠ fail(${fail})`)
   return { pass, fail, failures }
 }
 
@@ -596,29 +678,134 @@ function selfTest() {
       src: () => synth('          reviewStatus: `pending`,', { fn: 'upsertJobs' }),
     },
     {
-      // 反向断言必须**无视位置**：展开之前的写入若展开对象不含该键就真的生效，
-      // 仍是潜在的无条件重置。这条守住 hasKey 不被误改成 trustedValue。
-      //
-      // 两个键都写、并用 wantMissing 钉住键集合，是刻意的：判据是
-      // `if (!hasR && !hasP)`，只写一个键时把另一个键的 hasKey 改成 trustedValue
-      // 仍会因剩下那个键报失败 → verdict 照样是 reverse-fail → 变异逃逸（已实测）。
-      // 钉住集合后，任一键被降级都会让 failures 少一项 → 用例转红。
+      // 反向断言：重置在展开之前也必须报失败。
+      // 第 6 轮：两个键显式写出，且都在展开 ...syncData 之前；彼时用 hasKey 捕获，
+      //   wantMissing 钉住键集合防止"只写单键 → 另一键 hasKey 降级 → 变异逃逸"。
+      // 第 7 轮：checkMustNotReset 改为「第一层含任何展开→ fail-closed」，spread guard
+      //   先于 hasKey 触发，failures 里是 { spreadClosed:true, keys:[] }，
+      //   wantMissing 不再适用 —— 改为 wantSpreadFail: true。
+      // 保留本用例的价值：M/M′ 只含展开、无显式键；K⁗ 含 reviewStatus+publishStatus 显式键 +
+      //   展开，专门验证「有显式键时 spread guard 仍然先触发、不被 hasKey 跳过」。
       name: 'K⁗ 反向断言：重置在展开之前也必须报失败（不可按"可能被覆写"放过）',
       expect: 'reverse-fail',
       caseSite: CASE_SITE('upsertJobs'),
-      wantMissing: ['reviewStatus', 'publishStatus'],
+      wantSpreadFail: true,
       src: () =>
         synth(
           `          reviewStatus: 'pending',\n          publishStatus: 'draft',\n          ...syncData,`,
           { fn: 'upsertJobs' }
         ),
     },
+    // ── Round 7 新增用例（codex High 1 + High 2）────────────────────────────────
+    {
+      // High 1：反向断言 update 块含展开变量 → hasKey 看不见 spread-carried 键 →
+      // 以前静默 pass，现在必须 fail-closed。
+      // wantSpreadFail 要求 failures 中至少有一条 { spreadClosed: true }，
+      // 防止 fail 是因为其他原因（如改成"键存在就失败"的过宽判定）而非 spread 守卫。
+      name: 'M 反向断言：update 含展开变量（...resetFields）必须 fail-closed',
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantSpreadFail: true,
+      src: () => synth('          ...resetFields,', { fn: 'upsertJobs' }),
+    },
+    {
+      // High 1 变体：内联对象展开（...{ reviewStatus: 'pending' }）。
+      // spread 里是对象字面量，静态上能看出内容，但 topLevelProps 记录的是
+      // SpreadAssignment 节点，不是子属性 → hasKey 一样取不到 → 同样 fail-closed。
+      name: "M′ 反向断言：内联对象展开（...{ reviewStatus: 'pending' }）必须 fail-closed",
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantSpreadFail: true,
+      src: () =>
+        synth("          ...{ reviewStatus: 'pending', publishStatus: 'draft' },", {
+          fn: 'upsertJobs',
+        }),
+    },
+    {
+      // High 2：括号包裹的 callee —— 原实现未 unwrap，`memberName` 见到
+      // ParenthesizedExpression 返回 null → memberName !== 'upsert' → return null 静默跳过。
+      // 修复后 unwrap 去掉括号，照常判失败（update 块无重置字段）。
+      name: 'N 括号包裹的 callee（(this.prisma.job.upsert)(...)）修复后必须判失败',
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () => synth('          title: dto.title,').replace('this.prisma.job.upsert', '(this.prisma.job.upsert)'),
+    },
+    {
+      // High 2：`.call` 间接调用形态。data 参数是第二个实参，静态无法与 update 键映射 → throw。
+      // 实测门禁 exit 0：`memberName(callee) === 'call'` !== 'upsert' → return null 静默跳过。
+      name: 'O .call 形态（this.prisma.job.upsert.call(...)）必须 fail-closed（throw）',
+      expect: 'throw',
+      errRe: /通过 \.call\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          'await this.prisma.job.upsert.call(this.prisma.job,'
+        ),
+    },
+    {
+      // High 2：动态下标 `job['up'+'sert']`。下标是 BinaryExpression，运行时才知是否 upsert → throw。
+      // 实测门禁 exit 0：`memberName(callee)` 对 ElementAccess + 非字符串字面量返回 null → 静默跳过。
+      name: "P 动态下标 this.prisma.job['up'+'sert']() 必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /动态方法名调用/,
+      src: () =>
+        synth('          title: dto.title,').replace(
+          'this.prisma.job.upsert',
+          "this.prisma.job['up' + 'sert']"
+        ),
+    },
+    // Q–Q⁴：单字段缺失用例（singleton）——每条只缺一个 REQUIRED 字段，钉住 wantMissing。
+    // 目的：确保每个字段的判定逻辑独立生效，一个字段判定被意外删除时会有且只有
+    // 对应那条用例变红（而不是被其他字段的失败掩盖）。
+    {
+      name: "Q reviewStatus 字段完全缺失（只缺这一项）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ["reviewStatus:'pending'"],
+      src: () => synth(RESET_INLINE.replace("          reviewStatus: 'pending',\n", '')),
+    },
+    {
+      name: "Q′ publishStatus 字段完全缺失（只缺这一项）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ["publishStatus:'draft'"],
+      src: () => synth(RESET_INLINE.replace("          publishStatus: 'draft',\n", '')),
+    },
+    {
+      name: "Q″ rejectReason 字段完全缺失（只缺这一项）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ['rejectReason:null'],
+      src: () => synth(RESET_INLINE.replace('          rejectReason: null,\n', '')),
+    },
+    {
+      name: "Q‴ reviewedBy 字段完全缺失（只缺这一项）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ['reviewedBy:null'],
+      src: () => synth(RESET_INLINE.replace('          reviewedBy: null,\n', '')),
+    },
+    {
+      name: "Q⁴ reviewedAt 字段完全缺失（只缺这一项）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ['reviewedAt:null'],
+      src: () => synth(RESET_INLINE.replace('          reviewedAt: null,', '')),
+    },
   ]
+
+  // 重复用例名检测（Medium 1）：名称是用例的唯一 ID，重名会让报告无法定位，
+  // 也可能掩盖本不同但被合并的判定路径。在循环开始前一次性检查，
+  // 任何重名都立即 throw，防止两条不同期望的用例撞名后只有一条被执行。
+  const caseNames = cases.map((c) => c.name)
+  const dupNames = caseNames.filter((n, i) => caseNames.indexOf(n) !== i)
+  if (dupNames.length > 0)
+    throw new Error(`selfTest 用例存在重复名称（新增用例前请先检查）: ${[...new Set(dupNames)].join(' | ')}`)
 
   let leaked = 0
   // ⚠️ 必须统计「实际跑完的用例数」，不能用 cases.length。
   // 退化实测：把循环改成 `for (const c of [])` 时 cases.length 仍是 22、leaked 仍是 0
-  // → 与 EXPECTED_SELFTEST_CASES 相符 → 22 条断言全部消失却 exit 0。
+  // → 与 EXPECTED_SELFTEST_CASES 相符 → 34 条断言全部消失却 exit 0。
   // 这与 codex 指出的 `total: 0` 属同一类 fail-open，只是方向相反：
   // 一个谎报少、一个谎报多，都必须用「跑完才计数」来锁死。
   let executed = 0
@@ -674,6 +861,15 @@ function selfTest() {
           why = `（失败字段为 [${got}]，期望 [${want}]）`
         }
       }
+      // Round 7：反向断言展开 fail-closed 检测。wantSpreadFail: true 要求
+      // failures 中至少有一条 { spreadClosed: true }，防止误判为"因其他原因失败"。
+      if (c.wantSpreadFail !== undefined) {
+        const spreadFailed = result.failures.some((f) => f.spreadClosed)
+        if (c.wantSpreadFail && !spreadFailed) {
+          ok = false
+          why = '（spread 未被 fail-closed —— 反向断言被展开注入绕过）'
+        }
+      }
     }
 
     if (ok) {
@@ -711,6 +907,30 @@ let totalPass = 0,
   totalFail = 0
 
 /**
+ * Map-based 有序集合差分：正确处理重复键（同名站点出现 n 次要求 want 里也有 n 条）。
+ * 简单的 Array.includes 对重复键误判：actual=[a,a] want=[a] 时 includes 认为两条都满足。
+ *
+ * Round 7（Low 5）：原 runFile 用 `.filter(k => !actual.includes(k))` 计算 missing/extra，
+ * 若同一 key 出现两次，第二条的 includes 仍返回 true → 漏报"多出"。
+ * 实际站点名是唯一的（函数名·模型），重复概率极低；但 fail-closed 原则要求把重复也兜住。
+ */
+function inventoryDiff(want, actual) {
+  const wMap = new Map(), aMap = new Map()
+  for (const k of want) wMap.set(k, (wMap.get(k) ?? 0) + 1)
+  for (const k of actual) aMap.set(k, (aMap.get(k) ?? 0) + 1)
+  const missing = [], extra = []
+  for (const [k, n] of wMap) {
+    const have = aMap.get(k) ?? 0
+    for (let i = have; i < n; i++) missing.push(k)
+  }
+  for (const [k, n] of aMap) {
+    const need = wMap.get(k) ?? 0
+    for (let i = need; i < n; i++) extra.push(k)
+  }
+  return { missing, extra }
+}
+
+/**
  * fail-closed 库存核对：站点集合与 EXPECTED_SITES 不一致即失败。
  * 缺失 = 写入点被删/改名/换模型/改写成非 upsert 形式（门禁会失去覆盖）；
  * 多出 = 新增了未登记的写入点，必须显式登记后才放行。
@@ -729,9 +949,8 @@ function runFile(fileLabel, filepath, checker, checkerLabel) {
   }
   const actual = blocks.map((b) => b.key).sort()
   const want = [...expected].sort()
-  if (actual.length !== want.length || actual.some((k, i) => k !== want[i])) {
-    const missing = want.filter((k) => !actual.includes(k))
-    const extra = actual.filter((k) => !want.includes(k))
+  const { missing, extra } = inventoryDiff(want, actual)
+  if (missing.length > 0 || extra.length > 0) {
     console.error(
       `  ❌  ${fileLabel} · upsert 写入点集合与登记值不符。\n` +
         `      登记：${want.join(', ') || '(空)'}\n` +
@@ -771,7 +990,7 @@ const selfResult = selfTest()
 //   · 非整数（如 `return 1` 解构出 undefined）→ NaN → `NaN > 0` 为假 → 真实失败被抹掉；
 //   · 负数（`leaked: -1`）→ `totalFail += -1` 会**抵消**真实站点的失败，
 //     实测：植入一处真实缺字段后仍输出「总计 24 项 ✅ 24 PASS 0 FAIL」并 exit 0；
-//   · total=0（用例数组被清空）→ 20 项断言静默消失，实测输出「总计 7 项 ✅ 7 PASS」exit 0。
+//   · total=0（用例数组被清空）→ 34 项断言静默消失，实测输出「总计 7 项 ✅ 7 PASS」exit 0。
 // 故不只校验类型，还要校验区间与写死的期望条数。
 if (
   !selfResult ||
