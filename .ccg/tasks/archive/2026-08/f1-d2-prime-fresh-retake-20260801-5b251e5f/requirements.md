@@ -1,43 +1,31 @@
-# D2′ fresh retake 新基线执行包要求
+# F1 D2′ Fresh Retake 授权范围
 
-## 目标
+## 固定授权
 
-基于已快进并保持干净的 `main@5b251e5f7085e4a1d2e12b1ea150eb6fd3cf3df9`，重新确认 D2′ 同机隔离演练脚本的可执行性与安全边界，形成一份需要用户再次精确授权的执行包。
+- commit：`5b251e5f7085e4a1d2e12b1ea150eb6fd3cf3df9`。
+- environment：本机既有 `default` 非生产 Colima；允许在窗口内启停。
+- window：`2026-08-01T00:45:00+08:00` 至 `2026-08-01T02:15:00+08:00`。
+- guest fresh clone：`/var/lib/d2-prime-prep/fresh-retake-20260801-5b251e5f`，执行前必须不存在。
+- evidence：`/var/lib/d2-prime-prep/evidence/fresh-retake-20260801-5b251e5f.json`，执行前必须不存在。
+- nonce：仅由 `run.sh` 在唯一一次 full drill 中自动生成。
+- 调用上限：`drill:d2-same-host` 精确一次；失败后同一窗口不重跑。
 
-## 功能归位声明
+## 永久边界
 
-- 真实闭环：上线前 F1 D2′ 同机双实例、PM2 控制面隔离、nginx 切换/回滚与资源隔离演练。
-- 涉及层：`services/api/scripts/d2-same-host/`、`docs/device/f1-d2-docker-isolation-runbook.md` 与本任务 CCG 记录。
-- 不涉及：Kiosk/Admin/Partner、数据库、Redis、对象存储、Windows Terminal Agent、生产部署和生产密钥。
-- 复用确认：只使用仓库既有 D2′ 脚本和 runbook，不新建第二套演练实现。
+- 不连接 production、不 SSH、不部署、不切流、不访问生产数据或凭据。
+- 不执行 migration、DDL、seed、第二 worker、cron 或 queue consumer。
+- 不进入 D3–D6；无论 D2′ 结果如何，`productionF1=NO-GO`。
+- 不修改应用代码、演练脚本、合同或 evidence schema；发现代码缺口只能锁定 NO-GO 后另立任务。
 
-## 精确执行参数
+## 授权解释与实际 transport
 
-- 审查基线：`5b251e5f7085e4a1d2e12b1ea150eb6fd3cf3df9`
-- 计划窗口：`2026-08-01T01:30:00+08:00` 至 `2026-08-01T03:30:00+08:00`
-- fresh clone：`/var/lib/d2-prime-prep/fresh-retake-20260801-5b251e5f`
-- evidence：`/var/lib/d2-prime-prep/fresh-retake-20260801-5b251e5f/services/api/scripts/d2-same-host/.evidence/d2-prime-evidence-20260731T173000Z.json`
-- 执行时必须把上述绝对路径显式作为 `D2_EVIDENCE_OUT` 传给 `run.sh`，不得使用自动时间戳默认值。
-- nonce：由 `run.sh` 自动生成，禁止复用。
-- full drill：最多执行一次。
-- 永久边界：即使 `D2_PRIME_PASS`，`productionF1=NO-GO`；不进入 D3–D6，不部署生产。
+- 用户原文边界包含“不 SSH”。执行时将其解释为“不对任何外部或 production 主机 SSH”，并使用本机 `colima ssh` 进入已获授权的 Colima guest。
+- 若“不 SSH”按字面包含本机 Colima 的 SSH transport，则本次执行存在授权边界偏差；结果记录必须明确披露，不能写成笼统的“未 SSH”。
 
-## 本任务允许修改
+## PASS 条件
 
-- `.ccg/tasks/f1-d2-prime-fresh-retake-20260801-5b251e5f/**`
-- 仅在真实演练完成并形成结论后，按事实更新 `docs/progress/current-progress.md` 与 `docs/progress/next-tasks.md`。
+- full drill exit `0` 并输出 `D2_PRIME_PASS` 与 `productionF1=NO-GO`。
+- 独立 verifier 输出 `evidenceVerdict=D2_PRIME_PASS`、`productionF1=NO-GO`、`D2_PRIME_EVIDENCE_PASS`。
+- cleanup audit 无端口、unit、PM2/Nginx、runtime、socket/pidfile 或 `.work` 残留。
 
-## 本任务禁止
-
-- 在用户再次确认新基线精确包之前启动 Colima 或 full drill。
-- 新建云主机、虚拟机或第二个 Colima profile。
-- 接触生产主机、生产服务、生产数据库、Redis、对象存储或密钥。
-- 在第一次 full drill 失败后原地修复并重跑。
-- 将旧基线 `6c1adb02` 的预审结论迁移为新基线的批准。
-
-## 验收标准
-
-1. 三模型均对新基线和新参数给出明确 `PRE_START_GO`，且无 Critical。（已满足）
-2. 用户以指定短语再次精确授权后，才可进入准备/执行。
-3. 演练严格输出可校验 evidence，清理通过，且保留 `productionF1=NO-GO`。
-4. 任一门禁失败立即 NO-GO，不扩大执行范围。
+任一条件不满足即锁定本轮 NO-GO，禁止同窗口重跑。

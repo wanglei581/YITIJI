@@ -1,12 +1,12 @@
 {
   "id": "f1-d2-prime-fresh-retake-20260801-5b251e5f",
-  "title": "基于 origin/main@5b251e5f 重建 D2′ fresh retake 精确执行包",
+  "title": "在既有非生产 Colima 对 main@5b251e5f 执行唯一一次 D2′ fresh retake",
   "status": "completed",
-  "complexity": "L",
+  "complexity": "L+",
   "risk": "high",
-  "domain": "release",
+  "domain": "operations",
   "currentPhase": "completed",
-  "nextAction": "另立 stale-PID/cgroup consistency 与 cleanup unit-collected 语义修复任务；本任务禁止重跑",
-  "createdAt": "2026-07-31T16:39:47Z",
-  "branch": "codex/f1-d2-prime-retake-20260801"
+  "nextAction": "本地结果提交后等待 push / PR 授权；另立执行包合同 TDD 任务",
+  "createdAt": "2026-08-01T00:40:07+08:00",
+  "branch": "codex/f1-d2-prime-fresh-retake-result-20260801"
 }
