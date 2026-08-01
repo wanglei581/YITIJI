@@ -141,3 +141,19 @@ Task 3 已封板，下一步进入 `contract_upload` 高敏短期文件链路。
 保留一项非阻塞维护债务：`services/api/src/files/files.service.ts` 已超过 800 行，后续继续向文件服务新增职责前必须先拆分签名访问与生命周期清理；本任务不以重构扩大范围。
 
 Task 4 已封板。Gate 0 正式记录仍为 `blocked`，本结论不代表合同 AI 生产入口可开启。下一步进入版本化免责声明与独立同意。
+
+## Wave A Task 5：版本化免责声明与独立同意实施审查
+
+审查范围：`61d03337..3771957a`。
+
+- `contract_review` 与 `job_ai` 使用独立 scope 和版本；HTTP grant/revoke DTO 与 service 均只接受两个显式 scope，未知值及 `toString`、`__proto__` 等原型键在 Prisma 调用前 fail closed。
+- 授权保留 append-only 事件语义；状态页和后端授权检查统一读取 `grantedAt desc, id desc` 的最新任意版本事件，再判断当前版本和撤回时间，消除了多记录时 UI 与服务端真相分裂。
+- 撤回合同审查同意在同一 Prisma transaction 中撤回该 scope 所有 active 记录，并以明确处理中状态集合把会员任务收敛到 `cancelled`，不覆盖 `completed/failed/cancelled/expired` 终态；失败响应脱敏。
+- `contract_review_disclaimer` 已登记为法律文档类型，但创建仍固定为未激活草稿，未自动发布任何文案，也未解除 Gate 0。
+- `verify:contract-review:consent` 已注册并接入主 CI；`verify-job-ai-privacy` 使用 TypeScript AST 冻结 scope 必须为唯一、纯字符串字面量、无重复的精确联合，拒绝 `| string`、intersection、`typeof` 和增删成员等宽化形式。
+
+最终 `verify:contract-review:consent` 21/21、法律文档 11/11、岗位 AI 隐私、会员数据请求、API/shared typecheck 与 lint 均通过。内部规格审查为 `Spec compliant`、质量审查为 `Ready: Yes`；Claude、Antigravity、Cursor 最终均 `APPROVE`。
+
+后续硬门禁：Task 6 必须让会员任务创建的最终 consent 校验与 task insert 采用同一 Serializable/retry 并发协议，避免撤回与创建交错后遗留处理中任务；Task 14 必须用真实 PostgreSQL 双连接验证该竞态和事务回滚。历史数据权利请求 `revoke_consent` 当前保持 `job_ai` 语义，是否扩展为全部 AI scope 需独立产品决策，不在本任务静默改写。Kiosk 局部 scope 类型和 Admin 免责声明下拉在对应 UI 任务统一收口。合同同意测试文件已达 800 行，后续扩展前必须拆分 harness。
+
+Task 5 已封板，下一步进入归属、匿名令牌与状态机核心。

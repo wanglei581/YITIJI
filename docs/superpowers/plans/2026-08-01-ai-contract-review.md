@@ -470,6 +470,7 @@ git commit -m "feat: add contract review consent and disclaimer"
 - Create: `services/api/src/contract-review/contract-review-state.ts`
 - Create: `services/api/src/contract-review/contract-review.service.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-service.test.ts`
+- Modify: `services/api/src/member-privacy/member-privacy.service.ts`
 
 - [ ] **Step 1: 写匿名/会员 XOR 与非法转换失败测试**
 
@@ -515,7 +516,9 @@ export function assertOwnerShape(owner: { endUserId: string | null; accessTokenH
 }
 ```
 
-`contract-review-access.ts` 使用 `randomBytes(32).toString('base64url')`、SHA-256 和 `timingSafeEqual`；数据库只存 hash。`ContractReviewService.create()` 校验 `sourceFile.purpose/status/expiresAt/owner`，会员调用 `requireActiveConsent`，匿名要求 consent snapshot；任务 `expiresAt` 直接继承源文件，不能重新延长。
+`contract-review-access.ts` 使用 `randomBytes(32).toString('base64url')`、SHA-256 和 `timingSafeEqual`；数据库只存 hash。`ContractReviewService.create()` 校验 `sourceFile.purpose/status/expiresAt/owner`，匿名要求 consent snapshot；任务 `expiresAt` 直接继承源文件，不能重新延长。
+
+会员创建必须与 Task 5 的撤回事务形成同一并发协议：`MemberPrivacyService` 提供可在 Prisma transaction client 上执行的“最新事件真相”校验；创建使用 Serializable transaction，并对 Prisma 写冲突/序列化失败做有界重试。在同一事务中先读取 `contract_review` 最新 consent 事件并确认当前版本未撤回，再插入 `ContractReviewTask`。撤回路径使用同级 Serializable/retry 策略。并发结果必须满足二选一：创建先线性化时撤回事务能看见并取消任务；撤回先线性化时创建失败，绝不能留下“最新 consent 已撤回但任务仍为处理中”的状态。单元 fake 只验证协议与重试分支，真实 PostgreSQL 双连接验收留 Task 14。
 
 - [ ] **Step 4: 运行核心单测并要求 80% 覆盖**
 
@@ -1096,6 +1099,7 @@ git commit -m "feat: add kiosk contract review flow"
 - Create: `services/api/src/contract-review/contract-review-pdf.service.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-pdf.test.ts`
 - Create: `services/api/scripts/verify-contract-review.ts`
+- Create: `services/api/scripts/verify-contract-review-consent-postgres.ts`
 - Modify: `services/api/src/contract-review/contract-review.service.ts`
 - Modify: `services/api/src/contract-review/contract-review.module.ts`
 - Modify: `services/api/package.json`
@@ -1192,6 +1196,7 @@ Run:
 ```bash
 pnpm --filter @ai-job-print/api verify:contract-review:gate0
 pnpm --filter @ai-job-print/api verify:contract-review:contract
+pnpm --filter @ai-job-print/api verify:contract-review:consent
 pnpm --filter @ai-job-print/api verify:contract-review:http
 pnpm --filter @ai-job-print/api verify:contract-review
 pnpm --filter @ai-job-print/api verify:print-jobs
@@ -1208,7 +1213,9 @@ pnpm verify:dependency-security
 
 Expected: 全部 PASS。Gate 0 文档若仍为 `blocked`，验证只确认“生产默认关闭且阻断字段齐全”，最终发布步骤必须停止。
 
-同时把 `verify:contract-review:gate0` 与 `verify:contract-review:contract` 接入 `.github/workflows/ci.yml` 的显式 verifier allowlist；任一未接入时不得视为发布门禁完成。
+在 PostgreSQL readiness job 使用两个独立连接运行 `verify-contract-review-consent-postgres.ts`：定向交错会员任务创建与 `contract_review` 撤回，验证 Serializable/retry 后不存在“最新 consent 已撤回且任务仍处于处理中”的提交结果；同时验证事务失败回滚和终态 CAS 不回退。没有真实 PostgreSQL 连接时只能显式 skip，不能用内存 fake 冒充通过。
+
+同时确认 `verify:contract-review:gate0`、`verify:contract-review:contract`、`verify:contract-review:consent` 与最终 `verify:contract-review` 都在 `.github/workflows/ci.yml` 的显式 verifier allowlist；任一未接入时不得视为发布门禁完成。
 
 - [ ] **Step 5: 更新正式进度文档并提交**
 
