@@ -283,40 +283,36 @@ export class ScanTasksService {
     endUserId: string | null,
     controlToken: string | undefined
   ): Promise<ScanTaskStatusResult> {
-    const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+    let task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
       throw new NotFoundException({
         error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
       })
     }
-    // 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在下面的
-    // endUserId 归属校验之上（不是替代它）。历史行（B1-1 迁移前创建，
-    // controlTokenHash 为 null）一律拒绝——旧任务本来就该在几分钟内自然过期，
-    // 拒绝比"放行一个没有 token 保护的旧任务"更安全。
-    if (
-      !task.controlTokenHash ||
-      !controlToken ||
-      !timingSafeEqualHex(controlToken, task.controlTokenHash)
-    ) {
-      throw new ForbiddenException({
-        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
-      })
-    }
-    if (task.endUserId && task.endUserId !== endUserId) {
-      throw new ForbiddenException({
-        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
-      })
-    }
+    this.assertTaskReadAccess(task, endUserId, controlToken)
 
     let effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
     if (effectiveStatus === 'expired' && (task.status === 'waiting' || task.status === 'matched')) {
       // CAS：只在状态仍与本次读取一致时落盘，避免与并发的 cancel()/deliverScanFile() 竞态时
       // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
-      // 返回给调用方的 effectiveStatus 已经是按 expiresAt 纯计算得出，不依赖这次落盘是否成功。
-      await this.prisma.scanTask.updateMany({
+      // CAS 成功时返回逻辑 expired；失败时必须重读竞态胜者，不能继续返回旧快照。
+      const expired = await this.prisma.scanTask.updateMany({
         where: { id: scanTaskId, status: task.status },
         data: { status: 'expired' },
       })
+      if (expired.count === 0) {
+        const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+        if (!latest) {
+          throw new NotFoundException({
+            error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+          })
+        }
+        // CAS 失败说明并发请求已改变状态。只重读一次最新快照，
+        // 后续文件查询与响应均以它为准，不递归重试、不覆盖终态。
+        this.assertTaskReadAccess(latest, endUserId, controlToken)
+        task = latest
+        effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
+      }
     }
 
     const fileObject =
@@ -584,5 +580,30 @@ export class ScanTasksService {
       return 'expired'
     }
     return status
+  }
+
+  /**
+   * 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在
+   * endUserId 归属校验之上。重读竞态胜者后也必须对最新快照重新校验。
+   */
+  private assertTaskReadAccess(
+    task: { controlTokenHash: string | null; endUserId: string | null },
+    endUserId: string | null,
+    controlToken: string | undefined
+  ): void {
+    if (
+      !task.controlTokenHash ||
+      !controlToken ||
+      !timingSafeEqualHex(controlToken, task.controlTokenHash)
+    ) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
+      })
+    }
+    if (task.endUserId && task.endUserId !== endUserId) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
+      })
+    }
   }
 }

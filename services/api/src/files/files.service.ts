@@ -766,7 +766,16 @@ export class FilesService {
     const expired = await this.prisma.fileObject.findMany({
       // 导出文件必须由 member-privacy reconciler 同步收口请求账本，
       // 通用 cron 不得越过账本直接删除。
-      where: { deletedAt: null, purpose: { not: 'member_data_export' }, expiresAt: { lt: now } },
+      where: {
+        deletedAt: null,
+        purpose: { not: 'member_data_export' },
+        OR: [
+          { expiresAt: { lt: now } },
+          // contract_upload 必须始终有系统锁定的短期寿命；null 是异常高敏行，
+          // 按已过期处理，避免因无法命中 expiresAt < now 而无限留存。
+          { purpose: 'contract_upload', expiresAt: null },
+        ],
+      },
       select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
     })
 

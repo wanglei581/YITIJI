@@ -1209,12 +1209,17 @@ async function main(): Promise<void> {
       return originalUpdateMany(args)
     }) as typeof originalUpdateMany
 
-    await service.getStatus(created.scanTaskId, null, created.controlToken)
+    const returned = await service.getStatus(created.scanTaskId, null, created.controlToken)
 
     assert.equal(
       prisma.scanTasksById.get(created.scanTaskId)?.status,
       'cancelled',
       'lazy-expire write must not clobber a concurrently cancelled task back to expired'
+    )
+    assert.equal(
+      returned.status,
+      'cancelled',
+      'CAS loser must re-read and return the concurrently cancelled terminal state'
     )
   }
 
@@ -1244,19 +1249,40 @@ async function main(): Promise<void> {
       status: 'matched',
       expiresAt: new Date(Date.now() - 1000),
     })
+    prisma.filesById.set('file_concurrent_completed', {
+      id: 'file_concurrent_completed',
+      filename: 'race.pdf',
+      sizeBytes: tinyPdf().length,
+      mimeType: 'application/pdf',
+      sha256: createHash('sha256').update(tinyPdf()).digest('hex'),
+      purpose: 'print_doc',
+      endUserId: null,
+      deletedAt: null,
+      expiresAt: new Date(Date.now() + 60_000),
+    })
     const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
     prisma.scanTask.updateMany = (async (args: Parameters<typeof originalUpdateMany>[0]) => {
       const current = prisma.scanTasksById.get(created.scanTaskId)!
-      prisma.scanTasksById.set(created.scanTaskId, { ...current, status: 'completed' })
+      prisma.scanTasksById.set(created.scanTaskId, {
+        ...current,
+        status: 'completed',
+        fileId: 'file_concurrent_completed',
+      })
       return originalUpdateMany(args)
     }) as typeof originalUpdateMany
 
-    await service.getStatus(created.scanTaskId, null, created.controlToken)
+    const returned = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(
       prisma.scanTasksById.get(created.scanTaskId)?.status,
       'completed',
       'matched expiry CAS must not clobber a concurrently completed task'
     )
+    assert.equal(
+      returned.status,
+      'completed',
+      'CAS loser must re-read and return the concurrently completed terminal state'
+    )
+    assert.equal(returned.file?.fileId, 'file_concurrent_completed')
   }
 
   {
