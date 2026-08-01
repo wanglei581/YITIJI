@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import * as diagnosticModule from './diagnostics.mjs'
+import { verifyInvocationGovernanceContract } from './verify-invocation-governance.mjs'
 import {
   buildEvidence,
   createFailureMeasurements,
@@ -45,7 +46,13 @@ env -i \\
   LANG=C.UTF-8 \\
   D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \\
   D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \\
+  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \\
+  D2_TASK_ID="$D2_TASK_ID" \\
+  D2_BASELINE_SHA="$D2_BASELINE_SHA" \\
+  D2_BRANCH_NAME="$D2_BRANCH_NAME" \\
+  D2_CLONE_PATH="$D2_CLONE_PATH" \\
   D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \\
+  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \\
   pnpm --filter @ai-job-print/api drill:d2-same-host`
 
 function executableSource(source) {
@@ -120,6 +127,7 @@ function assertExecutionEntryContract(runSource, runbookSource) {
     'D2_PRIME_NO_GO_BUILD_INPUT', 'D2_PRIME_NO_GO_CGROUP_DELEGATION',
     'D2_PRIME_NO_GO_EVIDENCE_EXISTS', 'D2_PRIME_NO_GO_EVIDENCE_PATH', 'D2_PRIME_NO_GO_KERNEL',
     'D2_PRIME_NO_GO_MANAGED_SCOPE', 'D2_PRIME_NO_GO_NONCE', 'D2_PRIME_NO_GO_PATH',
+    'D2_PRIME_NO_GO_INVOCATION_INPUT',
     'D2_PRIME_NO_GO_PM2_PREFLIGHT', 'D2_PRIME_NO_GO_PORT', 'D2_PRIME_NO_GO_PRODUCTION_ENV',
     'D2_PRIME_NO_GO_RUNTIME_DIR', 'D2_PRIME_NO_GO_TOOLCHAIN', 'D2_PRIME_NO_GO_USER_MANAGER',
     'D2_PRIME_NO_GO_WORKSPACE',
@@ -950,7 +958,7 @@ function verifyEvidenceFile(args) {
   console.log('D2_PRIME_EVIDENCE_PASS')
 }
 
-function main(args = process.argv.slice(2)) {
+async function main(args = process.argv.slice(2)) {
   console.log('=== D2 prime offline contract ===')
   verifyNginxRenderer()
   verifyCutoverStateMachine()
@@ -973,12 +981,13 @@ function main(args = process.argv.slice(2)) {
   verifyEvidenceContract()
   verifyDrillDiagnosticContract()
   verifyDrillDiagnosticWiring()
+  await verifyInvocationGovernanceContract()
   console.log('D2_PRIME_CONTRACT_ALL_PASS')
   verifyEvidenceFile(args)
 }
 
 try {
-  main()
+  await main()
 } catch (error) {
   const code = error instanceof Error && /^D2_PRIME_[A-Z0-9_]+$/.test(error.message)
     ? error.message

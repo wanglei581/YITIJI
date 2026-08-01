@@ -10,9 +10,6 @@ SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 API_DIR="$(cd -P "$SCRIPT_DIR/../.." && pwd -P)"
 ROOT="$(cd -P "$API_DIR/../.." && pwd -P)"
 
-[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
-[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
-
 APPROVED_PATH="${D2_APPROVED_PATH:-/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 IFS=':' read -r -a approved_path_parts <<< "$APPROVED_PATH"
 [[ ${#approved_path_parts[@]} -gt 0 ]] || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
@@ -28,10 +25,64 @@ for path_part in "${approved_path_parts[@]}"; do
 done
 export PATH="$APPROVED_PATH"
 
+GOVERNANCE_ENV_BIN="$(command -v env 2>/dev/null || true)"
+GOVERNANCE_NODE_BIN="$(command -v node 2>/dev/null || true)"
+[[ "$GOVERNANCE_ENV_BIN" == /* && -x "$GOVERNANCE_ENV_BIN" ]] \
+  || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+[[ "$GOVERNANCE_NODE_BIN" == /* && -x "$GOVERNANCE_NODE_BIN" ]] \
+  || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+required_invocation_variables=(
+  D2_GOVERNANCE_ROOT D2_TASK_ID D2_BASELINE_SHA D2_BRANCH_NAME
+  D2_CLONE_PATH D2_EVIDENCE_OUT D2_ARCHIVE_PATH
+)
+for variable_name in "${required_invocation_variables[@]}"; do
+  [[ -n "${!variable_name:-}" ]] || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+done
+"$GOVERNANCE_ENV_BIN" -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
+  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
+  D2_TASK_ID="$D2_TASK_ID" \
+  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
+  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
+  D2_CLONE_PATH="$D2_CLONE_PATH" \
+  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
+  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
+  "$GOVERNANCE_NODE_BIN" "$SCRIPT_DIR/invocation-governance.mjs" --consume \
+  || exit 2
+
+[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
+[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
+
 required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
 for required_command in "${required_commands[@]}"; do
   command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 done
+
+assert_invocation_clone_identity() {
+  local current_baseline=""
+  local current_branch=""
+  local current_root=""
+  local invocation_clone_root=""
+  current_baseline="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  [[ "$current_baseline" == "$D2_BASELINE_SHA" ]] \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  current_branch="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  [[ "$current_branch" == "$D2_BRANCH_NAME" ]] \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  current_root="$(realpath "$ROOT" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  invocation_clone_root="$(realpath "$D2_CLONE_PATH" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  [[ "$current_root" == "$invocation_clone_root" ]] \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+  git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
+}
+
+assert_invocation_clone_identity
 node --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
 pnpm --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
 nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
@@ -109,6 +160,7 @@ stop_user_unit_and_prove_inactive() {
   return 1
 }
 
+assert_invocation_clone_identity
 systemctl --user show-environment >/dev/null 2>&1 \
   || no_go "D2_PRIME_NO_GO_USER_MANAGER"
 [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == "yes" ]] \
@@ -405,6 +457,7 @@ systemd-run --user \
   || no_go "D2_PRIME_NO_GO_MANAGED_SCOPE"
 KEEPER_STARTED=1
 
+assert_invocation_clone_identity
 set +e
 env -i \
   PATH="$APPROVED_PATH" \

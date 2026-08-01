@@ -33,23 +33,110 @@
 不是 production 容量配置。preflight 只证明 controller 和 effective value 可应用，不替代真实负载
 可达性；full drill 必须实际观察应用 membership 与 `nr_throttled` 增长。
 
-## 3. 最小执行命令
+## 3. 两阶段最小执行协议
 
-在待审 worktree 根目录执行：
+两个阶段必须按下述顺序执行，且使用同一组不变的七项身份：`D2_GOVERNANCE_ROOT`、
+`D2_TASK_ID`、`D2_BASELINE_SHA`、`D2_BRANCH_NAME`、`D2_CLONE_PATH`、`D2_EVIDENCE_OUT`
+和 `D2_ARCHIVE_PATH`。授权包只能向当前 shell 提供精确值；本 runbook 不记录任何已过期窗口、
+nonce 或具体授权值。父 shell 还必须提供绝对路径 `D2_SOURCE_REPOSITORY`；它只标识治理脚本的获批来源，
+不属于 reservation facet，也不进入 reserve/consume 身份。
+
+### 3.1 阶段一：clone 创建前预留
+
+必须从稳定、已审且已通过离线合同的仓库执行预留，不得从尚未创建的 fresh clone 执行。
+`D2_GOVERNANCE_ROOT` 必须事先存在，是位于任何 repository 与目标 clone 之外的真实目录，
+当前账户为 owner，mode 精确为 `0700`。`D2_CLONE_PATH`、`D2_EVIDENCE_OUT`、`D2_ARCHIVE_PATH`
+各自的物理 parent 必须事先存在且可解析，由当前 UID 拥有，group/world 均不可写（建议 mode `0700`）；
+三个目标本身在预留前都必须不存在。`D2_EVIDENCE_DIR` 也必须事先满足相同的可解析、owner 和权限条件，
+且 evidence 的物理 parent 必须位于 `D2_EVIDENCE_DIR` 的物理目录内。不得用符号链接、已有目标或仓库内
+governance root 绕过这些约束。
+
+先在父 shell 中执行且仅执行下述 source preflight，证明治理脚本来自获批 commit；该 block 固定 PATH，
+将 `D2_SOURCE_REPOSITORY` 解析为物理 top-level，并核对 HEAD、tracked worktree 与 index 均符合授权：
+
+```bash
+: "${D2_SOURCE_REPOSITORY:?missing exact approved source repository}" && \
+: "${D2_BASELINE_SHA:?missing exact baseline}" && \
+PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" && \
+export PATH && \
+D2_SOURCE_ROOT="$(cd -P -- "$D2_SOURCE_REPOSITORY" && pwd -P)" && \
+cd -P -- "$D2_SOURCE_ROOT" && \
+[[ "$(git rev-parse --show-toplevel)" == "$D2_SOURCE_ROOT" ]] && \
+[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_SHA" ]] && \
+git diff --quiet --ignore-submodules -- && \
+git diff --cached --quiet --ignore-submodules --
+```
+
+source preflight 成功后，必须保持同一父 shell 与同一组授权值，紧接着执行唯一 reserve block：
+
+<!-- D2_INVOCATION_RESERVE_COMMAND_START -->
+```bash
+: "${D2_GOVERNANCE_ROOT:?missing exact governance root}"
+: "${D2_TASK_ID:?missing exact task id}"
+: "${D2_BASELINE_SHA:?missing exact baseline}"
+: "${D2_BRANCH_NAME:?missing exact branch}"
+: "${D2_CLONE_PATH:?missing exact fresh clone path}"
+: "${D2_EVIDENCE_OUT:?missing exact evidence path}"
+: "${D2_ARCHIVE_PATH:?missing exact archive target}"
+env -i \
+  PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  HOME="$HOME" \
+  LANG=C.UTF-8 \
+  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
+  D2_TASK_ID="$D2_TASK_ID" \
+  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
+  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
+  D2_CLONE_PATH="$D2_CLONE_PATH" \
+  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
+  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
+node services/api/scripts/d2-same-host/invocation-governance.mjs --reserve
+```
+<!-- D2_INVOCATION_RESERVE_COMMAND_END -->
+
+`reserve` 只在 governance root 中持久化 reservation 和脱敏 ledger 事件；它不创建 clone、nonce、
+evidence 或 archive，也不调用 full drill。只有 `reserve` 成功后，才能在 `D2_CLONE_PATH`
+创建 fresh clone，并且只能使用下述 block 从相同 source 创建非本地 clone、从获批 baseline 新建唯一 branch，
+再复核物理 top-level、HEAD、symbolic branch、tracked worktree 与 index：
+
+```bash
+: "${D2_SOURCE_REPOSITORY:?missing exact approved source repository}" && \
+: "${D2_BASELINE_SHA:?missing exact baseline}" && \
+: "${D2_BRANCH_NAME:?missing exact branch}" && \
+: "${D2_CLONE_PATH:?missing exact fresh clone path}" && \
+PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" && \
+export PATH && \
+git clone --no-local -- "$D2_SOURCE_REPOSITORY" "$D2_CLONE_PATH" && \
+cd -P -- "$D2_CLONE_PATH" && \
+git switch -c "$D2_BRANCH_NAME" "$D2_BASELINE_SHA" && \
+D2_CLONE_ROOT="$(pwd -P)" && \
+[[ "$(git rev-parse --show-toplevel)" == "$D2_CLONE_ROOT" ]] && \
+[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_SHA" ]] && \
+[[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH_NAME" ]] && \
+git diff --quiet --ignore-submodules -- && \
+git diff --cached --quiet --ignore-submodules --
+```
+
+上述复核全部成功后，才在该 clone 根目录执行构建与离线合同：
 
 ```bash
 pnpm --filter @ai-job-print/api build
 pnpm --filter @ai-job-print/api verify:d2-same-host-contract
 ```
 
-授权包必须先把精确绝对路径写入当前 shell 的 `D2_EVIDENCE_DIR` 与 `D2_EVIDENCE_OUT`；两者缺失时，
-`run.sh` 自身和下述唯一 canonical full-drill command 都会在生成 nonce 前 fail closed。`D2_EVIDENCE_OUT`
+### 3.2 阶段二：fresh clone 内唯一 full drill
+
+授权包还必须把精确绝对路径写入当前 shell 的 `D2_EVIDENCE_DIR` 与 `D2_EVIDENCE_OUT`；两者缺失时，
+`run.sh` 和下述唯一 canonical full-drill command 都会在生成 nonce 前 fail closed。`D2_EVIDENCE_OUT`
 必须位于 `D2_EVIDENCE_DIR` 的物理目录内。`D2_APPROVED_PATH` 是冒号分隔的 **executable PATH**，只能
 指向仓库外的既有二进制目录；不得传入 fresh clone / repository path，指向仓库内部的符号链接同样会被
 物理路径检查拒绝，脚本也不会在非法值或缺失命令时回退到 caller PATH。
 
 canonical PATH 对应当前既有非生产 Colima 的工具链布局；如果目标环境的 required commands 不在这些
 目录中，必须先按独立代码任务同步更新 runbook 与 offline contract 并重新审查，不能在授权窗口内临时改命令。
+
+下述 block 必须在刚创建的 `D2_CLONE_PATH` 根目录执行，七项身份必须与阶段一完全一致。
+`run.sh` 会在 Linux、toolchain、preflight 和 nonce 边界之前自动 consume 已有 reservation；
+当前身份和授权窗口内不存在第二次调用。
 
 <!-- D2_FRESH_RETAKE_COMMAND_START -->
 ```bash
@@ -61,7 +148,13 @@ env -i \
   LANG=C.UTF-8 \
   D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
   D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \
+  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
+  D2_TASK_ID="$D2_TASK_ID" \
+  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
+  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
+  D2_CLONE_PATH="$D2_CLONE_PATH" \
   D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
+  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
   pnpm --filter @ai-job-print/api drill:d2-same-host
 ```
 <!-- D2_FRESH_RETAKE_COMMAND_END -->
@@ -75,8 +168,14 @@ node services/api/scripts/d2-same-host/verify-contract.mjs \
 
 不得设置 skip/mock/partial-pass 开关。`D2_NGINX_PORT`、`D2_EVIDENCE_DIR`、`D2_WORK_DIR` 或
 `D2_EVIDENCE_OUT` 如需覆盖，仍必须满足脚本的绝对路径、owner、权限、端口和独立 evidence 目录约束；
-不能用它们绕过 Linux/systemd/cgroup/production-env 检查。完整 full drill 每个授权窗口只允许调用一次，
-失败后不得用修改变量的方式在同一窗口重跑。
+不能用它们绕过 Linux/systemd/cgroup/production-env 检查。archive 目标在 reserve 和 consume 时都必须不存在，
+只能在调用结束后创建。
+
+reservation 以及 ledger 中的 `RESERVED` / `INVOKED` 事件都不属于 cleanup，任何普通 cleanup 或演练清理都不得删除它们。
+`reservation.lock` 残留表示临界区内存在无法证明状态的部分持久变更；当前窗口不得删除、恢复或绕过 stale lock。
+无论 reserve 失败、consume 失败，还是 consume 后的基线复核、preflight 或 full drill 失败，都不得在同一身份或授权窗口重跑。
+后续重试必须更换全部六个 facet：task、baseline、branch、clone、evidence、archive，并重新建立授权窗口与 reservation。
+governance root 只有在不存在 busy tombstone 且 ledger 健康时才可复用；否则必须停止并另立法证/恢复任务，不得在当前窗口修复。
 
 ## 4. PASS 与 NO-GO
 

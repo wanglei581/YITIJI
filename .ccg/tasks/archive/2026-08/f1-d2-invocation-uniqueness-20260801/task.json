@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-invocation-uniqueness-20260801",
+  "title": "F1 D2 task / invocation 唯一性治理",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "push / PR / merge 另行授权；stale-PID / cleanup 为下一独立任务",
+  "createdAt": "2026-08-01T04:58:00Z",
+  "branch": "codex/f1-d2-invocation-uniqueness-20260801"
+}
