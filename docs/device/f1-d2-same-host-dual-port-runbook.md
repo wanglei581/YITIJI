@@ -51,17 +51,17 @@ governance root 的 owner 能为任意合格 clone 发起预约，这是本合�
 > 本节命令只定义未来另行授权时的唯一操作模板。本任务不执行 reserve、full drill、post-drill verify，
 > 不启动 systemd、PM2、Nginx 或 API，也不授权 fresh retake、production 或 D3–D6。
 
-未来授权包必须先固定以下 operator-local 输入：预配置的 `D2_GOVERNANCE_ROOT`、全新 task ID、完整期望
-branch、完整 40/64 位 baseline OID、独立 clean clone 的绝对路径、尚不存在且唯一的 evidence/archive
-目标，以及独立 RFC3339 执行窗口。`D2_CLONE_ROOT` 必须正是随后执行 `run.sh` 的代码树；不能在 clone A
-预约后从 clone B 调用，也不能使用 linked worktree、`.git` gitfile 或预约后被替换/改动的 clone。
+未来授权包必须先固定以下 operator-local 输入：预配置的 `D2_GOVERNANCE_ROOT`、获批 source repository
+的绝对路径、全新 task ID、完整期望 branch、完整 40/64 位 baseline OID、尚不存在的独立 clean clone
+绝对路径、尚不存在且唯一的 evidence/archive 目标，以及独立 RFC3339 执行窗口。`D2_CLONE_ROOT` 必须
+正是随后执行 `run.sh` 的代码树；不能在 clone A 预约后从 clone B 调用，也不能使用 linked worktree、
+`.git` gitfile 或预约后被替换/改动的 clone。
 
 `D2_EVIDENCE_OUT` 与 `D2_ARCHIVE_OUT` 是操作者在当前授权 shell 中持有的绝对目标。它们只作为预约输入；
 evidence 路径在 invoke 成功后由 owner-only manifest 经私有 fd 3 交给 `run.sh`，不得再通过 full-drill 环境
 传入第二份真值。`D2_APPROVED_PATH` 不是 operator-local 输入；以下命令段拒绝任何预先定义，再将它固定并
-锁为只读 canonical 值。build、治理 verifier、旧 contract、reserve、invoke 和 post verifier 共用这一项
-工具链真值，禁止用 PATH A 预约后再用 PATH B invoke。预约前先在该 clone 根目录完成 fresh build 与离线
-合同核对：
+锁为只读 canonical 值。source preflight、clone、build、治理 verifier、旧 contract、reserve、invoke 和
+post verifier 共用这一项工具链真值，禁止用 PATH A 建链/预约后再用 PATH B invoke：
 
 ```bash
 if [[ "${D2_APPROVED_PATH+x}" == x ]]; then
@@ -69,6 +69,55 @@ if [[ "${D2_APPROVED_PATH+x}" == x ]]; then
   exit 2
 fi
 readonly D2_APPROVED_PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
+```
+
+先在尚未创建目标 clone 的同一 Bash 授权 shell 中，仅从稳定、已审的 source repository 执行以下 preflight。
+它把 source 解析为物理 Git top-level，并证明 source 的 HEAD、index、tracked/untracked worktree 都精确符合
+获批 baseline；任一检查失败都不得创建 clone 或预约：
+
+```bash
+: "${D2_SOURCE_REPOSITORY:?missing exact approved source repository}"
+: "${D2_BASELINE_OID:?missing exact baseline OID}"
+: "${D2_BRANCH:?missing exact fresh branch}"
+: "${D2_CLONE_ROOT:?missing exact fresh clone path}"
+D2_SOURCE_ROOT="$(cd -P -- "$D2_SOURCE_REPOSITORY" && pwd -P)"
+cd -P -- "$D2_SOURCE_ROOT"
+[[ "$(git rev-parse --show-toplevel)" == "$D2_SOURCE_ROOT" ]]
+[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]
+git diff --quiet --ignore-submodules --
+git diff --cached --quiet --ignore-submodules --
+[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+```
+
+source preflight 成功后，仍在同一授权 shell 中用 `--no-local` 创建唯一 clone；目标必须是绝对、尚不存在、
+非符号链接且按物理 parent 复算后仍为授权路径。随后从获批 baseline 创建全新 branch，并在任何 build 或
+reserve 前复核 standalone `.git`、物理 top-level、HEAD、symbolic branch、index 及完整 worktree：
+
+```bash
+[[ "$D2_CLONE_ROOT" == /* ]]
+[[ ! -e "$D2_CLONE_ROOT" && ! -L "$D2_CLONE_ROOT" ]]
+D2_CLONE_PARENT="$(dirname -- "$D2_CLONE_ROOT")"
+D2_CLONE_NAME="$(basename -- "$D2_CLONE_ROOT")"
+[[ -n "$D2_CLONE_NAME" && "$D2_CLONE_NAME" != '.' && "$D2_CLONE_NAME" != '..' ]]
+D2_CLONE_PHYSICAL_TARGET="$(cd -P -- "$D2_CLONE_PARENT" && pwd -P)/$D2_CLONE_NAME"
+[[ "$D2_CLONE_ROOT" == "$D2_CLONE_PHYSICAL_TARGET" ]]
+git clone --no-local -- "$D2_SOURCE_ROOT" "$D2_CLONE_ROOT"
+cd -P -- "$D2_CLONE_ROOT"
+git switch -c "$D2_BRANCH" "$D2_BASELINE_OID"
+[[ "$(pwd -P)" == "$D2_CLONE_ROOT" ]]
+[[ "$(git rev-parse --show-toplevel)" == "$D2_CLONE_ROOT" ]]
+[[ "$(git rev-parse --git-dir)" == '.git' && -d .git && ! -L .git ]]
+[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]
+[[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH" ]]
+git diff --quiet --ignore-submodules --
+git diff --cached --quiet --ignore-submodules --
+[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+```
+
+上述复核全部成功后，才在该 clone 根目录执行 fresh build 与两个独立离线合同；全部通过后才允许执行本节
+后续唯一 reserve：
+
+```bash
 env -i \
   PATH="$D2_APPROVED_PATH" \
   HOME="$HOME" \
