@@ -331,7 +331,6 @@ async function main() {
     const activation = await activateRelease({ candidateRoot: r2.releaseRoot, currentLink: fixture.managedCurrentLink, ...commonReleaseOptions })
     assert.equal(activation.releaseId, r2Id)
 
-    const managedAppPidBeforeRollback = pm2AppPid(pm2Bin, managedName, managedEnvironment)
     if (!isAbsolute(systemctlBin)) fail('SYSTEMCTL_INVALID')
     const managedControlGroup = systemdValue(systemctlBin, unitName, 'ControlGroup', systemEnvironment)
     if (!managedControlGroup.startsWith('/')) fail('CGROUP_INVALID')
@@ -470,7 +469,7 @@ async function main() {
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
     currentMeasureStep = MEASURE_STEPS.CGROUP_CONSISTENCY
-    assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)
+    assert.equal(controlGroup(managedAppPid), managedControlGroup)
     currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))
     if (evidence.verdict !== 'D2_PRIME_PASS') fail('EVIDENCE_NO_GO')
