@@ -14,9 +14,9 @@ approved_at: null
 
 # AI 合同审查 Gate 0 发布门禁
 
-## 当前结论
+## 门禁解释
 
-AI 合同审查当前处于 `blocked`。本记录仅用于冻结 Gate 0 的检查项、状态约束和默认关闭策略，不代表任何检查项已获批准，也不构成上线授权。
+前置 frontmatter 的 `status` 是本门禁状态的唯一机器可读来源。正文只说明检查项、状态约束和默认关闭策略，不复述可能随批准流程变化的当前状态；verifier 通过也不代表任何检查项已获批准或构成上线授权。
 
 任何一项未签字 approved，真实合同 AI 调用和生产入口都必须保持关闭。
 
@@ -40,10 +40,11 @@ AI 合同审查当前处于 `blocked`。本记录仅用于冻结 Gate 0 的检�
 - `fail_closed` 必须始终为布尔值 `true`；verifier 直接校验此字段，不依赖正文文案判断关闭策略。
 - 只有全部 Gate 0 检查项均为 `approved`，且 `approved_by` 非空时，才允许将 `status` 改为 `approved`。
 - `approved_by` 是 Gate 0 最终联合批准人的身份标识数组，并非各检查项证据或责任人签字的替代；仅在最终 `approved` 时填写，且必须唯一覆盖 `legal`、`compliance`、`security` 三个角色各一人（或一个稳定组织责任身份）。
-- 每个批准人使用 `<role>:<stable-id>` 格式，例如 `legal:contract-governance-counsel`、`compliance:ai-compliance-office`、`security:ai-security-office`。`stable-id` 只允许小写字母、数字、点、下划线和连字符，不得包含空白，也不得使用 `test`、`demo`、`example`、`placeholder`、`sample`、`todo`、`tbd`、`fake`、`dummy` 等占位词作为点、下划线或连字符分隔的独立段；不得重复身份或角色。
+- 每个批准人使用 `<role>:<stable-id>` 格式，例如 `legal:contract-governance-counsel`、`compliance:ai-compliance-office`、`security:ai-security-office`。`stable-id` 长度为 1–64 个字符，首字符必须是小写字母或数字，其余字符只允许小写字母、数字、点、下划线和连字符；不得包含空白，也不得使用 `test`、`demo`、`example`、`placeholder`、`sample`、`todo`、`tbd`、`fake`、`dummy` 等占位词作为独立段。
+- 三个角色的 `stable-id` 必须彼此不同，身份与角色也不得重复。批准人必须是具名、可追责的人类或组织责任身份；自动化任务不得代签，`bot`、`automation`、`automated`、`ci`、`runner`、`workflow`、`actions`、`github-actions` 及其大小写或点、下划线、连字符变体均禁止作为独立段。
 - `approved_at` 使用有效 RFC3339 时间记录最终联合批准时间。`blocked` 时 `approved_by` 必须为 `[]` 且 `approved_at` 必须为 `null`。
 - 任一批准被撤销、过期或证据无法复核时，必须立即将 `status` 恢复为 `blocked`，并保持真实调用与生产入口关闭。
 
 ## 验证边界
 
-`verify:contract-review:gate0` 只验证本记录的字段完整性和状态一致性。验证通过仅说明记录格式有效；在当前 `status: blocked` 下，门禁仍未获批准。
+`verify:contract-review:gate0` 只验证本记录的字段完整性和状态一致性。验证通过仅说明记录格式有效；只有 frontmatter 中 `status: approved` 且所有批准条件同时满足，才表示 Gate 0 已获批准。

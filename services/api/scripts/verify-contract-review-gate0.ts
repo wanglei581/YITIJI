@@ -22,8 +22,10 @@ const allowedKeys = [
 ] as const
 const allowedKeySet = new Set<string>(allowedKeys)
 const approverRoles = ['legal', 'compliance', 'security'] as const
-const stableApproverIdPattern = /^[a-z0-9](?:[a-z0-9._-]{1,62}[a-z0-9])?$/
+const stableApproverIdPattern = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const placeholderMarkerPattern = /(?:^|[._-])(?:test|demo|example|placeholder|sample|todo|tbd|fake|dummy)(?:$|[._-])/i
+const automationMarkerPattern =
+  /(?:^|[._-])(?:bot|automation|automated|ci|runner|workflow|actions|github[._-]?actions)(?:$|[._-])/i
 
 type GateField = (typeof gateFields)[number]
 type GateState = 'pending' | 'approved'
@@ -137,6 +139,7 @@ function isValidRfc3339(value: string): boolean {
 function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
   const seenIdentities = new Set<string>()
   const seenRoles = new Set<string>()
+  const seenStableIds = new Set<string>()
 
   for (const identity of approvedBy) {
     assert(typeof identity === 'string' && identity.length > 0, 'approved_by entries must be non-empty strings')
@@ -146,12 +149,15 @@ function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
     assert(match, 'approved_by identities must use <role>:<stable-id>')
 
     const [, role, stableId] = match
+    assert(!automationMarkerPattern.test(stableId), `approved_by stable-id contains an automation marker for role ${role}`)
     assert(stableApproverIdPattern.test(stableId), `approved_by stable-id is invalid for role ${role}`)
     assert(!placeholderMarkerPattern.test(stableId), `approved_by stable-id contains a placeholder marker for role ${role}`)
     assert(!seenIdentities.has(identity), `approved_by contains duplicate identity: ${identity}`)
     assert(!seenRoles.has(role), `approved_by contains duplicate role: ${role}`)
+    assert(!seenStableIds.has(stableId), `approved_by contains duplicate stable-id: ${stableId}`)
     seenIdentities.add(identity)
     seenRoles.add(role)
+    seenStableIds.add(stableId)
   }
 
   return seenRoles
@@ -159,8 +165,14 @@ function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
 
 export function verifyGateSource(source: string): void {
   const gate = parseGateFrontmatter(source)
+  const body = source.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n|$)/, '')
 
   assert.deepEqual(Object.keys(gate).sort(), [...allowedKeys].sort(), 'frontmatter must contain exactly the gate schema keys')
+  assert.doesNotMatch(
+    body,
+    /当前(?:状态|阶段|结论)?[^\r\n]{0,80}\bblocked\b/i,
+    'document body must not hardcode the current gate status as blocked',
+  )
   assert(
     gate.status === 'blocked' || gate.status === 'approved',
     'contract review release gate status must be blocked or approved',
@@ -255,6 +267,14 @@ function runRegressionFixtures(): void {
     assert.doesNotThrow(() => verifyGateSource(partialApprovedFixture))
   }
   assert.doesNotThrow(() => verifyGateSource(canonicalApprovedFixture))
+  assert.doesNotThrow(() =>
+    verifyGateSource(
+      canonicalApprovedFixture.replace(
+        /approved_by: .+/,
+        'approved_by: ["legal:l", "compliance:co", "security:sec"]',
+      ),
+    ),
+  )
 
   assert.throws(
     () => verifyGateSource(canonicalBlockedFixture.replace('status: blocked', 'status: blocked\nstatus: approved')),
@@ -368,6 +388,56 @@ function runRegressionFixtures(): void {
       ),
     /must include exactly one compliance approver/,
   )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          'approved_by: ["legal:shared-review-office", "compliance:shared-review-office", "security:shared-review-office"]',
+        ),
+      ),
+    /duplicate stable-id: shared-review-office/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          `approved_by: ["legal:contract-governance-counsel", "compliance:${'a'.repeat(65)}", "security:ai-security-office"]`,
+        ),
+      ),
+    /stable-id is invalid for role compliance/,
+  )
+  for (const automatedStableId of [
+    'bot-approver',
+    'automation-agent',
+    'Automated.Reviewer',
+    'ci-runner',
+    'release_runner',
+    'workflow-owner',
+    'actions-approver',
+    'github-actions',
+    'GitHub_Actions',
+    'GitHubActions',
+  ]) {
+    assert.throws(
+      () =>
+        verifyGateSource(
+          canonicalApprovedFixture.replace(
+            /approved_by: .+/,
+            `approved_by: ["legal:contract-governance-counsel", "compliance:${automatedStableId}", "security:ai-security-office"]`,
+          ),
+        ),
+      /automation marker for role compliance/,
+    )
+  }
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalBlockedFixture.replace('Canonical verifier fixture.', '当前状态为 blocked。'),
+      ),
+    /must not hardcode the current gate status as blocked/,
+  )
 }
 
 const source = readFileSync(gatePath, 'utf8')
@@ -375,5 +445,5 @@ verifyGateSource(source)
 runRegressionFixtures()
 
 console.log(
-  'Contract review Gate 0 verification passed: real record, all 6 partial approvals, and full approval accepted; negative fixtures rejected.',
+  'Contract review Gate 0 verification passed: lifecycle fixtures accepted; duplicate stable IDs, automation identities, and other negative fixtures rejected.',
 )
