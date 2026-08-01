@@ -221,8 +221,8 @@
 
 ## P0：合作机构后台账号安全移除
 
-- [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
-- [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：等待 PR CI；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
+- [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR #267 已 squash 合入 `main@30d168ce`（2026-07-16）；未部署。
+- [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：PR CI 已通过（PR #267 main push，2026-07-16）；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
 
 ## P0：剩余分支 / worktree 收口
 
@@ -300,7 +300,7 @@
 
 ## P0：上线前真实验收
 
-- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 已 squash 合入 main（2026-07-16）；GitHub Actions CI 成功。生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
 - [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
 
 - [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
