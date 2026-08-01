@@ -98,3 +98,16 @@
 ### 结论
 
 Task 1 已封板。Gate 0 静态验证通过只代表记录格式和状态一致性有效，不代表 Gate 已获批准，也不构成生产上线授权；当前正式记录仍为 `blocked`，真实合同 AI 调用和生产入口保持关闭。
+
+## Wave A Task 2：共享契约与状态机实施审查
+
+审查范围：`2e5480d3..622b7aa8`。
+
+- 新增唯一共享合同审查状态常量与 Finding / Result / TaskView 契约。
+- `FilePurpose` additive 增加 `contract_upload`，`ScanType` additive 增加 `contract`；UploadSession 请求通过既有 `FilePurpose` 复用自动获得类型支持。
+- verifier 自执行严格 ES2021 `tsc --noEmit`，以独立 expected shape 双向冻结状态、合同类型、优先级、分类、Finding、Result、TaskView 和嵌套字段，避免 SWC 擦除类型导致假通过。
+- API runtime 的 purpose 白名单、object key、留存策略和 scan mapping 按正式计划留在 Task 4；当前无合同路由或调用方，分支不会在半接通状态交付。
+
+本地规格与质量审查均 `APPROVE`，无剩余 Critical / Important / Minor。Antigravity 最终 `APPROVE`，无 Critical / Warning；Claude 最终 `APPROVE`，确认类型门禁真实有效，并提醒现有 CI 使用显式 verifier allowlist。该提醒已写入 Task 14：合并前必须把 `verify:contract-review:gate0` 与 `verify:contract-review:contract` 接入 CI，未接入不得视为发布门禁完成。
+
+Task 2 已封板，下一步进入双库 `ContractReviewTask` 聚合。

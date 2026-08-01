@@ -1099,6 +1099,7 @@ git commit -m "feat: add kiosk contract review flow"
 - Modify: `services/api/src/contract-review/contract-review.service.ts`
 - Modify: `services/api/src/contract-review/contract-review.module.ts`
 - Modify: `services/api/package.json`
+- Modify: `.github/workflows/ci.yml`
 - Modify: `docs/progress/current-progress.md`
 - Modify: `docs/progress/next-tasks.md`
 
@@ -1190,6 +1191,7 @@ Run:
 
 ```bash
 pnpm --filter @ai-job-print/api verify:contract-review:gate0
+pnpm --filter @ai-job-print/api verify:contract-review:contract
 pnpm --filter @ai-job-print/api verify:contract-review:http
 pnpm --filter @ai-job-print/api verify:contract-review
 pnpm --filter @ai-job-print/api verify:print-jobs
@@ -1205,6 +1207,8 @@ pnpm verify:dependency-security
 ```
 
 Expected: 全部 PASS。Gate 0 文档若仍为 `blocked`，验证只确认“生产默认关闭且阻断字段齐全”，最终发布步骤必须停止。
+
+同时把 `verify:contract-review:gate0` 与 `verify:contract-review:contract` 接入 `.github/workflows/ci.yml` 的显式 verifier allowlist；任一未接入时不得视为发布门禁完成。
 
 - [ ] **Step 5: 更新正式进度文档并提交**
 
