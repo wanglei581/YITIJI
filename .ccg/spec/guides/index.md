@@ -125,6 +125,15 @@
 - Full drill 首次失败必须保留原始 NO-GO evidence，不得原地修脚本后 retake；修复与新演练分成两个
   独立任务，新演练仍需新的 nonce、evidence 路径和明确授权。
 
+### Prisma 临时 SQLite 验证补充
+
+- 使用 Prisma 7 对任务专用或临时 SQLite 执行 `db push` / `migrate deploy` 前，必须先以
+  `closeSync(openSync(databasePath, 'a'))` 创建目标文件；不得依赖 schema engine 自动建文件。
+- 数据库创建、Prisma 子进程 `cwd` 与 cleanup 必须基于同一绝对 API 根路径；删除时同时收敛数据库、
+  `-wal` 和 `-shm`，不得读取或复用生产 `DATABASE_URL` 充当测试夹具。
+- 验证脚本的有效会员 fixture 必须同时满足当前 `EndUserAuthGuard` 的 `enabled: true` 与
+  `status: 'active'` 契约；不得通过补无关 Redis 假方法掩盖错误分支。
+
 ## 七、目录治理与物理迁移规则
 
 当前仓库目录职责以 `docs/project-structure.md` 为准。`apps/`、`services/`、`packages/` 是标准 monorepo 结构，不因“看起来不分类”而直接物理迁移。

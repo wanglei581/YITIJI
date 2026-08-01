@@ -1,0 +1,12 @@
+{
+  "id": "fix-prisma-fresh-sqlite-baseline",
+  "title": "修复最新 main 在全新 SQLite 上的 Prisma schema engine 基线失败",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "database-tooling",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并继续 AI 合同审查 Task 1",
+  "createdAt": "2026-08-01T12:30:06Z",
+  "branch": "codex/contract-review-p0"
+}
