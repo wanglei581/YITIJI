@@ -6,6 +6,7 @@ import {
   type ContractReviewCategory,
   type ContractReviewFinding,
   type ContractReviewPriority,
+  type ContractReviewResult,
   type ContractReviewStatus,
   type ContractReviewTaskView,
   type ContractType,
@@ -24,6 +25,71 @@ type Equal<Left, Right> =
     : false
 
 type SharedContractExports = typeof import('../../../packages/shared/src')
+
+type ExpectedContractReviewEvidence = {
+  pageNumber: number | null
+  excerpt: string
+  charStart: number | null
+  charEnd: number | null
+}
+
+type ExpectedContractReviewFinding = {
+  id: string
+  category:
+    | 'parties'
+    | 'term'
+    | 'probation'
+    | 'compensation'
+    | 'position_location'
+    | 'working_time'
+    | 'social_insurance'
+    | 'training_service'
+    | 'penalty'
+    | 'non_compete'
+    | 'deposit_documents'
+    | 'termination'
+    | 'imbalance'
+    | 'offer_conditions'
+  priority: 'priority_check' | 'attention' | 'insufficient_info'
+  title: string
+  evidence: ExpectedContractReviewEvidence
+  explanation: string
+  basisRef: string | null
+  verificationQuestion: string
+  uncertainty: string
+  source: 'rule' | 'ai' | 'rule_and_ai'
+}
+
+type ExpectedContractReviewResult = {
+  priorityCheckCount: number
+  attentionCount: number
+  insufficientInfoCount: number
+  coverage: 'complete' | 'truncated'
+  ocrConfidence: 'high' | 'medium' | 'low'
+  disclaimerVersion: string
+  rulePackVersion: string
+  generatedByAi: true
+  findings: ExpectedContractReviewFinding[]
+}
+
+type ExpectedContractReviewProgress = {
+  stage: (typeof CONTRACT_REVIEW_STATUSES)[number]
+  completedPages: number
+  totalPages: number | null
+}
+
+type ExpectedContractReviewTaskView = {
+  id: string
+  status: (typeof CONTRACT_REVIEW_STATUSES)[number]
+  contractType: 'labor_contract' | 'internship_agreement' | 'non_compete' | 'offer'
+  analyzedPages: number
+  totalPages: number | null
+  truncated: boolean
+  ocrConfidence: 'high' | 'medium' | 'low' | null
+  expiresAt: string
+  progress: ExpectedContractReviewProgress
+  result: ExpectedContractReviewResult | null
+}
 
 function expectType<Check extends true>(_check?: Check): void {}
 
@@ -56,6 +122,9 @@ expectType<
 >()
 expectType<Equal<BarrelContractReviewFinding, ContractReviewFinding>>()
 expectType<Equal<BarrelContractReviewTaskView, ContractReviewTaskView>>()
+expectType<Equal<ContractReviewFinding, ExpectedContractReviewFinding>>()
+expectType<Equal<ContractReviewResult, ExpectedContractReviewResult>>()
+expectType<Equal<ContractReviewTaskView, ExpectedContractReviewTaskView>>()
 expectType<Equal<Extract<FilePurpose, 'contract_upload'>, 'contract_upload'>>()
 expectType<Equal<Extract<ScanType, 'contract'>, 'contract'>>()
 expectType<
