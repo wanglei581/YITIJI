@@ -91,7 +91,7 @@ cd -P -- "$D2_SOURCE_ROOT"
 [[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]
 git diff --quiet --ignore-submodules --
 git diff --cached --quiet --ignore-submodules --
-[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+[[ -z "$(git status --porcelain=v2 --untracked-files=all)" ]]
 ```
 
 source preflight 成功后，仍在同一授权 shell 中用 `--no-local` 创建唯一 clone；目标必须是绝对、尚不存在、
@@ -116,7 +116,7 @@ git switch -c "$D2_BRANCH" "$D2_BASELINE_OID"
 [[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH" ]]
 git diff --quiet --ignore-submodules --
 git diff --cached --quiet --ignore-submodules --
-[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+[[ -z "$(git status --porcelain=v2 --untracked-files=all)" ]]
 ```
 
 上述复核全部成功后，才在该 clone 根目录执行 fresh build 与两个独立离线合同；全部通过后才允许执行本节
