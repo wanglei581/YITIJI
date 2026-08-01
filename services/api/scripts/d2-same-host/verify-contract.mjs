@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import * as diagnosticModule from './diagnostics.mjs'
+import { verifyCleanupContract as verifyReconciledCleanupContract } from './verify-cleanup-contract.mjs'
 import { verifyInvocationGovernanceContract } from './verify-invocation-governance.mjs'
 import {
   buildEvidence,
@@ -96,16 +97,6 @@ function expectContractFailure(action) {
   )
 }
 
-function shellFunctionSource(source, name) {
-  const marker = `\n${name}() {\n`
-  const markerStart = source.indexOf(marker)
-  const start = markerStart + 1
-  assert.ok(markerStart >= 0, `${name} function must exist`)
-  const end = source.indexOf('\n}\n', start)
-  assert.ok(end > start, `${name} function must have a bounded body`)
-  return source.slice(start, end + 2)
-}
-
 function assertExecutionEntryContract(runSource, runbookSource) {
   const shellSource = runSource.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
   const approvedPathGuard = '[[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]]'
@@ -165,179 +156,6 @@ function verifyExecutionEntryContract() {
   assert.throws(() => assertExecutionEntryContract(`${runSource}\nno_go "D2_PRIME_NO_GO_UNLISTED"\n`, runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource, runbookSource.replace('D2_EVIDENCE_DIR=', 'D2_EVIDENCE_DIRECTORY=')))
   console.log('  PASS D2 fresh-retake entry rejects repository PATH and locks one canonical command')
-}
-
-function productionEnvironmentNames(envExampleSource) {
-  const configuredNames = new Set(
-    [...envExampleSource.matchAll(/^#?([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]),
-  )
-  for (const runtimeCredentialName of ['TENCENT_TTS_SECRET_ID', 'TENCENT_TTS_SECRET_KEY']) {
-    assert.ok(configuredNames.has(runtimeCredentialName), `.env.example must declare ${runtimeCredentialName}`)
-  }
-  const dataPlaneNames = new Set([
-    'DATABASE_URL',
-    'DIRECT_URL',
-    'POSTGRES_URL',
-    'REDIS_URL',
-    'REDIS_HOST',
-    'REDIS_PASSWORD',
-  ])
-  const credentialName = /(?:SECRET|PASSWORD|PRIVATE_KEY|PUBLIC_KEY|APIV3_KEY|MCH_SERIAL_NO|ACCESS_KEY|API_KEY|APP_ID$|APPID$|MCHID$|SIGN_NAME$|TEMPLATE_ID$|CODEPAY_STORE_OUT_ID$)/
-  return [...configuredNames].filter((name) => dataPlaneNames.has(name) || credentialName.test(name))
-}
-
-function assertProductionEnvironmentContract(runSource, envExampleSource) {
-  const productionBlock = runSource.match(/production_variables=\(\n([\s\S]*?)\n\)/)?.[1]
-  assert.ok(productionBlock, 'production_variables must be a multiline shell array')
-  const productionNames = new Set(productionBlock.split(/\s+/).filter(Boolean))
-  for (const name of productionEnvironmentNames(envExampleSource)) {
-    assert.ok(productionNames.has(name), `production_variables must include ${name}`)
-  }
-  for (const legacyName of [
-    'OSS_ACCESS_KEY_ID',
-    'OSS_ACCESS_KEY_SECRET',
-    'AWS_ACCESS_KEY_ID',
-    'AWS_SECRET_ACCESS_KEY',
-    'AWS_SESSION_TOKEN',
-    'MINIO_ROOT_USER',
-    'MINIO_ROOT_PASSWORD',
-    'TENCENTCLOUD_SECRET_ID',
-    'TENCENTCLOUD_SECRET_KEY',
-  ]) assert.ok(productionNames.has(legacyName), `production_variables must retain ${legacyName}`)
-
-  const environmentGuard = runSource.slice(
-    runSource.indexOf('for variable_name in "${production_variables[@]}"'),
-    runSource.indexOf('done', runSource.indexOf('for variable_name in "${production_variables[@]}"')) + 4,
-  )
-  assert.match(environmentGuard, /\[\[ -z "\$\{!variable_name\+x\}" \]\]/)
-  assert.doesNotMatch(environmentGuard, /(?:echo|printf|export|printenv|env|set)[^\n]*\$\{!variable_name\}/)
-}
-
-// Both forensic directories must be individually guarded, so one guard can never stand in for
-// the other: `rm -rf` may only run when every earlier cleanup step succeeded.
-function assertForensicRetentionGuards(cleanupSource, message) {
-  for (const directory of ['RUN_DIR', 'PM2_CONTROL_ROOT']) {
-    const guard = new RegExp(`\\(\\( cleanup_failed != 0 \\)\\) \\|\\| rm -rf -- "\\$${directory}"`, 'g')
-    assert.equal((cleanupSource.match(guard) ?? []).length, 1, `${message} (${directory})`)
-  }
-}
-
-function assertCleanupContract(runSource) {
-  const absenceHelper = shellFunctionSource(runSource, 'user_unit_collected_absent')
-  // Each property read must fail closed: an unreadable manager may never look like absence.
-  assert.match(absenceHelper, /load_state="\$\(systemctl --user show "\$unit_name" -p LoadState --value 2>\/dev\/null\)" \|\| return 1/)
-  assert.match(absenceHelper, /\[\[ "\$load_state" == "not-found" \]\] \|\| return 1/)
-  assert.match(absenceHelper, /active_state="\$\(systemctl --user show "\$unit_name" -p ActiveState --value 2>\/dev\/null\)" \|\| return 1/)
-  assert.match(absenceHelper, /\[\[ "\$active_state" == "inactive" \]\] \|\| return 1/)
-  assert.doesNotMatch(absenceHelper, /\|\| true|-z "\$load_state"|-z "\$active_state"/)
-
-  const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
-  // stop_status must start clean, or a successful stop would be re-judged as a collected unit.
-  assert.match(stopHelper, /local stop_status=0\n/)
-  assert.match(stopHelper, /systemctl --user stop "\$unit_name" >\/dev\/null 2>&1 \|\| stop_status=\$\?/)
-  assert.match(
-    stopHelper,
-    /if \(\( stop_status != 0 \)\); then\n\s*user_unit_collected_absent "\$unit_name" && return 0\n\s*return 1\n\s*fi/,
-  )
-  assert.match(stopHelper, /systemctl --user show "\$unit_name" -p ActiveState --value/)
-  assert.match(stopHelper, /\[\[ "\$unit_state" == "inactive" \]\] && return 0/)
-  assert.doesNotMatch(stopHelper, /\|\| true|failed|-z "\$unit_state"/)
-  assert.ok(
-    (runSource.match(/stop_user_unit_and_prove_inactive "\$(?:PREFLIGHT_UNIT|UNIT_NAME)"/g) ?? []).length >= 2,
-    'preflight and final cleanup must share the strict inactive helper',
-  )
-
-  const earlyCleanup = shellFunctionSource(runSource, 'early_cleanup')
-  assert.equal((earlyCleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
-  assertForensicRetentionGuards(
-    earlyCleanup,
-    'early cleanup must retain forensic directories whenever any cleanup step already failed',
-  )
-  const earlyExitHandler = shellFunctionSource(runSource, 'early_cleanup_on_exit')
-  assert.match(earlyExitHandler, /local original_status=\$\?/)
-  assert.match(earlyExitHandler, /trap - EXIT/)
-  assert.match(earlyExitHandler, /if ! early_cleanup; then[\s\S]*exit 2[\s\S]*fi/)
-  assert.match(earlyExitHandler, /exit "\$original_status"/)
-  assert.match(runSource, /^trap early_cleanup_on_exit EXIT$/m)
-
-  const cleanup = shellFunctionSource(runSource, 'cleanup')
-  assert.match(cleanup, /stop_user_unit_and_prove_inactive "\$UNIT_NAME" \|\| cleanup_failed=1/)
-  assert.match(cleanup, /: > "\$STOP_MARKER"\) 2>\/dev\/null \|\| cleanup_failed=1/)
-  assert.equal((cleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
-  assertForensicRetentionGuards(
-    cleanup,
-    'final cleanup must retain forensic directories whenever any cleanup step already failed',
-  )
-
-  const exitHandler = shellFunctionSource(runSource, 'cleanup_on_exit')
-  assert.match(exitHandler, /local original_status=\$\?/)
-  assert.match(exitHandler, /trap - EXIT/)
-  assert.match(exitHandler, /if ! cleanup; then[\s\S]*exit 2[\s\S]*fi/)
-  assert.match(exitHandler, /exit "\$original_status"/)
-  assert.match(runSource, /^trap cleanup_on_exit EXIT$/m)
-
-  const evidenceVerified = runSource.lastIndexOf('"$SCRIPT_DIR/verify-contract.mjs" --evidence "$EVIDENCE_OUT"')
-  const finalTrapDisarm = runSource.lastIndexOf('trap - EXIT')
-  const finalCleanup = runSource.lastIndexOf('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"')
-  const pass = runSource.lastIndexOf("printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'")
-  assert.ok(evidenceVerified >= 0 && finalTrapDisarm > evidenceVerified)
-  assert.ok(finalCleanup > finalTrapDisarm && pass > finalCleanup)
-}
-
-function verifyCleanupContract() {
-  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
-  const envExampleSource = readFileSync(join(SCRIPT_DIR, '../../.env.example'), 'utf8')
-  assertProductionEnvironmentContract(runSource, envExampleSource)
-  assertCleanupContract(runSource)
-
-  const unsafeMutations = [
-    runSource.replace('[[ "$unit_state" == "inactive" ]] && return 0', '[[ -z "$unit_state" || "$unit_state" == "inactive" ]] && return 0'),
-    runSource.replace('trap - EXIT\ncleanup || no_go "D2_PRIME_CLEANUP_FAILED"', 'cleanup || no_go "D2_PRIME_CLEANUP_FAILED"'),
-    runSource.replace('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"', "printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'"),
-    // A collected unit may only be accepted after proving absence; never by ignoring the stop status.
-    runSource.replace(
-      '    user_unit_collected_absent "$unit_name" && return 0\n    return 1\n',
-      '    return 0\n',
-    ),
-    // A pre-set stop_status would re-judge a successful stop as a collected unit.
-    runSource.replace('  local stop_status=0\n', '  local stop_status=1\n'),
-    // Absence proof must require LoadState=not-found, not merely any unloaded-looking state.
-    runSource.replace('[[ "$load_state" == "not-found" ]] || return 1', '[[ -n "$load_state" ]] || return 1'),
-    // An unreadable manager must never be mistaken for absence: both reads must fail closed.
-    runSource.replace(
-      'load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)" || return 1',
-      'load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)"',
-    ),
-    runSource.replace(
-      'active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)" || return 1',
-      'active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"',
-    ),
-    // Absence proof must also require the unit be inactive, never absence alone.
-    runSource.replace('[[ "$active_state" == "inactive" ]] || return 1', 'return 0'),
-    // Forensic directories must survive a failed cleanup: dropping either guard is unsafe, and
-    // duplicating one directory's guard may never satisfy the other's.
-    runSource.replace(
-      '    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1',
-      '    rm -rf -- "$RUN_DIR" || cleanup_failed=1',
-    ),
-    runSource.replace(
-      '    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
-      '    rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
-    ),
-    runSource.replaceAll(
-      '    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
-      '    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1',
-    ),
-  ]
-  for (const mutation of unsafeMutations) {
-    assert.notEqual(mutation, runSource, 'every cleanup mutation must actually alter run.sh')
-    assert.throws(() => assertCleanupContract(mutation))
-  }
-
-  const requiredName = productionEnvironmentNames(envExampleSource)[0]
-  const missingCredential = runSource.replace(new RegExp(`\\b${requiredName}\\b`), '')
-  assert.throws(() => assertProductionEnvironmentContract(missingCredential, envExampleSource))
-  console.log('  PASS cleanup, user systemd inactive proof, and production environment denylist fail closed')
 }
 
 function measurements() {
@@ -1042,7 +860,7 @@ async function main(args = process.argv.slice(2)) {
     throw new Error('D2_PRIME_USER_SYSTEMD_CONTRACT_INVALID')
   }
   try {
-    verifyCleanupContract()
+    verifyReconciledCleanupContract()
   } catch {
     throw new Error('D2_PRIME_CLEANUP_CONTRACT_INVALID')
   }
