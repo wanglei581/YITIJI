@@ -1,0 +1,12 @@
+{
+  "id": "resolve-pr454-main-conflict",
+  "title": "同步最新 main 并解决 PR #454 正式进度文档冲突",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "release",
+  "currentPhase": "completed",
+  "nextAction": "等待 PR #454 最新 CI；未经用户另行授权不得合并",
+  "createdAt": "2026-07-31T18:00:00Z",
+  "branch": "codex/f1-d2-prime-retake-20260801"
+}
