@@ -25,7 +25,7 @@ const approverRoles = ['legal', 'compliance', 'security'] as const
 const stableApproverIdPattern = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const placeholderMarkerPattern = /(?:^|[._-])(?:test|demo|example|placeholder|sample|todo|tbd|fake|dummy)(?:$|[._-])/i
 const automationMarkerPattern =
-  /(?:^|[._-])(?:bot|automation|automated|ci|runner|workflow|actions|github[._-]?actions)(?:$|[._-])/i
+  /(?:^|[._-])(?:bot|automation|automated|runner|workflow|actions|github[._-]?actions)(?:$|[._-])/i
 const compactAutomationTerms = ['bot', 'automation', 'automated', 'runner', 'workflow', 'actions', 'githubactions'] as const
 const ciAutomationTerms = ['agent', 'bot', 'runner', 'workflow', 'actions', 'automation', 'automated'] as const
 
@@ -298,11 +298,11 @@ function runRegressionFixtures(): void {
       ),
     ),
   )
-  assert.doesNotThrow(() =>
-    verifyGateSource(
-      canonicalApprovedFixture.replace('legal:contract-governance-counsel', 'legal:civic-counsel'),
-    ),
-  )
+  for (const validStableId of ['civic-counsel', 'ci-officer', 'office-ci']) {
+    assert.doesNotThrow(() =>
+      verifyGateSource(canonicalApprovedFixture.replace('legal:contract-governance-counsel', `legal:${validStableId}`)),
+    )
+  }
 
   assert.throws(
     () => verifyGateSource(canonicalBlockedFixture.replace('status: blocked', 'status: blocked\nstatus: approved')),
@@ -440,7 +440,9 @@ function runRegressionFixtures(): void {
     'bot-approver',
     'automation-agent',
     'Automated.Reviewer',
+    'ci-agent',
     'ci-runner',
+    'agent-ci',
     'release_runner',
     'workflow-owner',
     'actions-approver',
