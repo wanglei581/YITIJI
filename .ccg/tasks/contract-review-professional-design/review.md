@@ -111,3 +111,16 @@ Task 1 已封板。Gate 0 静态验证通过只代表记录格式和状态一致
 本地规格与质量审查均 `APPROVE`，无剩余 Critical / Important / Minor。Antigravity 最终 `APPROVE`，无 Critical / Warning；Claude 最终 `APPROVE`，确认类型门禁真实有效，并提醒现有 CI 使用显式 verifier allowlist。该提醒已写入 Task 14：合并前必须把 `verify:contract-review:gate0` 与 `verify:contract-review:contract` 接入 CI，未接入不得视为发布门禁完成。
 
 Task 2 已封板，下一步进入双库 `ContractReviewTask` 聚合。
+
+## Wave A Task 3：双库 ContractReviewTask 聚合实施审查
+
+审查范围：`d6623116..67b191e0`。
+
+- SQLite schema 作为唯一真源新增 `ContractReviewTask` 与 EndUser relation；PostgreSQL schema 由 `db:pg:sync` 生成并通过 sync check。
+- 两套 migration 仅创建新表、EndUser 外键和五个查询/清理索引，无 DROP / ALTER 既有表或数据写入。
+- schema verifier 使用临时 SQLite 预创建文件，真实执行全部 75 条 migration、零 drift 检查和删列负向控制；配置 `POSTGRES_URL` 时只在 postgres-readiness 已完成 fresh deploy 后执行只读 PG drift。
+- `verify:contract-review:gate0`、`verify:contract-review:contract`、`verify:contract-review:schema` 已进入 SQLite 主 CI；schema verifier 同时进入 PostgreSQL readiness。
+
+本地规格与数据库质量审查均 `APPROVE`。质量审查额外在 PostgreSQL 16 事务中验证原 migration SQL、索引和 `ON DELETE SET NULL` 后回滚，未保留对象。Antigravity 与 Claude 最终均 `APPROVE`，无阻塞项。`resultJson` 使用 String 是 SQLite SSOT 下保持双库一致的当前取舍；如未来需要服务端 JSONB 查询，应作为独立 additive 演进，不在本任务扩大范围。
+
+Task 3 已封板，下一步进入 `contract_upload` 高敏短期文件链路。
