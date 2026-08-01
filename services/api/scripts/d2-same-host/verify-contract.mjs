@@ -46,6 +46,29 @@ const FRESH_RETAKE_COMMAND = `env -i \\
   D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \\
   D2_GOVERNANCE_RESERVATION_ID="$D2_GOVERNANCE_RESERVATION_ID" \\
   pnpm --filter @ai-job-print/api drill:d2-same-host`
+const FRESH_CLONE_PROVENANCE_SEQUENCE = Object.freeze([
+  'set -euo pipefail',
+  "readonly D2_APPROVED_PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'",
+  'D2_SOURCE_ROOT="$(cd -P -- "$D2_SOURCE_REPOSITORY" && pwd -P)"',
+  '[[ "$(git rev-parse --show-toplevel)" == "$D2_SOURCE_ROOT" ]]',
+  '[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]',
+  '[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]',
+  '[[ ! -e "$D2_CLONE_ROOT" && ! -L "$D2_CLONE_ROOT" ]]',
+  'D2_CLONE_PHYSICAL_TARGET="$(cd -P -- "$D2_CLONE_PARENT" && pwd -P)/$D2_CLONE_NAME"',
+  '[[ "$D2_CLONE_ROOT" == "$D2_CLONE_PHYSICAL_TARGET" ]]',
+  'git clone --no-local -- "$D2_SOURCE_ROOT" "$D2_CLONE_ROOT"',
+  'git switch -c "$D2_BRANCH" "$D2_BASELINE_OID"',
+  '[[ "$(git rev-parse --show-toplevel)" == "$D2_CLONE_ROOT" ]]',
+  '[[ "$(git rev-parse --git-dir)" == \'.git\' && -d .git && ! -L .git ]]',
+  '[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]',
+  '[[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH" ]]',
+  '[[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]',
+  'pnpm --filter @ai-job-print/api build',
+  'pnpm --filter @ai-job-print/api verify:d2-same-host-governance',
+  'pnpm --filter @ai-job-print/api verify:d2-same-host-contract',
+  'node services/api/scripts/d2-same-host/governance.mjs reserve',
+  'pnpm --filter @ai-job-print/api drill:d2-same-host',
+])
 
 function executableSource(source) {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source)
@@ -129,6 +152,18 @@ function assertExecutionEntryContract(runSource, runbookSource) {
   ).trim()
   assert.equal(marked, `\`\`\`bash\n${FRESH_RETAKE_COMMAND}\n\`\`\``)
   assert.equal((runbookSource.match(/drill:d2-same-host/g) ?? []).length, 1)
+  let provenanceCursor = -1
+  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
+    provenanceCursor = runbookSource.indexOf(fragment, provenanceCursor + 1)
+    assert.notEqual(provenanceCursor, -1)
+  }
+  const expectedOccurrences = new Map()
+  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
+    expectedOccurrences.set(fragment, (expectedOccurrences.get(fragment) ?? 0) + 1)
+  }
+  for (const [fragment, expected] of expectedOccurrences) {
+    assert.equal(runbookSource.split(fragment).length - 1, expected)
+  }
 }
 
 function verifyExecutionEntryContract() {
@@ -152,6 +187,12 @@ function verifyExecutionEntryContract() {
   assert.throws(() => assertExecutionEntryContract(`${runSource}\nno_go "D2_PRIME_NO_GO_UNLISTED"\n`, runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_ROOT=', 'D2_GOVERNANCE_STATE_ROOT=')))
   assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_RESERVATION_ID=', 'D2_GOVERNANCE_ID=')))
+  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
+    assert.throws(() => assertExecutionEntryContract(
+      runSource,
+      runbookSource.replace(fragment, 'D2_FRESH_CLONE_PROVENANCE_MUTATION'),
+    ))
+  }
   console.log('  PASS D2 fresh-retake entry rejects repository PATH and locks one canonical command')
 }
 

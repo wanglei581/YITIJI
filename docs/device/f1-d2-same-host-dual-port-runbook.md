@@ -64,12 +64,17 @@ evidence 路径在 invoke 成功后由 owner-only manifest 经私有 fd 3 交给
 post verifier 共用这一项工具链真值，禁止用 PATH A 建链/预约后再用 PATH B invoke：
 
 ```bash
+set -euo pipefail
 if [[ "${D2_APPROVED_PATH+x}" == x ]]; then
   printf '%s\n' 'D2_PRIME_APPROVED_PATH_INPUT_FORBIDDEN' >&2
   exit 2
 fi
 readonly D2_APPROVED_PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 ```
+
+首行启用的 errexit、nounset 与 pipefail 对本节后续所有命令块持续生效；不得在 reserve 前开启新的 shell、
+使用 `set +e`，或以其他方式忽略 source preflight、clone 复核、build、任一 verifier 的非零退出。任何一步
+失败都必须立即停止，不能继续 clone 或 reserve。
 
 先在尚未创建目标 clone 的同一 Bash 授权 shell 中，仅从稳定、已审的 source repository 执行以下 preflight。
 它把 source 解析为物理 Git top-level，并证明 source 的 HEAD、index、tracked/untracked worktree 都精确符合
