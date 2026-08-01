@@ -698,18 +698,25 @@ git commit -m "feat: add contract review rule pack"
 - Create: `services/api/src/contract-review/__tests__/contract-review-pii-masker.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-provider.test.ts`
 
-- [ ] **Step 1: 写漏遮、误遮和境外 fallback 失败测试**
+- [ ] **Step 1: 写逐页漏遮、误遮、稳定占位和境外 fallback 失败测试**
 
 ```typescript
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { maskContractText } from '../contract-review-pii-masker'
-import { loadContractProviderConfig } from '../contract-review-provider.service'
+import { maskContractPages } from '../contract-review-pii-masker'
+import {
+  ContractReviewProviderService,
+  loadContractProviderConfig,
+} from '../contract-review-provider.service'
 
-test('masker removes PII but preserves salary and term facts', () => {
-  const out = maskContractText('张三 370101199001011234 手机13800138000 月薪12000元 合同3年')
-  assert.doesNotMatch(out.text, /370101199001011234|13800138000|张三/)
-  assert.match(out.text, /12000元|3年/)
+test('masker removes PII across pages but preserves legal facts', () => {
+  const out = maskContractPages([
+    { pageNumber: 1, text: '乙方：张三 身份证370101199001011234 手机13800138000' },
+    { pageNumber: 2, text: '张三月薪12000元，合同3年，依据第19条。' },
+  ])
+  assert.doesNotMatch(out.pages.map((page) => page.text).join('\n'), /370101199001011234|13800138000|张三/)
+  assert.match(out.pages[1]!.text, /12000元|3年|第19条/)
+  assert.equal(out.pages[0]!.text.match(/\[劳动者_1\]/u)?.[0], out.pages[1]!.text.match(/\[劳动者_1\]/u)?.[0])
 })
 test('foreign or mutable providers fail closed', () => {
   assert.throws(() => loadContractProviderConfig({
@@ -718,7 +725,12 @@ test('foreign or mutable providers fail closed', () => {
     CONTRACT_REVIEW_MODEL: 'x',
   }), /CONTRACT_PROVIDER_NOT_ALLOWED/)
 })
+test('provider revalidates approval and config before every call', async () => {
+  // fake transport must not run after approval/config changes; there is no fallback.
+})
 ```
+
+测试矩阵必须覆盖：15/18 位及空格/连字符身份证、`+86`/空格手机号、16–19 位银行卡、邮箱、详细地址、统一社会信用代码、标签化劳动者/用人单位名称；同一实体跨页占位一致且结果不返回原值映射；薪资、日期、期限、法条编号不得误遮。masker 仅接受页码连续且已 canonicalize 的逐页输入，页序、页数保持不变；任何高置信残留或输入/输出预算越界均 fail closed。
 
 - [ ] **Step 2: 运行并确认两个模块不存在**
 
@@ -726,31 +738,32 @@ Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register src
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现固定 allowlist 和 schema-only 调用**
+- [ ] **Step 3: 实现“固定支持表 + 独立批准闸”的 schema-only 调用**
 
 ```typescript
-const CONTRACT_PROVIDER_ALLOWLIST = {
-  deepseek: { hosts: ['api.deepseek.com'], models: ['deepseek-chat'] },
-  qwen: { hosts: ['dashscope.aliyuncs.com'], models: ['qwen-plus'] },
+const CONTRACT_PROVIDER_SUPPORT = {
+  deepseek: [{ baseUrl: 'https://api.deepseek.com/', model: 'deepseek-v4-pro' }],
+  qwen: [{ baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/', model: 'qwen-plus' }],
 } as const
 
 export function loadContractProviderConfig(env: Record<string, string | undefined>) {
-  const provider = env.CONTRACT_REVIEW_PROVIDER
-  const baseUrl = new URL(env.CONTRACT_REVIEW_BASE_URL ?? '')
-  const model = env.CONTRACT_REVIEW_MODEL ?? ''
-  const allowed = provider && CONTRACT_PROVIDER_ALLOWLIST[provider as keyof typeof CONTRACT_PROVIDER_ALLOWLIST]
-  if (!allowed || !allowed.hosts.includes(baseUrl.hostname as never) || !allowed.models.includes(model as never)) {
-    throw new Error('CONTRACT_PROVIDER_NOT_ALLOWED')
-  }
-  return { provider, baseUrl: baseUrl.toString(), model }
+  // 所有字段仅接受 env 自有属性；URL 解析错误统一映射为安全错误码。
+  // 仅接受支持表中的精确 https base URL + model，并要求独立 API key。
+  // provider support 只表示代码可识别，不代表该组合已获得项目合规批准。
 }
 ```
 
-服务不得注入或调用 `LlmConfigService`；配置缺失、host/model 不匹配、超时和响应 schema 错误均 fail closed。请求正文只使用 masker 输出和结构化主体存在性事实，无工具、无网络代理、无完整日志。
+`maskContractPages` 先从 canonical 原文按甲方/乙方/姓名/用人单位/统一社会信用代码等明确标签提取仅布尔主体事实和会话内实体字典，再用固定“类别 + 序号”占位符逐页替换；字典只存在于调用栈内，返回值不得包含原值或可逆映射。不得用宽泛“任意 2–4 个汉字”规则冒充姓名识别；无法可靠识别但疑似含高风险 PII 时整份拒绝，不带病上送。
+
+服务不得注入或调用 `LlmConfigService`。固定支持表与独立 `ContractProviderApprovalGate` 必须分离：默认 gate 永远拒绝；只有 Task 14 归档并绑定精确 provider/base URL/model 的合规证据后才可替换。构造初始化和**每次调用前**都重新读取、验证配置并调用批准闸；初始化后 env、批准状态或配置变化必须在发请求前被阻断。
+
+URL 只接受支持表中的精确 canonical `https` base URL；拒绝 userinfo、显式端口、query/hash、尾点、IDN/IP、路径偏移和 redirect。API key 必填且不进入错误或日志。Provider 使用可注入 transport；Task 9 可实现并测试严格 fetch transport，但不注册 Nest module、不启用生产入口、不执行真实模型请求。固定超时 30 秒、输入上限 500,000 UTF-16 code units、流式响应上限 512 KiB，超时、非 2xx、重定向、超限、空响应和严格 schema 错误均 fail closed，不重试、不返回部分结果、不 fallback。
+
+请求的 system 与 contract data 分消息；正文只包含 masker 输出和不含明文的主体存在性事实，无工具、无网络/文件/数据库权限。模型仅返回结构化 finding draft（页码 + 非 PII excerpt，不信任模型给出的 canonical offset）；Task 11 在未遮蔽 canonical pages 上重新定位证据、合并规则结果后再交 Task 10 SafetyGate。原始请求正文和原始模型响应不得写日志、异常或审计。
 
 - [ ] **Step 4: 运行安全单测与源码反向门禁**
 
-Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-include=src/contract-review/contract-review-{pii-masker,provider.service}.ts src/contract-review/__tests__/contract-review-pii-masker.test.ts src/contract-review/__tests__/contract-review-provider.test.ts && ! rg "LlmConfigService|AiModelFeatureKey" services/api/src/contract-review`
+Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-branches=80 --test-coverage-lines=80 --test-coverage-functions=80 '--test-coverage-include=src/contract-review/contract-review-pii-masker.ts' '--test-coverage-include=src/contract-review/contract-review-provider.service.ts' src/contract-review/__tests__/contract-review-pii-masker.test.ts src/contract-review/__tests__/contract-review-provider.test.ts && ! rg "LlmConfigService|AiModelFeatureKey|llm-chat.service|llm-config.service" services/api/src/contract-review`
 
 Expected: PASS；反向搜索无命中。
 
