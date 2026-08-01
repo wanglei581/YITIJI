@@ -96,7 +96,8 @@ function makeFileAccessHarness(
   const signedTtlSeconds: number[] = []
   const prisma = {
     fileObject: {
-      findUnique: async () => record,
+      findUnique: async ({ where }: { where: { id: string } }) =>
+        where.id === 'missing-file' ? null : record,
       update: async ({ data }: { data: Partial<FileHarnessRecord> }) => {
         Object.assign(record, data)
         return record
@@ -129,7 +130,8 @@ function makeFileAccessHarness(
   }
 }
 
-async function expectFileNotFound(action: () => Promise<unknown>): Promise<void> {
+async function expectFileNotFound(action: () => Promise<unknown>): Promise<NotFoundException> {
+  let captured: NotFoundException | undefined
   await assert.rejects(action, (error: unknown) => {
     assert.ok(error instanceof NotFoundException)
     assert.equal(
@@ -137,8 +139,10 @@ async function expectFileNotFound(action: () => Promise<unknown>): Promise<void>
       'FILE_NOT_FOUND'
     )
     assert.doesNotMatch(JSON.stringify(error.getResponse()), /expired|contract/i)
+    captured = error
     return true
   })
+  return captured as NotFoundException
 }
 
 test('contract upload is locked to an exact two-hour system session', () => {
@@ -339,6 +343,34 @@ test('FilesService blocks every access path once a contract file reaches expires
     },
     'expired records must be rejected before signing or storage reads'
   )
+})
+
+test('readContentForEndUser reads only active records and hides non-active status', async () => {
+  const active = makeFileAccessHarness(new Date(Date.now() + 60_000))
+  assert.deepEqual(
+    await active.service.readContentForEndUser('contract-file-1', 'member-1'),
+    {
+      buffer: Buffer.from('%PDF-1.4 contract'),
+      mimeType: 'application/pdf',
+      filename: 'contract.pdf',
+      purpose: 'contract_upload',
+    },
+  )
+  assert.equal(active.calls().contentReadCalls, 1)
+
+  const missing = makeFileAccessHarness(new Date(Date.now() + 60_000))
+  const missingError = await expectFileNotFound(() =>
+    missing.service.readContentForEndUser('missing-file', 'member-1')
+  )
+
+  for (const status of ['uploading', 'quarantined']) {
+    const harness = makeFileAccessHarness(new Date(Date.now() + 60_000), { status })
+    const error = await expectFileNotFound(() =>
+      harness.service.readContentForEndUser('contract-file-1', 'different-member')
+    )
+    assert.deepEqual(error.getResponse(), missingError.getResponse())
+    assert.equal(harness.calls().contentReadCalls, 0)
+  }
 })
 
 test('download URL TTL never crosses file expiry and fails closed below one second', async () => {

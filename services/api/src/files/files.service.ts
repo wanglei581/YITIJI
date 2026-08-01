@@ -596,6 +596,9 @@ export class FilesService {
     endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireAlive(fileId)
+    if (record.status !== 'active') {
+      this.throwFileNotFound()
+    }
     const allowed = endUserId
       ? record.endUserId === endUserId
       : record.endUserId === null && record.ownerType === 'system'

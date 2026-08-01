@@ -1,8 +1,8 @@
 import { Inject, Injectable, Optional } from '@nestjs/common'
 import mammoth from 'mammoth'
-import type { FilesService } from '../files/files.service'
+import { FilesService } from '../files/files.service'
 import type { OcrResult } from '../ai/resume/ocr/ocr-provider.interface'
-import type { OcrService } from '../ai/resume/ocr/ocr.service'
+import { OcrService } from '../ai/resume/ocr/ocr.service'
 import {
   openPdfForRender,
   type RenderedPdf,
@@ -38,6 +38,12 @@ const MAX_FILE_BYTES = 20 * 1024 * 1024
 const MAX_PDF_PAGES = 50
 const MAX_OCR_PAGES = 20
 const OCR_RENDER_SCALE = 2
+const MAX_CANONICAL_PAGE_CODE_UNITS = 200_000
+const MAX_CANONICAL_DOCUMENT_CODE_UNITS = 2_000_000
+const MAX_DOCX_XML_UNCOMPRESSED_BYTES = 16 * 1024 * 1024
+const ZIP_CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50
+const ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE = 0x06054b50
+const ZIP_MAX_COMMENT_BYTES = 0xffff
 
 export const MIN_RELIABLE_TEXT_LAYER_CHARS = 30
 
@@ -102,6 +108,91 @@ function knownOr(error: unknown, fallback: string): ContractReviewExtractionErro
   return error instanceof ContractReviewExtractionError ? error : fail(fallback)
 }
 
+function assertCanonicalPageBudget(text: string): void {
+  if (text.length > MAX_CANONICAL_PAGE_CODE_UNITS) {
+    throw fail('CONTRACT_PAGE_TEXT_LIMIT_EXCEEDED')
+  }
+}
+
+function assertCanonicalDocumentBudget(pages: readonly string[]): void {
+  let total = 0
+  for (const page of pages) {
+    assertCanonicalPageBudget(page)
+    total += page.length
+    if (total > MAX_CANONICAL_DOCUMENT_CODE_UNITS) {
+      throw fail('CONTRACT_DOCUMENT_TEXT_LIMIT_EXCEEDED')
+    }
+  }
+}
+
+function assertDocxArchiveSafe(buffer: Buffer): void {
+  try {
+    const minimumOffset = Math.max(0, buffer.length - ZIP_MAX_COMMENT_BYTES - 22)
+    let eocdOffset = -1
+    for (let offset = buffer.length - 22; offset >= minimumOffset; offset -= 1) {
+      if (buffer.readUInt32LE(offset) !== ZIP_END_OF_CENTRAL_DIRECTORY_SIGNATURE) continue
+      const commentLength = buffer.readUInt16LE(offset + 20)
+      if (offset + 22 + commentLength === buffer.length) {
+        eocdOffset = offset
+        break
+      }
+    }
+    if (eocdOffset < 0) throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+
+    const diskNumber = buffer.readUInt16LE(eocdOffset + 4)
+    const centralDisk = buffer.readUInt16LE(eocdOffset + 6)
+    const entriesOnDisk = buffer.readUInt16LE(eocdOffset + 8)
+    const totalEntries = buffer.readUInt16LE(eocdOffset + 10)
+    const centralSize = buffer.readUInt32LE(eocdOffset + 12)
+    const centralOffset = buffer.readUInt32LE(eocdOffset + 16)
+    if (
+      diskNumber !== 0 || centralDisk !== 0 || entriesOnDisk !== totalEntries ||
+      totalEntries === 0xffff || centralSize === 0xffffffff || centralOffset === 0xffffffff ||
+      centralOffset + centralSize !== eocdOffset
+    ) {
+      throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+    }
+
+    let cursor = centralOffset
+    let xmlBytes = 0
+    let hasDocumentXml = false
+    const bodyEntries = new Set<string>()
+    for (let index = 0; index < totalEntries; index += 1) {
+      if (
+        cursor + 46 > eocdOffset ||
+        buffer.readUInt32LE(cursor) !== ZIP_CENTRAL_DIRECTORY_SIGNATURE
+      ) {
+        throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+      }
+      const uncompressedSize = buffer.readUInt32LE(cursor + 24)
+      const filenameLength = buffer.readUInt16LE(cursor + 28)
+      const extraLength = buffer.readUInt16LE(cursor + 30)
+      const commentLength = buffer.readUInt16LE(cursor + 32)
+      const diskStart = buffer.readUInt16LE(cursor + 34)
+      const next = cursor + 46 + filenameLength + extraLength + commentLength
+      if (diskStart !== 0 || uncompressedSize === 0xffffffff || next > eocdOffset) {
+        throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+      }
+      const filename = buffer.toString('utf8', cursor + 46, cursor + 46 + filenameLength)
+      if (/^word\/(?:document|footnotes|endnotes|comments|header\d+|footer\d+)\.xml$/u.test(filename)) {
+        if (bodyEntries.has(filename)) throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+        bodyEntries.add(filename)
+        hasDocumentXml ||= filename === 'word/document.xml'
+        xmlBytes += uncompressedSize
+        if (xmlBytes > MAX_DOCX_XML_UNCOMPRESSED_BYTES) {
+          throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
+        }
+      }
+      cursor = next
+    }
+    if (cursor !== eocdOffset || !hasDocumentXml) {
+      throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+    }
+  } catch (error) {
+    throw knownOr(error, 'CONTRACT_DOCX_ARCHIVE_INVALID')
+  }
+}
+
 /** Validate a declared PDF page count before unpdf allocates work for extractText. */
 export function assertBornDigitalPdfPageLimit(pageCount: unknown): void {
   if (!Number.isSafeInteger(pageCount) || (pageCount as number) < 1) {
@@ -112,13 +203,15 @@ export function assertBornDigitalPdfPageLimit(pageCount: unknown): void {
   }
 }
 
-/** Page-local text-layer reliability gate; whitespace does not count as content. */
+/** Page-local text-layer reliability gate; invisible Unicode does not count as content. */
 export function hasReliableTextLayer(text: unknown): boolean {
-  return typeof text === 'string' && text.replace(/\s+/gu, '').length >= MIN_RELIABLE_TEXT_LAYER_CHARS
+  return typeof text === 'string' &&
+    Array.from(text.replace(/[\p{White_Space}\p{Cc}\p{Cf}]+/gu, '')).length >=
+      MIN_RELIABLE_TEXT_LAYER_CHARS
 }
 
 function isNonEmptyCanonicalText(text: string): boolean {
-  return text.replace(/\s+/gu, '').length > 0
+  return text.replace(/[\p{White_Space}\p{Cc}\p{Cf}]+/gu, '').length > 0
 }
 
 function extensionOf(filename: string): string {
@@ -193,6 +286,7 @@ export class ContractReviewExtractionService {
     buffer: Buffer,
     onPageComplete?: ContractReviewExtractionInput['onPageComplete'],
   ): Promise<ContractReviewExtractionResult> {
+    assertDocxArchiveSafe(buffer)
     let value: unknown
     try {
       value = (await this.runtime.extractDocxRawText({ buffer })).value
@@ -202,6 +296,7 @@ export class ContractReviewExtractionService {
     if (typeof value !== 'string') throw fail('CONTRACT_DOCX_EXTRACTION_FAILED')
     const text = canonicalizePage(value)
     if (!isNonEmptyCanonicalText(text)) throw fail('CONTRACT_TEXT_EMPTY')
+    assertCanonicalDocumentBudget([text])
     await this.reportProgress(onPageComplete, 1, 1)
     return this.completeResult('text_layer', [this.textLayerPage(1, text)], null)
   }
@@ -257,14 +352,23 @@ export class ContractReviewExtractionService {
       if (
         extracted.totalPages !== proxy.numPages ||
         !Array.isArray(extracted.text) ||
-        extracted.text.length !== proxy.numPages ||
-        extracted.text.some((page) => typeof page !== 'string')
+        extracted.text.length !== proxy.numPages
       ) {
         throw fail('CONTRACT_PDF_INTEGRITY_FAILED')
       }
+      for (let index = 0; index < proxy.numPages; index += 1) {
+        const hasOwn = (Object as ObjectConstructor & {
+          hasOwn(value: object, property: PropertyKey): boolean
+        }).hasOwn(extracted.text, index)
+        if (!hasOwn || typeof extracted.text[index] !== 'string') {
+          throw fail('CONTRACT_PDF_INTEGRITY_FAILED')
+        }
+      }
+      const pages = extracted.text.map((page) => canonicalizePage(page))
+      assertCanonicalDocumentBudget(pages)
       result = {
         totalPages: proxy.numPages,
-        pages: extracted.text.map((page) => canonicalizePage(page)),
+        pages,
       }
     } catch (error) {
       primaryError = knownOr(error, 'CONTRACT_PDF_EXTRACTION_FAILED')
@@ -305,7 +409,9 @@ export class ContractReviewExtractionService {
       const missing = new Set(missingIndexes)
       const pages: ContractReviewExtractedPage[] = []
       const confidences: ContractReviewOcrConfidence[] = []
+      let canonicalCodeUnits = 0
       for (let index = 0; index < extracted.totalPages; index += 1) {
+        let page: ContractReviewExtractedPage
         if (missing.has(index)) {
           let image: Buffer
           try {
@@ -314,13 +420,19 @@ export class ContractReviewExtractionService {
             throw fail('OCR_FAILED')
           }
           const recognized = await this.recognize(image, 'image/png')
-          const page = this.ocrPage(index + 1, recognized)
-          pages.push(page)
+          page = this.ocrPage(index + 1, recognized)
           confidences.push(page.ocrConfidence as ContractReviewOcrConfidence)
         } else {
-          pages.push(this.textLayerPage(index + 1, extracted.pages[index] as string))
+          page = this.textLayerPage(index + 1, extracted.pages[index] as string)
         }
-        await this.reportProgress(onPageComplete, index + 1, extracted.totalPages)
+        pages.push(page)
+        canonicalCodeUnits += page.text.length
+        if (canonicalCodeUnits > MAX_CANONICAL_DOCUMENT_CODE_UNITS) {
+          throw fail('CONTRACT_DOCUMENT_TEXT_LIMIT_EXCEEDED')
+        }
+        if (index + 1 < extracted.totalPages) {
+          await this.reportProgress(onPageComplete, index + 1, extracted.totalPages)
+        }
       }
       const mode: ContractReviewExtractionMode = missingIndexes.length === extracted.totalPages ? 'ocr' : 'mixed'
       result = this.completeResult(mode, pages, this.worstConfidence(confidences))
@@ -338,6 +450,7 @@ export class ContractReviewExtractionService {
     if (primaryError) throw primaryError
     if (cleanupFailed) throw fail('CONTRACT_PDF_RESOURCE_CLEANUP_FAILED')
     if (!result) throw fail('OCR_FAILED')
+    await this.reportProgress(onPageComplete, extracted.totalPages, extracted.totalPages)
     return result
   }
 
@@ -358,6 +471,7 @@ export class ContractReviewExtractionService {
     if (typeof result.text !== 'string') throw fail('CONTRACT_TEXT_EMPTY')
     const text = canonicalizePage(result.text)
     if (!isNonEmptyCanonicalText(text)) throw fail('CONTRACT_TEXT_EMPTY')
+    assertCanonicalPageBudget(text)
     return { ok: true, text, confidence: result.confidence ?? 'low' }
   }
 

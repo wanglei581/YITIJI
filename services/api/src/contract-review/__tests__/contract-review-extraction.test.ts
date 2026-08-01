@@ -2,8 +2,11 @@ import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { OcrService } from '../../ai/resume/ocr/ocr.service'
+import { FilesService } from '../../files/files.service'
 import {
   ContractReviewExtractionService,
+  hasReliableTextLayer,
   type ContractReviewExtractionRuntime,
   type ContractReviewExtractionResult,
 } from '../contract-review-extraction.service'
@@ -11,6 +14,32 @@ import {
 const PDF = Buffer.from('%PDF test')
 const IMAGE = Buffer.from('image')
 const RELIABLE = '合同正文'.repeat(8)
+
+function makeDocxCentralDirectory(
+  entries: Array<{ name: string; uncompressedSize: number }> = [
+    { name: 'word/document.xml', uncompressedSize: 128 },
+  ],
+): Buffer {
+  const centralEntries = entries.map(({ name, uncompressedSize }) => {
+    const filename = Buffer.from(name, 'utf8')
+    const header = Buffer.alloc(46)
+    header.writeUInt32LE(0x02014b50, 0)
+    header.writeUInt16LE(20, 4)
+    header.writeUInt16LE(20, 6)
+    header.writeUInt32LE(0, 20)
+    header.writeUInt32LE(uncompressedSize, 24)
+    header.writeUInt16LE(filename.length, 28)
+    return Buffer.concat([header, filename])
+  })
+  const centralDirectory = Buffer.concat(centralEntries)
+  const eocd = Buffer.alloc(22)
+  eocd.writeUInt32LE(0x06054b50, 0)
+  eocd.writeUInt16LE(entries.length, 8)
+  eocd.writeUInt16LE(entries.length, 10)
+  eocd.writeUInt32LE(centralDirectory.length, 12)
+  eocd.writeUInt32LE(0, 16)
+  return Buffer.concat([centralDirectory, eocd])
+}
 
 interface HarnessOptions {
   buffer?: Buffer
@@ -113,6 +142,26 @@ function pageTexts(result: ContractReviewExtractionResult): string[] {
   return result.pages.map((page) => page.text)
 }
 
+test('publishes concrete Nest constructor metadata for production DI', () => {
+  const parameterTypes = Reflect.getMetadata(
+    'design:paramtypes',
+    ContractReviewExtractionService,
+  ) as unknown[] | undefined
+
+  assert.ok(parameterTypes)
+  assert.equal(parameterTypes[0], FilesService)
+  assert.equal(parameterTypes[1], OcrService)
+})
+
+test('text-layer reliability excludes Unicode whitespace, controls, formats and short headers', () => {
+  assert.equal(hasReliableTextLayer(RELIABLE), true)
+  assert.equal(hasReliableTextLayer('\u200b'.repeat(30)), false)
+  assert.equal(hasReliableTextLayer('\u0000\u0001\u0002'.repeat(10)), false)
+  assert.equal(hasReliableTextLayer('\u3000\n\t'.repeat(10)), false)
+  assert.equal(hasReliableTextLayer('😀'.repeat(15)), false)
+  assert.equal(hasReliableTextLayer('劳动合同　第 1 页'), false)
+})
+
 test('reads only through the end-user ownership boundary and emits ordered text-layer progress', async () => {
   const h = harness()
   const progress: Array<[number, number]> = []
@@ -163,6 +212,7 @@ test('rejects wrong purpose, empty, oversized, MIME/extension mismatch and legac
 
 test('extracts a DOCX as one canonical page and rejects parse failure or empty text', async () => {
   const docx = {
+    buffer: makeDocxCentralDirectory(),
     filename: 'contract.docx',
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   }
@@ -179,6 +229,47 @@ test('extracts a DOCX as one canonical page and rejects parse failure or empty t
   await expectCode(() => broken.service.extract({ fileId: 'docx', endUserId: null }), 'CONTRACT_DOCX_EXTRACTION_FAILED')
   const empty = harness({ ...docx, runtime: { extractDocxRawText: async () => ({ value: ' \r\n\t' }) } })
   await expectCode(() => empty.service.extract({ fileId: 'docx', endUserId: null }), 'CONTRACT_TEXT_EMPTY')
+})
+
+test('DOCX validates central-directory XML sizes before mammoth and enforces output budget', async () => {
+  let mammothCalls = 0
+  const docx = {
+    filename: 'contract.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  }
+  const malformed = harness({
+    ...docx,
+    buffer: Buffer.from('not-a-zip'),
+    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
+  })
+  await expectCode(
+    () => malformed.service.extract({ fileId: 'docx', endUserId: null }),
+    'CONTRACT_DOCX_ARCHIVE_INVALID',
+  )
+  assert.equal(mammothCalls, 0)
+
+  const zipBomb = harness({
+    ...docx,
+    buffer: makeDocxCentralDirectory([
+      { name: 'word/document.xml', uncompressedSize: 16 * 1024 * 1024 + 1 },
+    ]),
+    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
+  })
+  await expectCode(
+    () => zipBomb.service.extract({ fileId: 'docx', endUserId: null }),
+    'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED',
+  )
+  assert.equal(mammothCalls, 0)
+
+  const oversizedOutput = harness({
+    ...docx,
+    buffer: makeDocxCentralDirectory(),
+    runtime: { extractDocxRawText: async () => ({ value: '甲'.repeat(200_001) }) },
+  })
+  await expectCode(
+    () => oversizedOutput.service.extract({ fileId: 'docx', endUserId: null }),
+    'CONTRACT_PAGE_TEXT_LIMIT_EXCEEDED',
+  )
 })
 
 test('rejects invalid PDF page counts before text extraction and destroys the proxy', async () => {
@@ -252,20 +343,62 @@ test('rejects PDF extraction page-count and page-array mismatches', async () => 
   }
 })
 
+test('rejects sparse PDF page arrays even when length matches the declared page count', async () => {
+  const sparse = new Array<string>(1)
+  const h = harness({ runtime: { extractPdfText: async () => ({ totalPages: 1, text: sparse }) } })
+  await expectCode(
+    () => h.service.extract({ fileId: 'pdf', endUserId: null }),
+    'CONTRACT_PDF_INTEGRITY_FAILED',
+  )
+  assert.equal(h.calls.proxyDestroy, 1)
+})
+
+test('PDF canonical output budgets reject oversized pages and documents', async () => {
+  const oversizedPage = harness({ runtime: {
+    extractPdfText: async () => ({ totalPages: 1, text: ['甲'.repeat(200_001)] }),
+  } })
+  await expectCode(
+    () => oversizedPage.service.extract({ fileId: 'pdf', endUserId: null }),
+    'CONTRACT_PAGE_TEXT_LIMIT_EXCEEDED',
+  )
+
+  const pages = Array.from({ length: 11 }, () => '甲'.repeat(200_000))
+  const oversizedDocument = harness({ runtime: {
+    getDocumentProxy: async () => ({ numPages: 11, destroy: async () => undefined }),
+    extractPdfText: async () => ({ totalPages: 11, text: pages }),
+  } })
+  await expectCode(
+    () => oversizedDocument.service.extract({ fileId: 'pdf', endUserId: null }),
+    'CONTRACT_DOCUMENT_TEXT_LIMIT_EXCEEDED',
+  )
+})
+
 test('pure scan accepts 20 pages and rejects 21 before opening renderer or calling OCR', async () => {
   const scanPages = (count: number) => Array.from({ length: count }, () => '')
+  const renderCalls: number[] = []
+  const progress: number[] = []
   const twenty = harness({ runtime: {
     getDocumentProxy: async () => ({ numPages: 20, destroy: async () => undefined }),
     extractPdfText: async () => ({ totalPages: 20, text: scanPages(20) }),
     openPdfForRender: async () => ({
       totalPages: 20,
-      renderPage: async (page: number) => Buffer.from(`page-${page}`),
+      renderPage: async (page: number) => {
+        renderCalls.push(page)
+        return Buffer.from(`page-${page}`)
+      },
       destroy: async () => undefined,
     }),
   } })
-  const result = await twenty.service.extract({ fileId: 'pdf', endUserId: null })
+  const result = await twenty.service.extract({
+    fileId: 'pdf',
+    endUserId: null,
+    onPageComplete: async (completed) => { progress.push(completed) },
+  })
   assert.equal(result.mode, 'ocr')
   assert.equal(result.pages.length, 20)
+  assert.deepEqual(renderCalls, Array.from({ length: 20 }, (_, index) => index + 1))
+  assert.equal(twenty.calls.ocr, 20)
+  assert.deepEqual(progress, Array.from({ length: 20 }, (_, index) => index + 1))
 
   let rendererCalls = 0
   const twentyOne = harness({ runtime: {
@@ -385,6 +518,7 @@ test('renderer destroy failure does not mask an OCR failure', async () => {
   })
   await expectCode(() => h.service.extract({ fileId: 'pdf', endUserId: null }), 'OCR_FAILED')
 
+  const cleanupProgress: number[] = []
   const cleanup = harness({ runtime: {
     extractPdfText: async () => ({ totalPages: 1, text: [''] }),
     openPdfForRender: async () => ({
@@ -393,7 +527,12 @@ test('renderer destroy failure does not mask an OCR failure', async () => {
       destroy: async () => { throw new Error('destroy failed') },
     }),
   } })
-  await expectCode(() => cleanup.service.extract({ fileId: 'pdf', endUserId: null }), 'CONTRACT_PDF_RESOURCE_CLEANUP_FAILED')
+  await expectCode(() => cleanup.service.extract({
+    fileId: 'pdf',
+    endUserId: null,
+    onPageComplete: async (completed) => { cleanupProgress.push(completed) },
+  }), 'CONTRACT_PDF_RESOURCE_CLEANUP_FAILED')
+  assert.deepEqual(cleanupProgress, [], '100% must not be reported before renderer cleanup succeeds')
 })
 
 test('extracts a supported image as one OCR page and rejects MIME/extension mismatch', async () => {
@@ -410,4 +549,22 @@ test('extracts a supported image as one OCR page and rejects MIME/extension mism
 
   const mismatch = harness({ buffer: IMAGE, filename: 'contract.jpg', mimeType: 'image/png' })
   await expectCode(() => mismatch.service.extract({ fileId: 'image', endUserId: null }), 'CONTRACT_UNSUPPORTED_FILE_TYPE')
+})
+
+test('extracts WebP and enforces the OCR canonical page budget', async () => {
+  const webp = harness({ buffer: IMAGE, filename: 'contract.webp', mimeType: 'image/webp' })
+  const result = await webp.service.extract({ fileId: 'webp', endUserId: null })
+  assert.equal(result.mode, 'ocr')
+  assert.equal(result.pages[0]?.text, '识别合同正文')
+
+  const oversized = harness({
+    buffer: IMAGE,
+    filename: 'contract.webp',
+    mimeType: 'image/webp',
+    ocr: async () => ({ ok: true, text: '甲'.repeat(200_001), confidence: 'high' }),
+  })
+  await expectCode(
+    () => oversized.service.extract({ fileId: 'webp', endUserId: null }),
+    'CONTRACT_PAGE_TEXT_LIMIT_EXCEEDED',
+  )
 })
