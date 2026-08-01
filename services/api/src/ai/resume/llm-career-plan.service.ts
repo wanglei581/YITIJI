@@ -58,6 +58,8 @@ export interface CareerPlanContext {
   jobFit?: { jobTitle: string; fitLevel: string; gaps: string[] } | null
   /** 最近一次模拟面试表现（可选，仅会员可聚合；只用元数据级摘要） */
   interview?: { position: string; level: string; risks: string[] } | null
+  /** 最近一次自我探索（可选；仅作 hint，不参与校验 / 配额 / 签名门禁） */
+  selfAssessment?: { dimensions: Array<{ key: string; label: string; strength: number }>; summary: string | null } | null
   /**
    * A-6 成本可见性：每次真实 LLM 调用（含失败重试）回调一次元数据，
    * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
@@ -111,6 +113,15 @@ export class LlmCareerPlanService {
       parts.push(
         `【最近模拟面试表现摘要】岗位「${ctx.interview.position}」，练习等级 ${ctx.interview.level}；` +
         `主要改进点：${ctx.interview.risks.slice(0, 3).join('；').slice(0, 400)}`,
+      )
+    }
+    if (ctx.selfAssessment) {
+      const dims = ctx.selfAssessment.dimensions
+        .map((d) => `${d.label}(强度 ${d.strength}/5)`)
+        .join('、')
+      parts.push(
+        `【最近自我探索倾向参考（仅作上下文 hint，不参与校验）】维度：${dims.slice(0, 400)}` +
+        (ctx.selfAssessment.summary ? `；本人书写摘要：${ctx.selfAssessment.summary.slice(0, 200)}` : ''),
       )
     }
 
