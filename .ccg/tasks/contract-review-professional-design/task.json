@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "fullstack-legal-ai",
   "currentPhase": "implementation",
-  "nextAction": "执行 Wave B Task 9：全文脱敏与境内模型专用通道",
+  "nextAction": "执行 Wave B Task 10：ContractReviewSafetyGate",
   "createdAt": "2026-08-01T10:48:32Z",
   "branch": "codex/contract-review-p0"
 }

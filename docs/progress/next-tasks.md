@@ -602,7 +602,7 @@
 - [x] **百宝箱 AI skill TAS-G4 公共终端隐私竞态验收**：已验证三类 skill 切换时旧回复不回写新场景，刷新或返回后不保留旧消息，Network 只留脱敏摘要，并确认 localStorage / sessionStorage 不保存聊天内容。
 - [x] **百宝箱 AI skill TAS-G5 证据复核与上线阻断项收口**：已复核仓库外证据目录脱敏，执行记录已更新，TAS-G3 / TAS-G4 停止条件无残留；正式自有域名 HTTPS、Windows 一体机真机、触控 / 断网 / 重启、正式短信 / 试运营和法务宣传口径仍是后续上线阻断项。
 - [ ] **百宝箱微应用平台高风险 / 复杂微应用接线**：法律风险审查和合同审查必须先过法务评审与文件留存策略；试卷打印和英语模拟练习需先确认版权 / 商标 / 合作方授权、文件留存、真机打印或真实交互验收。
-- [ ] **AI 合同审查 Wave B**：Task 8 `cn-labor-p0-v1` 版本化规则包已封板；下一步执行 Task 9 全文 PII 脱敏与合同专用境内模型通道，provider/model allowlist 必须初始化及每次调用均 fail closed，禁止境外 fallback。Task 12 可终止 worker / 总时限 / 内存上限与 Task 14 真实 PostgreSQL、CI、法务发布门禁未完成前，Gate 0 保持 `blocked`，不得开放生产入口。
+- [ ] **AI 合同审查 Wave B**：Task 9 全文 PII 脱敏与合同专用境内模型通道已封板；下一步执行 Task 10 `ContractReviewSafetyGate`，统一拦截证据错位、伪法条、确定性法律结论、残余 PII 和非白名单 basis。Task 12 可终止 worker / 总时限 / 内存上限与 Task 14 真实 PostgreSQL、CI、供应商/法务发布门禁未完成前，Gate 0 保持 `blocked`，provider 默认批准闸保持拒绝，不得开放生产入口。
 - [ ] **百宝箱 TB-G0~TB-G4 预生产验收执行**：按执行包顺序先跑本地静态门禁并创建仓库外证据目录；经用户明确确认后再做预生产只读预检、PostgreSQL 备份与 migration、`KIOSK_EXTERNAL_APP_ALLOWED_HOSTS` / `KIOSK_QR_TARGET_ALLOWED_HOSTS` 脱敏复核、Admin 对真实终端配置站内 / 外部 H5 / 二维码项、Kiosk 真机打开外部 H5 / 取消 / 继续 / 二维码展示，并抽样 `ToolboxLaunchEvent` 确认只存纯 host 和匿名 action。未完成 TB-G2~TB-G4 前，不得宣称百宝箱预生产 / 生产验收完成。
 - [ ] 删除旧页面/组件/脚本/文档前，必须确认无路由、import、测试/verify、当前文档、生产部署或硬件链路依赖。
 - [ ] 构建产物、缓存、临时截图、录屏、数据库备份、密钥备份、可再生成文件不得进入 Git。

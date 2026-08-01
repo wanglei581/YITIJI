@@ -203,3 +203,19 @@ Task 12 必须在 processor 层补可终止 worker、总执行时间和内存上
 内部规格审查与质量审查均为 `Ready: Yes`；Antigravity、Claude、Cursor 最终均 `APPROVE`，Critical/Warning 为 0。Claude 封装器前两次无最终消息，恢复同一会话并限制为只输出结论后取得有效批准，未把技术失败冒充审查通过。
 
 Task 8 已封板。规则结论是保守筛查提示，不是法律意见；Gate 0 正式记录继续保持 `blocked`。下一步进入全文脱敏与境内模型专用通道。
+
+## Wave B Task 9：全文脱敏与境内模型专用通道实施审查
+
+审查范围：`9dcba47f`。
+
+- 新增逐页 `maskContractPages`，只按明确标签和高置信结构化 PII 工作，固定输出劳动者、用人单位、身份证、手机号、银行卡、邮箱、详细地址、统一社会信用代码八类不可逆占位符；调用栈内字典不返回原值映射，同一实体跨页稳定编号。
+- 输入保持 NFC + LF 与原页序，检测视图使用 NFKC 并映射回原 UTF-16 区间；覆盖全角/兼容字符、跨页/跨字段/跨 finding 的数字、DOB 身份证、邮箱、USCC、敏感标签及占位符危险尾部。合法日期、期限、薪资、法条和普通法律名词不误遮；无法可靠收口时整份 fail closed。
+- 增加页数、输入、输出、唯一实体和搜索工作量预算；160,000 候选路径由约 39.7 秒降到约 0.12 秒，2M DOB 近匹配探针保持线性。四个实现/测试文件均低于 500 行。
+- 境内模型通道只接受 DeepSeek `https://api.deepseek.com/` + `deepseek-v4-pro` 或 Qwen `https://dashscope.aliyuncs.com/compatible-mode/v1/` + `qwen-plus` 的精确支持组合；支持表不构成批准，默认批准闸永远拒绝，构造和每次调用前都重新校验配置与同步 `void` 批准结果，Promise/thenable 和任何非 `undefined` 返回均 fail closed。
+- 严格 transport 禁止 redirect，最长 30 秒、请求 500,000 UTF-16、流式响应 512 KiB；非 2xx、空响应、超限、严格 schema 错误均拒绝，无重试、无 fallback、无真实网络测试、无敏感正文或密钥日志，也未注册 Nest 生产入口。
+
+审查期间逐项修复了全角绕过、实体传播和多个二次复杂度路径、跨页/跨 finding PII 重组、异步批准 fail-open、日期误报、DOB 日期切分、非数字 PII 跨片、合法占位符切分与危险尾部、伪造占位符类别等问题。最终专项 57/57，完整 Contract Review 185 通过、1 个因未配置 `POSTGRES_URL` 按规则跳过；覆盖率 lines 98.68%、branches 90.29%、functions 100%；API typecheck、lint、共享合同门禁、反向依赖和 diff check 全部通过。
+
+内部规格审查为 `Spec compliant: Yes`，质量安全审查为 `Ready: Yes`。Cursor、Claude、Antigravity 最终均 `APPROVE`，无 Critical；Cursor/Claude 仅记录响应体超限错误码被归一化、无标签任意姓名属于计划内残余风险、占用数组内存和三日期显式银行卡边缘用例等非阻断提示。Antigravity 直连多次超时后通过 CCG wrapper 取得有效批准，未把通道失败冒充审查结论。
+
+Task 9 已封板。支持表仍不代表供应商合规批准，Task 14 证据归档和真实灰度前默认 gate 保持拒绝；Gate 0 正式记录继续为 `blocked`，本任务未开放生产入口。下一步进入 `ContractReviewSafetyGate`。
