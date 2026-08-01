@@ -6,6 +6,24 @@
  * 一律包含 reviewStatus:'pending' + publishStatus:'draft'（强制重审），
  * 并清空 rejectReason/reviewedBy/reviewedAt 审核元数据。
  *
+ * 【实现方式：TypeScript AST，不是正则/词法】
+ *
+ * 早期三个版本用「剥离注释字符串 + 花括号配平 + 整块正则」的词法方案，
+ * 连续三轮 codex 复审累计查出 7 条以上绕过，且每修一条就冒出新的语法边角：
+ *   `return /}/` 被当成除号导致块提前截断、`['update']:` 计算属性名、
+ *   重复 `update:` 键（JS 后者覆盖前者）、upsert 实参层展开、
+ *   `a++ / b / c` 被误判为正则、字段名前缀误匹配……
+ * 这些都是词法层**原理上**无法可靠判定的东西。现改为直接用 TypeScript
+ * 编译器 API 解析 AST（`typescript` 已是 services/api 的 devDependency，
+ * 零新增依赖），上述形态全部由结构判定天然消除：注释与字符串不再参与匹配，
+ * 正则是 RegularExpressionLiteral 节点，键名是精确匹配而非子串。
+ *
+ * 静态不可判定的形态一律**抛错**（fail-closed），绝不放行。共四类：
+ *   ① upsert 实参 / update 值不是对象字面量（常量引用、函数调用、三元…）；
+ *   ② 第一层出现展开 `...`（可能把状态覆写回已审已发布）；
+ *   ③ 第一层出现计算属性名 `[expr]:`（键名运行时才定）；
+ *   ④ 第一层出现重复键（JS 后者覆盖前者，静态取哪个都不安全）。
+ *
  * ⚠️ 关于 job-sync.service.ts 的反向断言（务必读完再改）
  *
  * 本脚本断言 job-sync（API 定时拉取）的 update 块**不含**无条件重置。
@@ -23,12 +41,13 @@
  *    展示字段变化才退审），那么这条断言需要同步放开——请改这里，
  *    不要绕过门禁，也不要简单删掉断言了事。
  *
- * 退出码：0 = 全部通过  1 = 有失败（fail-closed：目标文件/块缺失也算失败）
+ * 退出码：0 = 全部通过  1 = 有失败（fail-closed：文件缺失/解析失败/块数不符均算失败）
  */
 
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
+import ts from 'typescript'
 
 const __dir = fileURLToPath(new URL('.', import.meta.url))
 const SRC = resolve(__dir, '../src/jobs')
@@ -41,321 +60,179 @@ const EXPECTED = {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 工具：提取文件中所有 update:{ } 块（在 .upsert( 调用内）
+// AST 基础工具
 // ──────────────────────────────────────────────────────────────────────────────
-/**
- * 规范化源码，解决三个误判来源（保留换行，行号与原文件一致）：
- *   1. **注释整体剥除** —— 注释掉的 `// reviewStatus: 'pending'` 不能再被当成通过；
- *   2. **正则字面量整体抹除** —— `/['"]/g` 里的引号不能再被当成字符串起点
- *      （否则会吞掉后续源码造成静默漏判）。正则内不可能出现 Prisma 字段，抹掉无损；
- *   3. **字符串内的花括号中和** —— `description: '}'` 不能再提前终止 brace-depth 扫描。
- *
- * 字符串内容不是无条件保留：只有「单纯 token 形态」（`/^[\w.\-/]{0,64}$/`，
- * pending / draft 就是这种形态）才保留原文，用来支撑 `reviewStatus: 'pending'`
- * 的字面量判定；一旦含冒号、空白或花括号就整体抹成空格，否则
- * `description: "reviewStatus: 'pending'"` 这种对 Prisma 无效的诱饵字符串
- * 会骗过整块正则。两类误判都有对抗用例（见 selfTest 用例 C）。
- */
-function stripCommentsAndStrings(src) {
-  let out = ''
-  let i = 0
-  const n = src.length
-  // 上一个「有效字符」，用于判断 `/` 是正则起点还是除号
-  let prevSig = ''
-  while (i < n) {
-    const c = src[i]
-    const c2 = src[i + 1]
-    // 行注释
-    if (c === '/' && c2 === '/') {
-      while (i < n && src[i] !== '\n') { out += ' '; i++ }
-      continue
-    }
-    // 块注释
-    if (c === '/' && c2 === '*') {
-      out += '  '; i += 2
-      while (i < n && !(src[i] === '*' && src[i + 1] === '/')) {
-        out += src[i] === '\n' ? '\n' : ' '
-        i++
-      }
-      out += '  '; i += 2
-      continue
-    }
-    // 正则字面量：只在**明确允许正则的位置**才进入（保守；歧义时按除号处理，
-    // 残留的引号会被下面 assertLexicallySupported 兜住 → fail-closed）
-    if (c === '/' && REGEX_ALLOWED_PREV.has(prevSig)) {
-      let j = i + 1
-      let inClass = false
-      let closed = false
-      while (j < n && src[j] !== '\n') {
-        if (src[j] === '\\') { j += 2; continue }
-        if (src[j] === '[') inClass = true
-        else if (src[j] === ']') inClass = false
-        else if (src[j] === '/' && !inClass) { closed = true; break }
-        j++
-      }
-      if (closed) {
-        j++ // 越过收尾 '/'
-        while (j < n && /[gimsuyd]/.test(src[j])) j++ // flags
-        out += ' '.repeat(j - i)
-        i = j
-        prevSig = 'r' // 正则求值结果是个值，后面的 `/` 应按除号处理
-        continue
-      }
-      // 未闭合 → 不是正则，按普通字符继续
-    }
-    // 字符串 / 模板字符串
-    if (c === "'" || c === '"' || c === '`') {
-      const quote = c
-      i++
-      let body = ''
-      while (i < n) {
-        if (src[i] === '\\') { body += src[i] + (src[i + 1] ?? ''); i += 2; continue }
-        if (src[i] === quote) break
-        body += src[i]
-        i++
-      }
-      // 只有「单纯 token 形态」的短字面量保留内容（状态值就是这种形态：pending / draft），
-      // 其余一律抹成空格。这是为了同时挡住两类误判：
-      //   · 保留内容是必须的 —— 否则 reviewStatus: 'pending' 的字面量判定会失效；
-      //   · 但只要含冒号/空白/花括号，就可能是伪装成赋值的诱饵字符串，例如
-      //     description: "reviewStatus: 'pending' publishStatus: 'draft' …"
-      //     —— 对 Prisma 完全无效，却能骗过整块正则。已用对抗用例复现。
-      const tokenLike = /^[\w.\-/]{0,64}$/.test(body)
-      out += quote
-      out += tokenLike ? body : body.replace(/[^\n]/g, ' ')
-      if (i < n) { out += quote; i++ }
-      prevSig = 's'
-      continue
-    }
-    out += c
-    if (!/\s/.test(c)) prevSig = c
-    i++
+function parse(filename, source) {
+  const sf = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+  // 语法错误必须 fail-closed：解析出错时 AST 不可信，不能继续做判定
+  const diags = sf.parseDiagnostics ?? []
+  if (diags.length > 0) {
+    const first = ts.flattenDiagnosticMessageText(diags[0].messageText, ' ')
+    throw new Error(`${filename} 解析出现语法错误，AST 不可信：${first}`)
   }
-  return out
+  return sf
 }
 
-// `/` 出现在这些字符之后才可能是正则字面量起点（否则视为除号）。
-// 空串代表文件开头。刻意保守：漏判会退化成旧行为并被 fail-closed 兜住。
-const REGEX_ALLOWED_PREV = new Set(['', '(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^'])
+/** 剥掉不影响运行时值的包装：`as const` / `satisfies X` / `(expr)` */
+function unwrap(node) {
+  let n = node
+  for (;;) {
+    if (ts.isAsExpression(n) || ts.isParenthesizedExpression(n)) n = n.expression
+    else if (ts.isSatisfiesExpression?.(n)) n = n.expression
+    else if (ts.isNonNullExpression(n)) n = n.expression
+    else return n
+  }
+}
+
+/** 取属性名；计算属性名返回 null（调用方按不可判定处理） */
+function propName(prop) {
+  const name = prop.name
+  if (!name) return null
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text
+  return null // ComputedPropertyName / PrivateIdentifier
+}
 
 /**
- * 本脚本是**词法级**静态守卫，不是 AST 分析。
- *
- * 上面的 lexer 已能跳过「明确位置」上的正则字面量，因此含引号的正则通常无害。
- * 但正则与除号在语法上本就歧义，lexer 保守放过的那部分若含引号，仍会把后续源码
- * 当成字符串吞掉 → 静默漏判。本函数在**已剥离**的源码上做残留探测：
- * 注释与已正确跳过的正则此时都已成空白，不会误报（早期版本在 raw 上跑，
- * 会把注释里的 `// example: /['"]/g` 判成危险形态，属假阳性，已修）。
+ * 读对象字面量**第一层**的属性表。
+ * 三类静态不可判定形态直接抛错（fail-closed）：展开、计算属性名、重复键。
  */
-function assertLexicallySupported(stripped, filepath) {
-  const lines = stripped.split('\n')
-  for (let ln = 0; ln < lines.length; ln++) {
-    const m = lines[ln].match(/(?<![:/\w)\]])\/(?![/*])[^/\n]*['"][^/\n]*\/[gimsuyd]*/)
-    if (m) {
+function topLevelProps(objLit, where) {
+  const map = new Map()
+  for (const prop of objLit.properties) {
+    if (ts.isSpreadAssignment(prop)) {
       throw new Error(
-        `${filepath.split('/').pop()}:${ln + 1} 出现词法上无法安全处理的含引号正则 \`${m[0].trim()}\`。\n` +
-          '      该位置正则/除号歧义，lexer 未跳过它，引号会被当成字符串起点吞掉后续源码 → 静默漏判。\n' +
-          '      请改写该行（把引号提到正则外的常量里），或把本门禁升级为 TypeScript AST 分析。'
+        `${where} 第一层出现展开运算符 \`...\`。\n` +
+          '      展开对象可能把 reviewStatus/publishStatus 覆写回已审已发布，静态无法判定 → 按失败处理。\n' +
+          '      请把重置五项写成字面量并放在展开之后，或改为不使用展开。'
       )
     }
+    if (prop.name && ts.isComputedPropertyName(prop.name)) {
+      throw new Error(
+        `${where} 第一层出现计算属性名 \`[expr]:\`，键名运行时才确定，静态无法判定 → 按失败处理。`
+      )
+    }
+    const key = propName(prop)
+    if (key === null) {
+      throw new Error(`${where} 第一层出现无法静态求名的属性（${ts.SyntaxKind[prop.kind]}） → 按失败处理。`)
+    }
+    if (map.has(key)) {
+      throw new Error(
+        `${where} 第一层出现重复键 \`${key}\`。JS 语义是后者覆盖前者，静态取任一都不安全 → 按失败处理。`
+      )
+    }
+    // ShorthandPropertyAssignment / MethodDeclaration 没有 initializer，记为 null
+    map.set(key, ts.isPropertyAssignment(prop) ? unwrap(prop.initializer) : null)
   }
+  return map
+}
+
+const isStr = (want) => (node) =>
+  node != null && ts.isStringLiteral(node) && node.text === want
+const isNull = (node) => node != null && node.kind === ts.SyntaxKind.NullKeyword
+
+// 退审必须同时清空上一次的审核元数据，否则会出现
+// 「当前 pending 却仍显示上次审核人/时间/拒绝原因」的脏状态
+const REQUIRED = [
+  { key: 'reviewStatus', label: "reviewStatus:'pending'", ok: isStr('pending') },
+  { key: 'publishStatus', label: "publishStatus:'draft'", ok: isStr('draft') },
+  { key: 'rejectReason', label: 'rejectReason:null', ok: isNull },
+  { key: 'reviewedBy', label: 'reviewedBy:null', ok: isNull },
+  { key: 'reviewedAt', label: 'reviewedAt:null', ok: isNull },
+]
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 提取：找 .job.upsert( / .jobFair.upsert( 的 update 对象字面量
+// ──────────────────────────────────────────────────────────────────────────────
+/** 沿 AST 向上找最近的具名函数/方法，作为输出里的上下文标签 */
+function enclosingFnName(node) {
+  for (let p = node.parent; p; p = p.parent) {
+    if (ts.isMethodDeclaration(p) || ts.isFunctionDeclaration(p)) {
+      if (p.name && ts.isIdentifier(p.name)) return p.name.text
+    }
+    if ((ts.isFunctionExpression(p) || ts.isArrowFunction(p)) && ts.isVariableDeclaration(p.parent)) {
+      if (ts.isIdentifier(p.parent.name)) return p.parent.name.text
+    }
+  }
+  return '(unknown)'
 }
 
 /**
- * update 块第一层出现展开运算符时必须失败：`{ …五项重置…, ...overrides }`
- * 里的 overrides 完全可能把 reviewStatus 覆写回 approved，静态无法判定其内容。
- * 已用对抗用例复现（原实现放行）。
+ * 只认带审核字段的内容模型：`<任意>.job.upsert(` / `<任意>.jobFair.upsert(`。
+ * 刻意排除 fieldMappingRule 等没有 reviewStatus 字段的模型
+ * （早期版本用 /\.upsert\s*\(/ 会把 jobs-excel.service.ts 的
+ *   fieldMappingRule.upsert 扫进来，报假阳性）。
  */
-function assertNoTopLevelSpread(top, site, filepath) {
-  if (/\.\.\./.test(top)) {
-    throw new Error(
-      `${filepath.split('/').pop()} 的 ${site} 的 update 块第一层出现展开运算符 \`...\`。\n` +
-        '      展开对象可能把 reviewStatus/publishStatus 覆写回已审已发布，静态无法判定 → 按失败处理。\n' +
-        '      请把重置五项写成字面量并放在展开之后，或改为不使用展开。'
-    )
-  }
+function upsertModelOf(call) {
+  const callee = call.expression
+  if (!ts.isPropertyAccessExpression(callee)) return null
+  if (callee.name.text !== 'upsert') return null
+  const owner = callee.expression
+  if (!ts.isPropertyAccessExpression(owner)) return null
+  const model = owner.name.text
+  return model === 'job' || model === 'jobFair' ? model : null
 }
 
-function extractUpsertUpdateBlocks(filepath) {
-  return analyzeSource(readFileSync(filepath, 'utf8'), filepath)
-}
-
-/**
- * 纯函数分析入口（不读盘），供 --self-test 用内存变体做对抗测试。
- * @param {string} raw 源码文本
- * @param {string} filepath 仅用于报错信息里的文件名
- */
-/**
- * 在 `.upsert(` 调用文本里定位**实参对象第一层**的 `update: {`。
- *
- * 必须限定第一层：`create: { nested: { update: {…} } }` 里的嵌套 update 若被取走，
- * 门禁就会去检查一个 Prisma 根本不读的块，而真正的顶层 update 逃过检查。
- *
- * @returns {{braceIndex:number}|null} braceIndex 是 `{` 相对 callRange 起点的偏移
- */
-function findTopLevelUpdate(callRange) {
-  // callRange 形如 `.job.upsert({ … })`：先定位实参对象的 `{`
-  const argOpen = callRange.indexOf('{')
-  if (argOpen < 0) return null
-  let depth = 0
-  for (let i = argOpen; i < callRange.length; i++) {
-    const ch = callRange[i]
-    if (ch === '{') {
-      depth++
-      continue
-    }
-    if (ch === '}') {
-      depth--
-      if (depth === 0) break
-      continue
-    }
-    // 只在实参对象第一层（depth === 1）识别 update 键
-    if (depth === 1 && ch === 'u') {
-      const m = /^update\s*:\s*\{/.exec(callRange.slice(i))
-      if (m && !/[\w$]/.test(callRange[i - 1] ?? ' ')) {
-        return { braceIndex: i + m[0].length - 1 }
-      }
-    }
-  }
-  return null
-}
-
-function analyzeSource(raw, filepath) {
-  // 全程在剥离后的源码上做结构与字段判定；行号仍与原文件一致（换行已保留）
-  const src = stripCommentsAndStrings(raw)
-  assertLexicallySupported(src, filepath) // 剥离后再查残留，避免注释误报
+function extractBlocks(filepath, source) {
+  const short = filepath.split('/').pop()
+  const sf = parse(short, source)
   const blocks = []
 
-  // 只匹配带审核字段的内容模型：job / jobFair
-  // （刻意排除 fieldMappingRule 等无 reviewStatus 字段的模型）
-  const upsertRe = /\.(job|jobFair)\.upsert\s*\(/g
-  let upsertMatch
-  while ((upsertMatch = upsertRe.exec(src)) !== null) {
-    const upsertStart = upsertMatch.index
-    const modelName = upsertMatch[1]
+  const visit = (node) => {
+    const model = ts.isCallExpression(node) ? upsertModelOf(node) : null
+    if (model) {
+      const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
+      const site = `${enclosingFnName(node)}() · ${model}.upsert @L${line}`
+      const where = `${short} 的 ${site} 的 upsert 实参`
 
-    // ① 先按圆括号配平求出**本次 upsert 调用的真实范围**。
-    // 早期版本用「向后找第一个 update:{ 且距离 < 3000 字符」，
-    // 当本次 upsert 写成 `update: SOME_CONST`（无字面量花括号）时，
-    // 会错误借用**下一个** upsert 的 update 块而判为通过。
-    const openParen = upsertStart + upsertMatch[0].length - 1 // 指向 '('
-    let pDepth = 1
-    let pEnd = openParen + 1
-    while (pEnd < src.length && pDepth > 0) {
-      if (src[pEnd] === '(') pDepth++
-      else if (src[pEnd] === ')') pDepth--
-      pEnd++
+      const arg = node.arguments[0]
+      if (!arg || !ts.isObjectLiteralExpression(unwrap(arg))) {
+        throw new Error(
+          `${where}不是对象字面量（可能是常量引用/展开/函数调用）——本门禁无法判定其内容，按失败处理。`
+        )
+      }
+      // 实参层也要挡展开/计算键/重复键：`upsert({ ...args, update })` 能注入 update
+      const argProps = topLevelProps(unwrap(arg), where)
+      const updateNode = argProps.get('update')
+      if (updateNode === undefined) {
+        throw new Error(`${where}第一层未找到 \`update\` 键 —— 无法确认重置是否存在，按失败处理。`)
+      }
+      if (updateNode === null || !ts.isObjectLiteralExpression(updateNode)) {
+        throw new Error(
+          `${where}的 \`update\` 值不是对象字面量（可能写成了 \`update: 常量\` / 函数调用 / 三元）——\n` +
+            '      本门禁无法判定其内容，按失败处理。'
+        )
+      }
+      blocks.push({
+        filepath,
+        site,
+        line,
+        props: topLevelProps(updateNode, `${short} 的 ${site} 的 update 块`),
+      })
     }
-    if (pDepth !== 0) {
-      throw new Error(
-        `${filepath.split('/').pop()} 的 ${modelName}.upsert( 圆括号未配平（起始偏移 ${upsertStart}）——源码被截断或词法处理失效`
-      )
-    }
-    const callRange = src.slice(upsertStart, pEnd)
-
-    // ② 在调用范围内找 update: { —— 但**必须是实参对象的第一层**。
-    // 早期版本取「范围内第一个 update: {」，可被 `create: { nested: { update: {…五项…} } }`
-    // 抢位：嵌套块凑齐五项即放行，真正的顶层 update 完全没被检查。已用对抗用例复现。
-    const updateMatch = findTopLevelUpdate(callRange)
-    if (!updateMatch) {
-      throw new Error(
-        `${filepath.split('/').pop()} 的 ${modelName}.upsert( 实参第一层未找到字面量 \`update: {\`（起始偏移 ${upsertStart}）。\n` +
-          '      可能写成了 `update: 常量` / 展开运算符 / 嵌套位置 —— 本门禁无法判定其内容，按失败处理。'
-      )
-    }
-
-    // ③ 追踪花括号深度，提取 update:{...} 的内容；未配平即失败
-    const openBrace = upsertStart + updateMatch.braceIndex // 指向 '{'
-    let depth = 1
-    let i = openBrace + 1
-    while (i < src.length && depth > 0) {
-      if (src[i] === '{') depth++
-      else if (src[i] === '}') depth--
-      i++
-    }
-    if (depth !== 0) {
-      throw new Error(
-        `${filepath.split('/').pop()} 的 ${modelName}.upsert( 内 update 块花括号未配平（起始偏移 ${openBrace}）`
-      )
-    }
-    const blockContent = src.slice(openBrace, i)
-    // 向前扫全文，取最后一个出现在 upsert 之前的 async 方法名作为上下文标签
-    let fnName = '(unknown)'
-    const fnRe = /async\s+(\w+)\s*\(/g
-    let fnMatch
-    while ((fnMatch = fnRe.exec(src)) !== null && fnMatch.index < upsertStart) {
-      fnName = fnMatch[1]
-    }
-    const line = src.slice(0, upsertStart).split('\n').length
-    blocks.push({ filepath, fnName, modelName, line, content: blockContent })
+    ts.forEachChild(node, visit)
   }
+  visit(sf)
   return blocks
+}
+
+function extractBlocksFromFile(filepath) {
+  return extractBlocks(filepath, readFileSync(filepath, 'utf8'))
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 检查规则
 // ──────────────────────────────────────────────────────────────────────────────
-/**
- * 只保留 update 块**第一层**的文本，嵌套子对象内容全部抹掉。
- *
- * 不做这一步会有真实的假通过：把五项重置搬进 `meta: { reviewStatus: 'pending', ... }`
- * 这类嵌套子对象后，字段对 Prisma 而言完全无效（甚至会报错），但整块正则仍能匹配到，
- * 门禁照样放行。已用对抗用例复现过。
- */
-function topLevelOnly(blockContent) {
-  let out = ''
-  let depth = 0
-  for (const ch of blockContent) {
-    if (ch === '{') {
-      depth++
-      out += depth === 1 ? ch : ' '
-      continue
-    }
-    if (ch === '}') {
-      out += depth === 1 ? ch : ' '
-      depth--
-      continue
-    }
-    out += depth === 1 ? ch : ch === '\n' ? '\n' : ' '
-  }
-  return out
-}
-
-// 值必须是**完整字面量并紧跟分隔符**（`,` 或块尾 `}`）。
-// 早期只写 `:\s*null` 会把 `rejectReason: nullFlag ? undefined : 'kept'` 判为通过
-// （`null` 是 `nullFlag` 的前缀）；`'pending' + suffix`、`x ? a : 'pending'` 同理。
-// 已用对抗用例复现。
-const HAS_REVIEW = /reviewStatus\s*:\s*['"]pending['"]\s*[,}]/
-const HAS_PUBLISH = /publishStatus\s*:\s*['"]draft['"]\s*[,}]/
-
-// 退审同时必须清空上一次的审核元数据，否则会出现
-// 「当前 pending 却仍显示上次审核人/时间/拒绝原因」的脏状态
-const CLEARS_META = [
-  ["rejectReason:null", /rejectReason\s*:\s*null\s*[,}]/],
-  ["reviewedBy:null", /reviewedBy\s*:\s*null\s*[,}]/],
-  ["reviewedAt:null", /reviewedAt\s*:\s*null\s*[,}]/],
-]
-
 function checkMustReset(blocks, label) {
   let pass = 0,
     fail = 0
   for (const b of blocks) {
-    const site = `${b.fnName}() · ${b.modelName}.upsert @L${b.line}`
     // 只认第一层字段：搬进嵌套子对象的重置对 Prisma 无效，不能算通过
-    const top = topLevelOnly(b.content)
-    assertNoTopLevelSpread(top, site, b.filepath)
-    const missing = [
-      !HAS_REVIEW.test(top) && "reviewStatus:'pending'",
-      !HAS_PUBLISH.test(top) && "publishStatus:'draft'",
-      ...CLEARS_META.map(([name, re]) => !re.test(top) && name),
-    ].filter(Boolean)
+    const missing = REQUIRED.filter((f) => !f.ok(b.props.get(f.key))).map((f) => f.label)
     if (missing.length === 0) {
-      console.log(
-        `  ✅  ${label} · ${site} · update 块含 pending+draft 退审 & 已清空审核元数据`
-      )
+      console.log(`  ✅  ${label} · ${b.site} · update 块含 pending+draft 退审 & 已清空审核元数据`)
       pass++
     } else {
-      console.error(`  ❌  ${label} · ${site} · update 块缺少 ${missing.join(', ')}`)
+      console.error(`  ❌  ${label} · ${b.site} · update 块缺少 ${missing.join(', ')}`)
       fail++
     }
   }
@@ -367,13 +244,11 @@ function checkMustNotReset(blocks, label) {
     fail = 0
   for (const b of blocks) {
     // 反向断言同样只看第一层：嵌套里的字段对 Prisma 无效，不构成"无条件重置"
-    const top = topLevelOnly(b.content)
-    const hasR = HAS_REVIEW.test(top)
-    const hasP = HAS_PUBLISH.test(top)
-    const site = `${b.fnName}() · ${b.modelName}.upsert @L${b.line}`
+    const hasR = isStr('pending')(b.props.get('reviewStatus'))
+    const hasP = isStr('draft')(b.props.get('publishStatus'))
     if (!hasR && !hasP) {
       console.log(
-        `  ⚠️  ${label} · ${site} · 无条件重置缺席（符合断言）` +
+        `  ⚠️  ${label} · ${b.site} · 无条件重置缺席（符合断言）` +
           ' —— 注意这是【已登记 P0 缺口冻结态】，不代表当前实现无问题'
       )
       pass++
@@ -382,7 +257,7 @@ function checkMustNotReset(blocks, label) {
         .filter(Boolean)
         .join(', ')
       console.error(
-        `  ❌  ${label} · ${site} · 自动同步 update 块出现 ${unexpected}\n` +
+        `  ❌  ${label} · ${b.site} · 自动同步 update 块出现 ${unexpected}\n` +
           '      如果这是"无条件重置"：会让每 30 分钟一次的 Cron 把全部已审记录退回待审，压垮审核队列 → 请回退。\n' +
           '      如果你正在实施正解（按内容哈希退审：内容未变只更新 syncTime，展示字段变化才退审）：\n' +
           '      请改本脚本的这条断言，不要绕过门禁、也不要直接删断言。\n' +
@@ -395,215 +270,241 @@ function checkMustNotReset(blocks, label) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 自测：对抗用例（全内存，不写盘）
+// 自测：对抗用例（全内存合成夹具，不读真实文件、不写盘）
 //
-// 门禁自己也可能有假通过。以下用例都是 codex 复审点出、并已实际复现过的形态：
-//   A 把 update:{...} 改成常量引用     → 早期版本借用下一个 upsert 的块判为通过
-//   B 明确位置上的含引号正则           → 现已被 lexer 正确跳过，**必须仍能正常分析**
-//   B′ 歧义位置上的含引号正则          → lexer 保守放过，必须由残留探测抛错（fail-closed）
-//   C 字符串诱饵冒充赋值               → 早期版本保留全部字符串内容而被骗过
-//   D 重置搬进嵌套子对象               → 早期版本整块匹配，对 Prisma 无效却算通过
-//   E 嵌套 update 抢位                 → 早期版本取"第一个 update:{"，真顶层块逃过检查
-//   F update 第一层出现展开运算符      → 可能把状态覆写回已审，静态不可判 → 必须抛错
-//   G 正则含单侧括号 + 重置齐全        → **必须通过**（防过度收紧造成假阳性）
-//   G′ 正则含单侧括号 + 缺重置         → 必须失败
-//   H 值是表达式而非完整字面量         → `rejectReason: nullFlag ? …` 早期被当成 null 通过
-//   I 自动同步出现无条件重置           → 反向断言必须失败（防审核队列被压垮）
+// 门禁自己也可能有假通过。以下用例全部是 codex 三轮复审点出、并已实际复现过的
+// 绕过形态或误报形态。改用合成夹具而非「从真实文件切片」是刻意的：
+// 旧版靠 `raw.includes(RESET_BLOCK)` 对齐真实文件缩进，一旦真实文件改格式，
+// selfTest 会走 `return 1` 分支，而主逻辑按 `{leaked,total}` 解构 → 两者变
+// undefined → totalFail 变 NaN → `NaN > 0` 为 false → **真实失败被抹掉后 exit 0**。
+// 已实测复现：门禁先打印 `❌ partner · importJobs() … 缺少 reviewedAt:null`，
+// 紧接着打印 `✅ ALL PASS` 并 exit 0。合成夹具没有这个耦合，该 fail-open 随之消失。
 //
-// 两条设计约束（codex 指出的自测不可靠形态，已修）：
-//   · 不能"抛任何错都算拦住" —— 每个 throw 用例都要匹配**预期错误形态**；
-//   · 不能"任一块失败就算拦住" —— 必须确认失败的是**被改动的那个块**。
-// 自测只是回归烟测：它与被测实现共用同一套 lexer，能防退化，不构成解析正确性的证明。
+// expect 语义：
+//   'fail'         → 必须被判缺字段，且失败块的 site 须匹配 caseSite
+//   'throw'        → 必须抛错，且错误信息匹配 errRe（只接受目标机制的错误）
+//   'pass'         → 必须正常通过，且提取块数须等于 wantBlocks（防解析退化成空数组也算过）
+//   'reverse-fail' → 反向断言（checkMustNotReset）必须报失败
 // ──────────────────────────────────────────────────────────────────────────────
-const RESET_BLOCK = [
-  "            reviewStatus: 'pending',",
-  "            publishStatus: 'draft',",
-  '            rejectReason: null,',
-  '            reviewedBy: null,',
-  '            reviewedAt: null,',
+const RESET_INLINE = [
+  "          reviewStatus: 'pending',",
+  "          publishStatus: 'draft',",
+  '          rejectReason: null,',
+  '          reviewedBy: null,',
+  '          reviewedAt: null,',
 ].join('\n')
 
-/** 合成夹具：单个 upsert，便于精确断言"失败的就是被改动的那个块" */
-function synth(updateInner, model = 'job', fn = 'importJobs') {
-  return `class T {
-  async ${fn}() {
-    await this.prisma.${model}.upsert({
-      where: { k: 1 },
-      create: { title: 'x', reviewStatus: 'pending', publishStatus: 'draft' },
+/** 合成一个含单个 upsert 的最小 service 夹具 */
+function synth(updateInner, { model = 'job', fn = 'importJobs', argExtra = '', body = '' } = {}) {
+  return `import { Injectable } from '@nestjs/common'
+
+@Injectable()
+export class FixtureService {
+  async ${fn}(dto: any) {
+${body}
+    await this.prisma.${model}.upsert({${argExtra}
+      where: { id: dto.id },
+      create: { title: dto.title },
+      update: {
 ${updateInner}
+      },
     })
   }
 }
 `
 }
 
-const RESET_INLINE = [
-  "        reviewStatus: 'pending',",
-  "        publishStatus: 'draft',",
-  '        rejectReason: null,',
-  '        reviewedBy: null,',
-  '        reviewedAt: null,',
-].join('\n')
+const CASE_SITE = (fn = 'importJobs', model = 'job') => `${fn}() · ${model}.upsert @L`
 
 function selfTest() {
-  const partnerPath = resolve(SRC, 'jobs-partner.service.ts')
-  const raw = readFileSync(partnerPath, 'utf8')
-  if (!raw.includes(RESET_BLOCK)) {
-    console.error('  ❌  自测夹具失效：jobs-partner.service.ts 中未找到预期的五项重置块，请同步更新 RESET_BLOCK')
-    return 1
-  }
-
-  // expect: 'fail'  → 必须被判缺字段，且失败的块函数名须匹配 site
-  //         'throw' → 必须抛错，且错误信息匹配 errRe
-  //         'pass'  → 必须正常通过（防过度收紧导致假阳性）
   const cases = [
     {
-      name: 'A update:{...} → 常量引用',
+      name: 'A update 值是常量引用（无字面量可解析）',
       expect: 'throw',
-      errRe: /未找到字面量/,
-      src: () => {
-        const i = raw.indexOf('update: {')
-        let d = 1, j = i + 'update: {'.length
-        while (d > 0) { d += raw[j] === '{' ? 1 : raw[j] === '}' ? -1 : 0; j++ }
-        return raw.slice(0, i) + 'update: RESET_FIELDS' + raw.slice(j)
-      },
+      errRe: /不是对象字面量/,
+      src: () =>
+        synth('').replace(/update: \{\n\n      \},/, 'update: RESET_FIELDS,'),
     },
     {
-      name: 'B 明确位置的含引号正则（应被正确跳过）',
+      name: 'B 含引号与花括号的正则 + 重置齐全（应通过，防误报）',
       expect: 'pass',
-      src: () => {
-        const anchor = 'export class JobsPartnerService {'
-        const i = raw.indexOf(anchor) + anchor.length
-        return raw.slice(0, i) + `\n  private static readonly DECOY = 'x'.replace(/['"]/g, '')\n` + raw.slice(i)
-      },
+      wantBlocks: 1,
+      src: () =>
+        synth(`          title: /['"{}]/.test(dto.title) ? 'x' : dto.title,\n${RESET_INLINE}`),
     },
     {
-      name: "B′ 歧义位置的含引号正则（应 fail-closed）",
-      expect: 'throw',
-      // 两条 fail-closed 路径都可接受：残留探测直接命中，或引号吞掉源码后由括号配平兜住。
-      // 关键是必须抛错而非静默漏判 —— 但不能"抛任何错都算过"，故仍限定这两种形态。
-      errRe: /无法安全处理的含引号正则|圆括号未配平/,
-      src: () => synth(`      update: {\n        title: a /['"]/ b,\n${RESET_INLINE}\n      },`),
+      name: "B′ return /}/ 正则（旧词法版真实绕过：} 被当真闭括号致块截断）",
+      expect: 'pass',
+      wantBlocks: 1,
+      src: () =>
+        synth(
+          `          title: (() => {\n            return /}/.test(dto.title) ? 'a' : 'b'\n          })(),\n${RESET_INLINE}`
+        ),
     },
     {
-      name: 'C 字符串诱饵冒充赋值',
+      name: "B″ return /}/ 正则 + 缺重置（旧词法版此形态被放行 → 必须失败）",
       expect: 'fail',
-      site: /importJobs/,
-      src: () => synth(
-        `      update: {\n        description: "reviewStatus: 'pending' publishStatus: 'draft' rejectReason: null reviewedBy: null reviewedAt: null",\n      },`
-      ),
+      caseSite: CASE_SITE(),
+      src: () =>
+        synth(
+          `          title: (() => {\n            return /}/.test(dto.title) ? 'a' : 'b'\n          })(),\n          reviewStatus: 'pending',`
+        ),
     },
     {
-      name: 'D 重置搬进嵌套子对象',
+      name: 'C 字符串诱饵冒充字段赋值',
       expect: 'fail',
-      site: /importJobs/,
-      src: () => synth(
-        "      update: {\n        meta: { reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null, reviewedBy: null, reviewedAt: null },\n      },"
-      ),
+      caseSite: CASE_SITE(),
+      src: () =>
+        synth(
+          `          description: "reviewStatus: 'pending', publishStatus: 'draft', rejectReason: null, reviewedBy: null, reviewedAt: null",`
+        ),
     },
     {
-      name: 'E 嵌套 update 抢位（真 update 在后）',
+      name: 'D 五项重置搬进嵌套子对象（对 Prisma 无效）',
       expect: 'fail',
-      site: /importJobs/,
-      src: () => `class T {
-  async importJobs() {
-    await this.prisma.job.upsert({
-      where: { k: 1 },
-      create: { nested: { update: {\n${RESET_INLINE}\n      } } },
-      update: { title: item.title, syncTime: sync },
-    })
-  }
-}
-`,
+      caseSite: CASE_SITE(),
+      src: () => synth(`          meta: {\n${RESET_INLINE}\n          },`),
+    },
+    {
+      name: 'E 嵌套 update 抢位（真 update 在后且为空）',
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () => synth(`          child: { update: {\n${RESET_INLINE}\n          } },`),
     },
     {
       name: 'F update 第一层出现展开运算符',
       expect: 'throw',
       errRe: /展开运算符/,
-      src: () => synth(`      update: {\n${RESET_INLINE}\n        ...overrides,\n      },`),
+      src: () => synth(`          ...payload,\n${RESET_INLINE}`),
     },
     {
-      name: 'G 正则含单侧括号 + 重置齐全（应通过）',
+      name: 'F′ upsert 实参第一层出现展开（可注入 update）',
+      expect: 'throw',
+      errRe: /展开运算符/,
+      src: () => synth(RESET_INLINE, { argExtra: '\n      ...args,' }),
+    },
+    {
+      name: "G 计算属性名 ['update']:（键名运行时才定）",
+      expect: 'throw',
+      errRe: /计算属性名/,
+      src: () => synth(RESET_INLINE).replace('update: {', "['upd' + 'ate']: {"),
+    },
+    {
+      name: 'G′ 重复 update 键（JS 后者覆盖前者）',
+      expect: 'throw',
+      errRe: /重复键 `update`/,
+      src: () => synth(RESET_INLINE, { argExtra: '\n      update: {},' }),
+    },
+    {
+      name: 'H 值是表达式而非字面量（rejectReason: nullFlag）',
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () => synth(RESET_INLINE.replace('rejectReason: null,', 'rejectReason: nullFlag,')),
+    },
+    {
+      // 本用例专测「值内容比对」：五项键全在、类型也对，只是值写错。
+      // 若把 isStr 放宽成「是字符串字面量就算」，只有这条会亮。
+      name: "H″ 键全在但值写错（reviewStatus:'approved' / publishStatus:'published'）",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () =>
+        synth(
+          RESET_INLINE.replace("'pending',", "'approved',").replace("'draft',", "'published',")
+        ),
+    },
+    {
+      name: "H′ 字段名前缀伪装（xreviewStatus: 'pending' 不算)",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () => synth(RESET_INLINE.replace('reviewStatus:', 'xreviewStatus:')),
+    },
+    {
+      name: "I as const 包装应放行（reviewStatus: 'pending' as const）",
       expect: 'pass',
-      src: () => synth(`      update: {\n        title: item.title.replace(/\\(/g, ''),\n${RESET_INLINE}\n      },`),
+      wantBlocks: 1,
+      src: () => synth(RESET_INLINE.replace("'pending',", "'pending' as const,")),
     },
     {
-      name: "G′ 正则含单侧括号 + 缺重置",
-      expect: 'fail',
-      site: /importJobs/,
-      src: () => synth(`      update: {\n        title: item.title.replace(/\\(/g, ''),\n        syncTime: sync,\n      },`),
+      name: 'J 语法错误必须 fail-closed（AST 不可信）',
+      expect: 'throw',
+      errRe: /语法错误/,
+      src: () => synth(RESET_INLINE) + '\nexport class Broken { async x( {\n',
     },
     {
-      name: 'H 值是表达式而非完整字面量',
-      expect: 'fail',
-      site: /importJobs/,
-      src: () => synth(
-        `      update: {\n        reviewStatus: 'pending',\n        publishStatus: 'draft',\n        rejectReason: nullFlag ? undefined : 'kept',\n        reviewedBy: nullish ?? prev.reviewedBy,\n        reviewedAt: nullOr(prev.reviewedAt),\n      },`
-      ),
-    },
-    {
-      name: 'I 自动同步出现无条件重置（反向断言）',
+      name: 'K 自动同步支出现无条件重置（反向断言）',
       expect: 'reverse-fail',
-      src: () => synth(`      update: {\n${RESET_INLINE}\n        syncTime: sync,\n      },`, 'job', 'upsertJobs'),
+      src: () => synth(RESET_INLINE, { fn: 'upsertJobs' }),
     },
   ]
 
   let leaked = 0
-  const total = cases.length
   for (const c of cases) {
-    let verdict, detail = ''
+    let verdict
+    let blocks = null
     try {
-      const blocks = analyzeSource(c.src(), 'selftest.ts')
+      blocks = extractBlocks('/synthetic/fixture.ts', c.src())
       if (c.expect === 'reverse-fail') {
-        // 反向断言：无条件重置出现 → checkMustNotReset 必须报失败
-        const bad = blocks.filter((b) => {
-          const top = topLevelOnly(b.content)
-          return HAS_REVIEW.test(top) || HAS_PUBLISH.test(top)
-        })
-        verdict = bad.length > 0 ? 'reverse-fail' : 'pass'
+        // 必须走真实的 checkMustNotReset，不能在自测里重新实现判定逻辑
+        const r = withSilencedOutput(() => checkMustNotReset(blocks, 'selftest'))
+        verdict = r.fail > 0 ? 'reverse-fail' : 'pass'
       } else {
-        const failed = blocks.filter((b) => {
-          const top = topLevelOnly(b.content)
-          // 刻意不在这里 catch：展开运算符走的是 fail-closed 抛错路径，
-          // 若在此吞掉就会把 throw 用例误记成普通 fail，掩盖真实行为。
-          assertNoTopLevelSpread(top, 'x', 'selftest.ts')
-          return !HAS_REVIEW.test(top) || !HAS_PUBLISH.test(top) || CLEARS_META.some(([, re]) => !re.test(top))
-        })
-        verdict = failed.length > 0 ? 'fail' : 'pass'
-        // 必须是被改动的那个块失败，不能是"别处顺带失败"
-        if (verdict === 'fail' && c.site && !failed.some((b) => c.site.test(b.fnName))) {
-          verdict = 'fail-wrong-block'
-          detail = `失败块是 ${failed.map((b) => b.fnName).join('/')}，期望匹配 ${c.site}`
-        }
+        const r = withSilencedOutput(() => checkMustReset(blocks, 'selftest'))
+        verdict = r.fail > 0 ? 'fail' : 'pass'
       }
-    } catch (e) {
+    } catch (err) {
       verdict = 'throw'
-      detail = String(e.message).split('\n')[0]
-      // 必须是预期的错误形态，不能是"随便抛个错也算拦住"
-      if (c.expect === 'throw' && c.errRe && !c.errRe.test(detail)) {
-        verdict = 'throw-wrong-reason'
+      c._err = err.message
+    }
+
+    let ok = verdict === c.expect
+    let why = ''
+    if (ok && c.expect === 'throw' && c.errRe && !c.errRe.test(c._err)) {
+      ok = false
+      why = `（抛错原因不符：${String(c._err).split('\n')[0]}）`
+    }
+    if (ok && c.expect === 'pass' && blocks && blocks.length !== c.wantBlocks) {
+      // 防「解析退化成返回空数组 → 没有失败 → 也算 pass」
+      ok = false
+      why = `（应提取 ${c.wantBlocks} 个块，实际 ${blocks.length}）`
+    }
+    if (ok && c.expect === 'fail' && c.caseSite && blocks) {
+      // 防「因无关块失败而假绿」：失败的必须是本用例那一处
+      const hit = blocks.some((b) => b.site.startsWith(c.caseSite))
+      if (!hit) {
+        ok = false
+        why = `（失败块 site 不匹配 ${c.caseSite}）`
       }
     }
 
-    if (verdict === c.expect) {
-      const how = { fail: '被正确判为失败', throw: '被正确 fail-closed 抛错', pass: '被正确放行（无假阳性）', 'reverse-fail': '反向断言正确报失败' }[c.expect]
-      console.log(`  ✅  自测 ${c.name} · ${how}`)
+    if (ok) {
+      const how = { throw: '被正确 fail-closed 抛错', pass: '被正确放行（无假阳性）', fail: '被正确判为失败', 'reverse-fail': '反向断言正确报失败' }
+      console.log(`  ✅  自测 ${c.name} · ${how[c.expect]}`)
     } else {
-      console.error(
-        `  ❌  自测 ${c.name} · 期望 ${c.expect}，实际 ${verdict}` +
-          (detail ? `（${detail}）` : '') +
-          ' —— 门禁已退化，修好后再提交'
-      )
+      console.error(`  ❌  自测 ${c.name} · 期望 ${c.expect}，实际 ${verdict}${why} —— 门禁已退化，修好后再提交`)
       leaked++
     }
   }
-  return { leaked, total }
+  return { leaked, total: cases.length }
+}
+
+/** 自测用例会触发大量 ✅/❌ 输出，这里静音以免污染真实断言的报告 */
+function withSilencedOutput(fn) {
+  const log = console.log,
+    err = console.error
+  console.log = () => {}
+  console.error = () => {}
+  try {
+    return fn()
+  } finally {
+    console.log = log
+    console.error = err
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 主逻辑
 // ──────────────────────────────────────────────────────────────────────────────
-console.log('\n🔍  verify-import-review-reset — Partner/Excel 强制重审验证\n')
+console.log('\n🔍  verify-import-review-reset — Partner/Excel 强制重审验证（TypeScript AST）\n')
 
 let totalPass = 0,
   totalFail = 0
@@ -618,7 +519,7 @@ function runFile(fileLabel, filepath, checker, checkerLabel) {
   const expected = EXPECTED[fileLabel]
   let blocks
   try {
-    blocks = extractUpsertUpdateBlocks(filepath)
+    blocks = extractBlocksFromFile(filepath)
   } catch (err) {
     console.error(`  ❌  无法解析 ${fileLabel}：${err.message}`)
     totalFail++
@@ -640,12 +541,7 @@ function runFile(fileLabel, filepath, checker, checkerLabel) {
 }
 
 // ① Partner 手动 API 导入 / Webhook / 招聘会导入
-runFile(
-  'jobs-partner.service.ts',
-  resolve(SRC, 'jobs-partner.service.ts'),
-  checkMustReset,
-  'partner'
-)
+runFile('jobs-partner.service.ts', resolve(SRC, 'jobs-partner.service.ts'), checkMustReset, 'partner')
 
 // ② Excel 确认导入
 console.log('')
@@ -661,15 +557,31 @@ runFile(
 )
 
 // ④ 门禁自测：已知绕过形态必须全被拦住，且不得产生假阳性（全内存，不写盘）
-console.log('\n── 门禁自测（对抗用例，全内存不写盘）')
-const { leaked, total: selfTotal } = selfTest()
-totalFail += leaked
-totalPass += selfTotal - leaked
+console.log('\n── 门禁自测（对抗用例，全内存合成夹具，不写盘）')
+const selfResult = selfTest()
+// 返回值形态守卫：任何非法返回都必须计为失败，不能让 NaN 把真实失败抹掉后 exit 0
+if (
+  !selfResult ||
+  typeof selfResult !== 'object' ||
+  !Number.isInteger(selfResult.leaked) ||
+  !Number.isInteger(selfResult.total)
+) {
+  console.error('  ❌  selfTest() 返回值形态非法，无法核算自测结果 → 按失败处理')
+  totalFail++
+} else {
+  totalFail += selfResult.leaked
+  totalPass += selfResult.total - selfResult.leaked
+}
 
 // ──────────────────────────────────────────────────────────────────────────────
 // 摘要
 // ──────────────────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(60))
+if (!Number.isInteger(totalPass) || !Number.isInteger(totalFail)) {
+  // 防御性兜底：计数被污染时绝不宣称通过
+  console.error(`⛔  计数异常（pass=${totalPass} fail=${totalFail}）——按失败处理\n`)
+  process.exit(1)
+}
 console.log(
   `总计  ${totalPass + totalFail} 项  ✅ ${totalPass} PASS  ${totalFail > 0 ? '❌' : ''} ${totalFail} FAIL`
 )
