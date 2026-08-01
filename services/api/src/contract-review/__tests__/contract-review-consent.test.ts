@@ -320,6 +320,55 @@ test('GrantAiConsentDto accepts only job_ai and contract_review at runtime', asy
   }
 })
 
+test('revoke Param DTO accepts only job_ai and contract_review at runtime', async () => {
+  const parameterTypes = Reflect.getMetadata(
+    'design:paramtypes',
+    MemberPrivacyController.prototype,
+    'revokeConsent'
+  ) as Array<new () => object>
+  const RevokeAiConsentParamsDto = parameterTypes[1]
+  assert.ok(RevokeAiConsentParamsDto, 'revokeConsent params DTO metadata must exist')
+  assert.notEqual(RevokeAiConsentParamsDto, String, 'revoke route must use a validated DTO')
+
+  for (const scope of ['job_ai', 'contract_review']) {
+    const errors = await validate(plainToInstance(RevokeAiConsentParamsDto, { scope }))
+    assert.equal(errors.length, 0, `${scope} must remain accepted by the revoke Param DTO`)
+  }
+
+  for (const scope of [
+    'unknown_scope',
+    'toString',
+    '__proto__',
+    'constructor',
+    'hasOwnProperty',
+    undefined,
+  ]) {
+    const errors = await validate(plainToInstance(RevokeAiConsentParamsDto, { scope }))
+    assert.equal(errors.length, 1)
+    assert.ok(errors[0]?.constraints?.isIn)
+  }
+})
+
+test('contract consent verifier is registered and enforced in the main CI contract block', () => {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(repoRoot, 'services/api/package.json'), 'utf8')
+  ) as { scripts: Record<string, string> }
+  const ci = readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+  const verifier = readFileSync(
+    resolve(repoRoot, 'services/api/scripts/verify-job-ai-privacy.ts'),
+    'utf8'
+  )
+  const mainJob = ci.slice(ci.indexOf('  build-and-verify:'), ci.indexOf('  postgres-readiness:'))
+
+  assert.equal(
+    packageJson.scripts['verify:contract-review:consent'],
+    'node -r @swc-node/register --test src/contract-review/__tests__/contract-review-consent.test.ts'
+  )
+  assert.match(mainJob, /pnpm --filter @ai-job-print\/api verify:contract-review:consent/)
+  assert.match(verifier, /mustHaveStringLiteralUnion/)
+  assert.match(verifier, /MemberAiConsentScope/)
+})
+
 test('getConsentStatus returns independent job and contract review status entries', async () => {
   const revokedAt = new Date('2026-08-01T01:00:00.000Z')
   const harness = makePrivacyHarness([
@@ -420,7 +469,7 @@ test('prototype and unknown scope keys fail closed before every Prisma path', as
     )
     await assert.rejects(harness.service.revokeConsent('member-1', scope), isInvalidScopeError)
     await assert.rejects(
-      controller.revokeConsent({ endUserId: 'member-1' } as never, scope),
+      controller.revokeConsent({ endUserId: 'member-1' } as never, { scope } as never),
       isInvalidScopeError
     )
   }

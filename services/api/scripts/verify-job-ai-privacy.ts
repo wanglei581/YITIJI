@@ -50,18 +50,60 @@ function mustNotContain(source: string, markers: string[], label: string): void 
   else pass(label)
 }
 
+function mustHaveStringLiteralUnion(
+  source: string,
+  typeName: string,
+  expectedMembers: string[],
+  label: string
+): void {
+  const escapedTypeName = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const start = new RegExp(`export\\s+type\\s+${escapedTypeName}\\s*=`).exec(source)
+  const remainder = start ? source.slice((start.index ?? 0) + start[0].length) : ''
+  const nextExport = remainder.search(/\n\s*export\s+(?:type|interface|const|class|function)\b/)
+  const declaration = nextExport >= 0 ? remainder.slice(0, nextExport) : remainder
+  const actualMembers = [...declaration.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1])
+  const actual = [...new Set(actualMembers)].sort()
+  const expected = [...new Set(expectedMembers)].sort()
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    fail(`${label} — 期望: ${expected.join(' | ')}; 实际: ${actual.join(' | ') || '未找到'}`)
+  } else {
+    pass(label)
+  }
+}
+
 async function main(): Promise<void> {
   console.log('\n=== 岗位 AI 用户同意 / 隐私 / 配额治理门禁 ===')
 
-  const moduleFile = mustExist('src/member-privacy/member-privacy.module.ts', 'MemberPrivacyModule 已创建')
-  const memberController = mustExist('src/member-privacy/member-privacy.controller.ts', 'MemberPrivacyController 已创建')
-  const adminController = mustExist('src/member-privacy/admin-member-privacy.controller.ts', 'AdminMemberPrivacyController 已创建')
-  const privacyService = mustExist('src/member-privacy/member-privacy.service.ts', 'MemberPrivacyService 已创建')
-  const requestService = mustExist('src/member-privacy/member-data-request.service.ts', 'MemberDataRequestService 已创建')
-  const privacyTypes = mustExist('src/member-privacy/member-privacy.types.ts', 'MemberPrivacy types 已创建')
+  const moduleFile = mustExist(
+    'src/member-privacy/member-privacy.module.ts',
+    'MemberPrivacyModule 已创建'
+  )
+  const memberController = mustExist(
+    'src/member-privacy/member-privacy.controller.ts',
+    'MemberPrivacyController 已创建'
+  )
+  const adminController = mustExist(
+    'src/member-privacy/admin-member-privacy.controller.ts',
+    'AdminMemberPrivacyController 已创建'
+  )
+  const privacyService = mustExist(
+    'src/member-privacy/member-privacy.service.ts',
+    'MemberPrivacyService 已创建'
+  )
+  const requestService = mustExist(
+    'src/member-privacy/member-data-request.service.ts',
+    'MemberDataRequestService 已创建'
+  )
+  const privacyTypes = mustExist(
+    'src/member-privacy/member-privacy.types.ts',
+    'MemberPrivacy types 已创建'
+  )
   const quotaService = mustExist('src/job-ai/job-ai-quota.service.ts', 'JobAiQuotaService 已创建')
   const jobAiService = read('src/job-ai/job-ai.service.ts')
-  const governedJobFit = mustExist('src/job-ai/governed-job-fit.service.ts', 'GovernedJobFitService 已创建')
+  const governedJobFit = mustExist(
+    'src/job-ai/governed-job-fit.service.ts',
+    'GovernedJobFitService 已创建'
+  )
   const jobAiController = read('src/job-ai/job-ai.controller.ts')
   const prisma = read('src/prisma/prisma.service.ts')
   const appModule = read('src/app.module.ts')
@@ -80,7 +122,7 @@ async function main(): Promise<void> {
       'MemberAuthModule',
       'AuthModule',
     ],
-    'MemberPrivacyModule 通过鉴权模块注册唯一会员/Admin/下载入口',
+    'MemberPrivacyModule 通过鉴权模块注册唯一会员/Admin/下载入口'
   )
 
   mustContain(
@@ -95,7 +137,7 @@ async function main(): Promise<void> {
       "@Controller('me/data-requests')",
       "requestType: 'export' | 'delete' | 'revoke_consent'",
     ],
-    '会员端隐私 API 支持授权状态、授权、撤回和数据请求',
+    '会员端隐私 API 支持授权状态、授权、撤回和数据请求'
   )
 
   mustContain(
@@ -110,9 +152,13 @@ async function main(): Promise<void> {
       'this.requests.retry',
       'this.requests.reject',
     ],
-    'Admin 隐私 API 只支持列表与明确 retry/reject 动作',
+    'Admin 隐私 API 只支持列表与明确 retry/reject 动作'
   )
-  mustNotContain(adminController, ["@Patch('data-requests/:id')"], 'Admin 不再提供 arbitrary status PATCH')
+  mustNotContain(
+    adminController,
+    ["@Patch('data-requests/:id')"],
+    'Admin 不再提供 arbitrary status PATCH'
+  )
 
   mustContain(
     privacyService,
@@ -127,7 +173,7 @@ async function main(): Promise<void> {
       'revokedAt',
       'USER_AI_CONSENT_REQUIRED',
     ],
-    'MemberPrivacyService 只负责 UserAiConsent 同意真相',
+    'MemberPrivacyService 只负责 UserAiConsent 同意真相'
   )
 
   mustNotContain(
@@ -141,7 +187,7 @@ async function main(): Promise<void> {
       'aiResumeResult.deleteMany',
       'jobAiSession.deleteMany',
     ],
-    'MemberPrivacyService 不保留数据请求双写或部分删除路径',
+    'MemberPrivacyService 不保留数据请求双写或部分删除路径'
   )
 
   mustContain(
@@ -155,18 +201,23 @@ async function main(): Promise<void> {
       'idempotencyKey',
       'MEMBER_EXPORT_JOB',
     ],
-    'MemberDataRequestService 独占幂等、step-up、activeKey 与异步导出创建',
+    'MemberDataRequestService 独占幂等、step-up、activeKey 与异步导出创建'
   )
 
   mustContain(
     privacyTypes,
     [
       "export type MemberDataRequestType = 'export' | 'delete' | 'revoke_consent'",
-      "export type MemberAiConsentScope = 'job_ai'",
       'MemberAiConsentStatus',
       'MemberDataRequestItem',
     ],
-    'MemberPrivacy types 收敛 requestType 和 consent scope 字面量',
+    'MemberPrivacy types 收敛 requestType 和响应形状'
+  )
+  mustHaveStringLiteralUnion(
+    privacyTypes,
+    'MemberAiConsentScope',
+    ['job_ai', 'contract_review'],
+    'MemberPrivacy consent scope 精确包含 job_ai / contract_review'
   )
 
   mustContain(
@@ -186,25 +237,19 @@ async function main(): Promise<void> {
       'terminal',
       'ip',
     ],
-    'JobAiQuotaService 使用 Redis 日配额和脱敏维度 key',
+    'JobAiQuotaService 使用 Redis 日配额和脱敏维度 key'
   )
 
   mustNotContain(
     quotaService,
     ['new Map(', 'Map<string', 'globalThis'],
-    'JobAiQuotaService 禁止内存 Map / global 配额兜底',
+    'JobAiQuotaService 禁止内存 Map / global 配额兜底'
   )
 
   mustContain(
     jobAiController,
-    [
-      'ip?: string',
-      'socket?:',
-      'ipOf(req)',
-      'quotaContextOf(req',
-      'x-terminal-id',
-    ],
-    'JobAiController 提供 terminal/IP/member 配额上下文',
+    ['ip?: string', 'socket?:', 'ipOf(req)', 'quotaContextOf(req', 'x-terminal-id'],
+    'JobAiController 提供 terminal/IP/member 配额上下文'
   )
 
   mustContain(
@@ -220,7 +265,7 @@ async function main(): Promise<void> {
       'this.governed.matchForMember',
       'llm.explain',
     ],
-    'JobAiService 的 recommendations/explain 保持 consent + quota，match 委托治理服务',
+    'JobAiService 的 recommendations/explain 保持 consent + quota，match 委托治理服务'
   )
 
   mustContain(
@@ -234,7 +279,7 @@ async function main(): Promise<void> {
       'this.quota.rollback',
       "operation: 'jobMatch'",
     ],
-    'GovernedJobFitService 在会话创建和 LLM 调用前接入 consent + quota',
+    'GovernedJobFitService 在会话创建和 LLM 调用前接入 consent + quota'
   )
 
   mustContain(prisma, ['get userDataRequest()'], 'PrismaService 暴露 userDataRequest delegate')
@@ -243,7 +288,15 @@ async function main(): Promise<void> {
   mustContain(ci, ['verify:job-ai-privacy'], 'CI 串行 verify 接入岗位 AI 隐私门禁')
 
   mustNotContain(
-    [memberController, adminController, privacyService, requestService, quotaService, jobAiService, governedJobFit].join('\n'),
+    [
+      memberController,
+      adminController,
+      privacyService,
+      requestService,
+      quotaService,
+      jobAiService,
+      governedJobFit,
+    ].join('\n'),
     [
       'resumeText:',
       'resumeContent',
@@ -263,7 +316,7 @@ async function main(): Promise<void> {
       'offerStatus',
       '投递状态',
     ],
-    '隐私治理和 Job AI 不持久化简历原文、完整模型内容、签名 URL 或招聘闭环状态',
+    '隐私治理和 Job AI 不持久化简历原文、完整模型内容、签名 URL 或招聘闭环状态'
   )
 
   if (failed > 0) {
