@@ -26,6 +26,8 @@ const stableApproverIdPattern = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const placeholderMarkerPattern = /(?:^|[._-])(?:test|demo|example|placeholder|sample|todo|tbd|fake|dummy)(?:$|[._-])/i
 const automationMarkerPattern =
   /(?:^|[._-])(?:bot|automation|automated|ci|runner|workflow|actions|github[._-]?actions)(?:$|[._-])/i
+const compactAutomationTerms = ['bot', 'automation', 'automated', 'runner', 'workflow', 'actions', 'githubactions'] as const
+const ciAutomationTerms = ['agent', 'bot', 'runner', 'workflow', 'actions', 'automation', 'automated'] as const
 
 type GateField = (typeof gateFields)[number]
 type GateState = 'pending' | 'approved'
@@ -136,6 +138,19 @@ function isValidRfc3339(value: string): boolean {
   )
 }
 
+function hasAutomationMarker(stableId: string): boolean {
+  if (automationMarkerPattern.test(stableId)) return true
+
+  const compact = stableId.toLowerCase().replace(/[._-]/g, '')
+  if (compactAutomationTerms.some((term) => compact.startsWith(term) || compact.endsWith(term))) {
+    return true
+  }
+
+  return ciAutomationTerms.some(
+    (term) => compact.startsWith(`ci${term}`) || compact.endsWith(`${term}ci`),
+  )
+}
+
 function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
   const seenIdentities = new Set<string>()
   const seenRoles = new Set<string>()
@@ -149,7 +164,7 @@ function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
     assert(match, 'approved_by identities must use <role>:<stable-id>')
 
     const [, role, stableId] = match
-    assert(!automationMarkerPattern.test(stableId), `approved_by stable-id contains an automation marker for role ${role}`)
+    assert(!hasAutomationMarker(stableId), `approved_by stable-id contains an automation marker for role ${role}`)
     assert(stableApproverIdPattern.test(stableId), `approved_by stable-id is invalid for role ${role}`)
     assert(!placeholderMarkerPattern.test(stableId), `approved_by stable-id contains a placeholder marker for role ${role}`)
     assert(!seenIdentities.has(identity), `approved_by contains duplicate identity: ${identity}`)
@@ -173,6 +188,14 @@ export function verifyGateSource(source: string): void {
     /当前(?:状态|阶段|结论)?[^\r\n]{0,80}\bblocked\b/i,
     'document body must not hardcode the current gate status as blocked',
   )
+  assert.doesNotMatch(body, /\|\s*当前状态\s*\|/, 'document body must not include a current-status table column')
+  for (const field of gateFields) {
+    assert.doesNotMatch(
+      body,
+      new RegExp(`\\|\\s*\`?${field}\`?\\s*\\|\\s*\`?(?:pending|approved)\`?\\s*\\|`, 'i'),
+      `document body must not mirror the current ${field} state`,
+    )
+  }
   assert(
     gate.status === 'blocked' || gate.status === 'approved',
     'contract review release gate status must be blocked or approved',
@@ -273,6 +296,11 @@ function runRegressionFixtures(): void {
         /approved_by: .+/,
         'approved_by: ["legal:l", "compliance:co", "security:sec"]',
       ),
+    ),
+  )
+  assert.doesNotThrow(() =>
+    verifyGateSource(
+      canonicalApprovedFixture.replace('legal:contract-governance-counsel', 'legal:civic-counsel'),
     ),
   )
 
@@ -419,6 +447,13 @@ function runRegressionFixtures(): void {
     'github-actions',
     'GitHub_Actions',
     'GitHubActions',
+    'approvalbot',
+    'botapprover',
+    'automationrunner',
+    'automatedreviewer',
+    'ciagent',
+    'workflowowner',
+    'actionsapprover',
   ]) {
     assert.throws(
       () =>
@@ -437,6 +472,16 @@ function runRegressionFixtures(): void {
         canonicalBlockedFixture.replace('Canonical verifier fixture.', '当前状态为 blocked。'),
       ),
     /must not hardcode the current gate status as blocked/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalBlockedFixture.replace(
+          'Canonical verifier fixture.',
+          '| `provider_allowlist` | `pending` | mirrored state |',
+        ),
+      ),
+    /must not mirror the current provider_allowlist state/,
   )
 }
 
