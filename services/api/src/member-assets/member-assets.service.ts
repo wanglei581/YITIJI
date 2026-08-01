@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
-import type { MemberAiRecordItem, MemberAssetPage, MemberDocumentItem, MemberResumeItem } from './member-assets.types'
+import type {
+  MemberAiRecordItem,
+  MemberAssetPage,
+  MemberDocumentItem,
+  MemberResumeItem,
+} from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
 
 // ============================================================
@@ -37,7 +42,10 @@ export class MemberAssetsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** 我的简历：本人 parse（上传诊断，附「是否已生成优化版」）+ generate（AI 生成）列表。 */
-  async listResumes(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberResumeItem>> {
+  async listResumes(
+    endUserId: string,
+    page: MemberPageQuery
+  ): Promise<MemberAssetPage<MemberResumeItem>> {
     const where = { endUserId, kind: { in: [...RESUME_KINDS] }, expiresAt: { gt: new Date() } }
     const total = await this.prisma.aiResumeResult.count({ where })
     const rows = await this.prisma.aiResumeResult.findMany({
@@ -64,7 +72,7 @@ export class MemberAssetsService {
               where: { endUserId, kind: 'optimize', taskId: { in: parseTaskIds } },
               select: { taskId: true },
             })
-          ).map((r) => r.taskId),
+          ).map((r) => r.taskId)
     )
     return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
@@ -80,13 +88,19 @@ export class MemberAssetsService {
   }
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
-  async listDocuments(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberDocumentItem>> {
+  async listDocuments(
+    endUserId: string,
+    page: MemberPageQuery
+  ): Promise<MemberAssetPage<MemberDocumentItem>> {
     const where = {
       ...isVisibleMemberFileWhere(endUserId, new Date()),
       purpose: { notIn: ['signature_image', 'contract_upload'] },
       AND: [
         {
-          OR: [{ retentionLockedReason: null }, { retentionLockedReason: { not: 'contract_review_session_only' } }],
+          OR: [
+            { retentionLockedReason: null },
+            { retentionLockedReason: { not: 'contract_review_session_only' } },
+          ],
         },
       ],
     }
@@ -129,7 +143,10 @@ export class MemberAssetsService {
   }
 
   /** AI 服务记录：本人 AiResumeResult(parse / optimize / generate) 调用历史元数据（不含 payload）。 */
-  async listAiRecords(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberAiRecordItem>> {
+  async listAiRecords(
+    endUserId: string,
+    page: MemberPageQuery
+  ): Promise<MemberAssetPage<MemberAiRecordItem>> {
     const where = { endUserId, expiresAt: { gt: new Date() } }
     const total = await this.prisma.aiResumeResult.count({ where })
     const rows = await this.prisma.aiResumeResult.findMany({
@@ -150,7 +167,11 @@ export class MemberAssetsService {
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
       kind:
-        r.kind === 'optimize' || r.kind === 'generate' || r.kind === 'job_fit' || r.kind === 'career_plan' || r.kind === 'fair_visit_plan'
+        r.kind === 'optimize' ||
+        r.kind === 'generate' ||
+        r.kind === 'job_fit' ||
+        r.kind === 'career_plan' ||
+        r.kind === 'fair_visit_plan'
           ? r.kind
           : ('parse' as const),
       status: r.status,
@@ -172,7 +193,7 @@ export class MemberAssetsService {
    */
   async deleteAiRecord(
     endUserId: string,
-    recordId: string,
+    recordId: string
   ): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
     const deletion = await this.prisma.$transaction(async (tx) => {
       const row = await tx.aiResumeResult.findFirst({
@@ -216,7 +237,10 @@ export class MemberAssetsService {
    * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404。
    * - 与 deleteAiRecord 共享相同的事务策略，不新增 DB schema。
    */
-  async deleteResume(endUserId: string, recordId: string): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
+  async deleteResume(
+    endUserId: string,
+    recordId: string
+  ): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
     const deletion = await this.prisma.$transaction(async (tx) => {
       const row = await tx.aiResumeResult.findFirst({
         where: { id: recordId, endUserId, kind: { in: ['parse', 'generate'] } },

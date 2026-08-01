@@ -29,7 +29,13 @@ import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
  *   2. 本文件(后端副本)
  */
 export type ScanType = 'resume' | 'id' | 'document' | 'contract'
-export type ScanTaskStatus = 'waiting' | 'matched' | 'completed' | 'failed' | 'expired' | 'cancelled'
+export type ScanTaskStatus =
+  | 'waiting'
+  | 'matched'
+  | 'completed'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
 
 const SCAN_TASK_TTL_MS = 10 * 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
@@ -164,7 +170,10 @@ function isScanTaskActiveSessionConflict(e: unknown): boolean {
  * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
  * 且会变成未处理异常而不是可控的 403）。
  */
-function timingSafeEqualHex(token: string | undefined, expectedHash: string | null | undefined): boolean {
+function timingSafeEqualHex(
+  token: string | undefined,
+  expectedHash: string | null | undefined
+): boolean {
   if (!token || !expectedHash) return false
   const actual = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex')
   const expected = Buffer.from(expectedHash, 'hex')
@@ -178,12 +187,12 @@ export class ScanTasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
-    private readonly capabilities: TerminalCapabilitiesService,
+    private readonly capabilities: TerminalCapabilitiesService
   ) {}
 
   async create(
     dto: CreateScanTaskDto,
-    endUserId: string | null,
+    endUserId: string | null
   ): Promise<{
     scanTaskId: string
     controlToken: string
@@ -272,7 +281,7 @@ export class ScanTasksService {
   async getStatus(
     scanTaskId: string,
     endUserId: string | null,
-    controlToken: string | undefined,
+    controlToken: string | undefined
   ): Promise<ScanTaskStatusResult> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
@@ -284,7 +293,11 @@ export class ScanTasksService {
     // endUserId 归属校验之上（不是替代它）。历史行（B1-1 迁移前创建，
     // controlTokenHash 为 null）一律拒绝——旧任务本来就该在几分钟内自然过期，
     // 拒绝比"放行一个没有 token 保护的旧任务"更安全。
-    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+    if (
+      !task.controlTokenHash ||
+      !controlToken ||
+      !timingSafeEqualHex(controlToken, task.controlTokenHash)
+    ) {
       throw new ForbiddenException({
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
       })
@@ -328,7 +341,9 @@ export class ScanTasksService {
       scanType: task.scanType as ScanType,
       file,
       errorCode: task.errorCode,
-      errorMessage: task.errorCode ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试') : null,
+      errorMessage: task.errorCode
+        ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试')
+        : null,
       expiresAt: task.expiresAt.toISOString(),
     }
   }
@@ -336,7 +351,7 @@ export class ScanTasksService {
   async cancel(
     scanTaskId: string,
     endUserId: string | null,
-    controlToken: string | undefined,
+    controlToken: string | undefined
   ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
@@ -346,7 +361,11 @@ export class ScanTasksService {
     }
     // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
     // 历史行（controlTokenHash 为 null）一律拒绝。
-    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
+    if (
+      !task.controlTokenHash ||
+      !controlToken ||
+      !timingSafeEqualHex(controlToken, task.controlTokenHash)
+    ) {
       throw new ForbiddenException({
         error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
       })
@@ -412,7 +431,7 @@ export class ScanTasksService {
    */
   private startMatchedHeartbeat(
     taskId: string,
-    intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS,
+    intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS
   ): NodeJS.Timeout {
     return setInterval(() => {
       this.prisma.scanTask
@@ -420,7 +439,7 @@ export class ScanTasksService {
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           this.logger.warn(
-            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`,
+            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`
           )
         })
     }, intervalMs)
@@ -515,14 +534,18 @@ export class ScanTasksService {
         // 补偿删除本身失败（例如文件已经被其它路径删掉）不能打断这里原本要走的
         // 取消响应流程，只降级为一条 warn，不 rethrow。
         try {
-          await this.files.systemDelete(uploaded.fileId, 'ScanTask cancelled during upload, compensating orphaned file')
+          await this.files.systemDelete(
+            uploaded.fileId,
+            'ScanTask cancelled during upload, compensating orphaned file'
+          )
           this.logger.log(
-            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`,
+            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`
           )
         } catch (cleanupError) {
-          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          const cleanupMessage =
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
           this.logger.warn(
-            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`,
+            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`
           )
         }
         throw new ConflictException({

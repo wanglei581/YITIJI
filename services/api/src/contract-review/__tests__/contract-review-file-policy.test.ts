@@ -7,7 +7,11 @@ import { validate } from 'class-validator'
 import { KioskUploadOptionsDto } from '../../files/dto/kiosk-upload-options.dto'
 import { validateUpload } from '../../files/file-validation'
 import { FilesService } from '../../files/files.service'
-import { CONTRACT_REVIEW_TTL_MS, allowedPoliciesForFile, defaultRetentionForUpload } from '../../files/retention-policy'
+import {
+  CONTRACT_REVIEW_TTL_MS,
+  allowedPoliciesForFile,
+  defaultRetentionForUpload,
+} from '../../files/retention-policy'
 import { MemberAssetsService } from '../../member-assets/member-assets.service'
 import { CreateScanTaskDto } from '../../scan-tasks/dto/create-scan-task.dto'
 import { SCAN_TYPE_TO_PURPOSE } from '../../scan-tasks/scan-tasks.service'
@@ -31,7 +35,10 @@ test('contract upload is locked to an exact two-hour system session', () => {
   assert.equal(decision.retentionSetBy, 'system')
   assert.equal(decision.retentionConsentAt, null)
   assert.equal(decision.retentionConsentVersion, null)
-  assert.deepEqual(allowedPoliciesForFile({ purpose: 'contract_upload', assetCategory: 'original' }), ['system_short'])
+  assert.deepEqual(
+    allowedPoliciesForFile({ purpose: 'contract_upload', assetCategory: 'original' }),
+    ['system_short']
+  )
 })
 
 test('FilesService ignores weaker or longer client policy attempts for contract uploads', async () => {
@@ -94,8 +101,9 @@ test('FilesService ignores weaker or longer client policy attempts for contract 
   assert.equal(createData.retentionLockedReason, 'contract_review_session_only')
   const expiresAt = createData.expiresAt as Date
   assert.ok(
-    expiresAt.getTime() >= startedAt + CONTRACT_REVIEW_TTL_MS && expiresAt.getTime() <= finishedAt + CONTRACT_REVIEW_TTL_MS,
-    'contract upload must ignore expiresAtOverride and expire exactly two hours from server upload time',
+    expiresAt.getTime() >= startedAt + CONTRACT_REVIEW_TTL_MS &&
+      expiresAt.getTime() <= finishedAt + CONTRACT_REVIEW_TTL_MS,
+    'contract upload must ignore expiresAtOverride and expire exactly two hours from server upload time'
   )
 })
 
@@ -108,7 +116,7 @@ test('contract object keys use a user folder and anonymous keys never include se
       fileId: 'fileabc123',
       ext: 'PDF',
     }),
-    'users/member_1/contract-reviews/fileabc123.pdf',
+    'users/member_1/contract-reviews/fileabc123.pdf'
   )
 
   const anonymousKey = generateObjectKey({
@@ -124,20 +132,27 @@ test('contract object keys use a user folder and anonymous keys never include se
 })
 
 test('kiosk, upload-session, and scan DTOs accept only the new allowlisted values', async () => {
-  const kioskValid = await validate(plainToInstance(KioskUploadOptionsDto, { purpose: 'contract_upload' }))
+  const kioskValid = await validate(
+    plainToInstance(KioskUploadOptionsDto, { purpose: 'contract_upload' })
+  )
   const uploadSessionValid = await validate(
     plainToInstance(CreateUploadSessionDto, {
       purpose: 'contract_upload',
       mode: 'temporary',
       channel: 'phone_h5',
-    }),
+    })
   )
-  const scanValid = await validate(plainToInstance(CreateScanTaskDto, { scanType: 'contract', terminalId: 'terminal-1' }))
+  const scanValid = await validate(
+    plainToInstance(CreateScanTaskDto, { scanType: 'contract', terminalId: 'terminal-1' })
+  )
   assert.equal(kioskValid.length, 0)
   assert.equal(uploadSessionValid.length, 0)
   assert.equal(scanValid.length, 0)
 
-  assert.ok((await validate(plainToInstance(KioskUploadOptionsDto, { purpose: 'contract_secret' }))).length > 0)
+  assert.ok(
+    (await validate(plainToInstance(KioskUploadOptionsDto, { purpose: 'contract_secret' })))
+      .length > 0
+  )
   assert.ok(
     (
       await validate(
@@ -145,9 +160,9 @@ test('kiosk, upload-session, and scan DTOs accept only the new allowlisted value
           purpose: 'contract_secret',
           mode: 'temporary',
           channel: 'phone_h5',
-        }),
+        })
       )
-    ).length > 0,
+    ).length > 0
   )
   assert.ok(
     (
@@ -155,9 +170,9 @@ test('kiosk, upload-session, and scan DTOs accept only the new allowlisted value
         plainToInstance(CreateScanTaskDto, {
           scanType: 'contract_secret',
           terminalId: 'terminal-1',
-        }),
+        })
       )
-    ).length > 0,
+    ).length > 0
   )
 })
 
@@ -219,7 +234,10 @@ test('resume, print, and signature retention regressions remain unchanged', () =
   })
   assert.equal(resume.retentionPolicy, 'months_3')
   assert.equal(resume.expiresAt?.toISOString(), '2026-10-30T00:00:00.000Z')
-  assert.deepEqual(allowedPoliciesForFile({ purpose: 'signature_image', assetCategory: 'original' }), ['system_short'])
+  assert.deepEqual(
+    allowedPoliciesForFile({ purpose: 'signature_image', assetCategory: 'original' }),
+    ['system_short']
+  )
   assert.equal(
     validateUpload({
       purpose: 'print_doc',
@@ -228,6 +246,6 @@ test('resume, print, and signature retention regressions remain unchanged', () =
       sizeBytes: 10,
       mode: 'proxy',
     }).ok,
-    true,
+    true
   )
 })

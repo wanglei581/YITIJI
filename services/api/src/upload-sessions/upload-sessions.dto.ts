@@ -2,7 +2,13 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator'
 import type { FilePurpose } from '../files/file.types'
 
 export type UploadSessionMode = 'temporary' | 'member'
-export type UploadSessionStatus = 'pending' | 'uploading' | 'uploaded' | 'confirmed' | 'expired' | 'cancelled'
+export type UploadSessionStatus =
+  | 'pending'
+  | 'uploading'
+  | 'uploaded'
+  | 'confirmed'
+  | 'expired'
+  | 'cancelled'
 export type UploadSessionChannel = 'phone_h5'
 
 export class CreateUploadSessionDto {

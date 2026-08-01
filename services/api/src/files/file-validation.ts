@@ -178,7 +178,8 @@ export function validateUpload(args: {
   if (!Number.isFinite(args.sizeBytes) || args.sizeBytes <= 0) {
     return { ok: false, code: 'FILE_EMPTY', message: '文件为空或大小未知' }
   }
-  const maxBytes = args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
+  const maxBytes =
+    args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
   if (args.sizeBytes > maxBytes) {
     return {
       ok: false,

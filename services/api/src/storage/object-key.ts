@@ -59,7 +59,10 @@ export function normalizeExt(ext: string): string {
  * owner-scoped 的用途(简历/扫描/打印/机构素材)需要 ownerId;
  * 缺 ownerId 时由 generateObjectKey 回退到 tmp/。
  */
-const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'export' | 'tmp'; folder: string }> = {
+const PURPOSE_FOLDER: Record<
+  FilePurpose,
+  { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'export' | 'tmp'; folder: string }
+> = {
   // ── C 端求职者(users/{userId}/...)──────────────────────────────
   resume_upload: { scope: 'user', folder: 'resumes' },
   cover_letter: { scope: 'user', folder: 'resumes' },
@@ -92,7 +95,10 @@ export function generateObjectKey(args: ObjectKeyArgs): string {
   const fileId = safeSegment(args.fileId, 'file')
   const mapping = PURPOSE_FOLDER[args.purpose] ?? PURPOSE_FOLDER.temp
   // 合同上传的匿名回退绝不使用可能来自二维码/请求的 token 作为 key 分桶。
-  const session = safeSegment(args.purpose === 'contract_upload' ? fileId : (args.uploadSessionId ?? fileId), fileId)
+  const session = safeSegment(
+    args.purpose === 'contract_upload' ? fileId : (args.uploadSessionId ?? fileId),
+    fileId
+  )
 
   switch (mapping.scope) {
     case 'user': {

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import type {
   CompleteUploadResponse,
@@ -70,7 +76,7 @@ export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly storage: StorageService,
+    private readonly storage: StorageService
   ) {}
 
   // ── 服务端代理上传(multipart;校验后的 buffer 经服务端推送到对象存储)──────
@@ -117,7 +123,9 @@ export class FilesService {
     // 非结构级证明,能力边界见 content-sniff.ts 文件头注释)。
     const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
     if (!sniff.ok) {
-      this.logger.warn(`Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`)
+      this.logger.warn(
+        `Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`
+      )
       throw new BadRequestException({
         error: {
           code: 'FILE_CONTENT_MISMATCH',
@@ -140,8 +148,12 @@ export class FilesService {
       ownerType: owner.ownerType,
       endUserId: args.endUserId ?? null,
     })
-    const expiresAtOverride = args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
-    if (expiresAtOverride && (!Number.isFinite(expiresAtOverride.getTime()) || expiresAtOverride.getTime() <= Date.now())) {
+    const expiresAtOverride =
+      args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
+    if (
+      expiresAtOverride &&
+      (!Number.isFinite(expiresAtOverride.getTime()) || expiresAtOverride.getTime() <= Date.now())
+    ) {
       throw new BadRequestException({
         error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' },
       })
@@ -186,7 +198,8 @@ export class FilesService {
           retentionSetBy: retention.retentionSetBy,
           retentionConsentAt: retention.retentionConsentAt,
           retentionConsentVersion: retention.retentionConsentVersion,
-          retentionLockedReason: args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
+          retentionLockedReason:
+            args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
         },
       })
     } catch (createError) {
@@ -209,7 +222,7 @@ export class FilesService {
         ttlSeconds: this.storage.signTtlSeconds,
         disposition: 'inline',
       },
-      record.bucket,
+      record.bucket
     )
     return {
       fileId: record.id,
@@ -270,7 +283,7 @@ export class FilesService {
 
     const sensitiveLevel = this.resolveSensitiveLevel(
       body.purpose as FilePurpose,
-      body.sensitiveLevel as FileSensitiveLevel | undefined,
+      body.sensitiveLevel as FileSensitiveLevel | undefined
     )
     const id = randomUUID().replace(/-/g, '')
     const owner = deriveOwner({
@@ -317,7 +330,8 @@ export class FilesService {
         retentionSetBy: retention.retentionSetBy,
         retentionConsentAt: retention.retentionConsentAt,
         retentionConsentVersion: retention.retentionConsentVersion,
-        retentionLockedReason: body.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
+        retentionLockedReason:
+          body.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
       },
     })
 
@@ -328,7 +342,7 @@ export class FilesService {
         contentType: record.mimeType,
         ttlSeconds: this.storage.signTtlSeconds,
       },
-      record.bucket,
+      record.bucket
     )
 
     return {
@@ -386,7 +400,7 @@ export class FilesService {
       if (!sniff.ok) {
         // 与上方超限分支同款处理:物理删除 + quarantined,不让伪装文件留存。
         this.logger.warn(
-          `Direct-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`,
+          `Direct-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`
         )
         await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
         await this.prisma.fileObject.update({
@@ -433,7 +447,9 @@ export class FilesService {
     // 魔数校验:真实字节须与意图阶段声明的 MIME 签名级一致(非结构级证明)。
     const sniff = sniffDeclaredMimeMismatch(buffer, record.mimeType)
     if (!sniff.ok) {
-      this.logger.warn(`Raw-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`)
+      this.logger.warn(
+        `Raw-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`
+      )
       throw new BadRequestException({
         error: {
           code: 'FILE_CONTENT_MISMATCH',
@@ -441,7 +457,12 @@ export class FilesService {
         },
       })
     }
-    const put = await this.storage.putObject(record.storageKey, buffer, record.mimeType, record.bucket)
+    const put = await this.storage.putObject(
+      record.storageKey,
+      buffer,
+      record.mimeType,
+      record.bucket
+    )
     await this.prisma.fileObject.update({
       where: { id: fileId },
       data: { sizeBytes: put.sizeBytes, sha256: put.sha256, status: 'active' },
@@ -457,7 +478,7 @@ export class FilesService {
   async getAccessUrl(
     fileId: string,
     requester: FileRequester,
-    disposition: 'inline' | 'attachment',
+    disposition: 'inline' | 'attachment'
   ): Promise<{
     response: FileAccessUrlResponse
     record: { purpose: string; ownerType: string | null }
@@ -479,7 +500,7 @@ export class FilesService {
         ttlSeconds: this.storage.signTtlSeconds,
         disposition,
       },
-      record.bucket,
+      record.bucket
     )
 
     const isUserFile = record.ownerType === 'user' || Boolean(record.endUserId)
@@ -521,7 +542,7 @@ export class FilesService {
         ttlSeconds: this.storage.signTtlSeconds,
         disposition: 'inline',
       },
-      record.bucket,
+      record.bucket
     )
     return {
       fileId: record.id,
@@ -533,7 +554,9 @@ export class FilesService {
 
   // ── 读取文件 buffer(/content 代理;签名校验由 controller 完成)────────────
 
-  async readContent(fileId: string): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
+  async readContent(
+    fileId: string
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireAlive(fileId)
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
@@ -555,10 +578,12 @@ export class FilesService {
    */
   async readContentForEndUser(
     fileId: string,
-    endUserId: string | null,
+    endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
     const record = await this.requireAlive(fileId)
-    const allowed = endUserId ? record.endUserId === endUserId : record.endUserId === null && record.ownerType === 'system'
+    const allowed = endUserId
+      ? record.endUserId === endUserId
+      : record.endUserId === null && record.ownerType === 'system'
     if (!allowed) {
       throw new NotFoundException({
         error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
@@ -575,7 +600,9 @@ export class FilesService {
 
   // ── 列表(admin)─────────────────────────────────────────────────────────
 
-  async list(args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}): Promise<FileMetadata[]> {
+  async list(
+    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}
+  ): Promise<FileMetadata[]> {
     const records = await this.prisma.fileObject.findMany({
       where: {
         ...(args.includeDeleted ? {} : { deletedAt: null }),
@@ -606,7 +633,7 @@ export class FilesService {
         expiresAt: row.expiresAt,
         deletedAt: null,
       })),
-      now,
+      now
     )
   }
 
@@ -621,7 +648,11 @@ export class FilesService {
    * 归属人删除(owner / 管理员)。软删数据库记录,并物理删除对象。
    * 合规:敏感文件删除即物理回收,不留持久公开物。
    */
-  async ownerDelete(fileId: string, requester: FileRequester, reason: string): Promise<FileMetadata> {
+  async ownerDelete(
+    fileId: string,
+    requester: FileRequester,
+    reason: string
+  ): Promise<FileMetadata> {
     const record = await this.requireAlive(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
@@ -646,7 +677,7 @@ export class FilesService {
   async updateRetention(
     fileId: string,
     requester: FileRequester,
-    args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string },
+    args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string }
   ): Promise<FileRetentionUpdateResponse> {
     const record = await this.requireAlive(fileId)
     if (!canAccessFile(record, requester)) {
@@ -701,7 +732,12 @@ export class FilesService {
     }
   }
 
-  private async _delete(fileId: string, deletedBy: string, reason: string, allowMemberDataExport = false): Promise<FileMetadata> {
+  private async _delete(
+    fileId: string,
+    deletedBy: string,
+    reason: string,
+    allowMemberDataExport = false
+  ): Promise<FileMetadata> {
     const record = await this.requireAlive(fileId, allowMemberDataExport)
     await this.storage.deleteObject(record.storageKey, record.bucket)
     const updated = await this.prisma.fileObject.update({
@@ -741,7 +777,8 @@ export class FilesService {
           data: {
             deletedAt: now,
             deletedBy: 'auto',
-            deleteReason: triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
+            deleteReason:
+              triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
             status: 'deleted',
           },
         })
@@ -794,7 +831,10 @@ export class FilesService {
 
   // ── 内部 ────────────────────────────────────────────────────────────────────
 
-  private resolveSensitiveLevel(purpose: FilePurpose, explicit?: FileSensitiveLevel): FileSensitiveLevel {
+  private resolveSensitiveLevel(
+    purpose: FilePurpose,
+    explicit?: FileSensitiveLevel
+  ): FileSensitiveLevel {
     if (purpose === 'contract_upload') return 'highly_sensitive'
     return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
   }
@@ -809,7 +849,11 @@ export class FilesService {
 
   private async requireAlive(fileId: string, allowMemberDataExport = false) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (!record || record.deletedAt || (!allowMemberDataExport && record.purpose === 'member_data_export')) {
+    if (
+      !record ||
+      record.deletedAt ||
+      (!allowMemberDataExport && record.purpose === 'member_data_export')
+    ) {
       // 禁止通用端点成为导出 artifact 存在性探针。
       throw new NotFoundException({
         error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
@@ -827,7 +871,7 @@ export function canAccessFile(
     ownerType: string | null
     ownerId: string | null
   },
-  requester: FileRequester,
+  requester: FileRequester
 ): boolean {
   if (requester.kind === 'member') {
     return Boolean(record.endUserId) && record.endUserId === requester.endUserId

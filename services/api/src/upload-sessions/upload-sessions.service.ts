@@ -1,4 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
 import type { FilePurpose, FileSensitiveLevel, FileUploadResponse } from '../files/file.types'
 import { FilesService } from '../files/files.service'
@@ -6,7 +12,11 @@ import { defaultRetentionForUpload } from '../files/retention-policy'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
-import type { UploadSessionChannel, UploadSessionMode, UploadSessionStatus } from './upload-sessions.dto'
+import type {
+  UploadSessionChannel,
+  UploadSessionMode,
+  UploadSessionStatus,
+} from './upload-sessions.dto'
 
 export interface CreateUploadSessionInput {
   purpose: FilePurpose
@@ -94,7 +104,7 @@ export class UploadSessionsService {
   constructor(
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
-    private readonly files: FilesService,
+    private readonly files: FilesService
   ) {}
 
   async create(input: CreateUploadSessionInput): Promise<UploadSessionCreateResponse> {
@@ -144,7 +154,10 @@ export class UploadSessionsService {
     }
   }
 
-  async getStatus(sessionId: string, controlToken: string | undefined): Promise<UploadSessionStatusResponse> {
+  async getStatus(
+    sessionId: string,
+    controlToken: string | undefined
+  ): Promise<UploadSessionStatusResponse> {
     const record = await this.load(sessionId)
     this.assertControlToken(record, controlToken)
     const next = this.markExpired(record)
@@ -166,7 +179,10 @@ export class UploadSessionsService {
         error: { code: 'FILE_REQUIRED', message: '请选择要上传的文件' },
       })
     }
-    if (args.file.size > MAX_SESSION_UPLOAD_BYTES || args.file.buffer.length > MAX_SESSION_UPLOAD_BYTES) {
+    if (
+      args.file.size > MAX_SESSION_UPLOAD_BYTES ||
+      args.file.buffer.length > MAX_SESSION_UPLOAD_BYTES
+    ) {
       throw new BadRequestException({
         error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传文件不能超过 10MB' },
       })
@@ -222,7 +238,9 @@ export class UploadSessionsService {
       try {
         file = await this.files.upload({
           buffer: args.file.buffer,
-          filename: args.file.originalname || (latest.purpose === 'print_doc' ? 'document.pdf' : 'resume.pdf'),
+          filename:
+            args.file.originalname ||
+            (latest.purpose === 'print_doc' ? 'document.pdf' : 'resume.pdf'),
           mimeType: args.file.mimetype,
           purpose: latest.purpose,
           uploaderId: null,
@@ -250,7 +268,7 @@ export class UploadSessionsService {
   async confirm(
     sessionId: string,
     controlToken: string | undefined,
-    endUserId?: string | null,
+    endUserId?: string | null
   ): Promise<UploadSessionConfirmResponse> {
     const record = this.markExpired(await this.load(sessionId))
     this.assertControlToken(record, controlToken)
@@ -297,7 +315,10 @@ export class UploadSessionsService {
     }
   }
 
-  async cancel(sessionId: string, controlToken: string | undefined): Promise<UploadSessionCancelResponse> {
+  async cancel(
+    sessionId: string,
+    controlToken: string | undefined
+  ): Promise<UploadSessionCancelResponse> {
     const record = await this.load(sessionId)
     this.assertControlToken(record, controlToken)
     if (record.status === 'confirmed') {
@@ -318,10 +339,15 @@ export class UploadSessionsService {
       select: { endUserId: true, ownerType: true },
     })
     if (file?.endUserId || file?.ownerType === 'user') return
-    await this.files.forceDelete(record.file.fileId, 'upload-session', reason).catch(() => undefined)
+    await this.files
+      .forceDelete(record.file.fileId, 'upload-session', reason)
+      .catch(() => undefined)
   }
 
-  private async bindMemberFile(fileId: string, endUserId: string): Promise<{ expiresAt: Date | null }> {
+  private async bindMemberFile(
+    fileId: string,
+    endUserId: string
+  ): Promise<{ expiresAt: Date | null }> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file || file.deletedAt) {
       throw new NotFoundException({
@@ -336,7 +362,10 @@ export class UploadSessionsService {
     })
     const isContractUpload = file.purpose === 'contract_upload'
     const contractExpiry =
-      isContractUpload && file.expiresAt && retention.expiresAt && file.expiresAt <= retention.expiresAt
+      isContractUpload &&
+      file.expiresAt &&
+      retention.expiresAt &&
+      file.expiresAt <= retention.expiresAt
         ? file.expiresAt
         : retention.expiresAt
     return this.prisma.fileObject.update({

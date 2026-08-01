@@ -12,14 +12,18 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000
 export const CONTRACT_REVIEW_TTL_MS = 2 * 60 * 60 * 1000
 
-const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>(['resume_upload', 'resume_scan', 'cover_letter'])
+const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>([
+  'resume_upload',
+  'resume_scan',
+  'cover_letter',
+])
 
 export const CURRENT_RETENTION_CONSENT_VERSION = FILE_RETENTION_CONSENT_VERSION
 
 export class RetentionPolicyError extends Error {
   constructor(
     readonly code: string,
-    message: string,
+    message: string
   ) {
     super(message)
   }
@@ -62,7 +66,10 @@ export function defaultRetentionForUpload(input: RetentionUploadInput): Retentio
     }
   }
   // 会员账号内简历类文件默认保存 90 天；证件、匿名、系统和机构素材保持短 TTL。
-  const policy = input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose) ? 'months_3' : 'system_short'
+  const policy =
+    input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose)
+      ? 'months_3'
+      : 'system_short'
   return buildDecision({
     policy,
     sensitiveLevel: input.sensitiveLevel,
@@ -111,7 +118,10 @@ function assertCanSetRetention(input: RetentionUpdateInput): void {
     throw new RetentionPolicyError('RETENTION_MEMBER_REQUIRED', '仅允许会员本人修改文件保存期限')
   }
   if (!input.endUserId || input.ownerType !== 'user') {
-    throw new RetentionPolicyError('RETENTION_MEMBER_FILE_REQUIRED', '仅会员账号内文件可修改保存期限')
+    throw new RetentionPolicyError(
+      'RETENTION_MEMBER_FILE_REQUIRED',
+      '仅会员账号内文件可修改保存期限'
+    )
   }
   if (input.requesterEndUserId !== input.endUserId) {
     throw new RetentionPolicyError('RETENTION_ACCESS_DENIED', '无权修改他人文件保存期限')
@@ -123,11 +133,17 @@ function assertCanSetRetention(input: RetentionUpdateInput): void {
     throw new RetentionPolicyError('RETENTION_ID_SCAN_LOCKED', '证件文件只能使用系统短期保存')
   }
   if (input.purpose === 'signature_image' && input.policy !== 'system_short') {
-    throw new RetentionPolicyError('RETENTION_SIGNATURE_IMAGE_LOCKED', '签名/印章图片仅支持系统短期保存')
+    throw new RetentionPolicyError(
+      'RETENTION_SIGNATURE_IMAGE_LOCKED',
+      '签名/印章图片仅支持系统短期保存'
+    )
   }
   if (!allowedPoliciesForFile(input).includes(input.policy)) {
     if (input.assetCategory === 'original' && input.policy === 'long_term') {
-      throw new RetentionPolicyError('RETENTION_LONG_TERM_ORIGINAL_FORBIDDEN', '原始文件首批不支持长期保存')
+      throw new RetentionPolicyError(
+        'RETENTION_LONG_TERM_ORIGINAL_FORBIDDEN',
+        '原始文件首批不支持长期保存'
+      )
     }
     throw new RetentionPolicyError('RETENTION_POLICY_NOT_ALLOWED', '该文件不支持所选保存期限')
   }
@@ -155,7 +171,11 @@ function buildDecision(args: {
   }
 }
 
-function expiresAtForPolicy(policy: FileRetentionPolicy, sensitiveLevel: FileSensitiveLevel, now: Date): Date | null {
+function expiresAtForPolicy(
+  policy: FileRetentionPolicy,
+  sensitiveLevel: FileSensitiveLevel,
+  now: Date
+): Date | null {
   if (policy === 'months_3') return new Date(now.getTime() + 90 * DAY_MS)
   if (policy === 'months_6') return new Date(now.getTime() + 180 * DAY_MS)
   if (policy === 'long_term') return null
