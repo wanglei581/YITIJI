@@ -213,9 +213,32 @@ function assertProductionEnvironmentContract(runSource, envExampleSource) {
   assert.doesNotMatch(environmentGuard, /(?:echo|printf|export|printenv|env|set)[^\n]*\$\{!variable_name\}/)
 }
 
+// Both forensic directories must be individually guarded, so one guard can never stand in for
+// the other: `rm -rf` may only run when every earlier cleanup step succeeded.
+function assertForensicRetentionGuards(cleanupSource, message) {
+  for (const directory of ['RUN_DIR', 'PM2_CONTROL_ROOT']) {
+    const guard = new RegExp(`\\(\\( cleanup_failed != 0 \\)\\) \\|\\| rm -rf -- "\\$${directory}"`, 'g')
+    assert.equal((cleanupSource.match(guard) ?? []).length, 1, `${message} (${directory})`)
+  }
+}
+
 function assertCleanupContract(runSource) {
+  const absenceHelper = shellFunctionSource(runSource, 'user_unit_collected_absent')
+  // Each property read must fail closed: an unreadable manager may never look like absence.
+  assert.match(absenceHelper, /load_state="\$\(systemctl --user show "\$unit_name" -p LoadState --value 2>\/dev\/null\)" \|\| return 1/)
+  assert.match(absenceHelper, /\[\[ "\$load_state" == "not-found" \]\] \|\| return 1/)
+  assert.match(absenceHelper, /active_state="\$\(systemctl --user show "\$unit_name" -p ActiveState --value 2>\/dev\/null\)" \|\| return 1/)
+  assert.match(absenceHelper, /\[\[ "\$active_state" == "inactive" \]\] \|\| return 1/)
+  assert.doesNotMatch(absenceHelper, /\|\| true|-z "\$load_state"|-z "\$active_state"/)
+
   const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
-  assert.match(stopHelper, /systemctl --user stop "\$unit_name"[^\n]*\|\| return 1/)
+  // stop_status must start clean, or a successful stop would be re-judged as a collected unit.
+  assert.match(stopHelper, /local stop_status=0\n/)
+  assert.match(stopHelper, /systemctl --user stop "\$unit_name" >\/dev\/null 2>&1 \|\| stop_status=\$\?/)
+  assert.match(
+    stopHelper,
+    /if \(\( stop_status != 0 \)\); then\n\s*user_unit_collected_absent "\$unit_name" && return 0\n\s*return 1\n\s*fi/,
+  )
   assert.match(stopHelper, /systemctl --user show "\$unit_name" -p ActiveState --value/)
   assert.match(stopHelper, /\[\[ "\$unit_state" == "inactive" \]\] && return 0/)
   assert.doesNotMatch(stopHelper, /\|\| true|failed|-z "\$unit_state"/)
@@ -226,6 +249,10 @@ function assertCleanupContract(runSource) {
 
   const earlyCleanup = shellFunctionSource(runSource, 'early_cleanup')
   assert.equal((earlyCleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
+  assertForensicRetentionGuards(
+    earlyCleanup,
+    'early cleanup must retain forensic directories whenever any cleanup step already failed',
+  )
   const earlyExitHandler = shellFunctionSource(runSource, 'early_cleanup_on_exit')
   assert.match(earlyExitHandler, /local original_status=\$\?/)
   assert.match(earlyExitHandler, /trap - EXIT/)
@@ -237,6 +264,10 @@ function assertCleanupContract(runSource) {
   assert.match(cleanup, /stop_user_unit_and_prove_inactive "\$UNIT_NAME" \|\| cleanup_failed=1/)
   assert.match(cleanup, /: > "\$STOP_MARKER"\) 2>\/dev\/null \|\| cleanup_failed=1/)
   assert.equal((cleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
+  assertForensicRetentionGuards(
+    cleanup,
+    'final cleanup must retain forensic directories whenever any cleanup step already failed',
+  )
 
   const exitHandler = shellFunctionSource(runSource, 'cleanup_on_exit')
   assert.match(exitHandler, /local original_status=\$\?/)
@@ -263,8 +294,45 @@ function verifyCleanupContract() {
     runSource.replace('[[ "$unit_state" == "inactive" ]] && return 0', '[[ -z "$unit_state" || "$unit_state" == "inactive" ]] && return 0'),
     runSource.replace('trap - EXIT\ncleanup || no_go "D2_PRIME_CLEANUP_FAILED"', 'cleanup || no_go "D2_PRIME_CLEANUP_FAILED"'),
     runSource.replace('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"', "printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'"),
+    // A collected unit may only be accepted after proving absence; never by ignoring the stop status.
+    runSource.replace(
+      '    user_unit_collected_absent "$unit_name" && return 0\n    return 1\n',
+      '    return 0\n',
+    ),
+    // A pre-set stop_status would re-judge a successful stop as a collected unit.
+    runSource.replace('  local stop_status=0\n', '  local stop_status=1\n'),
+    // Absence proof must require LoadState=not-found, not merely any unloaded-looking state.
+    runSource.replace('[[ "$load_state" == "not-found" ]] || return 1', '[[ -n "$load_state" ]] || return 1'),
+    // An unreadable manager must never be mistaken for absence: both reads must fail closed.
+    runSource.replace(
+      'load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)" || return 1',
+      'load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)"',
+    ),
+    runSource.replace(
+      'active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)" || return 1',
+      'active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"',
+    ),
+    // Absence proof must also require the unit be inactive, never absence alone.
+    runSource.replace('[[ "$active_state" == "inactive" ]] || return 1', 'return 0'),
+    // Forensic directories must survive a failed cleanup: dropping either guard is unsafe, and
+    // duplicating one directory's guard may never satisfy the other's.
+    runSource.replace(
+      '    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1',
+      '    rm -rf -- "$RUN_DIR" || cleanup_failed=1',
+    ),
+    runSource.replace(
+      '    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
+      '    rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
+    ),
+    runSource.replaceAll(
+      '    (( cleanup_failed != 0 )) || rm -rf -- "$PM2_CONTROL_ROOT" || cleanup_failed=1',
+      '    (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1',
+    ),
   ]
-  for (const mutation of unsafeMutations) assert.throws(() => assertCleanupContract(mutation))
+  for (const mutation of unsafeMutations) {
+    assert.notEqual(mutation, runSource, 'every cleanup mutation must actually alter run.sh')
+    assert.throws(() => assertCleanupContract(mutation))
+  }
 
   const requiredName = productionEnvironmentNames(envExampleSource)[0]
   const missingCredential = runSource.replace(new RegExp(`\\b${requiredName}\\b`), '')
