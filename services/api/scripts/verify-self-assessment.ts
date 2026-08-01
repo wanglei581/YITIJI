@@ -5,31 +5,34 @@
  * - 容错：未知 dim / idx / 选项 → 落入 unmatched；
  * - evidence 仅含题号，不含答案原文；
  * - 复位 / 重答取最后一条；
- * - clamp：raw > 5 截断为 5；raw < 0 截断为 0。
+ * - clamp：raw > 5 截断为 5；raw 非法 → 0；
+ * - 纯函数：不依赖 NestJS / Prisma / LLM / 共享包。
  *
- * 用独立 mock 题目 seed 验证，不依赖 Prisma / NestJS / LLM。
+ * 题目种子由脚本内独立构造（mock 5×5），与 `@ai-job-print/shared` 的 `v1.questions.json`
+ * 解耦以避免 scoring 与 seed 边界耦合。
  */
 
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { scoreSelfAssessment } from '../src/ai/resume/self-assessment-scoring'
-import type {
-  SelfAssessmentAnswerV1,
-  SelfAssessmentQuestionsV1,
-} from '@ai-job-print/shared'
+import {
+  scoreSelfAssessment,
+  SELF_ASSESSMENT_DIMENSIONS,
+  type SelfAssessmentAnswerV1,
+  type SelfAssessmentDimensionKey,
+  type SelfAssessmentQuestionsV1,
+} from '../src/ai/resume/self-assessment-scoring'
 
 type RawChoice = { key: string; label: string; weight: number }
 type RawQuestion = { idx: number; prompt: string; choices: RawChoice[]; sensitive?: boolean }
-type RawDimension = { key: 'interest' | 'style' | 'team' | 'value' | 'motivation'; label: string; questions: RawQuestion[] }
+type RawDimension = { key: SelfAssessmentDimensionKey; label: string; questions: RawQuestion[] }
 
 function makeQuestions(seed: 'control' | 'boundary' = 'control'): SelfAssessmentQuestionsV1 {
-  // 生成 5×5 题目；每题 3 选项，权重按 seed 决定
-  const dims: RawDimension[] = ['interest', 'style', 'team', 'value', 'motivation'].map((key, dimIdx) => ({
-    key: key as RawDimension['key'],
-    label: `维度${dimIdx + 1}`,
+  const dims: RawDimension[] = SELF_ASSESSMENT_DIMENSIONS.map((meta) => ({
+    key: meta.key,
+    label: meta.label,
     questions: Array.from({ length: 5 }, (_, q) => ({
       idx: q,
-      prompt: `${key}-q${q}`,
+      prompt: `${meta.key}-q${q}`,
       choices: [
         { key: 'a', label: 'A', weight: seed === 'boundary' && q === 4 ? 7 : 1 },
         { key: 'b', label: 'B', weight: 0 },
@@ -41,8 +44,7 @@ function makeQuestions(seed: 'control' | 'boundary' = 'control'): SelfAssessment
 }
 
 function makeAnswers(): SelfAssessmentAnswerV1[] {
-  // 完整 25 题，全选 a
-  const dims = ['interest', 'style', 'team', 'value', 'motivation'] as const
+  const dims: SelfAssessmentDimensionKey[] = ['interest', 'style', 'team', 'value', 'motivation']
   const out: SelfAssessmentAnswerV1[] = []
   for (const d of dims) {
     for (let i = 0; i < 5; i++) out.push({ dim: d, idx: i, choice: 'a' })
@@ -63,7 +65,7 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 
 // 1) 5 维度结构命中
 {
-  const r = scoreSelfAssessment({ answers: makeAnswers() })
+  const r = scoreSelfAssessment({ answers: makeAnswers(), questions: makeQuestions() })
   assert.equal(r.dimensions.length, 5, 'dimensions 数 = 5')
   const keys = r.dimensions.map((d) => d.key).sort()
   assert.deepEqual(keys, ['interest', 'motivation', 'style', 'team', 'value'], '5 维度 key 命中')
@@ -76,7 +78,7 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 
 // 2) 全 a 加权 → strength=5
 {
-  const r = scoreSelfAssessment({ answers: makeAnswers() })
+  const r = scoreSelfAssessment({ answers: makeAnswers(), questions: makeQuestions() })
   for (const d of r.dimensions) {
     assert.equal(d.strength, 5, `${d.key} 全选 a → strength=5`)
   }
@@ -86,8 +88,8 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 // 3) answersHash 稳定：同答案 → 同 hash
 {
   const a1 = makeAnswers()
-  const r1 = scoreSelfAssessment({ answers: a1 })
-  const r2 = scoreSelfAssessment({ answers: a1 })
+  const r1 = scoreSelfAssessment({ answers: a1, questions: makeQuestions() })
+  const r2 = scoreSelfAssessment({ answers: a1, questions: makeQuestions() })
   assert.equal(r1.answersHash, r2.answersHash, '同答案 → 同 hash')
   pass('answersHash 稳定（同答案 → 同 hash）')
 }
@@ -96,8 +98,8 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 {
   const a1 = makeAnswers()
   const a2 = [...a1].reverse()
-  const r1 = scoreSelfAssessment({ answers: a1 })
-  const r2 = scoreSelfAssessment({ answers: a2 })
+  const r1 = scoreSelfAssessment({ answers: a1, questions: makeQuestions() })
+  const r2 = scoreSelfAssessment({ answers: a2, questions: makeQuestions() })
   assert.equal(r1.answersHash, r2.answersHash, '乱序答案 → 同 hash')
   pass('answersHash 与答案顺序无关')
 }
@@ -105,7 +107,7 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 // 5) answersHash 与 Node crypto SHA-256 一致
 {
   const a = makeAnswers()
-  const r = scoreSelfAssessment({ answers: a })
+  const r = scoreSelfAssessment({ answers: a, questions: makeQuestions() })
   const sorted = [...a]
     .map((x) => ({ dim: x.dim, idx: x.idx, choice: x.choice }))
     .sort((x, y) => (x.dim === y.dim ? x.idx - y.idx : x.dim.localeCompare(y.dim)))
@@ -120,7 +122,7 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
     { dim: 'interest', idx: 0, choice: 'a' },
     { dim: 'interest', idx: 0, choice: 'b' }, // 重复 → 最后一条生效（weight=0）
   ]
-  const r = scoreSelfAssessment({ answers: a })
+  const r = scoreSelfAssessment({ answers: a, questions: makeQuestions() })
   const interest = r.dimensions.find((d) => d.key === 'interest')!
   assert.equal(interest.strength, 0, '同一题号最后一条生效')
   assert.deepEqual(interest.evidenceQuestionIdx, [0], 'evidence 含 0 题号')
@@ -131,10 +133,10 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 {
   const a: SelfAssessmentAnswerV1[] = [
     { dim: 'interest', idx: 99, choice: 'a' }, // unknown_idx
-    { dim: 'fantasy', idx: 0, choice: 'a' }, // unknown_dim
+    { dim: 'fantasy' as SelfAssessmentDimensionKey, idx: 0, choice: 'a' }, // unknown_dim
     { dim: 'interest', idx: 0, choice: 'zz' }, // unknown_choice
   ]
-  const r = scoreSelfAssessment({ answers: a })
+  const r = scoreSelfAssessment({ answers: a, questions: makeQuestions() })
   assert.equal(r.unmatched.length, 3, '3 条未匹配')
   const reasons = r.unmatched.map((u) => u.reason).sort()
   assert.deepEqual(reasons, ['unknown_choice', 'unknown_dim', 'unknown_idx'], '未匹配原因分类正确')
@@ -144,7 +146,7 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
 // 8) evidence 不含答案原文（仅 idx）
 {
   const a = makeAnswers()
-  const r = scoreSelfAssessment({ answers: a })
+  const r = scoreSelfAssessment({ answers: a, questions: makeQuestions() })
   for (const d of r.dimensions) {
     for (const idx of d.evidenceQuestionIdx) {
       assert.ok(typeof idx === 'number' && Number.isInteger(idx), `${d.key} evidence 仅含整数 idx`)
@@ -170,12 +172,33 @@ console.log('\n=== self-assessment scoring 纯函数门禁 ===')
     { dim: 'interest', idx: 0, choice: 'a' }, // weight=1
   ]
   const questions = makeQuestions()
-  // 注入 NaN 权重
   questions.dimensions[0]!.questions[0]!.choices[0]!.weight = Number.NaN
   const r = scoreSelfAssessment({ answers: a, questions })
   const interest = r.dimensions.find((d) => d.key === 'interest')!
   assert.equal(interest.strength, 0, 'NaN weight → strength=0')
   pass('strength clamp：NaN weight → 0')
+}
+
+// 11) 纯函数无副作用：两次调用同一入参应得到等价输出
+{
+  const a = makeAnswers()
+  const q = makeQuestions()
+  const r1 = scoreSelfAssessment({ answers: a, questions: q })
+  const r2 = scoreSelfAssessment({ answers: a, questions: q })
+  assert.deepEqual(r1.dimensions, r2.dimensions, '两次调用 dimensions 相等')
+  assert.equal(r1.answersHash, r2.answersHash, '两次调用 answersHash 相等')
+  pass('纯函数无副作用：同入参 → 等价输出')
+}
+
+// 12) 空答案 → 全部 strength=0，unmatched 空
+{
+  const r = scoreSelfAssessment({ answers: [], questions: makeQuestions() })
+  for (const d of r.dimensions) {
+    assert.equal(d.strength, 0, `${d.key} 空答案 → strength=0`)
+    assert.deepEqual(d.evidenceQuestionIdx, [], `${d.key} 空答案 → evidence 空`)
+  }
+  assert.equal(r.unmatched.length, 0, '空答案 → unmatched 空')
+  pass('空答案 → 全部 strength=0，unmatched 空')
 }
 
 if (failed > 0) {
