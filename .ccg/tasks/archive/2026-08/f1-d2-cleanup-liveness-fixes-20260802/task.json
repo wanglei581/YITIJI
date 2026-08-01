@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-cleanup-liveness-fixes-20260802",
+  "title": "F1 D2′ cleanup 存活证明与有界性四处缺口修复",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend-release",
+  "currentPhase": "completed",
+  "nextAction": "任务已归档；等待用户授权推送分支并创建 PR",
+  "createdAt": "2026-08-02T00:20:00Z",
+  "branch": "codex/f1-d2-cleanup-liveness-fixes-20260802"
+}
