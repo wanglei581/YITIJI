@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
-import { createHmac } from 'node:crypto'
+import { createHash, createHmac } from 'node:crypto'
 import { test } from 'node:test'
 import {
   BadRequestException,
@@ -34,8 +34,9 @@ import {
   MemberPrivacyService,
 } from '../../member-privacy/member-privacy.service'
 
-const TEST_NOW = Date.now()
+const TEST_NOW = Date.parse('2099-08-01T01:00:00.000Z')
 const FUTURE = new Date('2099-08-01T02:00:00.000Z')
+const SIGNED_SOURCE_PROOF_EXPIRES_AT = Date.parse('2099-08-01T01:05:00.000Z')
 const DISCLAIMER_PUBLISHED_AT = new Date(TEST_NOW - 5 * 60 * 1000)
 const CURRENT_CONSENT_VERSION = CONSENT_VERSION_BY_SCOPE.contract_review
 const FILE_SIGNING_SECRET = 'contract-review-test-signing-secret-at-least-32-bytes'
@@ -92,6 +93,7 @@ interface HarnessOptions {
   file?: FileRow | null
   consents?: ConsentRow[]
   legalDocs?: LegalDocRow[]
+  clockNow?: () => number
   dbKind?: 'sqlite' | 'postgres'
   transactionFailures?: unknown[]
   taskCreateError?: unknown
@@ -242,7 +244,9 @@ function makeHarness(options: HarnessOptions = {}) {
     },
   }
   const privacy = new MemberPrivacyService(prisma as never)
-  const service = new ContractReviewService(prisma as never, privacy)
+  const service = new ContractReviewService(prisma as never, privacy, {
+    now: options.clockNow ?? (() => TEST_NOW),
+  })
   return {
     service,
     privacy,
@@ -331,7 +335,7 @@ function input(
 
 function signedSourceProof(
   fileId = 'contract-file-1',
-  expiresAt = TEST_NOW + 5 * 60 * 1000
+  expiresAt = SIGNED_SOURCE_PROOF_EXPIRES_AT
 ): string {
   const signature = createHmac('sha256', FILE_SIGNING_SECRET)
     .update(`${fileId}.${expiresAt}`)
@@ -478,6 +482,31 @@ test('consent scope snapshot is deterministic and binds all disclaimer fields an
   }
 })
 
+test('consent scope hashes the original disclaimer content without trimming metadata', () => {
+  const doc = activeDisclaimer({
+    id: ' disclaimer-doc-with-padding ',
+    version: ' disclaimer-version-with-padding ',
+    content: '  合同审查告知与免责声明\n',
+  })
+  assert.ok(doc.publishedAt)
+
+  const snapshot = createContractReviewConsentScopeSnapshot({
+    ...doc,
+    publishedAt: doc.publishedAt,
+  })
+
+  assert.equal(snapshot.scope.disclaimer.id, doc.id)
+  assert.equal(snapshot.scope.disclaimer.version, doc.version)
+  assert.equal(
+    snapshot.scope.disclaimer.contentSha256,
+    createHash('sha256').update(doc.content, 'utf8').digest('hex')
+  )
+  assert.notEqual(
+    snapshot.scope.disclaimer.contentSha256,
+    createHash('sha256').update(doc.content.trim(), 'utf8').digest('hex')
+  )
+})
+
 test('anonymous token is 32-byte base64url, hashed at rest, and verifiable', () => {
   const first = issueAnonymousAccessToken()
   const second = issueAnonymousAccessToken()
@@ -612,7 +641,7 @@ test('anonymous create requires a valid signed source proof for the exact source
     {
       endUserId: null,
       accessToken: null,
-      sourceFileProof: signedSourceProof('contract-file-1', TEST_NOW - 1),
+      sourceFileProof: signedSourceProof('contract-file-1', 1),
     },
     {
       endUserId: null,
@@ -682,7 +711,7 @@ test('create fails closed unless exactly one fully published disclaimer is activ
     [activeDisclaimer({ version: ' \t\n' })],
     [activeDisclaimer({ content: '' })],
     [activeDisclaimer({ content: ' \t\n' })],
-    [activeDisclaimer({ publishedAt: new Date(Date.now() + 59_000) })],
+    [activeDisclaimer({ publishedAt: new Date(TEST_NOW + 1) })],
   ]
 
   for (const legalDocs of invalidLegalDocs) {
@@ -763,28 +792,108 @@ test('anonymous create requires a complete current consent snapshot and stores o
   assert.equal(task?.disclaimerVersion, activeDisclaimer().version)
 })
 
-test('anonymous consent timestamp rejects future, stale, and pre-publication snapshots', async () => {
-  const invalidTimes = [
-    new Date(Date.now() + 60_001).toISOString(),
-    new Date(Date.now() - 15 * 60 * 1000 - 1_000).toISOString(),
-    new Date(DISCLAIMER_PUBLISHED_AT.getTime() - 1).toISOString(),
+test('anonymous consent timestamp enforces exact future, age, and publication boundaries', async () => {
+  const defaultDoc = activeDisclaimer()
+  const oldestAllowedDoc = activeDisclaimer({
+    publishedAt: new Date(TEST_NOW - 20 * 60 * 1000),
+  })
+  const cases: Array<{
+    name: string
+    doc: LegalDocRow
+    consentedAt: number
+    allowed: boolean
+  }> = [
+    {
+      name: 'exactly 60 seconds in the future',
+      doc: defaultDoc,
+      consentedAt: TEST_NOW + 60 * 1000,
+      allowed: true,
+    },
+    {
+      name: '60 seconds and 1 millisecond in the future',
+      doc: defaultDoc,
+      consentedAt: TEST_NOW + 60 * 1000 + 1,
+      allowed: false,
+    },
+    {
+      name: 'exactly 15 minutes old',
+      doc: oldestAllowedDoc,
+      consentedAt: TEST_NOW - 15 * 60 * 1000,
+      allowed: true,
+    },
+    {
+      name: '15 minutes and 1 millisecond old',
+      doc: oldestAllowedDoc,
+      consentedAt: TEST_NOW - 15 * 60 * 1000 - 1,
+      allowed: false,
+    },
+    {
+      name: 'exactly at disclaimer publication',
+      doc: defaultDoc,
+      consentedAt: defaultDoc.publishedAt!.getTime(),
+      allowed: true,
+    },
+    {
+      name: '1 millisecond before disclaimer publication',
+      doc: defaultDoc,
+      consentedAt: defaultDoc.publishedAt!.getTime() - 1,
+      allowed: false,
+    },
   ]
 
-  for (const consentedAt of invalidTimes) {
-    const harness = makeHarness({ file: anonymousFile(), consents: [] })
-    await assert.rejects(
-      harness.service.create(input({ consentedAt }), ANONYMOUS),
-      BadRequestException
+  for (const { name, doc, consentedAt, allowed } of cases) {
+    const harness = makeHarness({ file: anonymousFile(), consents: [], legalDocs: [doc] })
+    const create = harness.service.create(
+      input({ consentedAt: new Date(consentedAt).toISOString() }, doc),
+      ANONYMOUS
     )
-    assert.equal(harness.state().tasks.length, 0)
+    if (allowed) {
+      await create
+      assert.equal(harness.state().tasks.length, 1, name)
+    } else {
+      await assert.rejects(create, BadRequestException, name)
+      assert.equal(harness.state().tasks.length, 0, name)
+    }
   }
+})
 
-  const withinFutureSkew = makeHarness({ file: anonymousFile(), consents: [] })
-  await withinFutureSkew.service.create(
-    input({ consentedAt: new Date(Date.now() + 59_000).toISOString() }),
-    ANONYMOUS
+test('active disclaimer publication accepts now exactly and rejects one millisecond later', async () => {
+  const publishedNow = activeDisclaimer({ publishedAt: new Date(TEST_NOW) })
+  const exactHarness = makeHarness({
+    legalDocs: [publishedNow],
+    consents: [activeConsent({ grantedAt: new Date(TEST_NOW) })],
+  })
+
+  await exactHarness.service.create(input({}, publishedNow), MEMBER)
+  assert.equal(exactHarness.state().tasks.length, 1)
+
+  const publishedLater = activeDisclaimer({ publishedAt: new Date(TEST_NOW + 1) })
+  const laterHarness = makeHarness({
+    legalDocs: [publishedLater],
+    consents: [activeConsent({ grantedAt: new Date(TEST_NOW + 1) })],
+  })
+  await assert.rejects(
+    laterHarness.service.create(input({}, publishedLater), MEMBER),
+    ServiceUnavailableException
   )
-  assert.equal(withinFutureSkew.state().tasks.length, 1)
+  assert.equal(laterHarness.state().tasks.length, 0)
+})
+
+test('create captures the injected clock once and reuses it across transaction retries', async () => {
+  let clockCalls = 0
+  const harness = makeHarness({
+    dbKind: 'postgres',
+    transactionFailures: [p2034(), p2034()],
+    clockNow: () => {
+      clockCalls += 1
+      return TEST_NOW
+    },
+  })
+
+  await harness.service.create(input(), MEMBER)
+
+  assert.equal(clockCalls, 1)
+  assert.equal(harness.state().transactionCalls, 3)
 })
 
 test('commit-time P2034 rolls back and reexecutes the callback without duplicate business state', async () => {

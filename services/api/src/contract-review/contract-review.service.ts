@@ -3,9 +3,11 @@ import {
   BadRequestException,
   ForbiddenException,
   HttpException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common'
 import { parseAndVerifySignedContentUrl } from '../files/signing'
@@ -38,6 +40,12 @@ export const CONTRACT_REVIEW_RULE_PACK_VERSION = 'cn-labor-p0-v1'
 export const CONTRACT_REVIEW_SCHEMA_VERSION = 'contract-review-result-v1'
 const ANONYMOUS_CONSENT_MAX_AGE_MS = 15 * 60 * 1000
 const ANONYMOUS_CONSENT_FUTURE_SKEW_MS = 60 * 1000
+
+export const CONTRACT_REVIEW_CLOCK = Symbol('CONTRACT_REVIEW_CLOCK')
+
+export interface ContractReviewClock {
+  now(): number
+}
 
 export const CONTRACT_REVIEW_CONSENT_DISCLOSURES = Object.freeze({
   processorIdentityAndContact: 'provided_by_active_disclaimer',
@@ -136,7 +144,10 @@ interface ConsentSnapshot {
 export class ContractReviewService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly memberPrivacy: MemberPrivacyService
+    private readonly memberPrivacy: MemberPrivacyService,
+    @Optional()
+    @Inject(CONTRACT_REVIEW_CLOCK)
+    private readonly clock?: ContractReviewClock
   ) {}
 
   async create(
@@ -148,10 +159,12 @@ export class ContractReviewService {
     const issuedToken = memberId ? null : issueAnonymousAccessToken()
 
     try {
+      const nowMs = this.clock?.now() ?? Date.now()
+      if (!Number.isFinite(nowMs)) throw new TypeError('Invalid contract review clock')
       const task = await runSerializableTransaction(this.prisma, async (tx) => {
         const sourceFile = await this.loadSourceFile(tx, input.sourceFileId)
-        this.assertUsableSourceFile(sourceFile, requester)
-        const disclaimer = await this.loadActiveDisclaimer(tx)
+        this.assertUsableSourceFile(sourceFile, requester, nowMs)
+        const disclaimer = await this.loadActiveDisclaimer(tx, nowMs)
         const scopeSnapshot = createContractReviewConsentScopeSnapshot(disclaimer)
         this.assertRequestedConsentBinding(input, scopeSnapshot)
 
@@ -171,7 +184,12 @@ export class ContractReviewService {
         return this.createTask(tx, input, sourceFile, {
           endUserId: null,
           accessTokenHash: issuedToken!.accessTokenHash,
-          consent: this.requireAnonymousConsentSnapshot(input, disclaimer, scopeSnapshot),
+          consent: this.requireAnonymousConsentSnapshot(
+            input,
+            disclaimer,
+            scopeSnapshot,
+            nowMs
+          ),
         })
       })
 
@@ -221,7 +239,8 @@ export class ContractReviewService {
   }
 
   private async loadActiveDisclaimer(
-    tx: PrismaTransactionClient
+    tx: PrismaTransactionClient,
+    nowMs: number
   ): Promise<ContractReviewDisclaimerDocument> {
     const active = await tx.legalDocVersion.findMany({
       where: { docType: 'contract_review_disclaimer', isActive: true },
@@ -243,7 +262,7 @@ export class ContractReviewService {
       disclaimer.content.trim().length === 0 ||
       !(disclaimer.publishedAt instanceof Date) ||
       !Number.isFinite(disclaimer.publishedAt.getTime()) ||
-      disclaimer.publishedAt.getTime() > Date.now()
+      disclaimer.publishedAt.getTime() > nowMs
     ) {
       throw new ServiceUnavailableException({
         error: {
@@ -262,13 +281,14 @@ export class ContractReviewService {
 
   private assertUsableSourceFile(
     sourceFile: ContractReviewSourceFile | null,
-    requester: ContractReviewRequester
+    requester: ContractReviewRequester,
+    nowMs: number
   ): asserts sourceFile is ContractReviewSourceFile & { expiresAt: Date } {
     const expiresAt = sourceFile?.expiresAt
     const isAlive =
       expiresAt instanceof Date &&
       Number.isFinite(expiresAt.getTime()) &&
-      expiresAt.getTime() > Date.now()
+      expiresAt.getTime() > nowMs
     const validPolicy =
       sourceFile?.purpose === 'contract_upload' &&
       sourceFile.status === 'active' &&
@@ -343,17 +363,17 @@ export class ContractReviewService {
   private requireAnonymousConsentSnapshot(
     input: ContractReviewCreateInput,
     disclaimer: ContractReviewDisclaimerDocument,
-    scopeSnapshot: ContractReviewConsentScopeSnapshot
+    scopeSnapshot: ContractReviewConsentScopeSnapshot,
+    nowMs: number
   ): ConsentSnapshot {
     const consentedAt = new Date(input.consentedAt)
-    const now = Date.now()
     if (
       input.consentVersion !== CONSENT_VERSION_BY_SCOPE.contract_review ||
       typeof input.consentedAt !== 'string' ||
       !input.consentedAt ||
       !Number.isFinite(consentedAt.getTime()) ||
-      consentedAt.getTime() > now + ANONYMOUS_CONSENT_FUTURE_SKEW_MS ||
-      consentedAt.getTime() < now - ANONYMOUS_CONSENT_MAX_AGE_MS ||
+      consentedAt.getTime() > nowMs + ANONYMOUS_CONSENT_FUTURE_SKEW_MS ||
+      consentedAt.getTime() < nowMs - ANONYMOUS_CONSENT_MAX_AGE_MS ||
       consentedAt.getTime() < disclaimer.publishedAt.getTime()
     ) {
       throw this.invalidConsentSnapshot()
