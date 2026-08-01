@@ -104,6 +104,15 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
+function replaceOccurrence(source, fragment, occurrence, replacement) {
+  let fragmentIndex = -1
+  for (let current = 0; current <= occurrence; current += 1) {
+    fragmentIndex = source.indexOf(fragment, fragmentIndex + 1)
+    assert.notEqual(fragmentIndex, -1)
+  }
+  return `${source.slice(0, fragmentIndex)}${replacement}${source.slice(fragmentIndex + fragment.length)}`
+}
+
 function expectContractFailure(action) {
   assert.throws(
     action,
@@ -156,6 +165,7 @@ function assertExecutionEntryContract(runSource, runbookSource) {
   for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
     provenanceCursor = runbookSource.indexOf(fragment, provenanceCursor + 1)
     assert.notEqual(provenanceCursor, -1)
+    provenanceCursor += fragment.length - 1
   }
   const expectedOccurrences = new Map()
   for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
@@ -187,11 +197,14 @@ function verifyExecutionEntryContract() {
   assert.throws(() => assertExecutionEntryContract(`${runSource}\nno_go "D2_PRIME_NO_GO_UNLISTED"\n`, runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_ROOT=', 'D2_GOVERNANCE_STATE_ROOT=')))
   assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_RESERVATION_ID=', 'D2_GOVERNANCE_ID=')))
-  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
-    assert.throws(() => assertExecutionEntryContract(
-      runSource,
-      runbookSource.replace(fragment, 'D2_FRESH_CLONE_PROVENANCE_MUTATION'),
-    ))
+  for (const fragment of new Set(FRESH_CLONE_PROVENANCE_SEQUENCE)) {
+    const occurrences = FRESH_CLONE_PROVENANCE_SEQUENCE.filter((item) => item === fragment).length
+    for (let occurrence = 0; occurrence < occurrences; occurrence += 1) {
+      assert.throws(() => assertExecutionEntryContract(
+        runSource,
+        replaceOccurrence(runbookSource, fragment, occurrence, 'D2_FRESH_CLONE_PROVENANCE_MUTATION'),
+      ))
+    }
   }
   console.log('  PASS D2 fresh-retake entry rejects repository PATH and locks one canonical command')
 }
