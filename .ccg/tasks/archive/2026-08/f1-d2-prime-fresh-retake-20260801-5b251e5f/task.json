@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-fresh-retake-20260801-5b251e5f",
+  "title": "在既有非生产 Colima 对 main@5b251e5f 执行唯一一次 D2′ fresh retake",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "本地结果提交后等待 push / PR 授权；另立执行包合同 TDD 任务",
+  "createdAt": "2026-08-01T00:40:07+08:00",
+  "branch": "codex/f1-d2-prime-fresh-retake-result-20260801"
+}
