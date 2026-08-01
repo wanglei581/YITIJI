@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-integration-reconcile-20260801",
+  "title": "协调 F1 D2′ 开放 PR 并集成执行合同候选",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "等待 PR #457 CI 与合并授权；不得执行 retake",
+  "createdAt": "2026-08-01T12:30:00+08:00",
+  "branch": "codex/f1-d2-execution-contract-20260801"
+}
