@@ -6,7 +6,8 @@
 - 披露：本 reviewer 参与过治理 core 的候选对照和机械移植，不是完全独立于实现的盲审；本轮重新从
   `origin/main@e4334c5191998e6be58f00b065829f92cc3c9dfb` 检查完整集成 diff。
 - 审查实现基线：`2367d7e97ee6ff8aa4ceffeb2d0b9a7c1a81ed1e`；最终复核 HEAD：
-  `7330adf0`（含 `796b089b` 建链恢复、fail-closed / 静态合同收口及 porcelain v2 对齐）。
+  `e12500ed`（含 `796b089b` 建链恢复、fail-closed / 静态合同收口、porcelain v2 对齐，以及
+  provenance 顺序游标和重复锚点 mutation 的最终收紧）。
 - 范围：正确性、安全、回归、测试和文档；未运行真实 `run.sh` / drill / reserve / invoke、Colima、
   systemd、远程、生产或硬件操作。
 
@@ -44,7 +45,8 @@ index / tracked+untracked clean 复核 → build + governance gate + old contrac
 `set +e` 或忽略任一步骤非零退出。旧 contract 新增 ordered + exact-occurrence mutation guard，锁定
 physical target 定义、post-clone top-level/HEAD、standalone `.git`、full clean、build、两个 gate、
 reserve 和唯一 invoke 顺序；source/clone clean 均与治理实现统一使用 porcelain v2。该 finding 已新鲜
-复跑 contract 后关闭。
+复跑 contract 后关闭。最终增量 `e12500ed` 又将顺序游标推进到完整 fragment 末尾，并逐一 mutation
+每个重复 provenance 锚点；Claude 提出的两条静态合同 tightening 均已关闭。
 
 ## Info
 
@@ -118,7 +120,7 @@ nonce、PM2/Nginx 和 drill 等可变前置。wiring contract 以 prefix/block d
 | 保护文件 | 四项相对 `e4334c51` 均零差异 |
 | 单入口扫描 | live runtime 仅一次 `governance.mjs invoke`；旧引擎只剩 superseded 文档/负向测试文本 |
 | Governance gate | reviewer 新鲜复跑 exit 0；完整记录为 60/60，coverage lines 97.94%、branches 89.87%、functions 97.79%，29 mutations + 6 harness |
-| 旧 contract | 新鲜复跑 `D2_PRIME_CONTRACT_ALL_PASS`，含 cleanup helper 与 stale-PID/drill wiring |
+| 旧 contract | 在 `e12500ed` 新鲜复跑 `D2_PRIME_CONTRACT_ALL_PASS`；含 cleanup helper、stale-PID/drill wiring、完整 fragment 顺序游标与重复 provenance 锚点逐一 mutation |
 | 语法 | `bash -n run.sh` 与全部新增/修改 MJS 的 `node --check` 通过 |
 | API lint | `pnpm --filter @ai-job-print/api lint` exit 0 |
 | API typecheck | `pnpm --filter @ai-job-print/api typecheck` exit 0 |
@@ -128,8 +130,8 @@ nonce、PM2/Nginx 和 drill 等可变前置。wiring contract 以 prefix/block d
 
 ## 外部模型结论
 
-- Claude：`APPROVE`，Critical 0 / Warning 0。
-- Antigravity：首次额度失败；精简重试后 `APPROVE`，Critical 0 / Warning 0。
+- Claude：`APPROVE`；提出的两条 tightening 已由 `e12500ed` 关闭。
+- Antigravity：100/100，`APPROVE`，Critical 0 / Warning 0。
 - Cursor：总体 `APPROVE`。W1 的保护文件疑问已由 Git 零差异复算关闭；W2 的旧计划误导已由
   `2367d7e9` superseded banner 关闭；W3 为有意的独立 gate 分层。
 - 本 CCG reviewer 额外发现的 fresh-clone runbook 链及 fail-closed/回归锁定缺口已在终审中修复并复验。
