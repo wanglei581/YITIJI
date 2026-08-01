@@ -8,14 +8,16 @@
  *   2. UI 文案禁词("一键投递"等)由 lint 规则扫这里,集中检查
  *   3. 翻译 / A/B / 法务复核时只改一处
  *
- * 维护人:Claude(在 owners.md 独占清单内)。
- * Mavis 等其它协作者只 import 不修改;需新增文案 → 写 handoff-to-claude.md。
+ * 变更纪律:本文件是合规文案与禁词的唯一信源,任何协作者都可改,但必须
+ * 同步 docs/compliance/compliance-boundary.md,并在 PR 中说明法务口径依据。
+ * 不要另建 handoff 文档(CLAUDE.md §7 禁止新增交接文件)。
  */
 
 export const COMPLIANCE_COPY = {
   /**
    * Kiosk/20 招聘列表顶部横幅(橙色 warning)。
-   * 参考:legacy-miaoda/screenshots/kiosk/20-招聘页面.png 已有此文案。
+   * 文案出处:秒哒旧项目截图 kiosk/20-招聘页面.png,
+   * 目录已于 81724b73 移除,可从 tag archive/legacy-miaoda-20260605 取回。
    */
   KIOSK_JOBS_TOP: '本页面岗位信息由合作服务机构或官方就业平台提供,投递及后续招聘流程以前往来源平台办理为准。',
 
@@ -47,8 +49,8 @@ export const COMPLIANCE_COPY = {
 
   /**
    * Kiosk 简历诊断/优化页演示数据提示(蓝色 info,放在页面顶部)。
-   * 背景:真实 AI Provider 尚未接通(均为 stub),当前分数/建议由演示用 MockAiProvider 生成。
-   * 仅在 mock 模式(API_MODE!=='http')展示——http 模式接真后端后,假数据不再出现,banner 自动隐藏。
+   * 真实 AI Provider 已接通(Stage 2/3 完成,含百度 OCR)。本提示只在降级场景展示:
+   * API_MODE!=='http' 或 providerName==='mock'(见 ResumeReportPage.tsx isDemoReport)。
    * 目的:防止用户把演示分数误当作真实 AI 评价结果。
    */
   KIOSK_RESUME_DEMO_NOTICE: '当前简历诊断 / 优化结果由演示用 AI 生成,分数与建议仅供体验参考;接入正式 AI 服务后将以真实分析为准。',
@@ -81,7 +83,8 @@ export const COMPLIANCE_COPY = {
 
   /**
    * Admin/08 岗位信息源页顶部横幅(蓝色 info)。
-   * 法务最爱的那段。参考:legacy-miaoda/screenshots/admin/08-岗位信息源.png。
+   * 法务最爱的那段。文案出处:秒哒旧项目截图 admin/08-岗位信息源.png
+   * (tag archive/legacy-miaoda-20260605)。
    */
   ADMIN_JOB_SOURCES_TOP: '当前平台未取得人力资源服务许可证。系统仅作为第三方信息的聚合入口,禁止在系统内设计一键投递、企业收简历功能,所有岗位必须显示合法的外部跳转链接,由用户在第三方完成流程。',
 
@@ -99,7 +102,8 @@ export const COMPLIANCE_COPY = {
 
   /**
    * Partner 工作台顶部横幅(橙色 warning)。
-   * 参考:legacy-miaoda/screenshots/partner/01-首页方案A.png 已有此文案。
+   * 文案出处:秒哒旧项目截图 partner/01-首页方案A.png
+   * (tag archive/legacy-miaoda-20260605)。
    * 应对合作机构方:让他们知道我方不接受平台内投递/筛选/邀约。
    */
   PARTNER_DASHBOARD_TOP: '本后台用于合作数据维护与运营统计,不承接平台内简历投递、候选人筛选和面试邀约。',
@@ -108,16 +112,44 @@ export const COMPLIANCE_COPY = {
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY
 
 /**
- * UI 文案禁词清单。任何用户可见文案(按钮 / 提示 / 标题)出现这些词必须改写。
- * 由 CLAUDE.md §2 管控。lint 规则可扫描三端 src/ 检查。
+ * UI 文案禁词清单(唯一 SSOT)。任何用户可见文案(按钮 / 提示 / 标题)出现这些词必须改写。
+ *
+ * 2026-08-01 收敛:此前 CLAUDE.md §2(5 词)、compliance-boundary.md §三(含「投递简历」)、
+ * role-boundary.md §7(含「一键报名」)与本常量互不一致,现合并为 7 项并以本常量为准。
+ * 禁词扫描脚本必须 import 本清单,不要在脚本或页面里各自硬编码同义表述。
  */
 export const COMPLIANCE_FORBIDDEN_TERMS = [
   '一键投递',
   '立即投递',
   '平台投递',
+  '投递简历',
   '企业收简历',
   '候选人管理',
   '一键报名',
+] as const
+
+/**
+ * 禁词匹配正则,额外覆盖已知变体(如「平台内投递」)。
+ * 扫描脚本优先用本清单而非逐字 includes,避免变体绕过。
+ */
+export const COMPLIANCE_FORBIDDEN_TERM_PATTERNS: readonly RegExp[] = [
+  /一键投递/,
+  /立即投递/,
+  /平台内?投递/,
+  /投递简历/,
+  /企业收简历/,
+  /候选人管理/,
+  /一键报名/,
+]
+
+/**
+ * 合规豁免短语:本身合规但含禁词子串,扫描时必须先剔除再判定。
+ * 例:「去来源平台投递」含「平台投递」;「不提供平台内投递」是边界声明。
+ */
+export const COMPLIANCE_ALLOWED_PHRASES = [
+  '去来源平台投递',
+  '不提供平台内投递',
+  '不会提供平台内投递',
 ] as const
 
 /**

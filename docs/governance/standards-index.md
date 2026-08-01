@@ -50,16 +50,36 @@
 
 ## 五、文件规模与超阈值追踪
 
-普通源码的行数阈值与拆分规则**以 `.ccg/spec/guides/index.md` 为准**，本文件不重复阈值表。下面只维护治理需要持续盯防的**已知超阈值文件清单**（行数为某次 `origin/main` 实测的近似值，仅供跟踪，实际以仓库当前状态为准，不替代阈值规则）：
+普通源码的行数阈值与拆分规则**以 `.ccg/spec/guides/index.md` 为准**，本文件不重复阈值表。下面维护治理需要持续盯防的**已知超阈值文件清单**（2026-08-01 用 `wc -l` 全仓实测重建）。
 
-| 文件 | 近似规模 | 档位与后续要求 |
-| --- | --- | --- |
-| `services/api/src/jobs/jobs.service.ts` | ~2300 行 | 1000 行以上：进入重构/拆分清单，后续任务不得继续扩大 |
-| `apps/admin/src/routes/fairs/index.tsx` | ~1350 行 | 1000 行以上：进入重构/拆分清单，后续任务不得继续扩大 |
-| `apps/admin/src/routes/companies/index.tsx` | ~1050 行 | 1000 行以上：进入重构/拆分清单，后续任务不得继续扩大 |
-| `apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` | ~520 行 | 500 行以上：新增功能前必须评估拆分 |
+**业务代码当前无超阈值文件。** `apps/`、`services/*/src`、`packages/` 下没有任何文件超过 1000 行；此前本表列的 4 个文件在 Phase 7 起的整改中已拆完，实测远低于旧记录：
 
-超阈值文件不得继续承载无关新增能力；清单仅作治理盯防，新增或消除超阈值文件时同步更新本表。
+| 文件 | 旧记录 | 2026-08-01 实测 | 结论 |
+| --- | --- | --- | --- |
+| `services/api/src/jobs/jobs.service.ts` | ~2300 行 | **219 行** | 已拆完，出表 |
+| `apps/admin/src/routes/fairs/index.tsx` | ~1350 行 | **207 行** | 已拆完，出表 |
+| `apps/admin/src/routes/companies/index.tsx` | ~1050 行 | **192 行** | 已拆完，出表 |
+| `apps/kiosk/src/pages/profile/me/MyFeedbackPage.tsx` | ~520 行 | **254 行** | 已拆完，出表 |
+
+真正超过 1000 行的是 **verify 脚本**（此前本表完全未记录）：
+
+| 文件 | 实测行数 |
+| --- | --- |
+| `services/api/scripts/verify-scan-tasks.ts` | 1832 |
+| `services/api/scripts/verify-print-sign.ts` | 1578 |
+| `services/api/scripts/verify-internal-auth-phone.ts` | 1270 |
+| `services/api/scripts/verify-materials-processing.ts` | 1209 |
+| `services/api/scripts/verify-terminal-device-config.ts` | 1108 |
+| `services/api/scripts/verify-payment-real-channels.ts` | 1107 |
+| `apps/kiosk/scripts/verify-home-narrow-visual-balance.mjs` | 1092 |
+
+**verify 脚本单列口径**：一个脚本对应一条完整验收链路，机械按行数拆会割裂验收语义、且拆分本身有让门禁静默失效的风险。因此不套用业务代码阈值，改为：
+
+- 一个脚本只覆盖一个验收主题；新增断言优先扩写既有脚本，不要复制出 `-v2` / `-extra` 变体。
+- 超过 1500 行才考虑拆分，且必须**按验收阶段**（setup / 断言 / 清理）拆，不按函数拆。
+- 拆分后必须确认 `package.json` 的 `verify:*` 目标和 `.github/workflows/ci.yml` 的调用同步更新，拆完复跑该脚本确认断言数不减少。
+
+清单只作治理盯防；新增或消除超阈值文件时同步更新本表，并注明实测方式。
 
 ## 六、拆分约定（补充 `.ccg/spec/guides/index.md`，非替代）
 
@@ -87,8 +107,8 @@
 以下为推荐推进顺序，**仅作建议**；实际优先级与当前待办以 `docs/progress/next-tasks.md` 为准。每项独立分支：
 
 1. advisory 文件规模门禁：只提醒，不阻塞，先覆盖已知大文件和新增 diff。
-2. advisory 合规文案门禁：只提醒，人工判断禁用词是否位于“禁止/红线/检查清单”语境。
-3. `services/api/src/jobs/jobs.service.ts` 零行为拆分试点：先拆校验、查询或状态转换，保留 API 契约。
+2. ~~advisory 合规文案门禁~~ — **已落地且已是 blocking，本条作废（2026-08-01 核实）**。实测 `apps/*/scripts` + `services/api/scripts` 下有 46 个脚本在扫合规禁词，其中 38 个已被 `.github/workflows/ci.yml` 调用（失败即阻塞）。真实缺口不是「没有门禁」，而是**门禁分散、词表漂移**：`COMPLIANCE_FORBIDDEN_TERMS` 曾零消费者，各脚本自己硬编码词表且互不一致，导致「一键报名」0 个脚本覆盖、「投递简历」仅 13 个脚本覆盖。整改方向见第十节。
+3. ~~`services/api/src/jobs/jobs.service.ts` 零行为拆分试点~~ — **前提已消失，本条作废**。该文件实测 219 行，早已拆完（见第五节）。如需拆分试点，改用第五节列出的 verify 脚本，并按该节的 verify 单列口径执行。
 4. Admin 招聘会或企业页面五件套拆分试点：先拆展示和 hooks，保留 UI 行为。
 5. 把试点经验回写到本索引或 `.ccg/spec/guides/index.md`，再决定是否扩大。
 
@@ -97,3 +117,22 @@
 以下事项暂缓，除非用户单独确认：物理目录迁移到 `frontend/` / `backend/` / `terminal/`、全局一次性重构、强制 CI blocking 门禁、清理或删除主工作区未跟踪材料、整包迁入外部商业材料 / 历史 PDF / 交付件。
 
 注：`.ccg/tasks/` 等 AI 工具本地状态目录**恒不入库**（由 `main` CI 门禁拦截，见 `CLAUDE.md` §7），不属于“暂缓后可迁入”范围。
+
+## 十、合规禁词门禁的收敛计划（2026-08-01 新增）
+
+现状实测：门禁存在且多数已 blocking，但**分散、词表漂移、覆盖不均**。
+
+| 项 | 实测 |
+| --- | --- |
+| 扫禁词的脚本数 | 46（`apps/*/scripts` + `services/api/scripts`） |
+| 其中已进 `ci.yml`（失败即阻塞） | 38 |
+| `COMPLIANCE_FORBIDDEN_TERMS` 的代码消费者 | 收敛前为 **0**（自称 SSOT 但无人 import） |
+| 互不一致的词表版本 | 收敛前 **5** 份（CLAUDE.md §2 / compliance-boundary.md §三 / role-boundary.md §7 / `complianceCopy.ts` / `verify-fusion-w6.mjs`） |
+| 复述词表的 md 文档 | 63 |
+
+收敛步骤（按序推进，不要求一次做完）：
+
+1. **已完成**：`complianceCopy.ts` 的 `COMPLIANCE_FORBIDDEN_TERMS` 合并为 7 项，并新增 `COMPLIANCE_FORBIDDEN_TERM_PATTERNS`（覆盖「平台内投递」等变体）与 `COMPLIANCE_ALLOWED_PHRASES`（豁免「去来源平台投递」等合规短语）。`role-boundary.md` §7 改为引用而非复述。
+2. 新脚本**必须** import 上述常量，禁止再硬编码词表；既有 46 个脚本逐步替换，不要求一次改完。
+3. 新建 `verify:compliance-copy` 作为兜底：递归扫 `apps/*/src` 全量 `.ts` / `.tsx`（不是页面白名单），用 patterns + allowed-phrases 判定，进 CI。这条补的正是「一键报名 0 覆盖」这类缺口。
+4. 63 份 md 逐步改为「以 `complianceCopy.ts` 为准」的引用式表述，避免继续漂移。
