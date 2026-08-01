@@ -543,9 +543,13 @@ git commit -m "feat: add contract review ownership and state machine"
 
 **Files:**
 - Create: `services/api/src/contract-review/canonical-text.ts`
+- Create: `services/api/src/contract-review/contract-review-docx-archive.ts`
 - Create: `services/api/src/contract-review/contract-review-extraction.service.ts`
 - Create: `services/api/src/contract-review/__tests__/canonical-text.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-extraction.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-docx-archive.test.ts`
+- Modify: `services/api/src/files/files.service.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-file-policy.test.ts`
 
 - [ ] **Step 1: 写 NFC/LF、页内 UTF-16 边界和 50 页硬上限失败测试**
 
@@ -594,7 +598,13 @@ export function assertBornDigitalPdfPageLimit(pageCount: number): void {
 }
 ```
 
-Extraction service 只读取 `contract_upload`：DOCX 用 `mammoth.extractRawText`；文字层 PDF 用 `unpdf.extractText(..., { mergePages:false })` 保留页数组，并在处理前调用 `assertBornDigitalPdfPageLimit`，超过 50 页以 `CONTRACT_PAGE_LIMIT_EXCEEDED` 拒绝整份审查，绝不截断后伪装为完整结果；扫描 PDF 最多逐页 OCR 20 页、每页完成才递增进度，任一必需页失败则整体失败；图片按单页 OCR。始终在 `finally` 销毁 PDF renderer，全文只存在 worker 内存。
+Extraction service 必须通过 `FilesService.readContentForEndUser(fileId, task.endUserId)` 读取并二次断言 `purpose === 'contract_upload'`；禁止使用无归属校验的 `readContent()`。该读取会复验 active/未过期/会员或匿名 owner，防止 create 后到 worker 执行前的 TOCTOU。DOCX 用 `mammoth.extractRawText`；文字层 PDF 用 `unpdf.extractText(..., { mergePages:false })` 保留页数组，并在处理前调用 `assertBornDigitalPdfPageLimit`。PDF `numPages` 必须是 1–50 的安全整数，0/畸形直接失败；51 页必须在 `extractText` 零调用时以 `CONTRACT_PAGE_LIMIT_EXCEEDED` 拒绝整份审查，绝不截断后伪装为完整结果。
+
+PDF 按页决定 `text_layer | ocr | mixed`：每页先生成唯一 canonical text；无可靠文字层的页才进入 OCR。可靠性计数必须排除 Unicode 空白、控制字符和 format/零宽字符，且不得仅凭短页眉或页脚达到阈值；纯扫描 PDF 总页数最多 20；mixed PDF 总页数仍受 50 页上限且需 OCR 的页数最多 20，超限在 renderer/OCR 零调用时整体拒绝。按原页序逐页完成，只有该页已有可靠文字层或 OCR 成功后才递增真实进度；任一必需页 OCR/渲染失败或识别为空则整体失败，不返回部分 pages。任务级 OCR 置信度取所有 OCR 页的最低档。图片按单页 OCR。
+
+`unpdf` 返回的页数组必须逐索引验证为 dense string array，稀疏数组 fail closed。提取后还要执行 canonical 输出预算：单页不超过 200,000 个 UTF-16 code units、整份不超过 2,000,000。DOCX 在交给 `mammoth` 前必须按规范化路径逐条验证 ZIP central/local headers：拒绝路径别名/穿越、重复 entry、Zip64、加密、多盘、data descriptor 和未知压缩方法；限制单路径 1,024 bytes、最多 64 层和总 entry 4,096。标准 Unicode Path extra 必须按 version 1、raw filename CRC32、fatal UTF-8 和 NFC 校验；bit 11 未置时允许它作为 legacy raw filename 的 canonical Unicode 替代路径，central/local 的 resolved path 必须一致。central CRC、local CRC 与 stored/deflate 实际流式输出 CRC 必须三方一致。全部非目录 entry 的声明与实际流式解压内容统一计入 16MB 安全预算，同时保留 64MB 总量门禁；不采用可伪造的媒体魔数豁免，因此图片很多的超大 DOCX 也会 fail closed。要求唯一 `word/document.xml`。不能只相信 central-directory 声明大小，也不能把完整预解压结果聚合进内存。Task 12 仍需在 processor 层设置总执行时间、内存上限和可终止 worker 回收门禁，因为 Promise timeout 不能真正取消第三方原生解析；该门禁完成前保持 Gate 0 阻断。
+
+文字层 `unpdf` proxy 与 OCR `openPdfForRender` renderer 必须分别用独立 `finally` 销毁；先销毁文字层 proxy，再进入 renderer，不能同时持有两套 PDF 资源。destroy 失败不得掩盖已经发生的原始提取错误；若提取本身成功但 destroy 失败则 fail closed，且最后一页的 100% 进度只能在 renderer 成功销毁后上报，避免“已完成后又失败”。全文、页图和 OCR 文本只存在 worker 内存，不写临时文件、日志、审计或数据库。单元测试用可注入 runtime/fake 验证资源释放和调用顺序，并增加生产编译后的 Nest DI smoke，不以真实第三方调用替代边界断言。
 
 - [ ] **Step 4: 运行提取单测与 OCR 回归**
 
@@ -615,6 +625,7 @@ git commit -m "feat: add contract page extraction"
 - Create: `services/api/src/contract-review/contract-review.rules.ts`
 - Create: `services/api/src/contract-review/contract-review-rule-engine.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-rule-engine.test.ts`
+- Modify: `services/api/src/contract-review/contract-review.service.ts`
 
 - [ ] **Step 1: 写地域无关和地域降级失败测试**
 
@@ -646,13 +657,23 @@ Expected: FAIL。
 ```typescript
 export const CONTRACT_RULE_PACK_VERSION = 'cn-labor-p0-v1'
 export const BASIS_ALLOWLIST = new Map([
+  ['labor-contract-law:9', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
   ['labor-contract-law:19', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
+  ['labor-contract-law:20', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
   ['labor-contract-law:22', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
+  ['labor-contract-law:23', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
   ['labor-contract-law:24', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
+  ['labor-contract-law:25', { url: 'https://www.mohrss.gov.cn/xxgk2020/fdzdgknr/zcfg/fl/202011/t20201102_394622_wap.html', effectiveFrom: '2013-07-01' }],
 ])
 ```
 
-P0 确定性子集只包含试用期期限、竞业期限、扣押证件/收费、违约责任适用范围；地域工资和补偿只产生 `insufficient_info`。规则输出包含 `ruleId/rulePackVersion/basisRef/evidence/requiredFacts`，不生成法条号。
+`contract-review.rules.ts` 是规则包版本与 `BASIS_ALLOWLIST` 的唯一真源；`contract-review.service.ts` 只允许 import/re-export `CONTRACT_RULE_PACK_VERSION`，不得保留第二份字符串常量。Task 10 的 SafetyGate 必须复用同一白名单，不另建镜像。
+
+P0 只对 `labor_contract` 执行确定性规则；其他合同类型返回空确定性结果或明确 `insufficient_info`，不得伪装为已覆盖。确定性子集只包含试用期期限、竞业期限、扣押证件/财物、违约责任适用范围；地域最低工资和竞业补偿在没有已签署数据集时只产生 `insufficient_info`，并记录 `localityDatasetVersion: null`。不得从官方 URL 推导法务批准或解除 Gate 0。
+
+规则引擎必须是无 Nest、无 I/O、无 `Date`、无日志、无模型调用的纯函数/不可变实现。内部规则输出包含 `ruleId/rulePackVersion/basisRef/evidence/requiredFacts/source: 'rule'`，由 Task 11 再映射与合并到共享 Finding。所有 `priority_check` 必须携带 canonical page 上的精确原文证据，`charStart/charEnd` 使用 UTF-16 code units 且能按页切片还原；缺少完整事实或精确证据时必须降级为 `insufficient_info`，不得断言。输出文案使用“建议核实”“与法定上限不一致”等保守表述，禁止“合同无效”“必属违法”等结论性语言，也不生成白名单之外的法条编号。
+
+固定样本必须覆盖：合同期限 `<3` 月不得约定试用期、`3–<12` 月最多 1 月、`12–<36` 月最多 2 月、`>=36` 月或无固定期限最多 6 月；竞业期限超过 24 月；扣押证件/收取财物的否定语境；仅第 22/23 条范围内可约定违约金；emoji 前缀的 UTF-16 偏移、同页重复文本的证据定位、缺地域数据、所有 basisRef 均在白名单、输入/输出不可变，以及非劳动合同不得产生确定性违法判断。
 
 - [ ] **Step 4: 运行 100% 固定样本命中与覆盖率测试**
 
@@ -663,7 +684,7 @@ Expected: PASS；固定样本断言全部命中。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add services/api/src/contract-review/contract-review.rules.ts services/api/src/contract-review/contract-review-rule-engine.ts services/api/src/contract-review/__tests__/contract-review-rule-engine.test.ts
+git add services/api/src/contract-review/contract-review.rules.ts services/api/src/contract-review/contract-review-rule-engine.ts services/api/src/contract-review/__tests__/contract-review-rule-engine.test.ts services/api/src/contract-review/contract-review.service.ts
 git commit -m "feat: add contract review rule pack"
 ```
 

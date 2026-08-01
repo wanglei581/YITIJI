@@ -175,3 +175,17 @@ Task 5 已封板，下一步进入归属、匿名令牌与状态机核心。
 后续硬约束：Task 12 必须提供 `GET /contract-reviews/consent-scope`，匿名 create 只从 `x-contract-review-source-file-proof` header 读 proof，Kiosk 不复制 canonical hash 算法；Task 14 必须完成真实 PostgreSQL 双连接 create/revoke 竞态。`contract-review-service.test.ts` 已 999 行，后续不得继续堆测试，必须新建分层测试文件；`contract-review.service.ts` 已 479 行，Task 12 再新增 HTTP/读写职责前必须拆分 consent/access 或 repository 边界。
 
 Task 6 已封板，下一步进入逐页提取与 canonical text。
+
+## Wave B Task 7：逐页提取与 canonical text 实施审查
+
+审查范围：`0c3374cf..c291ef52`。
+
+- canonical text 统一为 NFC + LF，所有证据偏移使用 UTF-16 code units；PDF 逐页保留原页码，文字层不可靠时才进入 OCR，稀疏页数组、畸形页数、OCR 页数超限、空识别与部分失败均 fail closed。
+- PDF 文字层 proxy 与 OCR renderer 独立释放，原始错误优先；只有 renderer 成功销毁后才上报最终 100%。单页 200,000、整份 2,000,000 UTF-16 code units 的输出预算已锁定。
+- 文件读取通过 `FilesService.readContentForEndUser` 复验 active、归属、删除和过期状态，再断言 `contract_upload`，关闭 create 到 worker 执行之间的 TOCTOU。
+- DOCX 在进入 mammoth 前执行流式 ZIP 预检：标准 Unicode Path extra、NFC canonical path、central/local 路径一致、三方 CRC、Zip64/多盘/加密/data descriptor/未知压缩方法拒绝、4,096 entries、64 MiB 总量与全部非目录 entry 统一 16 MiB 实际/声明内容预算；不以媒体魔数绕过预算。
+- 最终专项测试 31/31；Contract Review 全套 97 通过、1 个 PostgreSQL 环境性 skip；API typecheck/lint、真实生成 DOCX 安全预检与 mammoth 解析均通过。
+
+内部规格审查与质量审查均为 `APPROVE / Ready: Yes`；Antigravity、Claude、Cursor 最终均 `APPROVE`。审查期间发现的 sparse array、active TOCTOU、Nest DI、短页眉误判、Unicode 计数、DOCX 解压炸弹、Unicode Path、relationship 预算绕过、CRC 与媒体豁免问题均已修复并回归。
+
+Task 12 必须在 processor 层补可终止 worker、总执行时间和内存上限；该项是硬发布门禁。Task 7 封板不代表生产可用，Gate 0 正式记录继续保持 `blocked`。下一步进入版本化规则包。
