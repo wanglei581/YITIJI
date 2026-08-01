@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { BadRequestException, ForbiddenException, UnauthorizedException } from '@nestjs/common'
 import { validateUpload, DEFAULT_SENSITIVE_BY_PURPOSE } from '../src/files/file-validation'
+import { CONTRACT_REVIEW_TTL_MS, defaultRetentionForUpload } from '../src/files/retention-policy'
 import { sniffDeclaredMimeMismatch } from '../src/files/content-sniff'
 import type { FilePurpose, FileUploadResponse } from '../src/files/file.types'
 import { UploadSessionsService } from '../src/upload-sessions/upload-sessions.service'
@@ -26,6 +27,7 @@ interface StoredFile {
   retentionSetBy: string | null
   retentionConsentAt: Date | null
   retentionConsentVersion: string | null
+  retentionLockedReason: string | null
 }
 
 class FakeRedis {
@@ -91,13 +93,7 @@ class FakeFilesService {
 
   constructor(private readonly prisma: FakePrisma) {}
 
-  async upload(args: {
-    buffer: Buffer
-    filename: string
-    mimeType: string
-    purpose: FilePurpose
-    endUserId?: string | null
-  }): Promise<FileUploadResponse> {
+  async upload(args: { buffer: Buffer; filename: string; mimeType: string; purpose: FilePurpose; endUserId?: string | null }): Promise<FileUploadResponse> {
     const validation = validateUpload({
       purpose: args.purpose,
       mimeType: args.mimeType,
@@ -106,17 +102,29 @@ class FakeFilesService {
       mode: 'proxy',
     })
     if (!validation.ok) {
-      throw new BadRequestException({ error: { code: validation.code, message: validation.message } })
+      throw new BadRequestException({
+        error: { code: validation.code, message: validation.message },
+      })
     }
     // 与真实 FilesService.upload 同款魔数校验(files/content-sniff.ts),
     // 保证本脚本的拒绝断言走的是同一条服务端校验链。
     const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
     if (!sniff.ok) {
       throw new BadRequestException({
-        error: { code: 'FILE_CONTENT_MISMATCH', message: '文件内容与声明的类型不一致，请检查文件后重新上传' },
+        error: {
+          code: 'FILE_CONTENT_MISMATCH',
+          message: '文件内容与声明的类型不一致，请检查文件后重新上传',
+        },
       })
     }
     const id = `file_${this.next++}`
+    const sensitiveLevel = DEFAULT_SENSITIVE_BY_PURPOSE[args.purpose]
+    const retention = defaultRetentionForUpload({
+      purpose: args.purpose,
+      sensitiveLevel,
+      ownerType: args.endUserId ? 'user' : 'system',
+      endUserId: args.endUserId ?? null,
+    })
     const file: StoredFile = {
       id,
       filename: args.filename,
@@ -124,16 +132,17 @@ class FakeFilesService {
       sizeBytes: args.buffer.length,
       sha256: `sha_${id}`,
       purpose: args.purpose,
-      sensitiveLevel: DEFAULT_SENSITIVE_BY_PURPOSE[args.purpose],
+      sensitiveLevel,
       endUserId: args.endUserId ?? null,
       ownerType: args.endUserId ? 'user' : 'system',
       ownerId: args.endUserId ?? null,
       deletedAt: null,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-      retentionPolicy: 'system_short',
-      retentionSetBy: 'system',
-      retentionConsentAt: null,
-      retentionConsentVersion: null,
+      expiresAt: retention.expiresAt,
+      retentionPolicy: retention.retentionPolicy,
+      retentionSetBy: retention.retentionSetBy,
+      retentionConsentAt: retention.retentionConsentAt,
+      retentionConsentVersion: retention.retentionConsentVersion,
+      retentionLockedReason: args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
     }
     this.prisma.files.set(id, file)
     return {
@@ -189,11 +198,7 @@ function file(args?: Partial<Express.Multer.File>): Express.Multer.File {
   }
 }
 
-async function expectRejects<T extends Error>(
-  action: () => Promise<unknown>,
-  errorType: new (...args: never[]) => T,
-  label: string,
-): Promise<void> {
+async function expectRejects<T extends Error>(action: () => Promise<unknown>, errorType: new (...args: never[]) => T, label: string): Promise<void> {
   let rejected = false
   try {
     await action()
@@ -208,12 +213,68 @@ async function main(): Promise<void> {
   {
     const { service, prisma } = makeService()
     const session = await service.create({
+      purpose: 'contract_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const beforeUpload = Date.now()
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'contract.pdf' }),
+    })
+    const stored = prisma.files.get(uploaded.file!.fileId)
+    assert.equal(stored?.sensitiveLevel, 'highly_sensitive')
+    assert.equal(stored?.retentionPolicy, 'system_short')
+    assert.equal(stored?.retentionSetBy, 'system')
+    assert.equal(stored?.retentionLockedReason, 'contract_review_session_only')
+    assert.ok(stored?.expiresAt)
+    assert.ok(
+      stored!.expiresAt!.getTime() >= beforeUpload + CONTRACT_REVIEW_TTL_MS && stored!.expiresAt!.getTime() <= Date.now() + CONTRACT_REVIEW_TTL_MS,
+      'temporary contract upload must expire exactly two hours after upload',
+    )
+    const confirmed = await service.confirm(session.sessionId, session.controlToken)
+    assert.equal(confirmed.file.fileUrl, undefined, 'contract upload confirmation must not mint a print URL')
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'contract_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_contract',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'contract.pdf' }),
+    })
+    const originalExpiry = prisma.files.get(uploaded.file!.fileId)?.expiresAt?.toISOString()
+    await service.confirm(session.sessionId, session.controlToken, 'member_contract')
+    const bound = prisma.files.get(uploaded.file!.fileId)
+    assert.equal(bound?.endUserId, 'member_contract')
+    assert.equal(bound?.ownerType, 'user')
+    assert.equal(bound?.retentionPolicy, 'system_short', 'member binding must not promote contract uploads to 90 days')
+    assert.equal(bound?.retentionLockedReason, 'contract_review_session_only')
+    assert.equal(bound?.expiresAt?.toISOString(), originalExpiry, 'member binding must preserve the original session expiry')
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
       purpose: 'resume_upload',
       mode: 'temporary',
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     assert.equal(uploaded.status, 'uploaded')
     assert.equal(uploaded.file?.filename, 'resume.pdf')
     assert.equal('signedUrl' in uploaded.file!, false)
@@ -227,7 +288,13 @@ async function main(): Promise<void> {
   {
     const { service } = makeService()
     await expectRejects(
-      () => service.create({ purpose: 'resume_upload', mode: 'member', channel: 'phone_h5', uploadUrl: 'http://localhost:5173/upload/phone' }),
+      () =>
+        service.create({
+          purpose: 'resume_upload',
+          mode: 'member',
+          channel: 'phone_h5',
+          uploadUrl: 'http://localhost:5173/upload/phone',
+        }),
       UnauthorizedException,
       'member session requires kiosk member token',
     )
@@ -242,7 +309,11 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
       endUserId: 'member_1',
     })
-    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     assert.equal(prisma.files.get(uploaded.file!.fileId)?.endUserId, null)
     const confirmed = await service.confirm(session.sessionId, session.controlToken, 'member_1')
     assert.equal(confirmed.status, 'confirmed')
@@ -262,7 +333,11 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
       endUserId: 'member_1',
     })
-    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     await expectRejects(() => service.confirm(session.sessionId, session.controlToken, 'member_2'), ForbiddenException, 'member mismatch denied')
     await expectRejects(() => service.confirm(session.sessionId, 'bad-control', 'member_1'), ForbiddenException, 'invalid control token denied')
   }
@@ -275,9 +350,18 @@ async function main(): Promise<void> {
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     await expectRejects(
-      () => service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file(),
+        }),
       BadRequestException,
       'upload token cannot be reused',
     )
@@ -292,11 +376,12 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
     await expectRejects(
-      () => service.uploadFile({
-        sessionId: session.sessionId,
-        uploadToken: session.uploadToken,
-        file: file({ buffer: Buffer.alloc(10 * 1024 * 1024 + 1), size: 10 * 1024 * 1024 + 1 }),
-      }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file({ buffer: Buffer.alloc(10 * 1024 * 1024 + 1), size: 10 * 1024 * 1024 + 1 }),
+        }),
       BadRequestException,
       'phone resume upload is capped at 10MB',
     )
@@ -311,21 +396,35 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
     await expectRejects(
-      () => service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'resume.exe', mimetype: 'application/pdf' }) }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file({ originalname: 'resume.exe', mimetype: 'application/pdf' }),
+        }),
       BadRequestException,
       'extension mismatch rejected through file validation',
     )
     // 魔数校验:文件名/声明 MIME 全对但真实字节不是 PDF(伪装 PDF)→ 服务端拒绝
     await expectRejects(
-      () => service.uploadFile({
-        sessionId: session.sessionId,
-        uploadToken: session.uploadToken,
-        file: file({ buffer: Buffer.from('this is not a pdf at all'), originalname: 'resume.pdf', mimetype: 'application/pdf' }),
-      }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file({
+            buffer: Buffer.from('this is not a pdf at all'),
+            originalname: 'resume.pdf',
+            mimetype: 'application/pdf',
+          }),
+        }),
       BadRequestException,
       'fake PDF payload rejected by content sniffing (FILE_CONTENT_MISMATCH)',
     )
-    const retry = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const retry = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     assert.equal(retry.status, 'uploaded')
   }
 
@@ -338,7 +437,12 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
     await expectRejects(
-      () => service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'resume.txt', mimetype: 'text/plain' }) }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: session.uploadToken,
+          file: file({ originalname: 'resume.txt', mimetype: 'text/plain' }),
+        }),
       BadRequestException,
       'plain text resume upload is rejected by server validation',
     )
@@ -353,7 +457,12 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
     await expectRejects(
-      () => service.uploadFile({ sessionId: session.sessionId, uploadToken: 'bad-token', file: file() }),
+      () =>
+        service.uploadFile({
+          sessionId: session.sessionId,
+          uploadToken: 'bad-token',
+          file: file(),
+        }),
       ForbiddenException,
       'invalid upload token rejected',
     )
@@ -367,7 +476,11 @@ async function main(): Promise<void> {
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     await service.confirm(session.sessionId, session.controlToken)
     await expectRejects(() => service.cancel(session.sessionId, session.controlToken), BadRequestException, 'confirmed session cannot be cancelled')
   }
@@ -380,7 +493,11 @@ async function main(): Promise<void> {
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     await service.cancel(session.sessionId, session.controlToken)
     assert.notEqual(prisma.files.get(uploaded.file!.fileId)?.deletedAt, null)
   }
@@ -394,7 +511,11 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
       endUserId: 'member_1',
     })
-    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     const current = prisma.files.get(uploaded.file!.fileId)!
     prisma.files.set(uploaded.file!.fileId, {
       ...current,
@@ -409,7 +530,13 @@ async function main(): Promise<void> {
   {
     const { service } = makeService()
     await expectRejects(
-      () => service.create({ purpose: 'admin_upload', mode: 'temporary', channel: 'phone_h5', uploadUrl: 'http://localhost:5173/upload/phone' }),
+      () =>
+        service.create({
+          purpose: 'admin_upload',
+          mode: 'temporary',
+          channel: 'phone_h5',
+          uploadUrl: 'http://localhost:5173/upload/phone',
+        }),
       BadRequestException,
       'unsupported purpose rejected at session creation',
     )
@@ -424,7 +551,11 @@ async function main(): Promise<void> {
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'doc.pdf' }) })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'doc.pdf' }),
+    })
     const confirmed = await service.confirm(session.sessionId, session.controlToken)
     assert.equal(confirmed.status, 'confirmed')
     assert.match(confirmed.file.fileUrl ?? '', /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/, 'print_doc confirm must return a signed content URL')
@@ -439,7 +570,11 @@ async function main(): Promise<void> {
       channel: 'phone_h5',
       uploadUrl: 'http://localhost:5173/upload/phone',
     })
-    await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file() })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file(),
+    })
     const confirmed = await service.confirm(session.sessionId, session.controlToken)
     assert.equal(confirmed.file.fileUrl, undefined, 'resume_upload confirm must not carry a print fileUrl')
   }
@@ -454,7 +589,11 @@ async function main(): Promise<void> {
       uploadUrl: 'http://localhost:5173/upload/phone',
       endUserId: 'member_1',
     })
-    const uploaded = await service.uploadFile({ sessionId: session.sessionId, uploadToken: session.uploadToken, file: file({ originalname: 'doc.pdf' }) })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'doc.pdf' }),
+    })
     const confirmed = await service.confirm(session.sessionId, session.controlToken, 'member_1')
     assert.match(confirmed.file.fileUrl ?? '', /^\/api\/v1\/files\//, 'print_doc member confirm must also carry a signed fileUrl')
     const bound = prisma.files.get(uploaded.file!.fileId)
@@ -464,11 +603,7 @@ async function main(): Promise<void> {
 
   {
     const controller = readFileSync(new URL('../src/upload-sessions/upload-sessions.controller.ts', import.meta.url), 'utf8')
-    assert.match(
-      controller,
-      /@Get\(':sessionId'\)\n\s+@Throttle\(\{ default: \{ ttl: 60_000, limit: 60 \} \}\)/,
-      'status polling endpoint should have a wide throttle',
-    )
+    assert.match(controller, /@Get\(':sessionId'\)\n\s+@Throttle\(\{ default: \{ ttl: 60_000, limit: 60 \} \}\)/, 'status polling endpoint should have a wide throttle')
   }
 
   console.log('PASS upload session verification')

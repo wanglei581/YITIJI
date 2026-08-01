@@ -86,11 +86,26 @@ class FakePrisma {
   readonly terminals = new Map<string, { id: string; enabled: boolean; terminalCode: string; lifecycleStatus: string }>()
 
   constructor() {
-    this.terminals.set('t_1', { id: 't_1', enabled: true, terminalCode: 'T-001', lifecycleStatus: 'active' })
-    this.terminals.set('t_disabled', { id: 't_disabled', enabled: false, terminalCode: 'T-002', lifecycleStatus: 'active' })
+    this.terminals.set('t_1', {
+      id: 't_1',
+      enabled: true,
+      terminalCode: 'T-001',
+      lifecycleStatus: 'active',
+    })
+    this.terminals.set('t_disabled', {
+      id: 't_disabled',
+      enabled: false,
+      terminalCode: 'T-002',
+      lifecycleStatus: 'active',
+    })
     // B1-5 多行 reap 测试需要第二个独立启用的终端（证明一次 reap 能跨终端一起收敛，
     // 不是只测同一终端的两条行）。
-    this.terminals.set('t_2', { id: 't_2', enabled: true, terminalCode: 'T-003', lifecycleStatus: 'active' })
+    this.terminals.set('t_2', {
+      id: 't_2',
+      enabled: true,
+      terminalCode: 'T-003',
+      lifecycleStatus: 'active',
+    })
   }
 
   readonly terminal = {
@@ -101,12 +116,7 @@ class FakePrisma {
       }
       return null
     },
-    updateMany: async ({
-      where,
-    }: {
-      where: { id: string; enabled: boolean; lifecycleStatus: string }
-      data: { lifecycleStatus: string }
-    }) => {
+    updateMany: async ({ where }: { where: { id: string; enabled: boolean; lifecycleStatus: string }; data: { lifecycleStatus: string } }) => {
       const terminal = this.terminals.get(where.id)
       const matches = terminal?.enabled === where.enabled && terminal.lifecycleStatus === where.lifecycleStatus
       return { count: matches ? 1 : 0 }
@@ -140,12 +150,7 @@ class FakePrisma {
     findUnique: async ({ where }: { where: { id: string } }) => this.scanTasksById.get(where.id) ?? null,
     findFirst: async ({ where }: { where: { terminalId: string; status: string; expiresAt: { gt: Date } } }) => {
       const candidates = Array.from(this.scanTasksById.values())
-        .filter(
-          (t) =>
-            t.terminalId === where.terminalId &&
-            t.status === where.status &&
-            t.expiresAt.getTime() > where.expiresAt.gt.getTime(),
-        )
+        .filter((t) => t.terminalId === where.terminalId && t.status === where.status && t.expiresAt.getTime() > where.expiresAt.gt.getTime())
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       return candidates[0] ?? null
     },
@@ -184,10 +189,7 @@ class FakePrisma {
       select?: { fileId: true }
     }) => {
       const matches = Array.from(this.scanTasksById.values()).filter(
-        (t) =>
-          t.terminalId === where.terminalId &&
-          t.fileId !== null &&
-          t.updatedAt.getTime() > where.updatedAt.gt.getTime(),
+        (t) => t.terminalId === where.terminalId && t.fileId !== null && t.updatedAt.getTime() > where.updatedAt.gt.getTime(),
       )
       void select
       return matches.map((t) => ({ fileId: t.fileId }))
@@ -197,11 +199,7 @@ class FakePrisma {
   readonly fileObject = {
     findUnique: async ({ where }: { where: { id: string } }) => this.filesById.get(where.id) ?? null,
     // B1-11：内容级去重的第二步——在候选 fileId 集合里找 sha256 完全一致的一条。
-    findFirst: async ({
-      where,
-    }: {
-      where: { id: { in: string[] }; sha256: string }
-    }) => {
+    findFirst: async ({ where }: { where: { id: { in: string[] }; sha256: string } }) => {
       for (const id of where.id.in) {
         const record = this.filesById.get(id)
         if (record && record.sha256 === where.sha256) return { id: record.id }
@@ -218,14 +216,7 @@ class FakeFilesService {
 
   constructor(private readonly prisma: FakePrisma) {}
 
-  async upload(args: {
-    buffer: Buffer
-    filename: string
-    mimeType: string
-    purpose: string
-    uploaderId?: string | null
-    endUserId?: string | null
-  }) {
+  async upload(args: { buffer: Buffer; filename: string; mimeType: string; purpose: string; uploaderId?: string | null; endUserId?: string | null }) {
     const id = `file_${this.seq++}`
     const record: StoredFileObject = {
       id,
@@ -259,7 +250,9 @@ class FakeFilesService {
     this.systemDeleteCalls.push({ fileId, reason })
     const record = this.prisma.filesById.get(fileId)
     if (!record || record.deletedAt) {
-      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+      throw new NotFoundException({
+        error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+      })
     }
     record.deletedAt = new Date()
     this.prisma.filesById.set(fileId, record)
@@ -270,14 +263,14 @@ class FakeFilesService {
 function makeService(): { service: ScanTasksService; prisma: FakePrisma; files: FakeFilesService } {
   const prisma = new FakePrisma()
   const files = new FakeFilesService(prisma)
-  return { service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities), prisma, files }
+  return {
+    service: new ScanTasksService(prisma as never, files as never, passthroughCapabilities),
+    prisma,
+    files,
+  }
 }
 
-async function expectRejects<T extends Error>(
-  action: () => Promise<unknown>,
-  errorType: new (...args: never[]) => T,
-  label: string,
-): Promise<void> {
+async function expectRejects<T extends Error>(action: () => Promise<unknown>, errorType: new (...args: never[]) => T, label: string): Promise<void> {
   let rejected = false
   try {
     await action()
@@ -293,7 +286,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 /** 访问 ScanTasksService 的 private startMatchedHeartbeat()——TS 的 private 只是编译期限制，B1-10 测试需要直接调用/替换它。 */
-type HeartbeatTestAccess = { startMatchedHeartbeat: (id: string, intervalMs?: number) => NodeJS.Timeout }
+type HeartbeatTestAccess = {
+  startMatchedHeartbeat: (id: string, intervalMs?: number) => NodeJS.Timeout
+}
 
 /**
  * B1-10：对着一个真实迁移过的数据库、真实 `ScanTaskReaperTask`（不改它的 3 分钟阈值）、
@@ -340,23 +335,42 @@ async function assertRealDbMatchedHeartbeatClosesRace(dbUrl: string): Promise<vo
     const fourMinutesAgo = new Date(Date.now() - 4 * 60 * 1000)
 
     const rowA = await client.scanTask.create({
-      data: { terminalId: terminalIdA, scanType: 'document', status: 'matched', expiresAt: new Date(Date.now() + 60_000) },
+      data: {
+        terminalId: terminalIdA,
+        scanType: 'document',
+        status: 'matched',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
       select: { id: true },
     })
-    await client.scanTask.updateMany({ where: { id: rowA.id }, data: { updatedAt: fourMinutesAgo } })
+    await client.scanTask.updateMany({
+      where: { id: rowA.id },
+      data: { updatedAt: fourMinutesAgo },
+    })
 
     const rowB = await client.scanTask.create({
-      data: { terminalId: terminalIdB, scanType: 'document', status: 'matched', expiresAt: new Date(Date.now() + 60_000) },
+      data: {
+        terminalId: terminalIdB,
+        scanType: 'document',
+        status: 'matched',
+        expiresAt: new Date(Date.now() + 60_000),
+      },
       select: { id: true },
     })
-    await client.scanTask.updateMany({ where: { id: rowB.id }, data: { updatedAt: fourMinutesAgo } })
+    await client.scanTask.updateMany({
+      where: { id: rowB.id },
+      data: { updatedAt: fourMinutesAgo },
+    })
 
     // Row B：启动真实的（未 mock 的）心跳方法，跑几个真实 tick，然后停掉。
     const heartbeat = (service as unknown as HeartbeatTestAccess).startMatchedHeartbeat(rowB.id, 20)
     await sleep(90)
     clearInterval(heartbeat)
 
-    const rowBAfterHeartbeat = await client.scanTask.findUnique({ where: { id: rowB.id }, select: { updatedAt: true } })
+    const rowBAfterHeartbeat = await client.scanTask.findUnique({
+      where: { id: rowB.id },
+      select: { updatedAt: true },
+    })
     assert.ok(
       rowBAfterHeartbeat!.updatedAt.getTime() > fourMinutesAgo.getTime() + 3 * 60 * 1000,
       'real heartbeat ticks must have refreshed updatedAt back to "now" against the real database',
@@ -439,7 +453,10 @@ async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | '
 
       // 约束的 WHERE 子句是 status IN ('waiting','matched')——单独验证 'matched' 分支也真的
       // 挡住新建，不能只测 'waiting'（否则如果约束被误写成只覆盖 'waiting'，这里测不出来）。
-      await client.scanTask.updateMany({ where: { id: first.scanTaskId }, data: { status: 'matched' } })
+      await client.scanTask.updateMany({
+        where: { id: first.scanTaskId },
+        data: { status: 'matched' },
+      })
       let caughtMatched: unknown
       try {
         await service.create({ scanType: 'document', terminalId }, null)
@@ -455,7 +472,10 @@ async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | '
       // 不是全状态生效，也不是压根没生效导致"看起来放行"其实是约束整体失效）。
       let activeTaskId = first.scanTaskId
       for (const terminalState of ['completed', 'cancelled', 'expired', 'failed'] as const) {
-        await client.scanTask.updateMany({ where: { id: activeTaskId }, data: { status: terminalState } })
+        await client.scanTask.updateMany({
+          where: { id: activeTaskId },
+          data: { status: terminalState },
+        })
         const created = await service.create({ scanType: 'document', terminalId }, null)
         assert.ok(
           created.scanTaskId,
@@ -572,7 +592,12 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
 
     let caught: unknown
     try {
-      await service.deliverScanFile({ terminalId, buffer: bufferA, filename: 'a-retry.pdf', mimeType: 'application/pdf' })
+      await service.deliverScanFile({
+        terminalId,
+        buffer: bufferA,
+        filename: 'a-retry.pdf',
+        mimeType: 'application/pdf',
+      })
     } catch (error) {
       caught = error
     }
@@ -587,17 +612,15 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       'real DB: duplicate rejection must carry the specific SCAN_FILE_ALREADY_DELIVERED code',
     )
 
-    const taskBAfterDuplicateAttempt = await client.scanTask.findUnique({ where: { id: taskB.scanTaskId } })
+    const taskBAfterDuplicateAttempt = await client.scanTask.findUnique({
+      where: { id: taskB.scanTaskId },
+    })
     assert.equal(
       taskBAfterDuplicateAttempt?.status,
       'waiting',
       'real DB: member_b task must remain completely untouched — this is the cross-user PII leak the fix closes',
     )
-    assert.equal(
-      taskBAfterDuplicateAttempt?.fileId,
-      null,
-      'real DB: member_b task must never end up with member_a content attached',
-    )
+    assert.equal(taskBAfterDuplicateAttempt?.fileId, null, 'real DB: member_b task must never end up with member_a content attached')
 
     // 不同内容不得被误伤：真实的 sha256 比对必须真的按字节甄别，不是"同终端有过成功
     // 投递就全部拒绝"。
@@ -629,9 +652,7 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
       2,
       `real DB: the exact findMany() filter shape used by deliverScanFile() must return exactly the 2 completed rows for this terminal (taskA + taskB), got ${recentlyDeliveredForTerminal.length}`,
     )
-    const candidateFileIds = recentlyDeliveredForTerminal
-      .map((t) => t.fileId)
-      .filter((id): id is string => id !== null)
+    const candidateFileIds = recentlyDeliveredForTerminal.map((t) => t.fileId).filter((id): id is string => id !== null)
 
     const dupMatch = await client.fileObject.findFirst({
       where: { id: { in: candidateFileIds }, sha256: contentHashA },
@@ -700,11 +721,7 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 
   // rawExpr is whitelisted to [\d\s*+-] above (not arbitrary source), so evaluating it here is safe.
   const agentDeliveryRetryMaxMs = new Function(`return (${rawExpr});`)() as number
-  assert.equal(
-    typeof agentDeliveryRetryMaxMs,
-    'number',
-    `parsed DELIVERY_RETRY_MAX_MS expression "${rawExpr}" did not evaluate to a number`,
-  )
+  assert.equal(typeof agentDeliveryRetryMaxMs, 'number', `parsed DELIVERY_RETRY_MAX_MS expression "${rawExpr}" did not evaluate to a number`)
 
   assert.equal(
     agentDeliveryRetryMaxMs,
@@ -719,6 +736,20 @@ function assertDeliveryRetryMaxMsStaysInSyncWithDedupWindow(): void {
 
 async function main(): Promise<void> {
   const dto: CreateScanTaskDto = { scanType: 'document', terminalId: 't_1' }
+
+  {
+    // contract scan 必须贯通专用高敏短期 purpose，不能退化到通用 print_doc。
+    const { service, prisma } = makeService()
+    const created = await service.create({ scanType: 'contract', terminalId: 't_1' }, null)
+    const delivered = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: tinyPdf(),
+      filename: 'contract.pdf',
+      mimeType: 'application/pdf',
+    })
+    assert.equal(delivered.scanTaskId, created.scanTaskId)
+    assert.equal(prisma.filesById.get(delivered.fileId)?.purpose, 'contract_upload')
+  }
 
   {
     // B1-11 follow-up：两个独立部署包（services/api、apps/terminal-agent）里各自声明的
@@ -937,7 +968,13 @@ async function main(): Promise<void> {
     // 没有等待中任务时投递必须 409 ConflictException（不得误建档，也不能静默吞掉文件）
     const { service } = makeService()
     await expectRejects(
-      () => service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'stray.pdf', mimeType: 'application/pdf' }),
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: tinyPdf(),
+          filename: 'stray.pdf',
+          mimeType: 'application/pdf',
+        }),
       ConflictException,
       'no waiting task rejected',
     )
@@ -949,7 +986,12 @@ async function main(): Promise<void> {
     const first = await service.create(dto, null)
     await new Promise((r) => setTimeout(r, 5))
     const second = await service.create(dto, null)
-    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
+    const delivered = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: tinyPdf(),
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(delivered.scanTaskId, first.scanTaskId, 'must match the oldest waiting task, not the newest')
     void second
   }
@@ -959,11 +1001,20 @@ async function main(): Promise<void> {
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
-    prisma.scanTasksById.set(created.scanTaskId, { ...task, expiresAt: new Date(Date.now() - 1000) })
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      expiresAt: new Date(Date.now() - 1000),
+    })
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'expired')
     await expectRejects(
-      () => service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'late.pdf', mimeType: 'application/pdf' }),
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer: tinyPdf(),
+          filename: 'late.pdf',
+          mimeType: 'application/pdf',
+        }),
       ConflictException,
       'expired task must not be matched',
     )
@@ -977,7 +1028,10 @@ async function main(): Promise<void> {
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
     const task = prisma.scanTasksById.get(created.scanTaskId)!
-    prisma.scanTasksById.set(created.scanTaskId, { ...task, expiresAt: new Date(Date.now() - 1000) })
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      expiresAt: new Date(Date.now() - 1000),
+    })
 
     const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
     prisma.scanTask.updateMany = (async (args: Parameters<typeof originalUpdateMany>[0]) => {
@@ -1131,7 +1185,12 @@ async function main(): Promise<void> {
     // 已完成任务不能取消（cancel() 在 CAS 之前就做了 completed 前置检查）
     const { service } = makeService()
     const created = await service.create(dto, null)
-    await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
+    await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: tinyPdf(),
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
     await expectRejects(
       () => service.cancel(created.scanTaskId, null, created.controlToken),
       BadRequestException,
@@ -1151,7 +1210,12 @@ async function main(): Promise<void> {
     // scanType -> FilePurpose 映射正确（id 扫描必须落 id_scan，不能落成通用 print_doc）
     const { service, prisma } = makeService()
     const created = await service.create({ scanType: 'id', terminalId: 't_1' }, null)
-    const delivered = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'id.pdf', mimeType: 'application/pdf' })
+    const delivered = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: tinyPdf(),
+      filename: 'id.pdf',
+      mimeType: 'application/pdf',
+    })
     const file = prisma.filesById.get(delivered.fileId)
     assert.equal(file?.purpose, 'id_scan')
     void created
@@ -1285,11 +1349,7 @@ async function main(): Promise<void> {
     const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(status.status, 'cancelled', 'task must remain cancelled, not silently marked completed')
 
-    assert.equal(
-      baseFiles.systemDeleteCalls.length,
-      1,
-      'orphaned file must be compensating-deleted exactly once via FilesService.systemDelete()',
-    )
+    assert.equal(baseFiles.systemDeleteCalls.length, 1, 'orphaned file must be compensating-deleted exactly once via FilesService.systemDelete()')
     const orphanedFileId = baseFiles.systemDeleteCalls[0]!.fileId
     assert.ok(orphanedFileId.startsWith('file_'), 'systemDelete must be called with the real uploaded fileId, not a placeholder')
     assert.equal(
@@ -1298,7 +1358,10 @@ async function main(): Promise<void> {
       'reason string must be diagnostic, not empty/generic',
     )
     const orphanedFileRecord = prisma.filesById.get(orphanedFileId)
-    assert.ok(orphanedFileRecord?.deletedAt, 'orphaned FileObject must actually be marked deleted, not just have systemDelete() invoked without effect')
+    assert.ok(
+      orphanedFileRecord?.deletedAt,
+      'orphaned FileObject must actually be marked deleted, not just have systemDelete() invoked without effect',
+    )
   }
 
   {
@@ -1320,7 +1383,9 @@ async function main(): Promise<void> {
       },
       systemDelete: async (): Promise<never> => {
         systemDeleteCallCount += 1
-        throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' } })
+        throw new NotFoundException({
+          error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+        })
       },
     }
     const service = new ScanTasksService(prisma as never, racyFiles as never, passthroughCapabilities)
@@ -1382,7 +1447,9 @@ async function main(): Promise<void> {
       caught = error
     }
     assert.ok(caught instanceof ConflictException, `cancel CAS conflict: expected ConflictException, got ${(caught as Error)?.constructor.name}`)
-    const responseBody = (caught as ConflictException).getResponse() as { error?: { code?: string } }
+    const responseBody = (caught as ConflictException).getResponse() as {
+      error?: { code?: string }
+    }
     assert.equal(
       responseBody.error?.code,
       'SCAN_TASK_CANCEL_CONFLICT',
@@ -1403,20 +1470,32 @@ async function main(): Promise<void> {
     const reaper = new ScanTaskReaperTask(prisma as never)
 
     const stale = await service.create(dto, null)
-    await prisma.scanTask.updateMany({ where: { id: stale.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    await prisma.scanTask.updateMany({
+      where: { id: stale.scanTaskId, status: 'waiting' },
+      data: { status: 'matched' },
+    })
     const staleStored = prisma.scanTasksById.get(stale.scanTaskId)!
     // 4 分钟前——超过 reaper 的 3 分钟阈值。
-    prisma.scanTasksById.set(stale.scanTaskId, { ...staleStored, updatedAt: new Date(Date.now() - 4 * 60 * 1000) })
+    prisma.scanTasksById.set(stale.scanTaskId, {
+      ...staleStored,
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+    })
 
     const fresh = await service.create(dto, null)
-    await prisma.scanTask.updateMany({ where: { id: fresh.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    await prisma.scanTask.updateMany({
+      where: { id: fresh.scanTaskId, status: 'waiting' },
+      data: { status: 'matched' },
+    })
     // fresh 保持刚更新的 updatedAt（现在），在阈值内。
 
     const oldWaiting = await service.create(dto, null)
     const oldWaitingStored = prisma.scanTasksById.get(oldWaiting.scanTaskId)!
     // 同样很旧（早于阈值），但状态仍是 'waiting'，不应被这个 reaper 触碰
     // （'waiting' 的过期收敛是另一条既有的惰性过期路径，不归 B1-5 管）。
-    prisma.scanTasksById.set(oldWaiting.scanTaskId, { ...oldWaitingStored, updatedAt: new Date(Date.now() - 10 * 60 * 1000) })
+    prisma.scanTasksById.set(oldWaiting.scanTaskId, {
+      ...oldWaitingStored,
+      updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+    })
 
     await reaper.reapStuckMatched()
 
@@ -1451,11 +1530,7 @@ async function main(): Promise<void> {
     await reaper.reapStuckMatched()
     const staleAfterSecondRun = prisma.scanTasksById.get(stale.scanTaskId)!
     assert.equal(staleAfterSecondRun.status, 'failed', 'already-reaped task must remain failed on a second run')
-    assert.equal(
-      staleAfterSecondRun.errorCode,
-      staleAfterFirstRun.errorCode,
-      'second no-op run must not mutate an already-reaped task again',
-    )
+    assert.equal(staleAfterSecondRun.errorCode, staleAfterFirstRun.errorCode, 'second no-op run must not mutate an already-reaped task again')
   }
 
   {
@@ -1467,14 +1542,26 @@ async function main(): Promise<void> {
     const reaper = new ScanTaskReaperTask(prisma as never)
 
     const staleA = await service.create({ scanType: 'document', terminalId: 't_1' }, null)
-    await prisma.scanTask.updateMany({ where: { id: staleA.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    await prisma.scanTask.updateMany({
+      where: { id: staleA.scanTaskId, status: 'waiting' },
+      data: { status: 'matched' },
+    })
     const staleAStored = prisma.scanTasksById.get(staleA.scanTaskId)!
-    prisma.scanTasksById.set(staleA.scanTaskId, { ...staleAStored, updatedAt: new Date(Date.now() - 4 * 60 * 1000) })
+    prisma.scanTasksById.set(staleA.scanTaskId, {
+      ...staleAStored,
+      updatedAt: new Date(Date.now() - 4 * 60 * 1000),
+    })
 
     const staleB = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
-    await prisma.scanTask.updateMany({ where: { id: staleB.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    await prisma.scanTask.updateMany({
+      where: { id: staleB.scanTaskId, status: 'waiting' },
+      data: { status: 'matched' },
+    })
     const staleBStored = prisma.scanTasksById.get(staleB.scanTaskId)!
-    prisma.scanTasksById.set(staleB.scanTaskId, { ...staleBStored, updatedAt: new Date(Date.now() - 5 * 60 * 1000) })
+    prisma.scanTasksById.set(staleB.scanTaskId, {
+      ...staleBStored,
+      updatedAt: new Date(Date.now() - 5 * 60 * 1000),
+    })
 
     const result = await reaper.reapStuckMatched()
     assert.equal(result.count, 2, 'a single reap tick must report reaping both independently-stale matched rows across two terminals')
@@ -1535,11 +1622,7 @@ async function main(): Promise<void> {
         assert.equal(heartbeatCalls[0], created.scanTaskId, 'heartbeat must be armed for the matched task id')
         assert.ok(armedBeforeUploadStarted, 'heartbeat must be armed before FilesService.upload() begins, not after')
         assert.equal(clearedHandles.length, 1, 'heartbeat handle must be cleared exactly once on the success path')
-        assert.equal(
-          clearedHandles[0],
-          sentinelHandle,
-          'clearInterval must be called with the exact handle startMatchedHeartbeat returned',
-        )
+        assert.equal(clearedHandles[0], sentinelHandle, 'clearInterval must be called with the exact handle startMatchedHeartbeat returned')
       }
 
       {
@@ -1568,11 +1651,7 @@ async function main(): Promise<void> {
           Error,
           'upload failure must still propagate',
         )
-        assert.equal(
-          clearedHandles.length,
-          1,
-          'heartbeat handle must be cleared exactly once even when upload throws (finally guarantee)',
-        )
+        assert.equal(clearedHandles.length, 1, 'heartbeat handle must be cleared exactly once even when upload throws (finally guarantee)')
         assert.equal(clearedHandles[0], sentinelHandle)
       }
     } finally {
@@ -1588,7 +1667,10 @@ async function main(): Promise<void> {
     //      其它终态，心跳只能安静 no-op，不能把它"复活"回 matched，也不能报错。
     const { service, prisma } = makeService()
     const created = await service.create(dto, null)
-    await prisma.scanTask.updateMany({ where: { id: created.scanTaskId, status: 'waiting' }, data: { status: 'matched' } })
+    await prisma.scanTask.updateMany({
+      where: { id: created.scanTaskId, status: 'waiting' },
+      data: { status: 'matched' },
+    })
 
     const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
     let tickCount = 0
@@ -1628,11 +1710,7 @@ async function main(): Promise<void> {
     clearInterval(heartbeat2)
 
     const afterCancelledTicks = prisma.scanTasksById.get(created.scanTaskId)!
-    assert.equal(
-      afterCancelledTicks.status,
-      'cancelled',
-      'heartbeat must never resurrect a task that concurrently left the matched state',
-    )
+    assert.equal(afterCancelledTicks.status, 'cancelled', 'heartbeat must never resurrect a task that concurrently left the matched state')
     assert.equal(
       afterCancelledTicks.updatedAt.getTime(),
       cancelledSnapshotUpdatedAt,
@@ -1668,7 +1746,12 @@ async function main(): Promise<void> {
     const buffer = tinyPdf()
 
     const taskA = await service.create(dto, 'member_a')
-    const deliveredA = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+    const deliveredA = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer,
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
     // 模拟场景：另一个用户（member_b）在同一物理终端开了一个全新的等待中任务。
@@ -1676,7 +1759,12 @@ async function main(): Promise<void> {
 
     let caught: unknown
     try {
-      await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a-retry.pdf', mimeType: 'application/pdf' })
+      await service.deliverScanFile({
+        terminalId: 't_1',
+        buffer,
+        filename: 'a-retry.pdf',
+        mimeType: 'application/pdf',
+      })
     } catch (error) {
       caught = error
     }
@@ -1684,7 +1772,9 @@ async function main(): Promise<void> {
       caught instanceof ConflictException,
       `duplicate content delivery (same bytes, retried after original success) must be rejected, not silently matched to a new task — got ${(caught as Error)?.constructor?.name}`,
     )
-    const responseBody = (caught as ConflictException).getResponse() as { error?: { code?: string } }
+    const responseBody = (caught as ConflictException).getResponse() as {
+      error?: { code?: string }
+    }
     assert.equal(
       responseBody.error?.code,
       'SCAN_FILE_ALREADY_DELIVERED',
@@ -1693,7 +1783,11 @@ async function main(): Promise<void> {
 
     // taskB 必须原封不动地保持 waiting——绝不能被这次重复投递偷走匹配、挂上别人的文件。
     const taskBAfter = prisma.scanTasksById.get(taskB.scanTaskId)!
-    assert.equal(taskBAfter.status, 'waiting', 'the duplicate-content delivery must NOT consume/match an unrelated waiting task belonging to a different user')
+    assert.equal(
+      taskBAfter.status,
+      'waiting',
+      'the duplicate-content delivery must NOT consume/match an unrelated waiting task belonging to a different user',
+    )
     assert.equal(taskBAfter.fileId, null, 'the unrelated waiting task must not end up with any fileId attached')
   }
 
@@ -1702,12 +1796,22 @@ async function main(): Promise<void> {
     // 内容判断，两次内容不同的合法投递都必须正常成功，不能被误伤。
     const { service } = makeService()
     const taskA = await service.create(dto, null)
-    const deliveredA = await service.deliverScanFile({ terminalId: 't_1', buffer: tinyPdf(), filename: 'a.pdf', mimeType: 'application/pdf' })
+    const deliveredA = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: tinyPdf(),
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(deliveredA.scanTaskId, taskA.scanTaskId)
 
     const taskB = await service.create(dto, null)
     const differentBuffer = Buffer.from('%PDF-1.4\ncompletely different content, not a duplicate\n%%EOF\n', 'latin1')
-    const deliveredB = await service.deliverScanFile({ terminalId: 't_1', buffer: differentBuffer, filename: 'b.pdf', mimeType: 'application/pdf' })
+    const deliveredB = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer: differentBuffer,
+      filename: 'b.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(
       deliveredB.scanTaskId,
       taskB.scanTaskId,
@@ -1724,7 +1828,12 @@ async function main(): Promise<void> {
     const { service, prisma } = makeService()
     const buffer = tinyPdf()
     const taskA = await service.create(dto, null)
-    await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+    await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer,
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
 
     // 把 taskA 的 updatedAt 手工回拨到去重窗口之外（2 小时 + 5 分钟前）。
     const taskAStored = prisma.scanTasksById.get(taskA.scanTaskId)!
@@ -1734,7 +1843,12 @@ async function main(): Promise<void> {
     })
 
     const taskB = await service.create(dto, null)
-    const deliveredB = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a-retry-old.pdf', mimeType: 'application/pdf' })
+    const deliveredB = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer,
+      filename: 'a-retry-old.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(
       deliveredB.scanTaskId,
       taskB.scanTaskId,
@@ -1749,10 +1863,20 @@ async function main(): Promise<void> {
     const { service } = makeService()
     const buffer = tinyPdf()
     await service.create({ scanType: 'document', terminalId: 't_1' }, null)
-    await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'a.pdf', mimeType: 'application/pdf' })
+    await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer,
+      filename: 'a.pdf',
+      mimeType: 'application/pdf',
+    })
 
     const taskT2 = await service.create({ scanType: 'document', terminalId: 't_2' }, null)
-    const deliveredT2 = await service.deliverScanFile({ terminalId: 't_2', buffer, filename: 'a-on-t2.pdf', mimeType: 'application/pdf' })
+    const deliveredT2 = await service.deliverScanFile({
+      terminalId: 't_2',
+      buffer,
+      filename: 'a-on-t2.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(
       deliveredT2.scanTaskId,
       taskT2.scanTaskId,
@@ -1790,7 +1914,13 @@ async function main(): Promise<void> {
     const buffer = tinyPdf()
 
     await expectRejects(
-      () => service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'race.pdf', mimeType: 'application/pdf' }),
+      () =>
+        service.deliverScanFile({
+          terminalId: 't_1',
+          buffer,
+          filename: 'race.pdf',
+          mimeType: 'application/pdf',
+        }),
       ConflictException,
       'first attempt must hit SCAN_TASK_STATE_CHANGED as before (unrelated to this new dedup check)',
     )
@@ -1801,7 +1931,12 @@ async function main(): Promise<void> {
     )
 
     const taskB = await service.create(dto, null)
-    const deliveredRetry = await service.deliverScanFile({ terminalId: 't_1', buffer, filename: 'race-retry.pdf', mimeType: 'application/pdf' })
+    const deliveredRetry = await service.deliverScanFile({
+      terminalId: 't_1',
+      buffer,
+      filename: 'race-retry.pdf',
+      mimeType: 'application/pdf',
+    })
     assert.equal(
       deliveredRetry.scanTaskId,
       taskB.scanTaskId,

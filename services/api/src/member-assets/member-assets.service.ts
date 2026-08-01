@@ -1,12 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
-import type {
-  MemberAiRecordItem,
-  MemberAssetPage,
-  MemberDocumentItem,
-  MemberResumeItem,
-} from './member-assets.types'
+import type { MemberAiRecordItem, MemberAssetPage, MemberDocumentItem, MemberResumeItem } from './member-assets.types'
 import { allowedPoliciesForFile, isVisibleMemberFileWhere } from '../files/retention-policy'
 
 // ============================================================
@@ -47,7 +42,16 @@ export class MemberAssetsService {
     const total = await this.prisma.aiResumeResult.count({ where })
     const rows = await this.prisma.aiResumeResult.findMany({
       where,
-      select: { id: true, taskId: true, kind: true, status: true, provider: true, createdAt: true, updatedAt: true, expiresAt: true },
+      select: {
+        id: true,
+        taskId: true,
+        kind: true,
+        status: true,
+        provider: true,
+        createdAt: true,
+        updatedAt: true,
+        expiresAt: true,
+      },
       ...memberPageArgs(page),
     })
     // 仅查当前页 parse 行对应的 optimize 行（同样限定本人），标注「已生成优化版」。
@@ -77,13 +81,29 @@ export class MemberAssetsService {
 
   /** 我的文档：本人 FileObject（仅元数据 + 临时访问端点路径，无文件内容）。 */
   async listDocuments(endUserId: string, page: MemberPageQuery): Promise<MemberAssetPage<MemberDocumentItem>> {
-    const where = { ...isVisibleMemberFileWhere(endUserId, new Date()), purpose: { not: 'signature_image' } }
+    const where = {
+      ...isVisibleMemberFileWhere(endUserId, new Date()),
+      purpose: { notIn: ['signature_image', 'contract_upload'] },
+      AND: [
+        {
+          OR: [{ retentionLockedReason: null }, { retentionLockedReason: { not: 'contract_review_session_only' } }],
+        },
+      ],
+    }
     const total = await this.prisma.fileObject.count({ where })
     const rows = await this.prisma.fileObject.findMany({
       where,
       select: {
-        id: true, filename: true, mimeType: true, sizeBytes: true,
-        purpose: true, sensitiveLevel: true, assetCategory: true, retentionPolicy: true, createdAt: true, expiresAt: true,
+        id: true,
+        filename: true,
+        mimeType: true,
+        sizeBytes: true,
+        purpose: true,
+        sensitiveLevel: true,
+        assetCategory: true,
+        retentionPolicy: true,
+        createdAt: true,
+        expiresAt: true,
       },
       ...memberPageArgs(page),
     })
@@ -114,14 +134,25 @@ export class MemberAssetsService {
     const total = await this.prisma.aiResumeResult.count({ where })
     const rows = await this.prisma.aiResumeResult.findMany({
       where,
-      select: { id: true, taskId: true, kind: true, status: true, provider: true, createdAt: true, expiresAt: true },
+      select: {
+        id: true,
+        taskId: true,
+        kind: true,
+        status: true,
+        provider: true,
+        createdAt: true,
+        expiresAt: true,
+      },
       ...memberPageArgs(page),
     })
     return buildMemberPage(rows, page, total, (r) => ({
       id: r.id,
       taskId: r.taskId,
       // generate 必须如实展示为「生成」，绝不冒充「解析」（C-2D 验收点）。
-      kind: r.kind === 'optimize' || r.kind === 'generate' || r.kind === 'job_fit' || r.kind === 'career_plan' || r.kind === 'fair_visit_plan' ? r.kind : ('parse' as const),
+      kind:
+        r.kind === 'optimize' || r.kind === 'generate' || r.kind === 'job_fit' || r.kind === 'career_plan' || r.kind === 'fair_visit_plan'
+          ? r.kind
+          : ('parse' as const),
       status: r.status,
       provider: r.provider,
       createdAt: r.createdAt.toISOString(),
@@ -150,9 +181,7 @@ export class MemberAssetsService {
       })
       if (!row) return null
       const results = await tx.aiResumeResult.deleteMany({
-        where: row.kind === 'parse'
-          ? { endUserId, taskId: row.taskId }
-          : { endUserId, id: row.id },
+        where: row.kind === 'parse' ? { endUserId, taskId: row.taskId } : { endUserId, id: row.id },
       })
       // 并发删除已先一步移除目标时，不得再按 taskId 清理会话。
       if (results.count === 0) return null
@@ -187,10 +216,7 @@ export class MemberAssetsService {
    * - 归属：findFirst 同时限定 id + endUserId；删他人 / 不存在统一 404。
    * - 与 deleteAiRecord 共享相同的事务策略，不新增 DB schema。
    */
-  async deleteResume(
-    endUserId: string,
-    recordId: string,
-  ): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
+  async deleteResume(endUserId: string, recordId: string): Promise<{ deleted: true; taskId: string; kind: string; deletedCount: number }> {
     const deletion = await this.prisma.$transaction(async (tx) => {
       const row = await tx.aiResumeResult.findFirst({
         where: { id: recordId, endUserId, kind: { in: ['parse', 'generate'] } },
@@ -198,9 +224,7 @@ export class MemberAssetsService {
       })
       if (!row) return null
       const results = await tx.aiResumeResult.deleteMany({
-        where: row.kind === 'parse'
-          ? { endUserId, taskId: row.taskId }
-          : { endUserId, id: row.id },
+        where: row.kind === 'parse' ? { endUserId, taskId: row.taskId } : { endUserId, id: row.id },
       })
       if (results.count === 0) return null
       if (row.kind === 'parse') {

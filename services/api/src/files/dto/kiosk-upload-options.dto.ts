@@ -9,14 +9,6 @@ import { IsIn } from 'class-validator'
  *     防止恶意调用方把证件/匿名/system_short 文件伪装成普通短期文件)
  */
 export class KioskUploadOptionsDto {
-  @IsIn([
-    'resume_upload',
-    'resume_scan',
-    'id_scan',
-    'print_doc',
-    'fair_material',
-    'cover_letter',
-    'signature_image',
-  ])
+  @IsIn(['resume_upload', 'resume_scan', 'id_scan', 'print_doc', 'fair_material', 'cover_letter', 'contract_upload', 'signature_image'])
   purpose!: string
 }

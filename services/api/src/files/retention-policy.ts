@@ -10,6 +10,7 @@ import {
 } from './file.types'
 
 const DAY_MS = 24 * 60 * 60 * 1000
+export const CONTRACT_REVIEW_TTL_MS = 2 * 60 * 60 * 1000
 
 const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>(['resume_upload', 'resume_scan', 'cover_letter'])
 
@@ -51,11 +52,17 @@ export interface RetentionUpdateInput extends RetentionUploadInput {
 
 export function defaultRetentionForUpload(input: RetentionUploadInput): RetentionDecision {
   const now = input.now ?? new Date()
+  if (input.purpose === 'contract_upload') {
+    return {
+      expiresAt: new Date(now.getTime() + CONTRACT_REVIEW_TTL_MS),
+      retentionPolicy: 'system_short',
+      retentionSetBy: 'system',
+      retentionConsentAt: null,
+      retentionConsentVersion: null,
+    }
+  }
   // 会员账号内简历类文件默认保存 90 天；证件、匿名、系统和机构素材保持短 TTL。
-  const policy =
-    input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose)
-      ? 'months_3'
-      : 'system_short'
+  const policy = input.ownerType === 'user' && input.endUserId && MEMBER_DEFAULT_PURPOSES.has(input.purpose) ? 'months_3' : 'system_short'
   return buildDecision({
     policy,
     sensitiveLevel: input.sensitiveLevel,
@@ -73,7 +80,7 @@ export function computeRetentionDecision(input: RetentionUpdateInput): Retention
     sensitiveLevel: input.sensitiveLevel,
     now,
     setBy: 'user',
-    consentVersion: requiresConsent(input.policy) ? input.consentVersion ?? null : null,
+    consentVersion: requiresConsent(input.policy) ? (input.consentVersion ?? null) : null,
   })
 }
 
@@ -83,6 +90,7 @@ export function allowedPoliciesForFile(input: {
 }): FileRetentionPolicy[] {
   if (input.purpose === 'id_scan') return ['system_short']
   if (input.purpose === 'signature_image') return ['system_short']
+  if (input.purpose === 'contract_upload') return ['system_short']
   if (input.assetCategory === 'optimized' || input.assetCategory === 'derived') {
     return ['months_3', 'months_6', 'long_term']
   }
@@ -147,11 +155,7 @@ function buildDecision(args: {
   }
 }
 
-function expiresAtForPolicy(
-  policy: FileRetentionPolicy,
-  sensitiveLevel: FileSensitiveLevel,
-  now: Date,
-): Date | null {
+function expiresAtForPolicy(policy: FileRetentionPolicy, sensitiveLevel: FileSensitiveLevel, now: Date): Date | null {
   if (policy === 'months_3') return new Date(now.getTime() + 90 * DAY_MS)
   if (policy === 'months_6') return new Date(now.getTime() + 180 * DAY_MS)
   if (policy === 'long_term') return null

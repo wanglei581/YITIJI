@@ -1,8 +1,8 @@
 import { IsIn, IsString, MaxLength, MinLength } from 'class-validator'
 
 export class CreateScanTaskDto {
-  @IsIn(['resume', 'id', 'document'])
-  scanType!: 'resume' | 'id' | 'document'
+  @IsIn(['resume', 'id', 'document', 'contract'])
+  scanType!: 'resume' | 'id' | 'document' | 'contract'
 
   @IsString()
   @MinLength(1)

@@ -1,26 +1,12 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common'
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto'
-import type {
-  FilePurpose,
-  FileSensitiveLevel,
-  FileUploadResponse,
-} from '../files/file.types'
+import type { FilePurpose, FileSensitiveLevel, FileUploadResponse } from '../files/file.types'
 import { FilesService } from '../files/files.service'
 import { defaultRetentionForUpload } from '../files/retention-policy'
 import { signFileUrl } from '../files/signing'
 import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../common/redis/redis.service'
-import type {
-  UploadSessionChannel,
-  UploadSessionMode,
-  UploadSessionStatus,
-} from './upload-sessions.dto'
+import type { UploadSessionChannel, UploadSessionMode, UploadSessionStatus } from './upload-sessions.dto'
 
 export interface CreateUploadSessionInput {
   purpose: FilePurpose
@@ -96,7 +82,12 @@ const MAX_SESSION_UPLOAD_BYTES = 10 * 1024 * 1024
 const PRINT_UPLOAD_URL_TTL_MS = 30 * 60 * 1000
 const SESSION_PREFIX = 'upload_session:'
 const UPLOAD_LOCK_PREFIX = 'upload_session_upload_lock:'
-const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set(['resume_upload', 'print_doc', 'signature_image'])
+const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set([
+  'resume_upload',
+  'print_doc',
+  'signature_image',
+  'contract_upload',
+])
 
 @Injectable()
 export class UploadSessionsService {
@@ -108,10 +99,17 @@ export class UploadSessionsService {
 
   async create(input: CreateUploadSessionInput): Promise<UploadSessionCreateResponse> {
     if (!SUPPORTED_UPLOAD_SESSION_PURPOSES.has(input.purpose)) {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_PURPOSE_UNSUPPORTED', message: '当前用途不支持扫码上传会话' } })
+      throw new BadRequestException({
+        error: {
+          code: 'UPLOAD_SESSION_PURPOSE_UNSUPPORTED',
+          message: '当前用途不支持扫码上传会话',
+        },
+      })
     }
     if (input.mode === 'member' && !input.endUserId) {
-      throw new UnauthorizedException({ error: { code: 'MEMBER_AUTH_REQUIRED', message: '会员上传会话需要先在终端登录' } })
+      throw new UnauthorizedException({
+        error: { code: 'MEMBER_AUTH_REQUIRED', message: '会员上传会话需要先在终端登录' },
+      })
     }
 
     const sessionId = randomUUID().replace(/-/g, '')
@@ -126,7 +124,7 @@ export class UploadSessionsService {
       channel: input.channel,
       status: 'pending',
       terminalId: input.terminalId?.trim() || null,
-      pendingEndUserId: input.mode === 'member' ? input.endUserId ?? null : null,
+      pendingEndUserId: input.mode === 'member' ? (input.endUserId ?? null) : null,
       uploadTokenHash: hashToken(uploadToken),
       controlTokenHash: hashToken(controlToken),
       file: null,
@@ -164,39 +162,57 @@ export class UploadSessionsService {
     file: Express.Multer.File
   }): Promise<UploadSessionStatusResponse> {
     if (!args.file) {
-      throw new BadRequestException({ error: { code: 'FILE_REQUIRED', message: '请选择要上传的文件' } })
+      throw new BadRequestException({
+        error: { code: 'FILE_REQUIRED', message: '请选择要上传的文件' },
+      })
     }
     if (args.file.size > MAX_SESSION_UPLOAD_BYTES || args.file.buffer.length > MAX_SESSION_UPLOAD_BYTES) {
-      throw new BadRequestException({ error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传文件不能超过 10MB' } })
+      throw new BadRequestException({
+        error: { code: 'FILE_TOO_LARGE', message: '手机扫码上传文件不能超过 10MB' },
+      })
     }
 
     const record = this.markExpired(await this.load(args.sessionId))
     if (record.status === 'expired') {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请在终端重新生成' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请在终端重新生成' },
+      })
     }
     if (record.status !== 'pending') {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
+      })
     }
     if (!safeEquals(record.uploadTokenHash, hashToken(args.uploadToken))) {
-      throw new ForbiddenException({ error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' } })
+      throw new ForbiddenException({
+        error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' },
+      })
     }
 
     const lockKey = uploadLockKey(args.sessionId)
     const lockAcquired = await this.redis.setNxEx(lockKey, randomUUID(), UPLOAD_LOCK_TTL_SECONDS)
     if (!lockAcquired) {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_UPLOAD_IN_PROGRESS', message: '该二维码正在上传中,请稍候' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_UPLOAD_IN_PROGRESS', message: '该二维码正在上传中,请稍候' },
+      })
     }
 
     try {
       const latest = this.markExpired(await this.load(args.sessionId))
       if (latest.status === 'expired') {
-        throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请在终端重新生成' } })
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请在终端重新生成' },
+        })
       }
       if (latest.status !== 'pending') {
-        throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' } })
+        throw new BadRequestException({
+          error: { code: 'UPLOAD_SESSION_NOT_PENDING', message: '该二维码已使用,请重新生成' },
+        })
       }
       if (!safeEquals(latest.uploadTokenHash, hashToken(args.uploadToken))) {
-        throw new ForbiddenException({ error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' } })
+        throw new ForbiddenException({
+          error: { code: 'UPLOAD_TOKEN_INVALID', message: '上传令牌无效' },
+        })
       }
 
       const uploading: StoredUploadSession = { ...latest, status: 'uploading' }
@@ -240,15 +256,21 @@ export class UploadSessionsService {
     this.assertControlToken(record, controlToken)
     if (record.status === 'expired') {
       await this.cleanupAbandonedFile(record, 'upload session expired before confirm')
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
+      })
     }
     if (record.status !== 'uploaded' || !record.file) {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_NOT_READY', message: '手机端尚未上传文件' },
+      })
     }
     let confirmedFile = record.file
     if (record.mode === 'member') {
       if (!endUserId || endUserId !== record.pendingEndUserId) {
-        throw new ForbiddenException({ error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' } })
+        throw new ForbiddenException({
+          error: { code: 'UPLOAD_SESSION_MEMBER_MISMATCH', message: '会员身份与上传会话不一致' },
+        })
       }
       const boundFile = await this.bindMemberFile(record.file.fileId, endUserId)
       confirmedFile = {
@@ -279,7 +301,9 @@ export class UploadSessionsService {
     const record = await this.load(sessionId)
     this.assertControlToken(record, controlToken)
     if (record.status === 'confirmed') {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_CONFIRMED', message: '已确认的上传会话不能取消' },
+      })
     }
     await this.cleanupAbandonedFile(record, 'upload session cancelled')
     const cancelled: StoredUploadSession = { ...record, status: 'cancelled', file: null }
@@ -300,7 +324,9 @@ export class UploadSessionsService {
   private async bindMemberFile(fileId: string, endUserId: string): Promise<{ expiresAt: Date | null }> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (!file || file.deletedAt) {
-      throw new NotFoundException({ error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' } })
+      throw new NotFoundException({
+        error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' },
+      })
     }
     const retention = defaultRetentionForUpload({
       purpose: file.purpose as FilePurpose,
@@ -308,17 +334,29 @@ export class UploadSessionsService {
       ownerType: 'user',
       endUserId,
     })
+    const isContractUpload = file.purpose === 'contract_upload'
+    const contractExpiry =
+      isContractUpload && file.expiresAt && retention.expiresAt && file.expiresAt <= retention.expiresAt
+        ? file.expiresAt
+        : retention.expiresAt
     return this.prisma.fileObject.update({
       where: { id: fileId },
       data: {
         endUserId,
         ownerType: 'user',
         ownerId: endUserId,
-        expiresAt: retention.expiresAt,
+        expiresAt: contractExpiry,
         retentionPolicy: retention.retentionPolicy,
         retentionSetBy: retention.retentionSetBy,
         retentionConsentAt: retention.retentionConsentAt,
         retentionConsentVersion: retention.retentionConsentVersion,
+        ...(isContractUpload
+          ? {
+              sensitiveLevel: 'highly_sensitive',
+              visibility: 'private',
+              retentionLockedReason: 'contract_review_session_only',
+            }
+          : {}),
       },
       select: { expiresAt: true },
     })
@@ -327,7 +365,9 @@ export class UploadSessionsService {
   private async load(sessionId: string): Promise<StoredUploadSession> {
     const raw = await this.redis.get(sessionKey(sessionId))
     if (!raw) {
-      throw new NotFoundException({ error: { code: 'UPLOAD_SESSION_NOT_FOUND', message: '上传会话不存在或已过期' } })
+      throw new NotFoundException({
+        error: { code: 'UPLOAD_SESSION_NOT_FOUND', message: '上传会话不存在或已过期' },
+      })
     }
     return JSON.parse(raw) as StoredUploadSession
   }
@@ -335,7 +375,9 @@ export class UploadSessionsService {
   private async persist(record: StoredUploadSession): Promise<void> {
     const ttl = await this.redis.ttl(sessionKey(record.sessionId))
     if (ttl <= 0) {
-      throw new BadRequestException({ error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' } })
+      throw new BadRequestException({
+        error: { code: 'UPLOAD_SESSION_EXPIRED', message: '二维码已过期,请重新生成' },
+      })
     }
     await this.redis.setExistingWithCurrentTtl(sessionKey(record.sessionId), JSON.stringify(record))
   }
@@ -361,7 +403,9 @@ export class UploadSessionsService {
 
   private assertControlToken(record: StoredUploadSession, controlToken: string | undefined): void {
     if (!controlToken || !safeEquals(record.controlTokenHash, hashToken(controlToken))) {
-      throw new ForbiddenException({ error: { code: 'UPLOAD_SESSION_CONTROL_INVALID', message: '上传会话控制令牌无效' } })
+      throw new ForbiddenException({
+        error: { code: 'UPLOAD_SESSION_CONTROL_INVALID', message: '上传会话控制令牌无效' },
+      })
     }
   }
 }
