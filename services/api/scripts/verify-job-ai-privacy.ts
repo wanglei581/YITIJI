@@ -12,6 +12,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import ts from 'typescript'
 
 let failed = 0
 
@@ -50,24 +51,58 @@ function mustNotContain(source: string, markers: string[], label: string): void 
   else pass(label)
 }
 
+export function assertExactStringLiteralUnion(
+  source: string,
+  typeName: string,
+  expectedMembers: readonly string[]
+): void {
+  const sourceFile = ts.createSourceFile(
+    'consent-scope.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  )
+  const aliases = sourceFile.statements.filter(
+    (statement): statement is ts.TypeAliasDeclaration =>
+      ts.isTypeAliasDeclaration(statement) && statement.name.text === typeName
+  )
+  if (aliases.length !== 1) {
+    throw new Error(`${typeName}: expected exactly one type alias`)
+  }
+  const aliasType = aliases[0].type
+  if (!ts.isUnionTypeNode(aliasType)) {
+    throw new Error(`${typeName}: expected a union type`)
+  }
+  const actualMembers = aliasType.types.map((member) => {
+    if (!ts.isLiteralTypeNode(member) || !ts.isStringLiteral(member.literal)) {
+      throw new Error(`${typeName}: union members must be string literal types`)
+    }
+    return member.literal.text
+  })
+  if (new Set(actualMembers).size !== actualMembers.length) {
+    throw new Error(`${typeName}: duplicate union member`)
+  }
+  const actual = [...actualMembers].sort()
+  const expected = [...new Set(expectedMembers)].sort()
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(
+      `${typeName}: expected ${expected.join(' | ')}; received ${actual.join(' | ') || 'none'}`
+    )
+  }
+}
+
 function mustHaveStringLiteralUnion(
   source: string,
   typeName: string,
-  expectedMembers: string[],
+  expectedMembers: readonly string[],
   label: string
 ): void {
-  const escapedTypeName = typeName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const start = new RegExp(`export\\s+type\\s+${escapedTypeName}\\s*=`).exec(source)
-  const remainder = start ? source.slice((start.index ?? 0) + start[0].length) : ''
-  const nextExport = remainder.search(/\n\s*export\s+(?:type|interface|const|class|function)\b/)
-  const declaration = nextExport >= 0 ? remainder.slice(0, nextExport) : remainder
-  const actualMembers = [...declaration.matchAll(/['"]([^'"]+)['"]/g)].map((match) => match[1])
-  const actual = [...new Set(actualMembers)].sort()
-  const expected = [...new Set(expectedMembers)].sort()
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    fail(`${label} — 期望: ${expected.join(' | ')}; 实际: ${actual.join(' | ') || '未找到'}`)
-  } else {
+  try {
+    assertExactStringLiteralUnion(source, typeName, expectedMembers)
     pass(label)
+  } catch (error) {
+    fail(`${label} — ${error instanceof Error ? error.message : 'AST validation failed'}`)
   }
 }
 
@@ -327,7 +362,9 @@ async function main(): Promise<void> {
   console.log('✅ ALL PASS — 岗位 AI 用户同意 / 隐私 / 配额治理门禁一致\n')
 }
 
-main().catch((error) => {
-  console.error(error)
-  process.exit(1)
-})
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
+}

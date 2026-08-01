@@ -21,7 +21,17 @@ import {
 } from '../../member-privacy/member-privacy.service'
 import type { MemberAiConsentScope } from '../../member-privacy/member-privacy.types'
 
+const assertExactStringLiteralUnion =
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  (require('../../../scripts/verify-job-ai-privacy') as Record<string, unknown>)
+    .assertExactStringLiteralUnion as (
+    source: string,
+    typeName: string,
+    expectedMembers: readonly string[]
+  ) => void
+
 const CONTRACT_VERSION = 'contract-review-consent-v1'
+const EXPECTED_CONSENT_SCOPES = ['job_ai', 'contract_review'] as const
 const repoRoot = resolve(__dirname, '../../../../..')
 const PROCESSING_STATUSES = [
   'uploaded',
@@ -258,6 +268,21 @@ function consent(
   }
 }
 
+function contractConsent(
+  id: string,
+  consentVersion: string,
+  grantedAt: string,
+  revokedAt?: string
+): ConsentRecord {
+  return consent(
+    id,
+    'contract_review',
+    consentVersion,
+    revokedAt ? new Date(revokedAt) : null,
+    new Date(grantedAt)
+  )
+}
+
 function contractStatus(statuses: Awaited<ReturnType<MemberPrivacyService['getConsentStatus']>>) {
   const status = statuses.find((item) => item.scope === 'contract_review')
   assert.ok(status)
@@ -354,19 +379,41 @@ test('contract consent verifier is registered and enforced in the main CI contra
     readFileSync(resolve(repoRoot, 'services/api/package.json'), 'utf8')
   ) as { scripts: Record<string, string> }
   const ci = readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
-  const verifier = readFileSync(
-    resolve(repoRoot, 'services/api/scripts/verify-job-ai-privacy.ts'),
-    'utf8'
-  )
   const mainJob = ci.slice(ci.indexOf('  build-and-verify:'), ci.indexOf('  postgres-readiness:'))
-
   assert.equal(
     packageJson.scripts['verify:contract-review:consent'],
     'node -r @swc-node/register --test src/contract-review/__tests__/contract-review-consent.test.ts'
   )
   assert.match(mainJob, /pnpm --filter @ai-job-print\/api verify:contract-review:consent/)
-  assert.match(verifier, /mustHaveStringLiteralUnion/)
-  assert.match(verifier, /MemberAiConsentScope/)
+})
+
+test('consent scope verifier requires an exact string-literal-only union AST', () => {
+  const validFixtures = [
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review'`,
+    `export type MemberAiConsentScope =
+      "contract_review"
+      | "job_ai"`,
+  ]
+  for (const source of validFixtures) {
+    assert.doesNotThrow(() =>
+      assertExactStringLiteralUnion(source, 'MemberAiConsentScope', EXPECTED_CONSENT_SCOPES)
+    )
+  }
+  const invalidFixtures = [
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'other'`,
+    `export type MemberAiConsentScope = 'job_ai'`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | string`,
+    `type OtherScope = 'other'; export type MemberAiConsentScope = ('job_ai' | 'contract_review') & OtherScope`,
+    `const scopes = ['job_ai', 'contract_review'] as const; export type MemberAiConsentScope = typeof scopes[number]`,
+    `export type MemberAiConsentScope = 'job_ai' | 'contract_review' | 'job_ai'`,
+    `export type AnotherScope = 'job_ai' | 'contract_review'`,
+  ]
+  for (const source of invalidFixtures) {
+    assert.throws(
+      () => assertExactStringLiteralUnion(source, 'MemberAiConsentScope', EXPECTED_CONSENT_SCOPES),
+      /MemberAiConsentScope/
+    )
+  }
 })
 
 test('getConsentStatus returns independent job and contract review status entries', async () => {
@@ -484,20 +531,8 @@ test('prototype and unknown scope keys fail closed before every Prisma path', as
 
 test('latest old-version event makes status false and require deny', async () => {
   const harness = makePrivacyHarness([
-    consent(
-      'current-older',
-      'contract_review',
-      CONTRACT_VERSION,
-      null,
-      new Date('2026-08-01T00:00:00.000Z')
-    ),
-    consent(
-      'old-newer',
-      'contract_review',
-      'contract-review-consent-v0',
-      null,
-      new Date('2026-08-01T00:01:00.000Z')
-    ),
+    contractConsent('current-older', CONTRACT_VERSION, '2026-08-01T00:00:00.000Z'),
+    contractConsent('old-newer', 'contract-review-consent-v0', '2026-08-01T00:01:00.000Z'),
   ])
 
   assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, false)
@@ -508,20 +543,8 @@ test('latest old-version event makes status false and require deny', async () =>
 
 test('latest current-version event makes status and require allow', async () => {
   const harness = makePrivacyHarness([
-    consent(
-      'old-older',
-      'contract_review',
-      'contract-review-consent-v0',
-      null,
-      new Date('2026-08-01T00:00:00.000Z')
-    ),
-    consent(
-      'current-newer',
-      'contract_review',
-      CONTRACT_VERSION,
-      null,
-      new Date('2026-08-01T00:01:00.000Z')
-    ),
+    contractConsent('old-older', 'contract-review-consent-v0', '2026-08-01T00:00:00.000Z'),
+    contractConsent('current-newer', CONTRACT_VERSION, '2026-08-01T00:01:00.000Z'),
   ])
 
   assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, true)
@@ -532,19 +555,12 @@ test('latest current-version event makes status and require allow', async () => 
 
 test('latest revoked current event overrides an earlier active current event', async () => {
   const harness = makePrivacyHarness([
-    consent(
-      'active-older',
-      'contract_review',
-      CONTRACT_VERSION,
-      null,
-      new Date('2026-08-01T00:00:00.000Z')
-    ),
-    consent(
+    contractConsent('active-older', CONTRACT_VERSION, '2026-08-01T00:00:00.000Z'),
+    contractConsent(
       'revoked-newer',
-      'contract_review',
       CONTRACT_VERSION,
-      new Date('2026-08-01T00:02:00.000Z'),
-      new Date('2026-08-01T00:01:00.000Z')
+      '2026-08-01T00:01:00.000Z',
+      '2026-08-01T00:02:00.000Z'
     ),
   ])
 
@@ -558,12 +574,11 @@ test('same grantedAt uses id desc as the latest-event tie-break for status and r
   const grantedAt = new Date('2026-08-01T00:00:00.000Z')
   const harness = makePrivacyHarness([
     consent('event-a-active', 'contract_review', CONTRACT_VERSION, null, grantedAt),
-    consent(
+    contractConsent(
       'event-z-revoked',
-      'contract_review',
       CONTRACT_VERSION,
-      new Date('2026-08-01T00:02:00.000Z'),
-      grantedAt
+      grantedAt.toISOString(),
+      '2026-08-01T00:02:00.000Z'
     ),
   ])
 
