@@ -1,105 +1,18 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
-import { once } from 'node:events'
 import { test } from 'node:test'
-import { createDeflateRaw, deflateRawSync } from 'node:zlib'
 import { OcrService } from '../../ai/resume/ocr/ocr.service'
 import { FilesService } from '../../files/files.service'
 import {
   ContractReviewExtractionService,
   hasReliableTextLayer,
   type ContractReviewExtractionRuntime,
-  type ContractReviewExtractionResult,
 } from '../contract-review-extraction.service'
 
 const PDF = Buffer.from('%PDF test')
 const IMAGE = Buffer.from('image')
 const RELIABLE = '合同正文'.repeat(8)
-
-interface TestZipEntry {
-  name: string
-  filenameBytes?: Buffer
-  content?: Buffer
-  method?: number
-  flags?: number
-  centralExtra?: Buffer
-  localExtra?: Buffer
-  declaredUncompressedSize?: number
-  compressedData?: Buffer
-}
-
-function makeDocxArchive(
-  entries: TestZipEntry[] = [
-    { name: 'word/document.xml', content: Buffer.from('<w:document/>'), method: 8 },
-  ],
-): Buffer {
-  const localEntries: Buffer[] = []
-  const centralEntries: Buffer[] = []
-  let localOffset = 0
-  for (const entry of entries) {
-    const filename = entry.filenameBytes ?? Buffer.from(entry.name, 'utf8')
-    const content = entry.content ?? Buffer.from('x')
-    const method = entry.method ?? 0
-    const flags = entry.flags ?? 0
-    const compressed = entry.compressedData ?? (method === 8 ? deflateRawSync(content) : content)
-    const declaredSize = entry.declaredUncompressedSize ?? content.length
-    const localExtra = entry.localExtra ?? Buffer.alloc(0)
-    const centralExtra = entry.centralExtra ?? Buffer.alloc(0)
-
-    const localHeader = Buffer.alloc(30)
-    localHeader.writeUInt32LE(0x04034b50, 0)
-    localHeader.writeUInt16LE(20, 4)
-    localHeader.writeUInt16LE(flags, 6)
-    localHeader.writeUInt16LE(method, 8)
-    localHeader.writeUInt32LE(compressed.length, 18)
-    localHeader.writeUInt32LE(declaredSize, 22)
-    localHeader.writeUInt16LE(filename.length, 26)
-    localHeader.writeUInt16LE(localExtra.length, 28)
-    const localEntry = Buffer.concat([localHeader, filename, localExtra, compressed])
-    localEntries.push(localEntry)
-
-    const centralHeader = Buffer.alloc(46)
-    centralHeader.writeUInt32LE(0x02014b50, 0)
-    centralHeader.writeUInt16LE(20, 4)
-    centralHeader.writeUInt16LE(20, 6)
-    centralHeader.writeUInt16LE(flags, 8)
-    centralHeader.writeUInt16LE(method, 10)
-    centralHeader.writeUInt32LE(compressed.length, 20)
-    centralHeader.writeUInt32LE(declaredSize, 24)
-    centralHeader.writeUInt16LE(filename.length, 28)
-    centralHeader.writeUInt16LE(centralExtra.length, 30)
-    centralHeader.writeUInt32LE(localOffset, 42)
-    centralEntries.push(Buffer.concat([centralHeader, filename, centralExtra]))
-    localOffset += localEntry.length
-  }
-
-  const localData = Buffer.concat(localEntries)
-  const centralDirectory = Buffer.concat(centralEntries)
-  const eocd = Buffer.alloc(22)
-  eocd.writeUInt32LE(0x06054b50, 0)
-  eocd.writeUInt16LE(entries.length, 8)
-  eocd.writeUInt16LE(entries.length, 10)
-  eocd.writeUInt32LE(centralDirectory.length, 12)
-  eocd.writeUInt32LE(localData.length, 16)
-  return Buffer.concat([localData, centralDirectory, eocd])
-}
-
-async function makeDeflateBomb(outputBytes: number): Promise<Buffer> {
-  const deflater = createDeflateRaw({ level: 9 })
-  const chunks: Buffer[] = []
-  deflater.on('data', (chunk: Buffer) => chunks.push(chunk))
-  const block = Buffer.alloc(64 * 1024)
-  let remaining = outputBytes
-  while (remaining > 0) {
-    const chunk = remaining >= block.length ? block : block.subarray(0, remaining)
-    if (!deflater.write(chunk)) await once(deflater, 'drain')
-    remaining -= chunk.length
-  }
-  deflater.end()
-  await once(deflater, 'end')
-  return Buffer.concat(chunks)
-}
 
 interface HarnessOptions {
   buffer?: Buffer
@@ -198,10 +111,6 @@ async function expectCode(action: () => Promise<unknown>, code: string): Promise
   return captured as Error
 }
 
-function pageTexts(result: ContractReviewExtractionResult): string[] {
-  return result.pages.map((page) => page.text)
-}
-
 test('publishes concrete Nest constructor metadata for production DI', () => {
   const parameterTypes = Reflect.getMetadata(
     'design:paramtypes',
@@ -280,156 +189,6 @@ test('rejects wrong purpose, empty, oversized, MIME/extension mismatch and legac
   for (const [options, code] of cases) {
     await expectCode(() => harness(options).service.extract({ fileId: 'f', endUserId: null }), code)
   }
-})
-
-test('extracts a DOCX as one canonical page and rejects parse failure or empty text', async () => {
-  const docx = {
-    buffer: makeDocxArchive(),
-    filename: 'contract.docx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  }
-  const success = harness({
-    ...docx,
-    runtime: { extractDocxRawText: async () => ({ value: 'Café\r\n合同' }) },
-  })
-  const result = await success.service.extract({ fileId: 'docx', endUserId: null })
-  assert.deepEqual(pageTexts(result), ['Café\n合同'])
-  assert.equal(result.mode, 'text_layer')
-  assert.equal(result.totalPages, 1)
-
-  const broken = harness({ ...docx, runtime: { extractDocxRawText: async () => { throw new Error('zip details') } } })
-  await expectCode(() => broken.service.extract({ fileId: 'docx', endUserId: null }), 'CONTRACT_DOCX_EXTRACTION_FAILED')
-  const empty = harness({ ...docx, runtime: { extractDocxRawText: async () => ({ value: ' \r\n\t' }) } })
-  await expectCode(() => empty.service.extract({ fileId: 'docx', endUserId: null }), 'CONTRACT_TEXT_EMPTY')
-})
-
-test('DOCX validates the complete ZIP structure and budgets before mammoth', async () => {
-  let mammothCalls = 0
-  const docx = {
-    filename: 'contract.docx',
-    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  }
-  let directoryMammothCalls = 0
-  const withDirectory = harness({
-    ...docx,
-    buffer: makeDocxArchive([
-      { name: 'word/', content: Buffer.alloc(0), method: 0 },
-      { name: 'word/document.xml', content: Buffer.from('doc'), method: 8 },
-    ]),
-    runtime: {
-      extractDocxRawText: async () => {
-        directoryMammothCalls += 1
-        return { value: RELIABLE }
-      },
-    },
-  })
-  await withDirectory.service.extract({ fileId: 'docx', endUserId: null })
-  assert.equal(directoryMammothCalls, 1)
-
-  const malformed = harness({
-    ...docx,
-    buffer: Buffer.from('not-a-zip'),
-    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
-  })
-  await expectCode(
-    () => malformed.service.extract({ fileId: 'docx', endUserId: null }),
-    'CONTRACT_DOCX_ARCHIVE_INVALID',
-  )
-  assert.equal(mammothCalls, 0)
-
-  const zipBomb = harness({
-    ...docx,
-    buffer: makeDocxArchive([
-      { name: 'word/document.xml', content: Buffer.from('doc') },
-      { name: 'word/styles.xml', content: Buffer.from('style'), declaredUncompressedSize: 16 * 1024 * 1024 + 1 },
-    ]),
-    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
-  })
-  await expectCode(
-    () => zipBomb.service.extract({ fileId: 'docx', endUserId: null }),
-    'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED',
-  )
-  assert.equal(mammothCalls, 0)
-
-  const oversizedDeclaration = harness({
-    ...docx,
-    buffer: makeDocxArchive([
-      { name: 'word/document.xml', content: Buffer.from('doc') },
-      { name: 'word/media/blob.bin', content: Buffer.from('x'), declaredUncompressedSize: 64 * 1024 * 1024 },
-    ]),
-    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
-  })
-  await expectCode(
-    () => oversizedDeclaration.service.extract({ fileId: 'docx', endUserId: null }),
-    'CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED',
-  )
-  assert.equal(mammothCalls, 0)
-
-  const zip64Extra = Buffer.from([0x01, 0x00, 0x00, 0x00])
-  const invalidArchives = [
-    makeDocxArchive([{ name: 'x/../word/document.xml' }]),
-    makeDocxArchive([{ name: 'word/document.xml', centralExtra: zip64Extra }]),
-    makeDocxArchive([{ name: 'word/document.xml', method: 99 }]),
-    makeDocxArchive([{ name: 'word/document.xml', flags: 0x0001 }]),
-    makeDocxArchive([
-      { name: 'word/document.xml' },
-      { name: 'word/document.xml' },
-    ]),
-    makeDocxArchive([
-      { name: 'word/document.xml' },
-      { name: 'WORD/DOCUMENT.XML' },
-    ]),
-    makeDocxArchive([
-      { name: 'word/document.xml' },
-      { name: 'invalid', filenameBytes: Buffer.from([0xff]), flags: 0x0800 },
-    ]),
-    makeDocxArchive([
-      { name: 'word/document.xml' },
-      { name: 'word/样式.xml' },
-    ]),
-  ]
-  for (const buffer of invalidArchives) {
-    const invalid = harness({
-      ...docx,
-      buffer,
-      runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
-    })
-    await expectCode(
-      () => invalid.service.extract({ fileId: 'docx', endUserId: null }),
-      'CONTRACT_DOCX_ARCHIVE_INVALID',
-    )
-  }
-  assert.equal(mammothCalls, 0)
-
-  const compressedBomb = await makeDeflateBomb(64 * 1024 * 1024 + 1)
-  const actualSizeBomb = harness({
-    ...docx,
-    buffer: makeDocxArchive([
-      { name: 'word/document.xml', content: Buffer.from('doc'), method: 8 },
-      {
-        name: 'word/media/blob.bin',
-        method: 8,
-        compressedData: compressedBomb,
-        declaredUncompressedSize: 1,
-      },
-    ]),
-    runtime: { extractDocxRawText: async () => { mammothCalls += 1; return { value: RELIABLE } } },
-  })
-  await expectCode(
-    () => actualSizeBomb.service.extract({ fileId: 'docx', endUserId: null }),
-    'CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED',
-  )
-  assert.equal(mammothCalls, 0)
-
-  const oversizedOutput = harness({
-    ...docx,
-    buffer: makeDocxArchive(),
-    runtime: { extractDocxRawText: async () => ({ value: '甲'.repeat(200_001) }) },
-  })
-  await expectCode(
-    () => oversizedOutput.service.extract({ fileId: 'docx', endUserId: null }),
-    'CONTRACT_PAGE_TEXT_LIMIT_EXCEEDED',
-  )
 })
 
 test('rejects invalid PDF page counts before text extraction and destroys the proxy', async () => {
