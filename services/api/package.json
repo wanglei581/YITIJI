@@ -104,6 +104,7 @@
     "verify:production-runtime-gates": "node -r @swc-node/register scripts/verify-production-runtime-gates.ts",
     "verify:contract-review:gate0": "node -r @swc-node/register scripts/verify-contract-review-gate0.ts",
     "verify:contract-review:contract": "node -r @swc-node/register scripts/verify-contract-review-contract.ts",
+    "verify:contract-review:schema": "node -r @swc-node/register --test src/contract-review/__tests__/contract-review-schema.test.ts",
     "verify:trust-proxy": "node -r @swc-node/register scripts/verify-trust-proxy.ts",
     "verify:release-provenance": "node -r @swc-node/register scripts/verify-release-provenance.ts",
     "verify:release-genesis": "node -r @swc-node/register scripts/verify-release-genesis.ts",

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 
 const apiRoot = resolve(__dirname, '../../..')
@@ -28,6 +30,41 @@ function modelBlock(schema: string, modelName: string): string {
 
 function compact(line: string): string {
   return line.trim().replace(/\s+/g, ' ')
+}
+
+function runPrisma(args: string[], env: NodeJS.ProcessEnv, input?: string): string {
+  const result = spawnSync('pnpm', ['exec', 'prisma', ...args], {
+    cwd: apiRoot,
+    env: { ...process.env, ...env },
+    encoding: 'utf8',
+    input,
+  })
+  const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim()
+
+  if (result.error) {
+    throw new Error(`Failed to start Prisma: ${result.error.message}\n${output}`)
+  }
+  if (result.status !== 0) {
+    throw new Error(`Prisma exited with status ${result.status ?? 'unknown'}\n${output}`)
+  }
+  return output
+}
+
+function assertNoSchemaDrift(config: string, schema: string, env: NodeJS.ProcessEnv): void {
+  const output = runPrisma(
+    [
+      'migrate',
+      'diff',
+      '--config',
+      config,
+      '--from-config-datasource',
+      '--to-schema',
+      schema,
+      '--exit-code',
+    ],
+    env
+  )
+  assert.match(output, /(?:^|\n)No difference detected\.(?:\n|$)/)
 }
 
 test('both Prisma schemas define the complete ContractReviewTask aggregate', () => {
@@ -80,7 +117,7 @@ test('both Prisma schemas define the complete ContractReviewTask aggregate', () 
     assert.match(
       endUser,
       /^\s*contractReviewTasks\s+ContractReviewTask\[\]\s*$/m,
-      `${schemaPath} EndUser must expose contractReviewTasks`,
+      `${schemaPath} EndUser must expose contractReviewTasks`
     )
   }
 })
@@ -100,7 +137,7 @@ test('both migrations add only ContractReviewTask, its EndUser foreign key, and 
     assert.match(migration, /CREATE TABLE "ContractReviewTask"/)
     assert.match(
       migration,
-      /CONSTRAINT "ContractReviewTask_endUserId_fkey"[\s\S]*FOREIGN KEY \("endUserId"\)[\s\S]*REFERENCES "EndUser"\s*\("id"\)[\s\S]*ON DELETE SET NULL ON UPDATE CASCADE/,
+      /CONSTRAINT "ContractReviewTask_endUserId_fkey"[\s\S]*FOREIGN KEY \("endUserId"\)[\s\S]*REFERENCES "EndUser"\s*\("id"\)[\s\S]*ON DELETE SET NULL ON UPDATE CASCADE/
     )
     for (const indexName of expectedIndexes) {
       assert.match(migration, new RegExp(`CREATE INDEX "${indexName}"`))
@@ -111,3 +148,40 @@ test('both migrations add only ContractReviewTask, its EndUser foreign key, and 
     assert.doesNotMatch(migration, /^\s*(?:DROP|ALTER|DELETE|UPDATE|TRUNCATE)\b/im)
   }
 })
+
+test('fresh SQLite migrations match the complete Prisma schema without drift', () => {
+  const tempDirectory = mkdtempSync(join(tmpdir(), 'contract-review-schema-'))
+  const databasePath = join(tempDirectory, 'fresh.db')
+  const env = { DATABASE_URL: `file:${databasePath}` }
+
+  try {
+    closeSync(openSync(databasePath, 'a'))
+    runPrisma(['migrate', 'deploy', '--config', 'prisma.config.ts'], env)
+    assertNoSchemaDrift('prisma.config.ts', 'prisma/schema.prisma', env)
+
+    runPrisma(
+      ['db', 'execute', '--config', 'prisma.config.ts', '--stdin'],
+      env,
+      'ALTER TABLE "ContractReviewTask" DROP COLUMN "resultJson";'
+    )
+    assert.throws(
+      () => assertNoSchemaDrift('prisma.config.ts', 'prisma/schema.prisma', env),
+      /Prisma exited with status 2[\s\S]*Added column `resultJson`/
+    )
+  } finally {
+    rmSync(tempDirectory, { recursive: true, force: true })
+  }
+})
+
+const postgresUrl = process.env.POSTGRES_URL
+
+test(
+  'migrated PostgreSQL database matches the generated PostgreSQL schema without drift',
+  { skip: postgresUrl ? false : 'POSTGRES_URL is not configured; PostgreSQL drift check skipped' },
+  () => {
+    assert.match(postgresUrl!, /^postgres(?:ql)?:\/\//)
+    assertNoSchemaDrift('prisma.postgres.config.ts', 'prisma/postgres/schema.prisma', {
+      POSTGRES_URL: postgresUrl!,
+    })
+  }
+)
