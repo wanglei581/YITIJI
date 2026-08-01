@@ -323,7 +323,7 @@ async function main() {
 
     // ── 6. 正向：有效 token + 会话 → 通过并注入 endUser ──────────
     const redisOk = { get: async () => userA } as never
-    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true }) } } as never
+    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } } as never
     const guardOk = new EndUserAuthGuard(jwtOk, redisOk, prismaEnabled)
     const ctx = mockCtx({ authorization: 'Bearer ok.token' })
     const allowed = await guardOk.canActivate(ctx)

@@ -24,14 +24,17 @@
 import 'dotenv/config'
 import { execFileSync } from 'child_process'
 import { randomUUID } from 'crypto'
-import { rmSync } from 'fs'
+import { closeSync, openSync, rmSync } from 'node:fs'
+import path from 'node:path'
 import type { ExecutionContext } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MemberFavoritesService } from '../src/member-favorites/member-favorites.service'
 import { MemberBenefitsService } from '../src/member-benefits/member-benefits.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 
+const apiRoot = path.resolve(__dirname, '..')
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-favorites-benefits-${randomUUID().slice(0, 8)}.db`
+const fallbackDbPath = fallbackDbName ? path.join(apiRoot, 'prisma', fallbackDbName) : null
 if (fallbackDbName) {
   process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
   prepareFallbackDb()
@@ -283,7 +286,7 @@ async function main() {
     await expectGuardCode(() => guardBad.canActivate(mockCtx({ authorization: 'Bearer bad.token' })), 'MEMBER_TOKEN_INVALID', '10b. 错 token → 401 MEMBER_TOKEN_INVALID')
 
     const jwtOk = { verify: () => ({ sub: userA, jti: 'sess-x' }) } as never
-    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true }) } } as never
+    const prismaEnabled = { endUser: { findUnique: async () => ({ enabled: true, status: 'active' }) } } as never
     const guardNoSession = new EndUserAuthGuard(jwtOk, { get: async () => null } as never, {} as never)
     await expectGuardCode(() => guardNoSession.canActivate(mockCtx({ authorization: 'Bearer ok.token' })), 'MEMBER_SESSION_EXPIRED', '10c. 有效 token 但无 Redis 会话 → 401 MEMBER_SESSION_EXPIRED')
 
@@ -310,15 +313,17 @@ main().catch((error: unknown) => {
 })
 
 function cleanupFallbackDb(): void {
-  if (!fallbackDbName) return
+  if (!fallbackDbPath) return
   for (const suffix of ['', '-wal', '-shm']) {
-    rmSync(`prisma/${fallbackDbName}${suffix}`, { force: true })
+    rmSync(`${fallbackDbPath}${suffix}`, { force: true })
   }
 }
 
 function prepareFallbackDb(): void {
+  if (!fallbackDbPath) return
   try {
-    execFileSync('pnpm', ['exec', 'prisma', 'db', 'push'], { stdio: 'pipe' })
+    closeSync(openSync(fallbackDbPath, 'a'))
+    execFileSync('pnpm', ['exec', 'prisma', 'db', 'push'], { cwd: apiRoot, stdio: 'pipe' })
   } catch (error) {
     const details = (error as { stdout?: Buffer; stderr?: Buffer })
     console.error(details.stdout?.toString() ?? '')

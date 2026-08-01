@@ -4,7 +4,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'verify-scan-tasks-secret-0123456789-abcd
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common'
@@ -26,6 +26,10 @@ function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): voi
     env,
     stdio: 'pipe',
   })
+}
+
+function ensureSqliteFile(dbPath: string): void {
+  closeSync(openSync(dbPath, 'a'))
 }
 
 // Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
@@ -848,6 +852,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
+      ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
@@ -1644,6 +1649,7 @@ async function main(): Promise<void> {
     const dbPath = path.join(tmpDir, 'verify.db')
     const dbUrl = `file:${dbPath}`
     try {
+      ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
       await assertRealDbMatchedHeartbeatClosesRace(dbUrl)
     } finally {
@@ -1815,6 +1821,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
+      ensureSqliteFile(dbPath)
       runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbDedupGuardClosesCrossUserLeak(dbUrl)
