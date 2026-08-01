@@ -124,3 +124,20 @@ Task 2 已封板，下一步进入双库 `ContractReviewTask` 聚合。
 本地规格与数据库质量审查均 `APPROVE`。质量审查额外在 PostgreSQL 16 事务中验证原 migration SQL、索引和 `ON DELETE SET NULL` 后回滚，未保留对象。Antigravity 与 Claude 最终均 `APPROVE`，无阻塞项。`resultJson` 使用 String 是 SQLite SSOT 下保持双库一致的当前取舍；如未来需要服务端 JSONB 查询，应作为独立 additive 演进，不在本任务扩大范围。
 
 Task 3 已封板，下一步进入 `contract_upload` 高敏短期文件链路。
+
+## Wave A Task 4：`contract_upload` 高敏短期文件链路实施审查
+
+审查范围：`b692f0c3..702679d3`。
+
+- Kiosk multipart、UploadSession、ScanTask 三条入口均把合同文件映射为 `contract_upload`，服务端强制 `highly_sensitive`、`private`、`system_short`、固定两小时寿命和 `contract_review_session_only` 留存锁，客户端不能降级或延长。
+- 合同文件使用独立对象键目录；匿名路径不包含 session token 或原始文件名。合同及被留存锁定的派生文件不会进入会员“我的文档”。
+- 读取、预览、下载、续期和会员绑定统一按持久化 `expiresAt` fail closed；`expiresAt=null` 的异常合同会进入物理删除和数据库软删流程，非合同 null-TTL 长期文件保持原语义。
+- 会员绑定及并发绑定不会把两小时寿命重置为会员 90 天，也不会解除留存锁。首次上传、后续访问和管理签名的存储层下载 URL 均截断到文件剩余寿命；不足一秒拒绝签发。
+- 扫描采集窗口仍为十分钟；完成后的合同扫描按文件两小时寿命返回。waiting/matched 懒过期使用条件更新，CAS 竞争失败后只重读一次并重新鉴权，响应与并发 completed/cancelled 终态一致。
+- `verify:contract-review:file-policy` 最终 13/13 通过；`verify:file-retention`、`verify:upload-sessions`、`verify:scan-tasks`、API typecheck/lint 通过。member-assets 在临时 SQLite 全量 migration 后回归通过；本机无 PostgreSQL URL 的 scan 专项由 postgres-readiness 覆盖。
+
+内部规格审查为 `Spec compliant`，质量审查为 `Ready: Yes`，无 Critical/Important。Claude、Antigravity、Cursor 最终均 `APPROVE`；Cursor 提出的首次上传下载 URL 未统一 clamp 已修复，Claude 提出的精确秒数测试 flake 已改为稳定性质断言并由三方复审通过。
+
+保留一项非阻塞维护债务：`services/api/src/files/files.service.ts` 已超过 800 行，后续继续向文件服务新增职责前必须先拆分签名访问与生命周期清理；本任务不以重构扩大范围。
+
+Task 4 已封板。Gate 0 正式记录仍为 `blocked`，本结论不代表合同 AI 生产入口可开启。下一步进入版本化免责声明与独立同意。

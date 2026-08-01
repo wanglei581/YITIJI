@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "fullstack-legal-ai",
   "currentPhase": "implementation",
-  "nextAction": "执行 Wave A Task 4：contract_upload 短期文件链路",
+  "nextAction": "执行 Wave A Task 5：版本化免责声明与独立同意",
   "createdAt": "2026-08-01T10:48:32Z",
   "branch": "codex/contract-review-p0"
 }
