@@ -1,12 +1,14 @@
 import { createHash } from 'node:crypto'
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import { parseAndVerifySignedContentUrl } from '../files/signing'
 import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import {
   CONSENT_VERSION_BY_SCOPE,
@@ -34,11 +36,100 @@ const CONTRACT_TYPES: ReadonlySet<string> = new Set<ContractType>([
 
 export const CONTRACT_REVIEW_RULE_PACK_VERSION = 'cn-labor-p0-v1'
 export const CONTRACT_REVIEW_SCHEMA_VERSION = 'contract-review-result-v1'
+const ANONYMOUS_CONSENT_MAX_AGE_MS = 15 * 60 * 1000
+const ANONYMOUS_CONSENT_FUTURE_SKEW_MS = 60 * 1000
+
+export const CONTRACT_REVIEW_CONSENT_DISCLOSURES = Object.freeze({
+  processorIdentityAndContact: 'provided_by_active_disclaimer',
+  processingPurposeAndMethod: Object.freeze([
+    'contract_risk_notice',
+    'ocr_extraction',
+    'deterministic_rules',
+    'domestic_llm_analysis',
+  ]),
+  dataCategories: Object.freeze(['source_file', 'ocr_text', 'ai_review_result']),
+  entrustedProcessingRoles: Object.freeze([
+    'baidu_ocr_as_ocr_processor',
+    'domestic_llm_as_ai_inference_processor',
+  ]),
+  retention: Object.freeze({ maximumHours: 2, sessionDeletionFirst: true }),
+  dataSubjectRights: Object.freeze(['access', 'delete', 'withdraw_consent']),
+  sensitivePersonalInformation: Object.freeze({
+    separateConsentRequired: true,
+    necessityAndImpactNoticeRequired: true,
+  }),
+})
+
+export interface ContractReviewDisclaimerDocument {
+  id: string
+  version: string
+  content: string
+  publishedAt: Date
+}
+
+export interface ContractReviewConsentScopeSnapshot {
+  scope: {
+    scope: 'contract_review'
+    consentVersion: string
+    disclaimer: {
+      id: string
+      version: string
+      contentSha256: string
+      publishedAt: string
+    }
+    disclosures: typeof CONTRACT_REVIEW_CONSENT_DISCLOSURES
+  }
+  canonicalJson: string
+  consentScopeHash: string
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    return JSON.stringify(value)
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new TypeError('Non-finite canonical JSON number')
+    return JSON.stringify(value)
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  if (typeof value === 'object') {
+    const object = value as Record<string, unknown>
+    return `{${Object.keys(object)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`)
+      .join(',')}}`
+  }
+  throw new TypeError('Unsupported canonical JSON value')
+}
+
+/** Pure SSOT used by the API snapshot validator and the Task 12 public consent contract. */
+export function createContractReviewConsentScopeSnapshot(
+  disclaimer: ContractReviewDisclaimerDocument
+): ContractReviewConsentScopeSnapshot {
+  const scope = {
+    scope: 'contract_review' as const,
+    consentVersion: CONSENT_VERSION_BY_SCOPE.contract_review,
+    disclaimer: {
+      id: disclaimer.id,
+      version: disclaimer.version,
+      contentSha256: createHash('sha256').update(disclaimer.content, 'utf8').digest('hex'),
+      publishedAt: disclaimer.publishedAt.toISOString(),
+    },
+    disclosures: CONTRACT_REVIEW_CONSENT_DISCLOSURES,
+  }
+  const canonical = canonicalJson(scope)
+  return {
+    scope,
+    canonicalJson: canonical,
+    consentScopeHash: createHash('sha256').update(canonical, 'utf8').digest('hex'),
+  }
+}
 
 interface ConsentSnapshot {
   consentVersion: string
   consentedAt: Date
   consentScopeHash: string
+  disclaimerVersion: string
 }
 
 @Injectable()
@@ -53,35 +144,36 @@ export class ContractReviewService {
     requester: ContractReviewRequester
   ): Promise<ContractReviewCreatedTask> {
     this.assertCreateInput(input)
-    const memberId = this.memberIdOf(requester)
+    const memberId = this.memberIdOf(requester, input.sourceFileId)
     const issuedToken = memberId ? null : issueAnonymousAccessToken()
-    const anonymousSnapshot = memberId ? null : this.requireAnonymousConsentSnapshot(input)
 
     try {
-      const task = memberId
-        ? await runSerializableTransaction(this.prisma, async (tx) => {
-            const sourceFile = await this.loadSourceFile(tx, input.sourceFileId)
-            this.assertUsableSourceFile(sourceFile, requester)
-            const consent = await this.memberPrivacy.requireActiveConsentInTransaction(
-              tx,
-              memberId,
-              'contract_review'
-            )
-            return this.createTask(tx, input, sourceFile, {
-              endUserId: memberId,
-              accessTokenHash: null,
-              consent: this.memberConsentSnapshot(consent),
-            })
+      const task = await runSerializableTransaction(this.prisma, async (tx) => {
+        const sourceFile = await this.loadSourceFile(tx, input.sourceFileId)
+        this.assertUsableSourceFile(sourceFile, requester)
+        const disclaimer = await this.loadActiveDisclaimer(tx)
+        const scopeSnapshot = createContractReviewConsentScopeSnapshot(disclaimer)
+        this.assertRequestedConsentBinding(input, scopeSnapshot)
+
+        if (memberId) {
+          const consent = await this.memberPrivacy.requireActiveConsentInTransaction(
+            tx,
+            memberId,
+            'contract_review'
+          )
+          return this.createTask(tx, input, sourceFile, {
+            endUserId: memberId,
+            accessTokenHash: null,
+            consent: this.memberConsentSnapshot(consent, disclaimer, scopeSnapshot),
           })
-        : await this.prisma.$transaction(async (tx) => {
-            const sourceFile = await this.loadSourceFile(tx, input.sourceFileId)
-            this.assertUsableSourceFile(sourceFile, requester)
-            return this.createTask(tx, input, sourceFile, {
-              endUserId: null,
-              accessTokenHash: issuedToken!.accessTokenHash,
-              consent: anonymousSnapshot!,
-            })
-          })
+        }
+
+        return this.createTask(tx, input, sourceFile, {
+          endUserId: null,
+          accessTokenHash: issuedToken!.accessTokenHash,
+          consent: this.requireAnonymousConsentSnapshot(input, disclaimer, scopeSnapshot),
+        })
+      })
 
       return {
         id: task.id,
@@ -126,6 +218,45 @@ export class ContractReviewService {
         ownerId: true,
       },
     })
+  }
+
+  private async loadActiveDisclaimer(
+    tx: PrismaTransactionClient
+  ): Promise<ContractReviewDisclaimerDocument> {
+    const active = await tx.legalDocVersion.findMany({
+      where: { docType: 'contract_review_disclaimer', isActive: true },
+      orderBy: { id: 'asc' },
+      take: 2,
+      select: {
+        id: true,
+        version: true,
+        content: true,
+        publishedAt: true,
+      },
+    })
+    const disclaimer = active[0]
+    if (
+      active.length !== 1 ||
+      !disclaimer ||
+      !disclaimer.id ||
+      !disclaimer.version ||
+      !disclaimer.content ||
+      !(disclaimer.publishedAt instanceof Date) ||
+      !Number.isFinite(disclaimer.publishedAt.getTime())
+    ) {
+      throw new ServiceUnavailableException({
+        error: {
+          code: 'CONTRACT_REVIEW_LEGAL_CONFIGURATION_INVALID',
+          message: '合同审查服务暂不可用，请稍后再试',
+        },
+      })
+    }
+    return {
+      id: disclaimer.id,
+      version: disclaimer.version,
+      content: disclaimer.content,
+      publishedAt: disclaimer.publishedAt,
+    }
   }
 
   private assertUsableSourceFile(
@@ -178,7 +309,7 @@ export class ContractReviewService {
         consentVersion: owner.consent.consentVersion,
         consentedAt: owner.consent.consentedAt,
         consentScopeHash: owner.consent.consentScopeHash,
-        disclaimerVersion: input.disclaimerVersion.trim(),
+        disclaimerVersion: owner.consent.disclaimerVersion,
         rulePackVersion: CONTRACT_REVIEW_RULE_PACK_VERSION,
         schemaVersion: CONTRACT_REVIEW_SCHEMA_VERSION,
         expiresAt: sourceFile.expiresAt,
@@ -187,44 +318,62 @@ export class ContractReviewService {
     })
   }
 
-  private memberConsentSnapshot(consent: ConsentTruthEvent): ConsentSnapshot {
-    const consentScopeHash = createHash('sha256')
-      .update(
-        JSON.stringify({
-          scope: 'contract_review',
-          eventId: consent.id,
-          consentVersion: consent.consentVersion,
-          consentedAt: consent.grantedAt.toISOString(),
-        })
-      )
-      .digest('hex')
+  private memberConsentSnapshot(
+    consent: ConsentTruthEvent,
+    disclaimer: ContractReviewDisclaimerDocument,
+    scopeSnapshot: ContractReviewConsentScopeSnapshot
+  ): ConsentSnapshot {
+    if (
+      consent.consentVersion !== CONSENT_VERSION_BY_SCOPE.contract_review ||
+      !(consent.grantedAt instanceof Date) ||
+      !Number.isFinite(consent.grantedAt.getTime()) ||
+      consent.grantedAt.getTime() < disclaimer.publishedAt.getTime()
+    ) {
+      throw this.consentRequired()
+    }
     return {
       consentVersion: consent.consentVersion,
       consentedAt: consent.grantedAt,
-      consentScopeHash,
+      consentScopeHash: scopeSnapshot.consentScopeHash,
+      disclaimerVersion: disclaimer.version,
     }
   }
 
-  private requireAnonymousConsentSnapshot(input: ContractReviewCreateInput): ConsentSnapshot {
+  private requireAnonymousConsentSnapshot(
+    input: ContractReviewCreateInput,
+    disclaimer: ContractReviewDisclaimerDocument,
+    scopeSnapshot: ContractReviewConsentScopeSnapshot
+  ): ConsentSnapshot {
     const consentedAt = new Date(input.consentedAt)
+    const now = Date.now()
     if (
       input.consentVersion !== CONSENT_VERSION_BY_SCOPE.contract_review ||
+      typeof input.consentedAt !== 'string' ||
       !input.consentedAt ||
       !Number.isFinite(consentedAt.getTime()) ||
-      !/^[a-f0-9]{64}$/.test(input.consentScopeHash) ||
-      !input.disclaimerVersion.trim()
+      consentedAt.getTime() > now + ANONYMOUS_CONSENT_FUTURE_SKEW_MS ||
+      consentedAt.getTime() < now - ANONYMOUS_CONSENT_MAX_AGE_MS ||
+      consentedAt.getTime() < disclaimer.publishedAt.getTime()
     ) {
-      throw new BadRequestException({
-        error: {
-          code: 'CONTRACT_REVIEW_CONSENT_SNAPSHOT_INVALID',
-          message: '请重新确认合同审查授权与免责声明',
-        },
-      })
+      throw this.invalidConsentSnapshot()
     }
     return {
       consentVersion: input.consentVersion,
       consentedAt,
-      consentScopeHash: input.consentScopeHash,
+      consentScopeHash: scopeSnapshot.consentScopeHash,
+      disclaimerVersion: disclaimer.version,
+    }
+  }
+
+  private assertRequestedConsentBinding(
+    input: ContractReviewCreateInput,
+    scopeSnapshot: ContractReviewConsentScopeSnapshot
+  ): void {
+    if (
+      input.disclaimerVersion !== scopeSnapshot.scope.disclaimer.version ||
+      input.consentScopeHash !== scopeSnapshot.consentScopeHash
+    ) {
+      throw this.invalidConsentSnapshot()
     }
   }
 
@@ -242,13 +391,60 @@ export class ContractReviewService {
     }
   }
 
-  private memberIdOf(requester: ContractReviewRequester): string | null {
-    if (requester.endUserId && requester.accessToken) {
-      throw new BadRequestException({
-        error: { code: 'CONTRACT_REVIEW_REQUESTER_INVALID', message: '请求身份无效' },
-      })
+  private memberIdOf(
+    requester: ContractReviewRequester,
+    sourceFileId: string
+  ): string | null {
+    const memberId =
+      typeof requester.endUserId === 'string' && requester.endUserId.trim()
+        ? requester.endUserId.trim()
+        : null
+    if (memberId) {
+      if (requester.accessToken !== null || requester.sourceFileProof != null) {
+        throw this.invalidRequester()
+      }
+      return memberId
     }
-    return requester.endUserId?.trim() || null
+    if (requester.endUserId !== null) throw this.invalidRequester()
+    if (
+      requester.accessToken !== null ||
+      typeof requester.sourceFileProof !== 'string' ||
+      !requester.sourceFileProof
+    ) {
+      throw this.sourceNotFound()
+    }
+    let proof: { fileId: string } | null = null
+    try {
+      proof = parseAndVerifySignedContentUrl(requester.sourceFileProof)
+    } catch {
+      proof = null
+    }
+    if (proof?.fileId !== sourceFileId) throw this.sourceNotFound()
+    return null
+  }
+
+  private invalidRequester(): BadRequestException {
+    return new BadRequestException({
+      error: { code: 'CONTRACT_REVIEW_REQUESTER_INVALID', message: '请求身份无效' },
+    })
+  }
+
+  private invalidConsentSnapshot(): BadRequestException {
+    return new BadRequestException({
+      error: {
+        code: 'CONTRACT_REVIEW_CONSENT_SNAPSHOT_INVALID',
+        message: '请重新确认合同审查授权与免责声明',
+      },
+    })
+  }
+
+  private consentRequired(): ForbiddenException {
+    return new ForbiddenException({
+      error: {
+        code: 'USER_AI_CONSENT_REQUIRED',
+        message: '请重新确认合同审查 AI 授权',
+      },
+    })
   }
 
   private sourceNotFound(): NotFoundException {

@@ -1,6 +1,7 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
+import { createHmac } from 'node:crypto'
 import { test } from 'node:test'
 import {
   BadRequestException,
@@ -14,7 +15,10 @@ import {
   issueAnonymousAccessToken,
   verifyAnonymousAccessToken,
 } from '../contract-review-access'
-import { ContractReviewService } from '../contract-review.service'
+import {
+  ContractReviewService,
+  createContractReviewConsentScopeSnapshot,
+} from '../contract-review.service'
 import {
   ALLOWED_TRANSITIONS,
   assertOwnerShape,
@@ -30,9 +34,12 @@ import {
   MemberPrivacyService,
 } from '../../member-privacy/member-privacy.service'
 
+const TEST_NOW = Date.now()
 const FUTURE = new Date('2099-08-01T02:00:00.000Z')
+const DISCLAIMER_PUBLISHED_AT = new Date(TEST_NOW - 5 * 60 * 1000)
 const CURRENT_CONSENT_VERSION = CONSENT_VERSION_BY_SCOPE.contract_review
-const VALID_SCOPE_HASH = 'b'.repeat(64)
+const FILE_SIGNING_SECRET = 'contract-review-test-signing-secret-at-least-32-bytes'
+process.env['FILE_SIGNING_SECRET'] = FILE_SIGNING_SECRET
 
 interface FileRow {
   id: string
@@ -54,6 +61,13 @@ interface ConsentRow {
   revokedAt: Date | null
 }
 
+interface LegalDocRow {
+  id: string
+  version: string
+  content: string
+  publishedAt: Date | null
+}
+
 interface TaskRow extends Record<string, unknown> {
   id: string
   endUserId: string | null
@@ -65,6 +79,7 @@ interface TaskRow extends Record<string, unknown> {
 interface HarnessOptions {
   file?: FileRow | null
   consents?: ConsentRow[]
+  legalDocs?: LegalDocRow[]
   dbKind?: 'sqlite' | 'postgres'
   transactionFailures?: unknown[]
   taskCreateError?: unknown
@@ -82,9 +97,17 @@ function cloneTask(row: TaskRow): TaskRow {
   return { ...row, expiresAt: new Date(row.expiresAt) }
 }
 
+function cloneLegalDoc(row: LegalDocRow): LegalDocRow {
+  return {
+    ...row,
+    publishedAt: row.publishedAt ? new Date(row.publishedAt) : null,
+  }
+}
+
 function makeHarness(options: HarnessOptions = {}) {
   const file = options.file === undefined ? memberFile() : options.file
   const consents = (options.consents ?? [activeConsent()]).map(cloneConsent)
+  const legalDocs = (options.legalDocs ?? [activeDisclaimer()]).map(cloneLegalDoc)
   const tasks: TaskRow[] = []
   const failures = [...(options.transactionFailures ?? [])]
   const transactionOptions: unknown[] = []
@@ -100,9 +123,6 @@ function makeHarness(options: HarnessOptions = {}) {
     ) => {
       transactionCalls += 1
       transactionOptions.push(txOptions)
-      const injectedFailure = failures.shift()
-      if (injectedFailure) throw injectedFailure
-
       const txConsents = consents.map(cloneConsent)
       const txTasks = tasks.map(cloneTask)
       const txOperations: string[] = []
@@ -112,6 +132,12 @@ function makeHarness(options: HarnessOptions = {}) {
           findUnique: async ({ where }: { where: { id: string } }) => {
             txOperations.push('file.find')
             return file?.id === where.id ? { ...file } : null
+          },
+        },
+        legalDocVersion: {
+          findMany: async () => {
+            txOperations.push('legal.findMany')
+            return legalDocs.slice(0, 2).map(cloneLegalDoc)
           },
         },
         userAiConsent: {
@@ -194,6 +220,8 @@ function makeHarness(options: HarnessOptions = {}) {
         },
       }
       const result = await operation(tx)
+      const commitFailure = failures.shift()
+      if (commitFailure) throw commitFailure
       consents.splice(0, consents.length, ...txConsents)
       tasks.splice(0, tasks.length, ...txTasks)
       return result
@@ -244,26 +272,63 @@ function activeConsent(overrides: Partial<ConsentRow> = {}): ConsentRow {
     endUserId: 'member-1',
     scope: 'contract_review',
     consentVersion: CURRENT_CONSENT_VERSION,
-    grantedAt: new Date('2026-08-01T00:00:00.000Z'),
+    grantedAt: new Date(TEST_NOW - 2 * 60 * 1000),
     revokedAt: null,
     ...overrides,
   }
 }
 
-function input(overrides: Partial<ContractReviewCreateInput> = {}): ContractReviewCreateInput {
+function activeDisclaimer(overrides: Partial<LegalDocRow> = {}): LegalDocRow {
   return {
-    sourceFileId: 'contract-file-1',
-    contractType: 'labor_contract',
-    consentVersion: CURRENT_CONSENT_VERSION,
-    consentedAt: '2026-08-01T00:00:00.000Z',
-    consentScopeHash: VALID_SCOPE_HASH,
-    disclaimerVersion: 'contract-review-disclaimer-v1',
+    id: 'contract-review-disclaimer-doc-1',
+    version: 'contract-review-disclaimer-v1',
+    content: '合同审查告知与免责声明',
+    publishedAt: DISCLAIMER_PUBLISHED_AT,
     ...overrides,
   }
 }
 
-const MEMBER: ContractReviewRequester = { endUserId: 'member-1', accessToken: null }
-const ANONYMOUS: ContractReviewRequester = { endUserId: null, accessToken: null }
+function scopeHash(doc: LegalDocRow = activeDisclaimer()): string {
+  assert.ok(doc.publishedAt)
+  return createContractReviewConsentScopeSnapshot({ ...doc, publishedAt: doc.publishedAt })
+    .consentScopeHash
+}
+
+function input(
+  overrides: Partial<ContractReviewCreateInput> = {},
+  doc: LegalDocRow = activeDisclaimer()
+): ContractReviewCreateInput {
+  return {
+    sourceFileId: 'contract-file-1',
+    contractType: 'labor_contract',
+    consentVersion: CURRENT_CONSENT_VERSION,
+    consentedAt: new Date(TEST_NOW - 60 * 1000).toISOString(),
+    consentScopeHash: scopeHash(doc),
+    disclaimerVersion: doc.version,
+    ...overrides,
+  }
+}
+
+function signedSourceProof(
+  fileId = 'contract-file-1',
+  expiresAt = TEST_NOW + 5 * 60 * 1000
+): string {
+  const signature = createHmac('sha256', FILE_SIGNING_SECRET)
+    .update(`${fileId}.${expiresAt}`)
+    .digest('hex')
+  return `/api/v1/files/${fileId}/content?expires=${expiresAt}&sig=${signature}`
+}
+
+const MEMBER: ContractReviewRequester = {
+  endUserId: 'member-1',
+  accessToken: null,
+  sourceFileProof: null,
+}
+const ANONYMOUS: ContractReviewRequester = {
+  endUserId: null,
+  accessToken: null,
+  sourceFileProof: signedSourceProof(),
+}
 
 function p2034(message = 'serialization conflict contains private database details'): Error {
   return Object.assign(new Error(message), { code: 'P2034' })
@@ -306,11 +371,25 @@ test('task owner is exactly one of member or anonymous token', () => {
   }
 })
 
-test('state machine permits exactly the planned transition table and fails closed for unknowns', () => {
-  const statuses = Object.keys(ALLOWED_TRANSITIONS) as ContractReviewStatus[]
+test('state machine matches an independently hard-coded transition matrix', () => {
+  const expected: Readonly<Record<ContractReviewStatus, readonly ContractReviewStatus[]>> = {
+    uploaded: ['queued', 'cancelled', 'expired'],
+    queued: ['extracting', 'cancelled', 'failed', 'expired'],
+    extracting: ['awaiting_confirmation', 'failed', 'cancelled', 'expired'],
+    awaiting_confirmation: ['rule_checking', 'cancelled', 'expired'],
+    rule_checking: ['ai_analyzing', 'failed', 'cancelled', 'expired'],
+    ai_analyzing: ['safety_reviewing', 'failed', 'cancelled', 'expired'],
+    safety_reviewing: ['completed', 'failed', 'cancelled', 'expired'],
+    completed: ['expired'],
+    failed: ['expired'],
+    cancelled: ['expired'],
+    expired: [],
+  }
+  const statuses = Object.keys(expected) as ContractReviewStatus[]
+  assert.deepEqual(ALLOWED_TRANSITIONS, expected)
   for (const from of statuses) {
     for (const to of statuses) {
-      if (ALLOWED_TRANSITIONS[from].includes(to)) {
+      if (expected[from].includes(to)) {
         assert.doesNotThrow(() => assertTransition(from, to))
       } else {
         assert.throws(() => assertTransition(from, to), /CONTRACT_REVIEW_INVALID_TRANSITION/)
@@ -322,6 +401,61 @@ test('state machine permits exactly the planned transition table and fails close
     () => assertTransition('unknown' as ContractReviewStatus, 'queued'),
     /CONTRACT_REVIEW_INVALID_TRANSITION/
   )
+})
+
+test('state transition matrix is recursively frozen at runtime', () => {
+  const originalUploaded = [...ALLOWED_TRANSITIONS.uploaded]
+
+  assert.equal(Object.isFrozen(ALLOWED_TRANSITIONS), true)
+  for (const transitions of Object.values(ALLOWED_TRANSITIONS)) {
+    assert.equal(Object.isFrozen(transitions), true)
+  }
+  assert.equal(Reflect.set(ALLOWED_TRANSITIONS.uploaded, 0, 'completed'), false)
+  assert.equal(Reflect.set(ALLOWED_TRANSITIONS, 'uploaded', ['completed']), false)
+  assert.deepEqual(ALLOWED_TRANSITIONS.uploaded, originalUploaded)
+  assert.doesNotThrow(() => assertTransition('uploaded', 'queued'))
+  assert.throws(
+    () => assertTransition('uploaded', 'completed'),
+    /CONTRACT_REVIEW_INVALID_TRANSITION/
+  )
+})
+
+test('consent scope snapshot is deterministic and binds all disclaimer fields and disclosures', () => {
+  const doc = activeDisclaimer()
+  assert.ok(doc.publishedAt)
+  const first = createContractReviewConsentScopeSnapshot({
+    ...doc,
+    publishedAt: doc.publishedAt,
+  })
+  const second = createContractReviewConsentScopeSnapshot({
+    content: doc.content,
+    publishedAt: new Date(doc.publishedAt),
+    version: doc.version,
+    id: doc.id,
+  })
+
+  assert.deepEqual(first, second)
+  assert.match(first.consentScopeHash, /^[a-f0-9]{64}$/)
+  assert.equal(first.scope.scope, 'contract_review')
+  assert.equal(first.scope.consentVersion, CURRENT_CONSENT_VERSION)
+  assert.equal(Object.keys(first.scope.disclosures).length, 7)
+  assert.equal(first.scope.disclaimer.id, doc.id)
+  assert.equal(first.scope.disclaimer.version, doc.version)
+  assert.equal(first.scope.disclaimer.publishedAt, doc.publishedAt.toISOString())
+  for (const changed of [
+    { ...doc, id: `${doc.id}-changed`, publishedAt: doc.publishedAt },
+    { ...doc, version: `${doc.version}-changed`, publishedAt: doc.publishedAt },
+    { ...doc, content: `${doc.content}更新`, publishedAt: doc.publishedAt },
+    {
+      ...doc,
+      publishedAt: new Date(doc.publishedAt.getTime() + 1),
+    },
+  ]) {
+    assert.notEqual(
+      createContractReviewConsentScopeSnapshot(changed).consentScopeHash,
+      first.consentScopeHash
+    )
+  }
 })
 
 test('anonymous token is 32-byte base64url, hashed at rest, and verifiable', () => {
@@ -365,23 +499,36 @@ test('member create reads consent then inserts in one PostgreSQL Serializable tr
     input({
       consentVersion: 'client-lie',
       consentedAt: '2099-01-01T00:00:00.000Z',
-      consentScopeHash: 'f'.repeat(64),
     }),
     MEMBER
   )
   const state = harness.state()
 
   assert.equal(created.accessToken, undefined)
-  assert.deepEqual(state.operations, [['file.find', 'consent.find', 'task.create']])
+  assert.deepEqual(state.operations, [
+    ['file.find', 'legal.findMany', 'consent.find', 'task.create'],
+  ])
   assert.deepEqual(state.transactionOptions, [{ isolationLevel: 'Serializable' }])
   assert.equal(state.tasks[0]?.consentVersion, CURRENT_CONSENT_VERSION)
   assert.equal(
     (state.tasks[0]?.consentedAt as Date).toISOString(),
-    '2026-08-01T00:00:00.000Z'
+    activeConsent().grantedAt.toISOString()
   )
-  assert.notEqual(state.tasks[0]?.consentScopeHash, 'f'.repeat(64))
+  assert.equal(state.tasks[0]?.consentScopeHash, scopeHash())
+  assert.equal(state.tasks[0]?.disclaimerVersion, activeDisclaimer().version)
   assert.equal(state.tasks[0]?.endUserId, 'member-1')
   assert.equal(state.tasks[0]?.accessTokenHash, null)
+})
+
+test('a valid short-lived source proof is bearer proof, not an unintended one-time token', async () => {
+  const harness = makeHarness({ file: anonymousFile(), consents: [] })
+
+  const first = await harness.service.create(input(), ANONYMOUS)
+  const second = await harness.service.create(input(), ANONYMOUS)
+
+  assert.notEqual(first.id, second.id)
+  assert.notEqual(first.accessToken, second.accessToken)
+  assert.equal(harness.state().tasks.length, 2)
 })
 
 test('SQLite strategy omits unsupported isolation options without pretending to test concurrency', async () => {
@@ -418,6 +565,48 @@ test('source must exist, be active contract_upload, unexpired, and owned by requ
   )
 })
 
+test('anonymous create requires a valid signed source proof for the exact source file', async () => {
+  const requesters: ContractReviewRequester[] = [
+    { endUserId: null, accessToken: null, sourceFileProof: null },
+    { endUserId: null, accessToken: 'task-token-is-not-source-proof', sourceFileProof: null },
+    { endUserId: null, accessToken: null, sourceFileProof: '' },
+    { endUserId: null, accessToken: null, sourceFileProof: 'not-a-url' },
+    {
+      endUserId: null,
+      accessToken: null,
+      sourceFileProof: signedSourceProof('different-file'),
+    },
+    {
+      endUserId: null,
+      accessToken: null,
+      sourceFileProof: signedSourceProof('contract-file-1', TEST_NOW - 1),
+    },
+    {
+      endUserId: null,
+      accessToken: null,
+      sourceFileProof: `${signedSourceProof()}tampered`,
+    },
+  ]
+
+  for (const requester of requesters) {
+    const harness = makeHarness({ file: anonymousFile(), consents: [] })
+    await expectHiddenSource(() => harness.service.create(input(), requester))
+    assert.equal(harness.state().transactionCalls, 0)
+    assert.equal(harness.state().tasks.length, 0)
+  }
+})
+
+test('member create rejects task tokens and source proofs instead of mixing requester modes', async () => {
+  for (const requester of [
+    { ...MEMBER, accessToken: 'unexpected-task-token' },
+    { ...MEMBER, sourceFileProof: signedSourceProof() },
+  ]) {
+    const harness = makeHarness()
+    await assert.rejects(harness.service.create(input(), requester), BadRequestException)
+    assert.equal(harness.state().transactionCalls, 0)
+  }
+})
+
 test('task expiry exactly inherits source expiry and is never recalculated', async () => {
   const exactExpiry = new Date('2099-08-01T02:00:00.123Z')
   const harness = makeHarness({ file: memberFile({ expiresAt: exactExpiry }) })
@@ -437,8 +626,8 @@ test('member create denies missing, old-version, and revoked latest consent', as
       activeConsent({ id: 'older-active' }),
       activeConsent({
         id: 'newer-revoked',
-        grantedAt: new Date('2026-08-01T00:01:00.000Z'),
-        revokedAt: new Date('2026-08-01T00:02:00.000Z'),
+        grantedAt: new Date(TEST_NOW - 60 * 1000),
+        revokedAt: new Date(TEST_NOW - 30 * 1000),
       }),
     ],
   ]
@@ -447,6 +636,63 @@ test('member create denies missing, old-version, and revoked latest consent', as
     await expectConsentRequired(() => harness.service.create(input(), MEMBER))
     assert.equal(harness.state().tasks.length, 0)
   }
+})
+
+test('create fails closed unless exactly one fully published disclaimer is active', async () => {
+  const invalidLegalDocs: LegalDocRow[][] = [
+    [],
+    [activeDisclaimer(), activeDisclaimer({ id: 'duplicate-active-doc' })],
+    [activeDisclaimer({ publishedAt: null })],
+    [activeDisclaimer({ id: '' })],
+    [activeDisclaimer({ version: '' })],
+    [activeDisclaimer({ content: '' })],
+  ]
+
+  for (const legalDocs of invalidLegalDocs) {
+    const harness = makeHarness({ legalDocs })
+    await assert.rejects(harness.service.create(input(), MEMBER), (error: unknown) => {
+      assert.ok(error instanceof ServiceUnavailableException)
+      assert.equal(
+        (error.getResponse() as { error?: { code?: string } }).error?.code,
+        'CONTRACT_REVIEW_LEGAL_CONFIGURATION_INVALID'
+      )
+      return true
+    })
+    assert.equal(harness.state().tasks.length, 0)
+  }
+})
+
+test('member and anonymous create require the exact active disclaimer version and scope hash', async () => {
+  for (const requester of [MEMBER, ANONYMOUS]) {
+    const file = requester.endUserId ? memberFile() : anonymousFile()
+    const consents = requester.endUserId ? undefined : []
+    for (const invalid of [
+      { disclaimerVersion: 'stale-disclaimer-version' },
+      { disclaimerVersion: ` ${activeDisclaimer().version}` },
+      { consentScopeHash: 'f'.repeat(64) },
+      { consentScopeHash: scopeHash(activeDisclaimer({ content: 'stale content' })) },
+    ]) {
+      const harness = makeHarness({ file, consents })
+      await assert.rejects(harness.service.create(input(invalid), requester), (error: unknown) => {
+        assert.ok(error instanceof BadRequestException)
+        assert.equal(
+          (error.getResponse() as { error?: { code?: string } }).error?.code,
+          'CONTRACT_REVIEW_CONSENT_SNAPSHOT_INVALID'
+        )
+        return true
+      })
+      assert.equal(harness.state().tasks.length, 0)
+    }
+  }
+})
+
+test('member grant must be current and no earlier than active disclaimer publication', async () => {
+  const harness = makeHarness({
+    consents: [activeConsent({ grantedAt: new Date(DISCLAIMER_PUBLISHED_AT.getTime() - 1) })],
+  })
+
+  await expectConsentRequired(() => harness.service.create(input(), MEMBER))
+  assert.equal(harness.state().tasks.length, 0)
 })
 
 test('anonymous create requires a complete current consent snapshot and stores only token hash', async () => {
@@ -476,9 +722,35 @@ test('anonymous create requires a complete current consent snapshot and stores o
   assert.match(task?.accessTokenHash ?? '', /^[a-f0-9]{64}$/)
   assert.notEqual(task?.accessTokenHash, created.accessToken)
   assert.equal(verifyAnonymousAccessToken(created.accessToken, task?.accessTokenHash), true)
+  assert.equal(task?.consentScopeHash, scopeHash())
+  assert.equal(task?.disclaimerVersion, activeDisclaimer().version)
 })
 
-test('P2034 conflicts retry once or twice and then commit a single task', async () => {
+test('anonymous consent timestamp rejects future, stale, and pre-publication snapshots', async () => {
+  const invalidTimes = [
+    new Date(Date.now() + 60_001).toISOString(),
+    new Date(Date.now() - 15 * 60 * 1000 - 1_000).toISOString(),
+    new Date(DISCLAIMER_PUBLISHED_AT.getTime() - 1).toISOString(),
+  ]
+
+  for (const consentedAt of invalidTimes) {
+    const harness = makeHarness({ file: anonymousFile(), consents: [] })
+    await assert.rejects(
+      harness.service.create(input({ consentedAt }), ANONYMOUS),
+      BadRequestException
+    )
+    assert.equal(harness.state().tasks.length, 0)
+  }
+
+  const withinFutureSkew = makeHarness({ file: anonymousFile(), consents: [] })
+  await withinFutureSkew.service.create(
+    input({ consentedAt: new Date(Date.now() + 59_000).toISOString() }),
+    ANONYMOUS
+  )
+  assert.equal(withinFutureSkew.state().tasks.length, 1)
+})
+
+test('commit-time P2034 rolls back and reexecutes the callback without duplicate business state', async () => {
   for (const conflictCount of [1, 2]) {
     const harness = makeHarness({
       dbKind: 'postgres',
@@ -486,8 +758,17 @@ test('P2034 conflicts retry once or twice and then commit a single task', async 
     })
     await harness.service.create(input(), MEMBER)
     assert.equal(harness.state().transactionCalls, conflictCount + 1)
+    assert.equal(harness.state().operations.length, conflictCount + 1)
+    for (const attempt of harness.state().operations) {
+      assert.deepEqual(attempt, [
+        'file.find',
+        'legal.findMany',
+        'consent.find',
+        'task.create',
+      ])
+    }
     assert.equal(harness.state().tasks.length, 1)
-    assert.equal(harness.state().createCalls, 1)
+    assert.equal(harness.state().createCalls, conflictCount + 1)
   }
 })
 
@@ -505,6 +786,8 @@ test('P2034 retry exhaustion returns a redacted retryable error', async () => {
     return true
   })
   assert.equal(harness.state().transactionCalls, 3)
+  assert.equal(harness.state().operations.length, 3)
+  assert.equal(harness.state().createCalls, 3)
   assert.equal(harness.state().tasks.length, 0)
 })
 
@@ -518,6 +801,8 @@ test('non-P2034 failures are not retried and are redacted', async () => {
     return true
   })
   assert.equal(harness.state().transactionCalls, 1)
+  assert.equal(harness.state().createCalls, 1)
+  assert.equal(harness.state().tasks.length, 0)
 })
 
 test('create then revoke cancels the processing task under the shared transaction protocol', async () => {

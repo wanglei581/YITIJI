@@ -18,6 +18,8 @@ export type ContractType = 'labor_contract' | 'internship_agreement' | 'non_comp
 export interface ContractReviewRequester {
   endUserId: string | null
   accessToken: string | null
+  /** Short-lived signed content URL presented only when creating an anonymous task. */
+  sourceFileProof: string | null
 }
 
 export interface ContractReviewCreateInput {
