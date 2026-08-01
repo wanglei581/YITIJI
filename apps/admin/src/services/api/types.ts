@@ -316,12 +316,20 @@ export interface AdminFairSourceRecord {
 export type AiOperation =
   | 'parseResume'
   | 'optimizeResume'
+  | 'adjustResumeLayout'
   | 'generateResume'
   | 'chatAssistant'
   | 'classifyIntent'
   | 'jobRecommend'
   | 'jobExplain'
   | 'jobMatch'
+  // A-6 成本可见性补齐（2026-07-31）
+  | 'careerPlan'
+  | 'fairVisitPlan'
+  | 'interviewQuestion'
+  | 'interviewReport'
+  | 'voiceTranscribe'   // ASR：按时长计费，estimatedCostCny 通常为 undefined
+  | 'voiceSynthesize'   // TTS：按字符计费，estimatedCostCny 通常为 undefined
 export type AiLogStatus = 'success' | 'failed'
 export type JobSourceQualitySummary = JobSourceQualitySummaryDTO
 
@@ -349,16 +357,7 @@ export interface AdminAiUsage {
   failCount: number
   successRate: number           // 0–100, one decimal
   avgLatencyMs: number          // success-only average
-  byOperation: {
-    parseResume: number
-    optimizeResume: number
-    generateResume: number
-    chatAssistant: number
-    classifyIntent: number
-    jobRecommend: number
-    jobExplain: number
-    jobMatch: number
-  }
+  byOperation: Record<AiOperation, number>
   errorDistribution: Array<{ code: string; count: number }>
   tokenUsageTotals: {
     promptTokens: number

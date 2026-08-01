@@ -55,6 +55,20 @@
       "autoPort": false
     },
     {
+      "name": "admin-http",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@ai-job-print/admin",
+        "exec",
+        "vite",
+        "--port",
+        "5277"
+      ],
+      "port": 5277,
+      "autoPort": false
+    },
+    {
       "name": "kiosk-w5",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [

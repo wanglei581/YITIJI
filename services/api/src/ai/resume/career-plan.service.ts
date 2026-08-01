@@ -7,6 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
+import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -58,6 +59,7 @@ export class CareerPlanService {
     private readonly files: FilesService,
     private readonly pdf: CareerPlanPdfService,
     private readonly audit: AuditService,
+    private readonly aiLog: AiLogService,
   ) {}
 
   async generate(taskId: string, requester: CareerPlanRequester) {
@@ -114,7 +116,18 @@ export class CareerPlanService {
       }
     }
 
-    const payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx })
+    // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
+    // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
+    const usage = new AiUsageAccumulator()
+    const startedAt = Date.now()
+    let payload: CareerPlanPayload
+    try {
+      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, onLlmCall: usage.add })
+    } catch (error) {
+      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
+      throw error
+    }
+    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
     const stored: StoredCareerPlan = {
       payload,
       basedOn: { resume: true, jobFit: jobFitCtx?.jobTitle ?? null, interview: interviewCtx?.position ?? null },
@@ -197,6 +210,34 @@ export class CareerPlanService {
       expiresAt: uploaded.signedUrlExpiresAt,
       printFileUrl: signFileUrl(uploaded.fileId).url,
     }
+  }
+
+  /**
+   * A-6：落 AiServiceLog（仅元数据）。
+   *
+   * 一次都没打到模型（如 AI_NOT_CONFIGURED 直接抛错）时不落，避免把配置缺失
+   * 记成"AI 调用失败"污染失败率告警。
+   */
+  private recordAiLog(
+    taskId: string,
+    usage: AiUsageAccumulator,
+    startedAt: number,
+    status: 'success' | 'failed',
+    endUserId: string | null,
+    errorCode?: string,
+  ): void {
+    if (usage.callCount === 0) return
+    this.aiLog.record({
+      taskId,
+      operation: 'careerPlan',
+      provider: usage.provider ?? 'llm',
+      status,
+      latencyMs: Math.max(0, Date.now() - startedAt),
+      tokenUsage: usage.tokenUsage,
+      errorCode,
+      endUserId,
+      terminalId: null,
+    })
   }
 
   private toResponse(taskId: string, stored: StoredCareerPlan) {

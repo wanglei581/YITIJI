@@ -168,6 +168,7 @@
     "db:pg:deploy": "prisma migrate deploy --config prisma.postgres.config.ts",
     "db:pg:migrate-data": "node -r @swc-node/register scripts/migrate-sqlite-to-postgres.ts",
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
+    "verify:ai-cost-coverage": "node -r @swc-node/register scripts/verify-ai-cost-coverage.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",
     "verify:member-data-retention": "node -r @swc-node/register scripts/verify-member-data-retention.ts",
     "verify:companies": "node -r @swc-node/register scripts/verify-companies.ts",

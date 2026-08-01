@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // 招聘会 AI 参会准备单。
 // 合规：仅供本人参会准备参考，不包含任何就业结果承诺，不向企业传递候选人信息。
@@ -37,6 +38,11 @@ export interface FairVisitPlanContext {
     sourceUrl: string | null
     positions: Array<{ title: string; requirements: string | null; education: string | null; location: string | null }>
   }>
+  /**
+   * A-6 成本可见性：每次真实 LLM 调用（含失败重试）回调一次元数据，
+   * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
+   */
+  onLlmCall?: AiLlmCallSink
 }
 
 export interface FairVisitPlanPayload {
@@ -98,7 +104,7 @@ export class LlmFairVisitPlanService {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const t0 = Date.now()
-      const raw = await this.callLlm(system, user)
+      const raw = await this.callLlm(system, user, ctx.onLlmCall)
       const parsed = this.parse(raw)
       const payload = this.validate(parsed, ctx)
       if (!payload) {
@@ -162,12 +168,15 @@ export class LlmFairVisitPlanService {
     }
   }
 
-  private async callLlm(system: string, user: string): Promise<string> {
+  // ⚠️ 共享 feature key 'resume_optimize'（与 career-plan、job-fit 等共用同一 LLM 配置）。
+  // A-6 成本可见性：每次 callLlm 执行完毕（无论成功或失败前）都回调 onLlmCall。
+  private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 服务暂未启用，请联系管理员配置' } })
     }
+    const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     let res: Response
     try {
       res = await fetch(`${cfg.baseURL.replace(/\/$/, '')}/chat/completions`, {
@@ -185,13 +194,16 @@ export class LlmFairVisitPlanService {
       })
     } catch {
       this.logger.error('fairvisit.llm network_error')
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
     }
     if (!res.ok) {
       this.logger.error(`fairvisit.llm upstream_non_2xx status=${res.status}`)
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage }
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
