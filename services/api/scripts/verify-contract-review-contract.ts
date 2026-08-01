@@ -1,17 +1,66 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import {
-  CONTRACT_REVIEW_STATUSES as CONTRACT_REVIEW_STATUSES_FROM_INDEX,
-} from '../../../packages/shared/src'
-import {
   CONTRACT_REVIEW_STATUSES,
+  type ContractReviewCategory,
   type ContractReviewFinding,
+  type ContractReviewPriority,
+  type ContractReviewStatus,
   type ContractReviewTaskView,
+  type ContractType,
 } from '../../../packages/shared/src/types/contractReview'
 import type { FilePurpose } from '../../../packages/shared/src/types/file'
-import type { ScanSessionCreateRequest } from '../../../packages/shared/src/types/scanTask'
+import type { ScanType } from '../../../packages/shared/src/types/scanTask'
 import type { UploadSessionCreateRequest } from '../../../packages/shared/src/types/uploadSession'
+import type {
+  ContractReviewFinding as BarrelContractReviewFinding,
+  ContractReviewTaskView as BarrelContractReviewTaskView,
+} from '../../../packages/shared/src'
+
+type Equal<Left, Right> =
+  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2
+    ? true
+    : false
+
+type SharedContractExports = typeof import('../../../packages/shared/src')
+
+function expectType<Check extends true>(_check?: Check): void {}
+
+expectType<Equal<ContractReviewStatus, (typeof CONTRACT_REVIEW_STATUSES)[number]>>()
+expectType<
+  Equal<ContractType, 'labor_contract' | 'internship_agreement' | 'non_compete' | 'offer'>
+>()
+expectType<Equal<ContractReviewPriority, 'priority_check' | 'attention' | 'insufficient_info'>>()
+expectType<
+  Equal<
+    ContractReviewCategory,
+    | 'parties'
+    | 'term'
+    | 'probation'
+    | 'compensation'
+    | 'position_location'
+    | 'working_time'
+    | 'social_insurance'
+    | 'training_service'
+    | 'penalty'
+    | 'non_compete'
+    | 'deposit_documents'
+    | 'termination'
+    | 'imbalance'
+    | 'offer_conditions'
+  >
+>()
+expectType<
+  Equal<SharedContractExports['CONTRACT_REVIEW_STATUSES'], typeof CONTRACT_REVIEW_STATUSES>
+>()
+expectType<Equal<BarrelContractReviewFinding, ContractReviewFinding>>()
+expectType<Equal<BarrelContractReviewTaskView, ContractReviewTaskView>>()
+expectType<Equal<Extract<FilePurpose, 'contract_upload'>, 'contract_upload'>>()
+expectType<Equal<Extract<ScanType, 'contract'>, 'contract'>>()
+expectType<
+  Equal<Extract<UploadSessionCreateRequest['purpose'], 'contract_upload'>, 'contract_upload'>
+>()
 
 const expectedStatuses = [
   'uploaded',
@@ -26,10 +75,6 @@ const expectedStatuses = [
   'cancelled',
   'expired',
 ] as const
-
-assert.deepEqual(CONTRACT_REVIEW_STATUSES, expectedStatuses)
-assert.equal(new Set(CONTRACT_REVIEW_STATUSES).size, CONTRACT_REVIEW_STATUSES.length)
-assert.strictEqual(CONTRACT_REVIEW_STATUSES_FROM_INDEX, CONTRACT_REVIEW_STATUSES)
 
 const finding: ContractReviewFinding = {
   id: 'f-1',
@@ -72,37 +117,49 @@ const view: ContractReviewTaskView = {
   },
 }
 
-const filePurpose: FilePurpose = 'contract_upload'
+const purpose: FilePurpose = 'contract_upload'
+const scanType: ScanType = 'contract'
 const uploadRequest: UploadSessionCreateRequest = {
   purpose: 'contract_upload',
   mode: 'temporary',
   channel: 'phone_h5',
 }
-const scanRequest: ScanSessionCreateRequest = {
-  scanType: 'contract',
-  terminalId: 'terminal-contract',
+
+function verifyTypeScriptContract(): void {
+  const typescriptCli = require.resolve('typescript/bin/tsc')
+  execFileSync(
+    process.execPath,
+    [
+      typescriptCli,
+      '--noEmit',
+      '--strict',
+      '--noUnusedLocals',
+      '--noUnusedParameters',
+      '--skipLibCheck',
+      '--target',
+      'ES2021',
+      '--module',
+      'commonjs',
+      '--moduleResolution',
+      'node',
+      '--esModuleInterop',
+      '--allowSyntheticDefaultImports',
+      '--resolveJsonModule',
+      '--pretty',
+      'false',
+      __filename,
+    ],
+    { cwd: resolve(__dirname, '../../..'), stdio: 'inherit' }
+  )
 }
 
+verifyTypeScriptContract()
+
+assert.deepEqual(CONTRACT_REVIEW_STATUSES, expectedStatuses)
+assert.equal(new Set(CONTRACT_REVIEW_STATUSES).size, CONTRACT_REVIEW_STATUSES.length)
 assert.equal(view.result?.findings[0]?.evidence.excerpt, '试用期六个月')
-assert.equal(filePurpose, 'contract_upload')
+assert.equal(purpose, 'contract_upload')
+assert.equal(scanType, 'contract')
 assert.equal(uploadRequest.purpose, 'contract_upload')
-assert.equal(scanRequest.scanType, 'contract')
-
-const repoRoot = resolve(__dirname, '../../..')
-const fileSource = readFileSync(resolve(repoRoot, 'packages/shared/src/types/file.ts'), 'utf8')
-const scanTaskSource = readFileSync(resolve(repoRoot, 'packages/shared/src/types/scanTask.ts'), 'utf8')
-const uploadSessionSource = readFileSync(
-  resolve(repoRoot, 'packages/shared/src/types/uploadSession.ts'),
-  'utf8',
-)
-const sharedIndexSource = readFileSync(resolve(repoRoot, 'packages/shared/src/index.ts'), 'utf8')
-
-assert.match(fileSource, /^\s*\| 'contract_upload'(?:\s|$)/m)
-assert.match(scanTaskSource, /^export type ScanType = [^\n]*\| 'contract'$/m)
-assert.match(
-  uploadSessionSource,
-  /export interface UploadSessionCreateRequest\s*{[\s\S]*purpose: FilePurpose/,
-)
-assert.match(sharedIndexSource, /export \* from ['"]\.\/types\/contractReview['"]/)
 
 console.log('contract review shared contract passed')

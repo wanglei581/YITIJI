@@ -1,5 +1,11 @@
 export type ScanType = 'resume' | 'id' | 'document' | 'contract'
-export type ScanTaskStatus = 'waiting' | 'matched' | 'completed' | 'failed' | 'expired' | 'cancelled'
+export type ScanTaskStatus =
+  | 'waiting'
+  | 'matched'
+  | 'completed'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
 
 export interface ScanSessionCreateRequest {
   scanType: ScanType
