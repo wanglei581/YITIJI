@@ -21,9 +21,23 @@ const allowedKeys = [
   'approved_at',
 ] as const
 const allowedKeySet = new Set<string>(allowedKeys)
+const approverRoles = ['legal', 'compliance', 'security'] as const
+const stableApproverIdPattern = /^[a-z0-9](?:[a-z0-9._-]{1,62}[a-z0-9])?$/
+const placeholderMarkerPattern = /(?:^|[._-])(?:test|demo|example|placeholder|sample|todo|tbd|fake|dummy)(?:$|[._-])/i
 
+type GateField = (typeof gateFields)[number]
+type GateState = 'pending' | 'approved'
 type FrontmatterValue = string | number | boolean | null | unknown[]
 type FrontmatterRecord = Record<string, FrontmatterValue>
+type GateFixture = Readonly<
+  Record<GateField, GateState> & {
+    status: 'blocked' | 'approved'
+    production_default: false
+    fail_closed: true
+    approved_by: readonly string[]
+    approved_at: string | null
+  }
+>
 
 function parseQuotedString(value: string, key: string): string {
   if (value.startsWith('"')) {
@@ -33,7 +47,7 @@ function parseQuotedString(value: string, key: string): string {
     } catch {
       assert.fail(`invalid quoted string for ${key}`)
     }
-    assert.equal(typeof parsed, 'string', `${key} must contain a string value`)
+    assert(typeof parsed === 'string', `${key} must contain a string value`)
     return parsed
   }
 
@@ -87,7 +101,7 @@ export function parseGateFrontmatter(source: string): FrontmatterRecord {
 
     const [, key, rawValue] = pair
     assert(allowedKeySet.has(key), `unknown key: ${key}`)
-    assert(!Object.hasOwn(parsed, key), `duplicate key: ${key}`)
+    assert(!Object.prototype.hasOwnProperty.call(parsed, key), `duplicate key: ${key}`)
     parsed[key] = parseValue(rawValue.trim(), key)
   }
 
@@ -120,6 +134,29 @@ function isValidRfc3339(value: string): boolean {
   )
 }
 
+function validateApproverIdentities(approvedBy: unknown[]): Set<string> {
+  const seenIdentities = new Set<string>()
+  const seenRoles = new Set<string>()
+
+  for (const identity of approvedBy) {
+    assert(typeof identity === 'string' && identity.length > 0, 'approved_by entries must be non-empty strings')
+    assert.equal(identity, identity.trim(), 'approved_by identities must not contain surrounding whitespace')
+
+    const match = identity.match(/^(legal|compliance|security):(.+)$/)
+    assert(match, 'approved_by identities must use <role>:<stable-id>')
+
+    const [, role, stableId] = match
+    assert(stableApproverIdPattern.test(stableId), `approved_by stable-id is invalid for role ${role}`)
+    assert(!placeholderMarkerPattern.test(stableId), `approved_by stable-id contains a placeholder marker for role ${role}`)
+    assert(!seenIdentities.has(identity), `approved_by contains duplicate identity: ${identity}`)
+    assert(!seenRoles.has(role), `approved_by contains duplicate role: ${role}`)
+    seenIdentities.add(identity)
+    seenRoles.add(role)
+  }
+
+  return seenRoles
+}
+
 export function verifyGateSource(source: string): void {
   const gate = parseGateFrontmatter(source)
 
@@ -132,23 +169,20 @@ export function verifyGateSource(source: string): void {
   assert.strictEqual(gate.fail_closed, true, 'fail_closed must be boolean true')
 
   for (const field of gateFields) {
-    assert(
-      gate[field] === 'pending' || gate[field] === 'approved',
-      `${field} must be pending or approved`,
-    )
+    assert(gate[field] === 'pending' || gate[field] === 'approved', `${field} must be pending or approved`)
   }
 
   assert(Array.isArray(gate.approved_by), 'approved_by must be an array')
-  assert(
-    gate.approved_by.every((identity) => typeof identity === 'string' && identity.trim().length > 0),
-    'approved_by entries must be non-empty identity strings',
-  )
+  const approvedRoles = validateApproverIdentities(gate.approved_by)
 
   if (gate.status === 'approved') {
     for (const field of gateFields) {
       assert.equal(gate[field], 'approved', `${field} must be approved before status can be approved`)
     }
-    assert(gate.approved_by.length > 0, 'approved_by must be non-empty when status is approved')
+    for (const role of approverRoles) {
+      assert(approvedRoles.has(role), `approved_by must include exactly one ${role} approver`)
+    }
+    assert.equal(approvedRoles.size, approverRoles.length, 'approved_by must contain exactly the required roles')
     assert(
       typeof gate.approved_at === 'string' && isValidRfc3339(gate.approved_at),
       'approved_at must be a valid RFC3339 timestamp when status is approved',
@@ -159,88 +193,187 @@ export function verifyGateSource(source: string): void {
   }
 }
 
-function makeApproved(source: string): string {
-  return source
-    .replace('status: blocked', 'status: approved')
-    .replace(/: pending/g, ': approved')
-    .replace('approved_by: []', 'approved_by: ["legal@example.com", "security@example.com"]')
-    .replace('approved_at: null', 'approved_at: 2026-08-01T12:00:00+08:00')
+function renderFixture(gate: GateFixture): string {
+  return [
+    '---',
+    `status: ${gate.status}`,
+    `production_default: ${gate.production_default}`,
+    `fail_closed: ${gate.fail_closed}`,
+    ...gateFields.map((field) => `${field}: ${gate[field]}`),
+    `approved_by: ${JSON.stringify(gate.approved_by)}`,
+    `approved_at: ${gate.approved_at ?? 'null'}`,
+    '---',
+    'Canonical verifier fixture.',
+  ].join('\n')
 }
 
-function runRegressionFixtures(validSource: string): void {
-  const duplicateStatus = validSource.replace('status: blocked', 'status: blocked\nstatus: approved')
-  assert.throws(() => verifyGateSource(duplicateStatus), /duplicate key: status/)
+const canonicalBlockedGate = Object.freeze({
+  status: 'blocked',
+  production_default: false,
+  fail_closed: true,
+  provider_allowlist: 'pending',
+  algorithm_filing: 'pending',
+  generative_ai_security_assessment: 'pending',
+  aigc_visible_label: 'pending',
+  aigc_metadata_label: 'pending',
+  legal_gold_set: 'pending',
+  approved_by: Object.freeze([] as string[]),
+  approved_at: null,
+} as const satisfies GateFixture)
+const canonicalApprovedGate = Object.freeze({
+  ...canonicalBlockedGate,
+  status: 'approved',
+  provider_allowlist: 'approved',
+  algorithm_filing: 'approved',
+  generative_ai_security_assessment: 'approved',
+  aigc_visible_label: 'approved',
+  aigc_metadata_label: 'approved',
+  legal_gold_set: 'approved',
+  approved_by: Object.freeze([
+    'legal:contract-governance-counsel',
+    'compliance:ai-compliance-office',
+    'security:ai-security-office',
+  ]),
+  approved_at: '2026-08-01T12:00:00+08:00',
+} as const satisfies GateFixture)
+const canonicalBlockedFixture = renderFixture(canonicalBlockedGate)
+const canonicalPartialApprovedFixtures = Object.freeze(
+  gateFields.map((field) =>
+    renderFixture(
+      Object.freeze({
+        ...canonicalBlockedGate,
+        [field]: 'approved',
+      }) as GateFixture,
+    ),
+  ),
+)
+const canonicalApprovedFixture = renderFixture(canonicalApprovedGate)
 
-  const duplicateProductionDefault = validSource.replace(
-    'production_default: false',
-    'production_default: false\nproduction_default: true',
+function runRegressionFixtures(): void {
+  assert.doesNotThrow(() => verifyGateSource(canonicalBlockedFixture))
+  for (const partialApprovedFixture of canonicalPartialApprovedFixtures) {
+    assert.doesNotThrow(() => verifyGateSource(partialApprovedFixture))
+  }
+  assert.doesNotThrow(() => verifyGateSource(canonicalApprovedFixture))
+
+  assert.throws(
+    () => verifyGateSource(canonicalBlockedFixture.replace('status: blocked', 'status: blocked\nstatus: approved')),
+    /duplicate key: status/,
   )
-  assert.throws(() => verifyGateSource(duplicateProductionDefault), /duplicate key: production_default/)
-
-  const unknownKey = validSource.replace('status: blocked', 'status: blocked\nunreviewed_escape_hatch: true')
-  assert.throws(() => verifyGateSource(unknownKey), /unknown key: unreviewed_escape_hatch/)
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalBlockedFixture.replace(
+          'production_default: false',
+          'production_default: false\nproduction_default: true',
+        ),
+      ),
+    /duplicate key: production_default/,
+  )
+  assert.throws(
+    () => verifyGateSource(canonicalBlockedFixture.replace('status: blocked', 'status: blocked\nescape_hatch: true')),
+    /unknown key: escape_hatch/,
+  )
 
   for (const invalidState of ['banana', '', 'null', 'unknown']) {
-    const invalidGateState = validSource.replace(
-      'provider_allowlist: pending',
-      `provider_allowlist: ${invalidState}`,
+    assert.throws(
+      () =>
+        verifyGateSource(
+          canonicalBlockedFixture.replace('provider_allowlist: pending', `provider_allowlist: ${invalidState}`),
+        ),
+      /provider_allowlist/,
     )
-    assert.throws(() => verifyGateSource(invalidGateState), /provider_allowlist/)
   }
 
-  const blockedWithApprover = validSource.replace('approved_by: []', 'approved_by: ["legal@example.com"]')
-  assert.throws(() => verifyGateSource(blockedWithApprover), /approved_by must be empty when status is blocked/)
-
-  const blockedWithTimestamp = validSource.replace('approved_at: null', 'approved_at: 2026-08-01T12:00:00Z')
-  assert.throws(() => verifyGateSource(blockedWithTimestamp), /approved_at must be null when status is blocked/)
-
-  const approvedWithoutTimestamp = makeApproved(validSource).replace(
-    'approved_at: 2026-08-01T12:00:00+08:00',
-    'approved_at: null',
+  assert.throws(
+    () => verifyGateSource(canonicalBlockedFixture.replace('production_default: false', 'production_default: "false"')),
+    /production_default must be boolean false/,
   )
-  assert.throws(() => verifyGateSource(approvedWithoutTimestamp), /approved_at must be a valid RFC3339 timestamp/)
-
-  const approvedWithEmptyApprovers = makeApproved(validSource).replace(
-    'approved_by: ["legal@example.com", "security@example.com"]',
-    'approved_by: []',
+  assert.throws(
+    () => verifyGateSource(canonicalBlockedFixture.replace('fail_closed: true', 'fail_closed: "true"')),
+    /fail_closed must be boolean true/,
   )
-  assert.throws(() => verifyGateSource(approvedWithEmptyApprovers), /approved_by must be non-empty/)
-
-  const approvedWithScalarApprover = makeApproved(validSource).replace(
-    'approved_by: ["legal@example.com", "security@example.com"]',
-    'approved_by: legal@example.com',
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalBlockedFixture.replace('approved_by: []', 'approved_by: ["legal:contract-governance-counsel"]'),
+      ),
+    /approved_by must be empty when status is blocked/,
   )
-  assert.throws(() => verifyGateSource(approvedWithScalarApprover), /approved_by must be an array/)
-
-  const approvedWithInvalidTimestamp = makeApproved(validSource).replace(
-    'approved_at: 2026-08-01T12:00:00+08:00',
-    'approved_at: 2026-02-30T12:00:00Z',
+  assert.throws(
+    () => verifyGateSource(canonicalBlockedFixture.replace('approved_at: null', 'approved_at: 2026-08-01T12:00:00Z')),
+    /approved_at must be null when status is blocked/,
   )
-  assert.throws(() => verifyGateSource(approvedWithInvalidTimestamp), /approved_at must be a valid RFC3339 timestamp/)
-
-  const approvedWithBlankApprover = makeApproved(validSource).replace(
-    'approved_by: ["legal@example.com", "security@example.com"]',
-    'approved_by: [""]',
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_at: .+/, 'approved_at: null')),
+    /approved_at must be a valid RFC3339 timestamp/,
   )
-  assert.throws(() => verifyGateSource(approvedWithBlankApprover), /approved_by entries/)
-
-  const approvedWithNonStringApprover = makeApproved(validSource).replace(
-    'approved_by: ["legal@example.com", "security@example.com"]',
-    'approved_by: [123]',
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_at: .+/, 'approved_at: 2026-02-30T12:00:00Z')),
+    /approved_at must be a valid RFC3339 timestamp/,
   )
-  assert.throws(() => verifyGateSource(approvedWithNonStringApprover), /approved_by entries/)
-
-  const quotedProductionDefault = validSource.replace('production_default: false', 'production_default: "false"')
-  assert.throws(() => verifyGateSource(quotedProductionDefault), /production_default must be boolean false/)
-
-  const quotedFailClosed = validSource.replace('fail_closed: true', 'fail_closed: "true"')
-  assert.throws(() => verifyGateSource(quotedFailClosed), /fail_closed must be boolean true/)
-
-  assert.doesNotThrow(() => verifyGateSource(makeApproved(validSource)))
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_by: .+/, 'approved_by: []')),
+    /must include exactly one legal approver/,
+  )
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_by: .+/, 'approved_by: legal:governance-counsel')),
+    /approved_by must be an array/,
+  )
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_by: .+/, 'approved_by: [""]')),
+    /approved_by entries must be non-empty/,
+  )
+  assert.throws(
+    () => verifyGateSource(canonicalApprovedFixture.replace(/approved_by: .+/, 'approved_by: [123]')),
+    /approved_by entries must be non-empty/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          'approved_by: ["legal:contract-governance-counsel", "legal:legal-review-counsel", "security:ai-security-office"]',
+        ),
+      ),
+    /duplicate role: legal/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          'approved_by: ["legal:contract-governance-counsel", "legal:contract-governance-counsel", "security:ai-security-office"]',
+        ),
+      ),
+    /duplicate identity: legal:contract-governance-counsel/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          'approved_by: ["legal:contract-governance-counsel", "compliance:demo-account", "security:ai-security-office"]',
+        ),
+      ),
+    /placeholder marker for role compliance/,
+  )
+  assert.throws(
+    () =>
+      verifyGateSource(
+        canonicalApprovedFixture.replace(
+          /approved_by: .+/,
+          'approved_by: ["legal:contract-governance-counsel", "security:ai-security-office"]',
+        ),
+      ),
+    /must include exactly one compliance approver/,
+  )
 }
 
 const source = readFileSync(gatePath, 'utf8')
-runRegressionFixtures(source)
 verifyGateSource(source)
+runRegressionFixtures()
 
-console.log('Contract review Gate 0 verification passed: schema, regression fixtures, and record are valid.')
+console.log(
+  'Contract review Gate 0 verification passed: real record, all 6 partial approvals, and full approval accepted; negative fixtures rejected.',
+)

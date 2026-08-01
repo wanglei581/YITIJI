@@ -39,7 +39,9 @@ AI 合同审查当前处于 `blocked`。本记录仅用于冻结 Gate 0 的检�
 - `production_default` 必须始终为 `false`；生产能力只能通过独立、显式且可审计的发布授权开启。
 - `fail_closed` 必须始终为布尔值 `true`；verifier 直接校验此字段，不依赖正文文案判断关闭策略。
 - 只有全部 Gate 0 检查项均为 `approved`，且 `approved_by` 非空时，才允许将 `status` 改为 `approved`。
-- `approved_by` 是 Gate 0 最终联合批准人的身份标识数组，并非各检查项证据或责任人签字的替代；`approved_at` 记录最终联合批准时间。不得用测试账号、自动化任务或占位值代替签字。
+- `approved_by` 是 Gate 0 最终联合批准人的身份标识数组，并非各检查项证据或责任人签字的替代；仅在最终 `approved` 时填写，且必须唯一覆盖 `legal`、`compliance`、`security` 三个角色各一人（或一个稳定组织责任身份）。
+- 每个批准人使用 `<role>:<stable-id>` 格式，例如 `legal:contract-governance-counsel`、`compliance:ai-compliance-office`、`security:ai-security-office`。`stable-id` 只允许小写字母、数字、点、下划线和连字符，不得包含空白，也不得使用 `test`、`demo`、`example`、`placeholder`、`sample`、`todo`、`tbd`、`fake`、`dummy` 等占位词作为点、下划线或连字符分隔的独立段；不得重复身份或角色。
+- `approved_at` 使用有效 RFC3339 时间记录最终联合批准时间。`blocked` 时 `approved_by` 必须为 `[]` 且 `approved_at` 必须为 `null`。
 - 任一批准被撤销、过期或证据无法复核时，必须立即将 `status` 恢复为 `blocked`，并保持真实调用与生产入口关闭。
 
 ## 验证边界
