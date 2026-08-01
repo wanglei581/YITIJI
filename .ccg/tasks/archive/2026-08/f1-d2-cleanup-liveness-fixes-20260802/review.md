@@ -22,3 +22,9 @@
 ## 边界
 
 没有运行 `run.sh`、reserve/invoke/full drill、Colima、systemd、PM2、Nginx 或 API 服务；没有生成 nonce/evidence，没有连接或部署 production。本任务不构成 D2′ PASS 或 fresh-retake 授权，`productionF1` 保持 NO-GO。
+
+## PR 集成
+
+- PR：[YITIJI #474](https://github.com/wanglei581/YITIJI/pull/474)。
+- 首轮 GitHub Actions run `30709420945`：`build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 3/3 全绿。
+- 尚未合入主干；真实 Linux 调用点复验和 fresh retake 仍需后续独立授权。
