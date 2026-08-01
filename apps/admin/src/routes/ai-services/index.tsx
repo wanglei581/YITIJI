@@ -30,14 +30,37 @@ import type { AdminAiUsage, AdminAiLogEntry, AiOperation, AiLogStatus, JobSource
 // ─── 常量映射 ─────────────────────────────────────────────────
 
 const OPERATION_LABELS: Record<AiOperation, string> = {
-  parseResume:    '简历解析',
-  optimizeResume: '简历优化',
-  generateResume: 'AI 简历生成',
-  chatAssistant:  'AI 对话',
-  classifyIntent: '意图分类',
-  jobRecommend:   '岗位 AI 推荐',
-  jobExplain:     'AI 岗位解读',
-  jobMatch:       '岗位匹配参考',
+  parseResume:        '简历解析',
+  optimizeResume:     '简历优化',
+  adjustResumeLayout: '排版调整',
+  generateResume:     'AI 简历生成',
+  chatAssistant:      'AI 对话',
+  classifyIntent:     '意图分类',
+  jobRecommend:       '岗位 AI 推荐',
+  jobExplain:         'AI 岗位解读',
+  jobMatch:           '岗位匹配参考',
+  // A-6 成本可见性补齐
+  careerPlan:         '职业规划',
+  fairVisitPlan:      '招聘会参观计划',
+  interviewQuestion:  '模拟面试出题',
+  interviewReport:    '面试报告生成',
+  voiceTranscribe:    '语音转写 (ASR)',   // 按时长计费，成本 Admin 展示 N/A
+  voiceSynthesize:    '语音播报 (TTS)',   // 按字符计费，成本 Admin 展示 N/A
+}
+
+/**
+ * 不按 token 计费的操作：ASR 按音频时长、TTS 按字符数。
+ *
+ * 后端对这些行不写 estimatedCostCny（保持 null），因为我们没有厂家确认的单价，
+ * 编一个数字就是伪造成本。页面必须如实标注「按量计费 · 未估算」，
+ * 绝不能因为聚合出来是 0 就显示成 ¥0.0000（那等于谎称免费）。
+ * 后端真相源：services/api/src/ai/ai-log.service.ts NON_TOKEN_BILLED_OPERATIONS
+ */
+const NON_TOKEN_BILLED_OPS: readonly AiOperation[] = ['voiceTranscribe', 'voiceSynthesize']
+
+const NON_TOKEN_BILLED_NOTE: Record<string, string> = {
+  voiceTranscribe: '按音频时长计费',
+  voiceSynthesize: '按字符数计费',
 }
 
 const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
@@ -54,23 +77,37 @@ const OP_FILTERS: OpFilter[] = [
   'all',
   'parseResume',
   'optimizeResume',
+  'adjustResumeLayout',
   'generateResume',
   'chatAssistant',
   'classifyIntent',
   'jobRecommend',
   'jobExplain',
   'jobMatch',
+  'careerPlan',
+  'fairVisitPlan',
+  'interviewQuestion',
+  'interviewReport',
+  'voiceTranscribe',
+  'voiceSynthesize',
 ]
 const OP_FILTER_LABELS: Record<OpFilter, string> = {
-  all:            '全部',
-  parseResume:    '简历解析',
-  optimizeResume: '简历优化',
-  generateResume: 'AI 简历生成',
-  chatAssistant:  'AI 对话',
-  classifyIntent: '意图分类',
-  jobRecommend:   '岗位推荐',
-  jobExplain:     '岗位解读',
-  jobMatch:       '匹配参考',
+  all:                '全部',
+  parseResume:        '简历解析',
+  optimizeResume:     '简历优化',
+  adjustResumeLayout: '排版调整',
+  generateResume:     'AI 简历生成',
+  chatAssistant:      'AI 对话',
+  classifyIntent:     '意图分类',
+  jobRecommend:       '岗位推荐',
+  jobExplain:         '岗位解读',
+  jobMatch:           '匹配参考',
+  careerPlan:         '职业规划',
+  fairVisitPlan:      '招聘会计划',
+  interviewQuestion:  '面试出题',
+  interviewReport:    '面试报告',
+  voiceTranscribe:    '语音转写',
+  voiceSynthesize:    '语音播报',
 }
 const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
 const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
@@ -160,6 +197,21 @@ export default function AiServicesPage() {
     : '基于 token 用量估算'
   const jobAiCalls = usage.byOperation.jobRecommend + usage.byOperation.jobExplain + usage.byOperation.jobMatch
   const jobAiCost = usage.costByOperation.jobRecommend + usage.costByOperation.jobExplain + usage.costByOperation.jobMatch
+
+  // A-6：全量 operation 明细。只列有调用的行，避免 15 行里 12 行是 0 的噪声。
+  const operationRows = (Object.keys(OPERATION_LABELS) as AiOperation[])
+    .map((op) => ({
+      op,
+      calls: usage.byOperation[op] ?? 0,
+      cost: usage.costByOperation[op] ?? 0,
+      tokenBilled: !NON_TOKEN_BILLED_OPS.includes(op),
+    }))
+    .filter((row) => row.calls > 0)
+    .sort((a, b) => b.calls - a.calls)
+  const totalOperationCalls = operationRows.reduce((sum, row) => sum + row.calls, 0)
+  const totalTokenBilledCost = operationRows
+    .filter((row) => row.tokenBilled)
+    .reduce((sum, row) => sum + row.cost, 0)
   const qualityTotals = qualitySummary.reduce(
     (acc, item) => ({
       totalJobs: acc.totalJobs + item.totalJobs,
@@ -323,6 +375,66 @@ export default function AiServicesPage() {
             iconClass="text-success-fg bg-success-bg"
           />
         </div>
+      </section>
+
+      {/* ── 分能力调用量与成本（A-6）────────────────────
+          上面的卡片只覆盖 6 个高频能力；这张表覆盖全部 15 个 operation，
+          避免职业规划 / 参会计划 / 模拟面试 / 语音这些能力的花费在 Admin 侧不可见。 */}
+      <section aria-label="分能力调用量与成本" className="mt-8">
+        <h2 className="mb-3 text-sm font-medium text-neutral-500">分能力调用量与成本（近 24 小时）</h2>
+        <Card className="overflow-hidden p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-neutral-100 bg-neutral-50 text-xs text-neutral-500">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">AI 能力</th>
+                  <th className="px-4 py-3 text-left font-medium">operation</th>
+                  <th className="px-4 py-3 text-right font-medium">调用次数</th>
+                  <th className="px-4 py-3 text-right font-medium">估算成本</th>
+                  <th className="px-4 py-3 text-left font-medium">计费方式</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-50">
+                {operationRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-neutral-400">
+                      近 24 小时暂无 AI 调用记录
+                    </td>
+                  </tr>
+                ) : (
+                  operationRows.map((row) => (
+                    <tr key={row.op} className="hover:bg-neutral-50/50">
+                      <td className="px-4 py-3 text-neutral-700">{OPERATION_LABELS[row.op]}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-neutral-400">{row.op}</td>
+                      <td className="px-4 py-3 text-right font-mono text-neutral-700">{row.calls}</td>
+                      <td className="px-4 py-3 text-right font-mono text-xs">
+                        {row.tokenBilled
+                          ? <span className="text-neutral-700">¥{row.cost.toFixed(4)}</span>
+                          : <span className="text-neutral-400">未估算</span>}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">
+                        {row.tokenBilled ? '按 token 用量' : NON_TOKEN_BILLED_NOTE[row.op]}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {operationRows.length > 0 && (
+                <tfoot className="border-t border-neutral-100 bg-neutral-50 text-xs">
+                  <tr>
+                    <td className="px-4 py-3 font-medium text-neutral-600" colSpan={2}>合计（按 token 计费部分）</td>
+                    <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">{totalOperationCalls}</td>
+                    <td className="px-4 py-3 text-right font-mono font-medium text-neutral-700">¥{totalTokenBilledCost.toFixed(4)}</td>
+                    <td className="px-4 py-3 text-neutral-500">语音能力成本未含在内</td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </Card>
+        <p className="mt-2 text-xs text-neutral-400">
+          语音转写 / 语音播报按时长与字符计费，缺少厂家确认单价，此处不估算成本，请以厂商账单为准。
+        </p>
       </section>
 
       {/* ── 岗位来源质量 ─────────────────────────────── */}

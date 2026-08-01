@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../ai/llm/llm-config.service'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai/ai-log.service'
 
 // ============================================================
 // 2C 模拟面试 LLM 服务：面试官提问 + 练习报告生成。
@@ -109,8 +110,12 @@ export class MockInterviewLlmService {
 
   constructor(private readonly config: LlmConfigService) {}
 
-  /** 生成下一道面试问题（首题附问候语）。命中禁词自动重生成一次。 */
-  async nextQuestion(input: NextQuestionInput): Promise<NextQuestionOutput> {
+  /** 生成下一道面试问题（首题附问候语）。命中禁词自动重生成一次。
+   *
+   * A-6 成本可见性：传入 onLlmCall 后每次真实 HTTP 调用回调一次元数据（含 token usage），
+   * 由调用方按 interviewQuestion 操作累计后落 AiServiceLog。
+   */
+  async nextQuestion(input: NextQuestionInput, onLlmCall?: AiLlmCallSink): Promise<NextQuestionOutput> {
     const isFirst = input.askedCount === 0
     const isLast = input.askedCount >= input.questionTarget - 1
     const sys =
@@ -132,7 +137,7 @@ export class MockInterviewLlmService {
     if (userParts.length === 0) userParts.push('（首题，尚无对话）')
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const raw = await this.callLlm(sys, userParts.join('\n\n'))
+      const raw = await this.callLlm(sys, userParts.join('\n\n'), onLlmCall)
       const parsed = this.parseJson<Partial<NextQuestionOutput>>(raw)
       const question = typeof parsed?.question === 'string' ? parsed.question.trim().slice(0, 200) : ''
       if (!question) continue
@@ -148,8 +153,12 @@ export class MockInterviewLlmService {
     throw new ServiceUnavailableException({ error: { code: 'AI_INTERVIEW_QUESTION_FAILED', message: '面试问题生成失败，请稍后重试' } })
   }
 
-  /** 生成练习报告（10 模块 JSON 契约）。结构不符 / 命中禁词 → 重试一次 → 诚实失败。 */
-  async buildReport(input: ReportInput): Promise<InterviewReportPayload> {
+  /** 生成练习报告（10 模块 JSON 契约）。结构不符 / 命中禁词 → 重试一次 → 诚实失败。
+   *
+   * A-6 成本可见性：传入 onLlmCall 后每次真实 HTTP 调用回调一次元数据，
+   * 由调用方按 interviewReport 操作累计后落 AiServiceLog。
+   */
+  async buildReport(input: ReportInput, onLlmCall?: AiLlmCallSink): Promise<InterviewReportPayload> {
     const sys =
       basePersona(input) +
       '\n你的任务：基于完整对话，生成一份「模拟面试练习报告」。这是练习反馈，不是录用评估。' +
@@ -181,7 +190,7 @@ export class MockInterviewLlmService {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const t0 = Date.now()
-      const raw = await this.callLlm(sys, user)
+      const raw = await this.callLlm(sys, user, onLlmCall)
       const parsed = this.parseJson<Partial<InterviewReportPayload>>(raw)
       const report = this.validateReport(parsed)
       if (!report) {
@@ -257,13 +266,16 @@ export class MockInterviewLlmService {
     }
   }
 
-  /** OpenAI 兼容调用（mock_interview 功能位；密钥仅服务端，输出/输入不写日志）。 */
-  private async callLlm(system: string, user: string): Promise<string> {
+  /** OpenAI 兼容调用（mock_interview 功能位；密钥仅服务端，输出/输入不写日志）。
+   * A-6：每次调用结束后通过 onLlmCall? 回调 provider + token usage。
+   */
+  private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
     const apiKey = this.config.getApiKey('mock_interview')
     const cfg = this.config.getConfig('mock_interview')
     if (!apiKey || !cfg.enabled) {
       throw new ServiceUnavailableException({ error: { code: 'AI_NOT_CONFIGURED', message: 'AI 模拟面试暂未启用，请联系管理员配置' } })
     }
+    const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     const url = `${cfg.baseURL.replace(/\/$/, '')}/chat/completions`
     let res: Response
     try {
@@ -282,13 +294,16 @@ export class MockInterviewLlmService {
       })
     } catch {
       this.logger.error('interview.llm network_error')
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
     }
     if (!res.ok) {
       this.logger.error(`interview.llm upstream_non_2xx status=${res.status}`)
+      onLlmCall?.({ provider: providerLabel })
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: RawLlmUsage }
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })

@@ -7,6 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { FairVisitPlanPdfService } from './fair-visit-plan-pdf.service'
 import { LlmFairVisitPlanService, type FairVisitPlanContext, type FairVisitPlanPayload } from './llm-fair-visit-plan.service'
+import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 
 const RESULT_TTL_HOURS = (() => {
   const raw = Number(process.env['AI_RESUME_RESULT_TTL_HOURS'])
@@ -49,6 +50,7 @@ export class FairVisitPlanService {
     private readonly files: FilesService,
     private readonly pdf: FairVisitPlanPdfService,
     private readonly audit: AuditService,
+    private readonly aiLog: AiLogService,
   ) {}
 
   async generate(fairId: string, taskId: string, requester: FairVisitPlanRequester) {
@@ -68,7 +70,18 @@ export class FairVisitPlanService {
       }
     }
 
-    const payload = await this.llm.build({ resumeText, ...fairContext })
+    // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
+    // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
+    const usage = new AiUsageAccumulator()
+    const startedAt = Date.now()
+    let payload: FairVisitPlanPayload
+    try {
+      payload = await this.llm.build({ resumeText, ...fairContext, onLlmCall: usage.add })
+    } catch (error) {
+      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_FAIR_VISIT_PLAN_FAILED'))
+      throw error
+    }
+    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
     const stored = this.buildStored(fairContext, payload)
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     await this.prisma.aiResumeResult.upsert({
@@ -166,6 +179,32 @@ export class FairVisitPlanService {
       expiresAt: uploaded.signedUrlExpiresAt,
       printFileUrl: signFileUrl(uploaded.fileId).url,
     }
+  }
+
+  /**
+   * A-6：落 AiServiceLog（仅元数据）。
+   * 一次都没打到模型（如 AI_NOT_CONFIGURED 直接抛错）时不落，避免污染失败率告警。
+   */
+  private recordAiLog(
+    taskId: string,
+    usage: AiUsageAccumulator,
+    startedAt: number,
+    status: 'success' | 'failed',
+    endUserId: string | null,
+    errorCode?: string,
+  ): void {
+    if (usage.callCount === 0) return
+    this.aiLog.record({
+      taskId,
+      operation: 'fairVisitPlan',
+      provider: usage.provider ?? 'llm',
+      status,
+      latencyMs: Math.max(0, Date.now() - startedAt),
+      tokenUsage: usage.tokenUsage,
+      errorCode,
+      endUserId,
+      terminalId: null,
+    })
   }
 
   private buildStored(

@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common'
 import { LlmConfigService } from '../llm/llm-config.service'
+import { normalizeLlmUsage, type AiLlmCallSink, type RawLlmUsage } from '../ai-log.service'
 
 // ============================================================
 // 2E 职业规划建议（真实化既有「职业规划」入口）。
@@ -57,6 +58,11 @@ export interface CareerPlanContext {
   jobFit?: { jobTitle: string; fitLevel: string; gaps: string[] } | null
   /** 最近一次模拟面试表现（可选，仅会员可聚合；只用元数据级摘要） */
   interview?: { position: string; level: string; risks: string[] } | null
+  /**
+   * A-6 成本可见性：每次真实 LLM 调用（含失败重试）回调一次元数据，
+   * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
+   */
+  onLlmCall?: AiLlmCallSink
 }
 
 export interface CareerPlanPayload {
@@ -110,7 +116,7 @@ export class LlmCareerPlanService {
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const t0 = Date.now()
-      const raw = await this.callLlm(sys, parts.join('\n\n'))
+      const raw = await this.callLlm(sys, parts.join('\n\n'), ctx.onLlmCall)
       const parsed = this.parse(raw)
       const payload = this.validate(parsed, ctx.resumeText)
       if (!payload) {
@@ -201,8 +207,13 @@ export class LlmCareerPlanService {
     }
   }
 
-  /** 复用 resume_optimize 功能位（同"基于简历的定向输出"链路；密钥仅服务端）。 */
-  private async callLlm(system: string, user: string): Promise<string> {
+  /**
+   * 复用 resume_optimize 功能位（同"基于简历的定向输出"链路；密钥仅服务端）。
+   *
+   * ⚠️ 本键当前被 6 项用户可见能力共用，权威清单与后果见
+   * services/api/src/ai/llm/llm-config.service.ts 的共用键警示。
+   */
+  private async callLlm(system: string, user: string, onLlmCall?: AiLlmCallSink): Promise<string> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -228,11 +239,17 @@ export class LlmCareerPlanService {
       this.logger.error('careerplan.llm network_error')
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型连接失败，请稍后重试' } })
     }
+    const providerLabel = `llm:${cfg.vendor}:${cfg.model}`
     if (!res.ok) {
+      onLlmCall?.({ provider: providerLabel })
       this.logger.error(`careerplan.llm upstream_non_2xx status=${res.status}`)
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: `AI 模型返回错误 (${res.status})` } })
     }
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: RawLlmUsage
+    }
+    onLlmCall?.({ provider: providerLabel, tokenUsage: normalizeLlmUsage(data.usage) })
     const reply = data.choices?.[0]?.message?.content?.trim()
     if (!reply) {
       throw new ServiceUnavailableException({ error: { code: 'AI_UNAVAILABLE', message: 'AI 模型未返回内容' } })
