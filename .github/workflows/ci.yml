@@ -81,6 +81,11 @@ jobs:
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
         run: pnpm verify:dependency-security
 
+      - name: Compliance copy gate (forbidden UI terms)
+        # 扫 apps/{admin,kiosk,partner}/src 全量 .ts/.tsx,禁词清单来自 packages/shared 的 SSOT。
+        # 放在重装依赖之前:只依赖 node + 仓库,违规能最快失败。
+        run: pnpm verify:compliance-copy
+
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
         run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server

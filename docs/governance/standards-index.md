@@ -126,13 +126,25 @@
 | --- | --- |
 | 扫禁词的脚本数 | 46（`apps/*/scripts` + `services/api/scripts`） |
 | 其中已进 `ci.yml`（失败即阻塞） | 38 |
-| `COMPLIANCE_FORBIDDEN_TERMS` 的代码消费者 | 收敛前为 **0**（自称 SSOT 但无人 import） |
+| `COMPLIANCE_FORBIDDEN_TERMS` 的代码消费者 | 收敛前 **0**（自称 SSOT 但无人消费）→ 现为 **1**（`scripts/verify-compliance-copy.mjs`，全量扫三端 src） |
 | 互不一致的词表版本 | 收敛前 **5** 份（CLAUDE.md §2 / compliance-boundary.md §三 / role-boundary.md §7 / `complianceCopy.ts` / `verify-fusion-w6.mjs`） |
 | 复述词表的 md 文档 | 63 |
 
 收敛步骤（按序推进，不要求一次做完）：
 
-1. **已完成**：`complianceCopy.ts` 的 `COMPLIANCE_FORBIDDEN_TERMS` 合并为 7 项，并新增 `COMPLIANCE_FORBIDDEN_TERM_PATTERNS`（覆盖「平台内投递」等变体）与 `COMPLIANCE_ALLOWED_PHRASES`（豁免「去来源平台投递」等合规短语）。`role-boundary.md` §7 改为引用而非复述。
-2. 新脚本**必须** import 上述常量，禁止再硬编码词表；既有 46 个脚本逐步替换，不要求一次改完。
-3. 新建 `verify:compliance-copy` 作为兜底：递归扫 `apps/*/src` 全量 `.ts` / `.tsx`（不是页面白名单），用 patterns + allowed-phrases 判定，进 CI。这条补的正是「一键报名 0 覆盖」这类缺口。
-4. 63 份 md 逐步改为「以 `complianceCopy.ts` 为准」的引用式表述，避免继续漂移。
+1. **已完成**：`complianceCopy.ts` 的 `COMPLIANCE_FORBIDDEN_TERMS` 合并为 7 项，并新增 `COMPLIANCE_FORBIDDEN_TERM_PATTERNS`（覆盖「平台内投递」等变体）。`role-boundary.md` §7 改为引用而非复述。
+
+2. **已完成**：新建 `verify:compliance-copy`（`scripts/verify-compliance-copy.mjs`，已进 `ci.yml` 的 `build-and-verify`），递归扫 `apps/{admin,kiosk,partner}/src` 全量 `.ts` / `.tsx`（不是页面白名单）。实测扫 437 个文件、禁词命中 38 处、豁免 38 处、违规 0 处。补上的正是「一键报名 0 覆盖」这类缺口。
+
+   两个设计结论值得记住，改这个门禁前先读：
+
+   - **判定不是"命中即违规"**。`平台内?投递` 在业务源码命中 33 处，其中 30 处合规（「去来源平台投递」是白名单文案本身，「不参与平台内投递」是边界声明），前缀有 24 种写法。原先设想的「豁免短语白名单」永远补不齐，已改为按语义标记判定，见 `COMPLIANCE_EXEMPTION_MARKERS`（否定式／指向站外，按前向回看窗口）与 `COMPLIANCE_BAN_DECLARATION_MARKERS`（该行是在*禁止*这些词，按整行判定）。
+   - **豁免标记一律不用单字**。实测单字「无」会让「无需注册，一键投递到企业」「无门槛投递简历」全部误判为合规，单字「非」会让「非常快，立即投递」误判为合规。这类漏放比误报危险得多，已把这 5 条句式钉进脚本自检用例，改回单字会立刻失败。
+
+3. 门禁用**文本解析**读 SSOT，不是 `import` —— `packages/shared` 只导出裸 TS（无 dist／无 build），根 verify 脚本在纯 `node` 下跑。解析失败一律 fail-closed 退出，不降级为「跳过检查」；禁词项数与正则项数不一致也直接报错（防「加了词忘加变体正则」）。新增禁词只改数组，门禁自动跟随。
+
+4. 既有 46 个脚本的硬编码词表逐步替换，不要求一次改完；本兜底门禁已覆盖用户可见文案，替换属降低维护成本而非补漏。
+
+5. 63 份 md 逐步改为「以 `complianceCopy.ts` 为准」的引用式表述，避免继续漂移。
+
+**已知剩余缺口（未做，需单独立项）**：`services/api/src` 有 7 处运行时守卫各自硬编码禁词正则（`member-feedback` / `member-notifications` / `llm-career-plan` / `llm-job-fit` / `llm-fair-visit-plan` / `job-ai-llm` / `benefit-activities` 等），词表与 SSOT 不一致，「一键报名」在服务端仍无覆盖。本次未纳入：改动跨 7 个 service 文件、涉及 LLM 输出拦截路径，超出本任务文件预算，且需按真实 AI 输出回归验证。
