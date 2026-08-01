@@ -23,6 +23,7 @@
 ## 本轮允许修改
 
 - `docs/superpowers/specs/2026-08-01-ai-contract-review-design.md`
+- `docs/superpowers/plans/2026-08-01-ai-contract-review.md`
 - `.ccg/tasks/contract-review-professional-design/`
 
 ## 本轮禁止修改
