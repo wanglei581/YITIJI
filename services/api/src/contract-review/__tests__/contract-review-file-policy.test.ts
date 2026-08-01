@@ -3,7 +3,7 @@ process.env['FILE_SIGNING_SECRET'] ||= 'contract-file-policy-secret-0123456789-a
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { NotFoundException } from '@nestjs/common'
+import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import { plainToInstance } from 'class-transformer'
 import { validate } from 'class-validator'
 import { KioskUploadOptionsDto } from '../../files/dto/kiosk-upload-options.dto'
@@ -22,46 +22,110 @@ import { CreateUploadSessionDto } from '../../upload-sessions/upload-sessions.dt
 
 const FIXED_NOW = new Date('2026-08-01T00:00:00.000Z')
 
-function makeFileAccessHarness(initialExpiresAt: Date) {
-  const record = {
+interface FileHarnessRecord {
+  id: string
+  uploaderId: string | null
+  endUserId: string | null
+  ownerType: string | null
+  ownerId: string | null
+  purpose: string
+  sensitiveLevel: string
+  visibility: string
+  status: string
+  assetCategory: string
+  sourceFileId: string | null
+  retentionPolicy: string | null
+  retentionSetBy: string | null
+  retentionConsentAt: Date | null
+  retentionConsentVersion: string | null
+  retentionLockedReason: string | null
+  deletedAt: Date | null
+  deletedBy: string | null
+  deleteReason: string | null
+  expiresAt: Date | null
+  bucket: string
+  region: string
+  storageKey: string
+  filename: string
+  mimeType: string
+  sizeBytes: number
+  sha256: string
+  createdBy: string | null
+  createdAt: Date
+}
+
+function makeFileAccessHarness(
+  initialExpiresAt: Date | null,
+  overrides: Partial<FileHarnessRecord> = {}
+) {
+  const record: FileHarnessRecord = {
     id: 'contract-file-1',
     uploaderId: null,
     endUserId: 'member-1',
     ownerType: 'user',
     ownerId: 'member-1',
     purpose: 'contract_upload',
+    sensitiveLevel: 'highly_sensitive',
+    visibility: 'private',
+    status: 'active',
+    assetCategory: 'original',
+    sourceFileId: null,
+    retentionPolicy: 'system_short',
+    retentionSetBy: 'system',
+    retentionConsentAt: null,
+    retentionConsentVersion: null,
+    retentionLockedReason: 'contract_review_session_only',
     deletedAt: null,
+    deletedBy: null,
+    deleteReason: null,
     expiresAt: initialExpiresAt,
     bucket: 'private-files',
+    region: 'local',
     storageKey: 'users/member-1/contract-reviews/contract-file-1.pdf',
     filename: 'contract.pdf',
     mimeType: 'application/pdf',
+    sizeBytes: 100,
+    sha256: 'a'.repeat(64),
+    createdBy: null,
+    createdAt: FIXED_NOW,
+    ...overrides,
   }
   let signedUrlCalls = 0
   let contentReadCalls = 0
+  let deleteObjectCalls = 0
+  const signedTtlSeconds: number[] = []
   const prisma = {
     fileObject: {
       findUnique: async () => record,
+      update: async ({ data }: { data: Partial<FileHarnessRecord> }) => {
+        Object.assign(record, data)
+        return record
+      },
     },
   }
   const storage = {
-    getDownloadUrl: () => {
+    signTtlSeconds: 1800,
+    getDownloadUrl: (args: { ttlSeconds: number }) => {
       signedUrlCalls += 1
+      signedTtlSeconds.push(args.ttlSeconds)
       return {
         url: 'https://files.local/contract-file-1',
-        expiresAt: new Date(Date.now() + 60_000),
+        expiresAt: new Date(Date.now() + args.ttlSeconds * 1000),
       }
     },
     getObject: async () => {
       contentReadCalls += 1
       return Buffer.from('%PDF-1.4 contract')
     },
+    deleteObject: async () => {
+      deleteObjectCalls += 1
+    },
   }
 
   return {
     record,
     service: new FilesService(prisma as never, {} as never, storage as never),
-    calls: () => ({ signedUrlCalls, contentReadCalls }),
+    calls: () => ({ signedUrlCalls, contentReadCalls, deleteObjectCalls, signedTtlSeconds }),
   }
 }
 
@@ -165,7 +229,7 @@ test('FilesService ignores weaker or longer client policy attempts for contract 
 })
 
 test('FilesService blocks every access path once a contract file reaches expiresAt', async () => {
-  const harness = makeFileAccessHarness(new Date(Date.now() + 60_000))
+  const harness = makeFileAccessHarness(new Date(Date.now() + 60_900))
   const requester = { kind: 'member' as const, endUserId: 'member-1' }
 
   const signed = await harness.service.getAccessUrl('contract-file-1', requester, 'attachment')
@@ -176,9 +240,13 @@ test('FilesService blocks every access path once a contract file reaches expires
     filename: 'contract.pdf',
     purpose: 'contract_upload',
   })
-  assert.deepEqual(harness.calls(), { signedUrlCalls: 1, contentReadCalls: 1 })
+  const issuedTtlSeconds = harness.calls().signedTtlSeconds[0]
+  assert.ok(issuedTtlSeconds && issuedTtlSeconds <= 60)
+  assert.equal(harness.calls().contentReadCalls, 1)
+  assert.equal(harness.calls().deleteObjectCalls, 0)
 
-  // A URL issued while alive must not bypass the content endpoint's own expiry check.
+  assert.match(signed.response.printFileUrl ?? '', /^\/api\/v1\/files\//)
+  // printFileUrl 即使在文件有效时签出，/content 也必须在逻辑过期后二次拒绝。
   harness.record.expiresAt = new Date(Date.now() - 1)
   await expectFileNotFound(() =>
     harness.service.getAccessUrl('contract-file-1', requester, 'attachment')
@@ -194,11 +262,105 @@ test('FilesService blocks every access path once a contract file reaches expires
     })
   )
   await expectFileNotFound(() => harness.service.readContent('contract-file-1'))
+  await expectFileNotFound(() =>
+    harness.service.updateRetention('contract-file-1', requester, {
+      retentionPolicy: 'months_3',
+      consentVersion: 'file-retention-v1',
+    })
+  )
   assert.deepEqual(
     harness.calls(),
-    { signedUrlCalls: 1, contentReadCalls: 1 },
+    {
+      signedUrlCalls: 1,
+      contentReadCalls: 1,
+      deleteObjectCalls: 0,
+      signedTtlSeconds: [issuedTtlSeconds],
+    },
     'expired records must be rejected before signing or storage reads'
   )
+})
+
+test('download URL TTL never crosses file expiry and fails closed below one second', async () => {
+  const nearExpiry = makeFileAccessHarness(new Date(Date.now() + 10_900))
+  const requester = { kind: 'member' as const, endUserId: 'member-1' }
+
+  const access = await nearExpiry.service.getAccessUrl('contract-file-1', requester, 'attachment')
+  const legacy = await nearExpiry.service.getSignedUrl('contract-file-1', {
+    userId: 'admin-1',
+    role: 'admin',
+    orgId: null,
+  })
+  assert.deepEqual(nearExpiry.calls().signedTtlSeconds, [10, 10])
+  assert.ok(new Date(access.response.expiresAt).getTime() <= nearExpiry.record.expiresAt!.getTime())
+  assert.ok(new Date(legacy.expiresAt).getTime() <= nearExpiry.record.expiresAt!.getTime())
+
+  const longLived = makeFileAccessHarness(new Date(Date.now() + 24 * 60 * 60 * 1000), {
+    purpose: 'print_doc',
+    retentionLockedReason: null,
+  })
+  await longLived.service.getAccessUrl('contract-file-1', requester, 'inline')
+  await longLived.service.getSignedUrl('contract-file-1', {
+    userId: 'admin-1',
+    role: 'admin',
+    orgId: null,
+  })
+  assert.deepEqual(longLived.calls().signedTtlSeconds, [1800, 1800])
+
+  const noExpiry = makeFileAccessHarness(null)
+  await noExpiry.service.getAccessUrl('contract-file-1', requester, 'inline')
+  assert.deepEqual(noExpiry.calls().signedTtlSeconds, [1800])
+
+  const subsecond = makeFileAccessHarness(new Date(Date.now() + 500))
+  await expectFileNotFound(() =>
+    subsecond.service.getAccessUrl('contract-file-1', requester, 'inline')
+  )
+  assert.equal(subsecond.calls().signedUrlCalls, 0)
+})
+
+test('expired files remain deletable through system, owner, and admin privacy paths', async () => {
+  const expiredAt = new Date(Date.now() - 60_000)
+
+  const system = makeFileAccessHarness(expiredAt, {
+    purpose: 'member_data_export',
+    endUserId: 'member-system',
+    ownerId: 'member-system',
+  })
+  const systemDeleted = await system.service.systemDelete('contract-file-1', 'privacy cleanup')
+  assert.equal(systemDeleted.status, 'deleted')
+  assert.equal(system.calls().deleteObjectCalls, 1)
+  assert.ok(system.record.deletedAt)
+
+  const owner = makeFileAccessHarness(expiredAt)
+  const ownerDeleted = await owner.service.ownerDelete(
+    'contract-file-1',
+    { kind: 'member', endUserId: 'member-1' },
+    'owner privacy deletion'
+  )
+  assert.equal(ownerDeleted.status, 'deleted')
+  assert.equal(owner.calls().deleteObjectCalls, 1)
+
+  const admin = makeFileAccessHarness(expiredAt)
+  const adminDeleted = await admin.service.forceDelete(
+    'contract-file-1',
+    'admin-1',
+    'admin privacy deletion'
+  )
+  assert.equal(adminDeleted.status, 'deleted')
+  assert.equal(admin.calls().deleteObjectCalls, 1)
+
+  const unauthorized = makeFileAccessHarness(expiredAt)
+  await assert.rejects(
+    () =>
+      unauthorized.service.ownerDelete(
+        'contract-file-1',
+        { kind: 'member', endUserId: 'member-2' },
+        'unauthorized deletion'
+      ),
+    ForbiddenException
+  )
+  assert.equal(unauthorized.calls().deleteObjectCalls, 0)
+  assert.equal(unauthorized.record.deletedAt, null)
+  await expectFileNotFound(() => unauthorized.service.readContent('contract-file-1'))
 })
 
 test('contract object keys use a user folder and anonymous keys never include session tokens', () => {

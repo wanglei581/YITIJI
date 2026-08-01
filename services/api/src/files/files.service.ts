@@ -491,13 +491,15 @@ export class FilesService {
       })
     }
 
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt)
+
     const signed = this.storage.getDownloadUrl(
       {
         objectKey: record.storageKey,
         fileId: record.id,
         filename: record.filename,
         mimeType: record.mimeType,
-        ttlSeconds: this.storage.signTtlSeconds,
+        ttlSeconds,
         disposition,
       },
       record.bucket
@@ -510,8 +512,13 @@ export class FilesService {
       response: {
         fileId: record.id,
         url: signed.url,
+        // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
+        // requireAlive 二次校验 file.expiresAt，不会因该 URL 的签名期越过文件寿命。
         printFileUrl: signFileUrl(record.id).url,
-        expiresAt: signed.expiresAt.toISOString(),
+        expiresAt: this.ensureSignedExpiryWithinFileLifetime(
+          signed.expiresAt,
+          record.expiresAt
+        ).toISOString(),
         disposition,
       },
       record: { purpose: record.purpose, ownerType: record.ownerType },
@@ -533,13 +540,14 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt)
     const signed = this.storage.getDownloadUrl(
       {
         objectKey: record.storageKey,
         fileId: record.id,
         filename: record.filename,
         mimeType: record.mimeType,
-        ttlSeconds: this.storage.signTtlSeconds,
+        ttlSeconds,
         disposition: 'inline',
       },
       record.bucket
@@ -547,7 +555,10 @@ export class FilesService {
     return {
       fileId: record.id,
       signedUrl: signed.url,
-      expiresAt: signed.expiresAt.toISOString(),
+      expiresAt: this.ensureSignedExpiryWithinFileLifetime(
+        signed.expiresAt,
+        record.expiresAt
+      ).toISOString(),
       purpose: record.purpose as FilePurpose,
     }
   }
@@ -653,7 +664,7 @@ export class FilesService {
     requester: FileRequester,
     reason: string
   ): Promise<FileMetadata> {
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireDeletable(fileId)
     if (!canAccessFile(record, requester)) {
       throw new ForbiddenException({
         error: { code: 'FILE_ACCESS_DENIED', message: '无权删除此文件' },
@@ -738,7 +749,7 @@ export class FilesService {
     reason: string,
     allowMemberDataExport = false
   ): Promise<FileMetadata> {
-    const record = await this.requireAlive(fileId, allowMemberDataExport)
+    const record = await this.requireDeletable(fileId, { allowMemberDataExport })
     await this.storage.deleteObject(record.storageKey, record.bucket)
     const updated = await this.prisma.fileObject.update({
       where: { id: fileId },
@@ -847,20 +858,58 @@ export class FilesService {
     return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
   }
 
-  private async requireAlive(fileId: string, allowMemberDataExport = false) {
+  private downloadUrlTtlSeconds(expiresAt: Date | null): number {
+    if (!expiresAt) return this.storage.signTtlSeconds
+    const remainingSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
+    // 对象存储签名的最小安全粒度为 1 秒；不足时禁止调用存储签名。
+    if (remainingSeconds < 1) {
+      this.throwFileNotFound()
+    }
+    return Math.min(this.storage.signTtlSeconds, remainingSeconds)
+  }
+
+  private ensureSignedExpiryWithinFileLifetime(
+    signedExpiresAt: Date,
+    fileExpiresAt: Date | null
+  ): Date {
+    if (fileExpiresAt && signedExpiresAt.getTime() > fileExpiresAt.getTime()) {
+      this.throwFileNotFound()
+    }
+    return signedExpiresAt
+  }
+
+  private async requireAlive(fileId: string, options: { allowMemberDataExport?: boolean } = {}) {
+    return this.requireFile(fileId, { ...options, allowExpired: false })
+  }
+
+  private async requireDeletable(
+    fileId: string,
+    options: { allowMemberDataExport?: boolean } = {}
+  ) {
+    return this.requireFile(fileId, { ...options, allowExpired: true })
+  }
+
+  private async requireFile(
+    fileId: string,
+    options: { allowMemberDataExport?: boolean; allowExpired: boolean }
+  ) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (
       !record ||
       record.deletedAt ||
-      (record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
-      (!allowMemberDataExport && record.purpose === 'member_data_export')
+      (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
+      (!options.allowMemberDataExport && record.purpose === 'member_data_export')
     ) {
       // 禁止通用端点成为导出 artifact 存在性探针。
-      throw new NotFoundException({
-        error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
-      })
+      this.throwFileNotFound()
     }
     return record
+  }
+
+  private throwFileNotFound(): never {
+    throw new NotFoundException({
+      error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
+    })
   }
 }
 
