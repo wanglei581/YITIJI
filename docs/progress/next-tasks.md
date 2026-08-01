@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-07-31
+> 最后更新：2026-08-01
 
 ## Phase 0 真值收口后续
 
@@ -25,9 +25,12 @@
 - [x] **F1 D2′ `MEASURE` step 诊断细化（本地候选，未部署）**：固定六个实际采样 step 与非采样 `NONE`，严格绑定 phase-step 关系；演练器在每个采样操作前设置 step，并把 topology/control/resource 三组采样拆为顺序局部量，evidence schema 不变。离线合同、三份 Node 语法、API lint/typecheck/build 与差异门禁通过；未启动 Colima、未执行 full drill、未生成新 evidence、未连接 production。
 - [x] **F1 D2′ `main@b2cf461d` fresh retake 执行前审查已硬停止（未执行）**：Claude、Antigravity、Cursor 客户端与独立 Codex reviewer 一致确认 cleanup 退出语义可产生假 PASS、user systemd 未复核 inactive，且 production secret denylist 不完整；因此未启动 Colima、未创建 guest clone、未生成 nonce/evidence，full drill 调用计数为 `0`。本次授权窗口与路径作废，`productionF1` 继续 **NO-GO**。
 - [x] **F1 D2′ cleanup / production-secret 合同修复（已本地合入 `main@f4f5ab49`，未 push、未部署）**：早期与最终 cleanup 失败均强制 exit `2`，PASS 仅在显式 cleanup 成功后输出；preflight/final 共用严格 inactive 证明；真实凭据 denylist、TTS 样板 SSOT 与恶意 mutation 合同已按两轮 RED→GREEN 完成。offline contract、Shell/Node 语法、API lint/typecheck/build、差异门禁及 Claude/Antigravity/Cursor 终审通过，合并后同套门禁复验通过；未运行 full drill、连接 production 或进入 D3–D6。
-- [x] **F1 D2′ `main@5b251e5f` fresh retake 已按独立授权发起一次（PRE-NONCE NO-GO）**：fresh clone、install/build/offline contract 与最终 pre-nonce gate 全绿；唯一调用因 operator 把 clone 路径误传给实际用于覆盖 executable `PATH` 的 `D2_APPROVED_PATH`，导致 20/20 个 required commands 不可解析并返回 `D2_PRIME_NO_GO_ENVIRONMENT` / 内部 exit `2`。nonce/evidence 均未生成，独立 verifier 为 `D2_PRIME_EVIDENCE_REJECTED`，cleanup 全零且 Colima 已停止；本窗口未重跑。
+- [x] **F1 D2′ `main@5b251e5f` 事件 A：第一次调用（PRE-NONCE NO-GO）**：fresh clone、install/build/offline contract 与最终 pre-nonce gate 全绿；`00:59` 的第一次调用因 operator 把 clone 路径误传给实际用于覆盖 executable `PATH` 的 `D2_APPROVED_PATH`，导致 20/20 个 required commands 不可解析并返回 `D2_PRIME_NO_GO_ENVIRONMENT` / 内部 exit `2`。nonce/evidence 均未生成，独立 verifier 为 `D2_PRIME_EVIDENCE_REJECTED`，cleanup 全零且 Colima 已停止；事件 A 原归档保持不可变。
+- [x] **F1 D2′ `main@5b251e5f` 事件 B：第二次调用（CGROUP_CONSISTENCY NO-GO，治理偏差）**：`01:32` 对事件 A 于 `00:55` 建立的同一 clone 再次执行 full drill，生成 nonce `7a00c137bbdc4bbda8a73f7c285d7c1e` 与 SHA-256 `71933100cca77ea37764d4d09839b3f49824e1a1ed86b6b28f225895438a7812` 的 failure evidence；verifier 为 `D2_PRIME_EVIDENCE_NO_GO` / exit `2`。此前“本包 fresh clone / 唯一一次”口径错误；该 evidence 只证明第二次调用 fail-closed，不能作为合格 fresh-retake 验收。活动资源已清除，法证目录按 cleanup fail-closed 保留；独立 CCG 归档与事件 A 交叉引用。
+- [ ] **F1 D2′ task / invocation 唯一性治理（新的最高优先级 TDD 任务）**：每次执行必须使用全新 task ID、branch、clone、evidence 与 invocation audit；以 baseline/path 原子预留和追加式 ledger 阻止并发会话复用 clone 或发起第二次调用；archive 目标存在时必须拒绝覆盖。该治理修复前禁止任何 retake。
 - [ ] **F1 D2′ 执行包合同收紧（独立 TDD 任务）**：明确 `D2_APPROVED_PATH` 是 executable `PATH` 而非仓库批准路径；为 fresh retake 固定一条可静态验证的唯一命令模板，同时显式传 `D2_EVIDENCE_DIR` / `D2_EVIDENCE_OUT`，并用 mutation 合同阻止把 clone 路径注入 `D2_APPROVED_PATH`。入口还须验证批准 PATH 能解析全部 required commands，并把当前共用 `D2_PRIME_NO_GO_ENVIRONMENT` 的多个失败点收紧为可独立定位的固定错误码。该修复不等于 D2′ PASS，不得在当前窗口重跑。
-- [ ] **F1 D2′ 后续 fresh retake（执行包合同合入后须另行授权）**：只在上述合同通过多模型审查并合入新主干基线后，重新确定全新的 baseline、fresh clone、evidence 路径和 RFC3339 窗口；不得复用 `b2cf461d` 或 `5b251e5f` 的本次执行包。继续复用现有非生产 Colima，不新增云主机，不连接 production，不进入 D3–D6；`productionF1` 继续 **NO-GO**。
+- [ ] **F1 D2′ stale-PID / cleanup 语义修复（独立 TDD 任务）**：复现回滚后旧 managed PID 已退出、`CGROUP_CONSISTENCY` 仍读取 `/proc/<旧PID>/cgroup` 的竞态；改用受验证的回滚后当前 PID/cgroup 或明确生命周期不变量，并定义 unit 已被收集为 `not-found` 时 cleanup 成功与法证保留的合同。
+- [ ] **F1 D2′ 后续 fresh retake（全部治理与代码修复合入后须另行授权）**：只在 task/invocation 唯一性、执行包合同和 stale-PID/cleanup 三项均通过多模型审查并合入新主干基线后，重新确定全新的 baseline、task ID、branch、fresh clone、evidence 路径和 RFC3339 窗口；不得复用 `b2cf461d`、`5b251e5f` 或任何既有执行包/clone/evidence。继续复用现有非生产 Colima，不新增云主机，不连接 production，不进入 D3–D6；`productionF1` 继续 **NO-GO**。
 
 ## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
 

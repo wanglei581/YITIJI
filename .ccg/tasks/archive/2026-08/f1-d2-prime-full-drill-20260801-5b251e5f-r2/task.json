@@ -1,0 +1,14 @@
+{
+  "id": "f1-d2-prime-full-drill-20260801-5b251e5f-r2",
+  "precedingTaskId": "f1-d2-prime-fresh-retake-20260801-5b251e5f",
+  "title": "独立归档 D2′ full drill 事件 B 并校正 clone 复用与调用口径",
+  "status": "completed",
+  "complexity": "L",
+  "risk": "high",
+  "domain": "release",
+  "currentPhase": "completed",
+  "nextAction": "另立 stale-PID/cgroup consistency、cleanup unit-collected 语义与授权治理修复任务；本事件禁止重跑",
+  "createdAt": "2026-07-31T16:39:47Z",
+  "branch": "codex/f1-d2-prime-retake-20260801",
+  "productionF1": "NO-GO"
+}
