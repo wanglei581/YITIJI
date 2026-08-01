@@ -189,3 +189,17 @@ Task 6 已封板，下一步进入逐页提取与 canonical text。
 内部规格审查与质量审查均为 `APPROVE / Ready: Yes`；Antigravity、Claude、Cursor 最终均 `APPROVE`。审查期间发现的 sparse array、active TOCTOU、Nest DI、短页眉误判、Unicode 计数、DOCX 解压炸弹、Unicode Path、relationship 预算绕过、CRC 与媒体豁免问题均已修复并回归。
 
 Task 12 必须在 processor 层补可终止 worker、总执行时间和内存上限；该项是硬发布门禁。Task 7 封板不代表生产可用，Gate 0 正式记录继续保持 `blocked`。下一步进入版本化规则包。
+
+## Wave B Task 8：版本化规则包实施审查
+
+审查范围：`65db6eb3`。
+
+- 新增 `cn-labor-p0-v1` 规则包唯一真源与不可变只读法条 allowlist，依据人社部现行《劳动合同法》第 9、19、20、22、23、24、25 条；P0 仅处理劳动合同，其他合同类型明确返回信息不足。
+- 规则引擎保持纯函数、无 I/O、无时钟、无模型调用；确定性子集覆盖试用期期限、竞业限制期限、用人单位扣押证件 / 收取财物、违约金适用范围。地域工资和补偿在无签名地域数据集时始终降级为 `insufficient_info`。
+- `priority_check` 必须绑定 canonical page 的 UTF-16 精确证据；结构化期限事实也必须与同值、可信原文一致。未知事实与明确不存在分流，畸形 pages/facts fail closed。
+- 审查期间修复了普通保密义务被错误视为违约金豁免、期限/付款主体/收取方向语义误绑、首个否定条款遮蔽后续肯定、只读 Map 泄漏、跨逗号极性、作用域冲突、畸形布尔值和结构化事实与原文不一致等问题；规则 pack 和测试文件均保持在 800 行以下。
+- 最终专项测试 31/31；覆盖率 engine lines 97.63%、branches 91.77%、functions 100%，rules 100%；API typecheck、lint 与 `git diff --check` 通过。
+
+内部规格审查与质量审查均为 `Ready: Yes`；Antigravity、Claude、Cursor 最终均 `APPROVE`，Critical/Warning 为 0。Claude 封装器前两次无最终消息，恢复同一会话并限制为只输出结论后取得有效批准，未把技术失败冒充审查通过。
+
+Task 8 已封板。规则结论是保守筛查提示，不是法律意见；Gate 0 正式记录继续保持 `blocked`。下一步进入全文脱敏与境内模型专用通道。
