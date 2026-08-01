@@ -132,6 +132,10 @@ jobs:
         # Pure renderer/state/evidence checks only; no PM2, Nginx, systemd, network, or production data plane.
         run: pnpm --filter @ai-job-print/api verify:d2-same-host-contract
 
+      - name: D2 prime invocation governance fixture
+        # Temporary Git/filesystem fixtures only; never launches the drill, systemd, PM2, Nginx, or production clients.
+        run: pnpm --filter @ai-job-print/api verify:d2-same-host-governance
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation

@@ -25,64 +25,13 @@ for path_part in "${approved_path_parts[@]}"; do
 done
 export PATH="$APPROVED_PATH"
 
-GOVERNANCE_ENV_BIN="$(command -v env 2>/dev/null || true)"
-GOVERNANCE_NODE_BIN="$(command -v node 2>/dev/null || true)"
-[[ "$GOVERNANCE_ENV_BIN" == /* && -x "$GOVERNANCE_ENV_BIN" ]] \
-  || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-[[ "$GOVERNANCE_NODE_BIN" == /* && -x "$GOVERNANCE_NODE_BIN" ]] \
-  || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-required_invocation_variables=(
-  D2_GOVERNANCE_ROOT D2_TASK_ID D2_BASELINE_SHA D2_BRANCH_NAME
-  D2_CLONE_PATH D2_EVIDENCE_OUT D2_ARCHIVE_PATH
-)
-for variable_name in "${required_invocation_variables[@]}"; do
-  [[ -n "${!variable_name:-}" ]] || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-done
-"$GOVERNANCE_ENV_BIN" -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
-  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
-  D2_TASK_ID="$D2_TASK_ID" \
-  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
-  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
-  D2_CLONE_PATH="$D2_CLONE_PATH" \
-  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
-  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
-  "$GOVERNANCE_NODE_BIN" "$SCRIPT_DIR/invocation-governance.mjs" --consume \
-  || exit 2
-
 [[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
 [[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
 
-required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
+required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl timeout tr)
 for required_command in "${required_commands[@]}"; do
   command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 done
-
-assert_invocation_clone_identity() {
-  local current_baseline=""
-  local current_branch=""
-  local current_root=""
-  local invocation_clone_root=""
-  current_baseline="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  [[ "$current_baseline" == "$D2_BASELINE_SHA" ]] \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  current_branch="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  [[ "$current_branch" == "$D2_BRANCH_NAME" ]] \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  current_root="$(realpath "$ROOT" 2>/dev/null)" \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  invocation_clone_root="$(realpath "$D2_CLONE_PATH" 2>/dev/null)" \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  [[ "$current_root" == "$invocation_clone_root" ]] \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-  git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
-    || no_go "D2_PRIME_NO_GO_INVOCATION_INPUT"
-}
-
-assert_invocation_clone_identity
 node --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
 pnpm --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
 nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
@@ -91,10 +40,93 @@ PM2_BIN="$(command -v pm2)"
 NGINX_BIN="$(command -v nginx)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
 
-[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]] \
-  || no_go "D2_PRIME_NO_GO_EVIDENCE_PATH"
-EVIDENCE_DIR="$D2_EVIDENCE_DIR"
-EVIDENCE_OUT="$D2_EVIDENCE_OUT"
+# D2_GOVERNANCE_INVOKE_START
+[[ -n "${D2_GOVERNANCE_ROOT:-}" && -n "${D2_GOVERNANCE_RESERVATION_ID:-}" ]] \
+  || no_go "D2_PRIME_NO_GO_GOVERNANCE_STATE"
+
+GOVERNANCE_CONTEXT_SENTINEL="D2_GOVERNANCE_CONTEXT_END"
+GOVERNANCE_CONTEXT_RAW=""
+if ! GOVERNANCE_CONTEXT_RAW="$(
+  env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
+    "$NODE_BIN" "$SCRIPT_DIR/governance.mjs" invoke \
+    --state-root "$D2_GOVERNANCE_ROOT" \
+    --reservation-id "$D2_GOVERNANCE_RESERVATION_ID" \
+    --context-fd 3 \
+    3>&1 >/dev/null
+  GOVERNANCE_STATUS=$?
+  (( GOVERNANCE_STATUS == 0 )) || exit "$GOVERNANCE_STATUS"
+  printf '%s' "$GOVERNANCE_CONTEXT_SENTINEL"
+)"; then
+  unset GOVERNANCE_CONTEXT_RAW GOVERNANCE_CONTEXT_SENTINEL
+  exit 2
+fi
+[[ "$GOVERNANCE_CONTEXT_RAW" == *"$GOVERNANCE_CONTEXT_SENTINEL" ]] \
+  || no_go "D2_PRIME_NO_GO_MANIFEST"
+GOVERNANCE_CONTEXT_PAYLOAD="${GOVERNANCE_CONTEXT_RAW%$GOVERNANCE_CONTEXT_SENTINEL}"
+[[ "$GOVERNANCE_CONTEXT_PAYLOAD" == *$'\n' ]] || no_go "D2_PRIME_NO_GO_MANIFEST"
+GOVERNANCE_CONTEXT_PAYLOAD="${GOVERNANCE_CONTEXT_PAYLOAD%$'\n'}"
+[[ "$GOVERNANCE_CONTEXT_PAYLOAD" == *$'\n'* ]] || no_go "D2_PRIME_NO_GO_MANIFEST"
+EVIDENCE_DIR="${GOVERNANCE_CONTEXT_PAYLOAD%%$'\n'*}"
+EVIDENCE_OUT="${GOVERNANCE_CONTEXT_PAYLOAD#*$'\n'}"
+[[ -n "$EVIDENCE_DIR" && -n "$EVIDENCE_OUT" && "$EVIDENCE_DIR" == /* \
+  && "$EVIDENCE_OUT" == /* && "$EVIDENCE_OUT" != *$'\n'* ]] \
+  || no_go "D2_PRIME_NO_GO_MANIFEST"
+unset GOVERNANCE_CONTEXT_RAW GOVERNANCE_CONTEXT_SENTINEL GOVERNANCE_CONTEXT_PAYLOAD GOVERNANCE_STATUS
+# D2_GOVERNANCE_INVOKE_END
+
+INVOCATION_CLONE_ROOT="$(realpath "$ROOT" 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_GIT_ROOT="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_GIT_ROOT="$(realpath "$INVOCATION_GIT_ROOT" 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+[[ "$INVOCATION_CLONE_ROOT" == "$INVOCATION_GIT_ROOT" ]] \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_BASELINE_OID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_TREE_OID="$(git -C "$ROOT" rev-parse 'HEAD^{tree}' 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+
+assert_invocation_clone_identity() {
+  local current_root=""
+  local current_git_root=""
+  local current_baseline_oid=""
+  local current_tree_oid=""
+  local current_branch=""
+  current_root="$(realpath "$ROOT" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_git_root="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_git_root="$(realpath "$current_git_root" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_root" == "$INVOCATION_CLONE_ROOT" && "$current_git_root" == "$INVOCATION_GIT_ROOT" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_baseline_oid="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_baseline_oid" == "$INVOCATION_BASELINE_OID" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_tree_oid="$(git -C "$ROOT" rev-parse 'HEAD^{tree}' 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_tree_oid" == "$INVOCATION_TREE_OID" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_branch="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_branch" == "$INVOCATION_BRANCH" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+}
+
+assert_invocation_clone_identity
+command -v systemd-run >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 
 production_variables=(
   DATABASE_URL DIRECT_URL POSTGRES_URL
@@ -265,7 +297,8 @@ env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
   ' 3010 3011 "$NGINX_PORT" \
   || no_go "D2_PRIME_NO_GO_PORT"
 
-WORK_DIR="${D2_WORK_DIR:-$SCRIPT_DIR/.work}"
+[[ -z "${D2_WORK_DIR+x}" ]] || no_go "D2_PRIME_NO_GO_GOVERNANCE_STATE"
+WORK_DIR="$SCRIPT_DIR/.work"
 [[ "$EVIDENCE_DIR" == /* && "$WORK_DIR" == /* ]] || no_go "D2_PRIME_NO_GO_PATH"
 mkdir -p -m 700 "$EVIDENCE_DIR" "$WORK_DIR"
 [[ -O "$EVIDENCE_DIR" && -O "$WORK_DIR" && ! -L "$EVIDENCE_DIR" && ! -L "$WORK_DIR" ]] \

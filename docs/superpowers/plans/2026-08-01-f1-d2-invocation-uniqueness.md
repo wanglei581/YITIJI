@@ -1,5 +1,7 @@
 # F1 D2 Invocation Uniqueness Implementation Plan
 
+> **历史计划（已被替代）：** 本文记录的是已合入 `main` 的 #463 初始方案，不再作为当前执行真值。后续 D2′ 调用治理必须以 `docs/device/f1-d2-same-host-dual-port-runbook.md` 和当前代码中的 `governance.mjs reserve/invoke` 合同为准；不要继续实施本文的 JSONL ledger、全局锁或 `--consume` 设计。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 在不执行 full drill 的前提下，用两阶段 `reserve` / `consume` 协议保证每个 D2 fresh-retake 的 task、baseline、branch、clone、evidence 和 archive 身份均只能使用一次。
