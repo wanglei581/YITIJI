@@ -147,7 +147,7 @@ function hasAutomationMarker(stableId: string): boolean {
   }
 
   return ciAutomationTerms.some(
-    (term) => compact.startsWith(`ci${term}`) || compact.endsWith(`${term}ci`),
+    (term) => compact.includes(`ci${term}`) || compact.includes(`${term}ci`),
   )
 }
 
@@ -298,7 +298,7 @@ function runRegressionFixtures(): void {
       ),
     ),
   )
-  for (const validStableId of ['civic-counsel', 'ci-officer', 'office-ci']) {
+  for (const validStableId of ['civic-counsel', 'ci-officer', 'office-ci', 'cindy-counsel']) {
     assert.doesNotThrow(() =>
       verifyGateSource(canonicalApprovedFixture.replace('legal:contract-governance-counsel', `legal:${validStableId}`)),
     )
@@ -454,6 +454,9 @@ function runRegressionFixtures(): void {
     'automationrunner',
     'automatedreviewer',
     'ciagent',
+    'office-ci-agent',
+    'x-ci-runner-y',
+    'security-agent-ci-office',
     'workflowowner',
     'actionsapprover',
   ]) {
