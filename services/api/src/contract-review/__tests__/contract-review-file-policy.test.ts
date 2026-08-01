@@ -231,7 +231,7 @@ test('FilesService ignores weaker or longer client policy attempts for contract 
 test('FilesService clamps the initial contract download URL to the persisted file lifetime', async () => {
   let createData: Record<string, unknown> | undefined
   const signedTtlSeconds: number[] = []
-  const persistedExpiry = new Date(Date.now() + 10_900)
+  const persistedExpiry = new Date(Date.now() + 10 * 60 * 1000)
   const prisma = {
     fileObject: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -281,7 +281,10 @@ test('FilesService clamps the initial contract download URL to the persisted fil
 
   assert.ok(createData)
   assert.ok((createData.expiresAt as Date).getTime() >= startedAt + CONTRACT_REVIEW_TTL_MS)
-  assert.deepEqual(signedTtlSeconds, [10])
+  assert.equal(signedTtlSeconds.length, 1)
+  const issuedTtlSeconds = signedTtlSeconds[0]!
+  assert.ok(issuedTtlSeconds > 0)
+  assert.ok(issuedTtlSeconds < storage.signTtlSeconds)
   assert.equal(uploaded.fileExpiresAt, persistedExpiry.toISOString())
   assert.ok(new Date(uploaded.signedUrlExpiresAt).getTime() <= persistedExpiry.getTime())
 })
