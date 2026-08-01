@@ -121,7 +121,7 @@
 以下为推荐推进顺序，**仅作建议**；实际优先级与当前待办以 `docs/progress/next-tasks.md` 为准。每项独立分支：
 
 1. advisory 文件规模门禁：只提醒，不阻塞，先覆盖已知大文件和新增 diff。
-2. ~~advisory 合规文案门禁~~ — **已落地且已是 blocking，本条作废（2026-08-01 核实，同日复核修正数字）**。实测 `apps/*/scripts` + `services/api/scripts` 下有 **49** 个脚本在扫合规禁词，其中 **40** 个已被 `.github/workflows/ci.yml` 调用（失败即阻塞），9 个未进 CI（6 个属尚未上线的百宝箱验收、3 个为 UI 局部守卫）。此处此前写作 46 / 38，为未记录口径的手工统计，已按下述可复现命令重算：
+2. ~~advisory 合规文案门禁~~ — **已落地且已是 blocking，本条作废（2026-08-01 核实，同日复核修正数字）**。实测 `apps/*/scripts` + `services/api/scripts` 下有 **49** 个脚本在扫合规禁词，其中 **40** 个已被 `.github/workflows/ci.yml` 调用（失败即阻塞），9 个未进 CI（6 个属尚未上线的百宝箱相关验收、**2** 个为 UI 局部守卫、**1** 个是 API/业务闭环静态守卫 `services/api/scripts/verify-fair-visit-plan.ts`——该脚本门禁的是 controller/service/LLM/PDF 与 `AiResumeResult`/`FileObject` 闭环，不是 UI，此前误并入「UI 局部守卫」）。此处此前写作 46 / 38，为未记录口径的手工统计，已按下述可复现命令重算：
 
    ```bash
    # 分母：扫合规禁词的脚本数（49）
@@ -147,8 +147,9 @@
 
 | 项 | 实测 |
 | --- | --- |
-| 扫禁词的脚本数 | 46（`apps/*/scripts` + `services/api/scripts`） |
-| 其中已进 `ci.yml`（失败即阻塞） | 38 |
+| 扫禁词的脚本数 | 49（`apps/*/scripts` + `services/api/scripts`；`.mjs` 33 + `.ts` 16） |
+| 其中已进 `ci.yml`（失败即阻塞） | 40 |
+| 未进 CI | 9（6 个百宝箱相关验收、2 个 UI 局部守卫、1 个 API/业务闭环静态守卫） |
 | `COMPLIANCE_FORBIDDEN_TERMS` 的代码消费者 | 收敛前 **0**（自称 SSOT 但无人消费）→ 现为 **1**（`scripts/verify-compliance-copy.mjs`，全量扫三端 src） |
 | 互不一致的词表版本 | 收敛前 **5** 份（CLAUDE.md §2 / compliance-boundary.md §三 / role-boundary.md §7 / `complianceCopy.ts` / `verify-fusion-w6.mjs`） |
 | 复述词表的 md 文档 | 63 |
@@ -172,7 +173,7 @@
 
 **已知剩余缺口（未做，需单独立项）**：`services/api/src` 有 7 处运行时守卫各自硬编码禁词正则（`member-feedback` / `member-notifications` / `llm-career-plan` / `llm-job-fit` / `llm-fair-visit-plan` / `job-ai-llm` / `benefit-activities` 等），词表与 SSOT 不一致，「一键报名」在服务端仍无覆盖。本次未纳入：改动跨 7 个 service 文件、涉及 LLM 输出拦截路径，超出本任务文件预算，且需按真实 AI 输出回归验证。
 
-另有 **8 个 `COMPLIANCE_COPY` key 零消费者**（`KIOSK_JOBS_TOP`、`KIOSK_FAIRS_TOP`、`KIOSK_SCAN_HARDWARE_NOTICE`、`KIOSK_CAMPUS_TOP`、`ADMIN_JOB_SOURCES_TOP`、`ADMIN_FILES_TOP`、`ADMIN_AUDIT_TOP`、`PARTNER_DASHBOARD_TOP`，共 15 个 key）。其余 7 个在 kiosk 有 18 处渲染，所以这不是整体死代码，而是「岗位／招聘会页的来源声明」与「三端后台合规提示」两类文案定义了却没渲染。上线前需逐个判定：该渲染的接上，不该保留的删掉——留着等于给后续开发一个「看起来已有声明」的假象。复核命令：
+另有 **8 个 `COMPLIANCE_COPY` key 零消费者**（`KIOSK_JOBS_TOP`、`KIOSK_FAIRS_TOP`、`KIOSK_SCAN_HARDWARE_NOTICE`、`KIOSK_CAMPUS_TOP`、`ADMIN_JOB_SOURCES_TOP`、`ADMIN_FILES_TOP`、`ADMIN_AUDIT_TOP`、`PARTNER_DASHBOARD_TOP`，共 15 个 key）。其余 7 个 key 在 Kiosk 有 **11 处引用/渲染表达式，分布于 7 个文件**（此前写「18 处渲染」有误：`rg COMPLIANCE_COPY` 的 18 是 7 个 import 加 11 个成员访问，import 不是渲染。复核用 `rg -n 'COMPLIANCE_COPY\.[A-Z][A-Z0-9_]+' apps -g '*.ts' -g '*.tsx' | wc -l` 得 11、`rg -l ... | wc -l` 得 7）。所以这不是整体死代码，而是「岗位／招聘会页的来源声明」与「三端后台合规提示」两类文案定义了却没渲染。上线前需逐个判定：该渲染的接上，不该保留的删掉——留着等于给后续开发一个「看起来已有声明」的假象。复核命令：
 
 ```bash
 node -e "const s=require('fs').readFileSync('packages/shared/src/types/complianceCopy.ts','utf8');const b=s.slice(s.indexOf('export const COMPLIANCE_COPY'),s.indexOf('} as const',s.indexOf('export const COMPLIANCE_COPY')));for(const m of b.matchAll(/^ {2}([A-Z][A-Z0-9_]+):/gm))console.log(m[1])"
