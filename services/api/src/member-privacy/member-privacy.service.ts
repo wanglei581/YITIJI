@@ -13,7 +13,11 @@ export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, str
   contract_review: 'contract-review-consent-v1',
 }
 
-const CONSENT_SCOPES = Object.keys(CONSENT_VERSION_BY_SCOPE) as MemberAiConsentScope[]
+const CONSENT_SCOPES = [
+  'job_ai',
+  'contract_review',
+] as const satisfies readonly MemberAiConsentScope[]
+const CONSENT_SCOPE_SET: ReadonlySet<string> = new Set(CONSENT_SCOPES)
 const CONTRACT_REVIEW_PROCESSING_STATUSES = [
   'uploaded',
   'queued',
@@ -24,14 +28,20 @@ const CONTRACT_REVIEW_PROCESSING_STATUSES = [
   'safety_reviewing',
 ] as const
 
+interface ConsentTruthEvent {
+  id: string
+  consentVersion: string
+  grantedAt: Date
+  revokedAt: Date | null
+}
+
 export function consentVersionForScope(scope: MemberAiConsentScope): string {
-  const version = (CONSENT_VERSION_BY_SCOPE as Partial<Record<string, string>>)[scope]
-  if (!version) {
+  if (!CONSENT_SCOPE_SET.has(scope)) {
     throw new BadRequestException({
       error: { code: 'INVALID_AI_CONSENT_SCOPE', message: 'AI 授权范围不支持' },
     })
   }
-  return version
+  return CONSENT_VERSION_BY_SCOPE[scope]
 }
 
 @Injectable()
@@ -41,11 +51,8 @@ export class MemberPrivacyService {
   async getConsentStatus(endUserId: string): Promise<MemberAiConsentStatus[]> {
     return Promise.all(
       CONSENT_SCOPES.map(async (scope) => {
-        const latest = await this.prisma.userAiConsent.findFirst({
-          where: { endUserId, scope },
-          orderBy: { grantedAt: 'desc' },
-        })
-        return this.consentStatus(scope, latest ?? null)
+        const latest = await this.latestConsentEvent(endUserId, scope)
+        return this.consentStatus(scope, latest)
       })
     )
   }
@@ -57,6 +64,7 @@ export class MemberPrivacyService {
   ): Promise<MemberAiConsentStatus> {
     this.assertScope(scope)
     const consentVersion = consentVersionForScope(scope)
+    // Grant is an append-only authorization event; previous grant rows remain as history.
     const row = await this.prisma.userAiConsent.create({
       data: {
         endUserId,
@@ -119,18 +127,8 @@ export class MemberPrivacyService {
         },
       })
     }
-    const consentVersion = consentVersionForScope(scope)
-    const consent = await this.prisma.userAiConsent.findFirst({
-      where: {
-        endUserId,
-        scope,
-        consentVersion,
-        revokedAt: null,
-      },
-      orderBy: { grantedAt: 'desc' },
-      select: { id: true },
-    })
-    if (!consent) {
+    const latest = await this.latestConsentEvent(endUserId, scope)
+    if (!this.consentStatus(scope, latest).granted) {
       throw new ForbiddenException({
         error: {
           code: 'USER_AI_CONSENT_REQUIRED',
@@ -144,9 +142,25 @@ export class MemberPrivacyService {
     consentVersionForScope(scope as MemberAiConsentScope)
   }
 
+  private latestConsentEvent(
+    endUserId: string,
+    scope: MemberAiConsentScope
+  ): Promise<ConsentTruthEvent | null> {
+    return this.prisma.userAiConsent.findFirst({
+      where: { endUserId, scope },
+      orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        consentVersion: true,
+        grantedAt: true,
+        revokedAt: true,
+      },
+    })
+  }
+
   private consentStatus(
     scope: MemberAiConsentScope,
-    row: { consentVersion: string; grantedAt: Date; revokedAt: Date | null } | null
+    row: ConsentTruthEvent | null
   ): MemberAiConsentStatus {
     const consentVersion = consentVersionForScope(scope)
     const granted = Boolean(row && row.consentVersion === consentVersion && !row.revokedAt)

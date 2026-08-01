@@ -55,6 +55,12 @@ interface PrivacyHarnessOptions {
   beforeContractTaskUpdate?: (tasks: ContractTaskRecord[]) => void
 }
 
+interface ConsentFindFirstArgs {
+  where: Record<string, unknown>
+  orderBy?: Record<string, 'asc' | 'desc'> | Array<Record<string, 'asc' | 'desc'>>
+  select?: Record<string, boolean>
+}
+
 function cloneConsent(record: ConsentRecord): ConsentRecord {
   return {
     ...record,
@@ -67,25 +73,64 @@ function cloneTask(record: ContractTaskRecord): ContractTaskRecord {
   return { ...record }
 }
 
+function compareConsentValues(left: unknown, right: unknown): number {
+  const normalizedLeft = left instanceof Date ? left.getTime() : left
+  const normalizedRight = right instanceof Date ? right.getTime() : right
+  if (normalizedLeft === normalizedRight) return 0
+  if (typeof normalizedLeft === 'number' && typeof normalizedRight === 'number') {
+    return normalizedLeft < normalizedRight ? -1 : 1
+  }
+  return String(normalizedLeft).localeCompare(String(normalizedRight))
+}
+
+function compareConsents(
+  left: ConsentRecord,
+  right: ConsentRecord,
+  orderBy: ConsentFindFirstArgs['orderBy']
+): number {
+  const clauses = Array.isArray(orderBy) ? orderBy : orderBy ? [orderBy] : []
+  for (const clause of clauses) {
+    for (const [field, direction] of Object.entries(clause)) {
+      const comparison = compareConsentValues(
+        left[field as keyof ConsentRecord],
+        right[field as keyof ConsentRecord]
+      )
+      if (comparison !== 0) return direction === 'desc' ? -comparison : comparison
+    }
+  }
+  return 0
+}
+
+function selectConsent(record: ConsentRecord, select?: Record<string, boolean>): unknown {
+  const cloned = cloneConsent(record)
+  if (!select) return cloned
+  return Object.fromEntries(
+    Object.entries(select)
+      .filter(([, included]) => included)
+      .map(([field]) => [field, cloned[field as keyof ConsentRecord]])
+  )
+}
+
 function makePrivacyHarness(
   initialConsents: ConsentRecord[] = [],
   initialTasks: ContractTaskRecord[] = [],
   options: PrivacyHarnessOptions = {}
 ) {
-  let consents = initialConsents.map(cloneConsent)
-  let tasks = initialTasks.map(cloneTask)
+  const consents = initialConsents.map(cloneConsent)
+  const tasks = initialTasks.map(cloneTask)
   let sequence = 0
   let transactionCalls = 0
   const createData: Array<Record<string, unknown>> = []
-  const findFirstWhere: Array<Record<string, unknown>> = []
   const consentUpdateWhere: Array<Record<string, unknown>> = []
   const contractTaskUpdateWhere: Array<Record<string, unknown>> = []
   const transactionOperations: string[] = []
+  const findFirstCalls: ConsentFindFirstArgs[] = []
 
   function consentDelegate(target: ConsentRecord[], inTransaction: boolean) {
     return {
-      findFirst: async ({ where }: { where: Record<string, unknown> }) => {
-        findFirstWhere.push(where)
+      findFirst: async (args: ConsentFindFirstArgs) => {
+        const { where, orderBy, select } = args
+        findFirstCalls.push(args)
         const matches = target
           .filter((record) =>
             Object.entries(where).every(([key, value]) => {
@@ -93,9 +138,9 @@ function makePrivacyHarness(
               return record[key as keyof ConsentRecord] === value
             })
           )
-          .sort((left, right) => right.grantedAt.getTime() - left.grantedAt.getTime())
+          .sort((left, right) => compareConsents(left, right, orderBy))
         const row = matches[0]
-        return row ? cloneConsent(row) : null
+        return row ? selectConsent(row, select) : null
       },
       create: async ({ data }: { data: Omit<ConsentRecord, 'id' | 'grantedAt' | 'revokedAt'> }) => {
         createData.push(data)
@@ -174,8 +219,8 @@ function makePrivacyHarness(
         userAiConsent: consentDelegate(transactionConsents, true),
         contractReviewTask: contractTaskDelegate(transactionTasks),
       })
-      consents = transactionConsents
-      tasks = transactionTasks
+      consents.splice(0, consents.length, ...transactionConsents)
+      tasks.splice(0, tasks.length, ...transactionTasks)
       return result
     },
   }
@@ -187,7 +232,7 @@ function makePrivacyHarness(
       tasks: tasks.map(cloneTask),
       transactionCalls,
       createData: [...createData],
-      findFirstWhere: [...findFirstWhere],
+      findFirstCalls: [...findFirstCalls],
       consentUpdateWhere: [...consentUpdateWhere],
       contractTaskUpdateWhere: [...contractTaskUpdateWhere],
       transactionOperations: [...transactionOperations],
@@ -199,7 +244,8 @@ function consent(
   id: string,
   scope: MemberAiConsentScope,
   consentVersion: string,
-  revokedAt: Date | null = null
+  revokedAt: Date | null = null,
+  grantedAt = new Date('2026-08-01T00:00:00.000Z')
 ): ConsentRecord {
   return {
     id,
@@ -207,9 +253,31 @@ function consent(
     scope,
     consentVersion,
     terminalId: null,
-    grantedAt: new Date('2026-08-01T00:00:00.000Z'),
+    grantedAt,
     revokedAt,
   }
+}
+
+function contractStatus(statuses: Awaited<ReturnType<MemberPrivacyService['getConsentStatus']>>) {
+  const status = statuses.find((item) => item.scope === 'contract_review')
+  assert.ok(status)
+  return status
+}
+
+function isInvalidScopeError(error: unknown): boolean {
+  assert.ok(error instanceof BadRequestException)
+  assert.deepEqual(error.getResponse(), {
+    error: { code: 'INVALID_AI_CONSENT_SCOPE', message: 'AI 授权范围不支持' },
+  })
+  return true
+}
+
+async function expectConsentRequired(operation: () => Promise<unknown>): Promise<void> {
+  await assert.rejects(operation, (error: unknown) => {
+    assert.ok(error instanceof ForbiddenException)
+    assert.match(JSON.stringify(error.getResponse()), /USER_AI_CONSENT_REQUIRED/)
+    return true
+  })
 }
 
 test('contract review has an isolated consent version in API and shared contracts', () => {
@@ -303,15 +371,19 @@ test('grantConsent and requireActiveConsent use the selected scope version', asy
   assert.deepEqual(
     harness
       .state()
-      .findFirstWhere.slice(-2)
-      .map(({ scope, consentVersion, revokedAt }) => ({
-        scope,
-        consentVersion,
-        revokedAt,
-      })),
+      .findFirstCalls.slice(-2)
+      .map(({ where, orderBy, select }) => ({ where, orderBy, select })),
     [
-      { scope: 'job_ai', consentVersion: CURRENT_JOB_AI_CONSENT_VERSION, revokedAt: null },
-      { scope: 'contract_review', consentVersion: CONTRACT_VERSION, revokedAt: null },
+      {
+        where: { endUserId: 'member-1', scope: 'job_ai' },
+        orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+        select: { id: true, consentVersion: true, grantedAt: true, revokedAt: true },
+      },
+      {
+        where: { endUserId: 'member-1', scope: 'contract_review' },
+        orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+        select: { id: true, consentVersion: true, grantedAt: true, revokedAt: true },
+      },
     ]
   )
 })
@@ -331,6 +403,183 @@ test('invalid runtime scopes fail closed without exposing internal data', async 
   )
   await assert.rejects(harness.service.revokeConsent('member-1', invalidScope), BadRequestException)
   assert.deepEqual(harness.state().createData, [])
+})
+
+test('prototype and unknown scope keys fail closed before every Prisma path', async () => {
+  const harness = makePrivacyHarness()
+  const controller = new MemberPrivacyController(harness.service)
+  const invalidScopes = ['toString', '__proto__', 'constructor', 'hasOwnProperty', 'unknown_scope']
+
+  for (const rawScope of invalidScopes) {
+    const scope = rawScope as MemberAiConsentScope
+    assert.throws(() => consentVersionForScope(scope), isInvalidScopeError)
+    await assert.rejects(harness.service.grantConsent('member-1', scope, null), isInvalidScopeError)
+    await assert.rejects(
+      harness.service.requireActiveConsent('member-1', scope),
+      isInvalidScopeError
+    )
+    await assert.rejects(harness.service.revokeConsent('member-1', scope), isInvalidScopeError)
+    await assert.rejects(
+      controller.revokeConsent({ endUserId: 'member-1' } as never, scope),
+      isInvalidScopeError
+    )
+  }
+
+  const state = harness.state()
+  assert.deepEqual(state.createData, [])
+  assert.deepEqual(state.findFirstCalls, [])
+  assert.deepEqual(state.consentUpdateWhere, [])
+  assert.deepEqual(state.contractTaskUpdateWhere, [])
+  assert.equal(state.transactionCalls, 0)
+})
+
+test('latest old-version event makes status false and require deny', async () => {
+  const harness = makePrivacyHarness([
+    consent(
+      'current-older',
+      'contract_review',
+      CONTRACT_VERSION,
+      null,
+      new Date('2026-08-01T00:00:00.000Z')
+    ),
+    consent(
+      'old-newer',
+      'contract_review',
+      'contract-review-consent-v0',
+      null,
+      new Date('2026-08-01T00:01:00.000Z')
+    ),
+  ])
+
+  assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, false)
+  await expectConsentRequired(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
+})
+
+test('latest current-version event makes status and require allow', async () => {
+  const harness = makePrivacyHarness([
+    consent(
+      'old-older',
+      'contract_review',
+      'contract-review-consent-v0',
+      null,
+      new Date('2026-08-01T00:00:00.000Z')
+    ),
+    consent(
+      'current-newer',
+      'contract_review',
+      CONTRACT_VERSION,
+      null,
+      new Date('2026-08-01T00:01:00.000Z')
+    ),
+  ])
+
+  assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, true)
+  await assert.doesNotReject(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
+})
+
+test('latest revoked current event overrides an earlier active current event', async () => {
+  const harness = makePrivacyHarness([
+    consent(
+      'active-older',
+      'contract_review',
+      CONTRACT_VERSION,
+      null,
+      new Date('2026-08-01T00:00:00.000Z')
+    ),
+    consent(
+      'revoked-newer',
+      'contract_review',
+      CONTRACT_VERSION,
+      new Date('2026-08-01T00:02:00.000Z'),
+      new Date('2026-08-01T00:01:00.000Z')
+    ),
+  ])
+
+  assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, false)
+  await expectConsentRequired(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
+})
+
+test('same grantedAt uses id desc as the latest-event tie-break for status and require', async () => {
+  const grantedAt = new Date('2026-08-01T00:00:00.000Z')
+  const harness = makePrivacyHarness([
+    consent('event-a-active', 'contract_review', CONTRACT_VERSION, null, grantedAt),
+    consent(
+      'event-z-revoked',
+      'contract_review',
+      CONTRACT_VERSION,
+      new Date('2026-08-01T00:02:00.000Z'),
+      grantedAt
+    ),
+  ])
+
+  assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, false)
+  await expectConsentRequired(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
+  const contractCalls = harness
+    .state()
+    .findFirstCalls.filter((call) => call.where.scope === 'contract_review')
+  for (const call of contractCalls) {
+    assert.deepEqual(call.orderBy, [{ grantedAt: 'desc' }, { id: 'desc' }])
+    assert.deepEqual(call.select, {
+      id: true,
+      consentVersion: true,
+      grantedAt: true,
+      revokedAt: true,
+    })
+  }
+})
+
+/**
+ * Task 6 create must place its final consent check and task creation in one transaction or
+ * authorization-generation protocol. These unit tests do not claim that cross-request linearization;
+ * the real PostgreSQL two-connection race remains a Task 14 integration gate.
+ */
+test('repeated grant appends events and the deterministic latest event wins', async () => {
+  const harness = makePrivacyHarness()
+
+  await harness.service.grantConsent('member-1', 'contract_review', 'terminal-1')
+  await harness.service.grantConsent('member-1', 'contract_review', 'terminal-2')
+
+  const state = harness.state()
+  assert.equal(state.createData.length, 2)
+  assert.equal(state.consents.length, 2)
+  assert.deepEqual(
+    state.consents.map(({ id, terminalId, revokedAt }) => ({ id, terminalId, revokedAt })),
+    [
+      { id: 'consent-1', terminalId: 'terminal-1', revokedAt: null },
+      { id: 'consent-2', terminalId: 'terminal-2', revokedAt: null },
+    ]
+  )
+  const latest = contractStatus(await harness.service.getConsentStatus('member-1'))
+  assert.equal(latest.granted, true)
+  assert.equal(latest.grantedAt, state.consents[1]?.grantedAt.toISOString())
+  await assert.doesNotReject(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
+})
+
+test('grant after revoke appends a new latest active event', async () => {
+  const harness = makePrivacyHarness()
+
+  await harness.service.grantConsent('member-1', 'contract_review', 'terminal-1')
+  await harness.service.revokeConsent('member-1', 'contract_review')
+  await harness.service.grantConsent('member-1', 'contract_review', 'terminal-2')
+
+  const state = harness.state()
+  assert.equal(state.consents.length, 2)
+  assert.ok(state.consents[0]?.revokedAt)
+  assert.equal(state.consents[1]?.revokedAt, null)
+  assert.equal(contractStatus(await harness.service.getConsentStatus('member-1')).granted, true)
+  await assert.doesNotReject(() =>
+    harness.service.requireActiveConsent('member-1', 'contract_review')
+  )
 })
 
 test('missing contract review consent uses a safe scope-specific error', async () => {
