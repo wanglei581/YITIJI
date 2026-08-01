@@ -14,6 +14,7 @@ const RELIABLE = '合同正文'.repeat(8)
 interface TestZipEntry {
   name: string
   filenameBytes?: Buffer
+  localFilenameBytes?: Buffer
   content?: Buffer
   method?: number
   flags?: number
@@ -21,6 +22,8 @@ interface TestZipEntry {
   localExtra?: Buffer
   declaredUncompressedSize?: number
   compressedData?: Buffer
+  centralCrc?: number
+  localCrc?: number
 }
 
 function crc32(input: Buffer): number {
@@ -58,6 +61,7 @@ function makeDocxArchive(entries: TestZipEntry[] = [{
   let localOffset = 0
   for (const entry of entries) {
     const filename = entry.filenameBytes ?? Buffer.from(entry.name, 'utf8')
+    const localFilename = entry.localFilenameBytes ?? filename
     const content = entry.content ?? Buffer.from('x')
     const method = entry.method ?? 0
     const flags = entry.flags ?? 0
@@ -65,16 +69,18 @@ function makeDocxArchive(entries: TestZipEntry[] = [{
     const declaredSize = entry.declaredUncompressedSize ?? content.length
     const localExtra = entry.localExtra ?? Buffer.alloc(0)
     const centralExtra = entry.centralExtra ?? Buffer.alloc(0)
+    const contentCrc = crc32(content)
     const localHeader = Buffer.alloc(30)
     localHeader.writeUInt32LE(0x04034b50, 0)
     localHeader.writeUInt16LE(20, 4)
     localHeader.writeUInt16LE(flags, 6)
     localHeader.writeUInt16LE(method, 8)
+    localHeader.writeUInt32LE(entry.localCrc ?? contentCrc, 14)
     localHeader.writeUInt32LE(compressed.length, 18)
     localHeader.writeUInt32LE(declaredSize, 22)
-    localHeader.writeUInt16LE(filename.length, 26)
+    localHeader.writeUInt16LE(localFilename.length, 26)
     localHeader.writeUInt16LE(localExtra.length, 28)
-    const localEntry = Buffer.concat([localHeader, filename, localExtra, compressed])
+    const localEntry = Buffer.concat([localHeader, localFilename, localExtra, compressed])
     localEntries.push(localEntry)
 
     const centralHeader = Buffer.alloc(46)
@@ -83,6 +89,7 @@ function makeDocxArchive(entries: TestZipEntry[] = [{
     centralHeader.writeUInt16LE(20, 6)
     centralHeader.writeUInt16LE(flags, 8)
     centralHeader.writeUInt16LE(method, 10)
+    centralHeader.writeUInt32LE(entry.centralCrc ?? contentCrc, 16)
     centralHeader.writeUInt32LE(compressed.length, 20)
     centralHeader.writeUInt32LE(declaredSize, 24)
     centralHeader.writeUInt16LE(filename.length, 28)
@@ -179,32 +186,30 @@ test('extracts valid DOCX canonically and rejects mammoth/empty/output failures'
   )
 })
 
-test('accepts canonical directory, Unicode Path and trusted JPEG/PNG media entries', async () => {
+test('accepts UTF-8 and standard legacy raw names resolved by Unicode Path extras', async () => {
   const unicodeFilename = 'word/备注.xml'
   const unicodeBytes = Buffer.from(unicodeFilename, 'utf8')
-  const unicodeExtra = makeUnicodePathExtra(unicodeBytes, unicodeFilename)
-  const jpegBytes = 17 * 1024 * 1024
-  const jpeg = await makeCompressedOutput(jpegBytes, Buffer.from([0xff, 0xd8, 0xff, 0xe0]))
-  const pngBytes = 17 * 1024 * 1024
-  const png = await makeCompressedOutput(
-    pngBytes,
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-  )
+  const utf8Extra = makeUnicodePathExtra(unicodeBytes, unicodeFilename)
+  const legacyBytes = Buffer.concat([
+    Buffer.from('word/', 'ascii'),
+    Buffer.from([0x82]),
+    Buffer.from('.xml', 'ascii'),
+  ])
+  const legacyFilename = 'word/简历.xml'
+  const legacyExtra = makeUnicodePathExtra(legacyBytes, legacyFilename)
   let mammothCalls = 0
   const archive = makeDocxArchive([
     { name: 'word/', content: Buffer.alloc(0), method: 0 },
     { name: 'word/document.xml', content: Buffer.from('doc'), method: 8 },
     {
       name: unicodeFilename, flags: 0x0800,
-      localExtra: unicodeExtra, centralExtra: unicodeExtra,
+      localExtra: utf8Extra, centralExtra: utf8Extra,
     },
     {
-      name: 'word/media/photo.jpg', method: 8,
-      compressedData: jpeg, declaredUncompressedSize: jpegBytes,
-    },
-    {
-      name: 'word/media/logo.png', method: 8,
-      compressedData: png, declaredUncompressedSize: pngBytes,
+      name: legacyFilename,
+      filenameBytes: legacyBytes,
+      localExtra: legacyExtra,
+      centralExtra: legacyExtra,
     },
   ])
   await docxService(archive, async () => {
@@ -214,7 +219,7 @@ test('accepts canonical directory, Unicode Path and trusted JPEG/PNG media entri
   assert.equal(mammothCalls, 1)
 })
 
-test('rejects declared XML and total archive budgets before mammoth', async () => {
+test('rejects every non-directory entry over the content budget before mammoth', async () => {
   let mammothCalls = 0
   const extract = async () => {
     mammothCalls += 1
@@ -232,7 +237,15 @@ test('rejects declared XML and total archive budgets before mammoth', async () =
     ]), 'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED'],
     [makeDocxArchive([
       { name: 'word/document.xml', content: Buffer.from('doc') },
-      { name: 'word/media/blob.bin', content: Buffer.from('x'), declaredUncompressedSize: 64 * 1024 * 1024 },
+      { name: 'word/media/photo.jpg', content: Buffer.from([0xff]), declaredUncompressedSize: 16 * 1024 * 1024 + 1 },
+    ]), 'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED'],
+    [makeDocxArchive([
+      { name: 'word/document.xml', content: Buffer.from('doc') },
+      { name: 'word/media/logo.png', content: Buffer.from([0x89]), declaredUncompressedSize: 16 * 1024 * 1024 + 1 },
+    ]), 'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED'],
+    [makeDocxArchive([
+      { name: 'word/document.xml', content: Buffer.from('doc') },
+      { name: 'word/media/blob.bin', content: Buffer.from('x'), declaredUncompressedSize: 64 * 1024 * 1024 + 1 },
     ]), 'CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED'],
   ]
   for (const [archive, code] of cases) {
@@ -250,6 +263,21 @@ test('rejects path aliases, unsupported ZIP features and Unicode Path mismatches
   const zip64Extra = Buffer.from([0x01, 0x00, 0x00, 0x00])
   const wrongVersionExtra = makeUnicodePathExtra(unicodeBytes, unicodeFilename)
   wrongVersionExtra.writeUInt8(2, 4)
+  const legacyBytes = Buffer.concat([
+    Buffer.from('word/', 'ascii'),
+    Buffer.from([0x82]),
+    Buffer.from('.xml', 'ascii'),
+  ])
+  const centralLegacyExtra = makeUnicodePathExtra(legacyBytes, 'word/central.xml')
+  const localLegacyExtra = makeUnicodePathExtra(legacyBytes, 'word/local.xml')
+  const alternateLegacyBytes = Buffer.concat([
+    Buffer.from('word/', 'ascii'),
+    Buffer.from([0x83]),
+    Buffer.from('.xml', 'ascii'),
+  ])
+  const duplicateResolvedPath = 'word/duplicate.xml'
+  const firstDuplicateExtra = makeUnicodePathExtra(legacyBytes, duplicateResolvedPath)
+  const secondDuplicateExtra = makeUnicodePathExtra(alternateLegacyBytes, duplicateResolvedPath)
   const invalidArchives = [
     makeDocxArchive([{ name: 'x/../word/document.xml' }]),
     makeDocxArchive([{ name: 'word/document.xml', centralExtra: zip64Extra }]),
@@ -281,10 +309,30 @@ test('rejects path aliases, unsupported ZIP features and Unicode Path mismatches
       { name: 'word/document.xml' },
       { name: unicodeFilename, flags: 0x0800, centralExtra: wrongVersionExtra },
     ]),
-    makeDocxArchive([{
-      name: 'word/document.xml',
-      centralExtra: makeUnicodePathExtra(Buffer.from('word/document.xml'), 'word/document.xml'),
-    }]),
+    makeDocxArchive([
+      { name: 'word/document.xml' },
+      {
+        name: 'word/central.xml',
+        filenameBytes: legacyBytes,
+        centralExtra: centralLegacyExtra,
+        localExtra: localLegacyExtra,
+      },
+    ]),
+    makeDocxArchive([
+      { name: 'word/document.xml' },
+      {
+        name: duplicateResolvedPath,
+        filenameBytes: legacyBytes,
+        centralExtra: firstDuplicateExtra,
+        localExtra: firstDuplicateExtra,
+      },
+      {
+        name: duplicateResolvedPath,
+        filenameBytes: alternateLegacyBytes,
+        centralExtra: secondDuplicateExtra,
+        localExtra: secondDuplicateExtra,
+      },
+    ]),
     makeDocxArchive([{ name: 'word/document.xml' }, { name: 'a'.repeat(1025) }]),
     makeDocxArchive([{ name: 'word/document.xml' }, { name: `${'a/'.repeat(64)}leaf.bin` }]),
   ]
@@ -301,34 +349,16 @@ test('rejects path aliases, unsupported ZIP features and Unicode Path mismatches
   assert.equal(mammothCalls, 0)
 })
 
-test('stream-counts actual deflate output and classifies disguised XML as sensitive', async () => {
+test('stream-counts every actual deflate output against the content budget', async () => {
   let mammothCalls = 0
-  const totalBombBytes = 64 * 1024 * 1024 + 1
-  const totalBomb = await makeCompressedOutput(
-    totalBombBytes,
-    Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
-  )
-  const fakeXmlBytes = 16 * 1024 * 1024 + 1
-  const fakeXml = await makeCompressedOutput(
-    fakeXmlBytes,
-    Buffer.concat([
-      Buffer.from([0xef, 0xbb, 0xbf]),
-      Buffer.from('  \n<relationships>'),
-    ]),
-  )
+  const imageBytes = 16 * 1024 * 1024 + 1
+  const image = await makeCompressedOutput(imageBytes, Buffer.from([0xff, 0xd8, 0xff, 0xe0]))
   const cases: Array<[Buffer, string]> = [
     [makeDocxArchive([
       { name: 'word/document.xml', content: Buffer.from('doc'), method: 8 },
       {
         name: 'word/media/photo.jpg', method: 8,
-        compressedData: totalBomb, declaredUncompressedSize: 1,
-      },
-    ]), 'CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED'],
-    [makeDocxArchive([
-      { name: 'word/document.xml', content: Buffer.from('doc'), method: 8 },
-      {
-        name: 'word/media/relationship-target.bin', method: 8,
-        compressedData: fakeXml, declaredUncompressedSize: fakeXmlBytes,
+        compressedData: image, declaredUncompressedSize: 1,
       },
     ]), 'CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED'],
   ]
@@ -339,6 +369,40 @@ test('stream-counts actual deflate output and classifies disguised XML as sensit
         return { value: RELIABLE }
       }).extract({ fileId: 'docx', endUserId: null }),
       code,
+    )
+  }
+  assert.equal(mammothCalls, 0)
+})
+
+test('rejects stored/deflated content CRC failures and central-local CRC disagreement', async () => {
+  const storedPayload = Buffer.from('stored-payload')
+  const corruptedStored = makeDocxArchive([
+    { name: 'word/document.xml', content: storedPayload, method: 0 },
+  ])
+  const storedDataOffset = 30 + Buffer.byteLength('word/document.xml')
+  corruptedStored[storedDataOffset] = (corruptedStored[storedDataOffset] as number) ^ 0xff
+
+  const declared = Buffer.from('declared')
+  const deflatedMismatch = makeDocxArchive([{
+    name: 'word/document.xml',
+    content: declared,
+    method: 8,
+    compressedData: deflateRawSync(Buffer.from('mismatch')),
+  }])
+  const headerMismatch = makeDocxArchive([{
+    name: 'word/document.xml',
+    content: Buffer.from('doc'),
+    localCrc: 0,
+  }])
+
+  let mammothCalls = 0
+  for (const archive of [corruptedStored, deflatedMismatch, headerMismatch]) {
+    await expectCode(
+      () => docxService(archive, async () => {
+        mammothCalls += 1
+        return { value: RELIABLE }
+      }).extract({ fileId: 'docx', endUserId: null }),
+      'CONTRACT_DOCX_ARCHIVE_INVALID',
     )
   }
   assert.equal(mammothCalls, 0)

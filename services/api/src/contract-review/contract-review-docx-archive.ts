@@ -1,7 +1,7 @@
 import { TextDecoder } from 'node:util'
 import { createInflateRaw } from 'node:zlib'
 
-const MAX_XML_BYTES = 16 * 1024 * 1024
+const MAX_CONTENT_BYTES = 16 * 1024 * 1024
 const MAX_TOTAL_BYTES = 64 * 1024 * 1024
 const MAX_ENTRIES = 4096
 const LOCAL_FILE_SIGNATURE = 0x04034b50
@@ -13,7 +13,6 @@ const UNICODE_PATH_EXTRA_FIELD_ID = 0x7075
 const ALLOWED_FLAGS = 0x0806
 const MAX_FILENAME_BYTES = 1024
 const MAX_PATH_SEGMENTS = 64
-const MEDIA_SNIFF_BYTES = 16
 
 interface DocxZipEntry {
   filename: string
@@ -21,12 +20,12 @@ interface DocxZipEntry {
   isDirectory: boolean
   flags: number
   method: 0 | 8
+  contentCrc: number
   compressedSize: number
   uncompressedSize: number
   localHeaderOffset: number
   dataStart: number
   dataEnd: number
-  isMediaPath: boolean
 }
 
 class DocxArchiveError extends Error {
@@ -44,28 +43,29 @@ function knownOr(error: unknown, fallback: string): DocxArchiveError {
   return error instanceof DocxArchiveError ? error : fail(fallback)
 }
 
-function crc32(input: Buffer): number {
-  let crc = 0xffffffff
+function updateCrc32(crc: number, input: Buffer): number {
   for (const byte of input) {
     crc ^= byte
     for (let bit = 0; bit < 8; bit += 1) {
       crc = (crc >>> 1) ^ ((crc & 1) === 1 ? 0xedb88320 : 0)
     }
   }
-  return (crc ^ 0xffffffff) >>> 0
+  return crc >>> 0
 }
 
-function assertExtraFields(
+function crc32(input: Buffer): number {
+  return (updateCrc32(0xffffffff, input) ^ 0xffffffff) >>> 0
+}
+
+function readUnicodePathExtra(
   buffer: Buffer,
   offset: number,
   length: number,
   filenameBytes: Buffer,
-  flags: number,
-  filename: string,
-): void {
+): string | null {
   const end = offset + length
   let cursor = offset
-  let unicodePathSeen = false
+  let unicodePath: string | null = null
   while (cursor < end) {
     if (cursor + 4 > end) throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     const fieldId = buffer.readUInt16LE(cursor)
@@ -75,50 +75,63 @@ function assertExtraFields(
       throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     }
     if (fieldId === UNICODE_PATH_EXTRA_FIELD_ID) {
-      const usesUtf8 = (flags & 0x0800) !== 0
       if (
-        !usesUtf8 ||
-        unicodePathSeen ||
+        unicodePath !== null ||
         fieldLength < 5 ||
         buffer.readUInt8(cursor) !== 1
       ) {
         throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
       }
       const expectedCrc = buffer.readUInt32LE(cursor + 1)
-      const unicodePath = new TextDecoder('utf-8', { fatal: true }).decode(
+      const decodedPath = new TextDecoder('utf-8', { fatal: true }).decode(
         buffer.subarray(cursor + 5, cursor + fieldLength),
       )
       if (
         expectedCrc !== crc32(filenameBytes) ||
-        unicodePath !== filename ||
-        unicodePath !== unicodePath.normalize('NFC')
+        decodedPath !== decodedPath.normalize('NFC')
       ) {
         throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
       }
-      unicodePathSeen = true
+      unicodePath = decodedPath
     }
     cursor += fieldLength
   }
+  return unicodePath
 }
 
-function decodeCanonicalPath(
+function resolveCanonicalPath(
   filenameBytes: Buffer,
   flags: number,
+  unicodePath: string | null,
 ): { filename: string; isDirectory: boolean } {
   const usesUtf8 = (flags & 0x0800) !== 0
-  if (!usesUtf8 && filenameBytes.some((byte) => byte > 0x7f)) {
-    throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+  let filename: string
+  if (usesUtf8) {
+    const rawFilename = new TextDecoder('utf-8', { fatal: true }).decode(filenameBytes)
+    if (
+      !Buffer.from(rawFilename, 'utf8').equals(filenameBytes) ||
+      (unicodePath !== null && unicodePath !== rawFilename)
+    ) {
+      throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+    }
+    filename = rawFilename
+  } else if (unicodePath !== null) {
+    filename = unicodePath
+  } else {
+    if (filenameBytes.some((byte) => byte > 0x7f)) {
+      throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+    }
+    filename = filenameBytes.toString('ascii')
   }
-  const filename = usesUtf8
-    ? new TextDecoder('utf-8', { fatal: true }).decode(filenameBytes)
-    : filenameBytes.toString('ascii')
   const isDirectory = filename.endsWith('/')
+  const rawIsDirectory = filenameBytes[filenameBytes.length - 1] === 0x2f
   const canonicalPath = isDirectory ? filename.slice(0, -1) : filename
   const segments = canonicalPath.split('/')
   if (
     filenameBytes.length === 0 ||
     filenameBytes.length > MAX_FILENAME_BYTES ||
-    (usesUtf8 && !Buffer.from(filename, 'utf8').equals(filenameBytes)) ||
+    Buffer.byteLength(filename, 'utf8') > MAX_FILENAME_BYTES ||
+    rawIsDirectory !== isDirectory ||
     canonicalPath === '' ||
     canonicalPath !== canonicalPath.normalize('NFC') ||
     filename.startsWith('/') ||
@@ -183,7 +196,7 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
   const canonicalNames = new Set<string>()
   let cursor = centralOffset
   let declaredTotalBytes = 0
-  let declaredXmlBytes = 0
+  let declaredContentBytes = 0
   let documentXmlCount = 0
   for (let index = 0; index < totalEntries; index += 1) {
     if (
@@ -194,6 +207,7 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
     }
     const flags = buffer.readUInt16LE(cursor + 8)
     const method = buffer.readUInt16LE(cursor + 10)
+    const contentCrc = buffer.readUInt32LE(cursor + 16)
     const compressedSize = buffer.readUInt32LE(cursor + 20)
     const uncompressedSize = buffer.readUInt32LE(cursor + 24)
     const filenameLength = buffer.readUInt16LE(cursor + 28)
@@ -216,8 +230,8 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
       throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     }
     const filenameBytes = Buffer.from(buffer.subarray(filenameStart, extraStart))
-    const { filename, isDirectory } = decodeCanonicalPath(filenameBytes, flags)
-    assertExtraFields(buffer, extraStart, extraLength, filenameBytes, flags, filename)
+    const unicodePath = readUnicodePathExtra(buffer, extraStart, extraLength, filenameBytes)
+    const { filename, isDirectory } = resolveCanonicalPath(filenameBytes, flags, unicodePath)
     if (isDirectory && (method !== 0 || compressedSize !== 0 || uncompressedSize !== 0)) {
       throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     }
@@ -225,13 +239,12 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
     if (canonicalNames.has(canonicalName)) throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     canonicalNames.add(canonicalName)
 
-    const isMediaPath = !isDirectory && canonicalName.startsWith('word/media/')
     declaredTotalBytes += uncompressedSize
-    if (!isDirectory && !isMediaPath) declaredXmlBytes += uncompressedSize
+    if (!isDirectory) declaredContentBytes += uncompressedSize
     if (declaredTotalBytes > MAX_TOTAL_BYTES) {
       throw fail('CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED')
     }
-    if (declaredXmlBytes > MAX_XML_BYTES) {
+    if (declaredContentBytes > MAX_CONTENT_BYTES) {
       throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
     }
     if (filename === 'word/document.xml') documentXmlCount += 1
@@ -241,12 +254,12 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
       isDirectory,
       flags,
       method: method as 0 | 8,
+      contentCrc,
       compressedSize,
       uncompressedSize,
       localHeaderOffset,
       dataStart: 0,
       dataEnd: 0,
-      isMediaPath,
     })
     cursor = next
   }
@@ -275,6 +288,7 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
     }
     const localFlags = buffer.readUInt16LE(offset + 6)
     const localMethod = buffer.readUInt16LE(offset + 8)
+    const localContentCrc = buffer.readUInt32LE(offset + 14)
     const localCompressedSize = buffer.readUInt32LE(offset + 18)
     const localUncompressedSize = buffer.readUInt32LE(offset + 22)
     const filenameLength = buffer.readUInt16LE(offset + 26)
@@ -283,24 +297,28 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
     const extraStart = filenameStart + filenameLength
     const dataStart = extraStart + extraLength
     const dataEnd = dataStart + entry.compressedSize
+    const localFilenameBytes = Buffer.from(buffer.subarray(filenameStart, extraStart))
     if (
       localFlags !== entry.flags ||
       localMethod !== entry.method ||
+      localContentCrc !== entry.contentCrc ||
       dataEnd > centralOffset ||
-      !buffer.subarray(filenameStart, extraStart).equals(entry.filenameBytes) ||
+      !localFilenameBytes.equals(entry.filenameBytes) ||
       localCompressedSize !== entry.compressedSize ||
       localUncompressedSize !== entry.uncompressedSize
     ) {
       throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
     }
-    assertExtraFields(
+    const localUnicodePath = readUnicodePathExtra(
       buffer,
       extraStart,
       extraLength,
-      entry.filenameBytes,
-      entry.flags,
-      entry.filename,
+      localFilenameBytes,
     )
+    const localPath = resolveCanonicalPath(localFilenameBytes, localFlags, localUnicodePath)
+    if (localPath.filename !== entry.filename || localPath.isDirectory !== entry.isDirectory) {
+      throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+    }
     return { ...entry, dataStart, dataEnd }
   })
   const ranges = [...withLocalRanges].sort(
@@ -317,120 +335,82 @@ function parseCentralDirectory(buffer: Buffer): DocxZipEntry[] {
   return withLocalRanges
 }
 
-function isTrustedMediaPrefix(prefix: Buffer): boolean {
-  let contentOffset = 0
-  if (prefix.length >= 3 && prefix.subarray(0, 3).equals(Buffer.from([0xef, 0xbb, 0xbf]))) {
-    contentOffset = 3
-  }
-  while (
-    contentOffset < prefix.length &&
-    [0x09, 0x0a, 0x0d, 0x20].includes(prefix[contentOffset] as number)
-  ) {
-    contentOffset += 1
-  }
-  if (prefix[contentOffset] === 0x3c) return false
-  const ascii = (start: number, end: number): string => prefix.subarray(start, end).toString('ascii')
-  return (
-    (prefix.length >= 3 && prefix[0] === 0xff && prefix[1] === 0xd8 && prefix[2] === 0xff) ||
-    (prefix.length >= 8 && prefix.subarray(0, 8).equals(
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    )) ||
-    (prefix.length >= 6 && (ascii(0, 6) === 'GIF87a' || ascii(0, 6) === 'GIF89a')) ||
-    (prefix.length >= 2 && ascii(0, 2) === 'BM') ||
-    (prefix.length >= 4 && (
-      prefix.subarray(0, 4).equals(Buffer.from([0x49, 0x49, 0x2a, 0x00])) ||
-      prefix.subarray(0, 4).equals(Buffer.from([0x4d, 0x4d, 0x00, 0x2a]))
-    )) ||
-    (prefix.length >= 12 && ascii(0, 4) === 'RIFF' && ['WEBP', 'WAVE'].includes(ascii(8, 12))) ||
-    (prefix.length >= 4 && ascii(0, 4) === 'OggS') ||
-    (prefix.length >= 3 && ascii(0, 3) === 'ID3') ||
-    (prefix.length >= 8 && ascii(4, 8) === 'ftyp')
-  )
-}
-
 async function countDeflatedEntryBytes(
   compressed: Buffer,
-  entry: DocxZipEntry,
   priorTotalBytes: number,
-  priorXmlBytes: number,
-): Promise<{ entryBytes: number; totalBytes: number; xmlBytes: number }> {
+  priorContentBytes: number,
+): Promise<{ entryBytes: number; totalBytes: number; contentBytes: number; contentCrc: number }> {
   const inflater = createInflateRaw()
   let entryBytes = 0
   let totalBytes = priorTotalBytes
-  let xmlBytes = priorXmlBytes
-  const prefix = Buffer.alloc(MEDIA_SNIFF_BYTES)
-  let prefixBytes = 0
-  let pendingMediaBytes = 0
-  let trustedMedia: boolean | null = entry.isMediaPath ? null : false
+  let contentBytes = priorContentBytes
+  let contentCrc = 0xffffffff
   try {
     inflater.end(compressed)
     for await (const chunk of inflater) {
       const source = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
       entryBytes += source.length
       totalBytes += source.length
-      if (trustedMedia === false) {
-        xmlBytes += source.length
-      } else if (trustedMedia === null) {
-        const copiedBytes = Math.min(source.length, MEDIA_SNIFF_BYTES - prefixBytes)
-        source.copy(prefix, prefixBytes, 0, copiedBytes)
-        prefixBytes += copiedBytes
-        pendingMediaBytes += source.length
-        if (prefixBytes === MEDIA_SNIFF_BYTES) {
-          trustedMedia = isTrustedMediaPrefix(prefix)
-          if (!trustedMedia) xmlBytes += pendingMediaBytes
-          pendingMediaBytes = 0
-        }
-      }
+      contentBytes += source.length
+      contentCrc = updateCrc32(contentCrc, source)
       if (entryBytes > MAX_TOTAL_BYTES || totalBytes > MAX_TOTAL_BYTES) {
         throw fail('CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED')
       }
-      if (xmlBytes > MAX_XML_BYTES) {
+      if (contentBytes > MAX_CONTENT_BYTES) {
         throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
       }
-    }
-    if (trustedMedia === null) {
-      trustedMedia = isTrustedMediaPrefix(prefix.subarray(0, prefixBytes))
-      if (!trustedMedia) xmlBytes += pendingMediaBytes
-      if (xmlBytes > MAX_XML_BYTES) throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
     }
   } catch (error) {
     throw knownOr(error, 'CONTRACT_DOCX_ARCHIVE_INVALID')
   } finally {
     inflater.destroy()
   }
-  return { entryBytes, totalBytes, xmlBytes }
+  return {
+    entryBytes,
+    totalBytes,
+    contentBytes,
+    contentCrc: (contentCrc ^ 0xffffffff) >>> 0,
+  }
 }
 
 export async function assertDocxArchiveSafe(buffer: Buffer): Promise<void> {
   try {
     const entries = parseCentralDirectory(buffer)
     let totalBytes = 0
-    let xmlBytes = 0
+    let contentBytes = 0
     for (const entry of entries) {
       const compressed = buffer.subarray(entry.dataStart, entry.dataEnd)
       if (entry.method === 0) {
         const entryBytes = compressed.length
         totalBytes += entryBytes
-        if (
-          !entry.isDirectory &&
-          (!entry.isMediaPath ||
-            !isTrustedMediaPrefix(compressed.subarray(0, MEDIA_SNIFF_BYTES)))
-        ) {
-          xmlBytes += entryBytes
-        }
+        if (!entry.isDirectory) contentBytes += entryBytes
         if (entryBytes > MAX_TOTAL_BYTES || totalBytes > MAX_TOTAL_BYTES) {
           throw fail('CONTRACT_DOCX_ARCHIVE_SIZE_LIMIT_EXCEEDED')
         }
-        if (xmlBytes > MAX_XML_BYTES) throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
-        if (entryBytes !== entry.uncompressedSize) throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+        if (contentBytes > MAX_CONTENT_BYTES) {
+          throw fail('CONTRACT_DOCX_XML_SIZE_LIMIT_EXCEEDED')
+        }
+        if (
+          entryBytes !== entry.uncompressedSize ||
+          crc32(compressed) !== entry.contentCrc
+        ) {
+          throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
+        }
         continue
       }
-      const counted = await countDeflatedEntryBytes(compressed, entry, totalBytes, xmlBytes)
-      if (counted.entryBytes !== entry.uncompressedSize) {
+      const counted = await countDeflatedEntryBytes(
+        compressed,
+        totalBytes,
+        contentBytes,
+      )
+      if (
+        counted.entryBytes !== entry.uncompressedSize ||
+        counted.contentCrc !== entry.contentCrc
+      ) {
         throw fail('CONTRACT_DOCX_ARCHIVE_INVALID')
       }
       totalBytes = counted.totalBytes
-      xmlBytes = counted.xmlBytes
+      contentBytes = counted.contentBytes
     }
   } catch (error) {
     throw knownOr(error, 'CONTRACT_DOCX_ARCHIVE_INVALID')
