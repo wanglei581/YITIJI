@@ -205,9 +205,14 @@ export function assertBornDigitalPdfPageLimit(pageCount: unknown): void {
 
 /** Page-local text-layer reliability gate; invisible Unicode does not count as content. */
 export function hasReliableTextLayer(text: unknown): boolean {
-  return typeof text === 'string' &&
-    Array.from(text.replace(/[\p{White_Space}\p{Cc}\p{Cf}]+/gu, '')).length >=
-      MIN_RELIABLE_TEXT_LAYER_CHARS
+  if (typeof text !== 'string') return false
+  const lineLengths = text
+    .split(/\r\n|[\n\r\u2028\u2029]/u)
+    .map((line) => Array.from(line.replace(/[\p{White_Space}\p{Cc}\p{Cf}]+/gu, '')).length)
+  const totalVisibleCharacters = lineLengths.reduce((total, length) => total + length, 0)
+  if (totalVisibleCharacters < MIN_RELIABLE_TEXT_LAYER_CHARS) return false
+  return lineLengths.some((length) => length >= MIN_RELIABLE_TEXT_LAYER_CHARS) ||
+    lineLengths.filter((length) => length >= 8).length >= 3
 }
 
 function isNonEmptyCanonicalText(text: string): boolean {

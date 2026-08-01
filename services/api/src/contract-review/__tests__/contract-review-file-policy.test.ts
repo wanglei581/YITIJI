@@ -363,6 +363,13 @@ test('readContentForEndUser reads only active records and hides non-active statu
     missing.service.readContentForEndUser('missing-file', 'member-1')
   )
 
+  const expired = makeFileAccessHarness(new Date(Date.now() - 1))
+  const expiredError = await expectFileNotFound(() =>
+    expired.service.readContentForEndUser('contract-file-1', 'member-1')
+  )
+  assert.deepEqual(expiredError.getResponse(), missingError.getResponse())
+  assert.equal(expired.calls().contentReadCalls, 0)
+
   for (const status of ['uploading', 'quarantined']) {
     const harness = makeFileAccessHarness(new Date(Date.now() + 60_000), { status })
     const error = await expectFileNotFound(() =>

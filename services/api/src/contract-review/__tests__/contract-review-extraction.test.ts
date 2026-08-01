@@ -155,6 +155,13 @@ test('publishes concrete Nest constructor metadata for production DI', () => {
 
 test('text-layer reliability excludes Unicode whitespace, controls, formats and short headers', () => {
   assert.equal(hasReliableTextLayer(RELIABLE), true)
+  assert.equal(hasReliableTextLayer(`${'甲'.repeat(15)}\n${'乙'.repeat(15)}`), false)
+  assert.equal(hasReliableTextLayer(`${'短页眉'.repeat(5)}\n${'短页脚'.repeat(5)}`), false)
+  assert.equal(
+    hasReliableTextLayer(`${'甲'.repeat(10)}\n${'乙'.repeat(10)}\n${'丙'.repeat(10)}`),
+    true,
+  )
+  assert.equal(hasReliableTextLayer('正文'.repeat(15)), true)
   assert.equal(hasReliableTextLayer('\u200b'.repeat(30)), false)
   assert.equal(hasReliableTextLayer('\u0000\u0001\u0002'.repeat(10)), false)
   assert.equal(hasReliableTextLayer('\u3000\n\t'.repeat(10)), false)
