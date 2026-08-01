@@ -102,8 +102,9 @@ nonce、PM2/Nginx 和 drill 等可变前置。wiring contract 以 prefix/block d
 
 - 主干已记录的四处 cleanup 存活/有界性缺口未被本任务关闭，仍阻止把未来 fresh retake 的 PASS
   当成可信完成；这是基线既有、范围外且文档已披露的阻塞，不是本 diff 新增 finding。
-- `pnpm audit` 的 3 low / 1 moderate / 3 high 为未改依赖的既有
-  react-router / brace-expansion 项；`pnpm-lock.yaml` 零差异，本任务没有扩大依赖风险。
+- 最终 `pnpm audit` 的 3 low / 1 moderate / 3 high 来自未改依赖的 react-router、brace-expansion、
+  valibot、esbuild、`@babel/core` 与 body-parser 公告；`pnpm-lock.yaml` 零差异，本任务没有扩大依赖风险，
+  也不把这些范围外既有项误写成 audit 通过。
 - 本 PR、离线测试或本审查都不构成 D2′ PASS，不授权 fresh retake、production 或 D3–D6。
 
 ### I6 — 文档事实与执行边界一致
