@@ -21,161 +21,160 @@
 
 必须同时满足：
 
+- 主机管理员已在仓库外预先创建 `D2_GOVERNANCE_ROOT`；程序不会创建该 root，也不会调用 `sudo`；
+- governance root 是 realpath 后不变的本地文件系统真实目录，owner 为演练账户的有效 UID，mode 精确为
+  `0700`，不是符号链接；
+- governance root 与 clone、evidence、archive、`services/api/scripts/d2-same-host/.work` 及其他 cleanup root
+  必须双向隔离：任何一方都不能等于、包含或被另一方包含；
 - `uname -s` 为 `Linux`，且 `/sys/fs/cgroup/cgroup.controllers` 可读；
 - user systemd manager 可用，目标账户 `Linger=yes`，transient unit 能真实应用 cgroup v2 controller；
-- executable PATH 中已有真实 Node.js、pnpm、PM2、Nginx、systemd 工具；脚本不安装软件、不使用 sudo；
+- canonical executable PATH `/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin` 中已有真实 Git、Node.js、pnpm、
+  PM2、Nginx、systemd 工具；脚本不安装软件、不使用 sudo，且所有命令都只从该固定 PATH 解析；
 - loopback `3010`、`3011` 和演练 Nginx 端口均空闲；
 - `services/api/dist/release-provenance/` 来自当前待审 commit 的 fresh build；
 - shell 中没有脚本拒绝的生产 DB、Redis、对象存储凭据变量；子进程始终通过 `env -i` 获得最小环境。
+
+governance root 中任何 incomplete reservation/invocation、截断、损坏、权限或关系异常都必须 NO-GO。
+已取得的 identity 或 invocation 永不自动回滚、删除、补写或恢复；治理状态丢失、不可读或真实性无法证明时，
+不得用新建空目录恢复同一 retake。
+
+governance root 的 owner 能为任意合格 clone 发起预约，这是本合同明确的主机账户威胁边界。该 root 必须仅由
+获授权的演练账户持有；本治理不声称抵御同一 Unix UID 或 root 主动篡改 state root、Git、Node、内核或运行时代码。
 
 演练 transient unit 固定使用 `MemoryMax=256MiB`、`CPUQuota=25%`、`TasksMax=64`、
 `LimitNOFILE=256`。这些值只用于让 keeper、PM2 daemon 与 managed API 可运行并观察内核节流；它们
 不是 production 容量配置。preflight 只证明 controller 和 effective value 可应用，不替代真实负载
 可达性；full drill 必须实际观察应用 membership 与 `nr_throttled` 增长。
 
-## 3. 两阶段最小执行协议
+## 3. 未来授权模板：reserve → invoke 单一路径
 
-两个阶段必须按下述顺序执行，且使用同一组不变的七项身份：`D2_GOVERNANCE_ROOT`、
-`D2_TASK_ID`、`D2_BASELINE_SHA`、`D2_BRANCH_NAME`、`D2_CLONE_PATH`、`D2_EVIDENCE_OUT`
-和 `D2_ARCHIVE_PATH`。授权包只能向当前 shell 提供精确值；本 runbook 不记录任何已过期窗口、
-nonce 或具体授权值。父 shell 还必须提供绝对路径 `D2_SOURCE_REPOSITORY`；它只标识治理脚本的获批来源，
-不属于 reservation facet，也不进入 reserve/consume 身份。
+> 本节命令只定义未来另行授权时的唯一操作模板。本任务不执行 reserve、full drill、post-drill verify，
+> 不启动 systemd、PM2、Nginx 或 API，也不授权 fresh retake、production 或 D3–D6。
 
-### 3.1 阶段一：clone 创建前预留
+未来授权包必须先固定以下 operator-local 输入：预配置的 `D2_GOVERNANCE_ROOT`、全新 task ID、完整期望
+branch、完整 40/64 位 baseline OID、独立 clean clone 的绝对路径、尚不存在且唯一的 evidence/archive
+目标，以及独立 RFC3339 执行窗口。`D2_CLONE_ROOT` 必须正是随后执行 `run.sh` 的代码树；不能在 clone A
+预约后从 clone B 调用，也不能使用 linked worktree、`.git` gitfile 或预约后被替换/改动的 clone。
 
-必须从稳定、已审且已通过离线合同的仓库执行预留，不得从尚未创建的 fresh clone 执行。
-`D2_GOVERNANCE_ROOT` 必须事先存在，是位于任何 repository 与目标 clone 之外的真实目录，
-当前账户为 owner，mode 精确为 `0700`。`D2_CLONE_PATH`、`D2_EVIDENCE_OUT`、`D2_ARCHIVE_PATH`
-各自的物理 parent 必须事先存在且可解析，由当前 UID 拥有，group/world 均不可写（建议 mode `0700`）；
-三个目标本身在预留前都必须不存在。`D2_EVIDENCE_DIR` 也必须事先满足相同的可解析、owner 和权限条件，
-且 evidence 的物理 parent 必须位于 `D2_EVIDENCE_DIR` 的物理目录内。不得用符号链接、已有目标或仓库内
-governance root 绕过这些约束。
-
-先在父 shell 中执行且仅执行下述 source preflight，证明治理脚本来自获批 commit；该 block 固定 PATH，
-将 `D2_SOURCE_REPOSITORY` 解析为物理 top-level，并核对 HEAD、tracked worktree 与 index 均符合授权：
+`D2_EVIDENCE_OUT` 与 `D2_ARCHIVE_OUT` 是操作者在当前授权 shell 中持有的绝对目标。它们只作为预约输入；
+evidence 路径在 invoke 成功后由 owner-only manifest 经私有 fd 3 交给 `run.sh`，不得再通过 full-drill 环境
+传入第二份真值。`D2_APPROVED_PATH` 不是 operator-local 输入；以下命令段拒绝任何预先定义，再将它固定并
+锁为只读 canonical 值。build、治理 verifier、旧 contract、reserve、invoke 和 post verifier 共用这一项
+工具链真值，禁止用 PATH A 预约后再用 PATH B invoke。预约前先在该 clone 根目录完成 fresh build 与离线
+合同核对：
 
 ```bash
-: "${D2_SOURCE_REPOSITORY:?missing exact approved source repository}" && \
-: "${D2_BASELINE_SHA:?missing exact baseline}" && \
-PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" && \
-export PATH && \
-D2_SOURCE_ROOT="$(cd -P -- "$D2_SOURCE_REPOSITORY" && pwd -P)" && \
-cd -P -- "$D2_SOURCE_ROOT" && \
-[[ "$(git rev-parse --show-toplevel)" == "$D2_SOURCE_ROOT" ]] && \
-[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_SHA" ]] && \
-git diff --quiet --ignore-submodules -- && \
-git diff --cached --quiet --ignore-submodules --
-```
-
-source preflight 成功后，必须保持同一父 shell 与同一组授权值，紧接着执行唯一 reserve block：
-
-<!-- D2_INVOCATION_RESERVE_COMMAND_START -->
-```bash
-: "${D2_GOVERNANCE_ROOT:?missing exact governance root}"
-: "${D2_TASK_ID:?missing exact task id}"
-: "${D2_BASELINE_SHA:?missing exact baseline}"
-: "${D2_BRANCH_NAME:?missing exact branch}"
-: "${D2_CLONE_PATH:?missing exact fresh clone path}"
-: "${D2_EVIDENCE_OUT:?missing exact evidence path}"
-: "${D2_ARCHIVE_PATH:?missing exact archive target}"
+if [[ "${D2_APPROVED_PATH+x}" == x ]]; then
+  printf '%s\n' 'D2_PRIME_APPROVED_PATH_INPUT_FORBIDDEN' >&2
+  exit 2
+fi
+readonly D2_APPROVED_PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'
 env -i \
-  PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  PATH="$D2_APPROVED_PATH" \
   HOME="$HOME" \
   LANG=C.UTF-8 \
-  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
-  D2_TASK_ID="$D2_TASK_ID" \
-  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
-  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
-  D2_CLONE_PATH="$D2_CLONE_PATH" \
-  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
-  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
-node services/api/scripts/d2-same-host/invocation-governance.mjs --reserve
+  pnpm --filter @ai-job-print/api build
+env -i \
+  PATH="$D2_APPROVED_PATH" \
+  HOME="$HOME" \
+  LANG=C.UTF-8 \
+  pnpm --filter @ai-job-print/api verify:d2-same-host-governance
+env -i \
+  PATH="$D2_APPROVED_PATH" \
+  HOME="$HOME" \
+  LANG=C.UTF-8 \
+  pnpm --filter @ai-job-print/api verify:d2-same-host-contract
 ```
-<!-- D2_INVOCATION_RESERVE_COMMAND_END -->
 
-`reserve` 只在 governance root 中持久化 reservation 和脱敏 ledger 事件；它不创建 clone、nonce、
-evidence 或 archive，也不调用 full drill。只有 `reserve` 成功后，才能在 `D2_CLONE_PATH`
-创建 fresh clone，并且只能使用下述 block 从相同 source 创建非本地 clone、从获批 baseline 新建唯一 branch，
-再复核物理 top-level、HEAD、symbolic branch、tracked worktree 与 index：
+在同一 Bash 授权 shell、同一 clone 中仅执行一次以下预约。command substitution 内只在 Node 成功后用
+Bash builtin `printf` 追加固定控制字符 sentinel，使 Node stdout 的尾随换行不会被 command substitution
+吞掉；父侧要求 sentinel 唯一且位于末尾，剥离后 payload 必须精确以单个换行结束，去掉该换行后不得再含
+任何换行。只有剩余单行精确匹配 `D2_PRIME_GOVERNANCE_RESERVED <32 位小写十六进制 ID>` 时，才导出
+裸 opaque ID。Node 非零（即使此前输出合法行）、零行、合法行后额外空行、两行、错误前缀或错误 ID 均固定
+exit 2；预约可能已写入不可变状态，因此**绝不能第二次执行 reserve 来重新取值**。任何冲突、部分写入、
+崩溃或损坏都消耗已取得的 identity 并保持 NO-GO，不得删除 state 后重试：
 
 ```bash
-: "${D2_SOURCE_REPOSITORY:?missing exact approved source repository}" && \
-: "${D2_BASELINE_SHA:?missing exact baseline}" && \
-: "${D2_BRANCH_NAME:?missing exact branch}" && \
-: "${D2_CLONE_PATH:?missing exact fresh clone path}" && \
-PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" && \
-export PATH && \
-git clone --no-local -- "$D2_SOURCE_REPOSITORY" "$D2_CLONE_PATH" && \
-cd -P -- "$D2_CLONE_PATH" && \
-git switch -c "$D2_BRANCH_NAME" "$D2_BASELINE_SHA" && \
-D2_CLONE_ROOT="$(pwd -P)" && \
-[[ "$(git rev-parse --show-toplevel)" == "$D2_CLONE_ROOT" ]] && \
-[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_SHA" ]] && \
-[[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH_NAME" ]] && \
-git diff --quiet --ignore-submodules -- && \
-git diff --cached --quiet --ignore-submodules --
+readonly D2_GOVERNANCE_RESERVE_SENTINEL=$'\034'
+if D2_GOVERNANCE_RESERVE_FRAME="$(
+  env -i \
+    PATH="$D2_APPROVED_PATH" \
+    HOME="$HOME" \
+    LANG=C.UTF-8 \
+    node services/api/scripts/d2-same-host/governance.mjs reserve \
+      --state-root "$D2_GOVERNANCE_ROOT" \
+      --task-id "$D2_TASK_ID" \
+      --branch "$D2_BRANCH" \
+      --baseline "$D2_BASELINE_OID" \
+      --clone "$D2_CLONE_ROOT" \
+      --evidence "$D2_EVIDENCE_OUT" \
+      --archive "$D2_ARCHIVE_OUT" &&
+    builtin printf '%s' "$D2_GOVERNANCE_RESERVE_SENTINEL"
+)"; then
+  :
+else
+  printf '%s\n' 'D2_PRIME_GOVERNANCE_RESERVE_FAILED' >&2
+  exit 2
+fi
+if [[ "$D2_GOVERNANCE_RESERVE_FRAME" != *"$D2_GOVERNANCE_RESERVE_SENTINEL" ]]; then
+  printf '%s\n' 'D2_PRIME_GOVERNANCE_RESERVE_OUTPUT_INVALID' >&2
+  exit 2
+fi
+D2_GOVERNANCE_RESERVE_PAYLOAD="${D2_GOVERNANCE_RESERVE_FRAME%"$D2_GOVERNANCE_RESERVE_SENTINEL"}"
+if [[ "$D2_GOVERNANCE_RESERVE_PAYLOAD" == *"$D2_GOVERNANCE_RESERVE_SENTINEL"* ||
+  "$D2_GOVERNANCE_RESERVE_PAYLOAD" != *$'\n' ]]; then
+  printf '%s\n' 'D2_PRIME_GOVERNANCE_RESERVE_OUTPUT_INVALID' >&2
+  exit 2
+fi
+D2_GOVERNANCE_RESERVE_LINE="${D2_GOVERNANCE_RESERVE_PAYLOAD%$'\n'}"
+if [[ "$D2_GOVERNANCE_RESERVE_LINE" == *$'\n'* ||
+  ! "$D2_GOVERNANCE_RESERVE_LINE" =~ ^D2_PRIME_GOVERNANCE_RESERVED\ ([0-9a-f]{32})$ ]]; then
+  printf '%s\n' 'D2_PRIME_GOVERNANCE_RESERVE_OUTPUT_INVALID' >&2
+  exit 2
+fi
+export D2_GOVERNANCE_RESERVATION_ID="${BASH_REMATCH[1]}"
+unset D2_GOVERNANCE_RESERVE_FRAME D2_GOVERNANCE_RESERVE_PAYLOAD D2_GOVERNANCE_RESERVE_LINE
 ```
 
-上述复核全部成功后，才在该 clone 根目录执行构建与离线合同：
-
-```bash
-pnpm --filter @ai-job-print/api build
-pnpm --filter @ai-job-print/api verify:d2-same-host-contract
-```
-
-### 3.2 阶段二：fresh clone 内唯一 full drill
-
-授权包还必须把精确绝对路径写入当前 shell 的 `D2_EVIDENCE_DIR` 与 `D2_EVIDENCE_OUT`；两者缺失时，
-`run.sh` 和下述唯一 canonical full-drill command 都会在生成 nonce 前 fail closed。`D2_EVIDENCE_OUT`
-必须位于 `D2_EVIDENCE_DIR` 的物理目录内。`D2_APPROVED_PATH` 是冒号分隔的 **executable PATH**，只能
-指向仓库外的既有二进制目录；不得传入 fresh clone / repository path，指向仓库内部的符号链接同样会被
-物理路径检查拒绝，脚本也不会在非法值或缺失命令时回退到 caller PATH。
+`D2_APPROVED_PATH` 是上述 runbook 固定且只读的 executable PATH，不接受操作者覆盖；不得传入 clone 或
+repository path，也不得在 reserve 与 invoke 之间更换。缺失 Git 或其他必需命令时保持 NO-GO，不得改用
+另一条 PATH 或回退到 caller PATH。
 
 canonical PATH 对应当前既有非生产 Colima 的工具链布局；如果目标环境的 required commands 不在这些
 目录中，必须先按独立代码任务同步更新 runbook 与 offline contract 并重新审查，不能在授权窗口内临时改命令。
 
-下述 block 必须在刚创建的 `D2_CLONE_PATH` 根目录执行，七项身份必须与阶段一完全一致。
-`run.sh` 会在 Linux、toolchain、preflight 和 nonce 边界之前自动 consume 已有 reservation；
-当前身份和授权窗口内不存在第二次调用。
-
 <!-- D2_FRESH_RETAKE_COMMAND_START -->
 ```bash
-: "${D2_EVIDENCE_DIR:?missing exact authorized evidence directory}"
-: "${D2_EVIDENCE_OUT:?missing exact authorized evidence path}"
 env -i \
   PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
   HOME="$HOME" \
   LANG=C.UTF-8 \
   D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
-  D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \
   D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \
-  D2_TASK_ID="$D2_TASK_ID" \
-  D2_BASELINE_SHA="$D2_BASELINE_SHA" \
-  D2_BRANCH_NAME="$D2_BRANCH_NAME" \
-  D2_CLONE_PATH="$D2_CLONE_PATH" \
-  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
-  D2_ARCHIVE_PATH="$D2_ARCHIVE_PATH" \
+  D2_GOVERNANCE_RESERVATION_ID="$D2_GOVERNANCE_RESERVATION_ID" \
   pnpm --filter @ai-job-print/api drill:d2-same-host
 ```
 <!-- D2_FRESH_RETAKE_COMMAND_END -->
 
-full drill 结束后，独立 verifier 使用同一授权 evidence 路径：
+canonical command 会在任何 production-env/cgroup/port 等后续 preflight 前调用唯一 invoke 门禁。
+invocation tombstone 一旦落盘，本次调用即永久消耗；即使后续 preflight、nonce、systemd、evidence 或 cleanup
+失败，也不得在同一 reservation 或授权窗口重跑。重新预约必须等待新的独立用户授权，并使用全新的全部身份与目标。
+
+full drill 结束后，独立 verifier 才使用操作者在预约时保留的同一个 `D2_EVIDENCE_OUT`：
 
 ```bash
-node services/api/scripts/d2-same-host/verify-contract.mjs \
-  --evidence "$D2_EVIDENCE_OUT"
+env -i \
+  PATH="$D2_APPROVED_PATH" \
+  HOME="$HOME" \
+  LANG=C.UTF-8 \
+  node services/api/scripts/d2-same-host/verify-contract.mjs \
+    --evidence "$D2_EVIDENCE_OUT"
 ```
 
-不得设置 skip/mock/partial-pass 开关。`D2_NGINX_PORT`、`D2_EVIDENCE_DIR`、`D2_WORK_DIR` 或
-`D2_EVIDENCE_OUT` 如需覆盖，仍必须满足脚本的绝对路径、owner、权限、端口和独立 evidence 目录约束；
-不能用它们绕过 Linux/systemd/cgroup/production-env 检查。archive 目标在 reserve 和 consume 时都必须不存在，
-只能在调用结束后创建。
-
-reservation 以及 ledger 中的 `RESERVED` / `INVOKED` 事件都不属于 cleanup，任何普通 cleanup 或演练清理都不得删除它们。
-`reservation.lock` 残留表示临界区内存在无法证明状态的部分持久变更；当前窗口不得删除、恢复或绕过 stale lock。
-无论 reserve 失败、consume 失败，还是 consume 后的基线复核、preflight 或 full drill 失败，都不得在同一身份或授权窗口重跑。
-后续重试必须更换全部六个 facet：task、baseline、branch、clone、evidence、archive，并重新建立授权窗口与 reservation。
-governance root 只有在不存在 busy tombstone 且 ledger 健康时才可复用；否则必须停止并另立法证/恢复任务，不得在当前窗口修复。
+不得设置 skip/mock/partial-pass 开关，也不得向 canonical command 增加未列出的输入。`D2_WORK_DIR`、
+`D2_EVIDENCE_DIR` 和 `D2_EVIDENCE_OUT` 都不是 `run.sh` override，不能进入 full-drill env；workspace 固定由
+脚本管理，evidence 真值只来自已预约 manifest。操作者持有的 evidence 变量仅用于上面的预约参数和事后
+只读 verifier，不能绕过 Linux/systemd/cgroup/production-env 或唯一调用门禁。
 
 ## 4. PASS 与 NO-GO
 
@@ -217,6 +216,9 @@ failure measurements，不能复用可能已组成 PASS 的实时 measurements�
 PM2 app/daemon、managed app、managed keeper transient unit 和临时 release workspace。Nginx 与 unit
 按精确 PID/name 等待退出；若仍存活则保留 workspace 并 exit 2，避免删掉在用文件。脚本不使用宿主
 默认 `PM2_HOME`，不使用宽泛进程名或 glob，不触碰 production/其他本地 PM2。
+
+cleanup 永不触碰仓库外 governance root、reservation/identity/invocation tombstone、manifest 或 immutable
+event。若 root 与任何 cleanup 范围无法证明隔离，必须在预约前 NO-GO，而不是依赖 cleanup 排除规则补救。
 
 ## 7. 与旧 D2、D3–D6 的关系
 
