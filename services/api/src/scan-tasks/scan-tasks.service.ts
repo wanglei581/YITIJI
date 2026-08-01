@@ -308,7 +308,7 @@ export class ScanTasksService {
       })
     }
 
-    const effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
+    let effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
     if (effectiveStatus === 'expired' && task.status === 'waiting') {
       // CAS：只在仍是 waiting 时落盘过期状态，避免与并发的 cancel()/deliverScanFile() 竞态时
       // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
@@ -319,19 +319,29 @@ export class ScanTasksService {
       })
     }
 
+    const fileObject =
+      task.status === 'completed' && task.fileId
+        ? await this.prisma.fileObject.findUnique({ where: { id: task.fileId } })
+        : null
+    const contractSessionExpired =
+      task.scanType === 'contract' &&
+      task.status === 'completed' &&
+      (task.expiresAt.getTime() <= Date.now() ||
+        Boolean(fileObject?.expiresAt && fileObject.expiresAt.getTime() <= Date.now()))
+    if (contractSessionExpired) {
+      effectiveStatus = 'expired'
+    }
+
     let file: ScanTaskFileView | null = null
-    if (effectiveStatus === 'completed' && task.fileId) {
-      const fileObject = await this.prisma.fileObject.findUnique({ where: { id: task.fileId } })
-      if (fileObject && !fileObject.deletedAt) {
-        const signed = signFileUrl(fileObject.id, SCAN_FILE_URL_TTL_MS)
-        file = {
-          fileId: fileObject.id,
-          filename: fileObject.filename,
-          sizeBytes: fileObject.sizeBytes,
-          mimeType: fileObject.mimeType,
-          sha256: fileObject.sha256,
-          fileUrl: signed.url,
-        }
+    if (effectiveStatus === 'completed' && fileObject && !fileObject.deletedAt) {
+      const signed = signFileUrl(fileObject.id, SCAN_FILE_URL_TTL_MS)
+      file = {
+        fileId: fileObject.id,
+        filename: fileObject.filename,
+        sizeBytes: fileObject.sizeBytes,
+        mimeType: fileObject.mimeType,
+        sha256: fileObject.sha256,
+        fileUrl: signed.url,
       }
     }
 

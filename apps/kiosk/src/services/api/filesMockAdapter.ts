@@ -1,4 +1,9 @@
-import { FILE_DEFAULT_TTL_HOURS, type FileUploadResponse, type FilePurpose, type FileSensitiveLevel } from '@ai-job-print/shared'
+import {
+  FILE_DEFAULT_TTL_HOURS,
+  type FileUploadResponse,
+  type FilePurpose,
+  type FileSensitiveLevel,
+} from '@ai-job-print/shared'
 
 /**
  * Mock 仅能根据 purpose + token 近似模拟后端默认保存策略:
@@ -6,7 +11,12 @@ import { FILE_DEFAULT_TTL_HOURS, type FileUploadResponse, type FilePurpose, type
  * - 匿名/证件/系统文件保持 system_short 的 24h/6h/1h。
  * 真实归属仍以后端 ownerType/endUserId 判断为准。
  */
-const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>(['resume_upload', 'resume_scan', 'cover_letter'])
+const MEMBER_DEFAULT_PURPOSES = new Set<FilePurpose>([
+  'resume_upload',
+  'resume_scan',
+  'cover_letter',
+])
+const CONTRACT_UPLOAD_TTL_MS = 2 * 60 * 60 * 1000
 
 const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   resume_upload: 'highly_sensitive',
@@ -24,11 +34,19 @@ const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   temp: 'sensitive',
   signature_image: 'highly_sensitive',
   member_data_export: 'highly_sensitive',
+  contract_upload: 'highly_sensitive',
 }
 
 let nextId = 1
 
-function computeMockFileExpiresAt(purpose: FilePurpose, token: string | null | undefined, now: number): string {
+function computeMockFileExpiresAt(
+  purpose: FilePurpose,
+  token: string | null | undefined,
+  now: number
+): string {
+  if (purpose === 'contract_upload') {
+    return new Date(now + CONTRACT_UPLOAD_TTL_MS).toISOString()
+  }
   if (token && MEMBER_DEFAULT_PURPOSES.has(purpose)) {
     return new Date(now + 90 * 24 * 60 * 60 * 1000).toISOString()
   }
@@ -38,7 +56,11 @@ function computeMockFileExpiresAt(purpose: FilePurpose, token: string | null | u
 }
 
 export const filesMockAdapter = {
-  async kioskUpload(file: File, purpose: FilePurpose, token?: string | null): Promise<FileUploadResponse> {
+  async kioskUpload(
+    file: File,
+    purpose: FilePurpose,
+    token?: string | null
+  ): Promise<FileUploadResponse> {
     await new Promise((r) => setTimeout(r, 600))
     const fileId = `mock-file-${Date.now()}-${nextId++}`
     const now = Date.now()

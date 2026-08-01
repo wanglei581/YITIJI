@@ -61,7 +61,9 @@ class FakeRedis {
   }
 
   async setNxEx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
-    if (await this.get(key)) return false
+    const current = this.values.get(key)
+    if (current && current.expiresAt > Date.now()) return false
+    if (current) this.values.delete(key)
     this.values.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 })
     return true
   }
@@ -69,6 +71,11 @@ class FakeRedis {
   async del(key: string): Promise<number> {
     const existed = this.values.delete(key)
     return existed ? 1 : 0
+  }
+
+  hasLiveKey(key: string): boolean {
+    const entry = this.values.get(key)
+    return Boolean(entry && entry.expiresAt > Date.now())
   }
 }
 
@@ -98,8 +105,12 @@ class FakePrisma {
 
 class FakeFilesService {
   private next = 1
+  readonly uploadCalls: Array<{ purpose: FilePurpose; filename: string }> = []
 
-  constructor(private readonly prisma: FakePrisma) {}
+  constructor(
+    private readonly prisma: FakePrisma,
+    private readonly beforeUpload?: (callNumber: number) => Promise<void>
+  ) {}
 
   async upload(args: {
     buffer: Buffer
@@ -108,6 +119,8 @@ class FakeFilesService {
     purpose: FilePurpose
     endUserId?: string | null
   }): Promise<FileUploadResponse> {
+    this.uploadCalls.push({ purpose: args.purpose, filename: args.filename })
+    await this.beforeUpload?.(this.uploadCalls.length)
     const validation = validateUpload({
       purpose: args.purpose,
       mimeType: args.mimeType,
@@ -187,14 +200,29 @@ class FakeFilesService {
   }
 }
 
-function makeService(): { service: UploadSessionsService; prisma: FakePrisma } {
+function makeService(options?: { beforeUpload?: (callNumber: number) => Promise<void> }): {
+  service: UploadSessionsService
+  prisma: FakePrisma
+  files: FakeFilesService
+  redis: FakeRedis
+} {
   const redis = new FakeRedis()
   const prisma = new FakePrisma()
-  const files = new FakeFilesService(prisma)
+  const files = new FakeFilesService(prisma, options?.beforeUpload)
   return {
     service: new UploadSessionsService(redis as never, prisma as never, files as never),
     prisma,
+    files,
+    redis,
   }
+}
+
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
 }
 
 function file(args?: Partial<Express.Multer.File>): Express.Multer.File {
@@ -412,6 +440,70 @@ async function main(): Promise<void> {
       BadRequestException,
       'upload token cannot be reused'
     )
+  }
+
+  {
+    const uploadEntered = deferred()
+    const releaseUpload = deferred()
+    const { service, prisma, files, redis } = makeService({
+      beforeUpload: async (callNumber) => {
+        if (callNumber === 1) {
+          uploadEntered.resolve()
+          await releaseUpload.promise
+        }
+      },
+    })
+    const session = await service.create({
+      purpose: 'resume_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    const lockKey = `upload_session_upload_lock:${session.sessionId}`
+    const originalGet = redis.get.bind(redis)
+    const lockReadersReady = deferred()
+    let lockReaders = 0
+    redis.get = async (key: string) => {
+      if (key === lockKey) {
+        lockReaders += 1
+        if (lockReaders === 2) lockReadersReady.resolve()
+        await lockReadersReady.promise
+      }
+      return originalGet(key)
+    }
+
+    const request = () =>
+      service.uploadFile({
+        sessionId: session.sessionId,
+        uploadToken: session.uploadToken,
+        file: file(),
+      })
+    const first = request()
+    const second = request()
+    await uploadEntered.promise
+
+    const asSettled = (promise: Promise<unknown>) =>
+      promise.then(
+        (value) => ({ status: 'fulfilled' as const, value }),
+        (reason: unknown) => ({ status: 'rejected' as const, reason })
+      )
+    try {
+      const earlyResult = await Promise.race([asSettled(first), asSettled(second)])
+      assert.equal(
+        earlyResult.status,
+        'rejected',
+        'the competing request must reject while the lock holder is still uploading'
+      )
+    } finally {
+      releaseUpload.resolve()
+    }
+
+    const results = await Promise.allSettled([first, second])
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 1)
+    assert.equal(results.filter((result) => result.status === 'rejected').length, 1)
+    assert.equal(files.uploadCalls.length, 1)
+    assert.equal(prisma.files.size, 1)
+    assert.equal(redis.hasLiveKey(lockKey), false, 'upload lock must be cleaned after completion')
   }
 
   {

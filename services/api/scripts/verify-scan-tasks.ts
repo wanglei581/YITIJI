@@ -73,6 +73,7 @@ interface StoredFileObject {
   purpose: string
   endUserId: string | null
   deletedAt: Date | null
+  expiresAt: Date | null
 }
 
 /**
@@ -282,6 +283,9 @@ class FakeFilesService {
       purpose: args.purpose,
       endUserId: args.endUserId ?? null,
       deletedAt: null,
+      expiresAt: new Date(
+        Date.now() + (args.purpose === 'contract_upload' ? 2 * 60 * 60 * 1000 : 60 * 60 * 1000)
+      ),
     }
     this.prisma.filesById.set(id, record)
     return {
@@ -292,7 +296,7 @@ class FakeFilesService {
       sha256: record.sha256,
       signedUrl: `https://files.local/${id}`,
       signedUrlExpiresAt: new Date(Date.now() + 60_000).toISOString(),
-      fileExpiresAt: null,
+      fileExpiresAt: record.expiresAt.toISOString(),
     }
   }
 
@@ -846,6 +850,19 @@ async function main(): Promise<void> {
     })
     assert.equal(delivered.scanTaskId, created.scanTaskId)
     assert.equal(prisma.filesById.get(delivered.fileId)?.purpose, 'contract_upload')
+
+    const task = prisma.scanTasksById.get(created.scanTaskId)!
+    const storedFile = prisma.filesById.get(delivered.fileId)!
+    storedFile.expiresAt = new Date(Date.now() - 1)
+    const fileExpired = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(fileExpired.status, 'expired')
+    assert.equal(fileExpired.file, null)
+
+    storedFile.expiresAt = new Date(Date.now() + 60_000)
+    task.expiresAt = new Date(Date.now() - 1)
+    const taskExpired = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(taskExpired.status, 'expired')
+    assert.equal(taskExpired.file, null)
   }
 
   {
@@ -897,6 +914,19 @@ async function main(): Promise<void> {
       status.file?.fileUrl ?? '',
       /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/
     )
+
+    storedTask!.expiresAt = new Date(Date.now() - 1)
+    const completedAfterTaskExpiry = await service.getStatus(
+      created.scanTaskId,
+      null,
+      created.controlToken
+    )
+    assert.equal(
+      completedAfterTaskExpiry.status,
+      'completed',
+      'non-contract completed scan status remains unchanged when only its task window expires'
+    )
+    assert.equal(completedAfterTaskExpiry.file?.fileId, delivered.fileId)
   }
 
   {

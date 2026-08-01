@@ -852,6 +852,7 @@ export class FilesService {
     if (
       !record ||
       record.deletedAt ||
+      (record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
       (!allowMemberDataExport && record.purpose === 'member_data_export')
     ) {
       // 禁止通用端点成为导出 artifact 存在性探针。
