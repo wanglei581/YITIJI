@@ -1,12 +1,12 @@
 {
   "id": "f1-d2-invocation-governance-reconcile-20260801",
   "title": "F1 D2′ invocation governance latest-main reconciliation",
-  "status": "in_progress",
+  "status": "completed",
   "complexity": "L+",
   "risk": "high",
   "domain": "backend",
-  "currentPhase": "review",
-  "nextAction": "执行最新主干终审、归档并推送创建 PR",
+  "currentPhase": "completed",
+  "nextAction": "归档后推送分支并创建 PR；不授权 fresh retake",
   "createdAt": "2026-08-01T13:48:15Z",
   "branch": "codex/f1-d2-invocation-governance-reconcile-20260801"
 }
