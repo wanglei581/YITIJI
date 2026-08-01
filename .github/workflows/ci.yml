@@ -86,6 +86,12 @@ jobs:
         # 放在重装依赖之前:只依赖 node + 仓库,违规能最快失败。
         run: pnpm verify:compliance-copy
 
+      - name: Import review reset gate (forced re-review on partner import)
+        # 静态断言 Partner/Excel 主动导入的 job/jobFair upsert update 块一律回 pending+draft,
+        # 并反向断言 job-sync 自动拉取不覆写审核状态。纯 node,不需要 DB。
+        working-directory: services/api
+        run: pnpm verify:import-review-reset
+
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
         run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server

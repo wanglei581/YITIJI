@@ -411,6 +411,8 @@ export class JobsExcelService {
                 salaryMax: parseMappedNumber(mapped.salaryMax),
                 salaryUnit: mapped.salaryUnit || null,
                 validThrough: parseMappedDate(mapped.validThrough),
+                // Excel 确认导入一律回 pending+draft 强制重审，即使已发布也立即下架
+                reviewStatus: 'pending', publishStatus: 'draft',
                 syncTime: sync,
               },
             })
@@ -445,6 +447,8 @@ export class JobsExcelService {
                 venue: mapped.venue ?? '', city: mapped.city ?? '',
                 address: mapped.address || null,
                 description: mapped.description || null,
+                // Excel 确认导入招聘会一律回 pending+draft 强制重审，即使已发布也立即下架
+                reviewStatus: 'pending', publishStatus: 'draft',
                 syncTime: sync,
               },
             })

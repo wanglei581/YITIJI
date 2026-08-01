@@ -190,6 +190,8 @@ export class JobsPartnerService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            // Partner 主动导入一律回 pending+draft 强制重审，即使已发布也立即下架
+            reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
         })
@@ -261,6 +263,8 @@ export class JobsPartnerService {
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough ? new Date(item.validThrough) : undefined,
+            // Partner Webhook 主动推送一律回 pending+draft 强制重审，即使已发布也立即下架
+            reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
         })
@@ -404,6 +408,8 @@ export class JobsPartnerService {
             description: item.description,
             companyCount: item.companyCount ?? undefined,
             jobCount: item.jobCount ?? undefined,
+            // Partner 主动导入招聘会一律回 pending+draft 强制重审，即使已发布也立即下架
+            reviewStatus: 'pending', publishStatus: 'draft',
             syncTime: sync,
           },
         })

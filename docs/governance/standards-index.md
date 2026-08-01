@@ -181,7 +181,7 @@ node -e "const s=require('fs').readFileSync('packages/shared/src/types/complianc
 
 ## 十一、待立项的代码级缺口（2026-08-01 codex 复审查出，均已独立取证）
 
-以下两项是**代码问题**，不是文档表述问题，已确认属实但超出当轮文件预算，未修：
+两项均为**代码问题**，不是文档表述问题。第 1 项已于 2026-08-01 修复并落门禁，第 2 项仍待立项：
 
-1. **P0｜Partner 导入绕过强制重审**。`jobs-partner.service.ts:178/248/394`、`jobs-excel.service.ts:399/439` 五处 upsert 的 `update` 分支均未重置 `reviewStatus`/`publishStatus`，而 Kiosk 只按当前 `approved`+`published` 过滤 —— 一条**已发布**岗位再次导入会改写标题／公司／描述／`sourceUrl` 后**继续公开且无需再审**，与 `compliance-boundary.md:132`、`role-boundary.md:116` 的「导入/编辑一律回到 pending」矛盾。修复口径：所有 Job/JobFair upsert 的 `update` 分支统一重置 `pending + draft`，并补「已发布记录再次导入立即从公开查询消失」回归断言。文件预算 4–6 个。
-2. **P0｜`offline-agencies` 审核/发布/删除全程无审计**。全模块 0 处审计引用；`adminDelete` 先 `offlineJob.deleteMany` 再删机构，同样不写 `AuditLog`。叠加两项既有事实：`audit.service.ts:45` 的 `write()` 设计上「失败只 log 不抛」（审计丢失不阻断业务），且 DB 层无 append-only role。因此凡出现「不可删除、不可篡改」的表述都超出现状 —— 要么补 DB append-only role／防篡改链，要么把文案降级为可验证表述。文件预算 5–8 个。
+1. ~~**P0｜Partner 导入绕过强制重审**~~ ✅ **已修复（2026-08-01）**。原问题：`jobs-partner.service.ts` 的 `importJobs` / `importJobsFromWebhook` / `importFairs` 与 `jobs-excel.service.ts` 的 `confirmExcelImport`（job + jobFair 两支）共五处 upsert 的 `update` 分支均未重置 `reviewStatus`/`publishStatus`，而 Kiosk 只按 `approved`+`published` 过滤 —— 一条**已发布**岗位再次导入会改写标题／公司／描述／`sourceUrl` 后**继续公开且无需再审**，与 `compliance-boundary.md:132`、`role-boundary.md:116` 的「导入/编辑一律回到 pending」矛盾。修复：五处 `update` 分支统一补 `reviewStatus: 'pending', publishStatus: 'draft'`（已发布记录再次导入立即下架、退回待审）。新增静态门禁 `services/api/scripts/verify-import-review-reset.mjs`（`pnpm verify:import-review-reset`，已进 `ci.yml`），7 项断言：5 处 Partner/Excel 必须重置 + 2 处 `job-sync.service.ts` 自动拉取**必须不重置**的反向断言。**`job-sync.service.ts` 刻意不改** —— 该处 `reviewStatus/publishStatus 不覆写，防绕过审核` 是定时拉取的正确设计，若一并重置会导致每晚同步把数百条已审岗位全部退回待审。门禁已做 fail-closed 验证（故意回退一处 → exit 1 并精确定位到 `importFairs() · jobFair.upsert @L379`）。
+2. **P0｜`offline-agencies` 审核/发布/删除全程无审计**（**仍待立项**）。全模块 0 处审计引用；`adminDelete` 先 `offlineJob.deleteMany` 再删机构，同样不写 `AuditLog`。叠加两项既有事实：`audit.service.ts:45` 的 `write()` 设计上「失败只 log 不抛」（审计丢失不阻断业务），且 DB 层无 append-only role。因此凡出现「不可删除、不可篡改」的表述都超出现状 —— 要么补 DB append-only role／防篡改链，要么把文案降级为可验证表述。文件预算 5–8 个。
