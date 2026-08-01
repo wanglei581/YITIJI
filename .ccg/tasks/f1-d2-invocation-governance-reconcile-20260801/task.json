@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-invocation-governance-reconcile-20260801",
+  "title": "F1 D2′ invocation governance latest-main reconciliation",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "planning",
+  "nextAction": "按文件归属移植治理内核并保留主干 cleanup/stale-PID/systemd 合同",
+  "createdAt": "2026-08-01T13:48:15Z",
+  "branch": "codex/f1-d2-invocation-governance-reconcile-20260801"
+}
