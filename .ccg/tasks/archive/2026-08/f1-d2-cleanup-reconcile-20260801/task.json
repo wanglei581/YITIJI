@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-cleanup-reconcile-20260801",
+  "title": "合并 PR #464 与严格 D2 cleanup 合同防线",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "待用户单独授权后推送并创建 PR；本任务不含 retake",
+  "createdAt": "2026-08-01T09:59:15Z",
+  "branch": "codex/f1-d2-cleanup-reconcile-20260801"
+}

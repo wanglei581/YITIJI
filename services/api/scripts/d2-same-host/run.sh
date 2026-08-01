@@ -143,37 +143,52 @@ XDG_RUNTIME_DIR="/run/user/$(id -u)"
   || no_go "D2_PRIME_NO_GO_RUNTIME_DIR"
 export XDG_RUNTIME_DIR
 
-# A unit started with `systemd-run --user --collect` is garbage-collected by systemd once it
-# exits, so a later `systemctl stop` reports a non-zero status for a unit that is already gone.
-# Cleanup may treat that as success, but only by positively proving absence: LoadState must be
-# not-found AND ActiveState must be inactive. Any other state, including an empty or unreadable
-# one, stays a cleanup failure so forensic directories are retained.
-user_unit_collected_absent() {
-  local unit_name="$1"
-  local load_state=""
-  local active_state=""
-  load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)" || return 1
-  [[ "$load_state" == "not-found" ]] || return 1
-  active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)" || return 1
-  [[ "$active_state" == "inactive" ]] || return 1
-  return 0
-}
-
+# A `--collect` unit may disappear before or while cleanup polls it. Ignore the stop exit status
+# only long enough to obtain one keyed state snapshot; success still requires one of the two
+# explicit inactive tuples below. Malformed, contradictory, or unknown snapshots fail closed.
 stop_user_unit_and_prove_inactive() {
   local unit_name="$1"
-  local unit_state=""
-  local stop_status=0
-  systemctl --user stop "$unit_name" >/dev/null 2>&1 || stop_status=$?
-  if (( stop_status != 0 )); then
-    user_unit_collected_absent "$unit_name" && return 0
-    return 1
+  local unit_properties=""
+  local load_state=""
+  local active_state=""
+  local property_name=""
+  local property_value=""
+  local load_state_seen=0
+  local active_state_seen=0
+  if systemctl --user stop "$unit_name" >/dev/null 2>&1; then
+    :
   fi
   for _ in {1..50}; do
-    if ! unit_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"; then
+    if ! unit_properties="$(systemctl --user show "$unit_name" -p LoadState -p ActiveState 2>/dev/null)"; then
       return 1
     fi
-    [[ "$unit_state" == "inactive" ]] && return 0
-    case "$unit_state" in
+    load_state=""
+    active_state=""
+    load_state_seen=0
+    active_state_seen=0
+    while IFS='=' read -r property_name property_value; do
+      case "$property_name" in
+        LoadState)
+          (( load_state_seen == 0 )) || return 1
+          load_state_seen=1
+          load_state="$property_value"
+          ;;
+        ActiveState)
+          (( active_state_seen == 0 )) || return 1
+          active_state_seen=1
+          active_state="$property_value"
+          ;;
+        *) return 1 ;;
+      esac
+    done <<< "$unit_properties"
+    (( load_state_seen == 1 && active_state_seen == 1 )) || return 1
+    [[ -n "$load_state" && -n "$active_state" ]] || return 1
+    if [[ "$active_state" == "inactive" ]]; then
+      [[ "$load_state" == "loaded" || "$load_state" == "not-found" ]] && return 0
+      return 1
+    fi
+    [[ "$load_state" == "loaded" ]] || return 1
+    case "$active_state" in
       active|activating|deactivating|reloading) sleep 0.1 ;;
       *) return 1 ;;
     esac
