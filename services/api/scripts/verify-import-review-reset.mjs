@@ -52,12 +52,26 @@ import ts from 'typescript'
 const __dir = fileURLToPath(new URL('.', import.meta.url))
 const SRC = resolve(__dir, '../src/jobs')
 
-// 期望库存：数量变化即失败，避免"删掉一处 upsert 后剩余块仍全部通过"的漏网
-const EXPECTED = {
-  'jobs-partner.service.ts': 3, // importJobs / importJobsFromWebhook / importFairs
-  'jobs-excel.service.ts': 2, // confirmExcelImport: tx.job + tx.jobFair
-  'job-sync.service.ts': 2, // upsertJobs / upsertFairs（反向断言）
+/**
+ * 期望库存：精确到「函数名 · 模型」的多重集合，不是每文件数量。
+ *
+ * 早期只登记数量（partner:3 / excel:2 / sync:2），于是把 `importFairs` 里的
+ * `.jobFair.upsert(` 改成 `.job.upsert(` —— 招聘会导入实际写错表，是真实 bug ——
+ * 数量仍为 3，门禁照样输出 `✅ importFairs() · job.upsert` 并 exit 0（已实测）。
+ * 改为精确集合后，站点构成变化（改名/换模型/挪函数）都会失败。
+ */
+const EXPECTED_SITES = {
+  'jobs-partner.service.ts': ['importJobs·job', 'importJobsFromWebhook·job', 'importFairs·jobFair'],
+  'jobs-excel.service.ts': ['confirmExcelImport·job', 'confirmExcelImport·jobFair'],
+  'job-sync.service.ts': ['upsertJobs·job', 'upsertFairs·jobFair'], // 反向断言
 }
+
+/** 自测用例总数（写死：用例数组被清空时 total=0 会让 17 项断言静默消失，须由此常量兜住） */
+const EXPECTED_SELFTEST_CASES = 24
+
+/** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
+const EXPECTED_TOTAL =
+  Object.values(EXPECTED_SITES).reduce((n, a) => n + a.length, 0) + EXPECTED_SELFTEST_CASES
 
 // ──────────────────────────────────────────────────────────────────────────────
 // AST 基础工具
@@ -73,13 +87,18 @@ function parse(filename, source) {
   return sf
 }
 
-/** 剥掉不影响运行时值的包装：`as const` / `satisfies X` / `(expr)` */
+/**
+ * 剥掉不影响运行时值的包装：`as const` / `satisfies X` / `(expr)` / `expr!` / `<const>expr`。
+ * 这些都是纯类型层语法，剥掉不改变运行时值；漏剥只会造成误报（正向断言判为缺失），
+ * 不会造成漏判，因此宁可多列几种也不能少列可能改变值的形态。
+ */
 function unwrap(node) {
   let n = node
   for (;;) {
     if (ts.isAsExpression(n) || ts.isParenthesizedExpression(n)) n = n.expression
     else if (ts.isSatisfiesExpression?.(n)) n = n.expression
     else if (ts.isNonNullExpression(n)) n = n.expression
+    else if (ts.isTypeAssertionExpression?.(n)) n = n.expression // 老式 <const>'pending'
     else return n
   }
 }
@@ -98,13 +117,18 @@ function propName(prop) {
  */
 function topLevelProps(objLit, where) {
   const map = new Map()
+  // 记录最后一个展开的位置。JS 对象字面量语义：**后写的键覆盖先前的展开**，
+  // 所以「五项重置全部位于最后一个展开之后」是静态可判定的安全形态，应当放行；
+  // 反之位于展开之前（或之间）则可能被展开覆写回 approved+published，必须拒绝。
+  // 早期版本一律抛错，但错误提示写的是「请放在展开之后」——照做仍然失败，
+  // 这种"提示一条走不通的路"的门禁会逼人绕过它，故改为真正实现位置判定。
+  let lastSpreadIdx = -1
+  let idx = -1
   for (const prop of objLit.properties) {
+    idx++
     if (ts.isSpreadAssignment(prop)) {
-      throw new Error(
-        `${where} 第一层出现展开运算符 \`...\`。\n` +
-          '      展开对象可能把 reviewStatus/publishStatus 覆写回已审已发布，静态无法判定 → 按失败处理。\n' +
-          '      请把重置五项写成字面量并放在展开之后，或改为不使用展开。'
-      )
+      lastSpreadIdx = idx
+      continue
     }
     if (prop.name && ts.isComputedPropertyName(prop.name)) {
       throw new Error(
@@ -121,9 +145,32 @@ function topLevelProps(objLit, where) {
       )
     }
     // ShorthandPropertyAssignment / MethodDeclaration 没有 initializer，记为 null
-    map.set(key, ts.isPropertyAssignment(prop) ? unwrap(prop.initializer) : null)
+    map.set(key, {
+      value: ts.isPropertyAssignment(prop) ? unwrap(prop.initializer) : null,
+      idx,
+    })
   }
-  return map
+  // 注意：这里**不**剔除展开之前的键，位置信息交给两个 checker 各自解释——
+  // 两个方向对"位于展开之前的键"的保守解释恰好相反，合并处理必然错一边：
+  //   · 正向（必须重置）：展开之前的写入可能被覆写回 approved+published
+  //     → 不可信 → 按「缺少」处理（见 trustedValue）；
+  //   · 反向（不得无条件重置）：展开之前的写入**也可能真的生效**
+  //     （若展开对象不含该键），仍是潜在的无条件重置
+  //     → 按「存在」处理（见 checkMustNotReset 用 hasKey 而非 trustedValue）。
+  return { map, lastSpreadIdx }
+}
+
+/** 取「可信」值：键必须存在，且位置在最后一个展开之后（否则可能被展开覆写） */
+function trustedValue(props, key) {
+  const e = props.map.get(key)
+  if (e === undefined) return undefined
+  if (e.idx < props.lastSpreadIdx) return undefined // 可能被后面的展开覆写 → 不可信
+  return e.value
+}
+
+/** 键是否出现过（不论位置、不论形态）——反向断言用 */
+function hasKey(props, key) {
+  return props.map.has(key)
 }
 
 const isStr = (want) => (node) =>
@@ -162,13 +209,42 @@ function enclosingFnName(node) {
  * （早期版本用 /\.upsert\s*\(/ 会把 jobs-excel.service.ts 的
  *   fieldMappingRule.upsert 扫进来，报假阳性）。
  */
-function upsertModelOf(call) {
+/** 静态取成员名：`.foo` 与 `['foo']` 等价，`[expr]` 取不到 */
+function memberName(node) {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text
+  if (ts.isElementAccessExpression(node)) {
+    const a = node.argumentExpression
+    if (a && ts.isStringLiteralLike(a)) return a.text
+  }
+  return null
+}
+
+/**
+ * 判定一个调用是否 job/jobFair 的 upsert，返回模型名；不相关则 null。
+ *
+ * ⚠️ 认出是 upsert 之后，**取不到模型名就必须抛错**，不能 return null 静默跳过。
+ * 原实现只认 `a.b.upsert(...)` 一种形态，其余一律 null：于是新增一处
+ * `prisma['job'].upsert({...})`（不写重置）对门禁完全不可见——库存核对也抓不到，
+ * 因为它只比对「已登记站点是否都在」，凭空多出的隐形站点不在集合里。
+ */
+function upsertModelOf(call, where) {
   const callee = call.expression
-  if (!ts.isPropertyAccessExpression(callee)) return null
-  if (callee.name.text !== 'upsert') return null
-  const owner = callee.expression
-  if (!ts.isPropertyAccessExpression(owner)) return null
-  const model = owner.name.text
+  if (memberName(callee) !== 'upsert') return null
+
+  // owner 形态：`tx.job` / `prisma['job']` / 解构后的裸 `job`
+  const owner = ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
+    ? callee.expression
+    : null
+  let model = owner ? memberName(owner) : null
+  if (model === null && owner && ts.isIdentifier(owner)) model = owner.text // `const { job } = tx`
+
+  if (model === null) {
+    throw new Error(
+      `${where} 出现无法静态归属的 \`upsert\` 调用（形如 \`prisma[key].upsert\` / \`getModel().upsert\`）——\n` +
+        '      取不到模型名就无法判断它是否需要重置审核状态，按失败处理。\n' +
+        '      请改成 `tx.job.upsert(...)` 等可静态归属的写法，或在本门禁显式登记。'
+    )
+  }
   return model === 'job' || model === 'jobFair' ? model : null
 }
 
@@ -178,7 +254,7 @@ function extractBlocks(filepath, source) {
   const blocks = []
 
   const visit = (node) => {
-    const model = ts.isCallExpression(node) ? upsertModelOf(node) : null
+    const model = ts.isCallExpression(node) ? upsertModelOf(node, `${short} 第 ${sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1} 行`) : null
     if (model) {
       const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1
       const site = `${enclosingFnName(node)}() · ${model}.upsert @L${line}`
@@ -192,7 +268,9 @@ function extractBlocks(filepath, source) {
       }
       // 实参层也要挡展开/计算键/重复键：`upsert({ ...args, update })` 能注入 update
       const argProps = topLevelProps(unwrap(arg), where)
-      const updateNode = argProps.get('update')
+      // 实参层用 trustedValue：`upsert({ ...args, update: {...} })` 里 update 若在展开之前，
+      // 展开可能整体替换掉它 → 取不到可信值 → 走下面的「未找到 update 键」分支 fail-closed。
+      const updateNode = trustedValue(argProps, 'update')
       if (updateNode === undefined) {
         throw new Error(`${where}第一层未找到 \`update\` 键 —— 无法确认重置是否存在，按失败处理。`)
       }
@@ -206,6 +284,8 @@ function extractBlocks(filepath, source) {
         filepath,
         site,
         line,
+        // 库存核对键：函数名·模型（不含行号——行号会随无关编辑漂移，不适合做登记值）
+        key: `${enclosingFnName(node)}·${model}`,
         props: topLevelProps(updateNode, `${short} 的 ${site} 的 update 块`),
       })
     }
@@ -225,27 +305,41 @@ function extractBlocksFromFile(filepath) {
 function checkMustReset(blocks, label) {
   let pass = 0,
     fail = 0
+  // 结构化失败详情：自测据此断言「失败的是哪一处、缺的是哪几项」，
+  // 只看聚合 fail 数会让「因无关块失败」的用例假绿。
+  const failures = []
   for (const b of blocks) {
     // 只认第一层字段：搬进嵌套子对象的重置对 Prisma 无效，不能算通过
-    const missing = REQUIRED.filter((f) => !f.ok(b.props.get(f.key))).map((f) => f.label)
+    const missing = REQUIRED.filter((f) => !f.ok(trustedValue(b.props, f.key))).map((f) => f.label)
     if (missing.length === 0) {
       console.log(`  ✅  ${label} · ${b.site} · update 块含 pending+draft 退审 & 已清空审核元数据`)
       pass++
     } else {
       console.error(`  ❌  ${label} · ${b.site} · update 块缺少 ${missing.join(', ')}`)
+      failures.push({ site: b.site, missing })
       fail++
     }
   }
-  return { pass, fail }
+  return { pass, fail, failures }
 }
 
 function checkMustNotReset(blocks, label) {
   let pass = 0,
     fail = 0
+  const failures = []
   for (const b of blocks) {
     // 反向断言同样只看第一层：嵌套里的字段对 Prisma 无效，不构成"无条件重置"
-    const hasR = isStr('pending')(b.props.get('reviewStatus'))
-    const hasP = isStr('draft')(b.props.get('publishStatus'))
+    //
+    // ⚠️ 判据是「键在不在」，不是「值等不等于 'pending'」——方向与正向断言相反，这是刻意的：
+    //   · 正向（必须重置）要严格：只有确切的 'pending' 字面量才算数，写成表达式一律算缺失；
+    //   · 反向（不得无条件重置）要宽松：任何形态的赋值都可能是重置，都必须报失败。
+    // 若这里沿用 isStr('pending')，则 `reviewStatus: PENDING`（identifier）、
+    // `reviewStatus,`（shorthand）、`reviewStatus: \`pending\``（模板串）三种写法
+    // 都不是 StringLiteral 节点 → 判为「缺席」→ 静默放行，冻结标记形同虚设。
+    // 这三种绕过已实测复现（门禁 exit 0），故改为键存在即失败。
+    // job-sync 的 update 块本来就完全不写这两个键（见 :493 注释），故不会误报。
+    const hasR = hasKey(b.props, 'reviewStatus')
+    const hasP = hasKey(b.props, 'publishStatus')
     if (!hasR && !hasP) {
       console.log(
         `  ⚠️  ${label} · ${b.site} · 无条件重置缺席（符合断言）` +
@@ -253,8 +347,10 @@ function checkMustNotReset(blocks, label) {
       )
       pass++
     } else {
-      const unexpected = [hasR && "reviewStatus:'pending'", hasP && "publishStatus:'draft'"]
+      failures.push({ site: b.site, keys: [hasR && 'reviewStatus', hasP && 'publishStatus'].filter(Boolean) })
+      const unexpected = [hasR && 'reviewStatus', hasP && 'publishStatus']
         .filter(Boolean)
+        .map((k) => `${k}（任意形态的赋值都算）`)
         .join(', ')
       console.error(
         `  ❌  ${label} · ${b.site} · 自动同步 update 块出现 ${unexpected}\n` +
@@ -266,7 +362,7 @@ function checkMustNotReset(blocks, label) {
       fail++
     }
   }
-  return { pass, fail }
+  return { pass, fail, failures }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -372,16 +468,26 @@ function selfTest() {
       src: () => synth(`          child: { update: {\n${RESET_INLINE}\n          } },`),
     },
     {
-      name: 'F update 第一层出现展开运算符',
-      expect: 'throw',
-      errRe: /展开运算符/,
+      // 五项在展开之**前** → 展开可能把它们覆写回 approved+published → 不可信 → 按缺少处理
+      name: 'F 五项重置在展开之前（可能被展开覆写 → 必须失败）',
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      src: () => synth(`${RESET_INLINE}\n          ...payload,`),
+    },
+    {
+      // 与 F 互为对照：展开在**前**、五项在后 → JS 保证后者胜 → 静态可判定为安全 → 必须放行。
+      // 若这条被判失败，说明位置判定退化成了"一律拒绝展开"，
+      // 那种门禁会因提示一条走不通的路而逼人绕过它。
+      name: 'F″ 展开在前、五项重置在后（后者覆盖前者 → 安全，必须放行）',
+      expect: 'pass',
+      wantBlocks: 1,
       src: () => synth(`          ...payload,\n${RESET_INLINE}`),
     },
     {
-      name: 'F′ upsert 实参第一层出现展开（可注入 update）',
+      name: 'F‴ upsert 实参层 update 在展开之前（展开可整体替换 update）',
       expect: 'throw',
-      errRe: /展开运算符/,
-      src: () => synth(RESET_INLINE, { argExtra: '\n      ...args,' }),
+      errRe: /未找到 `update` 键/,
+      src: () => synth(RESET_INLINE).replace('    })', '      ...args,\n    })'),
     },
     {
       name: "G 计算属性名 ['update']:（键名运行时才定）",
@@ -399,6 +505,9 @@ function selfTest() {
       name: 'H 值是表达式而非字面量（rejectReason: nullFlag）',
       expect: 'fail',
       caseSite: CASE_SITE(),
+      // 只有 rejectReason 该失败：其余四项写法正确。若这里报出多项，
+      // 说明正向判据被改宽/改窄，波及了不该动的字段。
+      wantMissing: ['rejectReason:null'],
       src: () => synth(RESET_INLINE.replace('rejectReason: null,', 'rejectReason: nullFlag,')),
     },
     {
@@ -407,6 +516,9 @@ function selfTest() {
       name: "H″ 键全在但值写错（reviewStatus:'approved' / publishStatus:'published'）",
       expect: 'fail',
       caseSite: CASE_SITE(),
+      // 关键：恰好这两项失败。若把 isStr 放宽成「是字符串字面量就算」，
+      // 这条会变成 0 项失败 → 用例转绿，是本用例唯一的检出信号。
+      wantMissing: ["reviewStatus:'pending'", "publishStatus:'draft'"],
       src: () =>
         synth(
           RESET_INLINE.replace("'pending',", "'approved',").replace("'draft',", "'published',")
@@ -431,25 +543,98 @@ function selfTest() {
       src: () => synth(RESET_INLINE) + '\nexport class Broken { async x( {\n',
     },
     {
+      // codex 复审指出的最后一处静默跳过：只认 `a.b.upsert(...)`，
+      // 于是 `prisma[key].upsert({...})` 既不被分析、也不进库存集合 → 完全隐形。
+      name: 'L 无法静态归属的 upsert（prisma[key].upsert）必须 fail-closed',
+      expect: 'throw',
+      errRe: /无法静态归属的 `upsert` 调用/,
+      src: () =>
+        synth(RESET_INLINE).replace('this.prisma.job.upsert', 'this.prisma[modelKey].upsert'),
+    },
+    {
+      // 反向：`['job']` / `['upsert']` 是可静态求值的，必须照常分析而不是漏过
+      name: "L′ 字符串下标形态（prisma['job']['upsert']）须照常分析并判失败",
+      expect: 'fail',
+      caseSite: `importJobs() · job.upsert @L`,
+      src: () =>
+        synth('          title: dto.title,').replace(
+          'this.prisma.job.upsert',
+          "this.prisma['job']['upsert']"
+        ),
+    },
+    {
       name: 'K 自动同步支出现无条件重置（反向断言）',
       expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantMissing: ['reviewStatus', 'publishStatus'],
       src: () => synth(RESET_INLINE, { fn: 'upsertJobs' }),
+    },
+    // K′/K″/K‴：反向断言的三种实测绕过。原实现用 isStr('pending') 判定，
+    // 下面三种写法都不是 StringLiteral 节点 → 被判「重置缺席」→ 静默放行，
+    // 即「冻结 P0 缺口」的标记形同虚设。三种均已在真实 job-sync.service.ts 上
+    // 复现过门禁 exit 0，故必须各留一条常驻用例。
+    {
+      name: 'K′ 反向断言：identifier 形态（reviewStatus: PENDING）',
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantMissing: ['reviewStatus'],
+      src: () =>
+        synth('          reviewStatus: PENDING_STATUS,', { fn: 'upsertJobs' }),
+    },
+    {
+      name: 'K″ 反向断言：shorthand 形态（reviewStatus,）',
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantMissing: ['reviewStatus'],
+      src: () => synth('          reviewStatus,', { fn: 'upsertJobs' }),
+    },
+    {
+      name: 'K‴ 反向断言：模板串形态（reviewStatus: `pending`）',
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantMissing: ['reviewStatus'],
+      src: () => synth('          reviewStatus: `pending`,', { fn: 'upsertJobs' }),
+    },
+    {
+      // 反向断言必须**无视位置**：展开之前的写入若展开对象不含该键就真的生效，
+      // 仍是潜在的无条件重置。这条守住 hasKey 不被误改成 trustedValue。
+      //
+      // 两个键都写、并用 wantMissing 钉住键集合，是刻意的：判据是
+      // `if (!hasR && !hasP)`，只写一个键时把另一个键的 hasKey 改成 trustedValue
+      // 仍会因剩下那个键报失败 → verdict 照样是 reverse-fail → 变异逃逸（已实测）。
+      // 钉住集合后，任一键被降级都会让 failures 少一项 → 用例转红。
+      name: 'K⁗ 反向断言：重置在展开之前也必须报失败（不可按"可能被覆写"放过）',
+      expect: 'reverse-fail',
+      caseSite: CASE_SITE('upsertJobs'),
+      wantMissing: ['reviewStatus', 'publishStatus'],
+      src: () =>
+        synth(
+          `          reviewStatus: 'pending',\n          publishStatus: 'draft',\n          ...syncData,`,
+          { fn: 'upsertJobs' }
+        ),
     },
   ]
 
   let leaked = 0
+  // ⚠️ 必须统计「实际跑完的用例数」，不能用 cases.length。
+  // 退化实测：把循环改成 `for (const c of [])` 时 cases.length 仍是 22、leaked 仍是 0
+  // → 与 EXPECTED_SELFTEST_CASES 相符 → 22 条断言全部消失却 exit 0。
+  // 这与 codex 指出的 `total: 0` 属同一类 fail-open，只是方向相反：
+  // 一个谎报少、一个谎报多，都必须用「跑完才计数」来锁死。
+  let executed = 0
   for (const c of cases) {
     let verdict
     let blocks = null
+    let result = null
     try {
       blocks = extractBlocks('/synthetic/fixture.ts', c.src())
       if (c.expect === 'reverse-fail') {
         // 必须走真实的 checkMustNotReset，不能在自测里重新实现判定逻辑
-        const r = withSilencedOutput(() => checkMustNotReset(blocks, 'selftest'))
-        verdict = r.fail > 0 ? 'reverse-fail' : 'pass'
+        result = withSilencedOutput(() => checkMustNotReset(blocks, 'selftest'))
+        verdict = result.fail > 0 ? 'reverse-fail' : 'pass'
       } else {
-        const r = withSilencedOutput(() => checkMustReset(blocks, 'selftest'))
-        verdict = r.fail > 0 ? 'fail' : 'pass'
+        result = withSilencedOutput(() => checkMustReset(blocks, 'selftest'))
+        verdict = result.fail > 0 ? 'fail' : 'pass'
       }
     } catch (err) {
       verdict = 'throw'
@@ -467,12 +652,27 @@ function selfTest() {
       ok = false
       why = `（应提取 ${c.wantBlocks} 个块，实际 ${blocks.length}）`
     }
-    if (ok && c.expect === 'fail' && c.caseSite && blocks) {
-      // 防「因无关块失败而假绿」：失败的必须是本用例那一处
-      const hit = blocks.some((b) => b.site.startsWith(c.caseSite))
-      if (!hit) {
+    // 防「因无关块失败而假绿」：失败的必须是本用例那一处，而且缺的必须是预期字段。
+    // 只看 blocks 里「存在该 site」是不够的 —— 存在不等于就是它失败的。
+    // 必须读 checker 返回的结构化 failures，才能确认失败归属与缺失字段。
+    if (ok && (c.expect === 'fail' || c.expect === 'reverse-fail') && result) {
+      const sites = result.failures.map((f) => f.site)
+      if (sites.length === 0) {
         ok = false
-        why = `（失败块 site 不匹配 ${c.caseSite}）`
+        why = '（判为失败但 failures 为空 —— checker 未回传失败详情）'
+      } else if (c.caseSite && !sites.every((s) => s.startsWith(c.caseSite))) {
+        ok = false
+        why = `（失败 site 为 ${sites.join(',')}，应全部属于 ${c.caseSite}）`
+      } else if (c.wantMissing) {
+        const got = result.failures
+          .flatMap((f) => f.missing ?? f.keys ?? [])
+          .sort()
+          .join(',')
+        const want = [...c.wantMissing].sort().join(',')
+        if (got !== want) {
+          ok = false
+          why = `（失败字段为 [${got}]，期望 [${want}]）`
+        }
       }
     }
 
@@ -483,8 +683,9 @@ function selfTest() {
       console.error(`  ❌  自测 ${c.name} · 期望 ${c.expect}，实际 ${verdict}${why} —— 门禁已退化，修好后再提交`)
       leaked++
     }
+    executed++ // 放在循环末尾：只有真正走完判定才计数
   }
-  return { leaked, total: cases.length }
+  return { leaked, total: executed }
 }
 
 /** 自测用例会触发大量 ✅/❌ 输出，这里静音以免污染真实断言的报告 */
@@ -510,13 +711,14 @@ let totalPass = 0,
   totalFail = 0
 
 /**
- * fail-closed 库存核对：块数与 EXPECTED 不一致即失败。
- * 少于预期 = 有 upsert 被删/改写成别的调用形式，剩余块全过也不能算通过；
- * 多于预期 = 新增了未登记的写入点，必须显式登记后才放行。
+ * fail-closed 库存核对：站点集合与 EXPECTED_SITES 不一致即失败。
+ * 缺失 = 写入点被删/改名/换模型/改写成非 upsert 形式（门禁会失去覆盖）；
+ * 多出 = 新增了未登记的写入点，必须显式登记后才放行。
+ * 比单纯比数量强：改模型或改函数名时数量不变，但集合会变。
  */
 function runFile(fileLabel, filepath, checker, checkerLabel) {
   console.log(`── ${fileLabel}`)
-  const expected = EXPECTED[fileLabel]
+  const expected = EXPECTED_SITES[fileLabel] ?? []
   let blocks
   try {
     blocks = extractBlocksFromFile(filepath)
@@ -525,12 +727,18 @@ function runFile(fileLabel, filepath, checker, checkerLabel) {
     totalFail++
     return
   }
-  if (blocks.length !== expected) {
+  const actual = blocks.map((b) => b.key).sort()
+  const want = [...expected].sort()
+  if (actual.length !== want.length || actual.some((k, i) => k !== want[i])) {
+    const missing = want.filter((k) => !actual.includes(k))
+    const extra = actual.filter((k) => !want.includes(k))
     console.error(
-      `  ❌  ${fileLabel} · 提取到 ${blocks.length} 个 upsert update 块，登记值为 ${expected}。\n` +
-        '      少于登记值 = 写入点被删除或改写成非 upsert 形式（门禁会失去覆盖），\n' +
-        '      多于登记值 = 新增了未登记的导入写入点。\n' +
-        '      两种情况都必须人工确认后同步更新脚本顶部的 EXPECTED。'
+      `  ❌  ${fileLabel} · upsert 写入点集合与登记值不符。\n` +
+        `      登记：${want.join(', ') || '(空)'}\n` +
+        `      实际：${actual.join(', ') || '(空)'}\n` +
+        (missing.length ? `      缺失：${missing.join(', ')} —— 写入点被删除/改名/换模型，门禁失去覆盖\n` : '') +
+        (extra.length ? `      多出：${extra.join(', ')} —— 新增未登记写入点\n` : '') +
+        '      两种情况都必须人工确认后同步更新脚本顶部的 EXPECTED_SITES。'
     )
     totalFail++
     if (blocks.length === 0) return
@@ -559,7 +767,12 @@ runFile(
 // ④ 门禁自测：已知绕过形态必须全被拦住，且不得产生假阳性（全内存，不写盘）
 console.log('\n── 门禁自测（对抗用例，全内存合成夹具，不写盘）')
 const selfResult = selfTest()
-// 返回值形态守卫：任何非法返回都必须计为失败，不能让 NaN 把真实失败抹掉后 exit 0
+// 返回值形态守卫。三条都是实测出来的 fail-open 路径，不是防御性冗余：
+//   · 非整数（如 `return 1` 解构出 undefined）→ NaN → `NaN > 0` 为假 → 真实失败被抹掉；
+//   · 负数（`leaked: -1`）→ `totalFail += -1` 会**抵消**真实站点的失败，
+//     实测：植入一处真实缺字段后仍输出「总计 24 项 ✅ 24 PASS 0 FAIL」并 exit 0；
+//   · total=0（用例数组被清空）→ 20 项断言静默消失，实测输出「总计 7 项 ✅ 7 PASS」exit 0。
+// 故不只校验类型，还要校验区间与写死的期望条数。
 if (
   !selfResult ||
   typeof selfResult !== 'object' ||
@@ -567,6 +780,19 @@ if (
   !Number.isInteger(selfResult.total)
 ) {
   console.error('  ❌  selfTest() 返回值形态非法，无法核算自测结果 → 按失败处理')
+  totalFail++
+} else if (selfResult.leaked < 0 || selfResult.leaked > selfResult.total) {
+  console.error(
+    `  ❌  selfTest() 计数越界（leaked=${selfResult.leaked} total=${selfResult.total}）——\n` +
+      '      负数会抵消真实站点的失败数，须按失败处理。'
+  )
+  totalFail++
+} else if (selfResult.total !== EXPECTED_SELFTEST_CASES) {
+  console.error(
+    `  ❌  自测用例数为 ${selfResult.total}，登记值为 ${EXPECTED_SELFTEST_CASES}。\n` +
+      '      用例被删除或新增都会走到这里 —— 新增用例请同步更新 EXPECTED_SELFTEST_CASES，\n' +
+      '      不要靠"总计"数字自证（用例数组被清空时总计会静默变小且仍 exit 0）。'
+  )
   totalFail++
 } else {
   totalFail += selfResult.leaked
@@ -577,9 +803,22 @@ if (
 // 摘要
 // ──────────────────────────────────────────────────────────────────────────────
 console.log('\n' + '─'.repeat(60))
-if (!Number.isInteger(totalPass) || !Number.isInteger(totalFail)) {
-  // 防御性兜底：计数被污染时绝不宣称通过
+if (
+  !Number.isInteger(totalPass) ||
+  !Number.isInteger(totalFail) ||
+  totalPass < 0 ||
+  totalFail < 0
+) {
+  // 计数被污染时绝不宣称通过
   console.error(`⛔  计数异常（pass=${totalPass} fail=${totalFail}）——按失败处理\n`)
+  process.exit(1)
+}
+// 总项数必须等于登记值：任何"断言静默消失"都在这里现形，
+// 不能只靠 totalFail>0 判定（少跑断言不会产生 fail，只会让总数变小）。
+if (totalPass + totalFail !== EXPECTED_TOTAL) {
+  console.error(
+    `⛔  汇总检查项数为 ${totalPass + totalFail}，登记值为 ${EXPECTED_TOTAL} —— 有断言未执行或被跳过，按失败处理。\n`
+  )
   process.exit(1)
 }
 console.log(
