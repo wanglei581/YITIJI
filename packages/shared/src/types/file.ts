@@ -19,6 +19,7 @@ export type FilePurpose =
   // ── 既有(BE-1)─────────────────────────────────────────────
   | 'resume_upload'    // 求职者上传简历(高敏)
   | 'resume_scan'      // Kiosk 扫描纸质简历(高敏)
+  | 'contract_upload'  // 合同审查会话上传(高敏)
   | 'id_scan'          // 身份证 / 证件照(高敏)
   | 'print_doc'        // 通用打印文档(普通)
   | 'fair_material'    // 招聘会 / 模板素材(普通)
