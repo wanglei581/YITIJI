@@ -897,6 +897,7 @@ export class FilesService {
     if (
       !record ||
       record.deletedAt ||
+      (!options.allowExpired && record.purpose === 'contract_upload' && !record.expiresAt) ||
       (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
       (!options.allowMemberDataExport && record.purpose === 'member_data_export')
     ) {

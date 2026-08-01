@@ -853,16 +853,30 @@ async function main(): Promise<void> {
 
     const task = prisma.scanTasksById.get(created.scanTaskId)!
     const storedFile = prisma.filesById.get(delivered.fileId)!
+    task.expiresAt = new Date(Date.now() - 1)
+    const taskWindowExpired = await service.getStatus(
+      created.scanTaskId,
+      null,
+      created.controlToken
+    )
+    assert.equal(taskWindowExpired.status, 'completed')
+    assert.equal(taskWindowExpired.file?.fileId, delivered.fileId)
+
+    task.expiresAt = new Date(Date.now() + 60_000)
     storedFile.expiresAt = new Date(Date.now() - 1)
     const fileExpired = await service.getStatus(created.scanTaskId, null, created.controlToken)
     assert.equal(fileExpired.status, 'expired')
     assert.equal(fileExpired.file, null)
 
-    storedFile.expiresAt = new Date(Date.now() + 60_000)
-    task.expiresAt = new Date(Date.now() - 1)
-    const taskExpired = await service.getStatus(created.scanTaskId, null, created.controlToken)
-    assert.equal(taskExpired.status, 'expired')
-    assert.equal(taskExpired.file, null)
+    storedFile.expiresAt = null
+    const expiryMissing = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(expiryMissing.status, 'expired')
+    assert.equal(expiryMissing.file, null)
+
+    prisma.filesById.delete(delivered.fileId)
+    const fileMissing = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(fileMissing.status, 'expired')
+    assert.equal(fileMissing.file, null)
   }
 
   {
@@ -1201,6 +1215,47 @@ async function main(): Promise<void> {
       prisma.scanTasksById.get(created.scanTaskId)?.status,
       'cancelled',
       'lazy-expire write must not clobber a concurrently cancelled task back to expired'
+    )
+  }
+
+  {
+    // matched 也受扫描会话 TTL 约束；惰性过期必须带 matched 状态条件落盘。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    const task = prisma.scanTasksById.get(created.scanTaskId)!
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      status: 'matched',
+      expiresAt: new Date(Date.now() - 1000),
+    })
+
+    const status = await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(status.status, 'expired')
+    assert.equal(prisma.scanTasksById.get(created.scanTaskId)?.status, 'expired')
+  }
+
+  {
+    // matched 过期与并发完成竞态时，CAS 失败不得覆盖已完成状态。
+    const { service, prisma } = makeService()
+    const created = await service.create(dto, null)
+    const task = prisma.scanTasksById.get(created.scanTaskId)!
+    prisma.scanTasksById.set(created.scanTaskId, {
+      ...task,
+      status: 'matched',
+      expiresAt: new Date(Date.now() - 1000),
+    })
+    const originalUpdateMany = prisma.scanTask.updateMany.bind(prisma.scanTask)
+    prisma.scanTask.updateMany = (async (args: Parameters<typeof originalUpdateMany>[0]) => {
+      const current = prisma.scanTasksById.get(created.scanTaskId)!
+      prisma.scanTasksById.set(created.scanTaskId, { ...current, status: 'completed' })
+      return originalUpdateMany(args)
+    }) as typeof originalUpdateMany
+
+    await service.getStatus(created.scanTaskId, null, created.controlToken)
+    assert.equal(
+      prisma.scanTasksById.get(created.scanTaskId)?.status,
+      'completed',
+      'matched expiry CAS must not clobber a concurrently completed task'
     )
   }
 

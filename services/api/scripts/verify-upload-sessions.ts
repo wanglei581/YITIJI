@@ -81,6 +81,7 @@ class FakeRedis {
 
 class FakePrisma {
   readonly files = new Map<string, StoredFile>()
+  readonly fileUpdateCalls: Array<{ id: string; data: Partial<StoredFile> }> = []
 
   readonly fileObject = {
     findUnique: async ({ where }: { where: { id: string } }) => this.files.get(where.id) ?? null,
@@ -95,6 +96,7 @@ class FakePrisma {
     }) => {
       const current = this.files.get(where.id)
       if (!current) throw new Error(`file not found: ${where.id}`)
+      this.fileUpdateCalls.push({ id: where.id, data })
       const next = { ...current, ...data }
       this.files.set(where.id, next)
       if (select?.expiresAt) return { expiresAt: next.expiresAt }
@@ -323,6 +325,89 @@ async function main(): Promise<void> {
       originalExpiry,
       'member binding must preserve the original session expiry'
     )
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'contract_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_missing_expiry',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'contract.pdf' }),
+    })
+    const stored = prisma.files.get(uploaded.file!.fileId)!
+    prisma.files.set(stored.id, { ...stored, expiresAt: null })
+
+    let caught: unknown
+    try {
+      await service.confirm(session.sessionId, session.controlToken, 'member_missing_expiry')
+    } catch (error) {
+      caught = error
+    }
+    assert.ok(caught instanceof BadRequestException)
+    const response = caught.getResponse() as { error?: { code?: string; message?: string } }
+    assert.equal(response.error?.code, 'CONTRACT_FILE_EXPIRY_MISSING')
+    assert.doesNotMatch(response.error?.message ?? '', /expiresAt|null|contract/i)
+    assert.equal(prisma.fileUpdateCalls.length, 0, 'missing expiry must fail before file update')
+    assert.equal(prisma.files.get(stored.id)?.endUserId, null)
+  }
+
+  {
+    const { service, prisma } = makeService()
+    const session = await service.create({
+      purpose: 'contract_upload',
+      mode: 'member',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+      endUserId: 'member_concurrent',
+    })
+    const uploaded = await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: 'contract.pdf' }),
+    })
+    const originalExpiry = prisma.files.get(uploaded.file!.fileId)!.expiresAt!.toISOString()
+
+    const results = await Promise.allSettled([
+      service.confirm(session.sessionId, session.controlToken, 'member_concurrent'),
+      service.confirm(session.sessionId, session.controlToken, 'member_concurrent'),
+    ])
+    assert.equal(results.filter((result) => result.status === 'fulfilled').length, 2)
+    const bound = prisma.files.get(uploaded.file!.fileId)!
+    assert.equal(bound.expiresAt?.toISOString(), originalExpiry)
+    assert.equal(bound.retentionLockedReason, 'contract_review_session_only')
+    assert.ok(
+      prisma.fileUpdateCalls.every(
+        (call) =>
+          call.data.expiresAt?.toISOString() === originalExpiry &&
+          call.data.retentionLockedReason === 'contract_review_session_only'
+      ),
+      `concurrent binding must preserve expiry and never clear the retention lock: ${JSON.stringify(
+        prisma.fileUpdateCalls
+      )}`
+    )
+  }
+
+  {
+    const { service, files } = makeService()
+    const session = await service.create({
+      purpose: 'contract_upload',
+      mode: 'temporary',
+      channel: 'phone_h5',
+      uploadUrl: 'http://localhost:5173/upload/phone',
+    })
+    await service.uploadFile({
+      sessionId: session.sessionId,
+      uploadToken: session.uploadToken,
+      file: file({ originalname: '' }),
+    })
+    assert.equal(files.uploadCalls[0]?.filename, 'contract.pdf')
   }
 
   {

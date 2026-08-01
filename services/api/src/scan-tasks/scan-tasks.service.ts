@@ -309,12 +309,12 @@ export class ScanTasksService {
     }
 
     let effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
-    if (effectiveStatus === 'expired' && task.status === 'waiting') {
-      // CAS：只在仍是 waiting 时落盘过期状态，避免与并发的 cancel()/deliverScanFile() 竞态时
+    if (effectiveStatus === 'expired' && (task.status === 'waiting' || task.status === 'matched')) {
+      // CAS：只在状态仍与本次读取一致时落盘，避免与并发的 cancel()/deliverScanFile() 竞态时
       // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
       // 返回给调用方的 effectiveStatus 已经是按 expiresAt 纯计算得出，不依赖这次落盘是否成功。
       await this.prisma.scanTask.updateMany({
-        where: { id: scanTaskId, status: 'waiting' },
+        where: { id: scanTaskId, status: task.status },
         data: { status: 'expired' },
       })
     }
@@ -323,12 +323,14 @@ export class ScanTasksService {
       task.status === 'completed' && task.fileId
         ? await this.prisma.fileObject.findUnique({ where: { id: task.fileId } })
         : null
-    const contractSessionExpired =
+    const contractFileUnavailable =
       task.scanType === 'contract' &&
       task.status === 'completed' &&
-      (task.expiresAt.getTime() <= Date.now() ||
-        Boolean(fileObject?.expiresAt && fileObject.expiresAt.getTime() <= Date.now()))
-    if (contractSessionExpired) {
+      (!fileObject ||
+        Boolean(fileObject.deletedAt) ||
+        !fileObject.expiresAt ||
+        fileObject.expiresAt.getTime() <= Date.now())
+    if (contractFileUnavailable) {
       effectiveStatus = 'expired'
     }
 
@@ -578,7 +580,9 @@ export class ScanTasksService {
   }
 
   private effectiveStatus(status: string, expiresAt: Date): string {
-    if (status === 'waiting' && expiresAt.getTime() <= Date.now()) return 'expired'
+    if ((status === 'waiting' || status === 'matched') && expiresAt.getTime() <= Date.now()) {
+      return 'expired'
+    }
     return status
   }
 }

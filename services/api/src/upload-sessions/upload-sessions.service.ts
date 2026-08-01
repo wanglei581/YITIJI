@@ -238,9 +238,7 @@ export class UploadSessionsService {
       try {
         file = await this.files.upload({
           buffer: args.file.buffer,
-          filename:
-            args.file.originalname ||
-            (latest.purpose === 'print_doc' ? 'document.pdf' : 'resume.pdf'),
+          filename: args.file.originalname || defaultUploadFilename(latest.purpose),
           mimeType: args.file.mimetype,
           purpose: latest.purpose,
           uploaderId: null,
@@ -354,27 +352,30 @@ export class UploadSessionsService {
         error: { code: 'FILE_NOT_FOUND', message: '上传文件不存在或已被清理' },
       })
     }
+    const isContractUpload = file.purpose === 'contract_upload'
+    if (isContractUpload && !file.expiresAt) {
+      throw new BadRequestException({
+        error: {
+          code: 'CONTRACT_FILE_EXPIRY_MISSING',
+          message: '上传文件状态异常，请重新上传',
+        },
+      })
+    }
     const retention = defaultRetentionForUpload({
       purpose: file.purpose as FilePurpose,
       sensitiveLevel: file.sensitiveLevel as FileSensitiveLevel,
       ownerType: 'user',
       endUserId,
     })
-    const isContractUpload = file.purpose === 'contract_upload'
-    const contractExpiry =
-      isContractUpload &&
-      file.expiresAt &&
-      retention.expiresAt &&
-      file.expiresAt <= retention.expiresAt
-        ? file.expiresAt
-        : retention.expiresAt
+    // 合同上传的两小时寿命从原始上传时刻起算；会员绑定不得重置或延长。
+    const boundExpiry = isContractUpload ? file.expiresAt : retention.expiresAt
     return this.prisma.fileObject.update({
       where: { id: fileId },
       data: {
         endUserId,
         ownerType: 'user',
         ownerId: endUserId,
-        expiresAt: contractExpiry,
+        expiresAt: boundExpiry,
         retentionPolicy: retention.retentionPolicy,
         retentionSetBy: retention.retentionSetBy,
         retentionConsentAt: retention.retentionConsentAt,
@@ -445,6 +446,12 @@ function sessionKey(sessionId: string): string {
 
 function uploadLockKey(sessionId: string): string {
   return `${UPLOAD_LOCK_PREFIX}${sessionId}`
+}
+
+function defaultUploadFilename(purpose: FilePurpose): string {
+  if (purpose === 'print_doc') return 'document.pdf'
+  if (purpose === 'contract_upload') return 'contract.pdf'
+  return 'resume.pdf'
 }
 
 function sessionRedisTtlSeconds(): number {

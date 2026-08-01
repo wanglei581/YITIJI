@@ -306,7 +306,10 @@ test('download URL TTL never crosses file expiry and fails closed below one seco
   })
   assert.deepEqual(longLived.calls().signedTtlSeconds, [1800, 1800])
 
-  const noExpiry = makeFileAccessHarness(null)
+  const noExpiry = makeFileAccessHarness(null, {
+    purpose: 'print_doc',
+    retentionLockedReason: null,
+  })
   await noExpiry.service.getAccessUrl('contract-file-1', requester, 'inline')
   assert.deepEqual(noExpiry.calls().signedTtlSeconds, [1800])
 
@@ -315,6 +318,26 @@ test('download URL TTL never crosses file expiry and fails closed below one seco
     subsecond.service.getAccessUrl('contract-file-1', requester, 'inline')
   )
   assert.equal(subsecond.calls().signedUrlCalls, 0)
+})
+
+test('contract files without expiresAt fail closed while other files keep null-expiry semantics', async () => {
+  const requester = { kind: 'member' as const, endUserId: 'member-1' }
+  const malformedContract = makeFileAccessHarness(null)
+
+  await expectFileNotFound(() =>
+    malformedContract.service.getAccessUrl('contract-file-1', requester, 'inline')
+  )
+  await expectFileNotFound(() => malformedContract.service.readContent('contract-file-1'))
+  assert.equal(malformedContract.calls().signedUrlCalls, 0)
+  assert.equal(malformedContract.calls().contentReadCalls, 0)
+
+  const legacyNoExpiry = makeFileAccessHarness(null, {
+    purpose: 'print_doc',
+    retentionLockedReason: null,
+  })
+  const access = await legacyNoExpiry.service.getAccessUrl('contract-file-1', requester, 'inline')
+  assert.match(access.response.url, /^https:\/\/files\.local\//)
+  assert.equal((await legacyNoExpiry.service.readContent('contract-file-1')).purpose, 'print_doc')
 })
 
 test('expired files remain deletable through system, owner, and admin privacy paths', async () => {
