@@ -1,0 +1,12 @@
+{
+  "id": "contract-review-professional-design",
+  "title": "设计面向求职者的 AI 合同审查专业方案",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack-legal-ai",
+  "currentPhase": "review",
+  "nextAction": "等待用户书面确认设计稿；确认后再生成逐任务实施计划",
+  "createdAt": "2026-08-01T10:48:32Z",
+  "branch": "codex/gate0k-usb-bridge-token"
+}
