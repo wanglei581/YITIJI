@@ -212,14 +212,15 @@ export class FilesService {
       throw createError
     }
 
-    // 上传响应给 30 分钟签名 URL,覆盖"上传→预览→确认打印"整段触控窗口。
+    // 上传响应给至多 30 分钟的签名 URL，且不得越过文件自身寿命。
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
       {
         objectKey: record.storageKey,
         fileId: record.id,
         filename: record.filename,
         mimeType: record.mimeType,
-        ttlSeconds: this.storage.signTtlSeconds,
+        ttlSeconds,
         disposition: 'inline',
       },
       record.bucket
@@ -231,7 +232,10 @@ export class FilesService {
       mimeType: record.mimeType,
       sha256: record.sha256,
       signedUrl: signed.url,
-      signedUrlExpiresAt: signed.expiresAt.toISOString(),
+      signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
+        signed.expiresAt,
+        record.expiresAt
+      ).toISOString(),
       fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
     }
   }
@@ -491,7 +495,7 @@ export class FilesService {
       })
     }
 
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt)
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
 
     const signed = this.storage.getDownloadUrl(
       {
@@ -540,7 +544,7 @@ export class FilesService {
         error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
       })
     }
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt)
+    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
     const signed = this.storage.getDownloadUrl(
       {
         objectKey: record.storageKey,
@@ -867,7 +871,10 @@ export class FilesService {
     return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
   }
 
-  private downloadUrlTtlSeconds(expiresAt: Date | null): number {
+  private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
+    if (purpose === 'contract_upload' && !expiresAt) {
+      this.throwFileNotFound()
+    }
     if (!expiresAt) return this.storage.signTtlSeconds
     const remainingSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
     // 对象存储签名的最小安全粒度为 1 秒；不足时禁止调用存储签名。

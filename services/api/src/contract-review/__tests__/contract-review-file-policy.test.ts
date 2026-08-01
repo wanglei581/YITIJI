@@ -228,6 +228,64 @@ test('FilesService ignores weaker or longer client policy attempts for contract 
   )
 })
 
+test('FilesService clamps the initial contract download URL to the persisted file lifetime', async () => {
+  let createData: Record<string, unknown> | undefined
+  const signedTtlSeconds: number[] = []
+  const persistedExpiry = new Date(Date.now() + 10_900)
+  const prisma = {
+    fileObject: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        createData = data
+        // 受控 fake 只缩短 Prisma 返回的已持久快照，用于验证首包签名边界；
+        // 下方仍断言 FilesService 写入 data 的服务端合同策略为完整 2 小时。
+        return {
+          ...data,
+          id: data.id as string,
+          storageKey: data.storageKey as string,
+          bucket: data.bucket as string,
+          region: data.region as string,
+          filename: data.filename as string,
+          mimeType: data.mimeType as string,
+          sizeBytes: data.sizeBytes as number,
+          sha256: data.sha256 as string,
+          expiresAt: persistedExpiry,
+        }
+      },
+    },
+  }
+  const storage = {
+    defaultBucket: 'private-files',
+    defaultRegion: 'local',
+    signTtlSeconds: 1800,
+    putObject: async () => ({ sizeBytes: 15, sha256: 'b'.repeat(64) }),
+    deleteObject: async () => undefined,
+    getDownloadUrl: (args: { ttlSeconds: number }) => {
+      signedTtlSeconds.push(args.ttlSeconds)
+      return {
+        url: 'https://files.local/initial-contract-download',
+        expiresAt: new Date(Date.now() + args.ttlSeconds * 1000),
+      }
+    },
+  }
+  const service = new FilesService(prisma as never, {} as never, storage as never)
+  const startedAt = Date.now()
+
+  const uploaded = await service.upload({
+    buffer: Buffer.from('%PDF-1.4\n%%EOF\n', 'latin1'),
+    filename: 'contract.pdf',
+    mimeType: 'application/pdf',
+    purpose: 'contract_upload',
+    uploaderId: null,
+    endUserId: 'member-1',
+  })
+
+  assert.ok(createData)
+  assert.ok((createData.expiresAt as Date).getTime() >= startedAt + CONTRACT_REVIEW_TTL_MS)
+  assert.deepEqual(signedTtlSeconds, [10])
+  assert.equal(uploaded.fileExpiresAt, persistedExpiry.toISOString())
+  assert.ok(new Date(uploaded.signedUrlExpiresAt).getTime() <= persistedExpiry.getTime())
+})
+
 test('FilesService blocks every access path once a contract file reaches expiresAt', async () => {
   const harness = makeFileAccessHarness(new Date(Date.now() + 60_900))
   const requester = { kind: 'member' as const, endUserId: 'member-1' }
