@@ -157,3 +157,21 @@ Task 4 已封板。Gate 0 正式记录仍为 `blocked`，本结论不代表合�
 后续硬门禁：Task 6 必须让会员任务创建的最终 consent 校验与 task insert 采用同一 Serializable/retry 并发协议，避免撤回与创建交错后遗留处理中任务；Task 14 必须用真实 PostgreSQL 双连接验证该竞态和事务回滚。历史数据权利请求 `revoke_consent` 当前保持 `job_ai` 语义，是否扩展为全部 AI scope 需独立产品决策，不在本任务静默改写。Kiosk 局部 scope 类型和 Admin 免责声明下拉在对应 UI 任务统一收口。合同同意测试文件已达 800 行，后续扩展前必须拆分 harness。
 
 Task 5 已封板，下一步进入归属、匿名令牌与状态机核心。
+
+## Wave A Task 6：归属、匿名令牌与状态机核心实施审查
+
+审查范围：`b18ca731..15305eb7`。
+
+- 会员与匿名 task owner 严格 XOR；匿名 task token 使用 32 字节 base64url CSPRNG，数据库只存 SHA-256，畸形 token/hash 在等长检查后安全拒绝并使用 `timingSafeEqual`。
+- 匿名 create 不再把随机 `sourceFileId` 当作唯一授权：必须同时持有上传响应的短期 HMAC signed content URL proof，验签、有效期与 fileId 精确一致；缺失、错文件、过期或畸形 proof 与不存在同形 404。proof 不落库、不记录，TTL 内允许重试，Task 12 仍须执行 create 限流。
+- 源文件必须是本人/当前匿名会话可证明持有的 active `contract_upload`，未删除且未过期；task `expiresAt` 精确继承源文件，不重新延长。
+- create 同一事务要求唯一 active `contract_review_disclaimer`；0 个、多个、空白正文/版本/ID、无效或未来发布时间均 503 fail closed。canonical scope hash 绑定 scope、当前 consent version、文档 ID/version/原始 content SHA-256/publishedAt 和七项机器可读披露，task 只存服务端真相。
+- 匿名 consent 时间窗口固定为 15 分钟、未来容差 60 秒且不得早于免责声明发布；会员使用数据库最新授权事件并要求 grant 不早于当前免责声明发布。一次 create 捕获单一可注入服务端时钟快照，避免边界和 P2034 重试漂移。
+- 会员 create 的 latest consent read 与 task insert、合同 consent revoke 与 processing task cancel 共用 PostgreSQL Serializable + 精确 P2034 三次有界重试；SQLite 明确省略不支持的 isolation 参数。真实 PostgreSQL 双连接线性一致验证仍是 Task 14 硬门禁。
+- 状态迁移表与嵌套数组运行时冻结；终态只可进入 expired，expired 无出边。测试使用独立硬编码矩阵，不再从实现自证。
+
+审查期间修复了两项阻断：fileId-only 匿名 IDOR 与未绑定服务端免责声明/同意内容的伪快照；随后修复空白/未来免责声明和时间边界测试抖动。最终核心测试 28/28，50 轮稳定循环通过，lines 96.90%、branches 92.55%、functions 91.30%；Task 5 consent 21/21、file-policy、schema（本机 PG 按规则 skip）、legal、member-data、job-ai privacy、API typecheck/lint 与 `git diff --check` 通过。内部规格审查 `Spec compliant`、质量审查 `Ready: Yes`；Claude、Antigravity、Cursor 最终均 `APPROVE`。
+
+后续硬约束：Task 12 必须提供 `GET /contract-reviews/consent-scope`，匿名 create 只从 `x-contract-review-source-file-proof` header 读 proof，Kiosk 不复制 canonical hash 算法；Task 14 必须完成真实 PostgreSQL 双连接 create/revoke 竞态。`contract-review-service.test.ts` 已 999 行，后续不得继续堆测试，必须新建分层测试文件；`contract-review.service.ts` 已 479 行，Task 12 再新增 HTTP/读写职责前必须拆分 consent/access 或 repository 边界。
+
+Task 6 已封板，下一步进入逐页提取与 canonical text。

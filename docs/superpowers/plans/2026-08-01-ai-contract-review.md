@@ -518,6 +518,10 @@ export function assertOwnerShape(owner: { endUserId: string | null; accessTokenH
 
 `contract-review-access.ts` 使用 `randomBytes(32).toString('base64url')`、SHA-256 和 `timingSafeEqual`；数据库只存 hash。`ContractReviewService.create()` 校验 `sourceFile.purpose/status/expiresAt/owner`，匿名要求 consent snapshot；任务 `expiresAt` 直接继承源文件，不能重新延长。
 
+匿名创建不能把随机 `sourceFileId` 当成唯一授权：请求还必须携带上传接口已返回的短期 HMAC signed content URL 作为 `sourceFileProof`，服务端复用 `parseAndVerifySignedContentUrl` 验证未过期且 fileId 与 `sourceFileId` 精确一致。proof 不落库、不写日志；仅持有 fileId、畸形/过期 proof 或其他文件 proof 均与不存在同形拒绝。proof 是短期 bearer，不宣称一次性；同文件允许用户重试，重放成本由 Task 12 create 限流控制。
+
+任务 consent snapshot 必须绑定服务端真相：同一数据库事务内要求恰好一个 active `contract_review_disclaimer`，0 个或多个均 fail closed；用确定性 canonical JSON + SHA-256 绑定 scope、当前 consent version、active 文档 id/version/content hash/publishedAt 和设计 11.1 的七项固定披露。请求的 `disclaimerVersion` / `consentScopeHash` 必须精确匹配服务端计算值，task 只存服务端值。匿名 `consentedAt` 不得早于 publishedAt、不得超过 15 分钟且未来时钟容差最多 60 秒；会员继续记录 DB grant 时间，并要求当前版本 grant 不早于 active 文档 publishedAt。不得因 Gate 0 未通过而自动激活草稿。
+
 会员创建必须与 Task 5 的撤回事务形成同一并发协议：`MemberPrivacyService` 提供可在 Prisma transaction client 上执行的“最新事件真相”校验；创建使用 Serializable transaction，并对 Prisma 写冲突/序列化失败做有界重试。在同一事务中先读取 `contract_review` 最新 consent 事件并确认当前版本未撤回，再插入 `ContractReviewTask`。撤回路径使用同级 Serializable/retry 策略。并发结果必须满足二选一：创建先线性化时撤回事务能看见并取消任务；撤回先线性化时创建失败，绝不能留下“最新 consent 已撤回但任务仍为处理中”的状态。单元 fake 只验证协议与重试分支，真实 PostgreSQL 双连接验收留 Task 14。
 
 - [ ] **Step 4: 运行核心单测并要求 80% 覆盖**
@@ -879,10 +883,13 @@ git commit -m "feat: orchestrate contract review jobs"
 
 ### Task 12: 暴露最小 HTTP API 与真实轮询
 
+文件预算门禁：`contract-review.service.ts` 在 Task 6 已达约 479 行，Task 12 新增 `get/getConsentScope/confirm/remove/createReport` 前必须先把 consent snapshot / access 或持久化职责拆到独立文件；不得让该 service 跨过 500 行后继续堆叠。Task 6 的 `contract-review-service.test.ts` 已 999 行，Task 12 只能新建 HTTP/服务分层测试，禁止继续向该文件追加。
+
 **Files:**
 - Create: `services/api/src/contract-review/dto/contract-review.dto.ts`
 - Create: `services/api/src/contract-review/contract-review.controller.ts`
 - Create: `services/api/scripts/verify-contract-review-http.ts`
+- Modify: `services/api/src/contract-review/contract-review.service.ts`
 - Modify: `services/api/src/contract-review/contract-review.module.ts`
 - Modify: `services/api/package.json`
 
@@ -893,6 +900,9 @@ assert.equal(await request('GET', `/contract-reviews/${otherId}`, memberA).statu
 assert.equal(await request('GET', `/contract-reviews/${missingId}`, memberA).status, 404)
 assert.equal(await request('GET', `/contract-reviews/${anonymousId}`, { 'x-contract-review-access-token': 'wrong' }).status, 404)
 assert.equal((await request('POST', '/contract-reviews', anonymousWithoutConsent)).status, 400)
+assert.equal((await request('POST', '/contract-reviews', anonymousWithoutSourceProof)).status, 404)
+assert.equal((await request('POST', '/contract-reviews', anonymousWithWrongFileProof)).status, 404)
+assert.equal((await request('GET', '/contract-reviews/consent-scope')).status, 200)
 ```
 
 - [ ] **Step 2: 运行并确认路由 404**
@@ -923,14 +933,24 @@ export class ContractReviewController {
   private async requesterOf(req: RequestLike): Promise<ContractReviewRequester> {
     const member = await resolveOptionalEndUser(req.headers?.authorization, this.jwt, this.redis, this.prisma)
     return member
-      ? { endUserId: member.endUserId, accessToken: null }
-      : { endUserId: null, accessToken: headerOf(req, 'x-contract-review-access-token') }
+      ? { endUserId: member.endUserId, accessToken: null, sourceFileProof: null }
+      : {
+          endUserId: null,
+          accessToken: headerOf(req, 'x-contract-review-access-token'),
+          sourceFileProof: headerOf(req, 'x-contract-review-source-file-proof'),
+        }
   }
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async create(@Body() dto: CreateContractReviewDto, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.service.create(dto, await this.requesterOf(req)))
+  }
+
+  @Get('consent-scope')
+  @Throttle({ default: { ttl: 60_000, limit: 60 } })
+  async consentScope() {
+    return ApiResponse.ok(await this.service.getConsentScope())
   }
 
   @Get(':id')
@@ -957,9 +977,11 @@ export class ContractReviewController {
 }
 ```
 
+`ContractReviewService.getConsentScope()` 必须复用 Task 6 的唯一 active disclaimer 校验和 `createContractReviewConsentScopeSnapshot()`，返回当前免责声明 `id/version/content/publishedAt`、七项机器可读披露与服务端计算的 `consentScopeHash`；0 个/多个 active 文档继续 503 fail closed。Kiosk 必须先展示这份服务端内容并使用返回的 hash/version，不能在前端复制 canonical 算法或编造 hash。
+
 为保证 Task 12 单独可编译，`ContractReviewService.createReport()` 在 Task 14 接入 PDF 前先实现诚实的受控响应：完成归属校验后抛出 `REPORT_NOT_AVAILABLE`（503）；HTTP verify 必须断言该错误，不能返回假 fileId。Task 14 用真实短期派生文件实现替换该分支。
 
-Requester 解析沿用 optional member 模式；匿名只读 `x-contract-review-access-token` header，禁止 query token。Create DTO 只允许 `sourceFileId/contractType/consentVersion/consentedAt/consentScopeHash/disclaimerVersion`，全局 whitelist 拒绝额外字段。GET 仅 completed 返回 result；其余只返回真实 stage/page progress。
+Requester 解析沿用 optional member 模式；匿名任务读写只读 `x-contract-review-access-token` header，匿名 create 另只读 `x-contract-review-source-file-proof` header，二者均禁止 query token。source-file proof 必须是当前上传响应的短期 signed content URL，不能持久化到 local/session storage、日志或审计 payload。Create DTO 只允许 `sourceFileId/contractType/consentVersion/consentedAt/consentScopeHash/disclaimerVersion`，全局 whitelist 拒绝额外字段。GET 仅 completed 返回 result；其余只返回真实 stage/page progress。
 
 - [ ] **Step 4: 运行 HTTP、越权和回归验证**
 
@@ -999,6 +1021,7 @@ git commit -m "feat: expose contract review API"
 
 ```javascript
 assertIncludes(session, 'let accessToken: string | null = null')
+assertIncludes(session, 'let sourceFileProof: string | null = null')
 assertIncludes(session, 'clearContractReviewSession')
 assertNotIncludes(session, 'localStorage')
 assertNotIncludes(session, 'sessionStorage')
@@ -1058,13 +1081,18 @@ Expected: FAIL。
 - [ ] **Step 3: 实现易失 store、API 轮询和五步状态**
 
 ```typescript
-let state: { taskId: string | null; accessToken: string | null; sourceFileId: string | null } = {
-  taskId: null, accessToken: null, sourceFileId: null,
+let state: {
+  taskId: string | null
+  accessToken: string | null
+  sourceFileId: string | null
+  sourceFileProof: string | null
+} = {
+  taskId: null, accessToken: null, sourceFileId: null, sourceFileProof: null,
 }
 export function setContractReviewSession(next: typeof state): void { state = { ...next } }
 export function getContractReviewSession() { return { ...state } }
 export function clearContractReviewSession(): void {
-  state = { taskId: null, accessToken: null, sourceFileId: null }
+  state = { taskId: null, accessToken: null, sourceFileId: null, sourceFileProof: null }
 }
 
 export function shouldRedirectLegalRiskInput(intent: string | null, text: string): boolean {
@@ -1072,7 +1100,7 @@ export function shouldRedirectLegalRiskInput(intent: string | null, text: string
 }
 ```
 
-`contractReview.ts` 每次请求把 token 放 `X-Contract-Review-Access-Token` header；confirm 后从 1.5 秒轮询，指数退避封顶 5 秒，组件卸载/离席时 abort。五步 UI 固定为说明同意、上传/扫描、完整性确认、真实阶段、结果；不显示伪百分比或完整合同常驻文本。上传前和处理中明确“刷新将结束本次审查”。
+`contractReview.ts` 先从 `GET /contract-reviews/consent-scope` 获取并展示服务端免责声明/披露，直接使用返回的 version/hash；不得在 Kiosk 复制 canonical hash 算法。仅在匿名 create 时把上传响应的 `signedUrl` 放入 `X-Contract-Review-Source-File-Proof` header；创建成功后立即从内存移除 proof，后续请求只把任务 token 放 `X-Contract-Review-Access-Token` header。两种 bearer 都不得进入 URL、日志、localStorage 或 sessionStorage。confirm 后从 1.5 秒轮询，指数退避封顶 5 秒，组件卸载/离席时 abort。五步 UI 固定为说明同意、上传/扫描、完整性确认、真实阶段、结果；不显示伪百分比或完整合同常驻文本。上传前和处理中明确“刷新将结束本次审查”。
 
 `ContractReviewResult.tsx` 用 `EVIDENCE_VISIBLE_MS = 30_000` 管理最小证据片段；每次打开先清理旧 timer，30 秒无操作后 `setEvidenceVisible(false)` 并应用模糊遮罩，组件卸载时清理 timer。页面和可访问性文本都不得把完整合同放进 DOM。
 
