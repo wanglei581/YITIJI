@@ -470,7 +470,7 @@ async function main() {
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
     currentMeasureStep = MEASURE_STEPS.CGROUP_CONSISTENCY
-    assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)
+    assert.equal(controlGroup(managedAppPid), managedControlGroup)
     currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))
     if (evidence.verdict !== 'D2_PRIME_PASS') fail('EVIDENCE_NO_GO')
