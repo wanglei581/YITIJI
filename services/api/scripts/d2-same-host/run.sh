@@ -143,10 +143,31 @@ XDG_RUNTIME_DIR="/run/user/$(id -u)"
   || no_go "D2_PRIME_NO_GO_RUNTIME_DIR"
 export XDG_RUNTIME_DIR
 
+# A unit started with `systemd-run --user --collect` is garbage-collected by systemd once it
+# exits, so a later `systemctl stop` reports a non-zero status for a unit that is already gone.
+# Cleanup may treat that as success, but only by positively proving absence: LoadState must be
+# not-found AND ActiveState must be inactive. Any other state, including an empty or unreadable
+# one, stays a cleanup failure so forensic directories are retained.
+user_unit_collected_absent() {
+  local unit_name="$1"
+  local load_state=""
+  local active_state=""
+  load_state="$(systemctl --user show "$unit_name" -p LoadState --value 2>/dev/null)" || return 1
+  [[ "$load_state" == "not-found" ]] || return 1
+  active_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)" || return 1
+  [[ "$active_state" == "inactive" ]] || return 1
+  return 0
+}
+
 stop_user_unit_and_prove_inactive() {
   local unit_name="$1"
   local unit_state=""
-  systemctl --user stop "$unit_name" >/dev/null 2>&1 || return 1
+  local stop_status=0
+  systemctl --user stop "$unit_name" >/dev/null 2>&1 || stop_status=$?
+  if (( stop_status != 0 )); then
+    user_unit_collected_absent "$unit_name" && return 0
+    return 1
+  fi
   for _ in {1..50}; do
     if ! unit_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"; then
       return 1
