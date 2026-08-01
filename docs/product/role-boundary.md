@@ -122,7 +122,7 @@
 - ❌ 直接发布未审核内容(`PUBLISH_REQUIRES_APPROVAL` 后端硬断言,见 `policies.service.ts` / `jobs-admin.service.ts`)
 - ❌ 审核、发布、下架、删除等管理动作不落 `AuditLog`(这些路径必须写审计)
 
-> **口径修正(2026-08-01)**:本行此前写作「所有写操作都同步落 `AuditLog`,DB 层无 DELETE 权限」,与代码不符,已改为上面的可验证表述。实测:`services/api/src` 有 29 处 Prisma `delete/deleteMany`(覆盖 19 个模型)、28 个 `@Delete()` 端点;数据库使用单一应用账号,**没有**按角色收敛的 DELETE 权限。其中 `activity.service.ts` 的删除属会员删除本人浏览/跳转记录与 TTL 清理,不写 `AuditLog` 是设计如此。
+> **口径修正(2026-08-01)**:本行此前写作「所有写操作都同步落 `AuditLog`,DB 层无 DELETE 权限」,与代码不符,已改为上面的可验证表述。实测(口径:**显式 Prisma delegate 调用**):`services/api/src` 有 29 处 `delete/deleteMany`(覆盖 19 个模型)、28 个 `@Delete()` 端点。这**不等于**全部物理删除面——另有 Prisma 嵌套 `deleteMany: {}`(如 `fair-company-zone.service.ts:88`)以及 schema 中 40 处 `onDelete: Cascade`,后者会随父记录级联删除且不经过任何 service 审计封装。权限方面只能证明到仓库层:API runtime 仅从单一 `DATABASE_URL` 创建 client(`prisma.service.ts:29`),未发现运行时 `SET ROLE` 或权限收敛脚本(全仓 `GRANT`/`REVOKE`/`CREATE ROLE` 检索为空);**线上实际库角色权限本次未核验**,不要据此断言线上无 DELETE 收敛。其中 `activity.service.ts` 的删除属会员删除本人浏览/跳转记录与 TTL 清理,不写 `AuditLog` 是设计如此。
 >
 > 因此有效约束是:
 > - 删除必须走 service 层(软删或带审计的封装),禁止在 controller 里直接调 Prisma `delete`;

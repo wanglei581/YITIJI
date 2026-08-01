@@ -52,7 +52,21 @@
 
 普通源码的行数阈值与拆分规则**以 `.ccg/spec/guides/index.md` 为准**，本文件不重复阈值表。下面维护治理需要持续盯防的**已知超阈值文件清单**（2026-08-01 用 `wc -l` 全仓实测重建）。
 
-**业务代码当前无超阈值文件。** `apps/`、`services/*/src`、`packages/` 下没有任何文件超过 1000 行；此前本表列的 4 个文件在 Phase 7 起的整改中已拆完，实测远低于旧记录：
+**`.ts/.tsx` 业务代码当前无超阈值文件**，但 `*/src` 下有 **3 个 CSS 超 1000 行**：
+
+| 文件 | 实测行数 | 状态 |
+| --- | --- | --- |
+| `apps/kiosk/src/pages/styles/jobs-fairs-foundation.css` | 1361 | 跟踪中 |
+| `apps/admin/src/routes/login/login.css` | 1039 | 跟踪中 |
+| `apps/partner/src/routes/login/login.css` | 1039 | 跟踪中 |
+
+> **口径修正（2026-08-01 复核）**：本段此前写作「业务代码当前无超阈值文件，`apps/`、`services/*/src`、`packages/` 下没有任何文件超过 1000 行」。该结论来自只统计 `.ts/.tsx` 的命令，漏了同在 `*/src` 下的 CSS。CSS 是否套用同一阈值表尚未定论（选择器块与函数的可拆分性不同），故先入表跟踪，不直接判为违规。复核时不要只筛 `.ts/.tsx`：
+>
+> ```bash
+> find apps services packages -type f -path '*/src/*' -exec wc -l {} + | awk '$1 > 1000 && $2 != "total"' | sort -nr
+> ```
+
+此前本表列的 4 个 `.ts/.tsx` 文件在 Phase 7 起的整改中已拆完，实测远低于旧记录：
 
 | 文件 | 旧记录 | 2026-08-01 实测 | 结论 |
 | --- | --- | --- | --- |
@@ -107,7 +121,16 @@
 以下为推荐推进顺序，**仅作建议**；实际优先级与当前待办以 `docs/progress/next-tasks.md` 为准。每项独立分支：
 
 1. advisory 文件规模门禁：只提醒，不阻塞，先覆盖已知大文件和新增 diff。
-2. ~~advisory 合规文案门禁~~ — **已落地且已是 blocking，本条作废（2026-08-01 核实）**。实测 `apps/*/scripts` + `services/api/scripts` 下有 46 个脚本在扫合规禁词，其中 38 个已被 `.github/workflows/ci.yml` 调用（失败即阻塞）。真实缺口不是「没有门禁」，而是**门禁分散、词表漂移**：`COMPLIANCE_FORBIDDEN_TERMS` 曾零消费者，各脚本自己硬编码词表且互不一致，导致「一键报名」0 个脚本覆盖、「投递简历」仅 13 个脚本覆盖。整改方向见第十节。
+2. ~~advisory 合规文案门禁~~ — **已落地且已是 blocking，本条作废（2026-08-01 核实，同日复核修正数字）**。实测 `apps/*/scripts` + `services/api/scripts` 下有 **49** 个脚本在扫合规禁词，其中 **40** 个已被 `.github/workflows/ci.yml` 调用（失败即阻塞），9 个未进 CI（6 个属尚未上线的百宝箱验收、3 个为 UI 局部守卫）。此处此前写作 46 / 38，为未记录口径的手工统计，已按下述可复现命令重算：
+
+   ```bash
+   # 分母：扫合规禁词的脚本数（49）
+   grep -rl -E '一键投递|立即投递|平台投递|投递简历|企业收简历|候选人管理|一键报名' \
+     apps/*/scripts services/api/scripts \
+     --include='*.ts' --include='*.js' --include='*.cjs' --include='*.mjs' | wc -l
+   ```
+
+   分子（40）需判定「脚本被 ci.yml 直接引用，或经 `package.json` 的 `verify:*` 目标间接引用」，无单行命令；复核时按此定义逐个核对，并在改动本数字时同步更新判定口径。实测全部 49 个均为 `.ts`（16）或 `.mjs`（33），无 `.js/.cjs`。真实缺口不是「没有门禁」，而是**门禁分散、词表漂移**：`COMPLIANCE_FORBIDDEN_TERMS` 曾零消费者，各脚本自己硬编码词表且互不一致，导致「一键报名」0 个脚本覆盖、「投递简历」仅 13 个脚本覆盖。整改方向见第十节。
 3. ~~`services/api/src/jobs/jobs.service.ts` 零行为拆分试点~~ — **前提已消失，本条作废**。该文件实测 219 行，早已拆完（见第五节）。如需拆分试点，改用第五节列出的 verify 脚本，并按该节的 verify 单列口径执行。
 4. Admin 招聘会或企业页面五件套拆分试点：先拆展示和 hooks，保留 UI 行为。
 5. 把试点经验回写到本索引或 `.ccg/spec/guides/index.md`，再决定是否扩大。
@@ -143,8 +166,22 @@
 
 3. 门禁用**文本解析**读 SSOT，不是 `import` —— `packages/shared` 只导出裸 TS（无 dist／无 build），根 verify 脚本在纯 `node` 下跑。解析失败一律 fail-closed 退出，不降级为「跳过检查」；禁词项数与正则项数不一致也直接报错（防「加了词忘加变体正则」）。新增禁词只改数组，门禁自动跟随。
 
-4. 既有 46 个脚本的硬编码词表逐步替换，不要求一次改完；本兜底门禁已覆盖用户可见文案，替换属降低维护成本而非补漏。
+4. 既有 49 个脚本的硬编码词表逐步替换，不要求一次改完；本兜底门禁已覆盖用户可见文案，替换属降低维护成本而非补漏。
 
 5. 63 份 md 逐步改为「以 `complianceCopy.ts` 为准」的引用式表述，避免继续漂移。
 
 **已知剩余缺口（未做，需单独立项）**：`services/api/src` 有 7 处运行时守卫各自硬编码禁词正则（`member-feedback` / `member-notifications` / `llm-career-plan` / `llm-job-fit` / `llm-fair-visit-plan` / `job-ai-llm` / `benefit-activities` 等），词表与 SSOT 不一致，「一键报名」在服务端仍无覆盖。本次未纳入：改动跨 7 个 service 文件、涉及 LLM 输出拦截路径，超出本任务文件预算，且需按真实 AI 输出回归验证。
+
+另有 **8 个 `COMPLIANCE_COPY` key 零消费者**（`KIOSK_JOBS_TOP`、`KIOSK_FAIRS_TOP`、`KIOSK_SCAN_HARDWARE_NOTICE`、`KIOSK_CAMPUS_TOP`、`ADMIN_JOB_SOURCES_TOP`、`ADMIN_FILES_TOP`、`ADMIN_AUDIT_TOP`、`PARTNER_DASHBOARD_TOP`，共 15 个 key）。其余 7 个在 kiosk 有 18 处渲染，所以这不是整体死代码，而是「岗位／招聘会页的来源声明」与「三端后台合规提示」两类文案定义了却没渲染。上线前需逐个判定：该渲染的接上，不该保留的删掉——留着等于给后续开发一个「看起来已有声明」的假象。复核命令：
+
+```bash
+node -e "const s=require('fs').readFileSync('packages/shared/src/types/complianceCopy.ts','utf8');const b=s.slice(s.indexOf('export const COMPLIANCE_COPY'),s.indexOf('} as const',s.indexOf('export const COMPLIANCE_COPY')));for(const m of b.matchAll(/^ {2}([A-Z][A-Z0-9_]+):/gm))console.log(m[1])"
+# 再对每个 key 检索 COMPLIANCE_COPY.<KEY> 在 apps/ 下的引用
+```
+
+## 十一、待立项的代码级缺口（2026-08-01 codex 复审查出，均已独立取证）
+
+以下两项是**代码问题**，不是文档表述问题，已确认属实但超出当轮文件预算，未修：
+
+1. **P0｜Partner 导入绕过强制重审**。`jobs-partner.service.ts:178/248/394`、`jobs-excel.service.ts:399/439` 五处 upsert 的 `update` 分支均未重置 `reviewStatus`/`publishStatus`，而 Kiosk 只按当前 `approved`+`published` 过滤 —— 一条**已发布**岗位再次导入会改写标题／公司／描述／`sourceUrl` 后**继续公开且无需再审**，与 `compliance-boundary.md:132`、`role-boundary.md:116` 的「导入/编辑一律回到 pending」矛盾。修复口径：所有 Job/JobFair upsert 的 `update` 分支统一重置 `pending + draft`，并补「已发布记录再次导入立即从公开查询消失」回归断言。文件预算 4–6 个。
+2. **P0｜`offline-agencies` 审核/发布/删除全程无审计**。全模块 0 处审计引用；`adminDelete` 先 `offlineJob.deleteMany` 再删机构，同样不写 `AuditLog`。叠加两项既有事实：`audit.service.ts:45` 的 `write()` 设计上「失败只 log 不抛」（审计丢失不阻断业务），且 DB 层无 append-only role。因此凡出现「不可删除、不可篡改」的表述都超出现状 —— 要么补 DB append-only role／防篡改链，要么把文案降级为可验证表述。文件预算 5–8 个。

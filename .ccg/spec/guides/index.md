@@ -48,7 +48,16 @@
 
 **适用范围（2026-08-01 补充）**：本阈值表只管**业务源码** —— `apps/*/src`、`services/*/src`、`packages/*/src`。以下不受行数阈值约束：生成文件、Prisma migration 快照、静态数据快照，以及 `apps/*/scripts` 与 `services/api/scripts` 下的 **verify 脚本**。
 
-> 为什么单列 verify 脚本：一个脚本对应一条完整验收链路，机械按行数拆会割裂验收语义，且拆分本身有让门禁静默失效的风险。实测（2026-08-01）全仓 7 个超 1000 行的文件**全部**是 verify 脚本，业务源码为 0；若不声明范围，这条规则等于只对脚本生效、对业务代码空转。verify 脚本改用替代口径：单脚本单验收主题、新增断言优先扩写既有脚本、超 1500 行才按验收阶段拆分。完整口径见 [docs/governance/standards-index.md](../../../docs/governance/standards-index.md) 第五节。
+> 为什么单列 verify 脚本：一个脚本对应一条完整验收链路，机械按行数拆会割裂验收语义，且拆分本身有让门禁静默失效的风险。verify 脚本改用替代口径：单脚本单验收主题、新增断言优先扩写既有脚本、超 1500 行才按验收阶段拆分。完整口径见 [docs/governance/standards-index.md](../../../docs/governance/standards-index.md) 第五节。
+
+> **实测口径（2026-08-01 复核修正）**：`*/src` 下超 1000 行的文件有 **3 个，全部是 CSS**（`jobs-fairs-foundation.css` 1361、`admin/login.css` 1039、`partner/login.css` 1039）；`.ts/.tsx` 业务源码为 0。另有 7 个超 1000 行的 verify 脚本，但它们在 `*/scripts` 下，本就不在适用范围内。
+> 本行此前写作「7 个超千行文件**全部**是 verify 脚本，业务源码为 0」——该结论来自只统计 `.ts/.tsx` 的命令，漏了同在 `*/src` 下的 CSS。复核命令（不要再只筛 `.ts/.tsx`）：
+>
+> ```bash
+> find apps services packages -type f -path '*/src/*' -exec wc -l {} + | awk '$1 > 1000 && $2 != "total"' | sort -nr
+> ```
+>
+> CSS 是否套用同一阈值表尚未定论（选择器块与函数的可拆分性不同），故先记入超阈值清单跟踪，不直接判为违规。
 
 业务源码按以下阈值控制：
 
