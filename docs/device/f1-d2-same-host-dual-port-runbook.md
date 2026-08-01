@@ -23,7 +23,7 @@
 
 - `uname -s` 为 `Linux`，且 `/sys/fs/cgroup/cgroup.controllers` 可读；
 - user systemd manager 可用，目标账户 `Linger=yes`，transient unit 能真实应用 cgroup v2 controller；
-- PATH 中已有真实 Node.js、pnpm、PM2、Nginx、systemd 工具；脚本不安装软件、不使用 sudo；
+- executable PATH 中已有真实 Node.js、pnpm、PM2、Nginx、systemd 工具；脚本不安装软件、不使用 sudo；
 - loopback `3010`、`3011` 和演练 Nginx 端口均空闲；
 - `services/api/dist/release-provenance/` 来自当前待审 commit 的 fresh build；
 - shell 中没有脚本拒绝的生产 DB、Redis、对象存储凭据变量；子进程始终通过 `env -i` 获得最小环境。
@@ -40,17 +40,43 @@
 ```bash
 pnpm --filter @ai-job-print/api build
 pnpm --filter @ai-job-print/api verify:d2-same-host-contract
-
-D2_EVIDENCE_OUT="$(pwd)/services/api/scripts/d2-same-host/.evidence/final-review.json" \
-  pnpm --filter @ai-job-print/api drill:d2-same-host
-
-node services/api/scripts/d2-same-host/verify-contract.mjs \
-  --evidence "$(pwd)/services/api/scripts/d2-same-host/.evidence/final-review.json"
 ```
 
-不得设置 skip/mock/partial-pass 开关。`D2_APPROVED_PATH`、`D2_NGINX_PORT`、`D2_EVIDENCE_DIR`、
-`D2_WORK_DIR` 或 `D2_EVIDENCE_OUT` 如需覆盖，仍必须满足脚本的绝对路径、owner、权限、端口和
-独立 evidence 目录约束；不能用它们绕过 Linux/systemd/cgroup/production-env 检查。
+授权包必须先把精确绝对路径写入当前 shell 的 `D2_EVIDENCE_DIR` 与 `D2_EVIDENCE_OUT`；两者缺失时，
+`run.sh` 自身和下述唯一 canonical full-drill command 都会在生成 nonce 前 fail closed。`D2_EVIDENCE_OUT`
+必须位于 `D2_EVIDENCE_DIR` 的物理目录内。`D2_APPROVED_PATH` 是冒号分隔的 **executable PATH**，只能
+指向仓库外的既有二进制目录；不得传入 fresh clone / repository path，指向仓库内部的符号链接同样会被
+物理路径检查拒绝，脚本也不会在非法值或缺失命令时回退到 caller PATH。
+
+canonical PATH 对应当前既有非生产 Colima 的工具链布局；如果目标环境的 required commands 不在这些
+目录中，必须先按独立代码任务同步更新 runbook 与 offline contract 并重新审查，不能在授权窗口内临时改命令。
+
+<!-- D2_FRESH_RETAKE_COMMAND_START -->
+```bash
+: "${D2_EVIDENCE_DIR:?missing exact authorized evidence directory}"
+: "${D2_EVIDENCE_OUT:?missing exact authorized evidence path}"
+env -i \
+  PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  HOME="$HOME" \
+  LANG=C.UTF-8 \
+  D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+  D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \
+  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \
+  pnpm --filter @ai-job-print/api drill:d2-same-host
+```
+<!-- D2_FRESH_RETAKE_COMMAND_END -->
+
+full drill 结束后，独立 verifier 使用同一授权 evidence 路径：
+
+```bash
+node services/api/scripts/d2-same-host/verify-contract.mjs \
+  --evidence "$D2_EVIDENCE_OUT"
+```
+
+不得设置 skip/mock/partial-pass 开关。`D2_NGINX_PORT`、`D2_EVIDENCE_DIR`、`D2_WORK_DIR` 或
+`D2_EVIDENCE_OUT` 如需覆盖，仍必须满足脚本的绝对路径、owner、权限、端口和独立 evidence 目录约束；
+不能用它们绕过 Linux/systemd/cgroup/production-env 检查。完整 full drill 每个授权窗口只允许调用一次，
+失败后不得用修改变量的方式在同一窗口重跑。
 
 ## 4. PASS 与 NO-GO
 

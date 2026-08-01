@@ -36,6 +36,17 @@ const SHA_B = 'b'.repeat(64)
 const SHA_C = 'c'.repeat(64)
 const SHA_D = 'd'.repeat(64)
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
+const RUNBOOK_PATH = join(SCRIPT_DIR, '../../../../docs/device/f1-d2-same-host-dual-port-runbook.md')
+const FRESH_RETAKE_COMMAND = `: "\${D2_EVIDENCE_DIR:?missing exact authorized evidence directory}"
+: "\${D2_EVIDENCE_OUT:?missing exact authorized evidence path}"
+env -i \\
+  PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \\
+  HOME="$HOME" \\
+  LANG=C.UTF-8 \\
+  D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \\
+  D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \\
+  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \\
+  pnpm --filter @ai-job-print/api drill:d2-same-host`
 
 function executableSource(source) {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source)
@@ -86,6 +97,66 @@ function shellFunctionSource(source, name) {
   const end = source.indexOf('\n}\n', start)
   assert.ok(end > start, `${name} function must have a bounded body`)
   return source.slice(start, end + 2)
+}
+
+function assertExecutionEntryContract(runSource, runbookSource) {
+  const shellSource = runSource.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
+  const approvedPathGuard = '[[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]]'
+  const physicalPathGuard = '[[ "$path_part_physical" != "$ROOT" && "$path_part_physical" != "$ROOT/"* ]]'
+  const explicitEvidenceGuard = '[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]]'
+  assert.ok(shellSource.includes(approvedPathGuard))
+  assert.ok(shellSource.includes(physicalPathGuard))
+  assert.ok(shellSource.includes(explicitEvidenceGuard))
+  const approvedPathBlock = shellSource.slice(shellSource.indexOf('APPROVED_PATH='), shellSource.indexOf('export PATH="$APPROVED_PATH"'))
+  assert.doesNotMatch(approvedPathBlock, /no_go "(?!D2_PRIME_NO_GO_APPROVED_PATH")/)
+  assert.doesNotMatch(shellSource, /D2_PRIME_NO_GO_ENVIRONMENT/)
+  assert.match(
+    shellSource,
+    /command -v "\$required_command"[^\n]+no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"/,
+  )
+  const allowedCodes = new Set([
+    'D2_PRIME_CLEANUP_FAILED', 'D2_PRIME_EVIDENCE_REJECTED', 'D2_PRIME_RUNTIME_FAILURE',
+    'D2_PRIME_NO_GO_APPROVED_PATH', 'D2_PRIME_NO_GO_APPROVED_PATH_COMMAND',
+    'D2_PRIME_NO_GO_BUILD_INPUT', 'D2_PRIME_NO_GO_CGROUP_DELEGATION',
+    'D2_PRIME_NO_GO_EVIDENCE_EXISTS', 'D2_PRIME_NO_GO_EVIDENCE_PATH', 'D2_PRIME_NO_GO_KERNEL',
+    'D2_PRIME_NO_GO_MANAGED_SCOPE', 'D2_PRIME_NO_GO_NONCE', 'D2_PRIME_NO_GO_PATH',
+    'D2_PRIME_NO_GO_PM2_PREFLIGHT', 'D2_PRIME_NO_GO_PORT', 'D2_PRIME_NO_GO_PRODUCTION_ENV',
+    'D2_PRIME_NO_GO_RUNTIME_DIR', 'D2_PRIME_NO_GO_TOOLCHAIN', 'D2_PRIME_NO_GO_USER_MANAGER',
+    'D2_PRIME_NO_GO_WORKSPACE',
+  ])
+  const calls = [...shellSource.matchAll(/\bno_go\s+("[A-Z0-9_]+")/g)].map((match) => match[1].slice(1, -1))
+  assert.ok(calls.length > 0 && calls.every((code) => allowedCodes.has(code)))
+  assert.equal((shellSource.match(/\bno_go\s+/g) ?? []).length, calls.length)
+
+  const startMarker = '<!-- D2_FRESH_RETAKE_COMMAND_START -->'
+  const endMarker = '<!-- D2_FRESH_RETAKE_COMMAND_END -->'
+  assert.equal(runbookSource.split(startMarker).length, 2)
+  assert.equal(runbookSource.split(endMarker).length, 2)
+  const marked = runbookSource.slice(
+    runbookSource.indexOf(startMarker) + startMarker.length,
+    runbookSource.indexOf(endMarker),
+  ).trim()
+  assert.equal(marked, `\`\`\`bash\n${FRESH_RETAKE_COMMAND}\n\`\`\``)
+  assert.equal((runbookSource.match(/drill:d2-same-host/g) ?? []).length, 1)
+}
+
+function verifyExecutionEntryContract() {
+  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
+  const runbookSource = readFileSync(RUNBOOK_PATH, 'utf8')
+  assertExecutionEntryContract(runSource, runbookSource)
+  const guard = '[[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]]'
+  const physicalGuard = '[[ "$path_part_physical" != "$ROOT" && "$path_part_physical" != "$ROOT/"* ]]'
+  const evidenceGuard = '[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]]'
+  assert.throws(() => assertExecutionEntryContract(runSource.replace(guard, ':'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(`# ${guard}\n${runSource.replace(guard, ':')}`, runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace(physicalGuard, ':'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace(evidenceGuard, ':'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace('D2_PRIME_NO_GO_APPROVED_PATH', 'D2_PRIME_NO_GO_PATH'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace('command -v "$required_command"', ':'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace('D2_PRIME_NO_GO_APPROVED_PATH_COMMAND', 'D2_PRIME_NO_GO_ENVIRONMENT'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(`${runSource}\nno_go "D2_PRIME_NO_GO_UNLISTED"\n`, runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource, runbookSource.replace('D2_EVIDENCE_DIR=', 'D2_EVIDENCE_DIRECTORY=')))
+  console.log('  PASS D2 fresh-retake entry rejects repository PATH and locks one canonical command')
 }
 
 function productionEnvironmentNames(envExampleSource) {
@@ -417,10 +488,10 @@ function verifyPm2ControlPlane() {
 function assertUserSystemdEnvironmentContract(runSource, drillSource) {
   const deriveXdg = runSource.match(/^XDG_RUNTIME_DIR="\/run\/user\/\$\(id -u\)"$/m)?.index ?? -1
   const directoryCheck = runSource.match(
-    /^\[\[ -d "\$XDG_RUNTIME_DIR" && -O "\$XDG_RUNTIME_DIR" && ! -L "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT"$/m,
+    /^\[\[ -d "\$XDG_RUNTIME_DIR" && -O "\$XDG_RUNTIME_DIR" && ! -L "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_RUNTIME_DIR"$/m,
   )
   const modeCheck = runSource.match(
-    /^\[\[ "\$\(stat -c '%a' "\$XDG_RUNTIME_DIR"\)" == "700" && "\$\(realpath "\$XDG_RUNTIME_DIR"\)" == "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT"$/m,
+    /^\[\[ "\$\(stat -c '%a' "\$XDG_RUNTIME_DIR"\)" == "700" && "\$\(realpath "\$XDG_RUNTIME_DIR"\)" == "\$XDG_RUNTIME_DIR" \]\] \\\n  \|\| no_go "D2_PRIME_NO_GO_RUNTIME_DIR"$/m,
   )
   const exportXdg = runSource.match(/^export XDG_RUNTIME_DIR$/m)?.index ?? -1
   const firstUserSystemd = runSource.match(/^[ \t]*(?:systemctl|systemd-run)[ \t]+--user\b/m)?.index ?? -1
@@ -497,7 +568,7 @@ function verifyUserSystemdEnvironmentContract() {
   const checksAfterSystemd = runSource
     .replace(validationBlock, '')
     .replace(
-      /^(systemctl --user show-environment >\/dev\/null 2>&1 \\\n  \|\| no_go "D2_PRIME_NO_GO_ENVIRONMENT")$/m,
+      /^(systemctl --user show-environment >\/dev\/null 2>&1 \\\n  \|\| no_go "D2_PRIME_NO_GO_USER_MANAGER")$/m,
       `$1\n${validationBlock.trimEnd()}`,
     )
   assert.throws(() => assertUserSystemdEnvironmentContract(checksAfterSystemd, drillSource))
@@ -884,6 +955,11 @@ function main(args = process.argv.slice(2)) {
   verifyNginxRenderer()
   verifyCutoverStateMachine()
   verifyPm2ControlPlane()
+  try {
+    verifyExecutionEntryContract()
+  } catch {
+    throw new Error('D2_PRIME_EXECUTION_ENTRY_CONTRACT_INVALID')
+  }
   try {
     verifyUserSystemdEnvironmentContract()
   } catch {

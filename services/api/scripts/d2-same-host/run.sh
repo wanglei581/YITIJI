@@ -6,33 +6,44 @@ no_go() {
   exit 2
 }
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-API_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-ROOT="$(cd "$API_DIR/../.." && pwd)"
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+API_DIR="$(cd -P "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="$(cd -P "$API_DIR/../.." && pwd -P)"
 
-[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
+[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
 
 APPROVED_PATH="${D2_APPROVED_PATH:-/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 IFS=':' read -r -a approved_path_parts <<< "$APPROVED_PATH"
-[[ ${#approved_path_parts[@]} -gt 0 ]] || no_go "D2_PRIME_NO_GO_PATH"
+[[ ${#approved_path_parts[@]} -gt 0 ]] || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
 for path_part in "${approved_path_parts[@]}"; do
-  [[ "$path_part" == /* && "$path_part" != *$'\n'* && "$path_part" != *"/../"* ]] \
-    || no_go "D2_PRIME_NO_GO_PATH"
+  [[ "$path_part" == /* && "$path_part" != *$'\n'* && "$path_part" != *"/../"* && "$path_part" != *"/.." ]] \
+    || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
+  [[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]] \
+    || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
+  path_part_physical="$(cd -P -- "$path_part" 2>/dev/null && pwd -P)" \
+    || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
+  [[ "$path_part_physical" != "$ROOT" && "$path_part_physical" != "$ROOT/"* ]] \
+    || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
 done
 export PATH="$APPROVED_PATH"
 
 required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
 for required_command in "${required_commands[@]}"; do
-  command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 done
-node --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-pnpm --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+node --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
+pnpm --version >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
+nginx -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_TOOLCHAIN"
 NODE_BIN="$(command -v node)"
 PM2_BIN="$(command -v pm2)"
 NGINX_BIN="$(command -v nginx)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
+
+[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]] \
+  || no_go "D2_PRIME_NO_GO_EVIDENCE_PATH"
+EVIDENCE_DIR="$D2_EVIDENCE_DIR"
+EVIDENCE_OUT="$D2_EVIDENCE_OUT"
 
 production_variables=(
   DATABASE_URL DIRECT_URL POSTGRES_URL
@@ -76,9 +87,9 @@ done
 
 XDG_RUNTIME_DIR="/run/user/$(id -u)"
 [[ -d "$XDG_RUNTIME_DIR" && -O "$XDG_RUNTIME_DIR" && ! -L "$XDG_RUNTIME_DIR" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  || no_go "D2_PRIME_NO_GO_RUNTIME_DIR"
 [[ "$(stat -c '%a' "$XDG_RUNTIME_DIR")" == "700" && "$(realpath "$XDG_RUNTIME_DIR")" == "$XDG_RUNTIME_DIR" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  || no_go "D2_PRIME_NO_GO_RUNTIME_DIR"
 export XDG_RUNTIME_DIR
 
 stop_user_unit_and_prove_inactive() {
@@ -99,9 +110,9 @@ stop_user_unit_and_prove_inactive() {
 }
 
 systemctl --user show-environment >/dev/null 2>&1 \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  || no_go "D2_PRIME_NO_GO_USER_MANAGER"
 [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == "yes" ]] \
-  || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  || no_go "D2_PRIME_NO_GO_USER_MANAGER"
 
 PREFLIGHT_UNIT="f1-d2-preflight-$(tr -d '-' < /proc/sys/kernel/random/uuid)"
 PREFLIGHT_OK=1
@@ -142,7 +153,7 @@ if (( PREFLIGHT_OK == 1 )); then
   [[ "${PREFLIGHT_NOFILE%%:*}" == "256" ]] || PREFLIGHT_OK=0
 fi
 stop_user_unit_and_prove_inactive "$PREFLIGHT_UNIT" || PREFLIGHT_OK=0
-(( PREFLIGHT_OK == 1 )) || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+(( PREFLIGHT_OK == 1 )) || no_go "D2_PRIME_NO_GO_CGROUP_DELEGATION"
 
 NGINX_PORT="${D2_NGINX_PORT:-18080}"
 [[ "$NGINX_PORT" =~ ^[0-9]+$ ]] \
@@ -166,7 +177,6 @@ env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
   ' 3010 3011 "$NGINX_PORT" \
   || no_go "D2_PRIME_NO_GO_PORT"
 
-EVIDENCE_DIR="${D2_EVIDENCE_DIR:-$SCRIPT_DIR/.evidence}"
 WORK_DIR="${D2_WORK_DIR:-$SCRIPT_DIR/.work}"
 [[ "$EVIDENCE_DIR" == /* && "$WORK_DIR" == /* ]] || no_go "D2_PRIME_NO_GO_PATH"
 mkdir -p -m 700 "$EVIDENCE_DIR" "$WORK_DIR"
@@ -311,7 +321,6 @@ MANAGED_PM2_HOME_ID="${MANAGED_PM2_HOME_HASH%% *}"
 UNIT_NAME="f1-d2-managed-${NONCE:0:20}"
 READY_MARKER="$RUN_DIR/managed-ready.json"
 STOP_MARKER="$RUN_DIR/managed-stop"
-EVIDENCE_OUT="${D2_EVIDENCE_OUT:-$EVIDENCE_DIR/d2-prime-evidence-$(date -u +%Y%m%dT%H%M%SZ).json}"
 [[ "$EVIDENCE_OUT" == /* && "$(realpath -m "$(dirname "$EVIDENCE_OUT")")" == "$EVIDENCE_DIR" ]] \
   || no_go "D2_PRIME_NO_GO_EVIDENCE_PATH"
 [[ ! -e "$EVIDENCE_OUT" && ! -L "$EVIDENCE_OUT" ]] || no_go "D2_PRIME_NO_GO_EVIDENCE_EXISTS"
@@ -320,11 +329,11 @@ KEEPER_STARTED=0
 
 timeout --signal=TERM --kill-after=2s 5s \
   env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
-  "$PM2_BIN" -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  "$PM2_BIN" -v >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_PM2_PREFLIGHT"
 timeout --signal=TERM --kill-after=3s 8s \
   env -i PATH="$APPROVED_PATH" HOME="$PREFLIGHT_HOME" PM2_HOME="$PREFLIGHT_PM2_HOME" \
-  "$PM2_BIN" kill >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_ENVIRONMENT"
-pm2_home_has_state "$PREFLIGHT_PM2_HOME" && no_go "D2_PRIME_NO_GO_ENVIRONMENT"
+  "$PM2_BIN" kill >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_PM2_PREFLIGHT"
+pm2_home_has_state "$PREFLIGHT_PM2_HOME" && no_go "D2_PRIME_NO_GO_PM2_PREFLIGHT"
 
 cleanup() {
   local cleanup_failed=0
