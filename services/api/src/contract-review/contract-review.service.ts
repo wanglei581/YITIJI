@@ -20,6 +20,7 @@ import {
   type ConsentTruthEvent,
 } from '../member-privacy/member-privacy.service'
 import { issueAnonymousAccessToken } from './contract-review-access'
+import { CONTRACT_RULE_PACK_VERSION } from './contract-review.rules'
 import { assertOwnerShape } from './contract-review-state'
 import type {
   ContractReviewCreateInput,
@@ -36,7 +37,10 @@ const CONTRACT_TYPES: ReadonlySet<string> = new Set<ContractType>([
   'offer',
 ])
 
-export const CONTRACT_REVIEW_RULE_PACK_VERSION = 'cn-labor-p0-v1'
+export {
+  CONTRACT_RULE_PACK_VERSION,
+  CONTRACT_RULE_PACK_VERSION as CONTRACT_REVIEW_RULE_PACK_VERSION,
+} from './contract-review.rules'
 export const CONTRACT_REVIEW_SCHEMA_VERSION = 'contract-review-result-v1'
 const ANONYMOUS_CONSENT_MAX_AGE_MS = 15 * 60 * 1000
 const ANONYMOUS_CONSENT_FUTURE_SKEW_MS = 60 * 1000
@@ -331,7 +335,7 @@ export class ContractReviewService {
         consentedAt: owner.consent.consentedAt,
         consentScopeHash: owner.consent.consentScopeHash,
         disclaimerVersion: owner.consent.disclaimerVersion,
-        rulePackVersion: CONTRACT_REVIEW_RULE_PACK_VERSION,
+        rulePackVersion: CONTRACT_RULE_PACK_VERSION,
         schemaVersion: CONTRACT_REVIEW_SCHEMA_VERSION,
         expiresAt: sourceFile.expiresAt,
       },

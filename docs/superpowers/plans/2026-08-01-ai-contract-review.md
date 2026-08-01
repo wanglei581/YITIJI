@@ -673,11 +673,13 @@ P0 只对 `labor_contract` 执行确定性规则；其他合同类型返回空�
 
 规则引擎必须是无 Nest、无 I/O、无 `Date`、无日志、无模型调用的纯函数/不可变实现。内部规则输出包含 `ruleId/rulePackVersion/basisRef/evidence/requiredFacts/source: 'rule'`，由 Task 11 再映射与合并到共享 Finding。所有 `priority_check` 必须携带 canonical page 上的精确原文证据，`charStart/charEnd` 使用 UTF-16 code units 且能按页切片还原；缺少完整事实或精确证据时必须降级为 `insufficient_info`，不得断言。输出文案使用“建议核实”“与法定上限不一致”等保守表述，禁止“合同无效”“必属违法”等结论性语言，也不生成白名单之外的法条编号。
 
+事实输入必须区分“明确未约定”和“尚未提取/未知”：劳动合同规则字段缺失或为 unknown 时输出带 `requiredFacts` 的 `insufficient_info`，不得以空 findings 伪装为已检查无风险；显式 absent 才允许静默无命中。结构化事实与原文冲突、原文只有否定句、数字仅出现在工资/补偿/生效时间等非期限语境，均不得产生 `priority_check`。违约金第 23 条豁免只适用于竞业限制约定，不把一般保密义务单独当作允许劳动者承担违约金的情形；确定性证据还必须明确绑定劳动者一方的支付/承担义务。
+
 固定样本必须覆盖：合同期限 `<3` 月不得约定试用期、`3–<12` 月最多 1 月、`12–<36` 月最多 2 月、`>=36` 月或无固定期限最多 6 月；竞业期限超过 24 月；扣押证件/收取财物的否定语境；仅第 22/23 条范围内可约定违约金；emoji 前缀的 UTF-16 偏移、同页重复文本的证据定位、缺地域数据、所有 basisRef 均在白名单、输入/输出不可变，以及非劳动合同不得产生确定性违法判断。
 
 - [ ] **Step 4: 运行 100% 固定样本命中与覆盖率测试**
 
-Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-include=src/contract-review/contract-review-rule*.ts src/contract-review/__tests__/contract-review-rule-engine.test.ts`
+Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-lines=80 --test-coverage-functions=80 '--test-coverage-include=src/contract-review/contract-review-rule*.ts' '--test-coverage-include=src/contract-review/contract-review.rules.ts' src/contract-review/__tests__/contract-review-rule-engine.test.ts`
 
 Expected: PASS；固定样本断言全部命中。
 
