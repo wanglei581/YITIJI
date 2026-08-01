@@ -5,8 +5,8 @@
   "complexity": "L+",
   "risk": "high",
   "domain": "backend",
-  "currentPhase": "planning",
-  "nextAction": "按文件归属移植治理内核并保留主干 cleanup/stale-PID/systemd 合同",
+  "currentPhase": "implementation",
+  "nextAction": "并行移植治理内核、run.sh wiring 与旧 contract 增量适配",
   "createdAt": "2026-08-01T13:48:15Z",
   "branch": "codex/f1-d2-invocation-governance-reconcile-20260801"
 }
