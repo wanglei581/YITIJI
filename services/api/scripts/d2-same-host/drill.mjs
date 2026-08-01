@@ -331,7 +331,6 @@ async function main() {
     const activation = await activateRelease({ candidateRoot: r2.releaseRoot, currentLink: fixture.managedCurrentLink, ...commonReleaseOptions })
     assert.equal(activation.releaseId, r2Id)
 
-    const managedAppPidBeforeRollback = pm2AppPid(pm2Bin, managedName, managedEnvironment)
     if (!isAbsolute(systemctlBin)) fail('SYSTEMCTL_INVALID')
     const managedControlGroup = systemdValue(systemctlBin, unitName, 'ControlGroup', systemEnvironment)
     if (!managedControlGroup.startsWith('/')) fail('CGROUP_INVALID')

@@ -876,7 +876,7 @@ function assertDrillDiagnosticWiring(source) {
     ['TOPOLOGY', 'const topology = {'],
     ['CONTROL_ISOLATION', 'const controlIsolation = {'],
     ['RESOURCE_ISOLATION', 'const resourceIsolation = {'],
-    ['CGROUP_CONSISTENCY', 'assert.equal(controlGroup(managedAppPidBeforeRollback), managedControlGroup)'],
+    ['CGROUP_CONSISTENCY', 'assert.equal(controlGroup(managedAppPid), managedControlGroup)'],
   ]) {
     const assignment = `currentMeasureStep = MEASURE_STEPS.${step}`
     assert.equal(executable.split(assignment).length - 1, 1)
