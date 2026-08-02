@@ -207,10 +207,6 @@ export const kioskRouter = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgenciesPage')).default }),
       },
       {
-        path: 'offline-agencies/:id',
-        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgencyDetailPage')).default }),
-      },
-      {
         path: 'notifications',
         lazy: async () => ({ Component: (await import('../pages/placeholders/NotificationsPage')).default }),
       },

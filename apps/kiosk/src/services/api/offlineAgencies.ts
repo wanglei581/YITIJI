@@ -33,20 +33,11 @@ export interface WireOfflineAgency {
   updatedAt: string
 }
 
-interface WireOfflineAgencyListStats {
-  totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
-  lastSyncLabel?: string
-}
-
 interface WireOfflineAgencyListResponse {
-  items: WireOfflineAgency[]
+  data: WireOfflineAgency[]
   total: number
   page: number
   pageSize: number
-  stats?: WireOfflineAgencyListStats
 }
 
 export interface WireOfflineJobAgency {
@@ -94,17 +85,7 @@ export interface OfflineAgencyDTO {
   services: string[]
   orgCode?: string
   syncTime?: string
-  status: 'open' | 'rest'
-  statusLabel?: string
-  jobCount: number
-}
-
-export interface OfflineAgencyListStats {
-  totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
-  lastSyncLabel?: string
+  phone?: string | null
 }
 
 export interface OfflineAgencyListResult {
@@ -112,7 +93,6 @@ export interface OfflineAgencyListResult {
   total: number
   page: number
   pageSize: number
-  stats: OfflineAgencyListStats
 }
 
 export interface OfflineAgencyListParams {
@@ -223,7 +203,6 @@ export interface OfflineAgencyDetailDTO extends OfflineAgencyDTO {
 }
 
 export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDTO {
-  const isOpen = agency.status === 'active'
   return {
     id: agency.id,
     name: agency.name,
@@ -234,9 +213,7 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     services: parseStringList(agency.services),
     orgCode: agency.externalId ?? agency.sourceOrgId ?? undefined,
     syncTime: agency.syncTime ?? undefined,
-    status: isOpen ? 'open' : 'rest',
-    statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
-    jobCount: 0,
+    phone: agency.phone ?? null,
   }
 }
 
@@ -275,18 +252,12 @@ export async function getOfflineAgencies(
   const response = await getJson<WireOfflineAgencyListResponse>(
     `/kiosk/offline-agencies${qs({ ...params })}`,
   )
-  if (!Array.isArray(response.items)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
+  if (!Array.isArray(response.data)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
   return {
-    items: response.items.map(mapWireOfflineAgency),
+    items: response.data.map(mapWireOfflineAgency),
     total: response.total,
     page: response.page,
     pageSize: response.pageSize,
-    stats: response.stats ?? {
-      totalAgencies: response.total,
-      openAgencies: 0,
-      totalJobs: 0,
-      districts: 0,
-    },
   }
 }
 

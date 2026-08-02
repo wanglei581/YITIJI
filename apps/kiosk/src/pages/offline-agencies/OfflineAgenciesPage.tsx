@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
-import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
+import { BuildingIcon, ClockIcon, ExternalLinkIcon, MapPinIcon, PhoneIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
 import {
   getOfflineAgencies,
   type OfflineAgencyDTO,
   type OfflineAgencyListResult,
 } from '../../services/api/offlineAgencies'
+import { recordExternalJump } from '../../services/api/activity'
+import { useAuth } from '../../auth/useAuth'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
@@ -14,42 +16,25 @@ const PAGE_SIZE = 10
 const DISTRICTS = ['全部', '高新区', '城东区', '城南区', '城北区']
 const SERVICES = ['全部', '岗位推荐', '用工咨询', '劳务派遣']
 
-function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
-  const cells = [
-    { n: stats.totalAgencies, t: '合作机构' },
-    { n: stats.openAgencies, t: '今日服务' },
-    { n: stats.totalJobs, t: '在招岗位' },
-    { n: stats.districts, t: '覆盖区域' },
-  ]
-  return (
-    <div className="oa-stats-band" aria-label="机构概览">
-      <div className="oa-stats-cells">
-        {cells.map((cell) => (
-          <div key={cell.t}>
-            <div className="oa-n">{cell.n}</div>
-            <div className="oa-t">{cell.t}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () => void }) {
-  const isOpen = agency.status === 'open'
+function AgencyRow({
+  agency,
+  onVisit,
+  onCall,
+}: {
+  agency: OfflineAgencyDTO
+  onVisit: () => void
+  onCall: () => void
+}) {
   const services = Array.isArray(agency.services) ? agency.services : []
+  const hasPhone = Boolean(agency.phone && agency.phone.trim())
   return (
-    <article className="jf-row oa-agency-row" aria-label={agency.name} onClick={onClick} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+    <article className="jf-row oa-agency-row" aria-label={agency.name}>
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{agency.name}</b>
-          <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
-            <i className="oa-dot" aria-hidden="true" />
-            {agency.statusLabel || (isOpen ? '营业中' : '机构临时休息 · 以门店公告为准')}
-          </span>
         </div>
         <div className="jf-row-info">
           <span>
@@ -58,7 +43,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           </span>
           <span>
             <ClockIcon aria-hidden="true" />
-            {agency.hours || '以门店公告为准'}
+            {agency.hours || '服务时间以机构公示为准'}
           </span>
         </div>
         <div className="jf-row-sub">
@@ -69,9 +54,25 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           <span className="jf-chip ok">资质核验已通过</span>
         </div>
       </div>
-      <div className="oa-r-aside" aria-label={`${agency.jobCount} 个在招岗位`}>
-        <div className="oa-jobs-n">{agency.jobCount}</div>
-        <div className="oa-jobs-t">在招岗位</div>
+      <div className="oa-r-actions" aria-label={`到店 / 联系 ${agency.name}`}>
+        <button
+          type="button"
+          className="jf-btn sm"
+          onClick={onVisit}
+        >
+          <ExternalLinkIcon aria-hidden="true" />
+          到店咨询
+        </button>
+        {hasPhone && (
+          <button
+            type="button"
+            className="jf-btn ghost sm"
+            onClick={onCall}
+          >
+            <PhoneIcon aria-hidden="true" />
+            拨打机构电话
+          </button>
+        )}
       </div>
     </article>
   )
@@ -89,6 +90,7 @@ function EmptyState() {
 
 export function OfflineAgenciesPage() {
   const navigate = useNavigate()
+  const { getToken } = useAuth()
   const [data, setData] = useState<OfflineAgencyListResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -129,13 +131,24 @@ export function OfflineAgenciesPage() {
   }, [district, service, keyword, page, retryKey])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0
-  const syncHint = useMemo(() => data?.stats.lastSyncLabel || '已同步', [data])
+
+  const handleVisit = (agency: OfflineAgencyDTO) => {
+    const token = getToken()
+    recordExternalJump(token, 'offline_agency', agency.id, 'external_open')
+  }
+
+  const handleCall = (agency: OfflineAgencyDTO) => {
+    if (!agency.phone) return
+    const token = getToken()
+    recordExternalJump(token, 'offline_agency', agency.id, 'external_open')
+    window.location.href = `tel:${agency.phone}`
+  }
 
   return (
     <KioskPageFrame
       tone="clay"
       title="线下招聘机构"
-      subtitle="合作人力资源机构门店 · 岗位咨询与应聘到店办理"
+      subtitle="合作人力资源机构门店 · 到店咨询本平台不代收简历、不代收费用"
       backLabel="返回岗位信息"
       onBack={() => navigate('/jobs')}
       badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
@@ -185,14 +198,12 @@ export function OfflineAgenciesPage() {
         <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
       ) : !data ? null : (
         <div className="oa-list-shell">
-          <StatsBand stats={data.stats} />
-
           <div className="jf-list-meta">
             <span>
-              共 <b>{data.total}</b> 家合作机构 · {syncHint}
+              共 <b>{data.total}</b> 家合作机构
             </span>
             <span style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--muted)' }}>
-              到店咨询办理 · 本终端不代收简历
+              到店咨询办理 · 服务时间以机构公示为准
             </span>
           </div>
 
@@ -204,7 +215,8 @@ export function OfflineAgenciesPage() {
                 <AgencyRow
                   key={agency.id}
                   agency={agency}
-                  onClick={() => navigate(`/offline-agencies/${agency.id}`)}
+                  onVisit={() => handleVisit(agency)}
+                  onCall={() => handleCall(agency)}
                 />
               ))}
             </div>
