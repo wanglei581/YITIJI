@@ -9,6 +9,7 @@ import { PhoneRebindDto } from './dto/phone-rebind.dto'
 import { SendMemberStepUpCodeDto, VerifyMemberStepUpDto } from './dto/member-step-up.dto'
 import { ClaimQrLoginDto, ConfirmQrLoginDto, CreateQrLoginDto } from './dto/qr-login.dto'
 import { SendSmsCodeDto } from './dto/send-sms-code.dto'
+import { WxMiniappLoginDto } from './dto/wx-miniapp-login.dto'
 import {
   MemberAuthService,
   type MemberAuthUser,
@@ -67,6 +68,20 @@ export class MemberAuthController {
         termsVersion: dto.termsVersion,
         privacyVersion: dto.privacyVersion,
       }),
+    )
+  }
+
+  /** 微信小程序一键登录（getPhoneNumber 授权）。appSecret 全程服务端持有，不经前端。 */
+  @Post('auth/wx-login')
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async wxLogin(@Body() dto: WxMiniappLoginDto, @Req() req: Request): Promise<ApiResponse<MemberLoginResult>> {
+    return ApiResponse.ok(
+      await this.service.wxLogin(
+        dto.code,
+        dto.phoneCode,
+        { termsVersion: dto.termsVersion, privacyVersion: dto.privacyVersion },
+        clientIp(req),
+      ),
     )
   }
 

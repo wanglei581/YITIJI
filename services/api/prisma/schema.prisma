@@ -499,6 +499,8 @@ model EndUser {
   id          String    @id @default(cuid())
   phoneHash   String    @unique
   phoneEnc    String
+  /// 微信小程序 openid（一键登录后写入）；不存 sessionKey；null = 未绑定微信。
+  wxOpenId    String?   @unique
   nickname    String?
   enabled     Boolean   @default(true)
   status      String    @default("active")
