@@ -87,6 +87,7 @@
 | 73 | 73-assistant-call.html | 语音咨询中 | 面试助手政策 | (无独立路由;`/assistant` 内 AssistantCallPanel) | AssistantCallPanel | src/pages/assistant/AssistantCallPanel.tsx | useAiAdvisorCallSession | 声纹、实时字幕、通话控制 | loading / error / 通话态 | verify-assistant-trtc-guard |
 | 74 | 74-job-detail-offline.html | 岗位详情(线下机构) | 岗位企业 | `/jobs/:id/offline` (lazy) | OfflineJobDetailPage | src/pages/offline-agencies/OfflineJobDetailPage.tsx | offlineAgencies API | 机构门店卡、到店咨询、打印带走 | loading / error / "打印即将上线"提示 | (无专项) |
 | 75 | 75-offline-agencies.html | 线下招聘机构 | 岗位企业 | `/offline-agencies` (lazy) | OfflineAgenciesPage | src/pages/offline-agencies/OfflineAgenciesPage.tsx | offlineAgencies API | 机构门店列表、营业状态、服务范围 | loading / empty / error | (无专项) |
+| 75-B | (生产实现) | 线下机构详情 | 岗位企业 | `/offline-agencies/:id` (lazy) | OfflineAgencyDetailPage | src/pages/offline-agencies/OfflineAgencyDetailPage.tsx | offlineAgencies API | 机构详情、服务项目、联系方式 | loading / error | (无专项) |
 
 ---
 
@@ -291,7 +292,7 @@
 - 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
-- 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
+- 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/offline-agencies/:id`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
 - 自我探索 · 倾向参考（PR ③）：`/resume/self-assessment/intro`、`/resume/self-assessment/questions`、`/resume/self-assessment/result`、`/resume/self-assessment/history`。
 
 ### 8.3 Compatibility redirects（不是重复屏）

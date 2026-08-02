@@ -513,7 +513,6 @@ model EndUser {
   closingRequestedAt DateTime?
   anonymizedAt DateTime?
   lastLoginAt DateTime?
-  wxOpenId    String?   @unique
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
