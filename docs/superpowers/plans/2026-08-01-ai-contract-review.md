@@ -1111,29 +1111,56 @@ git commit -m "feat: orchestrate contract review jobs"
 
 Task 12 只接线 Task 11 的队列服务：create 持久化成功后必须 `enqueueExtract`；confirm 完成归属、`awaiting_confirmation` 和 `extractionFingerprint` 校验后，在数据库中写 `confirmedAt` 并 CAS 到 `rule_checking`，再 `enqueueAnalyze`。这个 CAS 是用户确认事件的持久化真相，不是 controller 伪造后台进度；analyze processor 不能从 `awaiting_confirmation` 自行推进。两者都禁止在 HTTP 线程内联执行。enqueue 失败时 create 将新 task CAS 为 `expired` 且把 `expiresAt` 收紧为当前时间后返回 503；confirm enqueue 失败则保留已确认的 `rule_checking`，同一归属用户重试 confirm 时只允许幂等补发同 jobId，不得重复改写 `confirmedAt`。匿名 create 在 enqueue 成功前不得把 access token 返回客户端。
 
-由于 Task 14 之前尚无可终止的进程隔离与 Gate 0 批准 runtime，`ContractReviewController` 只能在显式测试开关下注册供 verifier 使用；默认 AppModule 仍无生产合同 HTTP 路由。Task 12 的“路由通过”表示测试模块契约通过，不表示生产入口已启用。
+为避免上述边界被 controller 分裂，HTTP 编排固定收口到新的 `ContractReviewLifecycleService`：controller 只解析 requester、调用一个 lifecycle 方法并包装 `ApiResponse`，不直接调 queue/Prisma/清理。`createAndEnqueue` 在队列成功前只在调用栈内保持匿名明文 token；队列抛错后对 `uploaded/queued/extracting/awaiting_confirmation` 做 fail-closed CAS 到 `expired + expiresAt=now`，即使 CAS 因竞争为 0 也只返 503 且永不返 token。`confirmAndEnqueue` 首次确认与重试补发走同一方法，已是 `rule_checking + confirmedAt` 时只补发确定性 analyze jobId。
+
+由于 Task 14 之前尚无可终止的进程隔离与 Gate 0 批准 runtime，`ContractReviewController` 只能由不被 AppModule 引用的独立 `ContractReviewHttpModule` 显式装配供 verifier/单测使用；禁止通过 env 分支或“测试开关”改变默认 Module 元数据。默认 AppModule 仍无生产合同 HTTP 路由。Task 12 的“路由通过”表示测试模块契约通过，不表示生产入口已启用。
 
 **Files:**
 - Create: `services/api/src/contract-review/dto/contract-review.dto.ts`
 - Create: `services/api/src/contract-review/contract-review.controller.ts`
 - Create: `services/api/src/contract-review/contract-review-consent.service.ts`
-- Create: `services/api/src/contract-review/__tests__/contract-review-http-service.test.ts`
+- Create: `services/api/src/contract-review/contract-review-lifecycle.service.ts`
+- Create: `services/api/src/contract-review/contract-review-task-access.ts`
+- Create: `services/api/src/contract-review/contract-review-task-view.mapper.ts`
+- Create: `services/api/src/contract-review/contract-review-http.module.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-lifecycle.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-http-controller.test.ts`
 - Create: `services/api/scripts/verify-contract-review-http.ts`
 - Modify: `services/api/src/contract-review/contract-review.service.ts`
+- Modify: `services/api/src/contract-review/contract-review.types.ts`
+- Modify: `services/api/src/contract-review/contract-review.cleanup.task.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-cleanup.test.ts`
+- Modify: `services/api/src/contract-review/contract-review-safety-gate.service.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-safety-gate.test.ts`
 - Modify: `services/api/src/contract-review/contract-review.module.ts`
 - Modify: `services/api/package.json`
+- Modify: `docs/superpowers/plans/2026-08-01-ai-contract-review.md`
+
+`ContractReviewConsentService` 承接唯一 active disclaimer 查询、合法性检查和 scope snapshot；`ContractReviewTaskAccess` 只做 member/token 同形 404 归属校验；task-view mapper 是纯函数，只在 `status === 'completed'` 时解析并返回 `resultJson`。Task 6 的 `ContractReviewService.create()` 仍是可返回匿名明文 token 的内部持久化 primitive，只允许 lifecycle 调用；本次必须把 `ContractReviewService` 从模块 exports 移除，controller/外部模块不能注入或直连它，模块只公开 lifecycle/consent/queue 所需边界。`ContractReviewHttpModule` 不得被 AppModule 或默认 `ContractReviewModule` import，它只供 Task 12 verifier/单测显式装配 controller；Task 14 达成所有生产门禁后再决定生产注册。
+
+行数预算：`ContractReviewLifecycleService` 300–450 行，controller 不超过 180 行，consent/access/mapper 各自不超过 200 行；两个新增测试文件各不超过 600 行，按 lifecycle 并发/持久化语义与真实 HTTP/DTO/限流契约拆分。默认 `ContractReviewModule` 本次只能增加/导出 consent 与 lifecycle provider，其 metadata 必须继续零 controller、零 Bull queue/processor、零 `ContractReviewHttpModule` import，模块测试必须对此做精确断言。
+
+DELETE 要求真正“立即删除”，因此 Task 11 cleanup 必须暴露一个按 taskId 精确处理的受控方法 `purgeExpiredTaskById(taskId)`：lifecycle 先完成归属校验，再把当前状态 CAS 为 `expired` 并同步写 `expiresAt=now`，随后调用该方法删除原件/派生件和 task 行；它与 cron 复用同一共享引用、幂等删除和脱敏日志语义，不复制第二套删除实现。只有 task 行确认已删除（或被并发 cleanup 删除）才返回 `{ id, deleted: true }`；任一待删物理对象失败时必须保留 `expired + expiresAt<=now` 的 task 行并抛固定 503 `CONTRACT_REVIEW_DELETE_RETRY`，让下一轮 DELETE 或 cron 可立即重试，禁止返回假成功。
 
 - [ ] **Step 1: 写 HTTP 归属和错误同形失败验证**
 
 ```typescript
-assert.equal(await request('GET', `/contract-reviews/${otherId}`, memberA).status, 404)
-assert.equal(await request('GET', `/contract-reviews/${missingId}`, memberA).status, 404)
-assert.equal(await request('GET', `/contract-reviews/${anonymousId}`, { 'x-contract-review-access-token': 'wrong' }).status, 404)
+assert.equal((await request('GET', `/contract-reviews/${otherId}`, memberA)).status, 404)
+assert.equal((await request('GET', `/contract-reviews/${missingId}`, memberA)).status, 404)
+assert.equal((await request('GET', `/contract-reviews/${anonymousId}`, { 'x-contract-review-access-token': 'wrong' })).status, 404)
 assert.equal((await request('POST', '/contract-reviews', anonymousWithoutConsent)).status, 400)
 assert.equal((await request('POST', '/contract-reviews', anonymousWithoutSourceProof)).status, 404)
 assert.equal((await request('POST', '/contract-reviews', anonymousWithWrongFileProof)).status, 404)
 assert.equal((await request('GET', '/contract-reviews/consent-scope')).status, 200)
+assert.equal((await request('POST', `/contract-reviews/${id}/confirm`, validConfirm)).status, 202)
+assert.equal((await request('POST', `/contract-reviews/${id}/report`)).status, 503)
 ```
+
+同批 RED 还必须覆盖：匿名 create 入队成功才返 token，入队失败时 503 + 无 token + task 转 expired；confirm 入队失败后保留原 `confirmedAt/rule_checking`，同归属重试只补发同 jobId 且不重写时间；GET 在非 completed 状态即使库中存在 `resultJson` 也固定返 `result:null`；GET/confirm/report/delete 的跨会员、错 token、无 token、会员访问匿名 task 均与不存在完全同形 404；默认 Module/AppModule 继续无合同 controller，只有显式 HttpModule harness 路由通过。
+
+还必须显式断言：会员 create 永不返 accessToken；Confirm DTO 缺字段、多字段、页数/截断不匹配或两个声明不是字面量 `true` 均 400 且不写 `confirmedAt`；匿名 token 的空值、错误长度、非法 hex/base64 与超长值均走现有定长 hash/timing-safe verifier 并固定同形 404，不抛长度异常或泄露比较分支；completed 的持久化 JSON 解析/strict parser 失败只返固定 500 且不回显原 JSON；DELETE 在未到 TTL 时也立即把任务置为 `expired + expiresAt<=now` 并完成物理清理，首次对象删除失败保留可立即重试的 task 行且第二次 DELETE/cron 能成功，存在共享文件引用时保留共享对象但仍删除当前 task 行。Task 6 旧 `contract-review-service.test.ts` 保留“持久化层明文 token 与 hash 匹配”的内部安全断言，但不再代表 HTTP 暴露时机；新 lifecycle/HTTP 测试是“队列成功后才暴露 token”的唯一外部契约。禁止继续向 999 行旧测试追加用例。
+
+并发 RED 不得省略：两个同归属 confirm 并发时只允许一次 CAS 写入 `confirmedAt`，CAS 失败方重读到 `rule_checking + confirmedAt` 后只补发同一个确定性 analyze jobId；jobId 继续严格复用 Task 11 已冻结的 `${jobName}.${taskId}`（即 `contract-review.analyze.${taskId}`），禁止时间戳、ULID 或请求级随机量。create 入队出现“队列可能已接收但客户端抛错”的模糊失败时，无论 worker 已推进到何状态，都不得泄露匿名 token或盲写覆盖 worker 终态。重复 queue add 可发生，但 adapter 必须依赖相同 jobId 去重。
 
 - [ ] **Step 2: 运行并确认路由 404**
 
@@ -1145,7 +1172,7 @@ Expected: FAIL，合同审查路由不存在。
 
 ```typescript
 function headerOf(req: RequestLike, name: string): string | null {
-  const value = req.headers?.[name]
+  const value = req.headers?.[name.toLowerCase()]
   if (typeof value === 'string' && value.trim()) return value.trim()
   if (Array.isArray(value) && value[0]) return value[0].trim()
   return null
@@ -1154,80 +1181,133 @@ function headerOf(req: RequestLike, name: string): string | null {
 @Controller('contract-reviews')
 export class ContractReviewController {
   constructor(
-    private readonly service: ContractReviewService,
-    private readonly queue: ContractReviewQueueService,
+    private readonly lifecycle: ContractReviewLifecycleService,
+    private readonly consent: ContractReviewConsentService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
   ) {}
 
-  private async requesterOf(req: RequestLike): Promise<ContractReviewRequester> {
+  private async requesterOf(
+    req: RequestLike,
+    includeSourceProof = false,
+  ): Promise<ContractReviewRequester> {
     const member = await resolveOptionalEndUser(req.headers?.authorization, this.jwt, this.redis, this.prisma)
     return member
       ? { endUserId: member.endUserId, accessToken: null, sourceFileProof: null }
       : {
           endUserId: null,
           accessToken: headerOf(req, 'x-contract-review-access-token'),
-          sourceFileProof: headerOf(req, 'x-contract-review-source-file-proof'),
+          sourceFileProof: includeSourceProof
+            ? headerOf(req, 'x-contract-review-source-file-proof')
+            : null,
         }
   }
 
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async create(@Body() dto: CreateContractReviewDto, @Req() req: RequestLike) {
-    const created = await this.service.create(dto, await this.requesterOf(req))
-    await this.service.enqueueCreatedOrExpire(created, this.queue)
-    return ApiResponse.ok(created)
+    return ApiResponse.ok(await this.lifecycle.createAndEnqueue(
+      dto,
+      await this.requesterOf(req, true),
+    ))
   }
 
   @Get('consent-scope')
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async consentScope() {
-    return ApiResponse.ok(await this.service.getConsentScope())
+    return ApiResponse.ok(await this.consent.getConsentScope())
   }
 
   @Get(':id')
   async get(@Param('id') id: string, @Req() req: RequestLike) {
-    return ApiResponse.ok(await this.service.get(id, await this.requesterOf(req)))
+    return ApiResponse.ok(await this.lifecycle.get(id, await this.requesterOf(req)))
   }
 
   @Post(':id/confirm')
+  @HttpCode(HttpStatus.ACCEPTED)
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
   async confirm(@Param('id') id: string, @Body() dto: ConfirmContractReviewDto, @Req() req: RequestLike) {
-    const confirmed = await this.service.confirm(id, dto, await this.requesterOf(req))
-    await this.queue.enqueueAnalyze(id)
-    return ApiResponse.ok(confirmed)
+    return ApiResponse.ok(await this.lifecycle.confirmAndEnqueue(
+      id,
+      dto,
+      await this.requesterOf(req),
+    ))
   }
 
   @Post(':id/report')
   @Throttle({ default: { ttl: 60_000, limit: 4 } })
   async report(@Param('id') id: string, @Req() req: RequestLike) {
-    return ApiResponse.ok(await this.service.createReport(id, await this.requesterOf(req)))
+    return ApiResponse.ok(await this.lifecycle.createReport(id, await this.requesterOf(req)))
   }
 
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestLike) {
-    return ApiResponse.ok(await this.service.remove(id, await this.requesterOf(req)))
+    return ApiResponse.ok(await this.lifecycle.remove(id, await this.requesterOf(req)))
   }
 }
 ```
 
-`ContractReviewService.getConsentScope()` 必须复用 Task 6 的唯一 active disclaimer 校验和 `createContractReviewConsentScopeSnapshot()`，返回当前免责声明 `id/version/content/publishedAt`、七项机器可读披露与服务端计算的 `consentScopeHash`；0 个/多个 active 文档继续 503 fail closed。Kiosk 必须先展示这份服务端内容并使用返回的 hash/version，不能在前端复制 canonical 算法或编造 hash。
+Confirm DTO 固定为精确键：`contractType`、`totalPages`、`analyzedPages`、`truncated`、`ocrCoverageConfirmed: true`、`personalUseConfirmed: true`。页数/截断必须与任务持久化真相精确相等，两个声明必须是布尔字面量 `true`；`contractType` 允许用户在完整性确认时更正并与首次 CAS 同时写入。DTO 不接收 fingerprint、token、provider/model 或任何原文字段。Create 成功保持 Nest POST 的 `201 Created`；confirm 固定 `202 Accepted`；GET/DELETE 成功为 200；report 在 Task 14 前固定完成归属校验后返 503 `REPORT_NOT_AVAILABLE`。
 
-为保证 Task 12 单独可编译，`ContractReviewService.createReport()` 在 Task 14 接入 PDF 前先实现诚实的受控响应：完成归属校验后抛出 `REPORT_NOT_AVAILABLE`（503）；HTTP verify 必须断言该错误，不能返回假 fileId。Task 14 用真实短期派生文件实现替换该分支。
+`ContractReviewConsentService.getConsentScope()` 必须复用 Task 6 的唯一 active disclaimer 校验和 `createContractReviewConsentScopeSnapshot()`，返回当前免责声明 `id/version/content/publishedAt`、七项机器可读披露与服务端计算的 `consentScopeHash`；0 个/多个 active 文档继续 503 fail closed。Kiosk 必须先展示这份服务端内容并使用返回的 hash/version，不能在前端复制 canonical 算法或编造 hash。
+
+为保证 Task 12 单独可编译，`ContractReviewLifecycleService.createReport()` 在 Task 14 接入 PDF 前先实现诚实的受控响应：完成归属校验后抛出 `REPORT_NOT_AVAILABLE`（503）；HTTP verify 必须断言该错误，不能返回假 fileId。Task 14 用真实短期派生文件实现替换该分支。
 
 Requester 解析沿用 optional member 模式；匿名任务读写只读 `x-contract-review-access-token` header，匿名 create 另只读 `x-contract-review-source-file-proof` header，二者均禁止 query token。source-file proof 必须是当前上传响应的短期 signed content URL，不能持久化到 local/session storage、日志或审计 payload。Create DTO 只允许 `sourceFileId/contractType/consentVersion/consentedAt/consentScopeHash/disclaimerVersion`，全局 whitelist 拒绝额外字段。GET 仅 completed 返回 result；其余只返回真实 stage/page progress。
 
+归属规则固定为：会员 task 只匹配精确 `endUserId`；匿名 task 只使用 `verifyAnonymousAccessToken()` 验证存储 hash；有效 member JWT 时 controller 忽略匿名/proof header，无效 JWT 按现有 optional-member 模式回落匿名且仍必须拥有相应 task token/proof。不存在、跨会员、错/缺 token、会员访问匿名 task 以及任何 GET/confirm/report/delete 的 proof 重放均返完全同形 404 `CONTRACT_REVIEW_TASK_NOT_FOUND`，不用 403 泄露存在性。归属正确且行仍存在的 `expired` 任务可返 200 `status:'expired'`；cleanup 删行后返 404。
+
+Task-view mapper 仅输出共享 `ContractReviewTaskView` 定义的字段；非 `completed` 时无条件返 `result:null`，即使数据库异常存在 `resultJson`。Task 10 SafetyGate 必须导出它已有的 `parsePersistedContractReviewResult(value: unknown)` strict result-shape parser 供持久化读取复用，不复制第二套 schema；`completed` JSON 经 `JSON.parse` 后必须通过该 parser，失败只抛固定 `CONTRACT_REVIEW_RESULT_INVALID`，lifecycle 将其映射为不回显原 JSON 的固定 500。`errorMessage`、accessTokenHash、fingerprint、provider/model 不得进入 TaskView。
+
+create 入队失败的多状态 CAS 只执行一次；影响行数为 0 时不再做盲写，不返 token，固定 503，已有终态/竞争行由原 `expiresAt` + Task 11 cleanup 最终收口。此取舍避免 HTTP 错误分支覆盖 worker 真实终态。
+
+`ContractReviewHttpModule` 必须显式 import `ContractReviewModule`、`JwtVerifierModule`、`RedisModule`，但不在业务模块内重复注册全局限流守卫。测试 root module 单独 import `ThrottlerModule.forRoot(...)` 并注册 `APP_GUARD -> ThrottlerGuard`，同时像 `main.ts` 一样显式安装 `ValidationPipe({ whitelist:true, forbidNonWhitelisted:true, transform:true, exceptionFactory:... })` 与 `HttpExceptionFilter`，不得依赖 AppModule 的隐式全局状态。由于 `CONTRACT_REVIEW_QUEUE_ADAPTER` 在默认模块中是 optional 且未注册，harness 禁止对该 token 使用无效的 `overrideProvider`；必须 override 已注册且导出的 `ContractReviewQueueService`，其 value 为 `new ContractReviewQueueService(memoryAdapter)`，分别模拟成功、确定失败和“已接受后抛错”的模糊失败。真实 HTTP 测试必须覆盖未知 DTO 字段的统一 400、固定错误 envelope，以及 create/confirm/report 超限后的 429；默认 AppModule 仍不得 import 该 HttpModule。Task 14 若把 HttpModule 接入已有 `AppModule`，直接复用 AppModule 的单个全局 ThrottlerGuard，禁止再次注册造成双重计数。
+
+`verify-contract-review-http.ts` 必须在同一脚本内依次启动并关闭两个独立 Nest application：第一段使用默认 `AppModule`，只断言所有合同路由为 404；第二段显式使用测试 `ContractReviewHttpModule` + 每例新建的内存 queue adapter，断言正向/错误/限流契约。两段不得复用同一个 application、端口、adapter 状态或全局容器；若必须 `listen`，只能使用 `listen(0)` 并读取 OS 分配端口，禁止 CI 硬编码端口，确保“默认关闭”与“隔离可验证”不是靠环境开关切换出来的假象。
+
+DELETE 置为 `expired + expiresAt<=now` 后，即使客户端不再重试，也必须被 Task 11 已有周期 cleanup 的 `expiresAt<=now` 扫描选中并复用同一 purge 核心；新增回归测试要证明 HTTP 首次物理删除失败后，下一轮 `runOnce()` 能清掉该行，禁止仅依赖客户端第二次 DELETE。
+
 - [ ] **Step 4: 运行 HTTP、越权和回归验证**
 
-Run: `pnpm --filter @ai-job-print/api verify:contract-review:http && pnpm --filter @ai-job-print/api verify:upload-sessions:http && pnpm --filter @ai-job-print/api typecheck`
+Run:
 
-Expected: PASS；不存在与越权响应同为 404。
+```bash
+pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
+  src/contract-review/__tests__/contract-review-lifecycle.test.ts \
+  src/contract-review/__tests__/contract-review-http-controller.test.ts \
+  src/contract-review/__tests__/contract-review-cleanup.test.ts \
+  src/contract-review/__tests__/contract-review-safety-gate.test.ts \
+  src/contract-review/__tests__/contract-review-module.test.ts
+pnpm --filter @ai-job-print/api exec node --test \
+  --experimental-test-coverage \
+  --test-coverage-lines=80 \
+  --test-coverage-functions=80 \
+  --test-coverage-branches=80 \
+  --test-coverage-include='src/contract-review/contract-review-lifecycle.service.ts' \
+  --test-coverage-include='src/contract-review/contract-review-task-access.ts' \
+  --test-coverage-include='src/contract-review/contract-review-task-view.mapper.ts' \
+  --test-coverage-include='src/contract-review/contract-review-consent.service.ts' \
+  --test-coverage-include='src/contract-review/contract-review.controller.ts' \
+  -r @swc-node/register \
+  src/contract-review/__tests__/contract-review-lifecycle.test.ts \
+  src/contract-review/__tests__/contract-review-http-controller.test.ts
+pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register 'src/contract-review/__tests__/*.test.ts'
+pnpm --filter @ai-job-print/api verify:contract-review:http
+pnpm --filter @ai-job-print/api verify:upload-sessions:http
+pnpm --filter @ai-job-print/api verify:contract-review:schema
+pnpm --filter @ai-job-print/api typecheck
+pnpm --filter @ai-job-print/api lint
+pnpm --filter @ai-job-print/api verify:contract-review:gate0
+git diff --check
+```
+
+Expected: PASS；纳入统计的新增 lifecycle/access/view/consent/controller 代码整体行/函数/分支覆盖率均不低于 80%；不存在与越权响应同为 404；真实 ValidationPipe/Filter/Throttler 契约通过；默认 AppModule 仍 404，只有 verifier 显式装配的 `ContractReviewHttpModule` 通过路由；Gate 0 仍显示 `blocked`。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add services/api/src/contract-review services/api/scripts/verify-contract-review-http.ts services/api/package.json
+git add services/api/src/contract-review services/api/scripts/verify-contract-review-http.ts services/api/package.json docs/superpowers/plans/2026-08-01-ai-contract-review.md
 git commit -m "feat: expose contract review API"
 ```
 

@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "fullstack-legal-ai",
   "currentPhase": "implementation",
-  "nextAction": "执行 Wave C Task 12：HTTP 服务分层、确认 CAS、幂等入队与访问控制",
+  "nextAction": "执行 Task 12 HTTP lifecycle、归属控制、立即删除与独立测试模块",
   "createdAt": "2026-08-01T10:48:32Z",
   "branch": "codex/contract-review-p0"
 }
