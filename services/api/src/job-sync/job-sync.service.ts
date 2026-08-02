@@ -14,8 +14,10 @@ import {
   type JobSourceResponseConfig,
   type SyncStats,
 } from './job-sync.types'
+import { validatePublicUrl } from './ssrf-guard'
 
 const FETCH_TIMEOUT_MS = 30_000
+const MAX_REDIRECTS = 5
 
 // ── Internal mapped types ─────────────────────────────────────────────────────
 
@@ -273,11 +275,23 @@ export class JobSyncService {
 
   // ── Private: HTTP ──────────────────────────────────────────────────────────
 
+  /**
+   * 向合作机构配置的外部 URL 发起 HTTP 请求并返回 JSON。
+   *
+   * SSRF 防护:
+   *  - 首次请求前通过 validatePublicUrl 验证 URL 合法且解析到公网 IP。
+   *  - 禁用自动重定向(redirect:'manual'),手动跟随 3xx 时重新对 Location
+   *    执行相同的 SSRF 校验,防止通过重定向绕过初始检查。
+   *  - 最多跟随 MAX_REDIRECTS(5)次,超过则抛 TOO_MANY_REDIRECTS。
+   */
   private async fetchJson(
     endpoint: string,
     authType: string | null,
     credential: string,
   ): Promise<unknown> {
+    // 1. SSRF 校验初始 URL
+    await validatePublicUrl(endpoint)
+
     const headers: Record<string, string> = { Accept: 'application/json' }
     switch (authType) {
       case 'bearer':   headers['Authorization'] = `Bearer ${credential}`;                              break
@@ -285,21 +299,46 @@ export class JobSyncService {
       case 'basic':    headers['Authorization'] = `Basic ${Buffer.from(credential).toString('base64')}`; break
     }
 
-    const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
-    let res: Response
-    try {
-      res = await fetch(endpoint, { headers, signal: ac.signal })
-    } catch (e) {
-      clearTimeout(timer)
-      throw new Error((e as Error).name === 'AbortError' ? 'REQUEST_TIMEOUT' : `NETWORK_ERROR: ${(e as Error).message}`)
-    }
-    clearTimeout(timer)
+    let currentUrl = endpoint
 
-    if (!res.ok) {
-      throw new Error(`HTTP_${res.status}: ${res.statusText.slice(0, 80)}`)
+    for (let attempt = 0; attempt <= MAX_REDIRECTS; attempt++) {
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS)
+      let res: Response
+      try {
+        res = await fetch(currentUrl, { headers, signal: ac.signal, redirect: 'manual' })
+      } catch (e) {
+        clearTimeout(timer)
+        throw new Error((e as Error).name === 'AbortError' ? 'REQUEST_TIMEOUT' : `NETWORK_ERROR: ${(e as Error).message}`)
+      }
+      clearTimeout(timer)
+
+      // 2. 手动跟随重定向并对 Location 重新做 SSRF 校验
+      if (res.status >= 300 && res.status < 400) {
+        if (attempt === MAX_REDIRECTS) {
+          throw new Error('TOO_MANY_REDIRECTS')
+        }
+        const location = res.headers.get('location')
+        if (!location) throw new Error('REDIRECT_WITHOUT_LOCATION')
+        // 解析相对 URL(Location 可能是相对路径)
+        let nextUrl: string
+        try {
+          nextUrl = new URL(location, currentUrl).href
+        } catch {
+          throw new Error(`SSRF_INVALID_REDIRECT_URL: ${location.slice(0, 200)}`)
+        }
+        await validatePublicUrl(nextUrl) // 重定向目标也必须是公网地址
+        currentUrl = nextUrl
+        continue
+      }
+
+      if (!res.ok) {
+        throw new Error(`HTTP_${res.status}: ${res.statusText.slice(0, 80)}`)
+      }
+      return res.json() as Promise<unknown>
     }
-    return res.json() as Promise<unknown>
+
+    throw new Error('TOO_MANY_REDIRECTS')
   }
 
   // ── Private: parsing ───────────────────────────────────────────────────────
