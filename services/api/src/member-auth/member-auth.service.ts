@@ -14,7 +14,7 @@ import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { SMS_SENDER, type SmsSender } from './sms/sms-sender'
 
-export type LegalConsentSource = 'sms_login' | 'qr_login'
+export type LegalConsentSource = 'sms_login' | 'qr_login' | 'wx_login'
 
 export interface LegalConsentVersions {
   termsVersion: string
@@ -384,5 +384,164 @@ export class MemberAuthService {
       // Best effort only: never replace the original security/DB/signing error.
       // No token is returned, and account-status guards remain fail-closed.
     }
+  }
+
+  // ── 微信小程序一键登录 ──────────────────────────────────────────────────────
+
+  /**
+   * 微信小程序一键登录主入口。
+   * 1. jscode2session(code) → openid（sessionKey 立即丢弃，不存储）
+   * 2. stable_token + getPhoneNumber(phoneCode) → 真实手机号
+   * 3. find/create EndUser by phoneHash，写入 wxOpenId
+   * 4. 持久化法务同意 → issueLoginForUser
+   *
+   * appSecret 仅服务端使用；openid 只存 wxOpenId 字段，不返回给前端。
+   */
+  async wxLogin(
+    code: string,
+    phoneCode: string,
+    consent: LegalConsentVersions,
+    ip: string,
+  ): Promise<MemberLoginResult> {
+    const resolved = await this.resolveActiveLegalVersions()
+    this.assertConsentMatches(consent, resolved)
+
+    const openid = await this.fetchWxOpenId(code)
+    const phone = await this.fetchWxPhone(phoneCode)
+
+    const phoneHash = hashPhone(phone)
+    const existing = await this.prisma.endUser.findUnique({ where: { phoneHash } })
+    if (existing && (!existing.enabled || existing.status !== 'active')) {
+      throw this.accountUnavailable()
+    }
+
+    let endUser: { id: string; nickname: string | null }
+    if (!existing) {
+      endUser = await this.prisma.endUser.create({
+        data: {
+          phoneHash,
+          phoneEnc: encryptPhone(phone),
+          wxOpenId: openid,
+          status: 'active',
+          enabled: true,
+          lastLoginAt: new Date(),
+        },
+      })
+    } else {
+      endUser = await this.prisma.endUser.update({
+        where: { id: existing.id },
+        data: { wxOpenId: openid, lastLoginAt: new Date() },
+      })
+    }
+
+    await this.persistLegalConsent({
+      endUserId: endUser.id,
+      termsVersion: resolved.termsVersion,
+      privacyVersion: resolved.privacyVersion,
+      termsDocVersionId: resolved.termsDocVersionId,
+      privacyDocVersionId: resolved.privacyDocVersionId,
+      source: 'wx_login',
+      ipAddress: ip,
+    })
+
+    return this.issueLoginForUser({
+      id: endUser.id,
+      phoneMasked: maskPhone(phone),
+      nickname: endUser.nickname,
+    })
+  }
+
+  private async fetchWxOpenId(code: string): Promise<string> {
+    const appid = process.env['WECHAT_MINIAPP_APPID']
+    const secret = process.env['WECHAT_MINIAPP_APPSECRET']
+    if (!appid || !secret) {
+      throw new HttpException(
+        { error: { code: 'WX_CONFIG_MISSING', message: '微信小程序登录暂不可用，请使用短信验证码登录' } },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      )
+    }
+    const url =
+      `https://api.weixin.qq.com/sns/jscode2session` +
+      `?appid=${encodeURIComponent(appid)}` +
+      `&secret=${encodeURIComponent(secret)}` +
+      `&js_code=${encodeURIComponent(code)}` +
+      `&grant_type=authorization_code`
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new HttpException(
+        { error: { code: 'WX_CODE2SESSION_FAILED', message: '微信登录服务异常，请稍后再试' } },
+        HttpStatus.BAD_GATEWAY,
+      )
+    }
+    const data = (await res.json()) as { openid?: string; errcode?: number; errmsg?: string }
+    // sessionKey 故意丢弃，不存储
+    if (!data.openid) {
+      throw new HttpException(
+        { error: { code: 'WX_CODE_INVALID', message: '微信登录凭证无效或已过期，请重试' } },
+        HttpStatus.UNAUTHORIZED,
+      )
+    }
+    return data.openid
+  }
+
+  private async fetchWxPhone(phoneCode: string): Promise<string> {
+    const appid = process.env['WECHAT_MINIAPP_APPID']
+    const secret = process.env['WECHAT_MINIAPP_APPSECRET']
+    if (!appid || !secret) {
+      throw new HttpException(
+        { error: { code: 'WX_CONFIG_MISSING', message: '微信小程序登录暂不可用，请使用短信验证码登录' } },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      )
+    }
+    const cacheKey = `wx:miniapp:access_token:${appid}`
+    let accessToken = await this.redis.get(cacheKey)
+    if (!accessToken) {
+      const tokenRes = await fetch('https://api.weixin.qq.com/cgi-bin/stable_token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ grant_type: 'client_credential', appid, secret }),
+      })
+      if (!tokenRes.ok) {
+        throw new HttpException(
+          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
+          HttpStatus.BAD_GATEWAY,
+        )
+      }
+      const tokenData = (await tokenRes.json()) as { access_token?: string; errcode?: number }
+      if (!tokenData.access_token) {
+        throw new HttpException(
+          { error: { code: 'WX_TOKEN_FAILED', message: '微信服务暂不可用，请稍后再试' } },
+          HttpStatus.BAD_GATEWAY,
+        )
+      }
+      accessToken = tokenData.access_token
+      await this.redis.setEx(cacheKey, 7100, accessToken)
+    }
+    const phoneRes = await fetch(
+      `https://api.weixin.qq.com/wxa/business/getuserphonenumber?access_token=${encodeURIComponent(accessToken)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: phoneCode }),
+      },
+    )
+    if (!phoneRes.ok) {
+      throw new HttpException(
+        { error: { code: 'WX_PHONE_FAILED', message: '无法获取手机号，请使用短信验证码登录' } },
+        HttpStatus.BAD_GATEWAY,
+      )
+    }
+    const phoneData = (await phoneRes.json()) as {
+      errcode?: number
+      phone_info?: { phoneNumber?: string; purePhoneNumber?: string }
+    }
+    const phone = phoneData.phone_info?.purePhoneNumber ?? phoneData.phone_info?.phoneNumber
+    if (!phone) {
+      throw new HttpException(
+        { error: { code: 'WX_PHONE_INVALID', message: '无法获取手机号，请使用短信验证码登录' } },
+        HttpStatus.UNPROCESSABLE_ENTITY,
+      )
+    }
+    return phone
   }
 }
