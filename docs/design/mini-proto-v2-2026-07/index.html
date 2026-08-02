@@ -60,7 +60,7 @@
     <div class="hero-t">AI 求职打印服务 · 小程序</div>
     <div class="hero-s">面向求职者的移动端全流程原型。以「青序」设计语言呈现，覆盖打印扫描、AI 简历服务、第三方求职信息、AI 工具与个人中心五大板块，可直接作为功能开发的视觉与交互基准。</div>
     <div class="hero-meta">
-      <div><div class="hm-n">56</div><div class="hm-l">页面</div></div>
+      <div><div class="hm-n">57</div><div class="hm-l">页面</div></div>
       <div><div class="hm-n">5</div><div class="hm-l">功能板块</div></div>
       <div><div class="hm-n">390×844</div><div class="hm-l">竖屏尺寸</div></div>
     </div>
@@ -80,11 +80,25 @@
     </div>
   </div>
 
+  <!-- 批量预览快速入口 -->
+  <div class="dnote" style="margin-top:18px">
+    <div class="dnote-card">
+      <div class="dn-t">批量预览 · 分板块多帧速览</div>
+      <div class="dn-p" style="margin-bottom:12px">以下预览页横排多个手机帧，适合快速对比同板块页面风格与交互一致性。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        <a href="mini-preview-print-flow.html" target="_blank" class="dn-tag" style="cursor:pointer;text-decoration:none;color:var(--clay);border-color:var(--clay);background:var(--surface)">🖨 打印流程预览</a>
+        <a href="mini-preview-jobs.html" target="_blank" class="dn-tag" style="cursor:pointer;text-decoration:none;color:var(--wheat);border-color:var(--wheat);background:var(--surface)">💼 求职信息预览</a>
+        <a href="mini-preview-ai.html" target="_blank" class="dn-tag" style="cursor:pointer;text-decoration:none;color:var(--plum);border-color:var(--plum);background:var(--surface)">✦ AI 工具预览</a>
+        <a href="mini-preview-premium.html" target="_blank" class="dn-tag" style="cursor:pointer;text-decoration:none;color:var(--wheat-deep);border-color:var(--wheat-deep);background:var(--surface)">◆ 会员中心预览</a>
+      </div>
+    </div>
+  </div>
+
   <div class="wrap" id="gallery"></div>
 
   <div class="foot">
     AI 求职打印服务终端 · 小程序原型 v2 · 2026-07<br>
-    共 56 个页面 · 点击任意卡片在新窗口打开完整原型
+    共 57 个页面 · 点击任意卡片在新窗口打开完整原型
   </div>
 
   <script>
@@ -96,7 +110,7 @@
         ['04','home','首页 · 综合入口'],
       ]},
       { idx:'2', color:'#b8683c', title:'打印扫描', pages:[
-        ['05','print-hub','打印中心'],['06','print-upload','上传文件'],['07','print-layout-ai','AI 排版建议'],
+        ['05','print-hub','打印中心'],['05b','bundle','材料包'],['06','print-upload','上传文件'],['07','print-layout-ai','AI 排版建议'],
         ['08','print-settings','打印参数'],['09','print-preview','打印预览'],['10','print-store','选择门店'],
         ['11','print-pay','确认支付'],['12','print-pickup','取件码'],['13','print-done','打印完成'],
         ['14','scan-continue','扫码接力打印'],['15','scan-doc','手机扫描成 PDF'],['16','usb-import','U 盘导入指引'],
