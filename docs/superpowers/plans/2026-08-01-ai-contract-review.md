@@ -332,6 +332,7 @@ git commit -m "feat: add contract review task schema"
 - Modify: `services/api/src/files/file-validation.ts`
 - Modify: `services/api/src/files/retention-policy.ts`
 - Modify: `services/api/src/files/files.service.ts`
+- Modify: `services/api/src/files/files.cleanup.task.ts`
 - Modify: `services/api/src/files/dto/kiosk-upload-options.dto.ts`
 - Modify: `services/api/src/upload-sessions/upload-sessions.dto.ts`
 - Modify: `services/api/src/upload-sessions/upload-sessions.service.ts`
@@ -907,6 +908,7 @@ Task 11 的范围是建立 **默认关闭、无 HTTP 入口** 的后台能力。
 - Create: `services/api/src/contract-review/contract-review.cleanup.task.ts`
 - Create: `services/api/src/contract-review/contract-review.module.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-fact-merger.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-finding-mapper.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-orchestrator.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-processor.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-cleanup.test.ts`
@@ -920,13 +922,16 @@ Task 11 的范围是建立 **默认关闭、无 HTTP 入口** 的后台能力。
 - Modify: `services/api/src/contract-review/__tests__/contract-review-provider.test.ts`
 - Modify: `services/api/src/contract-review/__tests__/contract-review-schema.test.ts`
 - Modify: `services/api/src/files/files.service.ts`
+- Modify: `services/api/src/files/files.cleanup.task.ts`
+- Modify: `services/api/src/prisma/prisma.service.ts`
 - Modify: `services/api/prisma/schema.prisma`
 - Modify: `services/api/prisma/postgres/schema.prisma`
 - Modify: `services/api/src/app.module.ts`
+- Modify: `docs/superpowers/plans/2026-08-01-ai-contract-review.md`
 
 `contract-review-orchestrator.service.ts` 目标 300–450 行且只负责编排；事实抽取、finding 映射和清理必须留在独立文件，禁止形成新的 800 行服务。测试按事实、编排、processor、清理拆分，禁止把所有矩阵继续堆入一个超长测试文件。
 
-- [ ] **Step 1: 写两阶段、证据坐标、原子落库和清理重试的 RED 测试**
+- [x] **Step 1: 写两阶段、证据坐标、原子落库和清理重试的 RED 测试**
 
 ```typescript
 test('extract job stops at awaiting_confirmation and never calls provider', async () => {
@@ -976,7 +981,7 @@ test('validated result and completed status use one CAS transaction', async () =
 - 清理单条物理删除失败时保留 `expired` task，下一次 cron 继续选择并重试；成功或已被通用 file cleanup 删除时幂等收口。共享同一 source file 的未过期任务仍存在时不得删除该文件。
 - 合同清理必须调用 `FilesService.systemDeleteSensitive`（或等价受控入口）；其成功日志只含 fileId 摘要。测试必须证明现有 `_delete` 的完整 fileId 日志不会出现在高敏删除路径。
 
-- [ ] **Step 2: 运行并确认新组件不存在或断言失败**
+- [x] **Step 2: 运行并确认新组件不存在或断言失败**
 
 Run:
 
@@ -984,6 +989,7 @@ Run:
 pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
   src/contract-review/__tests__/contract-review-extraction.test.ts \
   src/contract-review/__tests__/contract-review-fact-merger.test.ts \
+  src/contract-review/__tests__/contract-review-finding-mapper.test.ts \
   src/contract-review/__tests__/contract-review-orchestrator.test.ts \
   src/contract-review/__tests__/contract-review-processor.test.ts \
   src/contract-review/__tests__/contract-review-cleanup.test.ts \
@@ -995,7 +1001,7 @@ pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现无 inline fallback 的两阶段队列和恢复点**
+- [x] **Step 3: 实现无 inline fallback 的两阶段队列和恢复点**
 
 ```typescript
 export const CONTRACT_REVIEW_QUEUE = 'contract-review'
@@ -1020,7 +1026,7 @@ extract job 使用 CAS 逐步推进，重试时允许从 `extracting` 重做本�
 
 每个 job 从 worker 实际开始时计算五分钟协作式 budget，在昂贵步骤前后及 extraction `onPageComplete` 中重读 task 状态与 deadline；发现 cancelled/expired/超时后不得开始下一页 OCR 或 LLM。必须诚实记录：这只能在页边界和网络调用边界停止，不能终止已经进入的第三方原生 PDF/DOCX 解析；真正的进程级 hard kill 与内存上限是 Task 14 启用生产入口前的阻断项。
 
-- [ ] **Step 4: 实现统一脱敏坐标、SafetyGate server truth 和最终事务**
+- [x] **Step 4: 实现统一脱敏坐标、SafetyGate server truth 和最终事务**
 
 为持久化确认真相，先给双 Prisma schema 添加 nullable `extractionFingerprint String?` 与 `confirmedAt DateTime?`，并用新的 additive SQLite/PostgreSQL migration 演进；更新 schema parity 测试并运行 fresh migration drift。不得回写或改写已经封板的 Task 3 migration。
 
@@ -1047,13 +1053,13 @@ const validated = gate.validate(candidateResult, masked.pages, context)
 
 SafetyGate 通过后，唯一一次 `$transaction` 内用 `updateMany where { id, status:'safety_reviewing', expiresAt:{gt:now} }` 同时写 `resultJson/status:'completed'/aiProvider/aiModel/ocrProvider/ocrConfidence/professionalConsultationRecommended`；影响行数不是 1 则整笔回滚。事务外不得写 `resultJson`，也不得把 candidate/raw draft 放进 Redis、错误、日志或审计。
 
-- [ ] **Step 5: 实现无需新增清理重试字段的 TTL 清理**
+- [x] **Step 5: 实现无需新增清理重试字段的 TTL 清理**
 
 清理 cron 每批最多处理固定数量的 `expiresAt <= now` task：先对当前 status 做 CAS 到 `expired`，再处理已 `expired` 的遗留行。每个 fileId 删除前读取 `FileObject`：不存在或 `deletedAt != null` 视为幂等完成；仍被其他未过期合同任务引用时跳过物理删除；否则调用新增的 `FilesService.systemDeleteSensitive`。该入口复用现有 storage + DB 删除语义，但成功日志只写不可逆摘要，不写完整 fileId。删除抛错后重新读取 `FileObject`，只有 DB 已证明 deleted 才视为成功。
 
 全部需删除对象完成或因活跃共享引用而正确延期后，删除已过期 task 行，使 `resultJson/accessTokenHash` 一并退出数据库；任一对象失败则保留 `expired` task，下一轮 cron 自动重试。日志只允许固定 `code`、计数和 taskId 摘要，禁止原始 error message、fileId、文件名、路径、正文、token 或模型内容。该设计不新增 `cleanupRetryCount`，以“expired 行仍存在”作为持久重试账本。
 
-- [ ] **Step 6: 运行覆盖率、全量合同回归和 API 门禁**
+- [x] **Step 6: 运行覆盖率、全量合同回归和 API 门禁**
 
 Run:
 
@@ -1061,8 +1067,14 @@ Run:
 pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
   --experimental-test-coverage \
   --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 \
-  '--test-coverage-include=src/contract-review/contract-review-{queue,processor,orchestrator.service,fact-merger,finding-mapper,cleanup.task}.ts' \
+  --test-coverage-include=src/contract-review/contract-review.queue.ts \
+  --test-coverage-include=src/contract-review/contract-review.processor.ts \
+  --test-coverage-include=src/contract-review/contract-review-orchestrator.service.ts \
+  --test-coverage-include=src/contract-review/contract-review-fact-merger.ts \
+  --test-coverage-include=src/contract-review/contract-review-finding-mapper.ts \
+  --test-coverage-include=src/contract-review/contract-review.cleanup.task.ts \
   src/contract-review/__tests__/contract-review-fact-merger.test.ts \
+  src/contract-review/__tests__/contract-review-finding-mapper.test.ts \
   src/contract-review/__tests__/contract-review-orchestrator.test.ts \
   src/contract-review/__tests__/contract-review-processor.test.ts \
   src/contract-review/__tests__/contract-review-cleanup.test.ts \

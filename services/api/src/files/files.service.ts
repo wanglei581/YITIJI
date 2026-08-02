@@ -5,7 +5,7 @@ import {
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common'
-import { randomUUID } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import type {
   CompleteUploadResponse,
   FileAccessUrlResponse,
@@ -691,6 +691,11 @@ export class FilesService {
     return this._delete(fileId, 'system', reason, true)
   }
 
+  /** 高敏生命周期任务专用删除入口；成功日志不得暴露完整 fileId。 */
+  async systemDeleteSensitive(fileId: string, reason: string): Promise<FileMetadata> {
+    return this._delete(fileId, 'system', reason, true, true)
+  }
+
   /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
   async updateRetention(
     fileId: string,
@@ -754,7 +759,8 @@ export class FilesService {
     fileId: string,
     deletedBy: string,
     reason: string,
-    allowMemberDataExport = false
+    allowMemberDataExport = false,
+    sensitiveLog = false
   ): Promise<FileMetadata> {
     const record = await this.requireDeletable(fileId, { allowMemberDataExport })
     await this.storage.deleteObject(record.storageKey, record.bucket)
@@ -762,7 +768,11 @@ export class FilesService {
       where: { id: fileId },
       data: { deletedAt: new Date(), deletedBy, deleteReason: reason, status: 'deleted' },
     })
-    this.logger.log(`File deleted by ${deletedBy}: ${fileId}`)
+    if (sensitiveLog) {
+      this.logger.log(`Sensitive file deleted by ${deletedBy}: ${digestFileId(fileId)}`)
+    } else {
+      this.logger.log(`File deleted by ${deletedBy}: ${fileId}`)
+    }
     return toMetadata(updated)
   }
 
@@ -823,8 +833,8 @@ export class FilesService {
         deletedIds.push(f.id)
         bySensitiveLevel[f.sensitiveLevel] = (bySensitiveLevel[f.sensitiveLevel] ?? 0) + 1
         byPurpose[f.purpose] = (byPurpose[f.purpose] ?? 0) + 1
-      } catch (err) {
-        this.logger.warn(`Failed to cleanup file ${f.id}: ${(err as Error).message}`)
+      } catch {
+        this.logger.warn(`code=FILE_CLEANUP_ITEM_FAILED file=${digestFileId(f.id)}`)
       }
     }
     if (deletedIds.length > 0) {
@@ -843,7 +853,7 @@ export class FilesService {
           deletedCount: deletedIds.length,
           bySensitiveLevel,
           byPurpose,
-          fileIdDigest: deletedIds.slice(0, 50),
+          fileIdDigest: deletedIds.slice(0, 50).map(digestFileId),
         },
       })
     }
@@ -931,6 +941,10 @@ export class FilesService {
       error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
     })
   }
+}
+
+function digestFileId(fileId: string): string {
+  return createHash('sha256').update(fileId).digest('hex').slice(0, 12)
 }
 
 /** 归属判定。member 只能访问 endUserId 匹配;User 按角色 / 上传者 / 机构。 */

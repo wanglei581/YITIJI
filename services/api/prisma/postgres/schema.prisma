@@ -882,6 +882,8 @@ model ContractReviewTask {
   disclaimerVersion String
   rulePackVersion String
   schemaVersion String
+  extractionFingerprint String?
+  confirmedAt DateTime?
   ocrProvider String?
   ocrConfidence String?
   analyzedPages Int @default(0)

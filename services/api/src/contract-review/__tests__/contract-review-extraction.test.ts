@@ -1,6 +1,7 @@
 import 'reflect-metadata'
 
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import { OcrService } from '../../ai/resume/ocr/ocr.service'
 import { FilesService } from '../../files/files.service'
@@ -12,7 +13,18 @@ import {
 
 const PDF = Buffer.from('%PDF test')
 const IMAGE = Buffer.from('image')
+const DOCX = Buffer.from(
+  'UEsDBBQAAAAAAAAAAAAAAAAAAAAAAAAAAAARAAAAd29yZC9kb2N1bWVudC54bWxQSwECFAAUAAAAAAAAAAAAAAAAAAAAAAAAAAAAEQAAAAAAAAAAAAAAAAAAAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAEAAQA/AAAALwAAAAAA',
+  'base64',
+)
 const RELIABLE = '合同正文'.repeat(8)
+
+function sourceIdentity(buffer: Buffer) {
+  return {
+    sourceSha256: createHash('sha256').update(buffer).digest('hex'),
+    sourceSizeBytes: buffer.length,
+  }
+}
 
 interface HarnessOptions {
   buffer?: Buffer
@@ -50,6 +62,8 @@ function harness(options: HarnessOptions = {}) {
         filename: options.filename ?? 'contract.pdf',
         mimeType: options.mimeType ?? 'application/pdf',
         purpose: options.purpose ?? 'contract_upload',
+        sha256: '0'.repeat(64),
+        sizeBytes: 999_999,
       }
     },
   }
@@ -158,9 +172,36 @@ test('reads only through the end-user ownership boundary and emits ordered text-
   assert.deepEqual(progress, [[1, 1]])
   assert.deepEqual(result, {
     mode: 'text_layer', totalPages: 1, analyzedPages: 1, truncated: false,
-    ocrConfidence: null,
+    ocrProvider: null, ocrConfidence: null,
+    ...sourceIdentity(PDF),
     pages: [{ pageNumber: 1, text: RELIABLE, source: 'text_layer', ocrConfidence: null }],
   })
+})
+
+test('successful PDF, DOCX and image results fingerprint the exact bytes read, not file metadata', async () => {
+  const cases = [
+    { buffer: PDF, filename: 'contract.pdf', mimeType: 'application/pdf', ocrProvider: null },
+    {
+      buffer: DOCX,
+      filename: 'contract.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ocrProvider: null,
+    },
+    { buffer: IMAGE, filename: 'contract.png', mimeType: 'image/png', ocrProvider: 'baidu' },
+  ] as const
+
+  for (const expected of cases) {
+    const result = await harness(expected).service.extract({ fileId: 'source', endUserId: null })
+    assert.deepEqual(
+      {
+        sourceSha256: result.sourceSha256,
+        sourceSizeBytes: result.sourceSizeBytes,
+        ocrProvider: result.ocrProvider,
+      },
+      { ...sourceIdentity(expected.buffer), ocrProvider: expected.ocrProvider },
+    )
+    assert.match(result.sourceSha256, /^[a-f0-9]{64}$/)
+  }
 })
 
 test('ownership, expiry and read failures have the same safe error shape', async () => {
@@ -351,6 +392,7 @@ test('mixed 50-page PDF OCRs only missing pages in original order and keeps wors
     onPageComplete: async (completed) => { progress.push(completed) },
   })
   assert.equal(result.mode, 'mixed')
+  assert.equal(result.ocrProvider, 'baidu')
   assert.equal(result.ocrConfidence, 'low')
   assert.deepEqual(h.calls.renders, [2, 49])
   assert.deepEqual(result.pages.map((page) => page.pageNumber), Array.from({ length: 50 }, (_, index) => index + 1))
@@ -462,6 +504,7 @@ test('extracts a supported image as one OCR page and rejects MIME/extension mism
     onPageComplete: async (done, total) => { progress.push([done, total]) },
   })
   assert.equal(result.mode, 'ocr')
+  assert.equal(result.ocrProvider, 'baidu')
   assert.equal(result.totalPages, 1)
   assert.equal(result.ocrConfidence, 'high')
   assert.deepEqual(progress, [[1, 1]])

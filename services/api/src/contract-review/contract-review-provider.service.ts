@@ -85,6 +85,11 @@ export interface ContractProviderReviewInput {
   readonly partyFacts: ContractPartyFacts
 }
 
+export interface ContractProviderReviewOutput {
+  readonly identity: ContractProviderIdentity
+  readonly draft: ContractModelDraft
+}
+
 type ContractProviderEnv = Readonly<Record<string, string | undefined>>
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>
 
@@ -180,8 +185,13 @@ export class ContractReviewProviderService {
   }
 
   async review(input: ContractProviderReviewInput): Promise<ContractModelDraft> {
+    return (await this.reviewWithIdentity(input)).draft
+  }
+
+  async reviewWithIdentity(input: ContractProviderReviewInput): Promise<ContractProviderReviewOutput> {
     const config = readConfig(this.env)
-    assertApproved(this.approvalGate, identityOf(config))
+    const identity = identityOf(config)
+    assertApproved(this.approvalGate, identity)
     validateReviewInput(input)
     const payload: ContractProviderPayload = {
       model: config.model,
@@ -213,7 +223,7 @@ export class ContractReviewProviderService {
     if (Buffer.byteLength(body, 'utf8') > MAX_RESPONSE_BYTES) {
       throw new Error('CONTRACT_PROVIDER_RESPONSE_TOO_LARGE')
     }
-    return parseResponse(body, input.pages)
+    return Object.freeze({ identity, draft: parseResponse(body, input.pages) })
   }
 }
 

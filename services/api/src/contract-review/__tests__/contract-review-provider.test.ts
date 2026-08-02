@@ -213,6 +213,35 @@ test('sends only masked JSON data with json_object mode and returns a typed draf
   }
 })
 
+test('returns the approved provider identity from the same config snapshot used for review', async () => {
+  let reads = 0
+  const service = new ContractReviewProviderService({
+    env: () => {
+      reads += 1
+      return deepseekEnv
+    },
+    approvalGate: allowExact(),
+    transport: {
+      async send(request) {
+        assert.equal(request.payload.model, 'deepseek-v4-pro')
+        return { status: 200, redirected: false, body: wireBody() }
+      },
+    },
+  })
+
+  const beforeReview = reads
+  const reviewed = await service.reviewWithIdentity(maskedInput())
+  assert.equal(reads, beforeReview + 1)
+  assert.deepEqual(reviewed, {
+    identity: {
+      provider: 'deepseek',
+      baseUrl: 'https://api.deepseek.com/',
+      model: 'deepseek-v4-pro',
+    },
+    draft: validDraft,
+  })
+})
+
 test('rejects raw PII, malformed pages, and request budgets before transport', async () => {
   let calls = 0
   const service = approvedService(async () => {

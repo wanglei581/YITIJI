@@ -7,6 +7,7 @@ import { test } from 'node:test'
 
 const apiRoot = resolve(__dirname, '../../..')
 const migrationName = '20260801090000_add_contract_review_task'
+const checkpointMigrationName = '20260801130000_add_contract_review_confirmation_checkpoint'
 
 const schemaPaths = [
   resolve(apiRoot, 'prisma/schema.prisma'),
@@ -16,6 +17,11 @@ const schemaPaths = [
 const migrationPaths = [
   resolve(apiRoot, 'prisma/migrations', migrationName, 'migration.sql'),
   resolve(apiRoot, 'prisma/postgres/migrations', migrationName, 'migration.sql'),
+]
+
+const checkpointMigrationPaths = [
+  resolve(apiRoot, 'prisma/migrations', checkpointMigrationName, 'migration.sql'),
+  resolve(apiRoot, 'prisma/postgres/migrations', checkpointMigrationName, 'migration.sql'),
 ]
 
 function read(path: string): string {
@@ -83,6 +89,8 @@ test('both Prisma schemas define the complete ContractReviewTask aggregate', () 
     'disclaimerVersion String',
     'rulePackVersion String',
     'schemaVersion String',
+    'extractionFingerprint String?',
+    'confirmedAt DateTime?',
     'ocrProvider String?',
     'ocrConfidence String?',
     'analyzedPages Int @default(0)',
@@ -120,6 +128,28 @@ test('both Prisma schemas define the complete ContractReviewTask aggregate', () 
       `${schemaPath} EndUser must expose contractReviewTasks`
     )
   }
+})
+
+test('checkpoint migrations add only nullable extraction fingerprint and confirmation columns', () => {
+  const expectedStatements = [
+    [
+      'ALTER TABLE "ContractReviewTask" ADD COLUMN "extractionFingerprint" TEXT;',
+      'ALTER TABLE "ContractReviewTask" ADD COLUMN "confirmedAt" DATETIME;',
+    ],
+    [
+      'ALTER TABLE "ContractReviewTask" ADD COLUMN "extractionFingerprint" TEXT;',
+      'ALTER TABLE "ContractReviewTask" ADD COLUMN "confirmedAt" TIMESTAMP(3);',
+    ],
+  ]
+
+  checkpointMigrationPaths.forEach((migrationPath, index) => {
+    const statements = read(migrationPath)
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0 && !line.startsWith('--'))
+
+    assert.deepEqual(statements, expectedStatements[index], migrationPath)
+  })
 })
 
 test('both migrations add only ContractReviewTask, its EndUser foreign key, and five indexes', () => {

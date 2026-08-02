@@ -1,4 +1,5 @@
 import { Inject, Injectable, Optional } from '@nestjs/common'
+import { createHash } from 'node:crypto'
 import mammoth from 'mammoth'
 import { FilesService } from '../files/files.service'
 import type { OcrResult } from '../ai/resume/ocr/ocr-provider.interface'
@@ -59,12 +60,20 @@ export interface ContractReviewExtractedPage {
 }
 
 export interface ContractReviewExtractionResult {
+  readonly sourceSha256: string
+  readonly sourceSizeBytes: number
+  readonly ocrProvider: string | null
   mode: ContractReviewExtractionMode
   totalPages: number
   analyzedPages: number
   truncated: false
   ocrConfidence: ContractReviewOcrConfidence | null
   pages: ContractReviewExtractedPage[]
+}
+
+interface ContractReviewSourceIdentity {
+  readonly sourceSha256: string
+  readonly sourceSizeBytes: number
 }
 
 export interface ContractReviewExtractionInput {
@@ -196,14 +205,20 @@ export class ContractReviewExtractionService {
       throw fail('CONTRACT_FILE_EMPTY')
     }
     if (content.buffer.length > MAX_FILE_BYTES) throw fail('CONTRACT_FILE_TOO_LARGE')
+    const sourceIdentity: ContractReviewSourceIdentity = {
+      sourceSha256: createHash('sha256').update(content.buffer).digest('hex'),
+      sourceSizeBytes: content.buffer.length,
+    }
 
     const kind = resolveSupportedKind(content.mimeType, content.filename)
     if (kind === null) throw fail('CONTRACT_UNSUPPORTED_FILE_TYPE')
-    if (kind === 'docx') return this.extractDocx(content.buffer, input.onPageComplete)
-    if (kind === 'image') {
-      return this.extractImage(content.buffer, content.mimeType, input.onPageComplete)
+    if (kind === 'docx') {
+      return this.extractDocx(content.buffer, sourceIdentity, input.onPageComplete)
     }
-    return this.extractPdf(content.buffer, input.onPageComplete)
+    if (kind === 'image') {
+      return this.extractImage(content.buffer, content.mimeType, sourceIdentity, input.onPageComplete)
+    }
+    return this.extractPdf(content.buffer, sourceIdentity, input.onPageComplete)
   }
 
   private assertInput(input: ContractReviewExtractionInput): void {
@@ -218,6 +233,7 @@ export class ContractReviewExtractionService {
 
   private async extractDocx(
     buffer: Buffer,
+    sourceIdentity: ContractReviewSourceIdentity,
     onPageComplete?: ContractReviewExtractionInput['onPageComplete'],
   ): Promise<ContractReviewExtractionResult> {
     await assertDocxArchiveSafe(buffer)
@@ -232,23 +248,25 @@ export class ContractReviewExtractionService {
     if (!isNonEmptyCanonicalText(text)) throw fail('CONTRACT_TEXT_EMPTY')
     assertCanonicalDocumentBudget([text])
     await this.reportProgress(onPageComplete, 1, 1)
-    return this.completeResult('text_layer', [this.textLayerPage(1, text)], null)
+    return this.completeResult('text_layer', [this.textLayerPage(1, text)], null, null, sourceIdentity)
   }
 
   private async extractImage(
     buffer: Buffer,
     mimeType: string,
+    sourceIdentity: ContractReviewSourceIdentity,
     onPageComplete?: ContractReviewExtractionInput['onPageComplete'],
   ): Promise<ContractReviewExtractionResult> {
-    this.assertOcrConfigured()
+    const ocrProvider = this.requireOcrProvider()
     const recognized = await this.recognize(buffer, mimeType)
     const page = this.ocrPage(1, recognized)
     await this.reportProgress(onPageComplete, 1, 1)
-    return this.completeResult('ocr', [page], page.ocrConfidence)
+    return this.completeResult('ocr', [page], page.ocrConfidence, ocrProvider, sourceIdentity)
   }
 
   private async extractPdf(
     buffer: Buffer,
+    sourceIdentity: ContractReviewSourceIdentity,
     onPageComplete?: ContractReviewExtractionInput['onPageComplete'],
   ): Promise<ContractReviewExtractionResult> {
     const extracted = await this.readPdfTextLayers(buffer)
@@ -263,11 +281,13 @@ export class ContractReviewExtractionService {
         pages.push(this.textLayerPage(index + 1, extracted.pages[index] as string))
         await this.reportProgress(onPageComplete, index + 1, extracted.totalPages)
       }
-      return this.completeResult('text_layer', pages, null)
+      return this.completeResult('text_layer', pages, null, null, sourceIdentity)
     }
 
-    this.assertOcrConfigured()
-    return this.ocrMissingPdfPages(buffer, extracted, missingIndexes, onPageComplete)
+    const ocrProvider = this.requireOcrProvider()
+    return this.ocrMissingPdfPages(
+      buffer, extracted, missingIndexes, ocrProvider, sourceIdentity, onPageComplete,
+    )
   }
 
   private async readPdfTextLayers(buffer: Buffer): Promise<{
@@ -325,6 +345,8 @@ export class ContractReviewExtractionService {
     buffer: Buffer,
     extracted: { totalPages: number; pages: string[] },
     missingIndexes: number[],
+    ocrProvider: string,
+    sourceIdentity: ContractReviewSourceIdentity,
     onPageComplete?: ContractReviewExtractionInput['onPageComplete'],
   ): Promise<ContractReviewExtractionResult> {
     let renderer: RenderedPdf | undefined
@@ -369,7 +391,13 @@ export class ContractReviewExtractionService {
         }
       }
       const mode: ContractReviewExtractionMode = missingIndexes.length === extracted.totalPages ? 'ocr' : 'mixed'
-      result = this.completeResult(mode, pages, this.worstConfidence(confidences))
+      result = this.completeResult(
+        mode,
+        pages,
+        this.worstConfidence(confidences),
+        ocrProvider,
+        sourceIdentity,
+      )
     } catch (error) {
       primaryError = knownOr(error, 'OCR_FAILED')
     } finally {
@@ -388,8 +416,10 @@ export class ContractReviewExtractionService {
     return result
   }
 
-  private assertOcrConfigured(): void {
-    if (this.ocr.activeProviderName === 'disabled') throw fail('OCR_NOT_CONFIGURED')
+  private requireOcrProvider(): string {
+    const provider = this.ocr.activeProviderName
+    if (provider === 'disabled') throw fail('OCR_NOT_CONFIGURED')
+    return provider
   }
 
   private async recognize(buffer: Buffer, mimeType: string): Promise<OcrResult> {
@@ -446,8 +476,12 @@ export class ContractReviewExtractionService {
     mode: ContractReviewExtractionMode,
     pages: ContractReviewExtractedPage[],
     ocrConfidence: ContractReviewOcrConfidence | null,
+    ocrProvider: string | null,
+    sourceIdentity: ContractReviewSourceIdentity,
   ): ContractReviewExtractionResult {
     return {
+      ...sourceIdentity,
+      ocrProvider,
       mode,
       totalPages: pages.length,
       analyzedPages: pages.length,

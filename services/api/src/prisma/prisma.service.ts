@@ -387,6 +387,12 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.legalDocVersion
   }
 
+  // ── AI 合同审查（默认关闭，Task 11 仅供后台编排单测）──────────────────────
+
+  get contractReviewTask() {
+    return this.client.contractReviewTask
+  }
+
   // ── Transaction ────────────────────────────────────────────────────────────
 
   $transaction<R>(fn: (prisma: PrismaTransactionClient) => Promise<R>, options?: { maxWait?: number; timeout?: number; isolationLevel?: unknown }): Promise<R>
