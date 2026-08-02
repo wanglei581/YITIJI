@@ -221,6 +221,7 @@ export function CareerPlanPage() {
               <Button variant="secondary" onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}><PencilLineIcon aria-hidden="true" />优化简历</Button>
               <Button variant="secondary" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}><TargetIcon aria-hidden="true" />岗位匹配</Button>
               <Button variant="secondary" onClick={() => navigate('/interview/setup')}><MicIcon aria-hidden="true" />模拟面试</Button>
+              <Button variant="secondary" onClick={() => navigate('/resume/self-assessment/intro?from=career-plan')}>做一次自我探索</Button>
             </div>
           </Section>
 

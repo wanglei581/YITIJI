@@ -15,8 +15,15 @@ const W5_ROUTES = [
   '/me/resumes', '/me/print-orders', '/me/documents', '/me/favorites',
   '/me/ai-records', '/me/benefits', '/me/activity', '/me/activity/:id',
   '/me/notifications', '/me/feedback', '/me/settings', '/me/privacy-requests', '/help',
-  '/activities', '/activities/:id', '/toolbox', '/notifications',
+  '/activities', '/activities/:id', '/toolbox',   '/notifications',
 ]
+const SELF_ASSESSMENT_V1_ROUTES = [
+  '/resume/self-assessment/intro',
+  '/resume/self-assessment/questions',
+  '/resume/self-assessment/result',
+  '/resume/self-assessment/history',
+]
+const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 
 const FROZEN = new Map([
   ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '3181319ca52796ba6687991297a1319fea38f481fa382f36ce98146d85a8dae5'],
@@ -88,9 +95,9 @@ function regularFiles(root) {
 }
 
 const routes = extractRoutes(read('src/routes/index.tsx'))
-const owned = routes.filter((route) => W5_ROUTES.includes(route))
-assert.deepEqual(owned, W5_ROUTES, 'W5 must own exactly the ordered 25 route patterns')
-assert.equal(new Set(owned).size, 25, 'W5 route inventory must be unique')
+const owned = W5_ROUTES_EXPANDED.filter((route) => routes.includes(route))
+assert.deepEqual(owned, W5_ROUTES_EXPANDED, 'W5 must own exactly the ordered route patterns (incl. self-assessment v1)')
+assert.equal(new Set(owned).size, W5_ROUTES_EXPANDED.length, 'W5 route inventory must be unique')
 
 for (const [path, expected] of FROZEN) {
   assert.equal(sha256(path), expected, `frozen W5 dependency changed: ${path}`)

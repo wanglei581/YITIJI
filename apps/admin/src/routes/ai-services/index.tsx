@@ -46,6 +46,8 @@ const OPERATION_LABELS: Record<AiOperation, string> = {
   interviewReport:    '面试报告生成',
   voiceTranscribe:    '语音转写 (ASR)',   // 按时长计费，成本 Admin 展示 N/A
   voiceSynthesize:    '语音播报 (TTS)',   // 按字符计费，成本 Admin 展示 N/A
+  // 自我探索 · 倾向参考（2026-08-01）
+  selfAssessment:     '自我探索 · 倾向参考',
 }
 
 /**
@@ -61,6 +63,8 @@ const NON_TOKEN_BILLED_OPS: readonly AiOperation[] = ['voiceTranscribe', 'voiceS
 const NON_TOKEN_BILLED_NOTE: Record<string, string> = {
   voiceTranscribe: '按音频时长计费',
   voiceSynthesize: '按字符数计费',
+  selfAssessment: '自我探索 · 倾向参考',
+
 }
 
 const STATUS_MAP: Record<AiLogStatus, { badge: 'success' | 'error'; label: string }> = {
@@ -108,6 +112,7 @@ const OP_FILTER_LABELS: Record<OpFilter, string> = {
   interviewReport:    '面试报告',
   voiceTranscribe:    '语音转写',
   voiceSynthesize:    '语音播报',
+  selfAssessment:     '自我探索 · 倾向参考',
 }
 const STATUS_FILTERS: StatusFilter[] = ['all', 'success', 'failed']
 const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {

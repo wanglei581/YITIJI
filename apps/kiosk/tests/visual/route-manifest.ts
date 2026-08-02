@@ -25,7 +25,12 @@ export const productionRoutePatterns = [
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats',
-] as const
+  // v1：自我探索 · 倾向参考（PR ③）
+  '/resume/self-assessment/intro',
+  '/resume/self-assessment/questions',
+  '/resume/self-assessment/result',
+  '/resume/self-assessment/history',
+] as const // 91 routes (was 87)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
