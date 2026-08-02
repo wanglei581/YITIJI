@@ -3,6 +3,17 @@
 
 **附**：CI 三 job 红源摸清（已写进 [PR #486 评论](https://github.com/wanglei581/YITIJI/pull/486#issuecomment-5156309785)）—— `verify-fusion-w4.mjs` 写死 `owned.length === 23`、禁 `/offline-agencies/:id`、禁 `jobCount/营业中/在招岗位/status === 'open'`，但 G1（#482）三页业务实现里全部踩了，且 #482 合入时即 `0/3 checks passed`。本分支不擅自解 verify 硬约束，仅追加纯 git 兜底脚本 `scripts/verify-self-assessment-r3-pick.mjs`（commit `56f8576a`），与主 CI 解耦，仅证明 r3 cherry-pick 链路上 7 项 Critical fix + 11 份核心文件完整。
 
+**附 2**：stacked 分支盘点结论（按 CLAUDE.md §8.1「清理须证明祖先关系后删除中间分支名；必须保留仍承载独有能力的基础锚点」）——
+
+| 分支 | ahead of main | 唯一独有内容（main 没有） | 处理建议 |
+|---|---|---|---|
+| `feature/staged-pr1-self-assessment-shared` | 3 | 无（`e2cb653` baseline + `6431d533` scoring + `1b23922f` test 全部对应 [PR #473](https://github.com/wanglei581/YITIJI/pull/473) squash content `348aeface`） | 可删 |
+| `feature/staged-pr2-self-assessment-server` | 5 | 无（`tokenMatches` export 与 `SelfAssessmentDimensionResult[]` 在 main `5ca7ce0a2c` = PR #475 squash content 已落地；`3a593472` tip 是后续小修） | 可删 |
+| `feature/staged-pr3-self-assessment-frontend` | 3 | 无（前端三页 + Playwright + Admin 在 [PR #476](https://github.com/wanglei581/YITIJI/pull/476) `5a2c086cdc` squash；`0a2d9672` tip 是 `Merge origin/main` + re-trigger） | 可删 |
+| `fix/self-assessment-staged-cleanup`（已关 #484） | 2 | 无（实质 fix 已 cherry-pick 进 `cleanup-r3`，tip `db866391` 仅文档） | 可删 |
+| `fix/self-assessment-staged-cleanup-r3` | 4 | 含 [PR #486](https://github.com/wanglei581/YITIJI/pull/486) 当前未合内容（7 项 Critical fix + 兜底脚本 + 文档） | 保留等 #486 合 main |
+| `feature/self-assessment-20260801` | — | 设计分支独立，不在堆叠链 | 保留（基础锚点） |
+
 2026-08-02 完成 **F1 D2′ PID identity pinning + TOCTOU sandwich fix（[PR #483](https://github.com/wanglei581/YITIJI/pull/483) 已squash 合入 `main@3d6db8e1`，未演练、未部署）**：两轮 TDD RED→GREEN。第一轮（`492b9598`）：`MANAGED_PID` step 后立即固定 `processStartTimeTicks(managedAppPid)`，在 `CGROUP_CONSISTENCY` 读 cgroup 前重验 ticks，不一致则 `fail('MANAGED_APP_PID_STALE')` fail-closed。第二轮（`1f36f4d7`，修复 Codex review 两项 Critical Issues）：① TOCTOU 残余窗口——单 guard 仍在 guard 与 read 之间留微秒竞争；改为 sandwich 模式：pre-guard → `const managedAppCgroupActual = controlGroup(pid)` → post-guard → `assert.equal(managedAppCgroupActual, …)`；② Wiring test 覆盖缺口——旧 anchor 只验 guard 行，删除 `assert.equal` 不触发 contract 失败；新增 sandwich 顺序检查（prePos→readPos→postPos→assertPos）+两个 mutation tests 覆盖 guard-delete 和 assertion-delete。全套门禁：`verify-contract.mjs` 11/11 `D2_PRIME_CONTRACT_ALL_PASS`，ESLint 0 warnings，TypeScript 0 errors。GitHub Actions quota 耗尽（06:00Z 后无新 run），本地验证全通后 force-push + 待用户确认 squash-merge；不等于 D2′ PASS，`productionF1` 继续 **NO-GO**。
 
 2026-08-02 完成 **Self-assessment v1 全链路打通（[PR #473](https://github.com/wanglei581/YITIJI/pull/473) + [PR #476](https://github.com/wanglei581/YITIJI/pull/476)，已 squash 合入 `main@348aefac` + `main@5a2c086c`，CI 3/3 ✅）**：PR #473 补齐共享类型（`packages/shared` DTO、纯函数评分引擎、5×5 题目 seed）；PR #476 落地 Kiosk 前端（`SelfAssessmentFlow.tsx` 479 行、4 条路由、6 个 CTA、`PrintConfirmPage` 打印勾选、Admin 操作入口、`verify-assess-isolation` + `verify-compliance` 两套独立 verify、完整验收包文档）。至此 Self-assessment v1 三段全部合入：① 共享类型 → ② 服务端（评分/LLM/PDF/会员资产/审计，#475）→ ③ Kiosk 前端，用户在一体机上可完整走通自我评估→诊断报告→打印闭环。
