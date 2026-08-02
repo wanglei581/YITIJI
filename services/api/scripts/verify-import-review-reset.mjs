@@ -74,8 +74,9 @@ const EXPECTED_SITES = {
  * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34
  * Round 8 新增 3 条（O′ O″ O‴）：34 → 37
  * Round 9 新增 4 条（O⁴ O⁵ O⁶ O⁷）：37 → 41
- * Round 10 新增 4 条（Q⁵ Q⁶ Q⁷ Q⁸）：41 → 45 */
-const EXPECTED_SELFTEST_CASES = 45
+ * Round 10 新增 4 条（Q⁵ Q⁶ Q⁷ Q⁸）：41 → 45
+ * Round 11 新增 3 条（R₁ R₂ R₃）：45 → 48 */
+const EXPECTED_SELFTEST_CASES = 48
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -262,6 +263,18 @@ function memberName(node) {
  *   已知边界（不修复）：`upsert['call']['call'](...)` 多级链调用 —— 生产代码不会出现，
  *     递归识别代价高于收益；已在 standards-index.md 第 9 轮条目登记为已知限制。
  *
+ * 第 11 轮修正（Round 11 Plan B）：
+ *   Low 修复：rawOwner → unwrap(rawOwner) → owner，处理 (this.prisma.job).upsert / job!.upsert /
+ *     (job as T).upsert 等 owner 被包裹的形态（R₁/R₂ 自测已验证）。
+ *   Medium（已知不可见，documented limits，R₃ 自测验证）：
+ *     ① 逗号运算符：`(0, prisma.job.upsert)(...)` —— callee 是 BinaryExpression，非 PAE/EAE，
+ *        unwrap 不变，memberName 返回 null → upsertModelOf 返回 null → 门禁不可见。
+ *     ② 条件表达式：`(cond ? prisma.job.upsert : noop)(...)` —— callee 是 ConditionalExpression，同理。
+ *     ③ Reflect.apply：`Reflect.apply(prisma.job.upsert, ctx, [{...}])` —— upsert 作为参数传递，
+ *        门禁不扫函数参数，不可见。
+ *   以上三种在生产代码中无此写法；静态识别代价高于收益；已在 standards-index.md
+ *   第 11 轮条目登记为已知限制。
+ *
  * 已知宽容：`getUnrelatedRepository().upsert({})` 仍会因取不到模型名而抛错。
  * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有此类调用模式，
  * 宽容误报的代价（一次门禁报错）远小于漏报的代价（审核状态绕过），故保留。
@@ -343,10 +356,12 @@ function upsertModelOf(call, where) {
   if (memberName(callee) !== 'upsert') return null
 
   // owner 形态：`tx.job` / `prisma['job']` / 解构后的裸 `job`
-  const owner =
+  // FIX(round11): rawOwner → unwrap(rawOwner) → owner，处理 (this.prisma.job).upsert / job!.upsert / (job as T).upsert
+  const rawOwner =
     ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)
       ? callee.expression
       : null
+  const owner = rawOwner ? unwrap(rawOwner) : null
   let model = owner ? memberName(owner) : null
   if (model === null && owner && ts.isIdentifier(owner)) model = owner.text // `const { job } = tx`
 
@@ -1020,6 +1035,70 @@ function selfTest() {
         `      create: { title: dto.title },\n` +
         `      update: {\n` +
         `${RESET_INLINE.replace("          publishStatus: 'draft',\n", '')}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    // ── Round 11 新增：owner-unwrap Low修复 + 逗号运算符 documented limit ─────────
+    {
+      name: "R₁ (this.prisma.job).upsert()含完整 reset —— owner-unwrap 正向通过",
+      expect: 'pass',
+      wantBlocks: 1,
+      caseSite: CASE_SITE(),
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (this.prisma.job).upsert({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    {
+      name: "R₂ (this.prisma.job).upsert()缺 rejectReason —— owner-unwrap 检出缺失",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ['rejectReason:null'],
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (this.prisma.job).upsert({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE.replace('          rejectReason: null,\n', '')}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    {
+      name: "R₃ (0,prisma.job.upsert)() —— 逗号运算符已知不可见（documented limit，wantBlocks:0）",
+      expect: 'pass',
+      wantBlocks: 0,
+      caseSite: CASE_SITE(),
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (0, this.prisma.job.upsert)({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE.replace("          reviewStatus: 'pending',\n", '')}\n` +
         `      },\n` +
         `    })\n` +
         `  }\n` +
