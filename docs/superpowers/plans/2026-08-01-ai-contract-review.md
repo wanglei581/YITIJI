@@ -778,9 +778,11 @@ git commit -m "feat: add compliant contract model channel"
 
 **Files:**
 - Create: `services/api/src/contract-review/contract-review-safety-gate.service.ts`
+- Create: `services/api/src/contract-review/contract-review-safety-semantics.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-safety-gate.test.ts`
+- Modify: `services/api/src/contract-review/contract-review.types.ts`
 
-- [ ] **Step 1: 写证据错位、伪法条、确定性结论和 PII 输出失败测试**
+- [ ] **Step 1: 写严格 schema、证据、规则冲突、输出边界和 PII 红队失败测试**
 
 ```typescript
 import test from 'node:test'
@@ -792,7 +794,7 @@ const gate = new ContractReviewSafetyGate()
 const canonicalPages = [{ pageNumber: 1, text: '试用期六个月' }]
 const validResult: ContractReviewResult = {
   priorityCheckCount: 1, attentionCount: 0, insufficientInfoCount: 0,
-  coverage: 'complete', ocrConfidence: 'high', disclaimerVersion: 'contract-review-v1',
+  coverage: 'complete', ocrConfidence: 'high', disclaimerVersion: 'active-disclaimer-v1',
   rulePackVersion: 'cn-labor-p0-v1', generatedByAi: true,
   findings: [{
     id: 'f1', category: 'probation', priority: 'priority_check', title: '核实试用期',
@@ -800,6 +802,13 @@ const validResult: ContractReviewResult = {
     explanation: '建议结合合同期限核实', basisRef: 'labor-contract-law:19',
     verificationQuestion: '合同期限是多少？', uncertainty: '', source: 'rule_and_ai',
   }],
+}
+const context = {
+  expectedDisclaimerVersion: 'active-disclaimer-v1',
+  expectedOcrConfidence: 'high' as const,
+  expectedCoverage: 'complete' as const,
+  hasFieldConflict: false,
+  authoritativeRuleFindings: [{ ...structuredClone(validResult.findings[0]!), source: 'rule' as const }],
 }
 const candidates = [
   { name: 'wrong offset', result: { ...validResult, findings: [{ ...validResult.findings[0]!, evidence: { pageNumber: 1, excerpt: '试用期六个月', charStart: 1, charEnd: 7 } }] } },
@@ -810,13 +819,28 @@ const candidates = [
 
 for (const candidate of candidates) {
   test(`rejects unsafe result: ${candidate.name}`, () => {
-    assert.throws(() => gate.validate(candidate.result, canonicalPages), /CONTRACT_SAFETY_GATE_REJECTED/)
+    assert.throws(
+      () => gate.validate(candidate.result, canonicalPages, context),
+      (error) => error instanceof Error && error.message === 'CONTRACT_SAFETY_GATE_REJECTED',
+    )
   })
 }
 test('accepts a schema-valid evidence-backed result', () => {
-  assert.equal(gate.validate(validResult, canonicalPages).generatedByAi, true)
+  assert.equal(gate.validate(validResult, canonicalPages, context).generatedByAi, true)
 })
 ```
+
+RED 矩阵必须覆盖：顶层 / finding / evidence 精确键集，拒绝额外键、accessor、错误原型、非法枚举、`NaN` / `Infinity` / 非安全整数、重复 finding id；最多 100 条 finding。SafetyGate 的终态字符串上限为 id 64、title 120、excerpt 500、explanation 2,000、basisRef 120、verificationQuestion / uncertainty 500 UTF-16 code units；除 Task 10 新增的 id 上限外，其余与 Task 9 provider 对齐。三个计数字段必须分别等于对应 priority 的 finding 数量，且三者之和必须等于 findings 总数。
+
+`services/api` 是隔离 CommonJS root，按现有 `contract-review.types.ts` 约定不得直接 runtime import shared ESM。Task 10 必须在该 API mirror 中 additive 补齐与 `packages/shared/src/types/contractReview.ts` 结构完全一致的 Result / Finding / Category / Priority 类型；测试读取两侧声明做精确防漂移。招聘禁词在 SafetyGate 内使用 runtime-local readonly mirror，并由测试断言完整包含 shared `COMPLIANCE_FORBIDDEN_TERMS` 六个字面量；不得修改 package 依赖、tsconfig 或复制一套可漂移而无门禁的契约。
+
+canonical pages 必须是 1–50 个连续页码的 NFC + LF 文本，单页 200,000、整份 2,000,000 UTF-16 code units；稀疏数组、重复/跳号页、CR、非 canonical Unicode、越界或畸形对象均拒绝。`priority_check` / `attention` 必须有非空、可按 UTF-16 `slice(charStart, charEnd)` 精确还原的 evidence；`insufficient_info` 可使用完整可定位证据或全空 null tuple，禁止半空结构。
+
+所有非 null `basisRef` 必须在 `BASIS_ALLOWLIST`，`priority_check` 及 `rule` / `rule_and_ai` finding 必须有 basis。测试必须覆盖确定性法律结论、诉讼承诺、平台投递 / 企业收简历 / 候选人筛选推荐等越界能力、已知 prompt-injection 标记和中英文变体，以及上述危险语义和 PII 在 title / excerpt / explanation / question / uncertainty 的跨字段 / 跨 finding 拆分重组。PII 检查必须复用 Task 9 `assertNoHighConfidencePii`，不得另建缩水正则；安全扫描必须基于剥离伪造官方 uncertainty 文案后的终态文本，禁止扫描后变换重新拼出 PII 或禁用结论。
+
+`ContractReviewSafetyContext` 必须绑定任务真相：`expectedDisclaimerVersion`、`expectedOcrConfidence`、`expectedCoverage`、`hasFieldConflict` 和 Task 11 映射后的 `authoritativeRuleFindings`。结果中的 disclaimer / OCR / coverage 必须与 context 精确一致，rulePackVersion 必须等于 `CONTRACT_RULE_PACK_VERSION`。规则 finding 以 `id` 唯一匹配最终结果，category / priority / basisRef / evidence / title / explanation 不得被 LLM 覆盖，最终 source 只能为 `rule` 或 `rule_and_ai`；缺失、降级、重复 id 或同 id AI 冒充均拒绝。
+
+导出并冻结三条确定性文案常量：`CONTRACT_SAFETY_LOW_OCR_NOTICE = '文字识别置信度较低，请以合同原件为准。'`、`CONTRACT_SAFETY_TRUNCATED_NOTICE = '本次仅分析了部分内容，未覆盖部分需要人工核对。'`、`CONTRACT_SAFETY_FIELD_CONFLICT_NOTICE = '提取字段存在冲突，请结合合同原件人工核对。'`。仅以 context 真相触发：`expectedOcrConfidence === 'low'` 触发 LOW_OCR，`expectedCoverage === 'truncated'` 触发 TRUNCATED，`hasFieldConflict === true` 触发 FIELD_CONFLICT；按该固定顺序把尚未包含的整句用 `；` 追加到每条 finding.uncertainty。不得重复追加，追加后仍须不超过 500 UTF-16 code units，否则整份拒绝。测试分别覆盖三个单独触发、组合顺序、已有文案去重、顶层结果伪造与长度越界。输入不得被修改，返回值必须递归冻结。所有失败只抛固定 `CONTRACT_SAFETY_GATE_REJECTED`，不得携带原因子码、合同片段或模型原文。
 
 - [ ] **Step 2: 运行并确认 SafetyGate 不存在**
 
@@ -824,34 +848,49 @@ Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register src
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现八项放行检查**
+- [ ] **Step 3: 实现八项放行检查与规则权威上下文**
 
 ```typescript
-validate(result: ContractReviewResult, pages: CanonicalPage[]): ContractReviewResult {
-  assertContractReviewSchema(result)
-  for (const finding of result.findings) {
-    if (finding.basisRef && !BASIS_ALLOWLIST.has(finding.basisRef)) this.reject('BASIS_NOT_ALLOWED')
-    assertEvidenceSlice(finding.evidence, pages)
-    assertNoDeterministicLegalConclusion(finding)
-    assertNoSensitivePii(finding)
-    assertNoPromptInjectionEcho(finding)
+validate(
+  result: unknown,
+  pages: unknown,
+  context: unknown,
+): ContractReviewResult {
+  try {
+    const checked = assertExactSchemaCountsAndBudgets(result)
+    const canonicalPages = assertCanonicalPages(pages)
+    const safetyContext = assertSafetyContext(context)
+    assertExpectedTaskTruth(checked, safetyContext)
+    assertBasisAllowlistAndEvidence(checked, canonicalPages)
+    assertNoDeterministicLegalOrProductConclusion(checked)
+    assertNoPromptInjectionEcho(checked)
+    assertNoHighConfidencePii(findingTextFragments(checked))
+    assertAuthoritativeRulesPreserved(checked, safetyContext.authoritativeRuleFindings)
+    return addMandatoryUncertaintyAndDeepFreeze(checked, safetyContext)
+  } catch {
+    throw new Error('CONTRACT_SAFETY_GATE_REJECTED')
   }
-  return forceUncertaintyForLowConfidence(result)
 }
 ```
 
-禁止词至少覆盖“合同无效/本条违法/一定胜诉/保证赔偿”；任何 finding 失败使整份 AI 输出 fail closed。原始模型输出不作为异常 message、日志或审计 payload。
+八项放行检查固定为：① strict runtime schema + keys / 枚举 / 长度 / 数量 / 唯一 id / 计数一致性；② `basisRef` 与版本白名单；③ canonical pages 和 UTF-16 证据切片；④ 禁止确定性法律结论、诉讼承诺、招聘闭环和企业侧能力；⑤ 已知提示注入标记与指令语义回显；⑥ Task 9 同源 PII 全字段 / 跨 finding 扫描；⑦ 低 OCR、截断、字段冲突强制 uncertainty；⑧ authoritative rule findings 不得被 LLM 删除、降级或改写。
+
+`findingTextFragments` 必须按 finding 顺序、按 `id → title → evidence.excerpt → explanation → basisRef（非 null）→ verificationQuestion → uncertainty` 的固定字段顺序无分隔拼接，按不超过 100,000 UTF-16 code units 切成连续伪页后一次性交给 `assertNoHighConfidencePii`；不得逐 finding 单独扫描或遗漏 excerpt，确保跨字段、跨 finding 重组仍可被 Task 9 的 virtual view 拦截。
+
+禁用结论至少覆盖“合同无效 / 本条违法 / 一定或必然胜诉 / 保证或必须赔偿 / 法院一定支持”等确定性承诺；招聘边界复用共享 `COMPLIANCE_FORBIDDEN_TERMS` 并补企业筛选、面试邀约、Offer 管理、候选人推荐和平台收简历语义。提示注入标记至少覆盖 `ignore previous instructions`、`system/developer prompt`、`<|im_start|>`、`[INST]`、`<<SYS>>`、忽略此前/系统指令、输出或泄露系统提示等大小写与 NFKC 变体。正则必须固定结构、无嵌套无界量词；任何 finding 失败使整份输出 fail closed。
+
+SafetyGate 是纯 TypeScript、无 Nest、无 I/O、无日志、无模型调用的独立服务；不注册 module / controller / worker，不修改 Gate 0。它只允许为 uncertainty 添加固定安全文案，其他无法修复的问题一律拒绝。原始模型输出不作为异常 message、日志或审计 payload。
 
 - [ ] **Step 4: 运行红队与覆盖率测试**
 
-Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-branches=80 --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-include=src/contract-review/contract-review-safety-gate.service.ts src/contract-review/__tests__/contract-review-safety-gate.test.ts`
+Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-branches=80 --test-coverage-lines=80 --test-coverage-functions=80 '--test-coverage-include=src/contract-review/contract-review-safety-gate.service.ts' '--test-coverage-include=src/contract-review/contract-review-safety-semantics.ts' src/contract-review/__tests__/contract-review-safety-gate.test.ts`
 
-Expected: PASS，红队绕过次数 0。
+Expected: PASS，红队绕过次数 0；输入未修改、输出递归冻结，错误字符串只包含固定安全码。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add services/api/src/contract-review/contract-review-safety-gate.service.ts services/api/src/contract-review/__tests__/contract-review-safety-gate.test.ts
+git add services/api/src/contract-review/contract-review-safety-gate.service.ts services/api/src/contract-review/contract-review-safety-semantics.ts services/api/src/contract-review/__tests__/contract-review-safety-gate.test.ts services/api/src/contract-review/contract-review.types.ts
 git commit -m "feat: add contract review safety gate"
 ```
 
@@ -901,6 +940,10 @@ export class ContractReviewProcessor extends WorkerHost {
   }
 }
 ```
+
+Task 11 合并规则与 AI finding 后，调用 SafetyGate 时必须显式组装 `ContractReviewSafetyContext`：`expectedDisclaimerVersion` 来自 task consent snapshot，`expectedOcrConfidence` / `expectedCoverage` 来自 extraction / OCR 服务端真相，`hasFieldConflict` 来自结构化事实冲突检测，`authoritativeRuleFindings` 来自 Task 8 规则结果映射且保留 rule id。不得从模型结果反向生成这些 expected 字段，也不得省略 context 走默认值。
+
+Task 11 processor RED 测试必须逐字段断言传给 `gate.validate` 的 context 来源：免责声明版本取 task snapshot；OCR 置信度取 extraction 结果；`task.truncated === true` 映射为 `expectedCoverage: 'truncated'`，否则为 `'complete'`；字段冲突取事实合并器；authoritative findings 取规则引擎映射。测试另构造模型结果伪造 OCR / coverage / disclaimer 的场景，确认 orchestrator 仍传服务端真相并由 gate 拒绝。
 
 Orchestrator 每阶段先做 CAS；五分钟总 deadline；取消/过期后停止后续 OCR。SafetyGate 通过后用一个 `$transaction` 写 `resultJson + completed + aiProvider/model`。清理 cron 先 CAS 到 expired，再删 source/result 对象，失败记录脱敏码并重试。
 
