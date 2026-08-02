@@ -71,6 +71,11 @@ const W6_INTEGRATION_FILES = new Set([
   'docs/design/kiosk-proto-2026-07-migration-matrix.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
+  // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
+  // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
+  'apps/kiosk/tests/visual/route-manifest.ts',
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,

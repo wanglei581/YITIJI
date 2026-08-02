@@ -19,7 +19,7 @@ export const productionRoutePatterns = [
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials',
   '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
-  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/notifications',
+  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
