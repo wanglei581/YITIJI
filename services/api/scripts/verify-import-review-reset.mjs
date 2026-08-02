@@ -72,8 +72,9 @@ const EXPECTED_SITES = {
 
 /** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
  * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34
- * Round 8 新增 3 条（O′ O″ O‴）：34 → 37 */
-const EXPECTED_SELFTEST_CASES = 37
+ * Round 8 新增 3 条（O′ O″ O‴）：34 → 37
+ * Round 9 新增 4 条（O⁴ O⁵ O⁶ O⁷）：37 → 41 */
+const EXPECTED_SELFTEST_CASES = 41
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -244,6 +245,15 @@ function memberName(node) {
  *   'call' ≠ 'upsert' → return null（fail-open）。现在字符串字面量下标先判
  *   subText ∈ {call,apply,bind}，若内部是 upsert 则同 PropertyAccess 分支 throw。
  *
+ * 第 9 轮修正（codex Round 8 复审后）：两处残留 fail-open：
+ *   ① subscript 未先 unwrap：[('call')] / ['call' as const] / ['call' satisfies string] 被判为
+ *     动态下标，dynOwner 取到 `...job.upsert`，dynModel='upsert'（不是'job'/'jobFair'）→ return null。
+ *     修复：先 unwrap(callee.argumentExpression) 再 isStringLiteralLike。
+ *   ② 动态分支只检查 dynModel∈{job,jobFair}，漏掉 dynModel==='upsert'（如 upsert['ca'+'ll']）。
+ *     修复：追加 dynModel==='upsert' → throw。
+ *   已知边界（不修复）：`upsert['call']['call'](...)` 多级链调用 —— 生产代码不会出现，
+ *     递归识别代价高于收益；已在 standards-index.md 第 9 轮条目登记为已知限制。
+ *
  * 已知宽容：`getUnrelatedRepository().upsert({})` 仍会因取不到模型名而抛错。
  * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有此类调用模式，
  * 宽容误报的代价（一次门禁报错）远小于漏报的代价（审核状态绕过），故保留。
@@ -279,7 +289,10 @@ function upsertModelOf(call, where) {
   // 设计边界（H-2，不修复）：alias `const repo = this.prisma.job; repo.upsert(...)` 返回 null；
   //   本门禁是 inventory-based，alias upsert 须手动新增 EXPECTED_SITES，否则库存核对失败。
   if (ts.isElementAccessExpression(callee)) {
-    const subscript = callee.argumentExpression
+    // FIX(round9): 先 unwrap 下标，剥掉 () / as const / satisfies 等包装，
+    // 否则 [('call')] / ['call' as const] / ['call' satisfies string] 都会被判为动态下标，
+    // dynOwner 取到 `...upsert`，dynModel='upsert'（不是'job'/'jobFair'）→ return null（fail-open）。
+    const subscript = callee.argumentExpression != null ? unwrap(callee.argumentExpression) : null
     if (subscript && ts.isStringLiteralLike(subscript)) {
       const subText = subscript.text
       if (subText === 'call' || subText === 'apply' || subText === 'bind') {
@@ -305,7 +318,16 @@ function upsertModelOf(call, where) {
             '      请改成 `tx.job.upsert(...)` 等静态写法。'
         )
       }
-      return null // 动态下标但 owner 不是已追踪模型 — 与本门禁无关，跳过
+      // FIX(round9): dynOwner 是 upsert 自身（如 upsert['ca'+'ll']）→ fail-closed。
+      // 动态下标施加在 upsert 引用上，无法静态排除是间接调用，须保守拒绝。
+      if (dynModel === 'upsert') {
+        throw new Error(
+          `${where} 出现在 upsert 上的动态方法名调用 \`upsert[expr]()\`——\n` +
+            '      下标运行时才确定，无法静态证明它不是间接调用形式，按失败处理。\n' +
+            '      请改成 `tx.job.upsert(...)` 等静态直接调用写法。'
+        )
+      }
+      return null // 动态下标且 owner 不是已追踪模型/upsert — 与本门禁无关，跳过
     }
   }
 
@@ -802,6 +824,54 @@ function selfTest() {
         synth(RESET_INLINE).replace(
           'await this.prisma.job.upsert(',
           "await this.prisma.job.upsert['call'](this.prisma.job,"
+        ),
+    },
+    {
+      // Round 9 H-1fix：O⁴ —— 括号包裹的字符串下标 [('call')]，subscript 未 unwrap 时被误判为动态下标。
+      // dynOwner = ...job.upsert，dynModel='upsert'（不是'job'/'jobFair'）→ return null（fail-open）。
+      // FIX(round9) 先 unwrap(subscript) 后得到 StringLiteral 'call'，走字符串字面量分支 → throw。
+      name: "O⁴ 括号包裹下标 [('call')] 形态（upsert[('call')](...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \['call'\]\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          "await this.prisma.job.upsert[('call')](this.prisma.job,"
+        ),
+    },
+    {
+      // Round 9 M-1补全：O⁵ —— ElementAccess ['apply']，与 O‴ 同分支，钉住 apply 条件。
+      name: "O⁵ 字符串下标 ['apply'] 形态（upsert['apply'](...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \['apply'\]\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          "await this.prisma.job.upsert['apply'](this.prisma.job,"
+        ),
+    },
+    {
+      // Round 9 M-1补全：O⁶ —— ElementAccess ['bind']，钉住 bind 条件。
+      name: "O⁶ 字符串下标 ['bind'] 形态（upsert['bind'](...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \['bind'\]\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          "await this.prisma.job.upsert['bind'](this.prisma.job,"
+        ),
+    },
+    {
+      // Round 9 H-1fix：O⁷ —— 动态下标施加在 upsert 自身（upsert['ca'+'ll']）。
+      // dynOwner = ...job.upsert，dynModel='upsert' → 原代码 return null（fail-open）。
+      // FIX(round9) 追加 `dynModel === 'upsert'` throw。
+      name: "O⁷ 动态下标施加在 upsert 上（upsert['ca'+'ll'](...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /upsert 上的动态方法名调用/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          "await this.prisma.job.upsert['ca' + 'll'](this.prisma.job,"
         ),
     },
     {
