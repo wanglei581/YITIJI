@@ -28,6 +28,7 @@
     "verify:upload-sessions:http": "node -r @swc-node/register scripts/verify-upload-sessions-http.ts",
     "verify:partner-smart-campus": "node -r @swc-node/register scripts/verify-partner-smart-campus.ts",
     "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
+    "verify:import-review-reset": "node scripts/verify-import-review-reset.mjs",
     "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
     "verify:partner-excel-template": "node -r @swc-node/register scripts/verify-partner-excel-template.ts",
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",
