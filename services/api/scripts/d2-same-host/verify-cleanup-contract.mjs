@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -69,9 +70,13 @@ function assertForensicRetentionGuards(cleanupSource, message) {
   }
 }
 
-function assertCleanupContract(runSource) {
+function assertCleanupContract(runSource, drillSource) {
   const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
-  assert.match(stopHelper, /systemctl --user stop "\$unit_name"/)
+  assert.match(
+    stopHelper,
+    /timeout --signal=TERM --kill-after=2s 10s \\\n\s+systemctl --user stop "\$unit_name"/,
+    'systemctl stop must have a hard client-side timeout before state polling',
+  )
   assert.doesNotMatch(stopHelper, /systemctl --user stop "\$unit_name"[^\n]*(?:\|\| return 1|\|\| true)/)
   assert.match(stopHelper, /systemctl --user show "\$unit_name" -p LoadState -p ActiveState/)
   assert.doesNotMatch(stopHelper, /-p LoadState -p ActiveState --value/)
@@ -87,6 +92,46 @@ function assertCleanupContract(runSource) {
     (runSource.match(/stop_user_unit_and_prove_inactive "\$(?:PREFLIGHT_UNIT|UNIT_NAME)"/g) ?? []).length >= 2,
     'preflight and final cleanup must share the strict inactive helper',
   )
+
+  const pm2Kill = shellFunctionSource(runSource, 'bounded_pm2_kill')
+  assert.doesNotMatch(
+    pm2Kill,
+    /pm2_home_has_state "\$pm2_home" \|\| return 0/,
+    'PM2 state disappearance must not bypass a previously captured daemon PID',
+  )
+  assert.match(
+    pm2Kill,
+    /if ! pm2_home_has_state "\$pm2_home"; then[\s\S]*\[\[ -z "\$daemon_pid" \]\] && return 0[\s\S]*break/,
+  )
+
+  const keeperInitial = runSource.indexOf('KEEPER_STARTED=0')
+  const keeperAttempt = runSource.indexOf('KEEPER_STARTED=1', keeperInitial)
+  const managedSystemdRun = runSource.indexOf('\nsystemd-run --user \\', keeperInitial)
+  assert.ok(keeperInitial >= 0 && keeperAttempt > keeperInitial)
+  assert.ok(
+    keeperAttempt < managedSystemdRun,
+    'keeper cleanup state must be pessimistically set before systemd-run can partially create the unit',
+  )
+
+  const nginxStop = shellFunctionSource(runSource, 'stop_nginx_and_prove_dead')
+  assert.match(nginxStop, /\[\[ "\$RUN_DIR" == "\$WORK_DIR\/"\* && "\$RUN_DIR" != "\$WORK_DIR" \]\] \|\| return 1/)
+  assert.match(nginxStop, /\[\[ -d "\$RUN_DIR" && -O "\$RUN_DIR" && ! -L "\$RUN_DIR" \]\] \|\| return 1/)
+  assert.match(nginxStop, /nginx-start-attempted/)
+  assert.match(nginxStop, /nginx-master\.identity/)
+  assert.match(nginxStop, /nginx_process_matches_identity "\$nginx_pid" "\$nginx_start_time"/)
+  assert.match(nginxStop, /kill -TERM "\$nginx_pid"/)
+  assert.match(nginxStop, /for _ in \{1\.\.50\}/)
+  assert.doesNotMatch(nginxStop, /(?:pgrep|pkill|killall)/)
+
+  const nginxAttemptPath = drillSource.indexOf("const nginxAttemptPath = join(nginxRoot, 'nginx-start-attempted')")
+  const nginxIdentityPath = drillSource.indexOf("const nginxIdentityPath = join(nginxRoot, 'nginx-master.identity')")
+  const nginxAttemptWrite = drillSource.indexOf("writeExclusive(nginxAttemptPath, '')")
+  const nginxStart = drillSource.indexOf("run(nginxBin, ['-p', nginxPrefix, '-c', nginxActive])")
+  const nginxPidRead = drillSource.indexOf('const nginxPid = readPidFile(nginxPidPath)')
+  const nginxIdentityWrite = drillSource.indexOf('writeExclusive(nginxIdentityPath,')
+  assert.ok(nginxAttemptPath >= 0 && nginxIdentityPath > nginxAttemptPath)
+  assert.ok(nginxAttemptWrite > nginxIdentityPath && nginxAttemptWrite < nginxStart)
+  assert.ok(nginxIdentityWrite > nginxPidRead)
 
   const earlyCleanup = shellFunctionSource(runSource, 'early_cleanup')
   assert.equal((earlyCleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
@@ -104,6 +149,7 @@ function assertCleanupContract(runSource) {
   const cleanup = shellFunctionSource(runSource, 'cleanup')
   assert.match(cleanup, /stop_user_unit_and_prove_inactive "\$UNIT_NAME" \|\| cleanup_failed=1/)
   assert.match(cleanup, /: > "\$STOP_MARKER"\) 2>\/dev\/null \|\| cleanup_failed=1/)
+  assert.match(cleanup, /stop_nginx_and_prove_dead \|\| cleanup_failed=1/)
   assert.equal((cleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
   assertForensicRetentionGuards(
     cleanup,
@@ -126,12 +172,148 @@ function assertCleanupContract(runSource) {
   assert.ok(finalCleanup > finalTrapDisarm && pass > finalCleanup)
 }
 
+function assertShellBehavior(script, expectedStatus, label) {
+  const result = spawnSync('bash', ['-c', script], { encoding: 'utf8', timeout: 5_000 })
+  assert.equal(result.signal, null, `${label}: fixture must not time out`)
+  assert.equal(result.status, expectedStatus, `${label}: ${result.stderr}`)
+}
+
+function verifyPm2CapturedPidBehavior(runSource) {
+  const fixtureRoot = mkdtempSync(join(tmpdir(), 'd2-pm2-cleanup-'))
+  const home = join(fixtureRoot, 'home')
+  const pm2Home = join(fixtureRoot, 'pm2')
+  const terminated = join(fixtureRoot, 'terminated')
+  mkdirSync(home)
+  mkdirSync(pm2Home)
+  try {
+    const pm2Kill = shellFunctionSource(runSource, 'bounded_pm2_kill')
+    assertShellBehavior(`set -u
+APPROVED_PATH=/bin
+PM2_BIN=/bin/true
+NODE_BIN=/bin/true
+SCRIPT_DIR=/tmp
+LIVE=1
+read_pm2_daemon_pid() { printf '4242'; }
+pm2_home_has_state() { return 1; }
+timeout() { return 0; }
+sleep() { :; }
+kill() {
+  if [[ "$1" == '-TERM' ]]; then
+    LIVE=0
+    return 0
+  fi
+  [[ "$1" == '-0' ]] || return 98
+  (( LIVE == 1 ))
+}
+env() {
+  if [[ "$*" == *'--terminate-daemon'* ]]; then
+    : > ${JSON.stringify(terminated)}
+    LIVE=0
+  fi
+  return 0
+}
+${pm2Kill}
+bounded_pm2_kill ${JSON.stringify(home)} ${JSON.stringify(pm2Home)} || exit $?
+[[ -f ${JSON.stringify(terminated)} ]] || exit 91
+`, 0, 'captured PM2 PID remains subject to identity-bound termination after state disappears')
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  }
+}
+
+function nginxFixtureScript(runSource, fixtureRoot, {
+  attempted,
+  identity,
+  live,
+  matches,
+  termStops,
+  exitDuringIdentityRecheck = false,
+}) {
+  const nginxRoot = join(fixtureRoot, 'nginx')
+  const attemptPath = join(nginxRoot, 'nginx-start-attempted')
+  const identityPath = join(nginxRoot, 'nginx-master.identity')
+  mkdirSync(nginxRoot)
+  if (attempted) writeFileSync(attemptPath, '')
+  if (identity !== null) writeFileSync(identityPath, identity)
+  const nginxStop = shellFunctionSource(runSource, 'stop_nginx_and_prove_dead')
+  return `set -u
+WORK_DIR=${JSON.stringify(join(fixtureRoot, '..'))}
+RUN_DIR=${JSON.stringify(fixtureRoot)}
+LIVE=${live ? 1 : 0}
+MATCHES=${matches ? 1 : 0}
+TERM_STOPS=${termStops ? 1 : 0}
+EXIT_DURING_IDENTITY_RECHECK=${exitDuringIdentityRecheck ? 1 : 0}
+MATCH_CALLS=0
+IDENTITY_SIZE=${identity === null ? 0 : Buffer.byteLength(identity)}
+nginx_process_matches_identity() {
+  (( MATCH_CALLS += 1 ))
+  if (( EXIT_DURING_IDENTITY_RECHECK == 1 && MATCH_CALLS >= 2 )); then
+    LIVE=0
+    return 1
+  fi
+  (( MATCHES == 1 ))
+}
+sleep() { :; }
+stat() {
+  [[ "$1" == '-c' && "$2" == '%s' ]] || return 98
+  [[ "$3" == *'nginx-start-attempted' ]] && { printf '0'; return; }
+  [[ "$3" == *'nginx-master.identity' ]] && { printf '%s' "$IDENTITY_SIZE"; return; }
+  return 97
+}
+kill() {
+  if [[ "$1" == '-0' ]]; then (( LIVE == 1 )); return; fi
+  if [[ "$1" == '-TERM' ]]; then (( TERM_STOPS == 1 )) && LIVE=0; return 0; fi
+  return 98
+}
+${nginxStop}
+stop_nginx_and_prove_dead
+`
+}
+
+function verifyNginxIdentityBehavior(runSource) {
+  const cases = [
+    ['not attempted is a safe no-op', false, null, false, true, true, 0, false],
+    ['attempt without identity fails closed', true, null, false, true, true, 1, false],
+    ['malformed identity fails closed', true, 'bad\n', false, true, true, 1, false],
+    ['recorded process already exited is success', true, '4242 98765\n', false, true, true, 0, false],
+    ['identity drift fails without signalling', true, '4242 98765\n', true, false, true, 1, false],
+    ['matching live process is stopped and proven dead', true, '4242 98765\n', true, true, true, 0, false],
+    ['process exit during identity recheck is success', true, '4242 98765\n', true, true, false, 0, true],
+    ['matching live process timeout fails closed', true, '4242 98765\n', true, true, false, 1, false],
+  ]
+  for (const [label, attempted, identity, live, matches, termStops, expected, exitDuringIdentityRecheck] of cases) {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'd2-nginx-cleanup-'))
+    try {
+      assertShellBehavior(
+        nginxFixtureScript(runSource, fixtureRoot, {
+          attempted,
+          identity,
+          live,
+          matches,
+          termStops,
+          exitDuringIdentityRecheck,
+        }),
+        expected,
+        label,
+      )
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true })
+    }
+  }
+  console.log('  PASS Nginx cleanup distinguishes no-attempt, exited, drifted, and live identities')
+}
+
 function fixtureScript(runSource, { stopStatus, shows }) {
   const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
   const fixtures = shows.map(({ load, active, status = 0, shape = 'normal' }) => (
     [load, active, status, shape].join('\t')
   )).join('\n')
   return `set -u
+timeout() {
+  [[ "$1" == '--signal=TERM' && "$2" == '--kill-after=2s' && "$3" == '10s' ]] || return 94
+  shift 3
+  "$@"
+}
 systemctl() {
   if [[ "$1" == "--user" && "$2" == "stop" ]]; then
     return ${stopStatus}
@@ -212,10 +394,13 @@ function verifyStrictCleanupBehavior(runSource) {
 
 export function verifyCleanupContract() {
   const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
+  const drillSource = readFileSync(join(SCRIPT_DIR, 'drill.mjs'), 'utf8')
   const envExampleSource = readFileSync(join(SCRIPT_DIR, '../../.env.example'), 'utf8')
   verifyStrictCleanupBehavior(runSource)
+  verifyPm2CapturedPidBehavior(runSource)
+  verifyNginxIdentityBehavior(runSource)
   assertProductionEnvironmentContract(runSource, envExampleSource)
-  assertCleanupContract(runSource)
+  assertCleanupContract(runSource, drillSource)
 
   const unsafeMutations = [
     runSource.replace('"$load_state" == "loaded" || "$load_state" == "not-found"', '"$load_state" == "loaded"'),
@@ -241,7 +426,40 @@ export function verifyCleanupContract() {
   ]
   for (const mutation of unsafeMutations) {
     assert.notEqual(mutation, runSource, 'every cleanup mutation must actually alter run.sh')
-    assert.throws(() => assertCleanupContract(mutation))
+    assert.throws(() => assertCleanupContract(mutation, drillSource))
+  }
+
+  const livenessMutations = [
+    runSource.replace('timeout --signal=TERM --kill-after=2s 10s \\\n    systemctl --user stop', 'systemctl --user stop'),
+    runSource.replace(
+      'if ! pm2_home_has_state "$pm2_home"; then',
+      'pm2_home_has_state "$pm2_home" || return 0\n    if false; then',
+    ),
+    runSource.replace(
+      'KEEPER_STARTED=1\n\nsystemd-run --user',
+      'systemd-run --user',
+    ).replace(
+      '|| no_go "D2_PRIME_NO_GO_MANAGED_SCOPE"',
+      '|| no_go "D2_PRIME_NO_GO_MANAGED_SCOPE"\nKEEPER_STARTED=1',
+    ),
+    runSource.replace('stop_nginx_and_prove_dead || cleanup_failed=1', ':'),
+    runSource.replace(
+      '[[ -d "$RUN_DIR" && -O "$RUN_DIR" && ! -L "$RUN_DIR" ]] || return 1',
+      ':',
+    ),
+  ]
+  for (const mutation of livenessMutations) {
+    assert.notEqual(mutation, runSource, 'every liveness mutation must actually alter run.sh')
+    assert.throws(() => assertCleanupContract(mutation, drillSource))
+  }
+
+  const drillMutations = [
+    drillSource.replace("writeExclusive(nginxAttemptPath, '')", ''),
+    drillSource.replace('writeExclusive(nginxIdentityPath,', 'void('),
+  ]
+  for (const mutation of drillMutations) {
+    assert.notEqual(mutation, drillSource, 'every Nginx lifecycle mutation must alter drill.mjs')
+    assert.throws(() => assertCleanupContract(runSource, mutation))
   }
 
   const requiredName = productionEnvironmentNames(envExampleSource)[0]
