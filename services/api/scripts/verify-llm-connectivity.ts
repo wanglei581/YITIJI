@@ -176,10 +176,12 @@ async function checkFeature(rawFeature: string, service: LlmConfigService, ms: n
       },
       body: JSON.stringify({
         model: cfg.model,
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 5,
+        messages: [{ role: 'user', content: 'Reply with exactly: pong' }],
+        max_tokens: 32,
         temperature: 0,
         stream: false,
+        // DeepSeek V4 默认可能占 reasoning_content；探测只认 message.content。
+        thinking: { type: 'disabled' },
       }),
     })
 

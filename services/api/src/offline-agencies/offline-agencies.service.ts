@@ -38,11 +38,19 @@ export interface JobListQuery extends PaginationQuery {
   keyword?: string
 }
 
-/** Query string 进来是 string；Prisma skip/take 必须是 Int。 */
+/** Query string 进来是 string；Prisma skip/take 必须是 Int。负数/NaN 回退默认值。 */
 function normalizePage(query: PaginationQuery): { page: number; pageSize: number; skip: number } {
-  const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1)
-  const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(query.pageSize ?? 20), 10) || 20))
+  const rawPage = Number.parseInt(String(query.page ?? 1), 10)
+  const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1
+  const rawPageSize = Number.parseInt(String(query.pageSize ?? 20), 10)
+  const pageSize = Math.min(100, Number.isFinite(rawPageSize) && rawPageSize > 0 ? rawPageSize : 20)
   return { page, pageSize, skip: (page - 1) * pageSize }
+}
+
+/** 供 verify 脚本导入：返回经过强制转 number + 边界保护后的 page/pageSize。 */
+export function resolveOfflineListPage(query: PaginationQuery): { page: number; pageSize: number } {
+  const { page, pageSize } = normalizePage(query)
+  return { page, pageSize }
 }
 
 function parseServices(raw: unknown): string[] {
