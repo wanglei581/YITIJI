@@ -132,6 +132,49 @@ interface JobFairData {
 - Partner 仅维护本机构来源数据（导入/编辑一律回 pending+draft 强制重审）。
 - 浏览企业 / 打开企业来源页进入 §4.4 的 BrowseLog / ExternalJumpLog（targetType=company_profile，action=external_open），同样不得记录任何投递/办理结果。
 
+### 4.6 业务指标诚实化（2026-08-02 新增，长期红线）
+
+> 根本原则：**没真实数据、真实接口、真实硬件状态或真实保存结果时，页面不得展示"已完成 / 已保存 / 已投递 / 已打印 / 设备正常"等结论**（CLAUDE.md §9 硬约束 + §18 不伪造能力）。
+
+#### 4.6.1 离线机构 / 招聘会场馆 / 企业的运行状态字段
+
+| 字段 | 允许的真实数据来源 | 禁止行为 |
+|---|---|---|
+| `营业中` / `open` / `营业/休息` | 仅当数据库字段 `status` 由来源机构或管理员手工维护、且有审计记录时 | **不得**通过 `mapDayOfWeek(openHours)` / `isSameDay` / `currentTime < xx:xx` 临时计算（"今天 X 点前算营业中"），也不得拉取第三方 LBS / 大众点评实时状态冒充真实营业 |
+| `在招岗位 N` / `jobCount` | 仅当 N 来自 `WHERE published_at IS NOT NULL AND expired_at > NOW() AND status='open'` 真实 SQL 查询 | **不得**用 mock 静态 `data.stats` / `Math.random()` 凑数；**不得**展示「外部口径估算」而无 `source_sync_time` 标注 |
+| `今日服务` / `今日 X 人` | 仅当数据库有真实 `service_count` 聚合查询 | **不得**用 `mockTotal + todaySalesLabel` 占位 |
+| `按直线距离` / `distanceKm` | 仅当通过合规地理位置 API（如高德/百度/腾讯地图官方企业认证 API）实时拉取并缓存 | **不得**用「相对位置文字 + 静态直线距离 km」冒充实时距离 |
+| `员工规模 N` / `展位号 N` | 仅当来源机构提供且经审核发布 | **不得**用区间模糊数字（如"100-499 人"）展示成精确数字 |
+| `审核中 / 草稿 / 已发布` | 仅当显示数据库 `review_status` / `publish_status` 真实字段 | **不得**用前端 switch 写死显示 |
+
+#### 4.6.2 零数据兜底文案（强约束）
+
+当上述字段**没有真实数据**时，UI 必须降级为以下诚实文案之一：
+
+- 「服务时间以机构公示为准」
+- 「暂无在招岗位」
+- 「暂无该数据」
+- 「不在工作时间请勿前往」
+- 「以门店现场公告为准」
+
+**禁止**展示「暂无统计 / 数据加载中 / 24 小时营业 / 暂未营业」等拼接假数据。
+
+#### 4.6.3 反向闸门：业务诉求也不得解禁
+
+- 任何业务方或运营方提出"先上 placeholder / 占位数字 / mock 一下"、"先放开 metric 验证"、"数据过来前先展示方便看"等诉求，**不得**作为修改配套 verify 脚本的依据。
+- 配套 verify 脚本（如 `verify-fusion-w4.mjs` 的 metric 断言）的存在即代表"业务不得解禁"的硬约束。即便 PR reviewer 同意改 verify，**仍须**有本节之外的独立文档（如运营 / 法务联签）作为安全垫。
+- 任何想"放开 metric 验证"的 PR 必须由 CLAUDE.md §1/§18 范围内的合规审查独立确认方可执行。
+
+#### 4.6.4 案例记录
+
+- **2026-08-02 [PR #482](https://github.com/wanglei581/YITIJI/pull/482) G1 线下招聘机构三页**：
+  - `OfflineAgenciesPage.tsx` 出现 `data.stats`、`jobCount`、`营业中`、`今日服务`、`在招岗位`、`按直线距离`、`status === 'open'`，均无真实数据源
+  - 详情页用 `agency.id` query 拼接深链而非独立路由 `/offline-agencies/:id`
+  - 配套 `verify-fusion-w4.mjs` 早就禁这些字面量（L276 黑名单），但 PR #482 直接 `0/3 checks passed` 仍被 squash 合入 main
+  - 结果：main 自身 CI 三 job 长期红（`build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness`）
+
+本节即针对此案例钉住：**业务诉求不是解禁 verify 的依据**。修复路径必须走业务收敛（去 metric 字段 + 加诚实文案 + 改独立路由），不得走 verify 适配（该路径与 §18 不兼容）。
+
 ---
 
 ## 五、文件安全要求

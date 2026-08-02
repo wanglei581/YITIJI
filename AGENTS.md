@@ -144,6 +144,37 @@ docs/                # 所有文档
 
 ---
 
+## CI 与合并门禁（2026-08-02 新增）
+
+> 背景：2026-08-02 [PR #482](https://github.com/wanglei581/YITIJI/pull/482) G1 线下招聘机构三页 squash 合入 `main` 时即 `0/3 checks passed`，但 GitHub 仍允许 merge，导致 main 自身 CI 三 job 长期红（`build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness`），所有后续 PR 都被动漂红无法独立判别。
+
+### 硬约束
+
+1. **CI 必须 100% passes 才能 squash / merge**。`gh pr checks <PR>` 任一 job `fail` / `cancelled` / `skipped` 都不允许 merge。
+   - 唯一例外：失败源已由独立 verify 守护、且该 PR 改动明确证明无关（须在 PR 描述 + `docs/progress/current-progress.md` 同步写证据；纯"看起来无关"不构成例外）。
+2. **PR 描述必须包含 `Local verify:` 一节**，列出本地跑过的 `typecheck` / `lint` / `verify:*` / `playwright` 全部 `n/m PASS` 证据。
+3. **存在"主分支红源"反向阻断**：若 `main` 当前 CI 红，所有新 PR **必须在合并前**确保本地 verify 全绿 + 在 PR 描述里写"本 PR 不引入新失败"逐项对照。
+4. **批量 squash 监控**：若一个 PR 包含超过 3 个 stacked sub-commit 的 squash，要在 PR 描述 "Roll-up" 段写明各项独立验证证据；不允许把所有 stacked sub-commit 串成一个 squash 蒙混。
+5. **CI quota 耗尽时**：`gh run watch` / `gh run list --status=in_progress` 看不到新 run 启动时，**不允许 squash merge**；必须等下次 quota 恢复并跑通。
+
+### 治理分支与 CI
+
+- 若某 staged PR 全部 sub-commit 都没带 `verify:xxx` 脚本，本节硬约束意味着合入后 CI 必红。修复方式：在合并前补 `verify:*` 脚本覆盖该批改动（N+1 模式），否则不允许 squash。
+- 不允许"先合红，再让后人修"— 那是上一节禁止的"等别人修"陷阱。
+
+### 谁的活
+
+- **PR 作者**：在 PR 描述里写 `Local verify:` + `CI run:` + 失败对照
+- **审查者**：squash 前必须肉眼复核 `gh pr checks` 全绿
+- **主开发**：在 `docs/progress/current-progress.md` 记录每个 PR 的 CI 状态
+
+### 与《工程规模控制》的关系
+
+- §8.1「不新增第二套项目标准」— 本节是合并门禁,不是项目结构;不重复 §8.1 的反堆砌规则
+- §8.1「保留仍承载独有能力的基础锚点」— 失败 verify 除非有合规模板(CONTROL/E2E)证据证明 fail-ok,否则认定是能力缺口而非装饰
+
+---
+
 ## 当前进度
 
 详见：[docs/progress/current-progress.md](docs/progress/current-progress.md)  

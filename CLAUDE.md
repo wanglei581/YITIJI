@@ -247,6 +247,22 @@ ai-job-print-terminal/
 - 远程分支清理必须区分真实远程 head 与本地 stale remote-tracking ref；未授权前不得用 `git remote prune` 或 `git gc` 作为“顺手清理”。
 - 堆叠分支清理只能在证明祖先关系后删除中间分支名；必须保留仍承载独有能力的基础锚点或顶层候选分支，直到对应能力迁移或明确放弃。
 
+### 8.2 CI 与合并门禁（2026-08-02 新增，防止 #482 类 0/3 checks passed 仍被 squash）
+
+> 详见 `AGENTS.md` §「CI 与合并门禁」完整版。本节是给 Claude 的关键摘要。
+
+**硬约束**：
+
+1. **CI 必须 100% passes 才能 squash / merge**。任何 `gh pr checks` 中 `fail` / `cancelled` / `skipped` 都不允许 merge。唯一例外：失败源已由独立 verify 守护、且 PR 改动明确证明无关（须在 PR 描述 + `docs/progress/current-progress.md` 同步写证据）。
+2. **PR 描述必须含 `Local verify:` 一节**，列出 `typecheck` / `lint` / `verify:*` / `playwright` 全部 `n/m PASS` 证据。
+3. **主分支 CI 红时反向阻断**：新 PR 必须在合并前证明本地 verify 全绿 + 写"本 PR 不引入新失败"逐项对照。
+4. **CI quota 耗尽时**（看不到新 run 启动）禁止 squash merge；必须等 quota 恢复并跑通。
+5. **批量 stacked squash**（>3 sub-commit）必须在 PR 描述 "Roll-up" 段写各项独立验证证据。
+
+**失败的姿势**：2026-08-02 [PR #482](https://github.com/wanglei581/YITIJI/pull/482) G1 线下招聘机构三页 squash 合入 main 时即 `0/3 checks passed`，造成 main 自身 CI 三 job 长期红（`build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness`），所有后续 PR 都被动漂红。本节硬约束即针对此治理缺口。
+
+**谁守门**：PR 作者 / 审查者 / 主开发 三方在 PR 描述 / squash 复核 / 进度文档 都有职责；详见 AGENTS.md 完整版。
+
 ## 9. 页面 UI 设计口径
 
 项目不再设置固定页面视觉风格限制。`docs/design/` 中的视觉规范、动效规范、历史预览和旧秒哒参考只作为可选设计参考，不再作为“必须使用 / 禁止使用”的硬性标准。
