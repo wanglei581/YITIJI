@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>简历上传 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .upload-zone {
+      border: 2px dashed var(--line);
+      border-radius: var(--r-md);
+      height: 160px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      cursor: pointer; transition: border-color .15s, background .15s;
+      background: var(--surface-2);
+    }
+    .upload-zone:active { border-color: var(--teal); background: var(--teal-wash); }
+    .upload-zone .uz-ic { font-size: 36px; }
+    .upload-zone .uz-title { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .upload-zone .uz-fmt { font-size: 11.5px; color: var(--faint); }
+    .upload-zone .uz-link {
+      font-size: 12px; color: var(--teal);
+      border-bottom: 1px dashed var(--teal-soft);
+      margin-top: 2px; cursor: pointer;
+    }
+    .form-section { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .seg-inline {
+      display: flex; background: var(--surface-2);
+      border-radius: var(--r-full); padding: 3px;
+      border: 1px solid var(--line-soft);
+    }
+    .seg-inline .s {
+      flex: 1; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r-full);
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: all .18s;
+    }
+    .seg-inline .s.on {
+      background: var(--surface); color: var(--ink); font-weight: 600;
+      box-shadow: var(--sh-xs);
+    }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">AI简历诊断</div>
+    <div style="width:32px"></div>
+  </div>
+
+  <!-- 步骤指示 -->
+  <div class="steps">
+    <div class="st on"><div class="n">1</div><div class="nl">上传</div></div>
+    <div class="line"></div>
+    <div class="st"><div class="n">2</div><div class="nl">解析</div></div>
+    <div class="line"></div>
+    <div class="st"><div class="n">3</div><div class="nl">诊断</div></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="spacer-sm"></div>
+
+    <!-- 上传区域 -->
+    <div class="card">
+      <div class="card-inner">
+        <div class="upload-zone">
+          <div class="uz-ic">📎</div>
+          <div class="uz-title">上传简历文件</div>
+          <div class="uz-fmt">支持 PDF · Word · 图片</div>
+          <div class="uz-link">或从我的简历选择</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 方向设置 -->
+    <div class="card">
+      <div class="card-head">
+        <span class="ch-title">诊断方向设置</span>
+        <span class="ch-more">可选</span>
+      </div>
+      <div class="form-section">
+        <div class="field">
+          <div class="fl">目标岗位方向</div>
+          <div class="inp"><span class="ph">如：UI设计师、产品经理、运营…</span></div>
+        </div>
+        <div class="field">
+          <div class="fl">期望城市</div>
+          <div class="inp"><span class="ph">如：上海、北京、广州…</span></div>
+        </div>
+        <div class="field">
+          <div class="fl">工作经验</div>
+          <div class="seg-inline">
+            <div class="s on">应届</div>
+            <div class="s">1–3 年</div>
+            <div class="s">3 年以上</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notice plum">
+      <span class="n-ic">💡</span>
+      <span>AI将基于你填写的方向提供更精准的诊断，不填写也可以直接分析。</span>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn primary block">开始 AI 诊断</button>
+  </div>
+</div>
+</body>
+</html>

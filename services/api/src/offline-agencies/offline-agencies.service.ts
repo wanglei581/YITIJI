@@ -29,6 +29,8 @@ export interface AgencyListQuery extends PaginationQuery {
   district?: string
   orgType?: string
   keyword?: string
+  /** Kiosk 服务筛选（匹配 services JSON 数组中的项） */
+  service?: string
 }
 
 export interface JobListQuery extends PaginationQuery {
@@ -36,14 +38,22 @@ export interface JobListQuery extends PaginationQuery {
   keyword?: string
 }
 
-/** 将 query 分页参数收成 Prisma 可用的整数（缺省/非法 → page=1, pageSize=20；封顶 100）。 */
-export function resolveOfflineListPage(query: PaginationQuery): { page: number; pageSize: number } {
-  const pageNum = Number(query.page)
-  const pageSizeNum = Number(query.pageSize)
-  const page = Number.isFinite(pageNum) && pageNum >= 1 ? Math.floor(pageNum) : 1
-  const pageSize =
-    Number.isFinite(pageSizeNum) && pageSizeNum >= 1 ? Math.min(100, Math.floor(pageSizeNum)) : 20
-  return { page, pageSize }
+/** Query string 进来是 string；Prisma skip/take 必须是 Int。 */
+function normalizePage(query: PaginationQuery): { page: number; pageSize: number; skip: number } {
+  const page = Math.max(1, Number.parseInt(String(query.page ?? 1), 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(query.pageSize ?? 20), 10) || 20))
+  return { page, pageSize, skip: (page - 1) * pageSize }
+}
+
+function parseServices(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String)
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return raw.split(/[,，]/).map((s) => s.trim()).filter(Boolean)
+  }
 }
 
 @Injectable()
@@ -53,9 +63,8 @@ export class OfflineAgenciesService {
   // ─── Kiosk 公开端点（只查已审核已发布）─────────────────────────────────────
 
   async findAll(query: AgencyListQuery) {
-    const { district, orgType, keyword } = query
-    const { page, pageSize } = resolveOfflineListPage(query)
-    const skip = (page - 1) * pageSize
+    const { page, pageSize, skip } = normalizePage(query)
+    const { district, orgType, keyword, service } = query
 
     const where: Record<string, unknown> = {
       reviewStatus: 'approved',
@@ -72,7 +81,7 @@ export class OfflineAgenciesService {
       ]
     }
 
-    const [items, total] = await Promise.all([
+    const [rows, total, districtRows] = await Promise.all([
       this.prisma.offlineAgency.findMany({
         where: where as never,
         skip,
@@ -80,16 +89,63 @@ export class OfflineAgenciesService {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, name: true, orgType: true, address: true, district: true,
-          lat: true, lng: true, openHours: true, phone: true, contactEmail: true,
-          website: true, services: true, description: true, logoUrl: true,
-          status: true, sourceOrgId: true, externalId: true, syncTime: true,
-          createdAt: true, updatedAt: true,
+          openHours: true, services: true, status: true,
+          sourceOrgId: true, externalId: true, syncTime: true, updatedAt: true,
+          _count: { select: { jobs: { where: { status: 'active' } } } },
         },
       }),
       this.prisma.offlineAgency.count({ where: where as never }),
+      this.prisma.offlineAgency.findMany({
+        where: {
+          reviewStatus: 'approved',
+          publishStatus: 'published',
+          status: 'active',
+          district: { not: null },
+        } as never,
+        select: { district: true },
+        distinct: ['district'],
+      }),
     ])
 
-    return { data: items, total, page, pageSize }
+    let items = rows.map((row: (typeof rows)[number]) => {
+      const services = parseServices(row.services)
+      const isOpen = row.status === 'active'
+      return {
+        id: row.id,
+        name: row.name,
+        type: row.orgType || 'recruitment',
+        status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
+        statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+        address: row.address,
+        district: row.district || '',
+        hours: row.openHours || '以门店公告为准',
+        services,
+        orgCode: row.externalId || row.sourceOrgId || row.id,
+        jobCount: row._count.jobs,
+        syncTime: (row.syncTime ?? row.updatedAt).toISOString(),
+      }
+    })
+
+    if (service) {
+      items = items.filter((it: (typeof items)[number]) => it.services.includes(service))
+    }
+
+    const payload = {
+      items,
+      total: service ? items.length : total,
+      page,
+      pageSize,
+      stats: {
+        totalAgencies: service ? items.length : total,
+        openAgencies: items.filter((it: (typeof items)[number]) => it.status === 'open').length,
+        totalJobs: items.reduce((sum: number, it: (typeof items)[number]) => sum + it.jobCount, 0),
+        districts: districtRows.length,
+        lastSyncLabel: items[0]?.syncTime ? '已同步' : '暂无同步',
+      },
+    }
+
+    // Kiosk get() 会取 body.data
+    return { data: payload }
   }
 
   async findOne(id: string) {
@@ -103,7 +159,36 @@ export class OfflineAgenciesService {
       },
     })
     if (!agency) throw new NotFoundException(`线下机构 ${id} 不存在或未发布`)
-    return agency
+
+    const services = parseServices(agency.services)
+    const isOpen = agency.status === 'active'
+    const data = {
+      id: agency.id,
+      name: agency.name,
+      type: agency.orgType || 'recruitment',
+      status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
+      statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+      address: agency.address,
+      district: agency.district || '',
+      hours: agency.openHours || '以门店公告为准',
+      services,
+      orgCode: agency.externalId || agency.sourceOrgId || agency.id,
+      jobCount: agency.jobs.length,
+      syncTime: (agency.syncTime ?? agency.updatedAt).toISOString(),
+      phone: agency.phone ?? null,
+      description: agency.description ?? null,
+      website: agency.website ?? null,
+      jobs: agency.jobs.map((j: (typeof agency.jobs)[number]) => ({
+        id: j.id,
+        title: j.title,
+        jobType: j.jobType ?? undefined,
+        location: j.location ?? undefined,
+        salaryMin: j.salaryMin ?? null,
+        salaryMax: j.salaryMax ?? null,
+        status: j.status,
+      })),
+    }
+    return { data }
   }
 
   async findJobsByAgency(agencyId: string, query: JobListQuery) {
@@ -114,9 +199,8 @@ export class OfflineAgenciesService {
     })
     if (!agency) throw new NotFoundException(`线下机构 ${agencyId} 不存在或未发布`)
 
+    const { page, pageSize, skip } = normalizePage(query)
     const { jobType, keyword } = query
-    const { page, pageSize } = resolveOfflineListPage(query)
-    const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = { agencyId, status: 'active' }
     if (jobType) where['jobType'] = jobType
@@ -147,26 +231,67 @@ export class OfflineAgenciesService {
       include: {
         agency: {
           select: {
-            id: true, name: true, orgType: true, address: true, district: true,
-            phone: true, openHours: true, website: true, reviewStatus: true, publishStatus: true,
+            id: true, name: true, orgType: true, address: true,
+            phone: true, openHours: true, services: true,
+            reviewStatus: true, publishStatus: true,
           },
         },
       },
     })
     if (!job) throw new NotFoundException(`岗位 ${id} 不存在`)
-    // 岗位所属机构必须已发布
     if (job.agency.reviewStatus !== 'approved' || job.agency.publishStatus !== 'published') {
       throw new NotFoundException(`岗位 ${id} 不存在或机构未发布`)
     }
-    return job
+
+    const unitLabel = job.salaryUnit === 'day' ? '天' : job.salaryUnit === 'hour' ? '时' : '月'
+    let salary = '薪资面议'
+    if (job.salaryMin != null && job.salaryMax != null) {
+      salary = `${job.salaryMin}-${job.salaryMax} 元/${unitLabel}`
+    } else if (job.salaryMin != null) {
+      salary = `${job.salaryMin} 元起/${unitLabel}`
+    }
+
+    const parseText = (raw: string | null | undefined): string[] => {
+      if (!raw?.trim()) return []
+      try {
+        const p = JSON.parse(raw) as unknown
+        return Array.isArray(p) ? p.map(String) : [raw]
+      } catch {
+        return raw.split(/\n+/).map((s) => s.trim()).filter(Boolean)
+      }
+    }
+
+    const agencyServices = parseServices(job.agency.services)
+
+    const data = {
+      id: job.id,
+      title: job.title,
+      salary,
+      jobType: job.jobType ?? undefined,
+      location: job.location ?? undefined,
+      tags: [] as string[],
+      requirements: parseText(job.requirements),
+      responsibilities: [] as string[],
+      agencyId: job.agencyId,
+      agencyName: job.agency.name,
+      agencyType: job.agency.orgType || 'recruitment',
+      agencyAddress: job.agency.address,
+      agencyHours: job.agency.openHours || '',
+      agencyPhone: job.agency.phone ?? undefined,
+      agencyServices,
+      sourceName: job.agency.name,
+      sourceType: job.agency.orgType || 'recruitment',
+      syncTime: job.updatedAt.toISOString(),
+      externalId: job.externalId || '',
+    }
+    return { data }
   }
 
   // ─── Admin 管理端点（无状态过滤）────────────────────────────────────────────
 
   async adminFindAll(query: AgencyListQuery) {
+    const { page, pageSize, skip } = normalizePage(query)
     const { district, orgType, keyword } = query
-    const { page, pageSize } = resolveOfflineListPage(query)
-    const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = {}
     if (district) where['district'] = district
@@ -297,9 +422,8 @@ export class OfflineAgenciesService {
 
   async adminFindJobsByAgency(agencyId: string, query: JobListQuery) {
     await this._assertAgencyExists(agencyId)
+    const { page, pageSize, skip } = normalizePage(query)
     const { jobType, keyword } = query
-    const { page, pageSize } = resolveOfflineListPage(query)
-    const skip = (page - 1) * pageSize
 
     const where: Record<string, unknown> = { agencyId }
     if (jobType) where['jobType'] = jobType

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>18 AI 助手</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .chat-body{flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:12px; background:var(--paper);}
+  .assistant-head{display:flex; align-items:center; gap:10px; padding:8px 16px 4px;}
+  .assistant-head .av{width:40px; height:40px; border-radius:50%; background:var(--teal-soft); color:var(--teal-deep); display:grid; place-items:center; font-family:var(--serif); font-weight:700; font-size:17px;}
+  .assistant-head h4{font-family:var(--serif); font-size:15px;} .assistant-head p{font-size:11px; color:var(--muted);}
+  .quick-q{display:flex; gap:8px; overflow-x:auto; padding:4px 0; scrollbar-width:none;}
+  .quick-q::-webkit-scrollbar{display:none;}
+  .quick-q .q{flex:none; padding:8px 14px; background:var(--surface); border:1px solid var(--line); border-radius:999px; font-size:12.5px; color:var(--ink-soft);}
+  .chat-input{flex:none; padding:10px 14px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:var(--surface); display:flex; gap:9px; align-items:center;}
+  .chat-input .box{flex:1; height:42px; border:1px solid var(--line); border-radius:var(--r-pill); background:var(--surface-2); padding:0 16px; display:flex; align-items:center; color:var(--faint); font-size:14px;}
+  .chat-input .send{width:42px; height:42px; border-radius:50%; background:var(--teal); color:#fff; display:grid; place-items:center; font-size:18px; flex:none;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">AI 助手 · 小青</span></div>
+  <div class="assistant-head">
+    <div class="av">青</div>
+    <div><h4>小青</h4><p>求职材料 & 打印小助手 · AI 生成</p></div>
+  </div>
+
+  <div class="chat-body">
+    <div class="bubble-row"><div class="avatar sm">青</div><div class="bubble ai">你好，我是小青 👋 我可以帮你诊断简历、指导打印、解答求职材料问题。想先做点什么？</div></div>
+    <div class="bubble-row me"><div class="bubble me">我的简历怎么打印成彩色的？</div></div>
+    <div class="bubble-row"><div class="avatar sm">青</div><div class="bubble ai">很简单：进入「打印」→ 选「手机上传·到店取件」→ 上传简历后，在参数里把颜色切成<b>彩色</b>，付款生成取件码，到店核销就能打印啦。需要我带你过去吗？</div></div>
+    <div class="quick-q" style="padding-left:44px;">
+      <span class="q">去打印简历</span>
+      <span class="q">诊断我的简历</span>
+      <span class="q">面试怎么练</span>
+    </div>
+  </div>
+
+  <div style="padding:0 16px 6px;"><div class="compliance-note">小青的回答由 AI 生成，仅供参考。本工具不提供岗位投递与招聘服务。</div></div>
+
+  <div class="chat-input">
+    <div class="box">问问小青…</div>
+    <div class="send">↑</div>
+  </div>
+</div>
+</body>
+</html>

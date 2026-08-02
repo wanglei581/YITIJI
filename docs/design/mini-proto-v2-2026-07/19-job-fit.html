@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>匹配参考 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    /* 圆形评分环（CSS conic-gradient实现） */
+    .ring-wrap {
+      display: flex; align-items: center; gap: 20px;
+      padding: 4px 0 8px;
+    }
+    .score-ring-css {
+      width: 100px; height: 100px; border-radius: 50%;
+      background: conic-gradient(var(--teal) 0% 74%, var(--line-soft) 74% 100%);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .score-ring-css .sri {
+      width: 74px; height: 74px; border-radius: 50%;
+      background: var(--surface);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .score-ring-css .sri .sv {
+      font-family: var(--font-serif); font-size: 26px; font-weight: 700; color: var(--ink); line-height: 1;
+    }
+    .score-ring-css .sri .sl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .ring-desc { flex: 1; }
+    .ring-desc .rd-level {
+      font-family: var(--font-serif); font-size: 17px; font-weight: 700; color: var(--teal-deep);
+    }
+    .ring-desc .rd-sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+    /* 维度行 */
+    .dim-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 0;
+    }
+    .dim-row + .dim-row { border-top: 1px solid var(--line-faint); }
+    .dim-row .dr-label { font-size: 13px; color: var(--ink-soft); width: 80px; flex-shrink: 0; }
+    .dim-row .dr-bar { flex: 1; }
+    .dim-row .dr-val { font-size: 13px; font-weight: 600; color: var(--ink); width: 38px; text-align: right; flex-shrink: 0; }
+
+    /* 优势/差距条目 */
+    .point-row {
+      display: flex; gap: 10px; padding: 8px 0;
+    }
+    .point-row + .point-row { border-top: 1px solid var(--line-faint); }
+    .point-row .pr-ic {
+      width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; flex-shrink: 0; margin-top: 1px;
+    }
+    .point-row .pr-ic.plus { background: var(--teal-soft); color: var(--teal); }
+    .point-row .pr-ic.minus { background: var(--clay-soft); color: var(--clay); }
+    .point-row .pr-body { flex: 1; }
+    .point-row .pr-title { font-size: 14px; font-weight: 500; color: var(--ink); line-height: 1.4; }
+    .point-row .pr-sub { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="sb-icons"><span>●●●</span><span>WiFi</span><span>🔋</span></div>
+  </div>
+
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <span class="nav-title">匹配参考</span>
+    <div class="nav-right"><span class="ai-badge">✦ AI</span></div>
+  </div>
+
+  <div class="content">
+
+    <!-- AI声明 -->
+    <div class="notice plum" style="margin-top:10px;">
+      <span class="n-ic">ℹ</span>
+      <span>以下为 AI 生成的求职参考，非企业招聘评价，不代表录取可能性，仅供个人参考。请以实际岗位要求为准。</span>
+    </div>
+
+    <!-- 总体参考等级 -->
+    <div style="padding: 0 16px 8px; font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.5px;">OVERALL · 总体参考</div>
+    <div class="card">
+      <div class="card-inner lg">
+        <div class="ring-wrap">
+          <div class="score-ring-css">
+            <div class="sri">
+              <div class="sv">74<span style="font-size:14px;font-weight:400;color:var(--muted);">%</span></div>
+              <div class="sl">参考覆盖率</div>
+            </div>
+          </div>
+          <div class="ring-desc">
+            <div class="rd-level">较高参考匹配</div>
+            <div class="rd-sub">基于关键词覆盖与经历相关性，该岗位与你的简历具有较高的参考关联度。</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);padding-top:8px;border-top:1px solid var(--line-faint);">
+          参考岗位：UI 设计师 · 杭州创意未来网络科技有限公司
+        </div>
+      </div>
+    </div>
+
+    <!-- 匹配维度 -->
+    <div style="padding: 8px 16px 6px; font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.5px;">DIMENSIONS · 维度分析</div>
+    <div class="card">
+      <div class="card-inner">
+        <div class="dim-row">
+          <div class="dr-label">关键词覆盖</div>
+          <div class="dr-bar">
+            <div class="meter"><i style="width:82%"></i></div>
+          </div>
+          <div class="dr-val" style="color:var(--teal)">82%</div>
+        </div>
+        <div class="dim-row">
+          <div class="dr-label">经历相关性</div>
+          <div class="dr-bar">
+            <div class="meter"><i class="wheat" style="width:70%"></i></div>
+          </div>
+          <div class="dr-val" style="color:var(--wheat)">70%</div>
+        </div>
+        <div class="dim-row">
+          <div class="dr-label">技能匹配</div>
+          <div class="dr-bar">
+            <div class="meter"><i style="width:78%"></i></div>
+          </div>
+          <div class="dr-val" style="color:var(--teal)">78%</div>
+        </div>
+        <div class="dim-row">
+          <div class="dr-label">教育背景</div>
+          <div class="dr-bar">
+            <div class="meter"><i class="clay" style="width:65%"></i></div>
+          </div>
+          <div class="dr-val" style="color:var(--clay)">65%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 优势分析 -->
+    <div class="ai-card">
+      <div class="ac-head">
+        <span class="ac-ic">✅</span>
+        <span class="ac-title">优势分析</span>
+        <span class="ac-badge">基于简历内容</span>
+      </div>
+      <div class="point-row">
+        <div class="pr-ic plus">+</div>
+        <div class="pr-body">
+          <div class="pr-title">有 Figma 与 Sketch 实战经验</div>
+          <div class="pr-sub">岗位要求熟练掌握主流设计工具，简历中有明确提及。</div>
+          <div class="evidence-quote">
+            <div class="eq-label">📄 简历原文</div>
+            <div class="eq-text">「熟练使用 Figma、Sketch，主导过 3 款 App 的全流程 UI 设计」</div>
+          </div>
+        </div>
+      </div>
+      <div class="point-row">
+        <div class="pr-ic plus">+</div>
+        <div class="pr-body">
+          <div class="pr-title">有移动端成熟项目案例</div>
+          <div class="pr-sub">岗位要求提供作品集，简历中有实际项目背书。</div>
+          <div class="evidence-quote">
+            <div class="eq-label">📄 简历原文</div>
+            <div class="eq-text">「负责「青橙」App 1.0–2.3 版本的完整视觉设计，月活提升 40%」</div>
+          </div>
+        </div>
+      </div>
+      <div class="point-row">
+        <div class="pr-ic plus">+</div>
+        <div class="pr-body">
+          <div class="pr-title">有设计系统建设经验</div>
+          <div class="pr-sub">岗位提及维护设计系统，简历中有相关描述。</div>
+          <div class="evidence-quote">
+            <div class="eq-label">📄 简历原文</div>
+            <div class="eq-text">「从零搭建前司 Design System，覆盖 200+ 组件，减少前端重复开发 30%」</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 差距分析 -->
+    <div class="ai-card" style="background:var(--clay-wash);border-left-color:var(--clay-soft);">
+      <div class="ac-head">
+        <span class="ac-ic">⚠️</span>
+        <span class="ac-title" style="color:var(--clay-deep)">差距分析</span>
+        <span class="ac-badge" style="background:var(--clay-soft);color:var(--clay-deep);">仅供参考</span>
+      </div>
+      <div class="point-row">
+        <div class="pr-ic minus">–</div>
+        <div class="pr-body">
+          <div class="pr-title">互联网行业背景偏弱</div>
+          <div class="pr-sub">该岗位来自互联网公司，简历中项目偏向传统行业，行业关键词覆盖度约 52%，可在简历中补充相关描述。</div>
+        </div>
+      </div>
+      <div class="point-row">
+        <div class="pr-ic minus">–</div>
+        <div class="pr-body">
+          <div class="pr-title">用户研究经历描述较少</div>
+          <div class="pr-sub">岗位提及参与用户研究与可用性测试，简历中未见明确表述，建议补充相关经历或调研项目。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="compliance-note">以上分析由 AI 基于简历文本与岗位描述关键词比对生成，不代表招聘方评价，亦不保证求职结果。</div>
+    <div class="spacer"></div>
+  </div>
+
+</div>
+</body>
+</html>

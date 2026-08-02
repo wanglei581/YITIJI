@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>校园招聘 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .campus-hero { background:linear-gradient(150deg,#8a6018,#a9781f); padding:20px 20px 46px; position:relative; overflow:hidden; }
+    .campus-hero::after { content:'🎓'; position:absolute; right:14px; bottom:-6px; font-size:88px; opacity:.14; }
+    .ch-t { font-family:var(--font-serif); font-size:23px; font-weight:700; color:#fff; }
+    .ch-s { font-size:12.5px; color:rgba(255,255,255,.75); margin-top:6px; max-width:240px; line-height:1.6; }
+    .stat-float { margin:-30px 16px 0; background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-md); display:flex; padding:16px 0; position:relative; }
+    .sf-cell { flex:1; text-align:center; }
+    .sf-cell + .sf-cell { border-left:1px solid var(--line-faint); }
+    .sf-n { font-family:var(--font-serif); font-size:21px; font-weight:700; color:var(--wheat-deep); }
+    .sf-l { font-size:11px; color:var(--muted); margin-top:3px; }
+    .cmp-card { display:flex; gap:12px; padding:14px 16px; cursor:pointer; }
+    .cmp-card + .cmp-card { border-top:1px solid var(--line-faint); }
+    .cmp-logo { width:50px; height:50px; border-radius:13px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; font-family:var(--font-serif); font-weight:700; }
+    .cmp-name { font-size:15px; font-weight:600; color:var(--ink); }
+    .cmp-tags { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+    .cmp-foot { font-size:11.5px; color:var(--faint); margin-top:7px; }
+    .live-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#e5484d; margin-right:4px; animation:pulse 1.6s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#8a6018"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light" style="background:#8a6018;border-bottom:none">
+    <div class="nav-back">‹</div>
+    <div class="nav-title" style="color:#fff">校园招聘</div>
+    <div class="nav-right"><span style="font-size:17px;color:rgba(255,255,255,.85)">🔍</span></div>
+  </div>
+
+  <div class="content has-tabbar">
+    <div class="campus-hero">
+      <div class="ch-t">2026 春季校园招聘季</div>
+      <div class="ch-s">汇集高校与合作机构发布的宣讲会与专场信息</div>
+    </div>
+
+    <div class="stat-float">
+      <div class="sf-cell"><div class="sf-n">128</div><div class="sf-l">在招企业</div></div>
+      <div class="sf-cell"><div class="sf-n">36</div><div class="sf-l">近期宣讲</div></div>
+      <div class="sf-cell"><div class="sf-n">12</div><div class="sf-l">合作高校</div></div>
+    </div>
+
+    <!-- 近期宣讲 -->
+    <div class="section-t">近期宣讲会 <span class="muted fw-400" style="font-size:12px">按时间排序</span></div>
+    <div class="card">
+      <div class="row-item">
+        <div class="ri-lead a-wheat">📅</div>
+        <div class="ri-body">
+          <div class="ri-title"><span class="live-dot"></span>今晚 19:00 · 星野科技空中宣讲</div>
+          <div class="ri-sub">线上直播 · 校招合作 · 研发/产品岗</div>
+        </div>
+        <div class="chip wheat">进行中</div>
+      </div>
+      <div class="row-item">
+        <div class="ri-lead a-slate">📅</div>
+        <div class="ri-body">
+          <div class="ri-title">明天 14:00 · 云图数据校园专场</div>
+          <div class="ri-sub">第三教学楼报告厅 · 数据/算法岗</div>
+        </div>
+        <div class="chip">明天</div>
+      </div>
+      <div class="row-item">
+        <div class="ri-lead a-teal">📅</div>
+        <div class="ri-body">
+          <div class="ri-title">07-28 · 春潮制造双选会</div>
+          <div class="ri-sub">大学生活动中心 · 多岗位</div>
+        </div>
+        <div class="chip">4 天后</div>
+      </div>
+    </div>
+
+    <!-- 参会企业 -->
+    <div class="section-t">参会企业</div>
+    <div class="card">
+      <div class="cmp-card">
+        <div class="cmp-logo" style="background:#1f9e86">星</div>
+        <div style="flex:1">
+          <div class="cmp-name">星野科技</div>
+          <div class="cmp-tags">
+            <span class="chip teal">互联网</span>
+            <span class="chip">研发 · 12 岗</span>
+          </div>
+          <div class="cmp-foot">来源：星野科技校招官网 · 同步 2 小时前</div>
+        </div>
+        <div style="align-self:center;color:var(--faint)">›</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-logo" style="background:#b8683c">云</div>
+        <div style="flex:1">
+          <div class="cmp-name">云图数据</div>
+          <div class="cmp-tags">
+            <span class="chip clay">大数据</span>
+            <span class="chip">算法 · 8 岗</span>
+          </div>
+          <div class="cmp-foot">来源：智联招聘 · 同步 5 小时前</div>
+        </div>
+        <div style="align-self:center;color:var(--faint)">›</div>
+      </div>
+      <div class="cmp-card">
+        <div class="cmp-logo" style="background:#a9781f">春</div>
+        <div style="flex:1">
+          <div class="cmp-name">春潮制造集团</div>
+          <div class="cmp-tags">
+            <span class="chip wheat">先进制造</span>
+            <span class="chip">工艺 · 20 岗</span>
+          </div>
+          <div class="cmp-foot">来源：校就业指导中心 · 同步 1 天前</div>
+        </div>
+        <div style="align-self:center;color:var(--faint)">›</div>
+      </div>
+    </div>
+
+    <div class="compliance-note">校招信息来自高校与第三方平台公开发布。报名、投递与预约请前往对应来源平台，本终端不代收简历。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab"><div class="ti">⌂</div><div class="tl">首页</div></div>
+    <div class="tab"><div class="ti">🖨</div><div class="tl">打印</div></div>
+    <div class="tab on"><div class="ti">💼</div><div class="tl">求职</div></div>
+    <div class="tab"><div class="ti">✦</div><div class="tl">AI</div></div>
+    <div class="tab"><div class="ti">◍</div><div class="tl">我的</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>上传打印 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .file-meta-card {
+      background: var(--surface);
+      border-radius: var(--r-md);
+      margin: 0 16px 12px;
+      box-shadow: var(--sh-sm);
+      padding: 16px;
+    }
+    .file-meta-card .fm-top {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .file-meta-card .fm-ic {
+      width: 48px; height: 48px; border-radius: 12px;
+      background: var(--clay-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px; flex-shrink: 0;
+    }
+    .file-meta-card .fm-info { flex: 1; min-width: 0; }
+    .file-meta-card .fm-name {
+      font-size: 15px; font-weight: 600; color: var(--ink);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .file-meta-card .fm-size { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .file-meta-card .fm-chips {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 12px; padding-top: 12px;
+      border-top: 1px solid var(--line-faint);
+      flex-wrap: wrap;
+    }
+    .fm-chips .fmc-item {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--muted);
+    }
+    .fm-chips .fmc-sep { width: 1px; height: 14px; background: var(--line); }
+    .fm-chips .fmc-loading {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 12px; color: var(--faint);
+    }
+
+    .param-section { padding: 0 16px; margin-bottom: 12px; }
+    .param-label {
+      font-size: 11px; font-weight: 700; letter-spacing: .5px;
+      color: var(--muted); margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .paper-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 40px; padding: 0 16px;
+      background: var(--surface-2); border: 1px solid var(--line);
+      border-radius: var(--r);
+      font-size: 14px; font-weight: 500; color: var(--ink);
+    }
+    .paper-badge .pb-note { font-size: 11px; color: var(--faint); margin-left: 4px; }
+
+    .copies-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 0;
+      border-top: 1px solid var(--line-faint);
+    }
+    .copies-row .cr-label { font-size: 15px; font-weight: 500; color: var(--ink); }
+    .copies-row .cr-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .duplex-row {
+      display: flex; gap: 8px;
+    }
+    .duplex-opt {
+      flex: 1; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--r);
+      border: 1.5px solid var(--line);
+      font-size: 13px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: all .15s;
+    }
+    .duplex-opt.on {
+      border-color: var(--teal); background: var(--teal-wash); color: var(--teal-deep);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="sb-icons">📶 5G 🔋</div>
+  </div>
+
+  <div class="navbar">
+    <div class="nav-back">←</div>
+    <span class="nav-title">上传打印</span>
+    <div class="nav-right"></div>
+  </div>
+
+  <!-- 步骤指示 -->
+  <div class="steps">
+    <div class="st done"><div class="n">✓</div><div class="nl">上传</div></div>
+    <div class="line done"></div>
+    <div class="st on"><div class="n">2</div><div class="nl">选参数</div></div>
+    <div class="line"></div>
+    <div class="st"><div class="n">3</div><div class="nl">结算</div></div>
+    <div class="line"></div>
+    <div class="st"><div class="n">4</div><div class="nl">取件</div></div>
+  </div>
+
+  <div class="content has-bar">
+
+    <!-- 文档信息卡 -->
+    <div class="file-meta-card">
+      <div class="fm-top">
+        <div class="fm-ic">📄</div>
+        <div class="fm-info">
+          <div class="fm-name">简历_王磊_应届2026.pdf</div>
+          <div class="fm-size">234 KB</div>
+        </div>
+      </div>
+      <div class="fm-chips">
+        <div class="fmc-item">📝 <span>PDF</span></div>
+        <div class="fmc-sep"></div>
+        <div class="fmc-loading">
+          <span style="color:var(--teal);">◌</span> 检测页数中…
+        </div>
+        <div class="fmc-sep"></div>
+        <span class="chip teal">📄 PDF 简历</span>
+      </div>
+    </div>
+
+    <!-- AI 版式提示 -->
+    <div class="ai-card">
+      <div class="ac-head">
+        <span class="ac-ic">📐</span>
+        <span class="ac-title">版式建议</span>
+        <span class="ac-badge">AI 建议</span>
+      </div>
+      <div style="font-size: 13px; color: var(--ink-soft); line-height: 1.6;">
+        检测到页边距偏小（上边距 6mm），建议调整至 15mm 以防止内容在边缘被裁切。预计不影响打印，但建议确认后继续。
+      </div>
+      <div style="margin-top: 10px;">
+        <span style="font-size: 12px; color: var(--plum); cursor: pointer;">查看详细诊断 ›</span>
+      </div>
+    </div>
+
+    <!-- 颜色参数 -->
+    <div class="param-section">
+      <div class="param-label">打印颜色</div>
+      <div class="opt on">
+        <div class="o-radio"></div>
+        <div class="oc">
+          <div class="ot">黑白打印</div>
+          <div class="od">通用文档首选，清晰耐久</div>
+        </div>
+        <div class="o-price">¥0.15<span style="font-size:11px;font-weight:400;color:var(--muted);">/页</span></div>
+      </div>
+      <div class="opt">
+        <div class="o-radio"></div>
+        <div class="oc">
+          <div class="ot">彩色打印</div>
+          <div class="od">适合有色图表或照片简历</div>
+        </div>
+        <div class="o-price">¥1.20<span style="font-size:11px;font-weight:400;color:var(--muted);">/页</span></div>
+      </div>
+    </div>
+
+    <!-- 纸张 -->
+    <div class="param-section">
+      <div class="param-label">纸张规格</div>
+      <div class="paper-badge">
+        📄 A4 标准纸
+        <span class="pb-note">（210×297mm，仅支持）</span>
+      </div>
+    </div>
+
+    <!-- 双面 -->
+    <div class="param-section" style="margin-top: 4px;">
+      <div class="param-label" style="margin-bottom:8px;">打印方式</div>
+      <div class="duplex-row">
+        <div class="duplex-opt">单面打印</div>
+        <div class="duplex-opt on">✓ 双面自动</div>
+      </div>
+    </div>
+
+    <!-- 份数 -->
+    <div class="param-section">
+      <div class="copies-row">
+        <div>
+          <div class="cr-label">打印份数</div>
+          <div class="cr-sub">每份含全部 2 页</div>
+        </div>
+        <div class="stepper">
+          <div class="s-btn">−</div>
+          <div class="s-val">1</div>
+          <div class="s-btn">+</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer-lg"></div>
+
+  </div>
+
+  <!-- 操作条 -->
+  <div class="actionbar">
+    <div class="ab-price">
+      <div class="label">预估费用</div>
+      <div class="val"><sup>¥</sup>0.30</div>
+    </div>
+    <button class="btn primary" style="flex:1;">选择门店 →</button>
+  </div>
+
+</div>
+</body>
+</html>

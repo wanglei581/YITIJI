@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>20 我的简历</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .resume-card{border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface); padding:14px; box-shadow:var(--shadow-card); display:flex; flex-direction:column; gap:11px;}
+  .resume-card .rt{display:flex; gap:12px; align-items:flex-start;}
+  .resume-card .thumb{width:48px; height:62px; border-radius:8px; background:var(--surface-2); border:1px solid var(--line); flex:none; display:grid; place-items:center; font-size:22px;}
+  .resume-card h4{font-family:var(--serif); font-size:15px;} .resume-card .m{font-size:11.5px; color:var(--muted); margin-top:3px;}
+  .resume-card .acts{display:flex; gap:8px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">我的简历</span>
+    <span class="nav-caps" style="border:none;background:none;color:var(--teal-deep);font-weight:600;">＋ 新建</span>
+  </div>
+
+  <div class="content has-tabbar">
+    <div class="filter-bar">
+      <div class="f-chip on">全部 3</div><div class="f-chip">已诊断</div><div class="f-chip">草稿</div>
+    </div>
+
+    <div class="resume-card">
+      <div class="rt">
+        <div class="thumb">📄</div>
+        <div style="flex:1;"><h4>张青柠_新媒体运营简历</h4><div class="m">PDF · 2 页 · 今天 14:20 更新</div>
+          <div class="chips mt4"><span class="chip ok">诊断 82 分</span><span class="chip">可打印</span></div>
+        </div>
+      </div>
+      <div class="acts">
+        <button class="btn sm ghost" style="flex:1;" onclick="location.href='13-resume-diagnosis.html'">看诊断</button>
+        <button class="btn sm ghost" style="flex:1;" onclick="location.href='15-resume-optimize.html'">优化</button>
+        <button class="btn sm primary" style="flex:1;" onclick="location.href='05-print-upload.html'">打印</button>
+      </div>
+    </div>
+
+    <div class="resume-card">
+      <div class="rt">
+        <div class="thumb">📄</div>
+        <div style="flex:1;"><h4>实习申请简历（英文）</h4><div class="m">PDF · 1 页 · 3 天前</div>
+          <div class="chips mt4"><span class="chip">未诊断</span><span class="chip">可打印</span></div>
+        </div>
+      </div>
+      <div class="acts">
+        <button class="btn sm ghost" style="flex:1;" onclick="location.href='12-resume-upload.html'">诊断</button>
+        <button class="btn sm ghost" style="flex:1;">导出</button>
+        <button class="btn sm primary" style="flex:1;" onclick="location.href='05-print-upload.html'">打印</button>
+      </div>
+    </div>
+
+    <div class="resume-card" style="opacity:.85;">
+      <div class="rt">
+        <div class="thumb">✍️</div>
+        <div style="flex:1;"><h4>AI 生成草稿</h4><div class="m">生成中 · 待完善</div>
+          <div class="chips mt4"><span class="chip warn">草稿</span><span class="chip err">非 PDF 暂不可打印</span></div>
+        </div>
+      </div>
+      <div class="acts">
+        <button class="btn sm ghost" style="flex:1;" onclick="location.href='14-resume-generate.html'">继续编辑</button>
+        <button class="btn sm ghost" style="flex:1;">导出 Word</button>
+      </div>
+    </div>
+
+    <div class="compliance-note">简历文件加密存储，你可随时删除。删除后不可恢复。</div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab" onclick="location.href='03-home.html'"><div class="ti">⌂</div>首页</div>
+    <div class="tab" onclick="location.href='04-print-hub.html'"><div class="ti">🖨️</div>打印</div>
+    <div class="tab" onclick="location.href='11-ai-hub.html'"><div class="ti">✦</div>AI</div>
+    <div class="tab on"><div class="ti">◍</div>我的</div>
+  </div>
+</div>
+</body>
+</html>
