@@ -46,7 +46,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
 interface StoredCareerPlan {
   payload: CareerPlanPayload
   /** 生成时使用的上下文来源（如实展示给用户：基于哪些材料） */
-  basedOn: { resume: true; jobFit: string | null; interview: string | null }
+  basedOn: {
+    resume: true
+    jobFit: string | null
+    interview: string | null
+    /** self_assessment 仅作可选上下文 hint，不参与签名门禁 / 校验 / 配额。 */
+    selfAssessment: string | null
+  }
   providerName: string
 }
 
@@ -116,13 +122,39 @@ export class CareerPlanService {
       }
     }
 
+    // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额 / 校验；
+    //    服务端按本人 endUserId 读取，匿名 parse 不强制要求，仅尝试按 accessTokenHash 匹配）。
+    let selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }>; summary: string | null } | null = null
+    {
+      const where = parse.endUserId
+        ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+        : { accessTokenHash: parse.accessTokenHash, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+      const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
+      if (row) {
+        try {
+          const stored = JSON.parse(row.payloadJson) as {
+            payload?: {
+              dimensions?: Array<{ key: string; label: string; strength: number }>
+              summary?: string | null
+            }
+          }
+          const dims = (stored.payload?.dimensions ?? [])
+            .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
+            .filter((d) => d.key && d.label)
+          if (dims.length > 0) {
+            selfAssessmentCtx = { dimensions: dims, summary: stored.payload?.summary ?? null }
+          }
+        } catch { /* 损坏行按无上下文处理 */ }
+      }
+    }
+
     // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
     // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
     const usage = new AiUsageAccumulator()
     const startedAt = Date.now()
     let payload: CareerPlanPayload
     try {
-      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, onLlmCall: usage.add })
+      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
     } catch (error) {
       this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
       throw error
@@ -130,7 +162,12 @@ export class CareerPlanService {
     this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
     const stored: StoredCareerPlan = {
       payload,
-      basedOn: { resume: true, jobFit: jobFitCtx?.jobTitle ?? null, interview: interviewCtx?.position ?? null },
+      basedOn: {
+        resume: true,
+        jobFit: jobFitCtx?.jobTitle ?? null,
+        interview: interviewCtx?.position ?? null,
+        selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+      },
       providerName: 'llm',
     }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)

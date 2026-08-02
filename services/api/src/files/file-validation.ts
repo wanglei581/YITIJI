@@ -88,6 +88,8 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
     mimes: [...MEMBER_DATA_EXPORT_FILE_POLICY.mimes],
     maxBytes: MEMBER_DATA_EXPORT_FILE_POLICY.maxBytes,
   },
+  // 自我探索报告 PDF：仅服务端生成，外部上传不应进入此用途；允许 PDF 兜底兼容老链路，但默认 mimes=空。
+  self_assessment_report: { mimes: [], maxBytes: 0 },
 }
 
 /** 服务端代理上传(multipart,整 buffer 进内存)的硬上限。超此须走 upload-intent 直传。 */
@@ -110,6 +112,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   temp: 'sensitive',
   signature_image: 'highly_sensitive',
   member_data_export: MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel,
+  self_assessment_report: 'sensitive',
 }
 
 /** 从文件名提取扩展名(小写,不带点);无则空串。 */

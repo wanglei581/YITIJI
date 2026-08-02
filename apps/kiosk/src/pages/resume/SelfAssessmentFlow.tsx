@@ -10,7 +10,7 @@
 // - 闲置恢复：写 sessionStorage 让回到页面时能恢复进度
 // ============================================================
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type {
@@ -37,7 +37,20 @@ import {
 } from '../../services/api/selfAssessment'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import './self-assessment-lightflow.css'
+
+/**
+ * 顶级路由的全屏壳 + PageFrame 组合，使 <main> 出现在 KioskFullscreenShell 内
+ * （不在 KioskLayout 的 <main> 里嵌套），同时携带 kiosk-shell 主题属性。
+ */
+function SelfAssessmentFullscreenFrame({ children }: { children: ReactNode }) {
+  return (
+    <KioskFullscreenShell>
+      <KioskPageFrame className="self-assessment-shell">{children}</KioskPageFrame>
+    </KioskFullscreenShell>
+  )
+}
 
 const SESSION_STORAGE_KEY = 'self_assessment_session_v1'
 const IDLE_TIMEOUT_MS = 60_000
@@ -102,7 +115,8 @@ export function SelfAssessmentIntroPage() {
     navigate('/resume/self-assessment/questions')
   }, [consent, navigate, session])
   return (
-    <KioskPageFrame data-kiosk-screen="resume-self-assessment-intro">
+    <SelfAssessmentFullscreenFrame>
+      <main data-kiosk-screen="resume-self-assessment-intro" data-kiosk-domain="resume" className="self-assessment-lightflow self-assessment-lightflow--intro flex h-full flex-col">
       <KioskPageHeader title="自我探索 · 倾向参考" description="非临床 · 本人自助参考" />
       <div className="self-assessment-lightflow__content">
         <ComplianceBanner tone="info" title="工具性质说明">
@@ -138,7 +152,8 @@ export function SelfAssessmentIntroPage() {
           </Button>
         </div>
       </div>
-    </KioskPageFrame>
+      </main>
+    </SelfAssessmentFullscreenFrame>
   )
 }
 
@@ -231,7 +246,8 @@ export function SelfAssessmentQuizPage() {
   }
 
   return (
-    <KioskPageFrame data-kiosk-screen="resume-self-assessment-quiz">
+    <SelfAssessmentFullscreenFrame>
+      <main data-kiosk-screen="resume-self-assessment-quiz" data-kiosk-domain="resume" className="self-assessment-lightflow self-assessment-lightflow--quiz flex h-full flex-col">
       <KioskPageHeader title="自我探索 · 倾向参考" description={`进度 ${done}/${total}`} />
       <div className="self-assessment-lightflow__content">
         <div className="self-assessment-lightflow__progress" aria-hidden="true">
@@ -279,7 +295,8 @@ export function SelfAssessmentQuizPage() {
           </Button>
         </div>
       </div>
-    </KioskPageFrame>
+      </main>
+    </SelfAssessmentFullscreenFrame>
   )
 }
 
@@ -300,7 +317,8 @@ export function SelfAssessmentResultPage() {
 
   if (!result || !taskId) {
     return (
-      <KioskPageFrame data-kiosk-screen="resume-self-assessment-result">
+      <SelfAssessmentFullscreenFrame>
+        <main data-kiosk-screen="resume-self-assessment-result" data-kiosk-domain="resume" className="self-assessment-lightflow self-assessment-lightflow--result flex h-full flex-col">
         <KioskPageHeader title="自我探索 · 倾向参考" description="无最近结果" />
         <div className="self-assessment-lightflow__content">
           <ComplianceBanner tone="info" title="暂无最近结果">
@@ -308,7 +326,8 @@ export function SelfAssessmentResultPage() {
           </ComplianceBanner>
           <Button onClick={() => navigate('/resume/self-assessment/intro')}>开始作答</Button>
         </div>
-      </KioskPageFrame>
+        </main>
+      </SelfAssessmentFullscreenFrame>
     )
   }
 
@@ -345,7 +364,8 @@ export function SelfAssessmentResultPage() {
   }
 
   return (
-    <KioskPageFrame data-kiosk-screen="resume-self-assessment-result">
+    <SelfAssessmentFullscreenFrame>
+      <main data-kiosk-screen="resume-self-assessment-result" data-kiosk-domain="resume" className="self-assessment-lightflow self-assessment-lightflow--result flex h-full flex-col">
       <KioskPageHeader title="自我探索 · 倾向参考" description="仅供本人参考" />
       <div className="self-assessment-lightflow__content">
         <ComplianceBanner tone="info" title="合规说明">
@@ -372,7 +392,8 @@ export function SelfAssessmentResultPage() {
           </Card>
         )}
       </div>
-    </KioskPageFrame>
+      </main>
+    </SelfAssessmentFullscreenFrame>
   )
 }
 
@@ -436,7 +457,8 @@ export function SelfAssessmentHistoryPage() {
   }, [])
 
   return (
-    <KioskPageFrame data-kiosk-screen="resume-self-assessment-history">
+    <SelfAssessmentFullscreenFrame>
+      <main data-kiosk-screen="resume-self-assessment-history" data-kiosk-domain="resume" className="self-assessment-lightflow self-assessment-lightflow--history flex h-full flex-col">
       <KioskPageHeader title="自我探索 · 倾向参考" description="历史" />
       <div className="self-assessment-lightflow__content">
         <ComplianceBanner tone="info" title="历史与权限">
@@ -451,6 +473,7 @@ export function SelfAssessmentHistoryPage() {
           <Button onClick={() => navigate('/me/ai-records')}>前往 AI 服务记录</Button>
         </div>
       </div>
-    </KioskPageFrame>
+      </main>
+    </SelfAssessmentFullscreenFrame>
   )
 }

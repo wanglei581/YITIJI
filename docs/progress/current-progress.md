@@ -1,5 +1,25 @@
 # 当前开发进度
 
+2026-08-02 完成 **F1 D2′ cleanup 存活证明四处缺口合入收口（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)，已 squash 合入 `main@6e805917`，未演练、未部署）**：从
+`origin/main@7f2ac0dc` 的独立 worktree 按 RED→GREEN 修复四项阻塞：(1) `systemctl --user stop`
+现由脚本级 10s TERM / 2s kill-after timeout 约束，stop 返回后仍只接受严格
+`loaded+inactive` / `not-found+inactive` 元组；(2) PM2 一旦捕获 daemon PID，状态文件消失只能结束
+轮询，不能绕过现有 `control-plane.mjs` 的 UID + `PM2_HOME` + God Daemon title 身份终止与退出复验；
+(3) keeper 在 `systemd-run` 前悲观置位清理状态，覆盖 unit 已创建而 CLI 非零的 partial-start；
+(4) `drill.mjs` 在 Nginx 启动前写独占 attempt marker，确认 master 后写独占 PID + `/proc` start-time
+身份记录，外层先复验 `RUN_DIR` 范围/所有权，再只在当前进程的 owner、可执行文件和 start-time 全匹配时发送 TERM 并有限等待；未尝试启动
+可安全跳过，已尝试但身份缺失/损坏、身份漂移或停止超时均 fail-closed 并保留 nonce workspace 与 PM2
+control root。离线合同先在旧实现上得到预期 `D2_PRIME_CLEANUP_CONTRACT_INVALID`，修复后总合同
+`D2_PRIME_CONTRACT_ALL_PASS`；Nginx 行为夹具覆盖未尝试、身份缺失/损坏、已退出、身份漂移、正常停止、
+身份复验期间退出和停止超时，PM2 行为夹具证明状态文件消失后仍进入身份绑定终止路径；governance 60/60、coverage
+lines 97.82% / branches 89.64% / functions 97.79%、API lint/typecheck/build、Shell/Node 语法与
+`git diff --check` 全绿。Claude、Antigravity 与 Cursor 已完成最终 diff 终审，三方均 `APPROVE`，
+Critical 0 / Warning 0；CCG 任务已归档。PR CI 最终 run `30709855868` 3/3 全绿；PR 于
+`2026-08-02T03:35:28Z` squash 合入 `main@6e805917`，合入后主线 [GitHub Actions run 30730887928](https://github.com/wanglei581/YITIJI/actions/runs/30730887928)
+的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 再次 3/3 全绿。本项没有运行 `run.sh`、reserve/invoke/full drill、Colima、systemd、PM2、Nginx 或 API，未生成
+nonce/evidence，未连接 production，也不构成 D2′ PASS / fresh-retake 授权；取得新的独立 retake
+授权之前，`productionF1` 继续 **NO-GO**。
+
 2026-08-01 完成 **F1 D2′ invocation governance 合入后文档收口（[PR #471](https://github.com/wanglei581/YITIJI/pull/471)，已 squash 合入 `main@3b3c3100`，未演练、未部署）**：PR #471 于 `2026-08-01T15:22:36Z` 合入，合入后主线 [GitHub Actions run 30705773186](https://github.com/wanglei581/YITIJI/actions/runs/30705773186) 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 3/3 全绿；下方同名条目只保留为候选形成阶段的历史快照，不再代表当前状态。主线现以 #471 的分 facet `O_EXCL` tombstone、严格 manifest、独立 event、完整 Git/clone identity、私有 fd 3 evidence 真值及拆分式 60 项 verifier 为唯一 invocation governance；历史 [PR #463](https://github.com/wanglei581/YITIJI/pull/463) 的共享 JSONL / 全局锁 / caller env 第二真值已被替换，verifier 拆分事项随本次合入关闭。合入和 CI 只证明代码与离线门禁进入主干，不构成 D2′ PASS、fresh-retake 授权、部署或 production GO；四处 cleanup 存活/有界性缺口继续独立阻塞，`productionF1` 继续 **NO-GO**。
 
 2026-08-01 完成 **F1 D2′ invocation governance latest-main reconciliation 候选（PR #471 合入前历史快照）**：候选从 `origin/main@e4334c51` 建立严格超集，以分 facet `O_EXCL` tombstone、严格 manifest、独立 event、完整 Git/clone identity、私有 fd 3 evidence 真值及拆分式 verifier 替换 #463，同时保留 #460/#464–#469 的 stale-PID、cleanup、systemd 与法证保留语义；governance 60/60、coverage、wiring、旧 contract、API lint/typecheck/build、语法与差异门禁通过，Claude、Antigravity、Cursor 与 CCG 最终均 `APPROVE`。该候选随后已由上条所述 [PR #471](https://github.com/wanglei581/YITIJI/pull/471) 合入 `main@3b3c3100`；本段只保留候选形成过程，不再代表当前状态。候选阶段及后续合入均未运行 `run.sh`、真实 reserve/invoke、full drill、Colima、systemd、PM2、Nginx、API 或 production，不生成 nonce/evidence，不构成 D2′ PASS 或 fresh-retake 授权。

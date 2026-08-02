@@ -97,6 +97,16 @@ function networkNamespaceInode(pid) {
   return statSync(`/proc/${pid}/ns/net`, { bigint: true }).ino.toString()
 }
 
+function processStartTimeTicks(pid) {
+  const source = readFileSync(`/proc/${pid}/stat`, 'utf8')
+  const closing = source.lastIndexOf(') ')
+  if (closing < 0) fail('PID_IDENTITY_INVALID')
+  const fields = source.slice(closing + 2).trim().split(/\s+/)
+  const startTimeTicks = fields[19]
+  if (!/^[1-9][0-9]*$/.test(startTimeTicks ?? '')) fail('PID_IDENTITY_INVALID')
+  return startTimeTicks
+}
+
 function controlGroup(pid) {
   const line = readFileSync(`/proc/${pid}/cgroup`, 'utf8').split('\n').find((entry) => entry.startsWith('0::/'))
   if (!line) fail('CGROUP_INVALID')
@@ -283,9 +293,11 @@ async function main() {
   const nginxActive = join(nginxRoot, 'nginx.conf')
   const nginxCandidate = join(nginxRoot, 'nginx.conf.candidate')
   const nginxPidPath = join(nginxRoot, 'nginx.pid')
+  const nginxAttemptPath = join(nginxRoot, 'nginx-start-attempted')
+  const nginxIdentityPath = join(nginxRoot, 'nginx-master.identity')
   writeFileSync(legacyMain, legacySource(), { mode: 0o600 })
 
-  let nginxStarted = false
+  let nginxStartAttempted = false
   const legacyDaemon = createSpawnAttemptTracker()
   let managedDaemonReady = false
   let evidenceWritten = false
@@ -347,10 +359,12 @@ async function main() {
     }), { mode: 0o600 })
     const nginxTestLegacy = run(nginxBin, ['-t', '-p', nginxPrefix, '-c', nginxActive], { allowFailure: true })
     if (nginxTestLegacy.status !== 0) fail('NGINX_INITIAL_CONFIG_INVALID')
+    writeExclusive(nginxAttemptPath, '')
+    nginxStartAttempted = true
     run(nginxBin, ['-p', nginxPrefix, '-c', nginxActive])
-    nginxStarted = true
     for (let attempt = 0; attempt < 30 && !existsSync(nginxPidPath); attempt += 1) await wait(100)
     const nginxPid = readPidFile(nginxPidPath)
+    writeExclusive(nginxIdentityPath, `${nginxPid} ${processStartTimeTicks(nginxPid)}\n`)
     const baseline = await observeTargets(nginxPort, 10)
     if (!baseline.targets.every((target) => target === 'legacy')) fail('NGINX_LEGACY_TARGET_INVALID')
 
@@ -497,7 +511,7 @@ async function main() {
     if (managedDaemonReady) {
       try { run(pm2Bin, ['delete', managedName], { environment: managedEnvironment, allowFailure: true }) } catch { /* keeper owns final daemon cleanup */ }
     }
-    if (nginxStarted) {
+    if (nginxStartAttempted) {
       try { run(nginxBin, ['-s', 'quit', '-p', `${nginxRoot}/`, '-c', nginxActive], { allowFailure: true }) } catch { /* wrapper removes only this nonce workspace */ }
     }
     if (legacyDaemon.shouldKill()) {

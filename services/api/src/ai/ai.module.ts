@@ -19,6 +19,11 @@ import { LlmCareerPlanService } from './resume/llm-career-plan.service'
 import { CareerPlanService } from './resume/career-plan.service'
 import { CareerPlanPdfService } from './resume/career-plan-pdf.service'
 import { CareerPlanController } from './career-plan.controller'
+import { LlmSelfAssessmentService } from './resume/llm-self-assessment.service'
+import { SelfAssessmentService } from './resume/self-assessment.service'
+import { SelfAssessmentPdfService } from './resume/self-assessment-pdf.service'
+import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
+import { SelfAssessmentController } from './self-assessment.controller'
 import { LlmFairVisitPlanService } from './resume/llm-fair-visit-plan.service'
 import { FairVisitPlanService } from './resume/fair-visit-plan.service'
 import { FairVisitPlanPdfService } from './resume/fair-visit-plan-pdf.service'
@@ -44,7 +49,7 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
   // FilesModule：ResumeExtractionService 注入 FilesService.readContent 读简历 buffer（Phase 1A）。
   // BenefitRedemptionModule：AI 简历优化端点可选核销会员权益（P1 权益核销 SSOT）。
   imports: [AuthModule, FilesModule, AsrModule, BenefitRedemptionModule],
-  controllers: [AiController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController],
+  controllers: [AiController, AiConfigController, AiConfigsController, CareerPlanController, FairVisitPlanController, SelfAssessmentController],
   providers: [
     AiService,
     AiLogService,
@@ -61,6 +66,10 @@ import { BenefitRedemptionModule } from '../benefit-redemption/benefit-redemptio
     LlmCareerPlanService,
     CareerPlanService,
     CareerPlanPdfService,
+    LlmSelfAssessmentService,
+    SelfAssessmentService,
+    SelfAssessmentPdfService,
+    AppendedSelfAssessmentService,
     LlmFairVisitPlanService,
     FairVisitPlanService,
     FairVisitPlanPdfService,

@@ -271,6 +271,14 @@ PM2 app/daemon、managed app、managed keeper transient unit 和临时 release w
 按精确 PID/name 等待退出；若仍存活则保留 workspace 并 exit 2，避免删掉在用文件。脚本不使用宿主
 默认 `PM2_HOME`，不使用宽泛进程名或 glob，不触碰 production/其他本地 PM2。
 
+清理的具体存活口径是：`systemctl --user stop` 受 10s TERM / 2s kill-after 的客户端 timeout 约束，
+随后仍只接受 `loaded+inactive` 或 `not-found+inactive`；managed keeper 在 `systemd-run` 前即按“已尝试
+启动”进入 cleanup，避免 transient unit 已创建但 CLI 非零时漏停。PM2 一旦捕获 daemon PID，控制文件
+消失不能代替进程退出证明，仍须通过既有 UID + 精确 `PM2_HOME` + God Daemon title 身份路径复验。
+Nginx 在启动前写 nonce 目录内的独占 attempt marker，确认 master 后另写 PID + `/proc` start-time 身份；
+外层只在 owner、Nginx 可执行文件和 start-time 全匹配时发送 TERM 并有限等待。未尝试启动可以跳过；
+已尝试但身份记录缺失/损坏、PID 身份漂移或超时仍存活均为 cleanup failure，禁止删除取证目录。
+
 cleanup 永不触碰仓库外 governance root、reservation/identity/invocation tombstone、manifest 或 immutable
 event。若 root 与任何 cleanup 范围无法证明隔离，必须在预约前 NO-GO，而不是依赖 cleanup 排除规则补救。
 
