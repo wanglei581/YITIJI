@@ -235,3 +235,19 @@ Task 9 已封板。支持表仍不代表供应商合规批准，Task 14 证据�
 内部规格审查为 `Spec compliant: Yes`，质量安全审查为 `Ready: Yes`。Antigravity 与 Cursor 冻结版终审均 `APPROVE`，无 Critical/Warning。Claude 已在正式设计和实施计划阶段完成审查并批准；冻结版代码终审的 direct CLI 与 CCG wrapper 多次持续无输出后人工中止，未把外部通道故障冒充批准。
 
 Task 10 已封板。Gate 0 正式记录继续为 `blocked`、`production_default: false`，provider 默认批准闸继续拒绝，且本任务没有生产注册。下一步进入 Task 11 BullMQ 编排、SafetyGate 后原子落库与过期清理。
+
+## Wave B Task 11：实施前架构修订审查
+
+初版 Task 11 被 Codex、Antigravity 与 Cursor/外部只读审查判定为 `REVISE`：单一 job 会绕过 `awaiting_confirmation`，计划漏列 orchestrator/事实合并器，规则与 AI 证据坐标空间冲突，默认 provider gate 会在 Nest 启动期失败，Redis 缺失与清理失败重试语义不完整。Claude wrapper 两次分别以状态 1 退出和持续无输出后中止；未把通道故障冒充批准。
+
+修订版冻结以下边界：
+
+- Task 14 前 AppModule 永不注册合同 BullMQ queue/processor 或 HTTP controller；Task 11 仅实现可隔离单测的 queue gateway、processor/orchestrator 与始终运行的 TTL 清理，默认 queue/provider runtime 均 fail closed。
+- extract/analyze 严格拆成两阶段。Stage 1 停在 `awaiting_confirmation`；Task 12 归属校验后持久化 `confirmedAt` 并 CAS 到 `rule_checking`，analyze 不得自行跨过确认。
+- 双 Prisma schema 以 additive migration 新增 `extractionFingerprint/confirmedAt`。Fingerprint 使用 extraction 本次实际读取 buffer 当场计算的 SHA-256/size、sourceFileId、解析模式、页数与 schema version；Stage 2 重提取必须精确匹配，避免只比页数与元数据 TOCTOU。
+- 规则引擎、AI excerpt 唯一定位和 SafetyGate 全部使用同一份脱敏 canonical pages；未遮蔽原文不进入最终 finding 坐标。规则 + AI 超过 100 条整体拒绝，权威规则不丢弃、不截断。
+- analyze 固定 `attempts:1`，进入模型阶段后不恢复重放；模型 draft 与 provider/model identity 来自同一次配置快照。SafetyGate 通过后才在单一 CAS 事务内写 completed/result/provider/model，迟到结果因状态或 TTL 不匹配回滚。
+- 清理以仍存在的 expired task 作为持久重试账本，无需新增 retry 字段；高敏文件走 `FilesService.systemDeleteSensitive`，日志只写不可逆摘要。共享活跃 source 不删除，全部完成后删除 task，使 result/token hash 同步退出数据库。
+- Task 11 五分钟预算只承诺页/网络边界协作式停止；真正 child-process hard kill、内存上限与连续会话 RSS 回收是 Task 14 启用生产入口前的硬门禁。
+
+内部最终复核为 `Spec compliant: Yes`，无剩余阻断项；Antigravity 最终 `APPROVE`。Cursor 独立复核重试发生 TLS 断连/后续无输出并中止，首轮问题已纳入修订；Claude 本轮通道仍不可用，均未虚构通过。计划已可进入 Task 11 RED 测试，Gate 0 继续为 `blocked`。

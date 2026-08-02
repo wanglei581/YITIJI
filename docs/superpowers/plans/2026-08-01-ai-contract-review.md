@@ -759,7 +759,7 @@ export function loadContractProviderConfig(env: Record<string, string | undefine
 
 URL 只接受支持表中的精确 canonical `https` base URL；拒绝 userinfo、显式端口、query/hash、尾点、IDN/IP、路径偏移和 redirect。API key 必填且不进入错误或日志。Provider 使用可注入 transport；Task 9 可实现并测试严格 fetch transport，但不注册 Nest module、不启用生产入口、不执行真实模型请求。固定超时 30 秒、输入上限 500,000 UTF-16 code units、流式响应上限 512 KiB，超时、非 2xx、重定向、超限、空响应和严格 schema 错误均 fail closed，不重试、不返回部分结果、不 fallback。
 
-请求的 system 与 contract data 分消息；正文只包含 masker 输出和不含明文的主体存在性事实，无工具、无网络/文件/数据库权限。模型仅返回结构化 finding draft（页码 + 非 PII excerpt，不信任模型给出的 canonical offset）；Task 11 在未遮蔽 canonical pages 上重新定位证据、合并规则结果后再交 Task 10 SafetyGate。原始请求正文和原始模型响应不得写日志、异常或审计。
+请求的 system 与 contract data 分消息；正文只包含 masker 输出和不含明文的主体存在性事实，无工具、无网络/文件/数据库权限。模型仅返回结构化 finding draft（页码 + 非 PII excerpt，不信任模型给出的 canonical offset）；Task 11 必须让规则引擎、AI excerpt 重定位和 SafetyGate 统一使用同一份 **脱敏后的 canonical pages**。不得把脱敏 excerpt 回映到含 PII 的原始页，也不得把原始页作为最终 finding 的证据坐标空间。原始请求正文和原始模型响应不得写日志、异常或审计。
 
 - [ ] **Step 4: 运行安全单测与源码反向门禁**
 
@@ -894,69 +894,202 @@ git add services/api/src/contract-review/contract-review-safety-gate.service.ts 
 git commit -m "feat: add contract review safety gate"
 ```
 
-### Task 11: 接入 BullMQ 编排、原子结果与清理
+### Task 11: 接入两阶段 BullMQ 编排、原子结果与可重试清理
+
+Task 11 的范围是建立 **默认关闭、无 HTTP 入口** 的后台能力。Gate 0 仍为 `blocked`，且进程级 hard kill / 内存上限尚未完成，因此 Task 14 前 AppModule **永不注册** 合同 BullMQ queue/processor；Task 11 只实现可直接单测的 queue gateway、processor 与 orchestrator，并在隔离测试模块中装配。高敏合同队列服务在 AppModule 中固定不可用，禁止 `setImmediate`、Promise 或 controller 内联执行。Task 14 只有在 Gate 0、Redis、显式开关和执行隔离全部通过后才修改 module 注册真实 worker。
 
 **Files:**
 - Create: `services/api/src/contract-review/contract-review.queue.ts`
 - Create: `services/api/src/contract-review/contract-review.processor.ts`
+- Create: `services/api/src/contract-review/contract-review-orchestrator.service.ts`
+- Create: `services/api/src/contract-review/contract-review-fact-merger.ts`
+- Create: `services/api/src/contract-review/contract-review-finding-mapper.ts`
 - Create: `services/api/src/contract-review/contract-review.cleanup.task.ts`
 - Create: `services/api/src/contract-review/contract-review.module.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-fact-merger.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-orchestrator.test.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-processor.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-cleanup.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-module.test.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-sensitive-delete.test.ts`
+- Create: `services/api/prisma/migrations/20260801130000_add_contract_review_confirmation_checkpoint/migration.sql`
+- Create: `services/api/prisma/postgres/migrations/20260801130000_add_contract_review_confirmation_checkpoint/migration.sql`
+- Modify: `services/api/src/contract-review/contract-review-provider.service.ts`
+- Modify: `services/api/src/contract-review/contract-review-extraction.service.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-extraction.test.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-provider.test.ts`
+- Modify: `services/api/src/contract-review/__tests__/contract-review-schema.test.ts`
+- Modify: `services/api/src/files/files.service.ts`
+- Modify: `services/api/prisma/schema.prisma`
+- Modify: `services/api/prisma/postgres/schema.prisma`
 - Modify: `services/api/src/app.module.ts`
 
-- [ ] **Step 1: 写“未过 SafetyGate 不落 resultJson”的失败测试**
+`contract-review-orchestrator.service.ts` 目标 300–450 行且只负责编排；事实抽取、finding 映射和清理必须留在独立文件，禁止形成新的 800 行服务。测试按事实、编排、processor、清理拆分，禁止把所有矩阵继续堆入一个超长测试文件。
+
+- [ ] **Step 1: 写两阶段、证据坐标、原子落库和清理重试的 RED 测试**
 
 ```typescript
-test('raw model output is never persisted before safety approval', async () => {
-  provider.review.mockResolvedValue(unsafeResult)
-  gate.validate.mockImplementation(() => { throw new Error('CONTRACT_SAFETY_GATE_REJECTED') })
-  await assert.rejects(() => processor.process(job))
-  assert.equal(prisma.contractReviewTask.update.mock.calls.some(([x]) => x.data?.resultJson), false)
+test('extract job stops at awaiting_confirmation and never calls provider', async () => {
+  await orchestrator.extract('task-1')
+  assert.equal(lastTaskWrite().status, 'awaiting_confirmation')
+  assert.equal(provider.reviewWithIdentity.mock.calls.length, 0)
 })
-test('validated result and completed status use one transaction', async () => {
-  await processor.process(job)
+
+test('analyze job uses masked canonical pages for rules, AI offsets and SafetyGate', async () => {
+  await orchestrator.analyze('task-1')
+  assert.deepEqual(ruleEngine.evaluate.mock.calls[0][0].canonicalPages, masked.pages)
+  assert.deepEqual(gate.validate.mock.calls[0][1], masked.pages)
+  assert.equal(gate.validate.mock.calls[0][2].expectedDisclaimerVersion, task.disclaimerVersion)
+  assert.equal(gate.validate.mock.calls[0][2].expectedOcrConfidence, extraction.ocrConfidence ?? 'high')
+  assert.equal(gate.validate.mock.calls[0][2].expectedCoverage, extraction.truncated ? 'truncated' : 'complete')
+  assert.equal(gate.validate.mock.calls[0][2].hasFieldConflict, merged.hasFieldConflict)
+})
+
+test('raw model output is never persisted before safety approval', async () => {
+  gate.validate.mockImplementation(() => { throw new Error('CONTRACT_SAFETY_GATE_REJECTED') })
+  await assert.rejects(() => orchestrator.analyze('task-1'))
+  assert.equal(allTaskWrites().some((write) => write.data?.resultJson !== undefined), false)
+})
+
+test('validated result and completed status use one CAS transaction', async () => {
+  await orchestrator.analyze('task-1')
   assert.equal(prisma.$transaction.mock.calls.length, 1)
+  assert.equal(finalTransactionWrite().where.status, 'safety_reviewing')
+  assert.equal(finalTransactionWrite().data.status, 'completed')
 })
 ```
 
-- [ ] **Step 2: 运行并确认 processor 不存在**
+同批 RED 还必须覆盖：
 
-Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register src/contract-review/__tests__/contract-review-processor.test.ts`
+- `extract` 和 `analyze` 两个 job name 严格分流，未知 name / 空 taskId 固定拒绝；jobId 按阶段 + taskId 幂等。extract 可有限重试，analyze 因包含模型调用固定 `attempts:1`，不得违反 Task 9 的模型不重试约束。
+- `uploaded → queued → extracting → awaiting_confirmation` 后必须停住。Extraction 必须对它本次实际读取的 buffer 当场计算 `sourceSha256/sourceSizeBytes` 并随结果返回，禁止另查或信任可能与对象不同步的 `FileObject.sha256`。Stage 1 持久化的 `extractionFingerprint` 是 `sourceFileId + 实际 buffer SHA-256/size + extraction mode/totalPages + schemaVersion` 的版本化 SHA-256，不含正文。
+- Task 12 的 confirm 在归属校验后持久化 `confirmedAt` 并 CAS `awaiting_confirmation → rule_checking`，该状态变更就是不可绕过的用户确认事实。analyze job 只接受 `status:'rule_checking' + confirmedAt 非空 + extractionFingerprint 非空`，不得自行从 `awaiting_confirmation` 推进；直接投递 job 无法绕过确认。
+- Stage 2 为避免持久化合同正文，允许在用户确认后重新提取一次；必须重算并精确匹配 `extractionFingerprint`，而不只是比较页数。同一 source file 的不可变 SHA、大小、解析模式或页数任一漂移都 fail closed。
+- 纯文本层 `ocrConfidence:null` 由服务端固定映射为 `high`；模型不得提供或覆盖 disclaimer/OCR/coverage/rulePackVersion。
+- 事实合并器对同一字段多个不同值输出 `hasFieldConflict:true` 并把该字段降为 unknown；不得任意选择一个值。无可靠事实时保持 `undefined`，让规则引擎输出 `insufficient_info`，不得猜测。
+- 规则引擎只接收脱敏 canonical pages；权威规则 finding 用固定 rule-id 映射表补 category/question/uncertainty。AI finding 的 excerpt 只在声明 page 的脱敏文本中做 **唯一精确匹配** 并生成 UTF-16 `charStart/charEnd`；0 次或多次命中均 fail closed。`pageNumber:null` 只允许映射为无证据的 `insufficient_info`。
+- provider 返回 draft 与实际使用的 provider/model identity 必须由同一次配置快照产生；不得 review 后再次读取易变 env 反推 identity。
+- provider 的 `reviewWithIdentity` 回归必须补入既有 provider 测试；module 测试必须证明 AppModule 在 `REDIS_URL` / 运行时开关任意组合下都不注册合同 processor，默认 provider runtime 也不会在启动时解析密钥或解除 Gate 0。
+- provider 未批准、SafetyGate 拒绝、超时、取消、过期、CAS 竞争和最终 BullMQ attempt 失败都只写固定 error code / 固定安全文案，不写原始异常、合同文本或模型响应。五分钟超时 CAS 为 `failed/CONTRACT_REVIEW_TIMEOUT`，用户取消保持 `cancelled`，TTL 保持 `expired`；所有迟到结果由最终 CAS 拒绝。
+- analyze 不从 `ai_analyzing/safety_reviewing` 恢复或再次调用模型；worker 崩溃后的该任务固定失败并要求用户新建任务。Task 14 的 child-process runner 也必须保持单次模型调用语义。
+- 规则 finding 永不丢弃。provider draft 与规则映射合计超过 SafetyGate 100 条上限时整体拒绝；禁止切掉规则，也禁止静默截断 AI finding。
+- 清理单条物理删除失败时保留 `expired` task，下一次 cron 继续选择并重试；成功或已被通用 file cleanup 删除时幂等收口。共享同一 source file 的未过期任务仍存在时不得删除该文件。
+- 合同清理必须调用 `FilesService.systemDeleteSensitive`（或等价受控入口）；其成功日志只含 fileId 摘要。测试必须证明现有 `_delete` 的完整 fileId 日志不会出现在高敏删除路径。
+
+- [ ] **Step 2: 运行并确认新组件不存在或断言失败**
+
+Run:
+
+```bash
+pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
+  src/contract-review/__tests__/contract-review-extraction.test.ts \
+  src/contract-review/__tests__/contract-review-fact-merger.test.ts \
+  src/contract-review/__tests__/contract-review-orchestrator.test.ts \
+  src/contract-review/__tests__/contract-review-processor.test.ts \
+  src/contract-review/__tests__/contract-review-cleanup.test.ts \
+  src/contract-review/__tests__/contract-review-module.test.ts \
+  src/contract-review/__tests__/contract-review-sensitive-delete.test.ts \
+  src/contract-review/__tests__/contract-review-provider.test.ts \
+  src/contract-review/__tests__/contract-review-schema.test.ts
+```
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现 Redis 可用才注册的专用队列**
+- [ ] **Step 3: 实现无 inline fallback 的两阶段队列和恢复点**
 
 ```typescript
 export const CONTRACT_REVIEW_QUEUE = 'contract-review'
-export const CONTRACT_REVIEW_JOB = 'contract-review.process'
-export interface ContractReviewJobData { taskId: string }
+export const CONTRACT_REVIEW_EXTRACT_JOB = 'contract-review.extract'
+export const CONTRACT_REVIEW_ANALYZE_JOB = 'contract-review.analyze'
+export interface ContractReviewJobData { readonly taskId: string }
 
 @Processor(CONTRACT_REVIEW_QUEUE)
 export class ContractReviewProcessor extends WorkerHost {
-  async process(job: Job<ContractReviewJobData>) {
-    if (job.name !== CONTRACT_REVIEW_JOB || !job.data.taskId) throw new Error('CONTRACT_REVIEW_JOB_INVALID')
-    return this.orchestrator.execute(job.data.taskId)
+  async process(job: Job<ContractReviewJobData>): Promise<unknown> {
+    assertContractReviewJob(job)
+    if (job.name === CONTRACT_REVIEW_EXTRACT_JOB) return this.orchestrator.extract(job.data.taskId)
+    if (job.name === CONTRACT_REVIEW_ANALYZE_JOB) return this.orchestrator.analyze(job.data.taskId)
+    throw new Error('CONTRACT_REVIEW_JOB_INVALID')
   }
 }
 ```
 
-Task 11 合并规则与 AI finding 后，调用 SafetyGate 时必须显式组装 `ContractReviewSafetyContext`：`expectedDisclaimerVersion` 来自 task consent snapshot，`expectedOcrConfidence` / `expectedCoverage` 来自 extraction / OCR 服务端真相，`hasFieldConflict` 来自结构化事实冲突检测，`authoritativeRuleFindings` 来自 Task 8 规则结果映射且保留 rule id。不得从模型结果反向生成这些 expected 字段，也不得省略 context 走默认值。
+`ContractReviewQueueService` 可接受显式注入的 Queue adapter；未注入时 `enqueueExtract/enqueueAnalyze` 只抛 `CONTRACT_REVIEW_QUEUE_UNAVAILABLE`。`ContractReviewModule` 在 AppModule 中只注册 service、清理任务、不可用 queue gateway 和默认拒绝 provider runtime；**不得** `BullModule.registerQueue`，也不得注册 processor。processor 和 mock queue 只在本任务的隔离单测模块中装配。模块启动不得实例化会因 Gate 0 默认拒绝而抛错的真实 `ContractReviewProviderService`，真实 provider runtime 与 BullMQ 注册都留给 Task 14。
 
-Task 11 processor RED 测试必须逐字段断言传给 `gate.validate` 的 context 来源：免责声明版本取 task snapshot；OCR 置信度取 extraction 结果；`task.truncated === true` 映射为 `expectedCoverage: 'truncated'`，否则为 `'complete'`；字段冲突取事实合并器；authoritative findings 取规则引擎映射。测试另构造模型结果伪造 OCR / coverage / disclaimer 的场景，确认 orchestrator 仍传服务端真相并由 gate 拒绝。
+extract job 使用 CAS 逐步推进，重试时允许从 `extracting` 重做本阶段；它只持久化页数、进度、OCR provider/confidence、coverage、版本化 `extractionFingerprint` 与 `awaiting_confirmation`，**不持久化原始页文本或事实全文**。analyze job 只从 Task 12 已确认的 `rule_checking` 单次执行；所有 canonical 原文、脱敏页、事实和 model draft 只存在于当前进程内存。进入 `ai_analyzing` 后的异常固定收敛到 failed，不允许 worker 自动重放模型调用。
 
-Orchestrator 每阶段先做 CAS；五分钟总 deadline；取消/过期后停止后续 OCR。SafetyGate 通过后用一个 `$transaction` 写 `resultJson + completed + aiProvider/model`。清理 cron 先 CAS 到 expired，再删 source/result 对象，失败记录脱敏码并重试。
+每个 job 从 worker 实际开始时计算五分钟协作式 budget，在昂贵步骤前后及 extraction `onPageComplete` 中重读 task 状态与 deadline；发现 cancelled/expired/超时后不得开始下一页 OCR 或 LLM。必须诚实记录：这只能在页边界和网络调用边界停止，不能终止已经进入的第三方原生 PDF/DOCX 解析；真正的进程级 hard kill 与内存上限是 Task 14 启用生产入口前的阻断项。
 
-- [ ] **Step 4: 运行 processor、清理与 API typecheck**
+- [ ] **Step 4: 实现统一脱敏坐标、SafetyGate server truth 和最终事务**
 
-Run: `pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register --experimental-test-coverage --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-include=src/contract-review/contract-review.{processor,cleanup.task}.ts src/contract-review/__tests__/contract-review-processor.test.ts && pnpm --filter @ai-job-print/api typecheck`
+为持久化确认真相，先给双 Prisma schema 添加 nullable `extractionFingerprint String?` 与 `confirmedAt DateTime?`，并用新的 additive SQLite/PostgreSQL migration 演进；更新 schema parity 测试并运行 fresh migration drift。不得回写或改写已经封板的 Task 3 migration。
 
-Expected: PASS。
+`ContractReviewFactMerger` 是纯 TypeScript、无 Nest/I/O/Date/日志/模型调用的保守解析器，只提取 Task 8 确定性子集需要的事实并显式检测冲突。它和规则引擎都接收 masker 输出页，禁止再次接触未遮蔽页。
 
-- [ ] **Step 5: 提交**
+`ContractReviewFindingMapper` 固定完成三件事：
+
+1. 以版本化静态表把 Task 8 `ruleId` 映射成共享 finding，保留 `id=ruleId`、basis 和脱敏 evidence；未知 rule id 立即拒绝。
+2. 把 provider draft 映射为 `source:'ai'` finding，id 用不含正文的确定性摘要生成，证据仅在脱敏页内唯一定位。
+3. 只做拼接和计数，不让 AI 覆盖同 id 规则 finding；规则 authoritative 集合原样传入 SafetyGate。规则 + AI 超过 100 条立即拒绝，不截断任何一方。
+
+调用 SafetyGate 时显式组装：
+
+```typescript
+const context: ContractReviewSafetyContext = {
+  expectedDisclaimerVersion: task.disclaimerVersion,
+  expectedOcrConfidence: extraction.ocrConfidence ?? 'high',
+  expectedCoverage: extraction.truncated ? 'truncated' : 'complete',
+  hasFieldConflict: merged.hasFieldConflict,
+  authoritativeRuleFindings,
+}
+const validated = gate.validate(candidateResult, masked.pages, context)
+```
+
+SafetyGate 通过后，唯一一次 `$transaction` 内用 `updateMany where { id, status:'safety_reviewing', expiresAt:{gt:now} }` 同时写 `resultJson/status:'completed'/aiProvider/aiModel/ocrProvider/ocrConfidence/professionalConsultationRecommended`；影响行数不是 1 则整笔回滚。事务外不得写 `resultJson`，也不得把 candidate/raw draft 放进 Redis、错误、日志或审计。
+
+- [ ] **Step 5: 实现无需新增清理重试字段的 TTL 清理**
+
+清理 cron 每批最多处理固定数量的 `expiresAt <= now` task：先对当前 status 做 CAS 到 `expired`，再处理已 `expired` 的遗留行。每个 fileId 删除前读取 `FileObject`：不存在或 `deletedAt != null` 视为幂等完成；仍被其他未过期合同任务引用时跳过物理删除；否则调用新增的 `FilesService.systemDeleteSensitive`。该入口复用现有 storage + DB 删除语义，但成功日志只写不可逆摘要，不写完整 fileId。删除抛错后重新读取 `FileObject`，只有 DB 已证明 deleted 才视为成功。
+
+全部需删除对象完成或因活跃共享引用而正确延期后，删除已过期 task 行，使 `resultJson/accessTokenHash` 一并退出数据库；任一对象失败则保留 `expired` task，下一轮 cron 自动重试。日志只允许固定 `code`、计数和 taskId 摘要，禁止原始 error message、fileId、文件名、路径、正文、token 或模型内容。该设计不新增 `cleanupRetryCount`，以“expired 行仍存在”作为持久重试账本。
+
+- [ ] **Step 6: 运行覆盖率、全量合同回归和 API 门禁**
+
+Run:
 
 ```bash
-git add services/api/src/contract-review services/api/src/app.module.ts
+pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register \
+  --experimental-test-coverage \
+  --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80 \
+  '--test-coverage-include=src/contract-review/contract-review-{queue,processor,orchestrator.service,fact-merger,finding-mapper,cleanup.task}.ts' \
+  src/contract-review/__tests__/contract-review-fact-merger.test.ts \
+  src/contract-review/__tests__/contract-review-orchestrator.test.ts \
+  src/contract-review/__tests__/contract-review-processor.test.ts \
+  src/contract-review/__tests__/contract-review-cleanup.test.ts \
+  src/contract-review/__tests__/contract-review-module.test.ts \
+  src/contract-review/__tests__/contract-review-sensitive-delete.test.ts
+pnpm --filter @ai-job-print/api exec node --test -r @swc-node/register 'src/contract-review/__tests__/*.test.ts'
+pnpm --filter @ai-job-print/api verify:contract-review:schema
+pnpm --filter @ai-job-print/api typecheck
+pnpm --filter @ai-job-print/api lint
+pnpm --filter @ai-job-print/api verify:contract-review:gate0
+```
+
+Expected: PASS；Gate 0 仍显示 `blocked`，默认运行时不开队列/processor，且没有 HTTP 入口。
+
+- [ ] **Step 7: 双模型审查后提交**
+
+```bash
+git add \
+  services/api/src/contract-review \
+  services/api/src/files/files.service.ts \
+  services/api/src/app.module.ts \
+  services/api/prisma/schema.prisma \
+  services/api/prisma/postgres/schema.prisma \
+  services/api/prisma/migrations/20260801130000_add_contract_review_confirmation_checkpoint/migration.sql \
+  services/api/prisma/postgres/migrations/20260801130000_add_contract_review_confirmation_checkpoint/migration.sql \
+  docs/superpowers/plans/2026-08-01-ai-contract-review.md \
+  .ccg/tasks/contract-review-professional-design
 git commit -m "feat: orchestrate contract review jobs"
 ```
 
@@ -964,9 +1097,15 @@ git commit -m "feat: orchestrate contract review jobs"
 
 文件预算门禁：`contract-review.service.ts` 在 Task 6 已达约 479 行，Task 12 新增 `get/getConsentScope/confirm/remove/createReport` 前必须先把 consent snapshot / access 或持久化职责拆到独立文件；不得让该 service 跨过 500 行后继续堆叠。Task 6 的 `contract-review-service.test.ts` 已 999 行，Task 12 只能新建 HTTP/服务分层测试，禁止继续向该文件追加。
 
+Task 12 只接线 Task 11 的队列服务：create 持久化成功后必须 `enqueueExtract`；confirm 完成归属、`awaiting_confirmation` 和 `extractionFingerprint` 校验后，在数据库中写 `confirmedAt` 并 CAS 到 `rule_checking`，再 `enqueueAnalyze`。这个 CAS 是用户确认事件的持久化真相，不是 controller 伪造后台进度；analyze processor 不能从 `awaiting_confirmation` 自行推进。两者都禁止在 HTTP 线程内联执行。enqueue 失败时 create 将新 task CAS 为 `expired` 且把 `expiresAt` 收紧为当前时间后返回 503；confirm enqueue 失败则保留已确认的 `rule_checking`，同一归属用户重试 confirm 时只允许幂等补发同 jobId，不得重复改写 `confirmedAt`。匿名 create 在 enqueue 成功前不得把 access token 返回客户端。
+
+由于 Task 14 之前尚无可终止的进程隔离与 Gate 0 批准 runtime，`ContractReviewController` 只能在显式测试开关下注册供 verifier 使用；默认 AppModule 仍无生产合同 HTTP 路由。Task 12 的“路由通过”表示测试模块契约通过，不表示生产入口已启用。
+
 **Files:**
 - Create: `services/api/src/contract-review/dto/contract-review.dto.ts`
 - Create: `services/api/src/contract-review/contract-review.controller.ts`
+- Create: `services/api/src/contract-review/contract-review-consent.service.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-http-service.test.ts`
 - Create: `services/api/scripts/verify-contract-review-http.ts`
 - Modify: `services/api/src/contract-review/contract-review.service.ts`
 - Modify: `services/api/src/contract-review/contract-review.module.ts`
@@ -1004,6 +1143,7 @@ function headerOf(req: RequestLike, name: string): string | null {
 export class ContractReviewController {
   constructor(
     private readonly service: ContractReviewService,
+    private readonly queue: ContractReviewQueueService,
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
@@ -1023,7 +1163,9 @@ export class ContractReviewController {
   @Post()
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async create(@Body() dto: CreateContractReviewDto, @Req() req: RequestLike) {
-    return ApiResponse.ok(await this.service.create(dto, await this.requesterOf(req)))
+    const created = await this.service.create(dto, await this.requesterOf(req))
+    await this.service.enqueueCreatedOrExpire(created, this.queue)
+    return ApiResponse.ok(created)
   }
 
   @Get('consent-scope')
@@ -1040,7 +1182,9 @@ export class ContractReviewController {
   @Post(':id/confirm')
   @Throttle({ default: { ttl: 60_000, limit: 8 } })
   async confirm(@Param('id') id: string, @Body() dto: ConfirmContractReviewDto, @Req() req: RequestLike) {
-    return ApiResponse.ok(await this.service.confirm(id, dto, await this.requesterOf(req)))
+    const confirmed = await this.service.confirm(id, dto, await this.requesterOf(req))
+    await this.queue.enqueueAnalyze(id)
+    return ApiResponse.ok(confirmed)
   }
 
   @Post(':id/report')
@@ -1203,6 +1347,9 @@ git commit -m "feat: add kiosk contract review flow"
 ### Task 14: 生成 AI 标识报告、打印并完成发布门禁
 
 **Files:**
+- Create: `services/api/src/contract-review/contract-review-execution-runner.ts`
+- Create: `services/api/src/contract-review/contract-review-execution.child.ts`
+- Create: `services/api/src/contract-review/__tests__/contract-review-execution-runner.test.ts`
 - Create: `services/api/src/contract-review/contract-review-pdf.service.ts`
 - Create: `services/api/src/contract-review/__tests__/contract-review-pdf.test.ts`
 - Create: `services/api/scripts/verify-contract-review.ts`
@@ -1214,7 +1361,11 @@ git commit -m "feat: add kiosk contract review flow"
 - Modify: `docs/progress/current-progress.md`
 - Modify: `docs/progress/next-tasks.md`
 
-- [ ] **Step 1: 写显式/隐式标识与短期派生文件失败测试**
+- [ ] **Step 1: 先写可终止执行隔离、显式/隐式标识与短期派生文件失败测试**
+
+Task 11 的五分钟 budget 只能协作式停止后续步骤，不能终止已进入的原生 PDF/DOCX 解析。Task 14 在任何生产开关或 controller 注册前必须增加独立 child-process 执行边界：父进程只传 `taskId + stage`，child 自行从数据库读取 server truth；禁止通过 argv、env 或 IPC 传正文/token/model output。父进程用固定五分钟 wall-clock 强制终止 child，并以 Node 内存参数设置固定 heap 上限；child 超时、异常退出、IPC 超限或内存退出都只映射固定安全码。测试必须使用可注入 child adapter，证明 timeout 会实际调用 `kill`、迟到消息不会落库、父进程不会记录 child 原始 stderr/stdout。
+
+只有 Gate 0 全部 approved、真实 provider runtime 绑定精确批准 identity、child-process hard kill/内存测试通过、Redis 可用且显式运行时开关开启时，Task 14 才允许注册 queue processor 和 HTTP controller；任何一项不满足都保持默认关闭。真实 Windows 连续会话还必须验证 child 退出后 RSS 回落，不能只靠 Promise race 冒充资源回收。
 
 ```typescript
 import test from 'node:test'
