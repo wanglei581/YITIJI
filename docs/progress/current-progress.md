@@ -1,5 +1,9 @@
 # 当前开发进度
 
+2026-08-02 完成 **P0 多实例安全：`bounded_pm2_kill` gap2 修复（[PR #480](https://github.com/wanglei581/YITIJI/pull/480)，已 squash 合入 `main@cc0a67cb`，CI 3/3 ✅）**：`bounded_pm2_kill()` 原先在 PM2 state 文件消失时无条件 `return 0`（`pm2_home_has_state "$pm2_home" || return 0`），即便已捕获到 daemon PID 也绕过 `--terminate-daemon` 逻辑，构成有界清理漏洞（gap2）。修复重构为 `if ! pm2_home_has_state`：state 文件消失且 `daemon_pid` 为空时才 `return 0`（进程确实未出现）；state 文件消失但 `daemon_pid` 已捕获时执行 `break` 跳出轮询以进入身份绑定终止路径，保证已知 PID 的 daemon 不被静默放行。`verify-cleanup-contract.mjs` 新增双断言（`doesNotMatch` 旧单行短路 + `match` 新 if 分支含 `[[ -z "$daemon_pid" ]] && return 0` 与 `break`）及 `verifyPm2CapturedPidBehavior` bash fixture（当 `pm2_home_has_state` 返回 1 且 `daemon_pid=4242` 时，必须仍调用 `env --terminate-daemon`）。离线合同 `D2_PRIME_CONTRACT_ALL_PASS`，CI 3/3 全绿后 squash 合入；不构成 D2′ PASS 或 retake 授权，`productionF1` 继续 **NO-GO**。
+
+2026-08-02 完成 **P0 多实例与相邻安全前置（[PR #479](https://github.com/wanglei581/YITIJI/pull/479)，已 squash 合入 `main@c6e550b4`，CI 3/3 ✅）**：Webhook/支付 nonce 防重放从进程内存 `LRU` 迁移到 Redis `SET NX EX 300`（键名 `webhook:nonce:{sourceId}:{nonce}`，TTL=300s 与现有 5 分钟 timeStamp 时间窗对齐；`tokenMatches` 用 `timingSafeEqual` 防时序攻击；Redis 不可用时 fast-fail 拒绝请求，不降级回内存）。Partner API 拉取新增 SSRF 防护：`validatePublicUrl(rawUrl)` 在 DNS 解析后调用 `isPrivateOrReserved(ip)` 阻断私网（RFC1918）、环回、链路本地、元数据地址（169.254.169.254）及 IPv6 特殊前缀；不跟随多跳重定向；`appSecret` 仅服务端保存，nonce 验证/签名/幂等守卫语义不变，不混入新业务入口。
+
 2026-08-02 完成 **F1 D2′ cleanup 存活证明四处缺口合入收口（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)，已 squash 合入 `main@6e805917`，未演练、未部署）**：从
 `origin/main@7f2ac0dc` 的独立 worktree 按 RED→GREEN 修复四项阻塞：(1) `systemctl --user stop`
 现由脚本级 10s TERM / 2s kill-after timeout 约束，stop 返回后仍只接受严格
