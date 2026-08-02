@@ -37,7 +37,7 @@ export default function OfflineJobDetailPage() {
     return <ErrorState message={error ?? '岗位不存在'} onRetry={() => setRetryKey((key) => key + 1)} />
   }
 
-  const services = job.agencyServices.join('、') || '以机构公示为准'
+  const services = '以机构公示为准'
 
   const jobTypeLabel = job.jobType === 'fulltime'
     ? '全职'

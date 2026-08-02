@@ -89,7 +89,7 @@ export class OfflineAgenciesService {
       ]
     }
 
-    const [rows, total, districtRows] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.offlineAgency.findMany({
         where: where as never,
         skip,
@@ -97,39 +97,27 @@ export class OfflineAgenciesService {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, name: true, orgType: true, address: true, district: true,
-          openHours: true, services: true, status: true,
+          openHours: true, phone: true, website: true, services: true, status: true,
           sourceOrgId: true, externalId: true, syncTime: true, updatedAt: true,
           _count: { select: { jobs: { where: { status: 'active' } } } },
         },
       }),
       this.prisma.offlineAgency.count({ where: where as never }),
-      this.prisma.offlineAgency.findMany({
-        where: {
-          reviewStatus: 'approved',
-          publishStatus: 'published',
-          status: 'active',
-          district: { not: null },
-        } as never,
-        select: { district: true },
-        distinct: ['district'],
-      }),
     ])
 
     let items = rows.map((row: (typeof rows)[number]) => {
       const services = parseServices(row.services)
-      const isOpen = row.status === 'active'
       return {
         id: row.id,
         name: row.name,
         type: row.orgType || 'recruitment',
-        status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
-        statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
         address: row.address,
         district: row.district || '',
-        hours: row.openHours || '以门店公告为准',
+        hours: row.openHours || '以机构公示为准',
         services,
         orgCode: row.externalId || row.sourceOrgId || row.id,
-        jobCount: row._count.jobs,
+        phone: row.phone ?? null,
+        website: row.website ?? null,
         syncTime: (row.syncTime ?? row.updatedAt).toISOString(),
       }
     })
@@ -143,13 +131,6 @@ export class OfflineAgenciesService {
       total: service ? items.length : total,
       page,
       pageSize,
-      stats: {
-        totalAgencies: service ? items.length : total,
-        openAgencies: items.filter((it: (typeof items)[number]) => it.status === 'open').length,
-        totalJobs: items.reduce((sum: number, it: (typeof items)[number]) => sum + it.jobCount, 0),
-        districts: districtRows.length,
-        lastSyncLabel: items[0]?.syncTime ? '已同步' : '暂无同步',
-      },
     }
 
     // Kiosk get() 会取 body.data
@@ -422,8 +403,9 @@ export class OfflineAgenciesService {
   async adminDelete(id: string) {
     await this._assertAgencyExists(id)
     // 先删子岗位，再删机构（SQLite FK restrict 约束）
-    await this.prisma.offlineJob.deleteMany({ where: { agencyId: id } })
-    return this.prisma.offlineAgency.delete({ where: { id } })
+    const deletedJobs = await this.prisma.offlineJob.deleteMany({ where: { agencyId: id } })
+    const agency = await this.prisma.offlineAgency.delete({ where: { id } })
+    return { agency, deletedJobs: deletedJobs.count }
   }
 
   // ─── Admin 岗位管理 ──────────────────────────────────────────────────────────
