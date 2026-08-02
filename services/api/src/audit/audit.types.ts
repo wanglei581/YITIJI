@@ -53,10 +53,6 @@ export type AuditAction =
   | 'system.login'
   | 'system.config_change'
   | 'print_job.admin_abandon'
-  | 'resume.self_assessment_create'
-  | 'resume.self_assessment_view'
-  | 'resume.self_assessment_print'
-  | 'resume.self_assessment_withdraw'
 
 export type AuditTargetType =
   | 'auth'

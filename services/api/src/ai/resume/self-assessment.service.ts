@@ -30,6 +30,21 @@ const RESULT_TTL_HOURS = (() => {
   return Number.isFinite(raw) && raw > 0 ? raw : 24
 })()
 
+const ANON_TOKEN_BYTES = 20
+const ANON_TASKID_BYTES = 12
+
+export interface AuditContext {
+  ipAddress: string | null
+  userAgent: string | null
+  requestId: string | null
+}
+
+export const EMPTY_AUDIT_CONTEXT: AuditContext = {
+  ipAddress: null,
+  userAgent: null,
+  requestId: null,
+}
+
 export interface SelfAssessmentRequester {
   endUserId: string | null
   accessToken: string | null
@@ -89,13 +104,23 @@ export class SelfAssessmentService {
    * 提交答案 → 纯函数评分 → LLM 解读 → 落库 → 审计。
    * 匿名用户铸造一次性 accessTokenHash（明文仅返回一次）。
    */
-  async submit(requester: SelfAssessmentRequester, input: SelfAssessmentSubmitInput): Promise<SelfAssessmentSubmitOutput> {
+  async submit(
+    requester: SelfAssessmentRequester,
+    input: SelfAssessmentSubmitInput,
+    ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+  ): Promise<SelfAssessmentSubmitOutput> {
     if (!input.consent.nonSensitive) {
       throw new NotFoundException({
         error: { code: 'SELF_ASSESSMENT_CONSENT_REQUIRED', message: '请勾选非敏感题作答同意后再提交' },
       })
     }
     const t0 = Date.now()
+
+    // taskId 在 t0 之后立刻提取,保证 ai_service_log / audit_log / ai_resume_result 三方一致
+    const isAnonymous = !requester.endUserId
+    const taskId = `sa-${randomBytes(ANON_TASKID_BYTES).toString('hex')}`
+    const accessToken = isAnonymous ? `sa-${randomBytes(ANON_TOKEN_BYTES).toString('hex')}` : null
+
     const consent = {
       nonSensitive: true,
       sensitive: input.consent.sensitive === true,
@@ -105,8 +130,6 @@ export class SelfAssessmentService {
     const scored = scoreSelfAssessment({ answers: input.answers, questions: SELF_ASSESSMENT_QUESTIONS_V1 })
 
     // 2) 匿名 session 模式 / 会员模式 → accessToken 决策（仅匿名铸造；明文仅返回一次）
-    const isAnonymous = !requester.endUserId
-    const accessToken = isAnonymous ? `sa-${randomBytes(20).toString('hex')}` : null
 
     // 3) LLM 解读（仅本人作答 + 维度分；不附答案原文）
     let dimensions: SelfAssessmentDimensionResult[] = scored.dimensions
@@ -133,7 +156,7 @@ export class SelfAssessmentService {
       llmErrorCode = 'LLM_ERROR'
     }
     this.log.record({
-      taskId: `sa-${Date.now()}-${randomBytes(4).toString('hex')}`,
+      taskId,
       provider: providerName ?? 'llm',
       operation: 'selfAssessment',
       latencyMs: Date.now() - t0,
@@ -142,7 +165,6 @@ export class SelfAssessmentService {
     })
 
     // 4) 落库（仅会员：endUserId 归属；匿名不留库，会话由 token 持有）
-    const taskId = `sa-${randomBytes(12).toString('hex')}`
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
     const completedAt = new Date().toISOString()
 
@@ -155,7 +177,11 @@ export class SelfAssessmentService {
       completedAt,
     }
 
-    if (!isAnonymous && !overallRejectReason) {
+    if (!overallRejectReason) {
+      // §1.3: 匿名用户的 self-assessment 也落 aiResumeResult(用 accessTokenHash 持有),
+      //       这样 MyAiRecords(本人 endUserId 查询)能正确反映;匿名用户升级到本人后还能
+      //       据 taskId 回溯。会话级持久:同 parse 类的匿名模式。
+      //       拒答场景保留最小行(answersHash + 拒答状态 + accessTokenHash),方便未来查阅。
       await this.prisma.aiResumeResult.create({
         data: {
           taskId,
@@ -164,7 +190,29 @@ export class SelfAssessmentService {
           provider: providerName ?? 'llm',
           payloadJson: JSON.stringify(persisted),
           endUserId: requester.endUserId,
-          accessTokenHash: null,
+          accessTokenHash: accessToken ? hashToken(accessToken) : null,
+          expiresAt,
+        },
+      })
+    } else if (isAnonymous && accessToken) {
+      // 拒答也保留最小行,用于未来本人端"拒答历史"展示;带 accessTokenHash 满足 read 校验。
+      const rejectedMinimal: StoredSelfAssessment = {
+        version: 'v1',
+        answersHash: scored.answersHash,
+        dimensions: [],
+        summary: null,
+        aiProvider: providerName,
+        completedAt,
+      }
+      await this.prisma.aiResumeResult.create({
+        data: {
+          taskId,
+          kind: 'self_assessment',
+          status: 'rejected',
+          provider: providerName ?? 'llm',
+          payloadJson: JSON.stringify(rejectedMinimal),
+          endUserId: null,
+          accessTokenHash: hashToken(accessToken),
           expiresAt,
         },
       })
@@ -183,7 +231,9 @@ export class SelfAssessmentService {
         unmatchedCount: scored.unmatched.length,
         status: overallRejectReason ? 'rejected' : 'completed',
       },
-      ipAddress: null, userAgent: null, requestId: null,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     })
 
     if (overallRejectReason) {
@@ -209,7 +259,11 @@ export class SelfAssessmentService {
   }
 
   /** 读回本人历史结果（仅会员；匿名不留库）。 */
-  async getLatest(taskId: string, requester: SelfAssessmentRequester) {
+  async getLatest(
+    taskId: string,
+    requester: SelfAssessmentRequester,
+    ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+  ) {
     const row = await this.loadAuthorizedRow(taskId, requester)
     const stored = JSON.parse(row.payloadJson) as StoredSelfAssessment
     if (stored.deletedAt) {
@@ -224,7 +278,9 @@ export class SelfAssessmentService {
       targetType: 'ai_task',
       targetId: taskId,
       payload: { hasEndUser: !!requester.endUserId },
-      ipAddress: null, userAgent: null, requestId: null,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     })
     return {
       taskId,
@@ -237,7 +293,11 @@ export class SelfAssessmentService {
   }
 
   /** 物理删除 payload 字段（保留行用于审计）；返回 { deleted: true }。 */
-  async withdraw(taskId: string, requester: SelfAssessmentRequester) {
+  async withdraw(
+    taskId: string,
+    requester: SelfAssessmentRequester,
+    ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+  ) {
     const row = await this.loadAuthorizedRow(taskId, requester)
     const empty: StoredSelfAssessment = {
       version: 'v1',
@@ -259,7 +319,9 @@ export class SelfAssessmentService {
       targetType: 'ai_task',
       targetId: taskId,
       payload: { hasEndUser: !!requester.endUserId },
-      ipAddress: null, userAgent: null, requestId: null,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     })
     return { deleted: true }
   }
@@ -267,7 +329,11 @@ export class SelfAssessmentService {
   /**
    * 自我探索报告 PDF（不附加到简历；append 模式由 print.service 提供）。
    */
-  async printReport(taskId: string, requester: SelfAssessmentRequester) {
+  async printReport(
+    taskId: string,
+    requester: SelfAssessmentRequester,
+    ctx: AuditContext = EMPTY_AUDIT_CONTEXT,
+  ) {
     const row = await this.loadAuthorizedRow(taskId, requester)
     const stored = JSON.parse(row.payloadJson) as StoredSelfAssessment
     if (stored.deletedAt) {
@@ -285,7 +351,9 @@ export class SelfAssessmentService {
       buffer,
       filename: `self-assessment-${taskId}.pdf`,
       mimeType: 'application/pdf',
-      purpose: 'print_doc',
+      // §1.2: 报告 PDF 走 self_assessment_report 用途,触发 sensitive 留存/标签;
+      //      不再用 print_doc (normal),否则审计/Cron 会误聚合普通打印件。
+      purpose: 'self_assessment_report',
       uploaderId: null,
       endUserId: requester.endUserId,
       createdBy: 'self_assessment',
@@ -297,7 +365,9 @@ export class SelfAssessmentService {
       targetType: 'ai_task',
       targetId: taskId,
       payload: { fileId: uploaded.fileId, pageCount },
-      ipAddress: null, userAgent: null, requestId: null,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     })
     return {
       fileId: uploaded.fileId,

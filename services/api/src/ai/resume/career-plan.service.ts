@@ -124,7 +124,8 @@ export class CareerPlanService {
 
     // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额 / 校验；
     //    服务端按本人 endUserId 读取，匿名 parse 不强制要求，仅尝试按 accessTokenHash 匹配）。
-    let selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }>; summary: string | null } | null = null
+    //    §1.7: 只读 dimensions,LLM 上轮拒答 summary 不注入下游(防跨轮污染)。
+    let selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null = null
     {
       const where = parse.endUserId
         ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
@@ -132,17 +133,16 @@ export class CareerPlanService {
       const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
       if (row) {
         try {
+          // self-assessment payloadJson 顶层就是 dimensions/summary(StoredSelfAssessment),
+          // 不是 { payload: { ... } }。配套 §1.7 修复:沿用正确 schema 仅读 dimensions。
           const stored = JSON.parse(row.payloadJson) as {
-            payload?: {
-              dimensions?: Array<{ key: string; label: string; strength: number }>
-              summary?: string | null
-            }
+            dimensions?: Array<{ key: string; label: string; strength: number }>
           }
-          const dims = (stored.payload?.dimensions ?? [])
+          const dims = (stored.dimensions ?? [])
             .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
             .filter((d) => d.key && d.label)
           if (dims.length > 0) {
-            selfAssessmentCtx = { dimensions: dims, summary: stored.payload?.summary ?? null }
+            selfAssessmentCtx = { dimensions: dims }
           }
         } catch { /* 损坏行按无上下文处理 */ }
       }

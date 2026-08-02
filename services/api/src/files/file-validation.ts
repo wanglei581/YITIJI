@@ -88,8 +88,11 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
     mimes: [...MEMBER_DATA_EXPORT_FILE_POLICY.mimes],
     maxBytes: MEMBER_DATA_EXPORT_FILE_POLICY.maxBytes,
   },
-  // 自我探索报告 PDF：仅服务端生成，外部上传不应进入此用途；允许 PDF 兜底兼容老链路，但默认 mimes=空。
-  self_assessment_report: { mimes: [], maxBytes: 0 },
+  // 自我探索报告 PDF：服务端生成(PDFKit / pdf-lib)的本人自助倾向摘要,默认 5MB 上限。
+  // 上游 self-assessment.service.printReport 与 appended-self-assessment.service.appendToResume
+  // 固定生成 application/pdf 此处的 mimes 必含 PDF;留 PDF_DOC_IMG 是给未来导出其他格式兜底。
+  // §1.2 配套修复: 之前 { mimes: [], maxBytes: 0 } 会让两路 services.upload 在 validateUpload 阶段拒上传。
+  self_assessment_report: { mimes: [...PDF_DOC_IMG], maxBytes: 5 * MB },
 }
 
 /** 服务端代理上传(multipart,整 buffer 进内存)的硬上限。超此须走 upload-intent 直传。 */
