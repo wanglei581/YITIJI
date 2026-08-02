@@ -71,8 +71,9 @@ const EXPECTED_SITES = {
 }
 
 /** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
- * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34 */
-const EXPECTED_SELFTEST_CASES = 34
+ * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34
+ * Round 8 新增 3 条（O′ O″ O‴）：34 → 37 */
+const EXPECTED_SELFTEST_CASES = 37
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -238,6 +239,11 @@ function memberName(node) {
  *   · `this.prisma.job['up'+'sert']({})`   —— 动态下标，memberName 返回 null
  * 均已实测复现门禁 exit 0。现改为先 unwrap，再分三路处理。
  *
+ * 第 8 轮修正（codex H-1）：ElementAccess + 字符串字面量下标（['call']/['apply']/['bind']）
+ *   未被拦截：下标通过 isStringLiteralLike 检查后原代码 fallthrough，memberName(callee) 取到
+ *   'call' ≠ 'upsert' → return null（fail-open）。现在字符串字面量下标先判
+ *   subText ∈ {call,apply,bind}，若内部是 upsert 则同 PropertyAccess 分支 throw。
+ *
  * 已知宽容：`getUnrelatedRepository().upsert({})` 仍会因取不到模型名而抛错。
  * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有此类调用模式，
  * 宽容误报的代价（一次门禁报错）远小于漏报的代价（审核状态绕过），故保留。
@@ -263,12 +269,33 @@ function upsertModelOf(call, where) {
     }
   }
 
-  // ── 动态下标形态：model['up'+'sert']({}) ─────────────────────────────────────
-  // callee 是 ElementAccessExpression，下标是非字符串字面量（运行时才知方法名）。
-  // 只在 owner 是已追踪模型时 fail-closed（防止误报无关对象的同名动态调用）。
+  // ── ElementAccess 形态：字符串字面量下标（含 ['call']/['apply']/['bind']）或动态下标 ──
+  // FIX(round8 H-1): 原只处理动态下标；字符串字面量 ['call']/['apply']/['bind'] 会走到
+  //   后续 memberName(callee) → 取到 'call' ≠ 'upsert' → return null 静默跳过（fail-open）。
+  // 现在先拦截字符串字面量下标，分三路：
+  //   ① subText ∈ {call,apply,bind} → 与 PropertyAccess .call/.apply/.bind 分支等效，throw
+  //   ② subText === 'upsert'        → 继续到后续 memberName 路径（PropertyAccess 已覆盖，fallthrough）
+  //   ③ 其他字符串                  → return null（与本门禁无关）
+  // 设计边界（H-2，不修复）：alias `const repo = this.prisma.job; repo.upsert(...)` 返回 null；
+  //   本门禁是 inventory-based，alias upsert 须手动新增 EXPECTED_SITES，否则库存核对失败。
   if (ts.isElementAccessExpression(callee)) {
     const subscript = callee.argumentExpression
-    if (!subscript || !ts.isStringLiteralLike(subscript)) {
+    if (subscript && ts.isStringLiteralLike(subscript)) {
+      const subText = subscript.text
+      if (subText === 'call' || subText === 'apply' || subText === 'bind') {
+        const innerFn = unwrap(callee.expression)
+        if (memberName(innerFn) === 'upsert') {
+          throw new Error(
+            `${where} 出现通过 ['${subText}']() 间接调用 upsert 的形态——\n` +
+              '      无法静态分析实际传入的 data 参数，按失败处理。\n' +
+              '      请改成 `tx.job.upsert(...)` 等可静态分析的直接调用写法。'
+          )
+        }
+        return null // ['call'/'apply'/'bind'] 但内部不是 upsert — 与本门禁无关
+      }
+      // 其他字符串下标（如 ['upsert']）：继续走后续 memberName 判断
+    } else {
+      // 非字符串字面量下标（动态下标：运行时才知方法名）
       const dynOwner = unwrap(callee.expression)
       const dynModel = memberName(dynOwner) ?? (ts.isIdentifier(dynOwner) ? dynOwner.text : null)
       if (dynModel === 'job' || dynModel === 'jobFair') {
@@ -392,13 +419,13 @@ function checkMustNotReset(blocks, label) {
     // hasKey 只可见「明确写出的属性」，spread-carried 键（update: { ...RESET }）
     // 对它完全不可见，会令反向断言假绿（门禁 exit 0 但实际重置字段存在）。
     // 已实测复现：probe 脚本确认 `hasKey(reviewStatus)=false` 且 exit 0。
-    // job-sync.service.ts 的 3 个注册 update 块不含第一层展开（已 Read 确认），
+    // job-sync.service.ts 的 2 个注册 update 块不含第一层展开（已 Read 确认），
     // 故 fail-closed 策略对线上代码零误报。
     if (b.props.lastSpreadIdx >= 0) {
       console.error(
         `  ❌  ${label} · ${b.site} · update 块第一层含展开（lastSpreadIdx=${b.props.lastSpreadIdx}），` +
           '静态无法证明展开对象不携带 reviewStatus/publishStatus — fail-closed\n' +
-          '      请把展开内容展开为逐字段写法，或拆分不含审核字段的展开到独立变量。'
+          '      请把展开内容展开为逐字段写法（拆到独立变量后再展开仍会触发此门禁，须彻底消除展开）。'
       )
       failures.push({ site: b.site, spreadClosed: true, keys: [] })
       fail++
@@ -740,6 +767,41 @@ function selfTest() {
         synth(RESET_INLINE).replace(
           'await this.prisma.job.upsert(',
           'await this.prisma.job.upsert.call(this.prisma.job,'
+        ),
+    },
+    {
+      // Round 8 M-1：O′ —— .apply 间接调用，PropertyAccess 路径（与 O 同分支，单独钉住防遗漏）。
+      name: "O′ .apply 形态（this.prisma.job.upsert.apply(...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \.apply\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          'await this.prisma.job.upsert.apply(this.prisma.job,'
+        ),
+    },
+    {
+      // Round 8 M-1：O″ —— .bind 间接调用，PropertyAccess 路径。
+      name: "O″ .bind 形态（this.prisma.job.upsert.bind(ctx)(...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \.bind\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          'await this.prisma.job.upsert.bind(this.prisma.job)('
+        ),
+    },
+    {
+      // Round 8 H-1：O‴ —— 字符串字面量下标 ['call']，ElementAccess 路径。
+      // 原实现：只处理动态下标，字符串字面量下标走到 memberName='call'≠'upsert' → return null (fail-open)。
+      // FIX(round8 H-1) 后须 throw。
+      name: "O‴ 字符串下标 ['call'] 形态（upsert['call'](...)）必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /通过 \['call'\]\(\) 间接调用 upsert/,
+      src: () =>
+        synth(RESET_INLINE).replace(
+          'await this.prisma.job.upsert(',
+          "await this.prisma.job.upsert['call'](this.prisma.job,"
         ),
     },
     {
