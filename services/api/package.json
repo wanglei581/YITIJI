@@ -197,6 +197,9 @@
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
     "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts",
     "verify:legal-doc-version": "node -r @swc-node/register scripts/verify-legal-doc-version.ts",
+    "verify:self-assessment": "node -r @swc-node/register scripts/verify-self-assessment.ts",
+    "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts",
+    "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts"
   },
   "dependencies": {

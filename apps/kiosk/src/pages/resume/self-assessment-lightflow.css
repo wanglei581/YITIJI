@@ -1,0 +1,150 @@
+/* 自我探索 · 倾向参考 —— Lightflow 样式 */
+
+.self-assessment-lightflow__content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 0;
+  max-width: 880px;
+  margin: 0 auto;
+}
+
+.self-assessment-lightflow__consent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.self-assessment-lightflow__consent label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.self-assessment-lightflow__consent input {
+  margin-top: 4px;
+  width: 22px;
+  height: 22px;
+}
+
+.self-assessment-lightflow__progress {
+  height: 8px;
+  background: var(--fusion-color-surface-2, #eef0f3);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.self-assessment-lightflow__progress span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  transition: width 0.2s ease;
+}
+
+.self-assessment-lightflow__question header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #6b7280;
+}
+.self-assessment-lightflow__question p {
+  font-size: 22px;
+  font-weight: 500;
+  margin: 0 0 18px;
+  line-height: 1.45;
+}
+
+.self-assessment-lightflow__dim {
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.self-assessment-lightflow__counter {
+  font-variant-numeric: tabular-nums;
+}
+
+.self-assessment-lightflow__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.self-assessment-lightflow__choices button {
+  text-align: left;
+  padding: 18px 20px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  font-size: 17px;
+  min-height: 56px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.self-assessment-lightflow__choices button:hover {
+  border-color: #3b82f6;
+  background: #f8fafc;
+}
+.self-assessment-lightflow__choices button.is-selected {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  font-weight: 600;
+}
+
+.self-assessment-lightflow__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.self-assessment-lightflow__summary header,
+.self-assessment-lightflow__dim-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.self-assessment-lightflow__summary header h2,
+.self-assessment-lightflow__dim-card header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.self-assessment-lightflow__strength {
+  font-size: 13px;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.self-assessment-lightflow__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.self-assessment-lightflow__dim-card p {
+  margin: 8px 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.self-assessment-lightflow__dim-card footer {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #9ca3af;
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 8px;
+}
+
+.self-assessment-lightflow__muted {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.self-assessment-lightflow__print-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

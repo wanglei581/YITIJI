@@ -58,6 +58,7 @@ import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureIn
 import { ConvertImagesPage } from '../pages/print-scan/ConvertImagesPage'
 import { SignStampPage } from '../pages/print-scan/SignStampPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
+import { SelfAssessmentIntroPage, SelfAssessmentQuizPage, SelfAssessmentResultPage, SelfAssessmentHistoryPage } from '../pages/resume/SelfAssessmentFlow'
 import { ResumeGeneratePage } from '../pages/resume/ResumeGeneratePage'
 import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreviewPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
@@ -93,6 +94,10 @@ export const kioskRouter = createBrowserRouter([
       { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/intro', element: <SelfAssessmentIntroPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/result', element: <SelfAssessmentResultPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/history', element: <SelfAssessmentHistoryPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },

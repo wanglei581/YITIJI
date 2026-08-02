@@ -1,0 +1,260 @@
+{
+  "version": "v1",
+  "dimensions": [
+    {
+      "key": "interest",
+      "label": "兴趣偏好",
+      "questions": [
+        {
+          "idx": 0,
+          "prompt": "在日常学习中，你更愿意花时间深入了解哪类内容？",
+          "choices": [
+            { "key": "a", "label": "解决具体的工程问题", "weight": 1 },
+            { "key": "b", "label": "与不同岗位背景的人沟通协作", "weight": 0 },
+            { "key": "c", "label": "梳理数据并得出结论", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 1,
+          "prompt": "你更愿意花精力打磨哪种类型的产出？",
+          "choices": [
+            { "key": "a", "label": "可运行的产品或代码", "weight": 1 },
+            { "key": "b", "label": "清晰可读的文档或方案", "weight": 0 },
+            { "key": "c", "label": "对外发布的稿件或讲解", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 2,
+          "prompt": "在团队合作中，你更喜欢扮演哪种角色？",
+          "choices": [
+            { "key": "a", "label": "推动事情落实落地的执行者", "weight": 1 },
+            { "key": "b", "label": "提出思路与可能性的探索者", "weight": 0 },
+            { "key": "c", "label": "把控节奏与方向的协调者", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 3,
+          "prompt": "面对新工具、新框架，你的反应更接近？",
+          "choices": [
+            { "key": "a", "label": "先跑通一个最小版本", "weight": 1 },
+            { "key": "b", "label": "先读官方文档或权威说明", "weight": 0 },
+            { "key": "c", "label": "观察他人使用后的反馈再决定", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 4,
+          "prompt": "什么样的工作内容会让你更愿意主动加班？",
+          "choices": [
+            { "key": "a", "label": "用户反馈推动的迭代与上线", "weight": 1 },
+            { "key": "b", "label": "某个长期项目的关键节点", "weight": 0 },
+            { "key": "c", "label": "研究和学习新的技术方向", "weight": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "style",
+      "label": "工作风格",
+      "questions": [
+        {
+          "idx": 0,
+          "prompt": "面对一项陌生任务，你更习惯的处理方式是？",
+          "choices": [
+            { "key": "a", "label": "先列出清单，再按顺序推进", "weight": 1 },
+            { "key": "b", "label": "先尝试一种思路，不行再调整", "weight": 0 },
+            { "key": "c", "label": "先了解背景与约束再动手", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 1,
+          "prompt": "你更喜欢的反馈方式是？",
+          "choices": [
+            { "key": "a", "label": "书面、明确、可回看", "weight": 1 },
+            { "key": "b", "label": "面对面、当场讨论", "weight": 0 },
+            { "key": "c", "label": "每周一次的复盘节奏", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 2,
+          "prompt": "面对多个并行任务，你更倾向？",
+          "choices": [
+            { "key": "a", "label": "先排好优先级，再依次推进", "weight": 1 },
+            { "key": "b", "label": "把可合并的并行处理", "weight": 0 },
+            { "key": "c", "label": "按截止日期自然推进", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 3,
+          "prompt": "你更喜欢的工作节奏是？",
+          "choices": [
+            { "key": "a", "label": "有规律、有计划", "weight": 1 },
+            { "key": "b", "label": "弹性、按状态切换", "weight": 0 },
+            { "key": "c", "label": "短冲刺、目标驱动", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 4,
+          "prompt": "独立完成一件事和与他人合作，你更喜欢？",
+          "choices": [
+            { "key": "a", "label": "可独立完成一段再到协作", "weight": 1 },
+            { "key": "b", "label": "一直与他人并行协作", "weight": 0 },
+            { "key": "c", "label": "视任务性质切换", "weight": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "team",
+      "label": "团队偏好",
+      "questions": [
+        {
+          "idx": 0,
+          "prompt": "在团队会议里你更常扮演哪种角色？",
+          "choices": [
+            { "key": "a", "label": "记录与跟进结论的执行者", "weight": 1 },
+            { "key": "b", "label": "提出不同视角的提问者", "weight": 0 },
+            { "key": "c", "label": "促成共识的协调者", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 1,
+          "prompt": "与不同背景的同事协作时，你更看重？",
+          "choices": [
+            { "key": "a", "label": "清晰的责任边界", "weight": 1 },
+            { "key": "b", "label": "充分的背景信息共享", "weight": 0 },
+            { "key": "c", "label": "互相补位的灵活度", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 2,
+          "prompt": "出现分歧时你更愿意？",
+          "choices": [
+            { "key": "a", "label": "用数据或事实讨论", "weight": 1 },
+            { "key": "b", "label": "先认同动机再讨论方案", "weight": 0 },
+            { "key": "c", "label": "由决策者拍板", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 3,
+          "prompt": "你更欣赏的团队文化是？",
+          "choices": [
+            { "key": "a", "label": "目标清晰、节奏稳定", "weight": 1 },
+            { "key": "b", "label": "鼓励尝试、容错度高", "weight": 0 },
+            { "key": "c", "label": "信息透明、人人发言", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 4,
+          "prompt": "团队规模变大时你的适应方式？",
+          "choices": [
+            { "key": "a", "label": "用流程保证一致性", "weight": 1 },
+            { "key": "b", "label": "用文档沉淀信息", "weight": 0 },
+            { "key": "c", "label": "和小范围伙伴保持紧密沟通", "weight": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "value",
+      "label": "价值取向",
+      "questions": [
+        {
+          "idx": 0,
+          "prompt": "工作中你更看重？",
+          "choices": [
+            { "key": "a", "label": "把事做成的能力", "weight": 1 },
+            { "key": "b", "label": "持续学习的空间", "weight": 0 },
+            { "key": "c", "label": "被信任的归属感", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 1,
+          "prompt": "在选择工作机会时，你更看重？",
+          "choices": [
+            { "key": "a", "label": "与日常生活的平衡", "weight": 1 },
+            { "key": "b", "label": "成长速度与挑战", "weight": 0 },
+            { "key": "c", "label": "稳定的长期发展", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 2,
+          "prompt": "你更认可的工作成果是？",
+          "choices": [
+            { "key": "a", "label": "可量化、可衡量的产出", "weight": 1 },
+            { "key": "b", "label": "对用户体验明显的改进", "weight": 0 },
+            { "key": "c", "label": "为团队建立长期能力", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 3,
+          "prompt": "面对工作与生活冲突时你倾向？",
+          "choices": [
+            { "key": "a", "label": "先稳住生活质量", "weight": 1 },
+            { "key": "b", "label": "按阶段冲刺", "weight": 0 },
+            { "key": "c", "label": "视重要性灵活切换", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 4,
+          "prompt": "你更看重什么样的认可？",
+          "choices": [
+            { "key": "a", "label": "具体任务上的反馈", "weight": 1 },
+            { "key": "b", "label": "长期能力的提升", "weight": 0 },
+            { "key": "c", "label": "稳定的合作机会", "weight": 0 }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "motivation",
+      "label": "求职动机",
+      "questions": [
+        {
+          "idx": 0,
+          "prompt": "对这一轮求职，你当前最想推进的是？",
+          "choices": [
+            { "key": "a", "label": "明确下一份工作的方向", "weight": 1 },
+            { "key": "b", "label": "找到能长期投入的事业", "weight": 0 },
+            { "key": "c", "label": "获得一次稳定的过渡机会", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 1,
+          "prompt": "下一份工作最希望给你带来？",
+          "choices": [
+            { "key": "a", "label": "解决日常生计的稳定保障", "weight": 1 },
+            { "key": "b", "label": "明确可感知的成长", "weight": 0 },
+            { "key": "c", "label": "与背景相称的合适岗位", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 2,
+          "prompt": "回顾当前情况，你想改进的更多是？",
+          "choices": [
+            { "key": "a", "label": "求职节奏与渠道", "weight": 1 },
+            { "key": "b", "label": "简历表达与亮点提炼", "weight": 0 },
+            { "key": "c", "label": "方向选择与判断", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 3,
+          "prompt": "你在意下一份工作的工作环境吗？",
+          "choices": [
+            { "key": "a", "label": "在意具体的环境与作息", "weight": 1 },
+            { "key": "b", "label": "在意合作氛围", "weight": 0 },
+            { "key": "c", "label": "在意发展与晋升空间", "weight": 0 }
+          ]
+        },
+        {
+          "idx": 4,
+          "prompt": "对未来的工作，你最希望？",
+          "choices": [
+            { "key": "a", "label": "在熟悉领域继续深耕", "weight": 1 },
+            { "key": "b", "label": "尝试一个相邻的新方向", "weight": 0 },
+            { "key": "c", "label": "先积累一段时间再调整", "weight": 0 }
+          ]
+        }
+      ]
+    }
+  ]
+}

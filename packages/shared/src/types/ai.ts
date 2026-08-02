@@ -493,8 +493,14 @@ export interface CareerPlanResponse {
   taskId: string
   status: 'completed' | 'failed'
   failReason?: string
-  /** 生成依据(如实展示):简历必有;岗位匹配/面试摘要可选 */
-  basedOn?: { resume: true; jobFit: string | null; interview: string | null }
+  /** 生成依据(如实展示):简历必有;岗位匹配/面试摘要可选;
+   *  selfAssessment 仅作可选上下文 hint,不参与签名门禁、配额、校验。 */
+  basedOn?: {
+    resume: true
+    jobFit: string | null
+    interview: string | null
+    selfAssessment?: string | null
+  }
   summary?: string
   currentSnapshot?: Array<{ point: string; evidence: string }>
   directions?: Array<{ title: string; why: string; firstStep: string }>

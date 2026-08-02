@@ -292,6 +292,7 @@
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
 - 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
+- 自我探索 · 倾向参考（PR ③）：`/resume/self-assessment/intro`、`/resume/self-assessment/questions`、`/resume/self-assessment/result`、`/resume/self-assessment/history`。
 
 ### 8.3 Compatibility redirects（不是重复屏）
 
