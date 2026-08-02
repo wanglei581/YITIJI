@@ -18,17 +18,45 @@ async function loadContractModule() {
 
 test('default contract module never registers BullMQ processor, controller, or real provider', async () => {
   const { ContractReviewModule } = await loadContractModule()
+  const [
+    { ContractReviewConsentService },
+    { ContractReviewController },
+    { ContractReviewHttpModule },
+    { ContractReviewLifecycleService },
+    { ContractReviewQueueService },
+    { ContractReviewService },
+    { ContractReviewTaskAccess },
+  ] = await Promise.all([
+    import('../contract-review-consent.service'),
+    import('../contract-review.controller'),
+    import('../contract-review-http.module'),
+    import('../contract-review-lifecycle.service'),
+    import('../contract-review.queue'),
+    import('../contract-review.service'),
+    import('../contract-review-task-access'),
+  ])
   const providers = metadata<unknown>(MODULE_METADATA.PROVIDERS, ContractReviewModule)
   const controllers = metadata<unknown>(MODULE_METADATA.CONTROLLERS, ContractReviewModule)
   const imports = metadata<unknown>(MODULE_METADATA.IMPORTS, ContractReviewModule)
 
   assert.equal(providers.includes(ContractReviewProcessor), false)
   assert.equal(providers.includes(ContractReviewProviderService), false)
-  assert.deepEqual(controllers, [])
+  assert.equal(providers.includes(ContractReviewLifecycleService), true)
+  assert.equal(providers.includes(ContractReviewConsentService), true)
+  assert.equal(providers.includes(ContractReviewTaskAccess), true)
+  assert.equal(controllers.includes(ContractReviewController), false)
+  assert.equal(controllers.length, 0)
+  assert.equal(imports.includes(ContractReviewHttpModule), false)
   assert.equal(imports.some((value) => {
     if (!value || typeof value !== 'object') return false
     return (value as { module?: { name?: string } }).module?.name === 'BullModule'
   }), false)
+
+  const exports = metadata<unknown>(MODULE_METADATA.EXPORTS, ContractReviewModule)
+  assert.equal(exports.includes(ContractReviewLifecycleService), true)
+  assert.equal(exports.includes(ContractReviewConsentService), true)
+  assert.equal(exports.includes(ContractReviewQueueService), true)
+  assert.equal(exports.includes(ContractReviewService), false)
 })
 
 test('blocked provider runtime never reads environment or performs a model request', async () => {

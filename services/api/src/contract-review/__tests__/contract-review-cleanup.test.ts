@@ -35,6 +35,43 @@ test('keeps an expired task after one file deletion fails and retries it next ru
   assert.equal(harness.taskRows.has(task.id), false)
 })
 
+test('purges one expired task by id and reports success only after its row is gone', async () => {
+  const task = expiredTask('task-direct', 'source-direct')
+  const harness = createHarness([task], [{ id: task.sourceFileId, deletedAt: null }])
+
+  const result = await harness.cleanup.purgeExpiredTaskById(task.id, NOW)
+
+  assert.equal(result.deleted, true)
+  assert.equal(result.deletedFiles, 1)
+  assert.equal(harness.taskRows.has(task.id), false)
+})
+
+test('direct purge leaves expired task immediately retryable after physical deletion fails', async () => {
+  const task = expiredTask('task-direct-retry', 'source-direct-retry')
+  const harness = createHarness([task], [{ id: task.sourceFileId, deletedAt: null }], {
+    async deleteFile() {
+      throw new Error('storage unavailable')
+    },
+  })
+
+  const result = await harness.cleanup.purgeExpiredTaskById(task.id, NOW)
+
+  assert.equal(result.deleted, false)
+  assert.equal(result.retryable, true)
+  assert.equal(harness.taskRows.get(task.id)?.status, 'expired')
+  assert.equal(harness.taskRows.get(task.id)?.expiresAt.getTime(), NOW.getTime() - 60 * 60 * 1000)
+})
+
+test('zero-row delete is successful only when a concurrent cleanup removed the row', async () => {
+  const task = expiredTask('task-delete-race', 'missing-source')
+  const harness = createHarness([task], [])
+  harness.beforeDeleteMany = () => harness.taskRows.delete(task.id)
+
+  const result = await harness.cleanup.purgeExpiredTaskById(task.id, NOW)
+
+  assert.equal(result.deleted, true)
+})
+
 test('defers physical deletion for a file shared by another unexpired contract task', async () => {
   const expired = expiredTask('task-expired', 'shared-source')
   const active = {
@@ -196,6 +233,7 @@ function createHarness(
   const logs: string[] = []
   const findManyArgs: Array<{ take: number }> = []
   const casWrites: Array<{ where: { status: string }; data: { status: string } }> = []
+  let beforeDeleteMany: (() => void) | undefined
 
   const prisma = {
     contractReviewTask: {
@@ -204,6 +242,9 @@ function createHarness(
         return [...taskRows.values()]
           .filter((row) => row.expiresAt.getTime() <= args.where.expiresAt.lte.getTime())
           .slice(0, args.take)
+      },
+      async findUnique(args: { where: { id: string } }) {
+        return taskRows.get(args.where.id) ?? null
       },
       async updateMany(args: {
         where: { id: string; status: string; expiresAt: { lte: Date } }
@@ -240,6 +281,8 @@ function createHarness(
         )
       },
       async deleteMany(args: { where: { id: string; status: string } }) {
+        beforeDeleteMany?.()
+        beforeDeleteMany = undefined
         const row = taskRows.get(args.where.id)
         if (!row || row.status !== args.where.status) return { count: 0 }
         taskRows.delete(row.id)
@@ -268,5 +311,8 @@ function createHarness(
       log: (value) => logs.push(value),
       warn: (value) => logs.push(value),
     }
-  return { cleanup, taskRows, fileRows, deleteCalls, logs, findManyArgs, casWrites }
+  return {
+    cleanup, taskRows, fileRows, deleteCalls, logs, findManyArgs, casWrites,
+    set beforeDeleteMany(value: (() => void) | undefined) { beforeDeleteMany = value },
+  }
 }

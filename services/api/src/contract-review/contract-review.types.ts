@@ -101,3 +101,54 @@ export interface ContractReviewCreatedTask {
   expiresAt: string
   accessToken?: string
 }
+
+export const CONTRACT_REVIEW_CLOCK = Symbol('CONTRACT_REVIEW_CLOCK')
+
+export interface ContractReviewClock {
+  now(): number
+}
+
+export interface ContractReviewConfirmInput {
+  contractType: ContractType
+  totalPages: number
+  analyzedPages: number
+  truncated: boolean
+  ocrCoverageConfirmed: true
+  personalUseConfirmed: true
+}
+
+export interface ContractReviewTaskOwnerRow {
+  endUserId: string | null
+  accessTokenHash: string | null
+}
+
+export interface ContractReviewTaskRow extends ContractReviewTaskOwnerRow {
+  id: string
+  contractType: string
+  status: string
+  analyzedPages: number
+  totalPages: number | null
+  truncated: boolean
+  ocrConfidence: string | null
+  expiresAt: Date
+  resultJson: string | null
+  extractionFingerprint: string | null
+  confirmedAt: Date | null
+}
+
+export interface ContractReviewTaskView {
+  id: string
+  status: ContractReviewStatus
+  contractType: ContractType
+  analyzedPages: number
+  totalPages: number | null
+  truncated: boolean
+  ocrConfidence: 'high' | 'medium' | 'low' | null
+  expiresAt: string
+  progress: {
+    stage: ContractReviewStatus
+    completedPages: number
+    totalPages: number | null
+  }
+  result: ContractReviewResult | null
+}

@@ -4,8 +4,10 @@ import { FilesModule } from '../files/files.module'
 import { MemberPrivacyModule } from '../member-privacy/member-privacy.module'
 import { PrismaModule } from '../prisma/prisma.module'
 import { ContractReviewExtractionService } from './contract-review-extraction.service'
+import { ContractReviewConsentService } from './contract-review-consent.service'
 import { ContractReviewFactMerger } from './contract-review-fact-merger'
 import { ContractReviewFindingMapper } from './contract-review-finding-mapper'
+import { ContractReviewLifecycleService } from './contract-review-lifecycle.service'
 import {
   CONTRACT_REVIEW_PROVIDER_RUNTIME,
   ContractReviewOrchestratorService,
@@ -16,6 +18,7 @@ import { ContractReviewQueueService } from './contract-review.queue'
 import { ContractReviewRuleEngine } from './contract-review-rule-engine'
 import { ContractReviewSafetyGate } from './contract-review-safety-gate.service'
 import { ContractReviewService } from './contract-review.service'
+import { ContractReviewTaskAccess } from './contract-review-task-access'
 import { ContractReviewCleanupTask } from './contract-review.cleanup.task'
 
 export const CONTRACT_REVIEW_BLOCKED_PROVIDER_RUNTIME: ContractReviewProviderRuntime = Object.freeze({
@@ -34,6 +37,9 @@ export const CONTRACT_REVIEW_BLOCKED_PROVIDER_RUNTIME: ContractReviewProviderRun
   imports: [PrismaModule, FilesModule, AiModule, MemberPrivacyModule],
   providers: [
     ContractReviewService,
+    ContractReviewConsentService,
+    ContractReviewTaskAccess,
+    ContractReviewLifecycleService,
     ContractReviewExtractionService,
     ContractReviewFactMerger,
     ContractReviewRuleEngine,
@@ -45,6 +51,6 @@ export const CONTRACT_REVIEW_BLOCKED_PROVIDER_RUNTIME: ContractReviewProviderRun
     { provide: CONTRACT_REVIEW_PROVIDER_RUNTIME, useValue: CONTRACT_REVIEW_BLOCKED_PROVIDER_RUNTIME },
     { provide: CONTRACT_REVIEW_ORCHESTRATOR, useExisting: ContractReviewOrchestratorService },
   ],
-  exports: [ContractReviewService, ContractReviewQueueService],
+  exports: [ContractReviewLifecycleService, ContractReviewConsentService, ContractReviewQueueService],
 })
 export class ContractReviewModule {}

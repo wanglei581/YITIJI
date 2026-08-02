@@ -67,6 +67,14 @@ export class ContractReviewSafetyGate {
   }
 }
 
+export function parsePersistedContractReviewResult(value: unknown): ContractReviewResult {
+  try {
+    return assertResultShape(value)
+  } catch {
+    throw new Error('CONTRACT_REVIEW_RESULT_INVALID')
+  }
+}
+
 function assertResultShape(value: unknown): ContractReviewResult {
   const result = exactRecord(value, RESULT_KEYS)
   const priorityCheckCount = safeCount(result.priorityCheckCount)
@@ -103,16 +111,30 @@ function assertFindingShape(value: unknown): ContractReviewFinding {
   boundedString(finding.uncertainty, 0, 500)
   if (finding.basisRef !== null) boundedString(finding.basisRef, 1, 120)
   enumValue(finding.source, SOURCES)
-  assertEvidenceShape(finding.evidence)
+  if (assertEvidenceShape(finding.evidence) === 'empty' && finding.priority !== 'insufficient_info') {
+    reject()
+  }
   return finding as unknown as ContractReviewFinding
 }
 
-function assertEvidenceShape(value: unknown): void {
+function assertEvidenceShape(value: unknown): 'empty' | 'present' {
   const evidence = exactRecord(value, EVIDENCE_KEYS)
   boundedString(evidence.excerpt, 0, 500)
   for (const key of ['pageNumber', 'charStart', 'charEnd'] as const) {
     if (evidence[key] !== null && !isSafeInteger(evidence[key], 0)) reject()
   }
+  const empty = evidence.pageNumber === null && evidence.excerpt === '' &&
+    evidence.charStart === null && evidence.charEnd === null
+  if (empty) return 'empty'
+  if (
+    !isSafeInteger(evidence.pageNumber, 1) ||
+    !isSafeInteger(evidence.charStart, 0) ||
+    !isSafeInteger(evidence.charEnd, 1) ||
+    evidence.excerpt.length === 0 ||
+    evidence.charEnd <= evidence.charStart ||
+    evidence.charEnd - evidence.charStart !== evidence.excerpt.length
+  ) reject()
+  return 'present'
 }
 
 function assertCanonicalPages(value: unknown): readonly ContractMaskPage[] {

@@ -8,6 +8,7 @@ import {
   CONTRACT_SAFETY_LOW_OCR_NOTICE,
   CONTRACT_SAFETY_TRUNCATED_NOTICE,
   ContractReviewSafetyGate,
+  parsePersistedContractReviewResult,
   type ContractReviewSafetyContext,
 } from '../contract-review-safety-gate.service'
 import type { ContractReviewFinding, ContractReviewResult } from '../contract-review.types'
@@ -88,6 +89,43 @@ function aiResult(overrides: Partial<ContractReviewFinding> = {}): ContractRevie
     findings: [finding({ priority: 'attention', source: 'ai', basisRef: null, ...overrides })],
   })
 }
+
+test('persisted result parser reuses the strict result shape without requiring source pages', () => {
+  const persisted = result()
+  assert.equal(parsePersistedContractReviewResult(persisted), persisted)
+  for (const invalid of [
+    { ...persisted, leakedProvider: 'private-model' },
+    { ...persisted, generatedByAi: false },
+    { ...persisted, findings: [{ ...persisted.findings[0], leaked: true }] },
+    { ...persisted, findings: [], priorityCheckCount: 1 },
+    {
+      ...persisted,
+      findings: [{
+        ...persisted.findings[0],
+        evidence: { pageNumber: null, excerpt: '试用期', charStart: null, charEnd: null },
+      }],
+    },
+    {
+      ...persisted,
+      findings: [{
+        ...persisted.findings[0],
+        evidence: { pageNumber: null, excerpt: '', charStart: null, charEnd: null },
+      }],
+    },
+    {
+      ...persisted,
+      findings: [{
+        ...persisted.findings[0],
+        evidence: { pageNumber: 1, excerpt: '试用期', charStart: 0, charEnd: 2 },
+      }],
+    },
+  ]) {
+    assert.throws(
+      () => parsePersistedContractReviewResult(invalid),
+      (error: unknown) => error instanceof Error && error.message === 'CONTRACT_REVIEW_RESULT_INVALID',
+    )
+  }
+})
 
 function context(overrides: Partial<ContractReviewSafetyContext> = {}): ContractReviewSafetyContext {
   return {

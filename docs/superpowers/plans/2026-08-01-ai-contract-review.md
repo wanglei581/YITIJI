@@ -1142,7 +1142,7 @@ Task 12 只接线 Task 11 的队列服务：create 持久化成功后必须 `enq
 
 DELETE 要求真正“立即删除”，因此 Task 11 cleanup 必须暴露一个按 taskId 精确处理的受控方法 `purgeExpiredTaskById(taskId)`：lifecycle 先完成归属校验，再把当前状态 CAS 为 `expired` 并同步写 `expiresAt=now`，随后调用该方法删除原件/派生件和 task 行；它与 cron 复用同一共享引用、幂等删除和脱敏日志语义，不复制第二套删除实现。只有 task 行确认已删除（或被并发 cleanup 删除）才返回 `{ id, deleted: true }`；任一待删物理对象失败时必须保留 `expired + expiresAt<=now` 的 task 行并抛固定 503 `CONTRACT_REVIEW_DELETE_RETRY`，让下一轮 DELETE 或 cron 可立即重试，禁止返回假成功。
 
-- [ ] **Step 1: 写 HTTP 归属和错误同形失败验证**
+- [x] **Step 1: 写 HTTP 归属和错误同形失败验证**
 
 ```typescript
 assert.equal((await request('GET', `/contract-reviews/${otherId}`, memberA)).status, 404)
@@ -1162,13 +1162,13 @@ assert.equal((await request('POST', `/contract-reviews/${id}/report`)).status, 5
 
 并发 RED 不得省略：两个同归属 confirm 并发时只允许一次 CAS 写入 `confirmedAt`，CAS 失败方重读到 `rule_checking + confirmedAt` 后只补发同一个确定性 analyze jobId；jobId 继续严格复用 Task 11 已冻结的 `${jobName}.${taskId}`（即 `contract-review.analyze.${taskId}`），禁止时间戳、ULID 或请求级随机量。create 入队出现“队列可能已接收但客户端抛错”的模糊失败时，无论 worker 已推进到何状态，都不得泄露匿名 token或盲写覆盖 worker 终态。重复 queue add 可发生，但 adapter 必须依赖相同 jobId 去重。
 
-- [ ] **Step 2: 运行并确认路由 404**
+- [x] **Step 2: 运行并确认路由 404**
 
 Run: `pnpm --filter @ai-job-print/api exec node -r @swc-node/register scripts/verify-contract-review-http.ts`
 
 Expected: FAIL，合同审查路由不存在。
 
-- [ ] **Step 3: 实现五个端点与限流**
+- [x] **Step 3: 实现五个端点与限流**
 
 ```typescript
 function headerOf(req: RequestLike, name: string): string | null {
@@ -1268,7 +1268,7 @@ create 入队失败的多状态 CAS 只执行一次；影响行数为 0 时不�
 
 DELETE 置为 `expired + expiresAt<=now` 后，即使客户端不再重试，也必须被 Task 11 已有周期 cleanup 的 `expiresAt<=now` 扫描选中并复用同一 purge 核心；新增回归测试要证明 HTTP 首次物理删除失败后，下一轮 `runOnce()` 能清掉该行，禁止仅依赖客户端第二次 DELETE。
 
-- [ ] **Step 4: 运行 HTTP、越权和回归验证**
+- [x] **Step 4: 运行 HTTP、越权和回归验证**
 
 Run:
 
@@ -1304,7 +1304,7 @@ git diff --check
 
 Expected: PASS；纳入统计的新增 lifecycle/access/view/consent/controller 代码整体行/函数/分支覆盖率均不低于 80%；不存在与越权响应同为 404；真实 ValidationPipe/Filter/Throttler 契约通过；默认 AppModule 仍 404，只有 verifier 显式装配的 `ContractReviewHttpModule` 通过路由；Gate 0 仍显示 `blocked`。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add services/api/src/contract-review services/api/scripts/verify-contract-review-http.ts services/api/package.json docs/superpowers/plans/2026-08-01-ai-contract-review.md

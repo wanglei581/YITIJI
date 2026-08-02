@@ -23,6 +23,13 @@ export type ContractReviewCleanupResult = {
   failedTasks: number
 }
 
+export type ContractReviewPurgeResult = {
+  deleted: boolean
+  retryable: boolean
+  deletedFiles: number
+  sharedFiles: number
+}
+
 @Injectable()
 export class ContractReviewCleanupTask {
   private readonly logger = new Logger(ContractReviewCleanupTask.name)
@@ -63,25 +70,76 @@ export class ContractReviewCleanupTask {
     }
 
     for (const task of tasks) {
-      if (!(await this.ensureExpired(task, now))) continue
-      const cleanup = await this.cleanupFiles(task, now)
-      result.deletedFiles += cleanup.deletedFiles
-      result.sharedFiles += cleanup.sharedFiles
-      if (!cleanup.complete) {
+      const purged = await this.purgeExpiredTaskById(task.id, now)
+      result.deletedFiles += purged.deletedFiles
+      result.sharedFiles += purged.sharedFiles
+      if (!purged.deleted) {
         result.failedTasks += 1
         continue
       }
-
-      const deleted = await this.prisma.contractReviewTask.deleteMany({
-        where: { id: task.id, status: 'expired', expiresAt: { lte: now } },
-      })
-      result.deletedTasks += deleted.count
+      result.deletedTasks += 1
     }
 
     this.logger.log(
       `code=CONTRACT_REVIEW_CLEANUP_COMPLETE scanned=${result.scanned} tasks=${result.deletedTasks} files=${result.deletedFiles} shared=${result.sharedFiles} failed=${result.failedTasks}`
     )
     return result
+  }
+
+  async purgeExpiredTaskById(
+    taskId: string,
+    now = new Date(),
+  ): Promise<ContractReviewPurgeResult> {
+    const task = await this.prisma.contractReviewTask.findUnique({
+      where: { id: taskId },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+        sourceFileId: true,
+        resultFileId: true,
+      },
+    })
+    if (!task) return emptyPurge(true)
+    if (task.expiresAt.getTime() > now.getTime()) return emptyPurge(false)
+    if (!(await this.ensureExpired(task, now))) {
+      const remaining = await this.prisma.contractReviewTask.findUnique({
+        where: { id: taskId },
+        select: { id: true },
+      })
+      return emptyPurge(!remaining)
+    }
+
+    const files = await this.cleanupFiles(task, now)
+    if (!files.complete) {
+      return {
+        deleted: false,
+        retryable: true,
+        deletedFiles: files.deletedFiles,
+        sharedFiles: files.sharedFiles,
+      }
+    }
+    const deleted = await this.prisma.contractReviewTask.deleteMany({
+      where: { id: task.id, status: 'expired', expiresAt: { lte: now } },
+    })
+    if (deleted.count === 1) {
+      return {
+        deleted: true,
+        retryable: false,
+        deletedFiles: files.deletedFiles,
+        sharedFiles: files.sharedFiles,
+      }
+    }
+    const remaining = await this.prisma.contractReviewTask.findUnique({
+      where: { id: taskId },
+      select: { id: true },
+    })
+    return {
+      deleted: !remaining,
+      retryable: Boolean(remaining),
+      deletedFiles: files.deletedFiles,
+      sharedFiles: files.sharedFiles,
+    }
   }
 
   private async ensureExpired(task: CleanupTaskRow, now: Date): Promise<boolean> {
@@ -163,4 +221,13 @@ function isFileId(value: string | null): value is string {
 
 function digestIdentifier(value: string): string {
   return createHash('sha256').update(value).digest('hex').slice(0, 12)
+}
+
+function emptyPurge(deleted: boolean): ContractReviewPurgeResult {
+  return {
+    deleted,
+    retryable: !deleted,
+    deletedFiles: 0,
+    sharedFiles: 0,
+  }
 }
