@@ -41,7 +41,14 @@ export class CareerPlanPdfService {
   private readonly logger = new Logger(CareerPlanPdfService.name)
 
   async render(
-    meta: { date: string; basedOn: { jobFit: string | null; interview: string | null } },
+    meta: {
+      date: string
+      basedOn: {
+        jobFit: string | null
+        interview: string | null
+        selfAssessment?: string | null
+      }
+    },
     plan: CareerPlanPayload,
   ): Promise<{ buffer: Buffer; pageCount: number }> {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 56, bottom: 56, left: 56, right: 56 } })
@@ -71,6 +78,7 @@ export class CareerPlanPdfService {
     const basis = ['本人简历']
     if (meta.basedOn.jobFit) basis.push(`岗位匹配参考（${meta.basedOn.jobFit}）`)
     if (meta.basedOn.interview) basis.push(`模拟面试表现（${meta.basedOn.interview}）`)
+    if (meta.basedOn.selfAssessment) basis.push('自我探索倾向参考')
     doc.fontSize(10).fillColor('#6b7280').text(`生成时间：${meta.date} ｜ 依据材料：${basis.join('、')}`)
     doc.moveDown(0.2)
     doc.fontSize(9).fillColor('#9ca3af').text('本建议单仅供本人职业发展参考，不构成任何就业、薪资或录用承诺；行动请基于本人真实经历，不要虚构。')

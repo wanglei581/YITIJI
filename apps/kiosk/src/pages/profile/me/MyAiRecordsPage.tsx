@@ -24,6 +24,7 @@ const KIND_META: Record<MemberAiRecordKind, { label: string; hint: string; icon:
   job_fit: { label: '岗位匹配参考', hint: '仅供求职准备参考', icon: 'briefcase', tone: 'slate' },
   career_plan: { label: '职业规划建议', hint: '阶段性行动建议记录', icon: 'route', tone: 'wheat' },
   fair_visit_plan: { label: '招聘会准备单', hint: '基于招聘会公开信息生成', icon: 'fair', tone: 'wheat' },
+  self_assessment: { label: '自我探索 / 个人倾向参考（仅本人可见）', hint: '基于本人作答的 5 维度倾向参考', icon: 'resume', tone: 'slate' },
 }
 
 const UNKNOWN_KIND_META = {
