@@ -5,23 +5,14 @@
 
 **附 2**：stacked 分支盘点结论（按 CLAUDE.md §8.1「清理须证明祖先关系后删除中间分支名；必须保留仍承载独有能力的基础锚点」）——
 
-**最终状态**：[PR #486](https://github.com/wanglei581/YITIJI/pull/486) 已 squash 合入 `main`（squash commit `03c30bdcd`），所有 stacked PR + 7 项 Critical fix 都在 main。
-
-| 分支 | ahead of main | 唯一独有内容（main 没有） | 处置 |
+| 分支 | ahead of main | 唯一独有内容（main 没有） | 处理建议 |
 |---|---|---|---|
-| `feature/staged-pr1-self-assessment-shared` | 3 | **0**（`git diff merge-base..tip vs merge-base..main` 显示 branch-touched 9 文件全部被 main 218 修改覆盖） | ✅ 已删（远程 + 本地） |
-| `feature/staged-pr2-self-assessment-server` | 5 | **0**（`tokenMatches` export + `SelfAssessmentDimensionResult[]` 都在 PR #475 squash `5ca7ce0a2c` 中；tip `3a593472` 是后续小修） | ✅ 已删（远程 + 本地） |
-| `feature/staged-pr3-self-assessment-frontend` | 3 | **0**（前端三页 + Playwright + Admin 在 [PR #476](https://github.com/wanglei581/YITIJI/pull/476) `5a2c086cdc` squash；audit.types.ts 差 1 文件是因为 #486 squash 修了 §1.1 重定义，不是 pr3 独有的能力） | ✅ 已删（远程 + 本地） |
-| `fix/self-assessment-staged-cleanup`（#484 已关） | 2 | **0**（实质 fix 已 cherry-pick 进 `cleanup-r3`，tip `db866391` 仅文档） | ✅ 已删（远程 + 本地） |
-| `fix/self-assessment-staged-cleanup-r3` | 0 | 已 squash 合入 main（`03c30bdcd`），分支与 main 同步；本地 + 远程均保留作为最简回滚锚点 | 保留（基础锚点，等下一个演进需求出现再合并） |
+| `feature/staged-pr1-self-assessment-shared` | 3 | 无（`e2cb653` baseline + `6431d533` scoring + `1b23922f` test 全部对应 [PR #473](https://github.com/wanglei581/YITIJI/pull/473) squash content `348aeface`） | 可删 |
+| `feature/staged-pr2-self-assessment-server` | 5 | 无（`tokenMatches` export 与 `SelfAssessmentDimensionResult[]` 在 main `5ca7ce0a2c` = PR #475 squash content 已落地；`3a593472` tip 是后续小修） | 可删 |
+| `feature/staged-pr3-self-assessment-frontend` | 3 | 无（前端三页 + Playwright + Admin 在 [PR #476](https://github.com/wanglei581/YITIJI/pull/476) `5a2c086cdc` squash；`0a2d9672` tip 是 `Merge origin/main` + re-trigger） | 可删 |
+| `fix/self-assessment-staged-cleanup`（已关 #484） | 2 | 无（实质 fix 已 cherry-pick 进 `cleanup-r3`，tip `db866391` 仅文档） | 可删 |
+| `fix/self-assessment-staged-cleanup-r3` | 4 | 含 [PR #486](https://github.com/wanglei581/YITIJI/pull/486) 当前未合内容（7 项 Critical fix + 兜底脚本 + 文档） | 保留等 #486 合 main |
 | `feature/self-assessment-20260801` | — | 设计分支独立，不在堆叠链 | 保留（基础锚点） |
-
-**执行依据**（CLAUDE.md §8.1）：
-- ✅ 「证明祖先关系」— 三个 stacked PR + #486 的 squash commit `03c30bdcd` 是 main 的祖先；本地/远程 stacked 分支与 main 文件 diff 通过 `git diff merge-base..branch vs merge-base..main` 全集合覆盖，证明「实质内容已被 main 覆盖」。
-- ✅ 「保留仍承载独有能力的基础锚点或顶层候选分支」— `cleanup-r3` 保留作后续演进锚点；`feature/self-assessment-20260801` 保留作设计分支独立锚点。
-- ✅ 「旧 worktree / 旧分支删除前先做只读盘点」— 本次操作前先写盘点表（#486 评论 + `docs/progress/current-progress.md` 表），再通过用户授权执行；删本地分支时验证 r3 仍包含 `30018b79` 的实质内容（`git merge-base --is-ancestor` 通过）。
-- ✅ 「远程分支清理必须区分真实远程 head 与本地 stale remote-tracking ref」— 用 `git push origin --delete` 操作真实远程，远程 `git fetch` 已确认。
-- ✅ 「堆叠分支清理只能在证明祖先关系后删除中间分支名」— 三个 stacked feature 分支已证明实质内容被 squash 进 main，中间分支名可删；`cleanup-r3` 是顶层候选分支，不在中间名清理范围。
 
 2026-08-02 完成 **F1 D2′ PID identity pinning + TOCTOU sandwich fix（[PR #483](https://github.com/wanglei581/YITIJI/pull/483) 已squash 合入 `main@3d6db8e1`，未演练、未部署）**：两轮 TDD RED→GREEN。第一轮（`492b9598`）：`MANAGED_PID` step 后立即固定 `processStartTimeTicks(managedAppPid)`，在 `CGROUP_CONSISTENCY` 读 cgroup 前重验 ticks，不一致则 `fail('MANAGED_APP_PID_STALE')` fail-closed。第二轮（`1f36f4d7`，修复 Codex review 两项 Critical Issues）：① TOCTOU 残余窗口——单 guard 仍在 guard 与 read 之间留微秒竞争；改为 sandwich 模式：pre-guard → `const managedAppCgroupActual = controlGroup(pid)` → post-guard → `assert.equal(managedAppCgroupActual, …)`；② Wiring test 覆盖缺口——旧 anchor 只验 guard 行，删除 `assert.equal` 不触发 contract 失败；新增 sandwich 顺序检查（prePos→readPos→postPos→assertPos）+两个 mutation tests 覆盖 guard-delete 和 assertion-delete。全套门禁：`verify-contract.mjs` 11/11 `D2_PRIME_CONTRACT_ALL_PASS`，ESLint 0 warnings，TypeScript 0 errors。GitHub Actions quota 耗尽（06:00Z 后无新 run），本地验证全通后 force-push + 待用户确认 squash-merge；不等于 D2′ PASS，`productionF1` 继续 **NO-GO**。
 
