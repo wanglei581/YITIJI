@@ -89,7 +89,7 @@ export class OfflineAgenciesService {
       ]
     }
 
-    const [rows, total] = await Promise.all([
+    const [rows, total, districtRows] = await Promise.all([
       this.prisma.offlineAgency.findMany({
         where: where as never,
         skip,
@@ -103,21 +103,35 @@ export class OfflineAgenciesService {
         },
       }),
       this.prisma.offlineAgency.count({ where: where as never }),
+      this.prisma.offlineAgency.findMany({
+        where: {
+          reviewStatus: 'approved',
+          publishStatus: 'published',
+          status: 'active',
+          district: { not: null },
+        } as never,
+        select: { district: true },
+        distinct: ['district'],
+      }),
     ])
 
     let items = rows.map((row: (typeof rows)[number]) => {
       const services = parseServices(row.services)
+      const isOpen = row.status === 'active'
       return {
         id: row.id,
         name: row.name,
         type: row.orgType || 'recruitment',
+        status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
+        statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
         address: row.address,
         district: row.district || '',
-        hours: row.openHours || '以机构公示为准',
+        hours: row.openHours || '以门店公告为准',
         services,
         orgCode: row.externalId || row.sourceOrgId || row.id,
         phone: row.phone ?? null,
         website: row.website ?? null,
+        jobCount: row._count.jobs,
         syncTime: (row.syncTime ?? row.updatedAt).toISOString(),
       }
     })
@@ -131,6 +145,13 @@ export class OfflineAgenciesService {
       total: service ? items.length : total,
       page,
       pageSize,
+      stats: {
+        totalAgencies: service ? items.length : total,
+        openAgencies: items.filter((it: (typeof items)[number]) => it.status === 'open').length,
+        totalJobs: items.reduce((sum: number, it: (typeof items)[number]) => sum + it.jobCount, 0),
+        districts: districtRows.length,
+        lastSyncLabel: items[0]?.syncTime ? '已同步' : '暂无同步',
+      },
     }
 
     // Kiosk get() 会取 body.data
