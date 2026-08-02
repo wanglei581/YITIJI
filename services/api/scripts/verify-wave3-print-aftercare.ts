@@ -33,8 +33,9 @@ async function initFallbackDb() {
   const client = createClient({ url: process.env['DATABASE_URL']! })
   try {
     await client.batch([
-      `CREATE TABLE IF NOT EXISTS "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+      `CREATE TABLE IF NOT EXISTS "EndUser" ("id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT, "wxOpenId" TEXT, "enabled" BOOLEAN NOT NULL DEFAULT true, "lastLoginAt" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE IF NOT EXISTS "AuditLog" ("id" TEXT NOT NULL PRIMARY KEY, "actorId" TEXT, "actorRole" TEXT NOT NULL, "action" TEXT NOT NULL, "targetType" TEXT NOT NULL, "targetId" TEXT, "payloadJson" TEXT NOT NULL DEFAULT '{}', "ipAddress" TEXT, "userAgent" TEXT, "requestId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE TABLE IF NOT EXISTS "BenefitGrant" ("id" TEXT NOT NULL PRIMARY KEY, "endUserId" TEXT NOT NULL, "benefitType" TEXT NOT NULL, "title" TEXT NOT NULL, "description" TEXT, "quantityTotal" INTEGER, "quantityRemaining" INTEGER, "status" TEXT NOT NULL DEFAULT 'active', "sourceType" TEXT NOT NULL DEFAULT 'platform', "sourceRef" TEXT, "validFrom" DATETIME, "validUntil" DATETIME, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
       `CREATE INDEX IF NOT EXISTS "BenefitGrant_endUserId_idx" ON "BenefitGrant"("endUserId")`,

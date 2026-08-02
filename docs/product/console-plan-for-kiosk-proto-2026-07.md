@@ -163,5 +163,169 @@
 
 - G1:终端与机构门店「直线距离」的计算来源(终端定位配置是否已有字段)。
 - G3:ad-assets 是否已有独立审核状态字段(本次盘点未见「审核」相关 UI)。
-- G7:job_fit / 模拟面试 / 职业规划当前模型凭证的实际配置来源(环境变量或共享管线)。
+- ~~G7:job_fit / 模拟面试 / 职业规划当前模型凭证的实际配置来源(环境变量或共享管线)。~~ **已核实(2026-07-31,见 §六)**:job_fit / 职业规划 / 招聘会拜访计划 / 岗位推荐 / 岗位解释 五项全部借用 `resume_optimize` 功能位;模拟面试有自己的 `mock_interview` 键。
 - G8:会话超时时长是否有运营侧可配诉求。
+
+---
+
+## 六、2026-07-31 修订:双后台重排与商业化收口(基于真实代码复核 + Codex 交叉审查)
+
+> 本节不替代 §三缺口清单,是把视角从「补缺口」升级为「重排 + 治理 + 商业化分轨」。
+> 复核基线 worktree:`amazing-vaughan-f5cd33`。所有结论附文件行号,可复验。
+> 上级执行框架仍以 [commercial-closure-and-console-redesign-plan-2026-07.md](./commercial-closure-and-console-redesign-plan-2026-07.md) 为准,本节不另起标准。
+
+### 6.1 诊断
+
+Kiosk 已按 6 个 AI 服务组组织(`apps/kiosk/src/pages/home/serviceGroups.ts`:简历 / 岗位 / 招聘会 / 打印扫描 / 面试 / 政策),Admin 侧栏仍是 **32 项平铺 / 5 组**(`apps/admin/src/layouts/AdminLayoutWrapper.tsx`,按「设备和表」组织)。Partner 侧栏 **12 项对 5 种机构类型完全一样**(`apps/partner/src/layouts/PartnerLayoutWrapper.tsx`)。
+
+前后台逐项核对后,**真正缺失的运营页只有一个:面试训练运营**。`services/api/src/mock-interview/mock-interview.controller.ts` 有 12 条路由(含语音转写 / 报告 / 打印),`grep -rin "interview" apps/admin/src/` 无任何业务页面命中。其余全是「重新归组 + 补数据」,不是新建功能。**本轮结论因此是重排与治理,不是扩张。**
+
+### 6.2 共用功能键:6 项能力挂在一个开关上(P0 隐蔽风险)
+
+读 `getApiKey('resume_optimize')` 的全部位置(共 6 处,无第 7 处;**不写行号**,因为加注释本身就会让行号漂移。权威清单用检索命令复核):
+
+```bash
+grep -rn --include='*.ts' -E "get(ApiKey|Config)\('resume_optimize'\)" services/api/src
+```
+
+| 用户可见能力 | 位置 |
+|---|---|
+| AI 简历优化 | `llm-resume-optimize.service.ts`(两处,本键的名义归属) |
+| 岗位大师 / 岗位匹配 | `llm-job-fit.service.ts` |
+| 职业规划 | `llm-career-plan.service.ts`(`callLlm`) |
+| 招聘会拜访计划 | `llm-fair-visit-plan.service.ts`(`callLlm`) |
+| 岗位推荐(`jobRecommend`) | `job-ai-llm.service.ts`(`callLlm`) |
+| 岗位解释(`jobExplain`) | `job-ai-llm.service.ts`(同一 `callLlm`) |
+
+在 Admin「AI大模型」关掉「AI简历优化」或改错凭证,**上述 6 项同时失效**。运行端不会说明这层依赖(各能力只表现为「未配置 / 不可用」)。已在代码就地加警示注释,并把共用清单写进 `AI_MODEL_FEATURES` 的 `runtimeNote`——该字段渲染在 `apps/admin/src/routes/ai-config/index.tsx:207,210`,**因此 Admin 配置页现在有提示**,运营动开关时能直接看到。
+
+治理方向:为后 5 项各建独立 feature key,**默认继承 `resume_optimize` 配置**(行为不变、可回滚),使开关与成本归属按能力隔离。
+
+### 6.3 AI 成本可见性缺口(修正原判断)
+
+`AiServiceLog` 的 `operation` 取值(后端 `AiOperation` 联合类型,9 个):`parseResume` / `optimizeResume` / `adjustResumeLayout` / `generateResume` / `chatAssistant` / `classifyIntent` / `jobRecommend` / `jobExplain` / `jobMatch`。
+
+⚠️ 不要把这一组和 `JobAiSession.operation` 混为一谈——后者是另一张表的取值(`match` / `recommend` / `explain`,见 `job-ai/job-ai.service.ts`、`governed-job-fit.service.ts`),二者不同源。**已发现一处真实类型漂移**:前端 `apps/admin/src/services/api/types.ts:316` 的 `AiOperation` 只有 8 个值,漏了后端已有的 `adjustResumeLayout`,而 `costByOperation` 是 `Record<AiOperation, number>`——即「简历排版调整」的成本在 Admin 侧类型上无处归属。A-6 统一枚举时一并修。
+
+**未写日志的能力**(`grep -c "aiLog|AiLogService"` 全为 0):
+
+- 职业规划 `llm-career-plan.service.ts`
+- 招聘会拜访计划 `llm-fair-visit-plan.service.ts`
+- 模拟面试全链路 `mock-interview/*.service.ts`(含按时长计费的语音转写)
+
+即这几项 AI 成本**完全不可见**,不是归类不准。
+
+另两处已确认的口径与覆盖问题:
+
+- **「今日」标签错**:`ai-log.service.ts:100` 是 `AI_USAGE_WINDOW_MS = 24 * 60 * 60 * 1000`(滚动 24 小时),但 `apps/admin/src/routes/ai-services/index.tsx` 写「今日概览」(标题 :224、`aria-label` :223)与「今日累计」(:229)——共 3 处文案需一起改。
+- **限流覆盖不全**:`ai.controller.ts` 11 条路由仅 4 条有 `@Throttle`;`mock-interview.controller.ts` 12 条仅 7 条。且限流值并不统一(全仓 `limit:` 分布 5/6/10/12/20/30/60)。限流是**防滥用**,不是商业额度。
+
+### 6.4 商业化闸门缺失
+
+`ai.controller.ts:170-200` + `ai.service.ts:320-380` 的实际时序是:
+
+```
+查缓存(loadAuthorizedResult 'optimize')→ 命中即直接返回
+  ↓ 未命中
+parse 行门禁 → 取简历原文 → 调 LLM(成本在此发生)→ 仅 completed 才落库
+  ↓ 回到 controller
+客户端若显式传了可选 @Query benefitGrantId 且 status === 'completed' → 事后核销权益
+```
+
+三点结论:
+
+1. **不存在服务端强制的事前额度闸门**——权益核销是事后、可选、由客户端参数触发。
+2. **缓存命中也满足 `completed`**,同样会走核销分支;真正防止重复扣费的是幂等键 `hash(grant:resume_optimize:taskId)`,不是时序。
+3. 因此后续做真实计费时,「缓存命中不重复扣费」必须显式设计,不能依赖当前偶然正确的幂等键。
+
+`price-config.seed.ts` 只有 `print_bw_page` / `print_color_page` 两个键,**无任何 AI 价目键**(注:`serviceKey` 是开放字符串,种子只有 2 条不等于生产库只有 2 条,上线前需核实际配置)。
+
+`PriceConfig.effectiveFrom` 是**无调度语义**的字段。准确表述:它由 `@default(now())` 自动填(两套 schema 均如此),`docs/operations/price-config-production.md:57` 的人工 SQL 也显式写 `NOW()`,Admin DTO(`admin-billing.service.ts:25,46,100`)与 mock 都带该字段——**并非「只由 seed 写入」**;真正缺的是读取方:`PricingService` 只按 `active` 报价,完全不读它。该状态**已被 verify 守卫锁定**(`verify-print-rollout-config.ts:186-195` 断言 `PricingService` 不得读 `effectiveFrom`),所以这不是失控项,而是已登记的「保留字段 + 禁用调度语义」。**不宜物理删除**:要动两套 Prisma schema + migration + DTO + 测试;且 `serviceKey @unique` 本身就存不了价格历史版本,真要做定时生效需先解开唯一约束。当前处置=Admin UI 标注「尚未启用」+ 保留字段与既有守卫。
+
+**关键结论:`AiServiceLog` 不能当计费账本。** 它是 best-effort 写入(`ai-log.service.ts:152` 只 `.catch()` 打 warn 不阻断),且 `estimatedCostCny` 是估算值。适合运维观测,不适合做不可丢失的收入 / 履约 / 退款依据。
+
+### 6.5 Partner 机构类型:两套概念必须分开建模
+
+`Organization.type` 才是真实字段(`partnerType` 只是共享类型标识符),运行时有 14 处使用。存在两套并行概念:
+
+| | 管什么 | 定义处 |
+|---|---|---|
+| `ORG_TYPE_MATRIX` | 该机构的**终端**开放哪些 Kiosk 能力(`sceneTemplate` + `allowedModules`,写入强校验) | `services/api/src/orgs/admin-orgs.service.ts:88-140` |
+| 权限矩阵 | 该机构在 **Partner 后台**能管什么 | `docs/product/partner-permission-matrix.md` |
+
+两者**不可互换**。实证:`licensed_hr_agency` 的 `allowedModules` 含 `job_fair`(终端可展示招聘会),但权限矩阵 §三「招聘会信息管理」整行对 `hr_agency` **全部 ❌**(后台不可管招聘会)。二者同时成立。
+
+因此 Partner 侧栏**不能直接复用 `ORG_TYPE_MATRIX`**(它还是 service 内部常量,前端拿不到)。正确顺序:先建服务端权威的 Partner capability 投影 → API 与路由双重校验 → 侧栏只作为该投影的展示结果。**隐藏导航不等于权限控制。**
+
+另需先定唯一事实源再动:`fair_organizer` 的企业资料应限定为招聘会关联企业;`enterprise_source` 只管本企业来源信息,不得演变为企业招聘后台;「校园招聘」目前无独立 Partner 页面,新增入口须先过入口冻结规则;`fair_organizer` / `enterprise_source` 的 `allowedModules` 当前是**空数组**,上线前需确认是有意(纯数据供给方)还是漏配。
+
+### 6.6 可合并 / 可精简清单
+
+**合并(仅合 IA,不合后端服务与状态机)**
+
+| # | 现状 | 合并为 | 依据 |
+|---|---|---|---|
+| M1 | `/member-privacy`(213 行) + `/privacy-requests`(457 行) | 保留 `/privacy-requests` | 同一端点 `GET /admin/member-privacy/data-requests`,同样的重试 / 驳回动作,8 状态 × 3 类型映射表两份 |
+| M2 | `job-sources` + `fair-sources` + `policy-sources` | 内容审核中心(3 个 type Tab) | 共用 `pending→reviewing→approved/rejected`。**只统一入口 / 状态词汇 / SLA 展示**;三者校验、发布规则、审计语义不同,不抽通用后端状态机 |
+| M3 | `import-batches` + `sync-sources` | 数据接入 = **数据源 / 文件导入 / 同步记录** 三类 | `AccessMode` 有 6 个值(`api`/`excel`/`csv`/`json`/`webhook`/`manual`),不能只做 Excel + API 两 Tab |
+| M4 | `orders` + `billing` | 订单与计费(订单 / 价目 / 对账 / 退款 Tab) | 同一财务域。**订单操作与财务对账权限不同,不合并服务与权限** |
+| M5 | `benefit-activities` + `member-benefits` | 权益运营(活动 / 发放 Tab) | 模型是一条链 `BenefitActivity→BenefitClaim→BenefitGrant`。活动领取与人工发放语义不同,不合并状态 |
+| M6 | `member-feedback` + `member-notifications` | 会员沟通(反馈 / 通知 Tab) | 反馈处理与通知发送不是同一工作流,只合入口 |
+
+**精简**
+
+- Admin `/permissions`(15 行 stub):**从侧栏摘掉,页面保留**。真实 RBAC 落地前不占「系统管理」头部位。
+- Partner `/stats`、`/terminals`(各 15 行 stub):从侧栏摘掉。**不并入工作台**——工作台现有真实数据,没有真实聚合指标前不加空面板。12 项里 3 项死路(25%)对付费机构是直接可信度损失。
+- Partner `/account`:接真(只读子账号列表 + 变更走平台联系入口)。
+- Admin `/peripherals`:**保留不动**,它是 `devices/index.tsx:63` 的 Tab,侧栏本无此项。
+
+净变化:**32 → 25 项**(合并省 7、摘 1 权限、加 1 面试运营)。
+
+### 6.7 建议 Admin IA(6 域 25 项)
+
+```
+运营总览   工作台
+服务运营   AI服务管理 / AI大模型 / 面试训练运营(新) / 打印扫描运维 / 招聘会运营 / 求职材料库
+内容与来源 内容审核中心(M2) / 数据接入(M3) / 企业展示管理
+会员与交易 用户管理 / 订单与计费(M4) / 权益运营(M5) / 会员沟通(M6)
+终端运营   设备管理(含外设 Tab) / 告警中心 / 宣传屏 / 百宝箱 / 智慧校园
+机构与治理 合作机构 / 线下机构 / 文件治理 / 数据权利工单(M1) / 法务文档版本 / 日志审计
+```
+
+改动落点:`AdminLayoutWrapper.tsx` 的 `NAV_ITEMS` / `PATH_TO_KEY` / `KEY_TO_PATH`。注意 `KEY_TO_PATH` 是 first-write-wins,调整顺序会改 active 高亮。**所有路由变更必须保留旧 URL 重定向**,避免书签 / 测试 / 文档链接失效。
+
+### 6.8 分轨执行(修订原一次性排序)
+
+原「W-1..W-6 一次收口」不可行:同时触碰 IA、数据库、AI 履约、计费、权限、隐私统计和结算,已不属于上线前收口,且最大风险是产出**半套 RBAC + 半套计费 + 不可审计扣费**——比不做更糟。改为:
+
+| 轨道 | 内容 | 定位 |
+|---|---|---|
+| **A 后台 IA 减法** | A-1 M1 去重(留旧 URL 重定向);A-2 摘 stub 导航;A-3 六域重组(M2–M6,只动 `NAV_ITEMS` + 路由 + Tab 容器);A-4 `effectiveFrom` 标「尚未启用」不删字段 | 可逆、零新功能,属上线前收口 |
+| **A+ AI 治理** | A-5 拆 5 个独立 feature key(默认继承);A-6 补职业规划 / 招聘会计划 / 模拟面试 / 语音转写日志 + 统一 `operation` 枚举;A-7 修「今日」口径 + 补 `@Throttle` 覆盖 + 超时 / 熔断 / 日预算;A-8 面试训练运营页(须在 A-6 有数据后) | 属收口。**成本看不见就无法定价**,是任何商业化的前置 |
+| **B 商业化** | SKU 与价目版本(先解 `serviceKey @unique`)、原子履约账本(`reserve → LLM → commit`,失败 `release`,请求幂等 / 缓存命中不重复扣费 / 超时退款 / 匿名转会员归属)、合同生命周期、机构结算、完整 RBAC | **上线后独立立项**。不得在现有 AI GET 接口前直接挂扣费——那些接口兼具读取 / 生成 / 缓存 / 扣权益副作用 |
+| **C Partner 自助** | 服务端 capability 投影 + API 路由双重校验 → 再按能力下发侧栏;Partner 聚合曝光统计(需动 schema) | 服务端授权必须先于动态侧栏 |
+
+**顺序(2026-07-31 二次修订 —— 原写法有验收失效错误)**
+
+原写的「P0 最终验收 → A → A+ → 上线」**是错的**:A / A+ 会改路由、导航、feature key、日志、限流与预算,若发生在最终验收之后,P0 证据就不再对应实际上线候选(候选已变,证据失效),违反本项目「冻结单一软件候选后再验收」的门禁口径。
+
+只能二选一:
+
+| 方案 | 顺序 | 适用 |
+|---|---|---|
+| **① 保持当前上线冻结(推荐)** | 完成剩余 P0(含 F1 D2′ / D3–D6、法务正文、PG/COS/真实服务、Windows 真机、试运营)→ **上线** → A → A+ → B、C | 后台 IA 与 AI 治理都不是上线阻塞项,不值得为它们推迟发布或作废已通过的 P0 证据 |
+| **② A/A+ 随首发** | P0 前置检查 → A → A+ → **重新执行完整 P0 最终验收** → 上线 → B、C | 仅当业务上必须首发就交付新后台 IA 时才选;代价是完整重跑一次最终验收 |
+
+依赖关系(两方案都成立):A-6 必须先于 A-8(无日志则运营页无数据);C 的服务端 capability 投影必须先于动态侧栏;**B 与 C 还有一个共同前置——先完成招聘信息发布 / 内容接入 / 曝光收费的许可边界审查**(见 compliance-boundary.md §8.8.1),许可结论未明确前不得实施任何按招聘内容计价的收费。
+
+### 6.9 Partner 曝光统计的实现约束
+
+`BrowseLog` / `ExternalJumpLog` 有 `targetType` + `targetId`,但**无 `sourceOrgId` 字段与对应索引**。要么 join 回 job / fair / policy 取 `sourceOrgId`(大数据量下慢),要么冗余一列 + 批量聚合。**归因快照不可变性**也是问题:内容后续换来源机构会导致历史统计漂移。
+
+隐私约束(见 [compliance-boundary.md](../compliance/compliance-boundary.md) §8.8):只给聚合数据 + 最小样本阈值,不暴露 endUser 行为明细。
+
+### 6.10 本次新增的「不做」条目(补 §四)
+
+8. **机构结算不得按招聘成果计费**:不得按候选人数 / 投递量 / 面试量 / Offer 量向机构收费——那等于效果付费招聘中介,直接撞无人力资源服务许可证红线。详见 compliance-boundary.md §8.8。
+9. **不得用 `AiServiceLog` 作为计费 / 退款依据**:它是 best-effort 写入 + 估算成本,只作运维观测。
+10. **不得以「隐藏导航」代替权限控制**:Partner / Admin 任何按机构类型或角色的可见性收窄,必须有服务端 API 与路由校验兜底。

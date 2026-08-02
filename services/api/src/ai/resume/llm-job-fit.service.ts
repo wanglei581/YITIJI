@@ -324,6 +324,8 @@ export class LlmJobFitService {
     provider: string
     tokenUsage?: JobFitTokenUsage
   }> {
+    // ⚠️ 借用 resume_optimize 功能位：该键被 6 项能力共用，关掉「AI简历优化」会静默停掉本功能。
+    // 治理方向见 llm-config.service.ts 中 resume_optimize 条目上方注释。
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
