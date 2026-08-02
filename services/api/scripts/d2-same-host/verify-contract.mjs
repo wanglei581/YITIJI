@@ -828,6 +828,20 @@ function assertDrillDiagnosticWiring(source) {
     const adjacency = `${assignment}\n    ${anchor}`
     assert.ok(executable.includes(adjacency), `${step} must immediately precede ${anchor}`)
   }
+  // Verify CGROUP_CONSISTENCY sandwich: pre-guard → cgroup-read → post-guard → assertion
+  {
+    const preGuard = 'if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('
+    const cgroupRead = 'const managedAppCgroupActual = controlGroup(managedAppPid)'
+    const cgroupAssert = 'assert.equal(managedAppCgroupActual, managedControlGroup)'
+    const prePos = executable.indexOf(preGuard)
+    const readPos = executable.indexOf(cgroupRead, prePos)
+    const postPos = executable.indexOf(preGuard, readPos)
+    const assertPos = executable.indexOf(cgroupAssert, postPos)
+    assert.ok(
+      prePos >= 0 && readPos > prePos && postPos > readPos && assertPos > postPos,
+      'CGROUP_CONSISTENCY sandwich required: pre-guard → cgroup-read → post-guard → assertion',
+    )
+  }
   const innerCatch = executable.slice(executable.indexOf('  } catch (error) {'), executable.indexOf('  } finally {'))
   assert.match(innerCatch, /let diagnostic = classifyDrillFailure\(error, currentPhase, currentMeasureStep\)/)
   const partialEvidenceBranch = innerCatch.slice(
@@ -867,6 +881,14 @@ function verifyDrillDiagnosticWiring() {
     ),
     source.replace(
       "if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')\n    ",
+      '',
+    ),
+    source.replace(
+      "    if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')\n    assert.equal(managedAppCgroupActual, managedControlGroup)",
+      '    assert.equal(managedAppCgroupActual, managedControlGroup)',
+    ),
+    source.replace(
+      '    assert.equal(managedAppCgroupActual, managedControlGroup)\n',
       '',
     ),
   ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))

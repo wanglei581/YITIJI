@@ -485,7 +485,9 @@ async function main() {
     }
     currentMeasureStep = MEASURE_STEPS.CGROUP_CONSISTENCY
     if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')
-    assert.equal(controlGroup(managedAppPid), managedControlGroup)
+    const managedAppCgroupActual = controlGroup(managedAppPid)
+    if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')
+    assert.equal(managedAppCgroupActual, managedControlGroup)
     currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))
     if (evidence.verdict !== 'D2_PRIME_PASS') fail('EVIDENCE_NO_GO')
