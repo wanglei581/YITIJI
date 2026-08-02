@@ -1,6 +1,6 @@
 # 当前开发进度
 
-2026-08-02 完成 **F1 D2′ cleanup 存活证明四处缺口 PR/CI 收口（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)，未演练、未部署）**：从
+2026-08-02 完成 **F1 D2′ cleanup 存活证明四处缺口合入收口（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)，已 squash 合入 `main@6e805917`，未演练、未部署）**：从
 `origin/main@7f2ac0dc` 的独立 worktree 按 RED→GREEN 修复四项阻塞：(1) `systemctl --user stop`
 现由脚本级 10s TERM / 2s kill-after timeout 约束，stop 返回后仍只接受严格
 `loaded+inactive` / `not-found+inactive` 元组；(2) PM2 一旦捕获 daemon PID，状态文件消失只能结束
@@ -14,10 +14,11 @@ control root。离线合同先在旧实现上得到预期 `D2_PRIME_CLEANUP_CONT
 身份复验期间退出和停止超时，PM2 行为夹具证明状态文件消失后仍进入身份绑定终止路径；governance 60/60、coverage
 lines 97.82% / branches 89.64% / functions 97.79%、API lint/typecheck/build、Shell/Node 语法与
 `git diff --check` 全绿。Claude、Antigravity 与 Cursor 已完成最终 diff 终审，三方均 `APPROVE`，
-Critical 0 / Warning 0；CCG 任务已随本次本地提交归档。[GitHub Actions run 30709420945](https://github.com/wanglei581/YITIJI/actions/runs/30709420945)
-的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 首轮 3/3 全绿。本项没有运行 `run.sh`、reserve/invoke/full drill、Colima、systemd、PM2、Nginx 或 API，未生成
-nonce/evidence，未连接 production，也不构成 D2′ PASS / fresh-retake 授权；PR 进入主干并取得独立
-retake 授权之前，`productionF1` 继续 **NO-GO**。
+Critical 0 / Warning 0；CCG 任务已归档。PR CI 最终 run `30709855868` 3/3 全绿；PR 于
+`2026-08-02T03:35:28Z` squash 合入 `main@6e805917`，合入后主线 [GitHub Actions run 30730887928](https://github.com/wanglei581/YITIJI/actions/runs/30730887928)
+的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 再次 3/3 全绿。本项没有运行 `run.sh`、reserve/invoke/full drill、Colima、systemd、PM2、Nginx 或 API，未生成
+nonce/evidence，未连接 production，也不构成 D2′ PASS / fresh-retake 授权；取得新的独立 retake
+授权之前，`productionF1` 继续 **NO-GO**。
 
 2026-08-01 完成 **F1 D2′ invocation governance 合入后文档收口（[PR #471](https://github.com/wanglei581/YITIJI/pull/471)，已 squash 合入 `main@3b3c3100`，未演练、未部署）**：PR #471 于 `2026-08-01T15:22:36Z` 合入，合入后主线 [GitHub Actions run 30705773186](https://github.com/wanglei581/YITIJI/actions/runs/30705773186) 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 3/3 全绿；下方同名条目只保留为候选形成阶段的历史快照，不再代表当前状态。主线现以 #471 的分 facet `O_EXCL` tombstone、严格 manifest、独立 event、完整 Git/clone identity、私有 fd 3 evidence 真值及拆分式 60 项 verifier 为唯一 invocation governance；历史 [PR #463](https://github.com/wanglei581/YITIJI/pull/463) 的共享 JSONL / 全局锁 / caller env 第二真值已被替换，verifier 拆分事项随本次合入关闭。合入和 CI 只证明代码与离线门禁进入主干，不构成 D2′ PASS、fresh-retake 授权、部署或 production GO；四处 cleanup 存活/有界性缺口继续独立阻塞，`productionF1` 继续 **NO-GO**。
 
