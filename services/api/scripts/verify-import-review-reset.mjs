@@ -75,8 +75,9 @@ const EXPECTED_SITES = {
  * Round 8 新增 3 条（O′ O″ O‴）：34 → 37
  * Round 9 新增 4 条（O⁴ O⁵ O⁶ O⁷）：37 → 41
  * Round 10 新增 4 条（Q⁵ Q⁶ Q⁷ Q⁸）：41 → 45
- * Round 11 新增 3 条（R₁ R₂ R₃）：45 → 48 */
-const EXPECTED_SELFTEST_CASES = 48
+ * Round 11 新增 3 条（R₁ R₂ R₃）：45 → 48
+ * Round 12 新增 2 条（R₄ R₅）：48 → 50 */
+const EXPECTED_SELFTEST_CASES = 50
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -267,16 +268,28 @@ function memberName(node) {
  *   Low 修复：rawOwner → unwrap(rawOwner) → owner，处理 (this.prisma.job).upsert / job!.upsert /
  *     (job as T).upsert 等 owner 被包裹的形态（R₁/R₂ 自测已验证）。
  *   Medium（已知不可见，documented limits，R₃ 自测验证）：
- *     ① 逗号运算符：`(0, prisma.job.upsert)(...)` —— callee 是 BinaryExpression，非 PAE/EAE，
- *        unwrap 不变，memberName 返回 null → upsertModelOf 返回 null → 门禁不可见。
- *     ② 条件表达式：`(cond ? prisma.job.upsert : noop)(...)` —— callee 是 ConditionalExpression，同理。
+ *     ① 逗号运算符：`(0, prisma.job.upsert)(...)` —— call.expression 是 ParenthesizedExpression，
+ *        经 unwrap 后是 BinaryExpression（CommaToken），非 PAE/EAE，
+ *        memberName 返回 null → upsertModelOf 返回 null → 门禁不可见。
+ *     ② 条件表达式：`(cond ? prisma.job.upsert : noop)(...)` —— call.expression 是 PAE，
+ *        经 unwrap 后是 ConditionalExpression，非 PAE/EAE，同理不可见。
  *     ③ Reflect.apply：`Reflect.apply(prisma.job.upsert, ctx, [{...}])` —— upsert 作为参数传递，
  *        门禁不扫函数参数，不可见。
  *   以上三种在生产代码中无此写法；静态识别代价高于收益；已在 standards-index.md
  *   第 11 轮条目登记为已知限制。
  *
- * 已知宽容：`getUnrelatedRepository().upsert({})` 仍会因取不到模型名而抛错。
- * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有此类调用模式，
+ * 第 12 轮修正（Round 12）：
+ *   M-1 修复（Codex Round 11 审查识别）：Round 11 的 rawOwner→unwrap(rawOwner) 在解包后
+ *     得到非规范名称标识符（如 repo、jobRepo）时，会从旧版的 model===null→throw 转变为
+ *     model='repo'→return null（fail-open）。修复：在 model 不在 tracked 列表时，
+ *     若 rawOwner !== owner（发生了解包），恢复 throw（fail-closed）；
+ *     若 rawOwner === owner（未发生解包），仍 return null（prisma.user 等无关模型正常跳过）。
+ *     R₄/R₅ 自测验证（`(repo as T).upsert()` 和 `repo!.upsert()` → expect:'throw'）。
+ *
+ * 已知宽容：`prisma.user.upsert({})` / `getUnrelatedRepository().upsert({})` 等：
+ *   前者因 rawOwner===owner 且 model='user' 不在列表 → return null（正确跳过）；
+ *   后者因 model===null → throw（fail-closed，生产3文件无此模式，可接受）。
+ * 本门禁只在 3 个注册文件上运行（EXPECTED_SITES），这 3 个文件没有上述调用模式，
  * 宽容误报的代价（一次门禁报错）远小于漏报的代价（审核状态绕过），故保留。
  */
 function upsertModelOf(call, where) {
@@ -372,7 +385,22 @@ function upsertModelOf(call, where) {
         '      请改成 `tx.job.upsert(...)` 等可静态归属的写法，或在本门禁显式登记。'
     )
   }
-  return model === 'job' || model === 'jobFair' ? model : null
+  // FIX(round12): restore fail-closed for wrapped non-standard owner.
+  // (repo as T).upsert() / repo!.upsert() — before R11 these hit model===null→throw;
+  // after R11 owner was unwrapped to Identifier('repo') → model='repo' via text fallback,
+  // then silently returned null (fail-open). Now three-branch:
+  //   tracked         → return model (correct)
+  //   wrapped+untracked → throw      (fail-closed restored)
+  //   no-wrap+untracked → return null (e.g. prisma.user.upsert — different model, skip)
+  if (model === 'job' || model === 'jobFair') return model
+  if (rawOwner !== owner) {
+    throw new Error(
+      `${where} 出现无法静态归属的 \`upsert\` 调用（owner 经解包后为标识符 '${model}'，不在受控模型列表）——\n` +
+        '      取不到模型名就无法判断它是否需要重置审核状态，按失败处理。\n' +
+        '      请改成 `tx.job.upsert(...)` 等可静态归属的写法，或在本门禁显式登记。'
+    )
+  }
+  return null
 }
 
 function extractBlocks(filepath, source) {
@@ -1099,6 +1127,54 @@ function selfTest() {
         `      create: { title: dto.title },\n` +
         `      update: {\n` +
         `${RESET_INLINE.replace("          reviewStatus: 'pending',\n", '')}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    // ── Round 12 新增：非规范 owner 解包后 fail-closed 恢复（R₄ R₅）────────────────
+    {
+      // R₄: (repo as T).upsert() — rawOwner=AsExpression, owner=Identifier('repo'),
+      // model='repo' 不在 tracked 列表 + rawOwner!==owner → 必须 throw（fail-closed）。
+      // Round 11 前：model===null→throw；Round 11 后 M-1 regression：model='repo'→null（fail-open）；
+      // Round 12 修复：恢复 throw。
+      name: "R₄ (repo as T).upsert() —— 包装后非规范名称，必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /owner 经解包后为标识符/,
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (repo as any).upsert({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    {
+      // R₅: repo!.upsert() — rawOwner=NonNullExpression, owner=Identifier('repo'),
+      // model='repo' 不在 tracked 列表 + rawOwner!==owner → 必须 throw（fail-closed）。
+      // 与 R₄ 同源；两者合并验证 R12 修复对 As 和 NonNull 两种包装的覆盖。
+      name: "R₅ repo!.upsert() —— 非空断言包裹后非规范名称，必须 fail-closed（throw）",
+      expect: 'throw',
+      errRe: /owner 经解包后为标识符/,
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await repo!.upsert({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE}\n` +
         `      },\n` +
         `    })\n` +
         `  }\n` +
