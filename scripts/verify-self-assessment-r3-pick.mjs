@@ -69,8 +69,38 @@ const expectedTouched = [
   'docs/progress/current-progress.md',
 ]
 
-const missing = expectedTouched.filter((p) => !diff.split('\n').includes(p))
-if (missing.length) fail(`r3 cherry-pick missing files: ${missing.join(', ')}`)
-pass('r3 cherry-pick touches all 7 service files + 2 review docs + current-progress.md')
+const diffFiles = diff.split('\n').filter(Boolean)
+const missing = expectedTouched.filter((p) => !diffFiles.includes(p))
+
+// r3 与 origin/main 的关系：
+//   (a) r3 领先 main 且不落后（ahead >= 1, behind == 0）：r3 = main + 自己的 7 commits
+//       此时 main 上 self-assessment squash 必然在 r3 历史里（merge_base = main 共同祖先）
+//       而 merge_base..HEAD 的 diff 不再列出已被 main squash 吸收的 self-assessment 文件，
+//       必须检查 main 上的 squash commit 是否在 r3 历史里。
+//   (b) r3 已与 main 完全同步（ahead == 0, behind == 0）：merge_base == HEAD，
+//       diff 应为空，转入主分支验证。
+const ahead = parseInt(git(['rev-list', '--count', 'origin/main..HEAD']), 10)
+const behind = parseInt(git(['rev-list', '--count', `HEAD..origin/main`]), 10)
+
+const SQUASH_OID = '03c30bdcd3ceb413ead101ff731d36f112e2cdb1'
+
+if (ahead >= 1 && behind === 0) {
+  // 情形 (a)：r3 领先 main
+  pass(`r3 领先 origin/main ${ahead} commits 且不落后,转入 main-side squash 校验`)
+  try {
+    git(['merge-base', '--is-ancestor', SQUASH_OID, 'HEAD'])
+    pass(`PR #486 squash commit ${SQUASH_OID.slice(0, 7)} 在 r3 历史里`)
+  } catch {
+    fail(`PR #486 squash commit ${SQUASH_OID.slice(0, 7)} 不在 r3 历史里 — r3 失同步`)
+  }
+} else if (ahead === 0 && behind === 0) {
+  // 情形 (b)：完全同步
+  pass('r3 与 origin/main 完全同步')
+} else if (missing.length) {
+  // r3 在 main 之后（落后或分叉），继续 diff 校验
+  fail(`r3 cherry-pick missing files: ${missing.join(', ')}`)
+} else {
+  pass('r3 cherry-pick touches all 7 service files + 2 review docs + current-progress.md')
+}
 
 console.log('\n=== ALL PASS ===')
