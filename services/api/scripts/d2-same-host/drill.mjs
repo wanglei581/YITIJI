@@ -440,6 +440,7 @@ async function main() {
     currentPhase = DRILL_PHASES.MEASURE
     currentMeasureStep = MEASURE_STEPS.MANAGED_PID
     const managedAppPid = pm2AppPid(pm2Bin, managedName, managedEnvironment)
+    const managedAppPidTicks = processStartTimeTicks(managedAppPid)
     currentMeasureStep = MEASURE_STEPS.NGINX_VERSION
     const nginxVersionOutput = run(nginxBin, ['-v'], { allowFailure: true })
     const nginxVersion = /nginx\/(\S+)/.exec(`${nginxVersionOutput.stderr}${nginxVersionOutput.stdout}`)?.[1]
@@ -483,6 +484,7 @@ async function main() {
       dataSafety: createFailureMeasurements(new Date().toISOString()).dataSafety,
     }
     currentMeasureStep = MEASURE_STEPS.CGROUP_CONSISTENCY
+    if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')
     assert.equal(controlGroup(managedAppPid), managedControlGroup)
     currentPhase = DRILL_PHASES.EVIDENCE
     const evidence = validateEvidence(buildEvidence(measurements))

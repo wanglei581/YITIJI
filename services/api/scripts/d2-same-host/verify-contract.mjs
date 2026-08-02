@@ -821,7 +821,7 @@ function assertDrillDiagnosticWiring(source) {
     ['TOPOLOGY', 'const topology = {'],
     ['CONTROL_ISOLATION', 'const controlIsolation = {'],
     ['RESOURCE_ISOLATION', 'const resourceIsolation = {'],
-    ['CGROUP_CONSISTENCY', 'assert.equal(controlGroup(managedAppPid), managedControlGroup)'],
+    ['CGROUP_CONSISTENCY', 'if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('],
   ]) {
     const assignment = `currentMeasureStep = MEASURE_STEPS.${step}`
     assert.equal(executable.split(assignment).length - 1, 1)
@@ -864,6 +864,10 @@ function verifyDrillDiagnosticWiring() {
     source.replace(
       'process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase, currentMeasureStep))}\\n`)',
       'process.stderr.write(`${error.message}\\n`)',
+    ),
+    source.replace(
+      "if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')\n    ",
+      '',
     ),
   ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))
   const assignment = 'currentMeasureStep = MEASURE_STEPS.TOPOLOGY'
