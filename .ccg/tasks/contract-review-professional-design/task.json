@@ -6,7 +6,7 @@
   "risk": "high",
   "domain": "fullstack-legal-ai",
   "currentPhase": "implementation",
-  "nextAction": "执行 Wave B Task 11 RED：checkpoint、两阶段编排、统一脱敏坐标与可重试清理",
+  "nextAction": "执行 Wave C Task 12：HTTP 服务分层、确认 CAS、幂等入队与访问控制",
   "createdAt": "2026-08-01T10:48:32Z",
   "branch": "codex/contract-review-p0"
 }

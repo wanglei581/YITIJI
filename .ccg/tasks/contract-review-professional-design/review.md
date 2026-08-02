@@ -251,3 +251,19 @@ Task 10 已封板。Gate 0 正式记录继续为 `blocked`、`production_default
 - Task 11 五分钟预算只承诺页/网络边界协作式停止；真正 child-process hard kill、内存上限与连续会话 RSS 回收是 Task 14 启用生产入口前的硬门禁。
 
 内部最终复核为 `Spec compliant: Yes`，无剩余阻断项；Antigravity 最终 `APPROVE`。Cursor 独立复核重试发生 TLS 断连/后续无输出并中止，首轮问题已纳入修订；Claude 本轮通道仍不可用，均未虚构通过。计划已可进入 Task 11 RED 测试，Gate 0 继续为 `blocked`。
+
+## Wave B Task 11：两阶段编排、原子结果与可重试清理实施审查
+
+- 默认模块无 HTTP controller、无 BullMQ 生产注册、无真实 provider；queue/provider runtime 均 fail closed。
+- Stage 1 仅持久化实际 buffer 的 SHA-256/size/mode/pages 版本化指纹并停在 `awaiting_confirmation`；Stage 2 只接受 `rule_checking + confirmedAt + extractionFingerprint`并重读校验。
+- 规则事实、AI excerpt 定位与 SafetyGate 共用同一份脱敏 canonical pages；provider draft 与 identity 来自同一配置快照，analyze 固定单次且不恢复重放。
+- extract 三次有界重试；process 前按 `attemptsMade + 1` 判断本次是否最终 attempt，failed 事件以 BullMQ 终态 `finishedOn` 覆盖 stalled / `UnrecoverableError` 提前终态，并以 `attemptsMade >= attempts` 处理普通耗尽。
+- SafetyGate 通过后才在单一 Prisma transaction CAS 中写入结果；TTL 清理以仍存在的 `expired` task 作为持久重试账本，敏感删除与通用 cron/审计均不记录原始 fileId、错误或对象路径。
+
+内部复审首轮发现通用清理泄露、extract 重试提前终态、模型阶段崩溃不收敛、失败落库二次异常覆盖安全错误和 BullMQ 提前终态识别等阻断；全部修复后复审 `Ready: Yes`。
+
+外部交叉审查：Antigravity `APPROVE / Ready: Yes`；Cursor `Ready: Yes`，其 provider 精确一次调用与文件预算提示已补回测试/计划；Claude 深审首次因网关 524 未完整返回，重试时曾把 Task 14 生产 hard-kill 误当成 Task 11 缺口，澄清“当前无生产可达管线、Task 14 是解除 Gate 0 前的发布阻断”后最终 `Ready: Yes`。
+
+最终验证：Task 11 49/49；lines 94.74%、branches 84.72%、functions 95.58%；完整 Contract Review 测试进程退出码 0；API typecheck/lint、SQLite fresh migration 无漂移、file-retention、Gate 0 与 `git diff --check` 通过。PostgreSQL live drift 因本机未配 `POSTGRES_URL` 按计划跳过。
+
+Task 11 已封板。Gate 0 仍为 `blocked`、`production_default: false`，provider 批准闸继续拒绝，本任务没有开放 AI 生产入口。下一步为 Task 12 HTTP 分层、确认 CAS、幂等入队与访问控制。

@@ -1089,7 +1089,7 @@ pnpm --filter @ai-job-print/api verify:contract-review:gate0
 
 Expected: PASS；Gate 0 仍显示 `blocked`，默认运行时不开队列/processor，且没有 HTTP 入口。
 
-- [ ] **Step 7: 双模型审查后提交**
+- [x] **Step 7: 双模型审查后提交**
 
 ```bash
 git add \
