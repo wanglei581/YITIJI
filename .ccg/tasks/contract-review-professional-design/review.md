@@ -267,3 +267,18 @@ Task 10 已封板。Gate 0 正式记录继续为 `blocked`、`production_default
 最终验证：Task 11 49/49；lines 94.74%、branches 84.72%、functions 95.58%；完整 Contract Review 测试进程退出码 0；API typecheck/lint、SQLite fresh migration 无漂移、file-retention、Gate 0 与 `git diff --check` 通过。PostgreSQL live drift 因本机未配 `POSTGRES_URL` 按计划跳过。
 
 Task 11 已封板。Gate 0 仍为 `blocked`、`production_default: false`，provider 批准闸继续拒绝，本任务没有开放 AI 生产入口。下一步为 Task 12 HTTP 分层、确认 CAS、幂等入队与访问控制。
+
+## Wave B Task 12：HTTP lifecycle、访问控制与独立验证模块实施审查
+
+- 新增 `ContractReviewLifecycleService`、consent/access/task-view 分层和精确 DTO；controller 只解析 requester 并委托 lifecycle/consent。会员永不返回匿名 token，匿名 token 仅在 extract job 入队成功后返回；create 入队失败固定 503 并尝试把任务收敛为 expired，confirm 首次 CAS 写入 `confirmedAt`，重试只补发同一确定性 analyze jobId。
+- GET/confirm/report/delete 统一执行会员或匿名 token 归属校验，不存在、跨会员、错/缺 token、会员访问匿名任务和非 create 的 source proof 重放均为同形 404。task view 只输出白名单字段，非 completed 固定 `result:null`；页数、进度、`truncated`、OCR confidence 或持久化 result/evidence 畸形时固定 500 fail closed，不回显原 JSON。
+- DELETE 先 CAS 为 `expired + expiresAt<=now`，再复用 Task 11 的精确 purge 核心；物理删除失败保留可立即重试的任务行，共享活跃源文件不误删，只有任务行确认删除才返回成功。Task 14 前报告端点在归属校验后诚实返回固定 503，不生成假 fileId。
+- 新增独立 `ContractReviewHttpModule` 和真实 HTTP verifier；默认 `AppModule`/`ContractReviewModule` 仍零合同 controller、零 BullMQ 生产注册、零真实 provider。verifier 依次启动默认 AppModule 与显式验证模块，使用 OS 随机端口和本地 provider override，验证默认 404、DTO、归属、proof 重放与三类限流，不靠环境开关改写默认模块元数据。
+
+内部终审先后修复三处 Warning：非 create proof header 被忽略、task view 对畸形 OCR/页数静默降级、persisted result evidence tuple 校验不完整。Cursor 随后指出 `truncated` 未做运行时布尔校验及 HTTP proof 重放未逐端点覆盖，已按 TDD 补齐；最终内部终审 `Ready: Yes`，无遗留 Critical/Warning。
+
+外部冻结版复核：Claude、Antigravity、Cursor 最终均 `Ready: Yes`。Claude/Antigravity 无 Critical/Warning；Cursor 仅提示 HTTP verifier 尚未进入 CI allowlist，该项已由 Task 14 明确负责，当前不提前越过发布门禁范围。
+
+最终验证：Task 12 定向 53/53，最终增量 24/24；完整 Contract Review 281 项中 280 通过、1 个 PostgreSQL 环境性 skip；聚合覆盖率 lines 90.79%、branches 86.60%、functions 93.65%；HTTP verifier、真实一次性 SQLite/Redis/API 上传会话回归、API typecheck、lint、SQLite schema drift、Gate 0 与 `git diff --check` 均通过。PostgreSQL live drift 因未配置 `POSTGRES_URL` 按计划跳过。
+
+Task 12 已封板。Gate 0 继续为 `blocked`、`production_default: false`，默认 provider 批准闸继续拒绝，本任务没有开放生产合同审查路由。下一步为 Task 13 Kiosk 易失会话、五步流程与既有百宝箱入口接线。
