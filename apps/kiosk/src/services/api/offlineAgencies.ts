@@ -33,11 +33,20 @@ export interface WireOfflineAgency {
   updatedAt: string
 }
 
+interface WireOfflineAgencyListStats {
+  totalAgencies: number
+  openAgencies: number
+  totalJobs: number
+  districts: number
+  lastSyncLabel?: string
+}
+
 interface WireOfflineAgencyListResponse {
-  data: WireOfflineAgency[]
+  items: WireOfflineAgency[]
   total: number
   page: number
   pageSize: number
+  stats?: WireOfflineAgencyListStats
 }
 
 export interface WireOfflineJobAgency {
@@ -85,6 +94,17 @@ export interface OfflineAgencyDTO {
   services: string[]
   orgCode?: string
   syncTime?: string
+  status: 'open' | 'rest'
+  statusLabel?: string
+  jobCount: number
+}
+
+export interface OfflineAgencyListStats {
+  totalAgencies: number
+  openAgencies: number
+  totalJobs: number
+  districts: number
+  lastSyncLabel?: string
 }
 
 export interface OfflineAgencyListResult {
@@ -92,10 +112,12 @@ export interface OfflineAgencyListResult {
   total: number
   page: number
   pageSize: number
+  stats: OfflineAgencyListStats
 }
 
 export interface OfflineAgencyListParams {
   district?: string
+  service?: string
   orgType?: string
   keyword?: string
   page?: number
@@ -183,7 +205,25 @@ function salaryLabel(min: number | null, max: number | null, unit: string): stri
   return undefined
 }
 
+export interface OfflineAgencyJobSummary {
+  id: string
+  title: string
+  jobType?: string
+  location?: string
+  salaryMin?: number | null
+  salaryMax?: number | null
+  status?: string
+}
+
+export interface OfflineAgencyDetailDTO extends OfflineAgencyDTO {
+  phone?: string | null
+  description?: string | null
+  website?: string | null
+  jobs: OfflineAgencyJobSummary[]
+}
+
 export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDTO {
+  const isOpen = agency.status === 'active'
   return {
     id: agency.id,
     name: agency.name,
@@ -194,7 +234,15 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     services: parseStringList(agency.services),
     orgCode: agency.externalId ?? agency.sourceOrgId ?? undefined,
     syncTime: agency.syncTime ?? undefined,
+    status: isOpen ? 'open' : 'rest',
+    statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+    jobCount: 0,
   }
+}
+
+/** 线下机构详情（含在招岗位）。 */
+export function getOfflineAgencyById(id: string): Promise<OfflineAgencyDetailDTO> {
+  return getJson(`/kiosk/offline-agencies/${encodeURIComponent(id)}`)
 }
 
 export function mapWireOfflineJob(job: WireOfflineJob): OfflineJobDetailDTO {
@@ -227,12 +275,18 @@ export async function getOfflineAgencies(
   const response = await getJson<WireOfflineAgencyListResponse>(
     `/kiosk/offline-agencies${qs({ ...params })}`,
   )
-  if (!Array.isArray(response.data)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
+  if (!Array.isArray(response.items)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
   return {
-    items: response.data.map(mapWireOfflineAgency),
+    items: response.items.map(mapWireOfflineAgency),
     total: response.total,
     page: response.page,
     pageSize: response.pageSize,
+    stats: response.stats ?? {
+      totalAgencies: response.total,
+      openAgencies: 0,
+      totalJobs: 0,
+      districts: 0,
+    },
   }
 }
 
