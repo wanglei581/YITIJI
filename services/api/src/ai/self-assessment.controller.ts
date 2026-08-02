@@ -4,12 +4,17 @@ import { JwtService } from '@nestjs/jwt'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { resolveOptionalEndUser } from '../common/auth/optional-end-user'
+import { resolveClientIp } from '../common/client-ip'
+import type { AuditContext } from './resume/self-assessment.service'
 import { SelfAssessmentService } from './resume/self-assessment.service'
 import { AppendedSelfAssessmentService } from './resume/appended-self-assessment.service'
 import type { SelfAssessmentAnswerV1 } from './resume/self-assessment.types'
 
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
+  ip?: string
+  socket?: { remoteAddress?: string }
+  requestId?: string
 }
 
 function headerOf(req: ReqLike, name: string): string | null {
@@ -17,6 +22,20 @@ function headerOf(req: ReqLike, name: string): string | null {
   if (typeof v === 'string' && v.trim()) return v.trim()
   if (Array.isArray(v) && v[0]) return v[0].trim()
   return null
+}
+
+function auditContextOf(req: ReqLike): AuditContext {
+  const ipAddress = resolveClientIp(req)
+  const rawUa = headerOf(req, 'user-agent')
+  const requestId =
+    typeof req.requestId === 'string' && req.requestId.trim()
+      ? req.requestId.trim()
+      : headerOf(req, 'x-request-id')
+  return {
+    ipAddress: ipAddress ?? null,
+    userAgent: rawUa ?? null,
+    requestId: requestId ?? null,
+  }
 }
 
 /**
@@ -52,18 +71,18 @@ export class SelfAssessmentController {
     @Body() body: { answers: SelfAssessmentAnswerV1[]; consent: { nonSensitive: boolean; sensitive: boolean } },
     @Req() req: ReqLike,
   ) {
-    return this.service.submit(await this.requesterOf(req), body)
+    return this.service.submit(await this.requesterOf(req), body, auditContextOf(req))
   }
 
   @Get(':taskId')
   async latest(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    return this.service.getLatest(taskId, await this.requesterOf(req))
+    return this.service.getLatest(taskId, await this.requesterOf(req), auditContextOf(req))
   }
 
   @Post(':taskId/print')
   @Throttle({ default: { ttl: 60_000, limit: 6 } })
   async print(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    return this.service.printReport(taskId, await this.requesterOf(req))
+    return this.service.printReport(taskId, await this.requesterOf(req), auditContextOf(req))
   }
 
   /**
@@ -81,11 +100,12 @@ export class SelfAssessmentController {
       taskId,
       requester: await this.requesterOf(req),
       resumeFileId: body.resumeFileId,
+      auditCtx: auditContextOf(req),
     })
   }
 
   @Delete(':taskId')
   async withdraw(@Param('taskId') taskId: string, @Req() req: ReqLike) {
-    return this.service.withdraw(taskId, await this.requesterOf(req))
+    return this.service.withdraw(taskId, await this.requesterOf(req), auditContextOf(req))
   }
 }

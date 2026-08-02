@@ -15,8 +15,17 @@ import { PDFDocument } from 'pdf-lib'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
 import { AuditService } from '../../audit/audit.service'
-import { SelfAssessmentService, tokenMatches } from './self-assessment.service'
-import { SELF_ASSESSMENT_DIMENSIONS, type SelfAssessmentDimensionKey } from './self-assessment.types'
+import {
+  SelfAssessmentService,
+  tokenMatches,
+  type AuditContext,
+  EMPTY_AUDIT_CONTEXT,
+} from './self-assessment.service'
+import {
+  SELF_ASSESSMENT_DIMENSIONS,
+  type SelfAssessmentDimensionKey,
+  type SelfAssessmentDimensionResult,
+} from './self-assessment.types'
 
 const DISCLAIMER_TEXT =
   '本附录基于本人作答的自我探索倾向，仅作为自助参考；不含临床 / 心理 / 人格诊断；' +
@@ -39,6 +48,7 @@ export class AppendedSelfAssessmentService {
     taskId: string
     requester: { endUserId: string | null; accessToken: string | null }
     resumeFileId: string
+    auditCtx?: AuditContext
   }): Promise<{
     fileId: string
     filename: string
@@ -47,6 +57,7 @@ export class AppendedSelfAssessmentService {
     signedUrl: string
     expiresAt: string
   }> {
+    const ctx = opts.auditCtx ?? EMPTY_AUDIT_CONTEXT
     // 1) 读取自我探索结果（已含归属校验）
     const stored = await this.loadStored(opts.taskId, opts.requester)
 
@@ -95,7 +106,9 @@ export class AppendedSelfAssessmentService {
       buffer: Buffer.from(out),
       filename,
       mimeType: 'application/pdf',
-      purpose: 'print_doc',
+      // §1.2: 合并 PDF 走 self_assessment_report 用途,触发 sensitive 留存/标签,
+      //       合并 PDF 含本人自助倾向摘要,不能挂普通 print_doc(normal)。
+      purpose: 'self_assessment_report',
       uploaderId: null,
       endUserId: opts.requester.endUserId,
       createdBy: 'self_assessment_append',
@@ -114,7 +127,9 @@ export class AppendedSelfAssessmentService {
         mergedFileId: uploaded.fileId,
         saPageCount,
       },
-      ipAddress: null, userAgent: null, requestId: null,
+      ipAddress: ctx.ipAddress,
+      userAgent: ctx.userAgent,
+      requestId: ctx.requestId,
     })
 
     return {
@@ -152,13 +167,24 @@ export class AppendedSelfAssessmentService {
     const validKeys = new Set(SELF_ASSESSMENT_DIMENSIONS.map((d) => d.key))
     const dims = (parsed.dimensions ?? [])
       .filter((d) => validKeys.has(d.key as never))
-      .map((d) => ({
-        key: d.key as SelfAssessmentDimensionKey,
-        label: d.label,
-        strength: (Math.max(0, Math.min(5, Math.round(Number(d.strength)))) as 0 | 1 | 2 | 3 | 4 | 5),
-        note: d.note,
-        evidenceQuestionIdx: d.evidenceQuestionIdx ?? [],
-      }))
+      // §1.5: payloadJson 是不可信 JSON,strength 在落库前已 clamp 成 0..5 离散值;
+      //       这里用 typeguard 拒越界 + 校验整型,不再做二次 round/clamp 兜底
+      //       (round/clamp 会让上游 7.5 等异常值「默默降级」,破坏 SSOT)。
+      //       任何越界 strength 一律丢弃整条 dimension。
+      .map((d): SelfAssessmentDimensionResult | null => {
+        const n = Number(d.strength)
+        if (!Number.isInteger(n)) return null
+        if (n < 0 || n > 5) return null
+        const strength = n as 0 | 1 | 2 | 3 | 4 | 5
+        return {
+          key: d.key as SelfAssessmentDimensionKey,
+          label: d.label,
+          strength,
+          note: d.note ?? null,
+          evidenceQuestionIdx: d.evidenceQuestionIdx ?? [],
+        }
+      })
+      .filter((d): d is SelfAssessmentDimensionResult => d !== null)
     return {
       answersHash: parsed.answersHash ?? '',
       dimensions: dims,
