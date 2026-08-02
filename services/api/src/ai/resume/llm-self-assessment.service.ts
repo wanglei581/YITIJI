@@ -107,7 +107,7 @@ export class LlmSelfAssessmentService {
     const providerName = this.config.getConfig('resume_optimize').vendor
     let raw: string
     try {
-      raw = await this.callLlm()
+      raw = await this.callLlm(input.scored.dimensions)
     } catch (err) {
       // LLM 不可用 → 优雅降级：返回 strength + null note（不阻塞主流程）
       this.logger.warn(`self_assessment.llm_unavailable degraded=${(err as Error).message}`)
@@ -192,7 +192,7 @@ export class LlmSelfAssessmentService {
    * 复用 resume_optimize LLM 接入（密钥仅服务端）。
    * 答案原文不送 LLM：仅送维度 key/label/strength + 简短证据题号。
    */
-  private async callLlm(): Promise<string> {
+  private async callLlm(dimensions: SelfAssessmentDimensionResult[]): Promise<string> {
     const apiKey = this.config.getApiKey('resume_optimize')
     const cfg = this.config.getConfig('resume_optimize')
     if (!apiKey || !cfg.enabled) {
@@ -211,7 +211,9 @@ export class LlmSelfAssessmentService {
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"dimensions":[{"key":"interest","note":"..."},{"key":"style","note":"..."},{"key":"team","note":"..."},{"key":"value","note":"..."},{"key":"motivation","note":"..."}],"summary":"整体解读"}'
 
-    const user = '请基于以下 5 维度强度生成本次自然语言解读。'
+    const user =
+      '请基于以下 5 维度强度生成本次自然语言解读：\n' +
+      dimensions.map((d) => `${d.label}（${d.key}）：强度 ${d.strength}/5`).join('\n')
 
     let res: Response
     try {

@@ -39,7 +39,7 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex')
 }
 
-function tokenMatches(token: string | null, expectedHash: string | null): boolean {
+export function tokenMatches(token: string | null, expectedHash: string | null): boolean {
   if (!token || !expectedHash) return false
   const actual = Buffer.from(hashToken(token), 'hex')
   const expected = Buffer.from(expectedHash, 'hex')

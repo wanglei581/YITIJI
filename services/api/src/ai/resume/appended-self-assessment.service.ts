@@ -15,7 +15,7 @@ import { PDFDocument } from 'pdf-lib'
 import { PrismaService } from '../../prisma/prisma.service'
 import { FilesService } from '../../files/files.service'
 import { AuditService } from '../../audit/audit.service'
-import { SelfAssessmentService } from './self-assessment.service'
+import { SelfAssessmentService, tokenMatches } from './self-assessment.service'
 import { SELF_ASSESSMENT_DIMENSIONS, type SelfAssessmentDimensionKey } from './self-assessment.types'
 
 const DISCLAIMER_TEXT =
@@ -139,7 +139,7 @@ export class AppendedSelfAssessmentService {
     if (row.endUserId) {
       if (requester.endUserId !== row.endUserId) throw notFound()
     } else {
-      if (!row.accessTokenHash || !requester.accessToken) throw notFound()
+      if (!row.accessTokenHash || !tokenMatches(requester.accessToken, row.accessTokenHash)) throw notFound()
     }
     const parsed = JSON.parse(row.payloadJson) as {
       answersHash?: string
