@@ -219,3 +219,19 @@ Task 8 已封板。规则结论是保守筛查提示，不是法律意见；Gate
 内部规格审查为 `Spec compliant: Yes`，质量安全审查为 `Ready: Yes`。Cursor、Claude、Antigravity 最终均 `APPROVE`，无 Critical；Cursor/Claude 仅记录响应体超限错误码被归一化、无标签任意姓名属于计划内残余风险、占用数组内存和三日期显式银行卡边缘用例等非阻断提示。Antigravity 直连多次超时后通过 CCG wrapper 取得有效批准，未把通道失败冒充审查结论。
 
 Task 9 已封板。支持表仍不代表供应商合规批准，Task 14 证据归档和真实灰度前默认 gate 保持拒绝；Gate 0 正式记录继续为 `blocked`，本任务未开放生产入口。下一步进入 `ContractReviewSafetyGate`。
+
+## Wave B Task 10：`ContractReviewSafetyGate` 实施审查
+
+审查范围：`2ededc8f`。
+
+- 新增纯 TypeScript SafetyGate，严格验证精确 schema、原型/accessor/symbol、枚举、字符串和数量预算、唯一 finding id、计数一致性、连续 canonical pages 与 page-local UTF-16 证据切片；所有失败统一收敛为 `CONTRACT_SAFETY_GATE_REJECTED`。
+- `basisRef` 只接受 Task 8 `BASIS_ALLOWLIST`，规则 finding 必须逐 id 保留 category、priority、basis、evidence、title、explanation 和 verificationQuestion，禁止 LLM 删除、降级、改写或冒充权威规则。
+- 复用 Task 9 `assertNoHighConfidencePii` 扫描 id、title、excerpt、explanation、basisRef、verificationQuestion、剥离官方文案后的 uncertainty，并按固定顺序无分隔拼接和 100,000 UTF-16 伪页分块，覆盖跨字段与跨 finding 重组。
+- 独立语义层以 NFKC、固定有界规则拦截确定性法律结论、诉讼承诺、招聘闭环、企业筛选/推荐/邀约/Offer 能力和提示注入回显。否定只绑定明确动作事件；跨 finding 重组保留 finding 分组，要求“主体+事件”或“事件+真实简历”至少一组内绑定，避免把无关投诉、用户核对和简历模板误拼为违规能力。
+- 三条 OCR/截断/字段冲突提示只由服务端 context 真相触发、固定顺序追加并去重，追加后仍受 500 UTF-16 上限；返回值递归冻结且不修改模型输入。实现未注册 Nest module/controller/worker，也未接入生产路由。
+
+最终 SafetyGate 专项 15/15；完整 Contract Review 200 通过、1 个因未配置 `POSTGRES_URL` 按规则跳过；覆盖率 lines 100%、branches 97.93%、functions 100%；API typecheck、lint、反向依赖、`git diff --check` 全部通过。测试文件 523 行已按项目阈值评估：仍是单一 SafetyGate 红队矩阵且低于 800 行硬上限，当前拆分会复制高安全 fixture；后续新增语义类别前必须先拆 harness。
+
+内部规格审查为 `Spec compliant: Yes`，质量安全审查为 `Ready: Yes`。Antigravity 与 Cursor 冻结版终审均 `APPROVE`，无 Critical/Warning。Claude 已在正式设计和实施计划阶段完成审查并批准；冻结版代码终审的 direct CLI 与 CCG wrapper 多次持续无输出后人工中止，未把外部通道故障冒充批准。
+
+Task 10 已封板。Gate 0 正式记录继续为 `blocked`、`production_default: false`，provider 默认批准闸继续拒绝，且本任务没有生产注册。下一步进入 Task 11 BullMQ 编排、SafetyGate 后原子落库与过期清理。
