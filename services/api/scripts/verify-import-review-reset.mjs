@@ -73,8 +73,9 @@ const EXPECTED_SITES = {
 /** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
  * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34
  * Round 8 新增 3 条（O′ O″ O‴）：34 → 37
- * Round 9 新增 4 条（O⁴ O⁵ O⁶ O⁷）：37 → 41 */
-const EXPECTED_SELFTEST_CASES = 41
+ * Round 9 新增 4 条（O⁴ O⁵ O⁶ O⁷）：37 → 41
+ * Round 10 新增 4 条（Q⁵ Q⁶ Q⁷ Q⁸）：41 → 45 */
+const EXPECTED_SELFTEST_CASES = 45
 
 /** 全部汇总检查项 = 5 真实站点 + 2 反向断言 + 自测用例数 */
 const EXPECTED_TOTAL =
@@ -106,6 +107,11 @@ function unwrap(node) {
     else if (ts.isSatisfiesExpression?.(n)) n = n.expression
     else if (ts.isNonNullExpression(n)) n = n.expression
     else if (ts.isTypeAssertionExpression?.(n)) n = n.expression // 老式 <const>'pending'
+    // FIX(round10): (expr<T>)({}) 在 TypeScript AST 中的包装节点是 ExpressionWithTypeArguments，
+    // 而非 InstantiationExpression —— 经 ts.createSourceFile 实测确认（TypeScript 5.x）。
+    // unwrap 不剥它，则 (prisma.job.upsert<any>)({}) 的 callee 停在 EWA，
+    // memberName(EWA) 返回 null → upsertModelOf return null → fail-open。
+    else if (ts.isExpressionWithTypeArguments?.(n)) n = n.expression
     else return n
   }
 }
@@ -216,11 +222,13 @@ function enclosingFnName(node) {
  * （早期版本用 /\.upsert\s*\(/ 会把 jobs-excel.service.ts 的
  *   fieldMappingRule.upsert 扫进来，报假阳性）。
  */
-/** 静态取成员名：`.foo` 与 `['foo']` 等价，`[expr]` 取不到 */
+/** 静态取成员名：`.foo` 与 `['foo']` / `[('foo')]` / `['foo' as const]` 等价，`[expr]` 取不到 */
 function memberName(node) {
   if (ts.isPropertyAccessExpression(node)) return node.name.text
   if (ts.isElementAccessExpression(node)) {
-    const a = node.argumentExpression
+    // FIX(round10/Q⁷): 先 unwrap 下标，否则 [('upsert')] 的 ParenthesizedExpression 不是
+    // StringLiteralLike → 返回 null → line-341 `memberName(callee) !== 'upsert'` → fail-open。
+    const a = node.argumentExpression != null ? unwrap(node.argumentExpression) : null
     if (a && ts.isStringLiteralLike(a)) return a.text
   }
   return null
@@ -923,6 +931,99 @@ function selfTest() {
       caseSite: CASE_SITE(),
       wantMissing: ['reviewedAt:null'],
       src: () => synth(RESET_INLINE.replace('          reviewedAt: null,', '')),
+    },
+    // ── Round 10 新增：ExpressionWithTypeArguments(EWA) + EA括号字符串下标 ──────
+    // Q⁵/Q⁶ 覆盖 (prisma.job.upsert<any>)({}) 形态：
+    //   CallExpression → ParenthesizedExpression → ExpressionWithTypeArguments
+    //   修复前 unwrap 不剥 EWA → upsertModelOf return null → fail-open
+    //   修复后 unwrap 剥掉 EWA → 检测正常
+    {
+      name: "Q⁵ (prisma.job.upsert<any>)() 含完整 reset —— EWA unwrap 正向通过",
+      expect: 'pass',
+      wantBlocks: 1,
+      caseSite: CASE_SITE(),
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (this.prisma.job.upsert<any>)({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    {
+      name: "Q⁶ (prisma.job.upsert<any>)() 缺 reviewStatus —— EWA unwrap 检出缺失",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ["reviewStatus:'pending'"],
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await (this.prisma.job.upsert<any>)({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE.replace("          reviewStatus: 'pending',\n", '')}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    // Q⁷/Q⁸ 覆盖 job[('upsert')]({}) 形态（EA 括号字符串下标）：
+    //   CallExpression.expression = ElementAccessExpression
+    //   ElementAccessExpression.argumentExpression = ParenthesizedExpression(StringLiteral)
+    //   此前有代码路径处理，但无专属用例；Q⁷/Q⁸ 补全覆盖并防退化。
+    {
+      name: "Q⁷ job[('upsert')]() 含完整 reset —— EA 括号字符串下标正向通过",
+      expect: 'pass',
+      wantBlocks: 1,
+      caseSite: CASE_SITE(),
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await this.prisma.job[('upsert')]({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
+    },
+    {
+      name: "Q⁸ job[('upsert')]() 缺 publishStatus —— EA 括号字符串下标检出缺失",
+      expect: 'fail',
+      caseSite: CASE_SITE(),
+      wantMissing: ["publishStatus:'draft'"],
+      src: () =>
+        `import { Injectable } from '@nestjs/common'\n` +
+        `\n` +
+        `@Injectable()\n` +
+        `export class FixtureService {\n` +
+        `  async importJobs(dto: any) {\n` +
+        `    await this.prisma.job[('upsert')]({\n` +
+        `      where: { id: dto.id },\n` +
+        `      create: { title: dto.title },\n` +
+        `      update: {\n` +
+        `${RESET_INLINE.replace("          publishStatus: 'draft',\n", '')}\n` +
+        `      },\n` +
+        `    })\n` +
+        `  }\n` +
+        `}\n`,
     },
   ]
 
