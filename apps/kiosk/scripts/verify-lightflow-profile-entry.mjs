@@ -369,6 +369,8 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',
