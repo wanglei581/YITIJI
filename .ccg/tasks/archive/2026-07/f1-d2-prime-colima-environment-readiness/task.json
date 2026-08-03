@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-colima-environment-readiness",
+  "title": "准备现有 Colima 的 D2′ 非生产 Linux 演练环境",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "已归档；D2′ full drill 必须另行授权",
+  "createdAt": "2026-07-30T10:49:40Z",
+  "branch": "codex/f1-d2-prime-colima-drill-20260730"
+}

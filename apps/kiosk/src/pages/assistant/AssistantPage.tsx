@@ -7,6 +7,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { KioskPageFrame } from '@ai-job-print/ui'
 import type { AssistantAction, AssistantSkill } from '@ai-job-print/shared'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
@@ -58,6 +59,7 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     serviceActions: [
       { label: '去做简历诊断', route: '/resume/source' },
       { label: '去打印文件', route: '/print/upload' },
+      { label: '做一次自我探索', route: '/resume/self-assessment/intro?from=assistant' },
     ],
   },
   {
@@ -345,10 +347,11 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
       : '与小青的本次咨询'
 
   return (
-    <main className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
+    <KioskPageFrame className="fusion-w3 fusion-w3--assistant">
+    <section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
       <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
 
-      <div ref={workbenchRef} className="assistant-workbench">
+      <div ref={workbenchRef} data-kiosk-domain="assistant" data-kiosk-screen="assistant" className="assistant-workbench">
         <header className="assistant-prototype-head">
           <span className="assistant-prototype-avatar" aria-hidden="true">青</span>
           <div>
@@ -522,7 +525,8 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
           inputRef.current?.blur()
         }}
       />
-    </main>
+    </section>
+    </KioskPageFrame>
   )
 }
 

@@ -19,6 +19,11 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { AuditService } from '../src/audit/audit.service'
 import { JobsService } from '../src/jobs/jobs.service'
+import { JobQualityService } from '../src/job-ai/job-quality.service'
+import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
+import { JobsAdminService } from '../src/jobs/jobs-admin.service'
+import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
+import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { cleanFairVerifyResidue } from './lib/verify-fair-residue'
 
@@ -52,7 +57,12 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
-  const svc = new JobsService(prisma, audit)
+  const _jobQuality = new JobQualityService(prisma)
+  const _kiosk = new JobsKioskService(prisma)
+  const _admin = new JobsAdminService(prisma, audit)
+  const _partner = new JobsPartnerService(prisma, audit, _jobQuality)
+  const _excel = new JobsExcelService(prisma, audit, _jobQuality)
+  const svc = new JobsService(_kiosk, _admin, _partner, _excel)
 
   // 预清:收掉上一次被强杀/锁超时漏删的本脚本残留(按稳定 tag)。
   await cleanFairVerifyResidue(prisma, RESIDUE_TAG)

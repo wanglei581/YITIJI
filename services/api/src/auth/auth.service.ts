@@ -4,6 +4,13 @@ import * as bcrypt from 'bcryptjs'
 import { createHash, randomInt, randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import {
+  hashEmail,
+  isValidEmail,
+  maskEmail,
+  maskEmailFromEnc,
+  normalizeEmail,
+} from '../common/crypto/email-identity'
+import {
   decryptPhone,
   encryptPhone,
   hashPhone,
@@ -13,10 +20,16 @@ import {
   normalizePhone,
 } from '../common/crypto/phone-identity'
 import type { UserRole } from '../common/decorators/roles.decorator'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
 import { PrismaService } from '../prisma/prisma.service'
 import type { SendInternalSmsCodeDto } from './dto/internal-auth.dto'
 import { InternalOtpService, type InternalSendCodeResult } from './internal-otp.service'
+import {
+  PASSWORD_PROOF_STATE,
+  passwordProofState,
+  passwordProofStateAfterSelfChange,
+} from './password-proof-state'
 
 type LoginPortal = 'admin' | 'partner' | 'kiosk'
 type SmsPortal = 'admin' | 'partner'
@@ -24,7 +37,6 @@ type SmsPortal = 'admin' | 'partner'
 const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
-const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 export interface LoginResult {
   token: string
@@ -35,6 +47,8 @@ export interface LoginResult {
     orgId:       string | null
     phoneMasked?: string
     phoneVerifiedAt?: string | null
+    emailMasked?: string
+    emailVerifiedAt?: string | null
   }
 }
 
@@ -42,6 +56,7 @@ interface InternalUser {
   id: string
   username: string
   passwordHash: string
+  passwordProofState: string
   name: string
   role: string
   orgId: string | null
@@ -49,6 +64,10 @@ interface InternalUser {
   phoneHash: string | null
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
+  emailHash: string | null
+  emailEnc: string | null
+  emailVerifiedAt: Date | null
+  emailVerifyMethod: string | null
   tokenVersion: number
   deletedAt: Date | null
 }
@@ -181,7 +200,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: userId, deletedAt: null, passwordHash: user.passwordHash },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.OWNER_MANAGED),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) throw this.resetFailed()
     await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
@@ -225,7 +248,11 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: user.id, deletedAt: null, passwordHash: user.passwordHash },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofStateAfterSelfChange(user.passwordProofState, user.role),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) {
       throw new HttpException({
@@ -282,6 +309,7 @@ export class AuthService {
     deviceId?: string,
   ): Promise<InternalSendCodeResult> {
     const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     if (!user.phoneEnc) {
       throw new BadRequestException({ error: { code: 'PHONE_NOT_BOUND', message: '当前账号未绑定登录手机号' } })
     }
@@ -292,7 +320,8 @@ export class AuthService {
   }
 
   async verifyAndBindPhone(userId: string, phone: string, code: string): Promise<{ phoneMasked: string; phoneVerifiedAt: Date }> {
-    await this.findUsableSelfPhoneUser(userId)
+    const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     await this.otp.verifyCode(phone, 'bind_phone', code)
     const normalized = normalizePhone(phone)
     const phoneHash = hashPhone(normalized)
@@ -302,7 +331,18 @@ export class AuthService {
     }
     const phoneVerifiedAt = new Date()
     const updated = await this.prisma.user.updateMany({
-      where: { id: userId, enabled: true, deletedAt: null },
+      where: {
+        id: userId,
+        enabled: true,
+        deletedAt: null,
+        phoneEnc: user.phoneEnc,
+        ...(user.role === 'partner'
+          ? {
+              passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
+              tokenVersion: user.tokenVersion,
+            }
+          : {}),
+      },
       data: {
         phoneHash,
         phoneEnc: encryptPhone(normalized),
@@ -318,6 +358,7 @@ export class AuthService {
     code: string,
   ): Promise<{ phoneMasked: string; phoneVerifiedAt: string }> {
     const user = await this.findUsableSelfPhoneUser(userId)
+    this.assertPartnerPasswordProofReady(user)
     if (!user.phoneEnc) {
       throw new BadRequestException({ error: { code: 'PHONE_NOT_BOUND', message: '当前账号未绑定登录手机号' } })
     }
@@ -333,6 +374,12 @@ export class AuthService {
       const phoneHash = hashPhone(phone)
       const user = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
       return user?.phoneVerifiedAt ? user : null
+    }
+    const email = this.normalizedEmailOrNull(loginId)
+    if (email) {
+      const emailHash = hashEmail(email)
+      const user = await this.prisma.user.findFirst({ where: { emailHash, deletedAt: null } })
+      return user?.emailVerifiedAt ? user : null
     }
     return this.prisma.user.findFirst({ where: { username: loginId.trim(), deletedAt: null } })
   }
@@ -400,6 +447,7 @@ export class AuthService {
       role,
       orgId: user.orgId,
       ver: user.tokenVersion,
+      jti: randomUUID(),
     })
 
     return {
@@ -411,6 +459,8 @@ export class AuthService {
         orgId: user.orgId,
         ...(user.phoneEnc ? { phoneMasked: maskPhoneFromEnc(user.phoneEnc) } : {}),
         phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
+        ...(user.emailEnc ? { emailMasked: maskEmailFromEnc(user.emailEnc) } : {}),
+        emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       },
     }
   }
@@ -420,9 +470,26 @@ export class AuthService {
     return isValidCnMobile(normalized) ? normalized : null
   }
 
+  private normalizedEmailOrNull(value: string): string | null {
+    const normalized = normalizeEmail(value)
+    return isValidEmail(normalized) ? normalized : null
+  }
+
+  private assertPartnerPasswordProofReady(user: Pick<InternalUser, 'role' | 'passwordProofState'>): void {
+    if (user.role !== 'partner' || user.passwordProofState === PASSWORD_PROOF_STATE.OWNER_MANAGED) return
+    throw new HttpException({
+      error: {
+        code: 'ACCOUNT_PASSWORD_PROOF_NOT_READY',
+        message: '该机构账号尚无独立持有人证明，请先完成线下核验恢复',
+      },
+    }, HttpStatus.CONFLICT)
+  }
+
   private maskLoginIdentity(value: string): string {
     const phone = this.normalizedPhoneOrNull(value)
     if (phone) return maskPhone(phone)
+    const email = this.normalizedEmailOrNull(value)
+    if (email) return maskEmail(email)
     const trimmed = value.trim()
     if (trimmed.length <= 2) return '*'.repeat(trimmed.length || 1)
     return `${trimmed.slice(0, 1)}***${trimmed.slice(-1)}`

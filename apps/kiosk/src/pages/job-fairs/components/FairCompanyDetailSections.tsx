@@ -285,7 +285,7 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
           <button
             type="button"
             onClick={() => onViewMode('list')}
-            className={['rounded-lg p-2 transition-colors', viewMode === 'list' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
+            className={['min-h-12 min-w-12 rounded-lg p-2 transition-colors', viewMode === 'list' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
             title="列表视图"
           >
             <ListIcon className="h-4 w-4" />
@@ -293,7 +293,7 @@ export function FilterBar({ positions, filters, viewMode, onFilter, onViewMode }
           <button
             type="button"
             onClick={() => onViewMode('poster')}
-            className={['rounded-lg p-2 transition-colors', viewMode === 'poster' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
+            className={['min-h-12 min-w-12 rounded-lg p-2 transition-colors', viewMode === 'poster' ? 'bg-[var(--dark)] text-[var(--paper)]' : 'text-[var(--muted)]'].join(' ')}
             title="海报视图"
           >
             <LayoutGridIcon className="h-4 w-4" />

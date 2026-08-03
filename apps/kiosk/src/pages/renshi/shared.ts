@@ -85,8 +85,8 @@ export const TAG_TONE: Record<TagTone, string> = {
   slate: 'bg-neutral-100 text-neutral-600',
 }
 
-// 复用按钮样式：金/amber 仅做轻底色描边，不大面积铺色（visual-design-spec §15.6）。
+// 复用按钮样式：麦金/wheat 轻底色描边，不大面积铺色（visual-design-spec §15.6）。
 export const BTN_OFFICIAL =
-  'flex min-h-[48px] items-center gap-2 rounded-lg border border-warning/50 bg-warning-bg px-4 text-sm font-semibold text-warning-fg hover:bg-warning/20'
+  'flex min-h-[48px] items-center gap-2 rounded-lg border bg-wheat-bg px-4 text-sm font-semibold text-wheat-fg hover:bg-wheat-soft'
 export const BTN_PRINT =
   'flex min-h-[48px] items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 text-sm font-semibold text-neutral-700 hover:bg-neutral-50'

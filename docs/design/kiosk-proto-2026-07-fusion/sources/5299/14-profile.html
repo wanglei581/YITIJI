@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 我的</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content { gap: 18px; }
+  .user-card { display: flex; align-items: center; gap: 22px; padding: 22px 30px; }
+  .user-card .avatar {
+    width: 84px; height: 84px; flex: none; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--teal-soft); border: 2px solid rgba(31,158,134,.35);
+    color: var(--teal-deep); font-family: var(--serif); font-size: 40px; font-weight: 700;
+  }
+  .user-card .u-info b { display: block; font-size: 28px; font-weight: 700; letter-spacing: 1px; }
+  .user-card .u-info span { display: block; margin-top: 6px; font-size: 20px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .u-stats { display: flex; gap: 14px; margin-left: auto; }
+  .u-stat {
+    min-width: 108px; padding: 12px 18px; text-align: center;
+    background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm);
+  }
+  .u-stat b { display: block; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .u-stat span { display: block; margin-top: 4px; font-size: 17px; color: var(--muted); }
+  .u-ops { display: flex; flex-direction: column; gap: 10px; margin-left: 18px; }
+  .u-ops .ico-row { display: flex; gap: 10px; }
+  .u-ops .icobtn { position: relative; width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); color: var(--teal-deep); cursor: pointer; }
+  .u-ops .icobtn svg { width: 26px; height: 26px; }
+  .u-ops .icobtn .dot-n { position: absolute; top: 10px; right: 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--error); }
+  .u-ops .btn.sm { min-height: 56px; padding: 0 22px; font-size: 20px; }
+  .session-strip {
+    display: flex; align-items: center; gap: 18px; padding: 18px 26px;
+    background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); border-radius: var(--r-md);
+  }
+  .session-strip .s-ico { width: 48px; height: 48px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--surface); color: var(--teal-deep); }
+  .session-strip .s-ico svg { width: 26px; height: 26px; }
+  .session-strip .s-text { flex: 1; }
+  .session-strip .s-text b { display: block; font-size: 22px; font-weight: 700; }
+  .session-strip .s-text span { display: block; margin-top: 4px; font-size: 17px; color: var(--muted); }
+  .sec { padding: 20px 26px 22px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+  .sec-head h2 { font-family: var(--serif); font-size: 26px; font-weight: 700; letter-spacing: 1px; border-left: 5px solid var(--accent, var(--teal)); padding-left: 12px; }
+  .sec-head span { font-size: 17px; color: var(--muted); }
+  .asset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .asset-grid .tile { min-height: 108px; padding: 16px 18px; }
+  .asset-grid .tile .t-text b { font-size: 22px; }
+  .asset-grid .tile .t-text span { font-size: 16px; }
+  .svc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .svc-grid .tile { min-height: 84px; padding: 12px 14px; gap: 12px; }
+  .svc-grid .tile .t-icon { width: 42px; height: 42px; }
+  .svc-grid .tile .t-text b { font-size: 19.5px; }
+  .svc-grid .tile .t-text span { font-size: 16px; margin-top: 2px; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .duo .sec { padding: 18px 24px 20px; }
+  .duo .tile { min-height: 92px; }
+  .duo .list { display: flex; flex-direction: column; gap: 12px; }
+  .acct-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .acct-row .tile { min-height: 88px; padding: 12px 16px; }
+  .acct-row .tile .t-text b { font-size: 20px; }
+  .acct-row .tile .t-text span { font-size: 16px; }
+  .content > .notice { margin-top: auto; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 顶部状态栏 -->
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
+    </div>
+  </header>
+
+  <main class="content a-teal" style="padding-top:26px">
+
+    <!-- 用户卡 + 账号概览统计(仅数量概览,明细在各业务页) -->
+    <section class="card accented user-card">
+      <span class="avatar">王</span>
+      <div class="u-info">
+        <b>王同学</b>
+        <span>138****1921 · 已登录</span>
+      </div>
+      <div class="u-stats">
+        <div class="u-stat"><b>7</b><span>AI记录</span></div>
+        <div class="u-stat"><b>7</b><span>收藏记录</span></div>
+        <div class="u-stat"><b>6</b><span>文档记录</span></div>
+      </div>
+      <div class="u-ops">
+        <div class="ico-row">
+          <button class="icobtn" aria-label="消息通知">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 9a6 6 0 10-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a1.8 1.8 0 003 0"/></svg>
+            <span class="dot-n"></span>
+          </button>
+          <button class="icobtn" aria-label="账号设置">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.9 1.2 2 2 0 11-4 0 1.6 1.6 0 00-2.9-1.2 2 2 0 11-2.8-2.8 1.6 1.6 0 00-1.2-2.9 2 2 0 110-4 1.6 1.6 0 001.2-2.9 2 2 0 112.8-2.8 1.6 1.6 0 002.9-1.2 2 2 0 114 0 1.6 1.6 0 002.9 1.2 2 2 0 112.8 2.8 1.6 1.6 0 001.2 2.9 2 2 0 110 4 1.6 1.6 0 00-1.2 2.9z"/></svg>
+          </button>
+        </div>
+        <button class="btn ghost sm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          退出登录
+        </button>
+      </div>
+    </section>
+
+    <!-- 本次服务记录(仅当前会话,不承诺跨会话留存) -->
+    <div class="session-strip">
+      <span class="s-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg></span>
+      <div class="s-text">
+        <b>本次服务记录:简历 1 份 · 扫描件 1 份 · 优化建议 1 条</b>
+        <span>仅保存在当前会话,离开或超时后自动清除;保存到账号后按对应业务留存期限保管</span>
+      </div>
+      <button class="btn primary sm">继续刚才的任务</button>
+    </div>
+
+    <!-- 我的资产 -->
+    <section class="card sec a-teal">
+      <div class="sec-head"><h2>我的资产</h2><span>本人简历、文档、订单与收藏</span></div>
+      <div class="asset-grid">
+        <button class="tile a-teal"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h5M10 16h5"/></svg></span><span class="t-text"><b>我的简历</b><span>原始 / 诊断 / 优化版</span></span></button>
+        <button class="tile a-slate"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg></span><span class="t-text"><b>我的文档</b><span>扫描件、证明材料</span></span></button>
+        <button class="tile a-plum"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg></span><span class="t-text"><b>AI服务记录</b><span>建议、面试、规划</span></span></button>
+        <button class="tile a-wheat"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span><span class="t-text"><b>打印订单</b><span>取件码、打印状态</span></span></button>
+        <button class="tile a-clay"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20s-7-4.5-7-10a4 4 0 017-2.5A4 4 0 0119 10c0 5.5-7 10-7 10z"/></svg></span><span class="t-text"><b>我的收藏</b><span>岗位、招聘会、政策</span></span></button>
+        <button class="tile a-plum"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span><span class="t-text"><b>我的权益</b><span>券与活动权益</span></span></button>
+      </div>
+    </section>
+
+    <!-- 常用服务 -->
+    <section class="card sec a-slate">
+      <div class="sec-head"><h2>常用服务</h2><span>直达既有功能页</span></div>
+      <div class="svc-grid">
+        <button class="tile a-teal"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg></span><span class="t-text"><b>AI简历服务</b><span>诊断与优化</span></span></button>
+        <button class="tile a-plum"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V3H6.5A2.5 2.5 0 004 5.5z"/></svg></span><span class="t-text"><b>简历模板</b><span>选择正式模板</span></span></button>
+        <button class="tile a-slate"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z"/></svg></span><span class="t-text"><b>文档打印</b><span>上传与参数设置</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 16l-4-4 4-4M17 8l4 4-4 4M3 12h18"/></svg></span><span class="t-text"><b>打印扫描</b><span>服务中心</span></span></button>
+        <button class="tile a-slate"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18"/></svg></span><span class="t-text"><b>扫描文件</b><span>进入扫描流程</span></span></button>
+        <button class="tile a-clay"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span><span class="t-text"><b>岗位信息</b><span>第三方或官方来源</span></span></button>
+        <button class="tile a-wheat"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="t-text"><b>招聘会</b><span>第三方或官方场次</span></span></button>
+        <button class="tile a-teal"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg></span><span class="t-text"><b>AI助手</b><span>文字与语音咨询</span></span></button>
+      </div>
+    </section>
+
+    <!-- 来源与活动 / 权益与政策 -->
+    <div class="duo">
+      <section class="card sec a-wheat">
+        <div class="sec-head"><h2>招聘会与活动</h2><span>本人记录</span></div>
+        <div class="list">
+          <button class="tile a-slate"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></span><span class="t-text"><b>浏览记录</b><span>岗位、招聘会、政策、企业</span></span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:24px;height:24px;margin-left:auto;color:var(--muted)"><path d="M9 5l7 7-7 7"/></svg></button>
+          <button class="tile a-teal"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/></svg></span><span class="t-text"><b>外部跳转记录</b><span>本人离场跳转记录</span></span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:24px;height:24px;margin-left:auto;color:var(--muted)"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </section>
+      <section class="card sec a-plum">
+        <div class="sec-head"><h2>权益与政策</h2><span>真实活动与官方入口</span></div>
+        <div class="list">
+          <button class="tile a-wheat"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9a2 2 0 012-2h14a2 2 0 012 2v1a2 2 0 000 4v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1a2 2 0 000-4z"/><path d="M13 7v10"/></svg></span><span class="t-text"><b>权益活动</b><span>查看正式活动入口</span></span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:24px;height:24px;margin-left:auto;color:var(--muted)"><path d="M9 5l7 7-7 7"/></svg></button>
+          <button class="tile a-wheat"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg></span><span class="t-text"><b>政策补贴指引</b><span>政策说明与官方入口</span></span><svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:24px;height:24px;margin-left:auto;color:var(--muted)"><path d="M9 5l7 7-7 7"/></svg></button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 账户与支持 -->
+    <section class="card sec">
+      <div class="sec-head"><h2>账户与支持</h2><span>本人消息、账号、帮助与反馈入口</span></div>
+      <div class="acct-row">
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 9a6 6 0 10-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a1.8 1.8 0 003 0"/></svg></span><span class="t-text"><b>消息通知</b><span>2 条未读</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8 1.6 1.6 0 00-2.9 1.2 2 2 0 11-4 0 1.6 1.6 0 00-2.9-1.2 2 2 0 11-2.8-2.8 1.6 1.6 0 00-1.2-2.9 2 2 0 110-4 1.6 1.6 0 001.2-2.9 2 2 0 112.8-2.8 1.6 1.6 0 002.9-1.2 2 2 0 114 0 1.6 1.6 0 002.9 1.2 2 2 0 112.8 2.8 1.6 1.6 0 001.2 2.9 2 2 0 110 4 1.6 1.6 0 00-1.2 2.9z"/></svg></span><span class="t-text"><b>账号设置</b><span>登录状态与会话</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114 2c-.9.7-1.5 1.2-1.5 2.2M12 17v.5"/></svg></span><span class="t-text"><b>帮助中心</b><span>使用说明与边界</span></span></button>
+        <button class="tile"><span class="t-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 10h6M9 13.5h4"/></svg></span><span class="t-text"><b>意见反馈</b><span>提交服务反馈</span></span></button>
+      </div>
+    </section>
+
+    <!-- 合规提示 -->
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.7-8 9-4.8-1.3-8-4.5-8-9V6z"/></svg>
+      本人数据仅本人可见,留存到期后自动清理;浏览与跳转明细在对应业务页查看,本页只保留入口与概览。
+    </div>
+  </main>
+
+  <!-- 底部导航:我的激活 -->
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item active">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

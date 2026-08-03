@@ -1,0 +1,12 @@
+{
+  "id": "p0-1b-kiosk-session-warning-20260729",
+  "title": "P0-1B 公共终端清场预警与任务感知文案",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "等待用户授权推送并创建 PR；PR/CI 通过后安排 1080×1920 与 Windows 真机验收",
+  "createdAt": "2026-07-29T09:38:00Z",
+  "branch": "codex/p0-1b-kiosk-session-warning-20260729"
+}

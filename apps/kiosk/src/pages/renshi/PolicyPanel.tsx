@@ -59,7 +59,7 @@ export function PolicyPanel({
       <AudienceFilter value={audience} onChange={onAudienceChange} />
 
       {sourceLine && (
-        <p className="flex shrink-0 items-center gap-2 text-[16px] text-neutral-500">
+        <p className="k8-policy-src-line">
           <InfoIcon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           {sourceLine}
         </p>
@@ -73,8 +73,8 @@ export function PolicyPanel({
           className="py-12"
         />
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[430px_minmax(0,1fr)] gap-[22px]">
-          <div className="flex min-h-0 flex-col gap-3.5 overflow-y-auto pr-1">
+        <div className="k8-policy-grid">
+          <div className="k8-policy-list">
             {visible.map((item) => {
               const active = selected?.id === item.id
               const canFavorite = !item.id.startsWith('builtin-')
@@ -82,20 +82,15 @@ export function PolicyPanel({
               return (
                 <article
                   key={item.id}
-                  className={[
-                    'flex shrink-0 items-start gap-3 rounded-[14px] border p-[18px_20px] transition-colors',
-                    active
-                      ? 'border-warning/50 bg-warning-bg shadow-[0_3px_14px_rgba(169,120,31,.12)]'
-                      : 'border-neutral-200 bg-surface hover:border-neutral-300',
-                  ].join(' ')}
+                  className={`k8-policy-list-item${active ? ' is-active' : ''}`}
                 >
                   <button type="button" className="min-w-0 flex-1 text-left" onClick={() => selectItem(item)}>
                     <span className={`inline-flex rounded-full px-3 py-1 text-[15px] font-semibold ${TAG_TONE[item.tagTone]}`}>
                       {item.tagLabel}
                     </span>
-                    <strong className="mt-2 block text-[22px] leading-snug text-neutral-900">{item.title}</strong>
-                    <span className="mt-2 block text-[16px] leading-snug text-neutral-500">{item.sourceName}</span>
-                    {item.updatedAt && <span className="mt-1 block text-[15px] text-neutral-400">更新 {item.updatedAt}</span>}
+                    <b className="mt-2 block">{item.title}</b>
+                    <span className="k8-policy-list-sub">{item.sourceName}</span>
+                    {item.updatedAt && <span className="k8-policy-list-updated">更新 {item.updatedAt}</span>}
                   </button>
                   {canFavorite && (
                     <button
@@ -116,8 +111,8 @@ export function PolicyPanel({
           </div>
 
           {selected && (
-            <section className="flex min-h-0 flex-col gap-4 overflow-y-auto rounded-[18px] border border-neutral-200 border-t-4 border-t-warning bg-surface p-6 shadow-sm">
-              <h2 className="font-serif text-[29px] font-bold leading-snug tracking-wide text-neutral-900">{selected.title}</h2>
+            <section className="k8-policy-detail">
+              <h2>{selected.title}</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-3 py-1 text-[15px] font-semibold ${TAG_TONE[selected.tagTone]}`}>{selected.tagLabel}</span>
                 <span className="rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-[15px] text-neutral-500">
@@ -125,28 +120,28 @@ export function PolicyPanel({
                 </span>
               </div>
 
-              {selected.conditions && <DetailList icon={BadgeCheckIcon} iconColor="text-warning-fg" title="先看是否符合" items={selected.conditions} />}
-              {selected.materials && <DetailList icon={ListChecksIcon} iconColor="text-warning-fg" title="需要准备材料" items={selected.materials} />}
-              {selected.steps && <DetailList icon={ChevronRightIcon} iconColor="text-warning-fg" title="建议办理路径" items={selected.steps} ordered />}
+              {selected.conditions && <DetailList icon={BadgeCheckIcon} iconColor="text-wheat-fg" title="先看是否符合" items={selected.conditions} />}
+              {selected.materials && <DetailList icon={ListChecksIcon} iconColor="text-wheat-fg" title="需要准备材料" items={selected.materials} />}
+              {selected.steps && <DetailList icon={ChevronRightIcon} iconColor="text-wheat-fg" title="建议办理路径" items={selected.steps} ordered />}
               {!selected.conditions && !selected.materials && !selected.steps && selected.content && (
                 <p className="whitespace-pre-wrap rounded-[14px] border border-neutral-200 bg-neutral-50 p-5 text-[19px] leading-relaxed text-neutral-700">
                   {selected.content}
                 </p>
               )}
 
-              <div className="mt-auto grid grid-cols-2 gap-3.5 pt-2">
-                <button type="button" onClick={() => navigate('/print/upload')} className={`${BTN_PRINT} min-h-[78px] justify-center text-[20px]`}>
+              <div className="k8-policy-detail-actions">
+                <button type="button" onClick={() => navigate('/print/upload')} className={`k8-policy-detail-btn ${BTN_PRINT}`}>
                   <PrinterIcon className="h-6 w-6" aria-hidden="true" />
                   上传自备材料打印
                 </button>
                 {selected.officialUrl && isValidSourceUrl(selected.officialUrl) && (
-                  <button type="button" onClick={() => onOfficialEntry(selected)} className={`${BTN_OFFICIAL} min-h-[78px] justify-center text-[20px]`}>
+                  <button type="button" onClick={() => onOfficialEntry(selected)} className={`k8-policy-detail-btn ${BTN_OFFICIAL}`}>
                     <QrCodeIcon className="h-6 w-6" aria-hidden="true" />
                     扫码打开官方入口
                   </button>
                 )}
               </div>
-              <p className="text-[15px] leading-relaxed text-neutral-500">办理结果以官方平台为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
+              <p className="k8-policy-detail-note">办理结果以官方平台为准，本系统仅提供信息说明、材料清单与打印辅助。</p>
             </section>
           )}
         </div>

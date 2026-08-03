@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-cleanup-contract-fix-20260731-90dfb01a",
+  "title": "修复 D2′ cleanup 退出语义、systemd inactive 复核与生产凭据 denylist",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交本地候选；后续 fresh retake 须另行授权",
+  "createdAt": "2026-07-31T11:19:17Z",
+  "branch": "codex/f1-d2-prime-cleanup-contract-fix-20260731-90dfb01a"
+}

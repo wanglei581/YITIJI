@@ -385,7 +385,8 @@ function TaskDetailBody({
   onCloseUnpaid: () => Promise<void> | void
 }) {
   const statusMeta = TASK_STATUS_MAP[detail.status] ?? { badge: 'default' as const, label: detail.status }
-  const canRetry = detail.type === 'print' && detail.status === 'failed'
+  const isUnconfirmed = detail.type === 'print' && detail.errorCode === 'PRINT_JOB_UNCONFIRMED'
+  const canRetry = detail.type === 'print' && detail.status === 'failed' && !isUnconfirmed
   const canCancel = detail.type === 'scan' && detail.status === 'waiting'
   const closeUnpaidBlockReason = detail.type === 'print' ? detail.closeUnpaidBlockReason : null
 
@@ -436,6 +437,19 @@ function TaskDetailBody({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {isUnconfirmed && (
+        <div className="rounded-lg border border-error-text/25 bg-error-bg px-3 py-2.5 text-[12.5px] leading-relaxed text-error-text">
+          <p className="font-bold">打印结果未确认，禁止重试，避免重复出纸。</p>
+          <p className="mt-1">
+            请先核对现场出纸情况，再前往{' '}
+            <Link to="/orders" className="font-bold underline underline-offset-2">
+              订单管理核查
+            </Link>
+            ，并按实际情况决定是否全额退款。
+          </p>
         </div>
       )}
 

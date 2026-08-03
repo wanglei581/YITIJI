@@ -67,6 +67,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.terminalBindCode
   }
 
+  get terminalCredential() {
+    return this.client.terminalCredential
+  }
+
   get printTaskStatusLog() {
     return this.client.printTaskStatusLog
   }
@@ -245,6 +249,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.userAiConsent
   }
 
+  get memberLegalConsent() {
+    return this.client.memberLegalConsent
+  }
+
   get userDataRequest() {
     return this.client.userDataRequest
   }
@@ -361,6 +369,22 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get toolboxLaunchEvent() {
     return this.client.toolboxLaunchEvent
+  }
+
+  // ── G1 线下招聘机构 ───────────────────────────────────────────────────────────
+
+  get offlineAgency() {
+    return this.client.offlineAgency
+  }
+
+  get offlineJob() {
+    return this.client.offlineJob
+  }
+
+  // ── G6 法务文档版本 ───────────────────────────────────────────────────────────
+
+  get legalDocVersion() {
+    return this.client.legalDocVersion
   }
 
   // ── Transaction ────────────────────────────────────────────────────────────

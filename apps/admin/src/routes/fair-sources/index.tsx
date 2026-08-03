@@ -8,6 +8,7 @@ import type { AdminFairSourceRecord, ReviewStatus, PublishStatus, JobFairStatus 
 import {
   getFairSources,
   approveFairSource,
+  rejectFairSource,
   publishFairSource,
   unpublishFairSource,
 } from '../../services/api'
@@ -64,6 +65,8 @@ export default function FairSourcesPage() {
   const [error,        setError]        = useState(false)
   const [reviewFilter, setReviewFilter] = useState('全部')
   const [viewing,      setViewing]      = useState<AdminFairSourceRecord | null>(null)
+  const [rejectingId,  setRejectingId]  = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
   const { page, pageSize, search, setPage, setPageSize, setSearch } = useTableState(20)
 
   useEffect(() => {
@@ -104,19 +107,28 @@ export default function FairSourcesPage() {
   }
 
   const handleApprove = (id: string) => {
-    approveFairSource(id).then((updated) => {
+    void approveFairSource(id).then((updated) => {
       setSources((prev) => prev.map((s) => s.id === id ? updated : s))
     })
   }
 
+  const handleReject = (id: string) => {
+    if (!rejectReason.trim()) return
+    void rejectFairSource(id, rejectReason.trim()).then((updated) => {
+      setSources((prev) => prev.map((s) => s.id === id ? updated : s))
+      setRejectingId(null)
+      setRejectReason('')
+    })
+  }
+
   const handlePublish = (id: string) => {
-    publishFairSource(id).then((updated) => {
+    void publishFairSource(id).then((updated) => {
       setSources((prev) => prev.map((s) => s.id === id ? updated : s))
     })
   }
 
   const handleUnpublish = (id: string) => {
-    unpublishFairSource(id).then((updated) => {
+    void unpublishFairSource(id).then((updated) => {
       setSources((prev) => prev.map((s) => s.id === id ? updated : s))
     })
   }
@@ -207,7 +219,12 @@ export default function FairSourcesPage() {
                     <tr key={s.id} className="hover:bg-neutral-50">
                       <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-neutral-700">{s.sourceName}</td>
                       <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{s.externalId}</td>
-                      <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
+                      <td className="px-4 py-3 font-medium text-neutral-800">
+                        <p>{s.name}</p>
+                        {s.reviewStatus === 'rejected' && s.rejectReason && (
+                          <p className="mt-0.5 text-xs text-error-fg">拒绝原因:{s.rejectReason}</p>
+                        )}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.organizer}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-500">
                         <div>{s.startTime}</div>
@@ -223,33 +240,72 @@ export default function FairSourcesPage() {
                       <td className="px-4 py-3"><StatusBadge dot status={review.badge}  label={review.label}  /></td>
                       <td className="px-4 py-3"><StatusBadge dot status={publish.badge} label={publish.label} /></td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-2">
-                          <button onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
-                          {s.reviewStatus === 'pending' && (
+                        {rejectingId === s.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              autoFocus
+                              className="h-7 w-40 rounded border border-error/30 px-2 text-xs focus:border-red-400 focus:outline-none"
+                              placeholder="拒绝原因(必填)"
+                              value={rejectReason}
+                              onChange={(e) => setRejectReason(e.target.value)}
+                            />
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
-                              onClick={() => handleApprove(s.id)}
+                              type="button"
+                              onClick={() => handleReject(s.id)}
+                              disabled={!rejectReason.trim()}
+                              className="rounded bg-error px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
                             >
-                              审核通过
+                              确认
                             </button>
-                          )}
-                          {s.reviewStatus === 'approved' && s.publishStatus === 'draft' && (
                             <button
-                              className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
-                              onClick={() => handlePublish(s.id)}
+                              type="button"
+                              onClick={() => { setRejectingId(null); setRejectReason('') }}
+                              className="rounded px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-100"
                             >
-                              发布
+                              取消
                             </button>
-                          )}
-                          {s.publishStatus === 'published' && (
-                            <button
-                              className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
-                              onClick={() => handleUnpublish(s.id)}
-                            >
-                              下架
-                            </button>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setViewing(s)} className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50">查看</button>
+                            {(s.reviewStatus === 'pending' || s.reviewStatus === 'reviewing') && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="rounded px-2 py-1 text-xs font-medium text-success-fg hover:bg-success-bg"
+                                  onClick={() => handleApprove(s.id)}
+                                >
+                                  审核通过
+                                </button>
+                                <button
+                                  type="button"
+                                  className="rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg"
+                                  onClick={() => { setRejectingId(s.id); setRejectReason('') }}
+                                >
+                                  拒绝
+                                </button>
+                              </>
+                            )}
+                            {s.reviewStatus === 'approved' && s.publishStatus === 'draft' && (
+                              <button
+                                type="button"
+                                className="rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50"
+                                onClick={() => handlePublish(s.id)}
+                              >
+                                发布
+                              </button>
+                            )}
+                            {s.publishStatus === 'published' && (
+                              <button
+                                type="button"
+                                className="rounded px-2 py-1 text-xs font-medium text-warning-fg hover:bg-warning-bg"
+                                onClick={() => handleUnpublish(s.id)}
+                              >
+                                下架
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
@@ -293,6 +349,9 @@ export default function FairSourcesPage() {
             <DetailRow label="同步时间" value={viewing.syncTime} />
             <DetailRow label="审核状态" value={REVIEW_MAP[viewing.reviewStatus].label} />
             <DetailRow label="发布状态" value={PUBLISH_MAP[viewing.publishStatus].label} />
+            {viewing.reviewStatus === 'rejected' && viewing.rejectReason ? (
+              <DetailRow label="拒绝原因" value={viewing.rejectReason} />
+            ) : null}
             <p className="mt-4 text-xs text-neutral-400">仅展示第三方来源数据，不参与招聘闭环。资料打印由一体机现场提供，此处为来源审核入口。</p>
           </div>
         )}

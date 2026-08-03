@@ -4,7 +4,8 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
-import { Card, EmptyState } from '@ai-job-print/ui'
+import { useNavigate } from 'react-router-dom'
+import { Button, Card, EmptyState } from '@ai-job-print/ui'
 import type { BenefitStatus, BenefitType, MemberBenefitItem } from '@ai-job-print/shared'
 import { GiftIcon } from 'lucide-react'
 import { getMyBenefits } from '../../../services/api/memberFavorites'
@@ -43,6 +44,7 @@ function validityLine(item: MemberBenefitItem): string {
 }
 
 export function MyBenefitsPage() {
+  const navigate = useNavigate()
   const { isLoggedIn, getToken } = useAuth()
   const [items, setItems] = useState<MemberBenefitItem[]>([])
   const [state, setState] = useState<MeListState>('loading')
@@ -76,6 +78,16 @@ export function MyBenefitsPage() {
         isLoggedIn={isLoggedIn}
         state={state}
         onRetry={() => setReloadKey((k) => k + 1)}
+        aside={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/activities')}>
+              去权益活动领取
+            </Button>
+            <Button size="sm" variant="secondary" className="me-ripple min-h-12" onClick={() => navigate('/profile')}>
+              返回我的
+            </Button>
+          </div>
+        }
       >
         <section className="me-detail-summary" aria-label="权益概览">
           <span className="me-summary-icon me-tone-clay" aria-hidden="true">
@@ -97,9 +109,14 @@ export function MyBenefitsPage() {
             <EmptyState
               icon={GiftIcon}
               title="还没有权益"
-              description="管理员发放优惠券、免费次数或政策资格提示后，这里会显示本人权益"
+              description="可先到权益活动领取；管理员发放后也会显示在这里。不接支付、不做核销。"
               className="py-12"
             />
+            <div className="flex justify-center pb-4">
+              <Button size="lg" className="me-ripple min-h-14 px-8" onClick={() => navigate('/activities')}>
+                去权益活动领取
+              </Button>
+            </div>
           </Card>
         ) : (
           items.map((item) => {

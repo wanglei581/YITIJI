@@ -1,4 +1,4 @@
-import { API_BASE_URL, ApiHttpError } from './client'
+import { API_BASE_URL, ApiHttpError, resolveApiUrl } from './client'
 import { authHeader, redirectToLogin } from '../auth'
 import type {
   PartnerDataSource,
@@ -23,9 +23,7 @@ import type {
 // ─── HTTP helpers ─────────────────────────────────────────────────────────────
 
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(`${API_BASE_URL}${path}`)
-  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  const res = await fetch(url.toString(), {
+  const res = await fetch(resolveApiUrl(path, params), {
     method: 'GET',
     headers: { Accept: 'application/json', ...authHeader() },
     credentials: 'include',
@@ -181,9 +179,7 @@ export const partnerHttpAdapter = {
 
   // Excel Import
   downloadExcelTemplate: async (dataType: 'job' | 'fair') => {
-    const url = new URL(`${API_BASE_URL}/partner/excel/template`, window.location.origin)
-    url.searchParams.set('dataType', dataType)
-    const res = await fetch(url.toString(), {
+    const res = await fetch(resolveApiUrl('/partner/excel/template', { dataType }), {
       method: 'GET',
       headers: {
         Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

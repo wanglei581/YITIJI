@@ -1,6 +1,7 @@
 /* service-desk tokens: --sd-surface --sd-text */
 @media (min-width: 1080px) {
   .interview-setup__form > .grid { grid-template-columns: 1fr 1fr; }
+  .interview-setup__layout { grid-template-columns: 1fr 380px; }
 }
 
 @media (max-width: 980px) {
@@ -25,7 +26,8 @@
   .interview-setup__form > .grid,
   .interview-report__abilities,
   .interview-report__two-col,
-  .interview-tips .interview-flow__scroll {
+  .interview-setup__layout,
+  .interview-tips__cols {
     grid-template-columns: 1fr;
   }
   .interview-tips .interview-flow__scroll > :first-child,

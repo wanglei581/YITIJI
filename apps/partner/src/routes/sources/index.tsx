@@ -305,6 +305,15 @@ export default function SourcesPage() {
   const [webhookGuide, setWebhookGuide] = useState<PartnerDataSource | null>(null)
   const [togglingId,   setTogglingId]   = useState<string | null>(null)
   const [toggleError,  setToggleError]  = useState<string | null>(null)
+  const [importNotice, setImportNotice] = useState<string | null>(null)
+
+  const fetchSources = () =>
+    getDataSources()
+      .then((data) => {
+        setSources(data)
+        setError(false)
+      })
+      .catch(() => setError(true))
 
   useEffect(() => {
     let cancelled = false
@@ -468,7 +477,11 @@ export default function SourcesPage() {
         </div>
       </Card>
 
-      <p className="mt-3 text-xs text-neutral-400">接入后端后实时展示数据源状态</p>
+      {importNotice && (
+        <p className="mt-3 text-xs text-success-fg" role="status">
+          {importNotice}
+        </p>
+      )}
 
       {excelSource && (
         <ExcelImportModal
@@ -476,9 +489,9 @@ export default function SourcesPage() {
           sourceName={excelSource.name}
           onClose={() => setExcelSource(null)}
           onImported={(count) => {
-            // TODO: refresh partner jobs list / show toast
-            console.info(`Excel 导入完成，共 ${count} 条`)
             setExcelSource(null)
+            setImportNotice(`Excel 导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
+            void fetchSources()
           }}
         />
       )}

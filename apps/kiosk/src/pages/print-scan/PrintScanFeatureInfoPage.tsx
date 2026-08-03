@@ -9,7 +9,7 @@
 // ============================================================
 
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
 import {
   ArrowLeftIcon,
@@ -23,6 +23,7 @@ import {
   ShieldCheckIcon,
   UserSquareIcon,
 } from 'lucide-react'
+import './styles/print-scan-fusion.css'
 
 type FeatureKey = 'id-photo'
 
@@ -84,16 +85,11 @@ export function PrintScanFeatureInfoPage() {
   // 未知 key 直达容错：不白屏，引导回服务中心
   if (!isFeatureKey(key)) {
     return (
-      <div className="flex h-full flex-col items-center justify-center p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
-          <FileType2Icon className="h-10 w-10 text-neutral-400" />
+      <KioskPageFrame className="w2-print-scan-page">
+        <div data-w2-page="print-scan-feature" className="w2-print-scan-shell flex h-full items-center justify-center p-8">
+          <KioskStatePanel tone="empty" title="未找到该功能" description="请返回打印扫描服务选择可用功能" icon={<FileType2Icon />} actions={<Button onClick={() => navigate('/print-scan')}>返回打印扫描服务</Button>} />
         </div>
-        <h1 className="mt-6 text-xl font-semibold text-neutral-900">未找到该功能</h1>
-        <p className="mt-2 text-sm text-neutral-500">请返回打印扫描服务选择可用功能</p>
-        <Button className="mt-8" onClick={() => navigate('/print-scan')}>
-          返回打印扫描服务
-        </Button>
-      </div>
+      </KioskPageFrame>
     )
   }
 
@@ -101,48 +97,26 @@ export function PrintScanFeatureInfoPage() {
   const Icon = info.icon
 
   return (
-    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
-      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
-        <div>
-          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
-          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
-          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
-            <span className="h-2.5 w-2.5 rounded-full bg-current" />
-            打印机正常 · A4纸充足
-          </span>
-        </div>
-      </header>
+    <KioskPageFrame className="w2-print-scan-page">
+      <div data-w2-page="print-scan-feature" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
+      <KioskPageHeader title={info.title} description="功能说明（即将上线）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <div className="mt-5 flex shrink-0 items-center gap-5">
-        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
-          <ArrowLeftIcon className="h-5 w-5" />
-          返回打印扫描服务
-        </button>
-        <div>
-          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">{info.title}</h1>
-          <p className="mt-1 text-xl text-neutral-500">功能说明（即将上线）</p>
-        </div>
-      </div>
-
-      <main className="mt-4 flex min-h-0 flex-1 gap-5">
+      <section className="mt-4 flex min-h-0 flex-1 gap-5">
         <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <section className="flex items-center gap-6 rounded-lg border border-warning/30 bg-surface p-7 shadow-sm">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-wheat flex items-center gap-6 p-7">
             <span className="grid h-24 w-24 shrink-0 place-items-center rounded-[24px] bg-warning-bg text-warning-fg">
               <Icon className="h-12 w-12" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
               <h2 className="flex items-center gap-3 font-serif text-[36px] font-black tracking-normal">
                 {info.title}
-                <span className="rounded-full border border-neutral-200 bg-canvas px-4 py-1.5 font-sans text-base font-semibold text-neutral-500">即将上线</span>
+                <span className="w2-print-scan-soon-badge">即将上线</span>
               </h2>
               <p className="mt-2 text-[19px] leading-relaxed text-neutral-500">{info.summary}</p>
             </span>
           </section>
 
-          <section className="flex flex-1 flex-col rounded-lg border border-warning/30 bg-surface p-6 shadow-sm">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-wheat flex flex-1 flex-col p-6">
             <b className="mb-2 block text-[22px] font-bold">计划支持</b>
             {PLAN_SUPPORT.map(([PlanIcon, title, copy]) => (
               <div key={String(title)} className="flex flex-1 items-center gap-4 border-b border-dashed border-neutral-200 py-3 last:border-b-0">
@@ -163,7 +137,7 @@ export function PrintScanFeatureInfoPage() {
           </div>
         </div>
 
-        <aside className="flex w-[420px] shrink-0 flex-col gap-4">
+        <aside className="w2-print-scan-side">
           <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
             <b className="mb-1 block text-xl font-bold">常见证件照规格参考</b>
             <p className="mb-3 text-[16.5px] text-neutral-500">仅供了解，实际以功能上线后支持的规格为准</p>
@@ -211,9 +185,9 @@ export function PrintScanFeatureInfoPage() {
             ))}
           </section>
         </aside>
-      </main>
+      </section>
 
-      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+      <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
           <ArrowLeftIcon className="mr-2 h-5 w-5" />
           返回打印扫描服务
@@ -223,7 +197,8 @@ export function PrintScanFeatureInfoPage() {
           <ImageIcon className="mr-2 h-5 w-5" />
           {info.fallbackLabel ?? '先用照片打印'}
         </Button>
+      </KioskActionBar>
       </div>
-    </div>
+    </KioskPageFrame>
   )
 }

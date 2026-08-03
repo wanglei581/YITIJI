@@ -20,6 +20,14 @@ import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
 
+function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
+  execFileSync(process.execPath, [path.join(apiRoot, 'node_modules', 'prisma', 'build', 'index.js'), ...args], {
+    cwd: apiRoot,
+    env,
+    stdio: 'pipe',
+  })
+}
+
 // Task 10 能力门禁直通 stub：门禁真实语义由 verify:admin-print-scan 覆盖，
 // 本脚本聚焦扫描任务状态机，不重复测门禁。
 const passthroughCapabilities = { assertUserTaskAllowed: async () => undefined } as never
@@ -71,14 +79,14 @@ class FakePrisma {
   private seq = 1
   readonly scanTasksById = new Map<string, StoredScanTask>()
   readonly filesById = new Map<string, StoredFileObject>()
-  readonly terminals = new Map<string, { id: string; enabled: boolean; terminalCode: string }>()
+  readonly terminals = new Map<string, { id: string; enabled: boolean; terminalCode: string; lifecycleStatus: string }>()
 
   constructor() {
-    this.terminals.set('t_1', { id: 't_1', enabled: true, terminalCode: 'T-001' })
-    this.terminals.set('t_disabled', { id: 't_disabled', enabled: false, terminalCode: 'T-002' })
+    this.terminals.set('t_1', { id: 't_1', enabled: true, terminalCode: 'T-001', lifecycleStatus: 'active' })
+    this.terminals.set('t_disabled', { id: 't_disabled', enabled: false, terminalCode: 'T-002', lifecycleStatus: 'active' })
     // B1-5 多行 reap 测试需要第二个独立启用的终端（证明一次 reap 能跨终端一起收敛，
     // 不是只测同一终端的两条行）。
-    this.terminals.set('t_2', { id: 't_2', enabled: true, terminalCode: 'T-003' })
+    this.terminals.set('t_2', { id: 't_2', enabled: true, terminalCode: 'T-003', lifecycleStatus: 'active' })
   }
 
   readonly terminal = {
@@ -89,7 +97,19 @@ class FakePrisma {
       }
       return null
     },
+    updateMany: async ({
+      where,
+    }: {
+      where: { id: string; enabled: boolean; lifecycleStatus: string }
+      data: { lifecycleStatus: string }
+    }) => {
+      const terminal = this.terminals.get(where.id)
+      const matches = terminal?.enabled === where.enabled && terminal.lifecycleStatus === where.lifecycleStatus
+      return { count: matches ? 1 : 0 }
+    },
   }
+
+  readonly $transaction = async <T>(callback: (tx: this) => Promise<T>): Promise<T> => callback(this)
 
   readonly scanTask = {
     create: async ({ data }: { data: Partial<StoredScanTask> }) => {
@@ -376,7 +396,9 @@ async function assertRealDbPartialUniqueIndex(dbUrl: string, label: 'sqlite' | '
   const { client } = createPrismaClient(dbUrl)
   await client.$connect()
   try {
-    const realPrisma = { terminal: client.terminal, scanTask: client.scanTask } as never
+    // ScanTasksService.create 以真实事务 + Terminal no-op CAS 与退役串行；这里必须传
+    // 完整真实 client，不能再用只摘 terminal/scanTask 的旧局部 mock。
+    const realPrisma = client as never
     // create() 本身不触碰 this.files，真实 FilesService 在这里没有必要。
     const service = new ScanTasksService(realPrisma, {} as never, passthroughCapabilities)
 
@@ -826,11 +848,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
-      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
-        cwd: apiRoot,
-        env: { ...process.env, DATABASE_URL: dbUrl },
-        stdio: 'pipe',
-      })
+      runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbPartialUniqueIndex(dbUrl, 'sqlite')
     } finally {
@@ -880,10 +898,10 @@ async function main(): Promise<void> {
       // `migrate deploy`（走 Postgres 专用配置/迁移目录，见 prisma.postgres.config.ts）。
       // migrate deploy 是幂等的，对已经部署过这条迁移的库（如 CI 提前 db:pg:deploy 过的库）
       // 重跑是安全的no-op。
-      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy', '--config', 'prisma.postgres.config.ts'], {
-        cwd: apiRoot,
-        env: { ...process.env, DATABASE_URL: pgUrl, POSTGRES_URL: pgUrl },
-        stdio: 'pipe',
+      runPrisma(apiRoot, ['migrate', 'deploy', '--config', 'prisma.postgres.config.ts'], {
+        ...process.env,
+        DATABASE_URL: pgUrl,
+        POSTGRES_URL: pgUrl,
       })
 
       await assertRealDbPartialUniqueIndex(pgUrl, 'postgres')
@@ -1626,11 +1644,7 @@ async function main(): Promise<void> {
     const dbPath = path.join(tmpDir, 'verify.db')
     const dbUrl = `file:${dbPath}`
     try {
-      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
-        cwd: apiRoot,
-        env: { ...process.env, DATABASE_URL: dbUrl },
-        stdio: 'pipe',
-      })
+      runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
       await assertRealDbMatchedHeartbeatClosesRace(dbUrl)
     } finally {
       rmSync(tmpDir, { recursive: true, force: true })
@@ -1801,11 +1815,7 @@ async function main(): Promise<void> {
     const dbUrl = `file:${dbPath}`
 
     try {
-      execFileSync(path.join(apiRoot, 'node_modules', '.bin', 'prisma'), ['migrate', 'deploy'], {
-        cwd: apiRoot,
-        env: { ...process.env, DATABASE_URL: dbUrl },
-        stdio: 'pipe',
-      })
+      runPrisma(apiRoot, ['migrate', 'deploy'], { ...process.env, DATABASE_URL: dbUrl })
 
       await assertRealDbDedupGuardClosesCrossUserLeak(dbUrl)
     } finally {

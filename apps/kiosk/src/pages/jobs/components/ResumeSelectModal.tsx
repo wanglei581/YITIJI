@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, EmptyState } from '@ai-job-print/ui'
+import { Button, EmptyState, KioskModal } from '@ai-job-print/ui'
 import type { MemberResumeItem } from '@ai-job-print/shared'
-import { CheckCircle2Icon, FileSearchIcon, Loader2Icon, XIcon } from 'lucide-react'
+import { CheckCircle2Icon, FileSearchIcon, Loader2Icon } from 'lucide-react'
 import { getMyResumes } from '../../../services/api/memberAssets'
 
 export function ResumeSelectModal({
@@ -46,22 +46,20 @@ export function ResumeSelectModal({
     [items],
   )
 
-  if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" role="dialog" aria-modal="true">
-      <Card className="relative flex max-h-[86vh] w-[34rem] max-w-full flex-col p-6">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="关闭"
-          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
-        >
-          <XIcon className="h-5 w-5" aria-hidden="true" />
-        </button>
-
-        <h2 className="text-lg font-semibold text-neutral-900">选择用于分析的简历</h2>
-        <p className="mt-1 text-sm text-neutral-500">仅展示本人已完成诊断的简历元数据，不展示简历原文。</p>
-
+    <KioskModal
+      open={open}
+      onClose={onClose}
+      title="选择用于分析的简历"
+      description="仅展示本人已完成诊断的简历元数据，不展示简历原文。"
+      className="max-h-[86vh] w-[34rem] max-w-full"
+      actions={(
+        <>
+          <Button size="lg" variant="secondary" className="h-12 flex-1" onClick={onClose}>取消</Button>
+          <Button size="lg" className="h-12 flex-1" onClick={() => { onClose(); onUpload() }}>去上传简历</Button>
+        </>
+      )}
+    >
         <div className="mt-4 min-h-[12rem] overflow-y-auto">
           {loading ? (
             <div className="flex min-h-[12rem] items-center justify-center gap-2 text-sm text-neutral-400">
@@ -102,22 +100,6 @@ export function ResumeSelectModal({
           )}
         </div>
 
-        <div className="mt-4 flex gap-3">
-          <Button size="lg" variant="secondary" className="h-12 flex-1" onClick={onClose}>
-            取消
-          </Button>
-          <Button
-            size="lg"
-            className="h-12 flex-1"
-            onClick={() => {
-              onClose()
-              onUpload()
-            }}
-          >
-            去上传简历
-          </Button>
-        </div>
-      </Card>
-    </div>
+    </KioskModal>
   )
 }

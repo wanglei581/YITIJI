@@ -153,7 +153,10 @@ async function main(): Promise<void> {
   rejectAny(methodBlock(jobAiController, 'match'), ['this.service.matchJob('], '会员 match controller 不再直接绕过治理服务')
 
   requireAll(jobFitController, ["import { GovernedJobFitService } from '../job-ai/governed-job-fit.service'", 'private readonly governed: GovernedJobFitService'], 'JobFitController 注入治理服务')
-  requireAll(jobAiController, ['member: requester.endUserId', 'terminal:', 'ip:', "fwd.split(',')[0]"], 'JobAiController 仍以 member/terminal/ip 与 XFF 首地址构造配额 context')
+  requireAll(jobAiController, ['member: requester.endUserId', 'terminal:', 'ip:', 'resolveClientIp'], 'JobAiController 仍以 member/terminal/ip 与 resolveClientIp（req.ip）构造配额 context')
+  rejectAny(jobAiController, ["headers?.['x-forwarded-for']", "headers['x-forwarded-for']", "fwd.split(',')[0]"], 'JobAiController 不得手解析 X-Forwarded-For')
+  requireAll(jobFitController, ['resolveClientIp', 'ip: ipOf(req)'], 'JobFitController 配额 IP 只信 resolveClientIp（req.ip）')
+  rejectAny(jobFitController, ["headers?.['x-forwarded-for']", "headers['x-forwarded-for']", "fwd.split(',')[0]"], 'JobFitController 不得手解析 X-Forwarded-For')
   const analyze = methodBlock(jobFitController, 'analyze')
   requirePattern(analyze, /return\s+this\.governed\.analyzeForJobFit\(dto\s*,\s*requester\s*,\s*[^)]+\)/, 'JobFitController POST 直接返回带三维 quota context 的 raw JobFitResponse')
   rejectAny(analyze, ['this.service.analyze(dto,', 'ApiResponse.ok', 'ApiResponse.fail'], 'JobFitController POST 不得绕过治理或改为 ApiResponse 包装')

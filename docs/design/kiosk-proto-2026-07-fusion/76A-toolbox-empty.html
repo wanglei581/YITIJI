@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>百宝箱 · 待配置(本区未开放)</title>
+<link rel="stylesheet" href="../kiosk-proto-2026-07/shared.css">
+<style>
+  /* 76 主态的状态变体:config.enabled=false 或无 items 时的兜底空态
+     真实依据:ToolboxZonePage.tsx `config.enabled ? items : []` → items.length===0 → .tb-empty */
+  .tb-content { flex: 1; min-height: 0; padding: 0 48px; display: flex; flex-direction: column; gap: 24px; }
+  .tb-empty-wrap { flex: 1; display: flex; }
+  .tb-empty-wrap .empty { flex: 1; justify-content: center; }
+  .tb-empty-wrap .empty .off-badge {
+    width: 132px; height: 132px; border-radius: 34px; display: grid; place-items: center;
+    background: var(--paper); border: 1px solid var(--line); color: var(--muted); opacity: 1;
+  }
+  .tb-empty-wrap .empty .off-badge svg { width: 66px; height: 66px; opacity: .5; }
+  .tb-empty-wrap .empty b { font-size: 30px; margin-top: 4px; }
+  .tb-empty-wrap .empty span { font-size: 21px; max-width: 640px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:24</span>
+      <span class="status-chip"><span class="dot"></span>终端在线</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>百宝箱</h1>
+      <p>本机暂未开放扩展服务,以学校 / 终端后台配置为准</p>
+    </div>
+  </div>
+
+  <main class="tb-content">
+    <div class="tb-empty-wrap">
+      <div class="empty">
+        <span class="off-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 7l-1.5-1.5a2 2 0 00-3 0L4 11l3 3 5.5-5.5M14 7l3 3M14 7l3-3 4 4-3 3M17 10l-6.5 6.5a2 2 0 01-3 0L4 14"/></svg>
+        </span>
+        <b>本区暂未开放</b>
+        <span>本机尚未上架扩展服务,或百宝箱已被学校 / 终端后台关闭。<br>后续有服务上线并经运营方审核后,会在这里展示。</span>
+      </div>
+    </div>
+
+    <div class="notice">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+      是否显示本区由学校 / 终端后台开关控制;未配置或已关闭时,首页不会出现「百宝箱」入口,直达本页也只显示此说明,不展示任何未上架服务。
+    </div>
+  </main>
+
+  <nav class="navbar">
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>
+      首页
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/><path d="M9 12h.01M13 12h.01M17 12h.01"/></svg>
+      AI助手
+    </button>
+    <button class="nav-item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>
+      我的
+    </button>
+  </nav>
+
+</div>
+<script src="../kiosk-proto-2026-07/shared.js"></script>
+</body>
+</html>

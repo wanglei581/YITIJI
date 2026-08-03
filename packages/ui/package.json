@@ -10,6 +10,7 @@
   "scripts": {
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
+    "verify:fusion-youth-foundation": "node scripts/verify-fusion-youth-foundation.mjs",
     "verify:service-desk-foundation": "node scripts/verify-service-desk-foundation.mjs"
   },
   "devDependencies": {

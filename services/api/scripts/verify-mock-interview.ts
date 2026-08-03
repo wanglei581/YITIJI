@@ -29,6 +29,7 @@ import { MockInterviewService } from '../src/mock-interview/mock-interview.servi
 import { InterviewReportPdfService } from '../src/mock-interview/interview-report-pdf.service'
 import { AsrService } from '../src/mock-interview/asr/asr.service'
 import { TtsService, splitForTts } from '../src/mock-interview/asr/tts.service'
+import { AiLogService } from '../src/ai/ai-log.service'
 
 const SECRET_ANSWER = '我在某电商项目里把首屏加载从4秒优化到1.5秒_机密标记XYZQ'
 const SECRET_QUESTION = '请讲讲你最有代表性的项目经历_问题标记ABCD'
@@ -90,6 +91,7 @@ async function main() {
   const { server, url } = await startStub()
   const prisma = new PrismaService()
   const audit = new AuditService(prisma)
+  const aiLog = new AiLogService(prisma)
   const stubConfig = {
     getApiKey: () => 'stub-key',
     getConfig: () => ({
@@ -99,7 +101,7 @@ async function main() {
   }
   const llm = new MockInterviewLlmService(stubConfig as never)
   const pdf = new InterviewReportPdfService()
-  const svc = new MockInterviewService(prisma, llm, pdf, {} as never, {} as never, audit)
+  const svc = new MockInterviewService(prisma, llm, pdf, {} as never, {} as never, audit, aiLog)
   const suffix = Date.now().toString(36)
   const endUserA = `vmi_a_${suffix}`
   const endUserB = `vmi_b_${suffix}`
@@ -136,7 +138,7 @@ async function main() {
           }
         },
       }
-      const guardedSvc = new MockInterviewService(prisma, llm, pdf, {} as never, guardedExtraction as never, audit)
+      const guardedSvc = new MockInterviewService(prisma, llm, pdf, {} as never, guardedExtraction as never, audit, aiLog)
       const created = await guardedSvc.createSession(
         { ...baseCfg, resumeFileId: ownedResumeFileId },
         { endUserId: endUserA, accessToken: null },

@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-post-latency-diagnostics-20260731",
+  "title": "F1 D2 prime post-latency diagnostic contract hardening",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend/operations",
+  "currentPhase": "completed",
+  "nextAction": "Archive task, commit, push, and open PR; do not merge without separate authorization",
+  "createdAt": "2026-07-31T03:15:00Z",
+  "branch": "codex/f1-d2-post-latency-diagnostics-20260731"
+}

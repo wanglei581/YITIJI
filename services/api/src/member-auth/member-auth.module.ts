@@ -5,6 +5,7 @@ import { MemberClosureReceiptGuard } from '../common/guards/member-closure-recei
 import { TerminalsModule } from '../terminals/terminals.module'
 import { MemberAuthController } from './member-auth.controller'
 import { MemberAuthService } from './member-auth.service'
+import { MemberPhoneRebindService } from './member-phone-rebind.service'
 import { MemberQrLoginService } from './member-qr-login.service'
 import { MemberStepUpService } from './member-step-up.service'
 import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
@@ -39,6 +40,7 @@ import { createSmsSender, SMS_SENDER } from './sms/sms-sender'
     MemberAuthService,
     MemberStepUpService,
     MemberQrLoginService,
+    MemberPhoneRebindService,
     EndUserAuthGuard,
     MemberClosureReceiptGuard,
     { provide: SMS_SENDER, useFactory: createSmsSender },

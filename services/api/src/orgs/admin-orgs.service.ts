@@ -11,10 +11,32 @@ import { randomUUID } from 'crypto'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
-import { encryptPhone, hashPhone, maskPhoneFromEnc, normalizePhone } from '../common/crypto/phone-identity'
+import {
+  EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+  encryptEmail,
+  hashEmail,
+  isValidEmail,
+  maskEmail,
+  normalizeEmail,
+} from '../common/crypto/email-identity'
+import { encryptPhone, hashPhone, normalizePhone } from '../common/crypto/phone-identity'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../common/constants/internal-session.constants'
 import { RedisService } from '../common/redis/redis.service'
 import { Prisma } from '../generated/prisma/client'
+import { PASSWORD_PROOF_STATE, passwordProofState } from '../auth/password-proof-state'
 import type { CreateOrgDto, UpdateOrgDto } from './dto/admin-org.dto'
+import {
+  ADMIN_ORG_ACCOUNT_SELECT,
+  mapAdminOrgAccount,
+  type AdminOrgAccount,
+} from './admin-org-account-view'
+import {
+  loadTrustedAccountForDeletion,
+  type TrustedAccountActionBinding,
+} from './admin-org-account-security'
+
+import { resolveClientIp } from '../common/client-ip'
+export type { AdminOrgAccount } from './admin-org-account-view'
 
 // ============================================================
 // AdminOrgsService — 阶段1B:Admin 合作机构管理
@@ -117,16 +139,6 @@ const ORG_TYPE_MATRIX: Record<string, OrgTypeMatrixRule> = {
   },
 }
 
-export interface AdminOrgAccount {
-  id: string
-  username: string
-  name: string
-  enabled: boolean
-  phoneMasked: string | null
-  phoneVerifiedAt: string | null
-  createdAt: string
-}
-
 export interface AdminOrgListItem {
   id: string
   name: string
@@ -200,26 +212,6 @@ function mapOrg(
   }
 }
 
-function mapAccount(u: {
-  id: string
-  username: string
-  name: string
-  enabled: boolean
-  phoneEnc: string | null
-  phoneVerifiedAt: Date | null
-  createdAt: Date
-}): AdminOrgAccount {
-  return {
-    id: u.id,
-    username: u.username,
-    name: u.name,
-    enabled: u.enabled,
-    phoneMasked: u.phoneEnc ? maskPhoneFromEnc(u.phoneEnc) : null,
-    phoneVerifiedAt: u.phoneVerifiedAt?.toISOString() ?? null,
-    createdAt: u.createdAt.toISOString(),
-  }
-}
-
 @Injectable()
 export class AdminOrgsService {
   private readonly logger = new Logger(AdminOrgsService.name)
@@ -272,15 +264,7 @@ export class AdminOrgsService {
         users: {
           where: { role: 'partner', deletedAt: null },
           orderBy: { createdAt: 'asc' },
-          select: {
-            id: true,
-            username: true,
-            name: true,
-            enabled: true,
-            phoneEnc: true,
-            phoneVerifiedAt: true,
-            createdAt: true,
-          },
+          select: ADMIN_ORG_ACCOUNT_SELECT,
         },
       },
     })
@@ -292,7 +276,7 @@ export class AdminOrgsService {
         jobs: o._count.jobs,
         fairs: o._count.jobFairs,
       }),
-      accounts: o.users.map(mapAccount),
+      accounts: o.users.map(mapAdminOrgAccount),
     }
   }
 
@@ -332,6 +316,7 @@ export class AdminOrgsService {
         data: {
           username: dto.account.username,
           passwordHash,
+          passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
           name: dto.account.name,
           role: 'partner',
           orgId,
@@ -343,7 +328,7 @@ export class AdminOrgsService {
       await this.writeAudit(admin, 'org.account.create', orgId, {
         accountId: account.id,
         username: account.username,
-        phoneMasked: mapAccount(account).phoneMasked,
+        phoneMasked: mapAdminOrgAccount(account).phoneMasked,
       })
     }
 
@@ -425,6 +410,7 @@ export class AdminOrgsService {
       data: {
         username: input.username,
         passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
         name: input.name,
         role: 'partner',
         orgId,
@@ -432,7 +418,7 @@ export class AdminOrgsService {
         phoneEnc: encryptPhone(normalizedPhone),
       },
     })
-    const mapped = mapAccount(account)
+    const mapped = mapAdminOrgAccount(account)
     await this.writeAudit(admin, 'org.account.create', orgId, {
       accountId: account.id,
       username: account.username,
@@ -465,7 +451,7 @@ export class AdminOrgsService {
       })
       await this.invalidateAccountSession(accountId)
     }
-    return mapAccount(updated)
+    return mapAdminOrgAccount(updated)
   }
 
   async resetAccountPassword(
@@ -478,13 +464,67 @@ export class AdminOrgsService {
     const passwordHash = await bcrypt.hash(password, 10)
     const updated = await this.prisma.user.updateMany({
       where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      data: {
+        passwordHash,
+        passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
+        tokenVersion: { increment: 1 },
+      },
     })
     if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
     await this.invalidateAccountSession(accountId)
     // 审计绝不含密码 / hash
     await this.writeAudit(admin, 'org.account.reset_password', orgId, { accountId, username: account.username })
     return { success: true }
+  }
+
+  /**
+   * Admin 代绑/换绑 Partner 登录邮箱。
+   * confirmVerified 必须为 true；写入 emailVerifiedAt + emailVerifyMethod=admin_manual（无 SMTP）。
+   */
+  async bindAccountEmail(
+    orgId: string,
+    accountId: string,
+    input: { email: string; confirmVerified: true },
+    admin: AuthedUser,
+  ): Promise<AdminOrgAccount> {
+    if (input.confirmVerified !== true) {
+      throw new BadRequestException({
+        error: { code: 'EMAIL_CONFIRM_REQUIRED', message: '必须确认已人工核验该邮箱归属' },
+      })
+    }
+    const account = await this.assertAccountInOrg(orgId, accountId)
+    const normalized = normalizeEmail(input.email)
+    if (!isValidEmail(normalized)) {
+      throw new BadRequestException({
+        error: { code: 'EMAIL_INVALID', message: '邮箱格式无效' },
+      })
+    }
+    await this.assertEmailAvailable(normalized, accountId)
+    const emailVerifiedAt = new Date()
+    const updated = await this.prisma.user.updateMany({
+      where: { id: accountId, orgId, role: 'partner', deletedAt: null },
+      data: {
+        emailHash: hashEmail(normalized),
+        emailEnc: encryptEmail(normalized),
+        emailVerifiedAt,
+        emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+        tokenVersion: { increment: 1 },
+      },
+    })
+    if (updated.count !== 1) this.throwAccountNotFound(orgId, accountId)
+    await this.invalidateAccountSession(accountId)
+    const refreshed = await this.prisma.user.findFirstOrThrow({
+      where: { id: accountId },
+      select: ADMIN_ORG_ACCOUNT_SELECT,
+    })
+    const mapped = mapAdminOrgAccount(refreshed)
+    await this.writeAudit(admin, 'org.account.bind_email', orgId, {
+      accountId,
+      username: account.username,
+      emailMasked: maskEmail(normalized),
+      emailVerifyMethod: EMAIL_VERIFY_METHOD_ADMIN_MANUAL,
+    })
+    return mapped
   }
 
   /**
@@ -495,14 +535,18 @@ export class AdminOrgsService {
     orgId: string,
     accountId: string,
     admin: AuthedUser,
+    trustedBinding: TrustedAccountActionBinding,
   ): Promise<{ success: true }> {
     const tombstonePasswordHash = await bcrypt.hash(randomUUID(), 10)
     const deleted = await this.withSerializableRetry(() => this.prisma.$transaction(
       async (tx) => {
-        const account = await tx.user.findFirst({
-          where: { id: accountId, orgId, role: 'partner', deletedAt: null },
-        })
-        if (!account) this.throwAccountNotFound(orgId, accountId)
+        const account = await loadTrustedAccountForDeletion(
+          tx,
+          orgId,
+          accountId,
+          admin.userId,
+          trustedBinding,
+        )
 
         const activeCount = await tx.user.count({
           where: { orgId, role: 'partner', enabled: true, deletedAt: null },
@@ -525,10 +569,15 @@ export class AdminOrgsService {
             tokenVersion: { increment: 1 },
             username: `deleted:${account.id}`,
             passwordHash: tombstonePasswordHash,
+            passwordProofState: passwordProofState(PASSWORD_PROOF_STATE.TEMPORARY),
             name: '已移除账号',
             phoneHash: null,
             phoneEnc: null,
             phoneVerifiedAt: null,
+            emailHash: null,
+            emailEnc: null,
+            emailVerifiedAt: null,
+            emailVerifyMethod: null,
             lastLoginAt: null,
           },
         })
@@ -645,6 +694,19 @@ export class AdminOrgsService {
     }
   }
 
+  private async assertEmailAvailable(email: string, exceptUserId?: string): Promise<void> {
+    const exists = await this.prisma.user.findFirst({
+      where: {
+        emailHash: hashEmail(email),
+        deletedAt: null,
+        ...(exceptUserId ? { NOT: { id: exceptUserId } } : {}),
+      },
+    })
+    if (exists) {
+      throw new ConflictException({ error: { code: 'EMAIL_ALREADY_BOUND', message: '该邮箱已绑定其他账号' } })
+    }
+  }
+
   private async assertAccountInOrg(orgId: string, accountId: string) {
     await this.assertOrgExists(orgId)
     const account = await this.prisma.user.findFirst({ where: { id: accountId, orgId, role: 'partner', deletedAt: null } })
@@ -686,7 +748,7 @@ export class AdminOrgsService {
     try {
       await this.redis.setJsonIfVersionNotOlder(
         this.sessionStateKey(user.id),
-        60,
+        INTERNAL_SESSION_CACHE_TTL_SECONDS,
         JSON.stringify({
           userId: user.id,
           role: user.role,
@@ -781,9 +843,7 @@ export class AdminOrgsService {
       targetType: 'organization',
       targetId: user.orgId,
       payload: { fields: Object.keys(data) },
-      ipAddress: typeof req.headers?.['x-forwarded-for'] === 'string'
-        ? (req.headers['x-forwarded-for'] as string).split(',')[0].trim()
-        : (req.ip ?? null),
+      ipAddress: resolveClientIp(req),
       userAgent: typeof req.headers?.['user-agent'] === 'string' ? req.headers['user-agent'] : null,
       requestId: req.requestId ?? null,
     })

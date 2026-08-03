@@ -19,6 +19,9 @@ export type AuditAction =
   | 'job.review'
   | 'job.publish'
   | 'job.import'
+  | 'offline_agency.review'
+  | 'offline_agency.publish'
+  | 'offline_agency.delete'
   | 'job_source.create'
   | 'job_source.update'
   | 'fair.review'
@@ -33,6 +36,10 @@ export type AuditAction =
   | 'terminal.profile.update'
   | 'resume.parse_submitted'
   | 'resume.optimize_requested'
+  | 'resume.self_assessment_create'
+  | 'resume.self_assessment_view'
+  | 'resume.self_assessment_print'
+  | 'resume.self_assessment_withdraw'
   | 'assistant.chat_message'
   | 'auth.password_change_self'
   | 'auth.phone_initial_bind_start'
@@ -48,12 +55,14 @@ export type AuditAction =
   | 'user.disable'
   | 'system.login'
   | 'system.config_change'
+  | 'print_job.admin_abandon'
 
 export type AuditTargetType =
   | 'auth'
   | 'file'
   | 'job'
   | 'job_source'
+  | 'offline_agency'
   | 'organization'
   | 'fair'
   | 'fair_source'
@@ -62,6 +71,7 @@ export type AuditTargetType =
   | 'smart_campus_config'
   | 'toolbox_config'
   | 'terminal'
+  | 'print_task'
 
 export interface AuditLogRecord {
   id: string

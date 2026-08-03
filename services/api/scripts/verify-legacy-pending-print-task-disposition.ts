@@ -290,7 +290,9 @@ async function main(): Promise<void> {
     } else fail(`cancelled Kiosk status mismatch: ${JSON.stringify(cancelledStatus)}`)
 
     const { TerminalsService } = await import('../src/terminals/terminals.service')
-    const terminals = new TerminalsService(prisma, null as never, null as never)
+    const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+    const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
+    const terminals = (() => { const _ag = new TerminalAgentService(prisma, null as never); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, null as never)) })()
     const terminalAck = await terminals.patchTaskStatus(
       unpaidTaskId,
       { status: 'printing' },

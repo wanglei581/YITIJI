@@ -25,6 +25,7 @@ import {
   RefreshCwIcon,
   ScrollTextIcon,
   ShieldIcon,
+  ShieldCheckIcon,
   SparklesIcon,
   UserCogIcon,
   UsersIcon,
@@ -64,10 +65,14 @@ const PATH_TO_KEY: Record<string, string> = {
   '/member-benefits': 'member-benefits',
   '/member-feedback': 'member-feedback',
   '/member-notifications': 'member-notifications',
+  '/member-privacy': 'member-privacy',
   '/alerts':       'alerts',
   '/permissions':  'permissions',
   '/audit':        'audit',
-  '/account-settings': 'account-settings',
+  '/account-settings':  'account-settings',
+  '/offline-agencies':  'offline-agencies',
+  '/legal-docs':        'legal-docs',
+  '/privacy-requests':  'privacy-requests',
 }
 
 // 反向映射:菜单 key → 落地路径。
@@ -106,13 +111,17 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'import-batches', label: 'Excel 导入记录', icon: FileSpreadsheetIcon, href: KEY_TO_PATH['import-batches'] },
   { key: 'sync-sources',   label: 'API 同步数据源', icon: RefreshCwIcon, href: KEY_TO_PATH['sync-sources'] },
   { key: 'partners',     label: '合作机构管理', icon: Building2Icon,       group: '机构用户', href: KEY_TO_PATH.partners },
+  { key: 'offline-agencies', label: '线下机构', icon: Building2Icon, href: KEY_TO_PATH['offline-agencies'] },
   { key: 'users',        label: '用户管理',     icon: UsersIcon, href: KEY_TO_PATH.users },
   { key: 'benefit-activities', label: '权益活动', icon: GiftIcon, href: KEY_TO_PATH['benefit-activities'] },
   { key: 'member-benefits', label: '会员权益', icon: GiftIcon, href: KEY_TO_PATH['member-benefits'] },
   { key: 'member-feedback', label: '意见反馈', icon: MessageSquareIcon, href: KEY_TO_PATH['member-feedback'] },
   { key: 'member-notifications', label: '消息通知', icon: MegaphoneIcon, href: KEY_TO_PATH['member-notifications'] },
+  { key: 'member-privacy', label: '会员隐私请求', icon: ShieldCheckIcon, href: KEY_TO_PATH['member-privacy'] },
   { key: 'permissions',  label: '权限管理',     icon: ShieldIcon,          group: '系统管理', href: KEY_TO_PATH.permissions },
   { key: 'audit',        label: '日志审计',     icon: ScrollTextIcon, href: KEY_TO_PATH.audit },
+  { key: 'legal-docs',   label: '法务文档版本', icon: FileTextIcon, href: KEY_TO_PATH['legal-docs'] },
+  { key: 'privacy-requests', label: '数据权利工单', icon: ShieldIcon, href: KEY_TO_PATH['privacy-requests'] },
 ]
 
 const ROLE_LABEL: Record<AuthedUser['role'], string> = {

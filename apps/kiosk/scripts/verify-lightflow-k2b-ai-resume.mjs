@@ -85,36 +85,10 @@ expectIncludes(
   'CI runs the resume and job material routing contract',
 )
 
-expectIncludes(kioskShell, 'const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [', 'Kiosk shell declares exact LightFlow route list')
-expectIncludes(kioskShell, 'SERVICE_DESK_EXACT_ROUTES.includes(pathname)', 'Kiosk shell uses exact LightFlow route matching')
+expectIncludes(kioskShell, 'visualTheme="service-desk"', 'Kiosk shell uses unified service-desk theme')
+expectIncludes(kioskShell, 'presentation="fusion-youth"', 'Kiosk shell uses unified fusion-youth presentation')
+expectNotIncludes(kioskShell, 'SERVICE_DESK_EXACT_ROUTES', 'Kiosk shell removes exact LightFlow route whitelist fork')
 expectNotIncludes(kioskShell, "startsWith('/resume')", 'Kiosk shell never broad-matches resume routes')
-const serviceDeskRouteList = kioskShell.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
-const expectedServiceDeskRoutes = [
-  '/',
-  '/help',
-  '/assistant',
-  '/profile',
-  '/resume/source',
-  '/resume/parse',
-  '/resume/report',
-  '/resume/generate',
-  '/resume/generate/preview',
-  '/resume/optimize',
-  '/resume/templates',
-  '/resume/materials',
-  '/resume/export',
-]
-const serviceDeskRoutes = [...serviceDeskRouteList.matchAll(/['\"]([^'\"]+)['\"]/g)].map((match) => match[1])
-expect(
-  serviceDeskRoutes.length === expectedServiceDeskRoutes.length
-    && new Set(serviceDeskRoutes).size === expectedServiceDeskRoutes.length
-    && expectedServiceDeskRoutes.every((route) => serviceDeskRoutes.includes(route)),
-  'Kiosk shell route whitelist is exactly the approved 13 LightFlow routes including profile',
-)
-for (const route of expectedServiceDeskRoutes) {
-  expectIncludes(serviceDeskRouteList, `'${route}'`, `Kiosk shell whitelists ${route}`)
-}
-expect(serviceDeskRoutes.every((route) => !route.startsWith('/me')), 'Kiosk shell keeps every /me detail route out of LightFlow')
 
 for (const [page, sourceCode, rootClass, cssPath] of [
   ['source', source, 'resume-source-lightflow', './resume-diagnosis-lightflow.css'],

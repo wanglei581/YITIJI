@@ -18,7 +18,7 @@ import {
   type PrintFile,
   type ViewMode,
 } from './components/FairCompanyDetailSections'
-import { ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -124,13 +124,13 @@ export function FairCompanyDetailPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title={company.companyName}
       subtitle={`展位 ${company.boothNumber ?? '—'} · ${company.industry}`}
       backLabel="返回列表"
       onBack={() => navigate(`/job-fairs/${fairId}/companies`)}
-      badge={<ProtoBadge icon={BuildingIcon}>{company.positions.length} 个岗位</ProtoBadge>}
+      badge={<FusionBadge icon={BuildingIcon}>{company.positions.length} 个岗位</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/companies`)}>
@@ -191,10 +191,10 @@ export function FairCompanyDetailPage() {
           <PositionPosterView positions={filteredPositions} companyName={company.companyName} industry={company.industry} />
         )}
 
-        <ProtoNotice>
+        <FusionNotice>
           {company.applyNote}。本系统仅展示招聘会现场企业与岗位信息，不接收简历，不参与招聘闭环。
           如需投递请扫码前往来源平台或现场前往展位咨询。
-        </ProtoNotice>
-    </ProtoPage>
+        </FusionNotice>
+    </KioskPageFrame>
   )
 }

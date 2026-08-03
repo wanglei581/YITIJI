@@ -9,7 +9,6 @@ import {
 } from 'lucide-react'
 import type { InterviewMessage, InterviewSessionPhase, InterviewVoiceState } from './types'
 import { formatInterviewClock } from './types'
-import { InterviewTopbar } from '../InterviewTopbar'
 
 type PillTone = 'gray' | 'blue' | 'red' | 'green'
 
@@ -74,8 +73,6 @@ export function InterviewSessionPanels({
 
   return (
     <>
-      <InterviewTopbar />
-
       <div className="interview-session__pagehead">
         <div className="interview-session__identity">
           <div className="interview-session__mark"><BotIcon aria-hidden="true" /></div>
@@ -90,7 +87,7 @@ export function InterviewSessionPanels({
         </div>
       </div>
 
-      <main className="interview-session__content">
+      <div className="interview-session__content">
         <section className="interview-session__progress-card">
           <span className="interview-session__question-count">第 {questionIndex} 题<small>/ 目标 {questionTarget} 题</small></span>
           <div className="interview-session__progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
@@ -151,7 +148,7 @@ export function InterviewSessionPanels({
             </div>
           )}
         </div>
-      </main>
+      </div>
     </>
   )
 }

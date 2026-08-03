@@ -159,6 +159,8 @@ async function main(): Promise<void> {
 
   const jobQuality = mustExist('src/job-ai/job-quality.service.ts', 'JobQualityService 已创建')
   const jobsService = read('src/jobs/jobs.service.ts')
+  // N1拆分后，质量刷新和字段映射在 jobs-partner.service.ts
+  const jobsPartnerService = (() => { try { return read('src/jobs/jobs-partner.service.ts') } catch { return '' } })()
   const jobsModule = read('src/jobs/jobs.module.ts')
   const jobSyncService = read('src/job-sync/job-sync.service.ts')
   const jobSyncModule = read('src/job-sync/job-sync.module.ts')
@@ -211,8 +213,13 @@ async function main(): Promise<void> {
     '质量规则覆盖 required 与 AI-ready 字段',
   )
 
+  // N1拆分后读所有 jobs 子服务合并扫描
+  const jobsSources = (() => {
+    const files = ['src/jobs/jobs.service.ts','src/jobs/jobs-partner.service.ts','src/jobs/jobs-shared.ts','src/jobs/jobs-public.service.ts']
+    return files.map(f => { try { return read(f) } catch { return '' } }).join('\n')
+  })()
   mustContain(
-    jobsService,
+    jobsSources,
     [
       'private readonly jobQuality: JobQualityService',
       'refreshJobQualitySnapshots',

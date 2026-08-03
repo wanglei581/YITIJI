@@ -28,7 +28,7 @@ export function ProfileEntrySection({ section, onTap }: { section: EntrySectionD
   if (section.entries.length === 0) return null
 
   return (
-    <section aria-label={section.title} className="kp-section">
+    <section aria-label={section.title} className="kp-section" data-rail={section.rail}>
       <div className="kp-section-head">
         <div>
           <h2>{section.title}</h2>

@@ -6,7 +6,9 @@ import {
   ExternalLinkIcon,
   FileSearchIcon,
   InfoIcon,
+  Link2Icon,
   MapPinIcon,
+  PrinterIcon,
   QrCodeIcon,
   ShieldCheckIcon,
   SmartphoneIcon,
@@ -82,9 +84,9 @@ export function JobSummarySection({
           onClick={onToggleFavorite}
           aria-pressed={favorite}
           aria-label={favorite ? '取消收藏' : '收藏岗位'}
-          className={`jf-f-chip ${favorite ? 'on' : ''}`}
+          className={`jf-fav-chip${favorite ? ' on' : ''}`}
         >
-          <StarIcon className={`h-5 w-5 ${favorite ? 'fill-current' : ''}`} />
+          <StarIcon className={`h-6 w-6 ${favorite ? 'fill-current' : ''}`} />
           {favorite ? '已收藏' : '收藏'}
         </button>
       </div>
@@ -180,8 +182,9 @@ export function JobTrustSection({ job, sourceCanApply }: { job: ExternalJobDTO; 
       </div>
 
       <div className="mt-4 flex items-center gap-2 text-[18px] text-[var(--muted)]">
-        <InfoIcon className="h-5 w-5" />
+        <Link2Icon className="h-5 w-5 shrink-0 opacity-70" />
         来源链接 <b className="break-all text-[var(--ink)]">{sourceCanApply ? job.sourceUrl : '来源平台未提供有效链接'}</b>
+        {sourceCanApply && <span className="ml-2 shrink-0">(完整链接见扫码页)</span>}
       </div>
 
       <div className="jf-notice mt-4">
@@ -198,19 +201,19 @@ export function JobTrustSection({ job, sourceCanApply }: { job: ExternalJobDTO; 
 export function JobNextActionsSection({
   job,
   sourceCanApply,
-  onOpenSource,
   onOpenQr,
   onViewCompany,
   onExplainAi,
   onMatchAi,
+  onPrint,
 }: {
   job: ExternalJobDTO
   sourceCanApply: boolean
-  onOpenSource: () => void
   onOpenQr: () => void
   onViewCompany: () => void
   onExplainAi: () => void
   onMatchAi: () => void
+  onPrint: () => void
 }) {
   return (
     <div className="jf-action-zone">
@@ -223,10 +226,10 @@ export function JobNextActionsSection({
           </div>
         </div>
         <div className="jf-next-grid">
-          <ActionButton icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
+          <ActionButton tinted icon={SparklesIcon} label="AI岗位解读" hint="看懂职责与准备点" onClick={onExplainAi} />
           <ActionButton icon={FileSearchIcon} label="岗位匹配参考" hint="用本人简历做准备" onClick={onMatchAi} />
           <ActionButton icon={BuildingIcon} label="查看企业" hint={job.companyProfileId ? job.company : '来源企业未关联'} disabled={!job.companyProfileId} onClick={onViewCompany} />
-          <ActionButton icon={ExternalLinkIcon} label="去来源平台投递" hint="打开第三方岗位页" disabled={!sourceCanApply} onClick={onOpenSource} />
+          <ActionButton icon={PrinterIcon} label="打印岗位信息" hint="A4 黑白 · 以现场公示价为准" onClick={onPrint} />
         </div>
       </section>
       <div className="jf-qr-panel">
@@ -252,12 +255,14 @@ function ActionButton({
   label,
   hint,
   disabled,
+  tinted,
   onClick,
 }: {
   icon: typeof QrCodeIcon
   label: string
   hint: string
   disabled?: boolean
+  tinted?: boolean
   onClick: () => void
 }) {
   return (
@@ -265,7 +270,7 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="jf-tile disabled:cursor-not-allowed disabled:opacity-50"
+      className={`jf-tile${tinted ? ' tinted' : ''} disabled:cursor-not-allowed disabled:opacity-50`}
     >
       <span className="jf-tile-icon"><Icon aria-hidden="true" /></span>
       <span><b>{label}</b><span>{hint}</span></span>

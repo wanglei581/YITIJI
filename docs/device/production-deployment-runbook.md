@@ -1,6 +1,6 @@
 # 生产服务器部署 Runbook（可复制粘贴执行版）
 
-> 最后更新：2026-06-13（Claude，上线前 P0 准备物，未真机执行）
+> 最后更新：2026-07-30（F1 activation 参数契约对齐，未生产执行）
 > 性质：本文是「**怎么做**」的执行手册；「**验收什么 / 通过标准**」见
 > [production-deployment-and-windows-host-checklist.md](./production-deployment-and-windows-host-checklist.md)。
 > 两份配套使用：先按本 runbook 执行，再回到 checklist §三 / §四逐项打勾。
@@ -233,17 +233,40 @@ pnpm verify:companies
 manifest/hash/archive、替换 PM2、reload、重启或修改 ecosystem。当前直接 `dist/main.js` 的历史
 守护形态不能被本文档追认成 provenance 通过。
 
-### 6.2 未来受控 release：首次启用须单独授权
+### 6.2 未来受控 release：D3–D6 分层授权
 
-仅在用户明确授权的未来部署窗口执行。先确认部署账户可写、API 运行账户只读，且以下绝对路径
-已经在审批单中固定：`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、`<CURRENT_LINK>`、
-`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`。release 根不得含 `.env`、日志、storage、uploads 或
-运行时缓存；这些目录必须位于 release 根外。
+本节是 future-only 模板，不是当前部署命令，也不授权 SSH、Genesis、切流、激活、PM2 或 Nginx
+操作。受管发布必须逐层取得独立、限时、具名授权：D3 只读预检通过后才可申请 D4 零流量
+Genesis；D4 证据复核通过后才可申请 D5 负载层切流；只有 managed 链已建立且 D5 完成后，才可在
+D6 稳态发布中使用 `release:activate`。上一层通过不自动授权下一层，`release:activate` 不得用于
+首次建链。D3 非秘密输入、状态和硬停止条件统一登记在
+[`f1-d3-managed-topology-inputs.md`](./f1-d3-managed-topology-inputs.md)；职责分离、审批记录索引与具名
+签批要求见
+[`f1-d3-managed-topology-approval-package.md`](./f1-d3-managed-topology-approval-package.md)。后者只引用
+前者的 B1–B9 状态，不建立第二套技术输入。
 
-在首次启用审批中，必须逐项列出 PM2 运行账户可继承的**最小环境变量名称**与用途；未经批准的
-部署账户、CI、调试或管理凭据不得进入 PM2 ecosystem。launcher/guard 必须继承运行账户的既有
-最小配置以启动 API，但不能把该继承误作新的秘密传递通道。`ecosystem` / `dump.pm2`、launcher、
-artifact 和 release 目录均须部署账户可写、运行账户只读。
+每层审批必须先确认部署账户可写、legacy 与 managed API 运行账户相互独立且只读，并固定以下非秘密标识：
+`<MANAGED_HOST_ROLE_ID>`、`<MANAGED_PM2_HOME>`、`<MANAGED_PM2_DAEMON_ID>`、
+`<MANAGED_PM2_NAME>`、`<MANAGED_LOG_ROOT>`、`<CANDIDATE_RELEASE_ROOT>`、`<ARTIFACT_ROOT>`、
+`<MANAGED_CURRENT_LINK>`、`<DEPLOYMENT_CONTROL_ROOT>`、`<LAUNCHER_CWD>`、`<LAUNCHER_PATH>`、
+`<RECORDED_LAUNCHER_SHA256>`、`<RUNTIME_ENV_CONTRACT_PATH>`、
+`<RECORDED_RUNTIME_ENV_CONTRACT_SHA256>`，以及代码固定的
+`http://127.0.0.1:3011/api/v1/health`。`<MANAGED_HOST_ROLE_ID>` 表示现有同一台 production host
+上的 managed 角色，不表示新增云主机；legacy 固定 loopback `3010`，managed 固定 loopback `3011`，
+两者必须同时存在且都不得对外网监听。managed 必须使用独立 Linux account、`PM2_HOME`、daemon、
+应用名、dump、日志、current、artifact、control root、launcher 与 runtime contract；不得复用 legacy
+控制面。release 根不得含 `.env`、日志、storage、uploads 或运行时缓存；这些目录必须位于 release 根外。
+
+D5 确认前，批准的 Nginx 配置必须保持 `100% legacy / managed 0%`，并在 D3 固定该 legacy 配置的
+SHA-256，作为尚未确认切流时唯一允许的恢复目标。D5 确认后不得把 legacy 当 fallback；后续 activation
+失败只能回到再次验证通过的 managed previous。shared PostgreSQL/Redis/对象存储的副作用预算、连接
+预算，以及同机 capacity/cgroup 方案都必须先在 B8 只读关闭，D1′/D2′ 不替代生产容量批准。
+
+runtime-env contract 只列 PM2 编排命令允许继承的最小环境变量**名称与用途**，不得包含值；未经
+批准的部署账户、CI、调试或管理凭据不得进入 PM2 ecosystem。该 contract 收窄的是激活器传给
+PM2 命令的环境副本，不能表述为“整个 API 进程环境已被完全收窄”。`ecosystem` / `dump.pm2`、
+launcher、artifact、control root 和 release 目录均须按已批准的部署账户可写、运行账户只读策略
+配置，并另行提供 control root 的长期保留证明。
 
 ```bash
 # 在尚未由 current 指向的 candidate release 根执行；SOURCE_ARCHIVE 必须来自已冻结的完整 commit。
@@ -261,36 +284,49 @@ pnpm --filter @ai-job-print/api release:manifest -- verify \
   --artifact-root <ARTIFACT_ROOT>
 ```
 
-PM2 不直接启动 candidate 的 `main.js` 或 guard。首次受控启用时，部署账户从已验证 candidate
+PM2 不直接启动 candidate 的 `main.js` 或 guard。D4 首次受控建链时，部署账户从已验证 candidate
 复制 `dist/release-provenance/release-current-launcher.js` 到 release 根外的 `<LAUNCHER_PATH>`，
 设置为运行账户不可写，并记录其 SHA-256。PM2 的固定配置必须满足：`cwd=<LAUNCHER_CWD>`、
-`script=<LAUNCHER_PATH>`、`script args=--current-link <CURRENT_LINK> --artifact-root <ARTIFACT_ROOT> --launcher-sha256 <RECORDED_LAUNCHER_SHA256>`。
+`script=<LAUNCHER_PATH>`、`script args=--current-link <MANAGED_CURRENT_LINK> --artifact-root <ARTIFACT_ROOT> --launcher-sha256 <RECORDED_LAUNCHER_SHA256>`。
 launcher 每次启动都解析 `current` 为真实目录，再调用该 release 内、manifest 覆盖的 guard；guard
 验证后才 `exec` API main。不得把 `current` 软链接直接作为 guard 的 `--release-root`。
 
-仅当 candidate 与 previous 均验证成功后，才可运行下列**未来**激活命令。它会原子切换 `current`、
-reload PM2、核验上述 launcher path/cwd/args、检查本机 PostgreSQL health；任何失败只会回切到
+仅当 D4 managed 链已建立、D5 已完成且 candidate 与 previous 均验证成功后，才可在单独授权的
+D6 窗口填写并运行下列**非可直接执行的占位模板**。它会原子切换 managed `current`、reload 指定的
+managed PM2 进程、核验 launcher path/cwd/args、检查本机 PostgreSQL health；任何失败只会回切到
 再次验证通过的 previous，否则返回 `NO-GO`。不得手工 `pm2 reload` 绕过该命令。
 
-激活器以排他方式创建 `<CURRENT_LINK>.activation.lock`，同一时刻只允许一个 activation。发现已有
+激活器以排他方式创建 `<MANAGED_CURRENT_LINK>.activation.lock`，同一时刻只允许一个 activation。发现已有
 锁、锁令牌不匹配或锁无法清理时均为 `NO-GO`，不得并发执行或擅自删除残留锁；须先取得单独授权，
 只读确认没有在途 activation 与 `current` / PM2 实际状态后，才可处置残留锁。
 
 ```bash
 pnpm --filter @ai-job-print/api release:activate -- \
   --candidate-root <CANDIDATE_RELEASE_ROOT> \
-  --current-link <CURRENT_LINK> \
+  --current-link <MANAGED_CURRENT_LINK> \
   --artifact-root <ARTIFACT_ROOT> \
-  --pm2-name api \
-  --health-url http://127.0.0.1:3010/api/v1/health \
+  --pm2-name <MANAGED_PM2_NAME> \
+  --health-url http://127.0.0.1:3011/api/v1/health \
   --launcher-cwd <LAUNCHER_CWD> \
   --launcher-path <LAUNCHER_PATH> \
-  --launcher-sha256 <RECORDED_LAUNCHER_SHA256>
+  --launcher-sha256 <RECORDED_LAUNCHER_SHA256> \
+  --runtime-env-contract-path <RUNTIME_ENV_CONTRACT_PATH> \
+  --runtime-env-contract-sha256 <RECORDED_RUNTIME_ENV_CONTRACT_SHA256>
 ```
 
+两套 CLI 不可混用：D4 `release:genesis` 为 11 flag / 22 参数，使用
+`--managed-current-link`、`--deployment-control-root` 与 `--runtime-env-contract`；D6
+`release:activate` 为上面的 10 flag / 20 参数，使用 `--current-link` 与
+`--runtime-env-contract-path`，且没有 control-root flag。任何交叉复制都会 fail-closed。PM2 配置中的
+3 项 launcher script args 是 PM2 传给 launcher 的运行参数，不属于 activation CLI 的 10 个 flag，
+不得合并计数。此处仅记录接口差异，不提供 D4/D5 可执行步骤。
+
 Worker 若为独立进程，仍按其实际入口单独守护；它不得复用 API launcher。每次受控切换后再执行
-`pm2 save`，并把 releaseId、commit、manifest/tree/launcher SHA-256、PM2 launcher 路径与 health
-结果写入脱敏部署记录。
+`pm2 save`，并立即把已批准的 `<PM2_HOME>/dump.pm2` 收紧为 `0600` 后复核。PM2 默认可能在重写
+dump 后恢复为 `0644`，因此权限修正是**每一次**
+`pm2 save` 的固定后置步骤，不能只在首次部署执行。随后把 releaseId、commit、
+manifest/tree/launcher SHA-256、PM2 launcher 路径、目标应用 `exec_interpreter` 与 health 结果写入
+脱敏部署记录；不得输出 dump 全文或环境变量值。
 
 ---
 
@@ -347,6 +383,12 @@ curl -s https://api.example.com/api/v1/health
 ## 9. 回滚
 
 - **代码回滚**：保留上一版本构建产物 / git tag；`pm2 reload` 切回。
+- **Node 运行时回滚顺序**：若目标应用的 PM2 dump 已将 `exec_interpreter` 固化为
+  `/usr/local/bin/node`，禁止先删除或改写该链接。必须先在同一授权窗口内用 `/usr/bin/node`
+  重建/重启同名应用，确认原 script/cwd、health 与真实 `/proc/<pid>/exe` 均正确，再执行
+  `pm2 save`、`chmod 0600 /root/.pm2/dump.pm2`，并脱敏确认 dump 已不再引用
+  `/usr/local/bin/node`；完成这些步骤后，才可回滚 `/usr/local/bin/node`、Corepack 或 `/opt` 工具链。
+  任一步失败都停止工具链清理并保留当前可启动解释器，避免 reboot/resurrect 时找不到 Node。
 - **数据库**：破坏性变更前先 `pg_dump -F c` 备份（见 postgres-operations.md §4）；
   PG→SQLite 退路见 postgres-operations.md §5（改 `DATABASE_URL=file:...` 重启，代码不改）。
 - **对象存储**：COS 文件不随代码回滚丢失（独立于代码）。

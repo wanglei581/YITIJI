@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>政策详情 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .pd-head { padding:18px 20px 20px; background:linear-gradient(160deg,#3a5ca0,#2f5090); }
+    .pd-tag { display:inline-block; margin-bottom:10px; }
+    .pd-title { font-family:var(--font-serif); font-size:21px; font-weight:700; color:#fff; line-height:1.5; }
+    .pd-meta { display:flex; gap:14px; margin-top:12px; font-size:11.5px; color:rgba(255,255,255,.7); }
+    .pd-body { padding:6px 4px; }
+    .pd-body p { font-size:14.5px; color:var(--ink-soft); line-height:1.85; margin:14px 0; }
+    .pd-h { font-family:var(--font-serif); font-size:16px; font-weight:700; color:var(--ink); margin:22px 0 8px; padding-left:11px; border-left:3px solid var(--slate); }
+    .pd-body ul { margin:8px 0; padding-left:4px; list-style:none; }
+    .pd-body li { font-size:14px; color:var(--ink-soft); line-height:1.7; padding-left:20px; position:relative; margin:8px 0; }
+    .pd-body li::before { content:''; position:absolute; left:4px; top:9px; width:6px; height:6px; border-radius:50%; background:var(--slate); }
+    .ai-plain { background:var(--plum-wash); border-radius:var(--r-lg); padding:15px 16px; margin:18px 0; }
+    .ap-head { display:flex; align-items:center; gap:7px; margin-bottom:9px; }
+    .ap-dot { width:22px; height:22px; border-radius:7px; background:var(--plum); color:#fff; display:flex; align-items:center; justify-content:center; font-size:12px; }
+    .ap-t { font-size:13px; font-weight:700; color:var(--plum-deep); }
+    .ap-txt { font-size:13.5px; color:var(--ink-soft); line-height:1.75; }
+    .src-box { display:flex; align-items:center; gap:12px; padding:14px 16px; background:var(--wash); border-radius:var(--r-lg); margin:16px 0; }
+    .src-logo { width:44px; height:44px; border-radius:12px; background:var(--slate); color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#3a5ca0"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light blur-bg">
+    <div class="nav-back" style="color:#fff">‹</div>
+    <div class="nav-title left" style="color:#fff">政策详情</div>
+    <div class="nav-right"><span style="font-size:17px;color:rgba(255,255,255,.85)">⤴</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="pd-head">
+      <span class="pd-tag chip teal">求职补贴</span>
+      <div class="pd-title">2026 年高校毕业生一次性求职创业补贴申领指南</div>
+      <div class="pd-meta"><span>市人力资源和社会保障局</span><span>2026-07-21 发布</span></div>
+    </div>
+
+    <div style="padding:14px 18px 0">
+      <!-- AI 摘要 -->
+      <div class="ai-plain">
+        <div class="ap-head">
+          <div class="ap-dot">✦</div>
+          <div class="ap-t">AI 政策速读 · 仅供参考</div>
+        </div>
+        <div class="ap-txt">面向低保家庭、脱贫户、残疾、助学贷款等 6 类困难毕业生，一次性发放 <b>1500 元</b> 求职创业补贴。<b>毕业学年内</b>申领，材料备齐后由学校统一初审。</div>
+      </div>
+
+      <div class="pd-body">
+        <div class="pd-h">补贴对象</div>
+        <p>纳入本市普通高等学校、职业院校（含技工院校）就业管理服务范围，且有就业创业意愿并积极求职的以下毕业年度学生：</p>
+        <ul>
+          <li>城乡居民最低生活保障家庭</li>
+          <li>脱贫家庭（含防止返贫监测对象）</li>
+          <li>残疾及获得国家助学贷款的毕业生</li>
+        </ul>
+
+        <div class="pd-h">补贴标准</div>
+        <p>符合条件人员每人一次性发放求职创业补贴 <b>1500 元</b>，同一学年内不重复享受。</p>
+
+        <div class="pd-h">申领流程</div>
+        <ul>
+          <li>学生本人向所在院校提出申请并提交证明材料</li>
+          <li>院校汇总公示 5 个工作日无异议后上报</li>
+          <li>人社部门复核通过后拨付至本人社保卡银行账户</li>
+        </ul>
+      </div>
+
+      <!-- 来源 -->
+      <div class="src-box">
+        <div class="src-logo">🏛</div>
+        <div style="flex:1">
+          <div class="fw-600 fs-14">市人力资源和社会保障局</div>
+          <div class="fs-12 muted mt-2">官方发布 · 政策原文</div>
+        </div>
+      </div>
+
+      <div class="compliance-note">本页为政策信息展示，不代表办理承诺。申领条件、材料与时限请以官方原文及当地经办窗口为准。</div>
+      <div class="spacer-lg"></div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">📄 打印政策</button>
+    <button class="btn primary" style="flex:1.6">查看官方原文</button>
+  </div>
+</div>
+</body>
+</html>

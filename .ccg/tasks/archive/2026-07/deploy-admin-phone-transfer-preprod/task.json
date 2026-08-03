@@ -1,0 +1,12 @@
+{
+  "id": "deploy-admin-phone-transfer-preprod",
+  "title": "部署 Admin 手机号安全转移引导到预生产并受控验收",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "已完成预生产真实短信与 Partner 到 admin 手机号安全转移 E2E",
+  "createdAt": "2026-07-26T14:15:00+08:00",
+  "branch": "codex/preprod-admin-phone-transfer-acceptance-20260726"
+}

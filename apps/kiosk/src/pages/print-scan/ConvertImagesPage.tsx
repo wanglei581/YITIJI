@@ -6,7 +6,7 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
@@ -27,6 +27,7 @@ import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import { convertImagesToPdf } from '../../services/api/printConversion'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
+import './styles/print-scan-fusion.css'
 
 const MAX_IMAGES = 20
 // 必须与后端 services/api/src/print-conversion/print-conversion.service.ts 的
@@ -161,47 +162,20 @@ export function ConvertImagesPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
-      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
-        <div>
-          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
-          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
-          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
-            <span className="h-2.5 w-2.5 rounded-full bg-current" />
-            打印机正常 · A4纸充足
-          </span>
-        </div>
-      </header>
+    <KioskPageFrame className="w2-print-scan-page">
+      <div data-w2-page="print-scan-convert" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
+      <KioskPageHeader title="格式转换" description="多张图片合并为一份 PDF，仅支持 JPG / PNG" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <div className="mt-5 flex shrink-0 items-center gap-5">
-        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
-          <ArrowLeftIcon className="h-5 w-5" />
-          返回打印扫描服务
-        </button>
-        <div>
-          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">格式转换</h1>
-          <p className="mt-1 text-xl text-neutral-500">多张图片合并为一份 PDF，仅支持 JPG / PNG</p>
-        </div>
-      </div>
-
-      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
-        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-lg leading-relaxed text-info-fg">
-          <InfoIcon className="h-6 w-6 shrink-0" />
-          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时；生成后直接进入确认打印。
+      <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+        <div className="flex items-center gap-3 rounded-lg border border-info/30 bg-info-bg px-5 py-4 text-base leading-relaxed text-info-fg">
+          <InfoIcon className="h-5 w-5 shrink-0" />
+          转换生成的 PDF 会保存到「我的文档」，默认保存约 24 小时，可在「我的文档」页面手动延长保存期限；生成后直接进入确认打印。
         </div>
 
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-base text-error-fg">
-            <AlertCircleIcon className="h-5 w-5 shrink-0" />
-            {error}
-          </div>
-        )}
+        {error && <KioskStatePanel compact tone="error" title="转换暂未完成" description={error} icon={<AlertCircleIcon />} />}
 
-        <div className="flex min-h-0 flex-1 gap-5">
-          <section className="flex min-w-0 flex-1 flex-col rounded-lg border border-info/30 bg-surface p-5 shadow-sm">
+        <div className="w2-print-scan-split">
+          <section className="w2-print-scan-card w2-print-scan-card--accent-info flex min-w-0 flex-1 flex-col p-5">
             <div className="mb-4 flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-info-bg text-info-fg">
                 <ImageIcon className="h-6 w-6" />
@@ -214,14 +188,17 @@ export function ConvertImagesPage() {
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               {images.map((img, index) => (
-                <div key={img.fileId} className="flex flex-1 items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
-                  <span className="flex aspect-[210/297] h-[96px] shrink-0 flex-col gap-1 rounded border border-neutral-200 bg-white p-2 shadow-sm">
-                    <i className="h-2 w-3/5 rounded-full bg-info-bg ring-1 ring-info/20" />
+                <div key={img.fileId} className="flex flex-none items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
+                  <span className="flex aspect-[210/297] h-[108px] shrink-0 flex-col gap-1.5 rounded border border-neutral-200 bg-white p-2.5 shadow-sm">
+                    <i className="h-2.5 w-3/5 rounded bg-info-bg ring-1 ring-info/25" />
                     <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                     <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
+                  </span>
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] bg-info-bg text-info-fg">
+                    <ImageIcon className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <b className="block break-all text-[22px] font-bold">{img.name}</b>
@@ -253,7 +230,7 @@ export function ConvertImagesPage() {
             </div>
           </section>
 
-          <aside className="flex w-[420px] shrink-0 flex-col gap-4">
+          <aside className="w2-print-scan-side">
             <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-3 block text-xl font-bold">继续添加图片</b>
               <input ref={inputRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={handleLocalFile} />
@@ -282,9 +259,9 @@ export function ConvertImagesPage() {
               />
             )}
 
-            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+            <section className="w2-print-scan-rules rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-2 block text-xl font-bold">转换规则</b>
-              <ul className="flex flex-1 list-disc flex-col justify-around gap-2 pl-5 text-[17.5px] leading-relaxed text-neutral-500">
+              <ul className="text-[17.5px] leading-relaxed text-neutral-500">
                 <li>仅支持 JPG / PNG 图片，单张不超过 10 MB。</li>
                 <li>一次最多合并 20 张图片，生成一份 PDF。</li>
                 <li>合并顺序即 PDF 页面顺序，生成前请调整好。</li>
@@ -293,9 +270,9 @@ export function ConvertImagesPage() {
             </section>
           </aside>
         </div>
-      </main>
+      </section>
 
-      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+      <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
           <ArrowLeftIcon className="mr-2 h-5 w-5" />
           返回
@@ -305,7 +282,8 @@ export function ConvertImagesPage() {
           {generating ? <LoaderIcon className="mr-2 h-5 w-5 animate-spin" /> : <FileType2Icon className="mr-2 h-5 w-5" />}
           {generating ? '正在生成…' : `生成 PDF（${images.length} 张）`}
         </Button>
+      </KioskActionBar>
       </div>
-    </div>
+    </KioskPageFrame>
   )
 }

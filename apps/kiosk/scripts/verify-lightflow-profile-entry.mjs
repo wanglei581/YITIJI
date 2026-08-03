@@ -98,9 +98,10 @@ function assertProfileCssScope(relativePath, source) {
     .filter((selector) => selector && !selector.startsWith('@'))
     .flatMap((selector) => selector.split(',').map((part) => part.trim()))
 
+  const allowedFrameSelector = "[data-kiosk-presentation='fusion-youth'] .fusion-w5--profile-entry > .ui-kiosk-page-content"
   expect(
-    selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow')),
-    `${relativePath} scopes every selector from .kprofile.kprofile-lightflow`,
+    selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow') || selector === allowedFrameSelector),
+    `${relativePath} scopes every selector to the profile entry surface`,
   )
 }
 
@@ -122,8 +123,6 @@ const profileCssFiles = [
 const profileCss = profileCssFiles.map((path) => read(path))
 const combinedProfileCss = profileCss.join('\n')
 const kioskRootSource = read('src/layouts/KioskRoot.tsx')
-const serviceDeskRouteList = kioskRootSource.split('const SERVICE_DESK_EXACT_ROUTES: readonly string[] = [')[1]?.split(']')[0] ?? ''
-
 expectIncludes(
   packageJson,
   '"verify:lightflow-profile-entry": "node scripts/verify-lightflow-profile-entry.mjs"',
@@ -131,7 +130,16 @@ expectIncludes(
 )
 
 expectNotIncludes(profile, 'ReferenceServiceNav', 'ProfilePage removes the homepage-only reference navigation')
-expectIncludes(profile, 'className="kprofile kprofile-lightflow"', 'ProfilePage binds the LightFlow root on its page shell')
+expectMatches(
+  profile,
+  /className="[^"]*\bkprofile\s+kprofile-lightflow\b[^"]*"/,
+  'ProfilePage binds the LightFlow root on its page shell',
+)
+expectMatches(
+  profile,
+  /<KioskPageFrame\b[^>]*className="[^"]*\bfusion-w5--profile-entry\b[^"]*"/,
+  'ProfilePage exposes a dedicated frame class for exact prototype gutter control',
+)
 expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage keeps an accessible-only page heading without visible 我的 copy')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
 expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage renders all five real sections from the existing entry configuration')
@@ -140,8 +148,9 @@ expectNotIncludes(header, 'lf-reference-', 'ProfileHeader does not reuse homepag
 expectNotIncludes(section, 'lf-reference-', 'ProfileEntrySection does not reuse homepage service-card primitives')
 expectNotIncludes(sessionRecords, 'lf-reference-', 'ProfileSessionRecords does not reuse homepage service-card primitives')
 expectNotIncludes(header, '<h1>我的', 'ProfileHeader does not render a visible 我的 page title')
-expectIncludes(serviceDeskRouteList, "'/profile'", 'KioskRoot opts the /profile landing page into the LightFlow shell')
-expectNotIncludes(serviceDeskRouteList, "'/me'", 'KioskRoot does not opt /me/* detail routes into LightFlow')
+expectIncludes(kioskRootSource, 'visualTheme="service-desk"', 'KioskRoot keeps /profile on the unified service-desk shell')
+expectIncludes(kioskRootSource, 'presentation="fusion-youth"', 'KioskRoot keeps fusion-youth presentation for profile')
+expectNotIncludes(kioskRootSource, 'SERVICE_DESK_EXACT_ROUTES', 'KioskRoot no longer maintains a LightFlow route whitelist')
 
 const profileHeaderMountIndex = profile.indexOf('<ProfileHeader')
 const pendingTaskMountIndex = profile.indexOf('{isLoggedIn && hasSessionRecords && <PendingTaskBanner')
@@ -186,11 +195,11 @@ for (const marker of [
   'onOpenNotifications',
   'className="kp-profile-header',
   'className="kp-profile-main"',
-  'className="kp-profile-boundary"',
   'className="p-stats"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
 }
+expectNotIncludes(header, 'kp-profile-boundary', 'ProfileHeader removes the non-prototype boundary panel')
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
 
 for (const marker of [
@@ -278,10 +287,54 @@ for (let index = 0; index < profileCssFiles.length; index += 1) {
   assertProfileCssScope(profileCssFiles[index], profileCss[index])
 }
 expectIncludes(combinedProfileCss, '--lf-canvas:', 'Profile CSS defines the LightFlow ice-blue canvas token')
+expectIncludes(combinedProfileCss, '--lf-paper:', 'Profile CSS exposes the prototype paper token through the current theme')
+expectIncludes(combinedProfileCss, '--lf-serif:', 'Profile CSS exposes the prototype display-font stack')
 expectIncludes(combinedProfileCss, '--lf-blue:', 'Profile CSS defines the single bright-blue action token')
 expectIncludes(combinedProfileCss, '--lf-ink:', 'Profile CSS defines the deep navy text token')
+expectMatches(
+  combinedProfileCss,
+  /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,
+  'Profile frame neutralizes the shared 48px inset exactly once',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-inner\s*\{[\s\S]*?width:\s*min\(984px,\s*calc\(100%\s*-\s*96px\)\);[\s\S]*?gap:\s*18px;[\s\S]*?margin:\s*26px auto 0;/,
+  'Profile content matches prototype 14 at 984px width, 48px gutters, 18px rhythm, and 26px top inset',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-profile-header\s*\{[^}]*border-top:\s*4px solid var\(--lf-blue\);[^}]*border-radius:\s*18px;[^}]*box-shadow:\s*0 3px 14px/,
+  'Profile identity header restores the prototype accented card treatment',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-section\s*\{[^}]*border:\s*1px solid var\(--lf-line\);[^}]*border-radius:\s*18px;[^}]*box-shadow:\s*0 3px 14px/,
+  'Profile five sections restore the prototype card treatment',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-section-head h2\s*\{[^}]*font-family:\s*var\(--lf-serif\);[^}]*font-size:\s*26px;/,
+  'Profile section headings match prototype 14 display typography',
+)
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS retains 56px primary touch targets')
-expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS retains 48px secondary touch targets')
+expectMatches(
+  combinedProfileCss,
+  /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/,
+  'Profile icon actions exceed the 48px secondary touch-target minimum',
+)
+expectIncludes(header, "className={`p-actions ${isLoggedIn ? 'p-actions--member' : 'p-actions--guest'}`}", 'ProfileHeader distinguishes guest/member action layouts')
+expectMatches(
+  combinedProfileCss,
+  /\.p-actions--guest\s*\{[^}]*display:\s*flex;[^}]*margin-inline-start:\s*0;/,
+  'Profile guest login CTA owns a flexible 176px action track without clipping at 1080px',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.p-actions--member \.p-btn\.ghost\s*\{[^}]*padding-inline:\s*16px;/,
+  'Profile member logout CTA fits the fixed 122px action grid across Chinese font stacks',
+)
+expectIncludes(combinedProfileCss, 'var(--color-plum-deep, var(--color-plum))', 'Profile plum/rose icons keep a defined category-color fallback')
+expectIncludes(combinedProfileCss, 'var(--color-wheat-deep, var(--color-wheat-fg))', 'Profile wheat icons keep a defined category-color fallback')
 expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS gives every directory entry the same 92px desktop height')
 expectMatches(
   combinedProfileCss,
@@ -292,26 +345,40 @@ expectIncludes(combinedProfileCss, '@media (prefers-reduced-motion: reduce)', 'P
 expectNotIncludes(combinedProfileCss, 'lf-reference-', 'Profile CSS removes homepage service-card selectors')
 expectNotIncludes(combinedProfileCss, 'p-hero', 'Profile CSS removes the old p-hero visual shell')
 expectNotIncludes(combinedProfileCss, 'sec-head', 'Profile CSS removes the old sec-head visual shell')
-expectNotIncludes(combinedProfileCss, 'box-shadow:', 'Profile CSS does not restore large panel shadows')
 
 for (const marker of [
-  '--paper:',
-  '--serif:',
   '#f4f1e8',
   '#fffdf8',
   '#10302b',
   '#1f9e86',
-  'Noto Serif',
-  'Source Han Serif',
-  'Songti',
-  'SimSun',
   'repeating-linear-gradient(0deg',
   'mask-image:',
 ]) {
-  expectNotIncludes(combinedProfileCss, marker, `Profile CSS removes InkPaper marker ${marker}`)
+  expectNotIncludes(combinedProfileCss, marker, `Profile CSS keeps raw prototype token ${marker} out of page-local styles`)
 }
 
-const allowedMeChanges = new Set(['apps/kiosk/src/pages/profile/me/MySettingsPage.tsx'])
+// W5 keeps the LightFlow profile landing contract while migrating the owned /me/*
+// presentation surfaces to the shared fusion frame. Keep this allowlist explicit so
+// unrelated member pages still fail closed.
+const allowedMeChanges = new Set([
+  'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
+  'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
+  // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
+  'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
+  'apps/kiosk/src/pages/profile/me/styles/me-assets.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-detail-base.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-records.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
+])
 const forbiddenMeChanges = changedFiles().filter(
   (path) => path.startsWith('apps/kiosk/src/pages/profile/me/') && !allowedMeChanges.has(path),
 )

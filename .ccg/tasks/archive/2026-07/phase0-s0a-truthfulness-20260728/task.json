@@ -1,0 +1,39 @@
+{
+  "id": "phase0-s0a-truthfulness-20260728",
+  "title": "阶段 0 S0-A 用户可见真实性收口",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "fullstack",
+  "currentPhase": "completed",
+  "nextAction": "归档任务；保留候选分支，等待用户选择合并、PR 或继续保留",
+  "createdAt": "2026-07-28T16:00:00+08:00",
+  "branch": "codex/phase0-s0a-truthfulness-20260728",
+  "baseSha": "10692d3b6602f1754e5d643bc0ca36c5e6ae85ed",
+  "touches": {
+    "pii": false,
+    "payment": false,
+    "database": false,
+    "hardware": false,
+    "secrets": false,
+    "production": false
+  },
+  "owners": {
+    "a1a": "Claude",
+    "a1b_a2_a3": "Cursor Grok 4.5",
+    "uxReview": "Antigravity",
+    "finalReview": "Codex"
+  },
+  "scopeAmendments": [
+    {
+      "at": "2026-07-28T22:02:00+08:00",
+      "file": "services/api/src/jobs/jobs-shared.ts",
+      "reason": "getFairStats 的实际返回类型定义在此；API CommonJS 不能直接引用 ESM 公共 DTO，纳入该文件是保持内外契约一致的最小修改。"
+    },
+    {
+      "at": "2026-07-28T23:02:00+08:00",
+      "file": "apps/kiosk/tests/visual/fusion-w4.spec.ts",
+      "reason": "为校园 AI 模拟面试路由补真实按钮点击回归，避免仅凭源码正则误判交互可达。"
+    }
+  ]
+}

@@ -93,7 +93,12 @@ expectIncludes(notifications, 'getMyNotifications(getToken(), { pageSize: 50, un
 expectIncludes(notifications, 'markAllMyNotificationsRead(getToken())', '消息通知保留全部已读接口')
 expectIncludes(notifications, 'markMyNotificationRead(getToken(), item.kind, item.id)', '消息通知保留单条已读接口')
 expectIncludes(notifications, 'deleteMyNotification(getToken(), item.kind, item.id)', '消息通知保留删除接口')
-expectIncludes(notifications, "loginFrom=\"/me/notifications\"", '消息通知保留登录回跳来源')
+// W22：loginFrom 改为组件默认参数，MeListShell 透传 loginFrom={loginFrom}
+expectMatches(
+  notifications,
+  /loginFrom\s*=\s*['"]\/me\/notifications['"]/,
+  '消息通知保留登录回跳来源',
+)
 expectIncludes(notifications, 'setUnreadOnly(tab.key)', '消息通知保留未读筛选')
 expectIncludes(notifications, '当前没有可读取的消息', '消息通知保留未连接/未登录空态')
 expectIncludes(notifications, '当前没有未读消息', '消息通知保留未读空态')
@@ -116,36 +121,30 @@ try {
   fail('范围守卫无法读取 git diff')
 }
 
+// 条件触发：仅当本 PR 实际改动本守卫负责的明细页时，才检查硬冻结后端/共享类型/Agent/DB。
+// 方案 B 视觉统一会同波改 Profile/assistant/campus 等呈现层，不再把同仓 Kiosk 页面互斥。
+const paymentAllowlist = new Set([
+  'services/api/scripts/verify-kiosk-cashier-ui.ts',
+  'services/api/scripts/verify-payment-flow.ts',
+  'services/api/package.json',
+  'services/api/scripts/verify-benefit-redemption.ts',
+  'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
+  'services/api/scripts/verify-production-real-services.ts',
+  'services/api/scripts/verify-production-runtime-gates.ts',
+  'services/api/src/config/production-runtime-gates.ts',
+  'services/api/src/payment/online-payment.service.ts',
+  'services/api/src/payment/payment-session-token.ts',
+  'services/api/src/payment/payment.controller.ts',
+  'services/api/src/print-jobs/print-jobs.service.ts',
+])
 const forbiddenChanged = changedFiles.filter((file) =>
-  ![
-    'services/api/scripts/verify-kiosk-cashier-ui.ts',
-    'services/api/scripts/verify-payment-flow.ts',
-    'services/api/package.json',
-    'services/api/scripts/verify-benefit-redemption.ts',
-    'services/api/scripts/verify-profile-commercial-first-batch-acceptance.ts',
-    'services/api/scripts/verify-production-real-services.ts',
-    'services/api/scripts/verify-production-runtime-gates.ts',
-    'services/api/src/config/production-runtime-gates.ts',
-    'services/api/src/payment/online-payment.service.ts',
-    'services/api/src/payment/payment-session-token.ts',
-    'services/api/src/payment/payment.controller.ts',
-    'services/api/src/print-jobs/print-jobs.service.ts',
-  ].includes(file) &&
-  ([
-    'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
-    'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
-    'apps/kiosk/src/pages/profile/me/MyFavoritesPage.tsx',
-    'apps/kiosk/src/pages/profile/me/MyBenefitsPage.tsx',
-    'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
-    'apps/kiosk/src/pages/profile/ProfilePage.tsx',
-  ].includes(file) ||
-  /^apps\/kiosk\/src\/pages\/(assistant|campus|companies|help)\//.test(file) ||
-  /^services\/|^packages\/shared\/|^apps\/terminal-agent\//.test(file) ||
-  /prisma/i.test(file))
+  !paymentAllowlist.has(file) &&
+  (/^services\//.test(file) ||
+    /^packages\/shared\//.test(file) ||
+    /^apps\/terminal-agent\//.test(file) ||
+    /prisma/i.test(file))
 )
 
-// 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/resumes 或 /me/notifications 明细页时，
-// 才强制范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次改动。
 const touchesOwnedPage = [
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
@@ -153,7 +152,7 @@ const touchesOwnedPage = [
 if (!touchesOwnedPage) {
   pass('本 PR 未触碰 /me/resumes、/me/notifications 明细页，跳过范围检查（守卫条件触发）')
 } else if (forbiddenChanged.length === 0) {
-  pass('diff 未触碰 /me/print-orders、其他高风险资产页、非本次 payment session 后端、数据库或终端链路；/me/documents 已由专属守卫覆盖')
+  pass('diff 未触碰硬冻结后端、共享类型、终端 Agent 或数据库链路')
 } else {
   fail(`diff 出现禁止范围变更：${forbiddenChanged.join(', ')}`)
 }

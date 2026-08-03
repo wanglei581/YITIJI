@@ -23,6 +23,7 @@ import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { BenefitRedemptionService } from '../benefit-redemption/benefit-redemption.service'
 
+import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
@@ -30,11 +31,8 @@ interface ReqLike {
   socket?: { remoteAddress?: string }
 }
 
-function ipOf(req: ReqLike): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]?.trim() ?? null
-  if (Array.isArray(fwd) && fwd.length > 0) return fwd[0] ?? null
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: ReqLike): string | null {
@@ -313,7 +311,20 @@ export class AiController {
     if (!isWavBuffer(audio.buffer)) {
       throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
     }
+    // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
+    const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
+    this.logService.record({
+      taskId: null,
+      operation: 'voiceTranscribe',
+      provider: this.asr.activeProviderName,
+      status: result.ok ? 'success' : 'failed',
+      latencyMs: Math.max(0, Date.now() - asrStartedAt),
+      tokenUsage: undefined,
+      errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
+      endUserId: null,
+      terminalId: null,
+    })
     if (!result.ok) {
       throw new BadRequestException({
         error: {

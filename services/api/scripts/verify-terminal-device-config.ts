@@ -159,20 +159,34 @@ function runStaticChecks(): void {
     ['toolbox: { enabled: true, items: [] }', 'getCachedKioskTerminalConfig'],
     'E2. Kiosk 统一配置本地默认启用百宝箱空占位并复用缓存',
   )
+  // prototype-v1（2026-07-20）：首页按 01-home.html 重写为聚合 zone-card，百宝箱完整能力
+  // （config 驱动 / 启动 / 离场确认 / 占位文案）移入承载页 /toolbox（ToolboxZonePage）；
+  // 统一配置缓存复用下沉到 useToolboxConfig hook。以下 E3* / E4 断言随职责位置重定向，
+  // 契约（仅显式关闭才隐藏、空配置不隐藏而是占位、复用缓存、保留占位文案）保持不放宽。
+  contains(
+    '../../apps/kiosk/src/hooks/useToolboxConfig.ts',
+    ['getCachedKioskTerminalConfig(terminalId)'],
+    'E3. Kiosk 百宝箱复用统一终端配置缓存（useToolboxConfig）',
+  )
   contains(
     '../../apps/kiosk/src/pages/home/HomePage.tsx',
-    ['if (!config.enabled) return null', 'getCachedKioskTerminalConfig(terminalId)'],
-    'E3. Kiosk 百宝箱仅显式关闭时整块隐藏且复用统一配置缓存',
+    ['toolbox.enabled'],
+    'E3a. Kiosk 首页百宝箱入口仅由 toolbox.enabled 控制显隐',
+  )
+  contains(
+    '../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
+    ['config.enabled ?', ': []'],
+    'E3c. /toolbox 页在配置关闭时不暴露可启动扩展项（enabled 门控 items）',
   )
   notContainsSource(
-    read('../../apps/kiosk/src/pages/home/HomePage.tsx'),
-    ['items.length === 0) return null'],
-    'E3b. Kiosk 百宝箱空配置不得作为整块隐藏条件',
+    read('../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx'),
+    ['items.length === 0) return null', 'items.length === 0 ? null'],
+    'E3b. /toolbox 空配置不得作为整块隐藏条件（应回落占位）',
   )
   contains(
-    '../../apps/kiosk/src/pages/home/HomePage.tsx',
+    '../../apps/kiosk/src/pages/toolbox/ToolboxZonePage.tsx',
     ['待配置', '后续功能上线后将在这里展示'],
-    'E4. Kiosk 首页保留百宝箱空配置占位文案',
+    'E4. /toolbox 承载页保留百宝箱空配置占位文案',
   )
   contains(
     'src/terminals/terminal-toolbox.service.ts',
@@ -234,9 +248,9 @@ function runStaticChecks(): void {
   )
 
   const publicConfigService = section(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-admin.service.ts',
     'async getKioskTerminalConfig',
-    '/**\n   * Admin 打印机页真实数据源。',
+    'async listPrintersForAdmin',  // N3拆分后 end marker 改为下一个方法
   )
   notContainsSource(
     publicConfigService,
@@ -244,9 +258,9 @@ function runStaticChecks(): void {
     'G. 公开 Kiosk config service 不返回设备档案/机构字段',
   )
   const publicConfigLookup = section(
-    'src/terminals/terminals.service.ts',
-    'private async findSmartCampusConfigByTerminalRef',
-    'private async resetExpiredClaims',
+    'src/terminals/terminals-agent.service.ts',
+    'async findSmartCampusConfigByTerminalRef',  // N3拆分后为 async 非 private async
+    '// ── Private helpers',  // 紧接着的注释，不包含后续 MAC 处理方法
   )
   notContainsSource(
     publicConfigLookup,
@@ -269,12 +283,17 @@ function runStaticChecks(): void {
     'J. Kiosk 本地 OFF_CONFIG 不声明公开配置外字段',
   )
   contains(
-    'src/terminals/terminals.service.ts',
-    ['allowDisabled: true', 'TERMINAL_DISABLED', 'tryNormalizeMacAddress(dto.macAddress)'],
+    'src/terminals/terminals-agent.service.ts',  // N3拆分后这些模式在 agent service
+    ['allowDisabled: true', 'tryNormalizeMacAddress(dto.macAddress)'],
     'K. 停用终端禁止任务操作,心跳仍可上报且坏 MAC 不打挂心跳',
   )
+  contains(
+    'src/terminals/terminal-credential-security.service.ts',
+    ['TERMINAL_DISABLED', '!options.allowDisabled && !terminal.enabled'],
+    'K2. Terminal credential security fails closed for disabled devices except explicit heartbeat allowance',
+  )
   const updateProfileLookup = section(
-    'src/terminals/terminals.service.ts',
+    'src/terminals/terminals-admin.service.ts',
     'async updateTerminalProfile',
     'async getKioskTerminalConfig',
   )
@@ -291,6 +310,8 @@ function runStaticChecks(): void {
 
 async function runServiceChecks(): Promise<void> {
   const { TerminalsService } = await import('../src/terminals/terminals.service')
+  const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+  const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
   const { AdminTerminalsController } = await import('../src/terminals/admin-terminals.controller')
   const { TerminalCapabilitiesService } = await import('../src/terminals/terminal-capabilities.service')
   const { SmartCampusService } = await import('../src/smart-campus/smart-campus.service')
@@ -302,7 +323,7 @@ async function runServiceChecks(): Promise<void> {
   const audit = new AuditService(prisma)
   const toolbox = new TerminalToolboxService(prisma)
   const smartCampus = new SmartCampusService(prisma, toolbox)
-  const terminals = new TerminalsService(prisma, toolbox, audit)
+  const terminals = (() => { const _ag = new TerminalAgentService(prisma, audit); return new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, toolbox)) })()
   const capabilities = new TerminalCapabilitiesService(prisma)
   const adminController = new AdminTerminalsController(terminals, capabilities, audit)
 

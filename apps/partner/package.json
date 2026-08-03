@@ -12,6 +12,7 @@
     "verify:partner-refresh-safe": "node scripts/verify-partner-refresh-safe.mjs",
     "verify:job-quality-dashboard-ui": "node scripts/verify-job-quality-dashboard-ui.mjs",
     "verify:excel-template-download-ui": "node scripts/verify-excel-template-download-ui.mjs",
+    "verify:partner-relative-api-url": "node scripts/verify-partner-relative-api-url.mjs",
     "preview": "vite preview --port 5175"
   },
   "dependencies": {
@@ -21,7 +22,7 @@
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.15.1",
+    "react-router-dom": "7.18.1",
     "recharts": "^3.8.1"
   },
   "devDependencies": {

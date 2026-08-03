@@ -25,6 +25,11 @@ const PROD_OK: Env = {
   PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
   // Task 11：生产必须显式声明 print-scan 能力开关未配置行语义
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
+  // 反代可信跳数：生产必须显式声明 1..9（禁止 true）
+  TRUST_PROXY_HOPS: '1',
+  // Gate 0 batch 2：生产必须关闭共享 adminSecret 旧注册面。
+  TERMINAL_LEGACY_REGISTER_ENABLED: 'false',
+  TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true',
 }
 const REQUIRED_SMS_KEYS = [
   'TENCENT_SMS_SECRET_ID',
@@ -281,6 +286,51 @@ function main(): void {
   expectAllowed(
     { ...PROD_OK, PRINT_SCAN_CAPABILITY_MODE: 'strict' },
     '生产环境允许显式声明 strict（未配置能力行 fail-closed）',
+  )
+
+  // TRUST_PROXY_HOPS：生产必须显式跳数，禁止 true/false
+  expectRejected(
+    { ...PROD_OK, TRUST_PROXY_HOPS: undefined },
+    'PRODUCTION_TRUST_PROXY_HOPS_UNDECLARED',
+    '生产环境拒绝未显式声明 TRUST_PROXY_HOPS',
+  )
+  expectRejected(
+    { ...PROD_OK, TRUST_PROXY_HOPS: 'true' },
+    'TRUST_PROXY_HOPS_BOOLEAN_FORBIDDEN',
+    '生产环境拒绝 TRUST_PROXY_HOPS=true（会信任任意 X-Forwarded-For）',
+  )
+  expectRejected(
+    { ...PROD_OK, TRUST_PROXY_HOPS: '0' },
+    'TRUST_PROXY_HOPS_INVALID',
+    '生产环境拒绝非法跳数 0',
+  )
+  expectAllowed(
+    { ...PROD_OK, TRUST_PROXY_HOPS: '2' },
+    '生产环境允许显式声明 hops=2',
+  )
+
+  expectRejected(
+    { ...PROD_OK, TERMINAL_LEGACY_REGISTER_ENABLED: undefined },
+    'PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN',
+    '生产环境拒绝未显式关闭 Terminal 共享密钥旧注册',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_LEGACY_REGISTER_ENABLED: 'true' },
+    'PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN',
+    '生产环境拒绝开启 Terminal 共享密钥旧注册',
+  )
+  expectRejected(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: undefined },
+    'PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED',
+    '生产环境拒绝未显式声明 planned writer 状态',
+  )
+  expectAllowed(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: 'false' },
+    '生产滚动部署第一阶段允许显式关闭 planned writer',
+  )
+  expectAllowed(
+    { ...PROD_OK, TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true' },
+    '生产全实例升级后允许显式开启 planned writer',
   )
 
   console.log('\n=== ALL PASS ===')

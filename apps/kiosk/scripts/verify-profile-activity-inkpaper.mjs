@@ -5,6 +5,22 @@ import { fileURLToPath } from 'node:url'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8')
 
+function readCssTree(relativePath, seen = new Set()) {
+  if (seen.has(relativePath)) throw new Error(`CSS import cycle: ${relativePath}`)
+  seen.add(relativePath)
+  const source = read(relativePath)
+  const directory = relativePath.slice(0, relativePath.lastIndexOf('/') + 1)
+  const imports = [...source.matchAll(/@import\s+['"]([^'"]+)['"]\s*;/g)]
+  const imported = imports.map((match) => {
+    if (!match[1].startsWith('./')) throw new Error(`CSS import must stay local: ${match[1]}`)
+    const path = `${directory}${match[1].slice(2)}`
+    if (!path.startsWith('src/pages/profile/me/')) throw new Error(`CSS import escapes profile scope: ${path}`)
+    return readCssTree(path, seen)
+  })
+  seen.delete(relativePath)
+  return `${source}\n${imported.join('\n')}`
+}
+
 let failures = 0
 function pass(message) {
   console.log(`  PASS ${message}`)
@@ -29,7 +45,8 @@ function expectAbsent(source, pattern, message) {
 console.log('\n=== /me/activity 墨青纸感换装守卫 ===')
 
 const activity = read('src/pages/profile/me/MyActivityPage.tsx')
-const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
+const presentation = read('src/pages/profile/me/activityPresentation.ts')
+const detailCss = readCssTree('src/pages/profile/me/me-detail-inkpaper.css')
 const api = read('src/services/api/activity.ts')
 const routes = read('src/routes/index.tsx')
 const packageJson = read('package.json')
@@ -46,9 +63,9 @@ expectIncludes(activity, "searchParams.get('tab') === 'jump' ? 'jump' : 'browse'
 expectIncludes(activity, "setSearchParams(next === 'jump' ? { tab: 'jump' } : {}, { replace: true })", 'MyActivityPage 保留 tab replace 导航行为')
 expectIncludes(activity, 'detailRoute(it.targetType, it.targetId, it.externalId)', 'MyActivityPage 保留详情跳转路由计算')
 expectIncludes(activity, 'actionLabel(it.action, it.targetType)', 'MyActivityPage 保留外部跳转动作中性文案映射')
-expectIncludes(activity, '岗位来源入口', 'MyActivityPage 保留来源入口中性文案')
-expectIncludes(activity, '招聘会来源入口', 'MyActivityPage 保留招聘会来源入口文案')
-expectIncludes(activity, '官方入口', 'MyActivityPage 保留官方入口文案')
+expectIncludes(presentation, '岗位来源入口', '活动呈现映射保留来源入口中性文案')
+expectIncludes(presentation, '招聘会来源入口', '活动呈现映射保留招聘会来源入口文案')
+expectIncludes(presentation, '官方入口', '活动呈现映射保留官方入口文案')
 expectIncludes(activity, '投递 / 预约结果以来源平台为准，本系统不记录', 'MyActivityPage 保留投递/预约结果边界文案')
 
 expectIncludes(api, 'getMyBrowseLogs', 'activity API 保留浏览记录查询函数')

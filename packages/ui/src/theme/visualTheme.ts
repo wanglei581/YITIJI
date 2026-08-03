@@ -11,3 +11,17 @@ export function getVisualThemeAttributes(
     'data-ux-density': density,
   } as const
 }
+
+export type KioskPresentation = 'legacy' | 'fusion-youth'
+
+export type KioskViewport = 'kiosk' | 'mobile'
+
+export function getKioskPresentationAttributes(
+  presentation: KioskPresentation,
+  viewport: KioskViewport,
+) {
+  return {
+    'data-kiosk-presentation': presentation,
+    'data-kiosk-viewport': viewport,
+  } as const
+}

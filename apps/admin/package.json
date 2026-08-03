@@ -15,13 +15,19 @@
     "verify:admin-job-materials-ui": "node scripts/verify-admin-job-materials-ui.mjs",
     "verify:job-ai-ops-dashboard-ui": "node scripts/verify-job-ai-ops-dashboard-ui.mjs",
     "verify:service-desk-dashboard-ui": "node scripts/verify-service-desk-dashboard-ui.mjs",
+    "verify:data-request-ui": "node ../kiosk/scripts/verify-data-request-ui.mjs",
+    "verify:admin-users-ui": "node scripts/verify-admin-users-ui.mjs",
+    "verify:honest-placeholders": "node scripts/verify-honest-placeholders.mjs",
     "verify:toolbox-review-ui": "node scripts/verify-toolbox-review-ui.mjs",
     "verify:admin-terminal-bind-code-ui": "node scripts/verify-admin-terminal-bind-code-ui.mjs",
     "verify:admin-billing-ui": "node scripts/verify-admin-billing-ui.mjs",
     "verify:admin-account-settings-ui": "node scripts/verify-admin-account-settings-ui.mjs",
     "verify:admin-phone-transfer-ui": "node scripts/verify-admin-phone-transfer-ui.mjs",
-    "verify:partner-account-delete-ui": "node scripts/verify-partner-account-delete-ui.mjs",
+    "verify:partner-account-action-ui": "node scripts/verify-partner-account-action-ui.mjs",
+    "verify:partner-account-action-state": "pnpm --filter @ai-job-print/api exec node --import tsx --experimental-test-coverage --test-coverage-lines=97 --test-coverage-functions=100 --test-coverage-branches=80 --test ../../apps/admin/src/routes/partners/partnerAccountActionMachine.test.ts",
+    "verify:partner-account-delete-ui": "node scripts/verify-partner-account-action-ui.mjs",
     "verify:admin-device-fleet-overview-ui": "node scripts/verify-admin-device-fleet-overview-ui.mjs",
+    "verify:admin-terminal-network-diagnostics-ui": "node scripts/verify-admin-terminal-network-diagnostics-ui.mjs",
     "preview": "vite preview --port 5174"
   },
   "dependencies": {
@@ -31,7 +37,7 @@
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.15.1",
+    "react-router-dom": "7.18.1",
     "recharts": "^3.8.1"
   },
   "devDependencies": {

@@ -10,8 +10,8 @@ export interface MemberAssetPage<T> {
   nextCursor: string | null
 }
 
-/** AI 服务记录种类：解析 / 优化 / 生成。 */
-export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit' | 'career_plan' | 'fair_visit_plan'
+/** AI 服务记录种类：解析 / 优化 / 生成 / 岗位匹配 / 职业规划 / 招聘会准备 / 自我探索（v1）。 */
+export type MemberAiRecordKind = 'parse' | 'optimize' | 'generate' | 'job_fit' | 'career_plan' | 'fair_visit_plan' | 'self_assessment'
 
 export interface MemberResumeItem {
   id: string

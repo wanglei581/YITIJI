@@ -14,6 +14,7 @@ import type { AuditService } from '../src/audit/audit.service'
 import { AdminInitialPhoneBindService } from '../src/auth/admin-initial-phone-bind.service'
 import { InternalOtpService } from '../src/auth/internal-otp.service'
 import { assertInternalAuthVerifyTarget } from '../src/auth/internal-auth-verify-target'
+import { PASSWORD_PROOF_STATE } from '../src/auth/password-proof-state'
 import { encryptPhone, hashPhone, maskPhone } from '../src/common/crypto/phone-identity'
 import { JwtAuthGuard } from '../src/common/guards/jwt-auth.guard'
 import type { RedisService } from '../src/common/redis/redis.service'
@@ -163,6 +164,7 @@ async function createAdmin(context: TestContext, label: string, tokenVersion = 0
       passwordHash: context.adminPasswordHash,
       name: `转移验证管理员_${label}`,
       role: 'admin',
+      passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
       tokenVersion,
     },
   })
@@ -464,6 +466,12 @@ async function verifyOtpIsolationRetryAndReplay(context: TestContext): Promise<v
   const admin = await createAdmin(context, 'otp-isolation')
   await createPartner(context, 'otp-isolation', phone)
   await context.otp.sendCode({ phone, purpose: 'bind_phone', ip: '127.0.1.6', shouldDeliver: true })
+  await expectCode(
+    () => service.start(admin.id, context.adminPassword, phone, '127.0.1.7'),
+    'SMS_TOO_FREQUENT',
+    '6. bind_phone 与 transfer_phone 未共享全局发送冷却',
+  )
+  context.redis.advanceSeconds(60)
   const started = await service.start(admin.id, context.adminPassword, phone, '127.0.1.7')
   const transferCode = await requireTransferCode(context, phone, '6. transfer_phone OTP 未写入')
   const guaranteedWrongCode = transferCode === '000000' ? '111111' : '000000'
@@ -478,7 +486,7 @@ async function verifyOtpIsolationRetryAndReplay(context: TestContext): Promise<v
   await service.verify(admin.id, started.bindTicket, transferCode)
   await expectCode(() => service.verify(admin.id, started.bindTicket, transferCode), UNAVAILABLE, '6. 已消费 ticket 可以重放')
   ensure(context.redis.raw(bindCodeKey(phone)) === guaranteedWrongCode, '6. 完成转移错误清理了 bind_phone 命名空间')
-  pass('6. transfer_phone OTP 与 bind_phone 冷却/验证码隔离，错误 OTP 可重试且 ticket 不可重放')
+  pass('6. transfer_phone 与 bind_phone 共享冷却但验证码隔离，错误 OTP 可重试且 ticket 不可重放')
 }
 
 async function verifyDoubleVerifyAndAdminCompetition(context: TestContext): Promise<void> {

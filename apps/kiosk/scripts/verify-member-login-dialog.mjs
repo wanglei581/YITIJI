@@ -241,7 +241,7 @@ const loginDialog = readRequired('src/pages/auth/components/MemberLoginDialog.ts
 const loginPage = readRequired('src/pages/auth/LoginPage.tsx')
 const home = readRequired('src/pages/home/HomePage.tsx')
 const loginDialogCss = readRequired('src/pages/auth/styles/login-dialog.css')
-const kioskRoot = readRequired('src/layouts/KioskRoot.tsx')
+const privacyGuard = readRequired('src/auth/KioskPrivacyGuard.tsx')
 const packageJson = readRequired('package.json')
 const workflow = readRequired('../../.github/workflows/ci.yml')
 const handleSendCode = extractConstFunction(memberHook, 'handleSendCode')
@@ -326,6 +326,11 @@ expectMatches(
 )
 expectMatches(
   memberHook,
+  /import\s*\{\s*fetchLegalConsentVersions\s*\}\s*from\s*['"][^'"]*services\/auth\/legalConsentVersions['"]/,
+  '共享 hook 从 legalConsentVersions 拉取协议版本',
+)
+expectMatches(
+  memberHook,
   /import\s*\{(?=[^}]*getMemberAuthDeviceId)[^}]*\}\s*from\s*['"][^'"]*services\/auth\/memberAuthDevice['"]/,
   '共享 hook 从真实 memberAuthDevice 导入 getMemberAuthDeviceId',
 )
@@ -366,7 +371,8 @@ expectGuardBeforeUpdate(
 expectMatches(handleLogin, /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/, 'handleLogin 使用稳定会员登录 deviceId')
 expect(Boolean(loginGeneration), 'handleLogin 生成并捕获 request generation')
 expect(loginTry.length > 0 && loginCatch.length > 0 && loginFinally.length > 0, 'handleLogin 分别包含 try/catch/finally')
-expectMatches(loginTry, /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*deviceId\)/, 'handleLogin try 调用真实登录 API')
+expectMatches(loginTry, /fetchLegalConsentVersions\s*\(/, 'handleLogin try 先拉取协议版本')
+expectMatches(loginTry, /const\s+(?:result|res)\s*=\s*await\s+memberLogin\(phone,\s*code,\s*consent,\s*deviceId\)/, 'handleLogin try 调用真实登录 API（含协议版本）')
 expectGuardBeforeUpdate(
   loginTry,
   generationGuardPattern(loginGeneration),
@@ -547,7 +553,23 @@ expectNoMatches(agreement, /href="#"|to="#"/, '共享协议组件不使用占位
 
 expectMatches(home, /<MemberLoginDialog/, '首页挂载 MemberLoginDialog')
 expectNoMatches(home, /\b(?:sendSmsCode|memberLogin)\s*\(/, '首页不复制认证 API')
-expectMatches(kioskRoot, /useIdleLogout\(/, 'KioskRoot 保持全局 useIdleLogout 空闲清场')
+// P0-1B：screensaver 与 idle 控制器经 warning handler 接入 Guard，最终清场仍由 Guard.hardClear() 走 fail-closed 路径与统一敏感会话清理。
+expectMatches(
+  privacyGuard,
+  /useIdleLogout\(\s*screensaverActive\s*,\s*handleOrdinaryWarning\s*\)/,
+  'KioskPrivacyGuard 接入 idle 控制器到普通闲置预警 handler',
+)
+expectMatches(
+  privacyGuard,
+  /useScreensaverController\(\s*handleScreensaverWarning\s*\)/,
+  'KioskPrivacyGuard 接入屏保控制器到屏保预警 handler',
+)
+expectMatches(
+  privacyGuard,
+  /clearKioskSensitiveSession\(\)/,
+  'KioskPrivacyGuard 经统一 helper 清理敏感会话',
+)
+expectMatches(privacyGuard, /\bhardClear\b/, 'KioskPrivacyGuard 保留 fail-closed hardClear 路径')
 
 expect(loginDialogCss.includes('.member-login-dialog::backdrop'), '弹窗样式定义原生 ::backdrop')
 expectMatches(loginDialogCss, /\.member-login-dialog\s*\{/, '弹窗样式定义 1080 居中容器基础规则')
@@ -572,8 +594,8 @@ expect(
 )
 expectMatches(
   workflow,
-  /pnpm --filter @ai-job-print\/kiosk verify:home-service-desk\s*\n\s*pnpm --filter @ai-job-print\/kiosk verify:member-login-dialog/,
-  'CI 在 verify:home-service-desk 后紧跟登录弹窗合同',
+  /pnpm --filter @ai-job-print\/kiosk verify:home-prototype-v1\s*\n\s*pnpm --filter @ai-job-print\/kiosk verify:member-login-dialog/,
+  'CI 在 verify:home-prototype-v1 后紧跟登录弹窗合同（首页重建为 prototype-v1，守卫更名）',
 )
 
 if (failures > 0) {

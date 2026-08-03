@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiosk 原型总览 · AI求职打印服务终端(75核心屏 + 生产全路由 86/86)</title>
+<style>
+  :root {
+    --paper: #f4f1e8; --surface: #fffdf8; --ink: #10302b; --muted: #5d6b63;
+    --line: #e2dccb; --teal: #1f9e86; --teal-deep: #157a67;
+    --clay: #b8683c; --wheat: #a9781f; --plum: #7a5a86; --slate: #3f68b0;
+    --serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+    --sans: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); font-family: var(--sans); color: var(--ink); padding: 48px clamp(20px, 5vw, 80px) 80px; }
+  header h1 { font-family: var(--serif); font-size: clamp(28px, 4vw, 44px); font-weight: 900; letter-spacing: 2px; }
+  header p { margin-top: 10px; color: var(--muted); font-size: 17px; line-height: 1.6; }
+  .section { margin-top: 40px; }
+  .section h2 {
+    font-family: var(--serif); font-size: 22px; font-weight: 700;
+    padding-left: 14px; border-left: 5px solid var(--accent, var(--teal)); margin-bottom: 6px;
+  }
+  .section .s-sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; padding-left: 19px; }
+  .s-teal { --accent: var(--teal); } .s-clay { --accent: var(--clay); }
+  .s-wheat { --accent: var(--wheat); } .s-plum { --accent: var(--plum); } .s-slate { --accent: var(--slate); }
+  .s-ink { --accent: var(--ink); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  a.card {
+    display: block; text-decoration: none; color: var(--ink);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; transition: transform .1s ease, box-shadow .1s ease;
+  }
+  a.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16,48,43,.08); }
+  a.card b { display: block; font-size: 17px; font-weight: 700; }
+  a.card span { display: block; margin-top: 5px; font-size: 13.5px; color: var(--muted); line-height: 1.4; }
+  a.card .num { display: inline-block; margin-bottom: 6px; font-size: 12px; color: var(--accent, var(--teal)); font-weight: 700; letter-spacing: 1px; }
+  .pending { opacity: .45; pointer-events: none; }
+  code { font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace; font-size: .92em; background: rgba(31,158,134,.1); padding: 1px 6px; border-radius: 5px; color: var(--teal-deep); }
+  /* 顶部数据看板 */
+  .dash { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 26px; }
+  .dash-item { flex: 1 1 130px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+  .dash-item .dv { font-family: var(--serif); font-size: 28px; font-weight: 900; color: var(--teal-deep); letter-spacing: 1px; }
+  .dash-item .dl { font-size: 13px; color: var(--muted); }
+  /* 类型徽章 */
+  .badge { display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .5px; padding: 2px 9px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+  .b-new   { background: rgba(31,158,134,.12);  color: var(--teal-deep); border-color: rgba(31,158,134,.35); }
+  .b-reuse { background: rgba(63,104,176,.12);  color: var(--slate);     border-color: rgba(63,104,176,.35); }
+  .b-sub   { background: rgba(122,90,134,.12);  color: var(--plum);      border-color: rgba(122,90,134,.35); }
+  .b-fall  { background: rgba(169,120,31,.14);  color: var(--wheat);     border-color: rgba(169,120,31,.4); }
+  .b-redir { background: rgba(95,107,99,.12);   color: var(--muted);     border-color: rgba(95,107,99,.35); }
+  /* 路由详情卡 */
+  .rt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+  a.rt-card { display: block; text-decoration: none; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; transition: transform .1s ease, box-shadow .1s ease; }
+  a.rt-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(16,48,43,.08); }
+  .rt-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .rt-head code { font-size: 13.5px; font-weight: 700; }
+  .rt-row { display: flex; gap: 8px; font-size: 13px; line-height: 1.5; margin-top: 5px; }
+  .rt-row .k { flex: 0 0 62px; color: var(--muted); }
+  .rt-row .v { flex: 1; color: var(--ink); }
+  .rt-row .v b { color: var(--teal-deep); }
+  /* 纯重定向映射行 */
+  .redir-map { display: flex; flex-direction: column; gap: 10px; }
+  .redir-row { display: grid; grid-template-columns: 1fr auto 1fr auto; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; font-size: 14px; }
+  .redir-row code { font-weight: 600; }
+  .redir-row .arrow { color: var(--teal); font-weight: 700; font-size: 16px; }
+  .redir-row .to-proto { text-decoration: none; }
+  .redir-row .to-proto .badge { transition: transform .1s ease; }
+  .redir-row .to-proto:hover .badge { transform: translateY(-1px); }
+  @media (max-width: 620px) { .redir-row { grid-template-columns: 1fr; gap: 6px; } .redir-row .arrow { display: none; } }
+  /* 功能流程链 */
+  .flow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; }
+  .flow-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+  .flow-note { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+  .flow-steps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; }
+  .flow-steps a { text-decoration: none; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 9px; padding: 5px 10px; font-size: 12.5px; white-space: nowrap; transition: background .1s ease; }
+  .flow-steps a:hover { background: var(--teal-soft, #e2f2ec); }
+  .flow-steps a .fn { color: var(--teal-deep); font-weight: 700; margin-right: 4px; }
+  .flow-steps .sep { color: var(--muted); font-size: 13px; }
+  .tip { margin-top: 48px; padding: 14px 20px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 14px; background: rgba(255,253,248,.7); line-height: 1.6; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kiosk 高保真原型总览 · 75 核心屏 + 生产全路由基准</h1>
+  <p>AI求职打印服务终端 · 1080×1920 竖屏(62/63 屏为手机尺寸)· 青绿米纸 V1 定稿风格 · 零外部依赖,断网可用<br>此页为「先完成并审查完整原型基准，再改生产 Kiosk」的单一基准入口:75 张核心原型 + 生产额外 12 条路由(含 5 条纯重定向,不重复出图),对齐 <code>apps/kiosk/src/routes/index.tsx</code> 全部 <b>86/86</b> 路由。</p>
+
+  <div class="dash">
+    <div class="dash-item"><span class="dv">75</span><span class="dl">核心原型屏</span></div>
+    <div class="dash-item"><span class="dv">12</span><span class="dl">生产额外路由</span></div>
+    <div class="dash-item"><span class="dv">86 / 86</span><span class="dl">总路径覆盖</span></div>
+    <div class="dash-item"><span class="dv">77</span><span class="dl">独立原型文件</span></div>
+    <div class="dash-item"><span class="dv">5</span><span class="dl">纯重定向(不出图)</span></div>
+    <div class="dash-item"><span class="dv">1</span><span class="dl">路由级状态变体</span></div>
+    <div class="dash-item"><span class="dv">4</span><span class="dl">待开发容错页</span></div>
+  </div>
+</header>
+
+<div class="section s-teal">
+  <h2>首页 · 登录 · 系统屏</h2>
+  <div class="s-sub">入口层与公共终端安全屏</div>
+  <div class="grid">
+    <a class="card" href="01-home.html"><span class="num">01</span><b>首页</b><span>六大服务分组 + 扫码登录</span></a>
+    <a class="card" href="15-login.html"><span class="num">15</span><b>扫码登录</b><span>微信扫码 + 手机号登录 + 游客模式</span></a>
+    <a class="card" href="57-screensaver.html"><span class="num">57</span><b>待机宣传屏</b><span>轮播 + 触摸唤醒提示</span></a>
+    <a class="card" href="60-session-timeout.html"><span class="num">60</span><b>会话超时提醒</b><span>倒计时 + 自动清理会话(商用补缺)</span></a>
+    <a class="card" href="61-error-offline.html"><span class="num">61</span><b>网络/设备异常</b><span>断网降级说明,诚实状态(商用补缺)</span></a>
+    <a class="card" href="58-help.html"><span class="num">58</span><b>帮助中心</b><span>FAQ + 现场协助</span></a>
+    <a class="card" href="59-legal.html"><span class="num">59</span><b>法务文档</b><span>用户协议/隐私政策 + 字号调节</span></a>
+    <a class="card" href="62-phone-upload.html"><span class="num">62</span><b>手机上传落地页</b><span>390×844 手机尺寸</span></a>
+    <a class="card" href="63-qr-login-mobile.html"><span class="num">63</span><b>手机登录确认页</b><span>390×844 手机尺寸</span></a>
+  </div>
+</div>
+
+<div class="section s-slate">
+  <h2>打印 · 扫描</h2>
+  <div class="s-sub">打印七步主流程(上传→材料检查→预览→参数→确认→支付→打印)+ 扫描四步 + 工具能力</div>
+  <div class="grid">
+    <a class="card" href="02-print-hub.html"><span class="num">02</span><b>打印扫描中心</b><span>七能力卡 + 隐私横幅 + 记录入口</span></a>
+    <a class="card" href="31-print-material-check.html"><span class="num">31</span><b>材料检查</b><span>文件体检 + A4 规范化 + 隐私片段检查</span></a>
+    <a class="card" href="64-print-preview.html"><span class="num">64</span><b>打印预览</b><span>单页放大 + 缩略图 + 页面范围</span></a>
+    <a class="card" href="03-print-settings.html"><span class="num">03</span><b>打印参数</b><span>份数/色彩/双面/缩放 + 用量费用预估</span></a>
+    <a class="card" href="65-print-confirm.html"><span class="num">65</span><b>确认打印</b><span>参数确认清单 + 隐私摘要 + 须知</span></a>
+    <a class="card" href="32-print-cashier.html"><span class="num">32</span><b>收银台</b><span>价目明细 + 双支付方式 + 核实兜底</span></a>
+    <a class="card" href="04-print-progress.html"><span class="num">04</span><b>打印进度</b><span>状态时间线 + 异常应对指引</span></a>
+    <a class="card" href="33-print-done.html"><span class="num">33</span><b>打印完成</b><span>取件凭证码 + 任务摘要 + 满意度</span></a>
+    <a class="card" href="34-scan-start.html"><span class="num">34</span><b>扫描类型选择</b><span>简历/证件/普通文档三选一</span></a>
+    <a class="card" href="35-scan-settings.html"><span class="num">35</span><b>扫描指引</b><span>面板操作四步 + 任务会话</span></a>
+    <a class="card" href="36-scan-progress.html"><span class="num">36</span><b>扫描等待</b><span>诚实等待态 + 处理阶段时间线</span></a>
+    <a class="card" href="37-scan-result.html"><span class="num">37</span><b>扫描结果</b><span>AI简历识别/打印/保存文档</span></a>
+    <a class="card" href="66-print-scan-convert.html"><span class="num">66</span><b>格式转换</b><span>图片合并 PDF + 排序 + 双通道添加</span></a>
+    <a class="card" href="67-print-scan-sign.html"><span class="num">67</span><b>签名盖章</b><span>四步签章 + 授权勾选 + 非 CA 声明</span></a>
+    <a class="card" href="68-print-scan-feature.html"><span class="num">68</span><b>功能介绍</b><span>证件照·即将上线 + 替代路径</span></a>
+  </div>
+</div>
+
+<div class="section s-teal">
+  <h2>AI简历</h2>
+  <div class="s-sub">诊断、优化、生成、导出、素材全链路</div>
+  <div class="grid">
+    <a class="card" href="05-resume-source.html"><span class="num">05</span><b>简历来源选择</b><span>上传 / 扫码传 / 纸质扫描 OCR</span></a>
+    <a class="card" href="27-resume-parse.html"><span class="num">27</span><b>AI解析中</b><span>加载态 + 三步清单</span></a>
+    <a class="card" href="06-resume-diagnosis.html"><span class="num">06</span><b>AI诊断报告</b><span>总评分 + 维度条 + 逐项建议</span></a>
+    <a class="card" href="07-resume-optimize.html"><span class="num">07</span><b>优化对比</b><span>原文/建议双栏</span></a>
+    <a class="card" href="25-resume-generate.html"><span class="num">25</span><b>AI简历生成</b><span>信息表单 + 生成说明</span></a>
+    <a class="card" href="26-resume-generate-preview.html"><span class="num">26</span><b>生成预览</b><span>A4 缩略 + 分段重生成</span></a>
+    <a class="card" href="28-resume-export.html"><span class="num">28</span><b>导出</b><span>PDF/Word/纯文本 + 去向选择</span></a>
+    <a class="card" href="29-resume-templates.html"><span class="num">29</span><b>简历素材库</b><span>2×3 模板卡三种布局变体</span></a>
+    <a class="card" href="30-resume-materials.html"><span class="num">30</span><b>求职材料库</b><span>求职信/自我介绍/清单/证书</span></a>
+  </div>
+</div>
+
+<div class="section s-clay">
+  <h2>岗位 · 企业(第三方来源入口)</h2>
+  <div class="s-sub">线上招聘平台 + 线下招聘机构,来源三要素齐全</div>
+  <div class="grid">
+    <a class="card" href="08-jobs-list.html"><span class="num">08</span><b>岗位列表</b><span>类型/来源筛选 + 线上线下双轨标识</span></a>
+    <a class="card" href="09-job-detail.html"><span class="num">09</span><b>岗位详情(线上平台)</b><span>数据来源卡 + 扫码投递</span></a>
+    <a class="card" href="74-job-detail-offline.html"><span class="num">74</span><b>岗位详情(线下机构)</b><span>机构门店卡 + 到店咨询指引 + 打印带走</span></a>
+    <a class="card" href="75-offline-agencies.html"><span class="num">75</span><b>线下招聘机构</b><span>机构门店列表 + 营业状态 + 服务范围</span></a>
+    <a class="card" href="53-companies.html"><span class="num">53</span><b>找企业</b><span>来源企业与岗位导览</span></a>
+    <a class="card" href="54-company-detail.html"><span class="num">54</span><b>企业详情</b><span>在招岗位 + 来源说明</span></a>
+    <a class="card" href="55-job-fit.html"><span class="num">55</span><b>岗位匹配参考</b><span>较高/中等/偏低三档,仅供参考</span></a>
+    <a class="card" href="56-career-plan.html"><span class="num">56</span><b>职业规划</b><span>现状 + 方向建议 + 行动项</span></a>
+  </div>
+</div>
+
+<div class="section s-wheat">
+  <h2>招聘会 · 校园</h2>
+  <div class="s-sub">场次信息与现场服务,预约去来源平台</div>
+  <div class="grid">
+    <a class="card" href="10-fairs-list.html"><span class="num">10</span><b>招聘会列表</b><span>场次 + 状态标签</span></a>
+    <a class="card" href="11-fair-detail.html"><span class="num">11</span><b>招聘会详情</b><span>展位导览 + 扫码预约</span></a>
+    <a class="card" href="43-fair-checkin.html"><span class="num">43</span><b>扫码签到</b><span>三步指引,主办方管理</span></a>
+    <a class="card" href="44-fair-companies.html"><span class="num">44</span><b>参展企业</b><span>展位号 + 行业筛选</span></a>
+    <a class="card" href="45-fair-company-detail.html"><span class="num">45</span><b>展位企业详情</b><span>在招岗位 + 来源卡</span></a>
+    <a class="card" href="46-fair-map.html"><span class="num">46</span><b>场馆导览图</b><span>CSS 分区色块 + 路线提示</span></a>
+    <a class="card" href="47-fair-materials.html"><span class="num">47</span><b>活动资料</b><span>批量打印</span></a>
+    <a class="card" href="48-fair-visit-plan.html"><span class="num">48</span><b>AI参会准备单</b><span>基于本人简历 + 本场公开信息</span></a>
+    <a class="card" href="49-fair-stats.html"><span class="num">49</span><b>现场数据</b><span>签到进度 + 行业/意向分布</span></a>
+    <a class="card" href="50-campus.html"><span class="num">50</span><b>校园招聘专区</b><span>校招双选会 5-Tab 沉浸页</span></a>
+    <a class="card" href="51-smart-campus.html"><span class="num">51</span><b>智慧校园</b><span>迎新 + 校园自助服务 6 卡</span></a>
+    <a class="card" href="52-smart-campus-service.html"><span class="num">52</span><b>校园卡办理</b><span>自助服务办理指引(代表屏)</span></a>
+    <a class="card" href="69-smart-campus-welcome.html"><span class="num">69</span><b>迎新系统</b><span>报到流程 + 办事窗口 + 求职准备</span></a>
+    <a class="card" href="70-freshman-insights.html"><span class="num">70</span><b>校园大数据</b><span>未开放锁定态,合规兜底</span></a>
+  </div>
+</div>
+
+<div class="section s-plum">
+  <h2>AI面试 · 助手 · 政策</h2>
+  <div class="s-sub">模拟练习仅供参考;政策 info-only</div>
+  <div class="grid">
+    <a class="card" href="38-interview-setup.html"><span class="num">38</span><b>面试设置</b><span>岗位/难度/题量/方式</span></a>
+    <a class="card" href="39-interview-session.html"><span class="num">39</span><b>答题现场</b><span>问题卡 + 作答区 + 计时</span></a>
+    <a class="card" href="40-interview-report.html"><span class="num">40</span><b>面试报告</b><span>总分 + 四维度 + 逐题点评</span></a>
+    <a class="card" href="41-interview-tips.html"><span class="num">41</span><b>面试技巧</b><span>STAR 法则等 + 打印手册</span></a>
+    <a class="card" href="42-interview-reports.html"><span class="num">42</span><b>历史报告</b><span>记录列表 + 空态演示</span></a>
+    <a class="card" href="13-assistant.html"><span class="num">13</span><b>AI助手 · 小青</b><span>咨询主题 + 对话 + 白名单动作</span></a>
+    <a class="card" href="73-assistant-call.html"><span class="num">73</span><b>语音咨询中</b><span>声纹 + 实时字幕 + 通话控制</span></a>
+    <a class="card" href="12-policy.html"><span class="num">12</span><b>政策服务</b><span>三类政策 + 材料清单打印</span></a>
+  </div>
+</div>
+
+<div class="section s-ink">
+  <h2>我的</h2>
+  <div class="s-sub">入口与概览,明细归位业务页</div>
+  <div class="grid">
+    <a class="card" href="14-profile.html"><span class="num">14</span><b>我的(主页)</b><span>五分区入口 + 概览统计 + 本次记录</span></a>
+    <a class="card" href="16-me-resumes.html"><span class="num">16</span><b>我的简历</b><span>诊断/生成记录 + 报告/优化/岗位匹配</span></a>
+    <a class="card" href="17-me-documents.html"><span class="num">17</span><b>我的文档</b><span>保存期限管理 + 签名盖章 + 清理口径</span></a>
+    <a class="card" href="18-me-print-orders.html"><span class="num">18</span><b>打印订单</b><span>状态筛选 + 支付信息 + 取件码详单</span></a>
+    <a class="card" href="19-me-ai-records.html"><span class="num">19</span><b>AI服务记录</b><span>岗位 AI 会话 + 简历/规划记录</span></a>
+    <a class="card" href="20-me-favorites.html"><span class="num">20</span><b>我的收藏</b><span>岗位/招聘会/政策,浏览标记</span></a>
+    <a class="card" href="21-me-benefits.html"><span class="num">21</span><b>我的权益</b><span>券/免费次数/额度/政策资格提示</span></a>
+    <a class="card" href="22-me-notifications.html"><span class="num">22</span><b>通知与反馈</b><span>消息分类已读删除 + 反馈工单</span></a>
+    <a class="card" href="23-me-settings.html"><span class="num">23</span><b>账号设置</b><span>会话说明 + AI授权 + 退出登录</span></a>
+    <a class="card" href="24-activities.html"><span class="num">24</span><b>权益活动</b><span>领取型活动列表 + 库存状态</span></a>
+    <a class="card" href="71-me-activity.html"><span class="num">71</span><b>浏览与跳转记录</b><span>浏览 / 外部跳转两 Tab,只记动作</span></a>
+    <a class="card" href="72-activity-detail.html"><span class="num">72</span><b>权益活动详情</b><span>额度/有效期/规则 + 领取</span></a>
+  </div>
+</div>
+
+<div class="section s-teal" style="margin-top:56px; border-top:2px solid var(--line); padding-top:32px;">
+  <h2>生产额外路由(12)· 对齐真实路由表</h2>
+  <div class="s-sub">75 张核心原型之外,<code>routes/index.tsx</code> 还存在 12 条路由。下表逐条给出:路由 / 页面组件 / 类型 / 对应原型 / 前置条件 / 主按钮及下一步 / 最终状态。全部可点击跳到对应原型,无孤儿卡片。</div>
+
+  <h3 style="font-family:var(--serif); font-size:16px; margin:8px 0 12px 0; color:var(--teal-deep);">① 新增原型(2)· 有独立视觉与业务意义</h3>
+  <div class="rt-grid">
+    <a class="rt-card" href="76-toolbox-zone.html">
+      <div class="rt-head"><code>/toolbox</code><span class="badge b-new">新增原型 · 76</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">ToolboxZonePage(lazy)</span></div>
+      <div class="rt-row"><span class="k">前置</span><span class="v">终端后台开启「百宝箱」开关;无开关时首页不出入口,路由保留直达容错</span></div>
+      <div class="rt-row"><span class="k">主按钮</span><span class="v">进入各扩展服务瓦片(证件照排版 / 政务导航 / 手册下载)· <b>更多服务=即将上线禁用态</b></span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">停留服务区;不记录第三方结果,底部合规提示</span></div>
+    </a>
+    <a class="rt-card" href="77-print-upload.html">
+      <div class="rt-head"><code>/print/upload</code><span class="badge b-new">新增原型 · 77</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">PrintUploadPage</span></div>
+      <div class="rt-row"><span class="k">前置</span><span class="v">打印七步流程 step 1;桌面浏览器为验证模式(A1),真机经 Terminal Agent 中转文件</span></div>
+      <div class="rt-row"><span class="k">主按钮</span><span class="v">选择文件后「下一步」→ <b>/print/material-check(31)</b>;未选文件时禁用</span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">带文件进入材料检查;空态诚实(未选择文件不放行)</span></div>
+    </a>
+  </div>
+
+  <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--plum);">② 路由级状态变体(1)· 复用既有屏,不新出图</h3>
+  <div class="rt-grid">
+    <a class="rt-card" href="22-me-notifications.html">
+      <div class="rt-head"><code>/me/feedback</code><span class="badge b-sub">状态变体 · 22-B</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">MyFeedbackPage</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">复用原型 <b>22 通知与反馈</b>的「反馈工单」子面板(标记为 22-B 状态,不复制 HTML)</span></div>
+      <div class="rt-row"><span class="k">前置</span><span class="v">需登录本人;未登录引导登录</span></div>
+      <div class="rt-row"><span class="k">主按钮</span><span class="v">提交反馈工单 / 查看工单详情与回复;无法提交时显示诚实错误态</span></div>
+    </a>
+  </div>
+
+  <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--wheat);">③ 待开发容错页(4)· 生产渲染「待开发」占位,映射到规范实现原型</h3>
+  <div class="s-sub" style="padding-left:0; margin-bottom:12px;">这 4 条为路由容错/旧别名,生产当前渲染诚实的「待开发 — XxxPage」占位符。规范能力已在下方对应原型实现,原型即其目标视觉基准(不为占位符单独出图)。</div>
+  <div class="rt-grid">
+    <a class="rt-card" href="22-me-notifications.html">
+      <div class="rt-head"><code>/notifications</code><span class="badge b-fall">待开发容错</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">NotificationsPage(占位:待开发)</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">规范实现见 <b>/me/notifications(原型 22)</b></span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">顶部通知入口的兜底路由;正式消息中心走原型 22</span></div>
+    </a>
+    <a class="rt-card" href="71-me-activity.html">
+      <div class="rt-head"><code>/me/activity/:id</code><span class="badge b-fall">待开发容错</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">MeActivityDetailPage(占位:待开发)</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">回到 <b>浏览与跳转记录(原型 71)</b>列表口径</span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">记录明细详情页占位;当前只展示动作,不造假数据</span></div>
+    </a>
+    <a class="rt-card" href="69-smart-campus-welcome.html">
+      <div class="rt-head"><code>/campus/welcome</code><span class="badge b-fall">待开发容错</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">CampusWelcomePage(占位:待开发)</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">规范实现见 <b>/smart-campus/welcome(原型 69 迎新系统)</b></span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">旧 campus 别名兜底;正式迎新走 smart-campus</span></div>
+    </a>
+    <a class="rt-card" href="70-freshman-insights.html">
+      <div class="rt-head"><code>/campus/freshman-insights</code><span class="badge b-fall">待开发容错</span></div>
+      <div class="rt-row"><span class="k">组件</span><span class="v">FreshmanInsightsPage(占位:待开发)</span></div>
+      <div class="rt-row"><span class="k">对应</span><span class="v">规范实现见 <b>/smart-campus/freshman-insights(原型 70)</b>,未开放锁定态</span></div>
+      <div class="rt-row"><span class="k">最终态</span><span class="v">旧 campus 别名兜底;正式页为合规锁定态</span></div>
+    </a>
+  </div>
+
+  <h3 style="font-family:var(--serif); font-size:16px; margin:24px 0 12px 0; color:var(--muted);">④ 纯重定向(5)· 只映射不出图</h3>
+  <div class="s-sub" style="padding-left:0; margin-bottom:12px;">按基准要求,5 条纯重定向<b>不复制出 5 张相同 HTML</b>,只在此展示:请求路由 → 最终路由 → 复用哪张原型。</div>
+  <div class="redir-map">
+    <div class="redir-row">
+      <code>/print/scan-convert</code><span class="arrow">→</span><code>/print-scan/convert</code>
+      <a class="to-proto" href="66-print-scan-convert.html"><span class="badge b-redir">复用原型 66</span></a>
+    </div>
+    <div class="redir-row">
+      <code>/print/scan-sign</code><span class="arrow">→</span><code>/print-scan/sign</code>
+      <a class="to-proto" href="67-print-scan-sign.html"><span class="badge b-redir">复用原型 67</span></a>
+    </div>
+    <div class="redir-row">
+      <code>/print/scan-feature</code><span class="arrow">→</span><code>/print-scan/feature/id-photo</code>
+      <a class="to-proto" href="68-print-scan-feature.html"><span class="badge b-redir">复用原型 68</span></a>
+    </div>
+    <div class="redir-row">
+      <code>/resume</code><span class="arrow">→</span><code>/resume/source</code>
+      <a class="to-proto" href="05-resume-source.html"><span class="badge b-redir">复用原型 05</span></a>
+    </div>
+    <div class="redir-row">
+      <code>/resume/upload</code><span class="arrow">→</span><code>/resume/source</code>
+      <a class="to-proto" href="05-resume-source.html"><span class="badge b-redir">复用原型 05</span></a>
+    </div>
+  </div>
+</div>
+
+<div class="section s-slate">
+  <h2>功能流程 · 多步链路入口与步骤</h2>
+  <div class="s-sub">串联型业务流程的完整步骤链(点击任一节点跳到对应原型),覆盖打印 / 扫描 / AI简历诊断 / AI简历生成 / 模拟面试 / 招聘会现场 / 登录上传七条主链路。</div>
+
+  <div class="flow">
+    <div class="flow-title">打印七步主流程</div>
+    <div class="flow-note">首页打印瓦片 → 上传 → 材料检查 → 预览 → 参数 → 确认 → 收银 → 打印进度 → 完成取件</div>
+    <div class="flow-steps">
+      <a href="01-home.html"><span class="fn">01</span>首页</a><span class="sep">→</span>
+      <a href="77-print-upload.html"><span class="fn">77</span>上传</a><span class="sep">→</span>
+      <a href="31-print-material-check.html"><span class="fn">31</span>材料检查</a><span class="sep">→</span>
+      <a href="64-print-preview.html"><span class="fn">64</span>预览</a><span class="sep">→</span>
+      <a href="03-print-settings.html"><span class="fn">03</span>参数</a><span class="sep">→</span>
+      <a href="65-print-confirm.html"><span class="fn">65</span>确认</a><span class="sep">→</span>
+      <a href="32-print-cashier.html"><span class="fn">32</span>收银</a><span class="sep">→</span>
+      <a href="04-print-progress.html"><span class="fn">04</span>进度</a><span class="sep">→</span>
+      <a href="33-print-done.html"><span class="fn">33</span>完成</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">扫描四步流程</div>
+    <div class="flow-note">从打印扫描中心进入,扫描到 PDF 后可转 AI 简历识别 / 打印 / 保存文档</div>
+    <div class="flow-steps">
+      <a href="02-print-hub.html"><span class="fn">02</span>打印扫描中心</a><span class="sep">→</span>
+      <a href="34-scan-start.html"><span class="fn">34</span>类型选择</a><span class="sep">→</span>
+      <a href="35-scan-settings.html"><span class="fn">35</span>扫描指引</a><span class="sep">→</span>
+      <a href="36-scan-progress.html"><span class="fn">36</span>扫描等待</a><span class="sep">→</span>
+      <a href="37-scan-result.html"><span class="fn">37</span>结果与去向</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">AI简历诊断流程</div>
+    <div class="flow-note">来源选择(上传/扫码/纸质OCR)→ 解析 → 诊断报告 → 优化对比 → 导出</div>
+    <div class="flow-steps">
+      <a href="05-resume-source.html"><span class="fn">05</span>来源选择</a><span class="sep">→</span>
+      <a href="27-resume-parse.html"><span class="fn">27</span>AI解析</a><span class="sep">→</span>
+      <a href="06-resume-diagnosis.html"><span class="fn">06</span>诊断报告</a><span class="sep">→</span>
+      <a href="07-resume-optimize.html"><span class="fn">07</span>优化对比</a><span class="sep">→</span>
+      <a href="28-resume-export.html"><span class="fn">28</span>导出</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">AI简历生成流程</div>
+    <div class="flow-note">信息表单 → 生成预览(可分段重生成)→ 导出去向</div>
+    <div class="flow-steps">
+      <a href="25-resume-generate.html"><span class="fn">25</span>信息表单</a><span class="sep">→</span>
+      <a href="26-resume-generate-preview.html"><span class="fn">26</span>生成预览</a><span class="sep">→</span>
+      <a href="28-resume-export.html"><span class="fn">28</span>导出</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">模拟面试流程</div>
+    <div class="flow-note">仅供练习参考;设置 → 答题现场 → 报告(可查历史 / 打印技巧手册)</div>
+    <div class="flow-steps">
+      <a href="38-interview-setup.html"><span class="fn">38</span>设置</a><span class="sep">→</span>
+      <a href="39-interview-session.html"><span class="fn">39</span>答题现场</a><span class="sep">→</span>
+      <a href="40-interview-report.html"><span class="fn">40</span>面试报告</a><span class="sep">→</span>
+      <a href="42-interview-reports.html"><span class="fn">42</span>历史报告</a><span class="sep">·</span>
+      <a href="41-interview-tips.html"><span class="fn">41</span>技巧手册</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">招聘会现场服务流程</div>
+    <div class="flow-note">列表 → 详情 → 扫码签到 → 参展企业/展位详情 → 导览图 → AI参会准备单;预约去来源平台</div>
+    <div class="flow-steps">
+      <a href="10-fairs-list.html"><span class="fn">10</span>列表</a><span class="sep">→</span>
+      <a href="11-fair-detail.html"><span class="fn">11</span>详情</a><span class="sep">→</span>
+      <a href="43-fair-checkin.html"><span class="fn">43</span>扫码签到</a><span class="sep">→</span>
+      <a href="44-fair-companies.html"><span class="fn">44</span>参展企业</a><span class="sep">→</span>
+      <a href="45-fair-company-detail.html"><span class="fn">45</span>展位详情</a><span class="sep">→</span>
+      <a href="46-fair-map.html"><span class="fn">46</span>导览图</a><span class="sep">→</span>
+      <a href="48-fair-visit-plan.html"><span class="fn">48</span>AI准备单</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-title">登录与手机上传流程</div>
+    <div class="flow-note">终端扫码登录 ↔ 手机端确认;手机上传落地页把文件回传到终端打印链路</div>
+    <div class="flow-steps">
+      <a href="15-login.html"><span class="fn">15</span>终端扫码登录</a><span class="sep">→</span>
+      <a href="63-qr-login-mobile.html"><span class="fn">63</span>手机确认</a><span class="sep">·</span>
+      <a href="62-phone-upload.html"><span class="fn">62</span>手机上传落地页</a><span class="sep">→</span>
+      <a href="77-print-upload.html"><span class="fn">77</span>终端打印上传</a>
+    </div>
+  </div>
+</div>
+
+<div class="section s-plum">
+  <h2>状态变体 · 说明</h2>
+  <div class="s-sub">「路由级状态变体」指同一页面组件因不同路由/入口呈现的子面板态,用「原屏号 + 字母」编号,不单独出图。</div>
+  <div class="rt-grid">
+    <a class="rt-card" href="22-me-notifications.html">
+      <div class="rt-head"><span><b>22-B</b> · 反馈工单态</span><span class="badge b-sub">状态变体</span></div>
+      <div class="rt-row"><span class="k">来源</span><span class="v">路由 <code>/me/feedback</code> 直达原型 22 的「反馈工单」子面板</span></div>
+      <div class="rt-row"><span class="k">与 22 差异</span><span class="v">默认展开反馈提交表单 + 工单列表,而非消息通知 Tab</span></div>
+    </a>
+  </div>
+  <div class="s-sub" style="padding-left:0; margin-top:14px;">另:多张核心原型已内含合规必需的<b>内联状态</b>(已直接画在各自文件内,不计入上方路由级变体):27/36 加载等待态、42/70 空态与未开放锁定态、61 断网降级态、68 即将上线态、77 未选文件禁用态。</div>
+</div>
+</div>
+
+<div class="tip">
+  说明:全部页面为静态高保真原型,数据均为示例;岗位/招聘会/企业信息仅为第三方来源展示与跳转指引,不含平台内投递能力;金额均标注"以现场公示价为准"。原型不进正式工程,归档位置待定(docs/design 或原型分支)。<b>60/61(会话超时/网络异常)对应的生产页面已真实实现</b>(SessionTimeoutPage / ErrorOfflinePage,非占位),原型作为其视觉基准。
+</div>
+</body>
+</html>

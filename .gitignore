@@ -1,5 +1,6 @@
 # Codex temp
 .codex-tmp/
+.codegraph/
 
 # Dependencies
 node_modules
@@ -54,10 +55,13 @@ pnpm-debug.log*
 # Browser verification artifacts
 .playwright-cli/
 test-results/
+playwright-report/
+blob-report/
 
 # Temp
 .tmp
 /tmp/
+.cache/
 mavis-workspace/
 .mavis/
 .opencode/

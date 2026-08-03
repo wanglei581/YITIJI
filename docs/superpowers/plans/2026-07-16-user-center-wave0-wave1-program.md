@@ -21,13 +21,8 @@
 | 顺序 | 分支 | 对应详细计划 | 依赖 | 当前状态 |
 |---|---|---|---|---|
 | 1 | `codex/user-center-wave0-truth-baseline` | `2026-07-16-user-center-wave0-truth-baseline.md` | 最新干净 `main` | 已由 PR #261 合入；PR #263 已合并补齐授权撤回终态保护。 |
-<<<<<<< HEAD
 | 2 | `codex/user-center-wave1-account-security` | `2026-07-16-user-center-wave1-account-security.md` | Wave 0 合入后的 `main` | 基础版已由 PR #265 合入；追加安全加固已由 PR #270（`88e940cd`）合入；不含数据权利 UI 或执行器。 |
 | 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main`；状态机、导出和 fail-closed 注销门禁可先实施，不可逆注销 handler 必须等法务分类留存矩阵签字后才能提交 | Slice 1 已由 PR #275 合入；Slice 2 仅有恢复型方案，运行时代码仍须从干净主线独立 worktree 开始。 |
-=======
-| 2 | `codex/user-center-wave1-account-security` | `2026-07-16-user-center-wave1-account-security.md` | Wave 0 合入后的 `main` | 已由 PR #265 合入；仅账户状态、会话撤销与 step-up 后端底座，不含数据权利 UI 或执行器。 |
-| 3 | `codex/user-center-wave1-data-rights` | `2026-07-16-user-center-wave1-data-rights.md` | Wave 1 account-security 合入后的 `main`；状态机、导出和 fail-closed 注销门禁可先实施，不可逆注销 handler 必须等法务分类留存矩阵签字后才能提交 | 未开始；下一波必须从当前干净主线另建 worktree。 |
->>>>>>> dd1a90b1 (docs: reconcile user center plan status)
 | 4 | `codex/user-center-wave1-ops-ui` | `2026-07-16-user-center-wave1-ops-ui.md` | Wave 1 data-rights 可用契约合入后的 `main`；导出领取、请求列表和 Admin 队列可先实施，Kiosk 注销入口必须等法务矩阵与注销执行 feature flag 同时获准后才能展示 | 未开始；不得提前展示注销入口。 |
 
 每个分支单独建立 CCG task、独立 worktree、独立复审和验收。当前包含用户在途改动的工作区只用于只读分析和写本计划，禁止直接开始运行时代码。

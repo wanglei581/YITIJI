@@ -26,31 +26,49 @@ if (page.includes('adminOrdersReadonlyService') && !page.includes('listPrintTask
   fail('orders page should use adminOrdersReadonlyService and avoid listPrintTasks')
 }
 
+// G5 已新增管理员退款入口（refundOrder），允许 POST /admin/orders/:id/refund。
+// 其余写操作（标记支付/强制改状态/updateOrderStatus）仍禁止。
 if (
   service.includes("'/admin/orders'") &&
-  service.includes("`/admin/orders/${encodeURIComponent(id)}`") &&
-  !/PATCH|POST|DELETE|updateOrderStatus|refundOrder/.test(service)
+  service.includes("`/admin/orders/${encodeURIComponent(id)}`")
 ) {
-  pass('service exposes GET list/detail only')
+  pass('service exposes GET list/detail + G5 refundOrder endpoint')
 } else {
-  fail('service must expose only GET /admin/orders list/detail')
+  fail('service must expose GET /admin/orders list/detail')
 }
 
-for (const forbidden of ['标记已支付', '标记支付失败', '标记退款', '确认退款', 'updateOrderStatus', 'refundOrder']) {
+// refundOrder 已由 G5 合法新增，不再列为禁止操作；
+// 标记支付/强制改状态仍禁止。
+for (const forbidden of ['标记已支付', '标记支付失败', 'updateOrderStatus']) {
   if (page.includes(forbidden)) fail(`orders page contains forbidden write operation: ${forbidden}`)
 }
-pass('orders page has no payment/refund/status mutation actions')
+pass('orders page has no unauthorized payment/status mutation actions')
 
 if (
-  page.includes('订单只读视图') &&
-  page.includes('支付 / 退款 / 对账域尚未上线') &&
   page.includes('orderNo') &&
   page.includes('payStatus') &&
   page.includes('taskStatus')
 ) {
-  pass('page copy and fields clearly communicate read-only order scope')
+  pass('page fields include order/payment/task metadata')
 } else {
-  fail('page must show read-only scope and order/payment/task fields')
+  fail('page must include orderNo, payStatus, taskStatus fields')
+}
+
+if (
+  service.includes('aftercareStatus: AdminOrderAftercareStatus') &&
+  service.includes('refundEligible: boolean') &&
+  service.includes('retryForbidden: boolean') &&
+  page.includes('已支付失败待核查') &&
+  page.includes("setStatusFilter('failed')") &&
+  page.includes("setPayStatus('paid')") &&
+  page.includes("detail.aftercareStatus === 'manual_check_required'") &&
+  page.includes('系统已禁止重新排队，避免重复出纸') &&
+  page.includes('detail.refundEligible') &&
+  page.includes('adminOrdersReadonlyService.refundOrder')
+) {
+  pass('paid+failed unconfirmed orders expose server-derived aftercare, quick filter, risk warning and canonical refund entry')
+} else {
+  fail('Gate 0.3B orders aftercare UI/service contract is incomplete')
 }
 
 console.log('\nALL PASS')

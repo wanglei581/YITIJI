@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>政策服务 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .policy-hero { background:linear-gradient(150deg,#2f5090,#3f68b0); padding:20px 20px 26px; position:relative; overflow:hidden; }
+    .policy-hero::before { content:''; position:absolute; right:-30px; top:-30px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,.06); }
+    .ph-t { font-family:var(--font-serif); font-size:23px; font-weight:700; color:#fff; position:relative; }
+    .ph-s { font-size:12.5px; color:rgba(255,255,255,.72); margin-top:6px; position:relative; }
+    .cat-scroll { display:flex; gap:10px; padding:14px 16px 4px; overflow-x:auto; }
+    .cat-scroll::-webkit-scrollbar { display:none; }
+    .cat { flex-shrink:0; width:76px; display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; }
+    .cat .c-ic { width:52px; height:52px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:24px; }
+    .cat .c-l { font-size:12px; color:var(--ink-soft); }
+    .policy-item { padding:14px 16px; cursor:pointer; }
+    .policy-item + .policy-item { border-top:1px solid var(--line-faint); }
+    .pi-top { display:flex; align-items:flex-start; gap:8px; }
+    .pi-tag { flex-shrink:0; }
+    .pi-title { font-size:15px; font-weight:600; color:var(--ink); line-height:1.45; }
+    .pi-sum { font-size:12.5px; color:var(--muted); margin-top:6px; line-height:1.55; }
+    .pi-foot { display:flex; align-items:center; justify-content:space-between; margin-top:8px; font-size:11px; color:var(--faint); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#2f5090"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light" style="background:#2f5090;border-bottom:none">
+    <div class="nav-back">‹</div>
+    <div class="nav-title" style="color:#fff">政策服务</div>
+    <div class="nav-right"><span style="font-size:18px;color:rgba(255,255,255,.8)">🔍</span></div>
+  </div>
+
+  <div class="content has-tabbar">
+    <div class="policy-hero">
+      <div class="ph-t">就业创业政策</div>
+      <div class="ph-s">汇总官方发布的求职、创业与补贴政策</div>
+    </div>
+
+    <!-- 分类 -->
+    <div class="cat-scroll">
+      <div class="cat"><div class="c-ic a-slate">🎓</div><div class="c-l">应届生</div></div>
+      <div class="cat"><div class="c-ic a-teal">💰</div><div class="c-l">求职补贴</div></div>
+      <div class="cat"><div class="c-ic a-wheat">🚀</div><div class="c-l">创业扶持</div></div>
+      <div class="cat"><div class="c-ic a-clay">🏠</div><div class="c-l">落户住房</div></div>
+      <div class="cat"><div class="c-ic a-plum">📜</div><div class="c-l">技能认证</div></div>
+    </div>
+
+    <!-- 政策列表 -->
+    <div class="section-t">最新政策</div>
+    <div class="card">
+      <div class="policy-item">
+        <div class="pi-top">
+          <span class="pi-tag chip teal">求职补贴</span>
+          <div class="pi-title">2026 年高校毕业生一次性求职创业补贴申领指南</div>
+        </div>
+        <div class="pi-sum">符合条件的困难毕业生可申领一次性求职创业补贴，本文说明申领条件、材料与流程。</div>
+        <div class="pi-foot"><span>来源：市人社局</span><span>发布 3 天前 · 阅读 1.2k</span></div>
+      </div>
+      <div class="policy-item">
+        <div class="pi-top">
+          <span class="pi-tag chip wheat">创业扶持</span>
+          <div class="pi-title">创业担保贷款及贴息政策解读</div>
+        </div>
+        <div class="pi-sum">个人最高可申请 30 万元创业担保贷款，财政给予贴息，符合条件的小微企业同样适用。</div>
+        <div class="pi-foot"><span>来源：省人社厅</span><span>发布 1 周前 · 阅读 860</span></div>
+      </div>
+      <div class="policy-item">
+        <div class="pi-top">
+          <span class="pi-tag chip">应届生</span>
+          <div class="pi-title">应届毕业生就业报到证取消后的手续办理</div>
+        </div>
+        <div class="pi-sum">报到证取消后，档案转递、就业登记等手续如何办理，一文说清。</div>
+        <div class="pi-foot"><span>来源：教育部</span><span>发布 2 周前 · 阅读 3.4k</span></div>
+      </div>
+    </div>
+
+    <div class="compliance-note">政策内容来自官方公开发布渠道，具体以官方原文及经办窗口解释为准。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab"><div class="ti">⌂</div><div class="tl">首页</div></div>
+    <div class="tab"><div class="ti">🖨</div><div class="tl">打印</div></div>
+    <div class="tab on"><div class="ti">💼</div><div class="tl">求职</div></div>
+    <div class="tab"><div class="ti">✦</div><div class="tl">AI</div></div>
+    <div class="tab"><div class="ti">◍</div><div class="tl">我的</div></div>
+  </div>
+</div>
+</body>
+</html>

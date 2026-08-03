@@ -42,7 +42,7 @@ function mustNotMatch(source: string, pattern: RegExp, message: string): void {
 // 诚实待办/免责限定词：命中这些词的分句不算过度宣称。
 // 「仍需」「有待」是同义变体（仍需…完成 / 有待…完成），需要同步维护避免只堵一个漏一个。
 const OVERCLAIM_ALLOWED_QUALIFIERS =
-  /(不代表|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|仍需|有待|需要|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
+  /(不代表|未宣称|不等于|不得|不能|禁止|尚未|未执行|未完成|未通过|待现场|待补齐|仍需|有待|需要|否|Not Passed Yet|PENDING|Blocked|阻塞|只代表|写成)/
 const OVERCLAIM_PATTERNS = [
   /Windows\s*真机[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
   /真实扫描[^。\n|]{0,40}(已通过|通过|完成|已完成|可上线|可商用)/,
@@ -106,6 +106,8 @@ function assertOverclaimHeuristicFixtures(): void {
     // 否定词统辖顿号列举的惯用句式：验收/进度文档大量使用，锁定「、」不得加入分句切分符，
     // 否则列举项与开头的「不代表」被切断，此句会炸出 4 处误伤。
     '本文件不代表生产迁移已执行、Windows 真机完整验收已通过、真实扫描已完成、U 盘导入已完成、奔图彩色 mode 已确认或小范围试运营已完成。',
+    // 2026-07-26：进度条「未宣称扫描/U盘…完成」曾被 U盘…完成 模式误伤（「未宣称」原不在豁免表）
+    '未宣称扫描/U盘整机或商用全部验收完成。',
   ]
 
   const missedFlags = shouldFlag.filter((s) => findOverclaimOffenders(s).length === 0)
@@ -136,8 +138,15 @@ function main(): void {
 
   const printJobsService = read('src/print-jobs/print-jobs.service.ts')
   const printJobsController = read('src/print-jobs/print-jobs.controller.ts')
-  const terminalsService = read('src/terminals/terminals.service.ts')
+  const terminalsService =
+    read('src/terminals/terminals.service.ts') +
+    '\n' +
+    read('src/terminals/terminals-agent.service.ts') +
+    '\n' +
+    read('src/terminals/terminals-admin.service.ts')
   const printJobsApi = read('../../apps/kiosk/src/services/print/printJobsApi.ts')
+  const runtimeTerminalIdentity = read('../../apps/kiosk/src/services/api/screensaver.ts')
+  const terminalConfigApi = read('../../apps/kiosk/src/services/api/terminalConfig.ts')
   const prismaSchema = read('prisma/schema.prisma')
   const adminTypes = read('../../apps/admin/src/services/api/types.ts')
   const adminTerminalsPage = read('../../apps/admin/src/routes/terminals/index.tsx')
@@ -156,8 +165,28 @@ function main(): void {
 
   mustContain(
     printJobsApi,
-    ["'X-Terminal-Id': terminalId", 'VITE_TERMINAL_ID', 'missing terminal id'],
-    'Kiosk print API must send configured terminal id and fail closed when missing',
+    [
+      "import { getTerminalId } from '../api/screensaver'",
+      'const terminalId = getTerminalId()',
+      "'X-Terminal-Id': terminalId",
+      'missing terminal id',
+    ],
+    'Kiosk print API must send the runtime terminal id and fail closed when missing',
+  )
+  mustNotContain(
+    printJobsApi,
+    ['VITE_TERMINAL_ID'],
+    'Kiosk print API must not fall back to a build-time terminal id',
+  )
+  mustContain(
+    runtimeTerminalIdentity,
+    ['/local/terminal-identity', 'if (import.meta.env.DEV)', "resolvedIdentity?.terminalId ?? ''"],
+    'Kiosk terminal identity must come from the local Agent with development-only fallback',
+  )
+  mustContain(
+    terminalConfigApi,
+    ["if (!terminalId.trim())", 'missing terminal id'],
+    'Kiosk terminal config must reject a missing runtime identity before requesting the API',
   )
 
   mustContain(
@@ -205,20 +234,20 @@ function main(): void {
   const statusBlock = section(terminalsService, 'async patchTaskStatus', 'async validateTerminalToken')
   mustContain(
     statusBlock,
-    ['TASK_TERMINAL_MISSING', 'TASK_NOT_OWNED', 'await this.findAndValidate(terminalIdHeader, authHeader)'],
+    ['TASK_TERMINAL_MISSING', 'TASK_NOT_OWNED', 'await this.credentialSecurity.validateTerminalToken(terminalIdHeader, authHeader)'],
     'status patch must reject legacy unbound tasks and wrong terminal updates',
   )
 
-  const resetBlock = section(terminalsService, 'private async resetExpiredClaims', 'private async seedPrintTask')
+  const resetBlock = section(terminalsService, 'async resetExpiredClaims', 'private async seedPrintTask')
   mustNotContain(
     resetBlock,
     ['terminalId: null'],
-    'expired claim reset must preserve target terminalId for same-terminal retry',
+    'unconfirmed timeout handling must preserve target terminalId for investigation',
   )
   mustContain(
     resetBlock,
-    ["status: 'claimed'", 'claimExpiry: { lt: now }', "status: 'pending'"],
-    'claim TTL reset must keep lease recovery behavior',
+    ["status: 'claimed'", 'claimExpiry: { lt: now }', "status: 'failed'", "errorCode: 'PRINT_JOB_UNCONFIRMED'", 'autoRequeued: false'],
+    'claim timeout must fail closed and prohibit automatic redispatch',
   )
 
   mustContain(

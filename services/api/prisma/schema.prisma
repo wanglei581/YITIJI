@@ -21,7 +21,12 @@ datasource db {
 model Terminal {
   id                String   @id
   terminalCode      String   @unique
+  // Gate 0 expand 阶段兼容载体：reader-aware API 全量部署前，新签发仍双写这里，
+  // 避免滚动升级期间旧 API 实例拒绝新 Token。后续 contract 批次才切 cred$ 哨兵并擦除明文。
   agentToken        String   @unique
+  credentialGeneration Int  @default(0)
+  lifecycleStatus   String   @default("active")
+  lifecycleVersion  Int      @default(0)
   deviceFingerprint String
   displayName       String?
   macAddress        String?  @unique
@@ -35,11 +40,33 @@ model Terminal {
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
   bindCodes    TerminalBindCode[]
+  credentials  TerminalCredential[]
   scanTasks    ScanTask[]
   capabilities TerminalCapability[]
 
   @@index([orgId])
   @@index([enabled])
+  @@index([lifecycleStatus])
+}
+
+// ── TerminalCredential ───────────────────────────────────────────────────────
+// 每设备凭证历史。Bearer token 为 256-bit 随机值；本表只保存 SHA-256 hash。
+// expand 窗口内 Terminal.agentToken 仍可能保留当前明文兼容载体，待受控 contract 回填擦除。
+// Terminal.credentialGeneration 是当前有效代次，避免并发签发时两枚凭证同时有效。
+model TerminalCredential {
+  id          String    @id
+  terminalId  String
+  terminal    Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  generation  Int
+  issueSource String
+  issuedAt    DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+
+  @@unique([terminalId, generation])
+  @@index([terminalId, revokedAt, expiresAt])
+  @@index([expiresAt])
 }
 
 // ── TerminalCapability ────────────────────────────────────────────────────────
@@ -158,6 +185,8 @@ model TerminalHeartbeat {
   terminal                   Terminal @relation(fields: [terminalId], references: [id])
   status                     String?
   printerStatus              String?
+  wiredNetworkStatus         String?
+  printerNetworkStatus       String?
   localTaskDatabaseAvailable Boolean?
   agentVersion               String?
   ipAddress                  String?
@@ -226,7 +255,7 @@ model Order {
   paidAt            DateTime?
   paidBy            String? // 'self' | 操作员标识（manual 时记录）
   pickupCode        String?   @unique // 取件凭证码，paid 时生成
-  billablePages     Int? // 后端识别的计费页数（绝不信任前端 file.pages）
+  billablePages     Int? // 实际计费页数：后端识别的文档页数 ∩ pageRange 选中页（绝不信任前端 file.pages）
   billingPageSource String? // 'pdf_lightweight_scan' | 'image_single_page'
 
   // ── C5-2 线上支付 additive 补列（沙箱通道，无 live 网关）─────────
@@ -429,6 +458,7 @@ model User {
   id           String        @id @default(cuid())
   username     String        @unique
   passwordHash String
+  passwordProofState String  @default("legacy")
   name         String
   role         String        // 见 UserRole
   orgId        String?
@@ -436,6 +466,11 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  emailHash    String?       @unique
+  emailEnc     String?
+  emailVerifiedAt DateTime?
+  /// Wave 1: admin_manual（Admin 受托核验）；预留 otp
+  emailVerifyMethod String?
   tokenVersion Int           @default(0)
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
@@ -450,6 +485,7 @@ model User {
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
+  @@index([emailVerifiedAt])
   @@index([orgId, role, enabled, deletedAt])
 }
 
@@ -463,6 +499,8 @@ model EndUser {
   id          String    @id @default(cuid())
   phoneHash   String    @unique
   phoneEnc    String
+  /// 微信小程序 openid（一键登录后写入）；不存 sessionKey；null = 未绑定微信。
+  wxOpenId    String?   @unique
   nickname    String?
   enabled     Boolean   @default(true)
   status      String    @default("active")
@@ -488,6 +526,7 @@ model EndUser {
   jobAiSessions   JobAiSession[]
   aiServiceLogs   AiServiceLog[]
   aiConsents      UserAiConsent[]
+  legalConsents   MemberLegalConsent[]
   dataRequests    UserDataRequest[]
   scanTasks       ScanTask[]
 
@@ -1416,6 +1455,24 @@ model UserAiConsent {
   @@index([revokedAt])
 }
 
+// G6: 会员登录时对《用户服务协议》《隐私政策》的同意快照（只追加，不改写）。
+// termsDocVersionId / privacyDocVersionId 指向当时有效的 LegalDocVersion.id；
+// 若当时尚无已激活版本，则 version 落 LEGAL_DRAFT_FALLBACK_VERSION，ID 为空。
+model MemberLegalConsent {
+  id                  String   @id @default(cuid())
+  endUserId           String
+  endUser             EndUser  @relation(fields: [endUserId], references: [id], onDelete: Cascade)
+  termsVersion        String
+  privacyVersion      String
+  termsDocVersionId   String?
+  privacyDocVersionId String?
+  source              String   // "sms_login" | "qr_login"
+  ipAddress           String?
+  createdAt           DateTime @default(now())
+
+  @@index([endUserId, createdAt])
+}
+
 model UserDataRequest {
   id                String    @id @default(cuid())
   endUserId         String
@@ -2050,27 +2107,34 @@ model HelpItem {
 
 model LegalDocVersion {
   id          String    @id @default(cuid())
-  docType     String
-  version     String
-  content     String
-  publishedAt DateTime?
+  docType     String    // "privacy_policy" | "terms_of_service" | "ai_disclaimer"
+  version     String    // "v1.0", "v1.1" 等
+  title       String    @default("")
+  content     String    // Markdown 格式全文
   isActive    Boolean   @default(false)
+  publishedAt DateTime?
+  publishedBy String?   // adminId
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([docType, version])
+  @@index([docType, isActive])
 }
 
 model OfflineAgency {
   id            String       @id @default(cuid())
   name          String
-  orgType       String
+  orgType       String       @default("recruitment")
   address       String
+  district      String?
   lat           Float?
   lng           Float?
   openHours     String?
   phone         String?
+  contactEmail  String?
+  website       String?
   services      String       @default("[]")
+  description   String?
+  logoUrl       String?
   status        String       @default("active")
   reviewStatus  String       @default("pending")
   publishStatus String       @default("draft")
@@ -2087,8 +2151,16 @@ model OfflineJob {
   agencyId     String
   agency       OfflineAgency @relation(fields: [agencyId], references: [id])
   title        String
-  salary       String?
+  jobType      String        @default("fulltime")
+  salaryMin    Int?
+  salaryMax    Int?
+  salaryUnit   String        @default("month")
   requirements String?
+  description  String?
+  headcount    Int           @default(1)
+  location     String?
+  education    String?
+  experience   String?
   externalUrl  String?
   externalId   String?
   status       String        @default("active")

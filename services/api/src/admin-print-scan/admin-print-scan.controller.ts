@@ -24,6 +24,7 @@ import type {
   AdminPrintScanTaskPage,
 } from './admin-print-scan.types'
 
+import { resolveClientIp } from '../common/client-ip'
 interface AuditReq {
   headers: Record<string, string | string[] | undefined>
   requestId?: string
@@ -123,10 +124,8 @@ export class AdminPrintScanController {
   }
 }
 
-function extractIp(req: AuditReq): string | null {
-  const fwd = req.headers['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd.length > 0) return fwd.split(',')[0]!.trim()
-  return req.ip ?? req.socket?.remoteAddress ?? null
+function extractIp(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function extractUa(req: AuditReq): string | null {

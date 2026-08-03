@@ -21,6 +21,7 @@ import MemberBenefitsPage from './member-benefits'
 import BenefitActivitiesPage from './benefit-activities'
 import MemberFeedbackPage from './member-feedback'
 import MemberNotificationsPage from './member-notifications'
+import MemberPrivacyPage from './member-privacy'
 import AlertsPage from './alerts'
 import PermissionsPage from './permissions'
 import AuditPage from './audit'
@@ -31,6 +32,9 @@ import ToolboxPage from './toolbox'
 import SmartCampusPage from './smart-campus'
 import JobMaterialsPage from './job-materials'
 import AccountSettingsPage from './account-settings'
+import OfflineAgenciesPage from './offline-agencies'
+import LegalDocsPage from './legal-docs'
+import PrivacyRequestsPage from './privacy-requests'
 
 export const adminRouter = createBrowserRouter([
   // /login 在 AdminLayoutWrapper 之外,不走 boot 鉴权;
@@ -64,6 +68,7 @@ export const adminRouter = createBrowserRouter([
       { path: 'member-benefits', element: <MemberBenefitsPage /> },
       { path: 'member-feedback', element: <MemberFeedbackPage /> },
       { path: 'member-notifications', element: <MemberNotificationsPage /> },
+      { path: 'member-privacy', element: <MemberPrivacyPage /> },
       { path: 'alerts',       element: <AlertsPage /> },
       { path: 'permissions',     element: <PermissionsPage /> },
       { path: 'audit',           element: <AuditPage /> },
@@ -73,6 +78,9 @@ export const adminRouter = createBrowserRouter([
       { path: 'toolbox',         element: <ToolboxPage /> },
       { path: 'smart-campus',    element: <SmartCampusPage /> },
       { path: 'account-settings', element: <AccountSettingsPage /> },
+      { path: 'offline-agencies', element: <OfflineAgenciesPage /> },
+      { path: 'legal-docs',       element: <LegalDocsPage /> },
+      { path: 'privacy-requests', element: <PrivacyRequestsPage /> },
     ],
   },
 ])

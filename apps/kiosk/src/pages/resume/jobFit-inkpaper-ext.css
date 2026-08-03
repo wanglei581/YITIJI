@@ -1,0 +1,88 @@
+/* 证据条目堆叠 */
+.job-fit-inkpaper .jf-ev-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.job-fit-inkpaper .jf-ev-item {
+  border-radius: 14px;
+  padding: 14px 18px;
+}
+.job-fit-inkpaper .jf-ev-item p {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--sd-color-text-strong);
+}
+.job-fit-inkpaper .jf-ev-item span {
+  display: block;
+  font-size: 16px;
+  color: var(--sd-color-text-muted);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.job-fit-inkpaper .jf-ev-item--match {
+  background: var(--sd-color-teal-soft);
+}
+.job-fit-inkpaper .jf-ev-item--gap {
+  background: var(--sd-color-wheat-soft);
+}
+/* 关键词覆盖行 */
+.job-fit-inkpaper .jf-kw-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sd-color-line);
+}
+.job-fit-inkpaper .jf-kw-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sd-color-text-muted);
+}
+.job-fit-inkpaper .jf-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.job-fit-inkpaper .jf-chip--ok {
+  background: var(--sd-color-teal-soft);
+  border: 1px solid rgba(31, 158, 134, .3);
+  color: var(--sd-color-teal-deep);
+}
+.job-fit-inkpaper .jf-chip--warn {
+  background: var(--sd-color-wheat-soft);
+  border: 1px solid rgba(169, 120, 31, .3);
+  color: var(--sd-color-wheat-deep);
+}
+/* 简历定向优化建议列表 */
+.job-fit-inkpaper .jf-sug-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+}
+.job-fit-inkpaper .jf-sug-list li {
+  display: flex;
+  gap: 10px;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--sd-color-text);
+}
+.job-fit-inkpaper .jf-sug-list li::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sd-color-primary);
+  margin-top: 9px;
+}

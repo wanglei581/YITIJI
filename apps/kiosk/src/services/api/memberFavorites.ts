@@ -15,6 +15,7 @@ import type {
   MemberBenefitItem,
   MemberFavoriteItem,
   FavoriteTargetType,
+  MemberRedemptionItem,
 } from '@ai-job-print/shared'
 import { isMemberSessionInvalidError, notifyMemberSessionExpired } from '../auth/memberSessionEvents'
 import { API_BASE_URL, API_MODE } from './client'
@@ -150,6 +151,26 @@ export function getMyBenefits(
   const q = params.toString()
   return request<{ items: MemberBenefitItem[]; nextCursor: string | null; total: number }>(
     `/me/benefits${q ? `?${q}` : ''}`,
+    token,
+  )
+}
+
+/**
+ * 我的核销记录（Wave 3；本人，只读；游标分页，pageSize 封顶 50）。
+ * 未登录 / mock 模式返回空页，不发真实请求。
+ * GET /api/v1/me/benefits/redemptions
+ */
+export function getMyRedemptions(
+  token: string | null | undefined,
+  opts?: { cursor?: string | null; pageSize?: number },
+): Promise<{ items: MemberRedemptionItem[]; nextCursor: string | null; total: number }> {
+  if (API_MODE !== 'http' || !token) return Promise.resolve({ items: [], nextCursor: null, total: 0 })
+  const params = new URLSearchParams()
+  if (opts?.cursor) params.set('cursor', opts.cursor)
+  if (opts?.pageSize) params.set('pageSize', String(opts.pageSize))
+  const q = params.toString()
+  return request<{ items: MemberRedemptionItem[]; nextCursor: string | null; total: number }>(
+    `/me/benefits/redemptions${q ? `?${q}` : ''}`,
     token,
   )
 }

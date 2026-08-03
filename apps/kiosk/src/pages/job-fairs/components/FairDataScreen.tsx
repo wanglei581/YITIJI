@@ -4,8 +4,8 @@
 // 合规：我们是第三方信息入口，无真实时数据。
 //   - 求职意向分布 / 行业分布 / 预计参会 = 机构录入预计值或按已录企业聚合，
 //     页面统一标注「预计 / 来源数据 · 非实时」，禁止写「实时」。
-//   - 另设「系统真实服务数据」区，展示我们真实拥有的服务行为（浏览/扫码/打印），
-//     明确不含求职者个人信息。
+//   - 服务行为计数（浏览/扫码/打印）仅在可证明统计源存在时展示；
+//     null = 未接入，隐藏或克制空态，禁止伪装成已接入的实时服务统计。
 // ============================================================
 
 import {
@@ -39,6 +39,10 @@ function MetricTile({ label, value, hint }: { label: string; value: string; hint
 export function FairDataScreen({ stats }: { stats: FairLiveStatsDTO }) {
   const intent = stats.seekerIntent ?? []
   const industry = stats.industryDistribution ?? []
+  const { browseCount, scanCount, printCount, dataSourceLabel } = stats
+
+  const hasServiceStats =
+    browseCount != null || scanCount != null || printCount != null
 
   return (
     <div className="flex flex-col gap-4">
@@ -46,13 +50,13 @@ export function FairDataScreen({ stats }: { stats: FairLiveStatsDTO }) {
       <div className="flex items-start gap-2 rounded-lg bg-warning-bg px-4 py-2.5">
         <InfoIcon className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <p className="text-xs leading-relaxed text-warning-fg">
-          下列参会规模与分布为{stats.dataSourceLabel}，由来源机构提供或按已录入企业聚合，仅供参考，不代表现场实时人数。
+          下列参会规模与分布为{dataSourceLabel}，由来源机构提供或按已录入企业聚合，仅供参考，不代表现场实时人数。
         </p>
       </div>
 
       {/* 预计规模指标 */}
       <Card className="p-5">
-        <p className="mb-3 text-sm font-medium text-neutral-700">活动规模（预计 / 来源）</p>
+        <p className="mb-3 text-sm font-medium text-neutral-700">活动规模（{dataSourceLabel}）</p>
         <div className="grid grid-cols-2 gap-3">
           <MetricTile
             label="预计参会人数"
@@ -71,7 +75,7 @@ export function FairDataScreen({ stats }: { stats: FairLiveStatsDTO }) {
           <PieChartIcon className="h-4 w-4 text-primary-500" />
           求职意向分布
         </p>
-        <p className="mb-3 text-xs text-neutral-400">预计数据 · 来源机构提供</p>
+        <p className="mb-3 text-xs text-neutral-400">{dataSourceLabel}</p>
         {intent.length > 0 ? (
           <div className="flex flex-col items-center gap-4">
             <div className="h-48 w-full">
@@ -114,7 +118,9 @@ export function FairDataScreen({ stats }: { stats: FairLiveStatsDTO }) {
       {/* 参展企业行业分布（柱状图） */}
       <Card className="p-5">
         <p className="mb-1 text-sm font-medium text-neutral-700">参展企业行业分布</p>
-        <p className="mb-3 text-xs text-neutral-400">按已录入参展企业聚合 · 共 {stats.totalCompanies} 家</p>
+        <p className="mb-3 text-xs text-neutral-400">
+          按已录入参展企业聚合 · 共 {stats.totalCompanies} 家 · {dataSourceLabel}
+        </p>
         {industry.length > 0 ? (
           <div className="h-56 w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -139,27 +145,37 @@ export function FairDataScreen({ stats }: { stats: FairLiveStatsDTO }) {
         )}
       </Card>
 
-      {/* 系统真实服务数据（合规：我们真实拥有的，不含求职者个人信息） */}
+      {/* 服务行为统计：仅展示可证明来源；null 不渲染 0 */}
       <Card className="p-5">
-        <p className="text-sm font-medium text-neutral-700">系统真实服务数据</p>
-        <p className="mb-3 text-xs text-neutral-400">本终端服务行为统计 · 不含求职者个人信息</p>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl bg-neutral-50 p-3 text-center">
-            <ScanIcon className="mx-auto h-5 w-5 text-neutral-400" />
-            <p className="mt-1.5 text-lg font-bold text-neutral-900">{stats.browseCount}</p>
-            <p className="text-xs text-neutral-500">信息浏览</p>
+        <p className="text-sm font-medium text-neutral-700">终端服务统计</p>
+        <p className="mb-3 text-xs text-neutral-400">可证明的本终端服务行为 · 不含求职者个人信息</p>
+        {hasServiceStats ? (
+          <div className="grid grid-cols-3 gap-3">
+            {browseCount != null && (
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <ScanIcon className="mx-auto h-5 w-5 text-neutral-400" />
+                <p className="mt-1.5 text-lg font-bold text-neutral-900">{browseCount.toLocaleString()}</p>
+                <p className="text-xs text-neutral-500">信息浏览</p>
+              </div>
+            )}
+            {scanCount != null && (
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <QrCodeIcon className="mx-auto h-5 w-5 text-neutral-400" />
+                <p className="mt-1.5 text-lg font-bold text-neutral-900">{scanCount.toLocaleString()}</p>
+                <p className="text-xs text-neutral-500">二维码展示</p>
+              </div>
+            )}
+            {printCount != null && (
+              <div className="rounded-xl bg-neutral-50 p-3 text-center">
+                <PrinterIcon className="mx-auto h-5 w-5 text-neutral-400" />
+                <p className="mt-1.5 text-lg font-bold text-neutral-900">{printCount.toLocaleString()}</p>
+                <p className="text-xs text-neutral-500">资料打印</p>
+              </div>
+            )}
           </div>
-          <div className="rounded-xl bg-neutral-50 p-3 text-center">
-            <QrCodeIcon className="mx-auto h-5 w-5 text-neutral-400" />
-            <p className="mt-1.5 text-lg font-bold text-neutral-900">{stats.scanCount}</p>
-            <p className="text-xs text-neutral-500">二维码展示</p>
-          </div>
-          <div className="rounded-xl bg-neutral-50 p-3 text-center">
-            <PrinterIcon className="mx-auto h-5 w-5 text-neutral-400" />
-            <p className="mt-1.5 text-lg font-bold text-neutral-900">{stats.printCount}</p>
-            <p className="text-xs text-neutral-500">资料打印</p>
-          </div>
-        </div>
+        ) : (
+          <p className="py-8 text-center text-base text-neutral-500">暂无统计 · 未接入可证明的服务数据源</p>
+        )}
       </Card>
     </div>
   )

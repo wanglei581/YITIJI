@@ -18,9 +18,8 @@ import {
   UserRoundIcon,
 } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
-import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
-import { useIdleTimer } from '../../hooks/useIdleTimer'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { MemberAgreement } from './components/MemberAgreement'
 import { MemberPhoneLoginPane } from './components/MemberPhoneLoginPane'
 import {
@@ -109,10 +108,6 @@ export function LoginPage() {
   const pendingLoginRef = useRef<MemberLoginPayload | null>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
-  const handleLoginIdle = useCallback(() => {
-    clearKioskSensitiveSession()
-    navigate('/', { replace: true })
-  }, [navigate])
 
   useEffect(() => {
     if (isLoggedIn) navigate(returnTo, { replace: true })
@@ -151,11 +146,7 @@ export function LoginPage() {
     requireAgreement: requireMemberAgreement,
   } = phoneLogin
 
-  useIdleTimer({
-    timeoutMs: resolveLoginIdleMs(),
-    enabled: !phoneLogin.loading && !successVisible,
-    onIdle: handleLoginIdle,
-  })
+  useBusyLock(phoneLogin.loading || successVisible)
 
   const switchTab = useCallback((next: LoginTab) => {
     setTab(next)
@@ -180,7 +171,7 @@ export function LoginPage() {
   const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim()
 
   return (
-    <div className="service-desk k1-login" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
+    <div className="fusion-w5 fusion-w5--auth service-desk k1-login" data-kiosk-screen="login" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch" ref={rootRef}>
       <header className="topbar">
         <span className="brand-mark">AI</span>
         <div className="brand-copy">
@@ -246,7 +237,7 @@ export function LoginPage() {
                 onClick={() => switchTab('phone')}
               >
                 <SmartphoneIcon size={22} aria-hidden="true" />
-                手机号
+                手机号登录
               </button>
               <button
                 type="button"
@@ -254,7 +245,7 @@ export function LoginPage() {
                 onClick={() => switchTab('scan')}
               >
                 <ScanLineIcon size={22} aria-hidden="true" />
-                扫码登录
+                手机扫码登录
               </button>
             </div>
 

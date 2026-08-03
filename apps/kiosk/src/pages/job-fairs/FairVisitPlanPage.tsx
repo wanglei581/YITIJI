@@ -17,13 +17,13 @@ import {
   Loader2Icon,
   PrinterIcon,
   SparklesIcon,
-  type LucideIcon,
+
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { generateFairVisitPlan, getLatestFairVisitPlan, printFairVisitPlan } from '../../services/api/fairVisitPlan'
 import { readAiResumeSession } from '../resume/aiResumeSession'
-import { CardHead, ProtoBadge, ProtoNotice, ProtoPage } from '../jobs-fairs-prototype'
+import { FusionBadge, FusionNotice, FusionSectionHead, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 interface PageState {
   taskId?: string
@@ -34,14 +34,6 @@ function formatSize(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`
 }
 
-function Section({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: React.ReactNode }) {
-  return (
-    <section className="jf-card">
-      <CardHead icon={Icon} title={title} />
-      {children}
-    </section>
-  )
-}
 
 export function FairVisitPlanPage() {
   const navigate = useNavigate()
@@ -119,16 +111,16 @@ export function FairVisitPlanPage() {
 
   if (!taskId) {
     return (
-      <ProtoPage
+      <KioskPageFrame
         tone="wheat"
         title="AI参会准备单"
         subtitle="基于本人简历与本场招聘会公开信息生成"
         backLabel="返回详情"
         onBack={() => navigate(`/job-fairs/${fairId}`)}
-        badge={<ProtoBadge icon={SparklesIcon}>需要简历</ProtoBadge>}
+        badge={<FusionBadge icon={SparklesIcon}>需要简历</FusionBadge>}
       >
         <section className="jf-card accented text-center">
-          <CardHead icon={SparklesIcon} title="先上传简历，再生成参会准备单" subtitle="系统不会把简历发送给企业" />
+          <FusionSectionHead icon={SparklesIcon} title="先上传简历，再生成参会准备单" subtitle="系统不会把简历发送给企业" />
           <p className="mx-auto max-w-[720px] text-[20px] leading-relaxed text-[var(--muted)]">
             参会准备单基于你的真实简历和当前招聘会公开信息生成，仅供本人参会准备参考。
           </p>
@@ -141,8 +133,8 @@ export function FairVisitPlanPage() {
             </button>
           </div>
         </section>
-        <ProtoNotice>活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。</ProtoNotice>
-      </ProtoPage>
+        <FusionNotice>活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。</FusionNotice>
+      </KioskPageFrame>
     )
   }
 
@@ -157,13 +149,13 @@ export function FairVisitPlanPage() {
 
   if (plan) {
     return (
-      <ProtoPage
+      <KioskPageFrame
         tone="wheat"
         title="AI参会准备单"
         subtitle={`${plan.basedOn?.fairName ?? plan.fair?.title ?? '招聘会'} · ${plan.basedOn?.companyCount ?? 0} 家企业 / ${plan.basedOn?.positionCount ?? 0} 个岗位`}
         backLabel="返回详情"
         onBack={() => navigate(`/job-fairs/${fairId}`)}
-        badge={<ProtoBadge icon={SparklesIcon}>已生成</ProtoBadge>}
+        badge={<FusionBadge icon={SparklesIcon}>已生成</FusionBadge>}
         actionBar={
           <>
             <button type="button" className="jf-btn ghost" disabled={generating} onClick={() => void handleGenerate()}>
@@ -177,76 +169,88 @@ export function FairVisitPlanPage() {
           </>
         }
       >
-          <ProtoNotice>
+          <FusionNotice>
             本准备单仅供本人参会准备参考；活动预约、岗位办理和结果均以来源平台为准，本系统不接收简历。
-          </ProtoNotice>
+          </FusionNotice>
 
           <section className="jf-card accented">
-            <CardHead icon={FileTextIcon} title="总览" />
+            <FusionSectionHead icon={FileTextIcon} title="总览" subtitle={`结合你的简历方向与本场公开信息`} />
             <p className="text-[20px] leading-relaxed text-[var(--ink)]">{plan.summary}</p>
           </section>
 
-          <Section icon={FileTextIcon} title="本场看点">
-            <ul className="jf-bullets">
-              {(plan.fairHighlights ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
-            </ul>
-          </Section>
+          {/* 两列：优先企业 + 准备清单 */}
+          <div className="jf-two-col">
+            <section className="jf-card">
+              <FusionSectionHead icon={BuildingIcon} title="现场优先了解企业" subtitle="按与简历方向匹配程度排序" />
+              {(plan.priorityCompanies ?? []).length === 0 ? (
+                <p className="text-[20px] text-[var(--muted)]">本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。</p>
+              ) : (
+                <div className="jf-co-pick">
+                  {(plan.priorityCompanies ?? []).map((company) => (
+                    <div key={company.companyName} className="jf-cp">
+                      <div className="jf-cp-top">
+                        <b>{company.companyName}</b>
+                      </div>
+                      <p>{company.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-          <Section icon={BuildingIcon} title="现场优先了解企业">
-            {(plan.priorityCompanies ?? []).length === 0 ? (
-              <p className="text-[20px] text-[var(--muted)]">本场企业信息有限，建议先打印活动资料并按现场展位逐一了解。</p>
-            ) : (
-              <div className="jf-two-col">
-                {(plan.priorityCompanies ?? []).map((company) => (
-                  <div key={company.companyName} className="jf-tile">
-                    <span className="jf-tile-icon"><BuildingIcon aria-hidden="true" /></span>
-                    <span>
-                      <b>{company.companyName}</b>
-                      <span>{company.reason}</span>
-                      {company.sourceUrl && <span>来源平台：{company.sourceUrl}</span>}
-                    </span>
-                  </div>
+            <section className="jf-card">
+              <FusionSectionHead icon={ClipboardListIcon} title="参会前准备清单" subtitle="出发前逐项核对" />
+              <ul className="jf-checklist">
+                {(plan.preparationChecklist ?? []).map((item) => (
+                  <li key={item} className="jf-check">
+                    <span className="box" aria-hidden="true" />
+                    {item}
+                  </li>
                 ))}
-              </div>
-            )}
-          </Section>
+              </ul>
+            </section>
+          </div>
 
-          <Section icon={ClipboardListIcon} title="参会前准备清单">
-            <ul className="jf-checklist">
-              {(plan.preparationChecklist ?? []).map((item) => (
-                <li key={item} className="jf-check">
-                  <span className="box" aria-hidden="true" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </Section>
+          {/* 两列：本场看点 + 可咨询问题 */}
+          <div className="jf-two-col">
+            <section className="jf-card">
+              <FusionSectionHead icon={SparklesIcon} title="本场看点" />
+              <ul className="jf-bullets">
+                {(plan.fairHighlights ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
+              </ul>
+            </section>
 
-          <Section icon={HelpCircleIcon} title="现场可咨询问题">
-            <ul className="jf-bullets">
-              {(plan.questionsToAsk ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
-            </ul>
-          </Section>
+            <section className="jf-card">
+              <FusionSectionHead icon={HelpCircleIcon} title="现场可咨询问题" />
+              <ul className="jf-bullets">
+                {(plan.questionsToAsk ?? []).map((item) => <li key={item} className="jf-bullet"><i />{item}</li>)}
+              </ul>
+            </section>
+          </div>
 
-          <Section icon={SparklesIcon} title="现场提醒">
-            <ul className="jf-tips-row">
-              {(plan.onsiteTips ?? []).map((item) => <li key={item} className="jf-tip">{item}</li>)}
-            </ul>
-          </Section>
+          {/* 现场提醒（横跨全宽） */}
+          {(plan.onsiteTips ?? []).length > 0 && (
+            <section className="jf-card">
+              <FusionSectionHead icon={SparklesIcon} title="现场提醒" subtitle="AI 生成，仅供参考" />
+              <ul className="jf-tips-row">
+                {(plan.onsiteTips ?? []).map((item) => <li key={item} className="jf-tip"><i className="inline-block w-3 h-3 flex-none mt-2 rounded bg-[var(--wheat)]" />{item}</li>)}
+              </ul>
+            </section>
+          )}
 
           {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
-      </ProtoPage>
+      </KioskPageFrame>
     )
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="wheat"
       title="AI参会准备单"
       subtitle="基于本人简历与本场招聘会公开信息生成"
       backLabel="返回详情"
       onBack={() => navigate(`/job-fairs/${fairId}`)}
-      badge={<ProtoBadge icon={SparklesIcon}>待生成</ProtoBadge>}
+      badge={<FusionBadge icon={SparklesIcon}>待生成</FusionBadge>}
       actionBar={
         <>
           <button type="button" className="jf-btn ghost" onClick={() => navigate(`/job-fairs/${fairId}/materials`)}>
@@ -266,11 +270,11 @@ export function FairVisitPlanPage() {
         </>
       }
     >
-        <ProtoNotice>
+        <FusionNotice>
           本准备单只服务本人参会准备；系统不会代办活动预约，也不会接收或转交简历。
-        </ProtoNotice>
+        </FusionNotice>
         <section className="jf-card accented">
-          <CardHead icon={SparklesIcon} title="将为你生成" subtitle="结合简历诊断和招聘会公开快照" />
+          <FusionSectionHead icon={SparklesIcon} title="将为你生成" subtitle="结合简历诊断和招聘会公开快照" />
           <div className="jf-two-col">
             <div className="jf-tile tinted">
               <span className="jf-tile-icon"><FileTextIcon aria-hidden="true" /></span>
@@ -294,6 +298,6 @@ export function FairVisitPlanPage() {
           </p>
         </section>
         {error && <p className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>}
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }

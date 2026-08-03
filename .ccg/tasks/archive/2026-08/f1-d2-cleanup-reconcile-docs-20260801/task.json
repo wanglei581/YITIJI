@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-cleanup-reconcile-docs-20260801",
+  "title": "记录 F1 D2 cleanup strict reconciliation 已合入主线",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 docs-only 候选",
+  "createdAt": "2026-08-01T10:45:13Z",
+  "branch": "codex/f1-d2-cleanup-reconcile-docs-20260801"
+}

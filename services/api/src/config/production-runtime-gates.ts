@@ -19,10 +19,16 @@
  *   - PRINT_SCAN_CAPABILITY_MODE 必须显式声明 managed|strict（Task 11：打印扫描能力开关
  *     是每终端 × 能力键的 DB 配置，未配置行在 managed 模式放行既有闭环、strict 模式
  *     fail-closed 拒绝；选哪种是显式部署决策，生产不允许沉默缺省）
+ *   - TRUST_PROXY_HOPS 必须显式声明 1..9（nginx 等反代可信跳数；禁止 true/false）
+ *   - TERMINAL_LEGACY_REGISTER_ENABLED 必须显式为 false（新设备只允许 Admin 预创建
+ *     + 一次性绑定码激活；共享 adminSecret 旧注册面不得在生产开放）
+ *   - TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式声明 true|false；滚动部署第一阶段保持
+ *     false，所有 API 实例升级且旧 binary 退出后再切 true
  *
  * 非生产环境一律放行：开发 / CI 用本地 SQLite + local 存储 + 测试密钥，不受此门禁约束。
  */
 import { assertRuntimeDatabaseAllowed } from '../prisma/create-client'
+import { assertProductionTrustProxyHops } from './trust-proxy'
 
 export interface ProductionRuntimeEnv {
   NODE_ENV?: string
@@ -46,6 +52,9 @@ export interface ProductionRuntimeEnv {
   PAYMENT_PROVIDER?: string
   PRINT_REQUIRE_PAID_BEFORE_CLAIM?: string
   PRINT_SCAN_CAPABILITY_MODE?: string
+  TRUST_PROXY_HOPS?: string
+  TERMINAL_LEGACY_REGISTER_ENABLED?: string
+  TERMINAL_PLANNED_PROVISIONING_ENABLED?: string
 }
 
 const MIN_JWT_SECRET_LENGTH = 16
@@ -178,6 +187,21 @@ export function assertProductionRuntimeGates(
   if (capabilityMode !== 'managed' && capabilityMode !== 'strict') {
     throw new Error(
       'PRODUCTION_PRINT_SCAN_CAPABILITY_MODE_UNDECLARED: NODE_ENV=production 时必须显式设置 PRINT_SCAN_CAPABILITY_MODE=managed|strict（print-scan 能力开关未配置行的放行/拒绝语义必须是显式部署决策）',
+    )
+  }
+
+  // 反代可信跳数：生产必须显式声明，禁止 trust proxy=true。
+  assertProductionTrustProxyHops(env)
+
+  if (env.TERMINAL_LEGACY_REGISTER_ENABLED?.trim().toLowerCase() !== 'false') {
+    throw new Error(
+      'PRODUCTION_TERMINAL_LEGACY_REGISTER_FORBIDDEN: NODE_ENV=production 时 TERMINAL_LEGACY_REGISTER_ENABLED 必须显式为 false（新设备只允许 Admin 预创建 + 一次性绑定码激活）',
+    )
+  }
+  const plannedProvisioning = env.TERMINAL_PLANNED_PROVISIONING_ENABLED?.trim().toLowerCase()
+  if (plannedProvisioning !== 'true' && plannedProvisioning !== 'false') {
+    throw new Error(
+      'PRODUCTION_TERMINAL_PLANNED_PROVISIONING_UNDECLARED: NODE_ENV=production 时 TERMINAL_PLANNED_PROVISIONING_ENABLED 必须显式为 true|false（滚动部署阶段必须保持 false，全实例升级后才切 true）',
     )
   }
 }

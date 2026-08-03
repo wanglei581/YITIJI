@@ -165,91 +165,12 @@ export default function StatsPage() {
   const periodLabel = PERIODS.find((p) => p.value === period)?.label ?? ''
 
   return (
-    <Page
-      title="数据统计"
-      subtitle="同步批次 · 数据质量 · 趋势分析"
-      actions={<PeriodSelector value={period} onChange={setPeriod} />}
-    >
-      <DemoBanner />
-
-      {loading && !data ? (
-        <LoadingState text="加载统计数据…" className="py-20" />
-      ) : error || !data ? (
-        <ErrorState
-          title="统计数据加载失败"
-          message="请检查网络后重试"
-          onRetry={() => { setLoading(true); setError(false); getPartnerStats(period).then(setData).catch(() => setError(true)).finally(() => setLoading(false)) }}
-          className="py-20"
-        />
-      ) : (
-        <div className="space-y-5">
-
-          {/* KPI 四卡 */}
-          <MetricGrid
-            metrics={[
-              {
-                label: `${periodLabel}同步批次`,
-                value: data.sync.totalBatches.current.toString(),
-                deltaPercent: data.sync.totalBatches.deltaPercent ?? undefined,
-                deltaHint: data.sync.totalBatches.comparisonLabel,
-                icon: <RefreshCwIcon className="h-5 w-5" />,
-              },
-              {
-                label: `${periodLabel}同步成功率`,
-                value: `${data.sync.successRate.current}%`,
-                deltaPercent: data.sync.successRate.deltaPercent ?? undefined,
-                deltaHint: data.sync.successRate.comparisonLabel,
-                icon: <BarChart2Icon className="h-5 w-5" />,
-              },
-              {
-                label: `${periodLabel}入库数据量`,
-                value: data.sync.totalAdded.current.toLocaleString(),
-                deltaPercent: data.sync.totalAdded.deltaPercent ?? undefined,
-                deltaHint: data.sync.totalAdded.comparisonLabel,
-                icon: <DatabaseIcon className="h-5 w-5" />,
-              },
-              {
-                label: `${periodLabel}同步失败`,
-                value: data.sync.totalFailed.current.toString(),
-                deltaPercent: data.sync.totalFailed.deltaPercent ?? undefined,
-                deltaHint: data.sync.totalFailed.comparisonLabel,
-                icon: <BriefcaseIcon className="h-5 w-5" />,
-              },
-            ]}
-          />
-
-          {/* 趋势图 + 状态分布 */}
-          <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-            <SectionCard title={`${periodLabel}同步趋势`}>
-              <TrendLineChart
-                labels={data.trend.map((b) => b.date.slice(5))}
-                series={[
-                  { label: '新增', values: data.trend.map((b) => b.added),   color: '#1f9e86' },
-                  { label: '更新', values: data.trend.map((b) => b.updated), color: '#3f68b0' },
-                  { label: '失败', values: data.trend.map((b) => b.failed),  color: '#c14a34' },
-                ]}
-                height={220}
-                className="mt-1"
-              />
-            </SectionCard>
-
-            <SectionCard title={`${periodLabel}同步状态分布`}>
-              <StatusDistCard dist={data.statusDist} />
-            </SectionCard>
-          </div>
-
-          {/* 当前快照 */}
-          <div>
-            <div className="mb-3 flex items-center gap-2">
-              <span className="inline-block h-3.5 w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
-              <h2 className="text-[13px] font-bold text-neutral-700">当前快照</h2>
-              <span className="text-[11px] text-neutral-400">实时数据，不受时间范围影响</span>
-            </div>
-            <SnapshotRow snapshot={data.snapshot} />
-          </div>
-
-        </div>
-      )}
+    <Page title="数据统计" subtitle="岗位与招聘会数据统计">
+      <EmptyState
+        icon={BarChart2Icon}
+        title="统计报表本阶段不开放"
+        description="岗位与招聘会请在「数据源 / 同步日志 / 工作台」查看真实业务数据。本页不做假报表或演示图表。"
+      />
     </Page>
   )
 }

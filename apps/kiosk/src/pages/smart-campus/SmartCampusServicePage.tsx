@@ -21,12 +21,13 @@ import {
   MapPinIcon,
   PackageIcon,
   PartyPopperIcon,
+  PrinterIcon,
   ScanFaceIcon,
   ShieldCheckIcon,
   WifiIcon,
   type LucideIcon,
 } from 'lucide-react'
-import '../prototype/kiosk-prototype.css'
+import { FusionBadge, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 type ServiceKey = 'campus-card' | 'all-in-one' | 'campus-network' | 'luggage' | 'panorama'
 
@@ -132,18 +133,15 @@ export function SmartCampusServicePage() {
   const Icon = info.icon
 
   return (
-    <div className="kproto kproto-teal">
-      <div className="kproto-shell">
-        <div className="kproto-pagehead">
-          <button type="button" className="kproto-back" onClick={() => navigate('/smart-campus')}>返回</button>
-          <div className="kproto-title">
-            <h1>{info.title}</h1>
-            <p>{info.subtitle} · 智慧校园自助服务指引</p>
-          </div>
-          <div className="kproto-aside"><span className="kproto-badge">办理指引 · 未接线上办理</span></div>
-        </div>
-
-        <main className="kproto-content">
+    <KioskPageFrame
+      tone="wheat"
+      title={info.title}
+      subtitle={`${info.subtitle} · 智慧校园自助服务指引`}
+      backLabel="返回智慧校园"
+      onBack={() => navigate('/smart-campus')}
+      badge={<FusionBadge>办理指引 · 未接线上办理</FusionBadge>}
+    >
+        <div className="kproto kproto-teal kproto-content">
           <div className="kproto-auth">
             <ShieldCheckIcon aria-hidden="true" />
             <p>校方官方信息入口，仅展示与指引，不在本终端采集任何个人信息；实际办理请前往现场服务窗口或学校官方自助平台。</p>
@@ -201,10 +199,41 @@ export function SmartCampusServicePage() {
             </div>
           </section>
 
-          <div className="kproto-notice">
+          <div className="kproto-notice warn">
             <ShieldCheckIcon aria-hidden="true" />
             <p>{info.note}</p>
           </div>
+
+          {/* 本机可办（仅校园卡页展示：证件照打印即将上线 + 入学材料打印可用） */}
+          {key === 'campus-card' && (
+            <div className="kproto-grid-2">
+              <button
+                type="button"
+                disabled
+                className="kproto-tile flex cursor-not-allowed items-center gap-4 opacity-55"
+                style={{ borderStyle: 'dashed', background: 'var(--kp-surface)' }}
+              >
+                <span className="kproto-icon shrink-0"><ScanFaceIcon aria-hidden="true" /></span>
+                <span className="flex-1 text-left">
+                  <b className="block text-[23px] font-semibold">证件照排版打印</b>
+                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">功能即将上线；当前可用手机照片在打印扫描页打印</span>
+                </span>
+                <span className="shrink-0 rounded-full border border-[var(--kp-line)] bg-[var(--kp-paper)] px-3 py-1 text-[14px] text-[var(--kp-muted)]">即将上线</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/print/upload')}
+                className="kproto-tile flex items-center gap-4"
+                style={{ background: 'var(--kp-teal-soft)', borderColor: 'rgba(31,158,134,.35)' }}
+              >
+                <span className="kproto-icon shrink-0" style={{ background: 'var(--kp-teal)', color: '#fffdf8' }}><PrinterIcon aria-hidden="true" /></span>
+                <span className="flex-1 text-left">
+                  <b className="block text-[23px] font-semibold">入学材料 / 表格打印</b>
+                  <span className="mt-1 block text-[17px] text-[var(--kp-muted)]">报到表、申请表等自助打印</span>
+                </span>
+              </button>
+            </div>
+          )}
 
           <div className="kproto-actionbar">
             <button type="button" className="kproto-btn" onClick={() => navigate('/smart-campus')}>返回智慧校园</button>
@@ -213,8 +242,7 @@ export function SmartCampusServicePage() {
               查看迎新报到指引<ChevronRightIcon aria-hidden="true" />
             </button>
           </div>
-        </main>
-      </div>
-    </div>
+        </div>
+    </KioskPageFrame>
   )
 }

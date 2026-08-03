@@ -1,0 +1,133 @@
+diff --git a/index.js b/index.js
+index 4b6ae1ff0d9c82cfea7d135b5276f16609cbe8b0..8177dabde1d30bfd476241096894a84d505162ff 100644
+--- a/index.js
++++ b/index.js
+@@ -3,6 +3,12 @@ var balanced = require('balanced-match');
+ 
+ module.exports = expandTop;
+ 
++// Backport of the CVE-2026-14257 resource bounds from brace-expansion 5.0.8.
++// Keep the 1.x callable CommonJS export required by minimatch 3.
++var EXPANSION_MAX = 100000;
++var EXPANSION_MAX_LENGTH = 4000000;
++var EXPANSION_MAX_GROUPS = 256;
++
+ var escSlash = '\0SLASH'+Math.random()+'\0';
+ var escOpen = '\0OPEN'+Math.random()+'\0';
+ var escClose = '\0CLOSE'+Math.random()+'\0';
+@@ -67,7 +73,8 @@ function expandTop(str, options) {
+     return [];
+ 
+   options = options || {};
+-  var max = options.max == null ? Infinity : options.max;
++  var max = options.max == null ? EXPANSION_MAX : options.max;
++  var maxLength = options.maxLength == null ? EXPANSION_MAX_LENGTH : options.maxLength;
+ 
+   // I don't know why Bash 4.3 does this, but it does.
+   // Anything starting with {} will have the first two bytes preserved
+@@ -79,7 +86,13 @@ function expandTop(str, options) {
+     str = '\\{\\}' + str.substr(2);
+   }
+ 
+-  return expand(escapeBraces(str), max, true).map(unescapeBraces);
++  var escaped = escapeBraces(str);
++  var groupCount = (escaped.match(/\{/g) || []).length;
++  if (groupCount > EXPANSION_MAX_GROUPS) {
++    throw new RangeError('Brace expansion group limit exceeded');
++  }
++
++  return expand(escaped, max, true, { remaining: maxLength }).map(unescapeBraces);
+ }
+ 
+ function identity(e) {
+@@ -100,7 +113,23 @@ function gte(i, y) {
+   return i >= y;
+ }
+ 
+-function expand(str, max, isTop) {
++function pushBounded(target, value, budget) {
++  if (value.length > budget.remaining) {
++    budget.remaining = 0;
++    return false;
++  }
++  target.push(value);
++  budget.remaining -= value.length;
++  return true;
++}
++
++function boundedSingleton(value, budget) {
++  var result = [];
++  pushBounded(result, value, budget);
++  return result;
++}
++
++function expand(str, max, isTop, budget) {
+   var expansions = [];
+ 
+   // The `{a},b}` rewrite below restarts expansion on a rewritten string with
+@@ -108,7 +137,7 @@ function expand(str, max, isTop) {
+   // of non-expanding `{}` groups can't exhaust the call stack.
+   for (;;) {
+     var m = balanced('{', '}', str);
+-    if (!m || /\$$/.test(m.pre)) return [str];
++    if (!m || /\$$/.test(m.pre)) return boundedSingleton(str, budget);
+ 
+     var isNumericSequence = /^-?\d+\.\.-?\d+(?:\.\.-?\d+)?$/.test(m.body);
+     var isAlphaSequence = /^[a-zA-Z]\.\.[a-zA-Z](?:\.\.-?\d+)?$/.test(m.body);
+@@ -131,14 +160,17 @@ function expand(str, max, isTop) {
+       n = parseCommaParts(m.body);
+       if (n.length === 1) {
+         // x{{a,b}}y ==> x{a}y x{b}y
+-        n = expand(n[0], max, false).map(embrace);
++        n = expand(n[0], max, false, budget).map(embrace);
+         if (n.length === 1) {
+           var post = m.post.length
+-            ? expand(m.post, max, false)
++            ? expand(m.post, max, false, budget)
+             : [''];
+-          return post.map(function(p) {
+-            return m.pre + n[0] + p;
+-          });
++          var combined = [];
++          for (var p = 0; p < post.length; p++) {
++            if (!pushBounded(combined, m.pre + n[0] + post[p], budget))
++              break;
++          }
++          return combined;
+         }
+       }
+     }
+@@ -149,7 +181,7 @@ function expand(str, max, isTop) {
+     // no need to expand pre, since it is guaranteed to be free of brace-sets
+     var pre = m.pre;
+     var post = m.post.length
+-      ? expand(m.post, max, false)
++      ? expand(m.post, max, false, budget)
+       : [''];
+ 
+     var N;
+@@ -190,17 +222,20 @@ function expand(str, max, isTop) {
+             }
+           }
+         }
+-        N.push(c);
++        if (!pushBounded(N, c, budget))
++          break;
+       }
+     } else {
+-      N = concatMap(n, function(el) { return expand(el, max, false) });
++      N = concatMap(n, function(el) { return expand(el, max, false, budget) });
+     }
+ 
+     for (var j = 0; j < N.length; j++) {
+       for (var k = 0; k < post.length && expansions.length < max; k++) {
+         var expansion = pre + N[j] + post[k];
+-        if (!isTop || isSequence || expansion)
+-          expansions.push(expansion);
++        if (!isTop || isSequence || expansion) {
++          if (!pushBounded(expansions, expansion, budget))
++            return expansions;
++        }
+       }
+     }
+ 

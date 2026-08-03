@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { KioskPageFrame } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { KIcon } from '../../components/kiosk-icon'
 import { useInkRipple } from '../../hooks/useInkRipple'
@@ -120,7 +121,8 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="kprofile kprofile-lightflow">
+    <KioskPageFrame className="fusion-w5 fusion-w5--profile fusion-w5--profile-entry h-full">
+      <div className="kprofile kprofile-lightflow" data-kiosk-screen="profile">
       <div className="kp-inner">
         <h1 className="kprofile-sr-only">我的</h1>
         <ProfileHeader
@@ -173,6 +175,7 @@ export function ProfilePage() {
             : '以上为本次服务产生的记录，仅保存在当前会话；登录后可查看本人服务概览'}
         </p>
       </div>
-    </div>
+      </div>
+    </KioskPageFrame>
   )
 }

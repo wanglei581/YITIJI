@@ -93,23 +93,25 @@ const USER_FACING_SCAN_ERROR: Record<string, string> = {
   SCAN_MATCHED_TIMEOUT: '扫描处理超时未完成',
 }
 
+// 指引单一事实源：Kiosk 只渲染本数组全文，禁止前端再按 index 拼接本地标题。
+// 不写 UNC/共享路径明文；只提示「本机已配置的网络接收目录」。
 const SCAN_TYPE_INSTRUCTIONS: Record<ScanType, string[]> = {
   resume: [
-    '将简历原件正面朝上放入打印机自动进纸器（或正面朝下放上玻璃板）',
-    '在打印机操作面板选择"扫描"功能',
-    '选择黑白或彩色（简历建议黑白，文字更清晰）',
-    '按下开始扫描；完成后回到一体机等待识别',
+    '将简历原件正面朝上放入自动进纸器，或正面朝下对齐玻璃板左上角',
+    '在打印机操作面板打开「扫描」功能',
+    '选择扫描到网络 / SMB（本机已配置的接收目录）；简历建议黑白，文字更清晰',
+    '按「开始」扫描；完成后回到本屏幕等待自动识别，请勿关闭页面',
   ],
   id: [
-    '将证件正面朝下放在打印机玻璃板中央',
-    '在打印机操作面板选择"扫描"功能，分辨率建议 300 DPI',
-    '按下开始扫描；如需正反面，扫完一面后翻面重复',
-    '完成后回到一体机等待识别',
+    '将证件正面朝下放在打印机玻璃板中央，取下订书钉并抚平',
+    '在打印机操作面板打开「扫描」功能，分辨率建议 300 DPI',
+    '选择扫描到网络 / SMB（本机已配置的接收目录）后按「开始」；正反面需翻面再扫一次',
+    '完成后回到本屏幕等待自动识别，请勿关闭页面',
   ],
   document: [
-    '将文件放入打印机自动进纸器（多页）或玻璃板（单页）',
-    '在打印机操作面板选择"扫描"功能',
-    '按下开始扫描；完成后回到一体机等待识别',
+    '多页材料放入自动进纸器，单页证书放在玻璃板上',
+    '在打印机操作面板打开「扫描」，并选择扫描到网络 / SMB（本机已配置的接收目录）',
+    '按「开始」扫描；整叠扫完后回到本屏幕等待自动生成 PDF，请勿关闭页面',
   ],
 }
 
@@ -179,13 +181,19 @@ export class ScanTasksService {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
-      select: { id: true, enabled: true },
+      select: { id: true, enabled: true, lifecycleStatus: true },
     })
     if (!terminal) {
       throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_NOT_FOUND', message: '目标终端不存在' } })
     }
     if (!terminal.enabled) {
       throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_DISABLED', message: '目标终端已停用' } })
+    }
+
+    if (terminal.lifecycleStatus !== 'active') {
+      throw new BadRequestException({
+        error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端当前不可创建新扫描任务' },
+      })
     }
 
     // Task 10 服务端能力门禁：管理员把该终端 scan 配为非 available 时拒绝创建
@@ -200,15 +208,26 @@ export class ScanTasksService {
     const expiresAt = new Date(Date.now() + SCAN_TASK_TTL_MS)
     let task: { id: string }
     try {
-      task = await this.prisma.scanTask.create({
-        data: {
-          terminalId: terminal.id,
-          scanType: dto.scanType,
-          endUserId,
-          expiresAt,
-          controlTokenHash,
-        },
-        select: { id: true },
+      task = await this.prisma.$transaction(async (tx) => {
+        const activeLock = await tx.terminal.updateMany({
+          where: { id: terminal.id, enabled: true, lifecycleStatus: 'active' },
+          data: { lifecycleStatus: 'active' },
+        })
+        if (activeLock.count !== 1) {
+          throw new BadRequestException({
+            error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端状态已变化，当前不可创建新扫描任务' },
+          })
+        }
+        return tx.scanTask.create({
+          data: {
+            terminalId: terminal.id,
+            scanType: dto.scanType,
+            endUserId,
+            expiresAt,
+            controlTokenHash,
+          },
+          select: { id: true },
+        })
       })
     } catch (e) {
       if (isScanTaskActiveSessionConflict(e)) {

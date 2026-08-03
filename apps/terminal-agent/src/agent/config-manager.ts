@@ -8,12 +8,13 @@
 
 import fs from 'fs'
 import path from 'path'
+import { spawnSync } from 'child_process'
 import { log } from '../logger'
+import { clearUnauthorized } from './auth-state'
 import { loadAgentToken, saveAgentToken } from './dpapi'
 import type { AgentConfig } from './types'
 
-const CONFIG_FILE = path.resolve(__dirname, '../../config/agent-config.json')
-const LAST_KNOWN_GOOD_FILE = path.resolve(__dirname, '../../config/agent-config.last-known-good.json')
+const LEGACY_CONFIG_DIRECTORY = path.resolve(__dirname, '../../config')
 const PERSISTED_SECRET_KEYS = new Set(['_comment', 'agentToken', 'adminSecret', 'bindCode'])
 
 export type AgentStartupErrorCode =
@@ -22,10 +23,13 @@ export type AgentStartupErrorCode =
   | 'AGENT_CONFIG_INVALID_SHAPE'
   | 'AGENT_CONFIG_REQUIRED_FIELD_MISSING'
   | 'AGENT_CONFIG_INVALID_FIELD'
+  | 'AGENT_CONFIG_MIGRATION_REQUIRES_REBIND'
+  | 'AGENT_CONFIG_PROGRAM_DATA_ACL_UNSAFE'
   | 'AGENT_TOKEN_DECRYPT_FAILED'
   | 'AGENT_PROFILE_REJECTED'
   | 'AGENT_REGISTRATION_FAILED'
   | 'AGENT_STARTUP_FAILED'
+  | 'AGENT_UNAUTHORIZED'
   | 'AGENT_READY'
 
 export class AgentStartupError extends Error {
@@ -37,6 +41,46 @@ export class AgentStartupError extends Error {
 
 export function isAgentStartupError(error: unknown): error is AgentStartupError {
   return error instanceof AgentStartupError
+}
+
+export interface AgentConfigPaths {
+  readonly configPath: string
+  readonly lastKnownGoodPath: string
+  readonly legacyConfigPath: string
+  readonly legacyLastKnownGoodPath: string
+  readonly usesProgramData: boolean
+}
+
+/** Resolve the production state root while retaining a one-release legacy read path. */
+export function resolveAgentConfigPaths(options?: {
+  platform?: NodeJS.Platform
+  programDataDir?: string
+  legacyConfigDirectory?: string
+}): AgentConfigPaths {
+  const platform = options?.platform ?? process.platform
+  const legacyConfigDirectory = options?.legacyConfigDirectory ?? LEGACY_CONFIG_DIRECTORY
+  const legacyConfigPath = path.join(legacyConfigDirectory, 'agent-config.json')
+  const legacyLastKnownGoodPath = path.join(legacyConfigDirectory, 'agent-config.last-known-good.json')
+
+  if (platform !== 'win32') {
+    return {
+      configPath: legacyConfigPath,
+      lastKnownGoodPath: legacyLastKnownGoodPath,
+      legacyConfigPath,
+      legacyLastKnownGoodPath,
+      usesProgramData: false,
+    }
+  }
+
+  const programDataDir = options?.programDataDir ?? process.env['PROGRAMDATA'] ?? 'C:\\ProgramData'
+  const configDirectory = path.join(programDataDir, 'AIJobPrintAgent')
+  return {
+    configPath: path.join(configDirectory, 'agent-config.json'),
+    lastKnownGoodPath: path.join(configDirectory, 'agent-config.last-known-good.json'),
+    legacyConfigPath,
+    legacyLastKnownGoodPath,
+    usesProgramData: true,
+  }
 }
 
 function requireNonEmpty(value: unknown, field: string): string {
@@ -176,22 +220,123 @@ export function writeValidatedConfigAt(
   writeTextAtomically(configPath, nextText)
 }
 
+function readOptionalValidatedConfig(filePath: string, ignoreInvalid = false): AgentConfig | undefined {
+  if (!fs.existsSync(filePath)) return undefined
+  try {
+    return parseConfigText(fs.readFileSync(filePath, 'utf8'))
+  } catch (error) {
+    if (ignoreInvalid) {
+      log('config: ignoring an invalid legacy last-known-good candidate during migration')
+      return undefined
+    }
+    throw error
+  }
+}
+
+function withoutPersistedSecrets(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    agentToken: undefined,
+    adminSecret: undefined,
+  }
+}
+
 /**
- * Load configuration, optionally migrating the legacy plaintext token only
- * after the primary configuration has passed validation.
+ * Verify that the ProgramData state root retains the installer ACL before a
+ * service runtime writes the migrated configuration into it.
  */
-export function loadConfig(): AgentConfig {
-  if (!fs.existsSync(CONFIG_FILE)) {
+function assertSecureProgramDataDirectory(directory: string): void {
+  const script = [
+    '$path = [Console]::In.ReadLine()',
+    '$item = Get-Item -LiteralPath $path -Force -ErrorAction Stop',
+    'if (-not $item.PSIsContainer -or (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)) { exit 1 }',
+    '$acl = Get-Acl -LiteralPath $path -ErrorAction Stop',
+    'if (-not $acl.AreAccessRulesProtected) { exit 1 }',
+    '$required = @("S-1-5-18", "S-1-5-32-544")',
+    '$owner = ([System.Security.Principal.NTAccount]$acl.Owner).Translate([System.Security.Principal.SecurityIdentifier]).Value',
+    'if ($required -notcontains $owner) { exit 1 }',
+    '$rules = @($acl.Access | Where-Object { $_.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow })',
+    'if ($rules.Count -ne 2) { exit 1 }',
+    'foreach ($rule in $rules) { $sid = ([System.Security.Principal.NTAccount]$rule.IdentityReference).Translate([System.Security.Principal.SecurityIdentifier]).Value; if ($required -notcontains $sid -or $rule.IsInherited -or $rule.FileSystemRights -ne [System.Security.AccessControl.FileSystemRights]::FullControl) { exit 1 } }',
+    'Write-Output ok',
+  ].join('; ')
+  const result = spawnSync('powershell', ['-NonInteractive', '-NoProfile', '-Command', script], {
+    input: directory,
+    encoding: 'utf8',
+    timeout: 10_000,
+  })
+  if (result.error || result.status !== 0 || (result.stdout as string).trim() !== 'ok') {
     throw new AgentStartupError(
-      'AGENT_CONFIG_NOT_FOUND',
-      'Agent configuration was not found. Repair the terminal configuration before starting the Agent.',
+      'AGENT_CONFIG_PROGRAM_DATA_ACL_UNSAFE',
+      'ProgramData configuration directory is not protected for terminal state; rerun the production installer before starting the Agent.',
+    )
+  }
+}
+
+/** Move a legacy installation-root config into ProgramData exactly once. */
+export function migrateLegacyConfigAt(
+  paths: AgentConfigPaths,
+  legacyConfig: AgentConfig,
+  options?: {
+    hasPersistedToken?: () => boolean
+    assertSecureDirectory?: (directory: string) => void
+  },
+): AgentConfig {
+  if (!paths.usesProgramData) return legacyConfig
+  const hasPersistedToken = options?.hasPersistedToken ?? (() => loadAgentToken() !== null)
+  const assertSecureDirectory = options?.assertSecureDirectory ?? assertSecureProgramDataDirectory
+  if (legacyConfig.adminSecret || (legacyConfig.agentToken && !hasPersistedToken())) {
+    throw new AgentStartupError(
+      'AGENT_CONFIG_MIGRATION_REQUIRES_REBIND',
+      'Legacy credential configuration cannot be migrated safely; rebind this terminal with a new one-time code.',
     )
   }
 
-  const parsed = parseConfigText(fs.readFileSync(CONFIG_FILE, 'utf8'))
+  assertSecureDirectory(path.dirname(paths.configPath))
+  const migratedConfig = withoutPersistedSecrets(legacyConfig)
+  const legacyLastKnownGood = readOptionalValidatedConfig(paths.legacyLastKnownGoodPath, true)
+  const migratedLastKnownGood = withoutPersistedSecrets(legacyLastKnownGood ?? legacyConfig)
+
+  // Scrub the legacy files before creating the new root. If the new-root write
+  // is interrupted, the next startup retries without retaining JSON credentials.
+  writeTextAtomically(paths.legacyConfigPath, serializePersistedConfig(migratedConfig))
+  if (legacyLastKnownGood) {
+    writeTextAtomically(paths.legacyLastKnownGoodPath, serializePersistedConfig(migratedLastKnownGood))
+  }
+  writeTextAtomically(paths.lastKnownGoodPath, serializePersistedConfig(migratedLastKnownGood))
+  writeTextAtomically(paths.configPath, serializePersistedConfig(migratedConfig))
+  log('config: migrated legacy installation-root config into ProgramData')
+  return migratedConfig
+}
+
+function loadPersistedConfig(paths: AgentConfigPaths): AgentConfig {
+  const persisted = readOptionalValidatedConfig(paths.configPath)
+  if (persisted) return persisted
+
+  const legacyConfig = paths.usesProgramData
+    ? readOptionalValidatedConfig(paths.legacyConfigPath)
+    : undefined
+  if (legacyConfig) return migrateLegacyConfigAt(paths, legacyConfig)
+
+  throw new AgentStartupError(
+    'AGENT_CONFIG_NOT_FOUND',
+    'Agent configuration was not found. Repair the terminal configuration before starting the Agent.',
+  )
+}
+
+/**
+ * Load configuration, optionally migrating an existing persisted plaintext
+ * token only after the primary configuration has passed validation.
+ */
+export function loadConfig(): AgentConfig {
+  const paths = resolveAgentConfigPaths()
+  const parsed = loadPersistedConfig(paths)
 
   if (parsed.agentToken) {
-    log('config: legacy plaintext agentToken detected — migrating to DPAPI encrypted storage')
+    if (paths.usesProgramData) {
+      assertSecureProgramDataDirectory(path.dirname(paths.configPath))
+    }
+    log('config: plaintext agentToken detected — migrating to DPAPI encrypted storage')
     saveAgentToken(parsed.agentToken)
     saveConfig(parsed)
     log('config: agentToken migrated to encrypted storage and removed from agent-config.json')
@@ -212,7 +357,8 @@ export function loadConfig(): AgentConfig {
 
 /** Persist a credential-free, validated configuration and keep a manual recovery candidate. */
 export function saveConfig(config: AgentConfig): void {
-  writeValidatedConfigAt(CONFIG_FILE, LAST_KNOWN_GOOD_FILE, config)
+  const paths = resolveAgentConfigPaths()
+  writeValidatedConfigAt(paths.configPath, paths.lastKnownGoodPath, config)
 }
 
 /**
@@ -233,6 +379,7 @@ export function persistRegistration(
     agentToken: undefined,
   }
   saveConfig(updated)
+  clearUnauthorized()
   log(`config: registration persisted — terminalId=${terminalId}, adminSecret cleared`)
 
   return { ...updated, agentToken }

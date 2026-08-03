@@ -1,0 +1,33 @@
+.me-list-shell {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  background: transparent;
+}
+
+.me-list-shell > .ui-kiosk-page-header {
+  margin: 24px 24px 0;
+}
+
+.me-activity-detail > .ui-kiosk-page-header {
+  margin: 24px 24px 0;
+}
+
+.me-activity-detail .me-detail-scroll {
+  padding: 0 24px 32px;
+}
+
+.me-activity-detail dl {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.me-activity-detail dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.me-activity-detail dt { color: var(--muted); }
+.me-activity-detail dd { color: var(--ink); font-weight: 800; }

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>版式诊断 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .score-header {
+      display: flex; align-items: center; gap: 20px;
+      padding: 20px 16px;
+    }
+    .score-ring-wrap {
+      position: relative; width: 100px; height: 100px; flex-shrink: 0;
+    }
+    .score-ring-wrap svg {
+      position: absolute; inset: 0; transform: rotate(-90deg);
+    }
+    .score-ring-inner {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .score-val {
+      font-family: var(--font-serif); font-size: 30px; font-weight: 700;
+      color: var(--ink); line-height: 1;
+    }
+    .score-label { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .score-info { flex: 1; }
+    .score-info .si-title {
+      font-family: var(--font-serif); font-size: 18px; font-weight: 700;
+      color: var(--ink);
+    }
+    .score-info .si-sub {
+      font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.5;
+    }
+    .score-info .si-chip { margin-top: 10px; }
+
+    .issue-item {
+      padding: 14px 16px;
+    }
+    .issue-item + .issue-item {
+      border-top: 1px solid var(--line-faint);
+    }
+    .issue-item .ii-head {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    }
+    .issue-item .ii-icon { font-size: 16px; flex-shrink: 0; }
+    .issue-item .ii-title {
+      flex: 1; font-size: 14px; font-weight: 600; color: var(--ink);
+    }
+    .issue-item .ii-detail {
+      font-size: 12px; color: var(--muted); line-height: 1.5;
+      padding-left: 24px;
+    }
+
+    .fix-suggestion {
+      display: inline-flex; align-items: center; gap: 4px;
+      height: 24px; padding: 0 10px;
+      background: var(--teal-soft); color: var(--teal-deep);
+      border-radius: var(--r-full); font-size: 11px; font-weight: 500;
+      margin-top: 6px; margin-left: 24px;
+    }
+
+    .ai-disclaimer {
+      font-size: 12px; color: var(--ink-soft); line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="sb-icons">📶 5G 🔋</div>
+  </div>
+
+  <div class="navbar">
+    <div class="nav-back">←</div>
+    <span class="nav-title" style="display:flex;align-items:center;gap:6px;">
+      版式诊断 <span class="ai-badge">AI</span>
+    </span>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="content has-bar">
+
+    <!-- 整体评分卡 -->
+    <div class="card" style="margin-top: 12px;">
+      <div class="score-header">
+        <!-- SVG 圆环 -->
+        <div class="score-ring-wrap">
+          <svg width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#e2f2ec" stroke-width="8"/>
+            <circle cx="50" cy="50" r="42" fill="none" stroke="#1f9e86" stroke-width="8"
+              stroke-dasharray="263.9" stroke-dashoffset="39.6" stroke-linecap="round"/>
+          </svg>
+          <div class="score-ring-inner">
+            <div class="score-val">85</div>
+            <div class="score-label">版式评分</div>
+          </div>
+        </div>
+        <div class="score-info">
+          <div class="si-title">版式良好</div>
+          <div class="si-sub">文件整体结构清晰，有 1 项需注意的边距问题，不影响基本阅读</div>
+          <div class="si-chip"><span class="chip ok">✓ 可以打印</span></div>
+        </div>
+      </div>
+
+      <div class="card-sep"></div>
+
+      <!-- 问题列表 -->
+      <div class="issue-item">
+        <div class="ii-head">
+          <span class="ii-icon">⚠️</span>
+          <span class="ii-title">上边距偏小</span>
+          <span class="chip warn">需注意</span>
+        </div>
+        <div class="ii-detail">检测到上边距约为 6mm，低于建议值 15mm，内容可能在打印时被边缘裁切</div>
+        <div class="evidence-quote" style="margin-left:24px; margin-right:0; margin-top:8px;">
+          <div class="eq-label">📍 证据位置</div>
+          <div class="eq-text">位于第1页，正文区域顶部约 6mm 处检测到文字内容起始行</div>
+        </div>
+        <div class="fix-suggestion">建议调整至 15mm+</div>
+      </div>
+
+      <div class="card-sep"></div>
+
+      <div class="issue-item">
+        <div class="ii-head">
+          <span class="ii-icon">ℹ️</span>
+          <span class="ii-title">正文字体偏小</span>
+          <span class="chip" style="background:var(--surface-2);color:var(--faint);">参考</span>
+        </div>
+        <div class="ii-detail">部分正文区域检测到字号约为 8pt，对于激光打印效果偏小，建议正文不低于 10pt</div>
+        <div class="evidence-quote" style="margin-left:24px; margin-right:0; margin-top:8px;">
+          <div class="eq-label">📍 证据位置</div>
+          <div class="eq-text">位于第1页工作经历区域，描述文字约占页面宽度 90%</div>
+        </div>
+      </div>
+
+      <div class="card-sep"></div>
+
+      <div class="issue-item">
+        <div class="ii-head">
+          <span class="ii-icon">✅</span>
+          <span class="ii-title">页面比例正常</span>
+          <span class="chip ok">通过</span>
+        </div>
+        <div class="ii-detail">文件尺寸为 A4（210×297mm），与选定纸张完全匹配，无需缩放</div>
+      </div>
+
+    </div>
+
+    <!-- AI 说明 -->
+    <div class="ai-card">
+      <div class="ac-head">
+        <span class="ac-ic">🤖</span>
+        <span class="ac-title">关于此分析</span>
+        <span class="ac-badge">AI 生成</span>
+      </div>
+      <div class="ai-disclaimer">
+        以上分析仅为参考，基于通用打印规范自动生成。实际效果以打印输出为准。本提示不代表对文件内容的审核，也不构成修改建议。最终打印结果与文件原始排版有关。
+      </div>
+    </div>
+
+    <div class="spacer-lg"></div>
+
+  </div>
+
+  <!-- 操作条 -->
+  <div class="actionbar">
+    <button class="btn ghost" style="flex:1;">忽略，直接继续</button>
+    <button class="btn primary" style="flex:1;">了解建议 ›</button>
+  </div>
+
+</div>
+</body>
+</html>

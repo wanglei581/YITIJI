@@ -1,0 +1,12 @@
+{
+  "id": "publish-kiosk-fusion-pr",
+  "title": "推送 Kiosk 8177/5299 融合候选并创建 Pull Request",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "git-delivery",
+  "currentPhase": "completed",
+  "nextAction": "等待 PR #325 CI 与审查；不自动合并或部署",
+  "createdAt": "2026-07-25T00:50:00+08:00",
+  "branch": "codex/kiosk-8177-5299-fusion-design-20260723"
+}

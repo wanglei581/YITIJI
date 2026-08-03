@@ -1,5 +1,5 @@
-import { Button, Card } from '@ai-job-print/ui'
-import { AlertCircleIcon, ShieldCheckIcon, SparklesIcon, XIcon } from 'lucide-react'
+import { Button, KioskModal } from '@ai-job-print/ui'
+import { AlertCircleIcon, ShieldCheckIcon, SparklesIcon } from 'lucide-react'
 
 export function JobAiConsentModal({
   open,
@@ -14,23 +14,26 @@ export function JobAiConsentModal({
   onConfirm: () => void
   onCancel: () => void
 }) {
-  if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-5" role="dialog" aria-modal="true">
-      <Card className="relative w-[30rem] max-w-full p-6">
-        <button
-          type="button"
-          onClick={onCancel}
-          aria-label="关闭"
-          className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100"
-        >
-          <XIcon className="h-5 w-5" aria-hidden="true" />
-        </button>
-
+    <KioskModal
+      open={open}
+      onClose={onCancel}
+      title="开启岗位 AI 辅助"
+      description="基于本人简历与来源岗位字段生成参考建议，不代表录用结果。"
+      className="w-[30rem] max-w-full"
+      actions={(
+        <>
+          <Button size="lg" variant="secondary" className="h-12" disabled={loading} onClick={onCancel}>取消</Button>
+          <Button size="lg" className="h-12" disabled={loading} onClick={onConfirm}>
+            <ShieldCheckIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />同意并继续
+          </Button>
+        </>
+      )}
+    >
+      <div className="p-1">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
           <SparklesIcon className="h-6 w-6" aria-hidden="true" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-neutral-900">开启岗位 AI 辅助</h2>
         <p className="mt-2 text-sm leading-relaxed text-neutral-600">
           本系统会基于你的本人简历和岗位来源字段生成岗位解读、匹配参考和准备建议，结果仅供求职参考，不代表录用结果。
         </p>
@@ -48,17 +51,8 @@ export function JobAiConsentModal({
           </div>
         )}
 
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <Button size="lg" variant="secondary" className="h-12" disabled={loading} onClick={onCancel}>
-            取消
-          </Button>
-          <Button size="lg" className="h-12" disabled={loading} onClick={onConfirm}>
-            <ShieldCheckIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-            同意并继续
-          </Button>
-        </div>
-      </Card>
-    </div>
+      </div>
+    </KioskModal>
   )
 }
 

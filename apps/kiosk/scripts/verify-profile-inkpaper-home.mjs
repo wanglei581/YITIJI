@@ -33,6 +33,21 @@ function expectAbsent(source, pattern, message) {
   if (!pattern.test(source)) pass(message)
   else fail(`${message} — forbidden pattern ${pattern} matched`)
 }
+function expectClassTokens(source, tokens, message) {
+  const classLists = [...source.matchAll(/className="([^"]*)"/g)].map((match) => match[1].split(/\s+/))
+  if (classLists.some((classList) => tokens.every((token) => classList.includes(token)))) pass(message)
+  else fail(`${message} — class tokens ${tokens.join(' + ')} not found`)
+}
+function readImportedCss(entryPath, expectedImports, message) {
+  const entry = read(entryPath)
+  const imports = [...entry.matchAll(/^@import\s+['"]([^'"]+)['"];\s*$/gm)].map((match) => match[1])
+  if (JSON.stringify(imports) !== JSON.stringify(expectedImports)) {
+    fail(`${message} — ${entryPath} 的显式 CSS imports 已变化: ${imports.join(' | ')}`)
+    return ''
+  }
+  pass(`${message} — 仅拼接聚合入口显式导入的 CSS`)
+  return imports.map((importPath) => read(join(dirname(entryPath), importPath))).join('\n')
+}
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
@@ -90,7 +105,15 @@ function checkScopedCss(relativePath, source) {
     .map((match) => match[1].trim())
     .filter((selector) => selector && !selector.startsWith('@'))
     .flatMap((selector) => selector.split(',').map((part) => part.trim()))
-  if (selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow'))) {
+  const allowedProfileFrameSelector =
+    relativePath === 'src/pages/profile/profile-lightflow-shell.css'
+      ? "[data-kiosk-presentation='fusion-youth'] .fusion-w5--profile-entry > .ui-kiosk-page-content"
+      : ''
+  if (
+    selectors.every(
+      (selector) => selector.startsWith('.kprofile.kprofile-lightflow') || selector === allowedProfileFrameSelector,
+    )
+  ) {
     pass(`${relativePath} 的所有 selector 从 .kprofile.kprofile-lightflow 开始`)
   } else {
     fail(`${relativePath} 存在未从 .kprofile.kprofile-lightflow 开始的 selector`)
@@ -120,7 +143,17 @@ const profileCssPaths = [
 ]
 const profileCss = profileCssPaths.map(readOptional)
 const combinedProfileCss = profileCss.join('\n')
-const detailCss = read('src/pages/profile/me/me-detail-inkpaper.css')
+const detailCss = readImportedCss(
+  'src/pages/profile/me/me-detail-inkpaper.css',
+  [
+    './styles/me-detail-base.css',
+    './styles/me-assets.css',
+    './styles/me-orders.css',
+    './styles/me-records.css',
+    './styles/me-settings-feedback.css',
+  ],
+  '明细页 CSS 聚合入口保持封闭',
+)
 const routes = read('src/routes/index.tsx')
 const favoritesPage = read('src/pages/profile/me/MyFavoritesPage.tsx')
 const benefitsPage = read('src/pages/profile/me/MyBenefitsPage.tsx')
@@ -135,7 +168,7 @@ const lightflowProfileVerify = read('scripts/verify-lightflow-profile-entry.mjs'
 expectIncludes(profile, "import './profile-inkpaper.css'", 'ProfilePage 引入局部 profile-inkpaper.css')
 expectAbsent(profile, /ReferenceServiceNav|lf-reference-/, 'ProfilePage 移除首页专属导航与服务卡骨架')
 expectMatches(profile, /useInkRipple\(\s*'\.kprofile/, 'ProfilePage 只在 .kprofile 作用域启用涟漪')
-expectMatches(profile, /className="kprofile kprofile-lightflow"/, 'ProfilePage 外层容器使用局部 LightFlow 根')
+expectClassTokens(profile, ['kprofile', 'kprofile-lightflow'], 'ProfilePage 外层容器使用局部 LightFlow 根')
 expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage 仅保留读屏可见的 我的 标题')
 expectMatches(profile, /className="kp-inner"/, 'ProfilePage 使用 .kp-inner 内容宽度容器')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage 使用五区服务目录')
@@ -143,7 +176,7 @@ expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage 数据驱动�
 expectAbsent(header, /p-hero|<h[1-6][^>]*>\s*我的\s*<\//, 'ProfileHeader 不再使用 p-hero 或 我的 标题')
 expectIncludes(header, 'className="kp-profile-header', 'ProfileHeader 使用开放式身份摘要')
 expectIncludes(header, 'className="kp-profile-main"', 'ProfileHeader 保留身份主行')
-expectIncludes(header, 'className="kp-profile-boundary"', 'ProfileHeader 展示真实信息边界')
+expectAbsent(header, /kp-profile-boundary/, 'ProfileHeader 移除原型 14 不存在的额外信息边界面板')
 expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
 expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
 expectIncludes(section, 'className={`kp-entry-grid kp-entry-grid--${section.layout}`}', 'ProfileEntrySection 使用等权入口网格')
@@ -154,8 +187,9 @@ expectIncludes(records, 'className="kp-session-records"', 'ProfileSessionRecords
 expectIncludes(records, 'className="kp-section-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
 expectAbsent(`${header}\n${section}\n${records}`, /lf-reference-/, 'Profile 组件完全移除首页服务卡原语')
 expectAbsent(section, /sec-head/, 'ProfileEntrySection 不再使用 sec-head 旧骨架')
-expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|--serif:|#f4f1e8|Noto Serif|Source Han Serif|Songti|SimSun|repeating-linear-gradient/, 'Profile CSS 不回退纸感视觉或旧入口骨架')
-expectAbsent(combinedProfileCss, /box-shadow\s*:/, 'Profile CSS 不恢复大型投影')
+expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|#f4f1e8|repeating-linear-gradient/, 'Profile CSS 不回退旧入口骨架或裸色纸纹')
+expectIncludes(combinedProfileCss, '--lf-serif:', 'Profile CSS 保留原型 14 的展示字体 token')
+expectMatches(combinedProfileCss, /box-shadow:\s*0 3px 14px/, 'Profile CSS 仅恢复原型 14 的轻量卡片投影')
 
 const expectedCssImports = [
   "@import './profile-lightflow-shell.css';",
@@ -167,10 +201,15 @@ else fail('profile-inkpaper.css 必须只保留 shell/directory/state 三份局�
 for (let index = 0; index < profileCssPaths.length; index += 1) {
   checkScopedCss(profileCssPaths[index], profileCss[index])
 }
-expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*#eaf5ff/, 'CSS 定义冰蓝服务台底色变量')
+// 用户确认原型 14 为最高真值：Profile 画布绑定 fusion 纸面 token（--k-paper），不写裸 hex。
+expectMatches(
+  combinedProfileCss,
+  /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*var\(--k-paper/,
+  'CSS 定义融合壳画布底色变量（绑定 --k-paper）',
+)
 expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s+\.k-ripple/, 'CSS 定义局部点击涟漪')
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS 保留 56px 主操作触控高度')
-expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS 保留 48px 次操作触控高度')
+expectMatches(combinedProfileCss, /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/, 'Profile CSS 将次操作触控目标提升到 56px')
 expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS 保留桌面端 92px 等权入口')
 expectMatches(combinedProfileCss, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.kprofile\.kprofile-lightflow \.kp-entry-grid[\s\S]*?grid-template-columns:\s*1fr;/, 'Profile CSS 在 520px 收口为单列')
 expectAbsent(combinedProfileCss, /lf-reference-/, 'Profile CSS 不保留首页服务卡 selector')
@@ -251,11 +290,16 @@ for (const [label, source] of [
 ]) {
   expectIncludes(source, "import './me-detail-inkpaper.css'", `${label} 引入明细页局部 CSS`)
   expectIncludes(source, "useInkRipple('.me-inkdetail", `${label} 只在 .me-inkdetail 作用域启用涟漪`)
-  expectMatches(source, /className="me-inkdetail/, `${label} 使用 .me-inkdetail 根作用域`)
+  expectClassTokens(source, ['me-inkdetail'], `${label} 使用 .me-inkdetail 根作用域`)
   expectIncludes(source, 'KIcon', `${label} 复用 KIcon 图标系统`)
 }
 
-expectMatches(detailCss, /\.me-inkdetail\s*\{[\s\S]*--paper:\s*#f4f1e8/, '明细页 CSS 定义米纸底色变量')
+// 方案 B：明细页纸面绑定 --k-paper / --color-canvas，不再锁定米纸裸 hex。
+expectMatches(
+  detailCss,
+  /\.me-inkdetail\s*\{[\s\S]*--paper:\s*var\(--k-paper/,
+  '明细页 CSS 定义融合壳纸面底色变量（绑定 --k-paper）',
+)
 expectMatches(detailCss, /\.me-inkdetail::before/, '明细页 CSS 使用局部纸纹层')
 expectMatches(detailCss, /\.me-inkdetail \.k-ripple/, '明细页 CSS 定义局部墨水涟漪')
 expectAbsent(detailCss, /\.kprofile|\.khome|\.kassistant|\.kcampus/, '明细页 CSS 不污染其他墨青页面作用域')
@@ -277,17 +321,18 @@ expectIncludes(settingsPage, 'revokeJobAiConsent', '账号设置保留撤回岗�
 expectIncludes(settingsPage, '手机号登录', '账号设置保留游客登录按钮')
 expectIncludes(settingsPage, '公共终端会话说明', '账号设置保留公共终端会话说明')
 expectIncludes(settingsPage, '退出登录', '账号设置保留退出登录操作')
-expectIncludes(settingsPage, '手机号换绑、账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
+// Wave 2 已实现换绑，只有注销和数据导出仍未开放
+expectIncludes(settingsPage, '账号注销和数据导出尚未开放', '账号设置明确尚未开放的账户能力')
 
 expectIncludes(aiRecordsPage, "import './me-detail-inkpaper.css'", 'AI服务记录引入明细页局部 CSS')
 expectIncludes(aiRecordsPage, "useInkRipple('.me-inkdetail", 'AI服务记录只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(aiRecordsPage, /className="me-inkdetail/, 'AI服务记录使用 .me-inkdetail 根作用域')
+expectClassTokens(aiRecordsPage, ['me-inkdetail'], 'AI服务记录使用 .me-inkdetail 根作用域')
 expectIncludes(aiRecordsPage, 'deleteMyAiRecord', 'AI服务记录保留本人 AI 记录删除接口')
 expectIncludes(jobAiRecords, '删除岗位 AI 参考记录', '岗位 AI 参考记录保留删除操作文案')
 
 expectIncludes(activityPage, "import './me-detail-inkpaper.css'", '浏览与跳转记录引入明细页局部 CSS')
 expectIncludes(activityPage, "useInkRipple('.me-inkdetail", '浏览与跳转记录只在 .me-inkdetail 作用域启用涟漪')
-expectMatches(activityPage, /className="me-inkdetail/, '浏览与跳转记录使用 .me-inkdetail 根作用域')
+expectClassTokens(activityPage, ['me-inkdetail'], '浏览与跳转记录使用 .me-inkdetail 根作用域')
 expectIncludes(activityPage, 'getMyBrowseLogs', '浏览与跳转记录保留浏览记录真实 API 拉取')
 expectIncludes(activityPage, 'getMyJumpLogs', '浏览与跳转记录保留外部跳转真实 API 拉取')
 expectIncludes(activityPage, '投递 / 预约结果以来源平台为准，本系统不记录', '浏览与跳转记录保留投递/预约边界文案')
@@ -328,8 +373,15 @@ const allowedLowRiskInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
   'apps/kiosk/src/pages/profile/me/JobAiSessionRecords.tsx',
   'apps/kiosk/src/pages/profile/me/MyActivityPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MeListShell.tsx',
+  'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-assets.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-detail-base.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-orders.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-records.css',
+  'apps/kiosk/src/pages/profile/me/styles/me-settings-feedback.css',
   'apps/kiosk/scripts/verify-profile-documents-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-feedback-inkpaper.mjs',
   'apps/kiosk/scripts/verify-profile-ai-records-inkpaper.mjs',
@@ -359,12 +411,22 @@ const allowedPrintOrdersInkpaperChanged = new Set([
   'apps/kiosk/src/pages/profile/me/printOrders/__fixtures__/member-print-orders-login-smoke.json',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
 ])
+/** 2026-07-25：冻结项诚实文案 / 合规入口收口（允许主入口标签与 toast，不做视觉换装）。 */
+const allowedHonestCopyChanged = new Set([
+  'apps/kiosk/src/pages/profile/ProfilePage.tsx',
+  'apps/kiosk/src/pages/profile/profileEntries.ts',
+  'apps/kiosk/src/pages/profile/profileTypes.ts',
+  'apps/kiosk/src/pages/profile/components/ProfileEntrySection.tsx',
+  'apps/kiosk/src/pages/profile/me/MyPrivacyRequestsPage.tsx',
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+])
 const allowedChanged = new Set([
   'apps/kiosk/src/layouts/KioskRoot.tsx',
   ...allowedProfileLandingChanged,
   ...allowedLowRiskInkpaperChanged,
   ...allowedPrintOrderRefreshChanged,
   ...allowedPrintOrdersInkpaperChanged,
+  ...allowedHonestCopyChanged,
 ])
 const profileRelatedChanged = changedFiles.filter(
   (file) => file.startsWith('apps/kiosk/src/pages/profile/') || file.startsWith('apps/kiosk/scripts/verify-profile-inkpaper-home'),
@@ -382,6 +444,33 @@ if (delegatesMeBoundary) {
   pass('/me/documents 已由专属守卫覆盖，/me/print-orders 已由专属守卫覆盖；LightFlow 本批 /me/* 禁入已委托给同一 CI 中的 verify:lightflow-profile-entry')
 } else {
   fail('LightFlow 本批 /me/* 禁入委托缺失或未与 Profile 主守卫共同接入 CI')
+}
+
+const forbiddenMeChanged = changedFiles.filter((file) => {
+  if (file === 'apps/kiosk/src/pages/profile/me/MyPrintOrdersPage.tsx') {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  if (/^apps\/kiosk\/src\/pages\/profile\/me\/printOrders\//.test(file)) {
+    return !allowedPrintOrderRefreshChanged.has(file) && !allowedPrintOrdersInkpaperChanged.has(file)
+  }
+  return false
+})
+if (forbiddenMeChanged.length === 0) {
+  pass('/me/print-orders 状态刷新小步仍在允许范围内')
+} else {
+  fail(`本批禁止触碰未声明的高风险 /me 明细页：${forbiddenMeChanged.join(', ')}`)
+}
+
+const forbiddenProfileChanged = changedFiles.filter(
+  (file) =>
+    /^apps\/kiosk\/src\/pages\/profile\/(ProfilePage|profileEntries|profile-inkpaper|components\/Profile)/.test(file)
+    && !allowedHonestCopyChanged.has(file)
+    && !allowedProfileLandingChanged.has(file),
+)
+if (forbiddenProfileChanged.length === 0) {
+  pass('ProfilePage 主入口仅允许诚实文案 / 合规标签收口，未做未声明换装')
+} else {
+  fail(`本批禁止触碰 ProfilePage 主入口：${forbiddenProfileChanged.join(', ')}`)
 }
 
 // 5) 不能引入旧 MyPrintOrdersPage 的回退口径。

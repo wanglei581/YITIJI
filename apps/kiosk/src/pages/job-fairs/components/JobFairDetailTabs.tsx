@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
+import { Card, EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type {
   ExternalJobFairDTO,
   FairCompanyDTO,
@@ -11,12 +11,10 @@ import type {
 import {
   BriefcaseIcon,
   BuildingIcon,
-  CalendarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   DoorOpenIcon,
   ExternalLinkIcon,
-  FileTextIcon,
   FilterIcon,
   InfoIcon,
   MapIcon,
@@ -26,7 +24,6 @@ import {
   NavigationIcon,
   PrinterIcon,
   SparklesIcon,
-  UsersIcon,
 } from 'lucide-react'
 import { getFairVenueGuide } from '../../../services/api'
 
@@ -103,153 +100,163 @@ function MapBlock({ lat, lng, mapImageUrl, venue }: { lat?: number; lng?: number
 
 export function DetailsTab({
   fair,
-  sc,
   featuredZones,
   navUrl,
   onNav,
 }: {
   fair: ExternalJobFairDTO
-  sc: { label: string; bg: string; text: string }
   featuredZones: FairZoneDTO[]
   navUrl: string | null
   onNav: () => void
 }) {
   const navigate = useNavigate()
+  const companyCount = fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)
 
   return (
     <>
-      {/* 概览 + 地图（两栏：信息左 / 地图右，复刻参考图） */}
-      <Card className="p-5">
-        <div className="grid gap-5 lg:grid-cols-2">
+      {/* 概览：信息左 / 位置右（复刻原型 11 ov-grid） */}
+      <section className="jf-card accented compact">
+        <div className="ov-grid">
           {/* 左：信息 */}
-          <div className="flex flex-col">
-            <div className="flex items-start justify-between gap-3">
-              <h2 className="flex-1 text-xl font-bold text-neutral-900">{fair.name}</h2>
-              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${sc.bg} ${sc.text}`}>{sc.label}</span>
+          <div>
+            <div className="jf-kv">
+              <div className="k">主办方</div>
+              <div className="v">{fair.organizer}</div>
             </div>
-            <p className="mt-1 text-sm text-neutral-500">主办方：{fair.organizer}</p>
-            <div className="mt-3 flex items-center gap-2 text-sm text-neutral-700">
-              <CalendarIcon className="h-4 w-4 shrink-0 text-neutral-400" />
-              <span>{formatDateTime(fair.startTime)}<span className="mx-1 text-neutral-400">–</span>{formatDateTime(fair.endTime)}</span>
+            <div className="jf-kv" style={{ marginTop: 16 }}>
+              <div className="k">活动时间</div>
+              <div className="v">{formatDateTime(fair.startTime)} — {formatDateTime(fair.endTime)}</div>
             </div>
-            {/* 信息 pill 行（地点 / 预计参会 / 参展企业） */}
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-                <MapPinIcon className="h-4 w-4 text-warning-fg" />{fair.city ? `${fair.city} · ` : ''}{fair.venue}
-              </span>
+            {/* pill 行 */}
+            <div className="jf-pill-row">
+              <span className="jf-chip"><b>{fair.city ? `${fair.city} · ` : ''}{fair.venue}</b></span>
               {fair.expectedAttendance != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-                  <UsersIcon className="h-4 w-4 text-primary-500" />预计参会 <b className="font-semibold">{fair.expectedAttendance.toLocaleString()}</b> 人
-                </span>
+                <span className="jf-chip">预计参会 <b>{fair.expectedAttendance.toLocaleString()} 人</b></span>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
-                <BuildingIcon className="h-4 w-4 text-success" />参展企业 <b className="font-semibold">{fair.hasManagedData ? fair.managedCompanyCount : (fair.boothCount ?? 0)}</b> 家
-              </span>
+              <span className="jf-chip">参展企业 <b>{companyCount} 家</b></span>
+              {fair.jobCount != null && (
+                <span className="jf-chip">招聘岗位 <b>{fair.jobCount} 个</b></span>
+              )}
             </div>
-            {/* 详细地址与交通指引（复刻参考图左栏） */}
-            <div className="mt-4">
-              <p className="flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-                <NavigationIcon className="h-4 w-4 text-primary-500" />详细地址与交通指引
-              </p>
-              {fair.address && <p className="mt-1.5 text-sm text-neutral-600">{fair.address}</p>}
-              {fair.trafficInfo && <p className="mt-1 text-sm leading-relaxed text-neutral-500">{fair.trafficInfo}</p>}
-            </div>
+            {/* 地址与交通 */}
+            {(fair.address || fair.trafficInfo) && (
+              <div className="jf-traffic">
+                <b>详细地址与交通指引</b>
+                {fair.address && <span>{fair.address}</span>}
+                {fair.trafficInfo && <span style={{ display: 'block', marginTop: 4 }}>{fair.trafficInfo}</span>}
+              </div>
+            )}
             {navUrl && (
-              <Button size="md" variant="outline" className="mt-4 flex w-fit items-center justify-center gap-2" onClick={onNav}>
-                <NavigationIcon className="h-4 w-4" />扫码在手机上导航
-              </Button>
+              <button type="button" className="jf-btn sm ghost" style={{ marginTop: 16 }} onClick={onNav}>
+                <NavigationIcon aria-hidden="true" />
+                扫码在手机上导航
+              </button>
             )}
           </div>
           {/* 右：地图 */}
-          <div className="overflow-hidden rounded-xl border border-neutral-100">
+          <div className="jf-mini-map">
+            <span className="grid-bg" />
             <MapBlock lat={fair.latitude} lng={fair.longitude} mapImageUrl={fair.mapImageUrl} venue={fair.venue} />
           </div>
         </div>
         {fair.description && (
-          <p className="mt-4 border-t border-neutral-100 pt-4 text-sm leading-relaxed text-neutral-600">{fair.description}</p>
+          <p style={{ marginTop: 18, fontSize: 18, lineHeight: 1.55, color: 'var(--muted)' }}>{fair.description}</p>
         )}
-      </Card>
+      </section>
 
-      {/* 各市区创新特色展区（复刻参考图：图标 + 城市角标 + 标题 + 描述） */}
+      {/* 各市区创新特色展区（jf-zones3 + jf-zone-card 复刻原型 11） */}
       {featuredZones.length > 0 && (
-        <Card className="p-5">
-          <p className="mb-3 flex items-center gap-1.5 text-base font-semibold text-neutral-800">
-            <SparklesIcon className="h-4 w-4 text-primary-500" />
-            各市区创新特色展区
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="jf-card compact">
+          <div className="jf-card-head">
+            <span className="jf-g-icon"><SparklesIcon aria-hidden="true" /></span>
+            <div>
+              <h2>各市区创新特色展区</h2>
+              <div className="sub">由主办方设置，现场以指示牌为准</div>
+            </div>
+          </div>
+          <div className="jf-zones3">
             {featuredZones.map((z) => (
-              <div key={z.id} className="relative rounded-xl border border-neutral-100 bg-white p-4 transition-shadow hover:shadow-md">
-                {z.city && (
-                  <span className="absolute right-4 top-4 text-xs font-medium text-primary-500">{z.city}</span>
-                )}
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-50">
-                  <MonitorIcon className="h-6 w-6 text-primary-600" />
+              <div key={z.id} className="jf-zone-card">
+                {z.city && <span className="city-badge">{z.city}</span>}
+                <span className="z-icon">
+                  <MonitorIcon aria-hidden="true" />
                 </span>
-                <p className="mt-3 pr-12 text-base font-semibold text-neutral-900">{z.zoneName}</p>
-                {z.description && (
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-500">{z.description}</p>
-                )}
+                <b>{z.zoneName}</b>
+                {z.description && <span className="desc">{z.description}</span>}
               </div>
             ))}
           </div>
-        </Card>
+        </section>
       )}
 
-      {/* 现场服务入口（展馆导览 / 活动资料） */}
+      {/* 现场服务（展馆导览 / 活动资料 / 数据大屏 / AI准备单 — 4列 jf-svc-tiles） */}
       {fair.hasManagedData && (
-        <Card className="p-5">
-          <p className="mb-3 text-sm font-medium text-neutral-700">现场服务</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              className="flex items-center gap-2 rounded-xl bg-neutral-50 p-3 text-left transition-colors hover:bg-primary-50"
-              onClick={() => navigate(`/job-fairs/${fair.id}/map`)}
-            >
-              <MapIcon className="h-5 w-5 text-primary-500" />
-              <span className="text-sm font-medium text-neutral-700">展馆导览</span>
-              <ChevronRightIcon className="ml-auto h-4 w-4 text-neutral-300" />
+        <section className="jf-card compact">
+          <div className="jf-card-head">
+            <span className="jf-g-icon"><MapIcon aria-hidden="true" /></span>
+            <div>
+              <h2>现场服务</h2>
+              <div className="sub">导览、资料与 AI 参会准备</div>
+            </div>
+          </div>
+          <div className="jf-svc-tiles">
+            <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/map`)}>
+              <span className="t-text">
+                <b>展馆导览</b>
+                <span className="cnt">查看会场布局</span>
+              </span>
             </button>
-            <button
-              className="flex items-center gap-2 rounded-xl bg-neutral-50 p-3 text-left transition-colors hover:bg-primary-50"
-              onClick={() => navigate(`/job-fairs/${fair.id}/materials`)}
-            >
-              <FileTextIcon className="h-5 w-5 text-primary-500" />
-              <span className="text-sm font-medium text-neutral-700">活动资料</span>
-              <span className="ml-auto text-xs text-neutral-400">{fair.managedMaterialCount} 份</span>
+            <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/materials`)}>
+              <span className="t-text">
+                <b>活动资料</b>
+                <span className="cnt">{fair.managedMaterialCount} 份 · 可免费打印</span>
+              </span>
+            </button>
+            <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/stats`)}>
+              <span className="t-text">
+                <b>现场数据</b>
+                <span className="cnt">签到进度 · 行业分布</span>
+              </span>
+            </button>
+            <button type="button" className="jf-tile tinted" onClick={() => navigate(`/job-fairs/${fair.id}/visit-plan`)}>
+              <span className="t-text">
+                <b>AI参会准备单</b>
+                <span className="cnt">基于本人简历生成</span>
+              </span>
             </button>
           </div>
-        </Card>
+        </section>
       )}
 
-      {/* 数据来源（合规必展示） */}
-      <Card className="p-5">
-        <p className="mb-3 text-sm font-medium text-neutral-700">数据来源</p>
-        <div className="space-y-2 text-sm text-neutral-600">
-          <div className="flex justify-between">
-            <span className="text-neutral-400">来源机构</span>
-            <span>{fair.sourceName}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-400">同步时间</span>
-            <span>{formatSync(fair.syncTime)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-neutral-400">外部编号</span>
-            <span className="font-mono text-xs">{fair.externalId}</span>
+      {/* 数据来源（合规必展示 — accented + jf-kv3） */}
+      <section className="jf-card accented compact">
+        <div className="jf-card-head">
+          <span className="jf-g-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3z"/>
+            </svg>
+          </span>
+          <div>
+            <h2>数据来源</h2>
+            <div className="sub">第三方 / 官方来源信息，请核对后前往办理</div>
           </div>
         </div>
-        <p className="mt-3 text-xs text-neutral-400">{fair.dataSourceNote}</p>
-      </Card>
-
-      {/* 合规提示 */}
-      {fair.status !== 'ended' && (
-        <div className="flex items-start gap-2 rounded-lg bg-neutral-50 px-4 py-3">
-          <InfoIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-400" />
-          <p className="text-xs leading-relaxed text-neutral-400">
-            预约请点击底部「扫码预约」，使用手机前往来源平台办理。本系统仅展示第三方来源信息，不参与活动报名流程。
-          </p>
+        <div className="jf-kv3">
+          <div className="jf-kv"><div className="k">来源机构</div><div className="v">{fair.sourceName}</div></div>
+          <div className="jf-kv"><div className="k">同步时间</div><div className="v">{formatSync(fair.syncTime)}</div></div>
+          <div className="jf-kv"><div className="k">外部ID</div><div className="v">{fair.externalId}</div></div>
         </div>
-      )}
+        {(fair.dataSourceNote || fair.status !== 'ended') && (
+          <div className="jf-notice" style={{ marginTop: 18 }}>
+            <InfoIcon aria-hidden="true" />
+            <span>
+              {fair.status !== 'ended'
+                ? '预约请点击底部「扫码预约」，使用手机前往来源平台办理。本系统仅展示第三方来源信息，不参与活动报名流程。'
+                : (fair.dataSourceNote || '本系统仅展示来源信息，信息以来源平台为准。')}
+            </span>
+          </div>
+        )}
+      </section>
     </>
   )
 }

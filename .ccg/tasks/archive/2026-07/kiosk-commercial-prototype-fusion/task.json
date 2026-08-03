@@ -1,0 +1,12 @@
+{
+  "id": "kiosk-commercial-prototype-fusion",
+  "title": "将现有 Kiosk 用户前端全量换装为 8177 与 5299 融合版",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "frontend-ui-migration",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 W6 最终收口；后续转入上线前 P0 真实验收",
+  "createdAt": "2026-07-23T17:35:00+08:00",
+  "branch": "codex/kiosk-8177-5299-fusion-design-20260723"
+}

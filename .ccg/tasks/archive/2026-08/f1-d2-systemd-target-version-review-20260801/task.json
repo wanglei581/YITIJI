@@ -1,0 +1,13 @@
+{
+  "id": "f1-d2-systemd-target-version-review-20260801",
+  "title": "审查 F1 D2 目标 systemd 版本与 helper 离线演算范围",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "infrastructure",
+  "currentPhase": "completed",
+  "nextAction": "等待用户批准 docs-only 对账；启动 Colima 捕获精确版本与最小真机语义验证仍须单独授权",
+  "createdAt": "2026-08-01T12:38:00Z",
+  "completedAt": "2026-08-01T12:47:32Z",
+  "branch": "codex/f1-d2-systemd-target-version-review-20260801"
+}

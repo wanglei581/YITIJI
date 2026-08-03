@@ -1,0 +1,20 @@
+{
+  "id": "phase0-s0b-merge-record-20260729",
+  "title": "记录 Phase 0 S0-B 合并事实",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "归档并提交 docs-only PR",
+  "createdAt": "2026-07-29T00:28:00+08:00",
+  "branch": "codex/phase0-s0b-merge-record-20260729",
+  "baseSha": "7299e5237f4ab6bc8157d1a18dc06ea833d2490b",
+  "touches": {
+    "production": false,
+    "code": false,
+    "database": false,
+    "hardware": false,
+    "secrets": false
+  }
+}

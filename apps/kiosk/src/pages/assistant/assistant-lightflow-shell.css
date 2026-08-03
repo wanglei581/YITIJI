@@ -1,18 +1,20 @@
+[data-kiosk-presentation='fusion-youth'] .fusion-w3--assistant > .ui-kiosk-page-content { padding: 0; }
+
 .kassist.kassist-lightflow {
-  --sd-canvas: var(--sd-color-canvas, #f7faff);
-  --sd-canvas-outer: var(--sd-color-canvas-outer, #e9f1fb);
-  --sd-surface: var(--sd-color-surface, #ffffff);
-  --sd-surface-soft: #f3f8ff;
-  --sd-text-strong: var(--sd-color-text-strong, #071a43);
-  --sd-text: var(--sd-color-text, #17345d);
-  --sd-copy: var(--sd-color-copy, #566a84);
-  --sd-copy-muted: var(--sd-color-copy-muted, #64748b);
-  --sd-primary: var(--sd-color-primary, #1769e8);
-  --sd-primary-strong: var(--sd-color-primary-strong, #0758d7);
-  --sd-line: var(--sd-color-line, #dce6f4);
-  --sd-line-strong: var(--sd-color-line-strong, #cbd9ed);
-  --sd-shadow-touch: 0 18px 60px rgba(30, 71, 124, 0.09);
-  --sd-shadow-soft: 0 9px 28px rgba(30, 71, 124, 0.07);
+  --sd-canvas: var(--sd-color-canvas);
+  --sd-canvas-outer: var(--sd-color-canvas-outer);
+  --sd-surface: var(--sd-color-surface, var(--k-surface, var(--color-surface)));
+  --sd-surface-soft: var(--k-teal-soft);
+  --sd-text-strong: var(--sd-color-text-strong, var(--k-ink));
+  --sd-text: var(--sd-color-text);
+  --sd-copy: var(--sd-color-copy);
+  --sd-copy-muted: var(--sd-color-copy-muted);
+  --sd-primary: var(--sd-color-primary, var(--k-teal));
+  --sd-primary-strong: var(--sd-color-primary-strong, var(--k-teal-deep));
+  --sd-line: var(--sd-color-line);
+  --sd-line-strong: var(--sd-color-line-strong);
+  --sd-shadow-touch: 0 18px 60px rgba(16, 48, 43, 0.08);
+  --sd-shadow-soft: 0 9px 28px rgba(16, 48, 43, 0.06);
   --sd-control-min: 48px;
   --sd-primary-control-min: 56px;
   --kassist-control-min: 48px;

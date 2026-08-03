@@ -16,6 +16,7 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { InterviewAnswerDock } from './session/InterviewAnswerDock'
 import { InterviewSessionPanels } from './session/InterviewSessionPanels'
+import { InterviewShell } from './InterviewShell'
 import type { InterviewMessage, InterviewSessionPhase, InterviewSessionRouteState, InterviewVoiceState } from './session/types'
 import './interview-service-desk.css'
 
@@ -76,7 +77,13 @@ export function InterviewSessionPage() {
   const [recordSec, setRecordSec] = useState(0)
   const questionShownAtRef = useRef(Date.now())
 
-  useBusyLock(true)
+  useBusyLock(
+    phase === 'thinking' ||
+    phase === 'finishing' ||
+    voice.kind === 'requesting_permission' ||
+    voice.kind === 'recording' ||
+    voice.kind === 'transcribing',
+  )
 
   const access = useMemo(
     () => ({ token: getToken(), accessToken: state?.accessToken ?? null }),
@@ -156,7 +163,8 @@ export function InterviewSessionPage() {
 
   if (!state?.sessionId) {
     return (
-      <div className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewShell>
+      <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session-invalid" data-visual-theme="service-desk" data-ux-density="touch">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-error-bg text-error-fg">
           <AlertCircleIcon className="h-9 w-9" aria-hidden="true" />
         </div>
@@ -167,7 +175,8 @@ export function InterviewSessionPage() {
         <Button size="lg" className="h-14 px-10 text-base" onClick={() => navigate('/interview/setup')}>
           重新开始练习
         </Button>
-      </div>
+      </main>
+      </InterviewShell>
     )
   }
 
@@ -312,7 +321,8 @@ export function InterviewSessionPage() {
   const micStatusTone = micError || !voiceAvailable ? 'red' : 'green'
 
   return (
-    <div className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
+    <InterviewShell>
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-session" className="interview-flow interview-session" data-visual-theme="service-desk" data-ux-density="touch">
       <InterviewSessionPanels
         advisorPortrait={advisorPortrait}
         interviewerLabel={interviewerLabel}
@@ -371,6 +381,7 @@ export function InterviewSessionPage() {
         onSubmitText={() => void submit({ text: draft, skip: false })}
         onFinish={() => void finish()}
       />
-    </div>
+    </main>
+    </InterviewShell>
   )
 }

@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, PageHeader, Stepper } from '@ai-job-print/ui'
+import { Button, Card, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type {
   ResumeGenEducation,
   ResumeGenExperience,
@@ -20,6 +20,7 @@ import type {
 import {
   GraduationCapIcon,
   BriefcaseIcon,
+  CheckIcon,
   FolderGitIcon,
   PlusIcon,
   ShieldCheckIcon,
@@ -43,6 +44,50 @@ const STEPS = [
   { title: '项目经历', description: '可选' },
   { title: '技能证书', description: '技能与自我评价' },
 ] as const
+
+/** 右侧进度侧栏——展示6个填写阶段的完成状态 */
+function ProgressSidebar({ currentStep }: { currentStep: number }) {
+  return (
+    <aside className="resume-lightflow__sidebar" aria-label="填写进度">
+      <div className="fy-side-card">
+        <h3>填写进度</h3>
+        <p className="fy-side-sub">完成必填项后继续下一步</p>
+        <div className="fy-prog-list">
+          {STEPS.map((s, idx) => {
+            const done = idx < currentStep
+            const now = idx === currentStep
+            return (
+              <div
+                key={idx}
+                className={['fy-prog-item', done ? 'done' : now ? 'now' : ''].filter(Boolean).join(' ')}
+              >
+                <span className="fy-prog-dot" aria-hidden="true">
+                  {done ? <CheckIcon className="h-4 w-4" /> : idx + 1}
+                </span>
+                <span className="fy-prog-title">{s.title}</span>
+                <span className="fy-prog-status">{done ? '已填' : now ? '填写中' : s.description}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="fy-side-card">
+        <h3>生成说明</h3>
+        <div className="fy-hint-list">
+          <div className="fy-hint-item">
+            <ShieldCheckIcon aria-hidden="true" />
+            <span>AI 只润色你填写的真实信息，不会替你编造学历、证书、公司或项目经历；没填的内容会提示你补充。</span>
+          </div>
+          <div className="fy-hint-item">
+            <SparklesIcon aria-hidden="true" />
+            <span>本机为公共设备：填写内容仅用于本次生成，离开页面即清除；生成结果与导出文件短期保留后自动清理。</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  )
+}
 
 const inputCls =
   'resume-lightflow__field w-full rounded-xl border border-neutral-200 bg-white px-4 py-3.5 text-base text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100'
@@ -204,38 +249,29 @@ export function ResumeGeneratePage() {
   const StepIcon = stepIcon
 
   return (
-    <div className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
+    <KioskPageFrame className="fusion-w3 fusion-w3--resume">
+    <section data-kiosk-domain="resume" data-kiosk-screen="resume-generate" className="resume-lightflow resume-generate-lightflow flex h-full flex-col">
       <div className="resume-lightflow__header px-6 pt-6">
-        <PageHeader
+        <KioskPageHeader
           title="AI 简历生成"
-          subtitle="填写你的真实信息，AI 帮你润色成一份结构化简历"
-          actions={
-            <Button size="sm" variant="secondary" onClick={() => navigate('/resume/source')}>
-              返回简历服务
-            </Button>
-          }
+          description="填写你的真实信息，AI 帮你润色成一份结构化简历"
+          onBack={() => navigate('/resume/source')}
+          backLabel="返回简历服务"
         />
-        {/* 防编造 + 隐私说明(合规) */}
-        <div className="resume-lightflow__notice mt-3 flex items-start gap-2 rounded-xl bg-primary-50 px-4 py-3 text-sm text-primary-800">
-          <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <p>
-            AI 只润色你填写的真实信息，<b>不会替你编造</b>学历、证书、公司或项目经历；没填的内容会提示你补充。
-            本机为公共设备：填写内容仅用于本次生成，离开页面即清除，生成结果与导出文件按既定策略短期保留后自动清理。
-          </p>
-        </div>
         <div className="resume-lightflow__stepper mt-4">
           <Stepper steps={[...STEPS]} currentIndex={step} />
         </div>
       </div>
 
-      <div className="resume-lightflow__content mt-4 flex-1 overflow-y-auto px-6 pb-6">
-        <Card className="resume-lightflow__work-card p-5">
-          <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
-              <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-            </span>
-            <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
-          </div>
+      <div className="resume-lightflow__content mt-4 flex-1 min-h-0 px-6 pb-6">
+        <div className="resume-lightflow__form-col">
+            <Card className="resume-lightflow__work-card p-5">
+              <div className="resume-lightflow__section-heading mb-4 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50">
+                  <StepIcon className="h-5 w-5 text-primary-600" aria-hidden="true" />
+                </span>
+                <p className="text-lg font-semibold text-neutral-900">{STEPS[step].title}</p>
+              </div>
 
           {step === 0 && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -413,13 +449,16 @@ export function ResumeGeneratePage() {
           )}
         </Card>
 
-        {error && (
-          <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
-        )}
+            {error && (
+              <p className="mt-3 rounded-xl bg-error-bg px-4 py-3 text-sm text-error-fg">{error}</p>
+            )}
+        </div>
+
+        <ProgressSidebar currentStep={step} />
       </div>
 
       {/* 底部操作条 */}
-      <div className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
+      <KioskActionBar className="resume-lightflow__action-bar border-t border-neutral-100 px-6 pb-6 pt-3">
         <div className="flex gap-3">
           <Button
             size="lg"
@@ -432,7 +471,7 @@ export function ResumeGeneratePage() {
           </Button>
           {step < STEPS.length - 1 ? (
             <Button size="lg" className="flex-[2]" disabled={!canNext} onClick={() => setStep((s) => s + 1)}>
-              下一步
+              下一步：{STEPS[step + 1].title}
             </Button>
           ) : (
             <Button size="lg" className="flex flex-[2] items-center justify-center gap-2" disabled={generating} onClick={() => void handleGenerate()}>
@@ -441,7 +480,8 @@ export function ResumeGeneratePage() {
             </Button>
           )}
         </div>
-      </div>
-    </div>
+      </KioskActionBar>
+    </section>
+    </KioskPageFrame>
   )
 }

@@ -20,7 +20,6 @@ import type {
 import {
   BriefcaseIcon,
   BuildingIcon,
-  ChevronLeftIcon,
   LayersIcon,
   MapPinIcon,
   NavigationIcon,
@@ -34,7 +33,7 @@ import { useAuth } from '../../auth/useAuth'
 import { SourceUrlQr } from '../../components/SourceUrlQr'
 import { buildNavUrl } from '../../lib/url'
 import { AiJobTab, CompaniesTab, MapTab, OverviewTab, PrintTab } from './components/CampusTabs'
-import '../prototype/kiosk-prototype.css'
+import { KioskPageFrame } from '../jobs/components/W4Presentation'
 
 // verify marker: MapBlock lives in CampusTabs after the zero-behavior split.
 
@@ -236,7 +235,15 @@ export function CampusPage() {
   }
 
   return (
-    <div className="campus-proto flex h-full flex-col">
+    <KioskPageFrame
+      tone="clay"
+      title="校园招聘专区"
+      subtitle={`${fair.name} · 招聘会与来源平台信息`}
+      backLabel="返回首页"
+      onBack={() => navigate('/')}
+      tight
+    >
+    <div className="campus-proto">
       {qr?.kind === 'book' && (
         <QrModal
           title="扫码前往来源平台预约"
@@ -260,67 +267,54 @@ export function CampusPage() {
         />
       )}
 
-      {/* ── Hero（蓝色渐变大图）─────────────────────────────────── */}
-      <header className="campus-topbar">
-        <div className="flex items-baseline gap-4"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
-        <div className="flex items-center gap-4"><span>校园招聘专区</span><span className="rounded-full border border-[rgba(31,158,134,.45)] bg-[rgba(31,158,134,.18)] px-4 py-2">打印机正常 · A4纸充足</span></div>
-      </header>
-
-      <div className="campus-hero relative shrink-0 bg-gradient-to-br from-primary-600 via-primary-600 to-primary-500 px-5 pb-5 pt-6 text-white">
-        <div className="flex items-center justify-between gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="-ml-1.5 flex h-9 w-9 items-center justify-center rounded-full text-white/90 transition-colors hover:bg-white/15"
-            aria-label="返回首页"
-          >
-            <ChevronLeftIcon className="h-6 w-6" />
-          </button>
-          <span className="campus-date rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium tabular-nums">
+      {/* 顶栏由 KioskPageFrame pagehead 统一提供，不再自绘 campus-topbar（避免双顶栏/双返回）。 */}
+      <div className="campus-hero">
+        <div className="flex items-center justify-end">
+          <span className="campus-date tabular-nums">
             {fmtDateBadge(fair.startTime, fair.endTime)}
           </span>
         </div>
-        <div className="mt-2 flex items-start gap-2">
-          <h1 className="flex-1 text-xl font-bold leading-snug">{fair.name}</h1>
-          <span className={`campus-status mt-1 shrink-0 rounded-full px-4 py-1 text-lg font-semibold ${sc.bg} ${sc.text}`}>{sc.label}</span>
+        <div className="mt-5 flex items-start gap-3">
+          <h1 className="flex-1">
+            {fair.name}
+            <span className="campus-status">{sc.label}</span>
+          </h1>
         </div>
-        {fair.tagline && <p className="mt-1 text-sm text-white/80">{fair.tagline}</p>}
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-white/90">
-          <span className="inline-flex items-center gap-1">
-            <MapPinIcon className="h-4 w-4" />{fair.venue}
+        {fair.tagline && <p className="tagline">{fair.tagline}</p>}
+        <div className="campus-hero-meta">
+          <span>
+            <MapPinIcon aria-hidden="true" />{fair.venue}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <BuildingIcon className="h-4 w-4" />参展企业 {companyCount} 家
+          <span>
+            <BuildingIcon aria-hidden="true" />参展企业 {companyCount} 家
           </span>
-          <span className="inline-flex items-center gap-1">
-            <BriefcaseIcon className="h-4 w-4" />招聘岗位 {jobCount}+
+          <span>
+            <BriefcaseIcon aria-hidden="true" />招聘岗位 {jobCount}+
           </span>
         </div>
       </div>
 
       {/* ── Tab 栏 ─────────────────────────────────────────────── */}
-      <div className="campus-tabs flex shrink-0 border-b border-neutral-100 bg-white">
+      <div className="campus-tabs">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = tab === key
           return (
             <button
               key={key}
+              type="button"
               onClick={() => setTab(key)}
               aria-pressed={active}
-              className={[
-                'relative flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
-                active ? 'text-primary-600' : 'text-neutral-400 hover:text-neutral-600',
-              ].join(' ')}
+              className="campus-tab"
             >
-              <Icon className="h-5 w-5" />
+              <Icon aria-hidden="true" />
               {label}
-              {active && <span className="absolute inset-x-4 -bottom-px h-0.5 rounded-full bg-primary-600" />}
             </button>
           )
         })}
       </div>
 
       {/* ── Tab 内容 ───────────────────────────────────────────── */}
-      <div className="campus-tab-body flex-1 overflow-y-auto">
+      <div className="campus-tab-body">
         {tab === 'overview' && (
           <OverviewTab
             fair={fair}
@@ -332,7 +326,7 @@ export function CampusPage() {
           />
         )}
         {tab === 'companies' && (
-          <div className="px-5 py-4">
+          <div className="campus-tab-pane">
             <CompaniesTab fairId={fair.id} companies={companies} />
           </div>
         )}
@@ -345,5 +339,6 @@ export function CampusPage() {
         )}
       </div>
     </div>
+    </KioskPageFrame>
   )
 }

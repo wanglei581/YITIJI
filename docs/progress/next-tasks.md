@@ -1,27 +1,214 @@
 # 下一步任务
 
-> 最后更新：2026-07-17
+> 最后更新：2026-08-02
+
+## Phase 0 真值收口后续
+
+- [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
+- [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
+- [x] **S0-C 简历解析阶段真值已合入**：[PR #429](https://github.com/wanglei581/YITIJI/pull/429) → `main@5fcc4a50`；已移除固定延时与伪 OCR/提取/诊断阶段，立即提交真实请求，只展示明确的非实时处理内容说明；无 `fileId` 直达 fail-closed，返回不冒充撤回服务端任务；真实性门禁、W3 6/6、W6 聚焦 1/1、typecheck/lint/build、GitHub 三项 CI 和三模型终审均通过。未部署。
+- [x] **Phase 0 最终 GO/NO-GO 已完成（2026-07-29）**：正式商业上线与当前软件候选均为 **NO-GO**。完整证据见 `docs/reviews/phase0-final-go-no-go-2026-07-29.md`。
+- [x] **P0-1 公共终端硬性隐私超时与全路由清场（已合入主干）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已建立 Router 级安全根、普通 idle + 不受 busy 抑制的硬截止、fail-closed 遮罩/清场、keepalive logout、history back/forward 与 BFCache 防恢复、屏保跨刷新/唤醒边界、手机辅助页豁免和有界 busy；法律页逃逸与扫描设置清场误取消已按 RED→GREEN 修复，打印/扫描后台任务不取消。已同步 `origin/main@beade4af`，同步后 privacy **18/18**、truth **23/23**、smoke **6/6**、W1 **7/7** 及相关静态/Agent 回归通过；GitHub Actions [`30434676211`](https://github.com/wanglei581/YITIJI/actions/runs/30434676211) 对同步头 `e4a8b488` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。已合入 `main@59171851`，未 deploy。
+- [x] **P1-A 浏览器 truth 夹具收口（本地候选完成）**：`scan-session-truth.spec.ts` 已补终端 capabilities 诚实 fixture，独立 truth 恢复 **23/23**；W5/W6 路由门禁已适配 pathless runtime root，公共隐私套件已纳入 `kiosk-browser-smoke` 常规 CI。
+- [x] **P0-1 PR/CI 集成门禁（完成并合入主干）**：[PR #432](https://github.com/wanglei581/YITIJI/pull/432) 已同步最新 `main` 候选并通过同步头三项 GitHub CI；Claude 同步后最终只读审查 `APPROVE`（Critical 0、Warning 0），Cursor Grok 4.5 High/Fast 此前最终 `APPROVE`（Critical 0、High 0）。Antigravity 同步后调用因 quota/resource limit 未形成有效报告，不记作通过。已按授权合入 `main@59171851`，未部署；发布来源已记录，后续仍须按 P0 门禁继续验收。
+- [x] **P0-1B 清场预警与任务感知文案（已合入主干，未部署）**：[PR #434](https://github.com/wanglei581/YITIJI/pull/434) 已把普通 idle / 屏保 idle 接入既有 `/session-timeout`，保持硬隐私截止 fail-closed 且不受 busy 抑制；任务感知文案、继续使用、立即退出、匿名不可恢复、扫描 busy 终态释放与“不误取消后台任务”均有回归。首轮质量审查发现的屏保“立即退出”动作错误与孤立超时路由首帧暴露风险已由 Cursor **Grok 4.5 High/Fast** 按 RED→GREEN 修复；PR 集成阶段同步收口旧静态合同、孤立超时 smoke 与 privacy 首页回退 fixture。最终 warning **19/19**、privacy **18/18**，其余全套门禁、typecheck、生产 build 与静态契约复核均通过。PR #434 已 squash 合入 `main@b1d681f7`；主干推送 GitHub Actions [`30477913286`](https://github.com/wanglei581/YITIJI/actions/runs/30477913286) 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。下一步仅做 1080×1920 真机触控、Edge/Chrome Kiosk 与 Windows 现场验收；验收前不得部署或宣称现场闭环完成。
+- [x] **P0-2B F1 D3 真实审批资料受限采集准备（本地候选，未部署）**：已完成技术 SSOT、审批治理包、D3 预检报告与 runbook 的一致性盘点，并形成 `docs/reviews/f1-d3-approval-intake-readiness-2026-07-30.md` 引用式快照；只路由字段 ID 的责任和采集位置，不填写或复制 managed 值、状态及签批结论。当时的三方签批前提已由下一条 P0-2C 双模式治理纠正；managed 资产记录和限时 D3 只读窗口仍未提供，F1 保持 **NO-GO**，不得连接生产或申请 D4–D6。
+- [x] **P0-2C 单一负责人治理模式真实化（本地候选，未部署）**：当前一人公司使用 `single-owner`，不再要求或虚构机构/运维/安全三名员工；未来客户现场仍可切换 `institutional`。角色可以合并，但 B1–B9、部署/运行账户分离及 D3 / 锁处置 / D4 / D5 / D6 五个授权闸门不合并；AI 技术核对不是审批，普通聊天回复不是生产授权。下一步由业主负责人先在仓库外建立一条仅限 `D3_READONLY_PRECHECK` 的变更记录，固定 managed 输入引用、负责人、候选、证据摘要和 RFC3339 窗口，再对该窗口单独明确授权；此前 production F1 保持 **NO-GO**。
+- [ ] **P0-2～P0-6 上线门禁**：P0-1 与 P0-1B 已合入主干；冻结单一软件候选后，依次关闭发布来源 F1、法务正文、PG/COS/真实服务/线上浏览器、Windows 精确候选与任务恢复、1 台终端 + 1 台打印机试运营。未验收能力必须隐藏或标为未开放。
+- [x] **F1 D1′ + D2′ offline contract / 候选演练器**：D1′ 精确 managed `3011`、fixtures、旧 D2 兼容、offline evidence contract、CI 与同机双端口 SSOT 已按 RED→GREEN 收口；本地 verifier/typecheck/lint/build 通过。macOS full drill 按设计 NO-GO；候选代码与文档不等于 D2′ PASS，也未部署。
+- [x] **F1 D2′ 演练器 PM2 隔离修复（本地候选，未部署）**：短 `/run/user/<uid>/d2p-<nonce>` 控制根、UTF-8 socket 预算、PM2 有界 timeout、spawn-attempt 清理、受 UID + 精确 `PM2_HOME` + God Daemon title 约束的 PID TERM/KILL 兜底及行为回归均按 RED→GREEN 完成；offline contract、API typecheck/lint/build、Shell/Node 语法和差异门禁通过，Claude + Antigravity + Cursor 最终均 `APPROVE`。修复代码本身不等于 D2′ PASS，唯一一次旧 full drill/evidence 继续锁定 **NO-GO**。
+- [x] **F1 D2′ `main@e721f87a` Linux fresh retake 已按独立授权执行一次（NO-GO）**：现有非生产 Colima 的 fresh clone、frozen install、API build 与 offline contract 均通过；唯一 full drill 在生成 nonce 或 evidence 前因净化调用环境缺少 user systemd 所需 `XDG_RUNTIME_DIR` 返回 `D2_PRIME_NO_GO_ENVIRONMENT` / exit `2`，精确 evidence 文件未生成，独立 verifier 因 evidence absent 记 exit `2`。本窗口未重跑，旧 NO-GO evidence 未改写，清理检查全零，未连接 production 或进入 D3–D6。
+- [x] **F1 D2′ XDG user-systemd 执行契约修复（本地候选，未部署）**：`run.sh` 已在首个 user-systemd 前自派生并严格校验 exact `/run/user/$(id -u)`，内层 `env -i` 与 `drill.mjs` 的 5 个 systemd 查询均显式使用受信 XDG；离线合同以恶意变体锁定执行顺序、真实数据流及 DBUS/bus 拓扑禁令。Shell/Node 语法、offline contract、API lint/typecheck/build 与差异门禁通过，Claude、Antigravity、Cursor、独立 reviewer 最终均 `NO FINDINGS`。修复代码仍不等于 D2′ PASS，旧 retake 继续 **NO-GO**。
+- [x] **F1 D2′ `main@06c7fe00` 新 fresh retake 已按独立授权执行一次（NO-GO）**：现有非生产 Colima 的修正路径 fresh clone、frozen install、API build、offline contract 与 pre-nonce 门禁均通过；唯一 full drill 在输出 latency 后返回 `D2_PRIME_DRILL_FAILED` / `D2_PRIME_RUNTIME_FAILURE`、exit `2`，本窗口未重跑。独立 verifier 确认 evidence 为 `D2_PRIME_NO_GO`、`productionF1=NO-GO`、exit `2`，mode `0600`，SHA-256 `9ec390733185016981ddc46a03dcf0893e224e8fd21ba39329afdf7c2488f7b3`；cleanup 全零且 Colima 已停止。当前只能把失败定位在 `drill.mjs` latency 后、成功 evidence 写入前约 371–454 行，具体根因因顶层错误泛化与安全失败 evidence 缺少 phase/error class 而不可证明。
+- [x] **F1 D2′ post-latency 诊断合同修复（本地候选，未部署）**：已按 TDD 建立固定阶段/错误分类、静态具名错误闭集、canonical diagnostic snapshot 与失败 evidence 写入标记；原始 message、stack、cause、路径、主机名、PID、nonce、环境值、任意 errno 和 evidence 内容均不得进入输出，恶意 getter/Proxy 与两个 evidence 写失败分支均有离线合同。Node 语法、offline contract、API lint/typecheck/build 通过，Claude、Antigravity、Cursor 与独立 Codex reviewer 均 `APPROVE`；未执行 full drill、未生成新 evidence、未连接 production。
+- [x] **F1 D2′ `main@b2cf461d` fresh retake 已按独立授权执行一次（NO-GO）**：唯一一次非生产 Colima full drill 返回 `phase=MEASURE class=SYSTEM code=D2_PRIME_DRILL_FAILED` / exit `2`，独立 verifier 为 `D2_PRIME_EVIDENCE_NO_GO`、`productionF1=NO-GO`；evidence SHA-256 `874f494febc908794bc70167852377d7cb56f0c03066b814c634b88727e6e8c3`、mode `0600`。本窗口未重跑，cleanup 全零且 Colima 已停止；现有证据不能继续细分具体系统调用。
+- [x] **F1 D2′ `MEASURE` step 诊断细化（本地候选，未部署）**：固定六个实际采样 step 与非采样 `NONE`，严格绑定 phase-step 关系；演练器在每个采样操作前设置 step，并把 topology/control/resource 三组采样拆为顺序局部量，evidence schema 不变。离线合同、三份 Node 语法、API lint/typecheck/build 与差异门禁通过；未启动 Colima、未执行 full drill、未生成新 evidence、未连接 production。
+- [x] **F1 D2′ `main@b2cf461d` fresh retake 执行前审查已硬停止（未执行）**：Claude、Antigravity、Cursor 客户端与独立 Codex reviewer 一致确认 cleanup 退出语义可产生假 PASS、user systemd 未复核 inactive，且 production secret denylist 不完整；因此未启动 Colima、未创建 guest clone、未生成 nonce/evidence，full drill 调用计数为 `0`。本次授权窗口与路径作废，`productionF1` 继续 **NO-GO**。
+- [x] **F1 D2′ cleanup / production-secret 合同修复（已本地合入 `main@f4f5ab49`，未 push、未部署）**：早期与最终 cleanup 失败均强制 exit `2`，PASS 仅在显式 cleanup 成功后输出；preflight/final 共用严格 inactive 证明；真实凭据 denylist、TTS 样板 SSOT 与恶意 mutation 合同已按两轮 RED→GREEN 完成。offline contract、Shell/Node 语法、API lint/typecheck/build、差异门禁及 Claude/Antigravity/Cursor 终审通过，合并后同套门禁复验通过；未运行 full drill、连接 production 或进入 D3–D6。
+- [x] **F1 D2′ `main@5b251e5f` 事件 A：第一次调用（PRE-NONCE NO-GO）**：fresh clone、install/build/offline contract 与最终 pre-nonce gate 全绿；`00:59` 的第一次调用因 operator 把 clone 路径误传给实际用于覆盖 executable `PATH` 的 `D2_APPROVED_PATH`，导致 20/20 个 required commands 不可解析并返回 `D2_PRIME_NO_GO_ENVIRONMENT` / 内部 exit `2`。nonce/evidence 均未生成，独立 verifier 为 `D2_PRIME_EVIDENCE_REJECTED`，cleanup 全零且 Colima 已停止；事件 A 原归档保持不可变。
+- [x] **F1 D2′ `main@5b251e5f` 事件 B：第二次调用（CGROUP_CONSISTENCY NO-GO，治理偏差）**：`01:32` 对事件 A 于 `00:55` 建立的同一 clone 再次执行 full drill，生成 nonce `7a00c137bbdc4bbda8a73f7c285d7c1e` 与 SHA-256 `71933100cca77ea37764d4d09839b3f49824e1a1ed86b6b28f225895438a7812` 的 failure evidence；verifier 为 `D2_PRIME_EVIDENCE_NO_GO` / exit `2`。此前“本包 fresh clone / 唯一一次”口径错误；该 evidence 只证明第二次调用 fail-closed，不能作为合格 fresh-retake 验收。活动资源已清除，法证目录按 cleanup fail-closed 保留；独立 CCG 归档与事件 A 交叉引用。
+- [x] **F1 D2′ invocation governance latest-main reconciliation（[PR #471](https://github.com/wanglei581/YITIJI/pull/471)，已合入 `main@3b3c3100`，未演练、未部署）**：严格超集已替换 #463 的共享 JSONL / 全局锁 / caller env 第二真值和 1324 行 verifier，主干 #460/#464–#469 的 stale-PID、双状态 cleanup、法证保留和 systemd 事实保持不变。合入后主线 [CI run 30705773186](https://github.com/wanglei581/YITIJI/actions/runs/30705773186) 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 3/3 全绿。本项已关闭，但不等于 D2′ PASS、不授权 retake；四处 cleanup 存活/有界性缺口继续独立未完成。
+- [x] **F1 D2′ task / invocation 唯一性治理（历史 [PR #463](https://github.com/wanglei581/YITIJI/pull/463)，已由 #471 替换）**：#463 曾在 `main@e20429c9` 建立 clone 前 `reserve`、clone 内 `consume`、六 facet hash、全局锁和追加式 ledger，解决事件 A/B 的重复调用治理；#471 已在 `main@3b3c3100` 以分 facet `O_EXCL` tombstone、严格 manifest、独立 event、完整 Git/clone identity 与私有 fd 3 evidence 真值替换其共享 JSONL / 全局锁 / caller env 第二真值。该条只保留历史演进事实，不再作为当前执行入口。
+- [x] **F1 D2′ invocation verifier 拆分（随 [PR #471](https://github.com/wanglei581/YITIJI/pull/471) 合入关闭）**：主线已用 7 个内聚 verifier、60 项行为/并发/崩溃/wiring 测试、29 mutation、6 harness 与 ≥80% coverage 替代旧 1324 行文件，并覆盖并发 invoke barrier；旧 `mkfifo` 依赖随旧 verifier 删除，不再作为 gate 前提。
+- [x] **F1 D2′ cleanup helper 分支离线演算（已完成，docs-only 对账）**：PR #466 已把逻辑统一到 `stop_user_unit_and_prove_inactive`；`verify-cleanup-contract.mjs` 直接执行生产 helper，以 fake `systemctl` 覆盖 4 类成功与 10 类失败：stop 成功/非零、轮询中 collect、属性读取失败、字段缺失/重复/空值、未知状态、`loaded`+`inactive`、`not-found`+`inactive`、`not-found`+`active`、`masked`+`inactive`、`loaded`+`failed` 等。新鲜总合同 11/11 通过。该 helper 不调用 `systemd-run`，因此不再补 fake `systemd-run` fixture；真实 `systemd-run --user --collect` 生命周期、cgroup 委派与 manager 行为仍须在 Linux systemd 主机验证。离线合同不替代真机结论，不改变 PASS / GO。
+- [x] **F1 D2′ 目标主机 systemd 版本固定（已由环境体检答复）**：2026-08-01 环境体检（授权会话内观测，未留存可审计日志）确定目标主机为 **systemd 255（255.4-1ubuntu8.15）/ Ubuntu 24.04.4 LTS / aarch64 / kernel 6.8.0-117-generic**，原先引用的 v256 已改为 v255，并在 v255 tag 对应的不变 commit `db11bab38ccf1ed257f310d29070843d4c58ea01` 上逐一复核：`src/systemctl/systemctl-show.c:2154` 的 `not-found && inactive` 二元合取与 `SYSTEMCTL_SHOW_PROPERTIES → LOG_DEBUG`、`src/core/unit.c` `unit_start()` 的 `-EALREADY` 早于 `load_state != UNIT_LOADED` 检查、`src/core/cgroup.c:3123` `unit_prune_cgroup()` 的两处注释与 `cg_trim_everywhere()` 失败即忽略。**支撑本合同的条件、检查顺序与失败处理语义两版一致，故合同结论不因版本差异改变；但不宣称整段源码逐字相同**——`unit_prune_cgroup()` 在 v256 已重构（位置 v255:3123 → v256:3560，引入 `CGroupRuntime *crt` 间接层、增加内存计量缓存循环、`lsm_bpf_cleanup` 改名 `bpf_restrict_fs_cleanup`、trim 后重取 `crt` 并多一个 early return）。原稿写的「逐字一致」已按审查更正为本条表述。两份 SSOT 的版本 pin 已同步更正。**与 [PR #469](https://github.com/wanglei581/YITIJI/pull/469) 的口径差异**：#469 写「精确 `255.4-1ubuntu8.x` 修订仍未知」，那是就**仓库内可复算证据**而言的正确陈述——本次体检没有把 `systemctl --version` / `dpkg-query -W systemd` 输出落盘。两者不矛盾：修订号**已被观测**为 `255.4-1ubuntu8.15`，但**不可在仓库内独立复验**。需要可审计版本证据时仍须单独授权只读捕获并留存。
+- [ ] **F1 D2′ 最小真实 Linux 语义验证剩余部分（须单独授权启动现有非生产 Colima）**：（**范围更正**：原条目把「精确 systemd package version 固定」与本项合为一条，前者已由同日体检答复为 `255.4-1ubuntu8.15`（见上一条，仅授权会话观测、无留存日志），本条只保留仍未完成的语义验证部分。同日探针已覆盖 collect 后二元状态、missing-unit stop 非零、cgroup delegation 三项，**仍未覆盖**两条 `loaded+inactive` 成功分支及 `run.sh` 两个真实调用点与完整流程（属性读取失败 fail-closed 已由离线故障注入覆盖——见本条 ②，不作为真机缺口）。）现有记录只确认 guest 为 Ubuntu 24.04.4 ARM64；Ubuntu 24.04 上游基线为 systemd 255.4，systemd-stable v255.4 也包含本合同依赖的 `not-found`+`inactive` 与 cgroup 回收保护语义，但仓库没有该 guest 的 `systemctl --version`、`systemd-run --version`、`dpkg-query -W systemd` 实测输出落盘——**原稿（PR #469）写「精确 `255.4-1ubuntu8.x` 修订仍未知」**，就仓库内可复算证据而言是正确陈述；同日体检（见上一条）在授权会话中已将修订实测为 `255.4-1ubuntu8.15`，但未落盘可审计日志，故修订号已知但不可在仓库内独立复算；本条不再单独要求「固定版本」步骤，版本事实已归入上一条。此前 v256 链接仅是 PR #464 编写时的历史源码引用锚，不是目标机版本证明。后续须在独立授权下用隔离 transient user unit 验证两条 `loaded+inactive` 成功分支（collect 后二元状态、missing-unit stop 非零、cgroup delegation 已由同日探针覆盖；属性读取失败 fail-closed 已由离线故障注入覆盖；OS/kernel/systemd 包版本已由上一条记录——三者均不作为本条验证要求）。**`run.sh` 两个真实调用点与完整流程**（preflight 与 final cleanup 的 helper 调用点、到达后者须经 consume + managed `systemd-run` + `drill.mjs`）仍属真机缺口，但无法由隔离探针覆盖——必须在 cleanup 存活证明四处缺口关闭、且取得完整 full drill 授权后，方可通过 fresh retake 验证；不得在本条范围内 reserve/consume/drill，不生成 nonce/evidence，不连接 production，也不得据此改动 PASS / GO。
+- [x] **F1 D2′ cleanup 存活证明四处缺口（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)，已 squash 合入 `main@6e805917`；缺口 2 `bounded_pm2_kill` `pm2_home_has_state` 路径由 [PR #480](https://github.com/wanglei581/YITIJI/pull/480) 单独关闭）**：从 `origin/main@7f2ac0dc` 按 RED→GREEN 完成四项修复：systemd stop 加 10s 脚本级 timeout 且仍以严格 inactive 元组收口；PM2 状态文件消失不再绕过已捕获 daemon PID 的身份绑定终止/退出复验；keeper 在 `systemd-run` 前悲观置位，覆盖 partial-start；Nginx 使用独占 attempt marker 与 PID + `/proc` start-time 持久身份记录，先复验 `RUN_DIR` 范围/所有权，只有 owner、可执行文件、start-time 全匹配才发 TERM，身份缺失/损坏/漂移或停止超时均 fail-closed 并保留取证。旧实现先得到预期 RED，修复后总合同、Nginx/PM2 行为夹具、mutation、governance 60/60（coverage lines 97.82% / branches 89.64% / functions 97.79%）、API lint/typecheck/build、语法和差异门禁全绿；Claude、Antigravity、Cursor 最终均 `APPROVE`（Critical 0 / Warning 0），CCG 任务已归档；PR 最终 CI run `30709855868` 与合入后主线 [CI run 30730887928](https://github.com/wanglei581/YITIJI/actions/runs/30730887928) 均三项全绿。真实 Linux 两个调用点只允许在新的 fresh retake 中验证；另获 retake 授权前，不能把本项写成 D2′ PASS。
+- [x] **F1 D2′ 执行包合同收紧（已随 [PR #457](https://github.com/wanglei581/YITIJI/pull/457) 合入 `main@b4b3acf5`，未演练、未部署）**：已按 RED→GREEN 明确 `D2_APPROVED_PATH` 是仓库外 executable `PATH`，拒绝当前 repository/clone 字符串路径及物理解析进入仓库的符号链接；required command lookup、固定错误码闭集、唯一 canonical command 及 `run.sh` 强制显式接收 `D2_EVIDENCE_DIR` / `D2_EVIDENCE_OUT` 均由 mutation 合同锁定。offline contract 恢复 `D2_PRIME_CONTRACT_ALL_PASS`，API lint/typecheck/build、Shell/Node 语法与差异门禁通过；该修复不等于 D2′ PASS。
+- [x] **F1 D2′ stale-PID 竞态修复（原任务前半，已合入）**：复现回滚后旧 managed PID 已退出、`CGROUP_CONSISTENCY` 仍读取 `/proc/<旧PID>/cgroup` 的竞态；`drill.mjs` 的 `CGROUP_CONSISTENCY` 断言改用 rollback 后重新捕获的 `managedAppPid`，删除已失效的 `managedAppPidBeforeRollback` 死变量声明，`verify-contract.mjs` 静态锚点同步。PR #460 squash 合入 `main@a9914bf8`（2026-08-01），offline verify-contract 9 PASS / `D2_PRIME_CONTRACT_ALL_PASS`，三个 CI job 全绿。本项仅覆盖 stale-PID，不含下一条 cleanup/`not-found` 合同。
+- [x] **F1 D2′ PID identity pinning — `CGROUP_CONSISTENCY` 内核 PID 复用竞态（本地候选，[PR #483](https://github.com/wanglei581/YITIJI/pull/483) OPEN，Codex 审查进行中）**：PR #460 修复了「用旧 PID 做断言」的问题，但在 `MANAGED_PID` 捕获到 `CGROUP_CONSISTENCY` 之间存在另一层竞态：managed 进程重启后内核可以把旧 PID 复用给其他进程，令 `controlGroup(pid)` 读取错误进程的 cgroup。修复：在 `pm2AppPid()` 后立即 `processStartTimeTicks(pid)` 固定启动 ticks（读 `/proc/<pid>/stat` 字段 [19]），在 `CGROUP_CONSISTENCY` 断言前比对——不一致则 `fail('MANAGED_APP_PID_STALE')` fail-closed（`D2_PRIME_MANAGED_APP_PID_STALE` 已注册至 `TRUSTED_D2_CODES`）；`verify-contract.mjs` anchor 截断在 string literal 之前（`executableSource` 会把所有 string token 逐字符替为空格），并新增 mutation test 验证移除 guard 必定 fail。所有门禁：verify-contract 11/11 `D2_PRIME_CONTRACT_ALL_PASS`、governance 60/60 97.82% lines、verify-cleanup exit:0、lint/typecheck exit:0（commit `492b9598`）。PR #483 待合入后须三 CI 全绿；合入不等于 D2′ PASS，`productionF1` 继续 **NO-GO**。
+- [x] **F1 D2′ cleanup / `not-found` 语义合同（原任务后半，已合入）**：`stop_user_unit_and_prove_inactive` 此前把「unit 已被回收」与「停不下来」当成同一件事，导致预检 unit（`systemd-run --user --collect ... sleep 30`）在测量耗时超过 30s 时被回收后报出假 `D2_PRIME_NO_GO_CGROUP_DELEGATION`，final cleanup 也会为 cgroup 已释放的 unit 保留法证目录。新增 `user_unit_collected_absent`：只有正面证明 `LoadState=not-found` **且** `ActiveState=inactive` 才接受非零 stop，其余状态（含空值、读不到）仍算失败。该二元合取与 systemd 自身判定「unit could not be found」的条件一致（目标主机实为 **systemd 255**，`systemctl-show.c:2154` `show_one()`，`SYSTEMCTL_SHOW_PROPERTIES` 模式只 `LOG_DEBUG`、不 early return；原引用的 v256 已按环境体检更正；三处引用已在 v255 tag 对应不变 commit `db11bab38ccf1ed257f310d29070843d4c58ea01` 上复核，支撑本合同的条件、检查顺序与失败处理语义两版一致，但**不宣称整段源码逐字相同**——`unit_prune_cgroup()` 在 v256 已重构，位置 v255:3123 → v256:3560）。**合同安全性来自「要求 `ActiveState=inactive`」本身，不是来自 fail-open 不存在的源码证明**：`unit_start()` 先对 `UNIT_IS_ACTIVE_OR_RELOADING` 返回 `-EALREADY` 才检查 `load_state`，且活 unit 在 unit 文件被删后会显示 `not-found` + `active`，故必须两属性同时成立；`unit_notify()` 的 `unit_prune_cgroup()` 只是**尝试**回收（trim 失败仅记日志后忽略），「`inactive` 即 cgroup 必然已释放」在一般情形下不成立（同日体检已在目标主机实测到 `--collect` 正常退出这一路径确实释放，但 trim 失败被忽略的分支未触发、仍未验证）。顺带补掉一个既有漏洞：法证保留守卫 `(( cleanup_failed != 0 )) || rm -rf ...` 原先无任何断言覆盖（实测整段删除仍 `ALL_PASS`），现按 `RUN_DIR` / `PM2_CONTROL_ROOT` 逐目录各断言恰好一处。cleanup mutation 3 → 12 条，均由 verifier 实际施加并全部被拒。PR #464 squash 合入 `main@2751030d`（2026-08-01），offline verify-contract 10 PASS / `D2_PRIME_CONTRACT_ALL_PASS`，三个 CI job 全绿。**合入时仅代码与离线合同**（事实链来自 systemd 源码而非实测）；同日环境体检（无持久化变更，仅启动过若干有界自回收 transient-unit 探针）已在目标主机复现本项修复的场景（`--collect` 回收后 stop 退出码 5、`not-found` + `inactive`、cgroup 已释放），但体检不是演练、未生成 evidence、不构成 PASS/GO。
+- [x] **F1 D2′ cleanup / systemd-collected 严格 reconciliation（[PR #466](https://github.com/wanglei581/YITIJI/pull/466)，已合入 `main@054c59aa`，未演练、未部署）**：已按 RED→GREEN 收紧为单次 `systemctl show` 键解析，只接受 `loaded+inactive` / `not-found+inactive`；真实 Bash helper fixture 锁定 4 类成功、10 类失败边界，并保留 PR #464 的逐目录 forensic retention、mutation no-op 与 evidence anti-delete 防线。合入前 CI 3/3 全绿，合入后主线 CI run `30696320728` 再次 3/3 全绿；未执行 reserve/consume/full drill，未启动 Colima，未生成 nonce/evidence，未部署。
+- [ ] **F1 D2′ 后续 fresh retake（代码前置已进入主干或 PR 阶段，执行须另行授权）**：执行包合同、stale-PID 竞态（PR #460）、**PID identity pinning（[PR #483](https://github.com/wanglei581/YITIJI/pull/483) OPEN，须先合入）**、cleanup/`not-found` 合同（PR #464）、systemd-collected 严格 reconciliation（PR #466）、invocation governance（PR #471）和四处 cleanup 存活/有界性修复（[PR #474](https://github.com/wanglei581/YITIJI/pull/474)）均须合入主干且合入后 CI 全绿后，才可进入 fresh retake 流程。下一步只能从最新主线重新确定精确 baseline、task ID、branch、fresh clone、evidence 路径与 RFC3339 窗口，并由用户单独授权；仍须在执行包内确认 fresh `dist/release-provenance/` 与 shell 无生产凭据。此前 helper 正向路径只做过非演练真机探针，不等于完整 D2′ 演练；没有新的授权就不得 reserve/consume/full drill，也不得宣称 D2′ PASS。
+  2026-08-01 环境体检（无持久化变更，非演练）已关闭两块疑问：(a) runbook §2 的**主机侧 4 条**（§2 共 6 条）与 `run.sh:55` 的 20 个 required commands 在体检时点全部满足（systemd 255 / Ubuntu 24.04.4 / cgroup v2 delegation `cpu memory pids` / `Linger=yes` / 三端口空闲 / canonical PATH 全命中），即历史上两次「环境类 NO-GO」的根因已不复现；剩余 2 条（fresh `dist/release-provenance/` 构建、shell 无生产凭据）属**执行包条件**，只能在 retake 包内验证。(b) `--collect` 回收后 stop 退出码 5、`not-found` + `inactive`、cgroup 已释放，已在目标主机实测复现，PR #464 的修复对象成立。
+  **最小真实验证的当前状态（按性质分开，勿混记）**：① 真机侧——**2026-08-01 已用有界探针在真实 systemd 255 上跑通**：从 `main@054c59aa` 的 `run.sh` 原样抽出 `stop_user_unit_and_prove_inactive`（49 行，helper 源码 SHA-256 `eaa4b0e171aaeb38bb24616c8bdf92d3b606534a4246e77af6b0e8f3906418d8`）后 `eval` 执行，三条路径全部 `rc=0`：活 unit 正常 stop（`loaded+active` → `not-found+inactive`，14ms）、已被 `--collect` 回收（单独 `stop` 退出码 **5**、helper 仍 `rc=0`，即 PR #464/#466 的修复对象在真机上确实成立）、轮询中途被回收。**这是 helper 级正向探针，不是端到端验证**：探针是把函数抽出后 `eval`，没有经过 `run.sh` 的治理入口、`run.sh:243` preflight 调用点、`run.sh:437` final cleanup 调用点、EXIT trap 或完整演练；原稿写的「端到端成立」已按审查更正为本条表述。输出形状风险也已排除：真实 `systemctl --user show -p LoadState -p ActiveState` 对 `loaded+inactive`（`dirmngr` / `gpg-agent` / `keyboxd`）与不存在 unit 的 `not-found+inactive` 均**恰好 2 行、只含所请求的 2 个键、exit 0**，不会撞上解析器的「非 LoadState/ActiveState 键即 `return 1`」兜底；空输出经 `<<<` 产生 1 个空行时解析器按预期 fail closed。**仍未在真机覆盖的有三类**（原稿写「只剩负向路径」不准确，已按审查更正）：其一是负向路径（unit 始终不到 `inactive` 时 helper 必须 `rc=1`），该条件在真机难以构造，探针试图用 `KillSignal=SIGCONT` 构造时只测到 stop 阻塞 59.7s 后仍 `rc=0`（见上一条第 (4) 点），故应继续由离线 fixture 承担；其二是两条 `loaded+inactive` 成功分支（stop 成功、stop 非零但状态自证，见 `verify-cleanup-contract.mjs:181-182`）——`run.sh` 的两个 `systemd-run` 调用点（`run.sh:207` preflight、`run.sh:476` managed）**都带 `--collect`**，故演练里预期的终态元组正是探针已覆盖的 `not-found+inactive`，`loaded+inactive` 只在「已 `inactive` 但 GC 尚未完成」的竞态窗口出现，属防御性接受分支，目前仅离线覆盖；其三是两个真实调用点与完整 `run.sh` 流程本身。② 离线故障注入侧——已由 `verify-cleanup-contract.mjs` 覆盖，**不需要也不应记为真机缺口**：`show` 命令失败、缺键 / 重复键 / 空值、`not-found+active` 矛盾元组、`masked+inactive`、`loaded+failed`、未知 `ActiveState`（共 4 类成功 + 10 类失败，由真实 Bash 执行 helper 源码 + fake `systemctl` fixture 施加）。**离线 fixture 只能证明 Shell 分支行为，它假定了真机输出形状，因此不替代 ① 的真机结论。**
+  随后重新确定全新的 baseline、task ID、branch、fresh clone、evidence 路径和 RFC3339 窗口；`colima ssh` transport 已于 2026-08-01 由用户就环境体检单独授权，**full drill 的 transport 仍须另行明确**；不得复用 `b2cf461d`、`5b251e5f` 或任何既有执行包/clone/evidence。继续复用现有非生产 Colima，不新增云主机，不连接 production，不进入 D3–D6；`productionF1` 继续 **NO-GO**。
+
+## 当前阻塞：Kiosk 86 融合原型不可宣称“全部零问题”
+
+- [x] **恢复本地预览与首轮真实复核**：原型 `8399`、Kiosk `58245` 已恢复；真实 API 代理指向 `https://zyidai.cn`，`/api/v1/health` 返回 `ok/postgres`；共享 gutter 双 inset 已按 TDD 修复并完成 87/87 路由回归。
+- [x] **首页专区与 `/profile` 纠偏**：百宝箱/智慧校园及合规提示已回到 1080×1920 首屏并实点进入 `/toolbox`、`/smart-campus`；`/profile` 已按融合原型 14 重建视觉结构，保留真实状态和 22 个入口；四支相关 CI verify 全绿。该项不代表其余页面已逐屏像素/全状态验收。
+- [x] **运行时乱码与代表性错版第一轮修复**：全顶层路由中文错误恢复页、线下机构/岗位 raw wire 映射、打印上传双底栏、W2 打印页头/gutter、W3 简历来源/面试设置/顶级舞台均按 TDD 收口；W6 浏览器 87/87、用户当前浏览器 87 URL、三端 typecheck/lint/build 通过。Antigravity 服务端仍未返回有效审查报告，不能写成双模型完成。
+- [x] **P0 功能真实性第二批**：`/print/done` 已改为仅后端 `completed` 显示成功；`/resume/export` 保留诚实守门，不新建第二套假产物状态；扫描不再请求不存在的设备状态端点，直达不建会话，只接受服务端真实指引，不伪造离线/就绪态，停留期间过期会话也禁止继续并执行一次取消；场馆导览、打印完成反馈/帮助、线下机构搜索已接到既有真实路径/API。新增真实性浏览器 23/23 和相关静态门禁。
+- [x] **P1 逐屏证据合同与口径**：已固定 77 个主视觉目标 + 5 个状态参考、87 条路由处置、精确视口、状态、重定向/复用/无独立原型标记与 ignored 证据根；门禁会与真实 router AST 交叉校验。
+- [x] **首页招聘会 / 打印扫描视觉平衡候选**：手机竖屏及 932×430 横屏使用物理移动壳，打印扫描五卡 80px 等高、末项通栏，招聘会浅麦金层级、禁用态和降动效已收口；1024×768、1080×1920 舞台保护不变。已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。
+- [x] **P1 商用密度收口（Kiosk 前台）**：Wave 1–3 已随 PR #400 合入；其后热更为 `index-CPD4lg4F.js`，再经 USB bridge / 备案包覆盖。后续仅抽检回归，不碰 `/me/*`、API、支付、TRTC，**不再继续堆像素**。
+- [~] **P1 逐屏视觉证据执行**：83/83 截图已齐；Phase 2 已修 **65** / **57**；判定 PASS 33 / PASS_SHELL 37 / FAIL 0 / PROFILE_DEFER 11 / CAPTURE_FAIL 1（仅 **73** TRTC）。不等于像素封板或硬件验收。
+- [ ] **P0 真实链路与真机**：真实支付/OCR/打印/扫描/TRTC、Windows 一体机、法务和现场试运营继续按正式 P0 清单验收；fixture 浏览器通过不得替代这些结论。
+- [x] **PR #400 合入 + 预发 Kiosk 热更**：已合入 `main@f9195e96`；其后现网 Kiosk 以备案包为准（见下）。
+
+## 当前执行：上线前 P0 收口（视觉候选已进主干）
+
+视觉方案 B 已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`；商用密度与融合收口已随 [PR #400](https://github.com/wanglei581/YITIJI/pull/400) 合入并预发热更。**不再继续堆像素细对齐**；优先阻塞验收与运营安全闸。
+
+### 多主机部署：运行时终端身份
+
+- [x] **代码与 CI 收口**：[PR #420](https://github.com/wanglei581/YITIJI/pull/420)（`main@bcb24062`）、[PR #421](https://github.com/wanglei581/YITIJI/pull/421)（`main@6221e1a0`）、[PR #422](https://github.com/wanglei581/YITIJI/pull/422)（`main@beade4af`）均已合入。共享 Kiosk 从本机 Agent 读取 `terminalId` / `terminalCode`，生产不再使用构建期 `VITE_TERMINAL_ID` 路由终端任务；新主机 Provisioning 与未签名 MSI B1 生命周期 CI 已收口。尚未部署到 `KSK-002`，也不代表正式签名安装包或双机真机验收完成。
+- [x] **终端网络/打印链路诊断已合入主干**：[PR #439](https://github.com/wanglei581/YITIJI/pull/439) → `main@327595fa`；复用 Admin「设备管理 → 终端」表格显示云端、有线网卡和网络打印机三项只读状态；Agent 仅随心跳传输枚举，绝不上传或展示 SSID、密码、网关、打印机 IP/端口、token、BindCode，且异常统一显示“未知”，不干预网络配置、打印、扫描或任务领取。专项 verify、三端 typecheck、目标 lint、Agent build、Admin 生产 HTTP build 与 GitHub `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke`、`unsigned-msi-candidate` 均通过；`verify:terminal-provisioning` 隔离 SQLite schema engine error 未通过，不能将其计入回归绿灯。首轮 Kiosk CI 的 hard-reload test race 已仅收紧测试等待文档上下文，未改清场产品行为。部署前仍须在 `KSK-001` / `KSK-002` 做断开/恢复随身 WiFi、主机网线、打印机网口的下一心跳验证，并各完成一次真实打印和扫描回归。
+- [ ] **先部署新版 Agent**：全机队空队列并留存可回滚的 Agent runtime/config/token 后，依次在 `KSK-001`、`KSK-002` 安装/升级；确认升级保留 `scanWatchFolder` / `localApiBridgeToken` / `localApiAllowedOrigins` / `localApiPort`，服务为 Automatic/Running、local API 只监听 `127.0.0.1`，且实际 Kiosk Origin 存在于白名单。若 Kiosk 与 API 不同域，首次安装时使用 `-LocalApiAllowedOrigins`；后续升级会从 ACL 受保护配置合并保留。下线或误配 Origin 使用 `-ReplaceLocalApiAllowedOrigins` 按本次列表重建，禁止部署后手改配置。
+- [ ] **再部署共享 Kiosk**：确认所有在役 Agent 均支持 identity endpoint 后，使用同一份不设置 `VITE_TERMINAL_ID` 的 production build 并强制刷新终端缓存；保留上一版静态包回滚点。不得为每台主机分别构建或继续把 `KSK-001` 写入 bundle。
+- [ ] **双机隔离验收**：在两台 Windows 主机分别核对页面显示的 `terminalCode`、Agent 心跳、管理员设备在线状态；向 `KSK-001`、`KSK-002` 各下发一笔可识别任务，确认仅目标主机领取，且另一台不领取；每台至少完成一次真实打印出纸并保留任务 ID/Agent 日志。
+- [ ] **浏览器 loopback 验收**：在实际 Edge/Chrome Kiosk 模式确认 `https://zyidai.cn` 可访问 `http://127.0.0.1:9527/local/terminal-identity`，没有 mixed content / Private Network Access 阻断；未通过时禁止宣称多主机批量部署完成。
+- [ ] **QR/U 盘多主机凭证决策**：当前 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 会进入前端 bundle，只是本地 bridge 防护值，不是设备注册码或云端 Agent 认证凭据。当前共享 Kiosk 若启用 QR/U 盘，只能由同一发布批次使用同一个 bridge token；若要求每机不同，需先实现运行时本机会话凭证，才能让同一共享 Kiosk 同时启用这两类本地桥接能力。不得把 bridge token 当作每机注册码，也不得把“远程打印已按运行时终端身份隔离”扩大表述为“共享构建已覆盖每机独立 bridge token”。
+
+推荐顺序（2026-07-29 更新）：
+0m. [x] **新主机 Provisioning 配置完整性**：[PR #421](https://github.com/wanglei581/YITIJI/pull/421) 已合入；安装脚本已补安全交互式 BindCode、真实 Kiosk Origin、`scanWatchFolder` 与桥接令牌，并在重装时保留既有可选配置。该项只关闭代码与 CI，仍须在 `KSK-002` 受保护 runtime 上验收，不能替代 MSI、驱动或真机出纸/扫描。
+0n. [x] **Windows Agent MSI B1 未签名 CI 候选**：[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 的 staging、WiX、fresh install、LocalSystem fail-closed 启动、repair、uninstall 与共享 CI 已全绿，Claude Sonnet `APPROVE`；该项只关闭 B1 CI 候选，不代表正式安装包。发布仍缺企业 Authenticode 签名、受控 manifest、Provisioning 集成复核和 `KSK-002` 真机验收。
+0i. [x] **Kiosk-only 热更链路**：#400 → USB bridge `index-DmcUs_Nb.js` → 备案 [PR #424](https://github.com/wanglei581/YITIJI/pull/424) 现网 **`index-DEJ0O4c6.js`**（仍含 bridge token；明文未入仓）
+0j. [x] **Gate 0.4 11c**：Windows 真机 ACL `ok` → 紧急吊销停领 → BindCode 恢复 → 曾恢复 `active`；SMB 旁证时点为 `lifecycleVersion=10`/`credentialGeneration=8`（`next-tasks` 旧写 v5 已过时，现场前以 DB 只读为准）
+0j2. [x] **PS 5.1 安装脚本原子写入回填**：[PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`；现场可对齐上游 `install-production-agent.ps1`。Wave B unauthorized latch 仍取决于现场 Agent 二进制是否已含 #384
+0j3. [~] **PS 5.1 显式 backup-path 收口候选**（`codex/gate04-powershell51`）：配置写入与 token rollback 统一使用显式 backup 的 `Replace-FileAtomically`，并锁定两处冒号插值的 PS 5.1 解析；本机探针、ParseFile、服务恢复门禁与 Wave B unauthorized 回归均通过。待 review/合入；未部署到 Windows 终端。
+0k. [~] **扫描 / USB 整机**：SMB 旁证成立；Kiosk Phase R 已注入（现网备案包仍含 token）；Agent Phase W **未写入**（scp 策略拦截 + 须用仓库 `config` / `aijobprintagent.exe`）；插盘冒烟未做；Spike C 另开
+0k1. [x] **扫描页 B1 诚实化合入+预发**：[PR #413](https://github.com/wanglei581/YITIJI/pull/413)；曾被覆盖，已随 USB bridge / 备案构建恢复
+0k2. [x] **Gate 0k SMB 现场交付旁证**：预发 `ScanTask` 多笔 `completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）
+0k3. [~] **Gate 0k USB bridge**：工具 PR #423 合入后，仍须离线令牌 + `-ConfigDir` 仓库 config + `-ServiceName aijobprintagent.exe` + 一体机 Edge/Chrome 插盘。包：`docs/device/gate-0k-usb-bridge-token-field-acceptance.md`。不代表 USB 真机验收已通过。
+0l. [ ] **清单剩余只读/配置项**：COS 生命周期截图、法务正文、支付收费切换等——按 `production-deployment-and-windows-host-checklist.md`，不另开视觉任务
+
+推荐顺序（2026-07-25）：
+
+0i. [ ] **30 天付费市场验证 Gate**：按 `docs/business/职易达首单付费试点成交工具包-2026-07.md` 执行；用户先补齐签约主体、联系人、开票、设备、演示时段和风险预算，再核验并联系第一周 A 组六家。总目标仍是访谈 12—15 家预算负责人，取得至少 1 个付费试点或预算负责人书面启动采购、2 个可落地场地/现场协作意向。达到门槛前不批量采购设备、不新增重复入口或非必要功能；12 家后无人谈价格则暂停硬件投入并重审客户问题。
+
+0. [x] **预发事故：offline-agencies `pageSize` string → 500**：#366；现网 **`DEPLOY_SOURCE=83f2117f`** 仍固化；公网 `?pageSize=5` → 200
+0b. [x] **预发事故：登录 429 误报「服务器内部错误」**：#366 → `RATE_LIMITED`；现网 dist 已含
+0c. [x] **简历打印恢复扫码/U盘上传**（#369）：已随 **`83f2117f`** 全量固化；其后 Kiosk **#379** → `index-Dn7fbWN6.js`，再被 **#400** 热更覆盖为 `index-CPD4lg4F.js`（仍含「扫码上传 / U盘导入」）
+0d. [x] **Kiosk 多分辨率舞台适配（stage-fit）**（[PR #379](https://github.com/wanglei581/YITIJI/pull/379) → `main@60faec5a`；预发曾热更；现网 Kiosk 已为 #400 `index-CPD4lg4F.js`，仍含 stage-fit）
+0e. [x] **机构账号手机号安全转移**（[PR #391](https://github.com/wanglei581/YITIJI/pull/391) → `main@3c5b5a55`）：Admin-only 预发热更新、公网 mock 浏览器走查、`admin` 自助长期强密码、真实腾讯短信 OTP、Partner → Admin 原子转移、双方会话失效/审计、转移后管理员密码登录与 `/auth/me` 已于 2026-07-26 全部通过；用户随后完成实际短信登录与绑定结果检查并确认“没有问题”。`183****1921` 现已绑定并验证到 `admin`，原机构账号释放号码且继续停用；长期密码仅存本机钥匙串。`passwordProofState=owner_managed` 服务端断言已由 [PR #393](https://github.com/wanglei581/YITIJI/pull/393) 合入 `main@50cbca15`；其 API-only overlay 已由完整 API 发布 `main@1812ba54` 正式吸收，本机/公网 health `ok/postgres`，前端、环境、数据库业务数据、Redis 与短信配置未变。手机号转移闭环已完成，不再重复真实转移。
+0f. [x] **P1 PostgreSQL migration 履历回补**（[PR #396](https://github.com/wanglei581/YITIJI/pull/396)）：`20260722090000_pg_foundation_batch_tables` 已按服务器原始字节回填，服务器文件、历史 Git 对象与数据库 checksum 三方 SHA-256 `40ea789…944` 一致；本机隔离空库 44 个迁移全链 deploy、status、10 表/checksum 断言与二次 deploy 幂等均通过，临时库已销毁。未修改 SQL，未在预生产执行 `migrate reset` 或 `migrate resolve`。
+0g. [x] **P1 预生产备份真实 restore 冒烟**（用户已授权）：full API 发布前 custom-format dump 已校验远端/本机 SHA-256 一致，仅恢复到本机唯一 scratch PostgreSQL；`pg_restore --no-owner --no-privileges --exit-on-error` 通过，摘要为 public 表 81、finished migration 44、目标 10 表与 checksum 均匹配，scratch 已销毁并反查不存在。未覆盖、恢复或写入现有预生产库。
+0h. [x] **预生产 Node 22 应用运行时迁移**：PM2 应用保持原 `full_api_commit=1812ba54`、原脚本/原 cwd，仅将解释器固化为 `/usr/local/bin/node`；最终 `node_version=22.23.1`、`unstable=0`、dump `0600`，本机/公网 health `ok/postgres`、三端 200。Node 契约 `>=22.13 <23` 已通过 [PR #398](https://github.com/wanglei581/YITIJI/pull/398) squash 合入 `main@895630c1`，PR CI 与 main push CI `30205451885` 三项全绿；隔离 release 已完成 Node 22 frozen install/build/native/migration-status/manifest 验证但未激活。后续只剩：在 F1 Genesis production 门禁和具名授权完成后，才可把隔离候选作为正式 `current` 切流；当前不得把“候选已验证”写成“新业务版本已部署”。
+1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
+2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
+3. [x] **预生产部署**：完整应用基线仍为 `83f2117f`，API 完整候选 **`full_api_commit=1812ba54`**；Admin hotfix #391 为 `index-D85Q5xcv.js`；Kiosk 现网热更为 **#400 `index-CPD4lg4F.js`**（含 #379 stage-fit + 商用密度）；`TRUST_PROXY_HOPS=1`，**未**跑 F1 Genesis。
+0c. [x] **简历打印恢复扫码/U盘上传**（[PR #369](https://github.com/wanglei581/YITIJI/pull/369) → `main@4b32f7e9`；已随全量 **`DEPLOY_SOURCE=83f2117f`** 固化；现网 Kiosk #400 仍含通道；不代表 U 盘真机验收完成）
+1. [x] **文档 SSOT**：记录 #328 合入；纠正「close-unpaid 待提 PR」过时表述
+2. [x] **close-unpaid 代码**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入（`e2b3858d`）——**不必再开实现 PR**
+3. [x] **预生产部署**：完整应用基线 `83f2117f`（#369+#356+#375+#376；含 #366/#355/#357），API 完整候选 `1812ba54`；Kiosk 现网 **#400 `index-CPD4lg4F.js`**。
+4. [x] **close-unpaid Phase A 只读预检（预生产，2026-07-25）**：授权后只读确认 `pending=0/eligible=0`；路由 401；**未进 Phase B**。Runbook：`docs/device/close-unpaid-production-controlled-ops-runbook.md`。若将来有合格候选，须另授 `CLOSE_UNPAID_PHASE_B_SINGLE`（点名 taskId）；**禁止未授权演练关闭 / 禁止为关闭而造单**
+4b. [ ] **close-unpaid Phase B 单笔关闭**：仅当 Phase A 复检出现 `eligible≥1` 且用户点名 taskId 后执行
+5. [x] **G5 Admin 订单退款入口（最小版）**——[PR #311](https://github.com/wanglei581/YITIJI/pull/311) → `main@b58ddbe9`：Admin `/orders` 对 `paid` 全额退款 UI。**仍开**：部分退款、履约门控、`FREE_MODE` 隐藏、`G5_REFUND_SMOKE`
+6. [x] **G6 法务文档版本管理最小版**（[PR #343](https://github.com/wanglei581/YITIJI/pull/343)；P1-5 法务正文定稿仍开）
+7. [ ] **Windows / 支付 / SMS / 密钥轮换**——清单见 `production-deployment-and-windows-host-checklist.md`；预发完整应用基线 `83f2117f`，API 完整候选 `1812ba54`：
+   - **7a / 7a2 seed**：✅
+   - **7b 密钥举证（方案 C）**：✅；**真实短信 E2E**：✅（2026-07-26，`183****1921` 下发+登录 201；签名/模板 live 可用）
+   - **7c `WINDOWS_FIELD_RECHECK`**：✅ **通过**（F4：`ptask_kiosk_e0fe379299af7c50`；2026-07-26 再确认 `ptask_kiosk_f9587c2439e1855a`，用户回「是」；旁证 `ptask_kiosk_2a75352b81631efb`）
+   - **7d Partner 冒烟**：✅
+   - **不在本包**：G5 真实退款冒烟、F1 Genesis、close-unpaid Phase B、切收费支付
+8. [x] **`req.ip` 抽样确认**（2026-07-25）
+9. [ ] （可选 P1）打印任务状态实时追踪 UI；像素级抽检
+10. [x] **Partner 登录邮箱别名 Wave 1**——[PR #356](https://github.com/wanglei581/YITIJI/pull/356) 已合入；**预发已随 `DEPLOY_SOURCE=83f2117f` 部署并完成 PG migration**（`User.emailHash` 列存在）
+11. [~] **Gate 0.4**——0.3A/0.3B 已在预发 `83f2117f`：
+   - **11a Wave A**：✅ 移除长期 `-AgentToken` CLI + ProgramData ACL（SYSTEM/Administrators）+ 静态 verify/文档（[PR #384](https://github.com/wanglei581/YITIJI/pull/384) → `main@645e19e0`）
+   - **11b Wave B**：✅ Agent 401 本地 unauthorized latch + `AGENT_UNAUTHORIZED` 诊断（`verify:agent-unauthorized`）；不新增云端 heartbeat unauthorized 态
+   - **11c**：✅ 现场 ACL + 吊销停领 + BindCode 恢复 + `maintenance→active`（2026-07-27）
+   - **11c-fix**：✅ [PR #405](https://github.com/wanglei581/YITIJI/pull/405) → `main@4b5ea04f`
+
+
+---
+
+## 归档：Kiosk 86 屏视觉 1:1（方案 B）
+
+用户已确认：视觉/排版对齐 86 原型 + 生产诚实态（不伪造）。规格与计划见 `docs/superpowers/specs/2026-07-25-kiosk-86-proto-visual-1to1-design.md`、`docs/superpowers/plans/2026-07-25-kiosk-86-proto-visual-1to1.md`。
+
+- [x] W7–W22 方案 B 细对齐候选——已随 [PR #328](https://github.com/wanglei581/YITIJI/pull/328) 合入 `main@5843cafa`
+- [x] **多分辨率舞台适配（stage-fit）**——[PR #379](https://github.com/wanglei581/YITIJI/pull/379) 已合入并预发热更；布局路由 1080×1920 等比缩放居中；手机页/屏保除外（见 `current-progress` 2026-07-26）
+- [ ] （可选）像素级抽检与真机验收前的视觉回归——壳/token/细对齐候选 ≠ 86 屏全部 1:1 已封板
+- [ ] 上线前 P0 真机 / 支付 / 部署验收（整机商用，不在视觉任务宣称范围）→ **上移至「当前执行」**
+
+---
+
+## 归档：Kiosk 8177 / 5299 全量融合换装
+
+用户已确认对 `apps/kiosk` 全部用户可见页面进行融合换装：5299 作为完整视觉与信息组织主体，8177 补齐任务流程、异常/空/离线/支付失败状态和法律入口；现有真实路由、接口、数据库、认证、支付、文件、订单、打印、扫描及硬件行为必须保持不变。正式设计见 `docs/superpowers/specs/2026-07-23-kiosk-8177-5299-fusion-design.md`。
+
+- [x] 双原型与当前生产前端只读核验，确认差异范围与正确融合口径。
+- [x] 全页面融合设计、状态契约、分波次边界和验收标准定稿。
+- [x] 生成 W0 逐文件、逐测试 TDD 实施计划并完成审查。
+- [x] W0：冻结 `docs/design/kiosk-proto-2026-07-fusion/`，锁定 86 路由 / 5 兼容重定向 / 状态参考契约，建立 production-build Playwright smoke 与视觉验收 Runbook；W0 未修改 production runtime UI。
+- [x] **W1：shared presentation foundation + home/shell representative migration**——共享 token、五个 Kiosk-only 原语、壳层、首页与手机全屏路由已冻结于 `9999d022`；W0 browser smoke 4/4，W1 普通 / `CI=1` / 故障代理三环境各 6/6，static、typecheck、lint、production build 与配置守卫全量复验通过。实跑发现的 45px 聚合标题触控目标和漏接屏保请求已修复并复跑通过；内部、Antigravity 与 Claude 最终审查均 `APPROVE`。首页既有 nested `<main>` 语义债 deferred 到 W6。
+- [x] W2–W5：按打印扫描、简历 / AI / 面试、岗位 / 企业 / 招聘会 / 校园、个人中心 / 系统页面完成互斥分域融合；保持生产路由、服务和业务行为不变。
+- [x] W6：建立 86 条生产路由双视口验收（Kiosk 84 + Mobile 2），补齐语义 landmark、48px 触控、横向溢出、合规、fixture 隔离与生产构建门禁；最终浏览器 `86/86 PASS`，内部复审无 Critical/Warning。
+- [ ] **上线前 P0 真实验收**——完成生产部署、PostgreSQL 生产实例、Windows 一体机、Terminal Agent、奔图真机打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收和现场试运营；任何一项未完成都不得表述为正式商用上线。
+
+融合 W0–W6 已随 [PR #325](https://github.com/wanglei581/YITIJI/pull/325) 合入 `main`（`09947a45`），**未部署**。本地 86 路由验收通过不等于正式商用上线。
 
 ## P0：Kiosk 前台按 75 屏原型 1:1 开发(2026-07-17 定稿)
 
 设计基准:`docs/design/kiosk-proto-2026-07/`(75 屏 + shared.css token + README 开发规则);后台配套规划:`docs/product/console-plan-for-kiosk-proto-2026-07.md`。
 
-- [ ] **首批立项:G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台,同批开发,合规口径见原型 README §五
-- [ ] **G5 Admin 订单退款入口**(收费启用前阻塞)——前置:修订 orders readonly 守卫,需用户确认后动工
-- [ ] **G6 法务文档版本管理最小版**(LegalDocVersion + 发布审计 + 同意记录关联版本号)
-- [ ] 存量页面按原型逐屏换装对齐(±4px 截图比对验收),批次顺序建议:首页 → 打印扫描线 → 简历线 → 岗位招聘会线 → 我的 → 系统屏
+- [x] **G1 线下招聘机构闭环**——Admin 管理面(机构目录/资质核验/门店信息/岗位关联,sourceKind=hr_company)+ Kiosk 74/75 屏前台。PR #305 已合入 main(commit `e92abb56`,2026-07-17)
+- [x] **存量页面按原型主题换装与主要结构接入**——PR #307 已合入 main(commit `27832dea`,2026-07-19),涵盖首页/打印扫描/简历/岗位招聘会/智慧校园/活动/AI助手/登录/帮助/Profile 外壳的主题换装与主要结构接入。**注**:非"75 屏全量视觉对齐"——2026-07-20 只读审计(见迁移矩阵第六节)证明 03/05/06 仍为单列、未达原型双栏布局,详见下方 A 类挂账项
+- [x] **【P1】A 类:03/05/06 双栏布局对齐**——已在视觉 1:1 分支 W10 落地（有内容时双栏；无上下文诚实空态）；05 保留「云端上传」与 `/scan` 分流
+- [x] **【P1】A 类挂账 21/23/26**——W11：21 补「去权益活动领取」→既有 `/activities`；23 设置迁共享壳+触控行高、保留换绑/授权撤回；26 预览 A4 双栏构图、保留分段编辑与真实导出；空态 CTA 青绿
+- [x] **G5 Admin 订单退款入口（最小版）**——PR #311/`b58ddbe9` 已合入；见上方「当前执行」§5。缺口（部分退款 / FREE_MODE 隐藏 / 真实退款冒烟）另立项
+- [x] **G6 法务文档版本管理最小版**([PR #343](https://github.com/wanglei581/YITIJI/pull/343) → `main@7e59243c`；预生产已部署 + PG migrate；P1-5 正文定稿仍开)
 - [ ] 60/61(会话超时/断网异常)为规划新屏,按新增功能立项
 
-**开工前注意事项(2026-07-17)**:
+**开工前注意事项(2026-07-17；部分已过时，以「当前执行」为准)**:
 
 1. 本任务池及原型归档、后台规划三个 commit(`26ab2711`/`7c7421ac`/`93bc7181`)在工作分支 `claude/lucid-kilby-0199ed` 上,**尚未合入 main**;开工前应先发 PR 合入,后续开发分支一律从合入后的 main 拉取
-2. G5 退款入口动工前置:修订 Admin orders 页 readonly 守卫,**必须先经用户确认**(与既有记录口径一致)
+2. G5 最小版入口已合入；再改 readonly 守卫或做真实退款冒烟须另授 `G5_REFUND_SMOKE` / 书面确认
 3. `docs/product/console-plan-for-kiosk-proto-2026-07.md` 末尾 4 条「待核实」(门店距离来源/待机屏素材审核字段/job_fit 模型凭证来源/超时可配诉求),开发到对应模块时先核实再实现
 4. 原型是设计定稿而非代码:60/61/74/75 无路由实现;74/75 需先落 G1 数据底座(hr_company 线下轨)否则前台无数据
 5. 开发验收口径:与原型同屏截图对比,布局偏差 >±4px 打回;禁止硬编码色值,一律走 token(规则全文见 `docs/design/kiosk-proto-2026-07/README.md`)
 6. 合规复核点:岗位匹配三档口径不做后台可调;线下机构仅信息展示+到店指引,不代收简历/费用;按钮文案白名单在原型 README §五
 
+---
+
+## A 类视觉对齐方案(03/05/06 双栏布局,限定范围)
+
+**优先级**:P1 / 择期——排在 B 类上线前验收(迁移矩阵第七节,含登录/支付/扫描等阻塞项)全部通过之后。视觉对齐本身不阻塞上线。
+
+**目标**:把 03 打印参数、05 简历来源、06 诊断报告 从"单列纵向堆叠"改为原型的"左主区 + 右侧信息栏"双栏 + 顶部步骤条,达到与原型的视觉对齐。三屏功能已完整,本方案**只动布局/呈现,不改数据流与业务逻辑**。
+
+**复用基准**:07 简历优化页(`ResumeOptimizePage.tsx`)已验证的模式——顶部 Stepper + `左主列 + 右 ~348px 侧栏`。同一 kiosk 主题 token 与响应式规则已在 07 跑通,03/05/06 照搬结构,不发明新样式体系。
+
+**硬约束**:
+1. **不新增**路由、service、npm 依赖、重复组件——只重排现有 JSX + 复用现有样式类/token
+2. **手机响应式**:窄屏(原型移动断点)回落单列,复用 07 已有的响应式断点写法,不得横向溢出
+3. **05 保留真实分流**:上传通道维持「云端上传」+ 纸质扫描走独立 `/scan`,**不**为原型字面一致改回「纸质简历扫描」
+4. **逐屏推进**:一屏一提交,每屏 改 → 守卫(对应 verify)→ 生产 build → 与原型同屏截图对比(偏差 >±4px 打回,规则同 README §5)
+5. 不触碰 21(须先审入口稳定规则)、23/26(暂缓,避免回退已验证功能)、22(保留拆页)
+
+**分屏工作项**:
+- **03 打印参数**(`print/PrintParamsPage.tsx`):左=份数/色彩/双面/方向/缩放/页范围/纸张;右侧栏=打印机状态 + 用量预估 + 费用明细 + 打印须知。步骤条已接入(PR #307),核对 step index。
+- **05 简历来源**(`resume/ResumeSourcePage.tsx`):左=上传通道(云端上传)+ dropzone + AI 生成入口条;右=诊断方向表单(维度+目标)+ 报告维度卡 + 隐私。补顶部步骤条。
+- **06 诊断报告**(`resume/ResumeReportPage.tsx`):顶=总分 + 雷达(一行);下=两组 2 栏 grid(分项评估 / 修改优先级 / 风险 / 建议)。补步骤条。
+
+**验证口径**:每屏 typecheck + lint + 对应 verify 守卫 + 生产 build 全绿;`vite preview` 起服务后与 `docs/design/kiosk-proto-2026-07/0X-*.html` 同视口截图比对;逐屏单独提交,不 push、不建 PR,等用户确认后再推进。
+
 > 入口用途：当前任务池与执行顺序。历史任务长记录文本已归档到 `docs/progress/archive/2026-06-20-next-tasks-pre-normalization.md`；归档时行尾空格按仓库 whitespace 检查规范化。
+
+## P0-P2：多终端云管与商业化部署（方案批准后执行）
+
+> 权威方案：`docs/product/terminal-fleet-commercial-deployment-plan-2026-07.md`。不另建并列标准；沿用现有 Admin 设备管理、Terminal Agent、终端/任务 API 和生产 onboarding。管理员后台仍为服务器上的中心化 Web 控制台，不安装到每台 Windows 主机。
+
+- [x] **现状审计与商业化方案**：Codex、两项专项子代理和本地 Claude CLI 已完成只读复审并有条件批准；已盘点一次性绑定码、DPAPI、Windows 服务、心跳、按终端原子 claim、本地幂等/离线补报、Admin 终端/打印机/任务运维能力，明确设备激活码、日常设备凭证、商业授权 entitlement 三者分离，并补齐责任矩阵、合同附件、RBAC/租户隔离、三态承诺和量化放量门禁。本项只完成文档，不代表运行时实现或批量验收。
+- [ ] **P0 设备身份安全收口**：第 1/2 批由 PR #357 合入 `main@3bb27c05`；Gate 0.3A maintenance/drain 由 PR #375 合入 `main@fb1bb5c0`；Gate 0.3B 已由 [PR #376](https://github.com/wanglei581/YITIJI/pull/376) squash 合入 `main@d106ac39`。本地 Claude CLI 聚焦终审与子代理最终复核均为 `Critical=0 High=0`；合并前最终提交 `5383144e` 的 GitHub Actions run `30168881855` 中 SQLite `build-and-verify`、真实 PostgreSQL `postgres-readiness`、`kiosk-browser-smoke` 三项全绿。`suspended` 普通暂停保留心跳/在途回传，紧急吊销原子切暂停并使旧凭证立即失效；`retired` 排空后不可逆，撤销全部凭证/未使用绑定码并冻结设备身份；扫描建单与失败任务 retry 纳入 active Terminal 行串行；双库 guard 阻断身份改写、凭证/绑定码复活及任务状态复活；`PRINT_JOB_UNCONFIRMED` 禁止 retry，paid+failed 复用现有订单核查与 canonical 全额退款。Gate 0.3B 代码已随预发 `83f2117f` 部署；仍保留 `Terminal.agentToken` expand-window 兼容载体，未执行 contract 删除/backfill/生产部署，不得克隆凭证。Gate 0.4 Wave A+B 代码已由 [PR #384](https://github.com/wanglei581/YITIJI/pull/384) squash 合入 `main@645e19e0`（无 CLI Token + ProgramData ACL + 401 本地 unauthorized latch / `AGENT_UNAUTHORIZED`）；`agent_degraded` 既有本地 SQLite 路径保留。Windows 真机 ACL / 吊销后停领 / BindCode 恢复仍须另授现场验收，不得仅凭静态 verify 宣称完成。
+- [x] **P0 多实例与相邻安全前置（[PR #479](https://github.com/wanglei581/YITIJI/pull/479)，已 squash 合入 `main@c6e550b4`，CI 3/3 ✅）**：Webhook/支付 nonce 防重放已迁移到 Redis `SET NX EX 300`（键名 `webhook:nonce:{sourceId}:{nonce}`，TTL 与现有 5 分钟时间窗对齐，`timingSafeEqual` 防时序攻击）；Partner API 拉取已加 SSRF 防护（`validatePublicUrl` + `isPrivateOrReserved` 阻断私网/环回/元数据地址，多次重定向不跟随，不混入新业务入口）。`appSecret` 仅服务端，nonce/签名验证/幂等守卫不变。
+- [ ] **P0 单机商业基线**：完成 Windows 服务可靠性、断网/重启、Agent 降级恢复、失败任务、真实出纸、敏感文件清理与当前生产模式验收；未通过前不得进入批量安装。
+- [ ] **P1 签名 Bootstrapper/MSI**：使用独立分支设计可复现构建、私有 Node runtime、Authenticode、SBOM、交互/静默安装、repair/uninstall、配置/凭证保留矩阵；打印机驱动仅检查和引导，不在无授权情况下随包分发，不硬编码打印机型号。
+- [ ] **P1 5 台试点云管**：在现有设备管理页内补设备生命周期、标签/设备组、策略版本与应用回执、告警工单、脱敏诊断包和白名单远程动作；禁止任意 shell、文件浏览、静默远程桌面、绕过支付打印和远程发起扫描。
+- [ ] **P2 Agent 灰度升级**：独立更新助手、签名 manifest、drain、维护窗口、internal/pilot/canary/stable 通道、暂停和自动回滚；先完成 20 台灰度升级与真实回滚演练，再评估 100 台容量和 SLA。
 
 ## P0：项目规范化治理
 
@@ -41,12 +228,13 @@
 
 - [x] **critical/high 审计与运行时防护（已合入）**：[PR #271](https://github.com/wanglei581/YITIJI/pull/271) 已 squash merge 到 `main@f8b8f1ec`。`shell-quote@1.8.4`、`hono@4.12.25`、`multer@2.2.0`、三端 `vite@6.4.3` 通过 override/direct manifest/lockfile 收敛，Nest 间接 Multer 同样为 2.2.0。10 个 API `FileInterceptor` 显式 `fieldNestingDepth: 0`，保留已有 `fileSize`、不擅自改变其余四处文件大小语义；AST + 真实 loopback multipart verify 证明 flat 204、`meta[nested]` 400 且为 `LIMIT_FIELD_NESTING`，已接入 SQLite CI。冻结安装、audit、依赖树、全 workspace typecheck、四端 build、相关上传回归均通过；未部署。
 - [x] **PR CI 验证（已完成）**：GitHub Actions [`29552724252`](https://github.com/wanglei581/YITIJI/actions/runs/29552724252) 的 `build-and-verify` 与 `postgres-readiness` 均成功；前者在 Linux fresh SQLite schema 后实际运行新增 `verify:multipart-field-nesting` 与既有 `verify:print-jobs`。本机临时 SQLite 的 Prisma Schema Engine 通用错误未被 schema/migration 或生产环境绕过。
-- [ ] **P1 低/中危依赖评估**：当前完整 audit 仍有 `esbuild`（low）、`@babel/core`（low）和 `js-yaml`（moderate），但没有 high/critical；另起最小升级/兼容性任务处理，不与本 P0 补丁混合，也不得据此倒推出生产已部署。
+- [x] **P1 依赖审计评估（只读，2026-07-25）**：基线漂移报告见 `docs/reviews/dependency-audit-p1-2026-07-25.md`（完整树曾为 0 critical / 13 high / …）。旧「仅剩 esbuild/babel/js-yaml 且无 high」表述作废。
+- [x] **P1 依赖 remediation 工具链与应用运行时落地**：代码 [PR #397](https://github.com/wanglei581/YITIJI/pull/397) 已 squash 合入 `main@e53c1d1e`，main push CI 三项全绿，业务代码仍未部署。预生产已完成官方 Node `v22.23.1` 并列安装、Corepack `pnpm 11.2.2` 激活与 PM2 应用 interpreter 迁移；当前是“PM2 daemon 继续由 `/usr/bin/node v20.20.2` 驱动，`ai-job-print-api` 应用使用绝对 `/usr/local/bin/node` 的 Node 22”双轨状态。根 `engines.node >=22.13 <23` 契约、frozen install、安全门禁、原生依赖、构建与回滚已验证，独立 Node 22 release 仍**未激活**，现网仍保持原 `full_api_commit=1812ba54`、原 `dist/main.js` 和原 cwd。Node 契约候选已通过 [PR #398](https://github.com/wanglei581/YITIJI/pull/398) squash 合入 `main@895630c1`，PR CI 与 main push CI `30205451885` 三项全绿；且只有 F1 Genesis production 门禁与具名切流授权完成后，才能激活独立 release。仍禁止在现有运行目录直接 install 或覆盖 `/srv/ai-job-print/node_modules`；依赖补丁仍按 major 保持 `brace-expansion` 1.x/2.x 定向回补及 5.x 原生修复版本，registry High 仅在运行时补丁门禁通过时归类 `locally-patched`。
 
 ## P0：合作机构后台账号安全移除
 
-- [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR 尚未合入或部署。
-- [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：等待 PR CI；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
+- [x] **候选实现与本地专项验证**：`codex/partner-account-member-safe-removal-20260716` 已实现 Admin 机构内 Partner 账号 tombstone 移除、至少保留一个已启用账号的不变量、可串行化并发收口、会话墓碑缓存、最小审计及管理端二次确认/冲突提示；已 rebase 至 `origin/main@f69bf1b7`，并创建 [PR #267](https://github.com/wanglei581/YITIJI/pull/267)。SQLite 正式 migration SQL 重放、删除/并发/认证回归、API/Admin typecheck 与 lint、Admin HTTP 生产构建和浏览器确认框走查均通过；墓碑账号不可改密，普通停用账号的历史改密语义不被额外收紧且不会被重新启用。手机号转移隔离验证已同步 tombstone 数据库与会话缓存契约并通过专项 verify；PR #267 已 squash 合入 `main@30d168ce`（2026-07-16）；未部署。
+- [ ] **CI / 目标环境验收（目标 PostgreSQL 须另行授权）**：PR CI 已通过（PR #267 main push，2026-07-16）；本机 Prisma CLI 对该基线报通用 Schema engine 错误，未以 `db push` 绕过。随后须在目标 PostgreSQL 执行 `prisma migrate deploy/status`，并运行两条真实并发的 Admin 删除请求（验证 PostgreSQL 串行化重试）与真实 HTTP Admin 删除验收。不得删除机构、职位/招聘会/订单/文件/终端数据，且不得开放 Partner 自助删除入口。
 
 ## P0：剩余分支 / worktree 收口
 
@@ -59,13 +247,8 @@
 - [x] **面试重设计候选取舍**：已完成只读深审并由 #100 收口唯一可迁移的旧 `/interview/setup-preview` 清理点；正式 `/interview/setup` 真实链路保留，旧分叉本体不迁，fair verify residue guard 已由当前 `main` 更新版覆盖。
 - [x] **最终清理**：#100 已 rebase merge 到 `main`，本地 / 远程过渡分支已清理；`feature/interview-setup-redesign`、`backup/interview-b65d6e48`、本地 `keep/b65d6e48` tag 和无独有内容的 `codex/kiosk-design-style-sample` worktree / 残留目录已删除。本 docs 分支合入并清理后，本地分支、远程 head、worktree 均只剩 `main` / 主仓；未执行 `prune` / `gc`。
 
-## P0/P1：用户中心商用级闭环
 
-> 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案已由 PR #259 合入；Wave 0 已由 PR #261（`0c4cdd57`）合入；授权撤回终态保护已由 PR #263（`4f8084d1`）合入；Wave 1-A 账户安全底座已由 PR #265 合入当前 `origin/main@f69bf1b7`。最终 GitHub CI `29504775805` 的 `build-and-verify` 与 `postgres-readiness` 均成功。以上均未部署，且不表示 Wave 1-B、Wave 1-C、真实导出或不可逆注销已经完成。
-> 下一波只能从当前干净主线新建独立 worktree：先实施 Wave 1-B 数据权利执行器；不可逆注销 handler 必须继续等待法务版本化分类留存矩阵、冷静期与执行开关同时获准。随后才可按已合入契约实施 Wave 1-C Kiosk/Admin 隐私运营 UI；不得提前展示注销入口、伪写工单终态或在主工作区堆叠。
-- [x] **Wave 0 授权撤回终态保护（已合入）**：`codex/user-center-wave0-data-truth-20260716` 新增 `revoke_consent→rejected` 的 fail-closed 保护：授权已在请求创建时真实撤回，拒绝写入不实终态及审计；`revoke_consent→completed` 保持可用。该补丁已由 [PR #263](https://github.com/wanglei581/YITIJI/pull/263) 合入 `origin/main@4f8084d1`；此前 RED→GREEN、SQLite/PostgreSQL 空库复验与双 CI 均通过。未部署。
-- [x] **Wave 1-A 账户安全底座（已合入）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已由 [PR #265](https://github.com/wanglei581/YITIJI/pull/265) 合入当前 `origin/main@f69bf1b7`；最终 GitHub CI `29504775805` 两个 job 均成功。未新增 Kiosk/Admin UI，未实现数据权利执行器，未部署。
-- [ ] **Wave 1-B 数据权利执行器**：在 Wave 1-A 合入并通过 CI 后，补 export/delete 请求互斥、导出包异步生成、单次下载租约/finish/reconciler、服务端 auditRef、closing 最小回执和注销分类 fail-closed gate；法务分类留存矩阵未签字前不得执行不可逆删除。
+## P0/P1：用户中心商用级闭环
 
 > 审计、产品方案与已批准实施计划：`docs/reviews/user-center-commercial-closure-audit-2026-07-16.md`、`docs/product/user-center-commercial-closure-plan-2026-07.md`、`docs/superpowers/plans/2026-07-16-user-center-wave0-wave1-program.md` 及其引用的四份详细计划。方案、Wave 0 基线与授权撤回终态保护均已合入主线；Wave 1-A 基础版也已进入 `origin/main`。后续仍须一波一分支，不得直接在主工作区或既有候选分支堆叠。
 
@@ -78,30 +261,73 @@
 - [x] **Wave 1-A 账户安全底座基础版（已合入，未部署）**：`EndUser.status` 双 migration、`enabled && active` 全登录/认证门禁、会话 owner 索引安全撤销及 SMS step-up challenge/grant 后端已经主线 CI 修复收口；未新增 UI、未执行数据权利。
 - [x] **Wave 1-A 追加安全加固（已合入，未部署）**：PR #270 已 squash merge 到 `main@88e940cd`；challenge/grant Redis 原子性、状态 epoch、owner/碰撞隔离、provider 不确定结果、最终签发复核、HTTP no-store/可信代理边界和窄化注销回执 guard 已进入主线。合并前最终双模型终审与 GitHub Actions `29552177099` 双 CI 均通过；runner 外部 `rg` 依赖已改为 Node 标准库扫描。当前尚未部署。
 - [x] **Wave 1-B Slice 1 数据权利账本与注销硬闸门（已合入，未部署）**：PR #275 已 squash 合入 `main@0ae51289`，合并前和合并后双 CI 均成功。UUID 幂等、导出 step-up 预约、同步 `revoke_consent`、`delete` 零副作用 `409` 与 Admin 仅 `export→rejected` 已进入主线；不得据此声称真实导出、下载或注销已经开放。
-- [ ] **Wave 1-B Slice 2 导出执行器与恢复策略（PR #280，待 CI / Warning 决策）**：异步白名单 artifact、私有短期对象、下载租约/finish/reconciler、失败补偿与 required audit 已在 Slice 1 基线上整合并完成本地回归；已修复 Admin retry worker 抢先导致的误 503。双模型外部复审无 Critical；下一步完成 CI、确认历史非空幂等键重复预检、orphan 清理/发起审计粒度、下载单次成功交付语义与 step-up 设备匹配策略，再进行集成及上线前 PostgreSQL/Redis/COS 验收。仍不实现账户注销；所有 `active/disabled/closing/anonymized` 状态迁移必须在同一事务更新 `statusChangedAt`。
-- [ ] **Wave 1-C Admin 隐私运营 UI**：在真实执行器的契约与失败补偿可验证后，再增加 Admin 工单处理、SLA、失败重试与审计视图；不把 pending/handling 工单伪写为 completed/rejected。
+- [x] **Wave 1-B Slice 2 导出执行器与恢复策略（代码已合入，未部署）**：[PR #280](https://github.com/wanglei581/YITIJI/pull/280) 已于 2026-07-17 MERGED。异步白名单 artifact、私有短期对象、下载租约/finish/reconciler 已在 main。**一体机仍不提供导出提交/下载**；账号注销仍 `ACCOUNT_CLOSURE_NOT_AVAILABLE`。剩余：预生产 Redis+COS 导出演练、四项 Warning 决策验收、部署后 `TRUST_PROXY_HOPS` 真机确认 `req.ip`。不得把「代码已合入」写成「用户可导出」。
+- [x] **Wave 1-C Admin 隐私运营 UI（基础页已合入）**：Admin `/member-privacy` 列表 / 筛选 / retry / reject 已在 main。剩余缺口是 SLA、演练 runbook；范围文案已由 C-04/#329 对齐。
+- [x] **C-04 隐私导出范围文案对齐 Mapper（已合入）**：[PR #329](https://github.com/wanglei581/YITIJI/pull/329) → `main@9e6c255d`。预生产走查见 D4；**未部署**。
+- [x] **TRUST_PROXY_HOPS 部署与真机确认（预生产）**：[PR #331](https://github.com/wanglei581/YITIJI/pull/331) 已合入；2026-07-25 预生产部署 `main@70ed8f6d`，`.env` 写入 `TRUST_PROXY_HOPS=1`（单层 nginx→3010），`resolveTrustProxyHops=1` + `assertProductionTrustProxyHops` 通过，API 启动/health `db=postgres`、三端 200。**生产实例若另机部署须单独授权复做**；禁止 `true`。
+- [x] **TRUST_PROXY_HOPS `req.ip` 抽样确认**（2026-07-25）：公网伪造 XFF 探针 + nginx `remote_addr` + Express `trust proxy=1` 等价链复现通过；生产若另有 hops 数须单独改写。
 - [ ] **Wave 2 换绑与资产动作一致性**：旧号 step-up + 新号验证 + 冲突人工处理；补简历/文档/活动记录/收藏的删除、下载、分页和来源失效口径。账号冲突首期禁止自动合并。
 - [ ] **Wave 3 打印售后与权益单点闭环**：若启用收费，补未支付取消、支付重试、退款进度/凭证、从原文件再打印、权益适用范围/使用记录、服务端原子核销和异常对账；免费模式可后置。套餐商城在 SKU、价格、退款、发票/收据、后台运营和条款未齐前继续不展示。
 - [ ] **Wave 4 体验增强（P2）**：仅在真实运营数据证明必要时，补用户主动开启且短 TTL/可删除的 AI 顾问对话历史、消息偏好和账号冲突人工工具；不默认保存对话，不先做自动合并或第三方 OAuth。
 - [ ] **Wave 5 商用预生产与真机验收**：同一提交完成 PostgreSQL、Redis、COS、短信、Windows 一体机、真实打印、弱网、会话过期、键盘/读屏和隐私工单演练；收费模式另跑真实小额支付、退款和对账。
 
+## P0：前后端对齐与计价收口（2026-07-25 三端审计 + 双评审定稿）
+
+来源：2026-07-25 对 kiosk / admin / partner / services-api 的只读对齐审计，经 Gemini 与 team-reviewer 交叉评审后定稿。审计同时确认「已对齐基线」（岗位、企业展示、招聘会 / 校招、政策公告、权益活动、会员权益、消息通知、意见反馈、百宝箱、待机宣传屏、AI 简历主链路、模拟面试、职业规划、岗位匹配、收藏、浏览 / 外部跳转记录）不需要重做。
+
+- [x] **P0-1 第 1 步 自定义页码范围超收修复**：已完成并随 [PR #326](https://github.com/wanglei581/YITIJI/pull/326) squash 合入 `main@6b474051`（2026-07-25）。`countPagesInRange` + 建单接入 + fail-closed；预生产/真机出纸复验仍按下方冒烟清单执行。
+- [x] **P0-1 第 2 步 报价端点 + Kiosk 去硬编码价**：已完成并随 PR #326 合入。`POST /orders/quote` + Confirm/Preview 去硬编码；预生产须核对「确认页金额 == 建单 amountCents」。
+- [x] **P0-2 打印机与设备状态去伪**：已完成并随 PR #326 合入。`useTerminalDeviceStatus` fail-closed；真机 Agent 心跳/耗材上报仍待现场复验。
+- [x] **P0-3 用户数据请求（UserDataRequest）两端补 UI**：已随 PR #326 合入。一体机仅开放撤回授权。**范围文案由 C-04 候选纠正为与 Mapper 一致的元数据披露**；预生产走查见下方 D4。
+- [x] **P0-4 生产价目落库 SOP + seed 生产守卫**：代码与文档已合入 main。**上线操作仍须人工**：按 `docs/operations/price-config-production.md` 在目标库写入拍板价并私有留痕（勿对生产库跑会 seed 的开发 verify）。
+- [x] **P1-1 Admin 岗位 / 招聘会信息源补「拒绝审核」**：已完成并随 PR #326 合入。
+- [x] **P1-2 Partner Excel 导入后刷新**：已完成并随 PR #326 合入。
+- [x] **P1-3 Admin 价目维护页**（含改价审计）：**代码侧已齐，勾掉**。W-C（PR #174）已交付 Admin `/billing` 改价/启停 + `price.updated` 审计；PR #247 / #255 已合入说明独立编辑。不新开「价目 CRUD」功能 PR（新建/删除价目仍故意不开放）。剩余仅生产授权改 FREE_MODE 两条 `description` 诚实化（见下）。
+- [x] **P1-4 Admin 用户管理只读版**：已完成并随 PR #326 合入。
+- [ ] **P1-5 法律文档版本号 + 生效日期**：真正的阻塞是法务定稿文本，不是加版本号（`LegalDocPage.tsx:1-13` 已有 `UPDATED_AT` 和「草拟版待法务审定」注释）。改文案必须重跑 `verify:legal-retention-copy`（锁了 6 个必含标记和 5 条负向正则）。
+
+### PR #326 合入后冒烟（预生产优先；生产须单独授权）
+
+部署目标：先 `main@ef37bd22`（#326+#327），后跟进 `main@bffc7220`（+#329+#330）。证据私有留痕，勿把签名 URL / 密钥写入仓库。
+
+- [x] **D1 部署**（2026-07-25）：首发 `DEPLOY_SOURCE=ef37bd22`（Kiosk `index-BmJkvkh1.js`）；同日跟进 `DEPLOY_SOURCE=bffc7220`（Kiosk `index-D2cndxbU.js`，含 #329）。PM2 → `/srv/ai-job-print/services/api/dist/main.js`；health `db=postgres`；三端 200；保留 `20260722090000_pg_foundation_batch_tables`。备份/回滚：`pre-ef37bd22-…` 与 `pre-bffc7220-20260725T174423+0800`。
+- [x] **D2 报价诚实**（2026-07-25）：5 页 PDF `purpose=print_doc` → `POST /orders/quote` `pageRange=1-2` → `billablePages=2/amountCents=0`；同参建单 `ptask_kiosk_608db0c6a166e275` / `ORD-20260725-4B8570C048` 同为 `billablePages=2/amountCents=0`（未按 5 页超收）。首轮因打印机 offline 失败；**同日打印机恢复 ready 后复验** `ptask_kiosk_caa23c9d41669514` / `ORD-20260725-7D4AE0020A`：`pending→printing→completed`（约 18s），`billablePages=2/amountCents=0/payStatus=paid/taskStatus=completed`，可宣称页码范围计费 + 物理出纸闭环（FREE_MODE 0 元，非商用支付）。
+- [x] **D3 设备 fail-closed**（2026-07-25）：API `printerStatus=offline` + 心跳在线时浏览器显示「打印机离线」；恢复后心跳 `ready`，复验任务正常 claim/completed。
+- [x] **D4 隐私 UI**（2026-07-25，文案 + 登录撤回 API）：公网 `/me/privacy-requests` 可达；`main@bffc7220`（含 #329）部署后浏览器见「隐私与数据请求 / 撤回授权可用；导出与注销暂未在一体机开放」，旧「仅限岗位 AI 咨询会话」已消失；产物含「文件清单」且无「不导出订单」。同日用户授权 `SESSION-B_REDIS_TEST_CODE`：合成号 `170****2507`、Redis 一次性码（TTL 300、不切 `SMS_PROVIDER`）→ 登录 201 → `job_ai` 授权 201 → `POST /me/data-requests` `revoke_consent` 201/`completed`（`cms0aothd001kota8poichvqt`）→ 会员列表可见；PG 行 `handledBy=system`+审计、consent `revokedAt` 非空（Admin 列表同源）。夹具 EndUser/consent/request/audit/Redis 已清零。**边界**：测试夹具非真实短信；未做 Admin 浏览器登录点选；非 live 支付。
+- [x] **D5 价目维护**（2026-07-25，只读）：Admin `/billing` 未登录跳转登录页；Admin 产物含 `/billing`；本窗**未改价、未改说明**。
+- [x] **D6 价目 SOP 只读**（2026-07-25）：active `print_bw_page=0` / `print_color_page=0`，`description` 已是「免费试运营：…0 元/页」。**无需再写**；未跑 seed、未 SQL 直改。
+
+### 本轮明确冻结（不做，附理由）
+
+- [x] **冻结项诚实文案收口**（2026-07-25）：Admin 外设 / 权限、Partner 终端数据 / 统计 / 账号权限已去掉「功能建设中」；Kiosk Profile 继续遵守 Wave 0——**不展示**求职打印套餐 / AI服务套餐 / 招聘会扫码凭证占位（只保留 22 个已接真目的地）。`verify:honest-placeholders` 与 `verify:user-center-wave0` / fusion-w5 哈希合同已对齐。仍不做 RBAC / 统计报表 / 外设配置 / 套餐售卖。
+- **Admin 权限管理 / Partner 账号权限**：现状是粗粒度 `@Roles('admin'|'partner')` 散布 50+ 控制器，做 RBAC 需动全站鉴权面，收口期风险不可承受，且不阻塞任何业务闭环。占位页文案已改为诚实说明（「账号与角色由平台侧统一管理」），不做半套 RBAC。
+- **服务套餐 / 商品体系**（`profileEntries.ts`）：合规红线——若设计成招聘套餐 / 简历推荐包会触碰人力资源服务许可证边界。入口保持隐藏（Wave 0），不恢复「建设中 / 不提供」占位卡。
+- **招聘会自营扫码凭证**：合规红线——平台内发券 / 核销会使本系统成为招聘会主办承办方。Profile 不展示该占位；招聘会信息继续走 `/job-fairs` 来源平台 / 官方入口。
+- **求职材料模板后台化**：`JOB_MATERIAL_TEMPLATES` 放 `packages/shared` 常量符合预期，不是缺陷。
+- **智慧校园内容 CMS、政策社保 / 就业登记 Tab 后台化**：降 P2。`RenshiPage.tsx` 已 **944 行**，动它之前必须先拆分。
+
+### 未纳入 CI 的相关守卫（改动对应文件必须本地手跑）
+
+`verify:terminal-device-config` 与 `verify:legal-retention-copy` 已在主 CI；`verify:home-toolbox-ui`、`verify:print-entry-source-split` 仍未纳入，改动对应文件时必须本地手跑。[PR #435](https://github.com/wanglei581/YITIJI/pull/435) 已把 `verify:admin-orders-refund`、`verify:member-data-retention`、`verify:trtc-ownership`、`verify:file-retention`、`verify:job-materials` 五项补入 SQLite 串行套件，并只把前述真正涉及数据库行为的退款与求职材料两项补入 PostgreSQL readiness；三项 GitHub Actions 全绿后已 squash 合入 `main@b03af066`，现为主线 CI 兜底，但不代表部署、生产、外部服务或真机验收完成。
 
 ## P0：上线前真实验收
 
-- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 的上一版两项 GitHub CI 已成功；最新并发锁修订尚须 push 后重新通过 CI。用户指定的 Claude Opus 4.6 已复审为 APPROVE；Antigravity 当前额度耗尽，尚未形成可计入的独立前端模型报告。之后才可申请合并；生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
+- [ ] **Admin 严格首次手机号绑定发布**：协调候选基于 `origin/main@e0940a95`，已保留 Partner 通用路径，并完成 OTP 重试/锁定、取消、事务审计及“同 ticket 并发验证不消耗首个请求凭据”的本地回归。PR #256 已 squash 合入 main（2026-07-16）；GitHub Actions CI 成功。生产部署前仍须重新做线上基线与运行时门禁并取得单独明确的 G1-R 授权。旧 PR #254 / 旧候选不可作为部署来源。
 - [x] **F1 发布来源一致性修正后只读追溯**：2026-07-16 在新的明确授权下，固定白名单 SSH 会话以 `exit=0` 干净结束；PM2 路径一致、F1 标记存在、metadata 为 `bb9c7efbb032`（`origin/main`），本机确认 `faa82612` 与 `e0940a95` 都是其祖先。但 metadata 没有与运行中 dist 可比的声明 hash，归档仍为 `unavailable_or_non_whitelisted`，所以无法闭合 source → dist → PM2 的来源链；F1 维持 **NO-GO**。本项只完成追溯，不授权部署、迁移、重启、真实管理员验收或再次 SSH。
 
 - [x] **F1 未来发布证据补链机制（本地代码与 CI 门禁）**：已实现并本地验证严格白名单 source archive/runtime tree/manifest sidecar/artifact 副本、candidate guard、release 根外 stable current launcher、atomic activation 与 fail-closed activation lock；fixture 不访问网络、生产、PM2 或真实 health，API typecheck/lint/build 通过，CI 已接线。Gemini 3.1 Pro (High) 与 Claude Opus 4.6 的有效复审均为 `APPROVE`；Claude 初审提出的运行账户环境最小化和并发 activation 两项 High 已分别写入首次启用审批前置、以令牌锁与红绿测试关闭，复审后的两项测试覆盖 Warning 也已追加断言并复跑完整本地验证。当前 production 不回填、不安装 launcher、不改 PM2，F1 继续 **NO-GO**。
 
-- [ ] **F1 平行 Genesis bootstrap 的本地实现与镜像演练（设计和计划已确认，仍无生产授权）**：按 `docs/superpowers/plans/2026-07-16-f1-parallel-genesis-bootstrap-implementation.md` 在独立分支实施一次性、不可重入的 Genesis 原语与离线 RED→GREEN 门禁：它仅建立独立主机零流量 managed `r1`，再由既有稳态激活器验证 `r1 → r2`；任何 Genesis 失败只清理新链、保持 legacy 流量，不得手工改 `current`、PM2 reload 或 direct `main.js` 绕过。D1 Task2 runtime environment contract 本地候选已完成：hash-pinned 严格白名单环境、PM2 command runner total env replacement、post-switch verified rollback re-check、严格 activation CLI 与离线 fixture 均已通过本地验证和 Antigravity + Claude 双模型终审。后续仍须完成 D2 非生产镜像：证明生产运行账户 contract 完整性、真实 PM2 `spawnSync env` 行为、真实缺失进程输出分类，以及完整 `r2` post-switch health failure → verified `r1` rollback 演练；这是 D5 traffic cutover 的硬前置，生产不得故意造健康故障。D3–D6（只读预检、零流量 Genesis、负载层切流、稳态发布）均须分别取得具名、限时授权；无法证明 deployment-control root 的长期保留边界时保持 `NO-GO`。不得回填当前 release，亦不得把本地 fixture、CI 或旧 PM2 `online` 当作 production 来源一致性通过。
+- [x] **F1 平行 Genesis bootstrap D1 本地实现（Task 1–6；仍无生产授权）**：Task 1–2 已在 main（fixture 拆分 + runtime env contract）。Task 3–6 已在分支 `codex/f1-genesis-d1-offline-20260725` 完成：`release-genesis` / CLI、`verify:release-genesis` 场景 1–9、CI Genesis fixture、progress 收口；本地 provenance + genesis verify、typecheck/lint/build、无参 CLI `ARGUMENT_INVALID` 全绿。只证明本地代码与离线门禁；**production F1 继续 NO-GO**，不得把 `release:genesis` 存在写成 D4 或切流完成。
+- [x] **F1 平行 Genesis bootstrap D2 Docker 隔离演练（2026-07-25；非生产）**：生产主机无 Docker；本机 Colima 隔离平面真实 PM2 证明 `r1` Genesis、`r2` health 失败只回 verified `r1`、收窄 env（CANARY 不泄漏）、缺失进程精确分类；顺带修复 launcher PM2 `argv[1]`/`__filename` self-hash。Runbook：`docs/device/f1-d2-docker-isolation-runbook.md`。**production F1 仍 NO-GO**；未在生产跑 Genesis / 未切流。
+- [ ] **F1 平行 Genesis bootstrap D2′–D6（同机双端口，仍须独立授权）**：D1′ 的唯一 managed `3011` health 契约、fixtures、CI、runbook 与 D3 B1–B9 已完成本地收口；短 PM2 控制根、timeout、异常清理、精确 PID 身份兜底及 XDG user-systemd 三层执行契约均已完成本地 TDD、离线门禁和多模型审查，但 `main@e721f87a` fresh retake 的历史结果仍锁定 **NO-GO**，尚无合格 Linux fresh PASS evidence。下一步只能由用户对新的非生产 Colima 演练单独授权新 nonce、新 evidence 和新窗口，不得原地 retake、复用或改写旧 NO-GO evidence，不得借用 production 服务器，也不需要新增云主机。D2′ fresh PASS 后仍须由真实业主负责人建立单一用途、限时的 D3 记录并具名决定；D3 通过后仍分别授权 D4 零流量 Genesis、D5 原子切流和 D6 managed 稳态发布。`CUTOVER_CONFIRMED` 后严禁切回 legacy；不得 migration、DDL、seed、启动第二套 worker/cron/consumer，不得把设计、旧 D2、fixture、CI、代码 review 或 legacy `online` 当作 production 通过。
 
 - [ ] **P0 离线验收证据矩阵后的逐项授权**：离线矩阵结论仅覆盖仓库文档范围，不连接任何环境且不改变真实验收状态。此前引用的证据矩阵文档尚未提交进 `main`（`git log --all` 对该路径无来源），待其所有者补入仓库后再引用；在此之前不作为可访问的仓库证据。F1 发布来源一致性仍为独立 **NO-GO**，必须先按其单独的只读追溯与双模型门禁处理；其余 P0 仅可按数据安全、凭据/法务、线上浏览器与外部服务、Windows 现场、试运营/回滚的最小授权包推进。矩阵不是上线或部署批准。
 
 - [x] **F1 future-only provenance clean-main 候选迁移（已合并，未部署）**：候选从 `origin/main@0c4cdd57` 建立，仅迁移 `4f173145^..6de76e03` 的 9 个 F1 提交；两份 progress SSOT 冲突已按“保留新主线事实、只追加 F1 事实”处理。Gemini 3.1 Pro High 与 Claude 均 `APPROVE`；`verify:release-provenance` 19 个受控场景、API typecheck、lint、build、编译产物 CLI help 与 diff 门禁均已通过。该候选已随 [PR #262](https://github.com/wanglei581/YITIJI/pull/262) 合入 `main`（merge commit `4b3c9887`，head `b7a365da`；`build-and-verify` 与 `postgres-readiness` 均成功）。不得将该合并、本地 fixture 或 CI 接线写作 production 来源一致性通过：未部署、未安装 launcher、未改 PM2，当前 production 继续 **NO-GO**，不得执行首次启用；首次启用与回滚演练仍须单独生产授权。
 
-- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已 squash 合入 `main@cec65d9c`，合并后 GitHub Actions `29503789983` 的 `build-and-verify` / `postgres-readiness` 均成功，代码集成与主线 CI 已完成。尚未部署、发送真实短信或执行真实转移；当前下一步是单独清零依赖审计 P0，再取得部署授权并由用户本人完成 OTP。生产执行仍需另行授权，依赖阻塞未清除前不得部署或宣称可部署。
+- [ ] **Admin 从 Partner 安全转移手机号发布与真实执行（生产保持 `CLOSED_MODE`）**：[PR #266](https://github.com/wanglei581/YITIJI/pull/266) 已 squash 合入 `main@cec65d9c`，合并后 GitHub Actions `29503789983` 的 `build-and-verify` / `postgres-readiness` 均成功，代码集成与主线 CI 已完成。尚未部署、发送真实短信或执行真实转移；依赖侧 P1 remediation 代码已完成（见上），**部署与 OTP 仍须单独授权**。不得宣称可部署。
   1. **PR / CI（已完成）**：候选已合入主线；Admin UI 门禁与 `INTERNAL_AUTH_VERIFY_TARGET=isolated` 的 API 门禁已在共享 SQLite suite 中保持逐行串行，合并后双 job 成功。
-  2. **部署授权**：先单独处理依赖审计基线中的部署阻塞（`shell-quote` critical，`hono` / `multer` / `vite` high），再复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；这些依赖不在本候选范围内，阻塞未清除前不得部署。
+  2. **部署授权**：复核生产基线、数据库/Redis/短信运行时门禁，并取得明确的生产部署授权；旧文「`shell-quote` critical」已过时。未授权前不得部署。
   3. **真实转移**：仅在已授权部署并完成只读预检后，由已登录 Admin 用户本人在「账号设置」页面自行输入当前密码与真实短信 OTP 完成一次转移；AI/运维人员不得读取、代填、保存或输出密码、OTP、ticket、cookie 或手机号明文。执行后再只读核验脱敏审计、Partner 用户名/密码登录能力与相关旧会话失效；未另行授权前继续保持 `CLOSED_MODE`。
 
 - [x] **生产部署整合发布**：`6c2a9668` 已作为生产运行时发布；[PR #242](https://github.com/wanglei581/YITIJI/pull/242) 的 CI `29392336211`（`build-and-verify`、`postgres-readiness`）均 Success。已完成可读 PostgreSQL 备份、两项 ScanTask additive migration、PM2 原子目录切换、PostgreSQL health 与三端静态入口 HTTP 200 复核；三条实时符合资格的历史 pending PrintTask 均经受控事务关闭并逐条核验任务/订单/状态日志/审计。发布版本与备份、任务处置的精确事实见 `current-progress.md`；未把本项扩大为真实支付、管理员登录、Windows 真机或物理出纸验收。
@@ -126,15 +352,19 @@
 - [x] Windows 一体机下一次 probe 前置检查：`AIJobPrintAgent` 服务 Running/Automatic，`Pantum CM2800ADN Series` 由 Windows 与 terminal-agent 识别，`PrinterStatus=Normal`，PrintService Operational 已启用，公网 API health 正常。
 - [x] 服务器侧旧 active/pending 打印任务只读确认：`t_ksk_001` 的 `pending/claimed/printing` active 任务为 0 行；最近任务均为 `completed`，没有会被 Agent 抢走的旧 active 任务。
 - [x] 打印运营模式运行时复验：2026-07-15 已在现场人员确认 KSK-001 旁有人值守且 Windows 队列为空后，完成首台 `FREE_MODE` 唯一一笔生产零元验收。即时门禁确认 F1 active 0 元价目、F2 `PAYMENT_PROVIDER=disabled`、F3 `PRINT_REQUIRE_PAID_BEFORE_CLAIM=true`、F4 同源 `/api/v1` 与内部 HMAC URL 防线均保持；866 B 单页无个人信息 PDF 经正式上传 / 建单链路得到任务 `ptask_kiosk_14d3c375051c87d5`、订单 `ORD-20260715-4BDFD88D74`，`amountCents=0`、`payStatus=paid`、数据库 `paymentSource=free`，任务 `claimed -> printing -> completed` 且无错误码；现场确认真实出纸，Windows 队列为空，事后 active task 回到 0、终端仍 `online/ready`、health 正常。未创建第二单、未重试、未直改数据库或修改生产配置。2026-07-08 正式生产微信小额支付/退款/业务打印与 2026-07-13 自动确认后真实出纸样本继续作为付费模式技术证据；支付宝仍未完成生产验收。生产仍不得直接做不付款取消/超时演练，未支付任务生命周期关闭路径继续按独立任务推进。
-- [ ] **FREE_MODE 价目说明文案诚实化**：本次零元订单的真实 `unitCents/amountCents` 均为 0，但生产 `priceLines.description` 仍保留旧的“非正式预生产验收价目 / 100 分每页”说明。Admin 说明独立编辑候选已完成双模型终审并创建 [PR #247](https://github.com/wanglei581/YITIJI/pull/247)；GitHub `build-and-verify` 与 `postgres-readiness` 当前运行中，下一道门禁为其通过与评审，部署仍需明确授权。部署后再经独立生产授权更新两条 `description`，保持 0 元和 active，复核 `price.updated` 审计、渠道为空、health、终端与活动任务；不得重复建单或出纸。当前候选未合并、未部署，生产旧说明未修改。
+- [x] **FREE_MODE 价目说明文案诚实化**：按 D6 只读证据（2026-07-25）关闭——生产 active `print_bw_page` / `print_color_page` 的 `description` 已是「免费试运营：…0 元/页」；[PR #247](https://github.com/wanglei581/YITIJI/pull/247) / #255 能力已在部署路径可用。无需再写库；未跑 seed、未 SQL 直改。
 
-- [ ] **当前未支付任务受控关闭：**独立本地分支已实现 Admin 专用 `close-unpaid` 路径，条件为 pending、未领取、同一关联订单 `unpaid/pending` 且**不存在任何**支付尝试；事务内将订单原子关闭并审计，阻断迟到回调与新支付出码。外部 Antigravity + Claude 初审提出支付尝试读写窗口、审计请求元数据、中文阻断提示和 mock 错误码一致性问题，均已修复；订单 CAS 现同步要求 `paymentAttempts.none`，审计元数据同事务写入，二次双审均为 Critical/Warning 无。已通过 Admin / API typecheck、静态 UI verify、限定 API ESLint、由仓库 SQLite migrations 建立的临时数据库 `verify:admin-print-scan` 全量验证；临时库已删除。未合入、未部署、未执行生产任务关闭。下一步提交 PR 并等待 CI；合并、部署与生产只读预检 / 受控操作仍须用户另行授权；不得直接在生产以该功能演练或关闭任务。
+- [x] **当前未支付任务受控关闭（代码）**：[PR #223](https://github.com/wanglei581/YITIJI/pull/223) 已合入 `main@e2b3858d`（Admin `POST .../close-unpaid` + 详情资格字段 + `CloseUnpaidPrintTaskForm` + `verify:admin-print-scan`）。条件：pending、未领取、关联订单 `unpaid/pending` 且不存在任何 `PaymentAttempt`；事务内关任务/关订单并审计。
+- [x] **close-unpaid 受控操作 Runbook（文档）**：`docs/device/close-unpaid-production-controlled-ops-runbook.md`（2026-07-25）。
+- [x] **close-unpaid Phase A（预生产只读）**：`pending=0/eligible=0`；Phase B 仍须另授且点名 taskId（禁止造单）。
+- [x] **当前未支付任务受控关闭（预生产部署）**：已随 `DEPLOY_SOURCE=70ed8f6d` 上线；无 token 调用返回 `401 AUTH_MISSING_TOKEN`（证明路由在线）。
+- [ ] **当前未支付任务受控关闭（生产受控操作）**：仅在用户书面授权下做只读预检 / 受控关闭；**未授权不得对生产任务演练关闭**。
 - [x] 打印部署矩阵与本地守卫：已按 `docs/superpowers/plans/2026-07-04-print-rollout-ops-closure.md` 补 `docs/operations/print-rollout-deployment-matrix.md`、Windows PrintService 硬证据 runbook、API unsafe rollout 静态守卫 `verify:print-rollout-config` 和 Kiosk 生产包 DEV 沙箱按钮守卫；本地验证通过。
 - [x] 下一次 Kiosk 打印 probe：已完成且只创建 1 个任务 `ptask_kiosk_dd4a9a4210a8dc17`；后端最终 `completed`，`orderId=cmr7uffju022aaoa8jyn0ltba`、`orderNo=ORD-20260705-09B19C1DC9`；PrintService 目标时间附近记录 `Job 21`、`21:45:08`、`Pantum USB001`、`1 页`、`Win32 0x0`；最终打印队列为空，未见错误作业。实际提交走正式 API 链路 `/files/kiosk-upload` + `/print/jobs`，未改 DB、未清队列、未删 Agent 本地 DB、未重启 Agent。当前预生产价目仍是非正式验收价，且任务为 unpaid 完成，不能按商用收费口径宣称通过。
 - [x] G4/G5 复测后续处理：2026-07-06 `PS-G4-20260706-105325` 首次上传成功但 `/print/jobs` 返回 400；服务器只读缩圈已排除 active 价目缺失、COS 读取失败和 G4 PDF 轻量页数识别失败。`HttpExceptionFilter` 诊断热修已部署预生产并验证：缺失文件签名诊断请求返回 `PRINT_PAGE_COUNT_UNAVAILABLE` + `requestId=c6892d6d-17b1-43c8-a5d8-0779eedeeff5`，不再遮蔽机器码。热修后真实复测曾成功建单 `ptask_kiosk_74ee1da48ed051e1` / `ORD-20260706-2F2B3DF20E`，但因 `t_ksk_001` 在 11:48 后停止 heartbeat/claim，恢复时文件 URL 已过期，最终回传 `failed/PRINT_COMMAND_FAILED`（401）。该 G4 任务已冻结为诊断样本，禁止重试、手动 claim、清理或继续作为出纸复验对象。随后受控 G5 在 Agent 在线且 active 任务为 0 时新建 `ptask_kiosk_f05cd3c160ec55c6` / `ORD-20260706-DFC018281B`，已由 `t_ksk_001` claim 并回传 `completed`；现场补证目录 `C:\ai-job-print-evidence\PS-G5-EVIDENCE-20260706-130544` 显示 `AIJobPrintAgent` Running / Automatic，`Pantum CM2800ADN Series` Normal、USB001、JobCount=0、队列无残留，PrintService Event 307 / 842 记录 Job 26、1 页、Win32 `0x0`，且现场确认有纸。本项已闭环为本轮新增物理出纸证据；剩余不再是打印链路问题，而是打印运营模式决策 + FREE_MODE / 有人值守 mark-paid 运行时复验。
 - [ ] 腾讯短信：签名/模板审核、真实 CAM Key、真号登录 E2E 后才能启用 `SMS_PROVIDER=tencent`。
 - [ ] 管理员 / 机构手机号登录验收：只有已绑定且完成本人手机号验证的管理员或机构账号允许短信验证码登录；种子 admin 未绑定手机号，只能密码登录，属于预期行为。首次绑定候选部署后，未绑定的已登录 admin / partner 必须通过当前密码 + 真实短信验证码自行绑定；已预录手机号的历史账号继续走既有本人验证路径。不得以 `backfill-internal-user-phone.ts` 或直接 SQL 替代生产身份核验。
-- [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收；AI 简历相关功能先运行 `pnpm --filter @ai-job-print/api verify:llm-connectivity`。2026-06-30 本地已换入有效 DeepSeek key，并通过本地运行时配置同步 active LLM 功能；`verify:llm-connectivity -- --all` 已覆盖 `assistant_chat` / `resume_diagnosis` / `resume_generate` / `resume_optimize` / `mock_interview` 全部通过。后续仍需在预生产 / 生产环境分别注入有效密钥并做 live 冒烟，不得复用聊天中暴露过的旧 key。
+- [ ] 百度 OCR / AI / TRTC / ASR / TTS：生产 Key、权限、失败兜底和 live 冒烟按启用范围验收；AI 简历相关功能先运行 `pnpm --filter @ai-job-print/api verify:llm-connectivity`。2026-07-25：DeepSeek 官方停用 `deepseek-chat`，预发已热修为 `deepseek-v4-flash` 并注入新 key（进程内 `resume_diagnosis` ready）；源码在 `fix/deepseek-v4-model-20260725` 待合入固化。本地/预发密钥曾在聊天暴露，**须控制台轮换后只写服务器 `.env`**。仍需用真实可解析 PDF 做一次浏览器简历诊断 live 冒烟；不得复用聊天中的旧 key。
 - [ ] 生产运行时环境变量：部署脚本 / PM2 必须显式固定 `NODE_ENV=production`，并在 health / 启动日志验收中确认生产运行时门禁实际生效。
 - [x] 打印扫描首期安全底座 + 状态运营处理 + preflight 门禁（代码侧）：打印任务创建、领取、状态回写和 Agent 本地库不可用降级已形成 fail-closed 契约；Kiosk 进度页已展示真实状态并处理取消；Admin `/orders` 已支持受状态门控的取消 / 重分配终端；新增 `verify:print-scan-preflight` 只读检查未完成任务 / 订单缺少目标终端或目标不一致。
 - [x] 真实库打印扫描 preflight（隔离预生产库）：已在服务器当前 monorepo 隔离 PostgreSQL 数据库 `ai_job_print_preprod` 上运行 `verify:print-scan-preflight:postgres`，结果无未完成打印任务 / 订单目标终端异常；该结论仅覆盖新建隔离预生产空库，不代表既有线上 `zlixc-api` 所连生产库、Windows 真机、扫描、证件照或 U 盘验收完成。
@@ -164,7 +394,9 @@
 
 ## P1：Windows Agent MSI / 可修复安装包
 
-- [ ] **Windows Agent MSI / 可修复安装包**：独立设计与分支处理；范围包含签名 installer、install / repair / uninstall、保留 `%ProgramData%\AIJobPrintAgent`、以及 upgrade / rollback 验收。不在当前可靠性 P0 中开始，也不得与其合并验收结论混用。
+- [x] **Windows Agent MSI / 可修复安装包设计与未签名 B1 候选**（2026-07-29）：设计见 `docs/device/windows-agent-msi-design.md`；[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 已合入 `main@beade4af`，固定输入 staging、WiX 构建、fresh install、未 Provisioning fail-closed、repair、uninstall 与 `%ProgramData%\AIJobPrintAgent` 保留已在 Windows CI 通过。当前 artifact 明确为未签名、7 天保留的候选，尚未部署。
+- [ ] **Windows Agent 正式签名与受控发布**：使用企业 Authenticode 完成 installer/相关二进制签名，独立复核固定输入哈希，生成受控发布 manifest/SBOM，并在干净 Windows 主机验证签名链、安装、Provisioning、upgrade/rollback、repair、uninstall 和退役清理。打印机驱动只检查和引导，不在无授权情况下随包分发；不得把未签名 B1 artifact 当作正式安装包。
+- [x] **配置根可重定位与迁移兼容（代码/运维口径收口）**：[PR #411](https://github.com/wanglei581/YITIJI/pull/411) 已合入 `main@511b9d35`；Windows 主配置目标为 `%ProgramData%\AIJobPrintAgent\agent-config.json`，并保留旧安装根的一次性去敏迁移。迁移前必须复核 ProgramData ACL，含明文 token 但无既有 DPAPI token 的旧配置必须重新 BindCode。GitHub Node 22 CI 已通过；示例、Windows 主机验收和设备文档已同步该路径。**Windows 无打印迁移验收仍未执行**，未通过前 MSI staging / 发布继续 NO-GO。
 
 ## P1：Windows 终端机队管理与安全换机
 
@@ -227,7 +459,7 @@
 - [x] **首期 AI 文件体检**（2026-07-11，`feature/material-check-real` + `feature/material-check-followups`，代码 + 本地 verify + 真实全栈联调级 + Codex 三轮独立复审 READY(92/100) + 收尾复审 READY(94/100)，已通过 PR #185 合入远端 `main`（`93ca6161`），未部署）：`pii_scan` 已从"只查文件名"改为真实内容扫描（PDF 文字层/OCR 兜底、DOCX 真实解析），空白页检测已上线（PDF 渲染分支，真实 pdfjs 渲染验证过）。详见 `docs/progress/current-progress.md` 2026-07-11 集成收口与三批交付条目。`FileObject.mimeType` 魔数校验和第三方 OCR/AI 披露文案已随收尾分支一并合入；`normalize_a4`/`pii_redact` 仍是评估态 stub，COS 直传视频及 >32MB 对象仍按已披露边界不嗅探，材料包仍是独立未开工任务。
 - [ ] **材料包**（独立子问题，未开工）：可从我的简历、我的文档、招聘会资料、求职材料中选择多文件，支持 AI 建议组合、逐项参数、顺序打印、子任务失败单独重试。需要新建 `MaterialPackage`/`MaterialPackTask` 数据模型（`docs/product/print-scan-commercial-plan.md` 已有草案）、决定多文件打印任务如何落地（扩展 `PrintTask` 支持多文件，还是加一层"批次"包住多个单文件 `PrintTask`）、Kiosk 从零建多选 UI（当前"我的文档"等页面均无多选组件）。
 - [x] **上传内容魔数校验**（2026-07-11 发现，同日在 `feature/material-check-followups` 完成并通过 PR #185 合入远端 `main`（`93ca6161`），未部署）：新增 `services/api/src/files/content-sniff.ts` 共享嗅探器（手写签名，`file-type` npm 为 ESM-only 不可用），接入 `FilesService.upload()`/`writeRawUpload()`/`completeUpload()` 三个持字节位点，拒绝码 `FILE_CONTENT_MISMATCH`；`verify:cos:files`（57 项）/`verify:upload-sessions` 已接双 CI。已披露残留：COS 直传 `video/*` 与 >32MB 对象不嗅探（无 Range 读取）；判别为签名/容器级启发式非结构级证明；两处历史手写嗅探留 TODO 未合并。详见 current-progress.md 2026-07-11 第三批与集成收口条目。
-- [~] **首期真实扫描**（2026-07-10，`feature/real-scan` 分支，代码 + 本地 verify + mock 模式浏览器走查级，未合并/未真机）：已按方案文档（`docs/superpowers/specs/2026-07-10-real-scan-design.md`）实现"打印机扫描到 SMB 共享目录 + Terminal Agent 监听自动投递"路线（**非** TWAIN/WIA 直连）——新增 `ScanTask` 模型 + `scan-tasks` 模块（创建/查询/取消/Agent 投递）、Agent 端 `scan-watcher.ts`（chokidar 监听 + 5 分钟兜底 sweep + 并发安全）、Kiosk 四个扫描页全部接真（不再是 `mockFile()`）。**范围确认（brainstorming 阶段已定，非遗漏）**：固定输出 PDF（不支持 JPG 可选）；不提供 DPI / 单双面 / ADF-平板可选参数控制，改为"操作指引"文案（真实控制在打印机操作面板完成）；AI 裁边 / 纠偏 / 去阴影 / 去空白页 / OCR 均不在本轮范围内，未来如需要应另立项。**仍未做**：真实打印机 → SMB 共享 → Agent 端到端硬件链路从未在真机上跑过（Windows 真机验收清单待排期）；Kiosk 无法探测终端是否已配置 `scanWatchFolder`（未配置时仅靠 10 分钟任务过期兜底）；多终端共享同一台打印机的部署形态尚不支持。详见 `docs/progress/current-progress.md` 2026-07-10 对应条目。
+- [~] **首期真实扫描**（2026-07-10 代码闭环 + **2026-07-27 方案 B1 体验诚实化** + **同日 Windows SMB 预发库交付旁证**）：SMB 面板扫描 + Agent 目录监听主路线（**非** TWAIN）。B1 已预发；预发库多笔 `ScanTask.completed`+PDF（代表 `cms31h42w002yyga8di19zmdi`）。规格：`docs/superpowers/specs/2026-07-27-kiosk-scan-ux-honesty-design.md` / 现场包 `docs/device/gate-0k-smb-scan-field-acceptance.md`。**仍未做**：`scanWatchFolder` 健康上报（B2）；TWAIN 一点即扫（Spike C）；多终端共享打印机。未宣称整机商用全清单勾完。
 - [ ] **首期证件复印与证件照**：证件复印支持身份证正反面 A4 合成，默认不长期保存；证件照支持上传照片、抠图、换底色、规格检测、排版 PDF 和打印；身份证 / 证件照采集必须通过“采集 -> 使用 -> 删除 -> 审计”真机验收。
 - [~] **首期 U 盘导入**（2026-07-11，代码 + 本地 verify + Kiosk 浏览器走查级，未真机）：按 `docs/superpowers/plans/2026-06-30-print-scan-first-release-full-scope.md` Task 9 落地"Agent-only 枚举"路线——新增 `apps/terminal-agent/src/usb/usb-files.ts`（Windows CIM/PowerShell 检测可移动磁盘 + 白名单文件枚举，只返回文件名/扩展名/大小 + 一次性 `safeId`，从不返回绝对路径）；本地网桥 `qr-login-server.ts` 新增 `/local/usb/status`、`/local/usb/files`、`/local/usb/upload` 三个路由，复用现有 Origin CORS 白名单，并新增独立静态令牌 `localApiBridgeToken`（`X-Local-Bridge-Token`，随 Kiosk 构建 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 一起下发，未配置时该分支路由 fail-closed 403，不影响心跳/打印/扫描/QR登录）；upload 路由一次性消费 `safeId` 后转发到既有 `/files/kiosk-upload`（`purpose=print_doc`），不新增文件模型。Kiosk `PrintUploadPage.tsx` 的 `usb` tab 已从禁用占位接入真实轮询（未配置令牌时 tab 仍禁用显示"本机未配置"，不伪装可用）。验证：新增 `verify:usb-import-agent`（真实临时目录枚举白名单/隐藏文件过滤/一次性 safeId + 真实本地 HTTP server 鉴权/转发契约）与既有 `verify:local-qr-proxy` 均过，Terminal Agent/Kiosk typecheck、Kiosk lint、Kiosk 生产 build 全绿；浏览器走查确认未配置令牌时 tab 禁用、已配置但 Agent 未运行时展示"无法连接本机 Terminal Agent"错误态而非假成功、控制台无报错。**未验证**：`detectRemovableDrive()` / Windows 隐藏文件属性判定的 win32 分支在 macOS 开发环境无法真实调用，真实可移动磁盘检测、真实 U 盘插拔、Windows 服务安装态下的本地网桥联调均需 Windows 真机验收，未验收前不得宣称 U 盘导入已完成。
 - [x] **首期格式转换 · 图片→PDF（2026-07-11 已完成，代码 + 本地 verify 级）**：新增后端 `print-conversion` 模块（`services/api/src/print-conversion/`）——归属校验（会员按 `endUserId` 精确匹配；游客按 `fileAccessUrl` HMAC capability 校验，命中幂等缓存时同样重新校验）、JPEG/PNG 图片尺寸解析（零新依赖手写解析，处理 marker 填充字节等边界情况）、pdfkit 顺序合并（禁止 `Promise.all`，避免瞬时内存峰值）、资源上限（≤20 张/单张≤10MB/总≤40MB/像素上限）、Redis 幂等（`Idempotency-Key`，同 key 复用结果/冲突拒绝/占位过期重新抢锁/损坏值兜底放行）；`verify:print-conversion`（16 断言）已接入双 CI。Kiosk 新增 `ConvertImagesPage`（`/print-scan/convert`）：本机上传 + 手机扫码均"一次一张、可继续添加"，触控目标≥48px，扫码上传期间接入 `useBusyLock` 防待机打断；首页磁贴与 `/print-scan` 服务中心卡片均已从"即将上线"点亮为真实入口；生成后复用既有 `/print/confirm` 打印链路（含 `makePrintParams` 默认参数，不依赖 sessionStorage 残留）。**范围**：仅"图片（JPG/PNG）→ 合并为一份 PDF"，不含 PDF→图片、Word/Excel/PPT→PDF（均需额外依赖或排版渲染能力，留待独立评估）。**未做**：`CONVERT_STORAGE_UNAVAILABLE` 错误码（设计文档已列但未实现，存储读取失败目前走通用 500）。全仓 typecheck/lint、Nest DI 实际启动（本地起真实 NestJS 进程确认路由注册无依赖注入错误）、mock 模式浏览器三处入口走查均已通过；未预生产、未真机、未接入真实 COS/PostgreSQL 验收。
@@ -238,7 +470,7 @@
 ## P1：青序 LightFlow 用户前台迁移与双后台暖色边界
 
 - [x] **暖色边界的持久发布集成（2026-07-16）**：暖色候选已以代码提交 `189a035c` 经 PR #257 合入 `main`（merge commit `bb9c7efb`），GitHub `build-and-verify` / `postgres-readiness` 与 Antigravity + Claude 完整 diff 终审均通过；生产 release `frontend-bb9c7efb-20260716T090846Z` 已更新 Admin / Partner 源码与静态产物，公网入口加载新哈希并通过服务器静态门禁、产物 SHA-256 和完全拦截生产 API 的浏览器视觉验收。Kiosk、API、数据库、环境、支付、终端、打印、扫描、账号状态、nginx / PM2 与 `CLOSED_MODE` 均未修改；环境文件哈希前后一致，回滚包已保留。
-- [ ] **Partner 相对 API URL 解析独立修复**：本次线上视觉验收确认 `partnerHttpAdapter.get()` 在 `VITE_API_BASE_URL=/api/v1` 时会把相对地址直接传给单参数 `new URL()`，请求发出前进入页面错误态；旧版 `e62a9789` 与本次产物均使用同一相对 base，因此不是暖色发布引入的回归。本任务按边界未改接口适配逻辑；后续应单独补失败验证并把相对 base 按当前页面 origin 解析，再跑 Partner typecheck / lint / build / 相关 verify 与真实 API 只读验收。
+- [x] **Partner 相对 API URL 解析独立修复**（2026-07-25）：[PR #342](https://github.com/wanglei581/YITIJI/pull/342) → `main@6ed7ba7a`；同日预生产 **仅热更** Partner `dist` → `index-9Gb3kgQt.js`（API 仍 `70ed8f6d`）；同日已随 G6 全量部署 `7e59243c` 重建 Partner。未登录回跳 + 登录后 `/sources`/`/jobs` GET（`data-sources` / `jobs` / `quality-summary` 均为 200）冒烟全部通过。
 - [x] **视觉边界修正（2026-07-15）**：用户确认 Kiosk 用户前台继续青序 LightFlow 蓝白服务台，Admin 与 Partner 恢复并固定为暖色 Inkpaper 运营后台。双后台已移除 `service-desk.css` 导入和路由级 opt-in，Admin 告警 CTA 回到墨绿投影，Partner 岗位分类改用现有低饱和分类工具类并继续与审核/发布状态语义分离；未改路由、真实数据、权限、API、支付、打印、扫描或数据库。三份既有 CI 静态 verify 已改为断言该边界，其中基础门禁递归扫描双后台运行时源码；本地 TDD RED→GREEN、两端 lint/typecheck、带 `VITE_API_MODE=http VITE_API_BASE_URL=/api/v1` 的 production build，以及 Admin 工作台 / Partner 岗位页 1440×1024 本地 mock 浏览器视觉验收均通过。2026-07-15 仅替换 Admin / Partner `dist` 的首轮发布属于历史临时验证，随后被 `main=e62a9789` 全量发布覆盖；最终持久化集成、正式发布、线上静态与浏览器证据以上一条已完成任务为准。
 - [x] **规范、命名与全页面事实盘点**：4188 亮蓝白服务台仍命名为「青序 LightFlow」，工程内部保留 `service-desk` 主题命名；112 个正式页面组件、5 条重定向和 3 个路由壳层的三端事实盘点保留在 `docs/reviews/qingxu-lightflow-page-inventory-2026-07-12.md`。LightFlow 后续只迁移用户前台，不代表双后台需要蓝白换装。
 - [x] **UI-0 / UI-1 代表页实施（历史本地候选，后台部分已被本次边界修正取代）**：该候选曾在 Kiosk 首页、Admin 工作台、Partner 岗位管理建立服务台 opt-in。Kiosk 首页的 LightFlow 结果保留；Admin / Partner 的服务台 opt-in、蓝色投影和服务台专用分类变量已由本次暖色 Inkpaper 恢复替代。既有静态 verify 与 CI 接线继续保留，但现在锁定 Kiosk 蓝白、后台暖色的分流规则。
@@ -391,6 +623,39 @@
 
 - [x] **①双读映射 + ③Admin 弃用告警（2026-07-13，分支 `docs/cloud-upload-phone-upload-consolidation`，本地验证级）**：核实全仓仅 4 处引用 `cloud_upload`（`packages/shared/src/types/printScanCapability.ts`、`services/api/src/terminals/terminal-capabilities.types.ts`、`apps/admin/src/routes/print-scan/index.tsx`、`apps/admin/src/services/api/printScan.ts`），Kiosk 前端零引用。新增 `DEPRECATED_CAPABILITY_ALIAS`（`{ cloud_upload: 'phone_upload' }`，shared + 后端镜像 + Admin 本地镜像三处同步，`verify-admin-print-scan.ts` 新增契约防漂移断言）。`TerminalCapabilitiesService.listForTerminal`/`assertUserTaskAllowed` 读取 `phone_upload` 时，若其自身未配置而存在历史 `cloud_upload` 配置，回退读取后者状态/备注（仅只读兼容，不写库；`phone_upload` 一旦有自身配置则优先，不再回退）；Admin 能力页 `cloud_upload` 行加"已弃用，等同「手机扫码上传」"提示，mock 数据 note 同步更新。**验证**：`verify:admin-print-scan` 新增 5 条断言（回退读取/enforcement 回退/优先级覆盖，均 PASS）+ 全量 ALL PASS；shared/API/Admin typecheck 与 lint 全绿；真实浏览器 E2E（本地起 API + Admin 真实登录 admin/admin，对终端 `KSK-001` 手工把 `cloud_upload` 设为 `maintenance`+备注，刷新页面确认 `phone_upload` 行同步显示该状态/备注/更新时间，且弃用徽章正确渲染；测试数据已用只读盘点脚本确认清零并删除）。`.claude/launch.json` 新增 `api` dev server 预览配置（此前只有 kiosk/admin/partner，无 API，供本地验证时可通过 preview 工具直接起后端）。
 - [ ] **②盘点存量配置 + ④确认无引用后移除旧键**：已提供只读盘点脚本 `pnpm --filter @ai-job-print/api audit:cloud-upload-capability-usage`（新增 `services/api/scripts/audit-cloud-upload-capability-usage.ts`，纯 `SELECT`，不写库，读取 `.env`/`DATABASE_URL` 指向的目标库），需由有生产/预生产 PostgreSQL 访问权限的人对目标库运行；若报告 0 行且确认代码引用已清零，再另起独立任务执行④物理移除 `cloud_upload` 键本身（本任务窗口不具备生产库访问权限，未执行②③执行结果、未移除旧键）。未来「远程提交·到店取件」若立项应新增准确能力键（如 `remote_submit`/`terminal_release`），不复用 `cloud_upload`。依据与背景：`docs/reviews/2026-07-12-cloud-print-decision.md` §六 D4。
+
+## P1：双后台 IA 减法与 AI 治理（2026-07-31 审计登记，方案见 console-plan §六）
+
+> 全部依据与行号见 [console-plan-for-kiosk-proto-2026-07.md](../product/console-plan-for-kiosk-proto-2026-07.md) §六。
+>
+> **执行顺序（切勿写成「P0 最终验收 → A → A+ → 上线」，那会作废验收证据）**：A / A+ 会改路由、导航、feature key、日志与限流；若在最终验收后再改，P0 证据便不再对应实际上线候选。只能二选一——**① 推荐：完成剩余 P0 → 上线 → A → A+ → B/C**（后台 IA 与 AI 治理都不是上线阻塞项）；**② 若 A/A+ 必须随首发：P0 前置检查 → A → A+ → 重新执行完整 P0 最终验收 → 上线 → B/C**。轨道 B/C 另有共同前置：先完成招聘信息收费的许可边界审查（compliance-boundary §8.8.1）。
+
+### 已完成（本轮只做警示，不改行为）
+
+- [x] **`resume_optimize` 共用键警示落地（2026-07-31）**：核实 6 项用户可见能力共用该功能位——AI 简历优化（`llm-resume-optimize.service.ts`，两处）、岗位大师 / 岗位匹配（`llm-job-fit.service.ts`）、职业规划（`llm-career-plan.service.ts`）、招聘会拜访计划（`llm-fair-visit-plan.service.ts`）、岗位推荐与岗位解释（`job-ai-llm.service.ts` 同一 `callLlm`）。全仓共 6 处、无第 7 处，权威清单用 `grep -rn --include='*.ts' -E "get(ApiKey|Config)\('resume_optimize'\)" services/api/src` 复核（**故意不写行号**：加注释本身就会让行号漂移）。在 Admin「AI大模型」关掉「AI简历优化」或改错凭证会一并停掉全部 6 项；运行端不会说明这层依赖（各能力只表现为「未配置 / 不可用」）。已在 `llm-config.service.ts` 的 `resume_optimize` 条目上方加治理注释、在 4 个借用点各加就地指针注释，并把共用清单写入 `runtimeNote`（渲染于 `apps/admin/src/routes/ai-config/index.tsx:207,210`）——**因此 Admin 配置页现在有提示**。本项只是警示与登记，未拆键、未改业务逻辑；唯一运行时可见变化是该条 `runtimeNote` 文案。
+
+### 轨道 A：后台 IA 减法（可逆、零新功能，属上线前收口）
+
+- [ ] **A-1 隐私工单页去重**：`apps/admin/src/routes/member-privacy/index.tsx`（213 行）与 `privacy-requests/index.tsx`（457 行）打同一端点 `GET /admin/member-privacy/data-requests`，重试 / 驳回动作与 8 状态 × 3 类型映射表各有两份。保留功能更完整的 `/privacy-requests`，**必须保留 `/member-privacy` 旧 URL 重定向**，避免书签 / 测试 / 文档链接失效。
+- [ ] **A-2 摘掉 stub 导航项**：Admin `/permissions`（15 行 stub）、Partner `/stats`、`/terminals`、`/account`（各 15 行 stub，**共 3 项，不是 2 项**）从侧栏移除，**页面保留不删**。Partner 12 项导航里 3 项通向「本阶段未开放」，对付费机构是直接可信度损失。`/account`（账号权限）另需单独定性：console-plan 要求它接真，但接真属于轨道 C 的服务端 capability 投影范围（账号与权限必须服务端授权兜底），本轮先摘导航、在 A-2 里记明「接真归 C」，不要在 A 轨做半套权限页。**不把空页内容并入工作台**——工作台现有真实数据，没有真实聚合指标前不加空面板。
+- [ ] **A-3 Admin 六域导航重组**：32 → 25 项，只动 `AdminLayoutWrapper.tsx` 的 `NAV_ITEMS` / `PATH_TO_KEY` / `KEY_TO_PATH` + 路由 + Tab 容器，**不合并后端服务与状态机**。注意 `KEY_TO_PATH` 是 first-write-wins，调顺序会改 active 高亮；全部路由变更保留旧 URL 重定向。三处收窄：内容审核中心只统一入口 / 状态词汇 / SLA 展示（岗位 / 招聘会 / 政策的校验、发布、审计语义不同，不抽通用状态机）；数据接入按「数据源 / 文件导入 / 同步记录」三类而非 Excel+API 两 Tab（`AccessMode` 有 6 个值）；订单与计费、权益运营、会员沟通只合 IA 不合权限与状态。面试运营入口等 A-8 有数据后再挂，不提前放空页。
+- [ ] **A-4 `PriceConfig.effectiveFrom` 在 Admin UI 标注「尚未启用」**（低优先，非阻塞）：准确表述是该字段**无调度语义**——它由 `@default(now())` 自动填（两套 schema 均如此），`docs/operations/price-config-production.md:57` 人工 SQL 显式写 `NOW()`，Admin DTO（`admin-billing.service.ts:25,46,100`）与 mock 都带它；**并非「只由 seed 写入」**。缺的是读取方：`PricingService` 只按 `active` 报价。该状态**已被 verify 守卫锁定**（`verify-print-rollout-config.ts:186-195` 断言 `PricingService` 不得读 `effectiveFrom`），所以不是失控项，只是 UI 上没标出来。**不物理删除**——要动两套 Prisma schema + migration + DTO + 测试，且 `serviceKey @unique` 本身存不了价格历史版本。本轮只加 UI 标注；真做定时生效需先解开唯一约束，属轨道 B。
+
+### 轨道 A+：AI 治理（属收口，成本看不见就无法定价）
+
+- [ ] **A-5 拆独立 feature key**：为岗位大师 / 职业规划 / 招聘会拜访计划 / 岗位推荐 / 岗位解释各建独立 key，**默认继承 `resume_optimize` 配置**（行为不变、可回滚），使开关与成本归属按能力隔离。
+- [ ] **A-6 补 AI 成本日志覆盖 + 修前后端枚举漂移**：职业规划（`llm-career-plan.service.ts`）、招聘会拜访计划（`llm-fair-visit-plan.service.ts`）、模拟面试全链路（`mock-interview/*.service.ts`，含按时长计费的语音转写）当前 `grep -c "aiLog|AiLogService"` 全为 0，**这几项 AI 成本完全不可见**。同时修一处已确认的类型漂移：后端 `AiOperation`（`ai-log.service.ts:15`）有 9 个值，前端 `apps/admin/src/services/api/types.ts:316` 只有 8 个、漏 `adjustResumeLayout`，而 `costByOperation` 是 `Record<AiOperation, number>`——「简历排版调整」的成本在 Admin 侧类型上无处归属。注意 `AiServiceLog.operation` 与 `JobAiSession.operation`（`match` / `recommend` / `explain`）是两张表的两套取值，统一枚举时不要混。
+- [ ] **A-7 修「今日」口径 + 补限流覆盖**：`ai-log.service.ts:100` 是 `AI_USAGE_WINDOW_MS = 24h` 滚动窗，但 `apps/admin/src/routes/ai-services/index.tsx` 标「今日概览」（标题 :224、`aria-label` :223）与「今日累计」（:229），共 3 处文案口径标错。另 `ai.controller.ts` 11 条路由仅 4 条有 `@Throttle`、`mock-interview.controller.ts` 12 条仅 7 条，需补覆盖；并加超时 / 熔断 / 日预算。注意限流是防滥用，**不是**商业额度。
+- [ ] **A-8 面试训练运营页**：`mock-interview.controller.ts` 有 12 条路由（含语音转写 / 报告 / 打印），Admin 无任何业务页面。这是前后台核对后**唯一真正缺失的运营页**。须在 A-6 有数据后做才有意义；内容边界沿用「只见用量不见内容明细」（console-plan §四.2）。
+
+### 轨道 B：商业化（上线后独立立项，不塞进本轮收口）
+
+- [ ] **AI 商业化闸门**：`ai.controller.ts:170-200` + `ai.service.ts:320-380` 的实际时序是「**先查缓存，命中即返回** → 未命中才过 parse 行门禁、取原文、调 LLM（成本在此发生）→ 仅 completed 落库 → 客户端若显式传可选 `@Query benefitGrantId` 且 completed 才扣次数」，即事后可选记账，无服务端强制事前额度闸门。注意**缓存命中同样满足 `completed`、也会走核销分支**，真正防重复扣费的是幂等键 `hash(grant:resume_optimize:taskId)` 而非时序——做真实计费时「缓存命中不扣费」必须显式设计，不能依赖这个偶然正确的幂等键。`price-config.seed.ts` 只有 `print_bw_page` / `print_color_page` 两键，无任何 AI 价目键（注：`serviceKey` 是开放字符串，上线前需核实际生产库配置）。**不得在现有 AI GET 接口前直接挂扣费**——那些接口兼具读取 / 生成 / 缓存 / 扣权益副作用，直接加会产生不可审计扣费。需独立建：SKU 与价目版本（先解 `serviceKey @unique`）、原子履约账本（`reserve → LLM → commit`，失败 `release`，含请求幂等 / 缓存命中不重复扣费 / 超时退款 / 匿名转会员归属）、合同生命周期、机构结算、完整 RBAC。**`AiServiceLog` 不能当计费账本**（`ai-log.service.ts:152` best-effort 写入 + 估算成本，见 compliance-boundary §8.8.3）。
+
+### 轨道 C：Partner 自助（服务端授权必须先于动态侧栏）
+
+- [ ] **Partner capability 投影**：`Organization.type` 才是真实字段（`partnerType` 只是共享类型标识符），运行时 14 处使用。存在两套不可互换的概念：`ORG_TYPE_MATRIX`（`admin-orgs.service.ts:88-140`，管该机构**终端**开放哪些 Kiosk 能力）vs `partner-permission-matrix.md`（管该机构在 **Partner 后台**能管什么）。实证：`licensed_hr_agency` 的 `allowedModules` 含 `job_fair`，但权限矩阵 §三招聘会管理对 `hr_agency` 整行 ❌，二者同时成立。因此**不能直接复用 `ORG_TYPE_MATRIX` 下发侧栏**（它还是 service 内部常量，前端拿不到）。正确顺序：建服务端权威 capability 投影 → API 与路由双重校验 → 侧栏只作展示结果。**隐藏导航不等于权限控制。** 开工前需先定唯一事实源，并确认：`fair_organizer` 企业资料限定为招聘会关联企业；`enterprise_source` 只管本企业来源信息、不得演变为企业招聘后台；「校园招聘」目前无独立 Partner 页面、新增入口须过入口冻结规则；`fair_organizer` / `enterprise_source` 的 `allowedModules` 当前是空数组（需确认有意还是漏配）。
+- [ ] **Partner 聚合曝光统计（需动 schema，单独排期）**：`BrowseLog` / `ExternalJumpLog` 有 `targetType` + `targetId`，但无 `sourceOrgId` 字段与索引；要么 join 回 job / fair / policy（大数据量下慢），要么冗余一列 + 批量聚合。另需解决归因快照不可变性（内容换来源机构会致历史统计漂移）。隐私与计费边界强制遵守 compliance-boundary §8.8：**用户行为类**数据只给聚合 + 最小样本阈值（建议 N=5），不暴露 endUser 明细，曝光 / 跳转不得表述为投递或预约成功（机构自己的岗位 / 招聘会 / 数据源等业务对象数据不受此限，仍给对象级明细）。**另：统计能力可以做，但按招聘内容曝光 / 外跳收费属许可前置项（§8.8.1 第二类），法务与主管部门口径未明确前不得开启对应收费。**
 
 ## P2：商用二期候选（候选未立项，过门槛后才可立项）
 

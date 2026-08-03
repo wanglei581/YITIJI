@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI求职打印服务终端 · 登录验证失败</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* 15 的状态变体:验证码错误 / 短信发送失败(诚实反馈,不放行登录) */
+  .hero-row { flex: none; padding: 40px 48px 26px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .hero-row .eyebrow { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; color: var(--teal-deep); background: var(--teal-soft); border: 1px solid rgba(31,158,134,.3); border-radius: 999px; padding: 8px 18px; }
+  .hero-row .eyebrow svg { width: 20px; height: 20px; }
+  .hero-row h1 { margin-top: 22px; font-family: var(--serif); font-size: 54px; font-weight: 900; letter-spacing: 2px; line-height: 1.3; }
+  .hero-row p { margin-top: 14px; font-size: 23px; color: var(--muted); line-height: 1.5; max-width: 620px; }
+  .hero-clock { text-align: right; }
+  .hero-clock .time { font-family: var(--serif); font-size: 84px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+  .hero-clock .date { margin-top: 10px; font-size: 22px; color: var(--muted); }
+  .login-main { flex: 1; min-height: 0; padding: 0 48px; display: flex; }
+  .login-card { flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 30px 40px 34px; }
+  .folio { display: flex; justify-content: space-between; font-size: 18px; color: var(--muted); }
+  .folio b { font-family: var(--serif); font-size: 24px; color: var(--ink); }
+  .k-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .k-tab { min-height: 84px; display: flex; align-items: center; justify-content: center; gap: 14px; cursor: pointer; background: var(--paper); border: 2px solid var(--line); border-radius: var(--r-sm); font-family: var(--sans); font-size: 25px; font-weight: 600; color: var(--muted); }
+  .k-tab svg { width: 30px; height: 30px; }
+  .k-tab.on { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-deep); font-weight: 700; }
+  .agree-row { display: flex; align-items: center; gap: 14px; font-size: 19px; color: var(--muted); min-height: 52px; cursor: pointer; }
+  .agree-row .box { width: 40px; height: 40px; flex: none; border-radius: 10px; cursor: pointer; background: var(--surface); border: 2px solid var(--line); display: grid; place-items: center; }
+  .agree-row .box.on { background: var(--teal); border-color: var(--teal); }
+  .agree-row .box.on svg { width: 26px; height: 26px; color: #fff; }
+  .agree-row u { text-underline-offset: 4px; color: var(--teal-deep); }
+  /* 错误横幅(替换原 gate-hint 位置) */
+  .err-banner { display: flex; align-items: flex-start; gap: 12px; font-size: 18px; color: var(--error); background: var(--error-soft); border: 1px solid rgba(193,74,52,.4); border-radius: 12px; padding: 13px 18px; line-height: 1.5; }
+  .err-banner svg { width: 24px; height: 24px; flex: none; margin-top: 1px; }
+  .err-banner b { font-weight: 700; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .fields .sms-row { display: flex; gap: 12px; }
+  .fields .sms-row .field { flex: 1; }
+  .fields input { letter-spacing: 2px; font-variant-numeric: tabular-nums; }
+  .field.err input { border-color: var(--error); background: var(--error-soft); }
+  .field-err { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 15.5px; color: var(--error); }
+  .field-err svg { width: 16px; height: 16px; flex: none; }
+  .send-btn { flex: none; min-height: 76px; padding: 0 22px; cursor: not-allowed; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); font-family: var(--sans); font-size: 20px; font-weight: 600; color: var(--muted); }
+  .keypad { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .keypad button { min-height: 88px; cursor: pointer; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-sm); font-family: var(--serif); font-size: 36px; font-weight: 700; color: var(--ink); }
+  .keypad button:active { transform: scale(.97); background: var(--teal-soft); }
+  .keypad .fn { font-family: var(--sans); font-size: 22px; font-weight: 600; color: var(--muted); }
+  .login-card .btn.dark { min-height: 104px; font-size: 30px; letter-spacing: 4px; }
+  .helpline { flex: none; text-align: center; font-size: 19px; color: var(--muted); padding-top: 18px; }
+  .helpline b { color: var(--clay-deep); }
+  .foot-notice { flex: none; margin: 14px 48px 34px; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:25</span>
+      <button class="status-chip" style="cursor:pointer;min-height:48px">返回首页</button>
+    </div>
+  </header>
+
+  <section class="hero-row">
+    <div>
+      <span class="eyebrow">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+        就业服务 · 一体机自助办理
+      </span>
+      <h1>登录后,简历和记录<br>都替你存好</h1>
+      <p>AI 简历报告、打印订单、岗位与招聘会浏览记录自动保存到「我的」,下次来直接继续。</p>
+    </div>
+    <div class="hero-clock">
+      <div class="time">10:25</div>
+      <div class="date">7月17日 · 周五</div>
+    </div>
+  </section>
+
+  <main class="login-main">
+    <section class="card login-card">
+      <div class="folio"><b>会员登录</b><span>凭证仅存本机 · 离开请退出</span></div>
+
+      <div class="k-tabs">
+        <button class="k-tab on">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          手机号登录
+        </button>
+        <button class="k-tab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M20 20h1v1"/></svg>
+          手机扫码登录
+        </button>
+      </div>
+
+      <!-- 协议已勾选(门槛已过,失败发生在验证码环节) -->
+      <div class="agree-row" role="checkbox" aria-checked="true" tabindex="0">
+        <span class="box on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 8"/></svg></span>
+        <span>我已阅读并同意 <u>《用户服务协议》</u> 与 <u>《隐私政策》</u>(未注册手机号验证后自动创建账号)</span>
+      </div>
+
+      <!-- 错误横幅:验证码错误 -->
+      <div class="err-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.4v.3"/></svg>
+        <span><b>验证码不正确或已失效</b>,登录未成功。请核对短信后重新输入;超过 5 分钟需重新获取。连续多次失败请点下方「获取验证码」重发。</span>
+      </div>
+
+      <!-- 手机号 + 验证码(验证码框错误态) -->
+      <div class="fields">
+        <div class="field">
+          <label>手机号</label>
+          <input type="text" value="138 3691 6120" placeholder="请输入 11 位手机号">
+        </div>
+        <div class="sms-row">
+          <div class="field err">
+            <label>短信验证码<small style="font-weight:400;color:var(--muted)">(6 位数字,5 分钟内有效)</small></label>
+            <input type="text" value="4 8 2 1 0 9">
+            <div class="field-err">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>
+              验证码错误,请重新输入
+            </div>
+          </div>
+          <button class="send-btn" disabled style="align-self:flex-start;margin-top:34px">重新获取 · 52s</button>
+        </div>
+      </div>
+
+      <div class="keypad">
+        <button>1</button><button>2</button><button>3</button>
+        <button>4</button><button>5</button><button>6</button>
+        <button>7</button><button>8</button><button>9</button>
+        <button class="fn">清空</button><button>0</button><button class="fn">删除</button>
+      </div>
+
+      <button class="btn dark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+        重新验证并登录
+      </button>
+
+      <div class="helpline">无操作 <b>180</b> 秒后自动返回首页 · 遇到问题可找现场工作人员</div>
+    </section>
+  </main>
+
+  <div class="notice foot-notice">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>
+    登录仅用于保存你的简历、订单与浏览记录;敏感文件设有效期并自动清理,本终端不向任何企业提供简历。未登录也可浏览岗位与招聘会信息。
+  </div>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

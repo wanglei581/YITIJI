@@ -136,9 +136,22 @@ for (const forbidden of ['一键投递', '立即投递', '平台投递', '录用
   check(!allPages.includes(forbidden), `出现禁止或误导文案：${forbidden}`)
 }
 check(allPages.includes('不代表任何招聘结果承诺'), '缺少招聘结果合规边界')
-check(read('src/pages/interview/styles/interview-shell.css').includes('height: 100vh'), '顶级面试页未锁定完整视口高度')
-check(read('src/pages/interview/styles/interview-shell.css').includes('var(--sd-control-min, 48px)'), '普通触控目标未绑定 48px token')
-check(read('src/pages/interview/styles/interview-shell.css').includes('var(--sd-primary-control-min, 56px)'), '主操作未绑定 56px token')
+// 面试路由为顶级全屏：视口高度由 KioskFullscreenShell（h-screen）锁定；
+// .interview-flow 在壳内 flex 填满，不再自设 100vh（避免与共享顶栏叠出双滚动）。
+const fullscreenShell = read('src/components/kiosk-shell/KioskFullscreenShell.tsx')
+const interviewShell = read('src/pages/interview/InterviewShell.tsx')
+const interviewShellCss = read('src/pages/interview/styles/interview-shell.css')
+check(
+  fullscreenShell.includes('h-screen') || fullscreenShell.includes('100vh') || fullscreenShell.includes('100dvh'),
+  'KioskFullscreenShell 未锁定完整视口高度',
+)
+check(interviewShell.includes('KioskFullscreenShell'), 'InterviewShell 未接入共享全屏壳')
+check(
+  /\.interview-flow\s*\{[\s\S]*?(?:height:\s*100%|flex:\s*1)/.test(interviewShellCss),
+  '顶级面试页未在全屏壳内填满可用高度',
+)
+check(interviewShellCss.includes('var(--sd-control-min, 48px)'), '普通触控目标未绑定 48px token')
+check(interviewShellCss.includes('var(--sd-primary-control-min, 56px)'), '主操作未绑定 56px token')
 check(read('src/pages/interview/session/InterviewSessionPanels.tsx').includes('role="log" aria-live="polite"'), '对话新增内容缺少读屏播报合同')
 check(!read('src/pages/interview/styles/interview-responsive.css').includes('.interview-session__privacy-note { display: none; }'), '短屏不得隐藏全部会话隐私说明')
 

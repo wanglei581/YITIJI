@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button } from '@ai-job-print/ui'
+import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
 import {
   COMPLIANCE_COPY,
   makePrintParams,
@@ -35,6 +35,7 @@ import { kioskUploadFile } from '../../services/api/files'
 import { getTerminalId } from '../../services/api/screensaver'
 import { signCompose, signInspect } from '../../services/api/printSign'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
+import './styles/print-scan-fusion.css'
 
 const MAX_DOC_BYTES = 15 * 1024 * 1024
 const MAX_STAMP_BYTES = 10 * 1024 * 1024
@@ -277,45 +278,18 @@ export function SignStampPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-canvas px-6 py-5 text-neutral-900">
-      <header className="flex h-[72px] shrink-0 items-center justify-between rounded-lg bg-dark px-6 text-surface shadow-sm">
-        <div>
-          <b className="block text-[21px] font-bold">就业服务大厅 · 01号机</b>
-          <span className="mt-1 block text-sm text-neutral-100">AI求职打印服务终端</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-base text-neutral-100">2026年7月17日 10:24</span>
-          <span className="inline-flex h-10 items-center gap-2 rounded-full bg-success-bg px-4 text-base font-semibold text-success-fg">
-            <span className="h-2.5 w-2.5 rounded-full bg-current" />
-            打印机正常 · A4纸充足
-          </span>
-        </div>
-      </header>
+    <KioskPageFrame className="w2-print-scan-page">
+      <div data-w2-page="print-scan-sign" className="w2-print-scan-shell flex h-full flex-col bg-canvas text-neutral-900">
+      <KioskPageHeader title="签名盖章" description="在 PDF 上叠加签名 / 印章图片（版式合成）" onBack={() => navigate('/print-scan')} backLabel="返回打印扫描服务" />
 
-      <div className="mt-5 flex shrink-0 items-center gap-5">
-        <button type="button" onClick={() => navigate('/print-scan')} className="inline-flex h-14 items-center gap-2 rounded-md border border-neutral-200 bg-surface px-5 text-lg font-semibold text-neutral-700">
-          <ArrowLeftIcon className="h-5 w-5" />
-          返回打印扫描服务
-        </button>
-        <div>
-          <h1 className="font-serif text-[42px] font-black leading-tight tracking-normal">签名盖章</h1>
-          <p className="mt-1 text-xl text-neutral-500">在 PDF 上叠加签名 / 印章图片（版式合成）</p>
-        </div>
-      </div>
-
-      <main className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
+      <section className="mt-4 flex min-h-0 flex-1 flex-col gap-4">
         <div className="flex items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-5 py-4 text-lg leading-relaxed text-warning-fg">
           <InfoIcon className="h-6 w-6 shrink-0" />
           {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
         </div>
-        {error && (
-          <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-base text-error-fg">
-            <AlertCircleIcon className="h-5 w-5 shrink-0" />
-            {error}
-          </div>
-        )}
+        {error && <KioskStatePanel compact tone="error" title="签名盖章暂未完成" description={error} icon={<AlertCircleIcon />} />}
 
-        <div className="flex min-h-0 flex-1 gap-5">
+        <div className="w2-print-scan-split">
           <section className="flex min-w-0 flex-1 flex-col gap-4">
             <div className="rounded-lg border border-warning/30 bg-surface p-5 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
@@ -434,18 +408,18 @@ export function SignStampPage() {
             </div>
           </section>
 
-          <aside className="flex w-[400px] shrink-0 flex-col gap-4">
-            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+          <aside className="w2-print-scan-side">
+            <section className="w2-print-scan-preview rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
                 <b className="text-xl font-bold">{result ? '合成 PDF 预览' : '叠加效果示意'}</b>
                 <span className="ml-auto rounded-full bg-neutral-50 px-3 py-1 text-sm font-semibold text-neutral-500">第 {page} 页 · {POSITIONS.find((p) => p.key === position)?.label} · {SIZES.find((s) => s.key === size)?.label}</span>
               </div>
               {result ? (
-                <div className="h-[360px] overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                <div className="w2-print-scan-preview-frame">
                   <iframe title={`${result.name} 预览`} src={result.printFileUrl} className="h-full w-full bg-white" />
                 </div>
               ) : (
-                <div className="relative mx-auto flex aspect-[210/297] w-[240px] flex-col gap-2 rounded-md border border-neutral-200 bg-white p-4 shadow-md">
+                <div className="w2-print-scan-preview-mock">
                   <i className="h-3 w-1/2 rounded-full bg-neutral-800/70" />
                   <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                   <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
@@ -461,25 +435,38 @@ export function SignStampPage() {
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-warning-bg text-lg font-bold text-warning-fg">4</span>
                 <b className="text-[21px] font-bold">确认授权并生成</b>
               </div>
-              <label className="flex min-h-12 cursor-pointer items-start gap-3">
-                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="mt-1 h-6 w-6 shrink-0 accent-warning" />
+              <label className="flex min-h-[56px] cursor-pointer items-start gap-3">
+                <span
+                  className={[
+                    'mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border-2 transition-colors',
+                    authorized
+                      ? 'border-warning bg-warning-bg text-warning-fg'
+                      : 'border-neutral-300 bg-surface text-transparent',
+                  ].join(' ')}
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} className="h-6 w-6">
+                    <path d="M5 12.5l4.5 4.5L19 8" />
+                  </svg>
+                </span>
+                <input type="checkbox" checked={authorized} onChange={(e) => setAuthorized(e.target.checked)} className="sr-only" />
                 <span className="text-[17px] leading-relaxed text-neutral-700">{AUTHORIZATION_LABEL}</span>
               </label>
-              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">请点击上方勾选确认授权后再生成。伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
             </section>
 
-            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-3 block text-xl font-bold">生成后你可以</b>
-              <div className="flex flex-1 flex-col gap-2.5">
-                <button type="button" disabled={!result} onClick={goPrint} className="flex flex-1 items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
+              <div className="flex flex-col gap-2.5">
+                <button type="button" disabled={!result} onClick={goPrint} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
                   <PrinterIcon className="h-6 w-6" />
                   <span><b className="block text-lg font-bold">去打印</b><span className="text-sm text-neutral-500">预览合成 PDF 后进入确认打印</span></span>
                 </button>
-                <button type="button" disabled={!result} onClick={addAnother} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                <button type="button" disabled={!result} onClick={addAnother} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
                   <StampIcon className="h-6 w-6 text-warning-fg" />
                   <span><b className="block text-lg font-bold">再加一处签名 / 印章</b><span className="text-sm text-neutral-500">以合成结果为底继续叠加</span></span>
                 </button>
-                <button type="button" disabled={!result} onClick={redoPlacement} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                <button type="button" disabled={!result} onClick={redoPlacement} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
                   <RotateCcwIcon className="h-6 w-6 text-warning-fg" />
                   <span><b className="block text-lg font-bold">重新选位置</b><span className="text-sm text-neutral-500">不满意可回到本步重新生成</span></span>
                 </button>
@@ -487,9 +474,9 @@ export function SignStampPage() {
             </section>
           </aside>
         </div>
-      </main>
+      </section>
 
-      <div className="mt-5 flex h-[76px] shrink-0 items-center gap-4 border-t border-neutral-200 bg-canvas pt-4">
+      <KioskActionBar>
         <Button variant="secondary" size="lg" className="h-14 px-7 text-lg" onClick={() => navigate('/print-scan')}>
           <ArrowLeftIcon className="mr-2 h-5 w-5" />
           返回
@@ -506,7 +493,8 @@ export function SignStampPage() {
             {busy ? '正在生成…' : authorized ? '生成合成 PDF' : '生成合成 PDF（请先确认授权）'}
           </Button>
         )}
+      </KioskActionBar>
       </div>
-    </div>
+    </KioskPageFrame>
   )
 }

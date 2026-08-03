@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>材料扫描 · 扫描仪暂不可用</title>
+<link rel="stylesheet" href="../kiosk-proto-2026-07/shared.css">
+<style>
+  /* 34 的状态变体:HARDWARE_BLOCKED 扫描仪离线 / 忙碌 / 故障
+     诚实反映硬件不可用,不创建扫描任务,给出仍可用的替代路径 */
+  .scan-off-wrap { flex: 1; min-height: 0; display: flex; gap: 22px; }
+  .off-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px 46px; }
+  .off-icon { width: 138px; height: 138px; border-radius: 38px; display: grid; place-items: center; background: var(--clay-soft); color: var(--clay-deep); border: 1px solid rgba(184,104,60,.3); }
+  .off-icon svg { width: 74px; height: 74px; }
+  .off-main h2 { margin-top: 30px; font-family: var(--serif); font-size: 42px; font-weight: 900; letter-spacing: 2px; }
+  .off-main .desc { margin-top: 16px; font-size: 22px; line-height: 1.65; color: var(--muted); max-width: 560px; }
+  .off-main .check-meta { margin-top: 22px; display: inline-flex; align-items: center; gap: 10px; font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 10px 22px; }
+  .off-main .check-meta svg { width: 20px; height: 20px; }
+  .off-actions { margin-top: 38px; display: flex; gap: 18px; }
+  .off-actions .btn { min-height: 96px; min-width: 300px; }
+  .off-actions .btn.primary { font-size: 27px; letter-spacing: 2px; }
+  .side-col { width: 400px; flex: none; display: flex; flex-direction: column; gap: 16px; }
+  .impact-card { flex: 1; padding: 22px 26px; display: flex; flex-direction: column; }
+  .impact-card b.hd { font-size: 21px; font-weight: 700; display: block; margin-bottom: 14px; }
+  .impact-card ul { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+  .impact-card li { list-style: none; display: flex; align-items: center; gap: 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; font-size: 18.5px; }
+  .impact-card li .txt { flex: 1; min-width: 0; }
+  .impact-card li .txt b { font-weight: 600; display: block; }
+  .impact-card li .txt span { font-size: 15.5px; color: var(--muted); }
+  .impact-card li .chip { flex: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <header class="topbar">
+    <div class="brand"><b>就业服务大厅 · 01号机</b><span>AI求职打印服务终端</span></div>
+    <div class="right">
+      <span class="clock" id="clock">2026年7月17日 10:26</span>
+      <span class="status-chip warn"><span class="dot"></span>扫描仪暂不可用</span>
+    </div>
+  </header>
+
+  <div class="pagehead">
+    <button class="back-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回
+    </button>
+    <div class="titles">
+      <h1>材料扫描</h1>
+      <p>扫描仪当前无法使用,暂不能创建扫描任务</p>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step active"><span class="s-dot">1</span><span class="s-label">选择类型</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">2</span><span class="s-label">扫描指引</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">3</span><span class="s-label">扫描中</span></div>
+    <div class="step-line"></div>
+    <div class="step"><span class="s-dot">4</span><span class="s-label">完成</span></div>
+  </div>
+
+  <main class="content">
+
+    <div class="notice warn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.3"/></svg>
+      本机检测到扫描仪未就绪(离线、正忙或需要处理),现在无法开始扫描;请稍后重试或改用下方仍可用的方式。
+    </div>
+
+    <div class="scan-off-wrap">
+
+      <!-- 主区:扫描仪离线态 -->
+      <section class="card off-main">
+        <span class="off-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 3l18 18"/><path d="M8 11h.01M12 11h4"/></svg>
+        </span>
+        <h2>扫描仪暂不可用</h2>
+        <p class="desc">本机与打印机 / 扫描仪的连接未就绪,或设备正在处理其他任务。系统正在自动检测,恢复后可继续创建扫描任务。</p>
+        <span class="check-meta">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          最近检测 10:26 · 每 10 秒自动重试,已重试 3 次
+        </span>
+        <div class="off-actions">
+          <button class="btn primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20 12a8 8 0 10-2.3 5.6M20 12V6m0 6h-6"/></svg>
+            重新检测扫描仪
+          </button>
+          <button class="btn ghost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12a8 8 0 0116 0M3 14a2 2 0 012-2h1v6H5a2 2 0 01-2-2zM21 14a2 2 0 00-2-2h-1v6h1a2 2 0 002-2v-2z"/></svg>
+            联系工作人员
+          </button>
+        </div>
+      </section>
+
+      <!-- 右:仍可用的替代路径(诚实分列) -->
+      <div class="side-col">
+        <section class="card impact-card">
+          <b class="hd">你现在还能做什么</b>
+          <ul>
+            <li>
+              <span class="txt"><b>上传文件打印</b><span>手机 / U盘里的现成文件仍可打印</span></span>
+              <span class="chip ok">可使用</span>
+            </li>
+            <li>
+              <span class="txt"><b>U盘直插打印</b><span>打印机自带能力,U盘插打印机即可</span></span>
+              <span class="chip ok">可使用</span>
+            </li>
+            <li>
+              <span class="txt"><b>扫描到 U盘</b><span>打印机面板自带,以设备现场提示为准</span></span>
+              <span class="chip ok">可尝试</span>
+            </li>
+            <li>
+              <span class="txt"><b>本机发起扫描任务</b><span>需扫描仪就绪后才可创建</span></span>
+              <span class="chip warn">暂不可用</span>
+            </li>
+          </ul>
+        </section>
+
+        <div class="notice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>
+          若长时间未恢复,请到服务台联系现场工作人员检查设备连接与纸张状态。
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn ghost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
+      返回打印扫描
+    </button>
+    <span class="spacer"></span>
+    <button class="btn primary" style="min-width: 360px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+      改用上传文件打印
+    </button>
+  </div>
+</div>
+<script src="../kiosk-proto-2026-07/shared.js"></script>
+</body>
+</html>

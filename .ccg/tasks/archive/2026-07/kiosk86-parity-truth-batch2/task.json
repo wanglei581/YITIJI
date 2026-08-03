@@ -1,0 +1,12 @@
+{
+  "id": "kiosk86-parity-truth-batch2",
+  "title": "Kiosk 82 个视觉目标逐屏证据与功能真实性第二批",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务，后续独立执行 83 组视觉证据生成与人工逐对判定",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-kiosk87-closure-20260726"
+}

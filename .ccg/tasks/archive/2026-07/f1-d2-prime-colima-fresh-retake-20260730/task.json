@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-colima-fresh-retake-20260730",
+  "title": "在现有 Colima 非生产 Linux 对 main@e721f87a 执行一次 F1 D2′ fresh retake",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "另起任务修复 XDG user-systemd 执行契约；未经新授权不得再次 retake",
+  "createdAt": "2026-07-30T14:43:10Z",
+  "branch": "codex/f1-d2-prime-colima-fresh-retake-20260730"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "review-preprod-pnpm1122-integration-20260726",
+  "title": "审查预生产 Node 22 / pnpm 11.2.2 分支的 5 个提交",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "tooling-security",
+  "currentPhase": "completed",
+  "nextAction": "归档审查记录；待用户授权后修正单处文档冲突并推送 / 建 PR",
+  "createdAt": "2026-07-26T13:40:00Z",
+  "branch": "codex/preprod-pnpm1122-upgrade-20260726"
+}

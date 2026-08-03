@@ -1,5 +1,6 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
 import { KioskRoot } from '../layouts/KioskRoot'
+import { KioskRuntimeRoot } from '../layouts/KioskRuntimeRoot'
 import { LoginPage } from '../pages/auth/LoginPage'
 import { MobileQrLoginPage } from '../pages/auth/MobileQrLoginPage'
 import { PhoneUploadPage } from '../pages/upload/PhoneUploadPage'
@@ -32,6 +33,7 @@ import { ScanResultPage } from '../pages/scan/ScanResultPage'
 import { PrintUploadPage } from '../pages/print/PrintUploadPage'
 import { PrintMaterialCheckPage } from '../pages/print/PrintMaterialCheckPage'
 import { PrintPreviewPage } from '../pages/print/PrintPreviewPage'
+import { PrintParamsPage } from '../pages/print/PrintParamsPage'
 import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
@@ -45,6 +47,7 @@ import { MyActivityPage } from '../pages/profile/me/MyActivityPage'
 import { MyBenefitsPage } from '../pages/profile/me/MyBenefitsPage'
 import { MyAiRecordsPage } from '../pages/profile/me/MyAiRecordsPage'
 import { MySettingsPage } from '../pages/profile/me/MySettingsPage'
+import { MyPrivacyRequestsPage } from '../pages/profile/me/MyPrivacyRequestsPage'
 import { MyNotificationsPage } from '../pages/profile/me/MyNotificationsPage'
 import { MyFeedbackPage } from '../pages/profile/me/MyFeedbackPage'
 import { HelpCenterPage } from '../pages/help/HelpCenterPage'
@@ -55,6 +58,7 @@ import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureIn
 import { ConvertImagesPage } from '../pages/print-scan/ConvertImagesPage'
 import { SignStampPage } from '../pages/print-scan/SignStampPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
+import { SelfAssessmentIntroPage, SelfAssessmentQuizPage, SelfAssessmentResultPage, SelfAssessmentHistoryPage } from '../pages/resume/SelfAssessmentFlow'
 import { ResumeGeneratePage } from '../pages/resume/ResumeGeneratePage'
 import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreviewPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
@@ -71,34 +75,50 @@ import { SmartCampusHomePage } from '../pages/smart-campus/SmartCampusHomePage'
 import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcomePage'
 import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
+import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
 
 export const kioskRouter = createBrowserRouter([
-  // 顶级全屏路由——不嵌套在 KioskRoot，无 header/footer/nav（L2-4B）
-  { path: '/login', element: <LoginPage /> },
-  { path: '/member/qr-login', element: <MobileQrLoginPage /> },
-  { path: '/upload/phone', element: <PhoneUploadPage /> },
-  { path: '/legal/:doc', element: <LegalDocPage /> },
-  { path: '/resume/job-fit', element: <JobFitPage /> },
-  { path: '/resume/career-plan', element: <CareerPlanPage /> },
-  { path: '/interview/setup', element: <InterviewSetupPage /> },
-  { path: '/interview/session', element: <InterviewSessionPage /> },
-  { path: '/interview/report', element: <InterviewReportPage /> },
-  { path: '/interview/tips', element: <InterviewTipsPage /> },
-  { path: '/interview/reports', element: <InterviewReportsPage /> },
-  // 待机宣传屏:顶级路由,全屏渲染(不套 KioskLayout 头部/底部导航)
-  { path: '/screensaver', element: <ScreensaverPage /> },
+  // 只有明确的手机辅助入口豁免 27 寸公共终端运行时超时。
+  { path: '/member/qr-login', element: <MobileQrLoginPage />, errorElement: <KioskRouteErrorPage /> },
+  { path: '/upload/phone', element: <PhoneUploadPage />, errorElement: <KioskRouteErrorPage /> },
   {
-    path: '/session-timeout',
-    lazy: async () => ({ Component: (await import('../pages/placeholders/SessionTimeoutPage')).default }),
-  },
-  {
-    path: '/error-offline',
-    lazy: async () => ({ Component: (await import('../pages/placeholders/ErrorOfflinePage')).default }),
-  },
-  {
-    path: '/',
-    element: <KioskRoot />,
+    element: <KioskRuntimeRoot />,
     children: [
+      {
+        element: <Outlet />,
+        errorElement: <KioskRouteErrorPage />,
+        children: [
+      // 全屏终端路由：进入安全根，但不嵌套 KioskRoot 的视觉壳。
+      { path: '/login', element: <LoginPage />, errorElement: <KioskRouteErrorPage /> },
+      // 法律文档可从已登录终端会话进入，不能成为暂停硬隐私截止的逃逸路由。
+      { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/intro', element: <SelfAssessmentIntroPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/result', element: <SelfAssessmentResultPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/history', element: <SelfAssessmentHistoryPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/tips', element: <InterviewTipsPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/interview/reports', element: <InterviewReportsPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/screensaver', element: <ScreensaverPage />, errorElement: <KioskRouteErrorPage /> },
+      {
+        path: '/session-timeout',
+        errorElement: <KioskRouteErrorPage />,
+        lazy: async () => ({ Component: (await import('../pages/placeholders/SessionTimeoutPage')).default }),
+      },
+      {
+        path: '/error-offline',
+        errorElement: <KioskRouteErrorPage />,
+        lazy: async () => ({ Component: (await import('../pages/placeholders/ErrorOfflinePage')).default }),
+      },
+      {
+        path: '/',
+        element: <KioskRoot />,
+        errorElement: <KioskRouteErrorPage />,
+        children: [
       { index: true,               element: <HomePage /> },
       { path: 'assistant',         element: <AssistantPage /> },
       { path: 'profile',           element: <ProfilePage /> },
@@ -118,6 +138,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'me/feedback',       element: <MyFeedbackPage /> },
       // 账号设置轻量版（只读状态 + 协议入口 + 退出/切换账号；不做换绑/注销）
       { path: 'me/settings',       element: <MySettingsPage /> },
+      { path: 'me/privacy-requests', element: <MyPrivacyRequestsPage /> },
       // 帮助中心（静态 FAQ；仅描述已上线能力）
       { path: 'help',              element: <HelpCenterPage /> },
       // 权益活动中心（活动领取后生成 BenefitGrant，进入 /me/benefits；不含支付/套餐购买/招聘会凭证）
@@ -134,6 +155,7 @@ export const kioskRouter = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../pages/placeholders/FreshmanInsightsPage')).default }),
       },
       // 智慧校园（按学校/终端后台开关显示首页入口；路由本身保留直接访问容错）
+      { path: 'toolbox',                         lazy: async () => ({ Component: (await import('../pages/toolbox/ToolboxZonePage')).default }) },
       { path: 'smart-campus',                    element: <SmartCampusHomePage /> },
       { path: 'smart-campus/welcome',            element: <SmartCampusWelcomePage /> },
       { path: 'smart-campus/freshman-insights',  element: <FreshmanInsightsPage /> },
@@ -150,6 +172,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/upload',      element: <PrintUploadPage /> },
       { path: 'print/material-check', element: <PrintMaterialCheckPage /> },
       { path: 'print/preview',     element: <PrintPreviewPage /> },
+      { path: 'print/params',      element: <PrintParamsPage /> },
       { path: 'print/confirm',     element: <PrintConfirmPage /> },
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },
@@ -177,11 +200,15 @@ export const kioskRouter = createBrowserRouter([
       { path: 'jobs/:id',                              element: <JobDetailPage /> },
       {
         path: 'jobs/:id/offline',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/OfflineJobDetailPage')).default }),
+        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineJobDetailPage')).default }),
       },
       {
         path: 'offline-agencies',
-        lazy: async () => ({ Component: (await import('../pages/placeholders/OfflineAgenciesPage')).default }),
+        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgenciesPage')).default }),
+      },
+      {
+        path: 'offline-agencies/:id',
+        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgencyDetailPage')).default }),
       },
       {
         path: 'notifications',
@@ -199,6 +226,11 @@ export const kioskRouter = createBrowserRouter([
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
       { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
+        ],
+      },
+      { path: '*', element: <KioskRouteErrorPage /> },
+        ],
+      },
     ],
   },
 ])

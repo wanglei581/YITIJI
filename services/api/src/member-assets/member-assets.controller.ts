@@ -7,16 +7,15 @@ import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MemberAssetsService } from './member-assets.service'
 import type { MemberAiRecordItem, MemberAssetPage, MemberDocumentItem, MemberResumeItem } from './member-assets.types'
 
+import { resolveClientIp } from '../common/client-ip'
 interface ReqLike {
   headers?: Record<string, string | string[] | undefined>
   ip?: string
   requestId?: string
 }
 
-function ipOf(req: ReqLike): string | null {
-  const fwd = req.headers?.['x-forwarded-for']
-  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim()
-  return req.ip ?? null
+function ipOf(req: unknown): string | null {
+  return resolveClientIp(req)
 }
 
 function uaOf(req: ReqLike): string | null {
@@ -89,6 +88,38 @@ export class MemberAssetsController {
       actorId: null, // AuditLog.actorId FK 指向运营 User，会员动作记 payload.endUserId
       actorRole: 'enduser',
       action: 'member.ai_record_delete',
+      targetType: 'ai_resume_result',
+      targetId: id,
+      payload: {
+        endUserId: user.endUserId,
+        taskId: result.taskId,
+        kind: result.kind,
+        deletedCount: result.deletedCount,
+        cascade: result.kind === 'parse',
+      },
+      ipAddress: ipOf(req),
+      userAgent: uaOf(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok({ deleted: true, deletedCount: result.deletedCount })
+  }
+
+  /**
+   * 删除本人一条简历记录（Wave 2）。
+   * kind 限定 parse/generate；parse 行级联删同任务所有派生行和 JobAiSession。
+   * 删他人 / 不存在统一 404；动作写审计日志。
+   */
+  @Delete('resumes/:id')
+  async deleteResume(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param('id') id: string,
+    @Req() req: ReqLike,
+  ): Promise<ApiResponse<{ deleted: true; deletedCount: number }>> {
+    const result = await this.assets.deleteResume(user.endUserId, id)
+    await this.audit.write({
+      actorId: null,
+      actorRole: 'enduser',
+      action: 'member.resume_delete',
       targetType: 'ai_resume_result',
       targetId: id,
       payload: {

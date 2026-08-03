@@ -77,6 +77,17 @@ async function main() {
     data: { username: `vao_admin_${suffix}`, passwordHash: 'x', name: '验证管理员', role: 'admin' },
   })
   const admin: AuthedUser = { userId: adminRow.id, role: 'admin', orgId: null }
+  const trustedBindingFor = async (accountId: string) => {
+    const [freshAdmin, freshPartner] = await Promise.all([
+      prisma.user.findUnique({ where: { id: adminRow.id }, select: { tokenVersion: true } }),
+      prisma.user.findUnique({ where: { id: accountId }, select: { tokenVersion: true } }),
+    ])
+    if (!freshAdmin || !freshPartner) throw new Error('missing trusted account action binding fixture')
+    return {
+      adminTokenVersion: freshAdmin.tokenVersion,
+      partnerTokenVersion: freshPartner.tokenVersion,
+    }
+  }
 
   const username = `vao_partner_${suffix}`
   const phone = `139${Date.now().toString().slice(-8)}`
@@ -211,7 +222,7 @@ async function main() {
         phone: removablePhone,
       }, admin)
 
-      await svc.deleteAccount(orgId, removable.id, admin)
+      await svc.deleteAccount(orgId, removable.id, admin, await trustedBindingFor(removable.id))
 
       const detail = await svc.getOrgDetail(orgId)
       if (detail.accounts.some((account) => account.id === removable.id) || detail.counts.accounts !== 2) {
@@ -238,7 +249,7 @@ async function main() {
       }
 
       await expectCode(
-        () => svc.deleteAccount(orgId, removable.id, admin),
+        async () => svc.deleteAccount(orgId, removable.id, admin, await trustedBindingFor(removable.id)),
         'ACCOUNT_NOT_FOUND',
         '9c. 已移除账号不可重复移除',
       )
@@ -259,7 +270,7 @@ async function main() {
       const activeAccount = (await svc.getOrgDetail(orgId)).accounts.find((account) => account.username === username)
       if (!activeAccount) fail('9d. 未找到唯一有效账号，无法验证最后有效账号保护')
       await expectCode(
-        () => svc.deleteAccount(orgId, activeAccount.id, admin),
+        async () => svc.deleteAccount(orgId, activeAccount.id, admin, await trustedBindingFor(activeAccount.id)),
         'LAST_ACTIVE_PARTNER_ACCOUNT_REQUIRED',
         '9d. 不允许移除机构最后一个有效合作账号',
       )

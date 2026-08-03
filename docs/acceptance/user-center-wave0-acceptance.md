@@ -35,7 +35,7 @@
 |---|---|---|
 | Wave 0 页面真值 | `pnpm --filter @ai-job-print/kiosk verify:user-center-wave0` | PASS |
 | 登录扫码回归 | `pnpm --filter @ai-job-print/kiosk verify:qr-login-ui` | PASS |
-| Profile 回归 | `verify:profile-inkpaper-home`、`verify:lightflow-profile-entry`、`verify:lightflow-4188-layout-parity`、`verify:profile-commercial-first-batch`、`verify:member-session-closure` | PASS |
+| Profile 回归 | `verify:profile-inkpaper-home`、`verify:lightflow-profile-entry`、`verify:profile-commercial-first-batch`、`verify:member-session-closure` | PASS |
 | 隐私工单真值 | `pnpm --filter @ai-job-print/api verify:member-data-request-truth` | SQLite / PostgreSQL 均 PASS；当前补丁追加 `revoke_consent→rejected` 阻断并在两种正式 migration 空库复验 PASS |
 | 既有隐私治理 | `pnpm --filter @ai-job-print/api verify:job-ai-privacy` | PASS；当前补丁追加无审计、无状态更新的动态断言 |
 | 类型检查 | Kiosk、API `typecheck` | PASS |

@@ -1,0 +1,12 @@
+{
+  "id": "p0-kiosk-privacy-timeout-20260729",
+  "title": "公共终端硬性隐私超时与全路由清场",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "kiosk-security",
+  "currentPhase": "completed",
+  "nextAction": "已完成本地候选，归档后保留分支；不 push、不合并、不部署",
+  "createdAt": "2026-07-29T00:00:00+08:00",
+  "branch": "codex/p0-kiosk-privacy-timeout-20260729"
+}

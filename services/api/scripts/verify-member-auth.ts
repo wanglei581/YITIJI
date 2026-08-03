@@ -303,13 +303,13 @@ async function main() {
     const code = await redis.get(`member:sms:code:${phoneHash}`)
     if (code && /^\d{6}$/.test(code)) info(`从 Redis 取得验证码（脱敏校验内部用）: ${code.slice(0, 2)}****`)
     else fail('未能从 Redis 取得验证码')
-    const wrong = await post('/auth/login', { phone: PHONE, code: code === '000000' ? '111111' : '000000' })
+    const wrong = await post('/auth/login', { phone: PHONE, code: code === '000000' ? '111111' : '000000' , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' })
     if (wrong.status === 401) pass('错误验证码 → 401')
     else fail(`错误验证码 → ${wrong.status} (expected 401)`)
 
     // ── 6. 正确验证码登录 → 200 ───────────────────────────────────────────────
     console.log('\n── 6. 正确验证码登录 → 200 ────────────────────────────────────')
-    const login = await post('/auth/login', { phone: PHONE, code: code! })
+    const login = await post('/auth/login', { phone: PHONE, code: code! , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' })
     const loginData = (login.json.data ?? {}) as Json
     const token = loginData.token as string | undefined
     const user = (loginData.user ?? {}) as Json
@@ -384,7 +384,7 @@ async function main() {
       const matrixCode = `${unavailableLoginStates.indexOf(state) + 1}`.padStart(6, '4')
       await redis.setEx(`member:sms:code:${phoneHash}`, 300, matrixCode)
       await redis.del(`member:sms:attempt:${phoneHash}`)
-      const result = await post('/auth/login', { phone: PHONE, code: matrixCode })
+      const result = await post('/auth/login', { phone: PHONE, code: matrixCode , termsVersion: 'draft-pending-legal-review', privacyVersion: 'draft-pending-legal-review' })
       const error = result.json.error as Json | undefined
       if (
         result.status === 403 &&

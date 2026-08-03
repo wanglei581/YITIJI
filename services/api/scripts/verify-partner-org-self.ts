@@ -18,6 +18,11 @@ import { join } from 'path'
 import { AuditService } from '../src/audit/audit.service'
 import type { AuthedUser } from '../src/common/decorators/current-user.decorator'
 import { JobsService } from '../src/jobs/jobs.service'
+import { JobQualityService } from '../src/job-ai/job-quality.service'
+import { JobsKioskService } from '../src/jobs/jobs-kiosk.service'
+import { JobsAdminService } from '../src/jobs/jobs-admin.service'
+import { JobsPartnerService } from '../src/jobs/jobs-partner.service'
+import { JobsExcelService } from '../src/jobs/jobs-excel.service'
 import { AdminOrgsService } from '../src/orgs/admin-orgs.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
@@ -121,7 +126,12 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const orgs = new AdminOrgsService(prisma, audit)
-  const jobs = new JobsService(prisma, audit)
+  const _jobQuality = new JobQualityService(prisma)
+  const _kiosk = new JobsKioskService(prisma)
+  const _admin = new JobsAdminService(prisma, audit)
+  const _partner = new JobsPartnerService(prisma, audit, _jobQuality)
+  const _excel = new JobsExcelService(prisma, audit, _jobQuality)
+  const jobs = new JobsService(_kiosk, _admin, _partner, _excel)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 10)
   const staleOrgPrefix = 'org_psv_'

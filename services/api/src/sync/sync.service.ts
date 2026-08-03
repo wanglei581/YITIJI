@@ -4,10 +4,12 @@ import { PrismaService } from '../prisma/prisma.service'
 import { JobsService } from '../jobs/jobs.service'
 import { AuditService } from '../audit/audit.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
-import { ReplayGuard } from './replay-guard'
+import { RedisService } from '../common/redis/redis.service'
 import type { WebhookPayloadDto } from './dto/webhook-payload.dto'
 
 const TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
+/** Nonce TTL in Redis — matches the timestamp acceptance window (300 s = 5 min). */
+const NONCE_TTL_SECONDS = 300
 
 /**
  * 同步服务(BE-8)。
@@ -31,16 +33,20 @@ const TIMESTAMP_WINDOW_MS = 5 * 60 * 1000
  *
  * 写入路径:JobsService.importJobsFromWebhook(orgId, sourceName, items)
  * 状态机:落 pending+draft,必须 admin 审核才能上 Kiosk。
+ *
+ * 防重放存储:Redis SET NX EX 300(与时间戳窗口对齐)。
+ * 多实例/PM2 cluster 下不同 worker 共享同一 Redis,消除单进程 Map 方案的
+ * 重放漏洞。key 格式:`webhook:nonce:{sourceId}:{nonce}`。
  */
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name)
-  private readonly replay = new ReplayGuard()
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobs: JobsService,
     private readonly audit: AuditService,
+    private readonly redis: RedisService,
   ) {}
 
   async handleWebhook(args: {
@@ -64,7 +70,7 @@ export class SyncService {
     const ts = Number(args.timestampHeader)
     if (!Number.isFinite(ts) || ts <= 0) denied()
     if (!args.signatureHeader || args.signatureHeader.length < 8) denied()
-    if (!args.nonceHeader || args.nonceHeader.length < 8) denied()
+    if (!args.nonceHeader || args.nonceHeader.length < 8 || args.nonceHeader.length > 128) denied()
 
     // 1) 时间戳窗口(±5min)
     const tsMs = ts * 1000
@@ -101,7 +107,10 @@ export class SyncService {
     if (!sigMatch) denied()
 
     // 4) 防重放(nonce 在 sourceId 下 5min 唯一)
-    if (!this.replay.register(args.nonceHeader!, args.sourceId, tsMs)) denied()
+    //    Redis SET NX EX:多实例/PM2-cluster 安全;key 已存在 → replay → deny
+    const nonceKey = `webhook:nonce:${args.sourceId}:${args.nonceHeader!}`
+    const isNewNonce = await this.redis.setNxEx(nonceKey, '1', NONCE_TTL_SECONDS)
+    if (!isNewNonce) denied()
 
     // 5) 落库(走 JobsService.importJobsFromWebhook,与 Partner 手动导入共用 upsert 逻辑)
     const receivedRequestId = randomUUID()

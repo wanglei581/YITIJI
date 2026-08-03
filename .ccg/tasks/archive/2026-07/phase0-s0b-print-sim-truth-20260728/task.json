@@ -1,0 +1,22 @@
+{
+  "id": "phase0-s0b-print-sim-truth-20260728",
+  "title": "阶段 0 S0-B 打印 SIM 演示真值收口",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 PR；CI 通过前不合并，不部署",
+  "createdAt": "2026-07-28T23:24:00+08:00",
+  "branch": "codex/phase0-s0b-print-sim-truth-20260728",
+  "baseSha": "e909769c3052c7e732ea796384bdd971564112b0",
+  "analysisDecision": "现有 Playwright 固定 VITE_API_MODE=http，SIM 分支在正式浏览器套件不可达；不修改 Playwright 配置。永久回归使用静态真值 verify，另以 mock 模式 1080×1920 浏览器证据验收；真实 HTTP build 与既有 W2 print 13/13 保证生产链路未回退。",
+  "touches": {
+    "pii": false,
+    "payment": false,
+    "database": false,
+    "hardware": false,
+    "secrets": false,
+    "production": false
+  }
+}

@@ -93,6 +93,14 @@ export type TerminalPrinterStatus =
   | 'error'
   | 'not_found'
 
+export type TerminalLifecycleStatus =
+  | 'planned'
+  | 'commissioning'
+  | 'active'
+  | 'maintenance'
+  | 'suspended'
+  | 'retired'
+
 export interface AdminTerminalRecord {
   id: string
   terminalCode: string
@@ -100,6 +108,10 @@ export interface AdminTerminalRecord {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+  lifecycleStatus: TerminalLifecycleStatus
+  lifecycleVersion: number
+  credentialGeneration: number
+  hasActiveCredential: boolean
   orgId: string | null            // 所属机构 id；null = 未绑定
   orgName: string | null          // 所属机构名称
   registeredAt: string            // ISO
@@ -109,9 +121,29 @@ export interface AdminTerminalRecord {
   agentStatus: 'online' | 'offline' | 'error' | 'agent_degraded' | string | null
   localTaskDatabaseAvailable: boolean | null
   printerStatus: TerminalPrinterStatus | string | null
+  wiredNetworkStatus: 'connected' | 'disconnected' | 'unknown' | string | null
+  printerNetworkStatus: 'reachable' | 'unreachable' | 'not_network_printer' | 'unknown' | string | null
   agentVersion: string | null
   ipAddress: string | null
   diskFreeGb: number | null
+}
+
+export interface CreatePlannedTerminalInput {
+  terminalCode: string
+  displayName?: string
+  locationLabel?: string
+  orgId?: string
+}
+
+export interface PlannedTerminalCreated {
+  terminalId: string
+  terminalCode: string
+  displayName: string | null
+  locationLabel: string | null
+  orgId: string | null
+  orgName: string | null
+  enabled: boolean
+  lifecycleStatus: 'planned'
 }
 
 export interface AdminTerminalsResponse {
@@ -154,6 +186,47 @@ export interface UpdateTerminalProfileResult {
   macAddress: string | null
   locationLabel: string | null
   enabled: boolean
+}
+
+export interface UpdateTerminalLifecycleInput {
+  targetStatus: 'active' | 'maintenance' | 'suspended' | 'retired'
+  expectedStatus: Exclude<TerminalLifecycleStatus, 'planned' | 'retired'>
+  expectedVersion: number
+  reason: string
+  confirmationText?: string
+}
+
+export interface UpdateTerminalLifecycleResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: TerminalLifecycleStatus
+  newStatus: TerminalLifecycleStatus
+  inFlightTaskCount: number
+  lifecycleVersion: number
+  activePrintTaskCount?: number
+  activeScanTaskCount?: number
+  revokedCredentialCount?: number
+  revokedBindCodeCount?: number
+}
+
+export interface EmergencyRevokeTerminalInput {
+  expectedStatus: Exclude<TerminalLifecycleStatus, 'planned' | 'retired'>
+  expectedVersion: number
+  expectedCredentialGeneration: number
+  reason: string
+  confirmationText: string
+}
+
+export interface EmergencyRevokeTerminalResult {
+  terminalId: string
+  terminalCode: string
+  oldStatus: TerminalLifecycleStatus
+  newStatus: 'suspended'
+  lifecycleVersion: number
+  credentialGeneration: number
+  revokedCredentialCount: number
+  revokedBindCodeCount: number
+  inFlightTaskCount: number
 }
 
 // ── 终端授权绑定码（一次性）────────────────────────────────────────────────────
@@ -212,6 +285,7 @@ export interface AdminJobSourceRecord {
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
+  rejectReason?: string | null
 }
 
 // R1: Added sourceOrgId, sourceUrl, description
@@ -233,6 +307,7 @@ export interface AdminFairSourceRecord {
   syncTime: string
   reviewStatus: ReviewStatus
   publishStatus: PublishStatus
+  rejectReason?: string | null
 }
 
 // ─── Admin AI 服务管理类型 ─────────────────────────────────────
@@ -241,12 +316,23 @@ export interface AdminFairSourceRecord {
 export type AiOperation =
   | 'parseResume'
   | 'optimizeResume'
+  | 'adjustResumeLayout'
   | 'generateResume'
   | 'chatAssistant'
   | 'classifyIntent'
   | 'jobRecommend'
   | 'jobExplain'
   | 'jobMatch'
+  // A-6 成本可见性补齐（2026-07-31）
+  | 'careerPlan'
+  | 'fairVisitPlan'
+  | 'interviewQuestion'
+  | 'interviewReport'
+  | 'voiceTranscribe'   // ASR：按时长计费，estimatedCostCny 通常为 undefined
+  | 'voiceSynthesize'   // TTS：按字符计费，estimatedCostCny 通常为 undefined
+  | 'selfAssessment'    // 自我探索 · 倾向参考（2026-08-01）
+
+
 export type AiLogStatus = 'success' | 'failed'
 export type JobSourceQualitySummary = JobSourceQualitySummaryDTO
 
@@ -274,16 +360,7 @@ export interface AdminAiUsage {
   failCount: number
   successRate: number           // 0–100, one decimal
   avgLatencyMs: number          // success-only average
-  byOperation: {
-    parseResume: number
-    optimizeResume: number
-    generateResume: number
-    chatAssistant: number
-    classifyIntent: number
-    jobRecommend: number
-    jobExplain: number
-    jobMatch: number
-  }
+  byOperation: Record<AiOperation, number>
   errorDistribution: Array<{ code: string; count: number }>
   tokenUsageTotals: {
     promptTokens: number

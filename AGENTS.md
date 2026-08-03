@@ -59,8 +59,9 @@ services/worker/     # 打印/AI/同步任务
 packages/ui/         # 公共 UI 组件
 packages/shared/     # 公共类型和工具
 docs/                # 所有文档
-legacy-miaoda/       # 旧秒哒项目（仅参考，不用于开发）
 ```
+
+> `legacy-miaoda/` 已于 81724b73（2026-06-05）移出仓库，仅存于 tag `archive/legacy-miaoda-20260605`。不要按它规划目录或开发。
 
 ---
 
@@ -186,6 +187,5 @@ Agent 设计：[docs/device/windows-terminal-agent-design.md](docs/device/window
 
 ## 重要提醒
 
-- 不要在旧秒哒项目（legacy-miaoda/）里改代码。
 - 不要假设打印机支持 A3 或云端远程扫描。
 - 每次修改后更新 docs/progress/current-progress.md。

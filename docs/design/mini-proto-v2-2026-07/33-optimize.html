@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>简历优化 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .opt-head { padding:16px 20px 18px; background:linear-gradient(155deg,#614870,#7a5a86); }
+    .oh-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:rgba(255,255,255,.85); background:rgba(255,255,255,.14); padding:4px 10px; border-radius:var(--r-full); margin-bottom:10px; }
+    .oh-t { font-family:var(--font-serif); font-size:20px; font-weight:700; color:#fff; }
+    .oh-s { font-size:12.5px; color:rgba(255,255,255,.75); margin-top:6px; }
+    .seg-wrap { padding:14px 16px 4px; }
+    .diff-block { margin:0 16px 12px; }
+    .diff-label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; margin-bottom:7px; }
+    .diff-old { background:#fbeceb; border:1px solid #f3d4d2; border-radius:var(--r-md); padding:12px 14px; font-size:13.5px; color:#8a4b47; line-height:1.7; text-decoration:line-through; text-decoration-color:#d99; }
+    .diff-new { background:#e9f6f1; border:1px solid #c9e9de; border-radius:var(--r-md); padding:12px 14px; font-size:13.5px; color:#1a6b5a; line-height:1.7; }
+    .diff-arrow { text-align:center; color:var(--faint); font-size:14px; margin:5px 0; }
+    .hl { background:rgba(31,158,134,.16); padding:0 3px; border-radius:3px; font-weight:600; }
+    .why-row { display:flex; gap:8px; align-items:flex-start; font-size:12px; color:var(--muted); margin-top:8px; padding-left:2px; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#614870"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light" style="background:#614870;border-bottom:none">
+    <div class="nav-back" style="color:#fff">‹</div>
+    <div class="nav-title" style="color:#fff">AI 简历优化</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="opt-head">
+      <div class="oh-badge">✦ AI 优化 · 内容由 AI 生成</div>
+      <div class="oh-t">已生成 6 处优化建议</div>
+      <div class="oh-s">对比原文与优化后表述，逐条采纳或忽略</div>
+    </div>
+
+    <!-- 切换 -->
+    <div class="seg-wrap">
+      <div class="seg">
+        <div class="s on">逐条对比</div>
+        <div class="s">整篇预览</div>
+      </div>
+    </div>
+
+    <!-- diff 1 -->
+    <div class="diff-block">
+      <div class="diff-label"><span class="risk-tier high">项目经历</span></div>
+      <div class="diff-old">负责后台管理系统的开发与维护，参与多个功能模块。</div>
+      <div class="diff-arrow">↓</div>
+      <div class="diff-new">独立负责后台管理系统 <span class="hl">5 个核心模块</span> 开发，通过接口缓存与懒加载将平均响应时间 <span class="hl">从 800ms 降至 220ms</span>，支撑日活 3k+。</div>
+      <div class="why-row"><span class="plum">✦</span><div>优化点：补充可量化的结果与技术手段，增强说服力。</div></div>
+      <div class="row gap-8 mt-10">
+        <button class="btn ghost sm" style="flex:1">忽略</button>
+        <button class="btn primary sm" style="flex:1.4">采纳此项</button>
+      </div>
+    </div>
+
+    <!-- diff 2 -->
+    <div class="diff-block">
+      <div class="diff-label"><span class="risk-tier mid">技能标签</span></div>
+      <div class="diff-old">熟悉前端开发，会使用一些框架。</div>
+      <div class="diff-arrow">↓</div>
+      <div class="diff-new">熟练使用 <span class="hl">React / TypeScript</span>，掌握组件化开发与 <span class="hl">性能优化</span>，了解 Vite 工程化配置。</div>
+      <div class="why-row"><span class="plum">✦</span><div>优化点：补齐目标岗位关键词，提升筛选匹配度。</div></div>
+      <div class="row gap-8 mt-10">
+        <button class="btn ghost sm" style="flex:1">忽略</button>
+        <button class="btn primary sm" style="flex:1.4">采纳此项</button>
+      </div>
+    </div>
+
+    <div class="notice plum" style="margin:4px 16px 0">
+      <span>✦</span>
+      <div>还有 <b>4 处</b> 优化建议，采纳后可一键生成新版简历并打印。</div>
+    </div>
+
+    <div class="compliance-note">优化内容由 AI 生成，请自行核对真实性后再使用，切勿添加不实经历。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar ab-price">
+    <div class="ab-info"><div class="ab-hint">已采纳</div><div class="ab-amt teal">2 / 6 项</div></div>
+    <button class="btn plum lg" style="flex:1">✦ 生成新版简历</button>
+  </div>
+</div>
+</body>
+</html>

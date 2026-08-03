@@ -49,19 +49,22 @@ for (const file of walk(join(root, 'src'))) {
 if (offenders.length === 0) pass('kiosk src 无硬编码单价常量（PRICE_BW/PRICE_COLOR/¥x.x/面）')
 else fail(`硬编码价格常量出现在：${offenders.join(', ')}`)
 
-// ── 2. 预览/确认页接真服务端价目 + 估价口径同源 ──
+// ── 2. 预览参考价 / 确认页后端报价 / 参数页本地估价（均无硬编码单价）──
 const preview = read(join(root, 'src/pages/print/PrintPreviewPage.tsx'))
 const confirm = read(join(root, 'src/pages/print/PrintConfirmPage.tsx'))
-for (const [name, src] of [
-  ['PrintPreviewPage', preview],
-  ['PrintConfirmPage', confirm],
-]) {
-  expectMatches(src, /usePrintPriceConfig\(\)/, `${name} 使用服务端价目 hook`)
-  expectMatches(src, /estimatePrintCents\(/, `${name} 估价经统一口径 helper（按内容页）`)
-  expectAbsent(src, /totalFaces\s*\*\s*\w*[Pp]rice/, `${name} 不再按「面」自行乘价`)
-}
-expectMatches(preview, /价格暂不可用|以收银台金额为准/, 'PrintPreviewPage 取价失败态诚实提示（不显示假价）')
-expectMatches(confirm, /价格暂不可用|以收银台显示为准/, 'PrintConfirmPage 取价失败态诚实提示')
+const paramsPage = read(join(root, 'src/pages/print/PrintParamsPage.tsx'))
+expectAbsent(preview, /PRICE_BW|PRICE_COLOR|¥0\.20|¥0\.50/, 'PrintPreviewPage 无硬编码单价')
+expectMatches(confirm, /quotePrintOrder\(/, 'PrintConfirmPage 经 POST /orders/quote 取应付金额')
+expectMatches(confirm, /usePrintPriceConfig|quotePrintOrder/, 'PrintConfirmPage 不自持单价常量')
+expectAbsent(confirm, /totalFaces\s*\*\s*\w*[Pp]rice/, 'PrintConfirmPage 不再按「面」自行乘价')
+expectMatches(confirm, /演示模式不显示金额|页数待服务端确认，以最终计费为准|打印文件尚未就绪，无法报价/, 'PrintConfirmPage 无可靠报价时不展示具体金额')
+expectMatches(paramsPage, /usePrintPriceConfig\(\)/, 'PrintParamsPage 使用服务端价目 hook')
+expectMatches(paramsPage, /estimatePrintCents\(/, 'PrintParamsPage 估价经统一口径 helper（按内容页）')
+expectMatches(paramsPage, /countPagesInRange/, 'PrintParamsPage 估价纳入 pageRange')
+expectMatches(paramsPage, /以确认页报价为准/, 'PrintParamsPage 标明实付以确认页为准')
+expectAbsent(paramsPage, /totalFaces\s*\*\s*\w*[Pp]rice/, 'PrintParamsPage 不再按「面」自行乘价')
+expectMatches(preview, /价格暂不可用|以收银台金额为准|确认页|报价/, 'PrintPreviewPage 取价失败态诚实提示（不显示假价）')
+expectMatches(confirm, /价格暂不可用|以收银台显示为准|以最终计费为准|无法报价|演示模式不显示金额/, 'PrintConfirmPage 取价失败态诚实提示')
 expectAbsent(preview, /请选择优惠券/, 'PrintPreviewPage 不再渲染假的优惠券入口')
 
 // ── 3. priceConfigApi：DEMO 仅 mock 可达 + http 失败不回退 ──

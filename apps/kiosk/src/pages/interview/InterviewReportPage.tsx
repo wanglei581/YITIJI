@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Button, Card, ComplianceBanner, ErrorState, LoadingState, PageHeader } from '@ai-job-print/ui'
+import { Button, Card, ComplianceBanner, ErrorState, KioskPageHeader, LoadingState } from '@ai-job-print/ui'
 import type { InterviewReportResponse } from '@ai-job-print/shared'
 import { makePrintParams } from '@ai-job-print/shared'
 import {
@@ -25,7 +25,7 @@ import {
 import { getInterviewReport, printInterviewReport } from '../../services/api/interview'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
-import { InterviewTopbar } from './InterviewTopbar'
+import { InterviewShell } from './InterviewShell'
 import './interview-service-desk.css'
 
 interface ReportState {
@@ -117,33 +117,43 @@ export function InterviewReportPage() {
     }
   }
 
-  if (loading) return <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch"><LoadingState className="py-24" /></div>
+  if (loading) {
+    return (
+      <InterviewShell>
+        <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+          <LoadingState className="py-24" />
+        </div>
+      </InterviewShell>
+    )
+  }
   if (loadError || !data) {
     return (
-      <div className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
+      <InterviewShell>
+      <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-state-page" data-visual-theme="service-desk" data-ux-density="touch">
         <ErrorState message="报告不存在或已过期" className="py-4" />
-        <Button size="lg" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
-      </div>
+        <Button size="lg" className="min-h-14" onClick={() => navigate('/interview/setup')}>重新开始练习</Button>
+      </main>
+      </InterviewShell>
     )
   }
 
   const level = LEVEL_META[data.report.overall.level] ?? LEVEL_META['pass']
 
   return (
-    <div className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
-      <InterviewTopbar />
-      <PageHeader
+    <InterviewShell>
+    <main data-kiosk-domain="interview" data-kiosk-screen="interview-report" className="interview-flow interview-report" data-visual-theme="service-desk" data-ux-density="touch">
+      <KioskPageHeader
         className="interview-pagehead"
         title="模拟面试练习报告"
-        subtitle={`模拟练习，仅供参考 · ${data.position} · ${data.industry} · ${data.interviewerLabel}`}
-        actions={
-          <Button size="sm" variant="secondary" onClick={() => navigate('/')}>返回</Button>
+        description={`模拟练习，仅供参考 · ${data.position} · ${data.industry} · ${data.interviewerLabel}`}
+        aside={
+          <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
         }
       />
 
       <div className="interview-flow__scroll flex flex-1 flex-col gap-4 overflow-y-auto pb-32">
         <ComplianceBanner tone="info">
-          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
+          本报告仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。练习结果仅供本人复盘，不会发送给任何企业。
         </ComplianceBanner>
 
         {/* 综合表现 */}
@@ -226,6 +236,7 @@ export function InterviewReportPage() {
           </Button>
         </div>
       </div>
-    </div>
+    </main>
+    </InterviewShell>
   )
 }

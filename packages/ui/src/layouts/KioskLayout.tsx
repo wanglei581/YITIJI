@@ -1,8 +1,12 @@
 import { BotIcon, HomeIcon, UserIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { KioskTopbar } from '../components/KioskTopbar'
 import { cn } from '../lib/cn'
 import {
+  getKioskPresentationAttributes,
   getVisualThemeAttributes,
+  type KioskPresentation,
+  type KioskViewport,
   type UiDensity,
   type VisualTheme,
 } from '../theme/visualTheme'
@@ -29,12 +33,18 @@ export interface KioskLayoutProps {
   onTabChange?: (tab: KioskTab) => void
   /** Optional right-side element in the top status bar. */
   headerRight?: ReactNode
+  /** 顶栏品牌名（原型 topbar 左侧主标题），如「就业服务大厅」。 */
+  brandTitle?: string
+  /** 顶栏品牌副标题（原型 topbar 左侧次要说明），如终端编号。 */
+  brandSubtitle?: string
   /** Hide the top status bar entirely. */
   hideHeader?: boolean
   /** Hide the bottom navigation entirely (e.g. immersive 招聘会 detail pages). */
   hideBottomNav?: boolean
   visualTheme?: VisualTheme
   density?: UiDensity
+  presentation?: KioskPresentation
+  viewport?: KioskViewport
   className?: string
 }
 
@@ -43,24 +53,26 @@ export function KioskLayout({
   activeTab = 'home',
   onTabChange,
   headerRight,
+  brandTitle = '就业服务大厅',
+  brandSubtitle = 'AI求职打印服务终端',
   hideHeader = false,
   hideBottomNav = false,
   visualTheme = 'legacy',
   density = 'touch',
+  presentation = 'legacy',
+  viewport = 'kiosk',
   className,
 }: KioskLayoutProps) {
   return (
     <div
       {...getVisualThemeAttributes(visualTheme, density)}
+      {...getKioskPresentationAttributes(presentation, viewport)}
       className={cn('ui-kiosk-shell flex h-screen flex-col overflow-hidden bg-canvas', className)}
     >
 
-      {/* ── Top status bar (optional) ───────────────────── */}
+      {/* ── Top status bar：原型 topbar（76px 墨绿，品牌 + 状态） ── */}
       {!hideHeader && (
-        <header className="ui-kiosk-header flex h-10 shrink-0 items-center justify-between border-b border-neutral-200 bg-surface px-4">
-          <span className="text-xs font-medium text-neutral-500">AI求职打印服务终端</span>
-          {headerRight && <div className="flex items-center gap-2">{headerRight}</div>}
-        </header>
+        <KioskTopbar brandTitle={brandTitle} brandSubtitle={brandSubtitle} right={headerRight} />
       )}
 
       {/* ── Main content — scrollable ────────────────────── */}
@@ -68,12 +80,9 @@ export function KioskLayout({
         {children}
       </main>
 
-      {/* ── Bottom navigation ────────────────────────────── */}
+      {/* ── Bottom navigation：原型 navbar（116px 墨绿 + 青玉指示条） ── */}
       {!hideBottomNav && (
-      <nav
-        aria-label="主导航"
-        className="ui-kiosk-nav flex h-20 shrink-0 items-center gap-2 border-t border-neutral-200 bg-surface px-4 py-1.5"
-      >
+      <nav aria-label="主导航" className="ui-kiosk-nav">
         {TABS.map(({ key, label, icon: Icon }) => {
           const active = activeTab === key
           return (
@@ -83,16 +92,10 @@ export function KioskLayout({
               aria-label={label}
               aria-current={active ? 'page' : undefined}
               onClick={() => onTabChange?.(key)}
-              className={cn(
-                /* touch target: nav 高度扣除 padding 后 ≥ 56px × 1/3 宽 */
-                'flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-[18px] transition-colors',
-                active
-                  ? 'bg-primary-100 font-bold text-primary-700'
-                  : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700 active:text-neutral-700',
-              )}
+              className="ui-kiosk-nav__item"
             >
-              <Icon className="h-6 w-6" aria-hidden="true" />
-              <span className="text-xs font-semibold">{label}</span>
+              <Icon aria-hidden="true" />
+              <span>{label}</span>
             </button>
           )
         })}

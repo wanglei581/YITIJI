@@ -4,15 +4,16 @@ import type {
   BenefitStatus,
   BenefitType,
   MemberBenefitItem,
+  MemberRedemptionItem,
 } from './member-benefits.types'
 import { PrismaService } from '../prisma/prisma.service'
 import { buildMemberPage, memberPageArgs, type MemberPageQuery } from '../common/utils/member-page'
 
 // ============================================================
-// 会员权益只读服务（Phase C-2C 底座）。
+// 会员权益只读服务（Phase C-2C 底座 + Wave 3 核销记录查看）。
 //
 // 只读：本阶段不做发放 / 核销真实逻辑、不接支付。权益数据由后续活动(C-3) / 套餐(C-4) /
-// 支付核销(C-5) 阶段写入；当前仅提供"我的权益"列表展示。
+// 支付核销(C-5) 阶段写入；当前仅提供"我的权益"列表展示与"我的核销记录"查看。
 //
 // 全部查询都以传入的 endUserId（来自 EndUserAuthGuard 注入的 req.endUser）为唯一过滤维度，
 // 绝不接受任意 id 参数 → 跨用户越权天然不可能。
@@ -65,6 +66,53 @@ export class MemberBenefitsService {
       sourceType: r.sourceType as BenefitSourceType,
       validFrom: r.validFrom ? r.validFrom.toISOString() : null,
       validUntil: r.validUntil ? r.validUntil.toISOString() : null,
+      createdAt: r.createdAt.toISOString(),
+    }))
+  }
+
+  /**
+   * 我的核销记录列表（Wave 3）。
+   *
+   * 返回本人所有 RedemptionRecord，游标分页，按核销时间倒序。
+   * 仅读取安全字段（不含 idempotencyKey）；amountCents 代表平台 credit 抵扣额（非资金）。
+   * 全查询以 endUserId 为唯一过滤维度，跨用户越权天然不可能。
+   */
+  async listRedemptions(
+    endUserId: string,
+    page: MemberPageQuery,
+  ): Promise<{ items: MemberRedemptionItem[]; nextCursor: string | null; total: number }> {
+    const where = { endUserId }
+    const total = await this.prisma.redemptionRecord.count({ where })
+    type RedemptionRow = {
+      id: string; kind: string; benefitRef: string; serviceType: string
+      serviceRefId: string; orderId: string | null; amountCents: number
+      quantity: number; createdAt: Date
+    }
+    const rows = await this.prisma.redemptionRecord.findMany({
+      where,
+      select: {
+        id: true,
+        kind: true,
+        benefitRef: true,
+        serviceType: true,
+        serviceRefId: true,
+        orderId: true,
+        amountCents: true,
+        quantity: true,
+        createdAt: true,
+      },
+      // memberPageArgs 已包含 orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      ...memberPageArgs(page),
+    }) as unknown as RedemptionRow[]
+    return buildMemberPage(rows, page, total, (r) => ({
+      id: r.id,
+      kind: r.kind,
+      benefitRef: r.benefitRef,
+      serviceType: r.serviceType,
+      serviceRefId: r.serviceRefId,
+      orderId: r.orderId,
+      amountCents: r.amountCents,
+      quantity: r.quantity,
       createdAt: r.createdAt.toISOString(),
     }))
   }

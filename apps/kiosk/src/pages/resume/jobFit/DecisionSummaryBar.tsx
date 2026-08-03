@@ -1,9 +1,10 @@
 import type { JobFitResponse } from '@ai-job-print/shared'
+import { ClockIcon } from 'lucide-react'
 
 const FIT_META: Record<NonNullable<JobFitResponse['fitLevel']>, { label: string; cls: string }> = {
-  reference_high: { label: '匹配参考：较高', cls: 'bg-success-bg text-success-fg' },
-  reference_medium: { label: '匹配参考：中等', cls: 'bg-primary-50 text-primary-700' },
-  reference_low: { label: '匹配参考：偏低', cls: 'bg-warning-bg text-warning-fg' },
+  reference_high:   { label: '匹配参考：较高', cls: 'jf-fit-badge jf-fit-badge--high' },
+  reference_medium: { label: '匹配参考：中等', cls: 'jf-fit-badge jf-fit-badge--medium' },
+  reference_low:    { label: '匹配参考：偏低', cls: 'jf-fit-badge jf-fit-badge--low' },
 }
 
 interface DecisionSummaryBarProps {
@@ -13,21 +14,29 @@ interface DecisionSummaryBarProps {
   summary?: string
 }
 
-/** 可由既有 JobFitResponse 完整支撑的决策摘要，不补造任何结论。 */
+/** 岗位决策摘要卡 — 对齐原型屏55 a-clay accented card */
 export function DecisionSummaryBar({ jobTitle, company, fitLevel, summary }: DecisionSummaryBarProps) {
   const fit = fitLevel ? FIT_META[fitLevel] : null
   return (
-    <section className="job-fit-summary rounded-2xl border border-primary-100 bg-primary-50/40 p-5" aria-label="岗位匹配摘要">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-primary-600">岗位决策参考</p>
-          <h2 className="mt-0.5 truncate text-base font-bold text-neutral-900">
+    <section className="job-fit-summary jf-decision-summary" aria-label="岗位匹配摘要">
+      <div className="jf-decision-summary__head">
+        <div className="jf-decision-summary__titles">
+          <p className="jf-decision-summary__eyebrow">岗位决策参考</p>
+          <h2 className="jf-decision-summary__title">
             {jobTitle}{company ? ` · ${company}` : ''}
           </h2>
         </div>
-        {fit && <span className={['shrink-0 rounded-full px-3 py-1 text-sm font-semibold', fit.cls].join(' ')}>{fit.label}</span>}
+        {fit && (
+          <span className={fit.cls} aria-label={fit.label}>
+            <ClockIcon aria-hidden="true" />
+            {fit.label}
+          </span>
+        )}
       </div>
-      {summary && <p className="mt-3 text-sm leading-relaxed text-neutral-700">{summary}</p>}
+      {summary && <p className="jf-decision-summary__body">{summary}</p>}
+      <p className="jf-decision-summary__disclaimer">
+        匹配等级仅供本人参考，不代表录用结果；结果不会提供给任何企业。
+      </p>
     </section>
   )
 }

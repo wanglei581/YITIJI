@@ -14,6 +14,8 @@ export interface AuthedUser {
   userId: string
   role:   UserRole
   orgId:  string | null
+  /** 当前 Bearer Token 的 SHA-256 指纹，只用于服务端绑定高风险近期验证。 */
+  sessionId?: string
 }
 
 /**

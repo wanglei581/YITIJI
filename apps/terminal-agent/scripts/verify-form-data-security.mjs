@@ -44,7 +44,7 @@ assert.match(manifest.dependencies['form-data'], /^\^4\.0\.6(?:$|[\s])/,
 assert.ok(isAtLeast(installedVersion, '4.0.6'), `installed form-data must be >= 4.0.6, got ${installedVersion}`)
 assert.doesNotMatch(lockfile, /form-data@4\.0\.5:/, 'lockfile must not retain the vulnerable form-data@4.0.5 snapshot')
 assert.match(lockfile, /form-data@4\.0\.6:/, 'lockfile must resolve the patched form-data@4.0.6 snapshot')
-assert.match(lockfile, /axios@1\.16\.1:[\s\S]*?form-data: 4\.0\.6/, 'axios must dedupe to the patched form-data resolution')
+assert.match(lockfile, /axios@1\.18\.\d+:[\s\S]*?form-data: 4\.0\.6/, 'axios must dedupe to the patched form-data resolution')
 
 // Windows filesystems reject CR/LF and double quotes in file names, so this is
 // a local dependency-boundary regression rather than a claim of a physical USB

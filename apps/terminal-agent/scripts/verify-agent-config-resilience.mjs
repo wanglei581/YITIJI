@@ -17,7 +17,9 @@ const agentRoot = resolve(__dirname, '..')
 const {
   AgentStartupError,
   parseConfigText,
+  resolveAgentConfigPaths,
   serializePersistedConfig,
+  migrateLegacyConfigAt,
   writeValidatedConfigAt,
 } = require(join(agentRoot, 'src/agent/config-manager.ts'))
 const {
@@ -205,6 +207,58 @@ try {
     'AGENT_CONFIG_REQUIRED_FIELD_MISSING',
   )
   assert.equal(readFileSync(configPath, 'utf8'), primaryBeforeInvalidWrite, 'must not alter primary config after validation fails')
+
+  const legacyConfigDirectory = join(tempDir, 'legacy-config')
+  const programDataDir = join(tempDir, 'program-data')
+  const migrationPaths = resolveAgentConfigPaths({
+    platform: 'win32',
+    programDataDir,
+    legacyConfigDirectory,
+  })
+  fs.mkdirSync(legacyConfigDirectory, { recursive: true })
+  const legacyConfig = { ...valid, agentToken: 'legacy-agent-token' }
+  const legacyLastKnownGood = { ...valid, terminalCode: 'KSK-LEGACY' }
+  writeFileSync(migrationPaths.legacyConfigPath, JSON.stringify(legacyConfig), 'utf8')
+  writeFileSync(migrationPaths.legacyLastKnownGoodPath, JSON.stringify(legacyLastKnownGood), 'utf8')
+  const securedDirectories = []
+  const migrated = migrateLegacyConfigAt(
+    migrationPaths,
+    parseConfigText(readFileSync(migrationPaths.legacyConfigPath, 'utf8')),
+    {
+      hasPersistedToken: () => true,
+      assertSecureDirectory: (directory) => securedDirectories.push(directory),
+    },
+  )
+  assert.equal(migrationPaths.usesProgramData, true, 'Windows paths must use ProgramData')
+  assert.deepEqual(securedDirectories, [dirname(migrationPaths.configPath)], 'migration must verify ProgramData ACL before writing')
+  assert.equal(migrated.agentToken, undefined, 'migrated config must not retain plaintext token')
+  assert.equal(JSON.parse(readFileSync(migrationPaths.configPath, 'utf8')).agentToken, undefined, 'ProgramData config must not persist token')
+  assert.equal(JSON.parse(readFileSync(migrationPaths.legacyConfigPath, 'utf8')).agentToken, undefined, 'legacy config must be scrubbed')
+  assert.equal(JSON.parse(readFileSync(migrationPaths.lastKnownGoodPath, 'utf8')).terminalCode, 'KSK-LEGACY', 'legacy LKG must be preserved')
+  assertStartupError(
+    () => migrateLegacyConfigAt(migrationPaths, { ...valid, adminSecret: 'legacy-admin-secret' }),
+    'AGENT_CONFIG_MIGRATION_REQUIRES_REBIND',
+  )
+  assertStartupError(
+    () => migrateLegacyConfigAt(migrationPaths, legacyConfig, { hasPersistedToken: () => false }),
+    'AGENT_CONFIG_MIGRATION_REQUIRES_REBIND',
+  )
+
+  const corruptLkgDirectory = join(tempDir, 'corrupt-lkg-config')
+  const corruptLkgPaths = resolveAgentConfigPaths({
+    platform: 'win32',
+    programDataDir: join(tempDir, 'corrupt-lkg-program-data'),
+    legacyConfigDirectory: corruptLkgDirectory,
+  })
+  fs.mkdirSync(corruptLkgDirectory, { recursive: true })
+  writeFileSync(corruptLkgPaths.legacyConfigPath, JSON.stringify(valid), 'utf8')
+  writeFileSync(corruptLkgPaths.legacyLastKnownGoodPath, '{', 'utf8')
+  migrateLegacyConfigAt(corruptLkgPaths, valid, { assertSecureDirectory: () => {} })
+  assert.equal(
+    JSON.parse(readFileSync(corruptLkgPaths.lastKnownGoodPath, 'utf8')).terminalCode,
+    'KSK-001',
+    'an invalid legacy LKG must not block migration of the valid primary config',
+  )
 
   assert.equal(basename(diagnosticPath), 'last-startup-diagnostic.json')
   let diagnosticFailureObserved = false

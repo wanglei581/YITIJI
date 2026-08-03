@@ -35,6 +35,16 @@ function expectAbsent(source, pattern, message) {
   if (!pattern.test(source)) pass(message)
   else fail(`${message} — forbidden pattern ${pattern} matched`)
 }
+function readImportedCss(entryPath, expectedImports, message) {
+  const entry = read(entryPath)
+  const imports = [...entry.matchAll(/^@import\s+['"]([^'"]+)['"];\s*$/gm)].map((match) => match[1])
+  if (JSON.stringify(imports) !== JSON.stringify(expectedImports)) {
+    fail(`${message} — ${entryPath} 的显式 CSS imports 已变化: ${imports.join(' | ')}`)
+    return ''
+  }
+  pass(`${message} — 仅拼接聚合入口显式导入的 CSS`)
+  return imports.map((importPath) => read(join(dirname(entryPath), importPath))).join('\n')
+}
 function git(args) {
   return execFileSync('git', args, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 }
@@ -59,7 +69,17 @@ function listChangedFiles() {
 console.log('\n=== /me/print-orders 墨青纸感换装守卫 ===')
 
 const page = read('src/pages/profile/me/MyPrintOrdersPage.tsx')
-const css = read('src/pages/profile/me/me-detail-inkpaper.css')
+const css = readImportedCss(
+  'src/pages/profile/me/me-detail-inkpaper.css',
+  [
+    './styles/me-detail-base.css',
+    './styles/me-assets.css',
+    './styles/me-orders.css',
+    './styles/me-records.css',
+    './styles/me-settings-feedback.css',
+  ],
+  '明细页 CSS 聚合入口保持封闭',
+)
 const summary = read('src/pages/profile/me/printOrders/OrderPaymentSummary.tsx')
 const pickup = read('src/pages/profile/me/printOrders/PickupCodePanel.tsx')
 const copy = read('src/pages/profile/me/printOrders/paymentCopy.ts')

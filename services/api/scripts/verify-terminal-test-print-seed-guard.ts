@@ -73,6 +73,9 @@ async function main(): Promise<void> {
   try {
     // 这两个常量在模块加载期读取；先补齐只供本 verify 使用的安全占位值。
     const { TerminalsService } = await import('../src/terminals/terminals.service')
+    const { TerminalAgentService } = await import('../src/terminals/terminals-agent.service')
+    const { TerminalAdminService } = await import('../src/terminals/terminals-admin.service')
+    const { TerminalToolboxService } = await import('../src/terminals/terminal-toolbox.service')
 
     async function seedCallCount(env: Partial<Record<TestEnvKey, string>>): Promise<{
       upserts: SeedUpsertInput[]
@@ -97,7 +100,10 @@ async function main(): Promise<void> {
             },
           } as unknown as PrismaService
 
-          await new TerminalsService(prisma, null as never, null as never).onModuleInit()
+          // N3拆分后 onModuleInit 在 TerminalAgentService，TerminalsService 用 agent+admin 构造
+          const agentSvc = new TerminalAgentService(prisma, null as never)
+          await agentSvc.onModuleInit()
+          const _ = new TerminalsService(agentSvc, new TerminalAdminService(prisma, agentSvc, new TerminalToolboxService(null as never)))
         } finally {
           for (const interval of createdIntervals) clearInterval(interval)
           globalThis.setInterval = originalSetInterval

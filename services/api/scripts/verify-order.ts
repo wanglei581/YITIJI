@@ -26,6 +26,8 @@ import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.servic
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
+import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
+import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
 
 const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
 
@@ -61,10 +63,9 @@ async function main(): Promise<void> {
   const pricing = new PricingService(prisma)
   const orderStatus = new OrderStatusService(prisma, audit)
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
-  const terminals = new TerminalsService(prisma, new TerminalToolboxService(prisma), audit)
-  const resetExpiredClaims = (
-    terminals as unknown as { resetExpiredClaims: () => Promise<void> }
-  ).resetExpiredClaims.bind(terminals)
+  const _ag = new TerminalAgentService(prisma, audit)
+  const terminals = new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma)))
+  const resetExpiredClaims = _ag.resetExpiredClaims.bind(_ag)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_order_${suffix}`
@@ -307,12 +308,13 @@ async function main(): Promise<void> {
       where: { printTaskId: expiredPrint.taskId },
     })
     if (
-      resetTask?.status === 'pending' &&
+      resetTask?.status === 'failed' &&
+      resetTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
       resetTask.terminalId === terminalId &&
-      resetOrder?.taskStatus === 'pending' &&
+      resetOrder?.taskStatus === 'failed' &&
       resetOrder.terminalId === terminalId
     ) {
-      pass('resetExpiredClaims mirrors expired tasks back to pending and preserves terminalId')
+      pass('resetExpiredClaims fails unconfirmed tasks without automatic redispatch and preserves terminalId')
     } else {
       fail(`reset mirror mismatch: task=${JSON.stringify(resetTask)} order=${JSON.stringify(resetOrder)}`)
     }

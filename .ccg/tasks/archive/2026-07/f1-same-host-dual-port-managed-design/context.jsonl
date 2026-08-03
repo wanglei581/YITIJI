@@ -1,0 +1,5 @@
+{"path":"docs/superpowers/specs/2026-07-16-f1-parallel-genesis-bootstrap-design.md","reason":"冻结的平行 Genesis 状态机与切流后 managed-only rollback 边界"}
+{"path":"docs/superpowers/plans/2026-07-16-f1-parallel-genesis-bootstrap-implementation.md","reason":"现行固定 3010 与禁止同机私增端口的旧实施约束"}
+{"path":"docs/device/f1-d3-managed-topology-inputs.md","reason":"当前 B1-B9 D3 非秘密输入 SSOT，仍保持 NO-GO"}
+{"path":"docs/reviews/f1-d3-production-readonly-precheck-2026-07-30.md","reason":"同机第二端口设计前的 D3 只读硬停止结论"}
+{"path":"services/api/src/release-provenance/release-runtime-contract.ts","reason":"当前 health URL 精确固定为 127.0.0.1:3010 的代码契约"}

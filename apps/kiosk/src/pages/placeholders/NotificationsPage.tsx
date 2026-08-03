@@ -1,3 +1,6 @@
+import { MyNotificationsPage } from '../profile/me/MyNotificationsPage'
+
+/** Alias route — reuses canonical member notifications capability (Scheme B: no second data source). */
 export default function NotificationsPage() {
-  return <div className="p-8 text-center text-xl">待开发 — NotificationsPage</div>
+  return <MyNotificationsPage loginFrom="/notifications" />
 }

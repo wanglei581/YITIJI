@@ -1,17 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Button, Card } from '@ai-job-print/ui'
-import { AlertCircleIcon, FileTextIcon, InfoIcon, LoaderIcon } from 'lucide-react'
+import {
+  AlertCircleIcon,
+  ArrowLeftIcon,
+  CheckCircleIcon,
+  CreditCardIcon,
+  FileTextIcon,
+  InfoIcon,
+  LoaderIcon,
+  PackageCheckIcon,
+  PrinterIcon,
+} from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
+import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
-import {
-  estimatePrintCents,
-  formatPriceCents,
-  unitCentsFor,
-  usePrintPriceConfig,
-} from '../../services/print/priceConfigApi'
-import { createPrintJob } from '../../services/print/printJobsApi'
+import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
+import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
+import { formatCents } from './cashierStatus'
 import {
   clearPrintMaterialSession,
   printUploadPathForSource,
@@ -20,7 +26,7 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
-import { PrintPrototypeHeader } from './PrintPrototypeLayout'
+import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
 
@@ -30,6 +36,33 @@ interface LocationState {
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
 }
+
+interface SelfAssessmentSessionSnapshot {
+  taskId?: string
+  accessToken?: string
+  result?: { expiresAt?: string }
+}
+
+const SELF_ASSESSMENT_SESSION_KEY = 'self_assessment_session_v1'
+
+function readSelfAssessmentSnapshot(): SelfAssessmentSessionSnapshot | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(SELF_ASSESSMENT_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SelfAssessmentSessionSnapshot
+    if (!parsed || typeof parsed !== 'object' || !parsed.taskId) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+type QuoteView =
+  | { status: 'demo' }
+  | { status: 'loading' }
+  | { status: 'ready'; amountCents: number; billablePages: number; unitCents: number; quantity: number }
+  | { status: 'unavailable'; reason: string }
 
 const DUPLEX_LABEL: Record<string, string> = {
   simplex: '单面',
@@ -69,6 +102,16 @@ export function PrintConfirmPage() {
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
+  const selfAssessmentSnapshot = useMemo(() => readSelfAssessmentSnapshot(), [])
+  const appendEligible =
+    appendSelfAssessment &&
+    Boolean(selfAssessmentSnapshot?.taskId) &&
+    Boolean(file.fileId) &&
+    (file.mimeType === undefined || file.mimeType === 'application/pdf')
+  const [quote, setQuote] = useState<QuoteView>(
+    API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
+  )
 
   const { totalFaces, sheetsUsed, paperSaved } = useMemo(() => {
     const facesPerCopy = Math.ceil(effectivePages / params.pagesPerSheet)
@@ -77,15 +120,51 @@ export function PrintConfirmPage() {
     return { totalFaces: tf, sheetsUsed: su, paperSaved: tf - su }
   }, [effectivePages, params])
 
-  // ── 展示价（W-A：唯一来源=服务端价目；估价口径与服务端一致=单价×内容页×份数）──
-  // 实际扣款金额由服务端建单时计算（绝不信任前端）；付费单进收银台必见真实金额。
-  const priceCfg = usePrintPriceConfig()
-  const unitCents = unitCentsFor(priceCfg.config, params.colorMode)
-  const estimateCents = estimatePrintCents(priceCfg.config, {
-    pages: file.pages,
-    copies: params.copies,
-    colorMode: params.colorMode,
-  })
+  // P0-1：应付金额只读后端 POST /orders/quote；无 fileUrl / 报价失败时不显示具体金额。
+  useEffect(() => {
+    if (API_MODE !== 'http') {
+      setQuote({ status: 'demo' })
+      return
+    }
+    if (!file.fileUrl) {
+      setQuote({ status: 'unavailable', reason: '打印文件尚未就绪，无法报价' })
+      return
+    }
+    let cancelled = false
+    setQuote({ status: 'loading' })
+    void quotePrintOrder({ fileUrl: file.fileUrl, params })
+      .then((q) => {
+        if (cancelled) return
+        const line = q.priceLines[0]
+        setQuote({
+          status: 'ready',
+          amountCents: q.amountCents,
+          billablePages: q.billablePages,
+          unitCents: line?.unitCents ?? 0,
+          quantity: line?.quantity ?? q.billablePages * params.copies,
+        })
+      })
+      .catch(() => {
+        if (cancelled) return
+        setQuote({ status: 'unavailable', reason: '页数待服务端确认，以最终计费为准' })
+      })
+    return () => {
+      cancelled = true
+    }
+    // params 字段逐项列出，避免对象引用变化导致重复报价；与后端计费相关的字段均已覆盖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional field-level deps
+  }, [
+    file.fileUrl,
+    params.copies,
+    params.colorMode,
+    params.pageRange,
+    params.pagesPerSheet,
+    params.duplex,
+    params.orientation,
+    params.quality,
+    params.scale,
+    params.paperSize,
+  ])
 
   const summaryRows = [
     { label: '文件名称', value: file.name },
@@ -96,37 +175,54 @@ export function PrintConfirmPage() {
     { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
-    {
-      label: '页面范围',
-      value: params.pageRange ?? '全部页面',
-    },
+    { label: '页面范围', value: params.pageRange ?? '全部页面' },
   ]
 
+  const confirmBlocked =
+    submitting || (API_MODE === 'http' && quote.status !== 'ready' && quote.status !== 'demo')
+
   const handleConfirm = async () => {
-    // 生产/联网模式(http):必须有真实 fileUrl 才能创建真任务并轮询真实打印状态。
     if (API_MODE === 'http') {
-      // 无真实 fileUrl(如上游 AI 导出未拿到 signedUrl)时,严禁退回下方 SIM 动画伪造
-      // "打印成功"(CLAUDE.md §9:无真实结果不得展示已打印)。拦截并提示重新生成/上传。
       if (!file.fileUrl) {
         setSubmitError('打印文件尚未就绪，无法提交打印。请返回重新上传或重新生成文件后再试。')
+        return
+      }
+      if (quote.status !== 'ready') {
+        setSubmitError(quote.status === 'unavailable' ? quote.reason : '报价尚未就绪，请稍后再试')
+        return
+      }
+      if (appendSelfAssessment && !file.fileId) {
+        setSubmitError('当前文件不支持「附加自我探索」合并，请先在简历页生成可合并的简历 PDF 后再试。')
         return
       }
       setSubmitting(true)
       setSubmitError(null)
       try {
+        let printFileUrl = file.fileUrl
+        let printFileName = file.name
+        let printFileMd5: string | undefined = file.fileMd5
+        if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
+          const authToken = getToken()
+          const merged = await appendSelfAssessmentToResume(
+            selfAssessmentSnapshot.taskId,
+            file.fileId,
+            { token: authToken, accessToken: selfAssessmentSnapshot.accessToken ?? null },
+          )
+          printFileUrl = merged.printFileUrl ?? ''
+          printFileName = merged.filename || `${file.name.replace(/\.pdf$/i, '')}-self-assessment.pdf`
+          printFileMd5 = undefined
+        }
         const created = await createPrintJob({
-          fileUrl:  file.fileUrl,
-          fileMd5:  file.fileMd5,
-          fileName: file.name,
+          fileUrl:  printFileUrl,
+          fileMd5:  printFileMd5,
+          fileName: printFileName,
           params,
           token:    getToken(),
         })
         clearPrintMaterialSession()
-        // C5-3：付费单先进收银页出码支付；免费单（amountCents=0，已 paid+free）直接进履约。
-        // orderId/amountCents/priceLines 透传给收银页与「完成」页（后者据 orderId 取 paid 后 pickupCode）。
         const nextState = {
           ...location.state,
-          file,
+          file: { ...file, fileUrl: printFileUrl, name: printFileName, fileMd5: printFileMd5 },
           params,
           source,
           taskId:      created.taskId,
@@ -148,32 +244,54 @@ export function PrintConfirmPage() {
       }
       return
     }
-    // 仅 mock/dev 模式(API_MODE !== 'http')→ 前端模拟动画,用于本地演示,绝不用于生产。
     clearPrintMaterialSession()
     navigate('/print/progress', { state: { ...location.state, file, params, source } })
   }
 
   // Guard: 直达 /print/confirm（无前置上传）会拿到"未知文件"占位，禁止继续提交无效任务。
-  // 所有 hook 已在上方执行，此处安全提前返回。
   if (!state?.file && !restoredSession?.file) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-6 p-8">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-warning-bg">
-          <AlertCircleIcon className="h-10 w-10 text-warning" />
+      <PrintPageFrame>
+        <div data-w2-page="print-confirm" className="print-confirm-body">
+          <div className="print-confirm-guard">
+            <div className="print-confirm-guard-icon">
+              <AlertCircleIcon aria-hidden="true" />
+            </div>
+            <div>
+              <p className="print-confirm-guard-title">未找到文件信息</p>
+              <p className="print-confirm-guard-hint">请重新上传文件后再确认打印</p>
+            </div>
+            <button
+              type="button"
+              className="print-confirm-primary"
+              style={{ flex: 'none', minWidth: 200 }}
+              onClick={() => navigate(uploadPath)}
+            >
+              重新上传文件
+            </button>
+          </div>
         </div>
-        <div className="text-center">
-          <p className="text-lg font-semibold text-neutral-900">未找到文件信息</p>
-          <p className="mt-2 text-sm text-neutral-500">请重新上传文件后再确认打印</p>
-        </div>
-        <Button size="lg" onClick={() => navigate(uploadPath)}>
-          重新上传文件
-        </Button>
-      </div>
+      </PrintPageFrame>
     )
   }
 
+  const costCalcLabel =
+    quote.status === 'ready'
+      ? `${formatCents(quote.unitCents)}/页 × ${quote.quantity} 页`
+      : quote.status === 'loading'
+        ? '正在向服务端确认页数与价目…'
+        : quote.status === 'demo'
+          ? '演示模式不显示金额'
+          : quote.status === 'unavailable'
+            ? quote.reason
+            : '页数待服务端确认，以最终计费为准'
+
+  const privWarnState = materialCheck?.redaction?.resultFileCreated === false
+    && (materialCheck?.redactedCount ?? 0) > 0
+
   return (
-    <div className="print-proto flex min-h-full flex-col p-6">
+    <PrintPageFrame>
+    <div data-w2-page="print-confirm" className="print-confirm-body">
       <PrintPrototypeHeader
         title="确认打印"
         subtitle="核对以下参数，确认无误后提交打印任务"
@@ -182,145 +300,206 @@ export function PrintConfirmPage() {
         onBack={() => navigate(-1)}
       />
 
-      <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto">
-        {/* File info */}
-        <Card className="flex items-center gap-4 p-5">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-            <FileTextIcon className="h-6 w-6 text-primary-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium text-neutral-900">{file.name}</p>
-            <p className="mt-0.5 text-sm text-neutral-500">{file.size}</p>
-          </div>
-        </Card>
+      <div className="print-confirm-split" style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        {/* 左栏：文件条 + 参数摘要卡 */}
+        <div className="print-confirm-left" style={{ overflowY: 'auto' }}>
 
-        {/* Parameter summary */}
-        <Card className="overflow-hidden p-0">
-          <table className="w-full">
-            <tbody>
-              {summaryRows.map(({ label, value }, i) => (
-                <tr key={label} className={i % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
-                  <td className="border-b border-neutral-100 px-5 py-3.5 text-sm text-neutral-500">
-                    {label}
-                  </td>
-                  <td className="border-b border-neutral-100 px-5 py-3.5 text-right text-sm font-medium text-neutral-900">
-                    {value}
-                  </td>
-                </tr>
+          {/* 文件条 */}
+          <div className="print-file-strip">
+            <div className="print-file-icon">
+              <FileTextIcon aria-hidden="true" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <b className="print-file-name">{file.name}</b>
+              <span className="print-file-meta">
+                {file.size}
+                {file.pages !== null && ` · ${file.pages} 页`}
+              </span>
+            </div>
+            {materialCheck && (
+              <span className="print-file-chip">
+                <CheckCircleIcon style={{ width: 16, height: 16 }} aria-hidden="true" />
+                材料检查已完成
+              </span>
+            )}
+          </div>
+
+          {/* 参数摘要卡 */}
+          <div className="print-sum-card">
+            <b className="print-sum-title">参数确认清单</b>
+            <div className="print-sum-table">
+              {summaryRows.map(({ label, value }) => (
+                <div key={label} className="print-sum-row">
+                  <span className="k">{label}</span>
+                  <span className="v">{value}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </Card>
-
-        {materialCheck && (
-          <Card
-            className={[
-              'p-5',
-              materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
-                ? 'border-warning/30 bg-warning-bg'
-                : 'border-success/30 bg-success-bg',
-            ].join(' ')}
-          >
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white">
-                <InfoIcon
-                  className={[
-                    'h-5 w-5',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
-                  ].join(' ')}
-                />
-              </div>
-              <div className="min-w-0">
-                <p
-                  className={[
-                    'font-semibold',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
-                  ].join(' ')}
-                >
-                  隐私检查摘要{materialCheck.mode === 'demo' ? '（流程演示）' : ''}
-                </p>
-                <p
-                  className={[
-                    'mt-1 text-sm leading-relaxed',
-                    materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? 'text-warning-fg' : 'text-success-fg',
-                  ].join(' ')}
-                >
-                  {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
-                  遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
-                  {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
-                    ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
-                    : '本次打印前选择已记录，仅用于本次确认。'}
-                </p>
-              </div>
             </div>
-          </Card>
-        )}
-
-        {/* Usage + cost */}
-        <Card className="p-5">
-          <div className="grid grid-cols-2 gap-y-2.5 text-sm">
-            <span className="text-neutral-500">总打印面</span>
-            <span className="text-right font-medium text-neutral-900">{totalFaces} 面</span>
-            <span className="text-neutral-500">预计用纸</span>
-            <span className="text-right font-medium text-neutral-900">{sheetsUsed} 张</span>
           </div>
+        </div>
 
-          {paperSaved > 0 && (
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-success-bg px-3 py-2 text-xs text-success-fg">
-              <InfoIcon className="h-4 w-4 shrink-0" />
-              双面打印比单面节省 {paperSaved} 张纸
-            </div>
-          )}
+        {/* 右栏：隐私摘要 + 费用 + 流程 + 须知 */}
+        <div className="print-confirm-side" style={{ overflowY: 'auto' }}>
 
-          <div className="mt-4 flex items-baseline justify-between border-t border-neutral-100 pt-4">
-            <div>
-              <p className="text-sm text-neutral-700 font-medium">预计费用</p>
-              <p className="mt-0.5 text-xs text-neutral-400">
-                {priceCfg.status === 'error' || unitCents === null
-                  ? '价格暂不可用，实付以收银台显示为准'
-                  : file.pages === null
-                    ? `${formatPriceCents(unitCents)}/页（${params.colorMode === 'color' ? '彩色' : '黑白'}）× 页数待识别`
-                    : `${formatPriceCents(unitCents)}/页（${params.colorMode === 'color' ? '彩色' : '黑白'}）× ${file.pages} 页 × ${params.copies} 份`}
+          {/* 隐私摘要卡（仅有 materialCheck 时展示） */}
+          {materialCheck && (
+            <div className={privWarnState ? 'print-priv-card' : 'print-priv-card'}>
+              <div className="print-priv-head">
+                <InfoIcon aria-hidden="true" />
+                <b>隐私检查摘要{materialCheck.mode === 'demo' ? '（流程演示）' : ''}</b>
+              </div>
+              <p className="print-priv-body">
+                {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
+                遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
+                {privWarnState
+                  ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
+                  : '本次打印前选择已记录，仅用于本次确认。'}
               </p>
             </div>
-            <div className="text-right">
-              <span className="text-2xl font-bold text-neutral-900">
-                {estimateCents === null ? '—' : formatPriceCents(estimateCents)}
+          )}
+
+          {/* 费用卡 */}
+          <div className="print-cost-card">
+            <div className="print-est-row">
+              <span className="k">总打印面</span>
+              <span className="v">{totalFaces} 面</span>
+            </div>
+            <div className="print-est-row">
+              <span className="k">预计用纸</span>
+              <span className="v">
+                {sheetsUsed} 张
+                {paperSaved > 0 && <span style={{ fontSize: 15, fontWeight: 400, color: 'var(--print-muted)', marginLeft: 6 }}>（双面省 {paperSaved} 张）</span>}
               </span>
-              <p className="mt-0.5 text-xs text-neutral-400">按内容页计费，实付以收银台为准</p>
+            </div>
+            <div className="print-est-row">
+              <span className="k">计费方式</span>
+              <span className="v" style={{ fontSize: 16 }}>{costCalcLabel}</span>
+            </div>
+            {params.colorMode === 'color' && (
+              <div className="print-est-row">
+                <span className="k print-color-hint">彩色效果以设备支持和当前耗材状态为准</span>
+              </div>
+            )}
+            <div className="print-cost-total">
+              <span className="print-cost-label">
+                预计费用<br />
+                按内容页计费 · 实付以收银台为准<br />
+                金额以现场公示价为准
+              </span>
+              <span className="print-cost-num">
+                <small>¥</small>
+                {quote.status === 'ready'
+                  ? formatCents(quote.amountCents).replace(/^¥/, '')
+                  : quote.status === 'loading'
+                    ? '…'
+                    : '—'}
+              </span>
             </div>
           </div>
 
-          {params.colorMode === 'color' && (
-            <p className="mt-3 text-xs text-warning-fg">彩色效果以设备支持和当前耗材状态为准</p>
+          {/* 提交后流程 + 打印须知（合并，避免右栏碎卡堆叠） */}
+          <div className="print-flow-card print-rules-card">
+            <b className="print-flow-title">
+              提交后流程
+              <span>免费订单自动跳过支付</span>
+            </b>
+            <div className="print-flow-row">
+              <div className="print-flow-step">
+                <CreditCardIcon aria-hidden="true" />
+                <span>完成支付</span>
+              </div>
+              <svg className="print-flow-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="print-flow-step">
+                <PrinterIcon aria-hidden="true" />
+                <span>自动打印</span>
+              </div>
+              <svg className="print-flow-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <path d="M9 5l7 7-7 7" />
+              </svg>
+              <div className="print-flow-step">
+                <PackageCheckIcon aria-hidden="true" />
+                <span>取件核对</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 附加自我探索摘要（仅在已有测评结果且为 PDF 简历时出现） */}
+          {selfAssessmentSnapshot?.taskId && (
+            <div className="print-rules-card print-self-assessment-card">
+              <label className="print-self-assessment-toggle">
+                <input
+                  type="checkbox"
+                  checked={appendSelfAssessment}
+                  onChange={(e) => setAppendSelfAssessment(e.target.checked)}
+                  disabled={!file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
+                />
+                <span>附加自我探索 · 倾向参考摘要</span>
+              </label>
+              <p className="print-self-assessment-hint">
+                仅在本人简历下方合并一份本人自助参考摘要；勾选后系统会即时生成仅供本人打印的合并 PDF，文件名追加 <code>-self-assessment</code>；合并结果不会进入任何企业、合作机构、Partner 或第三方可见的分享链路。
+              </p>
+              {appendSelfAssessment && !file.fileId && (
+                <p className="print-self-assessment-hint" role="alert">
+                  当前文件不支持合并：请在简历页生成可合并的简历 PDF 后再勾选此项。
+                </p>
+              )}
+            </div>
           )}
-        </Card>
+
+          {/* 打印须知卡 */}
+          <div className="print-rules-card">
+            <b className="print-rules-title" style={{ marginTop: 16 }}>打印须知</b>
+            <ol className="print-rules-list">
+              <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
+              <li>隐私检查仅用于本次打印前确认，扫描件 / 图片可能经第三方 OCR 识别文字。</li>
+              <li>提交后请留在机器旁，任务确认后自动开始打印（免费任务直接进入打印队列，付费任务完成支付后开始）。</li>
+              <li>打印完成请从出纸口取件；如有质量问题请联系现场工作人员。</li>
+            </ol>
+          </div>
+        </div>
       </div>
 
-      {/* Submit error */}
+      {/* 提交错误提示 */}
       {submitError && (
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-4 py-3 text-sm text-error-fg">
-          <AlertCircleIcon className="h-4 w-4 shrink-0" />
+        <div className="print-submit-error">
+          <AlertCircleIcon aria-hidden="true" />
           <span>{submitError}</span>
         </div>
       )}
 
-      {/* Bottom action */}
-      <div className="mt-4 flex gap-3">
-        <Button variant="secondary" size="lg" className="flex-1" disabled={submitting} onClick={() => navigate(-1)}>
+      {/* 底部行动条 */}
+      <KioskActionBar className="print-confirm-actionbar">
+        <button
+          type="button"
+          className="print-confirm-back"
+          disabled={submitting}
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeftIcon aria-hidden="true" />
           返回修改
-        </Button>
-        <Button size="lg" className="flex-1" disabled={submitting} onClick={() => void handleConfirm()}>
+        </button>
+        <button
+          type="button"
+          className="print-confirm-primary"
+          disabled={confirmBlocked}
+          onClick={() => void handleConfirm()}
+        >
           {submitting ? (
-            <span className="flex items-center gap-2">
-              <LoaderIcon className="h-4 w-4 animate-spin" />
+            <>
+              <LoaderIcon style={{ width: 24, height: 24, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
               提交中…
-            </span>
+            </>
           ) : (
-            '按以上设置打印'
+            <>
+              <PrinterIcon aria-hidden="true" />
+              {appendEligible ? '打印合并版（简历+自我探索）' : '按以上设置打印原文件'}
+            </>
           )}
-        </Button>
-      </div>
+        </button>
+      </KioskActionBar>
     </div>
+    </PrintPageFrame>
   )
 }

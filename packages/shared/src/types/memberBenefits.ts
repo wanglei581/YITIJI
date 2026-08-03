@@ -43,3 +43,30 @@ export interface MemberBenefitItem {
   validUntil: string | null
   createdAt: string
 }
+
+/**
+ * 我的核销记录（Wave 3）：会员名下一条 RedemptionRecord 只读视图。
+ *
+ * 安全约束：
+ * - 后端 EndUserAuthGuard 保证只返回本人记录，跨用户越权天然不可能。
+ * - amountCents 代表平台 credit 抵扣额（非资金、非真实收款）。
+ * - 不含 idempotencyKey 等内部字段。
+ */
+export interface MemberRedemptionItem {
+  id: string
+  /** 核销权益类型（coupon / free_quota / package_entitlement） */
+  kind: string
+  /** 关联 BenefitGrant id */
+  benefitRef: string
+  /** 核销场景：order_redeem / resume_optimize / print_task 等 */
+  serviceType: string
+  /** 场景产物 id（orderId / taskId 等） */
+  serviceRefId: string
+  /** 订单 id（serviceType=order_redeem 时有值，其余为 null） */
+  orderId: string | null
+  /** 本次核销抵扣金额（分，平台 credit；服务点位为 0）*/
+  amountCents: number
+  /** 核销数量（通常为 1） */
+  quantity: number
+  createdAt: string
+}

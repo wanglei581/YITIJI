@@ -27,7 +27,7 @@ import {
   JobTrustSection,
   QrOverlay,
 } from './components/JobDetailSections'
-import { ProtoBadge, ProtoPage } from '../jobs-fairs-prototype'
+import { FusionBadge, KioskPageFrame } from './components/W4Presentation'
 
 export function JobDetailPage() {
   const navigate = useNavigate()
@@ -237,13 +237,13 @@ export function JobDetailPage() {
   }
 
   return (
-    <ProtoPage
+    <KioskPageFrame
       tone="clay"
       title="岗位详情"
       subtitle={`${currentJob.sourceName} · 信息以来源平台为准`}
       backLabel="返回列表"
       onBack={() => navigate('/jobs')}
-      badge={<ProtoBadge icon={ExternalLinkIcon}>线上招聘平台来源</ProtoBadge>}
+      badge={<FusionBadge icon={ExternalLinkIcon}>线上招聘平台来源</FusionBadge>}
       actionBar={
         <>
           <span className="jf-action-note">投递在来源平台完成，本终端不接收简历、不参与招聘流程</span>
@@ -287,11 +287,11 @@ export function JobDetailPage() {
       <JobNextActionsSection
         job={currentJob}
         sourceCanApply={sourceCanApply}
-        onOpenSource={openSourcePlatform}
         onOpenQr={openSourceQr}
         onViewCompany={viewCompany}
         onExplainAi={() => void startExplain()}
         onMatchAi={() => void startMatch()}
+        onPrint={() => navigate('/print/upload', { state: { source: 'job_detail', jobId: currentJob.id, jobTitle: currentJob.title } })}
       />
       {(aiLoading || aiError || explanation || matchResult) && (
         <JobAiResultPanel
@@ -311,7 +311,7 @@ export function JobDetailPage() {
           }}
         />
       )}
-    </ProtoPage>
+    </KioskPageFrame>
   )
 }
 

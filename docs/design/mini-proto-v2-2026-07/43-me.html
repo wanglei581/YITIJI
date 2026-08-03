@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>我的 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .me-head { background:linear-gradient(158deg,#157a67,#1f9e86); padding:22px 20px 44px; position:relative; overflow:hidden; }
+    .me-head::before { content:''; position:absolute; right:-30px; top:-40px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,.06); }
+    .me-row { display:flex; align-items:center; gap:14px; position:relative; }
+    .me-av { width:60px; height:60px; border-radius:50%; background:rgba(255,255,255,.2); border:2px solid rgba(255,255,255,.5); display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
+    .me-name { font-family:var(--font-serif); font-size:20px; font-weight:700; color:#fff; }
+    .me-phone { font-size:12px; color:rgba(255,255,255,.72); margin-top:4px; }
+    .me-vip { display:inline-flex; align-items:center; gap:4px; margin-top:8px; font-size:11px; color:#5a4410; background:linear-gradient(135deg,#f4d98a,#e8c15f); padding:3px 10px; border-radius:var(--r-full); font-weight:600; }
+    .me-set { color:rgba(255,255,255,.85); font-size:20px; align-self:flex-start; }
+    /* stats */
+    .stat-float { margin:-28px 16px 0; background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-md); display:flex; padding:15px 0; position:relative; }
+    .st-cell { flex:1; text-align:center; cursor:pointer; }
+    .st-cell + .st-cell { border-left:1px solid var(--line-faint); }
+    .st-n { font-family:var(--font-serif); font-size:20px; font-weight:700; color:var(--ink); }
+    .st-l { font-size:11px; color:var(--muted); margin-top:3px; }
+    /* group list */
+    .glist { background:var(--surface); border-radius:var(--r-lg); margin:14px 16px 0; box-shadow:var(--sh-xs); overflow:hidden; }
+    .gl-item { display:flex; align-items:center; gap:13px; padding:15px 16px; cursor:pointer; }
+    .gl-item + .gl-item { border-top:1px solid var(--line-faint); }
+    .gl-ic { width:34px; height:34px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+    .gl-t { flex:1; font-size:14.5px; color:var(--ink); }
+    .gl-meta { font-size:12px; color:var(--faint); }
+    .gl-go { color:var(--faint); font-size:15px; }
+    .gl-badge { font-size:11px; background:var(--clay); color:#fff; border-radius:var(--r-full); padding:1px 7px; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#157a67"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+
+  <div class="content has-tabbar" style="padding-top:0">
+    <div class="me-head">
+      <div class="me-row">
+        <div class="me-av">🧑</div>
+        <div style="flex:1">
+          <div class="me-name">陈明</div>
+          <div class="me-phone">138****6621</div>
+          <div class="me-vip">◆ 黄金会员 · 剩 68 天</div>
+        </div>
+        <div class="me-set">⚙</div>
+      </div>
+    </div>
+
+    <!-- 概览统计 -->
+    <div class="stat-float">
+      <div class="st-cell"><div class="st-n">3</div><div class="st-l">我的简历</div></div>
+      <div class="st-cell"><div class="st-n">12</div><div class="st-l">我的文档</div></div>
+      <div class="st-cell"><div class="st-n">8</div><div class="st-l">打印订单</div></div>
+      <div class="st-cell"><div class="st-n">24</div><div class="st-l">AI 记录</div></div>
+    </div>
+
+    <!-- 我的内容 -->
+    <div class="section-t">我的内容</div>
+    <div class="glist" style="margin-top:0">
+      <div class="gl-item">
+        <div class="gl-ic plum-wash" style="color:var(--plum-deep)">📄</div>
+        <div class="gl-t">我的简历</div>
+        <span class="gl-meta">3 份</span>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic wash" style="color:var(--teal-deep)">📁</div>
+        <div class="gl-t">我的文档</div>
+        <span class="gl-meta">12 个文件</span>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic clay-wash" style="color:var(--clay-deep)">🖨</div>
+        <div class="gl-t">打印订单</div>
+        <span class="gl-badge">1 待取件</span>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic plum-wash" style="color:var(--plum-deep)">✦</div>
+        <div class="gl-t">AI 服务记录</div>
+        <span class="gl-meta">24 条</span>
+        <span class="gl-go">›</span>
+      </div>
+    </div>
+
+    <!-- 求职足迹 -->
+    <div class="section-t">求职足迹</div>
+    <div class="glist" style="margin-top:0">
+      <div class="gl-item">
+        <div class="gl-ic wheat-wash" style="color:var(--wheat-deep)">🕐</div>
+        <div class="gl-t">浏览与跳转记录</div>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic clay-wash" style="color:var(--clay-deep)">☆</div>
+        <div class="gl-t">我的收藏</div>
+        <span class="gl-meta">6 个</span>
+        <span class="gl-go">›</span>
+      </div>
+    </div>
+
+    <!-- 账户 -->
+    <div class="section-t">账户</div>
+    <div class="glist" style="margin-top:0">
+      <div class="gl-item">
+        <div class="gl-ic" style="background:linear-gradient(135deg,#f4d98a,#e8c15f);color:#5a4410">◆</div>
+        <div class="gl-t">会员中心</div>
+        <span class="gl-meta">黄金会员</span>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic wash" style="color:var(--slate)">🔔</div>
+        <div class="gl-t">消息通知</div>
+        <span class="gl-badge">3</span>
+        <span class="gl-go">›</span>
+      </div>
+      <div class="gl-item">
+        <div class="gl-ic wash" style="color:var(--ink-soft)">⚙</div>
+        <div class="gl-t">设置</div>
+        <span class="gl-go">›</span>
+      </div>
+    </div>
+
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab"><div class="ti">⌂</div><div class="tl">首页</div></div>
+    <div class="tab"><div class="ti">🖨</div><div class="tl">打印</div></div>
+    <div class="tab"><div class="ti">💼</div><div class="tl">求职</div></div>
+    <div class="tab"><div class="ti">✦</div><div class="tl">AI</div></div>
+    <div class="tab on"><div class="ti">◍</div><div class="tl">我的</div></div>
+  </div>
+</div>
+</body>
+</html>

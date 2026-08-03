@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>01 启动授权</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #stage{background:linear-gradient(170deg,#1f9e86 0%,#157a67 42%,#10302b 100%);}
+  .launch{flex:1; display:flex; flex-direction:column; align-items:center; color:#fff; padding:0 28px;}
+  .brand-mark{width:96px; height:96px; border-radius:26px; background:rgba(255,255,255,.14); backdrop-filter:blur(8px); display:grid; place-items:center; font-family:var(--serif); font-size:44px; font-weight:800; margin-top:96px; border:1px solid rgba(255,255,255,.22);}
+  .brand-name{font-family:var(--serif); font-size:27px; font-weight:800; letter-spacing:2px; margin-top:26px;}
+  .brand-sub{font-size:13.5px; color:rgba(255,255,255,.8); margin-top:10px; text-align:center; line-height:1.6;}
+  .scope-tags{display:flex; gap:8px; margin-top:22px; flex-wrap:wrap; justify-content:center;}
+  .scope-tags span{font-size:11.5px; padding:5px 12px; border-radius:999px; background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.2);}
+  .launch-foot{width:100%; margin-top:auto; padding-bottom:34px; display:flex; flex-direction:column; gap:12px;}
+  .privacy-line{font-size:11.5px; color:rgba(255,255,255,.75); text-align:center; line-height:1.6;}
+  .privacy-line a{color:#fff; text-decoration:underline;}
+  /* 隐私弹窗 */
+  .mask{position:absolute; inset:0; background:rgba(9,26,23,.5); display:flex; align-items:flex-end; z-index:20;}
+  .sheet{width:100%; background:var(--surface); border-radius:22px 22px 0 0; padding:24px 20px calc(20px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:14px;}
+  .sheet h3{font-family:var(--serif); font-size:18px; font-weight:800; text-align:center; color:var(--ink);}
+  .sheet .pv-body{font-size:12.5px; color:var(--muted); line-height:1.7; max-height:210px; overflow-y:auto; background:var(--surface-2); border:1px solid var(--line); border-radius:14px; padding:14px;}
+  .sheet .pv-body b{color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar" style="color:#fff;">
+    <span>9:41</span>
+    <span class="sb-icons">●●● 5G ▮▮▮</span>
+  </div>
+  <div class="launch">
+    <div class="brand-mark">青</div>
+    <div class="brand-name">求职打印助手</div>
+    <div class="brand-sub">AI 简历 · 文件打印 · 手机连一体机<br>随身的求职材料工具箱</div>
+    <div class="scope-tags">
+      <span>🖨️ 到店打印</span>
+      <span>📄 AI 简历</span>
+      <span>🎤 面试训练</span>
+    </div>
+    <div class="launch-foot">
+      <button class="btn btn-wx lg block" onclick="document.getElementById('mask').style.display='flex'">
+        <span style="font-size:18px;">✔</span> 微信一键登录
+      </button>
+      <div class="privacy-line">登录即代表同意 <a href="25-privacy.html">《用户协议》</a> 与 <a href="25-privacy.html">《隐私政策》</a></div>
+    </div>
+  </div>
+
+  <!-- 隐私授权弹窗（微信合规必需） -->
+  <div class="mask" id="mask" style="display:none;">
+    <div class="sheet">
+      <h3>隐私保护提示</h3>
+      <div class="pv-body">
+        感谢使用「求职打印助手」。在你使用前，请阅读并同意 <b>《隐私政策》</b>。我们将按政策收集与使用你的信息：<br><br>
+        · <b>微信授权</b>：获取你的头像、昵称用于展示，获取登录凭证用于建立账号；<br>
+        · <b>手机号</b>：用于订单与取件通知，加密存储、页面脱敏展示；<br>
+        · <b>你上传的简历 / 文件</b>：仅用于本次 AI 服务或打印，通过临时链接传输，到期自动清理，<b>不长期保存</b>身份证、简历等敏感文件；<br>
+        · <b>AI 生成内容</b>：由大模型生成，会标识「AI 生成」，仅供参考。<br><br>
+        本工具 <b>不提供岗位投递、不收取简历给企业、不做候选人筛选</b>，仅提供简历与打印工具服务。
+      </div>
+      <button class="btn primary lg block" onclick="location.href='02-login.html'">同意并继续</button>
+      <button class="btn ghost block" onclick="document.getElementById('mask').style.display='none'">暂不使用</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

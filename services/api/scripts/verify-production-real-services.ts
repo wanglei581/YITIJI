@@ -23,6 +23,9 @@ const PROD_OK: Env = {
   // C5-6：生产必须显式声明 paid-before-claim（缺省启动即拒）
   PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
+  TRUST_PROXY_HOPS: '1',
+  TERMINAL_LEGACY_REGISTER_ENABLED: 'false',
+  TERMINAL_PLANNED_PROVISIONING_ENABLED: 'true',
 }
 
 function expectAllowed(env: Env, label: string): void {

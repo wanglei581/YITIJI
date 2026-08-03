@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -97,7 +97,7 @@ expectMatches(paymentApi, /createPayAttempt\(input:\s*PaymentSessionInput\b/, 'c
 expectMatches(paymentApi, /getPayStatus\(input:\s*PaymentSessionInput\)/, 'getPayStatus 仍强制使用 PaymentSessionInput')
 expectMatches(cashier, /createPayAttempt\(\{\s*orderId,\s*paymentSessionToken\s*,\s*channel\s*\}\)/, 'PrintCashierPage 出码仍带 paymentSessionToken')
 expectMatches(cashier, /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintCashierPage 轮询仍带 paymentSessionToken')
-expectMatches(done, /getPayStatus\(\{\s*orderId:\s*state\.orderId as string,\s*paymentSessionToken:\s*state\.paymentSessionToken\s*\}\)/, 'PrintDonePage 取件码查询仍带 paymentSessionToken')
+expectMatches(done, /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/, 'PrintDonePage 取件码查询仍带 paymentSessionToken')
 
 expectIncludes(packageJson, '"verify:profile-commercial-first-batch"', 'package.json 注册 profile-commercial-first-batch 守卫')
 expectIncludes(ci, 'verify:profile-commercial-first-batch', 'CI Verify suites 接入 profile-commercial-first-batch 守卫')
@@ -262,6 +262,27 @@ const USER_CENTER_WAVE0_CHANGED = new Set([
   'services/api/scripts/verify-member-data-request-truth.ts',
 ])
 
+// Wave 2 账号换绑批次：手机号换绑服务、step-up类型扩展、资产删除、Kiosk 换绑 UI
+const WAVE2_ACCOUNT_REBIND_CHANGED = new Set([
+  'apps/kiosk/scripts/verify-profile-inkpaper-home.mjs',
+  'apps/kiosk/scripts/verify-user-center-wave0.mjs',
+  'apps/kiosk/src/pages/profile/me/MySettingsPage.tsx',
+  'apps/kiosk/src/services/auth/memberAuthApi.ts',
+  'packages/shared/src/types/member-privacy.ts',
+  'services/api/scripts/verify-member-step-up.ts',
+  'services/api/scripts/verify-wave2-account-rebind.ts',
+  'services/api/src/member-assets/member-assets.controller.ts',
+  'services/api/src/member-assets/member-assets.service.ts',
+  'services/api/src/member-auth/dto/phone-rebind.dto.ts',
+  'services/api/src/member-auth/member-auth.controller.ts',
+  'services/api/src/member-auth/member-auth.module.ts',
+  'services/api/src/member-auth/member-phone-rebind.service.ts',
+  'services/api/src/member-auth/member-step-up.types.ts',
+  'docs/progress/current-progress.md',
+  'docs/progress/next-tasks.md',
+  'docs/progress/today-claude.md',
+])
+
 const files = [...new Set(changedFiles())]
 // 范围检查条件触发（对齐 C5-4 定的 inkpaper 守卫口径，2026-07-06 C5-6 调整）：
 // 仅当 diff 实际触碰本守卫负责的 /me 第一批明细页时，才强制 P0a allowlist 范围检查。
@@ -269,17 +290,38 @@ const files = [...new Set(changedFiles())]
 // 不再以「触碰守卫脚本」为触发条件误伤一切后端/支付 PR；防回退由上方静态断言 + 人工评审兜底。
 const protectedPagePrefix = 'apps/kiosk/src/pages/profile/me/'
 const touchesProtectedPages = files.some((file) => file.startsWith(protectedPagePrefix))
-const unexpectedChanged = touchesProtectedPages
+const fusionW5VerifierPath = join(root, 'scripts/verify-fusion-w5.mjs')
+const fusionW5OwnsScope = existsSync(fusionW5VerifierPath)
+if (touchesProtectedPages && fusionW5OwnsScope) {
+  try {
+    execFileSync(process.execPath, [fusionW5VerifierPath], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    pass('融合 W5 合同接管 /profile 与 /me/* 精确范围检查')
+  } catch (error) {
+    fail(`融合 W5 范围合同未通过：${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+const unexpectedChanged = touchesProtectedPages && !fusionW5OwnsScope
   ? files.filter(
       (file) =>
         !allowedChanged.has(file) &&
         !PRINT_URL_CONTRACT_CHANGED.has(file) &&
         !JOB_FIT_M1_5_CHANGED.has(file) &&
         !SIGN_STAMP_CHANGED.has(file) &&
-        !USER_CENTER_WAVE0_CHANGED.has(file),
+        !USER_CENTER_WAVE0_CHANGED.has(file) &&
+        !WAVE2_ACCOUNT_REBIND_CHANGED.has(file),
     )
   : []
-if (unexpectedChanged.length === 0) pass(touchesProtectedPages ? 'diff 仅触碰 P0a 守卫、注册和进度文档' : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言')
+if (unexpectedChanged.length === 0) pass(
+  touchesProtectedPages && fusionW5OwnsScope
+    ? 'diff 范围已由融合 W5 精确合同验证'
+    : touchesProtectedPages
+      ? 'diff 仅触碰 P0a 守卫、注册和进度文档'
+      : 'diff 未触碰 /me 第一批明细页，仅执行静态防回退断言',
+)
 else fail(`diff 出现 P0a 范围外变更：${unexpectedChanged.join(', ')}`)
 
 if (failures > 0) {

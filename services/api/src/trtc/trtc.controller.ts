@@ -4,6 +4,7 @@ import type { Request } from 'express'
 import { TrtcService } from './trtc.service'
 import { RedisService } from '../common/redis/redis.service'
 
+import { resolveClientIpOrUnknown } from '../common/client-ip'
 // taskId → 客户端特征（IP + UA）的归属记录，落 Redis（全局 RedisModule，REDIS_URL 为硬依赖）。
 // 用 Redis 而非进程内 Map：API 重启后归属仍在（30min TTL 与 TRTC MaxIdleTime 对齐），
 // 避免重启窗口内任意请求方跨会话终止他人会话、触发腾讯云异常计费。
@@ -11,9 +12,7 @@ const OWNER_KEY_PREFIX = 'trtc:owner:'
 const OWNER_TTL_SECONDS = 30 * 60
 
 function makeClientKey(req: Request): string {
-  const ip = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim()
-    ?? req.ip
-    ?? 'unknown'
+  const ip = resolveClientIpOrUnknown(req)
   const ua = ((req.headers['user-agent'] as string | undefined) ?? '').slice(0, 80)
   return `${ip}|${ua}`
 }

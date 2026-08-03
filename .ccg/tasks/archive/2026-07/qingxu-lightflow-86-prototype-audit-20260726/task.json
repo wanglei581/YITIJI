@@ -1,0 +1,12 @@
+{
+  "id": "qingxu-lightflow-86-prototype-audit-20260726",
+  "title": "青序 LightFlow Kiosk 87 路径统一壳层收口",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "已完成；归档并形成本地可审查提交",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-kiosk87-closure-20260726"
+}

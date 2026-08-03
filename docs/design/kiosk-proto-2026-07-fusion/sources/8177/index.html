@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiosk 高保真原型 · 流程闭环导航 · 86 path 收口</title>
+<style>
+:root{
+  --paper:#f4f1e8;--surface:#fffdf8;--ink:#10302b;--muted:#5d6b63;--line:#e2dccb;
+  --teal:#1f9e86;--teal-deep:#157a67;--teal-soft:#e2f2ec;
+  --clay:#b8683c;--clay-soft:#f4e8dd;--wheat:#a9781f;--wheat-soft:#f2ead6;
+  --error:#c14a34;--error-soft:#f6e3de;--slate:#4a5b63;
+  --r-sm:14px;--r-md:18px;
+  --serif:'Noto Serif SC','Songti SC',serif;--sans:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.5;padding:34px clamp(18px,4vw,56px) 90px}
+.wrap{max-width:1200px;margin:0 auto}
+header.top h1{font-family:var(--serif);font-size:clamp(26px,3.4vw,36px);font-weight:900;letter-spacing:1px}
+header.top .sub{color:var(--muted);margin-top:8px;font-size:15px;line-height:1.65}
+.stats{display:flex;gap:20px;flex-wrap:wrap;margin-top:18px;padding:16px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
+.stats div{display:flex;flex-direction:column}
+.stats b{font-family:var(--serif);font-size:23px;color:var(--teal-deep);line-height:1.1}
+.stats span{color:var(--muted);font-size:12.5px;margin-top:2px}
+.legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}
+.legend .lk{font-size:12.5px;color:var(--muted);margin-right:2px}
+.pre{display:inline-flex;align-items:center;font-size:11.5px;padding:2px 9px;border-radius:999px;font-weight:700;white-space:nowrap;letter-spacing:.3px}
+.pre.cfg{background:var(--wheat-soft);color:var(--wheat)}
+.pre.ext{background:var(--clay-soft);color:var(--clay)}
+.pre.hw{background:#e4edef;color:#3f6b74}
+.flow{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 20px 22px;margin-top:18px}
+.flow.zone{border-style:dashed;border-color:#d8c9a6;background:#fdfaf1}
+.fh{display:flex;align-items:flex-start;gap:13px}
+.fnum{flex:none;width:38px;height:38px;border-radius:11px;background:var(--teal);color:#fff;font-family:var(--serif);font-size:18px;font-weight:700;display:grid;place-items:center}
+.fnum.z{background:var(--wheat)}
+.ft{flex:1;min-width:0}
+.ft h2{font-family:var(--serif);font-size:20px;font-weight:700}
+.fc{color:var(--muted);font-size:13px;margin-top:3px;line-height:1.55}
+.fpre{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-self:flex-start;max-width:240px}
+.sub-label{font-size:12.5px;color:var(--teal-deep);font-weight:700;margin:16px 0 2px;display:flex;align-items:center;gap:6px}
+.sub-label::before{content:'';width:14px;height:2px;background:var(--teal);border-radius:2px}
+.chain{display:flex;flex-wrap:wrap;gap:9px;align-items:stretch;margin-top:11px}
+.pc{position:relative;display:flex;flex-direction:column;gap:2px;width:212px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 12px 12px;text-decoration:none;color:inherit;transition:.14s}
+.pc:hover{border-color:var(--teal);transform:translateY(-2px);box-shadow:0 6px 16px rgba(21,122,103,.12)}
+.pc .pn{align-self:flex-start;font-family:var(--serif);font-size:12px;font-weight:700;color:var(--teal-deep);background:var(--teal-soft);padding:1px 8px;border-radius:6px}
+.pc .step{position:absolute;top:10px;right:11px;font-size:11px;color:var(--muted);font-weight:600}
+.pc .pt{font-weight:700;font-size:14.5px;margin-top:4px}
+.pc .pd{font-size:12px;color:var(--muted);line-height:1.4}
+.pc .pr{font-family:ui-monospace,SFMono-Regular,monospace;font-size:10.5px;color:#8a9691;word-break:break-all;margin-top:2px}
+.pc .pflags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.pc.var{background:var(--error-soft);border-color:#e8c5bb;border-style:dashed}
+.pc.var .pn{background:#eccabf;color:var(--error)}
+.pc.sub{background:#eef4f2;border-style:dashed}
+.pc.map{background:#f1eee4;border-style:dashed;border-color:#d8cfb6}
+.pc.map .pn{background:#e6dfc9;color:var(--wheat)}
+.arrow{align-self:center;color:#bcae8f;font-size:16px;font-weight:700;flex:none}
+.endpoint{align-self:center;display:flex;align-items:center;gap:5px;font-size:12px;color:var(--teal-deep);font-weight:700;background:var(--teal-soft);padding:6px 12px;border-radius:999px;flex:none}
+.cover{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:20px 22px;margin-top:22px}
+.cover h2{font-family:var(--serif);font-size:19px;margin-bottom:4px}
+.cover .cd{color:var(--muted);font-size:13px;margin-bottom:14px}
+table.cov{width:100%;border-collapse:collapse;font-size:13px}
+table.cov th,table.cov td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+table.cov th{color:var(--muted);font-weight:700;font-size:12px}
+table.cov td.n{font-family:var(--serif);color:var(--teal-deep);font-weight:700;text-align:center;width:56px}
+table.cov tr.sum td{font-weight:700;border-top:2px solid var(--teal);background:var(--teal-soft)}
+.tip{margin-top:24px;padding:15px 20px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);font-size:13.5px;background:rgba(255,253,248,.7);line-height:1.65}
+.tip b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>Kiosk 高保真原型 · 流程闭环导航</h1>
+  <p class="sub">AI求职打印服务终端 · 1080×1920 竖屏(62/63 屏为手机尺寸)· 青绿米纸 V1 · 零外部依赖断网可用<br>
+  按 <b>12 条业务线 + 受控专区</b>编排:每条线呈现「入口 → 前置 → 分步原型 → 状态变体 → 合法终点」的完整闭环。权威依据见同目录 <code>WAVE-P-CLOSURE.md</code>(P1 分类)与 <code>WAVE-P2-FLOWS.md</code>(P2 流程)。</p>
+  <div class="stats">
+    <div><b>86</b><span>路径条目(收口)</span></div>
+    <div><b>77</b><span>UNIQUE_PAGE</span></div>
+    <div><b>82</b><span>原型 HTML(74 已有+3 缺图+4 变体+1 子状态)</span></div>
+    <div><b>5</b><span>REDIRECT_ALIAS(只映射)</span></div>
+    <div><b>4</b><span>FALLBACK_PLACEHOLDER</span></div>
+  </div>
+  <div class="legend">
+    <span class="lk">前置条件图例:</span>
+    <span class="pre cfg">CONFIG 后台开关门控</span>
+    <span class="pre ext">EXTERNAL 第三方依赖</span>
+    <span class="pre hw">HARDWARE 真机硬件</span>
+  </div>
+</header>
+
+<!-- ===== 全局入口 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum z">·</div>
+    <div class="ft">
+      <h2>全局入口 · 首页</h2>
+      <div class="fc">所有业务线的共同起点;服务分组跳转 + 扫码登录。百宝箱 / 智慧校园专区入口受后台开关控制。</div>
+    </div>
+    <div class="fpre"><span class="pre cfg">CONFIG 专区开关</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="01-home.html"><span class="pn">01</span><span class="pt">首页</span><span class="pd">六大服务分组 + 扫码登录 + 本次继续办理</span><span class="pr">/</span></a>
+    <span class="endpoint">→ 进入下方各业务线</span>
+  </div>
+</section>
+<!-- ===== Flow 1 文档打印 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">1</div>
+    <div class="ft">
+      <h2>文档打印</h2>
+      <div class="fc">入口:首页「打印扫描」→ 打印扫描中心(02)。主链路八步:77上传 → 31体检 → 64预览 → 03参数 → 65确认 → 32收银 → 04出件 → 33完成。终点:取件码 + 订单入「我的·打印订单」。</div>
+    </div>
+    <div class="fpre"><span class="pre hw">HARDWARE 打印机/U盘</span><span class="pre ext">EXTERNAL 支付</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="02-print-hub.html"><span class="pn">02</span><span class="step">入口</span><span class="pt">打印扫描中心</span><span class="pd">七能力卡 + 隐私横幅</span><span class="pr">/print-scan</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="77-print-upload.html"><span class="pn">77</span><span class="step">1</span><span class="pt">上传文件</span><span class="pd">本机/扫码/U盘三 tab</span><span class="pr">/print/upload</span><span class="pflags"><span class="pre hw">HW U盘</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="31-print-material-check.html"><span class="pn">31</span><span class="step">2</span><span class="pt">材料检查</span><span class="pd">文件体检 + A4 规范化</span><span class="pr">/print/material-check</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="64-print-preview.html"><span class="pn">64</span><span class="step">3</span><span class="pt">打印预览</span><span class="pd">单页放大 + 页面范围</span><span class="pr">/print/preview</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="03-print-settings.html"><span class="pn">03</span><span class="step">4</span><span class="pt">打印参数</span><span class="pd">份数/色彩/双面 + 费用预估</span><span class="pr">/print/params</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="65-print-confirm.html"><span class="pn">65</span><span class="step">5</span><span class="pt">确认打印</span><span class="pd">参数确认 + 隐私摘要</span><span class="pr">/print/confirm</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="32-print-cashier.html"><span class="pn">32</span><span class="step">6</span><span class="pt">收银台</span><span class="pd">价目明细 + 双支付</span><span class="pr">/print/cashier</span><span class="pflags"><span class="pre ext">EXT 支付</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="04-print-progress.html"><span class="pn">04</span><span class="step">7</span><span class="pt">打印进度</span><span class="pd">轮询状态 + 缺纸/卡纸/失败/重试</span><span class="pr">/print/progress</span><span class="pflags"><span class="pre hw">HW 打印机</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="33-print-done.html"><span class="pn">33</span><span class="step">8</span><span class="pt">打印完成</span><span class="pd">取件码 + 满意度</span><span class="pr">/print/done</span></a>
+    <span class="endpoint">✓ 订单入 /me/print-orders(18)</span>
+  </div>
+  <div class="sub-label">状态变体</div>
+  <div class="chain">
+    <a class="pc var" href="32A-cashier-failed.html"><span class="pn">32A</span><span class="pt">支付失败态</span><span class="pd">未扣款 · 未创建打印任务 · 文件仍在,守合规底线</span><span class="pr">基于 proto 32</span></a>
+    <span class="endpoint" style="background:#f0efe8;color:var(--muted)">打印机离线:已在 04 内绘制,不另建</span>
+  </div>
+  <div class="sub-label">辅助工具(同属打印线,产出回主链路)</div>
+  <div class="chain">
+    <a class="pc" href="66-print-scan-convert.html"><span class="pn">66</span><span class="pt">图片转 PDF</span><span class="pd">合并排序 → 去打印/保存</span><span class="pr">/print-scan/convert</span></a>
+    <a class="pc" href="67-print-scan-sign.html"><span class="pn">67</span><span class="pt">签名盖章</span><span class="pd">四步签章 + 非 CA 声明</span><span class="pr">/print-scan/sign</span></a>
+    <a class="pc" href="68-print-scan-feature.html"><span class="pn">68</span><span class="pt">功能说明</span><span class="pd">证件照·即将上线(诚实标注)</span><span class="pr">/print-scan/feature/:key</span></a>
+  </div>
+</section>
+<!-- ===== Flow 2 纸质扫描 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">2</div>
+    <div class="ft">
+      <h2>纸质扫描</h2>
+      <div class="fc">入口:打印扫描中心(02)「扫描原件」。全程依赖扫描仪硬件。终点:AI 简历识别去诊断(Flow 3)/ 打印(Flow 1)/ 保存「我的·文档」。</div>
+    </div>
+    <div class="fpre"><span class="pre hw">HARDWARE 扫描仪</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="34-scan-start.html"><span class="pn">34</span><span class="step">1</span><span class="pt">扫描类型选择</span><span class="pd">简历/证件/普通三选一</span><span class="pr">/scan/start</span><span class="pflags"><span class="pre hw">HW</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="35-scan-settings.html"><span class="pn">35</span><span class="step">2</span><span class="pt">扫描指引</span><span class="pd">面板操作四步 + 任务会话</span><span class="pr">/scan/settings</span><span class="pflags"><span class="pre hw">HW</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="36-scan-progress.html"><span class="pn">36</span><span class="step">3</span><span class="pt">扫描等待</span><span class="pd">诚实等待态 + 阶段时间线</span><span class="pr">/scan/progress</span><span class="pflags"><span class="pre hw">HW</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="37-scan-result.html"><span class="pn">37</span><span class="step">4</span><span class="pt">扫描结果</span><span class="pd">AI识别/打印/保存三去向</span><span class="pr">/scan/result</span></a>
+    <span class="endpoint">✓ 去诊断 / 打印 / 我的文档(17)</span>
+  </div>
+  <div class="sub-label">状态变体</div>
+  <div class="chain">
+    <a class="pc var" href="34A-scan-offline.html"><span class="pn">34A</span><span class="pt">扫描仪离线态</span><span class="pd">诚实降级不显示「扫描完成」;列出上传/U盘替代路径</span><span class="pr">基于 proto 34,34–37 复用</span></a>
+  </div>
+</section>
+
+<!-- ===== Flow 3 AI简历诊断 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">3</div>
+    <div class="ft">
+      <h2>AI 简历诊断</h2>
+      <div class="fc">入口:首页「AI简历服务」→ 简历来源。数字源直进解析;纸质源分流扫描(Flow 2)回诊断。OCR 失败不调 LLM(诚实中止)。终点:结果入「我的·简历 / AI服务记录」。</div>
+    </div>
+    <div class="fpre"></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="05-resume-source.html"><span class="pn">05</span><span class="step">入口</span><span class="pt">简历来源选择</span><span class="pd">上传/扫码传/纸质扫描 OCR</span><span class="pr">/resume/source</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="27-resume-parse.html"><span class="pn">27</span><span class="step">1</span><span class="pt">AI 解析中</span><span class="pd">加载态 + 三步清单</span><span class="pr">/resume/parse</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="06-resume-diagnosis.html"><span class="pn">06</span><span class="step">2</span><span class="pt">AI 诊断报告</span><span class="pd">总评分 + 维度条 + 逐项建议</span><span class="pr">/resume/report</span></a>
+    <span class="endpoint">→ 去优化(Flow 4);入 /me/resumes(16)</span>
+  </div>
+</section>
+<!-- ===== Flow 4 AI简历优化 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">4</div>
+    <div class="ft">
+      <h2>AI 简历优化</h2>
+      <div class="fc">入口:诊断报告(06)「去优化」/「我的·简历」。原文 vs 建议对比 → 导出。非 PDF 暂不可打印(如实标注)。终点:PDF/Word/纯文本下载 / 打印(Flow 1)/ 入我的文档。</div>
+    </div>
+    <div class="fpre"></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="07-resume-optimize.html"><span class="pn">07</span><span class="step">1</span><span class="pt">优化对比</span><span class="pd">原文/建议双栏 + 排版</span><span class="pr">/resume/optimize</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="28-resume-export.html"><span class="pn">28</span><span class="step">2</span><span class="pt">导出</span><span class="pd">PDF/Word/纯文本 + 去向</span><span class="pr">/resume/export</span></a>
+    <span class="endpoint">✓ 下载 / 打印 / 入 /me/documents(17)</span>
+  </div>
+  <div class="sub-label">辅助工具</div>
+  <div class="chain">
+    <a class="pc" href="29-resume-templates.html"><span class="pn">29</span><span class="pt">简历模板库</span><span class="pd">模板卡 + 三种布局变体 → 回生成/优化</span><span class="pr">/resume/templates</span></a>
+    <a class="pc" href="30-resume-materials.html"><span class="pn">30</span><span class="pt">求职材料库</span><span class="pd">求职信/自我介绍/清单 → 回导出</span><span class="pr">/resume/materials</span></a>
+  </div>
+</section>
+
+<!-- ===== Flow 5 AI简历生成 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">5</div>
+    <div class="ft">
+      <h2>AI 简历生成</h2>
+      <div class="fc">入口:首页「AI简历服务」→ 生成分支。表单提交 → A4 预览分段重生成 → 导出(共用 Flow 4 的 28)。生成内容基于用户填写,不虚构履历。</div>
+    </div>
+    <div class="fpre"></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="25-resume-generate.html"><span class="pn">25</span><span class="step">1</span><span class="pt">AI 简历生成</span><span class="pd">信息表单 + 生成说明</span><span class="pr">/resume/generate</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="26-resume-generate-preview.html"><span class="pn">26</span><span class="step">2</span><span class="pt">生成预览</span><span class="pd">A4 缩略 + 分段重生成</span><span class="pr">/resume/generate/preview</span></a>
+    <span class="endpoint">→ 导出(28,Flow 4);入 /me/resumes(16)</span>
+  </div>
+</section>
+
+<!-- ===== Flow 6 岗位匹配 + Flow 7 职业规划(单页闭环) ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">6</div>
+    <div class="ft">
+      <h2>岗位匹配参考 &nbsp;·&nbsp; <span style="color:var(--wheat)">7 职业规划</span></h2>
+      <div class="fc">两条单页闭环全屏流程。匹配为参考,非投递、非推荐给企业;规划结果可打印带走。终点均入「我的·AI服务记录」。</div>
+    </div>
+    <div class="fpre"></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="55-job-fit.html"><span class="pn">55</span><span class="step">Flow 6</span><span class="pt">岗位匹配参考</span><span class="pd">较高/中等/偏低三档 + 改写建议(登录/匿名同意态)</span><span class="pr">/resume/job-fit</span></a>
+    <span class="endpoint">✓ 入 AI服务记录;去优化/打印</span>
+  </div>
+  <div class="chain">
+    <a class="pc" href="56-career-plan.html"><span class="pn">56</span><span class="step">Flow 7</span><span class="pt">职业规划</span><span class="pd">现状 + 方向建议 + 行动项(loading/error/未登录)</span><span class="pr">/resume/career-plan</span></a>
+    <span class="endpoint">✓ 入 AI服务记录 + 我的文档;打印带走</span>
+  </div>
+</section>
+<!-- ===== Flow 8 AI模拟面试 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">8</div>
+    <div class="ft">
+      <h2>AI 模拟面试</h2>
+      <div class="fc">入口:首页「AI简历服务/模拟面试」→ 面试设置。语音失败回文字,不伪造评分。终点:四维度评分入「我的·AI服务记录」;可打印。</div>
+    </div>
+    <div class="fpre"><span class="pre ext">EXTERNAL 语音(可选)</span><span class="pre hw">HW 打印(可选)</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="38-interview-setup.html"><span class="pn">38</span><span class="step">1</span><span class="pt">面试设置</span><span class="pd">岗位/难度/题量 + 上传简历</span><span class="pr">/interview/setup</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="39-interview-session.html"><span class="pn">39</span><span class="step">2</span><span class="pt">答题现场</span><span class="pd">问题卡 + 作答 + 计时/语音</span><span class="pr">/interview/session</span><span class="pflags"><span class="pre ext">EXT 语音</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="40-interview-report.html"><span class="pn">40</span><span class="step">3</span><span class="pt">面试报告</span><span class="pd">总分 + 四维度 + 逐题点评</span><span class="pr">/interview/report</span></a>
+    <span class="endpoint">✓ 入 AI服务记录(19);打印带走</span>
+  </div>
+  <div class="sub-label">辅助</div>
+  <div class="chain">
+    <a class="pc" href="41-interview-tips.html"><span class="pn">41</span><span class="pt">面试技巧手册</span><span class="pd">STAR 法则等(静态)+ 打印</span><span class="pr">/interview/tips</span></a>
+    <a class="pc" href="42-interview-reports.html"><span class="pn">42</span><span class="pt">历史报告</span><span class="pd">记录列表 + 空态 → 单份报告(40)</span><span class="pr">/interview/reports</span></a>
+  </div>
+</section>
+
+<!-- ===== Flow 9 岗位·企业·招聘会 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">9</div>
+    <div class="ft">
+      <h2>岗位 · 企业 · 招聘会(第三方/官方来源入口)</h2>
+      <div class="fc"><b style="color:var(--clay)">合规红线</b>:只做来源信息导览 + 合规外跳,全程无平台内投递/收简历/筛选/邀约/Offer。主按钮文案严格白名单(查看岗位/去来源平台投递/扫码投递/查看招聘会/去来源平台预约/扫码预约)。</div>
+    </div>
+    <div class="fpre"><span class="pre ext">EXTERNAL 来源平台</span></div>
+  </div>
+  <div class="sub-label">9a 岗位(线上平台)</div>
+  <div class="chain">
+    <a class="pc" href="08-jobs-list.html"><span class="pn">08</span><span class="pt">岗位列表</span><span class="pd">类型/来源筛选 + 线上线下双轨</span><span class="pr">/jobs</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="09-job-detail.html"><span class="pn">09</span><span class="pt">岗位详情(线上)</span><span class="pd">数据来源卡 + 去来源平台投递/扫码投递</span><span class="pr">/jobs/:id</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+    <span class="endpoint">外跳来源平台;埋点入 /me/activity(71)</span>
+  </div>
+  <div class="sub-label">9b 岗位(线下机构) · 不代收简历/费用</div>
+  <div class="chain">
+    <a class="pc" href="75-offline-agencies.html"><span class="pn">75</span><span class="pt">线下招聘机构</span><span class="pd">门店列表 + 营业状态</span><span class="pr">/offline-agencies</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="74-job-detail-offline.html"><span class="pn">74</span><span class="pt">岗位详情(线下)</span><span class="pd">机构门店卡 + 到店指引 + 资料打印</span><span class="pr">/jobs/:id/offline</span></a>
+    <span class="endpoint">到店指引;打印带走</span>
+  </div>
+  <div class="sub-label">9c 企业导览 · 非招聘平台</div>
+  <div class="chain">
+    <a class="pc" href="53-companies.html"><span class="pn">53</span><span class="pt">找企业</span><span class="pd">来源企业与岗位导览、筛选</span><span class="pr">/companies</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="54-company-detail.html"><span class="pn">54</span><span class="pt">企业详情</span><span class="pd">在招岗位 + 来源说明(指标受开关控制)</span><span class="pr">/companies/:id</span><span class="pflags"><span class="pre ext">EXT</span><span class="pre cfg">CFG 指标</span></span></a>
+    <span class="endpoint">外跳来源;埋点跳转</span>
+  </div>
+  <div class="sub-label">9d 招聘会 + 现场服务</div>
+  <div class="chain">
+    <a class="pc" href="10-fairs-list.html"><span class="pn">10</span><span class="pt">招聘会列表</span><span class="pd">场次 + 状态标签</span><span class="pr">/job-fairs</span><span class="pflags"><span class="pre ext">EXT 预约</span></span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="11-fair-detail.html"><span class="pn">11</span><span class="pt">招聘会详情</span><span class="pd">展位导览 + 去来源平台预约/扫码预约</span><span class="pr">/job-fairs/:id</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+    <span class="arrow">›</span>
+    <span class="endpoint" style="background:var(--wheat-soft);color:var(--wheat)">↓ 现场服务子页</span>
+  </div>
+  <div class="chain">
+    <a class="pc" href="43-fair-checkin.html"><span class="pn">43</span><span class="pt">扫码签到</span><span class="pd">三步指引(主办方管理)</span><span class="pr">/job-fairs/checkin</span></a>
+    <a class="pc" href="44-fair-companies.html"><span class="pn">44</span><span class="pt">参展企业</span><span class="pd">展位号 + 行业筛选</span><span class="pr">…/companies</span></a>
+    <a class="pc" href="45-fair-company-detail.html"><span class="pn">45</span><span class="pt">展位企业详情</span><span class="pd">在招岗位 + 来源卡(外跳)</span><span class="pr">…/companies/:cid</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+    <a class="pc" href="46-fair-map.html"><span class="pn">46</span><span class="pt">场馆导览图</span><span class="pd">分区色块 + 路线提示</span><span class="pr">…/map</span></a>
+    <a class="pc" href="47-fair-materials.html"><span class="pn">47</span><span class="pt">活动资料</span><span class="pd">批量打印</span><span class="pr">…/materials</span><span class="pflags"><span class="pre hw">HW</span></span></a>
+    <a class="pc" href="48-fair-visit-plan.html"><span class="pn">48</span><span class="pt">AI参会准备单</span><span class="pd">本人简历 + 本场公开信息</span><span class="pr">…/visit-plan</span><span class="pflags"><span class="pre hw">HW</span></span></a>
+    <a class="pc" href="49-fair-stats.html"><span class="pn">49</span><span class="pt">现场数据</span><span class="pd">签到进度 + 分布(只读)</span><span class="pr">…/stats</span></a>
+  </div>
+  <div class="fc" style="margin-top:12px">三类收藏统一进「我的·收藏」(20)。</div>
+</section>
+<!-- ===== Flow 10 AI助手 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">10</div>
+    <div class="ft">
+      <h2>AI 助手 · 小青</h2>
+      <div class="fc">入口:底栏「AI助手」。咨询主题 → 对话 → 白名单动作引导跳功能页。只做咨询与引导,不代替业务页产生「已完成」结论;语音失败回文字。</div>
+    </div>
+    <div class="fpre"><span class="pre ext">EXTERNAL TRTC 语音(可选)</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="13-assistant.html"><span class="pn">13</span><span class="step">入口</span><span class="pt">AI 助手</span><span class="pd">咨询主题 + 对话 + 白名单动作</span><span class="pr">/assistant</span></a>
+    <span class="arrow">›</span>
+    <a class="pc sub" href="73-assistant-call.html"><span class="pn">73</span><span class="step">子状态</span><span class="pt">语音咨询中</span><span class="pd">声纹 + 实时字幕(页内 AssistantCallPanel,非独立路由)</span><span class="pr">/assistant 内</span></a>
+    <span class="endpoint">→ 引导跳打印/简历/岗位/政策</span>
+  </div>
+</section>
+
+<!-- ===== Flow 11 个人中心(我的) ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">11</div>
+    <div class="ft">
+      <h2>个人中心(我的)· 入口与概览</h2>
+      <div class="fc">遵 2026-06-14 IA 整改:「我的」(14)只做<b>入口 + 概览 + 本次记录</b>,不重建「账号资产/资产中心」聚合区;下列 /me/* 为各数据分类的<b>独立明细页</b>(归位对应业务语境),非「我的」页内聚合分区。只记录本人浏览/外跳/打印/AI调用,不记录投递/预约结果;撤权即时生效。各明细页均含 loading/empty/error/未登录态。</div>
+    </div>
+    <div class="fpre"><span class="pre ext">EXTERNAL 短信登录</span></div>
+  </div>
+  <div class="sub-label">入口 + 登录 + 手机协同</div>
+  <div class="chain">
+    <a class="pc" href="14-profile.html"><span class="pn">14</span><span class="step">入口</span><span class="pt">我的(主页)</span><span class="pd">五分区入口 + 概览 + 本次记录</span><span class="pr">/profile</span></a>
+    <a class="pc" href="15-login.html"><span class="pn">15</span><span class="pt">扫码登录</span><span class="pd">微信扫码 + 手机号 + 游客</span><span class="pr">/login</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+    <a class="pc" href="63-qr-login-mobile.html"><span class="pn">63</span><span class="pt">手机登录确认</span><span class="pd">PC 扫码 · 390×844 手机尺寸</span><span class="pr">/member/qr-login</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+    <a class="pc" href="62-phone-upload.html"><span class="pn">62</span><span class="pt">手机上传落地</span><span class="pd">文件回传 PC · 390×844</span><span class="pr">/upload/phone</span></a>
+  </div>
+  <div class="sub-label">数据分类明细页(各自独立 /me/* 页,非「我的」页内聚合)</div>
+  <div class="chain">
+    <a class="pc" href="16-me-resumes.html"><span class="pn">16</span><span class="pt">我的简历</span><span class="pd">→ 报告/优化/匹配</span><span class="pr">/me/resumes</span></a>
+    <a class="pc" href="17-me-documents.html"><span class="pn">17</span><span class="pt">我的文档</span><span class="pd">签章/打印/到期清理</span><span class="pr">/me/documents</span></a>
+    <a class="pc" href="18-me-print-orders.html"><span class="pn">18</span><span class="pt">打印订单</span><span class="pd">状态筛选 + 取件码</span><span class="pr">/me/print-orders</span></a>
+    <a class="pc" href="19-me-ai-records.html"><span class="pn">19</span><span class="pt">AI服务记录</span><span class="pd">各 AI 结果 + 删除</span><span class="pr">/me/ai-records</span></a>
+    <a class="pc" href="20-me-favorites.html"><span class="pn">20</span><span class="pt">我的收藏</span><span class="pd">岗位/招聘会/政策</span><span class="pr">/me/favorites</span></a>
+    <a class="pc" href="21-me-benefits.html"><span class="pn">21</span><span class="pt">我的权益</span><span class="pd">券/免费次数/额度</span><span class="pr">/me/benefits</span></a>
+    <a class="pc" href="71-me-activity.html"><span class="pn">71</span><span class="pt">浏览与跳转记录</span><span class="pd">浏览/外跳两 Tab(只记动作)</span><span class="pr">/me/activity</span></a>
+    <a class="pc" href="22-me-notifications.html"><span class="pn">22</span><span class="pt">通知中心</span><span class="pd">消息分类/已读/删除</span><span class="pr">/me/notifications</span></a>
+    <a class="pc" href="22B-me-feedback.html"><span class="pn">22B</span><span class="pt">意见反馈</span><span class="pd">提交反馈工单(缺图 P3 补)</span><span class="pr">/me/feedback</span></a>
+    <a class="pc" href="23-me-settings.html"><span class="pn">23</span><span class="pt">账号设置</span><span class="pd">会话/AI授权撤销/退出</span><span class="pr">/me/settings</span></a>
+  </div>
+  <div class="sub-label">权益活动(从我的权益 21 进入)</div>
+  <div class="chain">
+    <a class="pc" href="24-activities.html"><span class="pn">24</span><span class="pt">权益活动</span><span class="pd">领取型活动列表 + 库存</span><span class="pr">/activities</span></a>
+    <span class="arrow">›</span>
+    <a class="pc" href="72-activity-detail.html"><span class="pn">72</span><span class="pt">权益活动详情</span><span class="pd">额度/有效期/规则 + 领取</span><span class="pr">/activities/:id</span></a>
+    <span class="endpoint">✓ 领取生成 BenefitGrant → 我的权益</span>
+  </div>
+  <div class="sub-label">状态变体</div>
+  <div class="chain">
+    <a class="pc var" href="15A-login-error.html"><span class="pn">15A</span><span class="pt">登录短信失败态</span><span class="pd">协议已勾选,失败在验证码环节,不放行登录;冷却重发</span><span class="pr">基于 proto 15</span></a>
+  </div>
+</section>
+<!-- ===== Flow 12 系统状态页 ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum">12</div>
+    <div class="ft">
+      <h2>系统状态页(全局兜底)</h2>
+      <div class="fc">终端全局兜底与安全屏,非用户核心任务闭环。placeholder 页如实标注「新增功能」,不冒充已实现。</div>
+    </div>
+    <div class="fpre"><span class="pre cfg">CONFIG 素材集</span><span class="pre ext">EXTERNAL 法务正文</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="57-screensaver.html"><span class="pn">57</span><span class="pt">待机宣传屏</span><span class="pd">轮播 + 触摸唤醒;无素材兜底</span><span class="pr">/screensaver</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="60-session-timeout.html"><span class="pn">60</span><span class="pt">会话超时</span><span class="pd">倒计时 + 自动清理(页面已在 main 真实实现,自动触发待接线)</span><span class="pr">/session-timeout</span></a>
+    <a class="pc" href="61-error-offline.html"><span class="pn">61</span><span class="pt">网络/设备异常</span><span class="pd">健康轮询 + 断网降级(页面已在 main 真实实现,自动触发待接线)</span><span class="pr">/error-offline</span></a>
+    <a class="pc" href="58-help.html"><span class="pn">58</span><span class="pt">帮助中心</span><span class="pd">FAQ + 现场协助(静态)</span><span class="pr">/help</span></a>
+    <a class="pc" href="59-legal.html"><span class="pn">59</span><span class="pt">法务文档</span><span class="pd">协议/隐私 + 字号调节;无正文走硬编码兜底</span><span class="pr">/legal/:doc</span><span class="pflags"><span class="pre ext">EXT</span></span></a>
+  </div>
+</section>
+
+<!-- ===== 受控内容专区 ===== -->
+<section class="flow zone">
+  <div class="fh">
+    <div class="fnum z">◈</div>
+    <div class="ft">
+      <h2>受控内容专区(config 门控)</h2>
+      <div class="fc">内容/运营专区,受后台开关门控,不构成用户核心任务闭环,但有明确归属避免孤儿页。关闭时入口不出现或页内诚实提示。</div>
+    </div>
+    <div class="fpre"><span class="pre cfg">CONFIG_BLOCKED</span></div>
+  </div>
+  <div class="chain">
+    <a class="pc" href="12-policy.html"><span class="pn">12</span><span class="pt">政策服务</span><span class="pd">政策/社保/登记/公告 + 材料打印(接 Flow 1)</span><span class="pr">/renshi</span></a>
+    <a class="pc" href="76-toolbox-zone.html"><span class="pn">76</span><span class="pt">百宝箱专区</span><span class="pd">微应用卡跳转(缺图 P3 补)</span><span class="pr">/toolbox</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="50-campus.html"><span class="pn">50</span><span class="pt">校园招聘专区</span><span class="pd">校招双选会 5-Tab → 接 Flow 9</span><span class="pr">/campus</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="51-smart-campus.html"><span class="pn">51</span><span class="pt">智慧校园</span><span class="pd">迎新 + 校园自助 6 卡</span><span class="pr">/smart-campus</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="69-smart-campus-welcome.html"><span class="pn">69</span><span class="pt">迎新系统</span><span class="pd">报到流程 + 办事窗口(静态)</span><span class="pr">/smart-campus/welcome</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="52-smart-campus-service.html"><span class="pn">52</span><span class="pt">校园自助服务</span><span class="pd">办理指引(静态,代表屏)</span><span class="pr">/smart-campus/service/:key</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+    <a class="pc" href="70-freshman-insights.html"><span class="pn">70</span><span class="pt">校园大数据</span><span class="pd">未开放锁定态,绝不展示假数据</span><span class="pr">/smart-campus/freshman-insights</span><span class="pflags"><span class="pre cfg">CFG</span></span></a>
+  </div>
+  <div class="sub-label">状态变体</div>
+  <div class="chain">
+    <a class="pc var" href="76A-toolbox-empty.html"><span class="pn">76A</span><span class="pt">百宝箱未开放态</span><span class="pd">开关关闭或无 items 时页内「待配置」空态,页框仍渲染</span><span class="pr">基于 proto 76</span></a>
+  </div>
+</section>
+<!-- ===== 重定向 + 兜底占位映射(只建映射卡) ===== -->
+<section class="flow">
+  <div class="fh">
+    <div class="fnum z">↳</div>
+    <div class="ft">
+      <h2>重定向 + 兜底占位(只映射,不复制页面)</h2>
+      <div class="fc">5 个 <code>REDIRECT_ALIAS</code> 为纯 <code>Navigate</code> 旧入口;4 个 <code>FALLBACK_PLACEHOLDER</code> 为生产占位/别名,语义指向正式页。二者均无独立视觉页面,点击卡片跳转到其目标原型。</div>
+    </div>
+    <div class="fpre"></div>
+  </div>
+  <div class="sub-label">5 重定向别名 → 目标原型</div>
+  <div class="chain">
+    <a class="pc map" href="66-print-scan-convert.html"><span class="pn">→66</span><span class="pt">/print/scan-convert</span><span class="pd">Navigate → /print-scan/convert</span><span class="pr">目标 proto 66</span></a>
+    <a class="pc map" href="67-print-scan-sign.html"><span class="pn">→67</span><span class="pt">/print/scan-sign</span><span class="pd">Navigate → /print-scan/sign</span><span class="pr">目标 proto 67</span></a>
+    <a class="pc map" href="68-print-scan-feature.html"><span class="pn">→68</span><span class="pt">/print/scan-feature</span><span class="pd">Navigate → /print-scan/feature/id-photo</span><span class="pr">目标 proto 68</span></a>
+    <a class="pc map" href="05-resume-source.html"><span class="pn">→05</span><span class="pt">/resume</span><span class="pd">Navigate → /resume/source</span><span class="pr">目标 proto 05</span></a>
+    <a class="pc map" href="05-resume-source.html"><span class="pn">→05</span><span class="pt">/resume/upload</span><span class="pd">Navigate → /resume/source</span><span class="pr">目标 proto 05</span></a>
+  </div>
+  <div class="sub-label">4 兜底占位 → 语义指向正式页</div>
+  <div class="chain">
+    <a class="pc map" href="71-me-activity.html"><span class="pn">→71</span><span class="pt">/me/activity/:id</span><span class="pd">明细占位 stub,返回列表</span><span class="pr">正式列表 proto 71</span></a>
+    <a class="pc map" href="69-smart-campus-welcome.html"><span class="pn">→69</span><span class="pt">/campus/welcome</span><span class="pd">直达兜底,语义指向智慧校园迎新</span><span class="pr">正式 proto 69</span></a>
+    <a class="pc map" href="70-freshman-insights.html"><span class="pn">→70</span><span class="pt">/campus/freshman-insights</span><span class="pd">直达兜底,语义指向校园大数据</span><span class="pr">正式 proto 70</span></a>
+    <a class="pc map" href="22-me-notifications.html"><span class="pn">→22</span><span class="pt">/notifications</span><span class="pd">顶层通知占位,语义指向站内通知</span><span class="pr">正式 proto 22</span></a>
+  </div>
+</section>
+<!-- ===== 86-path 覆盖校验清单 ===== -->
+<div class="cover">
+  <h2>86-path 覆盖校验清单</h2>
+  <div class="cd">每条 route 恰好归属一处,加总严格 = 86,无重、无漏、无孤儿。UNIQUE_PAGE 计 77,+5 REDIRECT_ALIAS +4 FALLBACK_PLACEHOLDER = 86。(状态变体 15A/32A/34A/76A、子状态 73 不占 route,不计入 86。)</div>
+  <table class="cov">
+    <thead><tr><th>归属</th><th class="n">route</th><th>类型</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>全局入口 · 首页</td><td class="n">1</td><td>UNIQUE_PAGE</td><td>01 首页</td></tr>
+      <tr><td>Flow 1 文档打印</td><td class="n">12</td><td>UNIQUE_PAGE</td><td>02/77/31/64/03/65/32/04/33 + 辅助 66/67/68</td></tr>
+      <tr><td>Flow 2 纸质扫描</td><td class="n">4</td><td>UNIQUE_PAGE</td><td>34/35/36/37</td></tr>
+      <tr><td>Flow 3 简历诊断</td><td class="n">3</td><td>UNIQUE_PAGE</td><td>05/27/06</td></tr>
+      <tr><td>Flow 4 简历优化</td><td class="n">4</td><td>UNIQUE_PAGE</td><td>07/28 + 辅助 29/30</td></tr>
+      <tr><td>Flow 5 简历生成</td><td class="n">2</td><td>UNIQUE_PAGE</td><td>25/26(导出 28 计入 Flow 4)</td></tr>
+      <tr><td>Flow 6 岗位匹配</td><td class="n">1</td><td>UNIQUE_PAGE</td><td>55</td></tr>
+      <tr><td>Flow 7 职业规划</td><td class="n">1</td><td>UNIQUE_PAGE</td><td>56</td></tr>
+      <tr><td>Flow 8 模拟面试</td><td class="n">5</td><td>UNIQUE_PAGE</td><td>38/39/40/41/42</td></tr>
+      <tr><td>Flow 9 岗位/企业/招聘会</td><td class="n">15</td><td>UNIQUE_PAGE</td><td>08/09/74/75/53/54/10/11/43/44/45/46/47/48/49</td></tr>
+      <tr><td>Flow 10 AI助手</td><td class="n">1</td><td>UNIQUE_PAGE</td><td>13(73 为页内子状态,不占 route)</td></tr>
+      <tr><td>Flow 11 会员中心</td><td class="n">16</td><td>UNIQUE_PAGE</td><td>14/15/63/62/16/17/18/19/20/21/71/22/22B/23/24/72</td></tr>
+      <tr><td>Flow 12 系统状态页</td><td class="n">5</td><td>UNIQUE_PAGE</td><td>57/60/61/58/59</td></tr>
+      <tr><td>受控专区</td><td class="n">7</td><td>UNIQUE_PAGE</td><td>12/76/50/51/69/52/70</td></tr>
+      <tr><td>重定向别名</td><td class="n">5</td><td>REDIRECT_ALIAS</td><td>/print/scan-convert · scan-sign · scan-feature · /resume · /resume/upload</td></tr>
+      <tr><td>兜底占位</td><td class="n">4</td><td>FALLBACK_PLACEHOLDER</td><td>/me/activity/:id · /campus/welcome · /campus/freshman-insights · /notifications</td></tr>
+      <tr class="sum"><td>合计</td><td class="n">86</td><td>—</td><td>77 UNIQUE_PAGE + 5 REDIRECT + 4 FALLBACK,无孤儿</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="tip">
+  <b>说明</b>:全部页面为静态高保真原型,数据均为示例。<b>合规红线</b>:岗位/招聘会/企业信息仅为第三方/官方来源展示与跳转指引,不含平台内投递/收简历/筛选/邀约/Offer;主按钮文案严格白名单;金额均标注「以现场公示价为准」。<b>诚实态</b>:支付失败(32A)不伪造扣款/任务、扫描仪离线(34A)不显示「扫描完成」、校园大数据(70)未开放锁定不展示假数据、百宝箱(76/76A)关闭时诚实空态。60/61(会话超时/网络异常)页面组件已在 main 真实实现(commit ff09a692,含 30s 倒计时登出、/api/v1/health 轮询重连);当前尚无自动触发接线(idle 走屏保/静默登出,断网仅置首页设备标志),生产需补接触发路由。<br>
+  <b>⚠️ 设备状态绑定合约(生产必读)</b>:全部原型页面中的「打印机状态」「设备在线」「纸张充足」等状态芯片均为<b>静态示例文案</b>,与任何 API / WebSocket / Terminal Agent 均无连接。生产实现时必须将上述状态芯片替换为 Terminal Agent 心跳遥测的<b>真实实时数据</b>;在 Agent 心跳未就绪或连接断开时必须诚实降级(显示「设备状态未知」或「连接中」),禁止继续显示静态「正常」态。此约束与 CLAUDE.md §3 「不伪造硬件状态」及 docs/compliance/compliance-boundary.md 硬诚实性要求一致。<br>
+  本目录为 Wave P 冻结候选,进入 P5(双模型视觉+流程审查、全屏截图存证、Critical/High 清零)后冻结为 Kiosk 唯一视觉与流程基准;冻结前禁止任何生产 Kiosk UI 改动。
+</div>
+
+</div>
+</body>
+</html>

@@ -7,6 +7,8 @@ export interface AdminOrderReadonlyPrintSummary {
   pageRange: string | null
 }
 
+export type AdminOrderAftercareStatus = 'manual_check_required' | null
+
 export interface AdminOrderReadonlyItem {
   id: string
   orderNo: string
@@ -23,6 +25,9 @@ export interface AdminOrderReadonlyItem {
   colorMode: 'black_white' | 'color' | null
   paperSize: string | null
   errorCode: string | null
+  aftercareStatus: AdminOrderAftercareStatus
+  refundEligible: boolean
+  retryForbidden: boolean
   createdAt: string
   updatedAt: string
 }
@@ -37,6 +42,8 @@ export interface AdminOrderStatusLogItem {
 export interface AdminOrderReadonlyDetail extends AdminOrderReadonlyItem {
   refundedAt: string | null
   refundReason: string | null
+  /** PrintTask.id（废弃孤单入口使用；非文件链接，不含敏感内容）。 */
+  printTaskId: string | null
   print: (AdminOrderReadonlyPrintSummary & {
     status: string
     createdAt: string

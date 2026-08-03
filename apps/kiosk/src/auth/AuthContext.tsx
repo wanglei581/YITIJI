@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBusyState(false)
     // 登出回到干净「未登录」态（公共终端会话重置）。
     setGuestMode(false)
-    // fire-and-forget：后端失败静默，公共终端本地已清即安全。
+    // fire-and-forget：memberLogout 内部用 keepalive 尽力送达；后端失败时本地已清即安全。
     if (token) {
       memberLogout(token).catch(() => undefined)
     }

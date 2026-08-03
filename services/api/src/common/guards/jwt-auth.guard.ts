@@ -1,10 +1,14 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common'
+import { createHash } from 'node:crypto'
 import { JwtService } from '@nestjs/jwt'
 import type { Request } from 'express'
 import type { AuthedUser } from '../decorators/current-user.decorator'
 import type { UserRole } from '../decorators/roles.decorator'
 import { PrismaService } from '../../prisma/prisma.service'
+import { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
 import { RedisService } from '../redis/redis.service'
+
+export { INTERNAL_SESSION_CACHE_TTL_SECONDS } from '../constants/internal-session.constants'
 
 interface JwtPayload {
   sub:   string
@@ -24,8 +28,6 @@ interface CachedSessionState {
   deletedAt: string | null
   orgEnabled: boolean | null
 }
-
-export const INTERNAL_SESSION_CACHE_TTL_SECONDS = 60
 
 /**
  * 解析请求头 `Authorization: Bearer <token>`,验证 JWT,
@@ -91,7 +93,12 @@ export class JwtAuthGuard implements CanActivate {
       }
     }
 
-    req.user = { userId: state.userId, role, orgId: state.orgId }
+    req.user = {
+      userId: state.userId,
+      role,
+      orgId: state.orgId,
+      sessionId: createHash('sha256').update(token).digest('hex'),
+    }
     return true
   }
 

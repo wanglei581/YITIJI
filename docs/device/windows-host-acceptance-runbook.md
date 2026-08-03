@@ -32,7 +32,7 @@ Get-Printer | Select-Object Name, DriverName, PortName
 ```
 
 - 设计文档预期识别名：`Pantum CM2800ADN Series`。
-- **以本机实际输出为准**记录下来，下一步写进 `config.json` 的 `printerName`。
+- **以本机实际输出为准**记录下来，下一步写进 `%ProgramData%\AIJobPrintAgent\agent-config.json` 的 `printerName`。
 - 红线（CLAUDE.md §3）：`printerName` 必须可配置，**禁止在代码里硬编码任何具体型号字符串**。
 
 验证打印机可被命令行驱动（先打一张系统测试页确认驱动通路）：
@@ -48,7 +48,7 @@ Get-PrintJob -PrinterName "Pantum CM2800ADN Series"   # 改成上一步记录的
 
 Agent 打包为单文件可执行（目标机不要求预装 Node.js，设计文档 §8.1）。
 
-**配置文件路径**：`%ProgramData%\AIJobPrintAgent\config.json`
+**配置文件路径**：`%ProgramData%\AIJobPrintAgent\agent-config.json`
 （仅 Agent 服务账号 / 管理员可读写）
 
 ```json
@@ -83,7 +83,7 @@ Agent 打包为单文件可执行（目标机不要求预装 Node.js，设计文
    → 后端返回 terminalId + agentToken + actionTokenSecret
 2) Agent 用 Windows DPAPI 加密保存 token（LocalMachine scope，存 agent.token，
    设计文档 §7.1 / Phase 8.1C）——明文不落盘
-3) 把返回的 terminalId 回填到 config.json（如未自动写入）
+3) 把返回的 terminalId 回填到 `%ProgramData%\AIJobPrintAgent\agent-config.json`（如未自动写入）
 4) 心跳每 30s：PUT /terminals/:id/heartbeat
 ```
 
