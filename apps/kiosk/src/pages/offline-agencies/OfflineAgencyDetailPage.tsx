@@ -41,7 +41,6 @@ export default function OfflineAgencyDetailPage() {
   const services = Array.isArray(agency.services) ? agency.services : []
   const jobs = Array.isArray(agency.jobs) ? agency.jobs : []
   const isOpen = agency.status === 'open'
-
   return (
     <KioskPageFrame
       tone="clay"
@@ -57,7 +56,7 @@ export default function OfflineAgencyDetailPage() {
             <span className="oa-ag-type">{agency.district || '本地机构'}</span>
             <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
               <i className="oa-dot" aria-hidden="true" />
-              {agency.statusLabel || (isOpen ? '服务中' : '暂停服务')}
+              {isOpen ? '正常收录' : '暂停收录'}
             </span>
           </div>
           <div className="jf-row-info">

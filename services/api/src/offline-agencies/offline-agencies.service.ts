@@ -156,7 +156,10 @@ export class OfflineAgenciesService {
       name: agency.name,
       type: agency.orgType || 'recruitment',
       status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
-      statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+      // 文案由前端根据 status 字段渲染（fallback='请到店咨询'），
+      // 这里不再硬编码'营业中'以避免 verify-fusion-w4 反向闸门失效。
+      // 原因：'营业中'是运营状态声明，需真实业务数据支撑（如后端聚合"今日开放门店数"），
+      // 单纯按 agency.status 字段输出等于相信 DB 字段等于真实运营状态，不真实。
       address: agency.address,
       district: agency.district || '',
       hours: agency.openHours || '以门店公告为准',

@@ -86,20 +86,10 @@ export interface OfflineAgencyDTO {
   orgCode?: string
   syncTime?: string
   phone?: string | null
-  /** 机构当前状态（'open' | 'closed' | ...），来自后端 status 字段 */
-  status?: string
-  /** 状态显示文案（由后端或 mapper 提供，可选）*/
-  statusLabel?: string
-  /** 当前在招岗位数，由后端聚合返回（可选）*/
+  /** 机构当前状态（'open' | 'rest'），来自后端 status 字段；前端按此渲染徽章 */
+  status: 'open' | 'rest' | string
+  /** 当前在招岗位数，由后端聚合返回（仅详情端点提供，列表端点不提供）*/
   jobCount?: number
-}
-
-export interface OfflineAgencyListStats {
-  totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
-  lastSyncLabel?: string
 }
 
 export interface OfflineAgencyListResult {
@@ -107,8 +97,6 @@ export interface OfflineAgencyListResult {
   total: number
   page: number
   pageSize: number
-  /** 聚合统计（后端按需返回，前端做 undefined guard）*/
-  stats?: OfflineAgencyListStats
 }
 
 export interface OfflineAgencyListParams {
