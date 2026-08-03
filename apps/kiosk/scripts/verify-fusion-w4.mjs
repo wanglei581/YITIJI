@@ -40,6 +40,13 @@ const PLANNED_TEST_FILES = new Set([
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
 ])
 const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
+// G1 二次合规（2026-08-03）：后端 hardcode '营业中' / 机构临时休息 文案，属于
+// 运营状态声明且 verify-fusion-w4 反向闸门原则要求只能收敛到中性语。
+// 唯一允许修改的后端 service 文件；变更前必须确认：
+//   1. 文案仅为中性兜底（如 '请到店咨询'），不再硬编码运营状态
+//   2. 不得新增 jobs/stats/todayOpen 等聚合字段
+//   3. 修改须配套 docs/progress 日志
+const OFFLINE_AGENCY_BACKEND_SERVICE = 'services/api/src/offline-agencies/offline-agencies.service.ts'
 const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx',
   'apps/kiosk/src/routes/index.tsx',
@@ -222,7 +229,7 @@ check('exact 24-route ownership', () => {
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
   const changes = changedFiles()
-  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
+  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && path !== OFFLINE_AGENCY_BACKEND_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
   const scopeViolations = changes.filter((path) => {
@@ -232,6 +239,7 @@ check('changes stay inside W4 scope and hard-frozen files remain untouched', () 
     if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
     if (PLANNED_TEST_FILES.has(path)) return false
     if (path === OFFLINE_AGENCY_SERVICE) return false
+    if (path === OFFLINE_AGENCY_BACKEND_SERVICE) return false
     return !ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path))
   })
   assert.deepEqual(scopeViolations, [], `W4 scope violation: ${scopeViolations.join(', ')}`)
