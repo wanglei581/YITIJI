@@ -1,5 +1,15 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
+> **验收快照（2026-08-03）**  
+> ✅ main CI 3/3 PASS（PR #492 后，build-and-verify + kiosk-browser-smoke + postgres-readiness）  
+> ✅ `pnpm build` 全通过（kiosk / admin / partner / api）  
+> ✅ `pnpm --filter @ai-job-print/api run verify:compliance` PASS（13 entry paths，禁词零违规）  
+> ✅ `pnpm --filter @ai-job-print/api run verify:assess-isolation` PASS  
+> ✅ `pnpm --filter @ai-job-print/api run verify:self-assessment` PASS（strength clamp / 纯函数 / 空答案）  
+> ⚠️ 部分清单项需生产服务器 / 一体机现场 / 法务审定，本地无法验证（见各节标注）
+
+
+
 > 最后更新：2026-07-25（补 Terminal planned 预创建两阶段发布与旧 binary 禁回滚门禁）；2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
