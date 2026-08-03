@@ -15,6 +15,7 @@ const DISTRICTS = ['全部', '高新区', '城东区', '城南区', '城北区']
 const SERVICES = ['全部', '岗位推荐', '用工咨询', '劳务派遣']
 
 function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
+  if (!stats) return null
   const cells = [
     { n: stats.totalAgencies, t: '合作机构' },
     { n: stats.openAgencies, t: '今日开放' },
@@ -129,7 +130,7 @@ export function OfflineAgenciesPage() {
   }, [district, service, keyword, page, retryKey])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0
-  const syncHint = useMemo(() => data?.stats.lastSyncLabel || '已同步', [data])
+  const syncHint = useMemo(() => data?.stats?.lastSyncLabel || '已同步', [data])
 
   return (
     <KioskPageFrame

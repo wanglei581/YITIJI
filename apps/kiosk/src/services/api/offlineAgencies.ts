@@ -86,6 +86,20 @@ export interface OfflineAgencyDTO {
   orgCode?: string
   syncTime?: string
   phone?: string | null
+  /** 机构当前状态（'open' | 'closed' | ...），来自后端 status 字段 */
+  status?: string
+  /** 状态显示文案（由后端或 mapper 提供，可选）*/
+  statusLabel?: string
+  /** 当前在招岗位数，由后端聚合返回（可选）*/
+  jobCount?: number
+}
+
+export interface OfflineAgencyListStats {
+  totalAgencies: number
+  openAgencies: number
+  totalJobs: number
+  districts: number
+  lastSyncLabel?: string
 }
 
 export interface OfflineAgencyListResult {
@@ -93,6 +107,8 @@ export interface OfflineAgencyListResult {
   total: number
   page: number
   pageSize: number
+  /** 聚合统计（后端按需返回，前端做 undefined guard）*/
+  stats?: OfflineAgencyListStats
 }
 
 export interface OfflineAgencyListParams {
@@ -214,6 +230,7 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     orgCode: agency.externalId ?? agency.sourceOrgId ?? undefined,
     syncTime: agency.syncTime ?? undefined,
     phone: agency.phone ?? null,
+    status: agency.status,
   }
 }
 
