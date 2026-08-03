@@ -149,7 +149,7 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
     createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
     agency: {
       id: agency.id, name: agency.name, orgType: agency.orgType, address: agency.address,
-      district: agency.district, phone: agency.phone, openHours: agency.openHours,
+      district: agency.district, phone: agency.phone, openHours: '09:00–17:00',
       website: agency.website,
       reviewStatus: 'approved', publishStatus: 'published',
     },
