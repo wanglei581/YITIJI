@@ -136,7 +136,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: w4, featureText: '前端工程师' },
   { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: w4, featureText: '线下机构岗位' },
   { pattern: '/offline-agencies', url: '/offline-agencies', marker: w4, featureText: '线下招聘机构' },
-  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: w4, featureText: '线下机构详情' },
+  { pattern: '/offline-agencies/:id', url: '/offline-agencies/agency-001', marker: w4, featureText: '到店咨询办理' },
   { pattern: '/notifications', url: '/notifications', marker: member, featureText: '消息通知' },
   { pattern: '/companies', url: '/companies', marker: w4, featureText: '找企业' },
   { pattern: '/companies/:id', url: '/companies/company-001', marker: w4, featureText: '青岛示例制造有限公司' },
