@@ -19,7 +19,7 @@ export const productionRoutePatterns = [
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials',
   '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
-  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/notifications',
+  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
@@ -30,7 +30,7 @@ export const productionRoutePatterns = [
   '/resume/self-assessment/questions',
   '/resume/self-assessment/result',
   '/resume/self-assessment/history',
-] as const // 91 routes (was 87)
+] as const // 92 routes (was 91)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

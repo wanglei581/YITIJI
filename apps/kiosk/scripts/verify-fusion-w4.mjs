@@ -8,7 +8,7 @@ import ts from 'typescript'
 const KIOSK_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKSPACE_ROOT = join(KIOSK_ROOT, '..', '..')
 const W4_ROUTES = [
-  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies',
+  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
@@ -71,6 +71,15 @@ const W6_INTEGRATION_FILES = new Set([
   'docs/design/kiosk-proto-2026-07-migration-matrix.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
+  // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
+  // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
+  'apps/kiosk/tests/visual/route-manifest.ts',
+  // baseline script route count mirrors W6; must update together
+  'apps/kiosk/scripts/verify-fusion-baseline.mjs',
+  // migration matrix is a documentation contract updated alongside route manifest
+  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
@@ -203,13 +212,12 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 23-route ownership', () => {
+check('exact 24-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 23)
-  assert.equal(new Set(owned).size, 23)
+  assert.equal(owned.length, 24)
+  assert.equal(new Set(owned).size, 24)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
-  assert.ok(!owned.includes('/offline-agencies/:id'))
 })
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
@@ -269,11 +277,19 @@ check('jobs preserve source-only application contract', () => {
     'job search input keeps the kiosk 48px touch target',
   )
 })
-check('offline agency list does not invent a detail route', () => {
-  assert.doesNotMatch(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
+check('offline agency list navigates to real detail route', () => {
+  // G1 #482: /offline-agencies/:id 已作为真实路由注册，列表页须提供导航入口
+  assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('offline agency presentation does not invent unavailable metrics or live status', () => {
-  assert.doesNotMatch(offlineAgencies, /data\.stats|jobCount|distanceKm|status === ['"]open['"]|oa-st open|营业中|今日服务|在招岗位|按直线距离/)
+  // G1 #482 added API-driven status badge (oa-st open/rest → agency.status from server)
+  // and a stats band (openAgencies / totalJobs from server stats field).
+  // These are backend-sourced — they are not fabricated.
+  // Retain guards for: distance proximity (distanceKm / 按直线距离) — backend does NOT
+  // provide coordinates on this endpoint, so any such value would be invented.
+  assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
+  // Hardcoded "营业中" copy would be a live operational claim without API backing.
+  assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
   assert.match(offlineAgencies, /服务时间以机构公示为准/)
   assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
 })

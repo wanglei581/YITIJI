@@ -159,8 +159,8 @@ await runGroup('immutable fusion source hashes', async (fail) => {
 
 await runGroup('router route inventory', async (fail) => {
   const routes = await readDeclaredRoutes(fail)
-  if (routes !== null && routes.length !== 91) {
-    fail(`${displayPath(routerPath)}: expected exactly 91 normalized routes, received ${routes.length}`)
+  if (routes !== null && routes.length !== 92) {
+    fail(`${displayPath(routerPath)}: expected exactly 92 normalized routes, received ${routes.length}`)
   }
   if (routes !== null) {
     const duplicates = listDuplicateValues(routes)
@@ -176,8 +176,8 @@ await runGroup('Playwright route manifest parity', async (fail) => {
   if (routes === null || manifestSource === null) return
 
   const manifestRoutes = extractManifestRoutePatterns(manifestSource)
-  if (manifestRoutes.length !== 91) {
-    fail(`${displayPath(manifestPath)}: expected exactly 91 route patterns, received ${manifestRoutes.length}`)
+  if (manifestRoutes.length !== 92) {
+    fail(`${displayPath(manifestPath)}: expected exactly 92 route patterns, received ${manifestRoutes.length}`)
   }
   const manifestDuplicates = listDuplicateValues(manifestRoutes)
   if (manifestDuplicates.length > 0) {
