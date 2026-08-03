@@ -12,6 +12,14 @@ import { PrismaService } from '../prisma/prisma.service'
 
 const MAX_IN_MEMORY_LOGS = 500
 
+// ⚠️ 新增 operation 取值必须三处同步，否则 Admin 侧会静默错算：
+//   1. 本文件的 AiOperation 联合类型 + OPERATIONS 数组（漏了会被 normalizeOperation
+//      兜底成 'classifyIntent'，即错算到别的能力头上）
+//   2. AdminAiUsage.byOperation 字段（Record 完整性由 TS 保证）
+//   3. apps/admin/src/services/api/types.ts 的 AiOperation +
+//      apps/admin/src/routes/ai-services/index.tsx 的 OPERATION_LABELS +
+//      apps/admin/src/services/api/adminAiMockAdapter.ts
+// 守卫：pnpm --filter @ai-job-print/api verify:ai-cost-coverage
 export type AiOperation =
   | 'parseResume'
   | 'optimizeResume'
@@ -22,6 +30,26 @@ export type AiOperation =
   | 'jobRecommend'
   | 'jobExplain'
   | 'jobMatch'
+  // ── A-6 成本可见性补齐（2026-07-31）：以下能力此前完全不落 AiServiceLog ──
+  | 'careerPlan'
+  | 'fairVisitPlan'
+  | 'interviewQuestion'
+  | 'interviewReport'
+  | 'voiceTranscribe'
+  | 'voiceSynthesize'
+  // ── 自我探索 · 倾向参考（2026-08-01） ──
+  | 'selfAssessment'
+/**
+ * 按时长/字符计费、不按 token 计费的 operation。
+ *
+ * 这些行的 tokenUsage 恒为空，estimatedCostCny 通常为 undefined（我们不编造单价）。
+ * Admin 侧必须据此如实标注「按时长/字符计费，未估算成本」，
+ * 不得把 undefined 当成 0 展示为「免费」。
+ */
+export const NON_TOKEN_BILLED_OPERATIONS: readonly AiOperation[] = [
+  'voiceTranscribe',
+  'voiceSynthesize',
+]
 
 export interface AiLogEntry {
   taskId: string
@@ -53,17 +81,7 @@ export interface AdminAiUsage {
   failCount: number
   successRate: number           // 0–100, one decimal
   avgLatencyMs: number          // success-only average, rounded
-  byOperation: {
-    parseResume: number
-    optimizeResume: number
-    adjustResumeLayout: number
-    generateResume: number
-    chatAssistant: number
-    classifyIntent: number
-    jobRecommend: number
-    jobExplain: number
-    jobMatch: number
-  }
+  byOperation: Record<AiOperation, number>
   errorDistribution: Array<{ code: string; count: number }>
   tokenUsageTotals: {
     promptTokens: number
@@ -85,6 +103,19 @@ export interface AdminAiLogsResult {
   entries: AiLogEntry[]         // safe — no content fields in AiLogEntry
 }
 
+/**
+ * record() 的入参。
+ *
+ * 与 AiLogEntry 的唯一差别：taskId 允许为 null。
+ * taskId 只是写入侧的关联标签（控制台排查用），并不落库；
+ * Admin 读取侧（getLogs）一律用 AiServiceLog.id 回填，所以那边仍是必有 string。
+ * 少数 AI 调用本身不挂在任何业务任务上（例如简历语音输入的匿名 ASR 端点），
+ * 这时如实写 null，而不是编一个假任务号。
+ */
+export type AiLogRecordInput = Omit<AiLogEntry, 'createdAt' | 'taskId'> & {
+  taskId: string | null
+}
+
 const OPERATIONS: AiOperation[] = [
   'parseResume',
   'optimizeResume',
@@ -95,7 +126,98 @@ const OPERATIONS: AiOperation[] = [
   'jobRecommend',
   'jobExplain',
   'jobMatch',
+  'careerPlan',
+  'fairVisitPlan',
+  'interviewQuestion',
+  'interviewReport',
+  'voiceTranscribe',
+  'voiceSynthesize',
+  'selfAssessment',
 ]
+
+// ─── 跨重试用量累计（A-6）────────────────────────────────────────
+//
+// 一次用户可见操作（生成职业规划 / 参会准备单 / 面试问题 / 面试报告）可能触发
+// 多次 LLM 调用：输出结构不合法或命中禁词时服务内部会重试。每次调用都真实花钱，
+// 所以成本必须累计，而不是只记最后一次成功调用。
+//
+// 用法：调用方 new 一个 accumulator 传给 LLM 服务的 onLlmCall；无论最终成功还是
+// 抛错，调用方都能从 accumulator 取到累计用量并落一条 AiServiceLog。
+
+export interface AiLlmCallMeta {
+  provider: string
+  tokenUsage?: AiLogEntry['tokenUsage']
+}
+
+export type AiLlmCallSink = (meta: AiLlmCallMeta) => void
+
+/** OpenAI 兼容接口的 usage 字段（不同厂商 snake_case / camelCase 混用）。 */
+export interface RawLlmUsage {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  promptTokens?: number
+  completionTokens?: number
+  totalTokens?: number
+}
+
+/**
+ * 从 Nest 异常里取业务错误码（如 AI_UNAVAILABLE / AI_NOT_CONFIGURED）。
+ * 只取错误码，不取 message——message 可能带上游返回的细节。
+ */
+export function aiErrorCodeOf(error: unknown, fallback = 'AI_FAILED'): string {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const response = (error as { response?: { error?: { code?: string } } }).response
+    if (response?.error?.code) return response.error.code
+  }
+  return error instanceof Error ? error.name : fallback
+}
+
+/** 归一化上游 usage；全 0 或缺失时返回 undefined（不伪造 0 成本）。 */
+export function normalizeLlmUsage(usage: RawLlmUsage | undefined): AiLogEntry['tokenUsage'] {
+  if (!usage) return undefined
+  const promptTokens = toNonNegativeInt(usage.prompt_tokens ?? usage.promptTokens)
+  const completionTokens = toNonNegativeInt(usage.completion_tokens ?? usage.completionTokens)
+  const totalTokens = toNonNegativeInt(usage.total_tokens ?? usage.totalTokens) || promptTokens + completionTokens
+  if (totalTokens <= 0) return undefined
+  return { promptTokens, completionTokens, totalTokens }
+}
+
+export class AiUsageAccumulator {
+  private promptTokens = 0
+  private completionTokens = 0
+  private totalTokens = 0
+  private calls = 0
+  private lastProvider: string | null = null
+
+  readonly add: AiLlmCallSink = (meta) => {
+    this.calls += 1
+    this.lastProvider = meta.provider
+    if (!meta.tokenUsage) return
+    this.promptTokens += meta.tokenUsage.promptTokens
+    this.completionTokens += meta.tokenUsage.completionTokens
+    this.totalTokens += meta.tokenUsage.totalTokens
+  }
+
+  /** LLM 调用次数（含失败重试）；0 表示一次都没真的打到模型（如未配置直接抛错）。 */
+  get callCount(): number {
+    return this.calls
+  }
+
+  get provider(): string | null {
+    return this.lastProvider
+  }
+
+  /** 累计 token；一次都没拿到 usage 时返回 undefined（不伪造 0）。 */
+  get tokenUsage(): AiLogEntry['tokenUsage'] {
+    if (this.totalTokens <= 0 && this.promptTokens <= 0 && this.completionTokens <= 0) return undefined
+    return {
+      promptTokens: this.promptTokens,
+      completionTokens: this.completionTokens,
+      totalTokens: this.totalTokens > 0 ? this.totalTokens : this.promptTokens + this.completionTokens,
+    }
+  }
+}
 
 const AI_USAGE_WINDOW_MS = 24 * 60 * 60 * 1000
 const AI_COST_ALERT_CNY = (() => {
@@ -106,12 +228,12 @@ const AI_COST_ALERT_CNY = (() => {
 @Injectable()
 export class AiLogService {
   private readonly logger = new Logger(AiLogService.name)
-  private readonly logs: AiLogEntry[] = []
+  private readonly logs: Array<AiLogRecordInput & { createdAt: string }> = []
 
   constructor(private readonly prisma: PrismaService) {}
 
-  record(entry: Omit<AiLogEntry, 'createdAt'>): void {
-    const full: AiLogEntry = {
+  record(entry: AiLogRecordInput): void {
+    const full: AiLogRecordInput & { createdAt: string } = {
       ...entry,
       estimatedCostCny: entry.estimatedCostCny ?? estimateCostCny(entry.provider, entry.tokenUsage),
       createdAt: new Date().toISOString(),
@@ -135,8 +257,9 @@ export class AiLogService {
     }))
   }
 
-  async persist(entry: AiLogEntry): Promise<void> {
+  async persist(entry: AiLogRecordInput): Promise<void> {
     // AiServiceLog 仅保存调用元数据；不包含简历原文、完整 prompt/output、签名 URL 或文件名。
+    // 注意：taskId 不落库（表里没有该列），只作为控制台关联标签使用。
     await this.prisma.aiServiceLog.create({
       data: {
         operation: entry.operation,

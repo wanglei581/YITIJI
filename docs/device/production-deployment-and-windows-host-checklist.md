@@ -1,6 +1,6 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> 最后更新：2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
+> 最后更新：2026-07-25（补 Terminal planned 预创建两阶段发布与旧 binary 禁回滚门禁）；2026-06-25（补 QR 扫码登录本地 Agent 桥接验收项：Kiosk HTTPS/本地 127.0.0.1 访问前提、手机可访问二维码公网/局域网基址、Terminal Agent local API Origin 白名单）；2026-06-24（新增「附录二」对齐 2026-06-22 预生产 Gate 2–4 实际状态，纠正附录 §G 过期判断；正文 §二–§八 正式生产门禁口径不变）；2026-06-14（当前窗口切换为上线验收与小范围试运营准备；新增 §六 试运营验收）
 > 适用范围：生产服务器上线、预生产演练、Windows 一体机本地主机更换、Terminal Agent 重新安装  
 > 关联文档：[postgres-operations.md](./postgres-operations.md) | [terminal-agent-windows.md](./terminal-agent-windows.md) | [windows-terminal-agent-design.md](./windows-terminal-agent-design.md) | [feature-scope.md](../product/feature-scope.md) | [compliance-boundary.md](../compliance/compliance-boundary.md)
 
@@ -37,15 +37,15 @@
 
 上线前必须轮换或重新签发生产密钥，不使用聊天/本地开发中暴露过的密钥：
 
-- [ ] 百度 OCR 应用密钥已在百度控制台重建/轮换。
-- [ ] 腾讯云 COS CAM 子用户密钥已轮换，权限最小化到私有桶所需动作。
+- [x] 百度 OCR 应用密钥已在百度控制台重建/轮换。（**2026-07-25 `SECRETS_ROTATION_EVIDENCE` 方案 C**：用户确认沿用 2026-06-13 控制台重建 + live 复验；今日未再轮换、未读密钥值。）
+- [x] 腾讯云 COS CAM 子用户密钥已轮换，权限最小化到私有桶所需动作。（同上：沿用 2026-06-13 轮换 + live；今日未再轮换。最小权限以当时配置为准，若 CAM 策略有变须另验。）
 - [ ] 腾讯云 COS 生命周期已人工验收：禁止配置 Bucket 全局过期规则；任何规则不得覆盖 `users/`、会员简历、AI 成果物或 `long_term` 长期保存对象。
 - [ ] 如启用 COS 生命周期兜底规则，仅允许作用于 `tmp/` 临时前缀；规则名称、作用前缀、过期天数和启用状态已截图存档。
-- [ ] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。
+- [x] 腾讯 ASR/TTS/SMS/TRTC 相关 CAM 权限已按生产最小权限配置。（**2026-07-25 方案 C**：用户确认 SMS/TRTC 为当前生产密钥且预发 `.env` 已同步、今日无需再换；未读密钥值。）
 - [ ] LLM/DeepSeek 或其他模型 API Key 已使用生产专用 Key。
-- [ ] 短信签名/模板审核通过后再启用真实短信。
-- [ ] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。
-- [ ] 生产/预生产环境的 seed 内部账号默认口令（`admin` / `partner1` / `partner2`，明文写在 `services/api/prisma/seed.ts`）已全部轮换为强密码或直接禁用账号；公网可达的后台登录页不得挂任何仓库内可见的默认口令（2026-07-12 发现预生产按 runbook 跑过 seed 后此风险真实存在，已列为 P0 待处置：轮换命令已备好，待用户亲手执行后本项才可勾选）。
+- [x] 短信签名/模板审核通过后再启用真实短信。（**2026-07-26 真号 E2E**：预发 `SMS_PROVIDER=tencent`，签名/模板名称级 `青岛智磊信创` / `2661213`；`sms-code` 201 + Tencent 下发成功日志；用户回填验证码后会员登录 201，`183****1921`。完整手机号/验证码/JWT 不入库。）
+- [x] 所有密钥只写入服务器环境变量/配置中心，不写入前端、不写入仓库、不写入日志。（**2026-07-25**：用户确认「密钥在 .env」；预发名称级复核 OCR/COS/SMS/TRTC 为 `SET`，值未读出。）
+- [x] 生产/预生产环境的 seed 内部账号默认口令（`admin` / `partner1` / `partner2`，明文写在 `services/api/prisma/seed.ts`）已全部轮换为强密码或直接禁用账号；公网可达的后台登录页不得挂任何仓库内可见的默认口令（2026-07-12 发现风险；**2026-07-25**：bcrypt 确认后执行 `SEED_PASSWORD_ROTATE`——admin 本已非默认，partner1/partner2 已轮换强随机口令且 `tokenVersion++`；seed 默认登录 `partner1`→`401 AUTH_LOGIN_FAILED`；明文仅服务器 root `0600` 文件，取后 shred。**注意**：勿再对预发跑会重置口令的 `db:seed` upsert）。
 
 ### 2.3 合规前置
 
@@ -89,11 +89,14 @@
 - [ ] OCR provider 与百度密钥正确。
 - [ ] AI provider / LLM 功能级配置可读取。
 - [ ] ASR/TTS provider 与腾讯密钥正确。
-- [ ] SMS provider 在短信审核前不得误设为真实生产发送。
+- [x] SMS provider 在短信审核前不得误设为真实生产发送。（**2026-07-26**：预发已为 `tencent` 且真号 E2E 通过；见 §2.2。正式生产仍须保持密钥仅服务端、禁止 log 假发送冒充生产。）
 - [ ] `PRINT_REQUIRE_PAID_BEFORE_CLAIM` 显式设为 true 或 false（生产缺省会拒启动；启用真实支付通道时必须 true）。
 - [ ] 若启用微信或支付宝「扫付款码」：`PAYMENT_CODEPAY_AUTO_CONVERGE_ENABLED=true` 已写入仅服务端环境并随 API 重启生效；支付宝同时已配置 `ALIPAY_APP_ID`、应用私钥、支付宝公钥、正式网关和 `PAYMENT_NOTIFY_BASE_URL=https://zyidai.cn`（密钥不进仓库、不进前端）。
 - [ ] 支付宝当面付现场验收：屏上动态二维码和 HID 扫码枪付款码各完成一笔受控小额交易；`10003`/网络不确定时只允许服务端查单收敛，不允许用户立即重扫；核对 Order、PaymentAttempt、渠道流水、出纸与退款记录一致。
 - [ ] `PRINT_SCAN_CAPABILITY_MODE` 显式设为 managed 或 strict（生产缺省会拒启动；managed=未配置能力行放行既有闭环，strict=未配置行 fail-closed，Task 11）。
+- [ ] `TERMINAL_LEGACY_REGISTER_ENABLED=false`；生产启动门禁必须拒绝缺省或 `true`，共享 `adminSecret` 不得再用于新设备注册。
+- [ ] `TERMINAL_PLANNED_PROVISIONING_ENABLED` 显式设为 `true|false`：滚动升级第一阶段保持 `false`；确认所有 API 实例均为 reader-aware 新版本且旧 binary 已摘流量/退出后，第二阶段才切 `true`。
+- [ ] 开启 planned writer 前已保存所有 API 实例的构建版本/commit、进程清单和健康检查证据；开启后禁止回滚到不认识 `lifecycleStatus` 的旧 binary。确需回滚时先把 planned writer 切回 `false` 并停止新设备预创建。
 - [ ] 文件大小、签名 URL TTL、匿名/会员数据 TTL 与产品要求一致。
 
 ### 3.3 构建与静态资源
@@ -256,6 +259,8 @@ pnpm --filter ./services/api verify:activity-logs
 
 换 Windows 主机时，必须按本节重新验收。不要因为旧机器通过就默认新机器通过。
 
+预发终端 `t_ksk_001` 的**远程 Phase R / 现场 Phase F** 执行清单与回执模板：`docs/device/windows-field-recheck-phase-f-runbook.md`（远程旁证不能替代本节勾选）。
+
 ### 5.1 Windows 环境
 
 - [ ] Windows 10/11 x64，版本记录清楚。
@@ -263,14 +268,14 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] 自动登录/开机启动策略符合现场 kiosk 使用方式。
 - [ ] Edge/Chrome 已安装并可进入全屏 Kiosk 模式。
 - [ ] Windows 更新策略不会在营业时段强制重启。
-- [ ] 本机防火墙允许 Agent 访问后端 API；Agent 本地端口只监听 `127.0.0.1`。
+- [x] 本机防火墙允许 Agent 访问后端 API；Agent 本地端口只监听 `127.0.0.1`。（2026-07-25 Phase F：`127.0.0.1:9527`；Agent 可达预发 API 旁证）
 
 ### 5.2 打印机驱动与配置
 
-- [ ] 奔图 CM2800/CM2820 系列驱动已安装。
-- [ ] Windows 打印机列表中真实驱动名已记录。
-- [ ] Agent 配置使用 `printerName`，不得硬编码具体型号字符串。
-- [ ] `printerName` 与 Windows 实际识别名一致。
+- [x] 奔图 CM2800/CM2820 系列驱动已安装。（2026-07-25 Phase F：队列名存在）
+- [x] Windows 打印机列表中真实驱动名已记录。（`Pantum CM2800ADN Series`）
+- [x] Agent 配置使用 `printerName`，不得硬编码具体型号字符串。（对照 `agent-config.json`）
+- [x] `printerName` 与 Windows 实际识别名一致。（2026-07-25 Phase F）
 - [ ] 打印机通过 USB 或有线网络连接稳定。
 - [ ] 默认纸张为 A4，不假设 A3。
 - [ ] 彩色、黑白、份数、双面参数在本机驱动下实测。
@@ -279,26 +284,31 @@ pnpm --filter ./services/api verify:activity-logs
 
 - [ ] Agent 版本与服务器 API 版本匹配。
 - [ ] Agent 配置包含 API base URL、terminalId/注册凭据、printerName、扫描目录、日志路径。
-- [ ] Token/凭据使用 Windows DPAPI 或设计文档要求的方式加密保存。
-- [ ] Agent Windows Service 安装成功。
-- [ ] Service 可开机自启。
+- [ ] Token/凭据使用 Windows DPAPI 或设计文档要求的方式加密保存。（现场现为仓库目录配置，正式安装口径仍开）
+- [x] Agent Windows Service 安装成功。（2026-07-25：`AIJobPrintAgent` Running）
+- [x] Service 可开机自启。（StartType=Automatic）
 - [ ] 单实例保护有效，重复启动不会产生双 Agent。
 - [ ] Agent 日志路径固定，日志不含用户文件正文/密钥。
 
 ### 5.4 终端注册与心跳
 
-- [ ] Agent 可访问生产/预生产 API。
-- [ ] 终端注册成功。
-- [ ] 心跳持续上报。
-- [ ] Admin 终端管理页显示在线。
-- [ ] 打印机状态/WMI 状态可上报。
-- [ ] 断网后状态变离线；恢复网络后自动重新在线。
+- [x] Agent 可访问生产/预生产 API。（2026-07-25：预发心跳 / printer ready）
+- [ ] Admin 在既有「设备管理」页预创建唯一 `terminalCode`，设备状态为「待安装」，此时未签发日常设备凭证且不能认证。
+- [ ] Admin 生成一次性绑定码，安装程序使用绑定码激活；首次凭证 generation=1，设备进入 `commissioning`，绑定码不可重复使用；首次成功认证心跳后自动进入 `active`。
+- [ ] 终端激活成功；生产安装包、命令行、镜像和日志均不携带共享 `adminSecret` 或可复用明文 Token。
+- [x] 心跳持续上报。（远程 Phase R + 现场在线）
+- [x] Admin 终端管理页显示在线。（同日浏览器只读旁证）
+- [x] 打印机状态/WMI 状态可上报。（`printerStatus=ready`）
+- [x] 断网后状态变离线；恢复网络后自动重新在线。（2026-07-25 F5：WLAN 75s，恢复无需重启 Agent）
 
 ### 5.5 本地 Kiosk 与 Agent 通信
 
 - [ ] Kiosk 页面可从生产域名打开。
-- [ ] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。
-- [ ] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。
+- [x] Kiosk 全屏模式无浏览器系统弹窗阻断主流程。（2026-07-25 F6：1080×1920；未覆盖 Assigned Access）
+- [x] `http://127.0.0.1:9527` 或当前 Agent local API 仅本机可访问。（2026-07-25 F3）
+- [ ] `GET /local/terminal-identity` 在允许 Origin 下只返回 `terminalId` / `terminalCode`，错误 Origin 返回 403；不得返回 Agent token、API URL、打印机名或本地路径。
+- [ ] 不设置 `VITE_TERMINAL_ID` 的同一份 production Kiosk 在 `KSK-001` / `KSK-002` 分别显示本机 `terminalCode`；Agent 未启动时显示“设备未绑定”且终端动作 fail-closed，不得伪装为“01号机”。
+- [ ] 浏览器早于 Agent 启动以及 Agent 服务重启后，Kiosk 无需人工刷新即可恢复本机身份；重新绑定为另一终端后不得继续使用旧 `terminalId`。
 - [ ] QR 登录本地桥接端口与 Kiosk 构建变量一致：Agent `localApiPort` / `localApiAllowedOrigins` 与 Kiosk `VITE_TERMINAL_AGENT_LOCAL_URL`、实际 Kiosk Origin 完全匹配。
 - [ ] 如 Kiosk 使用 HTTPS 页面，已实测浏览器不会因 mixed content / Private Network Access 阻断 `http://127.0.0.1:<localApiPort>`；若被阻断，扫码登录不得宣称可用，需改为受信本地桥接方案或现场允许的本地访问策略。
 - [ ] U 盘导入本地桥接令牌一致：Agent `agent-config.json` 的 `localApiBridgeToken` 与 Kiosk 构建变量 `VITE_TERMINAL_AGENT_BRIDGE_TOKEN` 完全一致（安装时一起生成/下发，不走网络协商）；未配置时 `/local/usb/*` 全部路由 fail-closed 403，Kiosk `usb` tab 应保持禁用并显示"本机未配置"，不得强行放行。
@@ -306,12 +316,13 @@ pnpm --filter ./services/api verify:activity-logs
 - [ ] U 盘 `safeId` 一次性消费有效：同一 `safeId` 二次调用 `/local/usb/upload` 返回 410（`LOCAL_USB_FILE_EXPIRED`），刷新文件列表后旧 `safeId` 全部失效。
 - [ ] 真实插入 U 盘后 `detectRemovableDrive()` 能正确识别盘符与卷标（win32 CIM/PowerShell 路径，未在开发环境验证过，属本清单新增待验收项）。
 - [ ] 页面展示设备状态与 Agent 上报一致。
+- [ ] 分别向 `KSK-001` / `KSK-002` 下发带唯一标识的任务，仅目标 Agent 可领取；交叉观察窗口内另一台不得领取，结果保留两端任务 ID 与 Agent 日志。
 
 ### 5.6 真机打印验收
 
 至少执行以下测试并留存结果：
 
-- [ ] 打印测试 PDF。
+- [x] 打印测试 PDF。（**2026-07-25 F4**：`ptask_kiosk_2a75352b81631efb` 等旁证；**补做** `ptask_kiosk_e0fe379299af7c50` 简历打印扫码上传 → completed；用户确认「有出纸」。**2026-07-26 再确认** `ptask_kiosk_f9587c2439e1855a` completed，用户回「是」）
 - [ ] 打印测试图片。
 - [ ] 打印简历 PDF。
 - [ ] 份数控制。
@@ -512,7 +523,7 @@ typecheck（6 包）/ lint（4 端，0 error）/ build（5 包）全绿；verify
 - Gate 4 **剩余浏览器证据**补齐（Admin 生命周期、签名 URL / 等待窗口、必要时 COS 控制台或 DB 脱敏摘要；API 级和会员路径已过，完整截图待补）。
 - **百度 OCR Key 预生产 live**、**AI / TRTC / ASR / TTS 按启用范围 live**（本地已验，预生产 live 待补）。
 - **正式域名 + 正式 HTTPS**（当前仅 30 天临时自签）。
-- **腾讯短信审核**通过后**真实手机号 E2E**（预生产仍 `SMS_PROVIDER=tencent`，真实发送待审核）。
-- **Windows 真机 / Terminal Agent / 奔图打印·扫描 / 断网恢复 / 真实出纸**（§五，需真机）。
+- ~~**腾讯短信审核**通过后**真实手机号 E2E**~~ → **2026-07-26 已完成**（见 §2.2）。
+- **Windows 真机 / Terminal Agent / 奔图打印·扫描 / 断网恢复 / 真实出纸**（§五；Phase F 含 F4 出纸已过；扫描/U盘整机与彩色/双面参数等仍可另开）。
 - **法务**用户协议 / 隐私政策审定（§2.3，当前为试运营文本）。
 - **小范围试运营**（§六）未开始。

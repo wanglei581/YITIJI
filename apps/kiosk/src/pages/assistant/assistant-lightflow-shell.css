@@ -1,3 +1,5 @@
+[data-kiosk-presentation='fusion-youth'] .fusion-w3--assistant > .ui-kiosk-page-content { padding: 0; }
+
 .kassist.kassist-lightflow {
   --sd-canvas: var(--sd-color-canvas);
   --sd-canvas-outer: var(--sd-color-canvas-outer);

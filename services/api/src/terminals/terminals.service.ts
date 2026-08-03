@@ -17,12 +17,14 @@ import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
+import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 
 // Re-export all types so existing import paths remain valid
 export type {
   ClaimTaskResponse,
   TerminalBindCodeCreated,
   TerminalBindCodeExchangeResult,
+  EmergencyCredentialRevokeResult,
 } from './terminals-agent.service'
 
 export {
@@ -39,6 +41,8 @@ export type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileResult,
   AdminPrinterView,
+  PlannedTerminalCreated,
+  UpdateTerminalLifecycleResult,
 } from './terminals-admin.service'
 
 @Injectable()
@@ -54,12 +58,25 @@ export class TerminalsService {
     return this.agent.register(dto)
   }
 
-  createBindCode(terminalRef: string, actorId: string | null, ttlMinutes?: number) {
-    return this.agent.createBindCode(terminalRef, actorId, ttlMinutes)
+  createBindCode(
+    terminalRef: string,
+    actorId: string | null,
+    ttlMinutes?: number,
+    auditContext?: Parameters<TerminalAgentService['createBindCode']>[3],
+  ) {
+    return this.agent.createBindCode(terminalRef, actorId, ttlMinutes, auditContext)
   }
 
   exchangeBindCode(dto: ExchangeTerminalBindCodeDto) {
     return this.agent.exchangeBindCode(dto)
+  }
+
+  emergencyRevokeCredentials(
+    terminalRef: string,
+    auditContext: Parameters<TerminalAgentService['emergencyRevokeCredentials']>[1],
+    expected: Parameters<TerminalAgentService['emergencyRevokeCredentials']>[2],
+  ) {
+    return this.agent.emergencyRevokeCredentials(terminalRef, auditContext, expected)
   }
 
   heartbeat(terminalId: string, dto: HeartbeatDto, authHeader: string | undefined) {
@@ -101,6 +118,10 @@ export class TerminalsService {
     return this.admin.listTerminalsForAdmin()
   }
 
+  createPlannedTerminal(dto: CreatePlannedTerminalDto) {
+    return this.admin.createPlannedTerminal(dto)
+  }
+
   listOrganizationOptions() {
     return this.admin.listOrganizationOptions()
   }
@@ -111,6 +132,15 @@ export class TerminalsService {
 
   updateTerminalProfile(terminalId: string, dto: UpdateTerminalProfileDto) {
     return this.admin.updateTerminalProfile(terminalId, dto)
+  }
+
+  updateTerminalLifecycle(
+    terminalId: string,
+    lifecycleStatus: Parameters<TerminalAdminService['updateTerminalLifecycle']>[1],
+    auditContext: Parameters<TerminalAdminService['updateTerminalLifecycle']>[2],
+    expected: Parameters<TerminalAdminService['updateTerminalLifecycle']>[3],
+  ) {
+    return this.admin.updateTerminalLifecycle(terminalId, lifecycleStatus, auditContext, expected)
   }
 
   getKioskTerminalConfig(terminalRef: string) {

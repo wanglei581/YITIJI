@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-execution-contract-hardening-20260801",
+  "title": "收紧 F1 D2′ fresh-retake 执行包合同",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "已完成并归档；push/PR/merge 等用户另行选择",
+  "createdAt": "2026-08-01T11:38:46+08:00",
+  "branch": "codex/f1-d2-execution-contract-20260801"
+}

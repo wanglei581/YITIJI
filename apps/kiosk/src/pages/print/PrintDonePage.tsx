@@ -4,6 +4,7 @@ import { AlertCircleIcon } from 'lucide-react'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import { API_MODE } from '../../services/api/client'
 import { getPayStatus } from '../../services/print/paymentApi'
+import { getPrintJobStatus } from '../../services/print/printJobsApi'
 import { printUploadPathForSource, type PrintMaterialSource } from './printMaterialSession'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
@@ -17,8 +18,6 @@ interface PrintFile {
 interface PrintJobState {
   file?:                PrintFile
   params?:              PrintJobParams
-  success?:             boolean
-  reason?:              string
   returnUrl?:           string
   returnLabel?:         string
   taskId?:              string
@@ -26,6 +25,22 @@ interface PrintJobState {
   paymentSessionToken?: string
   source?:              PrintMaterialSource
 }
+
+type PrintResultState = 'loading' | 'completed' | 'failed' | 'unknown'
+
+interface PrintVerification {
+  taskId: string
+  result: Exclude<PrintResultState, 'loading'>
+  failureReason?: string
+}
+
+interface PickupLookup {
+  orderId: string
+  code: string | null
+  error: string | null
+}
+
+const ACTIVE_PRINT_STATUSES = ['pending', 'claimed', 'printing'] as const
 
 const DUPLEX_LABEL: Record<string, string> = {
   simplex:           '单面',
@@ -38,53 +53,158 @@ export function PrintDonePage() {
   const location = useLocation()
   const state = (location.state ?? {}) as PrintJobState
 
-  const { file, params, success = true, reason } = state
+  const { file, params } = state
+  const taskId = typeof state.taskId === 'string' && state.taskId.trim() ? state.taskId.trim() : null
   const uploadPath = printUploadPathForSource(state.source)
+  const feedbackUrl = taskId
+    ? `/me/feedback?category=print&relatedPrintTaskId=${encodeURIComponent(taskId)}`
+    : null
+
+  const [verification, setVerification] = useState<PrintVerification | null>(null)
+  const resultState: PrintResultState = !taskId
+    ? 'unknown'
+    : verification?.taskId === taskId
+      ? verification.result
+      : 'loading'
+  const failureReason = verification?.taskId === taskId
+    ? verification.failureReason ?? '打印任务未能完成，请联系现场工作人员'
+    : '打印任务未能完成，请联系现场工作人员'
 
   // C5-3：paid 后展示取件凭证码。取件码可见性完全由后端 pickupCodeVisibleFor 决定
   // （paid + 未退款 + 任务未进终态），前端只透传后端返回值，不自行编造。
-  const [pickupCode, setPickupCode] = useState<string | null>(null)
-  const [pickupCodeError, setPickupCodeError] = useState<string | null>(null)
-  const [rating, setRating] = useState<'满意' | '一般' | '不满意' | null>(null)
+  const [pickupLookup, setPickupLookup] = useState<PickupLookup | null>(null)
+  const pickupCode = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.code : null
+  const pickupCodeError = state.orderId && pickupLookup?.orderId === state.orderId ? pickupLookup.error : null
 
   useEffect(() => {
-    if (!success || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) return
+    if (!taskId) {
+      setVerification(null)
+      return
+    }
+
     let cancelled = false
+    setVerification(null)
+    void getPrintJobStatus(taskId)
+      .then((result) => {
+        if (cancelled) return
+        if (result.taskId !== taskId) {
+          setVerification({ taskId, result: 'unknown' })
+          return
+        }
+        if (result.status === 'completed') {
+          setVerification({ taskId, result: 'completed' })
+          return
+        }
+        if (result.status === 'failed') {
+          setVerification({
+            taskId,
+            result: 'failed',
+            failureReason: result.failureReasonForUser ?? '打印任务未能完成，请联系现场工作人员',
+          })
+          return
+        }
+        if (ACTIVE_PRINT_STATUSES.some((status) => status === result.status)) {
+          navigate('/print/progress', {
+            replace: true,
+            state: { ...((location.state ?? {}) as object), taskId },
+          })
+          return
+        }
+        setVerification({ taskId, result: 'unknown' })
+      })
+      .catch(() => {
+        if (!cancelled) setVerification({ taskId, result: 'unknown' })
+      })
+
+    return () => { cancelled = true }
+  }, [location.state, navigate, taskId])
+
+  useEffect(() => {
+    if (resultState !== 'completed' || API_MODE !== 'http' || !state.orderId || !state.paymentSessionToken) {
+      setPickupLookup(null)
+      return
+    }
+    const orderId = state.orderId
+    const paymentSessionToken = state.paymentSessionToken
+    let cancelled = false
+    setPickupLookup(null)
     void (async () => {
       try {
-        const s = await getPayStatus({ orderId: state.orderId as string, paymentSessionToken: state.paymentSessionToken })
+        const s = await getPayStatus({ orderId, paymentSessionToken })
         if (!cancelled) {
-          setPickupCode(s.pickupCode)
-          setPickupCodeError(null)
+          setPickupLookup({ orderId, code: s.pickupCode, error: null })
         }
       } catch {
         if (!cancelled) {
-          setPickupCodeError('取件凭证暂时无法读取，请联系工作人员核验订单')
+          setPickupLookup({ orderId, code: null, error: '取件凭证暂时无法读取，请联系工作人员核验订单' })
         }
       }
     })()
     return () => { cancelled = true }
-  }, [success, state.orderId, state.paymentSessionToken])
-
-  const handleRetry = () => {
-    const CONTROL_FIELDS = new Set(['success', 'reason', 'simulateFailure', 'failReason'])
-    const retryState = Object.fromEntries(
-      Object.entries(state).filter(([k]) => !CONTROL_FIELDS.has(k)),
-    )
-    navigate('/print/confirm', { state: retryState })
-  }
+  }, [resultState, state.orderId, state.paymentSessionToken])
 
   const totalFaces = file && params
     ? file.pages * params.copies * (params.duplex === 'simplex' ? 1 : 2)
     : null
 
-  /* ── 失败态 ── */
-  if (!success) {
+  /* ── 核验中 / 无法确认 ── */
+  if (resultState === 'loading' || resultState === 'unknown') {
+    const isLoading = resultState === 'loading'
+    return (
+      <PrintPageFrame><div data-w2-page="print-done" className="flex min-h-full flex-col">
+        <PrintPrototypeHeader
+          title={isLoading ? '正在核验打印结果' : '无法确认打印结果'}
+          subtitle={isLoading ? '正在读取真实打印任务状态，请稍候' : '当前未取得可信的任务终态，请勿据此判断已经出纸'}
+          step={7}
+          backLabel="返回首页"
+          onBack={() => navigate('/')}
+        />
+        <div className="print-done-fail">
+          <div className="print-done-fail-icon">
+            <AlertCircleIcon aria-hidden="true" />
+          </div>
+          <div className="print-done-fail-title">
+            {isLoading ? '正在向打印服务核验' : '暂未取得可信状态'}
+          </div>
+          <div className="print-done-fail-reason">
+            {isLoading
+              ? '核验完成后将显示真实结果或返回任务进度页'
+              : taskId
+                ? `任务号 ${taskId} 暂时无法核验，请在打印订单中查看或联系工作人员`
+                : '未找到打印任务上下文，请从打印入口重新开始'}
+          </div>
+          {!isLoading && (
+            <div className="print-done-fail-actions">
+              <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/')}>
+                返回首页
+              </button>
+              {taskId && (
+                <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/me/print-orders')}>
+                  查看打印订单
+                </button>
+              )}
+              {feedbackUrl && (
+                <button type="button" className="print-done-action-btn ghost" onClick={() => navigate(feedbackUrl)}>
+                  异常反馈
+                </button>
+              )}
+              <button type="button" className="print-done-action-btn primary" onClick={() => navigate('/help')}>
+                使用帮助
+              </button>
+            </div>
+          )}
+        </div>
+      </div></PrintPageFrame>
+    )
+  }
+
+  /* ── 后端确认失败 ── */
+  if (resultState === 'failed') {
     return (
       <PrintPageFrame><div data-w2-page="print-done" className="flex min-h-full flex-col">
         <PrintPrototypeHeader
           title="打印失败"
-          subtitle="请检查任务状态后重试"
+          subtitle="打印任务已由服务端确认失败"
           step={7}
           backLabel="返回首页"
           onBack={() => navigate('/')}
@@ -95,14 +215,19 @@ export function PrintDonePage() {
           </div>
           <div className="print-done-fail-title">打印失败</div>
           <div className="print-done-fail-reason">
-            {reason ?? '打印任务未能完成，请重试或联系工作人员'}
+            {failureReason}
           </div>
           <div className="print-done-fail-actions">
             <button type="button" className="print-done-action-btn ghost" onClick={() => navigate('/')}>
               返回首页
             </button>
-            <button type="button" className="print-done-action-btn primary" onClick={handleRetry}>
-              重试打印
+            {feedbackUrl && (
+              <button type="button" className="print-done-action-btn ghost" onClick={() => navigate(feedbackUrl)}>
+                异常反馈
+              </button>
+            )}
+            <button type="button" className="print-done-action-btn primary" onClick={() => navigate('/help')}>
+              使用帮助
             </button>
           </div>
         </div>
@@ -196,40 +321,27 @@ export function PrintDonePage() {
               </div>
             )}
 
-            {/* 问题反馈 + 满意度 */}
+            {/* 问题反馈 */}
             <div className="print-done-card">
               <b className="print-done-card-hd">打印遇到问题？</b>
               <span className="print-done-card-sub">缺页、卡纸、质量不佳等问题可在此反馈</span>
               <div className="print-done-fb-group">
-                <button type="button" className="print-done-fb-btn" aria-label="异常反馈">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                    <path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z" />
-                    <path d="M9 12h.01M13 12h.01M17 12h.01" />
-                  </svg>
-                  异常反馈
-                </button>
-                <button type="button" className="print-done-fb-btn" aria-label="使用帮助">
+                {feedbackUrl && (
+                  <button type="button" className="print-done-fb-btn" aria-label="异常反馈" onClick={() => navigate(feedbackUrl)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                      <path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z" />
+                      <path d="M9 12h.01M13 12h.01M17 12h.01" />
+                    </svg>
+                    异常反馈
+                  </button>
+                )}
+                <button type="button" className="print-done-fb-btn" aria-label="使用帮助" onClick={() => navigate('/help')}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
                     <circle cx="12" cy="12" r="9" />
                     <path d="M9.5 9.3a2.5 2.5 0 014.9.7c0 1.7-2.4 2.1-2.4 3.5M12 16.8v.4" />
                   </svg>
                   使用帮助
                 </button>
-              </div>
-              <div className="print-done-rate-row" role="group" aria-label="满意度评分">
-                <span>本次体验</span>
-                {(['满意', '一般', '不满意'] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    aria-pressed={rating === item}
-                    data-active={String(rating === item)}
-                    onClick={() => setRating(item)}
-                    className="print-done-rate-chip"
-                  >
-                    {item}
-                  </button>
-                ))}
               </div>
             </div>
 

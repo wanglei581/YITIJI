@@ -59,6 +59,7 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     serviceActions: [
       { label: '去做简历诊断', route: '/resume/source' },
       { label: '去打印文件', route: '/print/upload' },
+      { label: '做一次自我探索', route: '/resume/self-assessment/intro?from=assistant' },
     ],
   },
   {

@@ -24,13 +24,19 @@ import {
   type AdminOrganizationOption,
   type AssignTerminalOrgResult,
   type TerminalBindCodeCreated,
+  type PlannedTerminalCreated,
   type UpdateTerminalProfileResult,
+  type UpdateTerminalLifecycleResult,
+  type EmergencyCredentialRevokeResult,
 } from './terminals.service'
 import { AssignTerminalOrgDto } from './dto/assign-terminal-org.dto'
 import { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import { CreateTerminalBindCodeDto } from './dto/create-terminal-bind-code.dto'
+import { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
 import { UpdateTerminalCapabilityDto } from './dto/update-terminal-capability.dto'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
+import { UpdateTerminalLifecycleDto } from './dto/update-terminal-lifecycle.dto'
+import { EmergencyRevokeTerminalCredentialsDto } from './dto/emergency-revoke-terminal-credentials.dto'
 
 import { resolveClientIp } from '../common/client-ip'
 interface AuditReq {
@@ -56,6 +62,36 @@ export class AdminTerminalsController {
     return ApiResponse.ok(await this.terminalsService.listTerminalsForAdmin())
   }
 
+  // POST /api/v1/admin/terminals
+  // Admin 先创建 planned 设备资产；此步骤不签发任何可用 Agent 凭证。
+  @Post()
+  async createPlannedTerminal(
+    @Body() dto: CreatePlannedTerminalDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<PlannedTerminalCreated>> {
+    const result = await this.terminalsService.createPlannedTerminal(dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'terminal.asset.create_planned',
+      targetType: 'terminal',
+      targetId: result.terminalCode,
+      payload: {
+        terminalCode: result.terminalCode,
+        displayName: result.displayName,
+        locationLabel: result.locationLabel,
+        orgId: result.orgId,
+        lifecycleStatus: result.lifecycleStatus,
+        credentialIssued: false,
+      },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
+  }
+
   // GET /api/v1/admin/terminals/org-options
   // 静态段，必须声明在 :terminalId 动态路由之前（本控制器无 GET :terminalId，故顺序无碍，仍保持清晰）。
   @Get('org-options')
@@ -72,19 +108,9 @@ export class AdminTerminalsController {
     @CurrentUser() user: AuthedUser,
     @Req() req: AuditReq,
   ): Promise<ApiResponse<TerminalBindCodeCreated>> {
-    const result = await this.terminalsService.createBindCode(terminalId, user.userId, dto.ttlMinutes)
-    await this.audit.write({
+    const result = await this.terminalsService.createBindCode(terminalId, user.userId, dto.ttlMinutes, {
       actorId: user.userId,
       actorRole: user.role,
-      action: 'terminal.bind_code.create',
-      targetType: 'terminal',
-      targetId: result.terminalCode,
-      payload: {
-        terminalCode: result.terminalCode,
-        expiresAt: result.expiresAt,
-        // 绝不写 bindCode 明文到审计日志。
-        bindCodeReturnedOnce: true,
-      },
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
@@ -184,6 +210,53 @@ export class AdminTerminalsController {
       ipAddress: extractIp(req),
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
+    })
+    return ApiResponse.ok(result)
+  }
+
+  // PATCH /api/v1/admin/terminals/:terminalId/lifecycle
+  // Gate 0.3A 仅允许 active <-> maintenance：maintenance 停止新任务并保留排空回传。
+  @Patch(':terminalId/lifecycle')
+  async updateLifecycle(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: UpdateTerminalLifecycleDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<UpdateTerminalLifecycleResult>> {
+    const result = await this.terminalsService.updateTerminalLifecycle(terminalId, dto.targetStatus, {
+      actorId: user.userId,
+      actorRole: user.role,
+      reason: dto.reason,
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+      confirmationText: dto.confirmationText,
+    }, {
+      expectedStatus: dto.expectedStatus,
+      expectedVersion: dto.expectedVersion,
+    })
+    return ApiResponse.ok(result)
+  }
+
+  @Post(':terminalId/emergency-revoke')
+  async emergencyRevoke(
+    @Param('terminalId') terminalId: string,
+    @Body() dto: EmergencyRevokeTerminalCredentialsDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ): Promise<ApiResponse<EmergencyCredentialRevokeResult>> {
+    const result = await this.terminalsService.emergencyRevokeCredentials(terminalId, {
+      actorId: user.userId,
+      actorRole: user.role,
+      reason: dto.reason,
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    }, {
+      expectedStatus: dto.expectedStatus,
+      expectedVersion: dto.expectedVersion,
+      expectedCredentialGeneration: dto.expectedCredentialGeneration,
+      confirmationText: dto.confirmationText,
     })
     return ApiResponse.ok(result)
   }

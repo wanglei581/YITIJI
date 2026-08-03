@@ -105,7 +105,15 @@ function checkScopedCss(relativePath, source) {
     .map((match) => match[1].trim())
     .filter((selector) => selector && !selector.startsWith('@'))
     .flatMap((selector) => selector.split(',').map((part) => part.trim()))
-  if (selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow'))) {
+  const allowedProfileFrameSelector =
+    relativePath === 'src/pages/profile/profile-lightflow-shell.css'
+      ? "[data-kiosk-presentation='fusion-youth'] .fusion-w5--profile-entry > .ui-kiosk-page-content"
+      : ''
+  if (
+    selectors.every(
+      (selector) => selector.startsWith('.kprofile.kprofile-lightflow') || selector === allowedProfileFrameSelector,
+    )
+  ) {
     pass(`${relativePath} 的所有 selector 从 .kprofile.kprofile-lightflow 开始`)
   } else {
     fail(`${relativePath} 存在未从 .kprofile.kprofile-lightflow 开始的 selector`)
@@ -168,7 +176,7 @@ expectIncludes(profile, 'SECTIONS.map((section) =>', 'ProfilePage 数据驱动�
 expectAbsent(header, /p-hero|<h[1-6][^>]*>\s*我的\s*<\//, 'ProfileHeader 不再使用 p-hero 或 我的 标题')
 expectIncludes(header, 'className="kp-profile-header', 'ProfileHeader 使用开放式身份摘要')
 expectIncludes(header, 'className="kp-profile-main"', 'ProfileHeader 保留身份主行')
-expectIncludes(header, 'className="kp-profile-boundary"', 'ProfileHeader 展示真实信息边界')
+expectAbsent(header, /kp-profile-boundary/, 'ProfileHeader 移除原型 14 不存在的额外信息边界面板')
 expectIncludes(section, 'className="kp-section"', 'ProfileEntrySection 使用独立信息区块')
 expectIncludes(section, 'className="kp-section-head"', 'ProfileEntrySection 使用原型分区标题')
 expectIncludes(section, 'className={`kp-entry-grid kp-entry-grid--${section.layout}`}', 'ProfileEntrySection 使用等权入口网格')
@@ -179,8 +187,9 @@ expectIncludes(records, 'className="kp-session-records"', 'ProfileSessionRecords
 expectIncludes(records, 'className="kp-section-head"', 'ProfileSessionRecords 使用当前服务记录分组头')
 expectAbsent(`${header}\n${section}\n${records}`, /lf-reference-/, 'Profile 组件完全移除首页服务卡原语')
 expectAbsent(section, /sec-head/, 'ProfileEntrySection 不再使用 sec-head 旧骨架')
-expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|--serif:|#f4f1e8|Noto Serif|Source Han Serif|Songti|SimSun|repeating-linear-gradient/, 'Profile CSS 不回退纸感视觉或旧入口骨架')
-expectAbsent(combinedProfileCss, /box-shadow\s*:/, 'Profile CSS 不恢复大型投影')
+expectAbsent(combinedProfileCss, /p-hero|sec-head|--paper:|#f4f1e8|repeating-linear-gradient/, 'Profile CSS 不回退旧入口骨架或裸色纸纹')
+expectIncludes(combinedProfileCss, '--lf-serif:', 'Profile CSS 保留原型 14 的展示字体 token')
+expectMatches(combinedProfileCss, /box-shadow:\s*0 3px 14px/, 'Profile CSS 仅恢复原型 14 的轻量卡片投影')
 
 const expectedCssImports = [
   "@import './profile-lightflow-shell.css';",
@@ -192,15 +201,15 @@ else fail('profile-inkpaper.css 必须只保留 shell/directory/state 三份局�
 for (let index = 0; index < profileCssPaths.length; index += 1) {
   checkScopedCss(profileCssPaths[index], profileCss[index])
 }
-// 方案 B：Profile 画布绑定 fusion 语义 token（--k-surface），不再锁定冰蓝裸 hex。
+// 用户确认原型 14 为最高真值：Profile 画布绑定 fusion 纸面 token（--k-paper），不写裸 hex。
 expectMatches(
   combinedProfileCss,
-  /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*var\(--k-surface/,
-  'CSS 定义融合壳画布底色变量（绑定 --k-surface）',
+  /\.kprofile\.kprofile-lightflow\s*\{[\s\S]*--lf-canvas:\s*var\(--k-paper/,
+  'CSS 定义融合壳画布底色变量（绑定 --k-paper）',
 )
 expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s+\.k-ripple/, 'CSS 定义局部点击涟漪')
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS 保留 56px 主操作触控高度')
-expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS 保留 48px 次操作触控高度')
+expectMatches(combinedProfileCss, /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/, 'Profile CSS 将次操作触控目标提升到 56px')
 expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS 保留桌面端 92px 等权入口')
 expectMatches(combinedProfileCss, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.kprofile\.kprofile-lightflow \.kp-entry-grid[\s\S]*?grid-template-columns:\s*1fr;/, 'Profile CSS 在 520px 收口为单列')
 expectAbsent(combinedProfileCss, /lf-reference-/, 'Profile CSS 不保留首页服务卡 selector')

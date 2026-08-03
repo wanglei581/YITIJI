@@ -132,7 +132,10 @@ function ServiceCard({ group }: { group: ServiceGroup }) {
   }
 
   return (
-    <section className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`.trim().replace(/\s+/g, ' ')}>
+    <section
+      className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`.trim().replace(/\s+/g, ' ')}
+      data-group-id={group.id}
+    >
       <div className="card-head">
         <span className="g-icon">
           <ProtoIcon name={GROUP_ICON[group.id] ?? 'group-resume'} />
@@ -311,6 +314,21 @@ export function HomePage() {
         <ProtoIcon name="info" />
         岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。
       </div>
+      <footer className="filing-info" aria-label="网站备案信息">
+        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer">
+          鲁ICP备2026023517号-2
+        </a>
+        <span aria-hidden="true">·</span>
+        <a
+          href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308"
+          target="_blank"
+          rel="noreferrer"
+        >
+          鲁公网安备37021402007308号
+        </a>
+        <span aria-hidden="true">·</span>
+        <span className="filing-brand">职易达AI</span>
+      </footer>
     </KioskPageFrame>
   )
 }

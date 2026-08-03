@@ -7,14 +7,17 @@
  * Retry policy:
  *   - Poll every 60s.
  *   - Exponential back-off: nextRetryAt = now + min(2^attempts * 30s, 30min).
- *   - 4xx response → abandon (remove from queue; log warning).
+ *   - 401 response → persist unauthorized latch and retain the patch for re-bind.
+ *   - Other 4xx response → abandon (remove from queue; log warning).
  *   - attempts >= 10 → abandon.
  *   - 2xx → success (remove from queue; log confirmation).
  *   - timer.unref() → never prevents the process from exiting cleanly.
  */
 
 import axios from 'axios'
-import { createApiClient, axiosErrorMessage } from './api-client'
+import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import {
   getPendingPatches,
   markPatchAttempt,
@@ -41,11 +44,14 @@ function nextRetryDelayMs(attempts: number): number {
 
 // ── Per-patch retry ───────────────────────────────────────────────────────────
 
-async function processPatch(
+export type OfflinePatchOutcome = 'processed' | 'skipped' | 'paused_unauthorized'
+
+export async function processPatch(
   patch: PendingPatch,
   config: AgentConfig,
   db: AgentDatabase,
-): Promise<void> {
+  sendPatch?: () => Promise<void>,
+): Promise<OfflinePatchOutcome> {
   // Max attempts guard
   if (patch.attempts >= MAX_ATTEMPTS) {
     warn(
@@ -53,28 +59,46 @@ async function processPatch(
         ` — max ${MAX_ATTEMPTS} attempts reached`,
     )
     markPatchAttempt(db, patch.id, false, undefined, /* abandon */ true)
-    return
+    return 'processed'
   }
 
   const { terminalId, agentToken, apiBaseUrl } = config
   if (!terminalId || !agentToken) {
     // Not yet registered; skip this cycle — will retry after registration completes
-    return
+    return 'skipped'
+  }
+  if (isUnauthorized()) {
+    return 'paused_unauthorized'
   }
 
-  const client = createApiClient(apiBaseUrl, agentToken, terminalId)
   const payload: Record<string, string> = { status: patch.status }
   if (patch.errorCode) payload['errorCode'] = patch.errorCode
   if (patch.errorMessage) payload['errorMessage'] = patch.errorMessage
 
   try {
-    await client.patch(`/print-tasks/${patch.taskId}/status`, payload)
+    if (sendPatch) {
+      await sendPatch()
+    } else {
+      const client = createApiClient(apiBaseUrl, agentToken, terminalId)
+      await client.patch(`/print-tasks/${patch.taskId}/status`, payload)
+    }
     log(
       `offline-queue: PATCH status=${patch.status} for ${patch.taskId} ✓` +
         ` (attempt ${patch.attempts + 1})`,
     )
     markPatchAttempt(db, patch.id, /* success */ true)
+    return 'processed'
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      warn(
+        `offline-queue: pausing patch id=${patch.id} task=${patch.taskId}` +
+          ' — unauthorized; retained for retry after re-bind',
+      )
+      return 'paused_unauthorized'
+    }
+
     const httpStatus = axios.isAxiosError(e) ? e.response?.status : undefined
 
     if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
@@ -95,18 +119,21 @@ async function processPatch(
       )
       markPatchAttempt(db, patch.id, false, nextRetryAt)
     }
+    return 'processed'
   }
 }
 
 // ── Polling loop ──────────────────────────────────────────────────────────────
 
 async function runRetryLoop(config: AgentConfig, db: AgentDatabase): Promise<void> {
+  if (isUnauthorized()) return
   const patches = getPendingPatches(db)
   if (patches.length === 0) return
 
   log(`offline-queue: processing ${patches.length} pending patch(es)`)
   for (const patch of patches) {
-    await processPatch(patch, config, db)
+    const outcome = await processPatch(patch, config, db)
+    if (outcome === 'paused_unauthorized') break
   }
 }
 

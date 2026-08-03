@@ -1,6 +1,8 @@
 # F1 平行 Genesis Bootstrap 设计
 
 > 状态：用户已确认的设计规格；仅定义未来实现和后续分阶段授权的边界。本文不授权部署、负载切流、PM2/Nginx 修改、凭据读取或任何生产写入。
+>
+> 2026-07-30 拓扑修订：用户在“只有一台 production 服务器、无 production Docker、不新增云主机”的约束下，确认采用 legacy `127.0.0.1:3010` + managed `127.0.0.1:3011` 的同机隔离方案。与独立主机、managed `:3010` 或“禁止同机第二端口”有关的后续口径，以 [F1 同机双端口 Managed 发布拓扑设计](./2026-07-30-f1-same-host-dual-port-managed-topology-design.md) 为准；本文其余 provenance、状态机、分层授权和切流后 managed-only rollback 语义保持不变。
 
 ## 1. 背景与结论
 

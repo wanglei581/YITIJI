@@ -11,7 +11,14 @@ import type {
   AssignTerminalOrgResult,
   UpdateTerminalProfileInput,
   UpdateTerminalProfileResult,
+  UpdateTerminalLifecycleInput,
+  UpdateTerminalLifecycleResult,
+  TerminalLifecycleStatus,
+  EmergencyRevokeTerminalInput,
+  EmergencyRevokeTerminalResult,
   TerminalBindCodeCreated,
+  CreatePlannedTerminalInput,
+  PlannedTerminalCreated,
   AuditLogListResponse,
   AuditLogListQuery,
   AuditLogRecord,
@@ -158,6 +165,9 @@ const MOCK_TERMINAL_PROFILE: Record<string, UpdateTerminalProfileResult> = {
     enabled: true,
   },
 }
+const MOCK_PLANNED_TERMINALS: PlannedTerminalCreated[] = []
+const MOCK_TERMINAL_LIFECYCLE: Record<string, { status: TerminalLifecycleStatus; version: number }> = {}
+const MOCK_TERMINAL_CREDENTIAL_STATE: Record<string, { generation: number; active: boolean }> = {}
 function mockOrgFields(terminalCode: string): { orgId: string | null; orgName: string | null } {
   const orgId = MOCK_TERMINAL_ORG[terminalCode] ?? null
   const orgName = orgId ? (MOCK_ORG_OPTIONS.find((o) => o.id === orgId)?.name ?? null) : null
@@ -295,25 +305,74 @@ export const adminMockAdapter = {
     await delay()
     const now = Date.now()
     const min = (n: number) => new Date(now - n * 60_000).toISOString()
-    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable'>> = [
-      { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
-      { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
-      { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
-      { id: 't4',  terminalCode: 'KSK-004', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
-      { id: 't7',  terminalCode: 'KSK-007', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
-      { id: 't8',  terminalCode: 'KSK-008', displayName: null, macAddress: null, locationLabel: null, enabled: false, registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
-      { id: 't9',  terminalCode: 'KSK-009', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          agentVersion: null,     ipAddress: null,          diskFreeGb: null },
-      { id: 't10', terminalCode: 'KSK-010', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
+    const base: Array<Omit<AdminTerminalRecord, 'orgId' | 'orgName' | 'agentStatus' | 'localTaskDatabaseAvailable' | 'lifecycleStatus' | 'lifecycleVersion' | 'credentialGeneration' | 'hasActiveCredential'>> = [
+      { id: 't1',  terminalCode: 'KSK-001', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          wiredNetworkStatus: 'connected',    printerNetworkStatus: 'reachable',           agentVersion: 'v1.2.3', ipAddress: '10.20.0.11',  diskFreeGb: 182.4 },
+      { id: 't2',  terminalCode: 'KSK-002', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-10T08:00:00.000Z', lastSeenAt: min(2),   online: true,  lastHeartbeatAt: min(2),   printerStatus: 'paper_empty', wiredNetworkStatus: 'connected',    printerNetworkStatus: 'reachable',           agentVersion: 'v1.2.3', ipAddress: '10.20.0.12',  diskFreeGb: 96.1 },
+      { id: 't3',  terminalCode: 'KSK-003', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-01-12T08:00:00.000Z', lastSeenAt: min(1),   online: true,  lastHeartbeatAt: min(1),   printerStatus: 'ok',          wiredNetworkStatus: 'disconnected', printerNetworkStatus: 'unreachable',         agentVersion: 'v1.2.1', ipAddress: '10.20.0.13',  diskFreeGb: 54.7 },
+      { id: 't4',  terminalCode: 'KSK-004', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-01T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'ok',          wiredNetworkStatus: 'unknown',      printerNetworkStatus: 'not_network_printer', agentVersion: 'v1.2.3', ipAddress: '10.20.0.14',  diskFreeGb: 210.0 },
+      { id: 't7',  terminalCode: 'KSK-007', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-02-15T08:00:00.000Z', lastSeenAt: min(120), online: false, lastHeartbeatAt: min(120), printerStatus: 'offline',     wiredNetworkStatus: 'unknown',      printerNetworkStatus: 'unknown',             agentVersion: 'v1.2.0', ipAddress: '10.20.0.17',  diskFreeGb: 12.3 },
+      { id: 't8',  terminalCode: 'KSK-008', displayName: null, macAddress: null, locationLabel: null, enabled: false, registeredAt: '2026-02-20T08:00:00.000Z', lastSeenAt: min(0),   online: true,  lastHeartbeatAt: min(0),   printerStatus: 'error',       wiredNetworkStatus: 'connected',    printerNetworkStatus: 'reachable',           agentVersion: 'v1.2.3', ipAddress: '10.20.0.18',  diskFreeGb: 140.9 },
+      { id: 't9',  terminalCode: 'KSK-009', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-01T08:00:00.000Z', lastSeenAt: min(300), online: false, lastHeartbeatAt: null,     printerStatus: null,          wiredNetworkStatus: null,           printerNetworkStatus: null,                  agentVersion: null,     ipAddress: null,          diskFreeGb: null },
+      { id: 't10', terminalCode: 'KSK-010', displayName: null, macAddress: null, locationLabel: null, enabled: true, registeredAt: '2026-03-10T08:00:00.000Z', lastSeenAt: min(10),  online: false, lastHeartbeatAt: min(10),  printerStatus: 'not_found',   wiredNetworkStatus: 'disconnected', printerNetworkStatus: 'unreachable',         agentVersion: 'v1.2.3', ipAddress: '10.20.0.20',  diskFreeGb: 78.2 },
     ]
     return {
-      terminals: base.map((t) => ({
+      terminals: [...MOCK_PLANNED_TERMINALS.map((t) => ({
+        id: t.terminalId,
+        terminalCode: t.terminalCode,
+        displayName: t.displayName,
+        macAddress: null,
+        locationLabel: t.locationLabel,
+        enabled: t.enabled,
+        lifecycleStatus: t.lifecycleStatus,
+        lifecycleVersion: 0,
+        credentialGeneration: 0,
+        hasActiveCredential: false,
+        orgId: t.orgId,
+        orgName: t.orgName,
+        registeredAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+        online: false,
+        lastHeartbeatAt: null,
+        agentStatus: null,
+        localTaskDatabaseAvailable: null,
+        printerStatus: null,
+        wiredNetworkStatus: null,
+        printerNetworkStatus: null,
+        agentVersion: null,
+        ipAddress: null,
+        diskFreeGb: null,
+      })), ...base.map((t) => ({
         ...t,
+        lifecycleStatus: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.status ?? 'active' as const,
+        lifecycleVersion: MOCK_TERMINAL_LIFECYCLE[t.terminalCode]?.version ?? 0,
+        credentialGeneration: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.generation ?? 1,
+        hasActiveCredential: MOCK_TERMINAL_CREDENTIAL_STATE[t.terminalCode]?.active ?? true,
         agentStatus: t.terminalCode === 'KSK-004' ? 'agent_degraded' : 'online',
         localTaskDatabaseAvailable: t.terminalCode === 'KSK-004' ? false : true,
         ...(MOCK_TERMINAL_PROFILE[t.terminalCode] ?? {}),
         ...mockOrgFields(t.terminalCode),
-      })),
+      }))],
     }
+  },
+
+  async createPlannedTerminal(input: CreatePlannedTerminalInput): Promise<PlannedTerminalCreated> {
+    await delay()
+    if (MOCK_PLANNED_TERMINALS.some((t) => t.terminalCode === input.terminalCode)) {
+      throw new ApiHttpError('TERMINAL_CODE_ALREADY_EXISTS', '终端编号已存在', 400)
+    }
+    const org = input.orgId ? MOCK_ORG_OPTIONS.find((o) => o.id === input.orgId) : undefined
+    const created: PlannedTerminalCreated = {
+      terminalId: `mock-planned-${Date.now()}`,
+      terminalCode: input.terminalCode,
+      displayName: input.displayName?.trim() || null,
+      locationLabel: input.locationLabel?.trim() || null,
+      orgId: input.orgId || null,
+      orgName: org?.name ?? null,
+      enabled: true,
+      lifecycleStatus: 'planned',
+    }
+    MOCK_PLANNED_TERMINALS.unshift(created)
+    return created
   },
 
   // ── 终端机构归属（绑定/解绑）mock ─────────────────────────────────────────
@@ -337,9 +396,16 @@ export const adminMockAdapter = {
 
   async updateTerminalProfile(terminalId: string, input: UpdateTerminalProfileInput): Promise<UpdateTerminalProfileResult> {
     await delay()
-    const existing = MOCK_TERMINAL_PROFILE[terminalId] ?? {
-      terminalId,
-      terminalCode: terminalId,
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    const terminalCode = terminal?.terminalCode ?? terminalId
+    if (input.enabled === true && MOCK_TERMINAL_LIFECYCLE[terminalCode]?.status === 'retired') {
+      throw new ApiHttpError('TERMINAL_RETIRED', '终端已永久退役，不能重新启用', 400)
+    }
+    const existing = MOCK_TERMINAL_PROFILE[terminalCode] ?? {
+      terminalId: terminal?.id ?? terminalId,
+      terminalCode,
       displayName: null,
       macAddress: null,
       locationLabel: null,
@@ -352,21 +418,138 @@ export const adminMockAdapter = {
       locationLabel: input.locationLabel === undefined ? existing.locationLabel : input.locationLabel,
       enabled: input.enabled === undefined ? existing.enabled : input.enabled,
     }
-    MOCK_TERMINAL_PROFILE[terminalId] = next
+    MOCK_TERMINAL_PROFILE[terminalCode] = next
     return next
+  },
+
+  async updateTerminalLifecycle(
+    terminalId: string,
+    input: UpdateTerminalLifecycleInput,
+  ): Promise<UpdateTerminalLifecycleResult> {
+    await delay()
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    const normalizedReason = input.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new ApiHttpError('LIFECYCLE_REASON_INVALID', '运维原因须为 8–500 个字符', 400)
+    }
+    if (terminal.lifecycleStatus !== input.expectedStatus || terminal.lifecycleVersion !== input.expectedVersion) {
+      throw new ApiHttpError('TERMINAL_LIFECYCLE_CONFLICT', '终端运维状态或版本已变化，请刷新后重试', 409)
+    }
+    if (terminal.lifecycleStatus === input.targetStatus) {
+      return {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        oldStatus: terminal.lifecycleStatus,
+        newStatus: input.targetStatus,
+        inFlightTaskCount: 0,
+        lifecycleVersion: terminal.lifecycleVersion,
+      }
+    }
+    const allowed =
+      (terminal.lifecycleStatus === 'active' && input.targetStatus === 'maintenance') ||
+      (terminal.lifecycleStatus === 'maintenance' && input.targetStatus === 'active') ||
+      (['commissioning', 'active', 'maintenance'].includes(terminal.lifecycleStatus) && input.targetStatus === 'suspended') ||
+      (terminal.lifecycleStatus === 'suspended' && input.targetStatus === 'maintenance') ||
+      (['commissioning', 'maintenance', 'suspended'].includes(terminal.lifecycleStatus) && input.targetStatus === 'retired')
+    if (!allowed) throw new ApiHttpError('TERMINAL_LIFECYCLE_TRANSITION_INVALID', '不允许的设备状态切换', 409)
+    if (input.targetStatus === 'retired' && input.confirmationText !== terminal.terminalCode) {
+      throw new ApiHttpError('TERMINAL_RETIRE_CONFIRMATION_INVALID', '请输入完整终端编号确认永久退役', 400)
+    }
+    MOCK_TERMINAL_LIFECYCLE[terminal.terminalCode] = {
+      status: input.targetStatus,
+      version: terminal.lifecycleVersion + 1,
+    }
+    if (input.targetStatus === 'retired') {
+      const profile = MOCK_TERMINAL_PROFILE[terminal.terminalCode] ?? {
+        terminalId: terminal.id,
+        terminalCode: terminal.terminalCode,
+        displayName: terminal.displayName,
+        macAddress: terminal.macAddress,
+        locationLabel: terminal.locationLabel,
+        enabled: terminal.enabled,
+      }
+      MOCK_TERMINAL_PROFILE[terminal.terminalCode] = { ...profile, enabled: false }
+      MOCK_TERMINAL_CREDENTIAL_STATE[terminal.terminalCode] = {
+        generation: terminal.credentialGeneration + 1,
+        active: false,
+      }
+    }
+    return {
+      terminalId: terminal.id,
+      terminalCode: terminal.terminalCode,
+      oldStatus: terminal.lifecycleStatus,
+      newStatus: input.targetStatus,
+      inFlightTaskCount: 0,
+      lifecycleVersion: terminal.lifecycleVersion + 1,
+    }
+  },
+
+  async emergencyRevokeTerminal(
+    terminalId: string,
+    input: EmergencyRevokeTerminalInput,
+  ): Promise<EmergencyRevokeTerminalResult> {
+    await delay()
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    if (terminal.lifecycleStatus === 'planned' || terminal.lifecycleStatus === 'retired') {
+      throw new ApiHttpError('TERMINAL_EMERGENCY_REVOKE_FORBIDDEN', '当前状态不允许紧急吊销', 409)
+    }
+    const normalizedReason = input.reason.trim()
+    if (normalizedReason.length < 8 || normalizedReason.length > 500) {
+      throw new ApiHttpError('LIFECYCLE_REASON_INVALID', '运维原因须为 8–500 个字符', 400)
+    }
+    if (
+      terminal.lifecycleStatus !== input.expectedStatus ||
+      terminal.lifecycleVersion !== input.expectedVersion ||
+      terminal.credentialGeneration !== input.expectedCredentialGeneration
+    ) {
+      throw new ApiHttpError('TERMINAL_LIFECYCLE_CONFLICT', '终端状态、版本或凭证代次已变化，请刷新后重试', 409)
+    }
+    if (input.confirmationText !== `吊销 ${terminal.terminalCode}`) {
+      throw new ApiHttpError('TERMINAL_REVOKE_CONFIRMATION_INVALID', '请输入指定文字确认紧急吊销', 400)
+    }
+    MOCK_TERMINAL_LIFECYCLE[terminal.terminalCode] = {
+      status: 'suspended',
+      version: terminal.lifecycleVersion + 1,
+    }
+    MOCK_TERMINAL_CREDENTIAL_STATE[terminal.terminalCode] = {
+      generation: terminal.credentialGeneration + 1,
+      active: false,
+    }
+    return {
+      terminalId: terminal.id,
+      terminalCode: terminal.terminalCode,
+      oldStatus: terminal.lifecycleStatus,
+      newStatus: 'suspended',
+      lifecycleVersion: terminal.lifecycleVersion + 1,
+      credentialGeneration: terminal.credentialGeneration + 1,
+      revokedCredentialCount: terminal.hasActiveCredential ? 1 : 0,
+      revokedBindCodeCount: 0,
+      inFlightTaskCount: 0,
+    }
   },
 
   // ── mock：一次性绑定码（仅用于前端 demo，不模拟真实 agentToken 流转） ──
   async createTerminalBindCode(terminalId: string, ttlMinutes = 10): Promise<TerminalBindCodeCreated> {
     await delay()
-    const profile = MOCK_TERMINAL_PROFILE[terminalId]
-    const terminalCode = profile?.terminalCode ?? terminalId
-    if (profile && profile.enabled === false) {
+    const terminal = (await this.getTerminals()).terminals.find(
+      (item) => item.id === terminalId || item.terminalCode === terminalId,
+    )
+    if (!terminal) throw new ApiHttpError('TERMINAL_NOT_FOUND', '终端不存在', 404)
+    if (!terminal.enabled) {
       throw new ApiHttpError('TERMINAL_DISABLED', '终端已停用，不能生成绑定码', 400)
+    }
+    if (terminal.lifecycleStatus !== 'planned' && terminal.lifecycleStatus !== 'maintenance') {
+      throw new ApiHttpError('TERMINAL_MAINTENANCE_REQUIRED', '已激活终端须先进入维护并排空任务', 400)
     }
     const bindCode = mockBindCode()
     const expiresAt = new Date(Date.now() + Math.max(1, Math.min(60, ttlMinutes)) * 60_000).toISOString()
-    return { terminalId, terminalCode, bindCode, expiresAt }
+    return { terminalId: terminal.id, terminalCode: terminal.terminalCode, bindCode, expiresAt }
   },
 
   async getPrinters(): Promise<AdminPrintersResponse> {

@@ -18,12 +18,18 @@
     "verify:print-scan-agent": "node scripts/verify-print-scan-agent.mjs",
     "verify:scan-watcher": "ts-node scripts/verify-scan-watcher.ts",
     "verify:scan-input-health": "ts-node scripts/verify-scan-input-health.ts",
+    "verify:network-diagnostics": "ts-node scripts/verify-network-diagnostics.ts",
     "verify:form-data-security": "node scripts/verify-form-data-security.mjs",
     "verify:agent-config-resilience": "node scripts/verify-agent-config-resilience.mjs",
-    "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs"
+    "verify:windows-service-recovery": "node scripts/verify-windows-service-recovery.mjs",
+    "verify:agent-unauthorized": "node scripts/verify-agent-unauthorized.mjs",
+    "verify:production-provisioning": "node scripts/verify-production-provisioning.mjs",
+    "verify:installer-inputs": "node installer/verify-installer-inputs.mjs",
+    "installer:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-staging.ps1",
+    "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1"
   },
   "dependencies": {
-    "axios": "^1.7.0",
+    "axios": "1.18.1",
     "better-sqlite3": "^12.10.0",
     "chokidar": "^4.0.0",
     "commander": "^12.1.0",

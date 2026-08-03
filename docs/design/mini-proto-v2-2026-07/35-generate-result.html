@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>简历生成结果 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .res-head { padding:14px 16px 6px; }
+    .banner-ok { display:flex; align-items:center; gap:10px; background:var(--plum-wash); border-radius:var(--r-lg); padding:13px 15px; }
+    .bo-ic { width:36px; height:36px; border-radius:11px; background:var(--plum); color:#fff; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+    /* 简历纸张 */
+    .paper { margin:12px 16px; background:#fff; border:1px solid var(--line-faint); border-radius:var(--r-md); box-shadow:var(--sh-sm); padding:20px 20px 22px; }
+    .rp-name { font-family:var(--font-serif); font-size:22px; font-weight:700; color:var(--ink); }
+    .rp-role { font-size:13px; color:var(--teal-deep); margin-top:3px; font-weight:600; }
+    .rp-contact { font-size:11px; color:var(--muted); margin-top:8px; display:flex; gap:12px; flex-wrap:wrap; }
+    .rp-sec-t { font-family:var(--font-serif); font-size:14px; font-weight:700; color:var(--ink); margin:18px 0 8px; padding-bottom:5px; border-bottom:2px solid var(--plum); display:inline-block; }
+    .rp-line { font-size:12px; color:var(--ink-soft); line-height:1.7; margin:5px 0; }
+    .rp-exp-h { display:flex; justify-content:space-between; margin-top:10px; }
+    .rp-exp-t { font-size:12.5px; font-weight:600; color:var(--ink); }
+    .rp-exp-d { font-size:11px; color:var(--faint); }
+    .rp-ul { margin:5px 0; padding-left:16px; }
+    .rp-ul li { font-size:12px; color:var(--ink-soft); line-height:1.65; margin:3px 0; }
+    .ai-tint { position:relative; }
+    .ai-tint::after { content:'AI 生成'; position:absolute; top:14px; right:14px; font-size:9px; color:var(--plum-deep); background:var(--plum-wash); padding:2px 7px; border-radius:var(--r-full); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">生成结果</div>
+    <div class="nav-right"><span style="font-size:14px;color:var(--plum-deep);font-weight:600">重新生成</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="res-head">
+      <div class="banner-ok">
+        <div class="bo-ic">✦</div>
+        <div style="flex:1">
+          <div class="fw-600 fs-14 ink">简历初稿已生成</div>
+          <div class="fs-12 muted mt-2">请核对内容真实性后再保存或打印</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 简历纸张 -->
+    <div class="paper ai-tint">
+      <div class="rp-name">陈明</div>
+      <div class="rp-role">前端开发工程师</div>
+      <div class="rp-contact"><span>📱 138****6621</span><span>✉ chenming@mail.com</span></div>
+
+      <div class="rp-sec-t">个人优势</div>
+      <div class="rp-line">3 年前端开发经验，熟练使用 React 与 TypeScript，擅长组件化开发与页面性能优化，具备从需求到上线的完整交付能力。</div>
+
+      <div class="rp-sec-t">工作经历</div>
+      <div class="rp-exp-h"><div class="rp-exp-t">星野科技 · 前端工程师</div><div class="rp-exp-d">2023.06 - 至今</div></div>
+      <ul class="rp-ul">
+        <li>负责后台管理系统核心模块开发，独立完成 5 个业务模块</li>
+        <li>通过接口缓存与懒加载优化，将首屏加载从 3.2s 降至 1.4s</li>
+      </ul>
+
+      <div class="rp-sec-t">技能标签</div>
+      <div class="rp-line">React · TypeScript · Vite · 组件化 · 性能优化 · Node.js</div>
+    </div>
+
+    <div class="notice warn" style="margin:0 16px">
+      <span>⚠</span>
+      <div>以上内容根据你填写的信息生成，<b>可能存在不准确之处</b>。请逐项核对，确保所有经历真实无误。</div>
+    </div>
+
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">编辑</button>
+    <button class="btn primary" style="flex:1.6">保存到我的简历</button>
+  </div>
+</div>
+</body>
+</html>

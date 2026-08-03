@@ -1,0 +1,12 @@
+{
+  "id": "kiosk87-runtime-visual-defect-audit",
+  "title": "审计并修复 Kiosk 87 页运行时乱码、点击错误与排版异常",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并精确提交本地候选",
+  "createdAt": "2026-07-26T00:00:00+08:00",
+  "branch": "codex/qingxu-lightflow-kiosk87-closure-20260726"
+}

@@ -14,6 +14,7 @@ import {
   type AdminPhoneTransferTicket,
 } from './admin-phone-transfer-ticket'
 import { INTERNAL_OTP_CODE_TTL_SECONDS, InternalOtpService } from './internal-otp.service'
+import { PASSWORD_PROOF_STATE } from './password-proof-state'
 
 export type { AdminPhoneTransferStartResult } from './admin-phone-transfer-ticket'
 
@@ -75,6 +76,9 @@ export class AdminPhoneTransferService {
   ): Promise<AdminPhoneTransferStartResult> {
     const admin = await this.getEligibleAdminForStart(adminId)
     await this.verifyCurrentPassword(admin.id, currentPassword, admin.passwordHash)
+    if (admin.passwordProofState !== PASSWORD_PROOF_STATE.OWNER_MANAGED) {
+      throw adminPhoneTransferUnavailable()
+    }
 
     const phone = normalizePhone(candidatePhone)
     if (!isValidCnMobile(phone)) throw adminPhoneTransferUnavailable()
@@ -340,6 +344,7 @@ export class AdminPhoneTransferService {
         phoneVerifiedAt: true,
         tokenVersion: true,
         passwordHash: true,
+        passwordProofState: true,
       },
     })
     return this.assertEligibleAdmin(admin)

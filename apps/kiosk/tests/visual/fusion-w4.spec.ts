@@ -31,11 +31,38 @@ test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
   await verifyPage(page, errors)
 })
 
-test('/offline-agencies 不导航到不存在的详情 @w4', async ({ page, api }) => {
+// G1 #482: /offline-agencies/:id 已注册为真实路由，列表须提供导航入口
+test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/offline-agencies')
   await expect(page.getByText('青岛合规人力服务机构')).toBeVisible()
-  await expect(page.locator('a[href^="/offline-agencies/"], button[aria-label^="查看青岛合规"]')).toHaveCount(0)
+  await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
+  await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
+  // 不得伪造实时指标
+  await expect(page.getByText(/营业中|今日服务|在招岗位|距本机|按直线距离/)).toHaveCount(0)
+  // 详情路由真实存在，列表页须有进入详情的可点击元素
+  await expect(page.locator('a[href^="/offline-agencies/"], button[aria-label^="查看青岛合规"]')).not.toHaveCount(0)
+  await verifyPage(page, errors)
+})
+
+test('/offline-agencies/:id 详情页加载机构信息 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/offline-agencies/agency-001')
+  await expect(page.getByText('青岛合规人力服务机构')).toBeVisible()
+  await expect(page.getByText(/市南区示例路|09:00|服务时间以机构公示为准/).first()).toBeVisible()
+  // 不得伪造实时运营状态
+  await expect(page.getByText(/营业中|今日服务|在招岗位|按直线距离/)).toHaveCount(0)
+  await verifyPage(page, errors)
+})
+
+test('/jobs/:id/offline 适配 raw 岗位与字符串字段 @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/jobs/offline-job-001/offline')
+  await expect(page.getByRole('heading', { name: '现场咨询岗位' })).toBeVisible()
+  await expect(page.getByText('8,000–12,000 元/月')).toBeVisible()
+  await expect(page.getByText('熟悉 TypeScript')).toBeVisible()
+  await expect(page.getByText('以机构公示为准', { exact: true })).toBeVisible()
+  await expect(page.getByText(/到店咨询/).first()).toBeVisible()
   await verifyPage(page, errors)
 })
 
@@ -78,6 +105,15 @@ test('/campus 与 /smart-campus 语义独立 @w4', async ({ page, api }) => {
   await page.goto('/smart-campus/freshman-insights')
   await expect(page.getByText('校园大数据暂未开放')).toBeVisible()
   await expect(page.getByText(/学校书面授权/)).toBeVisible()
+  await verifyPage(page, errors)
+})
+
+test('/campus AI求职「开始模拟」进入 /interview/setup @w4', async ({ page, api }) => {
+  const errors = runtimeErrors(page); registerW4Api(api)
+  await page.goto('/campus')
+  await page.getByRole('button', { name: 'AI求职' }).click()
+  await page.getByRole('button', { name: '开始模拟' }).click()
+  await expect(page).toHaveURL(/\/interview\/setup$/)
   await verifyPage(page, errors)
 })
 

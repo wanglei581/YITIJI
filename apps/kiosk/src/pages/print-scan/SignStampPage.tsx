@@ -408,18 +408,18 @@ export function SignStampPage() {
             </div>
           </section>
 
-          <aside className="w2-print-scan-side w-[400px]">
-            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+          <aside className="w2-print-scan-side">
+            <section className="w2-print-scan-preview rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
                 <b className="text-xl font-bold">{result ? '合成 PDF 预览' : '叠加效果示意'}</b>
                 <span className="ml-auto rounded-full bg-neutral-50 px-3 py-1 text-sm font-semibold text-neutral-500">第 {page} 页 · {POSITIONS.find((p) => p.key === position)?.label} · {SIZES.find((s) => s.key === size)?.label}</span>
               </div>
               {result ? (
-                <div className="h-[360px] overflow-hidden rounded-md border border-neutral-200 bg-neutral-50">
+                <div className="w2-print-scan-preview-frame">
                   <iframe title={`${result.name} 预览`} src={result.printFileUrl} className="h-full w-full bg-white" />
                 </div>
               ) : (
-                <div className="relative mx-auto flex aspect-[210/297] w-[240px] flex-col gap-2 rounded-md border border-neutral-200 bg-white p-4 shadow-md">
+                <div className="w2-print-scan-preview-mock">
                   <i className="h-3 w-1/2 rounded-full bg-neutral-800/70" />
                   <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
                   <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
@@ -455,18 +455,18 @@ export function SignStampPage() {
               <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">请点击上方勾选确认授权后再生成。伪造、变造印章或冒用他人签名属违法行为，责任由使用者自负。</p>
             </section>
 
-            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+            <section className="rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-3 block text-xl font-bold">生成后你可以</b>
-              <div className="flex flex-1 flex-col gap-2.5">
-                <button type="button" disabled={!result} onClick={goPrint} className="flex flex-1 items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
+              <div className="flex flex-col gap-2.5">
+                <button type="button" disabled={!result} onClick={goPrint} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-warning/30 bg-warning-bg px-4 text-left text-warning-fg disabled:opacity-45">
                   <PrinterIcon className="h-6 w-6" />
                   <span><b className="block text-lg font-bold">去打印</b><span className="text-sm text-neutral-500">预览合成 PDF 后进入确认打印</span></span>
                 </button>
-                <button type="button" disabled={!result} onClick={addAnother} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                <button type="button" disabled={!result} onClick={addAnother} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
                   <StampIcon className="h-6 w-6 text-warning-fg" />
                   <span><b className="block text-lg font-bold">再加一处签名 / 印章</b><span className="text-sm text-neutral-500">以合成结果为底继续叠加</span></span>
                 </button>
-                <button type="button" disabled={!result} onClick={redoPlacement} className="flex flex-1 items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
+                <button type="button" disabled={!result} onClick={redoPlacement} className="flex min-h-[76px] items-center gap-3 rounded-lg border border-neutral-200 bg-canvas px-4 text-left disabled:opacity-45">
                   <RotateCcwIcon className="h-6 w-6 text-warning-fg" />
                   <span><b className="block text-lg font-bold">重新选位置</b><span className="text-sm text-neutral-500">不满意可回到本步重新生成</span></span>
                 </button>

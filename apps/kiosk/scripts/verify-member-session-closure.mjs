@@ -95,7 +95,7 @@ assert(
   /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/.test(handleSendCode) &&
     /await\s+sendSmsCode\(phone,\s*deviceId\)/.test(sendTry) &&
     /const\s+deviceId\s*=\s*getMemberAuthDeviceId\(\)/.test(handleLogin) &&
-    /await\s+memberLogin\(phone,\s*code,\s*deviceId\)/.test(loginTry) &&
+    /await\s+memberLogin\(phone,\s*code,\s*consent,\s*deviceId\)/.test(loginTry) &&
     !/\b(?:sendSmsCode|memberLogin)\s*\(/.test(loginPage),
   '共享手机号验证码发送与登录都传入会员登录 deviceId，LoginPage 不复制认证调用',
 )

@@ -6,8 +6,9 @@ import { AuditService } from '../audit/audit.service'
 import { FilesService } from '../files/files.service'
 import { signFileUrl } from '../files/signing'
 import { ResumeExtractionService } from '../ai/resume/resume-extraction.service'
-import { MockInterviewLlmService, type InterviewReportPayload } from './mock-interview-llm.service'
+import { MockInterviewLlmService, type InterviewReportPayload, type NextQuestionOutput } from './mock-interview-llm.service'
 import { InterviewReportPdfService } from './interview-report-pdf.service'
+import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai/ai-log.service'
 
 // ============================================================
 // 2C 模拟面试会话服务。
@@ -60,6 +61,7 @@ export class MockInterviewService {
     private readonly files: FilesService,
     private readonly extraction: ResumeExtractionService,
     private readonly audit: AuditService,
+    private readonly aiLog: AiLogService,
   ) {}
 
   // ── 创建 / 开始 ────────────────────────────────────────────────────────────
@@ -128,7 +130,17 @@ export class MockInterviewService {
     if (session.status !== 'configured') {
       throw new BadRequestException({ error: { code: 'INTERVIEW_ALREADY_STARTED', message: '本场练习已开始或已结束' } })
     }
-    const q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] })
+    // A-6 成本可见性：本轮 nextQuestion 调用（含重试）通过 onLlmCall 累计 token。
+    const usage = new AiUsageAccumulator()
+    const startedAt = Date.now()
+    let q: NextQuestionOutput
+    try {
+      q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: 0, transcript: [] }, usage.add)
+    } catch (error) {
+      this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
+      throw error
+    }
+    this.recordAiLog(session.id, 'interviewQuestion', usage, startedAt, 'success', session.endUserId)
     const content = q.greeting ? `${q.greeting}\n${q.question}` : q.question
     await this.prisma.$transaction(async (tx) => {
       await tx.mockInterviewSession.update({ where: { id: session.id }, data: { status: 'in_progress', startedAt: new Date() } })
@@ -184,7 +196,17 @@ export class MockInterviewService {
     }
     const transcript = [...turns, { role: 'candidate' as const, content: input.skip ? '' : answerText, skipped: !!input.skip }]
       .map((t) => ({ role: t.role as 'interviewer' | 'candidate', content: t.content, skipped: 'skipped' in t ? !!t.skipped : false }))
-    const q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript })
+    // A-6 成本可见性：记录本轮问题生成
+    const qUsage = new AiUsageAccumulator()
+    const qStartedAt = Date.now()
+    let q: NextQuestionOutput
+    try {
+      q = await this.llm.nextQuestion({ ...this.llmCtx(session), askedCount: asked, transcript }, qUsage.add)
+    } catch (error) {
+      this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_QUESTION_FAILED'))
+      throw error
+    }
+    this.recordAiLog(session.id, 'interviewQuestion', qUsage, qStartedAt, 'success', session.endUserId)
     await this.prisma.mockInterviewTurn.create({
       data: { sessionId: session.id, idx: nextIdx + 1, role: 'interviewer', qType: q.qType, content: q.question },
     })
@@ -204,16 +226,26 @@ export class MockInterviewService {
     if (answered === 0) {
       throw new BadRequestException({ error: { code: 'INTERVIEW_NO_ANSWERS', message: '本场练习还没有任何回答，请至少回答一个问题后再生成报告' } })
     }
-    const payload = await this.llm.buildReport({
-      ...this.llmCtx(session),
-      transcript: turns.map((t) => ({
-        role: t.role as 'interviewer' | 'candidate',
-        content: t.content,
-        skipped: t.skipped,
-        ...(t.role === 'candidate' && t.answerDurationSec != null ? { durationSec: t.answerDurationSec } : {}),
-        ...(t.role === 'candidate' ? { inputMode: t.inputMode } : {}),
-      })),
-    })
+    // A-6 成本可见性：记录报告生成（含重试累计）
+    const rUsage = new AiUsageAccumulator()
+    const rStartedAt = Date.now()
+    let payload: InterviewReportPayload
+    try {
+      payload = await this.llm.buildReport({
+        ...this.llmCtx(session),
+        transcript: turns.map((t) => ({
+          role: t.role as 'interviewer' | 'candidate',
+          content: t.content,
+          skipped: t.skipped,
+          ...(t.role === 'candidate' && t.answerDurationSec != null ? { durationSec: t.answerDurationSec } : {}),
+          ...(t.role === 'candidate' ? { inputMode: t.inputMode } : {}),
+        })),
+      }, rUsage.add)
+    } catch (error) {
+      this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'failed', session.endUserId, aiErrorCodeOf(error, 'AI_INTERVIEW_REPORT_FAILED'))
+      throw error
+    }
+    this.recordAiLog(session.id, 'interviewReport', rUsage, rStartedAt, 'success', session.endUserId)
     const ttl = session.endUserId ? MEMBER_TTL_MS : ANON_TTL_MS
     await this.prisma.$transaction(async (tx) => {
       await tx.mockInterviewSession.update({ where: { id: session.id }, data: { status: 'completed', endedAt: new Date() } })
@@ -364,6 +396,33 @@ export class MockInterviewService {
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────────────
+
+  /**
+   * A-6：落 AiServiceLog（仅元数据）。
+   * callCount === 0 时不落，避免把配置缺失记成"AI 调用失败"污染告警。
+   */
+  private recordAiLog(
+    sessionId: string,
+    operation: 'interviewQuestion' | 'interviewReport',
+    usage: AiUsageAccumulator,
+    startedAt: number,
+    status: 'success' | 'failed',
+    endUserId: string | null,
+    errorCode?: string,
+  ): void {
+    if (usage.callCount === 0) return
+    this.aiLog.record({
+      taskId: sessionId,
+      operation,
+      provider: usage.provider ?? 'llm',
+      status,
+      latencyMs: Math.max(0, Date.now() - startedAt),
+      tokenUsage: usage.tokenUsage,
+      errorCode,
+      endUserId,
+      terminalId: null,
+    })
+  }
 
   private llmCtx(session: SessionRow) {
     return {

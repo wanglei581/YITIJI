@@ -87,6 +87,7 @@
 | 73 | 73-assistant-call.html | 语音咨询中 | 面试助手政策 | (无独立路由;`/assistant` 内 AssistantCallPanel) | AssistantCallPanel | src/pages/assistant/AssistantCallPanel.tsx | useAiAdvisorCallSession | 声纹、实时字幕、通话控制 | loading / error / 通话态 | verify-assistant-trtc-guard |
 | 74 | 74-job-detail-offline.html | 岗位详情(线下机构) | 岗位企业 | `/jobs/:id/offline` (lazy) | OfflineJobDetailPage | src/pages/offline-agencies/OfflineJobDetailPage.tsx | offlineAgencies API | 机构门店卡、到店咨询、打印带走 | loading / error / "打印即将上线"提示 | (无专项) |
 | 75 | 75-offline-agencies.html | 线下招聘机构 | 岗位企业 | `/offline-agencies` (lazy) | OfflineAgenciesPage | src/pages/offline-agencies/OfflineAgenciesPage.tsx | offlineAgencies API | 机构门店列表、营业状态、服务范围 | loading / empty / error | (无专项) |
+| 75-B | (生产实现) | 线下机构详情 | 岗位企业 | `/offline-agencies/:id` (lazy) | OfflineAgencyDetailPage | src/pages/offline-agencies/OfflineAgencyDetailPage.tsx | offlineAgencies API | 机构详情、服务项目、联系方式 | loading / error | (无专项) |
 
 ---
 
@@ -276,7 +277,7 @@
 | 15A 登录验证失败 | `/login` | `LoginPage` 的验证码错误 / 短信失败分支，不是新路由。 |
 | 22B 意见反馈 | `/me/feedback` | `MyFeedbackPage` 的反馈提交与工单分支，不是 `/me/notifications` 的复制路由。 |
 | 32A 支付未成功 | `/print/cashier` | `PrintCashierPage` 的失败 / 关闭 / 失败或过期 attempt 分支，不是新支付页面。 |
-| 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 当前扫描设备状态驱动的 offline 分支，不创建另一条扫描路由。 |
+| 34A 扫描仪暂不可用 | `/scan/start`、`/scan/settings` | 生产端没有可核验的实时扫描仪状态源：`/scan/start` 仅对应会话创建前边界，`/scan/settings` 仅对应真实创建会话失败；不得把任一状态宣称为已确认真机离线，也不创建另一条扫描路由。 |
 | 76 百宝箱主态 | `/toolbox` | `ToolboxZonePage` 的已配置服务区。 |
 | 76A 百宝箱待配置 | `/toolbox` | 同一页面的 disabled / empty 分支，不是新路由。 |
 | 77 文档打印上传 | `/print/upload` | 打印七步流程第一步；纸质扫描 CTA 独立导航到 `/scan/start`。 |
@@ -291,7 +292,8 @@
 - 校园与百宝箱：`/campus`、`/campus/welcome`、`/campus/freshman-insights`、`/toolbox`、`/smart-campus`、`/smart-campus/welcome`、`/smart-campus/freshman-insights`、`/smart-campus/service/:key`。
 - 打印扫描服务中心与打印流程：`/print-scan`、`/print-scan/feature/:key`、`/print-scan/convert`、`/print-scan/sign`、`/print/scan-convert`、`/print/scan-sign`、`/print/scan-feature`、`/print/upload`、`/print/material-check`、`/print/preview`、`/print/params`、`/print/confirm`、`/print/cashier`、`/print/progress`、`/print/done`。
 - AI 简历与扫描流程：`/resume`、`/resume/upload`、`/resume/source`、`/resume/generate`、`/resume/generate/preview`、`/resume/parse`、`/resume/report`、`/resume/optimize`、`/resume/export`、`/resume/templates`、`/resume/materials`、`/scan/start`、`/scan/settings`、`/scan/progress`、`/scan/result`。
-- 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
+- 岗位、企业与招聘会：`/jobs`、`/jobs/:id`、`/jobs/:id/offline`、`/offline-agencies`、`/offline-agencies/:id`、`/notifications`、`/companies`、`/companies/:id`、`/job-fairs`、`/job-fairs/checkin`、`/job-fairs/:id`、`/job-fairs/:id/companies`、`/job-fairs/:id/companies/:companyId`、`/job-fairs/:id/map`、`/job-fairs/:id/materials`、`/job-fairs/:id/visit-plan`、`/job-fairs/:id/stats`。
+- 自我探索 · 倾向参考（PR ③）：`/resume/self-assessment/intro`、`/resume/self-assessment/questions`、`/resume/self-assessment/result`、`/resume/self-assessment/history`。
 
 ### 8.3 Compatibility redirects（不是重复屏）
 
@@ -312,3 +314,10 @@
 - W2–W6 verifier、shared / ui / kiosk typecheck、两种生产构建及配置守卫均通过；lint 为 0 error，仅保留 4 条既有 Fast Refresh warning。
 
 以上只证明当前分支的本地融合页面与 86 路由候选完成，不证明生产环境、Windows 一体机、奔图真实打印 / 扫描、真实支付 / SMS、真实 TRTC、密钥轮换、法务验收或现场试运营已经通过。
+
+### 8.5 当前 87 路径收口结论（2026-07-26）
+
+- §8.4 的 86 条是 2026-07-24 当时的历史验收口径；最新正式清单为 **87 条 URL pattern**，由 82 个页面组件落点与 5 个兼容重定向组成。新增计入口径的是 `/me/privacy-requests`，它没有独立的 8399 原型屏。
+- 本批不重做已合入的 86 路径迁移，只修复三个共享壳层缺口：权益活动详情、法务文档、百宝箱专区。三个页面继续使用真实数据与既有业务分支，不引入原型假数据或演示状态。
+- W6 production-build Playwright 当前为 **87/87 PASS**：85 条 Kiosk 路由按 `1080×1920` 验收，`/member/qr-login` 与 `/upload/phone` 两条辅助页按 `390×844` 验收；`/me/privacy-requests` 只增加验证覆盖，没有修改受保护的 `/me/*` 生产实现。
+- 常驻 Playwright 覆盖 `390×844` 与 `1080×1920`；另以一次性人工浏览器实点覆盖 `390×700`、`1024×768`、`1280×800`、`1440×1024`。人工实点不构成持续回归门禁；这些结果也不等同于 87 个页面逐一像素级复刻或生产/真机验收。

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>确认支付 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .order-file { display:flex; align-items:center; gap:12px; padding:14px 16px; }
+    .order-file + .order-file { border-top:1px solid var(--line-faint); }
+    .of-thumb { width:44px; height:56px; border-radius:8px; background:var(--clay-wash); border:1px solid var(--clay-soft); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+    .of-info { flex:1; min-width:0; }
+    .of-name { font-size:14px; font-weight:500; color:var(--ink); }
+    .of-spec { font-size:12px; color:var(--muted); margin-top:3px; }
+    .of-price { font-family:var(--font-serif); font-size:15px; font-weight:700; color:var(--ink); }
+    .fee-row { display:flex; justify-content:space-between; padding:9px 16px; font-size:13px; color:var(--muted); }
+    .fee-row .v { color:var(--ink-soft); }
+    .fee-row.total { padding:14px 16px; border-top:1px solid var(--line-faint); }
+    .fee-row.total .l { font-size:15px; font-weight:600; color:var(--ink); }
+    .fee-row.total .v { font-family:var(--font-serif); font-size:20px; font-weight:700; color:var(--clay); }
+    .pay-opt { display:flex; align-items:center; gap:12px; padding:15px 16px; }
+    .pay-opt + .pay-opt { border-top:1px solid var(--line-faint); }
+    .pay-opt .po-ic { width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-size:19px; flex-shrink:0; }
+    .pay-opt .po-name { flex:1; font-size:15px; font-weight:500; color:var(--ink); }
+    .pay-opt .po-radio { width:20px; height:20px; border-radius:50%; border:2px solid var(--line); display:flex; align-items:center; justify-content:center; }
+    .pay-opt.on .po-radio { border-color:var(--teal); background:var(--teal); }
+    .pay-opt.on .po-radio::after { content:''; width:8px; height:8px; border-radius:50%; background:#fff; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">确认订单</div>
+    <div style="width:32px"></div>
+  </div>
+
+  <div class="content has-bar">
+    <!-- 取件门店 -->
+    <div class="section-t">取件门店</div>
+    <div class="card">
+      <div class="row-item" style="cursor:default">
+        <div class="ic a-teal">📍</div>
+        <div class="rc">
+          <div class="rt">就业服务大厅 01 号</div>
+          <div class="rs">行政楼一楼大厅 · 距你约 300 米 · <span class="teal">在线</span></div>
+        </div>
+        <div class="r-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 打印文件 -->
+    <div class="section-t">打印文件</div>
+    <div class="card">
+      <div class="order-file">
+        <div class="of-thumb">📄</div>
+        <div class="of-info">
+          <div class="of-name">我的简历_张晓.pdf</div>
+          <div class="of-spec">黑白 · A4 · 单面 · 2 页 × 2 份</div>
+        </div>
+        <div class="of-price">¥1.60</div>
+      </div>
+      <div class="order-file">
+        <div class="of-thumb" style="background:var(--teal-wash);border-color:var(--teal-soft)">🖼️</div>
+        <div class="of-info">
+          <div class="of-name">证件照_1寸.jpg</div>
+          <div class="of-spec">彩色 · 相纸 · 8 张</div>
+        </div>
+        <div class="of-price">¥8.00</div>
+      </div>
+    </div>
+
+    <!-- 费用明细 -->
+    <div class="card">
+      <div class="fee-row"><span class="l">打印费</span><span class="v">¥9.60</span></div>
+      <div class="fee-row"><span class="l">服务费</span><span class="v">¥0.40</span></div>
+      <div class="fee-row"><span class="l">优惠券</span><span class="v teal">-¥1.00</span></div>
+      <div class="fee-row total"><span class="l">合计</span><span class="v"><sup style="font-size:13px;font-weight:400">¥</sup>9.00</span></div>
+    </div>
+
+    <!-- 支付方式 -->
+    <div class="section-t">支付方式</div>
+    <div class="card">
+      <div class="pay-opt on">
+        <div class="po-ic" style="background:#e7f9ee">💚</div>
+        <div class="po-name">微信支付</div>
+        <div class="po-radio"></div>
+      </div>
+      <div class="pay-opt">
+        <div class="po-ic a-wheat">🎟️</div>
+        <div class="po-name">账户余额 <span class="muted fs12">（¥0.00）</span></div>
+        <div class="po-radio"></div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <span class="n-ic">ℹ</span>
+      <span>支付成功后生成取件码，请到所选门店一体机扫码或输入取件码后打印。文件仅本人可取。</span>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <div class="ab-price">
+      <div class="label">应付</div>
+      <div class="val"><sup>¥</sup>9.00</div>
+    </div>
+    <button class="btn wx lg" style="flex:1.4">微信支付</button>
+  </div>
+</div>
+</body>
+</html>

@@ -225,7 +225,9 @@ AI 简历优化属于求职材料工具服务，必须从既有「AI简历服务
 
 ### 6.7 个人资产中心 / 权益活动 / 服务套餐（会员资产与商业化线，长期规划）
 
-> **当前不开发**活动页 / 套餐页 / 支付接口。详细分阶段路线（Phase C-2 ~ C-6）见 [next-tasks.md](../progress/next-tasks.md) §个人资产中心 + 权益活动 + 服务套餐 产品规划；新增合规边界见 [compliance-boundary.md](../compliance/compliance-boundary.md) §八。
+> **口径更新（2026-08-01）**：此前写作「**当前不开发**活动页 / 套餐页 / 支付接口」，已与代码不符。支付域 C5-1 ~ C5-6 及后续 W-A / W-B / W-C 已全部合入 `main`，CI 中有 12 个支付相关门禁：`verify:payment-flow`、`verify:payment-real-channels`、`verify:payment-codepay`、`verify:refund-idempotent`、`verify:refund-real-channels`、`verify:refund-convergence`、`verify:wechat-refund-notify`、`verify:wechat-refund-regression`、`verify:reconciliation`、`verify:admin-billing`、`verify:admin-billing-ui`、`verify:admin-orders-refund`。
+>
+> 当前真实状态：**支付、计费、退款、对账、核销的代码侧已完成**；剩余为部署期事项（商户开通公钥模式与退款权限、https 域名、生产凭证注入、1 分钱 live 冒烟、渠道账单 diff）。权威路线图见 [payment-commercial-adaptation-plan-2026-07.md](./payment-commercial-adaptation-plan-2026-07.md)。分阶段路线（Phase C-2 ~ C-6）见 [next-tasks.md](../progress/next-tasks.md)；合规边界见 [compliance-boundary.md](../compliance/compliance-boundary.md) §八。
 > 此线从已完成的 Phase C-1（会员登录安全收口 + 首页登录状态栏）延续，与「AI 求职材料中心线」（Phase A-E）并行，命名不互换。
 > **信息架构约束（2026-06-14，用户确认）：** 「个人资产中心」是数据与商业化线的**概念命名**，**不**等于在「我的」页堆一个聚合「账号资产 / 资产中心」分区。后续这些数据与权益的展示要**归位到对应业务页面**（简历 / 打印 / 岗位·招聘会·政策 / 权益活动 / 套餐页）；「我的」页只做个人中心入口与概览，不重新渲染 `AccountAssetsPanel`，不新增「账号资产」「资产中心」重复入口。
 

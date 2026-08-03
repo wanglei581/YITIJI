@@ -2,10 +2,11 @@
 //
 // 语义：只把「管理员配置过（configured=true）」的能力键返回给页面做覆盖；
 // 未配置的键由页面保持各自的保守硬编码默认。请求失败 / mock 模式 / 未配置
-// terminalId 时返回空覆盖集——回落到硬编码默认，不放大可用性（默认里未上线
-// 能力本就是 available=false）。
+// terminalId 时：getConfiguredCapabilities 仍返回空覆盖集（兼容服务中心旧行为）；
+// ScanStart 等深链门禁应使用 loadConfiguredCapabilities，把失败与「未配置」区分开。
 import type { PrintScanCapabilityKey, PrintScanCapabilityStatus, TerminalCapabilityView } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
+import { getTerminalId } from './screensaver'
 
 export interface ConfiguredCapability {
   status: PrintScanCapabilityStatus
@@ -14,23 +15,43 @@ export interface ConfiguredCapability {
 
 export type ConfiguredCapabilityMap = Partial<Record<PrintScanCapabilityKey, ConfiguredCapability>>
 
-export async function getConfiguredCapabilities(): Promise<ConfiguredCapabilityMap> {
-  if (API_MODE !== 'http') return {}
-  const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
-  if (!terminalId) return {}
+export type CapabilitiesLoadResult =
+  | { status: 'ok'; map: ConfiguredCapabilityMap }
+  | { status: 'skipped'; map: ConfiguredCapabilityMap }
+  | { status: 'error'; map: ConfiguredCapabilityMap }
+
+function emptyMap(): ConfiguredCapabilityMap {
+  return {}
+}
+
+function toMap(capabilities: TerminalCapabilityView[] | undefined): ConfiguredCapabilityMap {
+  const map: ConfiguredCapabilityMap = {}
+  for (const cap of capabilities ?? []) {
+    if (cap.configured) map[cap.capabilityKey] = { status: cap.status, note: cap.note }
+  }
+  return map
+}
+
+/** 深链门禁用：区分拉取成功 / 跳过 / 失败，避免把失败当成「未配置可放行」。 */
+export async function loadConfiguredCapabilities(): Promise<CapabilitiesLoadResult> {
+  if (API_MODE !== 'http') return { status: 'skipped', map: emptyMap() }
+  const terminalId = getTerminalId()
+  if (!terminalId) return { status: 'error', map: emptyMap() }
 
   try {
     const res = await fetch(`${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/capabilities`, {
       headers: { Accept: 'application/json' },
     })
-    if (!res.ok) return {}
+    if (!res.ok) return { status: 'error', map: emptyMap() }
     const body = (await res.json()) as { capabilities?: TerminalCapabilityView[] }
-    const map: ConfiguredCapabilityMap = {}
-    for (const cap of body.capabilities ?? []) {
-      if (cap.configured) map[cap.capabilityKey] = { status: cap.status, note: cap.note }
-    }
-    return map
+    return { status: 'ok', map: toMap(body.capabilities) }
   } catch {
-    return {}
+    return { status: 'error', map: emptyMap() }
   }
+}
+
+/** 服务中心覆盖用：失败时回落空 map，不放大可用性。 */
+export async function getConfiguredCapabilities(): Promise<ConfiguredCapabilityMap> {
+  const result = await loadConfiguredCapabilities()
+  return result.map
 }

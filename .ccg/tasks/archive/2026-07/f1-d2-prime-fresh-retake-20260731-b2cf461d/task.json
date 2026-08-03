@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-fresh-retake-20260731-b2cf461d",
+  "title": "在诊断增强后的 main 上执行一次新的 D2′ fresh retake",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "operations",
+  "currentPhase": "completed",
+  "nextAction": "另立 TDD 代码任务修复 cleanup 退出语义、systemd inactive 复核和 production secret denylist；修复合入后重新申请全新的 retake 执行包",
+  "createdAt": "2026-07-31T05:20:00Z",
+  "branch": "codex/f1-d2-prime-fresh-retake-20260731-b2cf461d"
+}

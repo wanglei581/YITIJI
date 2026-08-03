@@ -11,6 +11,7 @@
 // ============================================================
 
 import { API_BASE_URL } from '../api/client'
+import { getTerminalId } from '../api/screensaver'
 import type {
   BillingPageSource,
   OrderPayStatus,
@@ -118,7 +119,7 @@ export async function quotePrintOrder(input: QuotePrintOrderInput): Promise<Prin
 
 export async function createPrintJob(input: CreatePrintJobInput): Promise<PrintJobCreated> {
   const { token, ...body } = input
-  const terminalId = (import.meta.env['VITE_TERMINAL_ID'] ?? '').trim()
+  const terminalId = getTerminalId()
   if (!terminalId) {
     throw new Error('createPrintJob failed: missing terminal id')
   }

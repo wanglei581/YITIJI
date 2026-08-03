@@ -77,7 +77,17 @@ const visit = (node) => {
 }
 visit(source)
 assert.ok(routerArray, 'createBrowserRouter array must exist')
-const root = routerArray.elements.find((item) => (
+const routeObjects = []
+const collectRoutes = (array) => {
+  for (const item of array.elements) {
+    if (!ts.isObjectLiteralExpression(item)) continue
+    routeObjects.push(item)
+    const nestedChildren = property(item, 'children')?.initializer
+    if (nestedChildren && ts.isArrayLiteralExpression(nestedChildren)) collectRoutes(nestedChildren)
+  }
+}
+collectRoutes(routerArray)
+const root = routeObjects.find((item) => (
   ts.isObjectLiteralExpression(item)
   && stringValue(item, 'path') === '/'
   && jsxName(property(item, 'element')?.initializer) === 'KioskRoot'
@@ -139,6 +149,18 @@ for (const [path, marker] of printScanPages) {
   assert.match(body, /\.\/styles\/print-scan-fusion\.css/, `${path} imports the scoped W2 stylesheet`)
 }
 const printScanFusionCss = read('src/pages/print-scan/styles/print-scan-fusion.css')
+const frameContentPaddingContracts = new Map([
+  ['src/pages/print-scan/styles/print-scan-fusion.css', 'w2-print-scan-page'],
+  ['src/pages/scan/styles/scan-fusion.css', 'w2-scan-page'],
+  ['src/pages/print/print-prototype.css', 'print-proto'],
+])
+for (const [path, frameClass] of frameContentPaddingContracts) {
+  assert.match(
+    read(path),
+    new RegExp(`\\[data-kiosk-presentation=['"]fusion-youth['"]\\]\\s+\\.${frameClass}\\s*>\\s*\\.ui-kiosk-page-content\\s*\\{[^}]*padding:\\s*0\\s*;`),
+    `${frameClass} neutralizes direct kiosk page content padding`,
+  )
+}
 assert.match(
   printScanFusionCss,
   /\.w2-print-scan-shell\s*>\s*:is\(main,\s*section\)\s*\{/,
@@ -153,6 +175,31 @@ const printScanHome = read('src/pages/print-scan/PrintScanHomePage.tsx')
 for (const marker of ['getConfiguredCapabilities', 'CARD_CAPABILITY_KEY', 'CAPABILITY_STATUS_NOTES']) {
   assert.match(printScanHome, new RegExp(marker), `print-scan home retains ${marker}`)
 }
+assert.match(
+  printScanHome,
+  /<KioskPageHeader[\s\S]*?onBack=\{\(\) => navigate\('\/'\)\}[\s\S]*?backLabel=["']返回["'][\s\S]*?\/>/,
+  'print-scan home exposes the prototype back button on the left of its page heading',
+)
+assert.doesNotMatch(
+  printScanHome,
+  /<KioskPageHeader[\s\S]*?aside=\{/,
+  'print-scan home must not move its primary back action into a narrow heading aside',
+)
+assert.doesNotMatch(
+  printScanHome,
+  /<KioskActionBar\b/,
+  'print-scan hub uses the prototype global navbar and must not render a second bottom action bar',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*\{[^}]*padding:\s*0\s+48px\s+32px\s*;/,
+  'print-scan shell uses the prototype 48px content gutter without adding top padding to the pagehead',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-shell\s*>\s*\.ui-kiosk-page-header\s*\{[^}]*margin-inline:\s*-48px\s*;/,
+  'print-scan pagehead bleeds through the content gutter so its back button starts at 48px',
+)
 const convertImages = read('src/pages/print-scan/ConvertImagesPage.tsx')
 for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
@@ -167,8 +214,46 @@ assert.match(printUpload, /type UploadTab = 'file' \| 'qr' \| 'usb'/, 'print upl
 assert.match(printUpload, /navigate\('\/scan\/start'\)/, 'print upload keeps scan as an independent CTA')
 assert.match(printUpload, /data-w2-page=["']print-upload["']/, 'print upload exposes its W2 marker')
 assert.match(printUpload, /w2-print-upload-source-grid/, 'print upload exposes the 2x2 source grid')
+assert.match(printUpload, /print-upload-footer/, 'print upload exposes a semantic footer selector')
 assert.match(read('src/pages/print/styles/print-upload.css'), /\.w2-print-upload-source-grid\b/, 'print upload stylesheet owns the live source grid selector')
 assert.equal((printUpload.match(/<UploadSessionQrPanel\b/g) ?? []).length, 1, 'print upload renders one QR session panel')
+const printPrototypeLayout = read('src/pages/print/PrintPrototypeLayout.tsx')
+assert.match(
+  printPrototypeLayout,
+  /classNames\.includes\(["']p-6["']\)/,
+  'shared print frame recognizes legacy p-6 callers that need the unified gutter',
+)
+assert.match(
+  printPrototypeLayout,
+  /className\s*!==\s*["']p-6["']/,
+  'shared print frame removes legacy outer padding instead of stacking it around the pagehead',
+)
+assert.match(
+  printPrototypeLayout,
+  /contentClassName=\{usesUnifiedGutter\s*\?\s*["']print-proto-content--guttered["']\s*:\s*undefined\}/,
+  'shared print frame moves legacy callers onto its content gutter contract',
+)
+const printPrototypeCss = read('src/pages/print/print-prototype.css')
+assert.match(
+  printPrototypeCss,
+  /--print-page-gutter:\s*48px\s*;/,
+  'print flow declares the prototype 48px gutter once',
+)
+assert.match(
+  printPrototypeCss,
+  /\.print-proto\s*>\s*\.ui-kiosk-page-content\.print-proto-content--guttered\s*\{[^}]*padding-inline:\s*var\(--print-page-gutter\)\s*;/,
+  'legacy print callers receive the shared 48px content gutter',
+)
+assert.match(
+  printPrototypeCss,
+  /\.print-proto-content--guttered[\s\S]*?>\s*:is\(\.ui-kiosk-page-header,\s*\.ui-kiosk-steps,\s*\.ui-kiosk-action-bar\)\s*\{[^}]*margin-inline:\s*calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s*;/,
+  'pagehead, steps and actionbar bleed through the content gutter without absolute positioning',
+)
+assert.match(
+  printPrototypeCss,
+  /\[data-w2-page=["']print-upload["']\]\s*>\s*\.print-upload-footer\s*\{[^}]*margin:\s*22px\s+calc\(-1\s*\*\s*var\(--print-page-gutter\)\)\s+0\s*;[^}]*padding:\s*26px\s+var\(--print-page-gutter\)\s+34px\s*;[^}]*border-top:\s*1px\s+solid\s+var\(--print-line\)\s*;/,
+  'print upload ordinary footer buttons follow the prototype actionbar geometry',
+)
 const materialPresentation = read('src/pages/print/components/MaterialCheckPresentation.tsx')
 assert.match(materialPresentation, /data-w2-page=["']print-material-check["']/, 'material presentation exposes its W2 marker')
 assert.match(materialPresentation, /aria-pressed=\{finding\.selected === action\}/, 'material privacy decisions expose their selected state accessibly')
@@ -259,12 +344,30 @@ for (const [path, marker] of scanPages) {
 }
 
 const scanStart = read('src/pages/scan/ScanStartPage.tsx')
-assert.match(scanStart, /fetchScannerStatus/, 'scan start retains real scanner status loading')
-assert.match(scanStart, /30_000/, 'scan start retains its 30 second device refresh')
-for (const status of ['ready', 'busy', 'offline']) {
-  assert.match(scanStart, new RegExp(`["']${status}["']`), `scan start retains normalized ${status} state`)
-}
-assert.match(scanStart, /KioskStatePanel[\s\S]*tone=["']offline["']/, 'scan start renders an honest offline state')
+assert.doesNotMatch(
+  scanStart,
+  /fetchScannerStatus|\/kiosk\/device\/status|setInterval\s*\(/,
+  'scan start must not pretend an unavailable scanner-status source exists',
+)
+assert.match(scanStart, /loadConfiguredCapabilities/, 'scan start gates on terminal scan capability')
+assert.match(scanStart, /下一步会创建真实扫描会话/, 'scan start explains when the real session is created')
+assert.match(scanStart, /可创建扫描任务/, 'scan start uses task-creation copy instead of hardware ready')
+assert.doesNotMatch(scanStart, /扫描仪就绪/, 'scan start must not claim scanner hardware ready')
+assert.match(
+  scanStart,
+  /navigate\(["']\/scan\/settings["'][\s\S]*state:\s*\{\s*scanType:\s*selected\s*\}/,
+  'scan start carries a validated scan type into settings',
+)
+const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
+assert.match(scanSettings, /function isScanType\(/, 'scan settings validates direct route state')
+assert.match(scanSettings, /if\s*\(!scanType\)\s*return/, 'invalid direct access cannot create a session')
+assert.match(scanSettings, /instructions\.map\(/, 'success renders only server instructions')
+assert.match(
+  scanSettings,
+  /const cancellationCredentials = getCancellationCredentials\(created\)[\s\S]*if \(!isValidCreatedSession\(created\)\)[\s\S]*cancelSessionOnce\(/,
+  'malformed created sessions with usable credentials are not left active',
+)
+assert.doesNotMatch(scanSettings, /const GUIDE_STEPS|localStorage|sessionStorage/, 'settings does not invent guides or persist control tokens')
 
 const assertNoStorageAccess = (path) => {
   const scanSource = ts.createSourceFile(path, read(path), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
@@ -278,7 +381,6 @@ const assertNoStorageAccess = (path) => {
   assert.deepEqual(hits, [], `${path} must not access browser storage`)
 }
 
-const scanSettings = read('src/pages/scan/ScanSettingsPage.tsx')
 for (const marker of ['createScanSession', 'sessionPromiseRef', 'confirmedRef', 'controlToken', 'instructions']) {
   assert.match(scanSettings, new RegExp(marker), `scan settings retains ${marker}`)
 }
@@ -297,7 +399,38 @@ const scanResult = read('src/pages/scan/ScanResultPage.tsx')
 for (const target of ['/print/confirm', '/me/documents', '/resume/parse']) {
   assert.match(scanResult, new RegExp(target.replaceAll('/', '\\\/')), `scan result retains ${target} action`)
 }
+assert.match(scanResult, /loginPathForCurrentLocation/, 'scan result guides guests to login before documents')
+assert.match(scanResult, /登录后管理文件|前往我的文档/, 'scan result uses honest documents destination copy')
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
+assert.doesNotMatch(scanResult, /保存到我的文档/, 'scan result must not imply a completed save action')
+
+const scanFusionCss = read('src/pages/scan/styles/scan-fusion.css')
+assert.match(
+  scanFusionCss,
+  /\.w2-scan-two-column\s*,[\s\S]*?align-items:\s*stretch/,
+  'scan dual columns stretch to equal height',
+)
+assert.match(
+  scanFusionCss,
+  /\.w2-scan-progress-list\s*>\s*div\s*\{[^}]*flex:\s*0\s+0\s+auto/,
+  'scan progress rows do not vertically explode empty space',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-split\s*\{[^}]*align-items:\s*stretch/,
+  'print-scan split columns stretch to equal height',
+)
+assert.match(
+  printScanFusionCss,
+  /\.w2-print-scan-preview-frame\s*\{[^}]*min-height:\s*360px/,
+  'sign-stamp preview frame grows instead of a fixed short box',
+)
+assert.match(signStamp, /w2-print-scan-preview/, 'sign-stamp uses the densified preview shell')
+assert.doesNotMatch(
+  convertImages,
+  /justify-around/,
+  'convert rules must not space-around empty vertical room',
+)
 
 console.log('ALL PASS fusion W2 print/scan contract')

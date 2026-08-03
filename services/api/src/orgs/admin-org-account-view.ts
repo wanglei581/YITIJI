@@ -1,3 +1,4 @@
+import { maskEmailFromEnc } from '../common/crypto/email-identity'
 import { maskPhoneFromEnc } from '../common/crypto/phone-identity'
 import type { Prisma } from '../generated/prisma/client'
 import {
@@ -14,6 +15,9 @@ export interface AdminOrgAccount {
   enabled: boolean
   phoneMasked: string | null
   phoneVerifiedAt: string | null
+  emailMasked: string | null
+  emailVerifiedAt: string | null
+  emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
   createdAt: string
 }
@@ -26,6 +30,10 @@ export const ADMIN_ORG_ACCOUNT_SELECT = {
   phoneHash: true,
   phoneEnc: true,
   phoneVerifiedAt: true,
+  emailHash: true,
+  emailEnc: true,
+  emailVerifiedAt: true,
+  emailVerifyMethod: true,
   passwordProofState: true,
   createdAt: true,
 } as const satisfies Prisma.UserSelect
@@ -38,6 +46,10 @@ interface AdminOrgAccountRow {
   phoneHash: string | null
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
+  emailHash: string | null
+  emailEnc: string | null
+  emailVerifiedAt: Date | null
+  emailVerifyMethod: string | null
   passwordProofState: string
   createdAt: Date
 }
@@ -66,6 +78,9 @@ export function mapAdminOrgAccount(account: AdminOrgAccountRow): AdminOrgAccount
     enabled: account.enabled,
     phoneMasked: account.phoneEnc ? maskPhoneFromEnc(account.phoneEnc) : null,
     phoneVerifiedAt: account.phoneVerifiedAt?.toISOString() ?? null,
+    emailMasked: account.emailEnc ? maskEmailFromEnc(account.emailEnc) : null,
+    emailVerifiedAt: account.emailVerifiedAt?.toISOString() ?? null,
+    emailVerifyMethod: account.emailVerifyMethod,
     availableActionVerificationMethods: availableMethodsForAccount({ ...account, passwordProofState }),
     createdAt: account.createdAt.toISOString(),
   }

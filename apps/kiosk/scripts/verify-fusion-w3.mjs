@@ -17,6 +17,11 @@ function stripCssComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '')
 }
 
+function cssRuleBody(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+}
+
 function splitSelectorList(source) {
   const selectors = []
   let current = ''
@@ -99,7 +104,7 @@ const frozen = {
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
   'src/pages/interview/session/types.ts': 'f3139d5375df69db492fc9428a3b4d99cc2ab389c081b50093418f71d3d0f369',
-  'src/hooks/useAiAdvisorCallSession.ts': '2b3f721231a5559e258634afdfe4649a868eebcc420dca94fbfdf8ce396ada5e',
+  'src/hooks/useAiAdvisorCallSession.ts': '75f2bdcc44b03e3c9bcaa505d32139036bc5e0b934d0bace5d6b8237d5bc76f8',
 }
 for (const [path, hash] of Object.entries(frozen)) check(sha256(path) === hash, `${path} remains frozen`)
 
@@ -124,8 +129,34 @@ for (const path of cssFiles) {
 for (const [selector, owners] of selectorOwners) check(owners.size === 1, `selector has one owner: ${selector}`)
 const jobFitSelectors = collectCssSelectors(read('src/pages/resume/styles/resume-fusion-job-fit.css'))
 check(jobFitSelectors.every((selector) => selector.startsWith('.job-fit-inkpaper')), 'job-fit selectors are fully scoped')
-check(read('src/pages/resume/resume-fusion-youth.css') === "@import './styles/resume-fusion-common.css';\n@import './styles/resume-fusion-diagnosis.css';\n@import './styles/resume-fusion-authoring.css';\n@import './styles/resume-fusion-library.css';\n", 'resume compatibility entrypoint is import-only')
+const resumeEntrypoint = stripCssComments(read('src/pages/resume/resume-fusion-youth.css'))
+const expectedResumeImports = [
+  './styles/resume-fusion-common.css',
+  './styles/resume-fusion-diagnosis.css',
+  './styles/resume-fusion-authoring.css',
+  './styles/resume-fusion-library.css',
+]
+const actualResumeImports = [...resumeEntrypoint.matchAll(/@import\s+['"]([^'"]+)['"]\s*;/g)].map((match) => match[1])
+check(JSON.stringify(actualResumeImports) === JSON.stringify(expectedResumeImports), 'resume compatibility entrypoint retains exactly four ordered imports')
+check(
+  JSON.stringify(collectCssSelectors(resumeEntrypoint)) === JSON.stringify([
+    "[data-kiosk-presentation='fusion-youth'] .fusion-w3--resume > .ui-kiosk-page-content",
+    "[data-kiosk-presentation='fusion-youth'] .resume-source-direction h2",
+    "[data-kiosk-presentation='fusion-youth'] .resume-source-split",
+    "[data-kiosk-presentation='fusion-youth'] .resume-source-side",
+  ]),
+  'resume compatibility entrypoint permits only the frame and source-layout repair rules',
+)
 check(read('src/pages/resume/jobFit-inkpaper.css') === "@import './styles/resume-fusion-job-fit.css';\n", 'job-fit compatibility entrypoint is import-only')
+
+for (const [path, frameClass] of [
+  ['src/pages/resume/resume-fusion-youth.css', 'resume'],
+  ['src/pages/assistant/assistant-lightflow-shell.css', 'assistant'],
+  ['src/pages/interview/styles/interview-shell.css', 'interview'],
+]) check(
+  /(?:^|;)\s*padding:\s*0\s*;?/.test(cssRuleBody(read(path), `[data-kiosk-presentation='fusion-youth'] .fusion-w3--${frameClass} > .ui-kiosk-page-content`)),
+  `${frameClass} frame neutralizes the shared content gutter`,
+)
 
 const screens = new Map([
   ['src/pages/resume/ResumeSourcePage.tsx', 'resume-source'],
@@ -150,13 +181,48 @@ for (const [path, screen] of screens) {
   const isInterview = path.includes('/interview/')
   includes(
     path,
-    isInterview ? 'InterviewShell' : 'KioskPageFrame',
+    path === 'src/pages/interview/InterviewReportsPage.tsx'
+      ? 'KioskFullscreenShell'
+      : isInterview
+        ? 'InterviewShell'
+        : 'KioskPageFrame',
     `${screen} consumes the frozen W1 frame`,
   )
   includes(path, `data-kiosk-screen="${screen}"`, `${screen} exposes its stable landmark`)
 }
 includes('src/pages/interview/InterviewShell.tsx', 'KioskFullscreenShell', 'interview shell uses shared fullscreen chrome')
 includes('src/pages/interview/InterviewShell.tsx', 'KioskPageFrame', 'interview shell still wraps KioskPageFrame')
+
+const fullscreenShell = read('src/components/kiosk-shell/KioskFullscreenShell.tsx')
+check(fullscreenShell.includes('KioskStageFit'), 'fullscreen kiosk chrome uses the fixed 1080x1920 stage')
+check(/viewport\s*===\s*['"]kiosk['"]/.test(fullscreenShell), 'stage-fit is limited to the kiosk viewport')
+for (const path of ['src/pages/resume/JobFitPage.tsx', 'src/pages/resume/CareerPlanPage.tsx']) {
+  includes(path, 'KioskFullscreenShell', `${path} uses fullscreen prototype chrome`)
+  check(!read(path).includes('standalone'), `${path} does not bypass the fixed stage with a standalone frame`)
+}
+
+const resumeSource = read('src/pages/resume/ResumeSourcePage.tsx')
+check(/resume-source-split[^"\n]*\bgrid\b/.test(resumeSource), 'resume source uses a grid for its two-column stage')
+check(!resumeSource.includes('lg:w-[348px]'), 'resume source removes the undersized 348px direction rail')
+check(/(?:^|;)\s*min-width:\s*440px\s*;?/.test(cssRuleBody(resumeEntrypoint, '.resume-source-side')), 'resume source direction rail keeps a 440px minimum at 1080')
+check(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(440px,\s*0\.9fr\)/.test(cssRuleBody(resumeEntrypoint, '.resume-source-split')), 'resume source uses a near-balanced 1080 two-column ratio')
+check(/(?:^|;)\s*white-space:\s*nowrap\s*;?/.test(cssRuleBody(resumeEntrypoint, '.resume-source-direction h2')), 'resume direction title cannot wrap character by character')
+
+const interviewSetup = read('src/pages/interview/InterviewSetupPage.tsx')
+includes('src/pages/interview/InterviewSetupPage.tsx', 'interview-setup__stack', 'interview setup uses the prototype vertical stack')
+includes('src/pages/interview/InterviewSetupPage.tsx', 'interview-setup__interviewer', 'interview setup keeps interviewer and difficulty in one vertical card')
+check(!interviewSetup.includes('interview-setup__summary'), 'interview setup removes the non-prototype summary rail')
+check(!interviewSetup.includes('SummaryRow'), 'interview setup removes duplicate summary rows')
+const interviewCss = read('src/pages/interview/styles/interview-shell.css')
+check(/(?:^|;)\s*display:\s*flex\s*;?/.test(cssRuleBody(interviewCss, '.interview-setup__stack')), 'interview setup stack is flex')
+check(/(?:^|;)\s*flex-direction:\s*column\s*;?/.test(cssRuleBody(interviewCss, '.interview-setup__stack')), 'interview setup stack is vertical')
+
+const interviewReports = read('src/pages/interview/InterviewReportsPage.tsx')
+includes('src/pages/interview/InterviewReportsPage.tsx', 'showBottomNav', 'interview reports restores prototype bottom navigation')
+check(/<nav\s+aria-label=["']\u4e3b\u5bfc\u822a["']\s+className=["']ui-kiosk-nav["']>/.test(fullscreenShell), 'fullscreen bottom navigation retains main-nav semantics')
+for (const destination of ['/', '/assistant', '/profile']) {
+  check(fullscreenShell.includes(`path: '${destination}'`), `fullscreen bottom navigation wires ${destination}`)
+}
 
 
 includes('src/pages/resume/ResumeSourcePage.tsx', 'UploadSessionQrPanel', 'resume source keeps the shared upload session')

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>扫码续传 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .relay-center { text-align:center; padding:20px 24px 8px; }
+    .relay-qr { margin:0 auto 12px; }
+    .relay-title { font-family:var(--font-serif); font-size:18px; font-weight:600; color:var(--ink); }
+    .relay-sub { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.6; }
+    .relay-code { display:inline-flex; align-items:center; gap:8px; margin-top:10px; padding:6px 14px; background:var(--surface-2); border-radius:var(--r-full); border:1px solid var(--line-soft); }
+    .relay-code .rc-n { font-family:var(--font-serif); font-size:16px; font-weight:700; color:var(--teal); letter-spacing:2px; }
+    .file-mini { display:flex; align-items:center; gap:10px; padding:12px 16px; }
+    .file-mini + .file-mini { border-top:1px solid var(--line-faint); }
+    .file-mini .fm-ic { width:34px; height:42px; border-radius:6px; background:var(--clay-wash); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .file-mini .fm-n { flex:1; font-size:14px; color:var(--ink); }
+    .file-mini .fm-s { font-size:11.5px; color:var(--muted); }
+    .flow-mini { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px 0; }
+    .flow-mini .fn { display:flex; flex-direction:column; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+    .flow-mini .fn .fi { width:36px; height:36px; border-radius:50%; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; font-size:16px; }
+    .flow-mini .arr { color:var(--ghost); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">扫码续传</div>
+    <div style="width:32px"></div>
+  </div>
+
+  <div class="content">
+    <div class="notice">
+      <span class="n-ic">📱</span>
+      <span>用一体机屏幕上的「扫码取文件」对准下方二维码，即可把手机里的文件传到终端上操作。</span>
+    </div>
+
+    <!-- 二维码 -->
+    <div class="card">
+      <div class="relay-center">
+        <div class="qr-box relay-qr"><div class="qr-inner"></div></div>
+        <div class="relay-title">等待一体机扫码</div>
+        <div class="relay-sub">二维码 5 分钟内有效，请尽快在终端上扫描</div>
+        <div class="relay-code"><span class="fs12 muted">传输码</span><span class="rc-n">RT-3902</span></div>
+      </div>
+    </div>
+
+    <!-- 待传文件 -->
+    <div class="section-t">本次传输文件（2）</div>
+    <div class="card">
+      <div class="file-mini">
+        <div class="fm-ic">📄</div>
+        <div class="fm-n">我的简历_张晓.pdf</div>
+        <div class="fm-s">248 KB</div>
+      </div>
+      <div class="file-mini">
+        <div class="fm-ic" style="background:var(--teal-wash)">🖼️</div>
+        <div class="fm-n">证件照_1寸.jpg</div>
+        <div class="fm-s">1.2 MB</div>
+      </div>
+    </div>
+
+    <!-- 流程 -->
+    <div class="card flat">
+      <div class="flow-mini">
+        <div class="fn"><div class="fi">📤</div>手机选文件</div>
+        <span class="arr">→</span>
+        <div class="fn"><div class="fi">📷</div>一体机扫码</div>
+        <span class="arr">→</span>
+        <div class="fn"><div class="fi">🖨️</div>终端打印</div>
+      </div>
+    </div>
+
+    <div class="compliance-note">文件仅在本次传输会话中有效，传输完成后自动失效，不长期保存在终端。</div>
+    <div class="spacer-lg"></div>
+  </div>
+</div>
+</body>
+</html>

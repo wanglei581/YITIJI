@@ -9,6 +9,8 @@ import {
   RotateCcwIcon,
   SparklesIcon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
@@ -46,6 +48,7 @@ const SCAN_TYPE_LABELS: Record<ScanType, string> = {
 export function ScanResultPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { isLoggedIn } = useAuth()
   const state = (location.state ?? {}) as ScanResultState
   const scanType = state.scanType ?? 'document'
   const success = state.success === true
@@ -69,9 +72,13 @@ export function ScanResultPage() {
     })
   }
 
-  const handleSave = () => {
+  const handleDocuments = () => {
     if (!file) return
-    navigate('/me/documents')
+    if (isLoggedIn) {
+      navigate('/me/documents')
+      return
+    }
+    navigate(loginPathForCurrentLocation())
   }
 
   const handleResumeAI = () => {
@@ -136,8 +143,8 @@ export function ScanResultPage() {
             <button type="button" disabled={!file} onClick={handlePrint}>
               <PrinterIcon /><span><b>直接打印</b><small>按默认参数进入确认打印，可再修改</small></span>
             </button>
-            <button type="button" disabled={!file} onClick={handleSave}>
-              <FolderIcon /><span><b>保存到我的文档</b><small>前往我的文档查看与管理已保存文件</small></span>
+            <button type="button" disabled={!file} onClick={handleDocuments}>
+              <FolderIcon /><span><b>{isLoggedIn ? '前往我的文档' : '登录后管理文件'}</b><small>{isLoggedIn ? '在「我的文档」查看与管理本次相关文件' : '临时扫描文件有有效期；登录后可在「我的文档」管理'}</small></span>
             </button>
             <button type="button" onClick={() => navigate('/')}>
               <HomeIcon /><span><b>返回首页</b><small>结束本次扫描，回到功能大厅</small></span>
@@ -146,7 +153,7 @@ export function ScanResultPage() {
         </section>
       </section>
 
-      <KioskActionBar leading={<span className="w2-scan-action-note">未选择去向的临时文件会按服务端策略清理</span>}>
+      <KioskActionBar leading={<span className="w2-scan-action-note">未选择去向的临时文件会按服务端策略清理；本页不会伪造“已保存”</span>}>
         <Button variant="secondary" size="lg" onClick={handleRetry}>
           <RotateCcwIcon />重新扫描
         </Button>

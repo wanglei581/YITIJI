@@ -14,7 +14,8 @@ import './screensaver-service-desk.css'
  * 评审 bug 防护:
  *   #2 视频自动播放被拦截 → muted + playsInline + autoPlay,play() 失败自动跳下一个
  *   #3 唤醒卡死 → 任意输入立即退出回首页(整页覆盖,无业务按钮可穿透)
- *   #4 断网黑屏 → resolveAssetUrl 缓存优先;拉不到配置/无素材直接退出,不显示空白
+ *   #4 断网/无素材 → resolveAssetUrl 缓存优先;拉不到配置/无素材 exit 回首页;
+ *       加载中仍展示唤醒壳（禁止纯黑 aria-hidden 空白）
  *   #5 大视频拖垮内存 → 只预加载"下一个",不全量加载
  *
  * 退出回首页(replace):为下一位用户重置会话,也避免上一位的浏览痕迹残留。
@@ -23,7 +24,12 @@ export function ScreensaverPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout } = useAuth()
-  const statePlaylist = (location.state as { playlist?: KioskScreensaverPlaylist } | null)?.playlist
+  const routeState = location.state as {
+    playlist?: KioskScreensaverPlaylist
+    privacyBoundary?: { token: string; minHistoryIndex: number; createdAt: number }
+  } | null
+  const statePlaylist = routeState?.playlist
+  const privacyBoundary = routeState?.privacyBoundary
 
   // 进入待机宣传屏即重置（Phase C-1 + C-2A）：屏保意味着用户已离开，
   // 清会员登录态 + 打印材料 / AI 简历最小会话（含匿名 accessToken），
@@ -43,7 +49,13 @@ export function ScreensaverPage() {
     return () => window.clearInterval(timer)
   }, [])
 
-  const exit = useCallback(() => navigate('/', { replace: true }), [navigate])
+  const exit = useCallback(
+    () => navigate('/', {
+      replace: true,
+      state: privacyBoundary ? { privacyBoundary } : undefined,
+    }),
+    [navigate, privacyBoundary],
+  )
 
   const advance = useCallback(() => {
     setIndex((i) => (items.length > 0 ? (i + 1) % items.length : 0))
@@ -134,13 +146,41 @@ export function ScreensaverPage() {
     return () => window.clearTimeout(t)
   }, [current, index, items.length])
 
+  const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim() || '就业服务大厅'
+  const clock = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+
+  // 加载中 / 素材 URL 未就绪：仍展示可触摸唤醒壳，禁止纯黑空白 aria-hidden 页。
+  // 无素材拉取结果仍走上方 exit()，不伪造宣传图。
   if (!current || !mediaUrl) {
-    return <div className="fusion-w5 fusion-w5--system service-desk k1-screensaver fixed inset-0 z-[9999] bg-black" data-kiosk-screen="screensaver" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="kiosk" data-visual-theme="service-desk" data-ux-density="touch" aria-hidden="true" />
+    return (
+      <div
+        className="fusion-w5 fusion-w5--system service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black"
+        data-kiosk-screen="screensaver"
+        data-kiosk-presentation="fusion-youth"
+        data-kiosk-viewport="kiosk"
+        data-visual-theme="service-desk"
+        data-ux-density="touch"
+        role="presentation"
+      >
+        <div className="screensaver-shade" aria-hidden="true" />
+        <div className="screensaver-corner screensaver-corner--left" aria-hidden="true">
+          <span />{terminalName}
+        </div>
+        <time className="screensaver-corner screensaver-corner--right" aria-hidden="true">{clock}</time>
+        <p className="screensaver-privacy" aria-hidden="true">
+          <ShieldCheckIcon />
+          进入待机时已自动退出上一位用户的登录，并清除本次会话记录
+        </p>
+        <div className="screensaver-wake-prompt" aria-hidden="true">
+          <PointerIcon />
+          <strong>触摸屏幕开始使用</strong>
+          <span>轻触任意位置进入首页</span>
+        </div>
+      </div>
+    )
   }
 
   const loopVideo = items.length <= 1
-  const terminalName = (import.meta.env['VITE_TERMINAL_DISPLAY_NAME'] ?? '').trim() || '就业服务大厅'
-  const clock = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-screensaver fixed inset-0 z-[9999] flex items-center justify-center bg-black" data-kiosk-screen="screensaver" data-kiosk-presentation="fusion-youth" data-kiosk-viewport="kiosk" data-visual-theme="service-desk" data-ux-density="touch" role="presentation">

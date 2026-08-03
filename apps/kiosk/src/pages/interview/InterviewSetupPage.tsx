@@ -1,7 +1,7 @@
 // ============================================================
 // 模拟面试 — 场景设置（2C）。
 //
-// 触控优先：左侧配置、右侧摘要，底部固定主操作。
+// 触控优先：纵向编排岗位行业、面试官难度与其他配置，底部固定主操作。
 // 合规：仅供本人练习参考，不代表任何招聘结果承诺。
 // ============================================================
 
@@ -16,9 +16,7 @@ import type {
   InterviewerType,
 } from '@ai-job-print/shared'
 import {
-  AlertCircleIcon,
   BriefcaseIcon,
-  CheckCircle2Icon,
   ClockIcon,
   FileTextIcon,
   GraduationCapIcon,
@@ -66,10 +64,6 @@ const DURATIONS: Array<{ key: InterviewDuration; label: string; desc: string }> 
 
 const POSITION_EXAMPLES = ['前端开发工程师', '行政专员', '市场运营', '机械工程师', '会计', '销售代表']
 
-function labelOf<T extends string | number>(items: Array<{ key: T; label: string }>, key: T): string {
-  return items.find((it) => it.key === key)?.label ?? String(key)
-}
-
 function OptionButton({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: ReactNode; className?: string }) {
   return (
     <button
@@ -100,15 +94,6 @@ function SectionTitle({ icon: Icon, title, desc }: { icon: ElementType; title: s
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="interview-summary-row flex items-center justify-between gap-4 border-b py-3 last:border-b-0">
-      <span className="shrink-0">{label}</span>
-      <span className="max-w-[13rem] text-right font-semibold">{value}</span>
-    </div>
-  )
-}
-
 export function InterviewSetupPage() {
   const navigate = useNavigate()
   const { getToken } = useAuth()
@@ -127,10 +112,6 @@ export function InterviewSetupPage() {
 
   useBusyLock(creating || uploading)
 
-  const interviewerLabel = labelOf(INTERVIEWERS, interviewerType)
-  const experienceLabel = labelOf(EXPERIENCES, experience)
-  const difficultyLabel = labelOf(DIFFICULTIES, difficulty)
-  const durationLabel = labelOf(DURATIONS, duration)
   const positionReady = position.trim().length > 0
 
   const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -206,8 +187,7 @@ export function InterviewSetupPage() {
           本功能仅供本人面试练习与准备参考，不代表任何招聘结果承诺，不参与企业筛选、面试邀约或录用决策。
         </ComplianceBanner>
 
-        <div className="interview-setup__layout mt-4 grid gap-4">
-          <div className="interview-setup__form space-y-4">
+        <div className="interview-setup__stack mt-4">
             <Card className="interview-card interview-setup__job p-5">
               <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="先确定目标岗位，后续题目会围绕这个方向展开。" />
               <div className="flex flex-wrap gap-2">
@@ -244,7 +224,7 @@ export function InterviewSetupPage() {
               </div>
             </Card>
 
-            <Card className="interview-card p-5">
+            <Card className="interview-card interview-setup__interviewer p-5">
               <SectionTitle icon={UserRoundCheckIcon} title="面试官与难度" desc="先选择面试官身份，再选择练习压力。" />
               <div className="grid gap-2 lg:grid-cols-2">
                 {INTERVIEWERS.map((it) => (
@@ -320,34 +300,6 @@ export function InterviewSetupPage() {
                 onChange={handleFileChosen}
               />
             </Card>
-          </div>
-
-          <aside className="interview-setup__summary">
-            <Card className="interview-card interview-card--summary p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <CheckCircle2Icon className="h-5 w-5 text-primary-600" aria-hidden="true" />
-                <h2 className="text-base font-semibold text-neutral-900">本次练习摘要</h2>
-              </div>
-              <div className="rounded-xl border px-4" style={{ borderColor: 'var(--interview-line, #e2dccb)', background: 'var(--interview-paper, #f4f1e8)' }}>
-                <SummaryRow label="面试官类型" value={interviewerLabel} />
-                <SummaryRow label="行业" value={industry} />
-                <SummaryRow label="目标岗位" value={positionReady ? position.trim() : '待填写'} />
-                <SummaryRow label="经验" value={experienceLabel} />
-                <SummaryRow label="难度" value={difficultyLabel} />
-                <SummaryRow label="时长" value={durationLabel} />
-                <SummaryRow label="使用简历" value={resumeFile ? resumeFile.name : '不使用简历'} />
-              </div>
-              {!positionReady && (
-                <div className="mt-4 flex items-start gap-2 rounded-xl border border-warning-bg bg-warning-bg px-4 py-3 text-sm text-warning-fg">
-                  <AlertCircleIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                  请填写目标岗位后开始模拟面试。
-                </div>
-              )}
-              <div className="mt-4 rounded-xl border border-neutral-100 px-4 py-3 text-xs leading-relaxed text-neutral-500">
-                报告将基于你的问题回答、跳过记录和确认后的转写文本生成，仅供本人练习复盘。
-              </div>
-            </Card>
-          </aside>
         </div>
 
         {error && (

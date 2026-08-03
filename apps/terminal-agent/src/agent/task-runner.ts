@@ -37,7 +37,9 @@ import os from 'os'
 import axios from 'axios'
 import type { AgentConfig, ClaimTask, PatchStatusPayload, ReportableStatus } from './types'
 import type { PrintJobParams } from '../printer/types'
-import { createApiClient, createDirectHttpAgents, axiosErrorMessage } from './api-client'
+import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print } from '../printer/print'
 import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
 import { log, warn, err } from '../logger'
@@ -193,25 +195,41 @@ function resolveFileUrl(fileUrl: string, apiBaseUrl: string): string {
  * Failures are logged as warnings; this function never throws.
  * The backend is idempotent for repeated PATCHes with the same terminal status.
  */
-async function patchStatus(
+export async function patchStatus(
   taskId: string,
   payload: PatchStatusPayload,
   apiBaseUrl: string,
   agentToken: string,
   terminalId: string,
+  sendPatch?: () => Promise<void>,
 ): Promise<boolean> {
-  const client = createApiClient(apiBaseUrl, agentToken, terminalId)
   try {
-    await client.patch(`/print-tasks/${taskId}/status`, payload)
+    if (sendPatch) {
+      await sendPatch()
+    } else {
+      const client = createApiClient(apiBaseUrl, agentToken, terminalId)
+      await client.patch(`/print-tasks/${taskId}/status`, payload)
+    }
     log(`task ${taskId}: PATCH status=${payload.status} ✓`)
     return true
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      err(`task ${taskId}: PATCH status=${payload.status} unauthorized — printing stopped (re-bind required)`)
+      return false
+    }
     warn(
       `task ${taskId}: PATCH status=${payload.status} failed — ${axiosErrorMessage(e)}` +
         ' (will retry via offline-queue if status is terminal)',
     )
     return false
   }
+}
+
+/** Testable fail-closed gate used immediately before invoking the printer. */
+export function shouldAbortBeforePrint(): boolean {
+  return isUnauthorized()
 }
 
 // ── Task execution ────────────────────────────────────────────────────────────
@@ -233,6 +251,10 @@ async function executeTask(
   const { terminalId, agentToken, apiBaseUrl, printerName } = config
   if (!terminalId || !agentToken) {
     err(`task ${task.taskId}: executeTask called without terminalId/agentToken — skipping`)
+    return
+  }
+  if (isUnauthorized()) {
+    warn(`task ${task.taskId}: credential unauthorized before execution; print skipped`)
     return
   }
 
@@ -333,7 +355,15 @@ async function executeTask(
     }
 
     // ── Step 3: PATCH printing (informational; failure does not abort) ────
+    if (shouldAbortBeforePrint()) {
+      warn(`task ${task.taskId}: credential became unauthorized before printing status; print skipped`)
+      return
+    }
     await patch('printing')
+    if (shouldAbortBeforePrint()) {
+      warn(`task ${task.taskId}: printing status rejected as unauthorized; print skipped`)
+      return
+    }
 
     // ── Step 4: Print ─────────────────────────────────────────────────────
     log(`task ${task.taskId}: printing on "${resolvedPrinter}"...`)
@@ -623,6 +653,10 @@ async function runClaimCycle(
   if (!config.terminalId || !config.agentToken) {
     return // Not registered yet; skip silently
   }
+  if (isUnauthorized()) {
+    warn('task-runner: credential unauthorized; claim skipped (re-bind required)')
+    return
+  }
   if (!isDatabaseAvailable(db)) {
     warn('task-runner: local task database unavailable; printing disabled')
     return
@@ -638,6 +672,12 @@ async function runClaimCycle(
     )
     tasks = Array.isArray(resp.data) ? resp.data : []
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      err('task-runner: claim unauthorized — credential revoked/invalid; printing stopped')
+      return
+    }
     const status = axios.isAxiosError(e) ? e.response?.status : undefined
     if (status !== 404 && status !== 204) {
       warn(`task-runner: claim cycle error — ${axiosErrorMessage(e)}`)
@@ -646,6 +686,10 @@ async function runClaimCycle(
   }
 
   if (tasks.length === 0) return
+  if (isUnauthorized()) {
+    warn('task-runner: credential became unauthorized while claim was in flight; claimed work will not print')
+    return
+  }
 
   for (const task of tasks) {
     if (activeTasks.has(task.taskId)) {

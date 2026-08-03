@@ -284,8 +284,13 @@ function runStaticChecks(): void {
   )
   contains(
     'src/terminals/terminals-agent.service.ts',  // N3拆分后这些模式在 agent service
-    ['allowDisabled: true', 'TERMINAL_DISABLED', 'tryNormalizeMacAddress(dto.macAddress)'],
+    ['allowDisabled: true', 'tryNormalizeMacAddress(dto.macAddress)'],
     'K. 停用终端禁止任务操作,心跳仍可上报且坏 MAC 不打挂心跳',
+  )
+  contains(
+    'src/terminals/terminal-credential-security.service.ts',
+    ['TERMINAL_DISABLED', '!options.allowDisabled && !terminal.enabled'],
+    'K2. Terminal credential security fails closed for disabled devices except explicit heartbeat allowance',
   )
   const updateProfileLookup = section(
     'src/terminals/terminals-admin.service.ts',

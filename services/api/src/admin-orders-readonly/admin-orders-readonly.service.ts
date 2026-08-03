@@ -39,6 +39,24 @@ interface LabelMaps {
   terminalCodes: Map<string, string>
 }
 
+const PRINT_JOB_UNCONFIRMED_ERROR_CODE = 'PRINT_JOB_UNCONFIRMED'
+
+function deriveAftercare(row: OrderRow): Pick<AdminOrderReadonlyItem, 'aftercareStatus' | 'refundEligible' | 'retryForbidden'> {
+  const manualCheckRequired =
+    row.type === 'print' &&
+    row.payStatus === 'paid' &&
+    row.taskStatus === 'failed' &&
+    row.printTask?.status === 'failed' &&
+    row.printTask.errorCode === PRINT_JOB_UNCONFIRMED_ERROR_CODE
+
+  return {
+    aftercareStatus: manualCheckRequired ? 'manual_check_required' : null,
+    // 保留既有 canonical 全额退款能力；RefundService 仍是最终写入门禁。
+    refundEligible: row.payStatus === 'paid',
+    retryForbidden: manualCheckRequired,
+  }
+}
+
 export interface ListAdminOrdersReadonlyParams {
   type?: string
   payStatus?: string
@@ -207,6 +225,7 @@ export class AdminOrdersReadonlyService {
       colorMode: printSummary.colorMode,
       paperSize: printSummary.paperSize,
       errorCode: row.printTask?.errorCode ?? null,
+      ...deriveAftercare(row),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     }

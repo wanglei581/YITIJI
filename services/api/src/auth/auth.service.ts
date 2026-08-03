@@ -4,6 +4,13 @@ import * as bcrypt from 'bcryptjs'
 import { createHash, randomInt, randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import {
+  hashEmail,
+  isValidEmail,
+  maskEmail,
+  maskEmailFromEnc,
+  normalizeEmail,
+} from '../common/crypto/email-identity'
+import {
   decryptPhone,
   encryptPhone,
   hashPhone,
@@ -40,6 +47,8 @@ export interface LoginResult {
     orgId:       string | null
     phoneMasked?: string
     phoneVerifiedAt?: string | null
+    emailMasked?: string
+    emailVerifiedAt?: string | null
   }
 }
 
@@ -55,6 +64,10 @@ interface InternalUser {
   phoneHash: string | null
   phoneEnc: string | null
   phoneVerifiedAt: Date | null
+  emailHash: string | null
+  emailEnc: string | null
+  emailVerifiedAt: Date | null
+  emailVerifyMethod: string | null
   tokenVersion: number
   deletedAt: Date | null
 }
@@ -362,6 +375,12 @@ export class AuthService {
       const user = await this.prisma.user.findFirst({ where: { phoneHash, deletedAt: null } })
       return user?.phoneVerifiedAt ? user : null
     }
+    const email = this.normalizedEmailOrNull(loginId)
+    if (email) {
+      const emailHash = hashEmail(email)
+      const user = await this.prisma.user.findFirst({ where: { emailHash, deletedAt: null } })
+      return user?.emailVerifiedAt ? user : null
+    }
     return this.prisma.user.findFirst({ where: { username: loginId.trim(), deletedAt: null } })
   }
 
@@ -440,6 +459,8 @@ export class AuthService {
         orgId: user.orgId,
         ...(user.phoneEnc ? { phoneMasked: maskPhoneFromEnc(user.phoneEnc) } : {}),
         phoneVerifiedAt: user.phoneVerifiedAt?.toISOString() ?? null,
+        ...(user.emailEnc ? { emailMasked: maskEmailFromEnc(user.emailEnc) } : {}),
+        emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       },
     }
   }
@@ -447,6 +468,11 @@ export class AuthService {
   private normalizedPhoneOrNull(value: string): string | null {
     const normalized = normalizePhone(value.trim())
     return isValidCnMobile(normalized) ? normalized : null
+  }
+
+  private normalizedEmailOrNull(value: string): string | null {
+    const normalized = normalizeEmail(value)
+    return isValidEmail(normalized) ? normalized : null
   }
 
   private assertPartnerPasswordProofReady(user: Pick<InternalUser, 'role' | 'passwordProofState'>): void {
@@ -462,6 +488,8 @@ export class AuthService {
   private maskLoginIdentity(value: string): string {
     const phone = this.normalizedPhoneOrNull(value)
     if (phone) return maskPhone(phone)
+    const email = this.normalizedEmailOrNull(value)
+    if (email) return maskEmail(email)
     const trimmed = value.trim()
     if (trimmed.length <= 2) return '*'.repeat(trimmed.length || 1)
     return `${trimmed.slice(0, 1)}***${trimmed.slice(-1)}`

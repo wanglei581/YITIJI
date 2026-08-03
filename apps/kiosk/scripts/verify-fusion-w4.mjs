@@ -8,7 +8,7 @@ import ts from 'typescript'
 const KIOSK_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKSPACE_ROOT = join(KIOSK_ROOT, '..', '..')
 const W4_ROUTES = [
-  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies',
+  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
@@ -39,6 +39,30 @@ const PLANNED_TEST_FILES = new Set([
   'apps/kiosk/tests/fixtures/fusion-w4-api.ts',
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
 ])
+const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
+const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
+  'apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx',
+  'apps/kiosk/src/routes/index.tsx',
+  'apps/kiosk/src/layouts/KioskRoot.tsx',
+  'apps/kiosk/src/main.tsx',
+  'apps/kiosk/src/pages/errors/KioskRouteErrorPage.tsx',
+  'apps/kiosk/scripts/verify-kiosk-runtime-error-boundary.mjs',
+  'apps/kiosk/scripts/verify-fusion-shell.mjs',
+  'apps/kiosk/scripts/verify-member-login-dialog.mjs',
+  'apps/kiosk/scripts/verify-job-material-library-ui.mjs',
+  'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
+  'apps/kiosk/scripts/verify-print-done-truth.mjs',
+  'apps/kiosk/scripts/verify-scan-session-truth.mjs',
+  'apps/kiosk/scripts/verify-visual-evidence-manifest.mjs',
+  'apps/kiosk/tests/visual/fixtures/kiosk-p1-visual-evidence-targets.ts',
+  'apps/kiosk/tests/visual/kiosk-visible-actions-truth.spec.ts',
+  'apps/kiosk/tests/visual/print-done-truth.spec.ts',
+  'apps/kiosk/tests/visual/scan-session-truth.spec.ts',
+  'apps/kiosk/tests/visual/fusion-smoke.spec.ts',
+  'apps/kiosk/tests/visual/kiosk-privacy-timeout.spec.ts',
+  'docs/acceptance/kiosk-8177-5299-fusion-visual-runbook.md',
+  'docs/superpowers/plans/2026-07-26-kiosk82-visual-evidence-and-truth-batch2.md',
+])
 const W6_INTEGRATION_FILES = new Set([
   '.github/workflows/ci.yml',
   'apps/kiosk/package.json',
@@ -47,6 +71,15 @@ const W6_INTEGRATION_FILES = new Set([
   'docs/design/kiosk-proto-2026-07-migration-matrix.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
+  // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
+  // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
+  'apps/kiosk/tests/visual/route-manifest.ts',
+  // baseline script route count mirrors W6; must update together
+  'apps/kiosk/scripts/verify-fusion-baseline.mjs',
+  // migration matrix is a documentation contract updated alongside route manifest
+  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
@@ -69,12 +102,13 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/src\/pages\/placeholders\/(?:ErrorOfflinePage|MeActivityDetailPage|NotificationsPage|SessionTimeoutPage)\.tsx$/,
   /^apps\/kiosk\/src\/pages\/placeholders\/system-pages-batch8\.css$/,
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w5|verify-profile-activity-inkpaper)\.mjs$/,
-  /^apps\/kiosk\/scripts\/(?:verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-lightflow-k1-public-entry|verify-lightflow-profile-entry|verify-profile-commercial-first-batch|verify-profile-inkpaper-home|verify-profile-resumes-notifications-inkpaper)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w5\.config\.ts|tests\/visual\/(?:fusion-w5\.spec|fixtures\/fusion-w5-pagination-route)\.ts)$/,
   // W6: integration verifier and its contract test are owned by the integration wave.
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
   // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
+  /^apps\/kiosk\/scripts\/verify-fusion-home\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
@@ -88,6 +122,17 @@ function check(label, run) {
   try { run(); pass(label) } catch (error) { fail(`${label}: ${error.message}`) }
 }
 function read(rel) { return readFileSync(join(KIOSK_ROOT, rel), 'utf8') }
+
+function stripCssComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '')
+}
+
+function cssRuleBody(source, selector) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = stripCssComments(source).match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))
+  assert.ok(match, `missing CSS rule: ${selector}`)
+  return match[1]
+}
 
 function collectRoutePaths() {
   const sourceText = read('src/routes/index.tsx')
@@ -167,25 +212,26 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 23-route ownership', () => {
+check('exact 24-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 23)
-  assert.equal(new Set(owned).size, 23)
+  assert.equal(owned.length, 24)
+  assert.equal(new Set(owned).size, 24)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
-  assert.ok(!owned.includes('/offline-agencies/:id'))
 })
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
   const changes = changedFiles()
-  const frozenHits = changes.filter((path) => !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
+  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
   const scopeViolations = changes.filter((path) => {
     if (W6_INTEGRATION_FILES.has(path)) return false
+    if (CURRENT_AUDIT_INTEGRATION_FILES.has(path)) return false
     if (OTHER_WAVE_PLAN.test(path)) return false
     if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
     if (PLANNED_TEST_FILES.has(path)) return false
+    if (path === OFFLINE_AGENCY_SERVICE) return false
     return !ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path))
   })
   assert.deepEqual(scopeViolations, [], `W4 scope violation: ${scopeViolations.join(', ')}`)
@@ -194,6 +240,8 @@ check('changes stay inside W4 scope and hard-frozen files remain untouched', () 
 const jobsPage = read('src/pages/jobs/JobsPage.tsx')
 const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
+const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
+const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
 const companyDetail = read('src/pages/companies/CompanyDetailPage.tsx')
 const companiesPage = read('src/pages/companies/CompaniesPage.tsx')
 const fairDetail = read('src/pages/job-fairs/JobFairDetailPage.tsx')
@@ -229,8 +277,21 @@ check('jobs preserve source-only application contract', () => {
     'job search input keeps the kiosk 48px touch target',
   )
 })
-check('offline agency list does not invent a detail route', () => {
-  assert.doesNotMatch(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
+check('offline agency list navigates to real detail route', () => {
+  // G1 #482: /offline-agencies/:id 已作为真实路由注册，列表页须提供导航入口
+  assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
+})
+check('offline agency presentation does not invent unavailable metrics or live status', () => {
+  // G1 #482 added API-driven status badge (oa-st open/rest → agency.status from server)
+  // and a stats band (openAgencies / totalJobs from server stats field).
+  // These are backend-sourced — they are not fabricated.
+  // Retain guards for: distance proximity (distanceKm / 按直线距离) — backend does NOT
+  // provide coordinates on this endpoint, so any such value would be invented.
+  assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
+  // Hardcoded "营业中" copy would be a live operational claim without API backing.
+  assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
+  assert.match(offlineAgencies, /服务时间以机构公示为准/)
+  assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
 })
 check('company detail retains browse and external jump records', () => {
   assert.match(companiesPage, /className="min-h-12 min-w-0 flex-1 bg-transparent/, 'company search input keeps the kiosk 48px touch target')
@@ -247,6 +308,80 @@ check('fair source, mock-stat and print contracts remain intact', () => {
   assert.doesNotMatch(fairMaterials, /fileUrl:\s*material\.fileUrl/)
   assert.match(fairStats, /stats\.isMockData/)
 })
+
+// Phase 0 S0-A A1b：招聘会统计 Kiosk 消费面诚实化（nullable metrics）
+const fairDataScreen = read('src/pages/job-fairs/components/FairDataScreen.tsx')
+const FAIR_STATS_NULLABLE_FIELDS = [
+  'checkedInCompanies',
+  'browseCount',
+  'scanCount',
+  'printCount',
+  'checkinCount',
+]
+
+check('fair stats kiosk surfaces reject misleading live/system-truth copy', () => {
+  assert.doesNotMatch(fairStats, /准实时数据|系统真实服务数据/)
+  assert.doesNotMatch(fairDataScreen, /准实时数据|系统真实服务数据/)
+})
+
+check('fair stats nullable metrics have explicit null branches and are not rendered unconditionally', () => {
+  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+    assert.match(
+      fairStats,
+      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+      `FairStatsPage must guard ${field} with explicit != null / !== null`,
+    )
+  }
+  for (const field of ['browseCount', 'scanCount', 'printCount']) {
+    assert.match(
+      fairDataScreen,
+      new RegExp(`${field}\\s*(?:!==|!=)\\s*null`),
+      `FairDataScreen must guard ${field} with explicit != null / !== null`,
+    )
+  }
+  // 禁止无条件把可空字段当数字插值进 JSX（须先经 null 分支）
+  for (const field of FAIR_STATS_NULLABLE_FIELDS) {
+    assert.doesNotMatch(
+      fairStats,
+      new RegExp(`\\{stats\\.${field}\\}`),
+      `FairStatsPage must not unconditionally render {stats.${field}}`,
+    )
+  }
+  for (const field of ['browseCount', 'scanCount', 'printCount']) {
+    assert.doesNotMatch(
+      fairDataScreen,
+      new RegExp(`\\{stats\\.${field}\\}`),
+      `FairDataScreen must not unconditionally render {stats.${field}}`,
+    )
+  }
+})
+
+check('fair checkinCount is labeled 现场签到, not 外部跳转', () => {
+  // checkinCount 与「外部跳转」不得同块出现；正向标签须为现场签到
+  assert.match(
+    fairStats,
+    /checkinCount\s*(?:!==|!=)\s*null[\s\S]*?现场签到/,
+    'checkinCount tile must be labeled 现场签到',
+  )
+  assert.doesNotMatch(
+    fairStats,
+    /checkinCount\s*(?:!==|!=)\s*null[\s\S]{0,400}?外部跳转/,
+    'checkinCount must not be mislabeled as 外部跳转',
+  )
+})
+
+check('fair check-in progress UI requires checkedInCompanies != null and totalCompanies > 0', () => {
+  assert.match(
+    fairStats,
+    /checkedInCompanies\s*(?:!==|!=)\s*null\s*&&\s*stats\.totalCompanies\s*>\s*0[\s\S]*?企业签到进度/,
+    '企业签到进度 must gate on checkedInCompanies != null && totalCompanies > 0',
+  )
+  assert.doesNotMatch(
+    fairStats,
+    /已签到 \$\{stats\.checkedInCompanies\}/,
+    'must not interpolate 已签到 N 家 from nullable checkedInCompanies unconditionally',
+  )
+})
 check('campus and smart-campus stay honest and distinct', () => {
   assert.match(campusPage, /getJobFairs\(terminalId \? \{ terminalId \} : undefined\)/)
   assert.doesNotMatch(campusWelcome, /待开发/)
@@ -258,19 +393,39 @@ check('campus and smart-campus stay honest and distinct', () => {
   assert.match(smartInsights, /聚合脱敏统计/)
   assert.doesNotMatch(smartInsights, /示例数据|MOCK_FRESHMAN|topMajors|ageDistribution/)
   assert.match(
-    campusPolicyCss,
-    /button\.kproto-badge\s*\{[\s\S]*?min-height:\s*48px;/,
+    cssRuleBody(campusPolicyCss, 'button.kproto-badge'),
+    /min-height:\s*48px;/,
     'interactive campus badges keep the kiosk 48px touch target',
   )
   assert.match(
-    jobsCompaniesCss,
-    /\.w4-page-content\s*\{[\s\S]*?--w4-page-inset:\s*clamp\(20px,\s*2\.4vw,\s*36px\);[\s\S]*?padding:\s*var\(--w4-page-inset\);/,
-    'W4 page content exposes its responsive inset contract',
+    cssRuleBody(jobsCompaniesCss, "[data-kiosk-presentation='fusion-youth'] .w4-page-frame > .ui-kiosk-page-content"),
+    /padding:\s*0;/,
+    'W4 frame neutralizes the shared content inset',
   )
   assert.match(
-    campusPolicyCss,
-    /\.kproto-actionbar\s*\{[\s\S]*?margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
+    cssRuleBody(jobsCompaniesCss, '.w4-page-content'),
+    /--w4-page-inset:\s*clamp\(20px,\s*4\.45vw,\s*48px\);[^}]*padding:\s*0\s+var\(--w4-page-inset\);/,
+    'W4 page content owns only the horizontal gutter without adding vertical shell gaps',
+  )
+  assert.match(
+    cssRuleBody(campusPolicyCss, '.kproto-actionbar'),
+    /margin-inline:\s*calc\(-1\s*\*\s*var\(--w4-page-inset\)\);/,
     'smart-campus action bars align with the W4 page inset',
+  )
+})
+
+// Phase 0 S0-A A3：校园 AI 模拟面试错跳（须进 /interview/setup，禁止 /assistant）
+const campusTabs = read('src/pages/campus/components/CampusTabs.tsx')
+check('campus AI模拟面试 navigates to /interview/setup, not /assistant', () => {
+  assert.match(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/interview\/setup'\)/,
+    'AI模拟面试 must target /interview/setup',
+  )
+  assert.doesNotMatch(
+    campusTabs,
+    /title="AI模拟面试"[^\n]*navigate\('\/assistant'\)/,
+    'AI模拟面试 must not target /assistant',
   )
 })
 check('policy builtin records remain server-safe', () => {
@@ -333,6 +488,24 @@ check('private fair wire mirrors exactly match production adapter', () => {
   for (const name of ['WireFairPosition', 'WireFairCompany', 'WireFairZone']) {
     assert.deepEqual(interfaceShape(fixture, name), interfaceShape(production, name))
   }
+})
+check('offline agency fixture mirrors the production wire contract', () => {
+  const fixture = read('tests/fixtures/fusion-w4-api.ts')
+  const w6Fixture = read('tests/visual/fixtures/fusion-w6-api.ts')
+  for (const name of ['WireOfflineAgency', 'WireOfflineJobAgency', 'WireOfflineJob']) {
+    assert.deepEqual(interfaceShape(fixture, name), interfaceShape(offlineAgencyService, name))
+  }
+  assert.match(fixture, /offline-agencies['"], \{ data: \[agency\], total: 1, page: 1, pageSize: 10 \}/)
+  assert.match(fixture, /offline-jobs\/offline-job-001['"], offlineJob/)
+  assert.doesNotMatch(fixture, /agency:\s*\{[^}]*services:/s, 'detail fixture mirrors the real agency select')
+  assert.match(w6Fixture, /salaryMin:/, 'W6 offline job fixture uses the raw wire contract')
+  assert.doesNotMatch(w6Fixture, /success\(offlineJob\)/, 'W6 must not restore the obsolete detail envelope')
+})
+check('offline agency service maps raw list and detail responses centrally', () => {
+  assert.match(offlineAgencyService, /function mapWireOfflineAgency\(/)
+  assert.match(offlineAgencyService, /function mapWireOfflineJob\(/)
+  assert.match(offlineAgencyService, /\.map\(mapWireOfflineAgency\)/)
+  assert.match(offlineAgencyService, /mapWireOfflineJob\(/)
 })
 
 if (failed > 0) {

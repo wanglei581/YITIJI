@@ -100,7 +100,10 @@ export function PrintUploadPage() {
   const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
   const pageSubtitle = isDocumentPrint ? '通用文档、求职材料或图片上传后打印' : '从我的简历或上传一份简历进入打印'
 
-  const initialTab: UploadTab = !isResumePrint && searchParams.get('tab') === 'qr' ? 'qr' : 'file'
+  // 简历打印与文档打印共用三种上传通道；?tab=qr 可从「手机扫码上传」入口直达扫码面板。
+  const requestedTab = searchParams.get('tab')
+  const initialTab: UploadTab =
+    requestedTab === 'qr' || requestedTab === 'usb' ? requestedTab : 'file'
   const [tab, setTab] = useState<UploadTab>(initialTab)
   const [file, setFile] = useState<UploadedFile | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -115,21 +118,22 @@ export function PrintUploadPage() {
   // 上传中或扫码会话进行中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading || qrBusy || usbUploading)
 
-  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = isResumePrint
-    ? [
-        { key: 'file', label: '上传简历', icon: MonitorSmartphoneIcon, note: 'PDF/图片' },
-      ]
-    : [
-        { key: 'file', label: '选择文件', icon: MonitorSmartphoneIcon, note: '桌面验证' },
-        { key: 'qr',   label: '扫码上传', icon: QrCodeIcon, note: '手机/浏览器' },
-        {
-          key: 'usb',
-          label: 'U盘导入',
-          icon: UsbIcon,
-          disabled: !usbConfigured,
-          note: usbConfigured ? undefined : '本机未配置',
-        },
-      ]
+  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = [
+    {
+      key: 'file',
+      label: isResumePrint ? '上传简历' : '选择文件',
+      icon: MonitorSmartphoneIcon,
+      note: isResumePrint ? 'PDF/图片' : '桌面验证',
+    },
+    { key: 'qr', label: '扫码上传', icon: QrCodeIcon, note: '手机/浏览器' },
+    {
+      key: 'usb',
+      label: 'U盘导入',
+      icon: UsbIcon,
+      disabled: !usbConfigured,
+      note: usbConfigured ? undefined : '本机未配置',
+    },
+  ]
 
   // U 盘状态轮询:仅在 usb tab 激活、本机已配置令牌、且尚未选定文件时才轮询,
   // 避免在其它 tab 停留时对 Agent 发起无意义请求。
@@ -477,7 +481,11 @@ export function PrintUploadPage() {
             <UploadSessionQrPanel
               purpose="print_doc"
               title="手机扫码上传"
-              description="手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。"
+              description={
+                isResumePrint
+                  ? '手机扫码上传简历（PDF/图片）；一体机确认后进入打印材料检查。'
+                  : '手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。'
+              }
               confirmLabel="确认使用这份文件"
               onUploaded={handleQrUploaded}
               onBusyChange={setQrBusy}
@@ -561,7 +569,7 @@ export function PrintUploadPage() {
       </div>
 
       {/* Bottom action */}
-      <div className="mt-6 flex gap-3">
+      <div className="print-upload-footer mt-6 flex gap-3">
         <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
           取消
         </Button>

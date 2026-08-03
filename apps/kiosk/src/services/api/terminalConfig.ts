@@ -2,7 +2,7 @@ import type { KioskTerminalConfig } from '@ai-job-print/shared'
 import { DEFAULT_SMART_CAMPUS_MODULES } from '@ai-job-print/shared'
 import { API_BASE_URL, API_MODE } from './client'
 import { ApiHttpError } from './httpAdapter'
-import { getTerminalId } from './screensaver'
+import { getTerminalCode, getTerminalId } from './screensaver'
 
 const OFF_CONFIG: KioskTerminalConfig = {
   smartCampus: { enabled: false, modules: { ...DEFAULT_SMART_CAMPUS_MODULES }, items: [] },
@@ -21,6 +21,9 @@ let inflight: Promise<KioskTerminalConfig> | null = null
 
 export async function getKioskTerminalConfig(terminalId: string): Promise<KioskTerminalConfig> {
   if (API_MODE !== 'http') return { ...OFF_CONFIG, serverTime: new Date().toISOString() }
+  if (!terminalId.trim()) {
+    throw new Error('getKioskTerminalConfig failed: missing terminal id')
+  }
 
   const url = new URL(
     `${API_BASE_URL}/terminals/${encodeURIComponent(terminalId)}/config`,
@@ -71,4 +74,4 @@ export async function getCachedKioskTerminalConfig(
   return inflight
 }
 
-export { getTerminalId }
+export { getTerminalCode, getTerminalId }

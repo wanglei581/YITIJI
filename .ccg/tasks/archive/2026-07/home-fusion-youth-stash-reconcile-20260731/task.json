@@ -1,0 +1,12 @@
+{
+  "id": "home-fusion-youth-stash-reconcile-20260731",
+  "title": "将首页 fusion-youth stash 安全对齐当前 prototype-v1 首页",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "frontend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交本地候选分支",
+  "createdAt": "2026-07-31T13:05:00Z",
+  "branch": "codex/home-fusion-youth-stash-reconcile-20260731"
+}

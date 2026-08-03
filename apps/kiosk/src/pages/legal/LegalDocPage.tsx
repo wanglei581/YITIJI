@@ -8,7 +8,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Button, PageHeader } from '@ai-job-print/ui'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { FileTextIcon, ShieldCheckIcon } from 'lucide-react'
 import { API_BASE_URL } from '../../services/api'
 import './legal-service-desk.css'
@@ -175,19 +175,25 @@ export function LegalDocPage() {
 
   return (
     <div className="fusion-w5 fusion-w5--system service-desk k1-legal-doc" data-kiosk-screen="legal-doc" data-kiosk-presentation="fusion-youth" data-visual-theme="service-desk" data-ux-density="touch">
-      <div className="legal-doc-shell">
-        <PageHeader
-          className="legal-doc-page-header"
-          title={meta.title}
-          subtitle={`更新日期：${displayedAt}`}
-          actions={
-            <div className="legal-doc-tools">
-              <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.max(90, value - 10))} aria-label="缩小字号">A−</button>
-              <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.min(120, value + 10))} aria-label="放大字号">A＋</button>
-              <Button size="sm" variant="secondary" className="legal-doc-back" onClick={() => navigate(-1)}>返回</Button>
-            </div>
-          }
-        />
+      <KioskPageFrame
+        className="h-full"
+        header={
+          <KioskPageHeader
+            className="legal-doc-page-header"
+            title={meta.title}
+            description={`更新日期：${displayedAt}`}
+            onBack={() => navigate(-1)}
+            backLabel="返回"
+            aside={
+              <div className="legal-doc-tools">
+                <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.max(90, value - 10))} aria-label="缩小字号">A−</button>
+                <button type="button" className="legal-doc-font" onClick={() => setFontPercent((value) => Math.min(120, value + 10))} aria-label="放大字号">A＋</button>
+              </div>
+            }
+          />
+        }
+      >
+        <div className="legal-doc-shell">
 
         <div className="legal-doc-tabs" role="group" aria-label="法律文档">
           <button type="button" aria-pressed={doc !== 'privacy'} className={doc !== 'privacy' ? 'is-active' : ''} onClick={() => navigate('/legal/terms', { replace: true })}>用户服务协议</button>
@@ -247,7 +253,8 @@ export function LegalDocPage() {
         <p className="legal-doc-notice">
           本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。
         </p>
-      </div>
+        </div>
+      </KioskPageFrame>
     </div>
   )
 }

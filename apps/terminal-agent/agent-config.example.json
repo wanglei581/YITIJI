@@ -1,9 +1,10 @@
 {
-  "_comment": "Copy this file to config/agent-config.json and fill in real values before starting the agent.",
+  "_comment": "Copy to %ProgramData%/AIJobPrintAgent/agent-config.json. Optional scanWatchFolder = local/mapped path Pantum SMB writes into; omit/empty skips scan watcher. Key is scanWatchFolder (not smbScanDir).",
   "apiBaseUrl": "http://YOUR_API_SERVER_IP:3000/api/v1",
   "terminalCode": "T-WIN-001",
   "adminSecret": "change-me-before-deploy",
   "printerName": "",
+  "scanWatchFolder": "",
   "agentVersion": "0.3.0",
   "heartbeatIntervalMs": 30000,
   "claimIntervalMs": 5000,

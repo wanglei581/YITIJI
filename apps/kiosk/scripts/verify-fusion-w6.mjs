@@ -140,7 +140,7 @@ function routerInventory() {
       const redirect = tag === 'Navigate'
         ? { to: jsxAttribute(routeElement, 'to'), replace: jsxAttribute(routeElement, 'replace') }
         : null
-      if (normalized !== null && !(indexProperty && normalized === '/' && routes.some((route) => route.path === '/'))) {
+      if (normalized !== null && rawPath !== '*' && !(indexProperty && normalized === '/' && routes.some((route) => route.path === '/'))) {
         routes.push({ path: normalized, depth, tag, redirect })
       }
 
@@ -202,7 +202,7 @@ const WAVE_ROUTES = new Map([
     '/interview/report', '/interview/tips', '/interview/reports',
   ]],
   ['W4', [
-    '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/companies',
+    '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/companies',
     '/companies/:id', '/job-fairs', '/job-fairs/checkin', '/job-fairs/:id',
     '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId',
     '/job-fairs/:id/map', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
@@ -217,18 +217,23 @@ const WAVE_ROUTES = new Map([
     '/me/activity/:id', '/me/notifications', '/me/feedback', '/me/settings',
     '/me/privacy-requests', '/help',
     '/activities', '/activities/:id', '/toolbox', '/notifications',
+    // v1: 自我探索 · 倾向参考四步路由（PR ③）
+    '/resume/self-assessment/intro',
+    '/resume/self-assessment/questions',
+    '/resume/self-assessment/result',
+    '/resume/self-assessment/history',
   ]],
 ])
 
 const routeInventory = routerInventory()
 const manifest = manifestInventory()
 
-check('87/87 routes', () => {
+check('92/92 routes', () => {
   const actual = routeInventory.map((route) => route.path)
-  assert.equal(actual.length, 87, `router exposes ${actual.length} normalized route patterns`)
-  assert.equal(new Set(actual).size, 87, 'router route patterns must be unique')
-  assert.equal(manifest.paths.length, 87, `manifest exposes ${manifest.paths.length} route patterns`)
-  assert.equal(new Set(manifest.paths).size, 87, 'manifest route patterns must be unique')
+  assert.equal(actual.length, 92, `router exposes ${actual.length} normalized route patterns`)
+  assert.equal(new Set(actual).size, 92, 'router route patterns must be unique')
+  assert.equal(manifest.paths.length, 92, `manifest exposes ${manifest.paths.length} route patterns`)
+  assert.equal(new Set(manifest.paths).size, 92, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   assert.equal(manifest.redirects.size, 5, 'manifest must contain five compatibility redirects')
   for (const [path, target] of manifest.redirects) {
@@ -250,7 +255,7 @@ check('wave ownership', () => {
   }
   const invalid = [...owners].filter(([, waves]) => waves.length !== 1)
   assert.deepEqual(invalid, [], `missing/duplicate ownership: ${JSON.stringify(invalid)}`)
-  assert.equal([...WAVE_ROUTES.values()].flat().length, 87, 'wave inventories must total 87')
+  assert.equal([...WAVE_ROUTES.values()].flat().length, 92, 'wave inventories must total 92')
 })
 
 function jsxDescendant(source, rootName, descendantName) {
@@ -286,8 +291,15 @@ check('mobile routes', () => {
     '/interview/tips', '/interview/reports', '/screensaver', '/session-timeout', '/error-offline',
   ]
   for (const path of expectedFullScreen) {
-    assert.equal(routeInventory.find((route) => route.path === path)?.depth, 0, `${path} must remain full-screen`)
+    const expectedDepth = ['/member/qr-login', '/upload/phone'].includes(path) ? 0 : 2
+    assert.equal(
+      routeInventory.find((route) => route.path === path)?.depth,
+      expectedDepth,
+      `${path} must remain outside the KioskRoot visual shell`,
+    )
   }
+  const routesSource = readKiosk('src/routes/index.tsx')
+  assert.match(routesSource, /element:\s*<KioskRuntimeRoot\s*\/>/, 'terminal full-screen routes retain the non-visual security root')
   for (const path of mobile) {
     const page = path === '/member/qr-login' ? 'src/pages/auth/MobileQrLoginPage.tsx' : 'src/pages/upload/PhoneUploadPage.tsx'
     const source = readKiosk(page)
@@ -481,10 +493,10 @@ check('W6 route acceptance contract', () => {
     assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
     return { pattern, viewport }
   })
-  assert.equal(routes.length, 87, 'W6 route cases must total 87')
-  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 87, 'W6 route cases must be unique')
+  assert.equal(routes.length, 92, 'W6 route cases must total 92')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 92, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 85, 'W6 kiosk allocation')
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 90, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })
 

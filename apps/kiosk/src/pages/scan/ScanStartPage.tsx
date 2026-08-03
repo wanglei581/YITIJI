@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, KioskActionBar, KioskPageFrame, KioskPageHeader, KioskStatePanel } from '@ai-job-print/ui'
+import { canCreateFormalPrintScanTask } from '@ai-job-print/shared'
 import {
   ArrowRightIcon,
   CheckIcon,
-  ClockIcon,
   CreditCardIcon,
   FileTextIcon,
   HeadphonesIcon,
@@ -13,13 +13,16 @@ import {
   ShieldCheckIcon,
   UploadIcon,
 } from 'lucide-react'
-import { useAuth } from '../../auth/useAuth'
-import { API_BASE_URL } from '../../services/api/client'
+import {
+  loadConfiguredCapabilities,
+  type ConfiguredCapability,
+} from '../../services/api/printScanCapabilities'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
 
 type ScanType = 'resume' | 'id' | 'document'
-type ScannerStatus = 'ready' | 'offline' | 'busy'
+/** 能力门禁态：禁止伪装硬件已就绪。 */
+type ScanGate = 'loading' | 'allowed' | 'blocked' | 'unknown'
 
 interface ScanTypeOption {
   type: ScanType
@@ -33,7 +36,7 @@ const SCAN_TYPES: ScanTypeOption[] = [
   {
     type: 'resume',
     label: '简历扫描',
-    description: '扫描纸质简历，可直接进入 AI 识别与优化，也可存档打印',
+    description: '扫描纸质简历生成 PDF，可进入 AI 识别与优化，也可打印',
     chips: [{ label: '支持 AI 简历识别', tone: 'ok' }, { label: '生成 PDF' }],
     icon: FileTextIcon,
   },
@@ -47,115 +50,72 @@ const SCAN_TYPES: ScanTypeOption[] = [
   {
     type: 'document',
     label: '普通文档',
-    description: '扫描通用文件生成 PDF 存档，可保存到「我的文档」或直接打印',
-    chips: [{ label: '生成 PDF' }, { label: '可存档 / 打印' }],
+    description: '扫描通用文件生成 PDF；登录后可在「我的文档」查看与管理',
+    chips: [{ label: '生成 PDF' }, { label: '可打印 / 管理' }],
     icon: ScanIcon,
   },
 ]
 
 const FLOW_STEPS = [
-  ['选择扫描类型', '点击下方「下一步」创建扫描任务'],
-  ['按屏幕指引', '到打印机放好原件，在操作面板上发起扫描'],
-  ['本机自动检测', '扫描结果，期间请勿关闭页面'],
-  ['选择文件去向', '打印、保存到我的文档或 AI 简历识别'],
+  ['选择扫描类型', '下一步会创建真实扫描会话'],
+  ['获取服务端指引', '只在会话创建成功后显示；含面板扫描到本机接收目录'],
+  ['在设备上扫描', '按当前会话的服务端指引在打印机面板操作'],
+  ['选择文件去向', '打印、前往我的文档或 AI 简历识别'],
 ] as const
 
-const ALT_PATHS = [
-  { title: '上传文件打印', desc: '手机 / U盘里的现成文件仍可打印', tone: 'ok' as const, chip: '可使用' },
-  { title: 'U盘直插打印', desc: '打印机自带能力，U盘插打印机即可', tone: 'ok' as const, chip: '可使用' },
-  { title: '扫描到 U盘', desc: '打印机面板自带，以设备现场提示为准', tone: 'ok' as const, chip: '可尝试' },
-  { title: '本机发起扫描任务', desc: '需扫描仪就绪后才可创建', tone: 'warn' as const, chip: '暂不可用' },
-]
-
-function normalizeScannerStatus(payload: unknown): ScannerStatus {
-  const data = payload && typeof payload === 'object' && 'data' in payload
-    ? (payload as { data?: unknown }).data
-    : payload
-  const scanner = data && typeof data === 'object' && 'scanner' in data
-    ? (data as { scanner?: unknown }).scanner
-    : data
-  if (scanner && typeof scanner === 'object') {
-    const raw = 'status' in scanner ? String((scanner as { status?: unknown }).status ?? '').toLowerCase() : ''
-    if (raw.includes('busy') || raw.includes('work') || raw.includes('scan')) return 'busy'
-    if (raw.includes('offline') || raw.includes('error') || raw.includes('down')) return 'offline'
-    if ('online' in scanner && (scanner as { online?: unknown }).online === false) return 'offline'
-    if ('busy' in scanner && (scanner as { busy?: unknown }).busy === true) return 'busy'
-    if (raw.includes('ready') || raw.includes('idle') || raw.includes('online')) return 'ready'
-    if ('online' in scanner && (scanner as { online?: unknown }).online === true) return 'ready'
-    return 'offline'
-  }
-  const raw = typeof data === 'string' ? data.toLowerCase() : ''
-  if (raw.includes('busy')) return 'busy'
-  if (raw.includes('offline')) return 'offline'
-  if (raw.includes('ready') || raw.includes('idle') || raw.includes('online')) return 'ready'
-  return 'offline'
+const CAPABILITY_STATUS_NOTES: Record<string, string> = {
+  testing: '测试中，暂未对用户开放',
+  maintenance: '维护中，暂时不可用',
+  unsupported: '本终端不支持该能力',
+  not_verified: '待验收，暂未开放',
 }
 
-async function fetchScannerStatus(token?: string | null): Promise<ScannerStatus> {
-  const url = new URL(`${API_BASE_URL}/kiosk/device/status`, window.location.origin)
-  const headers = new Headers({ Accept: 'application/json' })
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-  const response = await fetch(url.toString(), { method: 'GET', headers, credentials: 'include' })
-  if (!response.ok) return 'offline'
-  return normalizeScannerStatus(await response.json())
-}
-
-function formatCheckTime(ts: number | null): string {
-  if (!ts) return '尚未完成首次检测'
-  return new Date(ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+function resolveGate(scanCap: ConfiguredCapability | undefined, loadStatus: 'ok' | 'skipped' | 'error'): ScanGate {
+  if (loadStatus === 'error') return 'unknown'
+  if (!scanCap) return 'allowed'
+  return canCreateFormalPrintScanTask(scanCap.status) ? 'allowed' : 'blocked'
 }
 
 export function ScanStartPage() {
   const navigate = useNavigate()
-  const { getToken } = useAuth()
   const [selected, setSelected] = useState<ScanType>('resume')
-  const [scannerStatus, setScannerStatus] = useState<ScannerStatus>('offline')
+  const [gate, setGate] = useState<ScanGate>('loading')
+  const [blockedNote, setBlockedNote] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
-  const [lastCheckedAt, setLastCheckedAt] = useState<number | null>(null)
-  const [retryCount, setRetryCount] = useState(0)
 
-  const refreshStatus = useCallback(async () => {
+  const refreshGate = useCallback(async () => {
     setChecking(true)
     try {
-      const next = await fetchScannerStatus(getToken())
-      setScannerStatus(next)
+      const result = await loadConfiguredCapabilities()
+      const scanCap = result.map.scan
+      setGate(resolveGate(scanCap, result.status))
+      if (scanCap && !canCreateFormalPrintScanTask(scanCap.status)) {
+        setBlockedNote(scanCap.note ?? CAPABILITY_STATUS_NOTES[scanCap.status] ?? '该终端当前不提供扫描服务')
+      } else {
+        setBlockedNote(null)
+      }
     } catch {
-      setScannerStatus('offline')
+      setGate('unknown')
+      setBlockedNote(null)
     } finally {
-      setLastCheckedAt(Date.now())
-      setRetryCount((count) => count + 1)
       setChecking(false)
     }
-  }, [getToken])
+  }, [])
 
   useEffect(() => {
-    let stopped = false
-    const refresh = async () => {
-      try {
-        const next = await fetchScannerStatus(getToken())
-        if (!stopped) {
-          setScannerStatus(next)
-          setLastCheckedAt(Date.now())
-          setRetryCount((count) => count + 1)
-        }
-      } catch {
-        if (!stopped) {
-          setScannerStatus('offline')
-          setLastCheckedAt(Date.now())
-          setRetryCount((count) => count + 1)
-        }
-      }
-    }
-    void refresh()
-    const timer = window.setInterval(() => void refresh(), 30_000)
-    return () => { stopped = true; window.clearInterval(timer) }
-  }, [getToken])
+    void refreshGate()
+  }, [refreshGate])
 
-  const hardwareBlocked = scannerStatus === 'offline' || scannerStatus === 'busy'
+  const blocked = gate === 'blocked' || gate === 'unknown' || gate === 'loading'
   const statusLabel =
-    scannerStatus === 'busy' ? '扫描仪忙碌' :
-    scannerStatus === 'offline' ? '扫描仪暂不可用' :
-    '扫描仪就绪'
+    gate === 'loading' ? '正在确认扫描能力' :
+    gate === 'blocked' ? '扫描能力暂未开放' :
+    gate === 'unknown' ? '能力状态暂不可用' :
+    '可创建扫描任务 · 需面板操作'
+  const statusChipClass =
+    gate === 'allowed' ? 'is-ready' :
+    gate === 'loading' ? 'is-busy' :
+    'is-offline'
 
   return (
     <KioskPageFrame className="w2-scan-page">
@@ -163,35 +123,45 @@ export function ScanStartPage() {
         <KioskPageHeader
           title="材料扫描"
           description={
-            hardwareBlocked
-              ? '扫描仪当前无法使用，暂不能创建扫描任务'
-              : '请选择扫描类型，不同类型对应不同的后续用途'
+            blocked
+              ? '当前无法创建扫描任务，请查看说明或改用其他方式'
+              : '请先选择扫描类型；本页尚未创建任务。下一步会创建真实扫描会话'
           }
           onBack={() => navigate('/print-scan')}
           backLabel="返回打印扫描服务"
-          aside={<span className={`w2-scan-status-chip is-${scannerStatus}`}><span />{statusLabel}</span>}
+          aside={<span className={`w2-scan-status-chip ${statusChipClass}`}><span />{statusLabel}</span>}
         />
 
         <ScanFlowSteps activeIndex={0} />
 
         <section className="w2-scan-content">
-          {hardwareBlocked ? (
+          {blocked ? (
             <>
               <p className="w2-scan-notice is-warn">
-                本机检测到扫描仪未就绪（离线、正忙或需要处理），现在无法开始扫描；请稍后重试或改用下方仍可用的方式。
+                {gate === 'loading'
+                  ? '正在确认本终端是否开放扫描服务，请稍候。'
+                  : gate === 'unknown'
+                    ? '暂时无法确认扫描能力状态，不会创建扫描任务；请重试或联系工作人员。'
+                    : `扫描能力暂未开放${blockedNote ? `：${blockedNote}` : ''}。`}
               </p>
               <div className="w2-scan-off-wrap">
-                <section className="w2-scan-off-main" aria-label="扫描仪不可用">
+                <section className="w2-scan-off-main" aria-label="扫描能力不可用">
                   <KioskStatePanel
                     tone="offline"
-                    title="扫描仪暂不可用"
-                    description="本机与打印机 / 扫描仪的连接未就绪，或设备正在处理其他任务。系统正在自动检测，恢复后可继续创建扫描任务。"
+                    title={gate === 'loading' ? '正在确认扫描能力' : gate === 'unknown' ? '能力状态暂不可用' : '扫描能力暂未开放'}
+                    description={
+                      gate === 'loading'
+                        ? '正在读取本终端的扫描服务配置。'
+                        : gate === 'unknown'
+                          ? '本机未能读取扫描能力配置。恢复后可继续；扫描仍需在打印机面板操作。'
+                          : (blockedNote ?? '管理员尚未对本终端开放扫描服务，或该能力处于维护 / 待验收状态。')
+                    }
                     icon={<ScanIcon aria-hidden="true" />}
                     actions={(
                       <>
-                        <Button size="lg" className="min-h-14" disabled={checking} onClick={() => void refreshStatus()}>
+                        <Button size="lg" className="min-h-14" disabled={checking || gate === 'loading'} onClick={() => void refreshGate()}>
                           <RefreshCwIcon aria-hidden="true" />
-                          {checking ? '正在检测…' : '重新检测扫描仪'}
+                          {checking || gate === 'loading' ? '正在确认…' : '重新确认能力'}
                         </Button>
                         <Button size="lg" variant="secondary" className="min-h-14" onClick={() => navigate('/help')}>
                           <HeadphonesIcon aria-hidden="true" />
@@ -200,27 +170,28 @@ export function ScanStartPage() {
                       </>
                     )}
                   />
-                  <span className="w2-scan-check-meta">
-                    <ClockIcon aria-hidden="true" />
-                    最近检测 {formatCheckTime(lastCheckedAt)} · 每 30 秒自动重试，已检测 {retryCount} 次
-                  </span>
                 </section>
                 <aside className="w2-scan-side-card w2-scan-alt-card">
                   <h2>你现在还能做什么</h2>
                   <ul className="w2-scan-alt-list">
-                    {ALT_PATHS.map((item) => (
-                      <li key={item.title}>
-                        <span className="w2-scan-alt-copy">
-                          <b>{item.title}</b>
-                          <span>{item.desc}</span>
-                        </span>
-                        <small data-tone={item.tone}>{item.chip}</small>
-                      </li>
-                    ))}
+                    <li>
+                      <span className="w2-scan-alt-copy">
+                        <b>上传文件打印</b>
+                        <span>手机 / U盘里的现成文件仍可打印</span>
+                      </span>
+                      <small data-tone="ok">可使用</small>
+                    </li>
+                    <li>
+                      <span className="w2-scan-alt-copy">
+                        <b>本机扫描任务</b>
+                        <span>当前终端扫描能力未开放或状态未知</span>
+                      </span>
+                      <small data-tone="warn">暂不可用</small>
+                    </li>
                   </ul>
                   <div className="w2-scan-privacy">
                     <ShieldCheckIcon aria-hidden="true" />
-                    若长时间未恢复，请到服务台联系现场工作人员检查设备连接与纸张状态。
+                    若长时间未恢复，请到服务台联系现场工作人员检查终端能力配置。
                   </div>
                 </aside>
               </div>
@@ -228,7 +199,7 @@ export function ScanStartPage() {
           ) : (
             <>
               <p className="w2-scan-notice">
-                扫描说明：扫描在打印机设备上完成，本机负责创建任务并接收扫描文件；请按下一步指引在打印机操作面板上操作。
+                下一步会创建真实扫描会话。只有服务端成功返回会话后，下一页才会显示任务编号和设备操作指引（在打印机面板扫描到本机已配置的网络接收目录）。
               </p>
               <div className="w2-scan-start-grid">
                 <section className="w2-scan-type-list" aria-label="扫描类型">
@@ -263,15 +234,15 @@ export function ScanStartPage() {
                       <span>{index + 1}</span><p><b>{title}</b>，{copy}</p>
                     </div>
                   ))}
-                  <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期，未选择去向的文件会自动清理。</div>
+                  <div className="w2-scan-privacy"><ShieldCheckIcon />扫描文件设有效期；未登录时离开后可能无法在「我的文档」找回。</div>
                 </aside>
               </div>
             </>
           )}
         </section>
 
-        {hardwareBlocked ? (
-          <KioskActionBar leading={<span className="w2-scan-action-note">设备恢复前不会创建扫描任务</span>}>
+        {blocked ? (
+          <KioskActionBar leading={<span className="w2-scan-action-note">能力确认前不会创建扫描任务</span>}>
             <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回打印扫描</Button>
             <Button size="lg" onClick={() => navigate('/print/upload')}>
               <UploadIcon aria-hidden="true" />
@@ -279,10 +250,10 @@ export function ScanStartPage() {
             </Button>
           </KioskActionBar>
         ) : (
-          <KioskActionBar leading={<span className="w2-scan-action-note">只有扫描仪就绪时才能创建任务</span>}>
+          <KioskActionBar leading={<span className="w2-scan-action-note">进入下一步后才会向服务端创建真实会话</span>}>
             <Button variant="secondary" size="lg" onClick={() => navigate('/print-scan')}>返回</Button>
-            <Button size="lg" disabled={scannerStatus !== 'ready'} onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}>
-              下一步 · 查看扫描指引 <ArrowRightIcon />
+            <Button size="lg" onClick={() => navigate('/scan/settings', { state: { scanType: selected } })}>
+              下一步 · 创建扫描会话 <ArrowRightIcon />
             </Button>
           </KioskActionBar>
         )}

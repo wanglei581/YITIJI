@@ -263,6 +263,13 @@ const mockAdapter: AdminPrintScanServiceInterface = {
     const item = MOCK_PRINT_TASKS.find((t) => t.taskId === taskId)
     if (!item) throw new ApiHttpError('PRINT_SCAN_TASK_NOT_FOUND', '任务不存在', 404)
     if (item.status !== 'failed') throw new ApiHttpError('PRINT_SCAN_ACTION_INVALID_STATE', '仅失败状态的打印任务可以重试', 409)
+    if (item.errorCode === 'PRINT_JOB_UNCONFIRMED') {
+      throw new ApiHttpError(
+        'PRINT_SCAN_RETRY_UNCONFIRMED_FORBIDDEN',
+        '打印结果未确认，禁止重新排队；请前往订单管理核查并按需退款',
+        409,
+      )
+    }
     item.status = 'pending'
     item.errorCode = null
     return { taskId, type, action, fromStatus: 'failed', toStatus: 'pending' }

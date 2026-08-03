@@ -401,20 +401,24 @@ async function initFallbackDb(): Promise<void> {
         "id" TEXT NOT NULL PRIMARY KEY, "username" TEXT NOT NULL, "passwordHash" TEXT NOT NULL,
         "passwordProofState" TEXT NOT NULL DEFAULT 'legacy',
         "name" TEXT NOT NULL, "role" TEXT NOT NULL, "orgId" TEXT, "phoneHash" TEXT, "phoneEnc" TEXT,
-        "phoneVerifiedAt" DATETIME, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME,
+        "phoneVerifiedAt" DATETIME, "emailHash" TEXT, "emailEnc" TEXT, "emailVerifiedAt" DATETIME,
+        "emailVerifyMethod" TEXT, "tokenVersion" INTEGER NOT NULL DEFAULT 0, "lastLoginAt" DATETIME,
         "enabled" BOOLEAN NOT NULL DEFAULT true, "deletedAt" DATETIME,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
       `CREATE UNIQUE INDEX "User_username_key" ON "User"("username")`,
+      `CREATE UNIQUE INDEX "User_emailHash_key" ON "User"("emailHash")`,
       `CREATE TABLE "EndUser" (
         "id" TEXT NOT NULL PRIMARY KEY, "phoneHash" TEXT NOT NULL, "phoneEnc" TEXT NOT NULL, "nickname" TEXT,
+        "wxOpenId" TEXT,
         "enabled" BOOLEAN NOT NULL DEFAULT true, "status" TEXT NOT NULL DEFAULT 'active',
         "statusChangedAt" DATETIME, "closingRequestedAt" DATETIME, "anonymizedAt" DATETIME,
         "lastLoginAt" DATETIME,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
+      `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE "FileObject" (
         "id" TEXT NOT NULL PRIMARY KEY, "storageKey" TEXT NOT NULL,
         "bucket" TEXT NOT NULL DEFAULT 'local-fs', "region" TEXT NOT NULL DEFAULT 'local',

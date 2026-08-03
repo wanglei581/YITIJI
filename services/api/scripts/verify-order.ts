@@ -65,10 +65,7 @@ async function main(): Promise<void> {
   const printJobs = new PrintJobsService(prisma, audit, pageCount, pricing, orderStatus, new TerminalCapabilitiesService(prisma))
   const _ag = new TerminalAgentService(prisma, audit)
   const terminals = new TerminalsService(_ag, new TerminalAdminService(prisma, _ag, new TerminalToolboxService(prisma)))
-  // N3拆分后 resetExpiredClaims 在 TerminalAgentService（private），通过类型断言调用
-  const resetExpiredClaims = (
-    _ag as unknown as { resetExpiredClaims: () => Promise<void> }
-  ).resetExpiredClaims.bind(_ag)
+  const resetExpiredClaims = _ag.resetExpiredClaims.bind(_ag)
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const terminalId = `t_order_${suffix}`
@@ -311,12 +308,13 @@ async function main(): Promise<void> {
       where: { printTaskId: expiredPrint.taskId },
     })
     if (
-      resetTask?.status === 'pending' &&
+      resetTask?.status === 'failed' &&
+      resetTask.errorCode === 'PRINT_JOB_UNCONFIRMED' &&
       resetTask.terminalId === terminalId &&
-      resetOrder?.taskStatus === 'pending' &&
+      resetOrder?.taskStatus === 'failed' &&
       resetOrder.terminalId === terminalId
     ) {
-      pass('resetExpiredClaims mirrors expired tasks back to pending and preserves terminalId')
+      pass('resetExpiredClaims fails unconfirmed tasks without automatic redispatch and preserves terminalId')
     } else {
       fail(`reset mirror mismatch: task=${JSON.stringify(resetTask)} order=${JSON.stringify(resetOrder)}`)
     }

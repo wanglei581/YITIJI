@@ -51,7 +51,7 @@ function main() {
     else fail(`初始应无 key，实际 configured=${v0.apiKeyConfigured}`)
 
     // ── 1. apiKey 加密落盘，文件无明文 ──────────────────────────────────
-    svc.update({ apiKey: SECRET, enabled: true, vendor: 'deepseek', model: 'deepseek-chat' }, 'assistant_chat')
+    svc.update({ apiKey: SECRET, enabled: true, vendor: 'deepseek', model: 'deepseek-v4-flash' }, 'assistant_chat')
     const fileText = readFileSync(CONFIG_FILE, 'utf-8')
     if (!fileText.includes(SECRET)) pass('1. apiKey 加密落盘：配置文件不含明文')
     else fail('1. 配置文件出现 apiKey 明文！')

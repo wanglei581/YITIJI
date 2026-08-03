@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>我的文档 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .doc-item { display:flex; align-items:center; gap:13px; padding:14px 16px; cursor:pointer; }
+    .doc-item + .doc-item { border-top:1px solid var(--line-faint); }
+    .doc-ic { width:42px; height:42px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; color:#fff; }
+    .ic-pdf { background:#d9534f; } .ic-img { background:#3fa46a; } .ic-doc { background:#3f68b0; } .ic-scan { background:#a9781f; }
+    .doc-name { font-size:14.5px; font-weight:500; color:var(--ink); }
+    .doc-meta { font-size:11.5px; color:var(--faint); margin-top:4px; display:flex; gap:9px; }
+    .doc-exp { font-size:10.5px; color:var(--clay); background:var(--clay-wash); padding:1px 7px; border-radius:var(--r-full); }
+    .doc-more { color:var(--faint); font-size:18px; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">我的文档</div>
+    <div class="nav-right"><span style="font-size:16px;color:var(--teal-deep)">选择</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="filter-bar" style="padding-top:14px">
+      <div class="f-chip on">全部</div>
+      <div class="f-chip">简历</div>
+      <div class="f-chip">扫描件</div>
+      <div class="f-chip">证件照</div>
+      <div class="f-chip">AI 报告</div>
+    </div>
+
+    <div class="section-t">最近 · 12 个文件</div>
+    <div class="card">
+      <div class="doc-item">
+        <div class="doc-ic ic-pdf">PDF</div>
+        <div style="flex:1">
+          <div class="doc-name">前端开发-陈明.pdf</div>
+          <div class="doc-meta"><span>218 KB</span><span>2 天前</span></div>
+        </div>
+        <span class="doc-more">⋯</span>
+      </div>
+      <div class="doc-item">
+        <div class="doc-ic ic-scan">扫</div>
+        <div style="flex:1">
+          <div class="doc-name">身份证扫描件.pdf</div>
+          <div class="doc-meta"><span>1.2 MB</span><span>3 天前</span><span class="doc-exp">7 天后自动清理</span></div>
+        </div>
+        <span class="doc-more">⋯</span>
+      </div>
+      <div class="doc-item">
+        <div class="doc-ic ic-img">图</div>
+        <div style="flex:1">
+          <div class="doc-name">一寸证件照.jpg</div>
+          <div class="doc-meta"><span>86 KB</span><span>5 天前</span></div>
+        </div>
+        <span class="doc-more">⋯</span>
+      </div>
+      <div class="doc-item">
+        <div class="doc-ic" style="background:var(--plum)">✦</div>
+        <div style="flex:1">
+          <div class="doc-name">简历诊断报告-0722.pdf</div>
+          <div class="doc-meta"><span>AI 生成</span><span>2 天前</span></div>
+        </div>
+        <span class="doc-more">⋯</span>
+      </div>
+      <div class="doc-item">
+        <div class="doc-ic ic-doc">DOC</div>
+        <div style="flex:1">
+          <div class="doc-name">求职信-星野科技.docx</div>
+          <div class="doc-meta"><span>45 KB</span><span>1 周前</span></div>
+        </div>
+        <span class="doc-more">⋯</span>
+      </div>
+    </div>
+
+    <div class="notice warn" style="margin:0 16px">
+      <span>⚠</span>
+      <div>身份证等敏感文件已设置有效期，到期后系统自动清理。你也可随时手动删除。</div>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn primary lg block">📤 上传新文件</button>
+  </div>
+</div>
+</body>
+</html>

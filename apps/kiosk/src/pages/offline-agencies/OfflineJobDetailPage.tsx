@@ -14,24 +14,38 @@ export default function OfflineJobDetailPage() {
   const [job, setJob] = useState<OfflineJobDetailDTO | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
-    if (!id) return
+    if (!id) {
+      setError('岗位不存在')
+      setLoading(false)
+      return
+    }
+    let cancelled = false
     setLoading(true)
+    setError(null)
     getOfflineJobDetail(id)
-      .then(setJob)
-      .catch(() => setError('岗位信息加载失败，请重试'))
-      .finally(() => setLoading(false))
-  }, [id])
+      .then((result) => { if (!cancelled) setJob(result) })
+      .catch(() => { if (!cancelled) setError('岗位信息加载失败，请重试') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [id, retryKey])
 
   if (loading) return <LoadingState />
-  if (error || !job) return <ErrorState message={error ?? '岗位不存在'} onRetry={() => navigate(-1)} />
+  if (error || !job) {
+    return <ErrorState message={error ?? '岗位不存在'} onRetry={() => setRetryKey((key) => key + 1)} />
+  }
 
-  const services = Array.isArray(job.agencyServices)
-    ? job.agencyServices.join('、')
-    : (job.agencyServices as string) || '综合人力资源服务'
+  const services = '以机构公示为准'
 
-  const jobTypeLabel = job.jobType === 'fulltime' ? '全职' : job.jobType === 'parttime' ? '兼职' : '实习'
+  const jobTypeLabel = job.jobType === 'fulltime'
+    ? '全职'
+    : job.jobType === 'parttime'
+      ? '兼职'
+      : job.jobType === 'internship'
+        ? '实习'
+        : '以机构公示为准'
 
   return (
     <KioskPageFrame
@@ -48,7 +62,7 @@ export default function OfflineJobDetailPage() {
           </Button>
           <Button size="lg" onClick={() => navigate('/print/upload')}>
             <PrinterIcon aria-hidden="true" />
-            打印岗位信息带走
+            上传自备材料打印
           </Button>
         </>
       )}
@@ -118,7 +132,7 @@ export default function OfflineJobDetailPage() {
               ['机构名称', job.agencyName],
               ['机构类型', job.agencyType],
               ['服务项目', services],
-              ['营业时间', job.agencyHours || '请来电咨询'],
+              ['营业时间', job.agencyHours || '以机构公示为准'],
               ['联系电话', job.agencyPhone || '请至前台咨询'],
               ['机构地址', job.agencyAddress],
             ].map(([k, v]) => (

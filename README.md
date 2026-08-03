@@ -37,11 +37,9 @@ AI求职打印服务终端/
     progress/            # 当前进度、下一步任务
     decisions/           # 重要决策记录
     reviews/             # Codex 审查记录
-
-  legacy-miaoda/
-    screenshots/         # 秒哒截图（仅参考）
-    exported-code/       # 秒哒导出代码（仅参考，不用于开发）
 ```
+
+> `legacy-miaoda/` 已于 81724b73（2026-06-05）移出仓库，仅存于 tag `archive/legacy-miaoda-20260605`。
 
 ---
 

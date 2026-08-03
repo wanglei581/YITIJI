@@ -13,6 +13,7 @@ import { parseMemberPageQuery } from '../common/utils/member-page'
 import { MockInterviewService, type InterviewRequester } from './mock-interview.service'
 import { AsrService, ASR_MAX_AUDIO_BYTES } from './asr/asr.service'
 import { TtsService } from './asr/tts.service'
+import { AiLogService } from '../ai/ai-log.service'
 
 // ── DTO（全局 forbidNonWhitelisted：未知字段直接 400）─────────────────────────
 
@@ -98,6 +99,7 @@ export class MockInterviewController {
     private readonly jwt: JwtService,
     private readonly redis: RedisService,
     private readonly prisma: PrismaService,
+    private readonly aiLog: AiLogService,
   ) {}
 
   private async requesterOf(req: ReqLike): Promise<InterviewRequester> {
@@ -146,11 +148,25 @@ export class MockInterviewController {
     @Req() req: ReqLike,
   ) {
     // 先做归属校验(借 getSession 的门禁;不存在/越权统一 404),再消费音频
-    await this.service.getSession(id, await this.requesterOf(req))
+    const requester = await this.requesterOf(req)
+    await this.service.getSession(id, requester)
     if (!audio?.buffer?.length) {
       throw new BadRequestException({ error: { code: 'AUDIO_MISSING', message: '缺少音频内容' } })
     }
+    // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
+    const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
+    this.aiLog.record({
+      taskId: id,
+      operation: 'voiceTranscribe',
+      provider: this.asr.activeProviderName,
+      status: result.ok ? 'success' : 'failed',
+      latencyMs: Math.max(0, Date.now() - asrStartedAt),
+      tokenUsage: undefined,
+      errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
+      endUserId: requester.endUserId,
+      terminalId: null,
+    })
     if (!result.ok) {
       throw new BadRequestException({ error: { code: result.errorCode ?? 'ASR_FAILED', message: result.errorMessage ?? '语音转写失败' } })
     }
@@ -165,13 +181,28 @@ export class MockInterviewController {
   @Post(':id/turns/:idx/audio')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })
   async questionAudio(@Param('id') id: string, @Param('idx') idx: string, @Req() req: ReqLike) {
-    const session = await this.service.getSession(id, await this.requesterOf(req))
+    const requester = await this.requesterOf(req)
+    const session = await this.service.getSession(id, requester)
     const turnIdx = Number(idx)
     const turn = session.turns.find((t) => t.idx === turnIdx)
     if (!turn || turn.role !== 'interviewer') {
       throw new BadRequestException({ error: { code: 'TURN_NOT_FOUND', message: '该轮次不存在或不是面试官提问' } })
     }
+    // A-6 成本可见性：TTS 按字符计费，tokenUsage 恒为空，不编造单价。
+    // TtsService 目前仅支持腾讯云，无 activeProviderName 属性，固定写 'tts:tencent'。
+    const ttsStartedAt = Date.now()
     const result = await this.tts.synthesize(turn.content)
+    this.aiLog.record({
+      taskId: id,
+      operation: 'voiceSynthesize',
+      provider: 'tts:tencent',
+      status: result.ok ? 'success' : 'failed',
+      latencyMs: Math.max(0, Date.now() - ttsStartedAt),
+      tokenUsage: undefined,
+      errorCode: result.ok ? undefined : 'TTS_FAILED',
+      endUserId: requester.endUserId,
+      terminalId: null,
+    })
     if (!result.ok) {
       throw new BadRequestException({ error: { code: 'TTS_FAILED', message: result.errorMessage ?? '语音合成失败' } })
     }

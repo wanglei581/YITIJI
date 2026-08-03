@@ -339,10 +339,10 @@ export function ResumeReportPage() {
           )}
         </div>
 
-        <div className="resume-report-grid-b grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染 */}
+        <div className={`resume-report-grid-b grid grid-cols-1 gap-4 ${riskNotes.length > 0 ? 'lg:grid-cols-2' : ''}`}>
+          {/* 风险表述提醒：仅针对简历文本表达；旧报告无此字段时不渲染占位空卡 */}
           {riskNotes.length > 0 ? (
-            <Card className="resume-report-risks p-5">
+            <Card className="resume-report-risks h-full p-5">
               <div className="mb-2 flex items-center gap-2">
                 <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
                 <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
@@ -357,18 +357,10 @@ export function ResumeReportPage() {
                 ))}
               </ul>
             </Card>
-          ) : (
-            <Card className="resume-report-risks p-5">
-              <div className="mb-2 flex items-center gap-2">
-                <AlertCircleIcon className="h-4 w-4 text-warning" aria-hidden="true" />
-                <p className="text-sm font-medium text-neutral-700">风险表述提醒</p>
-              </div>
-              <p className="text-sm text-neutral-500">本报告未单独列出风险表述项。</p>
-            </Card>
-          )}
+          ) : null}
 
           {/* 优化建议 */}
-          <Card className="resume-report-suggestions p-5">
+          <Card className="resume-report-suggestions h-full p-5">
             <p className="mb-4 text-sm font-medium text-neutral-700">可执行建议</p>
             <ol className="space-y-3">
               {report.suggestions.map((tip, i) => (
@@ -410,7 +402,16 @@ export function ResumeReportPage() {
         </Button>
         <Button
           size="lg"
-          className="resume-primary-action flex flex-1 items-center gap-2"
+          variant="outline"
+          className="resume-secondary-action flex flex-1 items-center justify-center gap-2"
+          onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
+        >
+          <TargetIcon className="h-4 w-4" />
+          目标岗位匹配参考
+        </Button>
+        <Button
+          size="lg"
+          className="resume-primary-action flex flex-[1.4] items-center gap-2"
           onClick={() => navigate('/resume/optimize', { state: { ...state, taskId, accessToken, targetContext: state.targetContext } })}
         >
           <SparklesIcon className="h-4 w-4" />
@@ -427,6 +428,16 @@ export function ResumeReportPage() {
         <TargetIcon className="h-4 w-4" />
         目标岗位匹配参考（仅供参考）
       </Button>
+      <p className="resume-report-secondary-line mt-3">
+        想了解自己的倾向？
+        <button
+          type="button"
+          className="resume-report-secondary-link"
+          onClick={() => navigate('/resume/self-assessment/intro?from=resume-report')}
+        >
+          做一次自我探索
+        </button>
+      </p>
     </section>
     </KioskPageFrame>
   )

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>面试反馈报告 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .rep-hero { background:linear-gradient(155deg,#614870,#7a5a86); padding:22px 20px 48px; position:relative; }
+    .rh-badge { display:inline-flex; align-items:center; gap:5px; font-size:11px; color:rgba(255,255,255,.85); background:rgba(255,255,255,.14); padding:4px 10px; border-radius:var(--r-full); margin-bottom:14px; }
+    .rh-flex { display:flex; align-items:center; gap:18px; }
+    .rh-score { font-family:var(--font-serif); font-size:44px; font-weight:700; color:#fff; line-height:1; }
+    .rh-score small { font-size:16px; opacity:.7; font-weight:400; }
+    .rh-lvl { font-family:var(--font-serif); font-size:18px; color:#fff; font-weight:700; }
+    .rh-desc { font-size:12.5px; color:rgba(255,255,255,.78); line-height:1.6; margin-top:6px; }
+    .abil-float { margin:-30px 16px 0; }
+    .abil-row { display:flex; align-items:center; gap:12px; padding:11px 0; }
+    .abil-row + .abil-row { border-top:1px solid var(--line-faint); }
+    .abil-n { width:80px; font-size:13px; color:var(--ink-soft); flex-shrink:0; }
+    .abil-row .meter { flex:1; }
+    .abil-v { width:30px; text-align:right; font-family:var(--font-serif); font-weight:700; font-size:14px; flex-shrink:0; }
+    .qfb { padding:14px 16px; }
+    .qfb + .qfb { border-top:1px solid var(--line-faint); }
+    .qfb-q { font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.55; margin-bottom:9px; }
+    .qfb-tag { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 9px; border-radius:var(--r-full); margin-bottom:9px; }
+    .tag-good { background:#e9f6f1; color:#1a6b5a; }
+    .tag-improve { background:#fdf1e6; color:#9c5a24; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#614870"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light blur-bg">
+    <div class="nav-back" style="color:#fff">‹</div>
+    <div class="nav-title left" style="color:#fff">面试反馈报告</div>
+    <div class="nav-right"><span style="font-size:16px;color:rgba(255,255,255,.85)">⤴</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="rep-hero">
+      <div class="rh-badge">✦ AI 评估 · 仅供参考</div>
+      <div class="rh-flex">
+        <div><div class="rh-score">78<small>/100</small></div></div>
+        <div style="flex:1">
+          <div class="rh-lvl">表现不错</div>
+          <div class="rh-desc">回答条理清晰，项目细节扎实。可加强对问题的结构化梳理与结果量化。</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 能力雷达 -->
+    <div class="card abil-float">
+      <div class="card-inner">
+        <div class="abil-row">
+          <div class="abil-n">表达逻辑</div><div class="meter"><i style="width:82%"></i></div><div class="abil-v teal">82</div>
+        </div>
+        <div class="abil-row">
+          <div class="abil-n">专业深度</div><div class="meter"><i style="width:75%"></i></div><div class="abil-v teal">75</div>
+        </div>
+        <div class="abil-row">
+          <div class="abil-n">结构化</div><div class="meter clay"><i style="width:64%"></i></div><div class="abil-v clay">64</div>
+        </div>
+        <div class="abil-row">
+          <div class="abil-n">应变能力</div><div class="meter"><i style="width:80%"></i></div><div class="abil-v teal">80</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 逐题反馈 -->
+    <div style="padding:0 16px">
+      <div class="section-t" style="padding-left:0">逐题点评</div>
+      <div class="card">
+        <div class="qfb">
+          <span class="qfb-tag tag-good">✓ 回答亮眼</span>
+          <div class="qfb-q">Q2. 你是如何把首屏加载从 3.2s 降到 1.4s 的？</div>
+          <div class="evidence-quote">
+            <div class="eq-label">你的回答要点</div>
+            <div class="eq-text">路由懒加载、图片 CDN + WebP、接口缓存</div>
+          </div>
+          <div class="notice plum" style="margin-top:9px"><span>✦</span><div>手段完整、有明确数据对比，是一个很好的 STAR 式回答。</div></div>
+        </div>
+        <div class="qfb">
+          <span class="qfb-tag tag-improve">↑ 可提升</span>
+          <div class="qfb-q">Q3. 遇到团队意见冲突时你会怎么处理？</div>
+          <div class="qfb-body fs-13 muted" style="line-height:1.65">回答偏笼统，建议用 <b class="ink">具体事例 + 结果</b> 支撑，例如一次实际的方案分歧及你如何推动达成一致。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="compliance-note">本报告由 AI 生成，仅用于练习参考，不代表任何招聘方的评价或录用意向。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">📄 打印报告</button>
+    <button class="btn plum" style="flex:1.6">✦ 再练一次</button>
+  </div>
+</div>
+</body>
+</html>

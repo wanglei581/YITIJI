@@ -1,0 +1,10 @@
+{"path":"docs/superpowers/specs/2026-07-30-f1-same-host-dual-port-managed-topology-design.md","role":"approved_design","note":"D1′/D2′ 拓扑、安全、资源和分层授权控制规格"}
+{"path":"services/api/src/release-provenance/release-runtime-contract.ts","role":"runtime_contract","note":"assertLocalHealthUrl 单一精确相等定义"}
+{"path":"services/api/src/release-provenance/release-genesis.ts","role":"critical_caller","note":"runReleaseGenesis 在 PM2/current/control 副作用前调用 health contract"}
+{"path":"services/api/src/release-provenance/release-activation.ts","role":"critical_caller","note":"activateRelease 在 lock/current/reload 副作用前调用 health contract"}
+{"path":"services/api/scripts/verify-release-provenance.ts","role":"activation_fixture","note":"D1′ activation 正负例和前置失败证据"}
+{"path":"services/api/scripts/verify-release-genesis.ts","role":"genesis_fixture","note":"D1′ Genesis 正负例和前置失败证据"}
+{"path":"services/api/scripts/d2-docker-drill.mjs","role":"legacy_d2_baseline","note":"需要切到 3011 以保持基线可运行，但不可替代 D2′"}
+{"path":"docs/device/f1-d3-managed-topology-inputs.md","role":"d3_ssot","note":"B1–B9 当前仍含独立主机/managed 3010 假设"}
+{"path":"docs/device/production-deployment-runbook.md","role":"runbook_ssot","note":"future-only release 模板当前仍含 managed 3010 假设"}
+{"path":"docs/superpowers/plans/2026-07-30-f1-same-host-dual-port-d1-prime-implementation.md","role":"deliverable","note":"本任务实施计划"}

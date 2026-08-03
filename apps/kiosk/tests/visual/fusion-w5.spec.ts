@@ -41,6 +41,13 @@ async function expectFusionAcceptance(page: Page, errors: string[], options?: { 
   expect(errors).toEqual([])
 }
 
+async function expectSharedPageShell(page: Page, title: string): Promise<void> {
+  const frame = page.locator('[data-kiosk-component="page-frame"]')
+  await expect(frame).toBeVisible()
+  await expect(frame.locator('.ui-kiosk-page-header')).toBeVisible()
+  await expect(frame.getByRole('heading', { name: title, exact: true })).toBeVisible()
+}
+
 async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
   await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]')).toBeVisible()
@@ -274,28 +281,190 @@ for (const scenario of [
 
     await page.goto('/toolbox')
     await expect(page.locator('[data-kiosk-screen="toolbox"]')).toBeVisible()
+    await expectSharedPageShell(page, '百宝箱')
+    const backButton = page.getByRole('button', { name: /返回/ }).first()
+    await expect(backButton).toBeVisible()
     await expect(page.getByText(scenario.text, { exact: true })).toBeVisible()
     if (scenario.label === 'configured') {
       await expect(page.getByRole('button', { name: /使用帮助/ })).toBeEnabled()
     } else {
-      await expect(page.locator('.ktoolbox .tile')).toHaveCount(0)
+      await expect(page.locator('.ktoolbox .tb-tile')).toHaveCount(0)
     }
     await expectFusionAcceptance(page, errors)
+    await backButton.click()
+    await expect(page).toHaveURL(/\/$/)
   })
 }
 
-test('session timeout exposes continue, logout and countdown controls @w5-kiosk', async ({ page }) => {
+test('benefit activity detail keeps the shared shell, real content and return path @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
-  await page.goto('/session-timeout')
-  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toBeVisible()
-  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toBeVisible()
-  await expect(page.getByText('秒后自动退出', { exact: true })).toBeVisible()
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/activities', {
+    status: 200,
+    json: { success: true, data: { items: [] } },
+  })
+  api.respond('GET', '/api/v1/activities/w5-benefit-detail', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        id: 'w5-benefit-detail',
+        title: 'W5 打印服务体验权益',
+        description: '这是来自真实活动详情接口的验收内容。',
+        rulesText: '每人限领一次；仅用于现场打印服务。',
+        benefitType: 'free_quota',
+        sourceType: 'platform',
+        quantityTotal: 1,
+        stockTotal: 20,
+        stockRemaining: 8,
+        claimLimitPerUser: 1,
+        status: 'published',
+        validFrom: null,
+        validUntil: null,
+        grantValidDays: 30,
+        claimable: true,
+        claimed: false,
+        soldOut: false,
+        ended: false,
+        createdAt: '2026-07-24T00:00:00.000Z',
+        updatedAt: '2026-07-24T00:00:00.000Z',
+      },
+    },
+  })
+
+  await page.goto('/activities/w5-benefit-detail')
+  await expect(page.locator('[data-kiosk-domain="profile"][data-kiosk-screen="activity-detail"]')).toBeVisible()
+  await expectSharedPageShell(page, '权益活动详情')
+  await expect(page.getByRole('heading', { name: 'W5 打印服务体验权益', exact: true })).toBeVisible()
+  await expect(page.getByText('这是来自真实活动详情接口的验收内容。', { exact: true })).toBeVisible()
+  const backButton = page.getByRole('button', { name: /返回活动/ }).first()
+  await expect(backButton).toBeVisible()
   await expectFusionAcceptance(page, errors)
+  await backButton.click()
+  await expect(page).toHaveURL(/\/activities$/)
+})
+
+test('legal document keeps its standalone theme and scrollable long body @w5-kiosk', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  const paragraphs = Array.from(
+    { length: 40 },
+    (_, index) => `W5 隐私政策长正文第 ${index + 1} 段：公共终端仅处理完成当次服务所必需的信息，不建立企业可检索的简历库。`,
+  )
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: {
+      success: true,
+      data: { content: paragraphs.join('\n\n'), publishedAt: '2026-07-24T00:00:00.000Z' },
+    },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+
+  await page.goto('/legal/privacy')
+  const root = page.locator('[data-kiosk-screen="legal-doc"]')
+  await expect(root).toHaveAttribute('data-kiosk-presentation', 'fusion-youth')
+  await expect(root).toHaveAttribute('data-visual-theme', 'service-desk')
+  await expect(root).toHaveAttribute('data-ux-density', 'touch')
+  await expectSharedPageShell(page, '隐私政策')
+  await expect(page.getByText(paragraphs[0], { exact: true })).toBeVisible()
+  const body = root.locator('.legal-doc-body')
+  await expect(body).toBeVisible()
+  expect(await body.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
+    await body.evaluate((element) => element.clientHeight),
+  )
+  await body.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  expect(await body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  await expectFusionAcceptance(page, errors)
+})
+
+test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ page, api }) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  api.respond('GET', '/api/v1/kiosk/legal/privacy_policy', {
+    status: 200,
+    json: {
+      success: true,
+      data: {
+        content: '移动端隐私政策正文，用于验证共享页头与字号控制不会互相覆盖。',
+        publishedAt: '2026-07-24T00:00:00.000Z',
+      },
+    },
+  })
+  api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
+    status: 200,
+    json: { success: true, data: null },
+  })
+
+  await page.goto('/legal/privacy')
+  const root = page.locator('[data-kiosk-screen="legal-doc"]')
+  const header = root.locator('.legal-doc-page-header')
+  const title = header.locator('.ui-kiosk-page-header-title')
+  const back = header.locator('.ui-kiosk-back-button')
+  const tools = header.locator('.legal-doc-tools')
+  await expectSharedPageShell(page, '隐私政策')
+
+  const [headerBox, titleBox, backBox, toolsBox] = await Promise.all([
+    header.boundingBox(),
+    title.boundingBox(),
+    back.boundingBox(),
+    tools.boundingBox(),
+  ])
+  expect(headerBox).not.toBeNull()
+  expect(titleBox).not.toBeNull()
+  expect(backBox).not.toBeNull()
+  expect(toolsBox).not.toBeNull()
+  expect(headerBox!.height).toBeLessThan(260)
+  expect(titleBox!.width).toBeGreaterThan(120)
+  const controlsOverlap = !(
+    backBox!.x + backBox!.width <= toolsBox!.x
+    || toolsBox!.x + toolsBox!.width <= backBox!.x
+    || backBox!.y + backBox!.height <= toolsBox!.y
+    || toolsBox!.y + toolsBox!.height <= backBox!.y
+  )
+  const titleAndToolsOverlap = !(
+    titleBox!.x + titleBox!.width <= toolsBox!.x
+    || toolsBox!.x + toolsBox!.width <= titleBox!.x
+    || titleBox!.y + titleBox!.height <= toolsBox!.y
+    || toolsBox!.y + toolsBox!.height <= titleBox!.y
+  )
+  expect(controlsOverlap).toBe(false)
+  expect(titleAndToolsOverlap).toBe(false)
+  await expect(root.locator('.legal-doc-shell')).toHaveCSS('min-height', '0px')
+  await expectFusionAcceptance(page, errors)
+})
+
+test('direct visit to /session-timeout without a pending warning fails closed to a clean home page @w5-kiosk', async ({
+  page,
+  api,
+}) => {
+  const errors = runtimeErrors(page)
+  registerKioskShell(api)
+  // Home page reads smartCampus + toolbox out of the terminal config; registerKioskShell
+  // already covers screensaver/printer-status.
+  api.respond('GET', '/api/v1/terminals/KSK-001/config', {
+    status: 200,
+    json: terminalConfig({ enabled: false, items: [] }),
+  })
+
+  await page.goto('/session-timeout')
+
+  await expect(page).toHaveURL('http://127.0.0.1:4185/', { timeout: 5_000 })
+  await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '继续使用', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '立即退出并清除本机会话', exact: true })).toHaveCount(0)
+  await expect(page.getByText('秒后自动退出', { exact: true })).toHaveCount(0)
+  await expect(page.locator('main [data-kiosk-component="page-frame"]')).toBeVisible()
+  await expect(page.getByLabel('当前可使用功能')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  expect(errors).toEqual([])
 })
 
 test('offline page retains the 8177 state after an aborted health request @w5-kiosk', async ({ page, api }) => {
   const errors = runtimeErrors(page)
+  registerKioskShell(api)
   api.abort('GET', '/api/v1/health', 'internetdisconnected')
   await page.goto('/error-offline')
   await page.getByRole('button', { name: '重试连接', exact: true }).click()

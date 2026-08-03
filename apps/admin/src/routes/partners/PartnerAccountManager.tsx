@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { KeyRoundIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { KeyRoundIcon, MailIcon, SmartphoneIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { ApiHttpError } from '../../services/api/client'
 import {
   orgsAdminService,
@@ -88,6 +89,9 @@ export function PartnerAccountManager({
   const [newAccount, setNewAccount] = useState({ username: '', password: '', name: '', phone: '' })
   const [resetTarget, setResetTarget] = useState<AdminOrgAccount | null>(null)
   const [resetPassword, setResetPassword] = useState('')
+  const [emailTarget, setEmailTarget] = useState<AdminOrgAccount | null>(null)
+  const [emailValue, setEmailValue] = useState('')
+  const [emailConfirmVerified, setEmailConfirmVerified] = useState(false)
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const sectionRef = useRef<HTMLDivElement>(null)
@@ -98,6 +102,7 @@ export function PartnerAccountManager({
   }, [onChanged, onReload])
   const actionFlow = usePartnerAccountAction(orgId, reloadAccounts)
   const securityActionOpen = actionFlow.state.step !== 'closed'
+  const enabledAccountCount = accounts.filter((account) => account.enabled).length
 
   const addAccount = async () => {
     setAccountBusy('create')
@@ -148,6 +153,30 @@ export function PartnerAccountManager({
     }
   }
 
+  const bindAccountEmail = async () => {
+    if (!emailTarget || !emailConfirmVerified) return
+    const confirmed = window.confirm(
+      '请确认该邮箱为该合作机构官方指定管理员邮箱。管理员对其准确性负责，确认后该邮箱将立即作为登录凭证生效（人工核验，系统不发送验证邮件）。',
+    )
+    if (!confirmed) return
+    setAccountBusy(emailTarget.id)
+    setError(null)
+    try {
+      await orgsAdminService.bindAccountEmail(orgId, emailTarget.id, {
+        email: emailValue.trim(),
+        confirmVerified: true,
+      })
+      setEmailTarget(null)
+      setEmailValue('')
+      setEmailConfirmVerified(false)
+      await reloadAccounts()
+    } catch (caught) {
+      setError(messageForAccountError(caught))
+    } finally {
+      setAccountBusy(null)
+    }
+  }
+
   const canCreate =
     newAccount.username.trim().length >= 3
     && newAccount.password.length >= 8
@@ -167,6 +196,16 @@ export function PartnerAccountManager({
           <UserPlusIcon className="h-3.5 w-3.5" />
           新增账号
         </button>
+      </div>
+
+      <div className="rounded-lg border border-primary-100 bg-primary-50 px-3 py-2 text-xs leading-5 text-primary-800">
+        <p>只有一个手机号，且希望绑定到管理员账号？请勿删除机构账号或使用普通换绑。</p>
+        <p className="mt-1">
+          <Link to="/account-settings" className="font-medium text-primary-700 underline underline-offset-2">
+            前往账号设置安全转移
+          </Link>
+          <span>；转移后机构账号仍可使用用户名和密码登录。</span>
+        </p>
       </div>
 
       {error && <p className="rounded-lg bg-error-bg px-3 py-2 text-xs text-error-fg">{error}</p>}
@@ -211,6 +250,7 @@ export function PartnerAccountManager({
         <div className="divide-y divide-neutral-900/[0.06] rounded-lg border border-neutral-100">
           {accounts.map((account) => {
             const actionsUnavailable = account.availableActionVerificationMethods.length === 0
+            const isLastEnabledAccount = account.enabled && enabledAccountCount <= 1
             return (
             <div key={account.id} className="flex flex-wrap items-center gap-3 px-3 py-2.5">
               <div className="min-w-0 flex-1">
@@ -220,12 +260,19 @@ export function PartnerAccountManager({
                   <SmartphoneIcon className="h-3.5 w-3.5" />
                   {account.phoneMasked ?? '未绑定手机号'}
                 </p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-neutral-500">
+                  <MailIcon className="h-3.5 w-3.5" />
+                  {account.emailMasked ?? '未绑定登录邮箱'}
+                </p>
               </div>
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.enabled ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-600'}`}>
                 {account.enabled ? '启用' : '已停用'}
               </span>
               <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.phoneVerifiedAt ? 'bg-success-bg text-success-fg' : 'bg-warning-bg text-warning-fg'}`}>
                 {account.phoneVerifiedAt ? '手机号已验证' : '待验证'}
+              </span>
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${account.emailVerifiedAt ? 'bg-success-bg text-success-fg' : 'bg-neutral-100 text-neutral-600'}`}>
+                {account.emailVerifiedAt ? '邮箱可登录' : '邮箱未绑'}
               </span>
               <button
                 type="button"
@@ -240,6 +287,20 @@ export function PartnerAccountManager({
               <div className="flex flex-wrap items-center justify-end gap-1" aria-label={`${account.username} 账号安全操作`}>
                 <button
                   type="button"
+                  onClick={() => {
+                    setEmailTarget(account)
+                    setEmailValue('')
+                    setEmailConfirmVerified(false)
+                    setResetTarget(null)
+                  }}
+                  disabled={accountBusy !== null || securityActionOpen}
+                  className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MailIcon className="h-3.5 w-3.5" />
+                  {account.emailMasked ? '换绑登录邮箱' : '绑定登录邮箱'}
+                </button>
+                <button
+                  type="button"
                   onClick={(event) => actionFlow.open('rebind_phone', account, event.currentTarget)}
                   disabled={accountBusy !== null || securityActionOpen || actionsUnavailable}
                   className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -250,7 +311,7 @@ export function PartnerAccountManager({
                 <button
                   type="button"
                   onClick={(event) => actionFlow.open('delete_account', account, event.currentTarget)}
-                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable}
+                  disabled={accountBusy !== null || securityActionOpen || actionsUnavailable || isLastEnabledAccount}
                   className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2Icon className="h-3.5 w-3.5" />
@@ -260,6 +321,11 @@ export function PartnerAccountManager({
               {actionsUnavailable && (
                 <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
                   该账号安全验证未就绪；如原已验证手机可用，请由持有人通过手机找回密码，否则只能走独立线下核验，本系统不提供管理员绕过。
+                </p>
+              )}
+              {isLastEnabledAccount && (
+                <p className="basis-full rounded-lg bg-warning-bg px-3 py-2 text-xs leading-5 text-warning-fg">
+                  该账号是机构最后一个启用账号，不能删除。请先创建并启用接替账号；如目的是把手机号绑定给管理员，请使用账号设置中的安全转移。
                 </p>
               )}
             </div>
@@ -287,6 +353,61 @@ export function PartnerAccountManager({
               className="rounded-lg bg-warning px-3 py-1.5 text-xs font-medium text-white hover:bg-warning/90 disabled:opacity-50"
             >
               {accountBusy === resetTarget.id ? '重置中…' : '确认重置'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {emailTarget && (
+        <div className="space-y-3 rounded-lg border border-primary-200 bg-primary-50/40 p-3">
+          <p className="text-xs font-medium text-neutral-800">
+            {emailTarget.emailMasked ? '换绑' : '绑定'}「{emailTarget.name}（{emailTarget.username}）」的登录邮箱
+          </p>
+          <p className="text-xs leading-5 text-neutral-500">
+            此为账号登录别名，不是机构对外联系邮箱。系统不发送验证邮件；须管理员人工核验归属后才能用于密码登录。
+          </p>
+          <input
+            type="email"
+            autoComplete="off"
+            className={inputCls}
+            placeholder="例如 teacher@university.edu.cn"
+            value={emailValue}
+            onChange={(event) => setEmailValue(event.target.value)}
+          />
+          <label className="flex items-start gap-2 text-xs leading-5 text-neutral-700">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={emailConfirmVerified}
+              onChange={(event) => setEmailConfirmVerified(event.target.checked)}
+            />
+            <span>我已人工核实该邮箱属于该机构官方指定管理员，并设为已验证登录别名（admin_manual）</span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmailTarget(null)
+                setEmailValue('')
+                setEmailConfirmVerified(false)
+              }}
+              disabled={accountBusy !== null || securityActionOpen}
+              className="rounded-lg border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-surface disabled:opacity-50"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => void bindAccountEmail()}
+              disabled={
+                accountBusy !== null
+                || securityActionOpen
+                || !emailConfirmVerified
+                || !emailValue.includes('@')
+              }
+              className="rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {accountBusy === emailTarget.id ? '保存中…' : '确认绑定'}
             </button>
           </div>
         </div>

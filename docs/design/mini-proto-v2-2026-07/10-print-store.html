@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>选择门店 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .store-card {
+      background: var(--surface);
+      border-radius: var(--r-md);
+      margin: 0 16px 10px;
+      box-shadow: var(--sh-sm);
+      overflow: hidden;
+      cursor: pointer;
+      transition: box-shadow .15s;
+    }
+    .store-card:active { box-shadow: var(--sh-md); }
+    .store-card.selected {
+      border: 2px solid var(--teal);
+      box-shadow: 0 0 0 3px var(--teal-soft), var(--sh-sm);
+    }
+    .store-card .sc-body { padding: 16px; }
+    .store-card .sc-top {
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .store-card .sc-ic {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--teal-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .store-card.selected .sc-ic { background: var(--teal); }
+    .store-card .sc-info { flex: 1; min-width: 0; }
+    .store-card .sc-name {
+      font-family: var(--font-serif); font-size: 15px; font-weight: 600;
+      color: var(--ink);
+    }
+    .store-card .sc-addr { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .store-card .sc-meta {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid var(--line-faint);
+      flex-wrap: wrap;
+    }
+    .store-card .sc-btn { margin-left: auto; }
+
+    .dist-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 12px; color: var(--teal-deep);
+      background: var(--teal-soft); padding: 3px 8px;
+      border-radius: var(--r-full);
+    }
+    .time-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 12px; color: var(--wheat-deep);
+      background: var(--wheat-soft); padding: 3px 8px;
+      border-radius: var(--r-full);
+    }
+
+    .status-dot {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; color: var(--ok);
+    }
+    .status-dot::before {
+      content: '';
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--ok);
+      display: inline-block;
+    }
+
+    .summary-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 0;
+    }
+    .summary-row + .summary-row { border-top: 1px solid var(--line-faint); }
+    .summary-row .sr-key { font-size: 13px; color: var(--muted); }
+    .summary-row .sr-val { font-size: 13px; color: var(--ink); font-weight: 500; }
+  </style>
+</head>
+<body>
+<div id="stage">
+
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="sb-icons">📶 5G 🔋</div>
+  </div>
+
+  <div class="navbar">
+    <div class="nav-back">←</div>
+    <span class="nav-title">选择门店</span>
+    <div class="nav-right"></div>
+  </div>
+
+  <!-- 步骤 -->
+  <div class="steps">
+    <div class="st done"><div class="n">✓</div><div class="nl">上传</div></div>
+    <div class="line done"></div>
+    <div class="st done"><div class="n">✓</div><div class="nl">选参数</div></div>
+    <div class="line done"></div>
+    <div class="st on"><div class="n">3</div><div class="nl">选门店</div></div>
+    <div class="line"></div>
+    <div class="st"><div class="n">4</div><div class="nl">取件</div></div>
+  </div>
+
+  <div class="content has-bar">
+
+    <!-- 位置提示 -->
+    <div class="notice" style="margin-top: 4px;">
+      <div class="n-ic">📍</div>
+      <div>基于位置推荐附近门店。<span style="color:var(--teal);text-decoration:underline;cursor:pointer;">点击开启定位</span>可获得更精准推荐</div>
+    </div>
+
+    <div class="section-t" style="padding-top:4px;">附近终端（2）</div>
+
+    <!-- 门店 1（已选中） -->
+    <div class="store-card selected">
+      <div class="sc-body">
+        <div class="sc-top">
+          <div class="sc-ic" style="color:#fff;">🖨</div>
+          <div class="sc-info">
+            <div class="sc-name">就业服务大厅 01号</div>
+            <div class="sc-addr">一楼大厅东侧，A区服务台旁</div>
+          </div>
+        </div>
+        <div class="sc-meta">
+          <span class="dist-badge">📍 步行 300m</span>
+          <span class="time-badge">⏱ 约 5 分钟</span>
+          <span class="status-dot">机器空闲</span>
+          <div class="sc-btn">
+            <span class="chip ok">已选择 ✓</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 门店 2 -->
+    <div class="store-card">
+      <div class="sc-body">
+        <div class="sc-top">
+          <div class="sc-ic">🖨</div>
+          <div class="sc-info">
+            <div class="sc-name">职业指导中心 02号</div>
+            <div class="sc-addr">二楼走廊北端，电梯旁</div>
+          </div>
+        </div>
+        <div class="sc-meta">
+          <span class="dist-badge">📍 步行 820m</span>
+          <span class="time-badge">⏱ 约 3 分钟</span>
+          <span class="status-dot">机器空闲</span>
+          <div class="sc-btn">
+            <button class="btn ghost sm">选择</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 订单摘要 -->
+    <div class="section-t">订单摘要</div>
+    <div class="card flat">
+      <div class="card-inner">
+        <div class="summary-row">
+          <span class="sr-key">文件</span>
+          <span class="sr-val">简历_王磊_应届2026.pdf</span>
+        </div>
+        <div class="summary-row">
+          <span class="sr-key">颜色 / 纸张</span>
+          <span class="sr-val">黑白 · A4</span>
+        </div>
+        <div class="summary-row">
+          <span class="sr-key">页数 × 份数</span>
+          <span class="sr-val">2 页 × 1 份</span>
+        </div>
+        <div class="summary-row">
+          <span class="sr-key">门店</span>
+          <span class="sr-val">就业服务大厅 01号</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer-lg"></div>
+
+  </div>
+
+  <!-- 操作条 -->
+  <div class="actionbar">
+    <div class="ab-price">
+      <div class="label">合计</div>
+      <div class="val"><sup>¥</sup>0.30</div>
+    </div>
+    <button class="btn primary" style="flex:1;">去结算 →</button>
+  </div>
+
+</div>
+</body>
+</html>

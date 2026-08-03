@@ -16,14 +16,17 @@
  *
  * Failure handling:
  *   - Network / 5xx: log warn, continue (agent stays running)
- *   - 401: log error (no auto re-registration; operator must restart agent)
+ *   - 401: latch unauthorized locally (cannot report cloud status), stop claiming
  *   - failureCounter: incremented per failure for caller to monitor
  */
 
 import os from 'os'
 import type { AgentConfig, HeartbeatPayload, HeartbeatResponse } from './types'
-import { createApiClient, axiosErrorMessage } from './api-client'
+import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError } from './api-client'
+import { isUnauthorized, markUnauthorized } from './auth-state'
+import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { getPrinterStatus, getDiskFreeGB } from './wmi'
+import { collectNetworkDiagnostics } from './network-diagnostics'
 import { log, warn, err } from '../logger'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -88,11 +91,17 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     return false
   }
 
+  if (isUnauthorized()) {
+    warn('heartbeat: skipping — credential unauthorized (re-bind required)')
+    return false
+  }
+
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
-  const [printerStatus, diskFreeGB] = await Promise.all([
+  const [printerStatus, diskFreeGB, networkDiagnostics] = await Promise.all([
     getPrinterStatus(config.printerName),
     getDiskFreeGB(),
+    collectNetworkDiagnostics(config.printerName),
   ])
 
   const payload: HeartbeatPayload = {
@@ -104,6 +113,7 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
     macAddress: getMacAddress(),
     reportedAt: new Date().toISOString(),
     localTaskDatabaseAvailable,
+    ...networkDiagnostics,
   }
 
   try {
@@ -122,6 +132,14 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
 
     return true
   } catch (e) {
+    if (isUnauthorizedHttpError(e)) {
+      markUnauthorized()
+      writeStartupDiagnosticSafely('AGENT_UNAUTHORIZED')
+      err('heartbeat: ✗ unauthorized — credential revoked/invalid; claim/print stopped (re-bind required)')
+      if (failureCounter) failureCounter.count += 1
+      return false
+    }
+
     const msg = axiosErrorMessage(e)
     warn(`heartbeat: ✗ failed — ${msg}`)
 
@@ -142,12 +160,11 @@ export async function sendHeartbeat(options: HeartbeatOptions): Promise<boolean>
  *
  * @returns NodeJS.Timeout — pass to clearInterval() to stop.
  */
-export function startHeartbeat(options: HeartbeatOptions): NodeJS.Timeout {
+export function startHeartbeat(options: HeartbeatOptions, sendImmediately = true): NodeJS.Timeout {
   const interval = options.config.heartbeatIntervalMs ?? 30_000
   log(`heartbeat: starting — interval=${interval}ms`)
 
-  // First heartbeat immediately
-  sendHeartbeat(options).catch(() => undefined)
+  if (sendImmediately) sendHeartbeat(options).catch(() => undefined)
 
   return setInterval(() => {
     sendHeartbeat(options).catch(() => undefined)

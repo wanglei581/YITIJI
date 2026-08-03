@@ -229,12 +229,14 @@ async function initFallbackDb(): Promise<void> {
         "phoneHash" TEXT NOT NULL,
         "phoneEnc" TEXT NOT NULL,
         "nickname" TEXT,
+        "wxOpenId" TEXT,
         "enabled" BOOLEAN NOT NULL DEFAULT true,
         "lastLoginAt" DATETIME,
         "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
       )`,
       `CREATE UNIQUE INDEX "EndUser_phoneHash_key" ON "EndUser"("phoneHash")`,
+      `CREATE UNIQUE INDEX "EndUser_wxOpenId_key" ON "EndUser"("wxOpenId")`,
       `CREATE TABLE "BenefitGrant" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "endUserId" TEXT NOT NULL,

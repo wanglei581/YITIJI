@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>隐私设置 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .pv-group { background:var(--surface); border-radius:var(--r-lg); margin:12px 16px 0; box-shadow:var(--sh-xs); overflow:hidden; }
+    .pv-item { display:flex; align-items:flex-start; gap:12px; padding:15px 16px; }
+    .pv-item + .pv-item { border-top:1px solid var(--line-faint); }
+    .pv-t { font-size:14.5px; color:var(--ink); font-weight:500; }
+    .pv-s { font-size:12px; color:var(--muted); margin-top:4px; line-height:1.5; }
+    .tgl { width:44px; height:26px; border-radius:var(--r-full); background:var(--teal); position:relative; flex-shrink:0; margin-top:2px; }
+    .tgl.off { background:var(--line); }
+    .tgl::after { content:''; position:absolute; top:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:var(--sh-xs); right:3px; }
+    .tgl.off::after { right:21px; }
+    .pv-go { color:var(--faint); font-size:15px; margin-top:2px; }
+    .grp-label { font-size:12px; color:var(--faint); padding:16px 20px 4px; }
+    .danger { color:var(--clay); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">隐私设置</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="content">
+    <div class="grp-label">文件安全</div>
+    <div class="pv-group" style="margin-top:0">
+      <div class="pv-item">
+        <div style="flex:1">
+          <div class="pv-t">敏感文件自动清理</div>
+          <div class="pv-s">身份证、证件照等文件到期后自动删除</div>
+        </div>
+        <div class="tgl"></div>
+      </div>
+      <div class="pv-item">
+        <div style="flex:1">
+          <div class="pv-t">清理周期</div>
+          <div class="pv-s">当前设置为打印后 7 天</div>
+        </div>
+        <span class="pv-go">›</span>
+      </div>
+      <div class="pv-item">
+        <div style="flex:1">
+          <div class="pv-t">打印后自动删除源文件</div>
+          <div class="pv-s">打印完成后立即清除，最大化保护隐私</div>
+        </div>
+        <div class="tgl off"></div>
+      </div>
+    </div>
+
+    <div class="grp-label">数据授权</div>
+    <div class="pv-group" style="margin-top:0">
+      <div class="pv-item">
+        <div style="flex:1">
+          <div class="pv-t">允许 AI 使用我的简历优化建议</div>
+          <div class="pv-s">仅用于生成你的诊断与优化结果，不用于训练</div>
+        </div>
+        <div class="tgl"></div>
+      </div>
+      <div class="pv-item">
+        <div style="flex:1">
+          <div class="pv-t">个性化信息推荐</div>
+          <div class="pv-s">根据求职意向展示更相关的岗位与招聘会</div>
+        </div>
+        <div class="tgl"></div>
+      </div>
+    </div>
+
+    <div class="grp-label">数据管理</div>
+    <div class="pv-group" style="margin-top:0">
+      <div class="pv-item">
+        <div style="flex:1"><div class="pv-t">导出我的数据</div><div class="pv-s">下载你在本终端的个人数据副本</div></div>
+        <span class="pv-go">›</span>
+      </div>
+      <div class="pv-item">
+        <div style="flex:1"><div class="pv-t danger">注销账号</div><div class="pv-s">永久删除账号及全部数据，不可恢复</div></div>
+        <span class="pv-go danger">›</span>
+      </div>
+    </div>
+
+    <div class="compliance-note">我们仅收集为你提供服务所必需的信息。你的简历与文件不会提供给任何第三方或招聘方。</div>
+    <div class="spacer-lg"></div>
+  </div>
+</div>
+</body>
+</html>

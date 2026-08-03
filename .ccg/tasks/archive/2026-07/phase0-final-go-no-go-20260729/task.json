@@ -1,0 +1,12 @@
+{
+  "id": "phase0-final-go-no-go-20260729",
+  "title": "Phase 0 最终 GO/NO-GO 上线审计",
+  "status": "completed",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "release-governance",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交审计文档；不得据此部署",
+  "createdAt": "2026-07-29T00:00:00+08:00",
+  "branch": "codex/phase0-final-go-no-go-20260729"
+}

@@ -296,6 +296,10 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
           "phoneHash" TEXT,
           "phoneEnc" TEXT,
           "phoneVerifiedAt" DATETIME,
+          "emailHash" TEXT,
+          "emailEnc" TEXT,
+          "emailVerifiedAt" DATETIME,
+          "emailVerifyMethod" TEXT,
           "tokenVersion" INTEGER NOT NULL DEFAULT 0,
           "lastLoginAt" DATETIME,
           "enabled" BOOLEAN NOT NULL DEFAULT true,
@@ -306,8 +310,10 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
         );
         CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
         CREATE UNIQUE INDEX "User_phoneHash_key" ON "User"("phoneHash");
+        CREATE UNIQUE INDEX "User_emailHash_key" ON "User"("emailHash");
         CREATE INDEX "User_orgId_idx" ON "User"("orgId");
         CREATE INDEX "User_phoneVerifiedAt_idx" ON "User"("phoneVerifiedAt");
+        CREATE INDEX "User_emailVerifiedAt_idx" ON "User"("emailVerifiedAt");
         CREATE INDEX "User_orgId_role_enabled_deletedAt_idx" ON "User"("orgId", "role", "enabled", "deletedAt");
         CREATE TABLE "AuditLog" (
           "id" TEXT NOT NULL PRIMARY KEY,

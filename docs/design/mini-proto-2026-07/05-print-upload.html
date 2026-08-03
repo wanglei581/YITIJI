@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>05 上传选参</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .file-drop{border:1.5px dashed var(--teal); border-radius:var(--r-md); background:var(--teal-wash); padding:18px; display:flex; align-items:center; gap:13px;}
+  .file-drop .fd-ic{width:44px; height:44px; border-radius:12px; background:#fff; display:grid; place-items:center; font-size:22px; flex:none;}
+  .param-row{display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--line-soft);}
+  .param-row:last-child{border-bottom:none;}
+  .param-row .pl{font-size:14px; font-weight:600;}
+  .src-mini{display:flex; gap:8px;}
+  .src-mini .s{flex:1; height:46px; border:1px solid var(--line); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:11px; color:var(--muted);}
+  .src-mini .s .i{font-size:17px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">上传与设置</span></div>
+
+  <div class="content has-actionbar">
+    <div class="steps" style="padding:2px;">
+      <div class="st on"><span class="n">1</span>选文件</div><div class="line"></div>
+      <div class="st"><span class="n">2</span>选门店</div><div class="line"></div>
+      <div class="st"><span class="n">3</span>付款</div><div class="line"></div>
+      <div class="st"><span class="n">4</span>取件</div>
+    </div>
+
+    <!-- 已选文件 -->
+    <div class="card">
+      <div class="card-head"><h3>待打印文件</h3><span class="chip ok">已就绪</span></div>
+      <div class="row-item" style="padding-top:2px;">
+        <div class="ic a-clay" style="background:var(--clay-soft);color:var(--clay);">📄</div>
+        <div class="rc"><h4>张青柠_求职简历.pdf</h4><p>2 页 · 268 KB · PDF</p></div>
+        <span class="r-arrow">✕</span>
+      </div>
+      <div class="src-mini">
+        <div class="s"><span class="i">📁</span>本地文件</div>
+        <div class="s"><span class="i">💬</span>聊天文件</div>
+        <div class="s"><span class="i">☁️</span>我的文档</div>
+      </div>
+    </div>
+
+    <!-- 打印参数 -->
+    <div class="card">
+      <div class="card-head"><h3>打印参数</h3></div>
+      <div class="param-row">
+        <span class="pl">颜色</span>
+        <div class="seg" style="width:170px;"><div class="s">黑白</div><div class="s on">彩色</div></div>
+      </div>
+      <div class="param-row">
+        <span class="pl">单双面</span>
+        <div class="seg" style="width:170px;"><div class="s on">单面</div><div class="s">双面</div></div>
+      </div>
+      <div class="param-row">
+        <span class="pl">纸张</span>
+        <span class="chip">A4（不支持 A3）</span>
+      </div>
+      <div class="param-row">
+        <span class="pl">份数</span>
+        <div class="stepper"><button>−</button><span class="v">2</span><button>＋</button></div>
+      </div>
+    </div>
+
+    <div class="notice">
+      <span class="n-ic">💡</span>
+      <div>页数与价格以<b>服务端解析结果</b>为准，付款前会再次确认。</div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="ab-price"><b>¥2.40</b><span>2 页 × 2 份 · 彩色</span></div>
+    <button class="btn primary block" onclick="location.href='06-print-store.html'">选门店</button>
+  </div>
+</div>
+</body>
+</html>

@@ -10,6 +10,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -45,6 +46,7 @@ jobs:
       # terminals.service 在模块加载期 requireEnv 这两项（verify 启动完整 AppModule 需要）
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
+      TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
       # Profile 等 diff 范围守卫需要 merge-base；PR 默认 shallow checkout 无法可靠计算。
       - uses: actions/checkout@v4
@@ -66,7 +68,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.2.2
 
       - uses: actions/setup-node@v4
         with:
@@ -75,6 +77,21 @@ jobs:
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
+
+      - name: Dependency security gate
+        # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
+        run: pnpm verify:dependency-security
+
+      - name: Compliance copy gate (forbidden UI terms)
+        # 扫 apps/{admin,kiosk,partner}/src 全量 .ts/.tsx,禁词清单来自 packages/shared 的 SSOT。
+        # 放在重装依赖之前:只依赖 node + 仓库,违规能最快失败。
+        run: pnpm verify:compliance-copy
+
+      - name: Import review reset gate (forced re-review on partner import)
+        # 静态断言 Partner/Excel 主动导入的 job/jobFair upsert update 块一律回 pending+draft,
+        # 并反向断言 job-sync 自动拉取不覆写审核状态。纯 node,不需要 DB。
+        working-directory: services/api
+        run: pnpm verify:import-review-reset
 
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
@@ -123,6 +140,14 @@ jobs:
         # 仅使用临时目录、fake PM2、fake health、fake traffic controller；禁止连接网络、数据库、Redis、实例或真实 PM2。
         run: pnpm --filter @ai-job-print/api verify:release-genesis
 
+      - name: D2 prime offline contract fixture
+        # Pure renderer/state/evidence checks only; no PM2, Nginx, systemd, network, or production data plane.
+        run: pnpm --filter @ai-job-print/api verify:d2-same-host-contract
+
+      - name: D2 prime invocation governance fixture
+        # Temporary Git/filesystem fixtures only; never launches the drill, systemd, PM2, Nginx, or production clients.
+        run: pnpm --filter @ai-job-print/api verify:d2-same-host-governance
+
       - name: LightFlow UI static contracts
         run: |
           pnpm --filter @ai-job-print/ui verify:service-desk-foundation
@@ -145,18 +170,32 @@ jobs:
         # 放在 SQLite db 准备之前即可跑。
         working-directory: apps/terminal-agent
         run: |
+          pnpm run verify:direct-http-agents
+          pnpm run verify:form-data-security
           pnpm run verify:agent-profile-guard
           pnpm run verify:agent-config-resilience
           pnpm run verify:windows-service-recovery
           pnpm run verify:print-scan-agent
+          pnpm run verify:agent-unauthorized
+          pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
+          pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
 
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Install SQLite terminal database guards
+        working-directory: services/api
+        # db push intentionally remains the shared SQLite CI baseline; triggers are
+        # migration-only objects, so install the exact production migration SQL files before
+        # running provisioning verification.
+        run: |
+          sqlite3 prisma/dev.db ".read prisma/migrations/20260724200000_guard_planned_terminal_updates/migration.sql"
+          sqlite3 prisma/dev.db ".read prisma/migrations/20260726003000_guard_retired_terminal/migration.sql"
 
       - name: Verify suites
         # ⚠ 必须串行(逐行顺序执行)。这些 verify 共享同一个 SQLite dev.db,
@@ -203,6 +242,7 @@ jobs:
           pnpm --filter @ai-job-print/admin verify:admin-orders-readonly-ui
           pnpm --filter @ai-job-print/admin verify:admin-file-lifecycle-ui
           pnpm --filter @ai-job-print/admin verify:admin-device-fleet-overview-ui
+          pnpm --filter @ai-job-print/admin verify:admin-terminal-network-diagnostics-ui
           pnpm --filter @ai-job-print/admin verify:admin-phone-transfer-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-ui
           pnpm --filter @ai-job-print/admin verify:partner-account-action-state
@@ -229,6 +269,10 @@ jobs:
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
+          pnpm --filter @ai-job-print/api verify:terminal-bind-code
+          pnpm --filter @ai-job-print/api verify:terminal-credentials
+          pnpm --filter @ai-job-print/api verify:terminal-provisioning
+          pnpm --filter @ai-job-print/api verify:terminal-network-diagnostics
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           # SQLite 专用(拷 dev.db + sqlite3 CLI),不进 postgres-readiness job
           pnpm --filter @ai-job-print/api verify:terminal-device-config
@@ -244,6 +288,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:job-materials
           pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
@@ -256,6 +301,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
           pnpm --filter @ai-job-print/api verify:refund-convergence
+          pnpm --filter @ai-job-print/api verify:admin-orders-refund
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
@@ -271,6 +317,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:fair-info-fields
           pnpm --filter @ai-job-print/api verify:fair-company-positions
           pnpm --filter @ai-job-print/api verify:admin-orgs
+          pnpm --filter @ai-job-print/api verify:partner-email-login-alias
           pnpm --filter @ai-job-print/api verify:admin-orgs-delete-schema
           pnpm --filter @ai-job-print/api verify:admin-orgs-delete-concurrency
           pnpm --filter @ai-job-print/api verify:partner-account-action:schema
@@ -292,6 +339,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-qr-login
           pnpm --filter @ai-job-print/api verify:member-step-up
           pnpm --filter @ai-job-print/api verify:member-assets-c2d
+          pnpm --filter @ai-job-print/api verify:trtc-ownership
           pnpm --filter @ai-job-print/api verify:benefit-redemption
           pnpm --filter @ai-job-print/api verify:ocr-baidu
           pnpm --filter @ai-job-print/api verify:mock-interview
@@ -309,16 +357,20 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
+          pnpm --filter @ai-job-print/api verify:member-data-retention
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
+          pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
+          pnpm --filter @ai-job-print/api verify:file-retention
           pnpm --filter @ai-job-print/api verify:cos:files
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────
@@ -357,11 +409,12 @@ jobs:
       SMS_PROVIDER: log
       TERMINAL_ADMIN_SECRET: ci-only-terminal-admin-secret
       TERMINAL_ACTION_TOKEN_SECRET: ci-only-terminal-action-secret
+      TERMINAL_LEGACY_REGISTER_ENABLED: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.2.2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -397,9 +450,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:resume-optimize
           pnpm --filter @ai-job-print/api verify:job-fit
           pnpm --filter @ai-job-print/api verify:career-plan
+          pnpm --filter @ai-job-print/api verify:ai-cost-coverage
           pnpm --filter @ai-job-print/api verify:activity-logs
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
+          pnpm --filter @ai-job-print/api verify:offline-agencies-page
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth
@@ -414,6 +469,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:terminal-bind-code
+          pnpm --filter @ai-job-print/api verify:terminal-credentials
+          pnpm --filter @ai-job-print/api verify:terminal-provisioning
           pnpm --filter @ai-job-print/api verify:terminal-test-print-seed-guard
           pnpm --filter @ai-job-print/api verify:scan-tasks
           pnpm --filter @ai-job-print/api verify:print-conversion
@@ -423,6 +481,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:job-materials
           pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
@@ -435,6 +494,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:admin-billing
           pnpm --filter @ai-job-print/api verify:reconciliation
           pnpm --filter @ai-job-print/api verify:refund-convergence
+          pnpm --filter @ai-job-print/api verify:admin-orders-refund
           pnpm --filter @ai-job-print/api verify:http-exception-filter
           pnpm --filter @ai-job-print/api verify:kiosk-upload-print-contract
           pnpm --filter @ai-job-print/api verify:print-rollout-config
@@ -452,7 +512,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 11
+          version: 11.2.2
 
       - uses: actions/setup-node@v4
         with:
@@ -501,6 +561,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w4
           pnpm --filter @ai-job-print/kiosk test:browser:w5
           pnpm --filter @ai-job-print/kiosk test:browser:w6
+          pnpm --filter @ai-job-print/kiosk test:browser:privacy
+          pnpm --filter @ai-job-print/kiosk test:browser:warning
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()
@@ -522,4 +584,6 @@ jobs:
             test-results/kiosk-fusion-w5-report/**
             test-results/kiosk-fusion-w6/**
             test-results/kiosk-fusion-w6-report/**
+            test-results/kiosk-privacy-timeout/**
+            test-results/kiosk-session-warning/**
           if-no-files-found: ignore

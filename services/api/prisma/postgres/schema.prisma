@@ -26,7 +26,12 @@ datasource db {
 model Terminal {
   id                String   @id
   terminalCode      String   @unique
+  // Gate 0 expand 阶段兼容载体：reader-aware API 全量部署前，新签发仍双写这里，
+  // 避免滚动升级期间旧 API 实例拒绝新 Token。后续 contract 批次才切 cred$ 哨兵并擦除明文。
   agentToken        String   @unique
+  credentialGeneration Int  @default(0)
+  lifecycleStatus   String   @default("active")
+  lifecycleVersion  Int      @default(0)
   deviceFingerprint String
   displayName       String?
   macAddress        String?  @unique
@@ -40,11 +45,33 @@ model Terminal {
   heartbeats   TerminalHeartbeat[]
   printTasks   PrintTask[]
   bindCodes    TerminalBindCode[]
+  credentials  TerminalCredential[]
   scanTasks    ScanTask[]
   capabilities TerminalCapability[]
 
   @@index([orgId])
   @@index([enabled])
+  @@index([lifecycleStatus])
+}
+
+// ── TerminalCredential ───────────────────────────────────────────────────────
+// 每设备凭证历史。Bearer token 为 256-bit 随机值；本表只保存 SHA-256 hash。
+// expand 窗口内 Terminal.agentToken 仍可能保留当前明文兼容载体，待受控 contract 回填擦除。
+// Terminal.credentialGeneration 是当前有效代次，避免并发签发时两枚凭证同时有效。
+model TerminalCredential {
+  id          String    @id
+  terminalId  String
+  terminal    Terminal  @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  generation  Int
+  issueSource String
+  issuedAt    DateTime  @default(now())
+  expiresAt   DateTime
+  revokedAt   DateTime?
+
+  @@unique([terminalId, generation])
+  @@index([terminalId, revokedAt, expiresAt])
+  @@index([expiresAt])
 }
 
 // ── TerminalCapability ────────────────────────────────────────────────────────
@@ -163,6 +190,8 @@ model TerminalHeartbeat {
   terminal                   Terminal @relation(fields: [terminalId], references: [id])
   status                     String?
   printerStatus              String?
+  wiredNetworkStatus         String?
+  printerNetworkStatus       String?
   localTaskDatabaseAvailable Boolean?
   agentVersion               String?
   ipAddress                  String?
@@ -442,6 +471,11 @@ model User {
   phoneHash    String?       @unique
   phoneEnc     String?
   phoneVerifiedAt DateTime?
+  emailHash    String?       @unique
+  emailEnc     String?
+  emailVerifiedAt DateTime?
+  /// Wave 1: admin_manual（Admin 受托核验）；预留 otp
+  emailVerifyMethod String?
   tokenVersion Int           @default(0)
   lastLoginAt  DateTime?
   enabled      Boolean       @default(true)
@@ -456,6 +490,7 @@ model User {
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
+  @@index([emailVerifiedAt])
   @@index([orgId, role, enabled, deletedAt])
 }
 
@@ -469,6 +504,8 @@ model EndUser {
   id          String    @id @default(cuid())
   phoneHash   String    @unique
   phoneEnc    String
+  /// 微信小程序 openid（一键登录后写入）；不存 sessionKey；null = 未绑定微信。
+  wxOpenId    String?   @unique
   nickname    String?
   enabled     Boolean   @default(true)
   status      String    @default("active")

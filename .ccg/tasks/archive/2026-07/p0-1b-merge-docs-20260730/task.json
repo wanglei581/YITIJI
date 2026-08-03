@@ -1,0 +1,13 @@
+{
+  "id": "p0-1b-merge-docs-20260730",
+  "title": "同步 P0-1B 合并与主干 CI 状态",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交 docs-only 分支",
+  "createdAt": "2026-07-30T02:09:00Z",
+  "completedAt": "2026-07-30T02:12:30Z",
+  "branch": "codex/p0-1b-merge-docs-20260730"
+}

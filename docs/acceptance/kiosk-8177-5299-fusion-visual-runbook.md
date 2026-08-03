@@ -47,13 +47,13 @@ Playwright 必须由配置中的 `webServer` 启动生产构建和 `vite preview
 | offline | 对目标请求执行 `route.abort('internetdisconnected')` | 用 `500`、自造错误码或静态文案冒充断网 |
 | authenticated | 从真实登录 UI 发起操作，并拦截当前登录/会话响应，让页面按真实流程建立认证态 | 向 local/session storage、cookie 或页面上下文直接注入 token |
 | payment | 只覆盖当前契约已有的 `failed`、`closed`、failed-or-expired attempt 和 `refunded` | 发明新的支付状态、回调结果、支付渠道或成功结论 |
-| scanner offline | 返回当前 device status shape 中的离线状态，由现有页面逻辑渲染 | 自造扫描仪 DTO、硬件错误码、型号或 Agent 成功状态 |
+| scan-session unavailable | `/scan/start` 只截取“会话尚未创建”的 pre-session 边界，不发设备状态请求；从可见 CTA 进入 `/scan/settings` 后，才对真实创建会话请求返回当前契约支持的失败包络 | 把 `/scan/start` 宣称为已确认 scanner offline；自造 device-status DTO、硬件错误码、型号或 Agent 成功状态 |
 
 每个拦截器必须按准确的 HTTP method 与 `/api/v1` path 注册。未注册请求应以 `internetdisconnected` 失败并在用例结束时报出，不能被通配成功响应吞掉。加载态的 deferred response 在断言后必须释放或清理，避免污染后续用例。
 
 ## 4. 路由与截图执行
 
-1. 先运行融合基线校验，确认 86 条规范化路由、5 条兼容重定向和派生原型仍一致。
+1. 先运行融合基线校验，确认 87 条规范化路由、5 条兼容重定向和派生原型仍一致。
 2. 用 production build 启动独立 preview；不得复用来源不明的 dev server。
 3. 全部 production Kiosk routes 在 `1080×1920` 下逐路由验证；只有 `/member/qr-login` 与 `/upload/phone` 另外在 `390×844` 下验证。
 4. 每页至少核对可见 `<main>`、路由特征文本、无页面脚本异常、无失败 document request、无横向溢出。
@@ -81,3 +81,27 @@ Playwright 必须由配置中的 `webServer` 启动生产构建和 `vite preview
 每次验收至少记录：Git commit、production build 命令与布尔配置选择、Playwright 命令、项目/视口、通过数与失败数、使用的状态夹具、已知限制。只记录环境变量名称与布尔选择，不记录值或密钥。
 
 通过浏览器视觉验收时，结论必须写成“production-build 浏览器呈现通过”。除非对应独立证据也已完成，不得扩写为 API、Terminal Agent、Windows 主机、支付渠道、打印机、扫描仪或整体上线验收通过。
+
+## 7. P1 视觉证据合同（2026-07-26）
+
+P1 证据清单位于 `apps/kiosk/tests/visual/fixtures/kiosk-p1-visual-evidence-targets.ts`，校验入口为：
+
+```bash
+node apps/kiosk/scripts/verify-visual-evidence-manifest.mjs
+```
+
+该合同只引用唯一迁移矩阵 `docs/design/kiosk-proto-2026-07-migration-matrix.md`，不在 fixture 或本 Runbook 中建立第二份 route-to-screen 设计矩阵。合同的精确口径是：
+
+- 77 个主视觉目标：`01`–`77`；其中 `73` 是 `/assistant` 页内 `SUBVIEW_STATE`，不是独立路由。
+- 5 个 Fusion 状态参考：`15A`、`22B`、`32A`、`34A`、`76A`；其中 `34A` 必须分别覆盖 `/scan/start#pre-session` 与 `/scan/settings#session-create-failed`。前者只证明尚未创建会话且未声称设备状态，后者只证明真实创建会话请求失败；二者都不证明真机扫描仪离线。
+- 87 条路由逐一登记 `PRIMARY`、`SUBVIEW_STATE`、`ROUTE_STATE`、`REUSE`、`REDIRECT` 或 `NO_INDEPENDENT_PROTOTYPE` 处置。
+- 5 条 compatibility redirect 只验证 replace navigation，不生成伪原型/生产截图 pair；目标路由拥有视觉证据。
+- `/me/privacy-requests` 必须保持 `NO_INDEPENDENT_PROTOTYPE`：可记录 production-only 路由呈现，不得伪造 8399/Fusion 对照屏。
+
+每个视觉目标都显式记录 prototype path、reference kind、route/state、capture URL、viewport、fixture、precondition、ready marker、claim scope、known limits 和预期 screenshot pair。其中：
+
+- fixture 必须以 `contract-fixture` 标记，它只是 production-build 浏览器的受控合同夹具，不是预生产 API、支付、TRTC、Terminal Agent 或打印扫描闭环证据。
+- 所有截图输出只允许写入已忽略的 `test-results/kiosk-p1-visual-evidence/<sha>/`；`<sha>` 必须替换为当次候选提交标识。
+- 目标清单、capture URL 与预期输出路径只是待执行的证据合同；截图不存在、未人工对照或未记录执行环境时，不得记为 PASS。
+
+本合同不代表 82 个目标已完成逐屏像素验收，也不代表预生产、手机、27 寸竖屏或 Windows 打印/扫描真机验收通过。

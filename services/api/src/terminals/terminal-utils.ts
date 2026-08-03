@@ -13,7 +13,13 @@ import { DEFAULT_SMART_CAMPUS_MODULES, type SmartCampusModules } from '../smart-
 
 export const CONFIG_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 export const DEFAULT_BIND_CODE_TTL_MINUTES = 10
+export const DEFAULT_AGENT_CREDENTIAL_TTL_MS = 365 * 24 * 60 * 60 * 1000
 export const BIND_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ'
+export const CREDENTIAL_SENTINEL_PREFIX = 'cred$'
+export const PLANNED_CREDENTIAL_PREFIX = 'planned$'
+
+export type CredentialIssueSource = 'legacy_register' | 'bind_code'
+export type TerminalLifecycleStatus = 'planned' | 'commissioning' | 'active' | 'maintenance' | 'suspended' | 'retired'
 
 // ── PrintJobParams ─────────────────────────────────────────────────────────────
 
@@ -100,6 +106,32 @@ export function parseSmartCampusModules(json: string): SmartCampusModules {
 
 export function hashBindCode(code: string): string {
   return crypto.createHash('sha256').update(code.trim(), 'utf8').digest('hex')
+}
+
+export function hashAgentToken(token: string): string {
+  return crypto.createHash('sha256').update(token, 'utf8').digest('hex')
+}
+
+export function makeCredentialId(): string {
+  return `tc_${crypto.randomBytes(16).toString('hex')}`
+}
+
+export function isUniqueConstraintError(error: unknown): boolean {
+  return (error as { code?: string }).code === 'P2002'
+}
+
+export function normalizeLifecycleStatus(value: string): TerminalLifecycleStatus {
+  switch (value) {
+    case 'planned':
+    case 'commissioning':
+    case 'active':
+    case 'maintenance':
+    case 'suspended':
+    case 'retired':
+      return value
+    default:
+      return 'active'
+  }
 }
 
 /** 常量时间比较 agentToken，避免逐字节比较泄露时序信息。 */

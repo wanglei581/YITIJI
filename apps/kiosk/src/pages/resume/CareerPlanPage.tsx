@@ -1,5 +1,5 @@
 // 职业规划：真实规划读回、生成与打印逻辑保持在本页；LightFlow 仅重组视觉与状态层级。
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import type { CareerPlanResponse } from '@ai-job-print/shared'
@@ -16,6 +16,7 @@ import {
 import { generateCareerPlan, getLatestCareerPlan, printCareerPlan } from '../../services/api/careerPlan'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import { readAiResumeSession } from './aiResumeSession'
 import './careerPlan-lightflow.css'
 import './resume-fusion-youth.css'
@@ -23,6 +24,14 @@ import './resume-fusion-youth.css'
 interface PageState {
   taskId?: string
   accessToken?: string
+}
+
+function CareerPlanFullscreenFrame({ children }: { children: ReactNode }) {
+  return (
+    <KioskFullscreenShell>
+      <KioskPageFrame className="fusion-w3 fusion-w3--resume">{children}</KioskPageFrame>
+    </KioskFullscreenShell>
+  )
 }
 
 function Section({ title, Icon, children }: {
@@ -114,7 +123,7 @@ export function CareerPlanPage() {
 
   if (!taskId) {
     return (
-      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
+      <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--gate" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" aria-labelledby="career-plan-gate-title">
           <span className="career-plan-lightflow__state-icon" aria-hidden="true"><CompassIcon /></span>
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
@@ -124,26 +133,26 @@ export function CareerPlanPage() {
             去上传简历<ArrowRightIcon aria-hidden="true" />
           </Button>
         </section>
-      </main></KioskPageFrame>
+      </main></CareerPlanFullscreenFrame>
     )
   }
 
   if (loading) {
     return (
-      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
+      <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--loading" data-visual-theme="service-desk" data-ux-density="touch">
         <section className="career-plan-lightflow__state-card" role="status" aria-live="polite" aria-label="正在恢复职业规划">
           <Loader2Icon className="career-plan-lightflow__spinner" aria-hidden="true" />
           <p className="career-plan-lightflow__eyebrow">职业方向服务</p>
           <h1>正在读取你的职业规划</h1>
           <p>正在确认是否存在可继续查看的真实规划结果。</p>
         </section>
-      </main></KioskPageFrame>
+      </main></CareerPlanFullscreenFrame>
     )
   }
 
   if (plan) {
     return (
-      <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume"><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
+      <CareerPlanFullscreenFrame><main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--result" data-visual-theme="service-desk" data-ux-density="touch">
         <header className="career-plan-lightflow__header">
           <KioskPageHeader
             title="职业规划建议"
@@ -212,6 +221,7 @@ export function CareerPlanPage() {
               <Button variant="secondary" onClick={() => navigate('/resume/optimize', { state: { taskId, accessToken } })}><PencilLineIcon aria-hidden="true" />优化简历</Button>
               <Button variant="secondary" onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}><TargetIcon aria-hidden="true" />岗位匹配</Button>
               <Button variant="secondary" onClick={() => navigate('/interview/setup')}><MicIcon aria-hidden="true" />模拟面试</Button>
+              <Button variant="secondary" onClick={() => navigate('/resume/self-assessment/intro?from=career-plan')}>做一次自我探索</Button>
             </div>
           </Section>
 
@@ -227,12 +237,12 @@ export function CareerPlanPage() {
             {generating ? <Loader2Icon className="career-plan-lightflow__button-spinner" aria-hidden="true" /> : '重新生成'}
           </Button>
         </KioskActionBar>
-      </main></KioskPageFrame>
+      </main></CareerPlanFullscreenFrame>
     )
   }
 
   return (
-    <KioskPageFrame standalone className="fusion-w3 fusion-w3--resume">
+    <CareerPlanFullscreenFrame>
     <main data-kiosk-domain="resume" data-kiosk-screen="resume-career-plan" className="service-desk career-plan-lightflow career-plan-lightflow--guide" data-visual-theme="service-desk" data-ux-density="touch">
       <header className="career-plan-lightflow__header">
         <KioskPageHeader
@@ -265,6 +275,6 @@ export function CareerPlanPage() {
         </Button>
       </KioskActionBar>
     </main>
-    </KioskPageFrame>
+    </CareerPlanFullscreenFrame>
   )
 }

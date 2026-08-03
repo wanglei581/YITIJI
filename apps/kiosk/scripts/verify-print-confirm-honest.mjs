@@ -144,12 +144,12 @@ expectMatches(
 )
 expectMatches(
   doneSrc,
-  /getPayStatus\(\{\s*orderId:\s*state\.orderId\s+as\s+string,\s*paymentSessionToken:\s*state\.paymentSessionToken\s*\}\)/,
+  /getPayStatus\(\{\s*orderId,\s*paymentSessionToken\s*\}\)/,
   'PrintDonePage 查询取件码时携带 paymentSessionToken',
 )
 expectMatches(
   doneSrc,
-  /setPickupCodeError\('取件凭证暂时无法读取，请联系工作人员核验订单'\)/,
+  /error:\s*'取件凭证暂时无法读取，请联系工作人员核验订单'/,
   'PrintDonePage 取件码查询失败时显式提示工作人员核验，不静默隐藏',
 )
 
@@ -220,6 +220,398 @@ expectMatches(
   /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{[\s\S]*?打印任务尚未创建[\s\S]*?返回确认页[\s\S]*?\}/,
   'PrintProgressPage http 无 taskId 时显示错误态而非伪造成功',
 )
+
+// ============================================================
+// S0-B：PrintProgressPage SIM 演示真值
+//
+// 非 http 模拟路径不得伪装成真实建单 / 支付 / 出纸 / 取件成功。
+// 以下断言刻意结合结构与调用次数，避免仅靠可随意塞进注释的单词。
+// ============================================================
+console.log('\n=== S0-B PrintProgressPage SIM 演示真值 ===')
+
+function countMatches(source, pattern) {
+  const flags = pattern.global ? pattern.flags : `${pattern.flags}g`
+  return [...source.matchAll(new RegExp(pattern.source, flags))].length
+}
+
+function stripComments(source) {
+  // 去掉块注释 / JSX `{/* ... */}` 与行注释，防止仅靠注释字面量混过断言
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+}
+
+const progressCode = stripComments(progressSrc)
+
+/** 从 openIdx（指向 '('）提取平衡括号内的正文；失败返回 null */
+function sliceBalancedParen(source, openIdx) {
+  if (openIdx < 0 || source[openIdx] !== '(') return null
+  let depth = 0
+  for (let i = openIdx; i < source.length; i += 1) {
+    const ch = source[i]
+    if (ch === '(') depth += 1
+    else if (ch === ')') {
+      depth -= 1
+      if (depth === 0) return source.slice(openIdx + 1, i)
+    }
+  }
+  return null
+}
+
+/** 收集 `gateRe`（须以 `(` 结尾）匹配处的平衡括号正文 */
+function collectParenBodies(source, gateRe) {
+  const bodies = []
+  const re = new RegExp(gateRe.source, gateRe.flags.includes('g') ? gateRe.flags : `${gateRe.flags}g`)
+  for (const match of source.matchAll(re)) {
+    const openIdx = match.index + match[0].lastIndexOf('(')
+    const body = sliceBalancedParen(source, openIdx)
+    if (body != null) bodies.push(body)
+  }
+  return bodies
+}
+
+/** isSim ? (trueBody) : (falseBody) → 收集 true / false 括号体 */
+function collectIsSimTernaryBodies(source) {
+  const trues = []
+  const falses = []
+  for (const match of source.matchAll(/isSim\s*\?/g)) {
+    let i = match.index + match[0].length
+    while (i < source.length && /\s/.test(source[i])) i += 1
+    if (source[i] !== '(') continue
+    const trueBody = sliceBalancedParen(source, i)
+    if (trueBody == null) continue
+    let j = i + trueBody.length + 2
+    while (j < source.length && /\s/.test(source[j])) j += 1
+    if (source[j] !== ':') continue
+    j += 1
+    while (j < source.length && /\s/.test(source[j])) j += 1
+    if (source[j] !== '(') continue
+    const falseBody = sliceBalancedParen(source, j)
+    if (falseBody == null) continue
+    trues.push(trueBody)
+    falses.push(falseBody)
+  }
+  return { trues, falses }
+}
+
+function rangesFromBodies(source, bodies) {
+  const ranges = []
+  for (const body of bodies) {
+    let from = 0
+    while (true) {
+      const idx = source.indexOf(body, from)
+      if (idx < 0) break
+      ranges.push({ start: idx, end: idx + body.length })
+      from = idx + body.length
+    }
+  }
+  return ranges
+}
+
+/** 文案位于 isSim 真分支：`isSim && (` 或 `isSim ? (` … `)` */
+function inIsSimTrueBranch(source, needle) {
+  if (!source.includes(needle)) return false
+  const andBodies = collectParenBodies(source, /isSim\s*&&\s*\(/g)
+  const { trues } = collectIsSimTernaryBodies(source)
+  return [...andBodies, ...trues].some((body) => body.includes(needle))
+}
+
+/**
+ * 文案只能出现在 !isSim 分支：`!isSim && (` 或 `isSim ? (…) : (` 假分支。
+ * 用平衡括号正文判断，避免已关闭三元假阳性覆盖后续无条件 JSX。
+ */
+function inNotIsSimBranch(source, needle) {
+  if (!source.includes(needle)) return false
+  const andBodies = collectParenBodies(source, /!isSim\s*&&\s*\(/g)
+  const { falses } = collectIsSimTernaryBodies(source)
+  const ranges = rangesFromBodies(source, [...andBodies, ...falses])
+  let from = 0
+  let any = false
+  while (true) {
+    const idx = source.indexOf(needle, from)
+    if (idx < 0) break
+    any = true
+    if (!ranges.some((r) => idx >= r.start && idx < r.end)) return false
+    from = idx + needle.length
+  }
+  return any
+}
+
+// 1) 常驻可见文案「演示模式·非真实打印」——须为字符串字面量或 JSX 文本，不能只出现在注释
+const demoBannerLiteral =
+  /(?:['"`]演示模式·非真实打印['"`])|(?:>\s*演示模式·非真实打印\s*<)/
+if (demoBannerLiteral.test(progressCode) && inIsSimTrueBranch(progressCode, '演示模式·非真实打印')) {
+  pass('SIM 真分支含常驻文案「演示模式·非真实打印」(字符串/JSX，非注释)')
+} else {
+  fail('SIM 真分支必须常驻展示「演示模式·非真实打印」(不可仅写在注释或死代码)')
+}
+
+// 2) 本地 simDone / simFinished 终态，并声明未真实打印
+const hasSimEndState =
+  /\b(?:simDone|simFinished)\b/.test(progressCode) &&
+  /set(?:SimDone|SimFinished)\s*\(\s*true\s*\)/.test(progressCode)
+const declaresNoRealPrint = /未真实打印/.test(progressCode)
+if (hasSimEndState && declaresNoRealPrint) {
+  pass('SIM 具备本地 simDone/simFinished 终态，并声明未真实打印')
+} else {
+  fail('SIM 必须有本地 simDone/simFinished 终态(含 set* (true))，并声明未真实打印')
+}
+
+// 3) SIM effect 结束须 set 本地终态，禁止调用 navigateSuccess
+const simEffectMatch = progressCode.match(
+  /useEffect\(\(\)\s*=>\s*\{([\s\S]*?canSimulate[\s\S]*?)\},\s*\[[^\]]*canSimulate[^\]]*\]\)/,
+)
+const simEffectBody = simEffectMatch?.[1] ?? ''
+const simEffectSetsLocalEnd = /set(?:SimDone|SimFinished)\s*\(\s*true\s*\)/.test(simEffectBody)
+const simEffectCallsNavigateSuccess = /navigateSuccess\s*\(/.test(simEffectBody)
+const simEffectNavigatesDoneDirectly =
+  /navigate\s*\(\s*['"]\/print\/done['"]/.test(simEffectBody) ||
+  /navigate\s*\([\s\S]{0,200}?success\s*:\s*true/.test(simEffectBody)
+if (
+  simEffectMatch &&
+  simEffectSetsLocalEnd &&
+  !simEffectCallsNavigateSuccess &&
+  !simEffectNavigatesDoneDirectly
+) {
+  pass('SIM effect 结束 set 本地终态，不调用或直接跳转真实成功页')
+} else {
+  fail('SIM effect 结束必须 setSimDone/setSimFinished(true)，且不得调用或直接跳转真实成功页')
+}
+
+// 4) navigateSuccess() 在整个文件仅允许真实轮询使用一次
+const navigateSuccessCallCount = countMatches(progressCode, /navigateSuccess\s*\(\s*\)/)
+if (navigateSuccessCallCount === 1) {
+  pass(`navigateSuccess() 仅真实轮询使用一次 (count=${navigateSuccessCallCount})`)
+} else {
+  fail(`navigateSuccess() 在整个文件仅允许真实轮询调用一次，实际 ${navigateSuccessCallCount} 次`)
+}
+
+// 5) 真实话术须被 isSim 分支隔离；演示分支明确未建单 / 未支付 / 未出纸
+const hasIsSim = /(?:const|let)\s+isSim\s*=/.test(progressCode)
+const realPhrases = [
+  { phrase: '完成支付确认', label: '完成支付确认' },
+  { phrase: '终端已接收任务，文件校验通过', label: '终端已接收任务，文件校验通过' },
+  { phrase: '打印机正在出纸', label: '打印机正在出纸' },
+]
+let realPhrasesIsolated = hasIsSim
+for (const { phrase, label } of realPhrases) {
+  // 真实话术须出现在 isSim 三元的假分支（isSim ? demo : real），容忍换行与引号风格
+  const isolated = new RegExp(
+    String.raw`isSim\s*\?[\s\S]{0,240}?\s*:\s*[\s\S]{0,160}?${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+  ).test(progressCode)
+  if (isolated) {
+    pass(`真实话术「${label}」位于 isSim 假分支`)
+  } else {
+    realPhrasesIsolated = false
+    fail(`真实话术「${label}」必须经 isSim 三元隔离(假分支)，不得对 SIM 路径无条件展示`)
+  }
+}
+
+const simHonest =
+  /isSim\s*\?[\s\S]{0,320}?未建单/.test(progressCode) &&
+  /isSim\s*\?[\s\S]{0,320}?未支付/.test(progressCode) &&
+  /isSim\s*\?[\s\S]{0,320}?未出纸/.test(progressCode)
+if (simHonest) {
+  pass('演示分支明确声明未建单 / 未支付 / 未出纸')
+} else {
+  fail('演示分支必须明确声明未建单、未支付、未出纸(出现在 isSim ? … 真分支)')
+}
+
+if (!hasIsSim) {
+  fail('PrintProgressPage 须定义 isSim，用于隔离真实进度话术与演示文案')
+} else if (realPhrasesIsolated && simHonest) {
+  pass('isSim 分支同时隔离真实话术并提供演示诚实文案')
+}
+
+// ============================================================
+// S0-B 第二轮：右栏不得对 SIM 展示真实任务提示
+//
+// mock 浏览器验收：主时间线已诚实，但右栏仍无条件展示「预计出纸」
+// 「打印机缺纸 / 卡纸」「已支付但打印失败」「请勿离开…取走文件」。
+// 以下断言要求 JSX 条件结构 + 可见文案，注释字面量不算。
+// ============================================================
+console.log('\n=== S0-B 第二轮：SIM 右栏演示说明 / 真实提示隔离 ===')
+
+// 6) SIM 必须有独立「演示说明」区（标题 + 四条诚实声明，均在 isSim 真分支）
+const demoExplainTitleLiteral =
+  /(?:['"`]演示说明['"`])|(?:>\s*演示说明\s*<)|(?:aria-label\s*=\s*['"]演示说明['"])/
+const hasDemoExplainTitle = demoExplainTitleLiteral.test(progressCode)
+const demoExplainTitleInSim = inIsSimTrueBranch(progressCode, '演示说明')
+if (hasDemoExplainTitle && demoExplainTitleInSim) {
+  pass('SIM 含独立「演示说明」区标题(字符串/JSX/aria-label，且在 isSim 真分支)')
+} else {
+  fail('SIM 必须有独立「演示说明」区：标题须为可见字面量/JSX/aria-label，并位于 isSim && / isSim ? 真分支')
+}
+
+const simSideHonesty = [
+  { phrase: '未创建真实打印任务', label: '未创建真实打印任务' },
+  { phrase: '未产生订单或费用', label: '未产生订单或费用' },
+  { phrase: '未向打印机发送文件', label: '未向打印机发送文件' },
+  { phrase: '不会产生取件码', label: '不会产生取件码' },
+]
+let simSideHonest = hasDemoExplainTitle && demoExplainTitleInSim
+for (const { phrase, label } of simSideHonesty) {
+  // 已 stripComments；须落在 isSim && (…)/isSim ? (…) 真分支正文内
+  if (inIsSimTrueBranch(progressCode, phrase)) {
+    pass(`演示说明声明「${label}」位于 isSim 真分支(非注释)`)
+  } else {
+    simSideHonest = false
+    fail(`演示说明必须在 isSim 真分支明确「${label}」(JSX/字符串，不可仅注释)`)
+  }
+}
+if (simSideHonest) {
+  pass('SIM 演示说明区四条诚实声明齐全且均在 isSim 真分支')
+}
+
+// 7) 「预计出纸」行、真实常见情况处理区、出纸口隐私提示只能在 !isSim 分支渲染
+const realSideGates = [
+  { needle: '预计出纸', label: '「预计出纸」行' },
+  { needle: '常见情况处理', label: '真实常见情况处理区(aria-label/标题)' },
+  { needle: '打印机缺纸 / 卡纸', label: '真实 FAQ「打印机缺纸 / 卡纸」' },
+  { needle: '已支付但打印失败', label: '真实 FAQ「已支付但打印失败」' },
+  { needle: '请勿离开，打印完成后请及时取走文件', label: '出纸口隐私提示' },
+]
+let realSideIsolated = true
+for (const { needle, label } of realSideGates) {
+  if (inNotIsSimBranch(progressCode, needle)) {
+    pass(`${label}仅在 !isSim 分支渲染`)
+  } else {
+    realSideIsolated = false
+    fail(`${label}必须经 !isSim && (…)/isSim ? … : (…) 假分支隔离，不得对 SIM 无条件展示`)
+  }
+}
+if (realSideIsolated) {
+  pass('右栏真实任务提示(预计出纸/常见情况/隐私提示)均已用 !isSim 隔离')
+}
+
+// ============================================================
+// S0-B 第三轮：时间线 label 按 isSim 隔离 + simDone 全项完成图标
+//
+// 真实 1080×1920 截图：SIM 演示结束后时间线仍显示真实标签
+// 「打印中 / 完成取件」，且最后一步仍是时钟（tlIdx < 3 漏掉末项）。
+// 断言要求 TL label 结构隔离 + 完成图标覆盖全部 TL_ITEMS；注释不算。
+// ============================================================
+console.log('\n=== S0-B 第三轮：时间线 SIM label / simDone 全项完成 ===')
+
+/** label: isSim ? 'simLabel' : 'realLabel' — 容忍换行、引号、可选括号 */
+function timelineLabelIsolatedByIsSim(source, simLabel, realLabel) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(
+    String.raw`label\s*:\s*isSim\s*\?\s*\(?\s*['"\`]${esc(simLabel)}['"\`]\s*\)?\s*:\s*\(?\s*['"\`]${esc(realLabel)}['"\`]\s*\)?`,
+  ).test(source)
+}
+
+// 8) 时间线 label 必须按 isSim 隔离
+//    SIM 至少「打印演示」「演示结束」；真实假分支继续「打印中」「完成取件」
+const printLabelOk = timelineLabelIsolatedByIsSim(progressCode, '打印演示', '打印中')
+const pickupLabelOk = timelineLabelIsolatedByIsSim(progressCode, '演示结束', '完成取件')
+if (printLabelOk) {
+  pass('时间线 label「打印演示」/「打印中」按 isSim 隔离')
+} else {
+  fail('时间线 label 须为 isSim ? 「打印演示」 : 「打印中」（SIM 不得继续展示真实「打印中」）')
+}
+if (pickupLabelOk) {
+  pass('时间线 label「演示结束」/「完成取件」按 isSim 隔离')
+} else {
+  fail('时间线 label 须为 isSim ? 「演示结束」 : 「完成取件」（SIM 不得继续展示真实「完成取件」）')
+}
+if (printLabelOk && pickupLabelOk) {
+  pass('时间线关键 label 已按 isSim 隔离（SIM 演示名 / 真实假分支原名）')
+}
+
+// 9) simDone 时全部 TL_ITEMS（含最后一项）进入完成图标逻辑，不能只 tlIdx < 3
+const simDoneCheckCutsLast =
+  /isSim\s*&&\s*simDone\s*&&\s*tlIdx\s*<\s*3/.test(progressCode) ||
+  /simDone\s*&&\s*tlIdx\s*<\s*3/.test(progressCode)
+const simDoneChecksAllItems =
+  /isDone\s*\|\|\s*\(\s*isSim\s*&&\s*simDone\s*\)/.test(progressCode) ||
+  /isDone\s*\|\|\s*\(\s*isSim\s*&&\s*simDone\s*&&\s*tlIdx\s*<\s*TL_ITEMS\.length\s*\)/.test(
+    progressCode,
+  )
+const simDoneClassifiesAllItems =
+  /const\s+cls\s*=\s*isSim\s*&&\s*simDone\s*&&\s*!failed\s*\?\s*['"]tl-done['"]\s*:\s*tlItemClass\s*\(/.test(
+    progressCode,
+  )
+if (!simDoneCheckCutsLast && simDoneChecksAllItems && simDoneClassifiesAllItems) {
+  pass('simDone 时全部 TL_ITEMS（含最后一项）进入完成样式与 CheckIcon 逻辑')
+} else if (simDoneCheckCutsLast) {
+  fail('simDone 完成图标不能只判断 tlIdx < 3（最后一项会仍显示时钟）')
+} else {
+  fail(
+    'simDone 时所有 TL_ITEMS 须进入 tl-done 完成样式与 CheckIcon 逻辑（含最后一项）',
+  )
+}
+
+// 10) 仅执行中的真实任务或 SIM 演示保持 busy lock；失败、超时和结束态须释放
+const activeTaskBusyLock =
+  /useBusyLock\s*\(\s*\(\s*useRealApi\s*&&\s*!failed\s*&&\s*!timedOut\s*\)\s*\|\|\s*\(\s*isSim\s*&&\s*!failed\s*&&\s*!simDone\s*\)\s*,?\s*\)/.test(
+    progressCode,
+  )
+if (activeTaskBusyLock) {
+  pass('真实任务执行中与 SIM 演示进行中保持 busy lock，失败、超时和结束态释放')
+} else {
+  fail(
+    'useBusyLock 须仅覆盖执行中的真实任务或 SIM 演示，并在失败、超时和结束态释放',
+  )
+}
+
+// 11) SIM / 失败跳转定时器须可清理，避免离页后回调继续执行
+const simTimerCleanup =
+  /simTimerRef/.test(progressCode) &&
+  /clearTimeout\s*\(\s*simTimerRef\.current\s*\)/.test(progressCode)
+const failTimerCleanup =
+  /failTimerRef/.test(progressCode) &&
+  /clearTimeout\s*\(\s*failTimerRef\.current\s*\)/.test(progressCode)
+if (simTimerCleanup && failTimerCleanup) {
+  pass('SIM 动画与失败跳转 timer 均在离页时清理')
+} else {
+  fail('SIM 动画与失败跳转须分别保存 timer ref，并在 cleanup 中 clearTimeout')
+}
+
+// 12) 静态 SIM 标识不重复 aria-live；动态结束态由底部 status chip 播报
+const simTrueBodies = [
+  ...collectParenBodies(progressCode, /isSim\s*&&\s*\(/g),
+  ...collectIsSimTernaryBodies(progressCode).trues,
+].filter((body) => body.includes('演示模式·非真实打印'))
+if (simTrueBodies.length >= 2 && simTrueBodies.every((body) => !/aria-live/.test(body))) {
+  pass('常驻 SIM 标识均为静态语义，不重复 aria-live 播报')
+} else {
+  fail('常驻 SIM badge / 提示条不得携带 aria-live；动态状态统一由底部 status chip 播报')
+}
+
+// 13) mock 非法上下文（只有 taskId、无 file）必须进入错误守卫，不能渲染真实话术
+if (
+  /if\s*\(\s*!hasContext\s*\|\|\s*\(\s*!isHttpMode\s*&&\s*!canSimulate\s*\)\s*\)/.test(
+    progressCode,
+  )
+) {
+  pass('mock 仅 taskId / 无 file 的非法上下文进入错误守卫')
+} else {
+  fail('无真实 API 且不可模拟时必须进入错误守卫，禁止卡在伪真实进度 UI')
+}
+
+// 14) DEV/SIM 失败也留在演示页，不跳真实结果页
+const navigateFailMatch = progressCode.match(
+  /const\s+navigateFail\s*=\s*useCallback\s*\(\s*\(reason:[^)]*\)\s*=>\s*\{([\s\S]*?)\n\s*\},\s*\[[^\]]*\]\s*,?\s*\)/,
+)
+const navigateFailBody = navigateFailMatch?.[1] ?? ''
+const simFailStaysLocal =
+  /if\s*\(\s*isSim\s*\)/.test(navigateFailBody) &&
+  /setSimDone\s*\(\s*true\s*\)/.test(navigateFailBody) &&
+  /return/.test(navigateFailBody)
+if (simFailStaysLocal) {
+  pass('DEV/SIM 失败设置本地结束态并留在演示页')
+} else {
+  fail('navigateFail 在 isSim 时必须 setSimDone(true) 后 return，不得跳真实结果页')
+}
+
+// 15) SIM 失败保留失败步进态，同时仍提供触控出口
+const simEndActionsIncludeFailure =
+  /isSim\s*&&\s*simDone\s*&&\s*\(/.test(progressCode) &&
+  !/isSim\s*&&\s*simDone\s*&&\s*!failed\s*&&\s*\(/.test(progressCode)
+if (simEndActionsIncludeFailure) {
+  pass('SIM 成功或失败结束态均提供返回首页 / 重新上传操作')
+} else {
+  fail('SIM 结束操作区不得排除 failed；失败演示也必须有返回首页 / 重新上传出口')
+}
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} 项失败 — Kiosk 打印确认页诚实性守卫未通过\n`)

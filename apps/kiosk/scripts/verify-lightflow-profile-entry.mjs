@@ -98,9 +98,10 @@ function assertProfileCssScope(relativePath, source) {
     .filter((selector) => selector && !selector.startsWith('@'))
     .flatMap((selector) => selector.split(',').map((part) => part.trim()))
 
+  const allowedFrameSelector = "[data-kiosk-presentation='fusion-youth'] .fusion-w5--profile-entry > .ui-kiosk-page-content"
   expect(
-    selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow')),
-    `${relativePath} scopes every selector from .kprofile.kprofile-lightflow`,
+    selectors.every((selector) => selector.startsWith('.kprofile.kprofile-lightflow') || selector === allowedFrameSelector),
+    `${relativePath} scopes every selector to the profile entry surface`,
   )
 }
 
@@ -133,6 +134,11 @@ expectMatches(
   profile,
   /className="[^"]*\bkprofile\s+kprofile-lightflow\b[^"]*"/,
   'ProfilePage binds the LightFlow root on its page shell',
+)
+expectMatches(
+  profile,
+  /<KioskPageFrame\b[^>]*className="[^"]*\bfusion-w5--profile-entry\b[^"]*"/,
+  'ProfilePage exposes a dedicated frame class for exact prototype gutter control',
 )
 expectIncludes(profile, '<h1 className="kprofile-sr-only">我的</h1>', 'ProfilePage keeps an accessible-only page heading without visible 我的 copy')
 expectIncludes(profile, 'className="kp-service-directory"', 'ProfilePage groups existing entries in the compact service directory')
@@ -189,11 +195,11 @@ for (const marker of [
   'onOpenNotifications',
   'className="kp-profile-header',
   'className="kp-profile-main"',
-  'className="kp-profile-boundary"',
   'className="p-stats"',
 ]) {
   expectIncludes(header, marker, `ProfileHeader preserves ${marker}`)
 }
+expectNotIncludes(header, 'kp-profile-boundary', 'ProfileHeader removes the non-prototype boundary panel')
 expectNotIncludes(header, 'p-hero', 'ProfileHeader removes the old p-hero visual shell')
 
 for (const marker of [
@@ -281,10 +287,54 @@ for (let index = 0; index < profileCssFiles.length; index += 1) {
   assertProfileCssScope(profileCssFiles[index], profileCss[index])
 }
 expectIncludes(combinedProfileCss, '--lf-canvas:', 'Profile CSS defines the LightFlow ice-blue canvas token')
+expectIncludes(combinedProfileCss, '--lf-paper:', 'Profile CSS exposes the prototype paper token through the current theme')
+expectIncludes(combinedProfileCss, '--lf-serif:', 'Profile CSS exposes the prototype display-font stack')
 expectIncludes(combinedProfileCss, '--lf-blue:', 'Profile CSS defines the single bright-blue action token')
 expectIncludes(combinedProfileCss, '--lf-ink:', 'Profile CSS defines the deep navy text token')
+expectMatches(
+  combinedProfileCss,
+  /\.fusion-w5--profile-entry\s*>\s*\.ui-kiosk-page-content\s*\{[^}]*padding:\s*0;/,
+  'Profile frame neutralizes the shared 48px inset exactly once',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-inner\s*\{[\s\S]*?width:\s*min\(984px,\s*calc\(100%\s*-\s*96px\)\);[\s\S]*?gap:\s*18px;[\s\S]*?margin:\s*26px auto 0;/,
+  'Profile content matches prototype 14 at 984px width, 48px gutters, 18px rhythm, and 26px top inset',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-profile-header\s*\{[^}]*border-top:\s*4px solid var\(--lf-blue\);[^}]*border-radius:\s*18px;[^}]*box-shadow:\s*0 3px 14px/,
+  'Profile identity header restores the prototype accented card treatment',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-section\s*\{[^}]*border:\s*1px solid var\(--lf-line\);[^}]*border-radius:\s*18px;[^}]*box-shadow:\s*0 3px 14px/,
+  'Profile five sections restore the prototype card treatment',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.kp-section-head h2\s*\{[^}]*font-family:\s*var\(--lf-serif\);[^}]*font-size:\s*26px;/,
+  'Profile section headings match prototype 14 display typography',
+)
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS retains 56px primary touch targets')
-expectIncludes(combinedProfileCss, 'min-block-size: 48px;', 'Profile CSS retains 48px secondary touch targets')
+expectMatches(
+  combinedProfileCss,
+  /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/,
+  'Profile icon actions exceed the 48px secondary touch-target minimum',
+)
+expectIncludes(header, "className={`p-actions ${isLoggedIn ? 'p-actions--member' : 'p-actions--guest'}`}", 'ProfileHeader distinguishes guest/member action layouts')
+expectMatches(
+  combinedProfileCss,
+  /\.p-actions--guest\s*\{[^}]*display:\s*flex;[^}]*margin-inline-start:\s*0;/,
+  'Profile guest login CTA owns a flexible 176px action track without clipping at 1080px',
+)
+expectMatches(
+  combinedProfileCss,
+  /\.p-actions--member \.p-btn\.ghost\s*\{[^}]*padding-inline:\s*16px;/,
+  'Profile member logout CTA fits the fixed 122px action grid across Chinese font stacks',
+)
+expectIncludes(combinedProfileCss, 'var(--color-plum-deep, var(--color-plum))', 'Profile plum/rose icons keep a defined category-color fallback')
+expectIncludes(combinedProfileCss, 'var(--color-wheat-deep, var(--color-wheat-fg))', 'Profile wheat icons keep a defined category-color fallback')
 expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS gives every directory entry the same 92px desktop height')
 expectMatches(
   combinedProfileCss,
@@ -295,23 +345,16 @@ expectIncludes(combinedProfileCss, '@media (prefers-reduced-motion: reduce)', 'P
 expectNotIncludes(combinedProfileCss, 'lf-reference-', 'Profile CSS removes homepage service-card selectors')
 expectNotIncludes(combinedProfileCss, 'p-hero', 'Profile CSS removes the old p-hero visual shell')
 expectNotIncludes(combinedProfileCss, 'sec-head', 'Profile CSS removes the old sec-head visual shell')
-expectNotIncludes(combinedProfileCss, 'box-shadow:', 'Profile CSS does not restore large panel shadows')
 
 for (const marker of [
-  '--paper:',
-  '--serif:',
   '#f4f1e8',
   '#fffdf8',
   '#10302b',
   '#1f9e86',
-  'Noto Serif',
-  'Source Han Serif',
-  'Songti',
-  'SimSun',
   'repeating-linear-gradient(0deg',
   'mask-image:',
 ]) {
-  expectNotIncludes(combinedProfileCss, marker, `Profile CSS removes InkPaper marker ${marker}`)
+  expectNotIncludes(combinedProfileCss, marker, `Profile CSS keeps raw prototype token ${marker} out of page-local styles`)
 }
 
 // W5 keeps the LightFlow profile landing contract while migrating the owned /me/*
@@ -326,6 +369,8 @@ const allowedMeChanges = new Set([
   'apps/kiosk/src/pages/profile/me/MyResumesPage.tsx',
   // W22：系统通知页迁共享壳 + 诚实空态（仍复用 /me/notifications 真实路由）
   'apps/kiosk/src/pages/profile/me/MyNotificationsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyAiRecordsPage.tsx',
+  'apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx',
   'apps/kiosk/src/pages/profile/me/me-detail-inkpaper.css',
   'apps/kiosk/src/pages/profile/me/activityPresentation.ts',
   'apps/kiosk/src/pages/profile/me/styles/me-assets.css',

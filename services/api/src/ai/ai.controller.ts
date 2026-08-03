@@ -311,7 +311,20 @@ export class AiController {
     if (!isWavBuffer(audio.buffer)) {
       throw new BadRequestException({ error: { code: 'INVALID_AUDIO_FORMAT', message: '必须上传 WAV 格式音频' } })
     }
+    // A-6 成本可见性：ASR 按时长计费，tokenUsage 恒为空，不编造单价。
+    const asrStartedAt = Date.now()
     const result = await this.asr.recognizeWav(audio.buffer)
+    this.logService.record({
+      taskId: null,
+      operation: 'voiceTranscribe',
+      provider: this.asr.activeProviderName,
+      status: result.ok ? 'success' : 'failed',
+      latencyMs: Math.max(0, Date.now() - asrStartedAt),
+      tokenUsage: undefined,
+      errorCode: result.ok ? undefined : (result.errorCode ?? 'ASR_FAILED'),
+      endUserId: null,
+      terminalId: null,
+    })
     if (!result.ok) {
       throw new BadRequestException({
         error: {

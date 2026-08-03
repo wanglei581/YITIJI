@@ -188,7 +188,7 @@ export function ConvertImagesPage() {
 
             <div className="flex min-h-0 flex-1 flex-col gap-3">
               {images.map((img, index) => (
-                <div key={img.fileId} className="flex flex-1 items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
+                <div key={img.fileId} className="flex flex-none items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
                   <span className="flex aspect-[210/297] h-[108px] shrink-0 flex-col gap-1.5 rounded border border-neutral-200 bg-white p-2.5 shadow-sm">
                     <i className="h-2.5 w-3/5 rounded bg-info-bg ring-1 ring-info/25" />
@@ -259,9 +259,9 @@ export function ConvertImagesPage() {
               />
             )}
 
-            <section className="flex flex-1 flex-col rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
+            <section className="w2-print-scan-rules rounded-lg border border-neutral-200 bg-surface p-5 shadow-sm">
               <b className="mb-2 block text-xl font-bold">转换规则</b>
-              <ul className="flex flex-1 list-disc flex-col justify-around gap-2 pl-5 text-[17.5px] leading-relaxed text-neutral-500">
+              <ul className="text-[17.5px] leading-relaxed text-neutral-500">
                 <li>仅支持 JPG / PNG 图片，单张不超过 10 MB。</li>
                 <li>一次最多合并 20 张图片，生成一份 PDF。</li>
                 <li>合并顺序即 PDF 页面顺序，生成前请调整好。</li>

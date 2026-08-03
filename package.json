@@ -2,9 +2,10 @@
   "name": "ai-job-print-terminal",
   "version": "0.0.1",
   "private": true,
+  "packageManager": "pnpm@11.2.2",
   "engines": {
-    "node": ">=20.19",
-    "pnpm": ">=9"
+    "node": ">=22.13 <23",
+    "pnpm": ">=11.2.2 <12"
   },
   "scripts": {
     "dev": "concurrently --names kiosk,admin,partner --prefix-colors blue,green,yellow \"pnpm --filter ./apps/kiosk dev\" \"pnpm --filter ./apps/admin dev\" \"pnpm --filter ./apps/partner dev\"",
@@ -18,7 +19,9 @@
     "typecheck:refresh": "pnpm --filter @ai-job-print/refresh typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\" --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\" --ignore-path .prettierignore",
-    "clean": "rimraf \"apps/*/dist\" \"packages/*/dist\" \"apps/*/vite.config.js\" \"apps/*/vite.config.d.ts\" \"apps/*/tsconfig.tsbuildinfo\""
+    "clean": "rimraf \"apps/*/dist\" \"packages/*/dist\" \"apps/*/vite.config.js\" \"apps/*/vite.config.d.ts\" \"apps/*/tsconfig.tsbuildinfo\"",
+    "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
+    "verify:compliance-copy": "node scripts/verify-compliance-copy.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
@@ -33,15 +36,5 @@
     "rimraf": "^6.0.1",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.15.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "qs": "6.15.2",
-      "@hono/node-server": "2.0.4",
-      "uuid": "14.0.0",
-      "shell-quote": "1.8.4",
-      "hono": "4.12.25",
-      "multer": "2.2.0"
-    }
   }
 }

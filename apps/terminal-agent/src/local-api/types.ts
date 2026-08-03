@@ -27,6 +27,12 @@ export interface LocalApiError {
   message: string
 }
 
+/** Browser-safe identity exposed only through the loopback Origin allowlist. */
+export interface LocalTerminalIdentityResponse {
+  terminalId: string
+  terminalCode: string
+}
+
 // ── U 盘导入（Task 9） ──────────────────────────────────────────────────────
 
 export interface LocalUsbStatusResponse {

@@ -333,7 +333,7 @@ export default function LoginPage() {
             <span>数据审核后在终端展示</span>
           </div>
           <h2 className="serif">合作机构登录</h2>
-          <p className="sub">支持机构账号或手机号登录，数据经审核后在终端展示</p>
+          <p className="sub">支持机构账号、已验证手机号或已验证邮箱登录，数据经审核后在终端展示</p>
 
           <div className="c-mode">
             <button
@@ -362,14 +362,14 @@ export default function LoginPage() {
             <form className="c-pane" onSubmit={submitPassword}>
               <div className="c-field">
                 <label htmlFor="partner-login-id">
-                  <b className="fno">01</b>机构账号 / 手机号
+                  <b className="fno">01</b>机构账号 / 手机号 / 邮箱
                 </label>
                 <div className="c-inputwrap">
                   <Building2Icon className="lead" size={18} aria-hidden="true" />
                   <input
                     id="partner-login-id"
                     type="text"
-                    placeholder="请输入机构账号或手机号"
+                    placeholder="请输入机构账号、已验证手机号或已验证邮箱"
                     autoComplete="username"
                     value={loginId}
                     onChange={(e) => setLoginId(e.target.value)}
@@ -472,7 +472,7 @@ export default function LoginPage() {
               </div>
               <div className="c-hint">
                 <ShieldCheckIcon size={14} aria-hidden="true" />
-                验证码登录仅支持已完成本人验证手机号的机构账号
+                验证码登录仅支持已完成本人验证的手机号；邮箱暂不支持验证码登录，请改用密码登录
               </div>
               <AgreementRow agreed={agreed} onToggle={() => setAgreed((v) => !v)} onOpenDoc={setLegalDoc} />
               {error && <ErrorBar message={error} />}

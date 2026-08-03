@@ -479,7 +479,7 @@ export function AiJobTab() {
       </div>
       <div className="grid grid-cols-1 gap-3">
         <AiFeatureCard icon={FileTextIcon} iconBg="bg-primary-50" iconColor="text-primary-600" title="AI简历诊断" desc="简历分析与诊断，提供专业修改建议（仅供本人参考）。" cta="开始诊断" onClick={() => navigate('/resume/source?intent=diagnose')} />
-        <AiFeatureCard icon={MicIcon} iconBg="bg-plum-soft" iconColor="text-plum" title="AI模拟面试" desc="仿真面试场景与点评，迅速提升面试实战能力。" cta="开始模拟" onClick={() => navigate('/assistant')} />
+        <AiFeatureCard icon={MicIcon} iconBg="bg-plum-soft" iconColor="text-plum" title="AI模拟面试" desc="仿真面试场景与点评，迅速提升面试实战能力。" cta="开始模拟" onClick={() => navigate('/interview/setup')} />
         <AiFeatureCard icon={PenToolIcon} iconBg="bg-success-bg" iconColor="text-success-fg" title="AI简历优化" desc="基于你的简历原文优化表达，生成可编辑的优化版简历（不补充虚构信息）。" cta="开始优化" onClick={() => navigate('/resume/source?intent=optimize')} />
         <AiFeatureCard icon={AwardIcon} iconBg="bg-warning-bg" iconColor="text-warning-fg" title="岗位信息参考" desc="浏览第三方来源岗位信息，投递请前往来源平台办理。" cta="查看岗位" onClick={() => navigate('/jobs')} />
       </div>

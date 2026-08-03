@@ -6,6 +6,7 @@
 // 首页 zone-card 点击 → /toolbox；能力（config 驱动 / 站内·外部H5·二维码启动 /
 // 离场确认 / sendBeacon 事件）由本页保留，零削减。
 import type { KioskToolboxItem } from '@ai-job-print/shared'
+import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import { ChevronRightIcon } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -84,21 +85,18 @@ export function ToolboxZonePage() {
   const items = config.enabled ? [...(config.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
 
   return (
-    <div className="fusion-w5 fusion-w5--system kpv1 ktoolbox" data-kiosk-screen="toolbox">
-      <div className="pagehead">
-        <button type="button" className="back-btn" onClick={() => navigate('/')}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-            <path d="M15 6l-6 6 6 6" />
-          </svg>
-          返回
-        </button>
-        <div className="titles">
-          <h1>百宝箱</h1>
-          <p>本机已配置的扩展服务，经审核后上架</p>
-        </div>
-      </div>
-
-      <section className="tb-content">
+    <KioskPageFrame
+      className="fusion-w5 fusion-w5--system kpv1 ktoolbox"
+      header={
+        <KioskPageHeader
+          title="百宝箱"
+          description="本机已配置的扩展服务，经审核后上架"
+          onBack={() => navigate('/')}
+          backLabel="返回"
+        />
+      }
+    >
+      <section data-kiosk-screen="toolbox" className="tb-content">
         {items.length > 0 ? (
           <div className="tb-tiles">
             {items.map((item) => (
@@ -120,7 +118,7 @@ export function ToolboxZonePage() {
 
       <QrLaunchModal item={qrItem} placement="toolbox" onClose={() => setQrItem(null)} />
       <ExternalLaunchModal item={externalItem} placement="toolbox" onClose={() => setExternalItem(null)} />
-    </div>
+    </KioskPageFrame>
   )
 }
 

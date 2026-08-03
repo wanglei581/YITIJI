@@ -65,9 +65,21 @@ expect(/visualTheme="service-desk"/.test(root), 'KioskRoot 全路由固定 servi
 expect(/presentation="fusion-youth"/.test(root), 'KioskRoot 全路由固定 fusion-youth')
 expect(!root.includes('SERVICE_DESK_EXACT_ROUTES'), '无 SERVICE_DESK 路由白名单分叉')
 expect(!/visualTheme=\{isServiceDeskRoute/.test(root), '无 legacy/service-desk 三元切换')
-expect(/hideHeader=\{isCampusZone\}/.test(root) && /hideBottomNav=\{isCampusZone\}/.test(root), '仅校园专区隐藏共享顶栏/底栏')
+expect(
+  /hideHeader=\{isCampusZone\}/.test(root)
+    && /hideBottomNav=\{isCampusZone \|\| usesPageActionbar\}/.test(root),
+  '校园专区隐藏共享顶栏，行动条流程页以页面操作栏替代共享底栏',
+)
 expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(root), '共享顶栏始终拉取真实设备状态')
 expect(root.includes('<KioskTopbarStatus'), '共享顶栏注入时钟+设备状态胶囊')
+expect(root.includes('KioskStageFit'), 'KioskRoot 使用设计稿舞台等比适配')
+expect(indexCss.includes('kiosk-stage-fit.css'), 'index.css 导入 kiosk-stage-fit')
+{
+  const stageFit = read(join(kioskRoot, 'src/styles/kiosk-stage-fit.css'))
+  const hook = read(join(kioskRoot, 'src/hooks/useKioskStageFit.ts'))
+  expect(stageFit.includes('.kiosk-stage-host') && stageFit.includes('.kiosk-stage'), 'stage-fit CSS 定义宿主与舞台')
+  expect(/KIOSK_STAGE_WIDTH\s*=\s*1080/.test(hook) && /KIOSK_STAGE_HEIGHT\s*=\s*1920/.test(hook), '舞台尺寸固定 1080×1920')
+}
 
 expect(!/function KioskTopBar/.test(home) && !/function HomeNavbar/.test(home), '首页不再自绘顶栏/底栏组件')
 expect(home.includes('kpv1--content-only'), '首页内容区声明 content-only')

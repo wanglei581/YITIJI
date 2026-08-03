@@ -28,6 +28,7 @@ import {
   type HealthProbe,
   type Pm2ProcessSnapshot,
 } from '../src/release-provenance/release-activation'
+import { assertLocalHealthUrl } from '../src/release-provenance/release-runtime-contract'
 import {
   createFixture,
   createManifest,
@@ -42,6 +43,23 @@ import {
 
 const PREVIOUS_RELEASE_ID = 'release-20260716-previous'
 const CANDIDATE_RELEASE_ID = 'release-20260716-candidate'
+const MANAGED_HEALTH_URL = 'http://127.0.0.1:3011/api/v1/health'
+const LEGACY_HEALTH_URL = 'http://127.0.0.1:3010/api/v1/health'
+const REJECTED_HEALTH_URLS = [
+  LEGACY_HEALTH_URL,
+  'http://127.0.0.1:3012/api/v1/health',
+  'http://localhost:3011/api/v1/health',
+  'http://0.0.0.0:3011/api/v1/health',
+  'http://[::1]:3011/api/v1/health',
+  'http://api.local:3011/api/v1/health',
+  'https://127.0.0.1:3011/api/v1/health',
+  'http://127.0.0.1:3011/health',
+  'http://127.0.0.1:3011/api/v1/health/',
+  'http://user:pass@127.0.0.1:3011/api/v1/health',
+  'http://127.0.0.1:3011/api/v1/health?probe=1',
+  'http://127.0.0.1:3011/api/v1/health#probe',
+  'http://169.254.169.254/latest/meta-data/',
+] as const
 
 async function expectCodeAsync(expectedCode: string, action: () => Promise<unknown>): Promise<void> {
   try {
@@ -77,6 +95,19 @@ function expectCode(expectedCode: string, action: () => unknown): void {
     return
   }
   assert.fail(`expected ${expectedCode}`)
+}
+
+function verifyManagedHealthUrlContract(): void {
+  assert.doesNotThrow(() => assertLocalHealthUrl(MANAGED_HEALTH_URL))
+  for (const value of REJECTED_HEALTH_URLS) {
+    assert.throws(
+      () => assertLocalHealthUrl(value),
+      (error: unknown) =>
+        error instanceof ReleaseProvenanceError &&
+        error.code === 'RELEASE_PROVENANCE_HEALTH_URL_INVALID',
+    )
+  }
+  console.log('  PASS managed health URL accepts only exact loopback port 3011')
 }
 
 async function verifyGuardLaunch(): Promise<void> {
@@ -192,7 +223,7 @@ function createActivationFixture(): ActivationFixture {
   const previous = createFixture({ workspace, releaseName: 'previous', sourceArchiveName: 'previous.tar.gz' })
   const candidate = createFixture({ workspace, releaseName: 'candidate', sourceArchiveName: 'candidate.tar.gz' })
   const currentLink = join(workspace, 'current')
-  const healthUrl = 'http://127.0.0.1:3010/api/v1/health'
+  const healthUrl = MANAGED_HEALTH_URL
   const launcherCwd = join(workspace, 'launcher')
   const launcherPath = join(launcherCwd, 'release-current-launcher.js')
   writeFixtureFile(launcherPath, 'console.log("fixture launcher")\n')
@@ -244,6 +275,48 @@ function activationOptions(fixture: ActivationFixture, runner: CommandRunner, he
     runtimeEnvContractSha256: fixture.runtimeEnvContractSha256,
     runner,
     healthProbe,
+  }
+}
+
+async function verifyLegacyHealthUrlFailsBeforeActivationSideEffects(): Promise<void> {
+  const fixture = createActivationFixture()
+  try {
+    fixture.healthUrl = LEGACY_HEALTH_URL
+    let reloads = 0
+    let inspections = 0
+    let healthChecks = 0
+    const runner: CommandRunner = {
+      reload: () => {
+        reloads += 1
+      },
+      inspect: () => {
+        inspections += 1
+        return pm2Snapshot(
+          fixture.launcherCwd,
+          fixture.launcherPath,
+          fixture.currentLink,
+          fixture.candidate.artifactRoot,
+          fixture.launcherSha256,
+        )
+      },
+    }
+    const healthProbe: HealthProbe = async () => {
+      healthChecks += 1
+      return true
+    }
+
+    await expectCodeAsync('RELEASE_PROVENANCE_HEALTH_URL_INVALID', () =>
+      activateRelease(activationOptions(fixture, runner, healthProbe)),
+    )
+
+    assert.equal(reloads, 0)
+    assert.equal(inspections, 0)
+    assert.equal(healthChecks, 0)
+    assert.equal(realpathSync(fixture.currentLink), realpathSync(fixture.previous.releaseRoot))
+    assert.equal(existsSync(`${fixture.currentLink}.activation.lock`), false)
+    console.log('  PASS legacy health URL fails before activation side effects')
+  } finally {
+    rmSync(fixture.workspace, { recursive: true, force: true })
   }
 }
 
@@ -319,7 +392,7 @@ async function verifyActivationRuntimeEnvironmentContract(): Promise<void> {
 async function verifyActivationCliRejectsLegacyArgumentCount(): Promise<void> {
   const output = { write: () => undefined }
   await expectCodeAsync('RELEASE_PROVENANCE_ACTIVATION_ARGUMENT_INVALID', () =>
-    runReleaseActivationCli(['--candidate-root', 'relative', '--current-link', '/current', '--artifact-root', '/artifacts', '--pm2-name', 'fixture-api', '--health-url', 'http://127.0.0.1:3010/api/v1/health', '--launcher-cwd', '/launcher', '--launcher-path', '/launcher/release-current-launcher.js', '--launcher-sha256', '0'.repeat(64)], output),
+    runReleaseActivationCli(['--candidate-root', 'relative', '--current-link', '/current', '--artifact-root', '/artifacts', '--pm2-name', 'fixture-api', '--health-url', MANAGED_HEALTH_URL, '--launcher-cwd', '/launcher', '--launcher-path', '/launcher/release-current-launcher.js', '--launcher-sha256', '0'.repeat(64)], output),
   )
   console.log('  PASS activation CLI rejects the legacy 16-argument contract')
 }
@@ -509,6 +582,9 @@ async function verifyActivationRejectsWrongLauncherArgs(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log('\n=== release provenance verification ===')
+
+  verifyManagedHealthUrlContract()
+  await verifyLegacyHealthUrlFailsBeforeActivationSideEffects()
 
   withFixture((fixture) => {
     createManifest(fixture)

@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-xdg-contract-fix-20260730",
+  "title": "修复 F1 D2′ XDG user-systemd 执行契约",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "归档任务并提交本地候选分支；新的 D2′ retake 必须另行授权",
+  "createdAt": "2026-07-30T15:53:17Z",
+  "branch": "codex/f1-d2-prime-xdg-contract-fix-20260730"
+}

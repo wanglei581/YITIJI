@@ -45,6 +45,64 @@ interface WireFairZone {
   sortOrder?: number
 }
 
+interface WireOfflineAgency {
+  id: string
+  name: string
+  orgType: string
+  address: string
+  district: string | null
+  lat: number | null
+  lng: number | null
+  openHours: string | null
+  phone: string | null
+  contactEmail: string | null
+  website: string | null
+  services: string
+  description: string | null
+  logoUrl: string | null
+  status: string
+  sourceOrgId: string | null
+  externalId: string | null
+  syncTime: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+interface WireOfflineJobAgency {
+  id: string
+  name: string
+  orgType: string
+  address: string
+  district: string | null
+  phone: string | null
+  openHours: string | null
+  website: string | null
+  reviewStatus: string
+  publishStatus: string
+}
+
+interface WireOfflineJob {
+  id: string
+  agencyId: string
+  title: string
+  jobType: string
+  salaryMin: number | null
+  salaryMax: number | null
+  salaryUnit: string
+  requirements: string | null
+  description: string | null
+  headcount: number
+  location: string | null
+  education: string | null
+  experience: string | null
+  externalUrl: string | null
+  externalId: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  agency: WireOfflineJobAgency
+}
+
 export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: boolean } = {}): void {
   const job = {
     id: 'job-001', title: '前端工程师', company: '青岛示例制造有限公司', city: '青岛市',
@@ -74,10 +132,28 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
     id: 'zone-001', jobFairId: 'fair-001', name: '智能制造专区', category: '智能制造', city: '青岛市', sortOrder: 1,
   } satisfies WireFairZone
   const agency = {
-    id: 'agency-001', name: '青岛合规人力服务机构', type: '人力资源服务机构', status: 'open', statusLabel: '营业中',
-    address: '市南区示例路1号', district: '市南区', distanceKm: 1.2, hours: '09:00–17:00',
-    services: ['岗位咨询', '用工咨询'], orgCode: 'QD-HR-001', jobCount: 2, syncTime: '2026-07-24T08:00:00.000Z',
-  }
+    id: 'agency-001', name: '青岛合规人力服务机构', orgType: 'recruitment',
+    address: '市南区示例路1号', district: '市南区', lat: 36.0671, lng: 120.3826,
+    openHours: null, phone: '0532-00000000', contactEmail: null,
+    website: 'https://agency.example.gov.cn', services: '["岗位咨询","用工咨询"]',
+    description: '线下公开服务机构。', logoUrl: null, status: 'inactive',
+    sourceOrgId: 'source-001', externalId: 'QD-HR-001', syncTime: '2026-07-24T08:00:00.000Z',
+    createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
+  } satisfies WireOfflineAgency
+  const offlineJob = {
+    id: 'offline-job-001', agencyId: agency.id, title: '现场咨询岗位', jobType: 'fulltime',
+    salaryMin: 8000, salaryMax: 12000, salaryUnit: 'month',
+    requirements: '熟悉 TypeScript\n可到店沟通', description: '负责来源岗位信息整理\n配合现场咨询',
+    headcount: 2, location: '青岛市市南区', education: '大专', experience: '1-3年',
+    externalUrl: null, externalId: 'offline-ext-001', status: 'active',
+    createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
+    agency: {
+      id: agency.id, name: agency.name, orgType: agency.orgType, address: agency.address,
+      district: agency.district, phone: agency.phone, openHours: '09:00–17:00',
+      website: agency.website,
+      reviewStatus: 'approved', publishStatus: 'published',
+    },
+  } satisfies WireOfflineJob
   const company = {
     id: 'company-001', name: '青岛示例制造有限公司', logoUrl: null, companyType: 'private', industry: 'manufacturing',
     sourceName: '青岛公共就业服务网', province: '山东省', city: '青岛市', district: '崂山区', description: '专注智能制造。',
@@ -93,7 +169,17 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
   const respond = (path: string, data: unknown) => api.respond('GET', path, { status: 200, json: data })
   respond('/api/v1/jobs', { success: true, data: [job], pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 } })
   respond('/api/v1/jobs/job-001', { success: true, data: job })
-  respond('/api/v1/kiosk/offline-agencies', { success: true, data: { items: [agency], total: 1, page: 1, pageSize: 10, stats: { totalAgencies: 1, openAgencies: 1, totalJobs: 2, districts: 1, lastSyncLabel: '今日' } } })
+  respond('/api/v1/kiosk/offline-agencies', { data: [agency], total: 1, page: 1, pageSize: 10 })
+  respond('/api/v1/kiosk/offline-agencies/agency-001', {
+    id: 'agency-001', name: '青岛合规人力服务机构', type: '人力资源服务机构',
+    address: '市南区示例路1号', district: '市南区', hours: '09:00–17:00',
+    services: ['岗位咨询', '用工咨询'], orgCode: 'QD-HR-001',
+    syncTime: '2026-07-24T08:00:00.000Z', status: 'open', jobCount: 1,
+    phone: '0532-00000000', description: '线下公开服务机构。',
+    website: 'https://agency.example.gov.cn',
+    jobs: [{ id: 'offline-job-001', title: '现场咨询岗位', jobType: 'fulltime', location: '市南区', salaryMin: 8000, salaryMax: 12000, status: 'active' }],
+  })
+  respond('/api/v1/kiosk/offline-jobs/offline-job-001', offlineJob)
   respond('/api/v1/companies', { success: true, data: { items: [company], nextCursor: null, total: 1 } })
   respond('/api/v1/companies/stats', { success: true, data: { companyCount: 1, openJobCount: 1, todayNewJobCount: 1, fairCompanyCount: 1 } })
   respond('/api/v1/companies/company-001', { success: true, data: companyDetail })

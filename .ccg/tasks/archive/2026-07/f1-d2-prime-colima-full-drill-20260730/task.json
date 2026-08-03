@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-prime-colima-full-drill-20260730",
+  "title": "在现有 Colima 非生产 Linux 执行 F1 D2′ full drill",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "high",
+  "domain": "ops",
+  "currentPhase": "completed",
+  "nextAction": "归档 NO-GO 结果；另起任务按 TDD 修复演练器，修复后再申请独立 retake 授权",
+  "createdAt": "2026-07-30T11:45:00Z",
+  "branch": "codex/f1-d2-prime-colima-drill-20260730"
+}

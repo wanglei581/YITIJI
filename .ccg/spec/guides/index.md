@@ -46,7 +46,20 @@
 
 ## 二、单文件大小阈值
 
-除生成文件、迁移快照、静态数据快照外，普通源码文件按以下阈值控制：
+**适用范围（2026-08-01 补充）**：本阈值表只管**业务源码** —— `apps/*/src`、`services/*/src`、`packages/*/src`。以下不受行数阈值约束：生成文件、Prisma migration 快照、静态数据快照，以及 `apps/*/scripts` 与 `services/api/scripts` 下的 **verify 脚本**。
+
+> 为什么单列 verify 脚本：一个脚本对应一条完整验收链路，机械按行数拆会割裂验收语义，且拆分本身有让门禁静默失效的风险。verify 脚本改用替代口径：单脚本单验收主题、新增断言优先扩写既有脚本、超 1500 行才按验收阶段拆分。完整口径见 [docs/governance/standards-index.md](../../../docs/governance/standards-index.md) 第五节。
+
+> **实测口径（2026-08-01 复核修正）**：`*/src` 下超 1000 行的文件有 **3 个，全部是 CSS**（`jobs-fairs-foundation.css` 1361、`admin/login.css` 1039、`partner/login.css` 1039）；`.ts/.tsx` 业务源码为 0。另有 7 个超 1000 行的 verify 脚本，但它们在 `*/scripts` 下，本就不在适用范围内。
+> 本行此前写作「7 个超千行文件**全部**是 verify 脚本，业务源码为 0」——该结论来自只统计 `.ts/.tsx` 的命令，漏了同在 `*/src` 下的 CSS。复核命令（不要再只筛 `.ts/.tsx`）：
+>
+> ```bash
+> find apps services packages -type f -path '*/src/*' -exec wc -l {} + | awk '$1 > 1000 && $2 != "total"' | sort -nr
+> ```
+>
+> **CSS 口径（2026-08-01 定论，消除本节内部冲突）**：CSS 同样纳入超千行跟踪——超过阈值即触发结构审查，并禁止无评估继续扩大；但**是否拆分**依据选择器职责、重复率和层叠边界判定，不单凭行数判违规（选择器块与函数的可拆分性不同，机械按行数切层叠顺序会引入视觉回归）。此前写「是否适用尚未定论」，与本节适用范围已含整个 `*/src`、且 1000 行以上进入拆分清单的规定自相矛盾，故收敛为上述可执行口径。
+
+业务源码按以下阈值控制：
 
 | 行数 | 处理规则 |
 |------|----------|
@@ -116,6 +129,15 @@
 - 相关 typecheck、lint、build、verify 或浏览器验收已执行。
 - `docs/progress/current-progress.md` 和 `docs/progress/next-tasks.md` 已按实际结果同步。
 
+### Linux / PM2 隔离演练补充
+
+- 临时 `PM2_HOME` 必须在启动 daemon 前计算 `pub.sock` / `rpc.sock` 的绝对路径字节数，并为 Linux
+  `AF_UNIX sun_path` 预留余量；不得把仓库深路径直接当作默认控制面路径。
+- 所有可能派生 daemon 的 PM2 预检与清理命令都必须有有界 timeout，并在测试中覆盖“父 CLI 退出但
+  daemon 仍存活”的路径；清理只能按 nonce、owner、进程身份和精确 socket 路径执行。
+- Full drill 首次失败必须保留原始 NO-GO evidence，不得原地修脚本后 retake；修复与新演练分成两个
+  独立任务，新演练仍需新的 nonce、evidence 路径和明确授权。
+
 ## 七、目录治理与物理迁移规则
 
 当前仓库目录职责以 `docs/project-structure.md` 为准。`apps/`、`services/`、`packages/` 是标准 monorepo 结构，不因“看起来不分类”而直接物理迁移。
@@ -137,3 +159,15 @@
 - 后端迁移必须覆盖 SQLite 主验证和 PostgreSQL readiness。
 - Terminal Agent 迁移必须先在旧路径卸载 Windows 服务，再在新路径安装服务。
 - 完成后必须运行相关 typecheck、build、verify、本地启动验证，并做 Claude + 前端模型双模型审查。
+
+## 八、公共终端浏览器会话安全
+
+Kiosk 作为多人轮换使用的公共终端，不能只依赖组件卸载、SPA `replace` 或受 busy 抑制的 idle timer。涉及登录态、匿名 access token、文件、支付、面试、打印或扫描上下文时必须满足：
+
+- 所有终端业务路由、unknown route 和 error boundary 共享同一非视觉安全根；手机辅助页必须显式分组豁免，不能靠偶然路由层级。
+- 普通 idle / 屏保可以尊重真实短时 busy，但必须另有不受 busy 抑制的硬隐私截止；可见性恢复与 BFCache `pageshow.persisted` 必须按真实时间或 fail-closed 清场。
+- 清场顺序必须是：先阻断交互并同步清本地敏感状态，再尽力服务端登出，最后处理 history 和硬刷新；Storage、Cookie 或网络失败不得跳过本地清场。
+- `history.replaceState` 不能删除旧 forward/back。安全边界必须截断 forward，并在 Outlet 渲染前拒绝旧 back；屏保进入、刷新和唤醒首页都要延续同一无 PII boundary。
+- 多种边界载体存在时必须按显式代次选最新，不能无条件信任当前 landing；不得把可被第三方同标签页修改的 `window.name` 当可信边界。
+- 后台已创建的打印/扫描任务不因页面隐私清场而取消；只停止本地轮询和清除上一位用户的操作上下文。
+- 浏览器回归至少覆盖会员/匿名、back/forward、旧 landing、新旧边界冲突、持久化拒绝、屏保刷新/唤醒、BFCache、unknown route、真实 busy 任务和手机豁免。

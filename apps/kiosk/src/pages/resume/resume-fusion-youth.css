@@ -2,3 +2,12 @@
 @import './styles/resume-fusion-diagnosis.css';
 @import './styles/resume-fusion-authoring.css';
 @import './styles/resume-fusion-library.css';
+
+[data-kiosk-presentation='fusion-youth'] .fusion-w3--resume > .ui-kiosk-page-content { padding: 0; }
+
+[data-kiosk-presentation='fusion-youth'] .resume-source-direction h2 { white-space: nowrap; }
+
+@media (min-width: 1024px) {
+  [data-kiosk-presentation='fusion-youth'] .resume-source-split { grid-template-columns: minmax(0, 1fr) minmax(440px, 0.9fr); }
+  [data-kiosk-presentation='fusion-youth'] .resume-source-side { min-width: 440px; }
+}

@@ -9,6 +9,7 @@
 import crypto from 'crypto'
 import {
   Injectable,
+  Optional,
   OnModuleInit,
   NotFoundException,
   UnauthorizedException,
@@ -29,18 +30,23 @@ import {
   tryNormalizeMacAddress,
   isMacUniqueConstraintError,
   exceptionErrorCode,
-  hashBindCode,
-  constantTimeEquals,
-  makeBindCode,
   requirePaidBeforeClaim,
   shouldSeedTestPrintTask,
   normalizeHeartbeatStatus,
   inferMimeFromFileName,
   requireEnv,
-  DEFAULT_BIND_CODE_TTL_MINUTES,
+  DEFAULT_AGENT_CREDENTIAL_TTL_MS,
+  makeCredentialId,
   DEFAULT_PARAMS,
   type PrintJobParams,
 } from './terminal-utils'
+import {
+  TerminalCredentialSecurityService,
+  type TerminalBindCodeCreated,
+  type TerminalBindCodeExchangeResult,
+  type TerminalBindCodeAuditContext,
+  type EmergencyCredentialRevokeResult,
+} from './terminal-credential-security.service'
 
 // ── Task status type ───────────────────────────────────────────────────────────
 
@@ -75,19 +81,7 @@ export interface ClaimTaskResponse {
 
 // ── Bind code response types ───────────────────────────────────────────────────
 
-export interface TerminalBindCodeCreated {
-  terminalId: string
-  terminalCode: string
-  bindCode: string
-  expiresAt: string
-}
-
-export interface TerminalBindCodeExchangeResult {
-  terminalId: string
-  terminalCode: string
-  terminalToken: string
-  expiresAt: string
-}
+export type { TerminalBindCodeCreated, TerminalBindCodeExchangeResult, EmergencyCredentialRevokeResult } from './terminal-credential-security.service'
 
 // ── Sample files ───────────────────────────────────────────────────────────────
 
@@ -181,11 +175,16 @@ function createActionToken(taskId: string, terminalId: string, expiresAt: Date):
 @Injectable()
 export class TerminalAgentService implements OnModuleInit {
   private readonly logger = new Logger(TerminalAgentService.name)
+  private readonly credentialSecurity: TerminalCredentialSecurityService
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-  ) {}
+    audit: AuditService,
+    @Optional() credentialSecurity?: TerminalCredentialSecurityService,
+  ) {
+    // Nest 运行时使用独立 provider；脚本 fixture 保留两参构造兼容。
+    this.credentialSecurity = credentialSecurity ?? new TerminalCredentialSecurityService(prisma, audit)
+  }
 
   async onModuleInit(): Promise<void> {
     if (shouldSeedTestPrintTask()) {
@@ -201,7 +200,17 @@ export class TerminalAgentService implements OnModuleInit {
     terminalId: string
     terminalToken: string
     expiresAt: string
+    credentialId: string
+    generation: number
   }> {
+    if (process.env['TERMINAL_LEGACY_REGISTER_ENABLED'] !== 'true') {
+      throw new ForbiddenException({
+        error: {
+          code: 'TERMINAL_LEGACY_REGISTER_DISABLED',
+          message: '共享密钥注册已关闭，请由管理员预创建设备并使用一次性绑定码激活',
+        },
+      })
+    }
     if (dto.adminSecret !== ADMIN_SECRET) {
       throw new UnauthorizedException({
         error: { code: 'AUTH_INVALID_CREDENTIALS', message: 'adminSecret 无效' },
@@ -209,36 +218,75 @@ export class TerminalAgentService implements OnModuleInit {
     }
 
     const agentToken = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
+    const credentialId = makeCredentialId()
+    const expiresAt = new Date(Date.now() + DEFAULT_AGENT_CREDENTIAL_TTL_MS)
     const macAddress = normalizeMacAddress(dto.macAddress)
     if (macAddress) {
       await this.assertMacAvailable(macAddress, dto.terminalCode)
     }
 
-    const terminal = await this.writeWithMacConflictMapping(() =>
-      this.prisma.terminal.upsert({
+    const existing = await this.prisma.terminal.findUnique({
+      where: { terminalCode: dto.terminalCode },
+      select: { lifecycleStatus: true },
+    })
+    if (existing?.lifecycleStatus === 'planned') {
+      throw new ForbiddenException({
+        error: { code: 'TERMINAL_BIND_CODE_REQUIRED', message: '该终端已由管理员预创建，必须使用一次性绑定码激活' },
+      })
+    }
+    const terminal = await this.writeWithMacConflictMapping(() => this.prisma.$transaction(async (tx) => {
+      const current = await tx.terminal.findUnique({
+        where: { terminalCode: dto.terminalCode },
+        select: { lifecycleStatus: true },
+      })
+      if (current?.lifecycleStatus === 'planned') {
+        throw new ForbiddenException({
+          error: { code: 'TERMINAL_BIND_CODE_REQUIRED', message: '该终端已由管理员预创建，必须使用一次性绑定码激活' },
+        })
+      }
+      const row = await tx.terminal.upsert({
         where: { terminalCode: dto.terminalCode },
         update: {
           agentToken,
+          credentialGeneration: { increment: 1 },
           deviceFingerprint: dto.deviceFingerprint,
           displayName: cleanNullable(dto.displayName),
           macAddress,
           locationLabel: cleanNullable(dto.locationLabel),
+          lifecycleStatus: 'active',
         },
         create: {
           id: `t_${crypto.randomBytes(8).toString('hex')}`,
           terminalCode: dto.terminalCode,
           agentToken,
+          credentialGeneration: 1,
           deviceFingerprint: dto.deviceFingerprint,
           displayName: cleanNullable(dto.displayName),
           macAddress,
           locationLabel: cleanNullable(dto.locationLabel),
+          lifecycleStatus: 'active',
         },
-      }),
-    ) as { id: string; terminalCode: string }
+        select: { id: true, terminalCode: true, credentialGeneration: true },
+      })
+      await this.credentialSecurity.persistIssuedCredential(tx, {
+        credentialId,
+        terminalId: row.id,
+        token: agentToken,
+        generation: row.credentialGeneration,
+        issueSource: 'legacy_register',
+        expiresAt,
+      })
+      return row
+    }))
 
     this.logger.log(`register: terminalId=${terminal.id} code=${dto.terminalCode}`)
-    return { terminalId: terminal.id, terminalToken: agentToken, expiresAt }
+    return {
+      terminalId: terminal.id,
+      terminalToken: agentToken,
+      expiresAt: expiresAt.toISOString(),
+      credentialId,
+      generation: terminal.credentialGeneration,
+    }
   }
 
   /**
@@ -247,138 +295,23 @@ export class TerminalAgentService implements OnModuleInit {
   async createBindCode(
     terminalRef: string,
     actorId: string | null,
-    ttlMinutes = DEFAULT_BIND_CODE_TTL_MINUTES,
+    ttlMinutes?: number,
+    auditContext?: TerminalBindCodeAuditContext,
   ): Promise<TerminalBindCodeCreated> {
-    const terminal = await this.prisma.terminal.findFirst({
-      where: this.terminalRefWhere(terminalRef),
-      select: { id: true, terminalCode: true, enabled: true },
-    })
-    if (!terminal) {
-      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_FOUND', message: '终端不存在' } })
-    }
-    if (!terminal.enabled) {
-      throw new BadRequestException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能生成绑定码' } })
-    }
-
-    const ttl = Math.min(60, Math.max(1, Math.round(ttlMinutes || DEFAULT_BIND_CODE_TTL_MINUTES)))
-    const now = new Date()
-    const expiresAt = new Date(Date.now() + ttl * 60 * 1000)
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const bindCode = makeBindCode()
-      try {
-        await this.prisma.$transaction(async (tx) => {
-          await tx.terminalBindCode.updateMany({
-            where: {
-              terminalId: terminal.id,
-              usedAt: null,
-              revokedAt: null,
-              expiresAt: { gt: now },
-            },
-            data: { revokedAt: now },
-          })
-          await tx.terminalBindCode.create({
-            data: {
-              terminalId: terminal.id,
-              terminalCode: terminal.terminalCode,
-              codeHash: hashBindCode(bindCode),
-              createdBy: actorId,
-              expiresAt,
-            },
-          })
-        })
-        return {
-          terminalId: terminal.id,
-          terminalCode: terminal.terminalCode,
-          bindCode,
-          expiresAt: expiresAt.toISOString(),
-        }
-      } catch (error) {
-        if (attempt === 2) throw error
-      }
-    }
-    throw new Error('Failed to create terminal bind code')
+    return this.credentialSecurity.createBindCode(terminalRef, actorId, ttlMinutes, auditContext)
   }
 
   /** Agent 用一次性绑定码换取 terminalToken。成功后旧 token 立即失效。 */
   async exchangeBindCode(dto: ExchangeTerminalBindCodeDto): Promise<TerminalBindCodeExchangeResult> {
-    const codeHash = hashBindCode(dto.bindCode)
-    const now = new Date()
-    const agentToken = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString()
-    const macAddress = normalizeMacAddress(dto.macAddress)
-    const locationLabel = cleanNullable(dto.locationLabel)
-    const displayName = cleanNullable(dto.displayName)
+    return this.credentialSecurity.exchangeBindCode(dto)
+  }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const bind = await tx.terminalBindCode.findUnique({
-        where: { codeHash },
-        include: { terminal: { select: { id: true, terminalCode: true, enabled: true } } },
-      })
-      if (!bind) {
-        throw new UnauthorizedException({ error: { code: 'BIND_CODE_INVALID', message: '绑定码无效' } })
-      }
-      if (bind.revokedAt) {
-        throw new UnauthorizedException({ error: { code: 'BIND_CODE_REVOKED', message: '绑定码已撤销' } })
-      }
-      if (bind.usedAt) {
-        throw new UnauthorizedException({ error: { code: 'BIND_CODE_USED', message: '绑定码已使用' } })
-      }
-      if (bind.expiresAt <= now) {
-        throw new UnauthorizedException({ error: { code: 'BIND_CODE_EXPIRED', message: '绑定码已过期' } })
-      }
-      if (!bind.terminal.enabled) {
-        throw new ForbiddenException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用，不能绑定' } })
-      }
-      if (macAddress) {
-        const found = await tx.terminal.findFirst({ where: { macAddress }, select: { id: true, terminalCode: true } })
-        if (found && found.id !== bind.terminalId) {
-          throw new BadRequestException({ error: { code: 'MAC_ALREADY_BOUND', message: `MAC 地址已绑定到终端 ${found.terminalCode}` } })
-        }
-      }
-      const consumed = await tx.terminalBindCode.updateMany({
-        where: { id: bind.id, usedAt: null, revokedAt: null, expiresAt: { gt: now } },
-        data: { usedAt: now },
-      })
-      if (consumed.count !== 1) {
-        throw new UnauthorizedException({ error: { code: 'BIND_CODE_USED', message: '绑定码已使用' } })
-      }
-      const terminal = await tx.terminal.update({
-        where: { id: bind.terminalId },
-        data: {
-          agentToken,
-          deviceFingerprint: dto.deviceFingerprint,
-          ...(displayName !== undefined ? { displayName } : {}),
-          ...(macAddress !== undefined ? { macAddress } : {}),
-          ...(locationLabel !== undefined ? { locationLabel } : {}),
-        },
-        select: { id: true, terminalCode: true },
-      })
-      return terminal
-    })
-
-    this.logger.log(`bind-code exchange: terminalId=${result.id} code=${result.terminalCode}`)
-    await this.audit.write({
-      actorId: null,
-      actorRole: 'terminal-agent',
-      action: 'terminal.bind_code.exchange',
-      targetType: 'terminal',
-      targetId: result.terminalCode,
-      payload: {
-        terminalCode: result.terminalCode,
-        displayName,
-        macAddress,
-        locationLabel,
-        agentVersion: cleanNullable(dto.agentVersion) ?? null,
-        deviceFingerprintPrefix: dto.deviceFingerprint.slice(0, 12),
-      },
-    })
-    return {
-      terminalId: result.id,
-      terminalCode: result.terminalCode,
-      terminalToken: agentToken,
-      expiresAt,
-    }
+  emergencyRevokeCredentials(
+    terminalRef: string,
+    auditContext: Parameters<TerminalCredentialSecurityService['emergencyRevoke']>[1],
+    expected: Parameters<TerminalCredentialSecurityService['emergencyRevoke']>[2],
+  ): Promise<EmergencyCredentialRevokeResult> {
+    return this.credentialSecurity.emergencyRevoke(terminalRef, auditContext, expected)
   }
 
   // ── 2. Heartbeat ─────────────────────────────────────────────────────────────
@@ -388,7 +321,7 @@ export class TerminalAgentService implements OnModuleInit {
     dto: HeartbeatDto,
     authHeader: string | undefined,
   ): Promise<{ acknowledged: true }> {
-    await this.findAndValidate(terminalId, authHeader, { allowDisabled: true })
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader, { allowDisabled: true })
     const profilePatch = await this.buildDeviceProfilePatch(dto, terminalId)
     const lastSeenAt = new Date()
 
@@ -420,11 +353,18 @@ export class TerminalAgentService implements OnModuleInit {
         terminalId,
         status: normalizeHeartbeatStatus(dto.status),
         printerStatus: dto.printerStatus ?? null,
+        wiredNetworkStatus: dto.wiredNetworkStatus ?? null,
+        printerNetworkStatus: dto.printerNetworkStatus ?? null,
         localTaskDatabaseAvailable: dto.localTaskDatabaseAvailable ?? null,
         diskFreeGb: dto.diskFreeGB ?? null,
         agentVersion: dto.agentVersion ?? null,
         ipAddress: dto.ipAddress ?? null,
       },
+    })
+
+    await this.prisma.terminal.updateMany({
+      where: { id: terminalId, lifecycleStatus: 'commissioning' },
+      data: { lifecycleStatus: 'active' },
     })
 
     return { acknowledged: true }
@@ -437,7 +377,7 @@ export class TerminalAgentService implements OnModuleInit {
     dto: ClaimTasksDto,
     authHeader: string | undefined,
   ): Promise<ClaimTaskResponse[]> {
-    await this.findAndValidate(terminalId, authHeader)
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
     const canClaim = await this.canTerminalClaimTasks(terminalId)
     if (!canClaim) {
       this.logger.warn(`claimTasks: terminal ${terminalId} is agent_degraded/local DB unavailable; returning no tasks`)
@@ -469,6 +409,12 @@ export class TerminalAgentService implements OnModuleInit {
       let claimed
       try {
         claimed = await this.prisma.$transaction(async (tx) => {
+          // No-op CAS 同时是与 lifecycle 切换共用的行锁：只有 active 可以领取新任务。
+          const activeLock = await tx.terminal.updateMany({
+            where: { id: terminalId, enabled: true, lifecycleStatus: 'active' },
+            data: { lifecycleStatus: 'active' },
+          })
+          if (activeLock.count !== 1) return null
           const task = await tx.printTask.findFirst({
             where: claimableWhere,
             orderBy: { createdAt: 'asc' },
@@ -536,7 +482,7 @@ export class TerminalAgentService implements OnModuleInit {
       })
     }
     const terminalId = terminalIdHeader.trim()
-    await this.findAndValidate(terminalIdHeader, authHeader)
+    await this.credentialSecurity.validateTerminalToken(terminalIdHeader, authHeader)
 
     const preCheck = await this.prisma.printTask.findUnique({ where: { id: taskId } })
     if (!preCheck) {
@@ -593,7 +539,7 @@ export class TerminalAgentService implements OnModuleInit {
   }
 
   async validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void> {
-    await this.assertAgentAuthorized(terminalId, authHeader)
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
   }
 
   /**
@@ -604,7 +550,7 @@ export class TerminalAgentService implements OnModuleInit {
     authHeader: string | undefined,
     options: { allowDisabled?: boolean } = {},
   ): Promise<void> {
-    await this.findAndValidate(terminalId, authHeader, options)
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader, options)
   }
 
   // ── Semi-internal helpers (used by TerminalAdminService) ─────────────────────
@@ -681,24 +627,6 @@ export class TerminalAgentService implements OnModuleInit {
     return latestHeartbeat.status !== 'agent_degraded' && latestHeartbeat.localTaskDatabaseAvailable !== false
   }
 
-  private async findAndValidate(
-    terminalId: string,
-    authHeader: string | undefined,
-    options: { allowDisabled?: boolean } = {},
-  ): Promise<void> {
-    const terminal = await this.prisma.terminal.findUnique({ where: { id: terminalId } })
-    if (!terminal) {
-      throw new NotFoundException({ error: { code: 'TERMINAL_NOT_REGISTERED', message: '终端未注册' } })
-    }
-    const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
-    if (!token || !constantTimeEquals(token, terminal.agentToken)) {
-      throw new UnauthorizedException({ error: { code: 'AUTH_TOKEN_INVALID', message: 'agentToken 无效' } })
-    }
-    if (!options.allowDisabled && !terminal.enabled) {
-      throw new ForbiddenException({ error: { code: 'TERMINAL_DISABLED', message: '终端已停用' } })
-    }
-  }
-
   private async buildDeviceProfilePatch(
     dto: Pick<HeartbeatDto, 'displayName' | 'macAddress' | 'locationLabel'>,
     ownerRef: string,
@@ -732,44 +660,69 @@ export class TerminalAgentService implements OnModuleInit {
     return data
   }
 
-  private async resetExpiredClaims(): Promise<void> {
+  async resetExpiredClaims(): Promise<void> {
     const now = new Date()
     const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
 
     const { claimedCount, printingCount } = await this.prisma.$transaction(async (tx) => {
-      const expiredClaimed = await tx.printTask.findMany({
-        where: { status: 'claimed', claimExpiry: { lt: now } },
-        select: { id: true },
+      const candidates = await tx.printTask.findMany({
+        where: {
+          OR: [
+            { status: 'claimed', claimExpiry: { lt: now } },
+            { status: 'printing', updatedAt: { lt: printingTimeout } },
+          ],
+        },
+        select: { id: true, status: true, terminalId: true },
       })
-      const expiredPrinting = await tx.printTask.findMany({
-        where: { status: 'printing', claimedAt: { lt: printingTimeout } },
-        select: { id: true },
-      })
-      const claimedCount = await tx.printTask.updateMany({
-        where: { status: 'claimed', claimExpiry: { lt: now } },
-        data: { status: 'pending', claimedAt: null, claimExpiry: null },
-      })
-      const printingCount = await tx.printTask.updateMany({
-        where: { status: 'printing', claimedAt: { lt: printingTimeout } },
-        data: { status: 'pending', claimedAt: null, claimExpiry: null },
-      })
-      const resetIds = [...expiredClaimed, ...expiredPrinting].map((task) => task.id)
-      if (resetIds.length > 0) {
-        await tx.order.updateMany({
-          where: {
-            printTaskId: { in: resetIds },
-            printTask: { is: { status: 'pending' } },
+      let claimedCount = 0
+      let printingCount = 0
+      for (const task of candidates) {
+        const timeoutWhere = task.status === 'claimed'
+          ? { id: task.id, status: 'claimed', claimExpiry: { lt: now } }
+          : { id: task.id, status: 'printing', updatedAt: { lt: printingTimeout } }
+        const updated = await tx.printTask.updateMany({
+          where: timeoutWhere,
+          data: {
+            status: 'failed',
+            completedAt: now,
+            errorCode: 'PRINT_JOB_UNCONFIRMED',
+            errorMessage: '打印作业超时且未确认出纸，需要工作人员核查，禁止自动重派',
           },
-          data: { taskStatus: 'pending' },
+        })
+        if (updated.count !== 1) continue
+        if (task.status === 'claimed') claimedCount += 1
+        else printingCount += 1
+        await tx.printTaskStatusLog.create({
+          data: { taskId: task.id, fromStatus: task.status, toStatus: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED' },
+        })
+        await tx.order.updateMany({
+          where: { printTaskId: task.id, taskStatus: task.status },
+          data: { taskStatus: 'failed', terminalId: task.terminalId },
+        })
+        await tx.auditLog.create({
+          data: {
+            actorId: null,
+            actorRole: 'system',
+            action: 'print_job.timeout_unconfirmed',
+            targetType: 'print_task',
+            targetId: task.id,
+            payloadJson: JSON.stringify({
+              fromStatus: task.status,
+              toStatus: 'failed',
+              errorCode: 'PRINT_JOB_UNCONFIRMED',
+              terminalId: task.terminalId,
+              autoRequeued: false,
+            }),
+          },
         })
       }
       return { claimedCount, printingCount }
     })
 
-    const total = claimedCount.count + printingCount.count
+    const total = claimedCount + printingCount
     if (total > 0) {
       this.logger.log(
-        `resetExpiredClaims: reset ${claimedCount.count} claimed + ${printingCount.count} stuck-printing task(s) to pending`,
+        `resetExpiredClaims: failed ${claimedCount} expired claimed + ${printingCount} stuck-printing task(s) as PRINT_JOB_UNCONFIRMED`,
       )
     }
   }

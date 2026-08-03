@@ -25,6 +25,7 @@ import { LlmCareerPlanService, type CareerPlanPayload } from '../src/ai/resume/l
 import { CareerPlanService } from '../src/ai/resume/career-plan.service'
 import { CareerPlanPdfService } from '../src/ai/resume/career-plan-pdf.service'
 import { MemberAssetsService } from '../src/member-assets/member-assets.service'
+import { AiLogService } from '../src/ai/ai-log.service'
 
 const RESUME_TEXT = '李某某，大专，行政管理专业。曾任某商贸公司行政文员，负责档案管理与会议安排，整理合同文件300余份_简历标记CPRS。熟练使用Office办公软件。'
 
@@ -84,6 +85,7 @@ async function main() {
   const { server, url } = await startStub()
   const prisma = new PrismaService()
   const audit = new AuditService(prisma)
+  const aiLog = new AiLogService(prisma)
   const stubConfig = {
     getApiKey: () => 'stub-key',
     getConfig: () => ({ vendor: 'deepseek', model: 'stub', baseURL: url, systemPrompt: '', roleScope: '', forbiddenWords: [], temperature: 0, enabled: true, apiKeyEncrypted: 'x' }),
@@ -106,7 +108,7 @@ async function main() {
       signedUrl: 'http://localhost/test', signedUrlExpiresAt: new Date(Date.now() + 600_000).toISOString(),
     }),
   }
-  const svc = new CareerPlanService(prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit)
+  const svc = new CareerPlanService(prisma, llm, stubExtraction as never, stubFiles as never, pdf, audit, aiLog)
   const assets = new MemberAssetsService(prisma)
 
   const suffix = Date.now().toString(36)

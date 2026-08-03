@@ -20,6 +20,9 @@ export interface AdminOrgAccount {
   enabled: boolean
   phoneMasked: string | null
   phoneVerifiedAt: string | null
+  emailMasked: string | null
+  emailVerifiedAt: string | null
+  emailVerifyMethod: string | null
   availableActionVerificationMethods: PartnerAccountVerificationMethod[]
   createdAt: string
 }
@@ -114,6 +117,11 @@ export interface OrgsAdminServiceInterface {
   createAccount(orgId: string, input: OrgAccountInput): Promise<AdminOrgAccount>
   setAccountStatus(orgId: string, accountId: string, action: 'enable' | 'disable'): Promise<AdminOrgAccount>
   resetAccountPassword(orgId: string, accountId: string, password: string): Promise<void>
+  bindAccountEmail(
+    orgId: string,
+    accountId: string,
+    input: { email: string; confirmVerified: true },
+  ): Promise<AdminOrgAccount>
   createActionChallenge(
     orgId: string,
     accountId: string,
@@ -207,6 +215,8 @@ const httpAdapter: OrgsAdminServiceInterface = {
   resetAccountPassword: async (orgId, accountId, password) => {
     await req<{ success: boolean }>('PATCH', `/admin/orgs/${orgId}/accounts/${accountId}/password`, { password })
   },
+  bindAccountEmail: (orgId, accountId, input) =>
+    req<AdminOrgAccount>('PUT', `/admin/orgs/${orgId}/accounts/${accountId}/email`, input),
   createActionChallenge: (orgId, accountId, input, signal) =>
     req<PartnerAccountActionChallengeResponse>(
       'POST',
@@ -279,6 +289,9 @@ let mockAccounts: (AdminOrgAccount & { orgId: string })[] = [
     enabled: true,
     phoneMasked: '139****0001',
     phoneVerifiedAt: now(),
+    emailMasked: null,
+    emailVerifiedAt: null,
+    emailVerifyMethod: null,
     availableActionVerificationMethods: ['sms', 'password'],
     createdAt: now(),
   },
@@ -336,6 +349,9 @@ const mockAdapter: OrgsAdminServiceInterface = {
         enabled: true,
         phoneMasked: `${input.account.phone.slice(0, 3)}****${input.account.phone.slice(7)}`,
         phoneVerifiedAt: null,
+        emailMasked: null,
+        emailVerifiedAt: null,
+        emailVerifyMethod: null,
         availableActionVerificationMethods: [],
         createdAt: now(),
       })
@@ -367,6 +383,9 @@ const mockAdapter: OrgsAdminServiceInterface = {
       enabled: true,
       phoneMasked: `${input.phone.slice(0, 3)}****${input.phone.slice(7)}`,
       phoneVerifiedAt: null,
+      emailMasked: null,
+      emailVerifiedAt: null,
+      emailVerifyMethod: null,
       availableActionVerificationMethods: [],
       createdAt: now(),
     }
@@ -383,6 +402,21 @@ const mockAdapter: OrgsAdminServiceInterface = {
     const account = mockAccounts.find((a) => a.id === accountId && a.orgId === orgId)
     if (!account) throw new ApiHttpError('ACCOUNT_NOT_FOUND', '账号不存在', 404)
     account.availableActionVerificationMethods = account.phoneVerifiedAt ? ['sms'] : []
+  },
+  async bindAccountEmail(orgId, accountId, input) {
+    const account = mockAccounts.find((a) => a.id === accountId && a.orgId === orgId)
+    if (!account) throw new ApiHttpError('ACCOUNT_NOT_FOUND', '账号不存在', 404)
+    if (input.confirmVerified !== true) {
+      throw new ApiHttpError('EMAIL_CONFIRM_REQUIRED', '必须确认已人工核验该邮箱归属', 400)
+    }
+    const normalized = input.email.trim().toLowerCase()
+    const at = normalized.indexOf('@')
+    const local = at > 0 ? normalized.slice(0, at) : 'x'
+    const domain = at > 0 ? normalized.slice(at + 1) : 'example.com'
+    account.emailMasked = local.length <= 2 ? `${local[0] ?? '*'}***@${domain}` : `${local.slice(0, 2)}***@${domain}`
+    account.emailVerifiedAt = now()
+    account.emailVerifyMethod = 'admin_manual'
+    return account
   },
   async createActionChallenge(orgId, accountId, input) {
     const account = mockAccounts.find((item) => item.id === accountId && item.orgId === orgId)

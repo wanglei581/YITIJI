@@ -7,6 +7,7 @@ import { signFileUrl } from '../../files/signing'
 import { ResumeExtractionService } from './resume-extraction.service'
 import { LlmCareerPlanService, type CareerPlanPayload } from './llm-career-plan.service'
 import { CareerPlanPdfService } from './career-plan-pdf.service'
+import { AiLogService, AiUsageAccumulator, aiErrorCodeOf } from '../ai-log.service'
 
 // ============================================================
 // 2E 职业规划会话服务。
@@ -45,7 +46,13 @@ function tokenMatches(token: string | null, expectedHash: string | null): boolea
 interface StoredCareerPlan {
   payload: CareerPlanPayload
   /** 生成时使用的上下文来源（如实展示给用户：基于哪些材料） */
-  basedOn: { resume: true; jobFit: string | null; interview: string | null }
+  basedOn: {
+    resume: true
+    jobFit: string | null
+    interview: string | null
+    /** self_assessment 仅作可选上下文 hint，不参与签名门禁 / 校验 / 配额。 */
+    selfAssessment: string | null
+  }
   providerName: string
 }
 
@@ -58,6 +65,7 @@ export class CareerPlanService {
     private readonly files: FilesService,
     private readonly pdf: CareerPlanPdfService,
     private readonly audit: AuditService,
+    private readonly aiLog: AiLogService,
   ) {}
 
   async generate(taskId: string, requester: CareerPlanRequester) {
@@ -114,10 +122,52 @@ export class CareerPlanService {
       }
     }
 
-    const payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx })
+    // 3) 最近自我探索（仅作 hint，不参与签名门禁 / 配额 / 校验；
+    //    服务端按本人 endUserId 读取，匿名 parse 不强制要求，仅尝试按 accessTokenHash 匹配）。
+    //    §1.7: 只读 dimensions,LLM 上轮拒答 summary 不注入下游(防跨轮污染)。
+    let selfAssessmentCtx: { dimensions: Array<{ key: string; label: string; strength: number }> } | null = null
+    {
+      const where = parse.endUserId
+        ? { endUserId: parse.endUserId, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+        : { accessTokenHash: parse.accessTokenHash, kind: 'self_assessment' as const, expiresAt: { gt: new Date() } }
+      const row = await this.prisma.aiResumeResult.findFirst({ where, orderBy: { createdAt: 'desc' } })
+      if (row) {
+        try {
+          // self-assessment payloadJson 顶层就是 dimensions/summary(StoredSelfAssessment),
+          // 不是 { payload: { ... } }。配套 §1.7 修复:沿用正确 schema 仅读 dimensions。
+          const stored = JSON.parse(row.payloadJson) as {
+            dimensions?: Array<{ key: string; label: string; strength: number }>
+          }
+          const dims = (stored.dimensions ?? [])
+            .map((d) => ({ key: String(d.key ?? ''), label: String(d.label ?? ''), strength: Number(d.strength ?? 0) }))
+            .filter((d) => d.key && d.label)
+          if (dims.length > 0) {
+            selfAssessmentCtx = { dimensions: dims }
+          }
+        } catch { /* 损坏行按无上下文处理 */ }
+      }
+    }
+
+    // A-6 成本可见性：本能力此前完全不落 AiServiceLog，Admin 看不到调用量与成本。
+    // 用量按重试累计；成功/失败都落一条（失败也真实花钱）。
+    const usage = new AiUsageAccumulator()
+    const startedAt = Date.now()
+    let payload: CareerPlanPayload
+    try {
+      payload = await this.llm.build({ resumeText, jobFit: jobFitCtx, interview: interviewCtx, selfAssessment: selfAssessmentCtx, onLlmCall: usage.add })
+    } catch (error) {
+      this.recordAiLog(taskId, usage, startedAt, 'failed', parse.endUserId, aiErrorCodeOf(error, 'AI_CAREER_PLAN_FAILED'))
+      throw error
+    }
+    this.recordAiLog(taskId, usage, startedAt, 'success', parse.endUserId)
     const stored: StoredCareerPlan = {
       payload,
-      basedOn: { resume: true, jobFit: jobFitCtx?.jobTitle ?? null, interview: interviewCtx?.position ?? null },
+      basedOn: {
+        resume: true,
+        jobFit: jobFitCtx?.jobTitle ?? null,
+        interview: interviewCtx?.position ?? null,
+        selfAssessment: selfAssessmentCtx?.dimensions.length ? 'self_assessment' : null,
+      },
       providerName: 'llm',
     }
     const expiresAt = new Date(Date.now() + RESULT_TTL_HOURS * 60 * 60 * 1000)
@@ -197,6 +247,34 @@ export class CareerPlanService {
       expiresAt: uploaded.signedUrlExpiresAt,
       printFileUrl: signFileUrl(uploaded.fileId).url,
     }
+  }
+
+  /**
+   * A-6：落 AiServiceLog（仅元数据）。
+   *
+   * 一次都没打到模型（如 AI_NOT_CONFIGURED 直接抛错）时不落，避免把配置缺失
+   * 记成"AI 调用失败"污染失败率告警。
+   */
+  private recordAiLog(
+    taskId: string,
+    usage: AiUsageAccumulator,
+    startedAt: number,
+    status: 'success' | 'failed',
+    endUserId: string | null,
+    errorCode?: string,
+  ): void {
+    if (usage.callCount === 0) return
+    this.aiLog.record({
+      taskId,
+      operation: 'careerPlan',
+      provider: usage.provider ?? 'llm',
+      status,
+      latencyMs: Math.max(0, Date.now() - startedAt),
+      tokenUsage: usage.tokenUsage,
+      errorCode,
+      endUserId,
+      terminalId: null,
+    })
   }
 
   private toResponse(taskId: string, stored: StoredCareerPlan) {

@@ -1,0 +1,52 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="AI Job Print Agent"
+    Manufacturer="AI Job Print"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="8B8F74AC-9B68-44B8-88E7-BEB906221919"
+    Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer AI Job Print Agent is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="AIJobPrintAgent">
+        <Directory Id="BOOTSTRAPDIR" Name="bootstrap">
+          <Component Id="AgentServiceComponent" Guid="4BB83A61-04C6-473E-B528-A20F2D0DE494" Bitness="always64">
+            <File Id="AgentServiceExecutable" Source="$(var.StagingRoot)\bootstrap\aijobprintagent.exe" KeyPath="yes" Checksum="yes" />
+            <File Id="AgentServiceConfiguration" Source="$(var.StagingRoot)\bootstrap\aijobprintagent.xml" Checksum="yes" />
+            <ServiceInstall
+              Id="AgentServiceInstall"
+              Name="aijobprintagent.exe"
+              DisplayName="AIJobPrintAgent"
+              Description="AI Job Print Terminal Agent"
+              Type="ownProcess"
+              Start="demand"
+              ErrorControl="normal"
+              Account="LocalSystem" />
+            <ServiceControl
+              Id="AgentServiceControl"
+              Name="aijobprintagent.exe"
+              Stop="both"
+              Remove="uninstall"
+              Wait="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="AGENTSTATEDIR" Name="AIJobPrintAgent">
+        <Component Id="AgentStateDirectoryComponent" Guid="B5AEAB48-0EB6-496C-909E-B1F9E04EDE53" Permanent="yes" NeverOverwrite="yes" Bitness="always64">
+          <CreateFolder />
+          <RegistryValue Root="HKLM" Key="Software\AIJobPrint\Agent" Name="StateDirectoryCreated" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="AI Job Print Agent" Level="1">
+      <ComponentRef Id="AgentServiceComponent" />
+      <ComponentRef Id="AgentStateDirectoryComponent" />
+      <ComponentGroupRef Id="AgentPayload" />
+    </Feature>
+  </Package>
+</Wix>

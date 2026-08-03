@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>消息通知 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .nt-item { display:flex; gap:12px; padding:15px 16px; cursor:pointer; position:relative; }
+    .nt-item + .nt-item { border-top:1px solid var(--line-faint); }
+    .nt-item.unread::before { content:''; position:absolute; left:7px; top:20px; width:7px; height:7px; border-radius:50%; background:var(--clay); }
+    .nt-ic { width:40px; height:40px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .nt-head { display:flex; align-items:center; justify-content:space-between; }
+    .nt-t { font-size:14.5px; font-weight:600; color:var(--ink); }
+    .nt-time { font-size:11px; color:var(--faint); }
+    .nt-body { font-size:12.5px; color:var(--muted); margin-top:5px; line-height:1.55; }
+    .nt-link { font-size:12.5px; color:var(--teal-deep); font-weight:600; margin-top:8px; display:inline-block; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">消息通知</div>
+    <div class="nav-right"><span style="font-size:13px;color:var(--muted)">全部已读</span></div>
+  </div>
+
+  <div class="content">
+    <div class="filter-bar" style="padding-top:14px">
+      <div class="f-chip on">全部</div>
+      <div class="f-chip">打印</div>
+      <div class="f-chip">招聘会</div>
+      <div class="f-chip">系统</div>
+    </div>
+
+    <div class="card" style="margin-top:8px">
+      <div class="nt-item unread">
+        <div class="nt-ic wash" style="color:var(--teal-deep)">🖨</div>
+        <div style="flex:1">
+          <div class="nt-head"><div class="nt-t">文件已就绪，待取件</div><div class="nt-time">刚刚</div></div>
+          <div class="nt-body">订单 #P20260724 的文件已上传至城东服务点，取件码 8246，请到店打印。</div>
+          <span class="nt-link">查看订单 ›</span>
+        </div>
+      </div>
+      <div class="nt-item unread">
+        <div class="nt-ic wheat-wash" style="color:var(--wheat-deep)">🎪</div>
+        <div style="flex:1">
+          <div class="nt-head"><div class="nt-t">你关注的招聘会明天开始</div><div class="nt-time">2 小时前</div></div>
+          <div class="nt-body">「2026 春季大型双选会」将于明天 09:00 在市人才市场举办。预约请前往来源平台。</div>
+          <span class="nt-link">查看招聘会 ›</span>
+        </div>
+      </div>
+      <div class="nt-item unread">
+        <div class="nt-ic plum-wash" style="color:var(--plum-deep)">✦</div>
+        <div style="flex:1">
+          <div class="nt-head"><div class="nt-t">简历诊断报告已生成</div><div class="nt-time">今天 09:32</div></div>
+          <div class="nt-body">你的简历「前端开发-陈明」综合评分 75 分，有 3 项优化建议。</div>
+          <span class="nt-link">查看报告 ›</span>
+        </div>
+      </div>
+      <div class="nt-item">
+        <div class="nt-ic" style="background:linear-gradient(135deg,#f4d98a,#e8c15f);color:#5a4410">◆</div>
+        <div style="flex:1">
+          <div class="nt-head"><div class="nt-t">会员即将到期</div><div class="nt-time">昨天</div></div>
+          <div class="nt-body">你的黄金会员还有 68 天到期，续费年卡立享 8 折优惠。</div>
+        </div>
+      </div>
+      <div class="nt-item">
+        <div class="nt-ic wash" style="color:var(--slate)">🛡</div>
+        <div style="flex:1">
+          <div class="nt-head"><div class="nt-t">文件自动清理提醒</div><div class="nt-time">3 天前</div></div>
+          <div class="nt-body">你的身份证扫描件将于 4 天后自动清理，如需保留请及时下载。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="empty" style="display:none"></div>
+    <div class="spacer-lg"></div>
+  </div>
+</div>
+</body>
+</html>

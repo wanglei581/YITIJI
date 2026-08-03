@@ -18,9 +18,8 @@ import {
   UserRoundIcon,
 } from 'lucide-react'
 import { isSafeInternalPath } from '../../auth/returnPath'
-import { clearKioskSensitiveSession } from '../../auth/kioskSensitiveSession'
 import { useAuth } from '../../auth/useAuth'
-import { useIdleTimer } from '../../hooks/useIdleTimer'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { MemberAgreement } from './components/MemberAgreement'
 import { MemberPhoneLoginPane } from './components/MemberPhoneLoginPane'
 import {
@@ -109,10 +108,6 @@ export function LoginPage() {
   const pendingLoginRef = useRef<MemberLoginPayload | null>(null)
 
   const goToReturn = useCallback(() => navigate(returnTo), [navigate, returnTo])
-  const handleLoginIdle = useCallback(() => {
-    clearKioskSensitiveSession()
-    navigate('/', { replace: true })
-  }, [navigate])
 
   useEffect(() => {
     if (isLoggedIn) navigate(returnTo, { replace: true })
@@ -151,11 +146,7 @@ export function LoginPage() {
     requireAgreement: requireMemberAgreement,
   } = phoneLogin
 
-  useIdleTimer({
-    timeoutMs: resolveLoginIdleMs(),
-    enabled: !phoneLogin.loading && !successVisible,
-    onIdle: handleLoginIdle,
-  })
+  useBusyLock(phoneLogin.loading || successVisible)
 
   const switchTab = useCallback((next: LoginTab) => {
     setTab(next)

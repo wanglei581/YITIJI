@@ -1,6 +1,6 @@
 import { KioskTopbar } from '@ai-job-print/ui'
 import { useEffect, useState } from 'react'
-import { getTerminalId } from '../../services/api/terminalConfig'
+import { getTerminalCode } from '../../services/api/terminalConfig'
 import { useTerminalDeviceStatus } from '../../hooks/useTerminalDeviceStatus'
 
 /** 顶栏右侧：实时时钟 + 真实设备状态胶囊（原型 topbar .right）。 */
@@ -40,7 +40,7 @@ export function KioskTopbarStatus({ tone, label }: { tone: string; label: string
  */
 export function KioskAppTopbar() {
   const { loading, printerLabel, printerReady, kind } = useTerminalDeviceStatus(true)
-  const terminalId = getTerminalId() || '01号机'
+  const terminalCode = getTerminalCode() || '设备未绑定'
   const tone = loading
     ? 'neutral'
     : printerReady
@@ -51,7 +51,7 @@ export function KioskAppTopbar() {
 
   return (
     <KioskTopbar
-      brandTitle={`就业服务大厅 · ${terminalId}`}
+      brandTitle={`就业服务大厅 · ${terminalCode}`}
       brandSubtitle="AI求职打印服务终端"
       right={<KioskTopbarStatus tone={tone} label={loading ? '设备检查中' : printerLabel} />}
     />
