@@ -30,7 +30,7 @@ export const productionRoutePatterns = [
   '/resume/self-assessment/questions',
   '/resume/self-assessment/result',
   '/resume/self-assessment/history',
-] as const // 91 routes (was 87)
+] as const // 92 routes (was 91)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
