@@ -169,7 +169,7 @@ export default function FilesPage() {
                 <button
                   key={f}
                   onClick={() => resetPage(setter as (value: string) => void, f)}
-                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${selected === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'}`}
+                  className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${selected === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'}`}
                 >
                   {f}
                 </button>

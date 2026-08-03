@@ -3,7 +3,11 @@
  * 详细注释参见 apps/admin/src/services/auth/index.ts。
  */
 
-import { API_BASE_URL } from '../api/client'
+import { API_BASE_URL, API_MODE } from '../api/client'
+
+const MOCK_PARTNER_USER: AuthedUser = {
+  id: 'mock-partner-001', name: '测试机构账号（预览）', role: 'partner', orgId: 'org-mock-001',
+}
 
 const STORAGE_KEY = 'partner_auth_v1'
 
@@ -140,6 +144,11 @@ function ensurePartnerSession(data: { token: string; user: AuthedUser }): LoginR
 }
 
 export async function login(loginId: string, password: string): Promise<LoginResult> {
+  if (API_MODE === 'mock') {
+    const mockUser = { ...MOCK_PARTNER_USER, name: loginId || MOCK_PARTNER_USER.name }
+    writeState({ token: 'mock-token', user: mockUser })
+    return { ok: true, user: mockUser }
+  }
   const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login', { loginId, password, portal: 'partner' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
   return ensurePartnerSession(r.data)
@@ -194,6 +203,10 @@ export async function verifyOwnPhone(code: string): Promise<{ ok: true; phoneVer
 
 export async function verifyToken(): Promise<AuthedUser | null> {
   if (!getToken()) return null
+  if (API_MODE === 'mock') {
+    const u = getUser()
+    return u?.role === 'partner' ? u : null
+  }
   const r = await getJson<AuthedUser>('/auth/me')
   if (r.ok) {
     const u = r.data as unknown as { userId: string; role: AuthedUser['role']; orgId: string | null; phoneMasked?: string; phoneVerifiedAt?: string | null }

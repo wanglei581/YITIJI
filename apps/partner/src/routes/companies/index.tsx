@@ -7,7 +7,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { Building2Icon, PlusIcon, RefreshCwIcon } from 'lucide-react'
 import {
@@ -340,7 +340,7 @@ export default function CompaniesPage() {
     return (
       <Page title="企业资料管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -391,7 +391,7 @@ export default function CompaniesPage() {
               key={f}
               onClick={() => setReviewFilter(f)}
               className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                reviewFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -408,7 +408,7 @@ export default function CompaniesPage() {
             <thead>
               <tr>
                 {['外部编号', '企业名称', '行业', '企业类型', '地区', '招聘会参展', '关联岗位数', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>

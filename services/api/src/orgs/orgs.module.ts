@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common'
 import { AdminOrgsService } from './admin-orgs.service'
 import { AdminOrgsController } from './admin-orgs.controller'
 import { PartnerOrgController } from './partner-org.controller'
+import { PartnerStatsController } from './partner-stats.controller'
+import { PartnerStatsService } from './partner-stats.service'
 import { PrismaModule } from '../prisma/prisma.module'
 import { AuthModule } from '../auth/auth.module'
 import { RedisModule } from '../common/redis/redis.module'
@@ -12,8 +14,8 @@ import { PartnerAccountActionController } from './partner-account-action.control
 @Module({
   // AuthModule:导出 JwtAuthGuard / RolesGuard;AuditService 为 @Global 直接注入
   imports:     [PrismaModule, RedisModule, AuthModule],
-  providers:   [AdminOrgsService, PartnerAccountActionService, PartnerPhoneRebindService],
-  controllers: [AdminOrgsController, PartnerOrgController, PartnerAccountActionController],
+  providers:   [AdminOrgsService, PartnerStatsService, PartnerAccountActionService, PartnerPhoneRebindService],
+  controllers: [AdminOrgsController, PartnerOrgController, PartnerStatsController, PartnerAccountActionController],
   exports:     [AdminOrgsService],
 })
 export class OrgsModule {}

@@ -506,7 +506,7 @@ export default function PartnersPage() {
                     key={f}
                     onClick={() => { setStatusFilter(f); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      statusFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                      statusFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                     }`}
                   >
                     {f}
@@ -523,7 +523,7 @@ export default function PartnersPage() {
                     key={f.label}
                     onClick={() => { setTypeFilter(f.value); setPage(1) }}
                     className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${
-                      typeFilter === f.value ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                      typeFilter === f.value ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
                     }`}
                   >
                     {f.label}
@@ -550,7 +550,7 @@ export default function PartnersPage() {
                 <thead>
                   <tr>
                     {['机构名称', '机构类型', '场景模板', '启用模块', '联系人', '状态', '账号', '数据源', '岗位', '招聘会', '加入时间', '操作'].map((h) => (
-                      <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                      <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                     ))}
                   </tr>
                 </thead>

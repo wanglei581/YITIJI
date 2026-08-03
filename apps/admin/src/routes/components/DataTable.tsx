@@ -52,7 +52,7 @@ export function FilterPills({ filters, active, counts, onChange }: FilterPillsPr
   return (
     <div className="flex flex-wrap gap-2">
       {filters.map((f) => (
-        <button key={f} onClick={() => onChange(f)} className={'rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ' + (active === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')}>
+        <button key={f} onClick={() => onChange(f)} className={'rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ' + (active === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')}>
           {f}{counts && counts[f] !== undefined && <span className="ml-1.5 text-xs opacity-70">{counts[f]}</span>}
         </button>
       ))}

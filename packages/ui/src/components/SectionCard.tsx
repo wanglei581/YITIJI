@@ -23,13 +23,14 @@ export function SectionCard({ title, action, children, className, flush = false 
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-3 px-5 pt-4">
-        <h2 className="text-[15.5px] font-extrabold text-neutral-900 [font-family:var(--font-heading,inherit)]">
+      <div className="flex items-center justify-between gap-3 border-b border-neutral-900/[0.07] px-5 pb-3.5 pt-4">
+        <h2 className="flex items-center gap-2 text-[15px] font-extrabold text-neutral-900 [font-family:var(--font-heading,inherit)]">
+          <span className="inline-block h-[15px] w-[3px] shrink-0 rounded-full bg-primary-500" aria-hidden="true" />
           {title}
         </h2>
         {action}
       </div>
-      <div className={cn(flush ? 'pt-3' : 'px-5 pb-[18px] pt-3.5')}>{children}</div>
+      <div className={cn(flush ? 'pt-3' : 'px-5 pb-[18px] pt-4')}>{children}</div>
     </section>
   )
 }

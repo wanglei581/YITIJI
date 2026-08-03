@@ -17,7 +17,7 @@ export function FilterChip({
       className={
         'inline-flex h-[30px] items-center gap-1.5 rounded-full border px-[13px] text-[12.5px] font-bold transition-colors ' +
         (active
-          ? 'border-neutral-900 bg-neutral-900 text-white'
+          ? 'border-primary-600 bg-primary-600 text-white'
           : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40')
       }
     >

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { mergeById, useInteractionLock, useRefreshable } from '@ai-job-print/refresh'
-import { Button, Card, Drawer, StatusBadge } from '@ai-job-print/ui'
+import { Button, Card, Drawer, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { CalendarIcon, PlusIcon } from 'lucide-react'
 import type {
@@ -226,7 +226,7 @@ export default function FairsPage() {
     return (
       <Page title="招聘会信息管理" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -267,7 +267,7 @@ export default function FairsPage() {
             key={f}
             onClick={() => setStatusFilter(f)}
             className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-              statusFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+              statusFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
             }`}
           >
             {f}
@@ -283,7 +283,7 @@ export default function FairsPage() {
             <thead>
               <tr>
                 {['外部编号', '招聘会名称', '主办方', '时间', '地点', '会议状态', '来源预约链接', '来源签到链接', '同步时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>
