@@ -19,15 +19,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const ACCEPTED_UNREACHABLE_HIGH = 'GHSA-qwww-vcr4-c8h2'
 const OVERBROAD_BRACE_EXPANSION_HIGH = 'GHSA-mh99-v99m-4gvg'
+// GHSA-rgw5-rvv9-x895: "brace-expansion DoS via unbounded intermediate expansion"
+// patched upstream in >=1.1.18 / >=2.1.4 / >=5.0.9
+const INTERMEDIATE_BRACE_EXPANSION = 'GHSA-rgw5-rvv9-x895'
 const FRONTENDS = ['admin', 'kiosk', 'partner']
-const REQUIRED_BRACE_PATCHES = {
-  'brace-expansion@1.1.16': 'patches/brace-expansion@1.1.16.patch',
-  'brace-expansion@2.1.2': 'patches/brace-expansion@2.1.2.patch',
-}
+const REQUIRED_BRACE_PATCHES = {}
 const REQUIRED_BRACE_OVERRIDES = {
-  'brace-expansion@1.1.14': '1.1.16',
-  'brace-expansion@2.1.1': '2.1.2',
-  'brace-expansion@5.0.6': '5.0.8',
+  'brace-expansion@1.1.14': '1.1.18',
+  'brace-expansion@2.1.1': '2.1.4',
+  'brace-expansion@5.0.6': '5.0.9',
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
 
@@ -141,6 +141,8 @@ function workspaceMapping(workspace, blockName) {
 }
 
 function assertBracePatchesDeclared() {
+  // No local patches required: upstream 1.1.18/2.1.4/5.0.9 already include EXPANSION_MAX_LENGTH.
+  if (Object.keys(REQUIRED_BRACE_PATCHES).length === 0) return
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
   const workspacePatches = workspaceMapping(workspace, 'patchedDependencies')
 
@@ -373,17 +375,19 @@ function parseSemver(version) {
 function isUpstreamPatchedBraceExpansion(version) {
   const parsed = parseSemver(version)
   if (!parsed) return false
-  if (parsed.major === 5) return parsed.minor > 0 || parsed.patch >= 8
+  // 5.0.9+ fixes both GHSA-mh99-v99m-4gvg and GHSA-rgw5-rvv9-x895
+  if (parsed.major === 5) return parsed.minor > 0 || parsed.patch >= 9
+  // 2.1.4+ backports EXPANSION_MAX_LENGTH and fixes GHSA-rgw5-rvv9-x895
+  if (parsed.major === 2 && parsed.minor === 1) return parsed.patch >= 4
+  // 1.1.18+ backports EXPANSION_MAX_LENGTH and fixes GHSA-rgw5-rvv9-x895
+  if (parsed.major === 1 && parsed.minor === 1) return parsed.patch >= 18
   return false
 }
 
 function isRemediatedBraceExpansion(item) {
-  if (
-    advisoryId(item) !== OVERBROAD_BRACE_EXPANSION_HIGH ||
-    item.module_name !== 'brace-expansion'
-  ) {
-    return false
-  }
+  if (item.module_name !== 'brace-expansion') return false
+  const id = advisoryId(item)
+  if (id !== OVERBROAD_BRACE_EXPANSION_HIGH && id !== INTERMEDIATE_BRACE_EXPANSION) return false
   const versions = (item.findings || []).map((finding) => finding.version).filter(Boolean)
   if (versions.length === 0) return false
   return versions.every(
