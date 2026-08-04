@@ -117,6 +117,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
+  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("输入手机上的取件码，即可从本机出纸")', featureText: '扫码取件' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },
@@ -153,7 +154,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-] as const // 92 routes (was 91)
+] as const // 93 routes (was 92)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -165,8 +166,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 92) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 93) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 90) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 91) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
