@@ -22,6 +22,8 @@ export interface ServiceGroup {
   span2?: boolean
   cols2?: boolean
   badge?: { icon: KioskIconName; label: string }
+  /** AI能力标签，显示在组头右侧（对应原型 svc-tile 的 ai-chip，每组一个）。 */
+  aiChip?: string
   tiles: ServiceTile[]
   /** 组标题点击目标；未设置时沿用原逻辑（跳到第一个可用子项）。 */
   titleTo?: string
@@ -37,6 +39,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     layout: 'wide',
     span2: true,
     badge: { icon: 'star', label: '推荐先做' },
+    aiChip: 'AI诊断优化',
     tiles: [
       // intent 分流:同一上传链路,按入口语义展示不同标题/说明/引导(视觉与分组结构不变)
       { title: 'AI简历诊断', description: '上传后查看结构与表达建议', icon: 'doc-check', to: '/resume/source?intent=diagnose', emphasis: 'primary' },
@@ -54,6 +57,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     icon: 'briefcase',
     accent: 'clay',
     layout: 'half',
+    aiChip: 'AI岗位研判',
     tiles: [
       { title: '全职岗位', description: '第三方来源全职信息', icon: 'briefcase', to: '/jobs?category=fulltime' },
       { title: '实习岗位', description: '第三方来源实习信息', icon: 'campus', to: '/jobs?category=intern' },
@@ -71,6 +75,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     icon: 'fair',
     accent: 'wheat',
     layout: 'half',
+    aiChip: 'AI材料清单',
     tiles: [
       { title: '社会招聘会', description: '查看社会招聘会场次', icon: 'pin', to: '/job-fairs', emphasis: 'primary' },
       { title: '校园招聘会', description: '查看校园招聘会安排', icon: 'campus', to: '/campus', emphasis: 'primary' },
@@ -85,6 +90,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     accent: 'slate',
     layout: 'wide',
     titleTo: '/print-scan',
+    aiChip: 'AI文件预检',
     tiles: [
       { title: '文档打印', description: '上传文档后本机打印', icon: 'printer', to: '/print/upload?source=document', emphasis: 'primary' },
       { title: '证件复印', description: '待设备能力开放', icon: 'files', disabled: Boolean(true) },
@@ -102,6 +108,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     icon: 'mic',
     accent: 'plum',
     layout: 'half',
+    aiChip: 'AI模拟反馈',
     tiles: [
       { title: '模拟面试', description: 'AI 模拟问答练习', icon: 'mic', to: '/interview/setup', emphasis: 'primary' },
       { title: '面试技巧', description: '常见面试技巧参考', icon: 'bulb', to: '/interview/tips' },
@@ -118,6 +125,7 @@ export const SERVICE_GROUPS: ServiceGroup[] = [
     accent: 'wheat',
     layout: 'half',
     span2: true,
+    aiChip: 'AI来源解读',
     tiles: [
       // 「就业政策」Tab 内含补贴指引内容；「社保指南」与 tab=social 一一对应，避免同义重复入口。
       { title: '就业政策', description: '就业政策与官方口径', icon: 'policy', to: '/renshi?tab=policy' },

@@ -86,9 +86,9 @@ function HomeWelcome() {
     <section className="welcome">
       <div>
         <h1>
-          简历、打印、岗位信息<em>一趟办完</em>
+          简历、岗位、打印，<em>一趟办完</em>
         </h1>
-        <p>游客可直接使用大部分功能 · 触摸下方卡片开始</p>
+        <p>现场准备材料、了解机会，并在本机完成打印扫描</p>
       </div>
       {isLoggedIn ? (
         // 原型外动态状态：登录后入口，保持 88px 登录框外观
@@ -261,6 +261,9 @@ function ServiceCard({ group }: { group: ServiceGroup }) {
             {group.badge.label}
           </span>
         )}
+        {group.aiChip && (
+          <span className="ai-chip">{group.aiChip}</span>
+        )}
       </div>
       <div className={`tiles ${layout.cols}`}>
         {group.tiles.map((tile) => {
@@ -406,6 +409,17 @@ export function HomePage() {
       <ContinuePanel />
       <HomeReception />
       <HomeDispatch />
+      {/* 服务区标题（原型 .svc-header：核心服务 + AI增强服务徽章 + 提示语） */}
+      <div className="svc-header">
+        <span className="svc-title">核心服务</span>
+        <span className="svc-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} style={{ width: 16, height: 16 }}>
+            <path d="M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z" />
+          </svg>
+          AI增强服务
+        </span>
+        <span className="svc-hint">知道要办什么，也可以直接进入</span>
+      </div>
       <div className="groups" aria-label="当前可使用功能">
         {groups.map((group) => (
           <ServiceCard key={group.id} group={group} />

@@ -349,7 +349,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--assistant">
     <section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
-      <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
+      <h1 id="assistant-page-title" className="kassist-sr-only">AI顾问</h1>
 
       <div ref={workbenchRef} data-kiosk-domain="assistant" data-kiosk-screen="assistant" className="assistant-workbench">
         <header className="assistant-prototype-head">

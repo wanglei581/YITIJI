@@ -21,7 +21,7 @@ const SERVICES: Entry[] = [
   { icon: 'scan', tone: 'slate', label: '扫描文件', desc: '进入扫描流程', route: '/scan/start' },
   { icon: 'briefcase', tone: 'clay', label: '岗位信息', desc: '第三方或官方来源', route: '/jobs' },
   { icon: 'fair', tone: 'wheat', label: '招聘会', desc: '第三方或官方场次', route: '/job-fairs' },
-  { icon: 'robot', tone: 'teal', label: 'AI助手', desc: '文字与语音咨询', route: '/assistant' },
+  { icon: 'robot', tone: 'teal', label: 'AI顾问', desc: '文字与语音咨询', route: '/assistant' },
 ]
 
 // 3. 来源与活动（外部来源信息入口 / 记录）

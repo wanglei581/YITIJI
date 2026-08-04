@@ -21,7 +21,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: 'home',      label: '首页',   icon: HomeIcon },
-  { key: 'assistant', label: 'AI助手', icon: BotIcon },
+  { key: 'assistant', label: 'AI顾问', icon: BotIcon },
   { key: 'profile',   label: '我的',   icon: UserIcon },
 ]
 

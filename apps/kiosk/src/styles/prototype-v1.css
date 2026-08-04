@@ -574,6 +574,59 @@
   .kpv1 { width: 1080px; min-height: 0; }
 }
 
+/* ── 服务区标题（原型 .svc-header） ── */
+.kpv1 .svc-header {
+  flex: none;
+  padding: 8px 48px 4px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kpv1 .svc-title {
+  font-family: var(--pv-serif);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  letter-spacing: 1px;
+}
+.kpv1 .svc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--pv-teal-deep);
+  background: var(--pv-teal-soft);
+  border: 1px solid rgba(31,158,134,.22);
+  padding: 5px 14px;
+  border-radius: 999px;
+}
+.kpv1 .svc-hint {
+  font-size: 18px;
+  color: var(--pv-muted);
+  margin-left: auto;
+}
+
+/* ── AI能力标签（.ai-chip，显示在服务卡头部右侧） ── */
+.kpv1 .ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pv-teal-deep);
+  background: var(--pv-teal-soft);
+  border: 1px solid rgba(31,158,134,.25);
+  padding: 4px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.kpv1 .ai-chip::before {
+  content: '✦';
+  font-size: 12px;
+}
+
 /* ── AI接待区（design-d .reception + .ar-card + .device-card） ── */
 .kpv1 .reception {
   flex: none;
