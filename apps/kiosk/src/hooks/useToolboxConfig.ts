@@ -4,8 +4,25 @@ import type { KioskToolboxConfig } from '@ai-job-print/shared'
 import { useEffect, useState } from 'react'
 import { getCachedKioskTerminalConfig, getTerminalId } from '../services/api/terminalConfig'
 
-const EMPTY_TOOLBOX_CONFIG: KioskToolboxConfig = { enabled: false, items: [] }
-let cachedToolboxConfig: KioskToolboxConfig = EMPTY_TOOLBOX_CONFIG
+// 后台未配置百宝箱时的兜底默认项。只包含已通过 Gate 0 审批、
+// 具备完整前台实现的服务；Admin 配置的 toolbox 会覆盖此列表。
+const DEFAULT_TOOLBOX_CONFIG: KioskToolboxConfig = {
+  enabled: true,
+  items: [
+    {
+      key: 'contract-review',
+      title: '合同审查',
+      description: '识别试用期、竞业、违约金、薪资和社保等风险条款，仅供参考',
+      icon: 'file-text',
+      to: '/contract-review',
+      disabled: false,
+      sortOrder: 100,
+      launchMode: 'internal_route',
+    },
+  ],
+}
+
+let cachedToolboxConfig: KioskToolboxConfig = DEFAULT_TOOLBOX_CONFIG
 
 export function useToolboxConfig(): KioskToolboxConfig {
   const [config, setConfig] = useState<KioskToolboxConfig>(() => cachedToolboxConfig)
@@ -16,8 +33,15 @@ export function useToolboxConfig(): KioskToolboxConfig {
       try {
         const terminalId = getTerminalId()
         const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
-        cachedToolboxConfig = terminalConfig.toolbox
-        if (alive) setConfig(terminalConfig.toolbox)
+        // 后台显式配置了百宝箱（enabled 或 items 非空）时覆盖默认值；
+        // 否则保留含合同审查的兜底配置，让功能在未配置终端上也可用。
+        const backendToolbox = terminalConfig.toolbox
+        const resolved =
+          backendToolbox.enabled || backendToolbox.items.length > 0
+            ? backendToolbox
+            : DEFAULT_TOOLBOX_CONFIG
+        cachedToolboxConfig = resolved
+        if (alive) setConfig(resolved)
       } catch {
         if (alive) setConfig(cachedToolboxConfig)
       }
