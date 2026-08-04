@@ -16,6 +16,7 @@ const W4_ROUTES = [
   '/job-fairs/:id/stats', '/campus', '/campus/welcome',
   '/campus/freshman-insights', '/smart-campus', '/smart-campus/welcome',
   '/smart-campus/freshman-insights', '/smart-campus/service/:key', '/renshi',
+  '/jobs/online-platforms',
 ]
 
 const OWNED_PREFIX = /^(jobs(?:\/|$)|offline-agencies(?:\/|$)|companies(?:\/|$)|job-fairs(?:\/|$)|campus(?:\/|$)|smart-campus(?:\/|$)|renshi$)/
@@ -219,10 +220,10 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 24-route ownership', () => {
+check('exact 25-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 24)
-  assert.equal(new Set(owned).size, 24)
+  assert.equal(owned.length, 25)
+  assert.equal(new Set(owned).size, 25)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
 })

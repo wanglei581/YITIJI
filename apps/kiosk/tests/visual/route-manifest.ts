@@ -32,7 +32,11 @@ export const productionRoutePatterns = [
   '/resume/self-assessment/history',
   // 打印取件认领
   '/print/pickup-claim',
-] as const // 93 routes (was 92)
+  // PR #496 (AI OS 三新路由)
+  '/ai/plan',
+  '/session-resume',
+  '/jobs/online-platforms',
+] as const // 96 routes (was 93)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',
