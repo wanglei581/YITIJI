@@ -119,7 +119,7 @@
   display: flex; justify-content: space-between; align-items: flex-end; gap: 30px;
 }
 .kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 46px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
-.kpv1 .welcome h1 em { font-style: normal; color: #4de0bf; }
+.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); }
 .kpv1 .welcome p { margin-top: 10px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
 
 /* ── 登录按钮（01-home.html .login-btn，min-height:88px，r-md 圆角） ── */
@@ -542,7 +542,7 @@
   margin: 0;
   padding: 2px 7px;
   font-size: 12px;
-  color: rgba(240,237,228,.4);
+  color: var(--pv-muted);
 }
 .kiosk-home-mobile .kpv1 .card[data-group-id='print-scan'] .tile:last-child { grid-column: 1 / -1; }
 .kiosk-home-mobile .kpv1 .zone-row { grid-template-columns: 1fr; }
@@ -584,11 +584,11 @@
   align-items: start;
 }
 .kpv1 .ar-card {
-  background: linear-gradient(135deg, #0d2420 0%, #1a4840 55%, #1f5c52 100%);
-  border: 1px solid rgba(53,171,142,.25);
+  background: var(--pv-surface);
+  border: 1px solid rgba(31,158,134,.28);
   border-radius: var(--pv-r-md);
-  padding: 24px 28px 20px;
-  box-shadow: 0 8px 32px rgba(13,36,32,.45), inset 0 1px 0 rgba(255,255,255,.06);
+  padding: 22px 28px 18px;
+  box-shadow: 0 4px 18px rgba(31,158,134,.08);
   position: relative;
   overflow: hidden;
 }
@@ -596,8 +596,8 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, #35ab8e, rgba(53,171,142,.5), transparent);
+  height: 3px;
+  background: linear-gradient(90deg, var(--pv-teal), rgba(53,171,142,.5), transparent);
 }
 .kpv1 .ar-top {
   display: flex;
@@ -610,10 +610,10 @@
   align-items: center;
   gap: 7px;
   font-size: 16px;
-  color: #4de0bf;
+  color: var(--pv-teal-deep);
   font-weight: 600;
-  background: rgba(53,171,142,.18);
-  border: 1px solid rgba(53,171,142,.35);
+  background: var(--pv-teal-soft);
+  border: 1px solid rgba(31,158,134,.28);
   padding: 5px 14px;
   border-radius: 999px;
 }
@@ -621,18 +621,13 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #4de0bf;
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(77,224,191,.5); }
-  50% { box-shadow: 0 0 0 5px rgba(77,224,191,0); }
+  background: var(--pv-teal);
 }
 .kpv1 .ar-h {
   font-family: var(--pv-serif);
   font-size: 34px;
   font-weight: 700;
-  color: #f0ede4;
+  color: var(--pv-ink);
   letter-spacing: 1px;
   margin-bottom: 16px;
   line-height: 1.3;
@@ -641,8 +636,8 @@
   display: flex;
   gap: 0;
   margin-bottom: 14px;
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.12);
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
   border-radius: var(--pv-r-sm);
   overflow: hidden;
   min-height: 76px;
@@ -652,7 +647,7 @@
   flex: 1;
   padding: 0 22px;
   font-size: 20px;
-  color: rgba(240,237,228,.45);
+  color: var(--pv-muted);
   font-family: var(--pv-sans);
 }
 .kpv1 .ar-mic {
@@ -660,32 +655,32 @@
   flex: none;
   min-height: 76px;
   border: none;
-  border-left: 1px solid rgba(255,255,255,.1);
-  background: transparent;
+  border-left: 1px solid var(--pv-line);
+  background: var(--pv-paper);
   display: grid;
   place-items: center;
   cursor: pointer;
-  color: #4de0bf;
+  color: var(--pv-teal);
 }
 .kpv1 .ar-mic svg { width: 30px; height: 30px; }
 .kpv1 .ar-cta {
   width: 100%;
   min-height: 80px;
-  background: linear-gradient(135deg, #1f9e86 0%, #25b89a 100%);
-  color: #fff;
+  background: var(--pv-dark);
+  color: var(--pv-paper);
   border: none;
   border-radius: var(--pv-r-md);
   font-family: var(--pv-serif);
   font-size: 30px;
   font-weight: 700;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(31,158,134,.4);
+  box-shadow: 0 6px 20px rgba(16,48,43,.2);
 }
-.kpv1 .ar-cta:active { transform: scale(.99); box-shadow: 0 3px 10px rgba(31,158,134,.3); }
+.kpv1 .ar-cta:active { transform: scale(.99); }
 .kpv1 .ar-hint {
   font-size: 16px;
-  color: rgba(240,237,228,.5);
+  color: var(--pv-muted);
   text-align: center;
   margin: 9px 0 14px;
 }
@@ -697,27 +692,27 @@
 .kpv1 .ar-chip {
   min-height: 56px;
   padding: 0 20px;
-  background: rgba(255,255,255,.08);
-  border: 1px solid rgba(255,255,255,.14);
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
   border-radius: 999px;
   font-family: var(--pv-sans);
-  font-size: 19px;
-  color: rgba(240,237,228,.85);
+  font-size: 20px;
+  color: var(--pv-ink);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
-.kpv1 .ar-chip:active { background: rgba(53,171,142,.25); border-color: rgba(53,171,142,.4); }
-.kpv1 .ar-chip svg { width: 18px; height: 18px; color: #4de0bf; }
+.kpv1 .ar-chip:active { background: var(--pv-teal-soft); border-color: rgba(31,158,134,.3); }
+.kpv1 .ar-chip svg { width: 18px; height: 18px; color: var(--pv-teal); }
 
 /* device-card */
 .kpv1 .device-card {
-  background: linear-gradient(135deg, #0d2420 0%, #152f28 100%);
-  border: 1px solid rgba(53,171,142,.2);
+  background: var(--pv-surface);
+  border: 1px solid var(--pv-line);
   border-radius: var(--pv-r-md);
   padding: 22px 24px;
-  box-shadow: 0 4px 16px rgba(13,36,32,.35);
+  box-shadow: 0 3px 10px rgba(16,48,43,.04);
 }
 .kpv1 .device-card h3 {
   font-family: var(--pv-serif);
@@ -736,8 +731,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.1);
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
   border-radius: 12px;
   padding: 13px 16px;
 }
@@ -747,7 +742,7 @@
   gap: 12px;
 }
 .kpv1 .dc-left svg { width: 22px; height: 22px; color: var(--pv-teal-deep); }
-.kpv1 .dc-left span { font-size: 20px; color: rgba(240,237,228,.85); font-weight: 500; }
+.kpv1 .dc-left span { font-size: 20px; color: var(--pv-ink); font-weight: 500; }
 .kpv1 .dc-dot {
   width: 10px; height: 10px;
   border-radius: 50%;
