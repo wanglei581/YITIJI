@@ -53,7 +53,7 @@ export interface ConsentScope {
 async function call<T>(
   path: string,
   access: ContractReviewAccess,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; extraHeaders?: Record<string, string> },
 ): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: init?.method ?? 'GET',
@@ -64,6 +64,7 @@ async function call<T>(
         ? { 'x-contract-review-access-token': access.accessToken }
         : {}),
       ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.extraHeaders ?? {}),
     },
     credentials: 'include',
     ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
@@ -98,7 +99,11 @@ export async function createContractReview(
   if (API_MODE !== 'http') return mockCreateTask(contractType)
   // 1. 上传文件
   const upload = await kioskUploadFile(file, 'contract_upload', access.token)
-  // 2. 创建审查任务
+  // 2. 创建审查任务。匿名用户需附带 source-file-proof（上传返回的签名 URL），
+  //    后端用于验证 sourceFileId 归属；已登录用户凭 JWT 校验，无需 proof。
+  const extraHeaders: Record<string, string> = !access.token && upload.signedUrl
+    ? { 'x-contract-review-source-file-proof': upload.signedUrl }
+    : {}
   return call<ContractReviewTaskView>('/contract-reviews', access, {
     method: 'POST',
     body: {
@@ -109,6 +114,7 @@ export async function createContractReview(
       consentScopeHash: consent.consentScopeHash,
       disclaimerVersion: consent.disclaimerVersion,
     },
+    extraHeaders,
   })
 }
 
