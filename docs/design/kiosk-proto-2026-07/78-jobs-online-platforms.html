@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>线上招聘平台 · 职易达</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .content{gap:16px;}
+  .platform-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .plat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);padding:22px 24px;cursor:pointer;transition:transform .08s;box-shadow:0 2px 8px rgba(16,48,43,.05);position:relative;overflow:hidden;}
+  .plat-card:active{transform:scale(.98);}
+  .plat-card .pc-accent{position:absolute;top:0;left:0;bottom:0;width:5px;border-radius:5px 0 0 5px;}
+  .pc-head{display:flex;align-items:center;gap:16px;margin-bottom:14px;}
+  .pc-logo{width:54px;height:54px;border-radius:14px;flex:none;display:grid;place-items:center;font-family:var(--serif);font-size:21px;font-weight:900;color:#fffdf8;}
+  .pc-info b{display:block;font-size:24px;font-weight:700;color:var(--ink);}
+  .pc-info span{display:block;font-size:14px;color:var(--muted);margin-top:3px;}
+  .pc-stats{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:13px;}
+  .pc-stat{display:flex;align-items:center;gap:5px;font-size:16px;color:var(--muted);}
+  .pc-stat svg{width:15px;height:15px;color:var(--teal);}
+  .pc-stat b{color:var(--ink);font-weight:700;}
+  .ai-badge-sm{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-style:normal;font-weight:500;color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.18);padding:3px 8px;border-radius:999px;margin-bottom:13px;}
+  .ai-badge-sm::before{content:"✦";font-size:9px;}
+  .pc-cta{width:100%;min-height:58px;background:var(--dark);color:#f4f1e8;border:none;border-radius:var(--r-sm);font-family:var(--sans);font-size:20px;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+<div id="stage">
+<header class="topbar">
+  <div class="brand"><b>就业服务大厅 · 01号机</b><span>职易达AI求职操作系统</span></div>
+  <div class="right"><span class="clock" id="clock">2026年8月3日 10:42</span><span class="status-chip"><span class="dot"></span>打印机在线</span></div>
+</header>
+<div class="pagehead a-clay">
+  <button class="back-btn" onclick="location='08-jobs-list.html'">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>岗位信息
+  </button>
+  <div class="titles"><h1>线上招聘平台</h1><p>选择平台查看来源岗位，投递请前往来源平台办理</p></div>
+</div>
+<!-- AI上下文横幅 -->
+<div style="flex:none;margin:0 48px 0;background:rgba(31,158,134,.06);border:1px solid rgba(31,158,134,.18);border-radius:16px;padding:12px 20px;display:flex;align-items:center;gap:12px;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:16px;height:16px;color:var(--teal-deep);flex:none"><path d="M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z"/></svg>
+  <span style="font-size:15px;color:var(--teal-deep);font-weight:600;">AI岗位研判</span>
+  <span style="flex:1;font-size:13.5px;color:var(--muted);">登录并上传简历后，AI可在岗位旁标注匹配参考</span>
+  <span style="font-size:13px;color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.2);padding:3px 9px;border-radius:999px;white-space:nowrap;">需登录简历</span>
+</div>
+<main class="content a-clay" style="margin-top:14px">
+  <div class="platform-grid">
+    <div class="plat-card" onclick="location='09-job-detail.html'">
+      <div class="pc-accent" style="background:#f5a623"></div>
+      <div class="pc-head">
+        <div class="pc-logo" style="background:#f5a623">B</div>
+        <div class="pc-info"><b>Boss直聘</b><span>直接与老板沟通</span></div>
+      </div>
+      <div class="pc-stats">
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><b>2,847</b>个岗位</div>
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今日同步</div>
+      </div>
+      <em class="ai-badge-sm">AI岗位研判</em>
+      <button class="pc-cta">查看岗位</button>
+    </div>
+    <div class="plat-card" onclick="location='09-job-detail.html'">
+      <div class="pc-accent" style="background:#e35c2e"></div>
+      <div class="pc-head">
+        <div class="pc-logo" style="background:#e35c2e;font-size:15px">51job</div>
+        <div class="pc-info"><b>前程无忧</b><span>知名综合招聘平台</span></div>
+      </div>
+      <div class="pc-stats">
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><b>1,923</b>个岗位</div>
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今日同步</div>
+      </div>
+      <em class="ai-badge-sm">AI岗位研判</em>
+      <button class="pc-cta">查看岗位</button>
+    </div>
+    <div class="plat-card" onclick="location='09-job-detail.html'">
+      <div class="pc-accent" style="background:#1065cc"></div>
+      <div class="pc-head">
+        <div class="pc-logo" style="background:#1065cc;font-size:14px">智联</div>
+        <div class="pc-info"><b>智联招聘</b><span>专业职场发展平台</span></div>
+      </div>
+      <div class="pc-stats">
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><b>1,456</b>个岗位</div>
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>今日同步</div>
+      </div>
+      <em class="ai-badge-sm">AI岗位研判</em>
+      <button class="pc-cta">查看岗位</button>
+    </div>
+    <div class="plat-card" onclick="location='09-job-detail.html'">
+      <div class="pc-accent" style="background:#2aa4a4"></div>
+      <div class="pc-head">
+        <div class="pc-logo" style="background:#2aa4a4">猎</div>
+        <div class="pc-info"><b>猎聘</b><span>中高端职位专业平台</span></div>
+      </div>
+      <div class="pc-stats">
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><b>834</b>个岗位</div>
+        <div class="pc-stat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2'/></svg>今日同步</div>
+      </div>
+      <em class="ai-badge-sm">AI岗位研判</em>
+      <button class="pc-cta">查看岗位</button>
+    </div>
+  </div>
+  <div class="notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>本终端仅展示经审核发布的第三方来源岗位信息，不参与招聘流程。投递请前往对应来源平台完成。</div>
+</main>
+<nav class="navbar">
+  <button class="nav-item" onclick="location='01-home.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10"/></svg>首页</button>
+  <button class="nav-item" onclick="location='13-assistant.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z"/></svg>AI顾问</button>
+  <button class="nav-item" onclick="location='14-profile.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>我的</button>
+</nav>
+</div>
+<script src="shared.js"></script>
+</body>
+</html>

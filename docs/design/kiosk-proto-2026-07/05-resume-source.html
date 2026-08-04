@@ -91,6 +91,8 @@
       <span class="clock" id="clock">2026年7月17日 10:24</span>
       <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
     </div>
+
+
   </header>
 
   <div class="pagehead a-teal">
@@ -106,6 +108,9 @@
       <span class="chip ok">隐私保护 <b>原文仅用于本次诊断,不沉淀简历库</b></span>
     </div>
   </div>
+  <!-- ✦ AI底层驱动层 -->
+  <div style='flex:none;margin:12px 48px 0;background:linear-gradient(90deg,rgba(31,158,134,.07),rgba(31,158,134,.04));border:1px solid rgba(31,158,134,.2);border-radius:18px;padding:14px 20px;display:flex;align-items:center;gap:14px'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' style='width:16px;height:16px;flex:none'><path d='M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z'/></svg><div style='flex:1;min-width:0'><b style='display:block;font-size:17px;font-weight:700;color:var(--ink)'>✦ AI诊断优化</b><span style='display:block;font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4'>上传后AI自动解析结构、评分6个维度，基于目标岗位定向优化；原文仅用于本次服务</span></div><span style='font-size:12.5px;color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.22);padding:3px 10px;border-radius:999px;white-space:nowrap;flex:none'>AI就绪</span><button onclick="location='13-assistant.html'" style='min-height:52px;padding:0 18px;background:var(--dark);color:#f4f1e8;border:none;border-radius:14px;font-family:var(--sans);font-size:15px;font-weight:600;cursor:pointer;white-space:nowrap;flex:none'>先让小青规划方案</button></div>
+
 
   <div class="steps">
     <div class="step active"><span class="s-dot">1</span><span class="s-label">上传与方向</span></div>
@@ -217,7 +222,7 @@
       更换文件
     </button>
     <span class="spacer"></span>
-    <button class="btn primary" style="min-width: 460px;">
+    <button class="btn primary" style="min-width: 460px;" onclick="location='27-resume-parse.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M8.5 11l1.8 1.8 3.4-3.4"/></svg>
       开始 AI 诊断
     </button>

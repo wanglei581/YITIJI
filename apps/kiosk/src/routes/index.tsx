@@ -226,6 +226,19 @@ export const kioskRouter = createBrowserRouter([
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
       { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
+      // 原型 76–78：AI方案确认 / 继续上次 / 线上招聘平台
+      {
+        path: 'ai/plan',
+        lazy: async () => ({ Component: (await import('../pages/ai-plan/AiPlanPage')).AiPlanPage }),
+      },
+      {
+        path: 'session-resume',
+        lazy: async () => ({ Component: (await import('../pages/session-resume/SessionResumePage')).SessionResumePage }),
+      },
+      {
+        path: 'jobs/online-platforms',
+        lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
+      },
         ],
       },
       { path: '*', element: <KioskRouteErrorPage /> },
