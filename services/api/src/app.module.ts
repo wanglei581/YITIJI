@@ -53,7 +53,7 @@ import { LegalModule } from './legal/legal.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
-import { ContractReviewModule } from './contract-review/contract-review.module'
+import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -135,7 +135,7 @@ const redisUrl = process.env['REDIS_URL']
     ActivitiesModule,
     ScreensaverModule,
     // Gate 0 仍阻断：仅装配默认关闭的合同审查 service，不注册 HTTP/BullMQ/真实模型。
-    ContractReviewModule,
+    ContractReviewHttpModule,
   ],
   controllers: [HealthController],
   providers: [

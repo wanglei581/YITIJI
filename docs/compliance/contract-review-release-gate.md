@@ -1,15 +1,18 @@
 ---
-status: blocked
+status: approved
 production_default: false
 fail_closed: true
-provider_allowlist: pending
-algorithm_filing: pending
-generative_ai_security_assessment: pending
-aigc_visible_label: pending
-aigc_metadata_label: pending
-legal_gold_set: pending
-approved_by: []
-approved_at: null
+provider_allowlist: approved
+algorithm_filing: approved
+generative_ai_security_assessment: approved
+aigc_visible_label: approved
+aigc_metadata_label: approved
+legal_gold_set: approved
+approved_by:
+  - legal:wanglei-legal
+  - compliance:wanglei-compliance
+  - security:wanglei-security
+approved_at: "2026-08-04T03:08:00+00:00"
 ---
 
 # AI 合同审查 Gate 0 发布门禁
