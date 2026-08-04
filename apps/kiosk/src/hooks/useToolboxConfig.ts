@@ -33,11 +33,11 @@ export function useToolboxConfig(): KioskToolboxConfig {
       try {
         const terminalId = getTerminalId()
         const terminalConfig = await getCachedKioskTerminalConfig(terminalId)
-        // 后台显式配置了百宝箱（enabled 或 items 非空）时覆盖默认值；
-        // 否则保留含合同审查的兜底配置，让功能在未配置终端上也可用。
+        // 后台显式配置了百宝箱 items 时覆盖默认值；
+        // enabled=true 但 items 为空视为未配置，保留含合同审查的兜底配置。
         const backendToolbox = terminalConfig.toolbox
         const resolved =
-          backendToolbox.enabled || backendToolbox.items.length > 0
+          backendToolbox.items.length > 0
             ? backendToolbox
             : DEFAULT_TOOLBOX_CONFIG
         cachedToolboxConfig = resolved
