@@ -633,14 +633,14 @@
   padding: 0 48px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 16px;
 }
 .kpv1 .svc-tile {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 112px;
-  padding: 16px 18px 14px;
+  min-height: 152px;
+  padding: 20px 20px 18px;
   background: var(--pv-surface);
   border: 1px solid var(--pv-line);
   border-left: 6px solid var(--pv-accent, var(--pv-teal));
@@ -672,6 +672,42 @@
 .kpv1 .st-sub { font-size: 18px; color: var(--pv-muted); }
 .kpv1 .svc-tile .ai-chip { margin-left: 0; margin-top: 4px; align-self: flex-start; }
 .kpv1 .st-arr { flex: none; width: 24px; height: 24px; color: var(--pv-muted); }
+
+/* ── 继续办理横幅（原型 .continue-bar；未登录引导登录，已登录由 ContinuePanel 替代） ── */
+.kpv1 .continue-bar {
+  flex: none;
+  margin: 0 48px;
+  background: linear-gradient(90deg, rgba(31,158,134,.06), rgba(31,158,134,.03));
+  border: 1px solid rgba(31,158,134,.18);
+  border-radius: var(--pv-r-md);
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+.kpv1 .cb-body { display: flex; flex-direction: column; gap: 4px; }
+.kpv1 .cb-body b { font-size: 24px; font-weight: 700; color: var(--pv-ink); }
+.kpv1 .cb-body span { font-size: 18px; color: var(--pv-muted); }
+.kpv1 .cb-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 72px;
+  padding: 0 28px;
+  background: var(--pv-dark);
+  color: var(--pv-paper, #f4f1e8);
+  border: none;
+  border-radius: var(--pv-r-sm);
+  font-family: var(--pv-sans);
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.kpv1 .cb-btn svg { width: 22px; height: 22px; }
+.kpv1 .cb-btn:active { transform: scale(.97); }
 
 /* ── AI接待区（design-d .reception + .ar-card + .device-card） ── */
 .kpv1 .reception {

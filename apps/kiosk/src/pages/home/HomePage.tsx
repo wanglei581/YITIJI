@@ -398,6 +398,29 @@ export function ZoneRow() {
   )
 }
 
+/** 继续办理横幅（原型 .continue-bar）
+ * 未登录时显示引导登录；已登录则隐藏（ContinuePanel 接管）。
+ */
+function HomeContinueBar() {
+  const navigate = useNavigate()
+  const { isLoggedIn } = useAuth()
+  if (isLoggedIn) return null
+  return (
+    <div className="continue-bar">
+      <div className="cb-body">
+        <b>继续办理</b>
+        <span>登录后可查看并继续本人未完成事项</span>
+      </div>
+      <button type="button" className="cb-btn" onClick={() => navigate('/login')}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+          <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" />
+        </svg>
+        登录后查看
+      </button>
+    </div>
+  )
+}
+
 /** 8个扁平服务磁贴网格（原型 design-d .svc-grid，对应01-home.html 8个 svc-tile）
  * 替代旧分组 ServiceCard+ZoneRow 布局，与原型1:1视觉对齐。
  */
@@ -449,6 +472,7 @@ export function HomePage() {
       <ContinuePanel />
       <HomeReception />
       <HomeDispatch />
+      <HomeContinueBar />
       {/* 服务区标题（原型 .svc-header：核心服务 + AI增强服务徽章 + 提示语） */}
       <div className="svc-header">
         <span className="svc-title">核心服务</span>
