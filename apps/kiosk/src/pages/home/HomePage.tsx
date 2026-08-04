@@ -428,11 +428,11 @@ function SvcGrid() {
   const navigate = useNavigate()
   const tiles = [
     { to: '/print-scan',      accent: 'a-slate', icon: 'group-print',     title: '打印扫描',   sub: '上传、扫描与本机出纸',   aiChip: 'AI文件预检' },
-    { to: '/resume/source',   accent: 'a-teal',  icon: 'group-resume',    title: 'AI简历服务', sub: '诊断、优化、生成与打印', aiChip: 'AI诊断优化' },
-    { to: '/jobs',            accent: 'a-clay',  icon: 'group-jobs',      title: '岗位信息',   sub: '查看第三方来源岗位',     aiChip: 'AI岗位研判' },
-    { to: '/job-fairs',       accent: 'a-wheat', icon: 'group-fairs',     title: '招聘会',     sub: '场次、企业与现场导览',   aiChip: 'AI材料清单' },
-    { to: '/interview/setup', accent: 'a-plum',  icon: 'group-interview', title: 'AI面试训练', sub: '模拟问答与训练报告',     aiChip: 'AI模拟反馈' },
-    { to: '/renshi',          accent: 'a-wheat', icon: 'group-policy',    title: '政策服务',   sub: '政策查询与材料指引',     aiChip: 'AI来源解读' },
+    { to: '/resume-service',   accent: 'a-teal',  icon: 'group-resume',    title: 'AI简历服务', sub: '诊断、优化、生成与打印', aiChip: 'AI诊断优化' },
+    { to: '/jobs-service',    accent: 'a-clay',  icon: 'group-jobs',      title: '岗位信息',   sub: '查看第三方来源岗位',     aiChip: 'AI岗位研判' },
+    { to: '/fairs-service',   accent: 'a-wheat', icon: 'group-fairs',     title: '招聘会',     sub: '场次、企业与现场导览',   aiChip: 'AI材料清单' },
+    { to: '/interview-service', accent: 'a-plum',  icon: 'group-interview', title: 'AI面试训练', sub: '模拟问答与训练报告',     aiChip: 'AI模拟反馈' },
+    { to: '/policy-service',  accent: 'a-wheat', icon: 'group-policy',    title: '政策服务',   sub: '政策查询与材料指引',     aiChip: 'AI来源解读' },
     { to: '/toolbox',         accent: 'a-plum',  icon: 'zone-toolbox',    title: '百宝箱',     sub: '证件照、文档与实用工具', aiChip: 'AI受控工具' },
     { to: '/smart-campus',    accent: 'a-teal',  icon: 'zone-campus',     title: '智慧校园',   sub: '校园服务与信息展示',     aiChip: 'AI场景引导' },
   ]

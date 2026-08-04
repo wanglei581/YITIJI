@@ -239,6 +239,26 @@ export const kioskRouter = createBrowserRouter([
         path: 'jobs/online-platforms',
         lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
       },
+      {
+        path: 'resume-service',
+        lazy: async () => ({ Component: (await import('../pages/resume/ResumeServiceHubPage')).ResumeServiceHubPage }),
+      },
+      {
+        path: 'jobs-service',
+        lazy: async () => ({ Component: (await import('../pages/jobs/JobsServiceHubPage')).JobsServiceHubPage }),
+      },
+      {
+        path: 'fairs-service',
+        lazy: async () => ({ Component: (await import('../pages/job-fairs/FairsServiceHubPage')).FairsServiceHubPage }),
+      },
+      {
+        path: 'interview-service',
+        lazy: async () => ({ Component: (await import('../pages/interview/InterviewServiceHubPage')).InterviewServiceHubPage }),
+      },
+      {
+        path: 'policy-service',
+        lazy: async () => ({ Component: (await import('../pages/policy/PolicyServiceHubPage')).PolicyServiceHubPage }),
+      },
         ],
       },
       { path: '*', element: <KioskRouteErrorPage /> },
