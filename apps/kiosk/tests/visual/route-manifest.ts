@@ -36,7 +36,11 @@ export const productionRoutePatterns = [
   '/ai/plan',
   '/session-resume',
   '/jobs/online-platforms',
-] as const // 96 routes (was 93)
+  // PR #499 合同审查
+  '/contract-review',
+  '/contract-review/processing',
+  '/contract-review/result',
+] as const // 99 routes (was 96)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

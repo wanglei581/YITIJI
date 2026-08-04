@@ -158,7 +158,11 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-] as const // 93 routes (was 92)
+  // PR #499 合同审查
+  { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查' },
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', marker: 'p:text-is("审查未完成")', featureText: '审查未完成' },
+  { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果' },
+] as const // 96 routes (was 93)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -170,8 +174,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 96) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 99) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 94) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 97) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
