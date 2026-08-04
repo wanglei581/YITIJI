@@ -118,9 +118,9 @@
   flex: none; padding: 12px 48px 8px;
   display: flex; justify-content: space-between; align-items: flex-end; gap: 30px;
 }
-.kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 46px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
-.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); }
-.kpv1 .welcome p { margin-top: 10px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
+.kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 56px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
+.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); text-decoration: underline; text-decoration-color: rgba(31,158,134,.4); text-underline-offset: 6px; }
+.kpv1 .welcome p { margin-top: 10px; font-size: 20px; color: var(--pv-muted); letter-spacing: 1px; opacity: .75; }
 
 /* ── 登录按钮（01-home.html .login-btn，min-height:88px，r-md 圆角） ── */
 .kpv1 .login-btn {
@@ -577,14 +577,14 @@
 /* ── 服务区标题（原型 .svc-header） ── */
 .kpv1 .svc-header {
   flex: none;
-  padding: 8px 48px 4px;
+  padding: 12px 48px 8px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 .kpv1 .svc-title {
   font-family: var(--pv-serif);
-  font-size: 34px;
+  font-size: 38px;
   font-weight: 700;
   color: var(--pv-ink);
   letter-spacing: 1px;
@@ -641,26 +641,33 @@
   gap: 16px;
   min-height: 152px;
   padding: 20px 20px 18px;
-  background: var(--pv-surface);
+  background: linear-gradient(135deg, var(--pv-surface) 0%, color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 4%, var(--pv-surface)) 100%);
   border: 1px solid var(--pv-line);
-  border-left: 6px solid var(--pv-accent, var(--pv-teal));
+  border-top: 4px solid var(--pv-accent, var(--pv-teal));
   border-radius: var(--pv-r-md);
   cursor: pointer;
   text-align: left;
   font-family: var(--pv-sans);
-  box-shadow: 0 3px 12px rgba(16,48,43,.04);
+  box-shadow: 0 4px 20px rgba(16,48,43,.08);
+  transition: transform .12s ease, box-shadow .12s ease;
 }
-.kpv1 .svc-tile:active { transform: scale(.98); }
+@media (hover: hover) {
+  .kpv1 .svc-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(16,48,43,.13);
+  }
+}
+.kpv1 .svc-tile:active { transform: scale(.98); box-shadow: 0 2px 8px rgba(16,48,43,.06); }
 .kpv1 .st-icon {
   flex: none;
-  width: 64px; height: 64px;
-  border-radius: 14px;
+  width: 72px; height: 72px;
+  border-radius: 16px;
   display: grid;
   place-items: center;
   background: var(--pv-accent-soft, var(--pv-teal-soft));
   color: var(--pv-accent-deep, var(--pv-teal-deep));
 }
-.kpv1 .st-icon svg { width: 36px; height: 36px; }
+.kpv1 .st-icon svg { width: 42px; height: 42px; }
 .kpv1 .st-body {
   flex: 1;
   display: flex;
@@ -731,8 +738,8 @@
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, var(--pv-teal), rgba(53,171,142,.5), transparent);
+  height: 4px;
+  background: linear-gradient(90deg, var(--pv-teal-deep), var(--pv-teal), rgba(53,171,142,.3), transparent);
 }
 .kpv1 .ar-top {
   display: flex;
@@ -757,10 +764,15 @@
   height: 7px;
   border-radius: 50%;
   background: var(--pv-teal);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31,158,134,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(31,158,134,0); }
 }
 .kpv1 .ar-h {
   font-family: var(--pv-serif);
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--pv-ink);
   letter-spacing: 1px;
@@ -801,18 +813,25 @@
 .kpv1 .ar-cta {
   width: 100%;
   min-height: 80px;
-  background: var(--pv-dark);
+  background: linear-gradient(135deg, #10302b 0%, #1a5248 50%, #157a67 100%);
   color: var(--pv-paper);
   border: none;
   border-radius: var(--pv-r-md);
   font-family: var(--pv-serif);
   font-size: 30px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(16,48,43,.2);
+  box-shadow: 0 8px 24px rgba(16,48,43,.3);
+  transition: transform .15s ease, box-shadow .15s ease;
 }
-.kpv1 .ar-cta:active { transform: scale(.99); }
+@media (hover: hover) {
+  .kpv1 .ar-cta:hover {
+    box-shadow: 0 12px 32px rgba(16,48,43,.4);
+    transform: translateY(-2px);
+  }
+}
+.kpv1 .ar-cta:active { transform: scale(.99); box-shadow: 0 4px 12px rgba(16,48,43,.2); }
 .kpv1 .ar-hint {
   font-size: 16px;
   color: var(--pv-muted);
@@ -897,7 +916,7 @@
 /* AI 能力调度分隔条（design-d .dispatch） */
 .kpv1 .dispatch {
   flex: none;
-  padding: 6px 48px;
+  padding: 8px 48px;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -911,12 +930,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--pv-teal-deep);
   font-weight: 600;
   background: var(--pv-teal-soft);
   border: 1px solid rgba(31,158,134,.22);
-  padding: 6px 18px;
+  padding: 7px 20px;
   border-radius: 999px;
 }
 .kpv1 .d-label svg { width: 16px; height: 16px; }
