@@ -1,0 +1,30 @@
+Windows Registry Editor Version 5.00
+
+; ============================================================
+; AI求职打印服务终端 — Kiosk PNA / Mixed-Content 解锁策略
+; 用途：允许 https://zyidai.cn 访问本机 Agent http://127.0.0.1:9527
+; 适用：Windows 10/11 x64，Edge 108+ / Chrome 108+
+; 执行：以管理员身份双击导入，然后重启浏览器
+;        或在 PowerShell（管理员）运行：
+;        regedit /s windows-kiosk-pna-policy.reg
+; ============================================================
+
+; --- Microsoft Edge ---
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge]
+"InsecurePrivateNetworkRequestsAllowed"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\InsecurePrivateNetworkRequestsAllowedForUrls]
+"1"="https://zyidai.cn"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Edge\OverrideSecurityRestrictionsOnInsecureOrigin]
+"1"="http://127.0.0.1:9527"
+
+; --- Google Chrome ---
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome]
+"InsecurePrivateNetworkRequestsAllowed"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\InsecurePrivateNetworkRequestsAllowedForUrls]
+"1"="https://zyidai.cn"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Google\Chrome\OverrideSecurityRestrictionsOnInsecureOrigin]
+"1"="http://127.0.0.1:9527"

@@ -43,6 +43,24 @@ function assertProdAssistantTrtcMode(command: string, mode: string, env: Record<
   }
 }
 
+/**
+ * 生产构建门禁：禁止把构建机本地 VITE_TERMINAL_ID 打进产物。
+ * 多主机共享 Kiosk 的终端 ID 必须由运行期向本机 Agent
+ * (http://127.0.0.1:9527/local/terminal-identity) 动态获取，
+ * 不允许在构建期写死。本地 .env.local 可保留 VITE_TERMINAL_ID 用于 dev 调试，
+ * 生产构建时此函数会将其清空并打警告，不影响 dev server。
+ */
+function warnAndClearProdTerminalId(command: string, mode: string, env: Record<string, string>) {
+  if (command !== 'build' || mode !== 'production') return
+  if ((env['VITE_TERMINAL_ID'] ?? '').trim()) {
+    console.warn(
+      `[kiosk] ⚠️  生产构建检测到 VITE_TERMINAL_ID="${env['VITE_TERMINAL_ID']}"（来自 .env.local 或 CI 环境），` +
+        `已强制清空，产物不会包含硬编码终端 ID。` +
+        `多主机共享 Kiosk 的终端身份由运行期 Agent 动态提供。`,
+    )
+  }
+}
+
 function warnAssistantTrtcDevMode(command: string, env: Record<string, string>) {
   if (command !== 'serve') return
   const allowTextOnly = (env['VITE_ALLOW_TEXT_ONLY_ASSISTANT'] ?? '').trim() === 'true'
@@ -68,8 +86,14 @@ export default defineConfig(({ command, mode }) => {
   assertProdApiMode(command, mode, env)
   assertProdAssistantTrtcMode(command, mode, env)
   warnAssistantTrtcDevMode(command, env)
+  warnAndClearProdTerminalId(command, mode, env)
   return {
     plugins: [react(), tailwindcss()],
+    // 生产构建强制清空 VITE_TERMINAL_ID，防止构建机 .env.local 污染多主机共享 bundle。
+    // 运行期终端 ID 由 Agent 127.0.0.1:9527/local/terminal-identity 动态提供。
+    ...(command === 'build' && mode === 'production'
+      ? { define: { 'import.meta.env.VITE_TERMINAL_ID': JSON.stringify('') } }
+      : {}),
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
