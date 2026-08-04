@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>22 打印订单</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .order-card{border:1px solid var(--line); border-radius:var(--r-md); background:var(--surface); padding:14px; box-shadow:var(--shadow-card); display:flex; flex-direction:column; gap:10px;}
+  .order-card .oh{display:flex; align-items:center; justify-content:space-between;}
+  .order-card .oh .on{font-size:11.5px; color:var(--faint);}
+  .order-card .ob{display:flex; gap:12px; align-items:center;}
+  .order-card .code-mini{font-family:var(--serif); font-size:26px; font-weight:800; letter-spacing:4px; color:var(--teal-deep);}
+  .order-card .ob .oc h4{font-size:14px; font-weight:600;} .order-card .ob .oc p{font-size:12px; color:var(--muted); margin-top:2px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">打印订单</span></div>
+
+  <div class="content has-tabbar">
+    <div class="filter-bar">
+      <div class="f-chip on">全部</div><div class="f-chip">待取件</div><div class="f-chip">已完成</div><div class="f-chip">已退款</div>
+    </div>
+
+    <!-- 待取件：已付款，待到店核销 -->
+    <div class="order-card" style="border-color:var(--clay-soft);" onclick="location.href='08-print-pickup.html'">
+      <div class="oh"><span class="chip warn">待取件 · 待核销</span><span class="on">10:32 · ¥2.40</span></div>
+      <div class="ob">
+        <div class="code-mini" style="color:var(--clay);">8263</div>
+        <div class="oc"><h4>张青柠_求职简历.pdf</h4><p>A4 彩色 单面 2 份 · 幸福路服务站</p></div>
+        <span class="r-arrow">›</span>
+      </div>
+      <div class="notice warn" style="padding:8px 11px;"><span class="n-ic">⏰</span><div>今天 21:00 前到店核销，逾期未取自动退款。</div></div>
+    </div>
+
+    <!-- 已完成 -->
+    <div class="order-card">
+      <div class="oh"><span class="chip ok">已完成</span><span class="on">昨天 16:10 · ¥1.20</span></div>
+      <div class="ob">
+        <div class="ic a-teal" style="width:44px;height:44px;">🖨️</div>
+        <div class="oc"><h4>实习申请材料.pdf</h4><p>A4 黑白 双面 3 份 · 市人才市场</p></div>
+        <button class="btn sm ghost">再次打印</button>
+      </div>
+    </div>
+
+    <!-- 已退款 -->
+    <div class="order-card" style="opacity:.9;">
+      <div class="oh"><span class="chip">已退款</span><span class="on">3 天前 · ¥0.60</span></div>
+      <div class="ob">
+        <div class="ic" style="width:44px;height:44px;background:var(--surface-2);color:var(--muted);">↩</div>
+        <div class="oc"><h4>封面.pdf</h4><p>逾期未取件 · 已原路退款</p></div>
+      </div>
+    </div>
+
+    <div class="compliance-note">订单状态分为「支付 → 到店核销 → 打印 → 完成」；付款后未核销可退款。</div>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab" onclick="location.href='03-home.html'"><div class="ti">⌂</div>首页</div>
+    <div class="tab" onclick="location.href='04-print-hub.html'"><div class="ti">🖨️</div>打印</div>
+    <div class="tab" onclick="location.href='11-ai-hub.html'"><div class="ti">✦</div>AI</div>
+    <div class="tab on"><div class="ti">◍</div>我的</div>
+  </div>
+</div>
+</body>
+</html>

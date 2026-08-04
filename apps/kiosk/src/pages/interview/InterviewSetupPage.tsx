@@ -7,6 +7,7 @@
 
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
 import type {
   CreateInterviewInput,
@@ -181,6 +182,8 @@ export function InterviewSetupPage() {
           <Button size="sm" variant="secondary" className="min-h-12" onClick={() => navigate('/')}>返回</Button>
         }
       />
+
+      <AiDriverBanner feature="AI模拟面试反馈" description="面试后即时给出评分与改进建议" />
 
       <div className="interview-flow__scroll min-h-0 flex-1 overflow-y-auto pb-28">
         <ComplianceBanner tone="info">

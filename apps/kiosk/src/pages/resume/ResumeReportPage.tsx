@@ -418,6 +418,26 @@ export function ResumeReportPage() {
           {intent === 'optimize' ? '继续生成优化版简历' : '查看优化建议'}
         </Button>
       </KioskActionBar>
+      {/* 2D:目标岗位定向参考(仅参考,引导去来源平台投递) */}
+      <Button
+        size="lg"
+        variant="secondary"
+        className="resume-secondary-action mt-3 flex w-full items-center justify-center gap-2"
+        onClick={() => navigate('/resume/job-fit', { state: { taskId, accessToken } })}
+      >
+        <TargetIcon className="h-4 w-4" />
+        目标岗位匹配参考（仅供参考）
+      </Button>
+      <p className="resume-report-secondary-line mt-3">
+        想了解自己的倾向？
+        <button
+          type="button"
+          className="resume-report-secondary-link"
+          onClick={() => navigate('/resume/self-assessment/intro?from=resume-report')}
+        >
+          做一次自我探索
+        </button>
+      </p>
     </section>
     </KioskPageFrame>
   )

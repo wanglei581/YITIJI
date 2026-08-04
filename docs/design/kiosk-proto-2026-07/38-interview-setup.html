@@ -80,10 +80,12 @@
       <span class="clock" id="clock">2026年7月17日 10:24</span>
       <span class="status-chip"><span class="dot"></span>打印机正常 · A4纸充足</span>
     </div>
+
+
   </header>
 
   <div class="pagehead">
-    <button class="back-btn">
+    <button class="back-btn" onclick="location='14-profile.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
       返回
     </button>
@@ -95,6 +97,9 @@
       <span class="chip ok">练习结果仅本人可见</span>
     </div>
   </div>
+  <!-- ✦ AI底层驱动层 -->
+  <div style='flex:none;margin:12px 48px 0;background:linear-gradient(90deg,rgba(31,158,134,.07),rgba(31,158,134,.04));border:1px solid rgba(31,158,134,.2);border-radius:18px;padding:14px 20px;display:flex;align-items:center;gap:14px'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' style='width:16px;height:16px;flex:none'><path d='M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z'/></svg><div style='flex:1;min-width:0'><b style='display:block;font-size:17px;font-weight:700;color:var(--ink)'>✦ AI模拟面试反馈</b><span style='display:block;font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4'>练习后AI生成等级制反馈报告（非评分），基于你的简历和目标岗位个性化出题，结果仅供参考</span></div><span style='font-size:12.5px;color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.22);padding:3px 10px;border-radius:999px;white-space:nowrap;flex:none'>AI就绪</span></div>
+
 
   <main class="content">
 
@@ -214,12 +219,12 @@
   </main>
 
   <div class="actionbar">
-    <button class="btn ghost">
+    <button class="btn ghost" onclick="location='14-profile.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M15 5l-7 7 7 7"/></svg>
       返回
     </button>
     <span class="spacer"></span>
-    <button class="btn primary" style="min-width: 460px;">
+    <button class="btn primary" style="min-width: 460px;" onclick="location='39-interview-session.html'">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 5l11 7-11 7z"/></svg>
       开始模拟面试
     </button>

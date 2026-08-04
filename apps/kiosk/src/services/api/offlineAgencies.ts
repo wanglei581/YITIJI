@@ -85,6 +85,11 @@ export interface OfflineAgencyDTO {
   services: string[]
   orgCode?: string
   syncTime?: string
+  phone?: string | null
+  /** 机构当前状态（'open' | 'rest'），来自后端 status 字段；前端按此渲染徽章 */
+  status: 'open' | 'rest' | string
+  /** 当前在招岗位数，由后端聚合返回（仅详情端点提供，列表端点不提供）*/
+  jobCount?: number
 }
 
 export interface OfflineAgencyListResult {
@@ -96,6 +101,7 @@ export interface OfflineAgencyListResult {
 
 export interface OfflineAgencyListParams {
   district?: string
+  service?: string
   orgType?: string
   keyword?: string
   page?: number
@@ -183,6 +189,23 @@ function salaryLabel(min: number | null, max: number | null, unit: string): stri
   return undefined
 }
 
+export interface OfflineAgencyJobSummary {
+  id: string
+  title: string
+  jobType?: string
+  location?: string
+  salaryMin?: number | null
+  salaryMax?: number | null
+  status?: string
+}
+
+export interface OfflineAgencyDetailDTO extends OfflineAgencyDTO {
+  phone?: string | null
+  description?: string | null
+  website?: string | null
+  jobs: OfflineAgencyJobSummary[]
+}
+
 export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDTO {
   return {
     id: agency.id,
@@ -194,7 +217,14 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     services: parseStringList(agency.services),
     orgCode: agency.externalId ?? agency.sourceOrgId ?? undefined,
     syncTime: agency.syncTime ?? undefined,
+    phone: agency.phone ?? null,
+    status: agency.status,
   }
+}
+
+/** 线下机构详情（含在招岗位）。 */
+export function getOfflineAgencyById(id: string): Promise<OfflineAgencyDetailDTO> {
+  return getJson(`/kiosk/offline-agencies/${encodeURIComponent(id)}`)
 }
 
 export function mapWireOfflineJob(job: WireOfflineJob): OfflineJobDetailDTO {

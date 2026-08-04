@@ -1,6 +1,11 @@
-import { Page } from '../Page'
+// Partner 数据统计页 — /stats
+//
+// 口径：统计报表本阶段不开放，诚实告知用户。
+// 真实数据请在「数据源 / 同步日志 / 工作台」查看。
+
 import { EmptyState } from '@ai-job-print/ui'
 import { BarChart2Icon } from 'lucide-react'
+import { Page } from '../Page'
 
 export default function StatsPage() {
   return (

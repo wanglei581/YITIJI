@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>26 帮助与客服</title>
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">帮助与客服</span></div>
+
+  <div class="content">
+    <!-- 搜索框 -->
+    <div class="field" style="margin-bottom:12px;">
+      <input placeholder="搜索问题，如「取件码有效期」" style="background:transparent;border:none;outline:none;width:100%;font-size:14px;">
+    </div>
+
+    <!-- 快捷联系 -->
+    <div class="tiles" style="margin-bottom:0;">
+      <div class="tile" style="background:var(--teal-soft);gap:4px;align-items:center;">
+        <span style="font-size:22px;">💬</span>
+        <span style="font-size:12px;font-weight:600;color:var(--teal-deep);">在线客服</span>
+        <span style="font-size:10px;color:var(--teal-deep);opacity:.7;">工作日 9:00–18:00</span>
+      </div>
+      <div class="tile" style="background:var(--clay-soft);gap:4px;align-items:center;">
+        <span style="font-size:22px;">📞</span>
+        <span style="font-size:12px;font-weight:600;color:var(--clay);">拨打电话</span>
+        <span style="font-size:10px;color:var(--clay);opacity:.7;">400-xxx-xxxx</span>
+      </div>
+      <div class="tile" style="background:var(--surface-2);gap:4px;align-items:center;">
+        <span style="font-size:22px;">📧</span>
+        <span style="font-size:12px;font-weight:600;color:var(--text-body);">发邮件</span>
+        <span style="font-size:10px;color:var(--muted);">help@example.com</span>
+      </div>
+    </div>
+
+    <!-- 打印取件 FAQ -->
+    <div class="section-t">打印与取件</div>
+    <div class="card" style="gap:2px;" id="faq-print">
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>取件码有效期多长？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">取件码自支付成功起 <strong>72 小时</strong>有效。超期未取件将自动退款（退款周期 1–7 个工作日），文件同时删除。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>我付款了但文件没打印出来？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">手机远程下单后，需<strong>到达门店</strong>，在一体机上扫取件码核销，机器才会开始打印。付款≠立即出纸，这是正常流程。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>支持哪些文件格式？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">推荐 <strong>PDF</strong>（确保排版完全一致）。Word、图片等非 PDF 格式需先转换，转换质量可能因字体等原因存在差异，建议预览后确认。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>可以打印彩色吗？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">可以。上传文件后在参数页选择「彩色」，价格会有所不同。彩色打印以门店设备实际支持为准。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>如何退款？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">取件码有效期内可在「我的→打印订单」申请退款。已完成打印的订单不支持退款。逾期未取自动退款。退款 1–7 个工作日到账。</div>
+      </div>
+    </div>
+
+    <!-- AI 功能 FAQ -->
+    <div class="section-t">AI 功能</div>
+    <div class="card" style="gap:2px;">
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>AI 诊断结果准确吗？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">AI 诊断基于当前求职市场规律给出建议，<strong>仅供参考</strong>，不保证结果准确。所有 AI 生成内容均已标注「AI 生成」，请结合实际情况判断。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>我的简历会被其他人看到吗？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">不会。你的简历仅用于为你提供 AI 分析服务，不会共享给任何企业或第三方。本产品不做岗位投递，不收取简历给企业。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>扫描版简历为什么识别效果差？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">扫描版简历使用 OCR 识别，受图片清晰度、字体、排版影响。当前支持 ≤3 页，识别置信度低时会提示复核。建议使用清晰、直拍的原件扫描。</div>
+      </div>
+    </div>
+
+    <!-- 账号 FAQ -->
+    <div class="section-t">账号与安全</div>
+    <div class="card" style="gap:2px;">
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>如何更换绑定手机号？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">「我的→账号设置→更换手机号」，需要验证原手机号和新手机号各一次。</div>
+      </div>
+      <div class="faq-item" onclick="toggleFaq(this)">
+        <div class="faq-q"><span>一体机扫码登录安全吗？</span><span class="faq-arrow">›</span></div>
+        <div class="faq-a">安全。扫码登录采用一次性令牌，有效期 60 秒，且登录前会显示设备编号供你核对。<strong>请勿在非本人使用的机器前确认登录。</strong></div>
+      </div>
+    </div>
+
+    <div class="compliance-note">本产品不提供岗位投递、不收取求职者简历给企业、不做候选人筛选。</div>
+  </div>
+</div>
+
+<style>
+.faq-item { padding:12px 4px; border-bottom:1px solid var(--line-soft); cursor:pointer; }
+.faq-item:last-child { border-bottom:none; }
+.faq-q { display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:500; color:var(--text-body); gap:8px; }
+.faq-arrow { font-size:18px; color:var(--muted); transition:transform .2s; flex-shrink:0; }
+.faq-item.open .faq-arrow { transform:rotate(90deg); }
+.faq-a { font-size:13px; color:var(--muted); line-height:1.7; margin-top:8px; padding-left:2px; display:none; }
+.faq-item.open .faq-a { display:block; }
+</style>
+<script>
+function toggleFaq(el) {
+  el.classList.toggle('open');
+}
+</script>
+</body>
+</html>

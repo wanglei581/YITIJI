@@ -573,3 +573,215 @@
 @media (width: 1080px) and (height: 1920px) {
   .kpv1 { width: 1080px; min-height: 0; }
 }
+
+/* ── AI接待区（design-d .reception + .ar-card + .device-card） ── */
+.kpv1 .reception {
+  flex: none;
+  padding: 0 48px 8px;
+  display: grid;
+  grid-template-columns: 1fr 312px;
+  gap: 16px;
+  align-items: start;
+}
+.kpv1 .ar-card {
+  background: var(--pv-surface);
+  border: 1px solid rgba(31,158,134,.28);
+  border-radius: var(--pv-r-md);
+  padding: 22px 28px 18px;
+  box-shadow: 0 4px 18px rgba(31,158,134,.08);
+  position: relative;
+  overflow: hidden;
+}
+.kpv1 .ar-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--pv-teal), rgba(53,171,142,.5), transparent);
+}
+.kpv1 .ar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.kpv1 .ar-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 16px;
+  color: var(--pv-teal-deep);
+  font-weight: 600;
+  background: var(--pv-teal-soft);
+  border: 1px solid rgba(31,158,134,.28);
+  padding: 5px 14px;
+  border-radius: 999px;
+}
+.kpv1 .ar-badge .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--pv-teal);
+}
+.kpv1 .ar-h {
+  font-family: var(--pv-serif);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--pv-ink);
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+  line-height: 1.3;
+}
+.kpv1 .ar-input-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: var(--pv-r-sm);
+  overflow: hidden;
+  min-height: 76px;
+  align-items: center;
+}
+.kpv1 .ar-input-placeholder {
+  flex: 1;
+  padding: 0 22px;
+  font-size: 20px;
+  color: var(--pv-muted);
+  font-family: var(--pv-sans);
+}
+.kpv1 .ar-mic {
+  width: 76px;
+  flex: none;
+  min-height: 76px;
+  border: none;
+  border-left: 1px solid var(--pv-line);
+  background: var(--pv-paper);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--pv-teal);
+}
+.kpv1 .ar-mic svg { width: 30px; height: 30px; }
+.kpv1 .ar-cta {
+  width: 100%;
+  min-height: 80px;
+  background: var(--pv-dark);
+  color: var(--pv-paper);
+  border: none;
+  border-radius: var(--pv-r-md);
+  font-family: var(--pv-serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(16,48,43,.2);
+}
+.kpv1 .ar-cta:active { transform: scale(.99); }
+.kpv1 .ar-hint {
+  font-size: 16px;
+  color: var(--pv-muted);
+  text-align: center;
+  margin: 9px 0 14px;
+}
+.kpv1 .ar-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.kpv1 .ar-chip {
+  min-height: 56px;
+  padding: 0 20px;
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: 999px;
+  font-family: var(--pv-sans);
+  font-size: 20px;
+  color: var(--pv-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kpv1 .ar-chip:active { background: var(--pv-teal-soft); border-color: rgba(31,158,134,.3); }
+.kpv1 .ar-chip svg { width: 18px; height: 18px; color: var(--pv-teal); }
+
+/* device-card */
+.kpv1 .device-card {
+  background: var(--pv-surface);
+  border: 1px solid var(--pv-line);
+  border-radius: var(--pv-r-md);
+  padding: 22px 24px;
+  box-shadow: 0 3px 10px rgba(16,48,43,.04);
+}
+.kpv1 .device-card h3 {
+  font-family: var(--pv-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--pv-ink);
+}
+.kpv1 .device-card .dc-sub {
+  font-size: 17px;
+  color: var(--pv-muted);
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+.kpv1 .dc-items { display: flex; flex-direction: column; gap: 10px; }
+.kpv1 .dc-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--pv-paper);
+  border: 1px solid var(--pv-line);
+  border-radius: 12px;
+  padding: 13px 16px;
+}
+.kpv1 .dc-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kpv1 .dc-left svg { width: 22px; height: 22px; color: var(--pv-teal-deep); }
+.kpv1 .dc-left span { font-size: 20px; color: var(--pv-ink); font-weight: 500; }
+.kpv1 .dc-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #2db88a;
+  box-shadow: 0 0 0 3px rgba(45,184,138,.2);
+}
+.kpv1 .dc-footer {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  color: var(--pv-muted);
+}
+.kpv1 .dc-footer svg { width: 16px; height: 16px; flex: none; }
+
+/* AI 能力调度分隔条（design-d .dispatch） */
+.kpv1 .dispatch {
+  flex: none;
+  padding: 6px 48px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.kpv1 .d-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(31,158,134,.25), transparent);
+}
+.kpv1 .d-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--pv-teal-deep);
+  font-weight: 600;
+  background: var(--pv-teal-soft);
+  border: 1px solid rgba(31,158,134,.22);
+  padding: 6px 18px;
+  border-radius: 999px;
+}
+.kpv1 .d-label svg { width: 16px; height: 16px; }

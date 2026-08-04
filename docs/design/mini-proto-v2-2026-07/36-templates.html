@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>简历模板 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .tpl-grid { display:grid; grid-template-columns:1fr 1fr; gap:13px; padding:14px 16px; }
+    .tpl { cursor:pointer; }
+    .tpl-thumb { aspect-ratio:3/4; border-radius:var(--r-md); border:1px solid var(--line-faint); overflow:hidden; position:relative; box-shadow:var(--sh-xs); background:#fff; }
+    .tpl.on .tpl-thumb { border:2px solid var(--teal); box-shadow:0 0 0 3px rgba(31,158,134,.15); }
+    .tpl-check { position:absolute; top:7px; right:7px; width:22px; height:22px; border-radius:50%; background:var(--teal); color:#fff; display:none; align-items:center; justify-content:center; font-size:12px; }
+    .tpl.on .tpl-check { display:flex; }
+    .tpl-name { font-size:13px; font-weight:600; color:var(--ink); margin-top:8px; }
+    .tpl-tag { font-size:11px; color:var(--muted); margin-top:2px; }
+    /* mini resume skeletons */
+    .mini { padding:12px 11px; font-size:0; }
+    .m-bar { height:5px; border-radius:3px; background:#e3ded2; margin:4px 0; }
+    .m-head { height:12px; width:55%; border-radius:3px; margin-bottom:3px; }
+    .t1 .m-head { background:var(--teal); }
+    .t1 .m-accent { background:var(--teal); opacity:.35; }
+    .t2 { display:flex; gap:7px; }
+    .t2 .side { width:32%; background:#eef4f1; border-radius:4px; padding:8px 6px; }
+    .t2 .m-head { background:var(--teal-deep); }
+    .t3 .m-head { background:#333; }
+    .t3 .m-bar { background:#ddd; }
+    .t4 .m-head { background:var(--clay); }
+    .t4 .m-accent { background:var(--clay); opacity:.3; }
+    .pro-badge { position:absolute; top:7px; left:7px; font-size:9px; background:var(--wheat); color:#fff; padding:2px 7px; border-radius:var(--r-full); font-weight:600; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div class="nav-back">‹</div>
+    <div class="nav-title">选择简历模板</div>
+    <div class="nav-right"></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="filter-bar" style="padding-top:14px">
+      <div class="f-chip on">全部</div>
+      <div class="f-chip">简约</div>
+      <div class="f-chip">商务</div>
+      <div class="f-chip">创意</div>
+      <div class="f-chip">应届</div>
+    </div>
+
+    <div class="tpl-grid">
+      <div class="tpl on">
+        <div class="tpl-thumb">
+          <div class="tpl-check">✓</div>
+          <div class="mini t1">
+            <div class="m-bar m-head"></div>
+            <div class="m-bar" style="width:38%"></div>
+            <div class="m-bar m-accent" style="width:40%;height:7px;margin-top:9px"></div>
+            <div class="m-bar"></div><div class="m-bar" style="width:80%"></div>
+            <div class="m-bar m-accent" style="width:40%;height:7px;margin-top:9px"></div>
+            <div class="m-bar"></div><div class="m-bar" style="width:70%"></div>
+          </div>
+        </div>
+        <div class="tpl-name">经典单栏</div>
+        <div class="tpl-tag">通用 · 打印友好</div>
+      </div>
+
+      <div class="tpl">
+        <div class="tpl-thumb">
+          <div class="tpl-check">✓</div>
+          <div class="mini t2">
+            <div class="side">
+              <div class="m-bar m-head" style="width:80%"></div>
+              <div class="m-bar" style="width:100%"></div>
+              <div class="m-bar" style="width:100%;margin-top:12px"></div>
+            </div>
+            <div style="flex:1;padding-top:2px">
+              <div class="m-bar" style="width:60%;height:8px"></div>
+              <div class="m-bar"></div><div class="m-bar" style="width:85%"></div>
+              <div class="m-bar" style="margin-top:9px"></div><div class="m-bar" style="width:75%"></div>
+            </div>
+          </div>
+        </div>
+        <div class="tpl-name">双栏商务</div>
+        <div class="tpl-tag">信息密度高</div>
+      </div>
+
+      <div class="tpl">
+        <div class="tpl-thumb">
+          <span class="pro-badge">会员</span>
+          <div class="tpl-check">✓</div>
+          <div class="mini t3">
+            <div class="m-bar m-head" style="width:65%"></div>
+            <div class="m-bar" style="width:45%"></div>
+            <div class="m-bar" style="margin-top:11px"></div>
+            <div class="m-bar" style="width:90%"></div><div class="m-bar" style="width:80%"></div>
+            <div class="m-bar" style="margin-top:9px;width:88%"></div>
+          </div>
+        </div>
+        <div class="tpl-name">极简黑白</div>
+        <div class="tpl-tag">质感 · 高级</div>
+      </div>
+
+      <div class="tpl">
+        <div class="tpl-thumb">
+          <span class="pro-badge">会员</span>
+          <div class="tpl-check">✓</div>
+          <div class="mini t4">
+            <div class="m-bar m-head"></div>
+            <div class="m-bar" style="width:42%"></div>
+            <div class="m-bar m-accent" style="width:45%;height:7px;margin-top:9px"></div>
+            <div class="m-bar"></div><div class="m-bar" style="width:76%"></div>
+            <div class="m-bar m-accent" style="width:45%;height:7px;margin-top:9px"></div>
+            <div class="m-bar" style="width:88%"></div>
+          </div>
+        </div>
+        <div class="tpl-name">暖调创意</div>
+        <div class="tpl-tag">适合设计岗</div>
+      </div>
+    </div>
+
+    <div class="notice info" style="margin:0 16px">
+      <span>ℹ</span>
+      <div>模板仅改变排版样式，不改动你的简历内容。选定后可直接预览打印效果。</div>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink">预览</button>
+    <button class="btn primary" style="flex:1.6">应用此模板</button>
+  </div>
+</div>
+</body>
+</html>

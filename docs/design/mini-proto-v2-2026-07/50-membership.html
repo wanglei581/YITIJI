@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>会员中心 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    body { background:#2a2420; }
+    .vip-hero { background:linear-gradient(155deg,#3a322a,#2a2420); padding:20px 20px 28px; position:relative; overflow:hidden; }
+    .vip-hero::before { content:''; position:absolute; right:-40px; top:-30px; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle,rgba(240,210,120,.22),transparent 70%); }
+    /* vip card */
+    .vcard { background:linear-gradient(135deg,#f4d98a,#d9b45a); border-radius:var(--r-lg); padding:18px 20px; position:relative; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+    .vcard::after { content:'◆'; position:absolute; right:-6px; bottom:-14px; font-size:90px; color:rgba(255,255,255,.18); }
+    .vc-lvl { font-family:var(--font-serif); font-size:20px; font-weight:700; color:#5a4410; display:flex; align-items:center; gap:6px; }
+    .vc-exp { font-size:12px; color:#7a5f1c; margin-top:6px; }
+    .vc-name { font-size:12px; color:#7a5f1c; margin-top:14px; }
+    /* benefits */
+    .ben-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; padding:16px; }
+    .ben { background:#3a322a; border-radius:var(--r-md); padding:14px 13px; }
+    .ben-ic { font-size:22px; }
+    .ben-t { font-size:13.5px; font-weight:600; color:#f0e6d0; margin-top:8px; }
+    .ben-s { font-size:11px; color:#b0a48c; margin-top:4px; line-height:1.5; }
+    /* plans */
+    .plan-scroll { display:flex; gap:12px; padding:6px 16px 4px; overflow-x:auto; }
+    .plan-scroll::-webkit-scrollbar { display:none; }
+    .plan { flex-shrink:0; width:130px; background:#3a322a; border:1.5px solid #4a4038; border-radius:var(--r-lg); padding:16px 14px; text-align:center; position:relative; cursor:pointer; }
+    .plan.on { border-color:#e8c15f; background:#443a2e; }
+    .plan-tag { position:absolute; top:-9px; left:50%; transform:translateX(-50%); font-size:10px; background:#e8c15f; color:#5a4410; padding:2px 10px; border-radius:var(--r-full); font-weight:700; white-space:nowrap; }
+    .plan-name { font-size:13px; color:#d0c4ac; }
+    .plan-price { font-family:var(--font-serif); font-size:26px; font-weight:700; color:#f4d98a; margin:8px 0 2px; }
+    .plan-price small { font-size:12px; }
+    .plan-orig { font-size:11px; color:#8a7e66; text-decoration:line-through; }
+    .sec-t-dark { font-family:var(--font-serif); font-size:15px; font-weight:700; color:#f0e6d0; padding:16px 16px 4px; }
+    .pay-bar { position:absolute; left:0; right:0; bottom:0; background:#3a322a; border-top:1px solid #4a4038; padding:12px 16px 22px; display:flex; align-items:center; gap:14px; }
+    .pb-price { font-family:var(--font-serif); font-size:22px; font-weight:700; color:#f4d98a; }
+    .pb-btn { flex:1; height:50px; border-radius:var(--r-full); background:linear-gradient(135deg,#f4d98a,#e8c15f); color:#5a4410; font-size:16px; font-weight:700; display:flex; align-items:center; justify-content:center; border:none; }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar light" style="background:#3a322a"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar light" style="background:#3a322a;border-bottom:none">
+    <div class="nav-back" style="color:#f0e6d0">‹</div>
+    <div class="nav-title" style="color:#f4d98a">会员中心</div>
+    <div class="nav-right"><span style="font-size:13px;color:#b0a48c">权益说明</span></div>
+  </div>
+
+  <div class="content has-bar" style="background:#2a2420">
+    <div class="vip-hero" style="padding-bottom:8px">
+      <div class="vcard">
+        <div class="vc-lvl">◆ 黄金会员</div>
+        <div class="vc-exp">有效期至 2026-09-30 · 剩余 68 天</div>
+        <div class="vc-name">陈明 · 138****6621</div>
+      </div>
+    </div>
+
+    <!-- 权益 -->
+    <div class="sec-t-dark">会员专享权益</div>
+    <div class="ben-grid">
+      <div class="ben"><div class="ben-ic">✦</div><div class="ben-t">AI 服务无限次</div><div class="ben-s">诊断 / 优化 / 面试不限量</div></div>
+      <div class="ben"><div class="ben-ic">🎨</div><div class="ben-t">全部简历模板</div><div class="ben-s">解锁会员专属模板</div></div>
+      <div class="ben"><div class="ben-ic">🖨</div><div class="ben-t">打印折扣</div><div class="ben-s">每单享 8 折优惠</div></div>
+      <div class="ben"><div class="ben-ic">⚡</div><div class="ben-t">优先处理</div><div class="ben-s">打印任务优先排队</div></div>
+    </div>
+
+    <!-- 续费套餐 -->
+    <div class="sec-t-dark">续费或升级</div>
+    <div class="plan-scroll">
+      <div class="plan">
+        <div class="plan-name">月卡</div>
+        <div class="plan-price"><small>¥</small>19</div>
+        <div class="plan-orig">¥29</div>
+      </div>
+      <div class="plan on">
+        <div class="plan-tag">最超值</div>
+        <div class="plan-name">年卡</div>
+        <div class="plan-price"><small>¥</small>128</div>
+        <div class="plan-orig">¥348</div>
+      </div>
+      <div class="plan">
+        <div class="plan-name">季卡</div>
+        <div class="plan-price"><small>¥</small>49</div>
+        <div class="plan-orig">¥87</div>
+      </div>
+    </div>
+
+    <div class="compliance-note" style="background:transparent;color:#8a7e66">会员权益仅涉及本终端提供的 AI 与打印服务，不涉及任何第三方岗位投递或招聘结果。</div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <!-- 支付 -->
+  <div class="pay-bar">
+    <div>
+      <div style="font-size:11px;color:#b0a48c">年卡 · 到手价</div>
+      <div class="pb-price">¥128</div>
+    </div>
+    <button class="pb-btn">微信支付开通</button>
+  </div>
+</div>
+</body>
+</html>

@@ -10,6 +10,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -81,6 +82,17 @@ jobs:
         # Fail closed on unaccepted critical/high; only GHSA-qwww-vcr4-c8h2 may remain as accepted-unreachable.
         run: pnpm verify:dependency-security
 
+      - name: Compliance copy gate (forbidden UI terms)
+        # 扫 apps/{admin,kiosk,partner}/src 全量 .ts/.tsx,禁词清单来自 packages/shared 的 SSOT。
+        # 放在重装依赖之前:只依赖 node + 仓库,违规能最快失败。
+        run: pnpm verify:compliance-copy
+
+      - name: Import review reset gate (forced re-review on partner import)
+        # 静态断言 Partner/Excel 主动导入的 job/jobFair upsert update 块一律回 pending+draft,
+        # 并反向断言 job-sync 自动拉取不覆写审核状态。纯 node,不需要 DB。
+        working-directory: services/api
+        run: pnpm verify:import-review-reset
+
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
         run: sudo apt-get update -q && sudo apt-get install -y -q fonts-noto-cjk sqlite3 redis-server
@@ -131,6 +143,10 @@ jobs:
       - name: D2 prime offline contract fixture
         # Pure renderer/state/evidence checks only; no PM2, Nginx, systemd, network, or production data plane.
         run: pnpm --filter @ai-job-print/api verify:d2-same-host-contract
+
+      - name: D2 prime invocation governance fixture
+        # Temporary Git/filesystem fixtures only; never launches the drill, systemd, PM2, Nginx, or production clients.
+        run: pnpm --filter @ai-job-print/api verify:d2-same-host-governance
 
       - name: LightFlow UI static contracts
         run: |

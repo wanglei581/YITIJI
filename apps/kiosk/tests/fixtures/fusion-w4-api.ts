@@ -134,9 +134,9 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
   const agency = {
     id: 'agency-001', name: '青岛合规人力服务机构', orgType: 'recruitment',
     address: '市南区示例路1号', district: '市南区', lat: 36.0671, lng: 120.3826,
-    openHours: '09:00–17:00', phone: '0532-00000000', contactEmail: null,
+    openHours: null, phone: '0532-00000000', contactEmail: null,
     website: 'https://agency.example.gov.cn', services: '["岗位咨询","用工咨询"]',
-    description: '线下公开服务机构。', logoUrl: null, status: 'active',
+    description: '线下公开服务机构。', logoUrl: null, status: 'inactive',
     sourceOrgId: 'source-001', externalId: 'QD-HR-001', syncTime: '2026-07-24T08:00:00.000Z',
     createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
   } satisfies WireOfflineAgency
@@ -149,7 +149,7 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
     createdAt: '2026-07-01T08:00:00.000Z', updatedAt: '2026-07-24T08:00:00.000Z',
     agency: {
       id: agency.id, name: agency.name, orgType: agency.orgType, address: agency.address,
-      district: agency.district, phone: agency.phone, openHours: agency.openHours,
+      district: agency.district, phone: agency.phone, openHours: '09:00–17:00',
       website: agency.website,
       reviewStatus: 'approved', publishStatus: 'published',
     },
@@ -170,6 +170,15 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
   respond('/api/v1/jobs', { success: true, data: [job], pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 } })
   respond('/api/v1/jobs/job-001', { success: true, data: job })
   respond('/api/v1/kiosk/offline-agencies', { data: [agency], total: 1, page: 1, pageSize: 10 })
+  respond('/api/v1/kiosk/offline-agencies/agency-001', {
+    id: 'agency-001', name: '青岛合规人力服务机构', type: '人力资源服务机构',
+    address: '市南区示例路1号', district: '市南区', hours: '09:00–17:00',
+    services: ['岗位咨询', '用工咨询'], orgCode: 'QD-HR-001',
+    syncTime: '2026-07-24T08:00:00.000Z', status: 'open', jobCount: 1,
+    phone: '0532-00000000', description: '线下公开服务机构。',
+    website: 'https://agency.example.gov.cn',
+    jobs: [{ id: 'offline-job-001', title: '现场咨询岗位', jobType: 'fulltime', location: '市南区', salaryMin: 8000, salaryMax: 12000, status: 'active' }],
+  })
   respond('/api/v1/kiosk/offline-jobs/offline-job-001', offlineJob)
   respond('/api/v1/companies', { success: true, data: { items: [company], nextCursor: null, total: 1 } })
   respond('/api/v1/companies/stats', { success: true, data: { companyCount: 1, openJobCount: 1, todayNewJobCount: 1, fairCompanyCount: 1 } })

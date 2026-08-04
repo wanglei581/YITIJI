@@ -1,0 +1,12 @@
+{
+  "id": "f1-d2-cleanup-merged-status-20260802",
+  "title": "F1 D2′ cleanup PR #474 合入后状态收口",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "状态收口已归档；等待用户决定是否准备新的 fresh retake 执行包",
+  "createdAt": "2026-08-02T03:48:00Z",
+  "branch": "codex/f1-d2-cleanup-merged-status-20260802"
+}

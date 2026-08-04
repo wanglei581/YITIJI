@@ -179,11 +179,9 @@ ai-job-print-terminal/
     design/
     compliance/
     progress/
-
-  legacy-miaoda/
-    screenshots/
-    exported-code/
 ```
+
+> `legacy-miaoda/`（秒哒旧项目截图，52 文件/22M）已于 81724b73（2026-06-05）移出仓库，只保留 tag `archive/legacy-miaoda-20260605`。第 4 节关于「参考 / 不照搬」的口径作为历史结论保留，但仓库内已无该目录，不要按它规划目录或开发。
 
 当前物理目录仍采用标准 monorepo 结构；目录职责索引详见：[docs/project-structure.md](docs/project-structure.md)。当前阶段不做物理目录迁移。
 
@@ -263,7 +261,9 @@ ai-job-print-terminal/
 - 触控与可访问性不降低：一体机主操作仍需适合 27 寸竖屏触控显示器，主要按钮建议不小于 56px，所有可点击区域不小于 48px，并保证文字可读、状态明确。
 - 工程范围仍受控：UI 改版可以做，但必须声明范围、避免混入无关后端 / 数据库 / 硬件 / 合规改动，并按任务风险执行验证。
 
-## 9. 核心页面范围
+## 9A. 核心页面范围
+
+> 编号说明：本节此前误写为第二个 `## 9`，与上一节「页面 UI 设计口径」重号。仓库内 `§9` 引用已同时指向两处含义（多为「不伪造能力 / 触控尺寸」，少数指本节页面范围），直接顺移 §10–§19 会破坏 100+ 处既有引用，故改用 `9A` 消歧。引用本节请写 `CLAUDE.md §9A`。
 
 ### 一体机前台
 
@@ -644,7 +644,9 @@ Claude Code 每次开发前必须：
 - 岗位/招聘会只做第三方/官方来源信息入口。
 - 秒哒旧项目作为参考库，不作为正式工程继续开发。
 
-当前阶段（2026-06-12，**上线前收口；写完代码改这里 + docs/progress/current-progress.md**）：
+当前阶段（**本节只记长期不变的里程碑基线；实时阶段以 [docs/progress/current-progress.md](docs/progress/current-progress.md) 为唯一信源**）：
+
+> 口径修正（2026-08-01）：本节此前标注「2026-06-12 上线前收口」，已滞后约 7 周。实时进度只写进 `docs/progress/current-progress.md`，不再在本文件维护第二份阶段声明。截至 2026-08-01，真实阶段为 **F1 D2′ 演练收口**，`productionF1` 仍为 **NO-GO**（须先合入 invocation 唯一性与 stale-PID/cleanup 两项闸门）。下面列出的是已封板、长期不变的里程碑：
 
 - Phase 1–7（设计系统、前台、后台、合作机构、API 设计、AI Provider 骨架、岗位/招聘会真实 API）全部完成
 - **Phase 8 全部封板（2026-05-29）**：Phase 8.0 Spike / 8.1A–D Windows 真机出纸 / 8.2A Prisma 跨机 / 8.2B WMI 状态 / 8.2C 安全加固，全部 Mac 真实后端跨机 E2E 通过

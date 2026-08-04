@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>07 微信支付</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .pay-amount{text-align:center; padding:14px 0 4px;}
+  .pay-amount .lbl{font-size:13px; color:var(--muted);}
+  .pay-amount .amt{font-family:var(--serif); font-size:44px; font-weight:800; color:var(--ink);}
+  .pay-amount .amt small{font-size:22px;}
+  /* 微信支付面板 */
+  .mask{position:absolute; inset:0; background:rgba(9,26,23,.5); display:flex; align-items:flex-end; z-index:20;}
+  .wxpay{width:100%; background:#f7f7f7; border-radius:16px 16px 0 0; padding:16px 18px calc(20px + env(safe-area-inset-bottom));}
+  .wxpay .wp-head{text-align:center; font-size:15px; font-weight:600; padding:6px 0 14px; position:relative;}
+  .wxpay .wp-head .x{position:absolute; left:0; top:4px; font-size:20px; color:var(--muted);}
+  .wxpay .wp-amt{text-align:center; font-family:var(--serif); font-size:34px; font-weight:800; margin-bottom:16px;}
+  .wxpay .wp-row{display:flex; align-items:center; justify-content:space-between; background:#fff; border-radius:10px; padding:14px; font-size:14px; margin-bottom:16px;}
+  .wxpay .wp-row .l{display:flex; align-items:center; gap:9px;}
+  .wxpay .wp-row .wx-ic{width:26px; height:26px; border-radius:6px; background:#07c160; color:#fff; display:grid; place-items:center; font-size:15px;}
+  .wxpay .wp-pay{height:48px; background:#07c160; color:#fff; border:none; border-radius:10px; width:100%; font-size:16px; font-weight:600;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">确认订单</span></div>
+
+  <div class="content has-actionbar">
+    <div class="steps" style="padding:2px;">
+      <div class="st done"><span class="n">✓</span>选文件</div><div class="line"></div>
+      <div class="st done"><span class="n">✓</span>选门店</div><div class="line"></div>
+      <div class="st on"><span class="n">3</span>付款</div><div class="line"></div>
+      <div class="st"><span class="n">4</span>取件</div>
+    </div>
+
+    <div class="card">
+      <div class="pay-amount">
+        <div class="lbl">应付金额（服务端核算）</div>
+        <div class="amt"><small>¥</small>2.40</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="between fs13"><span class="muted">文件</span><span>张青柠_求职简历.pdf</span></div>
+      <div class="between fs13"><span class="muted">规格</span><span>A4 · 彩色 · 单面 · 2 份</span></div>
+      <div class="between fs13"><span class="muted">计费页数</span><span>2 页 × 2 = 4 页</span></div>
+      <div class="between fs13"><span class="muted">取件门店</span><span>幸福路社区服务站</span></div>
+    </div>
+
+    <div class="notice"><span class="n-ic">🔒</span><div>金额与页数由<b>服务端解析核算</b>，不以手机端传入为准；支付凭证仅在服务端处理。</div></div>
+    <div class="compliance-note">支付由微信支付提供，本工具仅提供打印材料服务。</div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn btn-wx block lg" onclick="document.getElementById('mask').style.display='flex'"><span style="font-size:17px;">✔</span> 微信支付 ¥2.40</button>
+  </div>
+
+  <!-- 微信支付面板 -->
+  <div class="mask" id="mask" style="display:none;">
+    <div class="wxpay">
+      <div class="wp-head"><span class="x" onclick="document.getElementById('mask').style.display='none'">✕</span>微信支付</div>
+      <div class="wp-amt">¥2.40</div>
+      <div class="wp-row"><div class="l"><span class="wx-ic">✔</span>零钱 / 银行卡</div><span style="color:var(--muted);">›</span></div>
+      <button class="wp-pay" onclick="location.href='08-print-pickup.html'">确认支付</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

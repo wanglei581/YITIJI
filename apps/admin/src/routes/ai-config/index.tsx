@@ -271,7 +271,7 @@ export default function AiConfigPage() {
               value={model}
               onChange={(e) => setModel(e.target.value)}
               className={inputCls}
-              placeholder="如 deepseek-chat"
+              placeholder="如 deepseek-v4-flash"
             />
             <datalist id="model-options">
               {currentPreset?.models.map((m) => <option key={m} value={m} />)}

@@ -8,7 +8,7 @@ import ts from 'typescript'
 const KIOSK_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKSPACE_ROOT = join(KIOSK_ROOT, '..', '..')
 const W4_ROUTES = [
-  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies',
+  '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
@@ -40,6 +40,13 @@ const PLANNED_TEST_FILES = new Set([
   'apps/kiosk/tests/visual/fusion-w4.spec.ts',
 ])
 const OFFLINE_AGENCY_SERVICE = 'apps/kiosk/src/services/api/offlineAgencies.ts'
+// G1 二次合规（2026-08-03）：后端 hardcode '营业中' / 机构临时休息 文案，属于
+// 运营状态声明且 verify-fusion-w4 反向闸门原则要求只能收敛到中性语。
+// 唯一允许修改的后端 service 文件；变更前必须确认：
+//   1. 文案仅为中性兜底（如 '请到店咨询'），不再硬编码运营状态
+//   2. 不得新增 jobs/stats/todayOpen 等聚合字段
+//   3. 修改须配套 docs/progress 日志
+const OFFLINE_AGENCY_BACKEND_SERVICE = 'services/api/src/offline-agencies/offline-agencies.service.ts'
 const CURRENT_AUDIT_INTEGRATION_FILES = new Set([
   'apps/kiosk/src/components/kiosk-shell/KioskFullscreenShell.tsx',
   'apps/kiosk/src/routes/index.tsx',
@@ -71,6 +78,15 @@ const W6_INTEGRATION_FILES = new Set([
   'docs/design/kiosk-proto-2026-07-migration-matrix.md',
   'docs/progress/current-progress.md',
   'docs/progress/next-tasks.md',
+  // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
+  'services/api/prisma/postgres/schema.prisma',
+  'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
+  // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
+  'apps/kiosk/tests/visual/route-manifest.ts',
+  // baseline script route count mirrors W6; must update together
+  'apps/kiosk/scripts/verify-fusion-baseline.mjs',
+  // migration matrix is a documentation contract updated alongside route manifest
+  'docs/design/kiosk-proto-2026-07-migration-matrix.md',
 ])
 const ALLOWED_PRODUCTION_PATHS = [
   /^apps\/kiosk\/src\/pages\/(?:jobs|companies|offline-agencies|job-fairs|campus|smart-campus|renshi)\//,
@@ -203,18 +219,17 @@ function interfaceShape(sourceText, interfaceName) {
 
 console.log('\n=== Kiosk Fusion W4 contract ===')
 
-check('exact 23-route ownership', () => {
+check('exact 24-route ownership', () => {
   const owned = collectRoutePaths()
-  assert.equal(owned.length, 23)
-  assert.equal(new Set(owned).size, 23)
+  assert.equal(owned.length, 24)
+  assert.equal(new Set(owned).size, 24)
   assert.deepEqual([...owned].sort(), [...W4_ROUTES].sort())
   assert.ok(!owned.includes('/notifications'))
-  assert.ok(!owned.includes('/offline-agencies/:id'))
 })
 
 check('changes stay inside W4 scope and hard-frozen files remain untouched', () => {
   const changes = changedFiles()
-  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
+  const frozenHits = changes.filter((path) => path !== OFFLINE_AGENCY_SERVICE && path !== OFFLINE_AGENCY_BACKEND_SERVICE && !CURRENT_AUDIT_INTEGRATION_FILES.has(path) && !W6_INTEGRATION_FILES.has(path) && FORBIDDEN_PATHS.some((pattern) => pattern.test(path)))
   assert.deepEqual(frozenHits, [], `hard-frozen path changed: ${frozenHits.join(', ')}`)
 
   const scopeViolations = changes.filter((path) => {
@@ -224,6 +239,7 @@ check('changes stay inside W4 scope and hard-frozen files remain untouched', () 
     if (OTHER_WAVE_PATHS.some((pattern) => pattern.test(path))) return false
     if (PLANNED_TEST_FILES.has(path)) return false
     if (path === OFFLINE_AGENCY_SERVICE) return false
+    if (path === OFFLINE_AGENCY_BACKEND_SERVICE) return false
     return !ALLOWED_PRODUCTION_PATHS.some((pattern) => pattern.test(path))
   })
   assert.deepEqual(scopeViolations, [], `W4 scope violation: ${scopeViolations.join(', ')}`)
@@ -269,11 +285,19 @@ check('jobs preserve source-only application contract', () => {
     'job search input keeps the kiosk 48px touch target',
   )
 })
-check('offline agency list does not invent a detail route', () => {
-  assert.doesNotMatch(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
+check('offline agency list navigates to real detail route', () => {
+  // G1 #482: /offline-agencies/:id 已作为真实路由注册，列表页须提供导航入口
+  assert.match(offlineAgencies, /offline-agencies\/\$\{agency\.id\}/)
 })
 check('offline agency presentation does not invent unavailable metrics or live status', () => {
-  assert.doesNotMatch(offlineAgencies, /data\.stats|jobCount|distanceKm|status === ['"]open['"]|oa-st open|营业中|今日服务|在招岗位|按直线距离/)
+  // G1 #482 added API-driven status badge (oa-st open/rest → agency.status from server)
+  // and a stats band (openAgencies / totalJobs from server stats field).
+  // These are backend-sourced — they are not fabricated.
+  // Retain guards for: distance proximity (distanceKm / 按直线距离) — backend does NOT
+  // provide coordinates on this endpoint, so any such value would be invented.
+  assert.doesNotMatch(offlineAgencies, /distanceKm|按直线距离/)
+  // Hardcoded "营业中" copy would be a live operational claim without API backing.
+  assert.doesNotMatch(offlineAgencies, /'营业中'|"营业中"/)
   assert.match(offlineAgencies, /服务时间以机构公示为准/)
   assert.doesNotMatch(offlineJobDetail, /agencyServices as string|Array\.isArray\(job\.agencyServices\)/)
 })

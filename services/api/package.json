@@ -14,6 +14,7 @@
     "release:current-launcher": "node dist/release-provenance/release-current-launcher.js",
     "drill:d2-docker": "bash scripts/d2-docker/run.sh",
     "verify:d2-same-host-contract": "node scripts/d2-same-host/verify-contract.mjs",
+    "verify:d2-same-host-governance": "node --test --experimental-test-coverage --test-coverage-include=\"scripts/d2-same-host/governance*.mjs\" --test-coverage-lines=80 --test-coverage-functions=80 --test-coverage-branches=80 scripts/d2-same-host/verify-governance.mjs",
     "drill:d2-same-host": "bash scripts/d2-same-host/run.sh",
     "dev": "prisma generate && node -r @swc-node/register src/main.ts",
     "lint": "eslint src/",
@@ -27,6 +28,7 @@
     "verify:upload-sessions:http": "node -r @swc-node/register scripts/verify-upload-sessions-http.ts",
     "verify:partner-smart-campus": "node -r @swc-node/register scripts/verify-partner-smart-campus.ts",
     "verify:job-sync": "node -r @swc-node/register scripts/verify-job-sync.ts",
+    "verify:import-review-reset": "node scripts/verify-import-review-reset.mjs",
     "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
     "verify:partner-excel-template": "node -r @swc-node/register scripts/verify-partner-excel-template.ts",
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",
@@ -202,6 +204,9 @@
     "verify:print-conversion": "node -r @swc-node/register scripts/verify-print-conversion.ts",
     "verify:print-sign": "node -r @swc-node/register scripts/verify-print-sign.ts",
     "verify:legal-doc-version": "node -r @swc-node/register scripts/verify-legal-doc-version.ts",
+    "verify:self-assessment": "node -r @swc-node/register scripts/verify-self-assessment.ts",
+    "verify:assess-isolation": "node -r @swc-node/register scripts/verify-assess-isolation.ts",
+    "verify:compliance": "node -r @swc-node/register scripts/verify-compliance.ts",
     "verify:fair-stats-truth": "node -r @swc-node/register scripts/verify-fair-stats-truth.ts"
   },
   "dependencies": {

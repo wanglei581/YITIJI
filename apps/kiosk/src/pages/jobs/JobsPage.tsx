@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
+import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { getJobs } from '../../services/api'
 import {
   getJobAiConsentStatus,
@@ -301,6 +302,7 @@ export function JobsPage() {
         onSelect={(resume) => void runAiRecommend(resume)}
         onUpload={() => navigate('/resume/source?intent=diagnose')}
       />
+      <AiDriverBanner feature="AI岗位研判" description="结合你的简历分析匹配度" />
       {facetLoading ? (
         <LoadingState className="flex-1" />
       ) : error ? (

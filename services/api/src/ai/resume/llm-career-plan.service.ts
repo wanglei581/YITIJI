@@ -58,6 +58,11 @@ export interface CareerPlanContext {
   jobFit?: { jobTitle: string; fitLevel: string; gaps: string[] } | null
   /** 最近一次模拟面试表现（可选，仅会员可聚合；只用元数据级摘要） */
   interview?: { position: string; level: string; risks: string[] } | null
+  /** 最近一次自我探索（可选；仅作 hint，不参与校验 / 配额 / 签名门禁）
+   *  §1.7: 不再送入 LLM 的本人书写摘要(summary),只参考维度结构与强度。
+   *        summary 是 LLM 上一次拒答后的降级文本,跨轮注入会污染下游。
+   */
+  selfAssessment?: { dimensions: Array<{ key: string; label: string; strength: number }> } | null
   /**
    * A-6 成本可见性：每次真实 LLM 调用（含失败重试）回调一次元数据，
    * 由调用方累计后落 AiServiceLog。只传 provider/token 元数据，不含任何正文。
@@ -111,6 +116,15 @@ export class LlmCareerPlanService {
       parts.push(
         `【最近模拟面试表现摘要】岗位「${ctx.interview.position}」，练习等级 ${ctx.interview.level}；` +
         `主要改进点：${ctx.interview.risks.slice(0, 3).join('；').slice(0, 400)}`,
+      )
+    }
+    if (ctx.selfAssessment) {
+      const dims = ctx.selfAssessment.dimensions
+        .map((d) => `${d.label}(强度 ${d.strength}/5)`)
+        .join('、')
+      // §1.7: 不再把本人书写 summary 注入 prompt(summary 是 LLM 拒答后的降级文本,跨轮污染)。
+      parts.push(
+        `【最近自我探索倾向参考（仅作上下文 hint，不参与校验）】维度：${dims.slice(0, 400)}`,
       )
     }
 
@@ -233,6 +247,8 @@ export class LlmCareerPlanService {
           ],
           temperature: cfg.temperature,
           stream: false,
+          // DeepSeek V4：关闭 thinking，避免 reasoning 占满输出导致 content 为空
+          ...(cfg.model.startsWith('deepseek-v4') ? { thinking: { type: 'disabled' } } : {}),
         }),
       })
     } catch {

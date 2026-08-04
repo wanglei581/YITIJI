@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, StatusBadge } from '@ai-job-print/ui'
+import { Card, StatusBadge, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { RefreshCwIcon } from 'lucide-react'
 import type { PartnerSyncLog, SyncDataType, SyncResult } from '../../services/api'
@@ -58,7 +58,7 @@ export default function SyncLogsPage() {
     return (
       <Page title="同步日志" subtitle="加载中...">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -84,7 +84,7 @@ export default function SyncLogsPage() {
             key={f}
             onClick={() => setResultFilter(f)}
             className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-              resultFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+              resultFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
             }`}
           >
             {f}
@@ -100,7 +100,7 @@ export default function SyncLogsPage() {
             <thead>
               <tr>
                 {['日志编号', '数据源', '类型', '成功数', '失败数', '重复数', '异常字段', '失败原因', '结果', '同步时间', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>

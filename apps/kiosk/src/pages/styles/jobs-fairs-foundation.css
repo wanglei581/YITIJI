@@ -368,6 +368,7 @@ button.jf-chip {
   padding: 17px 24px;
   color: var(--ink);
   text-align: left;
+  text-decoration: none;
   box-shadow: 0 3px 14px rgba(16, 48, 43, .035);
   cursor: pointer;
   transition: box-shadow .15s, background .15s;

@@ -19,13 +19,20 @@ export const productionRoutePatterns = [
   '/resume/generate/preview', '/resume/parse', '/resume/report',
   '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials',
   '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
-  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/notifications',
+  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
   '/job-fairs/:id', '/job-fairs/:id/companies',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats',
-] as const
+  // v1：自我探索 · 倾向参考（PR ③）
+  '/resume/self-assessment/intro',
+  '/resume/self-assessment/questions',
+  '/resume/self-assessment/result',
+  '/resume/self-assessment/history',
+  // 打印取件认领
+  '/print/pickup-claim',
+] as const // 93 routes (was 92)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

@@ -1,5 +1,6 @@
 # Codex temp
 .codex-tmp/
+.codegraph/
 
 # Dependencies
 node_modules

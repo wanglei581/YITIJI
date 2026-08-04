@@ -25,15 +25,35 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
+import { AuditService } from '../audit/audit.service'
+import { resolveClientIp } from '../common/client-ip'
 import { OfflineAgenciesService, type AgencyListQuery, type JobListQuery } from './offline-agencies.service'
 import { CreateOfflineAgencyDto, UpdateOfflineAgencyDto } from './dto/create-offline-agency.dto'
 import { CreateOfflineJobDto, UpdateOfflineJobDto } from './dto/create-offline-job.dto'
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator'
+
+interface AuditReq {
+  headers: Record<string, string | string[] | undefined>
+  requestId?: string
+  ip?: string
+  socket?: { remoteAddress?: string }
+}
+
+function extractIp(req: unknown): string | null {
+  return resolveClientIp(req)
+}
+
+function extractUa(req: AuditReq): string | null {
+  const ua = req.headers['user-agent']
+  return typeof ua === 'string' ? ua : null
+}
 
 class ReviewActionDto {
   @IsIn(['reviewing', 'approve', 'reject'])
@@ -55,7 +75,10 @@ class PublishStatusDto {
 @Roles('admin')
 @Controller('admin/offline-agencies')
 export class AdminOfflineAgenciesController {
-  constructor(private readonly service: OfflineAgenciesService) {}
+  constructor(
+    private readonly service: OfflineAgenciesService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get()
   async findAll(@Query() query: AgencyListQuery) {
@@ -73,18 +96,68 @@ export class AdminOfflineAgenciesController {
   }
 
   @Patch(':id/review')
-  async review(@Param('id') id: string, @Body() body: ReviewActionDto) {
-    return this.service.adminReview(id, body.action, body.reason)
+  async review(
+    @Param('id') id: string,
+    @Body() body: ReviewActionDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminReview(id, body.action, body.reason)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency.review',
+      targetType: 'offline_agency',
+      targetId: id,
+      payload: { action: body.action, reason: body.reason ?? null, reviewStatus: result.reviewStatus },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Patch(':id/publish')
-  async publish(@Param('id') id: string, @Body() body: PublishStatusDto) {
-    return this.service.adminPublish(id, body.publishStatus)
+  async publish(
+    @Param('id') id: string,
+    @Body() body: PublishStatusDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminPublish(id, body.publishStatus)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency.publish',
+      targetType: 'offline_agency',
+      targetId: id,
+      payload: { publishStatus: body.publishStatus },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return this.service.adminDelete(id)
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminDelete(id)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency.delete',
+      targetType: 'offline_agency',
+      targetId: id,
+      payload: { deletedJobs: result.deletedJobs ?? null },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   // ─── 机构岗位管理 ────────────────────────────────────────────────────────────

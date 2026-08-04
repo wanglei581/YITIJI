@@ -84,6 +84,7 @@ const PURPOSE_FOLDER: Record<
   admin_upload: { scope: 'admin', folder: 'uploads' },
   screensaver_material: { scope: 'screensaver', folder: 'materials' },
   temp: { scope: 'tmp', folder: 'uploads' },
+  self_assessment_report: { scope: 'user', folder: 'self-assessment' },
 }
 
 /**

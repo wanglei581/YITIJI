@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Card, StatusBadge, EmptyState } from '@ai-job-print/ui'
+import { Card, StatusBadge, EmptyState, LoadingState } from '@ai-job-print/ui'
 import { Page } from '../Page'
 import { ScrollTextIcon } from 'lucide-react'
 import { policiesAdminService, type AdminPolicyRecord } from '../../services/api/policiesAdmin'
@@ -99,7 +99,7 @@ export default function PolicySourcesPage() {
     return (
       <Page title="政策信息源" subtitle="合作机构提交的政策扶持/公告内容审核与发布">
         <div className="flex h-48 items-center justify-center">
-          <p className="text-sm text-neutral-400">加载中...</p>
+          <LoadingState text="加载中…" className="py-12" />
         </div>
       </Page>
     )
@@ -126,7 +126,7 @@ export default function PolicySourcesPage() {
               key={f}
               onClick={() => { setReviewFilter(f); setPage(1) }}
               className={`rounded-full border px-[13px] py-1.5 text-[12.5px] font-bold transition-colors ${
-                reviewFilter === f ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
+                reviewFilter === f ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-900/10 bg-surface text-neutral-700 hover:border-primary-600/40'
               }`}
             >
               {f}
@@ -147,7 +147,7 @@ export default function PolicySourcesPage() {
             <thead>
               <tr>
                 {['来源机构', '类型', '标题', '分组/标签', '展示日期', '提交时间', '审核状态', '发布状态', '操作'].map((h) => (
-                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
+                  <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
             </thead>

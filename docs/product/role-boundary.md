@@ -29,7 +29,7 @@
 
 | 角色 | 谁 | 端口 | 入口 |
 |---|---|---|---|
-| **Kiosk** | 求职者(无登录 / 轻量取件码) | 5173 | 27 寸竖屏触控显示器 + 浏览器 |
+| **Kiosk** | 求职者(游客可用基础服务;会员走手机号验证码 / 扫码登录) | 5173 | 27 寸竖屏触控显示器 + 浏览器 |
 | **Partner** | 合作的"内容提供方机构" | 5175 | 浏览器(机构账号登录) |
 | **Admin** | 我方运营人员 | 5174 | 浏览器(我方员工账号) |
 | **Terminal Agent** | Windows 一体机本机后台进程 | 本机 | 无 UI |
@@ -106,6 +106,7 @@
 - ❌ 看其他人的简历 / AI 报告
 - ❌ 看任何后台入口("管理员后台" / "合作机构后台"按钮)
 - ❌ 查看他人资料、绕过本人授权延长保存期限、在公共设备本机长期遗留个人敏感数据
+- ❌ 公共终端保持长期登录态(会员会话必须可一键清场 / 超时自动退出,见 `apps/kiosk/src/auth/`)
 
 ### Partner 不能
 
@@ -118,8 +119,15 @@
 ### Admin 不能
 
 - ❌ 无审计查看求职者简历内容（管理员因运维访问用户文件必须使用短期签名 URL 并落审计）
-- ❌ 直接发布未审核内容(`PUBLISH_REQUIRES_APPROVAL` 后端硬断言)
-- ❌ 跳过审计(所有写操作都同步落 `AuditLog`,DB 层无 DELETE 权限)
+- ❌ 直接发布未审核内容(`PUBLISH_REQUIRES_APPROVAL` 后端硬断言,见 `policies.service.ts` / `jobs-admin.service.ts`)
+- ❌ 审核、发布、下架、删除等管理动作不落 `AuditLog`(这些路径必须写审计)
+
+> **口径修正(2026-08-01)**:本行此前写作「所有写操作都同步落 `AuditLog`,DB 层无 DELETE 权限」,与代码不符,已改为上面的可验证表述。实测(口径:**显式 Prisma delegate 调用**):`services/api/src` 有 29 处 `delete/deleteMany`(覆盖 19 个模型)、28 个 `@Delete()` 端点。这**不等于**全部物理删除面——另有 Prisma 嵌套 `deleteMany: {}`(如 `fair-company-zone.service.ts:88`),以及 SQLite 与 PostgreSQL 两份 Prisma schema **各 40 处 `onDelete: Cascade`**(仓库共 80 个文本命中,语义上是 40 组镜像关系,不是 80 组),后者会随父记录级联删除且不经过任何 service 审计封装。此外还有两个不在 API runtime Prisma 面内、但盘点全部删除面时应一并记账的入口:**部署期 destructive DDL**——`services/api/prisma/migrations` 下 `DROP TABLE` 10 处、`DROP INDEX` 1 处(`TRUNCATE` 与 `DELETE FROM` 均为 0),属迁移执行面不属运行时;以及 **Terminal Agent 本地 SQLite**——`apps/terminal-agent/src/agent/db.ts:221` 对 `pending_patches` 执行 `DELETE FROM`,作用于终端本机库不碰主库。权限方面只能证明到仓库层:API runtime 仅从单一 `DATABASE_URL` 创建 client(`prisma.service.ts:29`),未发现运行时 `SET ROLE` 或权限收敛脚本(全仓 `GRANT`/`REVOKE`/`CREATE ROLE` 检索为空);**线上实际库角色权限本次未核验**,不要据此断言线上无 DELETE 收敛。其中 `activity.service.ts` 的删除属会员删除本人浏览/跳转记录与 TTL 清理,不写 `AuditLog` 是设计如此。
+>
+> 因此有效约束是:
+> - 删除必须走 service 层(软删或带审计的封装),禁止在 controller 里直接调 Prisma `delete`;
+> - 管理侧删除/审核/发布必须落 `AuditLog`;会员自助删除本人记录与 TTL 清理豁免;
+> - 「DB 层按角色收敛 DELETE 权限」是**待办**,需真正建独立 DB role 并 GRANT 后才能写进本清单。
 
 ### Enterprise(刻意不存在的端)绝不能
 
@@ -185,10 +193,14 @@
 
 ### 禁词(用户可见 UI 一律不出现)
 
+以 `COMPLIANCE_FORBIDDEN_TERMS` 为准(2026-08-01 起 7 项,含变体正则 `COMPLIANCE_FORBIDDEN_TERM_PATTERNS`)。此处不再复述词表,避免与 SSOT 漂移:
+
 ```
-"一键投递" / "立即投递" / "平台投递" /
-"企业收简历" / "候选人管理" / "一键报名"
+一键投递 / 立即投递 / 平台投递(含「平台内投递」) /
+投递简历 / 企业收简历 / 候选人管理 / 一键报名
 ```
+
+豁免短语见 `COMPLIANCE_ALLOWED_PHRASES`(如「去来源平台投递」含「平台投递」子串但合规)。
 
 ### 推荐词(必须用)
 

@@ -188,28 +188,33 @@ function CardLink({ href, children }: { href: string; children: ReactNode }) {
 
 function KpiSection({ cards }: { cards: KpiCard[] }) {
   return (
-    <section aria-label="核心指标" className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+    <section aria-label="核心指标" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cards.map((card) => {
         const Icon = card.icon
         return (
           <div
             key={card.label}
-            className="rounded-lg border border-neutral-900/[0.06] bg-surface px-5 py-[18px] shadow-sm"
+            className={
+              'rounded-lg border bg-surface px-5 py-[18px] shadow-sm ' +
+              (card.warn
+                ? 'border-warning/30'
+                : 'border-neutral-900/[0.06]')
+            }
           >
-            <div className="flex items-center gap-1.5 text-[12.5px] font-semibold text-neutral-500">
-              <Icon className="h-[15px] w-[15px]" aria-hidden="true" />
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-500">
+              <Icon className="h-[14px] w-[14px] shrink-0" aria-hidden="true" />
               {card.label}
             </div>
             <div
               className={
-                'mt-2.5 text-3xl font-extrabold tabular-nums ' +
+                'mt-2 text-[1.9rem] font-extrabold tabular-nums leading-none ' +
                 (card.warn ? 'text-warning' : 'text-neutral-900')
               }
             >
               {card.value}
-              {card.unit && <span className="ml-0.5 text-sm font-bold opacity-55">{card.unit}</span>}
+              {card.unit && <span className="ml-1 text-sm font-bold opacity-50">{card.unit}</span>}
             </div>
-            <p className="mt-2 text-xs text-neutral-500">{card.sub}</p>
+            <p className="mt-2 text-[11.5px] text-neutral-500">{card.sub}</p>
           </div>
         )
       })}

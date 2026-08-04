@@ -6,6 +6,7 @@ export const TYPE_LABEL: Record<ActivityTargetType, string> = {
   policy: '政策',
   company_profile: '企业',
   fair_company: '参展企业',
+  offline_agency: '线下招聘机构',
 }
 
 const ACTION_LABEL: Record<ActivityJumpAction, string> = {
@@ -29,6 +30,8 @@ export function detailRoute(
       return `/companies/${targetId}`
     case 'fair_company':
       return externalId ? `/job-fairs/${externalId}/companies/${targetId}` : '/job-fairs'
+    case 'offline_agency':
+      return '/offline-agencies'
     default:
       return '/renshi'
   }

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=390, initial-scale=1.0">
+  <title>打印完成 · AI求职打印服务终端</title>
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .done-center { text-align:center; padding:36px 24px 20px; }
+    .done-ring { width:88px; height:88px; border-radius:50%; background:var(--teal-soft); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; position:relative; }
+    .done-ring::before { content:''; position:absolute; inset:-8px; border-radius:50%; border:2px solid var(--teal-soft); }
+    .done-ring .dr-check { font-size:40px; color:var(--teal); }
+    .done-title { font-family:var(--font-serif); font-size:22px; font-weight:700; color:var(--ink); }
+    .done-sub { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.6; }
+    .receipt { margin:0 16px; background:var(--surface); border-radius:var(--r-md); box-shadow:var(--sh-sm); overflow:hidden; }
+    .receipt-head { padding:14px 16px; background:var(--surface-2); border-bottom:1px dashed var(--line); display:flex; align-items:center; justify-content:space-between; }
+    .receipt-head .rh-t { font-family:var(--font-serif); font-size:15px; font-weight:600; color:var(--ink); }
+    .r-line { display:flex; justify-content:space-between; padding:10px 16px; font-size:13px; }
+    .r-line .l { color:var(--muted); }
+    .r-line .v { color:var(--ink-soft); font-weight:500; }
+    .rate-box { text-align:center; padding:8px 16px 4px; }
+    .rate-stars { font-size:30px; letter-spacing:6px; color:var(--wheat); margin:8px 0; }
+    .rate-stars .off { color:var(--line); }
+  </style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><div class="sb-icons">📶 5G 🔋</div></div>
+  <div class="navbar">
+    <div style="width:32px"></div>
+    <div class="nav-title">打印完成</div>
+    <div class="nav-right"><span class="fs13 teal">完成</span></div>
+  </div>
+
+  <div class="content has-bar">
+    <div class="done-center">
+      <div class="done-ring"><span class="dr-check">✓</span></div>
+      <div class="done-title">打印完成</div>
+      <div class="done-sub">「就业服务大厅 01 号」已回传出纸完成 · 14:36<br>请取走你的文件，注意核对份数</div>
+    </div>
+
+    <!-- 小票 -->
+    <div class="receipt">
+      <div class="receipt-head">
+        <span class="rh-t">打印小票</span>
+        <span class="chip ok">终端已回传 · 已完成</span>
+      </div>
+      <div class="r-line"><span class="l">简历_张晓.pdf</span><span class="v">黑白 A4 · 2页×2份</span></div>
+      <div class="r-line"><span class="l">证件照_1寸.jpg</span><span class="v">彩色相纸 · 8张</span></div>
+      <div class="r-line"><span class="l">门店</span><span class="v">就业服务大厅 01 号</span></div>
+      <div class="r-line"><span class="l">完成时间</span><span class="v">今天 14:36</span></div>
+      <div class="r-line" style="border-top:1px dashed var(--line);padding-top:12px"><span class="l">实付金额</span><span class="v clay serif fw7">¥9.00</span></div>
+    </div>
+
+    <!-- 评价 -->
+    <div class="section-t">本次服务评价</div>
+    <div class="card">
+      <div class="rate-box">
+        <div class="rate-stars">★ ★ ★ ★ <span class="off">★</span></div>
+        <div class="fs12 muted">点按星星评价出纸质量与速度（选填）</div>
+      </div>
+    </div>
+
+    <div class="notice info">
+      <span class="n-ic">ℹ️</span>
+      <span>打印状态以终端上报为准，如与实际取件不符，请在门店核对或联系客服。</span>
+    </div>
+    <div class="notice">
+      <span class="n-ic">🔒</span>
+      <span>本次打印文件已按隐私策略从终端清理，如需再次打印可从「我的文档 / 材料包」重新发起。</span>
+    </div>
+    <div class="spacer-lg"></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost-ink" style="flex:1">从我的文档再发起</button>
+    <button class="btn primary" style="flex:1.4">完成</button>
+  </div>
+</div>
+</body>
+</html>

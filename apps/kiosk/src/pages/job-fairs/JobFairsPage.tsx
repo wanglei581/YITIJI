@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { EmptyState, ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobFairDTO } from '@ai-job-print/shared'
 import {
@@ -232,6 +233,7 @@ export function JobFairsPage() {
       badge={<FusionBadge icon={RefreshCwIcon}>每日同步更新</FusionBadge>}
       actionBar={<span className="jf-action-note">本系统仅展示第三方来源招聘会信息，不参与报名流程，预约请前往来源平台。</span>}
     >
+      <AiDriverBanner feature="AI参会材料清单" description="根据你的目标生成参会准备单" />
     <div className="w4-fair-page flex h-full flex-col bg-canvas" style={WHEAT_ACCENT}>
       {qrFair && <BookingQrOverlay fair={qrFair} onClose={() => setQrFair(null)} />}
 

@@ -330,6 +330,9 @@ export type AiOperation =
   | 'interviewReport'
   | 'voiceTranscribe'   // ASR：按时长计费，estimatedCostCny 通常为 undefined
   | 'voiceSynthesize'   // TTS：按字符计费，estimatedCostCny 通常为 undefined
+  | 'selfAssessment'    // 自我探索 · 倾向参考（2026-08-01）
+
+
 export type AiLogStatus = 'success' | 'failed'
 export type JobSourceQualitySummary = JobSourceQualitySummaryDTO
 

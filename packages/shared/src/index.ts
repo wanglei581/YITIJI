@@ -37,6 +37,8 @@ export * from './types/payment'
 export * from './types/cashier'
 export * from './types/printScanCapability'
 export * from './types/adminUsers'
+export * from './types/selfAssessment'
+export { SELF_ASSESSMENT_QUESTIONS_V1 } from './data/selfAssessment/v1.questions'
 export {
   MEMBER_DATA_REQUEST_SCOPE,
   MEMBER_DATA_REQUEST_TYPE_LABEL,

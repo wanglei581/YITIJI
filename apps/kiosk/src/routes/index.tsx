@@ -38,6 +38,7 @@ import { PrintConfirmPage } from '../pages/print/PrintConfirmPage'
 import { PrintCashierPage } from '../pages/print/PrintCashierPage'
 import { PrintProgressPage } from '../pages/print/PrintProgressPage'
 import { PrintDonePage } from '../pages/print/PrintDonePage'
+import { PrintPickupClaimPage } from '../pages/print/PrintPickupClaimPage'
 import { ProfilePage } from '../pages/profile/ProfilePage'
 import { MyPrintOrdersPage } from '../pages/profile/me/MyPrintOrdersPage'
 import { MyResumesPage } from '../pages/profile/me/MyResumesPage'
@@ -58,6 +59,7 @@ import { PrintScanFeatureInfoPage } from '../pages/print-scan/PrintScanFeatureIn
 import { ConvertImagesPage } from '../pages/print-scan/ConvertImagesPage'
 import { SignStampPage } from '../pages/print-scan/SignStampPage'
 import { ResumeSourcePage } from '../pages/resume/ResumeSourcePage'
+import { SelfAssessmentIntroPage, SelfAssessmentQuizPage, SelfAssessmentResultPage, SelfAssessmentHistoryPage } from '../pages/resume/SelfAssessmentFlow'
 import { ResumeGeneratePage } from '../pages/resume/ResumeGeneratePage'
 import { ResumeGeneratePreviewPage } from '../pages/resume/ResumeGeneratePreviewPage'
 import { ResumeParsePage } from '../pages/resume/ResumeParsePage'
@@ -96,6 +98,10 @@ export const kioskRouter = createBrowserRouter([
       { path: '/legal/:doc', element: <LegalDocPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/job-fit', element: <JobFitPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/resume/career-plan', element: <CareerPlanPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/intro', element: <SelfAssessmentIntroPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/questions', element: <SelfAssessmentQuizPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/result', element: <SelfAssessmentResultPage />, errorElement: <KioskRouteErrorPage /> },
+      { path: '/resume/self-assessment/history', element: <SelfAssessmentHistoryPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/setup', element: <InterviewSetupPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/session', element: <InterviewSessionPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
@@ -178,6 +184,7 @@ export const kioskRouter = createBrowserRouter([
       { path: 'print/cashier',     element: <PrintCashierPage /> },
       { path: 'print/progress',    element: <PrintProgressPage /> },
       { path: 'print/done',        element: <PrintDonePage /> },
+      { path: 'print/pickup-claim', element: <PrintPickupClaimPage /> },
       // AI简历服务（Phase 3）：服务中心中间页（ResumeHomePage）已移除，首页瓦片直达各功能。
       // /resume 与 /resume/upload 均保留为旧入口兼容，重定向到上传页 /resume/source，不再出现二次选择页。
       { path: 'resume',            element: <Navigate to="/resume/source" replace /> },
@@ -208,6 +215,10 @@ export const kioskRouter = createBrowserRouter([
         lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgenciesPage')).default }),
       },
       {
+        path: 'offline-agencies/:id',
+        lazy: async () => ({ Component: (await import('../pages/offline-agencies/OfflineAgencyDetailPage')).default }),
+      },
+      {
         path: 'notifications',
         lazy: async () => ({ Component: (await import('../pages/placeholders/NotificationsPage')).default }),
       },
@@ -223,6 +234,19 @@ export const kioskRouter = createBrowserRouter([
       { path: 'job-fairs/:id/materials',               element: <FairMaterialsPage /> },
       { path: 'job-fairs/:id/visit-plan',              element: <FairVisitPlanPage /> },
       { path: 'job-fairs/:id/stats',                   element: <FairStatsPage /> },
+      // 原型 76–78：AI方案确认 / 继续上次 / 线上招聘平台
+      {
+        path: 'ai/plan',
+        lazy: async () => ({ Component: (await import('../pages/ai-plan/AiPlanPage')).AiPlanPage }),
+      },
+      {
+        path: 'session-resume',
+        lazy: async () => ({ Component: (await import('../pages/session-resume/SessionResumePage')).SessionResumePage }),
+      },
+      {
+        path: 'jobs/online-platforms',
+        lazy: async () => ({ Component: (await import('../pages/jobs/OnlinePlatformsPage')).OnlinePlatformsPage }),
+      },
         ],
       },
       { path: '*', element: <KioskRouteErrorPage /> },

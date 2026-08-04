@@ -10,9 +10,6 @@ SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 API_DIR="$(cd -P "$SCRIPT_DIR/../.." && pwd -P)"
 ROOT="$(cd -P "$API_DIR/../.." && pwd -P)"
 
-[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
-[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
-
 APPROVED_PATH="${D2_APPROVED_PATH:-/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 IFS=':' read -r -a approved_path_parts <<< "$APPROVED_PATH"
 [[ ${#approved_path_parts[@]} -gt 0 ]] || no_go "D2_PRIME_NO_GO_APPROVED_PATH"
@@ -28,7 +25,10 @@ for path_part in "${approved_path_parts[@]}"; do
 done
 export PATH="$APPROVED_PATH"
 
-required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl systemd-run timeout tr)
+[[ "$(uname -s)" == "Linux" ]] || no_go "D2_PRIME_NO_GO_KERNEL"
+[[ -r /sys/fs/cgroup/cgroup.controllers ]] || no_go "D2_PRIME_NO_GO_KERNEL"
+
+required_commands=(date dirname git grep id loginctl mkdir nginx node pm2 pnpm realpath rm sha256sum sleep stat systemctl timeout tr)
 for required_command in "${required_commands[@]}"; do
   command -v "$required_command" >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 done
@@ -40,10 +40,93 @@ PM2_BIN="$(command -v pm2)"
 NGINX_BIN="$(command -v nginx)"
 SYSTEMCTL_BIN="$(command -v systemctl)"
 
-[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]] \
-  || no_go "D2_PRIME_NO_GO_EVIDENCE_PATH"
-EVIDENCE_DIR="$D2_EVIDENCE_DIR"
-EVIDENCE_OUT="$D2_EVIDENCE_OUT"
+# D2_GOVERNANCE_INVOKE_START
+[[ -n "${D2_GOVERNANCE_ROOT:-}" && -n "${D2_GOVERNANCE_RESERVATION_ID:-}" ]] \
+  || no_go "D2_PRIME_NO_GO_GOVERNANCE_STATE"
+
+GOVERNANCE_CONTEXT_SENTINEL="D2_GOVERNANCE_CONTEXT_END"
+GOVERNANCE_CONTEXT_RAW=""
+if ! GOVERNANCE_CONTEXT_RAW="$(
+  env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
+    "$NODE_BIN" "$SCRIPT_DIR/governance.mjs" invoke \
+    --state-root "$D2_GOVERNANCE_ROOT" \
+    --reservation-id "$D2_GOVERNANCE_RESERVATION_ID" \
+    --context-fd 3 \
+    3>&1 >/dev/null
+  GOVERNANCE_STATUS=$?
+  (( GOVERNANCE_STATUS == 0 )) || exit "$GOVERNANCE_STATUS"
+  printf '%s' "$GOVERNANCE_CONTEXT_SENTINEL"
+)"; then
+  unset GOVERNANCE_CONTEXT_RAW GOVERNANCE_CONTEXT_SENTINEL
+  exit 2
+fi
+[[ "$GOVERNANCE_CONTEXT_RAW" == *"$GOVERNANCE_CONTEXT_SENTINEL" ]] \
+  || no_go "D2_PRIME_NO_GO_MANIFEST"
+GOVERNANCE_CONTEXT_PAYLOAD="${GOVERNANCE_CONTEXT_RAW%$GOVERNANCE_CONTEXT_SENTINEL}"
+[[ "$GOVERNANCE_CONTEXT_PAYLOAD" == *$'\n' ]] || no_go "D2_PRIME_NO_GO_MANIFEST"
+GOVERNANCE_CONTEXT_PAYLOAD="${GOVERNANCE_CONTEXT_PAYLOAD%$'\n'}"
+[[ "$GOVERNANCE_CONTEXT_PAYLOAD" == *$'\n'* ]] || no_go "D2_PRIME_NO_GO_MANIFEST"
+EVIDENCE_DIR="${GOVERNANCE_CONTEXT_PAYLOAD%%$'\n'*}"
+EVIDENCE_OUT="${GOVERNANCE_CONTEXT_PAYLOAD#*$'\n'}"
+[[ -n "$EVIDENCE_DIR" && -n "$EVIDENCE_OUT" && "$EVIDENCE_DIR" == /* \
+  && "$EVIDENCE_OUT" == /* && "$EVIDENCE_OUT" != *$'\n'* ]] \
+  || no_go "D2_PRIME_NO_GO_MANIFEST"
+unset GOVERNANCE_CONTEXT_RAW GOVERNANCE_CONTEXT_SENTINEL GOVERNANCE_CONTEXT_PAYLOAD GOVERNANCE_STATUS
+# D2_GOVERNANCE_INVOKE_END
+
+INVOCATION_CLONE_ROOT="$(realpath "$ROOT" 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_GIT_ROOT="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_GIT_ROOT="$(realpath "$INVOCATION_GIT_ROOT" 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+[[ "$INVOCATION_CLONE_ROOT" == "$INVOCATION_GIT_ROOT" ]] \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_BASELINE_OID="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_TREE_OID="$(git -C "$ROOT" rev-parse 'HEAD^{tree}' 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+INVOCATION_BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
+  || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+
+assert_invocation_clone_identity() {
+  local current_root=""
+  local current_git_root=""
+  local current_baseline_oid=""
+  local current_tree_oid=""
+  local current_branch=""
+  current_root="$(realpath "$ROOT" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_git_root="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_git_root="$(realpath "$current_git_root" 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_root" == "$INVOCATION_CLONE_ROOT" && "$current_git_root" == "$INVOCATION_GIT_ROOT" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_baseline_oid="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_baseline_oid" == "$INVOCATION_BASELINE_OID" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_tree_oid="$(git -C "$ROOT" rev-parse 'HEAD^{tree}' 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_tree_oid" == "$INVOCATION_TREE_OID" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  current_branch="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD 2>/dev/null)" \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  [[ "$current_branch" == "$INVOCATION_BRANCH" ]] \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  git -C "$ROOT" diff --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+  git -C "$ROOT" diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1 \
+    || no_go "D2_PRIME_NO_GO_GIT_IDENTITY"
+}
+
+assert_invocation_clone_identity
+command -v systemd-run >/dev/null 2>&1 || no_go "D2_PRIME_NO_GO_APPROVED_PATH_COMMAND"
 
 production_variables=(
   DATABASE_URL DIRECT_URL POSTGRES_URL
@@ -67,6 +150,7 @@ production_variables=(
   WECHAT_PAY_PRIVATE_KEY_PEM WECHAT_PAY_PRIVATE_KEY_PATH WECHAT_PAY_APIV3_KEY
   WECHAT_PAY_PUBLIC_KEY_PEM WECHAT_PAY_PUBLIC_KEY_PATH WECHAT_PAY_PUBLIC_KEY_ID
   WECHAT_PAY_CODEPAY_STORE_OUT_ID
+  WECHAT_MINIAPP_APPID WECHAT_MINIAPP_APPSECRET
   ALIPAY_APP_ID ALIPAY_APP_PRIVATE_KEY_PEM ALIPAY_APP_PRIVATE_KEY_PATH
   ALIPAY_PUBLIC_KEY_PEM ALIPAY_PUBLIC_KEY_PATH
   AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
@@ -92,16 +176,53 @@ XDG_RUNTIME_DIR="/run/user/$(id -u)"
   || no_go "D2_PRIME_NO_GO_RUNTIME_DIR"
 export XDG_RUNTIME_DIR
 
+# A `--collect` unit may disappear before or while cleanup polls it. Ignore the stop exit status
+# only long enough to obtain one keyed state snapshot; success still requires one of the two
+# explicit inactive tuples below. Malformed, contradictory, or unknown snapshots fail closed.
 stop_user_unit_and_prove_inactive() {
   local unit_name="$1"
-  local unit_state=""
-  systemctl --user stop "$unit_name" >/dev/null 2>&1 || return 1
+  local unit_properties=""
+  local load_state=""
+  local active_state=""
+  local property_name=""
+  local property_value=""
+  local load_state_seen=0
+  local active_state_seen=0
+  if timeout --signal=TERM --kill-after=2s 10s \
+    systemctl --user stop "$unit_name" >/dev/null 2>&1; then
+    :
+  fi
   for _ in {1..50}; do
-    if ! unit_state="$(systemctl --user show "$unit_name" -p ActiveState --value 2>/dev/null)"; then
+    if ! unit_properties="$(systemctl --user show "$unit_name" -p LoadState -p ActiveState 2>/dev/null)"; then
       return 1
     fi
-    [[ "$unit_state" == "inactive" ]] && return 0
-    case "$unit_state" in
+    load_state=""
+    active_state=""
+    load_state_seen=0
+    active_state_seen=0
+    while IFS='=' read -r property_name property_value; do
+      case "$property_name" in
+        LoadState)
+          (( load_state_seen == 0 )) || return 1
+          load_state_seen=1
+          load_state="$property_value"
+          ;;
+        ActiveState)
+          (( active_state_seen == 0 )) || return 1
+          active_state_seen=1
+          active_state="$property_value"
+          ;;
+        *) return 1 ;;
+      esac
+    done <<< "$unit_properties"
+    (( load_state_seen == 1 && active_state_seen == 1 )) || return 1
+    [[ -n "$load_state" && -n "$active_state" ]] || return 1
+    if [[ "$active_state" == "inactive" ]]; then
+      [[ "$load_state" == "loaded" || "$load_state" == "not-found" ]] && return 0
+      return 1
+    fi
+    [[ "$load_state" == "loaded" ]] || return 1
+    case "$active_state" in
       active|activating|deactivating|reloading) sleep 0.1 ;;
       *) return 1 ;;
     esac
@@ -109,6 +230,7 @@ stop_user_unit_and_prove_inactive() {
   return 1
 }
 
+assert_invocation_clone_identity
 systemctl --user show-environment >/dev/null 2>&1 \
   || no_go "D2_PRIME_NO_GO_USER_MANAGER"
 [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == "yes" ]] \
@@ -177,7 +299,8 @@ env -i PATH="$APPROVED_PATH" HOME="$SCRIPT_DIR" \
   ' 3010 3011 "$NGINX_PORT" \
   || no_go "D2_PRIME_NO_GO_PORT"
 
-WORK_DIR="${D2_WORK_DIR:-$SCRIPT_DIR/.work}"
+[[ -z "${D2_WORK_DIR+x}" ]] || no_go "D2_PRIME_NO_GO_GOVERNANCE_STATE"
+WORK_DIR="$SCRIPT_DIR/.work"
 [[ "$EVIDENCE_DIR" == /* && "$WORK_DIR" == /* ]] || no_go "D2_PRIME_NO_GO_PATH"
 mkdir -p -m 700 "$EVIDENCE_DIR" "$WORK_DIR"
 [[ -O "$EVIDENCE_DIR" && -O "$WORK_DIR" && ! -L "$EVIDENCE_DIR" && ! -L "$WORK_DIR" ]] \
@@ -262,7 +385,10 @@ bounded_pm2_kill() {
     env -i PATH="$APPROVED_PATH" HOME="$home" PM2_HOME="$pm2_home" \
     "$PM2_BIN" kill >/dev/null 2>&1 || true
   for _ in {1..20}; do
-    pm2_home_has_state "$pm2_home" || return 0
+    if ! pm2_home_has_state "$pm2_home"; then
+      [[ -z "$daemon_pid" ]] && return 0
+      break
+    fi
     if [[ -z "$daemon_pid" ]]; then
       if daemon_pid="$(read_pm2_daemon_pid "$pm2_home")"; then
         break
@@ -282,6 +408,75 @@ bounded_pm2_kill() {
   fi
   kill -0 "$daemon_pid" 2>/dev/null && return 1
   return 0
+}
+
+process_start_time_ticks() {
+  local pid="$1"
+  local process_stat=""
+  local -a process_fields=()
+  [[ "$pid" =~ ^[1-9][0-9]{0,9}$ ]] || return 1
+  [[ -r "/proc/$pid/stat" ]] || return 1
+  process_stat="$(<"/proc/$pid/stat")" || return 1
+  [[ "$process_stat" == *") "* ]] || return 1
+  read -r -a process_fields <<< "${process_stat##*) }"
+  (( ${#process_fields[@]} >= 20 )) || return 1
+  [[ "${process_fields[19]}" =~ ^[1-9][0-9]*$ ]] || return 1
+  printf '%s' "${process_fields[19]}"
+}
+
+nginx_process_matches_identity() {
+  local nginx_pid="$1"
+  local expected_start_time="$2"
+  local expected_executable=""
+  local actual_executable=""
+  local actual_start_time=""
+  [[ -d "/proc/$nginx_pid" && -O "/proc/$nginx_pid" && ! -L "/proc/$nginx_pid" ]] || return 1
+  expected_executable="$(realpath "$NGINX_BIN" 2>/dev/null)" || return 1
+  actual_executable="$(realpath "/proc/$nginx_pid/exe" 2>/dev/null)" || return 1
+  [[ "$actual_executable" == "$expected_executable" ]] || return 1
+  actual_start_time="$(process_start_time_ticks "$nginx_pid")" || return 1
+  [[ "$actual_start_time" == "$expected_start_time" ]]
+}
+
+stop_nginx_and_prove_dead() {
+  [[ -n "${RUN_DIR:-}" ]] || return 1
+  [[ "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]] || return 1
+  [[ -d "$RUN_DIR" && -O "$RUN_DIR" && ! -L "$RUN_DIR" ]] || return 1
+  local nginx_attempt_file="$RUN_DIR/nginx/nginx-start-attempted"
+  local nginx_identity_file="$RUN_DIR/nginx/nginx-master.identity"
+  local nginx_identity=""
+  local nginx_identity_pattern='^([1-9][0-9]{0,9}) ([1-9][0-9]*)$'
+  local nginx_pid=""
+  local nginx_start_time=""
+  if [[ ! -e "$nginx_attempt_file" && ! -L "$nginx_attempt_file" ]]; then
+    [[ ! -e "$nginx_identity_file" && ! -L "$nginx_identity_file" ]] || return 1
+    return 0
+  fi
+  [[ -f "$nginx_attempt_file" && -O "$nginx_attempt_file" && ! -L "$nginx_attempt_file" ]] || return 1
+  [[ "$(stat -c '%s' "$nginx_attempt_file")" == "0" ]] || return 1
+  [[ -f "$nginx_identity_file" && -O "$nginx_identity_file" && ! -L "$nginx_identity_file" ]] || return 1
+  [[ "$(stat -c '%s' "$nginx_identity_file")" =~ ^[1-9][0-9]*$ ]] || return 1
+  (( $(stat -c '%s' "$nginx_identity_file") <= 64 )) || return 1
+  nginx_identity="$(<"$nginx_identity_file")" || return 1
+  [[ "$nginx_identity" =~ $nginx_identity_pattern ]] || return 1
+  nginx_pid="${BASH_REMATCH[1]}"
+  nginx_start_time="${BASH_REMATCH[2]}"
+  (( nginx_pid > 1 )) || return 1
+  kill -0 "$nginx_pid" 2>/dev/null || return 0
+  nginx_process_matches_identity "$nginx_pid" "$nginx_start_time" || return 1
+  if ! kill -TERM "$nginx_pid" 2>/dev/null; then
+    kill -0 "$nginx_pid" 2>/dev/null && return 1
+    return 0
+  fi
+  for _ in {1..50}; do
+    kill -0 "$nginx_pid" 2>/dev/null || return 0
+    if ! nginx_process_matches_identity "$nginx_pid" "$nginx_start_time"; then
+      kill -0 "$nginx_pid" 2>/dev/null || return 0
+      return 1
+    fi
+    sleep 0.1
+  done
+  return 1
 }
 
 early_cleanup() {
@@ -351,19 +546,7 @@ cleanup() {
   bounded_pm2_kill "$PREFLIGHT_HOME" "$PREFLIGHT_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$LEGACY_HOME" "$LEGACY_PM2_HOME" || cleanup_failed=1
   bounded_pm2_kill "$MANAGED_HOME" "$MANAGED_PM2_HOME" || cleanup_failed=1
-  local nginx_pid_file="${RUN_DIR:-}/nginx/nginx.pid"
-  if [[ -f "$nginx_pid_file" && -O "$nginx_pid_file" && ! -L "$nginx_pid_file" ]]; then
-    local nginx_pid
-    nginx_pid="$(<"$nginx_pid_file")"
-    if [[ "$nginx_pid" =~ ^[1-9][0-9]{0,9}$ ]] && kill -0 "$nginx_pid" 2>/dev/null; then
-      "$NGINX_BIN" -s stop -p "$RUN_DIR/nginx/" -c "$RUN_DIR/nginx/nginx.conf" >/dev/null 2>&1 || true
-      for _ in {1..50}; do
-        kill -0 "$nginx_pid" 2>/dev/null || break
-        sleep 0.1
-      done
-      kill -0 "$nginx_pid" 2>/dev/null && cleanup_failed=1
-    fi
-  fi
+  stop_nginx_and_prove_dead || cleanup_failed=1
   if [[ -n "${RUN_DIR:-}" && "$RUN_DIR" == "$WORK_DIR/"* && "$RUN_DIR" != "$WORK_DIR" ]]; then
     (( cleanup_failed != 0 )) || rm -rf -- "$RUN_DIR" || cleanup_failed=1
   fi
@@ -385,6 +568,8 @@ cleanup_on_exit() {
 trap cleanup_on_exit EXIT
 trap 'exit 2' INT TERM
 
+KEEPER_STARTED=1
+
 systemd-run --user \
   --unit "$UNIT_NAME" \
   --working-directory "$API_DIR" \
@@ -403,8 +588,8 @@ systemd-run --user \
   --collect \
   "$NODE_BIN" "$SCRIPT_DIR/managed-scope.mjs" >/dev/null \
   || no_go "D2_PRIME_NO_GO_MANAGED_SCOPE"
-KEEPER_STARTED=1
 
+assert_invocation_clone_identity
 set +e
 env -i \
   PATH="$APPROVED_PATH" \

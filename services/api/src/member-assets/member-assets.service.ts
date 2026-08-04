@@ -171,7 +171,8 @@ export class MemberAssetsService {
         r.kind === 'generate' ||
         r.kind === 'job_fit' ||
         r.kind === 'career_plan' ||
-        r.kind === 'fair_visit_plan'
+        r.kind === 'fair_visit_plan' ||
+        r.kind === 'self_assessment'
           ? r.kind
           : ('parse' as const),
       status: r.status,

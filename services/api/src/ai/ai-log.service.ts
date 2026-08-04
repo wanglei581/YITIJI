@@ -37,7 +37,8 @@ export type AiOperation =
   | 'interviewReport'
   | 'voiceTranscribe'
   | 'voiceSynthesize'
-
+  // ── 自我探索 · 倾向参考（2026-08-01） ──
+  | 'selfAssessment'
 /**
  * 按时长/字符计费、不按 token 计费的 operation。
  *
@@ -131,6 +132,7 @@ const OPERATIONS: AiOperation[] = [
   'interviewReport',
   'voiceTranscribe',
   'voiceSynthesize',
+  'selfAssessment',
 ]
 
 // ─── 跨重试用量累计（A-6）────────────────────────────────────────

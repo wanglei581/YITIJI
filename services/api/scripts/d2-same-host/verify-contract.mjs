@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import * as diagnosticModule from './diagnostics.mjs'
+import { verifyCleanupContract as verifyReconciledCleanupContract } from './verify-cleanup-contract.mjs'
 import {
   buildEvidence,
   createFailureMeasurements,
@@ -37,16 +38,37 @@ const SHA_C = 'c'.repeat(64)
 const SHA_D = 'd'.repeat(64)
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url))
 const RUNBOOK_PATH = join(SCRIPT_DIR, '../../../../docs/device/f1-d2-same-host-dual-port-runbook.md')
-const FRESH_RETAKE_COMMAND = `: "\${D2_EVIDENCE_DIR:?missing exact authorized evidence directory}"
-: "\${D2_EVIDENCE_OUT:?missing exact authorized evidence path}"
-env -i \\
+const FRESH_RETAKE_COMMAND = `env -i \\
   PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \\
   HOME="$HOME" \\
   LANG=C.UTF-8 \\
   D2_APPROVED_PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin" \\
-  D2_EVIDENCE_DIR="$D2_EVIDENCE_DIR" \\
-  D2_EVIDENCE_OUT="$D2_EVIDENCE_OUT" \\
+  D2_GOVERNANCE_ROOT="$D2_GOVERNANCE_ROOT" \\
+  D2_GOVERNANCE_RESERVATION_ID="$D2_GOVERNANCE_RESERVATION_ID" \\
   pnpm --filter @ai-job-print/api drill:d2-same-host`
+const FRESH_CLONE_PROVENANCE_SEQUENCE = Object.freeze([
+  'set -euo pipefail',
+  "readonly D2_APPROVED_PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin'",
+  'D2_SOURCE_ROOT="$(cd -P -- "$D2_SOURCE_REPOSITORY" && pwd -P)"',
+  '[[ "$(git rev-parse --show-toplevel)" == "$D2_SOURCE_ROOT" ]]',
+  '[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]',
+  '[[ -z "$(git status --porcelain=v2 --untracked-files=all)" ]]',
+  '[[ ! -e "$D2_CLONE_ROOT" && ! -L "$D2_CLONE_ROOT" ]]',
+  'D2_CLONE_PHYSICAL_TARGET="$(cd -P -- "$D2_CLONE_PARENT" && pwd -P)/$D2_CLONE_NAME"',
+  '[[ "$D2_CLONE_ROOT" == "$D2_CLONE_PHYSICAL_TARGET" ]]',
+  'git clone --no-local -- "$D2_SOURCE_ROOT" "$D2_CLONE_ROOT"',
+  'git switch -c "$D2_BRANCH" "$D2_BASELINE_OID"',
+  '[[ "$(git rev-parse --show-toplevel)" == "$D2_CLONE_ROOT" ]]',
+  '[[ "$(git rev-parse --git-dir)" == \'.git\' && -d .git && ! -L .git ]]',
+  '[[ "$(git rev-parse HEAD)" == "$D2_BASELINE_OID" ]]',
+  '[[ "$(git symbolic-ref --quiet --short HEAD)" == "$D2_BRANCH" ]]',
+  '[[ -z "$(git status --porcelain=v2 --untracked-files=all)" ]]',
+  'pnpm --filter @ai-job-print/api build',
+  'pnpm --filter @ai-job-print/api verify:d2-same-host-governance',
+  'pnpm --filter @ai-job-print/api verify:d2-same-host-contract',
+  'node services/api/scripts/d2-same-host/governance.mjs reserve',
+  'pnpm --filter @ai-job-print/api drill:d2-same-host',
+])
 
 function executableSource(source) {
   const scanner = ts.createScanner(ts.ScriptTarget.Latest, false, ts.LanguageVariant.Standard, source)
@@ -82,6 +104,15 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
+function replaceOccurrence(source, fragment, occurrence, replacement) {
+  let fragmentIndex = -1
+  for (let current = 0; current <= occurrence; current += 1) {
+    fragmentIndex = source.indexOf(fragment, fragmentIndex + 1)
+    assert.notEqual(fragmentIndex, -1)
+  }
+  return `${source.slice(0, fragmentIndex)}${replacement}${source.slice(fragmentIndex + fragment.length)}`
+}
+
 function expectContractFailure(action) {
   assert.throws(
     action,
@@ -89,24 +120,14 @@ function expectContractFailure(action) {
   )
 }
 
-function shellFunctionSource(source, name) {
-  const marker = `\n${name}() {\n`
-  const markerStart = source.indexOf(marker)
-  const start = markerStart + 1
-  assert.ok(markerStart >= 0, `${name} function must exist`)
-  const end = source.indexOf('\n}\n', start)
-  assert.ok(end > start, `${name} function must have a bounded body`)
-  return source.slice(start, end + 2)
-}
-
 function assertExecutionEntryContract(runSource, runbookSource) {
   const shellSource = runSource.split('\n').filter((line) => !line.trimStart().startsWith('#')).join('\n')
   const approvedPathGuard = '[[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]]'
   const physicalPathGuard = '[[ "$path_part_physical" != "$ROOT" && "$path_part_physical" != "$ROOT/"* ]]'
-  const explicitEvidenceGuard = '[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]]'
+  const explicitGovernanceGuard = '[[ -n "${D2_GOVERNANCE_ROOT:-}" && -n "${D2_GOVERNANCE_RESERVATION_ID:-}" ]]'
   assert.ok(shellSource.includes(approvedPathGuard))
   assert.ok(shellSource.includes(physicalPathGuard))
-  assert.ok(shellSource.includes(explicitEvidenceGuard))
+  assert.ok(shellSource.includes(explicitGovernanceGuard))
   const approvedPathBlock = shellSource.slice(shellSource.indexOf('APPROVED_PATH='), shellSource.indexOf('export PATH="$APPROVED_PATH"'))
   assert.doesNotMatch(approvedPathBlock, /no_go "(?!D2_PRIME_NO_GO_APPROVED_PATH")/)
   assert.doesNotMatch(shellSource, /D2_PRIME_NO_GO_ENVIRONMENT/)
@@ -119,6 +140,8 @@ function assertExecutionEntryContract(runSource, runbookSource) {
     'D2_PRIME_NO_GO_APPROVED_PATH', 'D2_PRIME_NO_GO_APPROVED_PATH_COMMAND',
     'D2_PRIME_NO_GO_BUILD_INPUT', 'D2_PRIME_NO_GO_CGROUP_DELEGATION',
     'D2_PRIME_NO_GO_EVIDENCE_EXISTS', 'D2_PRIME_NO_GO_EVIDENCE_PATH', 'D2_PRIME_NO_GO_KERNEL',
+    'D2_PRIME_NO_GO_GIT_IDENTITY',
+    'D2_PRIME_NO_GO_GOVERNANCE_STATE', 'D2_PRIME_NO_GO_MANIFEST',
     'D2_PRIME_NO_GO_MANAGED_SCOPE', 'D2_PRIME_NO_GO_NONCE', 'D2_PRIME_NO_GO_PATH',
     'D2_PRIME_NO_GO_PM2_PREFLIGHT', 'D2_PRIME_NO_GO_PORT', 'D2_PRIME_NO_GO_PRODUCTION_ENV',
     'D2_PRIME_NO_GO_RUNTIME_DIR', 'D2_PRIME_NO_GO_TOOLCHAIN', 'D2_PRIME_NO_GO_USER_MANAGER',
@@ -138,6 +161,19 @@ function assertExecutionEntryContract(runSource, runbookSource) {
   ).trim()
   assert.equal(marked, `\`\`\`bash\n${FRESH_RETAKE_COMMAND}\n\`\`\``)
   assert.equal((runbookSource.match(/drill:d2-same-host/g) ?? []).length, 1)
+  let provenanceCursor = -1
+  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
+    provenanceCursor = runbookSource.indexOf(fragment, provenanceCursor + 1)
+    assert.notEqual(provenanceCursor, -1)
+    provenanceCursor += fragment.length - 1
+  }
+  const expectedOccurrences = new Map()
+  for (const fragment of FRESH_CLONE_PROVENANCE_SEQUENCE) {
+    expectedOccurrences.set(fragment, (expectedOccurrences.get(fragment) ?? 0) + 1)
+  }
+  for (const [fragment, expected] of expectedOccurrences) {
+    assert.equal(runbookSource.split(fragment).length - 1, expected)
+  }
 }
 
 function verifyExecutionEntryContract() {
@@ -146,122 +182,31 @@ function verifyExecutionEntryContract() {
   assertExecutionEntryContract(runSource, runbookSource)
   const guard = '[[ "$path_part" != "$ROOT" && "$path_part" != "$ROOT/"* ]]'
   const physicalGuard = '[[ "$path_part_physical" != "$ROOT" && "$path_part_physical" != "$ROOT/"* ]]'
-  const evidenceGuard = '[[ -n "${D2_EVIDENCE_DIR:-}" && -n "${D2_EVIDENCE_OUT:-}" ]]'
+  const governanceGuard = '[[ -n "${D2_GOVERNANCE_ROOT:-}" && -n "${D2_GOVERNANCE_RESERVATION_ID:-}" ]]'
+  const markedCommand = `\`\`\`bash\n${FRESH_RETAKE_COMMAND}\n\`\`\``
+  const mutateMarkedCommand = (from, to) => runbookSource.replace(
+    markedCommand, markedCommand.replace(from, to),
+  )
   assert.throws(() => assertExecutionEntryContract(runSource.replace(guard, ':'), runbookSource))
   assert.throws(() => assertExecutionEntryContract(`# ${guard}\n${runSource.replace(guard, ':')}`, runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource.replace(physicalGuard, ':'), runbookSource))
-  assert.throws(() => assertExecutionEntryContract(runSource.replace(evidenceGuard, ':'), runbookSource))
+  assert.throws(() => assertExecutionEntryContract(runSource.replace(governanceGuard, ':'), runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource.replace('D2_PRIME_NO_GO_APPROVED_PATH', 'D2_PRIME_NO_GO_PATH'), runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource.replace('command -v "$required_command"', ':'), runbookSource))
   assert.throws(() => assertExecutionEntryContract(runSource.replace('D2_PRIME_NO_GO_APPROVED_PATH_COMMAND', 'D2_PRIME_NO_GO_ENVIRONMENT'), runbookSource))
   assert.throws(() => assertExecutionEntryContract(`${runSource}\nno_go "D2_PRIME_NO_GO_UNLISTED"\n`, runbookSource))
-  assert.throws(() => assertExecutionEntryContract(runSource, runbookSource.replace('D2_EVIDENCE_DIR=', 'D2_EVIDENCE_DIRECTORY=')))
+  assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_ROOT=', 'D2_GOVERNANCE_STATE_ROOT=')))
+  assert.throws(() => assertExecutionEntryContract(runSource, mutateMarkedCommand('D2_GOVERNANCE_RESERVATION_ID=', 'D2_GOVERNANCE_ID=')))
+  for (const fragment of new Set(FRESH_CLONE_PROVENANCE_SEQUENCE)) {
+    const occurrences = FRESH_CLONE_PROVENANCE_SEQUENCE.filter((item) => item === fragment).length
+    for (let occurrence = 0; occurrence < occurrences; occurrence += 1) {
+      assert.throws(() => assertExecutionEntryContract(
+        runSource,
+        replaceOccurrence(runbookSource, fragment, occurrence, 'D2_FRESH_CLONE_PROVENANCE_MUTATION'),
+      ))
+    }
+  }
   console.log('  PASS D2 fresh-retake entry rejects repository PATH and locks one canonical command')
-}
-
-function productionEnvironmentNames(envExampleSource) {
-  const configuredNames = new Set(
-    [...envExampleSource.matchAll(/^#?([A-Z][A-Z0-9_]*)=/gm)].map((match) => match[1]),
-  )
-  for (const runtimeCredentialName of ['TENCENT_TTS_SECRET_ID', 'TENCENT_TTS_SECRET_KEY']) {
-    assert.ok(configuredNames.has(runtimeCredentialName), `.env.example must declare ${runtimeCredentialName}`)
-  }
-  const dataPlaneNames = new Set([
-    'DATABASE_URL',
-    'DIRECT_URL',
-    'POSTGRES_URL',
-    'REDIS_URL',
-    'REDIS_HOST',
-    'REDIS_PASSWORD',
-  ])
-  const credentialName = /(?:SECRET|PASSWORD|PRIVATE_KEY|PUBLIC_KEY|APIV3_KEY|MCH_SERIAL_NO|ACCESS_KEY|API_KEY|APP_ID$|APPID$|MCHID$|SIGN_NAME$|TEMPLATE_ID$|CODEPAY_STORE_OUT_ID$)/
-  return [...configuredNames].filter((name) => dataPlaneNames.has(name) || credentialName.test(name))
-}
-
-function assertProductionEnvironmentContract(runSource, envExampleSource) {
-  const productionBlock = runSource.match(/production_variables=\(\n([\s\S]*?)\n\)/)?.[1]
-  assert.ok(productionBlock, 'production_variables must be a multiline shell array')
-  const productionNames = new Set(productionBlock.split(/\s+/).filter(Boolean))
-  for (const name of productionEnvironmentNames(envExampleSource)) {
-    assert.ok(productionNames.has(name), `production_variables must include ${name}`)
-  }
-  for (const legacyName of [
-    'OSS_ACCESS_KEY_ID',
-    'OSS_ACCESS_KEY_SECRET',
-    'AWS_ACCESS_KEY_ID',
-    'AWS_SECRET_ACCESS_KEY',
-    'AWS_SESSION_TOKEN',
-    'MINIO_ROOT_USER',
-    'MINIO_ROOT_PASSWORD',
-    'TENCENTCLOUD_SECRET_ID',
-    'TENCENTCLOUD_SECRET_KEY',
-  ]) assert.ok(productionNames.has(legacyName), `production_variables must retain ${legacyName}`)
-
-  const environmentGuard = runSource.slice(
-    runSource.indexOf('for variable_name in "${production_variables[@]}"'),
-    runSource.indexOf('done', runSource.indexOf('for variable_name in "${production_variables[@]}"')) + 4,
-  )
-  assert.match(environmentGuard, /\[\[ -z "\$\{!variable_name\+x\}" \]\]/)
-  assert.doesNotMatch(environmentGuard, /(?:echo|printf|export|printenv|env|set)[^\n]*\$\{!variable_name\}/)
-}
-
-function assertCleanupContract(runSource) {
-  const stopHelper = shellFunctionSource(runSource, 'stop_user_unit_and_prove_inactive')
-  assert.match(stopHelper, /systemctl --user stop "\$unit_name"[^\n]*\|\| return 1/)
-  assert.match(stopHelper, /systemctl --user show "\$unit_name" -p ActiveState --value/)
-  assert.match(stopHelper, /\[\[ "\$unit_state" == "inactive" \]\] && return 0/)
-  assert.doesNotMatch(stopHelper, /\|\| true|failed|-z "\$unit_state"/)
-  assert.ok(
-    (runSource.match(/stop_user_unit_and_prove_inactive "\$(?:PREFLIGHT_UNIT|UNIT_NAME)"/g) ?? []).length >= 2,
-    'preflight and final cleanup must share the strict inactive helper',
-  )
-
-  const earlyCleanup = shellFunctionSource(runSource, 'early_cleanup')
-  assert.equal((earlyCleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
-  const earlyExitHandler = shellFunctionSource(runSource, 'early_cleanup_on_exit')
-  assert.match(earlyExitHandler, /local original_status=\$\?/)
-  assert.match(earlyExitHandler, /trap - EXIT/)
-  assert.match(earlyExitHandler, /if ! early_cleanup; then[\s\S]*exit 2[\s\S]*fi/)
-  assert.match(earlyExitHandler, /exit "\$original_status"/)
-  assert.match(runSource, /^trap early_cleanup_on_exit EXIT$/m)
-
-  const cleanup = shellFunctionSource(runSource, 'cleanup')
-  assert.match(cleanup, /stop_user_unit_and_prove_inactive "\$UNIT_NAME" \|\| cleanup_failed=1/)
-  assert.match(cleanup, /: > "\$STOP_MARKER"\) 2>\/dev\/null \|\| cleanup_failed=1/)
-  assert.equal((cleanup.match(/rm -rf -- "\$(?:RUN_DIR|PM2_CONTROL_ROOT)" \|\| cleanup_failed=1/g) ?? []).length, 2)
-
-  const exitHandler = shellFunctionSource(runSource, 'cleanup_on_exit')
-  assert.match(exitHandler, /local original_status=\$\?/)
-  assert.match(exitHandler, /trap - EXIT/)
-  assert.match(exitHandler, /if ! cleanup; then[\s\S]*exit 2[\s\S]*fi/)
-  assert.match(exitHandler, /exit "\$original_status"/)
-  assert.match(runSource, /^trap cleanup_on_exit EXIT$/m)
-
-  const evidenceVerified = runSource.lastIndexOf('"$SCRIPT_DIR/verify-contract.mjs" --evidence "$EVIDENCE_OUT"')
-  const finalTrapDisarm = runSource.lastIndexOf('trap - EXIT')
-  const finalCleanup = runSource.lastIndexOf('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"')
-  const pass = runSource.lastIndexOf("printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'")
-  assert.ok(evidenceVerified >= 0 && finalTrapDisarm > evidenceVerified)
-  assert.ok(finalCleanup > finalTrapDisarm && pass > finalCleanup)
-}
-
-function verifyCleanupContract() {
-  const runSource = readFileSync(join(SCRIPT_DIR, 'run.sh'), 'utf8')
-  const envExampleSource = readFileSync(join(SCRIPT_DIR, '../../.env.example'), 'utf8')
-  assertProductionEnvironmentContract(runSource, envExampleSource)
-  assertCleanupContract(runSource)
-
-  const unsafeMutations = [
-    runSource.replace('[[ "$unit_state" == "inactive" ]] && return 0', '[[ -z "$unit_state" || "$unit_state" == "inactive" ]] && return 0'),
-    runSource.replace('trap - EXIT\ncleanup || no_go "D2_PRIME_CLEANUP_FAILED"', 'cleanup || no_go "D2_PRIME_CLEANUP_FAILED"'),
-    runSource.replace('cleanup || no_go "D2_PRIME_CLEANUP_FAILED"', "printf 'D2_PRIME_PASS\\nproductionF1=NO-GO\\n'"),
-  ]
-  for (const mutation of unsafeMutations) assert.throws(() => assertCleanupContract(mutation))
-
-  const requiredName = productionEnvironmentNames(envExampleSource)[0]
-  const missingCredential = runSource.replace(new RegExp(`\\b${requiredName}\\b`), '')
-  assert.throws(() => assertProductionEnvironmentContract(missingCredential, envExampleSource))
-  console.log('  PASS cleanup, user systemd inactive proof, and production environment denylist fail closed')
 }
 
 function measurements() {
@@ -876,12 +821,26 @@ function assertDrillDiagnosticWiring(source) {
     ['TOPOLOGY', 'const topology = {'],
     ['CONTROL_ISOLATION', 'const controlIsolation = {'],
     ['RESOURCE_ISOLATION', 'const resourceIsolation = {'],
-    ['CGROUP_CONSISTENCY', 'assert.equal(controlGroup(managedAppPid), managedControlGroup)'],
+    ['CGROUP_CONSISTENCY', 'if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('],
   ]) {
     const assignment = `currentMeasureStep = MEASURE_STEPS.${step}`
     assert.equal(executable.split(assignment).length - 1, 1)
     const adjacency = `${assignment}\n    ${anchor}`
     assert.ok(executable.includes(adjacency), `${step} must immediately precede ${anchor}`)
+  }
+  // Verify CGROUP_CONSISTENCY sandwich: pre-guard → cgroup-read → post-guard → assertion
+  {
+    const preGuard = 'if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('
+    const cgroupRead = 'const managedAppCgroupActual = controlGroup(managedAppPid)'
+    const cgroupAssert = 'assert.equal(managedAppCgroupActual, managedControlGroup)'
+    const prePos = executable.indexOf(preGuard)
+    const readPos = executable.indexOf(cgroupRead, prePos)
+    const postPos = executable.indexOf(preGuard, readPos)
+    const assertPos = executable.indexOf(cgroupAssert, postPos)
+    assert.ok(
+      prePos >= 0 && readPos > prePos && postPos > readPos && assertPos > postPos,
+      'CGROUP_CONSISTENCY sandwich required: pre-guard → cgroup-read → post-guard → assertion',
+    )
   }
   const innerCatch = executable.slice(executable.indexOf('  } catch (error) {'), executable.indexOf('  } finally {'))
   assert.match(innerCatch, /let diagnostic = classifyDrillFailure\(error, currentPhase, currentMeasureStep\)/)
@@ -920,6 +879,18 @@ function verifyDrillDiagnosticWiring() {
       'process.stderr.write(`${formatDrillFailure(resolveDrillDiagnostic(error, currentPhase, currentMeasureStep))}\\n`)',
       'process.stderr.write(`${error.message}\\n`)',
     ),
+    source.replace(
+      "if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')\n    ",
+      '',
+    ),
+    source.replace(
+      "    if (processStartTimeTicks(managedAppPid) !== managedAppPidTicks) fail('MANAGED_APP_PID_STALE')\n    assert.equal(managedAppCgroupActual, managedControlGroup)",
+      '    assert.equal(managedAppCgroupActual, managedControlGroup)',
+    ),
+    source.replace(
+      '    assert.equal(managedAppCgroupActual, managedControlGroup)\n',
+      '',
+    ),
   ]) assert.throws(() => assertDrillDiagnosticWiring(unsafeMutation))
   const assignment = 'currentMeasureStep = MEASURE_STEPS.TOPOLOGY'
   const anchor = 'const topology = {'
@@ -950,7 +921,7 @@ function verifyEvidenceFile(args) {
   console.log('D2_PRIME_EVIDENCE_PASS')
 }
 
-function main(args = process.argv.slice(2)) {
+async function main(args = process.argv.slice(2)) {
   console.log('=== D2 prime offline contract ===')
   verifyNginxRenderer()
   verifyCutoverStateMachine()
@@ -966,7 +937,7 @@ function main(args = process.argv.slice(2)) {
     throw new Error('D2_PRIME_USER_SYSTEMD_CONTRACT_INVALID')
   }
   try {
-    verifyCleanupContract()
+    verifyReconciledCleanupContract()
   } catch {
     throw new Error('D2_PRIME_CLEANUP_CONTRACT_INVALID')
   }
@@ -978,7 +949,7 @@ function main(args = process.argv.slice(2)) {
 }
 
 try {
-  main()
+  await main()
 } catch (error) {
   const code = error instanceof Error && /^D2_PRIME_[A-Z0-9_]+$/.test(error.message)
     ? error.message

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>08 取件凭证</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .pickup-hero{display:flex; flex-direction:column; align-items:center; gap:6px; padding:8px 0 4px;}
+  .pickup-hero .lbl{font-size:12.5px; color:var(--muted);}
+  .pickup-hero .code{font-family:var(--serif); font-size:56px; font-weight:800; letter-spacing:12px; color:var(--teal-deep); padding-left:12px;}
+  .status-track{display:flex; align-items:center; gap:0; padding:4px 0;}
+  .status-track .node{flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; position:relative;}
+  .status-track .node .d{width:26px; height:26px; border-radius:50%; display:grid; place-items:center; font-size:13px; background:var(--surface-2); border:1px solid var(--line); color:var(--faint); z-index:1;}
+  .status-track .node.done .d{background:var(--teal); border-color:var(--teal); color:#fff;}
+  .status-track .node.now .d{background:var(--clay); border-color:var(--clay); color:#fff;}
+  .status-track .node span{font-size:10.5px; color:var(--muted); text-align:center;}
+  .status-track .node.now span{color:var(--clay); font-weight:700;}
+  .status-track .bar{height:2px; flex:none; width:100%; background:var(--line); position:absolute; top:13px; left:50%; z-index:0;}
+  .status-track .node.done .bar{background:var(--teal);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="statusbar"><span>9:41</span><span class="sb-icons">●●● 5G ▮▮▮</span></div>
+  <div class="navbar"><span class="nav-back" onclick="history.back()">‹</span><span class="nav-title">取件凭证</span></div>
+
+  <div class="content has-actionbar">
+    <div class="card">
+      <div class="pickup-hero">
+        <span class="lbl">到店输入 / 报出取件码</span>
+        <div class="code">8 2 6 3</div>
+        <span class="chip warn mt4">待取件 · 核销后开始打印</span>
+      </div>
+      <div class="qr-panel">
+        <div class="qr-box"><div class="qr-inner"></div></div>
+        <p class="fs12 faint">也可在一体机上扫此码核销</p>
+      </div>
+    </div>
+
+    <!-- 三段状态机：支付→履约→设备。远程下单“待核销”，不提前建打印任务 -->
+    <div class="card">
+      <div class="card-head"><h3>订单状态</h3></div>
+      <div class="status-track">
+        <div class="node done"><div class="d">✓</div><span>已付款</span></div>
+        <div class="node now"><div class="d">◉</div><span>待到店核销</span></div>
+        <div class="node"><div class="d">3</div><span>打印中</span></div>
+        <div class="node"><div class="d">4</div><span>完成</span></div>
+      </div>
+      <div class="notice warn" style="margin-top:4px;">
+        <span class="n-ic">ℹ️</span>
+        <div>付款成功，文件已加密暂存。<b>到店核销后一体机才开始出纸</b>，请在有效期内取件。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>打印详情</h3><span class="chip ok">已付款</span></div>
+      <div class="between fs13"><span class="muted">文件</span><span>张青柠_求职简历.pdf</span></div>
+      <div class="between fs13"><span class="muted">规格</span><span>A4 · 彩色 · 单面 · 2 份</span></div>
+      <div class="between fs13"><span class="muted">页数</span><span>共 2 页 × 2 = 4 页</span></div>
+      <div class="divider"></div>
+      <div class="between fs13"><span class="muted">取件门店</span><span>幸福路社区服务站</span></div>
+      <div class="between fs13"><span class="muted">有效期至</span><span style="color:var(--clay);">今天 21:00</span></div>
+      <div class="divider"></div>
+      <div class="between"><span class="muted fs13">实付</span><span class="price" style="font-size:19px;">¥2.40</span></div>
+    </div>
+
+    <div class="compliance-note">文件仅用于本次打印，取件完成或超时后按策略自动清理。</div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn ghost" onclick="location.href='03-home.html'">回首页</button>
+    <button class="btn primary block" onclick="location.href='22-me-orders.html'">查看全部订单</button>
+  </div>
+</div>
+</body>
+</html>

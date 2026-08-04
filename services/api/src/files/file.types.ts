@@ -28,11 +28,12 @@ export type FilePurpose =
   | 'partner_video' // 机构视频素材
   | 'job_fair_material' // 招聘会资料 PDF/图片
   | 'screensaver_material' // 待机宣传屏素材
-  | 'admin_upload' // 管理员通用上传
-  | 'temp' // 临时 / 匿名上传
-  | 'contract_upload' // 合同审查会话上传(高敏、系统锁定两小时)
-  | 'signature_image' // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
-  | 'member_data_export' // 会员本人数据导出(仅服务端生成,高敏短期 JSON)
+  | 'admin_upload'         // 管理员通用上传
+  | 'temp'                 // 临时 / 匿名上传
+  | 'contract_upload'      // 合同审查会话上传(高敏、系统锁定两小时)
+  | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
+  | 'member_data_export'   // 会员本人数据导出(仅服务端生成,高敏短期 JSON)
+  | 'self_assessment_report' // 自我探索 · 倾向参考 报告 PDF(本人参考,不可分享)
 
 export type FileSensitiveLevel = 'normal' | 'sensitive' | 'highly_sensitive'
 

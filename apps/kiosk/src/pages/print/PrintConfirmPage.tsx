@@ -16,6 +16,7 @@ import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
 import { createPrintJob, quotePrintOrder } from '../../services/print/printJobsApi'
+import { appendSelfAssessmentToResume } from '../../services/api/selfAssessment'
 import { formatCents } from './cashierStatus'
 import {
   clearPrintMaterialSession,
@@ -34,6 +35,27 @@ interface LocationState {
   params: PrintJobParams
   materialCheck?: MaterialCheckSummary
   source?: PrintMaterialSource
+}
+
+interface SelfAssessmentSessionSnapshot {
+  taskId?: string
+  accessToken?: string
+  result?: { expiresAt?: string }
+}
+
+const SELF_ASSESSMENT_SESSION_KEY = 'self_assessment_session_v1'
+
+function readSelfAssessmentSnapshot(): SelfAssessmentSessionSnapshot | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.sessionStorage.getItem(SELF_ASSESSMENT_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as SelfAssessmentSessionSnapshot
+    if (!parsed || typeof parsed !== 'object' || !parsed.taskId) return null
+    return parsed
+  } catch {
+    return null
+  }
 }
 
 type QuoteView =
@@ -80,6 +102,13 @@ export function PrintConfirmPage() {
   const effectivePages = file.pages ?? 1
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [appendSelfAssessment, setAppendSelfAssessment] = useState(false)
+  const selfAssessmentSnapshot = useMemo(() => readSelfAssessmentSnapshot(), [])
+  const appendEligible =
+    appendSelfAssessment &&
+    Boolean(selfAssessmentSnapshot?.taskId) &&
+    Boolean(file.fileId) &&
+    (file.mimeType === undefined || file.mimeType === 'application/pdf')
   const [quote, setQuote] = useState<QuoteView>(
     API_MODE === 'http' ? { status: 'loading' } : { status: 'demo' },
   )
@@ -162,20 +191,38 @@ export function PrintConfirmPage() {
         setSubmitError(quote.status === 'unavailable' ? quote.reason : '报价尚未就绪，请稍后再试')
         return
       }
+      if (appendSelfAssessment && !file.fileId) {
+        setSubmitError('当前文件不支持「附加自我探索」合并，请先在简历页生成可合并的简历 PDF 后再试。')
+        return
+      }
       setSubmitting(true)
       setSubmitError(null)
       try {
+        let printFileUrl = file.fileUrl
+        let printFileName = file.name
+        let printFileMd5: string | undefined = file.fileMd5
+        if (appendEligible && selfAssessmentSnapshot?.taskId && file.fileId) {
+          const authToken = getToken()
+          const merged = await appendSelfAssessmentToResume(
+            selfAssessmentSnapshot.taskId,
+            file.fileId,
+            { token: authToken, accessToken: selfAssessmentSnapshot.accessToken ?? null },
+          )
+          printFileUrl = merged.printFileUrl ?? ''
+          printFileName = merged.filename || `${file.name.replace(/\.pdf$/i, '')}-self-assessment.pdf`
+          printFileMd5 = undefined
+        }
         const created = await createPrintJob({
-          fileUrl:  file.fileUrl,
-          fileMd5:  file.fileMd5,
-          fileName: file.name,
+          fileUrl:  printFileUrl,
+          fileMd5:  printFileMd5,
+          fileName: printFileName,
           params,
           token:    getToken(),
         })
         clearPrintMaterialSession()
         const nextState = {
           ...location.state,
-          file,
+          file: { ...file, fileUrl: printFileUrl, name: printFileName, fileMd5: printFileMd5 },
           params,
           source,
           taskId:      created.taskId,
@@ -376,6 +423,33 @@ export function PrintConfirmPage() {
                 <span>取件核对</span>
               </div>
             </div>
+          </div>
+
+          {/* 附加自我探索摘要（仅在已有测评结果且为 PDF 简历时出现） */}
+          {selfAssessmentSnapshot?.taskId && (
+            <div className="print-rules-card print-self-assessment-card">
+              <label className="print-self-assessment-toggle">
+                <input
+                  type="checkbox"
+                  checked={appendSelfAssessment}
+                  onChange={(e) => setAppendSelfAssessment(e.target.checked)}
+                  disabled={!file.fileId || file.mimeType === 'image/jpeg' || file.mimeType === 'image/png'}
+                />
+                <span>附加自我探索 · 倾向参考摘要</span>
+              </label>
+              <p className="print-self-assessment-hint">
+                仅在本人简历下方合并一份本人自助参考摘要；勾选后系统会即时生成仅供本人打印的合并 PDF，文件名追加 <code>-self-assessment</code>；合并结果不会进入任何企业、合作机构、Partner 或第三方可见的分享链路。
+              </p>
+              {appendSelfAssessment && !file.fileId && (
+                <p className="print-self-assessment-hint" role="alert">
+                  当前文件不支持合并：请在简历页生成可合并的简历 PDF 后再勾选此项。
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* 打印须知卡 */}
+          <div className="print-rules-card">
             <b className="print-rules-title" style={{ marginTop: 16 }}>打印须知</b>
             <ol className="print-rules-list">
               <li>上传文件需清晰完整，当前支持 PDF、JPG、PNG。</li>
@@ -420,7 +494,7 @@ export function PrintConfirmPage() {
           ) : (
             <>
               <PrinterIcon aria-hidden="true" />
-              按以上设置打印原文件
+              {appendEligible ? '打印合并版（简历+自我探索）' : '按以上设置打印原文件'}
             </>
           )}
         </button>
