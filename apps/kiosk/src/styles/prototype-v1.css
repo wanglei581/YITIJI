@@ -118,9 +118,9 @@
   flex: none; padding: 12px 48px 8px;
   display: flex; justify-content: space-between; align-items: flex-end; gap: 30px;
 }
-.kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 46px; font-weight: 900; letter-spacing: 2px; line-height: 1.22; }
-.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); }
-.kpv1 .welcome p { margin-top: 10px; font-size: 22px; color: var(--pv-muted); letter-spacing: 1px; }
+.kpv1 .welcome h1 { font-family: var(--pv-serif); font-size: 52px; font-weight: 900; letter-spacing: 2px; line-height: 1.18; }
+.kpv1 .welcome h1 em { font-style: normal; color: var(--pv-teal-deep); text-decoration: underline; text-decoration-color: rgba(31,158,134,.35); text-underline-offset: 6px; }
+.kpv1 .welcome p { margin-top: 10px; font-size: 21px; color: var(--pv-muted); letter-spacing: .5px; }
 
 /* ── 登录按钮（01-home.html .login-btn，min-height:88px，r-md 圆角） ── */
 .kpv1 .login-btn {
@@ -585,10 +585,10 @@
 }
 .kpv1 .ar-card {
   background: var(--pv-surface);
-  border: 1px solid rgba(31,158,134,.28);
+  border: 1px solid rgba(31,158,134,.32);
   border-radius: var(--pv-r-md);
-  padding: 22px 28px 18px;
-  box-shadow: 0 4px 18px rgba(31,158,134,.08);
+  padding: 24px 28px 20px;
+  box-shadow: 0 6px 28px rgba(31,158,134,.12), 0 2px 8px rgba(16,48,43,.06);
   position: relative;
   overflow: hidden;
 }
@@ -622,6 +622,11 @@
   height: 7px;
   border-radius: 50%;
   background: var(--pv-teal);
+  animation: badge-pulse 2.5s ease-in-out infinite;
+}
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31,158,134,.45); }
+  60% { box-shadow: 0 0 0 5px rgba(31,158,134,0); }
 }
 .kpv1 .ar-h {
   font-family: var(--pv-serif);
@@ -666,18 +671,19 @@
 .kpv1 .ar-cta {
   width: 100%;
   min-height: 80px;
-  background: var(--pv-dark);
+  background: linear-gradient(135deg, #0d2420 0%, #1a4840 100%);
   color: var(--pv-paper);
   border: none;
   border-radius: var(--pv-r-md);
   font-family: var(--pv-serif);
   font-size: 30px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(16,48,43,.2);
+  box-shadow: 0 6px 24px rgba(16,48,43,.28), 0 1px 4px rgba(31,158,134,.15);
+  transition: box-shadow .15s, transform .1s;
 }
-.kpv1 .ar-cta:active { transform: scale(.99); }
+.kpv1 .ar-cta:active { transform: scale(.99); box-shadow: 0 3px 12px rgba(16,48,43,.2); }
 .kpv1 .ar-hint {
   font-size: 16px;
   color: var(--pv-muted);
@@ -709,10 +715,10 @@
 /* device-card */
 .kpv1 .device-card {
   background: var(--pv-surface);
-  border: 1px solid var(--pv-line);
+  border: 1px solid rgba(31,158,134,.22);
   border-radius: var(--pv-r-md);
   padding: 22px 24px;
-  box-shadow: 0 3px 10px rgba(16,48,43,.04);
+  box-shadow: 0 4px 16px rgba(31,158,134,.08), 0 1px 4px rgba(16,48,43,.04);
 }
 .kpv1 .device-card h3 {
   font-family: var(--pv-serif);
