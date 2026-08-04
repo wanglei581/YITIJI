@@ -170,7 +170,7 @@ export function InterviewServiceHubPage() {
               <button
                 key={cap.key}
                 type="button"
-                onClick={() => navigate(cap.to)}
+                onClick={() => navigate(cap.to, cap.state ? { state: cap.state } : undefined)}
                 className={[
                   'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-6 text-left',
                   'border-t-4 shadow-sm active:scale-[0.99]',
