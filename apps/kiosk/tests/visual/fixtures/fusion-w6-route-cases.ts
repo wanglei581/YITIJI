@@ -118,6 +118,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
   { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("输入手机上的取件码，即可从本机出纸")', featureText: '扫码取件' },
+  // PR #496 新路由
+  { pattern: '/ai/plan', url: '/ai/plan', marker: 'h1:text-is("AI方案确认")', featureText: 'AI方案确认' },
+  { pattern: '/session-resume', url: '/session-resume', marker: 'h1:text-is("继续上次")', featureText: '继续上次' },
+  { pattern: '/jobs/online-platforms', url: '/jobs/online-platforms', marker: 'h1:text-is("线上招聘平台")', featureText: '线上招聘平台' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },
@@ -166,8 +170,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 93) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 96) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 91) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 94) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)

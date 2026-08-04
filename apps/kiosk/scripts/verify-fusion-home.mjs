@@ -336,7 +336,7 @@ const declaredRoutes = new Set([
   ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
   ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
 ])
-const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
+const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/print/upload', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
 expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
 expect(!/\bfetch\s*\(/.test(home + serviceGroups), '首页未新增 fetch')
 const productionIdentifiers = stripCommentsAndStrings(`${home}\n${serviceGroups}`).match(/\b[A-Za-z_$][\w$]*\b/g) ?? []
