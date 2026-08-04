@@ -154,7 +154,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
-] as const // 92 routes (was 91)
+] as const // 93 routes (was 92)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -166,8 +166,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 92) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 93) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 90) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 91) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
