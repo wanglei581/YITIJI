@@ -186,6 +186,7 @@ export function PrintPickupClaimPage() {
             id="pickup-code-input"
             ref={inputRef}
             className={['pcp-input', state === 'error' ? 'pcp-input--error' : ''].filter(Boolean).join(' ')}
+            style={{ minHeight: '56px' }}
             type="text"
             inputMode="text"
             placeholder="例：AB2C7M9P3K"
