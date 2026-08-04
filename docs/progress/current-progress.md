@@ -922,6 +922,8 @@ T0 已确认主工作区进度文档中新增了若干高价值结论，但这�
 6. T5 派生任务：已跟踪旧 PDF 已完成仓库外归档并移出 Git；商业计划书转正、对外简介转正、路线图转正、OPC 策略输入归档仍需另起独立分支。
 7. T4 派生任务：业务闭环审计文档化、代码瘦身候选确认、预生产部署事实脱敏收口，均需另起独立分支。
 
+| 2026-08-04 | AI 合同审查 Wave C Task 13 封板（PR #495）| Kiosk 三屏前台完整实现并通过 19/19 mock 全流程测试。新增 ContractReviewHomePage（上传+类型选择+知情同意）、ContractReviewProcessingPage（阶段轮询+awaiting_confirmation 确认弹窗）、ContractReviewResultPage（统计概览+风险项展开卡+打印跳转）；contractReview.ts API service（http+mock 双模式）；contract-review.css fusion-youth 竖屏样式；路由 /contract-review、/contract-review/processing、/contract-review/result 已注册；TypeScript noEmit 零错误；分支 codex/contract-review-p0 已推送 remote，PR #495 Draft。后端全链路（OCR/规则引擎/AI provider/安全门/DB）代码完整，Gate 0 发布门禁维持 blocked（docs/compliance/contract-review-release-gate.md），需法务+合规+安全三方签字后才能开放真实 AI 调用。 |
+
 ## 历史记录
 
 历史流水文本请查阅：
