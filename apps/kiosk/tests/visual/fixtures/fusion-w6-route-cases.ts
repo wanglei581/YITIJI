@@ -117,6 +117,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/print/cashier', url: '/print/cashier', marker: 'p:text-is("未找到待支付订单")', featureText: '未找到待支付订单' },
   { pattern: '/print/progress', url: '/print/progress', marker: 'p:text-is("未找到打印任务")', featureText: '未找到打印任务' },
   { pattern: '/print/done', url: '/print/done', marker: w2('print-done'), featureText: '无法确认打印结果' },
+  { pattern: '/print/pickup-claim', url: '/print/pickup-claim', marker: 'p:text-is("输入手机上的取件码，即可从本机出纸")', featureText: '扫码取件' },
   { pattern: '/resume', url: '/resume', expectedPath: compatibilityRedirects['/resume'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/upload', url: '/resume/upload', expectedPath: compatibilityRedirects['/resume/upload'], marker: screen('resume-source'), featureText: 'AI 简历诊断' },
   { pattern: '/resume/source', url: '/resume/source', marker: screen('resume-source'), featureText: 'AI 简历诊断' },
