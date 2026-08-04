@@ -14,6 +14,9 @@ overrides:
   js-yaml: 4.3.0
   fast-uri: 3.1.5
   postcss: 8.5.18
+  # brace-expansion: GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895
+  # upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH (CVE-2026-14257 backport);
+  # local patches are no longer needed. Direct overrides (pnpm does not chain resolutions).
   brace-expansion@1.1.14: 1.1.18
   brace-expansion@2.1.1: 2.1.4
   brace-expansion@5.0.6: 5.0.9
@@ -26,7 +29,4 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
-patchedDependencies:
-  # no patches required: brace-expansion upgraded to 1.1.18/2.1.4/5.0.9
-  # (GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895 fixed upstream; old patches removed)
 

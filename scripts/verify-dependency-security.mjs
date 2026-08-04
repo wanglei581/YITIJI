@@ -23,6 +23,7 @@ const OVERBROAD_BRACE_EXPANSION_HIGH = 'GHSA-mh99-v99m-4gvg'
 // patched upstream in >=1.1.18 / >=2.1.4 / >=5.0.9
 const INTERMEDIATE_BRACE_EXPANSION = 'GHSA-rgw5-rvv9-x895'
 const FRONTENDS = ['admin', 'kiosk', 'partner']
+// No local patches required: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH.
 const REQUIRED_BRACE_PATCHES = {}
 const REQUIRED_BRACE_OVERRIDES = {
   'brace-expansion@1.1.14': '1.1.18',
@@ -141,7 +142,7 @@ function workspaceMapping(workspace, blockName) {
 }
 
 function assertBracePatchesDeclared() {
-  // No local patches required: upstream 1.1.18/2.1.4/5.0.9 already include EXPANSION_MAX_LENGTH.
+  // No local patches required: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH.
   if (Object.keys(REQUIRED_BRACE_PATCHES).length === 0) return
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
   const workspacePatches = workspaceMapping(workspace, 'patchedDependencies')
@@ -279,6 +280,8 @@ function assertMinimatchConsumersUsePatchedBraceVersions() {
 }
 
 function assertBracePatchesEffective() {
+  // No local patches: skip patch-hash runtime checks.
+  if (Object.keys(REQUIRED_BRACE_PATCHES).length === 0) return
   for (const selector of Object.keys(REQUIRED_BRACE_PATCHES)) {
     assertBracePatchRuntime(selector.slice('brace-expansion@'.length))
   }
@@ -423,7 +426,7 @@ function assertAuditAcceptable(label, auditJson) {
     )
   }
   console.log(
-    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; locally-patched brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}) = ${acceptedBrace}`
+    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}/${INTERMEDIATE_BRACE_EXPANSION}) = ${acceptedBrace}`
   )
 }
 
@@ -433,7 +436,7 @@ assertSecurityOverrides()
 console.log(`OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; workspace security overrides verified`)
 assertBracePatchesDeclared()
 assertBracePatchesEffective()
-console.log('OK: brace-expansion 1.x/2.x local CVE patch declarations and runtime limits verified')
+console.log('OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)')
 assertSpaArchitectureGuard()
 console.log('OK: Admin/Kiosk/Partner remain Vite SPA + createBrowserRouter Data Mode')
 

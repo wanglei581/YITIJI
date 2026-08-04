@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
 import {
@@ -14,20 +14,42 @@ const PAGE_SIZE = 10
 const DISTRICTS = ['全部', '高新区', '城东区', '城南区', '城北区']
 const SERVICES = ['全部', '岗位推荐', '用工咨询', '劳务派遣']
 
-function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
+function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
+  const cells = [
+    { n: stats.totalAgencies, t: '合作机构' },
+    { n: stats.openAgencies, t: '今日服务' },
+    { n: stats.totalJobs, t: '在招岗位' },
+    { n: stats.districts, t: '覆盖区域' },
+  ]
+  return (
+    <div className="oa-stats-band" aria-label="机构概览">
+      <div className="oa-stats-cells">
+        {cells.map((cell) => (
+          <div key={cell.t}>
+            <div className="oa-n">{cell.n}</div>
+            <div className="oa-t">{cell.t}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () => void }) {
   const isOpen = agency.status === 'open'
   const services = Array.isArray(agency.services) ? agency.services : []
   return (
-    <Link to={`/offline-agencies/${agency.id}`} className="jf-row oa-agency-row" aria-label={agency.name}>
+    <article className="jf-row oa-agency-row" aria-label={agency.name} onClick={onClick} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
       <div className="jf-row-main">
         <div className="jf-row-title">
           <b>{agency.name}</b>
-            <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
-              <i className="oa-dot" aria-hidden="true" />
-            </span>
+          <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
+            <i className="oa-dot" aria-hidden="true" />
+            {agency.statusLabel || (isOpen ? '营业中' : '机构临时休息 · 以门店公告为准')}
+          </span>
         </div>
         <div className="jf-row-info">
           <span>
@@ -36,7 +58,7 @@ function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
           </span>
           <span>
             <ClockIcon aria-hidden="true" />
-            {agency.hours || '服务时间以机构公示为准'}
+            {agency.hours || '以门店公告为准'}
           </span>
         </div>
         <div className="jf-row-sub">
@@ -47,11 +69,11 @@ function AgencyRow({ agency }: { agency: OfflineAgencyDTO }) {
           <span className="jf-chip ok">资质核验已通过</span>
         </div>
       </div>
-      <div className="oa-r-aside" aria-label={`${agency.jobCount} 个岗位`}>
+      <div className="oa-r-aside" aria-label={`${agency.jobCount} 个在招岗位`}>
         <div className="oa-jobs-n">{agency.jobCount}</div>
-        <div className="oa-jobs-t">岗位</div>
+        <div className="oa-jobs-t">在招岗位</div>
       </div>
-    </Link>
+    </article>
   )
 }
 
@@ -107,6 +129,7 @@ export function OfflineAgenciesPage() {
   }, [district, service, keyword, page, retryKey])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0
+  const syncHint = useMemo(() => data?.stats.lastSyncLabel || '已同步', [data])
 
   return (
     <KioskPageFrame
@@ -162,9 +185,11 @@ export function OfflineAgenciesPage() {
         <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
       ) : !data ? null : (
         <div className="oa-list-shell">
+          <StatsBand stats={data.stats} />
+
           <div className="jf-list-meta">
             <span>
-              共 <b>{data.total}</b> 家合作机构
+              共 <b>{data.total}</b> 家合作机构 · {syncHint}
             </span>
             <span style={{ marginLeft: 'auto', fontSize: 18, color: 'var(--muted)' }}>
               到店咨询办理 · 本终端不代收简历
@@ -176,7 +201,11 @@ export function OfflineAgenciesPage() {
           ) : (
             <div className="jf-list">
               {data.items.map((agency) => (
-                <AgencyRow key={agency.id} agency={agency} />
+                <AgencyRow
+                  key={agency.id}
+                  agency={agency}
+                  onClick={() => navigate(`/offline-agencies/${agency.id}`)}
+                />
               ))}
             </div>
           )}
