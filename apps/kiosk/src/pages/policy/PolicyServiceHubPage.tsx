@@ -8,13 +8,14 @@
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
-  AlertCircleIcon,
+  BookmarkIcon,
   BotIcon,
   ChevronRightIcon,
   CoinsIcon,
   EyeIcon,
   FileTextIcon,
   FolderIcon,
+  InfoIcon,
   ShieldIcon,
 } from 'lucide-react'
 
@@ -77,16 +78,28 @@ const CAPABILITIES: PolicyCapability[] = [
     to: '/renshi?tab=subsidy',
   },
   {
-    key: 'ai-qa',
+    key: 'ai-assistant',
     icon: BotIcon,
+    accentBorder: 'border-t-primary-600',
+    iconBg: 'bg-primary-100',
+    iconColor: 'text-primary-700',
+    goColor: 'text-primary-700',
+    title: 'AI政策助手',
+    description: '提问政策疑问、补贴资格、办事材料，AI顾问给出个性化解答',
+    to: '/assistant',
+    state: { topic: 'policy' },
+  },
+  {
+    key: 'policy-fav',
+    icon: BookmarkIcon,
     accentBorder: 'border-t-plum',
     iconBg: 'bg-plum-soft',
     iconColor: 'text-plum',
     goColor: 'text-plum',
-    title: 'AI政策问答',
-    description: '向AI顾问提问政策疑问，AI整合政策要点给出个性化解答',
-    to: '/assistant',
-    state: { topic: 'policy' },
+    title: '政策收藏',
+    description: '查看已收藏的政策文章与AI问答记录，方便随时回顾',
+    to: '/me/ai-records',
+    state: { type: 'policy' },
   },
 ]
 
@@ -126,10 +139,7 @@ export function PolicyServiceHubPage() {
 
   return (
     <KioskPageFrame>
-      <div
-        data-page="policy-service-hub"
-        className="flex h-full flex-col overflow-y-auto bg-canvas"
-      >
+      <div className="flex h-full flex-col overflow-y-auto bg-canvas">
         <KioskPageHeader
           title="政策服务"
           description="就业政策 · 社保指南 · 档案登记 · AI智能匹配解读"
@@ -235,9 +245,9 @@ export function PolicyServiceHubPage() {
         </div>
 
         {/* 合规提示 */}
-        <div className="mt-6 mb-6 flex items-start gap-3 rounded-xl border border-dashed border-wheat bg-wheat-soft/40 px-5 py-4">
-          <AlertCircleIcon
-            className="mt-0.5 h-5 w-5 shrink-0 text-wheat"
+        <div className="mt-6 mb-6 flex items-start gap-3 rounded-xl border border-dashed border-neutral-200 bg-surface/70 px-5 py-4">
+          <InfoIcon
+            className="mt-0.5 h-5 w-5 shrink-0 text-neutral-400"
             aria-hidden="true"
           />
           <p className="text-[17px] leading-relaxed text-neutral-500">

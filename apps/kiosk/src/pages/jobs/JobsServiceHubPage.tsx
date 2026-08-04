@@ -19,6 +19,7 @@ import {
   EyeIcon,
   GraduationCapIcon,
   LayoutGridIcon,
+  MapPinIcon,
   ShieldCheckIcon,
   SmartphoneIcon,
   TargetIcon,
@@ -124,6 +125,18 @@ const CAPABILITIES: Capability[] = [
     to: '/jobs/online-platforms',
     available: true,
   },
+  {
+    key: 'offline',
+    icon: MapPinIcon,
+    accentBorder: 'border-t-wheat',
+    iconBg: 'bg-wheat-soft',
+    iconColor: 'text-wheat',
+    goColor: 'text-wheat',
+    title: '线下招聘机构',
+    description: '查看附近线下人力资源机构，直接咨询求职机会',
+    to: '/offline-agencies',
+    available: true,
+  },
 ]
 
 interface QuickLink {
@@ -171,9 +184,9 @@ export function JobsServiceHubPage() {
         />
 
         {/* AI能力提示横幅 */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl border border-clay/30 bg-clay-soft/40 px-5 py-3">
-          <span className="text-[20px] text-clay">✦</span>
-          <span className="text-[18px] font-semibold text-clay">AI岗位研判</span>
+        <div className="mt-5 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-5 py-3">
+          <span className="text-[20px] text-primary-700">✦</span>
+          <span className="text-[18px] font-semibold text-primary-700">AI岗位研判</span>
           <span className="ml-auto text-[17px] text-neutral-500">
             AI分析岗位要求 · 匹配简历技能 · 给出求职建议
           </span>
@@ -229,7 +242,7 @@ export function JobsServiceHubPage() {
                         cap.goColor,
                       ].join(' ')}
                     >
-                      {cap.available ? '查看' : '了解详情'}
+                      {cap.available ? '进入' : '了解详情'}
                       <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
                     </span>
                   ) : (

@@ -2,7 +2,11 @@
 // FairsServiceHubPage — 招聘会服务中心（/job-fairs/hub）
 //
 // 风格对齐 PrintScanHomePage.tsx：Tailwind CSS token + lucide-react
-// 布局：2 列竖屏 cap-grid，能力卡 + 快捷入口 + 合规提示
+// 布局：6 张能力卡（2 列 × 3 行，无孤儿）+ 快捷入口 + 合规提示
+//
+// 修复（2026-08）：
+//   - Critical: 原 7 张卡中 4 张重复指向 /job-fairs → 替换为真实路由
+//   - High: 7 张奇数卡末行孤儿 → 调整为 6 张偶数卡
 //
 // 合规：招聘会只做第三方/官方来源信息入口；预约请前往来源平台。
 // ============================================================
@@ -10,16 +14,14 @@
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
-  BuildingIcon,
   ChevronRightIcon,
-  ClipboardListIcon,
   ExternalLinkIcon,
   EyeIcon,
-  FilesIcon,
+  FileTextIcon,
   GraduationCapIcon,
   InfoIcon,
-  MapIcon,
   MapPinIcon,
+  PrinterIcon,
   QrCodeIcon,
   SparklesIcon,
 } from 'lucide-react'
@@ -34,7 +36,7 @@ interface Capability {
   title: string
   description: string
   to: string
-  note?: string
+  state?: Record<string, unknown>
 }
 
 const CAPABILITIES: Capability[] = [
@@ -61,54 +63,6 @@ const CAPABILITIES: Capability[] = [
     to: '/campus',
   },
   {
-    key: 'fair-plan',
-    icon: ClipboardListIcon,
-    accentBorder: 'border-t-primary-600',
-    iconBg: 'bg-primary-100',
-    iconColor: 'text-primary-700',
-    goColor: 'text-primary-700',
-    title: 'AI参会准备单',
-    description: '输入目标招聘会，AI为你生成参会材料清单和时间规划，支持打印',
-    to: '/job-fairs',
-    note: '进入后选择招聘会，再生成准备单',
-  },
-  {
-    key: 'fair-companies',
-    icon: BuildingIcon,
-    accentBorder: 'border-t-clay',
-    iconBg: 'bg-clay-soft',
-    iconColor: 'text-clay',
-    goColor: 'text-clay',
-    title: '参会企业',
-    description: '查看招聘会参展企业名录、展位信息和在招岗位',
-    to: '/job-fairs',
-    note: '进入后选择招聘会查看',
-  },
-  {
-    key: 'fair-map',
-    icon: MapIcon,
-    accentBorder: 'border-t-wheat',
-    iconBg: 'bg-wheat-soft',
-    iconColor: 'text-wheat',
-    goColor: 'text-wheat',
-    title: '场馆导览',
-    description: '查看招聘会场馆平面图与展位分布，提前规划参观路线',
-    to: '/job-fairs',
-    note: '进入后选择招聘会查看',
-  },
-  {
-    key: 'fair-materials',
-    icon: FilesIcon,
-    accentBorder: 'border-t-wheat',
-    iconBg: 'bg-wheat-soft',
-    iconColor: 'text-wheat',
-    goColor: 'text-wheat',
-    title: '活动资料',
-    description: '查看招聘会通知、参会指引等官方资料，可直接打印带走',
-    to: '/job-fairs',
-    note: '进入后选择招聘会查看',
-  },
-  {
     key: 'checkin',
     icon: QrCodeIcon,
     accentBorder: 'border-t-info',
@@ -118,6 +72,40 @@ const CAPABILITIES: Capability[] = [
     title: '扫码签到',
     description: '现场活动签到二维码展示与识别引导',
     to: '/job-fairs/checkin',
+  },
+  {
+    key: 'ai-plan',
+    icon: SparklesIcon,
+    accentBorder: 'border-t-primary-600',
+    iconBg: 'bg-primary-100',
+    iconColor: 'text-primary-700',
+    goColor: 'text-primary-700',
+    title: 'AI参会规划',
+    description: '告诉AI顾问你想参加的招聘会，小青为你生成参会清单和时间安排',
+    to: '/assistant',
+    state: { topic: 'jobfair' },
+  },
+  {
+    key: 'resume-prepare',
+    icon: FileTextIcon,
+    accentBorder: 'border-t-info',
+    iconBg: 'bg-info-bg',
+    iconColor: 'text-info-fg',
+    goColor: 'text-info-fg',
+    title: '求职材料准备',
+    description: '提前准备好简历和求职材料，现场打印后直接使用',
+    to: '/resume-service',
+  },
+  {
+    key: 'fair-print',
+    icon: PrinterIcon,
+    accentBorder: 'border-t-clay',
+    iconBg: 'bg-clay-soft',
+    iconColor: 'text-clay',
+    goColor: 'text-clay',
+    title: '活动资料打印',
+    description: '上传或扫描招聘会相关材料，本机直接打印备用',
+    to: '/print-scan',
   },
 ]
 
@@ -160,23 +148,23 @@ export function FairsServiceHubPage() {
       <div className="flex h-full flex-col overflow-y-auto bg-canvas">
         <KioskPageHeader
           title="招聘会信息"
-          description="场次查询 · 展位企业 · 场馆导览 · AI参会准备，投递预约请前往来源平台"
+          description="场次查询 · 校园专场 · AI参会规划 · 材料打印，投递预约请前往来源平台"
           onBack={() => navigate('/')}
           backLabel="返回"
         />
 
-        {/* AI 横幅 */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl border border-dashed border-primary-200 bg-primary-50 px-5 py-3">
+        {/* AI 横幅 — border border-primary-200 bg-primary-50（对齐其他 hub 页面） */}
+        <div className="mt-5 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-5 py-3">
           <SparklesIcon className="h-5 w-5 shrink-0 text-primary-700" aria-hidden="true" />
           <div className="flex flex-col">
-            <b className="text-[18px] font-bold text-primary-700">✦ AI材料清单</b>
+            <b className="text-[18px] font-bold text-primary-700">✦ AI参会助手小青</b>
             <p className="text-[17px] leading-relaxed text-neutral-500">
-              AI根据你的目标生成参会准备清单，材料提前打印
+              告诉小青你要参加哪场招聘会，AI为你生成参会清单和时间安排
             </p>
           </div>
         </div>
 
-        {/* 7 能力卡（2 列等高网格） */}
+        {/* 6 能力卡（2 列 × 3 行，无孤儿） */}
         <div className="mt-6 grid grid-cols-2 gap-5">
           {CAPABILITIES.map((cap) => {
             const Icon = cap.icon
@@ -184,7 +172,7 @@ export function FairsServiceHubPage() {
               <button
                 key={cap.key}
                 type="button"
-                onClick={() => navigate(cap.to)}
+                onClick={() => navigate(cap.to, cap.state ? { state: cap.state } : undefined)}
                 className={[
                   'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-6 text-left',
                   'border-t-4 shadow-sm active:scale-[0.99]',
@@ -199,9 +187,6 @@ export function FairsServiceHubPage() {
                   <h3 className="font-serif text-[28px] font-bold tracking-wide text-neutral-900">{cap.title}</h3>
                 </div>
                 <p className="text-[18px] leading-relaxed text-neutral-500">{cap.description}</p>
-                {cap.note && (
-                  <p className="text-[16px] leading-relaxed text-warning-fg">{cap.note}</p>
-                )}
                 <div className="mt-auto flex items-center gap-2">
                   <span className={['flex items-center gap-2 text-[19px] font-semibold', cap.goColor].join(' ')}>
                     进入
@@ -213,7 +198,7 @@ export function FairsServiceHubPage() {
           })}
         </div>
 
-        {/* 快捷入口 */}
+        {/* 快捷入口（2 列） */}
         <div className="mt-6">
           <div className="mb-2 flex items-baseline gap-3">
             <b className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">快捷入口</b>
@@ -243,7 +228,7 @@ export function FairsServiceHubPage() {
           </div>
         </div>
 
-        {/* 合规提示 */}
+        {/* 合规提示 — border-dashed border-neutral-200 bg-surface/70 + InfoIcon（对齐其他 hub 页面） */}
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-dashed border-neutral-200 bg-surface/70 px-5 py-3">
           <InfoIcon className="h-5 w-5 shrink-0 text-wheat" aria-hidden="true" />
           <p className="text-[17px] leading-relaxed text-neutral-500">

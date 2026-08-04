@@ -14,6 +14,7 @@ import {
   BotIcon,
   ChevronRightIcon,
   ClipboardCheckIcon,
+  ClockIcon,
   CompassIcon,
   InfoIcon,
   LightbulbIcon,
@@ -31,6 +32,7 @@ interface Capability {
   title: string
   description: string
   to: string
+  state?: Record<string, unknown>
   badge?: string
 }
 
@@ -81,15 +83,27 @@ const CAPABILITIES: Capability[] = [
     to: '/interview/tips',
   },
   {
-    key: 'reports',
-    icon: BarChart2Icon,
+    key: 'history',
+    icon: ClockIcon,
     accentBorder: 'border-t-info',
     iconBg: 'bg-info-bg',
     iconColor: 'text-info-fg',
     goColor: 'text-info-fg',
-    title: '我的训练报告',
-    description: '查看历次模拟面试报告，对比训练进度，持续提升表达能力',
-    to: '/interview/reports',
+    title: '评估历史',
+    description: '查看历次自我评估报告，追踪职业认知的成长变化',
+    to: '/resume/self-assessment/history',
+  },
+  {
+    key: 'salary',
+    icon: BarChart2Icon,
+    accentBorder: 'border-t-plum',
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
+    goColor: 'text-plum',
+    title: '行业薪资参考',
+    description: '问AI顾问了解目标岗位的市场薪资范围和谈薪技巧',
+    to: '/assistant',
+    state: { topic: 'salary' },
   },
 ]
 
