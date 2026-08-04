@@ -118,6 +118,37 @@ export const COMPLIANCE_COPY = {
    */
   PARTNER_DASHBOARD_TOP:
     '本后台用于合作数据维护与运营统计,不承接平台内简历投递、候选人筛选和面试邀约。',
+
+  /**
+   * Kiosk 简历服务中心 Hub 页底部合规免责声明。
+   * AI 生成内容告知 + 投递由本人负责。
+   */
+  KIOSK_RESUME_HUB_DISCLAIMER:
+    'AI生成内容仅供参考，不构成正式求职建议；简历最终投递由本人负责确认。',
+
+  /**
+   * Kiosk 岗位信息服务中心 Hub 页底部合规提示。
+   */
+  KIOSK_JOBS_HUB_DISCLAIMER:
+    '岗位信息均来自第三方 / 官方来源，本终端仅提供信息展示；投递、预约请前往来源平台完成，本系统不参与招聘闭环，不收取求职者简历给企业。',
+
+  /**
+   * Kiosk 招聘会服务中心 Hub 页底部合规提示。
+   */
+  KIOSK_FAIRS_HUB_DISCLAIMER:
+    '招聘会信息来自第三方或官方来源；预约、报名请前往来源平台完成，本终端只提供信息展示与跳转入口。',
+
+  /**
+   * Kiosk 面试训练服务中心 Hub 页底部免责声明。
+   */
+  KIOSK_INTERVIEW_HUB_DISCLAIMER:
+    'AI模拟面试内容仅供练习参考，不代表真实面试流程；评测结果不构成招聘意见，不对外共享。',
+
+  /**
+   * Kiosk 政策服务中心 Hub 页底部合规提示。
+   */
+  KIOSK_POLICY_HUB_DISCLAIMER:
+    '政策信息来源于官方发布，仅供参考；补贴类只做政策说明和材料指引（info-only），不承诺到账，不代办申请，正式办理请前往相关政府部门或官方渠道。',
 } as const
 
 export type ComplianceCopyKey = keyof typeof COMPLIANCE_COPY

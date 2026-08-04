@@ -12,11 +12,14 @@ overrides:
   hono: 4.12.27
   multer: 2.2.0
   js-yaml: 4.3.0
-  fast-uri: 3.1.4
+  fast-uri: 3.1.5
   postcss: 8.5.18
-  brace-expansion@1.1.14: 1.1.16
-  brace-expansion@2.1.1: 2.1.2
-  brace-expansion@5.0.6: 5.0.8
+  # brace-expansion: GHSA-mh99-v99m-4gvg + GHSA-rgw5-rvv9-x895
+  # upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH (CVE-2026-14257 backport);
+  # local patches are no longer needed.
+  brace-expansion@1.1.14: 1.1.18
+  brace-expansion@2.1.1: 2.1.4
+  brace-expansion@5.0.6: 5.0.9
 allowBuilds:
   '@alicloud/openapi-core': true
   '@nestjs/core': true
@@ -26,6 +29,3 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   prisma: true
-patchedDependencies:
-  brace-expansion@1.1.16: patches/brace-expansion@1.1.16.patch
-  brace-expansion@2.1.2: patches/brace-expansion@2.1.2.patch

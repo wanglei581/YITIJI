@@ -19,15 +19,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
 const ACCEPTED_UNREACHABLE_HIGH = 'GHSA-qwww-vcr4-c8h2'
 const OVERBROAD_BRACE_EXPANSION_HIGH = 'GHSA-mh99-v99m-4gvg'
+// GHSA-rgw5-rvv9-x895: "brace-expansion DoS via unbounded intermediate"
+// patched in >=1.1.18 / >=2.1.4 / >=5.0.9 — upstream already backports EXPANSION_MAX_LENGTH
+const INTERMEDIATE_BRACE_EXPANSION = 'GHSA-rgw5-rvv9-x895'
 const FRONTENDS = ['admin', 'kiosk', 'partner']
-const REQUIRED_BRACE_PATCHES = {
-  'brace-expansion@1.1.16': 'patches/brace-expansion@1.1.16.patch',
-  'brace-expansion@2.1.2': 'patches/brace-expansion@2.1.2.patch',
-}
+// Local patches removed: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH
+const REQUIRED_BRACE_PATCHES = {}
 const REQUIRED_BRACE_OVERRIDES = {
-  'brace-expansion@1.1.14': '1.1.16',
-  'brace-expansion@2.1.1': '2.1.2',
-  'brace-expansion@5.0.6': '5.0.8',
+  'brace-expansion@1.1.14': '1.1.18',
+  'brace-expansion@2.1.1': '2.1.4',
+  'brace-expansion@5.0.6': '5.0.9',
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
 
@@ -141,6 +142,8 @@ function workspaceMapping(workspace, blockName) {
 }
 
 function assertBracePatchesDeclared() {
+  // No local patches required: upstream 1.1.18 / 2.1.4 / 5.0.9 already include EXPANSION_MAX_LENGTH.
+  if (Object.keys(REQUIRED_BRACE_PATCHES).length === 0) return
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
   const workspacePatches = workspaceMapping(workspace, 'patchedDependencies')
 
@@ -277,6 +280,9 @@ function assertMinimatchConsumersUsePatchedBraceVersions() {
 }
 
 function assertBracePatchesEffective() {
+  // No local patches: skip patch-hash runtime checks.
+  // Upstream versions 1.1.18 / 2.1.4 / 5.0.9 have EXPANSION_MAX_LENGTH built-in.
+  if (Object.keys(REQUIRED_BRACE_PATCHES).length === 0) return
   for (const selector of Object.keys(REQUIRED_BRACE_PATCHES)) {
     assertBracePatchRuntime(selector.slice('brace-expansion@'.length))
   }
@@ -373,17 +379,20 @@ function parseSemver(version) {
 function isUpstreamPatchedBraceExpansion(version) {
   const parsed = parseSemver(version)
   if (!parsed) return false
+  // 5.0.8+ carries EXPANSION_MAX_LENGTH (GHSA-mh99-v99m-4gvg); 5.0.9+ also fixes GHSA-rgw5-rvv9-x895
   if (parsed.major === 5) return parsed.minor > 0 || parsed.patch >= 8
+  // 2.1.4+ backports EXPANSION_MAX_LENGTH and fixes GHSA-rgw5-rvv9-x895
+  if (parsed.major === 2 && parsed.minor === 1) return parsed.patch >= 4
+  // 1.1.18+ backports EXPANSION_MAX_LENGTH and fixes GHSA-rgw5-rvv9-x895
+  if (parsed.major === 1 && parsed.minor === 1) return parsed.patch >= 18
   return false
 }
 
 function isRemediatedBraceExpansion(item) {
-  if (
-    advisoryId(item) !== OVERBROAD_BRACE_EXPANSION_HIGH ||
-    item.module_name !== 'brace-expansion'
-  ) {
-    return false
-  }
+  if (item.module_name !== 'brace-expansion') return false
+  const id = advisoryId(item)
+  if (id !== OVERBROAD_BRACE_EXPANSION_HIGH && id !== INTERMEDIATE_BRACE_EXPANSION) return false
+
   const versions = (item.findings || []).map((finding) => finding.version).filter(Boolean)
   if (versions.length === 0) return false
   return versions.every(
@@ -419,7 +428,7 @@ function assertAuditAcceptable(label, auditJson) {
     )
   }
   console.log(
-    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; locally-patched brace-expansion (${OVERBROAD_BRACE_EXPANSION_HIGH}) = ${acceptedBrace}`
+    `OK: ${label} — unaccepted critical/high = 0; accepted-unreachable RSC (${ACCEPTED_UNREACHABLE_HIGH}) = ${acceptedRsc}; upstream-remediated brace-expansion = ${acceptedBrace}`
   )
 }
 
@@ -429,7 +438,7 @@ assertSecurityOverrides()
 console.log(`OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; workspace security overrides verified`)
 assertBracePatchesDeclared()
 assertBracePatchesEffective()
-console.log('OK: brace-expansion 1.x/2.x local CVE patch declarations and runtime limits verified')
+console.log('OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)')
 assertSpaArchitectureGuard()
 console.log('OK: Admin/Kiosk/Partner remain Vite SPA + createBrowserRouter Data Mode')
 
