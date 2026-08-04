@@ -12,6 +12,7 @@ import {
   BotIcon,
   ChevronRightIcon,
   CoinsIcon,
+  EyeIcon,
   FileTextIcon,
   FolderIcon,
   ShieldIcon,
@@ -86,6 +87,37 @@ const CAPABILITIES: PolicyCapability[] = [
     description: '向AI顾问提问政策疑问，AI整合政策要点给出个性化解答',
     to: '/assistant',
     state: { topic: 'policy' },
+  },
+]
+
+interface QuickLink {
+  key: string
+  icon: React.ComponentType<{ className?: string }>
+  iconBg: string
+  iconColor: string
+  title: string
+  description: string
+  to: string
+}
+
+const QUICK_LINKS: QuickLink[] = [
+  {
+    key: 'browse-history',
+    icon: EyeIcon,
+    iconBg: 'bg-primary-100',
+    iconColor: 'text-primary-700',
+    title: '浏览记录',
+    description: '查看最近浏览的政策文章',
+    to: '/me/activity',
+  },
+  {
+    key: 'ai-records',
+    icon: BotIcon,
+    iconBg: 'bg-plum-soft',
+    iconColor: 'text-plum',
+    title: 'AI政策问答记录',
+    description: '查看历次AI政策问答记录',
+    to: '/me/ai-records',
   },
 ]
 
@@ -166,8 +198,44 @@ export function PolicyServiceHubPage() {
           })}
         </div>
 
+        {/* 快捷入口 */}
+        <div className="mt-6">
+          <div className="mb-2 flex items-baseline gap-3">
+            <b className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">快捷入口</b>
+            <span className="text-[17px] text-neutral-500">登录后可查看历史记录</span>
+          </div>
+          <div className="grid grid-cols-2 gap-[18px]">
+            {QUICK_LINKS.map((link) => {
+              const Icon = link.icon
+              return (
+                <button
+                  key={link.key}
+                  type="button"
+                  onClick={() => navigate(link.to)}
+                  className="flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]"
+                >
+                  <span
+                    className={[
+                      'flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[13px]',
+                      link.iconBg,
+                      link.iconColor,
+                    ].join(' ')}
+                  >
+                    <Icon className="h-7 w-7" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <b className="block text-[21px] font-bold text-neutral-900">{link.title}</b>
+                    <span className="mt-0.5 block text-[16px] text-neutral-500">{link.description}</span>
+                  </span>
+                  <ChevronRightIcon className="h-[22px] w-[22px] shrink-0 text-neutral-400 opacity-60" aria-hidden="true" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* 合规提示 */}
-        <div className="mt-6 flex items-start gap-3 rounded-xl border border-dashed border-wheat bg-wheat-soft/40 px-5 py-4">
+        <div className="mt-6 mb-6 flex items-start gap-3 rounded-xl border border-dashed border-wheat bg-wheat-soft/40 px-5 py-4">
           <AlertCircleIcon
             className="mt-0.5 h-5 w-5 shrink-0 text-wheat"
             aria-hidden="true"
