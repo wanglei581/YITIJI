@@ -627,6 +627,52 @@
   font-size: 12px;
 }
 
+/* ── 扁平服务磁贴网格（原型 .svc-grid + .svc-tile） ── */
+.kpv1 .svc-grid {
+  flex: none;
+  padding: 0 48px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.kpv1 .svc-tile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 112px;
+  padding: 16px 18px 14px;
+  background: var(--pv-surface);
+  border: 1px solid var(--pv-line);
+  border-left: 6px solid var(--pv-accent, var(--pv-teal));
+  border-radius: var(--pv-r-md);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--pv-sans);
+  box-shadow: 0 3px 12px rgba(16,48,43,.04);
+}
+.kpv1 .svc-tile:active { transform: scale(.98); }
+.kpv1 .st-icon {
+  flex: none;
+  width: 64px; height: 64px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--pv-accent-soft, var(--pv-teal-soft));
+  color: var(--pv-accent-deep, var(--pv-teal-deep));
+}
+.kpv1 .st-icon svg { width: 36px; height: 36px; }
+.kpv1 .st-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.kpv1 .st-body b { font-size: 26px; font-weight: 700; color: var(--pv-ink); }
+.kpv1 .st-sub { font-size: 18px; color: var(--pv-muted); }
+.kpv1 .svc-tile .ai-chip { margin-left: 0; margin-top: 4px; align-self: flex-start; }
+.kpv1 .st-arr { flex: none; width: 24px; height: 24px; color: var(--pv-muted); }
+
 /* ── AI接待区（design-d .reception + .ar-card + .device-card） ── */
 .kpv1 .reception {
   flex: none;

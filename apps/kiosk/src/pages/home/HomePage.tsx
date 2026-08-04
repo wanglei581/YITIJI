@@ -15,7 +15,7 @@ import { useToolboxConfig } from '../../hooks/useToolboxConfig'
 import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { ContinuePanel } from './components/ContinuePanel'
 import { ProtoIcon } from './prototypeIcons'
-import { SERVICE_GROUPS, type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
+import { type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import '../../styles/prototype-v1.css'
 
 /** 服务组 id → 组头图标（键为稳定 group id；图标名对应 prototypeIcons 的 P 表） */
@@ -221,7 +221,7 @@ function HomeDispatch() {
 }
 
 /* ── 单个服务卡（原型统一 .tile 网格；废弃 primary/secondary 两级） ── */
-function ServiceCard({ group }: { group: ServiceGroup }) {
+export function ServiceCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
   const layout = GROUP_LAYOUT[group.id] ?? { cols: 'c3' as const, col: false, icons: true }
   const wide = group.layout === 'wide'
@@ -304,7 +304,7 @@ const SMART_CAMPUS_CHIP_LABELS: Partial<Record<SmartCampusModuleKey, string>> = 
 
 /** 动态专区行：百宝箱(z-plum) + 智慧校园(z-teal)；后台开关驱动，
  *  未启用不渲染，仅一个启用时 :only-child 自动通栏并多露预览签。 */
-function ZoneRow() {
+export function ZoneRow() {
   const navigate = useNavigate()
   const toolbox = useToolboxConfig()
   const campus = useSmartCampusConfig()
@@ -398,9 +398,49 @@ function ZoneRow() {
   )
 }
 
-export function HomePage() {
-  const groups = SERVICE_GROUPS
+/** 8个扁平服务磁贴网格（原型 design-d .svc-grid，对应01-home.html 8个 svc-tile）
+ * 替代旧分组 ServiceCard+ZoneRow 布局，与原型1:1视觉对齐。
+ */
+function SvcGrid() {
+  const navigate = useNavigate()
+  const tiles = [
+    { to: '/print-scan',      accent: 'a-slate', icon: 'group-print',     title: '打印扫描',   sub: '上传、扫描与本机出纸',   aiChip: 'AI文件预检' },
+    { to: '/resume/source',   accent: 'a-teal',  icon: 'group-resume',    title: 'AI简历服务', sub: '诊断、优化、生成与打印', aiChip: 'AI诊断优化' },
+    { to: '/jobs',            accent: 'a-clay',  icon: 'group-jobs',      title: '岗位信息',   sub: '查看第三方来源岗位',     aiChip: 'AI岗位研判' },
+    { to: '/job-fairs',       accent: 'a-wheat', icon: 'group-fairs',     title: '招聘会',     sub: '场次、企业与现场导览',   aiChip: 'AI材料清单' },
+    { to: '/interview/setup', accent: 'a-plum',  icon: 'group-interview', title: 'AI面试训练', sub: '模拟问答与训练报告',     aiChip: 'AI模拟反馈' },
+    { to: '/renshi',          accent: 'a-wheat', icon: 'group-policy',    title: '政策服务',   sub: '政策查询与材料指引',     aiChip: 'AI来源解读' },
+    { to: '/toolbox',         accent: 'a-plum',  icon: 'zone-toolbox',    title: '百宝箱',     sub: '证件照、文档与实用工具', aiChip: 'AI受控工具' },
+    { to: '/smart-campus',    accent: 'a-teal',  icon: 'zone-campus',     title: '智慧校园',   sub: '校园服务与信息展示',     aiChip: 'AI场景引导' },
+  ]
+  return (
+    <div className="svc-grid" role="navigation" aria-label="服务入口">
+      {tiles.map((t) => (
+        <button
+          key={t.to}
+          type="button"
+          className={`svc-tile ${t.accent}`}
+          onClick={() => navigate(t.to)}
+        >
+          <span className="st-icon">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <ProtoIcon name={t.icon as any} />
+          </span>
+          <span className="st-body">
+            <b>{t.title}</b>
+            <span className="st-sub">{t.sub}</span>
+            <span className="ai-chip">{t.aiChip}</span>
+          </span>
+          <svg className="st-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
+      ))}
+    </div>
+  )
+}
 
+export function HomePage() {
   return (
     <KioskPageFrame className="kpv1 kpv1--content-only">
       <HomeWelcome />
@@ -420,12 +460,7 @@ export function HomePage() {
         </span>
         <span className="svc-hint">知道要办什么，也可以直接进入</span>
       </div>
-      <div className="groups" aria-label="当前可使用功能">
-        {groups.map((group) => (
-          <ServiceCard key={group.id} group={group} />
-        ))}
-      </div>
-      <ZoneRow />
+      <SvcGrid />
       <div className="notice">
         <ProtoIcon name="info" />
         岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。
