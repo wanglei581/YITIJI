@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang='zh-CN'>
+<head><meta charset='UTF-8'><title>职易达AI求职操作系统 · 首页</title>
+<link rel='stylesheet' href='shared.css'>
+<style>
+/* === 玻璃质感 × 青绿米纸 · 首页 v5 === */
+#stage{
+  background:
+    radial-gradient(ellipse 960px 480px at 50% 0%,rgba(31,158,134,.09),transparent 58%),
+    radial-gradient(ellipse 600px 400px at 90% 20%,rgba(31,158,134,.05),transparent 55%),
+    #f4f1e8 !important;
+}
+/* === 顶部绿带 hero === */
+.hero-band{flex:none;background:linear-gradient(145deg,#1f9e86 0%,#157a67 55%,#0d5c4e 100%);padding:26px 48px 22px;position:relative;overflow:hidden;}
+.hero-band::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 700px 300px at 80% 120%,rgba(255,255,255,.06),transparent 60%);pointer-events:none;}
+.hb-inner{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;}
+.hb-brand{flex:1;}
+.hb-eyebrow{font-size:13px;color:rgba(255,255,255,.6);letter-spacing:3px;font-weight:600;text-transform:uppercase;margin-bottom:8px;}
+.hb-title{font-family:var(--serif);font-size:46px;font-weight:900;color:#fff;line-height:1.15;letter-spacing:1px;}
+.hb-title em{font-style:normal;color:#a8f0e0;}
+.hb-sub{font-size:17px;color:rgba(255,255,255,.65);margin-top:6px;letter-spacing:1px;}
+.hb-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.hb-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:rgba(255,255,255,.8);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);padding:5px 12px;border-radius:999px;backdrop-filter:blur(8px);}
+.hb-chip svg{width:13px;height:13px;color:#a8f0e0;}
+.hb-login{flex:none;min-height:70px;padding:0 24px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:18px;backdrop-filter:blur(12px);color:#fff;font-family:var(--sans);font-size:20px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 4px 16px rgba(0,0,0,.15);}
+.hb-login svg{width:22px;height:22px;}
+.hb-login small{display:block;font-size:12px;opacity:.65;font-weight:400;margin-top:2px;}
+/* === AI接待区（玻璃卡） === */
+.reception-row{flex:none;padding:16px 48px 0;display:grid;grid-template-columns:1fr 286px;gap:14px;}
+.ar-glass{background:rgba(255,253,248,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(31,158,134,.2);border-radius:22px;padding:22px 26px 18px;box-shadow:0 8px 28px rgba(31,158,134,.1),0 2px 8px rgba(16,48,43,.05);position:relative;overflow:hidden;}
+.ar-glass::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--teal),rgba(53,171,142,.55),transparent);}
+.ar-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.ar-badge{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--teal-deep);font-weight:600;background:var(--teal-soft);border:1px solid rgba(31,158,134,.25);padding:5px 12px;border-radius:999px;}
+.ar-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+.ar-av-row{display:flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);}
+.av-circle{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-deep));display:grid;place-items:center;color:#fffdf8;font-size:11px;font-weight:700;}
+.ar-h{font-family:var(--serif);font-size:30px;font-weight:700;color:var(--ink);letter-spacing:1px;margin-bottom:13px;line-height:1.3;}
+.ar-irow{display:flex;gap:10px;margin-bottom:11px;}
+.ar-inp{flex:1;min-height:66px;padding:0 18px;font-size:19px;font-family:var(--sans);color:var(--ink);background:rgba(244,241,232,.7);border:1.5px solid rgba(31,158,134,.18);border-radius:14px;}
+.ar-inp::placeholder{color:#9ea8a2;}
+.ar-mic{width:66px;flex:none;background:rgba(31,158,134,.08);border:1.5px solid rgba(31,158,134,.18);border-radius:14px;display:grid;place-items:center;cursor:pointer;color:var(--teal);}
+.ar-mic svg{width:25px;height:25px;}
+.ar-cta{width:100%;min-height:74px;background:linear-gradient(135deg,#1f9e86,#157a67);color:#fffdf8;border:none;border-radius:18px;font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:2px;cursor:pointer;box-shadow:0 6px 20px rgba(31,158,134,.35),0 2px 8px rgba(16,48,43,.1);}
+.ar-cta:active{transform:scale(.99);}
+.ar-hint{font-size:13.5px;color:var(--muted);text-align:center;margin:7px 0 11px;}
+.ar-chips{display:flex;gap:8px;flex-wrap:wrap;}
+.ar-chip{min-height:48px;padding:0 14px;background:rgba(255,253,248,.8);border:1px solid rgba(31,158,134,.16);border-radius:999px;font-family:var(--sans);font-size:17px;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px;backdrop-filter:blur(6px);}
+.ar-chip svg{width:14px;height:14px;color:var(--teal);}
+.ar-wave{display:flex;align-items:flex-end;gap:3px;margin-top:10px;height:17px;}
+.ar-wave span{width:3px;border-radius:2px;background:var(--teal);opacity:.2;}
+/* 设备状态玻璃卡 */
+.ds-glass{background:rgba(255,253,248,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(31,158,134,.16);border-radius:22px;padding:20px 22px;box-shadow:0 6px 20px rgba(31,158,134,.08);display:flex;flex-direction:column;}
+.ds-glass h3{font-family:var(--serif);font-size:21px;font-weight:700;color:var(--ink);}
+.ds-glass .ds-s{font-size:13px;color:var(--muted);margin:3px 0 13px;}
+.ds-items{display:flex;flex-direction:column;gap:8px;flex:1;}
+.ds-item{display:flex;align-items:center;justify-content:space-between;background:rgba(244,241,232,.65);border:1px solid rgba(31,158,134,.12);border-radius:12px;padding:10px 13px;backdrop-filter:blur(4px);}
+.ds-left{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--ink);font-weight:500;}
+.ds-left svg{width:18px;height:18px;color:var(--teal-deep);}
+.ds-dot{width:8px;height:8px;border-radius:50%;background:#2db88a;box-shadow:0 0 0 3px rgba(45,184,138,.18);}
+.ds-foot{font-size:12.5px;color:var(--muted);text-align:center;margin-top:11px;display:flex;align-items:center;gap:5px;justify-content:center;}
+/* AI调度 */
+.dispatch{flex:none;padding:10px 48px;display:flex;align-items:center;gap:12px;}
+.d-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(31,158,134,.2),transparent);}
+.d-tag{font-size:13px;color:var(--teal-deep);font-weight:600;background:var(--teal-soft);border:1px solid rgba(31,158,134,.2);padding:4px 13px;border-radius:999px;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+.d-tag svg{width:12px;height:12px;}
+/* 今日智能看板（玻璃卡） */
+.smart-board{flex:none;padding:0 48px;display:grid;grid-template-columns:1fr 1fr;gap:13px;}
+.sb{background:rgba(255,253,248,.85);backdrop-filter:blur(14px);border-radius:18px;padding:15px 18px;position:relative;overflow:hidden;}
+.sb.fair{border:1px solid rgba(31,158,134,.22);box-shadow:0 4px 16px rgba(31,158,134,.08);}
+.sb.cont{border:1px solid rgba(169,120,31,.2);box-shadow:0 4px 16px rgba(169,120,31,.06);}
+.sb-tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;margin-bottom:7px;}
+.sb-tag.t{color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.2);}
+.sb-tag.g{color:var(--wheat-deep);background:var(--wheat-soft);border:1px solid rgba(169,120,31,.18);}
+.sb-tag::before{content:'✦';font-size:9px;}
+.sb b{display:block;font-size:17px;font-weight:700;color:var(--ink);margin-bottom:4px;}
+.sb p{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:9px;}
+.sb-btns{display:flex;gap:7px;}
+.sb-btn{min-height:46px;padding:0 14px;border-radius:12px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.sb-btn svg{width:13px;height:13px;}
+.sb-btn.dark{background:var(--dark);color:#f4f1e8;border:none;}
+.sb-btn.ghost{background:rgba(244,241,232,.8);border:1px solid var(--line);color:var(--ink);}
+/* 直接入口区 */
+.shortcut-hd{flex:none;padding:12px 48px 8px;display:flex;align-items:center;gap:12px;}
+.sh-t{font-family:var(--serif);font-size:25px;font-weight:700;color:var(--ink);letter-spacing:1px;}
+.sh-line{flex:1;height:1px;background:var(--line);}
+.sh-hint{font-size:14px;color:var(--muted);}
+/* 服务磁贴（玻璃感） */
+.svc-grid{flex:none;padding:0 48px;display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.sv{display:flex;align-items:center;gap:13px;min-height:98px;padding:13px 15px 11px;background:rgba(255,253,248,.88);backdrop-filter:blur(10px);border:1px solid rgba(31,158,134,.14);border-left:5px solid var(--accent,var(--teal));border-radius:18px;cursor:pointer;font-family:var(--sans);color:var(--ink);transition:transform .08s,box-shadow .08s;box-shadow:0 2px 10px rgba(31,158,134,.06);}
+.sv:active{transform:scale(.98);box-shadow:0 4px 18px rgba(31,158,134,.14);}
+.sv-ico{width:46px;height:46px;flex:none;border-radius:12px;display:grid;place-items:center;background:var(--accent-soft,var(--teal-soft));color:var(--accent-deep,var(--teal-deep));}
+.sv-ico svg{width:24px;height:24px;}
+.sv-b{flex:1;min-width:0;}
+.sv-b b{display:block;font-size:20px;font-weight:700;letter-spacing:.3px;}
+.sv-b .sv-s{display:block;font-size:13px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ai-t{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-style:normal;font-weight:500;color:var(--teal-deep);background:var(--teal-soft);border:1px solid rgba(31,158,134,.18);padding:2px 6px;border-radius:999px;margin-top:4px;}
+.ai-t::before{content:'✦';font-size:8px;}
+.sv-arr{flex:none;width:16px;height:16px;color:var(--muted);opacity:.35;}
+/* Zone卡（玻璃） */
+.zone-row{flex:none;margin:10px 48px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.zc{display:flex;flex-direction:column;gap:9px;min-height:112px;padding:13px 18px;border-radius:18px;cursor:pointer;backdrop-filter:blur(12px);transition:transform .08s;}
+.zc:active{transform:scale(.98);}
+.zc.z-plum{background:rgba(239,231,241,.88);border:1px solid rgba(122,90,134,.2);}
+.zc.z-teal{background:rgba(226,242,236,.88);border:1px solid rgba(31,158,134,.22);}
+.z-top{display:flex;align-items:center;gap:13px;}
+.z-ico{width:46px;height:46px;flex:none;border-radius:12px;display:grid;place-items:center;color:#fffdf8;}
+.z-plum .z-ico{background:var(--plum);}
+.z-teal .z-ico{background:var(--teal);}
+.z-ico svg{width:25px;height:25px;}
+.z-name{font-family:var(--serif);font-size:22px;font-weight:700;color:var(--ink);}
+.z-s{font-size:13.5px;color:var(--muted);display:block;margin-top:2px;}
+.z-side{margin-left:auto;display:flex;align-items:center;gap:7px;}
+.z-tag{font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 9px;background:rgba(255,253,248,.7);}
+.z-chips{display:flex;gap:6px;overflow:hidden;}
+.z-chip{font-size:13px;white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgba(255,253,248,.7);border:1px solid var(--line);color:var(--muted);}
+.notice{margin:10px 48px 0;}
+.navbar{margin-top:10px;}
+</style></head>
+<body><div id='stage'>
+<header class='topbar'>
+  <div class='brand'><b>就业服务大厅 · 01号机</b><span>职易达AI求职操作系统</span></div>
+  <div class='right'><span class='clock' id='clock'>2026年8月3日 10:30</span>
+    <span class='status-chip'><span class='dot'></span>打印机在线</span></div>
+</header>
+
+<!-- 绿色渐变 Hero 横幅 -->
+<div class='hero-band'>
+  <div class='hb-inner'>
+    <div class='hb-brand'>
+      <p class='hb-eyebrow'>AI JOB KIOSK</p>
+      <h1 class='hb-title'>职易达 <em>AI</em> 求职操作系统</h1>
+      <p class='hb-sub'>现场准备材料、了解机会，并在本机完成打印扫描</p>
+      <div class='hb-chips'>
+        <span class='hb-chip'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/></svg>今天有1场招聘会</span>
+        <span class='hb-chip'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z'/></svg>AI功能全部就绪</span>
+        <span class='hb-chip'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z'/></svg>打印机已就绪</span>
+      </div>
+    </div>
+    <button class='hb-login' onclick="location='15-login.html'">
+      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><circle cx='12' cy='8' r='4'/><path d='M4 21a8 8 0 0116 0'/></svg>
+      <span>登录 / 注册<small>同步本人文档与办理记录 · 记录同步「我的」</small></span>
+    </button>
+  </div>
+</div>
+
+<!-- AI接待区 -->
+<div class='reception-row'>
+  <div class='ar-glass'>
+    <div class='ar-top'>
+      <span class='ar-badge'><span class='dot'></span>AI接待台 · 等待目标</span>
+      <span class='ar-av-row'><span class='av-circle'>青</span>小青 · AI办事顾问</span>
+    </div>
+    <p class='ar-h'>不知道从哪开始？说出你想办的事</p>
+    <div class='ar-irow'>
+      <input class='ar-inp' placeholder='例如：我周五参加招聘会，需要准备简历并打印' readonly/>
+      <button class='ar-mic'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0014 0M12 18v3'/></svg></button>
+    </div>
+    <button class='ar-cta' onclick="location='13-assistant.html'">让小青安排</button>
+    <p class='ar-hint'>将进入 AI 顾问，由你确认办理方案</p>
+    <div class='ar-chips'>
+      <button class='ar-chip' onclick="location='13-assistant.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M7 3h8l4 4v14H7z'/><path d='M15 3v4h4M10 12l2 2 4-4'/></svg>优化简历并打印</button>
+      <button class='ar-chip' onclick="location='13-assistant.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z'/></svg>准备招聘会材料</button>
+      <button class='ar-chip' onclick="location='02-print-hub.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z'/></svg>打印手机里的文件</button>
+    </div>
+    <div class='ar-wave'><span style='height:5px'></span><span style='height:12px'></span><span style='height:18px'></span><span style='height:9px'></span><span style='height:15px'></span><span style='height:7px'></span><span style='height:13px'></span><span style='height:9px'></span><span style='height:17px'></span><span style='height:11px'></span><span style='height:7px'></span><span style='height:15px'></span><span style='height:9px'></span><span style='height:5px'></span><span style='height:13px'></span><span style='height:8px'></span><span style='height:11px'></span><span style='height:17px'></span><span style='height:6px'></span></div>
+  </div>
+  <div class='ds-glass'>
+    <h3>本机办结能力</h3>
+    <p class='ds-s'>AI调用设备，现场完成</p>
+    <div class='ds-items'>
+      <div class='ds-item'><div class='ds-left'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z'/></svg>文档打印就绪</div><span class='ds-dot'></span></div>
+      <div class='ds-item'><div class='ds-left'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M3 8V5a2 2 0 012-2h3M16 3h3a2 2 0 012 2v3M21 16v3a2 2 0 01-2 2h-3M8 21H5a2 2 0 01-2-2v-3M3 12h18'/></svg>材料扫描就绪</div><span class='ds-dot'></span></div>
+      <div class='ds-item'><div class='ds-left'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M4 5a2 2 0 012-2h5v18H6a2 2 0 01-2-2zM11 3h7a2 2 0 012 2v14a2 2 0 01-2 2h-7'/></svg>自动双面可用</div><span class='ds-dot'></span></div>
+    </div>
+    <div class='ds-foot'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><circle cx='12' cy='12' r='9'/><path d='M12 7v5l3 2'/></svg>设备状态实时检测</div>
+  </div>
+</div>
+
+<div class='dispatch'>
+  <div class='d-line'></div>
+  <span class='d-tag'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z'/></svg>AI能力调度</span>
+  <div class='d-line'></div>
+</div>
+
+<!-- 今日智能看板 -->
+<div class='smart-board'>
+  <div class='sb fair'>
+    <span class='sb-tag t'>AI感知 · 今日活动</span>
+    <b>招聘会 · 今天 14:00 · 体育中心</b>
+    <p>2小时后开始，AI建议你现在优化并打印简历带去投递</p>
+    <div class='sb-btns'>
+      <button class='sb-btn dark' onclick="location='13-assistant.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M5 12h14M12 5l7 7-7 7'/></svg>去准备参会材料</button>
+    </div>
+  </div>
+  <div class='sb cont'>
+    <span class='sb-tag g'>AI记得 · 待续任务</span>
+    <b>简历优化建议待确认</b>
+    <p>本次会话已生成优化版，待你选择是否打印或保存</p>
+    <div class='sb-btns'>
+      <button class='sb-btn ghost' onclick="location='07-resume-optimize.html'">继续修改</button>
+      <button class='sb-btn dark' onclick="location='03-print-settings.html'">去打印</button>
+    </div>
+  </div>
+</div>
+
+<!-- 直接进入（次要区域） -->
+<div class='shortcut-hd'>
+  <span class='sh-t'>核心服务</span>
+  <div class='sh-line'></div>
+  <span class='sh-hint'>知道要办什么，也可以直接进入</span>
+</div>
+<div class='svc-grid'>
+  <button class='sv a-slate' onclick="location='02-print-hub.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M6 9V3h12v6M6 18h-2a1 1 0 01-1-1v-6a1 1 0 011-1h16a1 1 0 011 1v6a1 1 0 01-1 1h-2M6 15h12v6H6z'/></svg></span>
+    <span class='sv-b'><b>打印扫描</b><span class='sv-s'>上传、扫描与本机出纸</span><em class='ai-t'>AI文件预检</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-teal' onclick="location='05-resume-source.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M7 3h8l4 4v14H7z'/><path d='M15 3v4h4M10 12l2 2 4-4'/></svg></span>
+    <span class='sv-b'><b>AI简历服务</b><span class='sv-s'>诊断、优化、生成与打印</span><em class='ai-t'>AI诊断优化</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-clay' onclick="location='08-jobs-list.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><rect x='3' y='7' width='18' height='13' rx='2'/><path d='M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2M3 12h18'/></svg></span>
+    <span class='sv-b'><b>岗位信息</b><span class='sv-s'>线上平台 + 线下机构双轨</span><em class='ai-t'>AI岗位研判</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-wheat' onclick="location='10-fairs-list.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 21s-7-6.1-7-11a7 7 0 0114 0c0 4.9-7 11-7 11z'/><circle cx='12' cy='10' r='2.5'/></svg></span>
+    <span class='sv-b'><b>招聘会</b><span class='sv-s'>场次信息与现场服务</span><em class='ai-t'>AI材料清单</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-plum' onclick="location='38-interview-setup.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><rect x='9' y='3' width='6' height='11' rx='3'/><path d='M5 11a7 7 0 0014 0M12 18v3'/></svg></span>
+    <span class='sv-b'><b>AI面试训练</b><span class='sv-s'>模拟练习与训练报告</span><em class='ai-t'>AI模拟反馈</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-wheat' onclick="location='12-policy.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20z'/><path d='M9 9h6M9 13h4'/></svg></span>
+    <span class='sv-b'><b>政策服务</b><span class='sv-s'>政策查询与材料指引</span><em class='ai-t'>AI来源解读</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-plum' onclick="location='#'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><rect x='3' y='8' width='18' height='12' rx='2'/><path d='M9 8V6a3 3 0 016 0v2M3 13h18'/></svg></span>
+    <span class='sv-b'><b>百宝箱</b><span class='sv-s'>证件照、文档与实用工具</span><em class='ai-t'>AI受控工具</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+  <button class='sv a-teal' onclick="location='51-smart-campus.html'">
+    <span class='sv-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 3L2 8l10 5 10-5z'/><path d='M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5M22 8v5'/></svg></span>
+    <span class='sv-b'><b>智慧校园</b><span class='sv-s'>校园服务与信息展示</span><em class='ai-t'>AI场景引导</em></span>
+    <svg class='sv-arr' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'><path d='M9 6l6 6-6 6'/></svg>
+  </button>
+</div>
+
+<div class='zone-row'>
+  <button class='zc z-plum'>
+    <div class='z-top'><span class='z-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><rect x='3' y='8' width='18' height='12' rx='2'/><path d='M9 8V6a3 3 0 016 0v2M3 13h18M12 12v3'/></svg></span><div><span class='z-name'>百宝箱</span><span class='z-s'>本机扩展服务，审核后上架</span></div><span class='z-side'><span class='z-tag'>后台可配</span></span></div>
+    <div class='z-chips'><i class='z-chip'>证件照工具</i><i class='z-chip'>文档工具</i><i class='z-chip'>生活服务</i></div>
+  </button>
+  <button class='zc z-teal'>
+    <div class='z-top'><span class='z-ico'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M12 3L2 8l10 5 10-5z'/><path d='M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5M22 8v5'/></svg></span><div><span class='z-name'>智慧校园</span><span class='z-s'>校园终端由校方开启后显示</span></div><span class='z-side'><span class='z-tag'>校方开启</span></span></div>
+    <div class='z-chips'><i class='z-chip'>迎新指引</i><i class='z-chip'>VR校园</i><i class='z-chip'>校园卡办理</i></div>
+  </button>
+</div>
+
+<div class='notice'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><circle cx='12' cy='12' r='9'/><path d='M12 8v5M12 16.5v.5'/></svg>岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。</div>
+
+<nav class='navbar'>
+  <button class='nav-item active'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M3 11l9-7 9 7M5 10v10h5v-6h4v6h5V10'/></svg>首页</button>
+  <button class='nav-item' onclick="location='13-assistant.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><path d='M21 12a8 8 0 01-8 8H4l2-3a8 8 0 1115-5z'/><path d='M9 12h.01M13 12h.01M17 12h.01'/></svg>AI顾问</button>
+  <button class='nav-item' onclick="location='14-profile.html'"><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6'><circle cx='12' cy='8' r='4'/><path d='M4 21a8 8 0 0116 0'/></svg>我的</button>
+</nav>
+</div><script src='shared.js'></script></body></html>
