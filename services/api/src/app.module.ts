@@ -21,6 +21,7 @@ import { HealthController } from './common/health.controller'
 import { ActivityModule } from './activity/activity.module'
 import { CompaniesModule } from './companies/companies.module'
 import { MemberAssetsModule } from './member-assets/member-assets.module'
+import { BundlesModule } from './bundles/bundles.module'
 import { MockInterviewModule } from './mock-interview/mock-interview.module'
 import { MemberFavoritesModule } from './member-favorites/member-favorites.module'
 import { MemberBenefitsModule } from './member-benefits/member-benefits.module'
@@ -93,6 +94,7 @@ const redisUrl = process.env['REDIS_URL']
     ActivityModule,
     CompaniesModule,
     MemberAssetsModule,
+    BundlesModule,
     MockInterviewModule,
     MemberFavoritesModule,
     MemberBenefitsModule,

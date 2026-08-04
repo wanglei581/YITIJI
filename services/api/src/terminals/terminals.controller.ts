@@ -156,4 +156,10 @@ export class TerminalsController {
     res.setHeader('Content-Length', SAMPLE_VISIBLE_PDF.length)
     res.send(SAMPLE_VISIBLE_PDF)
   }
+  // ── C 端：公开终端列表（小程序选门店用，无需鉴权）─────────────────────
+  @Get('terminals/public')
+  listPublicTerminals() {
+    return this.terminalsService.listPublic()
+  }
+
 }

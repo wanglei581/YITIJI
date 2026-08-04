@@ -35,6 +35,7 @@ export {
   SAMPLE_VISIBLE_PDF_SHA256,
 } from './terminals-agent.service'
 
+export type { PublicTerminalView } from './terminals-admin.service'
 export type {
   AdminTerminalView,
   AdminOrganizationOption,
@@ -158,4 +159,8 @@ export class TerminalsService {
   getTerminalPrinterStatus(terminalId: string) {
     return this.admin.getTerminalPrinterStatus(terminalId)
   }
+  listPublic() {
+    return this.adminService.listPublic()
+  }
+
 }

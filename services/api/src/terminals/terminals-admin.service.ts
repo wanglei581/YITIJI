@@ -725,4 +725,24 @@ export class TerminalAdminService {
       isOnline,
     }
   }
+  // ── C 端：公开终端列表（小程序「选择门店」用）──────────────────────────
+  // GET /api/v1/terminals/public  — 无需鉴权，返回上线状态与位置信息
+  async listPublic(): Promise<PublicTerminalView[]> {
+    const ONLINE_MS = 5 * 60 * 1000
+    const rows = await this.prisma.terminal.findMany({
+      where: { enabled: true, lifecycleStatus: 'active' },
+      select: { id: true, displayName: true, locationLabel: true, lastSeenAt: true },
+      orderBy: { lastSeenAt: 'desc' },
+      take: 30,
+    })
+    const now = Date.now()
+    return rows.map(t => ({
+      id:            t.id,
+      displayName:   t.displayName ?? '服务终端',
+      locationLabel: t.locationLabel ?? '位置待配置',
+      isOnline:      now - t.lastSeenAt.getTime() < ONLINE_MS,
+      lastSeenAt:    t.lastSeenAt.toISOString(),
+    }))
+  }
+
 }
