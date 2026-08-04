@@ -204,6 +204,18 @@ export function HelpCenterPage() {
           <p className="k1-help-footer">
             本终端仅提供信息与打印辅助服务，办理结果以官方/来源平台为准。
           </p>
+
+          {/* 网站备案信息 */}
+          <p className="k1-help-footer" style={{ marginTop: 8, opacity: 0.6, fontSize: '0.9em' }}>
+            <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+              鲁ICP备2026023517号-2
+            </a>
+            {' · '}
+            <a href="https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+              鲁公网安备37021402007308号
+            </a>
+            {' · 职易达AI'}
+          </p>
         </div>
       </div>
       </section>

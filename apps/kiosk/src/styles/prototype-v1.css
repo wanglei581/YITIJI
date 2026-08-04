@@ -581,7 +581,7 @@
   display: grid;
   grid-template-columns: 1fr 312px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 .kpv1 .ar-card {
   background: var(--pv-surface);
