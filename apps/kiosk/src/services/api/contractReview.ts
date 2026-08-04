@@ -191,7 +191,7 @@ function mockCreateTask(contractType: ContractType): ContractReviewTaskView {
 }
 
 function mockGetTask(id: string): ContractReviewTaskView {
-  const stages = ['queued', 'extracting', 'awaiting_confirmation', 'rule_checking', 'ai_analyzing', 'completed'] as const
+  const stages = ['queued', 'extracting', 'awaiting_confirmation', 'rule_checking', 'ai_analyzing', 'safety_reviewing', 'completed'] as const
   _mockStep = Math.min(_mockStep + 1, stages.length - 1)
   const status = stages[_mockStep]
   if (status === 'completed') {

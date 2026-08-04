@@ -67,8 +67,10 @@ function makeProviderRuntime(): ContractReviewProviderRuntime {
       env: () => process.env as Record<string, string>,
       approvalGate: SELF_OPERATOR_APPROVAL_GATE,
     })
-  } catch {
-    // 配置不完整时 fail-closed：回退到 blocked runtime，不静默降级到 mock。
+  } catch (err) {
+    // fail-closed：回退到 blocked runtime，但必须记录错误以便运营排查
+    // （区分"未配置 key"和"key 格式错误/provider 初始化失败"两种情形）。
+    console.error('[ContractReviewModule] Provider init failed, falling back to blocked runtime:', err)
     return CONTRACT_REVIEW_BLOCKED_PROVIDER_RUNTIME
   }
 }

@@ -13,7 +13,13 @@ export interface ContractReviewHttpVerificationOverrides {
   queue: ContractReviewQueueService
 }
 
-/** Explicit Task 12 HTTP surface. It remains outside AppModule until all release gates pass. */
+/** Gate 0 已通过（2026-08-04 wanglei 自营签字），HTTP 端点已注册至 AppModule。
+ * 功能开关由 CONTRACT_REVIEW_API_KEY 环境变量控制：
+ *   - 已配置：启用真实 DeepSeek/Qwen provider + BullMQ 队列
+ *   - 未配置：fail-closed，所有 AI 分析请求返回 CONTRACT_PROVIDER_NOT_APPROVED
+ *
+ * @see docs/compliance/contract-review-release-gate.md
+ */
 @Module({
   imports: [ContractReviewModule, JwtVerifierModule, RedisModule],
   controllers: [ContractReviewController],
