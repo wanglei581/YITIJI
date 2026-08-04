@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
+import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -255,6 +256,8 @@ export function ResumeSourcePage() {
         onBack={() => navigate('/')}
         backLabel="返回首页"
       />
+
+      <AiDriverBanner feature="AI简历诊断" description="上传后自动解析结构、识别问题" />
 
       <div className="resume-source-privacy mt-4">
         <ComplianceBanner tone="success" title="隐私保护">

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
 import { AlertCircleIcon } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { AiDriverBanner } from '../../components/AiDriverBanner'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
@@ -489,6 +490,8 @@ export function PrintMaterialCheckPage() {
         backLabel="重新上传"
         onBack={() => navigate(uploadPath)}
       />
+
+      <AiDriverBanner feature="AI文件预检" description="自动检查格式、边距与打印风险" />
 
       <MaterialCheckPresentation
         stage={stage}

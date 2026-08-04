@@ -120,6 +120,106 @@ function HomeWelcome() {
   )
 }
 
+/** AI 接待区（原型 design-d .reception + .ar-card + .device-card）
+ * 作用：让小青主动引导用户描述需求 → 进入 AI 顾问（/assistant）。
+ * 设备状态静态展示就绪状态（无真实 hook 时保持静态）。
+ */
+function HomeReception() {
+  const navigate = useNavigate()
+
+  return (
+    <section className="reception">
+      {/* 左：AI 接待台卡片 */}
+      <div className="ar-card">
+        <div className="ar-top">
+          <span className="ar-badge">
+            <span className="dot" />AI接待台 · 等待目标
+          </span>
+        </div>
+        <p className="ar-h">不知道从哪开始？说出你想办的事</p>
+        <div className="ar-input-row">
+          <div className="ar-input-placeholder">例如：我周五参加招聘会，需要准备简历并打印</div>
+          <button
+            type="button"
+            className="ar-mic"
+            aria-label="语音输入"
+            onClick={() => navigate('/assistant')}
+          >
+            {/* mic 图标不在 ProtoIcon P 表，直接内联 */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+              <path d="M12 2a3 3 0 013 3v6a3 3 0 01-6 0V5a3 3 0 013-3z" />
+              <path d="M19 11a7 7 0 01-14 0M12 18v4M8 22h8" />
+            </svg>
+          </button>
+        </div>
+        <button
+          type="button"
+          className="ar-cta"
+          onClick={() => navigate('/assistant')}
+        >
+          让小青安排
+        </button>
+        <p className="ar-hint">将进入 AI 顾问，由你确认办理方案</p>
+        <div className="ar-chips">
+          <button type="button" className="ar-chip" onClick={() => navigate('/assistant', { state: { topic: 'resume' } })}>
+            <ProtoIcon name="diagnose" />优化简历并打印
+          </button>
+          <button type="button" className="ar-chip" onClick={() => navigate('/assistant', { state: { topic: 'jobfair' } })}>
+            <ProtoIcon name="fair-social" />准备招聘会材料
+          </button>
+          <button type="button" className="ar-chip" onClick={() => navigate('/print/upload')}>
+            <ProtoIcon name="printer" />打印手机里的文件
+          </button>
+        </div>
+      </div>
+      {/* 右：本机能力卡片 */}
+      <div className="device-card">
+        <h3>本机办结能力</h3>
+        <p className="dc-sub">AI 调用设备，现场完成</p>
+        <div className="dc-items">
+          <div className="dc-item">
+            <div className="dc-left">
+              <ProtoIcon name="printer" /><span>文档打印就绪</span>
+            </div>
+            <span className="dc-dot" />
+          </div>
+          <div className="dc-item">
+            <div className="dc-left">
+              <ProtoIcon name="scan" /><span>材料扫描就绪</span>
+            </div>
+            <span className="dc-dot" />
+          </div>
+          <div className="dc-item">
+            <div className="dc-left">
+              <ProtoIcon name="id-copy" /><span>自动双面可用</span>
+            </div>
+            <span className="dc-dot" />
+          </div>
+        </div>
+        <div className="dc-footer">
+          <ProtoIcon name="info" />设备状态实时检测
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/** AI 能力调度分隔条（原型 design-d .dispatch） */
+function HomeDispatch() {
+  return (
+    <div className="dispatch">
+      <div className="d-line" />
+      <span className="d-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
+          <path d="M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z" />
+        </svg>
+        AI 能力调度
+      </span>
+      <div className="d-line" />
+    </div>
+  )
+}
+
 /* ── 单个服务卡（原型统一 .tile 网格；废弃 primary/secondary 两级） ── */
 function ServiceCard({ group }: { group: ServiceGroup }) {
   const navigate = useNavigate()
@@ -304,6 +404,8 @@ export function HomePage() {
       {/* 继续上次：原型外生产动态状态。ContinuePanel 自门控——仅登录且确有可恢复任务
           （进行中打印/已诊断未优化简历）时渲染；无任务或匿名 → 返回 null，首页与原型 1:1。 */}
       <ContinuePanel />
+      <HomeReception />
+      <HomeDispatch />
       <div className="groups" aria-label="当前可使用功能">
         {groups.map((group) => (
           <ServiceCard key={group.id} group={group} />
