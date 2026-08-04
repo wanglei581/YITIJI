@@ -26,8 +26,8 @@ export class FilesCleanupTask {
       if (result.deletedCount > 0) {
         this.logger.log(`Hourly cron: cleaned up ${result.deletedCount} expired files`)
       }
-    } catch (err) {
-      this.logger.error(`Hourly cleanup failed: ${(err as Error).message}`)
+    } catch {
+      this.logger.error('code=FILE_CLEANUP_BATCH_FAILED')
     }
   }
 }

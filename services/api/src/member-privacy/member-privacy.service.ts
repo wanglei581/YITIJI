@@ -1,42 +1,172 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common'
-import { PrismaService } from '../prisma/prisma.service'
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
+import { PrismaService, type PrismaTransactionClient } from '../prisma/prisma.service'
 import type { MemberAiConsentScope, MemberAiConsentStatus } from './member-privacy.types'
 
 export const CURRENT_JOB_AI_CONSENT_VERSION = '20260701'
+export const CONSENT_VERSION_BY_SCOPE: Readonly<Record<MemberAiConsentScope, string>> = {
+  job_ai: CURRENT_JOB_AI_CONSENT_VERSION,
+  contract_review: 'contract-review-consent-v1',
+}
 
-const CONSENT_SCOPES = new Set<MemberAiConsentScope>(['job_ai'])
+const CONSENT_SCOPES = [
+  'job_ai',
+  'contract_review',
+] as const satisfies readonly MemberAiConsentScope[]
+const CONSENT_SCOPE_SET: ReadonlySet<string> = new Set(CONSENT_SCOPES)
+const CONTRACT_REVIEW_PROCESSING_STATUSES = [
+  'uploaded',
+  'queued',
+  'extracting',
+  'awaiting_confirmation',
+  'rule_checking',
+  'ai_analyzing',
+  'safety_reviewing',
+] as const
+
+export interface ConsentTruthEvent {
+  id: string
+  consentVersion: string
+  grantedAt: Date
+  revokedAt: Date | null
+}
+
+interface SerializableTransactionHost {
+  readonly dbKind?: 'sqlite' | 'postgres'
+  $transaction<R>(
+    operation: (tx: PrismaTransactionClient) => Promise<R>,
+    options?: { isolationLevel: 'Serializable' }
+  ): Promise<R>
+}
+
+export const SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS = 3
+
+export class SerializableTransactionRetryExhaustedError extends Error {
+  constructor() {
+    super('SERIALIZABLE_TRANSACTION_RETRY_EXHAUSTED')
+    this.name = 'SerializableTransactionRetryExhaustedError'
+  }
+}
+
+export function isPrismaSerializationConflict(error: unknown): boolean {
+  return Boolean(
+    error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'P2034'
+  )
+}
+
+/**
+ * PostgreSQL uses true Serializable transactions. Prisma's SQLite adapter does not expose a
+ * portable isolationLevel option, so local SQLite verification deliberately omits that option.
+ * The real two-connection concurrency gate belongs to the PostgreSQL integration suite.
+ */
+export async function runSerializableTransaction<R>(
+  prisma: SerializableTransactionHost,
+  operation: (tx: PrismaTransactionClient) => Promise<R>
+): Promise<R> {
+  for (let attempt = 1; attempt <= SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      return prisma.dbKind === 'postgres'
+        ? await prisma.$transaction(operation, { isolationLevel: 'Serializable' })
+        : await prisma.$transaction(operation)
+    } catch (error) {
+      if (!isPrismaSerializationConflict(error)) throw error
+      if (attempt === SERIALIZABLE_TRANSACTION_MAX_ATTEMPTS) {
+        throw new SerializableTransactionRetryExhaustedError()
+      }
+    }
+  }
+  throw new SerializableTransactionRetryExhaustedError()
+}
+
+export function consentVersionForScope(scope: MemberAiConsentScope): string {
+  if (!CONSENT_SCOPE_SET.has(scope)) {
+    throw new BadRequestException({
+      error: { code: 'INVALID_AI_CONSENT_SCOPE', message: 'AI 授权范围不支持' },
+    })
+  }
+  return CONSENT_VERSION_BY_SCOPE[scope]
+}
 
 @Injectable()
 export class MemberPrivacyService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getConsentStatus(endUserId: string): Promise<MemberAiConsentStatus[]> {
-    const latest = await this.prisma.userAiConsent.findFirst({
-      where: { endUserId, scope: 'job_ai' },
-      orderBy: { grantedAt: 'desc' },
-    })
-    return [this.consentStatus('job_ai', latest ?? null)]
+    return Promise.all(
+      CONSENT_SCOPES.map(async (scope) => {
+        const latest = await this.latestConsentEvent(endUserId, scope)
+        return this.consentStatus(scope, latest)
+      })
+    )
   }
 
   async grantConsent(
     endUserId: string,
     scope: MemberAiConsentScope,
-    terminalId: string | null,
+    terminalId: string | null
   ): Promise<MemberAiConsentStatus> {
     this.assertScope(scope)
+    const consentVersion = consentVersionForScope(scope)
+    // Grant is an append-only authorization event; previous grant rows remain as history.
     const row = await this.prisma.userAiConsent.create({
       data: {
         endUserId,
         scope,
-        consentVersion: CURRENT_JOB_AI_CONSENT_VERSION,
+        consentVersion,
         terminalId,
       },
     })
     return this.consentStatus(scope, row)
   }
 
-  async revokeConsent(endUserId: string, scope: MemberAiConsentScope): Promise<{ revoked: true; count: number }> {
+  async revokeConsent(
+    endUserId: string,
+    scope: MemberAiConsentScope
+  ): Promise<{ revoked: true; count: number }> {
     this.assertScope(scope)
+    if (scope === 'contract_review') {
+      try {
+        const count = await runSerializableTransaction(this.prisma, async (tx) => {
+          const consentResult = await tx.userAiConsent.updateMany({
+            where: { endUserId, scope, revokedAt: null },
+            data: { revokedAt: new Date() },
+          })
+          await tx.contractReviewTask.updateMany({
+            where: {
+              endUserId,
+              status: { in: [...CONTRACT_REVIEW_PROCESSING_STATUSES] },
+            },
+            data: { status: 'cancelled' },
+          })
+          return consentResult.count
+        })
+        return { revoked: true, count }
+      } catch (error) {
+        if (error instanceof SerializableTransactionRetryExhaustedError) {
+          throw new ServiceUnavailableException({
+            error: {
+              code: 'CONTRACT_REVIEW_TRANSACTION_RETRY',
+              message: '请求冲突，请稍后重试',
+              retryable: true,
+            },
+          })
+        }
+        throw new InternalServerErrorException({
+          error: {
+            code: 'CONTRACT_REVIEW_CONSENT_REVOKE_FAILED',
+            message: '撤回合同审查授权失败，请稍后重试',
+          },
+        })
+      }
+    }
     const result = await this.prisma.userAiConsent.updateMany({
       where: { endUserId, scope, revokedAt: null },
       data: { revokedAt: new Date() },
@@ -50,44 +180,78 @@ export class MemberPrivacyService {
       throw new ForbiddenException({
         error: {
           code: 'USER_AI_CONSENT_REQUIRED',
-          message: '请登录并确认 AI 简历分析授权后再使用岗位推荐',
+          message:
+            scope === 'job_ai'
+              ? '请登录并确认 AI 简历分析授权后再使用岗位推荐'
+              : '请登录并确认合同审查 AI 授权后再使用合同审查',
         },
       })
     }
-    const consent = await this.prisma.userAiConsent.findFirst({
-      where: {
-        endUserId,
-        scope,
-        consentVersion: CURRENT_JOB_AI_CONSENT_VERSION,
-        revokedAt: null,
-      },
-      orderBy: { grantedAt: 'desc' },
-      select: { id: true },
-    })
-    if (!consent) {
-      throw new ForbiddenException({
-        error: {
-          code: 'USER_AI_CONSENT_REQUIRED',
-          message: '请先确认 AI 简历分析授权',
-        },
-      })
-    }
+    const latest = await this.latestConsentEvent(endUserId, scope)
+    this.assertActiveConsent(scope, latest)
+  }
+
+  async requireActiveConsentInTransaction(
+    tx: PrismaTransactionClient,
+    endUserId: string,
+    scope: MemberAiConsentScope
+  ): Promise<ConsentTruthEvent> {
+    this.assertScope(scope)
+    const latest = await this.latestConsentEventFrom(tx, endUserId, scope)
+    this.assertActiveConsent(scope, latest)
+    return latest as ConsentTruthEvent
   }
 
   private assertScope(scope: string): asserts scope is MemberAiConsentScope {
-    if (!CONSENT_SCOPES.has(scope as MemberAiConsentScope)) {
-      throw new BadRequestException({ error: { code: 'INVALID_AI_CONSENT_SCOPE', message: 'AI 授权范围不支持' } })
-    }
+    consentVersionForScope(scope as MemberAiConsentScope)
+  }
+
+  private latestConsentEvent(
+    endUserId: string,
+    scope: MemberAiConsentScope
+  ): Promise<ConsentTruthEvent | null> {
+    return this.latestConsentEventFrom(this.prisma, endUserId, scope)
+  }
+
+  private latestConsentEventFrom(
+    client: Pick<PrismaTransactionClient, 'userAiConsent'>,
+    endUserId: string,
+    scope: MemberAiConsentScope
+  ): Promise<ConsentTruthEvent | null> {
+    return client.userAiConsent.findFirst({
+      where: { endUserId, scope },
+      orderBy: [{ grantedAt: 'desc' }, { id: 'desc' }],
+      select: {
+        id: true,
+        consentVersion: true,
+        grantedAt: true,
+        revokedAt: true,
+      },
+    })
+  }
+
+  private assertActiveConsent(
+    scope: MemberAiConsentScope,
+    latest: ConsentTruthEvent | null
+  ): asserts latest is ConsentTruthEvent {
+    if (this.consentStatus(scope, latest).granted) return
+    throw new ForbiddenException({
+      error: {
+        code: 'USER_AI_CONSENT_REQUIRED',
+        message: scope === 'job_ai' ? '请先确认 AI 简历分析授权' : '请先确认合同审查 AI 授权',
+      },
+    })
   }
 
   private consentStatus(
     scope: MemberAiConsentScope,
-    row: { consentVersion: string; grantedAt: Date; revokedAt: Date | null } | null,
+    row: ConsentTruthEvent | null
   ): MemberAiConsentStatus {
-    const granted = Boolean(row && row.consentVersion === CURRENT_JOB_AI_CONSENT_VERSION && !row.revokedAt)
+    const consentVersion = consentVersionForScope(scope)
+    const granted = Boolean(row && row.consentVersion === consentVersion && !row.revokedAt)
     return {
       scope,
-      consentVersion: CURRENT_JOB_AI_CONSENT_VERSION,
+      consentVersion,
       granted,
       grantedAt: row ? row.grantedAt.toISOString() : null,
       revokedAt: row?.revokedAt ? row.revokedAt.toISOString() : null,

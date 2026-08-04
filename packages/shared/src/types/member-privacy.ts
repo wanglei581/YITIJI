@@ -1,6 +1,16 @@
 export const END_USER_STATUSES = ['active', 'disabled', 'closing', 'anonymized'] as const
 export type EndUserStatus = (typeof END_USER_STATUSES)[number]
 
+export type MemberAiConsentScope = 'job_ai' | 'contract_review'
+
+export interface MemberAiConsentStatus {
+  scope: MemberAiConsentScope
+  consentVersion: string
+  granted: boolean
+  grantedAt: string | null
+  revokedAt: string | null
+}
+
 export const MEMBER_STEP_UP_ACTIONS = [
   'export_data_request',
   'export_data_download',

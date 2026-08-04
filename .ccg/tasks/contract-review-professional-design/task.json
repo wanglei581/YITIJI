@@ -1,0 +1,12 @@
+{
+  "id": "contract-review-professional-design",
+  "title": "设计面向求职者的 AI 合同审查专业方案",
+  "status": "in_progress",
+  "complexity": "L+",
+  "risk": "high",
+  "domain": "fullstack-legal-ai",
+  "currentPhase": "implementation",
+  "nextAction": "执行 Task 13 Kiosk 易失会话、五步流程与既有百宝箱入口接线",
+  "createdAt": "2026-08-01T10:48:32Z",
+  "branch": "codex/contract-review-p0"
+}

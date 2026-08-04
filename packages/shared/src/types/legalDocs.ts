@@ -6,5 +6,13 @@
  */
 export const LEGAL_DRAFT_FALLBACK_VERSION = 'draft-pending-legal-review'
 
+export const LEGAL_DOC_TYPES = [
+  'privacy_policy',
+  'terms_of_service',
+  'ai_disclaimer',
+  'contract_review_disclaimer',
+] as const
+export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
+
 export const LEGAL_CONSENT_DOC_TYPES = ['terms_of_service', 'privacy_policy'] as const
 export type LegalConsentDocType = (typeof LEGAL_CONSENT_DOC_TYPES)[number]

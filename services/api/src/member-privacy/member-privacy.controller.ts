@@ -25,7 +25,12 @@ function terminalIdOf(req: ReqLike): string | null {
 }
 
 class GrantAiConsentDto {
-  @IsIn(['job_ai'])
+  @IsIn(['job_ai', 'contract_review'])
+  scope!: MemberAiConsentScope
+}
+
+class RevokeAiConsentParamsDto {
+  @IsIn(['job_ai', 'contract_review'])
   scope!: MemberAiConsentScope
 }
 
@@ -62,14 +67,19 @@ export class MemberPrivacyController {
   async grantConsent(
     @CurrentEndUser() user: AuthedEndUser,
     @Body() dto: GrantAiConsentDto,
-    @Req() req: ReqLike,
+    @Req() req: ReqLike
   ) {
-    return ApiResponse.ok(await this.privacy.grantConsent(user.endUserId, dto.scope, terminalIdOf(req)))
+    return ApiResponse.ok(
+      await this.privacy.grantConsent(user.endUserId, dto.scope, terminalIdOf(req))
+    )
   }
 
   @Post(':scope/revoke')
-  async revokeConsent(@CurrentEndUser() user: AuthedEndUser, @Param('scope') scope: MemberAiConsentScope) {
-    return ApiResponse.ok(await this.privacy.revokeConsent(user.endUserId, scope))
+  async revokeConsent(
+    @CurrentEndUser() user: AuthedEndUser,
+    @Param() params: RevokeAiConsentParamsDto
+  ) {
+    return ApiResponse.ok(await this.privacy.revokeConsent(user.endUserId, params.scope))
   }
 }
 

@@ -1,7 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
-export const LEGAL_DOC_TYPES = ['privacy_policy', 'terms_of_service', 'ai_disclaimer'] as const
+export const LEGAL_DOC_TYPES = [
+  'privacy_policy',
+  'terms_of_service',
+  'ai_disclaimer',
+  'contract_review_disclaimer',
+] as const
 export type LegalDocType = (typeof LEGAL_DOC_TYPES)[number]
 
 export interface LegalDocActiveView {

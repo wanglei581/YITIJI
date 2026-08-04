@@ -28,8 +28,14 @@ import type { CreateScanTaskDto } from './dto/create-scan-task.dto'
  *   1. packages/shared/src/types/scanTask.ts(前端 SSOT)
  *   2. 本文件(后端副本)
  */
-export type ScanType = 'resume' | 'id' | 'document'
-export type ScanTaskStatus = 'waiting' | 'matched' | 'completed' | 'failed' | 'expired' | 'cancelled'
+export type ScanType = 'resume' | 'id' | 'document' | 'contract'
+export type ScanTaskStatus =
+  | 'waiting'
+  | 'matched'
+  | 'completed'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
 
 const SCAN_TASK_TTL_MS = 10 * 60 * 1000
 /** 建档后签发的内容 URL 有效期，与打印/上传会话链路同一惯例（30 分钟）。 */
@@ -78,10 +84,11 @@ const SCAN_MATCHED_HEARTBEAT_INTERVAL_MS = 60 * 1000
  */
 export const SCAN_CONTENT_DEDUP_WINDOW_MS = 2 * 60 * 60 * 1000
 
-const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
+export const SCAN_TYPE_TO_PURPOSE: Record<ScanType, FilePurpose> = {
   resume: 'resume_scan',
   id: 'id_scan',
   document: 'print_doc',
+  contract: 'contract_upload',
 }
 
 // 面向用户的失败原因必须是白名单文案，绝不透出内部错误细节（对齐 print-jobs.service.ts 同类做法）。
@@ -112,6 +119,12 @@ const SCAN_TYPE_INSTRUCTIONS: Record<ScanType, string[]> = {
     '多页材料放入自动进纸器，单页证书放在玻璃板上',
     '在打印机操作面板打开「扫描」，并选择扫描到网络 / SMB（本机已配置的接收目录）',
     '按「开始」扫描；整叠扫完后回到本屏幕等待自动生成 PDF，请勿关闭页面',
+  ],
+  contract: [
+    '将合同或协议按页序放入自动进纸器，单页材料正面朝下对齐玻璃板左上角',
+    '在打印机操作面板打开「扫描」，分辨率建议 300 DPI',
+    '选择扫描到网络 / SMB（本机已配置的接收目录）后按「开始」',
+    '完成后回到本屏幕等待处理，请勿关闭页面或离开当前会话',
   ],
 }
 
@@ -157,7 +170,10 @@ function isScanTaskActiveSessionConflict(e: unknown): boolean {
  * Buffer 长度不同而抛异常（那样反而会把"长度不同"这个信息通过异常/耗时差异暴露出去，
  * 且会变成未处理异常而不是可控的 403）。
  */
-function timingSafeEqualHex(token: string | undefined, expectedHash: string | null | undefined): boolean {
+function timingSafeEqualHex(
+  token: string | undefined,
+  expectedHash: string | null | undefined
+): boolean {
   if (!token || !expectedHash) return false
   const actual = Buffer.from(createHash('sha256').update(token).digest('hex'), 'hex')
   const expected = Buffer.from(expectedHash, 'hex')
@@ -171,23 +187,32 @@ export class ScanTasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly files: FilesService,
-    private readonly capabilities: TerminalCapabilitiesService,
+    private readonly capabilities: TerminalCapabilitiesService
   ) {}
 
   async create(
     dto: CreateScanTaskDto,
-    endUserId: string | null,
-  ): Promise<{ scanTaskId: string; controlToken: string; expiresAt: string; instructions: string[] }> {
+    endUserId: string | null
+  ): Promise<{
+    scanTaskId: string
+    controlToken: string
+    expiresAt: string
+    instructions: string[]
+  }> {
     const terminalRef = dto.terminalId.trim()
     const terminal = await this.prisma.terminal.findFirst({
       where: { OR: [{ id: terminalRef }, { terminalCode: terminalRef }] },
       select: { id: true, enabled: true, lifecycleStatus: true },
     })
     if (!terminal) {
-      throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_NOT_FOUND', message: '目标终端不存在' } })
+      throw new BadRequestException({
+        error: { code: 'SCAN_TERMINAL_NOT_FOUND', message: '目标终端不存在' },
+      })
     }
     if (!terminal.enabled) {
-      throw new BadRequestException({ error: { code: 'SCAN_TERMINAL_DISABLED', message: '目标终端已停用' } })
+      throw new BadRequestException({
+        error: { code: 'SCAN_TERMINAL_DISABLED', message: '目标终端已停用' },
+      })
     }
 
     if (terminal.lifecycleStatus !== 'active') {
@@ -215,7 +240,10 @@ export class ScanTasksService {
         })
         if (activeLock.count !== 1) {
           throw new BadRequestException({
-            error: { code: 'SCAN_TERMINAL_NOT_ACTIVE', message: '目标终端状态已变化，当前不可创建新扫描任务' },
+            error: {
+              code: 'SCAN_TERMINAL_NOT_ACTIVE',
+              message: '目标终端状态已变化，当前不可创建新扫描任务',
+            },
           })
         }
         return tx.scanTask.create({
@@ -233,7 +261,10 @@ export class ScanTasksService {
       if (isScanTaskActiveSessionConflict(e)) {
         // B1-2 的 partial unique index 命中：该终端已有一个 waiting/matched 中的会话。
         throw new ConflictException({
-          error: { code: 'SCAN_TERMINAL_BUSY', message: '该终端当前有正在进行的扫描，请稍后重试或联系工作人员' },
+          error: {
+            code: 'SCAN_TERMINAL_BUSY',
+            message: '该终端当前有正在进行的扫描，请稍后重试或联系工作人员',
+          },
         })
       }
       throw e
@@ -250,44 +281,65 @@ export class ScanTasksService {
   async getStatus(
     scanTaskId: string,
     endUserId: string | null,
-    controlToken: string | undefined,
+    controlToken: string | undefined
   ): Promise<ScanTaskStatusResult> {
-    const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+    let task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
-      throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+      throw new NotFoundException({
+        error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+      })
     }
-    // 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在下面的
-    // endUserId 归属校验之上（不是替代它）。历史行（B1-1 迁移前创建，
-    // controlTokenHash 为 null）一律拒绝——旧任务本来就该在几分钟内自然过期，
-    // 拒绝比"放行一个没有 token 保护的旧任务"更安全。
-    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
-      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
-    }
-    if (task.endUserId && task.endUserId !== endUserId) {
-      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' } })
+    this.assertTaskReadAccess(task, endUserId, controlToken)
+
+    let effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
+    if (effectiveStatus === 'expired' && (task.status === 'waiting' || task.status === 'matched')) {
+      // CAS：只在状态仍与本次读取一致时落盘，避免与并发的 cancel()/deliverScanFile() 竞态时
+      // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
+      // CAS 成功时返回逻辑 expired；失败时必须重读竞态胜者，不能继续返回旧快照。
+      const expired = await this.prisma.scanTask.updateMany({
+        where: { id: scanTaskId, status: task.status },
+        data: { status: 'expired' },
+      })
+      if (expired.count === 0) {
+        const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
+        if (!latest) {
+          throw new NotFoundException({
+            error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+          })
+        }
+        // CAS 失败说明并发请求已改变状态。只重读一次最新快照，
+        // 后续文件查询与响应均以它为准，不递归重试、不覆盖终态。
+        this.assertTaskReadAccess(latest, endUserId, controlToken)
+        task = latest
+        effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
+      }
     }
 
-    const effectiveStatus = this.effectiveStatus(task.status, task.expiresAt)
-    if (effectiveStatus === 'expired' && task.status === 'waiting') {
-      // CAS：只在仍是 waiting 时落盘过期状态，避免与并发的 cancel()/deliverScanFile() 竞态时
-      // 用无条件 update 把已经被其它请求改成 cancelled/matched/completed 的行覆盖回 expired。
-      // 返回给调用方的 effectiveStatus 已经是按 expiresAt 纯计算得出，不依赖这次落盘是否成功。
-      await this.prisma.scanTask.updateMany({ where: { id: scanTaskId, status: 'waiting' }, data: { status: 'expired' } })
+    const fileObject =
+      task.status === 'completed' && task.fileId
+        ? await this.prisma.fileObject.findUnique({ where: { id: task.fileId } })
+        : null
+    const contractFileUnavailable =
+      task.scanType === 'contract' &&
+      task.status === 'completed' &&
+      (!fileObject ||
+        Boolean(fileObject.deletedAt) ||
+        !fileObject.expiresAt ||
+        fileObject.expiresAt.getTime() <= Date.now())
+    if (contractFileUnavailable) {
+      effectiveStatus = 'expired'
     }
 
     let file: ScanTaskFileView | null = null
-    if (effectiveStatus === 'completed' && task.fileId) {
-      const fileObject = await this.prisma.fileObject.findUnique({ where: { id: task.fileId } })
-      if (fileObject && !fileObject.deletedAt) {
-        const signed = signFileUrl(fileObject.id, SCAN_FILE_URL_TTL_MS)
-        file = {
-          fileId: fileObject.id,
-          filename: fileObject.filename,
-          sizeBytes: fileObject.sizeBytes,
-          mimeType: fileObject.mimeType,
-          sha256: fileObject.sha256,
-          fileUrl: signed.url,
-        }
+    if (effectiveStatus === 'completed' && fileObject && !fileObject.deletedAt) {
+      const signed = signFileUrl(fileObject.id, SCAN_FILE_URL_TTL_MS)
+      file = {
+        fileId: fileObject.id,
+        filename: fileObject.filename,
+        sizeBytes: fileObject.sizeBytes,
+        mimeType: fileObject.mimeType,
+        sha256: fileObject.sha256,
+        fileUrl: signed.url,
       }
     }
 
@@ -297,7 +349,9 @@ export class ScanTasksService {
       scanType: task.scanType as ScanType,
       file,
       errorCode: task.errorCode,
-      errorMessage: task.errorCode ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试') : null,
+      errorMessage: task.errorCode
+        ? (USER_FACING_SCAN_ERROR[task.errorCode] ?? '扫描处理失败，请重试')
+        : null,
       expiresAt: task.expiresAt.toISOString(),
     }
   }
@@ -305,22 +359,34 @@ export class ScanTasksService {
   async cancel(
     scanTaskId: string,
     endUserId: string | null,
-    controlToken: string | undefined,
+    controlToken: string | undefined
   ): Promise<{ scanTaskId: string; status: 'cancelled' }> {
     const task = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
     if (!task) {
-      throw new NotFoundException({ error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' } })
+      throw new NotFoundException({
+        error: { code: 'SCAN_TASK_NOT_FOUND', message: '扫描任务不存在' },
+      })
     }
     // 同 getStatus()：controlToken 校验叠加在 endUserId 校验之上，会员+游客一视同仁；
     // 历史行（controlTokenHash 为 null）一律拒绝。
-    if (!task.controlTokenHash || !controlToken || !timingSafeEqualHex(controlToken, task.controlTokenHash)) {
-      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })
+    if (
+      !task.controlTokenHash ||
+      !controlToken ||
+      !timingSafeEqualHex(controlToken, task.controlTokenHash)
+    ) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
+      })
     }
     if (task.endUserId && task.endUserId !== endUserId) {
-      throw new ForbiddenException({ error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' } })
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权取消该扫描任务' },
+      })
     }
     if (task.status === 'completed') {
-      throw new BadRequestException({ error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } })
+      throw new BadRequestException({
+        error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' },
+      })
     }
     const cancelled = await this.prisma.scanTask.updateMany({
       where: { id: scanTaskId, status: { in: ['waiting', 'matched'] } },
@@ -331,10 +397,15 @@ export class ScanTasksService {
       // 不能盲目宣称已取消——重新读取真实状态并诚实报告。
       const latest = await this.prisma.scanTask.findUnique({ where: { id: scanTaskId } })
       if (latest?.status === 'completed') {
-        throw new BadRequestException({ error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' } })
+        throw new BadRequestException({
+          error: { code: 'SCAN_TASK_ALREADY_COMPLETED', message: '任务已完成，无法取消' },
+        })
       }
       throw new ConflictException({
-        error: { code: 'SCAN_TASK_CANCEL_CONFLICT', message: '任务状态已变化，取消失败，请刷新重试' },
+        error: {
+          code: 'SCAN_TASK_CANCEL_CONFLICT',
+          message: '任务状态已变化，取消失败，请刷新重试',
+        },
       })
     }
     return { scanTaskId, status: 'cancelled' }
@@ -366,14 +437,17 @@ export class ScanTasksService {
    * 的状态变更打架。心跳写入本身失败（例如瞬时 DB 抖动）只记 warn 日志、绝不 rethrow——
    * 不能让一次心跳失败打断一个本来会成功的上传。
    */
-  private startMatchedHeartbeat(taskId: string, intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS): NodeJS.Timeout {
+  private startMatchedHeartbeat(
+    taskId: string,
+    intervalMs: number = SCAN_MATCHED_HEARTBEAT_INTERVAL_MS
+  ): NodeJS.Timeout {
     return setInterval(() => {
       this.prisma.scanTask
         .updateMany({ where: { id: taskId, status: 'matched' }, data: { updatedAt: new Date() } })
         .catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err)
           this.logger.warn(
-            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`,
+            `scan task ${taskId}: matched-state heartbeat tick failed (non-fatal, upload continues): ${message}`
           )
         })
     }, intervalMs)
@@ -414,7 +488,10 @@ export class ScanTasksService {
       })
       if (duplicate) {
         throw new ConflictException({
-          error: { code: 'SCAN_FILE_ALREADY_DELIVERED', message: '该扫描文件此前已成功投递，请勿重复上传' },
+          error: {
+            code: 'SCAN_FILE_ALREADY_DELIVERED',
+            message: '该扫描文件此前已成功投递，请勿重复上传',
+          },
         })
       }
     }
@@ -424,7 +501,9 @@ export class ScanTasksService {
       orderBy: { createdAt: 'asc' },
     })
     if (!task) {
-      throw new ConflictException({ error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' } })
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
     }
 
     // CAS：先把任务标记为 matched，防止同一文件的重复投递请求并发匹配到同一任务。
@@ -433,7 +512,9 @@ export class ScanTasksService {
       data: { status: 'matched', matchedFileMtime: now },
     })
     if (claimed.count === 0) {
-      throw new ConflictException({ error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' } })
+      throw new ConflictException({
+        error: { code: 'NO_WAITING_SCAN_TASK', message: '没有匹配的等待中扫描任务' },
+      })
     }
 
     // B1-10：心跳必须在 CAS-to-matched 成功后、上传真正开始前启动，且无论下面的上传
@@ -461,14 +542,18 @@ export class ScanTasksService {
         // 补偿删除本身失败（例如文件已经被其它路径删掉）不能打断这里原本要走的
         // 取消响应流程，只降级为一条 warn，不 rethrow。
         try {
-          await this.files.systemDelete(uploaded.fileId, 'ScanTask cancelled during upload, compensating orphaned file')
+          await this.files.systemDelete(
+            uploaded.fileId,
+            'ScanTask cancelled during upload, compensating orphaned file'
+          )
           this.logger.log(
-            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`,
+            `scan task ${task.id} was no longer 'matched' after upload completed (likely cancelled concurrently); orphaned file ${uploaded.fileId} deleted via compensating systemDelete()`
           )
         } catch (cleanupError) {
-          const cleanupMessage = cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          const cleanupMessage =
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
           this.logger.warn(
-            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`,
+            `scan task ${task.id}: compensating systemDelete() failed for orphaned file ${uploaded.fileId}: ${cleanupMessage}`
           )
         }
         throw new ConflictException({
@@ -491,7 +576,34 @@ export class ScanTasksService {
   }
 
   private effectiveStatus(status: string, expiresAt: Date): string {
-    if (status === 'waiting' && expiresAt.getTime() <= Date.now()) return 'expired'
+    if ((status === 'waiting' || status === 'matched') && expiresAt.getTime() <= Date.now()) {
+      return 'expired'
+    }
     return status
+  }
+
+  /**
+   * 会员 + 游客一视同仁：controlToken 是纵深防御的第二层校验，叠加在
+   * endUserId 归属校验之上。重读竞态胜者后也必须对最新快照重新校验。
+   */
+  private assertTaskReadAccess(
+    task: { controlTokenHash: string | null; endUserId: string | null },
+    endUserId: string | null,
+    controlToken: string | undefined
+  ): void {
+    if (
+      !task.controlTokenHash ||
+      !controlToken ||
+      !timingSafeEqualHex(controlToken, task.controlTokenHash)
+    ) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
+      })
+    }
+    if (task.endUserId && task.endUserId !== endUserId) {
+      throw new ForbiddenException({
+        error: { code: 'SCAN_TASK_FORBIDDEN', message: '无权查看该扫描任务' },
+      })
+    }
   }
 }

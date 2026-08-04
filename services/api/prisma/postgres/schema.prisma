@@ -534,6 +534,7 @@ model EndUser {
   legalConsents   MemberLegalConsent[]
   dataRequests    UserDataRequest[]
   scanTasks       ScanTask[]
+  contractReviewTasks ContractReviewTask[]
 
   @@index([status])
 }
@@ -866,6 +867,45 @@ model DocumentProcessTask {
   @@index([resultFileId])
   @@index([endUserId])
   @@index([expiresAt])
+}
+
+model ContractReviewTask {
+  id String @id @default(cuid())
+  endUserId String?
+  endUser EndUser? @relation(fields: [endUserId], references: [id], onDelete: SetNull)
+  accessTokenHash String?
+  sourceFileId String
+  resultFileId String?
+  contractType String
+  status String @default("uploaded")
+  consentVersion String
+  consentedAt DateTime
+  consentScopeHash String
+  disclaimerVersion String
+  rulePackVersion String
+  schemaVersion String
+  extractionFingerprint String?
+  confirmedAt DateTime?
+  ocrProvider String?
+  ocrConfidence String?
+  analyzedPages Int @default(0)
+  totalPages Int?
+  truncated Boolean @default(false)
+  professionalConsultationRecommended Boolean @default(false)
+  aiProvider String?
+  aiModel String?
+  resultJson String?
+  errorCode String?
+  errorMessage String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([endUserId, createdAt])
+  @@index([accessTokenHash])
+  @@index([status, updatedAt])
+  @@index([expiresAt])
+  @@index([sourceFileId])
 }
 
 // PII 命中项仅归属于材料处理任务,任务删除时级联删除。

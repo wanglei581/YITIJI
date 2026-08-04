@@ -56,7 +56,14 @@ const MIME_EXTS: Record<string, string[]> = {
   'application/json': ['json'],
 }
 
-const PDF_DOC_IMG = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png', 'image/webp']
+const PDF_DOC_IMG = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]
 const IMG = ['image/jpeg', 'image/png', 'image/webp']
 const VIDEO = ['video/mp4', 'video/webm']
 const PRINTABLE = ['application/pdf', 'image/jpeg', 'image/png']
@@ -82,6 +89,8 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   screensaver_material: { mimes: [...IMG, ...VIDEO], maxBytes: 500 * MB },
   admin_upload: { mimes: [...PDF_DOC_IMG, ...VIDEO], maxBytes: 500 * MB },
   temp: { mimes: [...PRINTABLE, 'image/webp'], maxBytes: 20 * MB },
+  // 合同审查原件:仅用于会话级提取/分析，留存由 retention-policy.ts 锁定为两小时。
+  contract_upload: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
   // 签名/印章图片:仅供签章合成读取,高敏、系统短期、锁定不可延期(见 retention-policy.ts)
   signature_image: { mimes: ['image/jpeg', 'image/png'], maxBytes: 10 * MB },
   member_data_export: {
@@ -113,6 +122,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   screensaver_material: 'normal',
   admin_upload: 'normal',
   temp: 'sensitive',
+  contract_upload: 'highly_sensitive',
   signature_image: 'highly_sensitive',
   member_data_export: MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel,
   self_assessment_report: 'sensitive',
@@ -122,7 +132,10 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
 export function extFromFilename(filename: string): string {
   const dot = (filename ?? '').lastIndexOf('.')
   if (dot < 0 || dot >= filename.length - 1) return ''
-  return filename.slice(dot + 1).toLowerCase().replace(/[^a-z0-9]/g, '')
+  return filename
+    .slice(dot + 1)
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
 }
 
 /** 由 MIME 反推默认扩展名(文件名无扩展名时用)。 */
@@ -148,26 +161,31 @@ export function validateUpload(args: {
   mode: UploadValidationMode
 }): ValidationResult {
   if (!isPurpose(args.purpose)) {
-    return { ok: false, code: 'FILE_PURPOSE_INVALID', message: `不支持的文件用途: ${args.purpose}` }
+    return { ok: false, code: 'FILE_PURPOSE_INVALID', message: '不支持的文件用途' }
   }
   const policy = PURPOSE_POLICY[args.purpose]
 
   if (!policy.mimes.includes(args.mimeType)) {
-    return { ok: false, code: 'FILE_MIME_NOT_ALLOWED', message: `用途 ${args.purpose} 不支持该类型: ${args.mimeType}` }
+    return { ok: false, code: 'FILE_MIME_NOT_ALLOWED', message: '该文件用途不支持此文件类型' }
   }
 
   // 扩展名必须与 MIME 一致(防伪装)
   const allowedExts = MIME_EXTS[args.mimeType] ?? []
   const nameExt = extFromFilename(args.filename)
   if (nameExt && allowedExts.length > 0 && !allowedExts.includes(nameExt)) {
-    return { ok: false, code: 'FILE_EXT_MISMATCH', message: `扩展名 .${nameExt} 与类型 ${args.mimeType} 不一致` }
+    return {
+      ok: false,
+      code: 'FILE_EXT_MISMATCH',
+      message: '文件扩展名与声明类型不一致',
+    }
   }
   const ext = nameExt && allowedExts.includes(nameExt) ? nameExt : extFromMime(args.mimeType)
 
   if (!Number.isFinite(args.sizeBytes) || args.sizeBytes <= 0) {
     return { ok: false, code: 'FILE_EMPTY', message: '文件为空或大小未知' }
   }
-  const maxBytes = args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
+  const maxBytes =
+    args.mode === 'proxy' ? Math.min(policy.maxBytes, PROXY_MAX_BYTES) : policy.maxBytes
   if (args.sizeBytes > maxBytes) {
     return {
       ok: false,

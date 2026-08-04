@@ -46,7 +46,12 @@ function safeSegment(input: string, fallback: string): string {
 
 /** 扩展名归一:小写 + 去点 + 仅字母数字,最长 10,空则 'bin'。 */
 export function normalizeExt(ext: string): string {
-  return (ext ?? '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 10) || 'bin'
+  return (
+    (ext ?? '')
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .toLowerCase()
+      .slice(0, 10) || 'bin'
+  )
 }
 
 /**
@@ -54,13 +59,17 @@ export function normalizeExt(ext: string): string {
  * owner-scoped 的用途(简历/扫描/打印/机构素材)需要 ownerId;
  * 缺 ownerId 时由 generateObjectKey 回退到 tmp/。
  */
-const PURPOSE_FOLDER: Record<FilePurpose, { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'export' | 'tmp'; folder: string }> = {
+const PURPOSE_FOLDER: Record<
+  FilePurpose,
+  { scope: 'user' | 'partner' | 'admin' | 'screensaver' | 'export' | 'tmp'; folder: string }
+> = {
   // ── C 端求职者(users/{userId}/...)──────────────────────────────
   resume_upload: { scope: 'user', folder: 'resumes' },
   cover_letter: { scope: 'user', folder: 'resumes' },
   resume_scan: { scope: 'user', folder: 'scans' },
   id_scan: { scope: 'user', folder: 'scans' },
   print_doc: { scope: 'user', folder: 'print-files' },
+  contract_upload: { scope: 'user', folder: 'contract-reviews' },
   signature_image: { scope: 'user', folder: 'signatures' },
   // 导出产物使用独立稳定前缀，便于单独配置对象存储生命周期。
   // key 只含随机 fileId，不嵌入 endUserId / requestId / 手机号。
@@ -86,7 +95,11 @@ export function generateObjectKey(args: ObjectKeyArgs): string {
   const ext = normalizeExt(args.ext)
   const fileId = safeSegment(args.fileId, 'file')
   const mapping = PURPOSE_FOLDER[args.purpose] ?? PURPOSE_FOLDER.temp
-  const session = safeSegment(args.uploadSessionId ?? fileId, fileId)
+  // 合同上传的匿名回退绝不使用可能来自二维码/请求的 token 作为 key 分桶。
+  const session = safeSegment(
+    args.purpose === 'contract_upload' ? fileId : (args.uploadSessionId ?? fileId),
+    fileId
+  )
 
   switch (mapping.scope) {
     case 'user': {

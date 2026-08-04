@@ -259,6 +259,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          pnpm --filter @ai-job-print/api verify:contract-review:gate0
+          pnpm --filter @ai-job-print/api verify:contract-review:contract
+          pnpm --filter @ai-job-print/api verify:contract-review:file-policy
+          pnpm --filter @ai-job-print/api verify:contract-review:schema
+          pnpm --filter @ai-job-print/api verify:contract-review:consent
           pnpm --filter @ai-job-print/api verify:trust-proxy
           pnpm --filter @ai-job-print/api verify:deploy-data-safety-gate
           pnpm --filter @ai-job-print/api verify:production-real-services
@@ -442,6 +447,7 @@ jobs:
           node -r @swc-node/register prisma/seed-fairs.ts
       - name: Core verify suites on PG
         run: |
+          pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:jobfair-venue-guide
           pnpm --filter @ai-job-print/api verify:admin-fairs
           pnpm --filter @ai-job-print/api verify:resume-layout-export

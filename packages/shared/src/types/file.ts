@@ -17,20 +17,22 @@
 /** 文件用途。决定默认 sensitiveLevel + 默认 TTL + objectKey 前缀。 */
 export type FilePurpose =
   // ── 既有(BE-1)─────────────────────────────────────────────
-  | 'resume_upload'    // 求职者上传简历(高敏)
-  | 'resume_scan'      // Kiosk 扫描纸质简历(高敏)
-  | 'id_scan'          // 身份证 / 证件照(高敏)
-  | 'print_doc'        // 通用打印文档(普通)
-  | 'fair_material'    // 招聘会 / 模板素材(普通)
-  | 'cover_letter'     // 求职信 / 推荐信(敏感)
+  | 'resume_upload' // 求职者上传简历(高敏)
+  | 'resume_scan' // Kiosk 扫描纸质简历(高敏)
+  | 'contract_upload' // 合同审查会话上传(高敏)
+  | 'id_scan' // 身份证 / 证件照(高敏)
+  | 'print_doc' // 通用打印文档(普通)
+  | 'fair_material' // 招聘会 / 模板素材(普通)
+  | 'cover_letter' // 求职信 / 推荐信(敏感)
   // ── COS 接入新增 ────────────────────────────────────────────
-  | 'partner_profile'      // 机构资料图片
-  | 'partner_image'        // 岗位图片
-  | 'partner_video'        // 机构视频素材
-  | 'job_fair_material'    // 招聘会资料 PDF/图片
+  | 'partner_profile' // 机构资料图片
+  | 'partner_image' // 岗位图片
+  | 'partner_video' // 机构视频素材
+  | 'job_fair_material' // 招聘会资料 PDF/图片
   | 'screensaver_material' // 待机宣传屏素材
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
+  | 'contract_upload'      // 合同审查会话上传(高敏、系统锁定两小时)
   | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
   | 'member_data_export'   // 会员本人数据导出(仅服务端生成,高敏短期 JSON)
   | 'self_assessment_report' // 自我探索 · 倾向参考 报告 PDF(本人参考,不可分享)
@@ -92,7 +94,7 @@ export interface FileMetadata {
   uploaderId: string | null
   endUserId: string | null
   createdBy: string | null
-  expiresAt: string | null  // ISO; null 表示长期保存
+  expiresAt: string | null // ISO; null 表示长期保存
   deletedAt: string | null
   deletedBy: string | null
   deleteReason: string | null
@@ -107,15 +109,15 @@ export interface FileUploadResponse {
   mimeType: string
   sha256: string
   signedUrl: string
-  signedUrlExpiresAt: string  // ISO
-  fileExpiresAt: string | null       // ISO; null 表示长期保存
+  signedUrlExpiresAt: string // ISO
+  fileExpiresAt: string | null // ISO; null 表示长期保存
 }
 
 /** 仅返回签名 URL(用于已有 fileId 的二次访问)。 */
 export interface SignedUrlResponse {
   fileId: string
   signedUrl: string
-  expiresAt: string  // ISO
+  expiresAt: string // ISO
   purpose?: FilePurpose
 }
 
@@ -125,7 +127,7 @@ export interface FileAccessUrlResponse {
   url: string
   /** 系统 HMAC content URL，供 /print/jobs 与签章类内部文件变换端点（/print/sign/*）作访问凭证；url 只用于预览/下载。 */
   printFileUrl?: string
-  expiresAt: string  // ISO
+  expiresAt: string // ISO
   disposition: 'inline' | 'attachment'
 }
 
@@ -148,7 +150,7 @@ export interface UploadIntentResponse {
   uploadUrl: string
   uploadMethod: 'PUT'
   uploadHeaders: Record<string, string>
-  uploadUrlExpiresAt: string  // ISO
+  uploadUrlExpiresAt: string // ISO
   direct: boolean
 }
 
@@ -158,7 +160,7 @@ export interface CompleteUploadResponse {
   status: FileStatus
   sizeBytes: number
   sha256: string
-  fileExpiresAt: string | null  // ISO; null 表示长期保存
+  fileExpiresAt: string | null // ISO; null 表示长期保存
 }
 
 /** 更新文件保存期限请求。 */
@@ -194,7 +196,7 @@ export interface FileLifecycleSummaryResponse {
   expiredPendingCleanup: number
   byRetentionPolicy: FileLifecyclePolicyCount[]
   byRetentionSetBy: FileLifecycleSetByCount[]
-  generatedAt: string  // ISO
+  generatedAt: string // ISO
 }
 
 /** Admin 强制清理过期文件响应。 */
@@ -202,5 +204,5 @@ export interface FileCleanupResponse {
   deletedCount: number
   deletedFileIds: string[]
   triggeredBy: 'manual' | 'cron'
-  triggeredAt: string  // ISO
+  triggeredAt: string // ISO
 }

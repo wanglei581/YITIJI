@@ -3,7 +3,7 @@
  *
  * 检查项：
  *   1. schema.prisma 包含 model LegalDocVersion
- *   2. legal.service.ts 包含三个合规 docType 枚举
+ *   2. shared / legal.service.ts 包含四个合规 docType 枚举
  *   3. admin-legal-docs.controller.ts 使用 @UseGuards
  *   4. legal.controller.ts 中 GET /kiosk/legal/:type 路由存在
  *   5. activate 方法写入 auditLog
@@ -50,15 +50,26 @@ async function main() {
     pass('schema.prisma 包含 model LegalDocVersion')
   }
 
-  // ── 2. service 包含三个合规 docType 枚举 ─────────────────────────────────
+  // ── 2. shared / service 包含四个合规 docType 枚举 ────────────────────────────────
   {
     const service = readFile('services/api/src/legal/legal.service.ts')
-    const required = ['privacy_policy', 'terms_of_service', 'ai_disclaimer']
-    const missing = required.filter((t) => !service.includes(`'${t}'`))
+    const shared = readFile('packages/shared/src/types/legalDocs.ts')
+    const required = [
+      'privacy_policy',
+      'terms_of_service',
+      'ai_disclaimer',
+      'contract_review_disclaimer',
+    ]
+    const missing = required.filter(
+      (docType) => !service.includes(`'${docType}'`) || !shared.includes(`'${docType}'`)
+    )
     if (missing.length > 0) {
-      fail('legal.service.ts 缺少合规 docType 枚举', missing.join(', '))
+      fail('shared / legal.service.ts 缺少合规 docType 枚举', missing.join(', '))
     }
-    pass('legal.service.ts 包含三个合规 docType 枚举（privacy_policy / terms_of_service / ai_disclaimer）')
+    if (!service.includes('isActive: false')) {
+      fail('legal.service.ts 创建法务文档时必须保持草稿未激活')
+    }
+    pass('shared / legal.service.ts 包含 contract_review_disclaimer，且新文档保持未激活')
   }
 
   // ── 3. admin 控制器使用鉴权守卫 ──────────────────────────────────────────
@@ -68,9 +79,9 @@ async function main() {
       fail('admin-legal-docs.controller.ts 缺少 @UseGuards 鉴权装饰器')
     }
     if (!adminCtrl.includes("Roles('admin')")) {
-      fail('admin-legal-docs.controller.ts 缺少 @Roles(\'admin\') 角色限制')
+      fail("admin-legal-docs.controller.ts 缺少 @Roles('admin') 角色限制")
     }
-    pass('admin-legal-docs.controller.ts 使用 @UseGuards + @Roles(\'admin\')')
+    pass("admin-legal-docs.controller.ts 使用 @UseGuards + @Roles('admin')")
   }
 
   // ── 4. Kiosk 控制器注册 GET /kiosk/legal/:type ───────────────────────────
@@ -143,7 +154,10 @@ async function main() {
   {
     const schema = readFile('services/api/prisma/schema.prisma')
     const pgSchema = readFile('services/api/prisma/postgres/schema.prisma')
-    if (!schema.includes('model MemberLegalConsent') || !pgSchema.includes('model MemberLegalConsent')) {
+    if (
+      !schema.includes('model MemberLegalConsent') ||
+      !pgSchema.includes('model MemberLegalConsent')
+    ) {
       fail('schema 缺少 model MemberLegalConsent（SQLite / PG 双轨）')
     }
     if (!schema.includes('legalConsents') || !pgSchema.includes('legalConsents')) {
@@ -156,7 +170,10 @@ async function main() {
     }
     const sqliteSql = readFile(`${sqliteMig}/migration.sql`)
     const pgSql = readFile(`${pgMig}/migration.sql`)
-    if (!sqliteSql.includes('CREATE TABLE "MemberLegalConsent"') || !pgSql.includes('CREATE TABLE "MemberLegalConsent"')) {
+    if (
+      !sqliteSql.includes('CREATE TABLE "MemberLegalConsent"') ||
+      !pgSql.includes('CREATE TABLE "MemberLegalConsent"')
+    ) {
       fail('MemberLegalConsent 迁移未 CREATE TABLE')
     }
     pass('MemberLegalConsent 模型 + SQLite/PG 迁移存在')
@@ -193,7 +210,10 @@ async function main() {
       fail('useMemberPhoneLogin 未拉取当前协议版本')
     }
     const fetchUtil = readFile('apps/kiosk/src/services/auth/legalConsentVersions.ts')
-    if (!fetchUtil.includes('LEGAL_DRAFT_FALLBACK_VERSION') || !fetchUtil.includes('kiosk/legal/')) {
+    if (
+      !fetchUtil.includes('LEGAL_DRAFT_FALLBACK_VERSION') ||
+      !fetchUtil.includes('kiosk/legal/')
+    ) {
       fail('legalConsentVersions 未对接 kiosk/legal 或草拟哨兵')
     }
     const nav = readFile('apps/admin/src/layouts/AdminLayoutWrapper.tsx')
@@ -206,7 +226,10 @@ async function main() {
     }
     const shared = readFile('packages/shared/src/types/legalDocs.ts')
     const apiConst = readFile('services/api/src/legal/legal-constants.ts')
-    if (!shared.includes("draft-pending-legal-review") || !apiConst.includes("draft-pending-legal-review")) {
+    if (
+      !shared.includes('draft-pending-legal-review') ||
+      !apiConst.includes('draft-pending-legal-review')
+    ) {
       fail('shared / api 草拟哨兵版本号不一致或缺失')
     }
     pass('Kiosk 提交版本号 + Admin 侧栏入口与激活确认')
