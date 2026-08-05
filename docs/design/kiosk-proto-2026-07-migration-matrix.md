@@ -322,3 +322,13 @@
 - 本批不重做已合入的 86 路径迁移，只修复三个共享壳层缺口：权益活动详情、法务文档、百宝箱专区。三个页面继续使用真实数据与既有业务分支，不引入原型假数据或演示状态。
 - W6 production-build Playwright 当前为 **87/87 PASS**：85 条 Kiosk 路由按 `1080×1920` 验收，`/member/qr-login` 与 `/upload/phone` 两条辅助页按 `390×844` 验收；`/me/privacy-requests` 只增加验证覆盖，没有修改受保护的 `/me/*` 生产实现。
 - 常驻 Playwright 覆盖 `390×844` 与 `1080×1920`；另以一次性人工浏览器实点覆盖 `390×700`、`1024×768`、`1280×800`、`1440×1024`。人工实点不构成持续回归门禁；这些结果也不等同于 87 个页面逐一像素级复刻或生产/真机验收。
+
+### 8.6 当前 99 路径收口结论（2026-08-05）
+
+- 在 §8.5 的 87 条基础上，依次合入以下路由批次后，正式清单扩展至 **99 条 URL pattern**：
+  - 取件码认领（PR #491）：`/print/pickup-claim`
+  - 合同审阅三条（PR #501）：`/contract-review`、`/contract-review/processing`、`/contract-review/result`
+  - 线下招聘机构（PR #482/489）：`/offline-agencies`、`/offline-agencies/:id`、`/jobs/:id/offline`
+  - Self-assessment v1（PR #473/476）：`/resume/self-assessment/intro`、`/resume/self-assessment/questions`、`/resume/self-assessment/result`、`/resume/self-assessment/history`（已计入 §8.3，此处补全至99总量）
+- `verify-fusion-baseline.mjs` 路由清单守门已同步更新为 **99 条**。
+- 新增路由无独立 8399/5299 原型屏，继续沿用真实数据与既有业务分支。

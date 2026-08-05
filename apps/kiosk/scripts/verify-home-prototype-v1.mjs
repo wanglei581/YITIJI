@@ -367,7 +367,7 @@ const filingOrder = [
   '鲁公网安备37021402007308号',
   '职易达AI',
 ]
-const filingBlock = helpCenterPage.match(/<p className="k1-help-footer"[\s\S]*?<\/p>/)?.[0] ?? ''
+const filingBlock = helpCenterPage.match(/<p className="k1-filing-info"[\s\S]*?<\/p>/)?.[0] ?? ''
 expect(filingOrder.every((text) => filingBlock.includes(text)), '帮助中心展示 ICP、公安备案与「职易达AI」')
 expect(
   filingOrder.every(
@@ -381,7 +381,7 @@ expect(
   '公安备案号链接公安部备案查询',
 )
 expect(filingBlock.includes('职易达AI') && !/<a[^>]*>[\s\S]*?职易达AI/.test(filingBlock), '「职易达AI」保持纯文本，不新增外链')
-expect(/className="k1-help-footer"/.test(helpCenterPage), '备案信息在帮助中心页存在')
+expect(/className="k1-filing-info"/.test(helpCenterPage), '备案信息在帮助中心页存在')
 expect(/\.kpv1 \.filing-info\s*\{[^}]*flex-wrap:\s*wrap/.test(pv), '备案信息允许窄屏换行')
 expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*48px/.test(pv), '备案链接符合一体机 48px 最小触控高度')
 
