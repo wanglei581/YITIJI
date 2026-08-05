@@ -150,6 +150,7 @@ console.log('\n=== 首页 prototype-v1 静态合同（真值：01-home.html + sh
 const proto = readProto('01-home.html')
 const shared = readProto('shared.css')
 const home = read('src/pages/home/HomePage.tsx')
+const helpCenterPage = read('src/pages/help/HelpCenterPage.tsx')
 const pv = read('src/styles/prototype-v1.css')
 const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
@@ -289,14 +290,14 @@ for (const legacy of [
   expect(!existsSync(join(root, legacy)), `旧 .khome 首页样式已删除：${legacy}`)
 }
 expect(/className="kpv1 kpv1--content-only"/.test(home), '首页根节点使用 .kpv1 作用域（content-only）')
-expect(/<div className="groups"[^>]*aria-label="当前可使用功能"/.test(home), '首页服务区用中性 .groups 网格容器并保留可访问名称')
+expect(/<SvcGrid\s*\/>/.test(home), '首页服务区使用 SvcGrid 组件')
 expect(!/<main className="groups"/.test(home), '首页服务区不在 KioskLayout 主地标内嵌套 main')
 expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
 expect(!/home-reference-primary-list|home-reference-secondary-list/.test(home), '首页不再使用 primary/secondary 双列表结构')
 
 // ── 原型文案（1:1）──────────────────────────────────────────────
-expect(proto.includes('一趟办完') && /简历、打印、岗位信息<em>一趟办完<\/em>/.test(home), '欢迎区主标题 1:1 原型「简历、打印、岗位信息一趟办完」')
-expect(home.includes('游客可直接使用大部分功能 · 触摸下方卡片开始'), '欢迎区副标题实现包含「游客可直接」文案（01-home AI OS 已更新，实现过渡期保留）')
+expect(proto.includes('一趟办完') && /简历[^<]*<em>一趟办完<\/em>/.test(home), '欢迎区主标题包含「一趟办完」')
+expect(home.includes('现场准备材料、了解机会，并在本机完成打印扫描'), '欢迎区副标题说明现场使用场景')
 expect(proto.includes('登录 / 注册') && home.includes('登录 / 注册'), '登录按钮文案 1:1 原型「登录 / 注册」')
 expect(/badge\.label/.test(home) && /group\.badge/.test(home), '首页保留「推荐先做」徽章（来自 serviceGroups.badge）')
 
@@ -360,14 +361,14 @@ for (const [re, label] of [[/一键投递/, '一键投递'], [/立即投递/, '�
 }
 expect(/className="notice"/.test(home) && home.includes('本终端仅提供信息展示与跳转'), '首页保留合规提示条（第三方来源 + 跳转办理）')
 
-// ── 网站备案信息：首页最后一个内容节点，两个官方查询链接 + 纯文本品牌 ──────────────
+// ── 网站备案信息：已迁至帮助中心（fix(kiosk): 备案信息迁至帮助中心），在帮助中心页验证 ──────────────
 const filingOrder = [
   '鲁ICP备2026023517号-2',
   '鲁公网安备37021402007308号',
   '职易达AI',
 ]
-const filingBlock = home.match(/<footer className="filing-info"[\s\S]*?<\/footer>/)?.[0] ?? ''
-expect(filingOrder.every((text) => filingBlock.includes(text)), '首页展示 ICP、公安备案与「职易达AI」')
+const filingBlock = helpCenterPage.match(/<footer className="filing-info"[\s\S]*?<\/footer>/)?.[0] ?? ''
+expect(filingOrder.every((text) => filingBlock.includes(text)), '帮助中心展示 ICP、公安备案与「职易达AI」')
 expect(
   filingOrder.every(
     (text, index) => index === 0 || filingBlock.indexOf(filingOrder[index - 1]) < filingBlock.indexOf(text),
@@ -380,7 +381,7 @@ expect(
   '公安备案号链接公安部备案查询',
 )
 expect(/<span className="filing-brand">职易达AI<\/span>/.test(filingBlock), '「职易达AI」保持纯文本，不新增外链')
-expect(/<footer className="filing-info"[\s\S]*?<\/footer>\s*<\/KioskPageFrame>/.test(home), '备案信息是首页最后一个内容节点')
+expect(/<footer className="filing-info"[\s\S]*?<\/footer>/.test(helpCenterPage), '备案信息在帮助中心页存在')
 expect(/\.kpv1 \.filing-info\s*\{[^}]*flex-wrap:\s*wrap/.test(pv), '备案信息允许窄屏换行')
 expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*48px/.test(pv), '备案链接符合一体机 48px 最小触控高度')
 

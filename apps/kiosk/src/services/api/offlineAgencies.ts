@@ -239,7 +239,7 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     syncTime: agency.syncTime ?? undefined,
     phone: agency.phone ?? null,
     status: agency.status,
-    statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+    statusLabel: agency.statusLabel ?? '正常收录',
   }
 }
 
