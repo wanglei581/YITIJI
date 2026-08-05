@@ -248,7 +248,7 @@ const expectedEntries = [
   ['扫描文件', '/scan/start'],
   ['岗位信息', '/jobs'],
   ['招聘会', '/job-fairs'],
-  ['AI助手', '/assistant'],
+  ['AI顾问', '/assistant'],
   ['浏览记录', '/me/activity'],
   ['外部跳转记录', '/me/activity?tab=jump'],
   ['权益活动', '/activities'],
