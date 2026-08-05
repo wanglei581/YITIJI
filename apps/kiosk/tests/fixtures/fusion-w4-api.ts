@@ -169,7 +169,7 @@ export function registerW4Api(api: ApiRouter, options: { smartCampusEnabled?: bo
   const respond = (path: string, data: unknown) => api.respond('GET', path, { status: 200, json: data })
   respond('/api/v1/jobs', { success: true, data: [job], pagination: { page: 1, pageSize: 100, total: 1, totalPages: 1 } })
   respond('/api/v1/jobs/job-001', { success: true, data: job })
-  respond('/api/v1/kiosk/offline-agencies', { items: [agency], total: 1, page: 1, pageSize: 10 })
+  respond('/api/v1/kiosk/offline-agencies', { data: [agency], total: 1, page: 1, pageSize: 10 })
   respond('/api/v1/kiosk/offline-agencies/agency-001', {
     id: 'agency-001', name: '青岛合规人力服务机构', type: '人力资源服务机构',
     address: '市南区示例路1号', district: '市南区', hours: '09:00–17:00',

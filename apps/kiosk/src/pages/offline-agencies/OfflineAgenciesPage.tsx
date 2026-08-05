@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import { BuildingIcon, ClockIcon, MapPinIcon, SearchIcon, ShieldCheckIcon } from 'lucide-react'
@@ -10,9 +10,6 @@ import {
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
 
 const PAGE_SIZE = 10
-
-const DISTRICTS = ['全部', '高新区', '城东区', '城南区', '城北区']
-const SERVICES = ['全部', '岗位推荐', '用工咨询', '劳务派遣']
 
 function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () => void }) {
   const services = Array.isArray(agency.services) ? agency.services : []
@@ -56,7 +53,7 @@ function EmptyState() {
     <div className="oa-empty" role="status">
       <BuildingIcon aria-hidden="true" />
       <b>暂无线下招聘机构信息</b>
-      <span>可切换区域或服务类型再试；机构需完成资质核验后才会展示。</span>
+      <span>可调整机构名称关键词再试；机构需完成资质核验后才会展示。</span>
     </div>
   )
 }
@@ -66,41 +63,50 @@ export function OfflineAgenciesPage() {
   const [data, setData] = useState<OfflineAgencyListResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [district, setDistrict] = useState('全部')
-  const [service, setService] = useState('全部')
+  const [searchInput, setSearchInput] = useState('')
   const [keyword, setKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    const timer = window.setTimeout(() => {
-      setLoading(true)
-      setError(null)
-      getOfflineAgencies({
-        district: district === '全部' ? undefined : district,
-        service: service === '全部' ? undefined : service,
-        keyword: keyword.trim() || undefined,
-        page,
-        pageSize: PAGE_SIZE,
+    setLoading(true)
+    setError(null)
+    getOfflineAgencies({
+      keyword: keyword || undefined,
+      page,
+      pageSize: PAGE_SIZE,
+    })
+      .then((res) => {
+        if (cancelled) return
+        setData(res)
+        setLoading(false)
       })
-        .then((res) => {
-          if (cancelled) return
-          setData(res)
-          setLoading(false)
-        })
-        .catch(() => {
-          if (cancelled) return
-          setError('机构列表暂时无法加载，请稍后重试')
-          setLoading(false)
-        })
-    }, keyword.trim() ? 280 : 0)
+      .catch(() => {
+        if (cancelled) return
+        setError('机构列表暂时无法加载，请稍后重试')
+        setLoading(false)
+      })
 
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
+    return () => { cancelled = true }
+  }, [keyword, page, retryKey])
+
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const nextKeyword = searchInput.trim()
+    setPage(1)
+    if (nextKeyword === keyword) {
+      setRetryKey((value) => value + 1)
+      return
     }
-  }, [district, service, keyword, page, retryKey])
+    setKeyword(nextKeyword)
+  }
+
+  const clearSearch = () => {
+    setSearchInput('')
+    setKeyword('')
+    setPage(1)
+  }
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 0
 
@@ -113,43 +119,26 @@ export function OfflineAgenciesPage() {
       onBack={() => navigate('/jobs')}
       badge={<FusionBadge icon={ShieldCheckIcon}>机构资质核验后收录</FusionBadge>}
     >
-      <div className="oa-filter-stack">
-        <div className="jf-filter-bar">
-          <span className="jf-filter-label">区域</span>
-          {DISTRICTS.map((d) => (
-            <button
-              key={d}
-              type="button"
-              className={`jf-f-chip${district === d ? ' on' : ''}`}
-              onClick={() => { setDistrict(d); setPage(1) }}
-            >
-              {d}
+      <div className="jf-filter-bar">
+        <span className="jf-filter-label">区域</span>
+        <span className="jf-f-chip on">全部区域</span>
+        <form className="oa-search-btn flex-wrap" role="search" onSubmit={handleSearch}>
+          <SearchIcon aria-hidden="true" />
+          <input
+            type="search"
+            aria-label="搜索机构名称"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="输入机构名称"
+            className="min-h-12 w-[230px] min-w-[140px] flex-1 bg-transparent text-[21px] outline-none placeholder:text-[var(--muted)]"
+          />
+          {keyword && (
+            <button type="button" className="jf-btn ghost sm" onClick={clearSearch}>
+              清除搜索
             </button>
-          ))}
-          <label className="jf-searchbox" style={{ maxWidth: 360 }}>
-            <SearchIcon aria-hidden="true" />
-            <input
-              value={keyword}
-              onChange={(event) => { setKeyword(event.target.value); setPage(1) }}
-              placeholder="搜索机构名称"
-              aria-label="搜索机构名称"
-            />
-          </label>
-        </div>
-
-        <div className="jf-filter-bar">
-          <span className="jf-filter-label">服务</span>
-          {SERVICES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`jf-f-chip${service === s ? ' on' : ''}`}
-              onClick={() => { setService(s); setPage(1) }}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+          )}
+          <button type="submit" className="jf-btn dark sm">搜索</button>
+        </form>
       </div>
 
       {loading ? (

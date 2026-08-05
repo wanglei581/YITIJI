@@ -34,7 +34,7 @@ export interface WireOfflineAgency {
 }
 
 interface WireOfflineAgencyListResponse {
-  items: WireOfflineAgency[]
+  data: WireOfflineAgency[]
   total: number
   page: number
   pageSize: number
@@ -257,9 +257,9 @@ export async function getOfflineAgencies(
   const response = await getJson<WireOfflineAgencyListResponse>(
     `/kiosk/offline-agencies${qs({ ...params })}`,
   )
-  if (!Array.isArray(response.items)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
+  if (!Array.isArray(response.data)) throw new Error('INVALID_OFFLINE_AGENCY_RESPONSE')
   return {
-    items: response.items.map(mapWireOfflineAgency),
+    items: response.data.map(mapWireOfflineAgency),
     total: response.total,
     page: response.page,
     pageSize: response.pageSize,
