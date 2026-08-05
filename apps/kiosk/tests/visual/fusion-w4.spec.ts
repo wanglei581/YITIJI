@@ -35,7 +35,7 @@ test('/jobs/:id 只提供来源 CTA @w4', async ({ page, api }) => {
 test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/offline-agencies')
-  await expect(page.getByText('青岛合规人力服务机构')).toBeVisible()
+  await expect(page.getByText('青岛合规人力服务机构').first()).toBeVisible()
   await expect(page.getByText('岗位咨询', { exact: true })).toBeVisible()
   await expect(page.getByText(/服务时间以机构公示为准/)).toBeVisible()
   // 不得伪造实时指标
@@ -48,7 +48,7 @@ test('/offline-agencies 列表可进入真实详情页 @w4', async ({ page, api 
 test('/offline-agencies/:id 详情页加载机构信息 @w4', async ({ page, api }) => {
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/offline-agencies/agency-001')
-  await expect(page.getByText('青岛合规人力服务机构')).toBeVisible()
+  await expect(page.getByText('青岛合规人力服务机构').first()).toBeVisible()
   await expect(page.getByText(/市南区示例路|09:00|服务时间以机构公示为准/).first()).toBeVisible()
   // 不得伪造实时运营状态
   await expect(page.getByText(/营业中|今日服务|在招岗位|按直线距离/)).toHaveCount(0)
