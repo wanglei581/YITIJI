@@ -180,6 +180,13 @@
   text-align: center;
 }
 
+.k1-help-center .k1-help-footer a {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  padding-inline: 8px;
+}
+
 @media (max-width: 760px) {
   .k1-help-center .k1-help-faq-list { grid-template-columns: 1fr; }
   .k1-help-center .k1-help-row.is-open { grid-column: auto; }

@@ -32,6 +32,7 @@ export function registerW6Api(api: ApiRouter): void {
     validFrom: null, validUntil: null, rulesText: '仅用于验收', claimed: false, soldOut: false, ended: false,
   }))
   get('/api/v1/job-materials/templates', success([]))
+  get('/api/v1/me/pending-tasks', { data: [] })
 
   const offlineJob = {
     id: 'offline-job-001', agencyId: 'agency-001', title: '现场咨询岗位', jobType: 'fulltime',

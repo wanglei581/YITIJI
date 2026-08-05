@@ -148,17 +148,18 @@ export function ContractReviewResultPage() {
   if (!result) {
     return (
       <KioskFullscreenShell>
-        <KioskPageFrame
-          className="fusion-w3 fusion-w3--resume"
-          header={
-            <KioskPageHeader
-              title="AI 合同审查"
-              description="结果"
-              onBack={() => navigate('/contract-review', { replace: true })}
-              backLabel="返回"
-            />
-          }
-        >
+        <main className="flex min-h-0 flex-1 flex-col">
+          <KioskPageFrame
+            className="fusion-w3 fusion-w3--resume"
+            header={
+              <KioskPageHeader
+                title="AI 合同审查"
+                description="结果"
+                onBack={() => navigate('/contract-review', { replace: true })}
+                backLabel="返回"
+              />
+            }
+          >
           <div className="cr-done-screen">
             <div className="cr-done-screen__icon">
               <HelpCircleIcon size={52} />
@@ -169,7 +170,8 @@ export function ContractReviewResultPage() {
               重新上传
             </Button>
           </div>
-        </KioskPageFrame>
+          </KioskPageFrame>
+        </main>
       </KioskFullscreenShell>
     )
   }
@@ -180,18 +182,19 @@ export function ContractReviewResultPage() {
 
   return (
     <KioskFullscreenShell>
-      <KioskPageFrame
-        className="fusion-w3 fusion-w3--resume"
-        header={
-          <KioskPageHeader
-            title="审查结果"
-            description="AI 合同审查 · 仅供参考"
-            onBack={() => navigate('/contract-review', { replace: true })}
-            backLabel="重新审查"
-          />
-        }
-        footer={
-          <KioskActionBar>
+      <main className="flex min-h-0 flex-1 flex-col">
+        <KioskPageFrame
+          className="fusion-w3 fusion-w3--resume"
+          header={
+            <KioskPageHeader
+              title="审查结果"
+              description="AI 合同审查 · 仅供参考"
+              onBack={() => navigate('/contract-review', { replace: true })}
+              backLabel="重新审查"
+            />
+          }
+          footer={
+            <KioskActionBar>
             <Button
               variant="outline"
               size="lg"
@@ -213,9 +216,9 @@ export function ContractReviewResultPage() {
               <PrinterIcon size={20} className="mr-2" />
               打印审查报告
             </Button>
-          </KioskActionBar>
-        }
-      >
+            </KioskActionBar>
+          }
+        >
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
@@ -357,7 +360,8 @@ export function ContractReviewResultPage() {
             </>
           )}
         </div>
-      </KioskPageFrame>
+        </KioskPageFrame>
+      </main>
     </KioskFullscreenShell>
   )
 }

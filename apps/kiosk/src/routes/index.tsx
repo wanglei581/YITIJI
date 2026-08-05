@@ -77,9 +77,10 @@ import { SmartCampusWelcomePage } from '../pages/smart-campus/SmartCampusWelcome
 import { SmartCampusServicePage } from '../pages/smart-campus/SmartCampusServicePage'
 import { FreshmanInsightsPage } from '../pages/smart-campus/FreshmanInsightsPage'
 import { KioskRouteErrorPage } from '../pages/errors/KioskRouteErrorPage'
-import { ContractReviewHomePage } from '../pages/contract-review/ContractReviewHomePage'
-import { ContractReviewProcessingPage } from '../pages/contract-review/ContractReviewProcessingPage'
-import { ContractReviewResultPage } from '../pages/contract-review/ContractReviewResultPage'
+
+// Gate 0 requires production_default=false. Only an explicit build-time grant
+// may expose contract review; missing, empty, or malformed values fail closed.
+const contractReviewEnabled = import.meta.env.VITE_ENABLE_CONTRACT_REVIEW === 'true'
 
 export const kioskRouter = createBrowserRouter([
   // 只有明确的手机辅助入口豁免 27 寸公共终端运行时超时。
@@ -107,9 +108,33 @@ export const kioskRouter = createBrowserRouter([
       { path: '/interview/report', element: <InterviewReportPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/tips', element: <InterviewTipsPage />, errorElement: <KioskRouteErrorPage /> },
       { path: '/interview/reports', element: <InterviewReportsPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/contract-review', element: <ContractReviewHomePage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/contract-review/processing', element: <ContractReviewProcessingPage />, errorElement: <KioskRouteErrorPage /> },
-      { path: '/contract-review/result', element: <ContractReviewResultPage />, errorElement: <KioskRouteErrorPage /> },
+      {
+        path: '/contract-review',
+        ...(contractReviewEnabled
+          ? {
+              lazy: async () => ({ Component: (await import('../pages/contract-review/ContractReviewHomePage')).ContractReviewHomePage }),
+              errorElement: <KioskRouteErrorPage />,
+            }
+          : { element: <Navigate to="/" replace /> }),
+      },
+      {
+        path: '/contract-review/processing',
+        ...(contractReviewEnabled
+          ? {
+              lazy: async () => ({ Component: (await import('../pages/contract-review/ContractReviewProcessingPage')).ContractReviewProcessingPage }),
+              errorElement: <KioskRouteErrorPage />,
+            }
+          : { element: <Navigate to="/" replace /> }),
+      },
+      {
+        path: '/contract-review/result',
+        ...(contractReviewEnabled
+          ? {
+              lazy: async () => ({ Component: (await import('../pages/contract-review/ContractReviewResultPage')).ContractReviewResultPage }),
+              errorElement: <KioskRouteErrorPage />,
+            }
+          : { element: <Navigate to="/" replace /> }),
+      },
       { path: '/screensaver', element: <ScreensaverPage />, errorElement: <KioskRouteErrorPage /> },
       {
         path: '/session-timeout',

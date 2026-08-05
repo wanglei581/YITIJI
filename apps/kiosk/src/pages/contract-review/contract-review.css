@@ -209,8 +209,8 @@
   min-height: 64px;
 }
 .cr-consent-check input[type='checkbox'] {
-  width: 32px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   border-radius: 8px;
   border: 2px solid var(--line);
   accent-color: var(--teal);

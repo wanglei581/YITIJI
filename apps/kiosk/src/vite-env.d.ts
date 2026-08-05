@@ -4,6 +4,7 @@ interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string
   readonly VITE_USE_TRTC_CALL: string
   readonly VITE_ALLOW_TEXT_ONLY_ASSISTANT: string
+  readonly VITE_ENABLE_CONTRACT_REVIEW: string
   readonly VITE_TERMINAL_ID: string
   readonly VITE_PRINTER_NAME: string
   readonly VITE_TERMINAL_DISPLAY_NAME: string
