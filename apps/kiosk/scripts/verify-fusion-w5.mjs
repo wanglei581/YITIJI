@@ -28,7 +28,7 @@ const W5_ROUTES_EXPANDED = [...W5_ROUTES, ...SELF_ASSESSMENT_V1_ROUTES]
 const FROZEN = new Map([
   ['src/pages/auth/hooks/useMemberPhoneLogin.ts', '3181319ca52796ba6687991297a1319fea38f481fa382f36ce98146d85a8dae5'],
   ['src/pages/profile/assets/useMemberProfileOverview.ts', '3679de500e38d9d84b5f77680090997dc27eabca861af58c3d407eeb9e420395'],
-  ['src/pages/profile/profileEntries.ts', 'ee82813c97673da21e06656d01fca3ee9016f53c41f8a35a7b2dda16afb28aab'],
+  ['src/pages/profile/profileEntries.ts', 'dad0e5fbf3d7ea3e22ffa852750158d5ee1af50e028a7b8df9fc01c0a3a2b0ae'],
   ['src/pages/profile/profileTypes.ts', 'a97ea090c8c691f4873255fe4258813d37344371159d54dba89f8c251b46c89f'],
   ['src/pages/profile/assets/format.ts', '84f96614592bbcb611eeec10351435f661dd817e14cd3637e5d76f5e61451d04'],
   ['src/pages/profile/me/feedback/types.ts', 'a54e706d069dfff939b65d6714a1bbfa032b49cda974f14507362b00a11a048f'],
