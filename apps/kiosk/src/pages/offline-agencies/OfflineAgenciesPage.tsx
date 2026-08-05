@@ -187,7 +187,7 @@ export function OfflineAgenciesPage() {
         <ErrorState message={error} onRetry={() => setRetryKey((k) => k + 1)} className="flex-1" />
       ) : !data ? null : (
         <div className="oa-list-shell">
-          <StatsBand stats={data.stats} />
+        {data.stats && <StatsBand stats={data.stats} />}
 
           <div className="jf-list-meta">
             <span>

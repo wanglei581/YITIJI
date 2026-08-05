@@ -55,12 +55,17 @@ export class FilesService {
    * Mirrors the NestJS DI graph without requiring module setup.
    */
   static create(prisma: unknown, audit: unknown, storage: unknown): FilesService {
+    // Guard: scripts that pass {} as audit get a no-op to prevent TypeError in FileCleanupService
+    const auditSafe =
+      audit != null && typeof (audit as Record<string, unknown>)['write'] === 'function'
+        ? audit
+        : { write: async () => undefined }
     const query = new FileQueryService(prisma as never, storage as never)
     return new FilesService(
       new FileUploadService(prisma as never, storage as never, query),
       new FileAccessService(prisma as never, storage as never, query),
       new FileDeleteService(prisma as never, storage as never, query),
-      new FileCleanupService(prisma as never, storage as never, audit as never),
+      new FileCleanupService(prisma as never, storage as never, auditSafe as never),
     )
   }
 
