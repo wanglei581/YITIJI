@@ -68,7 +68,7 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
-  const files = new FilesService(prisma, audit, storage)
+  const files = FilesService.create(prisma, audit, storage)
 
   const sfx = randomUUID().replace(/-/g, '').slice(0, 10)
   const eu1 = `eu1_${sfx}`

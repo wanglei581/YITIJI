@@ -136,7 +136,7 @@ async function verifyMalformedContractCleanup(): Promise<void> {
       deletedObjects.push(storageKey)
     },
   }
-  const service = new FilesService(prisma as never, {} as never, storage as never)
+  const service = FilesService.create(prisma, {}, storage)
 
   const result = await service.cleanupExpired('manual')
 

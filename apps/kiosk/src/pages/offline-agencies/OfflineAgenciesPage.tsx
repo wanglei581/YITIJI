@@ -69,10 +69,12 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           <span className="jf-chip ok">资质核验已通过</span>
         </div>
       </div>
-      <div className="oa-r-aside" aria-label={`${agency.jobCount} 个在招岗位`}>
-        <div className="oa-jobs-n">{agency.jobCount}</div>
-        <div className="oa-jobs-t">在招岗位</div>
-      </div>
+      {agency.jobCount != null && (
+        <div className="oa-r-aside" aria-label={`${agency.jobCount} 个在招岗位`}>
+          <div className="oa-jobs-n">{agency.jobCount}</div>
+          <div className="oa-jobs-t">在招岗位</div>
+        </div>
+      )}
     </article>
   )
 }

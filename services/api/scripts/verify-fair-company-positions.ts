@@ -70,7 +70,7 @@ async function main() {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
-  const files = new FilesService(prisma, audit, storage)
+  const files = FilesService.create(prisma, audit, storage)
   const bridge = new FairMaterialPrintBridgeService(prisma, storage, files)
   // N5 拆分后 AdminFairsService 需要三个子服务
   const companyZone = new FairCompanyZoneService(prisma, audit)

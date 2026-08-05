@@ -70,7 +70,7 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const audit = new AuditService(prisma)
   const storage = new StorageService()
-  const files = new FilesService(prisma, audit, storage)
+  const files = FilesService.create(prisma, audit, storage)
   const bridge = new FairMaterialPrintBridgeService(prisma, storage, files)
   const companyZone = new FairCompanyZoneService(prisma, audit)
   const materialSvc = new FairMaterialService(prisma, audit, storage, bridge)

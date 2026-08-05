@@ -157,7 +157,7 @@ function createHarness(options: HarnessOptions = {}) {
     },
   }
 
-  const files = new FilesService(prisma as never, {} as never, storage as never)
+  const files = FilesService.create(prisma, {}, storage)
   const exportFiles = new MemberDataExportFileService(prisma as never, storage as never)
   const safeLogger = {
     warn(message: string) {

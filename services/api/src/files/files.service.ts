@@ -49,6 +49,20 @@ export class FilesService {
     private readonly cleanupSvc: FileCleanupService,
   ) {}
 
+  /**
+   * Convenience factory for verify scripts and integration harnesses.
+   * Mirrors the NestJS DI graph without requiring module setup.
+   */
+  static create(prisma: unknown, audit: unknown, storage: unknown): FilesService {
+    const query = new FileQueryService(prisma as never, storage as never)
+    return new FilesService(
+      new FileUploadService(prisma as never, storage as never, query),
+      new FileAccessService(prisma as never, storage as never, query),
+      new FileDeleteService(prisma as never, storage as never, query),
+      new FileCleanupService(prisma as never, storage as never, audit as never),
+    )
+  }
+
   // ── Upload ─────────────────────────────────────────────────────────────────
 
   upload(args: {

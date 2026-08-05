@@ -86,7 +86,7 @@ async function verifyRuntimeClosure(): Promise<void> {
   await prisma.onModuleInit()
   const storage = new StorageService()
   const audit = new AuditService(prisma)
-  const files = new FilesService(prisma, audit, storage)
+  const files = FilesService.create(prisma, audit, storage)
   const pdf = new JobMaterialPdfService()
   const service = new JobMaterialsService(files, pdf, prisma, audit)
   const memberAssets = new MemberAssetsService(prisma)

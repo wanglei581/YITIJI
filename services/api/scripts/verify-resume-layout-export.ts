@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   await prisma.onModuleInit()
   const storage = new StorageService()
   const audit = new AuditService(prisma)
-  const files = new FilesService(prisma, audit, storage)
+  const files = FilesService.create(prisma, audit, storage)
   const pdf = new ResumePdfService()
   const resumeDocx = new ResumeDocxService()
   const resumeText = new ResumeTextService()
