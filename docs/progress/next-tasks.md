@@ -1,6 +1,17 @@
 # 下一步任务
 
-> 最后更新：2026-08-02
+> 最后更新：2026-08-05
+
+## 2026-08-05 遗留 Codex 任务
+
+- [ ] **合并 PR `claude/epic-feistel-b5f30a`**：业主在 GitHub 开 PR，CI 三项（`build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness`）全绿后 squash 合入。typecheck 须由 CI 验证（worktree 无 node_modules）。
+- [ ] **三个大文件拆分（Codex 在主仓库执行，需 `pnpm typecheck` 保障）**：
+  - `services/api/src/payment/online-payment.service.ts` 986行 → 建议按「发起/查询/回调/管理」四域拆分
+  - `services/api/src/orgs/admin-orgs.service.ts` 852行 → 按「查询/写入/成员管理」拆分
+  - `services/api/src/materials/materials.service.ts` 822行 → 按「上传/查询/审核/清理」拆分
+  - 每个新子服务须 <500行，原 service 保持薄门面，module.ts 同步注册，不改 controller 签名
+- [ ] **P1 政策缺口修复（须先更新 `docs/compliance-boundary.md §4`）**：`services/api/src/fairs/admin-fairs.service.ts:167` — 管理员直接编辑已发布 `jobFair` 无 `reviewStatus` 重置。两条修复路径：(a) 内容哈希变更时条件性重置为 `pending`；(b) 新增管理员编辑独立审批流。修复前须合规文档授权。
+- [ ] **DeepSeek API Key 轮换**（不是 Codex 任务，业主在 DeepSeek 控制台操作）：密钥曾出现在聊天，上线前必须轮换并重新注入生产 `.env`。
 
 ## Phase 0 真值收口后续
 
