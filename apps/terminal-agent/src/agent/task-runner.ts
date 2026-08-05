@@ -618,7 +618,7 @@ async function monitorPrintJob(
     // Report as failed+PRINT_JOB_UNCONFIRMED — never assert false completed.
     // Operator must check the device physically.
     const retainedMsg = `print queue monitoring timed out after ${timeoutMs}ms: ` +
-      `job remained in 'Printing, Retained' state (Pantum CM2800ADN driver limitation — ` +
+      `job remained in 'Printing, Retained' state (${printerName} driver limitation — ` +
       `cannot distinguish completed vs paper-empty via Get-PrintJob); ` +
       `reporting PRINT_JOB_UNCONFIRMED — operator must check device`
     return {

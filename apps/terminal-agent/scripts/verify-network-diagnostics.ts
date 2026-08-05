@@ -13,12 +13,13 @@ async function main(): Promise<void> {
   assert.equal(normalizePrinterNetworkStatus('not_network_printer'), 'not_network_printer')
   assert.equal(normalizePrinterNetworkStatus('192.168.50.2'), 'unknown')
 
-  const diagnostics = await collectNetworkDiagnostics('Pantum CM2800ADN Series', async (script, stdin) => {
+  const testPrinterName = process.env['PRINTER_NAME'] ?? 'Pantum CM2800ADN Series'
+  const diagnostics = await collectNetworkDiagnostics(testPrinterName, async (script, stdin) => {
     assert.equal(stdin === undefined, script.includes('Get-NetAdapter'))
     return stdin === undefined ? 'connected' : 'reachable'
   })
   assert.deepEqual(diagnostics, { wiredNetworkStatus: 'connected', printerNetworkStatus: 'reachable' })
-  const fallback = await collectNetworkDiagnostics('Pantum CM2800ADN Series', async () => {
+  const fallback = await collectNetworkDiagnostics(testPrinterName, async () => {
     throw new Error('simulated diagnostic failure')
   })
   assert.deepEqual(fallback, { wiredNetworkStatus: 'unknown', printerNetworkStatus: 'unknown' })

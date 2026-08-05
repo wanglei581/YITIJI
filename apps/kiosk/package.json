@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
-    "dev:trtc": "VITE_USE_TRTC_CALL=true vite --port 5173",
+    "dev:trtc": "cross-env VITE_USE_TRTC_CALL=true vite --port 5173",
     "build": "tsc -b && vite build",
     "lint": "eslint src/",
     "test:browser": "playwright test",

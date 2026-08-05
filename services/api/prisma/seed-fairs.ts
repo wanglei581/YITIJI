@@ -235,6 +235,10 @@ async function upsertFair(args: {
 }
 
 async function main() {
+  if (process.env['NODE_ENV'] === 'production') {
+    console.log('[seed] Skipped: NODE_ENV=production. Run with NODE_ENV=development to seed.')
+    return
+  }
   console.log('🎪 fair seed: starting...')
 
   // ── Fair 1:校园双选会 ────────────────────────────────────────────────────

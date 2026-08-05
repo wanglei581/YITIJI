@@ -24,6 +24,10 @@ const prisma = createPrismaClient(url).client
 const SALT_ROUNDS = 10
 
 async function main() {
+  if (process.env['NODE_ENV'] === 'production') {
+    console.log('[seed] Skipped: NODE_ENV=production. Run with NODE_ENV=development to seed.')
+    return
+  }
   console.log('🌱 0b seed: starting...')
 
   // ── Organizations ─────────────────────────────────────────────────────────

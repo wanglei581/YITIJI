@@ -1,87 +1,57 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common'
-import { createHash, randomUUID } from 'crypto'
+/**
+ * 文件服务 — 薄门面，将所有调用委托给各子服务。
+ *
+ * 外部调用方（controller、其他模块）继续 import FilesService，签名不变。
+ * 子服务拆分在 file-upload / file-access / file-delete / file-cleanup 中。
+ *
+ * 向后兼容重导出：
+ *   canAccessFile, deriveOwner, FileRequester, DIRECT_UPLOAD_SNIFF_MAX_BYTES
+ */
+import { Injectable } from '@nestjs/common'
 import type {
   CompleteUploadResponse,
   FileAccessUrlResponse,
   FileAssetCategory,
+  FileCleanupResponse,
+  FileLifecycleSummaryResponse,
   FileMetadata,
-  FileOwnerType,
   FilePurpose,
   FileRetentionPolicy,
-  FileRetentionSetBy,
   FileRetentionUpdateResponse,
   FileSensitiveLevel,
-  FileStatus,
   FileUploadResponse,
-  FileLifecycleSummaryResponse,
   SignedUrlResponse,
-  FileCleanupResponse,
   UploadIntentResponse,
 } from './file.types'
 import type { AuthedUser } from '../common/decorators/current-user.decorator'
 import type { UserRole } from '../common/decorators/roles.decorator'
-import { PrismaService } from '../prisma/prisma.service'
-import { AuditService } from '../audit/audit.service'
-import { StorageService } from '../storage/storage.service'
-import { generateObjectKey, type FileOwnerType as ObjKeyOwnerType } from '../storage/object-key'
-import {
-  DEFAULT_SENSITIVE_BY_PURPOSE,
-  PURPOSE_POLICY,
-  validateUpload,
-  isPurpose,
-  type UploadValidationMode,
-} from './file-validation'
-import { sniffDeclaredMimeMismatch } from './content-sniff'
-import {
-  RetentionPolicyError,
-  allowedPoliciesForFile,
-  computeRetentionDecision,
-  defaultRetentionForUpload,
-} from './retention-policy'
-import { summarizeFileLifecycleRows } from './lifecycle-summary'
-import { parseContentFileId, signFileUrl } from './signing'
+import { FileUploadService } from './file-upload.service'
+import { FileAccessService } from './file-access.service'
+import { FileDeleteService } from './file-delete.service'
+import { FileCleanupService } from './file-cleanup.service'
+import type { UploadValidationMode } from './file-validation'
+import type { FileRequester } from './file-helpers'
 
-/**
- * COS 直传 completeUpload 阶段允许整读回嗅探的对象大小上限。
- * StorageService 暂无 Range 读取,超过此值的对象(admin_upload / screensaver_material
- * 等 purpose 允许非视频文件到 500MB)跳过嗅探,避免把数百 MB 读进内存。
- */
-export const DIRECT_UPLOAD_SNIFF_MAX_BYTES = 32 * 1024 * 1024
+// Re-export so existing callers (ai.service.ts, files.controller.ts) keep working.
+export {
+  canAccessFile,
+  deriveOwner,
+  DIRECT_UPLOAD_SNIFF_MAX_BYTES,
+} from './file-helpers'
+export type { FileRequester } from './file-helpers'
 
-/**
- * 文件请求者(下载 / 预览 / 删除鉴权用)。
- *   - user:  后台 User(admin / partner / kiosk),来自 User JWT。
- *   - member:C 端求职者(EndUser),来自 member token。
- */
-export type FileRequester =
-  | { kind: 'user'; userId: string; role: UserRole; orgId: string | null }
-  | { kind: 'member'; endUserId: string }
-
-/**
- * 文件服务:落库 + 对象存储(COS / 本地)写入 + 签名 + 软删 + 物理清理。
- *
- * 所有物理读写经 StorageService 路由到 COS 或本地后端,FilesService 不再直接
- * 触碰文件系统。鉴权 + 审计(管理员访问用户文件)在 service / controller 协作完成。
- */
 @Injectable()
 export class FilesService {
-  private readonly logger = new Logger(FilesService.name)
-
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-    private readonly storage: StorageService
+    private readonly uploadSvc: FileUploadService,
+    private readonly accessSvc: FileAccessService,
+    private readonly deleteSvc: FileDeleteService,
+    private readonly cleanupSvc: FileCleanupService,
   ) {}
 
-  // ── 服务端代理上传(multipart;校验后的 buffer 经服务端推送到对象存储)──────
+  // ── Upload ─────────────────────────────────────────────────────────────────
 
-  async upload(args: {
+  upload(args: {
     buffer: Buffer
     filename: string
     mimeType: string
@@ -94,155 +64,13 @@ export class FilesService {
     actorRole?: UserRole | null
     actorOrgId?: string | null
     createdBy?: string | null
-    /** 仅服务端内部调用可设 intent；外部 multipart 调用省略时固定为 proxy(15MB)。 */
     validationMode?: UploadValidationMode
-    /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
   }): Promise<FileUploadResponse> {
-    if (args.purpose === 'member_data_export') {
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
-          message: '该文件用途仅允许服务端生成',
-        },
-      })
-    }
-    const validation = validateUpload({
-      purpose: args.purpose,
-      mimeType: args.mimeType,
-      filename: args.filename,
-      sizeBytes: args.buffer.length,
-      mode: args.validationMode ?? 'proxy',
-    })
-    if (!validation.ok) {
-      throw new BadRequestException({
-        error: { code: validation.code, message: validation.message },
-      })
-    }
-    // 魔数校验:真实字节须与声明 MIME 签名级一致(降低纯客户端声明的混淆空间;
-    // 非结构级证明,能力边界见 content-sniff.ts 文件头注释)。
-    const sniff = sniffDeclaredMimeMismatch(args.buffer, args.mimeType)
-    if (!sniff.ok) {
-      this.logger.warn(
-        `Upload content mismatch (purpose=${args.purpose}, declared=${args.mimeType}): ${sniff.reason}`
-      )
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_CONTENT_MISMATCH',
-          message: '文件内容与声明的类型不一致，请检查文件后重新上传',
-        },
-      })
-    }
-
-    const sensitiveLevel = this.resolveSensitiveLevel(args.purpose, args.sensitiveLevel)
-    const id = randomUUID().replace(/-/g, '')
-    const owner = deriveOwner({
-      endUserId: args.endUserId ?? null,
-      role: args.actorRole ?? null,
-      uploaderId: args.uploaderId,
-      orgId: args.actorOrgId ?? null,
-    })
-    const retention = defaultRetentionForUpload({
-      purpose: args.purpose,
-      sensitiveLevel,
-      ownerType: owner.ownerType,
-      endUserId: args.endUserId ?? null,
-    })
-    const expiresAtOverride =
-      args.purpose === 'contract_upload' ? undefined : args.expiresAtOverride
-    if (
-      expiresAtOverride &&
-      (!Number.isFinite(expiresAtOverride.getTime()) || expiresAtOverride.getTime() <= Date.now())
-    ) {
-      throw new BadRequestException({
-        error: { code: 'FILE_EXPIRY_INVALID', message: '文件到期时间无效' },
-      })
-    }
-    const objectKey = generateObjectKey({
-      purpose: args.purpose,
-      ownerType: owner.ownerType as ObjKeyOwnerType,
-      ownerId: owner.ownerId,
-      fileId: id,
-      ext: validation.ext,
-    })
-
-    const put = await this.storage.putObject(objectKey, args.buffer, args.mimeType)
-
-    const bucket = this.storage.defaultBucket
-    const region = this.storage.defaultRegion
-    let record
-    try {
-      record = await this.prisma.fileObject.create({
-        data: {
-          id,
-          storageKey: objectKey,
-          bucket,
-          region,
-          filename: args.filename,
-          mimeType: args.mimeType,
-          sizeBytes: put.sizeBytes,
-          sha256: put.sha256,
-          uploaderId: args.uploaderId,
-          endUserId: args.endUserId ?? null,
-          ownerType: owner.ownerType,
-          ownerId: owner.ownerId,
-          purpose: args.purpose,
-          sensitiveLevel,
-          visibility: 'private',
-          status: 'active',
-          createdBy: args.createdBy ?? args.uploaderId ?? null,
-          assetCategory: args.assetCategory ?? 'original',
-          sourceFileId: args.sourceFileId ?? null,
-          expiresAt: expiresAtOverride ?? retention.expiresAt,
-          retentionPolicy: retention.retentionPolicy,
-          retentionSetBy: retention.retentionSetBy,
-          retentionConsentAt: retention.retentionConsentAt,
-          retentionConsentVersion: retention.retentionConsentVersion,
-          retentionLockedReason:
-            args.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
-        },
-      })
-    } catch (createError) {
-      try {
-        await this.storage.deleteObject(objectKey, bucket)
-      } catch {
-        // 不记录 key / 文件名 / owner；原始 create 错误仍是调用方看到的失败。
-        this.logger.warn('Object cleanup compensation failed after file metadata persistence error')
-      }
-      throw createError
-    }
-
-    // 上传响应给至多 30 分钟的签名 URL，且不得越过文件自身寿命。
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
-    const signed = this.storage.getDownloadUrl(
-      {
-        objectKey: record.storageKey,
-        fileId: record.id,
-        filename: record.filename,
-        mimeType: record.mimeType,
-        ttlSeconds,
-        disposition: 'inline',
-      },
-      record.bucket
-    )
-    return {
-      fileId: record.id,
-      filename: record.filename,
-      sizeBytes: record.sizeBytes,
-      mimeType: record.mimeType,
-      sha256: record.sha256,
-      signedUrl: signed.url,
-      signedUrlExpiresAt: this.ensureSignedExpiryWithinFileLifetime(
-        signed.expiresAt,
-        record.expiresAt
-      ).toISOString(),
-      fileExpiresAt: record.expiresAt ? record.expiresAt.toISOString() : null,
-    }
+    return this.uploadSvc.upload(args)
   }
 
-  // ── 直传意图(COS 预签名 PUT;本地回 API 代理 PUT)────────────────────────
-
-  async createUploadIntent(args: {
+  createUploadIntent(args: {
     body: {
       purpose: string
       filename: string
@@ -257,802 +85,91 @@ export class FilesService {
     actorOrgId?: string | null
     createdBy?: string | null
   }): Promise<UploadIntentResponse> {
-    const { body } = args
-    if (body.purpose === 'member_data_export') {
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
-          message: '该文件用途仅允许服务端生成',
-        },
-      })
-    }
-    if (!isPurpose(body.purpose)) {
-      throw new BadRequestException({
-        error: { code: 'FILE_PURPOSE_INVALID', message: '不支持的文件用途' },
-      })
-    }
-    const declaredSize = Number(body.sizeBytes ?? 1)
-    const validation = validateUpload({
-      purpose: body.purpose,
-      mimeType: body.mimeType,
-      filename: body.filename,
-      sizeBytes: Number.isFinite(declaredSize) && declaredSize > 0 ? declaredSize : 1,
-      mode: 'intent',
-    })
-    if (!validation.ok) {
-      throw new BadRequestException({
-        error: { code: validation.code, message: validation.message },
-      })
-    }
-
-    const sensitiveLevel = this.resolveSensitiveLevel(
-      body.purpose as FilePurpose,
-      body.sensitiveLevel as FileSensitiveLevel | undefined
-    )
-    const id = randomUUID().replace(/-/g, '')
-    const owner = deriveOwner({
-      endUserId: args.endUserId ?? null,
-      role: args.actorRole ?? null,
-      uploaderId: args.uploaderId,
-      orgId: args.actorOrgId ?? null,
-    })
-    const retention = defaultRetentionForUpload({
-      purpose: body.purpose as FilePurpose,
-      sensitiveLevel,
-      ownerType: owner.ownerType,
-      endUserId: args.endUserId ?? null,
-    })
-    const objectKey = generateObjectKey({
-      purpose: body.purpose as FilePurpose,
-      ownerType: owner.ownerType as ObjKeyOwnerType,
-      ownerId: owner.ownerId,
-      fileId: id,
-      ext: validation.ext,
-    })
-
-    const record = await this.prisma.fileObject.create({
-      data: {
-        id,
-        storageKey: objectKey,
-        bucket: this.storage.defaultBucket,
-        region: this.storage.defaultRegion,
-        filename: body.filename,
-        mimeType: body.mimeType,
-        sizeBytes: 0,
-        sha256: typeof body.sha256 === 'string' ? body.sha256 : '',
-        uploaderId: args.uploaderId,
-        endUserId: args.endUserId ?? null,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-        purpose: body.purpose,
-        sensitiveLevel,
-        visibility: 'private',
-        status: 'uploading',
-        createdBy: args.createdBy ?? args.uploaderId ?? null,
-        expiresAt: retention.expiresAt,
-        retentionPolicy: retention.retentionPolicy,
-        retentionSetBy: retention.retentionSetBy,
-        retentionConsentAt: retention.retentionConsentAt,
-        retentionConsentVersion: retention.retentionConsentVersion,
-        retentionLockedReason:
-          body.purpose === 'contract_upload' ? 'contract_review_session_only' : null,
-      },
-    })
-
-    const upload = this.storage.getUploadUrl(
-      {
-        objectKey: record.storageKey,
-        fileId: record.id,
-        contentType: record.mimeType,
-        ttlSeconds: this.storage.signTtlSeconds,
-      },
-      record.bucket
-    )
-
-    return {
-      fileId: record.id,
-      bucket: record.bucket,
-      region: record.region,
-      objectKey: record.storageKey,
-      uploadUrl: upload.url,
-      uploadMethod: upload.method,
-      uploadHeaders: upload.headers,
-      uploadUrlExpiresAt: upload.expiresAt.toISOString(),
-      direct: upload.direct,
-    }
+    return this.uploadSvc.createUploadIntent(args)
   }
 
-  /**
-   * 客户端直传完成后确认。headObject 复核对象确实落地 + 实测大小,
-   * 通过则 status→active。COS 端 sha256 无法就 buffer 计算,沿用意图阶段客户端值(可空)。
-   */
-  async completeUpload(fileId: string, requester: FileRequester): Promise<CompleteUploadResponse> {
-    const record = await this.requireAlive(fileId)
-    if (!canAccessFile(record, requester)) {
-      throw new ForbiddenException({
-        error: { code: 'FILE_ACCESS_DENIED', message: '无权确认此文件' },
-      })
-    }
-
-    const head = await this.storage.headObject(record.storageKey, record.bucket)
-    if (!head) {
-      throw new BadRequestException({
-        error: { code: 'FILE_NOT_UPLOADED', message: '对象未上传或上传未完成' },
-      })
-    }
-    // 实测大小复核 purpose 上限(直传可能绕过意图阶段声明)。
-    const policy = PURPOSE_POLICY[record.purpose as FilePurpose]
-    if (policy && head.sizeBytes > policy.maxBytes) {
-      // 超限对象立即物理删除 + 标记 quarantined,不让违规文件留存。
-      await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
-      await this.prisma.fileObject.update({
-        where: { id: fileId },
-        data: { status: 'quarantined' },
-      })
-      throw new BadRequestException({
-        error: { code: 'FILE_TOO_LARGE', message: '上传文件超出大小上限,已拒绝' },
-      })
-    }
-
-    // 魔数校验(直传路径:客户端字节直达对象存储,服务端此前从未看过内容)。
-    // 边界:StorageService 没有 ranged/partial read,getObject 会把整个对象读进内存,
-    // 故嗅探同时受 DIRECT_UPLOAD_SNIFF_MAX_BYTES 实测大小门限约束——video/* 与超限对象
-    // 本轮明确豁免(属已披露残留;待存储接口支持 Range 读取后收口)。
-    if (!record.mimeType.startsWith('video/') && head.sizeBytes <= DIRECT_UPLOAD_SNIFF_MAX_BYTES) {
-      const bytes = await this.storage.getObject(record.storageKey, record.bucket)
-      const sniff = sniffDeclaredMimeMismatch(bytes, record.mimeType)
-      if (!sniff.ok) {
-        // 与上方超限分支同款处理:物理删除 + quarantined,不让伪装文件留存。
-        this.logger.warn(
-          `Direct-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`
-        )
-        await this.storage.deleteObject(record.storageKey, record.bucket).catch(() => undefined)
-        await this.prisma.fileObject.update({
-          where: { id: fileId },
-          data: { status: 'quarantined' },
-        })
-        throw new BadRequestException({
-          error: {
-            code: 'FILE_CONTENT_MISMATCH',
-            message: '文件内容与声明的类型不一致，请检查文件后重新上传',
-          },
-        })
-      }
-    }
-
-    const updated = await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { sizeBytes: head.sizeBytes, status: 'active' },
-    })
-    return {
-      fileId: updated.id,
-      status: updated.status as FileStatus,
-      sizeBytes: updated.sizeBytes,
-      sha256: updated.sha256,
-      fileExpiresAt: updated.expiresAt ? updated.expiresAt.toISOString() : null,
-    }
+  completeUpload(fileId: string, requester: FileRequester): Promise<CompleteUploadResponse> {
+    return this.uploadSvc.completeUpload(fileId, requester)
   }
 
-  /** 本地后端直传:接收原始 buffer 写入,并复核大小/落地 active。 */
-  async writeRawUpload(fileId: string, buffer: Buffer): Promise<void> {
-    const record = await this.requireAlive(fileId)
-    const validation = validateUpload({
-      purpose: record.purpose,
-      mimeType: record.mimeType,
-      filename: record.filename,
-      sizeBytes: buffer.length,
-      mode: 'intent',
-    })
-    if (!validation.ok) {
-      throw new BadRequestException({
-        error: { code: validation.code, message: validation.message },
-      })
-    }
-    // 魔数校验:真实字节须与意图阶段声明的 MIME 签名级一致(非结构级证明)。
-    const sniff = sniffDeclaredMimeMismatch(buffer, record.mimeType)
-    if (!sniff.ok) {
-      this.logger.warn(
-        `Raw-upload content mismatch (purpose=${record.purpose}, declared=${record.mimeType}): ${sniff.reason}`
-      )
-      throw new BadRequestException({
-        error: {
-          code: 'FILE_CONTENT_MISMATCH',
-          message: '文件内容与声明的类型不一致，请检查文件后重新上传',
-        },
-      })
-    }
-    const put = await this.storage.putObject(
-      record.storageKey,
-      buffer,
-      record.mimeType,
-      record.bucket
-    )
-    await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { sizeBytes: put.sizeBytes, sha256: put.sha256, status: 'active' },
-    })
+  writeRawUpload(fileId: string, buffer: Buffer): Promise<void> {
+    return this.uploadSvc.writeRawUpload(fileId, buffer)
   }
 
-  // ── 下载 / 预览 短期 URL ──────────────────────────────────────────────────
+  // ── Access / Read ──────────────────────────────────────────────────────────
 
-  /**
-   * 生成下载 / 预览 URL,带归属鉴权。
-   * 返回 needsAdminAudit 表示"管理员访问了非本人的用户敏感文件",由 controller 落审计。
-   */
-  async getAccessUrl(
+  getAccessUrl(
     fileId: string,
     requester: FileRequester,
-    disposition: 'inline' | 'attachment'
+    disposition: 'inline' | 'attachment',
   ): Promise<{
     response: FileAccessUrlResponse
     record: { purpose: string; ownerType: string | null }
     needsAdminAudit: boolean
   }> {
-    const record = await this.requireAlive(fileId)
-    if (!canAccessFile(record, requester)) {
-      throw new ForbiddenException({
-        error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
-      })
-    }
-
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
-
-    const signed = this.storage.getDownloadUrl(
-      {
-        objectKey: record.storageKey,
-        fileId: record.id,
-        filename: record.filename,
-        mimeType: record.mimeType,
-        ttlSeconds,
-        disposition,
-      },
-      record.bucket
-    )
-
-    const isUserFile = record.ownerType === 'user' || Boolean(record.endUserId)
-    const needsAdminAudit = requester.kind === 'user' && requester.role === 'admin' && isUserFile
-
-    return {
-      response: {
-        fileId: record.id,
-        url: signed.url,
-        // printFileUrl 只是应用内部 HMAC 入口；/content 最终读取仍通过
-        // requireAlive 二次校验 file.expiresAt，不会因该 URL 的签名期越过文件寿命。
-        printFileUrl: signFileUrl(record.id).url,
-        expiresAt: this.ensureSignedExpiryWithinFileLifetime(
-          signed.expiresAt,
-          record.expiresAt
-        ).toISOString(),
-        disposition,
-      },
-      record: { purpose: record.purpose, ownerType: record.ownerType },
-      needsAdminAudit,
-    }
+    return this.accessSvc.getAccessUrl(fileId, requester, disposition)
   }
 
-  /** 兼容旧端点 GET /files/:id/url:重发短期签名 URL(归属校验)。 */
-  async getSignedUrl(fileId: string, user: AuthedUser): Promise<SignedUrlResponse> {
-    const requester: FileRequester = {
-      kind: 'user',
-      userId: user.userId,
-      role: user.role,
-      orgId: user.orgId,
-    }
-    const record = await this.requireAlive(fileId)
-    if (!canAccessFile(record, requester)) {
-      throw new ForbiddenException({
-        error: { code: 'FILE_ACCESS_DENIED', message: '无权访问此文件' },
-      })
-    }
-    const ttlSeconds = this.downloadUrlTtlSeconds(record.expiresAt, record.purpose)
-    const signed = this.storage.getDownloadUrl(
-      {
-        objectKey: record.storageKey,
-        fileId: record.id,
-        filename: record.filename,
-        mimeType: record.mimeType,
-        ttlSeconds,
-        disposition: 'inline',
-      },
-      record.bucket
-    )
-    return {
-      fileId: record.id,
-      signedUrl: signed.url,
-      expiresAt: this.ensureSignedExpiryWithinFileLifetime(
-        signed.expiresAt,
-        record.expiresAt
-      ).toISOString(),
-      purpose: record.purpose as FilePurpose,
-    }
+  getSignedUrl(fileId: string, user: AuthedUser): Promise<SignedUrlResponse> {
+    return this.accessSvc.getSignedUrl(fileId, user)
   }
 
-  // ── 读取文件 buffer(/content 代理;签名校验由 controller 完成)────────────
-
-  async readContent(
-    fileId: string
-  ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireAlive(fileId)
-    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
-    return {
-      buffer,
-      mimeType: record.mimeType,
-      filename: record.filename,
-      purpose: record.purpose as FilePurpose,
-    }
-  }
-
-  /**
-   * 会员 / 匿名业务流按上传归属读取文件内容。
-   *
-   * - endUserId 为 string: 只允许读取该会员自己的文件。
-   * - endUserId 为 null: 只允许读取匿名上传文件(ownerType=system)。
-   *
-   * 这里故意用 NOT_FOUND 口径，避免通过 fileId 探测他人文件是否存在。
-   * 签名 URL 内容代理仍使用 readContent；签名校验由 controller 完成。
-   */
-  async readContentForEndUser(
+  readContent(
     fileId: string,
-    endUserId: string | null
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireAlive(fileId)
-    if (record.status !== 'active') {
-      this.throwFileNotFound()
-    }
-    const allowed = endUserId
-      ? record.endUserId === endUserId
-      : record.endUserId === null && record.ownerType === 'system'
-    if (!allowed) {
-      throw new NotFoundException({
-        error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
-      })
-    }
-    const buffer = await this.storage.getObject(record.storageKey, record.bucket)
-    return {
-      buffer,
-      mimeType: record.mimeType,
-      filename: record.filename,
-      purpose: record.purpose as FilePurpose,
-    }
+    return this.accessSvc.readContent(fileId)
   }
 
-  // ── 列表(admin)─────────────────────────────────────────────────────────
+  readContentForEndUser(
+    fileId: string,
+    endUserId: string | null,
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
+    return this.accessSvc.readContentForEndUser(fileId, endUserId)
+  }
 
-  async list(
-    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {}
+  list(
+    args: { includeDeleted?: boolean; purpose?: string; limit?: number } = {},
   ): Promise<FileMetadata[]> {
-    const records = await this.prisma.fileObject.findMany({
-      where: {
-        ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose ? { purpose: args.purpose } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-      take: Math.min(args.limit ?? 100, 500),
-    })
-    return records.map(toMetadata)
+    return this.accessSvc.list(args)
   }
 
-  /** Admin 文件生命周期全局只读统计。 */
-  async lifecycleSummary(now = new Date()): Promise<FileLifecycleSummaryResponse> {
-    const rows = await this.prisma.fileObject.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true,
-        retentionPolicy: true,
-        retentionSetBy: true,
-        expiresAt: true,
-      },
-    })
-    return summarizeFileLifecycleRows(
-      rows.map((row) => ({
-        id: row.id,
-        retentionPolicy: row.retentionPolicy as FileRetentionPolicy | null,
-        retentionSetBy: row.retentionSetBy as FileRetentionSetBy | null,
-        expiresAt: row.expiresAt,
-        deletedAt: null,
-      })),
-      now
-    )
+  lifecycleSummary(now?: Date): Promise<FileLifecycleSummaryResponse> {
+    return this.accessSvc.lifecycleSummary(now)
   }
 
-  // ── 删除 ────────────────────────────────────────────────────────────────────
+  // ── Delete / Retention ─────────────────────────────────────────────────────
 
-  /** 管理员强制删除(软删 + 物理删 COS / 本地对象)。 */
-  async forceDelete(fileId: string, adminId: string, reason: string): Promise<FileMetadata> {
-    return this._delete(fileId, `admin:${adminId}`, reason)
+  forceDelete(fileId: string, adminId: string, reason: string): Promise<FileMetadata> {
+    return this.deleteSvc.forceDelete(fileId, adminId, reason)
   }
 
-  /**
-   * 归属人删除(owner / 管理员)。软删数据库记录,并物理删除对象。
-   * 合规:敏感文件删除即物理回收,不留持久公开物。
-   */
-  async ownerDelete(
+  ownerDelete(
     fileId: string,
     requester: FileRequester,
-    reason: string
-  ): Promise<FileMetadata> {
-    const record = await this.requireDeletable(fileId)
-    if (!canAccessFile(record, requester)) {
-      throw new ForbiddenException({
-        error: { code: 'FILE_ACCESS_DENIED', message: '无权删除此文件' },
-      })
-    }
-    const deletedBy =
-      requester.kind === 'member'
-        ? `member:${requester.endUserId}`
-        : requester.role === 'admin'
-          ? `admin:${requester.userId}`
-          : `user:${requester.userId}`
-    return this._delete(fileId, deletedBy, reason)
-  }
-
-  /** 服务端生命周期任务删除系统派生文件；不暴露给 controller。 */
-  async systemDelete(fileId: string, reason: string): Promise<FileMetadata> {
-    return this._delete(fileId, 'system', reason, true)
-  }
-
-  /** 高敏生命周期任务专用删除入口；成功日志不得暴露完整 fileId。 */
-  async systemDeleteSensitive(fileId: string, reason: string): Promise<FileMetadata> {
-    return this._delete(fileId, 'system', reason, true, true)
-  }
-
-  /** 会员本人修改文件保存期限。Admin 代改留给后续独立审批/锁定通道。 */
-  async updateRetention(
-    fileId: string,
-    requester: FileRequester,
-    args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string }
-  ): Promise<FileRetentionUpdateResponse> {
-    const record = await this.requireAlive(fileId)
-    if (!canAccessFile(record, requester)) {
-      throw new ForbiddenException({
-        error: { code: 'FILE_ACCESS_DENIED', message: '无权修改此文件' },
-      })
-    }
-    try {
-      const decision = computeRetentionDecision({
-        now: new Date(),
-        policy: args.retentionPolicy,
-        purpose: record.purpose as FilePurpose,
-        sensitiveLevel: record.sensitiveLevel as FileSensitiveLevel,
-        assetCategory: record.assetCategory as FileAssetCategory,
-        ownerType: record.ownerType as FileOwnerType | null,
-        endUserId: record.endUserId,
-        requesterKind: requester.kind,
-        requesterEndUserId: requester.kind === 'member' ? requester.endUserId : null,
-        consentVersion: args.consentVersion,
-        retentionLockedReason: record.retentionLockedReason,
-      })
-      const updated = await this.prisma.fileObject.update({
-        where: { id: fileId },
-        data: {
-          expiresAt: decision.expiresAt,
-          retentionPolicy: decision.retentionPolicy,
-          retentionSetBy: decision.retentionSetBy,
-          retentionConsentAt: decision.retentionConsentAt,
-          retentionConsentVersion: decision.retentionConsentVersion,
-        },
-      })
-      return {
-        file: toMetadata(updated),
-        allowedPolicies: allowedPoliciesForFile({
-          purpose: updated.purpose,
-          assetCategory: updated.assetCategory,
-        }),
-      }
-    } catch (err) {
-      if (err instanceof RetentionPolicyError) {
-        const payload = { error: { code: err.code, message: err.message } }
-        if (
-          err.code === 'RETENTION_MEMBER_REQUIRED' ||
-          err.code === 'RETENTION_ACCESS_DENIED' ||
-          err.code === 'RETENTION_LOCKED'
-        ) {
-          throw new ForbiddenException(payload)
-        }
-        throw new BadRequestException(payload)
-      }
-      throw err
-    }
-  }
-
-  private async _delete(
-    fileId: string,
-    deletedBy: string,
     reason: string,
-    allowMemberDataExport = false,
-    sensitiveLog = false
   ): Promise<FileMetadata> {
-    const record = await this.requireDeletable(fileId, { allowMemberDataExport })
-    await this.storage.deleteObject(record.storageKey, record.bucket)
-    const updated = await this.prisma.fileObject.update({
-      where: { id: fileId },
-      data: { deletedAt: new Date(), deletedBy, deleteReason: reason, status: 'deleted' },
-    })
-    if (sensitiveLog) {
-      this.logger.log(`Sensitive file deleted by ${deletedBy}: ${digestFileId(fileId)}`)
-    } else {
-      this.logger.log(`File deleted by ${deletedBy}: ${fileId}`)
-    }
-    return toMetadata(updated)
+    return this.deleteSvc.ownerDelete(fileId, requester, reason)
   }
 
-  // ── cron / 手动:清理所有已过期文件 ─────────────────────────────────────
-
-  async cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
-    const now = new Date()
-    const expired = await this.prisma.fileObject.findMany({
-      // 导出文件必须由 member-privacy reconciler 同步收口请求账本，
-      // 通用 cron 不得越过账本直接删除。
-      where: {
-        deletedAt: null,
-        purpose: { not: 'member_data_export' },
-        OR: [
-          { expiresAt: { lt: now } },
-          // contract_upload 必须始终有系统锁定的短期寿命；null 是异常高敏行，
-          // 按已过期处理，避免因无法命中 expiresAt < now 而无限留存。
-          { purpose: 'contract_upload', expiresAt: null },
-        ],
-      },
-      select: { id: true, storageKey: true, bucket: true, purpose: true, sensitiveLevel: true },
-    })
-
-    const deletedIds: string[] = []
-    const bySensitiveLevel: Record<string, number> = {}
-    const byPurpose: Record<string, number> = {}
-    for (const f of expired) {
-      try {
-        const bridge = await this.prisma.fairMaterialPrintBridge.findFirst({
-          where: { fileObjectId: f.id },
-          select: { id: true, status: true, revokedAt: true },
-        })
-        if (bridge && (await this.hasActivePrintTaskForFile(f.id))) {
-          continue
-        }
-        await this.storage.deleteObject(f.storageKey, f.bucket)
-        await this.prisma.fileObject.update({
-          where: { id: f.id },
-          data: {
-            deletedAt: now,
-            deletedBy: 'auto',
-            deleteReason:
-              triggeredBy === 'manual' ? 'manual cleanup of expired' : 'cron cleanup of expired',
-            status: 'deleted',
-          },
-        })
-        if (bridge && bridge.status === 'ready' && !bridge.revokedAt) {
-          await this.prisma.fairMaterialPrintBridge.update({
-            where: { id: bridge.id },
-            data: {
-              activeKey: null,
-              status: 'expired',
-              revokedAt: now,
-              revokeReason: 'file_expired_cleanup',
-            },
-          })
-        }
-        deletedIds.push(f.id)
-        bySensitiveLevel[f.sensitiveLevel] = (bySensitiveLevel[f.sensitiveLevel] ?? 0) + 1
-        byPurpose[f.purpose] = (byPurpose[f.purpose] ?? 0) + 1
-      } catch {
-        this.logger.warn(`code=FILE_CLEANUP_ITEM_FAILED file=${digestFileId(f.id)}`)
-      }
-    }
-    if (deletedIds.length > 0) {
-      this.logger.log(`Cleanup (${triggeredBy}): deleted ${deletedIds.length} expired files`)
-    }
-
-    if (triggeredBy === 'cron' && deletedIds.length > 0) {
-      await this.audit.write({
-        actorId: null,
-        actorRole: 'system',
-        action: 'file.cleanup_expired',
-        targetType: 'file',
-        targetId: null,
-        payload: {
-          triggeredBy,
-          deletedCount: deletedIds.length,
-          bySensitiveLevel,
-          byPurpose,
-          fileIdDigest: deletedIds.slice(0, 50).map(digestFileId),
-        },
-      })
-    }
-
-    return {
-      deletedCount: deletedIds.length,
-      deletedFileIds: deletedIds,
-      triggeredBy,
-      triggeredAt: now.toISOString(),
-    }
+  systemDelete(fileId: string, reason: string): Promise<FileMetadata> {
+    return this.deleteSvc.systemDelete(fileId, reason)
   }
 
-  // ── 内部 ────────────────────────────────────────────────────────────────────
-
-  private resolveSensitiveLevel(
-    purpose: FilePurpose,
-    explicit?: FileSensitiveLevel
-  ): FileSensitiveLevel {
-    if (purpose === 'contract_upload') return 'highly_sensitive'
-    return explicit ?? DEFAULT_SENSITIVE_BY_PURPOSE[purpose] ?? 'normal'
+  systemDeleteSensitive(fileId: string, reason: string): Promise<FileMetadata> {
+    return this.deleteSvc.systemDeleteSensitive(fileId, reason)
   }
 
-  private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {
-    const tasks = await this.prisma.printTask.findMany({
-      where: { status: { in: ['pending', 'claimed', 'printing'] } },
-      select: { fileUrl: true },
-    })
-    return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
-  }
-
-  private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
-    if (purpose === 'contract_upload' && !expiresAt) {
-      this.throwFileNotFound()
-    }
-    if (!expiresAt) return this.storage.signTtlSeconds
-    const remainingSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
-    // 对象存储签名的最小安全粒度为 1 秒；不足时禁止调用存储签名。
-    if (remainingSeconds < 1) {
-      this.throwFileNotFound()
-    }
-    return Math.min(this.storage.signTtlSeconds, remainingSeconds)
-  }
-
-  private ensureSignedExpiryWithinFileLifetime(
-    signedExpiresAt: Date,
-    fileExpiresAt: Date | null
-  ): Date {
-    if (fileExpiresAt && signedExpiresAt.getTime() > fileExpiresAt.getTime()) {
-      this.throwFileNotFound()
-    }
-    return signedExpiresAt
-  }
-
-  private async requireAlive(fileId: string, options: { allowMemberDataExport?: boolean } = {}) {
-    return this.requireFile(fileId, { ...options, allowExpired: false })
-  }
-
-  private async requireDeletable(
+  updateRetention(
     fileId: string,
-    options: { allowMemberDataExport?: boolean } = {}
-  ) {
-    return this.requireFile(fileId, { ...options, allowExpired: true })
+    requester: FileRequester,
+    args: { retentionPolicy: FileRetentionPolicy; consentVersion?: string },
+  ): Promise<FileRetentionUpdateResponse> {
+    return this.deleteSvc.updateRetention(fileId, requester, args)
   }
 
-  private async requireFile(
-    fileId: string,
-    options: { allowMemberDataExport?: boolean; allowExpired: boolean }
-  ) {
-    const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
-    if (
-      !record ||
-      record.deletedAt ||
-      (!options.allowExpired && record.purpose === 'contract_upload' && !record.expiresAt) ||
-      (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
-      (!options.allowMemberDataExport && record.purpose === 'member_data_export')
-    ) {
-      // 禁止通用端点成为导出 artifact 存在性探针。
-      this.throwFileNotFound()
-    }
-    return record
-  }
+  // ── Cleanup ────────────────────────────────────────────────────────────────
 
-  private throwFileNotFound(): never {
-    throw new NotFoundException({
-      error: { code: 'FILE_NOT_FOUND', message: '文件不存在或已被清理' },
-    })
-  }
-}
-
-function digestFileId(fileId: string): string {
-  return createHash('sha256').update(fileId).digest('hex').slice(0, 12)
-}
-
-/** 归属判定。member 只能访问 endUserId 匹配;User 按角色 / 上传者 / 机构。 */
-export function canAccessFile(
-  record: {
-    uploaderId: string | null
-    endUserId: string | null
-    ownerType: string | null
-    ownerId: string | null
-  },
-  requester: FileRequester
-): boolean {
-  if (requester.kind === 'member') {
-    return Boolean(record.endUserId) && record.endUserId === requester.endUserId
-  }
-  // requester.kind === 'user'
-  if (requester.role === 'admin') return true
-  if (record.uploaderId && record.uploaderId === requester.userId) return true
-  // 合作机构只能访问本机构(partner)文件,绝不能访问用户简历(ownerType='user')
-  if (
-    requester.role === 'partner' &&
-    record.ownerType === 'partner' &&
-    record.ownerId &&
-    requester.orgId &&
-    record.ownerId === requester.orgId
-  ) {
-    return true
-  }
-  return false
-}
-
-/** 由上传上下文推断 ownerType / ownerId。 */
-export function deriveOwner(args: {
-  endUserId: string | null
-  role: UserRole | null
-  uploaderId: string | null
-  orgId: string | null
-}): {
-  ownerType: FileOwnerType
-  ownerId: string | null
-} {
-  if (args.endUserId) return { ownerType: 'user', ownerId: args.endUserId }
-  if (args.role === 'admin') return { ownerType: 'admin', ownerId: args.uploaderId }
-  if (args.role === 'partner') return { ownerType: 'partner', ownerId: args.orgId }
-  return { ownerType: 'system', ownerId: null }
-}
-
-function toMetadata(r: {
-  id: string
-  bucket: string
-  region: string
-  storageKey: string
-  filename: string
-  mimeType: string
-  sizeBytes: number
-  sha256: string
-  purpose: string
-  sensitiveLevel: string
-  ownerType: string | null
-  ownerId: string | null
-  visibility: string
-  status: string
-  assetCategory: string
-  sourceFileId: string | null
-  retentionPolicy: string | null
-  retentionSetBy: string | null
-  retentionConsentAt: Date | null
-  retentionConsentVersion: string | null
-  retentionLockedReason: string | null
-  uploaderId: string | null
-  endUserId: string | null
-  createdBy: string | null
-  expiresAt: Date | null
-  deletedAt: Date | null
-  deletedBy: string | null
-  deleteReason: string | null
-  createdAt: Date
-}): FileMetadata {
-  const protectedExport = r.purpose === 'member_data_export'
-  return {
-    id: r.id,
-    bucket: protectedExport ? '' : r.bucket,
-    region: protectedExport ? '' : r.region,
-    objectKey: protectedExport ? '' : r.storageKey,
-    filename: r.filename,
-    mimeType: r.mimeType,
-    sizeBytes: r.sizeBytes,
-    sha256: protectedExport ? '' : r.sha256,
-    purpose: r.purpose as FilePurpose,
-    sensitiveLevel: r.sensitiveLevel as FileSensitiveLevel,
-    ownerType: r.ownerType as FileOwnerType | null,
-    ownerId: r.ownerId,
-    visibility: r.visibility as FileMetadata['visibility'],
-    status: r.status as FileStatus,
-    assetCategory: r.assetCategory as FileAssetCategory,
-    sourceFileId: r.sourceFileId,
-    retentionPolicy: r.retentionPolicy as FileRetentionPolicy | null,
-    retentionSetBy: r.retentionSetBy as FileMetadata['retentionSetBy'],
-    retentionConsentAt: r.retentionConsentAt?.toISOString() ?? null,
-    retentionConsentVersion: r.retentionConsentVersion,
-    retentionLockedReason: r.retentionLockedReason,
-    uploaderId: r.uploaderId,
-    endUserId: r.endUserId,
-    createdBy: r.createdBy,
-    expiresAt: r.expiresAt?.toISOString() ?? null,
-    deletedAt: r.deletedAt?.toISOString() ?? null,
-    deletedBy: r.deletedBy,
-    deleteReason: r.deleteReason,
-    createdAt: r.createdAt.toISOString(),
+  cleanupExpired(triggeredBy: 'manual' | 'cron'): Promise<FileCleanupResponse> {
+    return this.cleanupSvc.cleanupExpired(triggeredBy)
   }
 }

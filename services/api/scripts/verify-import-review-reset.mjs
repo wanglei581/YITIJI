@@ -70,6 +70,68 @@ const EXPECTED_SITES = {
   'job-sync.service.ts': ['upsertJobs·job', 'upsertFairs·jobFair'], // 反向断言
 }
 
+/**
+ * ── 已分析豁免路径 & 政策缺口（2026-08-05 prior audit）────────────────────────
+ *
+ * 以下路径经手工逐行复审，确认均不属于「Partner/Excel 外部数据导入 job/jobFair.upsert」
+ * 场景，故不纳入本门禁 EXPECTED_SITES。所有判定依据已逐条注释，防止后续维护者
+ * 误以为它们被遗漏。
+ *
+ * 【豁免：内部辅助元数据，非 ExternalJob / ExternalJobFair 模型，无 reviewStatus 字段】
+ *
+ *   services/api/src/jobs/fair-venue-guide.service.ts:116
+ *     调用：tx.fairVenueGuide.upsert({ where:{jobFairId}, create:{...}, update:{venueName} })
+ *     模型：FairVenueGuide（场馆导览配置，存展厅 / 设施布局）
+ *     豁免理由：
+ *       ① 模型不含 reviewStatus / publishStatus 字段；
+ *       ② 纯内部管理员配置写入，非 Partner/Excel 外部数据导入；
+ *       ③ upsertModelOf() 只追踪 job / jobFair，此处模型为 fairVenueGuide，
+ *          AST 扫描会返回 null 并跳过，不存在漏报风险。
+ *
+ *   services/api/src/jobs/fair-material.service.ts:179
+ *     调用：this.prisma.fairMaterial.update({ where:{id}, data:{name, type, …} })
+ *     模型：FairMaterial（活动资料：PDF / 图片文件元数据）
+ *     豁免理由：
+ *       ① 此处是 .update()，非 .upsert()，本门禁专盯 upsert 调用；
+ *       ② FairMaterial 不含 reviewStatus，是纯文件元数据子表；
+ *       ③ 非外部招聘数据，无需退审逻辑。
+ *
+ *   services/api/src/jobs/fair-company-zone.service.ts:49
+ *     调用：this.prisma.fairCompany.create({ data:{…} })
+ *   services/api/src/jobs/fair-company-zone.service.ts:74
+ *     调用：this.prisma.fairCompany.update({ where:{id}, data:{…} })
+ *   services/api/src/jobs/fair-company-zone.service.ts:109
+ *     调用：this.prisma.fairZone.create({ data:{…} })
+ *     模型：FairCompany（参展企业展示信息）/ FairZone（展区信息）
+ *     豁免理由：
+ *       ① 全部是 .create() / .update()，非 .upsert()；
+ *       ② FairCompany / FairZone 是招聘会子表展示信息，无 reviewStatus 字段；
+ *       ③ 不含外部岗位或招聘会主体数据（ExternalJob / ExternalJobFair），
+ *          无需退审门禁。
+ *
+ * ── TODO(P1-policy-gap): 管理员直接编辑已发布招聘会内容字段，无退审 ───────────
+ *
+ *   services/api/src/jobs/admin-fairs.service.ts:146–196 (updateFairInfo)
+ *     调用：this.prisma.jobFair.update({ where:{id}, data:{ title, venue, startAt, … } })
+ *     模型：jobFair ← 是受审核控制的模型
+ *
+ *   问题：管理员可直接修改已 approved+published 的招聘会展示字段
+ *         （标题、场馆、时间、描述等），Kiosk 立即展示修改后内容，无二次审核。
+ *
+ *   为何未纳入本门禁：
+ *     ① 此处是 .update()，非 .upsert()，本门禁当前范围仅覆盖导入路径的 upsert；
+ *     ② 是管理员发起的直接内容编辑（非 Partner/Excel 外部数据导入），
+ *        与导入流的审核重置语义不同（管理员身份本身已是授权因素）；
+ *     ③ 强制退审可能引入反向问题：每次微调标点都退审，与导入场景的 P0 缺口
+ *        （job-sync 无条件重置压垮队列）属同一类操作风险。
+ *
+ *   建议处理（不在本次改动中实施，须产品与合规确认后再加）：
+ *     a. 在 updateFairInfo 中，当展示字段（title/venue/description/startAt/endAt）
+ *        发生实质变化时将 reviewStatus 退回 'pending'（内容哈希比对方案）；
+ *     b. 或引入「管理员内容变更须合规人员二次审核」专属审批流；
+ *     c. 无论哪种方案，都需同步更新 docs/compliance/compliance-boundary.md §4 相关节。
+ */
+
 /** 自测用例总数（写死：用例数组被清空时 total=0 会让断言静默消失，须由此常量兜住）
  * Round 7 新增 10 条（M M′ N O P Q Q′ Q″ Q‴ Q⁴）：24 → 34
  * Round 8 新增 3 条（O′ O″ O‴）：34 → 37
