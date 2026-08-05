@@ -504,7 +504,7 @@ check('offline agency fixture mirrors the production wire contract', () => {
   for (const name of ['WireOfflineAgency', 'WireOfflineJobAgency', 'WireOfflineJob']) {
     assert.deepEqual(interfaceShape(fixture, name), interfaceShape(offlineAgencyService, name))
   }
-  assert.match(fixture, /offline-agencies['"], \{ data: \[agency\], total: 1, page: 1, pageSize: 10 \}/)
+  assert.match(fixture, /offline-agencies['"], \{ items: \[agency\], total: 1, page: 1, pageSize: 10 \}/)
   assert.match(fixture, /offline-jobs\/offline-job-001['"], offlineJob/)
   assert.doesNotMatch(fixture, /agency:\s*\{[^}]*services:/s, 'detail fixture mirrors the real agency select')
   assert.match(w6Fixture, /salaryMin:/, 'W6 offline job fixture uses the raw wire contract')

@@ -27,6 +27,11 @@ import type { CreateScanTaskDto } from '../src/scan-tasks/dto/create-scan-task.d
 import { AuditService } from '../src/audit/audit.service'
 import { StorageService } from '../src/storage/storage.service'
 import { FilesService } from '../src/files/files.service'
+import { FileQueryService } from '../src/files/file-query.service'
+import { FileUploadService } from '../src/files/file-upload.service'
+import { FileAccessService } from '../src/files/file-access.service'
+import { FileDeleteService } from '../src/files/file-delete.service'
+import { FileCleanupService } from '../src/files/file-cleanup.service'
 
 function runPrisma(apiRoot: string, args: string[], env: NodeJS.ProcessEnv): void {
   execFileSync(
@@ -629,7 +634,12 @@ async function assertRealDbDedupGuardClosesCrossUserLeak(dbUrl: string): Promise
     const realPrisma = client as never
     const audit = new AuditService(realPrisma)
     const storage = new StorageService()
-    const files = new FilesService(realPrisma, audit, storage)
+    const fileQuery = new FileQueryService(realPrisma, storage)
+    const uploadSvc = new FileUploadService(realPrisma, storage, fileQuery)
+    const accessSvc = new FileAccessService(realPrisma, storage, fileQuery)
+    const deleteSvc = new FileDeleteService(realPrisma, storage, fileQuery)
+    const cleanupSvc = new FileCleanupService(realPrisma, storage, audit)
+    const files = new FilesService(uploadSvc, accessSvc, deleteSvc, cleanupSvc)
     const service = new ScanTasksService(realPrisma, files, passthroughCapabilities)
 
     const bufferA = tinyPdf()
