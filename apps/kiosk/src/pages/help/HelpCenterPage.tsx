@@ -206,7 +206,11 @@ export function HelpCenterPage() {
           </p>
 
           {/* 网站备案信息 */}
-          <p className="k1-help-footer" style={{ marginTop: 8, opacity: 0.6, fontSize: '0.9em' }}>
+          <p
+            className="k1-help-footer"
+            aria-label="网站备案信息"
+            style={{ marginTop: 8, opacity: 0.6, fontSize: '0.9em' }}
+          >
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
               鲁ICP备2026023517号-2
             </a>

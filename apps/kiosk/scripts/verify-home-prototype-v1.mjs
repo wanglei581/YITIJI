@@ -387,6 +387,7 @@ expect(!/filing-info|鲁ICP备|鲁公网安备/.test(home), '首页不再重复�
 const filingStart = helpCenter.indexOf('{/* 网站备案信息 */}')
 const filingBlock = filingStart >= 0 ? helpCenter.slice(filingStart) : ''
 expect(filingOrder.every((text) => filingBlock.includes(text)), '帮助中心展示 ICP、公安备案与「职易达AI」')
+expect(/aria-label="网站备案信息"/.test(filingBlock), '帮助中心备案区保留稳定的可访问名称')
 expect(
   filingOrder.every(
     (text, index) => index === 0 || filingBlock.indexOf(filingOrder[index - 1]) < filingBlock.indexOf(text),

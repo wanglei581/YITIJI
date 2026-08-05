@@ -64,8 +64,8 @@ function registerPrivacyRuntimeApi(api: ApiRouter) {
   })
 }
 
-async function assertHomeFilingInfo(page: Page) {
-  const filingInfo = page.locator('footer[aria-label="网站备案信息"]')
+async function assertHelpCenterFilingInfo(page: Page) {
+  const filingInfo = page.locator('[aria-label="网站备案信息"]')
   await expect(filingInfo).toBeVisible()
   await expect(filingInfo.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute(
     'href',
@@ -75,7 +75,7 @@ async function assertHomeFilingInfo(page: Page) {
     'href',
     'https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308',
   )
-  await expect(filingInfo.getByText('职易达AI', { exact: true })).toBeVisible()
+  await expect(filingInfo).toContainText('职易达AI')
 }
 
 test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ page, api }) => {
@@ -89,7 +89,7 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   const homeMain = page.locator('main').first()
   await expect(homeMain).toBeVisible()
   await expect(
-    page.getByText('简历、打印、岗位信息', { exact: false }).first()
+    page.getByText('简历、岗位、打印', { exact: false }).first()
   ).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
@@ -102,12 +102,12 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
 })
 
 for (const projectTag of ['@kiosk', '@mobile'] as const) {
-  test(`home renders filing information ${projectTag}`, async ({ page, api }) => {
+  test(`help center renders filing information ${projectTag}`, async ({ page, api }) => {
     registerHomeShellApi(api)
     const runtimeErrors = collectRuntimeErrors(page)
 
-    await page.goto('/', { waitUntil: 'domcontentloaded' })
-    await assertHomeFilingInfo(page)
+    await page.goto('/help', { waitUntil: 'domcontentloaded' })
+    await assertHelpCenterFilingInfo(page)
     await assertNoHorizontalOverflow(page)
     expect(runtimeErrors).toEqual([])
   })
