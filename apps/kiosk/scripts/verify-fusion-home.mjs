@@ -221,7 +221,8 @@ const pageStart = home.indexOf('export function HomePage()')
 const page = pageStart >= 0 ? home.slice(pageStart) : ''
 const homePageBody = extractFunctionBody(home, 'HomePage')
 const frameTag = extractReturnedRootTag(homePageBody)
-const groupsTag = extractJsxOpeningTag(page, 'div')
+const svcGridBody = extractFunctionBody(home, 'SvcGrid')
+const svcGridTag = extractReturnedRootTag(svcGridBody)
 
 expect(
   /import\s*\{[^}]*\bKioskPageFrame\b[^}]*\}\s*from\s*['"]@ai-job-print\/ui['"]/.test(home),
@@ -237,24 +238,43 @@ expect(
 )
 expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
 expect(
-  /^<div\b/.test(groupsTag) &&
-    /\bclassName\s*=\s*['"]groups['"]/.test(groupsTag) &&
-    /\baria-label\s*=\s*['"]当前可使用功能['"]/.test(groupsTag),
-  '主服务区使用中性 div 并保留 groups 与可访问名称',
+  /^<div\b/.test(svcGridTag) &&
+    /\bclassName\s*=\s*['"]svc-grid['"]/.test(svcGridTag) &&
+    /\brole\s*=\s*['"]navigation['"]/.test(svcGridTag) &&
+    /\baria-label\s*=\s*['"]服务入口['"]/.test(svcGridTag),
+  '主服务区使用 svc-grid 导航并保留可访问名称',
 )
 expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
 const bodyIndexes = [
   page.indexOf(frameTag),
   page.search(/<HomeWelcome\s*\/>/),
   page.search(/<ContinuePanel\s*\/>/),
-  page.indexOf(groupsTag),
-  page.search(/<ZoneRow\s*\/>/),
+  page.search(/<HomeReception\s*\/>/),
+  page.search(/<HomeDispatch\s*\/>/),
+  page.search(/<HomeContinueBar\s*\/>/),
+  page.search(/<div\s+[^>]*className\s*=\s*['"]svc-header['"][^>]*>/),
+  page.search(/<SvcGrid\s*\/>/),
   page.search(/<div\s+[^>]*className\s*=\s*['"]notice['"][^>]*>/),
   page.indexOf('</KioskPageFrame>'),
 ]
-expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保留 HomeWelcome、ContinuePanel、groups、ZoneRow、notice 原有顺序')
+expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保持欢迎、续办、AI 接待、调度、8 项服务与合规提示顺序')
 expect(!/<KioskTopBar\b/.test(page), '首页不再自绘 KioskTopBar')
 expect(!/<HomeNavbar\b/.test(page) && !/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
+
+const svcTilesArray = extractAssignedArray(svcGridBody, 'const tiles')
+const svcTileObjects = directObjectBlocks(svcTilesArray)
+const expectedSvcTiles = [
+  ['打印扫描', '/print-scan'],
+  ['AI简历服务', '/resume-service'],
+  ['岗位信息', '/jobs-service'],
+  ['招聘会', '/fairs-service'],
+  ['AI面试训练', '/interview-service'],
+  ['政策服务', '/policy-service'],
+  ['百宝箱', '/toolbox'],
+  ['智慧校园', '/smart-campus'],
+]
+const actualSvcTiles = svcTileObjects.map((tile) => [stringField(tile, 'title'), stringField(tile, 'to')])
+expect(JSON.stringify(actualSvcTiles) === JSON.stringify(expectedSvcTiles), 'SvcGrid 精确保留 8 个定版入口的标题、路由与顺序')
 
 const groupsArray = extractAssignedArray(serviceGroups, 'export const SERVICE_GROUPS')
 const groupObjects = directObjectBlocks(groupsArray)
@@ -336,7 +356,11 @@ const declaredRoutes = new Set([
   ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
   ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
 ])
-const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/print/upload', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
+const allowedRoutes = new Set([
+  ...expectedRoutes.values(),
+  ...expectedSvcTiles.map(([, route]) => route),
+  '/print/upload', '/profile', '/assistant', '/login', '/',
+])
 expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
 expect(!/\bfetch\s*\(/.test(home + serviceGroups), '首页未新增 fetch')
 const productionIdentifiers = stripCommentsAndStrings(`${home}\n${serviceGroups}`).match(/\b[A-Za-z_$][\w$]*\b/g) ?? []

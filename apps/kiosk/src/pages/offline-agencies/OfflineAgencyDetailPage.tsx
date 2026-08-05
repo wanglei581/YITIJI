@@ -56,12 +56,12 @@ export default function OfflineAgencyDetailPage() {
             <b>{agency.name}</b>
             <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
               <i className="oa-dot" aria-hidden="true" />
-              {agency.statusLabel || (isOpen ? '营业中' : '休息中')}
+              {isOpen ? '正常收录' : '暂停收录'}
             </span>
           </div>
           <div className="jf-row-info">
             <span><MapPinIcon aria-hidden="true" />{agency.address}</span>
-            <span><ClockIcon aria-hidden="true" />{agency.hours || '以门店公告为准'}</span>
+            <span><ClockIcon aria-hidden="true" />{agency.hours || '服务时间以机构公示为准'}</span>
             {agency.phone ? <span><PhoneIcon aria-hidden="true" />{agency.phone}</span> : null}
           </div>
           <div className="jf-row-sub">
@@ -72,7 +72,7 @@ export default function OfflineAgencyDetailPage() {
         </div>
         <div className="oa-r-aside">
           <div className="oa-jobs-n">{agency.jobCount ?? jobs.length}</div>
-          <div className="oa-jobs-t">在招岗位</div>
+          <div className="oa-jobs-t">岗位</div>
         </div>
       </div>
 
@@ -83,15 +83,15 @@ export default function OfflineAgencyDetailPage() {
       ) : null}
 
       <div className="jf-list-meta">
-        <span>门店在招岗位 <b>{jobs.length}</b> 个 · 请到店咨询，本终端不代收简历</span>
+        <span>门店岗位信息 <b>{jobs.length}</b> 个 · 请到店咨询，本终端不代收简历</span>
       </div>
 
       <div className="jf-list">
         {jobs.length === 0 ? (
           <div className="oa-empty">
             <BuildingIcon aria-hidden="true" />
-            <b>暂无在招岗位</b>
-            <span>可稍后回来查看，或直接到店咨询最新岗位。</span>
+            <b>暂无岗位信息</b>
+            <span>可稍后回来查看，或到店咨询机构公示的最新信息。</span>
           </div>
         ) : jobs.map((job) => (
           <button

@@ -33,20 +33,11 @@ export interface WireOfflineAgency {
   updatedAt: string
 }
 
-interface WireOfflineAgencyListStats {
-  totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
-  lastSyncLabel?: string
-}
-
 interface WireOfflineAgencyListResponse {
   items: WireOfflineAgency[]
   total: number
   page: number
   pageSize: number
-  stats?: WireOfflineAgencyListStats
 }
 
 export interface WireOfflineJobAgency {
@@ -97,17 +88,8 @@ export interface OfflineAgencyDTO {
   phone?: string | null
   /** 机构当前状态（'open' | 'rest'），来自后端 status 字段；前端按此渲染徽章 */
   status: 'open' | 'rest' | string
-  statusLabel?: string
-  /** 当前在招岗位数，由后端聚合返回（仅详情端点提供，列表端点不提供）*/
+  /** 关联岗位数（仅详情端点提供，列表端点不提供）。 */
   jobCount?: number
-}
-
-export interface OfflineAgencyListStats {
-  totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
-  lastSyncLabel?: string
 }
 
 export interface OfflineAgencyListResult {
@@ -115,7 +97,6 @@ export interface OfflineAgencyListResult {
   total: number
   page: number
   pageSize: number
-  stats: OfflineAgencyListStats
 }
 
 export interface OfflineAgencyListParams {
@@ -226,7 +207,6 @@ export interface OfflineAgencyDetailDTO extends OfflineAgencyDTO {
 }
 
 export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDTO {
-  const isOpen = agency.status === 'active'
   return {
     id: agency.id,
     name: agency.name,
@@ -238,12 +218,11 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     orgCode: agency.externalId ?? agency.sourceOrgId ?? undefined,
     syncTime: agency.syncTime ?? undefined,
     phone: agency.phone ?? null,
-    status: agency.status,
-    statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
+    status: agency.status === 'active' || agency.status === 'open' ? 'open' : 'rest',
   }
 }
 
-/** 线下机构详情（含在招岗位）。 */
+/** 线下机构详情（含关联岗位信息）。 */
 export function getOfflineAgencyById(id: string): Promise<OfflineAgencyDetailDTO> {
   return getJson(`/kiosk/offline-agencies/${encodeURIComponent(id)}`)
 }
@@ -284,12 +263,6 @@ export async function getOfflineAgencies(
     total: response.total,
     page: response.page,
     pageSize: response.pageSize,
-    stats: response.stats ?? {
-      totalAgencies: response.total,
-      openAgencies: 0,
-      totalJobs: 0,
-      districts: 0,
-    },
   }
 }
 

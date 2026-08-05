@@ -116,7 +116,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
   // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
-  /^apps\/kiosk\/scripts\/verify-fusion-home\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-fusion-home|verify-home-prototype-v1)\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,

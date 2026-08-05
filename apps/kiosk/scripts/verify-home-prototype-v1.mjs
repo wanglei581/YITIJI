@@ -154,6 +154,7 @@ const pv = read('src/styles/prototype-v1.css')
 const serviceGroups = read('src/pages/home/serviceGroups.ts')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
 const icons = read('src/pages/home/prototypeIcons.tsx')
+const helpCenter = read('src/pages/help/HelpCenterPage.tsx')
 const pkg = read('package.json')
 const paletteScope = "[data-kiosk-presentation='fusion-youth']"
 
@@ -289,27 +290,43 @@ for (const legacy of [
   expect(!existsSync(join(root, legacy)), `旧 .khome 首页样式已删除：${legacy}`)
 }
 expect(/className="kpv1 kpv1--content-only"/.test(home), '首页根节点使用 .kpv1 作用域（content-only）')
-expect(/<div className="groups"[^>]*aria-label="当前可使用功能"/.test(home), '首页服务区用中性 .groups 网格容器并保留可访问名称')
-expect(!/<main className="groups"/.test(home), '首页服务区不在 KioskLayout 主地标内嵌套 main')
-expect(/tile\.emphasis === 'primary' \? 'primary' : ''/.test(home), '磁贴 emphasis→.tile.primary（统一网格，无独立次级列表）')
+expect(/<div className="svc-grid" role="navigation" aria-label="服务入口">/.test(home), '首页服务区使用原型 .svc-grid 导航容器')
+expect(!/<main className="(?:groups|svc-grid)"/.test(home), '首页服务区不在 KioskLayout 主地标内嵌套 main')
+expect(/className=\{`svc-tile \$\{t\.accent\}`\}/.test(home), '8 个核心入口使用原型 .svc-tile 品类色')
 expect(!/home-reference-primary-list|home-reference-secondary-list/.test(home), '首页不再使用 primary/secondary 双列表结构')
 
 // ── 原型文案（1:1）──────────────────────────────────────────────
-expect(proto.includes('一趟办完') && /简历、打印、岗位信息<em>一趟办完<\/em>/.test(home), '欢迎区主标题 1:1 原型「简历、打印、岗位信息一趟办完」')
-expect(home.includes('游客可直接使用大部分功能 · 触摸下方卡片开始'), '欢迎区副标题实现包含「游客可直接」文案（01-home AI OS 已更新，实现过渡期保留）')
+expect(proto.includes('简历、岗位、打印，<em>一趟办完</em>') && home.includes('简历、岗位、打印，<em>一趟办完</em>'), '欢迎区主标题对齐当前原型「简历、岗位、打印，一趟办完」')
+expect(proto.includes('现场准备材料、了解机会，并在本机完成打印扫描') && home.includes('现场准备材料、了解机会，并在本机完成打印扫描'), '欢迎区副标题对齐当前原型现场办理文案')
 expect(proto.includes('登录 / 注册') && home.includes('登录 / 注册'), '登录按钮文案 1:1 原型「登录 / 注册」')
-expect(/badge\.label/.test(home) && /group\.badge/.test(home), '首页保留「推荐先做」徽章（来自 serviceGroups.badge）')
+expect(home.includes('核心服务') && home.includes('AI增强服务'), '首页保留当前原型核心服务标题与 AI 增强标识')
 
 // ── 原型外动态状态：登录态复用 88px 登录框，文字改「进入我的」，不显示统计 ──
 expect(home.includes('进入我的'), '登录态复用登录框，文字改「进入我的」（原型外动态状态）')
 expect(/isLoggedIn \?[\s\S]*?className="login-btn"[\s\S]*?进入我的/.test(home), '登录态入口仍用 .login-btn 88px 外框')
 expect(!/id-stats|id-stat\b|stats\.resumes|stats\.documents|stats\.aiRecords/.test(home), '首页不显示原型没有的简历/文档/AI记录统计')
 
-// ── 真实能力：路由 / 禁用入口 / 六组（承接旧守卫，等价或更强）──────
+// ── 真实能力：8 个一级入口 + 下钻功能路由 ───────────────────────
+const svcTilesBlock = home.match(/function SvcGrid\(\)[\s\S]*?const tiles = \[([\s\S]*?)\n\s*\][\s\S]*?return \(/)?.[1] ?? ''
+const svcTileObjects = [...svcTilesBlock.matchAll(/\{[^{}]*\}/g)].map((match) => match[0])
+const field = (source, name) => source.match(new RegExp(`\\b${name}:\\s*'([^']+)'`))?.[1] ?? null
+const actualSvcTiles = svcTileObjects.map((tile) => [field(tile, 'title'), field(tile, 'to')])
+const expectedSvcTiles = [
+  ['打印扫描', '/print-scan'],
+  ['AI简历服务', '/resume-service'],
+  ['岗位信息', '/jobs-service'],
+  ['招聘会', '/fairs-service'],
+  ['AI面试训练', '/interview-service'],
+  ['政策服务', '/policy-service'],
+  ['百宝箱', '/toolbox'],
+  ['智慧校园', '/smart-campus'],
+]
+expect(JSON.stringify(actualSvcTiles) === JSON.stringify(expectedSvcTiles), '首页精确保留 8 个定版入口的标题、路由与顺序')
+
 const groupsBlock = serviceGroups.match(/export const SERVICE_GROUPS[\s\S]*?\n\]/)?.[0] ?? ''
-expect(home.includes("from './serviceGroups'"), '首页从 serviceGroups 消费真实路由数据')
+expect(serviceGroups.includes('export const SERVICE_GROUPS'), '下钻功能分组数据仍存在')
 const groupCount = (groupsBlock.match(/^\s{2,4}id:/gm) ?? []).length
-expect(groupCount === 6, `SERVICE_GROUPS 保持六组（实测 ${groupCount}）`)
+expect(groupCount === 6, `下钻功能 SERVICE_GROUPS 保持六组（实测 ${groupCount}）`)
 const expectedRoutes = new Map([
   ['AI简历诊断', '/resume/source?intent=diagnose'], ['AI简历优化', '/resume/source?intent=optimize'],
   ['简历素材库', '/resume/templates'], ['职业规划', '/resume/career-plan'],
@@ -331,7 +348,7 @@ for (const title of ['证件复印', '证件照打印']) {
 }
 expect((groupsBlock.match(/disabled:\s*Boolean\(true\)/g) ?? []).length === 2, 'SERVICE_GROUPS 仅两个禁用入口')
 expect(!/title:\s*'云打印'/.test(groupsBlock), '云打印入口保持按取舍决策删除')
-expect(/disabled=\{disabled\}/.test(home) && /tile\.disabled \|\| !tile\.to/.test(home), '磁贴禁用态由真实 disabled/to 驱动')
+expect(/disabled=\{disabled\}/.test(home) && /tile\.disabled \|\| !tile\.to/.test(home), '下钻功能磁贴禁用态由真实 disabled/to 驱动')
 
 // ── 真实设备状态：由共享 KioskLayout 顶栏消费 fail-closed hook，首页不再自绘 topbar ──
 expect(existsSync(join(root, 'src/hooks/useTerminalDeviceStatus.ts')), '真实设备状态 hook 存在')
@@ -360,14 +377,16 @@ for (const [re, label] of [[/一键投递/, '一键投递'], [/立即投递/, '�
 }
 expect(/className="notice"/.test(home) && home.includes('本终端仅提供信息展示与跳转'), '首页保留合规提示条（第三方来源 + 跳转办理）')
 
-// ── 网站备案信息：首页最后一个内容节点，两个官方查询链接 + 纯文本品牌 ──────────────
+// ── 网站备案信息：已从首页迁移到帮助中心 ─────────────────────────
 const filingOrder = [
   '鲁ICP备2026023517号-2',
   '鲁公网安备37021402007308号',
   '职易达AI',
 ]
-const filingBlock = home.match(/<footer className="filing-info"[\s\S]*?<\/footer>/)?.[0] ?? ''
-expect(filingOrder.every((text) => filingBlock.includes(text)), '首页展示 ICP、公安备案与「职易达AI」')
+expect(!/filing-info|鲁ICP备|鲁公网安备/.test(home), '首页不再重复展示备案信息')
+const filingStart = helpCenter.indexOf('{/* 网站备案信息 */}')
+const filingBlock = filingStart >= 0 ? helpCenter.slice(filingStart) : ''
+expect(filingOrder.every((text) => filingBlock.includes(text)), '帮助中心展示 ICP、公安备案与「职易达AI」')
 expect(
   filingOrder.every(
     (text, index) => index === 0 || filingBlock.indexOf(filingOrder[index - 1]) < filingBlock.indexOf(text),
@@ -379,10 +398,7 @@ expect(
   /href="https:\/\/beian\.mps\.gov\.cn\/#\/query\/webSearch\?code=37021402007308"[\s\S]*?鲁公网安备37021402007308号/.test(filingBlock),
   '公安备案号链接公安部备案查询',
 )
-expect(/<span className="filing-brand">职易达AI<\/span>/.test(filingBlock), '「职易达AI」保持纯文本，不新增外链')
-expect(/<footer className="filing-info"[\s\S]*?<\/footer>\s*<\/KioskPageFrame>/.test(home), '备案信息是首页最后一个内容节点')
-expect(/\.kpv1 \.filing-info\s*\{[^}]*flex-wrap:\s*wrap/.test(pv), '备案信息允许窄屏换行')
-expect(/\.kpv1 \.filing-info a\s*\{[^}]*min-height:\s*48px/.test(pv), '备案链接符合一体机 48px 最小触控高度')
+expect(/\{' · 职易达AI'\}/.test(filingBlock), '「职易达AI」在帮助中心保持纯文本，不新增外链')
 
 // ── ContinuePanel：原型外生产动态状态，条件挂载 + 自门控 ──────────────
 // 决策(2026-07-20)：登录且确有可恢复任务(进行中打印/已诊断未优化简历)时渲染；
