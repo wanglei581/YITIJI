@@ -133,11 +133,13 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/export', url: '/resume/export', marker: screen('resume-export'), featureText: '导出与打印' },
   { pattern: '/resume/templates', url: '/resume/templates', marker: screen('resume-templates'), featureText: '简历模板' },
   { pattern: '/resume/materials', url: '/resume/materials', marker: screen('resume-materials'), featureText: '求职材料' },
+  { pattern: '/resume-service', url: '/resume-service', marker: 'h1:text-is("AI简历服务")', featureText: 'AI简历服务' },
   { pattern: '/scan/start', url: '/scan/start', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/settings', url: '/scan/settings', marker: w2('scan-settings'), featureText: '未创建扫描任务' },
   { pattern: '/scan/progress', url: '/scan/progress', expectedPath: '/scan/start', marker: w2('scan-start'), featureText: '扫描服务' },
   { pattern: '/scan/result', url: '/scan/result', marker: w2('scan-result'), featureText: '扫描未完成' },
   { pattern: '/jobs', url: '/jobs', marker: w4, featureText: '岗位信息' },
+  { pattern: '/jobs-service', url: '/jobs-service', marker: 'h1:text-is("岗位信息")', featureText: '岗位信息' },
   { pattern: '/jobs/:id', url: '/jobs/job-001', marker: w4, featureText: '前端工程师' },
   { pattern: '/jobs/:id/offline', url: '/jobs/offline-job-001/offline', marker: w4, featureText: '线下机构岗位' },
   { pattern: '/offline-agencies', url: '/offline-agencies', marker: w4, featureText: '线下招聘机构' },
@@ -146,6 +148,7 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/companies', url: '/companies', marker: w4, featureText: '找企业' },
   { pattern: '/companies/:id', url: '/companies/company-001', marker: w4, featureText: '青岛示例制造有限公司' },
   { pattern: '/job-fairs', url: '/job-fairs', marker: w4, featureText: '招聘会' },
+  { pattern: '/fairs-service', url: '/fairs-service', marker: 'h1:text-is("招聘会信息")', featureText: '招聘会信息' },
   { pattern: '/job-fairs/checkin', url: '/job-fairs/checkin', marker: w4, featureText: '来源平台入场入口' },
   { pattern: '/job-fairs/:id', url: '/job-fairs/fair-001', marker: w4, featureText: '2026 青岛高校毕业生招聘会' },
   { pattern: '/job-fairs/:id/companies', url: '/job-fairs/fair-001/companies', marker: w4, featureText: '参展企业' },
@@ -158,11 +161,13 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/questions', url: '/resume/self-assessment/questions', marker: screen('resume-self-assessment-quiz'), featureText: '作答', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
+  { pattern: '/interview-service', url: '/interview-service', marker: 'h1:text-is("AI面试训练")', featureText: 'AI面试训练' },
   // PR #499 合同审查
   { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查' },
   { pattern: '/contract-review/processing', url: '/contract-review/processing', marker: 'p:text-is("审查未完成")', featureText: '审查未完成' },
   { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果' },
-] as const // 96 routes (was 93)
+  { pattern: '/policy-service', url: '/policy-service', marker: 'h1:text-is("政策服务")', featureText: '政策服务' },
+] as const // 104 routes (was 99)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -174,8 +179,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 99) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 104) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 97) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 102) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
