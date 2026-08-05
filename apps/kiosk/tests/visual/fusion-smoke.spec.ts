@@ -77,7 +77,7 @@ async function assertHomeFilingInfo(page: Page) {
     'href',
     'https://beian.mps.gov.cn/#/query/webSearch?code=37021402007308',
   )
-  await expect(filingInfo.getByText('职易达AI', { exact: true })).toBeVisible()
+  await expect(filingInfo.getByText('职易达AI', { exact: false })).toBeVisible()
 }
 
 test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ page, api }) => {

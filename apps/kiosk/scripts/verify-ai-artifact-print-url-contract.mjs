@@ -37,7 +37,7 @@ const jobFitService = read('services/api/src/ai/resume/job-fit.service.ts')
 const fairService = read('services/api/src/ai/resume/fair-visit-plan.service.ts')
 const interviewService = read('services/api/src/mock-interview/mock-interview.service.ts')
 const materialsService = read('services/api/src/job-materials/job-materials.service.ts')
-const filesService = read('services/api/src/files/files.service.ts')
+const filesService = read('services/api/src/files/file-access.service.ts')
 const adminFairsService = read('services/api/src/jobs/admin-fairs.service.ts')
 // N5 拆分后 printBridges.prepare 委托逻辑移至 fair-material.service.ts
 const fairMaterialService = (() => { try { return read('services/api/src/jobs/fair-material.service.ts') } catch { return '' } })()
