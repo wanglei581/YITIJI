@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { FilesService } from '../../files/files.service'
+import { FileQueryService } from '../../files/file-query.service'
+import { FileDeleteService } from '../../files/file-delete.service'
 import { FilesCleanupTask } from '../../files/files.cleanup.task'
 
 test('sensitive system deletion never logs the full file id', async () => {
@@ -16,7 +18,11 @@ test('sensitive system deletion never logs the full file id', async () => {
     deletedBy: 'system',
     deleteReason: 'contract_review_expired',
   }
-  const service = new FilesService(
+  const queryService = new FileQueryService({} as never, {} as never)
+  ;(queryService as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
+    async () => row
+
+  const deleteService = new FileDeleteService(
     {
       fileObject: {
         update: async (args: unknown) => {
@@ -25,18 +31,18 @@ test('sensitive system deletion never logs the full file id', async () => {
         },
       },
     } as never,
-    {} as never,
     {
       deleteObject: async (storageKey: string, bucket: string) => {
         storageDeletes.push({ storageKey, bucket })
       },
-    } as never
+    } as never,
+    queryService,
   )
-  ;(service as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
-    async () => row
-  ;(service as unknown as { logger: { log(value: string): void } }).logger = {
+  ;(deleteService as unknown as { logger: { log(value: string): void } }).logger = {
     log: (value) => logs.push(value),
   }
+
+  const service = new FilesService({} as never, {} as never, deleteService, {} as never)
 
   const deleted = await service.systemDeleteSensitive(fileId, 'contract_review_expired')
 

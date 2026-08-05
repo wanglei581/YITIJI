@@ -238,9 +238,10 @@ expect(
 expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
 expect(
   /^<div\b/.test(groupsTag) &&
-    /\bclassName\s*=\s*['"]groups['"]/.test(groupsTag) &&
-    /\baria-label\s*=\s*['"]当前可使用功能['"]/.test(groupsTag),
-  '主服务区使用中性 div 并保留 groups 与可访问名称',
+    /\bclassName\s*=\s*['"]svc-grid['"]/.test(groupsTag) &&
+    /\brole\s*=\s*['"]navigation['"]/.test(groupsTag) &&
+    /\baria-label\s*=\s*['"]服务入口['"]/.test(groupsTag),
+  '主服务区使用中性 div 并保留 svc-grid 与可访问名称',
 )
 expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
 const bodyIndexes = [

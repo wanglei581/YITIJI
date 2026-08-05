@@ -9,6 +9,9 @@ import { validate } from 'class-validator'
 import { KioskUploadOptionsDto } from '../../files/dto/kiosk-upload-options.dto'
 import { validateUpload } from '../../files/file-validation'
 import { FilesService } from '../../files/files.service'
+import { FileQueryService } from '../../files/file-query.service'
+import { FileAccessService } from '../../files/file-access.service'
+import { FileDeleteService } from '../../files/file-delete.service'
 import {
   CONTRACT_REVIEW_TTL_MS,
   allowedPoliciesForFile,
@@ -123,9 +126,12 @@ function makeFileAccessHarness(
     },
   }
 
+  const query = new FileQueryService(prisma as never, storage as never)
+  const accessSvc = new FileAccessService(prisma as never, storage as never, query)
+  const deleteSvc = new FileDeleteService(prisma as never, storage as never, query)
   return {
     record,
-    service: new FilesService(prisma as never, {} as never, storage as never),
+    service: new FilesService({} as never, accessSvc, deleteSvc, {} as never),
     calls: () => ({ signedUrlCalls, contentReadCalls, deleteObjectCalls, signedTtlSeconds }),
   }
 }
