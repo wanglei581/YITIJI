@@ -226,7 +226,6 @@ export interface OfflineAgencyDetailDTO extends OfflineAgencyDTO {
 }
 
 export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDTO {
-  const isOpen = agency.status === 'active'
   return {
     id: agency.id,
     name: agency.name,
@@ -239,7 +238,7 @@ export function mapWireOfflineAgency(agency: WireOfflineAgency): OfflineAgencyDT
     syncTime: agency.syncTime ?? undefined,
     phone: agency.phone ?? null,
     status: agency.status,
-    statusLabel: agency.statusLabel ?? '正常收录',
+    statusLabel: '服务时间以机构公示为准',
   }
 }
 

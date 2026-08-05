@@ -48,7 +48,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           <b>{agency.name}</b>
           <span className={`oa-st ${isOpen ? 'open' : 'rest'}`}>
             <i className="oa-dot" aria-hidden="true" />
-            {agency.statusLabel || '正常收录'}
+            {agency.statusLabel || '服务时间以机构公示为准'}
           </span>
         </div>
         <div className="jf-row-info">
