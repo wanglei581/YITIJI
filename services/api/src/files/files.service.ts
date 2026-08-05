@@ -29,6 +29,7 @@ import { FileUploadService } from './file-upload.service'
 import { FileAccessService } from './file-access.service'
 import { FileDeleteService } from './file-delete.service'
 import { FileCleanupService } from './file-cleanup.service'
+import { FileQueryService } from './file-query.service'
 import type { UploadValidationMode } from './file-validation'
 import type { FileRequester } from './file-helpers'
 

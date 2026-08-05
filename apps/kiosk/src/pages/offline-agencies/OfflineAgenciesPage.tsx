@@ -24,7 +24,7 @@ function StatsBand({ stats }: { stats: OfflineAgencyListResult['stats'] }) {
   return (
     <div className="oa-stats-band" aria-label="机构概览">
       <div className="oa-stats-cells">
-        {cells.map((cell) => (
+        {cells.filter((cell) => cell.n != null).map((cell) => (
           <div key={cell.t}>
             <div className="oa-n">{cell.n}</div>
             <div className="oa-t">{cell.t}</div>
