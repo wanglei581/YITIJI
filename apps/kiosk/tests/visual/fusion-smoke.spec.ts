@@ -65,6 +65,8 @@ function registerPrivacyRuntimeApi(api: ApiRouter) {
 }
 
 async function assertHomeFilingInfo(page: Page) {
+  // 备案信息已迁至帮助中心页（fix(kiosk): 备案信息迁至帮助中心）
+  await page.goto('/help', { waitUntil: 'domcontentloaded' })
   const filingInfo = page.locator('footer[aria-label="网站备案信息"]')
   await expect(filingInfo).toBeVisible()
   await expect(filingInfo.getByRole('link', { name: '鲁ICP备2026023517号-2' })).toHaveAttribute(
@@ -89,7 +91,7 @@ test('orphan /session-timeout fails closed to a clean home @kiosk', async ({ pag
   const homeMain = page.locator('main').first()
   await expect(homeMain).toBeVisible()
   await expect(
-    page.getByText('简历、打印、岗位信息', { exact: false }).first()
+    page.getByText('核心服务', { exact: false }).first()
   ).toBeVisible()
   await expect(page.locator('[data-kiosk-screen="session-timeout"]')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: '还在使用吗？', exact: true })).toHaveCount(0)
