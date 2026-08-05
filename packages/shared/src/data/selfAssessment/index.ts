@@ -1,4 +1,4 @@
-import questionsJson from './v1.questions.json' with { type: 'json' }
+import questionsJson from './v1.questions.json'
 import type { SelfAssessmentQuestionsV1 } from '../../types/selfAssessment'
 
 /** 题目 seed（v1）。版本化以备未来 v2 切换。 */
