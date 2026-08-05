@@ -204,7 +204,8 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   if (new URL(page.url()).pathname !== '/') {
     await page.getByRole('button', { name: '返回', exact: true }).click()
   }
-  await page.getByRole('button', { name: /面试报告/ }).click()
+  await page.getByRole('button', { name: /AI面试训练/ }).click()
+  await page.getByRole('button', { name: /训练报告/ }).click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)
   await expect.soft(page.getByText(MEMBER_REPORT_POSITION, { exact: false })).toHaveCount(0)
