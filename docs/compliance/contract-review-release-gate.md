@@ -8,10 +8,7 @@ generative_ai_security_assessment: approved
 aigc_visible_label: approved
 aigc_metadata_label: approved
 legal_gold_set: approved
-approved_by:
-  - legal:wanglei-legal
-  - compliance:wanglei-compliance
-  - security:wanglei-security
+approved_by: ["legal:wanglei-legal", "compliance:wanglei-compliance", "security:wanglei-security"]
 approved_at: "2026-08-04T03:08:00+00:00"
 ---
 

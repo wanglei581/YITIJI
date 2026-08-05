@@ -1,6 +1,13 @@
 # 下一步任务
 
-> 最后更新：2026-08-02
+> 最后更新：2026-08-05
+
+## 当前执行：生产混合版本故障恢复
+
+- [~] **冻结统一恢复候选**：PR #504 需先通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI；候选必须包含合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由，不得从工作树或单端热补丁直接部署。
+- [ ] **停写前数据保护**：对生产 PostgreSQL 执行 custom-format `pg_dump`，记录 SHA-256，并用 `pg_restore -l` 验证目录可读；运行 DP-GATE before。禁止 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
+- [ ] **同一提交整体切换**：只执行 additive `migrate deploy`，再从同一冻结提交构建并切换 API、Admin、Partner、Kiosk；保留旧应用包回滚点，不覆盖现有 `.env`，Kiosk 生产构建不设置 `VITE_TERMINAL_ID`，合同审查入口继续关闭。
+- [ ] **部署后验收**：运行 DP-GATE after，核对 migration、health、PM2/nginx、`/partner/stats`、微信登录、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环；数据库当前 `PolicyPost=0`，只能在确定真实来源后补录并走审核发布，禁止用 seed 或演示数据填充。
 
 ## Phase 0 真值收口后续
 

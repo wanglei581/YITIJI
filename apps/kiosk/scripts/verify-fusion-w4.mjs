@@ -84,6 +84,12 @@ const W6_INTEGRATION_FILES = new Set([
   'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
   // Baseline repair: exact migration generated from the postgres-readiness drift report.
   'services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql',
+  // Recovery candidate: keep contract review default-closed and its shared-type verifier buildable.
+  'services/api/src/app.module.ts',
+  'services/api/scripts/verify-contract-review-contract.ts',
+  'apps/kiosk/src/hooks/useToolboxConfig.ts',
+  'apps/kiosk/scripts/verify-home-toolbox-ui.mjs',
+  'docs/compliance/contract-review-release-gate.md',
   // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
   'apps/kiosk/tests/visual/route-manifest.ts',
   // baseline script route count mirrors W6; must update together

@@ -145,6 +145,18 @@ if (
   fail('E2. Kiosk 百宝箱事件上报必须可靠且不得发送 URL/host')
 }
 
+// E3. Kiosk 本地兜底同样必须为空，并完整尊重后端 enabled/items。
+if (
+  /const DEFAULT_TOOLBOX_CONFIG:[\s\S]*?enabled:\s*true,[\s\S]*?items:\s*\[\]/.test(toolboxHook) &&
+  toolboxHook.includes('cachedToolboxConfig = backendToolbox') &&
+  toolboxHook.includes('setConfig(backendToolbox)') &&
+  !toolboxHook.includes("key: 'contract-review'")
+) {
+  pass('E3. Kiosk 百宝箱本地兜底为空且完整尊重后端配置')
+} else {
+  fail('E3. Kiosk 百宝箱不得因空配置或请求失败自动公开未授权服务')
+}
+
 // F. package.json 注册
 if (packageJson.includes('"verify:home-toolbox-ui"')) {
   pass('F. package.json 注册 verify:home-toolbox-ui')
