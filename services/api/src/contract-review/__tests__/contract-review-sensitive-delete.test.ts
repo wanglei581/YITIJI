@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { FilesService } from '../../files/files.service'
 import { FileQueryService } from '../../files/file-query.service'
 import { FileDeleteService } from '../../files/file-delete.service'
+import { FileCleanupService } from '../../files/file-cleanup.service'
 import { FilesCleanupTask } from '../../files/files.cleanup.task'
 
 test('sensitive system deletion never logs the full file id', async () => {
@@ -58,20 +59,22 @@ test('generic system deletion keeps its existing full-id log behavior', async ()
   const fileId = 'ordinary-system-file-id'
   const logs: string[] = []
   const row = fileRow(fileId)
-  const service = new FilesService(
+  const queryService61 = new FileQueryService({} as never, {} as never)
+  ;(queryService61 as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
+    async () => row
+  const deleteService61 = new FileDeleteService(
     {
       fileObject: {
         update: async () => ({ ...row, status: 'deleted', deletedAt: new Date() }),
       },
     } as never,
-    {} as never,
-    { deleteObject: async () => undefined } as never
+    { deleteObject: async () => undefined } as never,
+    queryService61,
   )
-  ;(service as unknown as { requireDeletable: () => Promise<typeof row> }).requireDeletable =
-    async () => row
-  ;(service as unknown as { logger: { log(value: string): void } }).logger = {
+  ;(deleteService61 as unknown as { logger: { log(value: string): void } }).logger = {
     log: (value) => logs.push(value),
   }
+  const service = new FilesService({} as never, {} as never, deleteService61, {} as never)
 
   await service.systemDelete(fileId, 'existing_cleanup_reason')
 
@@ -81,7 +84,7 @@ test('generic system deletion keeps its existing full-id log behavior', async ()
 test('generic expired cleanup redacts file ids, storage errors, and cron batch errors', async () => {
   const fileId = 'contract-file-secret-370101199001011234'
   const logs: string[] = []
-  const service = new FilesService(
+  const cleanupService84 = new FileCleanupService(
     {
       fileObject: { findMany: async () => [{
         id: fileId, storageKey: 'contracts/member-1/private.pdf', bucket: 'private',
@@ -89,12 +92,13 @@ test('generic expired cleanup redacts file ids, storage errors, and cron batch e
       }] },
       fairMaterialPrintBridge: { findFirst: async () => null },
     } as never,
-    {} as never,
     { deleteObject: async () => { throw new Error(`storage failed ${fileId} contracts/member-1/private.pdf`) } } as never,
+    {} as never,
   )
-  ;(service as unknown as { logger: { warn(value: string): void; log(value: string): void } }).logger = {
+  ;(cleanupService84 as unknown as { logger: { warn(value: string): void; log(value: string): void } }).logger = {
     warn: (value) => logs.push(value), log: (value) => logs.push(value),
   }
+  const service = new FilesService({} as never, {} as never, {} as never, cleanupService84)
   await service.cleanupExpired('cron')
   assert.equal(logs.length, 1)
   assert.match(logs[0]!, /^code=FILE_CLEANUP_ITEM_FAILED file=[a-f0-9]{12}$/u)
@@ -115,7 +119,7 @@ test('cron audit stores irreversible digests instead of raw deleted file ids', a
   const fileId = 'contract-file-secret-370101199001011234'
   const audits: Array<{ payload?: { fileIdDigest?: string[] } }> = []
   const row = fileRow(fileId)
-  const service = new FilesService(
+  const cleanupService118 = new FileCleanupService(
     {
       fileObject: {
         findMany: async () => [{
@@ -126,12 +130,13 @@ test('cron audit stores irreversible digests instead of raw deleted file ids', a
       },
       fairMaterialPrintBridge: { findFirst: async () => null },
     } as never,
-    { write: async (entry: { payload?: { fileIdDigest?: string[] } }) => { audits.push(entry) } } as never,
     { deleteObject: async () => undefined } as never,
+    { write: async (entry: { payload?: { fileIdDigest?: string[] } }) => { audits.push(entry) } } as never,
   )
-  ;(service as unknown as { logger: { warn(): void; log(): void } }).logger = {
+  ;(cleanupService118 as unknown as { logger: { warn(): void; log(): void } }).logger = {
     warn: () => undefined, log: () => undefined,
   }
+  const service = new FilesService({} as never, {} as never, {} as never, cleanupService118)
   await service.cleanupExpired('cron')
   assert.equal(audits.length, 1)
   assert.equal(audits[0]?.payload?.fileIdDigest?.length, 1)

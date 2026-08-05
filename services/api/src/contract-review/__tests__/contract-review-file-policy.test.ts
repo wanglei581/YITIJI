@@ -12,6 +12,7 @@ import { FilesService } from '../../files/files.service'
 import { FileQueryService } from '../../files/file-query.service'
 import { FileAccessService } from '../../files/file-access.service'
 import { FileDeleteService } from '../../files/file-delete.service'
+import { FileUploadService } from '../../files/file-upload.service'
 import {
   CONTRACT_REVIEW_TTL_MS,
   allowedPoliciesForFile,
@@ -204,7 +205,9 @@ test('FilesService ignores weaker or longer client policy attempts for contract 
       expiresAt: new Date(FIXED_NOW.getTime() + 60_000),
     }),
   }
-  const service = new FilesService(prisma as never, {} as never, storage as never)
+  const query207 = new FileQueryService(prisma as never, storage as never)
+  const uploadSvc207 = new FileUploadService(prisma as never, storage as never, query207)
+  const service = new FilesService(uploadSvc207, {} as never, {} as never, {} as never)
   const startedAt = Date.now()
   const clientAttempt = {
     buffer: Buffer.from('%PDF-1.4\n%%EOF\n', 'latin1'),
@@ -277,7 +280,9 @@ test('FilesService clamps the initial contract download URL to the persisted fil
       }
     },
   }
-  const service = new FilesService(prisma as never, {} as never, storage as never)
+  const query280 = new FileQueryService(prisma as never, storage as never)
+  const uploadSvc280 = new FileUploadService(prisma as never, storage as never, query280)
+  const service = new FilesService(uploadSvc280, {} as never, {} as never, {} as never)
   const startedAt = Date.now()
 
   const uploaded = await service.upload({

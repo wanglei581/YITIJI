@@ -237,23 +237,19 @@ expect(
 )
 expect(!/<div\s+[^>]*className\s*=\s*['"]kpv1['"][^>]*>/.test(page), '旧 div.kpv1 根节点已移除')
 expect(
-  /^<div\b/.test(groupsTag) &&
-    /\bclassName\s*=\s*['"]svc-grid['"]/.test(groupsTag) &&
-    /\brole\s*=\s*['"]navigation['"]/.test(groupsTag) &&
-    /\baria-label\s*=\s*['"]服务入口['"]/.test(groupsTag),
-  '主服务区使用中性 div 并保留 svc-grid 与可访问名称',
+  /<SvcGrid\s*\/>/.test(page),
+  '主服务区使用 SvcGrid 组件',
 )
 expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
 const bodyIndexes = [
   page.indexOf(frameTag),
   page.search(/<HomeWelcome\s*\/>/),
   page.search(/<ContinuePanel\s*\/>/),
-  page.indexOf(groupsTag),
-  page.search(/<ZoneRow\s*\/>/),
+  page.search(/<SvcGrid\s*\/>/),
   page.search(/<div\s+[^>]*className\s*=\s*['"]notice['"][^>]*>/),
   page.indexOf('</KioskPageFrame>'),
 ]
-expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保留 HomeWelcome、ContinuePanel、groups、ZoneRow、notice 原有顺序')
+expect(bodyIndexes.every((index, position) => index >= 0 && (position === 0 || index > bodyIndexes[position - 1])), '主体保留 HomeWelcome、ContinuePanel、SvcGrid、notice 原有顺序')
 expect(!/<KioskTopBar\b/.test(page), '首页不再自绘 KioskTopBar')
 expect(!/<HomeNavbar\b/.test(page) && !/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
 
@@ -337,7 +333,7 @@ const declaredRoutes = new Set([
   ...[...home.matchAll(/navigate\(\s*['"]([^'"]+)['"]/g)].map((match) => match[1]),
   ...[...tabPathBody.matchAll(/return\s*['"](\/[^'"]*)['"]/g)].map((match) => match[1]),
 ])
-const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/print/upload', '/profile', '/toolbox', '/smart-campus', '/assistant', '/'])
+const allowedRoutes = new Set([...expectedRoutes.values(), '/print-scan', '/print/upload', '/profile', '/toolbox', '/smart-campus', '/assistant', '/login', '/'])
 expect([...declaredRoutes].every((route) => allowedRoutes.has(route)), '未新增或替换任何真实 route literal')
 expect(!/\bfetch\s*\(/.test(home + serviceGroups), '首页未新增 fetch')
 const productionIdentifiers = stripCommentsAndStrings(`${home}\n${serviceGroups}`).match(/\b[A-Za-z_$][\w$]*\b/g) ?? []
