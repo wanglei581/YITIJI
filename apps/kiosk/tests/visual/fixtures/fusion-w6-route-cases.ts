@@ -160,8 +160,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
   // PR #499 合同审查
   { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/contract-review/processing', url: '/contract-review/processing', marker: 'p:text-is("审查未完成")', featureText: '审查未完成', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', landmark: 'none', requiresTouchTargets: false },
+  // processing/result pages redirect to /contract-review when accessed without state (no active task)
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/contract-review', marker: '.cr-steps', landmark: 'none', requiresTouchTargets: false },
+  { pattern: '/contract-review/result', url: '/contract-review/result', expectedPath: '/contract-review', marker: '.cr-steps', landmark: 'none', requiresTouchTargets: false },
 ] as const // 96 routes (was 93)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
