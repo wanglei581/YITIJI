@@ -204,6 +204,10 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   if (new URL(page.url()).pathname !== '/') {
     await page.getByRole('button', { name: '返回', exact: true }).click()
   }
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
+  })
   await page.getByRole('button', { name: /AI面试训练/ }).click()
   await page.getByRole('button', { name: /训练报告/ }).click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
