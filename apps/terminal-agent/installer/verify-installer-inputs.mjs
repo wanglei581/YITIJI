@@ -14,6 +14,7 @@ const bundleProject = read('AIJobPrintTerminalSetup.wixproj')
 const buildExe = read('build-exe.ps1')
 const staging = read('build-staging.ps1')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
+const provisionerGui = fs.readFileSync(path.join(root, '../provisioner/provision-agent-gui.ps1'), 'utf8')
 const workflow = fs.readFileSync(
   path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
   'utf8',
@@ -22,6 +23,7 @@ const workflow = fs.readFileSync(
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
+assert.equal(inputs.productVersion, '0.3.1')
 assert.equal(inputs.node.version, '22.23.1')
 assert.match(inputs.node.url, /^https:\/\/nodejs\.org\//)
 assert.match(inputs.serviceWrapper.url, /^https:\/\/github\.com\/winsw\/winsw\/releases\//)
@@ -44,6 +46,18 @@ assert.match(wix, /Account="LocalSystem"/)
 assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
 assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
+assert.match(wix, /Id="ProvisionerStartMenuShortcut"/)
+assert.match(wix, /StandardDirectory Id="CommonProgramsFolder"/)
+assert.match(wix, /Target="\[System64Folder\]WindowsPowerShell\\v1\.0\\powershell\.exe"/)
+assert.match(wix, /Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File &quot;\[INSTALLFOLDER\]provisioner\\provision-agent-gui\.ps1&quot;"/)
+assert.match(wix, /WorkingDirectory="INSTALLFOLDER"/)
+assert.match(wix, /RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall"/)
+assert.match(wix, /ComponentRef Id="ProvisionerShortcutComponent"/)
+assert.doesNotMatch(
+  wix.match(/<Shortcut[\s\S]*?\/>/)?.[0] ?? '',
+  /(?:BindCode|AgentToken|BridgeToken|adminSecret)/i,
+  'Start menu shortcut must not carry credentials',
+)
 
 assert.match(bundleProject, /<OutputType>Bundle<\/OutputType>/)
 assert.match(bundleProject, /<InstallerPlatform>x64<\/InstallerPlatform>/)
@@ -92,9 +106,26 @@ assert.match(staging, /node-windows must not be present in the MSI runtime/)
 assert.match(staging, /Unexpected executable in staging/)
 assert.match(staging, /better-sqlite3/)
 assert.match(staging, /manifest\.json/)
+for (const provisionerFile of [
+  'provision-agent-gui.ps1',
+  'install-production-agent.ps1',
+  'service-identity.ps1',
+  'diagnose-production-agent.ps1',
+]) {
+  assert.match(staging, new RegExp(provisionerFile.replaceAll('.', '\\.')))
+}
+assert.doesNotMatch(staging, /provision-agent-core\.ps1/)
+assert.match(provisionerGui, /param\(\[switch\]\$SelfTest\)/)
+assert.match(provisionerGui, /PROVISIONER_SELF_TEST_PASS/)
+assert.doesNotMatch(
+  provisionerGui,
+  /Start-Process[^\r\n]*(?:BindCode|AgentToken|BridgeToken|adminSecret)/i,
+  'Provisioner must not pass credentials to a child process command line',
+)
 
 const lifecycle = read('test-msi-lifecycle.ps1')
 const exeLifecycle = read('test-exe-lifecycle.ps1')
+const exeUpgrade = read('test-exe-upgrade.ps1')
 assert.match(lifecycle, /Start-Service -Name \$serviceName/)
 assert.match(lifecycle, /Remove-Item -LiteralPath \$diagnosticPath -Force/)
 assert.match(lifecycle, /\$startServiceError = \$null/)
@@ -114,6 +145,15 @@ assert.match(lifecycle, /bootstrap\\aijobprintagent\.exe/)
 assert.match(lifecycle, /bootstrap\\aijobprintagent\.xml/)
 assert.match(lifecycle, /node\\node\.exe/)
 assert.match(lifecycle, /app\\dist\\index\.js/)
+assert.match(lifecycle, /provisioner\\provision-agent-gui\.ps1/)
+assert.match(lifecycle, /provisioner\\install-production-agent\.ps1/)
+assert.match(lifecycle, /provisioner\\service-identity\.ps1/)
+assert.match(lifecycle, /provisioner\\diagnose-production-agent\.ps1/)
+assert.match(lifecycle, /AI求职打印终端配置\.lnk/)
+assert.match(lifecycle, /PROVISIONER_SELF_TEST_PASS/)
+assert.match(lifecycle, /Remove-Item -LiteralPath \$provisionerGuiPath -Force/)
+assert.match(lifecycle, /Remove-Item -LiteralPath \$shortcutPath -Force/)
+assert.match(lifecycle, /Provisioner Start menu shortcut still exists after MSI uninstall/)
 assert.match(lifecycle, /Get-FileHash -LiteralPath \$fullPath -Algorithm SHA256/)
 assert.match(lifecycle, /VersionInfo\.FileVersion/)
 assert.match(lifecycle, /& \$nodePath --version/)
@@ -127,16 +167,30 @@ assert.match(exeLifecycle, /Invoke-Bundle -Action "\/uninstall"/)
 assert.match(exeLifecycle, /Stopped\/Manual service contract/)
 assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
 assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
+assert.match(exeLifecycle, /Join-Path \$installRoot "provisioner"/)
+assert.match(exeLifecycle, /Join-Path \$provisionerRoot "provision-agent-gui\.ps1"/)
+assert.match(exeLifecycle, /AI求职打印终端配置\.lnk/)
+assert.match(exeLifecycle, /PROVISIONER_SELF_TEST_PASS/)
+assert.match(exeLifecycle, /Remove-Item -LiteralPath \$provisionerGuiPath -Force/)
+assert.match(exeLifecycle, /Remove-Item -LiteralPath \$shortcutPath -Force/)
+assert.match(exeLifecycle, /Provisioner Start menu shortcut still exists after EXE uninstall/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
+assert.match(exeUpgrade, /EXE_UPGRADE_PASS from=0\.3\.0 to=0\.3\.1/)
+assert.match(exeUpgrade, /An unprovisioned upgrade must remain Stopped\/Manual until the GUI succeeds/)
+assert.match(exeUpgrade, /ProgramData state was not retained across the 0\.3\.0 to 0\.3\.1 upgrade/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
+assert.match(workflow, /498ac920c989e3bb8fa5a02e58906ad52fbce38b/)
+assert.match(workflow, /test-exe-upgrade\.ps1/)
 assert.ok(
   workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
   'EXE lifecycle must run first on a clean ProgramData root',
 )
 assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
 assert.match(workflow, /artifacts\/exe\/lifecycle-logs\//)
+assert.match(workflow, /Validate staged Provisioner PowerShell/)
+assert.match(workflow, /System\.Management\.Automation\.Language\.Parser/)
 
 console.log('ALL PASS: Windows Agent installer inputs')

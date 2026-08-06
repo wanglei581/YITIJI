@@ -1,6 +1,6 @@
 # Windows Terminal Agent MSI 实施设计
 
-> 状态：B1 MSI 与 B2 Burn EXE 未签名候选均已通过 Windows CI；尚待签名、Provisioner GUI 和真机发布验收。
+> 状态：B1 MSI 与 B2 Burn EXE 未签名候选已通过既有 Windows CI；B3 图形 Provisioner 已完成本地源码与静态门禁，尚待新版 Windows CI、签名和真机发布验收。
 > 适用范围：Windows Terminal Agent 的首次安装、修复、卸载和同机升级。
 > 上位设计：[终端机队管理与安全换机设计](./terminal-fleet-management-design.md)。
 
@@ -41,6 +41,7 @@ Program Files\\AIJobPrintAgent\\
   app\\node_modules\\    # 仅生产依赖，native addon 与 Node ABI 已匹配
   tools\\                 # 已批准的 SumatraPDF 等辅助程序
   bootstrap\\             # 独立启动器与版本元数据
+  provisioner\\           # 图形配置向导、双布局 Provisioning 和只读诊断脚本
 ```
 
 构建过程必须锁定 Node 版本、pnpm lockfile、依赖清单和每个输入文件的 SHA-256。CI 可产出未签名候选包用于 VM 测试，但不能标记为可发布。发布包、Bootstrapper 和版本 manifest 依次执行：
@@ -60,7 +61,9 @@ MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`�
 
 MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理员密钥。不得把 BindCode 放入 `msiexec` 命令行、MSI public property、CustomActionData、安装日志或注册表。
 
-安装完成后，由独立的本地 Provisioner 通过安全交互输入 BindCode，复用既有 `/auth/terminal/exchange-bind-code` 和 DPAPI LocalMachine 落盘能力。Provisioner 仅输出脱敏结果；成功后执行只读健康检查并由 Admin 确认心跳。Provisioner 的具体 UI/CLI、批量激活和远程下发另立任务，不随本设计实现。
+安装完成后，从 Windows 开始菜单打开「AI求职打印终端配置」。向导先请求管理员权限，再允许输入短时一次性 BindCode、选择 Windows 已安装打印机、填写 Kiosk Origin、可选扫描目录和可选本地桥接令牌。BindCode 与 bridge token 通过同进程 `SecureString` 传给既有加固逻辑，不进入子进程参数或 PowerShell 历史；云端兑换结果作为 `terminalId` / `terminalCode` 权威来源，用户不重复填写。成功后向导显示本地服务状态，Admin 仍须单独确认心跳与打印机状态。
+
+向导不安装打印机/扫描驱动、不创建打印任务、不触发扫描头，也不把扫描目录存在误写为扫描已验收。批量静默激活和远程下发仍不在本设计范围。
 
 ### 4.2 Repair、卸载与升级
 
@@ -90,7 +93,7 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 | --- | --- | --- |
 | 构建完整性 | staging 清单、lockfile、Node ABI、WiX 构建均可复现 | Windows 构建机 / CI |
 | 签名 | 正式候选签名、哈希、签名者指纹均通过 | 受控签名环境 |
-| 首次安装 | Program Files 与 ProgramData ACL 正确；服务 Automatic；未激活时不领取任务 | Windows VM |
+| 首次安装 | Program Files 与 ProgramData 路径正确；未激活服务 Manual/Stopped 且不领取任务 | Windows VM |
 | 激活 | BindCode 一次性兑换、DPAPI 落盘、日志无明文；Admin 看到在线 | 隔离预生产 VM |
 | Repair | 损坏二进制可恢复，token、配置、SQLite 不变 | Windows VM |
 | 卸载/重装 | 服务清理；ProgramData 保留；重装后可按既有流程恢复 | Windows VM |
@@ -113,7 +116,7 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 
 `apps/terminal-agent/installer/` 现已提供固定输入清单、Node 22 x64 staging、生产依赖裁剪、原生 ABI 探针、WiX v4 工程、install/repair/uninstall Windows CI 和未签名 MSI 构建。MSI 直接拥有 WinSW wrapper、配置和 SCM 注册，不调用 `node-windows install-service`；未激活服务为 Manual/Stopped，避免无配置主机反复失败重启。`%ProgramData%\AIJobPrintAgent` 作为永久状态目录保留，二进制安装到 `%ProgramFiles%\AIJobPrintAgent`。
 
-当前仍是 **NO-GO 发布候选**：B1 已由 PR #422 的干净 Windows CI 覆盖 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 和 ProgramData 保留，但 WinSW 与 MSI 仍未经本企业 Authenticode 签名；安全交互式 Provisioner GUI 与签名发布 manifest 仍在后续批次。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
+当前仍是 **NO-GO 发布候选**：B1 已由 PR #422 的干净 Windows CI 覆盖 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 和 ProgramData 保留，但 WinSW 与 MSI 仍未经本企业 Authenticode 签名；图形 Provisioner 属后续 B3 候选，必须取得新版 Windows CI 与真机证据。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
 
 ## 9. B2 Burn EXE 候选（2026-08-06）
 
@@ -121,10 +124,22 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 
 Windows 上双击 EXE 后，可通过标准向导完成安装；再次运行同一版本可进入修复或卸载。无人值守生命周期仅用于 Windows CI：`/install /quiet`、`/repair /quiet`、`/uninstall /quiet`。所有路径继续保留 `%ProgramData%\AIJobPrintAgent`，未 Provisioning 的服务必须保持 Manual/Stopped。
 
-Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作，不接收 BindCode、Agent token、bridge token、管理员密钥和打印机型号。首次安全绑定仍由安装后的独立 Provisioner 完成；当前仓库只有受保护的交互式 PowerShell Provisioning，尚无本地 GUI，因此本候选只关闭“双击安装/修复/卸载”，不能宣称首次装机已经完全零命令行。
+Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作，不接收 BindCode、Agent token、bridge token、管理员密钥和打印机型号。首次安全绑定由安装后的独立 Provisioner 完成；B2 的既有 CI 证据仍只证明“双击安装/修复/卸载”，B3 新证据通过前不能把旧 EXE 宣称为完整零命令行版本。
 
 构建顺序固定为 staging -> MSI -> EXE。`build-exe.ps1` 只接受唯一 MSI 输入并强制输出名；Windows CI 保留既有 required job 标识，新增 EXE build 和 install/repair/uninstall 生命周期验证，同时上传 MSI、EXE、manifest 和两套日志。macOS 上 WiX Burn 明确不支持生成 Windows 引导器，所以本地只运行静态契约和 NuGet 还原检查；EXE 产物、哈希和生命周期必须以 Windows 2022 CI/VM 为证据。
 
 Windows Actions run `31076102141` 已实际生成 43 MB 的 `AIJobPrintTerminalSetup.exe`（SHA-256 `4AF887EF6E38C48A6EC154835B5FC5321912C754DE1E9C11E0D4308A757D7EB6`），并通过干净安装、删除受 MSI 管理的 `node.exe` 后 repair 恢复、卸载、ProgramData 保留及随后独立 MSI 生命周期。该结果只证明未签名 CI 候选，不等于正式发布或现场启用。
 
-本候选仍为 **NO-GO 发布候选**：在 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、Provisioner GUI 和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。
+本候选仍为 **NO-GO 发布候选**：在新版 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、图形 Provisioner 真实绑定和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。
+
+## 10. B3 图形 Provisioner 候选（2026-08-06）
+
+安装器版本提升为 `0.3.1`。MSI 把图形向导和既有 Provisioning/诊断脚本安装到 `%ProgramFiles%\AIJobPrintAgent\provisioner`，并在所有用户开始菜单创建「AI求职打印终端配置」。向导使用 Windows 10/11 自带 PowerShell 5.1 + WinForms，不附加第二套运行时；首次显示密钥输入前完成 UAC 提升。
+
+底层脚本现同时识别源码布局与 MSI 布局。MSI 布局固定使用 `app\dist`、`node\node.exe` 和 WiX 已注册的唯一服务；服务缺失时要求 Repair，不调用已从 staging 移除的 `node-windows`，不创建第二套服务。GUI 只要求 BindCode，终端 ID/编号以兑换响应为准；已有受保护 DPAPI 凭据时可重新配置并启动。
+
+静态与本地门禁已覆盖凭证不进快捷方式/argv/日志、Admin 不再生成明文 `-BindCode` 命令、双布局、一次性码来源、ACL/DPAPI 既有契约、未授权 latch 和版本一致性。Windows 生命周期新增 Provisioner 文件、PowerShell 5.1 解析、开始菜单快捷方式、`-SelfTest`、删除后 Repair 恢复、Uninstall 清理和 ProgramData 保留。上述 Windows 项必须以新 Actions run 为证据；本地 macOS 结果不能替代。
+
+图形向导脚本以 UTF-8 BOM 安装，并由 Windows PowerShell 5.1 `SelfTest` 校验中文标题的固定 UTF-8 Base64，避免中文系统现场乱码。首次打印机必须显式选择；扫描目录默认留空，仅在面板到 SMB 已配置后填写。激活完成判定要求观察到晚于停服前基线的新心跳，不能复用五分钟在线窗口内的旧心跳。BindCode 已兑换但后续步骤失败时，当前窗口会立即切换为已保存凭据模式并禁止引导用户重复使用旧码。
+
+CI 还会从固定基线提交构建 `0.3.0` EXE，验证升级到 `0.3.1` 后 ProgramData 状态保留、GUI/开始菜单补齐、未激活服务继续 Manual/Stopped，再验证 Repair。该自动化不持有生产 BindCode，无法证明 UAC 点击、DPAPI 真实兑换、Automatic/Running 或物理打印扫描；这些仍属于隔离 Windows 真机门禁。

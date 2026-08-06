@@ -50,6 +50,29 @@ function Assert-ChildPath([string]$Root, [string]$Candidate) {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $agentRoot = Join-Path $repoRoot "apps\terminal-agent"
+$provisionerFiles = @(
+  [pscustomobject]@{
+    Source = Join-Path $agentRoot "provisioner\provision-agent-gui.ps1"
+    Name = "provision-agent-gui.ps1"
+  }
+  [pscustomobject]@{
+    Source = Join-Path $agentRoot "scripts\install-production-agent.ps1"
+    Name = "install-production-agent.ps1"
+  }
+  [pscustomobject]@{
+    Source = Join-Path $agentRoot "scripts\service-identity.ps1"
+    Name = "service-identity.ps1"
+  }
+  [pscustomobject]@{
+    Source = Join-Path $agentRoot "scripts\diagnose-production-agent.ps1"
+    Name = "diagnose-production-agent.ps1"
+  }
+)
+foreach ($provisionerFile in $provisionerFiles) {
+  if (-not (Test-Path -LiteralPath $provisionerFile.Source -PathType Leaf)) {
+    Fail "Provisioner source is missing: $($provisionerFile.Source)"
+  }
+}
 $inputsPath = Join-Path $PSScriptRoot "inputs.json"
 $inputs = Get-Content -Raw -Encoding UTF8 $inputsPath | ConvertFrom-Json
 $stagingRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
@@ -78,7 +101,8 @@ Assert-Sha256 -Path $nodeExecutable -Expected $inputs.node.executableSha256
 $nodeRoot = Join-Path $stagingRoot "node"
 $appRoot = Join-Path $stagingRoot "app"
 $bootstrapRoot = Join-Path $stagingRoot "bootstrap"
-New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot -Force | Out-Null
+$provisionerRoot = Join-Path $stagingRoot "provisioner"
+New-Item -ItemType Directory -Path $nodeRoot, $appRoot, $bootstrapRoot, $provisionerRoot -Force | Out-Null
 Copy-Item -LiteralPath $nodeExecutable -Destination (Join-Path $nodeRoot "node.exe")
 Copy-Item -LiteralPath (Join-Path $extractedNodeRoot "LICENSE") -Destination (Join-Path $nodeRoot "LICENSE")
 
@@ -126,6 +150,10 @@ $runtimePackage.dependencies.PSObject.Properties.Remove("node-windows")
 
 Copy-Item -LiteralPath $wrapperDownload -Destination (Join-Path $bootstrapRoot "aijobprintagent.exe")
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot "bootstrap\aijobprintagent.xml") -Destination $bootstrapRoot
+
+foreach ($provisionerFile in $provisionerFiles) {
+  Copy-Item -LiteralPath $provisionerFile.Source -Destination (Join-Path $provisionerRoot $provisionerFile.Name)
+}
 
 Remove-Item -LiteralPath $deployRoot -Recurse -Force
 Remove-Item -LiteralPath $extractRoot -Recurse -Force

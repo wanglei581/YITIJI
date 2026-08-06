@@ -43,9 +43,32 @@
       </Directory>
     </StandardDirectory>
 
+    <StandardDirectory Id="CommonProgramsFolder">
+      <Directory Id="AgentProgramMenuFolder" Name="AI求职打印终端">
+        <Component Id="ProvisionerShortcutComponent" Guid="18D6BC81-A861-4500-A343-6220532230DA" Bitness="always64">
+          <Shortcut
+            Id="ProvisionerStartMenuShortcut"
+            Name="AI求职打印终端配置"
+            Description="配置并诊断 AI 求职打印终端"
+            Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
+            Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File &quot;[INSTALLFOLDER]provisioner\provision-agent-gui.ps1&quot;"
+            WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
+          <RegistryValue
+            Root="HKLM"
+            Key="Software\AIJobPrint\Agent"
+            Name="ProvisionerShortcutInstalled"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
     <Feature Id="MainFeature" Title="AI Job Print Agent" Level="1">
       <ComponentRef Id="AgentServiceComponent" />
       <ComponentRef Id="AgentStateDirectoryComponent" />
+      <ComponentRef Id="ProvisionerShortcutComponent" />
       <ComponentGroupRef Id="AgentPayload" />
     </Feature>
   </Package>

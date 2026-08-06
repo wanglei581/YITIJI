@@ -4,7 +4,7 @@
 // 2. http / mock 适配器都接好了 createTerminalBindCode；
 // 3. 终端页存在「生成绑定码」按钮和弹窗入口；
 // 4. 弹窗展示 bindCode 明文 + 倒计时 + 复制按钮；
-// 5. 弹窗包含 install-production-agent.ps1 命令示例。
+// 5. 弹窗引导使用 Windows 图形配置向导，且不生成含明文绑定码的命令。
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -91,14 +91,18 @@ if (
 }
 
 if (
-  dialog.includes('install-production-agent.ps1') &&
-  dialog.includes('-BindCode') &&
-  dialog.includes('-PrinterName') &&
-  dialog.includes("join(' `\\n  ')")
+  dialog.includes('AI求职打印终端配置') &&
+  dialog.includes('开始菜单') &&
+  dialog.includes('0.3.1 或更高版本') &&
+  dialog.includes('已安装 0.3.0') &&
+  dialog.includes('请勿把绑定码写入命令行') &&
+  !dialog.includes('install-production-agent.ps1') &&
+  !dialog.includes('-BindCode') &&
+  !dialog.includes('buildInstallCommand')
 ) {
-  pass('弹窗展示 PowerShell install-production-agent.ps1 命令示例（包含 -BindCode/-PrinterName 和反引号续行）')
+  pass('弹窗引导使用 Windows 图形配置向导，且不生成含明文绑定码的命令')
 } else {
-  fail('modal must surface PowerShell install-production-agent.ps1 command sample with -BindCode + -PrinterName')
+  fail('modal must direct operators to the GUI provisioner and must not build a plaintext BindCode command')
 }
 
 if (

@@ -292,6 +292,7 @@ pnpm --filter ./services/api verify:activity-logs
 
 ### 5.3 Terminal Agent 安装
 
+- [ ] `0.3.1` 或后续安装包在开始菜单提供「AI求职打印终端配置」；向导可选择真实 Windows 打印机、输入一次性绑定码并完成 UAC 提升，快捷方式/进程命令行/日志不出现 BindCode 或 bridge token。（2026-08-06：代码与本地静态门禁完成，待新版 Windows CI 和目标机点击验收）
 - [ ] Agent 版本与服务器 API 版本匹配。
 - [ ] Agent 配置包含 API base URL、terminalId/注册凭据、printerName、扫描目录、日志路径。
 - [ ] Token/凭据使用 Windows DPAPI 或设计文档要求的方式加密保存。（现场现为仓库目录配置，正式安装口径仍开）

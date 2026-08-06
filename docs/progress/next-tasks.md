@@ -403,6 +403,8 @@
 ## P1：Windows Agent MSI / 可修复安装包
 
 - [x] **Windows Agent MSI / 可修复安装包设计与未签名 B1 候选**（2026-07-29）：设计见 `docs/device/windows-agent-msi-design.md`；[PR #422](https://github.com/wanglei581/YITIJI/pull/422) 已合入 `main@beade4af`，固定输入 staging、WiX 构建、fresh install、未 Provisioning fail-closed、repair、uninstall 与 `%ProgramData%\AIJobPrintAgent` 保留已在 Windows CI 通过。当前 artifact 明确为未签名、7 天保留的候选，尚未部署。
+- [~] **B3 图形 Provisioner 与零命令行首次激活候选**（2026-08-06，本地完成、Windows CI 待跑）：`0.3.1` MSI 已新增开始菜单「AI求职打印终端配置」、SecureString BindCode/bridge token、显式真实打印机选择、API/Kiosk Origin/默认关闭的可选扫描目录、复用已有 DPAPI 凭据、双布局运行时和脱敏状态反馈；Admin 已移除明文 `-BindCode` 命令。远程成功要求本次启动后的新心跳，一次性码已消费后的部分失败可在原窗口改用保存凭据重试。下一步必须让新版 `windows-agent-installer` Windows 2022 job 实际通过 PowerShell 5.1 中文自测、固定 `0.3.0 → 0.3.1` 升级、EXE/MSI install/self-test/repair/uninstall 和快捷方式验收，再在隔离 Windows 主机使用真实 BindCode 完成 `Manual/Stopped → Automatic/Running → Admin 新心跳在线 → 一页 PDF 出纸 → 重启恢复`。旧 `0.3.0` EXE 不具备 GUI，不得继续作为完整候选。
+- [ ] **Provisioning 脚本行为保持式拆分**：`install-production-agent.ps1` 已达 1100+ 行，B3 Windows CI 与真机验收稳定后，按 ACL/凭据、运行时与服务、心跳验证三个职责拆分为受控模块；拆分不得改变参数合同、DPAPI/ACL、唯一服务、fail-closed 或 GUI 行为，必须保留现有专项门禁并复跑 Windows lifecycle。
 - [ ] **Windows Agent 正式签名与受控发布**：使用企业 Authenticode 完成 installer/相关二进制签名，独立复核固定输入哈希，生成受控发布 manifest/SBOM，并在干净 Windows 主机验证签名链、安装、Provisioning、upgrade/rollback、repair、uninstall 和退役清理。打印机驱动只检查和引导，不在无授权情况下随包分发；不得把未签名 B1 artifact 当作正式安装包。
 - [x] **配置根可重定位与迁移兼容（代码/运维口径收口）**：[PR #411](https://github.com/wanglei581/YITIJI/pull/411) 已合入 `main@511b9d35`；Windows 主配置目标为 `%ProgramData%\AIJobPrintAgent\agent-config.json`，并保留旧安装根的一次性去敏迁移。迁移前必须复核 ProgramData ACL，含明文 token 但无既有 DPAPI token 的旧配置必须重新 BindCode。GitHub Node 22 CI 已通过；示例、Windows 主机验收和设备文档已同步该路径。**Windows 无打印迁移验收仍未执行**，未通过前 MSI staging / 发布继续 NO-GO。
 

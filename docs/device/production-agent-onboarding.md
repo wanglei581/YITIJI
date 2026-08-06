@@ -4,7 +4,20 @@
 
 ## 当前推荐流程
 
-短期可落地方式：使用 `apps/terminal-agent/scripts/install-production-agent.ps1` 在 Windows 主机上固化生产配置。
+对 `0.3.1` 及后续 MSI/EXE 候选，推荐使用安装后的图形配置向导：
+
+1. 管理员后台进入「设备管理」，预创建设备并生成短时一次性绑定码；
+2. Windows 开始菜单打开「AI求职打印终端配置」并通过 UAC；
+3. 确认生产 API，粘贴绑定码，从 Windows 真实打印机列表中选择打印机；
+4. 填写 Kiosk Origin；只有打印机面板到 SMB 已配置时才填写扫描接收目录，按需输入本地桥接令牌；
+5. 点击「激活并启动」，完成后在 Admin 核对三分钟内心跳、Agent 版本、链路诊断和打印机状态；
+6. 使用一页无敏感内容 PDF 做一次受控真机出纸。扫描另按打印机面板 → SMB 接收目录验收，不能由服务 Running 代替。
+
+BindCode 和 bridge token 只在已提升的 GUI 进程内以 `SecureString` 传递，不进入快捷方式、子进程命令行或 PowerShell 历史。后台不再生成带明文 `-BindCode` 的命令。首次配置不会自动选择排序第一的打印机，也不会默认创建扫描目录；操作员必须显式选择真实打印机，扫描目录留空不会启动 watcher。换发 BindCode 前先停止旧 Agent，避免旧 token 的 401 在换发窗口重新写入 unauthorized latch；向导只在 token 文件哈希确实变化时提示“新凭据已保存”，无效/过期绑定码不会被磁盘上的旧凭据掩盖。未激活时服务保持 Manual/Stopped；向导成功后才切换 Automatic/Running。
+
+从 `0.3.0` 升级时直接运行新版 EXE。升级必须保留 `%ProgramData%\AIJobPrintAgent`；未激活主机仍保持 Manual/Stopped。已经存在受保护凭据的主机，升级后从开始菜单打开向导，保持「使用这台电脑已保存的设备凭据重新配置」并点击「激活并启动」，不生成或重复使用旧绑定码。Windows CI 会覆盖 `0.3.0 → 0.3.1` 未激活升级；已激活服务的 Running 状态和真实心跳仍以隔离真机验收为准。
+
+既有 `apps/terminal-agent/scripts/install-production-agent.ps1` 保留为受控运维回退入口，不作为普通装机人员的默认操作。
 
 脚本负责：
 
@@ -17,9 +30,9 @@
 - 使用 Windows DPAPI LocalMachine 加密保存 `agentToken`；
 - 将 `%ProgramData%\AIJobPrintAgent`（及 `agent.token`）ACL 收紧为 **SYSTEM + Administrators**，并禁用继承；
 - 安装/启动 `AIJobPrintAgent` Windows 服务，并设置开机自启；
-- 校验远程心跳在线。
+- 在停止旧服务后记录云端心跳基线，并只接受本次服务启动后更晚的新心跳；最近五分钟内的旧 `isOnline` 状态不能单独判定激活成功。
 
-使用后台一次性绑定码（推荐商用流程）：
+受控 CLI 回退流程：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\apps\terminal-agent\scripts\install-production-agent.ps1 `
@@ -57,7 +70,7 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 
 - 进程内 latch：停止 claim / 新打印 / offline status 重试；
 - 本地诊断码：`AGENT_UNAUTHORIZED`（`%ProgramData%\AIJobPrintAgent\last-startup-diagnostic.json`）；
-- 恢复：Admin 重新签发 BindCode → 安装脚本 `-PromptForBindCode` 换发并重启服务（或成功 `persistRegistration` 后清除 latch）。
+- 恢复：Admin 重新签发 BindCode → Windows 开始菜单图形配置向导重新激活；受控运维也可用安装脚本 `-PromptForBindCode` 换发并重启服务（或成功 `persistRegistration` 后清除 latch）。
 
 `agent_degraded`（本地 SQLite 不可用）与 `AGENT_UNAUTHORIZED`（云端凭证失效）是两条独立路径，不得互相冒充。
 
@@ -69,7 +82,7 @@ API 返回 **401**（吊销 / 过期 / 无效 token）时，Agent **无法**再�
 |---|---|---|---|
 | 1 | 只读诊断 | `diagnose-production-agent.ps1` 可运行；服务 `AIJobPrintAgent` Running / Auto | 命令输出截图 |
 | 2 | ProgramData / runtime ACL | `diagnose-production-agent.ps1` 输出 `programDataAclStatus=ok`、`tokenFileAclStatus=ok` 且 `runtimeRootAclStatus=ok`（ProgramData 继承已禁用，仅 SYSTEM `S-1-5-18` + Administrators `S-1-5-32-544`；服务加载的 Agent runtime、Node 依赖树和配置目录不得被普通用户写入）；普通用户读 token 失败 | 诊断对象 + `icacls` 佐证 |
-| 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken`；新流程使用 `-PromptForBindCode` 或 `-UseExistingToken` | 安装记录 |
+| 3 | 无 CLI Token | 当前/历史安装命令未使用 `-AgentToken` 或明文 `-BindCode`；普通装机使用图形向导，受控回退使用 `-PromptForBindCode` 或 `-UseExistingToken` | 安装记录 |
 | 4 | 紧急吊销（另授） | Admin 对目标终端执行紧急吊销后，Agent 停止 claim；本地诊断出现 `AGENT_UNAUTHORIZED`；云端不得仅凭“心跳 unauthorized 态”判定（401 无法上报） | Admin 审计 + 本地 `last-startup-diagnostic.json` |
 | 5 | BindCode 恢复（另授） | 新一次性 BindCode + 安装脚本换发后 latch 清除，心跳恢复，可再 claim | 心跳时间 + 一笔受控打印（若另授出纸） |
 | 6 | 回归 | 吊销/恢复后打印机 `ready`、无残留 active 任务 | DB/Admin 只读 |

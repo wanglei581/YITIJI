@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory = $true)][string]$MsiPath)
 
 $ErrorActionPreference = "Stop"
@@ -6,6 +6,12 @@ $resolvedMsi = (Resolve-Path -LiteralPath $MsiPath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $diagnosticPath = Join-Path $stateRoot "last-startup-diagnostic.json"
+$nodePath = Join-Path $installRoot "node\node.exe"
+$provisionerRoot = Join-Path $installRoot "provisioner"
+$provisionerGuiPath = Join-Path $provisionerRoot "provision-agent-gui.ps1"
+$startMenuFolder = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI求职打印终端"
+$shortcutPath = Join-Path $startMenuFolder "AI求职打印终端配置.lnk"
+$powerShellPath = Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
 $serviceName = "aijobprintagent.exe"
 $logRoot = Join-Path (Split-Path -Parent $resolvedMsi) "lifecycle-logs"
 $testStartedAt = [DateTime]::Now
@@ -16,6 +22,60 @@ function Invoke-Msi([string[]]$Arguments, [string]$LogName) {
   $process = Start-Process -FilePath "msiexec.exe" -ArgumentList (@($Arguments) + @("/qn", "/norestart", "/l*v", $logPath)) -Wait -PassThru -WindowStyle Hidden
   if ($process.ExitCode -ne 0) {
     throw "msiexec failed with exit code $($process.ExitCode); see $logPath"
+  }
+}
+
+function Assert-ProvisionerInstalled {
+  foreach ($name in @(
+    "provision-agent-gui.ps1",
+    "install-production-agent.ps1",
+    "service-identity.ps1",
+    "diagnose-production-agent.ps1"
+  )) {
+    $path = Join-Path $provisionerRoot $name
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+      throw "Provisioner payload is missing: $path"
+    }
+  }
+  if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) {
+    throw "Provisioner Start menu shortcut is missing: $shortcutPath"
+  }
+
+  $shell = New-Object -ComObject WScript.Shell
+  try {
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    if ([System.IO.Path]::GetFullPath($shortcut.TargetPath) -ine [System.IO.Path]::GetFullPath($powerShellPath)) {
+      throw "Provisioner shortcut target is unexpected: $($shortcut.TargetPath)"
+    }
+    if ($shortcut.Arguments -notlike "*-NoProfile*" -or
+        $shortcut.Arguments -notlike "*-ExecutionPolicy Bypass*" -or
+        $shortcut.Arguments -notlike "*-STA*" -or
+        $shortcut.Arguments -notlike "*-WindowStyle Hidden*" -or
+        $shortcut.Arguments -notlike "*$provisionerGuiPath*") {
+      throw "Provisioner shortcut arguments are incomplete: $($shortcut.Arguments)"
+    }
+    if ($shortcut.Arguments -match "(?i)(BindCode|AgentToken|BridgeToken|adminSecret)") {
+      throw "Provisioner shortcut must not contain credential-bearing arguments"
+    }
+    if ([System.IO.Path]::GetFullPath($shortcut.WorkingDirectory) -ine [System.IO.Path]::GetFullPath($installRoot)) {
+      throw "Provisioner shortcut working directory is unexpected: $($shortcut.WorkingDirectory)"
+    }
+  } finally {
+    if ($null -ne $shortcut) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) }
+    [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell)
+  }
+}
+
+function Invoke-ProvisionerSelfTest {
+  $output = @(& $powerShellPath -NoProfile -ExecutionPolicy Bypass -STA -File $provisionerGuiPath -SelfTest 2>&1)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Provisioner self-test failed with exit code ${LASTEXITCODE}: $($output -join ' ')"
+  }
+  if (($output -join "`n") -notmatch "PROVISIONER_SELF_TEST_PASS") {
+    throw "Provisioner self-test did not emit its success marker: $($output -join ' ')"
+  }
+  if (($output -join "`n") -notmatch "uiTextBase64=QUnmsYLogYzmiZPljbDnu4jnq6/phY3nva4=") {
+    throw "Provisioner self-test did not preserve the expected Chinese UI text under Windows PowerShell 5.1"
   }
 }
 
@@ -80,6 +140,10 @@ function Export-LifecycleEvidence([string]$Phase) {
       Get-PayloadEvidence -Name "serviceXml" -RelativePath "bootstrap\aijobprintagent.xml"
       Get-PayloadEvidence -Name "nodeRuntime" -RelativePath "node\node.exe"
       Get-PayloadEvidence -Name "agentEntrypoint" -RelativePath "app\dist\index.js"
+      Get-PayloadEvidence -Name "provisionerGui" -RelativePath "provisioner\provision-agent-gui.ps1"
+      Get-PayloadEvidence -Name "provisionerInstaller" -RelativePath "provisioner\install-production-agent.ps1"
+      Get-PayloadEvidence -Name "provisionerServiceIdentity" -RelativePath "provisioner\service-identity.ps1"
+      Get-PayloadEvidence -Name "provisionerDiagnostics" -RelativePath "provisioner\diagnose-production-agent.ps1"
     )
     $nodeVersion = $null
     $nodePath = Join-Path $installRoot "node\node.exe"
@@ -196,12 +260,14 @@ $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Fresh install must register a stopped Manual service until provisioning succeeds"
 }
-if (-not (Test-Path -LiteralPath (Join-Path $installRoot "node\node.exe"))) {
+if (-not (Test-Path -LiteralPath $nodePath)) {
   throw "Bundled Node runtime is missing after install"
 }
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory is missing after install"
 }
+Assert-ProvisionerInstalled
+Invoke-ProvisionerSelfTest
 Export-LifecycleEvidence -Phase "post-install"
 
 # Prove that SCM/WinSW can launch the bundled Node runtime as LocalSystem. An
@@ -240,11 +306,19 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
   throw "Unprovisioned service did not return to Stopped after writing its diagnostic"
 }
 
+Remove-Item -LiteralPath $nodePath -Force
+Remove-Item -LiteralPath $provisionerGuiPath -Force
+Remove-Item -LiteralPath $shortcutPath -Force
 Invoke-Msi -Arguments @("/fa", $resolvedMsi) -LogName "repair.log"
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
-if ($null -eq $service -or $service.State -ne "Stopped") {
-  throw "Repair must preserve the unprovisioned stopped service"
+if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
+  throw "Repair must preserve the unprovisioned Stopped/Manual service contract"
 }
+if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
+  throw "MSI repair did not restore the managed Node runtime"
+}
+Assert-ProvisionerInstalled
+Invoke-ProvisionerSelfTest
 
 Invoke-Msi -Arguments @("/x", $resolvedMsi) -LogName "uninstall.log"
 if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -ErrorAction SilentlyContinue)) {
@@ -253,11 +327,17 @@ if ($null -ne (Get-CimInstance Win32_Service -Filter "Name='$serviceName'" -Erro
 if (Test-Path -LiteralPath $installRoot) {
   throw "Program Files payload still exists after uninstall"
 }
+if (Test-Path -LiteralPath $shortcutPath -PathType Leaf) {
+  throw "Provisioner Start menu shortcut still exists after MSI uninstall"
+}
+if (Test-Path -LiteralPath $startMenuFolder -PathType Container) {
+  throw "Provisioner Start menu folder still exists after MSI uninstall"
+}
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory must be retained after uninstall"
 }
 
-Write-Host "MSI_LIFECYCLE_PASS service=$serviceName stateRetained=true"
+Write-Host "MSI_LIFECYCLE_PASS service=$serviceName provisioner=true shortcut=true selfTest=true repairRestored=true stateRetained=true"
 } finally {
   Export-LifecycleEvidence -Phase "final"
 }

@@ -104,10 +104,12 @@ const tokenPreparation = installer.indexOf('Write-Step "Preparing token"')
 const bindCodeExchange = installer.indexOf('$exchange = Exchange-BindCode -ApiBase $apiBase -Code $effectiveBindCode')
 const existingTokenCheck = installer.indexOf('Test-TokenFile $tokenPath')
 const failClosedTokenSource = installer.indexOf(
-  'Fail "Provide -PromptForBindCode (preferred), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
+  'Fail "Provide -PromptForBindCode, -BindCodeSecure (GUI), -BindCode (legacy), or -UseExistingToken. Long-lived -AgentToken CLI input is not accepted."',
 )
 const configCommit = installer.indexOf('Commit-ProductionConfigAndToken -ConfigPath $configPath -ConfigText ($configJson + "`n") -TokenPath $tokenPath -TokenToPersist $tokenToPersist')
-const processStop = installer.indexOf('Stop-Process -Id $p.ProcessId')
+const processStop = installer.indexOf('Stop-Process -Id $process.ProcessId')
+const preExchangeStop = installer.indexOf('Stop-ExistingAgentRuntime -Reason "before BindCode exchange"')
+const preBaselineStop = installer.indexOf('Stop-ExistingAgentRuntime -Reason "before recording the heartbeat baseline"')
 const resolvedServiceName = installer.indexOf('$serviceName = [string]$service.Name')
 const serviceStart = installer.indexOf('Start-Service -Name $serviceName')
 const serviceRestart = installer.indexOf('Restart-Service -Name $serviceName -Force')
@@ -121,6 +123,8 @@ for (const [label, index] of [
   ['restricted runtime preflight', runtimeSecurityStep],
   ['config/token commit', configCommit],
   ['stale process stop', processStop],
+  ['pre-exchange Agent stop', preExchangeStop],
+  ['pre-baseline Agent stop', preBaselineStop],
   ['resolved SCM service name', resolvedServiceName],
   ['service start', serviceStart],
   ['service restart', serviceRestart],
@@ -135,10 +139,11 @@ assert.ok(runtimeSecurityStep < bindCodeExchange, 'restricted runtime verificati
 assert.ok(programDataAclStep < tokenPreparation, 'ProgramData ACL hardening must happen before token preparation')
 assert.ok(configValidationCall < tokenPreparation, 'generated config validation must happen before token preparation')
 assert.ok(tokenPreparation < bindCodeExchange, 'BindCode exchange must happen during token preparation')
+assert.ok(preExchangeStop < bindCodeExchange, 'old Agent must stop before BindCode exchange invalidates its credential')
 assert.ok(bindCodeExchange < configCommit, 'BindCode exchange must finish before the local commit')
 assert.ok(existingTokenCheck < configCommit, 'existing token validation must finish before the local commit')
 assert.ok(failClosedTokenSource < configCommit, 'fail-closed token source must finish before the local commit')
-assert.ok(configCommit < processStop, 'the local commit must finish before stopping Agent processes')
+assert.ok(configCommit < preBaselineStop, 'the local commit must finish before the final pre-start Agent stop')
 assert.ok(resolvedServiceName < serviceStart, 'installer must resolve the SCM service name before starting it')
 assert.ok(resolvedServiceName < serviceRestart, 'installer must resolve the SCM service name before restarting it')
 assert.ok(configCommit < serviceStart, 'the local commit must finish before starting the service')
@@ -245,7 +250,7 @@ assert.match(invokeSc, /\$LASTEXITCODE/, 'Invoke-Sc must check sc.exe exit statu
 assert.match(invokeSc, /\$\{LASTEXITCODE\}:/, 'Invoke-Sc failure text must parse in Windows PowerShell 5.1')
 assert.match(invokeSc, /Fail /, 'Invoke-Sc must fail on a non-zero sc.exe exit status')
 
-const serviceRecovery = sourceBetween(installer, /function Set-AgentServiceRecovery\(/, /\n\$repoRoot/)
+const serviceRecovery = sourceBetween(installer, /function Set-AgentServiceRecovery\(/, /\nfunction /)
 assert.match(serviceRecovery, /failure/, 'service recovery must configure sc.exe failure actions')
 assert.match(serviceRecovery, /reset=/, 'service recovery must set a reset period')
 assert.match(serviceRecovery, /86400/, 'service recovery reset period must be one day')

@@ -84,7 +84,7 @@ assert.ok(
 assert.match(installer, /\$unauthorizedMarkerPath/, 'installer must know the persistent latch marker')
 assert.match(
   installer,
-  /if \(\$null -ne \$tokenToPersist\)[\s\S]+Remove-Item -LiteralPath \$unauthorizedMarkerPath/,
+  /\$credentialReplaced = \$null -ne \$tokenToPersist[\s\S]+if \(\$credentialReplaced\)[\s\S]+Remove-Item -LiteralPath \$unauthorizedMarkerPath/,
   'successful BindCode credential replacement must clear the persistent latch',
 )
 assert.match(diagnose, /AGENT_UNAUTHORIZED/, 'diagnose whitelist must include AGENT_UNAUTHORIZED')

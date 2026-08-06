@@ -1,13 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CopyIcon, KeyRoundIcon, RefreshCwIcon, XIcon } from 'lucide-react'
-import { API_BASE_URL, API_MODE } from '../../services/api/client'
 import {
   createTerminalBindCode,
   type AdminTerminalRecord,
   type TerminalBindCodeCreated,
 } from '../../services/api/devices'
-
-const DEFAULT_PRODUCTION_API_BASE_URL = 'http://120.48.13.190/api/v1'
 
 type Notice = { type: 'success' | 'error'; text: string }
 
@@ -25,23 +22,6 @@ function formatCountdown(remainSec: number): string {
   return `${s} 秒`
 }
 
-function commandApiBaseUrl(): string {
-  if (API_MODE !== 'http') return '<你的生产 API>'
-  if (/^https?:\/\//i.test(API_BASE_URL)) return API_BASE_URL
-  return DEFAULT_PRODUCTION_API_BASE_URL
-}
-
-function buildInstallCommand(bindCode: TerminalBindCodeCreated): string {
-  return [
-    'powershell -ExecutionPolicy Bypass -File .\\apps\\terminal-agent\\scripts\\install-production-agent.ps1',
-    `-ApiBaseUrl "${commandApiBaseUrl()}"`,
-    `-TerminalCode "${bindCode.terminalCode}"`,
-    `-TerminalId "${bindCode.terminalId}"`,
-    `-BindCode "${bindCode.bindCode}"`,
-    '-PrinterName "<Windows 实际打印机名>"',
-  ].join(' `\n  ')
-}
-
 export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: TerminalBindCodeDialogProps) {
   const [bindCodeDraft, setBindCodeDraft] = useState<TerminalBindCodeCreated | null>(null)
   const [bindCodeTtlMin, setBindCodeTtlMin] = useState<number>(10)
@@ -49,11 +29,6 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
   const [bindCodeError, setBindCodeError] = useState<string | null>(null)
   const [bindCodeCountdown, setBindCodeCountdown] = useState<number>(0)
   const [bindCodeCopied, setBindCodeCopied] = useState(false)
-
-  const installCommand = useMemo(
-    () => bindCodeDraft ? buildInstallCommand(bindCodeDraft) : '',
-    [bindCodeDraft],
-  )
 
   useEffect(() => {
     if (!bindCodeDraft) {
@@ -151,9 +126,9 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
         {!bindCodeDraft ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-              绑定码仅返回一次，关闭弹窗后无法再次查看；请在 Windows 一体机上运行<br />
-              <code className="rounded bg-amber-100 px-1.5 py-0.5">install-production-agent.ps1 -BindCode "&lt;一次性码&gt;"</code><br />
-              完成首次授权。建议先在 Windows 端核对打印机名后再生成码，避免码过期浪费。
+              绑定码仅返回一次，关闭弹窗后无法再次查看。配置向导需要 0.3.1 或更高版本；已安装 0.3.0
+              的电脑请先运行新版安装包升级。升级后在 Windows 开始菜单打开<br />
+              <span className="font-semibold">AI求职打印终端配置</span>，选择打印机后再生成并粘贴绑定码完成激活。
             </div>
             <label className="block">
               <span className="text-xs font-medium text-gray-700">有效时长（分钟，最长 60）</span>
@@ -216,8 +191,9 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
               <p className="text-[11px] text-gray-400">过期时间：{new Date(bindCodeDraft.expiresAt).toLocaleString('zh-CN')}</p>
             </div>
             <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-600">
-              <p className="font-medium text-gray-700">Windows 一体机上推荐的安装命令</p>
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap break-all font-mono text-[11px] text-gray-700">{installCommand}</pre>
+              <p className="font-medium text-gray-700">Windows 一体机激活步骤</p>
+              <p className="mt-1">开始菜单 → AI求职打印终端配置 → 粘贴一次性绑定码 → 选择打印机 → 激活并启动。</p>
+              <p className="mt-1 text-gray-500">请勿把绑定码写入命令行、聊天、工单或安装日志。</p>
             </div>
             <div className="flex items-center justify-end gap-2 pt-1">
               <button

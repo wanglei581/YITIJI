@@ -15,7 +15,7 @@ permissions:
 jobs:
   unsigned-msi-candidate:
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +41,33 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-staging.ps1
 
+      - name: Validate staged Provisioner PowerShell
+        shell: powershell
+        run: |
+          $provisionerRoot = "apps/terminal-agent/installer/artifacts/staging/provisioner"
+          $expected = @(
+            "provision-agent-gui.ps1",
+            "install-production-agent.ps1",
+            "service-identity.ps1",
+            "diagnose-production-agent.ps1"
+          )
+          foreach ($name in $expected) {
+            $path = Join-Path $provisionerRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Staged Provisioner file is missing: $path"
+            }
+            $parseTokens = $null
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $path,
+              [ref]$parseTokens,
+              [ref]$parseErrors
+            )
+            if (@($parseErrors).Count -gt 0) {
+              throw "PowerShell parse failed for ${path}: $($parseErrors -join '; ')"
+            }
+          }
+
       - name: Build unsigned WiX MSI
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1
@@ -48,6 +75,26 @@ jobs:
       - name: Build unsigned WiX Burn EXE
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
+
+      - name: Check out the fixed 0.3.0 upgrade baseline
+        uses: actions/checkout@v4
+        with:
+          ref: 498ac920c989e3bb8fa5a02e58906ad52fbce38b
+          path: previous-0.3.0
+
+      - name: Build the fixed 0.3.0 upgrade baseline
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.0/apps/terminal-agent/installer/build-staging.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.0/apps/terminal-agent/installer/build-msi.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.0/apps/terminal-agent/installer/build-exe.ps1
+
+      - name: Exercise 0.3.0 to 0.3.1 EXE upgrade
+        shell: powershell
+        run: |
+          $previousExe = Get-ChildItem previous-0.3.0/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $currentExe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade.ps1 -PreviousExePath $previousExe.FullName -CurrentExePath $currentExe.FullName
 
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
@@ -71,6 +118,7 @@ jobs:
             apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/
             apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe
             apps/terminal-agent/installer/artifacts/exe/lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/exe/upgrade-logs/
             apps/terminal-agent/installer/artifacts/staging/manifest.json
           if-no-files-found: warn
           retention-days: 7
