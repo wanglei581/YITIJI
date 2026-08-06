@@ -26,7 +26,8 @@
     "verify:production-provisioning": "node scripts/verify-production-provisioning.mjs",
     "verify:installer-inputs": "node installer/verify-installer-inputs.mjs",
     "installer:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-staging.ps1",
-    "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1"
+    "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1",
+    "installer:build-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-exe.ps1"
   },
   "dependencies": {
     "axios": "1.18.1",
