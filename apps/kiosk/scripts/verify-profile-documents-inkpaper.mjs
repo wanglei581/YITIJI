@@ -312,13 +312,21 @@ const FILE_FLOW_CHANGED = new Set([
   'apps/kiosk/tests/visual/fusion-w3.spec.ts',
   'apps/partner/scripts/verify-excel-template-download-ui.mjs',
   'apps/partner/src/routes/sources/ExcelImportModal.tsx',
+  'apps/partner/src/routes/sources/index.tsx',
   'apps/terminal-agent/scripts/verify-usb-import-agent.ts',
   'apps/terminal-agent/installer/verify-installer-inputs.mjs',
   'apps/terminal-agent/src/local-api/qr-login-server.ts',
   'apps/terminal-agent/src/local-api/types.ts',
   'apps/terminal-agent/src/local-api/wire.ts',
   'docs/product/feature-scope.md',
+  'services/api/scripts/verify-http-exception-filter.ts',
+  'services/api/scripts/verify-partner-excel-import.ts',
   'services/api/scripts/verify-upload-sessions.ts',
+  'services/api/src/common/filters/http-exception.filter.ts',
+  'services/api/src/jobs/jobs-excel.service.ts',
+  'services/api/src/jobs/jobs-partner.service.ts',
+  'services/api/src/jobs/jobs-shared.ts',
+  'services/api/src/jobs/partner-import-file.ts',
 ])
 
 // 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/documents 明细页时，才强制 allowlist
