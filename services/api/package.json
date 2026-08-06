@@ -75,6 +75,7 @@
     "verify:terminal-network-diagnostics": "node -r @swc-node/register scripts/verify-terminal-network-diagnostics.ts",
     "maintenance:backfill-terminal-credentials": "node -r @swc-node/register scripts/backfill-terminal-credentials.ts",
     "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
+    "verify:demo-seed-guard": "node -r @swc-node/register scripts/verify-demo-seed-guard.ts",
     "verify:print-scan-preflight": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts",
     "verify:print-scan-preflight:postgres": "node -r @swc-node/register scripts/verify-print-scan-preflight.ts --require-postgres",
     "verify:db-load-indexes": "node -r @swc-node/register scripts/verify-db-load-indexes.ts",

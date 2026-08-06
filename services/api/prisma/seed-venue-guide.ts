@@ -9,7 +9,9 @@
  */
 import 'dotenv/config'
 import { createPrismaClient } from '../src/prisma/create-client'
+import { assertDemoSeedAllowed } from './seed-guard'
 
+assertDemoSeedAllowed(process.env)
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required')
 const prisma = createPrismaClient(url).client

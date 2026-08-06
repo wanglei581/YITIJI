@@ -132,7 +132,8 @@ pnpm build
 按 [postgres-operations.md](./postgres-operations.md) 执行并留存日志：
 
 - [ ] 全新空库 `migrate deploy` 通过。
-- [ ] seed 通过。
+- [ ] `verify:demo-seed-guard` 通过，且生产未执行任何 `db:seed*`。
+- [ ] 现有生产恢复确认沿用已存在且已轮换口令的管理员账号；全新空库须等待受审的首个管理员 bootstrap，禁止用 demo seed 创建账号。
 - [ ] API 启动日志显示连接 PostgreSQL，不是 SQLite。
 - [ ] PG schema 漂移校验通过。
 - [ ] 核心表外键与唯一约束生效。
@@ -478,7 +479,7 @@ pnpm --filter ./services/api verify:activity-logs
 ### C. §3.4/§3.6 PostgreSQL 底座 —— 本地预演通过
 
 - 空库 `migrate deploy`：4 个迁移（0_init + activity_logs + company_profiles…）全部应用 ✅；`db:pg:sync:check` 漂移校验通过 ✅。
-- PG seed（seed.ts + seed-fairs.ts）通过 ✅。
+- 历史本地 PG 预演曾运行 seed.ts + seed-fairs.ts 并通过 ✅；该结果仅证明当时测试数据可写，**不是当前生产步骤**。现行生产禁止 `db:seed*`。
 - PG 上核心 verify：`verify:companies` 11 PASS、`verify:activity-logs` 12 PASS、`verify:member-assets-c2d` 9 PASS ✅。
 - **备份恢复演练 ✅**：`pg_dump -F c`（118KB）→ `pg_restore` 到临时库 → 行数核对 Job=13/JobFair=3/Organization=2 一致。
 - `GET /api/v1/health` 已实现（2026-06-13 新增）：真实 DB 往返探活 + 返回 `db: sqlite|postgres`，部署时以此确认生产连接 PostgreSQL。
