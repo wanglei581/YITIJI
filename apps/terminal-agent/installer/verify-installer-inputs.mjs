@@ -53,6 +53,11 @@ assert.match(wix, /Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowSty
 assert.match(wix, /WorkingDirectory="INSTALLFOLDER"/)
 assert.match(wix, /RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall"/)
 assert.match(wix, /ComponentRef Id="ProvisionerShortcutComponent"/)
+assert.match(
+  wix.match(/<Component Id="ProvisionerShortcutComponent"[\s\S]*?<\/Component>/)?.[0] ?? '',
+  /RegistryValue\s+Root="HKCU"/,
+  'non-advertised ProgramMenu shortcut must use an HKCU component key path for MSI ICE validation',
+)
 assert.doesNotMatch(
   wix.match(/<Shortcut[\s\S]*?\/>/)?.[0] ?? '',
   /(?:BindCode|AgentToken|BridgeToken|adminSecret)/i,

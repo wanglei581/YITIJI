@@ -55,7 +55,7 @@
             WorkingDirectory="INSTALLFOLDER" />
           <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
           <RegistryValue
-            Root="HKLM"
+            Root="HKCU"
             Key="Software\AIJobPrint\Agent"
             Name="ProvisionerShortcutInstalled"
             Type="integer"
