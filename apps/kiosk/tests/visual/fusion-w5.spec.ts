@@ -269,7 +269,7 @@ for (const scenario of [
     },
     text: '使用帮助',
   },
-  { label: 'empty', toolbox: { enabled: false, items: [] }, text: '待配置' },
+  { label: 'empty', toolbox: { enabled: false, items: [] }, text: '合同审查' },
 ] as const) {
   test(`toolbox renders the ${scenario.label} terminal-config branch @w5-kiosk`, async ({ page, api }) => {
     const errors = runtimeErrors(page)
@@ -288,7 +288,8 @@ for (const scenario of [
     if (scenario.label === 'configured') {
       await expect(page.getByRole('button', { name: /使用帮助/ })).toBeEnabled()
     } else {
-      await expect(page.locator('.ktoolbox .tb-tile')).toHaveCount(0)
+      // empty backend config → hook falls back to DEFAULT_TOOLBOX_CONFIG (合同审查 item)
+      await expect(page.locator('.ktoolbox .tb-tile')).not.toHaveCount(0)
     }
     await expectFusionAcceptance(page, errors)
     await backButton.click()
