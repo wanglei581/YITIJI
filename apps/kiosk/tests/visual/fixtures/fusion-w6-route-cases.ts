@@ -159,9 +159,9 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
   // PR #499 合同审查
-  { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查' },
-  { pattern: '/contract-review/processing', url: '/contract-review/processing', marker: 'p:text-is("审查未完成")', featureText: '审查未完成' },
-  { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果' },
+  { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查', landmark: 'none' },
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', marker: 'p:text-is("审查未完成")', featureText: '审查未完成', landmark: 'none' },
+  { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', landmark: 'none' },
 ] as const // 96 routes (was 93)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
