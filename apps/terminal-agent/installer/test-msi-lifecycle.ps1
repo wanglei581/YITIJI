@@ -316,7 +316,8 @@ if ($null -eq $service -or $service.State -ne "Stopped") {
 Remove-Item -LiteralPath $nodePath -Force
 Remove-Item -LiteralPath $provisionerGuiPath -Force
 Remove-Item -LiteralPath $shortcutPath -Force
-Invoke-Msi -Arguments @("/famus", $resolvedMsi) -LogName "repair.log"
+# Match Burn's proven repair mode so files, registry entries, and shortcuts are restored.
+Invoke-Msi -Arguments @("/fcmuse", $resolvedMsi) -LogName "repair.log"
 $service = Get-CimInstance Win32_Service -Filter "Name='$serviceName'"
 if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
   throw "Repair must preserve the unprovisioned Stopped/Manual service contract"

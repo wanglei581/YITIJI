@@ -166,7 +166,7 @@ assert.match(lifecycle, /Remove-Item -LiteralPath \$provisionerGuiPath -Force/)
 assert.match(lifecycle, /Remove-Item -LiteralPath \$shortcutPath -Force/)
 assert.match(
   lifecycle,
-  /Invoke-Msi -Arguments @\("\/famus", \$resolvedMsi\)/,
+  /Invoke-Msi -Arguments @\("\/fcmuse", \$resolvedMsi\)/,
   'MSI repair must restore files, registry entries, and Start menu shortcuts',
 )
 assert.match(lifecycle, /Provisioner Start menu shortcut still exists after MSI uninstall/)
