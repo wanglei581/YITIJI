@@ -100,9 +100,9 @@ export interface AgentConfig {
    */
   localApiAllowedOrigins?: string[]
   /**
-   * 静态共享令牌,专供 U 盘本地文件网桥（/local/usb/*）使用。安装时随 Kiosk
-   * 构建（VITE_TERMINAL_AGENT_BRIDGE_TOKEN）与本文件一起下发,不走网络协商。
-   * 未配置时 U 盘导入路由整体 403（fail-closed），不影响心跳/打印/扫描/QR登录。
+   * 静态共享令牌，用于受保护的本地浏览器桥接路由。安装时随 Kiosk 构建
+   * （VITE_TERMINAL_AGENT_BRIDGE_TOKEN）与本文件一起下发，不走网络协商。
+   * 未配置时相关路由整体 403（fail-closed），不影响心跳与周期任务领取。
    */
   localApiBridgeToken?: string
 

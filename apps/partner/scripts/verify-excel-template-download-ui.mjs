@@ -65,6 +65,12 @@ mustContain('src/routes/sources/ExcelImportModal.tsx', [
   '技能标签',
   '有效期',
   '签到链接',
+  'onDragEnter',
+  'onDragOver',
+  'onDrop',
+  'selectFile(e.dataTransfer.files[0])',
+  'preview.sampleValid',
+  '有效行示例',
 ], 'Excel 导入弹窗提供模板下载按钮并覆盖 AI-ready/签到字段')
 mustNotContain('src/routes/sources/ExcelImportModal.tsx', [
   '候选人',

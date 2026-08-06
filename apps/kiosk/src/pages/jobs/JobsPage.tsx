@@ -4,6 +4,7 @@ import { ErrorState, LoadingState } from '@ai-job-print/ui'
 import type { ExternalJobDTO, JobAiRecommendationDTO, MemberResumeItem } from '@ai-job-print/shared'
 import { Building2Icon, FilterIcon, RefreshCwIcon, SearchIcon, SparklesIcon, StoreIcon } from 'lucide-react'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getJobs } from '../../services/api'
 import {
   getJobAiConsentStatus,
@@ -59,6 +60,7 @@ export function JobsPage() {
   const [sourceOrgId, setSourceOrgId] = useState(() => sourceOrgIdParam)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [sortMode, setSortMode] = useState<'latest' | 'salary_first'>('latest')
+  const [showFilterPicker, setShowFilterPicker] = useState(false)
   const [showConsent, setShowConsent] = useState(false)
   const [showResumeSelect, setShowResumeSelect] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
@@ -302,6 +304,36 @@ export function JobsPage() {
         onSelect={(resume) => void runAiRecommend(resume)}
         onUpload={() => navigate('/resume/source?intent=diagnose')}
       />
+      <KioskFilterPickerModal
+        open={showFilterPicker}
+        title="城市与行业筛选"
+        description="选项来自当前已同步的真实岗位；完整地区与行业字典将在数据接口升级后接入。"
+        sections={[
+          {
+            id: 'city',
+            label: '工作城市',
+            value: city,
+            allLabel: '全部城市',
+            options: cityOptions.map((value) => ({ value, label: value })),
+          },
+          {
+            id: 'industry',
+            label: '所属行业',
+            value: industry,
+            allLabel: '全部行业',
+            options: industryOptions.map((value) => ({ value, label: value })),
+          },
+        ]}
+        onChange={(sectionId, value) => {
+          if (sectionId === 'city') setCity(value)
+          if (sectionId === 'industry') setIndustry(value)
+        }}
+        onClear={() => {
+          setCity('')
+          setIndustry('')
+        }}
+        onClose={() => setShowFilterPicker(false)}
+      />
       <AiDriverBanner feature="AI岗位研判" description="结合你的简历分析匹配度" />
       {facetLoading ? (
         <LoadingState className="flex-1" />
@@ -355,12 +387,15 @@ export function JobsPage() {
               <StoreIcon aria-hidden="true" />
               线下机构门店
             </button>
-            <button type="button" className="jf-f-chip" onClick={() => {
-              if (cityOptions[0]) setCity(cityOptions[0])
-              else if (industryOptions[0]) setIndustry(industryOptions[0])
-            }}>
+            <button
+              type="button"
+              className={`jf-f-chip${city || industry ? ' on' : ''}`}
+              aria-haspopup="dialog"
+              aria-expanded={showFilterPicker}
+              onClick={() => setShowFilterPicker(true)}
+            >
               <FilterIcon aria-hidden="true" />
-              城市 / 行业筛选
+              城市 / 行业筛选{city || industry ? ` (${Number(Boolean(city)) + Number(Boolean(industry))})` : ''}
             </button>
           </div>
 

@@ -87,13 +87,13 @@ CORS 白名单（`http://localhost:5173` 等）是浏览器层辅助控制，**�
 | 查询设备状态 | `GET /local/status` | `localAuthToken` | 返回打印机、扫描仪状态 |
 | 轮询扫描结果 | `GET /local/scan/:id` | `localAuthToken` | 返回进度或已完成的文件 URL |
 | 获取 U 盘文件 | `GET /local/usb/files` | `localAuthToken` | 返回 U 盘可打印文件列表 |
-| 发起打印 | `POST /local/print` | `actionToken`（一次性） | 创建本地打印任务，返回 taskId |
+| 加速已建打印任务 | `POST /local/print/wake`（无 body / query） | 精确 Origin + `X-Local-Bridge-Token` | `202` 接受唤醒；实际任务仍由 Agent 向云端 claim |
 | 发起扫描 | `POST /local/scan` | `actionToken`（一次性） | 触发扫描，返回 scanId |
 | 触发 U 盘打印 | `POST /local/usb/print` | `actionToken`（一次性） | 打印 U 盘指定文件 |
 
 **localAuthToken**：终端注册完成后由 Agent 生成并加密保存，同时通过注册响应附带给后端，后端在 Kiosk 初始化时下发。Kiosk 在所有查询类请求头中携带：`Authorization: Bearer <localAuthToken>`。
 
-**actionToken 签发语义**：Kiosk 创建打印/扫描任务时，后端在创建任务响应中一并签发 `actionToken`（携带 `terminalId + action + taskId + expiresAt + nonce` 的 HMAC 签名），Kiosk 将 `actionToken` 随任务 ID 传给 Agent。**Agent 不主动申请 token**，仅校验与 `taskId` 绑定的 token 是否合法并在有效期内（默认 5 分钟），校验通过后执行动作；SQLite 标记 nonce 已使用防重放。以下情形返回 **403**：Token 过期、nonce 已被使用、action 不匹配当前请求、签名校验失败。
+**当前打印 MVP 边界**：`/local/print/wake` 不是本地直打接口，不接收 `taskId`、文件 URL、本地路径或打印参数，也不直接调用打印机。静态 bridge token 会进入 Kiosk 构建产物，只能作为防误调用门槛，不能当作本机任意进程之间的强安全边界；之所以可用于 wake，是因为 wake 只提前触发 Agent 本来就会执行的云端 claim，领取资格仍由 Agent 凭证、终端绑定、任务状态和付款门禁共同决定。`actionToken` 仍为未来本地直接动作的预留设计，当前 Kiosk 不得获取或传给 wake；未来启用前必须补 Agent 验签、nonce 持久化和防重放。
 
 ### 1.3 与后端 API 的关系
 
@@ -611,17 +611,17 @@ Agent 为长时间运行任务续租 claim。
 用户在 Kiosk 选择打印参数，点击"确认打印"
        │
        ▼
-Kiosk 调用后端 POST /api/v1/print-tasks
-后端创建任务（status=pending），签发 actionToken（terminalId+action=print+expiresAt+nonce）
+Kiosk 调用后端 POST /api/v1/print/jobs
+后端创建 Order + PrintTask（status=pending）；付费单等待服务端确认 paid，免费单创建时为 paid/free
        │
        ▼
-后端返回 { taskId, actionToken }，Kiosk 进入"打印进度"页面
+付费单经收银页确认 paid 后进入"打印进度"；免费单直接进入"打印进度"
        │
        ▼
-（Kiosk 可选：调用 POST /local/print + actionToken 触发 Agent 立即轮询，加速响应）
+Kiosk best-effort 调用 POST /local/print/wake（无 body）；不可达时不报业务失败
        │
        ▼
-Agent task-runner 每 5s 调用 POST /api/v1/terminals/:terminalId/tasks/claim
+Agent 立即执行或继续每 5s 执行同一个 POST /api/v1/terminals/:terminalId/tasks/claim
        │
        ▼
 后端原子更新 status=claimed，返回任务详情（含 fileUrl + fileMd5 + claimExpiresAt）

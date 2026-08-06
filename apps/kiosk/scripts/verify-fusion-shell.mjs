@@ -181,7 +181,8 @@ function assertImportOrder(css) {
     './styles/kiosk-stage-fit.css',
     './pages/jobs-fairs-prototype.css',
     'tailwindcss',
-  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind import order')
+    './styles/warm-professional-override.css',
+  ], 'index.css must preserve tokens -> fusion-youth -> service-desk -> kiosk-shell/components -> stage-fit -> local CSS -> Tailwind -> warm override import order')
 }
 
 const packageJson = JSON.parse(await read('package.json'))
@@ -265,10 +266,12 @@ for (const [label, pattern] of [
   ['unified service-desk theme', /visualTheme\s*=\s*['"]service-desk['"]/],
   ['unified fusion presentation', /presentation\s*=\s*['"]fusion-youth['"]/],
   ['responsive viewport size binding', /const\s*\{\s*viewportW\s*,\s*viewportH\s*\}\s*=\s*useKioskStageFit\(\s*\)/],
-  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*\(\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)\s*\)/],
-  ['responsive home viewport', /viewport\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
+  ['compact viewport boundary', /const\s+isCompactViewport\s*=\s*viewportW\s*<=\s*760\s*\|\|\s*\(\s*viewportW\s*<=\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
+  ['responsive home boundary', /const\s+isResponsiveHome\s*=\s*pathname\s*===\s*['"]\/['"]\s*&&\s*isCompactViewport/],
+  ['responsive viewport', /viewport\s*=\s*\{\s*isCompactViewport\s*\?\s*['"]mobile['"]\s*:\s*['"]kiosk['"]\s*\}/],
   ['responsive home stable class', /className\s*=\s*\{\s*isResponsiveHome\s*\?\s*['"]kiosk-home-mobile['"]\s*:\s*['"]h-full['"]\s*\}/],
-  ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!isResponsiveHome\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
+  ['fluid desktop boundary', /const\s+usesFluidViewport\s*=\s*isCompactViewport\s*\|\|\s*\(\s*viewportW\s*>\s*960\s*&&\s*viewportW\s*>\s*viewportH\s*\)/],
+  ['stable KioskStageFit wrapper', /return\s*<KioskStageFit\s+enabled=\{\s*!usesFluidViewport\s*\}>\s*\{\s*shell\s*\}\s*<\/KioskStageFit>/],
   ['device status always on', /useTerminalDeviceStatus\(\s*true\s*\)/],
   ['campus route detection', /pathname\s*===\s*['"]\/campus['"]/],
   ['campus-only header hide', /hideHeader\s*=\s*\{\s*isCampusZone\s*\}/],

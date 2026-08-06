@@ -251,6 +251,21 @@
   background: var(--lf-blue-soft);
 }
 
+@media (min-width: 901px) and (min-height: 1500px) {
+  .kprofile.kprofile-lightflow .kp-service-directory {
+    flex: 1;
+  }
+
+  .kprofile.kprofile-lightflow .kp-section {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kprofile.kprofile-lightflow .kp-entry-grid {
+    flex: 1;
+  }
+}
+
 @media (hover: hover) and (pointer: fine) {
   .kprofile.kprofile-lightflow .kp-entry:not(:disabled):hover {
     border-color: rgba(31, 158, 134, 0.45);

@@ -1,0 +1,288 @@
+/* ============================================================
+ * kiosk-uplift.css — 视觉精制层（叠加在 prototype-v1.css 之上）
+ *
+ * 全部选择器使用 [data-kiosk-presentation='fusion-youth'] .kpv1 前缀（0,3,0），
+ * 与 warm-professional-override.css 相同特异性，加载顺序靠后故优先。
+ * ============================================================ */
+
+/* ── 精制 Token ─────────────────────────────────────────────
+ * 深色指挥舱专用变量，不污染 --pv-* 命名空间。
+ * ─────────────────────────────────────────────────────────── */
+[data-kiosk-presentation='fusion-youth'] {
+  --up-cmd-glow:    rgba(31, 158, 134, 0.42);
+  --up-cmd-surface: rgba(255, 255, 255, 0.07);
+  --up-cmd-line:    rgba(255, 255, 255, 0.12);
+  --up-cmd-ink:     rgba(244, 241, 232, 0.95);
+  --up-cmd-muted:   rgba(244, 241, 232, 0.52);
+  --up-cmd-teal:    #35c3a0;
+  --up-led-ready:   #2db88a;
+}
+
+/* ══════════════════════════════════════════════════════════
+   AI 接待台 → 深色指挥舱
+   签名元素：首页亮色到深森林渐变，制造视觉锚点。
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-card {
+  background: linear-gradient(150deg, #091e16 0%, #112d22 52%, #1a4336 100%);
+  border: 1px solid var(--up-cmd-glow);
+  box-shadow:
+    0 20px 80px rgba(9, 30, 22, 0.48),
+    0 4px 20px rgba(31, 158, 134, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-card::before {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--up-cmd-teal) 32%,
+    rgba(53, 195, 160, 0.6) 72%,
+    transparent 100%
+  );
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-badge {
+  background: rgba(53, 195, 160, 0.14);
+  border-color: rgba(53, 195, 160, 0.38);
+  color: var(--up-cmd-teal);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-badge .dot {
+  background: var(--up-cmd-teal);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-h,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-hint {
+  color: var(--up-cmd-ink);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-hint {
+  color: var(--up-cmd-muted);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-input-row {
+  background: var(--up-cmd-surface);
+  border-color: var(--up-cmd-line);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-input-placeholder {
+  color: var(--up-cmd-muted);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-mic {
+  background: var(--up-cmd-surface);
+  border-left-color: var(--up-cmd-line);
+  color: var(--up-cmd-teal);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-mic:active {
+  background: rgba(53, 195, 160, 0.2);
+}
+
+/* CTA：鲜明 teal 渐变（覆盖 warm-professional-override 的橙色方案） */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-cta {
+  background: linear-gradient(135deg, #1da884 0%, #157a67 100%);
+  color: #fff;
+  box-shadow:
+    0 6px 28px rgba(31, 158, 134, 0.48),
+    0 2px 8px rgba(9, 30, 22, 0.38);
+  letter-spacing: 5px;
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-cta:active {
+  transform: scale(0.99);
+  box-shadow: 0 3px 14px rgba(31, 158, 134, 0.3);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-chip {
+  background: var(--up-cmd-surface);
+  border-color: var(--up-cmd-line);
+  color: var(--up-cmd-ink);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-chip svg {
+  color: var(--up-cmd-teal);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-chip:active {
+  background: rgba(53, 195, 160, 0.18);
+  border-color: rgba(53, 195, 160, 0.42);
+  transform: scale(0.97);
+}
+
+/* ══════════════════════════════════════════════════════════
+   设备状态卡 → 清爽绿调 + LED 就绪指示灯
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .device-card {
+  background: linear-gradient(155deg, #f6f9f7 0%, #eaf3ef 100%);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .dc-dot[data-state='ready'] {
+  width: 12px;
+  height: 12px;
+  background: var(--up-led-ready);
+  box-shadow:
+    0 0 0 3px rgba(45, 184, 138, 0.18),
+    0 0 10px rgba(45, 184, 138, 0.68);
+  animation: up-led 2.8s ease-in-out infinite;
+}
+
+@keyframes up-led {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(45, 184, 138, 0.18),
+      0 0 10px rgba(45, 184, 138, 0.65);
+  }
+  55% {
+    box-shadow:
+      0 0 0 5px rgba(45, 184, 138, 0.07),
+      0 0 18px rgba(45, 184, 138, 0.82);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   登录 / 进入我的按钮 → 深色渐变
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .login-btn {
+  background: linear-gradient(140deg, var(--pv-dark) 0%, #163d31 100%);
+  border: 1px solid rgba(31, 158, 134, 0.2);
+  box-shadow:
+    0 8px 30px rgba(16, 48, 43, 0.28),
+    0 2px 8px rgba(31, 158, 134, 0.1);
+}
+
+/* ══════════════════════════════════════════════════════════
+   服务分组卡 → 渐变左边条（浓 → 淡出）
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .groups .card::before {
+  background: linear-gradient(
+    180deg,
+    var(--pv-accent, var(--pv-teal)) 0%,
+    color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 25%, transparent) 100%
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   磁贴 hover → 轻量品类色晕
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .tile:not(:disabled):hover {
+  background: color-mix(
+    in srgb,
+    var(--pv-accent-soft, var(--pv-teal-soft)) 40%,
+    var(--pv-paper)
+  );
+  border-color: color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 28%, transparent);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+/* ══════════════════════════════════════════════════════════
+   核心服务磁贴网格 → 立体阴影 + 色调高光 + hover 浮起
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .svc-tile {
+  border-top-width: 5px;
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 2px 14px rgba(16, 48, 43, 0.06),
+    0 8px 36px color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 10%, transparent);
+  transition:
+    transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.18s ease;
+}
+
+/* 右上角径向色调光晕 */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .svc-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 120px 120px at 100% 0%,
+    color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 9%, transparent),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .svc-tile:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 6px 24px rgba(16, 48, 43, 0.1),
+    0 14px 56px color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 20%, transparent);
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .svc-tile:active {
+  transform: scale(0.975);
+  box-shadow: 0 2px 10px rgba(16, 48, 43, 0.07);
+  transition-duration: 0.08s;
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .st-icon {
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--pv-accent, var(--pv-teal)) 28%, transparent);
+}
+
+/* ══════════════════════════════════════════════════════════
+   AI 能力标签 → 精致内高光
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ai-chip {
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+/* ══════════════════════════════════════════════════════════
+   AI 能力调度分隔条 → 更有分量
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .d-line {
+  height: 1.5px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .d-label {
+  font-size: 17px;
+  padding: 8px 24px;
+  background: linear-gradient(135deg, var(--pv-teal-soft), rgba(226, 242, 236, 0.5));
+  box-shadow: 0 2px 12px rgba(31, 158, 134, 0.1);
+}
+
+/* ══════════════════════════════════════════════════════════
+   动态专区卡 → hover 浮起
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .zone-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(16, 48, 43, 0.12);
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s;
+}
+
+/* ══════════════════════════════════════════════════════════
+   合规提示条 → 毛玻璃
+   ══════════════════════════════════════════════════════════ */
+
+[data-kiosk-presentation='fusion-youth'] .kpv1 .notice {
+  background: rgba(255, 253, 248, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* ══════════════════════════════════════════════════════════
+   核心服务网格入场动画（错落渐入）
+   ══════════════════════════════════════════════════════════ */
+
+@keyframes up-tile-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile {
+    animation: up-tile-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(1) { animation-delay: 0ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(2) { animation-delay: 55ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(3) { animation-delay: 110ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(4) { animation-delay: 165ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(5) { animation-delay: 220ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(6) { animation-delay: 275ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(7) { animation-delay: 330ms; }
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .svc-grid .svc-tile:nth-child(8) { animation-delay: 385ms; }
+}

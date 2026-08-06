@@ -12,6 +12,8 @@
     "dev": "ts-node src/index.ts",
     "verify:direct-http-agents": "ts-node scripts/verify-direct-http-agents.ts",
     "verify:local-qr-proxy": "ts-node scripts/verify-local-qr-proxy.ts",
+    "verify:local-print-wake": "ts-node scripts/verify-local-print-wake.ts",
+    "verify:task-runner-wake": "ts-node scripts/verify-task-runner-wake.ts",
     "verify:usb-import-agent": "ts-node scripts/verify-usb-import-agent.ts",
     "verify:printer-config": "node scripts/verify-printer-config.mjs",
     "verify:agent-profile-guard": "node scripts/verify-agent-profile-guard.mjs",
@@ -26,7 +28,8 @@
     "verify:production-provisioning": "node scripts/verify-production-provisioning.mjs",
     "verify:installer-inputs": "node installer/verify-installer-inputs.mjs",
     "installer:stage": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-staging.ps1",
-    "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1"
+    "installer:build": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-msi.ps1",
+    "installer:build-exe": "powershell -NoProfile -ExecutionPolicy Bypass -File installer/build-exe.ps1"
   },
   "dependencies": {
     "axios": "1.18.1",

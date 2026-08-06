@@ -21,7 +21,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { key: 'home',      label: '首页',   icon: HomeIcon },
-  { key: 'assistant', label: 'AI助手', icon: BotIcon },
+  { key: 'assistant', label: 'AI顾问', icon: BotIcon },
   { key: 'profile',   label: '我的',   icon: UserIcon },
 ]
 
@@ -67,7 +67,7 @@ export function KioskLayout({
     <div
       {...getVisualThemeAttributes(visualTheme, density)}
       {...getKioskPresentationAttributes(presentation, viewport)}
-      className={cn('ui-kiosk-shell flex h-screen flex-col overflow-hidden bg-canvas', className)}
+      className={cn('ui-kiosk-shell flex h-dvh flex-col overflow-hidden bg-canvas', className)}
     >
 
       {/* ── Top status bar：原型 topbar（76px 墨绿，品牌 + 状态） ── */}

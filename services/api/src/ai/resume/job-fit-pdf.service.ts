@@ -94,34 +94,48 @@ export class JobFitPdfService {
     doc.fontSize(10.5).fillColor('#374151').text(payload.summary, { lineGap: 3 })
     doc.fontSize(10).fillColor('#6b7280').text(`参考等级：${this.fitLevelLabel(payload.fitLevel)}`)
 
-    section('二、已有匹配点（简历依据）')
+    const breakdown = meta.decisionSupport?.requirementBreakdown
+    if (breakdown) {
+      section('二、岗位要求拆解（岗位原文）')
+      const breakdownLine = (label: string, items: string[]) => {
+        if (items.length > 0) doc.fontSize(10.5).fillColor('#374151').text(`${label}：${items.join('；')}`, { lineGap: 3 })
+      }
+      breakdownLine('主要职责', breakdown.responsibilities)
+      breakdownLine('明确要求', breakdown.mustHave)
+      breakdownLine('优先条件', breakdown.preferred)
+      breakdownLine('需要留意', breakdown.attention)
+    }
+
+    section(breakdown ? '三、岗位要求与简历证据' : '二、岗位要求与简历证据')
     if (payload.matchPoints.length === 0) {
       bullet('当前记录未提供可展示的匹配点，请以本人简历与岗位来源信息为准。')
     } else {
       payload.matchPoints.forEach((item) => {
+        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${item.requirement}`, { lineGap: 2 })
         doc.fontSize(10.5).fillColor('#111827').text(`· ${item.point}`, { lineGap: 2 })
         doc.fontSize(9.5).fillColor('#6b7280').text(`   简历依据：${item.evidence}`, { lineGap: 4 })
       })
     }
 
-    section('三、待准备方向')
+    section(breakdown ? '四、待准备方向' : '三、待准备方向')
     if (payload.gapPoints.length === 0) {
       bullet('当前记录未提供具体差距项，建议在来源平台核对岗位要求后再准备。')
     } else {
       payload.gapPoints.forEach((item) => {
+        if (item.requirement) doc.fontSize(9.5).fillColor('#9a5530').text(`· 岗位要求：${item.requirement}`, { lineGap: 2 })
         doc.fontSize(10.5).fillColor('#111827').text(`· ${item.gap}`, { lineGap: 2 })
         doc.fontSize(9.5).fillColor('#6b7280').text(`   建议：${item.suggestion}`, { lineGap: 4 })
       })
     }
 
-    section('四、定向优化建议')
+    section(breakdown ? '五、定向优化建议' : '四、定向优化建议')
     if (payload.targetedSuggestions.length === 0) {
       bullet('当前记录未提供定向建议，请只补充可由本人真实经历支持的内容。')
     } else {
       payload.targetedSuggestions.forEach(bullet)
     }
 
-    section('五、岗位关键词参考')
+    section(breakdown ? '六、岗位关键词参考' : '五、岗位关键词参考')
     const coverage = meta.decisionSupport?.keywordCoverage
     if (!coverage) {
       doc.fontSize(10.5).fillColor('#6b7280').text('本次报告基于基础岗位匹配结果生成；该历史记录未包含 M1.5 关键词覆盖信息，因此不展示关键词清单。', { lineGap: 3 })
@@ -133,7 +147,7 @@ export class JobFitPdfService {
     }
 
     if (meta.job.sourceUrl) {
-      section('六、后续操作')
+      section(breakdown ? '七、后续操作' : '六、后续操作')
       doc.fontSize(10.5).fillColor('#374151').text('如需继续了解或提交材料，请前往岗位来源平台完成；本系统不接收简历。', { lineGap: 3 })
       doc.fontSize(9.5).fillColor('#6b7280').text(`来源链接：${meta.job.sourceUrl}`, { lineGap: 3 })
     }

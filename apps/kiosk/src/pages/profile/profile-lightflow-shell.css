@@ -50,6 +50,21 @@
   margin: 26px auto 0;
 }
 
+/* 27 寸竖屏把剩余高度交给真实服务目录，避免内容结束后留下无意义的大块空白。 */
+@media (min-width: 901px) and (min-height: 1500px) {
+  .kprofile.kprofile-lightflow {
+    display: flex;
+    block-size: 100%;
+    flex-direction: column;
+  }
+
+  .kprofile.kprofile-lightflow .kp-inner {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+  }
+}
+
 .kprofile.kprofile-lightflow .kp-profile-header {
   overflow: hidden;
   border: 1px solid var(--lf-line);

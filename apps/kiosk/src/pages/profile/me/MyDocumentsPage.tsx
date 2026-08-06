@@ -24,6 +24,18 @@ import { formatTime } from '../assets/format'
 import { MeListShell, type MeListState } from './MeListShell'
 import './me-detail-inkpaper.css'
 
+function openDeferredPreviewWindow(): Window | null {
+  const previewWindow = window.open('about:blank', '_blank')
+  if (!previewWindow) return null
+  previewWindow.opener = null
+  const referrerPolicy = previewWindow.document.createElement('meta')
+  referrerPolicy.name = 'referrer'
+  referrerPolicy.content = 'no-referrer'
+  previewWindow.document.head.append(referrerPolicy)
+  previewWindow.document.title = '正在打开文件'
+  return previewWindow
+}
+
 function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return '—'
   if (n < 1024) return `${n} B`
@@ -188,11 +200,17 @@ export function MyDocumentsPage() {
     if (opening || printingId || signingId || busyId || retentionBusy) return
     const token = getToken()
     if (!token) return
+    const previewWindow = openDeferredPreviewWindow()
+    if (!previewWindow) {
+      setHint('浏览器阻止了文件窗口，请允许本站打开新窗口后重试')
+      return
+    }
     setOpening(doc.id)
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
-      window.open(res.url, '_blank', 'noopener')
+      previewWindow.location.replace(res.url)
     } catch {
+      previewWindow.close()
       setHint('文档打开失败，可能已到期或被清理')
     } finally {
       setOpening(null)

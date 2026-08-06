@@ -1,0 +1,867 @@
+/* V8 pilot: modern public employment service. Six layouts, one restrained semantic palette. */
+
+:root {
+  --v8-bg: #f7f6f2;
+  --v8-surface: #ffffff;
+  --v8-ink: #1d2925;
+  --v8-muted: #68746f;
+  --v8-line: #d4dad6;
+  --v8-green: #1f5f4b;
+  --v8-green-dark: #173f34;
+  --v8-green-soft: #e8f0eb;
+  --v8-orange: #d95d32;
+  --v8-orange-soft: #f8e8e1;
+  --v8-blue: #3f6fae;
+  --v8-blue-soft: #eaf0f7;
+  --v8-device: #12201b;
+  --v8-device-line: #41534b;
+  --v8-device-muted: #a6b4ae;
+}
+
+/* Shared shell: calm surfaces, clear active state, no fluorescent accent. */
+.today-command-center,
+.materials-workdesk,
+.intelligence-desk,
+.service-account {
+  color: var(--v8-ink);
+  background: var(--v8-bg);
+}
+
+.today-command-center .tabbar,
+.materials-workdesk .tabbar,
+.intelligence-desk .tabbar,
+.service-account .tabbar {
+  border-top: 1px solid var(--v8-line);
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.today-command-center .tabbar button.active,
+.materials-workdesk .tabbar button.active,
+.intelligence-desk .tabbar button.active,
+.service-account .tabbar button.active {
+  color: var(--v8-green);
+}
+
+.today-command-center .tabbar button.active::after,
+.materials-workdesk .tabbar button.active::after,
+.intelligence-desk .tabbar button.active::after,
+.service-account .tabbar button.active::after {
+  width: 14px;
+  height: 2px;
+  background: var(--v8-orange);
+}
+
+/* Today: a personal service agenda, with one dominant action. */
+.today-command-center > .statusbar {
+  color: var(--v8-ink);
+  background: var(--v8-green-soft);
+}
+
+.today-command-center > .statusbar .status-icons {
+  color: var(--v8-muted);
+}
+
+.command-hero {
+  padding: 8px 18px 15px;
+  color: var(--v8-ink);
+  background: var(--v8-green-soft);
+}
+
+.command-hero .topline {
+  color: var(--v8-green);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.command-notice,
+.command-hero .topline button {
+  color: var(--v8-ink);
+}
+
+.command-notice b {
+  color: #fff;
+  background: var(--v8-orange);
+  font: 800 7px/1 var(--sans);
+}
+
+.command-label {
+  margin-top: 15px;
+  color: var(--v8-muted);
+  font-size: 9px;
+}
+
+.command-label b {
+  padding: 4px 7px;
+  color: var(--v8-green);
+  border: 1px solid #bed0c6;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 8px;
+}
+
+.command-hero h1 {
+  margin: 12px 0 7px;
+  color: var(--v8-green-dark);
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.28;
+  letter-spacing: 0;
+}
+
+.command-hero > p {
+  color: #596861;
+  font-size: 10px;
+  line-height: 1.62;
+}
+
+.command-primary {
+  min-height: 42px;
+  margin-top: 14px;
+  padding: 0 15px;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--v8-orange);
+  font-size: 11px;
+}
+
+.command-hero .ai-command {
+  min-height: 40px;
+  grid-template-columns: 48px 1fr 12px;
+  margin-top: 14px;
+  padding: 0 2px 0 9px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 2px solid var(--v8-blue);
+  color: #4f5e58;
+  background: rgba(255, 255, 255, 0.54);
+  font-size: 8.5px;
+}
+
+.command-hero .ai-command .ai-kicker,
+.command-hero .ai-command > svg {
+  color: var(--v8-blue);
+  font-family: var(--sans);
+}
+
+.today-command-center .scroll {
+  height: calc(100% - 323px);
+}
+
+.obligation-stack {
+  background: var(--v8-surface);
+}
+
+.stack-head,
+.action-index > header {
+  padding: 12px 18px 9px;
+}
+
+.stack-head b,
+.action-index > header b {
+  font-size: 12px;
+}
+
+.stack-head span,
+.action-index > header span {
+  color: var(--v8-muted);
+  font-size: 8px;
+}
+
+.obligation-primary {
+  min-height: 76px;
+  grid-template-columns: 56px 1fr 12px;
+  gap: 11px;
+  margin: 0 18px;
+  padding: 12px 12px 12px 10px;
+  border-left: 4px solid var(--v8-orange);
+  color: var(--v8-ink);
+  background: var(--v8-orange-soft);
+}
+
+.obligation-primary .deadline-number {
+  padding-right: 9px;
+  border-right: 1px solid #e1b9aa;
+}
+
+.obligation-primary .deadline-number b {
+  color: var(--v8-orange);
+}
+
+.obligation-primary small,
+.obligation-primary p {
+  color: #85513f;
+}
+
+.obligation-primary h2 {
+  font-size: 12px;
+}
+
+.obligation-secondary {
+  margin: 0 18px;
+  padding: 12px 0 13px;
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.obligation-secondary small,
+.obligation-secondary > b {
+  color: var(--v8-blue);
+}
+
+.obligation-secondary h3 {
+  font-size: 10.5px;
+}
+
+.obligation-secondary p {
+  color: var(--v8-muted);
+  font-size: 8px;
+}
+
+.obligation-secondary > i {
+  background: #e3e7e4;
+}
+
+.obligation-secondary > i span {
+  background: var(--v8-blue);
+}
+
+.action-index {
+  background: var(--v8-bg);
+}
+
+.action-index > header {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.action-row {
+  min-height: 51px;
+  border-bottom: 1px solid var(--v8-line);
+  color: var(--v8-ink);
+}
+
+.action-row span {
+  color: #87918c;
+  font-family: var(--sans);
+}
+
+.action-row strong {
+  font-size: 10px;
+}
+
+.action-row small {
+  color: var(--v8-muted);
+  font-size: 8px;
+}
+
+.action-row-primary strong,
+.action-row-primary span {
+  color: var(--v8-orange);
+}
+
+/* Materials: an archive desk with one dominant reusable document. */
+.materials-workdesk,
+.materials-workdesk .mini-nav {
+  background: var(--v8-bg);
+}
+
+.workdesk-head {
+  padding: 18px 18px 16px;
+}
+
+.workdesk-head small {
+  color: var(--v8-green);
+  font: 800 8px/1 var(--sans);
+}
+
+.workdesk-head h1 {
+  margin: 7px 0 6px;
+  color: var(--v8-green-dark);
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.workdesk-head p {
+  max-width: 273px;
+  color: var(--v8-muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+.workdesk-head > button {
+  width: 44px;
+  height: 44px;
+  border-radius: 4px;
+  color: #fff;
+  background: var(--v8-green);
+}
+
+.asset-filter {
+  gap: 21px;
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.asset-filter button {
+  color: var(--v8-muted);
+  font-size: 9px;
+}
+
+.asset-filter button.active {
+  border-bottom: 2px solid var(--v8-orange);
+  color: var(--v8-ink);
+}
+
+.asset-focus {
+  gap: 9px;
+  padding: 14px 18px 13px;
+}
+
+.asset-focus .featured-document {
+  min-height: 177px;
+  border-radius: 2px;
+  background: var(--v8-green-dark);
+}
+
+.asset-focus .document-sheet {
+  color: var(--v8-ink);
+  background: #fff;
+}
+
+.document-sheet span {
+  font-family: var(--sans);
+  font-weight: 800;
+}
+
+.featured-document small,
+.featured-document p {
+  color: #b7c6bf;
+  font-size: 7.5px;
+}
+
+.featured-document strong {
+  color: #fff;
+  font-size: 9px;
+}
+
+.asset-focus aside {
+  padding: 12px 9px;
+  border-top: 1px solid #9ba9a2;
+}
+
+.asset-focus aside span,
+.asset-focus aside p {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.asset-focus aside b {
+  color: var(--v8-green);
+  font-size: 10.5px;
+}
+
+.asset-register > header {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.asset-register > header span,
+.register-row small {
+  color: var(--v8-muted);
+  font-size: 8px;
+}
+
+.register-row {
+  min-height: 55px;
+  border-bottom: 1px solid var(--v8-line);
+  color: var(--v8-ink);
+}
+
+.register-index {
+  color: #87918c;
+  font-family: var(--sans);
+}
+
+.register-row strong {
+  font-size: 10.5px;
+}
+
+.register-row > b {
+  color: var(--v8-blue);
+  font-family: var(--sans);
+}
+
+.register-pack > b {
+  color: var(--v8-orange);
+}
+
+.processing-dock {
+  border: 1px solid var(--v8-line);
+  border-radius: 3px;
+  background: var(--v8-surface);
+}
+
+.processing-dock > span,
+.processing-dock i em {
+  background: var(--v8-blue);
+}
+
+.processing-dock small {
+  color: var(--v8-blue);
+  font-size: 7.5px;
+}
+
+/* Discover: a sourced editorial briefing, not a feature directory. */
+.intelligence-desk,
+.intelligence-desk .mini-nav {
+  background: #f8f6ef;
+}
+
+.brief-head {
+  padding: 17px 18px 15px;
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.brief-head small {
+  color: var(--v8-blue);
+  font: 800 8px/1 var(--sans);
+}
+
+.brief-head h1 {
+  color: var(--v8-green-dark);
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.brief-head p {
+  color: var(--v8-muted);
+  font-size: 8.5px;
+}
+
+.brief-head > button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #9eaaa4;
+  border-radius: 4px;
+  color: var(--v8-green);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.lead-brief {
+  padding: 17px 18px 18px;
+  background: var(--v8-green-dark);
+}
+
+.lead-brief time {
+  color: #fff;
+  font-family: var(--sans);
+}
+
+.lead-brief time span {
+  color: #a9c7ba;
+  font-size: 8px;
+}
+
+.lead-brief time b {
+  color: #fff;
+  font-size: 30px;
+}
+
+.lead-brief small {
+  color: #a9c7ba;
+  font-size: 8px;
+}
+
+.lead-brief h2 {
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.lead-brief p {
+  color: #c8d7d1;
+  font-size: 8.5px;
+}
+
+.lead-brief footer b {
+  color: #f3a283;
+}
+
+.intelligence-stream > header {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.intelligence-stream > header span,
+.stream-item small,
+.stream-item em {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.stream-item {
+  min-height: 62px;
+  border-bottom: 1px solid var(--v8-line);
+  color: var(--v8-ink);
+}
+
+.stream-index {
+  color: #87918c;
+  font-family: var(--sans);
+}
+
+.stream-item strong {
+  font-size: 10.5px;
+}
+
+.stream-job strong {
+  font-size: 13px;
+}
+
+.stream-item > b,
+.stream-policy > b {
+  color: var(--v8-blue);
+}
+
+.stream-job > b {
+  color: var(--v8-orange);
+}
+
+.stream-fair strong {
+  color: var(--v8-green);
+}
+
+.ai-margin-note {
+  margin-top: 9px;
+  padding: 10px 9px;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 2px solid var(--v8-blue);
+  border-radius: 0 3px 3px 0;
+  background: var(--v8-blue-soft);
+}
+
+.ai-margin-note > svg:first-child {
+  color: var(--v8-blue);
+}
+
+.ai-margin-note small {
+  color: #5f6e7f;
+  font-size: 7.5px;
+}
+
+/* Account: service obligations first, quiet account facts second. */
+.service-account,
+.service-account .mini-nav {
+  background: #f2f4f1;
+}
+
+.account-head {
+  padding: 17px 18px 14px;
+}
+
+.account-person > span {
+  color: #fff;
+  border-radius: 4px;
+  background: var(--v8-green);
+}
+
+.account-person h1 {
+  color: var(--v8-green-dark);
+  font-size: 17px;
+}
+
+.account-person p {
+  color: var(--v8-muted);
+  font-size: 8px;
+}
+
+.account-head > button {
+  padding: 5px 0;
+  border-bottom: 1px solid #94a19b;
+  color: var(--v8-green);
+  background: transparent;
+}
+
+.account-ledger {
+  border-top: 1px solid var(--v8-line);
+}
+
+.account-ledger > header small {
+  color: var(--v8-orange);
+}
+
+.account-ledger > header > span,
+.ledger-obligation small,
+.ledger-obligation em {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.ledger-obligation {
+  min-height: 63px;
+  border-top: 1px solid var(--v8-line);
+  color: var(--v8-ink);
+}
+
+.ledger-mark {
+  color: #87918c;
+  font-family: var(--sans);
+}
+
+.ledger-obligation strong {
+  font-size: 10.5px;
+}
+
+.ledger-obligation-urgent {
+  margin: 0;
+  padding-right: 8px;
+  padding-left: 8px;
+  border-left: 4px solid var(--v8-orange);
+  background: var(--v8-orange-soft);
+}
+
+.ledger-obligation-urgent .ledger-mark,
+.ledger-obligation-urgent small {
+  color: var(--v8-orange);
+}
+
+.account-facts {
+  margin-top: 15px;
+}
+
+.account-facts > header {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.account-facts > header span {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.account-facts > div {
+  display: block;
+}
+
+.account-facts button,
+.account-facts button + button {
+  width: 100%;
+  min-height: 47px;
+  grid-template-columns: 72px auto 1fr;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 0;
+  border-right: 0;
+  border-bottom: 1px solid var(--v8-line);
+  border-left: 0;
+}
+
+.account-facts button + button {
+  padding-left: 0;
+}
+
+.account-facts small,
+.account-facts em {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.account-facts strong,
+.account-facts button:first-child strong,
+.account-facts button:last-child strong {
+  color: var(--v8-green);
+  font: 800 14px/1 var(--sans);
+}
+
+.account-facts button:first-child strong {
+  font-size: 15px;
+}
+
+.account-facts button:last-child strong {
+  color: var(--v8-blue);
+}
+
+.account-utilities > div {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.account-utilities > div span,
+.account-utilities small {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.account-utilities > button {
+  min-height: 50px;
+  border-bottom: 1px solid var(--v8-line);
+  color: var(--v8-ink);
+}
+
+.account-utilities b {
+  font-size: 9.5px;
+}
+
+/* Pickup and tracking keep a professional device layer without console theatrics. */
+.pickup-screen:has(.handoff-console),
+.order-tracking-screen:has(.print-monitor) {
+  background: #f2f4f1;
+}
+
+.pickup-screen:has(.handoff-console) .mini-nav,
+.order-tracking-screen:has(.print-monitor) .mini-nav {
+  color: #fff;
+  border-bottom: 1px solid var(--v8-device-line);
+  background: var(--v8-device);
+}
+
+.handoff-console,
+.print-monitor {
+  color: #fff;
+  background: var(--v8-device);
+}
+
+.handoff-console > header,
+.print-monitor > header {
+  color: var(--v8-device-muted);
+  font-family: var(--sans);
+}
+
+.handoff-console > header b {
+  color: #f0a07e;
+}
+
+.handoff-copy small,
+.handoff-copy p,
+.monitor-state small,
+.monitor-state p,
+.print-monitor > footer {
+  color: var(--v8-device-muted);
+}
+
+.handoff-copy h1,
+.monitor-state h1 {
+  letter-spacing: 0;
+}
+
+.handoff-code {
+  border-radius: 4px;
+  color: var(--v8-green-dark);
+  background: #f7faf8;
+}
+
+.handoff-code small,
+.handoff-code span {
+  color: #53655d;
+  font-size: 8px;
+}
+
+.handoff-code b {
+  color: var(--v8-green-dark);
+  letter-spacing: 0;
+}
+
+.handoff-location {
+  border: 1px solid var(--v8-device-line);
+  border-radius: 3px;
+  color: #fff;
+  background: transparent;
+}
+
+.handoff-location > svg,
+.handoff-location em {
+  color: #8bc0a8;
+}
+
+.handoff-location small {
+  color: var(--v8-device-muted);
+}
+
+.checklist-title,
+.event-head,
+.monitor-order h2 {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.checklist-title small,
+.event-head span,
+.monitor-events li span,
+.monitor-order small,
+.monitor-order span {
+  color: var(--v8-muted);
+  font-size: 7.5px;
+}
+
+.handoff-checklist li,
+.monitor-events li,
+.monitor-order > div,
+.monitor-order > button {
+  border-bottom: 1px solid var(--v8-line);
+}
+
+.handoff-checklist li b,
+.monitor-events time {
+  color: #7d8983;
+}
+
+.handoff-checklist li.active b,
+.handoff-checklist li.active span {
+  color: var(--v8-orange);
+}
+
+.handoff-checklist .notice {
+  border-left-color: var(--v8-blue);
+  background: var(--v8-blue-soft);
+}
+
+.pickup-screen:has(.handoff-console) .actionbar,
+.order-tracking-screen:has(.print-monitor) .actionbar {
+  border-top-color: var(--v8-device-line);
+  background: var(--v8-device);
+}
+
+.pickup-screen:has(.handoff-console) .actionbar .primary-button,
+.order-tracking-screen:has(.print-monitor) .actionbar .primary-button {
+  border-color: var(--v8-orange);
+  border-radius: 4px;
+  color: #fff;
+  background: var(--v8-orange);
+}
+
+.pickup-screen:has(.handoff-console) .actionbar .secondary-button,
+.order-tracking-screen:has(.print-monitor) .actionbar .secondary-button {
+  border-color: #64746d;
+  border-radius: 4px;
+  color: #fff;
+  background: transparent;
+}
+
+.monitor-state > strong,
+.print-monitor > footer b {
+  color: #9bd1b9;
+}
+
+.monitor-state > strong,
+.monitor-events time {
+  font-family: var(--mono);
+}
+
+.monitor-bar {
+  height: 7px;
+  background: #3b4943;
+}
+
+.monitor-bar i {
+  background: #86bea6;
+}
+
+.monitor-events li.active {
+  border-left: 3px solid #86bea6;
+  background: var(--v8-surface);
+}
+
+.monitor-events li.active time,
+.monitor-events li.active b {
+  color: var(--v8-green);
+}
+
+.monitor-order > button {
+  border-right: 0;
+  border-left: 0;
+  background: var(--v8-surface);
+}

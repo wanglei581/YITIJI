@@ -9,6 +9,8 @@
 @import "./styles/kiosk-stage-fit.css";
 @import "./pages/jobs-fairs-prototype.css";
 @import "tailwindcss";
+/* 温暖专业感主题覆盖层必须保持为最后一个 CSS import。 */
+@import "./styles/warm-professional-override.css";
 @source "../../../packages/ui/src";
 @source "../../../packages/shared/src";
 
@@ -23,3 +25,6 @@
     background-color: var(--color-canvas);
   }
 }
+
+/* ── 温暖专业感主题覆盖层（最高优先级，注释此行可回滚） ── */
+@import "./styles/warm-professional-override.css";

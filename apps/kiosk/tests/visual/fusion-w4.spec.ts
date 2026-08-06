@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW4Api } from '../fixtures/fusion-w4-api'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow } from './assert-layout'
 
 function runtimeErrors(page: Page): string[] {
   const errors: string[] = []
@@ -11,6 +11,7 @@ function runtimeErrors(page: Page): string[] {
 
 async function verifyPage(page: Page, errors: string[]): Promise<void> {
   await assertNoHorizontalOverflow(page)
+  await assertKioskShellFillsViewport(page)
   expect(errors).toEqual([])
 }
 
@@ -19,6 +20,14 @@ test('/jobs 保留线上与线下双轨 @w4', async ({ page, api }) => {
   await page.goto('/jobs')
   await expect(page.getByText('前端工程师').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /线下机构门店/ })).toBeVisible()
+  await page.getByRole('button', { name: '城市 / 行业筛选' }).click()
+  const jobFilterDialog = page.getByRole('dialog', { name: '城市与行业筛选' })
+  await expect(jobFilterDialog).toBeVisible()
+  await assertDialogWithinViewport(page)
+  await jobFilterDialog.getByRole('button', { name: '青岛市', exact: true }).click()
+  await expect(jobFilterDialog.getByRole('button', { name: '青岛市', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await jobFilterDialog.getByRole('button', { name: '完成' }).click()
+  await expect(page.getByRole('button', { name: '城市 / 行业筛选 (1)' })).toBeVisible()
   await verifyPage(page, errors)
 })
 
@@ -72,6 +81,13 @@ test('companies 列表与详情保持来源导览 @w4', async ({ page, api }) =>
   const errors = runtimeErrors(page); registerW4Api(api)
   await page.goto('/companies')
   await expect(page.getByText('青岛示例制造有限公司').first()).toBeVisible()
+  await page.getByRole('button', { name: '选择类型 (12)' }).click()
+  const companyFilterDialog = page.getByRole('dialog', { name: '企业类型与行业' })
+  await expect(companyFilterDialog).toBeVisible()
+  await assertDialogWithinViewport(page)
+  await companyFilterDialog.getByRole('button', { name: '民营企业', exact: true }).click()
+  await companyFilterDialog.getByRole('button', { name: '完成' }).click()
+  await expect(page.getByRole('button', { name: '民营企业', exact: true })).toBeVisible()
   await page.goto('/companies/company-001')
   await expect(page.getByText(/来源企业与岗位导览/)).toBeVisible()
   await expect(page.getByText('前端工程师')).toBeVisible()

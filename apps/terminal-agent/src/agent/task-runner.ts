@@ -27,7 +27,8 @@
  *   - try/finally guarantees temp file cleanup
  *   - Duplicate task guard (Set<string> activeTasks) prevents same-cycle double-execution
  *   - HTTP errors on claim: log + skip cycle (heartbeat shows connectivity)
- *   - Tasks run async so claim loop is never blocked by a slow print job
+ *   - Claim cycles are serialized through task-runner-control so one printer never
+ *     executes two tasks concurrently
  */
 
 import fs from 'fs'
@@ -51,6 +52,7 @@ import {
   isDatabaseAvailable,
   type AgentDatabase,
 } from './db'
+import { createTaskRunnerControl, type TaskRunnerControl } from './task-runner-control'
 
 // ── Temp directory ────────────────────────────────────────────────────────────
 
@@ -705,14 +707,13 @@ async function runClaimCycle(
     activeTasks.add(task.taskId)
     log(`task-runner: claimed task ${task.taskId}`)
 
-    // Execute async — don't block claim loop
-    executeTask(task, config, db)
-      .catch((e) =>
-        err(`task-runner: unhandled error in task ${task.taskId} — ${e instanceof Error ? e.message : String(e)}`),
-      )
-      .finally(() => {
-        activeTasks.delete(task.taskId)
-      })
+    try {
+      await executeTask(task, config, db)
+    } catch (e) {
+      err(`task-runner: unhandled error in task ${task.taskId} — ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      activeTasks.delete(task.taskId)
+    }
   }
 }
 
@@ -724,26 +725,30 @@ export interface TaskRunnerOptions {
 }
 
 /**
- * Start the task claim polling loop.
- * Returns NodeJS.Timeout — pass to clearInterval() to stop.
+ * Start the task claim polling loop and expose a best-effort immediate wake.
+ * Interval ticks and wake requests share one full-lifecycle single-flight guard.
  */
-export function startTaskRunner(options: TaskRunnerOptions): NodeJS.Timeout {
+export function startTaskRunner(options: TaskRunnerOptions): TaskRunnerControl {
   const { config, db } = options
   const interval = config.claimIntervalMs ?? 5_000
   const activeTasks = new Set<string>()
 
   if (!isDatabaseAvailable(db)) {
     warn('task-runner: local task database unavailable; printing disabled; claim loop not started')
-    const timer = setInterval(() => undefined, interval)
-    timer.unref()
-    return timer
+    return createTaskRunnerControl({
+      intervalMs: interval,
+      enabled: false,
+      runCycle: async () => undefined,
+      onCycleError: () => undefined,
+    })
   }
 
   log(`task-runner: starting — interval=${interval}ms`)
 
-  return setInterval(() => {
-    runClaimCycle(config, db, activeTasks).catch((e) =>
+  return createTaskRunnerControl({
+    intervalMs: interval,
+    runCycle: () => runClaimCycle(config, db, activeTasks),
+    onCycleError: (e) =>
       err(`task-runner: unexpected cycle error — ${e instanceof Error ? e.message : String(e)}`),
-    )
-  }, interval)
+  })
 }

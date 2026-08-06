@@ -34,14 +34,14 @@
 
 .self-assessment-lightflow__progress {
   height: 8px;
-  background: var(--fusion-color-surface-2, #eef0f3);
+  background: var(--color-neutral-100);
   border-radius: 999px;
   overflow: hidden;
 }
 .self-assessment-lightflow__progress span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #06b6d4);
+  background: var(--k-teal);
   transition: width 0.2s ease;
 }
 
@@ -51,7 +51,7 @@
   align-items: center;
   margin-bottom: 12px;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--k-muted);
 }
 .self-assessment-lightflow__question p {
   font-size: 22px;
@@ -62,7 +62,7 @@
 
 .self-assessment-lightflow__dim {
   font-weight: 600;
-  color: #1d4ed8;
+  color: var(--k-teal-deep);
 }
 
 .self-assessment-lightflow__counter {
@@ -78,20 +78,20 @@
   text-align: left;
   padding: 18px 20px;
   border-radius: 12px;
-  border: 1px solid #d1d5db;
-  background: #fff;
+  border: 1px solid var(--k-line);
+  background: var(--k-surface);
   font-size: 17px;
   min-height: 56px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
 .self-assessment-lightflow__choices button:hover {
-  border-color: #3b82f6;
-  background: #f8fafc;
+  border-color: var(--k-teal);
+  background: var(--k-paper);
 }
 .self-assessment-lightflow__choices button.is-selected {
-  border-color: #1d4ed8;
-  background: #eff6ff;
+  border-color: var(--k-teal-deep);
+  background: var(--k-teal-soft);
   font-weight: 600;
 }
 
@@ -117,7 +117,7 @@
 }
 .self-assessment-lightflow__strength {
   font-size: 13px;
-  color: #1d4ed8;
+  color: var(--k-teal-deep);
   font-weight: 600;
 }
 
@@ -136,13 +136,13 @@
 .self-assessment-lightflow__dim-card footer {
   margin-top: 8px;
   font-size: 12px;
-  color: #9ca3af;
-  border-top: 1px dashed #e5e7eb;
+  color: var(--color-neutral-400);
+  border-top: 1px dashed var(--k-line);
   padding-top: 8px;
 }
 
 .self-assessment-lightflow__muted {
-  color: #9ca3af;
+  color: var(--color-neutral-400);
   font-size: 14px;
 }
 

@@ -26,7 +26,7 @@ export interface UploadSessionFileView {
   mimeType: string
   sha256: string
   fileExpiresAt: string | null
-  /** 仅 print_doc / signature_image 用途在 confirm 时携带:本系统签名内容 URL,供打印任务/签章合成创建使用。 */
+  /** resume_upload / print_doc / signature_image 在 confirm 时携带的短时签名内容 URL。 */
   fileUrl?: string | null
 }
 

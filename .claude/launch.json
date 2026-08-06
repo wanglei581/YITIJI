@@ -3,16 +3,22 @@
   "configurations": [
     {
       "name": "kiosk",
-      "runtimeExecutable": "pnpm",
+      "runtimeExecutable": "/bin/bash",
       "runtimeArgs": [
-        "--filter",
-        "@ai-job-print/kiosk",
-        "exec",
-        "vite",
-        "--port",
-        "5273"
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/apps/kiosk && /Users/wanglei/AI求职打印服务终端/apps/kiosk/node_modules/.bin/vite --port 5273"
       ],
       "port": 5273,
+      "autoPort": false
+    },
+    {
+      "name": "kiosk-uplift",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/wanglei/AI求职打印服务终端/apps/kiosk && /Users/wanglei/AI求职打印服务终端/apps/kiosk/node_modules/.bin/vite --port 5278"
+      ],
+      "port": 5278,
       "autoPort": false
     },
     {

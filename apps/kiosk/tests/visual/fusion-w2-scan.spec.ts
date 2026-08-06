@@ -3,15 +3,17 @@ import type { ApiRouter } from '../fixtures/api-router'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
 import { setReactRouterState, W2_FILE } from './fixtures/fusion-w2-state'
+import { FusionW2BinaryRoute } from './fixtures/fusion-w2-binary-route'
 
 const SCAN_TASK_ID = 'w2-scan-001'
 const CONTROL_TOKEN = 'w2-scan-control'
 const LATER = new Date(Date.now() + 10 * 60 * 1000).toISOString()
 
-function collectRuntimeErrors(page: Page): string[] {
+function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[] {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
+    if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
@@ -230,7 +232,9 @@ const resultState = {
 }
 
 test('successful scan result can continue to printing @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
   registerShell(api)
   api.respond('GET', '/api/v1/print/price-config', {
     status: 200,
@@ -256,6 +260,17 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
 
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
+  const preview = page.locator('[data-file-preview-kind="pdf"]')
+  await expect(preview).toBeVisible()
+  await expect(preview.locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
+  await expect.poll(() => {
+    try {
+      binary.assertPdfCompleted()
+      return true
+    } catch {
+      return false
+    }
+  }).toBe(true)
   const quoteResponse = page.waitForResponse((response) =>
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/orders/quote',

@@ -9,6 +9,9 @@ const workspace = fs.readFileSync(path.join(root, '../../../pnpm-workspace.yaml'
 const inputs = JSON.parse(read('inputs.json'))
 const wix = read('Agent.wxs')
 const project = read('AIJobPrintAgent.wixproj')
+const bundle = read('Bundle.wxs')
+const bundleProject = read('AIJobPrintTerminalSetup.wixproj')
+const buildExe = read('build-exe.ps1')
 const staging = read('build-staging.ps1')
 const serviceXml = read('bootstrap/aijobprintagent.xml')
 const workflow = fs.readFileSync(
@@ -42,6 +45,21 @@ assert.match(wix, /Permanent="yes"/)
 assert.match(wix, /NeverOverwrite="yes"/)
 assert.doesNotMatch(wix, /CustomAction/i, 'MSI must not shell out to node-windows or provisioning code')
 
+assert.match(bundleProject, /<OutputType>Bundle<\/OutputType>/)
+assert.match(bundleProject, /<InstallerPlatform>x64<\/InstallerPlatform>/)
+assert.match(bundleProject, /<OutputName>AIJobPrintTerminalSetup<\/OutputName>/)
+assert.match(bundleProject, /WixToolset\.Bal\.wixext" Version="4\.0\.6"/)
+assert.match(bundle, /Name="AI Job Print Terminal Setup"/)
+assert.match(bundle, /UpgradeCode="79F2B121-7AA0-452D-A932-BDC6F501F701"/)
+assert.match(bundle, /WixStandardBootstrapperApplication/)
+assert.match(bundle, /SuppressOptionsUI="yes"/)
+assert.match(bundle, /<MsiPackage[\s\S]*SourceFile="\$\(var\.MsiPath\)"[\s\S]*Compressed="yes"/)
+assert.doesNotMatch(bundle, /<(?:Variable|MsiProperty|ExePackage)\b/)
+assert.doesNotMatch(bundle, /(?:BindCode|AgentToken|BridgeToken|adminSecret)/i)
+assert.match(buildExe, /Expected exactly one MSI input/)
+assert.match(buildExe, /AIJobPrintTerminalSetup\.exe/)
+assert.match(buildExe, /unsigned CI candidate/)
+
 assert.match(serviceXml, /<executable>%BASE%\\\.\.\\node\\node\.exe<\/executable>/)
 assert.match(
   serviceXml,
@@ -64,14 +82,19 @@ assert.equal(
   1,
   'allowUnusedPatches must remain scoped to one deploy invocation',
 )
-assert.match(workspace, /patchedDependencies:/, 'workspace security patches must remain enabled')
-assert.match(workspace, /brace-expansion@2\.1\.2:/, 'brace-expansion security patch must remain pinned')
+assert.match(workspace, /overrides:/, 'workspace security overrides must remain enabled')
+assert.match(
+  workspace,
+  /brace-expansion@2\.1\.1:\s*2\.1\.4/,
+  'brace-expansion security fix must remain pinned',
+)
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
 assert.match(staging, /Unexpected executable in staging/)
 assert.match(staging, /better-sqlite3/)
 assert.match(staging, /manifest\.json/)
 
 const lifecycle = read('test-msi-lifecycle.ps1')
+const exeLifecycle = read('test-exe-lifecycle.ps1')
 assert.match(lifecycle, /Start-Service -Name \$serviceName/)
 assert.match(lifecycle, /Remove-Item -LiteralPath \$diagnosticPath -Force/)
 assert.match(lifecycle, /\$startServiceError = \$null/)
@@ -98,5 +121,22 @@ assert.match(lifecycle, /Join-Path \$stateRoot "logs"/)
 assert.match(lifecycle, /Copy-Item -LiteralPath \$item\.FullName -Destination \$copiedLogRoot -Recurse -Force/)
 assert.match(workflow, /artifacts\/msi\/lifecycle-logs\//)
 assert.doesNotMatch(workflow, /lifecycle-logs\/\*\.log/)
+assert.match(exeLifecycle, /Invoke-Bundle -Action "\/install"/)
+assert.match(exeLifecycle, /Invoke-Bundle -Action "\/repair"/)
+assert.match(exeLifecycle, /Invoke-Bundle -Action "\/uninstall"/)
+assert.match(exeLifecycle, /Stopped\/Manual service contract/)
+assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
+assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
+assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
+assert.match(exeLifecycle, /ProgramData state directory must be retained/)
+assert.match(workflow, /Build unsigned WiX Burn EXE/)
+assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
+assert.match(workflow, /test-exe-lifecycle\.ps1/)
+assert.ok(
+  workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
+  'EXE lifecycle must run first on a clean ProgramData root',
+)
+assert.match(workflow, /artifacts\/exe\/AIJobPrintTerminalSetup\.exe/)
+assert.match(workflow, /artifacts\/exe\/lifecycle-logs\//)
 
 console.log('ALL PASS: Windows Agent installer inputs')

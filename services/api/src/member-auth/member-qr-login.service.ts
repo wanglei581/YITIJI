@@ -114,6 +114,29 @@ export class MemberQrLoginService {
     return { status: 'confirmed' }
   }
 
+  async confirmByToken(
+    ticketId: string,
+    endUserId: string,
+  ): Promise<ConfirmQrLoginResult> {
+    const payload = await this.readTicket(ticketId)
+    if (payload.status === 'confirmed') {
+      throw new ConflictException({ error: { code: 'QR_LOGIN_ALREADY_CONFIRMED', message: '扫码登录已确认' } })
+    }
+
+    const user = await this.memberAuth.me(endUserId)
+    const confirmed: QrTicketPayload = {
+      ...payload,
+      status: 'confirmed',
+      user,
+    }
+    const updated = await this.redis.setExistingWithCurrentTtl(this.ticketKey(ticketId), JSON.stringify(confirmed))
+    if (updated === 'missing') {
+      throw new NotFoundException({ error: { code: 'QR_LOGIN_NOT_FOUND', message: '扫码登录已过期或不存在' } })
+    }
+
+    return { status: 'confirmed' }
+  }
+
   async claim(
     ticketId: string,
     claimToken: string,
