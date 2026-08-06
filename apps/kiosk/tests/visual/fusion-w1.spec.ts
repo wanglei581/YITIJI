@@ -129,7 +129,7 @@ test('fixture exposes all six state roles with scoped computed styles @w1-kiosk'
   await expect(root.getByRole('alert')).toHaveCount(3)
   await expect(root.locator('.ui-kiosk-state-panel[data-tone="loading"]')).toHaveAttribute('aria-busy', 'true')
   await expect(root.locator('.ui-kiosk-state-panel[data-tone="error"]')).toHaveAttribute('aria-live', 'assertive')
-  await expect(root.locator('.ui-kiosk-page-frame')).toHaveCSS('background-color', 'rgb(244, 241, 232)')
+  await expect(root.locator('.ui-kiosk-page-frame')).toHaveCSS('background-color', 'rgb(250, 248, 244)')
   await expect(root.locator('.ui-kiosk-state-panel').first()).toHaveCSS('border-radius', '18px')
   await expect(root.locator('.ui-kiosk-back-button')).toHaveCSS('transition-duration', '0s')
   await assertNoHorizontalOverflow(page)
