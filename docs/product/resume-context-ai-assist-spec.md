@@ -106,6 +106,7 @@ type SuggestionProvenance =
 interface ResumeProfileFieldSuggestion {
   id: string
   field: AllowedResumeProfileField
+  surfaces: ResumeAssistSurface[]
   value: unknown
   originalValue?: unknown
   confidence: 'high' | 'medium' | 'low'
@@ -126,11 +127,12 @@ interface ResumeProfileFieldSuggestion {
 约束：
 
 1. `field` 必须来自编译期白名单，不能接收前端传入的任意字段路径。
-2. `evidenceRef` 只引用本人可见证据；审计和普通日志不得记录证据原文。
-3. 字段可信等级不得高于源 OCR/提取可信等级。
-4. 百分比“准确率”不得展示给用户。
-5. 低可信和 `derived` 建议默认不勾选。
-6. 用户确认或编辑后的值优先于任何新建议。
+2. `surfaces` 必须非空且只来自服务端字段白名单；页面不得消费未包含当前 `surface` 的建议。
+3. `evidenceRef` 只引用本人可见证据；审计和普通日志不得记录证据原文。
+4. 字段可信等级不得高于源 OCR/提取可信等级。
+5. 百分比“准确率”不得展示给用户。
+6. 低可信和 `derived` 建议默认不勾选。
+7. 用户确认或编辑后的值优先于任何新建议。
 
 ## 五、页面消费矩阵
 
@@ -162,6 +164,7 @@ interface ResumeProfileFieldSuggestion {
 ### 7.1 会话级试点
 
 - 用户每次主动选择本人简历，并确认“用于生成当前页面建议”。
+- 服务端只允许通过一次性无状态端点返回建议；响应不生成可恢复的画像资源，不提供刷新恢复、决策历史或跨会话读取。
 - 建议值只保存在 React 内存，不写 `localStorage`、`sessionStorage`、IndexedDB、URL、埋点或错误日志。
 - 现有匿名 `taskId + accessToken` 会话机制可以继续用于本人访问，但不得在其中新增画像字段。
 - 退出、切换账号、进入待机、硬隐私超时、BFCache 恢复失败或来源简历删除时立即清空。
@@ -171,9 +174,9 @@ interface ResumeProfileFieldSuggestion {
 
 只有跨会话需求通过独立隐私评审后，才允许新增 `ResumeProfileSnapshot`：
 
-- 匿名用户不得长期保存；服务端临时快照最长 24 小时，且不得晚于来源简历或 AI 结果到期时间。
-- 登录会员未给予专用持久化同意时，同样最长 24 小时。
-- 登录会员主动同意 `resume_profile_assist` 后，最长 90 天，且不得晚于来源原始简历到期时间；不提供无限期保存。
+- 匿名用户不得长期保存；服务端临时快照从创建时起最长 24 小时，且不得晚于来源简历或 AI 结果到期时间。
+- 登录会员未给予专用持久化同意时，同样从创建时起最长 24 小时。
+- 登录会员主动同意 `resume_profile_assist` 后，从本人确认时起最长 90 天，且不得晚于来源原始简历到期时间；访问和使用不得滑动续期，不提供无限期保存。
 - 撤回同意、删除来源简历、删除相关 AI 记录、账号删除或 TTL 到期时必须级联失效并硬删画像内容。
 - 持久化 JSON 必须使用可轮换 envelope encryption；密钥只在服务端，行/任务/用户标识进入 AAD。
 
@@ -181,42 +184,43 @@ interface ResumeProfileFieldSuggestion {
 
 ## 八、接口与权限边界
 
-后续接口候选：
+会话级试点只允许一个无状态接口候选：
 
-1. `POST /api/v1/resume/records/:taskId/profile-draft`：按源文件哈希、schema 版本和模型配置幂等生成。
-2. `POST /api/v1/resume/records/:taskId/assist`：只接受受控 `surface` 和画像版本，返回该页面白名单内的建议，不提交表单。
-3. `PATCH /api/v1/resume/records/:taskId/profile-decisions`：长期复用阶段记录采用、编辑、拒绝及版本冲突。
-4. `DELETE /api/v1/resume/records/:taskId/profile-draft`：删除本人建议档案。
+1. `POST /api/v1/resume/records/:taskId/profile-suggestions`：只接受非空且去重的受控 `surfaces` 集合；首批值只能来自 `resume_generate`、`interview_setup`。服务端按源文件、schema 版本和模型配置生成这些页面字段白名单的并集，每条建议标注允许消费它的 `surfaces`，并直接返回；不创建 `profileId`，不保存响应正文，不提供刷新恢复，不提交表单或执行任何业务动作。
 
-所有接口沿用现有会员 `endUserId` 或匿名访问令牌门禁。无凭证、错凭证、过期、来源已删和跨用户访问统一不可见。Admin、Partner、企业、校方和第三方工具不得获得读取接口。
+长期复用获批后，Wave 4 才可单独评审 `POST/GET/PATCH/DELETE profile-snapshots`、决策版本和删除接口。它们不属于会话试点，也不得以 `profile-draft` 名义提前实现。
 
-页面当前值在前端本地合并，不把整张表单回传给通用“自动填写”接口。服务端不得接收任意 `surface`、任意字段路径或执行动作名称。
+所有接口沿用现有会员 `endUserId` 或匿名访问令牌门禁。无凭证、错凭证、过期、来源已删和跨用户访问统一不可见。Admin、Partner、企业、校方和第三方工具不得获得读取接口。试点端点不得以 Redis、数据库、对象存储或浏览器持久存储保存建议正文。
+
+页面当前值在前端本地合并，不把整张表单回传给通用“自动填写”接口。服务端不得接收任意 `surface`、任意字段路径或执行动作名称；React Context 可以保存首批页面字段并集，但页面 hook 只能返回当前页面白名单内且 `surfaces` 包含当前页面的建议。
 
 ## 九、模型、安全与成本
 
 - 新增独立能力键和日志 operation：`resume_profile_extract`，不借用 `resume_optimize`。
-- 同一 `sourceHash + schemaVersion + modelConfig` 只做一次结构化提取；各页面使用确定性 mapper，不重复调用 LLM。
+- 同一公共终端会话内，同一 `sourceHash + schemaVersion + modelConfig` 只做一次结构化提取；结果只在 React 内存中复用，各页面使用确定性 mapper，不重复调用 LLM。刷新或清场后不恢复旧建议。
+- “会话内只提取一次”由 React Context 和请求中的本地 in-flight 去重保证；服务端不得为实现这一语义保存响应、幂等结果或按 `sourceHash` 建立调用次数记录。刷新或清场后的新请求按新会话处理。
 - 模型输出必须经过严格 schema、长度、枚举、证据存在性、禁止字段和 prompt injection 校验。
 - 简历里的指令性文字一律作为不可信文档内容，不能改变 system policy、字段白名单或调用工具。
-- 限流、超时、熔断、日预算和失败降级必须在试点前完成。
-- 普通日志与审计只记录 surface、profileVersion、建议/采用/拒绝数量、可信等级分布、provider、耗时、token 和估算成本；不得记录字段值、证据原文、姓名、电话、学校、公司或文件 URL。
+- 限流、超时、熔断、日预算和失败降级必须在试点前完成。Wave 1 编码任务开始前必须基于既有 AI 端点和真实 provider 预算批准每身份/匿名令牌、每终端和全局并发的数值；可复用现有限流基础设施中的不含建议正文和简历字段值的短 TTL 计数器，这不等于允许 Redis 画像缓存。
+- 普通日志与审计只记录 surface、schemaVersion（长期复用阶段可增加 profileVersion）、建议/采用/拒绝数量、可信等级分布、provider、耗时、token 和估算成本；不得记录字段值、证据原文、姓名、电话、学校、公司或文件 URL。
 - `AiServiceLog` 只做运维观测，不作为收费账本。
 
 ## 十、实施顺序与文件预算
 
 当前上线 P0 完成前不启动功能编码。后续每一波从干净 `main` 新建独立分支：
 
-### Wave 1：共享契约与服务端画像草稿
+### Wave 1：共享契约与无状态建议服务
 
 - `packages/shared/src/types/`：1–2 个文件。
 - `services/api/src/ai/resume/`：最多 6 个聚焦文件，分别承载 extractor、validator、mapper、service/DTO。
-- `services/api/src/ai/`：现有 controller/module/config/log 最小接线，最多 4 个既有文件。
+- `services/api/src/ai/`：现有 controller/module/config/log 最小接线，最多 4 个既有文件；只允许接入一个 `POST profile-suggestions` 无状态端点。
 - `services/api/scripts/`：1 个专项 verify；优先扩展现有 AI 安全门禁。
-- 默认不改 Prisma；只有长期复用获批后才单独做 SQLite/PostgreSQL 双 migration。
+- 本阶段禁止 Prisma migration、数据库模型、repository、Redis/对象存储画像缓存、可恢复 `profile-draft` 资源和决策历史；只有长期复用获批后才单独评审 SQLite/PostgreSQL 双 migration。
 
 ### Wave 2：两页试点
 
 - 只接 `/resume/generate` 与 `/interview/setup`。
+- 首次选择简历后以首批两个受控 `surfaces` 调用一次无状态建议端点；响应仅进入会话级 React Context，由纯 mapper 向两个页面暴露各自白名单字段。
 - Kiosk 新增 1 个场景 hook、1 个纯 mapper、1 组建议核对组件；页面文件只做接线。
 - 不新增路由、首页入口、服务中心卡片或外部依赖。
 - 不在接近或超过 500 行的页面中继续内联复杂状态。
@@ -224,6 +228,12 @@ interface ResumeProfileFieldSuggestion {
 ### Wave 3：逐域扩展
 
 一次只开放一个 `surface`：简历诊断方向 → 岗位真实筛选 → 招聘会准备单 → 政策条件核对。每域独立审查、验证和发布，不一次覆盖 8 域。
+
+### Wave 4：会员长期复用
+
+- 只有专用同意、可轮换加密、最长 90 天且不晚于来源简历、撤回/删除级联和公共终端清场全部验收后，才允许新增 `ResumeProfileSnapshot`。
+- `profile-snapshots` CRUD、决策版本、刷新恢复和跨会话读取只在本阶段设计与实现；必须单独完成 SQLite/PostgreSQL 双 migration、本人权限和删除专项评审。
+- 未进入本阶段时，不得把试点响应、`AiResumeResult.payloadJson`、Redis 缓存或日志改造成事实上的长期画像存储。
 
 ## 十一、Go / No-Go 门禁
 
@@ -235,6 +245,7 @@ interface ResumeProfileFieldSuggestion {
 - 跨用户读取或公共终端残留数 = 0。
 - Admin、Partner、企业、校方或第三方工具获得画像字段数 = 0。
 - 删除或撤回后仍可读取的画像数 = 0。
+- 会话试点服务端持久化的建议正文或画像记录数 = 0。
 - 同一简历跨页面重复模型提取次数 = 0。
 - AI 失败时不可继续手填的页面数 = 0。
 - 1080×1920、390×844 和 425px 宽度无溢出，触控与焦点恢复通过。

@@ -592,15 +592,15 @@
 - [x] **Wave 6a 格式转换：docx/txt/md 导出接真实可打印实现（代码 + 本地 verify 级）**：`exportGeneratedResume`（`ai.service.ts`）不再只对 pdf 计算 `printFileUrl`；docx/txt/md 三种格式额外用既有 `ResumePdfService` 对同一份 `GeneratedResume` 多渲染一份纯净 PDF（不套用 `templateId`，因为模板是 pdf 主格式专属概念；仍透传 `layout`），作为独立 `FileObject` 落库并签发系统 `printFileUrl`，用户请求的原格式下载文件不受影响；`assertExportFormatAllowed`（Wave 5 计费占位）未被触碰，仍恒放行。Kiosk `ResumeOptimizePage.tsx` 移除"仅 pdf 显示打印按钮"的限制，四种格式导出后均展示「下载{格式}」+「去打印优化版」两个按钮。`verify:resume-export-formats`/`verify:resume-layout-export`/`verify:resume-template-fill` 三个既有 verify 的"docx/txt/md 不返回 printFileUrl"断言已同步改为"返回指向独立 PDF 副本的 printFileUrl 且副本为合法 PDF"，`verify:resume-optimize`、Kiosk `verify:resume-diagnosis-flow-ui`、API/shared/Kiosk typecheck、API/Kiosk lint 均回归通过；mock 模式浏览器走查确认 Word/PDF 切换导出后按钮布局正确、无控制台报错（mock 不造假文件，`printFileUrl`/`signedUrl` 均为空时两个按钮如实禁用）。范围边界：不做岗位 URL 定向收窄、不做 Windows 真机出纸/扫描/U盘验收，这两项仍是 Wave 6 剩余待办；未预生产、未真机、未合入 main（改动仅在本工作分支）。
 - [ ] **Wave 6b 岗位 URL 定向 + Windows 真机验收**：岗位 URL 收窄为合作来源白名单/用户手动粘贴 JD（不做任意站抓取）；Windows 真机出纸/扫描/U盘验收 docx/txt/md 打印链路。
 
-## P1：简历智能上下文 / 用简历建议填写（Gate 0 已批准，当前不编码）
+## P1：简历智能上下文 / 用简历建议填写（Gate 0 已批准并完成接口消歧，当前不编码）
 
 > 正式契约：[resume-context-ai-assist-spec.md](../product/resume-context-ai-assist-spec.md)；双模型审查：[kiosk-resume-context-ai-assist-audit-2026-08-06.md](../reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md)。本项排在上线 P0 之后，不新增首页入口，不与当前生产、真机、密钥和部署验收并行铺开。
 
-- [x] **Gate 0 产品/技术契约**：字段事实/推断/偏好分层、页面白名单、覆盖保护、专用同意、TTL、加密、删除级联、成本治理和 Go/No-Go 已固化；未开发功能。
-- [ ] **Wave 1 共享契约与服务端画像草稿**：从干净 `main` 新建独立分支；新增受控 shared 类型、`resume_profile_extract`、严格 schema/证据校验、本人权限、幂等/限流/超时/预算和专项 verify。默认不改 Prisma；长期复用需另审 SQLite/PostgreSQL 双 migration。
-- [ ] **Wave 2 两页会话试点**：只接 `/resume/generate` 与 `/interview/setup`；建议值仅 React 内存，默认只填空字段，逐项确认并可撤销；不新增路由、入口、依赖或持久模型。
+- [x] **Gate 0 产品/技术契约**：字段事实/推断/偏好分层、页面白名单、覆盖保护、专用同意、TTL、加密、删除级联、成本治理和 Go/No-Go 已固化；二次 Claude + Codex 审查已消除“Wave 1 可恢复画像资源”与“Wave 2 React 内存试点”的歧义，未开发功能。
+- [ ] **Wave 1 共享契约与无状态建议服务**：上线 P0 完成后从干净 `main` 新建独立分支；新增受控 shared 类型、`resume_profile_extract`、严格 schema/证据校验、本人权限、限流/超时/预算、一个无状态 `POST profile-suggestions` 和专项 verify。编码前先批准每身份/匿名令牌、每终端和全局并发的具体数值；本阶段禁止 Prisma、repository、数据库/Redis/对象存储画像缓存、可恢复资源和决策历史，只允许不含建议正文与字段值的既有限流短 TTL 计数器。
+- [ ] **Wave 2 两页会话试点**：只接 `/resume/generate` 与 `/interview/setup`；首次选择简历后取得一次性建议响应，仅存 React Context，默认只填空字段，逐项确认并可撤销；刷新不可恢复，不新增路由、入口、依赖或持久模型。
 - [ ] **Wave 3 逐域扩展**：一次只开放一个 surface，顺序为诊断方向 → 岗位真实筛选 → 招聘会准备单 → 政策条件核对；打印只做确定性文件提示，百宝箱默认不传画像，智慧校园不接画像。
-- [ ] **Wave 4 会员长期复用**：只有专用同意、可轮换加密、最长 90 天且不晚于来源简历、撤回/删除级联和公共终端清场全部通过后才可新增 `ResumeProfileSnapshot`；不得提供无限期画像保存。
+- [ ] **Wave 4 会员长期复用**：只有专用同意、可轮换加密、从本人确认时起最长 90 天且不晚于来源简历、访问不滑动续期、撤回/删除级联和公共终端清场全部通过后才可新增 `ResumeProfileSnapshot`、`profile-snapshots` CRUD、决策版本和 SQLite/PostgreSQL 双 migration；不得提供无限期画像保存。
 
 ## P1：工程质量门禁
 

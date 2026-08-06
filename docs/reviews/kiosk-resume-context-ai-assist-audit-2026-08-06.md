@@ -250,6 +250,7 @@
 ```ts
 interface ResumeProfileFieldSuggestion {
   field: AllowedResumeProfileField
+  surfaces: ResumeAssistSurface[]
   value: unknown
   confidence: 'high' | 'medium' | 'low'
   provenance: 'exact_text' | 'normalized_text' | 'derived' | 'user_confirmed'
@@ -262,11 +263,11 @@ interface ResumeProfileFieldSuggestion {
 
 ### 6.3 API 建议
 
-1. `POST /resume/records/:taskId/profile-draft`：按源文件哈希、schemaVersion 和模型配置幂等生成。
-2. `GET /resume/records/:taskId/profile-draft`：刷新恢复；沿用本人/匿名访问门禁。
-3. `POST /resume/records/:taskId/prefill`：请求只接受受控 `surface`、当前值和字段白名单，返回建议，不直接提交业务表单。
-4. `PATCH /resume/records/:taskId/profile-decisions`：记录采用、编辑和拒绝，使用版本号防止旧建议覆盖新值。
-5. `DELETE /resume/records/:taskId/profile-draft`：删除当前建议档案。
+会话试点只允许一个无状态端点：
+
+1. `POST /resume/records/:taskId/profile-suggestions`：只接受非空且去重的受控 `surfaces` 集合；首批只能请求 `resume_generate`、`interview_setup`。服务端返回两页字段白名单的并集，每条建议标注允许消费它的 `surfaces`；React Context 会话内复用，页面 hook 再按当前页面过滤。响应不创建 `profileId`，不保存建议正文，不提供刷新恢复，也不直接提交业务表单。
+
+`POST/GET/PATCH/DELETE profile-snapshots`、决策版本和删除接口只属于 Wave 4 会员长期复用，必须在专用同意、加密、TTL、级联删除和双数据库迁移单独获批后设计。试点不得以 `profile-draft`、Redis 缓存或 `AiResumeResult.payloadJson` 提前形成可恢复画像资源。
 
 首期 `surface` 只开放：`resume_generate`、`interview_setup`。后续按评审逐个加入 `resume_diagnosis`、`job_filters`、`fair_filters`、`policy_checklist`，禁止接收任意字段路径。
 
@@ -274,7 +275,7 @@ interface ResumeProfileFieldSuggestion {
 
 试点方案：建议只随响应返回并留在页面内存；优点是零迁移、风险最小，缺点是刷新不可恢复。
 
-生产 MVP：新增独立 `ResumeProfileSnapshot`，而不是把长期画像无约束塞入 `AiResumeResult.payloadJson`。建议至少包含 `taskId/sourceFileId/sourceHash/endUserId/accessTokenHash/schemaVersion/version/encryptedProfileJson/extractionSource/extractionConfidence/consentVersion/expiresAt/confirmedAt`。TTL 不得晚于来源简历和 parse 结果；删除简历、删除 AI 记录、撤回同意或会员数据删除时必须级联失效。
+生产 MVP：新增独立 `ResumeProfileSnapshot`，而不是把长期画像无约束塞入 `AiResumeResult.payloadJson`。建议至少包含 `taskId/sourceFileId/sourceHash/endUserId/accessTokenHash/schemaVersion/version/encryptedProfileJson/extractionSource/extractionConfidence/consentVersion/expiresAt/confirmedAt`。匿名或无专用同意的 TTL 从创建时起最长 24 小时；专用同意后的 TTL 从本人确认时起最长 90 天，访问不得滑动续期；两者均不得晚于来源简历和 parse 结果。删除简历、删除 AI 记录、撤回同意或会员数据删除时必须级联失效。
 
 登录会员的跨会话长期复用必须另设 `resume_profile_assist` 同意范围，并提供撤回与删除。匿名用户只允许当前 Kiosk 会话和现有 TTL 内使用，不能自动升级为会员长期画像。
 
@@ -285,6 +286,7 @@ interface ResumeProfileFieldSuggestion {
 - 画像 JSON 如落库必须使用面向用户 PII 的可轮换 envelope encryption，并以 row/task/endUser 作为 AAD；不直接复用为第三方凭证设计的单密钥加密工具。
 - `POST /resume/parse` 与画像生成需要限流、超时、熔断、每日预算和失败降级；当前 parse 未见与 generate/layout/voice 同等的 controller 级 throttle，应先补治理。
 - 同一源文件哈希只做一次结构化提取；后续页面使用确定性 mapper，不能每页重新调用 LLM。
+- 会话内单次提取由 React Context 与本地 in-flight 去重保证，服务端不保存响应或幂等结果；服务端短 TTL 限流计数器只能记录不含建议正文和简历字段值的额度元数据，不能变成画像缓存。
 - 新增独立模型能力键 `resume_profile_extract` 和日志 operation，不能继续借用 `resume_optimize`。
 - 画像、简历、诊断、岗位建议、参会计划和面试报告不得回流企业、合作机构、校方或百宝箱第三方工具。
 
@@ -296,16 +298,16 @@ interface ResumeProfileFieldSuggestion {
 
 预算：只改正式产品/合规/审查文档，以及必要的现有文案文件；不新增路由、模型或依赖。
 
-### Wave 1：底层画像草稿
+### Wave 1：共享契约与无状态建议服务
 
-目标：新增 shared schema、严格结构化 parser、字段证据校验、幂等 profile service/API、本人门禁、TTL、审计与成本观测，暂不接 8 个页面。
+目标：新增 shared schema、严格结构化 parser、字段证据校验、无状态 `profile-suggestions` 服务、本人门禁、限流/超时/预算、审计与成本观测，暂不接 8 个页面。
 
 预计范围：
 
 - `packages/shared/src/types/`：新增或扩展画像建议协议。
 - `services/api/src/ai/resume/`：独立 profile extractor、validator、mapper。
-- `services/api/src/ai/`：controller/service/config/log 接线。
-- `services/api/prisma/`：仅生产 MVP 选择落库时新增迁移；试点不落库则不改。
+- `services/api/src/ai/`：controller/service/config/log 最小接线，只允许一个无状态 POST 端点。
+- `services/api/prisma/`：本阶段禁止修改；同时禁止数据库/Redis/对象存储画像缓存、repository、可恢复 profile 资源和决策历史。
 - `services/api/scripts/`：新增 `verify:resume-profile-assist`。
 
 不涉及 Admin/Partner UI、Terminal Agent、打印协议和外部平台。
@@ -324,7 +326,7 @@ interface ResumeProfileFieldSuggestion {
 
 ### Wave 4：会员长期复用
 
-只有在画像专用同意、可轮换加密、撤回、导出、删除、留存矩阵和公共终端清场全部验收后，才开放“以后继续使用”。小程序可在同一后端契约上复用，但不得先于上述数据治理上线。
+只有在画像专用同意、可轮换加密、撤回、导出、删除、留存矩阵和公共终端清场全部验收后，才开放“以后继续使用”，并在本阶段单独设计 `ResumeProfileSnapshot`、`profile-snapshots` CRUD、决策版本和 SQLite/PostgreSQL 双 migration。小程序可在同一后端契约上复用，但不得先于上述数据治理上线。
 
 ## 九、验证计划
 
@@ -383,6 +385,7 @@ interface ResumeProfileFieldSuggestion {
 - Codex 独立子审查：后端架构、Kiosk 页面、UX/合规三个只读方向；未修改功能代码。
 - Claude Code `2.1.222`：使用 `--permission-mode plan`、仅允许 Read/Grep/Glob、禁止 Bash 和编辑，对上述正式入口与相关页面执行了部分只读复核，进程退出码为 0。Claude 原始输出认为“值得做，但设计边界非常重要”，并将正确形态定义为“上下文感知建议，而不是自动化代操作”；同样要求建议可见、用户主动确认，禁止静默写入已打印/已预约/已投递状态，禁止未经确认进入收费、打印或外部跳转，禁止用简历字段直接判断政策资格。
 - Claude 输出在“前端内存级会话 Context”技术草案中途结束，没有给出正式 `Verdict`，因此本报告只记录为**部分复核**，不写成 Claude 完整终审通过。其可证实的架构倾向是首期采用前端会话内存 Context；Codex 的补充意见是：该方案适合无迁移试点，但若要支持登录会员跨会话、跨端和可撤回的长期复用，应在完成专用同意、加密、TTL 和删除级联后使用独立 `ResumeProfileSnapshot`。两者不是首期实现冲突，而是试点层与生产长期层的边界差异。
+- 2026-08-06 第二轮 Claude Code `2.1.222` 终审使用 `safe-mode`、禁用全部工具、单轮无会话持久化；在 Codex 已核验的正式文档事实摘要上输出完整裁决。其结论是当前功能开发 `NO-GO`，并将 Wave 1 可恢复画像资源与 Wave 2 内存试点的歧义列为文档合入 Blocker。Codex 采纳“持久化 CRUD 后移 Wave 4”的结论，同时保留一个无状态 `POST profile-suggestions` 作为 Wave 1/2 的最小服务端边界；该端点不创建资源、不保存正文、不提供恢复，不突破 Claude 要求的零持久化试点边界。修订后的两轮封板复核均为 `APPROVE`；最终未关闭 Blocker / High / Medium 均为 0，结论为文档可提交，但生产恢复、上线 P0 和 Wave 1 数值门禁完成前仍不得编码。
 
 双方需保留的差异如下，最终取舍以当前正式产品和合规边界为准：
 
