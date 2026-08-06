@@ -105,8 +105,12 @@ function createHarness(options: HarnessOptions = {}) {
         return record
       },
       async findMany(input?: { where?: Record<string, unknown> }) {
-        if (input?.where && Object.hasOwn(input.where, 'expiresAt')) {
-          cleanupWhere = input.where
+        const isCleanupQuery = input?.where && (
+          Object.hasOwn(input.where, 'expiresAt') ||
+          Array.isArray(input.where['OR'])
+        )
+        if (isCleanupQuery) {
+          cleanupWhere = input!.where!
           return []
         }
         return record ? [record] : []

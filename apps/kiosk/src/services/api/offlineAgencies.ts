@@ -285,9 +285,10 @@ export async function getOfflineAgencies(
     pageSize: response.pageSize,
     stats: response.stats ?? {
       totalAgencies: response.total,
-      openAgencies: 0,
-      totalJobs: 0,
-      districts: 0,
+      openAgencies: undefined,
+      totalJobs: undefined,
+      districts: undefined,
+      lastSyncLabel: undefined,
     },
   }
 }
