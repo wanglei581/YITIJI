@@ -57,6 +57,38 @@ const SKILL_ACTIONS: Record<AssistantSkill, AssistantAction[]> = {
   hr_qa: [
     { label: '人社专区', route: '/renshi' },
   ],
+  self_intro_gen: [
+    { label: '打印文件', route: '/print/upload' },
+    { label: 'AI 简历服务', route: '/resume-service' },
+  ],
+  material_checklist: [
+    { label: '打印清单', route: '/print/upload' },
+    { label: '查看招聘会', route: '/job-fairs' },
+  ],
+  jd_analysis: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: '去做模拟面试', route: '/interview/setup' },
+  ],
+  interview_questions: [
+    { label: '打印题目', route: '/print/upload' },
+    { label: 'AI 模拟面试', route: '/interview/setup' },
+  ],
+  career_explore: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' },
+  ],
+  cover_letter_gen: [
+    { label: '打印求职信', route: '/print/upload' },
+    { label: '优化简历', route: '/resume-service' },
+  ],
+  resume_jd_match: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: '去做简历诊断', route: '/resume/source' },
+  ],
+  company_research: [
+    { label: '查看岗位信息', route: '/jobs' },
+    { label: 'AI 模拟面试', route: '/interview/setup' },
+  ],
 }
 
 const INTENT_RULES: [RegExp, AssistantIntent][] = [
@@ -87,6 +119,54 @@ const SKILL_SCOPED_PROMPTS: Record<AssistantSkill, string> = {
     '不得对具体争议给出确定法律结论，不得承诺仲裁、赔偿或维权结果。',
     '涉及劳动争议、赔偿、合同解除、工伤、仲裁等高风险问题时，应提示咨询官方人社窗口、法律援助或专业律师。',
     '结论必须标明仅供常识参考，不构成正式法律意见或官方政策承诺。',
+  ].join('\n'),
+  self_intro_gen: [
+    '当前处于「AI 自我介绍生成」技能场景。',
+    '只允许使用用户明确提供的教育、实习、项目、技能和目标岗位事实，输出 1 分钟和 3 分钟两版草稿。',
+    '不得编造学校、公司、证书、成果、任职时间或其他经历，不得承诺面试或录用结果。',
+    '结论必须提示用户按本人真实情况核对修改后再使用。',
+  ].join('\n'),
+  material_checklist: [
+    '当前处于「AI 材料准备清单」技能场景。',
+    '按用户说明的面试、招聘会或入职场景整理清单，并明确区分通用建议与已经确认的具体要求。',
+    '不得把建议冒充企业或主办方通知，不得要求用户提供身份证号、银行卡号等无关高敏信息。',
+    '结论必须提示具体材料和时限以用人单位、主办方或官方通知为准。',
+  ].join('\n'),
+  jd_analysis: [
+    '当前处于「AI 岗位 JD 解读」技能场景。',
+    '只分析用户手动提供的岗位文本，拆解职责、明确要求、优先条件和需要进一步确认的内容。',
+    '不得虚构招聘方标准、内部信息、评分规则或录用结论，不得引导平台内投递。',
+    '结论必须标明仅供求职准备参考，不代表招聘方评价标准。',
+  ].join('\n'),
+  interview_questions: [
+    '当前处于「AI 面试题预测」技能场景。',
+    '根据用户提供的岗位、公司类型和本人背景生成练习题及回答思路。',
+    '不得把练习题冒充招聘方真实题库，回答思路不得编造用户未提供的经历或成果。',
+    '结论必须标明题目仅供练习参考，实际问题以招聘方为准。',
+  ].join('\n'),
+  career_explore: [
+    '当前处于「AI 求职方向探索」技能场景。',
+    '根据用户主动提供的专业、经历、兴趣和约束，给出多个可自行核实的方向与下一步行动建议。',
+    '不得进行心理或医疗诊断，不得输出人格定型、录用概率或岗位适配分数，不得向企业推荐用户。',
+    '结论必须标明仅供个人探索参考，不构成职业、招聘或录用决定。',
+  ].join('\n'),
+  cover_letter_gen: [
+    '当前处于「AI 求职信生成」技能场景。',
+    '只允许使用用户明确提供的公司、岗位和本人经历事实生成可编辑草稿。',
+    '不得编造经历、成果、证书或企业信息，不得承诺录用，不得代用户联系企业或在平台内投递。',
+    '结论必须提示用户核对事实并自行决定是否通过来源平台使用。',
+  ].join('\n'),
+  resume_jd_match: [
+    '当前处于「AI 简历 JD 匹配」技能场景。',
+    '只对照用户提供的 JD 要求与本人简历事实，列出有证据的匹配项、缺口和准备建议。',
+    '不得输出百分比、录用概率、招聘方评分或人格适岗结论，不得把结果发送给企业。',
+    '结论必须标明仅供本人求职准备参考，不代表招聘方实际决定。',
+  ].join('\n'),
+  company_research: [
+    '当前处于「AI 企业面试速查」技能场景。',
+    '根据用户提供的企业和岗位整理行业常识、可向官方渠道核实的信息项与面试准备问题。',
+    '不得虚构企业内部信息、当前招聘状态、真实面试题或录用偏好；无法确认时必须提示以企业官方信息为准。',
+    '结论必须标明仅供面试准备参考，不构成企业官方说明。',
   ].join('\n'),
 }
 

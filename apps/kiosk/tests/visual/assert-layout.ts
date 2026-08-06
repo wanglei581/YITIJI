@@ -9,7 +9,9 @@ export async function assertNoHorizontalOverflow(page: Page): Promise<void> {
 }
 
 export async function assertKioskShellFillsViewport(page: Page): Promise<void> {
-  const dimensions = await page.locator('.ui-kiosk-shell').evaluate((shell) => {
+  const shell = page.locator('.ui-kiosk-shell')
+  await expect(shell, 'Kiosk 外层壳必须可见').toBeVisible()
+  const dimensions = await shell.evaluate((shell) => {
     const rect = shell.getBoundingClientRect()
     return {
       left: Math.round(rect.left),

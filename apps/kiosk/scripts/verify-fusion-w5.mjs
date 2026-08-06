@@ -37,7 +37,7 @@ const FROZEN = new Map([
   ['src/pages/home/components/ContinuePanel.tsx', 'd9fc437e98a25e9734494bbd6dece4d0c3649ea5fa616d57d4e97451c111eff3'],
   ['src/pages/home/components/kioskAppLaunch.ts', '5bb684513182d680b91c6f086d17d27e26caed8b6cf616eba79ea1fa3c0a3b6b'],
   ['src/pages/home/components/ToolboxLaunchModals.tsx', 'bb79f207e4e1fbb22cdfc33239dbefc58cbdcd18f7df89adf08e4061354fe99c'],
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '0c1606a0cab8bfe63fedeaa6dfa39676e80b9f5d4cf3c320ef27d629d5f885db'],
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50'],
 ])
 
 function propertyName(node) {

@@ -519,11 +519,21 @@ check('W6 legal and long-text fixture', () => {
   const longText = variableInitializer(source, 'W6_LONG_LEGAL_TEXT')
   assert.ok(longText && ts.isStringLiteralLike(longText), 'W6_LONG_LEGAL_TEXT must be a static string fixture')
   assert.ok(longText.text.length >= 240, `W6 long-text fixture is only ${longText.text.length} characters`)
+  const getEndpoints = new Set()
+  const collectGetEndpoints = (node) => {
+    if (ts.isCallExpression(node)
+      && ts.isIdentifier(node.expression)
+      && node.expression.text === 'get'
+      && node.arguments[0]
+      && ts.isStringLiteralLike(node.arguments[0])) getEndpoints.add(node.arguments[0].text)
+    ts.forEachChild(node, collectGetEndpoints)
+  }
+  collectGetEndpoints(source)
   const api = readKiosk('tests/visual/fixtures/fusion-w6-api.ts')
   for (const endpoint of [
     '/api/v1/kiosk/legal/terms_of_service',
     '/api/v1/kiosk/legal/privacy_policy',
-  ]) assert.ok(api.includes(`get('${endpoint}'`), `missing real legal endpoint ${endpoint}`)
+  ]) assert.ok(getEndpoints.has(endpoint), `missing real legal endpoint ${endpoint}`)
   assert.doesNotMatch(api, /get\('\/api\/v1\/kiosk\/legal\/privacy'/, 'obsolete legal fixture path must not return')
   const routes = readKiosk('tests/visual/fixtures/fusion-w6-route-cases.ts')
   const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')

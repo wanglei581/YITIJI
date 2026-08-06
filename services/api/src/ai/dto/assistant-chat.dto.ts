@@ -5,6 +5,14 @@ const ASSISTANT_SKILLS = [
   'offer_compare',
   'salary_negotiation',
   'hr_qa',
+  'self_intro_gen',
+  'material_checklist',
+  'jd_analysis',
+  'interview_questions',
+  'career_explore',
+  'cover_letter_gen',
+  'resume_jd_match',
+  'company_research',
 ] as const
 
 export class AssistantChatRequestDto {

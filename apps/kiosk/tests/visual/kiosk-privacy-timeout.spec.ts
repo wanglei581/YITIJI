@@ -19,6 +19,10 @@ const SENSITIVE_SESSION_KEYS = [
 ] as const
 
 function registerKioskShell(api: ApiRouter): void {
+  api.respond('GET', '/api/v1/health', {
+    status: 200,
+    json: { success: true, data: { status: 'ok' } },
+  })
   api.respond('GET', '/api/v1/terminals/KSK-001/screensaver', {
     status: 200,
     json: { enabled: false, idleTimeoutSec: 180, items: [] },
@@ -204,8 +208,11 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   if (new URL(page.url()).pathname !== '/') {
     await page.getByRole('button', { name: '返回', exact: true }).click()
   }
-  await page.getByRole('button', { name: /AI面试训练/ }).click()
-  await page.getByRole('button', { name: /训练报告/ }).click()
+  await page.getByRole('button', { name: /^AI面试训练/ }).click()
+  await page.waitForURL((url) => url.pathname === '/interview-service')
+  const trainingReports = page.getByRole('button', { name: /^训练报告/ })
+  await expect(trainingReports).toBeEnabled()
+  await trainingReports.click()
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)
   await expect.soft(page.getByText(MEMBER_REPORT_POSITION, { exact: false })).toHaveCount(0)
@@ -262,7 +269,7 @@ test('anonymous interview state is hard-cleared and browser back cannot restore 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)
 
   expect.soft(new URL(page.url()).pathname).toBe('/')
-  expect.soft(await readDocumentMarker(page)).toBeNull()
+  await expect.poll(() => readDocumentMarker(page)).toBeNull()
   const storedAfterDeadline = await page.evaluate(
     (keys) => keys.map((key) => window.sessionStorage.getItem(key)),
     SENSITIVE_SESSION_KEYS,

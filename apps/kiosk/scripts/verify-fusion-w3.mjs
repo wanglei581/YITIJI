@@ -99,7 +99,7 @@ const manifest = read('tests/visual/route-manifest.ts')
 for (const route of routes) check(manifest.includes(`'${route}'`), `manifest retains ${route}`)
 
 const frozen = {
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '0c1606a0cab8bfe63fedeaa6dfa39676e80b9f5d4cf3c320ef27d629d5f885db',
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -232,7 +232,7 @@ includes('src/pages/assistant/AssistantPage.tsx', 'chatWithAssistant({', 'assist
 includes('src/pages/assistant/AssistantPage.tsx', "import('./AssistantCallPanel')", 'assistant keeps TRTC lazy loading')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'interview keeps real ASR review')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'answerInterview(', 'interview keeps question progression')
-includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || phoneBusy)', 'upload busy lock remains')
+includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || phoneBusy || usbBusy)', 'local, phone, and USB upload busy locks remain')
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
