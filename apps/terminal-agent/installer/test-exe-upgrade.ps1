@@ -40,34 +40,37 @@ try {
   }
 
   $installAttempted = $true
-  Invoke-Bundle -BundlePath $previousExe -Action "/install" -LogName "install-0.3.0.log"
+  Invoke-Bundle -BundlePath $previousExe -Action "/install" -LogName "install-0.3.1.log"
   $service = Get-AgentService
   if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
-    throw "The 0.3.0 baseline did not install as Stopped/Manual"
+    throw "The 0.3.1 baseline did not install as Stopped/Manual"
   }
-  if (Test-Path -LiteralPath $provisionerGuiPath -PathType Leaf) {
-    throw "The 0.3.0 baseline unexpectedly contains the 0.3.1 Provisioner GUI"
+  if (-not (Test-Path -LiteralPath $provisionerGuiPath -PathType Leaf)) {
+    throw "The 0.3.1 baseline Provisioner GUI is missing"
+  }
+  if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) {
+    throw "The 0.3.1 baseline Start menu shortcut is missing"
   }
 
   [System.IO.File]::WriteAllText($canaryPath, "retain-across-upgrade", [System.Text.UTF8Encoding]::new($false))
 
-  Invoke-Bundle -BundlePath $currentExe -Action "/install" -LogName "upgrade-to-0.3.1.log"
+  Invoke-Bundle -BundlePath $currentExe -Action "/install" -LogName "upgrade-to-0.3.2.log"
   $service = Get-AgentService
-  if ($null -eq $service) { throw "Service is missing after the 0.3.0 to 0.3.1 upgrade" }
+  if ($null -eq $service) { throw "Service is missing after the 0.3.1 to 0.3.2 upgrade" }
   if ($service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
     throw "An unprovisioned upgrade must remain Stopped/Manual until the GUI succeeds"
   }
   if ((Get-Content -Raw -LiteralPath $canaryPath) -ne "retain-across-upgrade") {
-    throw "ProgramData state was not retained across the 0.3.0 to 0.3.1 upgrade"
+    throw "ProgramData state was not retained across the 0.3.1 to 0.3.2 upgrade"
   }
   if (-not (Test-Path -LiteralPath $provisionerGuiPath -PathType Leaf)) {
-    throw "The 0.3.1 Provisioner GUI is missing after upgrade"
+    throw "The 0.3.2 Provisioner GUI is missing after upgrade"
   }
   if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) {
-    throw "The 0.3.1 Start menu shortcut is missing after upgrade"
+    throw "The 0.3.2 Start menu shortcut is missing after upgrade"
   }
 
-  Invoke-Bundle -BundlePath $currentExe -Action "/repair" -LogName "repair-0.3.1.log"
+  Invoke-Bundle -BundlePath $currentExe -Action "/repair" -LogName "repair-0.3.2.log"
   $service = Get-AgentService
   if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -ne "Manual") {
     throw "Repair must retain the unprovisioned Stopped/Manual contract"
@@ -76,7 +79,7 @@ try {
     throw "ProgramData state was not retained across repair"
   }
 
-  Write-Host "EXE_UPGRADE_PASS from=0.3.0 to=0.3.1 unprovisionedSafe=true stateRetained=true provisionerAdded=true"
+  Write-Host "EXE_UPGRADE_PASS from=0.3.1 to=0.3.2 unprovisionedSafe=true stateRetained=true provisionerRetained=true"
 } finally {
   if ($installAttempted) {
     try {

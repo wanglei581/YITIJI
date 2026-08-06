@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.1-production",
+  [string]$AgentVersion = "0.3.2-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -301,14 +301,29 @@ function Resolve-AgentRuntimeLayout {
 }
 
 function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    Fail "ApiBaseUrl cannot be empty"
+  }
   $trimmed = $Value.Trim().TrimEnd("/")
-  if (-not ($trimmed -match "^https?://")) {
-    Fail "ApiBaseUrl must start with http:// or https://"
+  try {
+    $uri = [System.Uri]$trimmed
+  } catch {
+    Fail "ApiBaseUrl must be an absolute URL"
   }
-  if (-not ($trimmed.EndsWith("/api/v1"))) {
-    Fail "ApiBaseUrl must include /api/v1, e.g. https://api.example.com/api/v1"
+  if (-not $uri.IsAbsoluteUri -or @("http", "https") -notcontains $uri.Scheme -or -not [string]::IsNullOrEmpty($uri.UserInfo)) {
+    Fail "ApiBaseUrl must use HTTPS and must not contain user info"
   }
-  return $trimmed
+  if ($uri.AbsolutePath.TrimEnd("/") -ne "/api/v1" -or -not [string]::IsNullOrEmpty($uri.Query) -or -not [string]::IsNullOrEmpty($uri.Fragment)) {
+    Fail "ApiBaseUrl must end with /api/v1 and must not contain a query or fragment"
+  }
+  $localDebug = ([string]$env:AGENT_PROFILE).Trim().ToLowerInvariant() -eq "local-debug"
+  if ($uri.IsLoopback -and -not $localDebug) {
+    Fail "Loopback ApiBaseUrl requires AGENT_PROFILE=local-debug"
+  }
+  if ($uri.Scheme -eq "http" -and -not $uri.IsLoopback) {
+    Fail "Remote ApiBaseUrl must use HTTPS; HTTP is allowed only for loopback development"
+  }
+  return $uri.GetLeftPart([System.UriPartial]::Authority) + "/api/v1"
 }
 
 function ConvertTo-CanonicalOrigin([string]$Value) {
@@ -732,11 +747,9 @@ function Exchange-BindCode([string]$ApiBase, [string]$Code) {
     agentVersion      = $AgentVersion
   } | ConvertTo-Json -Depth 5
   try {
-    return Invoke-RestMethod -Uri "$ApiBase/auth/terminal/exchange-bind-code" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 30
+    return Invoke-RestMethod -Uri "$ApiBase/auth/terminal/exchange-bind-code" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 30 -MaximumRedirection 0
   } catch {
-    $detail = $_.Exception.Message
-    if ($_.ErrorDetails -and $_.ErrorDetails.Message) { $detail = $_.ErrorDetails.Message }
-    Fail "BindCode exchange failed: $detail"
+    Fail "BindCode exchange failed. Verify that the one-time code is valid and the HTTPS API is reachable."
   }
 }
 
@@ -772,10 +785,6 @@ Write-Host "Runtime root : $runtimeRoot"
 Write-Host "Agent app    : $agentAppRoot"
 Write-Host "API base     : $apiBase"
 Write-Host "Printer      : $PrinterName"
-
-if ($apiBase -match "localhost|127\.0\.0\.1") {
-  Fail "Production Agent cannot point to localhost. Use local-debug profile instead."
-}
 
 Write-Step "Checking prerequisites"
 if (-not (Test-Path -LiteralPath $runtimeRoot -PathType Container)) { Fail "Agent runtime root not found: $runtimeRoot" }

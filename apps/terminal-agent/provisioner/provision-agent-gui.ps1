@@ -49,6 +49,32 @@ function Get-TokenFingerprint {
   }
 }
 
+function ConvertTo-ValidatedApiBaseUrl([string]$Value) {
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    throw "云端 API 地址不能为空。"
+  }
+  $trimmed = $Value.Trim().TrimEnd("/")
+  try {
+    $uri = [System.Uri]$trimmed
+  } catch {
+    throw "云端 API 地址必须是完整网址。"
+  }
+  if (-not $uri.IsAbsoluteUri -or @("http", "https") -notcontains $uri.Scheme -or -not [string]::IsNullOrEmpty($uri.UserInfo)) {
+    throw "云端 API 地址必须使用 HTTPS，且不能包含用户信息。"
+  }
+  if ($uri.AbsolutePath.TrimEnd("/") -ne "/api/v1" -or -not [string]::IsNullOrEmpty($uri.Query) -or -not [string]::IsNullOrEmpty($uri.Fragment)) {
+    throw "云端 API 地址必须以 /api/v1 结尾，且不能包含查询参数或片段。"
+  }
+  $localDebug = ([string]$env:AGENT_PROFILE).Trim().ToLowerInvariant() -eq "local-debug"
+  if ($uri.IsLoopback -and -not $localDebug) {
+    throw "本机云端 API 仅用于显式 local-debug 调试；生产配置请使用 HTTPS 云端地址。"
+  }
+  if ($uri.Scheme -eq "http" -and -not $uri.IsLoopback) {
+    throw "远程云端 API 必须使用 HTTPS；HTTP 仅允许本机开发地址。"
+  }
+  return $uri.GetLeftPart([System.UriPartial]::Authority) + "/api/v1"
+}
+
 function Get-AgentStatus {
   $service = Resolve-AgentService -Identity $serviceIdentity
   $config = Get-ExistingConfig
@@ -84,6 +110,28 @@ if ($SelfTest) {
   $uiTextBase64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($productName))
   if ($uiTextBase64 -ne "QUnmsYLogYzmiZPljbDnu4jnq6/phY3nva4=") {
     throw "Provisioner self-test detected a Windows PowerShell UI text encoding failure"
+  }
+  $originalAgentProfile = $env:AGENT_PROFILE
+  try {
+    $env:AGENT_PROFILE = $null
+    foreach ($insecureApi in @("http://localhost:3000/api/v1", "http://example.com/api/v1")) {
+      try {
+        ConvertTo-ValidatedApiBaseUrl $insecureApi | Out-Null
+        throw "Provisioner self-test accepted an insecure production API: $insecureApi"
+      } catch {
+        if ($_.Exception.Message -eq "Provisioner self-test accepted an insecure production API: $insecureApi") { throw }
+      }
+    }
+    $env:AGENT_PROFILE = "local-debug"
+    foreach ($loopbackApi in @(
+      "http://localhost:3000/api/v1",
+      "http://127.0.0.1:3000/api/v1",
+      "http://[::1]:3000/api/v1"
+    )) {
+      ConvertTo-ValidatedApiBaseUrl $loopbackApi | Out-Null
+    }
+  } finally {
+    $env:AGENT_PROFILE = $originalAgentProfile
   }
   Write-Host "PROVISIONER_SELF_TEST_PASS serviceState=$($status.State) startMode=$($status.StartMode) uiTextBase64=$uiTextBase64"
   exit 0
@@ -263,8 +311,7 @@ $browseButton.Add_Click({
 
 $testApiButton.Add_Click({
   try {
-    $base = $apiText.Text.Trim().TrimEnd("/")
-    if ($base -notmatch "^https?://" -or -not $base.EndsWith("/api/v1")) { throw "地址必须以 http:// 或 https:// 开头，并以 /api/v1 结尾。" }
+    $base = ConvertTo-ValidatedApiBaseUrl $apiText.Text
     Set-Status "正在测试云端连接..." ([System.Drawing.Color]::FromArgb(86, 91, 98))
     $health = Invoke-RestMethod -Uri "$base/health" -Method Get -TimeoutSec 15
     $db = if ($health.data -and $health.data.db) { "，数据库 $($health.data.db)" } else { "" }
@@ -302,8 +349,7 @@ $activateButton.Add_Click({
   $usedExistingCredential = $false
   $tokenFingerprintBefore = $null
   try {
-    $apiBase = $apiText.Text.Trim().TrimEnd("/")
-    if ($apiBase -notmatch "^https?://" -or -not $apiBase.EndsWith("/api/v1")) { throw "云端 API 地址格式不正确。" }
+    $apiBase = ConvertTo-ValidatedApiBaseUrl $apiText.Text
     if ($printerCombo.SelectedIndex -lt 0) { throw "请先安装打印机驱动并选择一台 Windows 打印机。" }
     if ([string]::IsNullOrWhiteSpace($originText.Text)) { throw "网页来源地址不能为空。" }
     if (-not $useExistingCheck.Checked -and [string]::IsNullOrWhiteSpace($bindCodeText.Text)) { throw "请输入后台生成的一次性绑定码。" }

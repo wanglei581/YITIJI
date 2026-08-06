@@ -134,7 +134,7 @@ Windows Actions run `31076102141` 已实际生成 43 MB 的 `AIJobPrintTerminalS
 
 ## 10. B3 图形 Provisioner 候选（2026-08-06）
 
-安装器版本提升为 `0.3.1`。MSI 把图形向导和既有 Provisioning/诊断脚本安装到 `%ProgramFiles%\AIJobPrintAgent\provisioner`，并在所有用户开始菜单创建「AI求职打印终端配置」。向导使用 Windows 10/11 自带 PowerShell 5.1 + WinForms，不附加第二套运行时；首次显示密钥输入前完成 UAC 提升。
+最终候选安装器版本提升为 `0.3.2`；该版本可覆盖已安装的早期 `0.3.1` 候选。MSI 把图形向导和既有 Provisioning/诊断脚本安装到 `%ProgramFiles%\AIJobPrintAgent\provisioner`，并在所有用户开始菜单创建「AI求职打印终端配置」。向导使用 Windows 10/11 自带 PowerShell 5.1 + WinForms，不附加第二套运行时；首次显示密钥输入前完成 UAC 提升。
 
 底层脚本现同时识别源码布局与 MSI 布局。MSI 布局固定使用 `app\dist`、`node\node.exe` 和 WiX 已注册的唯一服务；服务缺失时要求 Repair，不调用已从 staging 移除的 `node-windows`，不创建第二套服务。GUI 只要求 BindCode，终端 ID/编号以兑换响应为准；已有受保护 DPAPI 凭据时可重新配置并启动。
 
@@ -142,4 +142,6 @@ Windows Actions run `31076102141` 已实际生成 43 MB 的 `AIJobPrintTerminalS
 
 图形向导脚本以 UTF-8 BOM 安装，并由 Windows PowerShell 5.1 `SelfTest` 校验中文标题的固定 UTF-8 Base64，避免中文系统现场乱码。首次打印机必须显式选择；扫描目录默认留空，仅在面板到 SMB 已配置后填写。激活完成判定要求观察到晚于停服前基线的新心跳，不能复用五分钟在线窗口内的旧心跳。BindCode 已兑换但后续步骤失败时，当前窗口会立即切换为已保存凭据模式并禁止引导用户重复使用旧码。
 
-CI 还会从固定基线提交构建 `0.3.0` EXE，验证升级到 `0.3.1` 后 ProgramData 状态保留、GUI/开始菜单补齐、未激活服务继续 Manual/Stopped，再验证 Repair。该自动化不持有生产 BindCode，无法证明 UAC 点击、DPAPI 真实兑换、Automatic/Running 或物理打印扫描；这些仍属于隔离 Windows 真机门禁。
+API 地址在 GUI 连接测试、GUI 激活和底层 Provisioning 脚本三处执行同一边界：非 loopback 地址必须使用 HTTPS；HTTP 只允许 `localhost`、`127.0.0.1`、`::1` 等 `[Uri]::IsLoopback` 本机地址，且必须显式设置 `AGENT_PROFILE=local-debug`，正常生产 GUI 因此只接受 HTTPS 云端 API。路径必须严格为 `/api/v1`，不允许 user info、query 或 fragment。该校验必须在 BindCode 兑换前完成，兑换 POST 禁止跟随重定向且错误不透传服务端正文，防止一次性绑定码被发送到明文远程连接或由错误信息回显。Kiosk 网页访问本机打印扫描能力使用独立的网页来源地址和 loopback 本地桥接，不应把云端 API 改为 localhost。
+
+CI 从固定基线提交构建 `0.3.1` EXE，验证升级到 `0.3.2` 后 ProgramData 状态、GUI 和开始菜单保留、未激活服务继续 Manual/Stopped，再验证 Repair。MSI Repair / Major Upgrade 会按设计重装 Manual/Stopped 服务，不承诺保留已激活服务的 Automatic/Running 状态，也不增加持有凭据的自定义动作。若升级或修复后显示“服务已停止”，操作者应从开始菜单打开「AI求职打印终端配置」，勾选复用已保存凭据并重新激活；成功条件仍是服务恢复 Automatic/Running 且云端出现本次启动后的新心跳。该自动化不持有生产 BindCode，无法证明 UAC 点击、DPAPI 真实复用、Automatic/Running 或物理打印扫描；这些仍属于隔离 Windows 真机门禁。

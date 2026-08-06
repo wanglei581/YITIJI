@@ -43,7 +43,7 @@ function failStartup(error: unknown, fallback: AgentStartupErrorCode): never {
 program
   .name('terminal-agent')
   .description('Phase 8.1C agent — register / heartbeat / claim / print / status / service')
-  .version('0.3.1')
+  .version('0.3.2')
 
 // ── agent (Phase 8.1C) ────────────────────────────────────────────────────────
 
