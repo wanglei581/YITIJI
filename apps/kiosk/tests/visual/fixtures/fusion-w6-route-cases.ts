@@ -159,10 +159,10 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   { pattern: '/resume/self-assessment/result', url: '/resume/self-assessment/result', marker: screen('resume-self-assessment-result'), featureText: '倾向参考', requiresFusionRoot: false },
   { pattern: '/resume/self-assessment/history', url: '/resume/self-assessment/history', marker: screen('resume-self-assessment-history'), featureText: '历史', requiresFusionRoot: false },
   // PR #499 合同审查
-  { pattern: '/contract-review', url: '/contract-review', marker: '.cr-steps', featureText: 'AI 合同审查', requiresTouchTargets: false },
+  { pattern: '/contract-review', url: '/contract-review', landmark: 'main', marker: '.cr-steps', featureText: 'AI 合同审查', requiresTouchTargets: false },
   // processing/result pages redirect to /contract-review when accessed without state (no active task)
-  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/contract-review', marker: '.cr-steps', requiresTouchTargets: false },
-  { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', requiresTouchTargets: false },
+  { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/contract-review', landmark: 'main', marker: '.cr-steps', requiresTouchTargets: false },
+  { pattern: '/contract-review/result', url: '/contract-review/result', landmark: 'main', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', requiresTouchTargets: false },
   // Service hub routes (SvcGrid 磁贴目标；merge main 后路由已定义，渲染真实 Hub 页面)
   { pattern: '/resume-service',    url: '/resume-service',    marker: 'button:has-text("AI简历诊断")',   featureText: 'AI简历诊断' },
   { pattern: '/interview-service', url: '/interview-service', marker: 'button:has-text("开始模拟面试")', featureText: '开始模拟面试' },
