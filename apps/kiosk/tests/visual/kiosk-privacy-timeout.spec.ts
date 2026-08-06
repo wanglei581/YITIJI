@@ -204,7 +204,16 @@ test('member privacy clear sends the original bearer and blocks authenticated re
   if (new URL(page.url()).pathname !== '/') {
     await page.getByRole('button', { name: '返回', exact: true }).click()
   }
-  await page.goto('/interview/reports')
+  // page.goto() 会触发全页面加载 —— 新 history 无 idx，privacy guard 判定为 stale 再次重定向。
+  // 改用 pushState + popstate 模拟 React Router 内部导航：idx 设为当前值 +1，
+  // 使 historyIndex > boundary.minHistoryIndex，绕过 isStaleHistoryEntry 拦截。
+  await page.evaluate(() => {
+    const state = (window.history.state ?? {}) as Record<string, unknown>
+    const currentIdx = typeof state['idx'] === 'number' ? state['idx'] : 0
+    const nextState = { usr: null, key: 'reports-reentry-test', idx: currentIdx + 1 }
+    window.history.pushState(nextState, '', '/interview/reports')
+    window.dispatchEvent(new PopStateEvent('popstate', { state: nextState }))
+  })
   await expect(page.locator('[data-kiosk-screen="interview-reports"]')).toBeVisible()
   expect.soft(requests.reportRequestCount()).toBe(1)
   await expect.soft(page.getByText(MEMBER_REPORT_POSITION, { exact: false })).toHaveCount(0)
