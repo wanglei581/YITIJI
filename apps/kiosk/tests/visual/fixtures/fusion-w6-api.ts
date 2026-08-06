@@ -59,6 +59,12 @@ export function registerW6Api(api: ApiRouter): void {
   get('/api/v1/job-fairs/fair-001/materials', { success: true, data: [], pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 } })
   get('/api/v1/job-fairs/fair-001/venue-guide', success(null))
 
+  // ContinuePanel（首页条件挂载）
+  get('/api/v1/me/pending-tasks', success({ hasPendingPrint: false, hasPendingResume: false }))
+
+  // contract-review 路由（PR #501 新增，W6 路由清单已更新至 99 条）
+  get('/api/v1/contract-reviews/consent-scope', success({ consentRequired: true, documentPurposes: ['contract_upload'], retentionTtlMs: 7200000 }))
+
   post('/api/v1/scan/sessions', success({
     scanTaskId: 'w6-scan-001', controlToken: 'w6-control', status: 'waiting', scanType: 'document',
     instructions: ['放好原件', '在打印机面板开始扫描'], expiresAt: '2099-01-01T00:00:00.000Z',
