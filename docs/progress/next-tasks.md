@@ -4,7 +4,7 @@
 
 ## 当前执行：生产混合版本故障恢复
 
-- [~] **先关闭主干 CI 回归，再恢复首管理员 PR #510**：`main@36690977` 的 runs `31096382731` / `31099112210` 均为 build/Kiosk 静态失败、PG 成功；独立分支 `codex/fix-main-ci-regressions` 已补 11 项 AI skill 的 DTO/LLM/mock/合规门禁，移除重复暖色 CSS import，并按真实实现收敛 Home/W3/W5/W6 静态合同。PR #511 前两轮暴露的旧 AI 名称、暖色断言、W2 导航 `ERR_ABORTED` 误报和打印扫描文档过度宣称均已修。第三轮 run `31104065847` 的 `build-and-verify`、`postgres-readiness` 全绿，W2 29/29 通过；唯一失败为 privacy 清理后重入 AI 面试页时旧 fixture 未声明新增 `/api/v1/health` 探测。现只为该场景补健康响应，未放宽未声明 API 与隐私断言；Node `v22.23.1` 隔离端口 privacy 18/18 已通过。下一步：提交推送并等待 #511 三项 CI 全绿；该修复获用户明确授权合入 `main` 后，#510 再同步主干、重跑首管理员真并发 PG CI。两项均未部署，合并也不授权自动执行 bootstrap 或生产发布。
+- [~] **等待 PR #511 明确合并授权，再恢复首管理员 PR #510**：`codex/fix-main-ci-regressions` 已修复 11 项 AI skill 的 DTO/LLM/mock/合规合同、重复暖色 CSS、Home/W1-W6 旧断言、W2 导航误报、打印扫描文档过度宣称和 privacy 健康探测 fixture。run `31105830591` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿，PR merge state 为 clean。下一步仅在用户明确授权后合入 #511；随后 #510 同步最新 `main` 并重跑首管理员真并发 PG CI，#510 的合并仍需另行明确授权。两项均未部署，也不授权自动执行 bootstrap 或生产发布。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
