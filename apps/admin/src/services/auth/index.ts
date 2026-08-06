@@ -286,6 +286,7 @@ function isValidAdminPhoneTransferCancelResponse(data: unknown): data is AdminIn
 
 export type LoginResult =
   | { ok: true; user: AuthedUser }
+  | { ok: true; passwordChangeRequired: true; changeTicket: string; expiresInSeconds: number }
   | { ok: false; code: string; message: string }
 
 /** 调 POST /auth/login,成功后落盘 token + user */
@@ -305,8 +306,15 @@ export async function login(loginId: string, password: string): Promise<LoginRes
     writeState({ token: 'mock-token', user: mockUser })
     return { ok: true, user: mockUser }
   }
-  const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login', { loginId, password, portal: 'admin' })
+  const r = await postJson<unknown>('/auth/login', { loginId, password, portal: 'admin' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (isFirstAdminPasswordChangeRequired(r.data)) {
+    return { ok: true, ...r.data }
+  }
+  if (!isFullLoginResponse(r.data)) {
+    clearAuth()
+    return { ok: false, code: 'AUTH_RESPONSE_INVALID', message: '登录响应无效' }
+  }
   return ensureAdminSession(r.data)
 }
 
@@ -321,9 +329,46 @@ export async function sendLoginSmsCode(phone: string): Promise<{ ok: true; coold
 }
 
 export async function loginWithSms(phone: string, code: string): Promise<LoginResult> {
-  const r = await postJson<{ token: string; user: AuthedUser }>('/auth/login/sms', { phone, code, portal: 'admin' })
+  const r = await postJson<unknown>('/auth/login/sms', { phone, code, portal: 'admin' })
   if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  if (isFirstAdminPasswordChangeRequired(r.data)) return { ok: true, ...r.data }
+  if (!isFullLoginResponse(r.data)) {
+    clearAuth()
+    return { ok: false, code: 'AUTH_RESPONSE_INVALID', message: '登录响应无效' }
+  }
   return ensureAdminSession(r.data)
+}
+
+export async function completeFirstAdminPasswordChange(
+  changeTicket: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const r = await postJson<{ success: true }>('/auth/password/first-admin-change', { changeTicket, newPassword })
+  if (!r.ok) return { ok: false, code: r.code, message: r.message }
+  return { ok: true }
+}
+
+function isFirstAdminPasswordChangeRequired(data: unknown): data is {
+  passwordChangeRequired: true
+  changeTicket: string
+  expiresInSeconds: number
+} {
+  if (!data || typeof data !== 'object') return false
+  const candidate = data as Record<string, unknown>
+  return candidate.passwordChangeRequired === true
+    && typeof candidate.changeTicket === 'string'
+    && candidate.changeTicket.length >= 48
+    && typeof candidate.expiresInSeconds === 'number'
+    && candidate.expiresInSeconds > 0
+    && candidate.expiresInSeconds <= 600
+}
+
+function isFullLoginResponse(data: unknown): data is { token: string; user: AuthedUser } {
+  if (!data || typeof data !== 'object') return false
+  const candidate = data as Record<string, unknown>
+  if (typeof candidate.token !== 'string' || !candidate.user || typeof candidate.user !== 'object') return false
+  const user = candidate.user as Record<string, unknown>
+  return typeof user.id === 'string' && typeof user.name === 'string' && user.role === 'admin'
 }
 
 export async function startPasswordReset(loginIdOrPhone: string): Promise<{ ok: true; cooldownSeconds: number } | { ok: false; code: string; message: string }> {

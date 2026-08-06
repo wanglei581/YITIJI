@@ -200,7 +200,32 @@ pnpm verify:demo-seed-guard
 
 生产和预生产均禁止执行 `db:seed*`。四个 seed 只服务可丢弃的本地开发/CI 数据库，会写入默认账号、演示终端和直接公开的岗位/招聘会/企业数据；其中企业 seed 会覆盖下架状态，场馆导览 seed 会先删除再重建配置。生产真实业务数据必须走现有 Admin / Partner 审核与发布闭环。
 
-当前生产故障恢复沿用已存在且已轮换口令的管理员账号。仓库尚无经过安全审查的“全新空库首个管理员” bootstrap 命令，因此真正全新生产空库在该能力补齐前仍为 **NO-GO**，不得用 demo seed 绕过。
+当前生产故障恢复沿用已存在且已轮换口令的管理员账号，**不得**运行首个管理员 bootstrap。只有迁移完成且只读查询确认 `User=0` 的真正全新 PostgreSQL 库，才可在双人复核后运行：
+
+运行前确认生产主机 NTP 已同步；执行窗口以生产主机时间为准。凭据目录所在磁盘必须启用静态加密，且不得被未加密备份、日志采集或制品归档收集。
+
+```bash
+# 先建立仅当前 Linux 用户可访问的仓库外目录
+install -d -m 700 /root/ai-job-print-bootstrap
+
+# NODE_ENV / DATABASE_URL 从受控生产环境读取，不把数据库口令写入命令历史
+export FIRST_ADMIN_BOOTSTRAP_CONFIRM=CREATE_FIRST_PRODUCTION_ADMIN
+export FIRST_ADMIN_BOOTSTRAP_AUTHORIZED_UNTIL='<未来10分钟内的RFC3339时间>'
+export FIRST_ADMIN_USERNAME='<首个管理员账号>'
+export FIRST_ADMIN_NAME='<管理员显示名>'
+export FIRST_ADMIN_CREDENTIALS_OUT=/root/ai-job-print-bootstrap/first-admin.json
+pnpm --filter @ai-job-print/api bootstrap:first-admin
+```
+
+执行窗口和确认短语只用于防误操作，不是独立身份认证；真正授权来自受控 Linux 账户、生产数据库凭据和双人审批。命令只允许 `NODE_ENV=production + PostgreSQL`，在 `Serializable` 事务内要求 `User=0`，创建一个 `temporary` admin 和同事务必成功的 `auth.first_admin_bootstrap.created` 审计。初始密码由系统强随机生成，只写入 `O_EXCL + 0600` 文件，不进入 stdout、日志、环境变量或仓库。
+
+首次使用必须通过 HTTPS 管理后台：正确初始密码只换取 10 分钟单次改密 ticket，不签发管理 JWT；设置符合商用规则的新密码后才变为 `owner_managed`，递增 `tokenVersion` 并写 `auth.first_admin_bootstrap.password_changed` 审计。随后先核对 `User=1`、两条审计齐全、新密码可登录且初始密码已失效，全部通过后才删除 0600 初始凭据文件。
+
+若命令返回 `FIRST_ADMIN_BOOTSTRAP_RECONCILIATION_REQUIRED`，不得立即删除凭据文件或重跑。先做只读核对：
+
+- `User=1` 且存在匹配的 `bootstrap.created`：数据库可能已提交，保留文件并继续首次改密。
+- `User=0` 且无匹配审计：数据库未提交，人工删除该 0600 文件后重新申请执行窗口。
+- 其他组合：状态不一致，保持 **NO-GO**，备份并人工审查；不得用 seed 或直接 SQL 补写。
 
 > 若迁移旧 SQLite 数据：按 postgres-operations.md §3 用 `db:pg:migrate-data`，
 > 必须确认输出「迁移完成并对账通过」并记录孤儿行告警，不静默丢数据。
