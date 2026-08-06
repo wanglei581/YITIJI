@@ -39,7 +39,12 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
   const isOpen = agency.status === 'open'
   const services = Array.isArray(agency.services) ? agency.services : []
   return (
-    <article className="jf-row oa-agency-row" aria-label={agency.name} onClick={onClick} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+    <a
+      href={`/offline-agencies/${agency.id}`}
+      className="jf-row oa-agency-row"
+      aria-label={`查看${agency.name}`}
+      onClick={(e) => { e.preventDefault(); onClick() }}
+    >
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
@@ -69,13 +74,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           <span className="jf-chip ok">资质核验已通过</span>
         </div>
       </div>
-      {agency.jobCount != null && (
-        <div className="oa-r-aside" aria-label={`${agency.jobCount} 个在招岗位`}>
-          <div className="oa-jobs-n">{agency.jobCount}</div>
-          <div className="oa-jobs-t">在招岗位</div>
-        </div>
-      )}
-    </article>
+    </a>
   )
 }
 
