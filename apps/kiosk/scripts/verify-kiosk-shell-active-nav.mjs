@@ -31,7 +31,7 @@ expectMatches(
 expectMatches(
   rootLayout,
   /pathname\.startsWith\('\/assistant'\)[\s\S]{0,80}return\s+'assistant'/,
-  '/assistant 继续高亮 AI助手',
+  '/assistant 继续高亮 AI顾问',
 )
 expectMatches(
   rootLayout,
