@@ -21,7 +21,7 @@ export interface W6RouteCase {
 type W6RouteDefinition = Omit<W6RouteCase, 'viewport' | 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'> & Partial<Pick<W6RouteCase, 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'>>
 
 const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone'])
-const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone', '/contract-review', '/contract-review/processing', '/contract-review/result', '/resume-service', '/interview-service', '/fairs-service', '/jobs-service', '/policy-service'] as const satisfies readonly ProductionRoutePattern[]
+const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone', '/contract-review', '/contract-review/processing', '/contract-review/result'] as const satisfies readonly ProductionRoutePattern[]
 const touchTargetExemptions = new Set<ProductionRoutePattern>(TOUCH_TARGET_EXEMPTIONS)
 
 function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
@@ -163,12 +163,12 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // processing/result pages redirect to /contract-review when accessed without state (no active task)
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/contract-review', marker: '.cr-steps', landmark: 'none', requiresTouchTargets: false },
   { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', landmark: 'none', requiresTouchTargets: false },
-  // Service hub routes (SvcGrid 磁贴目标；路由当前未定义，命中 KioskRouteErrorPage)
-  { pattern: '/resume-service',    url: '/resume-service',    marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/interview-service', url: '/interview-service', marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/fairs-service',     url: '/fairs-service',     marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/jobs-service',      url: '/jobs-service',      marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
-  { pattern: '/policy-service',    url: '/policy-service',    marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+  // Service hub routes (SvcGrid 磁贴目标；merge main 后路由已定义，渲染真实 Hub 页面)
+  { pattern: '/resume-service',    url: '/resume-service',    marker: 'button:has-text("AI简历诊断")',   featureText: 'AI简历诊断' },
+  { pattern: '/interview-service', url: '/interview-service', marker: 'button:has-text("开始模拟面试")', featureText: '开始模拟面试' },
+  { pattern: '/fairs-service',     url: '/fairs-service',     marker: 'button:has-text("社会招聘会")',   featureText: '社会招聘会' },
+  { pattern: '/jobs-service',      url: '/jobs-service',      marker: 'button:has-text("全职岗位")',     featureText: '全职岗位' },
+  { pattern: '/policy-service',    url: '/policy-service',    marker: 'button:has-text("就业政策")',     featureText: '就业政策' },
 ] as const // 101 routes (was 96)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
