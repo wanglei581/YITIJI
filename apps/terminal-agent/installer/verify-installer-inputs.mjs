@@ -64,8 +64,12 @@ assert.equal(
   1,
   'allowUnusedPatches must remain scoped to one deploy invocation',
 )
-assert.match(workspace, /patchedDependencies:/, 'workspace security patches must remain enabled')
-assert.match(workspace, /brace-expansion@2\.1\.2:/, 'brace-expansion security patch must remain pinned')
+assert.match(workspace, /overrides:/, 'workspace security overrides must remain enabled')
+assert.match(
+  workspace,
+  /brace-expansion@2\.1\.1:\s*2\.1\.4/,
+  'brace-expansion security fix must remain pinned',
+)
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
 assert.match(staging, /Unexpected executable in staging/)
 assert.match(staging, /better-sqlite3/)
