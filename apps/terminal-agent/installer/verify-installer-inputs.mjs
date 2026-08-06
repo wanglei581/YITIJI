@@ -52,6 +52,11 @@ assert.match(wix, /Advertise="no"/)
 assert.match(wix, /Target="\[System64Folder\]WindowsPowerShell\\v1\.0\\powershell\.exe"/)
 assert.match(wix, /Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File &quot;\[INSTALLFOLDER\]provisioner\\provision-agent-gui\.ps1&quot;"/)
 assert.match(wix, /WorkingDirectory="INSTALLFOLDER"/)
+assert.match(
+  wix.match(/<Component Id="ProvisionerShortcutComponent"[\s\S]*?<\/Component>/)?.[0] ?? '',
+  /<CreateFolder\s*\/>/,
+  'Start menu shortcut component must recreate its directory after uninstall',
+)
 assert.match(wix, /RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall"/)
 assert.match(wix, /ComponentRef Id="ProvisionerShortcutComponent"/)
 assert.match(

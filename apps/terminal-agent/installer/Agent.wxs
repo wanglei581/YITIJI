@@ -54,6 +54,7 @@
             Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
             Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File &quot;[INSTALLFOLDER]provisioner\provision-agent-gui.ps1&quot;"
             WorkingDirectory="INSTALLFOLDER" />
+          <CreateFolder />
           <RemoveFolder Id="RemoveAgentProgramMenuFolder" On="uninstall" />
           <RegistryValue
             Root="HKCU"
