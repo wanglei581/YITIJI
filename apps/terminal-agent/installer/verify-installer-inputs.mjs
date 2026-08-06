@@ -133,10 +133,9 @@ assert.doesNotMatch(staging, /provision-agent-core\.ps1/)
 assert.match(provisionerGui, /param\(\[switch\]\$SelfTest\)/)
 assert.match(provisionerGui, /PROVISIONER_SELF_TEST_PASS/)
 assert.match(provisionerGui, /function ConvertTo-ValidatedApiBaseUrl/)
-assert.match(provisionerGui, /\$uri\.Scheme -eq "http" -and -not \$uri\.IsLoopback/)
-assert.match(provisionerGui, /远程云端 API 必须使用 HTTPS；HTTP 仅允许本机开发地址。/)
-assert.match(provisionerGui, /\$env:AGENT_PROFILE = "local-debug"/)
-assert.match(provisionerGui, /本机云端 API 仅用于显式 local-debug 调试/)
+assert.match(provisionerGui, /\$uri\.Scheme -ne "https"/)
+assert.match(provisionerGui, /云端 API 必须使用 HTTPS/)
+assert.doesNotMatch(provisionerGui, /AGENT_PROFILE/, 'installed GUI must not promise a profile it cannot pass to LocalSystem')
 assert.doesNotMatch(
   provisionerGui,
   /Start-Process[^\r\n]*(?:BindCode|AgentToken|BridgeToken|adminSecret)/i,

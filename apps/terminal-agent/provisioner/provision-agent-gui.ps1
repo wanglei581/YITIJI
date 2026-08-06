@@ -65,12 +65,8 @@ function ConvertTo-ValidatedApiBaseUrl([string]$Value) {
   if ($uri.AbsolutePath.TrimEnd("/") -ne "/api/v1" -or -not [string]::IsNullOrEmpty($uri.Query) -or -not [string]::IsNullOrEmpty($uri.Fragment)) {
     throw "云端 API 地址必须以 /api/v1 结尾，且不能包含查询参数或片段。"
   }
-  $localDebug = ([string]$env:AGENT_PROFILE).Trim().ToLowerInvariant() -eq "local-debug"
-  if ($uri.IsLoopback -and -not $localDebug) {
-    throw "本机云端 API 仅用于显式 local-debug 调试；生产配置请使用 HTTPS 云端地址。"
-  }
-  if ($uri.Scheme -eq "http" -and -not $uri.IsLoopback) {
-    throw "远程云端 API 必须使用 HTTPS；HTTP 仅允许本机开发地址。"
+  if ($uri.Scheme -ne "https") {
+    throw "云端 API 必须使用 HTTPS。本机网页访问打印机请配置网页来源地址，不要把云端 API 改为 localhost。"
   }
   return $uri.GetLeftPart([System.UriPartial]::Authority) + "/api/v1"
 }
@@ -111,27 +107,21 @@ if ($SelfTest) {
   if ($uiTextBase64 -ne "QUnmsYLogYzmiZPljbDnu4jnq6/phY3nva4=") {
     throw "Provisioner self-test detected a Windows PowerShell UI text encoding failure"
   }
-  $originalAgentProfile = $env:AGENT_PROFILE
-  try {
-    $env:AGENT_PROFILE = $null
-    foreach ($insecureApi in @("http://localhost:3000/api/v1", "http://example.com/api/v1")) {
-      try {
-        ConvertTo-ValidatedApiBaseUrl $insecureApi | Out-Null
-        throw "Provisioner self-test accepted an insecure production API: $insecureApi"
-      } catch {
-        if ($_.Exception.Message -eq "Provisioner self-test accepted an insecure production API: $insecureApi") { throw }
-      }
+  if ((ConvertTo-ValidatedApiBaseUrl "https://zyidai.cn/api/v1") -ne "https://zyidai.cn/api/v1") {
+    throw "Provisioner self-test rejected a valid HTTPS API"
+  }
+  foreach ($insecureApi in @(
+    "http://localhost:3000/api/v1",
+    "http://127.0.0.1:3000/api/v1",
+    "http://[::1]:3000/api/v1",
+    "http://example.com/api/v1"
+  )) {
+    try {
+      ConvertTo-ValidatedApiBaseUrl $insecureApi | Out-Null
+      throw "Provisioner self-test accepted an insecure API: $insecureApi"
+    } catch {
+      if ($_.Exception.Message -eq "Provisioner self-test accepted an insecure API: $insecureApi") { throw }
     }
-    $env:AGENT_PROFILE = "local-debug"
-    foreach ($loopbackApi in @(
-      "http://localhost:3000/api/v1",
-      "http://127.0.0.1:3000/api/v1",
-      "http://[::1]:3000/api/v1"
-    )) {
-      ConvertTo-ValidatedApiBaseUrl $loopbackApi | Out-Null
-    }
-  } finally {
-    $env:AGENT_PROFILE = $originalAgentProfile
   }
   Write-Host "PROVISIONER_SELF_TEST_PASS serviceState=$($status.State) startMode=$($status.StartMode) uiTextBase64=$uiTextBase64"
   exit 0

@@ -316,12 +316,8 @@ function ConvertTo-CanonicalApiBaseUrl([string]$Value) {
   if ($uri.AbsolutePath.TrimEnd("/") -ne "/api/v1" -or -not [string]::IsNullOrEmpty($uri.Query) -or -not [string]::IsNullOrEmpty($uri.Fragment)) {
     Fail "ApiBaseUrl must end with /api/v1 and must not contain a query or fragment"
   }
-  $localDebug = ([string]$env:AGENT_PROFILE).Trim().ToLowerInvariant() -eq "local-debug"
-  if ($uri.IsLoopback -and -not $localDebug) {
-    Fail "Loopback ApiBaseUrl requires AGENT_PROFILE=local-debug"
-  }
-  if ($uri.Scheme -eq "http" -and -not $uri.IsLoopback) {
-    Fail "Remote ApiBaseUrl must use HTTPS; HTTP is allowed only for loopback development"
+  if ($uri.Scheme -ne "https") {
+    Fail "Production ApiBaseUrl must use HTTPS"
   }
   return $uri.GetLeftPart([System.UriPartial]::Authority) + "/api/v1"
 }

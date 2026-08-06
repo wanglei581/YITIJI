@@ -57,10 +57,9 @@ assert.match(installer, /localApiPort\s+=\s+\$effectiveLocalApiPort/)
 assert.match(installer, /Assert-NotReparsePoint \$scanFolderItem/)
 assert.match(installer, /GetLeftPart\(\[System\.UriPartial\]::Authority\)/)
 assert.match(installer, /function ConvertTo-CanonicalApiBaseUrl/)
-assert.match(installer, /\$uri\.Scheme -eq "http" -and -not \$uri\.IsLoopback/)
-assert.match(installer, /Remote ApiBaseUrl must use HTTPS; HTTP is allowed only for loopback development/)
-assert.match(installer, /Loopback ApiBaseUrl requires AGENT_PROFILE=local-debug/)
-assert.match(installer, /\(\[string\]\$env:AGENT_PROFILE\)\.Trim\(\)\.ToLowerInvariant\(\) -eq "local-debug"/)
+assert.match(installer, /\$uri\.Scheme -ne "https"/)
+assert.match(installer, /Production ApiBaseUrl must use HTTPS/)
+assert.doesNotMatch(installer, /Loopback ApiBaseUrl requires AGENT_PROFILE=local-debug/)
 assert.doesNotMatch(installer, /ApiBaseUrl must start with http:\/\/ or https:\/\//)
 assert.doesNotMatch(
   installer,
@@ -121,14 +120,14 @@ assert.equal(
   2,
   'GUI connection test and activation must share the secure API validator',
 )
-for (const loopbackApi of [
+for (const insecureApi of [
   'http://localhost:3000/api/v1',
   'http://127.0.0.1:3000/api/v1',
   'http://[::1]:3000/api/v1',
+  'http://example.com/api/v1',
 ]) {
-  assert.ok(provisioner.includes(loopbackApi), `GUI SelfTest must allow loopback API ${loopbackApi}`)
+  assert.ok(provisioner.includes(insecureApi), `GUI SelfTest must reject insecure API ${insecureApi}`)
 }
-assert.match(provisioner, /http:\/\/example\.com\/api\/v1/)
 assert.match(provisioner, /\$health\.data\.db/)
 assert.match(provisioner, /扫描接收目录（可选，仅在打印机面板与 SMB 已配置后填写）/)
 assert.match(provisioner, /\$scanDefault = if[^\r\n]+else \{ "" \}/)
