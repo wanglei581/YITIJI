@@ -132,11 +132,13 @@ if (
   page.includes('CreatePlannedTerminalDialog') &&
   plannedDialog.includes('createPlannedTerminal') &&
   plannedDialog.includes('这里只创建设备资产，不签发凭证') &&
+  plannedDialog.includes('role="alert"') &&
+  plannedDialog.includes('setErrorMessage(message)') &&
   devices.includes('createPlannedTerminal') &&
   http.includes("postData<PlannedTerminalCreated>('/admin/terminals', input)") &&
   mock.includes('createPlannedTerminal')
 ) {
-  pass('现有设备管理页接入 Admin 预创建设备，http/mock 双适配且不宣称签发凭证')
+  pass('现有设备管理页接入 Admin 预创建设备，接口失败在弹窗内可见，http/mock 双适配且不宣称签发凭证')
 } else {
   fail('Admin terminals page must expose planned-device creation through existing device management entry')
 }

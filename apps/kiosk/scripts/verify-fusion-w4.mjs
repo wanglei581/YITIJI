@@ -82,6 +82,14 @@ const W6_INTEGRATION_FILES = new Set([
   // PG schema parity: wxOpenId added to postgres/schema.prisma + PG migration (mirrors SQLite migration in prisma/migrations/)
   'services/api/prisma/postgres/schema.prisma',
   'services/api/prisma/postgres/migrations/20260802120000_add_wx_open_id_to_end_user/migration.sql',
+  // Baseline repair: exact migration generated from the postgres-readiness drift report.
+  'services/api/prisma/postgres/migrations/20260805132000_repair_notification_legal_defaults/migration.sql',
+  // Recovery candidate: keep contract review default-closed and its shared-type verifier buildable.
+  'services/api/src/app.module.ts',
+  'services/api/scripts/verify-contract-review-contract.ts',
+  'apps/kiosk/src/hooks/useToolboxConfig.ts',
+  'apps/kiosk/scripts/verify-home-toolbox-ui.mjs',
+  'docs/compliance/contract-review-release-gate.md',
   // W6 route manifest is a cross-wave contract file; route count changes are W6 integration scope
   'apps/kiosk/tests/visual/route-manifest.ts',
   // baseline script route count mirrors W6; must update together
@@ -116,7 +124,7 @@ const OTHER_WAVE_PATHS = [
   /^apps\/kiosk\/scripts\/(?:verify-fusion-w6|tests\/fusion-w6-contract\.test)\.mjs$/,
   /^apps\/kiosk\/(?:playwright\.w6\.config\.ts|tests\/visual\/(?:fusion-w6-routes\.spec|fixtures\/fusion-w6-(?:api|route-cases))\.ts)$/,
   // Visual unity / 方案 B 细对齐（跨域壳、门禁与 allowlist，非 W4 业务路由所有权变更）
-  /^apps\/kiosk\/scripts\/verify-fusion-home\.mjs$/,
+  /^apps\/kiosk\/scripts\/(?:verify-fusion-home|verify-home-prototype-v1)\.mjs$/,
   /^apps\/kiosk\/scripts\/verify-kiosk-visual-unity\.mjs$/,
   /^apps\/kiosk\/src\/styles\/prototype-v1\.css$/,
   /^packages\/ui\/src\/styles\/kiosk-shell\.css$/,
@@ -251,6 +259,7 @@ const jobDetail = read('src/pages/jobs/JobDetailPage.tsx')
 const offlineAgencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const offlineJobDetail = read('src/pages/offline-agencies/OfflineJobDetailPage.tsx')
 const offlineAgencyService = read('src/services/api/offlineAgencies.ts')
+const offlineAgencyBackendService = readFileSync(join(WORKSPACE_ROOT, OFFLINE_AGENCY_BACKEND_SERVICE), 'utf8')
 const companyDetail = read('src/pages/companies/CompanyDetailPage.tsx')
 const companiesPage = read('src/pages/companies/CompaniesPage.tsx')
 const fairDetail = read('src/pages/job-fairs/JobFairDetailPage.tsx')
@@ -511,6 +520,10 @@ check('offline agency fixture mirrors the production wire contract', () => {
   assert.doesNotMatch(w6Fixture, /success\(offlineJob\)/, 'W6 must not restore the obsolete detail envelope')
 })
 check('offline agency service maps raw list and detail responses centrally', () => {
+  assert.match(offlineAgencyBackendService, /return \{\s*data: items,\s*total:/)
+  assert.match(offlineAgencyBackendService, /async findOne\([\s\S]*?return data\s*\n\s*}/)
+  assert.match(offlineAgencyBackendService, /async findOneJob\([\s\S]*?return job\s*\n\s*}/)
+  assert.match(offlineAgencyService, /interface WireOfflineAgencyListResponse \{\s*data: WireOfflineAgency\[\]/)
   assert.match(offlineAgencyService, /function mapWireOfflineAgency\(/)
   assert.match(offlineAgencyService, /function mapWireOfflineJob\(/)
   assert.match(offlineAgencyService, /\.map\(mapWireOfflineAgency\)/)

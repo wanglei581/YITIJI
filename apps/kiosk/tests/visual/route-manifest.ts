@@ -17,11 +17,11 @@ export const productionRoutePatterns = [
   '/print/cashier', '/print/progress', '/print/done', '/resume',
   '/resume/upload', '/resume/source', '/resume/generate',
   '/resume/generate/preview', '/resume/parse', '/resume/report',
-  '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials',
+  '/resume/optimize', '/resume/export', '/resume/templates', '/resume/materials', '/resume-service',
   '/scan/start', '/scan/settings', '/scan/progress', '/scan/result', '/jobs',
-  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/notifications',
+  '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/jobs-service', '/notifications',
   '/companies', '/companies/:id', '/job-fairs', '/job-fairs/checkin',
-  '/job-fairs/:id', '/job-fairs/:id/companies',
+  '/job-fairs/:id', '/job-fairs/:id/companies', '/fairs-service',
   '/job-fairs/:id/companies/:companyId', '/job-fairs/:id/map',
   '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
   '/job-fairs/:id/stats',
@@ -29,7 +29,7 @@ export const productionRoutePatterns = [
   '/resume/self-assessment/intro',
   '/resume/self-assessment/questions',
   '/resume/self-assessment/result',
-  '/resume/self-assessment/history',
+  '/resume/self-assessment/history', '/interview-service',
   // 打印取件认领
   '/print/pickup-claim',
   // PR #496 (AI OS 三新路由)
@@ -40,7 +40,8 @@ export const productionRoutePatterns = [
   '/contract-review',
   '/contract-review/processing',
   '/contract-review/result',
-] as const // 99 routes (was 96)
+  '/policy-service',
+] as const // 104 routes (was 99)
 
 export const compatibilityRedirects = {
   '/print/scan-convert': '/print-scan/convert',

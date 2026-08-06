@@ -187,6 +187,7 @@ function routeDisposition(input: Pick<RouteEvidenceDisposition, 'routePattern' |
 
 const route = (routePattern: string, targetIds: readonly string[], captureUrl = routePattern, referenceKind: VisualReferenceKind = 'PRIMARY') => routeDisposition({ routePattern, targetIds, captureUrl, referenceKind })
 const redirect = (routePattern: string, redirectTo: string) => routeDisposition({ routePattern, referenceKind: 'REDIRECT', targetIds: [], captureUrl: null, redirectTo, precondition: `Navigate to ${routePattern} and assert replace navigation to ${redirectTo}.`, claimScope: 'Compatibility redirect behavior only; no visual pair is generated.', knownLimits: 'The destination owns the visual target and screenshot evidence.' })
+const productionOnly = (routePattern: string) => routeDisposition({ routePattern, referenceKind: 'NO_INDEPENDENT_PROTOTYPE', targetIds: [], captureUrl: routePattern, precondition: 'Capture production presentation without fabricating a prototype counterpart.', claimScope: 'Production-only route evidence and explicit prototype-gap record.', knownLimits: 'No independent prototype exists; no screenshot pair may be claimed.' })
 
 export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/', ['01']),
@@ -256,18 +257,22 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/resume/export', ['28']),
   route('/resume/templates', ['29']),
   route('/resume/materials', ['30']),
+  productionOnly('/resume-service'),
   route('/scan/start', ['34', '34A'], '/scan/start'),
   route('/scan/settings', ['35', '34A'], '/scan/settings'),
   route('/scan/progress', ['36']),
   route('/scan/result', ['37']),
   route('/jobs', ['08']),
+  productionOnly('/jobs-service'),
   route('/jobs/:id', ['09'], '/jobs/job-001'),
   route('/jobs/:id/offline', ['74'], '/jobs/offline-job-001/offline'),
   route('/offline-agencies', ['75']),
+  routeDisposition({ routePattern: '/offline-agencies/:id', referenceKind: 'REUSE', targetIds: ['75'], captureUrl: '/offline-agencies/evidence-agency', knownLimits: 'The agency-list prototype is structural guidance only; this detail route has no independent prototype.' }),
   routeDisposition({ routePattern: '/notifications', referenceKind: 'REUSE', targetIds: ['22'], captureUrl: '/notifications', knownLimits: 'Target 22 supplies notification structure only; this top-level route is distinct from the member route.' }),
   route('/companies', ['53']),
   route('/companies/:id', ['54'], '/companies/company-001'),
   route('/job-fairs', ['10']),
+  productionOnly('/fairs-service'),
   route('/job-fairs/checkin', ['43']),
   route('/job-fairs/:id', ['11'], '/job-fairs/fair-001'),
   route('/job-fairs/:id/companies', ['44'], '/job-fairs/fair-001/companies'),
@@ -276,4 +281,17 @@ export const routeEvidenceDispositions: readonly RouteEvidenceDisposition[] = [
   route('/job-fairs/:id/materials', ['47'], '/job-fairs/fair-001/materials'),
   route('/job-fairs/:id/visit-plan', ['48'], '/job-fairs/fair-001/visit-plan'),
   route('/job-fairs/:id/stats', ['49'], '/job-fairs/fair-001/stats'),
+  productionOnly('/interview-service'),
+  productionOnly('/policy-service'),
+  productionOnly('/resume/self-assessment/intro'),
+  productionOnly('/resume/self-assessment/questions'),
+  productionOnly('/resume/self-assessment/result'),
+  productionOnly('/resume/self-assessment/history'),
+  productionOnly('/print/pickup-claim'),
+  productionOnly('/ai/plan'),
+  productionOnly('/session-resume'),
+  productionOnly('/jobs/online-platforms'),
+  productionOnly('/contract-review'),
+  productionOnly('/contract-review/processing'),
+  productionOnly('/contract-review/result'),
 ]

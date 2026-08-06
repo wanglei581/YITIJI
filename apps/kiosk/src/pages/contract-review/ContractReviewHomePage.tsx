@@ -118,39 +118,40 @@ export function ContractReviewHomePage() {
 
   return (
     <KioskFullscreenShell>
-      <KioskPageFrame
-        className="fusion-w3 fusion-w3--resume"
-        header={
-          <KioskPageHeader
-            title="AI 合同审查"
-            description="风险提示 · 仅供参考 · 非法律意见"
-            onBack={() => navigate(-1)}
-            backLabel="返回"
-          />
-        }
-        footer={
-          <KioskActionBar>
-            <Button
-              size="lg"
-              className="w-full"
-              disabled={!canSubmit}
-              onClick={handleSubmit}
-            >
-              {submitting ? (
-                <>
-                  <Loader2Icon className="animate-spin mr-2" size={22} />
-                  上传中…
-                </>
-              ) : (
-                <>
-                  <ShieldAlertIcon size={22} className="mr-2" />
-                  开始 AI 审查
-                </>
-              )}
-            </Button>
-          </KioskActionBar>
-        }
-      >
+      <main className="flex min-h-0 flex-1 flex-col">
+        <KioskPageFrame
+          className="fusion-w3 fusion-w3--resume"
+          header={
+            <KioskPageHeader
+              title="AI 合同审查"
+              description="风险提示 · 仅供参考 · 非法律意见"
+              onBack={() => navigate(-1)}
+              backLabel="返回"
+            />
+          }
+          footer={
+            <KioskActionBar>
+              <Button
+                size="lg"
+                className="w-full"
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2Icon className="animate-spin mr-2" size={22} />
+                    上传中…
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlertIcon size={22} className="mr-2" />
+                    开始 AI 审查
+                  </>
+                )}
+              </Button>
+            </KioskActionBar>
+          }
+        >
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--active">
@@ -307,7 +308,8 @@ export function ContractReviewHomePage() {
             {error}
           </div>
         )}
-      </KioskPageFrame>
+        </KioskPageFrame>
+      </main>
     </KioskFullscreenShell>
   )
 }

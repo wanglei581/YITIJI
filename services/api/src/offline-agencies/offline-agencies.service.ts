@@ -89,7 +89,7 @@ export class OfflineAgenciesService {
       ]
     }
 
-    const [rows, total, districtRows] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prisma.offlineAgency.findMany({
         where: where as never,
         skip,
@@ -97,65 +97,27 @@ export class OfflineAgenciesService {
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, name: true, orgType: true, address: true, district: true,
-          openHours: true, phone: true, website: true, services: true, status: true,
-          sourceOrgId: true, externalId: true, syncTime: true, updatedAt: true,
-          _count: { select: { jobs: { where: { status: 'active' } } } },
+          lat: true, lng: true, openHours: true, phone: true, contactEmail: true,
+          website: true, services: true, description: true, logoUrl: true,
+          status: true, sourceOrgId: true, externalId: true, syncTime: true,
+          createdAt: true, updatedAt: true,
         },
       }),
       this.prisma.offlineAgency.count({ where: where as never }),
-      this.prisma.offlineAgency.findMany({
-        where: {
-          reviewStatus: 'approved',
-          publishStatus: 'published',
-          status: 'active',
-          district: { not: null },
-        } as never,
-        select: { district: true },
-        distinct: ['district'],
-      }),
     ])
 
-    let items = rows.map((row: (typeof rows)[number]) => {
-      const services = parseServices(row.services)
-      const isOpen = row.status === 'active'
-      return {
-        id: row.id,
-        name: row.name,
-        type: row.orgType || 'recruitment',
-        status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
-        statusLabel: isOpen ? '营业中' : '机构临时休息 · 以门店公告为准',
-        address: row.address,
-        district: row.district || '',
-        hours: row.openHours || '以门店公告为准',
-        services,
-        orgCode: row.externalId || row.sourceOrgId || row.id,
-        phone: row.phone ?? null,
-        website: row.website ?? null,
-        jobCount: row._count.jobs,
-        syncTime: (row.syncTime ?? row.updatedAt).toISOString(),
-      }
-    })
+    let items = rows
 
     if (service) {
-      items = items.filter((it: (typeof items)[number]) => it.services.includes(service))
+      items = items.filter((item: (typeof items)[number]) => parseServices(item.services).includes(service))
     }
 
-    const payload = {
-      items,
+    return {
+      data: items,
       total: service ? items.length : total,
       page,
       pageSize,
-      stats: {
-        totalAgencies: service ? items.length : total,
-        openAgencies: items.filter((it: (typeof items)[number]) => it.status === 'open').length,
-        totalJobs: items.reduce((sum: number, it: (typeof items)[number]) => sum + it.jobCount, 0),
-        districts: districtRows.length,
-        lastSyncLabel: items[0]?.syncTime ? '已同步' : '暂无同步',
-      },
     }
-
-    // Kiosk get() 会取 body.data
-    return { data: payload }
   }
 
   async findOne(id: string) {
@@ -177,10 +139,8 @@ export class OfflineAgenciesService {
       name: agency.name,
       type: agency.orgType || 'recruitment',
       status: (isOpen ? 'open' : 'rest') as 'open' | 'rest',
-      // 文案由前端根据 status 字段渲染（fallback='请到店咨询'），
-      // 这里不再硬编码'营业中'以避免 verify-fusion-w4 反向闸门失效。
-      // 原因：'营业中'是运营状态声明，需真实业务数据支撑（如后端聚合"今日开放门店数"），
-      // 单纯按 agency.status 字段输出等于相信 DB 字段等于真实运营状态，不真实。
+      // status 只表示当前记录的收录状态，不等同于门店实时运营状态；
+      // 可见文案由前端统一渲染为中性的“正常收录 / 暂停收录”。
       address: agency.address,
       district: agency.district || '',
       hours: agency.openHours || '以门店公告为准',
@@ -201,7 +161,7 @@ export class OfflineAgenciesService {
         status: j.status,
       })),
     }
-    return { data }
+    return data
   }
 
   async findJobsByAgency(agencyId: string, query: JobListQuery) {
@@ -244,8 +204,8 @@ export class OfflineAgenciesService {
       include: {
         agency: {
           select: {
-            id: true, name: true, orgType: true, address: true,
-            phone: true, openHours: true, services: true,
+            id: true, name: true, orgType: true, address: true, district: true,
+            phone: true, openHours: true, website: true,
             reviewStatus: true, publishStatus: true,
           },
         },
@@ -256,48 +216,7 @@ export class OfflineAgenciesService {
       throw new NotFoundException(`岗位 ${id} 不存在或机构未发布`)
     }
 
-    const unitLabel = job.salaryUnit === 'day' ? '天' : job.salaryUnit === 'hour' ? '时' : '月'
-    let salary = '薪资面议'
-    if (job.salaryMin != null && job.salaryMax != null) {
-      salary = `${job.salaryMin}-${job.salaryMax} 元/${unitLabel}`
-    } else if (job.salaryMin != null) {
-      salary = `${job.salaryMin} 元起/${unitLabel}`
-    }
-
-    const parseText = (raw: string | null | undefined): string[] => {
-      if (!raw?.trim()) return []
-      try {
-        const p = JSON.parse(raw) as unknown
-        return Array.isArray(p) ? p.map(String) : [raw]
-      } catch {
-        return raw.split(/\n+/).map((s) => s.trim()).filter(Boolean)
-      }
-    }
-
-    const agencyServices = parseServices(job.agency.services)
-
-    const data = {
-      id: job.id,
-      title: job.title,
-      salary,
-      jobType: job.jobType ?? undefined,
-      location: job.location ?? undefined,
-      tags: [] as string[],
-      requirements: parseText(job.requirements),
-      responsibilities: [] as string[],
-      agencyId: job.agencyId,
-      agencyName: job.agency.name,
-      agencyType: job.agency.orgType || 'recruitment',
-      agencyAddress: job.agency.address,
-      agencyHours: job.agency.openHours || '',
-      agencyPhone: job.agency.phone ?? undefined,
-      agencyServices,
-      sourceName: job.agency.name,
-      sourceType: job.agency.orgType || 'recruitment',
-      syncTime: job.updatedAt.toISOString(),
-      externalId: job.externalId || '',
-    }
-    return { data }
+    return job
   }
 
   // ─── Admin 管理端点（无状态过滤）────────────────────────────────────────────

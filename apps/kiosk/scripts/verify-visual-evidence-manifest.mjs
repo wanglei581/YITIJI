@@ -67,6 +67,7 @@ function declaredRoutePatterns(path) {
       ts.isPropertyAssignment(node)
       && ((ts.isIdentifier(node.name) && node.name.text === 'path') || (ts.isStringLiteral(node.name) && node.name.text === 'path'))
       && ts.isStringLiteralLike(node.initializer)
+      && node.initializer.text !== '*'
     ) {
       const value = node.initializer.text
       patterns.push(value.startsWith('/') ? value : `/${value}`)
@@ -135,8 +136,8 @@ if (contract && routeManifest) {
 
   check('frozen route inventory matches runtime route declarations', () => {
     const declared = declaredRoutePatterns(routeSourcePath)
-    assert.equal(declared.length, 87, 'runtime route declaration count')
-    assert.equal(new Set(declared).size, 87, 'runtime route declarations must be unique')
+    assert.equal(declared.length, 104, 'runtime route declaration count')
+    assert.equal(new Set(declared).size, 104, 'runtime route declarations must be unique')
     assert.deepEqual(sorted(declared), sorted(productionRoutePatterns))
   })
 
@@ -216,12 +217,12 @@ if (contract && routeManifest) {
     assert.match(byId.get('34A')?.knownLimits ?? '', /no scanner-status knowledge/i)
   })
 
-  check('87 routes each have exactly one disposition', () => {
+  check('104 routes each have exactly one disposition', () => {
     assert.ok(Array.isArray(routeEvidenceDispositions), 'routeEvidenceDispositions must be an array')
-    assert.equal(routeEvidenceDispositions.length, 87, 'route disposition count')
+    assert.equal(routeEvidenceDispositions.length, 104, 'route disposition count')
     const patterns = routeEvidenceDispositions.map(({ routePattern }) => routePattern)
-    assert.equal(new Set(patterns).size, 87, 'route dispositions must be unique')
-    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 87-route manifest')
+    assert.equal(new Set(patterns).size, 104, 'route dispositions must be unique')
+    assert.deepEqual(sorted(patterns), sorted(productionRoutePatterns), 'route disposition inventory must equal the frozen 104-route manifest')
     for (const disposition of routeEvidenceDispositions) {
       const label = `route ${disposition.routePattern}`
       assert.ok(allowedReferenceKinds.has(disposition.referenceKind), `${label} referenceKind ${disposition.referenceKind}`)

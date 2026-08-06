@@ -109,6 +109,14 @@
 | `/campus/freshman-insights` | FreshmanInsightsPage(待开发容错) | src/pages/placeholders/FreshmanInsightsPage.tsx | 校园招聘专区自身的新生信息直达容错,语义独立于 `/smart-campus/freshman-insights` |
 | `/me/activity/:id` | MeActivityDetailPage(placeholder) | src/pages/placeholders/MeActivityDetailPage.tsx | 浏览记录明细占位,原型 71 只有列表 |
 | `/notifications` | NotificationsPage(placeholder) | src/pages/placeholders/NotificationsPage.tsx | 顶层通知占位(与 `/me/notifications` 不同层级) |
+| `/resume-service` | ResumeServiceHubPage | src/pages/resume/ResumeServiceHubPage.tsx | 恢复的 AI 简历服务中心聚合入口；无独立原型屏，按生产页面验收 |
+| `/jobs-service` | JobsServiceHubPage | src/pages/jobs/JobsServiceHubPage.tsx | 恢复的岗位信息服务中心聚合入口；无独立原型屏，岗位投递仍前往来源平台 |
+| `/fairs-service` | FairsServiceHubPage | src/pages/job-fairs/FairsServiceHubPage.tsx | 恢复的招聘会信息服务中心聚合入口；无独立原型屏，预约仍前往来源平台 |
+| `/interview-service` | InterviewServiceHubPage | src/pages/interview/InterviewServiceHubPage.tsx | 恢复的 AI 面试训练服务中心聚合入口；无独立原型屏 |
+| `/policy-service` | PolicyServiceHubPage | src/pages/policy/PolicyServiceHubPage.tsx | 恢复的政策服务中心聚合入口；无独立原型屏，信息来源以官方发布为准 |
+| `/contract-review` | ContractReviewHomePage | src/pages/contract-review/ContractReviewHomePage.tsx | 合同审查入口；生产路由无独立迁移矩阵屏 |
+| `/contract-review/processing` | ContractReviewProcessingPage | src/pages/contract-review/ContractReviewProcessingPage.tsx | 合同审查处理中状态；生产路由无独立迁移矩阵屏 |
+| `/contract-review/result` | ContractReviewResultPage | src/pages/contract-review/ContractReviewResultPage.tsx | 合同审查结果状态；生产路由无独立迁移矩阵屏 |
 
 > 备注:`src/pages/placeholders/` 下另有 `OfflineAgenciesPage.tsx` / `OfflineJobDetailPage.tsx` / `PrintScanConvertPage.tsx` / `PrintScanFeaturePage.tsx` / `PrintScanSignPage.tsx` 等占位文件,**未被 routes/index.tsx 引用**(实际路由指向正式实现版),属历史遗留,不参与迁移。`src/pages/jobs-fairs-prototype.tsx` 亦未被路由引用。
 

@@ -1,17 +1,13 @@
 # 下一步任务
 
-> 最后更新：2026-08-05
+> 最后更新：2026-08-06
 
-## 2026-08-05 遗留 Codex 任务
+## 当前执行：生产混合版本故障恢复
 
-- [ ] **合并 PR `claude/epic-feistel-b5f30a`**：业主在 GitHub 开 PR，CI 三项（`build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness`）全绿后 squash 合入。typecheck 须由 CI 验证（worktree 无 node_modules）。
-- [ ] **三个大文件拆分（Codex 在主仓库执行，需 `pnpm typecheck` 保障）**：
-  - `services/api/src/payment/online-payment.service.ts` 986行 → 建议按「发起/查询/回调/管理」四域拆分
-  - `services/api/src/orgs/admin-orgs.service.ts` 852行 → 按「查询/写入/成员管理」拆分
-  - `services/api/src/materials/materials.service.ts` 822行 → 按「上传/查询/审核/清理」拆分
-  - 每个新子服务须 <500行，原 service 保持薄门面，module.ts 同步注册，不改 controller 签名
-- [ ] **P1 政策缺口修复（须先更新 `docs/compliance-boundary.md §4`）**：`services/api/src/fairs/admin-fairs.service.ts:167` — 管理员直接编辑已发布 `jobFair` 无 `reviewStatus` 重置。两条修复路径：(a) 内容哈希变更时条件性重置为 `pending`；(b) 新增管理员编辑独立审批流。修复前须合规文档授权。
-- [ ] **DeepSeek API Key 轮换**（不是 Codex 任务，业主在 DeepSeek 控制台操作）：密钥曾出现在聊天，上线前必须轮换并重新注入生产 `.env`。
+- [~] **冻结统一恢复候选**：PR #504 需先通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI；候选必须包含合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由，不得从工作树或单端热补丁直接部署。
+- [ ] **停写前数据保护**：对生产 PostgreSQL 执行 custom-format `pg_dump`，记录 SHA-256，并用 `pg_restore -l` 验证目录可读；运行 DP-GATE before。禁止 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
+- [ ] **同一提交整体切换**：只执行 additive `migrate deploy`，再从同一冻结提交构建并切换 API、Admin、Partner、Kiosk；保留旧应用包回滚点，不覆盖现有 `.env`，Kiosk 生产构建不设置 `VITE_TERMINAL_ID`，合同审查入口继续关闭。
+- [ ] **部署后验收**：运行 DP-GATE after，核对 migration、health、PM2/nginx、`/partner/stats`、微信登录、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环；数据库当前 `PolicyPost=0`，只能在确定真实来源后补录并走审核发布，禁止用 seed 或演示数据填充。
 
 ## Phase 0 真值收口后续
 
@@ -595,6 +591,16 @@
 - [ ] **Wave 5 收费闭环（支付/计费/套餐/券/核销）**：独立立项。计费属性定义、Package/Plan/SKU + PricingRule、支付集成（appSecret 仅服务端、回调验签+幂等）、权益核销、Order 金额真实计算、Admin 价格/额度/退款/账单后台。Wave 1 已预留 `assertExportFormatAllowed` 计费能力位。
 - [x] **Wave 6a 格式转换：docx/txt/md 导出接真实可打印实现（代码 + 本地 verify 级）**：`exportGeneratedResume`（`ai.service.ts`）不再只对 pdf 计算 `printFileUrl`；docx/txt/md 三种格式额外用既有 `ResumePdfService` 对同一份 `GeneratedResume` 多渲染一份纯净 PDF（不套用 `templateId`，因为模板是 pdf 主格式专属概念；仍透传 `layout`），作为独立 `FileObject` 落库并签发系统 `printFileUrl`，用户请求的原格式下载文件不受影响；`assertExportFormatAllowed`（Wave 5 计费占位）未被触碰，仍恒放行。Kiosk `ResumeOptimizePage.tsx` 移除"仅 pdf 显示打印按钮"的限制，四种格式导出后均展示「下载{格式}」+「去打印优化版」两个按钮。`verify:resume-export-formats`/`verify:resume-layout-export`/`verify:resume-template-fill` 三个既有 verify 的"docx/txt/md 不返回 printFileUrl"断言已同步改为"返回指向独立 PDF 副本的 printFileUrl 且副本为合法 PDF"，`verify:resume-optimize`、Kiosk `verify:resume-diagnosis-flow-ui`、API/shared/Kiosk typecheck、API/Kiosk lint 均回归通过；mock 模式浏览器走查确认 Word/PDF 切换导出后按钮布局正确、无控制台报错（mock 不造假文件，`printFileUrl`/`signedUrl` 均为空时两个按钮如实禁用）。范围边界：不做岗位 URL 定向收窄、不做 Windows 真机出纸/扫描/U盘验收，这两项仍是 Wave 6 剩余待办；未预生产、未真机、未合入 main（改动仅在本工作分支）。
 - [ ] **Wave 6b 岗位 URL 定向 + Windows 真机验收**：岗位 URL 收窄为合作来源白名单/用户手动粘贴 JD（不做任意站抓取）；Windows 真机出纸/扫描/U盘验收 docx/txt/md 打印链路。
+
+## P1：简历智能上下文 / 用简历建议填写（Gate 0 已批准并完成接口消歧，当前不编码）
+
+> 正式契约：[resume-context-ai-assist-spec.md](../product/resume-context-ai-assist-spec.md)；双模型审查：[kiosk-resume-context-ai-assist-audit-2026-08-06.md](../reviews/kiosk-resume-context-ai-assist-audit-2026-08-06.md)。本项排在上线 P0 之后，不新增首页入口，不与当前生产、真机、密钥和部署验收并行铺开。
+
+- [x] **Gate 0 产品/技术契约**：字段事实/推断/偏好分层、页面白名单、覆盖保护、专用同意、TTL、加密、删除级联、成本治理和 Go/No-Go 已固化；二次 Claude + Codex 审查已消除“Wave 1 可恢复画像资源”与“Wave 2 React 内存试点”的歧义，未开发功能。
+- [ ] **Wave 1 共享契约与无状态建议服务**：上线 P0 完成后从干净 `main` 新建独立分支；新增受控 shared 类型、`resume_profile_extract`、严格 schema/证据校验、本人权限、限流/超时/预算、一个无状态 `POST profile-suggestions` 和专项 verify。编码前先批准每身份/匿名令牌、每终端和全局并发的具体数值；本阶段禁止 Prisma、repository、数据库/Redis/对象存储画像缓存、可恢复资源和决策历史，只允许不含建议正文与字段值的既有限流短 TTL 计数器。
+- [ ] **Wave 2 两页会话试点**：只接 `/resume/generate` 与 `/interview/setup`；首次选择简历后取得一次性建议响应，仅存 React Context，默认只填空字段，逐项确认并可撤销；刷新不可恢复，不新增路由、入口、依赖或持久模型。
+- [ ] **Wave 3 逐域扩展**：一次只开放一个 surface，顺序为诊断方向 → 岗位真实筛选 → 招聘会准备单 → 政策条件核对；打印只做确定性文件提示，百宝箱默认不传画像，智慧校园不接画像。
+- [ ] **Wave 4 会员长期复用**：只有专用同意、可轮换加密、从本人确认时起最长 90 天且不晚于来源简历、访问不滑动续期、撤回/删除级联和公共终端清场全部通过后才可新增 `ResumeProfileSnapshot`、`profile-snapshots` CRUD、决策版本和 SQLite/PostgreSQL 双 migration；不得提供无限期画像保存。
 
 ## P1：工程质量门禁
 

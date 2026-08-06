@@ -191,17 +191,18 @@ export function ContractReviewProcessingPage() {
   if (error) {
     return (
       <KioskFullscreenShell>
-        <KioskPageFrame
-          className="fusion-w3 fusion-w3--resume"
-          header={
-            <KioskPageHeader
-              title="AI 合同审查"
-              description="分析中"
-              onBack={() => navigate('/contract-review', { replace: true })}
-              backLabel="返回"
-            />
-          }
-        >
+        <main className="flex min-h-0 flex-1 flex-col">
+          <KioskPageFrame
+            className="fusion-w3 fusion-w3--resume"
+            header={
+              <KioskPageHeader
+                title="AI 合同审查"
+                description="分析中"
+                onBack={() => navigate('/contract-review', { replace: true })}
+                backLabel="返回"
+              />
+            }
+          >
           <div className="cr-done-screen">
             <div className="cr-done-screen__icon" style={{ background: 'var(--error-soft)', color: 'var(--error)' }}>
               <XCircleIcon size={52} />
@@ -212,23 +213,25 @@ export function ContractReviewProcessingPage() {
               重新上传
             </Button>
           </div>
-        </KioskPageFrame>
+          </KioskPageFrame>
+        </main>
       </KioskFullscreenShell>
     )
   }
 
   return (
     <KioskFullscreenShell>
-      <KioskPageFrame
-        className="fusion-w3 fusion-w3--resume"
-        header={
-          <KioskPageHeader
-            title="AI 合同审查"
-            description="正在分析，请稍候…"
-            onBack={undefined}
-          />
-        }
-      >
+      <main className="flex min-h-0 flex-1 flex-col">
+        <KioskPageFrame
+          className="fusion-w3 fusion-w3--resume"
+          header={
+            <KioskPageHeader
+              title="AI 合同审查"
+              description="正在分析，请稍候…"
+              onBack={undefined}
+            />
+          }
+        >
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
@@ -322,7 +325,8 @@ export function ContractReviewProcessingPage() {
             取消审查
           </Button>
         </div>
-      </KioskPageFrame>
+        </KioskPageFrame>
+      </main>
 
       {/* awaiting_confirmation 确认弹窗 */}
       {showConfirmModal && task && (

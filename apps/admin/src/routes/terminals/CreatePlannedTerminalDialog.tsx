@@ -18,9 +18,11 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
   const [locationLabel, setLocationLabel] = useState('')
   const [orgId, setOrgId] = useState('')
   const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   async function submit() {
     if (!terminalCode.trim()) return
+    setErrorMessage(null)
     setSaving(true)
     try {
       const created = await createPlannedTerminal({
@@ -31,7 +33,9 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
       })
       onCreated(created.terminalCode)
     } catch (error) {
-      onError(error instanceof Error ? error.message : '预创建设备失败，请稍后重试')
+      const message = error instanceof Error ? error.message : '预创建设备失败，请稍后重试'
+      setErrorMessage(message)
+      onError(message)
     } finally {
       setSaving(false)
     }
@@ -71,6 +75,12 @@ export function CreatePlannedTerminalDialog({ organizations, onClose, onCreated,
             </select>
           </label>
         </div>
+
+        {errorMessage ? (
+          <p role="alert" className="mt-4 rounded-lg border border-error/20 bg-error-bg px-3 py-2 text-sm text-error-fg">
+            {errorMessage}
+          </p>
+        ) : null}
 
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={saving} className="h-9 rounded-lg border border-neutral-200 px-4 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50">取消</button>

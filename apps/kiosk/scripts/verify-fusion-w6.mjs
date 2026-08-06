@@ -200,16 +200,16 @@ const WAVE_ROUTES = new Map([
     '/resume/export', '/resume/templates', '/resume/materials', '/resume/job-fit',
     '/resume/career-plan', '/assistant', '/interview/setup', '/interview/session',
     '/interview/report', '/interview/tips', '/interview/reports',
-    '/ai/plan', '/session-resume',
+    '/ai/plan', '/session-resume', '/resume-service', '/interview-service',
   ]],
   ['W4', [
     '/jobs', '/jobs/:id', '/jobs/:id/offline', '/offline-agencies', '/offline-agencies/:id', '/companies',
     '/companies/:id', '/job-fairs', '/job-fairs/checkin', '/job-fairs/:id',
     '/job-fairs/:id/companies', '/job-fairs/:id/companies/:companyId',
     '/job-fairs/:id/map', '/job-fairs/:id/materials', '/job-fairs/:id/visit-plan',
-    '/job-fairs/:id/stats', '/campus', '/campus/welcome', '/campus/freshman-insights',
+    '/job-fairs/:id/stats', '/fairs-service', '/campus', '/campus/welcome', '/campus/freshman-insights',
     '/smart-campus', '/smart-campus/welcome', '/smart-campus/freshman-insights',
-    '/smart-campus/service/:key', '/renshi', '/jobs/online-platforms',
+    '/smart-campus/service/:key', '/renshi', '/jobs/online-platforms', '/jobs-service',
   ]],
   ['W5', [
     '/login', '/member/qr-login', '/upload/phone', '/legal/:doc', '/screensaver',
@@ -226,19 +226,19 @@ const WAVE_ROUTES = new Map([
     // PR #499 合同审查
     '/contract-review',
     '/contract-review/processing',
-    '/contract-review/result',
+    '/contract-review/result', '/policy-service',
   ]],
 ])
 
 const routeInventory = routerInventory()
 const manifest = manifestInventory()
 
-check('99/99 routes', () => {
+check('104/104 routes', () => {
   const actual = routeInventory.map((route) => route.path)
-  assert.equal(actual.length, 99, `router exposes ${actual.length} normalized route patterns`)
-  assert.equal(new Set(actual).size, 99, 'router route patterns must be unique')
-  assert.equal(manifest.paths.length, 99, `manifest exposes ${manifest.paths.length} route patterns`)
-  assert.equal(new Set(manifest.paths).size, 99, 'manifest route patterns must be unique')
+  assert.equal(actual.length, 104, `router exposes ${actual.length} normalized route patterns`)
+  assert.equal(new Set(actual).size, 104, 'router route patterns must be unique')
+  assert.equal(manifest.paths.length, 104, `manifest exposes ${manifest.paths.length} route patterns`)
+  assert.equal(new Set(manifest.paths).size, 104, 'manifest route patterns must be unique')
   assert.deepEqual([...actual].sort(), [...manifest.paths].sort(), 'router and frozen manifest differ')
   assert.equal(manifest.redirects.size, 5, 'manifest must contain five compatibility redirects')
   for (const [path, target] of manifest.redirects) {
@@ -260,7 +260,7 @@ check('wave ownership', () => {
   }
   const invalid = [...owners].filter(([, waves]) => waves.length !== 1)
   assert.deepEqual(invalid, [], `missing/duplicate ownership: ${JSON.stringify(invalid)}`)
-  assert.equal([...WAVE_ROUTES.values()].flat().length, 99, 'wave inventories must total 99')
+  assert.equal([...WAVE_ROUTES.values()].flat().length, 104, 'wave inventories must total 104')
 })
 
 function jsxDescendant(source, rootName, descendantName) {
@@ -498,10 +498,10 @@ check('W6 route acceptance contract', () => {
     assert.notEqual(marker, 'main', `${pattern} must use a page-level marker rather than generic main`)
     return { pattern, viewport }
   })
-  assert.equal(routes.length, 99, 'W6 route cases must total 99')
-  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 99, 'W6 route cases must be unique')
+  assert.equal(routes.length, 104, 'W6 route cases must total 104')
+  assert.equal(new Set(routes.map(({ pattern }) => pattern)).size, 104, 'W6 route cases must be unique')
   assert.deepEqual(routes.map(({ pattern }) => pattern).sort(), [...manifest.paths].sort(), 'W6 cases and manifest differ')
-  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 97, 'W6 kiosk allocation')
+  assert.equal(routes.filter(({ viewport }) => viewport === 'kiosk').length, 102, 'W6 kiosk allocation')
   assert.equal(routes.filter(({ viewport }) => viewport === 'mobile').length, 2, 'W6 mobile allocation')
 })
 
