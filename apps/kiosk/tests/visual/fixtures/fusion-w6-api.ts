@@ -63,7 +63,8 @@ export function registerW6Api(api: ApiRouter): void {
   get('/api/v1/me/pending-tasks', success({ hasPendingPrint: false, hasPendingResume: false }))
 
   // contract-review 路由（PR #501 新增，W6 路由清单已更新至 99 条）
-  get('/api/v1/contract-reviews/consent-scope', success({ consentRequired: true, documentPurposes: ['contract_upload'], retentionTtlMs: 7200000 }))
+  // consentRequired: false → .cr-steps 直接渲染（route surface 只验结构，不走同意流程）
+  get('/api/v1/contract-reviews/consent-scope', success({ consentRequired: false, documentPurposes: ['contract_upload'], retentionTtlMs: 7200000 }))
 
   post('/api/v1/scan/sessions', success({
     scanTaskId: 'w6-scan-001', controlToken: 'w6-control', status: 'waiting', scanType: 'document',
