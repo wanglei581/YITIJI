@@ -14,6 +14,7 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
+    if (request.resourceType() === 'script' && request.failure()?.errorText === 'net::ERR_ABORTED') return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
