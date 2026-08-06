@@ -58,6 +58,7 @@ export interface LocalUsbListResponse extends LocalUsbStatusResponse {
 
 export interface LocalUsbUploadRequest {
   safeId?: string
+  purpose?: 'print_doc' | 'resume_upload'
 }
 
 export interface LocalUsbUploadResponse {
