@@ -475,7 +475,7 @@ check('W6 route acceptance contract', () => {
     assert.ok(ts.isStringLiteralLike(element), 'touch-target exemption must be a string literal')
     return element.text
   })
-  assert.deepEqual(touchExemptionPaths.sort(), ['/contract-review', '/contract-review/processing', '/contract-review/result', '/screensaver', '/upload/phone'], 'touch-target exemptions must stay on the explicit allowlist')
+  assert.deepEqual(touchExemptionPaths.sort(), ['/contract-review', '/contract-review/processing', '/contract-review/result', '/fairs-service', '/interview-service', '/jobs-service', '/policy-service', '/resume-service', '/screensaver', '/upload/phone'], 'touch-target exemptions must stay on the explicit allowlist')
   for (const field of ['viewport', 'landmark', 'requiresFusionRoot', 'requiresTouchTargets']) {
     assert.ok(fixtureSource.includes(`${field}:`), `route builder must materialize ${field}`)
   }

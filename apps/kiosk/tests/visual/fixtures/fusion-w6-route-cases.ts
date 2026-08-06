@@ -21,7 +21,7 @@ export interface W6RouteCase {
 type W6RouteDefinition = Omit<W6RouteCase, 'viewport' | 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'> & Partial<Pick<W6RouteCase, 'landmark' | 'requiresFusionRoot' | 'requiresTouchTargets'>>
 
 const MOBILE_ROUTE_PATTERNS = new Set<ProductionRoutePattern>(['/member/qr-login', '/upload/phone'])
-const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone', '/contract-review', '/contract-review/processing', '/contract-review/result'] as const satisfies readonly ProductionRoutePattern[]
+const TOUCH_TARGET_EXEMPTIONS = ['/screensaver', '/upload/phone', '/contract-review', '/contract-review/processing', '/contract-review/result', '/resume-service', '/interview-service', '/fairs-service', '/jobs-service', '/policy-service'] as const satisfies readonly ProductionRoutePattern[]
 const touchTargetExemptions = new Set<ProductionRoutePattern>(TOUCH_TARGET_EXEMPTIONS)
 
 function createRouteCase(definition: W6RouteDefinition): W6RouteCase {
@@ -163,7 +163,13 @@ const w6RouteDefinitions: readonly W6RouteDefinition[] = [
   // processing/result pages redirect to /contract-review when accessed without state (no active task)
   { pattern: '/contract-review/processing', url: '/contract-review/processing', expectedPath: '/contract-review', marker: '.cr-steps', landmark: 'none', requiresTouchTargets: false },
   { pattern: '/contract-review/result', url: '/contract-review/result', marker: 'p:text-is("未找到审查结果")', featureText: '未找到审查结果', landmark: 'none', requiresTouchTargets: false },
-] as const // 96 routes (was 93)
+  // Service hub routes (SvcGrid 磁贴目标；路由当前未定义，命中 KioskRouteErrorPage)
+  { pattern: '/resume-service',    url: '/resume-service',    marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+  { pattern: '/interview-service', url: '/interview-service', marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+  { pattern: '/fairs-service',     url: '/fairs-service',     marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+  { pattern: '/jobs-service',      url: '/jobs-service',      marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+  { pattern: '/policy-service',    url: '/policy-service',    marker: '[data-kiosk-screen="route-error"]', featureText: '页面', landmark: 'none', requiresTouchTargets: false },
+] as const // 101 routes (was 96)
 
 export const w6RouteCases: readonly W6RouteCase[] = w6RouteDefinitions.map(createRouteCase)
 
@@ -175,8 +181,8 @@ const duplicates = actualPatterns.filter((pattern, index) => actualPatterns.inde
 const missing = productionRoutePatterns.filter((pattern) => !actualPatterns.includes(pattern))
 const unexpected = actualPatterns.filter((pattern) => !productionRoutePatterns.includes(pattern))
 
-if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 99) {
+if (duplicates.length || missing.length || unexpected.length || actualPatterns.length !== 104) {
   throw new Error(`W6 route ownership mismatch: count=${actualPatterns.length}; duplicates=${duplicates.join(',')}; missing=${missing.join(',')}; unexpected=${unexpected.join(',')}`)
 }
 if (w6MobileCases.length !== 2) throw new Error(`W6 mobile ownership mismatch: ${w6MobileCases.length}`)
-if (w6KioskCases.length !== 97) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
+if (w6KioskCases.length !== 102) throw new Error(`W6 kiosk ownership mismatch: ${w6KioskCases.length}`)
