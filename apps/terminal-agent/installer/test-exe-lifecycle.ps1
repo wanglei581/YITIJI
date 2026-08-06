@@ -50,8 +50,9 @@ function Assert-ProvisionerInstalled {
   $shell = New-Object -ComObject WScript.Shell
   try {
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    if ([System.IO.Path]::GetFullPath($shortcut.TargetPath) -ine [System.IO.Path]::GetFullPath($powerShellPath)) {
-      throw "Provisioner shortcut target is unexpected: $($shortcut.TargetPath)"
+    $shortcutTarget = ([string]$shortcut.TargetPath).Trim()
+    if ([string]::IsNullOrWhiteSpace($shortcutTarget) -or $shortcutTarget -ine $powerShellPath) {
+      throw "Provisioner shortcut target is unexpected: '$shortcutTarget'"
     }
     if ($shortcut.Arguments -notlike "*-NoProfile*" -or
         $shortcut.Arguments -notlike "*-ExecutionPolicy Bypass*" -or
@@ -63,8 +64,9 @@ function Assert-ProvisionerInstalled {
     if ($shortcut.Arguments -match "(?i)(BindCode|AgentToken|BridgeToken|adminSecret)") {
       throw "Provisioner shortcut must not contain credential-bearing arguments"
     }
-    if ([System.IO.Path]::GetFullPath($shortcut.WorkingDirectory) -ine [System.IO.Path]::GetFullPath($installRoot)) {
-      throw "Provisioner shortcut working directory is unexpected: $($shortcut.WorkingDirectory)"
+    $shortcutWorkingDirectory = ([string]$shortcut.WorkingDirectory).Trim().TrimEnd("\")
+    if (-not [string]::IsNullOrWhiteSpace($shortcutWorkingDirectory) -and $shortcutWorkingDirectory -ine $installRoot.TrimEnd("\")) {
+      throw "Provisioner shortcut working directory is unexpected: '$shortcutWorkingDirectory'"
     }
   } finally {
     if ($null -ne $shortcut) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) }
