@@ -8,7 +8,7 @@
 - [ ] **Windows U 盘真机验收**：在目标 Windows Kiosk + Terminal Agent 上覆盖插拔、空盘、隐藏文件、PDF / JPG / PNG、10MB 边界、会员 / 匿名身份和真实 AI 解析；确认 `resume_upload` 归属、错误恢复、重复点击锁与退出清场。自动化 Agent / Kiosk 夹具不能替代本项。
 - [ ] **Windows 文件显示与硬件验收**：用实际 Edge / Chrome Kiosk 模式肉眼或截图确认 PDF 插件显示真实内容，再覆盖真实扫描仪结果文件、图片缩略图、打印确认与实际出纸；不得只凭 iframe HTTP 200 宣称 PDF 已显示。
 - [ ] **Partner Excel 运行时验收**：在真实浏览器以 `DataTransfer` 拖放 `.xlsx` / `.csv`，覆盖错误扩展名、空表、列映射、有效 / 无效行预览和确认导入；确认导入数据默认待审核，不形成企业自主发岗收简历闭环。
-- [~] **候选集成与部署决策**：文件流修复已形成 Draft PR [#509](https://github.com/wanglei581/YITIJI/pull/509)；本地 Node 22 typecheck、lint、生产 build、文件流专项 verifier、W3 `11/11` 和 Claude Code `APPROVE` 均已完成。首轮 CI 的 `postgres-readiness` 通过，W5 哈希、K2b busy-lock 与安装器安全覆盖断言三条存量契约漂移已按真实实现修复并本地通过，下一步推送后等待第二轮 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 及 `unsigned-msi-candidate` 全绿，之后才能评估合并。生产仍按下方统一恢复候选、数据库备份、同提交整体切换和部署后验收执行；本文件流候选本身不授权部署。
+- [~] **候选集成与部署决策**：文件流修复已形成 Draft PR [#509](https://github.com/wanglei581/YITIJI/pull/509)；本地 Node 22 全套门禁、W3 `11/11` 和 Claude Code `APPROVE` 已完成。第二轮 `kiosk-browser-smoke`、`postgres-readiness`、`unsigned-msi-candidate` 全绿，`build-and-verify` 仅剩文件流 verifier 未登记进既有范围集合；精确 allowlist 已修复并本地通过。下一步等待第三轮四项 CI 全绿，之后才能评估合并。生产仍按下方统一恢复候选、数据库备份、同提交整体切换和部署后验收执行；本文件流候选本身不授权部署。
 - [ ] **超过 500 行页面拆分评估**：`ResumeSourcePage.tsx` 已抽出 U 盘面板但仍为 524 行，`ExcelImportModal.tsx` 为 503 行；本候选不做无关重构。两文件下一次新增功能前必须先按编排 / 数据加载 / 解析映射 / 预览职责评估拆分，期间禁止继续扩张。
 
 ## 当前执行：生产混合版本故障恢复
