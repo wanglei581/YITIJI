@@ -7,9 +7,9 @@
 - [x] **代码与浏览器候选收口**：本机 / 手机 / U 盘简历上传后页内预览，`我的文档`、优化简历、自评 PDF 敏感文件不再打开 Kiosk 外部标签页；扫描结果、图片转 PDF、Admin 文件查看、Partner Excel 预览与合同报告打印真值已补齐。最终 W3 `11/11` 覆盖 U 盘 10MB / MIME、PDF 页内弹层、二维码、关闭清理与无新 Page；其余文件候选浏览器套件此前全绿。未部署。
 - [ ] **Windows U 盘真机验收**：在目标 Windows Kiosk + Terminal Agent 上覆盖插拔、空盘、隐藏文件、PDF / JPG / PNG、10MB 边界、会员 / 匿名身份和真实 AI 解析；确认 `resume_upload` 归属、错误恢复、重复点击锁与退出清场。自动化 Agent / Kiosk 夹具不能替代本项。
 - [ ] **Windows 文件显示与硬件验收**：用实际 Edge / Chrome Kiosk 模式肉眼或截图确认 PDF 插件显示真实内容，再覆盖真实扫描仪结果文件、图片缩略图、打印确认与实际出纸；不得只凭 iframe HTTP 200 宣称 PDF 已显示。
-- [ ] **Partner Excel 运行时验收**：在真实浏览器以 `DataTransfer` 拖放 `.xlsx` / `.csv`，覆盖错误扩展名、空表、列映射、有效 / 无效行预览和确认导入；确认导入数据默认待审核，不形成企业自主发岗收简历闭环。
-- [~] **候选集成与部署决策**：文件流修复已形成 Draft PR [#509](https://github.com/wanglei581/YITIJI/pull/509)；精确提交 `84cc17e3` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness`、`unsigned-msi-candidate` 四项 CI 全绿，本地 Node 22 全套门禁、W3 `11/11` 和 Claude Code `APPROVE` 也已完成。自动化候选门禁已关闭，PR 继续保持 Draft；下一步必须以同一最终提交完成上方 Windows U 盘、文件真实显示 / 扫描 / 出纸和 Partner Excel 运行时外部门禁，全部通过后才能评估转 Ready / 合并。生产仍按下方统一恢复候选、数据库备份、同提交整体切换和部署后验收执行；本文件流候选本身不授权部署。
-- [ ] **超过 500 行页面拆分评估**：`ResumeSourcePage.tsx` 已抽出 U 盘面板但仍为 524 行，`ExcelImportModal.tsx` 为 503 行；本候选不做无关重构。两文件下一次新增功能前必须先按编排 / 数据加载 / 解析映射 / 预览职责评估拆分，期间禁止继续扩张。
+- [~] **Partner Excel 运行时验收**：真实浏览器文件选择器已覆盖错误扩展名、空表、5 个必填字段自动映射、`2 有效 / 1 无效` XLSX 预览确认、三份 CSV 导入、岗位列表、同步日志、数据源 `5/1` 真实计数与 SQLite `pending+draft` 落库；最终代码另以独立 API `3023` + Partner `5176` + SQLite 一致性备份复跑。CSV 假支持、空表误拒绝、`.xls` 误宣称、错误吞掉、`0/0` 假计数、XLSX 压缩放大、零行 API 绕过和并发重复确认均已修复并进入专项门禁。受控浏览器无法构造操作系统原生 Finder → 浏览器拖放，`DataTransfer` 门禁仍待 Chrome 扩展或现场浏览器补验；本项因此保持进行中，不记全通过。
+- [~] **候选集成与部署决策**：文件流修复已形成 Draft PR [#509](https://github.com/wanglei581/YITIJI/pull/509)；本地 Node 22 下增量 Claude 风险复核、API/Partner typecheck、lint、production build、HTTP 413 与 Partner Excel/CSV 专项 verifier、真实浏览器和 SQLite 证据均完成。远端 `ea769d7e` 之前的四项 CI 全绿不能替代本次最终候选；仍须提交推送并等待新 HEAD 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness`、`unsigned-msi-candidate` 四项 CI。PR 继续保持 Draft；Windows U 盘、文件真实显示 / 扫描 / 出纸和 Partner 原生 `DataTransfer` 全部通过后才能评估转 Ready / 合并。生产仍按下方统一恢复候选、数据库备份、同提交整体切换和部署后验收执行；本文件流候选本身不授权部署。
+- [ ] **超过 500 行页面拆分评估**：`ResumeSourcePage.tsx` 已抽出 U 盘面板但仍为 524 行，`ExcelImportModal.tsx` 为 504 行；本候选不做无关重构。两文件下一次新增功能前必须先按编排 / 数据加载 / 解析映射 / 预览职责评估拆分，期间禁止继续扩张。
 
 ## 当前执行：生产混合版本故障恢复
 

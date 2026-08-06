@@ -53,6 +53,24 @@ export class JobsPartnerService {
     }
   }
 
+  private async getDataSourceSyncSummaries(orgId: string, sourceIds: string[]) {
+    if (sourceIds.length === 0) return new Map<string, {
+      successCount: number
+      failCount: number
+    }>()
+    const totals = await this.prisma.syncLog.groupBy({
+      by: ['sourceId'],
+      where: { orgId, sourceId: { in: sourceIds } },
+      _sum: { addedCount: true, updatedCount: true, errorCount: true },
+    })
+    return new Map(totals.map((row) => {
+      return [row.sourceId, {
+        successCount: (row._sum.addedCount ?? 0) + (row._sum.updatedCount ?? 0),
+        failCount: row._sum.errorCount ?? 0,
+      }]
+    }))
+  }
+
   async getPartnerDataSources(user: AuthedUser): Promise<PartnerDataSourceDto[]> {
     if (!user.orgId) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_REQUIRED', message: 'partner 账号必须挂在机构下' } })
@@ -61,7 +79,8 @@ export class JobsPartnerService {
       where: { orgId: user.orgId },
       orderBy: { updatedAt: 'desc' },
     })
-    return sources.map(prismaJobSourceToPartnerDto)
+    const summaries = await this.getDataSourceSyncSummaries(user.orgId, sources.map((source) => source.id))
+    return sources.map((source) => prismaJobSourceToPartnerDto(source, summaries.get(source.id)))
   }
 
   async createPartnerDataSource(dto: CreateDataSourceDto, user: AuthedUser): Promise<PartnerDataSourceDto> {
@@ -119,6 +138,7 @@ export class JobsPartnerService {
       where: { id },
       data: { enabled: !source.enabled },
     })
+    const summaries = await this.getDataSourceSyncSummaries(user.orgId, [id])
     await this.audit.write({
       actorId: user.userId,
       actorRole: user.role,
@@ -127,7 +147,7 @@ export class JobsPartnerService {
       targetId: id,
       payload: { enabled: updated.enabled },
     })
-    return prismaJobSourceToPartnerDto(updated)
+    return prismaJobSourceToPartnerDto(updated, summaries.get(id))
   }
 
   async getPartnerJobs(user: AuthedUser): Promise<PartnerJobDto[]> {

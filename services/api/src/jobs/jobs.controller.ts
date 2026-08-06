@@ -62,6 +62,7 @@ import { CreateDataSourceDto } from './dto/data-source.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
 import { mapJobWorkTypeToCategory } from './work-type'
+import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
 // ExcelPreviewDto not needed at controller level — fields extracted from multipart body
 
 /** Number() 对非数字字符串返回 NaN，直接传 Prisma 会导致全量返回。安全解析并夹紧范围。 */
@@ -487,18 +488,22 @@ export class JobsController {
   @Post('partner/excel/parse')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fieldNestingDepth: 0, fileSize: PARTNER_IMPORT_MAX_FILE_BYTES } as { fieldNestingDepth: number; fileSize: number },
+  }))
   parseExcel(@UploadedFile() file: Express.Multer.File | undefined) {
     if (!file) {
-      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel 文件' } })
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel/CSV 文件' } })
     }
-    return this.jobsService.parseExcelColumns(file.buffer)
+    return this.jobsService.parseExcelColumns(file.buffer, file.originalname)
   }
 
   @Post('partner/excel/preview')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')
-  @UseInterceptors(FileInterceptor('file', { limits: { fieldNestingDepth: 0 } as { fieldNestingDepth: number; fileSize?: number } }))
+  @UseInterceptors(FileInterceptor('file', {
+    limits: { fieldNestingDepth: 0, fileSize: PARTNER_IMPORT_MAX_FILE_BYTES } as { fieldNestingDepth: number; fileSize: number },
+  }))
   previewExcel(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body('sourceId') sourceId: string,
@@ -507,7 +512,7 @@ export class JobsController {
     @CurrentUser() user: AuthedUser,
   ) {
     if (!file) {
-      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel 文件' } })
+      throw new BadRequestException({ error: { code: 'FILE_MISSING', message: '缺少 Excel/CSV 文件' } })
     }
     if (!sourceId?.trim()) {
       throw new BadRequestException({ error: { code: 'SOURCE_ID_REQUIRED', message: '缺少 sourceId' } })

@@ -124,9 +124,9 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
 
   const selectFile = (nextFile: File | undefined) => {
     if (!nextFile) return
-    if (!/\.(xlsx|xls|csv)$/i.test(nextFile.name)) {
+    if (!/\.(xlsx|csv)$/i.test(nextFile.name)) {
       setFile(null)
-      setError('仅支持 .xlsx、.xls 或 .csv 文件')
+      setError('仅支持 .xlsx 或 .csv 文件')
       return
     }
     setFile(nextFile)
@@ -146,7 +146,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
 
   // Step 1 → 2: upload and parse columns
   const handleUpload = async () => {
-    if (!file) { setError('请选择 Excel 文件'); return }
+    if (!file) { setError('请选择 Excel / CSV 文件'); return }
     setLoading(true); setError('')
     try {
       // T1: 并行解析文件 + 拉取上次保存的字段映射规则（规则获取失败不阻断导入）
@@ -177,8 +177,8 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
       setSavedRuleApplied(applied)
       setMapping(auto)
       setStep('mapping')
-    } catch {
-      setError('文件解析失败，请确认是有效的 Excel (.xlsx) 文件')
+    } catch (e) {
+      setError((e as Error).message || '文件解析失败，请确认是有效的 Excel (.xlsx) 或 CSV (.csv) 文件')
     } finally {
       setLoading(false)
     }
@@ -232,7 +232,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
         {/* Header */}
         <div className="flex items-start justify-between border-b border-neutral-100 px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-neutral-900">Excel 导入</h2>
+            <h2 className="text-base font-semibold text-neutral-900">Excel / CSV 导入</h2>
             <p className="mt-0.5 text-xs text-neutral-500">数据源：{sourceName}</p>
           </div>
           <button onClick={handleCancel} className="text-neutral-400 hover:text-neutral-600">
@@ -283,11 +283,11 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-neutral-700">选择 Excel 文件</label>
+                <label className="mb-1 block text-sm font-medium text-neutral-700">选择 Excel / CSV 文件</label>
                 <input
                   ref={fileRef}
                   type="file"
-                  accept=".xlsx,.xls,.csv"
+                  accept=".xlsx,.csv"
                   className="hidden"
                   onChange={(e) => {
                     selectFile(e.target.files?.[0])
@@ -316,7 +316,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   ) : (
                     <>
                       <UploadIcon className="h-10 w-10 text-neutral-300" />
-                      <p className="mt-2 text-sm text-neutral-500">点击选择或拖入 Excel 文件（.xlsx / .xls / .csv）</p>
+                      <p className="mt-2 text-sm text-neutral-500">点击选择或拖入 Excel / CSV 文件（.xlsx / .csv）</p>
                       <p className="mt-1 text-xs text-neutral-400">第一行为表头，数据从第二行开始</p>
                     </>
                   )}
@@ -326,6 +326,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
               <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-xs text-warning-fg">
                 只接受岗位/招聘会展示字段，导入后默认"待审核 + 草稿"，由管理员审核发布后才展示。
               </div>
+              <p className="text-xs text-neutral-400">单个文件不超过 10MB，最多 10000 行数据；CSV 请使用 UTF-8 编码。</p>
             </div>
           )}
 
@@ -333,7 +334,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
           {step === 'mapping' && (
             <div className="space-y-4">
               <p className="text-sm text-neutral-600">
-                检测到 {columns.length} 列。请将 Excel 列名映射到标准字段。
+                检测到 {columns.length} 列。请将文件列名映射到标准字段。
               </p>
               {savedRuleApplied && (
                 <div className="rounded-lg border border-primary-100 bg-primary-50 px-4 py-2 text-xs text-primary-700">
@@ -345,7 +346,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   <thead>
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">标准字段</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">对应 Excel 列</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-neutral-500">对应文件列</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-50">

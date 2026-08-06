@@ -3,7 +3,14 @@
  *
  * Run: pnpm --filter @ai-job-print/api verify:http-exception-filter
  */
-import { ArgumentsHost, BadRequestException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common'
+import {
+  ArgumentsHost,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
 import { HttpExceptionFilter } from '../src/common/filters/http-exception.filter'
 
@@ -98,6 +105,11 @@ function main(): void {
   assert(throttled.statusCode === 429, 'ThrottlerException keeps HTTP 429')
   assert(throttled.body.error.code === 'RATE_LIMITED', 'ThrottlerException maps to RATE_LIMITED (not INTERNAL_SERVER_ERROR)')
   assert(throttled.body.error.message === '尝试过于频繁，请稍后再试', 'ThrottlerException shows friendly rate-limit message')
+
+  const oversized = capture(new PayloadTooLargeException('File too large'))
+  assert(oversized.statusCode === 413, 'oversized upload keeps HTTP 413')
+  assert(oversized.body.error.code === 'FILE_TOO_LARGE', 'oversized upload maps to stable FILE_TOO_LARGE code')
+  assert(oversized.body.error.message === '上传文件过大，请缩小后重试', 'oversized upload shows a useful message')
 
   console.log('\nALL PASS')
 }
