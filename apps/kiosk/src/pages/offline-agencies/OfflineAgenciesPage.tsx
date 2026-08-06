@@ -39,9 +39,15 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
   const isOpen = agency.status === 'open'
   const services = Array.isArray(agency.services) ? agency.services : []
   return (
-    <article className="jf-row oa-agency-row" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
-      {/* href 锚点：供 Playwright W4 locator 和键盘辅助技术使用；onClick 阻止默认跳转改用 router */}
-      <a href={`/offline-agencies/${agency.id}`} className="oa-detail-cover" aria-label={`查看${agency.name}`} onClick={(e) => { e.preventDefault(); onClick() }} />
+    <article className="jf-row oa-agency-row" style={{ position: 'relative' }} tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+      {/* 覆盖链接：供 Playwright W4 locator 和键盘辅助技术使用；position:absolute 保证触控目标等于 article 高度 */}
+      <a
+        href={`/offline-agencies/${agency.id}`}
+        style={{ position: 'absolute', inset: 0, zIndex: 1 }}
+        aria-label={`查看${agency.name}`}
+        onClick={(e) => { e.preventDefault(); onClick() }}
+        tabIndex={-1}
+      />
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
