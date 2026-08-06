@@ -247,11 +247,11 @@ expect(
 expect(!/<main\b/.test(page), 'HomePage 不在 KioskLayout 主地标内嵌套 main')
 const bodyIndexes = [
   page.indexOf(frameTag),
-  page.search(/<HomeWelcome\b/),
+  page.search(/<HomeWelcome\b[^>]*\/>/),
   page.search(/<ContinuePanel\s*\/>/),
   page.search(/<HomeReception\s*\/>/),
   page.search(/<HomeDispatch\s*\/>/),
-  page.search(/<HomeContinueBar\b/),
+  page.search(/<HomeContinueBar\b[^>]*\/>/),
   page.search(/<div\s+[^>]*className\s*=\s*['"]svc-header['"][^>]*>/),
   page.search(/<SvcGrid\s*\/>/),
   page.search(/<div\s+[^>]*className\s*=\s*['"]notice['"][^>]*>/),
@@ -324,7 +324,12 @@ expect(/const\s*\{[^}]*\bisLoggedIn\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome), 
 expect(/const\s*\{[^}]*\bdisplayName\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome) && welcome.includes('{displayName}'), '登录态展示真实 displayName')
 expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile['"]\s*\)\}[^>]*>[\s\S]*?进入我的/.test(welcome), '登录态「进入我的」导航到 /profile')
 expect(page.includes('<MemberLoginDialog'), '保留 MemberLoginDialog')
-expect(/const\s+openLogin\s*=\s*\(\)\s*=>\s*setLoginOpen\(true\)/.test(page) && /<HomeWelcome\s+onOpenLogin=\{openLogin\}/.test(page), '游客保留打开登录弹窗回调')
+expect(
+  /const\s+openLogin\s*=\s*\(\)\s*=>\s*setLoginOpen\(true\)/.test(page) &&
+    /<HomeWelcome\s+onOpenLogin=\{openLogin\}\s*\/>/.test(page) &&
+    /<HomeContinueBar\s+onLogin=\{openLogin\}\s*\/>/.test(page),
+  '游客入口复用真实打开登录弹窗回调',
+)
 expect(/onContinueAsGuest=\{\(\)\s*=>\s*\{\s*continueAsGuest\(\);\s*setLoginOpen\(false\)/.test(page), '保留真实继续游客回调')
 expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
 expect(read('src/layouts/KioskRoot.tsx').includes('<KioskTopbarStatus'), '共享顶栏注入设备状态')

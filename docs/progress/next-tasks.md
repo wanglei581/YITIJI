@@ -4,7 +4,8 @@
 
 ## 当前执行：生产混合版本故障恢复
 
-- [~] **等待 PR #511 明确合并授权，再恢复首管理员 PR #510**：`codex/fix-main-ci-regressions` 已修复 11 项 AI skill 的 DTO/LLM/mock/合规合同、重复暖色 CSS、Home/W1-W6 旧断言、W2 导航误报、打印扫描文档过度宣称和 privacy 健康探测 fixture。run `31105830591` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿，PR merge state 为 clean。下一步仅在用户明确授权后合入 #511；随后 #510 同步最新 `main` 并重跑首管理员真并发 PG CI，#510 的合并仍需另行明确授权。两项均未部署，也不授权自动执行 bootstrap 或生产发布。
+- [~] **推送并冻结 PR #511 精确性加固，再恢复首管理员 PR #510**：`a1504ad0` 的 run `31105830591` 已三项全绿；其上的本地加固补齐 11 项 AI skill 运行时/合规门禁，并用真实 PDF fixture 与有效 loopback 代理目标替代 W2 全局 script `ERR_ABORTED` 忽略。本地 AI 两套门禁、打印扫描诚实性、W4 冻结范围、W2 29/29、privacy 18/18、全仓 typecheck 与 CI 等价 build 已通过。下一步推送现有 PR #511 并等待新的 `build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness` 三项全绿；不得沿用上一提交绿灯。获得用户明确授权合入 `main` 后，#510 才同步主干并重跑首管理员真并发 PG CI；合并不授权 bootstrap、部署或生产发布。
+- [ ] **确认真实 API 发布入口与环境隔离**：现有 `.github/workflows/deploy.yml` 只构建/复制 Kiosk 静态文件，不会构建、发布或重启 API；`120.48.13.190` 同时承载 `zyidai.cn`，预生产/生产隔离尚未证明。未明确独立预生产、后端 release/回滚流程和具名发布授权前，不得用该工作流声称 JD 拆解后端已上线，也不得连接、覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。

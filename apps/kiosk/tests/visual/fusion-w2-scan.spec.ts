@@ -14,7 +14,6 @@ function collectRuntimeErrors(page: Page, ignoredDocumentPath?: string): string[
   page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`))
   page.on('requestfailed', (request) => {
     if (request.resourceType() === 'document' && new URL(request.url()).pathname === ignoredDocumentPath) return
-    if (request.resourceType() === 'script' && request.failure()?.errorText === 'net::ERR_ABORTED') return
     if (['document', 'script', 'stylesheet'].includes(request.resourceType())) {
       errors.push(`${request.resourceType()}: ${request.url()} (${request.failure()?.errorText ?? 'unknown'})`)
     }
@@ -63,6 +62,17 @@ async function expectHealthy(page: Page, errors: string[]): Promise<void> {
   await expect(page.locator('[data-kiosk-presentation="fusion-youth"]').first()).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(errors).toEqual([])
+}
+
+async function expectPdfCompleted(binary: FusionW2BinaryRoute): Promise<void> {
+  await expect.poll(() => {
+    try {
+      binary.assertPdfCompleted()
+      return true
+    } catch {
+      return false
+    }
+  }).toBe(true)
 }
 
 function registerCreatedScan(api: ApiRouter): void {
@@ -264,14 +274,7 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
   const preview = page.locator('[data-file-preview-kind="pdf"]')
   await expect(preview).toBeVisible()
   await expect(preview.locator('iframe')).toHaveAttribute('src', W2_FILE.fileUrl)
-  await expect.poll(() => {
-    try {
-      binary.assertPdfCompleted()
-      return true
-    } catch {
-      return false
-    }
-  }).toBe(true)
+  await expectPdfCompleted(binary)
   const quoteResponse = page.waitForResponse((response) =>
     response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/orders/quote',
@@ -286,7 +289,9 @@ test('successful scan result can continue to printing @w2', async ({ page, api }
 })
 
 test('successful resume scan can continue to AI parsing @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
   registerShell(api)
   api.respond('POST', '/api/v1/resume/parse', {
     status: 503,
@@ -295,17 +300,21 @@ test('successful resume scan can continue to AI parsing @w2', async ({ page, api
 
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
+  await expectPdfCompleted(binary)
   await page.getByRole('button', { name: /AI 简历识别/ }).click()
   await page.waitForURL('**/resume/parse')
   await expectHealthy(page, errors)
 })
 
 test('successful scan exposes the real documents destination @w2', async ({ page, api }) => {
-  const errors = collectRuntimeErrors(page)
+  const errors = collectRuntimeErrors(page, new URL(W2_FILE.fileUrl, 'http://fixture.local').pathname)
+  const binary = new FusionW2BinaryRoute(page)
+  await binary.install()
   registerShell(api)
 
   await page.goto('/scan/result')
   await setReactRouterState(page, '/scan/result', resultState)
+  await expectPdfCompleted(binary)
   await page.getByRole('button', { name: /登录后管理文件|前往我的文档/ }).click()
   await page.waitForURL(/\/(login|me\/documents)/)
   await expectHealthy(page, errors)
