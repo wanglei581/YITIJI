@@ -259,6 +259,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-db-guard
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
+          pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
@@ -442,6 +443,9 @@ jobs:
         run: pnpm db:pg:deploy
       - name: Seed on PG
         working-directory: services/api
+        env:
+          NODE_ENV: test
+          DEMO_SEED_CONFIRM: I_UNDERSTAND_DEMO_DATA_WILL_BE_WRITTEN
         run: |
           node -r @swc-node/register prisma/seed.ts
           node -r @swc-node/register prisma/seed-fairs.ts

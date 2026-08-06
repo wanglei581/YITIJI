@@ -181,25 +181,26 @@ pnpm build:kiosk:production
 
 ---
 
-## 4. PostgreSQL 空库部署 + seed
+## 4. PostgreSQL 部署（禁止 demo seed）
 
 > 完整说明与回滚见 [postgres-operations.md](./postgres-operations.md)。命令优先用 `POSTGRES_URL`。
 
 ```bash
 cd services/api
 
-# 1) 构建会自动生成 SQLite + PG 两套 Prisma client；部署迁移到空库
+# 1) 构建会自动生成 SQLite + PG 两套 Prisma client；只执行 additive migration
 POSTGRES_URL="postgresql://USER:PASS@PGHOST:5432/ai_job_print" pnpm db:pg:deploy
 
 # 2) 漂移校验（CI 同款守门）
 pnpm db:pg:sync:check
 
-# 3) seed（按需，空库初始化基础数据）
-pnpm db:seed
-pnpm db:seed:fairs
-pnpm db:seed:companies
-pnpm db:seed:venue-guide
+# 3) 验证 demo seed 保护契约（该 verify 不连接数据库）
+pnpm verify:demo-seed-guard
 ```
+
+生产和预生产均禁止执行 `db:seed*`。四个 seed 只服务可丢弃的本地开发/CI 数据库，会写入默认账号、演示终端和直接公开的岗位/招聘会/企业数据；其中企业 seed 会覆盖下架状态，场馆导览 seed 会先删除再重建配置。生产真实业务数据必须走现有 Admin / Partner 审核与发布闭环。
+
+当前生产故障恢复沿用已存在且已轮换口令的管理员账号。仓库尚无经过安全审查的“全新空库首个管理员” bootstrap 命令，因此真正全新生产空库在该能力补齐前仍为 **NO-GO**，不得用 demo seed 绕过。
 
 > 若迁移旧 SQLite 数据：按 postgres-operations.md §3 用 `db:pg:migrate-data`，
 > 必须确认输出「迁移完成并对账通过」并记录孤儿行告警，不静默丢数据。

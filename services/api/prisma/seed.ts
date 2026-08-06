@@ -16,7 +16,9 @@ import 'dotenv/config'
 import { createPrismaClient } from '../src/prisma/create-client'
 import { PASSWORD_PROOF_STATE, passwordProofState } from '../src/auth/password-proof-state'
 import * as bcrypt from 'bcryptjs'
+import { assertDemoSeedAllowed } from './seed-guard'
 
+assertDemoSeedAllowed(process.env)
 const url = process.env['DATABASE_URL']
 if (!url) throw new Error('DATABASE_URL is required to run seed')
 const prisma = createPrismaClient(url).client

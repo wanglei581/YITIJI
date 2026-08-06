@@ -18,7 +18,7 @@ WP1 密钥就绪 → A. PG 空库部署 → B. 环境/连接自检 → C. 核心
 pnpm --filter @ai-job-print/api db:pg:deploy      # 空库 migrate deploy
 # 如有 SQLite 旧数据 → 走 §3.5 迁移演练，先备份、空库保护、行数对账
 ```
-验收：`migrate deploy` 通过、seed 通过、PG schema 无漂移、外键/唯一约束生效、`pg_dump` 备份可恢复到临时库。
+验收：`migrate deploy` 通过、PG schema 无漂移、外键/唯一约束生效、`pg_dump` 备份可恢复到临时库；`verify:demo-seed-guard` 通过且生产未执行任何 `db:seed*`。现有生产恢复沿用已存在的管理员账号；全新生产空库在受审的首个管理员 bootstrap 补齐前保持 **NO-GO**。
 
 ## B. 环境与连接自检
 ```bash
