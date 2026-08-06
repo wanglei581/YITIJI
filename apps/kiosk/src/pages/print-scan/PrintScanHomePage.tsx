@@ -9,7 +9,7 @@
 // 合规：敏感文件（证件照/身份证）自动清理提示；签名盖章为非 CA 电子签。
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
 import {
@@ -18,7 +18,11 @@ import {
   type PrintScanCapabilityKey,
   type PrintScanCapabilityStatus,
 } from '@ai-job-print/shared'
-import { getConfiguredCapabilities, type ConfiguredCapabilityMap } from '../../services/api/printScanCapabilities'
+import {
+  loadConfiguredCapabilities,
+  type CapabilitiesLoadResult,
+  type ConfiguredCapabilityMap,
+} from '../../services/api/printScanCapabilities'
 import {
   CheckIcon,
   ChevronRightIcon,
@@ -32,22 +36,18 @@ import {
   PrinterIcon,
   ScanLineIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   SmartphoneIcon,
   UserSquareIcon,
 } from 'lucide-react'
 import './styles/print-scan-fusion.css'
+import './styles/print-scan-home.css'
+import './styles/print-scan-uplift.css'
 
 interface Capability {
   key: string
   icon: React.ComponentType<{ className?: string }>
-  /** 卡片顶部 4px 色条，e.g. "border-t-info" */
-  accentBorder: string
-  /** 图标容器背景 Tailwind 类 */
-  iconBg: string
-  /** 图标前景色 Tailwind 类 */
-  iconColor: string
-  /** "进入/了解详情" 链接文字颜色（= accent-deep） */
-  goColor: string
+  accent: 'teal' | 'clay' | 'wheat' | 'plum' | 'slate'
   title: string
   description: string
   to: string
@@ -62,10 +62,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'doc-print',
     icon: FileTextIcon,
-    accentBorder: 'border-t-info',
-    iconBg: 'bg-info-bg',
-    iconColor: 'text-info-fg',
-    goColor: 'text-info-fg',
+    accent: 'slate',
     title: '文档打印',
     description: 'PDF、图片上传后先做材料检查，再设置参数打印',
     to: '/print/upload',
@@ -74,10 +71,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'phone-upload',
     icon: SmartphoneIcon,
-    accentBorder: 'border-t-info',
-    iconBg: 'bg-info-bg',
-    iconColor: 'text-info-fg',
-    goColor: 'text-info-fg',
+    accent: 'slate',
     title: '手机扫码上传',
     description: '手机或其他联网设备扫码上传文件，一体机确认后打印',
     to: '/print/upload?source=document&tab=qr',
@@ -86,10 +80,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'scan',
     icon: ScanLineIcon,
-    accentBorder: 'border-t-primary-600',
-    iconBg: 'bg-primary-100',
-    iconColor: 'text-primary-700',
-    goColor: 'text-primary-700',
+    accent: 'teal',
     title: '材料扫描',
     description: '纸质材料扫描成 PDF，可打印、做简历识别；登录后可在「我的文档」管理',
     to: '/scan/start',
@@ -98,10 +89,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'photo-print',
     icon: ImageIcon,
-    accentBorder: 'border-t-plum',
-    iconBg: 'bg-plum-soft',
-    iconColor: 'text-plum',
-    goColor: 'text-plum',
+    accent: 'plum',
     title: '照片打印',
     description: '上传 JPG / PNG 照片打印，走文档打印同一检查流程',
     to: '/print/upload',
@@ -111,10 +99,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'id-photo',
     icon: UserSquareIcon,
-    accentBorder: 'border-t-wheat',
-    iconBg: 'bg-wheat-soft',
-    iconColor: 'text-wheat',
-    goColor: 'text-wheat',
+    accent: 'wheat',
     title: '证件照',
     description: '常见规格证件照排版打印，当前可先用「照片打印」',
     to: '/print-scan/feature/id-photo',
@@ -123,10 +108,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'convert',
     icon: FileType2Icon,
-    accentBorder: 'border-t-info',
-    iconBg: 'bg-info-bg',
-    iconColor: 'text-info-fg',
-    goColor: 'text-info-fg',
+    accent: 'slate',
     title: '格式转换',
     description: '多张图片（最多 20 张）合并为一份 PDF，便于打印和存档',
     to: '/print-scan/convert',
@@ -135,10 +117,7 @@ const CAPABILITIES: Capability[] = [
   {
     key: 'sign',
     icon: PenToolIcon,
-    accentBorder: 'border-t-clay',
-    iconBg: 'bg-clay-soft',
-    iconColor: 'text-clay',
-    goColor: 'text-clay',
+    accent: 'clay',
     title: '签名盖章',
     description: '在 PDF 上叠加签名 / 印章图片（版式合成，非 CA 电子签）',
     to: '/print-scan/sign',
@@ -203,21 +182,45 @@ const QUICK_LINKS: QuickLink[] = [
 
 export function PrintScanHomePage() {
   const navigate = useNavigate()
-  const [configured, setConfigured] = useState<ConfiguredCapabilityMap>({})
+  const [capabilityLoad, setCapabilityLoad] = useState<
+    CapabilitiesLoadResult | { status: 'loading'; map: ConfiguredCapabilityMap }
+  >({ status: 'loading', map: {} })
+
+  const loadCapabilities = useCallback(() => {
+    setCapabilityLoad({ status: 'loading', map: {} })
+    void loadConfiguredCapabilities().then(setCapabilityLoad)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-    void getConfiguredCapabilities().then((map) => {
-      if (!cancelled) setConfigured(map)
+    setCapabilityLoad({ status: 'loading', map: {} })
+    void loadConfiguredCapabilities().then((result) => {
+      if (!cancelled) setCapabilityLoad(result)
     })
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
+
+  const capabilitiesConfirmed = capabilityLoad.status === 'ok'
+  const serviceUnavailableNote =
+    capabilityLoad.status === 'loading' ? '正在确认本机服务配置' : '服务状态无法确认，请重新检测'
 
   const capabilities = useMemo<Capability[]>(
     () =>
       CAPABILITIES.map((cap) => {
         const key = CARD_CAPABILITY_KEY[cap.key]
-        const override = key ? configured[key] : undefined
+        if (!capabilitiesConfirmed && key) {
+          return {
+            ...cap,
+            available: false,
+            to: '',
+            state: undefined,
+            note: serviceUnavailableNote,
+            unavailableBadge: capabilityLoad.status === 'loading' ? '检查中' : '状态未确认',
+          }
+        }
+        const override = key ? capabilityLoad.map[key] : undefined
         if (!override) return cap
         const available = canCreateFormalPrintScanTask(override.status)
         const disabledTo = cap.to.startsWith('/print-scan/feature/') ? cap.to : ''
@@ -232,139 +235,170 @@ export function PrintScanHomePage() {
           unavailableBadge: available ? cap.unavailableBadge : '暂不可用',
         }
       }),
-    [configured],
+    [capabilitiesConfirmed, capabilityLoad.map, capabilityLoad.status, serviceUnavailableNote]
   )
 
   return (
     <KioskPageFrame className="w2-print-scan-page">
-      <div data-w2-page="print-scan-home" className="w2-print-scan-shell flex h-full flex-col overflow-y-auto bg-canvas">
-      <KioskPageHeader
-        title="打印扫描服务"
-        description="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"
-        onBack={() => navigate('/')}
-        backLabel="返回"
-      />
+      <div
+        data-w2-page="print-scan-home"
+        className="w2-print-scan-shell flex h-full flex-col overflow-y-auto bg-canvas"
+      >
+        <KioskPageHeader
+          title="打印扫描服务"
+          description="文档打印 · 手机扫码上传 · 材料扫描 · 照片与证件照 · 格式转换 · 签名盖章"
+          onBack={() => navigate('/')}
+          backLabel="返回"
+        />
 
-      {/* 隐私保护提示 */}
-      <div className="mt-5 flex items-center gap-3 rounded-xl border border-dashed border-neutral-200 bg-surface/70 px-5 py-3">
-        <ShieldCheckIcon className="h-5 w-5 shrink-0 text-wheat" aria-hidden="true" />
-        <p className="text-[17px] leading-relaxed text-neutral-500">
-          {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE}
-        </p>
-      </div>
-
-      {/* 7 能力卡 + 本机设备能力卡（2 列等高网格） */}
-      <div className="mt-6 grid flex-1 grid-cols-2 gap-5">
-        {capabilities.map((cap) => {
-          const Icon = cap.icon
-          const isDisabled = !cap.available && !cap.to
-          return (
-            <button
-              key={cap.key}
-              type="button"
-              onClick={() => {
-                if (!cap.to) return
-                navigate(cap.to, cap.state ? { state: cap.state } : undefined)
-              }}
-              disabled={isDisabled}
-              className={[
-                'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-6 text-left',
-                'border-t-4 shadow-sm active:scale-[0.99]',
-                cap.accentBorder,
-                !cap.available ? 'opacity-[0.62]' : 'cursor-pointer',
-              ].join(' ')}
-            >
-              <div className="flex items-center gap-4">
-                <span className={['flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl', cap.iconBg].join(' ')}>
-                  <Icon className={['h-[34px] w-[34px]', cap.iconColor].join(' ')} aria-hidden="true" />
-                </span>
-                <h3 className="font-serif text-[28px] font-bold tracking-wide text-neutral-900">{cap.title}</h3>
-                {!cap.available && (
-                  <span className="rounded-full border border-neutral-200 bg-canvas px-3 py-1 text-[15px] text-neutral-500 whitespace-nowrap">
-                    {cap.unavailableBadge ?? '即将上线'}
-                  </span>
-                )}
-              </div>
-              <p className="text-[18px] leading-relaxed text-neutral-500">{cap.description}</p>
-              {cap.note && (
-                <p className="text-[16px] leading-relaxed text-warning-fg">{cap.note}</p>
-              )}
-              <div className="mt-auto flex items-center gap-2">
-                {cap.to ? (
-                  <span className={['flex items-center gap-2 text-[19px] font-semibold', cap.goColor].join(' ')}>
-                    {cap.available ? '进入' : '了解详情'}
-                    <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                ) : (
-                  <span className="text-[19px] font-semibold text-neutral-400">暂不可用</span>
-                )}
-              </div>
-            </button>
-          )
-        })}
-
-        {/* 本机设备能力卡（第 8 格，a-teal） */}
-        <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-t-4 border-neutral-200 border-t-primary-600 bg-surface p-6 shadow-sm">
-          <h3 className="font-serif text-[26px] font-bold text-neutral-900">
-            本机设备能力
-            <span className="ml-3 font-sans text-[15px] font-normal text-neutral-500">
-              以本机实际配置与耗材状态为准
-            </span>
-          </h3>
-          <div className="flex flex-col gap-2 text-[17px] text-neutral-500">
-            {[
-              '彩色 / 黑白激光打印 · A4 幅面',
-              '自动双面打印，省纸更环保',
-              '输稿器连续扫描，一次最多 50 页',
-              '材料扫描固定输出 PDF（面板扫描到本机接收目录）',
-            ].map((item) => (
-              <span key={item} className="flex items-center gap-2.5">
-                <CheckIcon className="h-[18px] w-[18px] shrink-0 text-primary-700" aria-hidden="true" />
-                {item}
-              </span>
-            ))}
+        <section className="ps-ai-rail" aria-label="在线服务状态" aria-live="polite">
+          <SparklesIcon aria-hidden="true" />
+          <div className="ps-ai-rail__copy">
+            <b>
+              {capabilitiesConfirmed
+                ? '在线服务已连接'
+                : capabilityLoad.status === 'loading'
+                  ? '正在确认在线服务'
+                  : '服务状态无法确认'}
+            </b>
+            <span>格式、隐私与打印参数仍会在提交后按真实处理结果再次确认</span>
           </div>
-        </div>
-      </div>
+          <span className="ps-ai-rail__status">
+            {capabilitiesConfirmed
+              ? '配置已读取'
+              : capabilityLoad.status === 'loading'
+                ? '检查中'
+                : '暂不开放任务'}
+          </span>
+          <button
+            type="button"
+            disabled={capabilityLoad.status === 'loading'}
+            onClick={() => {
+              if (capabilitiesConfirmed) navigate('/assistant')
+              else loadCapabilities()
+            }}
+          >
+            {capabilitiesConfirmed
+              ? '让小青安排打印'
+              : capabilityLoad.status === 'loading'
+                ? '正在检查'
+                : '重新检测'}
+          </button>
+        </section>
 
-      {/* 我的打印记录（登录后可查看） */}
-      <div className="mt-6">
-        <div className="mb-2 flex items-baseline gap-3">
-          <b className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">我的打印记录</b>
-          <span className="text-[17px] text-neutral-500">登录后可查看历史记录与凭证</span>
+        {/* 隐私保护提示 */}
+        <div className="ps-notice">
+          <ShieldCheckIcon aria-hidden="true" />
+          <p>{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_SENSITIVE}</p>
         </div>
-        <div className="grid grid-cols-3 gap-[18px]">
-          {QUICK_LINKS.map((link) => {
-            const Icon = link.icon
+
+        {/* 7 能力卡 + 本机设备能力卡（2 列等高网格） */}
+        <div className="ps-cap-grid">
+          {capabilities.map((cap) => {
+            const Icon = cap.icon
+            const isDisabled = !cap.to
             return (
               <button
-                key={link.key}
+                key={cap.key}
                 type="button"
-                onClick={() => navigate(link.to)}
-                className="flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]"
+                onClick={() => {
+                  if (!cap.to) return
+                  navigate(cap.to, cap.state ? { state: cap.state } : undefined)
+                }}
+                disabled={isDisabled}
+                className={`ps-cap ps-accent--${cap.accent}${!cap.available ? ' ps-cap--unavailable' : ''}`}
               >
-                <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[13px] bg-info-bg text-info-fg">
-                  <Icon className="h-7 w-7" aria-hidden="true" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <b className="block text-[21px] font-bold text-neutral-900">{link.title}</b>
-                  <span className="mt-0.5 block text-[16px] text-neutral-500">{link.description}</span>
-                </span>
-                <ChevronRightIcon className="h-[22px] w-[22px] shrink-0 text-neutral-400 opacity-60" aria-hidden="true" />
+                <div className="ps-cap__top">
+                  <span className="ps-cap__icon">
+                    <Icon aria-hidden="true" />
+                  </span>
+                  <h3>{cap.title}</h3>
+                  {!cap.available && (
+                    <span className="ps-cap__badge">{cap.unavailableBadge ?? '即将上线'}</span>
+                  )}
+                </div>
+                <p className="ps-cap__description">{cap.description}</p>
+                {cap.note && <p className="ps-cap__note">{cap.note}</p>}
+                <div className="ps-cap__footer">
+                  {cap.to ? (
+                    <span className="ps-cap__go">
+                      {cap.available ? '进入' : '了解详情'}
+                      <ChevronRightIcon aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <span className="ps-cap__disabled-label">暂不可用</span>
+                  )}
+                </div>
               </button>
             )
           })}
+
+          {/* 本机配置状态卡（第 8 格） */}
+          <div className="ps-device-card ps-accent--teal">
+            <h3>
+              本机服务配置
+              <span>
+                {capabilitiesConfirmed
+                  ? '配置已读取，具体硬件状态提交前再确认'
+                  : '当前无法确认设备能力'}
+              </span>
+            </h3>
+            <div className="ps-device-card__rows">
+              {[
+                capabilitiesConfirmed
+                  ? '打印、扫描与材料处理入口按本机配置开放'
+                  : '未取得本机打印扫描能力配置',
+                '纸张、耗材、双面与输稿器状态在提交任务前确认',
+                '未确认能力不会创建正式打印或扫描任务',
+              ].map((item) => (
+                <span key={item}>
+                  {capabilitiesConfirmed ? (
+                    <CheckIcon aria-hidden="true" />
+                  ) : (
+                    <InfoIcon aria-hidden="true" />
+                  )}
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* 非 CA 电子签说明 */}
-      <div className="mt-6 flex items-center gap-3 rounded-xl border border-dashed border-neutral-200 bg-surface/70 px-5 py-3">
-        <InfoIcon className="h-5 w-5 shrink-0 text-wheat" aria-hidden="true" />
-        <p className="text-[17px] leading-relaxed text-neutral-500">
-          {COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}
-        </p>
-      </div>
+        {/* 我的打印记录（登录后可查看） */}
+        <div className="ps-records">
+          <div className="ps-records__head">
+            <b>我的打印记录</b>
+            <span>登录后可查看历史记录与凭证</span>
+          </div>
+          <div className="ps-quick-row">
+            {QUICK_LINKS.map((link) => {
+              const Icon = link.icon
+              return (
+                <button
+                  key={link.key}
+                  type="button"
+                  onClick={() => navigate(link.to)}
+                  className="ps-quick"
+                >
+                  <span className="ps-quick__icon">
+                    <Icon aria-hidden="true" />
+                  </span>
+                  <span className="ps-quick__copy">
+                    <b>{link.title}</b>
+                    <span>{link.description}</span>
+                  </span>
+                  <ChevronRightIcon className="ps-quick__arrow" aria-hidden="true" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
+        {/* 非 CA 电子签说明 */}
+        <div className="ps-notice ps-notice--legal">
+          <InfoIcon aria-hidden="true" />
+          <p>{COMPLIANCE_COPY.KIOSK_PRINT_SCAN_ESIGN_NOTICE}</p>
+        </div>
       </div>
     </KioskPageFrame>
   )

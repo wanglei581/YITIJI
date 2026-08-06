@@ -585,6 +585,17 @@ const isGreaterThan = (node, leftName, rightName) => {
     isIdentifierNamed(expression.right, rightName),
   )
 }
+const isGreaterThanNumber = (node, name, value) => {
+  const expression = unwrapParentheses(node)
+  return Boolean(
+    expression &&
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.GreaterThanToken &&
+    isIdentifierNamed(expression.left, name) &&
+    ts.isNumericLiteral(expression.right) &&
+    expression.right.text === String(value),
+  )
+}
 
 function kioskShellContract(sourceFile) {
   const shellFunction = findNamedFunction(sourceFile, 'KioskShell')
@@ -601,15 +612,21 @@ function kioskShellContract(sourceFile) {
       ts.isCallExpression(declaration.initializer) &&
       isIdentifierNamed(declaration.initializer.expression, 'useKioskStageFit'),
     )
-  const responsive = findVariable(shellFunction, 'isResponsiveHome')?.initializer
-  const responsiveRoot = unwrapParentheses(responsive)
-  const responsiveSizes = responsiveRoot && ts.isBinaryExpression(responsiveRoot)
-    ? unwrapParentheses(responsiveRoot.right)
+  const compactRoot = unwrapParentheses(findVariable(shellFunction, 'isCompactViewport')?.initializer)
+  const landscapeSizes = compactRoot && ts.isBinaryExpression(compactRoot)
+    ? unwrapParentheses(compactRoot.right)
     : null
-  const landscapeSizes = responsiveSizes && ts.isBinaryExpression(responsiveSizes)
-    ? unwrapParentheses(responsiveSizes.right)
-    : null
+  const responsiveRoot = unwrapParentheses(findVariable(shellFunction, 'isResponsiveHome')?.initializer)
   const responsiveBoundary = Boolean(
+    compactRoot &&
+    ts.isBinaryExpression(compactRoot) &&
+    compactRoot.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
+    isLessThanOrEqual(compactRoot.left, 'viewportW', 760) &&
+    landscapeSizes &&
+    ts.isBinaryExpression(landscapeSizes) &&
+    landscapeSizes.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    isLessThanOrEqual(landscapeSizes.left, 'viewportW', 960) &&
+    isGreaterThan(landscapeSizes.right, 'viewportW', 'viewportH') &&
     responsiveRoot &&
     ts.isBinaryExpression(responsiveRoot) &&
     responsiveRoot.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
@@ -617,15 +634,22 @@ function kioskShellContract(sourceFile) {
     responsiveRoot.left.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
     isIdentifierNamed(responsiveRoot.left.left, 'pathname') &&
     isStringNamed(responsiveRoot.left.right, '/') &&
-    responsiveSizes &&
-    ts.isBinaryExpression(responsiveSizes) &&
-    responsiveSizes.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
-    isLessThanOrEqual(responsiveSizes.left, 'viewportW', 760) &&
-    landscapeSizes &&
-    ts.isBinaryExpression(landscapeSizes) &&
-    landscapeSizes.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-    isLessThanOrEqual(landscapeSizes.left, 'viewportW', 960) &&
-    isGreaterThan(landscapeSizes.right, 'viewportW', 'viewportH'),
+    isIdentifierNamed(responsiveRoot.right, 'isCompactViewport'),
+  )
+  const fluidRoot = unwrapParentheses(findVariable(shellFunction, 'usesFluidViewport')?.initializer)
+  const fluidLandscape = fluidRoot && ts.isBinaryExpression(fluidRoot)
+    ? unwrapParentheses(fluidRoot.right)
+    : null
+  const fluidBoundary = Boolean(
+    fluidRoot &&
+    ts.isBinaryExpression(fluidRoot) &&
+    fluidRoot.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
+    isIdentifierNamed(fluidRoot.left, 'isCompactViewport') &&
+    fluidLandscape &&
+    ts.isBinaryExpression(fluidLandscape) &&
+    fluidLandscape.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+    isGreaterThanNumber(fluidLandscape.left, 'viewportW', 960) &&
+    isGreaterThan(fluidLandscape.right, 'viewportW', 'viewportH'),
   )
   const shell = findVariable(shellFunction, 'shell')?.initializer
   let shellExpression = shell
@@ -639,7 +663,7 @@ function kioskShellContract(sourceFile) {
     layoutOpening?.tagName.getText(sourceFile) === 'KioskLayout' &&
     viewportExpression &&
     ts.isConditionalExpression(viewportExpression) &&
-    isIdentifierNamed(viewportExpression.condition, 'isResponsiveHome') &&
+    isIdentifierNamed(viewportExpression.condition, 'isCompactViewport') &&
     isStringNamed(viewportExpression.whenTrue, 'mobile') &&
     isStringNamed(viewportExpression.whenFalse, 'kiosk'),
   )
@@ -673,13 +697,13 @@ function kioskShellContract(sourceFile) {
       enabledExpression &&
       ts.isPrefixUnaryExpression(enabledExpression) &&
       enabledExpression.operator === ts.SyntaxKind.ExclamationToken &&
-      isIdentifierNamed(enabledExpression.operand, 'isResponsiveHome'),
+      isIdentifierNamed(enabledExpression.operand, 'usesFluidViewport'),
     )
     return disablesForMobile && expression.children.some((child) =>
       ts.isJsxExpression(child) && isIdentifierNamed(child.expression, 'shell'),
     )
   })
-  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, responsiveViewport, responsiveHeight, directHome, stableStage }
+  return { viewportBinding: Boolean(viewportBinding), responsiveBoundary, fluidBoundary, responsiveViewport, responsiveHeight, directHome, stableStage }
 }
 
 function jsxAttribute(opening, name, sourceFile) {
@@ -852,10 +876,11 @@ expect(serviceCardRootHasContract(homeAst), 'ServiceCard 返回根 section.card 
 const shellContract = kioskShellContract(kioskRootAst)
 expect(shellContract.viewportBinding, 'KioskShell 复用 useKioskStageFit() 的 viewportW/viewportH')
 expect(shellContract.responsiveBoundary, '首页 mobile 精确支持竖屏宽<=760 与横屏宽<=960')
-expect(shellContract.responsiveViewport, '首页手机分支使用 mobile viewport，其余保持 kiosk viewport')
+expect(shellContract.fluidBoundary, '窄屏与横屏桌面使用流式视口，竖屏一体机保留固定舞台')
+expect(shellContract.responsiveViewport, '全部窄屏路由使用 mobile viewport，其余保持 kiosk viewport')
 expect(shellContract.responsiveHeight, 'mobile 首页使用 kiosk-home-mobile 稳定类，其余 staged 页保持 h-full')
 expect(!shellContract.directHome, 'mobile 首页不再 direct-return shell 更换根节点')
-expect(shellContract.stableStage, 'KioskRoot 始终用 KioskStageFit 包裹并传 enabled={!isResponsiveHome}')
+expect(shellContract.stableStage, 'KioskRoot 始终用 KioskStageFit 包裹并传 enabled={!usesFluidViewport}')
 
 const responsiveHomeFor = (viewportW, viewportH) =>
   viewportW <= 760 || (viewportW <= 960 && viewportW > viewportH)

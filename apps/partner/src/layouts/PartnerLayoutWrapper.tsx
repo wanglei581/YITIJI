@@ -86,7 +86,7 @@ export function PartnerLayoutWrapper() {
 
   if (!authChecked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-canvas text-sm text-neutral-400">
+      <div className="flex h-dvh items-center justify-center bg-canvas text-sm text-neutral-400">
         正在验证身份…
       </div>
     )

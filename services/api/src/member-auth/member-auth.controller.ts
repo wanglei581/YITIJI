@@ -142,6 +142,17 @@ export class MemberAuthController {
     return ApiResponse.ok(await this.qrLogin.confirm(ticketId, dto))
   }
 
+  /** 小程序已登录用户扫码后直接凭 JWT 确认票据，无需再发短信验证码。 */
+  @Post('auth/qr/:ticketId/confirm-by-token')
+  @UseGuards(EndUserAuthGuard)
+  @Throttle({ default: { ttl: 60_000, limit: 10 } })
+  async confirmQrLoginByToken(
+    @Param('ticketId') ticketId: string,
+    @CurrentEndUser() user: AuthedEndUser,
+  ): Promise<ApiResponse<ConfirmQrLoginResult>> {
+    return ApiResponse.ok(await this.qrLogin.confirmByToken(ticketId, user.endUserId))
+  }
+
   /** Kiosk 使用私有 claimToken 一次性领取会员 token。 */
   @Post('auth/qr/:ticketId/claim')
   @Throttle({ default: { ttl: 60_000, limit: 20 } })

@@ -45,7 +45,17 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1
 
-      - name: Exercise install, repair, and uninstall
+      - name: Build unsigned WiX Burn EXE
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
+
+      - name: Exercise EXE install, repair, and uninstall
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-lifecycle.ps1 -ExePath $exe.FullName
+
+      - name: Exercise MSI install, repair, and uninstall
         shell: powershell
         run: |
           $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
@@ -55,10 +65,12 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: terminal-agent-unsigned-msi-candidate
+          name: terminal-agent-unsigned-installer-candidates
           path: |
             apps/terminal-agent/installer/artifacts/msi/*.msi
             apps/terminal-agent/installer/artifacts/msi/lifecycle-logs/
+            apps/terminal-agent/installer/artifacts/exe/AIJobPrintTerminalSetup.exe
+            apps/terminal-agent/installer/artifacts/exe/lifecycle-logs/
             apps/terminal-agent/installer/artifacts/staging/manifest.json
           if-no-files-found: warn
           retention-days: 7

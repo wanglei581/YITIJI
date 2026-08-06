@@ -309,8 +309,8 @@ expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '保留百宝箱/智慧校园真实配置 hooks')
 expect(/const showToolbox = toolbox\.enabled/.test(home) && /const showCampus = campus\.enabled/.test(home) && /if \(!showToolbox && !showCampus\) return null/.test(home), '保留百宝箱/智慧校园诚实门控')
 
-const complianceNotice = '岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。'
-expect(home.includes(complianceNotice), '保留完整合规提示文案')
+const complianceNotice = /岗位与招聘会信息均来自第三方\s*\/\s*官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。/
+expect(complianceNotice.test(home), '保留完整合规提示文案')
 const complianceSurface = `${home}\n${serviceGroups}\n${css}`
 expect(!/一键投递|立即投递/.test(complianceSurface), '拒绝「一键投递」/「立即投递」')
 expect(!/(?<!来源)平台投递/.test(complianceSurface), '「平台投递」仅允许「来源平台投递」语境')

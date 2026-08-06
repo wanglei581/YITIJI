@@ -183,7 +183,11 @@ const protoTileBase = pxProp(cssRule(shared, '.tile'), 'min-height')
 expect(protoTileBase === 96, `原型 shared 基类 .tile min-height 真值=96（实测 ${protoTileBase}）`)
 expect(pxProp(cssRule(pv, '.kpv1 .tile'), 'min-height') === protoTileBase, `实现基类 .kpv1 .tile min-height 对齐原型 ${protoTileBase}px`)
 expect(pxProp(cssRule(pv, '.kpv1 .groups .tile'), 'min-height') === 76, '实现 .kpv1 .groups .tile min-height=76px（prototype-v1.0 保留值）')
-expect(pxProp(cssRule(pv, '.kpv1 .tiles.c2 .tile, .kpv1 .tiles.c1 .tile'), 'min-height') === 70, '实现 c1/c2 .tile min-height=70px（prototype-v1.0 保留值）')
+expect(
+  pxProp(cssRules(pv, '.kpv1 .tiles.c2 .tile')[0] ?? '', 'min-height') === 70
+    && pxProp(cssRules(pv, '.kpv1 .tiles.c1 .tile')[0] ?? '', 'min-height') === 70,
+  '实现 c1/c2 .tile min-height=70px（prototype-v1.0 保留值）',
+)
 expect(pxProp(cssRule(pv, '.kpv1 .tile.col'), 'min-height') === 90, '实现 .tile.col min-height=90px（prototype-v1.0 保留值）')
 // [4] 卡片品类色：01-home AI OS 版不含此规则；实现层 prototype-v1.css 保留左侧竖条
 const implStripe = cssRule(pv, '.kpv1 .groups .card::before')

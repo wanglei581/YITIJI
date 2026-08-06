@@ -14,8 +14,19 @@ import { KIcon, type KioskIconName } from '../../components/kiosk-icon'
 import { KioskKeyboard } from '../../components/kiosk-keyboard/KioskKeyboard'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { chatWithAssistant } from '../../services/api'
+import {
+  Building2Icon,
+  CrosshairIcon,
+  HelpCircleIcon,
+  ListChecksIcon,
+  MailIcon,
+  Mic2Icon,
+  RouteIcon,
+  ScanSearchIcon,
+} from 'lucide-react'
 import './assistant-inkpaper.css'
 import './assistant-batch8.css'
+import './assistant-advisor.css'
 
 const USE_VOICE_CALL = import.meta.env.VITE_USE_TRTC_CALL === 'true'
 
@@ -31,7 +42,13 @@ const LazyCallPanel = USE_VOICE_CALL
   : null
 
 const ALLOWED_ROUTE_PREFIXES = [
-  '/resume', '/resume/', '/print/', '/scan/', '/jobs', '/job-fairs', '/interview', '/renshi',
+  '/resume', '/resume/', '/resume-service',
+  '/print/', '/print-scan',
+  '/scan/',
+  '/jobs', '/job-fairs', '/fairs-service', '/jobs-service',
+  '/interview', '/interview-service',
+  '/renshi', '/policy-service',
+  '/companies',
 ] as const
 
 function isAllowedRoute(route: string): boolean {
@@ -57,9 +74,10 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     welcome: '请告诉我你的目标岗位、目前的简历进度，以及最想解决的材料问题。',
     questions: ['项目经历应该怎么写？', '简历打印用 PDF 还是 Word？', '没有实习经历怎么办？'],
     serviceActions: [
-      { label: '去做简历诊断', route: '/resume/source' },
-      { label: '去打印文件', route: '/print/upload' },
-      { label: '做一次自我探索', route: '/resume/self-assessment/intro?from=assistant' },
+      { label: 'AI 简历服务', route: '/resume-service' },
+      { label: '简历诊断', route: '/resume/source' },
+      { label: '打印文件', route: '/print/upload' },
+      { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' },
     ],
   },
   {
@@ -69,7 +87,10 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     icon: 'chat',
     welcome: '请补充目标岗位、当前面试阶段，以及最想准备的问题。',
     questions: ['自我介绍应该怎么准备？', '面试常见问题怎么回答？', '谈薪时应该注意什么？'],
-    serviceActions: [{ label: '去做模拟面试', route: '/interview/setup' }],
+    serviceActions: [
+      { label: 'AI 模拟面试', route: '/interview/setup' },
+      { label: '查看岗位信息', route: '/jobs' },
+    ],
   },
   {
     id: 'jobs',
@@ -81,6 +102,7 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     serviceActions: [
       { label: '查看岗位信息', route: '/jobs' },
       { label: '查看招聘会', route: '/job-fairs' },
+      { label: '找企业', route: '/companies' },
     ],
   },
   {
@@ -90,7 +112,10 @@ const CONSULTATION_TASKS: readonly ConsultationTask[] = [
     icon: 'policy',
     welcome: '请补充所在地区、想了解的事项和当前阶段；具体规定请以当地官方信息为准。',
     questions: ['入职通常需要准备哪些材料？', '试用期有哪些常见注意事项？', '社保公积金应该怎样了解？'],
-    serviceActions: [{ label: '查看政策与材料说明', route: '/renshi?tab=policy' }],
+    serviceActions: [
+      { label: '政策服务', route: '/policy-service' },
+      { label: '政策与材料说明', route: '/renshi?tab=policy' },
+    ],
   },
 ]
 
@@ -131,11 +156,65 @@ const TOOLBOX_ASSISTANT_SCENES: Record<ToolboxAssistantSkill, ToolboxAssistantSc
     placeholder: '输入 HR 问题，例如：试用期社保怎么缴？离职证明什么时候开？',
     disclaimer: '回答仅供常识参考，不构成正式法律意见或官方政策承诺',
   },
+  self_intro_gen: {
+    title: 'AI 自我介绍生成',
+    welcome: '这里是 AI 自我介绍生成助手。请告诉我你的目标岗位、主要经历（学习/实习/项目各1-2条）和想突出的优势，我会生成1分钟和3分钟两版文稿供你打印准备。内容仅供参考，请根据实际情况调整。',
+    placeholder: '例如：应聘产品经理，211本科计算机，两段互联网实习，擅长数据分析和用户研究…',
+    disclaimer: '生成内容仅供参考，请根据实际情况修改后使用',
+  },
+  material_checklist: {
+    title: 'AI 材料准备清单',
+    welcome: '这里是材料准备清单助手。告诉我你要参加的是面试、招聘会还是入职，以及岗位和公司类型，我会生成一份个性化材料清单，可直接在本机打印带走。具体要求以用人单位通知为准。',
+    placeholder: '例如：明天参加国企校招现场面试，岗位是行政助理；或：下周参加IT行业校园招聘会…',
+    disclaimer: '清单仅供参考，具体材料要求以用人单位通知为准',
+  },
+  jd_analysis: {
+    title: 'AI 岗位 JD 解读',
+    welcome: '这里是 AI 岗位 JD 解读助手。请粘贴或描述招聘要求，我会拆解每条要求的实际含义、区分硬性门槛与加分项，并提示面试时可能被重点考查的方向。解读内容仅供参考，不代表招聘方评价标准。',
+    placeholder: '请粘贴 JD 内容，或描述关键要求，例如：要求3年Java开发，熟悉Spring，有分布式经验…',
+    disclaimer: '解读仅供参考，不代表招聘方的录用标准或面试评分规则',
+  },
+  interview_questions: {
+    title: 'AI 面试题预测',
+    welcome: '这里是 AI 面试题预测助手。请告诉我目标岗位、公司类型和你的背景，我会整理8-10道该岗位高频面试题及参考回答思路，可直接打印带走练习。实际题目以招聘方为准。',
+    placeholder: '例如：应聘互联网公司运营专员，985本科市场营销，有一段电商实习经历…',
+    disclaimer: '预测题目仅供练习参考，实际面试问题以招聘方为准',
+  },
+  career_explore: {
+    title: 'AI 求职方向探索',
+    welcome: '这里是求职方向探索助手。如果你还不确定自己适合做什么，可以告诉我专业背景、感兴趣的领域或当前困惑，我们一起通过对话梳理可匹配的岗位方向和下一步行动路径。结果仅供个人参考。',
+    placeholder: '例如：金融学本科，对互联网感兴趣，不知道适合哪个方向；或：想转行，有3年销售经验…',
+    disclaimer: '探索结果仅供个人参考，不构成职业规划建议',
+  },
+  cover_letter_gen: {
+    title: 'AI 求职信生成',
+    welcome: '这里是 AI 求职信生成助手。请告诉我目标公司名称、岗位、你的核心经历和想打动对方的一两个点，我会生成一封300-500字的求职信，可直接在本机打印带走。内容仅供参考，请根据实际情况调整。',
+    placeholder: '例如：应聘阿里巴巴运营岗，有两段互联网实习，擅长数据分析，希望体现执行力和对电商的热情…',
+    disclaimer: '生成内容仅供参考，请根据实际情况修改后使用，不保证录用结果',
+  },
+  resume_jd_match: {
+    title: 'AI 简历 JD 匹配',
+    welcome: '这里是 AI 简历与 JD 匹配分析助手。请先粘贴或描述招聘要求，再告诉我你的核心经历和技能，我会给出匹配项、差距项，以及面试时如何弥补差距的建议。',
+    placeholder: '例如：JD要求3年Java经验+分布式系统，我有2年Java经验、熟悉Spring，做过中型电商项目…',
+    disclaimer: '匹配分析仅供参考，不代表招聘方的实际评分标准或录用决定',
+  },
+  company_research: {
+    title: 'AI 企业面试速查',
+    welcome: '这里是 AI 企业面试速查助手。告诉我你要面试的公司名称和岗位，我会整理该企业/行业的面试常见风格、可能的考察方向和建议提前了解的5个问题，帮你在5分钟内做好基础准备。',
+    placeholder: '例如：明天去字节跳动面试产品经理，或：下午去华为面试硬件工程师…',
+    disclaimer: '速查内容来自公开信息整理，不构成招聘方官方说明，请以官方渠道信息为准',
+  },
 }
 
 function normalizeToolboxSkill(value: string | null): ToolboxAssistantSkill | undefined {
-  return value === 'offer_compare' || value === 'salary_negotiation' || value === 'hr_qa'
-    ? value
+  const valid: ToolboxAssistantSkill[] = [
+    'offer_compare', 'salary_negotiation', 'hr_qa',
+    'self_intro_gen', 'material_checklist', 'jd_analysis',
+    'interview_questions', 'career_explore',
+    'cover_letter_gen', 'resume_jd_match', 'company_research',
+  ]
+  return valid.includes(value as ToolboxAssistantSkill)
+    ? (value as ToolboxAssistantSkill)
     : undefined
 }
 
@@ -143,6 +222,79 @@ function normalizeToolboxSkill(value: string | null): ToolboxAssistantSkill | un
 function newSessionId(): string {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
+
+/** AI 专项工具入口数据（Approach B 页面卡片 + Approach A URL intent） */
+interface AiTool {
+  id: Extract<
+    ToolboxAssistantSkill,
+    | 'self_intro_gen' | 'material_checklist' | 'jd_analysis'
+    | 'interview_questions' | 'career_explore'
+    | 'cover_letter_gen' | 'resume_jd_match' | 'company_research'
+  >
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  description: string
+  accent: 'teal' | 'clay' | 'slate' | 'plum' | 'wheat'
+}
+
+const AI_TOOLS: readonly AiTool[] = [
+  {
+    id: 'self_intro_gen',
+    icon: Mic2Icon,
+    title: 'AI 自我介绍生成',
+    description: '描述经历，生成1/3分钟可打印文稿',
+    accent: 'teal',
+  },
+  {
+    id: 'cover_letter_gen',
+    icon: MailIcon,
+    title: 'AI 求职信生成',
+    description: '描述公司岗位和经历，生成可打印求职信',
+    accent: 'clay',
+  },
+  {
+    id: 'material_checklist',
+    icon: ListChecksIcon,
+    title: 'AI 材料准备清单',
+    description: '面试/招聘会前，生成个性化可打印清单',
+    accent: 'slate',
+  },
+  {
+    id: 'resume_jd_match',
+    icon: CrosshairIcon,
+    title: 'AI 简历 JD 匹配',
+    description: '简历与岗位对比，找出差距和加分建议',
+    accent: 'plum',
+  },
+  {
+    id: 'jd_analysis',
+    icon: ScanSearchIcon,
+    title: 'AI 岗位 JD 解读',
+    description: '拆解招聘要求，区分门槛与加分项',
+    accent: 'wheat',
+  },
+  {
+    id: 'interview_questions',
+    icon: HelpCircleIcon,
+    title: 'AI 面试题预测',
+    description: '预测高频题目与回答思路，可打印带走',
+    accent: 'teal',
+  },
+  {
+    id: 'company_research',
+    icon: Building2Icon,
+    title: 'AI 企业面试速查',
+    description: '面试前5分钟了解企业风格和考察方向',
+    accent: 'clay',
+  },
+  {
+    id: 'career_explore',
+    icon: RouteIcon,
+    title: 'AI 求职方向探索',
+    description: '不知道做什么？对话梳理方向和行动路径',
+    accent: 'plum',
+  },
+] as const
 
 interface Message {
   id: string
@@ -349,12 +501,13 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
   return (
     <KioskPageFrame className="fusion-w3 fusion-w3--assistant">
     <section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">
-      <h1 id="assistant-page-title" className="kassist-sr-only">AI助手</h1>
+      <h1 id="assistant-page-title" className="kassist-sr-only">AI顾问</h1>
 
       <div ref={workbenchRef} data-kiosk-domain="assistant" data-kiosk-screen="assistant" className="assistant-workbench">
         <header className="assistant-prototype-head">
           <span className="assistant-prototype-avatar" aria-hidden="true">青</span>
           <div>
+            <span className="assistant-advisor-badge">AI 顾问</span>
             <h2>你好，我是小青</h2>
             <p>AI 生成内容，仅供参考 · 不构成正式建议</p>
           </div>
@@ -372,6 +525,7 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             {CONSULTATION_TASKS.map((task) => (
               <button
                 type="button"
+                data-task-id={task.id}
                 className={`assistant-task${selectedTaskId === task.id ? ' is-active' : ''}`}
                 key={task.id}
                 onClick={() => setSelectedTaskId(task.id)}
@@ -388,6 +542,9 @@ function TextChat({ voiceAvailable }: { voiceAvailable: boolean }) {
             </button>
           </div>
         </section>
+
+        {/* AI 专项工具入口区：未激活特定技能时展示（Approach B） */}
+        {!toolboxScene && <AiToolSection />}
 
         <section className="assistant-conversation" aria-labelledby="assistant-conversation-title">
           <header>
@@ -535,6 +692,40 @@ function AdvisorAvatar() {
     <span className="assistant-message-avatar" aria-hidden="true">
       <img src="/assets/ai-advisor.png" alt="" />
     </span>
+  )
+}
+
+/** AI 专项工具入口区（Approach B：页面内卡片；点击跳转至 ?intent= 激活对应技能） */
+function AiToolSection() {
+  const navigate = useNavigate()
+  return (
+    <section className="assistant-ai-tools" aria-labelledby="ai-tools-heading">
+      <div className="assistant-ai-tools-header">
+        <h2 id="ai-tools-heading">AI 专项工具</h2>
+        <span>直接进入专项 AI 会话</span>
+      </div>
+      <div className="assistant-ai-tools-grid">
+        {AI_TOOLS.map((tool) => {
+          const Icon = tool.icon
+          return (
+            <button
+              key={tool.id}
+              type="button"
+              className={`assistant-ai-tool-card adv-tool--${tool.accent}`}
+              onClick={() => navigate(`/assistant?intent=${tool.id}`)}
+            >
+              <span className="aat-icon" aria-hidden="true">
+                <Icon />
+              </span>
+              <span className="aat-body">
+                <strong>{tool.title}</strong>
+                <small>{tool.description}</small>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

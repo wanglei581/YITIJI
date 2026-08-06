@@ -84,3 +84,22 @@
   --radius-xl:   1rem;       /* 16px — large panels, modals         */
   --radius-full: 9999px;     /* pill — status badges, chip labels   */
 }
+
+@layer base {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+  }
+
+  body,
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  body {
+    margin: 0;
+  }
+}

@@ -112,11 +112,26 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
   const [loading, setLoading]   = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [error, setError]       = useState('')
+  const [dragActive, setDragActive] = useState(false)
   // T1: 是否套用了上次保存的字段映射规则（用于映射步提示）
   const [savedRuleApplied, setSavedRuleApplied] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fields: readonly FieldDef[] = dataType === 'job' ? JOB_FIELDS : FAIR_FIELDS
+  const previewColumns = preview?.sampleValid[0]
+    ? Object.keys(preview.sampleValid[0].data).slice(0, 4)
+    : []
+
+  const selectFile = (nextFile: File | undefined) => {
+    if (!nextFile) return
+    if (!/\.(xlsx|xls|csv)$/i.test(nextFile.name)) {
+      setFile(null)
+      setError('仅支持 .xlsx、.xls 或 .csv 文件')
+      return
+    }
+    setFile(nextFile)
+    setError('')
+  }
 
   const handleDownloadTemplate = async () => {
     setDownloadingTemplate(true); setError('')
@@ -275,13 +290,22 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   accept=".xlsx,.xls,.csv"
                   className="hidden"
                   onChange={(e) => {
-                    const f = e.target.files?.[0]
-                    if (f) { setFile(f); setError('') }
+                    selectFile(e.target.files?.[0])
+                    e.target.value = ''
                   }}
                 />
-                <div
-                  className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50 p-8 hover:border-primary-300 hover:bg-primary-50/30"
+                <button
+                  type="button"
+                  className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 hover:border-primary-300 hover:bg-primary-50/30 ${dragActive ? 'border-primary-400 bg-primary-50' : 'border-neutral-200 bg-neutral-50'}`}
                   onClick={() => fileRef.current?.click()}
+                  onDragEnter={(e) => { e.preventDefault(); setDragActive(true) }}
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+                  onDragLeave={(e) => { e.preventDefault(); setDragActive(false) }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setDragActive(false)
+                    selectFile(e.dataTransfer.files[0])
+                  }}
                 >
                   {file ? (
                     <>
@@ -296,7 +320,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                       <p className="mt-1 text-xs text-neutral-400">第一行为表头，数据从第二行开始</p>
                     </>
                   )}
-                </div>
+                </button>
               </div>
 
               <div className="rounded-lg border border-warning/20 bg-warning-bg px-4 py-3 text-xs text-warning-fg">
@@ -367,6 +391,36 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
                   </div>
                 ))}
               </div>
+
+              {preview.sampleValid.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-success/20">
+                  <p className="border-b border-success/20 bg-success-bg px-3 py-2 text-xs font-medium text-success-fg">
+                    有效行示例（显示前 {preview.sampleValid.length} 行）
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-xs">
+                      <thead className="bg-neutral-50 text-neutral-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">行号</th>
+                          {previewColumns.map((column) => <th key={column} className="px-3 py-2 text-left font-medium">{column}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100">
+                        {preview.sampleValid.map((row) => (
+                          <tr key={row.rowIndex}>
+                            <td className="px-3 py-2 text-neutral-500">{row.rowIndex}</td>
+                            {previewColumns.map((column) => (
+                              <td key={column} className="max-w-48 truncate px-3 py-2 text-neutral-800" title={row.data[column]}>
+                                {row.data[column] || '—'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Sample invalid rows */}
               {preview.sampleInvalid.length > 0 && (

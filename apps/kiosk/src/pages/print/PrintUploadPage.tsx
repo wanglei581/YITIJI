@@ -30,7 +30,6 @@ import {
   UsbIcon,
   XIcon,
 } from 'lucide-react'
-import { API_MODE } from '../../services/api/client'
 import { kioskUploadFile } from '../../services/files/filesApi'
 import {
   getUsbStatus,
@@ -42,7 +41,10 @@ import {
 } from '../../services/files/usbImportApi'
 import { useAuth } from '../../auth/useAuth'
 import { getMyPrintOrders } from '../../services/api/memberPrintOrders'
-import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
+import {
+  UploadSessionQrPanel,
+  type PhoneUploadedFile,
+} from '../upload/components/UploadSessionQrPanel'
 import {
   clearPrintMaterialSession,
   savePrintMaterialSession,
@@ -77,7 +79,7 @@ const IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
 function resolveContentCategory(
   entryContentCategory: PrintMaterialContentCategory | undefined,
-  mimeType: string | undefined,
+  mimeType: string | undefined
 ): PrintMaterialContentCategory | undefined {
   if (entryContentCategory !== 'photo') return undefined
   if (!mimeType || !IMAGE_MIME_TYPES.has(mimeType)) return undefined
@@ -90,15 +92,19 @@ export function PrintUploadPage() {
   const [searchParams] = useSearchParams()
   const { getToken, isLoggedIn } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
-  const source: PrintMaterialSource = searchParams.get('source') === 'resume' ? 'resume' : 'document'
+  const source: PrintMaterialSource =
+    searchParams.get('source') === 'resume' ? 'resume' : 'document'
   // PrintScanHomePage 的"照片打印"卡片通过 router state 传 category: 'photo'；
   // 仅作为 pii_scan 任务的审计字段随请求持久化，不再驱动是否跳过真实扫描
   // （materials.service.ts 已移除 contentCategory 跳过口子，所有图片一律真实扫描）。
-  const contentCategory = (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
+  const contentCategory =
+    (location.state as { category?: 'photo' } | null)?.category === 'photo' ? 'photo' : undefined
   const isResumePrint = source === 'resume'
   const isDocumentPrint = source === 'document'
   const pageTitle = isDocumentPrint ? '文档打印' : '简历打印'
-  const pageSubtitle = isDocumentPrint ? '通用文档、求职材料或图片上传后打印' : '从我的简历或上传一份简历进入打印'
+  const pageSubtitle = isDocumentPrint
+    ? '通用文档、求职材料或图片上传后打印'
+    : '从我的简历或上传一份简历进入打印'
 
   // 简历打印与文档打印共用三种上传通道；?tab=qr 可从「手机扫码上传」入口直达扫码面板。
   const requestedTab = searchParams.get('tab')
@@ -118,7 +124,13 @@ export function PrintUploadPage() {
   // 上传中或扫码会话进行中:禁止进入待机宣传屏(评审 bug #1)
   useBusyLock(uploading || qrBusy || usbUploading)
 
-  const tabs: { key: UploadTab; label: string; icon: typeof FileTextIcon; disabled?: boolean; note?: string }[] = [
+  const tabs: {
+    key: UploadTab
+    label: string
+    icon: typeof FileTextIcon
+    disabled?: boolean
+    note?: string
+  }[] = [
     {
       key: 'file',
       label: isResumePrint ? '上传简历' : '选择文件',
@@ -160,7 +172,9 @@ export function PrintUploadPage() {
         if (cancelled) return
         setUsbStatus(null)
         setUsbFiles(null)
-        setUsbError(err instanceof Error ? err.message : 'U 盘状态查询失败，请确认 Terminal Agent 正在运行')
+        setUsbError(
+          err instanceof Error ? err.message : 'U 盘状态查询失败，请确认 Terminal Agent 正在运行'
+        )
       }
     }
 
@@ -209,16 +223,20 @@ export function PrintUploadPage() {
     try {
       const result = await kioskUploadFile(selected, getToken())
       const nextFile: UploadedFile = {
-        name:    result.filename,
-        size:    formatBytes(result.sizeBytes),
-        pages:   null,
-        fileId:  result.fileId,
+        name: result.filename,
+        size: formatBytes(result.sizeBytes),
+        pages: null,
+        fileId: result.fileId,
         fileUrl: result.signedUrl,
         fileMd5: result.sha256,
         mimeType: result.mimeType,
       }
       setFile(nextFile)
-      savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
+      savePrintMaterialSession({
+        file: nextFile,
+        source,
+        contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
+      })
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : '上传失败，请重试')
     } finally {
@@ -246,7 +264,11 @@ export function PrintUploadPage() {
       mimeType: uploaded.mimeType,
     }
     setFile(nextFile)
-    savePrintMaterialSession({ file: nextFile, source, contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType) })
+    savePrintMaterialSession({
+      file: nextFile,
+      source,
+      contentCategory: resolveContentCategory(contentCategory, nextFile.mimeType),
+    })
   }
 
   const handleUsbFileSelect = async (safeId: string) => {
@@ -282,307 +304,337 @@ export function PrintUploadPage() {
 
   const handleNext = () => {
     if (!file) return
-    savePrintMaterialSession({ file, source, contentCategory: resolveContentCategory(contentCategory, file.mimeType) })
+    savePrintMaterialSession({
+      file,
+      source,
+      contentCategory: resolveContentCategory(contentCategory, file.mimeType),
+    })
     navigate('/print/material-check', { state: { file, source } })
   }
 
   return (
     <PrintPageFrame className="p-6">
-    <div className="flex min-h-full flex-col" data-w2-page="print-upload">
-      <PrintPrototypeHeader
-        title={pageTitle}
-        subtitle={pageSubtitle}
-        step={1}
-        backLabel="返回首页"
-        onBack={() => navigate('/')}
-      />
+      <div className="flex min-h-full flex-col" data-w2-page="print-upload">
+        <PrintPrototypeHeader
+          title={pageTitle}
+          subtitle={pageSubtitle}
+          step={1}
+          backLabel="返回首页"
+          onBack={() => navigate('/')}
+        />
 
-      {source === 'resume' && (
-        <Card className="mt-6 border-primary-100 bg-primary-50/60 p-5">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
-              <PrinterIcon className="h-7 w-7" aria-hidden="true" />
+        {source === 'resume' && (
+          <Card className="mt-6 border-primary-100 bg-primary-50/60 p-5">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-primary-600 shadow-sm">
+                <PrinterIcon className="h-7 w-7" aria-hidden="true" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-lg font-bold text-neutral-900">先查看账号里的简历记录</p>
+                <p className="mt-1 text-sm leading-relaxed text-neutral-600">
+                  已生成的简历可继续查看并打印；诊断类记录可查看报告或继续优化。已有电子简历也可以在下方上传后直接打印。
+                </p>
+              </div>
+              <Button
+                size="lg"
+                className="h-14 shrink-0 px-6"
+                onClick={() => {
+                  if (isLoggedIn) {
+                    navigate('/me/resumes')
+                  } else {
+                    navigate('/login', { state: { from: '/print/upload?source=resume' } })
+                  }
+                }}
+              >
+                <SparklesIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
+                查看我的简历记录
+              </Button>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-neutral-900">先查看账号里的简历记录</p>
-              <p className="mt-1 text-sm leading-relaxed text-neutral-600">
-                已生成的简历可继续查看并打印；诊断类记录可查看报告或继续优化。已有电子简历也可以在下方上传后直接打印。
-              </p>
-            </div>
-            <Button
-              size="lg"
-              className="h-14 shrink-0 px-6"
+          </Card>
+        )}
+
+        {/* Tab bar */}
+        <div className="w2-print-upload-source-grid mt-6 grid grid-cols-2 gap-3">
+          {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
+            <button
+              key={key}
+              disabled={disabled}
               onClick={() => {
-                if (isLoggedIn) {
-                  navigate('/me/resumes')
-                } else {
-                  navigate('/login', { state: { from: '/print/upload?source=resume' } })
+                if (!disabled) {
+                  setTab(key)
+                  setFile(null)
+                  setUploadError(null)
                 }
               }}
+              className={[
+                'flex min-h-[72px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
+                disabled
+                  ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300'
+                  : tab === key
+                    ? 'border-primary-600 bg-primary-50 text-primary-600'
+                    : 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
+              ].join(' ')}
             >
-              <SparklesIcon className="mr-1.5 h-5 w-5" aria-hidden="true" />
-              查看我的简历记录
-            </Button>
-          </div>
-        </Card>
-      )}
+              <Icon className="h-5 w-5" />
+              <span>{label}</span>
+              {note && (
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium">
+                  {note}
+                </span>
+              )}
+            </button>
+          ))}
+          {!isResumePrint && (
+            <button
+              type="button"
+              onClick={() => navigate('/scan/start')}
+              className="flex min-h-[72px] items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white py-4 text-sm font-medium text-neutral-500 transition-colors hover:border-primary-400 hover:text-primary-700"
+            >
+              <PrinterIcon className="h-5 w-5" />
+              <span>扫描原件</span>
+            </button>
+          )}
+        </div>
 
-      {/* Tab bar */}
-      <div className="w2-print-upload-source-grid mt-6 grid grid-cols-2 gap-3">
-        {tabs.map(({ key, label, icon: Icon, disabled, note }) => (
-          <button
-            key={key}
-            disabled={disabled}
-            onClick={() => { if (!disabled) { setTab(key); setFile(null); setUploadError(null) } }}
-            className={[
-              'flex min-h-[72px] items-center justify-center gap-2 rounded-lg border py-4 text-sm font-medium transition-colors',
-              disabled ? 'cursor-not-allowed border-neutral-100 bg-neutral-50 text-neutral-300' :
-              tab === key
-                ? 'border-primary-600 bg-primary-50 text-primary-600'
-                : 'border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:text-neutral-700',
-            ].join(' ')}
+        {recentFiles.length > 0 && (
+          <section
+            className="mt-4 rounded-lg border border-neutral-200 bg-white p-4"
+            aria-label="最近打印文件"
           >
-            <Icon className="h-5 w-5" />
-            <span>{label}</span>
-            {note && <span className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-medium">{note}</span>}
-          </button>
-        ))}
-        {!isResumePrint && (
-          <button
-            type="button"
-            onClick={() => navigate('/scan/start')}
-            className="flex min-h-[72px] items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white py-4 text-sm font-medium text-neutral-500 transition-colors hover:border-primary-400 hover:text-primary-700"
-          >
-            <PrinterIcon className="h-5 w-5" />
-            <span>扫描原件</span>
-          </button>
-        )}
-      </div>
-
-      {recentFiles.length > 0 && (
-        <section className="mt-4 rounded-lg border border-neutral-200 bg-white p-4" aria-label="最近打印文件">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold text-neutral-900">最近文件</h2>
-            <span className="text-xs text-neutral-500">最近 3 份</span>
-          </div>
-          <div className="grid gap-2">
-            {recentFiles.map((item) => (
-              <div key={item.id} className="flex min-h-[56px] items-center gap-3 rounded-lg bg-neutral-50 px-3">
-                <FileTextIcon className="h-5 w-5 shrink-0 text-primary-600" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">{item.fileName ?? '打印文件'}</span>
-                <span className="text-xs text-neutral-500">{item.status}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Tab content */}
-      <div className="mt-4 flex flex-1 flex-col">
-        {tab === 'file' && (
-          <div className="flex flex-1 flex-col gap-3">
-            {/* A2 mode banner */}
-            {API_MODE === 'http' && (
-              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
-                <AlertCircleIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>桌面浏览器验证模式 — 生产 Kiosk 将切换为 Agent 文件中转（A1）</span>
-              </div>
-            )}
-
-            {/* Hidden file input — A2 桌面验证路径 */}
-            <input
-              ref={inputRef}
-              type="file"
-              accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'}
-              className="sr-only"
-              onChange={handleFileChange}
-            />
-
-            {/* Upload error */}
-            {uploadError && (
-              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
-                <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                {uploadError}
-              </div>
-            )}
-
-            {file ? (
-              <Card className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-                  <FileTextIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
-                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 页数待识别</p>
-                </div>
-                <button
-                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold text-neutral-900">最近文件</h2>
+              <span className="text-xs text-neutral-500">最近 3 份</span>
+            </div>
+            <div className="grid gap-2">
+              {recentFiles.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex min-h-[56px] items-center gap-3 rounded-lg bg-neutral-50 px-3"
                 >
-                  <XIcon className="h-4 w-4 text-neutral-400" />
-                </button>
-              </Card>
-            ) : (
-              <button
-                onClick={handleSelectClick}
-                disabled={uploading}
-                className="flex flex-1 w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-neutral-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors min-h-[200px] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {uploading ? (
-                  <>
-                    <LoaderIcon className="h-10 w-10 animate-spin text-primary-400" />
-                    <p className="text-base font-medium text-neutral-600">上传中…</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
-                      <FileTextIcon className="h-8 w-8 text-neutral-400" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-medium text-neutral-700">{source === 'resume' ? '点击选择简历文件' : '点击选择文件'}</p>
-                      <p className="mt-1.5 text-sm text-neutral-400">
-                        {source === 'resume'
-                          ? '支持 PDF、图片格式，适合已有电子简历直接打印'
-                          : '支持 PDF、图片格式，上传后将先做材料检查'}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+                  <FileTextIcon className="h-5 w-5 shrink-0 text-primary-600" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-neutral-900">
+                    {item.fileName ?? '打印文件'}
+                  </span>
+                  <span className="text-xs text-neutral-500">{item.status}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
-        {tab === 'qr' && (
-          <div className="flex flex-1 flex-col gap-3">
-            {uploadError && (
-              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
-                <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                {uploadError}
-              </div>
-            )}
-            {file && (
-              <Card className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-                  <FileTextIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
-                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已确认，可点击下方"下一步"</p>
-                </div>
-                <button
-                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
-                >
-                  <XIcon className="h-4 w-4 text-neutral-400" />
-                </button>
-              </Card>
-            )}
-            <UploadSessionQrPanel
-              purpose="print_doc"
-              title="手机扫码上传"
-              description={
-                isResumePrint
-                  ? '手机扫码上传简历（PDF/图片）；一体机确认后进入打印材料检查。'
-                  : '手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。'
-              }
-              confirmLabel="确认使用这份文件"
-              onUploaded={handleQrUploaded}
-              onBusyChange={setQrBusy}
-            />
-          </div>
-        )}
+        {/* Tab content */}
+        <div className="mt-4 flex flex-1 flex-col">
+          {tab === 'file' && (
+            <div className="flex flex-1 flex-col gap-3">
+              {/* Hidden file input — A2 桌面验证路径 */}
+              <input
+                ref={inputRef}
+                type="file"
+                accept={contentCategory === 'photo' ? '.jpg,.jpeg,.png' : '.pdf,.jpg,.jpeg,.png'}
+                className="sr-only"
+                onChange={handleFileChange}
+              />
 
-        {tab === 'usb' && (
-          <div className="flex flex-1 flex-col gap-3">
-            {usbError && (
-              <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
-                <AlertCircleIcon className="h-4 w-4 shrink-0" />
-                {usbError}
-              </div>
-            )}
+              {/* Upload error */}
+              {uploadError && (
+                <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+                  <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                  {uploadError}
+                </div>
+              )}
 
-            {file ? (
-              <Card className="flex items-center gap-4 p-5">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
-                  <FileTextIcon className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-neutral-900">{file.name}</p>
-                  <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已从 U 盘导入</p>
-                </div>
-                <button
-                  onClick={() => { setFile(null); setUploadError(null); clearPrintMaterialSession() }}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
-                >
-                  <XIcon className="h-4 w-4 text-neutral-400" />
-                </button>
-              </Card>
-            ) : usbStatus?.present ? (
-              usbFiles === null ? (
-                <Card className="flex h-full flex-col items-center justify-center gap-4 p-8">
-                  <LoaderIcon className="h-8 w-8 animate-spin text-primary-400" />
-                  <p className="text-sm text-neutral-500">正在读取 U 盘文件列表…</p>
-                </Card>
-              ) : usbFiles.length === 0 ? (
-                <Card className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-                  <UsbIcon className="h-10 w-10 text-neutral-400" />
-                  <p className="text-base font-medium text-neutral-700">未检测到可导入的文件</p>
-                  <p className="text-sm text-neutral-500">仅支持 PDF、JPG、PNG 格式，且不超过 20MB</p>
+              {file ? (
+                <Card className="flex items-center gap-4 p-5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+                    <FileTextIcon className="h-6 w-6 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 页数待识别</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFile(null)
+                      setUploadError(null)
+                      clearPrintMaterialSession()
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+                  >
+                    <XIcon className="h-4 w-4 text-neutral-400" />
+                  </button>
                 </Card>
               ) : (
-                <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
-                  {usbFiles.map((f) => (
-                    <button
-                      key={f.safeId}
-                      disabled={usbUploading}
-                      onClick={() => handleUsbFileSelect(f.safeId)}
-                      className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <FileTextIcon className="h-6 w-6 shrink-0 text-primary-600" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-neutral-900">{f.filename}</p>
-                        <p className="text-sm text-neutral-500">{formatBytes(f.sizeBytes)}</p>
+                <button
+                  onClick={handleSelectClick}
+                  disabled={uploading}
+                  className="flex flex-1 w-full flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-neutral-300 bg-white hover:border-primary-400 hover:bg-primary-50 transition-colors min-h-[200px] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {uploading ? (
+                    <>
+                      <LoaderIcon className="h-10 w-10 animate-spin text-primary-400" />
+                      <p className="text-base font-medium text-neutral-600">上传中…</p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-neutral-100">
+                        <FileTextIcon className="h-8 w-8 text-neutral-400" />
                       </div>
-                      {usbUploading && <LoaderIcon className="h-5 w-5 shrink-0 animate-spin text-primary-400" />}
-                    </button>
-                  ))}
-                </div>
-              )
-            ) : (
-              <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
-                  <UsbIcon className="h-10 w-10 text-neutral-400" />
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-medium text-neutral-800">请插入 U 盘</p>
-                  <p className="mt-2 text-sm text-neutral-500">
-                    连接后系统将自动读取 U 盘内文件，
-                    <br />
-                    请确保文件格式为 PDF 或图片
-                  </p>
-                </div>
-              </Card>
-            )}
-          </div>
-        )}
-      </div>
+                      <div className="text-center">
+                        <p className="text-lg font-medium text-neutral-700">
+                          {source === 'resume' ? '点击选择简历文件' : '点击选择文件'}
+                        </p>
+                        <p className="mt-1.5 text-sm text-neutral-400">
+                          {source === 'resume'
+                            ? '支持 PDF、图片格式，适合已有电子简历直接打印'
+                            : '支持 PDF、图片格式，上传后将先做材料检查'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
 
-      {/* Bottom action */}
-      <div className="print-upload-footer mt-6 flex gap-3">
-        <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
-          取消
-        </Button>
-        <Button
-          size="lg"
-          className="flex-1"
-          disabled={!file || uploading}
-          onClick={handleNext}
-        >
-          下一步
-        </Button>
+          {tab === 'qr' && (
+            <div className="flex flex-1 flex-col gap-3">
+              {uploadError && (
+                <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+                  <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                  {uploadError}
+                </div>
+              )}
+              {file && (
+                <Card className="flex items-center gap-4 p-5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+                    <FileTextIcon className="h-6 w-6 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="mt-0.5 text-sm text-neutral-500">
+                      {file.size} · 已确认，可点击下方"下一步"
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFile(null)
+                      setUploadError(null)
+                      clearPrintMaterialSession()
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+                  >
+                    <XIcon className="h-4 w-4 text-neutral-400" />
+                  </button>
+                </Card>
+              )}
+              <UploadSessionQrPanel
+                purpose="print_doc"
+                title="手机扫码上传"
+                description={
+                  isResumePrint
+                    ? '手机扫码上传简历（PDF/图片）；一体机确认后进入打印材料检查。'
+                    : '手机或其他联网设备打开链接上传文件；一体机上确认后自动填入本次打印任务。'
+                }
+                confirmLabel="确认使用这份文件"
+                onUploaded={handleQrUploaded}
+                onBusyChange={setQrBusy}
+              />
+            </div>
+          )}
+
+          {tab === 'usb' && (
+            <div className="flex flex-1 flex-col gap-3">
+              {usbError && (
+                <div className="flex items-center gap-2 rounded-lg border border-error/30 bg-error-bg px-3 py-2 text-sm text-error-fg">
+                  <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                  {usbError}
+                </div>
+              )}
+
+              {file ? (
+                <Card className="flex items-center gap-4 p-5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary-50">
+                    <FileTextIcon className="h-6 w-6 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate font-medium text-neutral-900">{file.name}</p>
+                    <p className="mt-0.5 text-sm text-neutral-500">{file.size} · 已从 U 盘导入</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setFile(null)
+                      setUploadError(null)
+                      clearPrintMaterialSession()
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-neutral-100"
+                  >
+                    <XIcon className="h-4 w-4 text-neutral-400" />
+                  </button>
+                </Card>
+              ) : usbStatus?.present ? (
+                usbFiles === null ? (
+                  <Card className="flex h-full flex-col items-center justify-center gap-4 p-8">
+                    <LoaderIcon className="h-8 w-8 animate-spin text-primary-400" />
+                    <p className="text-sm text-neutral-500">正在读取 U 盘文件列表…</p>
+                  </Card>
+                ) : usbFiles.length === 0 ? (
+                  <Card className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+                    <UsbIcon className="h-10 w-10 text-neutral-400" />
+                    <p className="text-base font-medium text-neutral-700">未检测到可导入的文件</p>
+                    <p className="text-sm text-neutral-500">
+                      仅支持 PDF、JPG、PNG 格式，且不超过 20MB
+                    </p>
+                  </Card>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-2 overflow-y-auto">
+                    {usbFiles.map((f) => (
+                      <button
+                        key={f.safeId}
+                        disabled={usbUploading}
+                        onClick={() => handleUsbFileSelect(f.safeId)}
+                        className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-primary-400 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <FileTextIcon className="h-6 w-6 shrink-0 text-primary-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-neutral-900">{f.filename}</p>
+                          <p className="text-sm text-neutral-500">{formatBytes(f.sizeBytes)}</p>
+                        </div>
+                        {usbUploading && (
+                          <LoaderIcon className="h-5 w-5 shrink-0 animate-spin text-primary-400" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <Card className="flex h-full flex-col items-center justify-center gap-6 p-8">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-neutral-100">
+                    <UsbIcon className="h-10 w-10 text-neutral-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-medium text-neutral-800">请插入 U 盘</p>
+                    <p className="mt-2 text-sm text-neutral-500">
+                      连接后系统将自动读取 U 盘内文件，
+                      <br />
+                      请确保文件格式为 PDF 或图片
+                    </p>
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom action */}
+        <div className="print-upload-footer mt-6 flex gap-3">
+          <Button variant="secondary" size="lg" className="flex-1" onClick={() => navigate('/')}>
+            取消
+          </Button>
+          <Button size="lg" className="flex-1" disabled={!file || uploading} onClick={handleNext}>
+            下一步
+          </Button>
+        </div>
       </div>
-    </div>
     </PrintPageFrame>
   )
 }

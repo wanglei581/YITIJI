@@ -1,0 +1,295 @@
+/* ============================================================
+ * assistant-advisor.css — AI顾问 视觉精制层
+ *
+ * 叠加在 assistant-batch8.css 之后。
+ * 使用 .kassist.kassist-lightflow 前缀（0,3,0 特异性）覆写原有样式。
+ * ============================================================ */
+
+/* ── AI顾问 标题徽章 ─────────────────────────────────────────────
+ * 在页面头部展示「AI顾问」可见标签，明确服务定位。
+ * ─────────────────────────────────────────────────────────────── */
+.kassist.kassist-lightflow .assistant-advisor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  margin-bottom: 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(31, 158, 134, 0.28);
+  background: linear-gradient(135deg, #e2f2ec, rgba(226, 242, 236, 0.55));
+  color: #157a67;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.kassist.kassist-lightflow .assistant-advisor-badge::before {
+  content: '✦';
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+/* ── 咨询主题卡片 — 品类色左边条 ─────────────────────────────────
+ * 按4个主题类别分配与首页服务磁贴一致的品类色：
+ *   简历 → teal（AI简历服务同色）
+ *   面试 → plum（AI面试训练同色）
+ *   岗位 → clay（岗位信息同色）
+ *   职场 → wheat（政策服务同色）
+ * ─────────────────────────────────────────────────────────────── */
+.kassist.kassist-lightflow .assistant-task[data-task-id='resume']    { --adv-accent: #1f9e86; --adv-soft: #e2f2ec; }
+.kassist.kassist-lightflow .assistant-task[data-task-id='interview'] { --adv-accent: #7a5a86; --adv-soft: #efe7f1; }
+.kassist.kassist-lightflow .assistant-task[data-task-id='jobs']      { --adv-accent: #b8683c; --adv-soft: #f4e8dd; }
+.kassist.kassist-lightflow .assistant-task[data-task-id='workplace'] { --adv-accent: #a9781f; --adv-soft: #f2ead6; }
+
+/* 左侧品类色边条 + hover 色晕 */
+.kassist.kassist-lightflow .assistant-task[data-task-id] {
+  border-left: 4px solid var(--adv-accent, #1f9e86);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.kassist.kassist-lightflow .assistant-task[data-task-id] .assistant-task-copy strong {
+  color: var(--adv-accent, #1f9e86);
+  font-size: 19px;
+}
+
+.kassist.kassist-lightflow .assistant-task[data-task-id]:not(.is-active):hover {
+  background: color-mix(in srgb, var(--adv-soft, #e2f2ec) 45%, var(--color-surface));
+}
+
+/* 选中态：软色背景 + 单色描边 + 轻微阴影 */
+.kassist.kassist-lightflow .assistant-task[data-task-id].is-active {
+  border-color: var(--adv-accent, #1f9e86);
+  background: var(--adv-soft, #e2f2ec);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--adv-accent, #1f9e86) 25%, transparent);
+  color: var(--adv-accent, #1f9e86);
+}
+
+/* ── 对话框标题区 — 强调当前主题 ───────────────────────────────── */
+.kassist.kassist-lightflow .assistant-conversation > header {
+  background: transparent;
+}
+
+.kassist.kassist-lightflow .assistant-conversation > header h2 {
+  font-size: 22px;
+  color: var(--color-neutral-700);
+}
+
+/* ── 行动入口芯片 — 对齐项目服务色 ────────────────────────────── */
+.kassist.kassist-lightflow .action-chip {
+  border-color: rgba(31, 158, 134, 0.3);
+  background: #e2f2ec;
+  color: #157a67;
+  font-weight: 600;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.kassist.kassist-lightflow .action-chip:hover {
+  background: color-mix(in srgb, #e2f2ec 70%, white);
+  box-shadow: 0 2px 10px rgba(31, 158, 134, 0.15);
+}
+
+/* ── 快捷问题芯片 hover ─────────────────────────────────────────── */
+.kassist.kassist-lightflow .assistant-quick-questions button:hover {
+  background: color-mix(in srgb, var(--color-surface) 60%, #e2f2ec);
+  border-color: rgba(31, 158, 134, 0.22);
+  transition: background 0.12s;
+}
+
+/* ══════════════════════════════════════════════════════════
+   AI 专项工具入口区（Approach B：页面内卡片网格）
+   ══════════════════════════════════════════════════════════ */
+
+.kassist.kassist-lightflow .assistant-ai-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.kassist.kassist-lightflow .assistant-ai-tools-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.kassist.kassist-lightflow .assistant-ai-tools-header h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+  letter-spacing: 0.03em;
+}
+
+.kassist.kassist-lightflow .assistant-ai-tools-header span {
+  font-size: 16px;
+  color: var(--color-neutral-500);
+}
+
+/* 3 列网格，第5张卡自然换行（左侧对齐），给视觉留白 */
+.kassist.kassist-lightflow .assistant-ai-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* 工具卡片基础样式 */
+.kassist.kassist-lightflow .assistant-ai-tool-card {
+  --tool-accent: #1f9e86;
+  --tool-soft:   #e2f2ec;
+  --tool-deep:   #157a67;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 100px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-neutral-200);
+  border-top: 4px solid var(--tool-accent);
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    var(--color-surface) 0%,
+    color-mix(in srgb, var(--tool-soft) 15%, var(--color-surface)) 100%
+  );
+  color: var(--color-neutral-900);
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    0 2px 10px rgba(16, 48, 43, 0.05),
+    0 6px 24px color-mix(in srgb, var(--tool-accent) 8%, transparent);
+  transition:
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.15s ease;
+}
+
+.kassist.kassist-lightflow .assistant-ai-tool-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 4px 18px rgba(16, 48, 43, 0.08),
+    0 10px 40px color-mix(in srgb, var(--tool-accent) 18%, transparent);
+}
+
+.kassist.kassist-lightflow .assistant-ai-tool-card:active {
+  transform: scale(0.975);
+  transition-duration: 0.08s;
+}
+
+/* 图标容器 — 软色背景 + 品类深色图标（与 ps-cap__icon / st-icon 保持一致） */
+.kassist.kassist-lightflow .aat-icon {
+  flex: none;
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--tool-soft);
+  color: var(--tool-deep);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--tool-accent) 20%, transparent);
+}
+.kassist.kassist-lightflow .aat-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+/* 文字区 */
+.kassist.kassist-lightflow .aat-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kassist.kassist-lightflow .aat-body strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--tool-deep);
+  line-height: 1.25;
+}
+.kassist.kassist-lightflow .aat-body small {
+  display: block;
+  font-size: 15px;
+  color: var(--color-neutral-500);
+  line-height: 1.4;
+}
+
+/* ── 5种品类色 Token ─────────────────────────────────────────── */
+.kassist.kassist-lightflow .adv-tool--teal  { --tool-accent: #1f9e86; --tool-soft: #e2f2ec; --tool-deep: #157a67; }
+.kassist.kassist-lightflow .adv-tool--clay  { --tool-accent: #b8683c; --tool-soft: #f4e8dd; --tool-deep: #9e5330; }
+.kassist.kassist-lightflow .adv-tool--slate { --tool-accent: #3f68b0; --tool-soft: #e5edf4; --tool-deep: #35608f; }
+.kassist.kassist-lightflow .adv-tool--plum  { --tool-accent: #7a5a86; --tool-soft: #efe7f1; --tool-deep: #63466f; }
+.kassist.kassist-lightflow .adv-tool--wheat { --tool-accent: #a9781f; --tool-soft: #f2ead6; --tool-deep: #8a6219; }
+
+/* ── 「直接问小青」按钮 — 与主题卡片视觉统一 ─────────────────── */
+.kassist.kassist-lightflow .assistant-direct-question {
+  border-color: var(--color-neutral-200);
+  border-style: dashed;
+  transition: background 0.12s;
+}
+.kassist.kassist-lightflow .assistant-direct-question.is-active {
+  background: color-mix(in srgb, var(--color-primary-100) 80%, white);
+  border-style: solid;
+}
+
+/* ── 语音咨询按钮 → 强调为辅助操作 ────────────────────────────── */
+.kassist.kassist-lightflow .assistant-prototype-head > button {
+  border-color: rgba(31, 158, 134, 0.25);
+  color: #157a67;
+  background: #e2f2ec;
+  transition: background 0.12s, box-shadow 0.12s;
+}
+.kassist.kassist-lightflow .assistant-prototype-head > button:hover {
+  background: color-mix(in srgb, #e2f2ec 65%, white);
+  box-shadow: 0 2px 10px rgba(31, 158, 134, 0.15);
+}
+
+/* ── 「重新选择主题」上下文芯片 ─────────────────────────────────── */
+.kassist.kassist-lightflow .assistant-context-chip {
+  border-color: rgba(31, 158, 134, 0.22);
+  color: #157a67;
+  background: #e2f2ec;
+  transition: background 0.1s;
+}
+.kassist.kassist-lightflow .assistant-context-chip:hover {
+  background: color-mix(in srgb, #e2f2ec 60%, white);
+}
+
+/* ══════════════════════════════════════════════════════════
+   响应式适配：AI 专项工具网格
+   一体机主画布（1080px）：3 列；平板：2 列；手机：1 列
+   ══════════════════════════════════════════════════════════ */
+
+/* 平板 768px 以下 → 2 列 */
+@media (max-width: 767.98px) {
+  .kassist.kassist-lightflow .assistant-ai-tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* 手机 480px 以下 → 1 列，卡片紧凑 */
+@media (max-width: 479.98px) {
+  .kassist.kassist-lightflow .assistant-ai-tools-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kassist.kassist-lightflow .assistant-ai-tool-card {
+    min-height: 76px;
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .kassist.kassist-lightflow .aat-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 13px;
+  }
+  .kassist.kassist-lightflow .aat-icon svg {
+    width: 26px;
+    height: 26px;
+  }
+  .kassist.kassist-lightflow .aat-body strong {
+    font-size: 17px;
+  }
+  .kassist.kassist-lightflow .aat-body small {
+    font-size: 13px;
+  }
+  .kassist.kassist-lightflow .assistant-ai-tools-header h2 {
+    font-size: 21px;
+  }
+}

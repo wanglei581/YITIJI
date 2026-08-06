@@ -25,7 +25,9 @@ import {
   Loader2Icon,
   MapPinIcon,
   SearchIcon,
+  SlidersHorizontalIcon,
 } from 'lucide-react'
+import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { getCompanies, getCompanyStats, type CompanyQuery } from '../../services/api/companies'
 import { PROVINCES, citiesOf, districtsOf, isMunicipality } from '../../lib/regions'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
@@ -46,12 +48,15 @@ function labelOfIndustry(v: string | null): string | null {
 // ─── 筛选 chip 行 ───────────────────────────────────────────────────────────
 
 function ChipRow({
-  label, options, active, onChange,
+  label, options, active, onChange, totalCount, moreLabel, onMore,
 }: {
   label: string
   options: { value: string; text: string }[]
   active: string
   onChange: (v: string) => void
+  totalCount?: number
+  moreLabel?: string
+  onMore?: () => void
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -74,9 +79,31 @@ function ChipRow({
             {o.text}
           </button>
         ))}
+        {onMore && totalCount && totalCount > options.length && (
+          <button
+            type="button"
+            className="jf-f-chip"
+            aria-haspopup="dialog"
+            onClick={onMore}
+          >
+            <SlidersHorizontalIcon aria-hidden="true" />
+            {moreLabel ?? `查看全部 (${totalCount})`}
+          </button>
+        )}
       </div>
     </div>
   )
+}
+
+function visibleOptions(
+  options: { value: string; text: string }[],
+  limit: number,
+  active: string,
+) {
+  const visible = options.slice(0, limit)
+  const activeOption = options.find((option) => option.value === active)
+  if (!activeOption || visible.some((option) => option.value === active)) return visible
+  return [...visible.slice(0, Math.max(0, limit - 1)), activeOption]
 }
 
 // ─── 企业卡片 ───────────────────────────────────────────────────────────────
@@ -148,6 +175,7 @@ export function CompaniesPage() {
   const [industry, setIndustry] = useState('')
   const [recruitType, setRecruitType] = useState('')
   const [sourceKind, setSourceKind] = useState('')
+  const [showTaxonomyPicker, setShowTaxonomyPicker] = useState(false)
 
   const [stats, setStats] = useState<CompanyStatsDTO | null>(null)
   const [items, setItems] = useState<CompanyCardDTO[]>([])
@@ -256,10 +284,48 @@ export function CompaniesPage() {
       onBack={() => navigate('/jobs')}
       badge={<FusionBadge>最近更新 · 实时数据</FusionBadge>}
     >
+        <KioskFilterPickerModal
+          open={showTaxonomyPicker}
+          title="企业类型与行业"
+          description="完整展示当前统一企业字典；选择后立即用于真实数据筛选。"
+          sections={[
+            {
+              id: 'companyType',
+              label: '企业类型',
+              value: companyType,
+              allLabel: '全部类型',
+              options: typeOpts.map((option) => ({ value: option.value, label: option.text })),
+            },
+            {
+              id: 'industry',
+              label: '所属行业',
+              value: industry,
+              allLabel: '全部行业',
+              options: industryOpts.map((option) => ({ value: option.value, label: option.text })),
+            },
+          ]}
+          onChange={(sectionId, value) => {
+            if (sectionId === 'companyType') setCompanyType(value)
+            if (sectionId === 'industry') setIndustry(value)
+          }}
+          onClear={() => {
+            setCompanyType('')
+            setIndustry('')
+          }}
+          onClose={() => setShowTaxonomyPicker(false)}
+        />
         <div className="kproto kproto-clay kproto-content gap-3">
           <div className="grid gap-3">
             <div className="flex flex-wrap items-center gap-3">
-              <ChipRow label="类型" options={typeOpts.slice(0, 3)} active={companyType} onChange={setCompanyType} />
+              <ChipRow
+                label="类型"
+                options={visibleOptions(typeOpts, 3, companyType)}
+                active={companyType}
+                onChange={setCompanyType}
+                totalCount={typeOpts.length}
+                moreLabel={`选择类型 (${typeOpts.length})`}
+                onMore={() => setShowTaxonomyPicker(true)}
+              />
               <label className="ml-auto flex min-h-[58px] min-w-[280px] items-center gap-3 rounded-full border border-[var(--kp-line)] bg-[var(--kp-surface)] px-5">
                 <SearchIcon className="h-6 w-6 text-[var(--kp-muted)]" aria-hidden="true" />
                 <input
@@ -270,7 +336,15 @@ export function CompaniesPage() {
                 />
               </label>
             </div>
-            <ChipRow label="行业" options={industryOpts.slice(0, 5)} active={industry} onChange={setIndustry} />
+            <ChipRow
+              label="行业"
+              options={visibleOptions(industryOpts, 5, industry)}
+              active={industry}
+              onChange={setIndustry}
+              totalCount={industryOpts.length}
+              moreLabel={`选择行业 (${industryOpts.length})`}
+              onMore={() => setShowTaxonomyPicker(true)}
+            />
             <ChipRow label="招聘" options={recruitOpts} active={recruitType} onChange={setRecruitType} />
             <ChipRow label="来源" options={sourceOpts.slice(0, 4)} active={sourceKind} onChange={setSourceKind} />
             <div className="flex gap-3">

@@ -17,6 +17,7 @@ import type {
   ResumeGenerateInput,
   ResumeGenerateResponse,
 } from '@ai-job-print/shared'
+import { EDUCATION_LEVEL_OPTIONS } from '@ai-job-print/shared'
 import {
   GraduationCapIcon,
   BriefcaseIcon,
@@ -331,7 +332,7 @@ export function ResumeGeneratePage() {
                   <Field label="学历">
                     <select className={inputCls} value={e.degree ?? ''} onChange={(ev) => setEducation((list) => list.map((x, idx) => idx === i ? { ...x, degree: ev.target.value } : x))}>
                       <option value="">不填写</option>
-                      {['高中', '中专', '大专', '本科', '硕士', '博士'].map((d) => <option key={d} value={d}>{d}</option>)}
+                      {EDUCATION_LEVEL_OPTIONS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
                   </Field>
                   <Field label="起止时间">

@@ -9,7 +9,9 @@
 require('dotenv').config()
 
 import { PrismaService } from '../src/prisma/prisma.service'
+import { assertDemoSeedAllowed } from './seed-guard'
 
+assertDemoSeedAllowed(process.env)
 const ORG_ID = 'org-demo-companies'
 
 const COMPANIES = [

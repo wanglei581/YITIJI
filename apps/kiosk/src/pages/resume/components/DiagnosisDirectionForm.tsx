@@ -1,14 +1,16 @@
+import { useState } from 'react'
 import { Card } from '@ai-job-print/ui'
 import {
+  EDUCATION_LEVEL_OPTIONS,
+  EMPLOYMENT_INDUSTRY_SECTORS,
   RESUME_SCORING_DIMENSIONS,
   RESUME_TARGET_EXPERIENCE_OPTIONS,
   RESUME_TARGET_SCENE_OPTIONS,
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
 } from '@ai-job-print/shared'
-import { TargetIcon } from 'lucide-react'
-
-const INDUSTRY_OPTIONS = ['互联网/科技', '先进制造', '现代服务', '教育/科研', '通用']
+import { ListFilterIcon, TargetIcon } from 'lucide-react'
+import { KioskFilterPickerModal } from '../../../components/KioskFilterPickerModal'
 
 interface DiagnosisDirectionFormProps {
   genericDiagnosis: boolean
@@ -47,8 +49,26 @@ export function DiagnosisDirectionForm({
   onTargetMajorChange,
   onTargetDegreeChange,
 }: DiagnosisDirectionFormProps) {
+  const [showIndustryPicker, setShowIndustryPicker] = useState(false)
+
   return (
-    <Card className="flex h-full flex-col p-5">
+    <>
+      <KioskFilterPickerModal
+        open={showIndustryPicker}
+        title="选择行业门类"
+        description="覆盖 GB/T 4754-2017 的 20 个行业门类；更细行业将在后续分级字典中选择。"
+        sections={[{
+          id: 'industry',
+          label: '行业门类',
+          value: targetIndustry,
+          allLabel: '暂不指定',
+          options: EMPLOYMENT_INDUSTRY_SECTORS.map((item) => ({ value: item.label, label: item.label })),
+        }]}
+        onChange={(_, value) => onTargetIndustryChange(value)}
+        onClear={() => onTargetIndustryChange('')}
+        onClose={() => setShowIndustryPicker(false)}
+      />
+      <Card className="flex h-full flex-col p-5">
       <div className="mb-4 flex items-center gap-4">
         <span
           className="fy-g-icon flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600"
@@ -113,17 +133,20 @@ export function DiagnosisDirectionForm({
             className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
           />
         </label>
-        <label className="block">
+        <div className="block">
           <span className="mb-2 block text-sm font-semibold text-neutral-700">行业方向</span>
-          <select
-            value={targetIndustry}
+          <button
+            type="button"
             disabled={genericDiagnosis}
-            onChange={(e) => onTargetIndustryChange(e.target.value)}
-            className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
+            aria-haspopup="dialog"
+            aria-label="选择行业方向"
+            onClick={() => setShowIndustryPicker(true)}
+            className="flex h-16 w-full items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 text-left text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
           >
-            {INDUSTRY_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-          </select>
-        </label>
+            <span className="min-w-0 truncate">{targetIndustry || '暂不指定'}</span>
+            <ListFilterIcon className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
+          </button>
+        </div>
         <label className="block">
           <span className="mb-2 block text-sm font-semibold text-neutral-700">经验级别</span>
           <select
@@ -158,19 +181,22 @@ export function DiagnosisDirectionForm({
         </label>
         <label className="block">
           <span className="mb-2 block text-sm font-semibold text-neutral-700">学历（选填）</span>
-          <input
+          <select
             value={targetDegree}
             disabled={genericDiagnosis}
-            onChange={(e) => onTargetDegreeChange(e.target.value.slice(0, 30))}
-            placeholder="例如：本科、硕士、大专"
+            onChange={(e) => onTargetDegreeChange(e.target.value)}
             className="h-16 w-full rounded-xl border border-neutral-200 px-4 text-base outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-neutral-50"
-          />
+          >
+            <option value="">不填写</option>
+            {EDUCATION_LEVEL_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
         </label>
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-neutral-500">
         专业与学历仅用于本人简历表达的诊断重点参考，不影响是否可以诊断。
       </p>
-    </Card>
+      </Card>
+    </>
   )
 }

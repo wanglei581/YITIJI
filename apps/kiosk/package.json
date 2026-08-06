@@ -36,6 +36,7 @@
     "verify:print-entry-source-split": "node scripts/verify-print-entry-source-split.mjs",
     "verify:print-confirm-honest": "node scripts/verify-print-confirm-honest.mjs",
     "verify:device-status-honest": "node scripts/verify-device-status-honest.mjs",
+    "verify:service-entry-readiness": "node scripts/verify-service-entry-readiness.mjs",
     "verify:runtime-terminal-identity": "node scripts/verify-runtime-terminal-identity.mjs",
     "verify:ai-artifact-print-url-contract": "node scripts/verify-ai-artifact-print-url-contract.mjs",
     "verify:job-fit-m1-5-ui": "node scripts/verify-job-fit-m1-5-ui.mjs",

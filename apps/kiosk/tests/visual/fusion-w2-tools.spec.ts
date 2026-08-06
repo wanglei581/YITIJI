@@ -66,6 +66,16 @@ test('unknown tool feature key fails closed with a real recovery action @w2', as
 
 test('conversion page renders a server conversion error without fabricating output @w2', async ({ page, api }) => {
   const errors = collectRuntimeErrors(page)
+  await page.route('**/w2-fixtures/image.png', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        'base64',
+      ),
+    }),
+  )
   registerShell(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', {
     status: 200,
@@ -92,6 +102,9 @@ test('conversion page renders a server conversion error without fabricating outp
   const upload = page.locator('input[type="file"]')
   await upload.setInputFiles({ name: 'w2-image.png', mimeType: 'image/png', buffer: Buffer.from('synthetic-w2-image') })
   await expect(page.getByText('w2-image.png', { exact: true })).toBeVisible()
+  const thumbnail = page.getByRole('img', { name: 'w2-image.png 缩略图' })
+  await expect(thumbnail).toBeVisible()
+  await expect.poll(() => thumbnail.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0)
   await page.getByRole('button', { name: /生成 PDF/ }).click()
   await expect(page.getByText('合成图片尺寸不受支持', { exact: true })).toBeVisible()
   await expect(page).toHaveURL(/\/print-scan\/convert$/)

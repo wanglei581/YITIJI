@@ -42,6 +42,7 @@
   isolation: isolate;
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--paper);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -1021,11 +1022,21 @@
 
 /* 窄屏：卡片内边距收紧，避免手机上留白过厚 */
 @media (max-width: 640px) {
+  .clogin .c-right {
+    min-width: 0;
+    justify-content: flex-start;
+    padding: 20px 20px 28px;
+  }
   .clogin .c-card {
     padding: 30px 24px 28px;
   }
   .clogin .c-card h2 {
     font-size: 26px;
+  }
+  .clogin .c-legal {
+    position: static;
+    margin-top: 14px;
+    padding: 0 8px;
   }
 }
 

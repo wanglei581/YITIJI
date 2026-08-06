@@ -42,7 +42,7 @@
 .cr-step--active .cr-step__dot {
   background: var(--teal);
   border-color: var(--teal);
-  color: #fffdf8;
+  color: var(--paper);
 }
 .cr-step--active .cr-step__label {
   color: var(--ink);
@@ -96,7 +96,7 @@
 }
 .cr-upload-zone--filled .cr-upload-icon {
   background: var(--teal);
-  color: #fffdf8;
+  color: var(--paper);
 }
 .cr-upload-icon svg {
   width: 38px;
@@ -314,7 +314,7 @@
 }
 .cr-stage-item--active .cr-stage-item__icon {
   background: var(--teal);
-  color: #fffdf8;
+  color: var(--paper);
 }
 .cr-stage-item--done .cr-stage-item__icon {
   background: var(--teal-soft);

@@ -33,6 +33,11 @@ export interface LocalTerminalIdentityResponse {
   terminalCode: string
 }
 
+export interface LocalPrintWakeResponse {
+  accepted: true
+  coalesced: boolean
+}
+
 // ── U 盘导入（Task 9） ──────────────────────────────────────────────────────
 
 export interface LocalUsbStatusResponse {
