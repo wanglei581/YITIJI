@@ -104,9 +104,9 @@ export interface OfflineAgencyDTO {
 
 export interface OfflineAgencyListStats {
   totalAgencies: number
-  openAgencies: number
-  totalJobs: number
-  districts: number
+  openAgencies: number | undefined
+  totalJobs: number | undefined
+  districts: number | undefined
   lastSyncLabel?: string
 }
 
