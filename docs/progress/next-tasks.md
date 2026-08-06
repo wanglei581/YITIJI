@@ -5,7 +5,7 @@
 ## 当前执行：生产混合版本故障恢复
 
 - [x] **冻结统一恢复候选**：PR #504 已合入 `main@42913050`，PR #506 / #507 后续合入至 `main@fdbe84be`；最新主干 GitHub Actions run `31078867282` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 3/3 全绿。该结论只冻结软件来源，不等于已部署或 `productionF1=GO`；禁止从工作树或单端热补丁直接部署。
-- [~] **生产 demo seed fail-closed 候选**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已让四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行；CI 和三份生产 runbook 已同步。本地 guard 15/15、目标 TypeScript / ESLint、API typecheck、YAML / JSON 解析及四个生产命令真实拒绝通过；待 PR CI / 合并，未部署、未连接数据库。
+- [~] **生产 demo seed fail-closed 候选**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已让四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行；CI 和三份生产 runbook 已同步。本地 guard 15/15、目标 TypeScript / ESLint、API typecheck、YAML / JSON 解析及四个生产命令真实拒绝通过；GitHub Actions run `31082272994` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 3/3 全绿，待合并，未部署、未连接数据库。
 - [ ] **全新生产空库首个管理员 bootstrap**：当前生产恢复沿用已存在且已轮换口令的管理员账号；仓库尚无受审的一次性首个管理员创建命令。后续须单独设计短时授权、强随机初始凭据、强制改密、幂等/仅空库保护、审计与凭据不进日志；补齐前全新生产空库保持 **NO-GO**，禁止用 demo seed 绕过。
 - [ ] **停写前数据保护**：对生产 PostgreSQL 执行 custom-format `pg_dump`，记录 SHA-256，并用 `pg_restore -l` 验证目录可读；运行 DP-GATE before。禁止 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [ ] **同一提交整体切换**：只执行 additive `migrate deploy`，再从同一冻结提交构建并切换 API、Admin、Partner、Kiosk；保留旧应用包回滚点，不覆盖现有 `.env`，Kiosk 生产构建不设置 `VITE_TERMINAL_ID`，合同审查入口继续关闭。
