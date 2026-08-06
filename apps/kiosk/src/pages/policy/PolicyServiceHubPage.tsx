@@ -7,6 +7,8 @@
 
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { ServiceReadinessStrip } from '../../components/ServiceReadinessStrip'
+import { useApiReadiness } from '../../hooks/useApiReadiness'
 import {
   BookmarkIcon,
   BotIcon,
@@ -18,6 +20,7 @@ import {
   InfoIcon,
   ShieldIcon,
 } from 'lucide-react'
+import '../styles/service-hub-editorial.css'
 
 interface PolicyCapability {
   key: string
@@ -30,6 +33,7 @@ interface PolicyCapability {
   description: string
   to: string
   state?: Record<string, unknown>
+  requiresApi?: boolean
 }
 
 const CAPABILITIES: PolicyCapability[] = [
@@ -54,6 +58,7 @@ const CAPABILITIES: PolicyCapability[] = [
     title: '社保指南',
     description: '参保流程、社保办事材料清单，含城镇职工和灵活就业人员险种说明',
     to: '/renshi?tab=social',
+    requiresApi: false,
   },
   {
     key: 'archive',
@@ -65,6 +70,7 @@ const CAPABILITIES: PolicyCapability[] = [
     title: '档案 / 登记',
     description: '人事档案托管办理材料指引、毕业生就业登记流程与证明开具说明',
     to: '/renshi?tab=register',
+    requiresApi: false,
   },
   {
     key: 'subsidy',
@@ -136,10 +142,12 @@ const QUICK_LINKS: QuickLink[] = [
 
 export function PolicyServiceHubPage() {
   const navigate = useNavigate()
+  const { status: apiStatus, retry: retryApi } = useApiReadiness()
+  const apiBlocked = apiStatus !== 'ready'
 
   return (
     <KioskPageFrame>
-      <div className="flex h-full flex-col overflow-y-auto bg-canvas">
+      <div className="service-hub service-hub--policy flex h-full flex-col overflow-y-auto bg-canvas">
         <KioskPageHeader
           title="政策服务"
           description="就业政策 · 社保指南 · 档案登记 · AI智能匹配解读"
@@ -147,57 +155,56 @@ export function PolicyServiceHubPage() {
           backLabel="返回"
         />
 
-        {/* AI横幅 */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-5 py-4">
-          <span className="text-[22px]">✦</span>
-          <div>
-            <b className="block text-[19px] font-bold text-primary-700">AI政策匹配</b>
-            <p className="mt-0.5 text-[17px] leading-relaxed text-primary-600">
-              AI解读政策要点，匹配你的情况，给出申请材料指引
-            </p>
-          </div>
-        </div>
+        <ServiceReadinessStrip status={apiStatus} onRetry={retryApi} />
 
         {/* 能力卡片（2列） */}
-        <div className="mt-6 grid grid-cols-2 gap-5">
+        <div className="service-hub__grid mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-5">
           {CAPABILITIES.map((cap) => {
             const Icon = cap.icon
+            const blocked = apiBlocked && cap.requiresApi !== false
             return (
               <button
                 key={cap.key}
                 type="button"
-                onClick={() => navigate(cap.to, cap.state ? { state: cap.state } : undefined)}
+                onClick={() => {
+                  if (!blocked) navigate(cap.to, cap.state ? { state: cap.state } : undefined)
+                }}
+                disabled={blocked}
                 className={[
-                  'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-6 text-left',
+                  'service-hub__card',
+                  'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-4 text-left sm:p-6',
                   'border-t-4 shadow-sm active:scale-[0.99]',
                   cap.accentBorder,
+                  blocked ? 'service-hub__card--blocked' : 'cursor-pointer',
                 ].join(' ')}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <span
                     className={[
-                      'flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl',
+                      'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl',
                       cap.iconBg,
                     ].join(' ')}
                   >
                     <Icon
-                      className={['h-[34px] w-[34px]', cap.iconColor].join(' ')}
+                      className={['h-7 w-7 sm:h-[34px] sm:w-[34px]', cap.iconColor].join(' ')}
                       aria-hidden="true"
                     />
                   </span>
-                  <h3 className="font-serif text-[28px] font-bold tracking-wide text-neutral-900">
+                  <h3 className="font-serif text-[22px] font-bold tracking-wide text-neutral-900 sm:text-[28px]">
                     {cap.title}
                   </h3>
                 </div>
-                <p className="text-[18px] leading-relaxed text-neutral-500">{cap.description}</p>
+                <p className="text-[15px] leading-relaxed text-neutral-500 sm:text-[18px]">
+                  {cap.description}
+                </p>
                 <div className="mt-auto flex items-center gap-2">
                   <span
                     className={[
-                      'flex items-center gap-2 text-[19px] font-semibold',
+                      'flex items-center gap-2 text-[16px] font-semibold sm:text-[19px]',
                       cap.goColor,
                     ].join(' ')}
                   >
-                    进入
+                    {blocked ? '等待服务' : '进入'}
                     <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
                   </span>
                 </div>
@@ -207,22 +214,25 @@ export function PolicyServiceHubPage() {
         </div>
 
         {/* 快捷入口 */}
-        <div className="mt-6">
+        <div className="service-hub__quick-section mt-6">
           <div className="mb-2 flex items-baseline gap-3">
             <b className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">
               快捷入口
             </b>
             <span className="text-[17px] text-neutral-500">登录后可查看历史记录</span>
           </div>
-          <div className="grid grid-cols-2 gap-[18px]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-[18px]">
             {QUICK_LINKS.map((link) => {
               const Icon = link.icon
               return (
                 <button
                   key={link.key}
                   type="button"
-                  onClick={() => navigate(link.to)}
-                  className="flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]"
+                  onClick={() => {
+                    if (!apiBlocked) navigate(link.to)
+                  }}
+                  disabled={apiBlocked}
+                  className={`flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]${apiBlocked ? ' service-hub__quick--blocked' : ''}`}
                 >
                   <span
                     className={[

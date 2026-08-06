@@ -14,13 +14,13 @@
 @theme {
   /* ── Brand: Primary（品牌青） ─────────────────────────────── */
   --color-primary-50:  #f2f9f6;
-  --color-primary-100: #e2f2ec;   /* --teal-soft */
+  --color-primary-100: #e2f2ec;
   --color-primary-200: #c8e7db;
   --color-primary-300: #a0d5c2;
   --color-primary-400: #62bda1;
   --color-primary-500: #35ab8e;
-  --color-primary-600: #1f9e86;   /* --teal */
-  --color-primary-700: #157a67;   /* --teal-deep */
+  --color-primary-600: #1f9e86;
+  --color-primary-700: #157a67;
   --color-primary-800: #126250;
   --color-primary-900: #0f4f42;
   --color-primary-950: #093429;
@@ -48,11 +48,11 @@
   --color-neutral-200: #e2dccb;
   --color-neutral-300: #cfc9b6;
   --color-neutral-400: #8b968e;
-  --color-neutral-500: #5d6b63;   /* --muted（v4 加深，27寸一米距离可读） */
+  --color-neutral-500: #5d6b63;
   --color-neutral-600: #4b5850;
   --color-neutral-700: #3c4a43;
   --color-neutral-800: #273a34;
-  --color-neutral-900: #10302b;   /* --ink */
+  --color-neutral-900: #10302b;
 
   /* ── Dark Surface（墨绿顶栏/深底） ────────────────────────── */
   --color-dark:        #10302b;
@@ -71,8 +71,8 @@
   --color-plum-soft:   #efe7f1;
 
   /* ── Surface / Background（米纸） ─────────────────────────── */
-  --color-canvas:  #f4f1e8;   /* --paper */
-  --color-surface: #fffdf8;   /* 偏暖白，非纯白，降 AI 感 */
+  --color-canvas:  #f4f1e8;
+  --color-surface: #fffdf8;
 
   /* ── Typography ───────────────────────────────────────────── */
   --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
@@ -102,6 +102,9 @@
   --fy-line: #e2dccb;
   --fy-teal: #1f9e86;
   --fy-teal-deep: #157a67;
+  --fy-dark-start: #0d2420;
+  --fy-dark-end: #1a4840;
+  --fy-device-ready: #2db88a;
   --fy-clay: #b8683c;
   --fy-error: #c14a34;
   --fy-error-soft: #f6e3de;
@@ -435,12 +438,20 @@
 }
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header {
+  flex-direction: column;
+  align-items: stretch;
   gap: 16px;
   padding: 20px 20px 16px;
 }
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header-main {
+  width: 100%;
+  align-items: flex-start;
   gap: 14px;
+}
+
+[data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header-titles {
+  flex: 1;
 }
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-back-button {
@@ -452,13 +463,18 @@
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header-title {
   font-size: 30px;
-  letter-spacing: 1px;
+  letter-spacing: 0;
 }
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header-description {
   margin-top: 4px;
   font-size: 16px;
   letter-spacing: 0;
+}
+
+[data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-page-header-aside {
+  width: 100%;
+  margin-left: 0;
 }
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-action-bar {
@@ -472,7 +488,9 @@
 
 [data-kiosk-presentation='fusion-youth'][data-kiosk-viewport='mobile'] .ui-kiosk-action-items {
   width: 100%;
-  justify-content: stretch;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   margin-left: 0;
 }
 

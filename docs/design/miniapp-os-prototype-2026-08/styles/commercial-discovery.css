@@ -1,0 +1,209 @@
+/* Commercial discovery pages: lists, articles, schedules and public-service directories. */
+
+.discover-home-screen .page-band,
+.ai-catalog-screen .page-band {
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.discover-home-screen .page-title,
+.ai-catalog-screen .page-title {
+  font-size: 18px;
+}
+
+.discover-home-screen .panel,
+.ai-catalog-screen .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.discover-home-screen .fair-date {
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+/* D02: a quiet job rail built for quick comparison. */
+.job-list-screen .chip-row {
+  padding-bottom: 2px;
+}
+
+.job-list-screen .content-card {
+  position: relative;
+  min-height: 94px;
+  padding: 15px 0 15px 82px;
+}
+
+.job-list-screen .content-card::before {
+  content: '岗位';
+  position: absolute;
+  top: 19px;
+  left: 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.job-list-screen .content-meta .salary {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  width: 70px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.job-list-screen .content-meta {
+  justify-content: flex-end;
+}
+
+/* D03: source evidence is part of the reading header, not a badge cloud. */
+.job-detail-screen .article {
+  padding-top: 18px;
+}
+
+.job-detail-screen .article > .badge-row .badge {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding-left: 0;
+}
+
+.job-detail-screen .article h1 {
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ink);
+}
+
+.job-detail-screen .source-box {
+  border-radius: 0;
+  background: #f0f3f1;
+}
+
+/* D04: events read as dated entries on one timeline. */
+.fair-list-screen .section:has(.content-card) {
+  position: relative;
+  padding-left: 31px;
+}
+
+.fair-list-screen .section:has(.content-card)::before {
+  content: '';
+  position: absolute;
+  top: 38px;
+  bottom: 26px;
+  left: 18px;
+  width: 1px;
+  background: var(--line);
+}
+
+.fair-list-screen .content-card {
+  position: relative;
+  padding: 14px 0 16px 10px;
+}
+
+.fair-list-screen .content-card::before {
+  content: '';
+  position: absolute;
+  top: 19px;
+  left: -17px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--coral);
+  box-shadow: 0 0 0 1px var(--coral);
+}
+
+/* D05: editorial event sheet with one preparation callout. */
+.fair-detail-screen .page-band {
+  padding: 19px 18px 17px;
+  border: 0;
+  border-top: 4px solid var(--coral);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.fair-detail-screen .page-title {
+  font-size: 20px;
+  line-height: 1.45;
+}
+
+.fair-detail-screen .panel.green {
+  border: 0;
+  border-left: 3px solid var(--green);
+  border-radius: 0;
+  background: #f2f6f3;
+}
+
+/* D06: official bulletin list. */
+.policy-list-screen .content-card {
+  padding: 16px 0;
+}
+
+.policy-list-screen .content-card h3 {
+  padding-right: 20px;
+  font-size: 14px;
+}
+
+.policy-list-screen .content-card .badge-row .badge {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding-left: 0;
+}
+
+/* D07: policy article with a restrained quoted summary. */
+.policy-detail-screen .article h1 {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.policy-detail-screen .article .lead {
+  margin: 14px 0;
+  padding: 12px 0 12px 14px;
+  border-left: 3px solid var(--blue);
+  color: var(--ink-2);
+}
+
+.policy-detail-screen .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* D08-D09: public-service directory and honest address information. */
+.agency-list-screen .service-item {
+  margin: 0;
+  padding: 15px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.agency-detail-screen .map-block {
+  display: none;
+}
+
+.agency-detail-screen .scroll > .section:first-child {
+  padding-top: 22px;
+  border-top: 4px solid var(--blue);
+}
+
+.agency-detail-screen .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* D10: compact service catalog, no AI feature wall. */
+.ai-catalog-screen .scroll > .section:first-of-type {
+  padding-top: 8px;
+}
+
+.ai-catalog-screen .row {
+  min-height: 62px;
+}
+
+.ai-catalog-screen .price-line {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}

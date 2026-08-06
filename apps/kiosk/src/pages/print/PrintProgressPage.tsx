@@ -33,6 +33,7 @@ import {
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { API_MODE } from '../../services/api/client'
 import { getPrintJobStatus, type BackendJobStatus } from '../../services/print/printJobsApi'
+import { wakeLocalPrintQueue } from '../../services/print/localPrintWakeApi'
 import type { PrintJobParams } from '@ai-job-print/shared'
 import type { PrintFileState } from './printMaterialSession'
 import { printUploadPathForSource } from './printMaterialSession'
@@ -169,6 +170,7 @@ export function PrintProgressPage() {
   const cancelRef               = useRef(false)
   const simTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
   const failTimerRef            = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wakeRequestedTaskIdRef  = useRef<string | null>(null)
 
   // 仅真实任务或 SIM 演示仍在执行时抑制普通待机；非法、失败、超时和结束态释放。
   useBusyLock(
@@ -251,6 +253,11 @@ export function PrintProgressPage() {
     // Step 0 is already "done" — we submitted before landing here.
     // Start showing step 1 immediately.
     setCurrent('queuing')
+
+    if (wakeRequestedTaskIdRef.current !== taskId) {
+      wakeRequestedTaskIdRef.current = taskId
+      void wakeLocalPrintQueue()
+    }
 
     const tick = async () => {
       if (cancelRef.current) return

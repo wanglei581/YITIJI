@@ -9,6 +9,7 @@ const read = (path) => readFileSync(join(root, path), 'utf8')
 const agencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const fairMap = read('src/pages/job-fairs/FairMapPage.tsx')
 const resumeExport = read('src/pages/resume/ResumeExportPage.tsx')
+const contractResult = read('src/pages/contract-review/ContractReviewResultPage.tsx')
 
 assert.match(agencies, /type="search"/)
 assert.match(agencies, /const \[searchInput, setSearchInput\] = useState\(''\)/)
@@ -34,5 +35,8 @@ assert.match(resumeExport, /resume-lightflow__shell(?! resume-lightflow__shell--
 assert.match(resumeExport, /disabled title="尚无真实导出文件"/)
 assert.match(resumeExport, /navigate\('\/resume\/source'\)/)
 assert.doesNotMatch(resumeExport, /new Blob|URL\.createObjectURL|signedUrl|printFileUrl|fileId/)
+
+assert.match(contractResult, /disabled[\s\S]{0,160}?报告打印暂未开放/)
+assert.doesNotMatch(contractResult, /navigate\(['"]\/print\/upload/)
 
 console.log('PASS kiosk visible actions truth contract')

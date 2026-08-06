@@ -1,0 +1,131 @@
+.template-home .screen-body {
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+}
+
+.template-directory .screen-primary,
+.template-collection .screen-primary {
+  overflow: auto;
+  padding-right: 8px;
+}
+
+.template-detail .screen-body {
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.72fr);
+}
+
+.template-progress .screen-body {
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+}
+
+.template-state .screen-main {
+  justify-content: center;
+}
+
+.template-state .screen-body {
+  flex: none;
+  min-height: 980px;
+  grid-template-columns: 1fr;
+  align-content: center;
+  padding: 80px 120px;
+}
+
+.state-panel {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.state-code {
+  color: var(--red);
+  font-size: 96px;
+  font-weight: 850;
+}
+
+.state-panel h1 {
+  margin: 18px 0 0;
+  font-size: 45px;
+}
+
+.state-panel p {
+  margin: 18px auto 0;
+  color: var(--ink-soft);
+  font-size: 21px;
+  line-height: 1.65;
+}
+
+.state-panel .action-buttons {
+  justify-content: center;
+  margin: 32px 0 0;
+}
+
+.screen-state-layer {
+  position: absolute;
+  inset: 84px 0 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 80px;
+  background: rgba(246, 247, 244, 0.96);
+}
+
+.screen-state-layer[hidden] {
+  display: none;
+}
+
+.screen-state-box {
+  max-width: 620px;
+  text-align: center;
+}
+
+.screen-state-box strong {
+  display: block;
+  font-size: 36px;
+}
+
+.screen-state-box p {
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 19px;
+  line-height: 1.6;
+}
+
+.screen-state-box .action-buttons {
+  justify-content: center;
+  margin: 28px 0 0;
+}
+
+.mobile-frame {
+  width: 390px;
+  min-height: 844px;
+  margin: 20px auto;
+  overflow: hidden;
+  background: var(--surface);
+  border: 12px solid #1f2926;
+  border-radius: 34px;
+}
+
+.mobile-frame header,
+.mobile-frame main,
+.mobile-frame footer {
+  padding: 22px;
+}
+
+.mobile-frame header {
+  color: #ffffff;
+  background: var(--green-dark);
+}
+
+.mobile-frame h2 {
+  margin: 0;
+  font-size: 25px;
+}
+
+.mobile-frame p {
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+@media (max-height: 850px) {
+  #stage-scaler {
+    transform: scale(0.36);
+  }
+}

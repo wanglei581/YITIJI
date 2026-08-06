@@ -140,4 +140,16 @@
   [data-kiosk-presentation='fusion-youth'] .w2-print-scan-side {
     width: 100%;
   }
+
+}
+
+@media (max-width: 480px) {
+  [data-kiosk-presentation='fusion-youth'] .w2-print-scan-shell {
+    padding-inline: 14px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .w2-print-scan-shell > .ui-kiosk-page-header {
+    margin-inline: -14px;
+  }
+
 }

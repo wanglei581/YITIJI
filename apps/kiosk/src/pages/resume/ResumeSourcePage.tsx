@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { useAuth } from '../../auth/useAuth'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { FileContentPreview } from '../../components/FileContentPreview'
 import { Button, Card, ComplianceBanner, KioskActionBar, KioskPageFrame, KioskPageHeader, Stepper } from '@ai-job-print/ui'
 import type { StepperStep } from '@ai-job-print/ui'
 import { COMPLIANCE_COPY } from '@ai-job-print/shared'
@@ -18,6 +19,7 @@ import {
   UsbIcon,
 } from 'lucide-react'
 import {
+  DEFAULT_EMPLOYMENT_INDUSTRY,
   RESUME_SCORING_DIMENSIONS,
   type ResumeScoringDimensionKey,
   type ResumeTargetContext,
@@ -25,6 +27,7 @@ import {
 import { kioskUploadFile } from '../../services/api'
 import { UploadSessionQrPanel, type PhoneUploadedFile } from '../upload/components/UploadSessionQrPanel'
 import { DiagnosisDirectionForm } from './components/DiagnosisDirectionForm'
+import { ResumeUsbImportPanel, type ResumeUsbImportedFile } from './components/ResumeUsbImportPanel'
 import './resume-diagnosis-lightflow.css'
 import './resume-diagnosis-ext.css'
 import './resume-fusion-youth.css'
@@ -122,6 +125,8 @@ interface UploadedResumeFile {
   size: string
   format: string
   fileId: string
+  fileUrl?: string
+  mimeType?: string
   channel: UploadChannel
 }
 
@@ -152,10 +157,11 @@ export function ResumeSourcePage() {
   const [uploadedFile, setUploadedFile] = useState<UploadedResumeFile | null>(null)
   const [uploading, setUploading] = useState(false)
   const [phoneBusy, setPhoneBusy] = useState(false)
+  const [usbBusy, setUsbBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [genericDiagnosis, setGenericDiagnosis] = useState(false)
   const [selectedDimensions, setSelectedDimensions] = useState<ResumeScoringDimensionKey[]>(DEFAULT_SELECTED_DIMENSIONS)
-  const [targetIndustry, setTargetIndustry] = useState('互联网/科技')
+  const [targetIndustry, setTargetIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
   const [targetJob, setTargetJob] = useState('')
   const [targetExperience, setTargetExperience] = useState<ResumeTargetContext['experience']>('应届')
   const [targetScene, setTargetScene] = useState<ResumeTargetContext['scene']>('校招')
@@ -163,7 +169,7 @@ export function ResumeSourcePage() {
   const [targetMajor, setTargetMajor] = useState('')
   const [targetDegree, setTargetDegree] = useState('')
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(uploading || phoneBusy)
+  useBusyLock(uploading || phoneBusy || usbBusy)
 
   const toggleDimension = (key: ResumeScoringDimensionKey) => {
     setSelectedDimensions((current) =>
@@ -188,14 +194,15 @@ export function ResumeSourcePage() {
 
   const handleSelect = (option: UploadOption) => {
     setError(null)
+    if (option.type !== selected) setUploadedFile(null)
     setSelected(option.type)
-    if (option.type === 'phone') return
+    if (option.type !== 'cloud') return
     fileInputRef.current?.click()
   }
 
   const handleUploadBoxClick = () => {
     setError(null)
-    if (selected === 'phone') return
+    if (selected !== 'cloud') return
     fileInputRef.current?.click()
   }
 
@@ -216,6 +223,8 @@ export function ResumeSourcePage() {
         size: formatSize(uploaded.sizeBytes),
         format: inferFormat(uploaded.mimeType || uploaded.filename),
         fileId: uploaded.fileId,
+        fileUrl: uploaded.signedUrl,
+        mimeType: uploaded.mimeType,
         channel: selected,
       })
     } catch (err) {
@@ -227,6 +236,11 @@ export function ResumeSourcePage() {
   }
 
   const handlePhoneUploaded = (file: PhoneUploadedFile) => {
+    setUploadedFile({ ...file, fileUrl: file.fileUrl })
+    setError(null)
+  }
+
+  const handleUsbUploaded = (file: ResumeUsbImportedFile) => {
     setUploadedFile(file)
     setError(null)
   }
@@ -358,6 +372,8 @@ export function ResumeSourcePage() {
               <div className="resume-source-phone-session flex-1">
                 <UploadSessionQrPanel onUploaded={handlePhoneUploaded} onBusyChange={setPhoneBusy} />
               </div>
+            ) : selected === 'usb' ? (
+              <ResumeUsbImportPanel onUploaded={handleUsbUploaded} onBusyChange={setUsbBusy} />
             ) : (
               <button
                 type="button"
@@ -396,6 +412,16 @@ export function ResumeSourcePage() {
             <p className="resume-source-upload-hint mt-3 text-sm leading-relaxed text-neutral-500">
               再次触摸上方区域可更换文件；图片与扫描件将经 OCR 文字识别，识别置信度较低时报告页会提示人工复核。上传失败会如实提示原因，可重试或更换上传方式。
             </p>
+            {uploadedFile && (
+              <FileContentPreview
+                compact
+                className="mt-4"
+                fileUrl={uploadedFile.fileUrl}
+                fileName={uploadedFile.name}
+                mimeType={uploadedFile.mimeType}
+                format={uploadedFile.format}
+              />
+            )}
           </div>
 
           <aside className="resume-source-side flex min-w-0 w-full flex-col">

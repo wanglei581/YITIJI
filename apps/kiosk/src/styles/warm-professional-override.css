@@ -1,0 +1,257 @@
+/*
+ * 温暖专业感主题覆盖层 — Warm Professional Theme Override
+ *
+ * 独立文件，不修改任何现有 CSS，在 index.css 末尾 import 以最高优先级生效。
+ * 随时可通过删除 index.css 中的 @import 行回滚，不影响 CI 门禁。
+ *
+ * 设计方向：
+ *   暖米白底 #FAF8F4 + 藏青主色 #1B3A5C + 橙色行动色 #E8551A
+ *   中文优先圆润无衬线（PingFang SC / Noto Sans SC）
+ *
+ * 作用域：仅 [data-kiosk-presentation='fusion-youth']，Admin/Partner 不受影响。
+ */
+
+/* ══════════════════════════════════════════════════════════════
+ * 1. Kiosk Scope Token Overrides
+ *    覆盖 fusion-youth 作用域内全部 --k-* / --pv-* / --fy-* / --sd-* token
+ * ══════════════════════════════════════════════════════════════ */
+[data-kiosk-presentation='fusion-youth'],
+[data-kiosk-presentation='fusion-youth'][data-visual-theme='service-desk'],
+[data-kiosk-presentation='fusion-youth'] [data-visual-theme='service-desk'] {
+
+  /* 背景 */
+  --color-canvas:  #FAF8F4;
+  --color-surface: #FFFFFF;
+
+  /* 藏青主色（替换旧 teal） */
+  --k-teal:       #1B3A5C;
+  --k-teal-deep:  #0E2238;
+  --k-teal-soft:  #EAF0F7;
+  --k-dark:       #0E2238;   /* 顶栏/导航深色底 */
+
+  /* 橙色行动色（新增） */
+  --k-action:      #E8551A;
+  --k-action-deep: #C43E0E;
+  --k-action-soft: #FDEEE8;
+
+  /* 暖色文字 */
+  --k-ink:   #1A1714;
+  --k-muted: #6B6560;
+  --k-line:  #E5DDD0;
+
+  /* 中文优先圆润无衬线 */
+  --k-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --k-page-inset: 48px;
+
+  /* service-desk 色覆写 */
+  --sd-color-canvas:        #FAF8F4;
+  --sd-color-canvas-outer:  #FAF8F4;
+  --sd-color-surface:       #FFFFFF;
+  --sd-color-text-strong:   #1A1714;
+  --sd-color-text:          #1A1714;
+  --sd-color-copy:          #6B6560;
+  --sd-color-copy-muted:    #6B6560;
+  --sd-color-primary:       #1B3A5C;
+  --sd-color-primary-strong:#0E2238;
+  --sd-color-line:          #E5DDD0;
+  --sd-color-line-strong:   #CEC6BC;
+  --sd-shadow-touch:        0 18px 60px rgba(14,34,56,.08);
+  --sd-shadow-console:      0 10px 34px rgba(14,34,56,.06);
+  --sd-category-blue-bg:    #EAF0F7;
+  --sd-category-blue-fg:    #0E2238;
+
+  /* Tailwind --color-primary-* 阶 → 藏青 */
+  --color-primary-50:  #EAF0F7;
+  --color-primary-100: #D4E3F0;
+  --color-primary-200: #A8C3DC;
+  --color-primary-300: #739DC3;
+  --color-primary-400: #4A7BA8;
+  --color-primary-500: #2E5D89;
+  --color-primary-600: #1B3A5C;
+  --color-primary-700: #0E2238;
+  --color-primary-800: #091929;
+  --color-primary-900: #05101A;
+
+  /* Tailwind --color-neutral-* 阶 → 暖灰 */
+  --color-neutral-50:  #F5F2EF;
+  --color-neutral-100: #EDE9E4;
+  --color-neutral-200: #E2DBD3;
+  --color-neutral-300: #CEC6BC;
+  --color-neutral-400: #A09890;
+  --color-neutral-500: #6B6560;
+  --color-neutral-600: #544E49;
+  --color-neutral-700: #3D3832;
+  --color-neutral-800: #2A2520;
+  --color-neutral-900: #1A1714;
+
+  /* pv-* prototype tokens */
+  --pv-paper:       #FAF8F4;
+  --pv-surface:     #FFFFFF;
+  --pv-ink:         #1A1714;
+  --pv-muted:       #6B6560;
+  --pv-line:        #E5DDD0;
+  --pv-teal:        #1B3A5C;
+  --pv-teal-deep:   #0E2238;
+  --pv-teal-soft:   #EAF0F7;
+  --pv-action:      #E8551A;
+  --pv-action-deep: #C43E0E;
+  --pv-action-soft: #FDEEE8;
+  --pv-dark:        #0E2238;
+  --pv-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --pv-sans:  'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+
+  /* fy-* primitive tokens */
+  --fy-paper:       #FAF8F4;
+  --fy-surface:     #FFFFFF;
+  --fy-ink:         #1A1714;
+  --fy-muted:       #6B6560;
+  --fy-line:        #E5DDD0;
+  --fy-teal:        #1B3A5C;
+  --fy-teal-deep:   #0E2238;
+  --fy-teal-soft:   #EAF0F7;
+  --fy-action:      #E8551A;
+  --fy-action-deep: #C43E0E;
+  --fy-action-soft: #FDEEE8;
+  --fy-serif: 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+  --fy-sans:  'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei New', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 2. 舞台背景渐变 → 藏青 + 橙暖光
+ * ══════════════════════════════════════════════════════════════ */
+[data-kiosk-presentation='fusion-youth'].ui-kiosk-shell {
+  background:
+    radial-gradient(1200px 600px at 85% -5%, rgba(27,58,92,.06), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(232,85,26,.04), transparent 55%),
+    var(--k-paper, #FAF8F4);
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 3. Shell 导航激活指示器 → 橙色
+ * ══════════════════════════════════════════════════════════════ */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-nav__item[aria-current='page']::after {
+  background: var(--k-action, #E8551A);
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 4. 页头/状态面板 字体 → 无衬线
+ * ══════════════════════════════════════════════════════════════ */
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-page-header-title,
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-state-title,
+[data-kiosk-presentation='fusion-youth'] .ui-kiosk-modal-title {
+  font-family: var(--fy-sans, 'PingFang SC', 'Noto Sans SC', system-ui, sans-serif);
+  letter-spacing: 0.5px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+ * 5. kpv1 原型组件覆盖
+ *    注：prototype-v1.css 在组件级动态注入，此处加 [data-kiosk-presentation] 父选择器
+ *    使特异性从 (0,2,0) 升至 (0,3,0)，确保覆盖层最终生效。
+ * ══════════════════════════════════════════════════════════════ */
+
+/* ── 底部导航激活指示 → 橙色 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .nav-item.active::after {
+  background: var(--pv-action, #E8551A);
+}
+
+/* ── 首页主 CTA 按钮 → 橙色渐变 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-cta {
+  background: linear-gradient(135deg, #E8551A 0%, #B33A0A 100%);
+  color: #fff;
+  font-family: var(--pv-sans);
+  box-shadow: 0 6px 24px rgba(232,85,26,.30), 0 2px 6px rgba(14,34,56,.10);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-cta:active {
+  box-shadow: 0 3px 12px rgba(232,85,26,.22);
+}
+
+/* ── 继续/流程主操作按钮 → 橙色 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .continue .btn.primary,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .cb-btn {
+  background: var(--pv-action, #E8551A);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(232,85,26,.26);
+}
+
+/* ── 顶栏状态芯片 → 白色半透明（深藏青底上） ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .status-chip {
+  background: rgba(255,255,255,.10);
+  border-color: rgba(255,255,255,.20);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .status-chip .dot {
+  background: #35AB8E;
+  box-shadow: 0 0 0 4px rgba(53,171,142,.22);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .status-chip.warn {
+  background: rgba(232,85,26,.18);
+  border-color: rgba(232,85,26,.42);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .status-chip.warn .dot {
+  background: var(--pv-action, #E8551A);
+  box-shadow: 0 0 0 4px rgba(232,85,26,.20);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .status-chip.neutral {
+  background: rgba(255,255,255,.07);
+  border-color: rgba(255,255,255,.13);
+}
+
+/* ── 设备状态点：默认未知，只有真实 ready 才使用语义绿 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .dc-dot {
+  background: var(--pv-muted);
+  box-shadow: 0 0 0 3px rgba(96, 111, 107, 0.14);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .dc-dot[data-state='ready'] {
+  background: #35AB8E;
+  box-shadow: 0 0 0 3px rgba(53,171,142,.22);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .dc-dot[data-state='checking'] {
+  background: var(--pv-wheat);
+  box-shadow: 0 0 0 3px rgba(181, 134, 52, 0.16);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .dc-dot[data-state='unavailable'] {
+  background: var(--pv-clay);
+  box-shadow: 0 0 0 3px rgba(190, 91, 66, 0.16);
+}
+
+/* ── AI接待卡片 → 藏青调 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-card {
+  border-color: rgba(27,58,92,.20);
+  box-shadow: 0 6px 28px rgba(27,58,92,.09), 0 2px 8px rgba(14,34,56,.05);
+}
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-card::before {
+  background: linear-gradient(90deg, var(--pv-action, #E8551A), rgba(232,85,26,.40), transparent);
+}
+
+/* ── 继续办理横幅 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .continue-bar {
+  background: linear-gradient(90deg, rgba(27,58,92,.06), rgba(27,58,92,.03));
+  border-color: rgba(27,58,92,.14);
+}
+
+/* ── 设备卡片 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .device-card {
+  border-color: rgba(27,58,92,.14);
+  box-shadow: 0 4px 14px rgba(14,34,56,.06), 0 1px 4px rgba(14,34,56,.04);
+}
+
+/* ── 欢迎区 h1 em 下划线 → 橙调 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .welcome h1 em {
+  color: var(--pv-teal-deep, #0E2238);
+  text-decoration-color: rgba(232,85,26,.32);
+}
+
+/* ── 标题字体统一无衬线 ── */
+[data-kiosk-presentation='fusion-youth'] .kpv1 .card-head h2,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .ar-h,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .z-text b,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .welcome h1,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .svc-title,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .device-card h3,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .continue .c-copy strong,
+[data-kiosk-presentation='fusion-youth'] .kpv1 .cb-body b {
+  font-family: var(--pv-sans);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-kiosk-presentation='fusion-youth'] .kpv1 .ar-cta { transition: none; }
+}

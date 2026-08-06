@@ -798,7 +798,7 @@ async function main(): Promise<void> {
   }
 
   {
-    // resume_upload 维持原契约:confirm 不应携带 fileUrl(打印域专属字段不应外溢到简历流程)。
+    // resume_upload:confirm 签发短时内容 URL，供一体机在提交诊断前核对原文件。
     const { service } = makeService()
     const session = await service.create({
       purpose: 'resume_upload',
@@ -812,10 +812,10 @@ async function main(): Promise<void> {
       file: file(),
     })
     const confirmed = await service.confirm(session.sessionId, session.controlToken)
-    assert.equal(
-      confirmed.file.fileUrl,
-      undefined,
-      'resume_upload confirm must not carry a print fileUrl'
+    assert.match(
+      confirmed.file.fileUrl ?? '',
+      /^\/api\/v1\/files\/.+\/content\?expires=\d+&sig=[0-9a-f]+$/,
+      'resume_upload confirm must return a signed preview URL'
     )
   }
 

@@ -1,6 +1,6 @@
 # 合规边界文档
 
-> 最后更新：2026-08-06（新增 §8.9 简历智能上下文与 AI 辅助填写边界）
+> 最后更新：2026-07-31（新增 §8.8 机构侧收费与机构数据回流边界）
 > 关联文档：[CLAUDE.md](../../CLAUDE.md) | [feature-scope.md](../product/feature-scope.md) | [next-tasks.md](../progress/next-tasks.md)
 
 ---

@@ -62,6 +62,12 @@ export interface JobFitDecisionSupport {
     matched: string[]
     missing: string[]
   }
+  requirementBreakdown?: {
+    responsibilities: string[]
+    mustHave: string[]
+    preferred: string[]
+    attention: string[]
+  }
 }
 
 export interface JobFitPayload {
@@ -69,9 +75,9 @@ export interface JobFitPayload {
   fitLevel: 'reference_high' | 'reference_medium' | 'reference_low'
   summary: string
   /** 匹配点：evidence 必须出自简历原文（服务端已校验） */
-  matchPoints: Array<{ point: string; evidence: string }>
+  matchPoints: Array<{ requirement?: string; point: string; evidence: string }>
   /** 差距与建议：只谈准备方向/表达，不编造经历 */
-  gapPoints: Array<{ gap: string; suggestion: string }>
+  gapPoints: Array<{ requirement?: string; gap: string; suggestion: string }>
   /** 简历定向优化建议（表达层面） */
   targetedSuggestions: string[]
   /** M1.5 可选决策辅助；旧模型不输出时保持缺失。 */
@@ -136,12 +142,13 @@ export class LlmJobFitService {
       '\n6. 不得给出无依据的示例数字（如"100份/月""3次/周""提升30%"），只能说"补充你实际处理的数量、频次或结果"。' +
       '\n7. 不得出现自相矛盾判断（如"大专但符合本科要求"）。学历、年限、技能不符合岗位要求时，直接说明差距（如"学历不符合要求：岗位要求本科及以上，当前简历为大专学历"）。' +
       '\n8. decisionSupport 为可选 M1.5 决策辅助；输出时 analysisVersion 必须为 job_fit_m1_5。keywordCoverage.matched 只列同时出现在简历原文与岗位文本中的关键词；missing 只列岗位文本中出现且简历尚未具备的关键词。' +
+      '\n9. requirementBreakdown 及 matchPoints/gapPoints 的 requirement 只能逐字摘录岗位原文，不得补写岗位未说明的门槛。responsibilities=主要职责，mustHave=明确必备，preferred=明确优先，attention=原文中的限制或需留意条件；没有就返回空数组。' +
       '\n只输出 JSON（不要 markdown 代码块）：' +
       '{"fitLevel":"reference_high|reference_medium|reference_low","summary":"2-3 句总评（说明这是参考）",' +
-      '"matchPoints":[{"point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
-      '"gapPoints":[{"gap":"与岗位要求的差距","suggestion":"表达/准备建议"}](1-4 条),' +
+      '"matchPoints":[{"requirement":"岗位原文摘录","point":"与岗位要求的匹配点","evidence":"简历原文摘录(≤60字)"}](2-5 条),' +
+      '"gapPoints":[{"requirement":"岗位原文摘录","gap":"与岗位要求的差距","suggestion":"表达/准备建议"}](1-4 条),' +
       '"targetedSuggestions":["针对该岗位修改简历的具体建议"](2-5 条),' +
-      '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]}}(可选)}'
+      '"decisionSupport":{"analysisVersion":"job_fit_m1_5","keywordCoverage":{"matched":["有依据关键词"],"missing":["岗位待补充关键词"]},"requirementBreakdown":{"responsibilities":["岗位原文摘录"],"mustHave":["岗位原文摘录"],"preferred":[],"attention":[]}}(可选)}'
 
     const jobText =
       `岗位：${job.title}${job.company ? `（${job.company}）` : ''}\n` +
@@ -211,9 +218,13 @@ export class LlmJobFitService {
     // 防编造：evidence 必须出自简历原文（归一化子串匹配）；不符的匹配点丢弃
     const normResume = normalizeForMatch(resumeText)
     const matchPoints = p.matchPoints
-      .filter((m): m is { point: string; evidence: string } =>
+      .filter((m): m is { requirement?: string; point: string; evidence: string } =>
         !!m && typeof m.point === 'string' && typeof m.evidence === 'string' && m.point.trim().length > 0 && m.evidence.trim().length > 0)
-      .map((m) => ({ point: m.point.trim().slice(0, 200), evidence: m.evidence.trim().slice(0, 120) }))
+      .map((m) => ({
+        ...(this.jobQuote(m.requirement, job) ? { requirement: m.requirement!.trim().slice(0, 160) } : {}),
+        point: m.point.trim().slice(0, 200),
+        evidence: m.evidence.trim().slice(0, 120),
+      }))
       .filter((m) => {
         const needle = normalizeForMatch(m.evidence)
         return needle.length >= 4 && normResume.includes(needle)
@@ -222,11 +233,12 @@ export class LlmJobFitService {
     if (matchPoints.length === 0) return null // 一条真实匹配点都给不出 → 视为无效输出
 
     const gapPoints = p.gapPoints
-      .filter((g): g is { gap: string; suggestion: string } =>
+      .filter((g): g is { requirement?: string; gap: string; suggestion: string } =>
         !!g && typeof g.gap === 'string' && typeof g.suggestion === 'string' && g.gap.trim().length > 0)
       .map((g) => {
         const suggestion = g.suggestion.trim()
         return {
+          ...(this.jobQuote(g.requirement, job) ? { requirement: g.requirement!.trim().slice(0, 160) } : {}),
           gap: g.gap.trim().slice(0, 200),
           suggestion: (isUnsafeAdvice(suggestion) ? safeAdviceFallback() : suggestion).slice(0, 300),
         }
@@ -262,16 +274,9 @@ export class LlmJobFitService {
     job: JobFitJobContext,
   ): JobFitDecisionSupport | undefined {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
-    const support = value as { analysisVersion?: unknown; keywordCoverage?: unknown }
+    const support = value as { analysisVersion?: unknown; keywordCoverage?: unknown; requirementBreakdown?: unknown }
     if (support.analysisVersion !== 'job_fit_m1_5') return undefined
-    if (!support.keywordCoverage || typeof support.keywordCoverage !== 'object' || Array.isArray(support.keywordCoverage)) {
-      return { analysisVersion: 'job_fit_m1_5' }
-    }
-
-    const coverage = support.keywordCoverage as { matched?: unknown; missing?: unknown }
-    if (!Array.isArray(coverage.matched) || !Array.isArray(coverage.missing)) {
-      return { analysisVersion: 'job_fit_m1_5' }
-    }
+    const result: JobFitDecisionSupport = { analysisVersion: 'job_fit_m1_5' }
 
     const cleanKeywords = (keywords: unknown[]): string[] => [
       ...new Set(
@@ -281,27 +286,59 @@ export class LlmJobFitService {
       ),
     ]
     const normalizedResume = normalizeForMatch(resumeText)
-    const normalizedJob = normalizeForMatch(
+    const normalizedJob = this.normalizedJob(job)
+    if (support.keywordCoverage && typeof support.keywordCoverage === 'object' && !Array.isArray(support.keywordCoverage)) {
+      const coverage = support.keywordCoverage as { matched?: unknown; missing?: unknown }
+      if (Array.isArray(coverage.matched) && Array.isArray(coverage.missing)) {
+        result.keywordCoverage = {
+          matched: cleanKeywords(coverage.matched).filter((keyword) => {
+            const needle = normalizeForMatch(keyword)
+            return needle.length > 0 && normalizedResume.includes(needle) && normalizedJob.includes(needle)
+          }),
+          missing: cleanKeywords(coverage.missing).filter((keyword) => {
+            const needle = normalizeForMatch(keyword)
+            return needle.length > 0 && normalizedJob.includes(needle) && !normalizedResume.includes(needle)
+          }),
+        }
+      }
+    }
+
+    if (support.requirementBreakdown && typeof support.requirementBreakdown === 'object' && !Array.isArray(support.requirementBreakdown)) {
+      const breakdown = support.requirementBreakdown as Record<string, unknown>
+      const quoted = (key: string, max: number): string[] => Array.isArray(breakdown[key])
+        ? cleanKeywords(breakdown[key] as unknown[])
+          .filter((item) => {
+            const needle = normalizeForMatch(item)
+            return needle.length >= 4 && normalizedJob.includes(needle)
+          })
+          .slice(0, max)
+        : []
+      const requirementBreakdown = {
+        responsibilities: quoted('responsibilities', 5),
+        mustHave: quoted('mustHave', 5),
+        preferred: quoted('preferred', 4),
+        attention: quoted('attention', 4),
+      }
+      if (Object.values(requirementBreakdown).some((items) => items.length > 0)) {
+        result.requirementBreakdown = requirementBreakdown
+      }
+    }
+
+    return result
+  }
+
+  private normalizedJob(job: JobFitJobContext): string {
+    return normalizeForMatch(
       [job.title, job.description, job.requirements]
         .filter((part): part is string => typeof part === 'string')
         .join('\n'),
     )
-    const matched = cleanKeywords(coverage.matched).filter((keyword) => {
-      const needle = normalizeForMatch(keyword)
-      return needle.length > 0 && normalizedResume.includes(needle) && normalizedJob.includes(needle)
-    })
-    const missing = cleanKeywords(coverage.missing).filter((keyword) => {
-      const needle = normalizeForMatch(keyword)
-      return needle.length > 0 && normalizedJob.includes(needle) && !normalizedResume.includes(needle)
-    })
+  }
 
-    return {
-      analysisVersion: 'job_fit_m1_5',
-      keywordCoverage: {
-        matched,
-        missing,
-      },
-    }
+  private jobQuote(value: unknown, job: JobFitJobContext): value is string {
+    if (typeof value !== 'string' || !value.trim()) return false
+    const needle = normalizeForMatch(value)
+    return needle.length >= 4 && this.normalizedJob(job).includes(needle)
   }
 
   private parse(raw: string): Partial<JobFitPayload> | null {

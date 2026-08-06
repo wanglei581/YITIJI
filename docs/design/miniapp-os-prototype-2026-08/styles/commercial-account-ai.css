@@ -1,0 +1,455 @@
+/* Commercial account and AI pages: quiet account tools and task-specific AI services. */
+
+/* U01: account overview without prototype numbering or oversized metrics. */
+.profile-ledger .profile-index,
+.benefit-ledger .benefit-index,
+.assistant-notes .assistant-index {
+  display: none;
+}
+
+.profile-ledger .profile-band {
+  min-height: 92px;
+  padding: 20px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.profile-ledger .metric-row {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-ledger .metric {
+  min-height: 54px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.profile-ledger .metric b {
+  font-size: 18px;
+}
+
+.profile-ledger .panel,
+.order-list-screen .panel,
+.benefit-ledger .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* U02: the active fulfillment object outweighs history and filter chrome. */
+.order-list-screen .segmented {
+  display: flex;
+  gap: 24px;
+}
+
+.order-list-screen .segmented button {
+  flex: 0 0 auto;
+  padding: 0 3px;
+}
+
+.order-list-screen .scroll > .section:nth-of-type(2) .panel {
+  border-left: 3px solid var(--coral);
+  background: #fff;
+}
+
+.order-list-screen .scroll > .section:nth-of-type(2) .row {
+  min-height: 70px;
+}
+
+.order-list-screen .scroll > .section:nth-of-type(2) .row-title {
+  font-size: 15px;
+}
+
+.order-list-screen .scroll > .section:nth-of-type(2) .row-value {
+  color: var(--coral);
+  font-weight: 750;
+}
+
+/* U03: expiry risk precedes the ordinary balance ledger. */
+.benefit-ledger .benefit-balance {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.benefit-ledger .benefit-balance b {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.benefit-ledger .benefit-balance b span {
+  font-size: 25px;
+}
+
+.benefit-ledger .benefit-balance .page-subtitle {
+  margin: 6px 0 0;
+}
+
+.benefit-ledger .benefit-expiry {
+  border-left: 3px solid var(--coral);
+  background: #fff;
+}
+
+.benefit-ledger .benefit-expiry .row {
+  min-height: 68px;
+}
+
+.benefit-ledger .benefit-expiry .row-title {
+  font-size: 15px;
+}
+
+.benefit-ledger .benefit-expiry .row-value {
+  color: var(--coral);
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 750;
+}
+
+.benefit-ledger .scroll > .notice.warning {
+  margin: -8px 16px 4px;
+  border-left-color: var(--coral);
+  background: #fff3ef;
+}
+
+.benefit-ledger .benefit-digital {
+  background: #fff;
+}
+
+/* U04-U05: time-bound action first; support remains a quiet operational form. */
+.message-center-screen .message-item {
+  padding: 15px 0;
+}
+
+.message-center-screen .message-item.urgent {
+  margin-bottom: 4px;
+  padding: 17px 12px 17px 10px;
+  border-left: 3px solid var(--coral);
+  background: #fff;
+}
+
+.message-center-screen .message-item.urgent .row-title {
+  font-size: 14px;
+}
+
+.message-center-screen .message-item.urgent .message-time {
+  color: var(--coral);
+  font-weight: 750;
+}
+
+.message-center-screen .message-item.result {
+  padding-left: 13px;
+}
+
+.message-center-screen .message-item.settled {
+  opacity: 0.72;
+}
+
+.support-form-screen .field {
+  margin: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.support-form-screen .field .fake-input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.support-form-screen .section:has(.notice) {
+  padding-top: 0;
+}
+
+.support-form-screen .notice {
+  border: 0;
+  border-left: 3px solid var(--gold);
+  border-radius: 0;
+  background: #f8f5ed;
+}
+
+/* U06: identity facts, preferences, and session risk use different structures. */
+.account-settings-screen .panel,
+.privacy-data-screen .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.account-settings-screen .identity-ledger {
+  border-left: 3px solid var(--green);
+  background: #fff;
+}
+
+.account-settings-screen .identity-ledger .row:first-child {
+  min-height: 61px;
+}
+
+.account-settings-screen .preference-ledger {
+  border-top: 1px solid var(--line);
+  background: #fff;
+}
+
+.account-settings-screen .preference-ledger .field {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-settings-screen .preference-ledger .fake-input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.account-settings-screen .preference-ledger .notice {
+  margin-top: 0;
+}
+
+.account-settings-screen .exit-ledger {
+  border-left: 3px solid var(--danger);
+  background: #fff;
+}
+
+.account-settings-screen .exit-ledger .row-title,
+.privacy-data-screen .rights-ledger .row:last-child .row-title {
+  color: var(--danger);
+}
+
+.account-settings-screen .exit-ledger .icon-tile,
+.privacy-data-screen .rights-ledger .row:last-child .icon-tile {
+  border-color: #efc4c0;
+  color: var(--danger);
+  background: transparent;
+}
+
+/* U07: authorization, retention, and irreversible rights are three distinct ledgers. */
+.privacy-data-screen .scroll {
+  counter-reset: privacy-ledger;
+}
+
+.privacy-data-screen .section {
+  counter-increment: privacy-ledger;
+}
+
+.privacy-data-screen .section-head {
+  position: relative;
+  padding-left: 31px;
+}
+
+.privacy-data-screen .section-head::before {
+  content: counter(privacy-ledger, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+  font: 700 10px/1 var(--mono);
+}
+
+.privacy-data-screen .authorization-ledger {
+  border-left: 3px solid var(--green);
+  background: #fff;
+}
+
+.privacy-data-screen .setting-row {
+  min-height: 58px;
+}
+
+.privacy-data-screen .setting-row:first-child {
+  min-height: 70px;
+}
+
+.privacy-data-screen .setting-row:first-child b {
+  font-size: 13px;
+}
+
+.privacy-data-screen .retention-ledger {
+  background: #fff;
+}
+
+.privacy-data-screen .retention-ledger .row:first-child {
+  min-height: 67px;
+  border-left: 3px solid var(--gold);
+  padding-left: 9px;
+}
+
+.privacy-data-screen .rights-ledger {
+  padding: 0;
+  background: transparent;
+}
+
+.privacy-data-screen .rights-ledger .row {
+  min-height: 63px;
+  padding: 0 12px 0 10px;
+  background: #fff;
+}
+
+.privacy-data-screen .rights-ledger .row:first-child {
+  border-left: 3px solid var(--blue);
+}
+
+.privacy-data-screen .rights-ledger .row:last-child {
+  margin-top: 10px;
+  border-top: 0;
+  border-left: 3px solid var(--danger);
+}
+
+/* A01: natural-language service input with notebook-style recommendations. */
+.assistant-notes .assistant-top {
+  padding: 14px 16px 13px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.assistant-notes .assistant-top h2 {
+  font-size: 16px;
+}
+
+.assistant-notes .assistant-top p {
+  color: var(--muted);
+}
+
+.assistant-notes .assistant-journal {
+  background: #f6f7f4;
+}
+
+.assistant-notes .assistant-note {
+  border: 0;
+  border-left: 3px solid var(--green);
+  border-radius: 0;
+  background: var(--surface);
+}
+
+.assistant-notes .intent-actions button {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.assistant-notes .composer {
+  gap: 8px;
+  padding: 9px 12px 15px;
+  background: var(--surface);
+}
+
+.assistant-notes .composer .fake-input {
+  border-radius: 4px;
+  background: #f1f3f1;
+}
+
+.assistant-notes .composer button {
+  width: 42px;
+  border-radius: 4px;
+  background: var(--green-dark);
+}
+
+/* A02/A05/A06: page-specific compact intros instead of repeated banners. */
+.interview-setup-screen .page-band,
+.career-plan-screen .page-band,
+.offer-compare-screen .page-band,
+.interview-report .page-band {
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.interview-setup-screen .page-band .page-title,
+.career-plan-screen .page-band .page-title,
+.offer-compare-screen .page-band .page-title,
+.interview-report .page-band .page-title {
+  font-size: 17px;
+}
+
+.interview-setup-screen .field,
+.career-plan-screen .field {
+  margin: 0;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.interview-setup-screen .panel,
+.career-plan-screen .panel {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* A03: the question and answer control dominate; prompts stay secondary. */
+.interview-session-screen .question-box {
+  border: 0;
+  border-left: 3px solid var(--green);
+  background: var(--surface);
+}
+
+.interview-session-screen .badge-row {
+  gap: 14px;
+}
+
+.interview-session-screen .badge {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/* A04: qualitative recommendations first, numeric references second. */
+.interview-report .metric-row {
+  justify-content: flex-start;
+  gap: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.interview-report .metric {
+  min-height: auto;
+  padding: 4px 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.interview-report .metric b {
+  font-size: 17px;
+}
+
+.interview-report .panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* A06: a real segmented preference control under the comparison table. */
+.offer-compare-screen .offer-table {
+  border-radius: 0;
+}
+
+.offer-compare-screen .chip-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+}
+
+.offer-compare-screen .chip {
+  min-width: 0;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+}
+
+.offer-compare-screen .chip + .chip {
+  border-left: 1px solid var(--line);
+}
+
+.offer-compare-screen .chip.active {
+  color: #fff;
+  background: var(--green-dark);
+}

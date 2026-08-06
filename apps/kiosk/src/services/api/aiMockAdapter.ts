@@ -180,6 +180,38 @@ export const aiMockAdapter = {
         reply: '您可以咨询入职、试用期、社保、公积金、离职、请假等常见 HR 流程问题。我会按常识解释；涉及劳动争议、赔偿、仲裁或合同解除时，请以官方人社窗口、法律援助或专业律师意见为准。',
         actions: [{ label: '人社专区', route: '/renshi' }],
       },
+      self_intro_gen: {
+        reply: '请告诉我您的目标岗位、主要经历（学习/实习/项目各1-2条）和想突出的优势，我会生成1分钟和3分钟两版自我介绍文稿，您可以在本机打印准备。',
+        actions: [{ label: '打印文件', route: '/print/upload' }, { label: 'AI 简历服务', route: '/resume-service' }],
+      },
+      material_checklist: {
+        reply: '请告诉我您要参加的是面试、招聘会还是入职，以及岗位和公司类型，我会生成一份个性化材料清单，可直接在本机打印带走。',
+        actions: [{ label: '打印清单', route: '/print/upload' }, { label: '查看招聘会', route: '/job-fairs' }],
+      },
+      jd_analysis: {
+        reply: '请粘贴或描述招聘要求，我会拆解每条要求的实际含义、区分硬性门槛与加分项，并提示面试时可能被重点考查的方向。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '去做模拟面试', route: '/interview/setup' }],
+      },
+      interview_questions: {
+        reply: '请告诉我目标岗位、公司类型和您的背景，我会整理8-10道该岗位高频面试题及参考回答思路，可直接打印带走练习。',
+        actions: [{ label: '打印题目', route: '/print/upload' }, { label: 'AI 模拟面试', route: '/interview/setup' }],
+      },
+      career_explore: {
+        reply: '请告诉我您的专业背景、感兴趣的领域，或者您目前的困惑，我们一起通过对话梳理可匹配的岗位方向和下一步行动路径。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' }],
+      },
+      cover_letter_gen: {
+        reply: '请告诉我目标公司名称、岗位、您的核心经历和想打动对方的一两个点，我会生成一封300-500字的求职信，可直接在本机打印带走。',
+        actions: [{ label: '打印求职信', route: '/print/upload' }, { label: '优化简历', route: '/resume-service' }],
+      },
+      resume_jd_match: {
+        reply: '请先粘贴或描述招聘要求，再告诉我您的核心经历和技能，我会给出匹配项、差距项，以及面试时如何弥补差距的建议。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '去做简历诊断', route: '/resume/source' }],
+      },
+      company_research: {
+        reply: '告诉我您要面试的公司名称和岗位，我会整理该企业/行业的面试常见风格、可能的考察方向和建议提前了解的5个问题，帮您在5分钟内做好基础准备。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: 'AI 模拟面试', route: '/interview/setup' }],
+      },
     }
     const sceneReply = req.skill ? sceneReplies[req.skill] : undefined
     if (sceneReply) {

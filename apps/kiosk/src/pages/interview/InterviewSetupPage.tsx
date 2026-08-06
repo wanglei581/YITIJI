@@ -8,19 +8,23 @@
 import { useRef, useState, type ChangeEvent, type ElementType, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AiDriverBanner } from '../../components/AiDriverBanner'
+import { KioskFilterPickerModal } from '../../components/KioskFilterPickerModal'
 import { Button, Card, ComplianceBanner, KioskPageHeader } from '@ai-job-print/ui'
-import type {
-  CreateInterviewInput,
-  InterviewDifficulty,
-  InterviewDuration,
-  InterviewExperience,
-  InterviewerType,
+import {
+  DEFAULT_EMPLOYMENT_INDUSTRY,
+  EMPLOYMENT_INDUSTRY_SECTORS,
+  type CreateInterviewInput,
+  type InterviewDifficulty,
+  type InterviewDuration,
+  type InterviewExperience,
+  type InterviewerType,
 } from '@ai-job-print/shared'
 import {
   BriefcaseIcon,
   ClockIcon,
   FileTextIcon,
   GraduationCapIcon,
+  ListFilterIcon,
   Loader2Icon,
   UserRoundCheckIcon,
   XIcon,
@@ -40,7 +44,10 @@ const INTERVIEWERS: Array<{ key: InterviewerType; label: string; desc: string }>
   { key: 'final', label: '终面负责人', desc: '价值观 · 长期发展 · 综合判断' },
 ]
 
-const INDUSTRIES = ['互联网 / AI', '制造业', '教育培训', '医疗健康', '金融服务', '政务 / 国企', '零售 / 服务业', '其他']
+const POPULAR_INDUSTRY_CODES = new Set(['I', 'C', 'P', 'Q', 'J', 'S'])
+const POPULAR_INDUSTRIES = EMPLOYMENT_INDUSTRY_SECTORS
+  .filter((item) => POPULAR_INDUSTRY_CODES.has(item.code))
+  .map<string>((item) => item.label)
 
 const EXPERIENCES: Array<{ key: InterviewExperience; label: string }> = [
   { key: 'fresh', label: '应届生' },
@@ -101,7 +108,8 @@ export function InterviewSetupPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [interviewerType, setInterviewerType] = useState<InterviewerType>('hr')
-  const [industry, setIndustry] = useState(INDUSTRIES[0])
+  const [industry, setIndustry] = useState(DEFAULT_EMPLOYMENT_INDUSTRY)
+  const [showIndustryPicker, setShowIndustryPicker] = useState(false)
   const [position, setPosition] = useState('')
   const [experience, setExperience] = useState<InterviewExperience>('fresh')
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>('standard')
@@ -114,6 +122,9 @@ export function InterviewSetupPage() {
   useBusyLock(creating || uploading)
 
   const positionReady = position.trim().length > 0
+  const visibleIndustries = POPULAR_INDUSTRIES.includes(industry)
+    ? POPULAR_INDUSTRIES
+    : [...POPULAR_INDUSTRIES.slice(0, 5), industry]
 
   const handleFileChosen = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -173,6 +184,22 @@ export function InterviewSetupPage() {
 
   return (
     <InterviewShell>
+    <KioskFilterPickerModal
+      open={showIndustryPicker}
+      title="选择面试行业"
+      description="覆盖 GB/T 4754-2017 的 20 个行业门类；用于调整模拟题目方向。"
+      sections={[{
+        id: 'industry',
+        label: '行业门类',
+        value: industry,
+        allLabel: '全部行业',
+        allowEmpty: false,
+        options: EMPLOYMENT_INDUSTRY_SECTORS.map((item) => ({ value: item.label, label: item.label })),
+      }]}
+      onChange={(_, value) => setIndustry(value)}
+      onClear={() => setIndustry(DEFAULT_EMPLOYMENT_INDUSTRY)}
+      onClose={() => setShowIndustryPicker(false)}
+    />
     <main data-kiosk-domain="interview" data-kiosk-screen="interview-setup" className="interview-flow interview-setup" data-visual-theme="service-desk" data-ux-density="touch">
       <KioskPageHeader
         className="interview-pagehead"
@@ -194,9 +221,18 @@ export function InterviewSetupPage() {
             <Card className="interview-card interview-setup__job p-5">
               <SectionTitle icon={BriefcaseIcon} title="岗位与行业" desc="先确定目标岗位，后续题目会围绕这个方向展开。" />
               <div className="flex flex-wrap gap-2">
-                {INDUSTRIES.map((name) => (
+                {visibleIndustries.map((name) => (
                   <OptionButton key={name} active={industry === name} onClick={() => setIndustry(name)}>{name}</OptionButton>
                 ))}
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setShowIndustryPicker(true)}
+                  className="interview-option inline-flex min-h-[52px] items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 hover:border-neutral-300"
+                >
+                  <ListFilterIcon className="h-4 w-4" aria-hidden="true" />
+                  选择行业 ({EMPLOYMENT_INDUSTRY_SECTORS.length})
+                </button>
               </div>
               <input
                 value={position}

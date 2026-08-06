@@ -54,7 +54,7 @@ export const RESUME_SCORING_DIMENSIONS = [
 
 export type ResumeScoringDimensionKey = typeof RESUME_SCORING_DIMENSIONS[number]['key']
 
-export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['应届', '1-3年', '3-5年', '5年以上'] as const
+export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['无工作经验', '应届', '1年以内', '1-3年', '3-5年', '5年以上'] as const
 export type ResumeTargetExperience = typeof RESUME_TARGET_EXPERIENCE_OPTIONS[number]
 
 export const RESUME_TARGET_SCENE_OPTIONS = ['校招', '社招', '转岗', '招聘会现场'] as const
@@ -88,7 +88,7 @@ export interface ResumeTargetContext {
   industry?: string
   /** 目标岗位（自由文本，可空） */
   targetJob?: string
-  /** 经验级别（应届/1-3年/3-5年/5年以上） */
+  /** 经验级别（统一选项；保留既有取值并增补无经验/1年以内） */
   experience?: ResumeTargetExperience
   /** 求职场景（校招/社招/转岗/招聘会现场） */
   scene?: ResumeTargetScene
@@ -195,9 +195,17 @@ export type AssistantIntent =
 
 /** 百宝箱首方 AI 技能场景；与助手消息分类 intent 保持正交 */
 export type AssistantSkill =
-  | 'offer_compare'       // 百宝箱：Offer 对比
-  | 'salary_negotiation'  // 百宝箱：薪资谈判话术
-  | 'hr_qa'               // 百宝箱：HR 知识问答
+  | 'offer_compare'        // 百宝箱：Offer 对比
+  | 'salary_negotiation'   // 百宝箱：薪资谈判话术
+  | 'hr_qa'                // 百宝箱：HR 知识问答
+  | 'self_intro_gen'       // AI 顾问：自我介绍生成
+  | 'material_checklist'   // AI 顾问：材料准备清单
+  | 'jd_analysis'          // AI 顾问：岗位 JD 解读
+  | 'interview_questions'  // AI 顾问：面试题预测
+  | 'career_explore'       // AI 顾问：求职方向探索
+  | 'cover_letter_gen'     // AI 顾问：求职信生成
+  | 'resume_jd_match'      // AI 顾问：简历 JD 匹配分析
+  | 'company_research'     // AI 顾问：企业面试速查
 
 /** 助手建议操作（提供路由跳转按钮） */
 export interface AssistantAction {
@@ -373,6 +381,13 @@ export interface JobFitDecisionSupport {
     matched: string[]
     missing: string[]
   }
+  /** 仅保留可在岗位原文中核验的摘录；旧结果可缺失。 */
+  requirementBreakdown?: {
+    responsibilities: string[]
+    mustHave: string[]
+    preferred: string[]
+    attention: string[]
+  }
 }
 
 export interface JobFitResponse {
@@ -382,8 +397,8 @@ export interface JobFitResponse {
   job?: JobFitJobInfo
   fitLevel?: 'reference_high' | 'reference_medium' | 'reference_low'
   summary?: string
-  matchPoints?: Array<{ point: string; evidence: string }>
-  gapPoints?: Array<{ gap: string; suggestion: string }>
+  matchPoints?: Array<{ requirement?: string; point: string; evidence: string }>
+  gapPoints?: Array<{ requirement?: string; gap: string; suggestion: string }>
   targetedSuggestions?: string[]
   providerName?: string
   /** 可选决策辅助；旧 LLM 输出不含该字段时不补默认值。 */

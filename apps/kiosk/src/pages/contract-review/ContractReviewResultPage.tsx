@@ -207,14 +207,11 @@ export function ContractReviewResultPage() {
             <Button
               size="lg"
               style={{ flex: 2 }}
-              onClick={() =>
-                navigate('/print/upload', {
-                  state: { from: 'contract-review', hint: '打印合同审查报告' },
-                })
-              }
+              disabled
+              title="合同审查报告文件尚未开放"
             >
               <PrinterIcon size={20} className="mr-2" />
-              打印审查报告
+              报告打印暂未开放
             </Button>
             </KioskActionBar>
           }

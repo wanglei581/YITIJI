@@ -1,0 +1,23 @@
+<Wix
+  xmlns="http://wixtoolset.org/schemas/v4/wxs"
+  xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle
+    Name="AI Job Print Terminal Setup"
+    Manufacturer="AI Job Print"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="79F2B121-7AA0-452D-A932-BDC6F501F701">
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+        LicenseUrl=""
+        SuppressOptionsUI="yes"
+        Theme="hyperlinkLicense" />
+    </BootstrapperApplication>
+
+    <Chain>
+      <MsiPackage
+        SourceFile="$(var.MsiPath)"
+        Compressed="yes"
+        Vital="yes" />
+    </Chain>
+  </Bundle>
+</Wix>
