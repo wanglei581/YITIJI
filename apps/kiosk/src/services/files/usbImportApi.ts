@@ -59,7 +59,12 @@ export function isUsbImportConfigured(): boolean {
   return Boolean(BRIDGE_TOKEN)
 }
 
-async function callLocalAgent<T>(path: string, method: 'GET' | 'POST', body?: unknown): Promise<T> {
+async function callLocalAgent<T>(
+  path: string,
+  method: 'GET' | 'POST',
+  body?: unknown,
+  endUserToken?: string | null,
+): Promise<T> {
   if (!BRIDGE_TOKEN) {
     throw new LocalAgentApiError('LOCAL_USB_BRIDGE_TOKEN_MISSING', '当前终端未配置 U 盘导入本地令牌', 0)
   }
@@ -71,6 +76,7 @@ async function callLocalAgent<T>(path: string, method: 'GET' | 'POST', body?: un
       headers: {
         Accept: 'application/json',
         'X-Local-Bridge-Token': BRIDGE_TOKEN,
+        ...(endUserToken ? { Authorization: `Bearer ${endUserToken}` } : {}),
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -104,6 +110,10 @@ export function listUsbFiles(): Promise<UsbFileListResult> {
   return callLocalAgent<UsbFileListResult>('/local/usb/files', 'GET')
 }
 
-export function uploadUsbFile(safeId: string): Promise<UsbUploadResult> {
-  return callLocalAgent<UsbUploadResult>('/local/usb/upload', 'POST', { safeId })
+export function uploadUsbFile(
+  safeId: string,
+  purpose: 'print_doc' | 'resume_upload' = 'print_doc',
+  endUserToken?: string | null,
+): Promise<UsbUploadResult> {
+  return callLocalAgent<UsbUploadResult>('/local/usb/upload', 'POST', { safeId, purpose }, endUserToken)
 }

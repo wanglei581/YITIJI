@@ -42,7 +42,7 @@ export interface UploadSessionFileView {
   mimeType: string
   sha256: string
   fileExpiresAt: string | null
-  /** 仅 print_doc / signature_image 用途在 confirm 时签发：本系统 HMAC 签名内容 URL，供打印任务/签章合成使用。 */
+  /** resume_upload / print_doc / signature_image 在 confirm 时签发的短时 HMAC 内容 URL。 */
   fileUrl?: string | null
 }
 
@@ -88,8 +88,8 @@ const SESSION_TTL_SECONDS = 10 * 60
 const SESSION_RETAIN_AFTER_EXPIRE_SECONDS = 60
 const UPLOAD_LOCK_TTL_SECONDS = 30
 const MAX_SESSION_UPLOAD_BYTES = 10 * 1024 * 1024
-/** print_doc confirm 签发的内容 URL 有效期,与 kiosk-upload 的 30 分钟 TTL 保持一致(覆盖手机确认到建单的窗口)。 */
-const PRINT_UPLOAD_URL_TTL_MS = 30 * 60 * 1000
+/** confirm 签发的内容 URL 有效期，与 kiosk-upload 的 30 分钟 TTL 保持一致。 */
+const CONFIRMED_FILE_URL_TTL_MS = 30 * 60 * 1000
 const SESSION_PREFIX = 'upload_session:'
 const UPLOAD_LOCK_PREFIX = 'upload_session_upload_lock:'
 const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set([
@@ -97,6 +97,11 @@ const SUPPORTED_UPLOAD_SESSION_PURPOSES: ReadonlySet<FilePurpose> = new Set([
   'print_doc',
   'signature_image',
   'contract_upload',
+])
+const SIGNED_URL_PURPOSES: ReadonlySet<FilePurpose> = new Set([
+  'resume_upload',
+  'print_doc',
+  'signature_image',
 ])
 
 @Injectable()
@@ -294,8 +299,8 @@ export class UploadSessionsService {
         fileExpiresAt: boundFile.expiresAt ? boundFile.expiresAt.toISOString() : null,
       }
     }
-    if (record.purpose === 'print_doc' || record.purpose === 'signature_image') {
-      const signed = signFileUrl(confirmedFile.fileId, PRINT_UPLOAD_URL_TTL_MS)
+    if (SIGNED_URL_PURPOSES.has(record.purpose)) {
+      const signed = signFileUrl(confirmedFile.fileId, CONFIRMED_FILE_URL_TTL_MS)
       confirmedFile = { ...confirmedFile, fileUrl: signed.url }
     }
 

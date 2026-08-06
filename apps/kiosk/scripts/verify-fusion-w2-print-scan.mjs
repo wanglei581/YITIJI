@@ -33,7 +33,7 @@ const redirects = new Map([
   ['/print/scan-feature', '/print-scan/feature/id-photo'],
 ])
 const frozenHashes = new Map([
-  ['src/pages/upload/components/UploadSessionQrPanel.tsx', '0c1606a0cab8bfe63fedeaa6dfa39676e80b9f5d4cf3c320ef27d629d5f885db'],
+  ['src/pages/upload/components/UploadSessionQrPanel.tsx', 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50'],
   ['src/pages/print/DevSandboxControls.tsx', 'f8798286863c8e78043f06d51f9e11cb887df937bdd7991cd953fd2599a2324b'],
   ['src/pages/print/cashierStatus.ts', '24523dad9d5641105e21c5d4d9bd2b12b6eea9cd6ad5ef831dcc514d74a5fd40'],
   ['src/pages/print/printMaterialSession.ts', 'c222592ca559b5edb8f45e5f29b294ad01e264f6903e2436100d36a8e04a3c78'],
@@ -204,6 +204,11 @@ const convertImages = read('src/pages/print-scan/ConvertImagesPage.tsx')
 for (const marker of ['kioskUploadFile', 'convertImagesToPdf', 'UploadSessionQrPanel']) {
   assert.match(convertImages, new RegExp(marker), `convert-images retains ${marker}`)
 }
+assert.match(
+  convertImages,
+  /<img[\s\S]*?src=\{img\.fileAccessUrl\}[\s\S]*?alt=\{`\$\{img\.name\} 缩略图`\}/,
+  'convert-images renders the uploaded image instead of a placeholder',
+)
 const signStamp = read('src/pages/print-scan/SignStampPage.tsx')
 for (const marker of ['signInspect', 'signCompose', 'AUTHORIZATION_LABEL', 'UploadSessionQrPanel']) {
   assert.match(signStamp, new RegExp(marker), `sign-stamp retains ${marker}`)
@@ -404,6 +409,11 @@ assert.match(scanResult, /登录后管理文件|前往我的文档/, 'scan resul
 assert.match(scanResult, /state\.file/, 'scan result derives its file only from route state')
 assert.ok(!/scan-result\.pdf/.test(scanResult), 'scan result never fabricates a local result file')
 assert.doesNotMatch(scanResult, /保存到我的文档/, 'scan result must not imply a completed save action')
+assert.match(
+  scanResult,
+  /<FileContentPreview[\s\S]*?fileUrl=\{file\.fileUrl\}/,
+  'scan result renders the real scanned file',
+)
 
 const scanFusionCss = read('src/pages/scan/styles/scan-fusion.css')
 assert.match(

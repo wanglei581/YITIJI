@@ -77,6 +77,11 @@ mustContain(fileTableSrc, "fmtDate(v.raw.retentionConsentAt, '-')", '同意时�
 mustContain(indexSrc, 'const [now, setNow] = useState(() => Date.now())', 'FilesPage 固定生命周期计算时间基准')
 mustContain(indexSrc, 'setNow(Date.now())', 'FilesPage 仅在重新加载数据时刷新时间基准')
 mustContain(indexSrc, "signedUrl.startsWith('http://') || signedUrl.startsWith('https://')", 'FilesPage 兼容 COS 绝对签名 URL')
+mustContain(indexSrc, "window.open('about:blank', '_blank')", 'FilesPage 在用户点击帧同步创建预览窗口')
+mustContain(indexSrc, "referrerPolicy.content = 'no-referrer'", 'FilesPage 预览窗口禁止发送 Referer')
+mustContain(indexSrc, 'previewWindow.opener = null', 'FilesPage 预览窗口切断 opener')
+mustContain(indexSrc, 'previewWindow.location.replace(resolveSignedUrl(res.signedUrl))', 'FilesPage 异步签名成功后替换窗口地址')
+mustMatch(indexSrc, /\.catch\(\(e: unknown\) => \{\s*previewWindow\.close\(\)/, 'FilesPage 签名失败时关闭空白窗口')
 
 const routeSource = readdirSync(filesRouteDir)
   .filter((name) => name.endsWith('.tsx') || name.endsWith('.ts'))

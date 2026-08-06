@@ -18,6 +18,7 @@ import {
   updateMyDocumentRetention,
 } from '../../../services/api/memberAssets'
 import { useAuth } from '../../../auth/useAuth'
+import { FileContentPreview } from '../../../components/FileContentPreview'
 import { KIcon } from '../../../components/kiosk-icon'
 import { useInkRipple } from '../../../hooks/useInkRipple'
 import { formatTime } from '../assets/format'
@@ -137,6 +138,7 @@ export function MyDocumentsPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [hint, setHint] = useState<string | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
+  const [preview, setPreview] = useState<{ url: string; filename: string; mimeType: string } | null>(null)
   const [printingId, setPrintingId] = useState<string | null>(null)
   const [signingId, setSigningId] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
@@ -191,7 +193,7 @@ export function MyDocumentsPage() {
     setOpening(doc.id)
     try {
       const res = await fetchAccessUrl(doc.previewUrlPath, token)
-      window.open(res.url, '_blank', 'noopener')
+      setPreview({ url: res.url, filename: doc.filename, mimeType: doc.mimeType })
     } catch {
       setHint('文档打开失败，可能已到期或被清理')
     } finally {
@@ -324,6 +326,35 @@ export function MyDocumentsPage() {
         {hint && (
           <div role="status" className="me-toast fixed left-1/2 top-4 z-50 -translate-x-1/2 px-5 py-2.5">
             {hint}
+          </div>
+        )}
+        {preview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-5">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="document-preview-title"
+              className="flex h-[min(86vh,900px)] w-[min(92vw,820px)] flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+            >
+              <header className="flex min-h-14 items-center gap-4 border-b border-neutral-200 px-5">
+                <h2 id="document-preview-title" className="min-w-0 flex-1 truncate text-base font-semibold text-neutral-900">
+                  {preview.filename}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setPreview(null)}
+                  className="me-ripple min-h-12 rounded-md px-4 text-sm font-semibold text-primary-700"
+                >
+                  关闭预览
+                </button>
+              </header>
+              <FileContentPreview
+                className="min-h-0 flex-1 rounded-none border-0"
+                fileUrl={preview.url}
+                fileName={preview.filename}
+                mimeType={preview.mimeType}
+              />
+            </section>
           </div>
         )}
         {retentionConfirm && confirmDoc && (

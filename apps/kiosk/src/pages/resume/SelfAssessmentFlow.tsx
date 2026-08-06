@@ -37,6 +37,7 @@ import {
 } from '../../services/api/selfAssessment'
 import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import './self-assessment-lightflow.css'
 
@@ -312,6 +313,7 @@ export function SelfAssessmentResultPage() {
   const [printing, setPrinting] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [printed, setPrinted] = useState<{ fileId: string; signedUrl: string; filename: string } | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useBusyLock(printing || withdrawing)
 
@@ -341,6 +343,7 @@ export function SelfAssessmentResultPage() {
         signedUrl: file.signedUrl,
         filename: file.filename,
       })
+      setPreviewOpen(true)
     } catch (err) {
       setError(err instanceof SelfAssessmentApiError ? err.message : '打印文件生成失败')
     } finally {
@@ -378,7 +381,7 @@ export function SelfAssessmentResultPage() {
         <div className="self-assessment-lightflow__actions">
           <Button variant="ghost" onClick={() => navigate('/resume/self-assessment/history')}>查看历史</Button>
           <Button onClick={handlePrint} disabled={printing}>
-            {printing ? '生成 PDF 中…' : '下载 PDF'} <DownloadIcon />
+            {printing ? '生成 PDF 中…' : '生成 PDF 预览'} <DownloadIcon />
           </Button>
           <Button onClick={handleWithdraw} variant="danger" disabled={withdrawing}>
             {withdrawing ? '撤回中…' : '撤回本次探索'} <Trash2Icon />
@@ -388,8 +391,17 @@ export function SelfAssessmentResultPage() {
           <Card className="self-assessment-lightflow__print-card">
             <FileWarningIcon aria-hidden="true" />
             <p>PDF 已生成：{printed.filename}</p>
-            <a href={printed.signedUrl} target="_blank" rel="noopener noreferrer">下载 PDF</a>
+            <Button variant="secondary" onClick={() => setPreviewOpen(true)}>页内预览 PDF</Button>
           </Card>
+        )}
+        {previewOpen && printed && (
+          <FilePreviewDialog
+            fileUrl={printed.signedUrl}
+            fileName={printed.filename}
+            mimeType="application/pdf"
+            phoneDownloadUrl={printed.signedUrl}
+            onClose={() => setPreviewOpen(false)}
+          />
         )}
       </div>
       </main>

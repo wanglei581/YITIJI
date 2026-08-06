@@ -35,6 +35,7 @@ interface RecordedRequest {
   url: string
   authorization?: string
   terminalId?: string
+  body: string
 }
 
 function readBody(req: http.IncomingMessage): Promise<Buffer> {
@@ -60,6 +61,7 @@ async function startBackendStub(): Promise<{
         url: req.url ?? '',
         authorization: req.headers.authorization,
         terminalId: req.headers['x-terminal-id'] as string | undefined,
+        body: body.toString('utf-8'),
       })
 
       if (req.method === 'POST' && req.url === '/api/v1/files/kiosk-upload') {
@@ -70,7 +72,7 @@ async function startBackendStub(): Promise<{
         assert.ok(text.includes('filename="usb-sample.pdf"'), 'multipart body must carry the original filename')
         assert.ok(text.includes('Content-Type: application/pdf'), 'multipart file part must declare the guessed mime type')
         assert.ok(text.includes('%PDF-1.4 sample'), 'multipart body must carry the real file bytes')
-        assert.ok(text.includes('name="purpose"') && text.includes('print_doc'), 'multipart body must carry purpose=print_doc')
+        assert.ok(text.includes('name="purpose"'), 'multipart body must carry an explicit purpose')
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({
           success: true,
@@ -108,11 +110,12 @@ async function startBackendStub(): Promise<{
 async function callJson<T>(
   url: string,
   method: 'GET' | 'POST',
-  opts: { origin?: string; bridgeToken?: string; body?: unknown } = {},
+  opts: { origin?: string; bridgeToken?: string; authorization?: string; body?: unknown } = {},
 ): Promise<{ status: number; json: T }> {
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (opts.origin) headers['Origin'] = opts.origin
   if (opts.bridgeToken) headers['X-Local-Bridge-Token'] = opts.bridgeToken
+  if (opts.authorization) headers['Authorization'] = opts.authorization
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json'
 
   const response = await fetch(url, {
@@ -235,6 +238,18 @@ async function verifyLocalHttpRoutes(): Promise<void> {
   const localBase = `http://127.0.0.1:${address.port}`
 
   try {
+    const preflight = await fetch(`${localBase}/local/usb/upload`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: ALLOWED_ORIGIN,
+        'Access-Control-Request-Headers': 'authorization, content-type, x-local-bridge-token',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Private-Network': 'true',
+      },
+    })
+    assert.equal(preflight.status, 204)
+    assert.match(preflight.headers.get('access-control-allow-headers') ?? '', /Authorization/i)
+
     // Origin 校验：错误来源必须 403，且错误码是 USB 专属（不是复用 QR 的错误码）
     const wrongOrigin = await callJson<{ success: false; error: { code: string } }>(
       `${localBase}/local/usb/status`,
@@ -312,6 +327,27 @@ async function verifyLocalHttpRoutes(): Promise<void> {
     assert.equal(unknownSafeId.status, 410)
     assert.equal(unknownSafeId.json.error.code, 'LOCAL_USB_FILE_EXPIRED')
 
+    const invalidPurpose = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      { origin: ALLOWED_ORIGIN, bridgeToken: BRIDGE_TOKEN, body: { safeId: 'does-not-exist', purpose: 'contract_upload' } },
+    )
+    assert.equal(invalidPurpose.status, 400)
+    assert.equal(invalidPurpose.json.error.code, 'LOCAL_USB_PURPOSE_INVALID')
+
+    const invalidAuthorization = await callJson<{ success: false; error: { code: string } }>(
+      `${localBase}/local/usb/upload`,
+      'POST',
+      {
+        origin: ALLOWED_ORIGIN,
+        bridgeToken: BRIDGE_TOKEN,
+        authorization: 'Basic not-allowed',
+        body: { safeId: 'does-not-exist', purpose: 'resume_upload' },
+      },
+    )
+    assert.equal(invalidAuthorization.status, 400)
+    assert.equal(invalidAuthorization.json.error.code, 'LOCAL_USB_AUTHORIZATION_INVALID')
+
     // upload：真实一次性消费 + 转发到后端 stub 的完整契约。
     // 通过直接调用 refreshUsbFileList 注入假驱动来产生一个真实 safeId（同一进程内
     // 与本地服务共享同一个 usb-files.ts 模块级注册表），再对正式 HTTP 路由发起上传。
@@ -335,6 +371,28 @@ async function verifyLocalHttpRoutes(): Promise<void> {
       assert.ok(forwarded, 'agent must forward the file to /files/kiosk-upload')
       assert.equal(forwarded!.authorization, 'Bearer agent-token-secret')
       assert.equal(forwarded!.terminalId, 'terminal-usb-1')
+      assert.ok(forwarded!.body.includes('print_doc'), 'default USB upload must remain purpose=print_doc')
+
+      const resumeListed = await refreshUsbFileList(() => ({ rootPath: dir, label: 'UPLOAD-TEST' }), () => new Set())
+      const resumeTarget = resumeListed.files.find((f) => f.filename === 'usb-sample.pdf')
+      assert.ok(resumeTarget, 'resume fixture must be re-issued after refreshing the one-time file list')
+      const memberAuthorization = 'Bearer member-jwt-in-memory-only'
+      const resumeUploaded = await callJson<{ success: true; data: { fileId: string; fileUrl: string | null } }>(
+        `${localBase}/local/usb/upload`,
+        'POST',
+        {
+          origin: ALLOWED_ORIGIN,
+          bridgeToken: BRIDGE_TOKEN,
+          authorization: memberAuthorization,
+          body: { safeId: resumeTarget!.safeId, purpose: 'resume_upload' },
+        },
+      )
+      assert.equal(resumeUploaded.status, 200)
+      const resumeForwarded = backend.records.filter((r) => r.url === '/api/v1/files/kiosk-upload').at(-1)
+      assert.ok(resumeForwarded, 'resume USB upload must reach /files/kiosk-upload')
+      assert.equal(resumeForwarded!.authorization, memberAuthorization, 'member token must replace Agent auth only for the resume upload')
+      assert.equal(resumeForwarded!.terminalId, 'terminal-usb-1')
+      assert.ok(resumeForwarded!.body.includes('resume_upload'), 'resume USB upload must carry purpose=resume_upload')
 
       // 同一 safeId 二次上传必须 410（一次性消费，不可重放）
       const replay = await callJson<{ success: false; error: { code: string } }>(

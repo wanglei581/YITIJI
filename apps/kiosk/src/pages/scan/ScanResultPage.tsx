@@ -10,6 +10,7 @@ import {
   SparklesIcon,
 } from 'lucide-react'
 import { useAuth } from '../../auth/useAuth'
+import { FileContentPreview } from '../../components/FileContentPreview'
 import { loginPathForCurrentLocation } from '../../auth/returnPath'
 import { ScanFlowSteps } from './ScanFlowSteps'
 import './styles/scan-fusion.css'
@@ -121,10 +122,18 @@ export function ScanResultPage() {
 
       <section className="w2-scan-content w2-scan-result-content">
         {file ? (
-          <section className="w2-scan-file-card">
-            <span className="w2-scan-file-icon"><FileTextIcon /></span>
-            <div><p>{SCAN_TYPE_LABELS[scanType]}</p><h2>{file.name}</h2><div className="w2-scan-chips"><small>{file.size}</small><small data-tone="ok">{file.format}</small><small>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</small><small data-tone="warn">临时文件 · 设有效期</small></div></div>
-          </section>
+          <div className="grid gap-4">
+            <FileContentPreview
+              fileUrl={file.fileUrl}
+              fileName={file.name}
+              mimeType={file.mimeType ?? 'application/pdf'}
+              format={file.format}
+            />
+            <section className="w2-scan-file-card">
+              <span className="w2-scan-file-icon"><FileTextIcon /></span>
+              <div><p>{SCAN_TYPE_LABELS[scanType]}</p><h2>{file.name}</h2><div className="w2-scan-chips"><small>{file.size}</small><small data-tone="ok">{file.format}</small><small>{file.pages != null ? `${file.pages} 页` : '页数以文件为准'}</small><small data-tone="warn">临时文件 · 设有效期</small></div></div>
+            </section>
+          </div>
         ) : (
           <KioskStatePanel compact tone="error" title="缺少扫描结果文件" description="本页未收到真实扫描结果，不会生成占位文件。请重新开始扫描。" />
         )}
