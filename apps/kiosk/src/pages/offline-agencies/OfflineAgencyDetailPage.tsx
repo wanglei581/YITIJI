@@ -70,7 +70,6 @@ export default function OfflineAgencyDetailPage() {
             <span className="jf-chip ok">资质核验已通过</span>
           </div>
         </div>
-        </div>
       </div>
 
       {agency.description ? (
