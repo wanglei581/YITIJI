@@ -13,6 +13,7 @@ $serviceName = "aijobprintagent.exe"
 $provisionerGuiPath = Join-Path $installRoot "provisioner\provision-agent-gui.ps1"
 $shortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI求职打印终端\AI求职打印终端配置.lnk"
 $canaryPath = Join-Path $stateRoot "upgrade-state-canary.txt"
+$stateRegistryPath = "HKLM:\Software\AIJobPrint\Agent"
 $logRoot = Join-Path (Split-Path -Parent $currentExe) "upgrade-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 
@@ -85,6 +86,9 @@ try {
     }
     if ($null -eq (Get-AgentService) -and (Test-Path -LiteralPath $stateRoot)) {
       Remove-Item -LiteralPath $stateRoot -Recurse -Force
+    }
+    if ($null -eq (Get-AgentService) -and (Test-Path -LiteralPath $stateRegistryPath)) {
+      Remove-ItemProperty -LiteralPath $stateRegistryPath -Name "StateDirectoryCreated" -Force -ErrorAction SilentlyContinue
     }
   }
 }
