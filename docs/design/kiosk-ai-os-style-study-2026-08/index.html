@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>一体机视觉定调稿 V3 · 01 首页</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/studio.css" />
+    <link rel="stylesheet" href="styles/kiosk-base.css" />
+    <link rel="stylesheet" href="styles/home.css" />
+    <link rel="stylesheet" href="styles/print.css" />
+    <link rel="stylesheet" href="styles/advisor.css" />
+  </head>
+  <body>
+    <div class="studio-shell">
+      <aside class="studio-sidebar">
+        <div class="studio-brand">
+          <span class="studio-mark">职</span>
+          <div><strong>职易达</strong><span>27 寸一体机视觉定调 V3</span></div>
+        </div>
+
+        <div class="studio-intro">
+          <span>REFERENCE STUDY · V3</span>
+          <h1>用三页确定整套产品气质</h1>
+          <p>保留真实业务和触控逻辑，让首页、设备操作与 AI 编排拥有各自的构图性格。</p>
+        </div>
+
+        <nav class="studio-nav" aria-label="定调页面">
+          <button type="button" data-screen="home" class="is-active">
+            <span>01</span><strong>首页</strong><small>场景、目标与六项服务</small>
+          </button>
+          <button type="button" data-screen="print">
+            <span>03</span><strong>打印参数</strong><small>真实预览与参数工作台</small>
+          </button>
+          <button type="button" data-screen="advisor">
+            <span>13</span><strong>AI 助手</strong><small>目标、缺口与步骤确认</small>
+          </button>
+        </nav>
+
+        <dl class="studio-rules">
+          <div><dt>主动作</dt><dd>暖红</dd></div>
+          <div><dt>可信状态</dt><dd>深绿</dd></div>
+          <div><dt>来源信息</dt><dd>钴蓝</dd></div>
+          <div><dt>页面原则</dt><dd>一屏一主角</dd></div>
+        </dl>
+
+        <p class="studio-boundary">仅为设计候选，不连接 AI、支付、用户数据或打印硬件。</p>
+      </aside>
+
+      <main class="studio-main">
+        <header class="studio-toolbar">
+          <div><span id="screen-number">01</span><strong id="screen-name">首页</strong></div>
+          <p id="screen-note">场景建立信任，目标输入和六项服务承担导航。</p>
+        </header>
+        <section class="stage-host" aria-label="1080 乘 1920 一体机画布">
+          <div id="stage-sizer"><div id="kiosk-stage"></div></div>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="confirm-dialog" class="confirm-dialog">
+      <form method="dialog">
+        <span>需要你确认</span>
+        <h2 id="confirm-title">确认继续</h2>
+        <p id="confirm-copy">原型不会调用真实服务。</p>
+        <div>
+          <button type="submit" value="cancel" class="k-button k-button-secondary">返回检查</button>
+          <button type="submit" value="confirm" class="k-button k-button-primary">确认继续</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

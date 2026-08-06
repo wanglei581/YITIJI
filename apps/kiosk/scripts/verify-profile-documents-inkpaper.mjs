@@ -99,7 +99,10 @@ expectIncludes(page, 'getMyDocuments(getToken(), { pageSize: 50 })', '我的文�
 expectIncludes(page, "loginFrom=\"/me/documents\"", '我的文档保留登录回跳来源')
 expectIncludes(page, 'setItems([])', '我的文档保留游客态清空列表')
 expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档查看/打印保留短期签名 URL 现取现用')
-expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?window\.open\(res\.url,\s*'_blank',\s*'noopener'\)/, '查看文档保留短期 URL 新窗口打开')
+expectMatches(page, /openDeferredPreviewWindow\(\)[\s\S]{0,220}?fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,120}?previewWindow\.location\.replace\(res\.url\)/, '查看文档先同步创建窗口再获取短期 URL')
+expectIncludes(page, "referrerPolicy.content = 'no-referrer'", '文件窗口禁止发送 Referer')
+expectIncludes(page, 'previewWindow.opener = null', '文件窗口切断 opener')
+expectMatches(page, /catch\s*\{\s*previewWindow\.close\(\)/, '签名链接获取失败时关闭空白窗口')
 expectMatches(
   page,
   /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?navigate\('\/print\/confirm'[\s\S]*?fileUrl:\s*res\.printFileUrl[\s\S]*?mimeType:\s*doc\.mimeType[\s\S]*?makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,

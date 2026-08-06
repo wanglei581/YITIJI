@@ -21,7 +21,7 @@
 .me-inkdetail-settings .me-account-avatar.me-tone-slate {
   border-color: rgba(16, 48, 43, 0.18);
   background: rgba(16, 48, 43, 0.06);
-  color: var(--muted, #5b6f69);
+  color: var(--fy-muted);
 }
 
 .me-inkdetail-settings .me-link-row {

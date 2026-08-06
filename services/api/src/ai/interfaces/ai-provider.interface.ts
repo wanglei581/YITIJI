@@ -41,7 +41,7 @@ export const RESUME_SCORING_DIMENSIONS = [
 
 export type ResumeScoringDimensionKey = typeof RESUME_SCORING_DIMENSIONS[number]['key']
 
-export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['应届', '1-3年', '3-5年', '5年以上'] as const
+export const RESUME_TARGET_EXPERIENCE_OPTIONS = ['无工作经验', '应届', '1年以内', '1-3年', '3-5年', '5年以上'] as const
 export type ResumeTargetExperience = typeof RESUME_TARGET_EXPERIENCE_OPTIONS[number]
 
 export const RESUME_TARGET_SCENE_OPTIONS = ['校招', '社招', '转岗', '招聘会现场'] as const
@@ -274,6 +274,14 @@ export type AssistantSkill =
   | 'offer_compare'
   | 'salary_negotiation'
   | 'hr_qa'
+  | 'self_intro_gen'
+  | 'material_checklist'
+  | 'jd_analysis'
+  | 'interview_questions'
+  | 'career_explore'
+  | 'cover_letter_gen'
+  | 'resume_jd_match'
+  | 'company_research'
 
 export interface AssistantAction {
   label: string

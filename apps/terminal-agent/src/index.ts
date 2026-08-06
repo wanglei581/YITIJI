@@ -111,7 +111,7 @@ program
     const scanWatcherHandle = startScanWatcher(config)
 
     // ── Step 6: Start claim / print loop ──────────────────────────────────
-    const claimTimer = startTaskRunner({ config, db })
+    const taskRunner = startTaskRunner({ config, db })
 
     // ── Step 7: Start offline PATCH retry loop ────────────────────────────
     const offlineRetryTimer = startOfflineRetry(config, db)
@@ -119,7 +119,7 @@ program
     // ── Step 8: Start local QR-login bridge (best-effort) ─────────────────
     let qrLocalServer: LocalQrServerHandle | null = null
     try {
-      qrLocalServer = startQrLoginLocalServer(config)
+      qrLocalServer = startQrLoginLocalServer(config, { wakePrintQueue: taskRunner.wake })
     } catch (e) {
       warn(`local-qr: disabled — ${e instanceof Error ? e.message : String(e)}`)
     }
@@ -130,7 +130,7 @@ program
     const shutdown = (signal: string) => {
       log(`Agent: received ${signal}, shutting down...`)
       clearInterval(heartbeatTimer)
-      clearInterval(claimTimer)
+      taskRunner.stop()
       clearInterval(offlineRetryTimer)
       void qrLocalServer?.close()
       void scanWatcherHandle?.stop()

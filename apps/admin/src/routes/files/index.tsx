@@ -29,6 +29,18 @@ function resolveSignedUrl(signedUrl: string): string {
   return origin + signedUrl
 }
 
+function openDeferredPreviewWindow(): Window | null {
+  const previewWindow = window.open('about:blank', '_blank')
+  if (!previewWindow) return null
+  previewWindow.opener = null
+  const referrerPolicy = previewWindow.document.createElement('meta')
+  referrerPolicy.name = 'referrer'
+  referrerPolicy.content = 'no-referrer'
+  previewWindow.document.head.append(referrerPolicy)
+  previewWindow.document.title = '正在打开文件'
+  return previewWindow
+}
+
 export default function FilesPage() {
   const [files, setFiles] = useState<AdminFileRecord[]>([])
   const [summary, setSummary] = useState<AdminFileLifecycleSummary | null>(null)
@@ -100,11 +112,19 @@ export default function FilesPage() {
 
   const handleView = (id: string) => {
     if (busyId) return
+    const previewWindow = openDeferredPreviewWindow()
+    if (!previewWindow) {
+      setNotice('浏览器阻止了文件窗口，请允许本站打开新窗口后重试')
+      return
+    }
     setBusyId(id)
     setNotice(null)
     getFileSignedUrl(id)
-      .then((res) => { window.open(resolveSignedUrl(res.signedUrl), '_blank', 'noopener,noreferrer') })
-      .catch((e: unknown) => setNotice(`获取访问链接失败：${e instanceof Error ? e.message : '请稍后重试'}`))
+      .then((res) => { previewWindow.location.replace(resolveSignedUrl(res.signedUrl)) })
+      .catch((e: unknown) => {
+        previewWindow.close()
+        setNotice(`获取访问链接失败：${e instanceof Error ? e.message : '请稍后重试'}`)
+      })
       .finally(() => setBusyId(null))
   }
 

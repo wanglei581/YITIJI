@@ -64,15 +64,21 @@ const VALID = {
   fitLevel: 'reference_medium',
   summary: '与岗位有一定匹配，以下仅供参考。',
   matchPoints: [
-    { point: '有档案与合同管理经验', evidence: '负责档案管理与会议安排' },
-    { point: '熟悉办公软件', evidence: '熟练使用Office办公软件' },
+    { requirement: '熟悉档案管理', point: '有档案与合同管理经验', evidence: '负责档案管理与会议安排' },
+    { requirement: '负责公司日常行政事务', point: '熟悉办公软件', evidence: '熟练使用Office办公软件' },
   ],
-  gapPoints: [{ gap: '缺少跨部门协调案例', suggestion: '补充一段协调多方资源的经历表述' }],
+  gapPoints: [{ requirement: '跨部门协调', gap: '缺少跨部门协调案例', suggestion: '补充一段协调多方资源的经历表述' }],
   targetedSuggestions: ['在简历开头突出档案管理量化成果', '将合同整理数量前置'],
 }
 const M1_5_DECISION_SUPPORT = {
   analysisVersion: 'job_fit_m1_5',
   keywordCoverage: { matched: ['档案管理'], missing: ['跨部门协调'] },
+  requirementBreakdown: {
+    responsibilities: ['负责公司日常行政事务'],
+    mustHave: ['熟悉档案管理'],
+    preferred: [],
+    attention: ['跨部门协调'],
+  },
 } as const
 const vjson = (over: Record<string, unknown> = {}) => JSON.stringify({ ...VALID, ...over })
 
@@ -164,6 +170,7 @@ async function main() {
       decisionSupport?: {
         analysisVersion?: unknown
         keywordCoverage?: { matched?: unknown; missing?: unknown }
+        requirementBreakdown?: { responsibilities?: unknown; mustHave?: unknown; preferred?: unknown; attention?: unknown }
       }
     }
     const m15Violations: string[] = []
@@ -178,6 +185,18 @@ async function main() {
     const missingKeywords = r1M15.decisionSupport?.keywordCoverage?.missing
     if (!Array.isArray(missingKeywords) || !missingKeywords.includes('跨部门协调')) {
       m15Violations.push('decisionSupport.keywordCoverage.missing 未保留 M1.5 决策字段')
+    }
+    const requirementBreakdown = r1M15.decisionSupport?.requirementBreakdown
+    if (!Array.isArray(requirementBreakdown?.responsibilities) ||
+        !requirementBreakdown.responsibilities.includes('负责公司日常行政事务') ||
+        !Array.isArray(requirementBreakdown?.mustHave) ||
+        !requirementBreakdown.mustHave.includes('熟悉档案管理')) {
+      m15Violations.push('decisionSupport.requirementBreakdown 未保留可核验岗位原文')
+    }
+    const r1Points = r1 as unknown as { matchPoints?: Array<{ requirement?: unknown }>; gapPoints?: Array<{ requirement?: unknown }> }
+    if (r1Points.matchPoints?.[0]?.requirement !== '熟悉档案管理' ||
+        r1Points.gapPoints?.[0]?.requirement !== '跨部门协调') {
+      m15Violations.push('岗位要求未与简历证据/缺口建议建立可核验对照')
     }
     if (row1.provider !== 'llm:deepseek:stub') {
       m15Violations.push(`job_fit.provider 应保留实际 provider llm:deepseek:stub，实际为 ${row1.provider}`)
@@ -239,7 +258,7 @@ async function main() {
     responseQueue.length = 0
     pass('1c. M1.5 keywordCoverage.matched 无简历/岗位依据 → 过滤或安全重试，不原样回传')
 
-    // 1d. keywordCoverage 来源必须双向成立：matched 同时出自简历与岗位，missing 只保留岗位词且尚未出现在简历。
+    // 1d. keywordCoverage 与 JD 拆解都必须有岗位原文依据。
     responseQueue.push(vjson({
       decisionSupport: {
         analysisVersion: 'job_fit_m1_5',
@@ -247,15 +266,25 @@ async function main() {
           matched: ['Office办公软件', '日常行政事务', '档案管理'],
           missing: ['注册会计师', '档案管理'],
         },
+        requirementBreakdown: {
+          responsibilities: ['负责公司日常行政事务', '负责上市公司年报审计'],
+          mustHave: ['熟悉档案管理', '必须持有注册会计师证书'],
+          preferred: [],
+          attention: ['跨部门协调'],
+        },
       },
     }))
     responseQueue.push(vjson({ decisionSupport: M1_5_DECISION_SUPPORT }))
     const r1d = await svc.analyze({ taskId, jobId: jobPub.id }, requester)
     const r1dM15 = r1d as unknown as {
-      decisionSupport?: { keywordCoverage?: { matched?: unknown; missing?: unknown } }
+      decisionSupport?: {
+        keywordCoverage?: { matched?: unknown; missing?: unknown }
+        requirementBreakdown?: { responsibilities?: unknown; mustHave?: unknown; attention?: unknown }
+      }
     }
     const r1dMatchedKeywords = r1dM15.decisionSupport?.keywordCoverage?.matched
     const r1dMissingKeywords = r1dM15.decisionSupport?.keywordCoverage?.missing
+    const r1dBreakdown = r1dM15.decisionSupport?.requirementBreakdown
     const keywordProvenanceViolations: string[] = []
     if (r1d.status !== 'completed') keywordProvenanceViolations.push('非法关键词应过滤或安全重试后 completed')
     if (Array.isArray(r1dMatchedKeywords) && r1dMatchedKeywords.includes('Office办公软件')) {
@@ -269,6 +298,12 @@ async function main() {
     }
     if (Array.isArray(r1dMissingKeywords) && r1dMissingKeywords.includes('档案管理')) {
       keywordProvenanceViolations.push('已出现在简历的岗位词仍留在 missing')
+    }
+    if (Array.isArray(r1dBreakdown?.responsibilities) && r1dBreakdown.responsibilities.includes('负责上市公司年报审计')) {
+      keywordProvenanceViolations.push('岗位原文不存在的职责未被剔除')
+    }
+    if (Array.isArray(r1dBreakdown?.mustHave) && r1dBreakdown.mustHave.includes('必须持有注册会计师证书')) {
+      keywordProvenanceViolations.push('岗位原文不存在的必备条件未被剔除')
     }
     if (keywordProvenanceViolations.length > 0) {
       fail(`1d. M1.5 keywordCoverage 来源校验缺失：${keywordProvenanceViolations.join('；')}`)

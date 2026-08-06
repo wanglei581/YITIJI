@@ -77,7 +77,7 @@ export function AdminLayout({
   return (
     <div
       {...getVisualThemeAttributes(visualTheme, density)}
-      className={cn('ui-admin-shell flex h-screen overflow-hidden bg-canvas', className)}
+      className={cn('ui-admin-shell flex h-dvh overflow-hidden bg-canvas', className)}
     >
 
       {/* ── Sidebar ────────────────────────────────────────── */}

@@ -190,13 +190,12 @@ export function ConvertImagesPage() {
               {images.map((img, index) => (
                 <div key={img.fileId} className="flex flex-none items-center gap-4 rounded-md border border-neutral-200 bg-canvas px-5 py-3">
                   <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-neutral-200 bg-surface text-xl font-bold text-neutral-500">{index + 1}</span>
-                  <span className="flex aspect-[210/297] h-[108px] shrink-0 flex-col gap-1.5 rounded border border-neutral-200 bg-white p-2.5 shadow-sm">
-                    <i className="h-2.5 w-3/5 rounded bg-info-bg ring-1 ring-info/25" />
-                    <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
-                    <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
-                    <i className="h-1.5 w-4/5 rounded-full bg-neutral-200" />
-                    <i className="h-1.5 w-3/5 rounded-full bg-neutral-200" />
-                  </span>
+                  <img
+                    src={img.fileAccessUrl}
+                    alt={`${img.name} 缩略图`}
+                    className="aspect-[210/297] h-[108px] shrink-0 rounded border border-neutral-200 bg-white object-contain shadow-sm"
+                    loading="lazy"
+                  />
                   <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[12px] bg-info-bg text-info-fg">
                     <ImageIcon className="h-6 w-6" />
                   </span>

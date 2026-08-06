@@ -1,0 +1,512 @@
+/* V2 uses visibly different compositions for each service situation. */
+.kiosk-screen {
+  --domain: var(--green);
+  --domain-dark: var(--green-dark);
+  --domain-soft: var(--green-soft);
+  background: #fafaf8;
+}
+
+.domain-foundation,
+.domain-resume {
+  --domain: var(--red);
+  --domain-dark: var(--red-dark);
+  --domain-soft: var(--red-soft);
+}
+
+.domain-jobs {
+  --domain: var(--blue);
+  --domain-dark: var(--blue-dark);
+  --domain-soft: var(--blue-soft);
+}
+
+.domain-fairs {
+  --domain: #416b5e;
+  --domain-dark: #234a3f;
+  --domain-soft: #e5eeea;
+}
+
+.domain-interview {
+  --domain: var(--amber);
+  --domain-dark: #774b06;
+  --domain-soft: var(--amber-soft);
+}
+
+.domain-account {
+  --domain: #4d5d58;
+  --domain-dark: #283833;
+  --domain-soft: #e9edeb;
+}
+
+.kiosk-topbar {
+  height: 88px;
+  padding: 0 54px;
+  background: #182721;
+}
+
+.kiosk-brand {
+  align-items: center;
+}
+
+.kiosk-brand > div,
+.kiosk-brand > div strong,
+.kiosk-brand > div span {
+  display: block;
+}
+
+.kiosk-brand-mark {
+  width: 46px;
+  height: 46px;
+  display: grid !important;
+  place-items: center;
+  color: #fff !important;
+  background: var(--red);
+  border-radius: var(--r-sm);
+  font-size: 22px !important;
+  font-weight: 800;
+}
+
+.kiosk-brand > div span {
+  margin-top: 2px;
+}
+
+.task-strip {
+  min-height: 92px;
+  padding: 15px 54px;
+}
+
+.task-context-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--domain-dark);
+  background: var(--domain-soft);
+  border-radius: var(--r-sm);
+}
+
+.task-context-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.task-context small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--domain-dark);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.task-context strong {
+  font-size: 19px;
+}
+
+.task-context span {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.task-step {
+  color: var(--domain-dark);
+}
+
+.task-step i {
+  background: var(--domain);
+}
+
+.screen-head {
+  min-height: 216px;
+  padding: 28px 54px 30px;
+  background: #fff;
+}
+
+.screen-back {
+  min-height: 44px;
+  margin-bottom: 11px;
+}
+
+.screen-kicker {
+  color: var(--domain-dark);
+}
+
+.screen-head h1 {
+  font-size: 48px;
+}
+
+.screen-head-mark {
+  width: 84px;
+  height: 84px;
+  display: grid;
+  place-items: center;
+  color: var(--domain-dark);
+  background: var(--domain-soft);
+  border-radius: 50%;
+}
+
+.screen-head-mark svg {
+  width: 36px;
+  height: 36px;
+}
+
+.screen-body {
+  gap: 28px;
+  padding: 30px 54px;
+}
+
+.section-block {
+  padding: 24px 0;
+}
+
+.section-heading h2 {
+  font-size: 26px;
+}
+
+.row-number {
+  color: var(--domain-dark);
+  background: var(--domain-soft);
+}
+
+.row-number svg {
+  width: 23px;
+  height: 23px;
+}
+
+.button svg,
+.kiosk-navbar svg {
+  width: 22px;
+  height: 22px;
+}
+
+.button-primary {
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.kiosk-navbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+}
+
+.screen-actionbar {
+  min-height: 124px;
+  padding: 20px 54px;
+}
+
+/* Service directories read like an in-person counter menu. */
+.template-directory .screen-head {
+  min-height: 250px;
+  color: #fff;
+  background: var(--domain-dark);
+  border: 0;
+}
+
+.template-directory .screen-kicker,
+.template-directory .screen-head p {
+  color: #c8d8d2;
+}
+
+.template-directory .screen-head-mark {
+  color: var(--domain-dark);
+  background: #f1eee7;
+}
+
+.template-directory .screen-body {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  background: #fafaf8;
+}
+
+.template-directory .screen-primary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-content: start;
+  gap: 20px 24px;
+}
+
+.template-directory .section-block {
+  padding: 0;
+  border: 0;
+}
+
+.template-directory .service-list {
+  gap: 10px;
+}
+
+.template-directory .service-row {
+  min-height: 132px;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--domain);
+  border-radius: var(--r-sm);
+}
+
+.template-directory .screen-rail {
+  padding: 24px;
+  color: #fff;
+  background: #24352f;
+  border: 0;
+}
+
+.template-directory .screen-rail .summary-pair span,
+.template-directory .screen-rail p {
+  color: #c4d0cc;
+}
+
+.template-directory .screen-rail .truth-note,
+.template-directory .screen-rail .warning-note,
+.template-directory .screen-rail .assistant-note {
+  color: var(--ink);
+}
+
+.template-directory .screen-rail .truth-note p,
+.template-directory .screen-rail .warning-note p,
+.template-directory .screen-rail .assistant-note p,
+.template-progress .screen-rail .truth-note p,
+.template-progress .screen-rail .warning-note p,
+.template-progress .screen-rail .assistant-note p {
+  color: var(--ink-soft);
+}
+
+/* Workbenches keep controls close and put truth checks in the right lane. */
+.template-workbench .screen-body {
+  grid-template-columns: minmax(0, 1.72fr) 330px;
+  background: #f4f5f3;
+}
+
+.template-workbench .screen-primary {
+  padding: 28px 32px;
+  background: #fff;
+}
+
+.template-workbench .section-block:first-child {
+  border-top: 5px solid var(--domain);
+  padding-top: 24px;
+}
+
+.template-workbench .screen-rail {
+  padding: 0;
+  border: 0;
+}
+
+.template-workbench .task-summary {
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+/* Document screens enlarge the artifact and treat commentary as marginalia. */
+.template-document .screen-head {
+  min-height: 190px;
+}
+
+.template-document .screen-body {
+  grid-template-columns: minmax(0, 2.65fr) 300px;
+  background: #e9ece9;
+}
+
+.template-document .screen-primary {
+  padding: 26px;
+  background: #d9ddda;
+  overflow: hidden;
+}
+
+.template-document .section-block {
+  padding: 0 0 24px;
+  border: 0;
+}
+
+.template-document .document-sheet {
+  background: #fff;
+  box-shadow: 0 18px 38px rgba(18, 31, 26, 0.13);
+}
+
+.template-document .screen-rail {
+  padding: 24px;
+  background: #fff;
+  border: 0;
+}
+
+/* Collections are intentionally dense for repeated scanning. */
+.template-collection .screen-head {
+  min-height: 184px;
+}
+
+.template-collection .screen-body {
+  grid-template-columns: minmax(0, 1fr) 286px;
+}
+
+.template-collection .screen-primary {
+  gap: 10px;
+}
+
+.template-collection .section-form {
+  padding: 20px 24px;
+  background: var(--domain-soft);
+  border: 0;
+}
+
+.template-collection .service-row {
+  min-height: 92px;
+  padding: 15px 8px;
+}
+
+.template-collection .screen-rail {
+  padding: 22px;
+  background: #f0f2f0;
+  border: 0;
+}
+
+/* Details use editorial hierarchy: source context on the side, content first. */
+.template-detail .screen-head {
+  min-height: 260px;
+  border-bottom: 6px solid var(--domain);
+}
+
+.template-detail .screen-head h1 {
+  font-size: 54px;
+}
+
+.template-detail .screen-body {
+  grid-template-columns: minmax(0, 2.2fr) 330px;
+}
+
+.template-detail .screen-primary {
+  padding-right: 12px;
+}
+
+.template-detail .section-heading {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.template-detail .screen-rail {
+  padding: 26px;
+  background: var(--domain-soft);
+  border: 0;
+}
+
+/* Progress pages put the live state above all secondary detail. */
+.template-progress .screen-body {
+  grid-template-columns: minmax(0, 1.55fr) 330px;
+  background: #f1f3f1;
+}
+
+.template-progress .screen-primary {
+  padding: 34px 38px;
+  background: #fff;
+}
+
+.template-progress .progress-hero {
+  padding: 24px 0 36px;
+  border-bottom: 1px solid var(--line);
+}
+
+.template-progress .progress-symbol {
+  width: 108px;
+  height: 108px;
+  background: var(--domain);
+  border-radius: 50%;
+  font-size: 38px;
+}
+
+.template-progress .screen-rail {
+  padding: 26px;
+  color: #fff;
+  background: #24352f;
+  border: 0;
+}
+
+.template-progress .screen-rail p,
+.template-progress .screen-rail .summary-pair span {
+  color: #c5d1cd;
+}
+
+/* State pages are sparse by intent and never masquerade as successful content. */
+.template-state .screen-body {
+  display: grid;
+  place-items: center;
+  background: #f1f3f1;
+}
+
+.template-state .state-panel {
+  max-width: 760px;
+  padding: 72px;
+  background: #fff;
+  border-top: 8px solid var(--domain);
+  box-shadow: 0 18px 40px rgba(18, 31, 26, 0.1);
+}
+
+/* Deliberate hierarchy: only comparable controls remain evenly distributed. */
+.metric-list {
+  grid-template-columns: 1.2fr 0.9fr 0.9fr;
+}
+
+.metric:first-child {
+  background: var(--domain-soft);
+  border-left: 4px solid var(--domain);
+}
+
+.template-directory .screen-primary {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.template-directory .section-heading {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-directory .screen-primary .section-block:first-child .service-row {
+  min-height: 210px;
+}
+
+.template-directory .screen-primary .section-block:last-child .service-row {
+  min-height: 118px;
+}
+
+.template-directory .screen-primary .section-block:first-child .row-number {
+  width: 64px;
+  height: 64px;
+}
+
+.template-directory .screen-primary .section-block:first-child .row-copy strong {
+  font-size: 24px;
+}
+
+.template-directory .screen-primary .section-block:first-child .row-copy span {
+  margin-top: 9px;
+  font-size: 16px;
+}
+
+.template-collection .screen-primary .section-block:not(.section-form):first-child {
+  padding-top: 18px;
+  border-top: 5px solid var(--domain);
+}
+
+.template-detail .screen-primary .section-block:first-child {
+  padding: 26px 28px;
+  background: var(--domain-soft);
+  border: 0;
+}
+
+.template-progress .timeline-item.is-active {
+  padding-left: 16px;
+  border-left: 4px solid var(--red);
+}
+
+.template-progress .timeline-item.is-active .timeline-copy strong {
+  color: var(--red-dark);
+}
+
+.template-workbench .screen-primary .section-block:first-child .section-heading h2 {
+  font-size: 31px;
+}
+
+.template-workbench .screen-primary .section-block:first-child .section-heading span {
+  color: var(--domain-dark);
+  font-weight: 700;
+}

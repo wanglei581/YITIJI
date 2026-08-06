@@ -9,6 +9,8 @@
 @import "./styles/kiosk-stage-fit.css";
 @import "./pages/jobs-fairs-prototype.css";
 @import "tailwindcss";
+/* 温暖专业感主题覆盖层必须保持为最后一个 CSS import。 */
+@import "./styles/warm-professional-override.css";
 @source "../../../packages/ui/src";
 @source "../../../packages/shared/src";
 

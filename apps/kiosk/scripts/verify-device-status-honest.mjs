@@ -39,6 +39,7 @@ console.log('\n=== Kiosk 设备状态去伪守卫 ===')
 const hookSrc = read('src/hooks/useTerminalDeviceStatus.ts')
 const previewSrc = read('src/pages/print/PrintPreviewPage.tsx')
 const homeSrc = read('src/pages/home/HomePage.tsx')
+const warmOverrideSrc = read('src/styles/warm-professional-override.css')
 const pillsSrc = read('src/components/KioskDeviceStatusPills.tsx')
 const rootSrc = read('src/layouts/KioskRoot.tsx')
 
@@ -117,7 +118,30 @@ expectNotMatches(
   /打印机在线[\s\S]{0,80}网络正常/,
   'HomePage 不得硬编码「打印机在线」+「网络正常」静态药丸',
 )
+for (const copy of ['文档打印就绪', '材料扫描就绪', '自动双面可用']) {
+  expectNotMatches(homeSrc, new RegExp(copy), `HomePage 不得硬编码「${copy}」`)
+}
+expectMatches(
+  homeSrc,
+  /useOutletContext<TerminalDeviceStatusView>/,
+  'HomePage 复用共享壳的真实设备状态',
+)
+expectNotMatches(
+  homeSrc,
+  /useTerminalDeviceStatus\s*\(/,
+  'HomePage 不得再次启动独立设备状态轮询',
+)
 expectNotMatches(homeSrc, /function KioskTopBar/, 'HomePage 不再自绘顶栏（设备态由共享壳展示）')
+expectMatches(
+  warmOverrideSrc,
+  /\.dc-dot\[data-state='ready'\]/,
+  '暖色主题只有 ready 状态使用语义绿',
+)
+expectMatches(
+  warmOverrideSrc,
+  /\.dc-dot\[data-state='unavailable'\]/,
+  '暖色主题为离线/异常状态提供非绿色状态点',
+)
 
 expectMatches(
   pillsSrc,
@@ -144,6 +168,11 @@ expectNotMatches(
   'KioskRoot 不得 useState(idle) 伪状态',
 )
 expectMatches(rootSrc, /printerLabel/, 'KioskRoot 顶栏使用中文 printerLabel')
+expectMatches(
+  rootSrc,
+  /<Outlet context=\{deviceStatus\}\s*\/>/,
+  'KioskRoot 向首页复用同一份设备状态',
+)
 expectNotMatches(
   rootSrc,
   /label=\{deviceStatus\}/,

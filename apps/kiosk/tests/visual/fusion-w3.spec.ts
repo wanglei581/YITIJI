@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/kiosk-test'
 import type { ApiRouter } from '../fixtures/api-router'
-import { assertNoHorizontalOverflow } from './assert-layout'
+import { assertDialogWithinViewport, assertKioskShellFillsViewport, assertNoHorizontalOverflow } from './assert-layout'
 import {
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
@@ -20,7 +20,16 @@ function terminalBaseline(api: ApiRouter): void {
 
 test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
+  let previewLoaded = false
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/w3-fixtures/resume.pdf' && response.status() === 200) {
+      previewLoaded = true
+    }
+  })
+  await page.route('**/w3-fixtures/resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' }),
+  )
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
   await page.route('**/api/v1/resume/parse', async (route) => {
@@ -28,7 +37,20 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(diagnosis) })
   })
   await page.goto('/resume/source')
+  await assertKioskShellFillsViewport(page)
+  await page.getByRole('button', { name: '选择行业方向' }).click()
+  const diagnosisIndustryDialog = page.getByRole('dialog', { name: '选择行业门类' })
+  await expect(diagnosisIndustryDialog).toBeVisible()
+  await assertDialogWithinViewport(page)
+  await diagnosisIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await diagnosisIndustryDialog.getByRole('button', { name: '完成' }).click()
+  await page.getByLabel('经验级别').selectOption('1年以内')
+  await page.getByLabel('学历（选填）').selectOption('本科')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  const preview = page.locator('[data-file-preview-kind="pdf"]')
+  await expect(preview).toBeVisible()
+  await expect(preview.locator('iframe')).toHaveAttribute('src', '/w3-fixtures/resume.pdf')
+  await expect.poll(() => previewLoaded).toBe(true)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('处理内容说明 · 非实时阶段', { exact: true })).toBeVisible()
   await expect(page.getByText('不代表服务端实时阶段', { exact: false })).toBeVisible()
@@ -57,12 +79,29 @@ test('direct resume parse stays fail-closed without fake stages @w3-kiosk', asyn
 
 test('resume parse failure remains honest @w3-kiosk', async ({ page, api }) => {
   const runtimeErrors: string[] = []
+  let previewLoaded = false
   page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === '/w3-fixtures/resume.pdf' && response.status() === 200) {
+      previewLoaded = true
+    }
+  })
+  await page.route('**/w3-fixtures/resume.pdf', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      body: '%PDF-1.4\n%%EOF',
+    }),
+  )
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
   api.abort('POST', '/api/v1/resume/parse', 'internetdisconnected')
   await page.goto('/resume/source')
   await page.getByLabel('选择本机简历文件').setInputFiles({ name: '求职简历.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-w3') })
+  const preview = page.locator('[data-file-preview-kind="pdf"]')
+  await expect(preview).toBeVisible()
+  await expect(preview.locator('iframe')).toHaveAttribute('src', '/w3-fixtures/resume.pdf')
+  await expect.poll(() => previewLoaded).toBe(true)
   await page.getByRole('button', { name: '开始 AI 诊断' }).click()
   await expect(page.getByText('解析出错', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: /重试|重新/ })).toBeVisible()
@@ -117,6 +156,13 @@ test('interview setup → text answer → report @w3-kiosk', async ({ page, api 
   api.respond('POST', '/api/v1/mock-interviews/interview-w3-public-fixture/end', { status: 200, json: interviewReport })
   api.respond('GET', '/api/v1/mock-interviews/interview-w3-public-fixture/report', { status: 200, json: interviewReport })
   await page.goto('/interview/setup')
+  await assertKioskShellFillsViewport(page)
+  await page.getByRole('button', { name: '选择行业 (20)' }).click()
+  const interviewIndustryDialog = page.getByRole('dialog', { name: '选择面试行业' })
+  await expect(interviewIndustryDialog).toBeVisible()
+  await assertDialogWithinViewport(page)
+  await interviewIndustryDialog.getByRole('button', { name: '制造业', exact: true }).click()
+  await interviewIndustryDialog.getByRole('button', { name: '完成' }).click()
   await page.getByPlaceholder(/输入目标岗位/).fill('前端开发工程师')
   await page.getByRole('button', { name: '开始模拟面试' }).click()
   await page.waitForURL('/interview/session')

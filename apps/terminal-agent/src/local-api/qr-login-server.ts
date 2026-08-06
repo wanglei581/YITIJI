@@ -9,6 +9,7 @@ import { consumeUsbFile, getUsbStatus, refreshUsbFileList } from '../usb/usb-fil
 import { allowedOrigins, isLocalBridgeTokenValid, isOriginAllowed } from './origin-guard'
 import type {
   LocalApiError,
+  LocalPrintWakeResponse,
   LocalQrClaimRequest,
   LocalQrCreateRequest,
   LocalTerminalIdentityResponse,
@@ -43,7 +44,14 @@ export interface LocalQrServerHandle {
   close: () => Promise<void>
 }
 
-export function startQrLoginLocalServer(config: AgentConfig): LocalQrServerHandle | null {
+export interface LocalQrServerOptions {
+  wakePrintQueue?: () => { accepted: boolean; coalesced: boolean }
+}
+
+export function startQrLoginLocalServer(
+  config: AgentConfig,
+  options: LocalQrServerOptions = {},
+): LocalQrServerHandle | null {
   if (!config.terminalId || !config.agentToken) {
     warn('local-qr: terminal credentials missing; QR local bridge disabled')
     return null
@@ -58,14 +66,16 @@ export function startQrLoginLocalServer(config: AgentConfig): LocalQrServerHandl
   const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
   const bridgeToken = config.localApiBridgeToken?.trim() || undefined
   if (!bridgeToken) {
-    warn('local-qr: localApiBridgeToken not configured; /local/qr-login/* and /local/usb/* routes will reject all requests')
+    warn('local-qr: localApiBridgeToken not configured; protected local bridge routes will reject all requests')
   }
 
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin
-    void handleRequest({ req, res, origins, claims, client, bridgeToken, config }).catch((error) => {
+    void handleRequest({ req, res, origins, claims, client, bridgeToken, config, options }).catch((error) => {
       const isUsbRoute = (req.url ?? '').startsWith('/local/usb/')
-      const mapped = localExceptionFromUnknown(error, isUsbRoute ? 'usb' : 'qr')
+      const isPrintRoute = (req.url ?? '').startsWith('/local/print/')
+      const context = isUsbRoute ? 'usb' : isPrintRoute ? 'print' : 'qr'
+      const mapped = localExceptionFromUnknown(error, context)
       if (mapped.status >= 500) warn(`local-qr: unexpected request error — ${safeErrorMessage(error)}`)
       sendJson(
         res,
@@ -104,11 +114,13 @@ async function handleRequest(input: {
   client: ReturnType<typeof createApiClient>
   bridgeToken: string | undefined
   config: AgentConfig
+  options: LocalQrServerOptions
 }): Promise<void> {
-  const { req, res, origins, claims, client, bridgeToken, config } = input
+  const { req, res, origins, claims, client, bridgeToken, config, options } = input
   const origin = req.headers.origin
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
+  const isPrintRoute = url.pathname.startsWith('/local/print/')
 
   if (!isOriginAllowed(origin, origins)) {
     sendJson(
@@ -116,6 +128,8 @@ async function handleRequest(input: {
       403,
       isUsbRoute
         ? { code: 'LOCAL_USB_ORIGIN_FORBIDDEN', message: 'U 盘导入来源不被允许' }
+        : isPrintRoute
+          ? { code: 'LOCAL_PRINT_ORIGIN_FORBIDDEN', message: '本机打印唤醒来源不被允许' }
         : { code: 'LOCAL_QR_ORIGIN_FORBIDDEN', message: '扫码登录来源不被允许' },
     )
     return
@@ -132,6 +146,11 @@ async function handleRequest(input: {
       terminalCode: config.terminalCode.trim(),
     }
     sendEnvelope(res, 200, identity, origin)
+    return
+  }
+
+  if (url.pathname === '/local/print/wake') {
+    await handlePrintWake(req, res, origin, url, bridgeToken, options.wakePrintQueue)
     return
   }
 
@@ -158,6 +177,38 @@ async function handleRequest(input: {
   }
 
   sendJson(res, 404, { code: 'LOCAL_QR_NOT_FOUND', message: '本机扫码登录接口不存在' }, origin)
+}
+
+async function handlePrintWake(
+  req: IncomingMessage,
+  res: ServerResponse,
+  origin: string,
+  url: URL,
+  bridgeToken: string | undefined,
+  wakePrintQueue: LocalQrServerOptions['wakePrintQueue'],
+): Promise<void> {
+  if (!isLocalBridgeTokenValid(req.headers['x-local-bridge-token'], bridgeToken)) {
+    sendJson(res, 403, { code: 'LOCAL_PRINT_BRIDGE_TOKEN_INVALID', message: '本机打印唤醒令牌校验失败' }, origin)
+    return
+  }
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { code: 'LOCAL_PRINT_METHOD_NOT_ALLOWED', message: '本机打印唤醒仅支持 POST' }, origin)
+    return
+  }
+  if (url.search.length > 0) {
+    sendJson(res, 400, { code: 'LOCAL_PRINT_QUERY_NOT_ALLOWED', message: '本机打印唤醒不接受查询参数' }, origin)
+    return
+  }
+
+  await assertEmptyBody(req)
+  const result = wakePrintQueue?.()
+  if (!result?.accepted) {
+    sendJson(res, 503, { code: 'LOCAL_PRINT_WAKE_UNAVAILABLE', message: '本机打印任务调度暂不可用' }, origin)
+    return
+  }
+
+  const response: LocalPrintWakeResponse = { accepted: true, coalesced: result.coalesced }
+  sendEnvelope(res, 202, response, origin)
 }
 
 // ── U 盘导入路由（Task 9） ───────────────────────────────────────────────────
@@ -350,6 +401,19 @@ async function readJsonBody<T>(req: IncomingMessage, context: 'qr' | 'usb' = 'qr
   return parsed as T
 }
 
+async function assertEmptyBody(req: IncomingMessage): Promise<void> {
+  let bytes = 0
+  for await (const chunk of req) {
+    bytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk))
+    if (bytes > MAX_BODY_BYTES) {
+      throw { status: 413, error: { code: 'LOCAL_PRINT_BODY_TOO_LARGE', message: '请求体过大' } } satisfies LocalApiException
+    }
+  }
+  if (bytes > 0) {
+    throw { status: 400, error: { code: 'LOCAL_PRINT_BODY_NOT_ALLOWED', message: '本机打印唤醒不接受请求体' } } satisfies LocalApiException
+  }
+}
+
 function cleanupExpiredClaims(claims: Map<string, StoredClaim>): void {
   const now = Date.now()
   for (const [ticketId, stored] of claims) {
@@ -374,8 +438,11 @@ function backendError(error: unknown, context: 'qr' | 'usb' = 'qr'): LocalApiExc
   return { status: 502, error: { code: fallbackCode, message: fallbackMessage } }
 }
 
-function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' = 'qr'): LocalApiException {
+function localExceptionFromUnknown(error: unknown, context: 'qr' | 'usb' | 'print' = 'qr'): LocalApiException {
   if (isLocalApiException(error)) return error
+  if (context === 'print') {
+    return { status: 500, error: { code: 'LOCAL_PRINT_INTERNAL_ERROR', message: '本机打印唤醒服务异常' } }
+  }
   return context === 'usb'
     ? { status: 500, error: { code: 'LOCAL_USB_INTERNAL_ERROR', message: 'U 盘导入本地服务异常' } }
     : { status: 500, error: { code: 'LOCAL_QR_INTERNAL_ERROR', message: '本机扫码登录服务异常' } }

@@ -10,6 +10,8 @@
 
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame, KioskPageHeader } from '@ai-job-print/ui'
+import { ServiceReadinessStrip } from '../../components/ServiceReadinessStrip'
+import { useApiReadiness } from '../../hooks/useApiReadiness'
 import {
   BookOpenIcon,
   BotIcon,
@@ -25,6 +27,7 @@ import {
   SparklesIcon,
   TargetIcon,
 } from 'lucide-react'
+import '../styles/service-hub-editorial.css'
 
 interface Capability {
   key: string
@@ -182,10 +185,12 @@ const QUICK_LINKS: QuickLink[] = [
 
 export function ResumeServiceHubPage() {
   const navigate = useNavigate()
+  const { status: apiStatus, retry: retryApi } = useApiReadiness()
+  const apiBlocked = apiStatus !== 'ready'
 
   return (
     <KioskPageFrame>
-      <div className="flex h-full flex-col overflow-y-auto bg-canvas">
+      <div className="service-hub service-hub--resume flex h-full flex-col overflow-y-auto bg-canvas">
         <KioskPageHeader
           title="AI简历服务"
           description="AI诊断 · 优化 · 生成 · 打印，一条龙完成"
@@ -193,48 +198,44 @@ export function ResumeServiceHubPage() {
           backLabel="返回"
         />
 
-        {/* AI能力提示横幅 */}
-        <div className="mt-5 flex items-center gap-3 rounded-xl border border-primary-200 bg-primary-50 px-5 py-3">
-          <span className="text-[20px] text-primary-700">✦</span>
-          <span className="text-[18px] font-semibold text-primary-700">AI智能驱动</span>
-          <span className="ml-auto text-[17px] text-neutral-500">
-            自动解析 · 定向优化 · 内容生成，全程 AI 辅助
-          </span>
-        </div>
+        <ServiceReadinessStrip status={apiStatus} onRetry={retryApi} />
 
         {/* 8 能力卡（2 列等高网格） */}
-        <div className="mt-6 grid grid-cols-2 gap-5">
+        <div className="service-hub__grid mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-5">
           {CAPABILITIES.map((cap) => {
             const Icon = cap.icon
+            const blocked = apiBlocked || (!cap.available && !cap.to)
             return (
               <button
                 key={cap.key}
                 type="button"
                 onClick={() => {
-                  if (!cap.to) return
+                  if (blocked || !cap.to) return
                   navigate(cap.to, cap.state ? { state: cap.state } : undefined)
                 }}
-                disabled={!cap.available && !cap.to}
+                disabled={blocked}
                 className={[
-                  'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-6 text-left',
+                  'service-hub__card',
+                  'flex flex-col gap-3 rounded-[var(--radius-lg)] border border-neutral-200 bg-surface p-4 text-left sm:p-6',
                   'border-t-4 shadow-sm active:scale-[0.99]',
                   cap.accentBorder,
+                  blocked ? 'service-hub__card--blocked' : '',
                   !cap.available ? 'opacity-[0.62]' : 'cursor-pointer',
                 ].join(' ')}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <span
                     className={[
-                      'flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl',
+                      'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl',
                       cap.iconBg,
                     ].join(' ')}
                   >
                     <Icon
-                      className={['h-[34px] w-[34px]', cap.iconColor].join(' ')}
+                      className={['h-7 w-7 sm:h-[34px] sm:w-[34px]', cap.iconColor].join(' ')}
                       aria-hidden="true"
                     />
                   </span>
-                  <h3 className="font-serif text-[28px] font-bold tracking-wide text-neutral-900">
+                  <h3 className="font-serif text-[22px] font-bold tracking-wide text-neutral-900 sm:text-[28px]">
                     {cap.title}
                   </h3>
                   {!cap.available && (
@@ -243,16 +244,18 @@ export function ResumeServiceHubPage() {
                     </span>
                   )}
                 </div>
-                <p className="text-[18px] leading-relaxed text-neutral-500">{cap.description}</p>
+                <p className="text-[15px] leading-relaxed text-neutral-500 sm:text-[18px]">
+                  {cap.description}
+                </p>
                 <div className="mt-auto flex items-center gap-2">
                   {cap.to ? (
                     <span
                       className={[
-                        'flex items-center gap-2 text-[19px] font-semibold',
+                        'flex items-center gap-2 text-[16px] font-semibold sm:text-[19px]',
                         cap.goColor,
                       ].join(' ')}
                     >
-                      {cap.available ? '进入' : '了解详情'}
+                      {apiBlocked ? '等待服务' : cap.available ? '进入' : '了解详情'}
                       <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
                     </span>
                   ) : (
@@ -265,22 +268,25 @@ export function ResumeServiceHubPage() {
         </div>
 
         {/* 快捷入口 */}
-        <div className="mt-6">
+        <div className="service-hub__quick-section mt-6">
           <div className="mb-2 flex items-baseline gap-3">
             <b className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">
               我的简历服务
             </b>
             <span className="text-[17px] text-neutral-500">登录后可查看历史记录</span>
           </div>
-          <div className="grid grid-cols-3 gap-[18px]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-[18px]">
             {QUICK_LINKS.map((link) => {
               const Icon = link.icon
               return (
                 <button
                   key={link.key}
                   type="button"
-                  onClick={() => navigate(link.to)}
-                  className="flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]"
+                  onClick={() => {
+                    if (!apiBlocked) navigate(link.to)
+                  }}
+                  disabled={apiBlocked}
+                  className={`flex min-h-24 items-center gap-4 rounded-[var(--radius-md)] border border-neutral-200 bg-surface px-[22px] py-4 text-left shadow-sm active:scale-[0.98]${apiBlocked ? ' service-hub__quick--blocked' : ''}`}
                 >
                   <span
                     className={[

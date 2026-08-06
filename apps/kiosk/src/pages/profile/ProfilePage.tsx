@@ -20,7 +20,7 @@ import './profile-inkpaper.css'
 // - 不新增后端 API（明细页消费既有 /me/* 端点）；不做活动 / 套餐 / 支付真实逻辑。
 // - 信息架构收口：不再把各类明细堆在独立「账号资产」聚合区；我的页只保留入口与概览，
 //   明细由 /me/* 轻量页承载（打印订单 / 文档 / 收藏 / 浏览·跳转记录），其余仍归位对应业务页。
-// 底部 Tab（首页 / AI助手 / 我的）由 KioskLayout 提供，本页不改动。
+// 底部 Tab（首页 / AI顾问 / 我的）由 KioskLayout 提供，本页不改动。
 
 export function ProfilePage() {
   const navigate = useNavigate()

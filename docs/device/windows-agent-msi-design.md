@@ -1,6 +1,6 @@
 # Windows Terminal Agent MSI 实施设计
 
-> 状态：B1 未签名候选已实施，尚未完成签名、Provisioner、Windows CI 生命周期结果和真机发布验收。
+> 状态：B1 MSI 未签名候选已通过 Windows CI；B2 Burn EXE 源码候选已实施，尚待 Windows CI、签名、Provisioner GUI 和真机发布验收。
 > 适用范围：Windows Terminal Agent 的首次安装、修复、卸载和同机升级。
 > 上位设计：[终端机队管理与安全换机设计](./terminal-fleet-management-design.md)。
 
@@ -56,7 +56,7 @@ Program Files\\AIJobPrintAgent\\
 
 ### 4.1 首次安装
 
-MSI 以管理员权限安装二进制、建立 `%ProgramData%\AIJobPrintAgent` 并应用现有最小 ACL：仅 `SYSTEM` 和 `Administrators` 可读写 token 与配置。它注册服务为 Automatic，设置既有 60 秒、300 秒的 SCM 恢复策略，但在未激活时不得领取打印任务。
+MSI 以管理员权限安装二进制并建立 `%ProgramData%\AIJobPrintAgent`，但未 Provisioning 时只注册 Manual/Stopped 服务，不写 token、配置或领取打印任务。独立 Provisioner 成功后才通过既有加固逻辑写入受 ACL 保护的配置与 DPAPI token，并把服务切换为 Automatic/Running；WinSW 继续使用既有 60 秒、300 秒恢复策略。
 
 MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理员密钥。不得把 BindCode 放入 `msiexec` 命令行、MSI public property、CustomActionData、安装日志或注册表。
 
@@ -113,4 +113,16 @@ MSI 不能接收 BindCode、Agent token、密码、数据库连接串或管理�
 
 `apps/terminal-agent/installer/` 现已提供固定输入清单、Node 22 x64 staging、生产依赖裁剪、原生 ABI 探针、WiX v4 工程、install/repair/uninstall Windows CI 和未签名 MSI 构建。MSI 直接拥有 WinSW wrapper、配置和 SCM 注册，不调用 `node-windows install-service`；未激活服务为 Manual/Stopped，避免无配置主机反复失败重启。`%ProgramData%\AIJobPrintAgent` 作为永久状态目录保留，二进制安装到 `%ProgramFiles%\AIJobPrintAgent`。
 
-当前仍是 **NO-GO 发布候选**：WinSW 与 MSI 未经本企业 Authenticode 签名；本机因已有在役同名服务未执行 MSI 生命周期测试，必须由干净 Windows CI/VM 提供 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 结果；安全交互式 Provisioner 与签名发布 manifest 仍在后续批次。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
+当前仍是 **NO-GO 发布候选**：B1 已由 PR #422 的干净 Windows CI 覆盖 fresh install、未激活 LocalSystem fail-closed 启动、repair、uninstall 和 ProgramData 保留，但 WinSW 与 MSI 仍未经本企业 Authenticode 签名；安全交互式 Provisioner GUI 与签名发布 manifest 仍在后续批次。独立新增 `KSK-002` 不属于 F2 同身份无缝换机，但仍必须完成新主机驱动、绑定、心跳、出纸、扫描和重启恢复验收后才能扩展部署。
+
+## 9. B2 Burn EXE 候选（2026-08-06）
+
+现场交互安装新增 `AIJobPrintTerminalSetup.exe` 候选。它使用 WiX Toolset v4 Burn 和 WixStandardBootstrapperApplication，将 B1 的唯一 MSI 内嵌为安装链；EXE 不复制 Agent 文件清单、不重新注册服务，也不形成第二套安装逻辑。企业批量部署仍可直接使用同一 MSI。
+
+Windows 上双击 EXE 后，可通过标准向导完成安装；再次运行同一版本可进入修复或卸载。无人值守生命周期仅用于 Windows CI：`/install /quiet`、`/repair /quiet`、`/uninstall /quiet`。所有路径继续保留 `%ProgramData%\AIJobPrintAgent`，未 Provisioning 的服务必须保持 Manual/Stopped。
+
+Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作，不接收 BindCode、Agent token、bridge token、管理员密钥和打印机型号。首次安全绑定仍由安装后的独立 Provisioner 完成；当前仓库只有受保护的交互式 PowerShell Provisioning，尚无本地 GUI，因此本候选只关闭“双击安装/修复/卸载”，不能宣称首次装机已经完全零命令行。
+
+构建顺序固定为 staging -> MSI -> EXE。`build-exe.ps1` 只接受唯一 MSI 输入并强制输出名；Windows CI 保留既有 required job 标识，新增 EXE build 和 install/repair/uninstall 生命周期验证，同时上传 MSI、EXE、manifest 和两套日志。macOS 上 WiX Burn 明确不支持生成 Windows 引导器，所以本地只运行静态契约和 NuGet 还原检查；EXE 产物、哈希和生命周期必须以 Windows 2022 CI/VM 为证据。
+
+本候选仍为 **NO-GO 发布候选**：在 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、Provisioner GUI 和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。

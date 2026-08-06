@@ -7,7 +7,7 @@ import { KioskStageFit } from './KioskStageFit'
 
 const NAV_ITEMS: Array<{ key: KioskTab; label: string; path: string; icon: typeof HomeIcon }> = [
   { key: 'home', label: '首页', path: '/', icon: HomeIcon },
-  { key: 'assistant', label: 'AI助手', path: '/assistant', icon: BotIcon },
+  { key: 'assistant', label: 'AI顾问', path: '/assistant', icon: BotIcon },
   { key: 'profile', label: '我的', path: '/profile', icon: UserIcon },
 ]
 

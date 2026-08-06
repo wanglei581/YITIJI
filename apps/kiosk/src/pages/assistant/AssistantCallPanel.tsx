@@ -130,7 +130,7 @@ export function AssistantCallPanel({ onClose, onSwitchToText }: AssistantCallPan
       >
         <header className="assistant-voice-header">
           <div>
-            <span>AI助手</span>
+            <span>AI顾问</span>
             <h2 id="assistant-voice-title">和小青语音咨询</h2>
           </div>
           <button

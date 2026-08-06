@@ -1,0 +1,441 @@
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+  padding: 14px 20px;
+  border: 1px solid color-mix(in srgb, var(--k-teal) 20%, transparent);
+  border-radius: var(--k-r-md);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--k-teal) 7%, transparent),
+    color-mix(in srgb, var(--k-teal) 4%, transparent)
+  );
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail > svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--k-teal-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy b,
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy span {
+  display: block;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy b {
+  color: var(--k-ink);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy span {
+  margin-top: 2px;
+  color: var(--k-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail__status {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid color-mix(in srgb, var(--k-teal) 22%, transparent);
+  border-radius: 999px;
+  background: var(--k-teal-soft);
+  color: var(--k-teal-deep);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail button {
+  min-height: 52px;
+  flex: none;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--k-r-sm);
+  background: var(--k-dark);
+  color: var(--k-paper);
+  font-family: var(--fy-sans);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-ai-rail button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-notice {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 12px 20px;
+  border: 1px dashed var(--k-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--k-surface) 70%, transparent);
+  color: var(--k-muted);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-notice svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--fy-wheat);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-notice p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.55;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(206px, 1fr);
+  flex: 1;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap,
+[data-kiosk-presentation='fusion-youth'] .ps-device-card {
+  --ps-accent: var(--k-teal);
+  --ps-accent-deep: var(--k-teal-deep);
+  --ps-accent-soft: var(--k-teal-soft);
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 26px;
+  border: 1px solid var(--k-line);
+  border-top: 4px solid var(--ps-accent);
+  border-radius: var(--k-r-md);
+  background: var(--k-surface);
+  box-shadow: var(--shadow-sm);
+  color: var(--k-ink);
+  text-align: left;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-accent--clay {
+  --ps-accent: var(--fy-clay);
+  --ps-accent-deep: var(--fy-clay);
+  --ps-accent-soft: var(--color-clay-soft);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-accent--wheat {
+  --ps-accent: var(--fy-wheat);
+  --ps-accent-deep: var(--fy-wheat);
+  --ps-accent-soft: var(--fy-wheat-soft);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-accent--plum {
+  --ps-accent: var(--color-plum);
+  --ps-accent-deep: var(--color-plum);
+  --ps-accent-soft: var(--color-plum-soft);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-accent--slate {
+  --ps-accent: var(--fy-slate);
+  --ps-accent-deep: var(--color-info-fg);
+  --ps-accent-soft: var(--fy-slate-soft);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap:active,
+[data-kiosk-presentation='fusion-youth'] .ps-quick:active {
+  transform: scale(0.99);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap--unavailable {
+  opacity: 0.62;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.5);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__icon {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  flex: none;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--ps-accent-soft);
+  color: var(--ps-accent-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__icon svg {
+  width: 34px;
+  height: 34px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap h3,
+[data-kiosk-presentation='fusion-youth'] .ps-device-card h3 {
+  margin: 0;
+  font-family: var(--k-serif);
+  font-size: 28px;
+  font-weight: 700;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__badge {
+  padding: 4px 12px;
+  border: 1px solid var(--k-line);
+  border-radius: 999px;
+  background: var(--k-paper);
+  color: var(--k-muted);
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__description,
+[data-kiosk-presentation='fusion-youth'] .ps-cap__note {
+  margin: 0;
+  color: var(--k-muted);
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__note {
+  color: var(--color-warning-fg);
+  font-size: 16px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__footer {
+  margin-top: auto;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__go {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ps-accent-deep);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__go svg {
+  width: 20px;
+  height: 20px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-cap__disabled-label {
+  color: var(--color-neutral-400);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-device-card h3 {
+  font-size: 26px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-device-card h3 span {
+  margin-left: 12px;
+  color: var(--k-muted);
+  font-family: var(--fy-sans);
+  font-size: 15px;
+  font-weight: 400;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-device-card__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--k-muted);
+  font-size: 17px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-device-card__rows > span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-device-card__rows svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  color: var(--k-teal-deep);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-records {
+  margin-top: 24px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-records__head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-records__head b {
+  font-family: var(--k-serif);
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-records__head span {
+  color: var(--k-muted);
+  font-size: 17px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick {
+  display: flex;
+  min-width: 0;
+  min-height: 96px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 22px;
+  border: 1px solid var(--k-line);
+  border-radius: var(--k-r-sm);
+  background: var(--k-surface);
+  color: var(--k-ink);
+  text-align: left;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex: none;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--fy-slate-soft);
+  color: var(--color-info-fg);
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__copy b,
+[data-kiosk-presentation='fusion-youth'] .ps-quick__copy span {
+  display: block;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__copy b {
+  font-size: 21px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__copy span {
+  margin-top: 3px;
+  color: var(--k-muted);
+  font-size: 16px;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-quick__arrow {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  color: var(--k-muted);
+  opacity: 0.6;
+}
+
+[data-kiosk-presentation='fusion-youth'] .ps-notice--legal {
+  margin-top: 24px;
+}
+
+@media (max-width: 900px) {
+  [data-kiosk-presentation='fusion-youth'] .ps-ai-rail {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-ai-rail__copy {
+    flex-basis: calc(100% - 36px);
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-ai-rail button {
+    flex: 1 0 100%;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap-grid,
+  [data-kiosk-presentation='fusion-youth'] .ps-quick-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap-grid {
+    grid-auto-rows: auto;
+    gap: 14px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap,
+  [data-kiosk-presentation='fusion-youth'] .ps-device-card {
+    min-height: 190px;
+    padding: 20px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-records__head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+@media (max-width: 480px) {
+  [data-kiosk-presentation='fusion-youth'] .ps-cap,
+  [data-kiosk-presentation='fusion-youth'] .ps-device-card {
+    min-height: 0;
+    padding: 18px 16px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap__icon {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap__icon svg {
+    width: 30px;
+    height: 30px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap h3 {
+    font-size: 24px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-cap__description,
+  [data-kiosk-presentation='fusion-youth'] .ps-notice p {
+    font-size: 15px;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-device-card h3 span {
+    display: block;
+    margin: 4px 0 0;
+  }
+
+  [data-kiosk-presentation='fusion-youth'] .ps-quick {
+    padding-inline: 16px;
+  }
+}

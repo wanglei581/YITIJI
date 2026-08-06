@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIRM = 'src/pages/print/PrintConfirmPage.tsx'
 const PROGRESS = 'src/pages/print/PrintProgressPage.tsx'
+const LOCAL_PRINT_WAKE = 'src/services/print/localPrintWakeApi.ts'
 const CASHIER = 'src/pages/print/PrintCashierPage.tsx'
 const DONE = 'src/pages/print/PrintDonePage.tsx'
 const PAYMENT_API = 'src/services/print/paymentApi.ts'
@@ -45,6 +46,7 @@ console.log('\n=== Kiosk 打印确认页诚实性守卫 ===')
 
 const confirmSrc = read(CONFIRM)
 const progressSrc = read(PROGRESS)
+const localPrintWakeSrc = read(LOCAL_PRINT_WAKE)
 const cashierSrc = read(CASHIER)
 const doneSrc = read(DONE)
 const paymentApiSrc = read(PAYMENT_API)
@@ -219,6 +221,26 @@ expectMatches(
   progressSrc,
   /if\s*\(\s*isHttpMode\s*&&\s*!taskId\s*\)\s*\{[\s\S]*?打印任务尚未创建[\s\S]*?返回确认页[\s\S]*?\}/,
   'PrintProgressPage http 无 taskId 时显示错误态而非伪造成功',
+)
+expectMatches(
+  progressSrc,
+  /wakeRequestedTaskIdRef\.current\s*!==\s*taskId[\s\S]*?wakeLocalPrintQueue\(\)/,
+  'PrintProgressPage 仅对真实 taskId 发起一次本机打印队列唤醒',
+)
+expectMatches(
+  localPrintWakeSrc,
+  /\/local\/print\/wake[\s\S]*?method:\s*'POST'/,
+  '本机打印唤醒使用 wake-only POST 协议',
+)
+if (/body\s*:/.test(localPrintWakeSrc)) {
+  fail('本机打印唤醒不得携带 taskId、文件或任意请求体')
+} else {
+  pass('本机打印唤醒不携带请求体')
+}
+expectMatches(
+  localPrintWakeSrc,
+  /catch\s*\{[\s\S]*?return\s+'unavailable'/,
+  '本机 Agent 不可达时静默回落到既有云端轮询',
 )
 
 // ============================================================

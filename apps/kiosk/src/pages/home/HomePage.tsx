@@ -7,16 +7,18 @@
 // 后台动态开关。登录态为「原型外动态状态」：复用 88px 登录框，文字改「进入我的」。
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
 import { KioskPageFrame } from '@ai-job-print/ui'
-import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
+import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxConfig } from '../../hooks/useToolboxConfig'
 import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { ContinuePanel } from './components/ContinuePanel'
 import { ProtoIcon } from './prototypeIcons'
 import { type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
 import '../../styles/prototype-v1.css'
+import '../../styles/kiosk-uplift.css'
 
 /** 服务组 id → 组头图标（键为稳定 group id；图标名对应 prototypeIcons 的 P 表） */
 const GROUP_ICON: Record<string, string> = {
@@ -53,7 +55,10 @@ const TILE_ICON: Record<string, string> = {
 }
 
 /** 原型 01-home 每组网格布局：cols、是否 .col 竖排、磁贴是否带图标；键为稳定 group id */
-const GROUP_LAYOUT: Record<string, { cols: 'c1' | 'c2' | 'c3' | 'c5'; col: boolean; icons: boolean }> = {
+const GROUP_LAYOUT: Record<
+  string,
+  { cols: 'c1' | 'c2' | 'c3' | 'c5'; col: boolean; icons: boolean }
+> = {
   resume: { cols: 'c3', col: false, icons: true },
   jobs: { cols: 'c2', col: false, icons: true },
   'job-fairs': { cols: 'c1', col: false, icons: true },
@@ -76,11 +81,9 @@ const ACCENT_CLASS: Record<Accent, string> = {
  * 未登录：88px .login-btn「登录 / 注册」→ 打开真实登录弹窗（弹窗内含游客体验）。
  * 已登录：原型外动态状态——复用同一 88px 框，文字改「进入我的」→ /profile；
  *         不显示原型没有的简历/文档/订单统计。 */
-function HomeWelcome() {
+function HomeWelcome({ onOpenLogin }: { onOpenLogin: () => void }) {
   const navigate = useNavigate()
-  const { isLoggedIn, displayName, continueAsGuest } = useAuth()
-  const [loginOpen, setLoginOpen] = useState(false)
-  const loginTriggerRef = useRef<HTMLButtonElement>(null)
+  const { isLoggedIn, displayName } = useAuth()
 
   return (
     <section className="welcome">
@@ -100,7 +103,11 @@ function HomeWelcome() {
           </span>
         </button>
       ) : (
-        <button ref={loginTriggerRef} type="button" className="login-btn" onClick={() => setLoginOpen(true)}>
+        <button
+          type="button"
+          className="login-btn"
+          onClick={onOpenLogin}
+        >
           <ProtoIcon name="user" />
           <span className="lb-text">
             登录 / 注册
@@ -108,24 +115,22 @@ function HomeWelcome() {
           </span>
         </button>
       )}
-      <MemberLoginDialog
-        open={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        onContinueAsGuest={() => {
-          continueAsGuest()
-          setLoginOpen(false)
-        }}
-      />
     </section>
   )
 }
 
-/** AI 接待区（原型 design-d .reception + .ar-card + .device-card）
- * 作用：让小青主动引导用户描述需求 → 进入 AI 顾问（/assistant）。
- * 设备状态静态展示就绪状态（无真实 hook 时保持静态）。
- */
+/** AI 接待区（原型 design-d .reception + .ar-card + .device-card）。 */
 function HomeReception() {
   const navigate = useNavigate()
+  const device = useOutletContext<TerminalDeviceStatusView>()
+  const printerState = device.loading
+    ? 'checking'
+    : device.printerReady
+      ? 'ready'
+      : device.kind === 'offline' || device.kind === 'error'
+        ? 'unavailable'
+        : 'unknown'
+  const printerLabel = device.loading ? '打印机状态检测中' : device.printerLabel
 
   return (
     <section className="reception">
@@ -133,7 +138,8 @@ function HomeReception() {
       <div className="ar-card">
         <div className="ar-top">
           <span className="ar-badge">
-            <span className="dot" />AI接待台 · 等待目标
+            <span className="dot" />
+            AI接待台 · 等待目标
           </span>
         </div>
         <p className="ar-h">不知道从哪开始？说出你想办的事</p>
@@ -152,52 +158,63 @@ function HomeReception() {
             </svg>
           </button>
         </div>
-        <button
-          type="button"
-          className="ar-cta"
-          onClick={() => navigate('/assistant')}
-        >
+        <button type="button" className="ar-cta" onClick={() => navigate('/assistant')}>
           让小青安排
         </button>
         <p className="ar-hint">将进入 AI 顾问，由你确认办理方案</p>
         <div className="ar-chips">
-          <button type="button" className="ar-chip" onClick={() => navigate('/assistant', { state: { topic: 'resume' } })}>
-            <ProtoIcon name="diagnose" />优化简历并打印
+          <button
+            type="button"
+            className="ar-chip"
+            onClick={() => navigate('/assistant', { state: { topic: 'resume' } })}
+          >
+            <ProtoIcon name="diagnose" />
+            优化简历并打印
           </button>
-          <button type="button" className="ar-chip" onClick={() => navigate('/assistant', { state: { topic: 'jobfair' } })}>
-            <ProtoIcon name="fair-social" />准备招聘会材料
+          <button
+            type="button"
+            className="ar-chip"
+            onClick={() => navigate('/assistant', { state: { topic: 'jobfair' } })}
+          >
+            <ProtoIcon name="fair-social" />
+            准备招聘会材料
           </button>
           <button type="button" className="ar-chip" onClick={() => navigate('/print/upload')}>
-            <ProtoIcon name="printer" />打印手机里的文件
+            <ProtoIcon name="printer" />
+            打印手机里的文件
           </button>
         </div>
       </div>
       {/* 右：本机能力卡片 */}
       <div className="device-card">
         <h3>本机办结能力</h3>
-        <p className="dc-sub">AI 调用设备，现场完成</p>
+        <p className="dc-sub">仅展示本机实时检测到的状态</p>
         <div className="dc-items">
-          <div className="dc-item">
+          <div className="dc-item" role="status" aria-live="polite">
             <div className="dc-left">
-              <ProtoIcon name="printer" /><span>文档打印就绪</span>
+              <ProtoIcon name="printer" />
+              <span>{printerLabel}</span>
             </div>
-            <span className="dc-dot" />
+            <span className="dc-dot" data-state={printerState} aria-hidden="true" />
           </div>
           <div className="dc-item">
             <div className="dc-left">
-              <ProtoIcon name="scan" /><span>材料扫描就绪</span>
+              <ProtoIcon name="scan" />
+              <span>材料扫描进入后检测</span>
             </div>
-            <span className="dc-dot" />
+            <span className="dc-dot" data-state="unknown" aria-hidden="true" />
           </div>
           <div className="dc-item">
             <div className="dc-left">
-              <ProtoIcon name="id-copy" /><span>自动双面可用</span>
+              <ProtoIcon name="id-copy" />
+              <span>双面能力提交前确认</span>
             </div>
-            <span className="dc-dot" />
+            <span className="dc-dot" data-state="unknown" aria-hidden="true" />
           </div>
         </div>
         <div className="dc-footer">
-          <ProtoIcon name="info" />设备状态实时检测
+          <ProtoIcon name="info" />
+          扫描、纸张与双面能力以办理时检查为准
         </div>
       </div>
     </section>
@@ -233,7 +250,9 @@ export function ServiceCard({ group }: { group: ServiceGroup }) {
 
   return (
     <section
-      className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`.trim().replace(/\s+/g, ' ')}
+      className={`card ${wide ? 'wide' : ''} ${ACCENT_CLASS[group.accent]}`
+        .trim()
+        .replace(/\s+/g, ' ')}
       data-group-id={group.id}
     >
       <div className="card-head">
@@ -245,7 +264,11 @@ export function ServiceCard({ group }: { group: ServiceGroup }) {
             // 分组标题作为聚合页入口（消费 group.titleTo，如 print-scan → /print-scan）。
             // 复用原型已有标题为点击入口，不新增可见组件；视觉与 h2 一致，仅加箭头暗示可点。
             <h2>
-              <button type="button" className="g-title-link" onClick={() => navigate(group.titleTo!)}>
+              <button
+                type="button"
+                className="g-title-link"
+                onClick={() => navigate(group.titleTo!)}
+              >
                 {group.title}
                 <ProtoIcon name="arrow" />
               </button>
@@ -306,9 +329,11 @@ export function ZoneRow() {
   const toolbox = useToolboxConfig()
   const campus = useSmartCampusConfig()
 
-  const toolboxItems = toolbox.enabled ? [...(toolbox.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder) : []
+  const toolboxItems = toolbox.enabled
+    ? [...(toolbox.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
+    : []
   const campusModules = (Object.keys(SMART_CAMPUS_CHIP_LABELS) as SmartCampusModuleKey[]).filter(
-    (key) => campus.modules?.[key],
+    (key) => campus.modules?.[key]
   )
   const campusItems = [...(campus.items ?? [])].sort((a, b) => a.sortOrder - b.sortOrder)
   const showToolbox = toolbox.enabled
@@ -362,7 +387,11 @@ export function ZoneRow() {
         </button>
       )}
       {showCampus && (
-        <button type="button" className="zone-card z-teal" onClick={() => navigate('/smart-campus')}>
+        <button
+          type="button"
+          className="zone-card z-teal"
+          onClick={() => navigate('/smart-campus')}
+        >
           <span className="z-top">
             <span className="z-icon">
               <ProtoIcon name="zone-campus" />
@@ -396,8 +425,7 @@ export function ZoneRow() {
 }
 
 /** 继续办理横幅 — 未登录时显示登录引导 */
-function HomeContinueBar() {
-  const navigate = useNavigate()
+function HomeContinueBar({ onLogin }: { onLogin: () => void }) {
   const { isLoggedIn } = useAuth()
   if (isLoggedIn) return null
   return (
@@ -406,9 +434,10 @@ function HomeContinueBar() {
         <b>继续办理</b>
         <span>登录后可查看并继续本人未完成事项</span>
       </div>
-      <button type="button" className="cb-btn" onClick={() => navigate('/login')}>
+      <button type="button" className="cb-btn" onClick={onLogin}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}>
-          <circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0116 0" />
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21a8 8 0 0116 0" />
         </svg>
         登录后查看
       </button>
@@ -420,19 +449,80 @@ function HomeContinueBar() {
 function SvcGrid() {
   const navigate = useNavigate()
   const tiles = [
-    { to: '/print-scan',       accent: 'a-slate', icon: 'group-print',     title: '打印扫描',   sub: '上传、扫描与本机出纸',   aiChip: 'AI文件预检' },
-    { to: '/resume-service',   accent: 'a-teal',  icon: 'group-resume',    title: 'AI简历服务', sub: '诊断、优化、生成与打印', aiChip: 'AI诊断优化' },
-    { to: '/jobs-service',     accent: 'a-clay',  icon: 'group-jobs',      title: '岗位信息',   sub: '查看第三方来源岗位',     aiChip: 'AI岗位研判' },
-    { to: '/fairs-service',    accent: 'a-wheat', icon: 'group-fairs',     title: '招聘会',     sub: '场次、企业与现场导览',   aiChip: 'AI材料清单' },
-    { to: '/interview-service',accent: 'a-plum',  icon: 'group-interview', title: 'AI面试训练', sub: '模拟问答与训练报告',     aiChip: 'AI模拟反馈' },
-    { to: '/policy-service',   accent: 'a-wheat', icon: 'group-policy',    title: '政策服务',   sub: '政策查询与材料指引',     aiChip: 'AI来源解读' },
-    { to: '/toolbox',          accent: 'a-plum',  icon: 'zone-toolbox',    title: '百宝箱',     sub: '证件照、文档与实用工具', aiChip: 'AI受控工具' },
-    { to: '/smart-campus',     accent: 'a-teal',  icon: 'zone-campus',     title: '智慧校园',   sub: '校园服务与信息展示',     aiChip: 'AI场景引导' },
+    {
+      to: '/print-scan',
+      accent: 'a-slate',
+      icon: 'group-print',
+      title: '打印扫描',
+      sub: '上传、扫描与本机出纸',
+      aiChip: 'AI文件预检',
+    },
+    {
+      to: '/resume-service',
+      accent: 'a-teal',
+      icon: 'group-resume',
+      title: 'AI简历服务',
+      sub: '诊断、优化、生成与打印',
+      aiChip: 'AI诊断优化',
+    },
+    {
+      to: '/jobs-service',
+      accent: 'a-clay',
+      icon: 'group-jobs',
+      title: '岗位信息',
+      sub: '查看第三方来源岗位',
+      aiChip: 'AI岗位研判',
+    },
+    {
+      to: '/fairs-service',
+      accent: 'a-wheat',
+      icon: 'group-fairs',
+      title: '招聘会',
+      sub: '场次、企业与现场导览',
+      aiChip: 'AI材料清单',
+    },
+    {
+      to: '/interview-service',
+      accent: 'a-plum',
+      icon: 'group-interview',
+      title: 'AI面试训练',
+      sub: '模拟问答与训练报告',
+      aiChip: 'AI模拟反馈',
+    },
+    {
+      to: '/policy-service',
+      accent: 'a-wheat',
+      icon: 'group-policy',
+      title: '政策服务',
+      sub: '政策查询与材料指引',
+      aiChip: 'AI来源解读',
+    },
+    {
+      to: '/toolbox',
+      accent: 'a-plum',
+      icon: 'zone-toolbox',
+      title: '百宝箱',
+      sub: '证件照、文档与实用工具',
+      aiChip: 'AI受控工具',
+    },
+    {
+      to: '/smart-campus',
+      accent: 'a-teal',
+      icon: 'zone-campus',
+      title: '智慧校园',
+      sub: '校园服务与信息展示',
+      aiChip: 'AI场景引导',
+    },
   ]
   return (
     <div className="svc-grid" role="navigation" aria-label="服务入口">
       {tiles.map((t) => (
-        <button key={t.to} type="button" className={`svc-tile ${t.accent}`} onClick={() => navigate(t.to)}>
+        <button
+          key={t.to}
+          type="button"
+          className={`svc-tile ${t.accent}`}
+          onClick={() => navigate(t.to)}
+        >
           <span className="st-icon">
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <ProtoIcon name={t.icon as any} />
@@ -442,7 +532,13 @@ function SvcGrid() {
             <span className="st-sub">{t.sub}</span>
             <span className="ai-chip">{t.aiChip}</span>
           </span>
-          <svg className="st-arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg
+            className="st-arr"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
             <path d="M9 6l6 6-6 6" />
           </svg>
         </button>
@@ -452,17 +548,32 @@ function SvcGrid() {
 }
 
 export function HomePage() {
+  const { continueAsGuest } = useAuth()
+  const [loginOpen, setLoginOpen] = useState(false)
+  const openLogin = () => setLoginOpen(true)
+
   return (
     <KioskPageFrame className="kpv1 kpv1--content-only">
-      <HomeWelcome />
+      <MemberLoginDialog
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        onContinueAsGuest={() => { continueAsGuest(); setLoginOpen(false) }}
+      />
+      <HomeWelcome onOpenLogin={openLogin} />
       <ContinuePanel />
       <HomeReception />
       <HomeDispatch />
-      <HomeContinueBar />
+      <HomeContinueBar onLogin={openLogin} />
       <div className="svc-header">
         <span className="svc-title">核心服务</span>
         <span className="svc-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} style={{ width: 16, height: 16 }}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            style={{ width: 16, height: 16 }}
+          >
             <path d="M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z" />
           </svg>
           AI增强服务
@@ -472,7 +583,8 @@ export function HomePage() {
       <SvcGrid />
       <div className="notice">
         <ProtoIcon name="info" />
-        岗位与招聘会信息均来自第三方 / 官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。
+        岗位与招聘会信息均来自第三方 /
+        官方来源，本终端仅提供信息展示与跳转，投递、预约请前往来源平台办理。
       </div>
     </KioskPageFrame>
   )

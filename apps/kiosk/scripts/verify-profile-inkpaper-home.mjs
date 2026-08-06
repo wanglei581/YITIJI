@@ -211,6 +211,16 @@ expectMatches(combinedProfileCss, /\.kprofile\.kprofile-lightflow\s+\.k-ripple/,
 expectIncludes(combinedProfileCss, 'min-block-size: 56px;', 'Profile CSS 保留 56px 主操作触控高度')
 expectMatches(combinedProfileCss, /\.p-iconbtn\s*\{[^}]*min-inline-size:\s*56px;[^}]*min-block-size:\s*56px;/, 'Profile CSS 将次操作触控目标提升到 56px')
 expectIncludes(combinedProfileCss, 'min-block-size: 92px;', 'Profile CSS 保留桌面端 92px 等权入口')
+expectMatches(
+  profileCss[1],
+  /@media\s*\(min-width:\s*901px\)\s*and\s*\(min-height:\s*1500px\)[\s\S]*?\.kp-inner\s*\{[^}]*display:\s*flex;[^}]*flex:\s*1;/,
+  'Profile 高屏桌面态由内容容器承接可用高度',
+)
+expectMatches(
+  profileCss[2],
+  /@media\s*\(min-width:\s*901px\)\s*and\s*\(min-height:\s*1500px\)[\s\S]*?\.kp-service-directory\s*\{[^}]*flex:\s*1;[\s\S]*?\.kp-section\s*\{[^}]*display:\s*flex;[\s\S]*?\.kp-entry-grid\s*\{[^}]*flex:\s*1;/,
+  'Profile 高屏桌面态只拉伸真实服务分区与入口',
+)
 expectMatches(combinedProfileCss, /@media\s*\(max-width:\s*520px\)[\s\S]*?\.kprofile\.kprofile-lightflow \.kp-entry-grid[\s\S]*?grid-template-columns:\s*1fr;/, 'Profile CSS 在 520px 收口为单列')
 expectAbsent(combinedProfileCss, /lf-reference-/, 'Profile CSS 不保留首页服务卡 selector')
 

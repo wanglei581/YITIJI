@@ -1359,4 +1359,16 @@ button.jf-chip {
     padding: 14px 22px 18px;
     flex-wrap: wrap;
   }
+
+  .w4-page-frame .ui-kiosk-action-items > .jf-spacer {
+    display: none;
+  }
+
+  .w4-page-frame .ui-kiosk-action-items > .jf-btn {
+    width: 100%;
+    min-height: 58px;
+    padding-inline: 20px;
+    font-size: 19px;
+    letter-spacing: 0;
+  }
 }
