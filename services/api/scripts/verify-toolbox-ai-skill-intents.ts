@@ -24,6 +24,17 @@ const currentProgressPath = join(repoRoot, 'docs/progress/current-progress.md')
 const nextTasksPath = join(repoRoot, 'docs/progress/next-tasks.md')
 
 const firstBatchIntents = ['offer_compare', 'salary_negotiation', 'hr_qa']
+const advisorIntents = [
+  'self_intro_gen',
+  'material_checklist',
+  'jd_analysis',
+  'interview_questions',
+  'career_explore',
+  'cover_letter_gen',
+  'resume_jd_match',
+  'company_research',
+]
+const allAssistantSkills = [...firstBatchIntents, ...advisorIntents]
 const forbiddenLaunchCopy = ['一键投递', '立即投递', '平台投递', '候选人推荐给企业', '企业端 Offer 管理']
 
 let failed = 0
@@ -87,9 +98,9 @@ function main(): void {
   const currentProgress = mustExist(currentProgressPath, 'current-progress 存在')
   const nextTasks = mustExist(nextTasksPath, 'next-tasks 存在')
 
-  mustContain(sharedAiTypes, [...firstBatchIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], '共享类型包含首批 AI skill 和请求字段')
-  mustContain(apiAiInterface, [...firstBatchIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], 'API provider 接口镜像包含首批 AI skill 和请求字段')
-  mustContain(assistantDto, [...firstBatchIntents, '@IsIn(ASSISTANT_SKILLS)', 'skill?:'], 'DTO 对 skill 做白名单校验')
+  mustContain(sharedAiTypes, [...allAssistantSkills, 'export type AssistantSkill', 'skill?: AssistantSkill'], '共享类型包含完整 AI skill 集合和请求字段')
+  mustContain(apiAiInterface, [...allAssistantSkills, 'export type AssistantSkill', 'skill?: AssistantSkill'], 'API provider 接口镜像包含完整 AI skill 集合和请求字段')
+  mustContain(assistantDto, [...allAssistantSkills, '@IsIn(ASSISTANT_SKILLS)', 'skill?:'], 'DTO 对完整 AI skill 集合做白名单校验')
 
   mustContain(kioskAssistant, [
     'useSearchParams',
@@ -97,7 +108,7 @@ function main(): void {
     'normalizeToolboxSkill',
     'skill: toolboxSkill',
     'source: \'toolbox_ai_skill\'',
-    ...firstBatchIntents,
+    ...allAssistantSkills,
     '不构成录用、入职或法律意见',
     '不构成涨薪或录用承诺',
     '不构成正式法律意见或官方政策承诺',
@@ -107,14 +118,22 @@ function main(): void {
     'SKILL_SCOPED_PROMPTS',
     'buildSkillScopedSystemPrompt',
     'skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]',
-    ...firstBatchIntents,
+    ...allAssistantSkills,
     '不得承诺录用结果',
     '不得承诺涨薪成功',
     '不得对具体争议给出确定法律结论',
+    '不得编造经历',
+    '不得把通用经验冒充具体单位要求',
+    '不得虚构招聘方内部标准',
+    '不得声称掌握招聘方内部题库',
+    '不得输出录用概率',
+    '不得编造项目',
+    '不得输出百分比匹配度',
+    '不得虚构企业现状',
   ], 'LLM 服务优先使用入口 intent 并注入场景合规 prompt')
 
   mustContain(`${apiMockProvider}\n${kioskMockAdapter}`, [
-    ...firstBatchIntents,
+    ...allAssistantSkills,
     '仅供个人参考',
     '不承诺涨薪或录用结果',
     '官方人社窗口',

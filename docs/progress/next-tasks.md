@@ -4,6 +4,7 @@
 
 ## 当前执行：生产混合版本故障恢复
 
+- [~] **先关闭主干 CI 回归，再恢复首管理员 PR #510**：`main@36690977` 的 runs `31096382731` / `31099112210` 均为 build/Kiosk 静态失败、PG 成功；独立分支 `codex/fix-main-ci-regressions` 已补 11 项 AI skill 的 DTO/LLM/mock/合规门禁，移除重复暖色 CSS import，并按真实实现收敛 Home/W3/W5/W6 静态合同。Node `v22.23.1` 下全仓 typecheck、目标 lint/build 与相关门禁通过；提交后须在干净树复跑 W4，创建独立 PR 并等待三项 CI 全绿。该修复合入 `main` 后，#510 再同步主干、重跑首管理员真并发 PG CI；两项均未部署，合并也不授权自动执行 bootstrap 或生产发布。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
