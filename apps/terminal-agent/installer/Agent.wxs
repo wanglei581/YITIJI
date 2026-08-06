@@ -50,6 +50,7 @@
             Id="ProvisionerStartMenuShortcut"
             Name="AI求职打印终端配置"
             Description="配置并诊断 AI 求职打印终端"
+            Advertise="no"
             Target="[System64Folder]WindowsPowerShell\v1.0\powershell.exe"
             Arguments="-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File &quot;[INSTALLFOLDER]provisioner\provision-agent-gui.ps1&quot;"
             WorkingDirectory="INSTALLFOLDER" />

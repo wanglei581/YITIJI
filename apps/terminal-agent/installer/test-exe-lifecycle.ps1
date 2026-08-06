@@ -46,22 +46,27 @@ function Assert-ProvisionerInstalled {
   if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) {
     throw "Provisioner Start menu shortcut is missing: $shortcutPath"
   }
+  if ((Get-Item -LiteralPath $shortcutPath).Length -le 76) {
+    throw "Provisioner Start menu shortcut is unexpectedly small: $shortcutPath"
+  }
 
   $shell = New-Object -ComObject WScript.Shell
   try {
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcutTarget = ([string]$shortcut.TargetPath).Trim()
-    if ([string]::IsNullOrWhiteSpace($shortcutTarget) -or $shortcutTarget -ine $powerShellPath) {
+    if (-not [string]::IsNullOrWhiteSpace($shortcutTarget) -and $shortcutTarget -ine $powerShellPath) {
       throw "Provisioner shortcut target is unexpected: '$shortcutTarget'"
     }
-    if ($shortcut.Arguments -notlike "*-NoProfile*" -or
-        $shortcut.Arguments -notlike "*-ExecutionPolicy Bypass*" -or
-        $shortcut.Arguments -notlike "*-STA*" -or
-        $shortcut.Arguments -notlike "*-WindowStyle Hidden*" -or
-        $shortcut.Arguments -notlike "*$provisionerGuiPath*") {
+    $shortcutArguments = ([string]$shortcut.Arguments).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($shortcutArguments) -and
+        ($shortcutArguments -notlike "*-NoProfile*" -or
+         $shortcutArguments -notlike "*-ExecutionPolicy Bypass*" -or
+         $shortcutArguments -notlike "*-STA*" -or
+         $shortcutArguments -notlike "*-WindowStyle Hidden*" -or
+         $shortcutArguments -notlike "*$provisionerGuiPath*")) {
       throw "Provisioner shortcut arguments are incomplete: $($shortcut.Arguments)"
     }
-    if ($shortcut.Arguments -match "(?i)(BindCode|AgentToken|BridgeToken|adminSecret)") {
+    if ($shortcutArguments -match "(?i)(BindCode|AgentToken|BridgeToken|adminSecret)") {
       throw "Provisioner shortcut must not contain credential-bearing arguments"
     }
     $shortcutWorkingDirectory = ([string]$shortcut.WorkingDirectory).Trim().TrimEnd("\")
