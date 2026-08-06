@@ -43,7 +43,7 @@
       </Directory>
     </StandardDirectory>
 
-    <StandardDirectory Id="CommonProgramsFolder">
+    <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="AgentProgramMenuFolder" Name="AI求职打印终端">
         <Component Id="ProvisionerShortcutComponent" Guid="18D6BC81-A861-4500-A343-6220532230DA" Bitness="always64">
           <Shortcut
