@@ -1,6 +1,6 @@
 # Windows Terminal Agent MSI 实施设计
 
-> 状态：B1 MSI 未签名候选已通过 Windows CI；B2 Burn EXE 源码候选已实施，尚待 Windows CI、签名、Provisioner GUI 和真机发布验收。
+> 状态：B1 MSI 与 B2 Burn EXE 未签名候选均已通过 Windows CI；尚待签名、Provisioner GUI 和真机发布验收。
 > 适用范围：Windows Terminal Agent 的首次安装、修复、卸载和同机升级。
 > 上位设计：[终端机队管理与安全换机设计](./terminal-fleet-management-design.md)。
 
@@ -124,5 +124,7 @@ Windows 上双击 EXE 后，可通过标准向导完成安装；再次运行同�
 Bundle 不声明可覆盖变量、MSI 属性、命令行透传或自定义动作，不接收 BindCode、Agent token、bridge token、管理员密钥和打印机型号。首次安全绑定仍由安装后的独立 Provisioner 完成；当前仓库只有受保护的交互式 PowerShell Provisioning，尚无本地 GUI，因此本候选只关闭“双击安装/修复/卸载”，不能宣称首次装机已经完全零命令行。
 
 构建顺序固定为 staging -> MSI -> EXE。`build-exe.ps1` 只接受唯一 MSI 输入并强制输出名；Windows CI 保留既有 required job 标识，新增 EXE build 和 install/repair/uninstall 生命周期验证，同时上传 MSI、EXE、manifest 和两套日志。macOS 上 WiX Burn 明确不支持生成 Windows 引导器，所以本地只运行静态契约和 NuGet 还原检查；EXE 产物、哈希和生命周期必须以 Windows 2022 CI/VM 为证据。
+
+Windows Actions run `31076102141` 已实际生成 43 MB 的 `AIJobPrintTerminalSetup.exe`（SHA-256 `4AF887EF6E38C48A6EC154835B5FC5321912C754DE1E9C11E0D4308A757D7EB6`），并通过干净安装、删除受 MSI 管理的 `node.exe` 后 repair 恢复、卸载、ProgramData 保留及随后独立 MSI 生命周期。该结果只证明未签名 CI 候选，不等于正式发布或现场启用。
 
 本候选仍为 **NO-GO 发布候选**：在 Windows CI 全绿、企业 Authenticode 双重签名（内嵌 MSI 与外层 EXE）、签名者指纹/时间戳/发布 manifest 校验、Provisioner GUI 和至少一台隔离 Windows 真机验收完成前，不得把该 EXE 发给在役终端作为正式商用安装包。
