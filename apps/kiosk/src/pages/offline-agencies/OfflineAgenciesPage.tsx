@@ -39,12 +39,9 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
   const isOpen = agency.status === 'open'
   const services = Array.isArray(agency.services) ? agency.services : []
   return (
-    <a
-      href={`/offline-agencies/${agency.id}`}
-      className="jf-row oa-agency-row"
-      aria-label={`查看${agency.name}`}
-      onClick={(e) => { e.preventDefault(); onClick() }}
-    >
+    <article className="jf-row oa-agency-row" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && onClick()}>
+      {/* href 锚点：供 Playwright W4 locator 和键盘辅助技术使用；onClick 阻止默认跳转改用 router */}
+      <a href={`/offline-agencies/${agency.id}`} className="oa-detail-cover" aria-label={`查看${agency.name}`} onClick={(e) => { e.preventDefault(); onClick() }} />
       <span className="oa-ag-logo" aria-hidden="true">
         <BuildingIcon />
       </span>
@@ -74,7 +71,7 @@ function AgencyRow({ agency, onClick }: { agency: OfflineAgencyDTO; onClick: () 
           <span className="jf-chip ok">资质核验已通过</span>
         </div>
       </div>
-    </a>
+    </article>
   )
 }
 
