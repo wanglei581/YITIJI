@@ -440,7 +440,7 @@ $printerSelfTestButton.Add_Click({
     $state = Get-PrintablePortState $printerName
     if (-not $state.Found) {
       Set-Status "未找到打印机：$printerName" ([System.Drawing.Color]::Firebrick)
-      [System.Windows.Forms.MessageBox]::Show("Windows 中未找到打印机“$printerName”。请检查驱动安装。", $productName, "OK", "Error") | Out-Null
+      [System.Windows.Forms.MessageBox]::Show("Windows 中未找到打印机 $printerName，请检查驱动安装。", $productName, "OK", "Error") | Out-Null
       return
     }
     $portLabel = switch ($state.PortType) {
