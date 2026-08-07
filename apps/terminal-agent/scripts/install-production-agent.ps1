@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.4-production",
+  [string]$AgentVersion = "0.3.5-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -790,7 +790,44 @@ function Exchange-BindCode([string]$ApiBase, [string]$Code) {
   try {
     return Invoke-RestMethod -Uri "$ApiBase/auth/terminal/exchange-bind-code" -Method Post -ContentType "application/json" -Body $body -TimeoutSec 30 -MaximumRedirection 0
   } catch {
-    Fail "BindCode exchange failed. Verify that the one-time code is valid and the HTTPS API is reachable."
+    $httpStatus = $null
+    $serverCode = $null
+    try {
+      if ($null -ne $_.Exception.Response -and $null -ne $_.Exception.Response.StatusCode) {
+        $httpStatus = [int]$_.Exception.Response.StatusCode
+      }
+    } catch {
+      $httpStatus = $null
+    }
+    try {
+      $responseBody = [string]$_.ErrorDetails.Message
+      if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+        $parsed = $responseBody | ConvertFrom-Json -ErrorAction Stop
+        $candidateCode = [string]$parsed.error.code
+        if ($candidateCode -match '^[A-Z][A-Z0-9_]{2,63}$') {
+          $serverCode = $candidateCode
+        }
+      }
+    } catch {
+      $serverCode = $null
+    }
+
+    $failureText = "BindCode exchange failed"
+    if ($null -ne $httpStatus) {
+      $failureText += " (HTTP $httpStatus"
+      if (-not [string]::IsNullOrWhiteSpace($serverCode)) {
+        $failureText += ", $serverCode"
+      }
+      $failureText += ")"
+    }
+    if ($serverCode -eq "MAC_ALREADY_BOUND") {
+      $failureText += ". This computer's MAC is already bound to another terminal; generate the bind code for that terminal."
+    } elseif ($serverCode -eq "TERMINAL_MAINTENANCE_REQUIRED") {
+      $failureText += ". Put the terminal into maintenance before generating an exchange bind code."
+    } else {
+      $failureText += ". Verify that the one-time code is valid and belongs to this terminal, and that the HTTPS API is reachable."
+    }
+    Fail $failureText
   }
 }
 

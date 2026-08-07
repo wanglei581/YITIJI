@@ -1,6 +1,6 @@
 {
   "name": "terminal-agent",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "description": "Windows Terminal Agent — Phase 8.1C: DPAPI token encryption / SQLite idempotency / single-instance lock / Windows service / offline PATCH queue",
   "scripts": {

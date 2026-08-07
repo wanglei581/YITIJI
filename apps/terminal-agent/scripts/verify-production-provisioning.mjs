@@ -12,6 +12,10 @@ const provisioner = fs.readFileSync(
   path.join(scriptDir, '../provisioner/provision-agent-gui.ps1'),
   'utf8',
 )
+const diagnose = fs.readFileSync(
+  path.join(scriptDir, 'diagnose-production-agent.ps1'),
+  'utf8',
+)
 const provisionerBytes = fs.readFileSync(path.join(scriptDir, '../provisioner/provision-agent-gui.ps1'))
 const lifecycleScripts = [
   path.join(scriptDir, '../installer/test-msi-lifecycle.ps1'),
@@ -39,7 +43,7 @@ assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
 assert.match(installer, /Use exactly one of -PromptForBindCode, -BindCode, or -BindCodeSecure/)
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
-assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.4-production"/)
+assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.5-production"/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)
@@ -71,14 +75,17 @@ assert.match(
   /exchange-bind-code[^\r\n]+-MaximumRedirection 0/,
   'BindCode exchange must not follow an HTTPS-to-HTTP redirect',
 )
-assert.match(installer, /BindCode exchange failed\. Verify that the one-time code is valid and the HTTPS API is reachable\./)
-assert.doesNotMatch(
-  installer.match(/function Exchange-BindCode[\s\S]*?\r?\n\}/)?.[0] ?? '',
-  /ErrorDetails|BindCode exchange failed: \$detail/,
-  'BindCode exchange errors must not expose an API response that could echo the secret',
-)
+assert.match(installer, /BindCode exchange failed/)
+assert.match(installer, /MAC_ALREADY_BOUND/)
+assert.match(installer, /TERMINAL_MAINTENANCE_REQUIRED/)
+assert.match(installer, /ErrorDetails\.Message/)
+assert.match(installer, /\$parsed\.error\.code/)
+const exchangeSlice = installer.match(/function Exchange-BindCode[\s\S]*?\r?\n\}/)?.[0] ?? ''
+assert.doesNotMatch(exchangeSlice, /Fail[^\r\n]*\$responseBody/, 'BindCode exchange errors must not expose the raw API response body')
+assert.doesNotMatch(exchangeSlice, /\$failureText[^\r\n]*\$responseBody/, 'BindCode exchange errors must not embed the API response body')
+assert.match(exchangeSlice, /\$failureText\s*\+=/, 'BindCode exchange must build a safe, structured failure message')
 assert.equal(agentConfigExample.apiBaseUrl, 'https://api.example.com/api/v1')
-assert.equal(agentConfigExample.agentVersion, '0.3.4')
+assert.equal(agentConfigExample.agentVersion, '0.3.5')
 assert.match(
   installer,
   /\$effectiveLocalApiAllowedOrigins\s*=\s*New-Object "System\.Collections\.Generic\.List\[string\]"/,
@@ -97,6 +104,9 @@ assert.match(installer, /INSTALLED_RUNTIME_ACL_PASS/)
 assert.match(installer, /function Test-TrustedRuntimeOwner/)
 assert.match(installer, /S-1-3-0/, 'runtime ACL must tolerate inherited CREATOR OWNER under Program Files')
 assert.match(installer, /S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464/, 'runtime owner check must tolerate TrustedInstaller-owned Program Files entries')
+assert.match(diagnose, /S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464/, 'diagnose must tolerate inherited TrustedInstaller full control')
+assert.match(diagnose, /S-1-3-0/, 'diagnose must tolerate inherited CREATOR OWNER full control')
+assert.doesNotMatch(diagnose, /FileSystemRights\]::Modify/, 'diagnose must use write-specific bits')
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')

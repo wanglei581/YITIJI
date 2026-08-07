@@ -101,6 +101,27 @@ function ConvertTo-SidValue([object]$IdentityReference) {
   ).Value
 }
 
+function Test-TrustedRuntimeOwner([string]$OwnerSid) {
+  $known = @(
+    "S-1-5-18",
+    "S-1-5-32-544",
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
+  )
+  if ($known -contains $OwnerSid) { return $true }
+
+  try {
+    $identity = New-Object System.Security.Principal.WindowsIdentity($OwnerSid)
+    try {
+      $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+      return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+    } finally {
+      $identity.Dispose()
+    }
+  } catch {
+    return $false
+  }
+}
+
 function Get-StartupDiagnosticCode([string]$Path) {
   try {
     $diagnosticText = [System.IO.File]::ReadAllText($Path, [System.Text.UTF8Encoding]::new($false))
@@ -216,7 +237,12 @@ function Get-RuntimeRootAclStatus([string]$Path) {
       return "unexpected"
     }
     $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
-    $trustedOwners = @("S-1-5-18", "S-1-5-32-544")
+    $allowedWriteSids = @(
+      "S-1-5-18",
+      "S-1-5-32-544",
+      "S-1-3-0",
+      "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
+    )
     $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor `
       [System.Security.AccessControl.FileSystemRights]::WriteData -bor `
       [System.Security.AccessControl.FileSystemRights]::AppendData -bor `
@@ -231,12 +257,17 @@ function Get-RuntimeRootAclStatus([string]$Path) {
     foreach ($rule in $acl.Access) {
       if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
       $sid = ConvertTo-SidValue $rule.IdentityReference
-      if ($trustedOwners -notcontains $sid -and ($rule.FileSystemRights -band $writeMask) -ne 0) {
+      $ownerSid = ConvertTo-SidValue $acl.Owner
+      $trustedOwner = Test-TrustedRuntimeOwner $ownerSid
+      if (
+        $allowedWriteSids -notcontains $sid -and
+        -not ($trustedOwner -and $sid -eq $ownerSid) -and
+        ($rule.FileSystemRights -band $writeMask) -ne 0
+      ) {
         return "too_permissive"
       }
     }
-    $ownerSid = ConvertTo-SidValue $acl.Owner
-    if ($trustedOwners -notcontains $ownerSid) { return "unexpected" }
+    if (-not (Test-TrustedRuntimeOwner (ConvertTo-SidValue $acl.Owner))) { return "unexpected" }
     return "ok"
   } catch {
     return "unavailable"
