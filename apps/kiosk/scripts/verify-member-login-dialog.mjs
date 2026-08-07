@@ -551,7 +551,12 @@ expectMatches(agreement, /<Link\s+[^>]*to="\/legal\/terms"/, '共享协议组件
 expectMatches(agreement, /<Link\s+[^>]*to="\/legal\/privacy"/, '共享协议组件链接真实隐私政策')
 expectNoMatches(agreement, /href="#"|to="#"/, '共享协议组件不使用占位协议链接')
 
-expectMatches(home, /<MemberLoginDialog/, '首页挂载 MemberLoginDialog')
+expectNoMatches(home, /<MemberLoginDialog|setLoginOpen|continueAsGuest/, '首页不再挂载或维护独立登录弹窗')
+expectMatches(
+  home,
+  /const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/,
+  '首页登录入口统一跳转全屏 /login 并保留首页返回路径',
+)
 expectNoMatches(home, /\b(?:sendSmsCode|memberLogin)\s*\(/, '首页不复制认证 API')
 // P0-1B：screensaver 与 idle 控制器经 warning handler 接入 Guard，最终清场仍由 Guard.hardClear() 走 fail-closed 路径与统一敏感会话清理。
 expectMatches(

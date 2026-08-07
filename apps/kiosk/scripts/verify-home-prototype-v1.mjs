@@ -361,9 +361,9 @@ expect(kioskRoot.includes('<KioskTopbarStatus'), '共享顶栏注入真实设备
 expect(!/function KioskTopBar/.test(home), '首页不再自绘 KioskTopBar')
 expect(!/>\s*打印机在线\s*</.test(home) && !home.includes('网络正常'), '首页不硬编码「打印机在线」/「网络正常」字面量')
 
-// ── 真实登录弹窗 + 动态专区开关（承接旧守卫）──────────────────────
-expect(home.includes('<MemberLoginDialog'), '首页挂载真实登录弹窗 MemberLoginDialog')
-expect(/onContinueAsGuest=\{\(\) => \{\s*continueAsGuest\(\)/.test(home), '登录弹窗游客回调进入真实游客态')
+// ── 统一全屏登录页 + 动态专区开关（承接旧守卫）────────────────────
+expect(!home.includes('<MemberLoginDialog'), '首页不再挂载独立登录弹窗')
+expect(/const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/.test(home), '首页登录入口统一跳转 /login 并保留首页返回路径')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '动态专区消费真实终端/校园配置 hook')
 expect(/if \(!showToolbox && !showCampus\) return null/.test(home), '两专区都未启用时 zone-row 不渲染（诚实占位）')
 expect(/\.kpv1 \.zone-row \.zone-card:only-child\s*\{[^}]*grid-column:\s*1 \/ -1/.test(pv), '单专区启用时 :only-child 自动通栏（对齐原型规则）')

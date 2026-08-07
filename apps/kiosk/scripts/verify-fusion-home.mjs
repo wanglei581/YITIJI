@@ -323,14 +323,14 @@ const welcome = welcomeStart >= 0 && welcomeEnd > welcomeStart ? home.slice(welc
 expect(/const\s*\{[^}]*\bisLoggedIn\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome), '登录态来自 useAuth.isLoggedIn')
 expect(/const\s*\{[^}]*\bdisplayName\b[^}]*\}\s*=\s*useAuth\(\)/s.test(welcome) && welcome.includes('{displayName}'), '登录态展示真实 displayName')
 expect(/isLoggedIn\s*\?[\s\S]*?onClick=\{\(\)\s*=>\s*navigate\(\s*['"]\/profile['"]\s*\)\}[^>]*>[\s\S]*?进入我的/.test(welcome), '登录态「进入我的」导航到 /profile')
-expect(page.includes('<MemberLoginDialog'), '保留 MemberLoginDialog')
+expect(!page.includes('<MemberLoginDialog'), '首页不再挂载独立登录弹窗')
 expect(
-  /const\s+openLogin\s*=\s*\(\)\s*=>\s*setLoginOpen\(true\)/.test(page) &&
+  /const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/.test(page) &&
     /<HomeWelcome\s+onOpenLogin=\{openLogin\}\s*\/>/.test(page) &&
     /<HomeContinueBar\s+onLogin=\{openLogin\}\s*\/>/.test(page),
-  '游客入口复用真实打开登录弹窗回调',
+  '游客入口复用统一全屏登录页跳转并保留首页返回路径',
 )
-expect(/onContinueAsGuest=\{\(\)\s*=>\s*\{\s*continueAsGuest\(\);\s*setLoginOpen\(false\)/.test(page), '保留真实继续游客回调')
+expect(!/setLoginOpen|continueAsGuest/.test(page), '首页不再维护第二套登录弹窗状态')
 expect(/useTerminalDeviceStatus\(\s*true\s*\)/.test(read('src/layouts/KioskRoot.tsx')), '真实设备状态改由共享壳拉取')
 expect(read('src/layouts/KioskRoot.tsx').includes('<KioskTopbarStatus'), '共享顶栏注入设备状态')
 expect(/<ContinuePanel\s*\/>/.test(page), '保留 ContinuePanel')

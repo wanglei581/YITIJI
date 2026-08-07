@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-07 完成 **Kiosk 首页登录入口统一为全屏 `/login`（待自动部署验收）**：修复首页仍打开独立 `MemberLoginDialog`、而「我的」等入口进入全屏登录页导致的视觉与交互不一致；首页顶部「登录 / 注册」和「继续办理」登录按钮统一跳转既有 `/login`，并携带 `from: '/'` 以保证登录成功或返回后回到首页。不新增入口、页面、路由、API、数据模型或依赖，不修改手机号/短信验证码、手机扫码登录、协议勾选、会话内存存储和公共终端隐私清场逻辑；旧弹窗组件暂不做跨任务删除，仅从首页生产入口解除挂载。Node `22.22.0` 下 Kiosk typecheck、production build、三条首页/登录专项静态门禁通过，lint 为 0 error、7 条既有 warning；本地 1080×1920 Playwright 实点确认两个首页登录按钮均进入同一 `/login` 全屏页。未修改数据库、密钥、支付、打印扫描或硬件链路；推送 `main` 后仍须等待 CI、自动部署和线上浏览器验收完成。
+
 2026-08-07 完成 **首次 GitHub Actions Kiosk 自动部署与线上验收**：PR #514 将 `js-yaml` 安全覆盖升级至 `4.3.1` 后合入 `main@e7493dcd`；主线 run `31142486608` 的 `build-and-verify`、`postgres-readiness`、`kiosk-browser-smoke` 全部通过。首次部署 run `31143067183` 曾在 SSH 步骤被取消，未将其记作成功；经明确授权后仅重跑同一 GitHub Actions 工作流，最终成功。只读验收确认服务器项目 HEAD 为 `e7493dcd`、Kiosk 静态目录含 31 个 assets、Nginx active、API PM2 进程 online，`https://zyidai.cn/` 与 `https://zyidai.cn/api/v1/health` 均返回 200，健康结果为 `db=postgres`。现有部署工作流只构建并同步 Kiosk 静态产物、重载 Nginx；不会滚动 API PM2 进程，因此本次不把 API 运行时版本更新或 Windows 主机、硬件、数据库迁移、密钥轮换记作已完成。全程未手工复制生产文件、未手工重载 Nginx/PM2、未改生产数据库或密钥。
 
 2026-08-07 完成 **PR #511 主干 CI 回归修复合入（未由该合并完成部署）**：用户明确授权后，已将 PR #511 的 `94e06944` 以 merge commit `200786a7` 合入 `main`；run `31107530315` 的 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全部通过。合入内容包括 11 项 AI skill 的 DTO/LLM/mock 运行时与合规门禁、W2 真实 PDF fixture 与精确 iframe 卸载处理、有效 loopback 测试代理目标，以及 privacy 健康探测 fixture；未全局忽略 script `ERR_ABORTED`。该合并后的 main run 因随后发布的 `js-yaml` 公告失败，部署 job 被跳过；未执行 bootstrap、数据库写入或 Windows 真机操作。
