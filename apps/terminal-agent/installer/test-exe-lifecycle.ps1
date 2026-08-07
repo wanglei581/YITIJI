@@ -95,7 +95,7 @@ function Invoke-ProvisionerSelfTest {
 function Invoke-InstalledRuntimeAclProbe {
   $output = @(& $powerShellPath -NoProfile -ExecutionPolicy Bypass -File `
     (Join-Path $provisionerRoot "install-production-agent.ps1") `
-    -PrinterName "Probe" -SelfTestRuntimeAcl 2>&1)
+    -ApiBaseUrl "https://probe.invalid/api/v1" -PrinterName "Probe" -SelfTestRuntimeAcl 2>&1)
   if ($LASTEXITCODE -ne 0) {
     throw "Installed runtime ACL probe failed with exit code ${LASTEXITCODE}: $($output -join ' ')"
   }
