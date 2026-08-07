@@ -513,7 +513,7 @@ $repairStartButton.Add_Click({
       throw $output
     }
     Refresh-AgentStatus
-    [System.Windows.Forms.MessageBox]::Show("服务已启动，本机接口已恢复。请刷新前端页面确认“打印机在线”，然后重新提交打印。", $productName, "OK", "Information") | Out-Null
+    [System.Windows.Forms.MessageBox]::Show("服务已启动，本机接口已恢复。请刷新前端页面确认打印机在线，然后重新提交打印。", $productName, "OK", "Information") | Out-Null
   } catch {
     Set-Status "一键修复并启动失败：$($_.Exception.Message)" ([System.Drawing.Color]::Firebrick)
     [System.Windows.Forms.MessageBox]::Show("一键修复并启动失败：$($_.Exception.Message)", $productName, "OK", "Error") | Out-Null
