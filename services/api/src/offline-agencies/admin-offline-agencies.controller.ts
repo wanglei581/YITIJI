@@ -86,13 +86,46 @@ export class AdminOfflineAgenciesController {
   }
 
   @Post()
-  async create(@Body() dto: CreateOfflineAgencyDto) {
-    return this.service.adminCreate(dto)
+  async create(
+    @Body() dto: CreateOfflineAgencyDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminCreate(dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency.create',
+      targetType: 'offline_agency',
+      targetId: result.id,
+      payload: { name: dto.name, orgType: dto.orgType ?? 'recruitment' },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateOfflineAgencyDto) {
-    return this.service.adminUpdate(id, dto)
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateOfflineAgencyDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminUpdate(id, dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency.update',
+      targetType: 'offline_agency',
+      targetId: id,
+      payload: { fields: Object.keys(dto).filter((k) => (dto as unknown as Record<string, unknown>)[k] !== undefined) },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Patch(':id/review')
@@ -168,8 +201,25 @@ export class AdminOfflineAgenciesController {
   }
 
   @Post(':id/jobs')
-  async createJob(@Param('id') agencyId: string, @Body() dto: CreateOfflineJobDto) {
-    return this.service.adminCreateJob(agencyId, dto)
+  async createJob(
+    @Param('id') agencyId: string,
+    @Body() dto: CreateOfflineJobDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminCreateJob(agencyId, dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency_job.create',
+      targetType: 'offline_agency_job',
+      targetId: result.id,
+      payload: { agencyId, title: dto.title, jobType: dto.jobType ?? 'fulltime' },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Put(':id/jobs/:jobId')
@@ -177,12 +227,43 @@ export class AdminOfflineAgenciesController {
     @Param('id') agencyId: string,
     @Param('jobId') jobId: string,
     @Body() dto: UpdateOfflineJobDto,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
   ) {
-    return this.service.adminUpdateJob(agencyId, jobId, dto)
+    const result = await this.service.adminUpdateJob(agencyId, jobId, dto)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency_job.update',
+      targetType: 'offline_agency_job',
+      targetId: jobId,
+      payload: { agencyId, fields: Object.keys(dto).filter((k) => (dto as unknown as Record<string, unknown>)[k] !== undefined) },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 
   @Delete(':id/jobs/:jobId')
-  async deleteJob(@Param('id') agencyId: string, @Param('jobId') jobId: string) {
-    return this.service.adminDeleteJob(agencyId, jobId)
+  async deleteJob(
+    @Param('id') agencyId: string,
+    @Param('jobId') jobId: string,
+    @CurrentUser() user: AuthedUser,
+    @Req() req: AuditReq,
+  ) {
+    const result = await this.service.adminDeleteJob(agencyId, jobId)
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'offline_agency_job.delete',
+      targetType: 'offline_agency_job',
+      targetId: jobId,
+      payload: { agencyId },
+      ipAddress: extractIp(req),
+      userAgent: extractUa(req),
+      requestId: req.requestId ?? null,
+    })
+    return result
   }
 }
