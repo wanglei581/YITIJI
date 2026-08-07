@@ -568,7 +568,7 @@ function Assert-RestrictedRuntime([string]$Root) {
         -not ($trustedOwner -and $sid -eq $ownerSid) -and
         (($rule.FileSystemRights -band $dangerousRights) -ne 0)
       ) {
-        throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName)"
+        throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName) [SID=$sid rights=$($rule.FileSystemRights) inherited=$($rule.IsInherited)]"
       }
     }
 
