@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to server (API + Kiosk)
+    name: Deploy to server (API + Kiosk + Admin + Partner)
     runs-on: ubuntu-latest
     # 只在 CI 全部通过后才部署
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -22,7 +22,7 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 30m
-          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,VITE_API_MODE,VITE_API_BASE_URL
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
@@ -52,6 +52,10 @@ jobs:
 
             echo "=== 构建 kiosk 前端 ==="
             pnpm --filter @ai-job-print/kiosk build
+
+            echo "=== 构建 admin / partner 前端 ==="
+            pnpm --filter @ai-job-print/admin build
+            pnpm --filter @ai-job-print/partner build
 
             if [ "${API_RELEASE_ENABLED:-}" = "true" ]; then
               echo "=== 受控发布 API（备份→迁移→构建→PM2→健康）==="
@@ -89,3 +93,5 @@ jobs:
           API_RELEASE_ENABLED: ${{ vars.DEPLOY_API_ENABLED }}
           DEPLOY_API_DIR: ${{ secrets.DEPLOY_API_DIR }}
           DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
+          VITE_API_MODE: http
+          VITE_API_BASE_URL: /api/v1
