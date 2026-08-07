@@ -99,6 +99,7 @@ function Invoke-InstalledRuntimeAclProbe {
   if ($LASTEXITCODE -ne 0) {
     throw "Installed runtime ACL probe failed with exit code ${LASTEXITCODE}: $($output -join ' ')"
   }
+  $output | ForEach-Object { Write-Host $_ }
   if (($output -join "`n") -notmatch "INSTALLED_RUNTIME_ACL_PASS") {
     throw "Installed runtime ACL probe did not emit its success marker: $($output -join ' ')"
   }
