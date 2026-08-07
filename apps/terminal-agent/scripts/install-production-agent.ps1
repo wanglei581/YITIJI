@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.5-production",
+  [string]$AgentVersion = "0.3.6-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,

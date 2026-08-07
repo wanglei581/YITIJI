@@ -258,6 +258,7 @@ $statusLabel.BackColor = [System.Drawing.Color]::White
 
 $refreshButton = New-Button -Text "刷新状态" -X 30 -Y 628 -Width 130
 $diagnoseButton = New-Button -Text "诊断详情" -X 174 -Y 628 -Width 130
+$printerSelfTestButton = New-Button -Text "打印机自检" -X 318 -Y 628 -Width 150
 $activateButton = New-Button -Text "激活并启动" -X 484 -Y 628 -Width 240
 $activateButton.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10, [System.Drawing.FontStyle]::Bold)
 
@@ -265,6 +266,102 @@ function Set-Status([string]$Text, [System.Drawing.Color]$Color) {
   $statusLabel.Text = $Text
   $statusLabel.ForeColor = $Color
   [System.Windows.Forms.Application]::DoEvents()
+}
+
+function Get-PrintablePortState([string]$PrinterName) {
+  $printer = Get-Printer -Name $PrinterName -ErrorAction SilentlyContinue
+  if ($null -eq $printer) { return @{ Found = $false; PortType = "not_found"; NetworkState = "n/a"; DriverState = "not_found" } }
+  $port = Get-PrinterPort -Name $printer.PortName -ErrorAction SilentlyContinue
+  $portType = "other"
+  $networkState = "n/a"
+  if ($null -ne $port) {
+    if (-not [string]::IsNullOrWhiteSpace([string]$port.PrinterHostAddress)) {
+      $portType = "network"
+      $hostAddress = [string]$port.PrinterHostAddress
+      $portNumber = [int]$port.PortNumber
+      if ($portNumber -lt 1) { $portNumber = 9100 }
+      $client = New-Object System.Net.Sockets.TcpClient
+      try {
+        $connect = $client.BeginConnect($hostAddress, $portNumber, $null, $null)
+        if ($connect.AsyncWaitHandle.WaitOne(3000)) {
+          $client.EndConnect($connect)
+          $networkState = "reachable"
+        } else {
+          $networkState = "unreachable"
+        }
+      } catch {
+        $networkState = "unreachable"
+      } finally {
+        $client.Close()
+      }
+    } elseif ([string]$port.Name -match "^(?i)usb") {
+      $portType = "usb"
+    }
+  }
+
+  $wmiFilter = "Name='" + $PrinterName.Replace("'", "''") + "'"
+  $wmi = Get-CimInstance -ClassName Win32_Printer -Filter $wmiFilter -ErrorAction SilentlyContinue
+  $driverState = "unknown"
+  if ($null -ne $wmi) {
+    $statusCode = [int]$wmi.PrinterStatus
+    $errorState = [int]$wmi.DetectedErrorState
+    $workOffline = [string]$wmi.WorkOffline
+    if ($workOffline -eq "True" -or $statusCode -eq 7 -or $errorState -eq 9) {
+      $driverState = "offline"
+    } elseif ($errorState -in @(4, 6, 7, 8)) {
+      $driverState = "error"
+    } elseif ($errorState -in @(0, 2)) {
+      $driverState = "ready"
+    }
+  }
+  return @{ Found = $true; PortType = $portType; NetworkState = $networkState; DriverState = $driverState }
+}
+
+function Invoke-PrintTestPage([string]$PrinterName) {
+  $agentRoot = Split-Path -Parent $PSScriptRoot
+  $nodePath = Join-Path $agentRoot "node\node.exe"
+  $appRoot = Join-Path $agentRoot "app"
+  $distPath = Join-Path $appRoot "dist\index.js"
+  $testPdf = Join-Path ([System.IO.Path]::GetTempPath()) ("aijobprint-test-" + [guid]::NewGuid().ToString("N") + ".pdf")
+  try {
+    if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) { throw "未找到随包 Node 运行时：$nodePath" }
+    if (-not (Test-Path -LiteralPath $distPath -PathType Leaf)) { throw "未找到 Agent 程序：$distPath" }
+    $generateScript = @"
+const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const doc = new PDFDocument({ size: 'A4' });
+const out = fs.createWriteStream(process.argv[1]);
+doc.pipe(out);
+doc.fontSize(30).text('AI Job Print Terminal - Test Page', 72, 120);
+doc.moveDown().fontSize(16).text('Generated at ' + new Date().toISOString());
+doc.end();
+"@
+    Push-Location $appRoot
+    try {
+      & $nodePath -e $generateScript $testPdf
+      if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $testPdf -PathType Leaf)) {
+        throw "测试页 PDF 生成失败（退出码 $LASTEXITCODE）"
+      }
+    } finally {
+      Pop-Location
+    }
+    $output = @(& $nodePath $distPath print --file $testPdf --printer $PrinterName 2>&1)
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0 -and (($output -join "`n") -match "PRINT SUCCESS")) {
+      return @{ Success = $true; Detail = "测试页已提交到打印机（PRINT SUCCESS）" }
+    }
+    $errorLine = ($output | Where-Object { $_ -match "PRINT_FAILED|errorCode|Error" } | Select-Object -First 1)
+    return @{
+      Success = $false
+      Detail = "测试页打印失败（退出码 $exitCode）：$([string]$errorLine)"
+    }
+  } catch {
+    return @{ Success = $false; Detail = "测试页打印失败：$($_.Exception.Message)" }
+  } finally {
+    if (Test-Path -LiteralPath $testPdf -PathType Leaf) {
+      Remove-Item -LiteralPath $testPdf -Force -ErrorAction SilentlyContinue
+    }
+  }
 }
 
 function Refresh-AgentStatus {
@@ -329,6 +426,62 @@ $diagnoseButton.Add_Click({
     [System.Windows.Forms.MessageBox]::Show($details, "终端诊断详情", "OK", "Information") | Out-Null
   } catch {
     [System.Windows.Forms.MessageBox]::Show("诊断失败：$($_.Exception.Message)", $productName, "OK", "Error") | Out-Null
+  }
+})
+
+$printerSelfTestButton.Add_Click({
+  try {
+    if ($printerCombo.SelectedIndex -lt 0) {
+      [System.Windows.Forms.MessageBox]::Show("请先在 Windows 打印机下拉框中选择打印机。", $productName, "OK", "Warning") | Out-Null
+      return
+    }
+    $printerName = [string]$printerCombo.SelectedItem
+    Set-Status "正在检查打印机链路..." ([System.Drawing.Color]::FromArgb(86, 91, 98))
+    $state = Get-PrintablePortState $printerName
+    if (-not $state.Found) {
+      Set-Status "未找到打印机：$printerName" ([System.Drawing.Color]::Firebrick)
+      [System.Windows.Forms.MessageBox]::Show("Windows 中未找到打印机“$printerName”。请检查驱动安装。", $productName, "OK", "Error") | Out-Null
+      return
+    }
+    $portLabel = switch ($state.PortType) {
+      "network" { "网络端口（TCP 探测：$($state.NetworkState)）" }
+      "usb" { "USB 端口" }
+      "other" { "其他端口（非网络、非 USB）" }
+      default { "未知" }
+    }
+    $driverLabel = switch ($state.DriverState) {
+      "ready" { "就绪" }
+      "offline" { "离线（Windows 驱动层）" }
+      "error" { "异常（缺纸/卡纸/开盖等）" }
+      default { "未知" }
+    }
+    $details = @(
+      "打印机：$printerName",
+      "端口类型：$portLabel",
+      "驱动状态：$driverLabel"
+    ) -join "`r`n"
+    $runTest = [System.Windows.Forms.MessageBox]::Show(
+      $details + "`r`n`r`n是否同时打印一页测试页？",
+      "打印机自检",
+      "YesNo",
+      "Question"
+    )
+    if ($runTest -eq [System.Windows.Forms.DialogResult]::Yes) {
+      Set-Status "正在生成并打印测试页，请稍候..." ([System.Drawing.Color]::FromArgb(86, 91, 98))
+      $testResult = Invoke-PrintTestPage $printerName
+      $details += "`r`n`r`n测试页：$($testResult.Detail)"
+      if ($testResult.Success) {
+        Set-Status "打印机自检完成：$portLabel；驱动 $driverLabel；测试页已提交。" ([System.Drawing.Color]::FromArgb(26, 112, 76))
+      } else {
+        Set-Status "打印机自检完成：$portLabel；驱动 $driverLabel；测试页失败，请检查打印机电源与连接。" ([System.Drawing.Color]::Firebrick)
+      }
+    } else {
+      Set-Status "打印机自检完成：$portLabel；驱动 $driverLabel。" ([System.Drawing.Color]::FromArgb(26, 112, 76))
+    }
+    [System.Windows.Forms.MessageBox]::Show($details, "打印机自检", "OK", "Information") | Out-Null
+  } catch {
+    Set-Status "打印机自检失败：$($_.Exception.Message)" ([System.Drawing.Color]::Firebrick)
+    [System.Windows.Forms.MessageBox]::Show("打印机自检失败：$($_.Exception.Message)", $productName, "OK", "Error") | Out-Null
   }
 })
 

@@ -169,3 +169,7 @@ Windows Actions run [`31157191672`](https://github.com/wanglei581/YITIJI/actions
 `0.3.5` 不再把兑换失败压成一句泛化提示：错误消息只展示 `HTTP <status>` 与服务器结构化错误代码（如 `MAC_ALREADY_BOUND` / `TERMINAL_MAINTENANCE_REQUIRED`），不透传响应正文、不包含绑定码，并针对两类常见原因给出可执行提示。诊断脚本 `Get-RuntimeRootAclStatus` 与激活校验同口径：TrustedInstaller / CREATOR OWNER 继承 ACE 视为可信，普通用户真实写权限仍拒绝；修复后“运行时 ACL: too_permissive”不再误报。固定升级基线调整为 `0.3.4@12b523b9 → 0.3.5`。新版 Windows CI 全绿与真机激活证据补齐前，`0.3.4` 仅保留历史证据。
 
 Windows Actions run [`31160510941`](https://github.com/wanglei581/YITIJI/actions/runs/31160510941) 已对提交 `cf24e226` 全绿：输出 `PROVISIONING_ORIGIN_COLLECTION_PASS`、两次 `INSTALLED_RUNTIME_ACL_PASS installedMode=installed`、`EXE_UPGRADE_PASS from=0.3.4 to=0.3.5`、`EXE_LIFECYCLE_PASS` 和 `MSI_LIFECYCLE_PASS`。最终未签名 `AIJobPrintTerminalSetup.exe` 为 45,306,519 bytes，SHA-256 `327A8BE31EA5D684C2C9AAB9B561FE7F38A6C2E4223A22E4CAD7206D6EC372AC`，已保存为本机 `Downloads/AIJobPrintTerminalSetup-0.3.5-unsigned.exe`。该文件仍未签名，CI 全绿不替代真实 BindCode、UAC、DPAPI、Automatic/Running、新心跳和奔图打印扫描验收。
+
+### 10.4 `0.3.6` 打印机自检（2026-08-07）
+
+现场 KSK-001 心跳同时出现 `printerStatus=ready`（Windows 驱动层）与 `printerNetworkStatus=unreachable`（TCP 探测），Admin 链路诊断因此显示“打印机不可达”；数据库近期无新打印任务。`0.3.6` 图形配置器新增「打印机自检」：显示打印机端口类型（USB / 网络 / 其他，不显示主机地址与端口号之外的细节）、网络端口 TCP 可达性、驱动状态，并可选择打印一页测试页（随包 Node + pdfkit 生成，走 Agent 同款生产打印路径）。该按钮用于把“前端无法打印”快速二分：端口/驱动/测试页任一失败即 Windows 打印机链路问题；全部成功仍无法从手机打印则属于远程终端选择入口缺失，需另立需求。固定升级基线调整为 `0.3.5@cf24e226 → 0.3.6`。新版 Windows CI 全绿与真机自检证据补齐前，`0.3.5` 仅保留历史证据。
