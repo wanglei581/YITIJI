@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-07 补充 **生产数据治理只读复核（无生产写入）**：只读确认内容治理第一步已生效——Job 219 中 published=0（approved/unpublished 217、approved/draft 1、pending/draft 1），招聘会 3 场与演示机构均 unpublished，演示岗位 inactive，腾讯样本来源 disabled，PolicyPost=0。`_prisma_migrations` 中 `20260730100000_add_terminal_network_diagnostics` 两条同 checksum 记录判定为“失败回滚 + 成功重跑”的正常残留（migrate deploy 无 pending）。另列出两个 enabled 但 `lastSyncAt` 为空的来源（`src-hr-api` 市人才网 API、`src-uni-excel` 高校就业信息 Excel）待数据负责人核实授权。详见 `docs/reviews/production-data-governance-readonly-audit-2026-08-07.md`；未删改生产、未执行 seed、未触发发布。
+
 2026-08-07 完成 **生产内容数据运营收口第一步（下架演示/预生产内容，未删除数据）**：用户以数据负责人身份确认后，先备份再在单事务内执行：`Job.publishStatus=published → unpublished` 共 215 条（来源全部为“预生产腾讯公开岗位样本 / 预生产验证 / 演示 / 高校 / 市人才网”等既有数据，保留记录可恢复）；`JobFair` 已发布 3 场全部下架（均已于 2026-06 结束）；`OfflineAgency`“职易达就业服务大厅（演示机构）”下架、其 `OfflineJob`“前台接待（演示岗位）”置 `inactive`；`JobSource` 停用“腾讯招聘公开来源样本”与“腾讯招聘公开来源样本（预生产验证）”（市人才网 API、高校就业信息 Excel 保持启用）。备份锚点 `/srv/ai-job-print-backups/pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…b2823`）；5 条 `content_cleanup.*` 审计行已写入 `AuditLog`（actorRole=system、payload 含计数与原因）。公网复验：`/api/v1/jobs` 与 `/api/v1/job-fairs` 均 `total=0`，`/api/v1/policies` 空。未删除任何业务数据、未动 schema/代码/密钥/PM2；真实岗位与政策来源、授权、有效期与审核规则仍待数据负责人提供后按既有导入链路接入。
 
 2026-08-07 补充 **生产内容数据替换清单（后续执行清单，未再执行生产操作）**：`docs/operations/production-content-data-replacement-list-2026-08.md` 提供数据负责人决策项、四类数据判定/导入路径/验证门禁与禁止项；与第一步下架事实一致（公网 jobs/fairs 已空态、真实来源待接入），作为后续授权后接入真实岗位/招聘会/政策/线下机构的执行清单。本清单不替代授权；未连接生产、未删改数据。
