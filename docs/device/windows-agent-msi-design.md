@@ -153,3 +153,9 @@ Windows Actions run [`31090012573`](https://github.com/wanglei581/YITIJI/actions
 `0.3.2` 在 Windows 真机首次激活时发现 PowerShell 变量名大小写不敏感导致的阻塞缺陷：数组参数 `$LocalApiAllowedOrigins` 与列表累加器 `$localApiAllowedOrigins` 实际指向同一变量，泛型 List 被参数类型约束重新转换为固定大小数组，首次 `.Add()` 即失败。该失败发生在 BindCode 兑换 HTTP 请求之前，因此失败尝试不消费一次性码，也不修改终端凭据。
 
 `0.3.3` 仅把内部累加器改为 `$effectiveLocalApiAllowedOrigins`，不改变 GUI、参数名、Origin 合并顺序或持久化配置结构；并增加 Windows PowerShell 5.1 运行探针与静态防重名断言。安装器固定升级基线改为已验证的 `0.3.2@0aa8dbca`。Windows Actions run [`31146502327`](https://github.com/wanglei581/YITIJI/actions/runs/31146502327) 已对提交 `be2d9044` 输出 `PROVISIONING_ORIGIN_COLLECTION_PASS distinctAccumulator=true deduplicated=true`、`EXE_UPGRADE_PASS from=0.3.2 to=0.3.3`、`EXE_LIFECYCLE_PASS` 和 `MSI_LIFECYCLE_PASS`，证明覆盖安装继续保留 ProgramData、Provisioner 和开始菜单入口；EXE/MSI Repair 日志分别含 `REINSTALLMODE=cmuse` / `REINSTALLMODE=ecmus` 与 `ShortcutCreate`。最终未签名 EXE 为 45,305,281 bytes，SHA-256 `8C371DC2DE59AC3E0DBACCB4DAD1DA0C76E4DB56997150FDFAA815AAE48939D2`。真机激活证据补齐前，`0.3.2` 仅保留历史生命周期证据，不再作为可首次激活候选；`0.3.3` 也仍是未签名候选，不代表已通过真实打印扫描验收。
+
+### 10.2 `0.3.4` 真机运行时 ACL 修复（2026-08-07）
+
+`0.3.3` 在 Windows 真机激活时报告“Agent runtime, dependency tree, or node.exe is not restricted to SYSTEM/Administrators”。失败发生在 BindCode 兑换 HTTP 请求之前，不消费一次性码。根因是 `Assert-RestrictedRuntime` 把“禁止普通用户写入”过度实现为“所有者只能是 SYSTEM/Administrators、任何非这两个 SID 的写类 ACE 一律失败”：Windows 标准 `%ProgramFiles%` 布局可能由 TrustedInstaller 或管理员成员账户所有，并携带继承的 CREATOR OWNER FullControl 等正常 ACE，因而合法 MSI 安装被误判。
+
+`0.3.4` 的安全口径调整为：运行时所有者必须是 SYSTEM、Administrators、TrustedInstaller 或 Administrators 组成员；写类 ACE 只允许 SYSTEM、Administrators、CREATOR OWNER（受保护目录下仅管理员可创建）或可信所有者自身；Users / Authenticated Users / Everyone 等普通主体的写类 ACE 仍严格拒绝，配置与 token 的 ProgramData ACL 契约不变。安装器新增 `-SelfTestRuntimeAcl`，EXE lifecycle 在真实安装与 Repair 后的布局上递归运行完整校验并强制 `INSTALLED_RUNTIME_ACL_PASS`。固定升级基线调整为 `0.3.3@be2d9044 → 0.3.4`。新版 Windows CI 全绿与真机激活证据补齐前，`0.3.3` 仅保留历史证据，不再作为可首次激活候选。

@@ -126,7 +126,7 @@ export function TerminalBindCodeDialog({ terminal, onClose, onNotice }: Terminal
         {!bindCodeDraft ? (
           <div className="space-y-4">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
-              绑定码仅返回一次，关闭弹窗后无法再次查看。安全配置向导需要 0.3.3 或更高版本；已安装 0.3.2
+              绑定码仅返回一次，关闭弹窗后无法再次查看。安全配置向导需要 0.3.4 或更高版本；已安装 0.3.3
               或更早版本的电脑请先运行新版安装包升级。升级后在 Windows 开始菜单打开<br />
               <span className="font-semibold">AI求职打印终端配置</span>，选择打印机后再生成并粘贴绑定码完成激活。
             </div>

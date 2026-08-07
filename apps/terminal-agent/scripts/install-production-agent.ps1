@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.3-production",
+  [string]$AgentVersion = "0.3.4-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -102,7 +102,10 @@ param(
   [switch]$SkipServiceInstall,
 
   [Parameter(Mandatory = $false)]
-  [switch]$SkipHeartbeatVerify
+  [switch]$SkipHeartbeatVerify,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$SelfTestRuntimeAcl
 )
 
 $ErrorActionPreference = "Stop"
@@ -415,6 +418,27 @@ function ConvertTo-SidValue([object]$IdentityReference) {
   ).Value
 }
 
+function Test-TrustedRuntimeOwner([string]$OwnerSid) {
+  $known = @(
+    "S-1-5-18",
+    "S-1-5-32-544",
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
+  )
+  if ($known -contains $OwnerSid) { return $true }
+
+  try {
+    $identity = New-Object System.Security.Principal.WindowsIdentity($OwnerSid)
+    try {
+      $principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+      return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
+    } finally {
+      $identity.Dispose()
+    }
+  } catch {
+    return $false
+  }
+}
+
 function Assert-NotReparsePoint([System.IO.FileSystemInfo]$Item) {
   if (($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
     throw "Refusing filesystem reparse point: $($Item.FullName)"
@@ -515,7 +539,7 @@ function Assert-RestrictedRuntime([string]$Root) {
   $rootItem = Get-Item -Force -LiteralPath $Root -ErrorAction Stop
   $pending = New-Object "System.Collections.Generic.Queue[System.IO.FileSystemInfo]"
   $pending.Enqueue($rootItem)
-  $allowedSids = @("S-1-5-18", "S-1-5-32-544")
+  $allowedWriteSids = @("S-1-5-18", "S-1-5-32-544", "S-1-3-0")
   $dangerousRights = [System.Security.AccessControl.FileSystemRights]::Write -bor `
     [System.Security.AccessControl.FileSystemRights]::Modify -bor `
     [System.Security.AccessControl.FileSystemRights]::Delete -bor `
@@ -529,8 +553,9 @@ function Assert-RestrictedRuntime([string]$Root) {
 
     $acl = Get-Acl -LiteralPath $item.FullName -ErrorAction Stop
     $ownerSid = ConvertTo-SidValue $acl.Owner
-    if ($allowedSids -notcontains $ownerSid) {
-      throw "Runtime owner must be SYSTEM or Administrators: $($item.FullName)"
+    $trustedOwner = Test-TrustedRuntimeOwner $ownerSid
+    if (-not $trustedOwner) {
+      throw "Runtime owner must be SYSTEM, Administrators, or TrustedInstaller: $($item.FullName)"
     }
 
     foreach ($rule in @($acl.Access)) {
@@ -539,7 +564,8 @@ function Assert-RestrictedRuntime([string]$Root) {
       }
       $sid = ConvertTo-SidValue $rule.IdentityReference
       if (
-        $allowedSids -notcontains $sid -and
+        $allowedWriteSids -notcontains $sid -and
+        -not ($trustedOwner -and $sid -eq $ownerSid) -and
         (($rule.FileSystemRights -band $dangerousRights) -ne 0)
       ) {
         throw "Runtime grants write-like access to a non-privileged principal: $($item.FullName)"
@@ -747,6 +773,25 @@ function Exchange-BindCode([string]$ApiBase, [string]$Code) {
   } catch {
     Fail "BindCode exchange failed. Verify that the one-time code is valid and the HTTPS API is reachable."
   }
+}
+
+if ($SelfTestRuntimeAcl) {
+  $selfTestLayout = Resolve-AgentRuntimeLayout
+  $selfTestRuntimeRoot = [string]$selfTestLayout.RuntimeRoot
+  $selfTestNode = [string]$selfTestLayout.NodeExecutable
+  $selfTestModuleRoots = @(Get-NodeModuleRoots -StartPath ([string]$selfTestLayout.AppRoot))
+  try {
+    Assert-RestrictedRuntime -Root $selfTestRuntimeRoot
+    Assert-RestrictedRuntime -Root $selfTestNode
+    foreach ($selfTestModuleRoot in $selfTestModuleRoots) {
+      Assert-RestrictedRuntime -Root $selfTestModuleRoot
+    }
+  } catch {
+    Write-Host "INSTALLED_RUNTIME_ACL_FAILED: $($_.Exception.Message)"
+    exit 1
+  }
+  Write-Host "INSTALLED_RUNTIME_ACL_PASS installedMode=$([string]$selfTestLayout.Mode)"
+  exit 0
 }
 
 $runtimeLayout = Resolve-AgentRuntimeLayout

@@ -39,7 +39,7 @@ assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
 assert.match(installer, /Use exactly one of -PromptForBindCode, -BindCode, or -BindCodeSecure/)
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
-assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.3-production"/)
+assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.4-production"/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)
@@ -78,7 +78,7 @@ assert.doesNotMatch(
   'BindCode exchange errors must not expose an API response that could echo the secret',
 )
 assert.equal(agentConfigExample.apiBaseUrl, 'https://api.example.com/api/v1')
-assert.equal(agentConfigExample.agentVersion, '0.3.3')
+assert.equal(agentConfigExample.agentVersion, '0.3.4')
 assert.match(
   installer,
   /\$effectiveLocalApiAllowedOrigins\s*=\s*New-Object "System\.Collections\.Generic\.List\[string\]"/,
@@ -91,6 +91,12 @@ assert.doesNotMatch(
   /\$localApiAllowedOrigins\s*=\s*New-Object/i,
   'PowerShell variables are case-insensitive; assigning a List to the typed array parameter recreates the fixed-size collection bug',
 )
+assert.match(installer, /\[switch\]\$SelfTestRuntimeAcl/)
+assert.match(installer, /if \(\$SelfTestRuntimeAcl\)/)
+assert.match(installer, /INSTALLED_RUNTIME_ACL_PASS/)
+assert.match(installer, /function Test-TrustedRuntimeOwner/)
+assert.match(installer, /S-1-3-0/, 'runtime ACL must tolerate inherited CREATOR OWNER under Program Files')
+assert.match(installer, /S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464/, 'runtime owner check must tolerate TrustedInstaller-owned Program Files entries')
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')

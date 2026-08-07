@@ -206,6 +206,8 @@ assert.match(runtimeVerifier, /Get-ChildItem\s+-Force\s+-LiteralPath/, 'runtime 
 assert.match(runtimeVerifier, /Assert-NotReparsePoint/, 'runtime verifier must reject reparse points')
 assert.match(runtimeVerifier, /ChangePermissions/, 'runtime verifier must reject WRITE_DAC-like rights')
 assert.match(runtimeVerifier, /TakeOwnership/, 'runtime verifier must reject WRITE_OWNER-like rights')
+assert.match(runtimeVerifier, /Test-TrustedRuntimeOwner/, 'runtime verifier must recognize trusted owners')
+assert.match(runtimeVerifier, /S-1-3-0/, 'runtime verifier must tolerate inherited CREATOR OWNER full control under Program Files')
 assert.match(installer, /Get-NodeModuleRoots/, 'installer must discover Node dependency roots')
 assert.match(installer, /Assert-RestrictedRuntime\s+-Root\s+\$nodeModuleRoot/, 'installer must verify Node dependency trees')
 assert.match(installer, /Set-ProgramDataTreeAcl\s+-Root\s+\$programDataDir/, 'installer must harden existing ProgramData descendants')

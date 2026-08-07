@@ -92,6 +92,18 @@ function Invoke-ProvisionerSelfTest {
   }
 }
 
+function Invoke-InstalledRuntimeAclProbe {
+  $output = @(& $powerShellPath -NoProfile -ExecutionPolicy Bypass -File `
+    (Join-Path $provisionerRoot "install-production-agent.ps1") `
+    -PrinterName "Probe" -SelfTestRuntimeAcl 2>&1)
+  if ($LASTEXITCODE -ne 0) {
+    throw "Installed runtime ACL probe failed with exit code ${LASTEXITCODE}: $($output -join ' ')"
+  }
+  if (($output -join "`n") -notmatch "INSTALLED_RUNTIME_ACL_PASS") {
+    throw "Installed runtime ACL probe did not emit its success marker: $($output -join ' ')"
+  }
+}
+
 $installAttempted = $false
 $uninstallCompleted = $false
 try {
@@ -113,6 +125,7 @@ try {
   }
   Assert-ProvisionerInstalled
   Invoke-ProvisionerSelfTest
+  Invoke-InstalledRuntimeAclProbe
 
   Remove-Item -LiteralPath $nodePath -Force
   Remove-Item -LiteralPath $provisionerGuiPath -Force
@@ -127,6 +140,7 @@ try {
   }
   Assert-ProvisionerInstalled
   Invoke-ProvisionerSelfTest
+  Invoke-InstalledRuntimeAclProbe
 
   Invoke-Bundle -Action "/uninstall" -LogName "uninstall.log"
   $uninstallCompleted = $true
