@@ -27,11 +27,11 @@ jobs:
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
 
-            echo "=== 拉取最新代码 ==="
+            echo "=== 拉取并检出 CI 已验证提交 ==="
             EXPECTED_SHA='${{ github.event.workflow_run.head_sha }}'
             CURRENT_SHA="$(git rev-parse HEAD)"
             if [ "$CURRENT_SHA" = "$EXPECTED_SHA" ]; then
-              echo "服务器已在目标提交 $EXPECTED_SHA，跳过重复拉取"
+              echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
             else
               FETCH_OK=0
               for ATTEMPT in 1 2; do
@@ -42,8 +42,10 @@ jobs:
                 fi
               done
               test "$FETCH_OK" = "1"
-              test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
-              git merge --ff-only origin/main
+              # 只部署 CI 已验证的精确 SHA；即使 main 在此期间继续前进（文档/其他合并），
+              # 也不 ff 到新 tip，避免发布未经该次 CI 验证的提交。
+              git cat-file -e "$EXPECTED_SHA^{commit}"
+              git checkout --detach "$EXPECTED_SHA"
             fi
             test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
