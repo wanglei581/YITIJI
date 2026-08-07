@@ -185,3 +185,5 @@ Windows Actions run [`31166100094`](https://github.com/wanglei581/YITIJI/actions
 ### 10.6 `0.3.8` 一键修复并启动（2026-08-07）
 
 真机证据表明：配置与 DPAPI 凭据完好、仅服务停止时，`Start-Service` 即可恢复打印，无需重新激活。`0.3.8` 安装器新增 `-StartServiceOnly`：先按需执行 `RepairProgramDataAcl`，再校验 `agent-config.json`（terminalId/terminalCode/printerName）与 `agent.token` 的 ACL 和内容，把服务设为 Automatic 并启动，输出 `SERVICE_START_ONLY_PASS`；不重写配置、不换凭据、不需要绑定码。图形配置器新增「一键修复并启动」，刷新状态在“配置完好但服务停止”时直接引导点击该按钮。固定升级基线调整为 `0.3.7@82186e23 → 0.3.8`。新版 Windows CI 全绿与真机“停止 → 一键修复并启动 → 前端在线 → 出纸”闭环证据补齐前，`0.3.7` 仅保留历史证据。
+
+Windows Actions run [`31168227335`](https://github.com/wanglei581/YITIJI/actions/runs/31168227335) 已对提交 `a0874d61` 全绿：输出 `PROVISIONING_ORIGIN_COLLECTION_PASS`、两次 `INSTALLED_RUNTIME_ACL_PASS installedMode=installed`、`EXE_UPGRADE_PASS from=0.3.7 to=0.3.8`、`EXE_LIFECYCLE_PASS` 和 `MSI_LIFECYCLE_PASS`。最终未签名 `AIJobPrintTerminalSetup.exe` 为 45,309,251 bytes，SHA-256 `7118A18BA63E491649FDD623B2DFB1137298CA2393BF083CC5D3ED5383E3A0A3`，已保存为本机 `Downloads/AIJobPrintTerminalSetup-0.3.8-unsigned.exe`。该文件仍未签名，CI 全绿不替代真实 BindCode、UAC、DPAPI、Automatic/Running、新心跳、本机接口、前端在线、奔图打印自检与打印扫描验收。
