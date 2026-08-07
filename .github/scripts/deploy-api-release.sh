@@ -51,6 +51,14 @@ cd "$DEPLOY_PATH"
 pnpm --filter @ai-job-print/api db:pg:generate
 pnpm --filter @ai-job-print/api build
 
+echo "=== 4b. 校验三端前端 dist 均已构建（防止 rsync --delete 误删运行目录）==="
+for app in kiosk admin partner; do
+  if [ ! -f "$DEPLOY_PATH/apps/$app/dist/index.html" ]; then
+    echo "::error::missing $DEPLOY_PATH/apps/$app/dist/index.html; build all frontends before release" >&2
+    exit 1
+  fi
+done
+
 echo "=== 5. 同步运行目录（保留 .env / storage）==="
 rsync -a --delete \
   --exclude '.git' \
