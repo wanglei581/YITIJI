@@ -1,0 +1,12 @@
+<view class="tabbar">
+  <view
+    wx:for="{{list}}"
+    wx:key="text"
+    class="tab {{selected === index ? 'on' : ''}}"
+    data-index="{{index}}"
+    bindtap="switchTab"
+  >
+    <view class="tb"><view class="ti ficon i-{{item.icon}}"></view></view>
+    <view class="tl">{{item.text}}</view>
+  </view>
+</view>

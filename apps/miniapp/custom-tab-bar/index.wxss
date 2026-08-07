@@ -1,0 +1,5 @@
+/* WeChat 已把自定义 tabBar 放进底部固定容器，组件内改为静态定位 */
+.tabbar {
+  position: static;
+  width: 100%;
+}
