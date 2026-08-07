@@ -34,7 +34,7 @@
 
 ## 4. 目标状态
 
-API、Admin、Partner、Kiosk、DB 与 `DEPLOY_SOURCE` 均来自同一 `TARGET_COMMIT`；发布后 `pm2 env COMMIT == TARGET_SHA`、`DEPLOY_SOURCE.source == origin/main@<TARGET_SHA>`。
+API、Admin、Partner、Kiosk、DB 与 `DEPLOY_SOURCE` 均来自同一 `TARGET_COMMIT`；发布后 `pm2 env COMMIT == TARGET_SHA`、`DEPLOY_SOURCE.source == origin/main@<TARGET_SHA>`。Admin/Partner 静态产物随 deploy.yml 同步：配置 `DEPLOY_ADMIN_WEB_ROOT` / `DEPLOY_PARTNER_WEB_ROOT` secrets 后与 Kiosk 一起发布，未配置时保持现状并在日志中显式跳过。
 
 ## 5. 受控发布步骤（由 deploy.yml + `.github/scripts/deploy-api-release.sh` 执行）
 
@@ -73,3 +73,4 @@ API、Admin、Partner、Kiosk、DB 与 `DEPLOY_SOURCE` 均来自同一 `TARGET_C
 - 核实 `_prisma_migrations` 中 `20260730100000_add_terminal_network_diagnostics` 重复记录。
 - 选择目标提交并授权发布窗口。
 - 发布后验收：`DEPLOY_SOURCE`、`pm2 env COMMIT`、health、首页 bundle，以及 wx-login / contract-review / network diagnostics 探针。
+- 配置 `DEPLOY_ADMIN_WEB_ROOT` / `DEPLOY_PARTNER_WEB_ROOT` secrets 后发布 Admin/Partner 前端，并用线上 bundle 标记（Partner `.xlsx/.csv` 提示、Admin 文件预览）复验，消除 #518 文件流前端与已发布 API 的契约漂移。
