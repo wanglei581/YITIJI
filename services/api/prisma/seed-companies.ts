@@ -61,6 +61,10 @@ const COMPANIES = [
 ]
 
 async function main() {
+  if (process.env['NODE_ENV'] === 'production') {
+    console.log('[seed] Skipped: NODE_ENV=production. Run with NODE_ENV=development to seed.')
+    return
+  }
   const prisma = new PrismaService()
   try {
     const org = await prisma.organization.upsert({
