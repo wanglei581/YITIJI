@@ -46,7 +46,7 @@ function isLocalAssistantSelector(selector) {
   )
 }
 
-console.log('\n=== K2a AI 助手青序 LightFlow 静态合同 ===')
+console.log('\n=== K2a AI 顾问青序 LightFlow 静态合同 ===')
 
 const packageJson = read('package.json')
 const kioskRoot = read('src/layouts/KioskRoot.tsx')
@@ -76,12 +76,12 @@ expectIncludes(assistantPage, "import './assistant-inkpaper.css'", '助手页继
 expectIncludes(assistantPage, 'className="kassist kassist-lightflow"', '助手页使用局部 LightFlow 根命名空间')
 expectMatches(
   assistantPage,
-  /<section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI助手<\/h1>/,
+  /<section className="kassist kassist-lightflow" aria-labelledby="assistant-page-title">[\s\S]*?<h1 id="assistant-page-title" className="kassist-sr-only">AI顾问<\/h1>/,
   '页面名称仅以无障碍标题保留',
 )
 expect(
-  !/<h[1-6](?![^>]*kassist-sr-only)[^>]*>[\s\S]*?AI助手[\s\S]*?<\/h[1-6]>/.test(assistantPage),
-  '左上角及视觉顶部不显示 AI助手 标题',
+  !/<h[1-6](?![^>]*kassist-sr-only)[^>]*>[\s\S]*?AI顾问[\s\S]*?<\/h[1-6]>/.test(assistantPage),
+  '左上角及视觉顶部不显示 AI顾问标题',
 )
 expect(!assistantPage.includes('ReferenceServiceNav'), '助手页移除首页服务分类导航')
 expect(!assistantPage.includes('lf-reference-'), '助手页移除首页 lf-reference 服务卡骨架')
@@ -285,4 +285,4 @@ if (failures > 0) {
   process.exit(1)
 }
 
-console.log('\nALL PASS K2a AI 助手青序 LightFlow 静态合同')
+console.log('\nALL PASS K2a AI 顾问青序 LightFlow 静态合同')

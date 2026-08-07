@@ -372,7 +372,7 @@ expect(/\.kpv1 \.zone-row \.zone-card:only-child\s*\{[^}]*grid-column:\s*1 \/ -1
 expect(!/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
 expect(kioskRoot.includes('hideBottomNav={isCampusZone || usesPageActionbar}'), '首页使用共享底栏（校园专区或页面自带 actionbar 时隐藏）')
 const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
-expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI助手'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
+expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI顾问'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
 expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
 
 // ── 合规：禁用文案 + 合规提示条 ──────────────────────────────────

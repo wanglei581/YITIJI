@@ -523,7 +523,10 @@ check('W6 legal and long-text fixture', () => {
   for (const endpoint of [
     '/api/v1/kiosk/legal/terms_of_service',
     '/api/v1/kiosk/legal/privacy_policy',
-  ]) assert.ok(api.includes(`get('${endpoint}'`), `missing real legal endpoint ${endpoint}`)
+  ]) {
+    const escapedEndpoint = endpoint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    assert.match(api, new RegExp(`get\\(\\s*['"]${escapedEndpoint}['"]`), `missing real legal endpoint ${endpoint}`)
+  }
   assert.doesNotMatch(api, /get\('\/api\/v1\/kiosk\/legal\/privacy'/, 'obsolete legal fixture path must not return')
   const routes = readKiosk('tests/visual/fixtures/fusion-w6-route-cases.ts')
   const spec = readKiosk('tests/visual/fusion-w6-routes.spec.ts')

@@ -1,11 +1,19 @@
 import { IsIn, IsString, IsOptional, IsNotEmpty, MaxLength } from 'class-validator'
-import type { ChatOutput } from '../interfaces/ai-provider.interface'
+import type { AssistantSkill, ChatOutput } from '../interfaces/ai-provider.interface'
 
 const ASSISTANT_SKILLS = [
   'offer_compare',
   'salary_negotiation',
   'hr_qa',
-] as const
+  'self_intro_gen',
+  'material_checklist',
+  'jd_analysis',
+  'interview_questions',
+  'career_explore',
+  'cover_letter_gen',
+  'resume_jd_match',
+  'company_research',
+] as const satisfies readonly AssistantSkill[]
 
 export class AssistantChatRequestDto {
   @IsNotEmpty()

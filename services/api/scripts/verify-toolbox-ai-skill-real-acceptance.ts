@@ -68,7 +68,7 @@ function assertNoOverclaim(source: string, label: string): void {
     .split('\n')
     .map((line, index) => ({ line, index: index + 1 }))
     .filter(({ line }) => /百宝箱|AI skill|toolbox-ai-skill/i.test(line))
-    .filter(({ line }) => /(生产|预生产|商用|上线|试运营|真实模型|真机|Windows 真机)[^。\n]{0,60}(完成|通过|已完成|已通过|可上线|可商用)/.test(line))
+    .filter(({ line }) => /(生产|预生产|商用|上线|试运营|真实模型|真机|Windows 真机)[^。\n]{0,60}((?:已)?完成(?!后再)|(?:已)?通过(?!后再)|可上线|可商用)/.test(line))
     .filter(({ line }) => !/(不代表|不得|不能|未|待|仍需|尚未|PENDING|不等于|不可|执行包|只有|仍不得|禁止证明|本执行包不证明|代码侧|只读预检|后续 Gate|阻断后续)/.test(line))
     .filter(({ line }) => !/^\| (TAS|SEC)-G[0-9].*\| PASS_WITH_NOTES \|/.test(line))
   if (risky.length > 0) {
