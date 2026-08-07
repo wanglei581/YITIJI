@@ -1,0 +1,186 @@
+.phone-wrap {
+  height: 104rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--line);
+  border-radius: var(--r);
+  padding: 0 20rpx 0 28rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  transition: border-color .15s;
+}
+
+.phone-wrap.focused {
+  border-color: var(--teal);
+}
+
+.phone-prefix {
+  font-size: 30rpx;
+  color: var(--ink);
+  font-weight: 500;
+  border-right: 2rpx solid var(--line);
+  padding-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.phone-input {
+  flex: 1;
+  height: 100%;
+  font-size: 30rpx;
+  color: var(--ink);
+  background: transparent;
+}
+
+.send-btn {
+  height: 80rpx;
+  padding: 0 28rpx;
+  border-radius: var(--r-full);
+  background: var(--teal);
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.send-btn.counting {
+  background: var(--surface-2);
+  color: var(--faint);
+}
+
+.otp-row {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 8rpx;
+}
+
+.otp-box {
+  flex: 1;
+  height: 104rpx;
+  background: var(--surface);
+  border: 3rpx solid var(--line);
+  border-radius: var(--r);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: var(--font-serif);
+  transition: border-color .15s;
+}
+
+.otp-box.filled {
+  border-color: var(--teal);
+  background: var(--teal-wash);
+}
+
+.otp-box.active {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 6rpx var(--teal-soft);
+}
+
+/* 隐藏输入框覆盖 OTP 格子 */
+.otp-hidden-input {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.code-hint {
+  font-size: 22rpx;
+  color: var(--faint);
+  margin-top: 12rpx;
+}
+
+.agree-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  padding: 24rpx 40rpx;
+  margin-top: 4rpx;
+}
+
+.agree-check {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 10rpx;
+  border: 3rpx solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2rpx;
+  transition: background .15s, border-color .15s;
+}
+
+.agree-check.on {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.agree-link {
+  color: var(--teal);
+}
+
+.ph-title {
+  font-size: 38rpx;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12rpx;
+  font-family: var(--font-serif);
+}
+
+.ph-sub {
+  font-size: 26rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* M0.2 新增：微信一键登录 + 分隔线 */
+.wx-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16rpx;
+  height: 112rpx;
+  border-radius: 32rpx;
+  background: #1f9e86;
+  color: #fffdf8;
+  font-size: 32rpx;
+  font-weight: 600;
+  border: none;
+  line-height: 112rpx;
+}
+.wx-login-btn::after {
+  border: none;
+}
+.wx-login-btn[disabled] {
+  background: #9bc9bd;
+  color: #fffdf8;
+}
+.wx-login-ic {
+  width: 40rpx;
+  height: 40rpx;
+}
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin: 48rpx 0 8rpx;
+}
+.divider-line {
+  flex: 1;
+  height: 1rpx;
+  background: var(--line);
+}
+.divider-text {
+  font-size: 24rpx;
+  color: var(--faint);
+}

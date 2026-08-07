@@ -3,7 +3,10 @@
     "pages/home/home",
     "pages/ai/ai",
     "pages/jobs/jobs",
-    "pages/me/me"
+    "pages/me/me",
+    "pages/login/login",
+    "pages/terms/terms",
+    "pages/privacy/privacy"
   ],
   "window": {
     "navigationBarTextStyle": "black",

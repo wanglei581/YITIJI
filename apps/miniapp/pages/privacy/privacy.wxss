@@ -1,0 +1,73 @@
+/* pages/privacy/privacy.wxss */
+.grp-label {
+  margin: 28rpx 8rpx 14rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+  letter-spacing: .5rpx;
+}
+.grp-label:first-of-type { margin-top: 8rpx; }
+
+.pv-group {
+  background: var(--surface);
+  border: 1rpx solid var(--line-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-xs);
+  overflow: hidden;
+}
+.pv-item {
+  display: flex;
+  align-items: center;
+  min-height: 108rpx;
+  padding: 20rpx 24rpx;
+  border-bottom: 1rpx solid var(--line-faint);
+}
+.pv-item:last-child { border-bottom: none; }
+
+.pv-main { flex: 1; }
+.pv-t {
+  font-size: 30rpx;
+  color: var(--ink);
+}
+.pv-t.danger { color: var(--clay-deep); }
+.pv-s {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: var(--muted);
+}
+.pv-v {
+  font-size: 26rpx;
+  color: var(--muted);
+  margin-left: 12rpx;
+}
+.pv-go {
+  margin-left: 12rpx;
+  font-size: 34rpx;
+  color: var(--faint);
+  line-height: 1;
+}
+.pv-go.danger { color: var(--clay); }
+
+/* 开关（与 settings 页相同规格） */
+.tgl {
+  position: relative;
+  width: 88rpx;
+  height: 52rpx;
+  border-radius: 999rpx;
+  background: var(--line);
+  transition: background .2s ease;
+  flex-shrink: 0;
+}
+.tgl::after {
+  content: "";
+  position: absolute;
+  top: 6rpx;
+  right: 42rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(0,0,0,.18);
+  transition: right .2s ease;
+}
+.tgl.on { background: var(--teal); }
+.tgl.on::after { right: 6rpx; }
