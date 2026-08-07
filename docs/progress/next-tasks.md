@@ -6,7 +6,7 @@
 
 - [x] **PR #511 主干 CI 回归修复已合入**：用户明确授权后，PR #511 已以 merge commit `200786a7` 合入 `main`；head `94e06944` 的 run `31107530315` 中 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。未部署，也未执行 bootstrap 或生产发布。
 - [x] **`js-yaml` 高危公告已由 PR #514 修复并完成 Kiosk 部署**：`js-yaml@4.3.1` 与唯一实例/标准 YAML 运行时防回退门禁已合入 `main@e7493dcd`，main run `31142486608` 三项全绿；重复 PR #513 已关闭。deploy run `31143067183` 第一次尝试被取消，随后经另一流程明确授权重跑 attempt 2 并成功完成依赖安装、Kiosk production build、Nginx 静态目录替换与 reload；只读验收确认线上首页/API health 200、Nginx active、API PM2 online。该工作流没有滚动 API PM2，不得把 API 运行时升级、数据库迁移、Windows 主机或硬件验收记作完成。
-- [ ] **确认真实 API 发布入口与环境隔离**：现有 `.github/workflows/deploy.yml` 只构建/复制 Kiosk 静态文件，不会构建、发布或重启 API；`120.48.13.190` 同时承载 `zyidai.cn`，预生产/生产隔离尚未证明。未明确独立预生产、后端 release/回滚流程和具名发布授权前，不得用该工作流声称 JD 拆解后端已上线，也不得连接、覆盖或重启线上 API。
+- [ ] **确认真实 API 发布入口与环境隔离**：现有 `.github/workflows/deploy.yml` 只构建/复制 Kiosk 静态文件，不会构建、发布或重启 API；`120.48.13.190` 同时承载 `zyidai.cn`，预生产/生产隔离尚未证明。2026-08-07 已形成 `codex/deploy-api-workflow-20260807` 方案 PR 候选：`DEPLOY_API_ENABLED=true` 授权闸门 + 受控 API 发布脚本（备份→additive 迁移→构建→同步运行目录→PM2→健康→`DEPLOY_SOURCE`）+ 未启用时 fail-closed 预检；尚未合并、启用或部署。未明确独立预生产、后端 release/回滚流程和具名发布授权前，不得用该工作流声称 JD 拆解后端已上线，也不得连接、覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
@@ -35,7 +35,7 @@
 - [ ] **Windows 真机验收**：Node 22 本地根级 typecheck/lint/build、W2-W6 和 warning 已通过；仍须在真实 Windows 1080x1920 触控一体机验证字体、缩放、触控目标、滚动、软键盘、支付、打印、扫描、异常恢复和隐私清场。打印机只能读取 `printerName` 配置，未知彩色 mode 不得硬编码。
 - [x] **本机打印即时唤醒代码候选**：不新增页面/按钮，Kiosk 真实 `/print/progress` 仅发送一次无 body/query 的 loopback wake；Agent 仍通过同一云端 claim 领取，并以 full-lifecycle single-flight 串行 interval/wake。Origin、bridge token、无 body/query、立即 `202`、不可用 `503`、并发合并、401 latch、付款配置与 Kiosk 静默回落专项门禁已通过；未部署。
 - [ ] **本机打印即时唤醒 Windows 验收**：必须先升级 Agent，再发布 Kiosk；在真实 `https://zyidai.cn` Edge/Chrome Kiosk 模式验证 `http://127.0.0.1:9527/local/print/wake` 的 Mixed Content / Private Network Access 与实际 Origin 白名单，分别覆盖 paid/free 即时 claim、未支付不可 claim、Agent/loopback 离线继续周期 claim、连续点击/刷新不重复出纸、两笔任务严格串行、PrintService/计数器/任务状态一致。通过前不得宣称该加速链路已上线或真机闭环。
-- [ ] **线上发布需单独授权**：仅在逐屏差异、CI、生产备份、同一冻结提交整体构建和回滚方案全部完成后申请发布窗口；未取得明确部署授权前，不连接或覆盖线上 Kiosk。
+- [ ] **线上发布需单独授权**：仅在逐屏差异、CI、生产备份、同一冻结提交整体构建和回滚方案全部完成后申请发布窗口；未取得明确部署授权前，不连接或覆盖线上 Kiosk。2026-08-07 起以仓库变量 `DEPLOY_API_ENABLED=true` 作为 API 受控发布授权闸门；未设置前部署会 fail-closed，不会继续放大前后端错位。
 
 ## P1：Kiosk 触控选择项分批收口
 
