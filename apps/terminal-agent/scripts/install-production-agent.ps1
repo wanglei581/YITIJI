@@ -539,7 +539,12 @@ function Assert-RestrictedRuntime([string]$Root) {
   $rootItem = Get-Item -Force -LiteralPath $Root -ErrorAction Stop
   $pending = New-Object "System.Collections.Generic.Queue[System.IO.FileSystemInfo]"
   $pending.Enqueue($rootItem)
-  $allowedWriteSids = @("S-1-5-18", "S-1-5-32-544", "S-1-3-0")
+  $allowedWriteSids = @(
+    "S-1-5-18",
+    "S-1-5-32-544",
+    "S-1-3-0",
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464"
+  )
   $dangerousRights = [System.Security.AccessControl.FileSystemRights]::Write -bor `
     [System.Security.AccessControl.FileSystemRights]::Modify -bor `
     [System.Security.AccessControl.FileSystemRights]::Delete -bor `
