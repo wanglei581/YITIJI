@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { ExternalLinkIcon, FileWarningIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { FileWarningIcon } from 'lucide-react'
 
 type PreviewKind = 'pdf' | 'image' | 'unsupported' | 'unavailable'
 
@@ -19,9 +19,14 @@ function resolvePreviewKind(
   format?: string | null,
 ): PreviewKind {
   if (!fileUrl || fileUrl.startsWith('/mock/')) return 'unavailable'
-  const normalized = `${mimeType ?? ''} ${format ?? ''} ${fileName}`.toLowerCase()
-  if (normalized.includes('pdf') || normalized.endsWith('.pdf')) return 'pdf'
-  if (/image\/(jpeg|png|webp)/.test(normalized) || /\.(jpe?g|png|webp)$/.test(normalized)) return 'image'
+  const normalizedMime = mimeType?.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  const normalizedFormat = format?.trim().replace(/^\./, '').toLowerCase() ?? ''
+  const extension = fileName.trim().toLowerCase().match(/\.([^.]+)$/)?.[1] ?? ''
+  if (normalizedMime === 'application/pdf') return 'pdf'
+  if (['image/jpeg', 'image/png', 'image/webp'].includes(normalizedMime)) return 'image'
+  if (normalizedMime && !['application/octet-stream', 'binary/octet-stream'].includes(normalizedMime)) return 'unsupported'
+  if (normalizedFormat === 'pdf' || extension === 'pdf') return 'pdf'
+  if (['jpg', 'jpeg', 'png', 'webp'].includes(normalizedFormat) || ['jpg', 'jpeg', 'png', 'webp'].includes(extension)) return 'image'
   return 'unsupported'
 }
 
@@ -34,6 +39,11 @@ export function FileContentPreview({
   compact = false,
 }: FileContentPreviewProps) {
   const [renderFailed, setRenderFailed] = useState(false)
+
+  useEffect(() => {
+    setRenderFailed(false)
+  }, [fileName, fileUrl, format, mimeType])
+
   const kind = renderFailed ? 'unavailable' : resolvePreviewKind(fileUrl, fileName, mimeType, format)
 
   return (
@@ -65,23 +75,12 @@ export function FileContentPreview({
             <p className="break-all text-sm font-semibold text-neutral-800">{fileName}</p>
             <p className="max-w-lg text-xs leading-5 text-neutral-500">
               {kind === 'unsupported'
-                ? '该格式不能在当前浏览器内直接显示，请在新窗口核对原文件。'
+                ? '该格式不能在当前浏览器内直接显示，请更换为 PDF、JPG、PNG 或 WebP 文件后预览。'
                 : '预览链接不可用或已过期，请重新上传文件。'}
             </p>
           </div>
         )}
       </div>
-      {fileUrl && !fileUrl.startsWith('/mock/') && (
-        <a
-          href={fileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex min-h-12 items-center justify-center gap-2 border-t border-neutral-200 bg-white px-4 text-sm font-semibold text-primary-700 hover:bg-primary-50"
-        >
-          <ExternalLinkIcon className="h-4 w-4" aria-hidden="true" />
-          在新窗口打开原文件
-        </a>
-      )}
     </section>
   )
 }

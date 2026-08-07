@@ -12,7 +12,7 @@ process.env.no_proxy = mergedProxyBypass
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: /fusion-w3\.spec\.ts$/,
+  testMatch: /(?:fusion-w3|fusion-self-assessment-flow)\.spec\.ts$/,
   outputDir: '../../test-results/kiosk-fusion-w3',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
@@ -33,7 +33,7 @@ export default defineConfig({
   },
   projects: [{ name: 'kiosk-1080x1920', grep: /@w3-kiosk/, use: { viewport: { width: 1080, height: 1920 } } }],
   webServer: {
-    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4183 --strictPort',
+    command: 'VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 VITE_USE_TRTC_CALL=true VITE_ALLOW_TEXT_ONLY_ASSISTANT=false VITE_TERMINAL_ID=KSK-001 VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4183 --strictPort',
     url: 'http://127.0.0.1:4183', reuseExistingServer: false, timeout: 180_000,
   },
 })

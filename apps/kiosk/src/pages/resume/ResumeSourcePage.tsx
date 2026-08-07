@@ -168,8 +168,9 @@ export function ResumeSourcePage() {
   // 目标维度补充(可选):专业与学历,仅用于本人简历表达诊断/优化重点参考
   const [targetMajor, setTargetMajor] = useState('')
   const [targetDegree, setTargetDegree] = useState('')
+  const sourceBusy = uploading || phoneBusy || usbBusy
   // 简历上传中:禁止进入待机宣传屏(评审 bug #1)
-  useBusyLock(uploading || phoneBusy || usbBusy)
+  useBusyLock(sourceBusy)
 
   const toggleDimension = (key: ResumeScoringDimensionKey) => {
     setSelectedDimensions((current) =>
@@ -337,7 +338,7 @@ export function ResumeSourcePage() {
               {UPLOAD_OPTIONS.map((option) => {
               const isSelected = selected === option.type
               const Icon = option.icon
-              const disabled = uploading
+              const disabled = sourceBusy
               return (
                 <button
                   type="button"
@@ -377,7 +378,7 @@ export function ResumeSourcePage() {
             ) : (
               <button
                 type="button"
-                disabled={uploading}
+                disabled={sourceBusy}
                 onClick={handleUploadBoxClick}
                 className={[
                   'resume-source-dropzone flex flex-1 min-h-[214px] flex-col items-center justify-center rounded-3xl border-2 border-dashed bg-white px-6 py-8 text-center transition-colors',
@@ -497,7 +498,7 @@ export function ResumeSourcePage() {
             size="lg"
             variant="outline"
             className="resume-change-file min-h-[64px] min-w-[200px] text-lg"
-            disabled={uploading}
+            disabled={sourceBusy}
             onClick={() => {
               setUploadedFile(null)
               setError(null)
@@ -512,7 +513,7 @@ export function ResumeSourcePage() {
         <Button
           size="lg"
           className="resume-primary-action min-h-[64px] min-w-[280px] flex-1 text-lg sm:flex-none sm:min-w-[460px]"
-          disabled={!uploadedFile || uploading}
+          disabled={!uploadedFile || sourceBusy}
           onClick={handleStartDiagnosis}
         >
           {uploadedFile ? copy.buttonReady : copy.buttonEmpty}

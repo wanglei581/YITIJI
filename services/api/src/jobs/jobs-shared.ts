@@ -353,7 +353,13 @@ export function normalizeMappedWorkType(workType: string | undefined): JobWorkTy
     : undefined
 }
 
-export function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): PartnerDataSourceDto {
+export function prismaJobSourceToPartnerDto(
+  source: PrismaJobSourceRow,
+  syncSummary?: {
+    successCount: number
+    failCount: number
+  },
+): PartnerDataSourceDto {
   const connStatus: ConnStatus = !source.enabled
     ? 'disabled'
     : source.lastSyncStatus === 'failed'
@@ -367,8 +373,8 @@ export function prismaJobSourceToPartnerDto(source: PrismaJobSourceRow): Partner
     syncFreq: source.syncFreq as SyncFrequency,
     lastSyncTime: source.lastSyncAt ? fmtSyncTime(source.lastSyncAt) : '从未同步',
     connStatus,
-    successCount: 0,
-    failCount: source.lastSyncStatus === 'failed' ? 1 : 0,
+    successCount: syncSummary?.successCount ?? 0,
+    failCount: syncSummary?.failCount ?? 0,
     description: source.description ?? '',
     credentialConfigured: Boolean(source.encryptedCredential || source.webhookSecret),
     endpoint: source.endpoint ?? undefined,

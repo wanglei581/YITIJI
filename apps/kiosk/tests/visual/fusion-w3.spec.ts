@@ -5,6 +5,7 @@ import {
   assistantReply, diagnosis, interviewAnswered, interviewCreated,
   interviewReport, interviewStarted, uploadedResume,
 } from './fixtures/fusion-w3-states'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 
 function terminalBaseline(api: ApiRouter): void {
   api.respond('GET', '/api/v1/terminals/KSK-001/printer-status', {
@@ -28,7 +29,7 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
     }
   })
   await page.route('**/w3-fixtures/resume.pdf', (route) =>
-    route.fulfill({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4\n%%EOF' }),
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
   )
   terminalBaseline(api)
   api.respond('POST', '/api/v1/files/kiosk-upload', { status: 200, json: uploadedResume })
@@ -62,6 +63,206 @@ test('resume upload → parse → OCR report @w3-kiosk', async ({ page, api }) =
   for (const section of diagnosis.report.sections) await expect(page.getByText(section.label, { exact: true }).first()).toBeVisible()
   await assertNoHorizontalOverflow(page)
   expect(runtimeErrors).toEqual([])
+})
+
+test('USB resume keeps its purpose and reaches AI parsing @w3-kiosk', async ({ page, api }) => {
+  const runtimeErrors: string[] = []
+  let uploadBody: { safeId?: string; purpose?: string } | null = null
+  page.on('pageerror', (error) => runtimeErrors.push(error.message))
+  await page.route('**/w3-fixtures/usb-resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': 'http://127.0.0.1:4183',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (path.endsWith('/status')) {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'TEST-USB' } }) })
+      return
+    }
+    if (path.endsWith('/files')) {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'TEST-USB', files: [{ safeId: 'usb-safe-resume', filename: 'U盘简历.pdf', extension: '.pdf', sizeBytes: 2048 }] } }) })
+      return
+    }
+    uploadBody = request.postDataJSON() as { safeId?: string; purpose?: string }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { fileId: 'file-usb-resume', filename: 'U盘简历.pdf', sizeBytes: 2048, mimeType: 'application/pdf', sha256: 'c'.repeat(64), fileUrl: '/w3-fixtures/usb-resume.pdf', fileUrlExpiresAt: new Date(Date.now() + 300_000).toISOString() } }),
+    })
+  })
+  terminalBaseline(api)
+  api.respond('POST', '/api/v1/resume/parse', { status: 200, json: diagnosis })
+
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await page.getByRole('button', { name: /U盘简历\.pdf/ }).click()
+  await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
+  expect(uploadBody).toEqual({ safeId: 'usb-safe-resume', purpose: 'resume_upload' })
+  await page.getByRole('button', { name: '开始 AI 诊断' }).click()
+  await page.waitForURL('/resume/report')
+  await expect(page.locator('[data-kiosk-screen="resume-report"]')).toBeVisible()
+  await assertNoHorizontalOverflow(page)
+  expect(runtimeErrors).toEqual([])
+})
+
+test('USB resume filters oversize files and trusts exact image MIME @w3-kiosk', async ({ page, api }) => {
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64')
+  await page.route('**/w3-fixtures/my_pdf_resume.jpg', (route) =>
+    route.fulfill({ status: 200, contentType: 'image/jpeg', body: png }),
+  )
+  await page.route('http://127.0.0.1:9527/local/usb/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': 'http://127.0.0.1:4183',
+      'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Local-Bridge-Token',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true',
+    }
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({ status: 204, headers: corsHeaders })
+      return
+    }
+    if (path.endsWith('/status')) {
+      await route.fulfill({ status: 200, headers: corsHeaders, contentType: 'application/json', body: JSON.stringify({ success: true, data: { present: true, driveLabel: 'TEST-USB' } }) })
+      return
+    }
+    if (path.endsWith('/files')) {
+      await route.fulfill({
+        status: 200,
+        headers: corsHeaders,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            present: true,
+            driveLabel: 'TEST-USB',
+            files: [
+              { safeId: 'usb-image', filename: 'my_pdf_resume.jpg', extension: '.jpg', sizeBytes: 2048 },
+              { safeId: 'usb-oversize', filename: 'too-large.pdf', extension: '.pdf', sizeBytes: 11 * 1024 * 1024 },
+            ],
+          },
+        }),
+      })
+      return
+    }
+    await route.fulfill({
+      status: 200,
+      headers: corsHeaders,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, data: { fileId: 'file-usb-image', filename: 'my_pdf_resume.jpg', sizeBytes: 2048, mimeType: 'image/jpeg', sha256: 'd'.repeat(64), fileUrl: '/w3-fixtures/my_pdf_resume.jpg', fileUrlExpiresAt: new Date(Date.now() + 300_000).toISOString() } }),
+    })
+  })
+  terminalBaseline(api)
+
+  await page.goto('/resume/source')
+  await page.getByRole('button', { name: /U盘上传/ }).click()
+  await expect(page.getByRole('button', { name: /my_pdf_resume\.jpg/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /too-large\.pdf/ })).toHaveCount(0)
+  await page.getByRole('button', { name: /my_pdf_resume\.jpg/ }).click()
+  const preview = page.locator('[data-file-preview-kind="image"]')
+  await expect(preview).toBeVisible()
+  await expect(preview.locator('img')).toHaveAttribute('src', '/w3-fixtures/my_pdf_resume.jpg')
+  await expect(preview.locator('iframe')).toHaveCount(0)
+})
+
+test('optimized resume previews inline without opening a new tab @w3-kiosk', async ({ page, api }) => {
+  const optimizedResume = {
+    basic: { name: '测试用户', city: '青岛' },
+    intention: { position: '前端开发工程师', city: '青岛' },
+    summary: '基于本人真实经历整理的简历摘要。',
+    education: [{ school: '测试大学', major: '计算机科学', degree: '本科' }],
+    experience: [],
+    projects: [],
+    skills: ['TypeScript', 'React'],
+    certificates: [],
+  }
+  await page.route('**/w3-fixtures/optimized-resume.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  terminalBaseline(api)
+  api.respond('GET', '/api/v1/job-materials/templates', { status: 200, json: { success: true, data: [] } })
+  api.respond('GET', '/api/v1/resume/records/resume-w3-inline-preview/optimize', {
+    status: 200,
+    json: { taskId: 'resume-w3-inline-preview', status: 'completed', providerName: 'llm', modules: [], optimizedResume },
+  })
+  api.respond('POST', '/api/v1/resume/generate/export', {
+    status: 200,
+    json: {
+      fileId: 'optimized-file-w3',
+      filename: '优化版简历.pdf',
+      sizeBytes: 4096,
+      pageCount: 1,
+      signedUrl: '/w3-fixtures/optimized-resume.pdf',
+      expiresAt: new Date(Date.now() + 300_000).toISOString(),
+      printFileUrl: '/api/v1/files/optimized-file-w3/content?expires=1&sig=test',
+    },
+  })
+
+  await page.goto('/resume/optimize?taskId=resume-w3-inline-preview')
+  await expect(page.locator('[data-kiosk-screen="resume-optimize"]')).toBeVisible()
+  await page.getByRole('button', { name: '导出 PDF', exact: true }).click()
+  await expect(page.getByRole('button', { name: '查看或手机保存PDF' })).toBeVisible()
+  const pageCount = page.context().pages().length
+  await page.getByRole('button', { name: '查看或手机保存PDF' }).click()
+  const dialog = page.getByRole('dialog', { name: '优化版简历.pdf' })
+  await expect(dialog).toBeVisible()
+  await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/w3-fixtures/optimized-resume.pdf')
+  await expect(dialog.getByText('手机扫码保存')).toBeVisible()
+  expect(page.context().pages()).toHaveLength(pageCount)
+  await page.getByRole('button', { name: '关闭文件预览' }).click()
+  await expect(dialog).toHaveCount(0)
+  expect(page.context().pages()).toHaveLength(pageCount)
+})
+
+test('resume preview recovers after replacing a failed file @w3-kiosk', async ({ page, api }) => {
+  let uploadCount = 0
+  terminalBaseline(api)
+  await page.route('**/w3-fixtures/broken.png', (route) => route.abort('failed'))
+  await page.route('**/w3-fixtures/recovered.pdf', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+  )
+  await page.route('**/api/v1/files/kiosk-upload', async (route) => {
+    uploadCount += 1
+    const isBroken = uploadCount === 1
+    const isUnsupportedDocx = uploadCount === 3
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        data: {
+          ...uploadedResume.data,
+          fileId: `preview-file-${uploadCount}`,
+          filename: isBroken ? 'broken.png' : isUnsupportedDocx ? 'resume_pdf_final.docx' : 'recovered.pdf',
+          mimeType: isBroken ? 'image/png' : isUnsupportedDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf',
+          signedUrl: isBroken ? '/w3-fixtures/broken.png' : isUnsupportedDocx ? '/w3-fixtures/document.docx' : '/w3-fixtures/recovered.pdf',
+        },
+      }),
+    })
+  })
+
+  await page.goto('/resume/source')
+  const input = page.getByLabel('选择本机简历文件')
+  await input.setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('broken') })
+  await expect(page.locator('[data-file-preview-kind="unavailable"]')).toBeVisible()
+  await input.setInputFiles({ name: 'recovered.pdf', mimeType: 'application/pdf', buffer: Buffer.from(VISIBLE_PDF) })
+  await expect(page.locator('[data-file-preview-kind="pdf"]')).toBeVisible()
+  await expect(page.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/w3-fixtures/recovered.pdf')
+  await input.setInputFiles({ name: 'resume_pdf_final.docx', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', buffer: Buffer.from('synthetic-docx') })
+  await expect(page.locator('[data-file-preview-kind="unsupported"]')).toBeVisible()
+  await expect(page.locator('[data-file-preview-kind="unsupported"] iframe')).toHaveCount(0)
 })
 
 test('direct resume parse stays fail-closed without fake stages @w3-kiosk', async ({ page, api }) => {

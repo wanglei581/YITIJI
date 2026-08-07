@@ -31,6 +31,7 @@
     "verify:import-review-reset": "node scripts/verify-import-review-reset.mjs",
     "verify:field-mapping": "node -r @swc-node/register scripts/verify-field-mapping-rule.ts",
     "verify:partner-excel-template": "node -r @swc-node/register scripts/verify-partner-excel-template.ts",
+    "verify:partner-excel-import": "node -r @swc-node/register scripts/verify-partner-excel-import.ts",
     "verify:field-mapping:http": "node -r @swc-node/register scripts/q1-http-e2e-field-mapping.ts",
     "verify:sms-provider": "node -r @swc-node/register scripts/verify-sms-provider.ts",
     "verify:sms-send": "node -r @swc-node/register scripts/verify-sms-send.ts",

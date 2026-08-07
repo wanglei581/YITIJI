@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { registerW6Api } from './fixtures/fusion-w6-api'
+import { VISIBLE_PDF } from './fixtures/fusion-w2-binary-route'
 
 /**
  * 上线前自评估 §1.6 修复：真网络端到端断言。
@@ -50,7 +51,7 @@ function registerSelfAssessmentApi(api: ReturnType<typeof Object>, page: Page): 
   respond('GET', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}`, success(submissionData))
   respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/print`, success({
     fileId: 'sa-file-001', filename: 'self-assessment-001.pdf', sizeBytes: 12345, pageCount: 2,
-    signedUrl: 'about:blank', signedUrlExpiresAt: '2099-01-01T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
+    signedUrl: '/self-assessment-fixtures/report.pdf', signedUrlExpiresAt: '2099-01-01T00:00:00.000Z', expiresAt: '2099-01-01T00:00:00.000Z',
   }))
   respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/append`, success({
     fileId: 'sa-append-001', filename: 'self-assessment-append-001.pdf', sizeBytes: 23456, pageCount: 4,
@@ -135,6 +136,49 @@ test.describe('自我探索 · 倾向参考 §1.6 真网络闭环', () => {
     expect(json.data?.fileId).toBe('sa-file-001')
     expect(json.data?.pageCount).toBe(2)
     expect(errors).toEqual([])
+  })
+
+  test('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk', async ({ page, api }) => {
+    registerSelfAssessmentApi(api, page)
+    api.respond('POST', `/api/v1/resume/self-assessment/${MOCK_TASK_ID}/print`, {
+      status: 200,
+      json: {
+        fileId: 'sa-file-001',
+        filename: 'self-assessment-001.pdf',
+        sizeBytes: 12345,
+        pageCount: 2,
+        signedUrl: '/self-assessment-fixtures/report.pdf',
+        signedUrlExpiresAt: '2099-01-01T00:00:00.000Z',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+      },
+    })
+    await page.route('**/self-assessment-fixtures/report.pdf', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF }),
+    )
+    await page.addInitScript(({ key, value }) => {
+      sessionStorage.setItem(key, JSON.stringify(value))
+    }, {
+      key: 'self_assessment_session_v1',
+      value: {
+        answers: {},
+        consent: { nonSensitive: true, sensitive: false },
+        taskId: MOCK_TASK_ID,
+        accessToken: 'mock-anon-token-deadbeef',
+        result: submissionData,
+      },
+    })
+
+    await page.goto('/resume/self-assessment/result')
+    const pageCount = page.context().pages().length
+    await page.getByRole('button', { name: /生成 PDF 预览/ }).click()
+    const dialog = page.getByRole('dialog', { name: 'self-assessment-001.pdf' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('[data-file-preview-kind="pdf"] iframe')).toHaveAttribute('src', '/self-assessment-fixtures/report.pdf')
+    await expect(dialog.getByText('手机扫码保存')).toBeVisible()
+    expect(page.context().pages()).toHaveLength(pageCount)
+    await page.getByRole('button', { name: '关闭文件预览' }).click()
+    await expect(dialog).toHaveCount(0)
+    expect(page.context().pages()).toHaveLength(pageCount)
   })
 
   test('§1.3 + §1.5: 撤回 DELETE 真网络可达 @kiosk', async ({ page, api }) => {

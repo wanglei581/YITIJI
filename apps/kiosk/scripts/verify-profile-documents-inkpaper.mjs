@@ -99,10 +99,11 @@ expectIncludes(page, 'getMyDocuments(getToken(), { pageSize: 50 })', '我的文�
 expectIncludes(page, "loginFrom=\"/me/documents\"", '我的文档保留登录回跳来源')
 expectIncludes(page, 'setItems([])', '我的文档保留游客态清空列表')
 expectIncludes(page, 'fetchAccessUrl(doc.previewUrlPath, token)', '我的文档查看/打印保留短期签名 URL 现取现用')
-expectMatches(page, /openDeferredPreviewWindow\(\)[\s\S]{0,220}?fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,120}?previewWindow\.location\.replace\(res\.url\)/, '查看文档先同步创建窗口再获取短期 URL')
-expectIncludes(page, "referrerPolicy.content = 'no-referrer'", '文件窗口禁止发送 Referer')
-expectIncludes(page, 'previewWindow.opener = null', '文件窗口切断 opener')
-expectMatches(page, /catch\s*\{\s*previewWindow\.close\(\)/, '签名链接获取失败时关闭空白窗口')
+expectMatches(page, /fetchAccessUrl\(doc\.previewUrlPath,\s*token\)[\s\S]{0,180}?setPreview\(\{\s*url:\s*res\.url/, '查看文档在当前隐私根内使用短期 URL')
+expectIncludes(page, '<FileContentPreview', '我的文档使用页内真实文件预览')
+expectIncludes(page, 'aria-labelledby="document-preview-title"', '文档预览弹层保留可访问标题')
+expectIncludes(page, 'aria-modal="true"', '文档预览弹层保留 aria-modal')
+expectAbsent(page, /window\.open\(/, '我的文档不打开会逃逸公共终端隐私清场的新窗口')
 expectMatches(
   page,
   /if\s*\(\s*!res\.printFileUrl\s*\)\s*throw[\s\S]*?navigate\('\/print\/confirm'[\s\S]*?fileUrl:\s*res\.printFileUrl[\s\S]*?mimeType:\s*doc\.mimeType[\s\S]*?makePrintParams\(\{\s*copies:\s*1,\s*duplex:\s*'single',\s*color:\s*'bw'\s*\}\)/,
@@ -279,19 +280,71 @@ const SIGN_STAMP_CHANGED = new Set([
   'services/api/src/upload-sessions/upload-sessions.service.ts',
 ])
 
+// 文件真实显示收口批次：/me/documents 的页内预览与上传、扫描、Admin、Partner、
+// Terminal Agent U 盘简历 purpose/会员归属必须在同一候选中验证，不能拆成会失真的
+// 单端改动。这里只登记该批次的精确文件，业务断言仍由各自专属 verifier 负责。
+const FILE_FLOW_CHANGED = new Set([
+  'apps/admin/scripts/verify-admin-file-lifecycle.mjs',
+  'apps/admin/src/routes/files/index.tsx',
+  'apps/kiosk/playwright.w3.config.ts',
+  'apps/kiosk/scripts/verify-fusion-w2-print-scan.mjs',
+  'apps/kiosk/scripts/verify-fusion-w3.mjs',
+  'apps/kiosk/scripts/verify-fusion-w5.mjs',
+  'apps/kiosk/scripts/verify-kiosk-visible-actions-truth.mjs',
+  'apps/kiosk/scripts/verify-lightflow-k2b-ai-resume.mjs',
+  'apps/kiosk/scripts/verify-resume-diagnosis-flow-ui.mjs',
+  'apps/kiosk/scripts/verify-resume-phone-upload-ui.mjs',
+  'apps/kiosk/src/components/FileContentPreview.tsx',
+  'apps/kiosk/src/components/FilePreviewDialog.tsx',
+  'apps/kiosk/src/pages/contract-review/ContractReviewResultPage.tsx',
+  'apps/kiosk/src/pages/print-scan/ConvertImagesPage.tsx',
+  'apps/kiosk/src/pages/resume/ResumeOptimizePage.tsx',
+  'apps/kiosk/src/pages/resume/ResumeSourcePage.tsx',
+  'apps/kiosk/src/pages/resume/SelfAssessmentFlow.tsx',
+  'apps/kiosk/src/pages/resume/components/ResumeUsbImportPanel.tsx',
+  'apps/kiosk/src/pages/scan/ScanResultPage.tsx',
+  'apps/kiosk/src/pages/upload/components/UploadSessionQrPanel.tsx',
+  'apps/kiosk/src/services/files/usbImportApi.ts',
+  'apps/kiosk/tests/visual/fixtures/fusion-w2-binary-route.ts',
+  'apps/kiosk/tests/visual/fusion-self-assessment-flow.spec.ts',
+  'apps/kiosk/tests/visual/fusion-w2-scan.spec.ts',
+  'apps/kiosk/tests/visual/fusion-w2-tools.spec.ts',
+  'apps/kiosk/tests/visual/fusion-w3.spec.ts',
+  'apps/partner/scripts/verify-excel-template-download-ui.mjs',
+  'apps/partner/src/routes/sources/ExcelImportModal.tsx',
+  'apps/partner/src/routes/sources/index.tsx',
+  'apps/terminal-agent/scripts/verify-usb-import-agent.ts',
+  'apps/terminal-agent/installer/verify-installer-inputs.mjs',
+  'apps/terminal-agent/src/local-api/qr-login-server.ts',
+  'apps/terminal-agent/src/local-api/types.ts',
+  'apps/terminal-agent/src/local-api/wire.ts',
+  'docs/product/feature-scope.md',
+  'services/api/scripts/verify-http-exception-filter.ts',
+  'services/api/scripts/verify-partner-excel-import.ts',
+  'services/api/scripts/verify-upload-sessions.ts',
+  'services/api/src/common/filters/http-exception.filter.ts',
+  'services/api/src/jobs/jobs-excel.service.ts',
+  'services/api/src/jobs/jobs-partner.service.ts',
+  'services/api/src/jobs/jobs-shared.ts',
+  'services/api/src/jobs/partner-import-file.ts',
+])
+
 // 条件触发（根因修复）：仅当本 PR 实际改动本守卫负责的 /me/documents 明细页时，才强制 allowlist
 // 范围检查；未触碰则跳过，避免误伤无关 PR（如支付域 C5-4）。批次守卫不应拦截其它批次。
 const OWNED_PAGES = ['apps/kiosk/src/pages/profile/me/MyDocumentsPage.tsx']
 const touchesOwnedPage = changedFiles.some((file) => OWNED_PAGES.includes(file))
 const unexpectedChanged = touchesOwnedPage
   ? changedFiles.filter(
-      (file) => !allowedChanged.has(file) && !PRINT_URL_CONTRACT_CHANGED.has(file) && !SIGN_STAMP_CHANGED.has(file),
+      (file) => !allowedChanged.has(file)
+        && !PRINT_URL_CONTRACT_CHANGED.has(file)
+        && !SIGN_STAMP_CHANGED.has(file)
+        && !FILE_FLOW_CHANGED.has(file),
     )
   : []
 if (!touchesOwnedPage) {
   pass('本 PR 未触碰 /me/documents 明细页，跳过范围 allowlist 检查（守卫条件触发）')
 } else if (unexpectedChanged.length === 0) {
-  pass('diff 仅触碰文档页换装、局部 CSS、守卫、package、CI 与本次 payment session 精确范围')
+  pass('diff 仅触碰已登记的文档、打印、签章或文件真实显示批次精确范围')
 } else {
   fail(`diff 出现禁止范围变更：${unexpectedChanged.join(', ')}`)
 }
