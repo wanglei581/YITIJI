@@ -261,6 +261,8 @@ $diagnoseButton = New-Button -Text "诊断详情" -X 174 -Y 628 -Width 130
 $printerSelfTestButton = New-Button -Text "打印机自检" -X 318 -Y 628 -Width 150
 $activateButton = New-Button -Text "激活并启动" -X 484 -Y 628 -Width 240
 $activateButton.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10, [System.Drawing.FontStyle]::Bold)
+$repairStartButton = New-Button -Text "一键修复并启动" -X 30 -Y 672 -Width 330
+$repairStartButton.Font = New-Object System.Drawing.Font("Microsoft YaHei UI", 10, [System.Drawing.FontStyle]::Bold)
 
 function Set-Status([string]$Text, [System.Drawing.Color]$Color) {
   $statusLabel.Text = $Text
@@ -372,7 +374,7 @@ function Refresh-AgentStatus {
     } elseif ($status.State -eq "Running" -and $status.StartMode -eq "Auto") {
       Set-Status "服务正在运行｜开机自动启动｜终端 $($status.TerminalCode)｜打印机 $($status.PrinterName)" ([System.Drawing.Color]::FromArgb(26, 112, 76))
     } elseif ($status.Configured) {
-      Set-Status "设备已有配置，但服务当前为 $($status.State) / $($status.StartMode)。可使用已有凭据重新配置并启动。" ([System.Drawing.Color]::FromArgb(166, 92, 0))
+      Set-Status "设备已有配置，但服务当前为 $($status.State) / $($status.StartMode)。请点击「一键修复并启动」。" ([System.Drawing.Color]::FromArgb(166, 92, 0))
     } else {
       Set-Status "程序已安装，尚未激活。请输入后台生成的一次性绑定码。" ([System.Drawing.Color]::FromArgb(86, 91, 98))
     }
@@ -484,6 +486,37 @@ $printerSelfTestButton.Add_Click({
   } catch {
     Set-Status "打印机自检失败：$($_.Exception.Message)" ([System.Drawing.Color]::Firebrick)
     [System.Windows.Forms.MessageBox]::Show("打印机自检失败：$($_.Exception.Message)", $productName, "OK", "Error") | Out-Null
+  }
+})
+
+$repairStartButton.Add_Click({
+  try {
+    if ($printerCombo.SelectedIndex -lt 0) {
+      [System.Windows.Forms.MessageBox]::Show("请先在 Windows 打印机下拉框中选择打印机。", $productName, "OK", "Warning") | Out-Null
+      return
+    }
+    $apiBase = ConvertTo-ValidatedApiBaseUrl $apiText.Text
+    if ([string]::IsNullOrWhiteSpace($originText.Text)) { throw "网页来源地址不能为空。" }
+    Set-Status "正在修复配置权限并启动服务，请稍候..." ([System.Drawing.Color]::FromArgb(86, 91, 98))
+    $arguments = @{
+      ApiBaseUrl = $apiBase
+      PrinterName = [string]$printerCombo.SelectedItem
+      LocalApiAllowedOrigins = @($originText.Text.Trim())
+      ReplaceLocalApiAllowedOrigins = $true
+      RepairProgramDataAcl = $true
+      StartServiceOnly = $true
+    }
+    $output = & $provisionScript @arguments 6>&1 5>&1 4>&1 3>&1 2>&1 | Out-String
+    $arguments.Clear()
+    $arguments = $null
+    if (($output -join "`n") -notmatch "SERVICE_START_ONLY_PASS") {
+      throw $output
+    }
+    Refresh-AgentStatus
+    [System.Windows.Forms.MessageBox]::Show("服务已启动，本机接口已恢复。请刷新前端页面确认“打印机在线”，然后重新提交打印。", $productName, "OK", "Information") | Out-Null
+  } catch {
+    Set-Status "一键修复并启动失败：$($_.Exception.Message)" ([System.Drawing.Color]::Firebrick)
+    [System.Windows.Forms.MessageBox]::Show("一键修复并启动失败：$($_.Exception.Message)", $productName, "OK", "Error") | Out-Null
   }
 })
 

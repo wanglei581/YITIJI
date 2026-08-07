@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.7-production",
+  [string]$AgentVersion = "0.3.8-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -110,6 +110,10 @@ param(
 
   [Parameter(Mandatory = $false)]
   [switch]$RepairProgramDataAcl
+  ,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$StartServiceOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -863,6 +867,60 @@ $programDataDir = Join-Path $env:ProgramData "AIJobPrintAgent"
 $configPath = Join-Path $programDataDir "agent-config.json"
 $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
+if ($StartServiceOnly) {
+  if ($RepairProgramDataAcl) {
+    if (-not (Test-Path -LiteralPath $programDataDir -PathType Container)) {
+      New-Item -ItemType Directory -Path $programDataDir -Force | Out-Null
+    }
+    Set-ProgramDataTreeAcl -Root $programDataDir
+    Write-Ok "ProgramData ACL repaired to protected SYSTEM + Administrators: $programDataDir"
+  }
+  if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+    Fail "StartServiceOnly requires an existing production config: $configPath"
+  }
+  Assert-ProgramDataAcl -Path $programDataDir -IsContainer $true
+  Assert-ProgramDataAcl -Path $configPath -IsContainer $false
+  $startOnlyConfig = Get-Content -Raw -LiteralPath $configPath -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+  if (
+    [string]::IsNullOrWhiteSpace([string]$startOnlyConfig.terminalId) -or
+    [string]::IsNullOrWhiteSpace([string]$startOnlyConfig.terminalCode) -or
+    [string]::IsNullOrWhiteSpace([string]$startOnlyConfig.printerName)
+  ) {
+    Fail "StartServiceOnly requires terminalId/terminalCode/printerName in the production config"
+  }
+  if (-not (Test-Path -LiteralPath $tokenPath -PathType Leaf)) {
+    Fail "StartServiceOnly requires the DPAPI token file: $tokenPath"
+  }
+  Assert-ProgramDataAcl -Path $tokenPath -IsContainer $false
+  $startOnlyService = Resolve-AgentService -Identity $agentServiceIdentity
+  if ($null -eq $startOnlyService) {
+    if ($installedMode) {
+      Fail "The MSI-managed AIJobPrintAgent service is missing. Run the installer Repair action before starting."
+    }
+    & $nodeExecutable "dist\index.js" install-service
+    Start-Sleep -Seconds 3
+    $startOnlyService = Resolve-AgentService -Identity $agentServiceIdentity
+  }
+  if ($null -eq $startOnlyService) {
+    Fail "Could not resolve the AIJobPrintAgent service after install-service"
+  }
+  Assert-AgentServiceSecurity -Service $startOnlyService -AgentRoot $runtimeRoot
+  $startOnlyServiceName = [string]$startOnlyService.Name
+  Set-Service -Name $startOnlyServiceName -StartupType Automatic
+  Set-AgentServiceRecovery $startOnlyServiceName
+  if ($startOnlyService.State -ne "Running") {
+    Start-Service -Name $startOnlyServiceName
+  } else {
+    Restart-Service -Name $startOnlyServiceName -Force
+  }
+  Start-Sleep -Seconds 2
+  $startOnlyAfter = Resolve-AgentService -Identity $agentServiceIdentity
+  if ($null -eq $startOnlyAfter -or $startOnlyAfter.State -ne "Running") {
+    Fail "AIJobPrintAgent did not reach Running after StartServiceOnly"
+  }
+  Write-Host "SERVICE_START_ONLY_PASS terminal=$([string]$startOnlyConfig.terminalCode)"
+  exit 0
+}
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 $apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
 if ($RepairProgramDataAcl) {

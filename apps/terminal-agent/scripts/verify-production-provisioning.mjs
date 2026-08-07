@@ -43,7 +43,7 @@ assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
 assert.match(installer, /Use exactly one of -PromptForBindCode, -BindCode, or -BindCodeSecure/)
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
-assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.7-production"/)
+assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.8-production"/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)
@@ -85,7 +85,7 @@ assert.doesNotMatch(exchangeSlice, /Fail[^\r\n]*\$responseBody/, 'BindCode excha
 assert.doesNotMatch(exchangeSlice, /\$failureText[^\r\n]*\$responseBody/, 'BindCode exchange errors must not embed the API response body')
 assert.match(exchangeSlice, /\$failureText\s*\+=/, 'BindCode exchange must build a safe, structured failure message')
 assert.equal(agentConfigExample.apiBaseUrl, 'https://api.example.com/api/v1')
-assert.equal(agentConfigExample.agentVersion, '0.3.7')
+assert.equal(agentConfigExample.agentVersion, '0.3.8')
 assert.match(
   installer,
   /\$effectiveLocalApiAllowedOrigins\s*=\s*New-Object "System\.Collections\.Generic\.List\[string\]"/,
@@ -118,6 +118,11 @@ assert.match(provisioner, /RepairProgramDataAcl = \$true/)
 assert.match(diagnose, /configFileAclStatus/)
 assert.match(diagnose, /function Get-LocalApiStatus/)
 assert.match(diagnose, /localApiStatus/)
+assert.match(installer, /\[switch\]\$StartServiceOnly/)
+assert.match(installer, /SERVICE_START_ONLY_PASS/)
+assert.match(installer, /StartServiceOnly requires an existing production config/)
+assert.match(provisioner, /一键修复并启动/)
+assert.match(provisioner, /StartServiceOnly = \$true/)
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')
@@ -155,8 +160,8 @@ assert.match(provisioner, /function ConvertTo-ValidatedApiBaseUrl/)
 assert.match(provisioner, /ConvertTo-ValidatedApiBaseUrl \$apiText\.Text/)
 assert.equal(
   provisioner.match(/ConvertTo-ValidatedApiBaseUrl \$apiText\.Text/g)?.length,
-  2,
-  'GUI connection test and activation must share the secure API validator',
+  3,
+  'GUI connection test, activation, and one-click repair-start must share the secure API validator',
 )
 for (const insecureApi of [
   'http://localhost:3000/api/v1',
