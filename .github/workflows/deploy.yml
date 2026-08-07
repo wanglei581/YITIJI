@@ -21,12 +21,30 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
+          command_timeout: 20m
           script: |
-            set -e
+            set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
 
             echo "=== 拉取最新代码 ==="
-            git pull origin main
+            EXPECTED_SHA='${{ github.event.workflow_run.head_sha }}'
+            CURRENT_SHA="$(git rev-parse HEAD)"
+            if [ "$CURRENT_SHA" = "$EXPECTED_SHA" ]; then
+              echo "服务器已在目标提交 $EXPECTED_SHA，跳过重复拉取"
+            else
+              FETCH_OK=0
+              for ATTEMPT in 1 2; do
+                echo "fetch attempt $ATTEMPT/2"
+                if timeout --foreground --kill-after=10s 240s git fetch origin main; then
+                  FETCH_OK=1
+                  break
+                fi
+              done
+              test "$FETCH_OK" = "1"
+              test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+              git merge --ff-only origin/main
+            fi
+            test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
             echo "=== 安装依赖 ==="
             pnpm install --frozen-lockfile
