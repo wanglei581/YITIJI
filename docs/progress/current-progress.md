@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-07 完成 **生产首个管理员 bootstrap 执行授权门禁文档（保持 NO-GO，未连接生产）**：新增 `docs/device/first-admin-bootstrap-execution-gate.md`，把 PR #510 已合入的 `bootstrap-first-admin` CLI 固化为可执行的授权门禁：五项授权要素（具名生产授权、受控 Linux 账户与生产 PostgreSQL 凭据、双人审批、精确确认短语 `CREATE_FIRST_PRODUCTION_ADMIN`、10 分钟 RFC3339 窗口）、执行前只读核对证据清单、预期失败码表、首次登录/改密验收、三态 reconciliation 与仓库外脱敏证据模板；明确代码合入授权与生产执行授权互不等同。本文档与进度修改均未连接生产、未运行 CLI、未写数据库。
+
 2026-08-07 完成 **Kiosk 登录入口统一生产部署与线上验收**：`main@616fd967` 的 CI run `31147880039` 三个 job 全绿，自动 Deploy run `31148485491` 成功；修复后的部署流程一次有界 fetch 即将服务器从 `2098fdd8` 快进到目标 SHA，随后完成 frozen install、Kiosk production build、静态产物替换与 Nginx reload，未再出现 `git pull` 无限等待或遗留 git 进程。只读核验确认生产仓库 HEAD 精确为 `616fd967`、工作区干净、Nginx active，公网首页已加载新 bundle `index-vOiQlWfz.js`，`/api/v1/health` 返回 200 且 `db=postgres`。线上 1080×1920 Playwright 实点首页顶部「登录 / 注册」与「继续办理」登录按钮，二者均进入同一全屏 `/login` 页面，旧 `MemberLoginDialog` 打开数均为 0；本任务已完成，不修改数据库、密钥、PM2、Windows 主机、打印扫描或硬件链路。
 
 2026-08-07 完成 **Kiosk 自动部署拉取超时 fail-closed 修复（待新一轮 CI / 部署验收）**：登录入口统一提交 `2098fdd8` 的 CI run `31145961062` 三个 job 全绿，但 Deploy run `31146518312` 首次与失败重跑均在服务器 `git pull origin main` 阶段卡满默认 10 分钟；两次均未进入依赖安装、构建、静态目录清空、复制或 Nginx reload。只读检查确认第二次 action 超时后遗留的孤儿进程树为 `bash -> git pull -> git fetch -> ssh/index-pack`，服务器仓库工作区干净且 HEAD 已为目标 `2098fdd8`，随后仅按精确 PGID 终止该失败 workflow 遗留进程树，未改数据库、PM2、Nginx、生产静态目录或密钥。部署 workflow 现以 `workflow_run.head_sha` 为唯一目标：服务器 HEAD 已匹配时跳过重复网络拉取；不匹配时最多两次、每次 240 秒有界 fetch，要求 `origin/main` 精确等于目标 SHA 后才允许 `merge --ff-only`，并在安装和构建前再次校验 HEAD；SSH 总命令时限扩为 20 分钟以容纳有界拉取与正式构建。修复仍须经新一轮 main CI、自动部署和线上浏览器验收，未提前记作上线成功。
