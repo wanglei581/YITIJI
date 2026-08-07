@@ -13,7 +13,7 @@
 - [x] **部署后验收**：DP-GATE after、migration、health、PM2/nginx、鉴权路由、微信登录正式路由、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环均通过；`PolicyPost=0` 按真实空数据保留，禁止用 seed 或演示数据填充。后续仅保留 root 密码轮换/key-only SSH 与磁盘容量观察两项运维收尾。
 - [x] **生产 demo seed fail-closed**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已合入 `main@56939ace`；四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行。代码与三项 CI 已通过，但未随上述 `main@42913050` 恢复包部署，禁止把“已合入”写成“已上线”。
 - [x] **全新生产空库首个管理员 bootstrap 代码已合入**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 最终 head `05c91679` 的 run `31144247594` 三项全绿，隔离 PostgreSQL 16 首管理员真并发门禁通过；已用带 `[skip ci]` 的 merge commit `19f7e715` 合入 main，未为该提交触发 main CI 或再次部署，也未执行 bootstrap。
-- [ ] **生产首次管理员执行仍为独立 NO-GO 门禁**：须先确认 `productionF1` 明确 GO、生产确为空库、受控 Linux 账户与凭据目录、生产 PostgreSQL 凭据、双人审批、精确确认短语和 10 分钟窗口；执行后还须完成凭据交接、单次改密 ticket、owner-managed 改密、审计与三态 reconciliation。未获新的具名生产授权不得运行 CLI。
+- [ ] **生产首次管理员执行仍为独立 NO-GO 门禁**：执行授权门禁文档已落地为 `docs/device/first-admin-bootstrap-execution-gate.md`（含授权要素、只读核对清单、执行步骤、三态 reconciliation 与证据模板）。仍须先确认 `productionF1` 明确 GO、生产确为空库、受控 Linux 账户与凭据目录、生产 PostgreSQL 凭据、双人审批、精确确认短语和 10 分钟窗口；执行后还须完成凭据交接、单次改密 ticket、owner-managed 改密、审计与三态 reconciliation。未获新的具名生产授权不得运行 CLI。
 
 ## 上线门禁：文件预览与操作流程现场验收
 
