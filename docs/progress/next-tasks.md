@@ -12,7 +12,8 @@
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
 - [x] **部署后验收**：DP-GATE after、migration、health、PM2/nginx、鉴权路由、微信登录正式路由、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环均通过；`PolicyPost=0` 按真实空数据保留，禁止用 seed 或演示数据填充。后续仅保留 root 密码轮换/key-only SSH 与磁盘容量观察两项运维收尾。
 - [x] **生产 demo seed fail-closed**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已合入 `main@56939ace`；四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行。代码与三项 CI 已通过，但未随上述 `main@42913050` 恢复包部署，禁止把“已合入”写成“已上线”。
-- [~] **全新生产空库首个管理员 bootstrap 候选**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 的 Node `v22.23.1` 本地最小门禁全绿，head `35910f69` 的 run `31143419974` 三项全绿，隔离 PostgreSQL 16 首管理员真并发门禁通过。用户已授权以带 `[skip ci]` 的 merge commit 合入，但 `main` 随 PR #515 前进到 `362570f8`，#510 也新增 CI 事实记录 `2224edcf`；当前先同步 docs-only 主干变更、推送并等待新一轮 PR 三项检查，恢复 `CLEAN / MERGEABLE` 后再按已授权方式合入。授权不包含执行 bootstrap 或再次生产部署，真正生产执行仍须受控 Linux 账户、生产数据库凭据、精确确认短语、10 分钟窗口和双人审批。
+- [x] **全新生产空库首个管理员 bootstrap 代码已合入**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 最终 head `05c91679` 的 run `31144247594` 三项全绿，隔离 PostgreSQL 16 首管理员真并发门禁通过；已用带 `[skip ci]` 的 merge commit `19f7e715` 合入 main，未为该提交触发 main CI 或再次部署，也未执行 bootstrap。
+- [ ] **生产首次管理员执行仍为独立 NO-GO 门禁**：须先确认 `productionF1` 明确 GO、生产确为空库、受控 Linux 账户与凭据目录、生产 PostgreSQL 凭据、双人审批、精确确认短语和 10 分钟窗口；执行后还须完成凭据交接、单次改密 ticket、owner-managed 改密、审计与三态 reconciliation。未获新的具名生产授权不得运行 CLI。
 
 ## 上线门禁：文件预览与操作流程现场验收
 
