@@ -206,6 +206,8 @@ assert.match(runtimeVerifier, /Get-ChildItem\s+-Force\s+-LiteralPath/, 'runtime 
 assert.match(runtimeVerifier, /Assert-NotReparsePoint/, 'runtime verifier must reject reparse points')
 assert.match(runtimeVerifier, /ChangePermissions/, 'runtime verifier must reject WRITE_DAC-like rights')
 assert.match(runtimeVerifier, /TakeOwnership/, 'runtime verifier must reject WRITE_OWNER-like rights')
+assert.match(runtimeVerifier, /GenericWrite/, 'runtime verifier must reject GENERIC_WRITE-like rights')
+assert.doesNotMatch(runtimeVerifier, /FileSystemRights\]::Modify/, 'read-only ACEs share bits with Modify; runtime verifier must use write-specific bits')
 assert.match(runtimeVerifier, /Test-TrustedRuntimeOwner/, 'runtime verifier must recognize trusted owners')
 assert.match(runtimeVerifier, /S-1-3-0/, 'runtime verifier must tolerate inherited CREATOR OWNER full control under Program Files')
 assert.match(runtimeVerifier, /S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464/, 'runtime verifier must tolerate inherited TrustedInstaller full control under Program Files')

@@ -218,10 +218,16 @@ function Get-RuntimeRootAclStatus([string]$Path) {
     $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
     $trustedOwners = @("S-1-5-18", "S-1-5-32-544")
     $writeMask = [System.Security.AccessControl.FileSystemRights]::Write -bor `
-      [System.Security.AccessControl.FileSystemRights]::Modify -bor `
+      [System.Security.AccessControl.FileSystemRights]::WriteData -bor `
+      [System.Security.AccessControl.FileSystemRights]::AppendData -bor `
+      [System.Security.AccessControl.FileSystemRights]::WriteExtendedAttributes -bor `
+      [System.Security.AccessControl.FileSystemRights]::WriteAttributes -bor `
+      [System.Security.AccessControl.FileSystemRights]::DeleteSubdirectoriesAndFiles -bor `
       [System.Security.AccessControl.FileSystemRights]::Delete -bor `
       [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor `
-      [System.Security.AccessControl.FileSystemRights]::TakeOwnership
+      [System.Security.AccessControl.FileSystemRights]::TakeOwnership -bor `
+      [System.Security.AccessControl.FileSystemRights]::GenericWrite -bor `
+      [System.Security.AccessControl.FileSystemRights]::GenericAll
     foreach ($rule in $acl.Access) {
       if ($rule.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { continue }
       $sid = ConvertTo-SidValue $rule.IdentityReference
