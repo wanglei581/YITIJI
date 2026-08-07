@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy kiosk to server
+    name: Deploy to server (API + Kiosk)
     runs-on: ubuntu-latest
     # 只在 CI 全部通过后才部署
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
@@ -21,7 +21,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
-          command_timeout: 20m
+          command_timeout: 30m
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
@@ -52,6 +53,28 @@ jobs:
             echo "=== 构建 kiosk 前端 ==="
             pnpm --filter @ai-job-print/kiosk build
 
+            if [ "${API_RELEASE_ENABLED:-}" = "true" ]; then
+              echo "=== 受控发布 API（备份→迁移→构建→PM2→健康）==="
+              DEPLOY_PATH=${{ secrets.DEPLOY_PATH }} \
+              TARGET_SHA="$EXPECTED_SHA" \
+              CI_RUN="$CI_RUN" \
+              API_RELEASE_ENABLED="$API_RELEASE_ENABLED" \
+              DEPLOY_API_DIR="${DEPLOY_API_DIR:-/srv/ai-job-print}" \
+              DEPLOY_PM2_NAME="${DEPLOY_PM2_NAME:-ai-job-print-api}" \
+              bash .github/scripts/deploy-api-release.sh
+            else
+              echo "=== API 发布未启用：校验运行版本与目标一致，防止继续错位 ==="
+              RUNNING_SOURCE="$(sed -n 's/^source=origin\/main@\([0-9a-f]\{40\}\)/\1/p' "${DEPLOY_API_DIR:-/srv/ai-job-print}/DEPLOY_SOURCE.txt" | head -n1)"
+              if [ -z "$RUNNING_SOURCE" ]; then
+                echo "::error::无法读取运行 API 的 DEPLOY_SOURCE；禁止继续发布 Kiosk" >&2
+                exit 1
+              fi
+              if [ "$RUNNING_SOURCE" != "$EXPECTED_SHA" ]; then
+                echo "::error::运行 API 版本 $RUNNING_SOURCE 与目标 $EXPECTED_SHA 不一致；请设置仓库变量 DEPLOY_API_ENABLED=true 后重新触发受控发布" >&2
+                exit 1
+              fi
+            fi
+
             echo "=== 部署到 nginx 目录 ==="
             rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*
             cp -r apps/kiosk/dist/. ${{ secrets.DEPLOY_WEB_ROOT }}/
@@ -60,3 +83,9 @@ jobs:
             nginx -s reload || systemctl reload nginx
 
             echo "✅ 部署完成"
+        env:
+          TARGET_SHA: ${{ github.event.workflow_run.head_sha }}
+          CI_RUN: ${{ github.event.workflow_run.id }}
+          API_RELEASE_ENABLED: ${{ vars.DEPLOY_API_ENABLED }}
+          DEPLOY_API_DIR: ${{ secrets.DEPLOY_API_DIR }}
+          DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
