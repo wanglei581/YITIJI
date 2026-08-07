@@ -1,5 +1,5 @@
 /**
- * 百宝箱首批低风险 AI skill intent 接线防回退验证。
+ * 百宝箱 AI skill intent 接线防回退验证。
  *
  * 运行: pnpm --filter @ai-job-print/api verify:toolbox-ai-skill-intents
  *
@@ -8,6 +8,9 @@
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { plainToInstance } from 'class-transformer'
+import { validateSync } from 'class-validator'
+import { AssistantChatRequestDto } from '../src/ai/dto/assistant-chat.dto'
 
 const repoRoot = join(__dirname, '../../..')
 const sharedAiTypesPath = join(repoRoot, 'packages/shared/src/types/ai.ts')
@@ -24,6 +27,17 @@ const currentProgressPath = join(repoRoot, 'docs/progress/current-progress.md')
 const nextTasksPath = join(repoRoot, 'docs/progress/next-tasks.md')
 
 const firstBatchIntents = ['offer_compare', 'salary_negotiation', 'hr_qa']
+const extendedIntents = [
+  'self_intro_gen',
+  'material_checklist',
+  'jd_analysis',
+  'interview_questions',
+  'career_explore',
+  'cover_letter_gen',
+  'resume_jd_match',
+  'company_research',
+]
+const allSkillIntents = [...firstBatchIntents, ...extendedIntents]
 const forbiddenLaunchCopy = ['一键投递', '立即投递', '平台投递', '候选人推荐给企业', '企业端 Offer 管理']
 
 let failed = 0
@@ -72,7 +86,7 @@ function mustNotContainUnsafeForbiddenCopy(source: string, markers: string[], la
 }
 
 function main(): void {
-  console.log('\n=== 百宝箱首批低风险 AI skill intent 接线门禁 ===')
+  console.log('\n=== 百宝箱 AI skill intent 接线门禁 ===')
 
   const sharedAiTypes = mustExist(sharedAiTypesPath, '共享 AI 类型存在')
   const apiAiInterface = mustExist(apiAiInterfacePath, 'API AI provider 接口存在')
@@ -87,9 +101,22 @@ function main(): void {
   const currentProgress = mustExist(currentProgressPath, 'current-progress 存在')
   const nextTasks = mustExist(nextTasksPath, 'next-tasks 存在')
 
-  mustContain(sharedAiTypes, [...firstBatchIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], '共享类型包含首批 AI skill 和请求字段')
-  mustContain(apiAiInterface, [...firstBatchIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], 'API provider 接口镜像包含首批 AI skill 和请求字段')
-  mustContain(assistantDto, [...firstBatchIntents, '@IsIn(ASSISTANT_SKILLS)', 'skill?:'], 'DTO 对 skill 做白名单校验')
+  mustContain(sharedAiTypes, [...allSkillIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], '共享类型包含全部 AI skill 和请求字段')
+  mustContain(apiAiInterface, [...allSkillIntents, 'export type AssistantSkill', 'skill?: AssistantSkill'], 'API provider 接口镜像包含全部 AI skill 和请求字段')
+  mustContain(assistantDto, [...allSkillIntents, '@IsIn(ASSISTANT_SKILLS)', 'skill?:'], 'DTO 对 skill 做白名单校验（全部 11 项）')
+
+  const rejectedSkills = allSkillIntents.filter((skill) => (
+    validateSync(plainToInstance(AssistantChatRequestDto, { message: '测试', skill })).length > 0
+  ))
+  if (rejectedSkills.length > 0) fail(`DTO 运行时接受全部合法 skill — 被拒绝: ${rejectedSkills.join(' | ')}`)
+  else pass('DTO 运行时接受全部合法 skill')
+
+  const invalidSkillErrors = validateSync(plainToInstance(AssistantChatRequestDto, {
+    message: '测试',
+    skill: 'unknown_skill',
+  }))
+  if (invalidSkillErrors.some((error) => error.property === 'skill')) pass('DTO 运行时拒绝未知 skill')
+  else fail('DTO 运行时拒绝未知 skill — 非法 skill 未触发校验错误')
 
   mustContain(kioskAssistant, [
     'useSearchParams',
@@ -97,28 +124,36 @@ function main(): void {
     'normalizeToolboxSkill',
     'skill: toolboxSkill',
     'source: \'toolbox_ai_skill\'',
-    ...firstBatchIntents,
+    ...allSkillIntents,
     '不构成录用、入职或法律意见',
     '不构成涨薪或录用承诺',
     '不构成正式法律意见或官方政策承诺',
-  ], 'Kiosk 助手页读取 URL intent、展示场景文案并透传请求')
+  ], 'Kiosk 助手页读取全部 URL intent、展示场景文案并透传请求')
 
   mustContain(llmChat, [
     'SKILL_SCOPED_PROMPTS',
     'buildSkillScopedSystemPrompt',
     'skill ? SKILL_ACTIONS[skill] : INTENT_ROUTES[intent]',
-    ...firstBatchIntents,
+    ...allSkillIntents,
     '不得承诺录用结果',
     '不得承诺涨薪成功',
     '不得对具体争议给出确定法律结论',
-  ], 'LLM 服务优先使用入口 intent 并注入场景合规 prompt')
+    '不得编造用户未提供的学历、经历、成果、数据、证书或技能',
+    '不得虚构招聘方未公开的筛选规则、面试题或录用标准',
+    '不得输出确定的录用概率、适配结论或招聘方内部评分',
+    '不得虚构企业内部流程、面试风格、薪酬、题库或招聘结论',
+  ], 'LLM 服务为全部 intent 注入场景合规 prompt 和白名单动作')
 
   mustContain(`${apiMockProvider}\n${kioskMockAdapter}`, [
-    ...firstBatchIntents,
+    ...allSkillIntents,
     '仅供个人参考',
     '不承诺涨薪或录用结果',
     '官方人社窗口',
-  ], '前后端 mock 模式具备场景化演示回复')
+    '不代表招聘方评价标准',
+    '不构成职业、心理或医疗建议',
+    '不保证录用结果',
+    '不构成企业官方说明',
+  ], '前后端 mock 模式具备全部 skill 的场景化演示回复')
 
   mustContain(toolboxTypes, [
     'offer-compare',
@@ -158,7 +193,7 @@ function main(): void {
     process.exit(1)
   }
 
-  console.log('✅ ALL PASS — 百宝箱首批低风险 AI skill intent 接线门禁一致\n')
+  console.log('✅ ALL PASS — 百宝箱全部 AI skill intent 接线一致\n')
 }
 
 main()

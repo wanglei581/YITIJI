@@ -123,7 +123,7 @@ expectCssContract('src/pages/resume/resume-library-lightflow.css', [
 ])
 
 for (const [sourceCode, marker, label] of [
-  [source, 'useBusyLock(uploading || phoneBusy)', 'source keeps upload busy lock'],
+  [source, 'useBusyLock(uploading || phoneBusy || usbBusy)', 'source keeps upload busy lock'],
   [source, 'UploadSessionQrPanel', 'source keeps phone upload session'],
   [parse, 'submitResumeParse(', 'parse keeps real resume parse request'],
   [parse, 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'parse keeps minimal session only'],
