@@ -22,7 +22,7 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 30m
-          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,VITE_API_MODE,VITE_API_BASE_URL
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
@@ -53,9 +53,11 @@ jobs:
             echo "=== 构建 kiosk 前端 ==="
             pnpm --filter @ai-job-print/kiosk build
 
-            echo "=== 构建 admin / partner 前端 ==="
-            pnpm --filter @ai-job-print/admin build
-            pnpm --filter @ai-job-print/partner build
+            echo "=== 构建 admin 前端 ==="
+            VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build
+
+            echo "=== 构建 partner 前端 ==="
+            VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/partner build
 
             if [ "${API_RELEASE_ENABLED:-}" = "true" ]; then
               echo "=== 受控发布 API（备份→迁移→构建→PM2→健康）==="
@@ -83,6 +85,24 @@ jobs:
             rm -rf ${{ secrets.DEPLOY_WEB_ROOT }}/*
             cp -r apps/kiosk/dist/. ${{ secrets.DEPLOY_WEB_ROOT }}/
 
+            echo "=== 部署 admin 到 nginx 目录（未配置 DEPLOY_ADMIN_WEB_ROOT 时跳过）==="
+            if [ -n "${DEPLOY_ADMIN_WEB_ROOT:-}" ]; then
+              rm -rf "$DEPLOY_ADMIN_WEB_ROOT"/*
+              cp -r apps/admin/dist/. "$DEPLOY_ADMIN_WEB_ROOT"/
+              echo "admin dist 已同步到 $DEPLOY_ADMIN_WEB_ROOT"
+            else
+              echo "DEPLOY_ADMIN_WEB_ROOT 未配置，跳过 admin 前端发布（线上保持现状）"
+            fi
+
+            echo "=== 部署 partner 到 nginx 目录（未配置 DEPLOY_PARTNER_WEB_ROOT 时跳过）==="
+            if [ -n "${DEPLOY_PARTNER_WEB_ROOT:-}" ]; then
+              rm -rf "$DEPLOY_PARTNER_WEB_ROOT"/*
+              cp -r apps/partner/dist/. "$DEPLOY_PARTNER_WEB_ROOT"/
+              echo "partner dist 已同步到 $DEPLOY_PARTNER_WEB_ROOT"
+            else
+              echo "DEPLOY_PARTNER_WEB_ROOT 未配置，跳过 partner 前端发布（线上保持现状）"
+            fi
+
             echo "=== 重载 nginx ==="
             nginx -s reload || systemctl reload nginx
 
@@ -93,5 +113,5 @@ jobs:
           API_RELEASE_ENABLED: ${{ vars.DEPLOY_API_ENABLED }}
           DEPLOY_API_DIR: ${{ secrets.DEPLOY_API_DIR }}
           DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
-          VITE_API_MODE: http
-          VITE_API_BASE_URL: /api/v1
+          DEPLOY_ADMIN_WEB_ROOT: ${{ secrets.DEPLOY_ADMIN_WEB_ROOT }}
+          DEPLOY_PARTNER_WEB_ROOT: ${{ secrets.DEPLOY_PARTNER_WEB_ROOT }}
