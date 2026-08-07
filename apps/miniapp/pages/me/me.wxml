@@ -5,10 +5,19 @@
     <text class="tab-title">{{title}}</text>
   </view>
   <view class="tab-body">
-    <view class="empty-card">
-      <view class="empty-icon"><view class="ficon i-user"></view></view>
-      <text class="empty-title">登录与本人数据即将开放</text>
-      <text class="empty-copy">{{copy}}</text>
+    <view class="me-card">
+      <block wx:if="{{isLoggedIn}}">
+        <view class="me-avatar"><view class="ficon i-user"></view></view>
+        <text class="me-name">{{userName}}</text>
+        <text class="me-hint">已登录 · 本人数据将在 M0.4 起接入</text>
+        <button class="me-logout tap" hover-class="tap-press" bindtap="logout">退出登录</button>
+      </block>
+      <block wx:else>
+        <view class="me-avatar"><view class="ficon i-user"></view></view>
+        <text class="me-name">未登录</text>
+        <text class="me-hint">{{copy}}</text>
+        <button class="me-login tap" hover-class="tap-press" bindtap="goLogin">登录 / 注册</button>
+      </block>
     </view>
   </view>
 </view>

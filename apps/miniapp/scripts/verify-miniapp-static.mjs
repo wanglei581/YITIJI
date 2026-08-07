@@ -77,6 +77,7 @@ if (appJson) {
 
 const wxmlFiles = files.filter((f) => f.endsWith('.wxml'))
 const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
+const PAGE_PATHS = appJson ? (appJson.pages || []) : []
 
 for (const f of wxmlFiles) {
   const src = read(f)
@@ -93,6 +94,31 @@ for (const f of wxmlFiles) {
   if (hit.length) bad('合规文案', `${f}: ${hit.join(',')}`)
 }
 if (!fails.some((x) => x.startsWith('合规文案'))) ok('合规文案无违规词')
+
+// M0.2 登录门禁
+const loginWxml = read('pages/login/login.wxml')
+const loginJs = read('pages/login/login.js')
+const apiJs = read('utils/api.js')
+const meWxml = read('pages/me/me.wxml')
+const loginPageOk = PAGE_PATHS.includes('pages/login/login') &&
+  PAGE_PATHS.includes('pages/terms/terms') &&
+  PAGE_PATHS.includes('pages/privacy/privacy')
+if (loginPageOk) ok('登录/协议/隐私页已注册')
+else bad('登录/协议/隐私页已注册', 'app.json 缺少页面')
+if (loginWxml.includes('open-type="getPhoneNumber"') && loginWxml.includes('短信验证码')) ok('登录页含微信一键登录与短信降级')
+else bad('登录页含微信一键登录与短信降级', '缺少 open-type 或短信入口')
+if (loginWxml.includes('我已阅读并同意') && loginWxml.includes('《服务协议》') && loginWxml.includes('《隐私政策》')) ok('登录页含协议勾选')
+else bad('登录页含协议勾选', '缺少同意文案')
+if (
+  apiJs.includes('wx.login') &&
+  loginJs.includes('api.loginByPhone') &&
+  !/appSecret\s*[:=]/.test(loginJs) &&
+  !/session_key\s*[:=]/.test(loginJs) &&
+  !/appSecret\s*[:=]/.test(apiJs)
+) ok('登录实现无密钥残留')
+else bad('登录实现无密钥残留', '检查 api.js 的 wx.login 与敏感字段')
+if (meWxml.includes('登录 / 注册') && meWxml.includes('退出登录')) ok('我的页含登录/退出入口')
+else bad('我的页含登录/退出入口', '缺少按钮')
 
 const secretPatterns = [/sk-[A-Za-z0-9]{12,}/, /AKID[A-Za-z0-9]{10,}/, /AI_LLM_API_KEY\s*[:=]/, /DATABASE_URL\s*[:=]/]
 const textFiles = files.filter((f) => !f.endsWith('.json') || f.endsWith('app.json'))

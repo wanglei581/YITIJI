@@ -4,7 +4,7 @@
 
   <view class="page-hd">
     <view class="greet-col">
-      <text class="greet-main">{{greetWord}}，同学</text>
+      <text class="greet-main">{{greetWord}}，{{userName}}</text>
       <text class="greet-date">{{todayStr}}</text>
     </view>
     <view class="head-tools">

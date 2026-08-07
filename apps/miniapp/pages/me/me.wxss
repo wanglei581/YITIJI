@@ -1,4 +1,4 @@
-/* 我的占位页（M0.1 壳） */
+/* 我的页（M0.2 登录态） */
 .tab-page {
   min-height: 100vh;
   background: #f4f1e8;
@@ -15,16 +15,16 @@
 .tab-body {
   padding: 24rpx 32rpx;
 }
-.empty-card {
+.me-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 96rpx 48rpx;
+  padding: 72rpx 48rpx;
   background: #fffdf8;
   border: 1rpx solid #e2dccb;
   border-radius: 24rpx;
 }
-.empty-icon {
+.me-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -33,21 +33,49 @@
   border-radius: 50%;
   background: #f6e7dd;
 }
-.empty-icon .ficon {
+.me-avatar .ficon {
   width: 52rpx;
   height: 52rpx;
   color: #b8683c;
 }
-.empty-title {
+.me-name {
   margin-top: 32rpx;
   font-size: 32rpx;
   font-weight: 600;
   color: #274b43;
 }
-.empty-copy {
+.me-hint {
   margin-top: 16rpx;
   font-size: 26rpx;
   line-height: 1.7;
   color: #5d6b63;
   text-align: center;
+}
+.me-login {
+  margin-top: 48rpx;
+  width: 320rpx;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  background: #1f9e86;
+  color: #fffdf8;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+.me-login::after {
+  border: none;
+}
+.me-logout {
+  margin-top: 48rpx;
+  width: 320rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 40rpx;
+  background: #fffdf8;
+  color: #9a5530;
+  font-size: 28rpx;
+  border: 1rpx solid #e2dccb;
+}
+.me-logout::after {
+  border: none;
 }

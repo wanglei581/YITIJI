@@ -1,5 +1,6 @@
 // pages/home/home.js
 const app = getApp()
+const auth = require('../../utils/auth')
 
 // M0.1 壳阶段：首页入口只映射到四个 Tab；未上线功能统一提示，不伪造页面。
 const TAB_PATHS = ['/pages/home/home', '/pages/ai/ai', '/pages/jobs/jobs', '/pages/me/me']
@@ -25,6 +26,7 @@ Page({
     statusBarHeight: 20,
     greetWord: '你好',
     todayStr: '',
+    userName: '同学',
     preparationTools: [
       { title: '生成简历', icon: 'edit', tab: '/pages/ai/ai' },
       { title: '模拟面试', icon: 'comment', tab: '/pages/ai/ai' },
@@ -58,6 +60,8 @@ Page({
     if (typeof this.getTabBar === 'function' && this.getTabBar()) {
       this.getTabBar().setData({ selected: 0 })
     }
+    const user = auth.isLoggedIn() ? auth.getUser() : null
+    this.setData({ userName: (user && (user.nickname || user.name || user.phone)) || '同学' })
   },
 
   tapService(e) {
