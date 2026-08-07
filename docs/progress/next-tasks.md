@@ -1,10 +1,10 @@
 # 下一步任务
 
-> 最后更新：2026-08-06
+> 最后更新：2026-08-07
 
 ## 当前执行：生产混合版本故障恢复
 
-- [~] **推送并冻结 PR #511 精确性加固，再恢复首管理员 PR #510**：`a1504ad0` 的 run `31105830591` 已三项全绿；其上的本地加固补齐 11 项 AI skill 运行时/合规门禁，并用真实 PDF fixture 与有效 loopback 代理目标替代 W2 全局 script `ERR_ABORTED` 忽略。本地 AI 两套门禁、打印扫描诚实性、W4 冻结范围、W2 29/29、privacy 18/18、全仓 typecheck 与 CI 等价 build 已通过。下一步推送现有 PR #511 并等待新的 `build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness` 三项全绿；不得沿用上一提交绿灯。获得用户明确授权合入 `main` 后，#510 才同步主干并重跑首管理员真并发 PG CI；合并不授权 bootstrap、部署或生产发布。
+- [~] **先修复 `main` 新发布的 `js-yaml` 高危公告，再恢复首管理员 PR #510**：PR #511 已由用户合入 `main@200786a7`；main run `31140950843` 因 2026-08-06 新发布的 `GHSA-5p4m-2wfm-xmqj` 在依赖安全门禁失败，原生产路径为 `apps/kiosk -> react-diff-viewer-continued -> js-yaml@4.3.0`。独立分支 `codex/fix-js-yaml-advisory-20260807` 已最小升级到首个修复版本 `4.3.1`，并补 override 防回退断言；本地 frozen install、生产路径确认、正常 YAML 行为、完整/生产 audit 门禁、全仓 9 workspace typecheck 与 CI 等价生产构建均已通过。下一步提交并推送独立 PR，等待 `build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness` 三项全绿；新 PR 未获用户明确授权不得合入。#510 在 `main` 恢复全绿前继续暂停；本任务不授权 bootstrap、部署或生产发布。
 - [ ] **确认真实 API 发布入口与环境隔离**：现有 `.github/workflows/deploy.yml` 只构建/复制 Kiosk 静态文件，不会构建、发布或重启 API；`120.48.13.190` 同时承载 `zyidai.cn`，预生产/生产隔离尚未证明。未明确独立预生产、后端 release/回滚流程和具名发布授权前，不得用该工作流声称 JD 拆解后端已上线，也不得连接、覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。

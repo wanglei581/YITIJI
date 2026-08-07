@@ -30,6 +30,7 @@ const REQUIRED_BRACE_OVERRIDES = {
   'brace-expansion@2.1.1': '2.1.4',
   'brace-expansion@5.0.6': '5.0.9',
 }
+const REQUIRED_JS_YAML_VERSION = '4.3.1'
 const REQUIRED_PNPM_VERSION = '11.2.2'
 
 function readJson(filePath) {
@@ -112,6 +113,11 @@ function assertPnpmToolchain() {
 function assertSecurityOverrides() {
   const workspace = fs.readFileSync(path.join(root, 'pnpm-workspace.yaml'), 'utf8')
   const workspaceMap = workspaceMapping(workspace, 'overrides')
+  assert.equal(
+    workspaceMap['js-yaml'],
+    REQUIRED_JS_YAML_VERSION,
+    `js-yaml must remain pinned to the first version patched for GHSA-5p4m-2wfm-xmqj (${REQUIRED_JS_YAML_VERSION})`
+  )
   assert.equal(
     workspaceMap['brace-expansion'],
     undefined,
@@ -433,10 +439,14 @@ function assertAuditAcceptable(label, auditJson) {
 console.log('\n=== verify dependency security ===')
 assertPnpmToolchain()
 assertSecurityOverrides()
-console.log(`OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; workspace security overrides verified`)
+console.log(
+  `OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; js-yaml ${REQUIRED_JS_YAML_VERSION} and workspace security overrides verified`
+)
 assertBracePatchesDeclared()
 assertBracePatchesEffective()
-console.log('OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)')
+console.log(
+  'OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)'
+)
 assertSpaArchitectureGuard()
 console.log('OK: Admin/Kiosk/Partner remain Vite SPA + createBrowserRouter Data Mode')
 
