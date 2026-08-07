@@ -56,7 +56,7 @@ assert.match(installer, /\$apiOrigin\s*=\s*\(\[System\.Uri\]\$apiBase\)\.GetLeft
 assert.match(installer, /\[Alias\("KioskOrigins"\)\][\s\S]{0,80}?\[string\[\]\]\$LocalApiAllowedOrigins/, 'installer must expose one canonical origins parameter with the legacy KioskOrigins alias')
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\][\s\S]{0,80}?\[switch\]\$ReplaceLocalApiAllowedOrigins/, 'installer must expose one canonical replacement switch with the legacy alias')
 assert.match(installer, /ConvertTo-CanonicalOrigin/, 'installer must validate every local API origin')
-assert.match(installer, /localApiAllowedOrigins\s*=\s*@\(\$localApiAllowedOrigins\)/, 'installer must persist the production Kiosk origins')
+assert.match(installer, /localApiAllowedOrigins\s*=\s*@\(\$effectiveLocalApiAllowedOrigins\)/, 'installer must persist the production Kiosk origins')
 assert.match(installer, /Get-PreservedLocalSettings/, 'installer upgrades must inspect existing local-only settings')
 assert.match(installer, /@\("scanWatchFolder", "localApiBridgeToken"\)/, 'installer upgrades must preserve scan and local bridge settings')
 assert.match(

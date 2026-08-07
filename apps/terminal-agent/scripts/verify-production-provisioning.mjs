@@ -39,7 +39,7 @@ assert.match(installer, /Read-Host "Local bridge token" -AsSecureString/)
 assert.match(installer, /ZeroFreeBSTR/, 'secure prompt buffers must be zeroed after conversion')
 assert.match(installer, /Use exactly one of -PromptForBindCode, -BindCode, or -BindCodeSecure/)
 assert.match(installer, /Use either a BindCode flow or -UseExistingToken, not both/)
-assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.2-production"/)
+assert.match(installer, /\[string\]\$AgentVersion = "0\.3\.3-production"/)
 assert.match(installer, /\$effectiveBindCode = \$null/)
 assert.match(installer, /\[Alias\("KioskOrigins"\)\]/)
 assert.match(installer, /\[Alias\("ReplaceKioskOrigins"\)\]/)
@@ -78,8 +78,19 @@ assert.doesNotMatch(
   'BindCode exchange errors must not expose an API response that could echo the secret',
 )
 assert.equal(agentConfigExample.apiBaseUrl, 'https://api.example.com/api/v1')
-assert.equal(agentConfigExample.agentVersion, '0.3.2')
-assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$localApiAllowedOrigins\)/)
+assert.equal(agentConfigExample.agentVersion, '0.3.3')
+assert.match(
+  installer,
+  /\$effectiveLocalApiAllowedOrigins\s*=\s*New-Object "System\.Collections\.Generic\.List\[string\]"/,
+  'origin accumulator must not reuse the case-insensitive typed LocalApiAllowedOrigins parameter name',
+)
+assert.match(installer, /\$effectiveLocalApiAllowedOrigins\.Add\(\$canonicalOrigin\)/)
+assert.match(installer, /localApiAllowedOrigins\s+=\s+@\(\$effectiveLocalApiAllowedOrigins\)/)
+assert.doesNotMatch(
+  installer,
+  /\$localApiAllowedOrigins\s*=\s*New-Object/i,
+  'PowerShell variables are case-insensitive; assigning a List to the typed array parameter recreates the fixed-size collection bug',
+)
 assert.match(installer, /config\.scanWatchFolder = \$effectiveScanWatchFolder/)
 assert.match(installer, /config\.localApiBridgeToken = \$effectiveBridgeToken/)
 assert.doesNotMatch(installer, /ReadAllText\(\$configPath\)/, 'existing config must only be read through the ACL-checked preservation path')

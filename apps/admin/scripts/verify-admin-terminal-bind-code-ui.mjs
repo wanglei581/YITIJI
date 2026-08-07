@@ -93,8 +93,8 @@ if (
 if (
   dialog.includes('AI求职打印终端配置') &&
   dialog.includes('开始菜单') &&
-  dialog.includes('0.3.2 或更高版本') &&
-  dialog.includes('已安装 0.3.1') &&
+  dialog.includes('0.3.3 或更高版本') &&
+  dialog.includes('已安装 0.3.2') &&
   dialog.includes('请勿把绑定码写入命令行') &&
   !dialog.includes('install-production-agent.ps1') &&
   !dialog.includes('-BindCode') &&

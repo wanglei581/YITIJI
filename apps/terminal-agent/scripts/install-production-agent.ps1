@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.2-production",
+  [string]$AgentVersion = "0.3.3-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -764,7 +764,7 @@ $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `
   -ProgramDataDir $programDataDir `
   -SkipOrigins ([bool]$ReplaceLocalApiAllowedOrigins)
-$localApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
+$effectiveLocalApiAllowedOrigins = New-Object "System.Collections.Generic.List[string]"
 $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocalSettings.Contains("localApiAllowedOrigins")) {
   @($preservedLocalSettings["localApiAllowedOrigins"])
 } else {
@@ -772,7 +772,9 @@ $preservedOrigins = if (-not $ReplaceLocalApiAllowedOrigins -and $preservedLocal
 }
 foreach ($origin in @($apiOrigin) + @($LocalApiAllowedOrigins) + $preservedOrigins + @("http://localhost:5173", "http://127.0.0.1:5173")) {
   $canonicalOrigin = ConvertTo-CanonicalOrigin $origin
-  if (-not $localApiAllowedOrigins.Contains($canonicalOrigin)) { $localApiAllowedOrigins.Add($canonicalOrigin) }
+  if (-not $effectiveLocalApiAllowedOrigins.Contains($canonicalOrigin)) {
+    [void]$effectiveLocalApiAllowedOrigins.Add($canonicalOrigin)
+  }
 }
 
 Write-Step "Production Agent hardening"
@@ -878,7 +880,7 @@ $config = [ordered]@{
   heartbeatIntervalMs    = $HeartbeatIntervalMs
   claimIntervalMs        = $ClaimIntervalMs
   localApiPort           = $effectiveLocalApiPort
-  localApiAllowedOrigins = @($localApiAllowedOrigins)
+  localApiAllowedOrigins = @($effectiveLocalApiAllowedOrigins)
 }
 if ($null -ne $effectiveScanWatchFolder) {
   $config.scanWatchFolder = $effectiveScanWatchFolder

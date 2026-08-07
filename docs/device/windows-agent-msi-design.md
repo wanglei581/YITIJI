@@ -147,3 +147,9 @@ API 地址在 GUI 连接测试、GUI 激活和底层 production Provisioning 脚
 CI 从固定基线提交构建 `0.3.1` EXE，验证升级到 `0.3.2` 后 ProgramData 状态、GUI 和开始菜单保留、未激活服务继续 Manual/Stopped，再验证 Repair。MSI Repair / Major Upgrade 会按设计重装 Manual/Stopped 服务，不承诺保留已激活服务的 Automatic/Running 状态，也不增加持有凭据的自定义动作。若升级或修复后显示“服务已停止”，操作者应从开始菜单打开「AI求职打印终端配置」，勾选复用已保存凭据并重新激活；成功条件仍是服务恢复 Automatic/Running 且云端出现本次启动后的新心跳。该自动化不持有生产 BindCode，无法证明 UAC 点击、DPAPI 真实复用、Automatic/Running 或物理打印扫描；这些仍属于隔离 Windows 真机门禁。
 
 Windows Actions run [`31090012573`](https://github.com/wanglei581/YITIJI/actions/runs/31090012573) 已在 `windows-2022` 对提交 `0aa8dbca` 全绿：固定 `ff638a0d` 的可构建 `0.3.1` EXE 成功升级到 `0.3.2`，输出 `EXE_UPGRADE_PASS`；随后输出 `EXE_LIFECYCLE_PASS` 和 `MSI_LIFECYCLE_PASS`，两条 lifecycle 均确认 Provisioner、开始菜单快捷方式、PowerShell 5.1 SelfTest、删除后 Repair 恢复和 ProgramData 保留。EXE repair 的 MSI 日志记录 `REINSTALLMODE=cmuse` 与 `ShortcutCreate`；独立 MSI `/fcmuse` repair 被 Windows Installer 规范化为 `REINSTALLMODE=ecmus`，同样执行 `ShortcutCreate` 并成功结束。产物 `AIJobPrintTerminalSetup.exe` 为 45,304,991 bytes，SHA-256 `05F77AE1CA8EBEAE33EAB19EDD66C65C1976CB3C93B001C426A62B1DFE3D54CD`。该文件仍未签名，CI 全绿不替代真实 BindCode、UAC、DPAPI、Automatic/Running、新心跳和奔图打印扫描验收。
+
+### 10.1 `0.3.3` 现场激活修复（2026-08-07）
+
+`0.3.2` 在 Windows 真机首次激活时发现 PowerShell 变量名大小写不敏感导致的阻塞缺陷：数组参数 `$LocalApiAllowedOrigins` 与列表累加器 `$localApiAllowedOrigins` 实际指向同一变量，泛型 List 被参数类型约束重新转换为固定大小数组，首次 `.Add()` 即失败。该失败发生在 BindCode 兑换 HTTP 请求之前，因此失败尝试不消费一次性码，也不修改终端凭据。
+
+`0.3.3` 仅把内部累加器改为 `$effectiveLocalApiAllowedOrigins`，不改变 GUI、参数名、Origin 合并顺序或持久化配置结构；并增加 Windows PowerShell 5.1 运行探针与静态防重名断言。安装器固定升级基线改为已验证的 `0.3.2@0aa8dbca`，必须证明 `0.3.2 → 0.3.3` 覆盖安装继续保留 ProgramData、Provisioner 和开始菜单入口。新版 Windows CI 及真机激活证据补齐前，`0.3.2` 仅保留历史生命周期证据，不再作为可首次激活候选。
