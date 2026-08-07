@@ -408,14 +408,23 @@ function ConvertTo-SidValue([object]$IdentityReference) {
     return [string]$IdentityReference.Value
   }
 
-  $account = if ($IdentityReference -is [System.Security.Principal.NTAccount]) {
-    $IdentityReference
-  } else {
-    New-Object System.Security.Principal.NTAccount([string]$IdentityReference)
+  $rawValue = [string]$IdentityReference
+  if ($rawValue -match '^S-\d-(?:\d+-)+\d+$') {
+    return $rawValue
   }
-  return [string]$account.Translate(
-    [System.Security.Principal.SecurityIdentifier]
-  ).Value
+
+  try {
+    $account = if ($IdentityReference -is [System.Security.Principal.NTAccount]) {
+      $IdentityReference
+    } else {
+      New-Object System.Security.Principal.NTAccount($rawValue)
+    }
+    return [string]$account.Translate(
+      [System.Security.Principal.SecurityIdentifier]
+    ).Value
+  } catch {
+    return $rawValue
+  }
 }
 
 function Test-TrustedRuntimeOwner([string]$OwnerSid) {

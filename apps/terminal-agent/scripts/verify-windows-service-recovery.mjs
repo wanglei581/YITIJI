@@ -209,6 +209,7 @@ assert.match(runtimeVerifier, /TakeOwnership/, 'runtime verifier must reject WRI
 assert.match(runtimeVerifier, /GenericWrite/, 'runtime verifier must reject GENERIC_WRITE-like rights')
 assert.doesNotMatch(runtimeVerifier, /FileSystemRights\]::Modify/, 'read-only ACEs share bits with Modify; runtime verifier must use write-specific bits')
 assert.match(runtimeVerifier, /Test-TrustedRuntimeOwner/, 'runtime verifier must recognize trusted owners')
+assert.match(installer, /\^S-\\d-/, 'runtime verifier must accept raw SID strings without account translation')
 assert.match(runtimeVerifier, /S-1-3-0/, 'runtime verifier must tolerate inherited CREATOR OWNER full control under Program Files')
 assert.match(runtimeVerifier, /S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464/, 'runtime verifier must tolerate inherited TrustedInstaller full control under Program Files')
 assert.match(installer, /Get-NodeModuleRoots/, 'installer must discover Node dependency roots')
