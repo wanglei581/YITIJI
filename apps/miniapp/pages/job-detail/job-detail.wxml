@@ -1,0 +1,88 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">岗位详情</view>
+    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
+  </view>
+
+  <view class="content has-bar">
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="detail-state">加载中…</view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError}}" class="detail-state">
+      <view class="ds-msg">{{loadError}}</view>
+      <view class="state-retry tap" bindtap="reload">重新加载</view>
+      <view class="btn ghost tap ds-back" bindtap="goBack">返回</view>
+    </view>
+
+    <!-- 详情内容 -->
+    <block wx:else>
+    <!-- 岗位头部 -->
+    <view class="job-header rise-d1">
+      <view class="jh-title">{{job.title}}</view>
+      <view class="jh-salary">{{job.salary}}</view>
+      <view class="jh-company">{{job.company}}</view>
+      <view class="jh-tags">
+        <view class="chip" wx:for="{{job.tags}}" wx:key="*this">{{item}}</view>
+      </view>
+    </view>
+
+    <!-- 来源信息 -->
+    <view class="info-card rise-d2">
+      <view class="ic-title">来源信息</view>
+      <view class="ic-row"><text class="ic-k">来源机构</text><text class="ic-v">{{job.sourceOrg}}</text></view>
+      <view class="ic-row"><text class="ic-k">外部 ID</text><text class="ic-v mono">{{job.externalId}}</text></view>
+      <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{job.syncTime}}</text></view>
+      <view class="ic-note">数据来自第三方平台公开信息，不代表职位仍在招聘。</view>
+    </view>
+
+    <!-- AI 匹配参考入口 -->
+    <view class="ai-entry tap sheen rise-d2" bindtap="tapAiMatch">
+      <view class="ae-left">
+        <text class="ficon i-thunder ae-ic"></text>
+        <view class="ae-body">
+          <view class="ae-title">AI 匹配参考<block wx:if="{{job.matchText}}"> · {{job.matchText}}</block></view>
+          <view class="ae-sub">查看与你简历的匹配分析与优化建议</view>
+        </view>
+      </view>
+      <text class="ficon i-right ae-arr"></text>
+    </view>
+
+    <!-- 工作职责 -->
+    <view class="section-t rise-d3">工作职责</view>
+    <view class="duty-list rise-d3">
+      <view class="duty-item" wx:for="{{job.duties}}" wx:key="*this">
+        <view class="duty-dot"></view>
+        <text class="duty-text">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 任职要求 -->
+    <view class="section-t rise-d4">任职要求</view>
+    <view class="duty-list rise-d4">
+      <view class="duty-item" wx:for="{{job.requirements}}" wx:key="*this">
+        <view class="duty-dot"></view>
+        <text class="duty-text">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 合规提示 -->
+    <view class="notice info rise-d5">
+      <text class="ficon i-info n-ic"></text>
+      <text>岗位信息来自第三方来源，仅供参考，请到来源平台确认投递方式。本终端不提供平台内投递服务。</text>
+    </view>
+
+    </block>
+
+  </view>
+
+  <view class="actionbar">
+    <view class="btn ghost tap" bindtap="tapScanApply">扫码投递</view>
+    <view class="btn primary tap flex-1-6" bindtap="tapExternalApply">去来源平台投递</view>
+  </view>
+
+</view>
