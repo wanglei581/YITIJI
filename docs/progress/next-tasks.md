@@ -1,17 +1,18 @@
 # 下一步任务
 
-> 最后更新：2026-08-06
+> 最后更新：2026-08-07
 
 ## 当前执行：生产混合版本故障恢复
 
 - [x] **PR #511 主干 CI 回归修复已合入**：用户明确授权后，PR #511 已以 merge commit `200786a7` 合入 `main`；head `94e06944` 的 run `31107530315` 中 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。未部署，也未执行 bootstrap 或生产发布。
+- [x] **`js-yaml` 高危公告已由 PR #514 修复**：并行流程已把 `js-yaml@4.3.1` 与唯一实例/标准 YAML 运行时防回退门禁合入 `main@e7493dcd`，main run `31142486608` 三项全绿；重复 PR #513 已关闭。随后自动启动的 deploy run `31143067183` 因无部署授权被取消，日志证明仅完成服务器代码目录 `git pull` 并在依赖安装期间终止，未执行 Kiosk build、Nginx 静态目录替换或 reload；服务器代码目录与依赖状态仍须后续具名生产授权下检查，不能把本次记录写成“生产完全未触碰”。
 - [ ] **确认真实 API 发布入口与环境隔离**：现有 `.github/workflows/deploy.yml` 只构建/复制 Kiosk 静态文件，不会构建、发布或重启 API；`120.48.13.190` 同时承载 `zyidai.cn`，预生产/生产隔离尚未证明。未明确独立预生产、后端 release/回滚流程和具名发布授权前，不得用该工作流声称 JD 拆解后端已上线，也不得连接、覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
 - [x] **部署后验收**：DP-GATE after、migration、health、PM2/nginx、鉴权路由、微信登录正式路由、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环均通过；`PolicyPost=0` 按真实空数据保留，禁止用 seed 或演示数据填充。后续仅保留 root 密码轮换/key-only SSH 与磁盘容量观察两项运维收尾。
 - [x] **生产 demo seed fail-closed**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已合入 `main@56939ace`；四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行。代码与三项 CI 已通过，但未随上述 `main@42913050` 恢复包部署，禁止把“已合入”写成“已上线”。
-- [~] **全新生产空库首个管理员 bootstrap 候选**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 的实现提交为 `89691724`，main-base head `1e50c789` 的 run `31095673853` 曾三项 CI 全绿，Claude 冻结 SHA 缩小范围终审明确 `APPROVE`。最新 `origin/main@200786a7` 已无代码冲突合入专用 worktree；Node `v22.23.1` 下首管理员 15/15、demo seed guard 15/15、API lint/typecheck/build、Admin typecheck/build 通过。下一步推送 #510，等待 `postgres-readiness` 在隔离 PostgreSQL 16 上完成真并发门禁，并等待 `build-and-verify` / `kiosk-browser-smoke` 全绿与 mergeability 复核。未部署、未连接生产；即使后续合并，也不授权自动执行 bootstrap。
+- [~] **全新生产空库首个管理员 bootstrap 候选**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 的实现提交为 `89691724`，Claude 冻结 SHA 缩小范围终审明确 `APPROVE`。上一轮 run `31141461744` 的隔离 PostgreSQL 16 首管理员真并发门禁和 `kiosk-browser-smoke` 已通过，`build-and-verify` 唯一失败是现已由 #514 修复的 `js-yaml` 公告。最新 `origin/main@e7493dcd` 已无业务代码冲突合入专用 worktree；下一步在 Node `v22.23.1` 下复跑最小门禁、推送 #510，并等待新的 `build-and-verify` / `kiosk-browser-smoke` / `postgres-readiness` 全绿与 mergeability 复核。未执行 bootstrap；即使后续合并，也不授权自动执行 bootstrap 或生产部署。
 
 ## 上线门禁：文件预览与操作流程现场验收
 

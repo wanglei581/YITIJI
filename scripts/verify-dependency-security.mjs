@@ -31,6 +31,7 @@ const REQUIRED_BRACE_OVERRIDES = {
   'brace-expansion@5.0.6': '5.0.9',
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
+const REQUIRED_JS_YAML_VERSION = '4.3.1'
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -124,6 +125,11 @@ function assertSecurityOverrides() {
       `missing required brace-expansion override: ${selector} -> ${version}`
     )
   }
+  assert.equal(
+    workspaceMap['js-yaml'],
+    REQUIRED_JS_YAML_VERSION,
+    `missing required js-yaml override: js-yaml -> ${REQUIRED_JS_YAML_VERSION}`
+  )
 }
 
 function workspaceMapping(workspace, blockName) {
@@ -288,6 +294,27 @@ function assertBracePatchesEffective() {
   assertMinimatchConsumersUsePatchedBraceVersions()
 }
 
+function assertJsYamlRuntime() {
+  const packageRoots = virtualStoreEntries(`js-yaml@${REQUIRED_JS_YAML_VERSION}`)
+  assert.equal(
+    packageRoots.length,
+    1,
+    `expected exactly one js-yaml@${REQUIRED_JS_YAML_VERSION} virtual-store instance`
+  )
+  const requireFromJsYaml = createRequire(path.join(packageRoots[0], 'js-yaml', 'package.json'))
+  assert.equal(
+    requireFromJsYaml('js-yaml/package.json').version,
+    REQUIRED_JS_YAML_VERSION,
+    `installed js-yaml must be ${REQUIRED_JS_YAML_VERSION}`
+  )
+  const yaml = requireFromJsYaml('js-yaml')
+  assert.deepEqual(
+    yaml.load('service: kiosk\nfeatures:\n  - scan\n'),
+    { service: 'kiosk', features: ['scan'] },
+    'js-yaml must preserve standard YAML parsing behavior'
+  )
+}
+
 function collectSourceFiles(dir, out = []) {
   if (!fs.existsSync(dir)) return out
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -437,6 +464,8 @@ console.log(`OK: pnpm ${REQUIRED_PNPM_VERSION} pinned; workspace security overri
 assertBracePatchesDeclared()
 assertBracePatchesEffective()
 console.log('OK: brace-expansion overrides verified (upstream 1.1.18/2.1.4/5.0.9 carry EXPANSION_MAX_LENGTH)')
+assertJsYamlRuntime()
+console.log(`OK: js-yaml ${REQUIRED_JS_YAML_VERSION} override and standard YAML parsing verified`)
 assertSpaArchitectureGuard()
 console.log('OK: Admin/Kiosk/Partner remain Vite SPA + createBrowserRouter Data Mode')
 
