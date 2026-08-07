@@ -80,23 +80,23 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
 
-      - name: Check out the fixed 0.3.5 upgrade baseline
+      - name: Check out the fixed 0.3.6 upgrade baseline
         uses: actions/checkout@v4
         with:
-          ref: cf24e226f6c3c48f933942740a42d536cbf40798
-          path: previous-0.3.5
+          ref: 134f352ad337dff527ca8c8f2467598d0f3f4ee3
+          path: previous-0.3.6
 
-      - name: Build the fixed 0.3.5 upgrade baseline
+      - name: Build the fixed 0.3.6 upgrade baseline
         shell: powershell
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.5/apps/terminal-agent/installer/build-staging.ps1
-          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.5/apps/terminal-agent/installer/build-msi.ps1
-          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.5/apps/terminal-agent/installer/build-exe.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.6/apps/terminal-agent/installer/build-staging.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.6/apps/terminal-agent/installer/build-msi.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File previous-0.3.6/apps/terminal-agent/installer/build-exe.ps1
 
-      - name: Exercise 0.3.5 to 0.3.6 EXE upgrade
+      - name: Exercise 0.3.6 to 0.3.7 EXE upgrade
         shell: powershell
         run: |
-          $previousExe = Get-ChildItem previous-0.3.5/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $previousExe = Get-ChildItem previous-0.3.6/apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           $currentExe = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade.ps1 -PreviousExePath $previousExe.FullName -CurrentExePath $currentExe.FullName
 

@@ -419,8 +419,10 @@ $diagnoseButton.Add_Click({
       "配置 JSON：$($diagnostic.configValidJson)",
       "加密凭据：$($diagnostic.tokenFilePresenceStatus)",
       "ProgramData ACL：$($diagnostic.programDataAclStatus)",
+      "配置 ACL：$($diagnostic.configFileAclStatus)",
       "Token ACL：$($diagnostic.tokenFileAclStatus)",
       "运行时 ACL：$($diagnostic.runtimeRootAclStatus)",
+      "本机接口 127.0.0.1:$($diagnostic.localApiPort)：$($diagnostic.localApiStatus)",
       "最近启动诊断：$($diagnostic.lastStartupDiagnosticCode)"
     ) -join "`r`n"
     [System.Windows.Forms.MessageBox]::Show($details, "终端诊断详情", "OK", "Information") | Out-Null
@@ -507,6 +509,7 @@ $activateButton.Add_Click({
       PrinterName = [string]$printerCombo.SelectedItem
       LocalApiAllowedOrigins = @($originText.Text.Trim())
       ReplaceLocalApiAllowedOrigins = $true
+      RepairProgramDataAcl = $true
     }
     if (-not [string]::IsNullOrWhiteSpace($scanFolder)) { $arguments.ScanWatchFolder = $scanFolder }
 

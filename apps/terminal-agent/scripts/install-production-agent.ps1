@@ -72,7 +72,7 @@ param(
   [int]$HeartbeatIntervalMs = 30000,
 
   [Parameter(Mandatory = $false)]
-  [string]$AgentVersion = "0.3.6-production",
+  [string]$AgentVersion = "0.3.7-production",
 
   [Parameter(Mandatory = $false)]
   [string]$ScanWatchFolder,
@@ -106,6 +106,10 @@ param(
 
   [Parameter(Mandatory = $false)]
   [switch]$SelfTestRuntimeAcl
+  ,
+
+  [Parameter(Mandatory = $false)]
+  [switch]$RepairProgramDataAcl
 )
 
 $ErrorActionPreference = "Stop"
@@ -861,6 +865,13 @@ $tokenPath = Join-Path $programDataDir "agent.token"
 $unauthorizedMarkerPath = Join-Path $programDataDir "agent.unauthorized"
 $apiBase = ConvertTo-CanonicalApiBaseUrl $ApiBaseUrl
 $apiOrigin = ([System.Uri]$apiBase).GetLeftPart([System.UriPartial]::Authority)
+if ($RepairProgramDataAcl) {
+  if (-not (Test-Path -LiteralPath $programDataDir -PathType Container)) {
+    New-Item -ItemType Directory -Path $programDataDir -Force | Out-Null
+  }
+  Set-ProgramDataTreeAcl -Root $programDataDir
+  Write-Ok "ProgramData ACL repaired to protected SYSTEM + Administrators: $programDataDir"
+}
 $preservedLocalSettings = Get-PreservedLocalSettings `
   -ConfigPath $configPath `
   -ProgramDataDir $programDataDir `

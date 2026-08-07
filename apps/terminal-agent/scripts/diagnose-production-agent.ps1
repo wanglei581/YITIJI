@@ -274,6 +274,24 @@ function Get-RuntimeRootAclStatus([string]$Path) {
   }
 }
 
+function Get-LocalApiStatus([int]$Port = 9527) {
+  try {
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+      $connect = $client.BeginConnect("127.0.0.1", $Port, $null, $null)
+      if ($connect.AsyncWaitHandle.WaitOne(1500)) {
+        $client.EndConnect($connect)
+        return "listening"
+      }
+      return "refused"
+    } finally {
+      $client.Close()
+    }
+  } catch {
+    return "refused"
+  }
+}
+
 $service = $null
 $serviceResolution = "not_found"
 try {
@@ -354,12 +372,18 @@ $lastStartupDiagnosticCode = if ($startupDiagnosticFileStatus -eq "present") {
   $null
 }
 $programDataAclStatus = Get-ProgramDataAclStatus $ProgramDataDir
+$configFileAclStatus = Get-ProgramDataAclStatus $ConfigPath
 $tokenFileAclStatus = if ($tokenFilePresenceStatus -eq "present") {
   Get-ProgramDataAclStatus $tokenPath
 } else {
   $tokenFilePresenceStatus
 }
 $runtimeRootAclStatus = Get-RuntimeRootAclStatus $AgentRoot
+$localApiPort = 9527
+if ($configExists -and $config.localApiPort -is [int]) {
+  $localApiPort = [int]$config.localApiPort
+}
+$localApiStatus = Get-LocalApiStatus $localApiPort
 $scmFailurePolicy = $null
 
 if ($serviceExists) {
@@ -402,7 +426,10 @@ if ($serviceExists) {
   lastStartupDiagnosticCode = $lastStartupDiagnosticCode
   startupDiagnosticFileStatus = $startupDiagnosticFileStatus
   programDataAclStatus = $programDataAclStatus
+  configFileAclStatus = $configFileAclStatus
   tokenFileAclStatus = $tokenFileAclStatus
   runtimeRootAclStatus = $runtimeRootAclStatus
+  localApiPort = $localApiPort
+  localApiStatus = $localApiStatus
   scmFailurePolicy = $scmFailurePolicy
 }
