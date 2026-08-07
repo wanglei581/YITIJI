@@ -29,7 +29,7 @@
 - [x] **本地代码与浏览器候选**：简历本机/手机/U 盘、扫描结果、图片转 PDF 缩略图、我的文档/Admin 安全新窗口、Partner Excel 拖放/有效行样例和合同报告不可用态已完成接线；四端 typecheck/lint/build、专项门禁与 W2-W6/会话警告浏览器回归通过。候选未部署。
 - [x] **Node 22 本地功能复验**：已使用 Node `22.22.0` 完成 9 个 workspace 根级 typecheck/lint/build，并串行通过 W2 29/29、W3 6/6、W4 14/14、W5 18/18、W6 104/104、warning 19/19；Kiosk lint 0 error、7 条既有 warning。1080x1920 浏览器实查岗位、企业、简历生成及相关覆盖弹层无横向溢出、错位或关闭后布局位移；该结果不替代 Windows 真机。
 - [x] **干净候选冻结范围门禁（已闭环）**：已在干净 worktree 的审定候选 `origin/main@55105fa8`（Node `v22.23.1` / pnpm `11.2.2`）串行重跑全部 Kiosk fusion 静态合同：baseline、shell、home、W2、W3、W4、W5、W6 均 ALL PASS，其中 W3 的 6 个硬冻结文件 SHA 全部保持不变、W4 的 25 路由归属与硬冻结文件守卫通过；证明此前失败源于共享脏工作区的他人未提交改动，不是产品缺陷。浏览器 W3/W4 行为套件仍以 CI `kiosk-browser-smoke` 与既有 Node 22 回归证据为准。
-- [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。未知彩色 mode 不得假设，打印机型号不得硬编码。
+- [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。现场按 `docs/device/windows-field-acceptance-runsheet-2026-08.md` 逐项执行并记录证据。未知彩色 mode 不得假设，打印机型号不得硬编码。
 - [ ] **生产文件链路验收**：在具名授权和备份/回滚方案下复验 PostgreSQL、Redis、COS/OSS、签名 URL 过期/刷新、匿名与会员归属、文件 TTL/删除、Admin 审计和跨账号隔离；本地 HMAC/SQLite/Mock 结果不得替代生产证据。
 - [ ] **未开放格式保持 fail-closed**：Word 打印转换/内嵌预览、政策附件、合同审查报告生成在真实转换/文件服务、数据模型、权限、审计和测试完成前继续保持未开放或诚实禁用，不得恢复成可点击占位流程。
 
