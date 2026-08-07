@@ -1,0 +1,58 @@
+<!--pages/policies/policies.wxml · P26 政策服务-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px" class="sb-tint"></view>
+
+  <view class="navbar tinted">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic light"></text></view>
+    <view class="nav-title light">政策服务</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="content has-tabbar">
+    <view class="policy-hero">
+      <view class="ph-t">就业创业政策</view>
+      <view class="ph-s">汇总官方发布的求职、创业与补贴政策</view>
+    </view>
+
+    <!-- 分类 -->
+    <scroll-view class="cat-scroll" scroll-x="true" enhanced="true" show-scrollbar="false">
+      <view class="cat tap" wx:for="{{cats}}" wx:key="label" hover-class="tap-press">
+        <view class="c-ic a-{{item.accent}}">{{item.emoji}}</view>
+        <view class="c-l">{{item.label}}</view>
+      </view>
+    </scroll-view>
+
+    <!-- 政策列表 -->
+    <view class="section-t">最新政策</view>
+
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{loadError}}" class="empty">
+      <view class="e-ic">!</view>
+      <view class="e-title">加载失败</view>
+      <view class="e-desc">{{loadError}}</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
+    </view>
+
+    <view wx:elif="{{policies.length === 0}}" class="empty">
+      <view class="e-ic">📜</view>
+      <view class="e-title">暂无政策</view>
+      <view class="e-desc">换个分类,或稍后再来看看</view>
+    </view>
+
+    <view wx:else class="card">
+      <view class="policy-item tap" wx:for="{{policies}}" wx:key="id"
+        hover-class="tap-press" bindtap="tapPolicy" data-id="{{item.id}}">
+        <view class="pi-top">
+          <view class="chip {{item.tagTone}} pi-tag">{{item.tag}}</view>
+          <view class="pi-title">{{item.title}}</view>
+        </view>
+        <view class="pi-sum">{{item.summary}}</view>
+        <view class="pi-foot"><text>来源：{{item.source}}</text><text>{{item.foot}}</text></view>
+      </view>
+    </view>
+
+    <view class="compliance-note">政策内容来自官方公开发布渠道，具体以官方原文及经办窗口解释为准。</view>
+    <view class="spacer-lg"></view>
+  </view>
+</view>

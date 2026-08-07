@@ -87,6 +87,30 @@ for (const f of wxmlFiles) {
   else ok(`路由检查 ${f}`)
 }
 
+// M0.3：JS 跳转目标审计（navigateTo / switchTab / redirectTo）+ 死绑定检查
+const jsFiles = files.filter((f) => f.endsWith('.js') && !f.includes('/scripts/'))
+const pagePathSet = new Set(PAGE_PATHS)
+for (const f of jsFiles) {
+  const src = read(f)
+  const targets = [...src.matchAll(/(?:navigateTo|switchTab|redirectTo|reLaunch)\(\{\s*url:\s*[`'"]([^`'"?]+)/g)].map((m) => m[1])
+  const deadJs = targets
+    .map((t) => t.replace(/^\//, '').replace(/\/$/, ''))
+    .filter((t) => !pagePathSet.has(t))
+  if (deadJs.length) bad('JS 跳转目标已注册', `${f}: ${[...new Set(deadJs)].join(',')}`)
+}
+if (!fails.some((x) => x.startsWith('JS 跳转目标已注册'))) ok('JS 跳转目标全部已注册')
+
+for (const f of wxmlFiles.filter((x) => x.startsWith('./pages/'))) {
+  const pageJs = f.replace(/\.wxml$/, '.js')
+  if (!jsFiles.includes(pageJs)) continue
+  const wxml = read(f)
+  const js = read(pageJs)
+  const handlers = [...wxml.matchAll(/(?:bind|catch)tap="([A-Za-z0-9_]+)"/g)].map((m) => m[1])
+  const deadHandlers = [...new Set(handlers)].filter((h) => !new RegExp(`${h}\\s*\\(`).test(js))
+  if (deadHandlers.length) bad('事件绑定有实现', `${f}: ${deadHandlers.join(',')}`)
+}
+if (!fails.some((x) => x.startsWith('事件绑定有实现'))) ok('事件绑定全部有实现')
+
 const forbidden = ['一键投递', '立即投递', '录用概率', '成功率', '匹配率', 'matchRate']
 for (const f of wxmlFiles) {
   const src = read(f)

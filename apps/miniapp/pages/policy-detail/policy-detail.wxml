@@ -1,0 +1,87 @@
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" bindtap="goBack"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">政策详情</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="content has-bar">
+
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="detail-state">加载中…</view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError}}" class="detail-state">
+      <view class="ds-msg">{{loadError}}</view>
+      <view class="state-retry tap" bindtap="reload">重新加载</view>
+      <view class="btn ghost tap ds-back" bindtap="goBack">返回</view>
+    </view>
+
+    <!-- 详情内容 -->
+    <block wx:else>
+    <!-- 政策头部 -->
+    <view class="policy-hero rise-d1">
+      <view class="ph-cat">{{policy.category}}</view>
+      <view class="ph-title">{{policy.title}}</view>
+      <view class="ph-meta">
+        <text>{{policy.org}}</text>
+        <text class="ph-dot">·</text>
+        <text>{{policy.date}}</text>
+      </view>
+    </view>
+
+    <!-- AI 速读 -->
+    <view class="ai-card rise-d2">
+      <view class="ai-head">
+        <text class="ficon i-thunder"></text>
+        <text>AI 政策速读 · 参考</text>
+      </view>
+      <view class="ai-body">{{policy.aiSummary}}</view>
+      <view class="ai-disclaimer">AI 摘要仅供参考，以官方原文及经办窗口解释为准。</view>
+    </view>
+
+    <!-- 政策正文 -->
+    <view class="section-t rise-d3">补贴对象</view>
+    <view class="body-text rise-d3">{{policy.targetGroup}}</view>
+
+    <view class="section-t rise-d3">补贴标准</view>
+    <view class="policy-table rise-d3">
+      <view class="pt-row" wx:for="{{policy.subsidies}}" wx:key="type">
+        <view class="pt-type">{{item.type}}</view>
+        <view class="pt-amt">{{item.amount}}</view>
+      </view>
+    </view>
+
+    <view class="section-t rise-d4">申领流程</view>
+    <view class="step-flow rise-d4">
+      <view class="sf-item" wx:for="{{policy.steps}}" wx:key="*this">
+        <view class="sf-n">{{index + 1}}</view>
+        <text class="sf-text">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- 来源机构 -->
+    <view class="info-card rise-d5">
+      <view class="ic-title">来源信息</view>
+      <view class="ic-row"><text class="ic-k">发布机构</text><text class="ic-v">{{policy.org}}</text></view>
+      <view class="ic-row"><text class="ic-k">同步时间</text><text class="ic-v">{{policy.syncTime}}</text></view>
+    </view>
+
+    <!-- 合规提示 -->
+    <view class="notice info rise-d5">
+      <text class="ficon i-info n-ic"></text>
+      <text>本页为政策信息展示，不代表办理承诺。申领条件、材料与时限请以官方原文及当地经办窗口为准。</text>
+    </view>
+
+    </block>
+
+  </view>
+
+  <view class="actionbar">
+    <view class="btn ghost tap" bindtap="tapPrint">打印政策</view>
+    <view class="btn primary tap flex-1-6" bindtap="tapOfficial">查看官方原文</view>
+  </view>
+
+</view>

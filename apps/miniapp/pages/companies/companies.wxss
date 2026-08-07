@@ -1,0 +1,13 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+
+.search-bar { display: flex; align-items: center; gap: 20rpx; padding: 16rpx 32rpx 8rpx; }
+.search-inp { flex: 1; height: 76rpx; background: var(--surface); border: 3rpx solid var(--line);
+  border-radius: 999rpx; display: flex; align-items: center; gap: 16rpx; padding: 0 28rpx;
+  font-size: 26rpx; color: var(--ghost); }
+.search-inp .ficon { font-size: 30rpx; }
+.si-ph { color: var(--ghost); }
+
+.cc-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8rpx; flex-shrink: 0; }
+.jobs-count { font-size: 22rpx; color: var(--teal); background: var(--teal-soft);
+  padding: 4rpx 16rpx; border-radius: 999rpx; font-weight: 600; white-space: nowrap; }
+.cc-arrow { font-size: 32rpx; color: var(--ghost); }

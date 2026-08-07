@@ -1,0 +1,60 @@
+<!--pages/fairs/fairs.wxml · P23 招聘会列表-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px" class="sb-tint"></view>
+
+  <view class="navbar tinted">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic light"></text></view>
+    <view class="nav-title light">招聘会</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="content has-bar">
+    <view class="fair-hero">
+      <view class="fh-title">近期招聘会</view>
+      <view class="fh-sub">来自各主办方公开信息，报名请前往来源平台</view>
+    </view>
+
+    <view class="filter-bar">
+      <view class="f-chip {{activeFilter === index ? 'on' : ''}}"
+        wx:for="{{filters}}" wx:key="*this" data-index="{{index}}" bindtap="tapFilter">{{item}}</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{loadError}}" class="empty">
+      <view class="e-ic">!</view>
+      <view class="e-title">加载失败</view>
+      <view class="e-desc">{{loadError}}</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
+    </view>
+
+    <view wx:elif="{{fairs.length === 0}}" class="empty">
+      <view class="e-ic">🎪</view>
+      <view class="e-title">暂无招聘会</view>
+      <view class="e-desc">近期暂无排期,稍后再来看看</view>
+    </view>
+
+    <block wx:else>
+    <view class="fair-list-card tap rise-d{{index+1}}" wx:for="{{fairs}}" wx:key="id"
+      hover-class="tap-press" bindtap="tapFair" data-id="{{item.id}}">
+      <view class="flc-banner" style="{{item.bannerStyle}}">
+        {{item.emoji}}
+        <view wx:if="{{item.live}}" class="flc-live"><view class="d"></view>进行中</view>
+      </view>
+      <view class="flc-body">
+        <view class="flc-title">{{item.title}}</view>
+        <view class="flc-meta">
+          <view class="m" wx:for="{{item.metaLines}}" wx:for-item="ml" wx:key="*this">{{ml}}</view>
+        </view>
+        <view class="flc-foot">
+          <text class="flc-source">来源：{{item.source}} · {{item.sync}}</text>
+          <view class="chip {{item.tagTone}}">{{item.tag}}</view>
+        </view>
+      </view>
+    </view>
+    </block>
+
+    <view class="compliance-note">以上招聘会信息来自第三方 / 官方主办方，本终端仅作信息展示，报名及预约请前往来源平台或现场办理。</view>
+    <view class="spacer-lg"></view>
+  </view>
+</view>

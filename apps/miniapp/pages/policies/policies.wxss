@@ -1,0 +1,28 @@
+.page-wrap { min-height: 100vh; background: var(--paper); }
+.sb-tint { background: #2f5090; }
+.navbar.tinted { background: #2f5090; border-bottom: none; }
+.nav-back-ic.light { color: rgba(255,255,255,.9); }
+.nav-title.light { color: #fff; }
+
+.policy-hero { background: linear-gradient(150deg,#2f5090,#3f68b0); padding: 40rpx 40rpx 52rpx;
+  position: relative; overflow: hidden; }
+.policy-hero::before { content:''; position: absolute; right: -60rpx; top: -60rpx;
+  width: 300rpx; height: 300rpx; border-radius: 50%; background: rgba(255,255,255,.06); }
+.ph-t { font-family: var(--font-serif); font-size: 46rpx; font-weight: 700; color: #fff; position: relative; }
+.ph-s { font-size: 25rpx; color: rgba(255,255,255,.72); margin-top: 12rpx; position: relative; }
+
+.cat-scroll { white-space: nowrap; padding: 28rpx 32rpx 8rpx; }
+.cat { display: inline-flex; flex-direction: column; align-items: center; gap: 12rpx;
+  width: 152rpx; vertical-align: top; }
+.c-ic { width: 104rpx; height: 104rpx; border-radius: 32rpx; display: flex; align-items: center;
+  justify-content: center; font-size: 48rpx; }
+.c-l { font-size: 24rpx; color: var(--ink-soft); }
+
+.policy-item { padding: 28rpx 32rpx; }
+.policy-item + .policy-item { border-top: 1rpx solid var(--line-faint); }
+.pi-top { display: flex; align-items: flex-start; gap: 16rpx; }
+.pi-tag { flex-shrink: 0; margin-top: 2rpx; }
+.pi-title { font-size: 29rpx; font-weight: 600; color: var(--ink); line-height: 1.45; }
+.pi-sum { font-size: 25rpx; color: var(--muted); margin-top: 12rpx; line-height: 1.55; }
+.pi-foot { display: flex; align-items: center; justify-content: space-between;
+  margin-top: 16rpx; font-size: 22rpx; color: var(--faint); }

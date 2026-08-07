@@ -6,7 +6,14 @@
     "pages/me/me",
     "pages/login/login",
     "pages/terms/terms",
-    "pages/privacy/privacy"
+    "pages/privacy/privacy",
+    "pages/job-detail/job-detail",
+    "pages/fairs/fairs",
+    "pages/fair-detail/fair-detail",
+    "pages/policies/policies",
+    "pages/policy-detail/policy-detail",
+    "pages/companies/companies",
+    "pages/company-detail/company-detail"
   ],
   "window": {
     "navigationBarTextStyle": "black",

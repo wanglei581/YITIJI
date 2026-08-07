@@ -1,14 +1,80 @@
-<!-- pages/jobs/jobs.wxml -->
-<view class="tab-page">
+<!--pages/jobs/jobs.wxml-->
+<view class="page-wrap">
   <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
-  <view class="tab-hd">
-    <text class="tab-title">{{title}}</text>
+
+  <!-- 页头 -->
+  <view class="page-hd">
+    <text class="page-title">发现岗位</text>
   </view>
-  <view class="tab-body">
-    <view class="empty-card">
-      <view class="empty-icon"><view class="ficon i-compass"></view></view>
-      <text class="empty-title">真实来源接入中</text>
-      <text class="empty-copy">{{copy}}</text>
+
+  <!-- 搜索栏 -->
+  <view class="search-bar tap" hover-class="tap-press" bindtap="tapSearch">
+    <view class="ficon i-search sb-ic"></view>
+    <text class="sb-ph">搜索职位、公司、行业…</text>
+  </view>
+
+  <!-- 分类筛选条 -->
+  <scroll-view class="filter-scroll" scroll-x enhanced="{{true}}" show-scrollbar="{{false}}">
+    <view class="filter-row">
+      <view
+        class="f-chip {{activeFilter === index ? 'f-on' : ''}} tap"
+        wx:for="{{filters}}"
+        wx:key="*this"
+        hover-class="tap-press"
+        data-index="{{index}}"
+        bindtap="tapFilter"
+      >{{item}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 加载中 -->
+  <view class="list-state" wx:if="{{loading}}">
+    <view class="ls-dot"></view><view class="ls-dot"></view><view class="ls-dot"></view>
+  </view>
+
+  <!-- 加载失败 -->
+  <view class="empty-wrap" wx:elif="{{loadError}}">
+    <view class="ev-icon">⚠️</view>
+    <view class="ev-title">加载失败</view>
+    <view class="ev-desc">{{loadError}}</view>
+    <view class="btn-retry tap" hover-class="tap-press" bindtap="reload">重新加载</view>
+  </view>
+
+  <!-- 空态 -->
+  <view class="empty-wrap" wx:elif="{{jobs.length === 0}}">
+    <view class="ev-icon">📋</view>
+    <view class="ev-title">暂无岗位</view>
+    <view class="ev-desc">换个筛选条件，或稍后再来看看</view>
+  </view>
+
+  <!-- 岗位卡列表 -->
+  <view class="job-list" wx:else>
+    <view
+      class="job-card tap"
+      wx:for="{{jobs}}"
+      wx:key="id"
+      hover-class="tap-press"
+      data-id="{{item.id}}"
+      bindtap="tapJob"
+    >
+      <view class="jc-top">
+        <text class="jc-title">{{item.title}}</text>
+        <text class="jc-salary">{{item.salary}}</text>
+      </view>
+      <text class="jc-company">{{item.company}}</text>
+      <view class="jc-tags" wx:if="{{item.tags && item.tags.length}}">
+        <text class="j-tag" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+      </view>
+      <view class="jc-footer">
+        <text class="jc-source">来源：{{item.source}}<block wx:if="{{item.time}}"> · {{item.time}}</block></text>
+        <view class="jc-cta tap" hover-class="act-press" catchtap="tapSource" data-url="{{item.sourceUrl}}">去来源平台 →</view>
+      </view>
     </view>
   </view>
+
+  <!-- 合规声明 -->
+  <view class="compliance-note">岗位信息均来自第三方或官方来源，本平台仅作展示与跳转，不收简历，不做平台内投递。</view>
+
+  <!-- tabBar 安全区 -->
+  <view style="height:calc(100rpx + env(safe-area-inset-bottom))"></view>
 </view>
