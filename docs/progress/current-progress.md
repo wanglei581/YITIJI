@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-07 完成 **小程序 M0.2 登录闭环（PR #543 合入 `main@57527e87`）**：登录页提供微信一键登录（`open-type=getPhoneNumber` → `POST /member/auth/wx-login`，前端零 appSecret）与短信验证码降级（`sms-code` + `login`）；登录前强制协议/隐私勾选并随登录提交当前协议版本（后端版本不一致拒登，与 Kiosk 口径一致）。新增《服务协议》《隐私政策》页（协议为诚实简洁文本，隐私沿用找回工程内容）；“我的”页登录态（未登录→登录/注册，已登录→昵称 + 退出登录并清理本地会话），首页问候显示昵称。静态门禁扩展至 19/19（登录页注册、双入口、协议勾选、无密钥残留、登录/退出入口），PR CI 三 job 全绿。真实登录联调（真实 AppID + 开发者工具服务端口）与 M0.3/M0.4 仍待后续批次。
+
 2026-08-07 完成 **小程序 M0.1 唯一工程底座（`apps/miniapp`，PR #541 合入 `main@305c7296`）**：按 M0/M1 计划建立原生小程序四 Tab 壳（首页 / AI百宝箱 / 求职 / 我的，自定义 TabBar）；首页一屏沿用找回工程已核验视觉基线（`app.wxss` 设计系统 + 内联 SVG 图标），入口全部收敛到四个 Tab，未上线功能统一提示、不伪造页面、不注册死路由；其余三 Tab 为真实空态占位。新增 `verify:static` 静态门禁（JSON/页面四件套/四 Tab 一致性/无死路由/合规文案/密钥残留），本地 11/11 通过；`project.config.json` 用 `touristappid`，真实 AppID 不提交；pnpm-lockfile 已注册新 workspace 包，PR CI 三 job 全绿。未包含（按计划）：登录、公开浏览、本人数据、AI 工具页与 CI 接线；微信开发者工具编译与 UI 实点待服务端口开启后执行。
 
 2026-08-07 完成 **小程序岗位匹配真实结果页 API 级验收（用户真实简历 + 多段真实 JD，生产环境）**：使用用户提供的真实简历 `我的简历测试文件.pdf` 与多段 JD（职责/任职要求/优先/需留意）走通：上传/解析 201；任务级授权；匹配分析 201 返回 `fitLevel=reference_low`（三档、无百分比），`keywordCoverage matched=2/missing=10`，`requirementBreakdown responsibilities=3/mustHave=4/preferred=2/attention=1` 全部来自 JD 原文拆解；读回一致；打印 PDF（岗位匹配决策报告.pdf，115KB，1 页，短时签名 URL）；撤回授权后重新分析 403 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED`、读回仍 200；连续动作“继续优化”触发 200（返回 taskId/status/failReason/providerName 契约）、“按岗位模拟面试”建会话 201（sessionId+token）。真实简历内容未打印/未落文档；匿名任务与文件按保留策略过期。剩余：微信开发者工具真实结果页 UI 实点（继续优化/按岗位模拟面试跳转与展示）与真实岗位/政策数据接入。
