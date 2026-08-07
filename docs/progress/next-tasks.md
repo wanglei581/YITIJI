@@ -57,6 +57,8 @@
 
 权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；开发视觉基线候选：[41 页现代公共就业服务 V8.0 pilot 原型](../design/miniapp-os-prototype-2026-08/README.md)；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。`/Users/wanglei/zhiyida-miniapp` 已找回 57 页原生微信小程序候选，但尚未迁入主仓唯一真源；V8.0 的行动队列、资产画布、情报流、服务台账、安全交接和实时设备监控继续作为产品布局目标。用户已确认四 Tab 为“首页 / AI百宝箱 / 求职 / 我的”；正式工程收敛前仍须确认产品名、首发阶段、到机履约范围和微信主体条件。
 
+- [~] **M0/M1 开发计划已定（2026-08-07）**：按 `docs/product/miniprogram-m0m1-development-plan-2026-08-07.md` 分四批推进——M0 工程壳/登录/公开浏览/我的只读；M1 今天引擎、简历链路、岗位匹配真实结果页、模拟面试、自我探索、资产材料；视觉沿用找回工程既有风格，每批独立 PR + 门禁。岗位匹配真实结果页 API 级验收已通过（用户真实简历），模拟器 UI 实点待开发者工具服务端口开启后执行。
+
 - [x] **Gate 0 API 事实冻结**：已基于 `origin/main@50896ed1` 完成只读对账。确认可复用公开内容、登录、AI 与本人资产底座；确认材料包、公开终端、订单取件详情、`claim-pickup`、JSAPI 支付和 Order-only 履约缺失；确认现有本人订单以 PrintTask 为主表、Kiosk 建单为 PrintTask-first，不能直接支持手机待到机订单。另锁定政策详情、CommonJS 解构、优化令牌、模拟面试 DTO 和会员岗位匹配 consent 等前端错误。未改运行时代码。
 - [x] **正式小程序岗位匹配参考真实化候选**：会员本人简历走 `job_ai` 授权，匿名任务走任务级 consent 且不附会员 Bearer；结果页已增加 JD 原文拆解、岗位要求与简历证据/缺口逐项对照、授权撤回，以及继续优化简历/按岗位模拟面试。后端 prompt、原文过滤、shared 契约和 PDF 同步完成，旧缓存兼容；只保留“较高 / 中等 / 偏低”，不做百分比、录用概率、人格适岗或站内投递。专项 verify、目标 typecheck/lint、微信开发者工具编译和空态验收通过，未发布。
 - [x] **岗位匹配真实结果页 API 级验收（2026-08-07，用户真实简历）**：真实简历 `我的简历测试文件.pdf` + 多段真实 JD 已在生产验证：解析、任务级授权、匹配分析三档结论（`reference_low`，无百分比）、`requirementBreakdown` 四组原文拆解（3/4/2/1）、读回一致、PDF 生成、撤回后重新分析 403 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED`、撤回后读回仍可用；“继续优化”与“按岗位模拟面试”两个连续动作 API 均 200/201。剩余：微信开发者工具真实结果页 UI 实点（结果展示、继续优化/模拟面试跳转、PDF 预览，按 `docs/acceptance/miniprogram-jobfit-ui-real-click-runsheet-2026-08-07.md` 执行）与真实岗位/政策数据接入；不得为验收伪造生产结果或引入站内投递。
