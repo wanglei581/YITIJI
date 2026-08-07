@@ -1,0 +1,53 @@
+/* AI 百宝箱占位页（M0.1 壳） */
+.tab-page {
+  min-height: 100vh;
+  background: #f4f1e8;
+  box-sizing: border-box;
+}
+.tab-hd {
+  padding: 8rpx 32rpx 16rpx;
+}
+.tab-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #10302b;
+}
+.tab-body {
+  padding: 24rpx 32rpx;
+}
+.empty-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 96rpx 48rpx;
+  background: #fffdf8;
+  border: 1rpx solid #e2dccb;
+  border-radius: 24rpx;
+}
+.empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 50%;
+  background: #f0f7f3;
+}
+.empty-icon .ficon {
+  width: 52rpx;
+  height: 52rpx;
+  color: #1f9e86;
+}
+.empty-title {
+  margin-top: 32rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #274b43;
+}
+.empty-copy {
+  margin-top: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.7;
+  color: #5d6b63;
+  text-align: center;
+}

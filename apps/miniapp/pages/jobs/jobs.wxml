@@ -1,0 +1,14 @@
+<!-- pages/jobs/jobs.wxml -->
+<view class="tab-page">
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+  <view class="tab-hd">
+    <text class="tab-title">{{title}}</text>
+  </view>
+  <view class="tab-body">
+    <view class="empty-card">
+      <view class="empty-icon"><view class="ficon i-compass"></view></view>
+      <text class="empty-title">真实来源接入中</text>
+      <text class="empty-copy">{{copy}}</text>
+    </view>
+  </view>
+</view>
