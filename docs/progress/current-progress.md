@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-07 完成 **小程序岗位匹配真实结果页 API 级验收（用户真实简历 + 多段真实 JD，生产环境）**：使用用户提供的真实简历 `我的简历测试文件.pdf` 与多段 JD（职责/任职要求/优先/需留意）走通：上传/解析 201；任务级授权；匹配分析 201 返回 `fitLevel=reference_low`（三档、无百分比），`keywordCoverage matched=2/missing=10`，`requirementBreakdown responsibilities=3/mustHave=4/preferred=2/attention=1` 全部来自 JD 原文拆解；读回一致；打印 PDF（岗位匹配决策报告.pdf，115KB，1 页，短时签名 URL）；撤回授权后重新分析 403 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED`、读回仍 200；连续动作“继续优化”触发 200（返回 taskId/status/failReason/providerName 契约）、“按岗位模拟面试”建会话 201（sessionId+token）。真实简历内容未打印/未落文档；匿名任务与文件按保留策略过期。剩余：微信开发者工具真实结果页 UI 实点（继续优化/按岗位模拟面试跳转与展示）与真实岗位/政策数据接入。
+
 2026-08-07 确认 **微信小程序 Gate 0 四项路线决策（决策确认单已落档）**：用户确认产品定位“职易达 · AI 求职与职业生活服务”（以微信后台实际注册名为准）、四 Tab 继续冻结、原生小程序渐进演进不迁 Taro 4、首发 M0+M1 且 v1 不做下单/到机履约/支付，M2 延后。正式结论见 `docs/product/miniprogram-gate0-decision-confirmation-2026-08-07.md`；AppID/主体/类目/隐私、真实岗位政策来源与真实简历列为待办清单，不阻塞 M0/M1 开发启动。生产 `389f37ff` 已带岗位要求逐项拆解（`requirementBreakdown`），岗位匹配真实结果页验收可开始。
 
 2026-08-07 补充 **生产数据治理只读复核（无生产写入）**：只读确认内容治理第一步已生效——Job 219 中 published=0（approved/unpublished 217、approved/draft 1、pending/draft 1），招聘会 3 场与演示机构均 unpublished，演示岗位 inactive，腾讯样本来源 disabled，PolicyPost=0。`_prisma_migrations` 中 `20260730100000_add_terminal_network_diagnostics` 两条同 checksum 记录判定为“失败回滚 + 成功重跑”的正常残留（migrate deploy 无 pending）。另列出两个 enabled 但 `lastSyncAt` 为空的来源（`src-hr-api` 市人才网 API、`src-uni-excel` 高校就业信息 Excel）待数据负责人核实授权。详见 `docs/reviews/production-data-governance-readonly-audit-2026-08-07.md`；未删改生产、未执行 seed、未触发发布。
