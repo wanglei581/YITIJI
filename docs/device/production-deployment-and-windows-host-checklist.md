@@ -133,7 +133,10 @@ pnpm build
 
 - [ ] 全新空库 `migrate deploy` 通过。
 - [ ] `verify:demo-seed-guard` 通过，且生产未执行任何 `db:seed*`。
-- [ ] 现有生产恢复确认沿用已存在且已轮换口令的管理员账号；全新空库须等待受审的首个管理员 bootstrap，禁止用 demo seed 创建账号。
+- [ ] 现有生产恢复确认沿用已存在且已轮换口令的管理员账号，未运行首个管理员 bootstrap。
+- [ ] 若为真正全新空库：运行前只读确认 `User=0`，受控凭据目录归当前用户且 mode 0700，双人批准 10 分钟执行窗口；bootstrap 后仅生成 1 个 temporary admin 和 1 条必成功创建审计。
+- [ ] 首个管理员以 HTTPS 登录，初始密码只进入强制改密流程且未获得管理 JWT；改密后为 `owner_managed`、`tokenVersion` 已递增、改密审计存在，并已使用新密码重新登录。
+- [ ] 0600 初始凭据文件已在改密验收后安全删除；CLI 结果不确定时已按 runbook 三态 reconciliation 核对，未直接重跑或删除凭据。
 - [ ] API 启动日志显示连接 PostgreSQL，不是 SQLite。
 - [ ] PG schema 漂移校验通过。
 - [ ] 核心表外键与唯一约束生效。

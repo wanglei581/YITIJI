@@ -260,6 +260,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
+          pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
@@ -441,6 +442,12 @@ jobs:
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
+      - name: Verify first admin bootstrap concurrency on isolated PG
+        working-directory: services/api
+        env:
+          NODE_ENV: test
+          FIRST_ADMIN_BOOTSTRAP_VERIFY_TARGET: isolated
+        run: pnpm verify:first-admin-bootstrap:postgres
       - name: Seed on PG
         working-directory: services/api
         env:
