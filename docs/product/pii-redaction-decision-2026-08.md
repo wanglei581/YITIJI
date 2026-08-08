@@ -113,6 +113,7 @@ POST /materials/:fileId/pii-redact
 → {
   ok: boolean
   redactedFileId: string | null
+  redactedFileUrl: string | null        // 见 §3.5：只有 id 在匿名路径上取不到文件
   items: Array<{
     id: string
     type: 'id_card' | 'phone' | 'bank_card' | 'address' | ...
@@ -136,6 +137,24 @@ POST /materials/:fileId/pii-redact
 把「能说什么」放在 API 边界上强制，而不是靠前端自觉。
 今天这个缺陷正是靠前端自觉没守住 —— 后端返回 `resultFileCreated:false`，
 前端照样让用户走完了整个遮挡流程。
+
+### 3.5 派生件必须直接带可访问 URL
+
+**本条是实现中发现的规格错误，已修正。**
+
+§3.4 初稿只给了 `redactedFileId`。但 `/files/:id/preview-url` **要求登录**，
+而一体机是匿名使用的 —— 匿名用户拿到 id 也取不到文件，
+遮挡功能在真实使用路径上整个不可用。
+
+响应必须直接带 TTL 受限的签名 URL（参考 `fair-company-print.service.ts` 的
+`FilesService.upload` → HMAC 签名链接，TTL 1h）。
+
+推论：返回 `claim: 'redacted_verified'` 的同时必须保证派生件**真的可取**。
+前端对此做了 fail-closed —— claim 说成功但拿不到文件时降级为「本机无法确认这次遮挡的结果」，
+因为那种情况下打印的还是原件，「已遮挡」就是假的。
+
+同理 `reverify.remainingCount` 不可省略：省略解析为 `null` 而非 `0`，
+**「没报告残留」不等于「零残留」**。
 
 ---
 
