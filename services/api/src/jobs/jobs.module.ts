@@ -13,6 +13,7 @@ import { JobQualityService } from '../job-ai/job-quality.service'
 import { FilesModule } from '../files/files.module'
 import { FairMaterialPrintBridgeService } from './fair-material-print-bridge.service'
 import { FairMaterialPrintBridgeCleanupTask } from './fair-material-print-bridge.cleanup.task'
+import { FairCompanyPrintService } from './fair-company-print.service'
 import { FairCompanyZoneService } from './fair-company-zone.service'
 import { FairMaterialService } from './fair-material.service'
 import { FairVenueGuideService } from './fair-venue-guide.service'
@@ -39,6 +40,7 @@ import { FairVenueGuideService } from './fair-venue-guide.service'
     JobQualityService,
     FairMaterialPrintBridgeService,
     FairMaterialPrintBridgeCleanupTask,
+    FairCompanyPrintService,
   ],
   controllers: [JobsController, AdminFairsController],
   exports:     [JobsService, AdminFairsService],

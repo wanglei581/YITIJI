@@ -177,6 +177,24 @@ export interface FairMaterialPrintResponse {
   printFileUrl: string
 }
 
+/** 参会企业按需打印的两种内容：企业资料 / 岗位清单。 */
+export type FairCompanyPrintVariant = 'profile' | 'positions'
+
+/**
+ * 参会企业资料按需打印响应。
+ * 与活动资料不同，企业资料没有预置文件，由服务端按库内展示字段实时渲染 PDF
+ * 后落成短期 FileObject；pageCount / sizeBytes 均来自真实渲染结果，不由前端估算。
+ */
+export interface FairCompanyPrintResponse {
+  fileId: string
+  filename: string
+  sizeBytes: number
+  mimeType: string
+  pageCount: number
+  printFileUrl: string
+  variant: FairCompanyPrintVariant
+}
+
 // ──────────────────────────────────────────────────────────────
 // FairLiveStatsDTO
 // ──────────────────────────────────────────────────────────────
