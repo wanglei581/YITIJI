@@ -20,6 +20,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\" --ignore-path .prettierignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,md,json}\" --ignore-path .prettierignore",
     "clean": "rimraf \"apps/*/dist\" \"packages/*/dist\" \"apps/*/vite.config.js\" \"apps/*/vite.config.d.ts\" \"apps/*/tsconfig.tsbuildinfo\"",
+    "verify:deploy-authorization-gate": "node scripts/verify-deploy-authorization-gate.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:compliance-copy": "node scripts/verify-compliance-copy.mjs"
   },
