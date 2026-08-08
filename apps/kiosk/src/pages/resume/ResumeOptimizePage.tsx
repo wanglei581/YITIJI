@@ -84,7 +84,6 @@ export function ResumeOptimizePage() {
   const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
   const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
   const accessToken = (typeof state?.accessToken === 'string' ? state.accessToken : undefined) ?? (usingSessionTask ? session?.accessToken : undefined)
-  const file   = state?.file as { name: string; size: string; format: string } | undefined
   const targetContext = state?.targetContext as ResumeTargetContext | undefined
   const summary = targetSummary(targetContext)
 
