@@ -17,6 +17,8 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairMaterialPrintResponse,
+  FairCompanyPrintResponse,
+  FairCompanyPrintVariant,
   FairLiveStatsDTO,
   FairVenueGuideDTO,
 } from '@ai-job-print/shared'
@@ -37,6 +39,12 @@ export interface JobFairServiceInterface {
   getFairMap(fairId: string): Promise<ApiResponse<{ zones: FairZoneDTO[]; booths: FairBoothDTO[] }>>
   getFairMaterials(fairId: string): Promise<PaginatedResponse<FairMaterialDTO>>
   prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintResponse>
+  /** 参会企业资料 / 岗位清单按需渲染打印文件（服务端出 PDF，返回真实签名 URL） */
+  prepareFairCompanyPrint(
+    fairId: string,
+    companyId: string,
+    variant: FairCompanyPrintVariant,
+  ): Promise<FairCompanyPrintResponse>
   getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>>
   /** 场馆导览(Admin 配置,Kiosk 只读;未配置 → data null) */
   getFairVenueGuide(fairId: string): Promise<ApiResponse<FairVenueGuideDTO | null>>
@@ -61,5 +69,7 @@ export const getFairZones       = (fairId: string)                => adapter.get
 export const getFairMap         = (fairId: string)                => adapter.getFairMap(fairId)
 export const getFairMaterials   = (fairId: string)                => adapter.getFairMaterials(fairId)
 export const prepareFairMaterialPrint = (fairId: string, materialId: string) => adapter.prepareFairMaterialPrint(fairId, materialId)
+export const prepareFairCompanyPrint = (fairId: string, companyId: string, variant: FairCompanyPrintVariant) =>
+  adapter.prepareFairCompanyPrint(fairId, companyId, variant)
 export const getFairStats       = (fairId: string)                => adapter.getFairStats(fairId)
 export const getFairVenueGuide  = (fairId: string)                => adapter.getFairVenueGuide(fairId)
