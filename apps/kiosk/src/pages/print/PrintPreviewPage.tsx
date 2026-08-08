@@ -30,6 +30,7 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
+import { materialRedactionBadge } from './piiRedaction'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
@@ -214,6 +215,8 @@ export function PrintPreviewPage() {
   const EMPTY_FILE: PrintFile = { name: '', size: '', pages: null }
   const file = locationState?.file ?? restoredSession?.file ?? EMPTY_FILE
   const materialCheck = locationState?.materialCheck ?? restoredSession?.materialCheck
+  // 遮挡结论只从后端 claim 派生（piiRedaction.materialRedactionBadge），本页不自行拼装。
+  const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
   const restoredPrintParams = restoredSession?.printParams
   const source = locationState?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
@@ -361,14 +364,16 @@ export function PrintPreviewPage() {
           {materialCheck && (
             <div
               className={[
-                'rounded-lg border px-3 py-2 text-center text-xs font-medium',
-                materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0
-                  ? 'border-warning/20 bg-warning-bg text-warning-fg'
-                  : 'border-success-bg bg-success-bg text-success-fg',
+                'rounded-lg border px-3 py-2 text-center text-base font-medium',
+                redactionBadge?.tone === 'danger'
+                  ? 'border-error-bg bg-error-bg text-error-fg'
+                  : redactionBadge?.tone === 'warning'
+                    ? 'border-warning/20 bg-warning-bg text-warning-fg'
+                    : 'border-success-bg bg-success-bg text-success-fg',
               ].join(' ')}
             >
-              {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成隐私检查'} · 遮挡 {materialCheck.redactedCount} 项
-              {materialCheck.redaction?.resultFileCreated === false && materialCheck.redactedCount > 0 ? ' · 仍使用原文件' : ''}
+              {materialCheck.mode === 'demo' ? '材料检查流程演示完成' : '已完成打印前隐私检查'}
+              {redactionBadge ? ` · ${redactionBadge.text}` : ''}
             </div>
           )}
         </div>
@@ -626,7 +631,7 @@ export function PrintPreviewPage() {
               {[
                 '上传文件需清晰完整，当前支持 PDF、JPG、PNG；Word 页内预览和转换能力后续接入。',
                 '左侧可预览 PDF 和图片；如果无法预览，请检查签名链接是否过期，或返回重新上传。',
-                '隐私检查只用于本次打印前确认，扫描件/图片可能通过第三方 OCR 服务识别文字；当前遮挡产物未生成时会明确提示仍使用原文件。',
+                '隐私检查只用于本次打印前确认，扫描件/图片可能通过第三方 OCR 服务识别文字；本机只能盖住它检出来的位置，最终以你核对过的预览为准。',
                 '打印完成后请从出纸口取件，如有质量问题请联系现场工作人员。',
               ].map((item, index) => (
                 <li key={item} className="flex gap-3">

@@ -46,3 +46,54 @@
 .w2-material-actions { position: sticky; bottom: 0; }
 .w2-material-actions button { min-height: 64px; min-width: 220px; }
 @media (max-width: 900px) { .w2-material-page { padding: 16px 24px 24px; } .w2-material-grid { grid-template-columns: 1fr; overflow-y: auto; } }
+
+/* ── 第 3 / 4 步：强制预览 + 人眼确认 ────────────────────────────────────────
+   预览区没有折叠开关，也没有跳过入口 —— 这是本功能唯一真正的安全阀，
+   任何把它做成可收起 / 可跳过的样式改动都不接受（决策文档 §四）。 */
+.w2-redact-page { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 18px; padding: 20px 48px 30px; }
+.w2-redact-result { display: flex; align-items: flex-start; gap: 16px; padding: 20px 22px; color: var(--print-teal-deep); border: 1px solid rgb(31 158 134 / 35%); border-radius: 16px; background: var(--print-teal-soft); }
+.w2-redact-result[data-tone='warning'] { color: var(--print-wheat-deep); border-color: rgb(169 120 31 / 35%); background: var(--print-wheat-soft); }
+.w2-redact-result[data-tone='danger'] { color: var(--print-error); border-color: rgb(193 74 52 / 35%); background: rgb(193 74 52 / 8%); }
+.w2-redact-result > svg { width: 34px; flex: none; }
+.w2-redact-result h2 { font-size: 24px; font-weight: 800; line-height: 1.4; }
+.w2-redact-result p { margin-top: 6px; font-size: 18px; line-height: 1.7; }
+.w2-redact-grid { display: grid; min-height: 0; flex: 1; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; }
+.w2-redact-preview { display: flex; min-height: 0; flex-direction: column; gap: 12px; }
+.w2-redact-preview-head { display: flex; align-items: center; gap: 10px; font-size: 18px; }
+.w2-redact-preview-head > svg { width: 24px; color: var(--print-teal-deep); }
+.w2-redact-preview-head span { overflow: hidden; color: var(--print-muted); text-overflow: ellipsis; white-space: nowrap; }
+.w2-redact-preview-frame { display: flex; min-height: 980px; flex: 1; overflow: hidden; border: 1px solid var(--print-line); border-radius: 16px; background: var(--print-surface); }
+.w2-redact-preview-frame iframe { width: 100%; height: 100%; border: 0; }
+.w2-redact-preview-frame img { width: 100%; height: 100%; object-fit: contain; }
+.w2-redact-preview-blocked { display: flex; width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px; color: var(--print-error); text-align: center; }
+.w2-redact-preview-blocked > svg { width: 44px; }
+.w2-redact-preview-blocked b { font-size: 20px; }
+.w2-redact-preview-blocked p { max-width: 46ch; font-size: 17px; line-height: 1.7; }
+.w2-redact-side { display: flex; min-height: 0; flex-direction: column; gap: 14px; overflow-y: auto; }
+.w2-redact-index, .w2-redact-failed, .w2-redact-reverify, .w2-redact-options { padding: 18px 20px; }
+.w2-redact-index h3, .w2-redact-failed h3, .w2-redact-reverify h3, .w2-redact-options h3 { display: flex; align-items: center; gap: 8px; font-size: 19px; font-weight: 700; }
+.w2-redact-index h3 > svg, .w2-redact-failed h3 > svg { width: 22px; flex: none; }
+.w2-redact-index p, .w2-redact-failed p, .w2-redact-reverify p, .w2-redact-options li { margin-top: 8px; color: var(--print-muted); font-size: 16.5px; line-height: 1.7; }
+.w2-redact-index ul { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.w2-redact-index li { display: flex; gap: 12px; padding: 10px 12px; border: 1px solid var(--print-line); border-radius: 12px; font-size: 16.5px; }
+.w2-redact-index li b { flex: none; }
+.w2-redact-index li span { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
+.w2-redact-index em { font-style: normal; }
+.w2-redact-index em[data-kind='redacted'] { color: var(--print-teal-deep); }
+.w2-redact-index em[data-kind='failed'] { color: var(--print-error); font-weight: 700; }
+.w2-redact-index em[data-kind='kept'] { color: var(--print-muted); }
+.w2-redact-failed { color: var(--print-error); border-color: rgb(193 74 52 / 35%); background: rgb(193 74 52 / 6%); }
+.w2-redact-failed ul { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.w2-redact-failed li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--print-surface); font-size: 16.5px; }
+.w2-redact-kept { display: flex; align-items: center; gap: 12px; padding: 14px 18px; color: var(--print-muted); font-size: 16.5px; }
+.w2-redact-kept > svg { width: 22px; flex: none; }
+.w2-redact-fallback { display: flex; flex-direction: column; gap: 14px; }
+.w2-redact-options ol { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-left: 22px; list-style: decimal; }
+.w2-redact-ack { display: flex; flex-direction: column; gap: 14px; padding: 18px 20px; }
+.w2-redact-ack button { min-height: 56px; }
+.w2-redact-confirm { padding: 18px 20px; border-color: var(--print-teal); background: var(--print-teal-soft); }
+.w2-redact-confirm label, .w2-redact-ack label { display: flex; min-height: 56px; align-items: center; gap: 14px; cursor: pointer; font-size: 18px; line-height: 1.6; }
+.w2-redact-confirm input[type='checkbox'], .w2-redact-ack input[type='checkbox'] { width: 32px; height: 32px; flex: none; accent-color: var(--print-teal-deep); }
+.w2-redact-actions { position: sticky; bottom: 0; }
+.w2-redact-actions button { min-height: 64px; min-width: 240px; }
+@media (max-width: 900px) { .w2-redact-page { padding: 16px 24px 24px; } .w2-redact-grid { grid-template-columns: 1fr; } .w2-redact-preview-frame { min-height: 460px; } }

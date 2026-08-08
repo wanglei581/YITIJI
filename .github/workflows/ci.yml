@@ -216,6 +216,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:pii-redaction-contract
           pnpm --filter @ai-job-print/kiosk verify:device-status-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
           pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui

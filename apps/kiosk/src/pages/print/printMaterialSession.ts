@@ -33,6 +33,28 @@ export interface StoredMaterialTask {
   updatedAt?: string
 }
 
+/**
+ * 遮挡结论摘要 —— 下游打印页（预览 / 参数 / 确认）只能读这里，
+ * 不允许各自按 findings 数量再编一句「遮挡 N 项」。
+ * `claim` 为空表示后端没有给出可识别结论，下游一律按「本机未确认」处理。
+ */
+export interface MaterialRedactionSummary {
+  /** 来自后端 claim；null = 未知 / 未产出结论（fail-closed）。 */
+  claim: 'redacted_verified' | 'redacted_unverified' | 'partial' | 'not_supported' | null
+  redactedFileId: string | null
+  /** 逐项真实结果计数，不是笼统成功。 */
+  appliedRedactedCount: number
+  failedNoPositionCount: number
+  keptCount: number
+  /** 复检残留；null = 后端没给数字，不等于 0。 */
+  reverifyRemainingCount: number | null
+  reverifyRan: boolean
+  /** 用户在强制预览页勾选「我核对过」的时间；为空表示没有经过人眼确认。 */
+  previewConfirmedAt?: string
+  /** 用户明确接受「不做遮挡直接打印原件」的时间。 */
+  unredactedAcknowledgedAt?: string
+}
+
 export interface MaterialCheckSummary {
   inspectionTaskId: string
   normalizeTaskId?: string
@@ -40,14 +62,10 @@ export interface MaterialCheckSummary {
   piiRedactTaskId?: string
   checkedAt: string
   findingCount: number
+  /** 用户请求遮挡的数量（裁决结果），不代表真的盖上了。 */
   redactedCount: number
   keptCount: number
-  redaction?: {
-    canRedact: boolean
-    redactedFileId: string | null
-    resultFileCreated: boolean
-    message: string
-  }
+  redaction?: MaterialRedactionSummary
   mode: 'checked' | 'demo'
 }
 
