@@ -16,8 +16,11 @@ import { createCanvas } from '@napi-rs/canvas'
 import { BadRequestException, ForbiddenException, GoneException } from '@nestjs/common'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { MaterialsService } from '../src/materials/materials.service'
+import { PiiRedactionService } from '../src/materials/pii-redaction.service'
 import type { OcrService } from '../src/ai/resume/ocr/ocr.service'
 import { StorageService } from '../src/storage/storage.service'
+import { FilesService } from '../src/files/files.service'
+import { AuditService } from '../src/audit/audit.service'
 import { LOCAL_BUCKET_SENTINEL, LOCAL_REGION_SENTINEL } from '../src/storage/storage.interface'
 
 /** 与 pii-scan.util.ts 内部同名常量保持一致的解析公式，避免测试假设与实际生效配置脱节。 */
@@ -79,13 +82,15 @@ async function main() {
   const prisma = new PrismaService()
   await prisma.onModuleInit()
   const storage = new StorageService()
+  const audit = new AuditService(prisma)
+  const files = new FilesService(prisma, audit, storage)
   // 共享实例只用于不涉及真实抽取的路径（inspection/normalize_a4/pii_redact/ownership 等）；
   // 若某条路径意外触发 OCR，立即在这里失败，而不是悄悄返回貌似合理的假结果。
   const strictNoOcr: Pick<OcrService, 'recognize'> = {
     recognize: async () =>
       fail('unexpected OCR call on the shared materials instance (a specific test path should have used its own FakeOcrService)'),
   }
-  const materials = new MaterialsService(prisma, storage, strictNoOcr as unknown as OcrService)
+  const materials = new MaterialsService(prisma, storage, strictNoOcr as unknown as OcrService, new PiiRedactionService(prisma, storage, strictNoOcr as unknown as OcrService, files))
 
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12)
   const ownerId = `eu_mat_owner_${suffix}`
@@ -266,7 +271,7 @@ async function main() {
     // buildPiiFindingsFromPages 正则匹配/去重管线（与 verify-scan-tasks.ts 的 FakeFilesService
     // 同一原则：fake the boundary, not the logic）。
     const textSampleOcr = makeFakeOcr(async () => ({ ok: true, text: textSample, confidence: 'high' as const }))
-    const materialsRealOcr = new MaterialsService(prisma, storage, textSampleOcr.ocr)
+    const materialsRealOcr = new MaterialsService(prisma, storage, textSampleOcr.ocr, new PiiRedactionService(prisma, storage, textSampleOcr.ocr, files))
 
     const task = await materialsRealOcr.createTask(
       { kind: 'pii_scan', sourceFileId: ownedFileId, params: sensitiveParams },
@@ -607,7 +612,7 @@ async function main() {
     //    现已彻底删除。无论客户端怎么声称 contentCategory，单页图片都必须真实走 OCR 抽取——
     //    这里验证 OCR 确实被调用、且结果是诚实的 mode=real（而不是被跳过）。
     const contentCategoryOcr = makeFakeOcr(async () => ({ ok: true, text: textSample, confidence: 'high' as const }))
-    const materialsContentCategoryOcr = new MaterialsService(prisma, storage, contentCategoryOcr.ocr)
+    const materialsContentCategoryOcr = new MaterialsService(prisma, storage, contentCategoryOcr.ocr, new PiiRedactionService(prisma, storage, contentCategoryOcr.ocr, files))
     const photoClaimTask = await materialsContentCategoryOcr.createTask(
       { kind: 'pii_scan', sourceFileId: imageFileId, params: { contentCategory: 'photo' } },
       { kind: 'anonymous' },
@@ -668,7 +673,7 @@ async function main() {
       },
     })
     const failingOcr = makeFakeOcr(async () => ({ ok: false, errorCode: 'OCR_FAILED', errorMessage: 'mock OCR provider failure' }))
-    const materialsFailingOcr = new MaterialsService(prisma, storage, failingOcr.ocr)
+    const materialsFailingOcr = new MaterialsService(prisma, storage, failingOcr.ocr, new PiiRedactionService(prisma, storage, failingOcr.ocr, files))
     const degradedTask = await materialsFailingOcr.createTask(
       { kind: 'pii_scan', sourceFileId: degradedOcrImageFileId, params: {} },
       { kind: 'anonymous' },
@@ -950,7 +955,7 @@ async function main() {
         },
       })
       const bigPageOcr = makeFakeOcr(async () => ({ ok: true, text: 'ocr-fallback-text', confidence: 'high' as const }))
-      const materialsBigPageOcr = new MaterialsService(prisma, storage, bigPageOcr.ocr)
+      const materialsBigPageOcr = new MaterialsService(prisma, storage, bigPageOcr.ocr, new PiiRedactionService(prisma, storage, bigPageOcr.ocr, files))
       const bigPageTask = await materialsBigPageOcr.createTask(
         { kind: 'pii_scan', sourceFileId: bigPageCountFileId, params: {} },
         { kind: 'anonymous' },

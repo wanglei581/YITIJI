@@ -20,6 +20,26 @@ interface UnpdfApi {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const unpdf = require('unpdf') as UnpdfApi
 
+/** pdfjs TextItem 的最小结构（本地类型，理由同上：不依赖 unpdf 的 types 解析）。 */
+interface PdfTextItem {
+  str?: string
+  /** [a, b, c, d, e, f]；e/f 即该 item 基线左端点在 PDF 用户空间的 x/y，d 的绝对值即字号。 */
+  transform?: number[]
+  width?: number
+  height?: number
+  hasEOL?: boolean
+}
+interface PdfPageProxy {
+  getViewport(opts: { scale: number }): { width: number; height: number }
+  getTextContent(): Promise<{ items: PdfTextItem[] }>
+  cleanup(): void
+}
+interface PdfDocumentProxy {
+  numPages?: number
+  getPage(pageNumber: number): Promise<PdfPageProxy>
+  destroy?(): Promise<void>
+}
+
 /** DOCX（Office Open XML Word 文档）MIME（与 resume-extraction.service.ts 保持一致，本地各自定义，未共享常量）。 */
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
@@ -47,6 +67,43 @@ const PII_SCAN_OCR_RENDER_SCALE = 2
  */
 const MAX_BORN_DIGITAL_EXTRACT_PAGES = 50
 
+/**
+ * 命中片段在文字层 PDF 上的一个矩形（PDF 用户空间点 pt，原点左下角）。
+ * pageWidth / pageHeight 一并带上，供前端按任意 DPI 换算预览叠加框、供服务端按同一坐标系画黑条。
+ */
+export type PiiBox = {
+  pageNumber: number
+  x: number
+  y: number
+  width: number
+  height: number
+  pageWidth: number
+  pageHeight: number
+}
+
+/** 抽取出的单个文字 item（带位置）。仅 PDF 文字层路径有；OCR / DOCX / 图片路径为空。 */
+export type PositionedTextItem = {
+  str: string
+  x: number
+  y: number
+  width: number
+  height: number
+  fontSize: number
+  hasEOL: boolean
+}
+
+export type ExtractedPage = {
+  pageNumber: number | null
+  text: string
+  /** 与 text 对齐的位置信息；缺省表示该页没有可用坐标（OCR / DOCX / 图片）。 */
+  items?: PositionedTextItem[]
+  /** text 中第 i 个字符来自 items[itemIndexByChar[i]] 的第 charOffsetByChar[i] 个字符。 */
+  itemIndexByChar?: number[]
+  charOffsetByChar?: number[]
+  pageWidth?: number
+  pageHeight?: number
+}
+
 export type PiiFindingDraft = {
   type: string
   label: string
@@ -54,7 +111,15 @@ export type PiiFindingDraft = {
   snippet: string | null
   confidence: number
   action: PiiFindingAction
+  /** 该值在文档中全部出现位置的矩形；空数组 = 拿不到坐标，不可遮挡。 */
+  boxes: PiiBox[]
 }
+
+/**
+ * 供 pii_redact 使用的、带原文值的命中项（**只在内存里存在，绝不落库**）。
+ * 落库走 PiiFindingDraft（snippet 已掩码、只留坐标）。
+ */
+export type PiiFindingWithValue = PiiFindingDraft & { value: string }
 
 /**
  * 为 pii_scan 提取可用于正则匹配的文本内容。
@@ -80,7 +145,7 @@ export async function extractTextForPiiScan(
   mimeType: string,
   ocr: Pick<OcrService, 'recognize'>,
 ): Promise<{
-  pages: Array<{ pageNumber: number | null; text: string }>
+  pages: ExtractedPage[]
   outcome: 'ok' | 'degraded' | 'unsupported_format'
   truncated: boolean
   /** 仅当 truncated=true 时有意义：实际完成 OCR 的页数 / 文档声明的总页数。 */
@@ -88,34 +153,36 @@ export async function extractTextForPiiScan(
   totalPages?: number
 }> {
   if (mimeType === 'application/pdf') {
-    let rawText = ''
+    let bornDigitalPages: ExtractedPage[] = []
     let totalPages = 0
-    let pdf: unknown
+    let pdf: PdfDocumentProxy
     try {
-      pdf = await unpdf.getDocumentProxy(new Uint8Array(buffer))
+      pdf = (await unpdf.getDocumentProxy(new Uint8Array(buffer))) as PdfDocumentProxy
     } catch {
       return { pages: [], outcome: 'degraded', truncated: false }
     }
-    const declaredPageCount = (pdf as { numPages?: number }).numPages ?? 0
-    if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
-      try {
-        const extracted = await unpdf.extractText(pdf, { mergePages: true })
-        totalPages = extracted.totalPages
-        rawText = Array.isArray(extracted.text) ? extracted.text.join('\n') : (extracted.text ?? '')
-      } catch {
-        return { pages: [], outcome: 'degraded', truncated: false }
+    const declaredPageCount = pdf.numPages ?? 0
+    try {
+      if (declaredPageCount > 0 && declaredPageCount <= MAX_BORN_DIGITAL_EXTRACT_PAGES) {
+        bornDigitalPages = await extractPositionedPages(pdf, declaredPageCount)
+        totalPages = declaredPageCount
+      } else {
+        // 声明页数为 0（无法判断）或超过上限：跳过无界的逐页文字层抽取，
+        // bornDigitalPages 保持空会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
+        totalPages = declaredPageCount
       }
-    } else {
-      // 声明页数为 0（无法判断）或超过上限：跳过无界的 extractText，
-      // rawText 保持 '' 会自动走下面 OCR 渲染兜底路径（该路径自带页数上限）。
-      totalPages = declaredPageCount
+    } catch {
+      return { pages: [], outcome: 'degraded', truncated: false }
+    } finally {
+      await pdf.destroy?.().catch(() => undefined)
     }
-    if (rawText.trim().length >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
-      return { pages: [{ pageNumber: null, text: rawText }], outcome: 'ok', truncated: false }
+    const bornDigitalChars = bornDigitalPages.reduce((sum, page) => sum + page.text.trim().length, 0)
+    if (bornDigitalChars >= MIN_TEXT_CHARS_FOR_BORN_DIGITAL) {
+      return { pages: bornDigitalPages, outcome: 'ok', truncated: false }
     }
     // 文字层为空/极少 → 扫描件，逐页渲染 + OCR
     const pagesToRender = Math.min(Math.max(totalPages, 1), PII_SCAN_MAX_OCR_PAGES)
-    const pages: Array<{ pageNumber: number | null; text: string }> = []
+    const pages: ExtractedPage[] = []
     try {
       const rendered = await openPdfForRender(buffer)
       try {
@@ -161,75 +228,273 @@ export async function extractTextForPiiScan(
   return { pages: [], outcome: 'unsupported_format', truncated: false }
 }
 
-export function buildPiiFindingsFromPages(pages: Array<{ pageNumber: number | null; text: string }>): PiiFindingDraft[] {
-  const findings: PiiFindingDraft[] = []
-  const seen = new Set<string>()
+/**
+ * 检测器表。顺序即命中项在结果里的分组顺序（与改动前逐段调用的顺序一致）。
+ * pattern 是工厂函数：带 /g 的正则有 lastIndex 状态，共享实例会串页漏匹配。
+ */
+const PII_PATTERNS: Array<{ type: string; label: string; confidence: number; pattern: () => RegExp }> = [
+  { type: 'phone', label: '手机号', confidence: 0.95, pattern: () => /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g },
+  { type: 'email', label: '邮箱', confidence: 0.93, pattern: () => /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi },
+  {
+    type: 'id_card',
+    label: '身份证号',
+    confidence: 0.9,
+    pattern: () => /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g,
+  },
+  {
+    type: 'address',
+    label: '地址',
+    confidence: 0.78,
+    pattern: () => /([一-龥]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[一-龥A-Za-z0-9\s-]{0,24}号?)/g,
+  },
+]
 
-  const pushUnique = (type: string, rawValue: string, draft: PiiFindingDraft) => {
-    const key = `${type}:${rawValue}`
-    if (!seen.has(key)) {
-      seen.add(key)
-      findings.push(draft)
+export function buildPiiFindingsFromPages(pages: ExtractedPage[]): PiiFindingDraft[] {
+  // 剥掉 value：落库 / 出 API 的形态永远不含 PII 原文。
+  return buildPiiFindingsWithValues(pages).map(({ value: _value, ...draft }) => draft)
+}
+
+/**
+ * 与 buildPiiFindingsFromPages 同一套检测逻辑，但保留命中原文值。
+ *
+ * **只允许在单次请求的内存里使用**：pii_redact 需要原文做遮挡后复检
+ * （判断"这个值是否还能从派生件里提取出来"）。绝不落库、绝不出 API、绝不写日志。
+ *
+ * 去重语义：同一 (type, value) 只产出一条命中项（用户只需为一个值做一次裁决），
+ * 但其 boxes 合并该值在整份文档里的**全部**出现位置 —— 只盖第一处就是漏盖。
+ */
+export function buildPiiFindingsWithValues(pages: ExtractedPage[]): PiiFindingWithValue[] {
+  const findings: PiiFindingWithValue[] = []
+  const byKey = new Map<string, PiiFindingWithValue>()
+
+  for (const { type, label, confidence, pattern } of PII_PATTERNS) {
+    for (const page of pages) {
+      const regex = pattern()
+      let match: RegExpExecArray | null
+      while ((match = regex.exec(page.text)) !== null) {
+        const value = match[1]
+        if (!value) continue
+        // 手机号那条正则带 (?:^|[^\d]) 前导组，match.index 不等于捕获组起点。
+        const valueStart = match.index + match[0].indexOf(value)
+        const boxes = locateBoxes(page, valueStart, value.length)
+        const key = `${type}:${value}`
+        const existing = byKey.get(key)
+        if (existing) {
+          existing.boxes.push(...boxes)
+          if (existing.pageNumber === null && page.pageNumber !== null) existing.pageNumber = page.pageNumber
+          continue
+        }
+        const draft: PiiFindingWithValue = {
+          type,
+          label,
+          pageNumber: page.pageNumber,
+          snippet: maskPiiSnippet(type, value),
+          confidence,
+          action: 'pending' as const,
+          boxes,
+          value,
+        }
+        byKey.set(key, draft)
+        findings.push(draft)
+      }
     }
-  }
-
-  for (const { pageNumber, text } of pages) {
-    collectMatches(text, /(?:^|[^\d])((?:\+?86[- ]?)?1[3-9]\d{9})(?!\d)/g, (value) => value).forEach((value) => {
-      pushUnique('phone', value, {
-        type: 'phone',
-        label: '手机号',
-        pageNumber,
-        snippet: maskPiiSnippet('phone', value),
-        confidence: 0.95,
-        action: 'pending' as const,
-      })
-    })
-
-    collectMatches(text, /([A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,})/gi, (value) => value).forEach((value) => {
-      pushUnique('email', value, {
-        type: 'email',
-        label: '邮箱',
-        pageNumber,
-        snippet: maskPiiSnippet('email', value),
-        confidence: 0.93,
-        action: 'pending' as const,
-      })
-    })
-
-    collectMatches(text, /\b([1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx])\b/g, (value) => value).forEach((value) => {
-      pushUnique('id_card', value, {
-        type: 'id_card',
-        label: '身份证号',
-        pageNumber,
-        snippet: maskPiiSnippet('id_card', value),
-        confidence: 0.9,
-        action: 'pending' as const,
-      })
-    })
-
-    collectMatches(text, /([\u4e00-\u9fa5]{2,}(?:省|市|区|县|镇|街道|路|街|巷)[\u4e00-\u9fa5A-Za-z0-9\s-]{0,24}号?)/g, (value) => value).forEach((value) => {
-      pushUnique('address', value, {
-        type: 'address',
-        label: '地址',
-        pageNumber,
-        snippet: maskPiiSnippet('address', value),
-        confidence: 0.78,
-        action: 'pending' as const,
-      })
-    })
   }
 
   return findings
 }
 
-function collectMatches<T>(text: string, regex: RegExp, toFinding: (value: string) => T): T[] {
-  const findings: T[] = []
-  let match: RegExpExecArray | null
-  while ((match = regex.exec(text)) !== null) {
-    const value = match[1]
-    if (value) findings.push(toFinding(value))
+/**
+ * 把 page.text 的字符区间 [start, start+length) 映射回一组 PDF 用户空间矩形。
+ *
+ * 一个命中值可能横跨多个 text item（PDF 生成器常因字距调整把一串数字拆开），
+ * 所以返回数组：每个被命中覆盖到的 item 产出一个矩形。
+ * 没有位置信息的页（OCR / DOCX / 图片）返回空数组 —— 调用方据此判定"不可遮挡"。
+ */
+function locateBoxes(page: ExtractedPage, start: number, length: number): PiiBox[] {
+  const { items, itemIndexByChar, charOffsetByChar, pageWidth, pageHeight, pageNumber } = page
+  if (!items || !itemIndexByChar || !charOffsetByChar) return []
+  if (pageNumber === null || pageWidth === undefined || pageHeight === undefined) return []
+
+  // 命中区间在每个 item 内覆盖到的字符下标范围。
+  const spans = new Map<number, { from: number; to: number }>()
+  for (let i = start; i < start + length; i += 1) {
+    const itemIndex = itemIndexByChar[i]
+    const charOffset = charOffsetByChar[i]
+    if (itemIndex === undefined || itemIndex < 0 || charOffset === undefined || charOffset < 0) continue
+    const span = spans.get(itemIndex)
+    if (span) {
+      span.from = Math.min(span.from, charOffset)
+      span.to = Math.max(span.to, charOffset + 1)
+    } else {
+      spans.set(itemIndex, { from: charOffset, to: charOffset + 1 })
+    }
   }
-  return findings
+
+  const boxes: PiiBox[] = []
+  for (const [itemIndex, span] of spans) {
+    const item = items[itemIndex]
+    if (!item) continue
+    const rect = estimateSubstringRect(item, span.from, span.to)
+    if (!rect) continue
+    boxes.push({ pageNumber, ...rect, pageWidth, pageHeight })
+  }
+  return boxes
+}
+
+/** 黑条两侧最小留白（pt）。 */
+const MIN_BOX_PAD_PT = 2
+/** 黑条两侧留白占字号的比例。 */
+const BOX_PAD_RATIO = 0.35
+/** 基线下方留白占字号的比例（descender）。 */
+const BOX_DESCENDER_RATIO = 0.3
+/** 基线上方留白占字号的比例（ascender + 余量）。 */
+const BOX_ASCENDER_RATIO = 1.05
+
+/**
+ * 估算 item.str 的 [from, to) 子串在 PDF 用户空间的矩形。
+ *
+ * getTextContent 只给整个 item 的 x/y/width/height，不给逐字宽度。按决策文档
+ * （docs/product/pii-redaction-decision-2026-08.md §3.2）「宁可多盖不可漏盖」，
+ * 这里用字符类别加权模型估算，而不是等宽比例：等宽比例对 "ID: 110101..." 这类
+ * "窄前缀 + 数字段"会把黑条整体右移（实测偏右约 6pt），那是**漏盖方向**的误差；
+ * 加权模型把误差压到 1–2pt 量级，再叠加两侧留白覆盖残差。
+ *
+ * 权重是字宽相对字号的粗略比例，最后按 item 已知总宽归一化，因此只需相对关系正确。
+ */
+function estimateSubstringRect(
+  item: PositionedTextItem,
+  from: number,
+  to: number,
+): { x: number; y: number; width: number; height: number } | null {
+  const chars = [...item.str]
+  if (chars.length === 0 || item.width <= 0) return null
+  const clampedFrom = Math.max(0, Math.min(from, chars.length))
+  const clampedTo = Math.max(clampedFrom, Math.min(to, chars.length))
+  if (clampedTo <= clampedFrom) return null
+
+  const weights = chars.map(charWidthWeight)
+  const total = weights.reduce((sum, weight) => sum + weight, 0)
+  if (total <= 0) return null
+  const scale = item.width / total
+  const before = weights.slice(0, clampedFrom).reduce((sum, weight) => sum + weight, 0)
+  const inside = weights.slice(clampedFrom, clampedTo).reduce((sum, weight) => sum + weight, 0)
+
+  const fontSize = item.fontSize > 0 ? item.fontSize : item.height
+  // 两侧留白：吸收加权模型的残余误差 + 字形自身的 side bearing。
+  const padX = Math.max(MIN_BOX_PAD_PT, fontSize * BOX_PAD_RATIO)
+  const padBelow = fontSize * BOX_DESCENDER_RATIO
+  const padAbove = fontSize * BOX_ASCENDER_RATIO
+  return {
+    x: item.x + before * scale - padX,
+    y: item.y - padBelow,
+    width: inside * scale + padX * 2,
+    height: padBelow + padAbove,
+  }
+}
+
+/**
+ * 字符宽度相对字号的粗略权重（只需相对关系正确，绝对值由 item.width 归一化）。
+ * 数字 / 大写按等宽记（tabular figures 是排版惯例），窄标点单列，CJK 全角记 1。
+ */
+function charWidthWeight(ch: string): number {
+  const code = ch.codePointAt(0) ?? 0
+  if (code > 0x2e80) return 1 // CJK / 全角标点
+  if (/\s/.test(ch)) return 0.28
+  if (/[.,:;'`|!ijlI[\]()]/.test(ch)) return 0.3
+  if (/[A-Z0-9@#%&Wm]/.test(ch)) return 0.6
+  return 0.52
+}
+
+/**
+ * 逐页抽取带位置的文字层。
+ *
+ * page.text 的拼接方式与 unpdf.extractText 的 getPageText 完全一致
+ * （`items.map(i => i.str + (i.hasEOL ? '\n' : '')).join('')`），随后按改动前
+ * mergePages:true 的 `.replace(/\s+/g, ' ')` 做同样的空白折叠 —— 折叠时同步维护
+ * 字符 → item 的映射，所以匹配语义与改动前一致，只是从"整份合并"变成"逐页"
+ * （跨页拼出的命中本来就是噪声，逐页更准，且这样才有真实页码可用）。
+ */
+async function extractPositionedPages(pdf: PdfDocumentProxy, pageCount: number): Promise<ExtractedPage[]> {
+  const pages: ExtractedPage[] = []
+  for (let pageNo = 1; pageNo <= pageCount; pageNo += 1) {
+    const page = await pdf.getPage(pageNo)
+    try {
+      const viewport = page.getViewport({ scale: 1 })
+      const content = await page.getTextContent()
+      const items: PositionedTextItem[] = []
+      let raw = ''
+      const rawItemIndex: number[] = []
+      const rawCharOffset: number[] = []
+      for (const item of content.items) {
+        if (typeof item.str !== 'string') continue
+        const transform = item.transform ?? []
+        const positioned: PositionedTextItem = {
+          str: item.str,
+          x: transform[4] ?? 0,
+          y: transform[5] ?? 0,
+          width: item.width ?? 0,
+          height: item.height ?? 0,
+          fontSize: Math.hypot(transform[2] ?? 0, transform[3] ?? 0) || (item.height ?? 0),
+          hasEOL: item.hasEOL === true,
+        }
+        const itemIndex = items.length
+        items.push(positioned)
+        const chars = [...item.str]
+        for (let c = 0; c < chars.length; c += 1) {
+          raw += chars[c]
+          rawItemIndex.push(itemIndex)
+          rawCharOffset.push(c)
+        }
+        if (positioned.hasEOL) {
+          raw += '\n'
+          rawItemIndex.push(-1)
+          rawCharOffset.push(-1)
+        }
+      }
+      const collapsed = collapseWhitespace(raw, rawItemIndex, rawCharOffset)
+      pages.push({
+        pageNumber: pageNo,
+        text: collapsed.text,
+        items,
+        itemIndexByChar: collapsed.itemIndexByChar,
+        charOffsetByChar: collapsed.charOffsetByChar,
+        pageWidth: viewport.width,
+        pageHeight: viewport.height,
+      })
+    } finally {
+      page.cleanup()
+    }
+  }
+  return pages
+}
+
+/** 把连续空白折叠成单个空格，同时把"字符 → item"的映射一起搬过去。 */
+function collapseWhitespace(
+  raw: string,
+  itemIndex: number[],
+  charOffset: number[],
+): { text: string; itemIndexByChar: number[]; charOffsetByChar: number[] } {
+  let text = ''
+  const outItemIndex: number[] = []
+  const outCharOffset: number[] = []
+  let previousWasSpace = false
+  const chars = [...raw]
+  for (let i = 0; i < chars.length; i += 1) {
+    const ch = chars[i]!
+    if (/\s/.test(ch)) {
+      if (previousWasSpace) continue
+      previousWasSpace = true
+      text += ' '
+      outItemIndex.push(itemIndex[i] ?? -1)
+      outCharOffset.push(charOffset[i] ?? -1)
+      continue
+    }
+    previousWasSpace = false
+    text += ch
+    outItemIndex.push(itemIndex[i] ?? -1)
+    outCharOffset.push(charOffset[i] ?? -1)
+  }
+  return { text, itemIndexByChar: outItemIndex, charOffsetByChar: outCharOffset }
 }
 
 /**

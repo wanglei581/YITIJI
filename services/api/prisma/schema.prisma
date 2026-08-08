@@ -918,6 +918,19 @@ model PiiFinding {
   snippet    String?
   confidence Float?
   action     String   @default("pending")
+  // 命中片段在文字层 PDF 上的位置(隐私遮挡一级能力,见 docs/product/pii-redaction-decision-2026-08.md)。
+  //
+  // 为什么是 JSON 数组而不是一组 x/y/w/h 标量列:
+  //   1. 同一个值可能在多页 / 多处出现(buildPiiFindingsFromPages 按 type:value 去重成"一条用户决策",
+  //      但遮挡必须覆盖全部出现位置,否则就是漏盖);
+  //   2. 一个值可能被 PDF 拆进多个 text item(字距调整很常见),一处出现也可能要画多个矩形。
+  //   单值标量列只能表达一个矩形,会静默漏盖 —— 这正是本功能最危险的失败模式。
+  //
+  // 形状: [{ pageNumber, x, y, width, height, pageWidth, pageHeight }],单位为 PDF 用户空间点(pt),
+  // 原点左下角; pageWidth / pageHeight 供前端按任意 DPI 换算预览叠加框。
+  // 只含坐标,不含任何 PII 原文(与 snippet 掩码策略一致)。
+  // null / 空数组 = 拿不到坐标(扫描件 OCR 路径 / DOCX / 图片),该项不可遮挡。
+  boxesJson  String?
   createdAt  DateTime @default(now())
 
   @@index([taskId])
