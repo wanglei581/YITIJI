@@ -1,6 +1,6 @@
 # 下一步任务
 
-> 最后更新：2026-08-07
+> 最后更新：2026-08-08
 
 ## 当前执行：文件流程候选冻结前外部门禁
 
@@ -13,9 +13,10 @@
 
 ## 当前执行：生产混合版本故障恢复
 
+- [ ] **取消部署现场只读复核**：2026-08-08 未授权 Deploy run `31259646187` 已在 Partner 构建阶段取消，日志证明未进入 API 发布、Nginx 覆盖或 reload，但服务器源码工作目录已检出 `b6f7ed2e` 并执行依赖安装、Kiosk/Admin 构建。下次具名授权发布前，先只读核对服务器 HEAD/工作区、运行目录 `DEPLOY_SOURCE`、PM2 commit/restart、三端线上 bundle 与备份空间；不得把服务器源码 HEAD 等同于已部署运行版本，不得在未重新授权时继续发布。
 - [x] **PR #511 主干 CI 回归修复已合入**：用户明确授权后，PR #511 已以 merge commit `200786a7` 合入 `main`；head `94e06944` 的 run `31107530315` 中 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。未部署，也未执行 bootstrap 或生产发布。
 - [x] **`js-yaml` 高危公告已由 PR #514 修复并完成 Kiosk 部署**：`js-yaml@4.3.1` 与唯一实例/标准 YAML 运行时防回退门禁已合入 `main@e7493dcd`，main run `31142486608` 三项全绿；重复 PR #513 已关闭。deploy run `31143067183` 第一次尝试被取消，随后经另一流程明确授权重跑 attempt 2 并成功完成依赖安装、Kiosk production build、Nginx 静态目录替换与 reload；只读验收确认线上首页/API health 200、Nginx active、API PM2 online。该工作流没有滚动 API PM2，不得把 API 运行时升级、数据库迁移、Windows 主机或硬件验收记作完成。
-- [~] **确认真实 API 发布入口与环境隔离**：2026-08-07 已合入 PR #519（`main@536c97f8`）：`DEPLOY_API_ENABLED=true` 仓库变量授权闸门 + 受控 API 发布脚本（备份→additive 迁移→构建→同步运行目录→PM2→健康→`DEPLOY_SOURCE`）+ 未启用时 fail-closed 预检（运行 API 版本与目标不一致时禁止继续发布 Kiosk）。2026-08-07 已按用户授权完成两次受控发布并线上验收通过（`main@e78f3668`、`main@389f37ff`，见 `current-progress.md` 顶部条目）：`DEPLOY_SOURCE`/PM2 COMMIT 均指向目标提交、迁移无 pending、health 与关键探针通过、备份/回滚锚点已记录，发布后变量已关闭。发布入口与受控执行路径已可用；**仍未证明**预生产/生产隔离与独立预生产、完整 release/回滚流程，未获具名发布授权前不得再次覆盖或重启线上 API。
+- [~] **确认真实 API 发布入口与环境隔离**：2026-08-07 已合入 PR #519（`main@536c97f8`）：`DEPLOY_API_ENABLED=true` 仓库变量授权闸门 + 受控 API 发布脚本（备份→additive 迁移→构建→同步运行目录→PM2→健康→`DEPLOY_SOURCE`）+ 未启用时 fail-closed 预检（运行 API 版本与目标不一致时禁止继续发布 Kiosk）。2026-08-07 已按用户授权完成两次受控发布并线上验收通过（`main@e78f3668`、`main@389f37ff`，见 `current-progress.md` 顶部条目）：`DEPLOY_SOURCE`/PM2 COMMIT 均指向目标提交、迁移无 pending、health 与关键探针通过、备份/回滚锚点已记录。当时记录称发布后变量已关闭，但 2026-08-08 readback 发现仍为 `true`；取消未授权 run `31259646187` 后已恢复为 `false`，并由 Deploy job 顶层显式授权门禁锁定。发布入口与受控执行路径已可用；**仍未证明**预生产/生产隔离与独立预生产、完整 release/回滚流程，未获具名发布授权前不得再次覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
