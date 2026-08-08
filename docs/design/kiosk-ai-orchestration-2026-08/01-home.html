@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI 调度台 · 首页 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   首页 · AI 调度台
+   立场：深色 = 机器在说话；纸色 = 用户自己的东西。
+   AI 编排层贯穿 8 大功能，并用连线指出本次编排会用到哪几个。
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+
+.main{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:24px 40px 0;overflow:hidden}
+
+/* 字标：SVG，覆盖 shared.css 的文字版实现 */
+.brand-mark{display:flex;align-items:center;justify-content:center;overflow:hidden;line-height:0;font-size:0}
+.brand-mark svg{width:28px;height:28px;display:block}
+
+/* ───────── 报头 ───────── */
+.masthead{--mh-tight:1;flex:none;display:flex;align-items:flex-start;justify-content:space-between;gap:30px;
+  padding-bottom:16px;border-bottom:2px solid var(--ink)}
+.mh-kicker{display:flex;align-items:center;gap:12px;margin-bottom:10px;
+  color:var(--teal-deep);font-size:15px;font-weight:700;letter-spacing:.18em}
+.mh-kicker::before{content:'';width:38px;height:3px;background:var(--teal);border-radius:2px}
+.masthead h1{font-family:var(--serif);font-size:58px;font-weight:800;line-height:1.14;letter-spacing:.01em}
+.masthead h1 em{display:block;font-style:normal;color:var(--teal-deep)}
+.masthead .lede{margin-top:11px;color:var(--muted);font-size:16.5px;line-height:1.6;max-width:592px}
+.mh-right{flex:none;text-align:right;padding-top:4px}
+.mh-date{font-family:var(--mono);font-size:15px;color:var(--ink-2);letter-spacing:.02em;font-variant-numeric:tabular-nums}
+.mh-machine{margin-top:5px;font-family:var(--mono);font-size:15px;color:var(--faint);letter-spacing:.06em}
+.mh-id{display:inline-flex;align-items:center;gap:9px;margin-top:14px;height:var(--tap);padding:0 16px;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:var(--r-pill);font-size:16.5px}
+.mh-id svg{width:18px;height:18px;color:var(--teal-deep)}
+.mh-id b{color:var(--teal-deep);font-weight:700}
+
+/* ───────── AI 调度带（机器的声音：深色） ───────── */
+.orch{position:relative;flex:none;margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) 322px;
+  gap:0;border-radius:var(--r-xl);overflow:hidden;
+  background:linear-gradient(148deg,var(--ink-panel-1) 0%,var(--ink-panel-2) 52%,var(--ink-panel-3) 100%);
+  box-shadow:0 26px 60px rgba(12,38,32,.34)}
+.orch::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background:radial-gradient(560px 300px at 88% -10%,rgba(63,196,158,.22),transparent 62%),
+             repeating-linear-gradient(90deg,rgba(255,255,255,.03) 0 1px,transparent 1px 46px)}
+.orch-l{position:relative;padding:26px 28px 24px 30px;color:var(--on-ink);display:flex;flex-direction:column}
+.orch-head{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+.orch-badge{display:inline-flex;align-items:center;gap:8px;height:34px;padding:0 14px;
+  color:#0f2b24;background:linear-gradient(180deg,var(--mint),var(--mint-3));border-radius:var(--r-pill);
+  font-size:15px;font-weight:800;letter-spacing:.04em}
+.orch-badge svg{width:16px;height:16px}
+.orch-ts{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--on-ink-4);letter-spacing:.04em}
+.evi{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:var(--r-pill);
+  font-size:16px;font-weight:700;letter-spacing:.02em}
+.evi.e1{color:#bdf0dc;background:rgba(63,196,158,.18);border:1px solid rgba(63,196,158,.34)}
+.evi.e2{color:#bcdcf0;background:rgba(90,160,205,.18);border:1px solid rgba(90,160,205,.34)}
+.orch h2{font-family:var(--serif);font-size:33px;font-weight:800;line-height:1.36;letter-spacing:.01em}
+.orch .why{margin-top:13px;color:var(--on-ink-2);font-size:17px;line-height:1.72}
+.orch .why u{text-decoration:none;color:#eaf7f1;padding:1px 5px;border-radius:4px;
+  background:rgba(63,196,158,.15);box-shadow:inset 0 -2px 0 rgba(63,196,158,.5)}
+.orch-facts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.ofact{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;color:#c4dbd2;
+  background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.1);border-radius:var(--r-s);font-size:16.5px}
+.ofact svg{width:15px;height:15px;color:var(--on-ink-4);flex:none}
+.ofact b{color:#eaf7f1;font-weight:700}
+.orch-foot{margin-top:auto;padding-top:16px;border-top:1px solid rgba(255,255,255,.09)}
+.of-row{display:flex;align-items:center;gap:14px}
+.of-note{margin-top:10px;color:var(--on-ink-3);font-size:16px;letter-spacing:.02em}
+.ocost{display:flex;align-items:center;gap:7px;color:var(--on-ink-3);font-size:16.5px;white-space:nowrap}
+.ocost svg{width:16px;height:16px;flex:none}
+.ocost b{color:#eaf7f1;font-weight:700}
+.plan{margin-left:auto;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.plan .p{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 13px;color:var(--on-ink-3);
+  background:rgba(255,255,255,.06);border-radius:var(--r-pill);font-size:16px;white-space:nowrap;
+  animation:planLight .5s var(--e-out) both}
+.plan .p:nth-child(1){animation-delay:.5s}.plan .p:nth-child(3){animation-delay:.68s}.plan .p:nth-child(5){animation-delay:.86s}
+.plan .p b{font-family:var(--mono);font-size:14px;opacity:.7}
+.plan .p.now{color:#0f2b24;background:linear-gradient(180deg,var(--mint),var(--mint-2));font-weight:800}
+.plan .p.now b{opacity:.65}
+.plan i{color:#4e6b61;font-style:normal;font-size:16px}
+@keyframes planLight{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+
+/* 今日现场（第三方来源，蓝） */
+.today{position:relative;display:flex;flex-direction:column;background:rgba(0,0,0,.2);
+  border-left:1px solid rgba(255,255,255,.1)}
+.today-img{position:relative;height:186px;flex:none;overflow:hidden}
+.today-img img{width:100%;height:100%;object-fit:cover;object-position:50% 38%;
+  filter:saturate(.92) contrast(1.03)}
+.today-img::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(14,33,28,0) 42%,rgba(14,33,28,.94) 100%)}
+.today-src{position:absolute;left:16px;top:14px;z-index:2;display:inline-flex;align-items:center;gap:7px;
+  height:30px;padding:0 12px;color:#dceaf5;background:rgba(20,52,76,.82);
+  border:1px solid rgba(150,200,235,.38);border-radius:var(--r-pill);
+  font-size:15px;font-weight:700;backdrop-filter:blur(4px)}
+.today-src svg{width:14px;height:14px}
+.today-body{flex:1;display:flex;flex-direction:column;padding:16px 18px 18px;color:var(--on-ink)}
+.today-body h4{font-family:var(--serif);font-size:21px;font-weight:800;line-height:1.34}
+.today-meta{margin-top:10px;display:flex;flex-direction:column;gap:7px}
+.today-meta span{display:flex;align-items:center;gap:8px;color:var(--on-ink-2);font-size:16.5px}
+.today-meta svg{width:15px;height:15px;flex:none;color:#6e8d81}
+.today-meta em{font-style:normal;color:#d7e9e0}
+.today-cta{margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;height:var(--tap);
+  color:#cfe9de;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+  border-radius:var(--r-s);font-family:var(--sans);font-size:16px;font-weight:600;cursor:pointer;
+  transition:background var(--t-base) var(--e-out)}
+.today-cta:hover{background:rgba(255,255,255,.16)}
+.today-cta svg{width:17px;height:17px}
+.today-note{margin-top:10px;font-family:var(--mono);font-size:16px;color:#8fb0a3;letter-spacing:.03em;text-align:center}
+
+/* ───────── 编排连线：把 AI 和它要用的功能真正连起来 ───────── */
+/* 连线颜色 = 目标功能的语义色，一眼看出这一步会用到哪个功能 */
+.wire{flex:none;height:52px;position:relative}
+.wire svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wire path{fill:none;stroke-width:2.2;stroke-dasharray:5 6;stroke-linecap:round;opacity:.68;
+  animation:flow 26s linear infinite}
+.wire .w-resume{stroke:var(--clay)}
+.wire .w-print{stroke:var(--teal)}
+.wire .d-resume{fill:var(--clay)}
+.wire .d-print{fill:var(--teal)}
+@keyframes flow{to{stroke-dashoffset:-264}}
+
+/* ───────── 8 大功能矩阵：三档权重，不等大 ───────── */
+.grid-a{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-b{flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+.grid-c{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+
+.svc{position:relative;display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-1);cursor:pointer;overflow:hidden;
+  transition:transform var(--t-base) var(--e-out),box-shadow var(--t-base) var(--e-out),
+             border-color var(--t-base) var(--e-out)}
+.svc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c);
+  opacity:.85;transition:width var(--t-base) var(--e-out)}
+.svc:hover{transform:translateY(-3px);box-shadow:var(--sh-3);border-color:var(--line)}
+.svc:hover::before{width:7px}
+.svc:active{transform:translateY(-1px) scale(.995)}
+.svc-no{display:none;position:absolute;right:18px;top:15px;font-family:var(--mono);font-size:12.5px;
+  color:var(--faint);letter-spacing:.08em}
+.svc-ico{display:grid;place-items:center;border-radius:15px;color:#fff;background:var(--c);
+  box-shadow:0 8px 18px color-mix(in srgb,var(--c) 34%,transparent)}
+.svc h3{font-family:var(--serif);font-weight:800;letter-spacing:.02em}
+.svc .desc{color:var(--muted);line-height:1.5}
+
+/* A 档：主力两卡 */
+.grid-a .svc{padding:22px 24px 0}
+.grid-a .svc-ico{width:58px;height:58px}
+.grid-a .svc-ico svg{width:27px;height:27px}
+.grid-a .svc h3{margin-top:16px;font-size:30px}
+.grid-a .svc .desc{margin-top:8px;font-size:18px}
+
+/* AI 现状行：AI 不是标签，是这个功能此刻的真实状态 */
+.aistat{margin-top:auto;display:flex;align-items:center;gap:10px;padding:13px 24px 13px 0;
+  margin-left:-24px;padding-left:24px;border-top:1px dashed var(--line);
+  background:linear-gradient(90deg,color-mix(in srgb,var(--c) 8%,transparent),transparent 72%)}
+.aistat .dot{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:8px;
+  color:#fff;background:var(--c)}
+.aistat .dot svg{width:14px;height:14px}
+.aistat p{flex:1;color:var(--ink-2);font-size:17px;line-height:1.48}
+.aistat p b{color:var(--c);font-weight:800}
+.aistat .lbl{display:block;margin-bottom:3px;color:var(--c);font-size:15px;font-weight:800;
+  letter-spacing:.08em}
+/* E3 标注：模型判断必须显式标「仅供参考」，不得包装成系统事实 */
+.aistat .ref{display:inline-flex;align-items:center;height:24px;margin-left:7px;padding:0 8px;
+  color:var(--amber);background:var(--amber-soft);border:1px solid var(--amber-line);
+  border-radius:var(--r-pill);font-size:14px;font-weight:700;letter-spacing:.04em;
+  vertical-align:1px}
+.aistat .go{flex:none;color:var(--faint);font-size:17px}
+
+/* 子入口清单：只在降级态出现，纯功能事实，不含 AI 声明 */
+.subs{display:none;flex-wrap:wrap;gap:7px;margin-top:20px;padding-top:16px;
+  border-top:1px dashed var(--line)}
+.subs span{display:inline-flex;align-items:center;height:var(--tap);padding:0 17px;color:var(--ink-2);
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-pill);
+  font-size:16px;white-space:nowrap;cursor:pointer}
+.subs span:active{transform:translateY(1px);background:var(--surface-3)}
+.grid-b .subs{gap:7px;margin-top:14px;padding-top:12px}
+.grid-b .subs span{height:var(--tap);padding:0 14px;font-size:16px}
+
+/* 编排徽标：本次 AI 编排会用到 */
+.inplan{position:absolute;right:16px;top:52px;display:inline-flex;align-items:center;gap:7px;
+  height:34px;padding:0 12px;border-radius:var(--r-pill);font-size:15px;font-weight:800;
+  color:#0f2b24;background:linear-gradient(180deg,var(--mint),var(--mint-2));
+  box-shadow:0 6px 14px rgba(35,120,98,.28);animation:popIn .34s var(--e-spring) both .95s}
+.inplan.later{color:var(--clay-deep);background:var(--clay-soft);border:1px solid var(--clay-line);box-shadow:none}
+.inplan b{font-family:var(--mono);font-size:13.5px}
+
+/* B 档：四个中卡 */
+.grid-b .svc{padding:18px 16px 0}
+.grid-b .svc-ico{width:46px;height:46px;border-radius:13px}
+.grid-b .svc-ico svg{width:22px;height:22px}
+.grid-b .svc h3{margin-top:13px;font-size:21px}
+.grid-b .svc .desc{margin-top:6px;font-size:16.5px}
+.grid-b .aistat{margin-left:-16px;padding:11px 14px 11px 16px;gap:8px}
+.grid-b .aistat .dot{width:22px;height:22px;border-radius:7px}
+.grid-b .aistat .dot svg{width:12px;height:12px}
+.grid-b .aistat p{font-size:16px;line-height:1.42}
+.grid-b .svc-no{right:14px;top:13px;font-size:11.5px}
+
+/* C 档：后台开关专区，横条 */
+.zone{position:relative;display:flex;align-items:center;gap:14px;min-height:92px;padding:0 20px;
+  background:var(--surface-2);border:1px dashed var(--line);border-radius:var(--r-m);cursor:pointer;
+  transition:background var(--t-base) var(--e-out),border-color var(--t-base) var(--e-out)}
+.zone:hover{background:var(--surface);border-color:var(--teal-line)}
+.zone-ico{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:12px;
+  color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.zone-ico svg{width:21px;height:21px}
+.zone b{display:block;font-size:18px;font-weight:700}
+.zone span{display:block;margin-top:4px;color:var(--muted);font-size:16.5px}
+.zone .tag{margin-left:auto;flex:none}
+.zone.off{opacity:.62;cursor:not-allowed}
+.zone.off:hover{background:var(--surface-2);border-color:var(--line)}
+
+/* ───────── 回流条 ───────── */
+.reflow{flex:none;display:flex;gap:14px;margin-top:16px}
+.rf-resume{flex:1;display:flex;align-items:center;gap:16px;padding:0 22px;min-height:120px;
+  background:var(--surface);border:1px solid var(--clay-line);border-left:5px solid var(--clay);
+  border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.rf-ico{width:50px;height:50px;flex:none;display:grid;place-items:center;color:var(--clay);
+  background:var(--clay-soft);border-radius:14px}
+.rf-ico svg{width:24px;height:24px}
+.rf-resume b{display:block;font-size:19px;font-weight:700}
+.rf-resume .sub{display:block;margin-top:6px;color:var(--muted);font-size:16.5px;line-height:1.5}
+.rf-resume .sub em{font-style:normal;color:var(--clay-deep);font-weight:700}
+.rf-go{margin-left:auto;flex:none;height:56px;padding:0 26px;color:#fff;background:linear-gradient(180deg,#c0713f,#9c5228);
+  border:0;border-radius:14px;font-family:var(--sans);font-size:17px;font-weight:700;cursor:pointer;
+  box-shadow:0 10px 22px rgba(156,82,40,.26);transition:transform var(--t-fast) var(--e-out)}
+.rf-go:hover{transform:translateY(-2px)}
+.assets{flex:none;width:326px;display:flex;flex-direction:column;justify-content:center;gap:10px;
+  padding:0 20px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m)}
+.assets-head{display:flex;align-items:center;justify-content:space-between}
+.assets-head b{font-size:17px;font-weight:700}
+.assets-head span{font-family:var(--mono);font-size:14px;color:var(--faint);letter-spacing:.05em}
+.assets-row{display:flex;gap:8px}
+.asset{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  height:58px;background:#fff;border:1px solid var(--line);border-radius:var(--r-s);cursor:pointer;
+  transition:border-color var(--t-base) var(--e-out)}
+.asset:hover{border-color:var(--teal-line)}
+.asset b{color:var(--teal-deep);font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.asset span{color:var(--muted);font-size:16px}
+
+/* ───────── 本机能力条：真实设备事实（E2 证据） + 兜底输入 ───────── */
+.capbar{flex:none;display:flex;align-items:center;gap:20px;height:86px;margin-top:16px;padding:0 22px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m)}
+.cap-label{display:block;color:var(--faint);font-size:11.5px;font-weight:700;letter-spacing:.16em;
+  margin-bottom:8px}
+.cap-chips{display:flex;gap:7px}
+.cap-chips span{display:inline-flex;align-items:center;height:32px;padding:0 12px;color:var(--ink-2);
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-pill);font-size:13.5px;white-space:nowrap}
+.cap-div{width:1px;height:50px;background:var(--line);flex:none}
+.meters{flex:none}
+.meter{display:flex;align-items:center;gap:9px;margin-top:5px}
+.meter:first-of-type{margin-top:0}
+.meter em{flex:none;width:44px;font-style:normal;color:var(--muted);font-size:13px}
+.meter i{width:88px;height:7px;flex:none;background:var(--surface-3);border-radius:4px;overflow:hidden;
+  position:relative}
+.meter i::after{content:'';position:absolute;left:0;top:0;bottom:0;width:var(--v);border-radius:4px;
+  background:linear-gradient(90deg,#2aa186,#136a58);animation:fillBar .9s var(--e-out) both .3s}
+.meter i.warn::after{background:linear-gradient(90deg,#d9a441,#a8761c)}
+.meter b{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+@keyframes fillBar{from{width:0}}
+.cap-ask{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:10px;height:var(--tap);
+  padding:0 18px;color:var(--muted);background:transparent;border:1.5px dashed var(--line);
+  border-radius:var(--r-m);font-family:var(--sans);font-size:14.5px;cursor:pointer;
+  transition:all var(--t-base) var(--e-out)}
+.cap-ask:hover{color:var(--teal-deep);border-color:var(--teal-line);background:#fff}
+.cap-ask svg{width:18px;height:18px;flex:none}
+.cap-ask u{text-decoration:none;color:var(--teal-deep);font-weight:700}
+
+/* ───────── 全局告示（降级 / 离线） ───────── */
+
+/* ───────── 四态：布局恒定，只换内容 ─────────
+   一体机用户站着操作，主入口必须永远在同一个位置。
+   任何能力不可用时都不重排页面，只在对应位置写明「什么不可用、为什么」。
+   卡片高度由内容决定，页面余量一律交给 .grow 吸收 —— 不靠抻长卡片填空。 */
+
+/* 没有真实计划时不标序号；派活连线用 visibility 隐藏以保留占位，避免整页位移 */
+body[data-state="first"] .inplan,
+body[data-state="degraded"] .inplan{display:none}
+body[data-state="first"] .wire,
+body[data-state="degraded"] .wire{visibility:hidden}
+/* 首次使用：没有本人身份，也没有历史单 */
+body[data-state="first"] .reflow{display:none}
+body[data-state="first"] .mh-id{display:none}
+
+/* 编排带：排不出来时保留这一块并写明原因，不整块删掉 ——
+   删掉的话用户根本不知道本机本来能替他盘点材料、安排顺序。 */
+.orch-badge i{font-style:normal}
+body[data-state="first"] .orch-badge,
+body[data-state="degraded"] .orch-badge{background:rgba(226,226,214,.13);color:#dfe4dc;
+  border-color:rgba(223,228,220,.26)}
+/* 依据标、材料清单、计划链都是对真实数据的断言，没有数据就不出现（位置留给原因说明） */
+body[data-state="first"] #orchEvi,
+body[data-state="degraded"] #orchEvi,
+body[data-state="first"] #orchFacts,
+body[data-state="degraded"] #orchFacts,
+body[data-state="first"] #orchPlan,
+body[data-state="degraded"] #orchPlan{display:none}
+/* 没有计划就不能承诺这次要花多久、哪一步免费；但费用与「不替你投递」的声明始终保留 */
+body[data-state="first"] .ocost,
+body[data-state="degraded"] .ocost{display:none}
+
+/* AI 行位置恒定：default/offline 给真实结论，first 说明这功能能做什么，degraded 说明为什么没有 */
+body[data-state="degraded"] .aistat .dot{background:rgba(226,226,214,.16);color:#7d8a80}
+body[data-state="degraded"] .aistat p{color:var(--ink-3)}
+
+/* 离线：设备药丸转红；打印卡降权但保持可读（不低于 .72），红色只用在真正故障那句话上 */
+body[data-state="offline"] .device{color:#f4d6cf;background:rgba(214,109,90,.18);border-color:rgba(214,109,90,.4)}
+body[data-state="offline"] .device i{background:#e2705c;box-shadow:0 0 0 4px rgba(226,112,92,.2);animation:none}
+body[data-state="offline"] .svc.s-print{opacity:.72}
+body[data-state="offline"] .svc.s-print .aistat p b{color:var(--danger)}
+/* 离线：计划链里的打印步骤标成做不了，但整条计划仍然给出来 */
+body[data-state="offline"] #orchPlan .p:last-child{opacity:.5;text-decoration:line-through}
+
+.grow{flex:1;min-height:0}
+
+/* ── v2 增补（2026-08-08）：现场兜底 / 公共终端脱敏 ── */
+.tb-help{display:inline-flex;align-items:center;gap:9px;height:var(--tap);padding:0 18px;
+  color:#dcece4;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);
+  border-radius:var(--r-pill);font:600 16.5px var(--sans);cursor:pointer;
+  transition:background var(--t-base) var(--e-out)}
+.tb-help:active{background:rgba(255,255,255,.2)}
+.tb-help svg{width:19px;height:19px}
+
+.btn-scan{display:none;align-items:center;gap:9px;height:var(--tap-main);padding:0 22px;margin-top:9px;
+  color:#fff;background:linear-gradient(180deg,#25957d,#136a58);border:0;border-radius:var(--r-pill);
+  font:700 18px var(--sans);cursor:pointer;box-shadow:0 10px 22px rgba(19,106,88,.26)}
+.btn-scan svg{width:20px;height:20px}
+body[data-state="first"] .btn-scan{display:inline-flex}
+.say-it{display:inline-flex;align-items:center;gap:9px;flex:none;min-height:var(--tap);margin-top:12px;padding:0 18px;
+  font-size:16.5px;
+  color:var(--teal-deep);background:var(--surface);border:1px solid var(--teal-line);
+  border-radius:var(--r-pill);font:600 17px var(--sans);cursor:pointer;
+  transition:background var(--t-base) var(--e-out)}
+.say-it:active{background:var(--teal-soft)}
+.say-it svg{width:18px;height:18px;flex:none}
+.mh-right .say-it{white-space:nowrap}
+
+.main{padding-top:12px}
+.grid-c .zone{min-height:80px}
+.masthead{padding-bottom:14px}
+.topbar .clock{font-size:16px}
+.topbar .device{font-size:16px}
+
+/* ═══════════ 科技感动效层 ═══════════
+   原则：只给「机器正在工作」的对象加动，用户自己的东西保持安静。
+   全部走 transform / opacity，1080×1920 单屏常驻不掉帧。 */
+
+/* ① 深色调度带：细网格底纹 + 极慢扫描光带 */
+.orch{position:relative;overflow:hidden;isolation:isolate}
+.orch::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(127,220,190,.055) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(127,220,190,.055) 1px,transparent 1px);
+  background-size:34px 34px;
+  mask-image:radial-gradient(760px 300px at 18% 0%,#000 15%,transparent 78%)}
+.orch::after{content:'';position:absolute;top:0;bottom:0;width:220px;z-index:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(127,220,190,.085) 45%,rgba(127,220,190,.13) 52%,transparent);
+  animation:scan 7.5s var(--e-out) infinite}
+@keyframes scan{0%{transform:translateX(-260px)}55%,100%{transform:translateX(1100px)}}
+.orch-l,.today{position:relative;z-index:1}
+
+/* ② AI 徽标：星芒呼吸 */
+.orch-badge svg{animation:spark 3.2s var(--e-out) infinite}
+@keyframes spark{0%,100%{transform:scale(1) rotate(0);opacity:.9}
+  50%{transform:scale(1.16) rotate(14deg);opacity:1}}
+
+/* ③ 结论打字机 */
+#verdict .caret{display:inline-block;width:3px;height:.92em;margin-left:3px;vertical-align:-2px;
+  background:var(--mint);animation:blink 1s steps(1) infinite}
+#verdict.done .caret{display:none}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+
+/* ④ 数字滚动：等宽，不抖版 */
+.num{font-variant-numeric:tabular-nums}
+
+/* ⑤ 连线：流动虚线 + 沿线光点 */
+.wire{flex:none;height:36px;margin:-4px 40px -6px;position:relative}
+.wire svg{width:100%;height:100%;overflow:visible}
+.wire path{fill:none;stroke-width:2;stroke-linecap:round;
+  stroke-dasharray:7 9;animation:flow 1.15s linear infinite}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.w-resume{stroke:#b3653a;opacity:.62}
+.w-print{stroke:#1f8a74;opacity:.62}
+.d-resume{fill:#b3653a}.d-print{fill:#1f8a74}
+.spark{filter:drop-shadow(0 0 5px currentColor)}
+.spark.s-r{fill:#d78a5c;color:#d78a5c}
+.spark.s-p{fill:#4ec4a4;color:#4ec4a4}
+
+/* ⑥ 本次会用到的卡：一道沿边缘走的流光 */
+.svc.inflow{position:relative}
+.svc.inflow::after{content:'';position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;
+  padding:1.6px;background:conic-gradient(from var(--a,0deg),
+    transparent 0deg, transparent 268deg,
+    color-mix(in srgb,var(--c) 78%,#fff) 316deg, transparent 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;
+  animation:orbit 4.6s linear infinite}
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes orbit{to{--a:360deg}}
+.svc.s-resume.inflow::after{animation-delay:-2.3s}
+
+/* ⑦ 「本次现在」徽标呼吸 */
+.inplan:not(.later){animation:popIn .34s var(--e-spring) both .95s,
+  glow 2.8s var(--e-out) infinite 1.4s}
+@keyframes glow{0%,100%{box-shadow:0 6px 14px rgba(35,120,98,.28)}
+  50%{box-shadow:0 6px 14px rgba(35,120,98,.28),0 0 0 7px rgba(127,220,190,.16)}}
+
+/* ⑧ 入场：从模糊到清晰，像刚渲染出来 */
+.anim-rise{animation:riseSharp .52s var(--e-out) both}
+@keyframes riseSharp{from{opacity:0;transform:translateY(15px);filter:blur(7px)}
+  to{opacity:1;transform:none;filter:blur(0)}}
+</style>
+</head>
+<body data-state="default">
+
+<div id="panel">
+  <p>状态切换</p>
+  <button data-s="default" class="on">默认 · 有上下文</button>
+  <button data-s="first">首次使用 · 无上下文</button>
+  <button data-s="degraded">AI 不可用 · 降级</button>
+  <button data-s="offline">打印机离线</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <div class="brand">
+        <!-- 字标用内联 SVG，不依赖字体渲染，跨机器不走样 -->
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5" />
+            <path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5" />
+            <path d="M16 4.5V9h5" />
+            <rect x="4.5" y="12.5" width="19" height="7" rx="1.6" />
+            <path d="M9 19.5h10v4H9z" />
+            <circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+        <div><strong>职易达</strong><span>AI 求职打印服务终端</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">09:41</span>
+      <span class="device"><i></i><span id="devText">打印机在线 · A4 纸充足 · 碳粉正常</span></span>
+      <button class="tb-help">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.2 2.7c-.8.4-1.3 1.1-1.3 2"/><path d="M12 17h.01"/></svg>
+        需要帮忙
+      </button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ══ 报头 ══ -->
+    <section class="masthead anim-rise">
+      <div>
+        <div class="mh-kicker">就业服务 · 自助办理</div>
+        <h1 id="mhTitle">今天想办什么？<em>说一件事就够</em></h1>
+        <p class="lede" id="mhLede">下面这单是机器按你上次留下的材料排的。不想按它来，直接选服务就行；付款和出纸前都会再问你一次。</p>
+      </div>
+      <div class="mh-right">
+        <div class="mh-date">2026-08-07 星期五</div>
+        <div class="mh-machine">就业服务大厅 · 01 号机</div>
+        <span class="mh-id">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          已登录 · <b>李同学</b>
+        </span>
+        <button class="say-it">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg>
+          说不清要办什么？直接跟机器说
+        </button>
+        <button class="btn-scan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>
+          扫码登录
+        </button>
+      </div>
+    </section>
+
+    <!-- 说明不再单独占一条告示带：哪里出问题就在哪里说 ——
+         编排排不出来 → 编排带自己讲原因；打印机离线 → 顶栏设备药丸转红 + 打印卡标注 + 主按钮换成可行的那个。 -->
+
+    <!-- ══ AI 调度带：机器的声音 ══ -->
+    <section class="orch anim-rise d1">
+      <div class="orch-l">
+        <div class="orch-head">
+          <span class="orch-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            <i id="orchBadge">本机为你安排</i>
+          </span>
+          <span id="orchEvi">
+            <span class="evi e1">依据 · 你的材料</span>
+            <span class="evi e2">依据 · 现场信息</span>
+          </span>
+        </div>
+
+        <h2 id="verdict" data-txt="先补简历里的成果数字，再打印带去周五的招聘会。"><span class="tw"></span><i class="caret"></i></h2>
+
+        <p class="why" id="orchWhy">
+          你上次上传的《李同学-简历.pdf》里，<u>6 段经历有 5 段没写成果数字</u>；
+          周五这场招聘会<u>有 <span class="num" data-to="128">0</span> 家企业参展</u>，主办方通知里建议自带纸质简历。可以先补完再打印；想直接打印也行。
+        </p>
+
+        <div class="orch-facts" id="orchFacts">
+          <span class="ofact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            已有 <b>简历 PDF · 2 页</b>
+          </span>
+          <span class="ofact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            缺口 <b>无证件照</b>
+          </span>
+          <span class="ofact">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            目标岗位 <b>产品运营</b>
+          </span>
+        </div>
+
+        <div class="orch-foot">
+          <div class="of-row">
+            <span class="ocost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              约 <b>40 秒</b>
+            </span>
+            <span class="ocost">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              诊断 <b>免费</b>
+            </span>
+            <span class="plan" id="orchPlan">
+              <span class="p now"><b>01</b>诊断</span><i>›</i>
+              <span class="p"><b>02</b>优化</span><i>›</i>
+              <span class="p"><b>03</b>打印</span>
+            </span>
+          </div>
+          <p class="of-note">打印费用以现场公示价为准；本机不代收其他费用，也不替你投递或预约。</p>
+        </div>
+      </div>
+
+      <aside class="today">
+        <div class="today-img">
+          <span class="today-src">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            第三方来源
+          </span>
+          <img src="assets/fair-today.jpg" alt="招聘会现场" />
+        </div>
+        <div class="today-body">
+          <h4>2026 夏季综合招聘会</h4>
+          <div class="today-meta">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>周五 09:00–16:00</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>广州国际会展中心</span>
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg><em>128 家</em>企业参展</span>
+          </div>
+          <button class="today-cta">
+            查看招聘会
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+          <div class="today-note">来源 · 市人社局 | 同步 08-07 08:12</div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ══ 8 大功能矩阵 · A 档主力 ══ -->
+    <!-- 编排连线：AI ↔ 本次会用到的功能。流动虚线 + 沿线光点 = 任务正在被派下去 -->
+    <div class="wire">
+      <svg viewBox="0 0 1000 34" preserveAspectRatio="none">
+        <path id="wR" class="w-resume" d="M378 0 C378 18, 754 14, 754 34"/>
+        <path id="wP" class="w-print"  d="M606 0 C606 19, 246 16, 246 34"/>
+        <circle class="spark s-r" r="3.4"><animateMotion dur="2.6s" repeatCount="indefinite"
+          keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#wR"/></animateMotion></circle>
+        <circle class="spark s-p" r="3.4"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite"
+          keyPoints="0;1" keyTimes="0;1" calcMode="linear"><mpath href="#wP"/></animateMotion></circle>
+        <circle class="d-resume" cx="754" cy="32" r="3.6"/>
+        <circle class="d-print"  cx="246" cy="32" r="3.6"/>
+      </svg>
+    </div>
+
+    <section class="grid-a">
+      <div class="svc s-print inflow" style="--c:#1f8a74">
+        <span class="svc-no">01</span>
+        <span class="inplan later"><b>03</b>本次稍后</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span>
+        <h3>打印扫描</h3>
+        <p class="desc">上传 · 扫码 · U盘 · 扫描原件 · 格式转换 · 签名盖章</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+          <p id="ai01"><span class="lbl">上传之后</span>会自动查<b>格式和页数</b>，并提示可能夹带的手机号、身份证号等信息，出纸前你再确认一遍</p>
+          <span class="go">→</span>
+        </div>
+        <div class="subs"><span>文档打印</span><span>手机扫码上传</span><span>U盘导入</span><span>材料扫描</span><span>照片打印</span><span>格式转换</span><span>签名盖章</span></div>
+      </div>
+
+      <div class="svc s-resume inflow" style="--c:#b3653a">
+        <span class="svc-no">02</span>
+        <span class="inplan"><b>01</b>本次现在</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+        <h3>AI 简历服务</h3>
+        <p class="desc">识别 · 诊断 · 优化 · 生成 · 模板 · 求职材料</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+          <p id="ai02"><span class="lbl">上次诊断</span>指出你有<b>5 段经历</b>只写了做过什么，没写做出什么结果。改完可以直接送去打印</p>
+          <span class="go">→</span>
+        </div>
+        <div class="subs"><span>上传识别</span><span>纸质简历扫描</span><span>简历诊断</span><span>简历优化</span><span>简历生成</span><span>模板</span><span>求职材料</span></div>
+      </div>
+    </section>
+
+    <!-- ══ B 档：四个中卡 ══ -->
+    <section class="grid-b">
+      <div class="svc" style="--c:#2f6f96">
+        <span class="svc-no">03</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+        <h3>岗位信息</h3>
+        <p class="desc">线上平台 · 线下机构 · 企业名录</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          <p id="ai03"><span class="lbl">按你的简历</span>有 <b><span class="num" data-to="12">0</span> 个</b>岗位方向比较接近<span class="ref">仅供参考</span></p>
+        </div>
+        <div class="subs"><span>岗位列表</span><span>线上平台</span><span>线下机构</span><span>找企业</span><span>岗位匹配参考</span><span>职业规划</span></div>
+      </div>
+
+      <div class="svc" style="--c:#3f7fa8">
+        <span class="svc-no">04</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        <h3>招聘会</h3>
+        <p class="desc">社会招聘会 · 校园招聘</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H3v10h6zM15 3H9v18h6zM21 7h-6v14h6z"/></svg></span>
+          <p id="ai04">周五那场已经排进上面的单子里了，参展企业和展位图都能看</p>
+        </div>
+        <div class="subs"><span>场次列表</span><span>校园招聘</span><span>参展企业</span><span>展位导览</span><span>活动资料打印</span></div>
+      </div>
+
+      <div class="svc" style="--c:#5f8f6a">
+        <span class="svc-no">05</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg></span>
+        <h3>AI 面试训练</h3>
+        <p class="desc">私密练习 · 逐题反馈</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          <p id="ai05"><span class="lbl">上次那份报告</span>还有 <b>3 处</b>没改</p>
+        </div>
+        <div class="subs"><span>开始训练</span><span>历史报告</span><span>面试要点</span></div>
+      </div>
+
+      <div class="svc" style="--c:#8a6aa0">
+        <span class="svc-no">06</span>
+        <span class="svc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 10h1"/><path d="M14 10h1"/><path d="M9 14h1"/><path d="M14 14h1"/></svg></span>
+        <h3>政策服务</h3>
+        <p class="desc">官方政策 · 材料清单</p>
+        <div class="aistat">
+          <span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+          <p id="ai06">找到 <b>3 条</b>可能相关的政策<span class="ref">是否符合以主管部门审核为准</span></p>
+        </div>
+        <div class="subs"><span>政策列表</span><span>材料清单</span><span>办事指引</span></div>
+      </div>
+    </section>
+
+    <!-- ══ C 档：后台开关专区 ══ -->
+    <section class="grid-c">
+      <div class="zone" style="--c:#a8761c">
+        <span class="zone-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M12 11v6M9 14h6"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg></span>
+        <div><b>百宝箱</b><span>证件照、文档工具与 8 个 AI 专项工具</span></div>
+        <span class="tag warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          后台已开启
+        </span>
+      </div>
+      <div class="zone off" style="--c:#6f7c75">
+        <span class="zone-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 10-10-5L2 10l10 5 10-5z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg></span>
+        <div><b>智慧校园</b><span>校园服务与信息展示</span></div>
+        <span class="tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          校方开启后可用
+        </span>
+      </div>
+    </section>
+
+    <!-- ══ 回流条 ══ -->
+    <section class="reflow">
+      <div class="rf-resume">
+        <span class="rf-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><polyline points="3 3 3 8 8 8"/></svg></span>
+        <div>
+          <b>继续上次办理 · 打印《三方协议》2 页</b>
+          <span class="sub">已核价未支付 · 未支付不出纸 · 本单保留至 <em>今天 18:00</em></span>
+        </div>
+        <button class="rf-go">继续</button>
+      </div>
+      <div class="assets">
+        <div class="assets-head"><b>我的</b><span>本人资产</span></div>
+        <div class="assets-row">
+          <div class="asset"><b>2</b><span>简历</span></div>
+          <div class="asset"><b>5</b><span>文档</span></div>
+          <div class="asset"><b>3</b><span>打印订单</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grow"></div>
+  </main>
+
+  <div class="actionbar">
+    <button class="btn" id="abAlt">跳过，直接打印</button>
+    <span class="ab-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      诊断要把简历内容发给 AI 服务处理，处理完即删。不替你投递，也不会把简历发给任何企业。
+    </span>
+    <button class="btn btn-primary" id="abMain">
+      <span>开始简历诊断</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
+
+  <nav class="bottomnav">
+    <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>首页</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById('stage');
+  st.style.transform = 'scale(' + s + ')';
+  st.style.height = (1920 * s) + 'px';
+}
+window.addEventListener('resize', fit); fit();
+
+// 四态共用同一套版面：标题、编排带、卡片、主按钮的位置都不变，只换里面的话。
+// badge / verdict / why 三项决定编排带这一块「说什么」；排不出来时它负责说明原因。
+var COPY = {
+  default:{ title:'今天想办什么？<em>说一件事就够</em>',
+    lede:'本机会盘点你已有的材料，安排办理顺序，并说明每一步的理由。付款、出纸、删除都由你本人确认。',
+    dev:'打印机在线 · A4 纸充足 · 碳粉正常', main:'开始简历诊断', alt:'跳过，直接打印',
+    badge:'本机为你安排',
+    verdict:'先补简历里的成果数字，再打印带去周五的招聘会。',
+    why:'你上次上传的《李同学-简历.pdf》里，<u>6 段经历有 5 段没写成果数字</u>；周五这场招聘会<u>有 128 家企业参展</u>，主办方通知里建议自带纸质简历。可以先补完再打印；想直接打印也行。' },
+  first:{ title:'今天想办什么？<em>八项服务任选</em>',
+    lede:'还没有你的材料，所以暂时不做安排。先选一项服务；进入后每一步都会告诉你为什么这么建议。',
+    dev:'打印机在线 · A4 纸充足 · 碳粉正常', main:'从打印扫描开始', alt:'让 AI 顾问帮我判断',
+    badge:'还没有你的材料',
+    verdict:'先放一份材料进来，本机就能替你排办理顺序。',
+    why:'本机会盘点你已经有的材料，算出还缺什么、先办哪一步，并说明每一步的理由。现在手上没有你的东西，所以这次不做安排 —— 下面 8 项服务你自己选就行；也可以扫码登录，把上次留下的材料接过来。' },
+  degraded:{ title:'今天想办什么？<em>八项服务任选</em>',
+    lede:'智能编排暂时不可用，8 项服务本身全部正常，可直接选择进入。',
+    dev:'打印机在线 · A4 纸充足 · 碳粉正常', main:'开始打印扫描', alt:'联系现场工作人员',
+    badge:'智能编排暂时不可用',
+    verdict:'这次排不出顺序，但 8 项服务本身都能用。',
+    why:'本机的智能编排暂时连不上，所以这次不替你安排先后，也不会给出简历诊断结论 —— 没有的东西不会编给你看。下面 8 项服务可以照常自己选；进去之后如果哪一项也用不了，会当场告诉你原因。' },
+  offline:{ title:'今天想办什么？<em>暂时不能出纸</em>',
+    lede:'本机打印机离线，其余 7 项服务正常。整理好的材料可以先存起来，或扫码发到手机稍后再打。',
+    dev:'打印机离线 · 暂不可出纸', main:'整理材料并存入我的文档', alt:'扫码发到手机',
+    badge:'本机为你安排',
+    verdict:'诊断和优化照常做；出纸这一步本机暂时做不了。',
+    why:'你上次上传的《李同学-简历.pdf》里，<u>6 段经历有 5 段没写成果数字</u>，这部分可以照常改完。<u>本机打印机离线</u>，最后出纸要么先存进「我的文档」，要么扫码发到手机，换一台空闲机器再打。' }
+};
+
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#panel button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    var s = b.dataset.s; document.body.dataset.state = s;
+    document.getElementById('mhTitle').innerHTML = COPY[s].title;
+    document.getElementById('mhLede').textContent = COPY[s].lede;
+    document.getElementById('devText').textContent = COPY[s].dev;
+    document.querySelector('#abMain span').textContent = COPY[s].main;
+    document.getElementById('abAlt').textContent = COPY[s].alt;
+    // 编排带：位置不变，只换说法；排不出来时这里负责讲清楚为什么
+    document.getElementById('orchBadge').textContent = COPY[s].badge;
+    document.getElementById('orchWhy').innerHTML = COPY[s].why;
+    runVerdict(COPY[s].verdict);
+    // 无上下文时禁止展示任何个人事实（CLAUDE.md §9 不伪造能力）：
+    // first 态只描述「这个功能能做什么」，不出现份数、条数、上次记录。
+    var LIVE = {
+      ai01:'<span class="lbl">AI 预检</span>上传后自动查<b>格式、页数与隐私片段</b>，出纸前先确认',
+      ai02:'<span class="lbl">AI 诊断</span>你的简历<b>5 段经历缺成果数字</b>，优化后可直接送打印',
+      ai03:'<span class="lbl">AI 研判</span><b>12 个</b>岗位方向接近<span class="ref">仅供参考</span>',
+      ai04:'<span class="lbl">AI 备料</span><b>周五参会清单</b>已生成',
+      ai05:'<span class="lbl">AI 反馈</span>上次报告 <b>3 项</b>待改进',
+      ai06:'<span class="lbl">AI 解读</span><b>3 项</b>补贴本月截止'
+    };
+    var IDLE = {
+      ai01:'<span class="lbl">AI 预检</span>上传后自动查<b>格式、页数与隐私片段</b>，出纸前先确认',
+      ai02:'<span class="lbl">AI 诊断</span><b>上传或扫描</b>一份简历，立即给出改进清单',
+      ai03:'<span class="lbl">AI 研判</span>选定目标岗位后给出<b>三档匹配参考</b><span class="ref">仅供参考</span>',
+      ai04:'<span class="lbl">AI 备料</span>选定场次后生成<b>参会材料清单</b>',
+      ai05:'<span class="lbl">AI 反馈</span>完成一轮训练后生成<b>逐题反馈报告</b>',
+      ai06:'<span class="lbl">AI 解读</span>按你的身份筛出<b>可办政策与材料</b>'
+    };
+    // AI 不可用时不能沿用任何 AI 结论：改成说清「这功能还能用什么、哪一部分没了」
+    var DOWN = {
+      ai01:'<span class="lbl">仍可使用</span>上传、扫码、U盘、扫描都正常；<b>自动预检暂时不可用</b>，出纸前请自己核对页数',
+      ai02:'<span class="lbl">部分可用</span>上传与纸质扫描正常；<b>AI 诊断与优化暂时不可用</b>',
+      ai03:'<span class="lbl">仍可使用</span>岗位列表与来源信息照常看；<b>AI 匹配参考暂时不可用</b>',
+      ai04:'<span class="lbl">仍可使用</span>场次、参展企业、展位图照常看；<b>AI 备料清单暂时不可用</b>',
+      ai05:'<span class="lbl">暂不可用</span>面试训练要靠 AI，<b>恢复后再来</b>',
+      ai06:'<span class="lbl">仍可使用</span>政策原文与材料清单照常看；<b>AI 解读暂时不可用</b>'
+    };
+    var src = (s === 'first') ? IDLE : (s === 'degraded') ? DOWN : LIVE;
+    Object.keys(src).forEach(function(k){
+      var el = document.getElementById(k); if (el) el.innerHTML = src[k];
+    });
+    if (s === 'offline') {
+      document.getElementById('ai01').innerHTML =
+        '<span class="lbl">AI 预检</span>可用，但<b>本机暂时不能出纸</b>；可先完成检查并存入我的文档';
+    }
+    // 注：本机能力条（耗材百分比）已按审计移除，顶栏 devText 已经覆盖设备与耗材状态，
+    // 原先针对 capMeterLabel 的实时/上次读数切换一并删除，不再留悬空引用。
+  });
+});
+
+
+// ── 结论打字机：机器一个字一个字把结论写出来。换状态时重跑，所以做成具名函数 ──
+var twTimer=null;
+function runVerdict(txt){
+  var h=document.getElementById('verdict'); if(!h) return;
+  var span=h.querySelector('.tw'); if(!span) return;
+  if(twTimer){ clearTimeout(twTimer); twTimer=null; }
+  h.dataset.txt = txt;
+  h.classList.remove('done');
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){
+    span.textContent=txt; h.classList.add('done'); return;
+  }
+  var i=0;
+  (function step(){
+    span.textContent=txt.slice(0,++i);
+    if(i<txt.length) twTimer=setTimeout(step, 42);
+    else twTimer=setTimeout(function(){h.classList.add('done')}, 700);
+  })();
+}
+runVerdict(document.getElementById('verdict').dataset.txt);
+
+// ── 数字滚动：只滚真实拿到的数，没有数就不滚 ──
+(function(){
+  var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  document.querySelectorAll('.num').forEach(function(el){
+    var to=parseInt(el.dataset.to,10); if(isNaN(to)) return;
+    if(reduce){ el.textContent=to; return; }
+    var t0=null, dur=900+Math.random()*300;
+    requestAnimationFrame(function tick(t){
+      if(!t0) t0=t;
+      var k=Math.min((t-t0)/dur,1), e=1-Math.pow(1-k,3);
+      el.textContent=Math.round(to*e);
+      if(k<1) requestAnimationFrame(tick);
+    });
+  });
+})();
+</script>
+</body>
+</html>

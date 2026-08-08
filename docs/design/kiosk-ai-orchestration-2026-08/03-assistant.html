@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>AI 顾问 · 小青 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   AI 顾问 v1 · 2026-08-08
+   设计立场：一体机上的 AI 顾问不是聊天框。站着打字很痛苦，
+   所以页面主体是「这台机器的 AI 能干什么」＋「小青现在能替你做哪一步」，
+   输入框是兜底不是入口。
+   三态：待命（能力台）→ 对话（能力坍缩成一行）→ 语音通话（数字人放大）。
+   ══════════════════════════════════════════════════════════════ */
+
+.kiosk{background:
+  radial-gradient(900px 480px at 88% -8%,rgba(31,138,116,.06),transparent 62%),
+  var(--paper)}
+
+.main{flex:1;min-height:0;display:flex;flex-direction:column;gap:18px;
+  padding:16px 0 0;overflow:hidden}
+
+/* ══════════ 顾问舱：数字人 + HUD ══════════ */
+.pod{position:relative;flex:none;margin:0 40px;display:grid;
+  grid-template-columns:326px 1fr;gap:0;overflow:hidden;
+  background:linear-gradient(155deg,var(--ink-panel-4),var(--ink-panel-2) 52%,var(--ink-panel-3));
+  border-radius:var(--r-l);box-shadow:var(--sh-3)}
+
+/* 舱内网格 + 扫描线：机器的空间感 */
+.pod::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:linear-gradient(rgba(127,220,190,.06) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(127,220,190,.06) 1px,transparent 1px);
+  background-size:30px 30px;
+  mask-image:radial-gradient(680px 380px at 14% 100%,#000 12%,transparent 76%)}
+.pod::after{content:'';position:absolute;top:0;bottom:0;width:190px;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(127,220,190,.09) 46%,rgba(127,220,190,.14) 53%,transparent);
+  animation:podScan 8s var(--e-out) infinite}
+@keyframes podScan{0%{transform:translateX(-230px)}58%,100%{transform:translateX(1120px)}}
+
+/* ── 数字人 ── */
+.human{position:relative;z-index:1;margin:16px 0 16px 16px;display:flex;align-items:flex-end;
+  justify-content:center;overflow:hidden;border-radius:var(--r-m);
+  /* 亮屏显示柱：数字人站在自己的屏里，屏中屏而不是抠图贴上去 */
+  background:linear-gradient(180deg,#eef0f5 0%,#e6e9f0 58%,#dcdfe8 100%);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),
+             inset 0 26px 46px rgba(255,255,255,.5),
+             0 0 0 1px rgba(127,220,190,.22),
+             0 0 34px rgba(127,220,190,.14)}
+/* 屏面扫描纹：极淡的横向行，像显示器 */
+.human::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(180deg,rgba(20,35,31,.05) 0 1px,transparent 1px 4px)}
+/* 屏面反光：斜向一道，缓慢移动 */
+.human::after{content:'';position:absolute;top:-40%;bottom:-40%;width:120px;z-index:3;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.42),transparent);
+  transform:rotate(9deg);animation:glass 9s var(--e-out) infinite}
+@keyframes glass{0%{transform:rotate(9deg) translateX(-200px)}62%,100%{transform:rotate(9deg) translateX(460px)}}
+.human img{position:relative;z-index:1;width:262px;display:block;margin-bottom:-6px;
+  animation:breathe2 5.2s var(--e-out) infinite}
+@keyframes breathe2{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-5px) scale(1.006)}}
+
+/* 光台：数字人站立的那圈光 */
+.stage-ring{position:absolute;left:50%;bottom:10px;translate:-50% 0;width:230px;height:44px;z-index:4;
+  border-radius:50%;pointer-events:none;
+  background:radial-gradient(ellipse at center,rgba(31,138,116,.34),rgba(31,138,116,.1) 48%,transparent 72%);
+  animation:ringPulse 3.4s var(--e-out) infinite}
+@keyframes ringPulse{0%,100%{opacity:.62;transform:translate(-50%,0) scale(1)}
+  50%{opacity:1;transform:translate(-50%,0) scale(1.09)}}
+.stage-ring i{position:absolute;left:50%;top:50%;translate:-50% -50%;
+  width:190px;height:36px;border-radius:50%;border:1px solid rgba(31,138,116,.4);
+  animation:ringOut 3.4s var(--e-out) infinite}
+@keyframes ringOut{0%{transform:translate(-50%,-50%) scale(.72);opacity:.9}
+  100%{transform:translate(-50%,-50%) scale(1.5);opacity:0}}
+
+/* HUD 角标：四角定位框，纯装饰但克制 */
+.hud{position:absolute;inset:14px 12px 12px;pointer-events:none}
+.hud span{position:absolute;width:16px;height:16px;border:1.6px solid rgba(127,220,190,.4)}
+.hud span:nth-child(1){left:0;top:0;border-right:0;border-bottom:0}
+.hud span:nth-child(2){right:0;top:0;border-left:0;border-bottom:0}
+.hud span:nth-child(3){left:0;bottom:0;border-right:0;border-top:0}
+.hud span:nth-child(4){right:0;bottom:0;border-left:0;border-top:0}
+
+/* ── 顾问信息 ── */
+.pod-r{position:relative;z-index:1;padding:28px 30px 26px 8px;display:flex;flex-direction:column}
+.who-tag{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;height:34px;padding:0 13px;
+  color:#0f2b24;background:linear-gradient(180deg,var(--mint),var(--mint-2));
+  border-radius:var(--r-pill);font-size:15px;font-weight:800;letter-spacing:.04em}
+.who-tag svg{width:16px;height:16px}
+.pod-r h1{margin-top:14px;font-family:var(--serif);font-size:42px;font-weight:900;
+  letter-spacing:-.015em;color:var(--on-ink);line-height:1.16}
+.pod-r h1 em{font-style:normal;color:var(--mint)}
+.pod-r .sub{margin-top:11px;font-size:18px;line-height:1.6;color:var(--on-ink-2);max-width:420px}
+
+/* 实时状态：机器现在在干嘛 */
+.live{margin-top:16px;display:inline-flex;align-items:center;gap:11px;align-self:flex-start;
+  height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--on-ink-fill);border:1px solid var(--on-ink-line);color:var(--on-ink-2);font-size:16.5px}
+.live .wave{color:var(--mint);height:20px}
+.live .wave i{width:2.6px}
+
+.pod-acts{margin-top:auto;display:flex;gap:12px;flex-wrap:wrap}
+.pod-btn{display:inline-flex;align-items:center;gap:10px;min-height:var(--tap-main);padding:0 22px;
+  border-radius:var(--r-pill);border:1px solid var(--on-ink-line);cursor:pointer;
+  color:var(--on-ink);background:var(--on-ink-fill);font:600 18px var(--sans);
+  transition:background var(--t-base) var(--e-out)}
+.pod-btn:active{transform:translateY(1px)}
+.pod-btn svg{width:20px;height:20px}
+.pod-btn.call{color:#0d2b23;border-color:transparent;
+  background:linear-gradient(180deg,var(--mint),var(--mint-3));font-weight:800;
+  box-shadow:0 12px 26px rgba(35,140,112,.32)}
+
+/* 合规注：AI 内容边界 */
+.pod-note{margin-top:14px;font-size:16px;line-height:1.5;color:var(--on-ink-4)}
+
+/* ══════════ 本次办理：一条，不抢戏 ══════════ */
+.errand{flex:none;margin:0 40px;display:flex;align-items:center;gap:16px;
+  min-height:78px;padding:12px 22px;background:var(--surface);border:1px solid var(--line);
+  border-left:5px solid var(--teal);border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.errand .lbl{flex:none;font-size:16px;color:var(--muted)}
+.errand .chain{display:flex;align-items:center;gap:8px}
+.errand .lk{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 15px;
+  border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--line-soft);
+  color:var(--muted);font-size:16.5px}
+.errand .lk b{font:800 14px var(--mono);opacity:.6}
+.errand .lk.done{color:var(--teal-deep);background:var(--teal-soft);border-color:var(--teal-line)}
+.errand .lk.now{color:#fff;background:linear-gradient(180deg,#25957d,#136a58);
+  border-color:transparent;font-weight:700}
+.errand .lk.now b{color:#bdf0dd;opacity:.9}
+.errand .ar{color:var(--faint);font-size:17px}
+.errand .go{margin-left:auto;flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:9px;
+  min-height:var(--tap);padding:0 20px;border:0;border-radius:var(--r-pill);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#25957d,#12695a);font:700 17px var(--sans)}
+
+/* ══════════ AI 能力台：本页主体 ══════════ */
+.deck{flex:1;min-height:0;margin:0 40px;display:flex;flex-direction:column;gap:14px}
+.deck-hd{flex:none;display:flex;align-items:baseline;gap:14px}
+.deck-hd h2{font-family:var(--serif);font-size:26px;font-weight:800;color:var(--ink)}
+.deck-hd .sep{flex:1;height:1px;background:var(--line)}
+.deck-hd .n{font-size:16px;color:var(--muted)}
+
+.grid9{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);
+  grid-template-rows:repeat(3,1fr);gap:13px}
+.cap{position:relative;display:flex;flex-direction:column;gap:8px;padding:17px 18px;
+  text-align:left;font-family:var(--sans);cursor:pointer;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);
+  box-shadow:var(--sh-1);transition:transform var(--t-base) var(--e-out),box-shadow var(--t-base) var(--e-out)}
+.cap:active{transform:translateY(2px);box-shadow:none}
+.cap .top{display:flex;align-items:center;gap:11px}
+.cap .ic{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;
+  color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.cap .ic svg{width:20px;height:20px}
+.cap h3{font-size:20px;font-weight:800;color:var(--ink);line-height:1.25}
+.cap p{font-size:16px;line-height:1.45;color:var(--muted)}
+/* 产出物：用户最关心「我能拿到什么」，所以单独一行 */
+.cap .out{margin-top:auto;display:inline-flex;align-items:center;gap:7px;
+  font-size:15.5px;color:var(--c);font-weight:700}
+.cap .out svg{width:15px;height:15px}
+/* 扫光：只在按下时走一遍，不常驻 */
+.cap::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:0;
+  background:linear-gradient(105deg,transparent 34%,color-mix(in srgb,var(--c) 22%,transparent) 50%,transparent 66%)}
+.cap:active::after{opacity:1;animation:sweep .5s var(--e-out)}
+@keyframes sweep{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+/* ══════════ 对话区（对话态才出现） ══════════ */
+.talk{display:none;flex:1;min-height:0;margin:0 40px;flex-direction:column;gap:14px;
+  justify-content:flex-end;overflow-y:auto;padding-right:4px}
+.talk::-webkit-scrollbar{width:0}
+.bub{max-width:78%;padding:16px 20px;font-size:19px;line-height:1.62;border-radius:var(--r-m)}
+.bub.me{align-self:flex-end;color:#fff;background:linear-gradient(180deg,#25957d,#136a58);
+  border-bottom-right-radius:6px}
+.bub.ai{align-self:flex-start;color:var(--ink-2);background:var(--surface);
+  border:1px solid var(--line);border-bottom-left-radius:6px;box-shadow:var(--sh-1)}
+.bub.ai .who{display:flex;align-items:center;gap:9px;margin-bottom:9px;
+  font-size:15.5px;font-weight:700;color:var(--teal-deep)}
+.bub.ai .who img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+
+/* AI 建议卡：结论 + 依据 + 白名单动作 */
+.advice{align-self:flex-start;width:88%;background:var(--surface);border:1px solid var(--teal-line);
+  border-radius:var(--r-m);overflow:hidden;box-shadow:var(--sh-2)}
+.advice .hd{display:flex;align-items:center;gap:10px;padding:12px 20px;
+  background:var(--teal-soft);border-bottom:1px solid var(--teal-line);
+  font-size:16px;font-weight:800;color:var(--teal-deep);letter-spacing:.03em}
+.advice .hd svg{width:18px;height:18px}
+.advice .bd{padding:18px 20px 20px}
+.advice .concl{font-family:var(--serif);font-size:25px;font-weight:800;line-height:1.4;color:var(--ink)}
+.advice ul{margin-top:13px;display:flex;flex-direction:column;gap:9px}
+.advice li{list-style:none;display:flex;gap:10px;font-size:17px;line-height:1.55;color:var(--ink-2)}
+.advice li .t{flex:none;margin-top:2px;padding:2px 8px;border-radius:4px;font-size:14.5px;font-weight:700}
+.advice li .t-mine{color:var(--teal-deep);background:var(--teal-soft)}
+.advice li .t-src{color:#2f6f96;background:var(--blue-soft)}
+.advice .acts{margin-top:16px;display:flex;gap:11px;flex-wrap:wrap}
+.abtn{display:inline-flex;align-items:center;gap:9px;min-height:var(--tap-main);padding:0 22px;
+  border-radius:var(--r-m);cursor:pointer;font:700 18px var(--sans);border:1px solid var(--line);
+  color:var(--ink-2);background:var(--surface-2)}
+.abtn.pri{color:#fff;border-color:transparent;background:linear-gradient(180deg,#25957d,#12695a);
+  box-shadow:0 10px 22px rgba(19,106,88,.26)}
+.abtn:active{transform:translateY(1px)}
+.abtn svg{width:19px;height:19px}
+
+/* 正在整理：扫描条 */
+.thinking{align-self:flex-start;display:flex;align-items:center;gap:12px;
+  padding:14px 20px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m)}
+.thinking .bar{position:relative;width:132px;height:5px;border-radius:3px;
+  background:var(--surface-3);overflow:hidden}
+.thinking .bar i{position:absolute;inset:0;width:46%;border-radius:3px;
+  background:linear-gradient(90deg,transparent,var(--teal),transparent);
+  animation:shuttle 1.25s var(--e-out) infinite}
+@keyframes shuttle{0%{transform:translateX(-110%)}100%{transform:translateX(230%)}}
+.thinking span{font-size:17px;color:var(--muted)}
+
+/* ══════════ 能力条（对话态：9 宫格坍缩成一行） ══════════ */
+.capstrip{display:none;flex:none;margin:0 40px;gap:9px;overflow-x:auto;padding-bottom:2px}
+.capstrip::-webkit-scrollbar{height:0}
+.capstrip button{flex:none;display:inline-flex;align-items:center;gap:9px;min-height:var(--tap);
+  padding:0 17px;border-radius:var(--r-pill);cursor:pointer;white-space:nowrap;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+.capstrip button .d{width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.capstrip button.on{color:#fff;background:linear-gradient(180deg,#25957d,#136a58);border-color:transparent}
+.capstrip button.on .d{background:#bdf0dd}
+
+/* ══════════ 输入区：兜底，不是入口 ══════════ */
+.composer{flex:none;padding:16px 40px 18px;background:var(--surface);border-top:1px solid var(--line)}
+.quick{display:flex;gap:9px;margin-bottom:12px;flex-wrap:wrap}
+.quick button{min-height:var(--tap);padding:0 18px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--muted);background:var(--surface-2);border:1px solid var(--line);font:400 16.5px var(--sans)}
+.crow{display:flex;gap:11px}
+.cinput{flex:1;display:flex;align-items:center;gap:12px;min-height:72px;padding:0 20px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m);
+  font-size:20px;color:var(--faint)}
+.cinput .caret{width:2px;height:26px;background:var(--teal);animation:blink 1.05s steps(1) infinite}
+@keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+.cvoice{width:72px;min-height:72px;display:grid;place-items:center;cursor:pointer;
+  color:var(--teal-deep);background:var(--surface-2);border:1px solid var(--teal-line);
+  border-radius:var(--r-m)}
+.cvoice svg{width:26px;height:26px}
+.csend{min-height:72px;padding:0 30px;border:0;border-radius:var(--r-m);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#25957d,#12695a);font:700 20px var(--sans)}
+.cnote{margin-top:12px;display:flex;align-items:center;gap:10px;font-size:16px;color:var(--muted)}
+.cnote svg{width:18px;height:18px;flex:none;color:var(--teal-deep)}
+
+/* ══════════ 语音通话态 ══════════ */
+.callmask{display:none;position:absolute;inset:0;z-index:20;flex-direction:column;
+  align-items:center;justify-content:center;gap:26px;padding:70px 60px;
+  background:linear-gradient(170deg,var(--ink-panel-4),var(--ink-panel-3))}
+.callmask::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(127,220,190,.06) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(127,220,190,.06) 1px,transparent 1px);
+  background-size:36px 36px;mask-image:radial-gradient(760px 620px at 50% 40%,#000 8%,transparent 74%)}
+.callmask .ph{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:center;
+  overflow:hidden;border-radius:var(--r-l);
+  background:linear-gradient(180deg,#eef0f5,#dcdfe8);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.6),0 0 0 1px rgba(127,220,190,.3),
+             0 0 54px rgba(127,220,190,.2),0 24px 50px rgba(0,0,0,.4)}
+.callmask .ph::before{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.5;
+  background:repeating-linear-gradient(180deg,rgba(20,35,31,.05) 0 1px,transparent 1px 4px)}
+.callmask .ph img{position:relative;z-index:1;width:440px;display:block;margin-bottom:-4px}
+.callmask h2{position:relative;z-index:1;font-family:var(--serif);font-size:44px;font-weight:900;color:var(--on-ink)}
+.bigwave{position:relative;z-index:1;display:flex;align-items:center;gap:7px;height:96px;color:var(--mint)}
+.bigwave i{width:7px;border-radius:3px;background:currentColor;
+  box-shadow:0 0 12px color-mix(in srgb,var(--mint) 60%,transparent);
+  animation:bw 1.1s var(--e-out) infinite}
+@keyframes bw{0%,100%{height:16%}50%{height:100%}}
+.caption{position:relative;z-index:1;max-width:820px;text-align:center;font-size:29px;line-height:1.6;
+  color:var(--on-ink);min-height:80px}
+.caption .cs{color:var(--on-ink-4)}
+.callacts{position:relative;z-index:1;display:flex;gap:16px}
+.callend{min-height:64px;padding:0 34px;border:0;border-radius:var(--r-pill);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#c1503f,#a63a2e);font:700 20px var(--sans);
+  box-shadow:0 12px 26px rgba(140,50,38,.34)}
+.callmute{min-height:64px;padding:0 28px;border:1px solid var(--on-ink-line);border-radius:var(--r-pill);
+  cursor:pointer;color:var(--on-ink);background:var(--on-ink-fill);font:600 19px var(--sans)}
+
+/* ══════════ 降级告示 ══════════ */
+.notice{display:none;align-items:flex-start;gap:13px;margin:0 40px;padding:16px 20px;
+  border-radius:var(--r-m);font-size:17.5px;line-height:1.55}
+.notice svg{width:22px;height:22px;flex:none;margin-top:2px}
+.notice.warn{color:#7a5714;background:var(--amber-soft);border:1px solid var(--amber-line)}
+
+/* ══════════ 底部导航 ══════════ */
+.bottomnav{height:116px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);
+  background:linear-gradient(180deg,#153029,#0e211c);border-top:1px solid rgba(255,255,255,.07)}
+.bottomnav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:none;border:0;color:#7fa294;font:600 17px var(--sans);cursor:pointer}
+.bottomnav button svg{width:27px;height:27px}
+.bottomnav button.active{color:#7fdcbe}
+
+/* ══════════ 三态切换 ══════════ */
+body[data-s="talk"] .pod{grid-template-columns:132px 1fr}
+body[data-s="talk"] .human{margin:12px 0 12px 12px}
+body[data-s="talk"] .human img{width:108px}
+body[data-s="talk"] .pod-r h1{font-size:29px;margin-top:8px}
+body[data-s="talk"] .pod-r .sub,
+body[data-s="talk"] .pod-note{display:none}
+body[data-s="talk"] .pod-acts{margin-top:14px}
+body[data-s="talk"] .stage-ring{width:120px;height:28px;bottom:2px}
+body[data-s="talk"] .stage-ring i{width:100px;height:22px}
+body[data-s="talk"] .deck{display:none}
+body[data-s="talk"] .capstrip{display:flex}
+body[data-s="talk"] .talk{display:flex}
+
+body[data-s="call"] .callmask{display:flex}
+
+body[data-s="degraded"] .pod-acts .call,
+body[data-s="degraded"] .errand,
+body[data-s="degraded"] .grid9,
+body[data-s="degraded"] .quick{display:none}
+body[data-s="degraded"] .notice.warn{display:flex}
+body[data-s="degraded"] .live{display:none}
+body[data-s="degraded"] .csend{background:linear-gradient(180deg,#8d9a94,#6f7c75)}
+</style>
+</head>
+<body data-s="standby">
+
+<div id="panel">
+  <p>状态切换</p>
+  <button class="on" data-set="standby">待命 · 能力台</button>
+  <button data-set="talk">对话中</button>
+  <button data-set="call">语音通话</button>
+  <button data-set="degraded">AI 不可用</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <button class="topbar-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        返回首页
+      </button>
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5"/><path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5"/>
+            <path d="M16 4.5V9h5"/><rect x="4.5" y="12.5" width="19" height="7" rx="1.6"/>
+            <path d="M9 19.5h10v4H9z"/><circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <div><strong>职易达</strong><span>AI 求职打印服务终端</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">09:47</span>
+      <span class="device"><i></i>AI 服务正常</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ══ 顾问舱 ══ -->
+    <section class="pod anim-rise">
+      <div class="hud"><span></span><span></span><span></span><span></span></div>
+      <div class="human">
+        <img src="assets/advisor-full.jpg" alt="AI 顾问小青">
+        <div class="stage-ring"><i></i></div>
+      </div>
+      <div class="pod-r">
+        <span class="who-tag">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+          AI 顾问
+        </span>
+        <h1>我是<em>小青</em>。<br>你说，我来把事排好。</h1>
+        <p class="sub">下面这九件事我可以直接替你做完，产出都能在本机打印带走。不知道从哪开始，就按语音跟我说一句。</p>
+
+        <span class="live">
+          <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+          在线 · 已读到你这台机器上的材料
+        </span>
+
+        <div class="pod-acts">
+          <button class="pod-btn call">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+            用说的（语音）
+          </button>
+          <button class="pod-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            打字问
+          </button>
+        </div>
+
+        <p class="pod-note">小青给的是建议，不替你做决定。付款、出纸、删除都要你自己按。岗位投递和招聘会预约都在来源平台完成，这台机器不代办。</p>
+      </div>
+    </section>
+
+    <div class="notice warn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+      <span><b>小青暂时联系不上。</b>常见问题的现成答案还能查，材料清单和模板也能直接打印。要找人的话，按顶栏的「需要帮忙」叫现场工作人员。</span>
+    </div>
+
+    <!-- ══ 本次办理：一条 ══ -->
+    <section class="errand anim-rise d1">
+      <span class="lbl">本次办理</span>
+      <span class="chain">
+        <span class="lk done"><b>01</b>诊断</span><span class="ar">›</span>
+        <span class="lk now"><b>02</b>优化</span><span class="ar">›</span>
+        <span class="lk"><b>03</b>打印</span>
+      </span>
+      <button class="go">
+        回到第 2 步
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+    </section>
+
+    <!-- ══ 能力条（对话态） ══ -->
+    <div class="capstrip">
+      <button class="on"><span class="d" style="--c:#1f8a74"></span>正在用 · 简历 JD 匹配</button>
+      <button><span class="d" style="--c:#b3653a"></span>自我介绍生成</button>
+      <button><span class="d" style="--c:#2f6f96"></span>岗位 JD 解读</button>
+      <button><span class="d" style="--c:#8a6aa0"></span>面试题预测</button>
+      <button><span class="d" style="--c:#5f8f6a"></span>材料准备清单</button>
+      <button><span class="d" style="--c:#a8761c"></span>求职信生成</button>
+      <button><span class="d" style="--c:#3f7fa8"></span>企业面试速查</button>
+      <button><span class="d" style="--c:#7a6a5a"></span>求职方向探索</button>
+      <button><span class="d" style="--c:#6f7c75"></span>HR 知识问答</button>
+    </div>
+
+    <!-- ══ AI 能力台（待命态主体） ══ -->
+    <section class="deck anim-rise d2">
+      <div class="deck-hd">
+        <h2>小青能直接替你做的九件事</h2>
+        <span class="sep"></span>
+        <span class="n">选一个，或者直接说</span>
+      </div>
+      <div class="grid9">
+
+        <button class="cap" style="--c:#1f8a74">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg></span>
+            <h3>简历 JD 匹配</h3>
+          </span>
+          <p>拿你的简历去比一个具体岗位，指出差在哪、哪几句可以加分。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>产出对照表，可打印</span>
+        </button>
+
+        <button class="cap" style="--c:#b3653a">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg></span>
+            <h3>自我介绍生成</h3>
+          </span>
+          <p>说清岗位和一两段经历，写成能背下来的稿子。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>1 分钟 + 3 分钟两版</span>
+        </button>
+
+        <button class="cap" style="--c:#2f6f96">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><path d="M6 12h4"/></svg></span>
+            <h3>岗位 JD 解读</h3>
+          </span>
+          <p>把招聘要求逐条拆开：哪些是硬门槛，哪些是写着好看的。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>逐条拆解清单</span>
+        </button>
+
+        <button class="cap" style="--c:#8a6aa0">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.2 2.7c-.8.4-1.3 1.1-1.3 2"/><path d="M12 17h.01"/></svg></span>
+            <h3>面试题预测</h3>
+          </span>
+          <p>按这个岗位常问的方向出题，附上该怎么答的思路。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>题目 + 答题要点</span>
+        </button>
+
+        <button class="cap" style="--c:#5f8f6a">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-5"/><path d="m9 14 2 2 4-4"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg></span>
+            <h3>材料准备清单</h3>
+          </span>
+          <p>明天去面试或者去招聘会，该带什么、要几份、要不要盖章。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>清单可勾选打印</span>
+        </button>
+
+        <button class="cap" style="--c:#a8761c">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg></span>
+            <h3>求职信生成</h3>
+          </span>
+          <p>说清目标公司和你最想让对方看到的那一点，写一封给人看的信。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>300–500 字，可打印</span>
+        </button>
+
+        <button class="cap" style="--c:#3f7fa8">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 11h1M14 11h1M9 15h1M14 15h1"/></svg></span>
+            <h3>企业面试速查</h3>
+          </span>
+          <p>去面试前先看看这家公司公开信息里的业务、规模和常见流程。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>一页速查卡</span>
+        </button>
+
+        <button class="cap" style="--c:#7a6a5a">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><path d="m4.9 4.9 2.9 2.9M16.2 16.2l2.9 2.9M19.1 4.9l-2.9 2.9M7.8 16.2l-2.9 2.9"/></svg></span>
+            <h3>求职方向探索</h3>
+          </span>
+          <p>不确定自己适合干什么，就从你做过的事往回推几个方向。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>方向建议，仅供参考</span>
+        </button>
+
+        <button class="cap" style="--c:#6f7c75">
+          <span class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+            <h3>HR 知识问答</h3>
+          </span>
+          <p>试用期、合同、社保、离职这些，问一句答一句，说人话。</p>
+          <span class="out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>不构成法律意见</span>
+        </button>
+
+      </div>
+    </section>
+
+    <!-- ══ 对话区（对话态） ══ -->
+    <div class="talk">
+      <div class="bub me">我下周三面一个产品运营，帮我看看简历够不够</div>
+
+      <div class="bub ai">
+        <span class="who"><img src="assets/advisor-face.jpg" alt="">小青</span>
+        好，我拿你机器上那份简历跟这个岗位比了一遍。先说结论，再说依据。
+      </div>
+
+      <div class="advice">
+        <div class="hd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+          小青的建议 · 简历 JD 匹配
+        </div>
+        <div class="bd">
+          <p class="concl" id="concl" data-txt="够得上，但有两处硬要求你简历里没写到。">&nbsp;</p>
+          <ul>
+            <li><span class="t t-mine">你的简历</span><span>写了 <b>2 段</b>运营实习，但都没写清带来了多少增长或者留存变化。</span></li>
+            <li><span class="t t-src">岗位原文</span><span>要求里点名要「数据分析能力」和「跨部门协作经验」，这两条你的简历里找不到对应的句子。</span></li>
+          </ul>
+          <div class="acts">
+            <button class="abtn pri">
+              按这两条改简历
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+            <button class="abtn">先看完整对照表</button>
+            <button class="abtn">查看岗位</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="thinking">
+        <span class="bar"><i></i></span>
+        <span>小青在按这个岗位预测面试题…</span>
+      </div>
+    </div>
+
+    <!-- ══ 输入区 ══ -->
+    <div class="composer">
+      <div class="quick">
+        <button>项目经历怎么写才有说服力？</button>
+        <button>面试问「你的缺点」怎么答？</button>
+        <button>入职一般要交哪些材料？</button>
+      </div>
+      <div class="crow">
+        <span class="cinput">说一件你想办的事，或者直接打字<span class="caret"></span></span>
+        <button class="cvoice">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+        </button>
+        <button class="csend">发送</button>
+      </div>
+      <p class="cnote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        这是公共机器，聊完就清空，不留在本机。内容会发到 AI 服务处理，处理完即删。小青给的都是参考，投递和预约请到来源平台自己完成。
+      </p>
+    </div>
+
+  </main>
+
+  <!-- ══ 语音通话态 ══ -->
+  <div class="callmask">
+    <div class="ph"><img src="assets/advisor-full.jpg" alt="AI 顾问小青"></div>
+    <h2>小青正在听</h2>
+    <div class="bigwave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="caption">我下周三面一个产品运营<span class="cs">，帮我看看简历</span></p>
+    <div class="callacts">
+      <button class="callmute">静音</button>
+      <button class="callend">结束通话</button>
+    </div>
+  </div>
+
+  <nav class="bottomnav">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>首页</button>
+    <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  document.getElementById('stage').style.transform = 'scale(' + s + ')';
+}
+addEventListener('resize', fit); fit();
+
+// 大声波：给每根柱子不同的相位和高度，避免整齐划一的机械感
+document.querySelectorAll('.bigwave i').forEach(function(b,i){
+  b.style.animationDelay = (i * 0.075).toFixed(3) + 's';
+  b.style.animationDuration = (0.85 + (i % 4) * 0.16).toFixed(2) + 's';
+});
+
+// 建议结论打字机
+function typeConcl(){
+  var el = document.getElementById('concl'); if(!el) return;
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches){ el.textContent = el.dataset.txt; return; }
+  var t = el.dataset.txt, i = 0; el.textContent = '';
+  (function step(){ el.textContent = t.slice(0, ++i); if(i < t.length) setTimeout(step, 46); })();
+}
+
+// 状态切换（预览用，生产不存在）
+document.querySelectorAll('#panel [data-set]').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#panel [data-set]').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    document.body.dataset.s = b.dataset.set;
+    if(b.dataset.set === 'talk') typeConcl();
+  };
+});
+</script>
+</body>
+</html>

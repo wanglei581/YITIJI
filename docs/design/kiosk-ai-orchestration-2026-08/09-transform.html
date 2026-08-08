@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>加工型 · AI 改了什么 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   加工型作业面 —— 文件 → AI 处理 → 新文件
+
+   覆盖：简历优化、简历解析后重排、图片合成 PDF、签章、隐私遮挡产出
+   本样张以「简历优化」为例。
+
+   本型的本质：AI 动了用户的东西，所以
+   ① 改了什么必须逐处可见（不能只给一个「已优化」的结果）
+   ② 每一处都可以否决（用户保留最终决定权）
+   ③ 产出是新文件，原件不动，且血缘可追（sourceFileId + assetCategory:'optimized'）
+
+   交互语法与 08-intake 一致：右侧逐条裁决 ↔ 左侧原文定位高亮
+   （08 裁决隐私片段，本页裁决 AI 改动，同一套语法）
+
+   后端现状（已审计）：
+   · 优化结果落 AiResumeResult(kind='optimize')，导出文件已正确传 sourceFileId
+     —— 是全仓 12 个产物点中仅有的 2 个传了血缘的之一
+   · 但前端「保存优化建议」按钮不发任何请求，只 navigate 到 /profile 的内存 state
+     —— 本样张按「真实落库」设计
+
+   版面契约：1920 = 顶栏 76 + 内容区 1728 + 底部 Tab 116
+     内容超出内部滚动；ActionBar 常驻；竖屏最多两栏且次栏 ≥400px
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+
+.main{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:18px 40px 0;overflow:hidden}
+
+.mh{flex:none;display:flex;align-items:center;justify-content:space-between;gap:28px}
+.mh-kicker{display:flex;align-items:center;gap:10px;font-size:15.5px;color:var(--muted);letter-spacing:.14em}
+.mh-kicker::before{content:'';width:30px;height:2px;background:var(--teal)}
+.mh h1{font-family:var(--serif);font-size:40px;font-weight:800;line-height:1.15;margin-top:5px}
+.mh h1 em{font-style:normal;color:var(--teal-deep)}
+.mh-lede{margin-top:6px;font-size:16.5px;color:var(--muted);line-height:1.5;max-width:700px}
+.mh-id{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--line);font-size:16px;color:var(--ink-2);flex:none}
+.mh-id svg{width:18px;height:18px;color:var(--muted)}
+
+/* ── 加工链：原件 → AI → 产出 ── */
+.chain{flex:none;margin-top:13px;display:flex;align-items:stretch;gap:0}
+.node{flex:1;display:flex;align-items:center;gap:12px;padding:13px 16px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:var(--sh-1)}
+.node:first-child{border-radius:15px 0 0 15px}
+.node:last-child{border-radius:0 15px 15px 0}
+.node .ic{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:var(--c-soft);color:var(--c)}
+.node .ic svg{width:21px;height:21px}
+.node-b{flex:1;min-width:0}
+.node-b .k{font-size:13.5px;color:var(--muted);letter-spacing:.05em}
+.node-b h4{margin-top:2px;font-size:17.5px;font-weight:800;line-height:1.3}
+.node-b p{margin-top:2px;font-size:14.5px;color:var(--faint)}
+/* 中间箭头：流动 = 正在加工 */
+.arrow{flex:none;width:52px;display:grid;place-items:center;background:var(--surface-2);
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:relative;overflow:hidden}
+.arrow svg{width:22px;height:22px;color:var(--teal);position:relative;z-index:1}
+.arrow::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(31,138,116,.22),transparent);
+  transform:translateX(-100%);display:none}
+body[data-state="working"] .arrow::before{display:block;animation:flowX 1.5s var(--e-out) infinite}
+@keyframes flowX{to{transform:translateX(100%)}}
+.node.pending{background:var(--surface-3);opacity:.62}
+.node.pending .ic{background:var(--surface-3);color:var(--faint)}
+
+/* ── 作业面：左原文 / 右改动 ── */
+.stage{flex:1;min-height:0;margin-top:12px;display:flex;flex-direction:column}
+.panel{flex:1;min-height:0;display:grid;grid-template-columns:1fr 460px;gap:12px}
+
+/* 左：原文，改动处高亮 */
+.doc{min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);
+  border-radius:17px;overflow:hidden;box-shadow:var(--sh-1)}
+.doc-h{flex:none;padding:13px 18px 11px;border-bottom:1px solid var(--line-soft);display:flex;align-items:center;gap:10px}
+.doc-h h3{font-size:18.5px;font-weight:800}
+.doc-h .tag{margin-left:auto;font-size:14px;color:var(--muted)}
+.doc-b{flex:1;min-height:0;overflow-y:auto;padding:16px 20px 18px;scrollbar-width:thin}
+.doc-b::-webkit-scrollbar{width:6px}
+.doc-b::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.sec{margin-bottom:16px}
+.sec h5{font-size:15px;font-weight:800;color:var(--muted);letter-spacing:.06em;margin-bottom:7px}
+.sec p{font-size:16.5px;line-height:1.68;color:var(--ink-2)}
+/* 被改动的句子 */
+.ev{border-radius:5px;padding:1px 4px;margin:0 -1px;transition:none;cursor:default}
+.ev.pend{background:var(--amber-soft);box-shadow:inset 0 -2px 0 var(--amber-line)}
+.ev.took{background:var(--teal-soft);box-shadow:inset 0 -2px 0 var(--teal-line)}
+.ev.kept{background:var(--surface-3);color:var(--muted)}
+.ev.hot{outline:2px solid var(--teal);outline-offset:2px}
+.ev del{text-decoration:line-through;color:var(--faint);opacity:.75}
+.ev ins{text-decoration:none;color:var(--teal-deep);font-weight:700}
+
+/* 右：AI 改动逐条裁决 */
+.diffs{min-height:0;display:flex;flex-direction:column;border-radius:17px;overflow:hidden;position:relative;
+  background:linear-gradient(160deg,var(--ink-panel-1),var(--ink-panel-2) 55%,var(--ink-panel-3));color:#eaf1ed}
+.diffs::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:30px 30px}
+.df-h{flex:none;position:relative;z-index:1;padding:14px 18px 12px;border-bottom:1px solid rgba(255,255,255,.1)}
+.df-badge{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(122,214,184,.16);border:1px solid rgba(122,214,184,.34);color:#a9e6cd;font-size:15.5px;font-weight:700}
+.df-badge svg{width:16px;height:16px}
+.df-badge i{font-style:normal}
+.df-sum{margin-top:9px;font-size:16px;line-height:1.5;color:#c8d8d0}
+.df-sum u{text-decoration:none;background:rgba(122,214,184,.14);border-bottom:1px solid rgba(122,214,184,.4);
+  padding:1px 5px;border-radius:4px;color:#dff0e7}
+.roll{display:inline-block;animation:rollUp .5s var(--e-spring) both}
+@keyframes rollUp{from{transform:translateY(.5em);opacity:0}to{transform:none;opacity:1}}
+
+.df-b{flex:1;min-height:0;position:relative;z-index:1;overflow-y:auto;padding:12px 16px 14px;
+  display:flex;flex-direction:column;gap:9px;scrollbar-width:thin}
+.df-b::-webkit-scrollbar{width:6px}
+.df-b::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+
+.d{padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);
+  animation:riseSharp .5s var(--e-out) both}
+@keyframes riseSharp{from{opacity:0;transform:translateY(13px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.d.hot{border-color:rgba(122,214,184,.55);background:rgba(122,214,184,.09)}
+.d .why{font-size:14px;color:#9fb3aa;letter-spacing:.03em}
+.d .old{margin-top:6px;font-size:15px;line-height:1.5;color:#8fa79d;text-decoration:line-through}
+.d .new{margin-top:5px;font-size:16.5px;line-height:1.5;color:#eaf1ed;font-weight:600}
+.d-act{margin-top:10px;display:flex;gap:8px}
+.d-act button{flex:1;height:var(--tap);border-radius:10px;font-size:15.5px;font-weight:700;
+  border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#dfeae4}
+.d-act button.on{background:#7ad6b8;color:#0e211c;border-color:transparent}
+.d-act button.no.on{background:rgba(226,170,90,.92);color:#2b1d06}
+
+/* 处理中 */
+.steps{display:flex;flex-direction:column;gap:11px;padding:4px 2px}
+.step{display:flex;align-items:center;gap:11px;font-size:16.5px;color:#c3d4cc}
+.step .dot{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
+  border:2px solid rgba(255,255,255,.2);font-size:13px}
+.step.done .dot{background:#7ad6b8;border-color:transparent;color:#0e211c;font-weight:800}
+.step.done{color:#dff0e7}
+.step.now .dot{border-color:#7ad6b8;border-right-color:transparent;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.df-note{margin-top:auto;padding:11px 14px;border-radius:12px;font-size:14.5px;line-height:1.55;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#a9bcb3}
+.df-note b{color:#d3e2da;font-weight:700}
+
+/* ActionBar */
+.ab{flex:none;margin:11px -40px 0;padding:13px 40px;background:var(--surface);
+  border-top:1px solid var(--line);display:flex;align-items:center;gap:16px}
+.ab-l{flex:1;min-width:0;display:flex;align-items:center;gap:14px}
+.ab-note{font-size:14.5px;color:var(--muted);line-height:1.5}
+.ab-note b{color:var(--ink-2)}
+.btn-alt{display:inline-flex;align-items:center;justify-content:center;height:var(--tap-main);padding:0 22px;
+  border-radius:14px;border:1px solid var(--line);background:var(--surface-2);
+  font-size:17px;font-weight:700;color:var(--ink-2);flex:none}
+.btn-main{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:var(--tap-main);
+  padding:0 30px;border-radius:14px;background:var(--teal);color:#fff;font-size:18.5px;font-weight:800;flex:none;
+  box-shadow:0 6px 18px rgba(31,138,116,.26)}
+.btn-main:not([disabled]){animation:glowPulse 3s var(--e-out) infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 6px 18px rgba(31,138,116,.26)}50%{box-shadow:0 6px 26px rgba(31,138,116,.44)}}
+.btn-main svg{width:19px;height:19px}
+.btn-main[disabled]{background:var(--surface-3);color:var(--faint);box-shadow:none;animation:none}
+
+@media (prefers-reduced-motion:reduce){
+  .arrow::before,.d,.roll,.btn-main{animation:none!important}
+}
+
+#panel{position:fixed;left:20px;top:20px;z-index:60;background:rgba(18,42,36,.94);border-radius:14px;
+  padding:11px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#panel .pt-l{font-size:11.5px;color:#9fb3aa;padding:0 4px 2px}
+#panel button{height:36px;padding:0 13px;border-radius:9px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#dfeae4;font-size:13px;text-align:left}
+#panel button.on{background:#7ad6b8;color:#0e211c;font-weight:700;border-color:transparent}
+</style>
+</head>
+<body data-state="done">
+
+<div id="panel">
+  <div class="pt-l">状态切换</div>
+  <button data-s="working">① AI 正在改</button>
+  <button data-s="done" class="on">② 改完 · 5 处待定</button>
+  <button data-s="partial">③ 部分没改动</button>
+  <button data-s="degraded">④ AI 不可用</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+      <div><h2>职易达</h2><p>AI 求职打印服务终端</p></div>
+    </div>
+    <div class="tb-r">
+      <span class="clock">09:41</span>
+      <span class="device"><i></i><span>打印机在线 · A4 纸充足 · 碳粉正常</span></span>
+      <button class="help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>需要帮忙</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="mh">
+      <div>
+        <div class="mh-kicker">第 2 步 · 加工</div>
+        <h1 id="mhTitle">AI 改了 <span class="roll" id="mhN">5</span> 处，你来定</h1>
+        <p class="mh-lede" id="mhLede">每一处都写了为什么这么改。左边是你的原文，点右边任一条会跳到对应位置。不用的可以单独退回。</p>
+      </div>
+      <span class="mh-id">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        已登录 · <b>李同学</b>
+      </span>
+    </section>
+
+    <!-- ══ 加工链 ══ -->
+    <section class="chain">
+      <div class="node" style="--c:#6f7c75;--c-soft:#f1ede2">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+        <div class="node-b"><div class="k">原件（不改动）</div><h4>李同学-简历.pdf</h4><p>2 页 · 486 KB · 已过隐私预检</p></div>
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+      <div class="node" style="--c:#1f8a74;--c-soft:#e4f1ec">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span>
+        <div class="node-b"><div class="k">本次加工</div><h4 id="chainAct">简历优化 · 补成果数字</h4><p id="chainSub">按你的目标岗位「产品运营」</p></div>
+      </div>
+      <div class="arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+      <div class="node" id="nodeOut" style="--c:#b3653a;--c-soft:#f6e9df">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+        <div class="node-b"><div class="k">产出（新文件）</div><h4 id="outName">李同学-简历-优化版.pdf</h4><p id="outSub">采用 4 处 · 退回 1 处 · 待生成</p></div>
+      </div>
+    </section>
+
+    <!-- ══ 左原文 / 右改动 ══ -->
+    <div class="stage">
+      <div class="panel">
+
+        <div class="doc">
+          <div class="doc-h">
+            <h3>你的原文</h3>
+            <span class="tag" id="docTag">黄色 = 待定 · 绿色 = 已采用 · 灰色 = 已退回</span>
+          </div>
+          <div class="doc-b" id="docB">
+            <div class="sec">
+              <h5>实习经历</h5>
+              <p>
+                某科技公司 · 产品运营实习生（2025.07–2025.12）：
+                <span class="ev pend" data-d="0" id="e0">负责用户增长活动的策划与执行</span>，
+                <span class="ev pend" data-d="1" id="e1">配合团队完成活动复盘</span>。
+              </p>
+            </div>
+            <div class="sec">
+              <h5>校园实践</h5>
+              <p>
+                校学生会文体部 · 干事（2024.09–2025.06）：
+                <span class="ev pend" data-d="2" id="e2">组织过校园文化节</span>，
+                参与场地协调与物料准备，
+                <span class="ev pend" data-d="3" id="e3">协助推广活动</span>。
+              </p>
+            </div>
+            <div class="sec">
+              <h5>技能</h5>
+              <p>
+                <span class="ev pend" data-d="4" id="e4">熟悉 SQL、Excel、Axure</span>；
+                英语 CET-6；具备较强的沟通与协作能力。
+              </p>
+            </div>
+            <div class="sec">
+              <h5>教育背景</h5>
+              <p>某大学 · 工商管理（2022.09–2026.06）· 专业前 15%</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="diffs">
+          <div class="df-h">
+            <span class="df-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+              <i id="dfBadge">本机改动</i>
+            </span>
+            <p class="df-sum" id="dfSum">
+              一共改了 <u><span class="roll">5</span> 处</u>，都是把「做过什么」补成「做出什么结果」。
+              <b>没有编造经历</b>——数字位置留空由你填，AI 不替你写数。
+            </p>
+          </div>
+
+          <div class="df-b" id="dfB">
+            <div class="steps" id="dfSteps" style="display:none">
+              <div class="step done"><span class="dot">✓</span>读取原文结构与段落</div>
+              <div class="step done"><span class="dot">✓</span>对照目标岗位「产品运营」</div>
+              <div class="step now"><span class="dot"></span>逐句找可以补成果的地方…</div>
+              <div class="step"><span class="dot"></span>等你逐条决定采用还是退回</div>
+            </div>
+
+            <div id="dfList">
+              <div class="d" data-d="0" style="animation-delay:.04s">
+                <div class="why">缺成果数字 · 岗位看重拉新量级</div>
+                <div class="old">负责用户增长活动的策划与执行</div>
+                <div class="new">主导 3 场用户增长活动的策划与执行，累计新增用户 ____ 人</div>
+                <div class="d-act"><button class="on">采用</button><button class="no">退回</button></div>
+              </div>
+              <div class="d" data-d="1" style="animation-delay:.12s">
+                <div class="why">「配合」弱化了你的作用</div>
+                <div class="old">配合团队完成活动复盘</div>
+                <div class="new">独立完成活动复盘，输出可复用的改进项 ____ 条</div>
+                <div class="d-act"><button class="on">采用</button><button class="no">退回</button></div>
+              </div>
+              <div class="d" data-d="2" style="animation-delay:.2s">
+                <div class="why">缺规模，招聘方看不出量级</div>
+                <div class="old">组织过校园文化节</div>
+                <div class="new">组织校园文化节，参与人数约 ____ 人，统筹 ____ 个执行小组</div>
+                <div class="d-act"><button class="on">采用</button><button class="no">退回</button></div>
+              </div>
+              <div class="d" data-d="3" style="animation-delay:.28s">
+                <div class="why">「协助」同样弱化作用</div>
+                <div class="old">协助推广活动</div>
+                <div class="new">负责线上推广，覆盖 ____ 人次</div>
+                <div class="d-act"><button class="no on">退回</button><button>采用</button></div>
+              </div>
+              <div class="d" data-d="4" style="animation-delay:.36s">
+                <div class="why">岗位明确要求熟练取数，只列技能没有证据</div>
+                <div class="old">熟悉 SQL、Excel、Axure</div>
+                <div class="new">熟练使用 SQL 取数（用于活动效果复盘）、Excel、Axure</div>
+                <div class="d-act"><button class="on">采用</button><button class="no">退回</button></div>
+              </div>
+            </div>
+
+            <p class="df-note" id="dfNote">
+              <b>产出是一份新文件</b>，原件不动，两份都在「我的文档」里可分别删除。
+              带 ____ 的地方需要你填上真实数字，<b>本机不替你编</b>；不填也能打印，只是空着。
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="ab">
+      <div class="ab-l">
+        <button class="btn-alt" id="abAlt">全部退回，用原文</button>
+        <p class="ab-note" id="abNote">
+          优化只改表述方式，<b>不新增你没做过的事</b>。改完的文件仅存进「我的文档」，不发给任何企业。
+        </p>
+      </div>
+      <button class="btn-main" id="abMain">
+        <span id="abMainT">生成优化版并去打印</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>首页</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><span>AI 顾问</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></button>
+  </nav>
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById("stage");
+  if(st){ st.style.transform = "scale(" + s + ")"; st.style.height = (1920 * s) + "px"; }
+}
+window.addEventListener("resize", fit); fit();
+
+// 裁决 ↔ 原文联动（与 06-jobfit / 08-intake 同一套语法）
+function sync(){
+  var took=0, back=0;
+  document.querySelectorAll('#dfList .d').forEach(function(d){
+    var i=d.dataset.d, ev=document.getElementById('e'+i);
+    var on=d.querySelector('.d-act button.on');
+    var isBack=on && on.classList.contains('no');
+    if(ev){ ev.classList.remove('pend','took','kept'); ev.classList.add(isBack?'kept':'took'); }
+    isBack ? back++ : took++;
+  });
+  var out=document.getElementById('outSub');
+  if(out) out.textContent='采用 '+took+' 处 · 退回 '+back+' 处 · 待生成';
+  var m=document.getElementById('abMainT');
+  if(m) m.textContent = took===0 ? '全部退回，直接打印原文' : '生成优化版并去打印';
+}
+document.querySelectorAll('.d-act').forEach(function(g){
+  g.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){
+      g.querySelectorAll('button').forEach(function(x){ x.classList.remove('on') });
+      b.classList.add('on'); sync();
+    });
+  });
+});
+// 点右边条目 → 左边定位高亮
+document.querySelectorAll('#dfList .d').forEach(function(d){
+  d.addEventListener('click', function(){
+    document.querySelectorAll('#dfList .d').forEach(function(x){ x.classList.remove('hot') });
+    document.querySelectorAll('.ev').forEach(function(x){ x.classList.remove('hot') });
+    d.classList.add('hot');
+    var ev=document.getElementById('e'+d.dataset.d);
+    if(ev){ ev.classList.add('hot'); ev.scrollIntoView({block:'center',behavior:'smooth'}); }
+  });
+});
+sync();
+
+var COPY = {
+  working:{ title:'正在逐句看你的简历', n:false,
+    lede:'只改表述方式，不会新增你没做过的事。改完会逐条列出来，每一条都能单独退回。',
+    main:'改完才能继续', disabled:true, alt:'取消',
+    note:'优化只改表述方式，<b>不新增你没做过的事</b>。',
+    steps:true, list:false, pending:true },
+  done:{ title:'AI 改了 5 处，你来定', n:true,
+    lede:'每一处都写了为什么这么改。左边是你的原文，点右边任一条会跳到对应位置。不用的可以单独退回。',
+    main:'生成优化版并去打印', disabled:false, alt:'全部退回，用原文',
+    note:'优化只改表述方式，<b>不新增你没做过的事</b>。改完的文件仅存进「我的文档」，不发给任何企业。',
+    steps:false, list:true, pending:false },
+  partial:{ title:'只有 2 处能改', n:false,
+    lede:'其余段落已经写得比较具体，没有可补的成果点——没有该改的地方就不硬改，免得越改越空。',
+    main:'生成优化版并去打印', disabled:false, alt:'全部退回，用原文',
+    note:'只改了确实有改进空间的部分，<b>其余原样保留</b>。',
+    steps:false, list:true, pending:false },
+  degraded:{ title:'这次改不了', n:false,
+    lede:'简历优化需要 AI 服务，现在连不上，所以<b>不会给出任何改动建议</b>——没有的东西不编给你看。原件可以照常打印，或存进「我的文档」稍后再来。',
+    main:'直接打印原文', disabled:false, alt:'存进我的文档',
+    note:'AI 服务暂时不可用，<b>本页不展示任何优化结论</b>。原件未被改动。',
+    steps:false, list:false, pending:true }
+};
+
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#panel button').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    var s=b.dataset.s; document.body.dataset.state=s;
+    var c=COPY[s];
+    document.getElementById('mhTitle').innerHTML = c.n
+      ? 'AI 改了 <span class="roll">5</span> 处，你来定' : c.title;
+    document.getElementById('mhLede').innerHTML = c.lede;
+    document.getElementById('abMainT').textContent = c.main;
+    document.getElementById('abMain').disabled = c.disabled;
+    document.getElementById('abAlt').textContent = c.alt;
+    document.getElementById('abNote').innerHTML = c.note;
+    document.getElementById('dfSteps').style.display = c.steps ? '' : 'none';
+    document.getElementById('dfList').style.display = c.list ? '' : 'none';
+    document.getElementById('nodeOut').classList.toggle('pending', c.pending);
+    document.getElementById('dfBadge').textContent =
+      (s==='working') ? '本机改动中' : (s==='degraded' ? '本机改动 · 不可用' : '本机改动');
+    document.getElementById('docTag').style.display = c.list ? '' : 'none';
+    if (s==='degraded') {
+      document.getElementById('dfSum').innerHTML = 'AI 服务连不上，<b>这次没有任何改动建议</b>。左边是你的原文，未被改动。';
+      document.getElementById('dfNote').innerHTML = '<b>原件不受影响</b>，可直接打印或存进「我的文档」。恢复后再回来优化也行。';
+      document.querySelectorAll('.ev').forEach(function(e){ e.classList.remove('took','kept','pend','hot') });
+      document.getElementById('outSub').textContent = '本次未生成';
+    } else if (s==='partial') {
+      document.getElementById('dfSum').innerHTML = '只有 <u>2 处</u>值得改，其余段落已经写得比较具体。<b>没有该改的地方就不硬改。</b>';
+      document.getElementById('dfNote').innerHTML = '<b>产出是一份新文件</b>，原件不动。带 ____ 的地方需要你填真实数字，<b>本机不替你编</b>。';
+      document.querySelectorAll('#dfList .d').forEach(function(d,i){ d.style.display = i<2 ? '' : 'none' });
+      document.querySelectorAll('.ev').forEach(function(e,i){
+        e.classList.remove('took','kept','hot'); if(i>=2) e.classList.remove('pend'); });
+      sync();
+    } else {
+      document.getElementById('dfSum').innerHTML =
+        '一共改了 <u><span class="roll">5</span> 处</u>，都是把「做过什么」补成「做出什么结果」。<b>没有编造经历</b>——数字位置留空由你填，AI 不替你写数。';
+      document.getElementById('dfNote').innerHTML =
+        '<b>产出是一份新文件</b>，原件不动，两份都在「我的文档」里可分别删除。带 ____ 的地方需要你填上真实数字，<b>本机不替你编</b>；不填也能打印，只是空着。';
+      document.querySelectorAll('#dfList .d').forEach(function(d){ d.style.display='' });
+      document.querySelectorAll('.ev').forEach(function(e){ e.classList.add('pend') });
+      sync();
+    }
+  });
+});
+</script>
+</body>
+</html>

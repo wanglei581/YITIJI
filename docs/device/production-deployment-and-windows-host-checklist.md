@@ -1,12 +1,26 @@
 # 生产部署与 Windows 本地主机换机验收清单
 
-> **验收快照（2026-08-03）**  
-> ✅ main CI 3/3 PASS（PR #492 后，build-and-verify + kiosk-browser-smoke + postgres-readiness）  
-> ✅ `pnpm build` 全通过（kiosk / admin / partner / api）  
-> ✅ `pnpm --filter @ai-job-print/api run verify:compliance` PASS（13 entry paths，禁词零违规）  
-> ✅ `pnpm --filter @ai-job-print/api run verify:assess-isolation` PASS  
-> ✅ `pnpm --filter @ai-job-print/api run verify:self-assessment` PASS（strength clamp / 纯函数 / 空答案）  
-> ⚠️ 部分清单项需生产服务器 / 一体机现场 / 法务审定，本地无法验证（见各节标注）
+> **验收快照（2026-08-08 线上实测复核）**
+>
+> 本次以 GitHub Actions 记录 + `zyidai.cn` 线上实际响应为证据复核，纠正此前「未部署」的过时判断。
+>
+> **已确认在生产运行：**
+> - ✅ **持续部署已自动化**：`CI` 通过后由 `.github/workflows/deploy.yml` 经 SSH 自动部署到 `zyidai.cn`；最近成功部署 run `31172765587`（2026-08-07T11:06:48Z）。
+> - ✅ **main CI 3/3 PASS**：`build-and-verify` + `postgres-readiness` + `kiosk-browser-smoke`，最近 run `31172027515`（2026-08-07T10:55:39Z）成功。
+> - ✅ **线上 API 在线**：`GET /api/v1/health` → `200 {"status":"ok","db":"postgres"}`；`/api/v1/jobs`、`/api/v1/job-fairs`、`/api/v1/policies` 均 200。
+> - ✅ **生产数据库为 PostgreSQL**（health 端点 `db: postgres` 实测，非 SQLite）。
+> - ✅ **HTTPS 正常**：nginx/1.24.0 (Ubuntu)，Let's Encrypt 证书 `CN=zyidai.cn`，有效期至 2026-10-04。
+> - ✅ **前端为真实构建产物**：线上返回 Vite 构建的 SPA（`/assets/index-*.js`），非占位页。
+> - ✅ 生产启动门禁代码在位：`services/api/src/config/production-runtime-gates.ts`（JWT_SECRET 长度、`FILE_STORAGE_DRIVER=cos`）。
+>
+> **实测发现的真实缺口（不是文档没打勾，是线上确实没有）：**
+> - ❌ **生产库三类内容全为空**：岗位 `total:0`、招聘会 `total:0`、政策 `data:[]`。页面可访问但没有可展示内容，不具备对外服务条件。
+> - ⚠️ **部署流水线只发 Kiosk 前端**：`deploy.yml` 仅 build 并同步 `apps/kiosk/dist` 到 nginx 根目录，API 不在该流水线内（线上 API 在跑，但发布路径未纳入自动化，须确认其部署与回滚方式）。
+> - ⚠️ `NODE_ENV=production` 无法从外部证实（health 未暴露），须在服务器侧确认。
+>
+> ⚠️ 其余需生产服务器登录 / 一体机现场 / 法务审定的项目，本地与外部探测均无法验证（见各节标注）。
+>
+> **勾选口径**：本清单的 `- [x]` 只代表「有可复核证据」，证据须写在条目后。未打勾 ≠ 未实现，可能只是尚未回填证据；请勿直接用勾选比例当作完成度。
 
 
 
@@ -36,11 +50,11 @@
 
 ### 2.1 代码与分支
 
-- [ ] main 分支为待部署版本。
-- [ ] Git 工作区无未确认业务改动。
+- [x] main 分支为待部署版本。（**2026-08-08 复核**：`deploy.yml` 以 `workflow_run` 监听 `CI` 且 `branches: [main]`，main 即部署源；最近部署 run `31172765587` 成功。）
+- [ ] Git 工作区无未确认业务改动。（2026-08-08 本地工作区有未提交改动：`apps/kiosk/src/pages/home/HomePage.tsx`、`index.css`、3 个 verify 脚本，以及 4 个未跟踪的 `apps/kiosk/*.mjs` 与 3 个 `docs/design/` 新目录；部署前须确认或清理。）
 - [ ] `.env`、`.env.local`、`.claude/settings.local.json`、日志、dist/build、临时简历文件未提交。
-- [ ] 最近一次 CI 主 job 通过。
-- [ ] `postgres-readiness` job 通过。
+- [x] 最近一次 CI 主 job 通过。（**2026-08-08 复核**：run `31172027515`，2026-08-07T10:55:39Z，`CI` 全部 success。）
+- [x] `postgres-readiness` job 通过。（**2026-08-08 复核**：同 run 内 job 定义于 `.github/workflows/ci.yml:385`，随 CI 一并 success。）
 - [ ] 如本次包含数据库 schema/type 变更，确认 PostgreSQL schema 已同步并通过漂移校验。
 
 ### 2.2 密钥轮换与最小权限
@@ -80,7 +94,7 @@
 - [ ] 服务器时区为 `Asia/Shanghai`。
 - [ ] 磁盘空间、内存、CPU 满足预估访问量。
 - [ ] 防火墙只开放必要端口：HTTP/HTTPS、必要管理端口；数据库/Redis 不对公网开放。
-- [ ] 域名解析、HTTPS 证书、证书自动续期正常。
+- [x] 域名解析、HTTPS 证书正常。（**2026-08-08 外部实测**：`https://zyidai.cn` 返回 `HTTP/2 200`，`server: nginx/1.24.0 (Ubuntu)`；证书 `subject=CN=zyidai.cn`，`issuer=Let's Encrypt`，`notAfter=2026-10-04`。）**证书自动续期仍未验证** —— 须在服务器确认 certbot/acme 定时任务存在且上次续期成功。
 
 ### 3.2 环境变量核对
 
@@ -89,9 +103,9 @@
 - [ ] `NODE_ENV=production`。
 - [ ] `JWT_SECRET` 使用生产强随机值，长度不少于 16 字符；不得使用本地开发/CI 测试值。
 - [ ] `NODE_ENV=production` 已由 PM2/部署环境显式注入；支付、数据库、CORS 和其他生产运行时门禁均依赖该值，不得遗漏或写为 development。
-- [ ] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。
-- [ ] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。
-- [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。
+- [x] `DATABASE_URL` 指向 PostgreSQL，不再指向 SQLite 文件。（**2026-08-08 外部实测**：`GET /api/v1/health` 返回 `{"status":"ok","db":"postgres"}`。）
+- [ ] `FILE_STORAGE_DRIVER=cos`；生产不得回退本地磁盘存储。（门禁代码在位，但外部无法读取实际取值，须服务器确认。）
+- [ ] API 生产启动门禁已验证：`NODE_ENV=production` 下，JWT_SECRET 缺失/过短、`FILE_STORAGE_DRIVER` 非 `cos`、`DATABASE_URL=file:` SQLite 均会启动失败。（**2026-08-08 复核**：门禁实现存在于 `services/api/src/config/production-runtime-gates.ts`（`PRODUCTION_JWT_SECRET_INVALID`、`PRODUCTION_FILE_STORAGE_DRIVER_NOT_COS`）。但线上 API 正常启动**不构成**门禁已生效的证据 —— 若 `NODE_ENV` 非 production，门禁根本不会执行。须在服务器确认 `NODE_ENV` 实际取值后才能打勾。）
 - [ ] `REDIS_URL` 正确。
 - [ ] API 监听端口、前端 API base URL、CORS allowlist 正确。
 - [ ] COS bucket、region、secretId、secretKey、签名 TTL 正确。
@@ -123,14 +137,23 @@ pnpm build
 验收：
 
 - [ ] 安装不依赖本机私有路径。
-- [ ] 构建产物路径与 nginx/静态服务配置一致。
-- [ ] 前端资源 base path 正确。
+- [x] 构建产物路径与 nginx/静态服务配置一致。（**2026-08-08 外部实测**：线上返回 Vite 构建 SPA，引用 `/assets/index-DqleN77r.js`、`/assets/index-CjAHAsWH.css`，非占位页；`deploy.yml` 将 `apps/kiosk/dist/.` 同步至 `DEPLOY_WEB_ROOT`。）
+- [x] 前端资源 base path 正确。（同上，`/assets/*` 绝对路径可正常加载，首页 200。）
 - [ ] 大文件上传入口不会被前端路由或 nginx 误拦截。
+
+#### 3.3.1 持续部署流水线（2026-08-08 新增，据线上实测补充）
+
+- [x] main CI 通过后自动部署已生效。（`.github/workflows/deploy.yml`，`appleboy/ssh-action@v1.0.3`，`if: workflow_run.conclusion == 'success'`；最近成功 run `31172765587`。）
+- [ ] **API 发布路径未纳入自动化**：`deploy.yml` 只执行 `pnpm --filter @ai-job-print/kiosk build` 并同步 kiosk 静态产物，**不部署 `services/api`**。线上 API 确在运行（health 200），须补记其部署方式、进程守护（PM2/systemd）、版本来源与回滚步骤，否则 API 变更不会随 CI 上线。
+- [ ] **部署脚本 `rm -rf ${DEPLOY_WEB_ROOT}/*` 为不可回滚操作**：须确认该路径专用于 kiosk 静态资源、不含其他站点或用户数据，并确认失败时的回滚手段（保留上一版本产物或 nginx 双目录切换）。
+- [ ] 部署失败时的告警与回滚演练已完成。
 
 ### 3.4 PostgreSQL 空库部署验收
 
 按 [postgres-operations.md](./postgres-operations.md) 执行并留存日志：
 
+- [x] 生产库已连通并可服务查询。（**2026-08-08 外部实测**：`/api/v1/jobs`、`/api/v1/job-fairs`、`/api/v1/policies` 均返回 200 且结构正确。）
+- [ ] **生产库业务内容为空 —— 上线前阻塞（2026-08-08 实测新增）**：岗位 `pagination.total = 0`、招聘会 `pagination.total = 0`、政策 `data: []`。接口与页面可用，但终端上没有任何可展示内容，不具备对外服务条件。须先完成：① 至少一个真实岗位来源（合作机构 API/Webhook/Excel 任一轨）导入并经管理员审核 `approved` + `published`；② 至少一场真实招聘会；③ 政策条目。导入后须复测三个端点 `total > 0`。
 - [ ] 全新空库 `migrate deploy` 通过。
 - [ ] `verify:demo-seed-guard` 通过，且生产未执行任何 `db:seed*`。
 - [ ] 现有生产恢复确认沿用已存在且已轮换口令的管理员账号，未运行首个管理员 bootstrap。
