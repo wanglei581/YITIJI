@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>配色风格对照表 — AI 求职操作系统 V3</title>
+<style>
+  :root { --card: 268px; --scale: .248; }
+  body {
+    margin: 0; padding: 26px 30px 40px;
+    background: radial-gradient(1400px 900px at 18% -12%, #101a1c, #06090a 62%, #030506);
+    color: #e8f1f1;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  h1 { font-family: "Songti SC", "SimSun", serif; font-size: 26px; font-weight: 600; margin: 0 0 6px; letter-spacing: .04em; }
+  p.sub { margin: 0 0 22px; font-size: 13px; color: #8ba4a9; line-height: 1.7; }
+  .grid { display: grid; grid-template-columns: repeat(4, var(--card)); gap: 22px 20px; }
+  figure { margin: 0; }
+  .frame {
+    width: var(--card); height: calc(1920px * var(--scale));
+    border-radius: 10px; overflow: hidden; position: relative;
+    border: 1px solid rgba(232,241,241,.14);
+    box-shadow: 0 20px 50px -22px rgba(0,0,0,.9);
+    background: #05090b;
+  }
+  .frame iframe {
+    width: 1080px; height: 1920px; border: 0; display: block;
+    transform: scale(var(--scale)); transform-origin: top left;
+  }
+  figcaption { padding-top: 9px; font-size: 13px; line-height: 1.55; }
+  figcaption b { display: block; font-size: 15px; color: #f2f7f7; letter-spacing: .04em; }
+  figcaption span { color: #7f979c; font-size: 12px; }
+  a.open { color: #34e0a8; text-decoration: none; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>配色风格对照表 · 同一套版面 / 同一套组件 / 七种色彩气质</h1>
+  <p class="sub">
+    结构、栅格、字号、间距、动效完全相同，只换色彩令牌。语义角色在任何风格下不变：
+    主色＝本机服务与已验证状态，钴蓝／石青＝第三方与官方来源，琥珀＝待核实，朱砂＝需本人确认的不可逆动作。<br>
+    七个方向都刻意避开紫蓝渐变——那是当前 AI 产品的通用皮，用了就有“AI 味”。
+  </p>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+  var THEMES = [
+    ['jade',   '青玉墨',   '现方案。青玉＝可信服务，最贴合“职易达”既有品牌绿'],
+    ['cobalt', '深空钴蓝', '冷、精密、工程感。像仪器，不像玩具'],
+    ['amber',  '暖夜琥珀', '暖炭底＋铜金。最有人味，最不像 SaaS 模板'],
+    ['neon',   '霓虹青梅', '近黑＋青梅绿＋品红。最年轻，最有活力'],
+    ['pine',   '松林墨绿', '低饱和、最沉稳。长期看不腻，最“贵”'],
+    ['ink',    '水墨素白', '近黑＋素白主动作＋朱砂点睛。最东方、最编辑感'],
+    ['frost',  '霜白玻璃', '浅色旗舰。白天强环境光下最稳，最像高端政务自助']
+  ]
+  document.getElementById('grid').innerHTML = THEMES.map(function (t) {
+    return '<figure>' +
+      '<div class="frame"><iframe src="01-home.html?capture=1&theme=' + t[0] + '" loading="eager" title="' + t[1] + '"></iframe></div>' +
+      '<figcaption><b>' + t[1] + '</b><span>' + t[2] + '</span><br>' +
+      '<a class="open" href="01-home.html?theme=' + t[0] + '" target="_blank">单独打开 →</a></figcaption>' +
+      '</figure>'
+  }).join('')
+</script>
+</body>
+</html>
