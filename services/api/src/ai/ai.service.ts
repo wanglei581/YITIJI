@@ -154,7 +154,7 @@ export class AiService {
     payload: ParseResumeOutput | OptimizeResumeOutput,
     endUserId?: string | null,
     accessTokenHash?: string | null,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // 明文 token 只在 response 返回；落库前从 payload 防御性摘掉 accessToken，
     // 确保即便未来调整调用顺序，payloadJson 也绝不含明文 token。
     const persistablePayload: Record<string, unknown> = { ...payload }
@@ -180,8 +180,18 @@ export class AiService {
           ...(accessTokenHash !== undefined ? { accessTokenHash } : {}),
         },
       })
-    } catch {
-      // 持久化失败不应让用户的解析/优化动作失败（结果仍在本次响应里返回）
+      return true
+    } catch (err) {
+      // 持久化失败不让用户的解析/优化动作失败（结果仍在本次响应里返回），
+      // 但**必须留痕**：此前这里是空 catch，写库失败时用户看到成功、库里却没有行，
+      // 之后「我的 AI 记录」查不到该条，且无人知晓 —— 这是一条静默丢数据路径，
+      // 会凭空制造出「已保存」的伪交付。
+      // 不打印 payload（含简历正文），只记可定位的元数据。
+      this.logger.error(
+        `AI 结果持久化失败 taskId=${taskId} kind=${kind} status=${status} provider=${provider}: ` +
+          (err instanceof Error ? err.message : String(err)),
+      )
+      return false
     }
   }
 
