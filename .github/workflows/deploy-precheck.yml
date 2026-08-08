@@ -77,6 +77,32 @@ jobs:
               echo "API_HEALTH_LOCAL=unreachable  （端口或路径可能与默认不同）"
             fi
 
+            echo "=== 6. 磁盘占用盘点（只输出数量级，用于判断清理目标）==="
+            # 首轮探测发现备份盘仅剩 1 GiB。发布脚本第一步就是 PG 全库备份、
+            # 第二步备份整个运行目录，空间不足会在备份阶段写满盘，
+            # 波及正在运行的 API 与 PostgreSQL。故先盘点占用分布再决定清理。
+            echo "ROOT_TOTAL_GB=$(df -BG --output=size / 2>/dev/null | tail -n1 | tr -dc '0-9')"
+            echo "ROOT_USED_PCT=$(df --output=pcent / 2>/dev/null | tail -n1 | tr -dc '0-9')"
+
+            if [ -d "$EXPECT_BACKUP" ]; then
+              echo "BACKUP_ROOT_SIZE_MB=$(du -sm "$EXPECT_BACKUP" 2>/dev/null | cut -f1)"
+              echo "BACKUP_FILE_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
+              echo "BACKUP_DIR_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+              echo "BACKUP_OLDEST_DAYS=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -printf '%T@\n' 2>/dev/null | sort -n | head -1 | awk '{print int((systime()-$1)/86400)}')"
+            else
+              echo "BACKUP_ROOT_EXISTS=no"
+            fi
+
+            echo "API_DIR_SIZE_MB=$(du -sm "$EXPECT_DIR" 2>/dev/null | cut -f1)"
+            echo "API_NODE_MODULES_MB=$(du -sm "$EXPECT_DIR/node_modules" 2>/dev/null | cut -f1)"
+            echo "PNPM_STORE_MB=$(du -sm ~/.local/share/pnpm/store 2>/dev/null | cut -f1)"
+            echo "PM2_LOGS_MB=$(du -sm ~/.pm2/logs 2>/dev/null | cut -f1)"
+            echo "NGINX_LOGS_MB=$(du -sm /var/log/nginx 2>/dev/null | cut -f1)"
+            echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
+
+            echo "=== 7. 本次发布需要的空间量级 ==="
+            echo "PG_DB_SIZE_MB=$(sudo -n -u postgres psql -tAc \"SELECT pg_database_size(current_database())/1024/1024;\" 2>/dev/null || echo 'unknown（无免密 sudo，可忽略）')"
+
             echo "=== 完成：以上均为只读探测，未做任何修改 ==="
         env:
           EXPECT_DIR: /srv/ai-job-print
