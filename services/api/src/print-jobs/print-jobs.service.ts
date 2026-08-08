@@ -151,6 +151,22 @@ function makeOrderNo(): string {
   return `ORD-${yyyy}${mm}${dd}-${suffix}`
 }
 
+/**
+ * 需要隐私预检的文件用途白名单：只覆盖「用户交进来的原始材料」。
+ * 派生产物与系统生成物（cover_letter / self_assessment_report / fair_material 等）
+ * 不在此列——它们由本机生成，不是用户手里可能夹带证件号的原件。
+ */
+const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan', 'contract_upload'])
+
+/**
+ * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启。
+ * 与 PRINT_REQUIRE_PAID_BEFORE_CLAIM 同一模式：关闭时只记录不拦截，
+ * 便于先观察真实流量中有多少文件绕过了 material-check，再决定何时收紧。
+ */
+export function requirePiiScanBeforePrint(): boolean {
+  return process.env['PRINT_REQUIRE_PII_SCAN'] === 'true'
+}
+
 @Injectable()
 export class PrintJobsService {
   constructor(
@@ -224,6 +240,18 @@ export class PrintJobsService {
         },
       })
     }
+
+    // 隐私预检门控：建单前确认该文件走过 pii_scan 且用户已逐项裁决。
+    //
+    // 背景：此前服务端完全不校验此事（print-jobs 下 documentProcessTask 零引用），
+    // 「打印前必须做隐私检查」只是前端流程约定 —— 直接调 POST /print/jobs 即可跳过
+    // 整个 material-check；而 print-scan/convert、print-scan/sign、scan/result
+    // 三条前端路径本来就绕过该步骤。
+    //
+    // 范围只覆盖「用户上传的原件」：派生产物（convert/sign 的输出、AI 生成的简历与
+    // 报告、招聘会运营资料）不是用户手里的原始材料，其风险由各自上游承担，此处放行
+    // 但记录，避免一刀切把既有打印链路堵死。
+    await this.assertPiiScanned(fileId)
 
     // B1: re-sign with 30-min TTL so the Terminal Agent can download even after
     // a claim delay (上送的 5-min URL 可能在 claim 前已过期)。
@@ -395,6 +423,67 @@ export class PrintJobsService {
         printTaskId: task.id,
       }),
     }
+  }
+
+  /**
+   * 建单前确认文件走过隐私预检。
+   *
+   * 判定：文件为「用户上传的原件」（assetCategory 非派生 + purpose 在白名单内）时，
+   * 必须存在一条 completed 的 pii_scan DocumentProcessTask，且不残留 pending 裁决。
+   * 派生产物与系统生成物放行。
+   *
+   * 门控关闭时（默认）只写审计不拦截，用于先观察真实绕过量。
+   */
+  private async assertPiiScanned(fileId: string): Promise<void> {
+    const file = await this.prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: { purpose: true, assetCategory: true },
+    })
+    // 文件不存在交由后续既有校验处理，此处不越权报错
+    if (!file) return
+
+    const isDerived = file.assetCategory === 'derived' || file.assetCategory === 'optimized'
+    if (isDerived || !PII_SCAN_REQUIRED_PURPOSES.has(file.purpose)) return
+
+    const scan = await this.prisma.documentProcessTask.findFirst({
+      where: { sourceFileId: fileId, kind: 'pii_scan', status: 'completed' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    })
+
+    let pendingFindings = 0
+    if (scan) {
+      pendingFindings = await this.prisma.piiFinding.count({
+        where: { taskId: scan.id, action: 'pending' },
+      })
+    }
+
+    const ok = Boolean(scan) && pendingFindings === 0
+    if (ok) return
+
+    const reason = !scan ? 'PII_SCAN_MISSING' : 'PII_DECISIONS_PENDING'
+
+    if (!requirePiiScanBeforePrint()) {
+      // 观察期：不拦截，只留痕，便于统计真实绕过量后再收紧
+      await this.audit.write({
+        actorId:    null,
+        actorRole:  'kiosk',
+        action:     'print_job.pii_scan_bypassed',
+        targetType: 'file_object',
+        targetId:   fileId,
+        payload: { reason, purpose: file.purpose, assetCategory: file.assetCategory, pendingFindings },
+      }).catch(() => undefined)
+      return
+    }
+
+    throw new BadRequestException({
+      error: {
+        code: 'PRINT_PII_SCAN_REQUIRED',
+        message: !scan
+          ? '这份文件还没做隐私检查，请返回材料检查步骤完成后再打印'
+          : '还有隐私片段没有确认保留或遮挡，请逐项确认后再打印',
+      },
+    })
   }
 
   async getStatus(taskId: string): Promise<PrintJobStatusResult> {
