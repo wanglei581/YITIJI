@@ -32,6 +32,7 @@ const REQUIRED_BRACE_OVERRIDES = {
 }
 const REQUIRED_PNPM_VERSION = '11.2.2'
 const REQUIRED_JS_YAML_VERSION = '4.3.1'
+const REQUIRED_NANOID_OVERRIDE = '3.3.17'
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -129,6 +130,11 @@ function assertSecurityOverrides() {
     workspaceMap['js-yaml'],
     REQUIRED_JS_YAML_VERSION,
     `missing required js-yaml override: js-yaml -> ${REQUIRED_JS_YAML_VERSION}`
+  )
+  assert.equal(
+    workspaceMap['nanoid@3.3.12'],
+    REQUIRED_NANOID_OVERRIDE,
+    `missing required nanoid override: nanoid@3.3.12 -> ${REQUIRED_NANOID_OVERRIDE}`
   )
 }
 
