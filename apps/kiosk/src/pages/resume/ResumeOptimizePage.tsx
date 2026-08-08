@@ -163,11 +163,16 @@ export function ResumeOptimizePage() {
     return () => { cancelled = true }
   }, [taskId, accessToken, getToken])
 
-  const handleSaveAdvice = () => {
-    const advice = modules.map((m) => ({ title: m.title, before: m.before, after: m.after }))
-    navigate('/profile', {
-      state: { savedResumeAdvice: { file, suggestions: advice, savedAt: new Date().toISOString() } },
-    })
+  // 不做「保存」动作：优化结果在生成时已由服务端落库
+  // （AiResumeResult kind='optimize'，见 services/api/src/ai/ai.service.ts），
+  // 此处只带用户去看真实那份记录。
+  //
+  // 原实现 navigate('/profile', { state: { savedResumeAdvice } }) 把建议塞进
+  // ProfilePage 的内存 useState（ProfilePage.tsx:46-53），刷新即丢，
+  // 却提示「优化建议已加入本次记录」—— 用户以为存下了，实际没有。
+  // 属 CLAUDE.md §9「不伪造能力」违规，已移除。
+  const handleViewRecord = () => {
+    navigate('/me/ai-records')
   }
 
   const requestLeave = (action: LeaveAction) => {
@@ -459,8 +464,8 @@ export function ResumeOptimizePage() {
       </div>
 
       <KioskActionBar className="resume-lightflow__action-bar mt-6 flex gap-3">
-        <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleSaveAdvice)}>
-          保存优化建议
+        <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleViewRecord)}>
+          在 AI 服务记录里查看
         </Button>
         <Button size="lg" className="flex flex-[2] items-center justify-center gap-2"
           disabled={exporting || !optimizedResume} onClick={() => void handleExport()}>
