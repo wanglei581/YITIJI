@@ -1,0 +1,319 @@
+/* ============================================================
+   V4 构图层 ·「印务台 Bench」
+   ------------------------------------------------------------
+   构图立场：这台机器是印务终端 + 求职操作系统，所以视觉语言取自
+   印刷业与精密仪器，不取自 SaaS 仪表盘：
+     · 套准标记 / 裁切线 / 出血     → 工作区边界，替代圆角卡片描边
+     · 半调网点                     → 图像与色块的过渡，替代渐变
+     · 校色条                       → 彩色能力的真实指示，不是装饰
+     · 等宽数字读数 + 发丝线        → 机器在报数，不是网页在排版
+     · 竖排标签                     → 9:16 竖屏的天然解法
+     · 左侧任务脊 Spine             → 办理单是全站骨架，不是一张卡
+   构图不再是"一堆卡片竖着排"，而是：脊 + 版面 + 目录 + 图条。
+   ============================================================ */
+
+/* ---------- 主体：脊 + 内容两列 ---------- */
+.bench {
+  flex: 1 1 auto; min-height: 0;
+  display: grid; grid-template-columns: 84px 1fr;
+  position: relative; z-index: var(--z-content);
+  overflow: hidden;
+}
+
+/* ================= 任务脊：办理单是页面骨架 ================= */
+.spine {
+  position: relative;
+  border-right: 1px solid var(--brd-1);
+  padding: var(--s-5) 0 var(--s-5);
+  display: flex; flex-direction: column; align-items: center;
+  background: var(--surf-1);
+}
+.spine-label {
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-size: var(--fz-1); letter-spacing: .5em; color: var(--fog-600);
+  margin-bottom: var(--s-4);
+}
+.spine-rail { position: relative; flex: 1; width: 100%; display: flex; flex-direction: column; }
+/* 垂直主线 */
+.spine-rail::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--brd-2) 8%, var(--brd-2) 92%, transparent);
+}
+/* 行进光点：办理方向 */
+.spine-rail::after {
+  content: ""; position: absolute; left: 50%; margin-left: -1.5px; width: 4px; height: 84px;
+  border-radius: 4px; background: linear-gradient(180deg, transparent, var(--jade-400), transparent);
+  animation: spine-run 4.2s var(--ease-in-out) infinite;
+}
+@keyframes spine-run {
+  0% { top: -84px; opacity: 0; } 12% { opacity: 1; }
+  76% { opacity: 1; } 100% { top: 100%; opacity: 0; }
+}
+.screen[data-state="ai-down"] .spine-rail::after { display: none; }
+
+.node {
+  position: relative; flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-3); min-height: 84px;
+  text-decoration: none; color: inherit;
+}
+.node-no {
+  font-family: var(--ff-num); font-size: var(--fz-2); letter-spacing: .12em;
+  color: var(--fog-600); z-index: 2;
+}
+.node-dot {
+  width: 13px; height: 13px; border-radius: 50%; z-index: 2;
+  background: var(--ink-200); border: 1.5px solid var(--brd-2);
+}
+.node-name {
+  writing-mode: vertical-rl; text-orientation: mixed;
+  font-size: var(--fz-2); letter-spacing: .18em; color: var(--fog-700);
+  z-index: 2; background: var(--ink-000); padding: 6px 0;
+}
+.node--now .node-dot {
+  background: var(--jade-400); border-color: var(--jade-400);
+  box-shadow: 0 0 0 5px var(--jade-a20), 0 0 16px var(--jade-a32);
+}
+.node--now .node-no { color: var(--jade-400); }
+.node--now .node-name { color: var(--fog-900); }
+.node--done .node-dot { background: var(--jade-700); border-color: var(--jade-700); }
+.node--off .node-dot { background: var(--ink-200); border-color: var(--brd-1); }
+.node--off .node-name, .node--off .node-no { color: var(--fog-600); }
+
+/* ================= 内容版面 ================= */
+.sheet {
+  position: relative; min-width: 0;
+  padding: var(--s-6) var(--s-8) var(--s-5) var(--s-7);
+  display: flex; flex-direction: column; gap: var(--s-4);
+  overflow: hidden;
+}
+
+/* 套准标记：工作区四角。替代"给每块内容加一个圆角边框" */
+.marks { position: absolute; inset: 12px; pointer-events: none; z-index: 1; }
+.marks i { position: absolute; width: 16px; height: 16px; opacity: .5; }
+.marks i::before, .marks i::after { content: ""; position: absolute; background: var(--fog-600); }
+.marks i::before { width: 100%; height: 1px; top: 0; }
+.marks i::after { height: 100%; width: 1px; left: 0; }
+.marks i:nth-child(1) { left: 0; top: 0; }
+.marks i:nth-child(2) { right: 0; top: 0; transform: scaleX(-1); }
+.marks i:nth-child(3) { left: 0; bottom: 0; transform: scaleY(-1); }
+.marks i:nth-child(4) { right: 0; bottom: 0; transform: scale(-1); }
+
+/* ---------- 版头：巨型标题 + 出血肖像 ---------- */
+.head { position: relative; z-index: 2; }
+.head-top { display: flex; align-items: baseline; gap: var(--s-4); margin-bottom: var(--s-4); }
+.head-title {
+  font-family: var(--ff-display); font-weight: 600;
+  font-size: 78px; line-height: 1.04; letter-spacing: -.01em;
+  color: var(--fog-900); margin: 0; max-width: 9.2em;
+}
+.head-title em { font-style: normal; color: var(--jade-500); }
+.head-sub {
+  margin: var(--s-4) 0 0; font-size: var(--fz-4); line-height: 1.6;
+  color: var(--fog-700); max-width: 30em;
+}
+
+/* 顾问：不做成卡片，做成出血的人物。multiply 让浅底照片融进纸面 */
+.figure {
+  position: absolute; right: -34px; top: -22px; width: 288px; height: 372px;
+  z-index: 1; pointer-events: none;
+}
+.figure img {
+  width: 100%; height: 100%; object-fit: cover; object-position: 50% 6%;
+  mix-blend-mode: multiply; filter: contrast(1.04) saturate(.94);
+  mask-image: radial-gradient(78% 70% at 54% 40%, #000 40%, transparent 84%);
+  -webkit-mask-image: radial-gradient(78% 70% at 54% 40%, #000 40%, transparent 84%);
+}
+.figure-tag {
+  position: absolute; left: -2px; bottom: 6px; z-index: 3;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border-radius: var(--r-full);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  font-size: var(--fz-1); color: var(--fog-800); letter-spacing: .06em;
+  backdrop-filter: blur(10px);
+}
+.screen[data-state="ai-down"] .figure img { filter: grayscale(1) contrast(1.02); }
+
+/* ---------- 指令条：下划线式，不是一个盒子 ---------- */
+.command { position: relative; z-index: 2; display: flex; align-items: center; gap: var(--s-4); }
+.command-field {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--s-4);
+  height: var(--touch-primary); padding: 0 var(--s-3);
+  border-bottom: 2px solid var(--brd-2);
+  transition: border-color var(--dur-2) var(--ease-out);
+}
+.command-field:focus-within { border-color: var(--jade-400); }
+.command-field .ic { width: 22px; height: 22px; color: var(--fog-600); }
+.command-field input {
+  flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent;
+  font-family: var(--ff-ui); font-size: var(--fz-5); color: var(--fog-900);
+}
+.command-field input::placeholder { color: var(--fog-600); }
+.command-hint {
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600);
+  letter-spacing: .1em; white-space: nowrap;
+}
+.scenes { display: flex; gap: var(--s-3); flex-wrap: wrap; position: relative; z-index: 2; }
+.scene {
+  display: inline-flex; align-items: center; height: var(--touch-min); padding: 0 var(--s-5);
+  border: 1px solid var(--brd-2); border-radius: var(--r-xs);
+  font-size: var(--fz-3); color: var(--fog-800); background: transparent; cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.scene:hover { border-color: var(--jade-400); color: var(--jade-500); }
+.scene--key { border-color: var(--jade-a32); color: var(--jade-500); background: var(--jade-a12); }
+
+/* ---------- 建议：粗规 + 排版，不做卡片 ---------- */
+.advice {
+  position: relative; z-index: 2;
+  border-left: 4px solid var(--jade-400);
+  padding: var(--s-2) 0 var(--s-2) var(--s-6);
+}
+.advice-kicker {
+  display: flex; align-items: center; gap: var(--s-3);
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .16em;
+  color: var(--fog-600); margin-bottom: var(--s-3);
+}
+.advice-h {
+  font-family: var(--ff-display); font-size: var(--fz-7); line-height: 1.22;
+  color: var(--fog-900); margin: 0 0 var(--s-3);
+}
+.advice-p { margin: 0; font-size: var(--fz-4); line-height: 1.62; color: var(--fog-700); max-width: 34em; }
+.advice-p b { color: var(--fog-900); font-weight: 600; }
+.advice-foot { display: flex; align-items: center; gap: var(--s-5); margin-top: var(--s-3); }
+.advice-cost {
+  font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .06em;
+  display: flex; align-items: center; gap: var(--s-4);
+}
+.screen[data-state="ai-down"] .advice { border-left-color: var(--brd-2); }
+.screen[data-state="device-off"] .advice { border-left-color: var(--amber-400); }
+
+/* ---------- 主服务块：半调网点 + 大字 ---------- */
+.duo { display: grid; grid-template-columns: 1fr 296px; gap: var(--s-5); position: relative; z-index: 2; }
+.slab {
+  position: relative; overflow: hidden;
+  padding: var(--s-5) var(--s-6);
+  border: 1px solid var(--brd-2);
+  background: var(--glass-1-bg);
+  text-decoration: none; color: inherit; cursor: pointer;
+  display: flex; flex-direction: column; gap: var(--s-3);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.slab:hover { border-color: var(--jade-400); }
+.slab:active { transform: translateY(2px); }
+/* 半调网点：从右下角渐入，替代渐变色块 */
+.slab-dots {
+  position: absolute; right: -20px; bottom: -20px; width: 260px; height: 190px;
+  color: var(--jade-500); opacity: .30; pointer-events: none;
+  background-image: radial-gradient(circle at center, currentColor 1.6px, transparent 1.7px);
+  background-size: 9px 9px;
+  mask-image: radial-gradient(120% 120% at 100% 100%, #000 12%, transparent 72%);
+  -webkit-mask-image: radial-gradient(120% 120% at 100% 100%, #000 12%, transparent 72%);
+}
+.slab-no {
+  font-family: var(--ff-num); font-size: var(--fz-2); letter-spacing: .16em; color: var(--fog-600);
+}
+.slab-name {
+  font-family: var(--ff-display); font-size: var(--fz-7); line-height: 1.15;
+  color: var(--fog-900); margin: 0;
+}
+.slab-desc { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.55; max-width: 22em; }
+.slab-chan { display: flex; gap: var(--s-4); margin-top: auto; flex-wrap: wrap; }
+.slab-chan span {
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .1em; color: var(--fog-700);
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.slab-chan span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--jade-500); }
+
+/* ---------- 仪表：等宽读数 + 纸量条 + 校色条 ---------- */
+.gauge {
+  border: 1px solid var(--brd-2); padding: var(--s-4) var(--s-5);
+  background: var(--glass-1-bg);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.gauge-hd {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  font-size: var(--fz-2); color: var(--fog-900); letter-spacing: .06em;
+  padding-bottom: var(--s-3); border-bottom: 1px solid var(--brd-1);
+}
+.gauge-hd .t { font-weight: 600; }
+.gauge-hd .s { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.readout { display: flex; align-items: center; gap: var(--s-3); min-height: 31px; }
+.readout .k { font-size: var(--fz-2); color: var(--fog-700); }
+.readout .v {
+  margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-4);
+  color: var(--fog-900); letter-spacing: .04em; font-variant-numeric: tabular-nums;
+}
+.readout .v small { font-size: var(--fz-2); color: var(--fog-600); margin-left: 3px; }
+.bar { height: 6px; background: var(--surf-3); position: relative; overflow: hidden; }
+.bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--jade-500); display: block; }
+.bar--warn i { background: var(--amber-400); }
+/* 校色条：真实表达"彩色可用"，不是装饰条 */
+.calib { display: flex; align-items: center; gap: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--brd-1); }
+.calib-strip { display: flex; gap: 2px; }
+.calib-strip i { width: 20px; height: 12px; display: block; }
+.calib-strip i:nth-child(1) { background: #1c1c1c; }
+.calib-strip i:nth-child(2) { background: #00a0c6; }
+.calib-strip i:nth-child(3) { background: #d6338c; }
+.calib-strip i:nth-child(4) { background: #f2c200; }
+.calib-txt { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.screen[data-state="device-off"] .calib-strip i { filter: grayscale(1) opacity(.42); }
+
+/* ---------- 服务目录：行式 + 大序号 + 点线导引 ---------- */
+.dir { position: relative; z-index: 2; border-top: 1px solid var(--brd-1); }
+.dir-row {
+  display: flex; align-items: center; gap: var(--s-5);
+  min-height: 66px; padding: 0 var(--s-3);
+  border-bottom: 1px solid var(--brd-1);
+  text-decoration: none; color: inherit;
+  transition: background var(--dur-2) var(--ease-out), padding-left var(--dur-2) var(--ease-out);
+}
+.dir-row:hover { background: var(--surf-1); padding-left: var(--s-5); }
+.dir-no {
+  font-family: var(--ff-num); font-size: var(--fz-6); letter-spacing: .04em;
+  color: var(--brd-2); width: 46px; flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.dir-row:hover .dir-no { color: var(--jade-500); }
+.dir-name { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; letter-spacing: .02em; flex: 0 0 auto; }
+.dir-desc { font-size: var(--fz-2); color: var(--fog-600); flex: 0 0 auto; }
+.dir-lead {
+  flex: 1; min-width: 24px; height: 1px;
+  background-image: linear-gradient(90deg, var(--brd-2) 0 2px, transparent 2px 6px);
+  background-size: 6px 1px;
+}
+.dir-meta {
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .08em;
+  color: var(--azure-400); flex: 0 0 auto;
+}
+.dir-go { width: 26px; height: 26px; color: var(--fog-600); flex: 0 0 auto; }
+.dir-row:hover .dir-go { color: var(--jade-500); }
+
+/* ---------- 图条：全幅现场，带裁切线 ---------- */
+.strip { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 296px; gap: var(--s-5); }
+.strip-img { position: relative; height: 148px; overflow: hidden; }
+.strip-img img { width: 100%; height: 100%; object-fit: cover; display: block; filter: saturate(.9) contrast(1.05); }
+.strip-img::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(6,10,10,.72), rgba(6,10,10,.10) 62%);
+}
+.strip-cap { position: absolute; left: var(--s-5); top: var(--s-4); right: 40%; z-index: 2; color: #f4f8f7; }
+.strip-cap b { display: block; font-family: var(--ff-display); font-size: var(--fz-5); font-weight: 600; letter-spacing: .02em; }
+.strip-cap span { display: block; margin-top: 5px; font-size: var(--fz-1); opacity: .88; line-height: 1.5; }
+.strip-cap em {
+  font-style: normal; font-family: var(--ff-num);
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 9px;
+  font-size: var(--fz-1); letter-spacing: .06em; opacity: .82;
+}
+.strip-side { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s-3); }
+.strip-side .privacy { display: flex; gap: var(--s-3); font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.strip-side .privacy .ic { width: 17px; height: 17px; color: var(--jade-500); flex: 0 0 auto; margin-top: 1px; }
+
+/* ---------- 顶栏遥测带：机器在报数 ---------- */
+.telemetry {
+  display: flex; align-items: center; gap: var(--s-5);
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .08em; color: var(--fog-600);
+}
+.telemetry b { color: var(--fog-900); font-weight: 600; }
+.telemetry span { display: inline-flex; align-items: center; gap: 7px; }
+.telemetry .sep { width: 1px; height: 13px; background: var(--brd-2); }

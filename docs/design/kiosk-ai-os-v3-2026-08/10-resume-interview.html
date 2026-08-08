@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P10 访谈式生成 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P10 访谈式生成">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/resume.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+  /* 访谈阶段：对话是当前操作，占主体；预览收在右栏。
+     到了预览阶段再把 A4 换到主体——操作对象变了，主次就该换。 */
+  .qa { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-5); }
+  .qa-ask {
+    display: flex; gap: var(--s-5); align-items: flex-start;
+    padding: var(--s-6); border-radius: var(--r-lg);
+    background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd);
+    box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur));
+  }
+  .qa-face { width: 68px; height: 68px; border-radius: 50%; overflow: hidden; flex: 0 0 auto; box-shadow: var(--sh-2); }
+  .qa-face img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; }
+  .qa-b { min-width: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+  .qa-who { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .08em; }
+  .qa-q { font-family: var(--ff-display); font-size: var(--fz-7); line-height: 1.35; color: var(--fog-900); margin: 0; }
+  .qa-hint { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+  .qa-opts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .qa-opt {
+    min-height: 72px; padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-4); text-align: left; cursor: pointer;
+    display: flex; align-items: center; gap: var(--s-4);
+    transition: all var(--dur-2) var(--ease-out);
+  }
+  .qa-opt:hover { border-color: var(--jade-500); background: var(--jade-a12); }
+  .qa-opt b { font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); }
+  .qa-free { display: flex; gap: var(--s-4); align-items: stretch; }
+  .qa-said { display: flex; flex-direction: column; gap: var(--s-3); overflow-y: auto; }
+  .said {
+    display: flex; gap: var(--s-4); align-items: flex-start;
+    padding: var(--s-4); border-radius: var(--r-sm);
+    background: var(--surf-1); border: 1px solid var(--brd-1);
+  }
+  .said-no { font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); width: 22px; flex: 0 0 auto; padding-top: 3px; }
+  .said-b { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .said-q { font-size: var(--fz-2); color: var(--fog-600); }
+  .said-a { font-size: var(--fz-3); color: var(--fog-900); line-height: 1.5; }
+  .said-edit { margin-left: auto; flex: 0 0 auto; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s2" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="09-resume-workbench.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">从零做一份简历</div>
+        <div class="brand-sub">职易达 · 01 号机 · 小青问，你答，边聊边成形</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>顾问在线 · 打印机在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>访谈服务中断 · 已上报</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 访谈不受影响</div>
+    <div class="clock" data-clock>2026年8月8日 <b>10:14</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">先说方向</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐题回答</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">看成品</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>2</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ================= 左 ================= -->
+    <div class="wmain">
+
+      <!-- S1 先说方向 -->
+      <div class="qa" data-at="s1">
+        <div class="qa-ask">
+          <span class="qa-face"><img src="assets/advisor-full.jpg" alt="顾问 小青"></span>
+          <span class="qa-b">
+            <span class="qa-who">顾问 小青</span>
+            <h2 class="qa-q" data-when="default first">你想找哪个方向的工作？</h2>
+            <h2 class="qa-q" data-when="ai-down">访谈服务暂时不可用</h2>
+            <h2 class="qa-q" data-when="device-off">你想找哪个方向的工作？</h2>
+            <span class="qa-hint" data-when="default first device-off">我会按方向问 8 个问题，大约 6 分钟。<b>每题都能跳过</b>，跳过的部分就不写进简历，不会留空模板。</span>
+            <span class="qa-hint" data-when="ai-down">这一整套是纯 AI 能力，中断时我不能替你提问。下面给两条不依赖 AI 的路。</span>
+          </span>
+        </div>
+
+        <div class="qa-opts" data-when="default first device-off">
+          <button class="qa-opt" data-go="s2"><b>01</b>运营 / 新媒体</button>
+          <button class="qa-opt" data-go="s2"><b>02</b>销售 / 商务</button>
+          <button class="qa-opt" data-go="s2"><b>03</b>行政 / 人事</button>
+          <button class="qa-opt" data-go="s2"><b>04</b>技术 / 研发</button>
+          <button class="qa-opt" data-go="s2"><b>05</b>设计 / 内容</button>
+          <button class="qa-opt" data-go="s2"><b>06</b>还没想好，边聊边定</button>
+        </div>
+
+        <div class="locked" data-when="ai-down">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <b>两条不依赖 AI 的路</b>
+          <p><b>一、打印一份空白简历表格</b>，用笔手写填好，再回来扫描进系统。<br>
+             <b>二、如果你手机里已经有简历</b>，扫码传过来直接做诊断（诊断也要 AI，但可以先存着）。</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="06-print-workbench.html">打印空白表格</a>
+            <a class="btn btn--ghost" href="09-resume-workbench.html">我有简历，扫码传</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 逐题 -->
+      <div class="qa" data-at="s2">
+        <div class="qa-ask" data-when="default first device-off">
+          <span class="qa-face"><img src="assets/advisor-full.jpg" alt="顾问 小青"></span>
+          <span class="qa-b">
+            <span class="qa-who">顾问 小青 · 第 3 题 / 共 8 题</span>
+            <h2 class="qa-q">上一份工作里，你做的哪件事最有成果？</h2>
+            <span class="qa-hint">说清<b>做了什么 + 结果是多少</b>就够，不用文采。比如「运营公众号，半年从 3 千涨到 1 万 2」。
+              <b>数字你自己报，我不替你估。</b></span>
+          </span>
+        </div>
+        <div class="qa-free" data-when="default first device-off">
+          <label class="goalfield" style="height:var(--touch-primary)">
+            <svg class="ic" aria-hidden="true"><use href="#i-pen"/></svg>
+            <input type="text" placeholder="用大白话说，我来整理成书面表达" aria-label="回答第 3 题">
+          </label>
+          <button class="btn btn--primary">说完了</button>
+        </div>
+        <div class="qa-opts" data-when="default first device-off" style="grid-template-columns:repeat(3,1fr)">
+          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">这题跳过</button>
+          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">上一题</button>
+          <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">让小青举个例子</button>
+        </div>
+
+        <div class="pane" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column" data-when="default first device-off">
+          <div class="pane-hd"><span class="t">你已经说过的</span><span class="s">2 题 · 可随时改</span></div>
+          <div class="qa-said">
+            <div class="said">
+              <span class="said-no">01</span>
+              <span class="said-b"><span class="said-q">你想找哪个方向？</span><span class="said-a">运营 / 新媒体</span></span>
+              <span class="said-edit"><button class="btn btn--quiet">改</button></span>
+            </div>
+            <div class="said">
+              <span class="said-no">02</span>
+              <span class="said-b"><span class="said-q">做过多久？在什么单位？</span><span class="said-a">2 年 3 个月，某科技公司，运营专员</span></span>
+              <span class="said-edit"><button class="btn btn--quiet">改</button></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="locked" data-when="ai-down">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <b>访谈中断，你说过的都留着</b>
+          <p>前 2 题的回答<b>已经存在本次会话里</b>，没有丢。服务恢复后可以接着答；
+             也可以现在就把已有内容导出成一份草稿带走。</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn--ghost">导出草稿</button>
+            <a class="btn btn--ghost" href="06-print-workbench.html">打印空白表格手写</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 成品：这时操作对象变成文件，A4 就该占主体 -->
+      <div class="paper" data-at="s3">
+        <div class="paper-bar">
+          <span class="nm">个人简历_访谈版.pdf</span>
+          <span class="mt" data-when="default first device-off">A4 · 1 页 · 8 题答了 6 题</span>
+          <span class="mt" data-when="ai-down">草稿 · 未成文</span>
+          <span class="pg">
+            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <span>第 1 / 共 1 页</span>
+            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+          </span>
+        </div>
+        <div class="paper-stage">
+          <div class="sheet-a4" data-when="default first device-off">
+            <h4>王 · 个人简历</h4>
+            <div class="meta">求职意向：运营 / 新媒体 · 广州　（联系方式待你补充）</div>
+            <div class="hr"></div>
+            <div class="sec">工作经历</div>
+            <div style="font-size:11px;line-height:1.8;color:var(--paper-ink)">
+              2024.03–2026.06　某科技公司　运营专员<br>
+              · 独立运营公众号，半年从 3000 粉增至 12000 粉<br>
+              · 策划并执行线上活动，单场最高带来 340 个新增关注<br>
+              · 维护用户社群，处理日常反馈
+            </div>
+            <div class="sec">技能</div>
+            <div style="font-size:11px;line-height:1.8;color:var(--paper-ink)">Excel · SQL · Photoshop · 英语六级</div>
+            <div class="gapline" style="margin-top:10px">这两块你跳过了，所以没写：<b>教育背景</b>、<b>项目经历</b>。空着比编上去好——要补随时回第 2 步。</div>
+            <span class="pgno">1 / 1</span>
+          </div>
+          <div class="paper-empty" data-when="ai-down">
+            <svg class="ic"><use href="#i-file"/></svg>
+            <b>成文需要 AI，现在不可用</b>
+            <p>你答过的 2 题原文可以导出成草稿带走，<br>服务恢复后回来一键成文。</p>
+            <button class="btn btn--ghost">导出草稿</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 右 ================= -->
+    <div class="wside">
+
+      <!-- S1 会问什么 -->
+      <div class="pane pane--fill" data-at="s1">
+        <div class="pane-hd"><span class="t">会问你这 8 件事</span><span class="s">每题都能跳过</span></div>
+        <div class="tline">
+          <div class="tl tl--now"><span class="tl-dot"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="tl-b"><span class="tl-t">想找什么方向</span><span class="tl-s">决定后面怎么问</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-clock"/></svg></span>
+            <span class="tl-b"><span class="tl-t">做过多久 · 什么单位</span><span class="tl-s">时间线</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="tl-b"><span class="tl-t">最有成果的一件事</span><span class="tl-s">数字你自己报</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-users"/></svg></span>
+            <span class="tl-b"><span class="tl-t">带过人 / 协作过吗</span><span class="tl-s">可跳过</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-campus"/></svg></span>
+            <span class="tl-b"><span class="tl-t">学历与专业</span><span class="tl-s">可跳过</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-layers"/></svg></span>
+            <span class="tl-b"><span class="tl-t">会用什么工具</span><span class="tl-s">只列真会的</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="tl-b"><span class="tl-t">证书 / 语言</span><span class="tl-s">可跳过</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-phone"/></svg></span>
+            <span class="tl-b"><span class="tl-t">联系方式</span><span class="tl-s">留了才写进简历</span></span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>跳过的部分不会被编出来。</b>简历上宁可空一块，也不写你没说过的事。联系方式不填就不出现在文件上。</span>
+        </div>
+      </div>
+
+      <!-- S2 成形进度 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><span class="t">简历长出来了多少</span><span class="s" data-when="default first device-off">2 / 8 题</span></div>
+        <div class="kv" data-when="default first device-off">
+          <div class="kv-row"><span class="k">求职意向</span><span class="v" style="color:var(--jade-600)">已写</span></div>
+          <div class="kv-row"><span class="k">工作经历</span><span class="v" style="color:var(--jade-600)">已写</span></div>
+          <div class="kv-row"><span class="k">成果数字</span><span class="v" style="color:var(--amber-600)">正在问</span></div>
+          <div class="kv-row"><span class="k">教育 / 技能 / 联系</span><span class="v v--fog">未问到</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default first device-off">
+          不显示百分比：8 题里你可能跳过好几题，「完成 XX%」对你没有意义。这里只报哪几块已经写上了。
+        </p>
+      </div>
+      <div class="pane pane--fill" data-at="s2">
+        <div class="pane-hd"><span class="t">两条底线</span></div>
+        <div class="notice notice--amber">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>数字你自己报，我不替你估。</b>你说「涨了不少」我不会写成「涨了 XX%」——我会再问一句具体多少，你说不清就不写数字。</span>
+        </div>
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>我只整理表达，不发明经历。</b>把口语理成书面话可以，编一段你没做过的项目不行。<span class="ev ev--e3">E3 表达属 AI 判断</span></span>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>未登录时回答只存在本次会话；离场或超时自动清空。要留下来需在最后一步存进「我的简历」。</span>
+        </div>
+      </div>
+
+      <!-- S3 去向 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><span class="t">这一版的情况</span></div>
+        <div class="kv" data-when="default first device-off">
+          <div class="kv-row"><span class="k">答了</span><span class="v">6 / 8 题</span></div>
+          <div class="kv-row"><span class="k">跳过</span><span class="v" style="color:var(--amber-600)">教育、项目</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
+          <div class="kv-row"><span class="k">版本</span><span class="v">v1 · 访谈版</span></div>
+        </div>
+        <div class="notice notice--amber" style="margin-top:12px" data-when="default first device-off">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>联系方式你没留，文件上这一行是空的。<b>投出去之前一定要补</b>，否则招聘方联系不到你。</span>
+        </div>
+      </div>
+      <div class="pane pane--fill" data-at="s3">
+        <div class="pane-hd"><span class="t">接下来</span></div>
+        <div class="outs">
+          <button class="out" data-when="default first device-off"><svg class="ic"><use href="#i-pen"/></svg>补上跳过的</button>
+          <a class="out" href="09-resume-workbench.html?stage=s3" data-when="default first device-off"><svg class="ic"><use href="#i-target"/></svg>做一次诊断</a>
+          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>去打印</button>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
+          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
+          <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-target"/></svg>诊断不可用</button>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span data-when="default first device-off">建议先补联系方式和教育背景，再做一次诊断——现在这一版还缺两块。</span>
+          <span data-when="ai-down">AI 不可用，只能导出草稿或打印空白表格。不给下一步建议。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-at="s1">
+        <div data-when="default first device-off"><div class="t">先说方向，我按方向问 8 个问题</div><div class="s">约 6 分钟 · 每题都能跳过 · 跳过的不会被编出来</div></div>
+        <div data-when="ai-down"><div class="t">访谈是纯 AI 能力，现在不可用</div><div class="s">给了两条不依赖 AI 的路</div></div>
+      </div>
+      <div data-at="s2">
+        <div data-when="default first device-off"><div class="t">第 3 题（共 8 题）：说清做了什么 + 结果是多少</div><div class="s">数字你自己报 · 提前结束会生成不完整的草稿</div></div>
+        <div data-when="ai-down"><div class="t">访谈中断，前 2 题的回答都留着</div><div class="s">可导出草稿带走</div></div>
+      </div>
+      <div data-at="s3">
+        <div data-when="default first"><div class="t">6 题成了 1 页，教育与项目空着</div><div class="s">联系方式还没留 · 投出去前一定要补</div></div>
+        <div data-when="ai-down"><div class="t">成文需要 AI，现在不可用</div><div class="s">可导出你答过的原文草稿</div></div>
+        <div data-when="device-off"><div class="t">1 页已生成，打印机离线</div><div class="s">可存进「我的简历」换机取回打印</div></div>
+      </div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">重新选方向</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回去补答</button>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first device-off">开始，先问方向<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s1" data-when="ai-down" href="06-print-workbench.html">打印空白表格<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">提前结束，生成草稿<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-when="ai-down">导出草稿<svg class="ic"><use href="#i-download"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first" href="06-print-workbench.html">拿去打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="ai-down">导出草稿<svg class="ic"><use href="#i-download"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off">存进我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=8"></script>
+</body>
+</html>

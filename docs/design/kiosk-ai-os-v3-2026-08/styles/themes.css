@@ -1,0 +1,269 @@
+/* ============================================================
+   V3 · 配色主题（同一套结构，五种色彩气质）
+   ------------------------------------------------------------
+   语义角色在任何主题下都不变，只换色相：
+     primary(--jade-*)  本机服务 / 已验证 / 可信
+     source(--azure-*)  第三方与官方来源
+     warn(--amber-*)    待核实 / 设备与价格未定
+     commit(--coral-*)  需本人确认的不可逆动作（支付 / 出纸 / 删除）
+   五个主题都刻意避开紫蓝渐变——那是当前 AI 产品的通用皮。
+   用法：<div class="screen" data-theme="cobalt">
+   ============================================================ */
+
+/* ---------- T1 青玉墨（默认，见 tokens.css） ---------- */
+[data-theme="jade"] { /* 与 :root 一致，显式列出便于切回 */
+  --ink-000: #04080a; --ink-050: #070d10; --ink-100: #0b1417;
+  --ink-200: #101d21; --ink-300: #17282d; --ink-400: #1f353b; --ink-500: #2b474e;
+  --fog-600: #5b767d; --fog-700: #8ba4a9; --fog-800: #bccfd2; --fog-900: #e8f1f1;
+  --jade-200: #a8f3d8; --jade-400: #34e0a8; --jade-500: #17c48f; --jade-600: #0f9a71; --jade-700: #0a6e51;
+  --jade-a12: rgba(52,224,168,.12); --jade-a20: rgba(52,224,168,.20); --jade-a32: rgba(52,224,168,.32);
+  --on-primary: #032018;
+  --aur-1: rgba(23,196,143,.42); --aur-2: rgba(44,107,224,.34); --aur-3: rgba(255,194,74,.16);
+  --sh-jade: 0 12px 40px -14px rgba(23,196,143,.46);
+}
+
+/* ---------- T2 深空钴蓝：冷、精密、工程感。像仪器不像玩具 ---------- */
+[data-theme="cobalt"] {
+  --ink-000: #04070e; --ink-050: #060b16; --ink-100: #0a121f;
+  --ink-200: #0f1a2b; --ink-300: #16253a; --ink-400: #1e3049; --ink-500: #2a4160;
+  --fog-600: #63758f; --fog-700: #93a5bf; --fog-800: #c2cfe0; --fog-900: #e9f1fb;
+
+  --jade-200: #b8ecff; --jade-400: #38ccff; --jade-500: #12b0ee; --jade-600: #0b83bd; --jade-700: #075a86;
+  --jade-a12: rgba(56,204,255,.12); --jade-a20: rgba(56,204,255,.20); --jade-a32: rgba(56,204,255,.32);
+  --on-primary: #01121c;
+
+  --azure-200: #cdd2ff; --azure-400: #8f95ff; --azure-600: #5b5fe2;
+  --azure-a12: rgba(143,149,255,.12); --azure-a20: rgba(143,149,255,.20);
+
+  --glass-1-bg: rgba(15,26,43,.58); --glass-2-bg: rgba(22,37,58,.70); --glass-3-bg: rgba(30,48,73,.82);
+  --aur-1: rgba(18,176,238,.40); --aur-2: rgba(91,95,226,.34); --aur-3: rgba(255,194,74,.12);
+  --sh-jade: 0 12px 40px -14px rgba(18,176,238,.46);
+}
+
+/* ---------- T3 暖夜琥珀：暖炭底 + 铜金。最像“人做的”，最不像 SaaS ---------- */
+[data-theme="amber"] {
+  --orb-2: #ff5145;
+
+  --ink-000: #0a0705; --ink-050: #100b07; --ink-100: #16100a;
+  --ink-200: #1d1610; --ink-300: #261d14; --ink-400: #33281c; --ink-500: #453727;
+  --fog-600: #857566; --fog-700: #b3a190; --fog-800: #ddd0be; --fog-900: #f7f0e4;
+
+  --jade-200: #ffe6b4; --jade-400: #f5b83f; --jade-500: #dd9c1e; --jade-600: #b07712; --jade-700: #7b520a;
+  --jade-a12: rgba(245,184,63,.12); --jade-a20: rgba(245,184,63,.20); --jade-a32: rgba(245,184,63,.32);
+  --on-primary: #22150a;
+
+  --azure-200: #c3e9fb; --azure-400: #56bfee; --azure-600: #2688b8;
+  --azure-a12: rgba(86,191,238,.12); --azure-a20: rgba(86,191,238,.20);
+
+  --amber-200: #ffd6b0; --amber-400: #ff9a4d; --amber-600: #d4671b;
+  --amber-a12: rgba(255,154,77,.12); --amber-a20: rgba(255,154,77,.20);
+
+  --coral-200: #ffc0b8; --coral-400: #ff5145; --coral-600: #ca2b20;
+  --coral-a12: rgba(255,81,69,.12); --coral-a20: rgba(255,81,69,.20);
+
+  --glass-1-bg: rgba(29,22,16,.58); --glass-2-bg: rgba(38,29,20,.70); --glass-3-bg: rgba(51,40,28,.82);
+  --glass-1-brd: rgba(247,240,228,.09); --glass-2-brd: rgba(247,240,228,.13); --glass-3-brd: rgba(247,240,228,.18);
+  --aur-1: rgba(221,156,30,.36); --aur-2: rgba(86,191,238,.20); --aur-3: rgba(202,43,32,.16);
+  --sh-jade: 0 12px 40px -14px rgba(221,156,30,.44);
+}
+
+/* ---------- T4 霓虹青梅：近黑底 + 青梅绿 + 品红。最年轻、最有活力 ---------- */
+[data-theme="neon"] {
+  --orb-2: #ff3d7f;
+
+  --ink-000: #050607; --ink-050: #08090b; --ink-100: #0c0e11;
+  --ink-200: #12151a; --ink-300: #1a1f26; --ink-400: #232a33; --ink-500: #2f3945;
+  --fog-600: #6d7580; --fog-700: #9ba3ae; --fog-800: #cdd3da; --fog-900: #f0f3f6;
+
+  --jade-200: #b6ffe9; --jade-400: #2ff0c8; --jade-500: #12d6ad; --jade-600: #0aa686; --jade-700: #077460;
+  --jade-a12: rgba(47,240,200,.12); --jade-a20: rgba(47,240,200,.20); --jade-a32: rgba(47,240,200,.34);
+  --on-primary: #002019;
+
+  --azure-200: #cbd9ff; --azure-400: #7aa2ff; --azure-600: #4470e8;
+  --azure-a12: rgba(122,162,255,.12); --azure-a20: rgba(122,162,255,.20);
+
+  --coral-200: #ffbcd4; --coral-400: #ff3d7f; --coral-600: #d5155a;
+  --coral-a12: rgba(255,61,127,.12); --coral-a20: rgba(255,61,127,.22);
+
+  --glass-1-bg: rgba(18,21,26,.60); --glass-2-bg: rgba(26,31,38,.72); --glass-3-bg: rgba(35,42,51,.84);
+  --aur-1: rgba(18,214,173,.42); --aur-2: rgba(255,61,127,.26); --aur-3: rgba(122,162,255,.20);
+  --sh-jade: 0 12px 40px -14px rgba(18,214,173,.50);
+  --sh-coral: 0 12px 40px -14px rgba(213,21,90,.48);
+}
+
+/* ============================================================
+   暖色浅底两套（推荐用于一体机：白天强环境光下不反光、久看不累）
+   暖的来源是纸底 + 暖灰墨字 + 铜金辅色，不是把所有东西都调成橙色
+   ============================================================ */
+
+/* ---------- T8 暖玉纸：象牙纸底 + 深青玉主色 + 铜金辅。宣纸上的青绿 ---------- */
+[data-theme="warm"] {
+  --ink-000: #f3ede2; --ink-050: #f7f2e9; --ink-100: #fbf7f0;
+  --ink-200: #fffdf8; --ink-300: #ffffff; --ink-400: #e6dccb; --ink-500: #d3c6b1;
+  --fog-600: #7d7060; --fog-700: #574e40; --fog-800: #362f26; --fog-900: #241f18;
+
+  --jade-200: #0b6b50; --jade-400: #0f8a67; --jade-500: #0d7a5c; --jade-600: #0a6247; --jade-700: #084a36;
+  --jade-a12: rgba(15,138,103,.10); --jade-a20: rgba(15,138,103,.18); --jade-a32: rgba(15,138,103,.28);
+  --on-primary: #fffdf8;
+
+  --azure-200: #23568f; --azure-400: #2a5ca8; --azure-600: #1d4480;
+  --azure-a12: rgba(42,92,168,.10); --azure-a20: rgba(42,92,168,.18);
+  --amber-200: #8a5c0c; --amber-400: #b8791f; --amber-600: #8a5c0c;
+  --amber-a12: rgba(184,121,31,.12); --amber-a20: rgba(184,121,31,.22);
+  --coral-200: #a02a1d; --coral-400: #c0392b; --coral-600: #97281c;
+  --coral-a12: rgba(192,57,43,.10); --coral-a20: rgba(192,57,43,.20);
+  --orb-2: #b8791f;
+
+  --surf-1: rgba(36,31,24,.035); --surf-2: rgba(36,31,24,.055); --surf-3: rgba(36,31,24,.10);
+  --brd-1: rgba(36,31,24,.10); --brd-2: rgba(36,31,24,.15);
+  --glass-1-bg: rgba(255,253,248,.66); --glass-2-bg: rgba(255,253,248,.82); --glass-3-bg: rgba(255,255,255,.92);
+  --glass-1-brd: rgba(36,31,24,.09); --glass-2-brd: rgba(36,31,24,.12); --glass-3-brd: rgba(36,31,24,.16);
+  --glass-hi: inset 0 1px 0 rgba(255,255,255,.92);
+  --sh-1: 0 1px 2px rgba(74,58,36,.08);
+  --sh-2: 0 10px 26px -12px rgba(74,58,36,.22), 0 2px 6px rgba(74,58,36,.07);
+  --sh-3: 0 26px 60px -24px rgba(74,58,36,.30), 0 6px 16px rgba(74,58,36,.09);
+  --sh-jade: 0 12px 34px -14px rgba(15,138,103,.40);
+  --sh-coral: 0 12px 34px -14px rgba(192,57,43,.34);
+
+  --chrome-top: linear-gradient(180deg, rgba(251,247,240,.94), rgba(251,247,240,.60));
+  --chrome-bar: linear-gradient(180deg, rgba(251,247,240,.72), rgba(255,253,248,.96));
+  --chrome-nav: rgba(255,253,248,.96);
+  --field-bg: rgba(255,255,255,.92);
+  --mesh-line: rgba(90,70,40,.07);
+  --grain-op: .16; --grain-blend: multiply;
+  --aur-1: rgba(15,138,103,.18); --aur-2: rgba(184,121,31,.24); --aur-3: rgba(192,57,43,.10);
+}
+
+/* ---------- T9 蜜杏暖橙：砂杏底 + 赤陶主色 + 石青来源。暖得更直接 ---------- */
+[data-theme="honey"] {
+  --ink-000: #f6ece0; --ink-050: #faf2e8; --ink-100: #fdf7ef;
+  --ink-200: #fffdfa; --ink-300: #ffffff; --ink-400: #ecdcc8; --ink-500: #dcc7ab;
+  --fog-600: #877158; --fog-700: #5e4d3a; --fog-800: #3b2e21; --fog-900: #2a2016;
+
+  --jade-200: #8f4318; --jade-400: #c2622c; --jade-500: #ad5624; --jade-600: #96471c; --jade-700: #7a3915;
+  --jade-a12: rgba(194,98,44,.10); --jade-a20: rgba(194,98,44,.18); --jade-a32: rgba(194,98,44,.28);
+  --on-primary: #fffaf3;
+
+  --azure-200: #2f5c8c; --azure-400: #3a6ea5; --azure-600: #2a5480;
+  --azure-a12: rgba(58,110,165,.10); --azure-a20: rgba(58,110,165,.18);
+  --amber-200: #7d5f0f; --amber-400: #a8811a; --amber-600: #7d5f0f;
+  --amber-a12: rgba(168,129,26,.12); --amber-a20: rgba(168,129,26,.22);
+  --coral-200: #7d1f1f; --coral-400: #9b2c2c; --coral-600: #7d1f1f;
+  --coral-a12: rgba(155,44,44,.10); --coral-a20: rgba(155,44,44,.20);
+  --orb-2: #3a6ea5;
+
+  --surf-1: rgba(42,32,22,.035); --surf-2: rgba(42,32,22,.06); --surf-3: rgba(42,32,22,.10);
+  --brd-1: rgba(42,32,22,.10); --brd-2: rgba(42,32,22,.15);
+  --glass-1-bg: rgba(255,253,250,.66); --glass-2-bg: rgba(255,253,250,.82); --glass-3-bg: rgba(255,255,255,.92);
+  --glass-1-brd: rgba(42,32,22,.09); --glass-2-brd: rgba(42,32,22,.12); --glass-3-brd: rgba(42,32,22,.16);
+  --glass-hi: inset 0 1px 0 rgba(255,255,255,.92);
+  --sh-1: 0 1px 2px rgba(86,60,32,.08);
+  --sh-2: 0 10px 26px -12px rgba(86,60,32,.22), 0 2px 6px rgba(86,60,32,.07);
+  --sh-3: 0 26px 60px -24px rgba(86,60,32,.30), 0 6px 16px rgba(86,60,32,.09);
+  --sh-jade: 0 12px 34px -14px rgba(194,98,44,.40);
+  --sh-coral: 0 12px 34px -14px rgba(155,44,44,.34);
+
+  --chrome-top: linear-gradient(180deg, rgba(253,247,239,.94), rgba(253,247,239,.60));
+  --chrome-bar: linear-gradient(180deg, rgba(253,247,239,.72), rgba(255,253,250,.96));
+  --chrome-nav: rgba(255,253,250,.96);
+  --field-bg: rgba(255,255,255,.92);
+  --mesh-line: rgba(110,70,30,.07);
+  --grain-op: .18; --grain-blend: multiply;
+  --aur-1: rgba(194,98,44,.22); --aur-2: rgba(168,129,26,.20); --aur-3: rgba(58,110,165,.12);
+}
+
+/* ---------- T6 霜白玻璃：浅色旗舰。白天强环境光下最稳，最像高端政务/银行自助 ---------- */
+[data-theme="frost"] {
+  --orb-2: #2c6be0;
+
+  --ink-000: #e9ede9; --ink-050: #eef1ee; --ink-100: #f5f7f4;
+  --ink-200: #ffffff; --ink-300: #ffffff; --ink-400: #dbe2dd; --ink-500: #c4cdc7;
+  --fog-600: #6b7a76; --fog-700: #46534f; --fog-800: #25302d; --fog-900: #0b1614;
+
+  --jade-200: #0a6e51; --jade-400: #0f9a71; --jade-500: #0d8763; --jade-600: #0a6e51; --jade-700: #075440;
+  --jade-a12: rgba(15,154,113,.10); --jade-a20: rgba(15,154,113,.18); --jade-a32: rgba(15,154,113,.28);
+  --on-primary: #ffffff;
+
+  --azure-200: #245fc9; --azure-400: #2c6be0; --azure-600: #1c4fb0;
+  --azure-a12: rgba(44,107,224,.10); --azure-a20: rgba(44,107,224,.18);
+  --amber-200: #8f6205; --amber-400: #d68f14; --amber-600: #a06a05;
+  --amber-a12: rgba(214,143,20,.12); --amber-a20: rgba(214,143,20,.22);
+  --coral-200: #a8291a; --coral-400: #d8412f; --coral-600: #a8291a;
+  --coral-a12: rgba(216,65,47,.10); --coral-a20: rgba(216,65,47,.20);
+
+  --surf-1: rgba(11,22,20,.035); --surf-2: rgba(11,22,20,.055); --surf-3: rgba(11,22,20,.10);
+  --brd-1: rgba(11,22,20,.10); --brd-2: rgba(11,22,20,.14);
+  --glass-1-bg: rgba(255,255,255,.62); --glass-2-bg: rgba(255,255,255,.78); --glass-3-bg: rgba(255,255,255,.90);
+  --glass-1-brd: rgba(11,22,20,.09); --glass-2-brd: rgba(11,22,20,.12); --glass-3-brd: rgba(11,22,20,.16);
+  --glass-hi: inset 0 1px 0 rgba(255,255,255,.92);
+  --sh-1: 0 1px 2px rgba(20,45,40,.08);
+  --sh-2: 0 10px 26px -12px rgba(20,45,40,.20), 0 2px 6px rgba(20,45,40,.06);
+  --sh-3: 0 26px 60px -24px rgba(20,45,40,.28), 0 6px 16px rgba(20,45,40,.08);
+  --sh-jade: 0 12px 34px -14px rgba(15,154,113,.42);
+  --sh-coral: 0 12px 34px -14px rgba(216,65,47,.36);
+
+  --chrome-top: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.60));
+  --chrome-bar: linear-gradient(180deg, rgba(255,255,255,.70), rgba(255,255,255,.95));
+  --chrome-nav: rgba(255,255,255,.96);
+  --field-bg: rgba(255,255,255,.92);
+  --mesh-line: rgba(11,60,50,.07);
+  --grain-op: .10;
+  --aur-1: rgba(15,154,113,.20); --aur-2: rgba(44,107,224,.16); --aur-3: rgba(214,143,20,.12);
+}
+
+/* ---------- T7 水墨素白：近黑 + 素白主动作 + 朱砂点睛。最东方、最编辑感 ---------- */
+[data-theme="ink"] {
+  --orb-2: #d2372c;
+
+  --ink-000: #0a0a0b; --ink-050: #0e0e10; --ink-100: #131316;
+  --ink-200: #1a1a1e; --ink-300: #232327; --ink-400: #2e2e34; --ink-500: #3d3d45;
+  --fog-600: #7a7a83; --fog-700: #a8a8b1; --fog-800: #d2d2d8; --fog-900: #f5f5f7;
+
+  --jade-200: #f5f5f7; --jade-400: #f0f0f3; --jade-500: #dcdce2; --jade-600: #bdbdc6; --jade-700: #8a8a94;
+  --jade-a12: rgba(245,245,247,.10); --jade-a20: rgba(245,245,247,.16); --jade-a32: rgba(245,245,247,.26);
+  --on-primary: #0a0a0b;
+
+  --azure-200: #cadff0; --azure-400: #7fa8c9; --azure-600: #4a7ea6;
+  --azure-a12: rgba(127,168,201,.12); --azure-a20: rgba(127,168,201,.20);
+  --amber-200: #ecd79b; --amber-400: #c9a227; --amber-600: #96771a;
+  --amber-a12: rgba(201,162,39,.12); --amber-a20: rgba(201,162,39,.22);
+  --coral-200: #f2b6b0; --coral-400: #d2372c; --coral-600: #a3241b;
+  --coral-a12: rgba(210,55,44,.12); --coral-a20: rgba(210,55,44,.24);
+
+  --surf-1: rgba(245,245,247,.04); --surf-2: rgba(245,245,247,.07); --surf-3: rgba(245,245,247,.13);
+  --brd-1: rgba(245,245,247,.09); --brd-2: rgba(245,245,247,.14);
+  --glass-1-bg: rgba(26,26,30,.58); --glass-2-bg: rgba(35,35,39,.70); --glass-3-bg: rgba(46,46,52,.82);
+  --chrome-top: linear-gradient(180deg, rgba(10,10,11,.88), rgba(10,10,11,.46));
+  --chrome-bar: linear-gradient(180deg, rgba(14,14,16,.74), rgba(10,10,11,.95));
+  --chrome-nav: rgba(10,10,11,.96);
+  --field-bg: rgba(10,10,11,.60);
+  --mesh-line: rgba(245,245,247,.05);
+  --aur-1: rgba(245,245,247,.12); --aur-2: rgba(127,168,201,.20); --aur-3: rgba(210,55,44,.14);
+  --sh-jade: 0 12px 40px -16px rgba(245,245,247,.22);
+}
+
+/* ---------- T5 松林墨绿：低饱和、最沉、最“贵”。适合长期看不腻 ---------- */
+[data-theme="pine"] {
+  --orb-2: #8fb4d9;
+
+  --ink-000: #060a09; --ink-050: #0a100e; --ink-100: #0f1614;
+  --ink-200: #14201d; --ink-300: #1c2b27; --ink-400: #263933; --ink-500: #344b44;
+  --fog-600: #6b7d76; --fog-700: #9aaaa3; --fog-800: #c7d2cc; --fog-900: #eaf0ec;
+
+  --jade-200: #cfe8da; --jade-400: #7cc3a0; --jade-500: #5aa885; --jade-600: #3f8265; --jade-700: #2b5b47;
+  --jade-a12: rgba(124,195,160,.12); --jade-a20: rgba(124,195,160,.20); --jade-a32: rgba(124,195,160,.30);
+  --on-primary: #0a1f17;
+
+  --azure-200: #cfe0ee; --azure-400: #8fb4d9; --azure-600: #5d87b0;
+  --azure-a12: rgba(143,180,217,.12); --azure-a20: rgba(143,180,217,.20);
+
+  --amber-200: #ecd9ad; --amber-400: #d8b46a; --amber-600: #a8873f;
+  --amber-a12: rgba(216,180,106,.12); --amber-a20: rgba(216,180,106,.20);
+
+  --coral-200: #e9bdb2; --coral-400: #c9705c; --coral-600: #a04a38;
+  --coral-a12: rgba(201,112,92,.12); --coral-a20: rgba(201,112,92,.22);
+
+  --glass-1-bg: rgba(20,32,29,.58); --glass-2-bg: rgba(28,43,39,.70); --glass-3-bg: rgba(38,57,51,.82);
+  --aur-1: rgba(90,168,133,.32); --aur-2: rgba(93,135,176,.24); --aur-3: rgba(216,180,106,.14);
+  --sh-jade: 0 12px 40px -14px rgba(90,168,133,.38);
+}

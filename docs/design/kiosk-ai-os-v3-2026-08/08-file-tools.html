@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P08 文件加工台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P08 文件加工台">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="t1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="06-print-workbench.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">文件加工</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-7742</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 加工服务就绪</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 加工仍可用</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:52</b></div>
+  </header>
+
+  <!-- 三个工具是并列关系，不是流程步骤，所以用标签不用阶段轨 -->
+  <div class="rail">
+    <div class="tabs">
+      <button class="tab" data-go="t1"><svg class="ic"><use href="#i-image"/></svg>图片转 PDF</button>
+      <button class="tab" data-go="t2"><svg class="ic"><use href="#i-pen"/></svg>签名盖章</button>
+      <button class="tab" data-go="t3" aria-disabled="true"><svg class="ic"><use href="#i-idcard"/></svg>证件照 · 未开放</button>
+    </div>
+    <span class="rail-count">把散图和待签材料整理成能直接打的文件</span>
+  </div>
+
+  <div class="work">
+    <!-- ================= 左 ================= -->
+    <div class="wmain">
+
+      <!-- T1 图片转 PDF -->
+      <div class="checks" data-at="t1">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default device-off">已按拍摄时间排好序</span>
+          <span class="t" data-when="ai-down">排序需你自己确认</span>
+          <span class="t" data-when="first">还没有图片</span>
+          <span class="s" data-when="default device-off">本机读取 EXIF · 可拖动改</span>
+          <span class="s" data-when="ai-down">读取服务中断</span>
+        </div>
+        <div class="checks-list" data-when="default device-off">
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>5 张图，均为竖向，无需旋转</span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>最小分辨率 1440×1920，打印清晰</span>
+          <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>4</b> 张偏暗，建议重拍或调亮</span></span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>合成后 5 页 A4，约 2.6 MB</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>自动排序与画质检查不可用。合成本身正常，顺序请你自己核对——下面卡片左上角的序号就是装订顺序。</span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>点右下角「添加图片」，或用手机扫码把照片传过来。</span>
+        </div>
+      </div>
+
+      <div class="tray" data-at="t1">
+        <div class="traygrid" data-when="default ai-down device-off">
+          <div class="tile-img"><span class="ord">1</span><svg class="ic"><use href="#i-image"/></svg>
+            <button class="del" aria-label="移除第 1 张"><svg class="ic"><use href="#i-close"/></svg></button>
+            <span class="nm">IMG_2041.JPG · 身份证正面</span></div>
+          <div class="tile-img"><span class="ord">2</span><svg class="ic"><use href="#i-image"/></svg>
+            <button class="del" aria-label="移除第 2 张"><svg class="ic"><use href="#i-close"/></svg></button>
+            <span class="nm">IMG_2042.JPG · 身份证反面</span></div>
+          <div class="tile-img"><span class="ord">3</span><svg class="ic"><use href="#i-image"/></svg>
+            <button class="del" aria-label="移除第 3 张"><svg class="ic"><use href="#i-close"/></svg></button>
+            <span class="nm">IMG_2043.JPG · 学位证</span></div>
+          <div class="tile-img"><span class="ord">4</span><svg class="ic"><use href="#i-idcard"/></svg>
+            <button class="del" aria-label="移除第 4 张"><svg class="ic"><use href="#i-close"/></svg></button>
+            <span class="nm">IMG_2044.JPG · 成绩单（偏暗）</span></div>
+          <div class="tile-img"><span class="ord">5</span><svg class="ic"><use href="#i-image"/></svg>
+            <button class="del" aria-label="移除第 5 张"><svg class="ic"><use href="#i-close"/></svg></button>
+            <span class="nm">IMG_2045.JPG · 资格证</span></div>
+          <div class="tile-img tile-img--add"><svg class="ic"><use href="#i-plus"/></svg>添加图片</div>
+        </div>
+        <div class="traygrid" data-when="first">
+          <div class="tile-img tile-img--add" style="aspect-ratio:4/3"><svg class="ic"><use href="#i-upload"/></svg>本机选择</div>
+          <div class="tile-img tile-img--add" style="aspect-ratio:4/3"><svg class="ic"><use href="#i-qr"/></svg>手机扫码传</div>
+          <div class="tile-img tile-img--add" style="aspect-ratio:4/3"><svg class="ic"><use href="#i-usb"/></svg>U 盘导入</div>
+        </div>
+      </div>
+
+      <!-- T2 签名盖章 -->
+      <div class="checks" data-at="t2">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--amber-400)"><use href="#i-alert"/></svg>
+          <span class="t">这不是电子签名认证</span>
+          <span class="s">非 CA 数字签名</span>
+        </div>
+        <div class="checks-list" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>本功能只是把你手写的签名或印章图像<b>合成到文件上</b>，方便你打印带走。它<b>不具备</b>《电子签名法》意义上的可靠电子签名效力，也不做时间戳与身份核验。需要法律效力请走线下签署或有资质的第三方 CA。</span>
+        </div>
+      </div>
+
+      <div class="signpad" data-at="t2">
+        <div class="hint" data-when="first">
+          在这块区域用手指写下你的签名<br>
+          <span style="font-size:var(--fz-2)">写坏了可以点右侧「清除重写」</span>
+        </div>
+        <div data-when="default ai-down device-off" style="position:absolute;inset:0">
+          <span class="ink"></span>
+          <span style="position:absolute;left:12%;bottom:22%;font-size:12px;color:var(--paper-fog)">已采集签名 · 09:52 · 只用于本次合成</span>
+        </div>
+      </div>
+
+      <div class="steps4" data-at="t2">
+        <div class="st4"><b>01</b><span>选要签的文件（本次会话内已有 1 份）</span></div>
+        <div class="st4"><b>02</b><span>手写签名或选已保存的印章</span></div>
+        <div class="st4"><b>03</b><span>拖到落款位置，可缩放</span></div>
+        <div class="st4"><b>04</b><span>勾选授权后合成新文件（不覆盖原件）</span></div>
+      </div>
+
+      <!-- T3 证件照：未开放 -->
+      <div class="locked" data-at="t3">
+        <svg class="ic"><use href="#i-idcard"/></svg>
+        <b>证件照拍摄与排版尚未开放</b>
+        <p>这台机器没有配置符合规格的补光与背景板，拍出来的照片不符合各类证件照标准，
+          做出来大概率白花钱、还得重拍。所以这里<b>不提供一个看起来能点、实际不通的入口</b>。</p>
+        <p style="color:var(--fog-600);font-size:var(--fz-2)">
+          现在能做的替代路径：把已有的证件照电子文件用「图片转 PDF」整理后打印；
+          或用「打印扫描」把纸质证件照扫成电子件留存。</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+          <button class="btn btn--ghost" data-go="t1">去图片转 PDF</button>
+          <a class="btn btn--ghost" href="07-scan-workbench.html">去纸质扫描</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 右 ================= -->
+    <div class="wside">
+
+      <!-- T1 输出设置 -->
+      <div class="pane" data-at="t1">
+        <div class="pane-hd"><span class="t">输出设置</span><span class="s" data-when="default device-off">已预设</span><span class="s" data-when="ai-down first">需你确认</span></div>
+        <div class="field">
+          <div class="field-lb">页面尺寸<span class="prefill" data-when="default device-off">本机仅支持 A4</span></div>
+          <div class="seg"><button aria-pressed="true">A4</button><button aria-pressed="false" aria-disabled="true">A3 不支持</button></div>
+        </div>
+        <div class="field">
+          <div class="field-lb">每页放几张<span class="prefill" data-when="default device-off">已按图片方向预设 · 可改</span></div>
+          <div class="seg"><button aria-pressed="true">1 张</button><button aria-pressed="false">2 张</button><button aria-pressed="false">4 张</button></div>
+        </div>
+        <div class="field">
+          <div class="field-lb">留白</div>
+          <div class="seg"><button aria-pressed="false">无边距</button><button aria-pressed="true">窄边距</button><button aria-pressed="false">宽边距</button></div>
+        </div>
+        <div class="field">
+          <div class="field-lb">文件名</div>
+          <label class="goalfield" style="height:52px;border-radius:var(--r-xs)">
+            <input type="text" value="证件材料_20260808.pdf" aria-label="输出文件名" style="font-size:var(--fz-3)">
+          </label>
+        </div>
+      </div>
+
+      <div class="pane pane--fill" data-at="t1">
+        <div class="pane-hd"><span class="t">合成后去哪</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off">5 页</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">预计大小</span><span class="v" data-when="default device-off">约 2.6 MB</span><span class="v v--fog" data-when="ai-down first">合成后可知</span></div>
+          <div class="kv-row"><span class="k">原图</span><span class="v">保留，不修改</span></div>
+        </div>
+        <div class="notice" data-when="default first ai-down" style="margin-top:12px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>合成会生成一个新文件，原图不动。含身份证的文件默认只留到本次会话结束；要长期保存需你本人选「存进我的文档」，并写入操作日志。</span>
+        </div>
+        <div class="notice notice--amber" data-when="device-off" style="margin-top:12px">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>打印机离线，合成后暂时不能直接打印。可先存进「我的文档」，凭手机号在任一台空闲机器取回打印。</span>
+        </div>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" style="width:100%" data-when="default ai-down device-off">预览合成结果</button>
+        </div>
+      </div>
+
+      <!-- T2 授权与定位 -->
+      <div class="pane" data-at="t2">
+        <div class="pane-hd"><span class="t">要签的文件</span><span class="s">本次会话</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件</span><span class="v">就业协议书.pdf</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v">4 页</span></div>
+          <div class="kv-row"><span class="k">落款位置</span><span class="v">第 4 页右下</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="t2">
+        <div class="pane-hd"><span class="t">签名</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" style="width:100%">清除重写</button>
+          <button class="btn btn--ghost" style="width:100%">用已保存的印章</button>
+        </div>
+        <div class="field" style="border-bottom:0;padding-bottom:0">
+          <div class="field-lb">大小</div>
+          <div class="seg"><button aria-pressed="false">小</button><button aria-pressed="true">中</button><button aria-pressed="false">大</button></div>
+        </div>
+      </div>
+      <div class="pane pane--fill" data-at="t2">
+        <div class="pane-hd"><span class="t">合成前需你授权</span></div>
+        <label class="kv-row" style="align-items:flex-start;gap:12px;cursor:pointer;border-bottom:0">
+          <input type="checkbox" style="width:24px;height:24px;margin-top:11px;accent-color:var(--jade-500)">
+          <span style="font-size:var(--fz-2);color:var(--fog-700);line-height:1.6">
+            我确认这份签名是<b>我本人</b>手写，同意把它合成到上述文件；我知道这<b>不是</b>具有法律效力的电子签名。
+          </span>
+        </label>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>签名图像只用于本次合成，会话结束即删除，不会留在机器上、也不会用于其他文件。合成结果是新文件，原件不变。</span>
+        </div>
+      </div>
+
+      <!-- T3 为什么未开放 -->
+      <div class="pane pane--fill" data-at="t3">
+        <div class="pane-hd"><span class="t">为什么这里是关着的</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">补光与背景板</span><span class="v v--fog">未配置</span></div>
+          <div class="kv-row"><span class="k">规格校验</span><span class="v v--fog">未实现</span></div>
+          <div class="kv-row"><span class="k">相纸与裁切</span><span class="v v--fog">未配置</span></div>
+          <div class="kv-row"><span class="k">开放条件</span><span class="v">硬件到位 + 规格校验通过</span></div>
+        </div>
+        <div class="notice" style="margin-top:14px">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>按项目口径（CLAUDE.md §9「不伪造能力」），没有真实硬件与校验能力的功能一律显示为未开放，并给出替代路径，不做占位流程。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-at="t1">
+        <div data-when="default device-off"><div class="t">5 张已排好序，第 4 张偏暗</div><div class="s">合成会生成新文件，原图保留不动</div></div>
+        <div data-when="ai-down"><div class="t">自动排序不可用，请核对左上角序号</div><div class="s">序号就是装订顺序 · 合成功能正常</div></div>
+        <div data-when="first"><div class="t">先把图片送进来</div><div class="s">本机选择 / 手机扫码传 / U 盘</div></div>
+      </div>
+      <div data-at="t2">
+        <div data-when="first"><div class="t">在左边写下签名</div><div class="s">这不是具有法律效力的电子签名</div></div>
+        <div data-when="default ai-down device-off"><div class="t">勾选授权后才会合成，且只生成新文件</div><div class="s">签名图像会话结束即删除</div></div>
+      </div>
+      <div data-at="t3"><div class="t">证件照尚未开放，已给出替代路径</div><div class="s">硬件到位并通过规格校验后才会开放</div></div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="t1">全部清空</button>
+    <button class="btn btn--lg btn--ghost" data-at="t2" data-go="t1">换个工具</button>
+    <button class="btn btn--lg btn--ghost" data-at="t3" data-go="t1">换个工具</button>
+
+    <button class="btn btn--primary" data-at="t1" data-when="default ai-down device-off">合成 5 页 PDF<svg class="ic"><use href="#i-layers"/></svg></button>
+    <button class="btn btn--primary" data-at="t1" data-when="first">添加图片<svg class="ic"><use href="#i-plus"/></svg></button>
+    <button class="btn btn--commit" data-at="t2" data-when="default ai-down device-off">授权并合成<svg class="ic"><use href="#i-pen"/></svg></button>
+    <button class="btn btn--primary" data-at="t2" data-when="first" aria-disabled="true">先写签名</button>
+    <a class="btn btn--primary" data-at="t3" href="07-scan-workbench.html">去纸质扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* 工具标签的选中态：stages.js 只管 .rstep，这里补 .tab */
+;(function () {
+  var scr = document.querySelector('.screen')
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.tab').forEach(function (t) {
+      t.setAttribute('aria-selected', t.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+})()
+</script>
+<script src="scripts/audit-plus.js?v=8"></script>
+</body>
+</html>
