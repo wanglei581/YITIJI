@@ -1,3 +1,17 @@
+/**
+ * 打印前材料检查 + 隐私遮挡四步交互（docs/product/pii-redaction-decision-2026-08.md §四）。
+ *
+ * 1. 检出逐项列出（第几页 / 类型 / 掩码片段）
+ * 2. 逐项裁决：默认全部遮挡，「保留」需要单独点
+ * 3. **强制预览**：看遮挡后的文件，原尺寸、不可折叠、没有跳过入口
+ * 4. 勾「我核对过」才解锁打印
+ *
+ * 第 3 步是这个功能唯一真正的安全阀：机器复检只能发现「盖错位置」，
+ * 发现不了「压根没检出」—— 同一个检测器扫两遍，系统性漏检两遍都漏。
+ * 不要以「少一步更顺」为由把它做成可跳过 / 默认折叠。
+ *
+ * 所有遮挡结论文案统一来自 piiRedactionCopy(claim)，本页不自行拼装。
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@ai-job-print/ui'
@@ -9,11 +23,11 @@ import { ApiHttpError } from '../../services/api/httpAdapter'
 import {
   createMaterialTask,
   decidePiiFindings,
+  getFilePreviewUrl,
   getMaterialTask,
   type DocumentProcessTaskView,
   type PiiFindingAction,
   type PiiFindingDecisionAction,
-  type PiiFindingView,
 } from '../../services/api/materials'
 import {
   clearPrintMaterialSession,
@@ -21,43 +35,47 @@ import {
   printUploadPathForSource,
   readPrintMaterialSession,
   type MaterialCheckSummary,
+  type MaterialRedactionSummary,
   type PrintMaterialSource,
   type PrintFileState,
   type PrintMaterialSession,
 } from './printMaterialSession'
+import {
+  countDecisions,
+  findingLabel,
+  inspectionSummaryFromTask,
+  isDemoTask,
+  maskSnippet,
+  normalizeA4SummaryFromTask,
+  pageCountFromInspection,
+  pageLabelForFinding,
+  piiScanModeCopy,
+  riskLevelForFinding,
+} from './materialCheckModel'
+import {
+  countByApplied,
+  groupItemsByPage,
+  hasUsableRedactedFile,
+  parsePiiRedactionResult,
+  piiRedactionCopy,
+  piiReverifyNote,
+  piiTypeLabel,
+  type PiiRedactionResult,
+} from './piiRedaction'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 import {
   MaterialCheckPresentation,
   type MaterialCheckStage,
 } from './components/MaterialCheckPresentation'
+import { RedactionReviewPresentation } from './components/RedactionReviewPresentation'
 
 interface LocationState {
   file?: PrintFileState
   source?: PrintMaterialSource
 }
 
-type InspectionMessageSeverity = 'info' | 'warning'
 const TASK_POLL_ATTEMPTS = 30
 const TASK_POLL_INTERVAL_MS = 1_000
-
-interface InspectionSummaryView {
-  pageCount: number | null
-  canPrint: boolean | null
-  messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
-}
-
-interface NormalizeA4SummaryView {
-  targetPaperSize: string
-  canNormalize: boolean | null
-  messages: Array<{ code: string; severity: InspectionMessageSeverity; text: string }>
-}
-
-interface PiiRedactionSummaryView {
-  canRedact: boolean
-  redactedFileId: string | null
-  resultFileCreated: boolean
-  message: string
-}
 
 function isPendingStatus(task: DocumentProcessTaskView): boolean {
   return task.status === 'pending' || task.status === 'processing'
@@ -85,159 +103,36 @@ function assertTaskReady(task: DocumentProcessTaskView, label: string): void {
   throw new Error(`${label}仍在处理中，请稍后重试`)
 }
 
-function pageCountFromInspection(task: DocumentProcessTaskView): number | null {
-  const checks = task.result?.['checks']
-  if (!checks || typeof checks !== 'object' || Array.isArray(checks)) return null
-  const pageCount = (checks as Record<string, unknown>)['pageCount']
-  if (typeof pageCount !== 'number' || !Number.isInteger(pageCount)) return null
-  return pageCount > 0 && pageCount <= 2000 ? pageCount : null
-}
-
 function applyDetectedPageCount(file: PrintFileState, inspection: DocumentProcessTaskView): PrintFileState {
   const pageCount = pageCountFromInspection(inspection)
   if (!pageCount || file.pages === pageCount) return file
   return { ...file, pages: pageCount }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+function suggestionForRisk(risk: 'high' | 'medium' | 'low'): string {
+  if (risk === 'high') return '默认遮挡；确需露出时再点「保留」'
+  if (risk === 'medium') return '默认遮挡；投递用材料通常需要保留联系方式'
+  return '默认遮挡；按材料用途决定是否保留'
 }
 
-function inspectionSummaryFromTask(task: DocumentProcessTaskView | null): InspectionSummaryView | null {
-  const checks = task?.result?.['checks']
-  if (!isRecord(checks)) return null
-  const pageCount = task ? pageCountFromInspection(task) : null
-  const canPrint = typeof checks['canPrint'] === 'boolean' ? checks['canPrint'] : null
-  const messages = normalizeInspectionMessages(checks)
-  return { pageCount, canPrint, messages }
+function previewKindForUrl(url: string | null, mimeType?: string): 'pdf' | 'image' | 'unavailable' {
+  if (!url) return 'unavailable'
+  if (mimeType?.startsWith('image/')) return 'image'
+  if (/\.(png|jpe?g|webp)(\?|$)/i.test(url)) return 'image'
+  return 'pdf'
 }
 
-function normalizeA4SummaryFromTask(task: DocumentProcessTaskView | null): NormalizeA4SummaryView | null {
-  const checks = task?.result?.['checks']
-  if (!isRecord(checks)) return null
-  const targetPaperSize = typeof checks['targetPaperSize'] === 'string' ? checks['targetPaperSize'] : 'A4'
-  const canNormalize = typeof checks['canNormalize'] === 'boolean' ? checks['canNormalize'] : null
-  const messages = normalizeInspectionMessages(checks)
-  return { targetPaperSize, canNormalize, messages }
-}
-
-function piiRedactionSummaryFromTask(task: DocumentProcessTaskView | null): PiiRedactionSummaryView | null {
-  const checks = task?.result?.['checks']
-  if (!isRecord(checks)) return null
-  const messages = normalizeInspectionMessages(checks)
+function redactionSummaryOf(result: PiiRedactionResult | null): MaterialRedactionSummary | undefined {
+  if (!result) return undefined
   return {
-    canRedact: checks['canRedact'] === true,
-    redactedFileId: typeof checks['redactedFileId'] === 'string' ? checks['redactedFileId'] : null,
-    resultFileCreated: checks['resultFileCreated'] === true,
-    message: messages[0]?.text ?? '已完成遮挡产物评估，当前版本不生成新文件，打印仍使用原文件',
+    claim: result.claim,
+    redactedFileId: result.redactedFileId,
+    appliedRedactedCount: countByApplied(result.items, 'redacted'),
+    failedNoPositionCount: countByApplied(result.items, 'failed_no_position'),
+    keptCount: countByApplied(result.items, 'kept'),
+    reverifyRemainingCount: result.reverify.remainingCount,
+    reverifyRan: result.reverify.ran,
   }
-}
-
-function normalizeInspectionMessages(checks: Record<string, unknown>): InspectionSummaryView['messages'] {
-  const rawMessages = Array.isArray(checks['messages']) ? checks['messages'] : []
-  const messages = rawMessages.flatMap((item) => {
-    if (!isRecord(item) || typeof item['text'] !== 'string') return []
-    const severity: InspectionMessageSeverity = item['severity'] === 'warning' ? 'warning' : 'info'
-    return [{
-      code: typeof item['code'] === 'string' ? item['code'] : 'INSPECTION_MESSAGE',
-      severity,
-      text: item['text'],
-    }]
-  })
-  if (messages.length > 0) return messages.slice(0, 3)
-
-  const warnings = Array.isArray(checks['warnings']) ? checks['warnings'].filter((item): item is string => typeof item === 'string') : []
-  if (warnings.length > 0) {
-    return warnings.slice(0, 3).map((code) => ({
-      code,
-      severity: 'warning',
-      text: inspectionWarningText(code),
-    }))
-  }
-  return []
-}
-
-function inspectionWarningText(code: string): string {
-  if (code === 'PDF_PAGE_COUNT_NOT_DETECTED') return '暂未识别 PDF 页数，以实际打印为准'
-  if (code === 'SOURCE_FILE_BYTES_UNAVAILABLE') return '暂未读取到文件内容，以实际打印为准'
-  if (code === 'PRINT_MIME_UNSUPPORTED') return '当前文件格式暂不支持打印前体检'
-  return '材料体检存在提示，请继续核对打印参数'
-}
-
-function maskSnippet(type: string, snippet: string | null): string {
-  if (!snippet) return '未提供片段'
-  const value = snippet.trim()
-  if (!value) return '未提供片段'
-  if (type === 'phone') return value.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-  if (type === 'email') {
-    const [name, domain] = value.split('@')
-    if (!name || !domain) return value
-    const first = name.slice(0, 1)
-    return `${first}***@${domain}`
-  }
-  if (value.length <= 4) return `${value.slice(0, 1)}**`
-  return `${value.slice(0, 2)}***${value.slice(-2)}`
-}
-
-function suggestionForFinding(finding: PiiFindingView): string {
-  if (riskLevelForFinding(finding) === 'high') return '建议遮挡后再打印'
-  if (riskLevelForFinding(finding) === 'medium') return '建议确认是否需要遮挡'
-  return '按材料用途确认保留或遮挡'
-}
-
-function riskLevelForFinding(finding: PiiFindingView): 'high' | 'medium' | 'low' {
-  if (finding.type.includes('id') || finding.type.includes('address')) return 'high'
-  if (finding.type === 'phone' || finding.type === 'email') return 'medium'
-  return 'low'
-}
-
-function countDecisions(decisions: Record<string, PiiFindingAction>): { keptCount: number; redactedCount: number } {
-  return Object.values(decisions).reduce(
-    (acc, action) => ({
-      keptCount: acc.keptCount + (action === 'keep' ? 1 : 0),
-      redactedCount: acc.redactedCount + (action === 'redact' ? 1 : 0),
-    }),
-    { keptCount: 0, redactedCount: 0 },
-  )
-}
-
-function isDemoTask(task: DocumentProcessTaskView | null): boolean {
-  const mode = task?.result?.['mode']
-  return mode === 'mock' || mode === 'skeleton'
-}
-
-/**
- * pii_scan 完成后的诚实结果态文案。
- * 后端 mode 取值（见 materials.service.ts / pii-scan.util.ts）：
- * - 'real'：真实扫描完成且覆盖了文档全部页面，命中结果走 findings 列表展示，这里不需要额外文案。
- * - 'partial'：扫描版 PDF 页数超过 OCR 页数上限，只扫描了前 N 页（共 M 页），即使 0 命中也
- *   不能当作"已确认无风险"，必须诚实提示人工确认剩余页面。
- * - 'skipped_non_document'：历史遗留态，contentCategory=photo 跳过口子已在服务端移除；仅为兼容
- *   修复上线前、TASK_TTL_HOURS 窗口内可能仍被读取到的存量任务而保留此文案分支。
- * - 'degraded'：本该真实扫描但 OCR 不可用/失败，诚实告知需人工确认，不是"演示"。
- * - 'unsupported_format'：该文件格式完全没有内容提取路径（如旧版 .doc），诚实告知，不是"演示"。
- * - 其余未知取值一律 fail-closed 显示警告：旧后端在 TASK_TTL_HOURS 窗口内的存量任务
- *   （如历史 'simulated'）或未来新增 mode，都不允许静默呈现为"真实扫描完成"。
- *   'mock'/'skeleton' 例外——它们由 isDemoTask 的"流程演示"徽标单独诚实标注。
- */
-function piiScanModeCopy(task: DocumentProcessTaskView | null): { label: string; tone: 'neutral' | 'warning' } | null {
-  const mode = task?.result?.['mode']
-  if (mode === 'skipped_non_document') return { label: '该文件类型无需隐私扫描', tone: 'neutral' }
-  if (mode === 'degraded') return { label: '内容扫描暂不可用，请人工确认文件不含敏感信息', tone: 'warning' }
-  if (mode === 'unsupported_format') return { label: '该文件格式暂不支持内容扫描，请人工确认文件不含敏感信息', tone: 'warning' }
-  if (mode === 'partial') {
-    const scannedPages = task?.result?.['scannedPages']
-    const totalPages = task?.result?.['totalPages']
-    const scannedLabel = typeof scannedPages === 'number' ? scannedPages : '部分'
-    const totalLabel = typeof totalPages === 'number' ? totalPages : '全部'
-    return {
-      label: `本次仅检查了前 ${scannedLabel} 页（共 ${totalLabel} 页），请人工确认其余页面不含敏感信息`,
-      tone: 'warning',
-    }
-  }
-  if (mode === 'real') return null
-  if (isDemoTask(task)) return null
-  return { label: '本次隐私检查结果状态未知，请人工确认文件不含敏感信息', tone: 'warning' }
 }
 
 export function PrintMaterialCheckPage() {
@@ -261,6 +156,13 @@ export function PrintMaterialCheckPage() {
   const [decisions, setDecisions] = useState<Record<string, PiiFindingAction>>({})
   const [error, setError] = useState<string | null>(null)
 
+  // 第 3 / 4 步（强制预览 + 人眼确认）状态
+  const [redactTask, setRedactTask] = useState<DocumentProcessTaskView | null>(null)
+  const [redaction, setRedaction] = useState<PiiRedactionResult | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewConfirmed, setPreviewConfirmed] = useState(false)
+  const [acknowledgedUnredacted, setAcknowledgedUnredacted] = useState(false)
+
   const findings = piiTask?.piiFindings ?? []
   const allDecided = findings.every((finding) => decisions[finding.id] === 'keep' || decisions[finding.id] === 'redact')
   const decisionCounts = useMemo(() => countDecisions(decisions), [decisions])
@@ -271,14 +173,32 @@ export function PrintMaterialCheckPage() {
   const canContinue = stage === 'review' && allDecided && !requiresFormatReview
   const isWorking = stage === 'inspection' || stage === 'normalize_a4' || stage === 'pii_scan' || stage === 'submitting'
   useBusyLock(isWorking)
-  const presentationFindings = findings.map((finding) => ({
-    id: finding.id,
-    label: finding.label || finding.type,
-    maskedSnippet: maskSnippet(finding.type, finding.snippet),
-    suggestion: suggestionForFinding(finding),
-    risk: riskLevelForFinding(finding),
-    selected: decisions[finding.id] ?? 'pending',
-  }))
+
+  const redactionCopy = useMemo(() => piiRedactionCopy(redaction), [redaction])
+  const pageGroups = useMemo(() => groupItemsByPage(redaction?.items ?? []), [redaction])
+  const failedItems = useMemo(
+    () => (redaction?.items ?? [])
+      .filter((item) => item.applied === 'failed_no_position')
+      .map((item) => ({
+        id: item.id,
+        label: piiTypeLabel(item.type),
+        pageLabel: item.pageNumber ? `第 ${item.pageNumber} 页` : '页码未知',
+      })),
+    [redaction],
+  )
+
+  const presentationFindings = findings.map((finding) => {
+    const risk = riskLevelForFinding(finding)
+    return {
+      id: finding.id,
+      label: findingLabel(finding),
+      pageLabel: pageLabelForFinding(finding),
+      maskedSnippet: maskSnippet(finding.type, finding.snippet),
+      suggestion: suggestionForRisk(risk),
+      risk,
+      selected: decisions[finding.id] ?? 'pending',
+    }
+  })
 
   const persistSession = (patch: Partial<Omit<PrintMaterialSession, 'updatedAt'>>) => {
     const nextFile = patch.file ?? file
@@ -306,6 +226,11 @@ export function PrintMaterialCheckPage() {
     setNormalizeTask(null)
     setPiiTask(null)
     setDecisions({})
+    setRedactTask(null)
+    setRedaction(null)
+    setPreviewUrl(null)
+    setPreviewConfirmed(false)
+    setAcknowledgedUnredacted(false)
 
     try {
       const token = getToken()
@@ -368,7 +293,10 @@ export function PrintMaterialCheckPage() {
       const readyPii = await waitForCompletedTask(pii, token, pii.accessToken)
       assertTaskReady(readyPii, '隐私检查')
       setPiiTask(readyPii)
-      setDecisions(Object.fromEntries((readyPii.piiFindings ?? []).map((finding) => [finding.id, finding.action])))
+      // §四 第 2 步：默认全部遮挡；「保留」必须用户逐项单独点，不提供批量保留入口。
+      setDecisions(Object.fromEntries(
+        (readyPii.piiFindings ?? []).map((finding) => [finding.id, 'redact' as PiiFindingAction]),
+      ))
       persistSession({ file: checkedFile, inspectionTask: readyInspection, normalizeTask: readyNormalize, piiTask: readyPii })
       setStage('review')
     } catch (err) {
@@ -394,15 +322,30 @@ export function PrintMaterialCheckPage() {
     setDecisions((prev) => ({ ...prev, [findingId]: action }))
   }
 
-  const applySuggestedDecisions = () => {
-    setDecisions(Object.fromEntries(findings.map((finding) => [
-      finding.id,
-      riskLevelForFinding(finding) === 'low' ? 'keep' : 'redact',
-    ])))
-  }
+  const buildSummary = (args: {
+    piiTaskId: string
+    redactTaskId?: string
+    findingCount: number
+    redactedCount: number
+    keptCount: number
+    redaction?: MaterialRedactionSummary
+  }): MaterialCheckSummary => ({
+    inspectionTaskId: inspectionTask?.id ?? '',
+    normalizeTaskId: normalizeTask?.id,
+    piiTaskId: args.piiTaskId,
+    piiRedactTaskId: args.redactTaskId,
+    checkedAt: new Date().toISOString(),
+    findingCount: args.findingCount,
+    redactedCount: args.redactedCount,
+    keptCount: args.keptCount,
+    redaction: args.redaction,
+    mode: isDemoTask(inspectionTask) || isDemoTask(normalizeTask) || isDemoTask(piiTask) ? 'demo' : 'checked',
+  })
 
-  const keepAll = () => {
-    setDecisions(Object.fromEntries(findings.map((finding) => [finding.id, 'keep'])))
+  const goToPreview = (nextFile: PrintFileState, materialCheck: MaterialCheckSummary) => {
+    persistSession({ file: nextFile, materialCheck })
+    setStage('done')
+    navigate('/print/preview', { state: { file: nextFile, materialCheck, source } })
   }
 
   const handleContinue = async () => {
@@ -423,42 +366,89 @@ export function PrintMaterialCheckPage() {
       const latestDecisions = Object.fromEntries(latestFindings.map((finding) => [finding.id, finding.action]))
       const { keptCount, redactedCount } = countDecisions(latestDecisions)
 
+      // 没有任何一处要求遮挡 → 没有遮挡产物可核对，不做「强制预览」这道戏。
+      // 这是唯一允许不进入第 3 步的条件，且此路径不会出现任何遮挡结论文案。
+      if (redactedCount === 0) {
+        persistSession({ piiTask: decidedTask })
+        goToPreview(file, buildSummary({
+          piiTaskId: decidedTask.id,
+          findingCount: latestFindings.length,
+          redactedCount,
+          keptCount,
+        }))
+        return
+      }
+
       const redactionTask = await createMaterialTask({
         kind: 'pii_redact',
         sourceFileId: file.fileId,
         params: { decisionTaskId: decidedTask.id },
       }, token, decidedTask.accessToken ?? piiTask.accessToken)
-      persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: redactionTask })
+      persistSession({ piiTask: decidedTask, piiRedactTask: redactionTask })
       const readyRedaction = await waitForCompletedTask(redactionTask, token, redactionTask.accessToken)
-      assertTaskReady(readyRedaction, '遮挡产物评估')
-      const redaction = piiRedactionSummaryFromTask(readyRedaction) ?? undefined
-      if (redaction && !redaction.canRedact) {
-        persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction })
-        setError(redaction.message)
-        setStage('review')
-        return
+      assertTaskReady(readyRedaction, '隐私遮挡处理')
+
+      const parsed = parsePiiRedactionResult(readyRedaction)
+      // 派生件 URL 首选后端直接带出（checks.redactedFileUrl）；拿不到时兜底问
+      // /files/:id/preview-url（需登录）。两处都拿不到 → previewUrl 为 null，
+      // 核对页 fail-closed：看不到就不允许确认，也不会声称遮挡。
+      let url = parsed?.redactedFileUrl ?? null
+      if (!url && parsed?.redactedFileId) {
+        url = await getFilePreviewUrl(parsed.redactedFileId, {
+          token,
+          accessToken: readyRedaction.accessToken ?? decidedTask.accessToken,
+        })
       }
 
-      const materialCheck: MaterialCheckSummary = {
-        inspectionTaskId: inspectionTask.id,
-        normalizeTaskId: normalizeTask?.id,
-        piiTaskId: piiTask.id,
-        piiRedactTaskId: readyRedaction.id,
-        checkedAt: new Date().toISOString(),
-        findingCount: latestFindings.length,
-        redactedCount,
-        keptCount,
-        redaction,
-        mode: isDemoTask(inspectionTask) || isDemoTask(normalizeTask) || isDemoTask(piiTask) || isDemoTask(readyRedaction) ? 'demo' : 'checked',
-      }
-
-      persistSession({ inspectionTask, normalizeTask: normalizeTask ?? undefined, piiTask: decidedTask, piiRedactTask: readyRedaction, materialCheck })
-      setStage('done')
-      navigate('/print/preview', { state: { file, materialCheck, source } })
+      setRedactTask(readyRedaction)
+      setRedaction(parsed ? { ...parsed, redactedFileUrl: url } : null)
+      setPreviewUrl(url)
+      setPreviewConfirmed(false)
+      setAcknowledgedUnredacted(false)
+      persistSession({ piiTask: decidedTask, piiRedactTask: readyRedaction })
+      setStage('redaction_review')
     } catch (err) {
-      setError(err instanceof Error ? err.message : '保存隐私选择失败，请重试')
+      setError(err instanceof Error ? err.message : '隐私遮挡处理失败，请重试')
       setStage('review')
     }
+  }
+
+  /** 第 4 步：人眼确认通过 → 用遮挡后的派生件继续打印（打印与存档同一份）。 */
+  const handleRedactionConfirm = () => {
+    if (!file || !piiTask || !redaction || !previewConfirmed) return
+    if (!hasUsableRedactedFile(redaction)) return
+    const summary = redactionSummaryOf(redaction)
+    if (!summary) return
+    const derivedFile: PrintFileState = {
+      ...file,
+      fileId: redaction.redactedFileId ?? file.fileId,
+      fileUrl: redaction.redactedFileUrl ?? file.fileUrl,
+      fileMd5: undefined,
+    }
+    goToPreview(derivedFile, buildSummary({
+      piiTaskId: piiTask.id,
+      redactTaskId: redactTask?.id,
+      findingCount: findings.length,
+      redactedCount: decisionCounts.redactedCount,
+      keptCount: decisionCounts.keptCount,
+      redaction: { ...summary, previewConfirmedAt: new Date().toISOString() },
+    }))
+  }
+
+  /** 「本机做不到」时的出路之一：用户明确接受打印未遮挡的原件。 */
+  const handlePrintOriginal = () => {
+    if (!file || !piiTask || !acknowledgedUnredacted) return
+    const summary = redactionSummaryOf(redaction)
+    goToPreview(file, buildSummary({
+      piiTaskId: piiTask.id,
+      redactTaskId: redactTask?.id,
+      findingCount: findings.length,
+      redactedCount: decisionCounts.redactedCount,
+      keptCount: decisionCounts.keptCount,
+      redaction: summary
+        ? { ...summary, unredactedAcknowledgedAt: new Date().toISOString() }
+        : undefined,
+    }))
   }
 
   if (!file) {
@@ -480,47 +470,80 @@ export function PrintMaterialCheckPage() {
     )
   }
 
+  const reviewingRedaction = stage === 'redaction_review'
+
   return (
     <PrintPageFrame className="p-6">
     <div className="flex min-h-full flex-col">
       <PrintPrototypeHeader
-        title="打印前材料检查"
-        subtitle="仅用于本次打印前确认；扫描件 / 图片可能通过第三方 OCR 服务识别文字"
+        title={reviewingRedaction ? '核对遮挡结果' : '打印前材料检查'}
+        subtitle={reviewingRedaction
+          ? redactionCopy.showFallbackOptions
+            // 本机做不到时没有预览可看，副标题不能继续要求「看预览」。
+            ? '本机没有产出遮挡后的文件，请选择下面的处理方式'
+            : '请逐页看过下面的预览，确认之后才能继续打印'
+          : '仅用于本次打印前确认；扫描件 / 图片可能通过第三方 OCR 服务识别文字'}
         step={2}
-        backLabel="重新上传"
-        onBack={() => navigate(uploadPath)}
+        backLabel={reviewingRedaction ? '返回逐项选择' : '重新上传'}
+        onBack={() => (reviewingRedaction ? setStage('review') : navigate(uploadPath))}
       />
 
-      <AiDriverBanner feature="AI文件预检" description="自动检查格式、边距与打印风险" />
+      {reviewingRedaction ? (
+        <RedactionReviewPresentation
+          copy={redactionCopy}
+          fileName={file.name}
+          previewUrl={previewUrl}
+          previewKind={previewKindForUrl(previewUrl, file.mimeType)}
+          previewUnavailableReason={
+            redaction?.redactedFileId
+              ? '本机没有拿到遮挡后文件的预览地址（未登录时可能出现）。看不到就没法核对，因此这一步不能确认。'
+              : '本机没有拿到遮挡后的文件。'
+          }
+          pageGroups={pageGroups}
+          failedItems={failedItems}
+          keptCount={countByApplied(redaction?.items ?? [], 'kept')}
+          reverifyNote={piiReverifyNote(redaction)}
+          confirmed={previewConfirmed}
+          onConfirmedChange={setPreviewConfirmed}
+          acknowledgedUnredacted={acknowledgedUnredacted}
+          onAcknowledgedChange={setAcknowledgedUnredacted}
+          isWorking={false}
+          onBack={() => setStage('review')}
+          onContinue={handleRedactionConfirm}
+          onPrintOriginal={handlePrintOriginal}
+        />
+      ) : (
+        <>
+          <AiDriverBanner feature="AI文件预检" description="自动检查格式、边距与打印风险" />
 
-      <MaterialCheckPresentation
-        stage={stage}
-        file={file}
-        error={error}
-        inspection={inspectionSummary ? {
-          pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
-          canPrint: inspectionSummary.canPrint,
-          messages: inspectionSummary.messages.map((message) => message.text),
-        } : null}
-        normalization={normalizeSummary ? {
-          targetPaperSize: normalizeSummary.targetPaperSize,
-          canNormalize: normalizeSummary.canNormalize,
-          messages: normalizeSummary.messages.map((message) => message.text),
-        } : null}
-        privacyModeWarning={piiModeCopy?.label ?? null}
-        demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
-        findings={presentationFindings}
-        requiresFormatReview={requiresFormatReview}
-        canContinue={canContinue}
-        isWorking={isWorking}
-        redactedCount={decisionCounts.redactedCount}
-        onRetry={() => void runChecks()}
-        onBack={() => navigate(uploadPath)}
-        onApplySuggested={applySuggestedDecisions}
-        onKeepAll={keepAll}
-        onDecision={setDecision}
-        onContinue={() => void handleContinue()}
-      />
+          <MaterialCheckPresentation
+            stage={stage}
+            file={file}
+            error={error}
+            inspection={inspectionSummary ? {
+              pageLabel: inspectionSummary.pageCount ? `${inspectionSummary.pageCount} 页` : '页数以实际打印为准',
+              canPrint: inspectionSummary.canPrint,
+              messages: inspectionSummary.messages.map((message) => message.text),
+            } : null}
+            normalization={normalizeSummary ? {
+              targetPaperSize: normalizeSummary.targetPaperSize,
+              canNormalize: normalizeSummary.canNormalize,
+              messages: normalizeSummary.messages.map((message) => message.text),
+            } : null}
+            privacyModeWarning={piiModeCopy?.label ?? null}
+            demoMode={isDemoTask(inspectionTask) || isDemoTask(piiTask)}
+            findings={presentationFindings}
+            requiresFormatReview={requiresFormatReview}
+            canContinue={canContinue}
+            isWorking={isWorking}
+            redactedCount={decisionCounts.redactedCount}
+            onRetry={() => void runChecks()}
+            onBack={() => navigate(uploadPath)}
+            onDecision={setDecision}
+            onContinue={() => void handleContinue()}
+          />
+        </>
+      )}
     </div>
     </PrintPageFrame>
   )

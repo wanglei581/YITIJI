@@ -86,7 +86,12 @@ assert(
   uploadPage.includes("navigate('/print/material-check', { state: { file, source } })") &&
     materialCheckPage.includes('source?: PrintMaterialSource') &&
     materialCheckPage.includes('state?.source ?? session?.source') &&
-    materialCheckPage.includes("navigate('/print/preview', { state: { file, materialCheck, source } })") &&
+    // 2026-08-09:材料检查页新增遮挡核对阶段后，跳转封装成 goToPreview(nextFile, ...)，
+    // 参数名不再一定是 file（通过人眼确认时传的是遮挡后的派生件）。断言意图不变：
+    // 跳 /print/preview 时必须带上 materialCheck 与 source。
+    /navigate\('\/print\/preview', \{ state: \{ file(?::\s*\w+)?, materialCheck, source \} \}\)/.test(
+      materialCheckPage,
+    ) &&
     previewPage.includes('source?: PrintMaterialSource') &&
     previewPage.includes('locationState?.source ?? restoredSession?.source') &&
     previewPage.includes("navigate('/print/confirm', { state: { file, params, materialCheck, source } })") &&
