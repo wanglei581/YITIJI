@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>打印工作台 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   打印工作台
+   融合：75 屏的 7 个独立屏（上传→材料检查→预览→参数→确认→支付→打印）
+   收成一个「文件常驻」的工作台——文件预览永不离开屏幕，右侧导轨分步走。
+   理由：用户是核对完才敢付钱的，把要核对的东西换走再问他要钱，是设计错误。
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+.brand-mark{display:flex;align-items:center;justify-content:center;overflow:hidden;line-height:0;font-size:0}
+.brand-mark svg{width:28px;height:28px;display:block}
+
+.stepbar{padding:18px 40px 0}
+/* .step 是状态标签不是按钮，不适用 --tap；不得改成可点 */
+.step{font-size:14.5px;height:42px;padding:0 14px;gap:8px}
+.step .n{width:20px;height:20px;font-size:11.5px}
+.step-pin{height:36px;font-size:13px}
+
+.work{flex:1;min-height:0;display:grid;grid-template-columns:600px minmax(0,1fr);gap:20px;
+  padding:18px 40px 0;position:relative;z-index:1}
+
+/* ═══ 左：文件工作区（常驻） ═══ */
+.viewer{display:flex;flex-direction:column;min-height:0;gap:12px}
+
+.vtool{flex:none;height:64px;display:flex;align-items:center;gap:10px;padding:0 14px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m)}
+.vfile{display:flex;align-items:center;gap:9px;min-width:0}
+.vfile svg{width:19px;height:19px;flex:none;color:var(--clay)}
+.vfile b{font-size:15.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+.vfile span{color:var(--muted);font-size:13px;white-space:nowrap}
+.vzoom{margin-left:auto;display:flex;gap:5px;padding:4px;background:var(--surface-3);border-radius:9px}
+.vzoom button{height:var(--tap);padding:0 16px;color:var(--ink-2);background:transparent;border:0;border-radius:6px;
+  font-family:var(--sans);font-size:13.5px;font-weight:600;cursor:pointer;transition:all var(--t-base) var(--e-out)}
+.vzoom button.on{color:var(--teal-deep);background:#fff;box-shadow:var(--sh-1)}
+
+/* AI 预检结果条 */
+.precheck{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pc{display:flex;align-items:center;gap:10px;height:78px;padding:0 14px;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-m)}
+.pc-ico{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px}
+.pc-ico svg{width:17px;height:17px}
+.pc.ok .pc-ico{color:#fff;background:var(--teal)}
+.pc.todo .pc-ico{color:#fff;background:var(--clay)}
+.pc b{display:block;font-size:14px;font-weight:700;line-height:1.3}
+.pc span{display:block;margin-top:3px;color:var(--muted);font-size:12.5px;line-height:1.3}
+.pc.todo b{color:var(--clay-deep)}
+
+/* 页面舞台 */
+.stage-wrap{flex:1;min-height:0;display:grid;place-items:center;overflow:auto;
+  background:linear-gradient(180deg,#efeade,#e9e3d5);border:1px solid var(--line);
+  border-radius:var(--r-m);box-shadow:inset 0 2px 10px rgba(42,34,20,.07)}
+.sheet{position:relative;width:560px;height:792px;background:#fff;flex:none;
+  box-shadow:0 10px 30px rgba(42,34,20,.18),0 1px 0 rgba(0,0,0,.06);
+  transform-origin:center;transition:transform var(--t-slow) var(--e-out)}
+.stage-wrap.zoom .sheet{transform:scale(1.36)}
+/* 纸上的简历排版（缩略比例） */
+.doc{position:absolute;inset:0;padding:48px 50px;font-size:10px;line-height:1.85;color:#26302c}
+.doc h1{font-family:var(--serif);font-size:22px;font-weight:800;letter-spacing:.04em;color:#14231f}
+.doc .meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 12px;color:#5c6b64;font-size:9.5px}
+.doc hr{margin:14px 0 12px;border:0;border-top:1px solid #dcd6c8}
+.doc h2{margin-top:14px;font-family:var(--serif);font-size:12px;font-weight:800;color:#126a59;
+  letter-spacing:.08em;border-left:3px solid #1f8a74;padding-left:8px}
+.doc .row{margin-top:8px}
+.doc .row b{font-size:10.5px;font-weight:700}
+.doc .row i{float:right;font-style:normal;color:#7b8880;font-size:9px}
+.doc .row p{margin-top:3px;color:#4a5852}
+.doc .bar{height:5px;margin-top:5px;background:#eee9dc;border-radius:3px}
+.doc .bar.s{width:74%}.doc .bar.m{width:88%}.doc .bar.l{width:96%}
+/* 隐私片段 */
+mark{background:#fff2cf;color:inherit;padding:0 2px;border-radius:2px;cursor:pointer;
+  box-shadow:inset 0 -1.5px 0 #e6c46a;transition:all var(--t-base) var(--e-out)}
+mark.hot{background:#ffe08a;box-shadow:0 0 0 3px rgba(230,196,106,.45)}
+mark.masked{color:transparent;background:#14231f;box-shadow:none;user-select:none}
+.sheet-no{position:absolute;right:-1px;bottom:-1px;padding:3px 9px;color:#7b8880;background:#fbf9f3;
+  border-top-left-radius:6px;font-family:var(--mono);font-size:10px}
+
+/* 页面范围 */
+.range{flex:none;display:flex;align-items:center;gap:12px;height:66px;padding:0 16px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m)}
+.range > b{font-size:14.5px;font-weight:700;white-space:nowrap}
+.range .seg{margin-left:auto}
+.range .seg button{min-height:var(--tap);padding:0 20px;font-size:14.5px}
+.seg button{white-space:nowrap}
+
+/* 缩略图 */
+.thumbs{flex:none;height:158px;display:flex;align-items:center;gap:12px;padding:0 16px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow-x:auto}
+.thumbs-label{flex:none;color:var(--faint);font-size:12px;letter-spacing:.14em;font-weight:700;
+  writing-mode:vertical-rl;height:100px;display:grid;place-items:center}
+.thumb{flex:none;width:88px;cursor:pointer}
+.thumb .mini{width:88px;height:124px;background:#fff;border:2px solid var(--line);border-radius:4px;
+  padding:8px;transition:all var(--t-base) var(--e-out)}
+.thumb .mini i{display:block;height:2.5px;margin-bottom:4px;background:#e4dfd2;border-radius:2px}
+.thumb .mini i:nth-child(1){width:60%;height:5px;background:#c9c2b0;margin-bottom:7px}
+.thumb .mini i:nth-child(4){width:82%}.thumb .mini i:nth-child(7){width:70%}
+.thumb em{display:block;margin-top:6px;font-style:normal;text-align:center;color:var(--muted);font-size:12px}
+.thumb.on .mini{border-color:var(--teal);box-shadow:0 6px 16px rgba(31,138,116,.22)}
+.thumb.on em{color:var(--teal-deep);font-weight:700}
+
+/* ═══ 右：分步导轨 ═══ */
+.rail{display:flex;flex-direction:column;min-height:0;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r-l);box-shadow:var(--sh-2);overflow:hidden}
+.rail-head{flex:none;display:flex;align-items:center;gap:10px;padding:16px 20px 14px;
+  border-bottom:1px solid var(--line-soft)}
+.rail-head h2{font-family:var(--serif);font-size:21px;font-weight:800}
+.rail-head .tag{margin-left:auto}
+.rail-body{flex:1;min-height:0;padding:16px 20px 20px}
+.panel{display:none}
+.panel.on{display:block;animation:riseIn var(--t-slow) var(--e-out) both}
+
+.frow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.frow:last-child{border-bottom:0}
+.frow > span:first-child{color:var(--muted);font-size:14.5px}
+.frow > b{margin-left:auto;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.field{margin-bottom:18px}
+.field-label{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.field-label b{font-size:15px;font-weight:700}
+.field-label span{color:var(--faint);font-size:12.5px}
+
+/* 隐私片段项 */
+.pitem{padding:13px 14px;margin-bottom:9px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:var(--r-m);cursor:pointer;transition:all var(--t-base) var(--e-out)}
+.pitem:hover{border-color:var(--clay-line);background:#fff}
+.pitem.active{border-color:var(--clay);box-shadow:0 0 0 3px var(--clay-soft)}
+.pitem-top{display:flex;align-items:center;gap:8px}
+.pitem-top b{font-size:15px;font-weight:700}
+.pitem-top .tag{margin-left:auto;height:26px;padding:0 9px;font-size:11.5px}
+.pitem .frag{margin-top:7px;font-family:var(--mono);font-size:13px;color:var(--ink-2);
+  background:#fff;border:1px dashed var(--line);border-radius:6px;padding:5px 9px;display:inline-block}
+.pitem .loc{margin-top:6px;color:var(--muted);font-size:12.5px}
+.pitem .seg{margin-top:10px}
+.pitem .seg button{min-height:var(--tap);font-size:14.5px}
+.pitem .seg button.on{color:#fff;background:var(--clay);box-shadow:none}
+.pitem .seg button.on.keep{color:var(--ink-2);background:#fff;box-shadow:var(--sh-1)}
+
+.bulk{display:flex;gap:9px;margin-bottom:14px}
+.bulk button{flex:1;height:var(--tap);color:var(--ink-2);background:var(--surface-2);
+  border:1.5px solid var(--line);border-radius:var(--r-s);font-family:var(--sans);font-size:14.5px;
+  font-weight:600;cursor:pointer;transition:all var(--t-base) var(--e-out)}
+.bulk button:hover{border-color:var(--clay-line);background:#fff}
+
+/* 支付 */
+.qr{margin:0 auto;width:210px;height:210px;display:grid;place-items:center;background:#fff;
+  border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.qr svg{width:170px;height:170px}
+.qr-note{margin-top:11px;text-align:center;color:var(--muted);font-size:13.5px}
+.qr-note b{color:var(--clay-deep);font-variant-numeric:tabular-nums}
+.paylink{display:block;width:100%;margin-top:12px;height:var(--tap);color:var(--teal-deep);
+  background:var(--teal-soft);border:0;border-radius:var(--r-s);font-family:var(--sans);
+  font-size:14.5px;font-weight:700;cursor:pointer}
+
+/* 打印完成 */
+.pickup{padding:22px;text-align:center;background:linear-gradient(180deg,#eaf4f0,#f6fbf9);
+  border:1px solid var(--teal-line);border-radius:var(--r-m)}
+.pickup .lbl{color:var(--teal-deep);font-size:13px;font-weight:700;letter-spacing:.18em}
+.pickup .code{margin-top:8px;font-family:var(--mono);font-size:52px;font-weight:800;
+  letter-spacing:.14em;color:var(--teal-deep);line-height:1}
+.pickup p{margin-top:10px;color:var(--muted);font-size:13.5px;line-height:1.55}
+.ring{margin:0 auto 16px;width:118px;height:118px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:9;stroke-linecap:round}
+.ring .bg{stroke:var(--surface-3)}
+.ring .fg{stroke:var(--teal);stroke-dasharray:314;stroke-dashoffset:78;
+  animation:ringGo 1.6s var(--e-out) both}
+@keyframes ringGo{from{stroke-dashoffset:314}}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;font-weight:800;
+  font-variant-numeric:tabular-nums;color:var(--teal-deep)}
+
+/* ═══ 核价条（常驻，参数一动就变） ═══ */
+.costbar{flex:none;display:flex;align-items:center;gap:0;height:96px;margin:16px 40px 0;
+  background:linear-gradient(148deg,var(--ink-panel-1),var(--ink-panel-2));border-radius:var(--r-m);
+  box-shadow:0 14px 34px rgba(12,38,32,.24);overflow:hidden}
+.cb{flex:1;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:0 20px;
+  border-right:1px solid rgba(255,255,255,.09)}
+.cb span{color:var(--on-ink-4);font-size:12.5px;letter-spacing:.06em}
+.cb b{color:#eaf7f1;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.cb.total{flex:none;width:250px;border-right:0;background:rgba(255,255,255,.05);align-items:flex-end}
+.cb.total span{color:var(--on-ink-3)}
+.cb.total b{color:var(--mint);font-size:34px;font-weight:800;letter-spacing:.01em}
+.cb-save{display:inline-flex;align-items:center;gap:5px;color:var(--mint);font-size:12px}
+.cb-save svg{width:13px;height:13px}
+
+.actionbar{margin-top:14px}
+.ab-note{max-width:390px}
+
+@media (prefers-reduced-motion:reduce){.stage-wrap.zoom .sheet{transition:none}}
+</style>
+</head>
+<body data-step="check">
+
+<div id="panel">
+  <p>流程步骤</p>
+  <button data-s="check" class="on">2 材料检查</button>
+  <button data-s="params">3 参数</button>
+  <button data-s="confirm">4 确认</button>
+  <button data-s="pay">5 支付</button>
+  <button data-s="done">6 打印完成</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <button class="topbar-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        上一步
+      </button>
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5"/><path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5"/><path d="M16 4.5V9h5"/>
+            <rect x="4.5" y="12.5" width="19" height="7" rx="1.6"/><path d="M9 19.5h10v4H9z"/>
+            <circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <div><strong>打印扫描</strong><span>文档打印 · 本机出纸</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">09:47</span>
+      <span class="device"><i></i>打印机在线 · A4 纸充足 · 碳粉正常</span>
+    </div>
+  </header>
+
+  <!-- 步骤条：预览不再是一个步骤，它常驻 -->
+  <div class="stepbar">
+    <span class="step done" data-k="upload"><span class="n"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>上传</span>
+    <span class="step-sep"></span>
+    <span class="step on" data-k="check"><span class="n">2</span>材料检查</span>
+    <span class="step-sep"></span>
+    <span class="step" data-k="params"><span class="n">3</span>参数</span>
+    <span class="step-sep"></span>
+    <span class="step" data-k="confirm"><span class="n">4</span>确认</span>
+    <span class="step-sep"></span>
+    <span class="step" data-k="pay"><span class="n">5</span>支付</span>
+    <span class="step-sep"></span>
+    <span class="step" data-k="done"><span class="n">6</span>打印</span>
+    <span class="step-pin">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      文件预览全程常驻
+    </span>
+  </div>
+
+  <div class="work">
+
+    <!-- ══ 左：文件工作区 ══ -->
+    <section class="viewer">
+      <div class="vtool">
+        <span class="vfile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <b>李同学-简历.pdf</b><span>· 3 页 · 2.1 MB · A4</span>
+        </span>
+        <span class="vzoom">
+          <button class="on" id="zFit">适应页面</button>
+          <button id="zBig">放大</button>
+        </span>
+      </div>
+
+      <!-- AI 预检三项：真实检查结果，不是装饰 -->
+      <div class="precheck">
+        <div class="pc ok">
+          <span class="pc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <div><b>文件体检</b><span>3 页 · 格式正常</span></div>
+        </div>
+        <div class="pc ok">
+          <span class="pc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+          <div><b>A4 规范化</b><span>版式适配 A4</span></div>
+        </div>
+        <div class="pc todo priv">
+          <span class="pc-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg></span>
+          <div><b>隐私片段</b><span id="pcText"><b>4 项</b>待你确认</span></div>
+        </div>
+      </div>
+
+      <!-- 纸 -->
+      <div class="stage-wrap" id="stageWrap">
+        <div class="sheet">
+          <div class="doc">
+            <h1>李 同 学</h1>
+            <div class="meta">
+              <span>求职意向：产品运营</span>
+              <span>电话 <mark data-k="phone">138****5678</mark></span>
+              <span>邮箱 <mark data-k="email">w***@example.com</mark></span>
+              <span>出生 <mark data-k="birth">19**年**月</mark></span>
+              <span>现住 <mark data-k="addr">杭州***区**路</mark></span>
+            </div>
+            <hr />
+            <h2>教育背景</h2>
+            <div class="row"><b>某某大学 · 工商管理（本科）</b><i>2022.09 – 2026.06</i>
+              <p>主修市场营销、消费者行为、数据分析；连续三年专业前 15%。</p></div>
+            <h2>实习经历</h2>
+            <div class="row"><b>某科技公司 · 产品运营实习生</b><i>2025.07 – 2025.12</i>
+              <p>负责用户增长活动策划与执行，配合数据团队完成周度复盘。</p>
+              <span class="bar l"></span><span class="bar m"></span></div>
+            <div class="row"><b>某电商平台 · 内容运营实习生</b><i>2025.02 – 2025.06</i>
+              <p>负责站内话题运营与素材排期，参与两次大促专题落地。</p>
+              <span class="bar m"></span><span class="bar s"></span></div>
+            <h2>校园实践</h2>
+            <div class="row"><b>学生会宣传部 · 部长</b><i>2023.09 – 2025.06</i>
+              <p>统筹校级活动宣传，带领 8 人小组完成年度品牌视觉改版。</p>
+              <span class="bar m"></span></div>
+            <h2>技能与证书</h2>
+            <div class="row"><p>SQL / Excel 数据透视 / Figma；CET-6；普通话二甲。</p>
+              <span class="bar l"></span><span class="bar s"></span></div>
+          </div>
+          <span class="sheet-no" id="sheetNo">第 1 页 / 共 3 页 · A4</span>
+        </div>
+      </div>
+
+      <!-- 页面范围 -->
+      <div class="range">
+        <b>页面范围</b>
+        <span style="color:var(--muted);font-size:13.5px">默认打印全部，也可只打部分页</span>
+        <span class="seg">
+          <button class="on">全部页面</button>
+          <button>自定义</button>
+        </span>
+      </div>
+
+      <!-- 缩略图 -->
+      <div class="thumbs scroll" id="thumbs">
+        <span class="thumbs-label">页面</span>
+        <div class="thumb on" data-p="1"><div class="mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><em>第 1 页</em></div>
+        <div class="thumb" data-p="2"><div class="mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><em>第 2 页</em></div>
+        <div class="thumb" data-p="3"><div class="mini"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><em>第 3 页</em></div>
+      </div>
+    </section>
+
+    <!-- ══ 右：分步导轨 ══ -->
+    <aside class="rail">
+      <div class="rail-head">
+        <h2 id="railTitle">打印前材料检查</h2>
+        <span class="tag todo" id="railTag">4 项待确认</span>
+      </div>
+      <div class="rail-body scroll">
+
+        <!-- ── 2 材料检查 ── -->
+        <div class="panel on" data-p="check">
+          <div class="notice info" style="margin-bottom:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>点任一项会在左边原文标出位置。选「遮挡」左边即时变黑条，方便你先看清效果再决定。</span>
+          </div>
+
+          <div class="bulk">
+            <button id="bulkAdvise">按建议处理</button>
+            <button id="bulkKeep">全部保留</button>
+          </div>
+
+          <div id="plist"></div>
+
+          <div class="notice warn" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span><b>当前版本会记录你的遮挡选择并完成评估，但尚不生成遮挡后的文件；打印仍使用原文件。</b>进入确认页前会再次提示。</span>
+          </div>
+          <div class="notice info" style="margin-top:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>文档文字层在本机读取；扫描件 / 图片可能经第三方 OCR 识别文字后立即丢弃原文。页面只显示片段，不显示完整原文。</span>
+          </div>
+        </div>
+
+        <!-- ── 3 参数 ── -->
+        <div class="panel" data-p="params">
+          <div class="field">
+            <div class="field-label"><b>打印份数</b><span>最多 99 份</span></div>
+            <div class="stepper">
+              <button id="cMinus">−</button><output id="copies">2</output><button id="cPlus">+</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label"><b>色彩模式</b><span>彩色效果以本机耗材状态为准</span></div>
+            <div class="seg" id="segColor">
+              <button class="on" data-v="bw">黑白 0.50 元/页</button>
+              <button data-v="color">彩色 2.00 元/页</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label"><b>单双面</b><span>双面省纸，不影响计费页数</span></div>
+            <div class="seg sm" id="segDuplex">
+              <button data-v="single">单面</button>
+              <button class="on" data-v="long">双面·长边</button>
+              <button data-v="short">双面·短边</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-label"><b>页面方向</b></div>
+            <div class="seg sm"><button class="on">自动</button><button>纵向</button><button>横向</button></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><b>缩放方式</b></div>
+            <div class="seg sm"><button class="on">适合页面</button><button>实际大小</button></div>
+          </div>
+          <div class="field">
+            <div class="field-label"><b>纸张规格</b><span>本机仅支持 A4</span></div>
+            <div class="seg sm"><button class="on">A4（210 × 297 mm）</button></div>
+          </div>
+          <div class="notice info">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            <span><b>参数已按文件内容预设，可随时修改。</b>识别为简历、3 页 A4，因此默认黑白双面 2 份。</span>
+          </div>
+        </div>
+
+        <!-- ── 4 确认 ── -->
+        <div class="panel" data-p="confirm">
+          <div class="frow"><span>文件名称</span><b>李同学-简历.pdf</b></div>
+          <div class="frow"><span>文件页数</span><b>3 页</b></div>
+          <div class="frow"><span>纸张规格</span><b>A4（210 × 297 mm）</b></div>
+          <div class="frow"><span>打印份数</span><b id="cf-copies">2 份</b></div>
+          <div class="frow"><span>色彩模式</span><b id="cf-color">黑白</b></div>
+          <div class="frow"><span>单双面</span><b id="cf-duplex">双面（长边翻转）</b></div>
+          <div class="frow"><span>页面范围</span><b>全部页面</b></div>
+          <div class="frow"><span>总打印面</span><b id="cf-sides">6 面</b></div>
+          <div class="frow"><span>预计用纸</span><b id="cf-sheets">4 张</b></div>
+          <div class="frow"><span>计费方式</span><b id="cf-rate">0.50 元/页 × 3 页 × 2 份</b></div>
+          <div class="notice warn" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span><b>隐私检查摘要：</b><span id="cf-priv">遮挡 2 项，保留 2 项</span>。当前版本尚未生成遮挡后文件，<b>打印仍使用原文件</b>，确认后继续。</span>
+          </div>
+          <div class="notice info" style="margin-top:10px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span>金额以现场公示价为准；实付以收银台显示为准。<b>未支付不出纸。</b></span>
+          </div>
+        </div>
+
+        <!-- ── 5 支付 ── -->
+        <div class="panel" data-p="pay">
+          <div class="frow"><span>订单号</span><b style="font-family:var(--mono);font-size:13.5px">O-20260807-0102</b></div>
+          <div class="frow"><span id="pay-rate-l">黑白打印</span><b id="pay-rate">3.00 元</b></div>
+          <div class="frow"><span>双面附加</span><b>本单不收取 · 0.00 元</b></div>
+
+          <div class="field" style="margin-top:16px">
+            <div class="field-label"><b>支付方式</b><span>先选通道，再选扫码方式</span></div>
+            <div class="seg sm"><button class="on">微信支付</button><button>支付宝</button></div>
+            <div class="seg sm" style="margin-top:8px"><button class="on">屏上收款码</button><button>扫我的付款码</button></div>
+          </div>
+
+          <div class="qr">
+            <svg viewBox="0 0 100 100" aria-label="收款码占位">
+              <rect width="100" height="100" fill="#fff"/>
+              <g fill="#14231f">
+                <rect x="6" y="6" width="24" height="24"/><rect x="12" y="12" width="12" height="12" fill="#fff"/>
+                <rect x="70" y="6" width="24" height="24"/><rect x="76" y="12" width="12" height="12" fill="#fff"/>
+                <rect x="6" y="70" width="24" height="24"/><rect x="12" y="76" width="12" height="12" fill="#fff"/>
+                <rect x="38" y="8" width="6" height="6"/><rect x="50" y="8" width="6" height="6"/><rect x="44" y="16" width="6" height="6"/>
+                <rect x="38" y="26" width="6" height="6"/><rect x="56" y="20" width="6" height="6"/><rect x="8" y="38" width="6" height="6"/>
+                <rect x="20" y="38" width="6" height="6"/><rect x="32" y="38" width="6" height="6"/><rect x="44" y="38" width="6" height="6"/>
+                <rect x="56" y="38" width="6" height="6"/><rect x="68" y="38" width="6" height="6"/><rect x="80" y="38" width="6" height="6"/>
+                <rect x="14" y="50" width="6" height="6"/><rect x="26" y="50" width="6" height="6"/><rect x="44" y="50" width="6" height="6"/>
+                <rect x="62" y="50" width="6" height="6"/><rect x="86" y="50" width="6" height="6"/><rect x="38" y="62" width="6" height="6"/>
+                <rect x="50" y="62" width="6" height="6"/><rect x="68" y="62" width="6" height="6"/><rect x="80" y="62" width="6" height="6"/>
+                <rect x="38" y="74" width="6" height="6"/><rect x="56" y="74" width="6" height="6"/><rect x="74" y="74" width="6" height="6"/>
+                <rect x="44" y="86" width="6" height="6"/><rect x="62" y="86" width="6" height="6"/><rect x="86" y="86" width="6" height="6"/>
+              </g>
+            </svg>
+          </div>
+          <p class="qr-note">请使用微信扫码支付 · 收款码 <b>04:37</b> 后失效</p>
+          <button class="paylink">已支付但未跳转？点此核实支付结果</button>
+
+          <div class="notice info" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>付款码提示待核实时请勿重复扫码，等待系统查单。订单超时未支付将自动关闭，<b>不会扣款</b>。本机不提供自助退款，如需退款请联系现场工作人员。</span>
+          </div>
+        </div>
+
+        <!-- ── 6 打印完成 ── -->
+        <div class="panel" data-p="done">
+          <div class="ring">
+            <svg viewBox="0 0 118 118"><circle class="bg" cx="59" cy="59" r="50"/><circle class="fg" cx="59" cy="59" r="50"/></svg>
+            <b>6/6</b>
+          </div>
+          <div class="pickup">
+            <div class="lbl">取件凭证码</div>
+            <div class="code">Q7X2</div>
+            <p>共 6 面已全部送出，请从出纸口取走并核对页数。<br/>如需现场核验或补打，请向工作人员出示此凭证码。</p>
+          </div>
+          <div style="margin-top:14px">
+            <div class="frow"><span>任务号</span><b style="font-family:var(--mono);font-size:13.5px">P-20260807-0043</b></div>
+            <div class="frow"><span>完成时间</span><b>09:52</b></div>
+            <div class="frow"><span>实付金额</span><b id="dn-paid">3.00 元</b></div>
+            <div class="frow"><span>已存入</span><b>我的 · 打印订单</b></div>
+          </div>
+          <div class="notice warn" style="margin-top:14px">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span><b>缺页、卡纸或质量不佳？</b>凭任务号与取件码可在此反馈，工作人员可协助核验补打。已支付的任务不会因取件失败而丢失。</span>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- 核价条：参数一动就变，付钱前一直看得见 -->
+  <div class="costbar">
+    <div class="cb"><span>文件页数 × 份数</span><b id="k-pages">3 页 × 2 份</b></div>
+    <div class="cb"><span>总打印面</span><b id="k-sides">6 面</b></div>
+    <div class="cb"><span>预计用纸</span><b id="k-sheets">4 张 <span class="cb-save" id="k-save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>双面省 2 张</span></b></div>
+    <div class="cb total"><span>预估金额 · 以现场公示价为准</span><b id="k-total">¥ 3.00</b></div>
+  </div>
+
+  <div class="actionbar">
+    <button class="btn" id="abAlt">返回上一步</button>
+    <span class="ab-note">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span id="abNote">隐私片段只在本机确认，页面不展示完整原文；未支付不出纸。</span>
+    </span>
+    <button class="btn btn-primary" id="abMain">
+      <span>下一步 · 设置参数</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </button>
+  </div>
+
+  <nav class="bottomnav">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>首页</button>
+    <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById('stage');
+  st.style.transform = 'scale(' + s + ')';
+  st.style.height = (1920 * s) + 'px';
+}
+window.addEventListener('resize', fit); fit();
+
+/* ═══ 隐私片段：列表 ↔ 原文双向联动 ═══ */
+var PRIV = [
+  {k:'phone', name:'手机号码', risk:'中风险', tag:'warn', frag:'138****5678', loc:'第 1 页 · 联系方式区域', advise:'mask'},
+  {k:'addr',  name:'家庭住址', risk:'高风险', tag:'risk', frag:'杭州***区**路', loc:'第 1 页 · 基本信息区域', advise:'mask'},
+  {k:'email', name:'电子邮箱', risk:'中风险', tag:'warn', frag:'w***@example.com', loc:'第 1 页 · 联系方式区域', advise:'keep'},
+  {k:'birth', name:'出生日期', risk:'低风险', tag:'ok',   frag:'19**年**月', loc:'第 1 页 · 基本信息区域', advise:'keep'}
+];
+var choice = {};   // k -> 'mask' | 'keep' | undefined
+
+function renderPriv(){
+  var html = PRIV.map(function(p){
+    var c = choice[p.k];
+    return '<div class="pitem" data-k="'+p.k+'">'
+      + '<div class="pitem-top"><b>'+p.name+'</b><span class="tag '+p.tag+'">'+p.risk+'</span></div>'
+      + '<span class="frag">'+p.frag+'</span>'
+      + '<div class="loc">'+p.loc+' · 建议'+(p.advise==='mask'?'遮挡':'确认后保留')+'</div>'
+      + '<div class="seg sm">'
+      +   '<button data-v="mask" class="'+(c==='mask'?'on':'')+'">遮挡</button>'
+      +   '<button data-v="keep" class="'+(c==='keep'?'on keep':'')+'">保留</button>'
+      + '</div></div>';
+  }).join('');
+  document.getElementById('plist').innerHTML = html;
+  bindPriv();
+  syncPriv();
+}
+
+function syncPriv(){
+  PRIV.forEach(function(p){
+    var m = document.querySelector('mark[data-k="'+p.k+'"]');
+    if (m) m.classList.toggle('masked', choice[p.k] === 'mask');
+  });
+  var left = PRIV.filter(function(p){ return !choice[p.k]; }).length;
+  var masked = PRIV.filter(function(p){ return choice[p.k]==='mask'; }).length;
+  var kept = PRIV.filter(function(p){ return choice[p.k]==='keep'; }).length;
+  var pcCard = document.querySelector('.pc.priv');
+  document.getElementById('pcText').innerHTML = left
+    ? '<b>' + left + ' 项</b>待你确认'
+    : '<b>遮挡 ' + masked + ' · 保留 ' + kept + '</b>';
+  pcCard.classList.toggle('todo', left > 0);
+  pcCard.classList.toggle('ok', left === 0);
+  var tag = document.getElementById('railTag');
+  if (document.body.dataset.step === 'check'){
+    tag.className = 'tag ' + (left ? 'todo' : 'ok');
+    tag.textContent = left ? (left + ' 项待确认') : '已确认 · 可继续';
+  }
+  document.getElementById('cf-priv').textContent = '遮挡 ' + masked + ' 项，保留 ' + kept + ' 项';
+  var main = document.getElementById('abMain');
+  if (document.body.dataset.step === 'check') main.disabled = left > 0;
+}
+
+function bindPriv(){
+  document.querySelectorAll('.pitem').forEach(function(el){
+    var k = el.dataset.k;
+    el.addEventListener('click', function(){
+      document.querySelectorAll('.pitem').forEach(function(x){ x.classList.remove('active'); });
+      el.classList.add('active');
+      var m = document.querySelector('mark[data-k="'+k+'"]');
+      if (m){ m.classList.add('hot'); setTimeout(function(){ m.classList.remove('hot'); }, 1100); }
+    });
+    el.querySelectorAll('.seg button').forEach(function(b){
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        choice[k] = b.dataset.v;
+        el.querySelectorAll('.seg button').forEach(function(x){ x.className = ''; });
+        b.className = (b.dataset.v === 'keep') ? 'on keep' : 'on';
+        syncPriv();
+      });
+    });
+  });
+}
+/* 原文点击也能定位到列表项 */
+document.querySelectorAll('mark').forEach(function(m){
+  m.addEventListener('click', function(){
+    var el = document.querySelector('.pitem[data-k="'+m.dataset.k+'"]');
+    if (!el) return;
+    document.querySelectorAll('.pitem').forEach(function(x){ x.classList.remove('active'); });
+    el.classList.add('active');
+    el.scrollIntoView({block:'nearest', behavior:'smooth'});
+  });
+});
+
+/* ═══ 参数 ↔ 核价实时联动 ═══ */
+var P = { pages:3, copies:2, color:'bw', duplex:'long' };
+var RATE = { bw:0.50, color:2.00 };
+
+function calc(){
+  var sides = P.pages * P.copies;
+  var sheets = (P.duplex === 'single') ? sides : Math.ceil(P.pages / 2) * P.copies;
+  var saved = sides - sheets;
+  var total = P.pages * P.copies * RATE[P.color];
+  var colorLabel = (P.color === 'bw') ? '黑白' : '彩色';
+  var duplexLabel = P.duplex === 'single' ? '单面' : (P.duplex === 'long' ? '双面（长边翻转）' : '双面（短边翻转）');
+
+  document.getElementById('copies').textContent = P.copies;
+  document.getElementById('k-pages').textContent  = P.pages + ' 页 × ' + P.copies + ' 份';
+  document.getElementById('k-sides').textContent  = sides + ' 面';
+  document.getElementById('k-sheets').innerHTML   = sheets + ' 张'
+    + (saved > 0 ? ' <span class="cb-save"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>双面省 ' + saved + ' 张</span>' : '');
+  document.getElementById('k-total').textContent  = '¥ ' + total.toFixed(2);
+
+  document.getElementById('cf-copies').textContent = P.copies + ' 份';
+  document.getElementById('cf-color').textContent  = colorLabel;
+  document.getElementById('cf-duplex').textContent = duplexLabel;
+  document.getElementById('cf-sides').textContent  = sides + ' 面';
+  document.getElementById('cf-sheets').textContent = sheets + ' 张' + (saved>0 ? '（双面省 '+saved+' 张）' : '');
+  document.getElementById('cf-rate').textContent   = RATE[P.color].toFixed(2) + ' 元/页 × ' + P.pages + ' 页 × ' + P.copies + ' 份';
+
+  document.getElementById('pay-rate-l').textContent = colorLabel + '打印';
+  document.getElementById('pay-rate').textContent   = total.toFixed(2) + ' 元';
+  document.getElementById('dn-paid').textContent    = total.toFixed(2) + ' 元';
+  if (document.body.dataset.step === 'confirm') setMain('去支付 ¥ ' + total.toFixed(2));
+}
+
+document.getElementById('cPlus').addEventListener('click', function(){ if (P.copies < 99){ P.copies++; calc(); } });
+document.getElementById('cMinus').addEventListener('click', function(){ if (P.copies > 1){ P.copies--; calc(); } });
+document.querySelectorAll('#segColor button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#segColor button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on'); P.color = b.dataset.v; calc();
+  });
+});
+document.querySelectorAll('#segDuplex button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#segDuplex button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on'); P.duplex = b.dataset.v; calc();
+  });
+});
+/* 通用 seg（方向/缩放/纸张/支付方式） */
+document.querySelectorAll('.seg').forEach(function(g){
+  if (g.id === 'segColor' || g.id === 'segDuplex' || g.closest('.pitem')) return;
+  g.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){
+      g.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
+      b.classList.add('on');
+    });
+  });
+});
+
+/* ═══ 预览：缩放与翻页 ═══ */
+document.getElementById('zFit').addEventListener('click', function(){
+  document.getElementById('stageWrap').classList.remove('zoom');
+  this.classList.add('on'); document.getElementById('zBig').classList.remove('on');
+});
+document.getElementById('zBig').addEventListener('click', function(){
+  document.getElementById('stageWrap').classList.add('zoom');
+  this.classList.add('on'); document.getElementById('zFit').classList.remove('on');
+});
+document.querySelectorAll('.thumb').forEach(function(t){
+  t.addEventListener('click', function(){
+    document.querySelectorAll('.thumb').forEach(function(x){ x.classList.remove('on'); });
+    t.classList.add('on');
+    document.getElementById('sheetNo').textContent = '第 ' + t.dataset.p + ' 页 / 共 3 页 · A4';
+  });
+});
+
+/* ═══ 步骤切换 ═══ */
+var STEP = {
+  check:  {title:'打印前材料检查', main:'下一步 · 设置参数', alt:'重新上传',
+           note:'隐私片段只在本机确认，页面不展示完整原文；未支付不出纸。'},
+  params: {title:'打印参数', main:'下一步 · 核对确认', alt:'返回材料检查',
+           note:'参数已按文件内容预设，可随时修改；彩色效果以本机耗材状态为准。'},
+  confirm:{title:'确认打印', main:'去支付 ¥ 3.00', alt:'返回修改',
+           note:'确认后才创建订单；未支付不出纸，超时未支付自动关闭且不扣款。'},
+  pay:    {title:'订单支付', main:'等待支付到账…', alt:'退出支付',
+           note:'支付结果由系统自动确认，本机不代替你确认到账；请勿重复扫码。'},
+  done:   {title:'打印完成', main:'完成 · 返回首页', alt:'再打一份',
+           note:'凭取件码可现场核验或补打；本次订单已存入「我的 · 打印订单」。'}
+};
+function setMain(text){ document.querySelector('#abMain span').textContent = text; }
+
+function goStep(k){
+  document.body.dataset.step = k;
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.toggle('on', p.dataset.p === k); });
+  var order = ['upload','check','params','confirm','pay','done'];
+  var idx = order.indexOf(k);
+  document.querySelectorAll('.step').forEach(function(s){
+    var i = order.indexOf(s.dataset.k);
+    s.classList.toggle('on', i === idx);
+    s.classList.toggle('done', i < idx);
+  });
+  document.querySelectorAll('#panel button').forEach(function(b){ b.classList.toggle('on', b.dataset.s === k); });
+  var c = STEP[k];
+  document.getElementById('railTitle').textContent = c.title;
+  setMain(c.main);
+  document.getElementById('abAlt').textContent = c.alt;
+  document.getElementById('abNote').textContent = c.note;
+
+  var tag = document.getElementById('railTag'), main = document.getElementById('abMain');
+  main.disabled = false;
+  if (k === 'check'){ syncPriv(); }
+  else if (k === 'pay'){
+    tag.className = 'tag todo'; tag.textContent = '待支付';
+    main.disabled = true;              // 不伪造支付成功：到账由系统确认
+  }
+  else if (k === 'done'){ tag.className = 'tag ok'; tag.textContent = '任务已完成'; }
+  else { tag.className = 'tag ok'; tag.textContent = '可继续'; }
+  calc();
+}
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){ goStep(b.dataset.s); });
+});
+document.getElementById('abMain').addEventListener('click', function(){
+  var order = ['check','params','confirm','pay','done'];
+  var i = order.indexOf(document.body.dataset.step);
+  if (i >= 0 && i < order.length - 1) goStep(order[i + 1]);
+});
+document.getElementById('abAlt').addEventListener('click', function(){
+  var order = ['check','params','confirm','pay','done'];
+  var i = order.indexOf(document.body.dataset.step);
+  if (i > 0) goStep(order[i - 1]);
+});
+document.getElementById('bulkAdvise').addEventListener('click', function(){
+  PRIV.forEach(function(p){ choice[p.k] = p.advise; }); renderPriv();
+});
+document.getElementById('bulkKeep').addEventListener('click', function(){
+  PRIV.forEach(function(p){ choice[p.k] = 'keep'; }); renderPriv();
+});
+
+renderPriv();
+calc();
+</script>
+</body>
+</html>

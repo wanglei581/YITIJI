@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>岗位匹配参考 · 比对面 C 型 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   C 型作业面（比对类）· 2026-08-08
+   对应生产页：apps/kiosk/src/pages/resume/JobFitPage.tsx（/resume/job-fit）
+   —— 这是既有页面的视觉与交互升级，**不是 AI 顾问里的新入口**。
+   顾问里的 resume_jd_match 保留为「外部 JD 临时比对」的兜底，两者不重复。
+
+   核心语法：左岗位原文 / 右你的简历，逐条要求双向联动定位 ——
+   与 02-print-workbench 的「隐私片段 ↔ 原文」是同一套交互，全站统一。
+
+   合规硬约束（CLAUDE.md §16 / docs/compliance）：
+   只给三档参考（较高 / 中等 / 偏低），禁止百分比、匹配率、录用概率；
+   详情必须展示来源机构、同步时间、外部 ID；不出现平台内投递。
+   ══════════════════════════════════════════════════════════════ */
+
+.kiosk{background:
+  radial-gradient(900px 460px at 90% -8%,rgba(31,138,116,.055),transparent 62%),
+  var(--paper)}
+.main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ══ 能力条 ══ */
+.taskbar{flex:none;display:flex;align-items:center;gap:16px;padding:16px 40px 12px}
+.taskbar .ic{width:52px;height:52px;flex:none;display:grid;place-items:center;border-radius:14px;
+  color:#fff;background:linear-gradient(160deg,#3d86ad,#2a6288);box-shadow:0 10px 20px rgba(35,85,120,.24)}
+.taskbar .ic svg{width:26px;height:26px}
+.taskbar .tx{flex:1;min-width:0}
+.taskbar .tx h1{font-family:var(--serif);font-size:31px;font-weight:900;color:var(--ink);letter-spacing:-.012em}
+.taskbar .tx p{margin-top:4px;font-size:17px;color:var(--muted)}
+.taskbar .swap{flex:none;min-height:var(--tap);padding:0 18px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+
+.steps{flex:none;display:flex;align-items:center;gap:8px;padding:0 40px 12px}
+.stp{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 15px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:1px solid var(--line-soft);color:var(--muted);font-size:16px}
+.stp b{font:800 13.5px var(--mono);opacity:.6}
+.stp.done{color:var(--teal-deep);background:var(--teal-soft);border-color:var(--teal-line)}
+.stp.on{color:#fff;background:linear-gradient(180deg,#25957d,#136a58);border-color:transparent;font-weight:700}
+.stp.on b{color:#bdf0dd;opacity:.9}
+.steps .ln{flex:1;height:1px;background:var(--line)}
+
+/* ══ 结论条：三档，绝不给百分比 ══ */
+.verdict{flex:none;margin:0 40px 12px;display:flex;align-items:center;gap:20px;
+  padding:16px 22px;background:var(--surface);border:1px solid var(--line);
+  border-left:6px solid var(--teal);border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.lvl{flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;
+  min-width:118px;padding:10px 16px;border-radius:var(--r-m);
+  background:var(--teal-soft);border:1px solid var(--teal-line)}
+.lvl b{font-family:var(--serif);font-size:30px;font-weight:900;color:var(--teal-deep);line-height:1}
+.lvl span{font-size:14.5px;color:var(--teal-deep);opacity:.8}
+.verdict .say{flex:1;min-width:0}
+.verdict .say p{font-family:var(--serif);font-size:24px;font-weight:800;line-height:1.4;color:var(--ink)}
+.verdict .say .sub{margin-top:7px;font-family:var(--sans);font-size:16.5px;font-weight:400;color:var(--muted)}
+.tally{flex:none;display:flex;gap:10px}
+.ty{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:74px;padding:9px 10px;
+  border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--line-soft)}
+.ty b{font-family:var(--serif);font-size:25px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.ty span{font-size:14.5px;color:var(--muted)}
+.ty.ok b{color:var(--teal-deep)}
+.ty.mid b{color:var(--amber)}
+.ty.gap b{color:var(--clay-deep)}
+
+/* ══ 双栏比对 ══ */
+.cmp{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:0 40px}
+.pane{display:flex;flex-direction:column;min-height:0;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.pane-hd{flex:none;display:flex;align-items:center;gap:11px;padding:13px 18px;
+  background:var(--surface-2);border-bottom:1px solid var(--line)}
+.pane-hd .k{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:9px}
+.pane-hd .k svg{width:18px;height:18px}
+.pane-hd.jd .k{color:#2f6f96;background:var(--blue-soft)}
+.pane-hd.me .k{color:var(--teal-deep);background:var(--teal-soft)}
+.pane-hd b{font-size:19px;font-weight:800;color:var(--ink)}
+.pane-hd .meta{margin-left:auto;font-size:15.5px;color:var(--muted);text-align:right;line-height:1.35}
+.pane-bd{flex:1;min-height:0;overflow-y:auto;padding:14px}
+.pane-bd::-webkit-scrollbar{width:0}
+
+/* 左：岗位逐条要求，点一条右边定位 */
+.req{width:100%;display:flex;gap:12px;padding:14px 15px;margin-bottom:10px;text-align:left;
+  cursor:pointer;font-family:var(--sans);border-radius:var(--r-s);
+  background:var(--surface-2);border:1px solid var(--line-soft);
+  transition:background var(--t-fast) var(--e-out),border-color var(--t-fast) var(--e-out)}
+.req:last-child{margin-bottom:0}
+.req .st{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:50%;color:#fff}
+.req .st svg{width:14px;height:14px}
+.req.ok .st{background:var(--teal)}
+.req.mid .st{background:var(--amber)}
+.req.gap .st{background:var(--clay)}
+.req .rt{flex:1;min-width:0}
+.req .rt b{display:block;font-size:18px;font-weight:700;color:var(--ink);line-height:1.45}
+.req .rt .tag{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:4px;
+  font-size:14.5px;font-weight:700}
+.req.ok .tag{color:var(--teal-deep);background:var(--teal-soft)}
+.req.mid .tag{color:#7a5714;background:var(--amber-soft)}
+.req.gap .tag{color:var(--clay-deep);background:var(--clay-soft)}
+.req .rt .adv{margin-top:7px;font-size:16px;line-height:1.5;color:var(--muted)}
+.req.on{background:#fff;border-color:var(--teal);box-shadow:0 0 0 3px rgba(31,138,116,.12)}
+.req:active{transform:translateY(1px)}
+
+/* 右：简历原文，命中句高亮 */
+.doc{font-family:var(--serif);font-size:17px;line-height:1.95;color:var(--ink-2)}
+.doc h4{font-family:var(--sans);font-size:15.5px;font-weight:800;letter-spacing:.1em;
+  color:var(--faint);margin:18px 0 8px}
+.doc h4:first-child{margin-top:0}
+.doc p{margin-bottom:11px}
+.doc .ev{border-radius:3px;padding:1px 2px;transition:background var(--t-base) var(--e-out),
+  box-shadow var(--t-base) var(--e-out)}
+.doc .ev.hit{background:rgba(31,138,116,.16);box-shadow:inset 0 -2px 0 rgba(31,138,116,.5)}
+.doc .ev.pulse{animation:evPulse 1.05s var(--e-out) 2}
+@keyframes evPulse{0%,100%{background:rgba(31,138,116,.16)}
+  50%{background:rgba(31,138,116,.38);box-shadow:0 0 0 4px rgba(31,138,116,.14)}}
+/* 缺口：简历里根本没有的东西，用虚线空位标出来，比什么都不显示诚实 */
+.doc .miss{display:block;margin:10px 0;padding:12px 14px;border-radius:var(--r-s);
+  font-family:var(--sans);font-size:16px;line-height:1.55;color:var(--clay-deep);
+  background:var(--clay-soft);border:1px dashed var(--clay-line)}
+.doc .miss b{font-weight:800}
+
+/* 空态提示条：还没点任何一条要求时 */
+.tip{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:11px 14px;
+  border-radius:var(--r-s);background:var(--blue-soft);border:1px solid var(--blue-line);
+  font-size:16px;color:#2f6f96}
+.tip svg{width:18px;height:18px;flex:none}
+
+/* ══ 来源：CLAUDE.md §10 详情必须展示 ══ */
+.srcbar{flex:none;margin:12px 40px 0;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:12px 20px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m)}
+.srcbar .si{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--muted)}
+.srcbar .si b{color:var(--ink-2);font-weight:700}
+.srcbar .si svg{width:16px;height:16px;opacity:.7}
+.srcbar .ref{margin-left:auto;display:inline-flex;align-items:center;gap:8px;padding:5px 12px;
+  border-radius:var(--r-pill);font-size:15.5px;font-weight:700;
+  color:#7a5714;background:var(--amber-soft);border:1px solid var(--amber-line)}
+
+/* ══ ActionBar ══ */
+.actionbar{flex:none;display:flex;align-items:center;gap:14px;padding:14px 40px;
+  background:var(--surface);border-top:1px solid var(--line)}
+.ab{min-height:var(--tap-main);padding:0 20px;border-radius:var(--r-m);cursor:pointer;white-space:nowrap;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:600 17.5px var(--sans)}
+.ab:active{transform:translateY(1px)}
+.ab-note{flex:1;display:flex;align-items:center;gap:10px;font-size:16px;line-height:1.5;color:var(--muted)}
+.ab-note svg{width:19px;height:19px;flex:none;color:var(--teal-deep)}
+.ab-main{display:inline-flex;align-items:center;justify-content:center;gap:11px;
+  min-height:62px;padding:0 30px;border:0;border-radius:var(--r-m);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#25957d,#12695a);font:700 20px var(--sans);
+  box-shadow:0 12px 26px rgba(19,106,88,.28)}
+.ab-main svg{width:21px;height:21px}
+.ab-main:active{transform:translateY(1px)}
+
+/* ══ 底部导航 ══ */
+.bottomnav{height:116px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);
+  background:linear-gradient(180deg,#153029,#0e211c);border-top:1px solid rgba(255,255,255,.07)}
+.bottomnav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:none;border:0;color:#7fa294;font:600 17px var(--sans);cursor:pointer}
+.bottomnav button svg{width:27px;height:27px}
+.bottomnav button.active{color:#7fdcbe}
+
+/* ══ 态：缺岗位 / 缺简历 ══ */
+.blocked{display:none;flex:1;min-height:0;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;padding:0 70px}
+.blocked .bk{width:84px;height:84px;display:grid;place-items:center;border-radius:24px;
+  color:var(--clay-deep);background:var(--clay-soft);border:1px solid var(--clay-line)}
+.blocked .bk svg{width:42px;height:42px}
+.blocked h2{font-family:var(--serif);font-size:32px;font-weight:800;color:var(--ink);text-align:center}
+.blocked p{max-width:640px;text-align:center;font-size:18px;line-height:1.65;color:var(--muted)}
+.bways{margin-top:4px;display:grid;grid-template-columns:repeat(2,1fr);gap:14px;width:100%;max-width:760px}
+.bw{display:flex;flex-direction:column;gap:7px;padding:20px;text-align:left;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);
+  box-shadow:var(--sh-1);font-family:var(--sans)}
+.bw:active{transform:translateY(2px);box-shadow:none}
+.bw b{font-size:19.5px;font-weight:700;color:var(--ink)}
+.bw span{font-size:16.5px;color:var(--muted);line-height:1.45}
+
+body[data-s="blocked"] .verdict,
+body[data-s="blocked"] .cmp,
+body[data-s="blocked"] .srcbar,
+body[data-s="blocked"] .steps{display:none}
+body[data-s="blocked"] .blocked{display:flex}
+body[data-s="blocked"] .ab-main{background:linear-gradient(180deg,#25957d,#12695a)}
+</style>
+</head>
+<body data-s="result">
+
+<div id="panel">
+  <p>状态切换</p>
+  <button class="on" data-set="result">比对结果</button>
+  <button data-set="blocked">缺简历 / 缺岗位</button>
+  <p style="margin-top:6px">联动</p>
+  <button id="demo">演示：点第 3 条要求</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <button class="topbar-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        返回
+      </button>
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5"/><path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5"/>
+            <path d="M16 4.5V9h5"/><rect x="4.5" y="12.5" width="19" height="7" rx="1.6"/>
+            <path d="M9 19.5h10v4H9z"/><circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <div><strong>职易达</strong><span>AI 求职打印服务终端</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">10:18</span>
+      <span class="device"><i></i>打印机在线</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="taskbar">
+      <span class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M9 12h6"/></svg>
+      </span>
+      <span class="tx">
+        <h1>岗位匹配参考</h1>
+        <p>拿你的简历逐条比这个岗位的要求。只给参考等级，不打分、不算百分比、更不预测录用结果。</p>
+      </span>
+      <button class="swap">换个岗位比</button>
+    </section>
+
+    <div class="steps">
+      <span class="stp done"><b>01</b>选岗位</span>
+      <span class="ln"></span>
+      <span class="stp done"><b>02</b>选简历</span>
+      <span class="ln"></span>
+      <span class="stp on"><b>03</b>逐条比对</span>
+      <span class="ln"></span>
+      <span class="stp"><b>04</b>带走</span>
+    </div>
+
+    <!-- ══ 结论：三档 ══ -->
+    <section class="verdict">
+      <span class="lvl">
+        <b>较高</b>
+        <span>参考等级</span>
+      </span>
+      <span class="say">
+        <p>八条要求里对上五条，两条差一点，一条完全没写。</p>
+        <span class="sub">这只是拿文字比文字的参考，招聘方怎么看是另一回事。点左边任意一条，右边会定位到简历里对应的句子。</span>
+      </span>
+      <span class="tally">
+        <span class="ty ok"><b>5</b><span>对上了</span></span>
+        <span class="ty mid"><b>2</b><span>差一点</span></span>
+        <span class="ty gap"><b>1</b><span>没写到</span></span>
+      </span>
+    </section>
+
+    <!-- ══ 双栏 ══ -->
+    <section class="cmp">
+
+      <!-- 左：岗位原文逐条 -->
+      <div class="pane">
+        <div class="pane-hd jd">
+          <span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+          <b>岗位要求 · 逐条</b>
+          <span class="meta">产品运营 · 星野科技<br>共 8 条</span>
+        </div>
+        <div class="pane-bd" id="reqs">
+
+          <button class="req ok" data-ev="e1">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span class="rt">
+              <b>本科及以上学历，市场营销 / 工商管理等相关专业</b>
+              <span class="tag">对上了</span>
+            </span>
+          </button>
+
+          <button class="req ok" data-ev="e2">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span class="rt">
+              <b>一年以上用户运营或活动运营经验，应届优秀者可放宽</b>
+              <span class="tag">对上了</span>
+            </span>
+          </button>
+
+          <button class="req gap" data-ev="miss1">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+            <span class="rt">
+              <b>具备数据分析能力，熟练使用 SQL 或同类工具取数</b>
+              <span class="tag">简历里没写到</span>
+              <span class="adv">你简历技能栏写了「SQL / Excel 数据透视」，但没有一句话说明你用它做过什么。补一句「用 SQL 拉过活动前后留存数据」就能对上。</span>
+            </span>
+          </button>
+
+          <button class="req mid" data-ev="e3">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></span>
+            <span class="rt">
+              <b>有跨部门协作推动项目落地的经验</b>
+              <span class="tag">差一点</span>
+              <span class="adv">你写了「配合团队完成活动复盘」，但没写清跨了哪些部门、你在其中推动了什么。</span>
+            </span>
+          </button>
+
+          <button class="req ok" data-ev="e4">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span class="rt">
+              <b>能独立策划并执行线上线下活动</b>
+              <span class="tag">对上了</span>
+            </span>
+          </button>
+
+          <button class="req mid" data-ev="e5">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12h14"/></svg></span>
+            <span class="rt">
+              <b>有内容运营或新媒体运营相关经历</b>
+              <span class="tag">差一点</span>
+              <span class="adv">有一段内容运营实习，但只写了职责，没写做出什么结果。</span>
+            </span>
+          </button>
+
+          <button class="req ok" data-ev="e6">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span class="rt">
+              <b>文字表达清晰，能独立撰写活动方案与复盘报告</b>
+              <span class="tag">对上了</span>
+            </span>
+          </button>
+
+          <button class="req ok" data-ev="e7">
+            <span class="st"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            <span class="rt">
+              <b>英语 CET-4 以上</b>
+              <span class="tag">对上了</span>
+            </span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- 右：简历原文 -->
+      <div class="pane">
+        <div class="pane-hd me">
+          <span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+          <b>你的简历 v4</b>
+          <span class="meta">08-07 生成 · 2 页</span>
+        </div>
+        <div class="pane-bd">
+          <div class="tip" id="tip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+            点左边任意一条要求，这里会定位到对应的原文
+          </div>
+          <div class="doc" id="doc">
+            <h4>教育背景</h4>
+            <p><span class="ev" id="e1">某某大学　工商管理（本科）　2022.09–2026.06　连续三年专业前 15%</span></p>
+
+            <h4>实习经历</h4>
+            <p><span class="ev" id="e2">某科技公司 · 产品运营实习生（2025.07–2025.12）</span>：<span class="ev" id="e4">负责用户增长活动的策划与执行</span>，<span class="ev" id="e3">配合团队完成活动复盘</span>。</p>
+            <p><span class="ev" id="e5">某电商平台 · 内容运营实习生（2025.02–2025.06）</span>：负责站内话题运营与素材排期，参与两次大促专题落地。</p>
+
+            <h4>校园实践</h4>
+            <p>学生会宣传部 · 部长（2023.09–2025.06）：<span class="ev" id="e4b">统筹校级活动宣传，带领 8 人小组完成年度品牌视觉改版</span>。</p>
+            <p><span class="ev" id="e6">独立撰写并提交活动方案 6 份、复盘报告 4 份</span>。</p>
+
+            <h4>技能与证书</h4>
+            <p><span class="ev" id="e7">CET-6：普通话二甲</span>　·　SQL / Excel 数据透视 / Figma</p>
+
+            <span class="miss" id="miss1">
+              <b>这里缺一句。</b>技能栏虽然写了 SQL，但整份简历没有一句话说明你用它做过什么。
+              岗位明确要求「熟练使用 SQL 或同类工具取数」，招聘方看不到证据。
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ══ 来源：合规必须展示 ══ -->
+    <div class="srcbar">
+      <span class="si">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
+        来源机构 <b>市人社局公共招聘网</b>
+      </span>
+      <span class="si">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg>
+        同步时间 <b>08-08 06:30</b>
+      </span>
+      <span class="si">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 12h8"/></svg>
+        外部 ID <b>RS-2026-081142</b>
+      </span>
+      <span class="ref">按岗位原文逐条比对，结论仅供参考</span>
+    </div>
+
+    <!-- ══ 缺料态 ══ -->
+    <section class="blocked">
+      <span class="bk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
+      </span>
+      <h2>要比对，得先有这两样</h2>
+      <p>一份能读的简历，加一个具体岗位。少任何一样都比不了 —— 机器不会拿模板简历或者泛泛的岗位描述凑一份结果给你。</p>
+      <div class="bways">
+        <button class="bw">
+          <b>先给一份简历</b>
+          <span>上传、手机扫码传、或者把纸质的放进送稿器扫进来</span>
+        </button>
+        <button class="bw">
+          <b>再挑一个岗位</b>
+          <span>从本机同步过来的岗位里选。手上有外部 JD 的话，去 AI 顾问做临时比对</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ══ ActionBar ══ -->
+    <div class="actionbar">
+      <button class="ab">存进我的文档</button>
+      <button class="ab">打印这份对照表</button>
+      <span class="ab-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        比对在本机发起，内容发到 AI 服务处理后即删。投递请到来源平台自己完成，这台机器不代办。
+      </span>
+      <button class="ab-main">
+        按这 3 条改简历
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="bottomnav">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>首页</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  document.getElementById('stage').style.transform = 'scale(' + s + ')';
+}
+addEventListener('resize', fit); fit();
+
+// ── 双向联动：点左边一条要求 → 右边定位并高亮对应原文 ──
+// 与 02-print-workbench 的「隐私片段 ↔ 原文」是同一套交互，全站一种长相。
+var reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+function clearHits(){
+  document.querySelectorAll('#doc .ev.hit,#doc .ev.pulse').forEach(function(n){
+    n.classList.remove('hit','pulse');
+  });
+  document.querySelectorAll('#doc .miss').forEach(function(n){ n.style.outline = ''; });
+}
+
+document.querySelectorAll('#reqs .req').forEach(function(btn){
+  btn.onclick = function(){
+    document.querySelectorAll('#reqs .req').forEach(function(x){ x.classList.remove('on') });
+    btn.classList.add('on');
+    clearHits();
+
+    var tip = document.getElementById('tip'); if (tip) tip.remove();
+
+    var key = btn.dataset.ev;
+    // e4 在简历里有两处证据，一起点亮 —— 不能只亮一处让人以为只有一句
+    var ids = key === 'e4' ? ['e4', 'e4b'] : [key];
+    var first = null;
+    ids.forEach(function(id){
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (!first) first = el;
+      if (el.classList.contains('miss')) { el.style.outline = '2px solid var(--clay)'; }
+      else { el.classList.add('hit'); if (!reduce) el.classList.add('pulse'); }
+    });
+    if (first) first.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  };
+});
+
+// 演示按钮（预览用，生产不存在）
+document.getElementById('demo').onclick = function(){
+  document.querySelectorAll('#reqs .req')[2].click();
+};
+
+document.querySelectorAll('#panel [data-set]').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#panel [data-set]').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    document.body.dataset.s = b.dataset.set;
+  };
+});
+</script>
+</body>
+</html>

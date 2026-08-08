@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>AI 顾问 · 作业面 B 型（要素卡 → 产出）· 1080×1920</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   AI 顾问作业面 · B 型（填槽类）· 2026-08-08
+   适用：自我介绍生成 / 求职信生成 / 材料准备清单
+   本样张以「求职信生成」为例。
+
+   核心范式：AI 预填，用户只确认和补空 —— 不是让站着的人打五段字。
+   每个槽位必须标明这条是从哪来的（说明书 §4.2 证据分级 + §5.2 预填的诚实表达）。
+   AI 永远不替用户按下不可逆的按钮：写信可以自动，打印必须本人确认。
+
+   五态：补要素 → 生成中 → 产出 → 改一版 → 缺料兜底
+   ══════════════════════════════════════════════════════════════ */
+
+.kiosk{background:
+  radial-gradient(900px 460px at 90% -8%,rgba(31,138,116,.055),transparent 62%),
+  var(--paper)}
+.main{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+
+/* ══ 能力标题条：你正在用哪个 AI，它会给你什么 ══ */
+.taskbar{flex:none;display:flex;align-items:center;gap:18px;padding:18px 40px 16px}
+.taskbar .ic{width:56px;height:56px;flex:none;display:grid;place-items:center;border-radius:15px;
+  color:#fff;background:linear-gradient(160deg,#c9834f,#a85c30);box-shadow:0 10px 22px rgba(150,80,40,.26)}
+.taskbar .ic svg{width:28px;height:28px}
+.taskbar .tx{flex:1;min-width:0}
+.taskbar .tx h1{font-family:var(--serif);font-size:34px;font-weight:900;color:var(--ink);letter-spacing:-.012em}
+.taskbar .tx p{margin-top:5px;font-size:17.5px;color:var(--muted)}
+.taskbar .swap{flex:none;min-height:var(--tap);padding:0 20px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+
+/* 四步进度：全站同一套语法 */
+.steps{flex:none;display:flex;align-items:center;gap:9px;padding:0 40px 16px}
+.stp{display:inline-flex;align-items:center;gap:9px;height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:1px solid var(--line-soft);color:var(--muted);font-size:16.5px}
+.stp b{font:800 14px var(--mono);opacity:.6}
+.stp.done{color:var(--teal-deep);background:var(--teal-soft);border-color:var(--teal-line)}
+.stp.on{color:#fff;background:linear-gradient(180deg,#25957d,#136a58);border-color:transparent;font-weight:700}
+.stp.on b{color:#bdf0dd;opacity:.9}
+.steps .ln{flex:1;height:1px;background:var(--line)}
+
+/* ══════════ 态 1：要素卡 ══════════ */
+.slots{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;padding:0 40px;overflow-y:auto}
+.slots::-webkit-scrollbar{width:0}
+
+/* 小青的开场：说清它已经替你做了什么 */
+.prefill{display:flex;align-items:flex-start;gap:14px;padding:16px 20px;border-radius:var(--r-m);
+  background:var(--teal-soft);border:1px solid var(--teal-line)}
+.prefill .face{width:42px;height:42px;flex:none;border-radius:50%;overflow:hidden}
+.prefill .face img{width:100%;height:100%;object-fit:cover;display:block}
+.prefill p{flex:1;font-size:18px;line-height:1.58;color:var(--teal-deep)}
+.prefill p b{font-weight:800}
+
+.slot{position:relative;display:flex;align-items:flex-start;gap:16px;padding:18px 20px 18px 22px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.slot::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:var(--r-m) 0 0 var(--r-m);
+  background:var(--teal)}
+.slot.need::before{background:var(--clay)}
+.slot .no{width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:50%;
+  font:800 15px var(--mono);color:var(--muted);background:var(--surface-3)}
+.slot .bd{flex:1;min-width:0}
+.slot .lb{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.slot .lb b{font-size:19px;font-weight:700;color:var(--ink-2)}
+.slot .req{padding:2px 8px;border-radius:4px;font-size:14.5px;font-weight:700;
+  color:var(--clay-deep);background:var(--clay-soft)}
+/* 来源标注：这条是机器读来的还是你说的，必须写清楚 */
+.src{display:inline-flex;align-items:center;gap:7px;padding:3px 10px;border-radius:4px;
+  font-size:15px;font-weight:700}
+.src svg{width:14px;height:14px}
+.src.mine{color:var(--teal-deep);background:var(--teal-soft)}
+.src.said{color:#2f6f96;background:var(--blue-soft)}
+.src.none{color:var(--clay-deep);background:var(--clay-soft)}
+.slot .val{margin-top:10px;font-family:var(--serif);font-size:25px;font-weight:800;color:var(--ink);
+  line-height:1.42}
+.slot .val.empty{font-family:var(--sans);font-size:19px;font-weight:400;color:var(--faint)}
+.slot .hint{margin-top:8px;font-size:16.5px;line-height:1.5;color:var(--muted)}
+.slot .edit{flex:none;min-height:var(--tap);padding:0 20px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:600 16.5px var(--sans)}
+.slot.need .edit{color:#fff;background:linear-gradient(180deg,#c17c4e,#a85c30);border-color:transparent;
+  font-weight:700;box-shadow:0 8px 18px rgba(150,80,40,.24)}
+.slot:active{transform:none}
+
+/* 候选项：从你自己的材料里挑，比让你现想快得多 */
+.picks{margin-top:13px;display:flex;gap:10px;flex-wrap:wrap}
+.pick{min-height:var(--tap);padding:0 18px;border-radius:var(--r-pill);cursor:pointer;text-align:left;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:400 17px var(--sans)}
+.pick.on{color:#fff;background:linear-gradient(180deg,#25957d,#136a58);border-color:transparent;font-weight:700}
+.pick.self{color:var(--muted);border-style:dashed}
+
+/* ══════════ 态 2：生成中 ══════════ */
+.gen{display:none;flex:1;min-height:0;flex-direction:column;align-items:center;justify-content:center;
+  gap:26px;padding:0 60px}
+.gen .orb{position:relative;width:150px;height:150px}
+.gen .orb i{position:absolute;inset:0;border-radius:50%;border:2px solid transparent;
+  border-top-color:var(--teal);animation:spin 1.15s linear infinite}
+.gen .orb i:nth-child(2){inset:16px;border-top-color:transparent;border-right-color:var(--clay);
+  animation-duration:1.7s;animation-direction:reverse}
+.gen .orb i:nth-child(3){inset:32px;border-top-color:transparent;border-left-color:#2f6f96;
+  animation-duration:2.3s}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gen .orb b{position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--serif);font-size:34px;font-weight:900;color:var(--teal-deep)}
+.gen h2{font-family:var(--serif);font-size:32px;font-weight:800;color:var(--ink)}
+.genlog{width:520px;display:flex;flex-direction:column;gap:11px}
+.gl{display:flex;align-items:center;gap:13px;padding:13px 18px;border-radius:var(--r-m);
+  background:var(--surface);border:1px solid var(--line);font-size:17.5px;color:var(--muted)}
+.gl .k{width:22px;height:22px;flex:none;display:grid;place-items:center;border-radius:50%;
+  background:var(--surface-3);color:var(--faint)}
+.gl .k svg{width:13px;height:13px}
+.gl.done{color:var(--ink-2)}
+.gl.done .k{background:var(--teal);color:#fff}
+.gl.now{color:var(--ink);border-color:var(--teal-line);background:var(--teal-soft)}
+.gl.now .k{background:var(--teal);color:#fff;animation:pulse2 1.4s var(--e-out) infinite}
+@keyframes pulse2{0%,100%{box-shadow:0 0 0 0 rgba(31,138,116,.4)}70%{box-shadow:0 0 0 8px rgba(31,138,116,0)}}
+.gen .cancel{min-height:var(--tap);padding:0 24px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--muted);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+
+/* ══════════ 态 3：产出面 ══════════ */
+.out{display:none;flex:1;min-height:0;gap:16px;padding:0 40px;overflow:hidden}
+/* 文件预览占主体 55–65%（说明书 §7.3） */
+.sheetwrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.sheetbar{flex:none;display:flex;align-items:center;gap:12px}
+.sheetbar .fn{flex:1;font-size:18px;color:var(--ink-2)}
+.sheetbar .fn b{font-weight:700}
+.zoom{display:flex;gap:8px}
+.zoom button{min-height:var(--tap);padding:0 16px;border-radius:var(--r-s);cursor:pointer;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+.zoom button.on{color:#fff;background:var(--teal);border-color:transparent}
+.sheet{flex:1;min-height:0;overflow-y:auto;background:var(--surface-3);border-radius:var(--r-m);
+  padding:22px;display:flex;justify-content:center}
+.sheet::-webkit-scrollbar{width:0}
+.a4{width:100%;max-width:520px;background:#fff;border-radius:3px;padding:52px 54px;
+  box-shadow:0 14px 34px rgba(60,48,28,.16);font-family:var(--serif);color:#1a1a1a}
+.a4 .to{font-size:17px;color:#444;line-height:1.9}
+.a4 h3{margin:22px 0 16px;font-size:22px;font-weight:800}
+.a4 p{font-size:16.5px;line-height:2.05;margin-bottom:15px;text-align:justify}
+.a4 mark{background:rgba(31,138,116,.14);box-shadow:inset 0 -1.5px 0 rgba(31,138,116,.4);
+  color:inherit;padding:0 1px;border-radius:2px}
+.a4 .sign{margin-top:26px;text-align:right;font-size:16.5px;line-height:2}
+.a4 .pg{margin-top:30px;padding-top:12px;border-top:1px solid #eae6dc;
+  text-align:center;font-family:var(--sans);font-size:13.5px;color:#9a958a}
+
+/* 溯源侧栏：这封信里每句话是从哪来的，点一条高亮原文 */
+.trace{flex:none;width:330px;display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.trace::-webkit-scrollbar{width:0}
+.tcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);overflow:hidden}
+.tcard .h{display:flex;align-items:center;gap:10px;padding:13px 17px;background:var(--surface-2);
+  border-bottom:1px solid var(--line);font-size:17px;font-weight:800;color:var(--ink)}
+.tcard .h svg{width:18px;height:18px;color:var(--teal-deep)}
+.tcard .b{padding:14px 17px;display:flex;flex-direction:column;gap:11px}
+.tr{display:flex;flex-direction:column;gap:5px;padding:11px 13px;border-radius:var(--r-s);cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line-soft);text-align:left;font-family:var(--sans)}
+.tr:active{background:var(--teal-soft);border-color:var(--teal-line)}
+.tr .k{display:inline-flex;align-items:center;gap:7px;font-size:15px;font-weight:700;color:var(--teal-deep)}
+.tr .k svg{width:16px;height:16px;flex:none}
+.tr .v{font-size:16.5px;line-height:1.5;color:var(--ink-2)}
+.meta{display:flex;flex-direction:column;gap:9px;padding:14px 17px}
+.mrow{display:flex;align-items:baseline;justify-content:space-between;font-size:16.5px;color:var(--muted)}
+.mrow b{font-family:var(--serif);font-size:20px;font-weight:800;color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.warnbox{display:flex;gap:11px;padding:14px 16px;border-radius:var(--r-m);
+  background:var(--amber-soft);border:1px solid var(--amber-line);color:#7a5714;
+  font-size:16px;line-height:1.55}
+.warnbox svg{width:19px;height:19px;flex:none;margin-top:2px}
+
+/* ══════════ 态 4：改一版 ══════════ */
+.revise{display:none;position:absolute;left:0;right:0;bottom:0;z-index:15;
+  padding:26px 40px 28px;background:var(--surface);
+  border-top:1px solid var(--line);border-radius:var(--r-l) var(--r-l) 0 0;
+  box-shadow:0 -18px 44px rgba(42,34,20,.14);animation:sheetUp .3s var(--e-out) both}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:none}}
+.revise h3{font-family:var(--serif);font-size:26px;font-weight:800;color:var(--ink)}
+.revise p{margin-top:8px;font-size:17px;color:var(--muted)}
+.rgrid{margin-top:18px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.rb{display:flex;flex-direction:column;gap:5px;padding:16px 18px;text-align:left;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m);font-family:var(--sans)}
+.rb:active{background:var(--teal-soft);border-color:var(--teal-line)}
+.rb b{font-size:19px;font-weight:700;color:var(--ink)}
+.rb span{font-size:16px;color:var(--muted);line-height:1.45}
+.rfoot{margin-top:16px;display:flex;gap:12px;align-items:center}
+.rsay{flex:1;display:flex;align-items:center;min-height:var(--tap-main);padding:0 20px;
+  background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m);
+  font-size:18px;color:var(--faint)}
+.rclose{min-height:var(--tap-main);padding:0 26px;border-radius:var(--r-m);cursor:pointer;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 18px var(--sans)}
+
+/* ══════════ 态 5：缺料兜底 ══════════ */
+.missing{display:none;flex:1;min-height:0;flex-direction:column;align-items:center;justify-content:center;
+  gap:22px;padding:0 70px}
+.missing .mk{width:88px;height:88px;display:grid;place-items:center;border-radius:26px;
+  color:var(--clay-deep);background:var(--clay-soft);border:1px solid var(--clay-line)}
+.missing .mk svg{width:44px;height:44px}
+.missing h2{font-family:var(--serif);font-size:34px;font-weight:800;color:var(--ink);text-align:center}
+.missing p{max-width:640px;text-align:center;font-size:18.5px;line-height:1.65;color:var(--muted)}
+.mways{margin-top:6px;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:840px}
+.mw{display:flex;flex-direction:column;gap:8px;padding:20px;text-align:left;cursor:pointer;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);
+  box-shadow:var(--sh-1);font-family:var(--sans)}
+.mw:active{transform:translateY(2px);box-shadow:none}
+.mw .i{width:38px;height:38px;display:grid;place-items:center;border-radius:11px;
+  color:var(--teal-deep);background:var(--teal-soft)}
+.mw .i svg{width:20px;height:20px}
+.mw b{font-size:19.5px;font-weight:700;color:var(--ink)}
+.mw span{font-size:16.5px;color:var(--muted);line-height:1.45}
+
+/* ══ ActionBar：全站同一位置，主按钮恒定右下 ══ */
+.actionbar{flex:none;display:flex;align-items:center;gap:16px;padding:16px 40px;
+  background:var(--surface);border-top:1px solid var(--line)}
+.ab-l{display:flex;gap:12px}
+.ab{min-height:var(--tap-main);padding:0 22px;border-radius:var(--r-m);cursor:pointer;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:600 18px var(--sans)}
+.ab:active{transform:translateY(1px)}
+.ab-note{flex:1;display:flex;align-items:center;gap:10px;font-size:16px;line-height:1.5;color:var(--muted)}
+.ab-note svg{width:19px;height:19px;flex:none;color:var(--teal-deep)}
+.ab-main{display:inline-flex;align-items:center;justify-content:center;gap:11px;
+  min-height:64px;padding:0 32px;border:0;border-radius:var(--r-m);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#25957d,#12695a);font:700 21px var(--sans);
+  box-shadow:0 12px 26px rgba(19,106,88,.28)}
+.ab-main svg{width:22px;height:22px}
+.ab-main:disabled{cursor:not-allowed;background:linear-gradient(180deg,#a8b3ad,#8d9a94);box-shadow:none}
+.ab-main:active:not(:disabled){transform:translateY(1px)}
+
+/* ══ 底部导航 ══ */
+.bottomnav{height:116px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);
+  background:linear-gradient(180deg,#153029,#0e211c);border-top:1px solid rgba(255,255,255,.07)}
+.bottomnav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:none;border:0;color:#7fa294;font:600 17px var(--sans);cursor:pointer}
+.bottomnav button svg{width:27px;height:27px}
+.bottomnav button.active{color:#7fdcbe}
+
+/* ══════════ 态切换 ══════════ */
+body[data-s="gen"] .slots,
+body[data-s="out"] .slots,
+body[data-s="revise"] .slots,
+body[data-s="missing"] .slots{display:none}
+body[data-s="gen"] .gen{display:flex}
+body[data-s="out"] .out,
+body[data-s="revise"] .out{display:flex}
+body[data-s="revise"] .revise{display:block}
+body[data-s="missing"] .missing{display:flex}
+body[data-s="missing"] .steps,
+body[data-s="gen"] .actionbar{display:none}
+
+/* 上一封记录 */
+.prev{display:flex;align-items:center;gap:16px;padding:16px 20px;margin-top:2px;
+  background:var(--surface-2);border:1px dashed var(--line);border-radius:var(--r-m)}
+.prev .pi{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:11px;
+  color:var(--muted);background:var(--surface-3)}
+.prev .pi svg{width:21px;height:21px}
+.prev .ptx{flex:1;min-width:0}
+.prev .ptx b{display:block;font-size:19px;font-weight:700;color:var(--ink-2)}
+.prev .ptx span{display:block;margin-top:3px;font-size:16.5px;color:var(--muted)}
+.prev .pacts{flex:none;display:flex;gap:10px}
+.pb{min-height:var(--tap);padding:0 18px;border-radius:var(--r-s);cursor:pointer;white-space:nowrap;
+  color:var(--ink-2);background:var(--surface);border:1px solid var(--line);font:600 16.5px var(--sans)}
+.pb:active{transform:translateY(1px);background:var(--surface-3)}
+</style>
+</head>
+<body data-s="slots">
+
+<div id="panel">
+  <p>状态切换</p>
+  <button class="on" data-set="slots">1 补要素</button>
+  <button data-set="gen">2 生成中</button>
+  <button data-set="out">3 产出</button>
+  <button data-set="revise">4 改一版</button>
+  <button data-set="missing">缺料兜底</button>
+  <p style="margin-top:6px">要素卡</p>
+  <button id="fillAll">把两个空填上</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <button class="topbar-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        返回 AI 顾问
+      </button>
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5"/><path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5"/>
+            <path d="M16 4.5V9h5"/><rect x="4.5" y="12.5" width="19" height="7" rx="1.6"/>
+            <path d="M9 19.5h10v4H9z"/><circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <div><strong>职易达</strong><span>AI 求职打印服务终端</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">10:03</span>
+      <span class="device"><i></i>打印机在线</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ══ 能力标题条 ══ -->
+    <section class="taskbar">
+      <span class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 6 10-6"/></svg>
+      </span>
+      <span class="tx">
+        <h1>求职信生成</h1>
+        <p>300–500 字，写完能直接在这台机器打印带走。内容仅供参考，投出去之前请自己再看一遍。</p>
+      </span>
+      <button class="swap">换一件事做</button>
+    </section>
+
+    <div class="steps">
+      <span class="stp done"><b>01</b>选能力</span>
+      <span class="ln"></span>
+      <span class="stp on" id="s2"><b>02</b>补要素</span>
+      <span class="ln"></span>
+      <span class="stp" id="s3"><b>03</b>生成</span>
+      <span class="ln"></span>
+      <span class="stp" id="s4"><b>04</b>带走</span>
+    </div>
+
+    <!-- ══════════ 态 1：要素卡 ══════════ -->
+    <section class="slots">
+
+      <div class="prefill">
+        <span class="face"><img src="assets/advisor-face.jpg" alt=""></span>
+        <p>写这封信要四样东西。<b>其中两样我从你这台机器上的材料里读到了，已经填好</b>，你看看对不对。剩下两样得你说一下 —— 缺了它们信写不准。</p>
+      </div>
+
+      <!-- 缺：必须用户提供 -->
+      <div class="slot need">
+        <span class="no">1</span>
+        <div class="bd">
+          <div class="lb">
+            <b>写给哪家公司</b>
+            <span class="req">必填</span>
+            <span class="src none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+              还没有
+            </span>
+          </div>
+          <p class="val empty" id="v1">公司名称会写进信的抬头和结尾，不能瞎编</p>
+          <p class="hint">可以直接说公司名，也可以从你看过的岗位里挑一个。</p>
+          <div class="picks" id="p1">
+            <button class="pick">从我看过的岗位里挑</button>
+            <button class="pick self">我自己说一个</button>
+          </div>
+        </div>
+        <button class="edit">去填</button>
+      </div>
+
+      <!-- 已预填：来自本人材料 -->
+      <div class="slot">
+        <span class="no">2</span>
+        <div class="bd">
+          <div class="lb">
+            <b>目标岗位</b>
+            <span class="src mine">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              读自你 09:44 那次岗位匹配
+            </span>
+          </div>
+          <p class="val">产品运营</p>
+          <p class="hint">不对的话改一下，信里的措辞会跟着变。</p>
+        </div>
+        <button class="edit">改</button>
+      </div>
+
+      <!-- 已预填：来自本人简历 -->
+      <div class="slot">
+        <span class="no">3</span>
+        <div class="bd">
+          <div class="lb">
+            <b>可以写进去的经历</b>
+            <span class="src mine">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+              读自你的简历 v4
+            </span>
+          </div>
+          <p class="val">2 段运营实习 + 1 个校园项目</p>
+          <p class="hint">信里最多写两段，写太多反而没重点。要指定写哪两段可以点「改」。</p>
+        </div>
+        <button class="edit">改</button>
+      </div>
+
+      <!-- 缺：给候选，不让人现想 -->
+      <div class="slot need">
+        <span class="no">4</span>
+        <div class="bd">
+          <div class="lb">
+            <b>最想让对方看到你哪一点</b>
+            <span class="req">必填</span>
+            <span class="src none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+              还没有
+            </span>
+          </div>
+          <p class="val empty" id="v4">这一句会写成信的第一段，决定对方看不看得下去</p>
+          <p class="hint">下面三个是我从你简历里挑出来的，选一个就行；都不合适就自己说。</p>
+          <div class="picks" id="p4">
+            <button class="pick">带过一次从 0 到 1 的活动</button>
+            <button class="pick">数据复盘做得比同组细</button>
+            <button class="pick">跨部门推过一个上线项目</button>
+            <button class="pick self">我自己说</button>
+          </div>
+        </div>
+        <button class="edit">去选</button>
+      </div>
+
+      <!-- 上一封：别让人重做已经做过的事 -->
+      <div class="prev">
+        <span class="pi">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        </span>
+        <span class="ptx">
+          <b>你 08-05 在这里写过一封</b>
+          <span>给「云和数据」的产品运营岗 · 412 字 · 存在我的文档里</span>
+        </span>
+        <span class="pacts">
+          <button class="pb">看那一封</button>
+          <button class="pb">拿它改成这家公司的</button>
+        </span>
+      </div>
+
+    </section>
+
+    <!-- ══════════ 态 2：生成中 ══════════ -->
+    <section class="gen">
+      <div class="orb"><i></i><i></i><i></i><b>青</b></div>
+      <h2>小青在写这封信</h2>
+      <div class="genlog">
+        <div class="gl done"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>读你简历里那两段运营实习</div>
+        <div class="gl done"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg></span>按「产品运营」这个岗位调措辞</div>
+        <div class="gl now"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14"/></svg></span>压到 400 字左右，去掉套话</div>
+        <div class="gl"><span class="k"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14"/></svg></span>排成 A4 一页，留出签名位置</div>
+      </div>
+      <button class="cancel">不写了，退出</button>
+    </section>
+
+    <!-- ══════════ 态 3：产出面 ══════════ -->
+    <section class="out">
+      <div class="sheetwrap">
+        <div class="sheetbar">
+          <span class="fn"><b>求职信 · 星野科技 产品运营</b> · 1 页 · A4</span>
+          <span class="zoom">
+            <button class="on">适应页面</button>
+            <button>放大</button>
+          </span>
+        </div>
+        <div class="sheet">
+          <div class="a4">
+            <p class="to">星野科技有限公司 人力资源部：</p>
+            <h3>关于应聘「产品运营」岗位</h3>
+            <p>您好。我是李同学，从贵司在市人社局招聘专区发布的岗位信息中看到这个职位，想争取一次面谈的机会。</p>
+            <p><mark>去年我在校内做过一次从零开始的活动运营</mark>：没有预算、没有现成渠道，我从选题、拉赞助到现场执行全程跟下来，最后参与人数是往届的两倍多。这段经历让我知道，运营不是把方案写漂亮，而是把每一个卡住的环节一个个推开。</p>
+            <p>后来在<mark>两段互联网公司的运营实习</mark>里，我主要负责用户增长活动的策划与落地。我习惯在每次活动结束后把数据拆开看——哪一步流失最多、哪个渠道的人留得住，再把结论写成下一次的改法。带我的同事说，我的复盘比同组其他人细。</p>
+            <p>贵司这个岗位提到需要数据分析能力和跨部门协作经验，这两点正好是我这段时间练得最多的部分。如果有机会，我希望能当面聊聊我能为团队做些什么。</p>
+            <p>感谢您抽时间读完这封信。</p>
+            <p class="sign">李同学<br>2026 年 8 月 8 日</p>
+            <div class="pg">第 1 页 / 共 1 页 · A4</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="trace">
+        <div class="tcard">
+          <div class="h">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            这封信用了你哪些东西
+          </div>
+          <div class="b">
+            <button class="tr">
+              <span class="k">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                简历 v4 · 校园实践
+              </span>
+              <span class="v">「从 0 到 1 的活动」这段来自你简历第 2 页</span>
+            </button>
+            <button class="tr">
+              <span class="k">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+                简历 v4 · 实习经历
+              </span>
+              <span class="v">两段运营实习的职责描述</span>
+            </button>
+            <button class="tr">
+              <span class="k">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                岗位原文 · 任职要求
+              </span>
+              <span class="v">「数据分析能力」「跨部门协作」引自岗位描述</span>
+            </button>
+            <button class="tr">
+              <span class="k">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>
+                你刚才说的
+              </span>
+              <span class="v">公司名「星野科技」、想突出「从 0 到 1」</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="tcard">
+          <div class="meta">
+            <span class="mrow">字数 <b>412</b></span>
+            <span class="mrow">页数 <b>1</b></span>
+            <span class="mrow">黑白单面 <b>1 张</b></span>
+            <span class="mrow">生成于 <b>10:05</b></span>
+          </div>
+        </div>
+
+        <div class="warnbox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+          <span>信里的公司名、岗位名和经历细节请自己再核一遍。这台机器不替你投递，也不会把这封信发给任何企业。</span>
+        </div>
+      </aside>
+    </section>
+
+    <!-- ══════════ 态 4：改一版 ══════════ -->
+    <div class="revise">
+      <h3>想改成什么样？</h3>
+      <p>改完是新的一版，上一版还在，可以对着看。</p>
+      <div class="rgrid">
+        <button class="rb"><b>再短一点</b><span>压到 300 字上下，只留最要紧的那两句</span></button>
+        <button class="rb"><b>语气更正式</b><span>去掉口语，按书面信件的写法</span></button>
+        <button class="rb"><b>换一段经历来写</b><span>改用另外那段实习作为主线</span></button>
+        <button class="rb"><b>换个开头</b><span>第一段重写，换个切入方式</span></button>
+      </div>
+      <div class="rfoot">
+        <span class="rsay">或者直接说你想怎么改…</span>
+        <button class="rclose">先不改了</button>
+      </div>
+    </div>
+
+    <!-- ══════════ 态 5：缺料兜底 ══════════ -->
+    <section class="missing">
+      <span class="mk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
+      </span>
+      <h2>这台机器上还没有你的简历</h2>
+      <p>求职信里的经历得有出处，不能凭空写。给我一份简历，或者你直接说两段经历也行 —— 但没有原始材料的话，写出来的东西会比较空。</p>
+      <div class="mways">
+        <button class="mw">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5"/><path d="M12 3v13"/></svg></span>
+          <b>上传一份</b>
+          <span>手机扫码传、U 盘导入都行</span>
+        </button>
+        <button class="mw">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg></span>
+          <b>扫纸质的</b>
+          <span>放进上方送稿器，几秒就好</span>
+        </button>
+        <button class="mw">
+          <span class="i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg></span>
+          <b>不用简历，我说</b>
+          <span>说两段经历，写出来会偏空</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ══ ActionBar ══ -->
+    <div class="actionbar">
+      <div class="ab-l" id="abl">
+        <button class="ab">返回</button>
+      </div>
+      <span class="ab-note" id="abnote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        还差 2 样必填的，填完才写得准。内容会发到 AI 服务处理，处理完即删。
+      </span>
+      <button class="ab-main" id="abmain" disabled>
+        <span id="abtxt">写这封信</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="bottomnav">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>首页</button>
+    <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  document.getElementById('stage').style.transform = 'scale(' + s + ')';
+}
+addEventListener('resize', fit); fit();
+
+// ── 要素卡：选候选项 ──
+document.querySelectorAll('#p4 .pick:not(.self)').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#p4 .pick').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    setSlot(4, b.textContent.trim());
+  };
+});
+document.querySelectorAll('#p1 .pick').forEach(function(b){
+  b.onclick = function(){ setSlot(1, '星野科技有限公司'); };
+});
+
+// 填上一个槽位：值、来源标注、边条颜色一起改，不能只改文字
+function setSlot(n, text){
+  var v = document.getElementById('v' + n);
+  var slot = v.closest('.slot');
+  v.textContent = text;
+  v.classList.remove('empty');
+  slot.classList.remove('need');
+  slot.querySelector('.req').remove();
+  var src = slot.querySelector('.src');
+  src.className = 'src said';
+  src.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" ' +
+    'stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>' +
+    '<path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>你刚说的';
+  slot.querySelector('.edit').textContent = '改';
+  var picks = slot.querySelector('.picks'); if (picks) picks.remove();
+  var hint = slot.querySelector('.hint'); if (hint) hint.remove();
+  refreshGate();
+}
+
+// 主按钮门控：缺必填就禁用，并说清还差什么 —— 不给没有理由的禁用
+function refreshGate(){
+  var left = document.querySelectorAll('.slot.need').length;
+  var main = document.getElementById('abmain');
+  var note = document.getElementById('abnote');
+  main.disabled = left > 0;
+  note.lastChild.textContent = left > 0
+    ? ' 还差 ' + left + ' 样必填的，填完才写得准。内容会发到 AI 服务处理，处理完即删。'
+    : ' 四样都齐了。内容会发到 AI 服务处理，处理完即删；写完由你决定要不要打印。';
+}
+document.getElementById('fillAll').onclick = function(){
+  setSlot(1, '星野科技有限公司');
+  var p = document.querySelector('#p4 .pick'); if (p) p.click();
+};
+
+// ── ActionBar 随态变化：主按钮永远在右下，但做的事不同 ──
+var AB = {
+  slots:   { txt:'写这封信', left:['返回'], note:null },
+  gen:     { txt:'写这封信', left:['返回'], note:null },
+  out:     { txt:'打印带走', left:['存进我的文档','扫码发到手机','让小青改一版'],
+             note:' 出纸前会再让你确认一次份数和费用。打印费用以现场公示价为准。' },
+  revise:  { txt:'打印带走', left:['存进我的文档','扫码发到手机','让小青改一版'],
+             note:' 出纸前会再让你确认一次份数和费用。打印费用以现场公示价为准。' },
+  missing: { txt:'先去传简历', left:['返回'], note:' 没有原始材料写出来的内容会比较空，机器不会替你编经历。' }
+};
+function applyAB(state){
+  var c = AB[state] || AB.slots;
+  document.getElementById('abtxt').textContent = c.txt;
+  document.getElementById('abl').innerHTML =
+    c.left.map(function(t){ return '<button class="ab">' + t + '</button>' }).join('');
+  var main = document.getElementById('abmain');
+  if (state === 'out' || state === 'revise') { main.disabled = false; }
+  else if (state === 'missing') { main.disabled = false; }
+  else { refreshGate(); }
+  if (c.note) document.getElementById('abnote').lastChild.textContent = c.note;
+  else refreshGate();
+  // 步骤条跟着走
+  document.getElementById('s2').className = 'stp' + (state === 'slots' ? ' on' : ' done');
+  document.getElementById('s3').className = 'stp' + (state === 'gen' ? ' on'
+    : (state === 'out' || state === 'revise') ? ' done' : '');
+  document.getElementById('s4').className = 'stp' + ((state === 'out' || state === 'revise') ? ' on' : '');
+}
+
+document.querySelectorAll('#panel [data-set]').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#panel [data-set]').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    document.body.dataset.s = b.dataset.set;
+    applyAB(b.dataset.set);
+  };
+});
+
+refreshGate();
+</script>
+</body>
+</html>

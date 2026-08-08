@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>采集型 · 把材料放进来 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   采集型作业面 —— 所有交付路径的共同起点（v2）
+
+   v1 的两处问题（本版修正）：
+   ① 深色面板下方空 660px 死黑 —— 用「左预览 / 右裁决」两栏把空间变成有用内容：
+      左边显示这一页长什么样，并在真实位置标出隐私片段；右边逐项裁决。
+      用户从此能看见「身份证号在第 2 页哪个位置」，而不是只看到一行文字。
+   ② 全静态。本版动效一律承载状态，不做装饰：
+      · 扫描光带自上而下扫过预览 = 正在逐页找（只在预检中出现）
+      · 发现项 stagger 浮现 = 一条条找出来的过程
+      · 数字滚动 = 真实计数
+      · 裁决为「遮挡」时，预览上对应位置实时盖上黑条 = 你的选择立刻可见
+      · 采集卡选中时边缘流光 = 当前来源
+      全部尊重 prefers-reduced-motion（shared.css:244 已有兜底）
+
+   结构价值：四个采集入口归一后，隐私预检不再可绕过
+   （现状 print-scan/convert、print-scan/sign、scan/result 三条直接空降确认页）
+
+   版面契约：1920 = 顶栏 76 + 内容区 1728 + 底部 Tab 116
+     内容超出内部滚动；ActionBar 常驻；竖屏最多两栏且次栏 ≥400px
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+
+.main{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:18px 40px 0;overflow:hidden}
+
+/* ── 报头 ── */
+.mh{flex:none;display:flex;align-items:center;justify-content:space-between;gap:28px}
+.mh-kicker{display:flex;align-items:center;gap:10px;font-size:15.5px;color:var(--muted);letter-spacing:.14em}
+.mh-kicker::before{content:'';width:30px;height:2px;background:var(--teal)}
+.mh h1{font-family:var(--serif);font-size:40px;font-weight:800;line-height:1.15;margin-top:5px}
+.mh-lede{margin-top:6px;font-size:16.5px;color:var(--muted);line-height:1.5;max-width:700px}
+.mh-id{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--line);font-size:16px;color:var(--ink-2);flex:none}
+.mh-id svg{width:18px;height:18px;color:var(--muted)}
+
+/* ── 四个采集入口 ── */
+.sources{flex:none;margin-top:13px;display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.src{position:relative;display:flex;flex-direction:column;align-items:flex-start;
+  padding:15px 16px 13px;border-radius:15px;background:var(--surface);border:1.5px solid var(--line);
+  box-shadow:var(--sh-1);text-align:left;min-height:142px;overflow:hidden}
+.src .ic{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;
+  background:var(--c-soft);color:var(--c);flex:none}
+.src .ic svg{width:23px;height:23px}
+.src h3{margin-top:11px;font-size:19px;font-weight:800;color:var(--ink)}
+.src p{margin-top:4px;font-size:14.5px;color:var(--muted);line-height:1.45}
+.src .st{margin-top:auto;padding-top:8px;font-size:14px;font-weight:700;color:var(--teal-deep)}
+/* 选中：边缘流光（表示当前来源，非装饰） */
+.src.on{border-color:var(--teal)}
+.src.on::before{content:'';position:absolute;inset:-2px;border-radius:17px;padding:2px;pointer-events:none;
+  background:conic-gradient(from var(--a,0deg),transparent 0deg,rgba(31,138,116,.85) 60deg,transparent 130deg,transparent 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;animation:orbit 3.4s linear infinite}
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes orbit{to{--a:360deg}}
+.src.on::after{content:'✓';position:absolute;top:12px;right:14px;width:25px;height:25px;border-radius:50%;
+  background:var(--teal);color:#fff;font-size:14px;font-weight:800;display:grid;place-items:center;z-index:2}
+.src.off{opacity:.5;background:var(--surface-3)}
+.src.off .st{color:var(--clay-deep)}
+
+/* ── 作业区 ── */
+.stage{flex:1;min-height:0;margin-top:12px;display:flex;flex-direction:column}
+.stage-empty{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;border:2px dashed var(--line);border-radius:18px;background:var(--surface-2)}
+.stage-empty svg{width:50px;height:50px;color:var(--faint)}
+.stage-empty h3{font-size:22px;font-weight:800;color:var(--ink-2)}
+.stage-empty p{font-size:16.5px;color:var(--muted);max-width:540px;text-align:center;line-height:1.55}
+
+.work{flex:1;min-height:0;display:none;flex-direction:column;gap:10px}
+body[data-state="picked"] .work,body[data-state="checked"] .work{display:flex}
+body[data-state="picked"] .stage-empty,body[data-state="checked"] .stage-empty{display:none}
+body[data-state="empty"] .work,body[data-state="deviceoff"] .work{display:none}
+
+/* 文件条 */
+.filecard{flex:none;display:flex;align-items:center;gap:14px;padding:13px 18px;border-radius:15px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--sh-1)}
+.fc-ic{width:46px;height:46px;border-radius:12px;flex:none;display:grid;place-items:center;
+  background:var(--teal-soft);color:var(--teal-deep)}
+.fc-ic svg{width:23px;height:23px}
+.fc-b{flex:1;min-width:0}
+.fc-b h4{font-size:20px;font-weight:800}
+.fc-b p{margin-top:3px;font-size:15.5px;color:var(--muted)}
+.fc-act{flex:none;display:inline-flex;align-items:center;height:var(--tap);padding:0 17px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface-2);font-size:16px;font-weight:700;color:var(--ink-2)}
+
+/* ── 深色作业面：左预览 / 右裁决 ── */
+.check{flex:1;min-height:0;display:flex;flex-direction:column;border-radius:18px;overflow:hidden;position:relative;
+  background:linear-gradient(160deg,var(--ink-panel-1),var(--ink-panel-2) 55%,var(--ink-panel-3));color:#eaf1ed}
+.check::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:30px 30px}
+.ck-h{flex:none;position:relative;z-index:1;padding:14px 20px 12px;display:flex;align-items:center;gap:10px;
+  flex-wrap:wrap;border-bottom:1px solid rgba(255,255,255,.1)}
+.ck-badge{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(122,214,184,.16);border:1px solid rgba(122,214,184,.34);color:#a9e6cd;font-size:15.5px;font-weight:700}
+.ck-badge svg{width:16px;height:16px}
+.ck-badge i{font-style:normal}
+.ck-line{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:var(--r-pill);
+  font-size:15px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#c3d4cc}
+.ck-line.ok{background:rgba(122,214,184,.1);border-color:rgba(122,214,184,.28);color:#9ddcc3}
+.ck-line.warn{background:rgba(200,150,60,.14);border-color:rgba(214,170,80,.34);color:#e8c98a}
+.ck-line svg{width:15px;height:15px}
+.roll{display:inline-block;animation:rollUp .5s var(--e-spring) both}
+@keyframes rollUp{from{transform:translateY(.5em);opacity:0}to{transform:none;opacity:1}}
+
+.ck-body{flex:1;min-height:0;position:relative;z-index:1;display:grid;grid-template-columns:1fr 470px;gap:0}
+
+/* 左：文件预览 + 真实位置标注 */
+.pv{position:relative;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:14px 14px 30px 20px;border-right:1px solid rgba(255,255,255,.1);overflow:hidden}
+/* 高度驱动 + aspect-ratio 得出宽度；子元素全为绝对定位，宽度不能交给 auto（会塌成 0） */
+.page{position:relative;flex:none;height:calc(50% - 6px);width:auto;aspect-ratio:1/1.414;
+  background:#fbfaf6;border-radius:6px;box-shadow:0 10px 26px rgba(0,0,0,.34);overflow:hidden}
+.page .pno{position:absolute;right:8px;bottom:6px;font-size:11px;color:#a9a396;font-weight:700}
+.page .ln{position:absolute;left:9%;height:6px;border-radius:3px;background:#d9d5cb}
+.page .ln.t{height:12px;background:#b9b4a8}
+/* 隐私位置高亮框 */
+.mark{position:absolute;border-radius:4px;border:2px solid rgba(226,170,90,.9);
+  background:rgba(226,170,90,.16);transition:none}
+.mark .tag{position:absolute;top:-11px;left:-2px;font-size:10.5px;font-weight:800;letter-spacing:.03em;
+  padding:1px 6px;border-radius:4px;background:#e2aa5a;color:#2b1d06;white-space:nowrap}
+/* 选了遮挡：黑条盖上（你的选择立刻可见） */
+.mark.redact{border-color:rgba(20,35,31,.9);background:#14231f}
+.mark.redact .tag{background:#14231f;color:#a9e6cd;border:1px solid rgba(122,214,184,.45)}
+.pv-cap{position:absolute;left:20px;bottom:12px;font-size:13.5px;color:#8fa79d}
+/* 扫描光带：只在预检中出现 = 正在逐页找 */
+.scanline{position:absolute;left:0;right:0;height:130px;pointer-events:none;display:none;
+  background:linear-gradient(180deg,transparent,rgba(122,214,184,.22) 45%,rgba(122,214,184,.42) 50%,rgba(122,214,184,.22) 55%,transparent);
+  animation:scanY 1.9s var(--e-out) infinite}
+@keyframes scanY{0%{transform:translateY(-140px)}100%{transform:translateY(calc(100% + 140px))}}
+body[data-state="picked"] .scanline{display:block}
+
+/* 右：裁决列表 */
+.dec{min-height:0;overflow-y:auto;padding:14px 18px 16px;display:flex;flex-direction:column;gap:9px;
+  scrollbar-width:thin}
+.dec::-webkit-scrollbar{width:6px}
+.dec::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+.dec-intro{font-size:16px;line-height:1.55;color:#c8d8d0}
+.dec-intro u{text-decoration:none;background:rgba(122,214,184,.14);border-bottom:1px solid rgba(122,214,184,.4);
+  padding:1px 5px;border-radius:4px;color:#dff0e7}
+
+.pii{padding:12px 14px;border-radius:13px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.13);
+  animation:riseSharp .5s var(--e-out) both}
+@keyframes riseSharp{from{opacity:0;transform:translateY(13px);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}
+.pii .k{font-size:14px;color:#9fb3aa;letter-spacing:.04em}
+.pii .v{margin-top:3px;font-size:17.5px;font-weight:700;color:#eaf1ed;font-variant-numeric:tabular-nums}
+.pii .where{margin-top:3px;font-size:14px;color:#8fa79d}
+.pii-act{margin-top:10px;display:flex;gap:8px}
+.pii-act button{flex:1;height:var(--tap);border-radius:10px;font-size:16px;font-weight:700;
+  border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#dfeae4}
+.pii-act button.on{background:#7ad6b8;color:#0e211c;border-color:transparent}
+.pii-act button.keep.on{background:rgba(226,170,90,.92);color:#2b1d06}
+
+.dec-out{margin-top:2px;padding:11px 14px;border-radius:12px;font-size:15px;line-height:1.55;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#a9bcb3}
+.dec-out b{color:#d3e2da;font-weight:700}
+
+/* 预检中的步骤 */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{display:flex;align-items:center;gap:11px;font-size:16.5px;color:#c3d4cc}
+.step .dot{width:24px;height:24px;border-radius:50%;flex:none;display:grid;place-items:center;
+  border:2px solid rgba(255,255,255,.2);font-size:13px}
+.step.done .dot{background:#7ad6b8;border-color:transparent;color:#0e211c;font-weight:800}
+.step.done{color:#dff0e7}
+.step.now .dot{border-color:#7ad6b8;border-right-color:transparent;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── ActionBar ── */
+.ab{flex:none;margin:11px -40px 0;padding:13px 40px;background:var(--surface);
+  border-top:1px solid var(--line);display:flex;align-items:center;gap:16px}
+.ab-l{flex:1;min-width:0;display:flex;align-items:center;gap:14px}
+.ab-note{font-size:14.5px;color:var(--muted);line-height:1.5}
+.ab-note b{color:var(--ink-2)}
+.btn-alt{display:inline-flex;align-items:center;justify-content:center;height:var(--tap-main);padding:0 22px;
+  border-radius:14px;border:1px solid var(--line);background:var(--surface-2);
+  font-size:17px;font-weight:700;color:var(--ink-2);flex:none}
+.btn-main{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  height:var(--tap-main);padding:0 30px;border-radius:14px;background:var(--teal);color:#fff;
+  font-size:18.5px;font-weight:800;flex:none;box-shadow:0 6px 18px rgba(31,138,116,.26)}
+.btn-main:not([disabled]){animation:glowPulse 3s var(--e-out) infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 6px 18px rgba(31,138,116,.26)}
+  50%{box-shadow:0 6px 26px rgba(31,138,116,.44)}}
+.btn-main svg{width:19px;height:19px}
+.btn-main[disabled]{background:var(--surface-3);color:var(--faint);box-shadow:none;animation:none}
+
+@media (prefers-reduced-motion:reduce){
+  .scanline,.src.on::before,.btn-main{animation:none!important}
+  .pii,.roll{animation:none!important}
+}
+
+#panel{position:fixed;left:20px;top:20px;z-index:60;background:rgba(18,42,36,.94);border-radius:14px;
+  padding:11px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#panel .pt-l{font-size:11.5px;color:#9fb3aa;padding:0 4px 2px}
+#panel button{height:36px;padding:0 13px;border-radius:9px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#dfeae4;font-size:13px;text-align:left}
+#panel button.on{background:#7ad6b8;color:#0e211c;font-weight:700;border-color:transparent}
+</style>
+</head>
+<body data-state="checked">
+
+<div id="panel">
+  <div class="pt-l">状态切换</div>
+  <button data-s="empty">① 还没放材料</button>
+  <button data-s="picked">② 已选文件 · 预检中</button>
+  <button data-s="checked" class="on">③ 预检完 · 3 处待裁决</button>
+  <button data-s="deviceoff">④ U盘未插 · 扫描仪离线</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+      <div><h2>职易达</h2><p>AI 求职打印服务终端</p></div>
+    </div>
+    <div class="tb-r">
+      <span class="clock">09:41</span>
+      <span class="device"><i></i><span id="devText">打印机在线 · 扫描仪就绪 · A4 纸充足</span></span>
+      <button class="help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>需要帮忙</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="mh">
+      <div>
+        <div class="mh-kicker">第 1 步 · 采集</div>
+        <h1 id="mhTitle">有 3 处要你定</h1>
+        <p class="mh-lede" id="mhLede">格式和页数都正常。这份文件里找到 3 处可能是个人信息，位置已在左边标出来，遮不遮由你决定。</p>
+      </div>
+      <span class="mh-id">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        已登录 · <b>李同学</b>
+      </span>
+    </section>
+
+    <section class="sources">
+      <button class="src" data-src="local" style="--c:#1f8a74;--c-soft:#e4f1ec">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+        <h3>本机选文件</h3><p>从这台机器已有的文档里挑</p><span class="st">可用</span>
+      </button>
+      <button class="src on" data-src="qr" style="--c:#2f6f96;--c-soft:#e7f1f7">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg></span>
+        <h3>手机扫码传</h3><p>手机上的文件扫码发过来</p><span class="st">本次来源</span>
+      </button>
+      <button class="src" data-src="usb" style="--c:#a8761c;--c-soft:#f8efdb">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v14"/><path d="M8 6l4-4 4 4"/><rect x="6" y="16" width="12" height="6" rx="2"/></svg></span>
+        <h3>U 盘导入</h3><p>插在机身侧面的 USB 口</p><span class="st" id="st-usb">可用</span>
+      </button>
+      <button class="src" data-src="scan" style="--c:#b3653a;--c-soft:#f6e9df">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></svg></span>
+        <h3>扫描纸质件</h3><p>把纸放进上方送稿器</p><span class="st" id="st-scan">扫描仪就绪</span>
+      </button>
+    </section>
+
+    <div class="stage">
+      <div class="stage-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <h3 id="emptyT">先从上面选一种方式</h3>
+        <p id="emptyP">材料放进来之前，本机不会做任何处理，也不会保存任何东西。</p>
+      </div>
+
+      <div class="work">
+        <div class="filecard">
+          <span class="fc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+          <div class="fc-b"><h4>李同学-简历.pdf</h4><p>2 页 · 486 KB · 来自手机扫码上传 · 09:41</p></div>
+          <button class="fc-act">换一份</button>
+        </div>
+
+        <div class="check">
+          <div class="ck-h">
+            <span class="ck-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+              <i id="ckBadge">本机预检</i>
+            </span>
+            <span class="ck-line ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>格式 PDF · 可打印</span>
+            <span class="ck-line ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>2 页 · A4 尺寸正常</span>
+            <span class="ck-line warn" id="ckl3"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>找到 <span class="roll" id="ckN">3</span> 处可能是个人信息</span>
+          </div>
+
+          <div class="ck-body">
+            <!-- 左：真实位置标注 -->
+            <div class="pv">
+              <div class="page">
+                <div class="ln t" style="top:9%;width:40%"></div>
+                <div class="ln" style="top:17%;width:58%"></div>
+                <div class="ln" style="top:23%;width:46%"></div>
+                <div class="ln t" style="top:35%;width:28%"></div>
+                <div class="ln" style="top:44%;width:80%"></div>
+                <div class="ln" style="top:50%;width:72%"></div>
+                <div class="ln" style="top:56%;width:76%"></div>
+                <div class="ln t" style="top:68%;width:32%"></div>
+                <div class="ln" style="top:77%;width:68%"></div>
+                <div class="ln" style="top:83%;width:74%"></div>
+                <div class="mark" data-m="0" style="left:50%;top:15.6%;width:34%;height:5%"><span class="tag">手机号</span></div>
+                <div class="scanline"></div>
+                <span class="pno">1 / 2</span>
+              </div>
+              <div class="page">
+                <div class="ln t" style="top:9%;width:30%"></div>
+                <div class="ln" style="top:17%;width:52%"></div>
+                <div class="ln" style="top:24%;width:62%"></div>
+                <div class="ln t" style="top:38%;width:34%"></div>
+                <div class="ln" style="top:47%;width:70%"></div>
+                <div class="ln" style="top:53%;width:64%"></div>
+                <div class="ln" style="top:65%;width:78%"></div>
+                <div class="ln" style="top:71%;width:56%"></div>
+                <div class="ln" style="top:83%;width:48%"></div>
+                <div class="mark redact" data-m="1" style="left:9%;top:45.6%;width:44%;height:5%"><span class="tag">身份证号</span></div>
+                <div class="mark redact" data-m="2" style="left:9%;top:51.6%;width:52%;height:5%"><span class="tag">家庭住址</span></div>
+                <div class="scanline" style="animation-delay:.5s"></div>
+                <span class="pno">2 / 2</span>
+              </div>
+              <div class="pv-cap" id="pvCap">两页都看过了 · 方框是找到的位置</div>
+            </div>
+
+            <!-- 右：裁决 -->
+            <div class="dec" id="dec">
+              <div class="steps" id="ckSteps" style="display:none">
+                <div class="step done"><span class="dot">✓</span>读取文件、确认格式与页数</div>
+                <div class="step done"><span class="dot">✓</span>按 A4 归一，检查页边距</div>
+                <div class="step now"><span class="dot"></span>逐页找可能夹带的个人信息…</div>
+                <div class="step"><span class="dot"></span>等你逐项决定保留还是遮挡</div>
+              </div>
+
+              <div id="ckResult">
+                <p class="dec-intro">
+                  找到 <u>3 处</u>。<b>遮不遮由你决定</b>——本机不替你判断哪些该藏，只指出位置。
+                  选「遮挡」后左边会立刻盖上黑条。
+                </p>
+                <div class="pii" style="animation-delay:.05s">
+                  <div class="k">手机号</div><div class="v">138****1921</div>
+                  <div class="where">第 1 页 · 页眉联系方式</div>
+                  <div class="pii-act" data-m="0"><button class="keep on">保留</button><button>遮挡</button></div>
+                </div>
+                <div class="pii" style="animation-delay:.16s">
+                  <div class="k">身份证号</div><div class="v">4401**********0037</div>
+                  <div class="where">第 2 页 · 个人信息栏</div>
+                  <div class="pii-act" data-m="1"><button class="keep">保留</button><button class="on">遮挡</button></div>
+                </div>
+                <div class="pii" style="animation-delay:.27s">
+                  <div class="k">家庭住址</div><div class="v">广州市天河区**路**号</div>
+                  <div class="where">第 2 页 · 个人信息栏</div>
+                  <div class="pii-act" data-m="2"><button class="keep">保留</button><button class="on">遮挡</button></div>
+                </div>
+                <p class="dec-out">
+                  <b>选了遮挡会发生什么：</b>本机会另外生成一份遮挡后的文件用于后续打印，<b>原件不改动</b>，
+                  两份都记在「我的文档」里，可分别删除。招聘会现场投递建议用遮挡版。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ab">
+      <div class="ab-l">
+        <button class="btn-alt" id="abAlt">换一份材料</button>
+        <p class="ab-note" id="abNote">遮挡会另存一份，<b>原件不改动</b>。两份都在「我的文档」里，可分别删除。</p>
+      </div>
+      <button class="btn-main" id="abMain">
+        <span>已定好，下一步</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>首页</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><span>AI 顾问</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></button>
+  </nav>
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById("stage");
+  if(st){ st.style.transform = "scale(" + s + ")"; st.style.height = (1920 * s) + "px"; }
+}
+window.addEventListener("resize", fit); fit();
+
+// 裁决 ↔ 预览联动：你的选择立刻在左边可见
+document.querySelectorAll('.pii-act').forEach(function(g){
+  var mi = g.dataset.m;
+  g.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){
+      g.querySelectorAll('button').forEach(function(x){ x.classList.remove('on') });
+      b.classList.add('on');
+      var mark = document.querySelector('.mark[data-m="'+mi+'"]');
+      if (mark) mark.classList.toggle('redact', !b.classList.contains('keep'));
+    });
+  });
+});
+document.querySelectorAll('.src').forEach(function(s){
+  s.addEventListener('click', function(){
+    if (s.classList.contains('off')) return;
+    document.querySelectorAll('.src').forEach(function(x){ x.classList.remove('on') });
+    s.classList.add('on');
+  });
+});
+
+var COPY = {
+  empty:{ title:'把材料放进来',
+    lede:'四种方式都行，放进来之后本机会先替你检查一遍格式、页数，并找出可能夹带的手机号、身份证号等信息，由你逐项决定保留还是遮挡。',
+    dev:'打印机在线 · 扫描仪就绪 · A4 纸充足', main:'请先放入材料', disabled:true, alt:'先不放了',
+    note:'材料只用于你本次发起的服务，<b>不进简历库、不发给任何企业</b>。未登录或高敏文件短期自动清理。',
+    usb:'可用', scan:'扫描仪就绪', off:false },
+  picked:{ title:'正在检查这份材料',
+    lede:'检查只在本机与本机的服务之间完成，结果只给你看。这一步不能跳过——后面打印用的是检查过的文件。',
+    dev:'打印机在线 · 扫描仪就绪 · A4 纸充足', main:'检查完才能继续', disabled:true, alt:'取消',
+    note:'材料只用于你本次发起的服务，<b>不进简历库、不发给任何企业</b>。',
+    usb:'可用', scan:'扫描仪就绪', off:false },
+  checked:{ title:'有 3 处要你定',
+    lede:'格式和页数都正常。这份文件里找到 3 处可能是个人信息，位置已在左边标出来，遮不遮由你决定。',
+    dev:'打印机在线 · 扫描仪就绪 · A4 纸充足', main:'已定好，下一步', disabled:false, alt:'换一份材料',
+    note:'遮挡会另存一份，<b>原件不改动</b>。两份都在「我的文档」里，可分别删除。',
+    usb:'可用', scan:'扫描仪就绪', off:false },
+  deviceoff:{ title:'把材料放进来',
+    lede:'U 盘没检测到，扫描仪现在也用不了。剩下两种方式照常可用——本机文件和手机扫码传，走完全一样的检查流程。',
+    dev:'打印机在线 · 扫描仪离线 · 未检测到 U 盘', main:'请先放入材料', disabled:true, alt:'先不放了',
+    note:'材料只用于你本次发起的服务，<b>不进简历库、不发给任何企业</b>。',
+    usb:'未检测到 U 盘', scan:'扫描仪暂时用不了', off:true }
+};
+
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#panel button').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    var s = b.dataset.s; document.body.dataset.state = s;
+    var c = COPY[s];
+    document.getElementById('mhTitle').textContent = c.title;
+    document.getElementById('mhLede').textContent = c.lede;
+    document.getElementById('devText').textContent = c.dev;
+    document.querySelector('#abMain span').textContent = c.main;
+    document.getElementById('abMain').disabled = c.disabled;
+    document.getElementById('abAlt').textContent = c.alt;
+    document.getElementById('abNote').innerHTML = c.note;
+    document.getElementById('st-usb').textContent = c.usb;
+    document.getElementById('st-scan').textContent = c.scan;
+    document.querySelector('.src[data-src="usb"]').classList.toggle('off', c.off);
+    document.querySelector('.src[data-src="scan"]').classList.toggle('off', c.off);
+    document.getElementById('ckSteps').style.display = (s === 'picked') ? '' : 'none';
+    document.getElementById('ckResult').style.display = (s === 'checked') ? '' : 'none';
+    document.getElementById('ckl3').style.display = (s === 'checked') ? '' : 'none';
+    document.getElementById('ckBadge').textContent = (s === 'picked') ? '本机预检中' : '本机预检';
+    document.querySelectorAll('.mark').forEach(function(m){ m.style.display = (s==='checked') ? '' : 'none' });
+    document.getElementById('pvCap').textContent = (s==='picked') ? '正在逐页扫描…' : '两页都看过了 · 方框是找到的位置';
+    if (s === 'checked') {
+      document.querySelectorAll('.pii').forEach(function(p){ p.style.animation='none'; p.offsetHeight; p.style.animation='' });
+    }
+  });
+});
+</script>
+</body>
+</html>

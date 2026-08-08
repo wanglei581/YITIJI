@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>我的 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   我的 v1 · 2026-08-08
+   设计立场：公共终端的「我的」不是 App 个人中心。
+   它要回答三件事：① 这台机器上现在有我什么东西 ② 什么时候会被清掉
+   ③ 我这段时间到底推进到哪了。
+   AI 不是多加一个入口，而是替你看这些资产：求职进度归纳 + 资产体检。
+   ══════════════════════════════════════════════════════════════ */
+
+.kiosk{background:
+  radial-gradient(900px 460px at 90% -8%,rgba(31,138,116,.055),transparent 62%),
+  var(--paper)}
+.main{flex:1;min-height:0;display:flex;flex-direction:column;gap:18px;
+  padding:18px 0 0;overflow:hidden}
+
+/* ══ 身份条：谁 + 这次会话还剩多久 ══ */
+.idbar{flex:none;margin:0 40px;display:flex;align-items:center;gap:18px;
+  padding:14px 22px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-m);box-shadow:var(--sh-1)}
+.idbar .face{width:56px;height:56px;flex:none;border-radius:50%;overflow:hidden;
+  border:2px solid var(--teal-line)}
+.idbar .face img{width:100%;height:100%;object-fit:cover;display:block}
+.idbar .nm{flex:1;min-width:0}
+.idbar .nm b{display:block;font-family:var(--serif);font-size:27px;font-weight:800;color:var(--ink)}
+.idbar .nm span{display:block;margin-top:3px;font-size:16.5px;color:var(--muted)}
+/* 会话倒计时：公共终端的真实压力，不是装饰 */
+.ttl{flex:none;display:inline-flex;align-items:center;gap:10px;height:var(--tap);padding:0 17px;
+  border-radius:var(--r-pill);font-size:16.5px;
+  color:var(--clay-deep);background:var(--clay-soft);border:1px solid var(--clay-line)}
+.ttl svg{width:18px;height:18px}
+.ttl b{font-family:var(--mono);font-weight:800;font-variant-numeric:tabular-nums}
+.idbar .out{flex:none;min-height:var(--tap);padding:0 20px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:600 16.5px var(--sans)}
+
+/* ══ AI 求职进度带：深色 = 机器在说话 ══ */
+.track{position:relative;flex:none;margin:0 40px;overflow:hidden;border-radius:var(--r-l);
+  background:linear-gradient(150deg,var(--ink-panel-4),var(--ink-panel-2) 54%,var(--ink-panel-3));
+  box-shadow:var(--sh-3)}
+.track::before{content:'';position:absolute;inset:0;pointer-events:none;opacity:.55;
+  background-image:linear-gradient(rgba(127,220,190,.055) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(127,220,190,.055) 1px,transparent 1px);
+  background-size:32px 32px;
+  mask-image:radial-gradient(700px 320px at 82% 0%,#000 12%,transparent 74%)}
+.track::after{content:'';position:absolute;top:0;bottom:0;width:200px;pointer-events:none;
+  background:linear-gradient(100deg,transparent,rgba(127,220,190,.08) 46%,rgba(127,220,190,.13) 53%,transparent);
+  animation:tScan 9s var(--e-out) infinite}
+@keyframes tScan{0%{transform:translateX(-240px)}56%,100%{transform:translateX(1120px)}}
+.track-in{position:relative;z-index:1;display:grid;grid-template-columns:1fr 372px;gap:0}
+
+.track-l{padding:26px 26px 24px 30px}
+.track-hd{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.tbadge{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;
+  border-radius:var(--r-pill);font-size:15px;font-weight:800;letter-spacing:.03em;
+  color:#0f2b24;background:linear-gradient(180deg,var(--mint),var(--mint-2))}
+.tbadge svg{width:16px;height:16px}
+.tref{display:inline-flex;align-items:center;height:32px;padding:0 11px;border-radius:var(--r-pill);
+  font-size:15px;font-weight:700;color:#e2c98a;background:rgba(212,168,74,.16);
+  border:1px solid rgba(212,168,74,.3)}
+.track-l h2{margin-top:16px;font-family:var(--serif);font-size:31px;line-height:1.42;font-weight:800;
+  color:var(--on-ink);letter-spacing:-.01em}
+.track-l h2 u{text-decoration:none;box-shadow:inset 0 -2px 0 rgba(127,220,190,.5);
+  background:linear-gradient(transparent 66%,rgba(127,220,190,.14) 66%)}
+.track-l p{margin-top:13px;font-size:17.5px;line-height:1.6;color:var(--on-ink-3);max-width:560px}
+.track-acts{margin-top:20px;display:flex;gap:12px;flex-wrap:wrap}
+.tbtn{display:inline-flex;align-items:center;gap:9px;min-height:var(--tap-main);padding:0 22px;
+  border-radius:var(--r-m);cursor:pointer;font:700 18px var(--sans);
+  color:#0d2b23;border:0;background:linear-gradient(180deg,var(--mint),var(--mint-3));
+  box-shadow:0 12px 24px rgba(35,140,112,.3)}
+.tbtn.ghost{color:var(--on-ink);background:var(--on-ink-fill);border:1px solid var(--on-ink-line);
+  box-shadow:none;font-weight:600}
+.tbtn svg{width:19px;height:19px}
+
+/* 三个环：这段时间的真实动作量 */
+.rings{border-left:1px solid var(--on-ink-line);padding:26px 24px;
+  display:flex;flex-direction:column;justify-content:center;gap:16px}
+.ring{display:flex;align-items:center;gap:16px}
+.ring .dial{position:relative;width:76px;height:76px;flex:none}
+.ring .dial svg{width:76px;height:76px;transform:rotate(-90deg)}
+.ring .dial circle{fill:none;stroke-width:7;stroke-linecap:round}
+.ring .dial .bg{stroke:rgba(255,255,255,.08)}
+.ring .dial .fg{stroke:var(--k);stroke-dasharray:201;stroke-dashoffset:201;
+  animation:dial 1.25s var(--e-out) .3s forwards}
+@keyframes dial{to{stroke-dashoffset:var(--off)}}
+.ring .dial b{position:absolute;inset:0;display:grid;place-items:center;
+  font-family:var(--serif);font-size:24px;font-weight:800;color:var(--on-ink);
+  font-variant-numeric:tabular-nums}
+.ring .tx b{display:block;font-size:18.5px;font-weight:700;color:var(--on-ink)}
+.ring .tx span{display:block;margin-top:3px;font-size:16px;color:var(--on-ink-4);line-height:1.4}
+
+/* ══ AI 资产体检 ══ */
+.checkup{flex:none;margin:0 40px;background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-m);box-shadow:var(--sh-1);overflow:hidden}
+.checkup-hd{display:flex;align-items:center;gap:12px;padding:15px 24px;
+  background:var(--surface-2);border-bottom:1px solid var(--line)}
+.checkup-hd .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:10px;
+  color:var(--teal-deep);background:var(--teal-soft)}
+.checkup-hd .ic svg{width:20px;height:20px}
+.checkup-hd b{font-family:var(--serif);font-size:23px;font-weight:800;color:var(--ink)}
+.checkup-hd .when{margin-left:auto;font-size:16px;color:var(--muted)}
+.checkup-hd .re{min-height:var(--tap);padding:0 18px;margin-left:14px;border-radius:var(--r-pill);
+  cursor:pointer;color:var(--teal-deep);background:var(--surface);border:1px solid var(--teal-line);
+  font:600 16.5px var(--sans)}
+.findings{display:grid;grid-template-columns:repeat(3,1fr)}
+.fd{display:flex;flex-direction:column;gap:9px;padding:18px 22px;text-align:left;cursor:pointer;
+  background:none;border:0;border-right:1px solid var(--line-soft);font-family:var(--sans)}
+.fd:last-child{border-right:0}
+.fd:active{background:var(--surface-2)}
+.fd .lv{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;
+  height:28px;padding:0 11px;border-radius:5px;font-size:15px;font-weight:800;letter-spacing:.03em}
+.fd .lv.warn{color:var(--clay-deep);background:var(--clay-soft)}
+.fd .lv.info{color:#2f6f96;background:var(--blue-soft)}
+.fd .lv.ok{color:var(--teal-deep);background:var(--teal-soft)}
+.fd .lv i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.fd strong{font-size:19px;font-weight:700;color:var(--ink);line-height:1.4}
+.fd span{font-size:16.5px;color:var(--muted);line-height:1.5}
+.fd .act{margin-top:auto;padding-top:4px;font-size:16.5px;font-weight:700;color:var(--teal-deep)}
+
+/* ══ 我的东西：四格 ══ */
+.assets{flex:none;margin:0 40px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.as{position:relative;display:flex;flex-direction:column;gap:6px;padding:18px 20px;text-align:left;
+  cursor:pointer;font-family:var(--sans);overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-m);box-shadow:var(--sh-1);
+  transition:transform var(--t-base) var(--e-out),box-shadow var(--t-base) var(--e-out)}
+.as:active{transform:translateY(2px);box-shadow:none}
+.as .ic{width:34px;height:34px;display:grid;place-items:center;border-radius:10px;
+  color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.as .ic svg{width:19px;height:19px}
+.as .n{font-family:var(--serif);font-size:40px;font-weight:900;line-height:1;color:var(--ink);
+  font-variant-numeric:tabular-nums;margin-top:4px}
+.as .t{font-size:18px;font-weight:700;color:var(--ink-2)}
+.as .s{font-size:16px;color:var(--muted);line-height:1.4}
+.as .flag{position:absolute;right:14px;top:14px;display:inline-flex;align-items:center;height:26px;
+  padding:0 9px;border-radius:5px;font-size:14.5px;font-weight:800;
+  color:var(--clay-deep);background:var(--clay-soft);animation:blip 2.6s var(--e-out) infinite}
+@keyframes blip{0%,100%{opacity:1}52%{opacity:.5}}
+
+/* ══ 记录与设置 ══ */
+.more{flex:none;margin:0 40px;display:grid;grid-template-columns:repeat(3,1fr);
+  grid-auto-rows:92px;gap:13px}
+.mi{display:flex;align-items:center;gap:14px;padding:0 20px;text-align:left;cursor:pointer;
+  font-family:var(--sans);background:var(--surface);border:1px solid var(--line);
+  border-radius:var(--r-m);min-height:var(--tap-main)}
+.mi:active{background:var(--surface-2)}
+.mi .ic{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:11px;
+  color:var(--muted);background:var(--surface-3)}
+.mi .ic svg{width:20px;height:20px}
+.mi .tx{flex:1;min-width:0}
+.mi .tx b{display:block;font-size:19px;font-weight:700;color:var(--ink)}
+.mi .tx span{display:block;margin-top:2px;font-size:16px;color:var(--muted)}
+.mi .cnt{flex:none;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--faint)}
+.mi .dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--clay)}
+
+/* ══ 隐私说明 ══ */
+.privacy{flex:none;margin:auto 40px 18px;display:flex;align-items:center;gap:14px;
+  padding:15px 22px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r-m)}
+.privacy .ic{width:36px;height:36px;flex:none;display:grid;place-items:center;border-radius:10px;
+  color:var(--teal-deep);background:var(--teal-soft)}
+.privacy .ic svg{width:20px;height:20px}
+.privacy p{flex:1;font-size:16.5px;line-height:1.55;color:var(--ink-2)}
+.privacy button{flex:none;min-height:var(--tap);padding:0 20px;border-radius:var(--r-pill);cursor:pointer;
+  color:var(--danger);background:var(--surface);border:1px solid var(--danger-line);
+  font:600 16.5px var(--sans)}
+
+/* ══ 底部导航 ══ */
+.bottomnav{height:116px;flex:none;display:grid;grid-template-columns:repeat(3,1fr);
+  background:linear-gradient(180deg,#153029,#0e211c);border-top:1px solid rgba(255,255,255,.07)}
+.bottomnav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;
+  background:none;border:0;color:#7fa294;font:600 17px var(--sans);cursor:pointer}
+.bottomnav button svg{width:27px;height:27px}
+.bottomnav button.active{color:#7fdcbe}
+
+/* ══ 告示 ══ */
+.notice{display:none;align-items:flex-start;gap:13px;margin:0 40px;padding:16px 20px;
+  border-radius:var(--r-m);font-size:17.5px;line-height:1.55}
+.notice svg{width:22px;height:22px;flex:none;margin-top:2px}
+.notice.warn{color:#7a5714;background:var(--amber-soft);border:1px solid var(--amber-line)}
+
+/* ══════ 三态 ══════ */
+/* 未登录：什么都不能显示，也不能编数字 */
+body[data-s="guest"] .track,
+body[data-s="guest"] .checkup,
+body[data-s="guest"] .assets,
+body[data-s="guest"] .idbar .face,
+body[data-s="guest"] .ttl,
+body[data-s="guest"] .idbar .out,
+body[data-s="guest"] .mi .cnt,
+body[data-s="guest"] .mi .dot{display:none}
+body[data-s="guest"] .guestcta{display:flex}
+.guestcta{display:none;flex:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  margin:0 40px;padding:56px 40px;background:var(--surface);border:1px dashed var(--line);
+  border-radius:var(--r-l)}
+.guestcta h2{font-family:var(--serif);font-size:34px;font-weight:800;color:var(--ink)}
+.guestcta p{max-width:620px;text-align:center;font-size:18.5px;line-height:1.62;color:var(--muted)}
+.guestcta .qr{width:150px;height:150px;border-radius:var(--r-m);background:var(--surface-2);
+  border:1px solid var(--line);display:grid;place-items:center;color:var(--faint);font-size:16px}
+.guestcta .go{min-height:var(--tap-main);padding:0 30px;border:0;border-radius:var(--r-pill);cursor:pointer;
+  color:#fff;background:linear-gradient(180deg,#25957d,#136a58);font:700 19px var(--sans)}
+
+/* AI 不可用：归纳和体检都不许出结论 */
+body[data-s="degraded"] .track,
+body[data-s="degraded"] .checkup{display:none}
+body[data-s="degraded"] .notice.warn{display:flex}
+
+/* ══ 本次会话产生的东西 ══ */
+.thistime{flex:none;margin:0 40px;background:var(--surface);border:1px solid var(--teal-line);
+  border-radius:var(--r-m);box-shadow:var(--sh-1);overflow:hidden}
+.tt-hd{display:flex;align-items:center;gap:12px;padding:14px 24px;
+  background:var(--teal-soft);border-bottom:1px solid var(--teal-line)}
+.tt-hd .ic{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;
+  color:#fff;background:var(--teal)}
+.tt-hd .ic svg{width:19px;height:19px}
+.tt-hd b{font-family:var(--serif);font-size:22px;font-weight:800;color:var(--teal-deep)}
+.tt-hd .hint{margin-left:auto;font-size:16.5px;color:var(--teal-deep);opacity:.82}
+.tt-rows{display:flex;flex-direction:column}
+.tt{display:flex;align-items:center;gap:16px;padding:15px 24px;border-bottom:1px solid var(--line-soft)}
+.tt:last-child{border-bottom:0}
+.tt-ic{width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:11px}
+.tt-ic svg{width:21px;height:21px}
+.tt-ic.doc{color:var(--clay-deep);background:var(--clay-soft)}
+.tt-ic.rep{color:#2f6f96;background:var(--blue-soft)}
+.tt-tx{flex:1;min-width:0}
+.tt-tx b{display:block;font-size:19.5px;font-weight:700;color:var(--ink)}
+.tt-tx span{display:block;margin-top:3px;font-size:16.5px;color:var(--muted)}
+.tt-acts{flex:none;display:flex;gap:10px}
+.tt-b{min-height:var(--tap);padding:0 18px;border-radius:var(--r-s);cursor:pointer;white-space:nowrap;
+  color:var(--ink-2);background:var(--surface-2);border:1px solid var(--line);font:600 16.5px var(--sans)}
+.tt-b:active{transform:translateY(1px)}
+.tt-b.pri{color:#fff;border-color:transparent;background:linear-gradient(180deg,#25957d,#12695a);font-weight:700}
+body[data-s="guest"] .thistime{display:none}
+</style>
+</head>
+<body data-s="default">
+
+<div id="panel">
+  <p>状态切换</p>
+  <button class="on" data-set="default">默认 · 已登录</button>
+  <button data-set="guest">未登录</button>
+  <button data-set="degraded">AI 不可用</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+
+  <header class="topbar">
+    <div class="topbar-l">
+      <button class="topbar-back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        返回首页
+      </button>
+      <div class="brand">
+        <span class="brand-mark">
+          <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4.5h8.5L21 9v7.5"/><path d="M7 12.5V6a1.5 1.5 0 0 1 1.5-1.5"/>
+            <path d="M16 4.5V9h5"/><rect x="4.5" y="12.5" width="19" height="7" rx="1.6"/>
+            <path d="M9 19.5h10v4H9z"/><circle cx="19.5" cy="16" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </span>
+        <div><strong>职易达</strong><span>AI 求职打印服务终端</span></div>
+      </div>
+    </div>
+    <div class="top-status">
+      <span class="clock">09:52</span>
+      <span class="device"><i></i>打印机在线</span>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- ══ 身份条 ══ -->
+    <section class="idbar anim-rise">
+      <span class="face"><img src="assets/advisor-face.jpg" alt=""></span>
+      <span class="nm">
+        <b>李同学</b>
+        <span>手机号登录 · 这台机器上的东西只有你自己看得到</span>
+      </span>
+      <span class="ttl">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg>
+        没操作 <b id="ttl">01:47</b> 后自动退出
+      </span>
+      <button class="out">退出</button>
+    </section>
+
+    <div class="notice warn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+      <span><b>AI 归纳和资产体检现在做不了。</b>下面你的简历、文档、订单和记录都还在，可以照常查看、打印和带走。</span>
+    </div>
+
+    <!-- ══ 未登录 ══ -->
+    <section class="guestcta">
+      <div class="qr">扫码登录</div>
+      <h2>先登录，才看得到你自己的东西</h2>
+      <p>这台机器不会在没登录的情况下留任何个人材料。登录之后，你在本机做过的简历、文档、打印订单和 AI 记录都会归到你名下，离开时按你设置的期限自动清理。</p>
+      <button class="go">用手机号登录</button>
+    </section>
+
+    <!-- ══ AI 求职进度带 ══ -->
+    <section class="track anim-rise d1">
+      <div class="track-in">
+        <div class="track-l">
+          <div class="track-hd">
+            <span class="tbadge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+              这一个月你走到哪了
+            </span>
+            <span class="tref">AI 归纳，仅供参考</span>
+          </div>
+
+          <h2 id="sum" data-txt="面试反馈里「说不清项目结果」被提了三次，简历还是没改。">&nbsp;</h2>
+
+          <p>你这个月看的岗位不少，练习也没停，但每次面试报告里指向的都是同一个问题。先把这一条改掉，比再多看几个岗位管用。</p>
+
+          <div class="track-acts">
+            <button class="tbtn">
+              照这条改简历
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+            <button class="tbtn ghost">看这三份面试报告</button>
+          </div>
+        </div>
+
+        <aside class="rings">
+          <div class="ring" style="--k:#7fdcbe">
+            <span class="dial">
+              <svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="32"/><circle class="fg" cx="38" cy="38" r="32" style="--off:56"/></svg>
+              <b class="cnt" data-to="34">0</b>
+            </span>
+            <span class="tx"><b>看过的岗位</b><span>其中 8 个跳去了来源平台</span></span>
+          </div>
+          <div class="ring" style="--k:#d99a63">
+            <span class="dial">
+              <svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="32"/><circle class="fg" cx="38" cy="38" r="32" style="--off:141"/></svg>
+              <b class="cnt" data-to="3">0</b>
+            </span>
+            <span class="tx"><b>练过的面试</b><span>最近一次 08-05</span></span>
+          </div>
+          <div class="ring" style="--k:#79b6da">
+            <span class="dial">
+              <svg viewBox="0 0 76 76"><circle class="bg" cx="38" cy="38" r="32"/><circle class="fg" cx="38" cy="38" r="32" style="--off:121"/></svg>
+              <b class="cnt" data-to="4">0</b>
+            </span>
+            <span class="tx"><b>简历改到第几版</b><span>最新一版 08-07 生成</span></span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ══ AI 资产体检 ══ -->
+    <section class="checkup anim-rise d2">
+      <div class="checkup-hd">
+        <span class="ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h6M9 11h2"/></svg>
+        </span>
+        <b>你存在这台机器上的东西，体检了一遍</b>
+        <span class="when">08-08 09:52 检查</span>
+        <button class="re">重新检查</button>
+      </div>
+      <div class="findings">
+        <button class="fd">
+          <span class="lv warn"><i></i>要处理</span>
+          <strong>3 份文档 7 天后到期清理</strong>
+          <span>《三方协议》《成绩单》《实习证明》。想留着就现在打印带走，或者扫码发到手机。</span>
+          <span class="act">打印带走 / 扫码取回 →</span>
+        </button>
+        <button class="fd">
+          <span class="lv info"><i></i>可以顺手做</span>
+          <strong>两版简历内容重复了七成</strong>
+          <span>v3 和 v4 差别很小，容易投错版本。可以合并成一份，或者标清楚各自投什么岗位。</span>
+          <span class="act">去合并 →</span>
+        </button>
+        <button class="fd">
+          <span class="lv ok"><i></i>已经齐了</span>
+          <strong>证件照和求职信都在</strong>
+          <span>一寸白底证件照 2 张、求职信 1 封，都在有效期内，随时能打印。</span>
+          <span class="act">看我的文档 →</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ══ 我的东西 ══ -->
+    <section class="assets anim-rise d3">
+      <button class="as" style="--c:#b3653a">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg></span>
+        <span class="n cnt" data-to="4">0</span>
+        <span class="t">我的简历</span>
+        <span class="s">最新 v4 · 08-07</span>
+      </button>
+      <button class="as" style="--c:#1f8a74">
+        <span class="flag">3 份将到期</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/></svg></span>
+        <span class="n cnt" data-to="9">0</span>
+        <span class="t">我的文档</span>
+        <span class="s">含扫描件与证件照</span>
+      </button>
+      <button class="as" style="--c:#2f6f96">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg></span>
+        <span class="n cnt" data-to="3">0</span>
+        <span class="t">打印订单</span>
+        <span class="s">1 单已核价未支付</span>
+      </button>
+      <button class="as" style="--c:#8a6aa0">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span>
+        <span class="n cnt" data-to="12">0</span>
+        <span class="t">AI 服务记录</span>
+        <span class="s">诊断 / 面试 / 匹配</span>
+      </button>
+    </section>
+
+    <!-- ══ 本次会话：离开前能带走的东西 ══ -->
+    <section class="thistime anim-rise d4">
+      <div class="tt-hd">
+        <span class="ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>
+        </span>
+        <b>这次在机器上弄出来的东西</b>
+        <span class="hint">不带走的话，离开两分钟后就没了</span>
+      </div>
+      <div class="tt-rows">
+        <div class="tt">
+          <span class="tt-ic doc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></span>
+          <span class="tt-tx"><b>简历 v4（改完成果数字的那版）</b><span>2 页 · 09:38 生成 · 还没打印</span></span>
+          <span class="tt-acts">
+            <button class="tt-b">存进我的文档</button>
+            <button class="tt-b">扫码发到手机</button>
+            <button class="tt-b pri">打印带走</button>
+          </span>
+        </div>
+        <div class="tt">
+          <span class="tt-ic rep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>
+          <span class="tt-tx"><b>简历 JD 匹配对照表</b><span>产品运营岗 · 09:44 生成 · 已存入 AI 服务记录</span></span>
+          <span class="tt-acts">
+            <button class="tt-b">扫码发到手机</button>
+            <button class="tt-b">打印带走</button>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 记录与设置 ══ -->
+    <section class="more anim-rise d4">
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
+        <span class="tx"><b>我的收藏</b><span>岗位 · 招聘会 · 政策</span></span>
+        <span class="cnt">17</span>
+      </button>
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg></span>
+        <span class="tx"><b>浏览与跳转记录</b><span>只记你看过和打开过的来源</span></span>
+        <span class="cnt">34</span>
+      </button>
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M16 14a4 4 0 0 0-8 0"/><path d="M12 6V2"/></svg></span>
+        <span class="tx"><b>权益与活动</b><span>免费次数 · 可领的活动</span></span>
+        <span class="dot"></span>
+      </button>
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+        <span class="tx"><b>通知与反馈</b><span>打印完成 · 问题反馈</span></span>
+        <span class="dot"></span>
+      </button>
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a1.7 1.7 0 0 0-1.6-1H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 3.6V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15 3c.6.3 1.4.2 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 20.4 9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></span>
+        <span class="tx"><b>账号与 AI 授权</b><span>哪些 AI 能读你的材料</span></span>
+      </button>
+      <button class="mi">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 1 1 4.2 2.7c-.8.4-1.3 1.1-1.3 2"/><path d="M12 17h.01"/></svg></span>
+        <span class="tx"><b>帮助与协议</b><span>常见问题 · 隐私政策</span></span>
+      </button>
+    </section>
+
+    <!-- ══ 隐私 ══ -->
+    <section class="privacy">
+      <span class="ic">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </span>
+      <p>简历和文档默认留 30 天，身份类材料留 7 天，到期自动删。你也可以现在就手动清掉；删除会留一条操作记录，但文件本身不再保留。</p>
+      <button>现在清空我的材料</button>
+    </section>
+
+  </main>
+
+  <nav class="bottomnav">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>首页</button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>AI 顾问</button>
+    <button class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>我的</button>
+  </nav>
+
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  document.getElementById('stage').style.transform = 'scale(' + s + ')';
+}
+addEventListener('resize', fit); fit();
+
+var reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+// 计数滚动：只滚真实拿到的数
+function roll(){
+  document.querySelectorAll('.cnt[data-to]').forEach(function(el){
+    var to = parseInt(el.dataset.to, 10); if (isNaN(to)) return;
+    if (reduce) { el.textContent = to; return; }
+    var t0 = null, dur = 850 + Math.random() * 350;
+    requestAnimationFrame(function tick(t){
+      if (!t0) t0 = t;
+      var k = Math.min((t - t0) / dur, 1);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3)));
+      if (k < 1) requestAnimationFrame(tick);
+    });
+  });
+}
+
+// AI 归纳打字机
+function typeSum(){
+  var el = document.getElementById('sum'); if (!el) return;
+  if (reduce) { el.innerHTML = el.dataset.txt; return; }
+  var t = el.dataset.txt, i = 0; el.textContent = '';
+  (function step(){ el.textContent = t.slice(0, ++i); if (i < t.length) setTimeout(step, 44); })();
+}
+
+// 会话倒计时：真实递减，不是摆设
+(function(){
+  var el = document.getElementById('ttl'); if (!el) return;
+  var left = 107;
+  setInterval(function(){
+    if (left <= 0) return;
+    left--;
+    var m = String(Math.floor(left / 60)).padStart(2, '0');
+    var s = String(left % 60).padStart(2, '0');
+    el.textContent = m + ':' + s;
+  }, 1000);
+})();
+
+roll(); typeSum();
+
+// 状态切换（预览用，生产不存在）
+document.querySelectorAll('#panel [data-set]').forEach(function(b){
+  b.onclick = function(){
+    document.querySelectorAll('#panel [data-set]').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    document.body.dataset.s = b.dataset.set;
+    if (b.dataset.set === 'default') { roll(); typeSum(); }
+  };
+});
+</script>
+</body>
+</html>

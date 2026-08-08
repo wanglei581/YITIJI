@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>岗位 · AI 分诊 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   岗位域 · 浏览型 + AI 分诊（v2）
+
+   v1 的三处错误（已修正）：
+   ① 竖屏做了横向三栏，栏宽只剩 392/290/290，「对上了」三个字都折两行
+      → 改为分段切换 + 一次一路纵向铺开，卡片满宽
+   ② AI 汇总写「三路一起找」，但 AI 实际只比对过本机岗位，
+      线上只拼了检索 URL、线下只知道地址与在招数量 —— 虚假横向比较
+      → 改为只声明自己真正看过的，其余明写「只能给入口」
+   ③ 三个来源视觉等权，等于把选择题丢回用户
+      → 分段控件分主次，默认停在 AI 推荐那一路
+
+   汇总有用性自检：删掉这条汇总，用户第一步操作是否改变？不变即废话。
+
+   版面契约：
+     1920 = 顶栏 76 + 内容区 1728 + 底部 Tab 116
+     内容超出必须内部滚动，不许溢出消失；ActionBar 常驻底部
+     竖屏不做三栏并排；1080 宽最多两栏且次栏 ≥400px
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+
+.main{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:20px 40px 0;overflow:hidden}
+
+/* ── 报头（压缩，把高度让给内容） ── */
+.mh{flex:none;display:flex;align-items:center;justify-content:space-between;gap:28px}
+.mh-kicker{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--muted);letter-spacing:.14em}
+.mh-kicker::before{content:'';width:32px;height:2px;background:var(--teal)}
+.mh h1{font-family:var(--serif);font-size:44px;font-weight:800;line-height:1.15;margin-top:6px}
+.mh h1 em{font-style:normal;color:var(--teal-deep)}
+.mh-id{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--line);font-size:16px;color:var(--ink-2);flex:none}
+.mh-id svg{width:18px;height:18px;color:var(--muted)}
+
+/* ── 说一句话 ── */
+.say{flex:none;margin-top:12px;display:flex;align-items:center;gap:14px;
+  height:var(--tap-main);padding:0 18px 0 22px;border-radius:15px;
+  background:var(--surface);border:2px solid var(--teal-line);box-shadow:var(--sh-1)}
+.say>svg{width:23px;height:23px;color:var(--teal);flex:none}
+.say .ph{flex:1;min-width:0;font-size:19.5px;color:var(--faint)}
+.say .said{flex:1;min-width:0;font-size:19.5px;color:var(--ink);font-weight:600}
+.say .go{flex:none;display:inline-flex;align-items:center;height:46px;padding:0 20px;border-radius:var(--r-pill);
+  background:var(--teal);color:#fff;font-size:16px;font-weight:700}
+body[data-state="first"] .said{display:none}
+body:not([data-state="first"]) .ph{display:none}
+
+/* ── AI 建议带：必须给行动结论 ── */
+.advice{flex:none;margin-top:12px;position:relative;overflow:hidden;isolation:isolate;
+  border-radius:18px;padding:18px 22px;color:#eaf1ed;
+  background:linear-gradient(160deg,var(--ink-panel-1),var(--ink-panel-2) 55%,var(--ink-panel-3))}
+.advice::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.032) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.032) 1px,transparent 1px);background-size:28px 28px}
+.ad-in{position:relative;z-index:1}
+.ad-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.ad-badge{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(122,214,184,.16);border:1px solid rgba(122,214,184,.34);color:#a9e6cd;font-size:15.5px;font-weight:700}
+.ad-badge svg{width:16px;height:16px}
+.ad-badge i{font-style:normal}
+.evi{display:inline-flex;align-items:center;height:30px;padding:0 11px;border-radius:var(--r-pill);font-size:15px;border:1px solid transparent}
+.evi.e1{background:rgba(122,214,184,.1);border-color:rgba(122,214,184,.26);color:#9ddcc3}
+.evi.e2{background:rgba(139,190,222,.1);border-color:rgba(139,190,222,.26);color:#a8cde6}
+
+.ad-body{margin-top:12px;display:flex;align-items:flex-start;gap:20px}
+.ad-txt{flex:1;min-width:0}
+.ad-txt h2{font-family:var(--serif);font-size:29px;font-weight:800;line-height:1.28;letter-spacing:.01em}
+.ad-why{margin-top:8px;font-size:17px;line-height:1.55;color:#c8d8d0}
+.ad-why u{text-decoration:none;background:rgba(122,214,184,.14);border-bottom:1px solid rgba(122,214,184,.4);
+  padding:1px 5px;border-radius:4px;color:#dff0e7}
+/* 信息边界：AI 没看过的东西必须说清楚 */
+.ad-edge{margin-top:10px;padding:9px 13px;border-radius:11px;font-size:15.5px;line-height:1.5;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);color:#a9bcb3}
+.ad-edge b{color:#d3e2da;font-weight:700}
+.ad-go{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  height:var(--tap-main);padding:0 26px;border-radius:14px;background:#7ad6b8;color:#0e211c;
+  font-size:18px;font-weight:800;align-self:center}
+.ad-go svg{width:19px;height:19px}
+
+/* ── 分段切换：分主次，不等权 ── */
+.seg{flex:none;margin-top:12px;display:flex;gap:10px}
+.seg button{flex:1;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;
+  height:76px;padding:0 18px;border-radius:14px;border:1px solid var(--line);
+  background:var(--surface-2);text-align:left;transition:none}
+.seg button .st{font-size:19px;font-weight:800;color:var(--ink-2);display:flex;align-items:center;gap:7px}
+.seg button .sd{font-size:14.5px;color:var(--muted)}
+/* 推荐项：视觉加重 */
+.seg button.rec .st::before{content:'建议';font-size:12.5px;font-weight:800;letter-spacing:.05em;
+  padding:2px 7px;border-radius:5px;background:var(--teal-soft);color:var(--teal-deep);border:1px solid var(--teal-line)}
+/* 当前项 */
+.seg button.on{background:var(--surface);border-color:var(--teal);box-shadow:0 0 0 2px rgba(31,138,116,.16)}
+.seg button.on .st{color:var(--teal-deep)}
+/* 备选项降权 */
+.seg button:not(.on):not(.rec){opacity:.72}
+body[data-state="degraded"] .seg button.rec .st::before{display:none}
+
+/* ── 内容区：一次一路，纵向铺开 ── */
+.stage{flex:1;min-height:0;margin-top:12px;display:flex;flex-direction:column}
+.lane{display:none;flex:1;min-height:0;flex-direction:column}
+.lane.on{display:flex}
+.lane-b{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:11px;padding-right:4px;
+  scrollbar-width:thin}
+.lane-b::-webkit-scrollbar{width:6px}
+.lane-b::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+
+/* 岗位卡：满宽，一行说完 */
+.job{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 20px;box-shadow:var(--sh-1)}
+.job-top{display:flex;align-items:flex-start;gap:14px}
+.job-t{flex:1;min-width:0}
+.job-t h4{font-size:22px;font-weight:800;line-height:1.3}
+.job-t .co{margin-top:4px;font-size:16.5px;color:var(--muted)}
+.fit{flex:none;display:inline-flex;align-items:center;height:32px;padding:0 13px;border-radius:var(--r-pill);
+  font-size:15px;font-weight:700;white-space:nowrap}
+.fit.h{background:var(--teal-soft);color:var(--teal-deep);border:1px solid var(--teal-line)}
+.fit.m{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line)}
+.job-why{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:6px}
+.pt{display:flex;gap:9px;font-size:16.5px;line-height:1.5;align-items:baseline}
+.pt .k{flex:none;font-weight:800;white-space:nowrap}
+.pt.ok .k{color:var(--teal-deep)}
+.pt.gap .k{color:var(--clay-deep)}
+.pt span{color:var(--ink-2)}
+.job-foot{margin-top:12px;display:flex;align-items:center;gap:14px}
+.job-src{flex:1;min-width:0;font-size:14.5px;color:var(--faint);line-height:1.5}
+.btn-s{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;height:var(--tap);
+  padding:0 18px;border-radius:11px;font-size:16.5px;font-weight:700;border:1px solid var(--teal-line);
+  background:var(--teal-soft);color:var(--teal-deep)}
+.btn-s.ghost{background:var(--surface-2);border-color:var(--line);color:var(--ink-2)}
+.btn-s svg{width:17px;height:17px}
+
+/* 平台 / 机构行：满宽 */
+.row{display:flex;align-items:center;gap:16px;padding:16px 20px;border:1px solid var(--line);
+  border-radius:16px;background:var(--surface);box-shadow:var(--sh-1)}
+.row-ic{width:48px;height:48px;border-radius:13px;flex:none;display:grid;place-items:center;
+  background:var(--blue-soft);color:var(--blue);font-size:19px;font-weight:800}
+.row-b{flex:1;min-width:0}
+.row-b h4{font-size:20px;font-weight:800}
+.row-b p{margin-top:4px;font-size:16px;color:var(--muted);line-height:1.5}
+.row-b .hit{color:var(--teal-deep);font-weight:700}
+.btn-qr{flex:none;display:inline-flex;align-items:center;gap:8px;height:var(--tap);padding:0 18px;
+  border-radius:11px;background:var(--surface-2);border:1px solid var(--line);
+  font-size:16.5px;font-weight:700;color:var(--ink-2)}
+.btn-qr svg{width:18px;height:18px}
+
+/* 区域筛选 */
+.geo{flex:none;display:flex;flex-wrap:wrap;gap:8px;margin-bottom:11px}
+.geo span{display:inline-flex;align-items:center;height:var(--tap);padding:0 16px;border-radius:var(--r-pill);
+  border:1px solid var(--line);background:var(--surface);font-size:16px;color:var(--ink-2)}
+.geo span.on{background:var(--teal-soft);border-color:var(--teal-line);color:var(--teal-deep);font-weight:700}
+
+/* 边界说明：数据没有的不假装有 */
+.lack{flex:none;margin-top:2px;padding:12px 16px;border-radius:12px;background:var(--amber-soft);
+  border:1px solid var(--amber-line);font-size:15.5px;line-height:1.55;color:#7a5714}
+.lack b{font-weight:800}
+
+/* ── ActionBar 常驻 ── */
+.ab{flex:none;margin:12px -40px 0;padding:14px 40px;background:var(--surface);
+  border-top:1px solid var(--line);display:flex;align-items:center;gap:16px}
+.ab-l{flex:1;min-width:0;display:flex;align-items:center;gap:14px}
+.ab-note{font-size:15px;color:var(--muted);line-height:1.5}
+.ab-note b{color:var(--ink-2)}
+.btn-alt{display:inline-flex;align-items:center;justify-content:center;height:var(--tap-main);padding:0 22px;
+  border-radius:14px;border:1px solid var(--line);background:var(--surface-2);
+  font-size:17.5px;font-weight:700;color:var(--ink-2);flex:none}
+.btn-main{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:var(--tap-main);
+  padding:0 30px;border-radius:14px;background:var(--teal);color:#fff;font-size:18.5px;font-weight:800;flex:none;
+  box-shadow:0 6px 18px rgba(31,138,116,.26)}
+.btn-main svg{width:19px;height:19px}
+
+/* 四态 */
+body[data-state="first"] .stage{opacity:.5;pointer-events:none}
+body[data-state="first"] .seg{opacity:.5;pointer-events:none}
+body[data-state="degraded"] .job-why,
+body[data-state="degraded"] .fit{display:none}
+body[data-state="degraded"] .ad-badge{background:rgba(226,226,214,.13);border-color:rgba(223,228,220,.26);color:#dfe4dc}
+body[data-state="degraded"] .ad-go{display:none}
+body[data-state="first"] .ad-go{display:none}
+
+/* ── 动效：一律承载状态，不做装饰 ────────────────────────
+   · 依据标 stagger 浮现 = AI 一项项确认它凭什么这么说
+   · 数字滚动 = 真实计数（12 条 / 4 家 / 6 家）
+   · 推荐入口边缘流光 = 这一路是 AI 建议先看的
+   · 切换分段时卡片浮现 = 换了一路，内容是新的
+   · 语音入口脉冲 = 在等你说话
+   · 主按钮呼吸 = 现在可以执行
+   全部尊重 prefers-reduced-motion */
+
+.evi{animation:riseSharp .45s var(--e-out) both}
+#evi1{animation-delay:.06s}
+#evi2{animation-delay:.16s}
+@keyframes riseSharp{from{opacity:0;transform:translateY(10px);filter:blur(5px)}
+  to{opacity:1;transform:none;filter:none}}
+
+.roll{display:inline-block;animation:rollUp .5s var(--e-spring) both}
+@keyframes rollUp{from{transform:translateY(.5em);opacity:0}to{transform:none;opacity:1}}
+
+/* 推荐那一路：边缘流光（与 08 采集卡选中同一语汇） */
+.seg button.rec{position:relative;overflow:hidden}
+.seg button.rec::after{content:'';position:absolute;inset:-2px;border-radius:16px;padding:2px;pointer-events:none;
+  background:conic-gradient(from var(--a,0deg),transparent 0deg,rgba(31,138,116,.75) 60deg,transparent 130deg,transparent 360deg);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask-composite:exclude;animation:orbit 3.6s linear infinite}
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false}
+@keyframes orbit{to{--a:360deg}}
+body[data-state="degraded"] .seg button.rec::after{display:none}
+
+/* 换一路：卡片依次浮现 */
+.lane.on .job,.lane.on .row{animation:riseSharp .45s var(--e-out) both}
+.lane.on .job:nth-child(1),.lane.on .row:nth-child(1){animation-delay:.04s}
+.lane.on .job:nth-child(2),.lane.on .row:nth-child(2){animation-delay:.12s}
+.lane.on .job:nth-child(3),.lane.on .row:nth-child(3){animation-delay:.2s}
+.lane.on .row:nth-child(4){animation-delay:.28s}
+
+/* 语音入口：等待输入时脉冲 */
+.say>svg{animation:micPulse 2.4s var(--e-out) infinite}
+@keyframes micPulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.09)}}
+body[data-state="degraded"] .say>svg{animation:none;opacity:.45}
+
+/* 主按钮：可执行时呼吸 */
+.btn-main{animation:glowPulse 3s var(--e-out) infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 6px 18px rgba(31,138,116,.26)}
+  50%{box-shadow:0 6px 26px rgba(31,138,116,.44)}}
+
+@media (prefers-reduced-motion:reduce){
+  .evi,.roll,.lane.on .job,.lane.on .row,.say>svg,.btn-main,.seg button.rec::after{animation:none!important}
+}
+
+#panel{position:fixed;left:20px;top:20px;z-index:60;background:rgba(18,42,36,.94);border-radius:14px;
+  padding:11px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#panel .pt-l{font-size:11.5px;color:#9fb3aa;padding:0 4px 2px}
+#panel button{height:36px;padding:0 13px;border-radius:9px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#dfeae4;font-size:13px;text-align:left}
+#panel button.on{background:#7ad6b8;color:#0e211c;font-weight:700;border-color:transparent}
+</style>
+</head>
+<body data-state="default">
+
+<div id="panel">
+  <div class="pt-l">状态切换</div>
+  <button data-s="default" class="on">默认 · 说了需求 + 有简历</button>
+  <button data-s="noresume">说了需求 · 无简历</button>
+  <button data-s="first">首次 · 什么都没说</button>
+  <button data-s="degraded">AI 不可用 · 降级</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+      <div><h2>职易达</h2><p>AI 求职打印服务终端</p></div>
+    </div>
+    <div class="tb-r">
+      <span class="clock">09:41</span>
+      <span class="device"><i></i><span>打印机在线 · A4 纸充足 · 碳粉正常</span></span>
+      <button class="help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>需要帮忙</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="mh">
+      <div>
+        <div class="mh-kicker">岗位信息 · 第三方来源</div>
+        <h1 id="mhTitle">找什么样的工作？<em>说一句就行</em></h1>
+      </div>
+      <span class="mh-id">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        已登录 · <b>李同学</b>
+      </span>
+    </section>
+
+    <div class="say">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg>
+      <span class="ph">按住说话，或点这里输入：想找什么岗位、在哪个城市、什么经验</span>
+      <span class="said">我想找广州的产品运营，应届，最好离地铁近</span>
+      <span class="go">重新说</span>
+    </div>
+
+    <!-- ══ AI 建议带：给行动结论，不做跨源比较 ══ -->
+    <section class="advice">
+      <div class="ad-in">
+        <div class="ad-head">
+          <span class="ad-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+            <i id="adBadge">本机为你分诊</i>
+          </span>
+          <span class="evi e1" id="evi1">依据 · 你刚才说的</span>
+          <span class="evi e2" id="evi2">依据 · 你的简历 v4</span>
+        </div>
+        <div class="ad-body">
+          <div class="ad-txt">
+            <h2 id="adTitle">先看本机收录的岗位。</h2>
+            <p class="ad-why" id="adWhy">
+              这批岗位<u>我逐条比过</u>你的简历，其中 <u>3 条</u>和你写的运营经历对得上，
+              并且标了差在哪、怎么改。广州、产品运营、应届这三个条件已经用上。
+            </p>
+            <p class="ad-edge" id="adEdge">
+              <b>说明我看到了什么：</b>只有本机这批岗位的正文我读过。线上平台我只能按你说的<b>拼出检索入口</b>，
+              里面有哪些岗位要你扫码后自己看；线下机构我只知道<b>地址和在招数量</b>，具体岗位得到店问。
+              所以下面不做三者好坏比较。
+            </p>
+          </div>
+          <button class="ad-go" id="adGo">
+            进入本机岗位
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══ 分段切换：有主次 ══ -->
+    <div class="seg">
+      <button data-lane="local" class="on rec">
+        <span class="st">本机收录岗位</span>
+        <span class="sd"><span class="roll">12</span> 条 · 已逐条对照你的简历</span>
+      </button>
+      <button data-lane="online">
+        <span class="st">线上平台</span>
+        <span class="sd"><span class="roll" style="animation-delay:.1s">4</span> 家 · 只提供检索入口</span>
+      </button>
+      <button data-lane="offline">
+        <span class="st">线下机构</span>
+        <span class="sd"><span class="roll" style="animation-delay:.2s">6</span> 家 · 只提供地址与在招数</span>
+      </button>
+    </div>
+
+    <!-- ══ 一次一路 ══ -->
+    <div class="stage">
+
+      <div class="lane on" data-lane="local">
+        <div class="lane-b">
+          <div class="job">
+            <div class="job-top">
+              <div class="job-t"><h4>产品运营专员（应届）</h4><div class="co">广州某科技有限公司 · 天河区 · 6–9K</div></div>
+              <span class="fit h">较高参考</span>
+            </div>
+            <div class="job-why">
+              <div class="pt ok"><span class="k">对上了</span><span>要求「活动策划与执行」，你简历里有 2 段运营实习写到这一项</span></div>
+              <div class="pt gap"><span class="k">差一点</span><span>要求「熟练取数」，你技能栏写了 SQL，但没有一句说明用它做过什么</span></div>
+            </div>
+            <div class="job-foot">
+              <div class="job-src">来源 · 市人社局公共就业服务平台｜同步 08-07 08:12｜外部ID JOB-2026-08842</div>
+              <button class="btn-s ghost">看逐条对照</button>
+              <button class="btn-s">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>
+                扫码投递
+              </button>
+            </div>
+          </div>
+
+          <div class="job">
+            <div class="job-top">
+              <div class="job-t"><h4>用户增长运营（校招）</h4><div class="co">广州某网络科技 · 海珠区 · 7–10K</div></div>
+              <span class="fit h">较高参考</span>
+            </div>
+            <div class="job-why">
+              <div class="pt ok"><span class="k">对上了</span><span>你做过「从 0 到 1 的校园活动」，与岗位的拉新场景接近</span></div>
+              <div class="pt gap"><span class="k">没写到</span><span>岗位要求投放或渠道经验，你的简历里找不到相关表述</span></div>
+            </div>
+            <div class="job-foot">
+              <div class="job-src">来源 · 市人社局公共就业服务平台｜同步 08-07 08:12｜外部ID JOB-2026-08857</div>
+              <button class="btn-s ghost">看逐条对照</button>
+              <button class="btn-s">扫码投递</button>
+            </div>
+          </div>
+
+          <div class="job">
+            <div class="job-top">
+              <div class="job-t"><h4>内容运营（新媒体方向）</h4><div class="co">广州某文化传播 · 越秀区 · 6–8K</div></div>
+              <span class="fit m">中等参考</span>
+            </div>
+            <div class="job-why">
+              <div class="pt ok"><span class="k">对上了</span><span>有活动复盘经验，与岗位的内容数据分析部分相关</span></div>
+              <div class="pt gap"><span class="k">差一点</span><span>岗位偏图文与短视频产出，你的经历更偏活动执行</span></div>
+            </div>
+            <div class="job-foot">
+              <div class="job-src">来源 · 广州人才网｜同步 08-07 07:40｜外部ID GZ-114529</div>
+              <button class="btn-s ghost">看逐条对照</button>
+              <button class="btn-s">扫码投递</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lane" data-lane="online">
+        <div class="lane-b">
+          <div class="row">
+            <span class="row-ic">智</span>
+            <div class="row-b"><h4>智联招聘</h4><p>已按 <span class="hit">广州 · 产品运营 · 应届</span> 拼好检索入口，扫码直接落到搜索结果页</p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>扫码去看</button>
+          </div>
+          <div class="row">
+            <span class="row-ic">前</span>
+            <div class="row-b"><h4>前程无忧</h4><p>已按 <span class="hit">广州 · 产品运营 · 应届</span> 拼好检索入口，扫码直接落到搜索结果页</p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>扫码去看</button>
+          </div>
+          <div class="row">
+            <span class="row-ic">B</span>
+            <div class="row-b"><h4>BOSS 直聘</h4><p>已按 <span class="hit">广州 · 产品运营 · 应届</span> 拼好检索入口，扫码直接落到搜索结果页</p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>扫码去看</button>
+          </div>
+          <div class="row">
+            <span class="row-ic">猎</span>
+            <div class="row-b"><h4>猎聘</h4><p>已按 <span class="hit">广州 · 产品运营</span> 拼好检索入口（该平台不支持按应届筛选）</p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg>扫码去看</button>
+          </div>
+          <p class="lack">
+            <b>本机没有读过这些平台里的岗位。</b>这里只是按你说的条件拼出检索链接，扫码后看到什么、有多少条，都以平台自己为准；
+            本机不保证与上面本机岗位一致，也不代你投递。
+          </p>
+        </div>
+      </div>
+
+      <div class="lane" data-lane="offline">
+        <div class="lane-b">
+          <div class="geo">
+            <span class="on">广州</span><span>天河区</span><span>海珠区</span><span>越秀区</span><span>白云区</span>
+          </div>
+          <div class="row">
+            <span class="row-ic" style="background:var(--clay-soft);color:var(--clay-deep)">机</span>
+            <div class="row-b"><h4>天河区公共就业服务中心</h4><p>天河路 XX 号 · 工作日 09:00–17:00 · <span class="hit">在招 3 个相关岗位</span></p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>扫码导航</button>
+          </div>
+          <div class="row">
+            <span class="row-ic" style="background:var(--clay-soft);color:var(--clay-deep)">机</span>
+            <div class="row-b"><h4>海珠区人力资源市场</h4><p>新港中路 XX 号 · 工作日 09:00–17:30 · <span class="hit">在招 2 个相关岗位</span></p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>扫码导航</button>
+          </div>
+          <div class="row">
+            <span class="row-ic" style="background:var(--clay-soft);color:var(--clay-deep)">机</span>
+            <div class="row-b"><h4>越秀区就业驿站</h4><p>中山五路 XX 号 · 工作日 09:00–17:00 · <span class="hit">在招 1 个相关岗位</span></p></div>
+            <button class="btn-qr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>扫码导航</button>
+          </div>
+          <p class="lack">
+            <b>机构可按区筛，岗位本身只到城市一级</b>——来源数据没有提供区县字段，本机不猜。
+            在招数量来自机构报送，具体岗位内容需到店咨询。
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="ab">
+      <div class="ab-l">
+        <button class="btn-alt" id="abAlt">换个说法再找</button>
+        <p class="ab-note" id="abNote">
+          本机只提供岗位信息与匹配参考，<b>不代你投递，也不会把简历发给企业</b>。匹配是拿文字比文字的参考，招聘方怎么看是另一回事。
+        </p>
+      </div>
+      <button class="btn-main" id="abMain">
+        <span>打印这 12 条岗位清单</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>首页</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><span>AI 顾问</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></button>
+  </nav>
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById("stage");
+  if(st){ st.style.transform = "scale(" + s + ")"; st.style.height = (1920 * s) + "px"; }
+}
+window.addEventListener("resize", fit); fit();
+
+// 分段切换
+document.querySelectorAll('.seg button').forEach(function(b){
+  b.addEventListener('click', function(){
+    var lane = b.dataset.lane;
+    document.querySelectorAll('.seg button').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    document.querySelectorAll('.lane').forEach(function(l){ l.classList.toggle('on', l.dataset.lane === lane) });
+    // 重跑浮现：换了一路，内容是新的
+    document.querySelectorAll('.lane.on .job, .lane.on .row').forEach(function(el){
+      el.style.animation = 'none'; el.offsetHeight; el.style.animation = '';
+    });
+  });
+});
+document.getElementById('adGo').addEventListener('click', function(){
+  document.querySelector('.seg button[data-lane="local"]').click();
+});
+
+// 四态：只换内容，版面不变
+var COPY = {
+  default:{
+    title:'找什么样的工作？<em>说一句就行</em>',
+    badge:'本机为你分诊',
+    adTitle:'先看本机收录的岗位。',
+    adWhy:'这批岗位<u>我逐条比过</u>你的简历，其中 <u>3 条</u>和你写的运营经历对得上，并且标了差在哪、怎么改。广州、产品运营、应届这三个条件已经用上。',
+    adEdge:'<b>说明我看到了什么：</b>只有本机这批岗位的正文我读过。线上平台我只能按你说的<b>拼出检索入口</b>，里面有哪些岗位要你扫码后自己看；线下机构我只知道<b>地址和在招数量</b>，具体岗位得到店问。所以下面不做三者好坏比较。',
+    main:'打印这 12 条岗位清单', alt:'换个说法再找',
+    note:'本机只提供岗位信息与匹配参考，<b>不代你投递，也不会把简历发给企业</b>。匹配是拿文字比文字的参考，招聘方怎么看是另一回事。',
+    evi1:true, evi2:true
+  },
+  noresume:{
+    title:'找什么样的工作？<em>说一句就行</em>',
+    badge:'本机为你分诊',
+    adTitle:'先看本机收录的岗位，但只能按你说的筛。',
+    adWhy:'广州、产品运营、应届这三个条件已经用上，<u>命中 12 条</u>。但<u>还没有你的简历</u>，所以给不出「哪一条和你的经历对得上」——传一份简历，同样这些岗位可以逐条比对。',
+    adEdge:'<b>说明我看到了什么：</b>本机这批岗位的正文我读过，但没有你的材料可比。线上平台我只能<b>拼出检索入口</b>，线下机构我只知道<b>地址和在招数量</b>。',
+    main:'传一份简历，看逐条对照', alt:'先这样看',
+    note:'本机只提供岗位信息，<b>不代你投递</b>。上传的简历仅用于本次匹配，不进简历库、不发给任何企业。',
+    evi1:true, evi2:false
+  },
+  first:{
+    title:'找什么样的工作？<em>说一句就行</em>',
+    badge:'还没听到你想找什么',
+    adTitle:'说一句话，我才知道去哪儿找。',
+    adWhy:'比如「广州的产品运营，应届」。说完之后，本机会在<u>已收录并审核过的岗位</u>里逐条比对，并按你的条件拼出线上平台的检索入口、列出本市线下机构。',
+    adEdge:'<b>先说清能力边界：</b>本机只读过自己收录的岗位。线上平台的岗位内容需要你扫码后自己看，线下机构只有地址和在招数量。',
+    main:'按住说话', alt:'不说了，我自己翻',
+    note:'本机只提供岗位信息与匹配参考，<b>不代你投递，也不会把简历发给企业</b>。',
+    evi1:false, evi2:false
+  },
+  degraded:{
+    title:'找什么样的工作？<em>按条件筛选</em>',
+    badge:'智能分诊暂时不可用',
+    adTitle:'这次排不出建议，三路来源都还在。',
+    adWhy:'语音理解和逐条对照这次用不了，所以<u>不会给出「哪条和你像」的结论</u>——没有的东西不编给你看。下面三路可以照常按城市、行业、来源机构自己筛，扫码入口正常。',
+    adEdge:'<b>能力边界不变：</b>本机原本也只读过自己收录的岗位；线上平台只提供检索入口，线下机构只有地址与在招数量。',
+    main:'打印当前筛选结果', alt:'按条件筛选',
+    note:'本机只提供岗位信息，<b>不代你投递</b>。当前无匹配参考，岗位排序按同步时间。',
+    evi1:false, evi2:false
+  }
+};
+
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#panel button').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    var s = b.dataset.s; document.body.dataset.state = s;
+    var c = COPY[s];
+    document.getElementById('mhTitle').innerHTML = c.title;
+    document.getElementById('adBadge').textContent = c.badge;
+    document.getElementById('adTitle').textContent = c.adTitle;
+    document.getElementById('adWhy').innerHTML = c.adWhy;
+    document.getElementById('adEdge').innerHTML = c.adEdge;
+    document.querySelector('#abMain span').textContent = c.main;
+    document.getElementById('abAlt').textContent = c.alt;
+    document.getElementById('abNote').innerHTML = c.note;
+    document.getElementById('evi1').style.display = c.evi1 ? '' : 'none';
+    document.getElementById('evi2').style.display = c.evi2 ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>

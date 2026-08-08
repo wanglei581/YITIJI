@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>问答型 · 边问边攒要点 · 1080×1920</title>
+<link rel="stylesheet" href="shared.css?v=2" />
+<style>
+/* ═══════════════════════════════════════════════════════════
+   问答型作业面（A 型）—— 覆盖 HR 知识问答 / 企业面试速查 / 求职方向探索
+
+   一体机上问答的真难题：站着聊完就走，什么也没留下。
+   后端 chatAssistant 刻意不落库（ai.service.ts:746-775，隐私设计），
+   所以对话本身带不走 —— 那就让 AI 边聊边把结论钉在右边，
+   攒成一份可打印、可存档、可扫码带走的「本次要点」。
+   问答型因此也有真实交付物，而不是聊完拉倒。
+
+   三条一体机约束：
+   ① 站着的人不愿打字 → 语音优先 + 预设问题一点即问
+   ② 对话不做无限滚动 → 左栏定高内部滚动，右栏是沉淀不是流水
+   ③ 政策类结论必须带「以主管部门审核为准」，不给保证性说法
+
+   版面契约：1920 = 顶栏 76 + 内容区 1728 + 底部 Tab 116
+     内容超出内部滚动；ActionBar 常驻；竖屏最多两栏且次栏 ≥400px
+   ═══════════════════════════════════════════════════════════ */
+
+.kiosk::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E")}
+
+.main{position:relative;z-index:1;flex:1;min-height:0;display:flex;flex-direction:column;
+  padding:18px 40px 0;overflow:hidden}
+
+.mh{flex:none;display:flex;align-items:center;justify-content:space-between;gap:28px}
+.mh-kicker{display:flex;align-items:center;gap:10px;font-size:15.5px;color:var(--muted);letter-spacing:.14em}
+.mh-kicker::before{content:'';width:30px;height:2px;background:var(--teal)}
+.mh h1{font-family:var(--serif);font-size:40px;font-weight:800;line-height:1.15;margin-top:5px}
+.mh h1 em{font-style:normal;color:var(--teal-deep)}
+.mh-lede{margin-top:6px;font-size:16.5px;color:var(--muted);line-height:1.5;max-width:700px}
+.mh-id{display:inline-flex;align-items:center;gap:8px;height:44px;padding:0 16px;border-radius:var(--r-pill);
+  background:var(--surface);border:1px solid var(--line);font-size:16px;color:var(--ink-2);flex:none}
+.mh-id svg{width:18px;height:18px;color:var(--muted)}
+
+/* ── 主体：左对话 / 右要点 ── */
+.stage{flex:1;min-height:0;margin-top:13px;display:grid;grid-template-columns:1fr 440px;gap:12px}
+
+/* 左：对话 */
+.chat{min-height:0;display:flex;flex-direction:column;border-radius:17px;overflow:hidden;position:relative;
+  background:linear-gradient(160deg,var(--ink-panel-1),var(--ink-panel-2) 55%,var(--ink-panel-3));color:#eaf1ed}
+.chat::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;z-index:0;
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:30px 30px}
+.ch-h{flex:none;position:relative;z-index:1;padding:14px 18px 12px;display:flex;align-items:center;gap:11px;
+  border-bottom:1px solid rgba(255,255,255,.1)}
+.av{width:44px;height:44px;border-radius:13px;flex:none;display:grid;place-items:center;
+  background:rgba(122,214,184,.16);border:1px solid rgba(122,214,184,.34);color:#a9e6cd}
+.av svg{width:22px;height:22px}
+.ch-h-b{flex:1;min-width:0}
+.ch-h-b h3{font-size:19px;font-weight:800}
+.ch-h-b p{margin-top:2px;font-size:14.5px;color:#9fb3aa}
+.ch-topic{display:inline-flex;align-items:center;height:32px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:15px;color:#c3d4cc;flex:none}
+
+.ch-b{flex:1;min-height:0;position:relative;z-index:1;overflow-y:auto;padding:16px 18px;
+  display:flex;flex-direction:column;gap:13px;scrollbar-width:thin}
+.ch-b::-webkit-scrollbar{width:6px}
+.ch-b::-webkit-scrollbar-thumb{background:rgba(255,255,255,.16);border-radius:3px}
+
+.msg{max-width:88%;animation:riseSharp .45s var(--e-out) both}
+@keyframes riseSharp{from{opacity:0;transform:translateY(12px);filter:blur(5px)}to{opacity:1;transform:none;filter:none}}
+.msg.me{align-self:flex-end}
+.msg .bub{padding:13px 16px;border-radius:15px;font-size:17px;line-height:1.6}
+.msg.ai .bub{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-top-left-radius:5px}
+.msg.me .bub{background:#7ad6b8;color:#0e211c;font-weight:600;border-top-right-radius:5px}
+.msg .bub b{color:#dff0e7;font-weight:700}
+.msg.me .bub b{color:#0e211c}
+/* 被钉到右边的句子 */
+.pin{background:rgba(122,214,184,.16);border-bottom:1px solid rgba(122,214,184,.45);
+  border-radius:4px;padding:1px 5px;color:#dff0e7}
+.msg .src{margin-top:6px;font-size:13.5px;color:#8fa79d;line-height:1.5}
+/* 打字中 */
+.typing{display:inline-flex;gap:5px;align-items:center;height:22px}
+.typing i{width:7px;height:7px;border-radius:50%;background:#7ad6b8;opacity:.5;
+  animation:blink3 1.2s var(--e-out) infinite}
+.typing i:nth-child(2){animation-delay:.18s}
+.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink3{0%,100%{opacity:.3;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+/* 输入区：语音优先 */
+.ch-f{flex:none;position:relative;z-index:1;padding:12px 16px 14px;border-top:1px solid rgba(255,255,255,.1);
+  display:flex;flex-direction:column;gap:10px}
+.quick{display:flex;flex-wrap:wrap;gap:8px}
+.quick button{height:var(--tap);padding:0 15px;border-radius:var(--r-pill);
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);color:#dfeae4;font-size:15.5px}
+.mic{display:flex;align-items:center;gap:12px;height:var(--tap-main);padding:0 16px 0 20px;border-radius:15px;
+  background:rgba(255,255,255,.08);border:1.5px solid rgba(122,214,184,.42)}
+.mic>svg{width:23px;height:23px;color:#7ad6b8;flex:none}
+.mic .ph{flex:1;min-width:0;font-size:18px;color:#9fb3aa}
+.mic .say{flex:none;display:inline-flex;align-items:center;height:46px;padding:0 20px;border-radius:var(--r-pill);
+  background:#7ad6b8;color:#0e211c;font-size:16px;font-weight:800}
+
+/* 右：本次要点（沉淀 = 交付物） */
+.pins{min-height:0;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);
+  border-radius:17px;overflow:hidden;box-shadow:var(--sh-1)}
+.pn-h{flex:none;padding:14px 18px 12px;border-bottom:1px solid var(--line-soft)}
+.pn-h h3{font-size:19px;font-weight:800;display:flex;align-items:center;gap:9px}
+.pn-h h3 .n{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 8px;
+  border-radius:var(--r-pill);background:var(--teal-soft);border:1px solid var(--teal-line);
+  color:var(--teal-deep);font-size:15px;font-weight:800}
+.pn-h p{margin-top:5px;font-size:14.5px;color:var(--muted);line-height:1.5}
+.pn-b{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px;
+  scrollbar-width:thin}
+.pn-b::-webkit-scrollbar{width:6px}
+.pn-b::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.pcard{padding:12px 14px;border-radius:13px;background:var(--surface-2);border:1px solid var(--line-soft);
+  animation:riseSharp .45s var(--e-out) both}
+.pcard .k{font-size:13.5px;font-weight:800;letter-spacing:.05em;color:var(--teal-deep)}
+.pcard p{margin-top:5px;font-size:16px;line-height:1.55;color:var(--ink-2)}
+.pcard .ref{margin-top:7px;font-size:13.5px;color:var(--faint);line-height:1.5}
+.pcard .x{margin-top:9px;display:inline-flex;align-items:center;height:var(--tap);padding:0 14px;
+  border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:15px;color:var(--muted)}
+.pn-empty{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:20px;text-align:center}
+.pn-empty svg{width:44px;height:44px;color:var(--faint)}
+.pn-empty p{font-size:16px;color:var(--muted);line-height:1.55;max-width:300px}
+/* 合规提示条 */
+.pn-note{flex:none;margin:0 14px 13px;padding:11px 13px;border-radius:12px;background:var(--amber-soft);
+  border:1px solid var(--amber-line);font-size:14.5px;line-height:1.55;color:#7a5714}
+.pn-note b{font-weight:800}
+
+/* ActionBar */
+.ab{flex:none;margin:11px -40px 0;padding:13px 40px;background:var(--surface);
+  border-top:1px solid var(--line);display:flex;align-items:center;gap:16px}
+.ab-l{flex:1;min-width:0;display:flex;align-items:center;gap:14px}
+.ab-note{font-size:14.5px;color:var(--muted);line-height:1.5}
+.ab-note b{color:var(--ink-2)}
+.btn-alt{display:inline-flex;align-items:center;justify-content:center;height:var(--tap-main);padding:0 22px;
+  border-radius:14px;border:1px solid var(--line);background:var(--surface-2);
+  font-size:17px;font-weight:700;color:var(--ink-2);flex:none}
+.btn-main{display:inline-flex;align-items:center;justify-content:center;gap:10px;height:var(--tap-main);
+  padding:0 30px;border-radius:14px;background:var(--teal);color:#fff;font-size:18.5px;font-weight:800;flex:none;
+  box-shadow:0 6px 18px rgba(31,138,116,.26)}
+.btn-main:not([disabled]){animation:glowPulse 3s var(--e-out) infinite}
+@keyframes glowPulse{0%,100%{box-shadow:0 6px 18px rgba(31,138,116,.26)}50%{box-shadow:0 6px 26px rgba(31,138,116,.44)}}
+.btn-main svg{width:19px;height:19px}
+.btn-main[disabled]{background:var(--surface-3);color:var(--faint);box-shadow:none;animation:none}
+
+@media (prefers-reduced-motion:reduce){
+  .msg,.pcard,.typing i,.btn-main{animation:none!important}
+}
+
+#panel{position:fixed;left:20px;top:20px;z-index:60;background:rgba(18,42,36,.94);border-radius:14px;
+  padding:11px;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+#panel .pt-l{font-size:11.5px;color:#9fb3aa;padding:0 4px 2px}
+#panel button{height:36px;padding:0 13px;border-radius:9px;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#dfeae4;font-size:13px;text-align:left}
+#panel button.on{background:#7ad6b8;color:#0e211c;font-weight:700;border-color:transparent}
+</style>
+</head>
+<body data-state="pinned">
+
+<div id="panel">
+  <div class="pt-l">状态切换</div>
+  <button data-s="idle">① 待命 · 还没问</button>
+  <button data-s="answering">② 正在回答</button>
+  <button data-s="pinned" class="on">③ 攒了 3 条要点</button>
+  <button data-s="degraded">④ AI 不可用</button>
+</div>
+
+<div id="stage">
+<div class="kiosk">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+      <div><h2>职易达</h2><p>AI 求职打印服务终端</p></div>
+    </div>
+    <div class="tb-r">
+      <span class="clock">09:41</span>
+      <span class="device"><i></i><span>打印机在线 · A4 纸充足 · 碳粉正常</span></span>
+      <button class="help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>需要帮忙</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="mh">
+      <div>
+        <div class="mh-kicker">AI 顾问 · HR 知识问答</div>
+        <h1 id="mhTitle">问出来的要点，<em>能带走</em></h1>
+        <p class="mh-lede" id="mhLede">对话本身不保存。但你问出来的关键结论会钉在右边，攒成一份可以打印或存进「我的文档」的要点清单。</p>
+      </div>
+      <span class="mh-id">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        已登录 · <b>李同学</b>
+      </span>
+    </section>
+
+    <div class="stage">
+
+      <!-- 左：对话 -->
+      <div class="chat">
+        <div class="ch-h">
+          <span class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg></span>
+          <div class="ch-h-b"><h3>小青 · AI 顾问</h3><p id="chSub">HR 知识问答 · 只答已公开的通行做法</p></div>
+          <span class="ch-topic">换个话题</span>
+        </div>
+
+        <div class="ch-b" id="chB">
+          <div class="msg ai" style="animation-delay:.02s">
+            <div class="bub">要问什么都行。比如三方协议怎么签、试用期能不能不交社保、offer 里哪几条要看清楚。<b>我只讲已经公开的通行做法</b>，具体到你这一份合同，还是要以你和单位签的文本为准。</div>
+          </div>
+
+          <div class="msg me" id="m1" style="animation-delay:.1s">
+            <div class="bub">试用期公司说先不交社保，等转正再补，可以吗？</div>
+          </div>
+
+          <div class="msg ai" id="m2" style="animation-delay:.18s">
+            <div class="bub">
+              不可以。<span class="pin">用人单位自用工之日起就负有为劳动者缴纳社会保险的义务，试用期包含在劳动合同期限内</span>，
+              不是「转正后才开始」。约定「试用期不缴、转正补缴」的条款，即使写进合同也不具备法律效力。
+              <br><br>遇到这种情况，可以先和单位人事沟通；沟通不成，可以向<span class="pin">当地社保经办机构或劳动保障监察部门反映</span>。
+              <div class="src">依据 · 公开的劳动法通行口径｜具体认定以主管部门为准，本机不提供法律意见</div>
+            </div>
+          </div>
+
+          <div class="msg me" id="m3" style="animation-delay:.26s">
+            <div class="bub">三方协议和劳动合同是一回事吗？</div>
+          </div>
+
+          <div class="msg ai" id="m4" style="animation-delay:.34s">
+            <div class="bub">
+              不是。<span class="pin">三方协议是学校、用人单位、毕业生三方在入职前签的就业意向文件，用于派遣和档案关系；劳动合同是入职后建立劳动关系的凭证</span>。
+              两者法律性质不同，三方协议里的违约金条款和劳动合同的试用期条款也不是一回事。
+              <div class="src">依据 · 公开的高校就业指导通行口径｜以学校就业中心与单位实际约定为准</div>
+            </div>
+          </div>
+
+          <div class="msg ai" id="mTyping" style="display:none">
+            <div class="bub"><span class="typing"><i></i><i></i><i></i></span></div>
+          </div>
+        </div>
+
+        <div class="ch-f">
+          <div class="quick" id="quick">
+            <button>offer 要看哪几条</button>
+            <button>试用期最长多久</button>
+            <button>档案怎么转</button>
+            <button>违约金合理吗</button>
+          </div>
+          <div class="mic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v4"/></svg>
+            <span class="ph" id="micPh">按住说话，或点右边打字</span>
+            <span class="say">按住说</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：本次要点 = 交付物 -->
+      <div class="pins">
+        <div class="pn-h">
+          <h3>本次要点 <span class="n" id="pinN">3</span></h3>
+          <p id="pnSub">你问出来的关键结论。对话不保存，这份要点可以打印或存进「我的文档」。</p>
+        </div>
+
+        <div class="pn-b" id="pnB">
+          <div class="pcard" style="animation-delay:.05s">
+            <div class="k">社保 · 试用期</div>
+            <p>用人单位自用工之日起就要缴社保，试用期包含在合同期内；「转正再补缴」的约定无效。</p>
+            <div class="ref">来自你 09:38 的提问｜以主管部门认定为准</div>
+            <button class="x">移出这条</button>
+          </div>
+          <div class="pcard" style="animation-delay:.14s">
+            <div class="k">社保 · 维权途径</div>
+            <p>沟通不成可向当地社保经办机构或劳动保障监察部门反映。</p>
+            <div class="ref">来自你 09:38 的提问｜以主管部门认定为准</div>
+            <button class="x">移出这条</button>
+          </div>
+          <div class="pcard" style="animation-delay:.23s">
+            <div class="k">三方协议 vs 劳动合同</div>
+            <p>三方协议是入职前的就业意向文件，用于派遣与档案；劳动合同是入职后建立劳动关系的凭证。两者性质不同。</p>
+            <div class="ref">来自你 09:40 的提问｜以学校与单位实际约定为准</div>
+            <button class="x">移出这条</button>
+          </div>
+        </div>
+
+        <div class="pn-empty" id="pnEmpty" style="display:none">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"/><path d="M12 2v13"/><polyline points="8 6 12 2 16 6"/></svg>
+          <p id="pnEmptyT">问出第一个问题后，关键结论会钉在这里，攒够了就能打印带走。</p>
+        </div>
+
+        <p class="pn-note" id="pnNote">
+          <b>这些是通行做法的说明，不是法律意见。</b>具体到你的合同与个人情况，以主管部门认定和你实际签署的文本为准。
+        </p>
+      </div>
+
+    </div>
+
+    <div class="ab">
+      <div class="ab-l">
+        <button class="btn-alt" id="abAlt">扫码发到手机</button>
+        <p class="ab-note" id="abNote">
+          对话内容<b>不保存、不外发</b>，离开即清除。只有你钉下的要点会生成文件，且只存进你自己的「我的文档」。
+        </p>
+      </div>
+      <button class="btn-main" id="abMain">
+        <span id="abMainT">打印这 3 条要点</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>首页</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg><span>AI 顾问</span></button>
+    <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>我的</span></button>
+  </nav>
+</div>
+</div>
+
+<script>
+function fit(){
+  var s = Math.min((window.innerHeight - 28) / 1920, (window.innerWidth - 290) / 1080, 1);
+  var st = document.getElementById("stage");
+  if(st){ st.style.transform = "scale(" + s + ")"; st.style.height = (1920 * s) + "px"; }
+}
+window.addEventListener("resize", fit); fit();
+
+document.querySelectorAll('.pcard .x').forEach(function(b){
+  b.addEventListener('click', function(){
+    var c = b.closest('.pcard'); c.remove();
+    var n = document.querySelectorAll('.pcard').length;
+    document.getElementById('pinN').textContent = n;
+    document.getElementById('abMainT').textContent = n ? ('打印这 ' + n + ' 条要点') : '还没有可带走的要点';
+    document.getElementById('abMain').disabled = n === 0;
+    document.getElementById('pnEmpty').style.display = n ? 'none' : '';
+  });
+});
+
+var COPY = {
+  idle:{ title:'问出来的要点，<em>能带走</em>',
+    lede:'对话本身不保存。但你问出来的关键结论会钉在右边，攒成一份可以打印或存进「我的文档」的要点清单。',
+    sub:'HR 知识问答 · 只答已公开的通行做法',
+    main:'还没有可带走的要点', disabled:true, alt:'换个话题',
+    note:'对话内容<b>不保存、不外发</b>，离开即清除。只有你钉下的要点会生成文件。',
+    msgs:1, pins:false, typing:false,
+    pnSub:'你问出来的关键结论会出现在这里。',
+    pnEmptyT:'问出第一个问题后，关键结论会钉在这里，攒够了就能打印带走。' },
+  answering:{ title:'小青正在答',
+    lede:'回答完会自动把关键结论钉到右边。你也可以随时打断，换个问题。',
+    sub:'HR 知识问答 · 正在回答',
+    main:'等回答完再打印', disabled:true, alt:'打断，换个问题',
+    note:'对话内容<b>不保存、不外发</b>，离开即清除。',
+    msgs:3, pins:true, typing:true,
+    pnSub:'这一条答完后会自动钉上来。',
+    pnEmptyT:'' },
+  pinned:{ title:'问出来的要点，<em>能带走</em>',
+    lede:'对话本身不保存。但你问出来的关键结论会钉在右边，攒成一份可以打印或存进「我的文档」的要点清单。',
+    sub:'HR 知识问答 · 只答已公开的通行做法',
+    main:'打印这 3 条要点', disabled:false, alt:'扫码发到手机',
+    note:'对话内容<b>不保存、不外发</b>，离开即清除。只有你钉下的要点会生成文件，且只存进你自己的「我的文档」。',
+    msgs:5, pins:true, typing:false,
+    pnSub:'你问出来的关键结论。对话不保存，这份要点可以打印或存进「我的文档」。',
+    pnEmptyT:'' },
+  degraded:{ title:'现在答不了',
+    lede:'AI 顾问需要联网服务，现在连不上，所以<b>不会给出任何回答</b>——没有的东西不编给你看。已经钉下的要点还在，可以照常打印带走。',
+    sub:'HR 知识问答 · 暂时不可用',
+    main:'打印已有的 3 条要点', disabled:false, alt:'扫码发到手机',
+    note:'AI 服务不可用期间<b>不产生任何新结论</b>。已钉下的要点是此前问出来的，未被改动。',
+    msgs:5, pins:true, typing:false,
+    pnSub:'这些是此前问出来的，AI 恢复前不会新增。',
+    pnEmptyT:'' }
+};
+
+document.querySelectorAll('#panel button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#panel button').forEach(function(x){ x.classList.remove('on') });
+    b.classList.add('on');
+    var s = b.dataset.s; document.body.dataset.state = s;
+    var c = COPY[s];
+    document.getElementById('mhTitle').innerHTML = c.title;
+    document.getElementById('mhLede').innerHTML = c.lede;
+    document.getElementById('chSub').textContent = c.sub;
+    document.getElementById('abMainT').textContent = c.main;
+    document.getElementById('abMain').disabled = c.disabled;
+    document.getElementById('abAlt').textContent = c.alt;
+    document.getElementById('abNote').innerHTML = c.note;
+    document.getElementById('pnSub').textContent = c.pnSub;
+    // 对话条数
+    ['m1','m2','m3','m4'].forEach(function(id, i){
+      var el = document.getElementById(id);
+      if (el) el.style.display = (i + 2 <= c.msgs) ? '' : 'none';
+    });
+    document.getElementById('mTyping').style.display = c.typing ? '' : 'none';
+    // 要点区
+    var has = document.querySelectorAll('.pcard').length > 0 && c.pins;
+    document.getElementById('pnB').style.display = has ? '' : 'none';
+    document.getElementById('pnEmpty').style.display = has ? 'none' : '';
+    if (!has && c.pnEmptyT) document.getElementById('pnEmptyT').textContent = c.pnEmptyT;
+    // 输入区：AI 不可用时禁用提问
+    document.getElementById('micPh').textContent = (s === 'degraded')
+      ? 'AI 顾问暂时不可用，恢复后可继续提问' : '按住说话，或点右边打字';
+    document.querySelector('.mic').style.opacity = (s === 'degraded') ? '.5' : '';
+    document.getElementById('quick').style.display = (s === 'degraded') ? 'none' : '';
+  });
+});
+</script>
+</body>
+</html>
