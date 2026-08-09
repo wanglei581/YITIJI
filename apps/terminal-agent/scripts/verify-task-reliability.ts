@@ -8,6 +8,7 @@ import Database from 'better-sqlite3'
 import { processPatch } from '../src/agent/offline-queue'
 import {
   abandonDeadLetter,
+  auditDeadLetter,
   confirmDeadLetter,
   listDeadLetters,
   parseExactDeadLetterId,
@@ -427,6 +428,39 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     assert.ok(actions.some((row) => row['action'] === 'abandon'))
     assert.doesNotMatch(JSON.stringify(actions), /task-|张三|Scans|token|resume\.pdf/i)
 
+    const successAudit = auditDeadLetter(db, successId)
+    assert.throws(() => auditDeadLetter(db, Number.MAX_SAFE_INTEGER), /DEAD_LETTER_NOT_FOUND/)
+    assert.deepEqual(
+      successAudit.map((entry) => entry.action),
+      ['replay_blocked', 'confirm', 'replay_attempt', 'replay_succeeded'],
+      'single dead-letter audit history must remain in durable insertion order',
+    )
+    for (const entry of successAudit) {
+      assert.deepEqual(
+        Object.keys(entry).sort(),
+        ['action', 'auditId', 'createdAt', 'outcome', 'reasonCode'],
+        'audit read model must expose only the fixed PII-safe field whitelist',
+      )
+    }
+    assert.ok(
+      auditDeadLetter(db, conflictId).some(
+        (entry) => entry.action === 'replay_failed' && entry.reasonCode === 'HTTP_409',
+      ),
+    )
+    assert.ok(
+      auditDeadLetter(db, abandonedId).some(
+        (entry) => entry.action === 'abandon' && entry.reasonCode === 'operator_policy',
+      ),
+    )
+    assert.doesNotMatch(
+      JSON.stringify([
+        successAudit,
+        auditDeadLetter(db, conflictId),
+        auditDeadLetter(db, abandonedId),
+      ]),
+      /task-|张三|Scans|token|resume\.pdf/i,
+    )
+
     const appRoot = join(__dirname, '..')
     const cli = spawnSync(
       process.execPath,
@@ -445,13 +479,41 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
       new RegExp(`task-|张三|Scans|token|resume\\.pdf|${root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
     )
 
+    const auditCli = spawnSync(
+      process.execPath,
+      [
+        '-r',
+        'ts-node/register',
+        join(appRoot, 'src/index.ts'),
+        'dead-letter',
+        'audit',
+        '--id',
+        String(successId),
+      ],
+      {
+        cwd: appRoot,
+        env: { ...process.env, PROGRAMDATA: root },
+        encoding: 'utf8',
+        timeout: 15_000,
+      },
+    )
+    assert.equal(auditCli.status, 0, auditCli.stderr)
+    assert.match(auditCli.stdout, /"auditId"/)
+    assert.doesNotMatch(`${auditCli.stdout}\n${auditCli.stderr}`, /task-|张三|Scans|token|resume\.pdf/i)
+    const auditWithoutId = spawnSync(
+      process.execPath,
+      ['-r', 'ts-node/register', join(appRoot, 'src/index.ts'), 'dead-letter', 'audit'],
+      { cwd: appRoot, env: { ...process.env, PROGRAMDATA: root }, encoding: 'utf8', timeout: 15_000 },
+    )
+    assert.notEqual(auditWithoutId.status, 0, 'audit CLI must never support an unscoped history read')
+
     const indexSource = readFileSync(join(__dirname, '../src/index.ts'), 'utf8')
     assert.match(indexSource, /registerDeadLetterCommands\(program\)/)
     const operatorSource = readFileSync(
       join(__dirname, '../src/agent/dead-letter-operator.ts'),
       'utf8',
     )
-    for (const subcommand of ['list', 'show', 'confirm', 'abandon', 'replay']) {
+    for (const subcommand of ['list', 'show', 'confirm', 'abandon', 'replay', 'audit']) {
       assert.match(operatorSource, new RegExp(`\\.command\\('${subcommand}'\\)`))
     }
     assert.doesNotMatch(operatorSource, /\bprint\s*\(/, 'dead-letter replay must never invoke printing')

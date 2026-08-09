@@ -49,6 +49,24 @@ export interface DeadLetterReplayResult {
   errorCode: string | null
 }
 
+export interface SafeDeadLetterAuditEntry {
+  auditId: number
+  action: string
+  outcome: string
+  reasonCode: string | null
+  createdAt: string | null
+}
+
+const SAFE_AUDIT_ACTIONS = new Set([
+  'confirm',
+  'abandon',
+  'replay_blocked',
+  'replay_attempt',
+  'replay_succeeded',
+  'replay_failed',
+])
+const SAFE_AUDIT_OUTCOMES = new Set(['succeeded', 'blocked', 'started', 'archived', 'retained'])
+
 export class DeadLetterOperatorError extends Error {
   constructor(readonly code: string) {
     super(code)
@@ -193,6 +211,35 @@ export function showDeadLetter(db: AgentDatabase, id: number): SafeDeadLetterVie
   const row = selectDeadLetter(live, id)
   if (!row) throw new DeadLetterOperatorError('DEAD_LETTER_NOT_FOUND')
   return toSafeView(row)
+}
+
+/** Exact-id-only durable action history; no task or error-message columns are selected. */
+export function auditDeadLetter(db: AgentDatabase, id: number): SafeDeadLetterAuditEntry[] {
+  const live = requireDatabase(db)
+  const exists = live
+    .prepare('SELECT id FROM pending_patches WHERE id = ? AND deadLetterAt IS NOT NULL')
+    .get(id)
+  if (!exists) throw new DeadLetterOperatorError('DEAD_LETTER_NOT_FOUND')
+  const rows = live
+    .prepare(
+      `SELECT id, action, outcome, reasonCode, createdAt
+       FROM dead_letter_operator_audit WHERE patchId = ? ORDER BY id ASC`
+    )
+    .all(id)
+  return rows.map((row) => {
+    const action = String(row['action'])
+    const outcome = String(row['outcome'])
+    const rawReason = row['reasonCode'] === null ? null : String(row['reasonCode'])
+    const fixedReason =
+      rawReason !== null && (DEAD_LETTER_ABANDON_REASONS as readonly string[]).includes(rawReason)
+    return {
+      auditId: Number.isSafeInteger(Number(row['id'])) ? Number(row['id']) : 0,
+      action: SAFE_AUDIT_ACTIONS.has(action) ? action : 'unknown',
+      outcome: SAFE_AUDIT_OUTCOMES.has(outcome) ? outcome : 'unknown',
+      reasonCode: fixedReason ? rawReason : safeMachineCode(rawReason),
+      createdAt: safeTimestamp(String(row['createdAt'])),
+    }
+  })
 }
 
 export function confirmDeadLetter(db: AgentDatabase, id: number): SafeDeadLetterView {
@@ -400,6 +447,19 @@ export function registerDeadLetterCommands(program: Command): void {
       try {
         const id = parseExactDeadLetterId(options.id)
         writeDeadLetterResult(useDeadLetterDatabase((db) => showDeadLetter(db, id)))
+      } catch (error) {
+        handleDeadLetterCommandFailure(error)
+      }
+    })
+
+  deadLetterCommand
+    .command('audit')
+    .description('Show PII-safe durable action history for one exact dead-letter id')
+    .requiredOption('--id <id>', 'Exact local dead-letter id')
+    .action((options: { id: string }) => {
+      try {
+        const id = parseExactDeadLetterId(options.id)
+        writeDeadLetterResult(useDeadLetterDatabase((db) => auditDeadLetter(db, id)))
       } catch (error) {
         handleDeadLetterCommandFailure(error)
       }
