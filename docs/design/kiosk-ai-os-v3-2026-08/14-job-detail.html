@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P14 岗位详情 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P14 岗位详情">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/listing.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<style>
+  .work--detail { grid-template-columns: 1fr 396px; }
+  /* 离站确认层默认不存在，点了外链动作才出现 */
+  .screen:not(.is-leaving) .sheet-mask { display: none; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="ok" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="13-jobs-desk.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">岗位详情</div>
+        <div class="brand-sub">职易达 · 01 号机 · 信息来自第三方来源，投递在来源平台完成</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>本机在线</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 浏览与跳转正常</div>
+    <div class="clock" data-clock>2026年8月8日 <b>10:38</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="states">
+      <button class="stbtn" data-go="ok"><svg class="ic" style="width:17px;height:17px"><use href="#i-briefcase"/></svg>正常</button>
+      <button class="stbtn" data-go="expired"><svg class="ic" style="width:17px;height:17px"><use href="#i-clock"/></svg>岗位已过期</button>
+      <button class="stbtn" data-go="error"><svg class="ic" style="width:17px;height:17px"><use href="#i-offline"/></svg>加载失败</button>
+    </div>
+    <span class="rail-count">过期与失败都要接线：第三方岗位随时会被来源平台下架</span>
+  </div>
+
+  <div class="work work--detail">
+    <!-- ================= 左：岗位正文 ================= -->
+    <div class="wmain">
+      <div class="detail" data-at="ok expired">
+
+        <div class="dhead">
+          <div class="dhead-row">
+            <span class="track track--online"><svg class="ic" style="width:14px;height:14px"><use href="#i-external"/></svg>线上平台岗位</span>
+            <span class="chip chip--coral" data-at="expired"><span class="dot dot--down"></span>来源平台已下架</span>
+            <span class="chip" data-at="ok">在招</span>
+          </div>
+          <h1 class="dhead-t">用户运营专员</h1>
+          <span class="dhead-org">广州××科技有限公司 · 互联网 · 100–499 人 · 民营</span>
+          <div class="dhead-row">
+            <span class="rcard-pay" style="text-align:left"><b style="font-size:var(--fz-7)">6–9K</b><span>薪资以来源平台公示为准</span></span>
+            <span class="rcard-meta">
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-pin"/></svg>广州 · 天河区 · 天河路 ×× 号</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-clock"/></svg>1–3 年</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-campus"/></svg>本科</span>
+              <span><svg class="ic" style="width:16px;height:16px"><use href="#i-users"/></svg>招 2 人</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="notice notice--coral" data-at="expired">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>这个岗位在来源平台已经下架了。</b>本机保留它只是因为你刚才浏览过，
+            <b>不建议再投</b>。下面内容是 8 月 8 日 09:20 同步时的快照，可能已经不准。</span>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">岗位职责</div>
+          <div class="dsec-body">
+            <ul>
+              <li>负责用户社群的日常运营与维护，处理用户反馈</li>
+              <li>独立完成线上活动的策划、执行与复盘</li>
+              <li>独立使用 SQL 取数，输出周期性运营数据报表</li>
+              <li>配合内容团队完成公众号等自有渠道的增长动作</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">任职要求</div>
+          <div class="dsec-body">
+            <ul>
+              <li>本科及以上学历，1–3 年运营相关经验</li>
+              <li>熟练使用 SQL 独立取数，具备数据复盘与增长分析能力</li>
+              <li>有活动策划与执行的完整经历，能提供可核对的成果数据</li>
+              <li>熟悉 A/B 测试流程者优先</li>
+              <li>有团队协作或带人经验者优先</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">福利与工作时间</div>
+          <div class="dsec-body">
+            五险一金 · 带薪年假 · 周末双休 · 09:30–18:30 · 节日福利<br>
+            <span style="font-size:var(--fz-2);color:var(--fog-600)">
+              以上为来源平台展示内容，本机<b>未做核实</b>。具体以你与用人单位签订的书面约定为准。
+            </span>
+          </div>
+        </div>
+
+        <div class="dsec">
+          <div class="dsec-t">数据来源</div>
+          <div class="srcline srcline--detail">
+            <span class="org">来源机构：前程无忧</span><span class="sep">·</span>
+            <span>同步时间：2026-08-08 09:20</span><span class="sep">·</span>
+            <span>外部 ID：JX-88214</span>
+          </div>
+          <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
+            本机<b>不是</b>该岗位的发布方，也不代该企业收取简历。岗位内容由来源机构提供并经管理员审核后展示；
+            如内容与来源平台不一致，以来源平台为准。
+          </p>
+        </div>
+      </div>
+
+      <!-- 加载失败 -->
+      <div class="blank" data-at="error">
+        <svg class="ic" style="color:var(--coral-400)"><use href="#i-offline"/></svg>
+        <b>这个岗位的详情没取到</b>
+        <p>本机与来源数据之间连接失败，<b>不是你的操作问题</b>。故障已自动上报。<br>
+          这里<b>不用列表页的摘要凑一个详情页</b>——摘要缺职责与要求，你看了也判断不了。</p>
+        <div class="acts">
+          <button class="btn btn--primary">重试</button>
+          <a class="btn btn--ghost" href="13-jobs-desk.html">回岗位列表</a>
+        </div>
+        <p style="font-size:var(--fz-2);color:var(--fog-600)">外部 ID JX-88214 · 失败时间 10:38 · 已重试 2 次</p>
+      </div>
+    </div>
+
+    <!-- ================= 右：动作区 ================= -->
+    <div class="wside">
+
+      <!-- 匹配参考 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd">
+          <span class="t">和你的简历比</span>
+          <span class="s" data-when="default device-off">三档参考</span>
+          <span class="s" data-when="first">需要简历</span>
+          <span class="s" data-when="ai-down">不可用</span>
+        </div>
+        <div data-when="default device-off">
+          <div class="tier tier--high" style="margin-bottom:10px">
+            <span class="tier-bars"><i></i><i></i><i></i></span>
+            <span class="tier-text" style="font-size:var(--fz-4);color:var(--jade-600);font-weight:600">较高</span>
+          </div>
+          <div class="concl-counts" style="margin:0 0 10px">
+            <span class="cnt cnt--ok"><b>5</b><span>对上了</span></span>
+            <span class="cnt cnt--near"><b>2</b><span>差一点</span></span>
+            <span class="cnt cnt--miss"><b>1</b><span>没写到</span></span>
+          </div>
+          <p style="margin:0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55">
+            只有三档：较高 / 中等 / 偏低。<b>不给百分比，也不预测录用概率。</b>
+          </p>
+          <a class="btn btn--ghost" href="11-jobfit-compare.html" style="width:100%;margin-top:12px">看逐条比对</a>
+        </div>
+        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="first">
+          还没有简历，不给匹配参考——没有你的材料就无从比对，猜一个档位对你没用。
+        </p>
+        <a class="btn btn--ghost" href="09-resume-workbench.html" style="width:100%;margin-top:12px" data-when="first">先做一份简历</a>
+        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65" data-when="ai-down">
+          比对服务中断，不给档位。岗位正文、扫码、打开来源平台都正常。
+        </p>
+      </div>
+
+      <!-- 扫码投递 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd"><span class="t">扫码投递</span><span class="s">在你手机上完成</span></div>
+        <div class="qr">
+          <div class="qr-box">
+            <svg viewBox="0 0 100 100" fill="var(--paper-ink)">
+              <rect x="4" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+              <rect x="70" y="4" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+              <rect x="4" y="70" width="26" height="26" fill="none" stroke="currentColor" stroke-width="6"/>
+              <rect x="14" y="14" width="6" height="6"/><rect x="80" y="14" width="6" height="6"/><rect x="14" y="80" width="6" height="6"/>
+              <rect x="40" y="8" width="6" height="6"/><rect x="52" y="8" width="6" height="6"/><rect x="40" y="20" width="6" height="6"/>
+              <rect x="58" y="20" width="6" height="6"/><rect x="8" y="40" width="6" height="6"/><rect x="20" y="40" width="6" height="6"/>
+              <rect x="40" y="40" width="6" height="6"/><rect x="52" y="46" width="6" height="6"/><rect x="64" y="40" width="6" height="6"/>
+              <rect x="76" y="46" width="6" height="6"/><rect x="88" y="40" width="6" height="6"/><rect x="40" y="58" width="6" height="6"/>
+              <rect x="58" y="64" width="6" height="6"/><rect x="70" y="58" width="6" height="6"/><rect x="82" y="70" width="6" height="6"/>
+              <rect x="40" y="76" width="6" height="6"/><rect x="52" y="88" width="6" height="6"/><rect x="64" y="82" width="6" height="6"/>
+              <rect x="8" y="52" width="6" height="6"/><rect x="20" y="64" width="6" height="6"/><rect x="88" y="88" width="6" height="6"/>
+            </svg>
+          </div>
+          <span class="qr-cap">
+            用手机扫这个码，会打开<b>来源平台的该岗位页面</b>，在手机上登录并投递。<br>
+            <span style="color:var(--fog-600)">码只在本次会话有效，离场即失效。本机不经手你的简历。</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- 其他动作 -->
+      <div class="pane pane--fill" data-at="ok">
+        <div class="pane-hd"><span class="t">还能做什么</span></div>
+        <div class="outs">
+          <button class="out"><svg class="ic"><use href="#i-bookmark"/></svg>收藏这个岗位</button>
+          <a class="out" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>看这家企业</a>
+          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印岗位信息</button>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>按这岗位练面试</a>
+          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练面试不可用</button>
+        </div>
+        <div class="notice" style="margin-top:14px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机<b>只记两件事</b>：你看过这个岗位、你打开过来源平台。
+            存进「我的 · 浏览与跳转记录」。<b>不记录你投没投、投没投成。</b></span>
+        </div>
+      </div>
+
+      <div class="pane pane--fill" data-at="expired">
+        <div class="pane-hd"><span class="t">已下架，还能做的</span></div>
+        <p style="margin:0 0 14px;font-size:var(--fz-3);color:var(--fog-800);line-height:1.7">
+          这个岗位不建议再投。但它的<b>要求可以留着用</b>——按它做一次简历比对，
+          知道自己差在哪，再去找同类在招岗位。
+        </p>
+        <div class="outs">
+          <a class="out" href="11-jobfit-compare.html" data-when="default device-off"><svg class="ic"><use href="#i-target"/></svg>按这份要求比对</a>
+          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-search"/></svg>找同类在招</a>
+          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-target"/></svg>比对不可用</button>
+        </div>
+        <div class="notice notice--amber" style="margin-top:14px">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>扫码与打开来源平台的入口<b>已关闭</b>——留着按钮让你白跑一趟，不如直接告诉你没了。</span>
+        </div>
+      </div>
+
+      <div class="pane" data-at="error">
+        <div class="pane-hd"><span class="t">现在能做的</span></div>
+        <div class="outs">
+          <button class="out"><svg class="ic"><use href="#i-refresh"/></svg>重试</button>
+          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>回列表</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 离站确认层：跳第三方必须你点确认 ============ -->
+  <div class="sheet-mask" id="leave-sheet">
+    <div class="sheet">
+      <div class="sheet-hd">
+        <svg class="ic"><use href="#i-external"/></svg>
+        <h2 class="sheet-t">要离开职易达，去前程无忧了</h2>
+      </div>
+      <p class="sheet-p">
+        接下来打开的是<b>来源平台自己的页面</b>，不再是本机。你在那边的登录、填表、上传简历
+        都由该平台处理，<b>本机不参与、也看不到</b>。
+      </p>
+      <div class="sheet-dest">
+        目标：前程无忧 · 岗位 JX-88214<br>
+        https://（来源平台域名）/job/JX-88214
+      </div>
+      <p class="sheet-p" style="font-size:var(--fz-2);color:var(--fog-600)">
+        本机会记下「你在 10:38 打开了这个来源平台链接」，用于你在「我的」里回头查。
+        不会记录你在对方平台做了什么。<br>
+        公共终端提醒：在对方平台登录后，<b>离开前请退出账号</b>。本机会在你离场或超时时清空会话，但管不到对方网站。
+      </p>
+      <div class="sheet-acts">
+        <button class="btn btn--lg btn--ghost" id="leave-cancel">再想想，留在本机</button>
+        <button class="btn btn--primary" id="leave-go">确认，打开来源平台<svg class="ic"><use href="#i-external"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-at="ok">
+        <div data-when="default device-off"><div class="t">和你的简历比：参考较高（5 对上 / 2 差一点 / 1 没写到）</div><div class="s">投递在来源平台自己完成 · 本机不代收简历</div></div>
+        <div data-when="first"><div class="t">扫码可在手机上打开来源平台的岗位页</div><div class="s">上传简历后可看三档匹配参考</div></div>
+        <div data-when="ai-down"><div class="t">匹配参考不可用，岗位与投递入口正常</div><div class="s">投递在来源平台自己完成 · 本机不代收简历</div></div>
+      </div>
+      <div data-at="expired"><div class="t">来源平台已下架，不建议再投</div><div class="s">投递入口已关闭 · 要求仍可用于比对</div></div>
+      <div data-at="error"><div class="t">详情没取到，已自动上报</div><div class="s">不用列表摘要凑详情——缺职责与要求你判断不了</div></div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="ok"><svg class="ic"><use href="#i-bookmark"/></svg>收藏</button>
+    <a class="btn btn--lg btn--ghost" data-at="expired" href="13-jobs-desk.html">找同类在招</a>
+    <button class="btn btn--lg btn--ghost" data-at="error">查看网络状态</button>
+
+    <button class="btn btn--primary" data-at="ok" id="btn-leave">去来源平台<svg class="ic"><use href="#i-external"/></svg></button>
+    <a class="btn btn--primary" data-at="expired" href="11-jobfit-compare.html">按这份要求比对<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="error">重试<svg class="ic"><use href="#i-refresh"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=19"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+;(function () {
+  var scr = document.querySelector('.screen')
+  function sync () {
+    var cur = scr.getAttribute('data-stage')
+    document.querySelectorAll('.stbtn').forEach(function (b) {
+      b.setAttribute('aria-selected', b.getAttribute('data-go') === cur ? 'true' : 'false')
+    })
+  }
+  new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
+  sync()
+
+  /* 离站确认：用 class 控制，不用 hidden——hidden 是四态/阶段机制的地盘（本轮踩过） */
+  var open = document.getElementById('btn-leave')
+  var cancel = document.getElementById('leave-cancel')
+  var go = document.getElementById('leave-go')
+  if (open) open.addEventListener('click', function () { scr.classList.add('is-leaving') })
+  if (cancel) cancel.addEventListener('click', function () { scr.classList.remove('is-leaving') })
+  if (go) go.addEventListener('click', function () {
+    scr.classList.remove('is-leaving')
+    go.textContent = '（原型：真实环境在此打开来源平台）'
+  })
+})()
+</script>
+</body>
+</html>
