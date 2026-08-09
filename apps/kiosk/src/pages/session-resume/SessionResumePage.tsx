@@ -2,35 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KioskPageFrame } from '@ai-job-print/ui'
 import {
-  FileTextIcon,
   PrinterIcon,
-  ScanIcon,
-  SparklesIcon,
   ArrowRightIcon,
   ClockIcon,
 } from 'lucide-react'
-import { API_BASE_URL, API_MODE } from '../../services/api/client'
+import { useAuth } from '../../auth/useAuth'
+import { getPendingTasks, type PendingTask } from '../../services/api/pendingTasks'
 import '../../styles/prototype-v1.css'
-
-interface PendingTask {
-  id: string
-  type: 'print' | 'resume' | 'scan' | 'ai-service' | string
-  title: string
-  description: string
-  route: string
-  updatedAt: string
-}
-
-interface PendingTasksResponse {
-  data: PendingTask[]
-}
 
 function taskIcon(type: string) {
   switch (type) {
     case 'print':      return <PrinterIcon aria-hidden="true" style={{ width: 28, height: 28 }} />
-    case 'resume':     return <FileTextIcon aria-hidden="true" style={{ width: 28, height: 28 }} />
-    case 'scan':       return <ScanIcon aria-hidden="true" style={{ width: 28, height: 28 }} />
-    case 'ai-service': return <SparklesIcon aria-hidden="true" style={{ width: 28, height: 28 }} />
     default:           return <ClockIcon aria-hidden="true" style={{ width: 28, height: 28 }} />
   }
 }
@@ -45,37 +27,58 @@ function formatRelativeTime(iso: string): string {
   return `${Math.floor(hours / 24)} 天前`
 }
 
-async function fetchPendingTasks(): Promise<PendingTask[]> {
-  const url = new URL(`${API_BASE_URL}/me/pending-tasks`, window.location.origin)
-  const res = await fetch(url.toString(), {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-    credentials: 'include',
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const json = (await res.json()) as PendingTasksResponse
-  return Array.isArray(json.data) ? json.data : []
+function taskDescription(task: PendingTask): string {
+  switch (task.status) {
+    case 'pending':
+      if (task.resume.kind === 'payment') {
+        return task.payStatus === 'paying' ? '支付处理中，可继续确认支付状态' : '订单待支付，完成支付后开始打印'
+      }
+      return '已支付，等待终端领取任务'
+    case 'claimed':
+      return '终端已领取任务，正在准备打印'
+    case 'printing':
+      return '打印机正在出纸，请及时取件'
+  }
 }
 
 export function SessionResumePage() {
   const navigate = useNavigate()
+  const { ready, isLoggedIn, getToken } = useAuth()
   const [tasks,   setTasks]   = useState<PendingTask[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(false)
 
   useEffect(() => {
-    // Mock 模式下没有真实 pending-tasks 接口，直接显示空态。
-    if (API_MODE !== 'http') {
-      setLoading(false)
+    if (!ready) return
+    const token = getToken()
+    if (!isLoggedIn || !token) {
+      navigate('/login', { replace: true, state: { from: '/session-resume' } })
       return
     }
     let cancelled = false
-    fetchPendingTasks()
+    getPendingTasks(token)
       .then((data) => { if (!cancelled) setTasks(data) })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [])
+  }, [getToken, isLoggedIn, navigate, ready])
+
+  const continueTask = (task: PendingTask) => {
+    const state = {
+      taskId: task.id,
+      file: task.fileName ? { name: task.fileName, size: '待识别' } : undefined,
+      orderId: task.resume.orderId,
+      orderNo: task.resume.orderNo,
+      amountCents: task.resume.amountCents,
+      paymentSessionToken: task.resume.paymentSessionToken,
+      ...(task.resume.kind === 'payment' ? { priceLines: task.resume.priceLines } : {}),
+    }
+    if (task.resume.kind === 'payment') {
+      navigate('/print/cashier', { state })
+      return
+    }
+    navigate('/print/progress', { state })
+  }
 
   return (
     <KioskPageFrame
@@ -163,7 +166,7 @@ export function SessionResumePage() {
               key={task.id}
               type="button"
               className="card"
-              onClick={() => navigate(task.route)}
+              onClick={() => continueTask(task)}
               style={{
                 padding: '20px 24px',
                 display: 'flex',
@@ -194,13 +197,13 @@ export function SessionResumePage() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 21, fontWeight: 600, color: 'var(--pv-ink)', letterSpacing: 0.5 }}>
-                  {task.title}
+                  {task.fileName ?? '打印任务'}
                 </div>
                 <div style={{ fontSize: 16, color: 'var(--pv-muted)', marginTop: 4 }}>
-                  {task.description}
+                  {taskDescription(task)}
                 </div>
                 <div style={{ fontSize: 14, color: 'var(--pv-muted)', marginTop: 6, opacity: 0.7 }}>
-                  {formatRelativeTime(task.updatedAt)} 中断
+                  {formatRelativeTime(task.updatedAt)} 更新
                 </div>
               </div>
               <ArrowRightIcon

@@ -8,8 +8,8 @@
  *   - Poll every 60s.
  *   - Exponential back-off: nextRetryAt = now + min(2^attempts * 30s, 30min).
  *   - 401 response → persist unauthorized latch and retain the patch for re-bind.
- *   - Other 4xx response → abandon (remove from queue; log warning).
- *   - attempts >= 10 → abandon.
+ *   - Other 4xx response → durable dead-letter (operator action required).
+ *   - attempts >= 10 → durable dead-letter.
  *   - 2xx → success (remove from queue; log confirmation).
  *   - timer.unref() → never prevents the process from exiting cleanly.
  */
@@ -20,6 +20,8 @@ import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import {
   getPendingPatches,
+  getDeadLetterPatchCount,
+  deadLetterPatch,
   markPatchAttempt,
   isDatabaseAvailable,
   type AgentDatabase,
@@ -55,10 +57,10 @@ export async function processPatch(
   // Max attempts guard
   if (patch.attempts >= MAX_ATTEMPTS) {
     warn(
-      `offline-queue: abandoning patch id=${patch.id} task=${patch.taskId}` +
-        ` — max ${MAX_ATTEMPTS} attempts reached`,
+      `offline-queue: dead-lettering patch id=${patch.id} task=${patch.taskId}` +
+        ` — max ${MAX_ATTEMPTS} attempts reached; operator action required`,
     )
-    markPatchAttempt(db, patch.id, false, undefined, /* abandon */ true)
+    deadLetterPatch(db, patch.id, `MAX_ATTEMPTS_REACHED:${MAX_ATTEMPTS}`)
     return 'processed'
   }
 
@@ -102,12 +104,12 @@ export async function processPatch(
     const httpStatus = axios.isAxiosError(e) ? e.response?.status : undefined
 
     if (httpStatus !== undefined && httpStatus >= 400 && httpStatus < 500) {
-      // 4xx → abandon; no point retrying a client-side error
+      // 4xx is not blindly retried, but its terminal-status evidence must remain.
       warn(
-        `offline-queue: abandoning patch id=${patch.id} task=${patch.taskId}` +
-          ` — 4xx (${httpStatus}): ${axiosErrorMessage(e)}`,
+        `offline-queue: dead-lettering patch id=${patch.id} task=${patch.taskId}` +
+          ` — 4xx (${httpStatus}); operator action required: ${axiosErrorMessage(e)}`,
       )
-      markPatchAttempt(db, patch.id, false, undefined, /* abandon */ true)
+      deadLetterPatch(db, patch.id, `HTTP_${httpStatus}`, true)
     } else {
       // 5xx / network error → schedule next retry with back-off
       const delay = nextRetryDelayMs(patch.attempts + 1)
@@ -152,6 +154,10 @@ export function startOfflineRetry(config: AgentConfig, db: AgentDatabase): NodeJ
   }
 
   log(`offline-queue: starting — interval=${RETRY_INTERVAL_MS / 1000}s, max attempts=${MAX_ATTEMPTS}`)
+  const deadLetterCount = getDeadLetterPatchCount(db)
+  if (deadLetterCount > 0) {
+    warn(`offline-queue: ${deadLetterCount} durable dead-letter patch(es) require operator action`)
+  }
   const timer = setInterval(() => {
     runRetryLoop(config, db).catch((e) =>
       warn(`offline-queue: unexpected error — ${e instanceof Error ? e.message : String(e)}`),

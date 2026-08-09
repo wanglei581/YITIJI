@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common'
 import { JwtModule } from '@nestjs/jwt'
 import { EndUserAuthGuard } from '../common/guards/end-user-auth.guard'
-import { MemberPrintOrdersController } from './member-print-orders.controller'
+import { MemberPendingTasksController, MemberPrintOrdersController } from './member-print-orders.controller'
 import { MemberPrintOrdersService } from './member-print-orders.service'
 
 /**
@@ -26,7 +26,7 @@ import { MemberPrintOrdersService } from './member-print-orders.service'
       },
     }),
   ],
-  controllers: [MemberPrintOrdersController],
+  controllers: [MemberPrintOrdersController, MemberPendingTasksController],
   providers: [MemberPrintOrdersService, EndUserAuthGuard],
 })
 export class MemberPrintOrdersModule {}

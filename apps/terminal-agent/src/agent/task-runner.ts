@@ -245,7 +245,7 @@ export function shouldAbortBeforePrint(): boolean {
  *   - Terminal status (completed/failed) is written to local DB BEFORE the PATCH
  *     so a crash between DB write and PATCH results in a queued retry, never a reprint
  */
-async function executeTask(
+export async function executeTask(
   task: ClaimTask,
   config: AgentConfig,
   db: AgentDatabase,
@@ -257,6 +257,10 @@ async function executeTask(
   }
   if (isUnauthorized()) {
     warn(`task ${task.taskId}: credential unauthorized before execution; print skipped`)
+    return
+  }
+  if (!isDatabaseAvailable(db)) {
+    warn(`task ${task.taskId}: local task database unavailable before execution; print skipped`)
     return
   }
 
@@ -274,23 +278,34 @@ async function executeTask(
   // ── Step 0: Idempotency check ─────────────────────────────────────────────
   if (isTaskDone(db, task.taskId)) {
     const localStatus = getTaskLocalStatus(db, task.taskId)
-    if (localStatus === 'spooled') {
-      // Agent crashed during post-spooling monitoring (Step 4.5). The job was
-      // already submitted to the Windows spooler before the crash, but we cannot
-      // confirm whether it actually printed (paper may or may not have come out).
+    if (localStatus === 'spooled' || localStatus === 'dispatching') {
+      // Agent crashed after durable dispatch intent. The job may or may not have
+      // reached the Windows spooler, so we cannot confirm whether it printed.
       // Report as failed+PRINT_JOB_UNCONFIRMED — do NOT assert completed, since
       // that would silently hide a possible no-paper / jam situation.
       // Operator must check the device physically before re-issuing the task.
-      const msg = '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态'
+      const msg = '打印派发已开始，但无法确认是否已进入队列或完成出纸，请工作人员现场核查'
       warn(
-        `task ${task.taskId}: was already submitted to Windows spooler before restart (crashed during monitoring); ` +
+        `task ${task.taskId}: print dispatch was already started before restart; ` +
         `outcome cannot be confirmed — PATCH failed+PRINT_JOB_UNCONFIRMED, operator must check device`,
       )
       markTaskDone(db, task.taskId, 'failed')
       const ok = await patch('failed', 'PRINT_JOB_UNCONFIRMED', msg)
       if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'PRINT_JOB_UNCONFIRMED', errorMessage: msg })
+    } else if (localStatus === 'completed') {
+      log(`task ${task.taskId}: locally completed task was re-claimed; replaying terminal status`)
+      const ok = await patch('completed')
+      if (!ok) enqueuePatch(db, task.taskId, { status: 'completed' })
+    } else if (localStatus === 'failed') {
+      log(`task ${task.taskId}: locally failed task was re-claimed; replaying terminal status`)
+      const ok = await patch('failed')
+      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed' })
     } else {
-      log(`task ${task.taskId}: already done in local DB (${localStatus ?? 'unknown'}), skipping (restart-idempotency)`)
+      const msg = `本地打印任务状态异常（${localStatus ?? 'unknown'}），为避免重复出纸已停止自动重试，请工作人员核查`
+      warn(`task ${task.taskId}: unknown local state; refusing automatic print and reporting failed`)
+      markTaskDone(db, task.taskId, 'failed')
+      const ok = await patch('failed', 'LOCAL_TASK_STATE_UNKNOWN', msg)
+      if (!ok) enqueuePatch(db, task.taskId, { status: 'failed', errorCode: 'LOCAL_TASK_STATE_UNKNOWN', errorMessage: msg })
     }
     return
   }
@@ -370,6 +385,30 @@ async function executeTask(
     // ── Step 4: Print ─────────────────────────────────────────────────────
     log(`task ${task.taskId}: printing on "${resolvedPrinter}"...`)
 
+    // Durable intent closes the crash window between physical spool submission
+    // and the later 'spooled' write. Any restart from this state is reconciled
+    // as unconfirmed and never invokes the printer automatically again.
+    try {
+      markTaskDone(db, task.taskId, 'dispatching')
+    } catch (dbErr) {
+      const detail = dbErr instanceof Error ? dbErr.message : String(dbErr)
+      err(`task ${task.taskId}: could not persist dispatching before print — ${detail}; print blocked`)
+      const msg = '本地任务状态无法持久化，为避免重复出纸已停止打印，请联系工作人员'
+      const ok = await patch('failed', 'LOCAL_TASK_STATE_PERSIST_FAILED', msg)
+      if (!ok) {
+        try {
+          enqueuePatch(db, task.taskId, {
+            status: 'failed',
+            errorCode: 'LOCAL_TASK_STATE_PERSIST_FAILED',
+            errorMessage: msg,
+          })
+        } catch (queueErr) {
+          err(`task ${task.taskId}: could not enqueue persistence failure status — ${queueErr instanceof Error ? queueErr.message : String(queueErr)}`)
+        }
+      }
+      return
+    }
+
     const result = await print(
       tempFilePath,
       resolvedPrinter,
@@ -382,7 +421,7 @@ async function executeTask(
 
       // ── Step 4.5: Immediately write 'spooled' to local DB ─────────────
       // N5 guarantee: if Agent crashes during post-spooling monitoring, restart
-      // will see 'spooled' → skip reprint → reconcile as completed (conservative).
+      // will see 'spooled' → skip reprint → reconcile as unconfirmed.
       // INSERT OR REPLACE so a later markTaskDone('completed'/'failed') can overwrite.
       try {
         markTaskDone(db, task.taskId, 'spooled')
@@ -390,7 +429,7 @@ async function executeTask(
         err(
           `task ${task.taskId}: failed to record spooled in local DB — ` +
             `${dbErr instanceof Error ? dbErr.message : String(dbErr)}; ` +
-            `task may be re-printed after restart`,
+            `dispatching remains durable; restart will require operator reconciliation`,
         )
       }
 

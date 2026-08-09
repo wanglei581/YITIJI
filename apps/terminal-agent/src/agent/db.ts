@@ -52,6 +52,8 @@ export interface PendingPatch {
   attempts: number
   nextRetryAt: string
   createdAt: string
+  deadLetterAt: string | null
+  deadLetterReason: string | null
 }
 
 // ── DB path ───────────────────────────────────────────────────────────────────
@@ -81,9 +83,17 @@ CREATE TABLE IF NOT EXISTS pending_patches (
   errorMessage TEXT,
   attempts     INTEGER NOT NULL DEFAULT 0,
   nextRetryAt  TEXT    NOT NULL,
-  createdAt    TEXT    NOT NULL
+  createdAt    TEXT    NOT NULL,
+  deadLetterAt TEXT,
+  deadLetterReason TEXT
 );
 `
+
+function ensureColumn(db: SqliteDb, table: string, column: string, definition: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all()
+  if (columns.some((row) => row['name'] === column)) return
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+}
 
 // ── Open ──────────────────────────────────────────────────────────────────────
 
@@ -103,6 +113,8 @@ export function openDatabase(): AgentDatabase {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     const db = new DatabaseCtor(dbPath)
     db.exec(SCHEMA_SQL)
+    ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
     log(`db: opened ${dbPath}`)
     return db
   } catch (e) {
@@ -167,6 +179,17 @@ export function enqueuePatch(
   payload: PatchStatusPayload,
 ): void {
   if (!db) return
+  const existing = db
+    .prepare(
+      `SELECT id, deadLetterAt FROM pending_patches
+       WHERE taskId = ? AND status = ? ORDER BY id DESC LIMIT 1`,
+    )
+    .get(taskId, payload.status)
+  if (existing) {
+    const disposition = existing['deadLetterAt'] ? 'dead-lettered; operator action required' : 'already queued'
+    warn(`db: PATCH status=${payload.status} for task ${taskId} not duplicated — ${disposition}`)
+    return
+  }
   const now = new Date().toISOString()
   // First retry after 30s
   const nextRetryAt = new Date(Date.now() + 30_000).toISOString()
@@ -196,28 +219,66 @@ export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
   const now = new Date().toISOString()
   return db
     .prepare(
-      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt
-       FROM pending_patches WHERE nextRetryAt <= ?`,
+      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
+              deadLetterAt, deadLetterReason
+       FROM pending_patches WHERE deadLetterAt IS NULL AND nextRetryAt <= ?`,
     )
     .all(now) as unknown as PendingPatch[]
+}
+
+/** Return durable, operator-actionable terminal status failures. */
+export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
+  if (!db) return []
+  return db
+    .prepare(
+      `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
+              deadLetterAt, deadLetterReason
+       FROM pending_patches WHERE deadLetterAt IS NOT NULL ORDER BY deadLetterAt ASC`,
+    )
+    .all() as unknown as PendingPatch[]
+}
+
+export function getDeadLetterPatchCount(db: AgentDatabase): number {
+  if (!db) return 0
+  const row = db
+    .prepare('SELECT COUNT(*) AS count FROM pending_patches WHERE deadLetterAt IS NOT NULL')
+    .get()
+  return Number(row?.['count'] ?? 0)
+}
+
+/** Move a patch to durable dead-letter state without deleting its evidence. */
+export function deadLetterPatch(
+  db: AgentDatabase,
+  id: number,
+  reason: string,
+  incrementAttempt = false,
+): void {
+  if (!db) return
+  const now = new Date().toISOString()
+  db
+    .prepare(
+      `UPDATE pending_patches
+       SET deadLetterAt = ?, deadLetterReason = ?, nextRetryAt = ?,
+           attempts = attempts + ?
+       WHERE id = ? AND deadLetterAt IS NULL`,
+    )
+    .run(now, reason, now, incrementAttempt ? 1 : 0, id)
 }
 
 /**
  * Record the outcome of a retry attempt.
  *
  * @param success    true  → delete the record (done)
- * @param nextRetryAt ISO string for the next retry (only used when success=false, abandon=false)
- * @param abandon    true  → delete the record without retrying (4xx or max attempts reached)
+ * @param nextRetryAt ISO string for the next retry (only used when success=false)
  */
 export function markPatchAttempt(
   db: AgentDatabase,
   id: number,
   success: boolean,
   nextRetryAt?: string,
-  abandon?: boolean,
 ): void {
   if (!db) return
-  if (success || abandon) {
+  if (success) {
     db.prepare('DELETE FROM pending_patches WHERE id = ?').run(id)
   } else {
     db

@@ -178,10 +178,21 @@ async function markCurrentDocument(page: Page, marker: string): Promise<void> {
 }
 
 async function readDocumentMarker(page: Page): Promise<string | null> {
-  return page.evaluate(() => {
-    const candidate = window as typeof window & { __privacyDocumentMarker?: string }
-    return candidate.__privacyDocumentMarker ?? null
-  })
+  let lastError: unknown
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    try {
+      return await page.evaluate(() => {
+        const candidate = window as typeof window & { __privacyDocumentMarker?: string }
+        return candidate.__privacyDocumentMarker ?? null
+      })
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof Error) || !error.message.includes('Execution context was destroyed')) throw error
+      await page.waitForLoadState('domcontentloaded').catch(() => undefined)
+      await page.waitForTimeout(25)
+    }
+  }
+  throw lastError
 }
 
 test('member report hard-replaces a clean homepage after the privacy deadline @privacy-kiosk', async ({ page, api }) => {
@@ -572,7 +583,7 @@ test('hard clear stops active print polling without cancelling the backend task 
     )
   }, PRINT_TASK_ID)
   await page.reload({ waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('任务已提交，正在等待终端处理，请留在机器旁', { exact: true })).toBeVisible()
+  await expect(page.getByText('任务已进入队列，终端尚未领取，请留在机器旁', { exact: true })).toBeVisible()
   await expect.poll(() => pollRequests).toBeGreaterThan(0)
 
   await page.waitForTimeout(HARD_PRIVACY_SETTLE_MS)

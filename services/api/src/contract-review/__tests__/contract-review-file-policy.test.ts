@@ -102,6 +102,19 @@ function makeFileAccessHarness(
         Object.assign(record, data)
         return record
       },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { id: string; deletedAt?: null }
+        data: Partial<FileHarnessRecord>
+      }) => {
+        if (where.id !== record.id || (where.deletedAt === null && record.deletedAt !== null)) {
+          return { count: 0 }
+        }
+        Object.assign(record, data)
+        return { count: 1 }
+      },
     },
   }
   const storage = {

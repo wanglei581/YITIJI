@@ -74,6 +74,8 @@ const authContext = read('src/auth/AuthContext.tsx')
 const returnPath = read('src/auth/returnPath.ts')
 const memberAuthDevice = read('src/services/auth/memberAuthDevice.ts')
 const memberSessionEvents = read('src/services/auth/memberSessionEvents.ts')
+const sessionResumePage = read('src/pages/session-resume/SessionResumePage.tsx')
+const pendingTasksApi = read('src/services/api/pendingTasks.ts')
 
 const handleSendCode = extractConstFunction(memberPhoneLoginHook, 'handleSendCode')
 const handleLogin = extractConstFunction(memberPhoneLoginHook, 'handleLogin')
@@ -180,6 +182,7 @@ const memberServiceFiles = [
   'src/services/api/careerPlan.ts',
   'src/services/api/interview.ts',
   'src/services/api/materials.ts',
+  'src/services/api/pendingTasks.ts',
 ]
 
 for (const file of memberServiceFiles) {
@@ -191,5 +194,36 @@ for (const file of memberServiceFiles) {
     `${file} 对带会员 token 的会话失效错误触发统一通知`,
   )
 }
+
+assert(
+  pendingTasksApi.includes('/me/pending-tasks') &&
+    /Authorization:\s*`Bearer \$\{token\}`/.test(pendingTasksApi) &&
+    pendingTasksApi.includes("credentials: 'include'") &&
+    pendingTasksApi.includes('notifyMemberSessionExpired') &&
+    pendingTasksApi.includes('isMemberSessionInvalidError'),
+  'pending-tasks 客户端调用真实 /me 端点并显式携带 AuthContext Bearer，统一处理会员会话失效',
+)
+
+assert(
+  sessionResumePage.includes('useAuth') &&
+    /const\s*\{[^}]*ready[^}]*isLoggedIn[^}]*getToken[^}]*\}\s*=\s*useAuth\(\)/s.test(sessionResumePage) &&
+    /const\s+token\s*=\s*getToken\(\)/.test(sessionResumePage) &&
+    /getPendingTasks\(token\)/.test(sessionResumePage) &&
+    sessionResumePage.includes("navigate('/login'") &&
+    !sessionResumePage.includes("`${API_BASE_URL}/me/pending-tasks`") &&
+    !/fetch\s*\(/.test(sessionResumePage),
+  'SessionResumePage 复用 useAuth 内存 token；未登录走统一登录页，不再发 credentials-only 的恒 401 请求',
+)
+
+assert(
+  sessionResumePage.includes("task.resume.kind === 'payment'") &&
+    sessionResumePage.includes("navigate('/print/cashier'") &&
+    sessionResumePage.includes("navigate('/print/progress'") &&
+    !sessionResumePage.includes('navigate(task.route)') &&
+    sessionResumePage.includes("case 'pending'") &&
+    sessionResumePage.includes("case 'claimed'") &&
+    sessionResumePage.includes("case 'printing'"),
+  'SessionResumePage 只把后端恢复动作映射到支付/打印两个固定站内路由，并诚实区分 pending/claimed/printing',
+)
 
 console.log('\nALL PASS')
