@@ -89,6 +89,28 @@
     return parts.join('、');
   }
 
+  /* 2026-08-09 修：describeElement 原来嵌在 auditInternalClipping 里，
+     auditCardOverlap(649 行)也调用它 —— 只要卡内溢出真的抓到明细就
+     ReferenceError 崩掉整个 v3AuditPlus。提一份到 IIFE 顶层作用域；
+     嵌套的那份留在原地（同名遮蔽，行为不变）。不改任何判定逻辑。 */
+  function describeElement(element) {
+    var description = element.tagName.toLowerCase();
+    var id = (element.id || '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+    var className = typeof element.className === 'string'
+      ? element.className.replace(/\s+/g, ' ').replace(/^ | $/g, '')
+      : '';
+    var classes;
+    var i;
+    if (id) description += '#' + id;
+    if (className) {
+      classes = className.split(/\s+/);
+      for (i = 0; i < classes.length && i < 3; i++) {
+        if (classes[i]) description += '.' + classes[i];
+      }
+    }
+    return description;
+  }
+
   function auditInternalClipping() {
     var result = {
       '视口外': 0,

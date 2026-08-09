@@ -68,6 +68,16 @@
     <div class="vcommand">
       <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
       <input type="text" data-typewriter placeholder="例如：周五要去招聘会，简历还没改" aria-label="说一句你的处境">
+      <!-- 2026-08-09 愿景补齐：站立触控场景语音优先于打字；真实 App 首页本就有麦克风入口。
+           ai-down 态语音识别不可用，如实置灰。 -->
+      <button class="btn btn--lg btn--ghost" data-when="default first device-off"
+              aria-label="按住说话，语音说出你的处境" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </button>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true"
+              aria-label="语音输入暂不可用" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </button>
       <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="default first"
               style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">
         排出办理顺序<svg class="ic" aria-hidden="true"><use href="#i-arrowRight"/></svg>
@@ -252,13 +262,13 @@
     <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" href="23-profile.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
     <a href="01-home-v5.html" aria-current="page"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>

@@ -75,6 +75,30 @@
         </button>
       </div>
 
+      <!-- 2026-08-09 留白复核：域内横向通道（closed-loop-map §二，与 P06 s1 同款真链接）。
+           .sources 是 flex:1，加通道后自动收窄，不挤压下方。 -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">不是要扫描？打印和文件加工在这两个台面</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="06-print-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">打印工作台</span>
+              <span class="xlane-ds">已有电子文件要出纸走那边；扫完的件也可以直接送去打</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="08-file-tools.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">文件加工台</span>
+              <span class="xlane-ds">手机里的散图合成 PDF、给文件加手写签章</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
       <!-- S2 怎么放 -->
       <div class="guide" data-at="s2">
         <div class="machine-art">
@@ -126,22 +150,52 @@
       </div>
 
       <!-- S3 正在扫描：逐页出现，绝不编总进度百分比 -->
+      <!-- 2026-08-09 留白复核：device-off 原来只剩 locked 一块，左栏空 1101px。
+           已扫的 3 页在中断后依然真实存在（locked 文案自己说"不会丢"），
+           所以四态都展示页面网格；只有「可继续加页」占位随离线换成「已中断」。 -->
       <div class="scanpages" data-at="s3">
-        <div class="scangrid" data-when="default first ai-down">
+        <div class="scangrid">
           <div class="scanpage"><i class="t"></i><i></i><i class="s"></i><i></i><i class="s"></i><span>1</span></div>
           <div class="scanpage"><i class="t"></i><i></i><i></i><i class="s"></i><span>2</span></div>
           <div class="scanpage scanpage--low"><i class="t"></i><i class="s"></i><i></i><span>3</span></div>
-          <div class="scanpage scanpage--pending"><em>可继续加页<br><span style="font-size:var(--fz-1)">总页数由实际走纸决定</span></em></div>
+          <div class="scanpage scanpage--pending" data-when="default first ai-down"><em>可继续加页<br><span style="font-size:var(--fz-1)">总页数由实际走纸决定</span></em></div>
+          <div class="scanpage scanpage--pending" data-when="device-off"><em>扫描已中断<br><span style="font-size:var(--fz-1)">剩下的页还没有扫</span></em></div>
         </div>
-        <div class="locked" data-when="device-off" style="margin-top:0">
+        <div class="locked" data-when="device-off" style="margin-top:var(--s-4)">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>扫描仪离线，本次扫描已中断</b>
           <p>已扫好的 <b>3 页</b>不会丢，已存进本次会话。故障已自动上报运维，不需要你操作。<br>
-             你可以改用手机拍照上传，或去任一台空闲机器继续扫剩下的页。</p>
+             你可以改用手机拍照上传，或去任一台空闲机器继续扫剩下的页——
+             凭手机号登录即可取回，文件跟人走，不跟机器走。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
             <button class="btn btn--ghost">手机拍照上传</button>
             <button class="btn btn--ghost" data-go="s4">先看已扫的 3 页</button>
           </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：扫描进行中，左栏页面网格下方原空 666px。
+           只补本页语境内已确认的事实：ADF 上限（CLAUDE.md §3 硬件）、本次预设
+           （s2 参数已定）、去向（s4 三个真实按钮）。device-off 不显示——
+           那一态版面已被网格 + 中断卡占满，且"可继续加页"不再成立。 -->
+      <div class="pane" data-at="s3" data-when="default first ai-down">
+        <div class="pane-hd"><span class="t">正在扫的这批</span><span class="s">#SC-0947-31</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">已采集</span><span class="v">3 页 · 09:47 起</span></div>
+          <div class="kv-row"><span class="k">预检</span><span class="v">第 3 页偏低 · 终检在扫完后</span></div>
+          <div class="kv-row"><span class="k">继续加页</span><span class="v">直接放进送稿器 · 单次上限 50 页</span></div>
+          <div class="kv-row"><span class="k">中途取消</span><span class="v">已采集图像即刻销毁</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s3">
+        <div class="pane-hd">
+          <span class="t" data-when="default first ai-down">扫完会得到什么</span>
+          <span class="t" data-when="device-off">已扫的 3 页现在就能</span>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件</span><span class="v" data-when="default first ai-down">PDF · 灰度 300dpi（可选 JPEG）</span><span class="v" data-when="device-off">PDF · 已扫 3 页 · 存本次会话</span></div>
+          <div class="kv-row"><span class="k">去向</span><span class="v" data-when="default first">送 AI 诊断 / 拿去打印 / 存我的文档</span><span class="v" data-when="ai-down">拿去打印 / 存我的文档（AI 诊断不可用）</span><span class="v" data-when="device-off">存我的文档（打印暂不可用）</span></div>
+          <div class="kv-row"><span class="k">某页没扫好</span><span class="v" data-when="default first ai-down">结果页可只重扫那一页</span><span class="v" data-when="device-off">换一台空闲机器继续扫</span></div>
         </div>
       </div>
 
@@ -186,8 +240,10 @@
         <div class="thumb" data-when="default first ai-down"><i class="t"></i><i></i><span>4</span></div>
         <div class="thumb" data-when="default first ai-down"><i class="t"></i><i class="s"></i><span>5</span></div>
         <div class="thumb" data-when="default first ai-down"><i class="t"></i><i></i><span>6</span></div>
-        <span class="thumbs-note">第 3 页红点：<b>预检</b>发现置信度偏低。终检在扫完后做，届时确认是否需要人工复核。</span>
       </div>
+      <!-- 2026-08-09 留白复核顺手修：注释原挤在 6 张缩略图右侧约 20px 宽的缝里，
+           逐字竖排且溢出条带（148px 定高）。挪出条带单独一行，四态都完整可读。 -->
+      <div class="thumbs-note" data-at="s4" style="margin-left:auto;max-width:none">第 3 页红点：<b>预检</b>发现置信度偏低。终检在扫完后做，届时确认是否需要人工复核。</div>
     </div>
 
     <!-- ================= 右 ================= -->
@@ -203,15 +259,9 @@
           <div class="kv-row"><span class="k">输出</span><span class="v">PDF（可选 JPEG）</span></div>
           <div class="kv-row"><span class="k">单次上限</span><span class="v">送稿器 50 页</span></div>
         </div>
-        <div class="notice" style="margin-top:14px">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>你的材料去哪、留多久、谁能看：</b><br>
-            · <b>去向</b>：扫描件先存在本次会话；只有你在结果页选「存进我的文档」才会长期保存。<br>
-            · <b>保留</b>：未保存的扫描件<b>会话结束即删除</b>；证件类即使保存也默认 7 天到期清理。<br>
-            · <b>谁能看</b>：只有你本人。管理员如需访问会<b>写入审计日志</b>。<br>
-            · <b>外部服务</b>：需要识别文字时，图像<b>会送到第三方 OCR 服务</b>处理；不需要识别的普通扫描不外送。<br>
-            · <b>取消与删除</b>：中途取消会销毁已采集图像；到期删除会留删除日志。</span>
-        </div>
+        <!-- 2026-08-09 留白复核：原挂在这里的隐私 notice 挪进下方常驻卡
+             「你的材料，规矩在先」（data-at="s1 s2 s3"）——同一段规则 s2/s3 也该看到，
+             不必在 s1 重复两份。 -->
       </div>
 
       <!-- S2 参数 + 设备 -->
@@ -286,12 +336,15 @@
       <!-- S4 去向 -->
       <div class="pane" data-at="s4">
         <div class="pane-hd"><span class="t">识别质量</span><span class="s" data-when="default first device-off">本机检查</span><span class="s" data-when="ai-down">未检查</span></div>
-        <div class="kv" data-when="default first device-off">
+        <!-- 2026-08-09 留白复核：任务号与完成时间不依赖识别服务，ai-down 也该看到；
+             只有置信度三行随识别服务隐藏。原来整个 kv 挂 data-when，ai-down 连任务号都没了。 -->
+        <div class="kv">
           <div class="kv-row"><span class="k">扫描任务号</span><span class="v">SC-0947-31</span></div>
           <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:49</span></div>
-          <div class="kv-row"><span class="k">可识别页</span><span class="v" data-when="default first">5 / 6 页</span><span class="v" data-when="device-off">2 / 3 页</span></div>
-          <div class="kv-row"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页</span></div>
-          <div class="kv-row"><span class="k">原因</span><span class="v">原件折痕导致断行</span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">可识别页</span><span class="v" data-when="default first">5 / 6 页</span><span class="v" data-when="device-off">2 / 3 页</span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页</span></div>
+          <div class="kv-row" data-when="default first device-off"><span class="k">原因</span><span class="v">原件折痕导致断行</span></div>
+          <div class="kv-row" data-when="ai-down"><span class="k">置信度终检</span><span class="v v--fog">已跳过 · 识别服务中断</span></div>
         </div>
         <div class="notice notice--amber" data-when="default first device-off" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -299,7 +352,8 @@
         </div>
         <div class="notice" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>识别服务中断，本次不做置信度检查、也不接 AI 诊断。扫描件本身完整，可以直接打印或存进「我的文档」。</span>
+          <span>识别服务中断，本次不做置信度检查、也不接 AI 诊断。扫描件本身完整，可以直接打印或存进「我的文档」。<br>
+            对某页效果不放心，下方「重扫某一页」现在就能用，不必等识别恢复。</span>
         </div>
       </div>
 
@@ -321,6 +375,85 @@
           <button class="btn btn--ghost" style="width:100%" data-when="default first ai-down">拿去打印</button>
           <button class="btn btn--ghost" style="width:100%" data-when="device-off" aria-disabled="true">打印不可用</button>
           <button class="btn btn--ghost" style="width:100%">存进「我的文档」</button>
+        </div>
+      </div>
+
+      <!-- ============ 2026-08-09 留白复核补实：右栏此前四个阶段底部空 713–967px，
+           全是无容器背景空洞。以下按阶段垫底，只写已确认事实（P06 先例同款）。 ============ -->
+
+      <!-- s2 专属：怎么放的补充事实，来自 s2 图示与 CLAUDE.md §3 硬件能力 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><span class="t">这些原件别走送稿器</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">证件、卡片</span><span class="v">掀盖放玻璃板</span></div>
+          <div class="kv-row"><span class="k">有折痕、破损页</span><span class="v">玻璃板逐页扫</span></div>
+          <div class="kv-row"><span class="k">带订书钉、回形针</span><span class="v">先取下再进送稿器</span></div>
+          <div class="kv-row"><span class="k">超过 50 页</span><span class="v">分多次扫</span></div>
+        </div>
+      </div>
+
+      <!-- s4 专属：下一步是打印时的费用预期。单价来自 P06 现场公示价；
+           device-off 打印去向不可用，这一卡换成「换机取回」。 -->
+      <div class="pane" data-at="s4" data-when="default first ai-down">
+        <div class="pane-hd"><span class="t">拿去打印要花多少钱</span><span class="s">按现场公示价预估</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">黑白 · 6 面 × 0.20 元</span><span class="v">1.20 元</span></div>
+          <div class="kv-row"><span class="k">彩色 · 6 面 × 1.50 元</span><span class="v">9.00 元</span></div>
+          <div class="kv-row"><span class="k">双面</span><span class="v">按面计价 · 用纸减半</span></div>
+          <div class="kv-row"><span class="k">口径</span><span class="v">以打印工作台核价为准</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s4" data-when="device-off">
+        <div class="pane-hd"><span class="t">换一台机器接着办</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">第 1 步</span><span class="v">手机号登录，存进「我的文档」</span></div>
+          <div class="kv-row"><span class="k">第 2 步</span><span class="v">到任一台空闲机器登录取回</span></div>
+          <div class="kv-row"><span class="k">第 3 步</span><span class="v">在那台机器打印，或继续扫剩下的页</span></div>
+        </div>
+      </div>
+
+      <!-- s1 专属：进门先说清收不收费。单价与收款方式来自 P06 现场公示价 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">扫描收不收费</span><span class="s">以本机屏上为准</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">扫描转 PDF</span><span class="v" style="color:var(--jade-600)">免费</span></div>
+          <div class="kv-row"><span class="k">AI 诊断 / 优化</span><span class="v" style="color:var(--jade-600)">免费</span></div>
+          <div class="kv-row"><span class="k">之后打印 A4 每面</span><span class="v">黑白 0.20 元 · 彩色 1.50 元</span></div>
+          <div class="kv-row"><span class="k">付款方式</span><span class="v">手机扫码 · 不收现金不刷卡</span></div>
+        </div>
+      </div>
+
+      <!-- 常驻：本机事实（E2）。s2 已有「设备」卡报扫描仪细节，不重复挂 -->
+      <div class="pane" data-at="s1 s3 s4">
+        <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:47</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">扫描仪</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+          <div class="kv-row" data-at="s1"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">空 · 单次可放 50 页</span><span class="v v--fog" data-when="device-off">未知</span></div>
+          <div class="kv-row" data-at="s3"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">走纸中 · 可继续加页</span><span class="v v--fog" data-when="device-off">未知</span></div>
+          <div class="kv-row" data-at="s4"><span class="k">送稿器</span><span class="v" data-when="default first ai-down">已走完 · 空</span><span class="v v--fog" data-when="device-off">未知</span></div>
+          <div class="kv-row"><span class="k">打印机</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>暂不可用 · 同机上报</span></div>
+          <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+          <div class="kv-row"><span class="k">AI 服务</span>
+            <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+            <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 扫描本身不受影响</span></div>
+        </div>
+      </div>
+
+      <!-- 常驻：隐私规则（自 s1「三种有什么不一样」卡内挪出，s1–s3 都能看到；
+           s4 版面已满且该阶段有自己的去向说明，不挂） -->
+      <div class="pane" data-at="s1 s2 s3">
+        <div class="pane-hd"><span class="t">你的材料，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· <b>去向</b>：扫描件先存在本次会话；只有你在结果页选「存进我的文档」才会长期保存。<br>
+            · <b>保留</b>：未保存的扫描件<b>会话结束即删除</b>；证件类即使保存也默认 7 天到期清理。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会<b>写入审计日志</b>。<br>
+            · <b>外部服务</b>：需要识别文字时，图像<b>会送到第三方 OCR 服务</b>处理；不需要识别的普通扫描不外送。<br>
+            · <b>取消与删除</b>：中途取消会销毁已采集图像；到期删除会留删除日志。</span>
         </div>
       </div>
     </div>
@@ -359,7 +492,7 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>

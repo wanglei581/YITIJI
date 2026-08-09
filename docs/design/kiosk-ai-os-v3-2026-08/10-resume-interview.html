@@ -54,6 +54,16 @@
   .said-q { font-size: var(--fz-2); color: var(--fog-600); }
   .said-a { font-size: var(--fz-3); color: var(--fog-900); line-height: 1.5; }
   .said-edit { margin-left: auto; flex: 0 0 auto; }
+  /* 2026-08-09 留白复核补实（先例见 06-print-workbench 同日注释）：
+     终审实测 s1/s2 主栏在选项与已答清单下方是无容器空洞（约 1.0k px）。
+     只补真实信息：s1 追加「答完去哪」与回工作台 xlane；s2 已答清单补成 8 题实况
+     （与右栏「会问你这 8 件事」逐条一致）。ai-down 的 locked 卡改为撑满访谈区——
+     空态居中是意图，背景空洞不是。 */
+  .qa > .locked { flex: 1 1 auto; }
+  .paper-stage .paper-empty { flex: 1 1 auto; }
+  .said--todo { border-style: dashed; background: transparent; }
+  .said--todo .said-a { color: var(--fog-600); }
+  .said-group { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .08em; margin: var(--s-2) 0 0; }
 </style>
 </head>
 <body>
@@ -116,6 +126,42 @@
           <button class="qa-opt" data-go="s2"><b>06</b>还没想好，边聊边定</button>
         </div>
 
+        <!-- 2026-08-09 留白复核补实：开聊前把「答完去哪」说清楚——内容与 S3「接下来」
+             及右栏隐私说明一致，不新增能力承诺。 -->
+        <div class="pane" data-when="default first device-off">
+          <div class="pane-hd"><span class="t">答完之后，这份简历去哪</span><span class="s">与第 3 步「接下来」一致</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">当场看到</span><span class="v">成 1 页 A4，答几题写几题</span></div>
+            <div class="kv-row"><span class="k">想拿纸质件</span><span class="v">去打印工作台出纸</span></div>
+            <div class="kv-row"><span class="k">想带走电子版</span><span class="v">发到手机，或登录后存进「我的简历」</span></div>
+            <div class="kv-row"><span class="k">想再改</span><span class="v">回简历工作台做诊断、逐条优化</span></div>
+          </div>
+        </div>
+
+        <!-- 域内横向通道：简历材料域 = P09 + P10 + P11 + P12（写法同 09 的 xlane）。
+             ai-down 不显示——locked 卡里已给同类替代路径，避免重复入口。 -->
+        <div class="xlane" style="margin-top:auto" data-when="default first device-off">
+          <span class="xlane-hd">手里已经有简历？不用从零聊，这两条路更快</span>
+          <div class="xlane-row">
+            <a class="xlane-go" href="09-resume-workbench.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">上传 / 手机扫码传</span>
+                <span class="xlane-ds">现成简历传进工作台，直接诊断和优化</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="xlane-go" href="07-scan-workbench.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">纸质简历扫描</span>
+                <span class="xlane-ds">纸质件扫成 PDF，自动识别文字进工作台</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+          </div>
+        </div>
+
         <div class="locked" data-when="ai-down">
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>两条不依赖 AI 的路</b>
@@ -152,8 +198,10 @@
           <button class="qa-opt" style="min-height:56px;font-size:var(--fz-3)">让小青举个例子</button>
         </div>
 
+        <!-- 2026-08-09 留白复核补实：原来只列已答 2 题，下方近 850px 无容器空洞。
+             补成 8 题实况清单——题目、顺序、备注与右栏「会问你这 8 件事」逐条一致。 -->
         <div class="pane" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column" data-when="default first device-off">
-          <div class="pane-hd"><span class="t">你已经说过的</span><span class="s">2 题 · 可随时改</span></div>
+          <div class="pane-hd"><span class="t">已答与还没问的</span><span class="s">已答 2 · 正在答 1 · 共 8 题</span></div>
           <div class="qa-said">
             <div class="said">
               <span class="said-no">01</span>
@@ -165,6 +213,36 @@
               <span class="said-b"><span class="said-q">做过多久？在什么单位？</span><span class="said-a">2 年 3 个月，某科技公司，运营专员</span></span>
               <span class="said-edit"><button class="btn btn--quiet">改</button></span>
             </div>
+            <div class="said said--todo">
+              <span class="said-no">03</span>
+              <span class="said-b"><span class="said-q">最有成果的一件事</span><span class="said-a" style="color:var(--amber-600)">正在答 · 就是上面这题</span></span>
+            </div>
+            <div class="said-group">还没问到的 5 题 · 会挨个来</div>
+            <div class="said said--todo">
+              <span class="said-no">04</span>
+              <span class="said-b"><span class="said-q">带过人 / 协作过吗</span><span class="said-a">还没问到 · 可跳过</span></span>
+            </div>
+            <div class="said said--todo">
+              <span class="said-no">05</span>
+              <span class="said-b"><span class="said-q">学历与专业</span><span class="said-a">还没问到 · 可跳过</span></span>
+            </div>
+            <div class="said said--todo">
+              <span class="said-no">06</span>
+              <span class="said-b"><span class="said-q">会用什么工具</span><span class="said-a">还没问到 · 只列真会的</span></span>
+            </div>
+            <div class="said said--todo">
+              <span class="said-no">07</span>
+              <span class="said-b"><span class="said-q">证书 / 语言</span><span class="said-a">还没问到 · 可跳过</span></span>
+            </div>
+            <div class="said said--todo">
+              <span class="said-no">08</span>
+              <span class="said-b"><span class="said-q">联系方式</span><span class="said-a">还没问到 · 留了才写进简历</span></span>
+            </div>
+          </div>
+          <div class="notice" style="margin-top:auto">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>跳过的题不会被编造进简历。</b>哪题跳过，第 3 步的成品就把那一块明确标成空着，不拿模板话术垫。
+              想提前走，「提前结束，生成草稿」只写你已答的。</span>
           </div>
         </div>
 
@@ -262,7 +340,9 @@
           不显示百分比：8 题里你可能跳过好几题，「完成 XX%」对你没有意义。这里只报哪几块已经写上了。
         </p>
       </div>
-      <div class="pane pane--fill" data-at="s2">
+      <!-- 2026-08-09 留白复核：两条底线从 s2 扩到 s1 s2 —— 开聊前正是该看承诺的时候，
+           右栏 s1 原本只有一张卡、底部空 800+px。margin-top:auto 垫底，不塞新话。 -->
+      <div class="pane pane--fill" data-at="s1 s2" style="margin-top:auto">
         <div class="pane-hd"><span class="t">两条底线</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -293,7 +373,7 @@
           <span>联系方式你没留，文件上这一行是空的。<b>投出去之前一定要补</b>，否则招聘方联系不到你。</span>
         </div>
       </div>
-      <div class="pane pane--fill" data-at="s3">
+      <div class="pane pane--fill" data-at="s3" style="margin-top:auto">
         <div class="pane-hd"><span class="t">接下来</span></div>
         <div class="outs">
           <button class="out" data-when="default first device-off"><svg class="ic"><use href="#i-pen"/></svg>补上跳过的</button>
@@ -346,7 +426,7 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>

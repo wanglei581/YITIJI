@@ -25,7 +25,7 @@
 .fgroup { display: flex; flex-direction: column; gap: var(--s-3); }
 .fgroup-lb { font-size: var(--fz-2); color: var(--fog-700); display: flex; align-items: center; gap: var(--s-3); }
 .fgroup-lb .n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
-.fchips { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.fgroup-row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .fchip {
   min-height: var(--touch-min); padding: 0 var(--s-4); border-radius: var(--r-xs);
   border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);

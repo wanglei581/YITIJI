@@ -176,6 +176,32 @@
 .src-ds { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.55; }
 .src-tag { margin-top: auto; }
 
+/* ---------- 域首屏横向通道：同域其他作业台的真实入口 ----------
+   closed-loop-map §二：每域入口 = 作业台第 1 阶段；该阶段必须列出
+   同域全部子能力。这里是通往兄弟台面的真链接（a 标签，非装饰）。 */
+.xlane { display: flex; flex-direction: column; gap: var(--s-3); }
+.xlane-hd { font-size: var(--fz-2); color: var(--fog-600); }
+.xlane-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.xlane-go {
+  display: flex; align-items: center; gap: var(--s-4);
+  min-height: 88px; padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-md); text-decoration: none; color: inherit; cursor: pointer;
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  backdrop-filter: blur(var(--glass-blur));
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.xlane-go:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
+.xlane-go .src-ic { flex: 0 0 auto; width: 46px; height: 46px; }
+.xlane-go .src-ic .ic { width: 24px; height: 24px; }
+.xlane-tx { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.xlane-nm { font-family: var(--ff-display); font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.xlane-ds { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
+.xlane-go > .ic:last-child { margin-left: auto; flex: 0 0 auto; width: 20px; height: 20px; color: var(--fog-600); }
+
+/* 右栏「本机状态」纸量小量表 */
+.side-meter { display: inline-block; width: 72px; height: 6px; border-radius: 999px; background: var(--surf-3); overflow: hidden; vertical-align: middle; }
+.side-meter i { display: block; height: 100%; background: var(--jade-500); border-radius: 999px; }
+
 /* ---------- 参数栏 ---------- */
 .pane {
   border-radius: var(--r-md); padding: var(--s-4) var(--s-5);

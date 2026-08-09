@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=7">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -88,9 +88,34 @@
         </a>
       </div>
 
+      <!-- S1 域内横向通道：简历材料域 = P09 + P10 + P11 + P12（closed-loop-map §二） -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">简历已经是现成的？这两件事也在这个台面做</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="11-jobfit-compare.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">岗位匹配对比</span>
+              <span class="xlane-ds">拿简历对照具体岗位，三档参考、逐项给证据</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="12-material-factory.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">材料工厂</span>
+              <span class="xlane-ds">求职信、自我介绍、材料清单、简历模板四件套</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
       <!-- S2 正在解析 -->
       <div class="scanpages" data-at="s2">
-        <div class="paper" style="height:100%" data-when="default first">
+        <!-- 2026-08-09 留白复核：device-off 补入解析画面 —— 打印机离线不影响 AI 解析，
+             原门控漏了该态导致主栏整块空(1356px)。 -->
+        <div class="paper" style="height:100%" data-when="default first device-off">
           <div class="paper-bar">
             <span class="nm">个人简历.pdf</span>
             <span class="mt">A4 · 3 页 · 正在解析</span>
@@ -104,6 +129,14 @@
               <div class="sec">工作经历</div><div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
               <div class="ln"></div><div class="ln ln--m"></div>
               <span class="pgno">1 / 3</span>
+            </div>
+            <!-- 2026-08-09 留白复核：解析预览同样多页滚动，第 2 页骨架排队待扫 -->
+            <div class="sheet-a4">
+              <div class="sec">项目经历</div><div class="ln"></div><div class="ln ln--m"></div>
+              <div class="sec">校园经历</div><div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <div class="sec">技能与证书</div><div class="ln ln--s"></div>
+              <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <span class="pgno">2 / 3</span>
             </div>
           </div>
         </div>
@@ -156,6 +189,27 @@
             </div>
             <div class="gapline" data-ev="i4" style="margin-top:8px">这里缺一句：技能栏写了 SQL，但整份简历没有一句说明用它做过什么。</div>
             <span class="pgno">1 / 3</span>
+          </div>
+          <!-- 2026-08-09 留白复核：预览本就是「多页连续滚动」（.paper-stage 注释），
+               此前只摆第 1 页导致栏底 614px 空洞。补第 2 页，与 3 页简历的 persona 一致。 -->
+          <div class="sheet-a4" data-when="default ai-down device-off">
+            <div class="sec">项目经历（续）</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              社群促活月计划　执行<br>
+              · 策划早晚打卡活动，维护 3 个 500 人群<br>
+              · 输出周报，向运营主管同步数据
+            </div>
+            <div class="sec">校园经历</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              校学生会宣传部　干事<br>
+              · 负责活动海报与推文排版
+            </div>
+            <div class="sec">证书</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              大学英语六级 · 普通话二级甲等
+            </div>
+            <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <span class="pgno">2 / 3</span>
           </div>
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
@@ -258,6 +312,26 @@
             </div>
             <span class="pgno">1 / 3</span>
           </div>
+          <!-- 2026-08-09 留白复核：v2 预览同样补第 2 页（未采纳的部分保留原文原样） -->
+          <div class="sheet-a4">
+            <div class="sec">项目经历（续）</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              社群促活月计划　执行<br>
+              · 策划早晚打卡活动，维护 3 个 500 人群<br>
+              · 输出周报，向运营主管同步数据
+            </div>
+            <div class="sec">校园经历</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              校学生会宣传部　干事<br>
+              · 负责活动海报与推文排版
+            </div>
+            <div class="sec">证书</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              大学英语六级 · 普通话二级甲等
+            </div>
+            <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <span class="pgno">2 / 3</span>
+          </div>
         </div>
       </div>
     </div>
@@ -293,7 +367,8 @@
       <!-- S2 解析进度 -->
       <div class="pane pane--fill" data-at="s2">
         <div class="pane-hd"><span class="t">正在做什么</span><span class="s">#RS-0958-12</span></div>
-        <div class="tline" data-when="default first">
+        <!-- 2026-08-09 门控修正：解析不依赖打印机,device-off 一并显示(与主栏同一处漏配) -->
+        <div class="tline" data-when="default first device-off">
           <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
             <span class="tl-b"><span class="tl-t">读取文件与页数</span><span class="tl-s">3 页 · 文字可提取</span></span></div>
           <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
@@ -303,7 +378,7 @@
           <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-clock"/></svg></span>
             <span class="tl-b"><span class="tl-t">汇总可改点</span><span class="tl-s">等待前一步</span></span></div>
         </div>
-        <div class="notice" data-when="default first" style="margin-top:auto">
+        <div class="notice" data-when="default first device-off" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
           <span>不显示百分比：可改点的数量要看完全文才知道，这里只报已完成的步骤。约 40 秒 · 免费。<br>
             解析只为给你出诊断，<b>不发送企业、不沉淀简历库</b>；失败可重试或换来源重新上传。</span>
@@ -431,6 +506,36 @@
           <span data-when="device-off">打印机离线，可先存进「我的简历」，凭手机号在任一台空闲机器取回打印。</span>
         </div>
       </div>
+
+      <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 权限红线与费用去向都是真规则。 -->
+      <div class="pane" data-at="s1 s2 s3 s4 s5">
+        <div class="pane-hd"><span class="t">你的简历，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· 原件<b>永远保留、不被覆盖</b>，优化只产生新版本，采不采纳由你定；<br>
+            · AI 只改表达，<b>不编造经历</b>，没写过的不会替你写；<br>
+            · 会话结束自动清空；登录后可长期存进「我的简历」。</span>
+        </div>
+      </div>
+      <div class="pane" data-at="s1 s2 s3 s4 s5">
+        <div class="pane-hd"><span class="t">费用与去向</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">免费</span></div>
+          <div class="kv-row"><span class="k">打印</span><span class="v">按现场公示价</span></div>
+          <div class="kv-row"><span class="k">诊断报告</span><span class="v">进「AI 服务记录」</span></div>
+          <div class="kv-row"><span class="k">新版本</span><span class="v">进「我的简历」</span></div>
+        </div>
+      </div>
+      <div class="pane" data-when="ai-down" data-at="s2 s3 s4">
+        <div class="pane-hd"><span class="t">现在还能做什么</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>打印、扫描、存档、岗位与招聘会浏览<b>都不受影响</b>：
+            <a href="06-print-workbench.html">去打印</a> ·
+            <a href="13-jobs-desk.html">看岗位</a> ·
+            <a href="17-fair-desk.html">看招聘会</a></span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -477,7 +582,7 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>

@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=7">
 <link rel="stylesheet" href="styles/pay.css?v=5">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -93,6 +93,29 @@
           <span class="src-ds">把纸质原件放上玻璃板或送稿器，扫成 PDF 再打印。</span>
           <span class="src-tag"><span class="chip chip--jade">扫描仪就绪</span></span>
         </button>
+      </div>
+
+      <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">不打印，只处理文件？这两个台面也在这里</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="07-scan-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">扫描工作台</span>
+              <span class="xlane-ds">纸质扫成 PDF，存「我的文档」或 U 盘带走，不出纸</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="08-file-tools.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">文件加工台</span>
+              <span class="xlane-ds">图片合成 PDF、加签章；处理完可回这里打印</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
       </div>
 
       <!-- S2–S4 体检结论 -->
@@ -370,7 +393,7 @@
       <!-- S6 取件 -->
       <div class="progress-wrap" data-at="s7">
         <div class="pickup">
-          <span class="chip chip--jade"><span class="dot dot--live"></span>本次办理完成</span>
+          <span class="chip chip--jade chip--info"><span class="dot dot--live"></span>本次办理完成</span>
           <div class="pickup-code">7742 106 358</div>
           <p class="pickup-hint">这是你的取件码。<b>7 天内</b>凭码可在任一台空闲机器复打同一份文件；文件到期自动清理，清理会留删除日志。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
@@ -381,6 +404,10 @@
         <div class="notice" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。</span>
+        </div>
+        <div class="notice" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板 / 送稿器上取走；<b>U 盘</b>拔下带好。</span>
         </div>
       </div>
     </div>
@@ -591,7 +618,10 @@
 
 
       <!-- S4/S5 价目表：金额必须能被核对，不能只给一个总数 -->
-      <div class="pane" data-at="s4 s5">
+      <!-- 2026-08-09 留白复核：公示价从 s4 挪到 s1 —— s4 已有服务端核价明细(冗余致右栏超高、
+           把「支付前请核对」挤出 14–39px)；s1 进门正需要价格预期。s5 保留(退款语境要对照价目)。
+           s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
+      <div class="pane" data-at="s1 s5">
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
@@ -605,6 +635,39 @@
           <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
           本机不接受现金，不找零；不支持刷卡。
         </p>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 本机事实(E2)与隐私规则。
+           s3/s4 栏内已满，不加；其余阶段垫底，杜绝无容器空洞。 -->
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:41</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">打印机</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+          <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">AI 服务</span>
+            <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+            <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 打印不受影响</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· 文件默认只保留到<b>本次会话结束</b>；<br>
+            · 支付、出纸、删除都要<b>你本人确认</b>，系统不代按；<br>
+            · 离场或超时自动清空，下一位用户看不到任何痕迹；<br>
+            · 要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。</span>
+        </div>
+      </div>
+      <div class="pane" data-at="s6">
+        <div class="pane-hd"><span class="t">出纸完成后</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <span>取件码会放大显示在屏幕上；已登录用户同步进「我的 · 打印订单」。<b>出纸完成前请不要离开本机。</b></span>
+        </div>
       </div>
 
       <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
@@ -771,7 +834,7 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
