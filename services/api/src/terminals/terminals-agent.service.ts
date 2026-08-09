@@ -14,6 +14,7 @@ import {
   NotFoundException,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Logger,
 } from '@nestjs/common'
@@ -501,7 +502,17 @@ export class TerminalAgentService implements OnModuleInit {
     }
 
     if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
-      return { acknowledged: true }
+      if (preCheck.status === dto.status) {
+        return { acknowledged: true }
+      }
+      if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
+        throw new ConflictException({
+          error: {
+            code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+            message: `任务已处于终态 ${preCheck.status}，不能确认不同终态 ${dto.status}`,
+          },
+        })
+      }
     }
 
     const allowed = VALID_TRANSITIONS[preCheck.status]
@@ -524,20 +535,53 @@ export class TerminalAgentService implements OnModuleInit {
           completedAt: isTerminal ? new Date() : null,
         },
       })
-      if (updated.count > 0) {
-        await tx.printTaskStatusLog.create({
-          data: {
-            taskId,
-            fromStatus: preCheck.status,
-            toStatus: dto.status,
-            errorCode: dto.errorCode ?? null,
+      if (updated.count === 0) {
+        const current = await tx.printTask.findUnique({
+          where: { id: taskId },
+          select: { status: true, terminalId: true },
+        })
+        if (!current) {
+          throw new NotFoundException({
+            error: { code: 'PRINT_TASK_NOT_FOUND', message: `任务 ${taskId} 不存在` },
+          })
+        }
+        if (current.terminalId !== terminalId) {
+          throw new BadRequestException({
+            error: { code: 'TASK_NOT_OWNED', message: `任务 ${taskId} 不属于终端 ${terminalId}` },
+          })
+        }
+        if (current.status === dto.status) return
+        if (
+          TERMINAL_STATES.includes(current.status as TaskStatus) &&
+          TERMINAL_STATES.includes(dto.status as TaskStatus)
+        ) {
+          throw new ConflictException({
+            error: {
+              code: 'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+              message: `任务已处于终态 ${current.status}，不能确认不同终态 ${dto.status}`,
+            },
+          })
+        }
+        throw new ConflictException({
+          error: {
+            code: 'PRINT_TASK_STATUS_CHANGED',
+            message: `任务状态已由 ${preCheck.status} 变更为 ${current.status}，请重新确认后上报`,
           },
         })
-        await tx.order.updateMany({
-          where: { printTaskId: taskId },
-          data: { taskStatus: dto.status, terminalId },
-        })
       }
+
+      await tx.printTaskStatusLog.create({
+        data: {
+          taskId,
+          fromStatus: preCheck.status,
+          toStatus: dto.status,
+          errorCode: dto.errorCode ?? null,
+        },
+      })
+      await tx.order.updateMany({
+        where: { printTaskId: taskId },
+        data: { taskStatus: dto.status, terminalId },
+      })
     })
 
     return { acknowledged: true }

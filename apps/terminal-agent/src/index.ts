@@ -27,6 +27,7 @@ import { isDatabaseAvailable, openDatabase, type AgentDatabase } from './agent/d
 import { startOfflineRetry } from './agent/offline-queue'
 import { startScanDeletionAuditReporter } from './agent/scan-deletion-audit-reporter'
 import { writeStartupDiagnosticSafely } from './agent/startup-diagnostics'
+import { registerDeadLetterCommands } from './agent/dead-letter-operator'
 
 const program = new Command()
 
@@ -153,6 +154,8 @@ program
       process.exit(1)
     })
   })
+
+registerDeadLetterCommands(program)
 
 // ── install-service (Windows only) ───────────────────────────────────────────
 
@@ -372,4 +375,4 @@ function printResultSummary(r: PrintResult): void {
   }
 }
 
-program.parse(process.argv)
+void program.parseAsync(process.argv)

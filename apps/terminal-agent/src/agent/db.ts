@@ -56,6 +56,12 @@ export interface PendingPatch {
   createdAt: string
   deadLetterAt: string | null
   deadLetterReason: string | null
+  operatorConfirmedAt: string | null
+  resolvedAt: string | null
+  resolution: string | null
+  manualReplayAttempts: number
+  lastManualReplayAt: string | null
+  manualReplayErrorCode: string | null
 }
 
 export type ScanDeletionResult = 'pending_delete' | 'deleted' | 'delete_failed'
@@ -107,8 +113,27 @@ CREATE TABLE IF NOT EXISTS pending_patches (
   nextRetryAt  TEXT    NOT NULL,
   createdAt    TEXT    NOT NULL,
   deadLetterAt TEXT,
-  deadLetterReason TEXT
+  deadLetterReason TEXT,
+  operatorConfirmedAt TEXT,
+  resolvedAt TEXT,
+  resolution TEXT,
+  manualReplayAttempts INTEGER NOT NULL DEFAULT 0,
+  lastManualReplayAt TEXT,
+  manualReplayErrorCode TEXT
 );
+
+CREATE TABLE IF NOT EXISTS dead_letter_operator_audit (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  patchId    INTEGER NOT NULL,
+  action     TEXT NOT NULL,
+  outcome    TEXT NOT NULL,
+  reasonCode TEXT,
+  createdAt  TEXT NOT NULL,
+  FOREIGN KEY (patchId) REFERENCES pending_patches(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dead_letter_operator_audit_patch
+  ON dead_letter_operator_audit (patchId, createdAt);
 
 CREATE TABLE IF NOT EXISTS scan_deletion_audit (
   eventId        TEXT PRIMARY KEY,
@@ -166,19 +191,25 @@ export function openDatabase(): AgentDatabase {
     db.exec(SCHEMA_SQL)
     ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
     ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'operatorConfirmedAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'resolvedAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'resolution', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'manualReplayAttempts', 'INTEGER NOT NULL DEFAULT 0')
+    ensureColumn(db, 'pending_patches', 'lastManualReplayAt', 'TEXT')
+    ensureColumn(db, 'pending_patches', 'manualReplayErrorCode', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportAttempts', 'INTEGER NOT NULL DEFAULT 0')
     ensureColumn(db, 'scan_deletion_audit', 'nextReportAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportedAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportDeadLetterAt', 'TEXT')
     ensureColumn(db, 'scan_deletion_audit', 'reportErrorCode', 'TEXT')
     activeDatabase = db
-    log(`db: opened ${dbPath}`)
+    log('db: opened local task database')
     return db
-  } catch (e) {
+  } catch {
     activeDatabase = null
     warn(
       `db: local task database unavailable; printing disabled — ` +
-        `better-sqlite3 加载失败，任务状态持久化不可用 — ${e instanceof Error ? e.message : String(e)}`,
+        'LOCAL_DB_OPEN_FAILED: better-sqlite3 加载或任务状态持久化不可用',
     )
     return null
   }
@@ -494,7 +525,8 @@ export function getPendingPatches(db: AgentDatabase): PendingPatch[] {
   return db
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
-              deadLetterAt, deadLetterReason
+              deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
        FROM pending_patches WHERE deadLetterAt IS NULL AND nextRetryAt <= ?`,
     )
     .all(now) as unknown as PendingPatch[]
@@ -506,8 +538,11 @@ export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
   return db
     .prepare(
       `SELECT id, taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
-              deadLetterAt, deadLetterReason
-       FROM pending_patches WHERE deadLetterAt IS NOT NULL ORDER BY deadLetterAt ASC`,
+              deadLetterAt, deadLetterReason, operatorConfirmedAt, resolvedAt, resolution,
+              manualReplayAttempts, lastManualReplayAt, manualReplayErrorCode
+       FROM pending_patches
+       WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL
+       ORDER BY deadLetterAt ASC`,
     )
     .all() as unknown as PendingPatch[]
 }
@@ -515,7 +550,10 @@ export function getDeadLetterPatches(db: AgentDatabase): PendingPatch[] {
 export function getDeadLetterPatchCount(db: AgentDatabase): number {
   if (!db) return 0
   const row = db
-    .prepare('SELECT COUNT(*) AS count FROM pending_patches WHERE deadLetterAt IS NOT NULL')
+    .prepare(
+      `SELECT COUNT(*) AS count FROM pending_patches
+       WHERE deadLetterAt IS NOT NULL AND resolvedAt IS NULL`,
+    )
     .get()
   return Number(row?.['count'] ?? 0)
 }

@@ -24,6 +24,81 @@ function sourceForFunction(source, name) {
   return source.slice(start, next === -1 ? source.length : next)
 }
 
+function findNode(rootNode, predicate) {
+  if (predicate(rootNode)) return rootNode
+  let found
+  ts.forEachChild(rootNode, (child) => {
+    if (!found) found = findNode(child, predicate)
+  })
+  return found
+}
+
+function unwrapParentheses(node) {
+  let current = node
+  while (current && ts.isParenthesizedExpression(current)) current = current.expression
+  return current
+}
+
+function containsJsxTag(rootNode, tagName) {
+  return !!findNode(
+    rootNode,
+    (node) =>
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText() === tagName
+  )
+}
+
+function functionDeclaration(sourceFile, name) {
+  return findNode(sourceFile, (node) => ts.isFunctionDeclaration(node) && node.name?.text === name)
+}
+
+function hasCommercialPasswordResetPolicy(source, fileName) {
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    ts.ScriptKind.TSX
+  )
+  const completeReset = functionDeclaration(sourceFile, 'completeReset')
+  if (!completeReset) return false
+
+  const completeResetText = completeReset.getText(sourceFile)
+  const completionIndex = completeResetText.indexOf(
+    'completePasswordReset(resetTicket, newPassword)'
+  )
+  if (completionIndex === -1) return false
+
+  const directGuards = [
+    'unicodeCharacterLength(newPassword) < 12',
+    'utf8ByteLength(newPassword) > 72',
+    'passwordCategoryCount(newPassword) < 3',
+  ]
+  const directGuarded = directGuards.every((guard) => {
+    const guardIndex = completeResetText.indexOf(guard)
+    return guardIndex !== -1 && guardIndex < completionIndex
+  })
+
+  const validator = functionDeclaration(sourceFile, 'validateCommercialPassword')
+  const validatorText = validator?.getText(sourceFile) ?? ''
+  const delegatedGuardIndex = completeResetText.indexOf('validateCommercialPassword(newPassword)')
+  const delegatedGuarded =
+    delegatedGuardIndex !== -1 &&
+    delegatedGuardIndex < completionIndex &&
+    completeResetText.includes('if (validationError)') &&
+    [
+      'unicodeCharacterLength(value) < 12',
+      'utf8ByteLength(value) > 72',
+      'passwordCategoryCount(value) < 3',
+    ].every((guard) => validatorText.includes(guard))
+
+  return (
+    (directGuarded || delegatedGuarded) &&
+    source.includes('minLength={12}') &&
+    source.includes('maxLength={72}')
+  )
+}
+
 const required = [
   'src/layouts/AdminLayoutWrapper.tsx',
   'src/routes/login/index.tsx',
@@ -47,12 +122,19 @@ for (const rel of required) {
 const layout = loaded['src/layouts/AdminLayoutWrapper.tsx']
 const routes = loaded['src/routes/index.tsx']
 const page = loaded['src/routes/account-settings/index.tsx']
+const pageSourceFile = ts.createSourceFile(
+  'account-settings/index.tsx',
+  page,
+  ts.ScriptTarget.ES2022,
+  true,
+  ts.ScriptKind.TSX
+)
 const adminPhoneBindingCard = loaded['src/routes/account-settings/AdminInitialPhoneBindingCard.tsx']
 const genericPhoneBindingCard = loaded['src/routes/account-settings/PhoneBindingCard.tsx']
 const auth = loaded['src/services/auth/index.ts']
 const resetPages = [
-  loaded['src/routes/login/index.tsx'],
-  loaded['../partner/src/routes/login/index.tsx'],
+  ['Admin', loaded['src/routes/login/index.tsx'], 'admin/login/index.tsx'],
+  ['Partner', loaded['../partner/src/routes/login/index.tsx'], 'partner/login/index.tsx'],
 ]
 const partnerAuth = loaded['../partner/src/services/auth/index.ts']
 
@@ -227,15 +309,36 @@ for (const token of [
 }
 pass('修改密码表单包含当前密码、新密码和确认密码字段')
 
+const phoneBoundDeclaration = findNode(
+  pageSourceFile,
+  (node) => ts.isVariableDeclaration(node) && node.name.getText(pageSourceFile) === 'phoneBound'
+)
+const phoneBindingConditional = findNode(
+  pageSourceFile,
+  (node) =>
+    ts.isConditionalExpression(node) &&
+    node.condition.getText(pageSourceFile) === 'phoneBound' &&
+    containsJsxTag(node.whenTrue, 'PhoneBoundCard')
+)
+const adminOnlyConditional = phoneBindingConditional
+  ? unwrapParentheses(phoneBindingConditional.whenFalse)
+  : undefined
+
 if (
   page.includes('const [user, setUser] = useState<AuthedUser | null>') &&
-  page.includes("user?.role === 'admin' && !user.phoneMasked") &&
-  page.includes('<AdminInitialPhoneBindingCard') &&
+  phoneBoundDeclaration?.initializer?.getText(pageSourceFile).replace(/\s/g, '') ===
+    '!!(user?.phoneMasked)' &&
+  adminOnlyConditional &&
+  ts.isConditionalExpression(adminOnlyConditional) &&
+  adminOnlyConditional.condition.getText(pageSourceFile).replace(/\s/g, '') ===
+    "user?.role==='admin'" &&
+  containsJsxTag(adminOnlyConditional.whenTrue, 'AdminInitialPhoneBindingCard') &&
+  !containsJsxTag(adminOnlyConditional.whenFalse, 'AdminInitialPhoneBindingCard') &&
   page.includes('{ ...current, ...phone }') &&
   !page.includes("from './PhoneBindingCard'") &&
   !page.includes('<PhoneBindingCard')
 ) {
-  pass('仅未绑定的已登录 Admin 显示专用首次绑定卡，且不可变更新当前用户')
+  pass('AST 确认已绑定分支先行，仅未绑定 Admin 显示专用首次绑定卡，且不可变更新当前用户')
 } else {
   fail('Admin 首次绑定必须只使用专用卡片；user=null、非 Admin 或已绑定账号均不能显示')
 }
@@ -474,25 +577,20 @@ if (page.includes('role="alert"') && page.includes('role="status"') && page.incl
   fail('错误提示必须使用 alert,成功提示必须使用 status + polite live region')
 }
 
-for (const resetPage of resetPages) {
-  if (
-    !resetPage.includes('unicodeCharacterLength(newPassword) < 12') ||
-    !resetPage.includes('Array.from(value).length') ||
-    !resetPage.includes('passwordCategoryCount(newPassword) < 3') ||
-    !resetPage.includes('utf8ByteLength(newPassword) > 72') ||
-    !resetPage.includes('minLength={12}') ||
-    !resetPage.includes('maxLength={72}')
-  ) {
-    fail('Admin 与 Partner 找回密码页面必须执行同一商用强密码规则')
+for (const [portal, resetPage, fileName] of resetPages) {
+  if (!hasCommercialPasswordResetPolicy(resetPage, fileName)) {
+    fail(`${portal} 找回密码页面必须在提交前执行 12 位、3 类、UTF-8 72 字节规则`)
   }
 }
-pass('Admin 与 Partner 找回密码页面已统一商用强密码规则')
+pass('AST 确认 Admin 与 Partner 找回密码在提交前统一执行商用强密码规则')
 
+const passwordSubmit = functionDeclaration(pageSourceFile, 'onSubmit')
+const passwordSubmitText = passwordSubmit?.getText(pageSourceFile) ?? ''
 if (
-  page.includes('finally {') &&
-  page.includes('setSubmitting(false)') &&
-  page.includes('setError(r.message') &&
-  page.includes('window.setTimeout(() => logout(), 1200)')
+  passwordSubmitText.includes('finally {') &&
+  passwordSubmitText.includes('setSubmitting(false)') &&
+  passwordSubmitText.includes("setPwError(r.message || '修改失败，请重试')") &&
+  passwordSubmitText.includes('window.setTimeout(() => logout(), 1200)')
 ) {
   pass('所有异常路径都会恢复提交状态,成功后强制退出重新登录')
 } else {

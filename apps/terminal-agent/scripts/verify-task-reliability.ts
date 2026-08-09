@@ -1,10 +1,19 @@
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { processPatch } from '../src/agent/offline-queue'
+import {
+  abandonDeadLetter,
+  confirmDeadLetter,
+  listDeadLetters,
+  parseExactDeadLetterId,
+  replayDeadLetter,
+  showDeadLetter,
+} from '../src/agent/dead-letter-operator'
 import {
   getDeadLetterPatches,
   getPendingPatches,
@@ -64,6 +73,12 @@ function pendingPatch(attempts: number): PendingPatch {
     createdAt: new Date(0).toISOString(),
     deadLetterAt: null,
     deadLetterReason: null,
+    operatorConfirmedAt: null,
+    resolvedAt: null,
+    resolution: null,
+    manualReplayAttempts: 0,
+    lastManualReplayAt: null,
+    manualReplayErrorCode: null,
   }
 }
 
@@ -144,6 +159,49 @@ async function startPatchServer(): Promise<{
   }
 }
 
+async function startOperatorPatchServer(): Promise<{
+  baseUrl: string
+  requests: Array<{ url: string; body: Record<string, unknown> }>
+  close: () => Promise<void>
+}> {
+  const requests: Array<{ url: string; body: Record<string, unknown> }> = []
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = []
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8')
+      requests.push({
+        url: req.url ?? '',
+        body: raw ? JSON.parse(raw) as Record<string, unknown> : {},
+      })
+      if (req.url?.includes('task-conflict')) {
+        res.writeHead(409, { 'Content-Type': 'application/json' })
+        res.end('{"error":{"code":"PRINT_TASK_TERMINAL_STATUS_CONFLICT"}}')
+        return
+      }
+      if (req.url?.includes('task-transient')) {
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end('{"error":{"code":"SERVICE_UNAVAILABLE"}}')
+        return
+      }
+      if (req.url?.includes('task-network')) {
+        req.socket.destroy()
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end('{"acknowledged":true}')
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  assert.ok(address && typeof address === 'object')
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}/api/v1`,
+    requests,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  }
+}
+
 function claimTask(taskId: string): ClaimTask {
   return {
     taskId,
@@ -192,6 +250,23 @@ async function verifyRealDatabaseMigrationAndTerminalReplay(): Promise<void> {
     const columns = db.prepare('PRAGMA table_info(pending_patches)').all().map((row) => row['name'])
     assert.ok(columns.includes('deadLetterAt'), 'legacy local DB must add deadLetterAt')
     assert.ok(columns.includes('deadLetterReason'), 'legacy local DB must add deadLetterReason')
+    for (const column of [
+      'operatorConfirmedAt',
+      'resolvedAt',
+      'resolution',
+      'manualReplayAttempts',
+      'lastManualReplayAt',
+      'manualReplayErrorCode',
+    ]) {
+      assert.ok(columns.includes(column), `legacy local DB must add ${column}`)
+    }
+    assert.ok(
+      db.prepare(
+        `SELECT name FROM sqlite_master
+         WHERE type = 'table' AND name = 'dead_letter_operator_audit'`,
+      ).get(),
+      'legacy local DB must add the durable operator action audit table',
+    )
 
     const now = new Date().toISOString()
     db.prepare(
@@ -233,6 +308,162 @@ async function verifyRealDatabaseMigrationAndTerminalReplay(): Promise<void> {
   }
 }
 
+async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
+  const root = mkdtempSync(join(tmpdir(), 'dead-letter-operator-verify-'))
+  const previousProgramData = process.env['PROGRAMDATA']
+  process.env['PROGRAMDATA'] = root
+  const db = openDatabase()
+  assert.ok(db)
+  const server = await startOperatorPatchServer()
+  const operatorConfig = { ...config(), apiBaseUrl: server.baseUrl }
+  const secretMarker = 'C:\\Scans\\张三-resume.pdf?token=must-not-leak'
+
+  const seed = (taskId: string, status: string, errorMessage: string | null = null): number => {
+    const now = new Date().toISOString()
+    const inserted = db.prepare(
+      `INSERT INTO pending_patches
+       (taskId, status, errorCode, errorMessage, attempts, nextRetryAt, createdAt,
+        deadLetterAt, deadLetterReason)
+       VALUES (?, ?, ?, ?, 3, ?, ?, ?, 'HTTP_409')`,
+    ).run(taskId, status, status === 'failed' ? 'PRINT_JOB_UNCONFIRMED' : null, errorMessage, now, now, now)
+    return Number(inserted.lastInsertRowid)
+  }
+
+  try {
+    assert.equal(parseExactDeadLetterId('7'), 7)
+    assert.throws(() => parseExactDeadLetterId('7x'), /DEAD_LETTER_ID_INVALID/)
+
+    const successId = seed('task-success', 'completed', secretMarker)
+    const safeList = listDeadLetters(db)
+    const safeShow = showDeadLetter(db, successId)
+    assert.doesNotMatch(JSON.stringify([safeList, safeShow]), /task-success|张三|Scans|token|resume\.pdf/i)
+    assert.deepEqual(
+      Object.keys(safeShow).sort(),
+      [
+        'attempts',
+        'confirmedAt',
+        'createdAt',
+        'deadLetterAt',
+        'deadLetterReason',
+        'id',
+        'lastManualReplayAt',
+        'manualReplayAttempts',
+        'manualReplayErrorCode',
+        'resolution',
+        'resolvedAt',
+        'status',
+      ],
+    )
+
+    await assert.rejects(
+      replayDeadLetter(db, successId, operatorConfig),
+      /DEAD_LETTER_CONFIRMATION_REQUIRED/,
+      'manual replay must require a separate durable confirmation',
+    )
+    assert.equal(server.requests.length, 0)
+    confirmDeadLetter(db, successId)
+    const replayed = await replayDeadLetter(db, successId, operatorConfig)
+    assert.deepEqual(replayed, { outcome: 'archived', errorCode: null })
+    assert.equal(server.requests.length, 1)
+    assert.deepEqual(server.requests[0]?.body, { status: 'completed' })
+    assert.equal(listDeadLetters(db).some((row) => row.id === successId), false)
+    assert.equal(showDeadLetter(db, successId).resolution, 'replayed')
+
+    const conflictId = seed('task-conflict', 'failed', secretMarker)
+    confirmDeadLetter(db, conflictId)
+    const conflicted = await replayDeadLetter(db, conflictId, operatorConfig)
+    assert.deepEqual(conflicted, { outcome: 'retained', errorCode: 'HTTP_409' })
+    assert.equal(showDeadLetter(db, conflictId).confirmedAt, null, '4xx must clear confirmation')
+    assert.doesNotMatch(JSON.stringify(server.requests.at(-1)?.body), /errorMessage|张三|Scans|token/i)
+    const requestCountAfterConflict = server.requests.length
+    await assert.rejects(
+      replayDeadLetter(db, conflictId, operatorConfig),
+      /DEAD_LETTER_CONFIRMATION_REQUIRED/,
+    )
+    assert.equal(server.requests.length, requestCountAfterConflict, '409 must not enter a replay loop')
+
+    const transientId = seed('task-transient', 'completed')
+    confirmDeadLetter(db, transientId)
+    const requestsBeforeTransient = server.requests.length
+    const transient = await replayDeadLetter(db, transientId, operatorConfig)
+    assert.deepEqual(transient, { outcome: 'retained', errorCode: 'HTTP_503' })
+    assert.equal(server.requests.length, requestsBeforeTransient + 1, '5xx replay must send once')
+    assert.ok(showDeadLetter(db, transientId).confirmedAt, '5xx must retain explicit confirmation')
+
+    const networkId = seed('task-network', 'completed')
+    confirmDeadLetter(db, networkId)
+    const requestsBeforeNetwork = server.requests.length
+    const network = await replayDeadLetter(db, networkId, operatorConfig)
+    assert.deepEqual(network, { outcome: 'retained', errorCode: 'NETWORK_ERROR' })
+    assert.equal(server.requests.length, requestsBeforeNetwork + 1, 'network replay must send once')
+    assert.ok(showDeadLetter(db, networkId).confirmedAt)
+
+    const printingId = seed('task-printing', 'printing')
+    confirmDeadLetter(db, printingId)
+    const requestsBeforeBlockedStatus = server.requests.length
+    await assert.rejects(
+      replayDeadLetter(db, printingId, operatorConfig),
+      /DEAD_LETTER_STATUS_NOT_TERMINAL/,
+    )
+    assert.equal(server.requests.length, requestsBeforeBlockedStatus)
+
+    const abandonedId = seed('task-abandoned', 'failed', secretMarker)
+    assert.throws(
+      () => abandonDeadLetter(db, abandonedId, 'free text with PII' as never),
+      /DEAD_LETTER_ABANDON_REASON_INVALID/,
+    )
+    const abandoned = abandonDeadLetter(db, abandonedId, 'operator_policy')
+    assert.equal(abandoned.resolution, 'abandoned')
+    assert.equal(listDeadLetters(db).some((row) => row.id === abandonedId), false)
+
+    const actions = db.prepare(
+      `SELECT patchId, action, outcome, reasonCode, createdAt
+       FROM dead_letter_operator_audit ORDER BY id`,
+    ).all()
+    assert.ok(actions.some((row) => row['action'] === 'confirm'))
+    assert.ok(actions.some((row) => row['action'] === 'replay_attempt'))
+    assert.ok(actions.some((row) => row['action'] === 'replay_succeeded'))
+    assert.ok(actions.some((row) => row['action'] === 'replay_failed'))
+    assert.ok(actions.some((row) => row['action'] === 'abandon'))
+    assert.doesNotMatch(JSON.stringify(actions), /task-|张三|Scans|token|resume\.pdf/i)
+
+    const appRoot = join(__dirname, '..')
+    const cli = spawnSync(
+      process.execPath,
+      ['-r', 'ts-node/register', join(appRoot, 'src/index.ts'), 'dead-letter', 'list'],
+      {
+        cwd: appRoot,
+        env: { ...process.env, PROGRAMDATA: root },
+        encoding: 'utf8',
+        timeout: 15_000,
+      },
+    )
+    assert.equal(cli.status, 0, cli.stderr)
+    assert.match(cli.stdout, /"id"/)
+    assert.doesNotMatch(
+      `${cli.stdout}\n${cli.stderr}`,
+      new RegExp(`task-|张三|Scans|token|resume\\.pdf|${root.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+    )
+
+    const indexSource = readFileSync(join(__dirname, '../src/index.ts'), 'utf8')
+    assert.match(indexSource, /registerDeadLetterCommands\(program\)/)
+    const operatorSource = readFileSync(
+      join(__dirname, '../src/agent/dead-letter-operator.ts'),
+      'utf8',
+    )
+    for (const subcommand of ['list', 'show', 'confirm', 'abandon', 'replay']) {
+      assert.match(operatorSource, new RegExp(`\\.command\\('${subcommand}'\\)`))
+    }
+    assert.doesNotMatch(operatorSource, /\bprint\s*\(/, 'dead-letter replay must never invoke printing')
+  } finally {
+    await server.close()
+    db.close()
+    if (previousProgramData === undefined) delete process.env['PROGRAMDATA']
+    else process.env['PROGRAMDATA'] = previousProgramData
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
 async function main(): Promise<void> {
   const cases: Array<[string, () => void | Promise<void>]> = [
     ['4xx dead-letter durability', verifyFourHundredPatchBecomesDurableDeadLetter],
@@ -240,6 +471,7 @@ async function main(): Promise<void> {
     ['known terminal task replay', verifyKnownTerminalTasksAreReplayed],
     ['pre-print dispatch durability', verifyDispatchIntentIsDurableBeforePrinterInvocation],
     ['real DB migration and terminal replay', verifyRealDatabaseMigrationAndTerminalReplay],
+    ['dead-letter operator workflow', verifyDeadLetterOperatorWorkflow],
   ]
   const failures: string[] = []
   for (const [name, verify] of cases) {

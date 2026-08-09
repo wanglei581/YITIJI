@@ -6,7 +6,7 @@
  *   2. 非法 fileUrl（外部地址 / 无签名 / 篡改 sig）→ 400 PRINT_INVALID_FILE_URL（SSRF 防护）。
  *   3. 终端 claim：只领取已绑定本终端的 pending 任务；错 agentToken → 401。
  *   4. 状态回传：claimed → printing → completed（含 completedAt）。
- *   5. 终态幂等：重复回传 completed / 终态后再请求 printing 都返回 ack 且不重写 DB。
+ *   5. 终态幂等：只允许重复回传相同终态；不同终态或回退到 printing 必须拒绝且不重写 DB。
  *   6. 状态查询：getStatus 反映终态；不存在任务 → 404 PRINT_TASK_NOT_FOUND。
  *
  * service 直调真库（prisma），不起 HTTP server——确定性、CI 友好，与现有 verify 一致。
@@ -235,11 +235,21 @@ async function main() {
       pass('5a. 终态幂等：重复回传 completed → ack 且 completedAt 不变（DB 未重写）')
     } else fail(`5a. 幂等异常: ${JSON.stringify(afterRepatch)}`)
 
-    const ack2 = await terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId)
+    await expectCode(
+      () => terminals.patchTaskStatus(created.taskId, { status: 'failed' }, `Bearer ${agentToken}`, terminalId),
+      'PRINT_TASK_TERMINAL_STATUS_CONFLICT',
+      '5b. completed 后回传 failed → 409 终态冲突',
+    )
     const afterIllegal = await printJobs.getStatus(created.taskId)
-    if (ack2.acknowledged === true && afterIllegal.status === 'completed') {
-      pass('5b. 终态后再请求 printing → 幂等 ack，状态仍 completed（终态保护）')
-    } else fail(`5b. 终态保护异常: ${afterIllegal.status}`)
+    if (afterIllegal.status === 'completed' && afterIllegal.completedAt === completedAt1) {
+      pass('5c. 终态冲突被拒绝后状态与 completedAt 均保持不变')
+    } else fail(`5c. 终态冲突后状态异常: ${JSON.stringify(afterIllegal)}`)
+
+    await expectCode(
+      () => terminals.patchTaskStatus(created.taskId, { status: 'printing' }, `Bearer ${agentToken}`, terminalId),
+      'INVALID_STATUS_TRANSITION',
+      '5d. completed 后回退 printing → 400 非法转换',
+    )
 
     // ── 6. 状态查询 404 ───────────────────────────────────────────────
     await expectCode(
