@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P01 首页 · 鲜彩玻璃 V5 — AI 求职操作系统</title>
+<meta name="screen-name" content="P01 首页 · 鲜彩玻璃 V5">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=1">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
+
+  <!-- ============ 顶栏 ============ -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">职易达</div>
+        <div class="brand-sub">就业服务终端 · 01 号机 · 广州人才市场南门</div>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · 队列空闲</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 扫描可用</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:41</b></div>
+  </header>
+
+  <div class="vivid">
+
+    <!-- ============ 大色域版头 ============ -->
+    <section class="vhero">
+      <div class="vhero-field"><i></i><i></i><i></i></div>
+      <div class="vhero-dots"></div>
+
+      <div class="vhero-inner">
+        <div class="vhero-copy rise">
+          <span class="kicker">今天想办什么</span>
+          <h1 class="vhero-title">说出你的处境，<em>顺序我来排</em></h1>
+          <p class="vhero-sub" data-when="default first">一句话就够。我会盘点你手上已有的材料、排出办理顺序，每一步都等你点头才继续。</p>
+          <p class="vhero-sub" data-when="ai-down">AI 排序暂时不可用。打印、扫描、上传与岗位招聘会浏览都正常，顺序需要你自己选。</p>
+          <p class="vhero-sub" data-when="device-off">这台机器打印机离线。材料可以先存起来，凭手机号在任一台空闲机器取回打印。</p>
+        </div>
+
+        <div class="vfigure" data-fx="figure">
+          <img src="assets/advisor-full.jpg" alt="就业服务顾问 小青">
+          <span class="vfigure-tag" data-when="default first device-off"><span class="dot dot--live"></span>顾问 小青 · 在线</span>
+          <span class="vfigure-tag" data-when="ai-down"><span class="dot dot--down"></span>顾问 · 暂不可用</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 玻璃指令胶囊：跨在版头底边上 -->
+    <div class="vcommand">
+      <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
+      <input type="text" data-typewriter placeholder="例如：周五要去招聘会，简历还没改" aria-label="说一句你的处境">
+      <!-- 2026-08-09 愿景补齐 + Codex 整改：语音能力真实落点是 P25 顾问的语音咨询态
+           (本机没有独立语音下单能力,README §人机分工),麦克风=去找小青语音说。
+           ai-down 态语音不可用,如实置灰。 -->
+      <a class="btn btn--lg btn--ghost" data-when="default first device-off" href="25-advisor.html"
+         aria-label="语音找顾问小青,说出你的处境" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </a>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true"
+              aria-label="语音顾问暂不可用" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </button>
+      <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="default first"
+              style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">
+        排出办理顺序<svg class="ic" aria-hidden="true"><use href="#i-arrowRight"/></svg>
+      </button>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true">排序暂不可用</button>
+      <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="device-off"
+              style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">按离线状况重排</button>
+    </div>
+
+    <div class="vscenes">
+      <button class="vscene" data-fx="scene">周五招聘会，简历还没改</button>
+      <button class="vscene" data-fx="scene">打印两份材料</button>
+      <button class="vscene vscene--key" data-fx="scene">我不知道从哪开始</button>
+    </div>
+
+    <div class="vbody">
+
+      <!-- ============ 办理单：建议 + 横向路径 ============ -->
+      <section class="verrand rise" data-fx="think-target">
+        <div class="verrand-main">
+          <div class="verrand-kick">
+            <span data-when="default">本次办理单 · 小青 09:41 排的</span>
+            <span data-when="first">本次办理单 · 还没有目标</span>
+            <span data-when="ai-down">本次办理单 · 排序不可用</span>
+            <span data-when="device-off">本次办理单 · 已按设备状况改过</span>
+            <span class="ev ev--e1" data-when="default device-off">E1 你的材料</span>
+            <span class="ev ev--e2" data-when="default device-off">E2 系统与来源</span>
+            <span class="ev ev--e3" data-when="default device-off">E3 排序是 AI 判断</span>
+          </div>
+
+          <h2 class="verrand-h" data-when="default">建议先做简历诊断</h2>
+          <h2 class="verrand-h" data-when="first">先告诉我一件事就够</h2>
+          <h2 class="verrand-h" data-when="ai-down">打印扫描照常，顺序你来定</h2>
+          <h2 class="verrand-h" data-when="device-off">先把材料转存到「我的文档」</h2>
+
+          <p class="verrand-p" data-when="default">你上传的《个人简历.pdf》里 <b>6 段经历有 5 段没写成果数字</b>；周五这场招聘会 <b>128 家企业参展、现场普遍收纸质简历</b>。</p>
+          <p class="verrand-p" data-when="first">在上面说一句处境，或直接选下面的服务。<b>拿到你的材料或目标之后我才会给建议</b>，现在不做任何猜测。</p>
+          <p class="verrand-p" data-when="ai-down">对话与排序服务中断，<b>已自动上报，不需要你操作</b>；打印、扫描、上传与浏览都不受影响。</p>
+          <p class="verrand-p" data-when="device-off">打印机离线已上报运维；你上传的 <b>2 份材料</b>可以先存起来，<b>凭手机号在任一台空闲机器取回打印</b>。</p>
+
+          <div class="verrand-foot">
+            <span class="verrand-cost" data-when="default"><span>约 40 秒</span><span>免费</span><span>结果进「我的简历」</span></span>
+            <span class="verrand-cost" data-when="first"><span>不收费</span><span>不需要登录</span><span>离场自动清空</span></span>
+            <span class="verrand-cost" data-when="ai-down"><span>打印、扫描、上传、浏览正常</span><span>不影响已支付订单</span></span>
+            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>文件保留 7 天</span></span>
+            <button class="btn btn--quiet" data-when="default" style="text-decoration:underline;text-underline-offset:4px">跳过，直接打印</button>
+            <button class="btn btn--quiet" data-when="ai-down device-off" style="text-decoration:underline;text-underline-offset:4px">查看设备状态</button>
+          </div>
+        </div>
+
+        <div class="vsteps">
+          <div class="vsteps-hd"><span>办理路径</span><span class="n" data-when="default">第 1 / 3 步</span><span class="n" data-when="first ai-down device-off">待生成</span></div>
+          <div class="vtrack">
+            <div class="vstep vstep--now">
+              <span class="vstep-dot">01</span>
+              <span class="vstep-name" data-when="default">简历诊断</span>
+              <span class="vstep-name" data-when="first">等你说一句</span>
+              <span class="vstep-name" data-when="ai-down">顺序自己选</span>
+              <span class="vstep-name" data-when="device-off">转存文档</span>
+              <span class="vstep-tag" data-when="default device-off">下一步</span>
+              <span class="vstep-tag" data-when="first ai-down">未开始</span>
+            </div>
+            <div class="vstep">
+              <span class="vstep-dot">02</span>
+              <span class="vstep-name" data-when="default">按岗位优化</span>
+              <span class="vstep-name" data-when="first">盘点材料</span>
+              <span class="vstep-name" data-when="ai-down">打印扫描可用</span>
+              <span class="vstep-name" data-when="device-off">换机打印</span>
+              <span class="vstep-tag">待办理</span>
+            </div>
+            <div class="vstep">
+              <span class="vstep-dot">03</span>
+              <span class="vstep-name" data-when="default">打印 5 份</span>
+              <span class="vstep-name" data-when="first">排出顺序</span>
+              <span class="vstep-name" data-when="ai-down">浏览不受影响</span>
+              <span class="vstep-name" data-when="device-off">凭码取件</span>
+              <span class="vstep-tag" data-when="default">待核价</span>
+              <span class="vstep-tag" data-when="first ai-down device-off">待办理</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 服务入口：身份色卡 ============ -->
+      <section class="vgrid-a rise">
+        <a class="card card--print" href="06-print-workbench.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+          <span class="card-name">打印扫描</span>
+          <span class="card-foot">
+            <!-- 这三个是真快捷入口（linkage.js 绑 data-href 并阻止冒泡到外层卡片链接）。
+                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
+            <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
+            <span class="card-pill card-pill--info" data-when="device-off">打印离线 · 扫描可用</span>
+            <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+        </a>
+        <a class="card card--resume" href="09-resume-workbench.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+          <span class="card-name">AI 简历服务</span>
+          <span class="card-foot">
+            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(linkage.js 绑 data-href)。
+                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
+            <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
+            <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          </span>
+        </a>
+      </section>
+
+      <section class="vgrid-b rise">
+        <a class="card card--sm card--job" href="13-jobs-desk.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+          <span class="card-name">岗位信息</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
+            <span class="card-pill" data-dots="12">12 家来源</span>
+          </span>
+        </a>
+        <a class="card card--sm card--fair" href="17-fair-desk.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+          <span class="card-name">招聘会</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
+            <span class="card-pill" data-dots="3">本周 3 场</span>
+          </span>
+        </a>
+        <a class="card card--sm card--mock" href="20-interview-pod.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
+          <span class="card-name">AI 面试训练</span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
+            <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
+          </span>
+        </a>
+        <a class="card card--sm card--policy" href="21-policy.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+          <span class="card-name">政策服务</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">官方来源</span></span>
+        </a>
+        <!-- 2026-08-09 用户定:百宝箱/智慧校园升为正式成员,与六服务同级同大(原角落迷你卡撤销) -->
+        <a class="card card--sm card--tool" href="27-toolbox.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
+          <span class="card-name">百宝箱</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务 · 后台上架控制</span></span>
+        </a>
+        <a class="card card--sm card--camp" href="19-smart-campus.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+          <span class="card-name">智慧校园</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">学校接入后开放</span></span>
+        </a>
+      </section>
+
+      <!-- ============ 现场大图 + 本机仪表 ============ -->
+      <section class="vfoot rise">
+        <div class="vsite">
+          <img src="assets/fair-today.jpg" alt="招聘会现场">
+          <div class="vsite-in">
+            <b>2026 夏季综合招聘会</b>
+            <span>广州国际会展中心 · 8 月 14 日（周五）09:00–16:00 · 128 家企业参展</span>
+            <span class="src">来源 广州市人才服务中心 · 8 月 8 日 08:52 同步</span>
+            <a class="btn" href="17-fair-desk.html">查看招聘会</a>
+          </div>
+        </div>
+
+        <div class="vpanel">
+          <div class="vpanel-hd">本机状态<span>8 月 8 日 09:41 上报</span></div>
+          <div class="vrow"><span class="k">打印机</span><span class="v" data-when="default first ai-down">在线</span><span class="v" data-when="device-off" style="color:var(--coral-400)">离线</span></div>
+          <div class="vrow"><span class="k">A4 纸张</span><span class="v" data-when="default first ai-down">78%</span><span class="v" data-when="device-off">—</span></div>
+          <div class="vbar" data-when="default first ai-down"><i style="width:78%"></i></div>
+          <div class="vrow"><span class="k">碳粉</span><span class="v" data-when="default first ai-down">62%</span><span class="v" data-when="device-off">—</span></div>
+          <div class="vrow"><span class="k">扫描仪</span><span class="v">就绪</span></div>
+          <div class="vcalib">
+            <span class="s"><i style="background:#1c1c1c"></i><i style="background:#00a0c6"></i><i style="background:#d6338c"></i><i style="background:#f2c200"></i></span>
+            <span class="t" data-when="default first ai-down">黑白 / 彩色均可 · 费用以现场公示价为准</span>
+            <span class="t" data-when="device-off">打印能力暂不可用 · 扫描与转存正常</span>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ ActionBar ============ -->
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-when="default"><div class="t">下一步：简历诊断</div><div class="s">约 40 秒 · 免费 · 你确认后才开始</div></div>
+      <div data-when="first"><div class="t">先选一项服务，或在上面说一句你的处境</div><div class="s">不需要登录也可以办理</div></div>
+      <div data-when="ai-down"><div class="t">AI 排序不可用，打印扫描正常</div><div class="s">打印、扫描、上传、浏览都不受影响</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，材料可以先存起来</div><div class="s">凭手机号在任一空闲机器取回打印</div></div>
+    </div>
+    <button class="btn btn--lg btn--ghost" data-when="default">跳过</button>
+    <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html" aria-current="page"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

@@ -1,0 +1,648 @@
+/* ============================================================
+ * home-v3.css · 首页 V3「鲜彩玻璃 warm」试点层
+ *
+ * 视觉真值：docs/design/kiosk-ai-os-v3-2026-08/01-home-v5.html
+ *          + styles/vivid.css（六服务身份色）+ styles/tokens.css / themes.css T8 warm。
+ * 作用域：全部选择器挂 .kpv1.hv3 根（0,2,0+），叠加在 prototype-v1.css 之后，
+ *        只作用于首页，不污染全站；共享壳（顶栏/底栏）不在本层管辖。
+ * 纪律（vivid.css 三条 + 触控硬约束）：
+ *  1) 服务身份色只用于入口识别（--hv3-cat-*），状态语义色沿用 dc-dot 既有映射；
+ *  2) 玻璃层只浮在色域之上（版头胶囊/仪表），纯色卡上不用玻璃；
+ *  3) 子入口 ≥48px，主入口/主按钮 ≥56px，任何规则不得下调。
+ * ============================================================ */
+
+.kpv1.hv3 {
+  /* 服务身份色（vivid.css :root --cat-* 逐值对齐） */
+  --hv3-cat-print: #0d8a6a;
+  --hv3-cat-resume: #c9821c;
+  --hv3-cat-job: #2c62b8;
+  --hv3-cat-fair: #cf5f33;
+  --hv3-cat-interview: #2f7d8f; /* vivid --cat-mock */
+  --hv3-cat-policy: #5b6b8c;
+  /* warm 主题（themes.css T8 暖玉纸）关键角色 */
+  --hv3-ink: #241f18;
+  --hv3-ink-soft: #574e40;
+  --hv3-muted: #7d7060;
+  --hv3-jade: #0d7a5c;
+  --hv3-jade-deep: #0a6247;
+  --hv3-line: rgba(36, 31, 24, 0.1);
+  --hv3-glass-bg: rgba(255, 253, 248, 0.78);
+  --hv3-glass-brd: rgba(255, 255, 255, 0.92);
+  --hv3-shadow: 0 22px 48px -18px rgba(74, 50, 20, 0.28);
+  --hv3-serif: 'Songti SC', 'Noto Serif SC', 'Source Han Serif SC', 'SimSun', serif;
+  /* 触控硬约束（tokens.css --touch-min / CLAUDE.md §9） */
+  --hv3-touch-min: 48px;
+  --hv3-touch-primary: 56px;
+}
+
+/* ── 版头：暖色域 + 网点质地（vhero） ── */
+.kpv1.hv3 .hv3-hero {
+  position: relative;
+  padding: 34px 48px 6px;
+  overflow: hidden;
+}
+.kpv1.hv3 .hv3-hero-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.kpv1.hv3 .hv3-hero-field i {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(52px);
+}
+.kpv1.hv3 .hv3-hero-field i:nth-child(1) {
+  width: 520px;
+  height: 400px;
+  left: -120px;
+  top: -150px;
+  background: radial-gradient(circle, rgba(13, 138, 106, 0.4), transparent 68%);
+  animation: hv3-field-a 34s ease-in-out infinite;
+}
+.kpv1.hv3 .hv3-hero-field i:nth-child(2) {
+  width: 560px;
+  height: 400px;
+  right: -150px;
+  top: -110px;
+  background: radial-gradient(circle, rgba(232, 163, 60, 0.44), transparent 66%);
+  animation: hv3-field-b 41s ease-in-out infinite;
+}
+.kpv1.hv3 .hv3-hero-field i:nth-child(3) {
+  width: 480px;
+  height: 340px;
+  left: 220px;
+  bottom: -200px;
+  background: radial-gradient(circle, rgba(207, 95, 51, 0.32), transparent 68%);
+  animation: hv3-field-c 47s ease-in-out infinite;
+}
+@keyframes hv3-field-a {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translate3d(60px, 40px, 0) scale(1.12);
+  }
+}
+@keyframes hv3-field-b {
+  0%,
+  100% {
+    transform: scale(1.05);
+  }
+  50% {
+    transform: translate3d(-70px, 50px, 0) scale(0.95);
+  }
+}
+@keyframes hv3-field-c {
+  0%,
+  100% {
+    transform: none;
+  }
+  50% {
+    transform: translate3d(50px, -60px, 0) scale(1.1);
+  }
+}
+.kpv1.hv3 .hv3-hero-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+}
+.kpv1.hv3 .hv3-hero-copy {
+  flex: 1;
+  min-width: 0;
+}
+.kpv1.hv3 .hv3-kicker {
+  display: inline-block;
+  font-size: 15px;
+  letter-spacing: 0.3em;
+  color: var(--hv3-ink-soft);
+}
+.kpv1.hv3 .hv3-hero-copy h1 {
+  margin: 12px 0 0;
+  font-family: var(--hv3-serif);
+  font-weight: 600;
+  font-size: 58px;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--hv3-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.kpv1.hv3 .hv3-hero-copy h1 em {
+  font-style: normal;
+  color: var(--hv3-cat-print);
+  /* 强调词整体换行，不在「一趟办完」中间断行。
+   * 不用 inline-block：它会在可访问名称中引入空格，破坏浏览器合同的 heading 精确匹配 */
+  white-space: nowrap;
+}
+.kpv1.hv3 .hv3-hero-copy p {
+  margin: 14px 0 0;
+  font-size: 20px;
+  line-height: 1.55;
+  color: var(--hv3-ink-soft);
+}
+/* 登录/进入我的：V5 玻璃胶囊形态（行为与 .login-btn 合同不变，≥56px） */
+.kpv1.hv3 .login-btn {
+  min-height: 72px;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: rgba(255, 253, 248, 0.8);
+  color: var(--hv3-ink);
+  border: 1px solid var(--hv3-glass-brd);
+  box-shadow: 0 14px 30px -14px rgba(74, 50, 20, 0.32);
+  backdrop-filter: blur(16px) saturate(150%);
+  font-size: 22px;
+}
+.kpv1.hv3 .login-btn svg {
+  width: 30px;
+  height: 30px;
+  color: var(--hv3-jade);
+}
+.kpv1.hv3 .login-btn small {
+  font-size: 14px;
+  opacity: 0.72;
+}
+
+/* ── 玻璃指令胶囊 + 场景快捷（vcommand / vscenes） ── */
+.kpv1.hv3 .hv3-command-wrap {
+  position: relative;
+  z-index: 3;
+  padding: 10px 48px 0;
+}
+.kpv1.hv3 .hv3-command {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 84px;
+  padding: 10px 12px 10px 24px;
+  border-radius: 999px;
+  background: var(--hv3-glass-bg);
+  border: 1px solid var(--hv3-glass-brd);
+  box-shadow: var(--hv3-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+.kpv1.hv3 .hv3-cmd-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+.kpv1.hv3 .hv3-cmd-ic svg {
+  width: 26px;
+  height: 26px;
+  color: var(--hv3-cat-print);
+}
+.kpv1.hv3 .hv3-cmd-ask {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--hv3-touch-primary);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  font-size: 20px;
+  color: var(--hv3-muted);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kpv1.hv3 .hv3-cmd-mic {
+  flex: none;
+  width: var(--hv3-touch-primary);
+  height: var(--hv3-touch-primary);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--hv3-line);
+  color: var(--hv3-ink-soft);
+  cursor: pointer;
+}
+.kpv1.hv3 .hv3-cmd-mic svg {
+  width: 24px;
+  height: 24px;
+}
+.kpv1.hv3 .hv3-cmd-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--hv3-touch-primary);
+  padding: 0 26px;
+  border-radius: 999px;
+  background: var(--hv3-jade);
+  border: 1px solid var(--hv3-jade-deep);
+  color: #fffdf8;
+  font-size: 20px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 26px -12px rgba(10, 98, 71, 0.55);
+}
+.kpv1.hv3 .hv3-cmd-go svg {
+  width: 20px;
+  height: 20px;
+}
+.kpv1.hv3 .hv3-cmd-go:active,
+.kpv1.hv3 .hv3-cmd-mic:active,
+.kpv1.hv3 .hv3-scene:active,
+.kpv1.hv3 .hv3-sub:active,
+.kpv1.hv3 .login-btn:active {
+  transform: scale(0.98);
+}
+.kpv1.hv3 .hv3-cmd-hint {
+  margin: 8px 26px 0;
+  font-size: 14px;
+  color: var(--hv3-muted);
+}
+.kpv1.hv3 .hv3-scenes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 48px 0;
+}
+.kpv1.hv3 .hv3-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--hv3-touch-min);
+  padding: 0 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--hv3-line);
+  font-size: 16px;
+  color: var(--hv3-ink-soft);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+}
+.kpv1.hv3 .hv3-scene svg {
+  width: 18px;
+  height: 18px;
+}
+.kpv1.hv3 .hv3-scene--key {
+  background: var(--hv3-cat-print);
+  border-color: var(--hv3-cat-print);
+  color: #fff;
+}
+
+/* ── 服务身份色卡（vgrid-a / vgrid-b + card） ── */
+.kpv1.hv3 .hv3-services {
+  padding: 18px 48px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.kpv1.hv3 .hv3-grid-a {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.kpv1.hv3 .hv3-grid-b {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.kpv1.hv3 .hv3-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 26px;
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: #fff;
+  box-shadow: 0 18px 40px -18px rgba(48, 34, 16, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.kpv1.hv3 .hv3-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: linear-gradient(152deg, var(--hv3-c1), var(--hv3-c2));
+}
+.kpv1.hv3 .hv3-card::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  bottom: -30px;
+  width: 220px;
+  height: 190px;
+  z-index: -1;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0.5;
+  background-image: radial-gradient(circle at center, currentColor 1.6px, transparent 1.7px);
+  background-size: 10px 10px;
+  -webkit-mask-image: radial-gradient(120% 120% at 100% 100%, #000 8%, transparent 68%);
+  mask-image: radial-gradient(120% 120% at 100% 100%, #000 8%, transparent 68%);
+}
+/* 身份色（vivid.css .card--* 渐变逐值对齐） */
+.kpv1.hv3 .hv3-cat-print {
+  --hv3-c1: #12a37d;
+  --hv3-c2: #08624c;
+}
+.kpv1.hv3 .hv3-cat-resume {
+  --hv3-c1: #dd9a2a;
+  --hv3-c2: #9a5f0d;
+}
+.kpv1.hv3 .hv3-cat-job {
+  --hv3-c1: #3a74cf;
+  --hv3-c2: #1e4587;
+}
+.kpv1.hv3 .hv3-cat-fair {
+  --hv3-c1: #dd6f3c;
+  --hv3-c2: #9c3f1a;
+}
+.kpv1.hv3 .hv3-cat-interview { /* vivid .card--mock */
+  --hv3-c1: #37909f;
+  --hv3-c2: #175c6b;
+}
+.kpv1.hv3 .hv3-cat-policy {
+  --hv3-c1: #6b7c9f;
+  --hv3-c2: #414e6b;
+}
+/* 主入口：整行按钮（保留 .svc-tile 触控合同类名，视觉在此重置） */
+.kpv1.hv3 .hv3-card-main.svc-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: none;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.kpv1.hv3 .hv3-card-main.svc-tile:active {
+  transform: scale(0.99);
+}
+.kpv1.hv3 .hv3-card-ic {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+.kpv1.hv3 .hv3-card-ic svg {
+  width: 25px;
+  height: 25px;
+  color: #fff;
+}
+.kpv1.hv3 .hv3-card-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpv1.hv3 .hv3-card-text b {
+  font-family: var(--hv3-serif);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+}
+.kpv1.hv3 .hv3-card-text span {
+  font-size: 15px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.86);
+}
+.kpv1.hv3 .hv3-card-go {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.2);
+}
+.kpv1.hv3 .hv3-card-go svg {
+  width: 20px;
+  height: 20px;
+  color: #fff;
+}
+/* 子入口：小功能直点（≥48px 触控，白玻璃 pill） */
+.kpv1.hv3 .hv3-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  margin-top: auto;
+}
+.kpv1.hv3 .hv3-sub {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--hv3-touch-min);
+  min-width: var(--hv3-touch-min);
+  padding: 0 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.kpv1.hv3 .hv3-sub:active {
+  background: rgba(255, 255, 255, 0.34);
+}
+/* 紧凑卡：标题字号收敛，子入口纵向撑满列宽（更大可点面）；
+ * 收起右侧箭头圈释放标题空间，避免四列窄卡中文标题竖排断行 */
+.kpv1.hv3 .hv3-grid-b .hv3-card-text b {
+  font-size: 20px;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-card-go {
+  display: none;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-card-text span {
+  font-size: 13px;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-card-main.svc-tile {
+  min-height: 60px;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-card-ic {
+  width: 44px;
+  height: 44px;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-subs {
+  flex-direction: column;
+  align-items: stretch;
+}
+.kpv1.hv3 .hv3-grid-b .hv3-sub {
+  justify-content: flex-start;
+}
+
+/* ── 动态专区（zone-row 复用 kpv1 基类，仅收位）── */
+.kpv1.hv3 .zone-row {
+  margin: 16px 48px 0;
+}
+
+/* ── 底部：合规提示 + 本机状态仪表（vfoot / vpanel）── */
+.kpv1.hv3 .hv3-foot {
+  margin: 16px 48px 0;
+  display: grid;
+  grid-template-columns: 1fr 348px;
+  gap: 16px;
+  align-items: stretch;
+}
+.kpv1.hv3 .hv3-foot .notice {
+  margin: 0;
+  align-items: flex-start;
+  padding: 16px 20px;
+}
+.kpv1.hv3 .hv3-panel {
+  border-radius: 22px;
+  padding: 16px 20px;
+  background: var(--hv3-glass-bg);
+  border: 1px solid var(--hv3-glass-brd);
+  box-shadow: 0 12px 28px -14px rgba(74, 50, 20, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(18px) saturate(150%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpv1.hv3 .hv3-panel-hd {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--hv3-ink);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.kpv1.hv3 .hv3-panel-hd span {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--hv3-muted);
+}
+.kpv1.hv3 .hv3-panel-row {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 15px;
+}
+.kpv1.hv3 .hv3-panel-row .k {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--hv3-ink-soft);
+}
+.kpv1.hv3 .hv3-panel-row .k svg {
+  width: 18px;
+  height: 18px;
+  color: var(--hv3-muted);
+  flex: none;
+}
+.kpv1.hv3 .hv3-panel-row .dc-dot {
+  margin-left: auto;
+}
+.kpv1.hv3 .hv3-panel-ft {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hv3-line);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--hv3-muted);
+}
+.kpv1.hv3 .hv3-panel-ft svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+/* ── 响应式：不破坏现有窄屏能力（1080 以下逐级收列）── */
+@media (max-width: 1079.98px) {
+  .kpv1.hv3 .hv3-hero {
+    padding: 24px 24px 4px;
+  }
+  .kpv1.hv3 .hv3-hero-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .kpv1.hv3 .hv3-hero-copy h1 {
+    font-size: 40px;
+  }
+  .kpv1.hv3 .hv3-hero-copy p {
+    font-size: 17px;
+  }
+  .kpv1.hv3 .hv3-command-wrap,
+  .kpv1.hv3 .hv3-scenes {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+  .kpv1.hv3 .hv3-command {
+    flex-wrap: wrap;
+    border-radius: 26px;
+    padding: 12px 16px;
+  }
+  .kpv1.hv3 .hv3-cmd-ask {
+    flex-basis: 100%;
+    white-space: normal;
+  }
+  .kpv1.hv3 .hv3-cmd-go {
+    flex: 1;
+    justify-content: center;
+  }
+  .kpv1.hv3 .hv3-services {
+    padding: 14px 24px 0;
+  }
+  .kpv1.hv3 .hv3-grid-a {
+    grid-template-columns: 1fr;
+  }
+  .kpv1.hv3 .hv3-grid-b {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .kpv1.hv3 .zone-row,
+  .kpv1.hv3 .hv3-foot {
+    margin-left: 24px;
+    margin-right: 24px;
+  }
+  .kpv1.hv3 .hv3-foot {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .kpv1.hv3 .hv3-hero-copy h1 {
+    font-size: 32px;
+  }
+  .kpv1.hv3 .hv3-grid-b {
+    grid-template-columns: 1fr;
+  }
+  .kpv1.hv3 .hv3-card-text b {
+    font-size: 22px;
+  }
+}
+
+/* ── 动效收敛：reduced-motion 关闭色域漂移与按压缩放 ── */
+@media (prefers-reduced-motion: reduce) {
+  .kpv1.hv3 .hv3-hero-field i {
+    animation: none;
+  }
+  .kpv1.hv3 .hv3-cmd-go:active,
+  .kpv1.hv3 .hv3-cmd-mic:active,
+  .kpv1.hv3 .hv3-scene:active,
+  .kpv1.hv3 .hv3-sub:active,
+  .kpv1.hv3 .hv3-card-main.svc-tile:active,
+  .kpv1.hv3 .login-btn:active {
+    transform: none;
+  }
+}
