@@ -112,13 +112,21 @@ function invokeV2(
   maximumPayload = 0
 ): TrustedWindowsCandidate & { unclaimedIdentity: WindowsFileIdentity } {
   const result = invokeHelper(request, RESPONSE_HEADER_BYTES + maximumPayload)
+  const helperFailureCode = Buffer.isBuffer(result.stderr)
+    ? /^SCAN_READER_E(\d{3})\r?\n$/.exec(result.stderr.toString('ascii'))?.[1]
+    : undefined
   if (
     !isAcceptedTrustedHelperResult(result, RESPONSE_HEADER_BYTES + maximumPayload) ||
     result.stdout.length < RESPONSE_HEADER_BYTES ||
     !result.stdout.subarray(0, 8).equals(RESPONSE_MAGIC) ||
     result.stdout.readUInt32LE(8) !== operation
-  )
-    throw new Error('SCAN_INPUT_SECURE_READER_REJECTED')
+  ) {
+    throw new Error(
+      helperFailureCode
+        ? `SCAN_INPUT_SECURE_READER_REJECTED_E${helperFailureCode}`
+        : 'SCAN_INPUT_SECURE_READER_REJECTED'
+    )
+  }
   const payloadLength = result.stdout.readUInt32LE(64)
   if (
     payloadLength !== result.stdout.length - RESPONSE_HEADER_BYTES ||

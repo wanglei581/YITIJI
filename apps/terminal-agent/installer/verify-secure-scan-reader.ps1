@@ -31,8 +31,8 @@ if (request.mode === 'inspect') {
   try {
     const candidate = secure.readTrustedWindowsCandidate(request.root, request.filename, expected)
     result = { accepted: true, length: candidate.bytes.length, sha256: crypto.createHash('sha256').update(candidate.bytes).digest('hex') }
-  } catch {
-    result = { accepted: false }
+  } catch (error) {
+    result = { accepted: false, errorCode: error instanceof Error ? error.message : 'SCAN_INPUT_SECURE_READER_REJECTED' }
   }
 } else if (request.mode === 'finalize-delete' || request.mode === 'finalize-quarantine') {
   try {
@@ -145,7 +145,7 @@ try {
   $quarantineResult = Invoke-Probe @{ mode = "finalize-quarantine"; root = $scanRoot; filename = "finalize-quarantine.pdf" }
   if (-not [bool]$quarantineResult.accepted -or (Test-Path -LiteralPath $quarantineFile) -or
       -not (Test-Path -LiteralPath (Join-Path $scanRoot "_unclaimed\finalize-quarantine.pdf") -PathType Leaf)) {
-    throw "Native quarantine did not use the pinned _unclaimed boundary"
+    throw "Native quarantine did not use the pinned _unclaimed boundary: $($quarantineResult | ConvertTo-Json -Compress)"
   }
 
   $sweepFile = Join-Path $scanRoot "_unclaimed\sweep.pdf"

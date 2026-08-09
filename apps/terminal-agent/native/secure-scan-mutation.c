@@ -120,14 +120,18 @@ int ajps_finalize(const ajps_request *request, BOOL quarantine) {
   if (zero_identity(request->root_identity) || zero_identity(request->candidate_identity)
       || !ajps_pin_directory_chain(request->root, FALSE, &root)) return ajps_fail(41);
   memset(&unclaimed, 0, sizeof(unclaimed)); unclaimed.leaf = INVALID_HANDLE_VALUE;
-  if (!ajps_identity_equal(root.identity, request->root_identity)
-      || !ajps_open_plain_file(&root, request->filename, 0, &candidate, &information)
-      || !ajps_information_matches(&information, request->expected_size, request->expected_mtime_ms, request->candidate_identity)) goto cleanup;
+  if (!ajps_identity_equal(root.identity, request->root_identity)) { result = 42; goto cleanup; }
+  if (!ajps_open_plain_file(&root, request->filename, 0, &candidate, &information)) { result = 43; goto cleanup; }
+  if (!ajps_information_matches(&information, request->expected_size, request->expected_mtime_ms, request->candidate_identity)) {
+    result = 44; goto cleanup;
+  }
   if (quarantine) {
-    if (!pin_unclaimed(&root, TRUE, &unclaimed) || !rename_into_unclaimed(candidate, unclaimed.leaf, request->filename)) goto cleanup;
-  } else if (!set_delete_pending(candidate)) goto cleanup;
-  if (ajps_write_response(request->operation, root.identity, request->candidate_identity,
-      quarantine ? unclaimed.identity : (ajps_identity){0}, request->expected_size, request->expected_mtime_ms, NULL, 0)) result = 0;
+    if (!pin_unclaimed(&root, TRUE, &unclaimed)) { result = 45; goto cleanup; }
+    if (!rename_into_unclaimed(candidate, unclaimed.leaf, request->filename)) { result = 46; goto cleanup; }
+  } else if (!set_delete_pending(candidate)) { result = 47; goto cleanup; }
+  if (!ajps_write_response(request->operation, root.identity, request->candidate_identity,
+      quarantine ? unclaimed.identity : (ajps_identity){0}, request->expected_size, request->expected_mtime_ms, NULL, 0)) result = 48;
+  else result = 0;
 cleanup:
   if (candidate != INVALID_HANDLE_VALUE) CloseHandle(candidate);
   ajps_close_pinned_path(&unclaimed);
