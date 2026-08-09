@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P26 顾问作业面 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P26 顾问作业面">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P26 专用 ───────────────────────────────────────────────────────────
+   九个能力共用一个作业面，只有三种作业型：
+     A 问答型 —— 你有具体问题，她答，你钉住有用的
+     B 填槽型 —— 你写不出来，她一问一答替你把槽填满
+     C 比对型 —— 两样东西摆一起，逐条指出差在哪
+
+   ── 本页最要紧的一个判断 ────────────────────────────────────────────
+   **型由问题决定，不由用户选。**
+
+   让用户先选"我要问答还是填槽"是把内部实现摊给用户看 ——
+   他不知道这三个词是什么意思，也不该知道。
+   他只会说「帮我看看简历哪里不行」，系统据此判定这是比对型。
+
+   但判定会错。所以页面必须做两件事：
+     ① 说清**为什么是这个型**（据你那句话里的哪个词）
+     ② 判错了能一键换 —— 换的时候**已填的内容不丢**
+
+   ── 三型共用的诚实口径 ────────────────────────────────────────────
+   · 每条结论带出处；没出处的标为"参考"
+   · 填槽型**绝不替用户编事实**：数字、公司名、时间一律留空让本人填
+   · 比对型只比"有没有写到"，不比"写得好不好"——后者本机没有依据
+
+   组件备忘：.tl 本身是一步（容器 .tline）；.ck / .jobrow 页内自带。
+   ──────────────────────────────────────────────────────────────────── */
+
+/* 型标识条：常驻，说清为什么是这个型 + 可切换 */
+.modebar { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); }
+/* 状态标签，不是入口：说的是本次按哪种型办，点它不通向别处。
+   命名带 -status 与 P17/P20/P21 同口径（自检按类名放行状态类）。 */
+.mb-tag-status { flex:0 0 auto; font-size:var(--fz-2); font-weight:700; padding:4px 12px;
+  border-radius:999px; background:var(--jade-a20); color:var(--jade-200); white-space:nowrap; }
+.mb-txt { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; min-width:0; }
+.mb-txt b { color:var(--fog-900); }
+.mb-sw { margin-left:auto; flex:0 0 auto; display:flex; gap:6px; }
+/* 这三个按钮是让用户推翻 AI 对意图的判定（"你判错了，改成帮我比"）——
+   在这套设计里属于最重要的一类控件：它是用户否决 AI 的出口。
+   原来 38px，站着操作点不准；按 §9 抬到 48px。 */
+.mb-sw button { font-size:var(--fz-1); padding:0 var(--s-4); border-radius:var(--r-xs);
+  background:var(--surf-1); border:1px solid var(--brd-1); color:var(--fog-700);
+  cursor:pointer; font-family:var(--ff-ui); min-height:var(--touch-min); }
+.mb-sw button:hover { border-color:var(--jade-a32); color:var(--jade-200); }
+
+/* A 问答型 */
+.chat { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+        gap:var(--s-4); padding-bottom:var(--s-4); }
+.msg { display:flex; gap:var(--s-4); align-items:flex-start; }
+.msg-av { width:32px; height:32px; border-radius:50%; flex:0 0 auto; display:grid; place-items:center;
+          background:var(--fog-a08); }
+.msg-av .ic { width:16px; height:16px; color:var(--fog-600); }
+.msg--ai .msg-av { background:var(--jade-a20); }
+.msg--ai .msg-av .ic { color:var(--jade-400); }
+.msg-b { min-width:0; padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+         font-size:var(--fz-3); color:var(--fog-800); line-height:1.68; }
+.msg--me { flex-direction:row-reverse; }
+.msg--me .msg-b { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.msg--ai .msg-b { background:var(--surf-1); border:1px solid var(--brd-1); }
+.msg-b b { color:var(--fog-900); }
+.msg-pin { margin-top:var(--s-3); display:inline-flex; align-items:center; gap:6px;
+  font-size:var(--fz-1); padding:4px 11px; border-radius:999px; cursor:pointer;
+  background:var(--fog-a08); color:var(--fog-700); border:1px solid var(--brd-1); }
+.msg-pin .ic { width:13px; height:13px; }
+
+/* B 填槽型 */
+.slots { display:flex; flex-direction:column; gap:var(--s-4); }
+.slot { padding:var(--s-5); border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.slot--now { border-color:var(--jade-400); background:var(--jade-a12); }
+.slot--todo { opacity:.62; border-style:dashed; }
+.slot-q { font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+.slot-why { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.slot-a { font-size:var(--fz-3); color:var(--fog-800); line-height:1.65;
+  padding:var(--s-4); border-radius:var(--r-xs); background:var(--surf-1);
+  border:1px solid var(--brd-1); }
+.slot-a .blank { display:inline-block; min-width:76px; border-bottom:2px solid var(--amber-400);
+  color:var(--amber-200); text-align:center; }
+
+/* 成稿：填槽的产物 */
+.draft { padding:var(--s-5); border-radius:var(--r-md); background:var(--surf-1);
+  border:1px solid var(--brd-1); font-size:var(--fz-3); color:var(--fog-800); line-height:1.8; }
+.draft .blank { display:inline-block; min-width:82px; border-bottom:2px solid var(--amber-400);
+  color:var(--amber-200); text-align:center; }
+.draft b { color:var(--fog-900); }
+
+/* C 比对型：主区内左右两栏（栏内分栏，不是页面级三栏） */
+.cmp { flex:1 1 auto; min-height:0; display:grid; grid-template-columns:1fr 1fr;
+       gap:var(--s-4); overflow:hidden; }
+.cmp-col { min-width:0; display:flex; flex-direction:column; gap:var(--s-3); overflow-y:auto; }
+.cmp-hd { flex:0 0 auto; font-size:var(--fz-2); font-weight:700; color:var(--fog-700);
+  padding-bottom:var(--s-3); border-bottom:1px solid var(--brd-1); }
+.ci { padding:var(--s-4); border-radius:var(--r-xs); background:var(--surf-1);
+  border:1px solid var(--brd-1); font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.ci b { color:var(--fog-900); }
+.ci--hit { background:var(--jade-a12); border-color:var(--jade-a32); }
+.ci--miss { background:var(--amber-a12); border-color:var(--amber-a20); }
+/* 同上：比对结果的判定标签，不是可点入口。 */
+.ci-tag-status { display:inline-block; font-size:var(--fz-1); padding:1px 8px; border-radius:999px;
+  margin-bottom:5px; }
+.ci--hit .ci-tag-status { background:var(--jade-a20); color:var(--jade-200); }
+.ci--miss .ci-tag-status { background:var(--amber-a20); color:var(--amber-200); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="sC" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="25-advisor.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">小青 · 作业中</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #A-6614</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>小青在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 作业面停在当前进度</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 结果存不成纸</div>
+    <div class="clock" data-clock>2026年8月9日 <b>17:06</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="sC"><span class="rstep-dot">C</span><span class="rstep-name">比对型</span></button>
+      <button class="rstep" data-go="sB"><span class="rstep-dot">B</span><span class="rstep-name">填槽型</span></button>
+      <button class="rstep" data-go="sA"><span class="rstep-dot">A</span><span class="rstep-name">问答型</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>三种作业型</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- 型标识条：常驻。说清为什么是这个型，且能换 -->
+      <div class="modebar" data-at="sC">
+        <span class="mb-tag-status">比对型</span>
+        <span class="mb-txt">你说的是「<b>我够不够格</b>」——
+          有明确的两样东西要放一起看，所以按比对型办。</span>
+        <span class="mb-sw">
+          <button data-go="sB">改成帮我写</button>
+          <button data-go="sA">改成直接问</button>
+        </span>
+      </div>
+      <div class="modebar" data-at="sB">
+        <span class="mb-tag-status">填槽型</span>
+        <span class="mb-txt">你说的是「<b>我不会写</b>」——
+          东西还不存在，得先问出来，所以按填槽型办。</span>
+        <span class="mb-sw">
+          <button data-go="sC">改成帮我比</button>
+          <button data-go="sA">改成直接问</button>
+        </span>
+      </div>
+      <div class="modebar" data-at="sA">
+        <span class="mb-tag-status">问答型</span>
+        <span class="mb-txt">你问的是一个<b>拿不准的判断</b>，没有现成的两样东西可比 ——
+          所以按问答型办。</span>
+        <span class="mb-sw">
+          <button data-go="sC">改成帮我比</button>
+          <button data-go="sB">改成帮我写</button>
+        </span>
+      </div>
+
+      <!-- ─────────── C 比对型 ─────────── -->
+      <div class="pane pane--grow" data-at="sC">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <b>你的简历 ↔ 恒信精密制造 · 机械设计工程师</b>
+          <span class="mt" data-when="default first">逐条比「有没有写到」，不比「写得好不好」</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 停在上次的比对结果</span>
+        </div>
+
+        <div class="sec cmp">
+          <div class="cmp-col">
+            <div class="cmp-hd">岗位正文要求 · 7 条</div>
+            <div class="ci ci--hit"><span class="ci-tag-status">你写到了</span>
+              <b>熟悉非标夹具设计</b><br>你的原文：「主导 3 条产线工装改造，负责结构」</div>
+            <div class="ci ci--hit"><span class="ci-tag-status">你写到了</span>
+              <b>能独立出图</b><br>你的原文：「用 SolidWorks 出图，做过 2 版样机」</div>
+            <div class="ci ci--hit"><span class="ci-tag-status">你写到了</span>
+              <b>能量化改善效果</b><br>你的原文：「卡料率从 12% 降到 3%」，且说清了测法</div>
+            <div class="ci ci--miss"><span class="ci-tag-status">没写到</span>
+              <b>有 DFM 评审经验</b><br>简历里找不到对应内容</div>
+            <div class="ci ci--miss"><span class="ci-tag-status">没写到</span>
+              <b>会用 PDM / PLM 系统</b><br>简历里找不到对应内容</div>
+            <div class="ci"><span class="ci-tag-status" style="background:var(--fog-a08);color:var(--fog-600)">不是能力项</span>
+              <b>学历不限，有夹具设计经验优先</b><br>这条不卡你</div>
+            <div class="ci"><span class="ci-tag-status" style="background:var(--fog-a08);color:var(--fog-600)">不是能力项</span>
+              <b>接受偶尔出差</b><br>这是你自己决定接不接受的条件</div>
+          </div>
+
+          <div class="cmp-col">
+            <div class="cmp-hd">你简历里有、但这条岗位没提的 · 3 条</div>
+            <div class="ci"><b>看液压原理图</b><br>
+              这家没要求，但设备调试类岗位常要 —— 别删，换个岗位可能用得上</div>
+            <div class="ci"><b>参与过工装液压回路改造</b><br>同上</div>
+            <div class="ci"><b>CET-4</b><br>
+              这家没提外语。机械岗多数不看，占篇幅可以往后放</div>
+
+            <div class="cmp-hd" style="margin-top:var(--s-5)">本机比不了的</div>
+            <div class="ci"><b>你写的这些是不是真的</b><br>
+              本机只看简历上有没有这句话，<b>核不了真伪</b> —— 面试会问细节</div>
+            <div class="ci"><b>写得好不好、有没有说服力</b><br>
+              这要懂这一行的人才看得出来，本机没有依据</div>
+            <div class="ci"><b>你会不会被录用</b><br>
+              由用人单位决定，本机不预测</div>
+          </div>
+        </div>
+
+        <div class="notice" style="flex:0 0 auto;margin-top:var(--s-4)">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>7 条要求里<b>你写到 3 条、没写到 2 条</b>，另 2 条不是能力项。<br>
+                没写到的两条<b>如果你其实做过，那是简历漏写，不是你缺</b> ——
+                去简历工作台补上，这份比对可以重跑。</span>
+        </div>
+      </div>
+
+      <!-- ─────────── B 填槽型 ─────────── -->
+      <div class="pane pane--grow" data-at="sB">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-pen"/></svg>
+          <b>帮你写一段自我介绍 · 第 3 问 / 共 4 问</b>
+          <span class="mt" data-when="default first">她问，你答，最后拼成一段可以直接念的话</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 停在第 3 问，已答的还在</span>
+        </div>
+
+        <div class="sec" style="overflow-y:auto">
+          <div class="slots">
+            <div class="slot">
+              <span class="slot-q">1 · 你现在做什么，做了多久？</span>
+              <span class="slot-a">机械设计，六年，主要做非标自动化夹具。</span>
+            </div>
+
+            <div class="slot">
+              <span class="slot-q">2 · 这六年里，你做成过最拿得出手的一件事是什么？</span>
+              <span class="slot-a">主导过 3 条产线的工装改造，第二版把卡料率从 12% 降到 3%。</span>
+            </div>
+
+            <div class="slot slot--now">
+              <span class="slot-q">3 · 你为什么想投这个岗？</span>
+              <span class="slot-why">
+                自我介绍最后一句要落到「所以我想做什么」，否则听完不知道你要什么 ——
+                这是你上次面试练习里被标出的同一个缺口。
+              </span>
+              <span class="slot-a">
+                想做<span class="blank">　　　　</span>方向，因为<span class="blank">　　　　　　</span>。
+                <br><span style="font-size:var(--fz-1);color:var(--fog-600)">
+                （直接说你的想法就行，不用组织语言，她会帮你顺）</span>
+              </span>
+            </div>
+
+            <div class="slot slot--todo">
+              <span class="slot-q">4 · 有没有希望对方知道、但简历上没写的？</span>
+              <span class="slot-why">比如证书在考、能接受出差、离职原因 —— 答完这条就成稿</span>
+            </div>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-file"/></svg><b>现在拼出来的样子</b>
+            <span class="mt">还差第 3、4 问</span>
+          </div>
+          <div class="draft">
+            我叫王磊，做机械设计六年，主要做<b>非标自动化夹具</b>。<br>
+            这六年里比较拿得出手的是<b>主导过 3 条产线的工装改造</b>——
+            第二版把卡料率<b>从 12% 降到 3%</b>，改造前后用的是同一套测算口径。<br>
+            我想投这个岗，是因为<span class="blank">　　　　　　</span>。<br>
+            另外<span class="blank">　　　　　　</span>。
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>空着的地方她不会替你编。</b>
+                  数字、公司名、时间、离职原因这类只有你知道的事，一律留空 ——
+                  编出来你面试时答不上，比空着更糟。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── A 问答型 ─────────── -->
+      <div class="pane pane--grow" data-at="sA">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <b>问答 · 有用的记得钉住</b>
+          <span class="mt" data-when="default first">对话不保存，钉住的能打成纸</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 停在已有的对话</span>
+        </div>
+
+        <div class="sec chat">
+          <div class="msg msg--me">
+            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
+            <span class="msg-b">离职三个月了，简历上要不要写空窗期的原因</span>
+          </div>
+
+          <div class="msg msg--ai">
+            <span class="msg-av"><svg class="ic"><use href="#i-brain"/></svg></span>
+            <span class="msg-b">
+              <b>三个月一般不用专门解释。</b>简历上留白三个月很常见，
+              多数人不会追问；写一句"因个人原因离职"反而把注意力引过去。<br><br>
+              真要被问，是在<b>面试</b>里问，那时候直接说就行 ——
+              这一条可以放进面试练习里练一遍。<br><br>
+              <span style="color:var(--fog-600);font-size:var(--fz-2)">
+              依据：这是通行做法，<b>本机没有你所在行业的具体数据</b> ——
+              这条算参考，不算有出处的结论。</span>
+              <span class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉住这条</span>
+            </span>
+          </div>
+
+          <div class="msg msg--me">
+            <span class="msg-av"><svg class="ic"><use href="#i-user"/></svg></span>
+            <span class="msg-b">那超过半年呢</span>
+          </div>
+
+          <div class="msg msg--ai">
+            <span class="msg-av"><svg class="ic"><use href="#i-brain"/></svg></span>
+            <span class="msg-b">
+              超过半年<b>建议在简历上给一行交代</b>，但写的是<b>你这段时间做了什么</b>，
+              不是解释为什么没工作 —— 比如考了什么证、接了什么零活、照顾家人。<br><br>
+              这里有个能落到实处的：你说过<b>在考电工证</b>。
+              那可以写成「2026.05–至今 备考电工作业操作证」，
+              既填了空窗，又正好对上设备调试类岗位那 19 条硬门槛。
+              <span class="msg-pin"><svg class="ic"><use href="#i-bookmark"/></svg>钉住这条</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- 三型共用：为什么是这个型 -->
+      <div class="pane" data-at="sC sB sA">
+        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>型是怎么定的</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+            <b>型由你的问题决定，不用你选。</b><br><br>
+            你不知道"填槽型"是什么意思，也不该知道 ——
+            那是我们内部怎么实现的，不是你要操心的事。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">「够不够格」</span><span class="v">比对型</span></div>
+            <div class="kv-row"><span class="k">「我不会写」</span><span class="v">填槽型</span></div>
+            <div class="kv-row"><span class="k">「要不要 / 该不该」</span><span class="v">问答型</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            <b>判错了顶部能一键换</b>，换的时候<b>已填的内容不丢</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 归属裁决落地：76 号原型「AI方案确认」(/ai/plan) 归 P26（原写 P22）。
+           方案确认 = 她把本次作业拟成可执行的顺序，办不办、从哪步办由你定。 -->
+      <div class="pane" data-at="sC sB sA">
+        <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>方案确认</b>
+          <span class="mt">她拟的顺序 · 办不办你定</span></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">去简历里补 DFM / PDM 两条</span>
+                <span class="tl-s">比对里发现的漏写项 · 简历工作台</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">答完自我介绍第 3、4 问</span>
+                <span class="tl-s">就差这两问成稿 · 本页填槽型</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">打印钉住的 2 条与新简历</span>
+                <span class="tl-s">去打印工作台核价</span></span></div>
+          </div>
+          <a class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)" href="09-resume-workbench.html">
+            <svg class="ic"><use href="#i-check"/></svg>按这个方案办 · 先去第 1 步
+          </a>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            每一步到了对应工作台还要你自己确认；不按这个顺序办，也不影响已完成的部分。
+          </div>
+        </div>
+      </div>
+
+      <!-- C 右 -->
+      <div class="pane pane--grow" data-at="sC">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这次比的是什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">左边</span><span class="v">岗位正文 7 条</span></div>
+            <div class="kv-row"><span class="k">右边</span><span class="v">你简历里多出的 3 条</span></div>
+            <div class="kv-row"><span class="k">你写到</span><span class="v"><b>3</b> 条</span></div>
+            <div class="kv-row"><span class="k">没写到</span><span class="v"><b>2</b> 条</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">岗位正文 · 同步 8月9日</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>比的是<b>有没有写到</b>，不是<b>写得好不好</b>。<br>
+                  后者要懂这一行的人才看得出来，本机没有依据，所以不比。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            「没写到」的两条如果你其实做过，那是<b>简历漏写</b>——
+            补上再重跑，结果会变。
+          </div>
+        </div>
+      </div>
+
+      <!-- B 右 -->
+      <div class="pane pane--grow" data-at="sB">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>她不会替你编什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">数字</span><span class="v v--fog">留空</span></div>
+            <div class="kv-row"><span class="k">公司名</span><span class="v v--fog">留空</span></div>
+            <div class="kv-row"><span class="k">时间</span><span class="v v--fog">留空</span></div>
+            <div class="kv-row"><span class="k">离职原因</span><span class="v v--fog">留空</span></div>
+            <div class="kv-row"><span class="k">证书 / 资质</span><span class="v v--fog">留空</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这些只有你知道。<b>编出来你面试时答不上，比空着更糟</b> ——
+                  面试官追问细节的第一句就会露。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            她做的是<b>把你说的话顺成书面表达</b>，不是替你想内容。
+            你随口说的口语，她会帮你改成能念出口的句子。
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>第 3 问这个缺口，是你<b>上次面试练习里被标出的同一个</b> ——
+                  这次趁着写自我介绍一起补上。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- A 右 -->
+      <div class="pane pane--grow" data-at="sA">
+        <div class="pane-hd"><svg class="ic"><use href="#i-bookmark"/></svg><b>钉住的 2 条</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">对话轮数</span><span class="v">4 轮</span></div>
+            <div class="kv-row"><span class="k">已钉住</span><span class="v"><b>2</b> 条</span></div>
+            <div class="kv-row"><span class="k">对话保存</span><span class="v v--fog">不保存</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>她答的这两条<b>出处不一样</b>：<br>
+                  第一条标了「这条算参考，本机没有你所在行业的数据」；<br>
+                  第二条落到你说过的「在考电工证」和本机读过的 19 条硬门槛上 ——
+                  <b>后者更硬</b>。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            打印时每条都会带上出处，<b>让你自己能分辨哪条更可信</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            小青干活的地方。<b>怎么干由你的问题决定</b> ——
+            要比就摆一起比，不会写就一问一答，拿不准就直接答。<br>
+            判错了顶部能一键换。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="btn btn--lg btn--ghost" data-at="sC sB sA" href="25-advisor.html">回去问别的</a>
+
+    <span class="actionbar-hint" data-at="sC" data-when="default first">7 条要求 · 你写到 3 条 · 2 条可能是漏写</span>
+    <span class="actionbar-hint" data-at="sB" data-when="default first">第 3 问 / 共 4 问 · 空着的她不替你编</span>
+    <span class="actionbar-hint" data-at="sA" data-when="default first">已钉住 2 条 · 打印时会带上出处</span>
+    <span class="actionbar-hint" data-at="sC sB sA" data-when="ai-down">AI 不可用 · 已完成的部分还在，可以打印</span>
+    <span class="actionbar-hint" data-at="sC sB sA" data-when="device-off">打印机离线 · 可扫码带走</span>
+
+    <a class="btn btn--primary" data-at="sC" data-when="default first ai-down" href="09-resume-workbench.html">去简历里补这 2 条<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="sB" data-when="default first">答第 3 问<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="sB" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印已完成的部分 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="sA" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印钉住的 2 条 · 去核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="sC sB sA" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

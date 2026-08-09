@@ -113,6 +113,32 @@
       ],
       "port": 5291,
       "autoPort": false
+    },
+    {
+      "name": "ai-os-v3",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5293",
+        "--directory",
+        "docs/design/kiosk-ai-os-v3-2026-08"
+      ],
+      "port": 5293,
+      "autoPort": true
+    },
+    {
+      "name": "ai-orchestration",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5292",
+        "--directory",
+        "docs/design/kiosk-ai-orchestration-2026-08"
+      ],
+      "port": 5292,
+      "autoPort": false
     }
   ]
 }

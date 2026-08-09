@@ -1,0 +1,757 @@
+/*
+ * 扩展自检：现有页面级溢出检查发现不了 .verrand 被 flex 压缩后，
+ * “跳过，直接打印”按钮超出卡片底部 20px 并被 overflow:hidden 裁掉的问题；
+ * 也发现不了文案承诺 data-ev 左右联动、实际却没有绑定点击行为的问题。
+ */
+(function (window, document) {
+  'use strict';
+
+  var originalAudit = window.v3Audit;
+  var decorationClasses = [
+    'aurora', 'mesh', 'grain', 'vhero-field', 'vhero-dots'
+  ];
+  var interactiveSelector =
+    'a,button,input,select,textarea,[role="button"]';
+
+  function trim(text) {
+    return String(text || '').replace(/^\s+|\s+$/g, '');
+  }
+
+  function hasClass(element, name) {
+    return !!(element.classList && element.classList.contains(name));
+  }
+
+  function isDecoration(element) {
+    var node = element;
+    var i;
+    while (node && node.nodeType === 1) {
+      for (i = 0; i < decorationClasses.length; i += 1) {
+        if (hasClass(node, decorationClasses[i])) {
+          return true;
+        }
+      }
+      node = node.parentNode;
+    }
+    return false;
+  }
+
+  function matches(element, selector) {
+    var method = element.matches ||
+      element.msMatchesSelector ||
+      element.webkitMatchesSelector;
+    return !!(method && method.call(element, selector));
+  }
+
+  function isClipping(style) {
+    var pattern = /(^|\s)(hidden|clip)(\s|$)/;
+    return pattern.test(style.overflow || '') ||
+      pattern.test(style.overflowY || '');
+  }
+
+  function elementName(element) {
+    var name;
+    var classes;
+    var i;
+    if (element.id) {
+      return '#' + element.id;
+    }
+    name = element.tagName.toLowerCase();
+    classes = trim(element.className).split(/\s+/);
+    for (i = 0; i < classes.length && i < 2; i += 1) {
+      if (classes[i]) {
+        name += '.' + classes[i];
+      }
+    }
+    return name;
+  }
+
+  function elementText(element) {
+    var text = trim(element.textContent);
+    if (!text) {
+      text = trim(
+        element.getAttribute('aria-label') ||
+        element.getAttribute('title') ||
+        element.value ||
+        element.tagName.toLowerCase()
+      );
+    }
+    return text.length > 50 ? text.substring(0, 47) + '...' : text;
+  }
+
+  function overflowText(bottom, right) {
+    var parts = [];
+    if (bottom > 0) {
+      parts.push('底部 ' + Math.ceil(bottom) + 'px');
+    }
+    if (right > 0) {
+      parts.push('右侧 ' + Math.ceil(right) + 'px');
+    }
+    return parts.join('、');
+  }
+
+  /* 2026-08-09 修：describeElement 原来嵌在 auditInternalClipping 里，
+     auditCardOverlap(649 行)也调用它 —— 只要卡内溢出真的抓到明细就
+     ReferenceError 崩掉整个 v3AuditPlus。提一份到 IIFE 顶层作用域；
+     嵌套的那份留在原地（同名遮蔽，行为不变）。不改任何判定逻辑。 */
+  function describeElement(element) {
+    var description = element.tagName.toLowerCase();
+    var id = (element.id || '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+    var className = typeof element.className === 'string'
+      ? element.className.replace(/\s+/g, ' ').replace(/^ | $/g, '')
+      : '';
+    var classes;
+    var i;
+    if (id) description += '#' + id;
+    if (className) {
+      classes = className.split(/\s+/);
+      for (i = 0; i < classes.length && i < 3; i++) {
+        if (classes[i]) description += '.' + classes[i];
+      }
+    }
+    return description;
+  }
+
+  function auditInternalClipping() {
+    var result = {
+      '视口外': 0,
+      '严重': 0,
+      '一般': 0,
+      '明细': []
+    };
+    var viewportItems = [];
+    var severeItems = [];
+    var normalItems = [];
+    var elements = document.getElementsByTagName('*');
+    var decorativeClasses = {
+      'aurora': true,
+      'mesh': true,
+      'grain': true,
+      'vhero-field': true,
+      'vhero-dots': true
+    };
+
+    function trimText(value) {
+      return String(value || '')
+        .replace(/\s+/g, ' ')
+        .replace(/^\s+|\s+$/g, '');
+    }
+
+    function isDecorative(element) {
+      var node = element;
+      var className;
+      var classes;
+      var i;
+
+      while (node && node.nodeType === 1) {
+        className = typeof node.className === 'string' ? node.className : '';
+        classes = className.split(/\s+/);
+
+        for (i = 0; i < classes.length; i++) {
+          if (decorativeClasses[classes[i]]) {
+            return true;
+          }
+        }
+
+        node = node.parentElement;
+      }
+
+      return false;
+    }
+
+    function isInteractive(element) {
+      var tagName = element.tagName.toLowerCase();
+      var role = trimText(element.getAttribute('role')).toLowerCase();
+
+      return tagName === 'a' ||
+        tagName === 'button' ||
+        tagName === 'input' ||
+        tagName === 'select' ||
+        tagName === 'textarea' ||
+        role === 'button';
+    }
+
+    function hasLeafText(element) {
+      return element.children.length === 0 &&
+        trimText(element.textContent || element.innerText).length > 0;
+    }
+
+    function isClippingContainer(element) {
+      var style = window.getComputedStyle(element);
+      var overflow = style.overflow;
+      var overflowY = style.overflowY;
+
+      return element.clientHeight > 40 &&
+        (overflow === 'hidden' ||
+         overflow === 'clip' ||
+         overflowY === 'hidden' ||
+         overflowY === 'clip');
+    }
+
+    /** 是否有可滚动祖先：有则该元素虽在视口外，用户滚一下就能看到，不算缺陷 */
+    function hasScrollableAncestor(element) {
+      var node = element.parentElement;
+      var style;
+      while (node && node.nodeType === 1) {
+        style = window.getComputedStyle(node);
+        if (/auto|scroll/.test(style.overflowY || '') &&
+            node.scrollHeight > node.clientHeight + 4) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
+    /** 元素到裁切容器之间（不含容器本身）是否存在可滚动祖先 —— 有则内容可达 */
+    function isReachableByScroll(element, container) {
+      var node = element.parentElement;
+      var style;
+      while (node && node !== container && node.nodeType === 1) {
+        style = window.getComputedStyle(node);
+        if (/auto|scroll/.test(style.overflowY || '') &&
+            node.scrollHeight > node.clientHeight + 4) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
+    function findNearestClippingContainer(element) {
+      var parent = element.parentElement;
+
+      while (parent) {
+        if (isClippingContainer(parent)) {
+          return parent;
+        }
+        parent = parent.parentElement;
+      }
+
+      return null;
+    }
+
+    function describeElement(element) {
+      var description = element.tagName.toLowerCase();
+      var id = trimText(element.id);
+      var className = typeof element.className === 'string'
+        ? trimText(element.className)
+        : '';
+      var classes;
+      var i;
+
+      if (id) {
+        description += '#' + id;
+      }
+
+      if (className) {
+        classes = className.split(/\s+/);
+        for (i = 0; i < classes.length && i < 3; i++) {
+          if (classes[i]) {
+            description += '.' + classes[i];
+          }
+        }
+      }
+
+      return description;
+    }
+
+    function getDisplayText(element) {
+      var text = trimText(element.innerText || element.textContent);
+
+      if (!text && element.value !== undefined) {
+        text = trimText(element.value);
+      }
+      if (!text) {
+        text = trimText(
+          element.getAttribute('aria-label') ||
+          element.getAttribute('title') ||
+          element.getAttribute('placeholder')
+        );
+      }
+
+      return text.length > 60 ? text.substring(0, 57) + '...' : text;
+    }
+
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      var interactive;
+      var container;
+      var elementRect;
+      var containerRect;
+      var limit;
+      var overflowAmount;
+      var detail;
+
+      if (isDecorative(element)) {
+        continue;
+      }
+
+      interactive = isInteractive(element);
+      if (!interactive && !hasLeafText(element)) {
+        continue;
+      }
+
+      elementRect = element.getBoundingClientRect();
+      if (elementRect.width <= 0 || elementRect.height <= 0) {
+        continue;
+      }
+
+      /*
+       * 顺序很重要：先判「视口外」，再判「相对容器被裁」。
+       *
+       * 实测漏检：.pgno「3 / 3」top=2086、bottom=2098，视口高 1920 —— 整个在屏幕下方，
+       * 用户完全看不见。但它相对最近的裁切祖先 .sheet-a4（底 2120）并没有溢出，
+       * 于是被「必须相对容器溢出」这个前置条件挡掉，报了 0 处，漏掉了真缺陷。
+       *
+       * 「跑到视口外」是比「被某个容器切掉一角」更严重的问题：前者整块内容看不见，
+       * 且不依赖任何容器是否 overflow:hidden。因此它必须独立判断，不设前置条件。
+       */
+      /*
+       * 「能滚到的」不算缺陷。
+       * 实测误报：.paper 预览区内部可滚动，第 1 页的「王·个人简历」「教育背景」等
+       * 被滚到视口上方（超出 -2184px），报了 4 处 —— 但用户往上滚就能看到，不是缺陷。
+       * 只有落在视口外**且没有可滚动祖先**（滚不到）才是真的看不见。
+       */
+      if ((elementRect.top >= window.innerHeight || elementRect.bottom <= 0) &&
+          !hasScrollableAncestor(element)) {
+        detail = {
+          '类型': '视口外',
+          '容器': (function () {
+            var c = findNearestClippingContainer(element);
+            return c ? describeElement(c) : '（无裁切容器·直接落在视口外）';
+          })(),
+          '文字': getDisplayText(element),
+          '超出': Math.round((elementRect.top - window.innerHeight) * 10) / 10,
+          '可交互': interactive
+        };
+        result['视口外']++;
+        viewportItems.push(detail);
+        continue;
+      }
+
+      container = findNearestClippingContainer(element);
+      if (!container) {
+        continue;
+      }
+
+      /* 元素与裁切容器之间若隔着一个**能滚的**列表，用户滚一下就看到了，不算缺陷。
+         这条此前只用在「视口外」判定上，「被容器裁切」这一支漏了 ——
+         而滚动容器是 overflow-y:auto，本身不算裁切容器（裁切容器只认 hidden/clip），
+         真正被判为裁切容器的是它外层 overflow:hidden 的 pane。
+         于是「元素超出 pane 底边」成立、报缺陷，但中间那个可滚列表被忽略了。
+         P21 实测：政策卡脚注报裁 49px，滚到底后实际还余 43px 完全可见 —— 纯误报。 */
+      if (isReachableByScroll(element, container)) {
+        continue;
+      }
+
+      containerRect = container.getBoundingClientRect();
+      limit = interactive ? 4 : 2;
+      overflowAmount = elementRect.bottom - containerRect.bottom;
+
+      if (overflowAmount <= limit) {
+        continue;
+      }
+
+      detail = {
+        '类型': '',
+        '容器': describeElement(container),
+        '文字': getDisplayText(element),
+        '超出': Math.round(overflowAmount * 10) / 10,
+        '可交互': interactive
+      };
+
+      /*
+       * 实测中，绝对定位的 .pgno「3 / 3」会被 body、stage、screen、work、
+       * wmain、paper 等六层裁切祖先重复上报。现在从元素向上只取最近的裁切
+       * 祖先，因此同一元素只统计一次；同时它位于 1920px 视口下方
+       * （top=2086、bottom=2098），应优先归为“视口外”，而不是普通被裁。
+       */
+      if (elementRect.top >= window.innerHeight || elementRect.bottom <= 0) {
+        detail['类型'] = '视口外';
+        result['视口外']++;
+        viewportItems.push(detail);
+      } else if (interactive) {
+        detail['类型'] = '可交互被裁';
+        result['严重']++;
+        severeItems.push(detail);
+      } else {
+        detail['类型'] = '文字被裁';
+        result['一般']++;
+        normalItems.push(detail);
+      }
+    }
+
+    result['明细'] = viewportItems
+      .concat(severeItems, normalItems)
+      .slice(0, 8);
+
+    return result;
+  }
+
+  /**
+   * 判定某个 [data-ev] 元素属于「证据侧」还是「条目侧」。
+   *
+   * 必须与 scripts/linkage.js 的判定保持一致，否则会出现
+   * 「联动实际能用，但自检报缺锚点」的矛盾（P09 实测过：
+   * 联动 4 条全通，自检却报 缺锚点 9 / 未绑定 5）。
+   *
+   * 两种页面写法都要支持：
+   *   P11 岗位匹配   —— 证据在 #src 容器内
+   *   P09 简历工作台 —— 没有容器，证据元素自身带 .hit / .gapline
+   */
+  function isInEvidencePane(element) {
+    var node = element;
+    var cls;
+    // ① 容器式
+    while (node && node.nodeType === 1) {
+      if (
+        node.id === 'src' ||
+        hasClass(node, 'resume-src') ||
+        (node.hasAttribute && node.hasAttribute('data-evidence-pane'))
+      ) {
+        return true;
+      }
+      node = node.parentNode;
+    }
+    // ② 无容器式：按证据元素自身类名
+    cls = (typeof element.className === 'string' ? element.className : '');
+    if (/(^|\s)(hit|gapline|ev-hit)(\s|$)/.test(cls)) {
+      return true;
+    }
+    return false;
+  }
+
+  function auditEvidenceWiring() {
+    var result = {
+      '声明条数': 0,
+      '缺锚点': [],
+      '未绑定': []
+    };
+    var elements = document.querySelectorAll('[data-ev]');
+    var anchors = {};
+    var i;
+
+    for (i = 0; i < elements.length; i += 1) {
+      if (isInEvidencePane(elements[i])) {
+        anchors['$' + elements[i].getAttribute('data-ev')] = true;
+      }
+    }
+
+    for (i = 0; i < elements.length; i += 1) {
+      var item = elements[i];
+      var value;
+      var role;
+      var cursor;
+      var hasOnclick;
+
+      if (isInEvidencePane(item)) {
+        continue;
+      }
+
+      value = item.getAttribute('data-ev');
+      result['声明条数'] += 1;
+
+      if (!anchors['$' + value]) {
+        result['缺锚点'].push(value);
+      }
+
+      role = trim(item.getAttribute('role')).toLowerCase();
+      cursor = window.getComputedStyle(item).cursor;
+      hasOnclick = item.getAttribute('onclick') !== null ||
+        typeof item.onclick === 'function';
+
+      if (role !== 'button' && cursor !== 'pointer' && !hasOnclick) {
+        result['未绑定'].push(value);
+      }
+    }
+    return result;
+  }
+
+  function issueValue(value) {
+    var names = ['数量', 'count', 'total', '严重', '一般', '明细',
+      'details', 'items'];
+    var i;
+
+    if (typeof value === 'number') {
+      return value > 0;
+    }
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+      return value.length > 0;
+    }
+    if (typeof value === 'string') {
+      return !/^(|0|0处|无|通过|正常)$/.test(trim(value));
+    }
+    if (value && typeof value === 'object') {
+      for (i = 0; i < names.length; i += 1) {
+        if (Object.prototype.hasOwnProperty.call(value, names[i]) &&
+            issueValue(value[names[i]])) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+
+  /**
+   * 检查三：看着能点、实际点不了
+   *
+   * 实证：首页功能卡里的「本机上传 / 手机扫码传 / U 盘」是 .card-pill 的 <span>，
+   * 视觉上是 chip，用户会去点，但没有任何交互 —— 界面承诺了一个不存在的入口。
+   * 与「底部写着可点却没绑事件」同类：**页面在对用户撒谎**。
+   *
+   * 判定：类名含 pill / chip / tag / btn，但既不是 a|button|input，
+   * 也没有 role=button、onclick、cursor:pointer 的元素。
+   * 豁免：类名含 info / static / label / meta 的（已被明确标注为「这是状态不是入口」），
+   * 以及 disabled 的。豁免机制很重要 —— 状态标签本来就不该可点，
+   * 一刀切都要求可点会制造另一种错误（用户点「12 家来源」期待发生什么）。
+   */
+  function auditFakeAffordance() {
+    var out = { '疑似假入口': 0, '明细': [] };
+    var all = document.querySelectorAll('[class*="pill"],[class*="chip"],[class*="tag"],[class*="btn"]');
+    var i, el, cls, tag, cs, txt;
+    for (i = 0; i < all.length; i++) {
+      el = all[i];
+      tag = el.tagName.toLowerCase();
+      if (tag === 'a' || tag === 'button' || tag === 'input') continue;
+      cls = (typeof el.className === 'string' ? el.className : '');
+      // 豁免：已明确标注为非入口的，以及项目里表示「状态」的既有命名。
+      // 实测误报 6 处：stage（舞台容器）、devpill（设备在线）、vfigure-tag（顾问在线）、
+      // vstep-tag（下一步）—— 全是状态标签，本来就不该可点。
+      // 判定假入口要看它是否**声称是入口**，而不是看类名里有没有 pill/tag。
+      // 豁免：已明确标注为非入口的，以及项目里表示「状态/评级」的既有命名。
+      // 实测误报累计 10 处：stage 舞台容器、devpill 设备在线、vfigure-tag 顾问在线、
+      // vstep-tag 下一步、dim-tag 维度评级（好/需改/一般）—— 全是状态，本来就不该可点。
+      // 判定假入口要看它是否**声称是入口**，而不是类名里有没有 pill/tag。
+      if (/info|static|label|meta|disabled|stage|dev|status|state|figure|step|badge|dot|dim|level|score|rank|grade/i.test(cls)) continue;
+      if (el.getAttribute('role') === 'button') continue;
+      if (el.getAttribute('onclick')) continue;
+      if (el.disabled) continue;
+      try { cs = window.getComputedStyle(el); } catch (e) { continue; }
+      if (cs.cursor === 'pointer') continue;
+      if (!el.getBoundingClientRect().width) continue;
+      txt = (el.textContent || '').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+      if (!txt) continue;
+      out['疑似假入口'] += 1;
+      if (out['明细'].length < 8) {
+        out['明细'].push({ '文字': txt.length > 24 ? txt.substring(0, 21) + '...' : txt, '类名': cls.substring(0, 30) });
+      }
+    }
+    return out;
+  }
+
+
+  /* ── 版面留白：检测「内容没填满」──────────────────────────────────────
+     今天做 P17 时发现的盲区：本文件此前只查一个方向 ——「内容被挤出容器」。
+     反方向的失败完全检不出来：内容只写到最小可行，一屏 1728px 的内容区
+     底下空 900px。那一版 16 个状态组合全报绿，可页面一看就不能用。
+
+     用户对这套页面提过的原话是「功能布局排版都显示不全」—— 说的正是这一类。
+
+     **这是烟雾报警器，不是判决。** 报出来只说明「去看一眼」，不等于必须改到 0：
+     一块撑到栏底的 pane，内容在上部、下面 300px 留白，读起来是卡片内的呼吸感；
+     而同样 300px 如果是没有容器的背景空洞，就是明显的没写完。
+     两者数值一样，观感天差地别 —— 检测器分不出来，眼睛能。所以：数值只用来定位，
+     改不改由人看过再定。别为了把数字压到 0 塞填充物，那比留白更糟。
+
+     判据取 200px：一两个卡片的高度。
+     只量 .wmain / .wside 两根主栏，不递归量每个 pane —— pane 内部留白是设计，
+     主栏见底才是欠内容。
+     ────────────────────────────────────────────────────────────────── */
+  function auditEmptyTail () {
+    var out = { '主栏留白过大': 0, '明细': [] };
+    var cols = [['左栏', '.wmain'], ['右栏', '.wside']];
+    var i, name, col, rect, maxBottom, gap, nodes, j, node, r;
+
+    for (i = 0; i < cols.length; i += 1) {
+      name = cols[i][0];
+      col = document.querySelector(cols[i][1]);
+      if (!col) continue;
+      rect = col.getBoundingClientRect();
+      if (rect.height < 400) continue;          // 栏本身很矮时不判
+      maxBottom = rect.top;
+      nodes = col.querySelectorAll('*');
+      for (j = 0; j < nodes.length; j += 1) {
+        node = nodes[j];
+        try { if (window.getComputedStyle(node).display === 'none') continue; } catch (e) { continue; }
+        /* 只量「内容」的底边，不量容器的底边。
+           初版量了所有元素 —— 但 .pane--grow 会自动撑到栏底，
+           于是「把 pane 改成撑高」就能让检测永远通过，哪怕里面是空的。
+           那是虚假的安心，比没有检测更糟。
+           内容 = 没有元素子节点的叶子（文字、图标、SVG、输入框、图形）。 */
+        if (node.childElementCount > 0) continue;
+        r = node.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > maxBottom) maxBottom = r.bottom;
+      }
+      gap = Math.round(rect.bottom - maxBottom);
+      if (gap > 200) {
+        out['主栏留白过大'] += 1;
+        out['明细'].push({ '栏': name, '底部空': gap + 'px' });
+      }
+    }
+    return out;
+  }
+
+
+  /* ── 主区空壳：整块内容被状态门控漏配 ────────────────────────────────
+     P22 实测抓到的一类新缺陷：能力块写了 data-when="default first"，
+     兜底块写了 data-when="ai-down" —— device-off 态下**两块都不显示**，
+     主区整栏空白。而打印机离线跟能不能读简历本来没有关系。
+
+     这类漏配很难靠肉眼发现：默认态一切正常，只有切到某个状态才空，
+     而人不会每个状态都点一遍。留白检测能间接报出来（左栏空 1088px），
+     但报的是"留白过大"，不是"这一态压根没配内容"—— 两者该分开说。
+
+     判据：主区可见的文本叶子少于 6 个，视为空壳。
+     ──────────────────────────────────────────────────────────────── */
+  function auditEmptyShell () {
+    var out = { '主区空壳': 0, '明细': [] };
+    var main = document.querySelector('.wmain');
+    var nodes, i, node, count = 0;
+    if (!main) return out;
+    nodes = main.querySelectorAll('*');
+    for (i = 0; i < nodes.length; i += 1) {
+      node = nodes[i];
+      if (node.childElementCount) continue;
+      try { if (window.getComputedStyle(node).display === 'none') continue; } catch (e) { continue; }
+      if ((node.textContent || '').replace(/\s+/g, '')) count += 1;
+    }
+    if (count < 6) {
+      out['主区空壳'] = 1;
+      out['明细'].push({ '可见文本块': count, '说明': '当前 state/stage 组合下主区几乎无内容，检查 data-when / data-at 是否漏配' });
+    }
+    return out;
+  }
+
+
+  /* ── 卡内溢出：内容溢出容器但**没有被裁**，而是重叠在下一块上 ──────────
+     P05 手机接力实测抓到的一类，主检测器完全看不见：
+
+       .ph-body 是 flex 列，子项默认 flex-shrink:1。内容超过容器高度时
+       卡片被**压扁**而不是撑开，文字溢出到下一张卡上（实测 9–19px）。
+
+     为什么「内部裁切」抓不到：那一支只找 overflow:hidden/clip 的裁切容器，
+     而这些卡片没有 overflow —— 文字不是被裁掉，是**画在了别人身上**。
+     视觉上比裁切更糟（两段字叠着，都读不清），检测上却完全静默。
+
+     判据：叶子文本的底边超出其最近的「有背景或边框的卡片祖先」超过 2px。
+     ────────────────────────────────────────────────────────────────── */
+  function auditCardOverlap () {
+    var out = { '卡内溢出': 0, '明细': [] };
+    var cards = document.querySelectorAll(
+      '[class*="card"],[class*="note"],[class*="act"],[class*="pane"],[class*="row"],[class*="item"]');
+    var i, j, card, cs, cr, kids, k, kr, over;
+
+    for (i = 0; i < cards.length; i += 1) {
+      card = cards[i];
+      try { cs = window.getComputedStyle(card); } catch (e) { continue; }
+      if (cs.display === 'none') continue;
+      /* 只看「看起来是一块卡」的容器：有背景或边框 */
+      if (cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === '0px') continue;
+      /* 有裁切或滚动的交给别的检查，这里只管"不裁而溢出" */
+      if (/hidden|clip|auto|scroll/.test(cs.overflowY || '')) continue;
+      cr = card.getBoundingClientRect();
+      if (cr.height < 20) continue;
+
+      kids = card.querySelectorAll('*');
+      for (j = 0; j < kids.length; j += 1) {
+        k = kids[j];
+        if (k.childElementCount) continue;
+        try { if (window.getComputedStyle(k).display === 'none') continue; } catch (e) { continue; }
+        if (!(k.textContent || '').replace(/\s+/g, '')) continue;
+        kr = k.getBoundingClientRect();
+        over = kr.bottom - cr.bottom;
+        if (over > 2) {
+          out['卡内溢出'] += 1;
+          if (out['明细'].length < 8) {
+            out['明细'].push({
+              '容器': describeElement(card),
+              '文字': (k.textContent || '').replace(/\s+/g, ' ').substring(0, 26),
+              '溢出': Math.round(over) + 'px'
+            });
+          }
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  window.v3AuditPlus = function () {
+    var result = {};
+    var baseError = false;
+    var oldKeys = ['横向溢出', '主体纵向溢出', '触控不足48', '违禁文案'];
+    var clipping;
+    var wiring;
+    var hasProblem;
+    var base;
+    var key;
+    var i;
+
+    if (typeof originalAudit === 'function') {
+      try {
+        base = originalAudit.call(window);
+        if (base && typeof base === 'object') {
+          for (key in base) {
+            if (Object.prototype.hasOwnProperty.call(base, key)) {
+              result[key] = base[key];
+            }
+          }
+        }
+      } catch (error) {
+        baseError = true;
+        if (window.console && window.console.warn) {
+          window.console.warn('v3Audit 原有自检执行失败：', error);
+        }
+      }
+    }
+
+    clipping = auditInternalClipping();
+    wiring = auditEvidenceWiring();
+    result['内部裁切'] = clipping;
+    result['联动接线'] = wiring;
+    result['假入口'] = auditFakeAffordance();
+    result['版面留白'] = auditEmptyTail();
+    result['主区空壳'] = auditEmptyShell();
+    result['卡内溢出'] = auditCardOverlap();
+
+    hasProblem = baseError ||
+      clipping['严重'] > 0 ||
+      clipping['一般'] > 0 ||
+      wiring['缺锚点'].length > 0 ||
+      wiring['未绑定'].length > 0 ||
+      result['版面留白']['主栏留白过大'] > 0 ||
+      result['主区空壳']['主区空壳'] > 0 ||
+      result['卡内溢出']['卡内溢出'] > 0;
+
+    for (i = 0; i < oldKeys.length; i += 1) {
+      if (issueValue(result[oldKeys[i]])) {
+        hasProblem = true;
+      }
+    }
+
+    if (window.console) {
+      if (hasProblem && window.console.warn) {
+        window.console.warn('v3AuditPlus 发现问题：', result);
+      } else if (!hasProblem && window.console.log) {
+        window.console.log('v3AuditPlus 全部通过：', result);
+      }
+    }
+    return result;
+  };
+
+  function autoRun() {
+    window.v3AuditPlus();
+  }
+
+  if (document.readyState === 'complete') {
+    window.setTimeout(autoRun, 0);
+  } else if (window.addEventListener) {
+    window.addEventListener('load', autoRun, false);
+  } else {
+    window.attachEvent('onload', autoRun);
+  }
+}(window, document));

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P05 手机接力 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P05 手机接力">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<style>
+/* ── P05 手机接力 ───────────────────────────────────────────────────────
+   **390×844，不是 1080×1920。**这是全套里唯一的手机端页面。
+
+   ── 最要紧的一条：这不是第二个 App ─────────────────────────────────
+   规格写死了「只承接当前一体机会话，不建第二套导航」—— 这条必须守住。
+
+   手机端一旦有了自己的首页、底部导航、我的、消息中心，
+   它就变成第二个产品：要单独维护、要单独做合规、要单独想留存，
+   而用户会开始问「那我为什么还要去那台机器」。
+
+   本机的价值是**能出纸**。手机干不了这件事。
+   所以手机端只做一件事：**把手机上有、而一体机上没有的东西递过去**，
+   以及**把一体机上做完、需要带走的东西接回来**。
+
+   因此本页：
+   · 没有底部导航栏
+   · 没有"我的"、没有消息、没有设置
+   · 顶部常驻「正在为 01 号机服务」—— 时刻提示这是接力不是独立入口
+   · 一体机会话结束，这一页立即失效（不是变成一个能自己逛的 App）
+
+   ── 第二条：手机是更安全的输入端 ────────────────────────────────
+   在大厅的大屏幕上输手机号，旁边的人能看见；在自己手机上输就不会。
+   所以身份验证优先走手机，这不是"顺便支持"，是**有意把敏感输入挪离公共屏幕**。
+
+   ── 结构 ────────────────────────────────────────────────────────
+   本页是手机版式，没有 .wmain / .wside —— audit-plus 的
+   「版面留白 / 主区空壳」会静默跳过，改用整屏底部空隙人工核。
+   ──────────────────────────────────────────────────────────────── */
+
+.stage { display:grid; place-items:center; }
+.screen {
+  width:390px; height:844px; border-radius:44px; overflow:hidden;
+  position:relative; display:flex; flex-direction:column;
+  box-shadow:0 30px 80px rgba(0,0,0,.34);
+}
+
+/* 顶部：常驻「正在为 01 号机服务」*/
+.ph-top { flex:0 0 auto; padding:18px 20px 14px; display:flex; align-items:center; gap:11px;
+  background:var(--jade-a12); border-bottom:1px solid var(--jade-a32); }
+.ph-mark { width:34px; height:34px; border-radius:9px; flex:0 0 auto; display:grid;
+  place-items:center; background:var(--jade-a20); color:var(--jade-200);
+  font-size:17px; font-weight:800; }
+.ph-b { min-width:0; display:flex; flex-direction:column; gap:1px; }
+.ph-t { font-size:15px; font-weight:700; color:var(--fog-900); }
+.ph-s { font-size:11.5px; color:var(--fog-600); }
+.ph-live { margin-left:auto; flex:0 0 auto; display:flex; align-items:center; gap:5px;
+  font-size:11px; color:var(--jade-200); }
+.ph-live i { width:7px; height:7px; border-radius:50%; background:var(--jade-500); display:block; }
+
+.ph-body { flex:1 1 auto; min-height:0; overflow-y:auto; padding:18px 20px 20px;
+  display:flex; flex-direction:column; gap:14px; }
+
+.ph-h { flex:0 0 auto; font-size:23px; font-weight:800; color:var(--fog-900); line-height:1.3; }
+.ph-p { flex:0 0 auto; font-size:13.5px; color:var(--fog-700); line-height:1.62; }
+.ph-p b { color:var(--fog-900); }
+
+/* 能做的事：只有两类 —— 递过去 / 接回来 */
+/* flex:0 0 auto 是必须的：.ph-body 是 flex 列，子项默认 flex-shrink:1，
+   内容超过容器高度时**卡片会被压扁而不是撑开**，文字直接溢出到下一张卡上。
+   实测溢出 9–19px。而且这类溢出**检测器抓不到** ——
+   .act 没有 overflow:hidden，不算裁切容器，文字是重叠不是被裁。 */
+.act { display:flex; align-items:flex-start; gap:13px; padding:15px 16px; border-radius:14px;
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  text-decoration:none; color:inherit; min-height:48px; flex:0 0 auto; }
+.act .ic { width:20px; height:20px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; }
+.act-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.act-t { font-size:15px; font-weight:600; color:var(--fog-900); }
+.act-s { font-size:12px; color:var(--fog-700); line-height:1.55; }
+
+.grp { flex:0 0 auto; font-size:11.5px; color:var(--fog-600); letter-spacing:.1em; margin-top:4px; }
+
+/* 提示条 */
+.ph-note { padding:13px 15px; border-radius:12px; font-size:12px; line-height:1.6;
+  display:flex; gap:10px; align-items:flex-start; flex:0 0 auto; }
+.ph-note .ic { width:16px; height:16px; flex:0 0 auto; margin-top:1px; }
+.ph-note--calm { background:var(--fog-a04); border:1px solid var(--brd-1); color:var(--fog-700); }
+.ph-note--calm .ic { color:var(--fog-600); }
+.ph-note--warn { background:var(--amber-a12); border:1px solid var(--amber-a20); color:var(--amber-200); }
+.ph-note--warn .ic { color:var(--amber-400); }
+.ph-note b { color:var(--fog-900); }
+
+/* 底部：单一动作，没有导航栏 */
+.ph-foot { flex:0 0 auto; padding:14px 20px 22px; border-top:1px solid var(--brd-1);
+  display:flex; flex-direction:column; gap:9px; background:var(--fog-a04); }
+.ph-btn { min-height:52px; border-radius:14px; display:flex; align-items:center;
+  justify-content:center; gap:8px; font-size:16px; font-weight:700; font-family:var(--ff-ui);
+  background:var(--jade-600, #0d6b52); color:#fff; border:0; cursor:pointer; }
+.ph-btn .ic { width:19px; height:19px; }
+.ph-hint { font-size:11.5px; color:var(--fog-600); text-align:center; line-height:1.5; }
+
+/* 上传进度 */
+.up { padding:15px 16px; border-radius:14px; background:var(--surf-1); border:1px solid var(--brd-1);
+  display:flex; flex-direction:column; gap:9px; flex:0 0 auto; }
+.up-row { display:flex; align-items:center; gap:11px; }
+.up-nm { font-size:13.5px; color:var(--fog-900); min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.up-pct { margin-left:auto; flex:0 0 auto; font-size:12.5px; font-family:var(--ff-num);
+  color:var(--fog-600); }
+.up-bar { height:6px; border-radius:3px; background:var(--fog-a12); overflow:hidden; }
+.up-bar i { display:block; height:100%; background:var(--jade-500); border-radius:3px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+
+  <!-- 常驻：这是接力，不是独立入口 -->
+  <div class="ph-top">
+    <span class="ph-mark">职</span>
+    <span class="ph-b">
+      <span class="ph-t">正在为 01 号机服务</span>
+      <span class="ph-s">市人力资源市场 A 馆 · 办理单 #F-2318</span>
+    </span>
+    <!-- 手机页的四态不照抄一体机，而是「机器那边现在什么情况」：
+         已连上 / 刚扫进来 / 机器的识别不可用（仍能传） / 机器离线（传了也出不来）。
+         这一条最关键：用户在手机上看不到机器，机器出事只能靠这里说。 -->
+    <span class="ph-live" data-at="s1 s2" data-when="default"><i></i>已连上</span>
+    <span class="ph-live" data-at="s1 s2" data-when="first"><i></i>刚连上 · 等你选文件</span>
+    <span class="ph-live" data-at="s1 s2" data-when="ai-down" style="color:var(--amber-600)">
+      <i style="background:var(--amber-500)"></i>已连上 · 机器的识别功能不可用</span>
+    <span class="ph-live" data-at="s1 s2" data-when="device-off" style="color:var(--coral-400)">
+      <i style="background:var(--coral-400)"></i>机器离线 · 现在传过去也出不来</span>
+    <span class="ph-live" data-at="s3" style="color:var(--fog-600)">
+      <i style="background:var(--fog-600)"></i>已结束</span>
+  </div>
+
+  <!-- ─────────── S1 能做什么 ─────────── -->
+  <div class="ph-body" data-at="s1">
+    <div class="ph-h">手机能帮你做<br>那台机器做不了的两件事</div>
+    <div class="ph-p">
+      这一页<b>只为你眼前那台机器服务</b> —— 没有首页、没有"我的"、没有消息。
+      机器那边办完，这一页就失效。
+    </div>
+
+    <div class="grp">把手机上有的递过去</div>
+    <div class="panel-note" style="margin:-4px 0 8px">原型说明:以下动作在真机手机页由上传会话执行,此稿仅呈现形态。</div>
+
+    <button class="act" type="button">
+      <svg class="ic"><use href="#i-upload"/></svg>
+      <span class="act-b">
+        <span class="act-t">传文件到机器</span>
+        <span class="act-s">简历、成绩单、证件照 —— 手机里的直接传，不用 U 盘</span>
+      </span>
+    </button>
+
+    <button class="act" type="button">
+      <svg class="ic"><use href="#i-image"/></svg>
+      <span class="act-b">
+        <span class="act-t">拍照传过去</span>
+        <span class="act-s">纸质材料不方便扫的，手机拍一张传过去也能打</span>
+      </span>
+    </button>
+
+    <button class="act" type="button">
+      <svg class="ic"><use href="#i-phone"/></svg>
+      <span class="act-b">
+        <span class="act-t">在手机上完成登录</span>
+        <span class="act-s"><b>号码不会出现在大厅那块屏幕上</b> —— 旁边有人时用这个</span>
+      </span>
+    </button>
+
+    <div class="grp">把机器上做完的接回来</div>
+
+    <button class="act" type="button">
+      <svg class="ic"><use href="#i-download"/></svg>
+      <span class="act-b">
+        <span class="act-t">存走刚生成的文件</span>
+        <span class="act-s">作战单、复盘单、办事清单 —— 存进手机，纸和电子版都有</span>
+      </span>
+    </button>
+
+    <div class="ph-note ph-note--warn">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span><b>这一页不能打印。</b>打印只能在机器上按 ——
+            要出纸就回到机器前面点「开始打印」。</span>
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span>传过去的文件<b>只进入这一次办理</b>，跟着机器那边的规则走：
+            没登录就离场即清，登录了才存进账号。</span>
+    </div>
+  </div>
+
+  <!-- ─────────── S2 正在传 ─────────── -->
+  <div class="ph-body" data-at="s2">
+    <div class="ph-h">正在传到 01 号机</div>
+    <div class="ph-p">
+      别关这一页，也<b>别锁屏</b>。传完机器那边会自动出现。
+    </div>
+
+    <div class="up">
+      <div class="up-row">
+        <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-file"/></svg>
+        <span class="up-nm">王磊_机械_2026.pdf</span>
+        <span class="up-pct">100%</span>
+      </div>
+      <div class="up-bar"><i style="width:100%"></i></div>
+    </div>
+
+    <div class="up">
+      <div class="up-row">
+        <svg class="ic" style="width:18px;height:18px;color:var(--jade-500)"><use href="#i-image"/></svg>
+        <span class="up-nm">成绩单_扫描件.jpg</span>
+        <span class="up-pct">62%</span>
+      </div>
+      <div class="up-bar"><i style="width:62%"></i></div>
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-info"/></svg>
+      <span>用<b>手机流量</b>比连大厅公共 WiFi 稳 —— 公共 WiFi 常有认证页拦着，
+            传到一半会断。</span>
+    </div>
+
+    <div class="ph-note ph-note--warn">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span>证件类文件传过去后，机器上默认<b>办完即清</b>。
+            如果你选了存进账号，保留期是 <b>7 天</b>。</span>
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-alert"/></svg>
+      <span>传失败会明确告诉你是哪一个、为什么，<b>不会悄悄少传一份</b>。</span>
+    </div>
+  </div>
+
+  <!-- ─────────── S3 会话已结束 ─────────── -->
+  <div class="ph-body" data-at="s3">
+    <div class="ph-h">这次办理结束了</div>
+    <div class="ph-p">
+      01 号机那边已经<b>结束并清空</b>。这一页也跟着失效了 ——
+      它本来就只为那一次办理服务。
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-check"/></svg>
+      <span>你在这次办理里<b>存进手机的文件不受影响</b>，还在你手机上。</span>
+    </div>
+
+    <div class="ph-note ph-note--warn">
+      <svg class="ic"><use href="#i-trash"/></svg>
+      <span>没存的、没打印的，<b>已经清掉了</b> ——
+            机器那边不留，这一页也拿不回来。</span>
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-info"/></svg>
+      <span><b>本机没有 App，也不需要你装。</b>
+            下次要用，还是走到机器前扫一次码 —— 那样最省事，
+            也不用在手机上多留一个东西。</span>
+    </div>
+
+    <div class="ph-note ph-note--calm">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span>这一页<b>不会给你发通知</b>，也不占后台 —— 关掉就行。</span>
+    </div>
+  </div>
+
+  <!-- 底部：单一动作，没有导航栏 -->
+  <div class="ph-foot">
+    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down">
+      <svg class="ic"><use href="#i-upload"/></svg>选文件传过去
+    </button>
+    <button class="ph-btn" data-at="s1" data-when="device-off" style="background:var(--fog-a12);color:var(--fog-800)">
+      先存到「我的文档」，等机器好了再打
+    </button>
+    <button class="ph-btn" data-at="s2" style="background:var(--fog-a12);color:var(--fog-800)">
+      取消这次传输
+    </button>
+    <button class="ph-btn" data-at="s3" style="background:var(--fog-a12);color:var(--fog-800)">
+      关闭这一页
+    </button>
+
+    <span class="ph-hint" data-at="s1" data-when="default first">要出纸请回到机器前面 · 这一页不能打印</span>
+    <span class="ph-hint" data-at="s1" data-when="ai-down">文件照样能传 · 机器那边暂时不做识别与建议</span>
+    <span class="ph-hint" data-at="s1" data-when="device-off">机器离线，传过去也打不出来 · 别白跑一趟</span>
+    <span class="ph-hint" data-at="s2">传完机器那边会自动出现，不用手动刷新</span>
+    <span class="ph-hint" data-at="s3">没有 App 要装 · 下次到机器前扫码就行</span>
+  </div>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

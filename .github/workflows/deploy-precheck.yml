@@ -103,7 +103,6 @@ jobs:
             echo "=== 7. 本次发布需要的空间量级 ==="
             echo "PG_DB_SIZE_MB=$(sudo -n -u postgres psql -tAc \"SELECT pg_database_size(current_database())/1024/1024;\" 2>/dev/null || echo 'unknown（无免密 sudo，可忽略）')"
 
-
             echo "=== 8. 发布后验证：#555 资金门禁启动告警是否出现在应用日志 ==="
             if pm2 logs "$EXPECT_PM2" --lines 200 --nostream 2>/dev/null | grep -q "PRINT_REQUIRE_PAID_BEFORE_CLAIM"; then
               echo "PAID_GATE_WARNING_PRESENT=yes"

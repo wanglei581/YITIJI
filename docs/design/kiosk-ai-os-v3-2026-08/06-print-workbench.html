@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P06 打印工作台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P06 打印工作台">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/pay.css?v=5">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+  /* 核价门控：金额没显示出来之前，朱砂支付键不存在 */
+  .screen:not(.is-quoted) [data-gate="quoted"],
+  .screen.is-quoted [data-gate="unquoted"] { display: none !important; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
+
+  <!-- ============ 顶栏 ============ -->
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">打印扫描</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-7742</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机在线 · A4 78% · 碳粉 62%</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:43</b></div>
+  </header>
+
+  <!-- ============ 阶段轨 ============ -->
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">选来源</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">材料体检</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">参数核价</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">核对金额</span></button>
+      <button class="rstep" data-go="s5" data-pay="wait scan confirm paid expired query closed"><span class="rstep-dot">5</span><span class="rstep-name">收银</span></button>
+      <button class="rstep rstep--skip" data-go="s5" data-pay="free" aria-disabled="true"><span class="rstep-dot">5</span><span class="rstep-name">收银 · 免费跳过</span></button>
+      <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">正在出纸</span></button>
+      <button class="rstep" data-go="s7"><span class="rstep-dot">7</span><span class="rstep-name">取件</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>3</b> / 7 步</span>
+  </div>
+
+  <!-- ============ 工作区 ============ -->
+  <div class="work">
+
+    <!-- ---------- 左：文件为主 ---------- -->
+    <div class="wmain">
+
+      <!-- S1 来源四选 -->
+      <div class="sources" data-at="s1">
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
+          <span class="src-nm">本机上传</span>
+          <span class="src-ds">插入 U 盘或用本机键盘选择文件。支持 PDF / JPG / PNG。</span>
+          <span class="src-tag"><span class="chip chip--jade">最常用</span></span>
+        </button>
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="src-nm">手机扫码传</span>
+          <span class="src-ds">扫屏幕上的码，从手机把文件传过来，不用插任何东西。</span>
+          <span class="src-tag"><span class="chip">一次性会话</span></span>
+        </button>
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-usb"/></svg></span>
+          <span class="src-nm">U 盘导入</span>
+          <span class="src-ds">插入右侧 USB 口，选择要打印的文件。</span>
+          <span class="src-tag"><span class="chip" data-when="default first ai-down">已识别 1 个设备</span><span class="chip" data-when="device-off">未检测到设备</span></span>
+        </button>
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="src-nm">纸质扫描</span>
+          <span class="src-ds">把纸质原件放上玻璃板或送稿器，扫成 PDF 再打印。</span>
+          <span class="src-tag"><span class="chip chip--jade">扫描仪就绪</span></span>
+        </button>
+      </div>
+
+      <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">不打印，只处理文件？这两个台面也在这里</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="07-scan-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">扫描工作台</span>
+              <span class="xlane-ds">纸质扫成 PDF，存「我的文档」或 U 盘带走，不出纸</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="08-file-tools.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">文件加工台</span>
+              <span class="xlane-ds">图片合成 PDF、加签章；处理完可回这里打印</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- S2–S4 体检结论 -->
+      <div class="checks" data-at="s2 s3 s4">
+        <div class="checks-hd">
+          <svg class="ic" style="width:19px;height:19px;color:var(--jade-500)"><use href="#i-brain"/></svg>
+          <span class="t" data-when="default first">材料体检已完成</span>
+          <span class="t" data-when="ai-down">材料体检不可用</span>
+          <span class="t" data-when="device-off">材料体检已完成 · 出纸受限</span>
+          <span class="s" data-when="default device-off">本机自动检查 · 09:43</span>
+          <span class="s" data-when="ai-down">服务中断，已上报</span>
+          <span class="s" data-when="first">还没有文件</span>
+        </div>
+
+        <div class="checks-list" data-when="default device-off">
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>纸张规格 A4，无需缩放</span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>3 页，无空白页</span>
+          <span class="chk chk--warn"><svg class="ic"><use href="#i-alert"/></svg><span>第 <b>2</b> 页含身份证号，建议遮盖后再打印</span></span>
+          <span class="chk chk--ok"><svg class="ic"><use href="#i-check"/></svg>字体已嵌入，不会缺字</span>
+        </div>
+        <div class="checks-list" data-when="ai-down" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>体检与参数预填服务中断。文件预览、参数设置、核价与出纸都不受影响，参数需要你自己确认。</span>
+        </div>
+        <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
+          <span class="chk"><svg class="ic"><use href="#i-info"/></svg>先回第 1 步把文件送进来，体检结果会显示在这里。</span>
+        </div>
+      </div>
+
+      <!-- S2–S4 文件预览：视觉主体 -->
+      <div class="paper" data-at="s2 s3 s4">
+        <div class="paper-bar">
+          <span class="nm" data-when="default ai-down device-off">个人简历.pdf</span>
+          <span class="nm" data-when="first">未选择文件</span>
+          <span class="mt" data-when="default ai-down device-off">A4 · 3 页 · 1.2 MB · 上传 09:43</span>
+          <span class="pg" data-when="default ai-down device-off">
+            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <span>第 2 / 共 3 页</span>
+            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+          </span>
+        </div>
+        <div class="paper-stage">
+          <!-- 三页连续滚动：和真实阅读器一致，用户能一路核对完再付钱 -->
+          <div class="sheet-a4" id="pg1" data-when="default ai-down device-off">
+            <h4>王 · 个人简历</h4>
+            <div class="meta">求职意向：运营专员 · 广州 · 电话 138****2046</div>
+            <div class="hr"></div>
+            <div class="sec">教育背景</div>
+            <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <div class="sec">工作经历</div>
+            <div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <div class="ln"></div><div class="ln ln--m"></div><div class="ln"></div>
+            <div class="sec">项目</div>
+            <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <span class="pgno">1 / 3</span>
+          </div>
+          <div class="sheet-a4" id="pg2" data-when="default ai-down device-off">
+            <div class="sec">证件与材料</div>
+            <div class="ln ln--m"></div>
+            <div class="ln ln--s"></div>
+            <div class="hr"></div>
+            <div class="ln"></div><div class="ln ln--m"></div>
+            <div class="ln ln--s"></div>
+            <div class="sec">在校证明</div>
+            <div class="ln ln--m"></div><div class="ln"></div>
+            <span class="pgno">2 / 3</span>
+            <div class="redact" style="top:118px"><span>身份证号</span></div>
+          </div>
+          <div class="sheet-a4" id="pg3" data-when="default ai-down device-off">
+            <div class="sec">技能</div>
+            <div class="ln ln--m"></div><div class="ln ln--s"></div>
+            <div class="sec">证书</div>
+            <div class="ln"></div><div class="ln ln--s"></div>
+            <div class="sec">自我评价</div>
+            <div class="ln ln--m"></div><div class="ln"></div><div class="ln ln--s"></div>
+            <span class="pgno">3 / 3</span>
+          </div>
+          <div class="paper-empty" data-when="first">
+            <svg class="ic"><use href="#i-file"/></svg>
+            <b>还没有文件</b>
+            <p>回到第 1 步，用本机上传、手机扫码传、U 盘或纸质扫描把材料送进来。<br>文件只保留到本次会话结束或你保存进「我的文档」。</p>
+            <button class="btn btn--ghost" data-go="s1">回第 1 步选来源</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2–S4 页缩略条 -->
+      <div class="thumbs" data-at="s2 s3 s4">
+        <div class="thumb" aria-current="false"><i class="t"></i><i></i><i class="s"></i><i></i><span>1</span></div>
+        <div class="thumb thumb--flag" aria-current="true"><i class="t"></i><i></i><i></i><i class="s"></i><span>2</span></div>
+        <div class="thumb" aria-current="false"><i class="t"></i><i class="s"></i><i></i><span>3</span></div>
+        <span class="thumbs-note" data-when="default device-off">第 2 页有红点：体检发现身份证号。点缩略图可翻页核对。</span>
+        <span class="thumbs-note" data-when="ai-down">体检不可用，红点标记不显示。缩略图仍可翻页核对。</span>
+        <span class="thumbs-note" data-when="first">没有文件时不显示页面。</span>
+      </div>
+
+      <!-- ─────────── S5 收银台 ───────────
+           六种处境同版面切换：待付 / 扫用户码 / 到账中 / 已到账 / 码失效 / 已关单。
+           金额位与码位固定不动，只换状态行和按钮。 -->
+      <div class="cashier" data-at="s5">
+
+        <div class="cash-amt">
+          <span class="lb">应付</span>
+          <span class="num">3.00<i>元</i></span>
+          <span class="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
+        </div>
+
+        <div class="cash-mode" data-pay="wait expired query">
+          <button data-pay-btn="wait" aria-pressed="true"><svg class="ic"><use href="#i-qr"/></svg>屏上出码，你扫</button>
+          <button data-pay-btn="scan"><svg class="ic"><use href="#i-scan"/></svg>你出码，本机扫</button>
+        </div>
+
+        <!-- 码位：出码 / 取景 / 作废 共用同一个方框，尺寸不变 -->
+        <div class="cash-code" data-pay="wait confirm">
+          <svg class="cash-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" aria-label="收款二维码（原型示意）"><path d="M0 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="2" width="3" height="3" fill="#101613"/><path d="M18 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="20" y="2" width="3" height="3" fill="#101613"/><path d="M0 18h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="20" width="3" height="3" fill="#101613"/><rect x="7" y="0" width="1" height="1" fill="#101613"/><rect x="10" y="0" width="1" height="1" fill="#101613"/><rect x="14" y="0" width="1" height="1" fill="#101613"/><rect x="7" y="1" width="1" height="1" fill="#101613"/><rect x="13" y="1" width="1" height="1" fill="#101613"/><rect x="15" y="1" width="1" height="1" fill="#101613"/><rect x="16" y="1" width="1" height="1" fill="#101613"/><rect x="7" y="2" width="1" height="1" fill="#101613"/><rect x="9" y="2" width="1" height="1" fill="#101613"/><rect x="10" y="2" width="1" height="1" fill="#101613"/><rect x="13" y="2" width="1" height="1" fill="#101613"/><rect x="14" y="2" width="1" height="1" fill="#101613"/><rect x="15" y="2" width="1" height="1" fill="#101613"/><rect x="17" y="2" width="1" height="1" fill="#101613"/><rect x="8" y="3" width="1" height="1" fill="#101613"/><rect x="11" y="3" width="1" height="1" fill="#101613"/><rect x="12" y="3" width="1" height="1" fill="#101613"/><rect x="14" y="3" width="1" height="1" fill="#101613"/><rect x="17" y="3" width="1" height="1" fill="#101613"/><rect x="7" y="4" width="1" height="1" fill="#101613"/><rect x="12" y="4" width="1" height="1" fill="#101613"/><rect x="16" y="4" width="1" height="1" fill="#101613"/><rect x="17" y="4" width="1" height="1" fill="#101613"/><rect x="7" y="5" width="1" height="1" fill="#101613"/><rect x="12" y="5" width="1" height="1" fill="#101613"/><rect x="15" y="5" width="1" height="1" fill="#101613"/><rect x="17" y="5" width="1" height="1" fill="#101613"/><rect x="7" y="6" width="1" height="1" fill="#101613"/><rect x="8" y="6" width="1" height="1" fill="#101613"/><rect x="14" y="6" width="1" height="1" fill="#101613"/><rect x="15" y="6" width="1" height="1" fill="#101613"/><rect x="16" y="6" width="1" height="1" fill="#101613"/><rect x="5" y="7" width="1" height="1" fill="#101613"/><rect x="9" y="7" width="1" height="1" fill="#101613"/><rect x="16" y="7" width="1" height="1" fill="#101613"/><rect x="21" y="7" width="1" height="1" fill="#101613"/><rect x="23" y="7" width="1" height="1" fill="#101613"/><rect x="4" y="8" width="1" height="1" fill="#101613"/><rect x="5" y="8" width="1" height="1" fill="#101613"/><rect x="7" y="8" width="1" height="1" fill="#101613"/><rect x="9" y="8" width="1" height="1" fill="#101613"/><rect x="10" y="8" width="1" height="1" fill="#101613"/><rect x="16" y="8" width="1" height="1" fill="#101613"/><rect x="22" y="8" width="1" height="1" fill="#101613"/><rect x="23" y="8" width="1" height="1" fill="#101613"/><rect x="0" y="9" width="1" height="1" fill="#101613"/><rect x="5" y="9" width="1" height="1" fill="#101613"/><rect x="6" y="9" width="1" height="1" fill="#101613"/><rect x="9" y="9" width="1" height="1" fill="#101613"/><rect x="11" y="9" width="1" height="1" fill="#101613"/><rect x="15" y="9" width="1" height="1" fill="#101613"/><rect x="17" y="9" width="1" height="1" fill="#101613"/><rect x="19" y="9" width="1" height="1" fill="#101613"/><rect x="20" y="9" width="1" height="1" fill="#101613"/><rect x="23" y="9" width="1" height="1" fill="#101613"/><rect x="0" y="10" width="1" height="1" fill="#101613"/><rect x="3" y="10" width="1" height="1" fill="#101613"/><rect x="4" y="10" width="1" height="1" fill="#101613"/><rect x="6" y="10" width="1" height="1" fill="#101613"/><rect x="11" y="10" width="1" height="1" fill="#101613"/><rect x="15" y="10" width="1" height="1" fill="#101613"/><rect x="16" y="10" width="1" height="1" fill="#101613"/><rect x="17" y="10" width="1" height="1" fill="#101613"/><rect x="18" y="10" width="1" height="1" fill="#101613"/><rect x="19" y="10" width="1" height="1" fill="#101613"/><rect x="21" y="10" width="1" height="1" fill="#101613"/><rect x="23" y="10" width="1" height="1" fill="#101613"/><rect x="24" y="10" width="1" height="1" fill="#101613"/><rect x="0" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="11" width="1" height="1" fill="#101613"/><rect x="2" y="11" width="1" height="1" fill="#101613"/><rect x="4" y="11" width="1" height="1" fill="#101613"/><rect x="9" y="11" width="1" height="1" fill="#101613"/><rect x="11" y="11" width="1" height="1" fill="#101613"/><rect x="12" y="11" width="1" height="1" fill="#101613"/><rect x="14" y="11" width="1" height="1" fill="#101613"/><rect x="15" y="11" width="1" height="1" fill="#101613"/><rect x="16" y="11" width="1" height="1" fill="#101613"/><rect x="18" y="11" width="1" height="1" fill="#101613"/><rect x="20" y="11" width="1" height="1" fill="#101613"/><rect x="21" y="11" width="1" height="1" fill="#101613"/><rect x="22" y="11" width="1" height="1" fill="#101613"/><rect x="23" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="12" width="1" height="1" fill="#101613"/><rect x="2" y="12" width="1" height="1" fill="#101613"/><rect x="5" y="12" width="1" height="1" fill="#101613"/><rect x="8" y="12" width="1" height="1" fill="#101613"/><rect x="10" y="12" width="1" height="1" fill="#101613"/><rect x="11" y="12" width="1" height="1" fill="#101613"/><rect x="13" y="12" width="1" height="1" fill="#101613"/><rect x="15" y="12" width="1" height="1" fill="#101613"/><rect x="17" y="12" width="1" height="1" fill="#101613"/><rect x="18" y="12" width="1" height="1" fill="#101613"/><rect x="19" y="12" width="1" height="1" fill="#101613"/><rect x="20" y="12" width="1" height="1" fill="#101613"/><rect x="21" y="12" width="1" height="1" fill="#101613"/><rect x="22" y="12" width="1" height="1" fill="#101613"/><rect x="0" y="13" width="1" height="1" fill="#101613"/><rect x="2" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="13" width="1" height="1" fill="#101613"/><rect x="6" y="13" width="1" height="1" fill="#101613"/><rect x="8" y="13" width="1" height="1" fill="#101613"/><rect x="12" y="13" width="1" height="1" fill="#101613"/><rect x="13" y="13" width="1" height="1" fill="#101613"/><rect x="16" y="13" width="1" height="1" fill="#101613"/><rect x="17" y="13" width="1" height="1" fill="#101613"/><rect x="18" y="13" width="1" height="1" fill="#101613"/><rect x="20" y="13" width="1" height="1" fill="#101613"/><rect x="22" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="14" width="1" height="1" fill="#101613"/><rect x="7" y="14" width="1" height="1" fill="#101613"/><rect x="9" y="14" width="1" height="1" fill="#101613"/><rect x="11" y="14" width="1" height="1" fill="#101613"/><rect x="13" y="14" width="1" height="1" fill="#101613"/><rect x="15" y="14" width="1" height="1" fill="#101613"/><rect x="16" y="14" width="1" height="1" fill="#101613"/><rect x="17" y="14" width="1" height="1" fill="#101613"/><rect x="21" y="14" width="1" height="1" fill="#101613"/><rect x="23" y="14" width="1" height="1" fill="#101613"/><rect x="24" y="14" width="1" height="1" fill="#101613"/><rect x="1" y="15" width="1" height="1" fill="#101613"/><rect x="2" y="15" width="1" height="1" fill="#101613"/><rect x="3" y="15" width="1" height="1" fill="#101613"/><rect x="11" y="15" width="1" height="1" fill="#101613"/><rect x="13" y="15" width="1" height="1" fill="#101613"/><rect x="20" y="15" width="1" height="1" fill="#101613"/><rect x="22" y="15" width="1" height="1" fill="#101613"/><rect x="23" y="15" width="1" height="1" fill="#101613"/><rect x="0" y="16" width="1" height="1" fill="#101613"/><rect x="2" y="16" width="1" height="1" fill="#101613"/><rect x="4" y="16" width="1" height="1" fill="#101613"/><rect x="6" y="16" width="1" height="1" fill="#101613"/><rect x="12" y="16" width="1" height="1" fill="#101613"/><rect x="14" y="16" width="1" height="1" fill="#101613"/><rect x="18" y="16" width="1" height="1" fill="#101613"/><rect x="19" y="16" width="1" height="1" fill="#101613"/><rect x="20" y="16" width="1" height="1" fill="#101613"/><rect x="0" y="17" width="1" height="1" fill="#101613"/><rect x="1" y="17" width="1" height="1" fill="#101613"/><rect x="5" y="17" width="1" height="1" fill="#101613"/><rect x="9" y="17" width="1" height="1" fill="#101613"/><rect x="11" y="17" width="1" height="1" fill="#101613"/><rect x="16" y="17" width="1" height="1" fill="#101613"/><rect x="20" y="17" width="1" height="1" fill="#101613"/><rect x="24" y="17" width="1" height="1" fill="#101613"/><rect x="8" y="18" width="1" height="1" fill="#101613"/><rect x="12" y="18" width="1" height="1" fill="#101613"/><rect x="20" y="18" width="1" height="1" fill="#101613"/><rect x="24" y="18" width="1" height="1" fill="#101613"/><rect x="7" y="19" width="1" height="1" fill="#101613"/><rect x="11" y="19" width="1" height="1" fill="#101613"/><rect x="14" y="19" width="1" height="1" fill="#101613"/><rect x="15" y="19" width="1" height="1" fill="#101613"/><rect x="17" y="19" width="1" height="1" fill="#101613"/><rect x="18" y="19" width="1" height="1" fill="#101613"/><rect x="7" y="20" width="1" height="1" fill="#101613"/><rect x="11" y="20" width="1" height="1" fill="#101613"/><rect x="12" y="20" width="1" height="1" fill="#101613"/><rect x="20" y="20" width="1" height="1" fill="#101613"/><rect x="21" y="20" width="1" height="1" fill="#101613"/><rect x="22" y="20" width="1" height="1" fill="#101613"/><rect x="9" y="21" width="1" height="1" fill="#101613"/><rect x="10" y="21" width="1" height="1" fill="#101613"/><rect x="14" y="21" width="1" height="1" fill="#101613"/><rect x="18" y="21" width="1" height="1" fill="#101613"/><rect x="19" y="21" width="1" height="1" fill="#101613"/><rect x="21" y="21" width="1" height="1" fill="#101613"/><rect x="22" y="21" width="1" height="1" fill="#101613"/><rect x="7" y="22" width="1" height="1" fill="#101613"/><rect x="8" y="22" width="1" height="1" fill="#101613"/><rect x="13" y="22" width="1" height="1" fill="#101613"/><rect x="14" y="22" width="1" height="1" fill="#101613"/><rect x="15" y="22" width="1" height="1" fill="#101613"/><rect x="16" y="22" width="1" height="1" fill="#101613"/><rect x="17" y="22" width="1" height="1" fill="#101613"/><rect x="18" y="22" width="1" height="1" fill="#101613"/><rect x="19" y="22" width="1" height="1" fill="#101613"/><rect x="20" y="22" width="1" height="1" fill="#101613"/><rect x="21" y="22" width="1" height="1" fill="#101613"/><rect x="22" y="22" width="1" height="1" fill="#101613"/><rect x="9" y="23" width="1" height="1" fill="#101613"/><rect x="11" y="23" width="1" height="1" fill="#101613"/><rect x="15" y="23" width="1" height="1" fill="#101613"/><rect x="17" y="23" width="1" height="1" fill="#101613"/><rect x="19" y="23" width="1" height="1" fill="#101613"/><rect x="20" y="23" width="1" height="1" fill="#101613"/><rect x="21" y="23" width="1" height="1" fill="#101613"/><rect x="23" y="23" width="1" height="1" fill="#101613"/><rect x="24" y="23" width="1" height="1" fill="#101613"/><rect x="7" y="24" width="1" height="1" fill="#101613"/><rect x="9" y="24" width="1" height="1" fill="#101613"/><rect x="12" y="24" width="1" height="1" fill="#101613"/><rect x="13" y="24" width="1" height="1" fill="#101613"/><rect x="14" y="24" width="1" height="1" fill="#101613"/><rect x="15" y="24" width="1" height="1" fill="#101613"/></svg>
+        </div>
+        <div class="cash-code cash-code--dead" data-pay="expired">
+          <svg class="cash-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" aria-label="收款二维码（原型示意）"><path d="M0 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="2" width="3" height="3" fill="#101613"/><path d="M18 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="20" y="2" width="3" height="3" fill="#101613"/><path d="M0 18h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="20" width="3" height="3" fill="#101613"/><rect x="7" y="0" width="1" height="1" fill="#101613"/><rect x="10" y="0" width="1" height="1" fill="#101613"/><rect x="14" y="0" width="1" height="1" fill="#101613"/><rect x="7" y="1" width="1" height="1" fill="#101613"/><rect x="13" y="1" width="1" height="1" fill="#101613"/><rect x="15" y="1" width="1" height="1" fill="#101613"/><rect x="16" y="1" width="1" height="1" fill="#101613"/><rect x="7" y="2" width="1" height="1" fill="#101613"/><rect x="9" y="2" width="1" height="1" fill="#101613"/><rect x="10" y="2" width="1" height="1" fill="#101613"/><rect x="13" y="2" width="1" height="1" fill="#101613"/><rect x="14" y="2" width="1" height="1" fill="#101613"/><rect x="15" y="2" width="1" height="1" fill="#101613"/><rect x="17" y="2" width="1" height="1" fill="#101613"/><rect x="8" y="3" width="1" height="1" fill="#101613"/><rect x="11" y="3" width="1" height="1" fill="#101613"/><rect x="12" y="3" width="1" height="1" fill="#101613"/><rect x="14" y="3" width="1" height="1" fill="#101613"/><rect x="17" y="3" width="1" height="1" fill="#101613"/><rect x="7" y="4" width="1" height="1" fill="#101613"/><rect x="12" y="4" width="1" height="1" fill="#101613"/><rect x="16" y="4" width="1" height="1" fill="#101613"/><rect x="17" y="4" width="1" height="1" fill="#101613"/><rect x="7" y="5" width="1" height="1" fill="#101613"/><rect x="12" y="5" width="1" height="1" fill="#101613"/><rect x="15" y="5" width="1" height="1" fill="#101613"/><rect x="17" y="5" width="1" height="1" fill="#101613"/><rect x="7" y="6" width="1" height="1" fill="#101613"/><rect x="8" y="6" width="1" height="1" fill="#101613"/><rect x="14" y="6" width="1" height="1" fill="#101613"/><rect x="15" y="6" width="1" height="1" fill="#101613"/><rect x="16" y="6" width="1" height="1" fill="#101613"/><rect x="5" y="7" width="1" height="1" fill="#101613"/><rect x="9" y="7" width="1" height="1" fill="#101613"/><rect x="16" y="7" width="1" height="1" fill="#101613"/><rect x="21" y="7" width="1" height="1" fill="#101613"/><rect x="23" y="7" width="1" height="1" fill="#101613"/><rect x="4" y="8" width="1" height="1" fill="#101613"/><rect x="5" y="8" width="1" height="1" fill="#101613"/><rect x="7" y="8" width="1" height="1" fill="#101613"/><rect x="9" y="8" width="1" height="1" fill="#101613"/><rect x="10" y="8" width="1" height="1" fill="#101613"/><rect x="16" y="8" width="1" height="1" fill="#101613"/><rect x="22" y="8" width="1" height="1" fill="#101613"/><rect x="23" y="8" width="1" height="1" fill="#101613"/><rect x="0" y="9" width="1" height="1" fill="#101613"/><rect x="5" y="9" width="1" height="1" fill="#101613"/><rect x="6" y="9" width="1" height="1" fill="#101613"/><rect x="9" y="9" width="1" height="1" fill="#101613"/><rect x="11" y="9" width="1" height="1" fill="#101613"/><rect x="15" y="9" width="1" height="1" fill="#101613"/><rect x="17" y="9" width="1" height="1" fill="#101613"/><rect x="19" y="9" width="1" height="1" fill="#101613"/><rect x="20" y="9" width="1" height="1" fill="#101613"/><rect x="23" y="9" width="1" height="1" fill="#101613"/><rect x="0" y="10" width="1" height="1" fill="#101613"/><rect x="3" y="10" width="1" height="1" fill="#101613"/><rect x="4" y="10" width="1" height="1" fill="#101613"/><rect x="6" y="10" width="1" height="1" fill="#101613"/><rect x="11" y="10" width="1" height="1" fill="#101613"/><rect x="15" y="10" width="1" height="1" fill="#101613"/><rect x="16" y="10" width="1" height="1" fill="#101613"/><rect x="17" y="10" width="1" height="1" fill="#101613"/><rect x="18" y="10" width="1" height="1" fill="#101613"/><rect x="19" y="10" width="1" height="1" fill="#101613"/><rect x="21" y="10" width="1" height="1" fill="#101613"/><rect x="23" y="10" width="1" height="1" fill="#101613"/><rect x="24" y="10" width="1" height="1" fill="#101613"/><rect x="0" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="11" width="1" height="1" fill="#101613"/><rect x="2" y="11" width="1" height="1" fill="#101613"/><rect x="4" y="11" width="1" height="1" fill="#101613"/><rect x="9" y="11" width="1" height="1" fill="#101613"/><rect x="11" y="11" width="1" height="1" fill="#101613"/><rect x="12" y="11" width="1" height="1" fill="#101613"/><rect x="14" y="11" width="1" height="1" fill="#101613"/><rect x="15" y="11" width="1" height="1" fill="#101613"/><rect x="16" y="11" width="1" height="1" fill="#101613"/><rect x="18" y="11" width="1" height="1" fill="#101613"/><rect x="20" y="11" width="1" height="1" fill="#101613"/><rect x="21" y="11" width="1" height="1" fill="#101613"/><rect x="22" y="11" width="1" height="1" fill="#101613"/><rect x="23" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="12" width="1" height="1" fill="#101613"/><rect x="2" y="12" width="1" height="1" fill="#101613"/><rect x="5" y="12" width="1" height="1" fill="#101613"/><rect x="8" y="12" width="1" height="1" fill="#101613"/><rect x="10" y="12" width="1" height="1" fill="#101613"/><rect x="11" y="12" width="1" height="1" fill="#101613"/><rect x="13" y="12" width="1" height="1" fill="#101613"/><rect x="15" y="12" width="1" height="1" fill="#101613"/><rect x="17" y="12" width="1" height="1" fill="#101613"/><rect x="18" y="12" width="1" height="1" fill="#101613"/><rect x="19" y="12" width="1" height="1" fill="#101613"/><rect x="20" y="12" width="1" height="1" fill="#101613"/><rect x="21" y="12" width="1" height="1" fill="#101613"/><rect x="22" y="12" width="1" height="1" fill="#101613"/><rect x="0" y="13" width="1" height="1" fill="#101613"/><rect x="2" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="13" width="1" height="1" fill="#101613"/><rect x="6" y="13" width="1" height="1" fill="#101613"/><rect x="8" y="13" width="1" height="1" fill="#101613"/><rect x="12" y="13" width="1" height="1" fill="#101613"/><rect x="13" y="13" width="1" height="1" fill="#101613"/><rect x="16" y="13" width="1" height="1" fill="#101613"/><rect x="17" y="13" width="1" height="1" fill="#101613"/><rect x="18" y="13" width="1" height="1" fill="#101613"/><rect x="20" y="13" width="1" height="1" fill="#101613"/><rect x="22" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="14" width="1" height="1" fill="#101613"/><rect x="7" y="14" width="1" height="1" fill="#101613"/><rect x="9" y="14" width="1" height="1" fill="#101613"/><rect x="11" y="14" width="1" height="1" fill="#101613"/><rect x="13" y="14" width="1" height="1" fill="#101613"/><rect x="15" y="14" width="1" height="1" fill="#101613"/><rect x="16" y="14" width="1" height="1" fill="#101613"/><rect x="17" y="14" width="1" height="1" fill="#101613"/><rect x="21" y="14" width="1" height="1" fill="#101613"/><rect x="23" y="14" width="1" height="1" fill="#101613"/><rect x="24" y="14" width="1" height="1" fill="#101613"/><rect x="1" y="15" width="1" height="1" fill="#101613"/><rect x="2" y="15" width="1" height="1" fill="#101613"/><rect x="3" y="15" width="1" height="1" fill="#101613"/><rect x="11" y="15" width="1" height="1" fill="#101613"/><rect x="13" y="15" width="1" height="1" fill="#101613"/><rect x="20" y="15" width="1" height="1" fill="#101613"/><rect x="22" y="15" width="1" height="1" fill="#101613"/><rect x="23" y="15" width="1" height="1" fill="#101613"/><rect x="0" y="16" width="1" height="1" fill="#101613"/><rect x="2" y="16" width="1" height="1" fill="#101613"/><rect x="4" y="16" width="1" height="1" fill="#101613"/><rect x="6" y="16" width="1" height="1" fill="#101613"/><rect x="12" y="16" width="1" height="1" fill="#101613"/><rect x="14" y="16" width="1" height="1" fill="#101613"/><rect x="18" y="16" width="1" height="1" fill="#101613"/><rect x="19" y="16" width="1" height="1" fill="#101613"/><rect x="20" y="16" width="1" height="1" fill="#101613"/><rect x="0" y="17" width="1" height="1" fill="#101613"/><rect x="1" y="17" width="1" height="1" fill="#101613"/><rect x="5" y="17" width="1" height="1" fill="#101613"/><rect x="9" y="17" width="1" height="1" fill="#101613"/><rect x="11" y="17" width="1" height="1" fill="#101613"/><rect x="16" y="17" width="1" height="1" fill="#101613"/><rect x="20" y="17" width="1" height="1" fill="#101613"/><rect x="24" y="17" width="1" height="1" fill="#101613"/><rect x="8" y="18" width="1" height="1" fill="#101613"/><rect x="12" y="18" width="1" height="1" fill="#101613"/><rect x="20" y="18" width="1" height="1" fill="#101613"/><rect x="24" y="18" width="1" height="1" fill="#101613"/><rect x="7" y="19" width="1" height="1" fill="#101613"/><rect x="11" y="19" width="1" height="1" fill="#101613"/><rect x="14" y="19" width="1" height="1" fill="#101613"/><rect x="15" y="19" width="1" height="1" fill="#101613"/><rect x="17" y="19" width="1" height="1" fill="#101613"/><rect x="18" y="19" width="1" height="1" fill="#101613"/><rect x="7" y="20" width="1" height="1" fill="#101613"/><rect x="11" y="20" width="1" height="1" fill="#101613"/><rect x="12" y="20" width="1" height="1" fill="#101613"/><rect x="20" y="20" width="1" height="1" fill="#101613"/><rect x="21" y="20" width="1" height="1" fill="#101613"/><rect x="22" y="20" width="1" height="1" fill="#101613"/><rect x="9" y="21" width="1" height="1" fill="#101613"/><rect x="10" y="21" width="1" height="1" fill="#101613"/><rect x="14" y="21" width="1" height="1" fill="#101613"/><rect x="18" y="21" width="1" height="1" fill="#101613"/><rect x="19" y="21" width="1" height="1" fill="#101613"/><rect x="21" y="21" width="1" height="1" fill="#101613"/><rect x="22" y="21" width="1" height="1" fill="#101613"/><rect x="7" y="22" width="1" height="1" fill="#101613"/><rect x="8" y="22" width="1" height="1" fill="#101613"/><rect x="13" y="22" width="1" height="1" fill="#101613"/><rect x="14" y="22" width="1" height="1" fill="#101613"/><rect x="15" y="22" width="1" height="1" fill="#101613"/><rect x="16" y="22" width="1" height="1" fill="#101613"/><rect x="17" y="22" width="1" height="1" fill="#101613"/><rect x="18" y="22" width="1" height="1" fill="#101613"/><rect x="19" y="22" width="1" height="1" fill="#101613"/><rect x="20" y="22" width="1" height="1" fill="#101613"/><rect x="21" y="22" width="1" height="1" fill="#101613"/><rect x="22" y="22" width="1" height="1" fill="#101613"/><rect x="9" y="23" width="1" height="1" fill="#101613"/><rect x="11" y="23" width="1" height="1" fill="#101613"/><rect x="15" y="23" width="1" height="1" fill="#101613"/><rect x="17" y="23" width="1" height="1" fill="#101613"/><rect x="19" y="23" width="1" height="1" fill="#101613"/><rect x="20" y="23" width="1" height="1" fill="#101613"/><rect x="21" y="23" width="1" height="1" fill="#101613"/><rect x="23" y="23" width="1" height="1" fill="#101613"/><rect x="24" y="23" width="1" height="1" fill="#101613"/><rect x="7" y="24" width="1" height="1" fill="#101613"/><rect x="9" y="24" width="1" height="1" fill="#101613"/><rect x="12" y="24" width="1" height="1" fill="#101613"/><rect x="13" y="24" width="1" height="1" fill="#101613"/><rect x="14" y="24" width="1" height="1" fill="#101613"/><rect x="15" y="24" width="1" height="1" fill="#101613"/></svg>
+        </div>
+        <div class="cash-code" data-pay="scan">
+          <div class="cash-lens"><span></span></div>
+        </div>
+        <div class="cash-code" data-pay="paid" style="border-color:var(--jade-a32)">
+          <svg class="ic" style="width:96px;height:96px;color:var(--jade-500)"><use href="#i-check"/></svg>
+        </div>
+        <div class="cash-code" data-pay="closed" style="background:var(--surf-2)">
+          <svg class="ic" style="width:88px;height:88px;color:var(--fog-500)"><use href="#i-close"/></svg>
+        </div>
+        <div class="cash-code" data-pay="query">
+          <svg class="ic" style="width:88px;height:88px;color:var(--amber-500)"><use href="#i-search"/></svg>
+        </div>
+
+        <!-- 状态行：位置固定，只换字与色 -->
+        <span class="cash-st cash-st--wait" data-pay="wait">
+          <svg class="ic"><use href="#i-clock"/></svg>用微信或支付宝扫上面的码 · 本码 <b>4:32</b> 后失效
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="scan">
+          <svg class="ic"><use href="#i-qr"/></svg>把手机里的付款码对准取景框 · 本机只读码，不存你的付款码
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="confirm">
+          <svg class="ic"><use href="#i-clock"/></svg>已收到扫码，正在等支付渠道回传到账结果 · <b>不要重复支付</b>
+        </span>
+        <span class="cash-st cash-st--ok" data-pay="paid">
+          <svg class="ic"><use href="#i-check"/></svg>已到账 3.00 元 · 按下面的按钮开始出纸
+        </span>
+        <span class="cash-st cash-st--bad" data-pay="expired">
+          <svg class="ic"><use href="#i-alert"/></svg>本码已失效并作废 · 重新出码会同时关闭旧码，不会两个码都能付
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="query">
+          <svg class="ic"><use href="#i-search"/></svg>正在按订单号向支付渠道查这笔钱到没到
+        </span>
+        <span class="cash-st cash-st--bad" data-pay="closed">
+          <svg class="ic"><use href="#i-close"/></svg>超时未支付，本单已关闭 · <b>没有收你钱，也没有打印</b>
+        </span>
+
+        <span class="cash-ch" data-pay="wait scan expired">
+          支持 <i>微信支付</i> <i>支付宝</i> · 收款方为本机运营方，收款主体与金额见屏上公示
+        </span>
+
+        <div class="notice" data-pay="confirm" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>渠道回传通常几秒内到。<b>如果你手机已显示付款成功但这里没动</b>，
+            按「我已付款，帮我查」——本机会按订单号主动查一次，不需要你再付一遍。
+            同一笔订单本机只接受一次收款；重复到账会自动退回原路。</span>
+        </div>
+
+        <div class="notice notice--amber" data-pay="query" style="max-width:40em">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>查单有三种结果：<b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
+            <b>渠道说处理中</b>→ 本机不会替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。
+            <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
+        </div>
+
+        <div class="notice" data-pay="closed" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>关单时二维码已同步作废，之后扫它不会成功。文件还在本次会话里，
+            可以回上一步重新下单；离场或会话结束会自动清空。</span>
+        </div>
+
+        <div class="cash-demo" data-review>
+          <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
+            原型演示 · 切到某个处境（真实系统由支付渠道回传和超时任务驱动，不由用户点）</span>
+          <button data-pay-btn="wait" aria-pressed="true">待付</button>
+          <button data-pay-btn="scan">扫用户码</button>
+          <button data-pay-btn="confirm">到账中</button>
+          <button data-pay-btn="paid">已到账</button>
+          <button data-pay-btn="expired">码失效</button>
+          <button data-pay-btn="query">查单</button>
+          <button data-pay-btn="closed">已关单</button>
+        </div>
+      </div>
+
+      <!-- S6 出纸进度 -->
+      <div class="progress-wrap" data-at="s6">
+
+        <!-- 「已付款」到「纸出来」中间有三段，每段都可能卡住。
+             原来这里是一步跳到出纸中，用户卡在排队时会以为机器死了。 -->
+        <div class="jline">
+          <span class="jnode jn--done"><i></i><b>已提交</b><em>13:41:02</em></span>
+          <span class="jnode jn--done"><i></i><b>排队</b><em data-job="printing jam">前面 0 单</em><em data-job="queued">前面 2 单 · 约 3 分钟</em><em data-job="checking checkfail timeout">已过</em></span>
+          <span class="jnode jn--done" data-job="printing jam timeout"><i></i><b>服务端校验</b><em>通过</em></span>
+          <span class="jnode jn--now"  data-job="checking"><i></i><b>服务端校验</b><em>正在检查文件能不能打</em></span>
+          <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>服务端校验</b><em>没通过</em></span>
+          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 面</em></span>
+          <span class="jnode"          data-job="queued checking"><i></i><b>出纸</b><em>还没开始</em></span>
+          <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>出纸</b><em>不会开始</em></span>
+          <span class="jnode jn--bad"  data-job="jam"><i></i><b>出纸</b><em>卡纸暂停</em></span>
+          <span class="jnode jn--bad"  data-job="timeout"><i></i><b>出纸</b><em>超时未开始</em></span>
+        </div>
+
+        <div class="notice notice--amber" data-job="queued" style="max-width:40em">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <span>前面还有 <b>2 单</b>，约 3 分钟。<b>钱已经收了，不会重复收</b>；
+            排队期间你可以离开，凭取件码回来打，也可以在这里等。
+            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</span>
+        </div>
+
+        <div class="notice" data-job="checking" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>正在检查这份文件能不能真的打出来：页数、字体是否内嵌、有没有加密、幅面是否 A4。
+            <b>这一步在出纸之前</b> —— 宁可现在拦住，也不要出到第 7 页才发现字体丢了。</span>
+        </div>
+
+        <div class="notice notice--coral" data-job="checkfail" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>校验没通过：第 2 页有一处字体没内嵌，打出来会变成方框。</b>没有出任何纸，也没有扣这一单的钱
+            （已收的 3.00 元会<b>原路退回</b>，1–3 个工作日到账，退款记录进「我的 · 打印订单」）。<br>
+            两条路：<b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；
+            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。</span>
+        </div>
+
+        <div class="notice notice--coral" data-job="timeout" style="max-width:40em">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <span><b>超过 10 分钟没能开始出纸，已自动转成待打印订单。</b>钱不退也不重复收 ——
+            凭取件码 <b>7742 106 358</b> 在任一台空闲机器直接打，7 天内有效。<br>
+            如果你不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</span>
+        </div>
+
+        <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
+          <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
+            原型演示 · 切任务处境（真实系统由服务端任务状态与超时任务驱动）</span>
+          <button data-job-btn="queued">排队</button>
+          <button data-job-btn="checking">校验中</button>
+          <button data-job-btn="checkfail">校验失败</button>
+          <button data-job-btn="printing" aria-pressed="true">出纸中</button>
+          <button data-job-btn="jam">卡纸</button>
+          <button data-job-btn="timeout">10 分钟超时</button>
+        </div>
+
+        <div class="dial" data-job="printing jam">
+          <svg viewBox="0 0 100 100">
+            <circle class="tk" cx="50" cy="50" r="43"/>
+            <circle class="vl" cx="50" cy="50" r="43" stroke-dasharray="270" stroke-dashoffset="216"/>
+          </svg>
+          <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 面</span></div></div>
+        </div>
+        <div class="notice" data-when="default first ai-down" data-job="printing" style="max-width:40em">
+          <svg class="ic"><use href="#i-printer"/></svg>
+          <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
+            凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
+        </div>
+        <!-- 2026-08-09 Codex 整改：中途离线文案只在真的出过纸的处境(printing/jam)出现,
+             排队/校验/超时各有自己的 0 面与退款事实,不能被这段"已出 3 面"覆盖。 -->
+        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>打印机中途离线，已暂停。你已经付过的钱不会再扣一次。</b>剩余 12 面有两条路，你选：<br>
+            · <b>继续打</b>：剩余份数保留为待打印订单，凭取件码在任一台空闲机器续打，不再收费。<br>
+            · <b>不打了</b>：按<b>未出的 12 面</b>退 2.40 元，已出的 3 面不退；退款走原渠道，1–3 个工作日到账。<br>
+            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</span>
+        </div>
+        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机<b>不会自己替你决定退还是续打</b>。你离场未选择时，订单默认转为待打印保留 7 天，
+            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。</span>
+        </div>
+      </div>
+
+      <!-- S6 取件 -->
+      <div class="progress-wrap" data-at="s7">
+        <div class="pickup">
+          <span class="chip chip--jade chip--info"><span class="dot dot--live"></span>本次办理完成</span>
+          <div class="pickup-code">7742 106 358</div>
+          <p class="pickup-hint">这是你的取件码。<b>7 天内</b>凭码可在任一台空闲机器复打同一份文件；文件到期自动清理，清理会留删除日志。</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <button class="btn btn--ghost">存进「我的文档」</button>
+            <button class="btn btn--ghost">发到我手机</button>
+          </div>
+        </div>
+        <div class="notice" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。</span>
+        </div>
+        <div class="notice" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板 / 送稿器上取走；<b>U 盘</b>拔下带好。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---------- 右：参数与核价，不反客为主 ---------- -->
+    <div class="wside">
+
+      <!-- S1 说明 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">支持什么</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件格式</span><span class="v">PDF / JPG / PNG</span></div>
+          <div class="kv-row"><span class="k">单份大小</span><span class="v">≤ 30 MB</span></div>
+          <div class="kv-row"><span class="k">幅面</span><span class="v">A4（不支持 A3）</span></div>
+          <div class="kv-row"><span class="k">双面</span><span class="v" data-when="default first ai-down">自动双面可用</span><span class="v v--fog" data-when="device-off">暂不可用</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><span class="t">Word 与其他格式</span></div>
+        <p style="margin:0;font-size:var(--fz-2);line-height:1.6;color:var(--fog-700)">
+          Word / Excel 转换尚未开放。先在手机上导出成 PDF 再传过来，或用纸质扫描。<br>
+          <span style="color:var(--fog-600)">这里不提供"看起来能点但其实不通"的入口。</span>
+        </p>
+      </div>
+
+      <!-- S2 文件信息 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><span class="t">文件信息</span><span class="s" data-when="default ai-down device-off">已上传</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件名</span><span class="v" data-when="default ai-down device-off">个人简历.pdf</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">页数</span><span class="v" data-when="default ai-down device-off">3 页</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">来源</span><span class="v" data-when="default ai-down device-off">手机扫码传</span><span class="v v--fog" data-when="first">—</span></div>
+          <div class="kv-row"><span class="k">保留期限</span><span class="v">本次会话</span></div>
+        </div>
+      </div>
+      <div class="pane pane--fill" data-at="s2">
+        <div class="pane-hd"><span class="t">建议</span></div>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off">
+          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断</span>，再进入参数。<br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：本机在第 2 页识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
+        </p>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="ai-down">
+          体检不可用时不给建议。<br>
+          <span style="font-size:var(--fz-2);color:var(--fog-600)">你可以直接进入参数设置，流程不受影响。</span>
+        </p>
+        <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="first">
+          还没有文件，暂无建议。
+        </p>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" data-when="default device-off" style="width:100%">遮盖这一处再继续</button>
+          <button class="btn btn--quiet" data-when="default device-off" style="width:100%">我知道了，保持原样</button>
+        </div>
+      </div>
+
+      <!-- S3 参数 -->
+      <div class="pane pane--fill" data-at="s3">
+        <div class="pane-hd">
+          <span class="t">打印参数</span>
+          <span class="s" data-when="default device-off">AI 已预设</span>
+          <span class="s" data-when="ai-down first">需你设置</span>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">份数
+            <span class="prefill" data-when="default device-off"><svg class="ic" style="width:11px;height:11px"><use href="#i-brain"/></svg>已按招聘会规模预设 · 可改</span>
+          </div>
+          <div class="stepper">
+            <button aria-label="减少"><svg class="ic"><use href="#i-minus"/></svg></button>
+            <span class="val">5<span class="unit"> 份</span></span>
+            <button aria-label="增加"><svg class="ic"><use href="#i-plus"/></svg></button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">色彩
+            <span class="prefill" data-when="default device-off">已按文件内容预设 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">黑白</button>
+            <button aria-pressed="false" data-when="default first ai-down">彩色</button>
+            <button aria-pressed="false" aria-disabled="true" data-when="device-off">彩色不可用</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">单双面
+            <span class="prefill" data-when="default device-off">已按页数预设 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="false">单面</button>
+            <button aria-pressed="true" data-when="default first ai-down">自动双面</button>
+            <button aria-pressed="false" aria-disabled="true" data-when="device-off">双面不可用</button>
+          </div>
+        </div>
+
+        <!-- 翻页边只在自动双面下才有意义，所以挂在双面之后、且写清后果。
+             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。 -->
+        <div class="field" data-when="default first ai-down">
+          <div class="field-lb">双面翻页边
+            <span class="prefill">简历按长边翻 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">长边翻（像书）</button>
+            <button aria-pressed="false">短边翻（像记事本）</button>
+          </div>
+          <p class="fnote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">页面方向
+            <span class="prefill" data-when="default device-off">按文件里的方向 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">跟随文件（纵向）</button>
+            <button aria-pressed="false">强制横向</button>
+          </div>
+          <p class="fnote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
+        </div>
+
+        <!-- 幅面与缩放：硬件只有 A4，不支持 A3。
+             非 A4 文件必须让用户明确选一次，不能静默缩放 —— 静默缩放会把表格压到看不清。 -->
+        <div class="field">
+          <div class="field-lb">幅面与缩放
+            <span class="prefill" data-when="default device-off">已检出 A4 · 无需缩放</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">按原尺寸（100%）</button>
+            <button aria-pressed="false">缩放到 A4</button>
+          </div>
+          <p class="fnote">
+            本机<b>只有 A4，不支持 A3</b>。这份文件检出为 A4，按原尺寸出即可。<br>
+            如果换成 A3 或 Letter，这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
+          </p>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">页码范围</div>
+          <div class="seg">
+            <button aria-pressed="true" id="rng-all">全部 3 页</button>
+            <button aria-pressed="false" id="rng-custom">自定义</button>
+          </div>
+          <label class="goalfield" id="rng-input" style="height:52px;border-radius:var(--r-xs);margin-top:10px;display:none">
+            <svg class="ic" aria-hidden="true"><use href="#i-file"/></svg>
+            <input type="text" value="2-3" placeholder="如 1,3 或 2-3" aria-label="自定义页码范围" style="font-size:var(--fz-3)">
+          </label>
+          <p id="rng-note" style="display:none;margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+            用逗号分隔单页、用连字符表示区间。超出 1–3 的页码会被忽略，不会静默按全部打印。
+          </p>
+        </div>
+      </div>
+
+      <!-- S3/S4 核价 -->
+      <div class="pane" data-at="s3 s4">
+        <div class="pane-hd"><span class="t">核价</span><span class="s">服务端计算</span></div>
+        <div class="quote">
+          <div class="qrow"><span class="k">内容</span><span class="v">3 页 × 5 份 = 15 个印刷面</span></div>
+          <div class="qrow"><span class="k">双面用纸</span><span class="v">10 张（每份 2 张）</span></div>
+          <div class="qrow"><span class="k">单价</span><span class="v">以现场公示价为准</span></div>
+          <div class="qtotal">
+            <span class="k">应付</span>
+            <span class="v" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed">未核价</span>
+            <span class="v" data-when="default first ai-down" data-pay="free" style="color:var(--jade-500)">0.00 元 · 免费</span>
+            <span class="v" data-when="device-off" style="color:var(--coral-400)">暂不可下单</span>
+          </div>
+          <p class="qnote" data-pay="free" data-when="default first ai-down">
+            本单金额为 <b>0 元</b>（只扫描 / 用了减免），<b>不进收银台、不出收款码</b>，第 5 站直接跳过。
+            不收钱也就没有退款问题；出纸完成一样有取件码和订单记录。</p>
+          <p class="qnote" data-when="default first ai-down">金额由服务端按现场公示价计算。<b>核价结果显示出来之后，才会出现「确认并支付」</b>——不让你确认一个还没看见的金额。</p>
+          <p class="qnote" data-when="device-off">打印机离线期间不接受支付。可先把文件存进「我的文档」，凭手机号在任一台空闲机器取回打印。</p>
+        </div>
+      </div>
+
+      <!-- 单据类型由服务端核价结果决定：金额 > 0 走收银，金额 = 0 跳过收银。
+           这里放切换是为了让两条真实路径都能看到，不是伪造用户选项 —— 所以标 data-review。 -->
+      <div class="pane" data-at="s4" data-review style="border-style:dashed">
+        <div class="pane-hd"><span class="t" style="color:var(--fog-600)">核价结果（服务端决定，此处可切换查看）</span></div>
+        <div class="cash-demo" style="position:static;justify-content:flex-start">
+          <button data-pay-btn="wait" aria-pressed="true">应付 3.00 元 · 走收银</button>
+          <button data-pay-btn="free">应付 0.00 元 · 跳过收银</button>
+        </div>
+      </div>
+
+      <!-- S4 确认前的隐私与须知 -->
+      <div class="pane pane--fill" data-at="s4">
+        <div class="pane-hd"><span class="t">支付前请核对</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf · 3 页</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 自动双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">印刷面数</span><span class="v">15 面</span></div>
+          <div class="kv-row"><span class="k">用纸</span><span class="v">10 张</span></div>
+          <div class="kv-row"><span class="k">隐私命中</span><span class="v" style="color:var(--amber-400)">第 2 页身份证号 · 未遮盖</span></div>
+        </div>
+        <div class="notice notice--amber" style="margin-top:12px">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>你选择了保持原样打印。<b>本机不会自动遮盖</b>——遮盖版未生成，出纸内容就是你上传的原文件。
+            含身份证号的纸质材料请自行妥善保管，不要留在取纸口。</span>
+        </div>
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>你的材料去哪、留多久、谁能看：</b><br>
+            · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
+            · <b>保留</b>：未支付的临时文件随本次会话结束清空；已支付订单的文件保留 7 天供复打；登录后主动存入「我的文档」的按其保留期。到期清理都留删除日志。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
+            · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<br>
+            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span>
+        </div>
+      </div>
+
+
+      <!-- S4/S5 价目表：金额必须能被核对，不能只给一个总数 -->
+      <!-- 2026-08-09 留白复核：公示价从 s4 挪到 s1 —— s4 已有服务端核价明细(冗余致右栏超高、
+           把「支付前请核对」挤出 14–39px)；s1 进门正需要价格预期。s5 保留(退款语境要对照价目)。
+           s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
+      <div class="pane" data-at="s1 s5">
+        <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
+        <div class="price">
+          <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
+          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v">1.50 元</span></div>
+          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
+          <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
+          <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
+        </div>
+        <p class="price-note">
+          <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
+          本机不接受现金，不找零；不支持刷卡。
+        </p>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 本机事实(E2)与隐私规则。
+           s3/s4 栏内已满，不加；其余阶段垫底，杜绝无容器空洞。 -->
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:41</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">打印机</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+          <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">AI 服务</span>
+            <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+            <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 打印不受影响</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· 文件默认只保留到<b>本次会话结束</b>；<br>
+            · 支付、出纸、删除都要<b>你本人确认</b>，系统不代按；<br>
+            · 离场或超时自动清空，下一位用户看不到任何痕迹；<br>
+            · 要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。</span>
+        </div>
+      </div>
+      <div class="pane" data-at="s6">
+        <div class="pane-hd"><span class="t">出纸完成后</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <span>取件码会放大显示在屏幕上；已登录用户同步进「我的 · 打印订单」。<b>出纸完成前请不要离开本机。</b></span>
+        </div>
+      </div>
+
+      <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
+      <div class="pane pane--fill pane--grow" data-at="s5">
+        <div class="pane-hd"><span class="t">退款怎么算</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">未出纸就取消</span><span class="v">全额退</span></div>
+          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出面数退</span></div>
+          <div class="kv-row"><span class="k">已出纸但你不满意</span><span class="v" style="color:var(--amber-400)">不退，可折价复打</span></div>
+          <div class="kv-row"><span class="k">重复到账</span><span class="v">自动退回原路</span></div>
+          <div class="kv-row"><span class="k">退款到账</span><span class="v">原渠道 1–3 个工作日</span></div>
+        </div>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>退款由服务端按<b>实际出纸面数</b>算，不看你按了几次按钮。
+            所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</span>
+        </div>
+      </div>
+
+      <!-- S6 任务信息 -->
+      <div class="pane pane--fill" data-at="s6">
+        <div class="pane-hd"><span class="t">任务</span><span class="s">#PT-20260808-0431</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">状态</span>
+            <span class="v" data-when="default first ai-down" data-job="printing"><span class="dot dot--live"></span>正在出纸</span>
+            <span class="v" data-when="default first ai-down" data-job="queued"><span class="dot dot--warn"></span>排队中 · 前面 2 单</span>
+            <span class="v" data-when="default first ai-down" data-job="checking"><span class="dot dot--warn"></span>服务端校验中</span>
+            <span class="v" data-when="default first ai-down" data-job="checkfail" style="color:var(--coral-400)"><span class="dot dot--down"></span>校验未通过，已终止</span>
+            <span class="v" data-when="default first ai-down" data-job="timeout" style="color:var(--coral-400)"><span class="dot dot--down"></span>超时，已转待打印</span>
+            <span class="v" data-when="default first ai-down" data-job="jam" style="color:var(--coral-400)"><span class="dot dot--down"></span>卡纸暂停</span>
+            <span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
+          <div class="kv-row"><span class="k">已完成</span>
+            <span class="v" data-job="printing">3 / 15 面</span>
+            <span class="v" data-job="jam">3 / 15 面（暂停在第 4 面）</span>
+            <span class="v" data-job="queued checking timeout">0 / 15 面 · 还没开始出纸</span>
+            <span class="v" data-job="checkfail">0 面 · 一张纸都没出</span></div>
+          <div class="kv-row"><span class="k">支付</span>
+            <span class="v" data-job="printing queued checking jam">已支付 3.00 元</span>
+            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 3.00 元</span>
+            <span class="v" data-job="timeout">已支付 3.00 元 · 未打可申请退款</span></div>
+          <div class="kv-row"><span class="k">取件码</span><span class="v">7742 106 358</span></div>
+        </div>
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" style="width:100%">卡纸了 / 需要帮助</button>
+        </div>
+      </div>
+
+      <!-- S6 订单 -->
+      <div class="pane pane--fill" data-at="s7">
+        <div class="pane-hd"><span class="t">本次订单</span><span class="s">#PT-20260808-0431</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
+          <div class="kv-row"><span class="k">参数</span><span class="v">黑白 · 双面 · 5 份</span></div>
+          <div class="kv-row"><span class="k">面数</span><span class="v">15 面 · 用纸 10 张</span></div>
+          <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
+          <div class="kv-row"><span class="k">去向</span><span class="v">已进「我的 · 打印订单」</span></div>
+          <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
+        </div>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" style="width:100%">
+            <svg class="ic"><use href="#i-alert"/></svg>这次打印有问题
+          </button>
+          <div>
+            <div style="font-size:var(--fz-2);color:var(--fog-700);margin-bottom:8px">这次办理还顺手吗？</div>
+            <div class="seg">
+              <button aria-pressed="false">满意</button>
+              <button aria-pressed="false">一般</button>
+              <button aria-pressed="false">不满意</button>
+            </div>
+            <p style="margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              评价只用于改进现场服务，不影响你的订单，也可以不评。
+            </p>
+          </div>
+        </div>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>下一步建议：这份简历还没做过按岗位优化。周五招聘会前可以先优化再多打几份。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ActionBar：主按钮恒定右下 ============ -->
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-at="s1"><div class="t">选一种方式，把要打印的文件送进来</div><div class="s">不需要登录也可以打印；文件默认只保留到本次会话结束</div></div>
+      <div data-at="s2">
+        <div data-when="default device-off"><div class="t">体检完成：第 2 页有身份证号</div><div class="s">建议遮盖后再打印 · 也可以保持原样继续</div></div>
+        <div data-when="ai-down"><div class="t">体检不可用，其余流程正常</div><div class="s">参数需要你自己确认</div></div>
+        <div data-when="first"><div class="t">还没有文件</div><div class="s">回第 1 步把材料送进来</div></div>
+      </div>
+      <div data-at="s3">
+        <div data-when="default device-off"><div class="t">参数已按文件内容预设，可改</div><div class="s">黑白 · 自动双面 · 5 份 · 全部 3 页</div></div>
+        <div data-when="ai-down first"><div class="t">请确认打印参数</div><div class="s">预填不可用，四项都需要你自己设</div></div>
+      </div>
+      <div data-at="s4">
+        <div data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="hint-quote"><div class="t">先获取核价，金额显示出来再决定要不要付</div><div class="s">本机不预先计算金额，也不承诺价格</div></div>
+        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银 · 按「直接出纸」开始</div></div>
+        <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
+      </div>
+      <div data-at="s5">
+        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效 · 失效会自动作废，不会重复收款</div></div>
+        <div data-pay="scan"><div class="t">把手机付款码对准取景框</div><div class="s">本机只读取一次，不保存你的付款码</div></div>
+        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付 · 手机已成功但这里没动，按「帮我查」</div></div>
+        <div data-pay="paid"><div class="t">已到账 3.00 元</div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
+        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码 · 这笔钱没有扣</div></div>
+        <div data-pay="query"><div class="t">正在按订单号向渠道查这笔钱</div><div class="s">查询结果来自支付渠道，本机不替渠道下结论</div></div>
+        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印 · 文件还在本次会话</div></div>
+      </div>
+      <div data-at="s6">
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
+        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单 · 约 3 分钟</div><div class="s">钱已收，不会重复收 · 可以离开，凭取件码回来打</div></div>
+        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前 · 宁可现在拦住</div></div>
+        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
+        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
+        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
+        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出 · 按各处境规则处理，不会重复扣款</div></div>
+      </div>
+      <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
+    </div>
+
+    <!-- 左侧：返回 / 备选 -->
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一步</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">返回改参数</button>
+    <button class="btn btn--lg btn--ghost" data-at="s6" data-job="printing queued checking jam timeout">异常求助</button>
+    <a class="btn btn--lg btn--ghost" data-at="s6" data-job="checkfail" href="08-file-tools.html?tool=t1">让本机转成可打印 PDF</a>
+    <button class="btn btn--lg btn--ghost" data-at="s7">再打一份</button>
+
+    <!-- 右侧：唯一主动作。不可逆动作用朱砂 -->
+    <button class="btn btn--primary" data-at="s1" data-go="s2">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default ai-down device-off">去设参数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-when="first" data-go="s1">先选来源<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">去确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="default first ai-down" id="btn-quote" data-gate="unquoted">获取核价<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
+    <button class="btn btn--commit" data-at="s4" data-go="s6" data-when="default first ai-down" data-pay="free" data-gate="quoted">本单免费，直接出纸<svg class="ic"><use href="#i-printer"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+
+    <!-- 收银台：左侧退出路径 -->
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="wait scan expired query" data-go="s4">取消支付，返回</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="confirm" data-pay-go="query">我已付款，帮我查</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed" data-go="s4">重新下单</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="paid" data-go="s4">先不打，转存我的文档</button>
+    <!-- 收银台：右侧主动作 -->
+    <button class="btn btn--primary" data-at="s5" data-pay="wait" data-pay-go="query">我已付款，帮我查<svg class="ic"><use href="#i-search"/></svg></button>
+    <button class="btn btn--primary" data-at="s5" data-pay="scan" aria-disabled="true">等待读取付款码…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="confirm" aria-disabled="true">等渠道回传到账…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="query" aria-disabled="true">查询中…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="expired" data-pay-go="wait">重新出码<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <button class="btn btn--commit" data-at="s5" data-pay="paid" data-go="s6">开始出纸<svg class="ic"><use href="#i-printer"/></svg></button>
+    <button class="btn btn--primary" data-at="s6" data-job="printing" aria-disabled="true">出纸中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="queued" aria-disabled="true">排队中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="checking" aria-disabled="true">校验中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="checkfail" data-go="s1">换一份文件重新上传<svg class="ic"><use href="#i-upload"/></svg></button>
+
+    <button class="btn btn--primary" data-at="s6" data-job="timeout" data-go="s7">看取件码<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s6" data-job="jam" aria-disabled="true">等你取出卡纸…</button>
+    <button class="btn btn--primary" data-at="s7" data-go="s1">完成<svg class="ic"><use href="#i-check"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* 页码范围：选「自定义」才出现输入框。原型 64 屏有输入能力，本页早前只做了切换按钮 */
+;(function () {
+  var all = document.getElementById('rng-all'), cus = document.getElementById('rng-custom')
+  var box = document.getElementById('rng-input'), note = document.getElementById('rng-note')
+  if (!all || !cus) return
+  function set (custom) {
+    all.setAttribute('aria-pressed', custom ? 'false' : 'true')
+    cus.setAttribute('aria-pressed', custom ? 'true' : 'false')
+    box.style.display = custom ? 'flex' : 'none'
+    note.style.display = custom ? 'block' : 'none'
+  }
+  all.addEventListener('click', function () { set(false) })
+  cus.addEventListener('click', function () { set(true) })
+})()
+</script>
+<script>
+/* 核价门控：没有金额就不给支付按钮。原型未接服务端，所以只把"金额位"标成待服务端填充，
+   而不是编一个假数字——这一步的诚实性比演示流畅更重要。 */
+;(function () {
+  var q = document.getElementById('btn-quote'), pay = document.getElementById('btn-pay')
+  if (!q || !pay) return
+  // 注意：门控**不能**用 hidden 属性——四态/阶段的 applyVisibility() 独占 hidden，
+  // 会把门控状态覆盖掉（本轮实测踩到过）。所以走 data-gate + .is-quoted class。
+  q.addEventListener('click', function () {
+    var v = document.querySelector('.qtotal .v:not([hidden])')
+    if (v) { v.textContent = '服务端返回金额（原型未接后端）'; v.style.fontSize = 'var(--fz-3)' }
+    var n = document.querySelector('.qnote:not([hidden])')
+    if (n) n.innerHTML = '已向服务端请求核价。<b>真实环境下这里显示金额与逐项明细</b>，确认后才扣款出纸。'
+    document.querySelector('.screen').classList.add('is-quoted')
+    var h = document.getElementById('hint-quote')
+    if (h) h.innerHTML = '<div class="t">核对金额与明细无误后按下确认，才会开始扣款与出纸</div><div class="s">金额以服务端按现场公示价核算为准</div>'
+  })
+})()
+</script>
+<script>
+/* 预览：翻页按钮与缩略图都真正驱动同一个滚动容器；页码跟着滚动实时更新 */
+;(function () {
+  var st = document.querySelector('.paper-stage')
+  var lb = document.querySelector('.paper-bar .pg span')
+  var thumbs = [].slice.call(document.querySelectorAll('.thumb'))
+  if (!st) return
+  function pages () { return [].slice.call(st.querySelectorAll('.sheet-a4')).filter(function (p) { return !p.hidden }) }
+  function goto (i) {
+    var ps = pages(); if (!ps[i]) return
+    st.scrollTo({ top: ps[i].offsetTop - st.offsetTop - 16, behavior: 'smooth' })
+  }
+  function current () {
+    var ps = pages(), best = 0, min = 1e9
+    for (var i = 0; i < ps.length; i++) {
+      var d = Math.abs(ps[i].offsetTop - st.offsetTop - st.scrollTop)
+      if (d < min) { min = d; best = i }
+    }
+    return best
+  }
+  function sync () {
+    var i = current(), n = pages().length
+    if (lb) lb.textContent = '第 ' + (i + 1) + ' / 共 ' + n + ' 页'
+    thumbs.forEach(function (t, k) { t.setAttribute('aria-current', k === i ? 'true' : 'false') })
+  }
+  st.addEventListener('scroll', sync, { passive: true })
+  thumbs.forEach(function (t, k) { t.addEventListener('click', function () { goto(k) }) })
+  var btns = document.querySelectorAll('.paper-bar .pgbtn')
+  if (btns[0]) btns[0].addEventListener('click', function () { goto(Math.max(0, current() - 1)) })
+  if (btns[1]) btns[1].addEventListener('click', function () { goto(Math.min(pages().length - 1, current() + 1)) })
+  addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
+})()
+</script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

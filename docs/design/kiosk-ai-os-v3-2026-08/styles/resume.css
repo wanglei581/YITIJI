@@ -1,0 +1,185 @@
+/* ============================================================
+   简历工作台构图层（resume）
+   ------------------------------------------------------------
+   一条纪律贯穿全页：**AI 只生成新版本，永不覆盖原件**。
+   所以版面里「原文」永远在左、永远可回看；改写永远是右侧的候选，
+   要用户逐条点「采纳」才进新版本。
+   评价一律用三档，不用百分比——简历好坏没有可核对的分母。
+   ============================================================ */
+
+/* ---------- 诊断：维度三档 ---------- */
+.dims { display: flex; flex-direction: column; gap: var(--s-3); }
+.dim { display: flex; align-items: center; gap: var(--s-4); }
+.dim-nm { font-size: var(--fz-2); color: var(--fog-700); width: 5.2em; flex: 0 0 auto; }
+.dim-bar { flex: 1; display: flex; gap: 4px; }
+.dim-bar i { flex: 1; height: 9px; border-radius: 5px; background: var(--surf-3); display: block; }
+.dim--good .dim-bar i:nth-child(-n+3) { background: var(--jade-500); }
+.dim--mid  .dim-bar i:nth-child(-n+2) { background: var(--amber-400); }
+.dim--weak .dim-bar i:nth-child(-n+1) { background: var(--coral-400); }
+.dim-tag { font-size: var(--fz-2); width: 3.4em; text-align: right; flex: 0 0 auto; }
+.dim--good .dim-tag { color: var(--jade-600); }
+.dim--mid  .dim-tag { color: var(--amber-600); }
+.dim--weak .dim-tag { color: var(--coral-400); }
+
+/* ---------- 问题清单：每条都要指向原文的具体位置 ---------- */
+.issues { display: flex; flex-direction: column; gap: var(--s-3); overflow-y: auto; }
+.issue {
+  text-align: left; cursor: pointer; width: 100%;
+  padding: var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+  font-family: var(--ff-ui);
+}
+.issue:hover { border-color: var(--jade-a32); }
+.issue[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+.issue-hd { display: flex; align-items: center; gap: var(--s-3); }
+.issue-sev {
+  font-size: 10px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px;
+  border: 1px solid currentColor; flex: 0 0 auto;
+}
+.issue--high .issue-sev { color: var(--coral-400); }
+.issue--mid  .issue-sev { color: var(--amber-600); }
+.issue--low  .issue-sev { color: var(--fog-600); }
+.issue-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.issue-loc { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); flex: 0 0 auto; }
+.issue-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+.issue-p b { color: var(--fog-900); font-weight: 600; }
+
+/* ---------- 原文里的命中标记 ---------- */
+.hit { background: var(--amber-a20); border-radius: 3px; box-shadow: 0 0 0 2px var(--amber-a20); }
+.hit--on { background: var(--jade-a20); box-shadow: 0 0 0 3px var(--jade-a32); }
+.gapline {
+  border: 1.5px dashed var(--coral-400); border-radius: 5px;
+  background: var(--coral-a12); padding: 9px 11px;
+  font-size: 11px; color: var(--coral-600); line-height: 1.5;
+}
+
+/* ---------- 优化对比：原文 vs 候选改写 ---------- */
+.diff { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-3); }
+.diff-hd { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.diff-hd span {
+  font-size: var(--fz-2); color: var(--fog-700); letter-spacing: .04em;
+  display: flex; align-items: center; gap: var(--s-3);
+}
+.diff-body { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-3); }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); align-items: stretch; }
+.pair-box {
+  /* 一体机是站着看的，正文不能用 14px */
+  padding: var(--s-5); border-radius: var(--r-sm); font-size: var(--fz-3); line-height: 1.72;
+  background: var(--ink-200); border: 1px solid var(--brd-1); color: var(--fog-700);
+}
+.pair-box--new {
+  background: var(--jade-a12); border-color: var(--jade-a20); color: var(--fog-900);
+  display: flex; flex-direction: column; gap: var(--s-3);
+}
+.pair-box del { text-decoration: line-through; color: var(--fog-600); }
+.pair-box ins { text-decoration: none; background: var(--jade-a20); border-radius: 3px; padding: 0 3px; }
+.pair-why { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.6; }
+.pair-act { display: flex; gap: var(--s-3); margin-top: auto; }
+.pair-act .btn { min-height: var(--touch-min); font-size: var(--fz-2); padding: 0 var(--s-4); white-space: nowrap; }
+.pair--taken .pair-box--new { border-color: var(--jade-500); }
+.pair--taken .pair-act { display: none; }
+.taken-flag {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: auto;
+  font-size: var(--fz-1); color: var(--jade-600); letter-spacing: .04em;
+}
+.taken-flag .ic { width: 15px; height: 15px; }
+
+/* ---------- 版本列表：可回退，绝不覆盖 ---------- */
+.vers { display: flex; flex-direction: column; gap: var(--s-3); }
+.ver {
+  padding: var(--s-4); border-radius: var(--r-sm); cursor: pointer; text-align: left; width: 100%;
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; align-items: center; gap: var(--s-4); font-family: var(--ff-ui);
+}
+.ver[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+.ver-no {
+  width: 44px; height: 44px; border-radius: var(--r-xs); flex: 0 0 auto;
+  display: grid; place-items: center; font-family: var(--ff-num); font-size: var(--fz-3);
+  background: var(--ink-200); border: 1px solid var(--brd-2); color: var(--fog-800);
+}
+.ver[aria-current="true"] .ver-no { background: var(--jade-500); border-color: var(--jade-500); color: #fff; }
+.ver-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ver-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+.ver-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
+.ver-tag { margin-left: auto; flex: 0 0 auto; }
+
+/* ---------- 导出去向组件已上移到 components.css（P14 等非简历页也要用） ---------- */
+
+/* ============================================================
+   岗位匹配对比（P11）
+   ------------------------------------------------------------
+   合规硬线：只给三档参考（较高 / 中等 / 偏低），
+   禁百分比、禁匹配率、禁录用概率、禁人格适岗结论。
+   交互语法与 P09 诊断一致：点左边任一条要求 → 右边原文定位高亮。
+   ============================================================ */
+.fitwrap { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: auto 1fr; gap: var(--s-4); }
+
+/* 结论条：三档 + 三个计数，没有第四个数字 */
+.concl {
+  display: flex; align-items: center; gap: var(--s-6);
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  backdrop-filter: blur(var(--glass-blur));
+}
+.concl-tier { display: flex; flex-direction: column; gap: 6px; }
+.concl-tier .lb { font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .1em; }
+.concl-tier .vl { font-family: var(--ff-display); font-size: var(--fz-7); color: var(--jade-600); font-weight: 600; }
+.concl-bars { display: flex; gap: 5px; }
+.concl-bars i { width: 34px; height: 10px; border-radius: 5px; background: var(--surf-3); display: block; }
+.concl--high .concl-bars i:nth-child(-n+3) { background: var(--jade-500); }
+.concl--mid .concl-bars i:nth-child(-n+2) { background: var(--amber-400); }
+.concl--mid .concl-tier .vl { color: var(--amber-600); }
+.concl--low .concl-bars i:nth-child(-n+1) { background: var(--fog-600); }
+.concl--low .concl-tier .vl { color: var(--fog-700); }
+.concl-counts { display: flex; gap: var(--s-6); margin-left: auto; }
+.cnt { display: flex; flex-direction: column; gap: 3px; text-align: right; }
+.cnt b { font-family: var(--ff-num); font-size: var(--fz-6); color: var(--fog-900); font-variant-numeric: tabular-nums; }
+.cnt span { font-size: var(--fz-1); color: var(--fog-600); }
+.cnt--ok b { color: var(--jade-600); }
+.cnt--near b { color: var(--amber-600); }
+.cnt--miss b { color: var(--coral-400); }
+.concl-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; max-width: 17em; }
+
+/* 双栏比对 */
+.fitcols { min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
+.fitcol { min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); }
+.fitcol-hd {
+  display: flex; align-items: center; gap: var(--s-3); flex: 0 0 auto;
+  font-size: var(--fz-2); color: var(--fog-700); letter-spacing: .04em;
+}
+.fitcol-hd .ic { width: 17px; height: 17px; color: var(--fog-600); }
+.fitcol-body { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-3); }
+
+/* 岗位要求条：三态 */
+.req {
+  text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui);
+  padding: var(--s-4); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+}
+.req:hover { border-color: var(--jade-a32); }
+.req[aria-current="true"] { border-color: var(--jade-500); background: var(--jade-a12); }
+.req-hd { display: flex; align-items: center; gap: var(--s-3); }
+.req-st { font-size: 11px; letter-spacing: .06em; padding: 2px 7px; border-radius: 4px; border: 1px solid currentColor; flex: 0 0 auto; }
+.req--ok   .req-st { color: var(--jade-600); }
+.req--near .req-st { color: var(--amber-600); }
+.req--miss .req-st { color: var(--coral-400); }
+.req-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; line-height: 1.4; }
+.req-p { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.6; }
+.req-fix { font-size: var(--fz-2); color: var(--jade-600); line-height: 1.55; }
+.req-fix b { color: var(--fog-900); }
+
+/* 简历原文侧：命中句高亮，缺口处插说明块 */
+.resume-src {
+  min-height: 0; overflow-y: auto; padding: var(--s-5);
+  background: var(--paper-000); color: var(--paper-ink);
+  border-radius: var(--r-sm); box-shadow: var(--sh-2);
+  font-size: var(--fz-2); line-height: 1.85;
+}
+.resume-src h5 { margin: 0 0 4px; font-family: var(--ff-display); font-size: var(--fz-4); }
+.resume-src .grp { font-size: 11px; font-weight: 700; letter-spacing: .1em; margin: 14px 0 5px; }
+.resume-src .row { display: block; }
+

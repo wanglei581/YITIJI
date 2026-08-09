@@ -22,6 +22,8 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairMaterialPrintResponse,
+  FairCompanyPrintResponse,
+  FairCompanyPrintVariant,
   FairLiveStatsDTO,
   FairVenueGuideDTO,
 } from '@ai-job-print/shared'
@@ -293,6 +295,16 @@ export const httpJobFairAdapter = {
 
   async prepareFairMaterialPrint(fairId: string, materialId: string): Promise<FairMaterialPrintResponse> {
     return post<FairMaterialPrintResponse>(`/job-fairs/${fairId}/materials/${materialId}/print-url`)
+  },
+
+  async prepareFairCompanyPrint(
+    fairId: string,
+    companyId: string,
+    variant: FairCompanyPrintVariant,
+  ): Promise<FairCompanyPrintResponse> {
+    return post<FairCompanyPrintResponse>(
+      `/job-fairs/${fairId}/companies/${companyId}/print-url?variant=${variant}`,
+    )
   },
 
   async getFairStats(fairId: string): Promise<ApiResponse<FairLiveStatsDTO | null>> {

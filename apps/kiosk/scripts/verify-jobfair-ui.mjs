@@ -138,6 +138,20 @@ mustNotContain(
   ['活动资料.pdf', "data/fairData"],
   'C2. 详情页无虚拟 PDF 构造、不直引 mock',
 )
+// C3(2026-08-09 修复回归守卫):参会企业详情页的两个打印入口曾构造没有 fileId/fileUrl 的
+// 假 PrintFile,页数还是 `Math.ceil(positions.length / 8)` 前端硬算 —— PrintPreviewPage
+// 判定 `!file.fileUrl` 即 unavailable,按钮点了永远不出纸。打印文件必须由后端渲染后
+// 返回真实签名 URL,页数/体积只能来自后端响应。
+mustContain(
+  'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+  ['prepareFairCompanyPrint', 'printable.printFileUrl', 'printable.fileId', 'printable.pageCount'],
+  'C3. 企业详情页打印走后端真实文件(prepareFairCompanyPrint)',
+)
+mustNotContain(
+  'src/pages/job-fairs/FairCompanyDetailPage.tsx',
+  ['_企业资料.pdf', '_岗位清单.pdf', 'Math.ceil(company.positions.length'],
+  'C4. 企业详情页无伪造 PrintFile / 前端硬算页数',
+)
 
 // ── D. /campus 校园页 ─────────────────────────────────────────────────────
 mustContain(

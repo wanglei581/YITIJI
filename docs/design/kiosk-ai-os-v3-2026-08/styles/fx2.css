@@ -1,0 +1,148 @@
+/* ============================================================
+   V5 增强动效层（fx2）· 只给「鲜彩玻璃」版
+   ------------------------------------------------------------
+   含义对照表（每个效果都必须能说出它在表达什么）：
+     数据流连线   = 顾问 → 你的指令 → 排出的办理路径，是一条链
+     路径流光     = 办理方向，下一步在哪
+     节点光环     = 当前这一步是活的
+     玻璃反光跟手 = 触点反馈（一体机没有鼠标）
+     计数点阵     = 真实数量的可视化（12 个点 = 12 家来源）
+     系统脉搏线   = 终端每 5 秒上报一次
+     处理日志     = AI 此刻在读什么、在核对什么（不是转圈圈）
+   仍然只动 transform / opacity / filter；reduced-motion 全部退化。
+   ============================================================ */
+
+/* ---------- 1. 数据流连线：顾问 → 办理路径 ---------- */
+.fx2-link { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.fx2-link .base { fill: none; stroke: var(--jade-a20); stroke-width: 1.5; }
+.fx2-link .flow {
+  fill: none; stroke: var(--cat-print); stroke-width: 2.4;
+  stroke-linecap: round; stroke-dasharray: 2 16;
+  filter: drop-shadow(0 0 5px var(--jade-a32));
+  animation: fx2flow 2.6s linear infinite;
+}
+@keyframes fx2flow { to { stroke-dashoffset: -216; } }
+.screen[data-state="ai-down"] .fx2-link { opacity: 0; }
+
+/* ---------- 2. 办理路径：连线流光 + 当前节点光环 ---------- */
+.vstep--now .vstep-dot { position: relative; }
+.vstep--now .vstep-dot::before {
+  /* 真正的环：用 mask 掏空中心，不用实心圆去盖连线 */
+  content: ""; position: absolute; inset: -7px; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 58%, var(--jade-400) 80%, transparent 94%);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px));
+  animation: fx2ring 2.4s linear infinite;
+}
+@keyframes fx2ring { to { transform: rotate(360deg); } }
+
+.vtrack { position: relative; }
+.vtrack::after {
+  content: ""; position: absolute; left: 16%; top: 12px; width: 34px; height: 3px;
+  border-radius: 3px; background: linear-gradient(90deg, transparent, var(--jade-400), transparent);
+  animation: fx2run 3.8s var(--ease-in-out) infinite;
+}
+@keyframes fx2run { 0% { left: 14%; opacity: 0; } 18% { opacity: 1; } 78% { opacity: 1; } 100% { left: 82%; opacity: 0; } }
+.screen[data-state="ai-down"] .vtrack::after,
+.screen[data-state="first"] .vtrack::after { display: none; }
+.screen[data-state="ai-down"] .vstep--now .vstep-dot::before,
+.screen[data-state="first"] .vstep--now .vstep-dot::before { display: none; }
+
+/* ---------- 3. 玻璃反光跟手 ---------- */
+.vcommand, .verrand, .vpanel { position: relative; overflow: hidden; }
+.vcommand::after, .verrand::after, .vpanel::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(320px circle at var(--mx, 50%) var(--my, -20%),
+              rgba(255,255,255,.55), transparent 62%);
+  opacity: 0; transition: opacity var(--dur-3) var(--ease-out);
+  mix-blend-mode: soft-light;
+}
+.vcommand.is-lit::after, .verrand.is-lit::after, .vpanel.is-lit::after { opacity: 1; }
+/* 服务卡的高光并进身份色域那一层，避免再加一层元素 */
+.card::before {
+  background:
+    radial-gradient(300px circle at var(--mx, 50%) var(--my, -30%), rgba(255,255,255,.26), transparent 58%),
+    linear-gradient(152deg, var(--c1), var(--c2));
+}
+
+/* ---------- 4. 计数点阵：真实数量，不是装饰 ---------- */
+.dotc { display: inline-flex; align-items: center; gap: 3px; margin-right: 7px; }
+/* 数量大于 6 时排成两行，避免把标签挤出卡片 */
+.dotc--wrap { display: grid; grid-auto-flow: column; grid-template-rows: repeat(2, 4px); gap: 2px 3px; }
+.dotc i {
+  width: 4px; height: 4px; border-radius: 50%; display: block;
+  background: rgba(255,255,255,.86);
+  animation: dotc-in 420ms var(--ease-out) both;
+}
+@keyframes dotc-in { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: none; } }
+
+/* ---------- 5. 系统脉搏线：贴在屏幕最顶，每 5 秒扫一次 ---------- */
+.pulseline {
+  position: absolute; left: 0; right: 0; top: 0; height: 2px; z-index: 50;
+  overflow: hidden; pointer-events: none;
+}
+.pulseline::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -22%; width: 22%;
+  background: linear-gradient(90deg, transparent, var(--cat-print), transparent);
+  animation: fx2pulse 5s var(--ease-in-out) infinite;
+}
+@keyframes fx2pulse { 0% { left: -22%; } 46%, 100% { left: 100%; } }
+.screen[data-state="device-off"] .pulseline::after {
+  background: linear-gradient(90deg, transparent, var(--coral-400), transparent);
+  animation-duration: 2.6s;
+}
+
+/* ---------- 6. 生成序列：全屏光扫 + 色域增亮 ---------- */
+.screen.is-working .vhero-field i { animation-duration: 8s; filter: blur(48px) saturate(1.25); }
+.sweep {
+  position: absolute; left: 0; right: 0; top: -30%; height: 30%; z-index: 48;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255,255,255,.42) 46%, transparent);
+  animation: fx2sweep 1.15s var(--ease-in-out) forwards;
+}
+@keyframes fx2sweep { to { top: 100%; } }
+
+/* ---------- 7. 处理日志：AI 此刻在读什么 ---------- */
+.proclog {
+  display: flex; flex-direction: column; gap: 7px;
+  margin: var(--s-2) 0 0;
+}
+.proclog div {
+  display: flex; align-items: center; gap: 9px;
+  font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-700);
+  letter-spacing: .04em;
+  opacity: 0; transform: translateX(-10px);
+  animation: proc-in 340ms var(--ease-out) forwards;
+}
+.proclog div::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cat-print); flex: 0 0 auto;
+  box-shadow: 0 0 0 4px var(--jade-a12);
+}
+.proclog div.done { color: var(--fog-600); }
+.proclog div.done::before { background: var(--jade-600); box-shadow: none; }
+@keyframes proc-in { to { opacity: 1; transform: none; } }
+
+/* 胶囊在处理时的扫掠光 */
+.vcommand.is-working::before {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(105deg, transparent 34%, rgba(255,255,255,.72) 50%, transparent 66%);
+  transform: translateX(-120%);
+  animation: capsheen 1.1s var(--ease-in-out) 2;
+}
+@keyframes capsheen { to { transform: translateX(120%); } }
+
+/* 路径节点逐条写入 */
+.vstep.is-writing { animation: writein 420ms var(--ease-out) both; }
+/* 彩色身份卡上用白色涟漪，绿色涟漪在彩底上会脏 */
+.card .ripple, .vscene--key .ripple { background: radial-gradient(circle, rgba(255,255,255,.55), transparent 70%); }
+
+/* ---------- 8. 卡片按压微倾斜：给触摸一个物理反馈 ---------- */
+.card { transform-style: preserve-3d; }
+.card.is-tilt { transition: transform 120ms var(--ease-out); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx2-link .flow, .vtrack::after, .pulseline::after,
+  .vstep--now .vstep-dot::before { animation: none; }
+  .fx2-link .flow { stroke-dasharray: none; opacity: .55; }
+}

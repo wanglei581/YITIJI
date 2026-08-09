@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import type { FairCompanyDTO } from '@ai-job-print/shared'
 import { BuildingIcon, ExternalLinkIcon, QrCodeIcon } from 'lucide-react'
-import { getFairCompanyById } from '../../services/api'
+import { getFairCompanyById, prepareFairCompanyPrint } from '../../services/api'
+import { API_MODE } from '../../services/api/client'
 import { recordExternalJump } from '../../services/api/activity'
 import { isValidSourceUrl } from '../../lib/url'
 import { useAuth } from '../../auth/useAuth'
@@ -15,10 +16,14 @@ import {
   PositionPosterView,
   QrOverlay,
   type Filters,
-  type PrintFile,
   type ViewMode,
 } from './components/FairCompanyDetailSections'
 import { FusionBadge, FusionNotice, KioskPageFrame } from '../jobs/components/W4Presentation'
+
+function formatSize(bytes: number): string {
+  const kb = Math.max(1, Math.round(bytes / 1024))
+  return kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,8 @@ export function FairCompanyDetailPage() {
   const [error,    setError]    = useState(false)
   const [showQr,   setShowQr]   = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [printing,   setPrinting]   = useState<'profile' | 'positions' | null>(null)
+  const [printError, setPrintError] = useState<string | null>(null)
   const [filters,  setFilters]  = useState<Filters>({
     location:     '不限',
     education:    '不限',
@@ -74,28 +81,44 @@ export function FairCompanyDetailPage() {
   const isFiltered   = Object.values(filters).some((v) => v !== '不限')
 
   // ── Print handlers ─────────────────────────────────────────────────────────
+  // 打印文件由后端按库内展示数据实时渲染成短期 FileObject，前端只消费真实的
+  // fileId / printFileUrl / pageCount；不再自造没有 fileUrl 的假 PrintFile
+  // （那会让 PrintPreviewPage 判定 unavailable，点了永远不出纸）。
   const returnUrl   = company ? `/job-fairs/${fairId}/companies/${companyId}` : undefined
   const returnLabel = company?.companyName
+  // mock 模式没有后端渲染能力，按钮如实置灰，而不是点了没反应
+  const printBackendReady = API_MODE === 'http'
 
-  const handlePrintProfile = () => {
-    if (!company) return
-    const file: PrintFile = {
-      name:  `${company.companyName}_企业资料.pdf`,
-      size:  '约 120 KB',
-      pages: 1 + Math.ceil(company.positions.length / 8),
+  const runPrint = async (variant: 'profile' | 'positions') => {
+    if (!company || printing) return
+    setPrinting(variant)
+    setPrintError(null)
+    try {
+      const printable = await prepareFairCompanyPrint(fairId, company.id, variant)
+      if (!printable.printFileUrl) throw new Error('打印链接未就绪')
+      navigate('/print/preview', {
+        state: {
+          file: {
+            name:     printable.filename,
+            size:     formatSize(printable.sizeBytes),
+            pages:    printable.pageCount > 0 ? printable.pageCount : null,
+            fileId:   printable.fileId,
+            fileUrl:  printable.printFileUrl,
+            mimeType: printable.mimeType,
+          },
+          returnUrl,
+          returnLabel,
+        },
+      })
+    } catch (err) {
+      setPrintError(err instanceof Error ? err.message : '打印文件准备失败，请稍后重试')
+    } finally {
+      setPrinting(null)
     }
-    navigate('/print/preview', { state: { file, returnUrl, returnLabel } })
   }
 
-  const handlePrintPositions = () => {
-    if (!company) return
-    const file: PrintFile = {
-      name:  `${company.companyName}_岗位清单.pdf`,
-      size:  `约 ${Math.max(40, company.positions.length * 15)} KB`,
-      pages: Math.max(1, Math.ceil(company.positions.length / 4)),
-    }
-    navigate('/print/preview', { state: { file, returnUrl, returnLabel } })
-  }
+  const handlePrintProfile   = () => { void runPrint('profile') }
+  const handlePrintPositions = () => { void runPrint('positions') }
 
   const openApplyQr = () => {
     if (!company || !isValidSourceUrl(company.sourceUrl)) return
@@ -155,12 +178,25 @@ export function FairCompanyDetailPage() {
 
       {/* Content */}
         <CompanyInfoCard company={company} />
+
+        {printError && (
+          <p className="rounded-lg bg-error-bg px-5 py-4 text-[18px] text-error-fg">{printError}</p>
+        )}
+
         <ActionBar
           sourceCanApply={isValidSourceUrl(company.sourceUrl)}
           onScanQr={openApplyQr}
           onOpenSource={openApplyQr}
           onPrintProfile={handlePrintProfile}
           onPrintPositions={handlePrintPositions}
+          printing={printing}
+          canPrintProfile={printBackendReady}
+          canPrintPositions={printBackendReady && company.positions.length > 0}
+          printDisabledHint={
+            !printBackendReady
+              ? '演示模式未接入后端，无法生成真实企业资料文件'
+              : '该企业暂无可打印的岗位信息'
+          }
         />
 
         <FilterBar

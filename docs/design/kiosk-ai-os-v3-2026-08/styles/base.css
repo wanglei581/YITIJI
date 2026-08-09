@@ -1,0 +1,220 @@
+/* ============================================================
+   V3 · 底座：舞台外壳 / 极光背景 / 颗粒 / 竖屏三段分区
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+[hidden] { display: none !important; }
+
+/* 图标默认尺寸：任何 .ic 都必须有确定尺寸，避免 SVG 落到 300×150 默认值 */
+.ic { width: 24px; height: 24px; flex: 0 0 auto; display: inline-block; vertical-align: middle; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: #02060700;
+  font-family: var(--ff-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------- 预览舞台（仅原型工作台用，生产不需要） ---------- */
+body.proto {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 800px at 20% -10%, #0b1a1e 0%, #05090b 60%, #030607 100%);
+  display: grid;
+  place-items: start center;
+  /* 2026-08-09 二改：104px 顶距把整页"顶下去"观感更差(用户反馈)。
+     回到 28px,改由 .shell 平时隐身(shell.css)解决遮挡。 */
+  padding: 28px 0 60px;
+  overflow-x: hidden;
+}
+body.capture { padding: 0; background: #000; }
+
+.stage {
+  position: relative;
+  width: 1080px; height: 1920px;
+  transform-origin: top center;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 40px 120px -30px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.06);
+}
+body.capture .stage { border-radius: 0; box-shadow: none; }
+
+/* ---------- 屏幕：1080×1920 竖屏本体 ---------- */
+.screen {
+  position: absolute; inset: 0;
+  background: var(--ink-000);
+  color: var(--fog-800);
+  font-size: var(--fz-3);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  isolation: isolate;
+}
+
+/* ---------- 极光：三团慢速漂移的光，构成"系统在运转"的底噪 ---------- */
+.aurora { position: absolute; inset: -12% -12% -12% -12%; z-index: var(--z-aurora); pointer-events: none; }
+.aurora i {
+  position: absolute; display: block; border-radius: 50%;
+  filter: blur(90px); opacity: .5;
+  will-change: transform;
+}
+.aurora i:nth-child(1) {
+  width: 780px; height: 780px; left: -170px; top: -120px;
+  background: radial-gradient(circle at 40% 40%, var(--aur-1), transparent 68%);
+  animation: drift-a var(--drift) var(--ease-in-out) infinite;
+}
+.aurora i:nth-child(2) {
+  width: 900px; height: 640px; right: -240px; top: 380px;
+  background: radial-gradient(circle at 55% 45%, var(--aur-2), transparent 66%);
+  animation: drift-b calc(var(--drift) * 1.35) var(--ease-in-out) infinite;
+}
+.aurora i:nth-child(3) {
+  width: 720px; height: 720px; left: 120px; bottom: -220px;
+  background: radial-gradient(circle at 50% 50%, var(--aur-3), transparent 62%);
+  animation: drift-c calc(var(--drift) * 1.7) var(--ease-in-out) infinite;
+}
+@keyframes drift-a {
+  0%,100% { transform: translate3d(0,0,0) scale(1); }
+  50%     { transform: translate3d(90px, 60px, 0) scale(1.12); }
+}
+@keyframes drift-b {
+  0%,100% { transform: translate3d(0,0,0) scale(1.05); }
+  50%     { transform: translate3d(-110px, -70px, 0) scale(.94); }
+}
+@keyframes drift-c {
+  0%,100% { transform: translate3d(0,0,0) scale(1); }
+  50%     { transform: translate3d(60px, -90px, 0) scale(1.14); }
+}
+
+/* ---------- 颗粒：抵消渐变的塑料感。设计师手感的关键一层 ---------- */
+.grain {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  opacity: var(--grain-op); mix-blend-mode: var(--grain-blend);
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'>\
+<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/>\
+<feColorMatrix type='saturate' values='0'/></filter>\
+<rect width='140' height='140' filter='url(%23n)' opacity='.5'/></svg>");
+}
+
+/* 细网格：只在 hero 后面出现，暗示"系统坐标系"，不铺满全屏 */
+.mesh {
+  position: absolute; z-index: 1; pointer-events: none;
+  inset: var(--h-topbar) 0 auto 0; height: 620px;
+  opacity: .5;
+  background-image:
+    linear-gradient(to right, var(--mesh-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--mesh-line) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 88%);
+}
+
+/* ---------- 顶栏：品牌 + 时间 + 设备（只看不摸区） ---------- */
+.topbar {
+  position: relative; z-index: var(--z-content);
+  height: var(--h-topbar); flex: 0 0 var(--h-topbar);
+  padding: 0 var(--gutter);
+  display: flex; align-items: center; gap: var(--s-4);
+  border-bottom: 1px solid var(--surf-2);
+  background: var(--chrome-top);
+  backdrop-filter: blur(14px);
+}
+.brand { display: flex; align-items: center; gap: var(--s-4); }
+.brand-mark {
+  width: 52px; height: 52px; border-radius: 15px;
+  background: linear-gradient(148deg, var(--jade-400), var(--jade-700) 78%);
+  box-shadow: var(--sh-jade), var(--glass-hi);
+  display: grid; place-items: center;
+  font-family: var(--ff-display); font-size: 26px; color: var(--on-primary);
+  position: relative; overflow: hidden;
+}
+.brand-mark::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,.5) 46%, transparent 62%);
+  transform: translateX(-120%);
+  animation: sheen 6.5s var(--ease-in-out) infinite;
+}
+@keyframes sheen { 0%, 72% { transform: translateX(-120%); } 88%, 100% { transform: translateX(130%); } }
+.brand-name { font-family: var(--ff-display); font-size: var(--fz-7); letter-spacing: .06em; color: var(--fog-900); line-height: 1.1; }
+.brand-sub { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .04em; margin-top: 3px; }
+.topbar-spacer { flex: 1; }
+.clock { font-family: var(--ff-num); font-size: var(--fz-4); color: var(--fog-700); letter-spacing: .04em; }
+.clock b { color: var(--fog-900); font-weight: 600; }
+
+/* ---------- 主体：唯一滚动容器 ---------- */
+.main {
+  position: relative; z-index: var(--z-content);
+  flex: 1 1 auto; min-height: 0;
+  padding: var(--s-7) var(--gutter) var(--s-6);
+  display: flex; flex-direction: column; gap: var(--s-5);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none;
+}
+.main::-webkit-scrollbar { width: 0; }
+
+/* ---------- ActionBar：全站同高、主按钮恒定右下 ---------- */
+.actionbar {
+  position: relative; z-index: var(--z-actionbar);
+  height: var(--h-actionbar); flex: 0 0 var(--h-actionbar);
+  padding: 0 var(--gutter);
+  display: flex; align-items: center; gap: var(--s-4);
+  border-top: 1px solid var(--brd-1);
+  background: var(--chrome-bar);
+  backdrop-filter: blur(var(--glass-blur));
+}
+.actionbar-hint { flex: 1; min-width: 0; }
+.actionbar-hint .t { font-size: var(--fz-4); color: var(--fog-900); line-height: 1.3; }
+.actionbar-hint .s { font-size: var(--fz-2); color: var(--fog-600); margin-top: 5px; }
+
+/* ---------- 底部导航：三项定版 ---------- */
+.navbar {
+  position: relative; z-index: var(--z-navbar);
+  height: var(--h-navbar); flex: 0 0 var(--h-navbar);
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--surf-2);
+  background: var(--chrome-nav);
+}
+.navbar a {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 7px; text-decoration: none; color: var(--fog-600);
+  font-size: var(--fz-2); letter-spacing: .06em;
+  min-height: var(--touch-min);
+  transition: color var(--dur-2) var(--ease-out);
+  position: relative;
+}
+.navbar a .ic { width: 30px; height: 30px; }
+.navbar a[aria-current="page"] { color: var(--jade-400); }
+.navbar a[aria-current="page"]::before {
+  content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 64px; height: 3px; border-radius: 0 0 3px 3px;
+  background: var(--jade-400); box-shadow: 0 0 18px var(--jade-a32);
+}
+
+/* ---------- 无障碍 / 降级 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .aurora i { opacity: .34; }
+}
+/* 低性能一体机降级：给 <html> 加 class="lowgpu" 即关掉模糊与极光动画。
+   注意：早前按类名枚举（[class*="glass"] + topbar + actionbar）漏掉了 panel / tile /
+   pane / vpanel / card / checks / advisor 等大多数毛玻璃组件——Codex 只读审查指出后改为全局兜掉。
+   逐类枚举在这种场景必然漏，不要退回去。 */
+html.lowgpu .aurora i { animation: none; filter: blur(60px); }
+html.lowgpu *, html.lowgpu *::before, html.lowgpu *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* 浏览器根本不支持 backdrop-filter 时（企业策略冻结在旧版 Edge 等），
+   半透明底会显得发灰、层次糊在一起，改用更实的第三级玻璃底 */
+@supports not (backdrop-filter: blur(2px)) {
+  .panel, .tile, .card, .pane, .checks, .vpanel, .vcommand, .verrand,
+  .devpill, .advisor, .paper-bar, .topbar, .actionbar {
+    background: var(--glass-3-bg);
+  }
+}
