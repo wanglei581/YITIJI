@@ -1,0 +1,110 @@
+name: Deploy Precheck (read-only)
+
+# 发布前置核对：只回答「部署脚本的默认值与服务器实际是否一致」，不做任何写操作。
+#
+# 背景：deploy-api-release.sh 的顺序是
+#   PG 全库备份 → 备份运行目录（回滚锚点）→ migrate → 构建 → PM2 重启 → 健康检查
+# 若 DEPLOY_API_DIR / DEPLOY_PM2_NAME 与实际不符，回滚锚点会指向错误目录，
+# 而 migrate 仍会执行 —— 数据库已改、锚点是假的。这是不可逆的组合，必须先核对。
+#
+# 当前 secret 中未配置 DEPLOY_API_DIR / DEPLOY_PM2_NAME，脚本会回退到默认值
+#   /srv/ai-job-print  与  ai-job-print-api
+# 本工作流即验证这两个默认值是否成立。
+#
+# 安全：仓库为 public，Actions 日志公开可读，
+# 因此**只输出 yes/no 与数量级信息，不打印任何路径、进程名、版本串或环境变量**。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  precheck:
+    name: Verify deploy defaults match server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read-only probe via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 3m
+          envs: EXPECT_DIR,EXPECT_PM2,EXPECT_BACKUP
+          script: |
+            set -uo pipefail
+
+            echo "=== 1. 部署脚本默认的 API 目录是否存在 ==="
+            if [ -d "$EXPECT_DIR" ]; then
+              echo "API_DIR_DEFAULT_OK=yes"
+            else
+              echo "API_DIR_DEFAULT_OK=no  （需配置 secret DEPLOY_API_DIR）"
+            fi
+
+            echo "=== 2. 该目录下是否有 DEPLOY_SOURCE.txt（发布脚本依赖它做版本一致性校验）==="
+            if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then
+              echo "DEPLOY_SOURCE_PRESENT=yes"
+            else
+              echo "DEPLOY_SOURCE_PRESENT=no  （首次受控发布会创建）"
+            fi
+
+            echo "=== 3. 默认 PM2 进程名是否存在 ==="
+            if command -v pm2 >/dev/null 2>&1; then
+              echo "PM2_INSTALLED=yes"
+              if pm2 jlist 2>/dev/null | grep -q "\"name\":\"$EXPECT_PM2\""; then
+                echo "PM2_NAME_DEFAULT_OK=yes"
+              else
+                echo "PM2_NAME_DEFAULT_OK=no  （需配置 secret DEPLOY_PM2_NAME）"
+                echo "PM2_PROCESS_COUNT=$(pm2 jlist 2>/dev/null | grep -o '"name":' | wc -l | tr -d ' ')"
+              fi
+            else
+              echo "PM2_INSTALLED=no  （API 可能不是用 PM2 托管，需确认托管方式）"
+            fi
+
+            echo "=== 4. 备份盘可用空间（仅输出 GiB 数量级）==="
+            BK_PARENT="$(dirname "$EXPECT_BACKUP")"
+            AVAIL_GB="$(df -BG --output=avail "$BK_PARENT" 2>/dev/null | tail -n1 | tr -dc '0-9')"
+            if [ -n "$AVAIL_GB" ]; then
+              echo "BACKUP_DISK_AVAIL_GB=$AVAIL_GB"
+            else
+              echo "BACKUP_DISK_AVAIL_GB=unknown"
+            fi
+
+            echo "=== 5. API 健康检查端点当前是否可达（本机回环）==="
+            if curl -fsS -m 5 http://127.0.0.1:3010/api/v1/health >/dev/null 2>&1; then
+              echo "API_HEALTH_LOCAL=ok"
+            else
+              echo "API_HEALTH_LOCAL=unreachable  （端口或路径可能与默认不同）"
+            fi
+
+            echo "=== 6. 磁盘占用盘点（只输出数量级，用于判断清理目标）==="
+            # 首轮探测发现备份盘仅剩 1 GiB。发布脚本第一步就是 PG 全库备份、
+            # 第二步备份整个运行目录，空间不足会在备份阶段写满盘，
+            # 波及正在运行的 API 与 PostgreSQL。故先盘点占用分布再决定清理。
+            echo "ROOT_TOTAL_GB=$(df -BG --output=size / 2>/dev/null | tail -n1 | tr -dc '0-9')"
+            echo "ROOT_USED_PCT=$(df --output=pcent / 2>/dev/null | tail -n1 | tr -dc '0-9')"
+
+            if [ -d "$EXPECT_BACKUP" ]; then
+              echo "BACKUP_ROOT_SIZE_MB=$(du -sm "$EXPECT_BACKUP" 2>/dev/null | cut -f1)"
+              echo "BACKUP_FILE_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')"
+              echo "BACKUP_DIR_COUNT=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | wc -l | tr -d ' ')"
+              echo "BACKUP_OLDEST_DAYS=$(find "$EXPECT_BACKUP" -maxdepth 1 -mindepth 1 -printf '%T@\n' 2>/dev/null | sort -n | head -1 | awk '{print int((systime()-$1)/86400)}')"
+            else
+              echo "BACKUP_ROOT_EXISTS=no"
+            fi
+
+            echo "API_DIR_SIZE_MB=$(du -sm "$EXPECT_DIR" 2>/dev/null | cut -f1)"
+            echo "API_NODE_MODULES_MB=$(du -sm "$EXPECT_DIR/node_modules" 2>/dev/null | cut -f1)"
+            echo "PNPM_STORE_MB=$(du -sm ~/.local/share/pnpm/store 2>/dev/null | cut -f1)"
+            echo "PM2_LOGS_MB=$(du -sm ~/.pm2/logs 2>/dev/null | cut -f1)"
+            echo "NGINX_LOGS_MB=$(du -sm /var/log/nginx 2>/dev/null | cut -f1)"
+            echo "JOURNAL_MB=$(journalctl --disk-usage 2>/dev/null | grep -o '[0-9.]*[MG]' | head -1)"
+
+            echo "=== 7. 本次发布需要的空间量级 ==="
+            echo "PG_DB_SIZE_MB=$(sudo -n -u postgres psql -tAc \"SELECT pg_database_size(current_database())/1024/1024;\" 2>/dev/null || echo 'unknown（无免密 sudo，可忽略）')"
+
+            echo "=== 完成：以上均为只读探测，未做任何修改 ==="
+        env:
+          EXPECT_DIR: /srv/ai-job-print
+          EXPECT_PM2: ai-job-print-api
+          EXPECT_BACKUP: /srv/ai-job-print-backups

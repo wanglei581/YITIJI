@@ -361,9 +361,9 @@ expect(kioskRoot.includes('<KioskTopbarStatus'), '共享顶栏注入真实设备
 expect(!/function KioskTopBar/.test(home), '首页不再自绘 KioskTopBar')
 expect(!/>\s*打印机在线\s*</.test(home) && !home.includes('网络正常'), '首页不硬编码「打印机在线」/「网络正常」字面量')
 
-// ── 真实登录弹窗 + 动态专区开关（承接旧守卫）──────────────────────
-expect(home.includes('<MemberLoginDialog'), '首页挂载真实登录弹窗 MemberLoginDialog')
-expect(/onContinueAsGuest=\{\(\) => \{\s*continueAsGuest\(\)/.test(home), '登录弹窗游客回调进入真实游客态')
+// ── 统一全屏登录页 + 动态专区开关（承接旧守卫）────────────────────
+expect(!home.includes('<MemberLoginDialog'), '首页不再挂载独立登录弹窗')
+expect(/const openLogin = \(\) => navigate\('\/login', \{ state: \{ from: '\/' \} \}\)/.test(home), '首页登录入口统一跳转 /login 并保留首页返回路径')
 expect(/const toolbox = useToolboxConfig\(\)/.test(home) && /const campus = useSmartCampusConfig\(\)/.test(home), '动态专区消费真实终端/校园配置 hook')
 expect(/if \(!showToolbox && !showCampus\) return null/.test(home), '两专区都未启用时 zone-row 不渲染（诚实占位）')
 expect(/\.kpv1 \.zone-row \.zone-card:only-child\s*\{[^}]*grid-column:\s*1 \/ -1/.test(pv), '单专区启用时 :only-child 自动通栏（对齐原型规则）')
@@ -372,7 +372,7 @@ expect(/\.kpv1 \.zone-row \.zone-card:only-child\s*\{[^}]*grid-column:\s*1 \/ -1
 expect(!/function HomeNavbar/.test(home), '首页不再自绘 HomeNavbar')
 expect(kioskRoot.includes('hideBottomNav={isCampusZone || usesPageActionbar}'), '首页使用共享底栏（校园专区或页面自带 actionbar 时隐藏）')
 const layoutSrc = read('../../packages/ui/src/layouts/KioskLayout.tsx')
-expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI助手'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
+expect(layoutSrc.includes("label: '首页'") && layoutSrc.includes("label: 'AI顾问'") && layoutSrc.includes("label: '我的'"), '共享底栏保留三 Tab 文案')
 expect(layoutSrc.includes('ui-kiosk-nav'), '共享底栏使用 ui-kiosk-nav')
 
 // ── 合规：禁用文案 + 合规提示条 ──────────────────────────────────

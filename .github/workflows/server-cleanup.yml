@@ -1,0 +1,132 @@
+name: Server Cleanup (backups / pnpm store / journal)
+
+# 服务器磁盘清理。默认 dry-run，只列清单不删任何东西。
+#
+# 背景：根分区 40GB 已用 100%，可用仅 1GiB。占用分布（只读探测所得）：
+#   /srv/ai-job-print-backups  8656 MB（20 文件 + 16 目录，最旧 37 天）← 主因
+#   pnpm store                 2704 MB
+#   journal                     983 MB
+#   API 目录                   1083 MB（其中 node_modules 992 MB，不动）
+#
+# 不能在满盘状态下发布：deploy-api-release.sh 第一步 PG 全库备份、
+# 第二步备份整个运行目录（约 1GB），空间不足会在备份阶段写满盘，
+# 波及正在运行的 API 与 PostgreSQL。
+#
+# 安全设计：
+#   · dry_run 默认 true，必须显式传 false 才真删
+#   · 备份按「保留最近 N 份发布」清理，N 默认 3，且**永不删最新的一份**
+#   · 只操作 /srv/ai-job-print-backups，路径写死，不接受外部输入
+#   · 仓库为 public、Actions 日志公开 —— 只输出序号/大小/天数，不打印完整路径与文件名
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '只列清单不删除（强烈建议先跑一次 true）'
+        type: boolean
+        default: true
+      keep:
+        description: '备份保留最近几份发布'
+        type: string
+        default: '3'
+      prune_pnpm:
+        description: '同时执行 pnpm store prune（只删无引用包，安全）'
+        type: boolean
+        default: true
+      vacuum_journal:
+        description: '同时把 journal 压到 200M'
+        type: boolean
+        default: true
+
+jobs:
+  cleanup:
+    name: Reclaim disk space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run cleanup via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 15m
+          envs: DRY_RUN,KEEP,PRUNE_PNPM,VACUUM_JOURNAL
+          script: |
+            set -uo pipefail
+            BK=/srv/ai-job-print-backups
+
+            echo "=== 清理前 ==="
+            echo "ROOT_USED_PCT=$(df --output=pcent / | tail -1 | tr -dc '0-9')"
+            echo "ROOT_AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
+
+            if [ ! -d "$BK" ]; then
+              echo "::error::备份目录不存在，中止（不在未知路径上执行删除）"; exit 1
+            fi
+
+            echo "=== 备份清单（按发布分组，新→旧）==="
+            # 每次发布产生 <prefix>.dump 与 <prefix>.runtime，按 prefix 归组
+            STEMS="$(find "$BK" -maxdepth 1 -mindepth 1 -printf '%T@\t%p\n' \
+                     | sort -rn \
+                     | sed 's#.*/##' \
+                     | sed 's/\.\(dump\|runtime\)$//' \
+                     | awk '!seen[$0]++')"
+            TOTAL="$(echo "$STEMS" | grep -c . || true)"
+            echo "RELEASE_GROUP_COUNT=$TOTAL"
+
+            IDX=0
+            KEEP_LIST=""
+            DEL_LIST=""
+            while IFS= read -r stem; do
+              [ -z "$stem" ] && continue
+              IDX=$((IDX+1))
+              SZ="$(du -sm "$BK"/"$stem"* 2>/dev/null | awk '{s+=$1} END{print s+0}')"
+              AGE="$(find "$BK" -maxdepth 1 -name "$stem*" -printf '%T@\n' 2>/dev/null | sort -rn | head -1 \
+                     | awk '{print int((systime()-$1)/86400)}')"
+              if [ "$IDX" -le "$KEEP" ]; then
+                echo "  [保留] #$IDX  ${SZ}MB  ${AGE}天前"
+                KEEP_LIST="$KEEP_LIST $stem"
+              else
+                echo "  [待删] #$IDX  ${SZ}MB  ${AGE}天前"
+                DEL_LIST="$DEL_LIST $stem"
+              fi
+            done <<< "$STEMS"
+
+            DEL_COUNT="$(echo $DEL_LIST | wc -w | tr -d ' ')"
+            echo "PLAN_KEEP=$KEEP  PLAN_DELETE_GROUPS=$DEL_COUNT"
+
+            if [ "$DRY_RUN" = "true" ]; then
+              echo "=== DRY-RUN：以上仅为计划，未删除任何文件 ==="
+            else
+              if [ "$IDX" -le "$KEEP" ]; then
+                echo "备份份数未超过保留数，无需删除"
+              else
+                echo "=== 执行删除（永不删最新一份）==="
+                for stem in $DEL_LIST; do
+                  # 双重保险：跳过保留名单中的任何 stem
+                  case " $KEEP_LIST " in *" $stem "*) echo "  跳过（在保留名单）"; continue;; esac
+                  rm -rf -- "$BK"/"$stem".dump "$BK"/"$stem".runtime 2>/dev/null
+                  echo "  已删除一组"
+                done
+              fi
+            fi
+
+            if [ "$PRUNE_PNPM" = "true" ] && [ "$DRY_RUN" != "true" ]; then
+              echo "=== pnpm store prune（只删无引用包）==="
+              pnpm store prune 2>&1 | tail -3 || echo "  pnpm 不可用，跳过"
+            fi
+
+            if [ "$VACUUM_JOURNAL" = "true" ] && [ "$DRY_RUN" != "true" ]; then
+              echo "=== journal 压缩到 200M ==="
+              journalctl --vacuum-size=200M 2>&1 | tail -2 || echo "  journalctl 不可用，跳过"
+            fi
+
+            echo "=== 清理后 ==="
+            echo "ROOT_USED_PCT=$(df --output=pcent / | tail -1 | tr -dc '0-9')"
+            echo "ROOT_AVAIL_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
+            echo "BACKUP_ROOT_SIZE_MB=$(du -sm "$BK" 2>/dev/null | cut -f1)"
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          KEEP: ${{ inputs.keep }}
+          PRUNE_PNPM: ${{ inputs.prune_pnpm }}
+          VACUUM_JOURNAL: ${{ inputs.vacuum_journal }}

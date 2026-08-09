@@ -3,17 +3,15 @@
 // 顶栏(76) + 底栏(116) 由共享 KioskLayout 提供；本页只渲染欢迎区 / 磁贴组 /
 // 动态专区 / 合规提示。最高真值仍是原型 shared.css + 01-home 内容节点。
 //
-// 保留的真实能力：真实路由(serviceGroups)、真实登录弹窗、百宝箱/智慧校园
+// 保留的真实能力：真实路由(serviceGroups)、统一全屏登录页、百宝箱/智慧校园
 // 后台动态开关。登录态为「原型外动态状态」：复用 88px 登录框，文字改「进入我的」。
 import type { SmartCampusModuleKey } from '@ai-job-print/shared'
 import { KioskPageFrame } from '@ai-job-print/ui'
-import { useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { useSmartCampusConfig } from '../../hooks/useSmartCampusConfig'
 import type { TerminalDeviceStatusView } from '../../hooks/useTerminalDeviceStatus'
 import { useToolboxConfig } from '../../hooks/useToolboxConfig'
-import { MemberLoginDialog } from '../auth/components/MemberLoginDialog'
 import { ContinuePanel } from './components/ContinuePanel'
 import { ProtoIcon } from './prototypeIcons'
 import { type Accent, type ServiceGroup, type ServiceTile } from './serviceGroups'
@@ -78,7 +76,7 @@ const ACCENT_CLASS: Record<Accent, string> = {
 }
 
 /* ── 欢迎区 + 登录/进入我的（原型 .welcome）──
- * 未登录：88px .login-btn「登录 / 注册」→ 打开真实登录弹窗（弹窗内含游客体验）。
+ * 未登录：88px .login-btn「登录 / 注册」→ 进入统一全屏登录页。
  * 已登录：原型外动态状态——复用同一 88px 框，文字改「进入我的」→ /profile；
  *         不显示原型没有的简历/文档/订单统计。 */
 function HomeWelcome({ onOpenLogin }: { onOpenLogin: () => void }) {
@@ -548,17 +546,11 @@ function SvcGrid() {
 }
 
 export function HomePage() {
-  const { continueAsGuest } = useAuth()
-  const [loginOpen, setLoginOpen] = useState(false)
-  const openLogin = () => setLoginOpen(true)
+  const navigate = useNavigate()
+  const openLogin = () => navigate('/login', { state: { from: '/' } })
 
   return (
     <KioskPageFrame className="kpv1 kpv1--content-only">
-      <MemberLoginDialog
-        open={loginOpen}
-        onClose={() => setLoginOpen(false)}
-        onContinueAsGuest={() => { continueAsGuest(); setLoginOpen(false) }}
-      />
       <HomeWelcome onOpenLogin={openLogin} />
       <ContinuePanel />
       <HomeReception />
