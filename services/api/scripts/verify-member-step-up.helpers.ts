@@ -326,6 +326,17 @@ export function isAllowedTestDatabase(databaseUrl: string): boolean {
 }
 
 export function assertNoSensitive(text: string, label: string): void {
-  const leaked = [...sensitiveValues].find((value) => text.includes(value))
+  const leaked = [...sensitiveValues].find((value) => {
+    // Six-digit SMS codes and eleven-digit phone numbers are short enough to
+    // occur by chance inside hashes, ciphertext, UUID-adjacent identifiers or
+    // timestamps. Treat them as leaked only when they appear as standalone
+    // values, while keeping exact substring checks for high-entropy tokens and
+    // device identifiers. This still catches JSON fields and normal log lines.
+    if (/^(?:\d{6}|1[3-9]\d{9})$/.test(value)) {
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      return new RegExp(`(^|[^A-Za-z0-9])${escaped}([^A-Za-z0-9]|$)`).test(text)
+    }
+    return text.includes(value)
+  })
   assert(!leaked, `${label} contains a raw phone, code, grant token, or device identifier`)
 }

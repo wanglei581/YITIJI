@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-09 修复 **生产发布门禁 `verify:member-step-up` 随机假阳性（PR #574，尚未部署）**：同一不可变主分支提交首次 CI 全绿，后续重跑却分别在 AuditLog JSON 与 Redis 键值扫描处失败；复核确认模块级敏感值集合会记录随机 6 位验证码，原断言再以普通子串扫描 SHA/HMAC 等高熵摘要，导致验证码偶然出现在摘要内部时误报。现将 6 位验证码和 11 位手机号改为仅按非字母数字边界识别明文，JSON/Redis 中的原始值仍会被拒绝；grant token、device identifier 等高熵秘密继续使用严格子串匹配。部署开关保持关闭，失败和取消的工作流均未触发生产部署；待本修复合入且新主分支 CI 全绿后再发布。
+
 2026-08-09 完成 **后台招聘数据 P0 冻结验收补强（独立 worktree，未部署）**：真实 Nest HTTP 复核发现 Admin 线下机构 controller 仍返回裸对象，而 Admin adapter 统一解包 `{ success, data }`，导致此前虽 typecheck/静态门禁全绿，真实 HTTP 列表、详情、新增仍会读到 `undefined`。现已将该 Admin controller 的机构与岗位 CRUD、审核、发布全部收口为标准 `ApiResponse`，并新增 `verify:backend-p0-http`，通过真实 JWT/role guard、全局 ValidationPipe、HttpExceptionFilter、Nest 路由与隔离 Prisma 库验证响应包络、PUT / `reason` / `publishStatus`、未知字段拒绝、岗位变更回待审、5 类机构 capability、跨机构 404、Webhook 默认停用/Admin 启用、停源不下架及确认后批量下架审计。同时把 `verify:job-sync` 改为无 Redis/无外网的确定性生产 service integration，修正旧 verifier 把历史 SyncLog 误认为新日志的竞态，动态确认“内容不变保留 approved/published，变更项单独回 pending/draft 并清空审核元数据，同批未变项不退审，失败写 SyncLog”。两条动态门禁已接入 SQLite 与 PostgreSQL CI。
 
 冻结复验使用 Node `v22.23.1` + pnpm `11.2.2`：API/Admin/Partner/Kiosk typecheck、lint 与 production build 通过；`verify:backend-p0-contracts` 13/13、`verify:import-review-reset` 58/58、线下机构 SQLite 服务契约、5 类机构权限契约、真实 HTTP 8 组闭环和动态 API sync 均通过。本机隔离 PGlite 已成功应用 PostgreSQL 全部 50 条 migration，但其 TCP 兼容层在 Prisma 并发 `findMany + count` 时主动断连，因此不记为真实 PostgreSQL 动态通过；仍须以 PR `postgres:16` job 为权威证据。候选分支现已快进吸收 `origin/main@78c8e71d` 的 Kiosk V3 设计基线，后端改动与设计资产零代码冲突，仅人工合并本进度记录。未连接生产 PostgreSQL/Redis，未使用生产密钥，未合并或部署。
