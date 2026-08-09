@@ -116,6 +116,7 @@ int ajps_finalize(const ajps_request *request, BOOL quarantine) {
   ajps_pinned_path root, unclaimed;
   HANDLE candidate = INVALID_HANDLE_VALUE;
   BY_HANDLE_FILE_INFORMATION information;
+  DWORD failure_error = ERROR_SUCCESS;
   int result = 40;
   if (zero_identity(request->root_identity) || zero_identity(request->candidate_identity)
       || !ajps_pin_directory_chain(request->root, FALSE, &root)) return ajps_fail(41);
@@ -127,7 +128,9 @@ int ajps_finalize(const ajps_request *request, BOOL quarantine) {
   }
   if (quarantine) {
     if (!pin_unclaimed(&root, TRUE, &unclaimed)) { result = 45; goto cleanup; }
-    if (!rename_into_unclaimed(candidate, unclaimed.leaf, request->filename)) { result = 46; goto cleanup; }
+    if (!rename_into_unclaimed(candidate, unclaimed.leaf, request->filename)) {
+      failure_error = GetLastError(); result = 46; goto cleanup;
+    }
   } else if (!set_delete_pending(candidate)) { result = 47; goto cleanup; }
   if (!ajps_write_response(request->operation, root.identity, request->candidate_identity,
       quarantine ? unclaimed.identity : (ajps_identity){0}, request->expected_size, request->expected_mtime_ms, NULL, 0)) result = 48;
@@ -136,7 +139,10 @@ cleanup:
   if (candidate != INVALID_HANDLE_VALUE) CloseHandle(candidate);
   ajps_close_pinned_path(&unclaimed);
   ajps_close_pinned_path(&root);
-  return result == 0 ? 0 : ajps_fail((unsigned)result);
+  if (result == 0) return 0;
+  return failure_error == ERROR_SUCCESS
+    ? ajps_fail((unsigned)result)
+    : ajps_fail_win32((unsigned)result, failure_error);
 }
 
 int ajps_sweep_inspect(const ajps_request *request) {

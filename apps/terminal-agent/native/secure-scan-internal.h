@@ -22,6 +22,7 @@ typedef struct ajps_pinned_path {
 } ajps_pinned_path;
 
 int ajps_fail(unsigned code);
+int ajps_fail_win32(unsigned code, DWORD win32_error);
 BOOL ajps_safe_filename(const wchar_t *filename);
 wchar_t *ajps_join_child(const wchar_t *root, const wchar_t *filename);
 BOOL ajps_pin_directory_chain(const wchar_t *input, BOOL create_leaf, ajps_pinned_path *pinned);

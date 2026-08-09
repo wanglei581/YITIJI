@@ -14,6 +14,14 @@ int ajps_fail(unsigned code) {
   return (int)(code == 0 ? 255 : code);
 }
 
+int ajps_fail_win32(unsigned code, DWORD win32_error) {
+  char message[48];
+  int length = snprintf(message, sizeof(message), "SCAN_READER_E%03u_W%08lu\n", code, (unsigned long)win32_error);
+  DWORD written = 0;
+  if (length > 0) WriteFile(GetStdHandle(STD_ERROR_HANDLE), message, (DWORD)length, &written, NULL);
+  return (int)(code == 0 ? 255 : code);
+}
+
 static BOOL read_exact(HANDLE input, void *buffer, DWORD length) {
   BYTE *cursor = (BYTE *)buffer;
   DWORD remaining = length;
