@@ -2,10 +2,10 @@
 
 > 审查根目录：`/Users/wanglei/AI求职打印服务终端-commercial-readiness-wave1`
 > 初始审查基线：`codex/commercial-readiness-wave1-20260809@83588b8f`
-> Wave 7 功能提交：`48ac2cd6`；文档生成前代码 HEAD：`93bdc7ab433d4b878cb164f31fb7dce51d0dc000`，已包含 `origin/main@65cd9cdf`，相对 main behind 0 / ahead 25、相对 upstream behind 0 / ahead 5，未部署
+> Wave 7 功能提交：`48ac2cd6`；语义合并提交：`0e885b0318ad218537ef297f93cae9f4ebb33b1a`；文档生成前代码 HEAD：`051c363515849cf03c161144fbbb812963be77ff`，已包含 `origin/main@eb3fd726`，相对 main behind 0 / ahead 28、相对 upstream behind 0 / ahead 9，未推送、未部署
 > Wave 6A/6B 已全绿代码候选：`9211b6d13f589da8acc3adbe7617cedca51e23f9`；Linux/PG/browser manual dispatch run `31322152768` 与 Windows run `31322154074` 全部 SUCCESS，未部署
 > Wave 5 修复提交：`392c5de5`；已全绿代码候选：`codex/commercial-readiness-wave1-20260809@6d2ed3479f51cceffab9676917e0cd1d4e9531ce`，已包含 `origin/main@66e0d951`，相对 main behind 0 / ahead 14，与 upstream 一致；最终报告提交会位于该代码 SHA 之后并须再次跑 CI
-> PR #570 当前仍绑定旧 head `67aee177`，OPEN/Draft、mergeability UNKNOWN；旧 head 四项 checks 全绿，但不能证明 Wave 7。最终 docs commit 位于 `93bdc7ab` 之后，须对最终同一 HEAD 重跑 Linux/PG/browser/Windows CI
+> PR #570 当前仍绑定旧 head `d0d29a54`，OPEN/Draft/CONFLICTING；新 merge 尚未推送，旧 head checks 不能证明当前候选。最终 docs commit 位于 `051c3635` 之后，须推送最终同一 SHA 并重跑 Linux/PG/browser/Windows CI
 > 审查方式：源码、路由、Prisma、workspace、CI、Git/worktree、独立小程序仓库只读核验；未连接或修改生产数据库、服务器、Windows 主机、对象存储或硬件
 > 删除结果：**本轮没有删除代码、模型、迁移、目录或本地资产**
 
@@ -25,7 +25,7 @@
 
 本轮最重要的判断不是“项目没做完”，而是项目已经形成了相当多真实闭环，但仍混有四类不同状态，必须分开治理：
 
-1. **已经修复但未进入生产**：Wave 1–6 的仓库完整性、状态真实性、持久化、扫描删除对账与 Windows secure reader；Wave 7 又新增 Agent dead-letter PII-safe 运维 CLI、修复 API 终态/CAS 合同，并补 11 条 direct deterministic CI。以上仍未部署，Wave 7 最终 HEAD 远程 CI 尚未运行。
+1. **已经修复但未进入生产**：Wave 1–6 的仓库完整性、状态真实性、持久化、扫描删除对账与 Windows secure reader；Wave 7 又新增 Agent dead-letter PII-safe 运维 CLI、修复 API 终态/CAS 合同，并补 11 条 direct deterministic CI。`0e885b03` 语义合并同时保留这些防线、文件 metadata-first 删除与主线合同报告生命周期；`051c3635` 又校准 sensitive-delete fixture 并关闭 metadata-first 生命周期断层，未放宽删除控制。以上仍未部署，最终 HEAD 远程 CI 尚未运行。
 2. **明确没有开始或只到诚实空态**：小程序 M0.4/M1、Partner 迎新内容/统计、Admin 补贴标签与退款异常处置。Claude 整套新页面仍未完成，继续作为受保护设计资产。
 3. **接口已暴露但实现是假成功/空数组**：`/api/v1/kiosk/session|help|notifications|activities|screensaver-content` 共 8 个 handler。
 4. **看似废弃但尚不能删**：旧 Kiosk API 模块、五组无运行时访问 Prisma 模型、空壳 worker、旧分支/worktree、独立小程序仓库。
@@ -41,7 +41,7 @@
 | P0（扫描恢复前） | `_unclaimed` 删除审计本地→API 已获 CI，生产现场仍缺 | Agent durable ack/retry/dead-letter；API 鉴权、幂等状态机、双库 additive migration、PII-safe 字段     | CI 不能替代生产留存告警、集中对账和 Windows 现场               |
 | P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`       | 五个 controller 直接返回常量，service 全为空                                                          | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象             |
 | P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理   | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header      | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换 |
-| P0               | Wave 7 最终 HEAD 尚无远程 CI                        | 功能提交 `48ac2cd6`；`93bdc7ab` 已吸收最新 main；PR 仍绑定旧 head `67aee177`                          | docs commit 后须对最终同一 HEAD 重跑 Linux/PG/browser/Windows  |
+| P0               | 最终 HEAD 尚无远程 CI                               | `051c3635` 已含 merge `0e885b03` 与 `main@eb3fd726`；PR 仍绑定旧 head `d0d29a54`、Draft/CONFLICTING   | docs commit 后推送最终同一 SHA 并重跑 Linux/PG/browser/Windows |
 | P1（已修）       | Router history 曾保留 payment session token         | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复 | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验       |
 | P1               | 独立小程序存在 local-only 提交                      | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                     | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选          |
 
@@ -150,8 +150,9 @@
 - dead-letter 专项已在 Node 26 以真实临时 SQLite + loopback HTTP 通过；Node 22 typecheck、build、unauthorized 回归通过。fresh Node 22 的完整动态执行仍以最终 HEAD CI 为权威。
 - API RED 证明旧 `patchTaskStatus` 对已处于任一终态的任务统一 ack，且 CAS `updateMany.count=0` 仍返回 ack。现改为：同终态幂等；不同终态返回 409；终态回退返回 400；CAS 丢失后重读，同状态 ack、不同终态冲突、其它变化返回 `PRINT_TASK_STATUS_CHANGED` 409，所有冲突路径不写 status log/order。纯内存专项已绿，真实 SQLite/PostgreSQL 等待 CI。
 - 主 CI 新增 11 条 direct deterministic gates：CI coverage 元守卫、Miniapp static、Kiosk service-entry、6 条 Admin/Partner 静态门禁、Agent task-runner wake、API terminal-status-idempotency。Admin account settings 只把脆弱字符串 fixture 改为 AST 校准，没有产品页面改动。deploy authorization 在 Wave 7 前已经由 `ci.yml` 直接执行，不是遗漏。
-- 功能提交 `48ac2cd6` 已由 `93bdc7ab` 吸收；后者包含 `origin/main@65cd9cdf`，相对 main behind 0 / ahead 25、相对 upstream behind 0 / ahead 5。PR #570 仍绑定旧 head，故 Wave 7 不能借用旧绿灯；最终 docs HEAD 必须重跑四项 CI。
+- 功能提交 `48ac2cd6` 已由 merge commit `0e885b03` 与 `origin/main@eb3fd726` 语义合并；合并同时保留 Wave 7 终态/CAS、文件 metadata-first 删除、11 条 direct gates 与主线合同报告生成、打印、终态清理生命周期。`051c3635` 随后修复合同敏感删除 test fixture 与 metadata-first 生命周期断层，四项 sensitive-delete 专项、API lint/typecheck 全绿；fixture 仅校准新的安全顺序，没有放宽删除控制。文档生成前 HEAD 相对 main behind 0 / ahead 28、相对 upstream behind 0 / ahead 9。PR #570 仍绑定旧 head `d0d29a54`、Draft/CONFLICTING，故不能借用旧 checks；最终 docs HEAD 推送后必须重跑四项 CI。
 - 本 Wave 零删除。旧 Kiosk 8 个 handler 与五组旧 Prisma model 继续等待 30 天访问日志/client census 和生产数据 census；Claude 未完成页面继续保护，不迁移、不覆盖。
+- 合同审查三个 feature flag 继续默认 false；当前 Kiosk DOM 只是主干候选的安全基线，不代表 Claude 新页面已设计冻结。Claude 整套页面完成并冻结前，不迁移、不覆盖、不删除其候选设计资产。
 
 ## 5. 已确认的接口断层与缺陷
 
@@ -233,14 +234,14 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 ### 7.1 GitHub 开放 PR
 
-| PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                              |
-| ------------------------------------------------ | ---------------------------------: | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 25 | **可迁入，当前首要候选** | 本地 `93bdc7ab` 已含 Wave 7/最新 main；PR 仍为旧 head `67aee177`，最终 docs HEAD CI 后再评估合并                  |
-| #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
-| #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
-| #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
-| #548 `codex/print-first-order-evidence-20260807` |                             20 / 1 | **可选择性迁入**         | 只提取仍真实的硬件证据/文档提交，先对照当前 Agent/生产事实；不复活落后分支继续开发                                |
-| #117 `feature/job-master`                        |                          1188 / 23 | **无法判断，默认冻结**   | 分叉过深；先做 23 个独有提交的需求覆盖矩阵。已被 main 覆盖的放弃，仍有独特价值的重做/选择性提取，禁止整分支 merge |
+| PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                                                                   |
+| ------------------------------------------------ | ---------------------------------: | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 28 | **可迁入，当前首要候选** | 本地 `051c3635` 已含 Wave 7、`main@eb3fd726` 与敏感删除一致性修复；PR 仍为旧 head `d0d29a54`、Draft/CONFLICTING，最终 docs HEAD 推送并全绿后再评估合并 |
+| #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                                                              |
+| #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                                                                    |
+| #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                                                             |
+| #548 `codex/print-first-order-evidence-20260807` |                             20 / 1 | **可选择性迁入**         | 只提取仍真实的硬件证据/文档提交，先对照当前 Agent/生产事实；不复活落后分支继续开发                                                                     |
+| #117 `feature/job-master`                        |                          1188 / 23 | **无法判断，默认冻结**   | 分叉过深；先做 23 个独有提交的需求覆盖矩阵。已被 main 覆盖的放弃，仍有独特价值的重做/选择性提取，禁止整分支 merge                                      |
 
 PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktree 仍有 56 个未提交文件，这部分本地资产没有随 PR 合并而自动获得保护性迁移结论，仍禁止清理。
 
@@ -250,7 +251,7 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 
 - branch：`feature/test-mode-pricing-2026-08-04`
 - HEAD：`ee0ca9b`，upstream/真实远程 head：`4d17e5b`
-- ahead/behind：`+1/-0`，工作区 clean
+- ahead/behind：`+1/-0`；2026-08-10 复测另有 8 个 tracked 修改（`job-fit`、`jobs`、`kiosk-login`、`orders`、`project.config.json`），仍未推送
 - local-only commit：`feat(miniapp): integrate kiosk login and runtime print pricing`
 - 变更规模：47 files，+2022/-423；含 `pages/kiosk-login/**`、`scripts/build-preview.mjs`、打印动态价格与多页接线
 - 文件面：独立仓库 300 个 tracked 文件、58 个页面 JS；monorepo `apps/miniapp` 77 个 tracked 文件、14 个页面 JS；相对路径比较为独立仓库特有 230、monorepo 特有 7、共有 70（其中 44 内容相同、26 内容不同）
@@ -259,7 +260,7 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 
 ### 7.3 本地 worktree 受保护资产
 
-最新快照共有 28 个 worktree，其中 6 个存在未提交资产；本审查 worktree 的 3 项均为本轮正式文档更新，不是未迁移产品代码：
+2026-08-10 文档修改前实测共有 29 个 monorepo worktree，全部 clean；这只表示当时没有未提交差异，不代表对应分支、独有提交或设计资产可删除。下表中的路径是历史审计确认过的受保护资产归属，状态数量不再作为当前 dirty 计数：
 
 | 路径/分支                                                                  | 状态数量 | 判定                                                   |
 | -------------------------------------------------------------------------- | -------: | ------------------------------------------------------ |
@@ -270,25 +271,26 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 | 本审查 worktree `codex/commercial-readiness-wave1-20260809`                |        3 | 仅三份正式 docs；完成本轮后交由父任务提交/合并         |
 | `.claude/worktrees/restore-history-conversations-99016d`                   |        1 | 工具配置改动，归属不明，需 owner 判断                  |
 
-这些 worktree 不能按“分支 tip 已被 main 覆盖”直接删：未提交内容本身就是候选资产。其余 22 个 clean worktree 也不能批量删除；仍须逐个验证 unique commits、开放 PR、祖先关系、路径所有者和最近使用时间。
+这些 worktree 不能按“当前 clean”或“分支 tip 已被 main 覆盖”直接删；29 个 worktree 仍须逐个验证 unique commits、开放 PR、祖先关系、路径所有者和最近使用时间。
 
 ## 8. Local ↔ Git/远程一致性精确快照
 
 ### 8.1 当前审查分支
 
-| 项                    | 值                                                                     |
-| --------------------- | ---------------------------------------------------------------------- |
-| branch                | `codex/commercial-readiness-wave1-20260809`                            |
-| Wave 7 feature commit | `48ac2cd6`                                                             |
-| pre-doc code HEAD     | `93bdc7ab433d4b878cb164f31fb7dce51d0dc000`                             |
-| upstream              | `origin/codex/commercial-readiness-wave1-20260809@67aee177`            |
-| upstream ahead/behind | local pre-doc HEAD ahead 5 / behind 0                                  |
-| `origin/main`         | `65cd9cdfb9579f58be3741e471c93d2056bd228f`                             |
-| `origin/main...HEAD`  | behind 0 / ahead 25；已包含 `origin/main@65cd9cdf`                     |
-| PR                    | #570 OPEN/Draft，head `67aee177`，mergeability UNKNOWN；旧 head 四项绿 |
-| Wave 7 CI             | 未运行；最终 docs HEAD 须重跑 Linux/PG/browser/Windows                 |
+| 项                    | 值                                                                          |
+| --------------------- | --------------------------------------------------------------------------- |
+| branch                | `codex/commercial-readiness-wave1-20260809`                                 |
+| Wave 7 feature commit | `48ac2cd6`                                                                  |
+| merge commit          | `0e885b0318ad218537ef297f93cae9f4ebb33b1a`                                  |
+| pre-doc code HEAD     | `051c363515849cf03c161144fbbb812963be77ff`                                  |
+| upstream              | `origin/codex/commercial-readiness-wave1-20260809@d0d29a54`                 |
+| upstream ahead/behind | local pre-doc HEAD ahead 9 / behind 0                                       |
+| `origin/main`         | `eb3fd72678306c435972e050f6ccfdcd025047ed`                                  |
+| `origin/main...HEAD`  | behind 0 / ahead 28；已包含 `origin/main@eb3fd726`                          |
+| PR                    | #570 OPEN/Draft，head `d0d29a54`，mergeability CONFLICTING；新 merge 未推送 |
+| 当前候选 CI           | 未运行；最终 docs HEAD 推送后须重跑 Linux/PG/browser/Windows                |
 
-Wave 7 功能提交 `48ac2cd6` 已由文档生成前代码 HEAD `93bdc7ab` 吸收，且后者已合并 `origin/main@65cd9cdf` 并保留双方正式进度。远端分支/PR 仍停在 `67aee177`，因此旧四绿不能证明 Wave 7；最终报告提交位于 `93bdc7ab` 之后并须重跑 CI。分支在审查并合入 main 前不得视为主干或生产事实，CI 全绿也不能替代生产与真机验收。
+Wave 7 功能提交 `48ac2cd6` 已由 `0e885b03` 与 `origin/main@eb3fd726` 语义合并，保留终态/CAS、metadata-first 删除、11 条 gates 与合同报告生命周期；`051c3635` 又关闭 sensitive-delete fixture/生命周期断层而未放宽删除控制。远端分支/PR 仍停在 `d0d29a54`，因此旧 checks 不能证明当前候选；最终报告提交位于 `051c3635` 之后，须推送同一 SHA 并重跑 CI。分支在审查并合入 main 前不得视为主干或生产事实，CI 全绿也不能替代生产与真机验收。
 
 ### 8.2 分支与 refs
 
@@ -296,12 +298,13 @@ Wave 7 功能提交 `48ac2cd6` 已由文档生成前代码 HEAD `93bdc7ab` 吸�
 | ----------------------------------- | ---: | ----------------------------------------------------------------------------- |
 | local branches                      |  591 | 不能按 merged/no-merged 数量直接删除                                          |
 | true remote heads (`git ls-remote`) |  321 | 真实 GitHub heads，不等同本地 tracking refs                                   |
+| local `refs/remotes/*`              |  335 | 334 个 `origin/*`（含 `origin/HEAD`）+ 1 个 `github/*` ref                    |
 | local `refs/remotes/origin/*`       |  334 | 含 321 个真实 heads、12 个 stale tracking-only refs 和 `origin/HEAD` 符号引用 |
 | stale tracking-only                 |   12 | 只表示远程已无同名 head；未授权前不 prune                                     |
-| worktrees                           |   30 | 不能直接 prune/remove                                                         |
+| worktrees                           |   29 | pre-doc 时全部 clean；仍不能直接 prune/remove                                 |
 | open PRs                            |    6 | 见第 7.1 节                                                                   |
 
-“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。591 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、未提交资产、堆叠基础分支和 local-only commits。脏 worktree 中仍有大量未提交资产，正好证明 stale ref 或分支 tip 祖先关系不能作为删除授权。
+“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。591 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、堆叠基础分支、local-only commits 和受保护设计资产。29 个 worktree 在 pre-doc 快照中均 clean，但 clean、stale ref 或分支 tip 祖先关系都不能作为删除授权。
 
 ### 8.3 可重建差异与真实功能差异
 
@@ -343,13 +346,13 @@ Admin account settings 的旧 verifier 依赖易漂移的源码字符串，本�
 
 ### 9.5 最终商用验收矩阵
 
-| 证据层级            | 已有事实                                                                                 | 放行前仍需                                                                          |
-| ------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 代码可证明          | Wave 1–6 专项；Wave 7 dead-letter CLI、API 终态/CAS 合同与 11 条 direct gates 的本地验证 | dead-letter fresh Node 22、终态合同真 SQLite/PG 由 CI 裁决                          |
-| 远程 CI             | PR 旧 head `67aee177` 四项绿；Wave 7 本地代码 HEAD `93bdc7ab` 尚未推送                   | docs commit 位于其后，最终同一 HEAD 重跑 Linux/PG/browser/Windows                   |
-| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                              | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA   |
-| Windows/Pantum 真机 | secure reader 已为 Windows CI verified；打印/扫描具备自动化回归                          | 两台真实 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、奔图真实出纸/扫描           |
-| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                     | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限 |
+| 证据层级            | 已有事实                                                                                                               | 放行前仍需                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 代码可证明          | Wave 1–6 专项；Wave 7 dead-letter、终态/CAS、metadata-first 删除、11 gates；合同报告生命周期与 sensitive-delete 四项绿 | fresh Node 22、终态合同真 SQLite/PG 仍由最终 CI 裁决                                |
+| 远程 CI             | PR 旧 head `d0d29a54`、Draft/CONFLICTING；本地 `051c3635` 尚未推送                                                     | docs commit 位于其后，推送最终同一 SHA 并重跑 Linux/PG/browser/Windows              |
+| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                                                            | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA   |
+| Windows/Pantum 真机 | secure reader 已为 Windows CI verified；打印/扫描具备自动化回归                                                        | 两台真实 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、奔图真实出纸/扫描           |
+| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                                                   | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限 |
 
 ## 10. 目录、数据、fixture 与文档渐进优化
 
@@ -387,7 +390,7 @@ Admin account settings 的旧 verifier 依赖易漂移的源码字符串，本�
 
 ### P0：发布前必须完成
 
-1. **冻结唯一发布候选**：Wave 7 功能提交 `48ac2cd6` 已由 `93bdc7ab` 吸收，但远端 PR 仍绑定旧 head；本轮 docs commit 位于其后。最终同一 HEAD 的 Linux checks 与 `windows-agent-installer` 必须全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
+1. **冻结唯一发布候选**：Wave 7 功能提交 `48ac2cd6` 已由 `0e885b03` 与 `main@eb3fd726` 语义合并，`051c3635` 又完成敏感删除一致性修复；远端 PR 仍绑定旧 head `d0d29a54`。本轮 docs commit 位于其后。最终同一 HEAD 的 Linux checks 与 `windows-agent-installer` 必须全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
 2. **生产只读对齐**：核对服务器源码、runtime、PM2、四端 bundle、migration、授权变量、备份/磁盘；确认后再申请具名发布窗口。
 3. **Windows/奔图验收**：两台主机覆盖安装升级、service 强杀、断网/断电、spooler/打印机重启、重复领取、终态补报、真实出纸；确认彩色 mode/pages-per-sheet，未知项必须拒绝或隐藏。
 4. **扫描恢复门禁**：secure reader 与删除审计本地→API 已获 Linux/Windows CI 验证；仍须覆盖真实 symlink/junction/reparse/写入替换/长驻 watcher，并在 Windows/SMB/ACL/杀毒占用/重启下验证删除上报、ack、dead-letter、留存告警与集中对账后再开放扫描。
@@ -436,13 +439,14 @@ Admin account settings 的旧 verifier 依赖易漂移的源码字符串，本�
 | 命令/检查                                              | 结果                                                                               |
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
 | `git status --porcelain=v2 --branch`（文档开始前）     | clean                                                                              |
-| `git rev-list --left-right --count @{upstream}...HEAD` | pre-doc candidate：upstream behind 0 / local ahead 5                               |
-| `git rev-list --left-right --count origin/main...HEAD` | pre-doc candidate：local behind 0 / ahead 25；含 `origin/main@65cd9cdf`            |
-| `git worktree list --porcelain`                        | 30 个 worktree                                                                     |
+| `git rev-list --left-right --count @{upstream}...HEAD` | pre-doc candidate：upstream behind 0 / local ahead 9                               |
+| `git rev-list --left-right --count origin/main...HEAD` | pre-doc candidate：local behind 0 / ahead 28；含 `origin/main@eb3fd726`            |
+| `git worktree list --porcelain`                        | 29 个 worktree；文档修改前全部 clean                                               |
 | `git for-each-ref refs/heads`                          | 591 个 local branches；未做批量删除                                                |
 | `git ls-remote --heads origin`                         | 321 个真实 remote heads                                                            |
+| `git for-each-ref refs/remotes`                        | 335 个本地 remote refs；其中 334 个 `origin/*`、1 个 `github/*`                    |
 | remote tracking 与 ls-remote 差集                      | 334 tracking refs（含 `origin/HEAD`）；12 个 origin stale tracking-only；未 prune  |
-| 独立 miniapp `git status`/`rev-list`                   | 5 项 dirty，local-only ahead 1，未推送                                             |
+| 独立 miniapp `git status`/`rev-list`                   | 8 项 tracked dirty，local-only ahead 1，未推送                                     |
 | worker route/import/docs/workspace 搜索                | tracked 占位且有正式文档引用；不删除                                               |
 | 旧 Kiosk module/controller/import 搜索                 | 5 module 注册、8 handler 可达；不删除                                              |
 | Prisma delegate 搜索                                   | 五组旧 model 0 个运行时访问命中；未做生产 census，不删除                           |
@@ -451,5 +455,5 @@ Admin account settings 的旧 verifier 依赖易漂移的源码字符串，本�
 | Wave 4/5 Agent/API/Kiosk 目标 verifier                 | 本地目标回归通过；Node 22 fresh DB schema engine 边界保留                          |
 | Security diff discovery / sealer                       | 52/52、6 candidates、唯一 Low 已修；缺 snapshotDigest，未 sealed                   |
 | Wave 7 本地专项                                        | dead-letter 真 SQLite/HTTP、Node 22 typecheck/build/unauthorized、终态纯内存专项绿 |
-| repository integrity / 显式 YAML / Prettier            | 3,113 tracked marker-free；5 workflow valid；`ci.yml` 通过                         |
+| repository integrity / 显式 YAML                       | 3,127 tracked marker-free；5 workflow valid                                        |
 | `git diff --check` / 文档格式                          | 主干冲突解决后已通过；最终三文档小修再次复跑                                       |
