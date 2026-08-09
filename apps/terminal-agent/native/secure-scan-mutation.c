@@ -47,6 +47,50 @@ static BOOL set_delete_pending(HANDLE handle) {
   return SetFileInformationByHandle(handle, FileDispositionInfo, &disposition, sizeof(disposition));
 }
 
+#define AJPS_FILE_RENAME_INFORMATION_CLASS 10u
+
+typedef struct ajps_io_status_block {
+  union {
+    LONG status;
+    PVOID pointer;
+  } value;
+  ULONG_PTR information;
+} ajps_io_status_block;
+
+typedef LONG (NTAPI *ajps_nt_set_information_file)(
+  HANDLE file,
+  ajps_io_status_block *io_status,
+  PVOID information,
+  ULONG information_length,
+  ULONG information_class
+);
+
+typedef ULONG (NTAPI *ajps_rtl_nt_status_to_dos_error)(LONG status);
+
+static BOOL set_relative_rename(HANDLE candidate, FILE_RENAME_INFO *rename_info, DWORD allocation) {
+  HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+  FARPROC nt_set_procedure;
+  FARPROC status_to_error_procedure;
+  ajps_nt_set_information_file nt_set_information;
+  ajps_rtl_nt_status_to_dos_error status_to_error;
+  ajps_io_status_block io_status;
+  LONG status;
+  if (ntdll == NULL) { SetLastError(ERROR_PROC_NOT_FOUND); return FALSE; }
+  nt_set_procedure = GetProcAddress(ntdll, "NtSetInformationFile");
+  status_to_error_procedure = GetProcAddress(ntdll, "RtlNtStatusToDosError");
+  if (nt_set_procedure == NULL || status_to_error_procedure == NULL
+      || sizeof(nt_set_information) != sizeof(nt_set_procedure)
+      || sizeof(status_to_error) != sizeof(status_to_error_procedure)) {
+    SetLastError(ERROR_PROC_NOT_FOUND); return FALSE;
+  }
+  memcpy(&nt_set_information, &nt_set_procedure, sizeof(nt_set_information));
+  memcpy(&status_to_error, &status_to_error_procedure, sizeof(status_to_error));
+  memset(&io_status, 0, sizeof(io_status));
+  status = nt_set_information(candidate, &io_status, rename_info, allocation, AJPS_FILE_RENAME_INFORMATION_CLASS);
+  if (status < 0) { SetLastError((DWORD)status_to_error(status)); return FALSE; }
+  return TRUE;
+}
+
 static BOOL rename_into_unclaimed(HANDLE candidate, HANDLE unclaimed, const wchar_t *basename) {
   size_t bytes = wcslen(basename) * sizeof(wchar_t);
   size_t allocation = sizeof(FILE_RENAME_INFO) + bytes;
@@ -58,7 +102,7 @@ static BOOL rename_into_unclaimed(HANDLE candidate, HANDLE unclaimed, const wcha
   rename_info->RootDirectory = unclaimed_handle;
   rename_info->FileNameLength = (DWORD)bytes;
   memcpy(rename_info->FileName, basename, bytes);
-  result = SetFileInformationByHandle(candidate, FileRenameInfo, rename_info, (DWORD)allocation);
+  result = set_relative_rename(candidate, rename_info, (DWORD)allocation);
   free(rename_info);
   return result;
 }
