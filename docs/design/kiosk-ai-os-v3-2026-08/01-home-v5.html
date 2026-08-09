@@ -183,6 +183,12 @@
           <span class="card-name">AI 简历服务</span>
           <span class="card-desc">诊断 · 按岗位优化 · 访谈式生成 · 导出打印</span>
           <span class="card-foot">
+            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(linkage.js 绑 data-href)。
+                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
             <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -195,13 +201,20 @@
           <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
           <span class="card-name">岗位信息</span>
           <span class="card-desc">第三方来源岗位 · 三档匹配参考</span>
-          <span class="card-foot"><span class="card-pill" data-dots="12">12 家来源</span></span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
+            <span class="card-pill" data-dots="12">12 家来源</span>
+          </span>
         </a>
         <a class="card card--sm card--fair" href="17-fair-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="card-name">招聘会</span>
           <span class="card-desc">场次 · 参展企业 · 展位导览</span>
-          <span class="card-foot"><span class="card-pill" data-dots="3">本周 3 场</span></span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
+            <span class="card-pill" data-dots="3">本周 3 场</span>
+          </span>
         </a>
         <a class="card card--sm card--mock" href="20-interview-pod.html">
           <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>

@@ -53,7 +53,8 @@
   function fit () {
     if (!stage) return
     if (CAPTURE) { stage.style.transform = 'none'; return }
-    var padY = 88, padX = 32
+    /* padY 与 body.proto 的 padding(104 顶 + 60 底)对齐，否则舞台底部出滚动 */
+    var padY = 164, padX = 32
     var s = Math.min((innerWidth - padX) / 1080, (innerHeight - padY) / 1920)
     s = Math.min(s, 1)
     stage.style.transform = 'scale(' + s + ')'
