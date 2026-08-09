@@ -23,7 +23,7 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: 22
           command_timeout: 30m
-          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT
+          envs: TARGET_SHA,CI_RUN,API_RELEASE_ENABLED,DEPLOY_API_DIR,DEPLOY_PM2_NAME,DEPLOY_ADMIN_WEB_ROOT,DEPLOY_PARTNER_WEB_ROOT,KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN
           script: |
             set -euo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
@@ -54,7 +54,15 @@ jobs:
             pnpm install --frozen-lockfile
 
             echo "=== 构建 kiosk 前端 ==="
-            pnpm --filter @ai-job-print/kiosk build
+            if [ -z "${KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN:-}" ]; then
+              echo "::error::KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN 未配置，禁止发布空白扫码登录页" >&2
+              exit 1
+            fi
+            VITE_API_MODE=http \
+            VITE_API_BASE_URL=/api/v1 \
+            VITE_USE_TRTC_CALL=true \
+            VITE_TERMINAL_AGENT_BRIDGE_TOKEN="$KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN" \
+            pnpm build:kiosk:production
 
             echo "=== 构建 admin 前端 ==="
             VITE_API_MODE=http VITE_API_BASE_URL=/api/v1 pnpm --filter @ai-job-print/admin build
@@ -118,3 +126,4 @@ jobs:
           DEPLOY_PM2_NAME: ${{ secrets.DEPLOY_PM2_NAME }}
           DEPLOY_ADMIN_WEB_ROOT: ${{ secrets.DEPLOY_ADMIN_WEB_ROOT }}
           DEPLOY_PARTNER_WEB_ROOT: ${{ secrets.DEPLOY_PARTNER_WEB_ROOT }}
+          KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN: ${{ secrets.KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN }}

@@ -133,6 +133,7 @@ jobs:
           VITE_API_BASE_URL: /api/v1
           VITE_USE_TRTC_CALL: 'true'
           VITE_TERMINAL_ID: KSK-001
+          VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
           pnpm --filter @ai-job-print/api build
           pnpm build:kiosk:production
@@ -222,6 +223,7 @@ jobs:
           VITE_API_BASE_URL: /api/v1
           VITE_USE_TRTC_CALL: 'true'
           VITE_TERMINAL_ID: KSK-001
+          VITE_TERMINAL_AGENT_BRIDGE_TOKEN: ci-only-local-bridge-token-0123456789abcdef
         run: |
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services

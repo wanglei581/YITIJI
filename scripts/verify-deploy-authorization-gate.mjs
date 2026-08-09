@@ -44,5 +44,20 @@ assert.match(
   /if \[ "\$\{API_RELEASE_ENABLED:-\}" = "true" \]; then/,
   'the remote script must retain its defense-in-depth authorization check'
 )
+assert.match(
+  deployJob,
+  /KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN:\s*\$\{\{\s*secrets\.KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN\s*\}\}/,
+  'deploy must receive the Kiosk local bridge token from a GitHub secret'
+)
+assert.match(
+  deployJob,
+  /envs:[^\n]*KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN/,
+  'SSH action must forward the Kiosk local bridge token to the remote build'
+)
+assert.match(
+  deployJob,
+  /VITE_TERMINAL_AGENT_BRIDGE_TOKEN="\$KIOSK_TERMINAL_AGENT_BRIDGE_TOKEN"[\s\S]*pnpm build:kiosk:production/,
+  'remote Kiosk build must inject and verify the local bridge token'
+)
 
 console.log('ALL PASS: deploy requires explicit repository authorization before SSH')
