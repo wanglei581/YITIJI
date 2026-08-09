@@ -24,6 +24,7 @@ const secureScanReader = [
   '../native/secure-scan-protocol.h',
 ].map((name) => fs.readFileSync(path.join(root, name), 'utf8')).join('\n')
 const secureScanMutation = fs.readFileSync(path.join(root, '../native/secure-scan-mutation.c'), 'utf8')
+const secureScanPath = fs.readFileSync(path.join(root, '../native/secure-scan-path.c'), 'utf8')
 const windowsScanAdapter = fs.readFileSync(path.join(root, '../src/agent/scan-input/windows-secure-reader.ts'), 'utf8')
 const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.ts'), 'utf8')
 
@@ -178,6 +179,7 @@ assert.match(windowsScanAdapter, /finalizeTrustedWindowsCandidate/, 'success-del
 assert.match(windowsScanAdapter, /sweepTrustedWindowsUnclaimed/, 'TTL deletion must cross the native mutation boundary')
 assert.match(secureScanReader, /AJPSR002/, 'native helper must parse protocol v2')
 assert.match(secureScanMutation, /RootDirectory\s*=\s*unclaimed/, 'quarantine rename must be relative to the pinned _unclaimed handle')
+assert.match(secureScanPath, /FILE_TRAVERSE/, 'pinned directory handles must support relative rename traversal')
 assert.match(secureScanMutation, /FileDispositionInfo/, 'deletion must target an already verified handle')
 assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?finalizeTrustedWindowsCandidate[\s\S]*?return\s*\}/, 'Windows finalize must return after the native boundary without Node fallback')
 assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?sweepTrustedWindowsUnclaimed[\s\S]*?return\s*\}/, 'Windows sweep must return after the native boundary without Node fallback')

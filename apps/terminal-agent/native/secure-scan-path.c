@@ -110,7 +110,7 @@ BOOL ajps_pin_directory_chain(const wchar_t *input, BOOL create_leaf, ajps_pinne
     wchar_t saved = path[3];
     HANDLE drive_root;
     path[3] = L'\0';
-    drive_root = CreateFileW(path, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+    drive_root = CreateFileW(path, FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES,
       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
     path[3] = saved;
@@ -127,7 +127,7 @@ BOOL ajps_pin_directory_chain(const wchar_t *input, BOOL create_leaf, ajps_pinne
     if (index < length && path[index] != L'\\') continue;
     if (pinned->handle_count >= AJPS_MAX_PINNED_DIRECTORIES) { free(path); ajps_close_pinned_path(pinned); return FALSE; }
     saved = path[index]; path[index] = L'\0';
-    handle = CreateFileW(path, FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+    handle = CreateFileW(path, FILE_LIST_DIRECTORY | FILE_TRAVERSE | FILE_READ_ATTRIBUTES,
       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
       FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
     path[index] = saved;
