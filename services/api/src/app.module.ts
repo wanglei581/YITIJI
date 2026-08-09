@@ -55,6 +55,7 @@ import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
 import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
+import { RecruitmentContentModule } from './recruitment-content/recruitment-content.module'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
   const u = new URL(url)
@@ -128,6 +129,7 @@ const redisUrl = process.env['REDIS_URL']
     PrintSignModule,
     DeviceFleetModule,
     OfflineAgenciesModule,
+    RecruitmentContentModule,
     KioskSessionModule,
     HelpModule,
     LegalModule,

@@ -194,6 +194,7 @@
     "verify:recruitment-p1-schema": "node -r @swc-node/register scripts/verify-recruitment-p1-schema.ts",
     "verify:recruitment-p1-schema:postgres-upgrade": "node -r @swc-node/register scripts/verify-recruitment-p1-schema.ts --postgres-upgrade",
     "verify:recruitment-p1-preflight": "node -r @swc-node/register scripts/verify-recruitment-p1-preflight.ts",
+    "verify:recruitment-content-http": "node -r @swc-node/register scripts/verify-recruitment-content-http.ts",
     "verify:career-plan": "node -r @swc-node/register scripts/verify-career-plan.ts",
     "verify:ai-cost-coverage": "node -r @swc-node/register scripts/verify-ai-cost-coverage.ts",
     "verify:activity-logs": "node -r @swc-node/register scripts/verify-activity-logs.ts",

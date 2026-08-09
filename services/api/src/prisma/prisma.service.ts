@@ -385,6 +385,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.client.offlineJob
   }
 
+  // ── P1 招聘信息统一治理(新 reader；legacy 写路径暂不切换)─────────────────
+
+  get qualificationRecord() {
+    return this.client.qualificationRecord
+  }
+
+  get onlinePlatformDirectory() {
+    return this.client.onlinePlatformDirectory
+  }
+
+  get offlineAgencyProfile() {
+    return this.client.offlineAgencyProfile
+  }
+
+  get offlineAgencyBranch() {
+    return this.client.offlineAgencyBranch
+  }
+
+  get reviewDecision() {
+    return this.client.reviewDecision
+  }
+
   // ── G6 法务文档版本 ───────────────────────────────────────────────────────────
 
   get legalDocVersion() {
