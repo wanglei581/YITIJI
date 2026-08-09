@@ -61,13 +61,19 @@ console.log('\n=== Kiosk 生产构建配置 / 数字人产物验证 ===')
 
 mustEqual('VITE_API_MODE', 'http', 'A1 生产构建使用真实 API 模式')
 mustEqual('VITE_API_BASE_URL', '/api/v1', 'A2 生产构建使用同源 /api/v1')
+const bridgeToken = env('VITE_TERMINAL_AGENT_BRIDGE_TOKEN')
+if (bridgeToken.length >= 24) {
+  pass('A3 生产构建已配置本地网桥令牌')
+} else {
+  fail('A3 VITE_TERMINAL_AGENT_BRIDGE_TOKEN 未配置或长度不足，扫码登录不会生成二维码')
+}
 const allowTextOnly = env('VITE_ALLOW_TEXT_ONLY_ASSISTANT') === 'true'
 if (allowTextOnly) {
-  pass('A3 生产构建显式允许文字助手模式，跳过 TRTC 数字人产物校验')
+  pass('A4 生产构建显式允许文字助手模式，跳过 TRTC 数字人产物校验')
 } else {
-  mustEqual('VITE_USE_TRTC_CALL', 'true', 'A3 生产构建启用 TRTC 数字人入口')
+  mustEqual('VITE_USE_TRTC_CALL', 'true', 'A4 生产构建启用 TRTC 数字人入口')
 }
-pass('A4 生产终端身份由本机 Agent 运行时提供，不要求构建期 VITE_TERMINAL_ID')
+pass('A5 生产终端身份由本机 Agent 运行时提供，不要求构建期 VITE_TERMINAL_ID')
 
 const indexHtml = readRequired(join(DIST, 'index.html'), 'B1 dist/index.html 已生成')
 if (indexHtml.includes('assets/index-') && indexHtml.includes('.js')) {
@@ -88,16 +94,28 @@ if (!existsSync(ASSETS)) {
   if (runtimeIdentityAsset) pass(`B4 本机 Agent 运行时身份探测已生成 (${runtimeIdentityAsset.name})`)
   else fail('B4 生产产物未包含 /local/terminal-identity，终端身份会不可用')
 
+  const qrBridgeAsset = jsAssets.find(({ src }) =>
+    src.includes('/local/qr-login/create') && src.includes('X-Local-Bridge-Token'),
+  )
+  if (qrBridgeAsset) pass(`B5 扫码登录本地网桥调用已生成 (${qrBridgeAsset.name})`)
+  else fail('B5 生产产物未包含扫码登录本地网桥调用')
+
+  if (bridgeToken && qrBridgeAsset?.src.includes(bridgeToken)) {
+    pass('B6 本地网桥令牌已注入生产产物')
+  } else {
+    fail('B6 本地网桥令牌未注入生产产物，二维码创建会被 Agent 拒绝')
+  }
+
   const terminalConsumerSources = [
     'src/services/print/printJobsApi.ts',
     'src/services/api/printScanCapabilities.ts',
     'src/hooks/useAiAdvisorCallSession.ts',
     'src/pages/home/hooks/useHomeDeviceStatus.ts',
-  ].map((relativePath) => readRequired(join(ROOT, relativePath), `B5 ${relativePath} 已纳入运行时身份检查`))
+  ].map((relativePath) => readRequired(join(ROOT, relativePath), `B7 ${relativePath} 已纳入运行时身份检查`))
   if (terminalConsumerSources.every((source) => !source.includes('VITE_TERMINAL_ID'))) {
-    pass('B5 终端敏感请求未直接读取构建期终端 ID')
+    pass('B7 终端敏感请求未直接读取构建期终端 ID')
   } else {
-    fail('B5 终端敏感请求仍直接读取 VITE_TERMINAL_ID，可能把多台主机错误路由到同一终端')
+    fail('B7 终端敏感请求仍直接读取 VITE_TERMINAL_ID，可能把多台主机错误路由到同一终端')
   }
 
   if (allowTextOnly) {

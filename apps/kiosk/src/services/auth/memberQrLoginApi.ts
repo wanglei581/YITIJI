@@ -6,7 +6,17 @@ const LOCAL_AGENT_BASE_URL = configuredLocalAgentBaseUrl || 'http://127.0.0.1:95
 // 与 U 盘导入本地网桥共用同一个静态令牌:随 Kiosk 构建注入,须与本机 Terminal Agent 的
 // localApiBridgeToken 配置一致,安装时一起下发。
 const BRIDGE_TOKEN = (import.meta.env['VITE_TERMINAL_AGENT_BRIDGE_TOKEN'] ?? '').trim()
-const LOCAL_AGENT_HEADERS: HeadersInit = BRIDGE_TOKEN ? { 'X-Local-Bridge-Token': BRIDGE_TOKEN } : {}
+
+function requireLocalAgentHeaders(): HeadersInit {
+  if (!BRIDGE_TOKEN) {
+    throw new MemberApiError(
+      'LOCAL_QR_BRIDGE_TOKEN_MISSING',
+      '当前终端版本未配置扫码登录本地网桥',
+      0,
+    )
+  }
+  return { 'X-Local-Bridge-Token': BRIDGE_TOKEN }
+}
 
 interface Envelope<T> {
   success: boolean
@@ -80,7 +90,7 @@ export function createQrLoginViaLocalAgent(input: {
     '/local/qr-login/create',
     'POST',
     input,
-    LOCAL_AGENT_HEADERS,
+    requireLocalAgentHeaders(),
   )
 }
 
@@ -90,7 +100,7 @@ export function claimQrLoginViaLocalAgent(ticketId: string): Promise<LoginResult
     '/local/qr-login/claim',
     'POST',
     { ticketId },
-    LOCAL_AGENT_HEADERS,
+    requireLocalAgentHeaders(),
   )
 }
 

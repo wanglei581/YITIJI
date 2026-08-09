@@ -44,9 +44,10 @@ export function ScanQrLoginPanel({
   const [error, setError] = useState<string | null>(null)
   const [displaySeconds, setDisplaySeconds] = useState<number | null>(null)
   const claimingRef = useRef(false)
+  const refreshingRef = useRef(false)
 
   const refresh = useCallback(async () => {
-    if (loading) return
+    if (refreshingRef.current) return
     if (!agreed) {
       setQr(null)
       setNotice(null)
@@ -54,6 +55,7 @@ export function ScanQrLoginPanel({
       onAgreementRequired()
       return
     }
+    refreshingRef.current = true
     setLoading(true)
     setClaiming(false)
     claimingRef.current = false
@@ -77,9 +79,10 @@ export function ScanQrLoginPanel({
       setQr(null)
       setError(localQrErrorMessage(err))
     } finally {
+      refreshingRef.current = false
       setLoading(false)
     }
-  }, [agreed, loading, onAgreementRequired, returnTo])
+  }, [agreed, onAgreementRequired, returnTo])
 
   useEffect(() => {
     void refresh()
@@ -242,8 +245,9 @@ export function ScanQrLoginPanel({
 
 function localQrErrorMessage(error: unknown): string {
   if (!(error instanceof MemberApiError)) return '扫码登录服务不可用，请使用手机号登录'
-  if (error.status === 0 || error.code === 'NETWORK_ERROR') return '本机扫码登录服务未连接，请使用手机号登录'
+  if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_MISSING') return '当前终端版本未配置扫码登录，请联系管理员或使用手机号登录'
   if (error.code === 'LOCAL_QR_ORIGIN_FORBIDDEN') return '当前页面来源未被本机扫码登录服务允许'
   if (error.code === 'LOCAL_QR_BRIDGE_TOKEN_INVALID') return '本机扫码登录服务未正确配置，请使用手机号登录'
+  if (error.status === 0 || error.code === 'NETWORK_ERROR') return '本机扫码登录服务未连接，请使用手机号登录'
   return error.message || '扫码登录服务不可用，请使用手机号登录'
 }

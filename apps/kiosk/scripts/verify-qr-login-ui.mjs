@@ -20,10 +20,14 @@ assert.match(loginPage, /<ScanQrLoginPanel[\s\S]*onLoginSuccess=\{handleQrLoginS
 assert.doesNotMatch(loginPage, /微信扫码|支付宝扫码|ai-job-print:\/\/member-login/)
 
 assert.match(scanPanel, /useRef\(false\)/)
+assert.match(scanPanel, /const refreshingRef = useRef\(false\)/)
+assert.match(scanPanel, /if \(refreshingRef\.current\) return/)
+assert.match(scanPanel, /refreshingRef\.current = true[\s\S]*finally \{[\s\S]*refreshingRef\.current = false/)
 assert.match(scanPanel, /claimingRef\.current = true/)
 assert.match(scanPanel, /if \(claimingRef\.current\) return/)
 assert.match(scanPanel, /claimingRef\.current = true[\s\S]*claimQrLoginViaLocalAgent/)
 assert.match(scanPanel, /本机扫码登录服务未连接，请使用手机号登录/)
+assert.match(scanPanel, /当前终端版本未配置扫码登录，请联系管理员或使用手机号登录/)
 assert.match(scanPanel, /扫码登录服务不可用，请使用手机号登录/)
 
 assert.match(mobilePage, /重新检查二维码/)
@@ -36,6 +40,9 @@ assert.match(qrApi, /new URL\(`\$\{candidate\.pathname\}\$\{candidate\.search\}\
 assert.match(qrApi, /function parseQrLoginPublicBase/)
 assert.match(qrApi, /catch \{[\s\S]*window\.location\.origin/)
 assert.match(qrApi, /claimQrLoginViaLocalAgent\(ticketId: string\): Promise<LoginResult>/)
+assert.match(qrApi, /LOCAL_QR_BRIDGE_TOKEN_MISSING/)
+assert.match(qrApi, /requireLocalAgentHeaders\(\)/)
+assert.doesNotMatch(qrApi, /BRIDGE_TOKEN \? \{ 'X-Local-Bridge-Token': BRIDGE_TOKEN \} : \{\}/)
 
 assert.match(routes, /path: '\/member\/qr-login'/)
 
