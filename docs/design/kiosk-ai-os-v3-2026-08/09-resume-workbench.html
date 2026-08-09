@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P09 简历工作台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P09 简历工作台">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/resume.css?v=9">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+  /* 诊断与对比阶段：原文占主体，结论在侧栏 */
+  .work--diag { grid-template-columns: 1fr 396px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s3" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">AI 简历服务</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #E-7742</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>AI 服务就绪 · 打印机在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 服务中断 · 已上报</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · AI 服务正常</div>
+    <div class="clock" data-clock>2026年8月8日 <b>09:58</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">简历来源</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">正在解析</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">诊断结论</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">逐条优化</span></button>
+      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">版本与导出</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>3</b> / 5 步</span>
+  </div>
+
+  <div class="work work--diag">
+    <!-- ================= 左：原文永远在这里，永远可回看 ================= -->
+    <div class="wmain">
+
+      <!-- S1 来源 -->
+      <div class="sources" data-at="s1">
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-upload"/></svg></span>
+          <span class="src-nm">上传已有简历</span>
+          <span class="src-ds">PDF / Word 导出的 PDF / 图片。本机上传或 U 盘导入。</span>
+          <span class="src-tag"><span class="chip chip--jade">最快</span></span>
+        </button>
+        <button class="src" data-go="s2">
+          <span class="src-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="src-nm">手机扫码传</span>
+          <span class="src-ds">简历在手机或微信里，扫码传过来，不用插东西。</span>
+          <span class="src-tag"><span class="chip">一次性会话</span></span>
+        </button>
+        <a class="src" href="07-scan-workbench.html">
+          <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+          <span class="src-nm">纸质简历扫描</span>
+          <span class="src-ds">只有纸质件时用。扫成 PDF 后自动识别文字，低置信页会先提示复核。</span>
+          <span class="src-tag"><span class="chip chip--amber">需识别</span></span>
+        </a>
+        <a class="src" href="10-resume-interview.html">
+          <span class="src-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+          <span class="src-nm">还没有简历，从零做</span>
+          <span class="src-ds">小青问你几个问题，边聊边生成。不用自己想格式。</span>
+          <span class="src-tag"><span class="chip chip--jade" data-when="default first">约 6 分钟</span><span class="chip" data-when="ai-down">AI 不可用</span></span>
+        </a>
+      </div>
+
+      <!-- S2 正在解析 -->
+      <div class="scanpages" data-at="s2">
+        <div class="paper" style="height:100%" data-when="default first">
+          <div class="paper-bar">
+            <span class="nm">个人简历.pdf</span>
+            <span class="mt">A4 · 3 页 · 正在解析</span>
+          </div>
+          <div class="paper-stage scanline">
+            <div class="sheet-a4">
+              <h4>王 · 个人简历</h4>
+              <div class="meta">求职意向：运营专员 · 广州</div>
+              <div class="hr"></div>
+              <div class="sec">教育背景</div><div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <div class="sec">工作经历</div><div class="ln"></div><div class="ln ln--m"></div><div class="ln ln--s"></div>
+              <div class="ln"></div><div class="ln ln--m"></div>
+              <span class="pgno">1 / 3</span>
+            </div>
+          </div>
+        </div>
+        <div class="locked" data-when="ai-down" style="height:100%">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <b>解析服务中断</b>
+          <p>你上传的文件<b>完好保存</b>在本次会话里，没有丢。故障已自动上报运维。<br>
+             现在可以直接打印这份简历，或存进「我的文档」稍后再诊断。</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+            <a class="btn btn--ghost" href="06-print-workbench.html">直接拿去打印</a>
+            <button class="btn btn--ghost">存进「我的文档」</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 诊断：原文带命中标记 -->
+      <div class="paper" data-at="s3">
+        <div class="paper-bar">
+          <span class="nm" data-when="default ai-down device-off">个人简历.pdf</span>
+          <span class="nm" data-when="first">未选择简历</span>
+          <span class="mt" data-when="default device-off">已解析 · 命中 4 处可改点</span>
+          <span class="mt" data-when="ai-down">未诊断</span>
+          <span class="pg">
+            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <span>第 1 / 共 3 页</span>
+            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+          </span>
+        </div>
+        <div class="paper-stage">
+          <div class="sheet-a4" data-when="default ai-down device-off">
+            <h4>王 · 个人简历</h4>
+            <div class="meta" id="e1">求职意向：<span class="hit" data-ev="i1">运营</span> · 广州 · 电话 138****2046</div>
+            <div class="hr"></div>
+            <div class="sec">工作经历</div>
+            <div class="ln"></div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              2024.03–2026.06　某科技公司　运营专员<br>
+              · <span class="hit" data-ev="i2">负责公众号日常运营与活动策划，配合完成各项运营工作</span><br>
+              · <span class="hit" data-ev="i2">协助部门完成月度目标，参与用户增长相关项目</span><br>
+              · 维护用户社群，处理日常反馈
+            </div>
+            <div class="sec">项目经历</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              校园推广项目　负责人<br>
+              · <span class="hit" data-ev="i3">带领团队完成校园地推，效果良好</span>
+            </div>
+            <div class="sec">技能</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              Excel · SQL · Photoshop · 英语六级
+            </div>
+            <div class="gapline" data-ev="i4" style="margin-top:8px">这里缺一句：技能栏写了 SQL，但整份简历没有一句说明用它做过什么。</div>
+            <span class="pgno">1 / 3</span>
+          </div>
+          <div class="paper-empty" data-when="first">
+            <svg class="ic"><use href="#i-resume"/></svg>
+            <b>还没有简历</b>
+            <p>回到第 1 步：上传已有简历、手机扫码传、扫纸质件，<br>或者让小青问你几个问题从零做一份。</p>
+            <button class="btn btn--ghost" data-go="s1">回第 1 步</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- S4 逐条优化 -->
+      <div class="diff" data-at="s4">
+        <div class="diff-hd" data-when="default device-off">
+          <span><svg class="ic" style="width:17px;height:17px;color:var(--fog-600)"><use href="#i-file"/></svg>你写的（原件不会被改）</span>
+          <span><svg class="ic" style="width:17px;height:17px;color:var(--jade-500)"><use href="#i-brain"/></svg>候选改写 <span class="ev ev--e3">E3 AI 判断，仅供参考</span></span>
+        </div>
+        <div class="diff-body" data-when="default device-off">
+          <div class="pair pair--taken">
+            <div class="pair-box">负责公众号日常运营与活动策划，配合完成各项运营工作</div>
+            <div class="pair-box pair-box--new">
+              <span>独立运营公众号（<ins>粉丝 1.2 万</ins>），策划 <ins>8 场</ins>活动，<ins>单场最高带来 340 个新增关注</ins></span>
+              <span class="pair-why">改动理由：原句没有可核对的数字，招聘方无法判断规模。<b>数字需要你自己填真实值</b>，这里的示例来自你在访谈里说过的内容。</span>
+              <span class="taken-flag" style="color:var(--amber-600)"><svg class="ic"><use href="#i-alert"/></svg>已采纳 · <b>3 个数字待你核实</b>，核实后才进 v2</span>
+              <span class="pair-act"><button class="btn btn--ghost">逐个核实数字</button><button class="btn btn--quiet">改回原文</button></span>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="pair-box">协助部门完成月度目标，参与用户增长相关项目</div>
+            <div class="pair-box pair-box--new">
+              <span><del>协助</del><ins>承担</ins>用户增长项目中的<ins>渠道投放与数据复盘</ins>，<ins>月度目标连续 4 个月达成</ins></span>
+              <span class="pair-why">改动理由：「协助 / 参与」看不出你做了什么。把动作换成你实际负责的环节。</span>
+              <span class="pair-act">
+                <button class="btn btn--primary" style="min-height:48px;font-size:var(--fz-2)">采纳</button>
+                <button class="btn btn--ghost">保留原文</button>
+                <button class="btn btn--quiet">换一版</button>
+              </span>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="pair-box">带领团队完成校园地推，效果良好</div>
+            <div class="pair-box pair-box--new">
+              <span>带 <ins>5 人</ins>团队在 <ins>3 所</ins>高校完成地推，<ins>累计触达 2000+ 学生，转化率 12%</ins>；「效果良好」<del>已删</del></span>
+              <span class="pair-why">改动理由：「效果良好」是自我评价，不是事实。团队规模与转化数据是可核对的。</span>
+              <span class="pair-act">
+                <button class="btn btn--primary" style="min-height:48px;font-size:var(--fz-2)">采纳</button>
+                <button class="btn btn--ghost">保留原文</button>
+                <button class="btn btn--quiet">换一版</button>
+              </span>
+            </div>
+          </div>
+          <div class="pair">
+            <div class="pair-box" style="border-style:dashed;color:var(--fog-600)">（技能栏只列了 SQL，正文里没有任何一句用到它）</div>
+            <div class="pair-box pair-box--new">
+              <span>建议在工作经历里补一句：用 SQL <ins>做过什么查询 / 出过什么报表 / 支撑了什么决策</ins></span>
+              <span class="pair-why">改动理由：目标岗位明确要求熟练取数，招聘方看不到证据就当没有。<b>这句需要你自己写，AI 不替你编经历。</b></span>
+              <span class="pair-act">
+                <button class="btn btn--ghost">我来补写</button>
+                <button class="btn btn--quiet">先跳过</button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="locked" data-when="ai-down first">
+          <svg class="ic"><use href="#i-offline"/></svg>
+          <b data-when="ai-down">改写服务中断</b>
+          <b data-when="first">还没有简历</b>
+          <p data-when="ai-down">诊断与改写都不可用，<b>你的原件完好</b>。可以直接打印，或存进「我的文档」，稍后再来优化。</p>
+          <p data-when="first">先回第 1 步给一份简历，再来这里逐条优化。</p>
+          <button class="btn btn--ghost" data-go="s1" data-when="first">回第 1 步</button>
+        </div>
+      </div>
+
+      <!-- S5 版本与导出：当前版本预览 -->
+      <div class="paper" data-at="s5">
+        <div class="paper-bar">
+          <span class="nm">个人简历_v2.pdf</span>
+          <span class="mt">已采纳 3 处 · 原件 v1 保留</span>
+          <span class="pg">
+            <button class="pgbtn" aria-label="上一页"><svg class="ic" style="transform:rotate(180deg)"><use href="#i-chevron"/></svg></button>
+            <span>第 1 / 共 3 页</span>
+            <button class="pgbtn" aria-label="下一页"><svg class="ic"><use href="#i-chevron"/></svg></button>
+          </span>
+        </div>
+        <div class="paper-stage">
+          <div class="sheet-a4">
+            <h4>王 · 个人简历</h4>
+            <div class="meta">求职意向：运营专员 · 广州 · 电话 138****2046</div>
+            <div class="hr"></div>
+            <div class="sec">工作经历</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              2024.03–2026.06　某科技公司　运营专员<br>
+              · <span class="hit hit--on">独立运营公众号（粉丝 1.2 万），策划 8 场活动，单场最高带来 340 个新增关注</span><br>
+              · 协助部门完成月度目标，参与用户增长相关项目<br>
+              · 维护用户社群，处理日常反馈
+            </div>
+            <div class="sec">项目经历</div>
+            <div style="font-size:11px;line-height:1.7;color:var(--paper-ink)">
+              校园推广项目　负责人<br>
+              · <span class="hit hit--on">带 5 人团队在 3 所高校完成地推，累计触达 2000+ 学生，转化率 12%</span>
+            </div>
+            <span class="pgno">1 / 3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 右：结论与操作 ================= -->
+    <div class="wside">
+
+      <!-- S1 说明 -->
+      <div class="pane pane--fill" data-at="s1">
+        <div class="pane-hd"><span class="t">这一步会发生什么</span></div>
+        <div class="tline">
+          <div class="tl tl--now"><span class="tl-dot"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="tl-b"><span class="tl-t">给一份简历</span><span class="tl-s">四种来源任选，不需要登录</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-brain"/></svg></span>
+            <span class="tl-b"><span class="tl-t">本机解析结构</span><span class="tl-s">拆出经历、技能、时间线</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-target"/></svg></span>
+            <span class="tl-b"><span class="tl-t">诊断，逐条指位置</span><span class="tl-s">每条都说清依据在原文哪一句</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-pen"/></svg></span>
+            <span class="tl-b"><span class="tl-t">你逐条决定改不改</span><span class="tl-s">采纳的才进新版本</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="tl-b"><span class="tl-t">导出或打印</span><span class="tl-s">原件永远保留，可随时回退</span></span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>AI 只生成新版本，永不覆盖你的原件。</b><br>
+            · <b>去向</b>：解析、诊断、改写结果<b>只进你本人的简历与记录</b>；<b>不发送给任何企业，不沉淀到任何简历库</b>。<br>
+            · <b>保留</b>：未登录时只留到本次会话结束；要长期保存需你本人选「存进我的简历」。<br>
+            · <b>外部服务</b>：诊断与改写由 AI 服务处理简历文本；扫描件走识别时会经第三方 OCR。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。</span>
+        </div>
+      </div>
+
+      <!-- S2 解析进度 -->
+      <div class="pane pane--fill" data-at="s2">
+        <div class="pane-hd"><span class="t">正在做什么</span><span class="s">#RS-0958-12</span></div>
+        <div class="tline" data-when="default first">
+          <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="tl-b"><span class="tl-t">读取文件与页数</span><span class="tl-s">3 页 · 文字可提取</span></span></div>
+          <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+            <span class="tl-b"><span class="tl-t">拆分结构</span><span class="tl-s">识别到 4 个模块</span></span></div>
+          <div class="tl tl--now"><span class="tl-dot"><svg class="ic"><use href="#i-refresh"/></svg></span>
+            <span class="tl-b"><span class="tl-t">逐段检查表达</span><span class="tl-s">正在看第 2 段工作经历</span></span></div>
+          <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-clock"/></svg></span>
+            <span class="tl-b"><span class="tl-t">汇总可改点</span><span class="tl-s">等待前一步</span></span></div>
+        </div>
+        <div class="notice" data-when="default first" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>不显示百分比：可改点的数量要看完全文才知道，这里只报已完成的步骤。约 40 秒 · 免费。<br>
+            解析只为给你出诊断，<b>不发送企业、不沉淀简历库</b>；失败可重试或换来源重新上传。</span>
+        </div>
+        <div class="notice notice--coral" data-when="ai-down" style="margin-top:0">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>解析中断。已自动上报，不需要你操作。你的文件没有丢，仍可打印或存文档。</span>
+        </div>
+      </div>
+
+      <!-- S3 诊断结论 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd">
+          <span class="t">四个维度</span>
+          <span class="s" data-when="default device-off">三档评价 · 不打分</span>
+          <span class="s" data-when="ai-down first">未诊断</span>
+        </div>
+        <div class="dims" data-when="default device-off">
+          <div class="dim dim--good"><span class="dim-nm">结构完整</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">好</span></div>
+          <div class="dim dim--weak"><span class="dim-nm">成果量化</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">需改</span></div>
+          <div class="dim dim--mid"><span class="dim-nm">用词具体</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">一般</span></div>
+          <div class="dim dim--mid"><span class="dim-nm">岗位相关</span><span class="dim-bar"><i></i><i></i><i></i></span><span class="dim-tag">一般</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
+          用三档不用分数：简历好坏没有可核对的分母，打个「72 分」是假精确。
+          <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
+        </p>
+        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="ai-down">
+          诊断服务中断，不给结论。左边的原文可以正常翻看、打印、存档。
+        </p>
+        <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="first">
+          还没有简历，暂无诊断。
+        </p>
+      </div>
+
+      <div class="pane pane--fill" data-at="s3">
+        <div class="pane-hd"><span class="t">可改点</span><span class="s" data-when="default device-off">4 处 · 点一条看原文位置</span></div>
+        <div class="issues" data-when="default device-off">
+          <button class="issue issue--high" data-ev="i2" aria-current="true">
+            <span class="issue-hd"><span class="issue-sev">重要</span><span class="issue-t">经历没有成果数字</span><span class="issue-loc">第 1 页</span></span>
+            <span class="issue-p"><b>6 段经历里 5 段没有任何数字</b>：粉丝数、活动场数、增长量、团队人数都没写。招聘方无法判断你做到什么程度。<span class="ev ev--e1">E1 你的材料</span></span>
+          </button>
+          <button class="issue issue--high" data-ev="i3">
+            <span class="issue-hd"><span class="issue-sev">重要</span><span class="issue-t">用了自我评价代替事实</span><span class="issue-loc">第 1 页</span></span>
+            <span class="issue-p">「效果良好」「表现优秀」这类话共 <b>3 处</b>。它们不是事实，招聘方会直接忽略。<span class="ev ev--e1">E1 你的材料</span></span>
+          </button>
+          <button class="issue issue--mid" data-ev="i4">
+            <span class="issue-hd"><span class="issue-sev">建议</span><span class="issue-t">技能列了但正文没证据</span><span class="issue-loc">第 1 页</span></span>
+            <span class="issue-p">技能栏有 <b>SQL</b>，但整份简历没有一句说明用它做过什么。目标岗位明确要求熟练取数。<span class="ev ev--e1">E1 你的材料</span><span class="ev ev--e2">E2 岗位要求</span></span>
+          </button>
+          <button class="issue issue--low" data-ev="i1">
+            <span class="issue-hd"><span class="issue-sev">可选</span><span class="issue-t">求职意向偏笼统</span><span class="issue-loc">第 1 页</span></span>
+            <span class="issue-p">只写「运营」，没说清是内容运营、用户运营还是活动运营。<span class="ev ev--e1">E1 你的材料</span></span>
+          </button>
+        </div>
+        <div class="notice" data-when="ai-down first" style="margin-top:0">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span data-when="ai-down">诊断不可用时这里不显示任何结论——不猜、不给通用建议。</span>
+          <span data-when="first">给一份简历后，可改点会逐条列在这里，每条都能点回原文位置。</span>
+        </div>
+      </div>
+
+      <!-- S4 采纳进度 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><span class="t">你已经决定了</span><span class="s" data-when="default device-off">待决定 3 条</span></div>
+        <div class="kv" data-when="default device-off">
+          <div class="kv-row"><span class="k">已采纳待核实</span><span class="v" style="color:var(--amber-600)">1 处</span></div>
+          <div class="kv-row"><span class="k">保留原文</span><span class="v">0 处</span></div>
+          <div class="kv-row"><span class="k">待你决定</span><span class="v">3 处</span></div>
+          <div class="kv-row"><span class="k">需你自己写</span><span class="v" style="color:var(--amber-600)">1 处</span></div>
+        </div>
+        <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.55" data-when="default device-off">
+          采纳且<b>数字核实过</b>的内容才进入 v2，<b>v1 原件不动</b>。任何时候都能在第 5 步回退。
+        </p>
+      </div>
+      <div class="pane pane--fill" data-at="s4">
+        <div class="pane-hd"><span class="t">两条底线</span></div>
+        <div class="notice notice--amber">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>数字要你自己核对。</b>改写里的粉丝数、场数、转化率是按你说过的内容填的示例，不是 AI 编的事实——发出去之前请确认每一个数都是真的。</span>
+        </div>
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>AI 不替你编经历。</b>你没做过的事，它只会提示「这里缺一句，需要你自己补」，不会凭空生成一段。</span>
+        </div>
+      </div>
+
+      <!-- S5 版本与导出 -->
+      <div class="pane" data-at="s5">
+        <div class="pane-hd"><span class="t">版本</span><span class="s">可随时回退</span></div>
+        <div class="vers">
+          <button class="ver" aria-current="true">
+            <span class="ver-no">v2</span>
+            <span class="ver-b"><span class="ver-t">采纳 3 处改写</span><span class="ver-s">09:58 生成 · 当前</span></span>
+            <span class="ver-tag"><span class="chip chip--jade">当前</span></span>
+          </button>
+          <button class="ver">
+            <span class="ver-no">v1</span>
+            <span class="ver-b"><span class="ver-t">你上传的原件</span><span class="ver-s">09:43 上传 · 永久保留</span></span>
+            <span class="ver-tag"><span class="chip">原件</span></span>
+          </button>
+        </div>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>原件永远在列表里，删不掉也覆盖不了。切换版本只改「当前用哪一版」，不销毁任何一版。</span>
+        </div>
+      </div>
+
+      <div class="pane pane--fill" data-at="s5">
+        <div class="pane-hd"><span class="t">拿去做什么</span></div>
+        <div class="outs">
+          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>去打印</button>
+          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
+          <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
+          <button class="out"><svg class="ic"><use href="#i-download"/></svg>导出 PDF</button>
+          <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
+          <a class="out" href="11-jobfit-compare.html" data-when="default first"><svg class="ic"><use href="#i-target"/></svg>按岗位比对</a>
+          <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-target"/></svg>比对不可用</button>
+          <a class="out" href="11-jobfit-compare.html" data-when="device-off"><svg class="ic"><use href="#i-target"/></svg>按岗位比对</a>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span data-when="default first">下一步建议：周五那场招聘会现场普遍收纸质简历，这一版可以先打 5 份。<span class="ev ev--e2">E2 来源信息</span></span>
+          <span data-when="ai-down">AI 服务中断，不给下一步建议。导出与存档都正常。</span>
+          <span data-when="device-off">打印机离线，可先存进「我的简历」，凭手机号在任一台空闲机器取回打印。</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="actionbar">
+    <div class="actionbar-hint">
+      <div data-at="s1"><div class="t">先给一份简历，四种来源任选</div><div class="s">不需要登录 · 原件永远保留不被覆盖</div></div>
+      <div data-at="s2">
+        <div data-when="default first"><div class="t">正在解析，约 40 秒</div><div class="s">免费 · 可改点的数量要看完全文才知道</div></div>
+        <div data-when="ai-down"><div class="t">解析中断，你的文件没有丢</div><div class="s">可直接打印或存进「我的文档」</div></div>
+      </div>
+      <div data-at="s3">
+        <div data-when="default device-off"><div class="t">4 处可改点，最重要的是「经历没有成果数字」</div><div class="s">点右边任一条，左边原文会定位到具体位置</div></div>
+        <div data-when="ai-down"><div class="t">诊断不可用，原文可正常翻看</div><div class="s">不猜、不给通用建议</div></div>
+        <div data-when="first"><div class="t">还没有简历</div><div class="s">回第 1 步给一份</div></div>
+      </div>
+      <div data-at="s4">
+        <div data-when="default device-off"><div class="t">逐条决定改不改，采纳的才进新版本</div><div class="s">数字要你自己核对 · AI 不替你编经历</div></div>
+        <div data-when="ai-down first"><div class="t">改写不可用</div><div class="s">原件完好，可打印或存档</div></div>
+      </div>
+      <div data-at="s5">
+        <div data-when="default first ai-down"><div class="t">v2 已生成，v1 原件永久保留</div><div class="s">随时可回退 · 切换版本不销毁任何一版</div></div>
+        <div data-when="device-off"><div class="t">v2 已生成，打印机离线</div><div class="s">可先存进「我的简历」换机取回打印</div></div>
+      </div>
+    </div>
+
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2">取消解析</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">换一份简历</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看诊断</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-go="s4">继续优化</button>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2">上传已有简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" aria-disabled="true" data-when="default first">解析中…</button>
+    <a class="btn btn--primary" data-at="s2" data-when="ai-down" href="06-print-workbench.html">直接拿去打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default device-off">逐条优化<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="06-print-workbench.html">拿去打印<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="first" data-go="s1">回第 1 步<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-go="s5" data-when="default device-off">生成 v2（未决定项保留原文）<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4" data-when="ai-down first" aria-disabled="true">改写不可用</button>
+    <a class="btn btn--primary" data-at="s5" data-when="default first ai-down" href="06-print-workbench.html">拿去打印 5 份<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s5" data-when="device-off">存进我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
+    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script>
+/* 诊断联动：点右边可改点 → 左边原文定位并高亮对应句子。
+   一条问题命中多处证据时全部点亮，不只亮一处误导用户。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var stage = document.querySelector('[data-at="s3"] .paper-stage')
+  if (!scr || !stage) return
+  scr.addEventListener('click', function (e) {
+    var btn = e.target.closest('.issue')
+    if (!btn) return
+    scr.querySelectorAll('.issue').forEach(function (b) { b.setAttribute('aria-current', b === btn ? 'true' : 'false') })
+    var key = btn.getAttribute('data-ev')
+    var first = null
+    stage.querySelectorAll('[data-ev]').forEach(function (n) {
+      var on = n.getAttribute('data-ev') === key
+      n.classList.toggle('hit--on', on && !n.classList.contains('gapline'))
+      if (n.classList.contains('gapline')) n.style.boxShadow = on ? '0 0 0 3px var(--coral-a20)' : ''
+      if (on && !first) first = n
+    })
+    if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+})()
+</script>
+<script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+/* ============================================================
+   列表 / 详情构图层（listing）· 给岗位、企业、招聘会、政策这类信息页
+   ------------------------------------------------------------
+   两条来自合规的硬约束（CLAUDE.md §10）：
+   1) 列表卡至少展示「来源机构 + 同步时间」；详情页还必须有「外部 ID」。
+      所以来源条不是可选装饰，是每张卡的固定构件（.srcline）。
+   2) 匹配参考只有三档（较高/中等/偏低），禁百分比、禁录用概率。
+   另：信息页必须能表达「空结果」和「加载失败」——真实数据源会给这两种，
+      设计里不给，接线时就会临时拼一个丑的。
+   ============================================================ */
+
+/* 结果状态切换（有结果 / 空结果 / 加载失败）：并列条件，不是流程步骤 */
+.states { display: flex; gap: var(--s-3); }
+.stbtn {
+  min-height: var(--touch-min); padding: 0 var(--s-5); border-radius: var(--r-full);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: all var(--dur-2) var(--ease-out);
+}
+.stbtn[aria-selected="true"] { background: var(--jade-500); border-color: var(--jade-500); color: #fff; font-weight: 600; }
+
+/* ---------- 筛选栏 ---------- */
+.filters { display: flex; flex-direction: column; gap: var(--s-4); }
+.fgroup { display: flex; flex-direction: column; gap: var(--s-3); }
+.fgroup-lb { font-size: var(--fz-2); color: var(--fog-700); display: flex; align-items: center; gap: var(--s-3); }
+.fgroup-lb .n { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); }
+.fchips { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.fchip {
+  min-height: var(--touch-min); padding: 0 var(--s-4); border-radius: var(--r-xs);
+  border: 1px solid var(--brd-2); background: transparent; color: var(--fog-800);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer; white-space: nowrap;
+}
+.fchip[aria-pressed="true"] { background: var(--jade-a12); border-color: var(--jade-500); color: var(--jade-600); font-weight: 600; }
+.fmore {
+  min-height: var(--touch-min); padding: 0 var(--s-4); border-radius: var(--r-xs);
+  border: 1px dashed var(--brd-2); background: transparent; color: var(--fog-600);
+  font-size: var(--fz-2); cursor: pointer;
+}
+
+/* ---------- 结果列表 ---------- */
+.rlist { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-3); }
+.rcard {
+  text-align: left; width: 100%; cursor: pointer; font-family: var(--ff-ui);
+  padding: var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  box-shadow: var(--sh-1);
+  display: flex; flex-direction: column; gap: var(--s-3);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out);
+}
+.rcard:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.rcard-top { display: flex; align-items: flex-start; gap: var(--s-4); }
+.rcard-t { font-size: var(--fz-5); color: var(--fog-900); font-weight: 600; line-height: 1.3; }
+.rcard-org { font-size: var(--fz-3); color: var(--fog-800); margin-top: 4px; }
+.rcard-pay { margin-left: auto; flex: 0 0 auto; text-align: right; }
+.rcard-pay b { display: block; font-family: var(--ff-num); font-size: var(--fz-5); color: var(--jade-600); }
+.rcard-pay span { font-size: var(--fz-1); color: var(--fog-600); }
+.rcard-meta { display: flex; gap: var(--s-3); flex-wrap: wrap; font-size: var(--fz-2); color: var(--fog-700); }
+.rcard-meta span { display: inline-flex; align-items: center; gap: 6px; }
+.rcard-foot { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
+
+/* 来源条：合规固定构件，不许省 */
+.srcline {
+  display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap;
+  font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .03em;
+}
+.srcline .org { color: var(--azure-400); }
+.srcline .sep { opacity: .45; }
+.srcline--detail { padding-top: var(--s-3); border-top: 1px solid var(--brd-1); }
+
+/* 线上 / 线下双轨标记 */
+.track {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border-radius: var(--r-xs); font-size: var(--fz-1); letter-spacing: .04em; white-space: nowrap;
+}
+.track--online { background: var(--azure-a12); color: var(--azure-400); border: 1px solid var(--azure-a20); }
+.track--offline { background: var(--amber-a12); color: var(--amber-600); border: 1px solid var(--amber-a20); }
+
+/* ---------- 空态 / 失败态：真实数据源一定会给，设计里必须有 ---------- */
+.blank {
+  flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-5); text-align: center; padding: var(--s-9) var(--s-8);
+}
+.blank .ic { width: 52px; height: 52px; color: var(--fog-600); }
+.blank b { font-family: var(--ff-display); font-size: var(--fz-7); color: var(--fog-900); }
+.blank p { margin: 0; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.7; max-width: 34em; }
+.blank .acts { display: flex; gap: var(--s-3); flex-wrap: wrap; justify-content: center; }
+
+/* ---------- 详情页 ---------- */
+.detail { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: var(--s-5); }
+.dhead { display: flex; flex-direction: column; gap: var(--s-3); }
+.dhead-t { font-family: var(--ff-display); font-size: var(--fz-9); line-height: 1.2; color: var(--fog-900); margin: 0; }
+.dhead-org { font-size: var(--fz-5); color: var(--fog-800); }
+.dhead-row { display: flex; gap: var(--s-4); flex-wrap: wrap; align-items: center; }
+.dsec { display: flex; flex-direction: column; gap: var(--s-3); }
+.dsec-t {
+  font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .16em;
+  padding-bottom: var(--s-2); border-bottom: 1px solid var(--brd-1);
+}
+.dsec-body { font-size: var(--fz-3); line-height: 1.8; color: var(--fog-800); }
+.dsec-body ul { margin: 0; padding-left: 1.3em; }
+.dsec-body li { margin-bottom: 6px; }
+
+/* 二维码：扫码投递 / 扫码预约的唯一形态 */
+.qr {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-4);
+  padding: var(--s-6); border-radius: var(--r-md);
+  background: var(--glass-2-bg); border: 1px solid var(--glass-2-brd);
+}
+.qr-box {
+  width: 190px; height: 190px; border-radius: var(--r-sm); background: #fff;
+  display: grid; place-items: center; box-shadow: var(--sh-2);
+  padding: 14px;
+}
+.qr-box svg { width: 100%; height: 100%; }
+.qr-cap { font-size: var(--fz-2); color: var(--fog-700); text-align: center; line-height: 1.6; }
+
+/* ---------- 离站确认层 ----------
+   权限矩阵红线：跳转第三方来源必须用户确认，AI 不替按。
+   所以这不是"提示条"，是真的拦截层——必须点确认才走。
+   岗位、招聘会、政策、企业四类外链共用这一层。 */
+.sheet-mask {
+  position: absolute; inset: 0; z-index: var(--z-sheet);
+  background: rgba(6, 10, 10, .58);
+  backdrop-filter: blur(6px);
+  display: grid; place-items: center; padding: var(--s-8);
+  animation: fadein var(--dur-3) var(--ease-out) both;
+}
+.sheet {
+  width: 100%; max-width: 720px;
+  border-radius: var(--r-lg); padding: var(--s-7);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  box-shadow: var(--sh-3), var(--glass-hi);
+  backdrop-filter: blur(var(--glass-blur-heavy));
+  display: flex; flex-direction: column; gap: var(--s-5);
+  animation: sheet-in var(--dur-4) var(--ease-out) both;
+}
+@keyframes sheet-in { from { opacity: 0; transform: translateY(26px) scale(.98); } to { opacity: 1; transform: none; } }
+.sheet-hd { display: flex; align-items: flex-start; gap: var(--s-4); }
+.sheet-hd .ic { width: 30px; height: 30px; color: var(--azure-400); flex: 0 0 auto; margin-top: 2px; }
+.sheet-t { font-family: var(--ff-display); font-size: var(--fz-7); color: var(--fog-900); margin: 0; line-height: 1.3; }
+.sheet-p { margin: 0; font-size: var(--fz-3); line-height: 1.75; color: var(--fog-700); }
+.sheet-p b { color: var(--fog-900); }
+.sheet-dest {
+  padding: var(--s-4) var(--s-5); border-radius: var(--r-sm);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+  font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-800);
+  word-break: break-all; line-height: 1.6;
+}
+.sheet-acts { display: flex; gap: var(--s-4); justify-content: flex-end; flex-wrap: wrap; }

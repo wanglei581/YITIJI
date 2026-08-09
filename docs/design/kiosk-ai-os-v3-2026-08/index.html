@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>26 页总览 — Kiosk AI 操作系统 V3</title>
+<style>
+  body {
+    margin: 0; padding: 30px 34px 60px;
+    background: radial-gradient(1400px 900px at 18% -14%, #12191b, #070a0b 60%, #040606);
+    color: #e8f1f1; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  h1 { font-family: "Songti SC", "SimSun", serif; font-size: 28px; font-weight: 600; margin: 0 0 8px; letter-spacing: .04em; }
+  .sub { margin: 0 0 8px; font-size: 13px; color: #8ba4a9; line-height: 1.75; max-width: 100ch; }
+  .sub b { color: #cfe0e0; font-weight: 600; }
+  .links { margin: 16px 0 26px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .links a {
+    display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 15px;
+    border-radius: 99px; border: 1px solid rgba(52,224,168,.34); color: #34e0a8;
+    text-decoration: none; font-size: 13px;
+  }
+  .links a.alt { border-color: rgba(232,241,241,.2); color: #b6c8c9; }
+  h2 {
+    font-size: 13px; letter-spacing: .22em; color: #6f8c90; font-weight: 500;
+    margin: 30px 0 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(232,241,241,.1);
+  }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    padding: 15px 17px; border-radius: 14px;
+    background: rgba(255,255,255,.035); border: 1px solid rgba(232,241,241,.1);
+    transition: border-color .2s, transform .2s, background .2s;
+  }
+  .card:hover { border-color: rgba(52,224,168,.42); transform: translateY(-2px); background: rgba(255,255,255,.06); }
+  .card.todo { opacity: .5; pointer-events: none; }
+  .row { display: flex; align-items: baseline; gap: 9px; }
+  .no { font-family: "SF Mono", Consolas, monospace; font-size: 12px; color: #5f7b7f; letter-spacing: .06em; }
+  .nm { font-size: 16px; color: #f2f7f7; font-weight: 600; letter-spacing: .02em; }
+  .st {
+    margin-left: auto; font-size: 11px; padding: 2px 8px; border-radius: 99px;
+    border: 1px solid rgba(52,224,168,.4); color: #34e0a8; white-space: nowrap;
+  }
+  .st.wait { border-color: rgba(232,241,241,.18); color: #7d9498; }
+  .ds { margin: 7px 0 0; font-size: 12px; color: #7f979c; line-height: 1.6; }
+  .src { margin: 8px 0 0; font-family: "SF Mono", Consolas, monospace; font-size: 11px; color: #5f7b7f; letter-spacing: .04em; }
+  footer { margin-top: 40px; font-size: 12px; color: #6a8286; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <h1>Kiosk AI 操作系统 V3 · 26 页总览</h1>
+  <p class="sub">
+    78 个原型编号（<b>kiosk-proto-2026-07</b>「75 屏」定稿）融合为 <b>26 页</b>，能力零丢失。每页承接的原型编号写在卡片下方。<br>
+    视觉与构图基线 = <b>P01 首页 · 鲜彩玻璃</b>。每页交付前必须过：四态同版面 / 纵向溢出 0 / 横向溢出 0 / 触控 ≥48px / 违禁文案 0。
+  </p>
+  <div class="links">
+    <a href="01-home-v5.html?theme=warm">▶ 打开基线首页</a>
+    <a class="alt" href="compare.html">首页三版构图对比</a>
+    <a class="alt" href="themes.html">9 套配色对照</a>
+    <a class="alt" href="README.md">设计说明书 + 覆盖矩阵</a>
+  </div>
+  <div id="out"></div>
+  <footer>
+    单页参数：<code>?theme=warm|honey|frost|amber|jade|cobalt|neon|pine|ink</code> ·
+    <code>?state=first|ai-down|device-off</code> ·
+    <code>?stage=s1…s6</code>（多阶段工作台）·
+    <code>?capture=1</code>（隐藏外壳按 1080×1920 原尺寸截图）<br>
+    自查：打开页面看 console，或在控制台调 <code>window.v3Audit()</code>。<br>
+    本目录不改 <code>apps/kiosk/</code> 生产代码；落地为第二阶段，需单独授权与文件预算。
+  </footer>
+
+<script>
+var G = [
+  ['入口与系统', [
+    ['P01', '首页 · 意图台', '六个定版入口 + 办理单编排 + 后台开关专区', '01', '01-home-v5.html?theme=warm'],
+    ['P02', '待机唤醒屏', '轮播 + 触摸唤醒 + 离线缓存', '57', '02-standby.html?theme=warm'],
+    ['P03', '身份门', '扫码 + 手机号 + 游客，弹层形态', '15, 63', '03-identity-gate.html?theme=warm&stage=s1'],
+    ['P04', '系统态', '帮助 / 法务 / 超时 / 断网 / 会话恢复，一页多形态', '58, 59, 60, 61, 77', '04-system-states.html?theme=warm&stage=s1'],
+    ['P05', '手机接力', '390×844，只承接当前一体机会话', '62, 63', '05-phone-relay.html?theme=warm&stage=s1']
+  ]],
+  ['打印扫描', [
+    ['P06', '打印工作台', '上传→体检→预览→参数→确认→收银→出纸→取件，六阶段一页', '02, 03, 04, 31, 32, 33, 64, 65, 77', '06-print-workbench.html?theme=warm&stage=s3'],
+    ['P07', '扫描工作台', '类型→指引→等待→结果，四阶段一页', '34, 35, 36, 37', '07-scan-workbench.html?theme=warm&stage=s3'],
+    ['P08', '文件加工台', '图片转 PDF / 签章 / 证件照未开放', '66, 67, 68', '08-file-tools.html?theme=warm&stage=t1']
+  ]],
+  ['简历与材料', [
+    ['P09', '简历工作台', '来源→解析→诊断→优化对比→版本→导出打印', '05, 06, 07, 26, 27, 28', '09-resume-workbench.html?theme=warm&stage=s3'],
+    ['P10', '访谈式生成', '小青逐题问，边答边成形；跳过的不编造', '25, 26', '10-resume-interview.html?theme=warm&stage=s2'],
+    ['P11', '岗位匹配对比', '三档参考（禁百分比）+ 逐项证据对照', '55', '11-jobfit-compare.html?theme=warm&stage=s2'],
+    ['P12', '材料工厂', '求职信 / 自我介绍 / 材料清单 / 简历模板 四件套', '29, 30', '12-material-factory.html?theme=warm&stage=t1']
+  ]],
+  ['岗位与企业', [
+    ['P13', '岗位情报台', '列表 + 筛选 + 线上线下双轨 + AI 收敛', '08, 78', '13-jobs-desk.html?theme=warm&stage=ok'],
+    ['P14', '岗位详情', '来源机构 / 同步时间 / 外部 ID / 扫码投递', '09', '14-job-detail.html?theme=warm&stage=ok'],
+    ['P15', '企业导览', '找企业 + 企业详情（指标受后台开关控制）', '53, 54', '15-companies.html?theme=warm&stage=list'],
+    ['P16', '线下机构', '机构列表 + 线下岗位；仅信息展示与到店指引', '74, 75', '16-offline-agencies.html?theme=warm&stage=list']
+  ]],
+  ['招聘会与校园', [
+    ['P17', '招聘会作战台', '场次→企业→导览→AI 准备单→资料打印→签到→现场数据', '10, 11, 43–49', '17-fair-desk.html?theme=warm&stage=s2'],
+    ['P18', '校园招聘专区', '校招季节条 + 逐场活动来源可核 + 计划表打印', '50', '18-campus.html?theme=warm&stage=s2'],
+    ['P19', '智慧校园', '未接入锁定态 + 接入后示意（明确标注非当前状态）', '51, 52, 69, 70', '19-smart-campus.html?theme=warm&stage=s1']
+  ]],
+  ['面试 · 政策 · 规划', [
+    ['P20', '面试训练舱', '设置→逐题→报告→历史→技巧', '38–42', '20-interview-pod.html?theme=warm&stage=s2'],
+    ['P21', '政策服务', '三类政策 + 材料清单打印', '12', '21-policy.html?theme=warm&stage=s1'],
+    ['P22', '职业规划', '现状 / 方向建议 / 行动项 / 打印', '56, 76', '22-career-plan.html?theme=warm&stage=s2']
+  ]],
+  ['我的 · 顾问', [
+    ['P23', '我的 · 资产中心', '简历 / 文档 / 订单 / AI 记录 / 收藏 / 权益 / 通知 / 设置', '14, 16–23, 71', '23-me.html?theme=warm&stage=s1'],
+    ['P24', '权益活动', '活动列表 + 详情领取', '24, 72', '24-benefits.html?theme=warm&stage=s1'],
+    ['P25', '顾问驾驶舱', '小青 + 文字对话 + 语音咨询态 + 九能力入口', '13, 73', '25-advisor.html?theme=warm&stage=s1'],
+    ['P26', '顾问作业面', 'A 问答型 / B 填槽型 / C 比对型，三态同页', '九能力', '26-advisor-work.html?theme=warm&stage=sA']
+  ]]
+]
+document.getElementById('out').innerHTML = G.map(function (g) {
+  return '<h2>' + g[0] + '</h2><div class="grid">' + g[1].map(function (p) {
+    var done = !!p[4]
+    return '<a class="card' + (done ? '' : ' todo') + '" href="' + (p[4] || '#') + '">' +
+      '<div class="row"><span class="no">' + p[0] + '</span><span class="nm">' + p[1] + '</span>' +
+      '<span class="st' + (done ? '' : ' wait') + '">' + (done ? '已交付' : '待做') + '</span></div>' +
+      '<p class="ds">' + p[2] + '</p>' +
+      '<p class="src">承接原型 ' + p[3] + '</p></a>'
+  }).join('') + '</div>'
+}).join('')
+</script>
+</body>
+</html>

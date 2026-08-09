@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P24 权益活动 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P24 权益活动">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P24 专用 ───────────────────────────────────────────────────────────
+   权益页最容易做成**诱导机器**：签到、积分、抽奖、限时秒杀、
+   "再邀请 1 人解锁"。这些手法本身是成熟的，但用在这台机器上不合适 ——
+   站在这里的人多数正在找工作、手头紧，把他们的时间和注意力
+   换成运营指标，是拿他们的处境换我们的数字。
+
+   所以本页的纪律：
+   · 不做签到、不做积分、不做抽奖、不做邀请裂变、不做倒计时催促
+   · 每一项必须标明**谁出的钱**（政府补贴 / 机构赞助 / 平台自营）——
+     出钱方决定了它靠不靠谱、以及为什么免费
+   · 领不了就直说领不了，并说清卡在哪 —— 不用灰按钮糊弄
+   · 不承诺"名额有限手慢无"，除非那是来源方公告里的原话且标明出处
+
+   组件备忘：.tl 本身是一步（容器 .tline）；.ck / .jobrow 页内自带。
+   ──────────────────────────────────────────────────────────────────── */
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-4); padding-bottom:var(--s-6); }
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 权益卡：出资方 + 能不能领 + 卡在哪 */
+.bf { padding:var(--s-5); border-radius:var(--r-md);
+      background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+      display:flex; flex-direction:column; gap:var(--s-3); }
+.bf-hd { display:flex; align-items:flex-start; gap:var(--s-4); }
+.bf-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.bf-src { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
+.bf-state-status { flex:0 0 auto; font-size:var(--fz-2); font-weight:700;
+      padding:3px 11px; border-radius:999px; white-space:nowrap; }
+.bs--can  { background:var(--jade-a20); color:var(--jade-200); }
+.bs--gap  { background:var(--amber-a12); color:var(--amber-200); }
+.bs--out  { background:var(--fog-a08); color:var(--fog-600); }
+.bs--had  { background:var(--fog-a08); color:var(--fog-700); }
+.bf-p { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; }
+.bf-p b { color:var(--fog-900); }
+
+/* 出资方标记：这一页最要紧的一列信息 */
+.payer { display:inline-flex; align-items:center; gap:5px; font-size:var(--fz-1);
+         padding:2px 9px; border-radius:var(--r-xs); font-family:var(--ff-num); }
+.payer .ic { width:13px; height:13px; }
+.py--gov { background:var(--jade-a12); color:var(--jade-200); }
+.py--org { background:var(--fog-a08); color:var(--fog-700); }
+.py--own { background:var(--amber-a12); color:var(--amber-200); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">权益活动</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #B-2077</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>16:10</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">现在能用什么</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">这一项怎么用</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">已有与用掉的</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 现在能用什么 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <b>本机现在能用的 6 项</b>
+          <span class="mt">每项都标了谁出的钱</span>
+        </div>
+        <div class="sec">
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>先说清楚谁出的钱</b> —— 这决定了一项权益靠不靠谱、以及为什么免费：<br>
+                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
+                  由人社部门出资，面向符合条件的求职者 ·
+                  <span class="payer py--org"><svg class="ic"><use href="#i-building"/></svg>机构赞助</span>
+                  合作机构出资，通常有推广目的 ·
+                  <span class="payer py--own"><svg class="ic"><use href="#i-printer"/></svg>本机自营</span>
+                  我们自己减免，成本我们承担</span>
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>本机<b>不做签到、不做积分、不做抽奖、不做邀请解锁</b>。<br>
+                  站在这里的人多数正在找工作、时间紧。
+                  把你的时间换成我们的运营数字，那是拿你的处境换我们的指标。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="joblist">
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">求职者免费打印额度 · 每月 20 页</span>
+                <span class="bf-src">
+                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
+                  市人社局「就业服务进社区」专项 · 同步 8月9日 07:30
+                </span>
+              </span>
+              <span class="bf-state-status bs--can" style="margin-left:auto">本机可领</span>
+            </div>
+            <div class="bf-p">
+              本月你还剩 <b>7 页</b>。用于打印简历、求职材料，<b>不能兑现、不能转让</b>。<br>
+              领取要核验：本市户籍或本市缴社保 + 已做失业登记。
+              <b>这两条和政策服务页里那条求职创业补贴是同一套核验</b>，办过一次就都通了。
+            </div>
+          </div>
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">首次上传简历 · 免费 AI 诊断一次</span>
+                <span class="bf-src">
+                  <span class="payer py--own"><svg class="ic"><use href="#i-printer"/></svg>本机自营</span>
+                  成本由本机承担
+                </span>
+              </span>
+              <span class="bf-state-status bs--had" style="margin-left:auto">你已用过</span>
+            </div>
+            <div class="bf-p">
+              8月9日 15:04 已使用。<br>
+              <b>顺带说清：AI 诊断、优化、面试练习、政策核对本来就都不收费</b> ——
+              这一项只是历史遗留的标注，不是"用完就要付费"。
+            </div>
+          </div>
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">秋季招聘会 · 现场简历打印 5 折</span>
+                <span class="bf-src">
+                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
+                  市人社局 · 限 8月12日 当天 · 限 A 馆内机器
+                </span>
+              </span>
+              <span class="bf-state-status bs--gap" style="margin-left:auto">时间未到</span>
+            </div>
+            <div class="bf-p">
+              8月12日 当天在 A 馆内的机器上自动生效，<b>不用领、不用出示任何东西</b>。<br>
+              本机就在 A 馆，那天来直接打就是半价。
+            </div>
+          </div>
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">职业技能培训 · 首课免费试听</span>
+                <span class="bf-src">
+                  <span class="payer py--org"><svg class="ic"><use href="#i-building"/></svg>机构赞助</span>
+                  某职业培训学校 · 有推广目的
+                </span>
+              </span>
+              <span class="bf-state-status bs--can" style="margin-left:auto">本机可领</span>
+            </div>
+            <div class="bf-p">
+              领了会打一张凭证，到机构报到时出示。<br>
+              <b>提醒两句</b>：① 这是机构出钱做推广，试听后大概率会被推荐付费课程，
+              <b>你没有义务报名</b>；② 如果你想申领政策里的培训补贴，
+              <b>先查当年目录再报名</b> —— 不在目录内的培训不补，顺序反了钱拿不回来。
+            </div>
+          </div>
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">应届生专项 · 简历打印 10 页免费</span>
+                <span class="bf-src">
+                  <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
+                  省教育厅学生服务中心 · 需学信网核验
+                </span>
+              </span>
+              <span class="bf-state-status bs--out" style="margin-left:auto">你不符合</span>
+            </div>
+            <div class="bf-p">
+              限毕业 2 年内。<b>按你在本机填的情况看你不属于这一类</b> ——
+              如果本机判错了，去核验窗口以他们的认定为准，本机不做资格认定。
+            </div>
+          </div>
+
+          <div class="bf">
+            <div class="bf-hd">
+              <span>
+                <span class="bf-t">线上简历模板包</span>
+                <span class="bf-src">
+                  <span class="payer py--org"><svg class="ic"><use href="#i-building"/></svg>机构赞助</span>
+                  某招聘平台
+                </span>
+              </span>
+              <span class="bf-state-status bs--out" style="margin-left:auto">本机领不了</span>
+            </div>
+            <div class="bf-p">
+              这一项要在对方 App 里登录才能领，<b>本机领不了，也不替你去领</b>。<br>
+              说明它存在是让你知道有这回事；要不要去对方平台注册，你自己决定。
+            </div>
+          </div>
+
+        </div>
+
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          以上 6 项来自<b>各自的出资方</b>，同步于 8月9日 07:30。
+          能否领取、发放多少，<b>以出资方规则为准</b>；本机只做展示与核销，不代办、不代领。
+        </div>
+      </div>
+
+      <!-- ─────────── S2 这一项怎么用 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <b>求职者免费打印额度 · 每月 20 页</b>
+          <span class="mt">
+            <span class="payer py--gov"><svg class="ic"><use href="#i-agency"/></svg>政府补贴</span>
+            市人社局「就业服务进社区」专项
+          </span>
+        </div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本月剩余</span><span class="v"><b>7</b> 页</span></div>
+            <div class="kv-row"><span class="k">本月已用</span><span class="v">13 页</span></div>
+            <div class="kv-row"><span class="k">重置时间</span><span class="v">每月 1 日 00:00</span></div>
+            <div class="kv-row"><span class="k">可用范围</span><span class="v">简历与求职材料</span></div>
+            <div class="kv-row"><span class="k">能否兑现</span><span class="v v--fog">不能</span></div>
+            <div class="kv-row"><span class="k">能否转让</span><span class="v v--fog">不能</span></div>
+            <div class="kv-row"><span class="k">跨机器通用</span><span class="v">是 · 全市联网机器</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">市人社局 · 同步 8月9日 07:30</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>怎么用 · 你现在卡在哪</b>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">本市户籍或本市缴社保</span>
+                <span class="tl-s">你在政策服务页选了本市户籍 —— 这条通了</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">已做失业登记</span>
+                <span class="tl-s"><b>本机查不到你的登记状态</b> ——
+                  没登记的话这条不成立。政务网或街道办可以办</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">在本机核验后自动抵扣</span>
+                <span class="tl-s">通过后打印时自动从额度里扣，不用每次点领取</span></span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>第 2 条<b>本机判不了</b>，所以这里不给"你已符合"的结论 ——
+                  真正的核验在核销那一刻由人社系统做，<b>本机只是转述规则</b>。<br>
+                  如果核验没过，打印会按正常价收费，<b>不会先扣额度再告诉你不行</b>。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>核验只在<b>核销那一次</b>调用人社接口，本机<b>不保存你的核验结果</b>，
+                  也拿不到你的其他社保信息。</span>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-target"/></svg><b>剩的 7 页，怎么用不浪费</b>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先把简历改到能投，再打</span>
+                <span class="tl-s">打完才发现要改，那几页就白扔了 —— 这是最常见的浪费</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">按实际要去的场次算份数</span>
+                <span class="tl-s">招聘会作战台会按你选的企业数算「每家 2 份」，不用凭感觉多打</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">证件、成绩单这类先扫成 PDF，别急着打</span>
+                <span class="tl-s">网申上传用电子版就够，到要交纸质件时再打</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-5)">
+            <b>用完之后</b>：照常能打，按公示价自付；9月1日 00:00 重置。
+            不能预支、不能攒到下月。<br>
+            用完<b>不影响任何功能</b> —— AI 诊断、优化、面试练习、政策核对本来就不收费，
+            额度只管纸张。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 已有与用掉的 ─────────── -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-history"/></svg>
+          <b>你的使用记录</b>
+          <span class="mt">只记核销，不记你打了什么内容</span>
+        </div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本月免费额度</span><span class="v">已用 13 / 20 页</span></div>
+            <div class="kv-row"><span class="k">本月省下</span><span class="v"><b>2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">累计使用</span><span class="v">3 项权益</span></div>
+            <div class="kv-row"><span class="k">已过期未用</span><span class="v">1 项</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <b>核销明细</b>
+        </div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">免费打印额度 · 扣 6 页</span>
+                <span class="tl-s">8月9日 15:19 · 01 号机 · 省 1.20 元</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">免费打印额度 · 扣 7 页</span>
+                <span class="tl-s">8月2日 10:33 · 03 号机 · 省 1.40 元</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">首次简历 AI 诊断 · 已用</span>
+                <span class="tl-s">8月9日 15:04 · 01 号机</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-close"/></svg></span>
+              <span class="tl-b"><span class="tl-t">7 月招聘会打印折扣 · 未使用已过期</span>
+                <span class="tl-s">7月31日 失效 · 本机没提醒你，这是我们的问题</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>上面最后一条<b>本机没有提醒你</b> —— 因为本机没有你的手机号，
+                  也不打算要。<br>
+                  代价是这类限时权益可能会过期。<b>这是我们选的取舍，如实告诉你</b>。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            记录只有<b>用了哪一项、什么时候、在哪台机器、省了多少钱</b>，
+            不含你打印的内容。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-history"/></svg><b>再往前</b>
+            <span class="mt">近 3 个月</span>
+          </div>
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">7 月免费额度 · 用 12 / 20 页</span>
+                <span class="tl-s">7月 · 省 2.40 元 · 剩余 8 页月底清零</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">6 月免费额度 · 用 5 / 20 页</span>
+                <span class="tl-s">6月 · 省 1.00 元 · 那个月你只来过一次</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-close"/></svg></span>
+              <span class="tl-b"><span class="tl-t">6 月技能培训试听券 · 未使用已过期</span>
+                <span class="tl-s">6月30日 失效 · 同样没提醒你</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span><b>这些数字可以自己对账</b>：每一条核销都对应「打印订单」里的一单，
+                  页数、时间、机器编号能一一对上。<br>
+                  对不上就是我们错了 —— 拿着订单号找现场工作人员。</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这 6 项的状态</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本机可领</span><span class="v"><b>2</b> 项</span></div>
+            <div class="kv-row"><span class="k">条件未到</span><span class="v"><b>1</b> 项</span></div>
+            <div class="kv-row"><span class="k">你不符合</span><span class="v"><b>1</b> 项</span></div>
+            <div class="kv-row"><span class="k">本机领不了</span><span class="v"><b>1</b> 项</span></div>
+            <div class="kv-row"><span class="k">已用过</span><span class="v"><b>1</b> 项</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            不符合和领不了的<b>也列出来</b> —— 藏起来你会以为本机没有，
+            反而去别处花钱。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机在权益上不做的事</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">签到 / 打卡</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">积分 / 等级</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">抽奖 / 盲盒</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">邀请解锁</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">倒计时催促</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">默认勾选</span><span class="v v--fog">不做</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这些手法本身是成熟的，但用在这台机器上不合适 ——
+                  站在这里的人多数正在找工作、手头紧。<br>
+                  <b>把他们的时间换成我们的运营数字，是拿他们的处境换我们的指标。</b></span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机也<b>不向你收求职服务费、内推费、会员费</b>。
+            只收打印纸张的钱，价格现场公示。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>这项谁出的钱</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">出资方</span><span class="v">市人社局</span></div>
+            <div class="kv-row"><span class="k">项目名</span><span class="v">就业服务进社区</span></div>
+            <div class="kv-row"><span class="k">本机角色</span><span class="v">核销点</span></div>
+            <div class="kv-row"><span class="k">本机收入</span><span class="v v--fog">按页结算</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            你免费打的这些页，<b>本机是按页向人社结算的</b> ——
+            所以这不是我们送你的，是政府买单。<b>说清楚比让你欠人情强。</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>用之前想清楚的</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+            <b>额度按月清零，不累积。</b><br>
+            剩的 7 页这个月不用就没了，<b>但也没必要为了用完而多打</b> ——
+            打出来用不上的纸是浪费，不是省钱。
+            <br><br>
+            <b>先想清楚要投哪几家，再决定打几份。</b><br>
+            招聘会作战台可以帮你算该带几份。
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>本机<b>不会催你「额度快过期了」</b> ——
+                  那种提醒是为了让你多用，不是为了帮你。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>一共省了多少</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本月</span><span class="v"><b>2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">累计</span><span class="v"><b>6.80</b> 元</span></div>
+            <div class="kv-row"><span class="k">本月自付</span><span class="v"><b>0.00</b> 元</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            金额不大，但这是<b>真实发生的核销</b>，不是虚拟积分。
+            每一笔都能在打印订单里对上。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>过期那一条</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+            7 月那张招聘会折扣券，<b>本机没提醒你就让它过期了</b>。<br><br>
+            原因是本机没有你的手机号，也不打算要 —— 要了就得存、就得保护、
+            就多一处可能泄露的地方。<br><br>
+            <b>代价就是这类限时权益会过期。</b>这是我们选的取舍，
+            不是疏忽，也不打算靠"要个手机号"来解决。
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span>能做的是：<b>限时权益尽量做成"到时候自动生效"</b>，
+                  不需要你记得领 —— 8月12日 那个 5 折就是这样。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            列出本机现在能用的权益，每项标明<b>谁出的钱</b>、能不能领、卡在哪。<br>
+            <b>不做签到、不做积分、不做抽奖。</b>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">看全部权益</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s1">看全部权益</button>
+
+    <span class="actionbar-hint" data-at="s1">2 项可领 · 不符合与领不了的也列出来了</span>
+    <span class="actionbar-hint" data-at="s2">核验在核销那一刻做 · 不会先扣额度再说不行</span>
+    <span class="actionbar-hint" data-at="s3">本月已省 2.60 元 · 每笔都能在打印订单里对上</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2">看这一项怎么用<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s2" href="21-policy.html">去看怎么办失业登记<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="06-print-workbench.html">去打印<svg class="ic"><use href="#i-printer"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

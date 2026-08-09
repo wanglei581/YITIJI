@@ -1,0 +1,154 @@
+/* ============================================================
+   V3 · 动效层（fx）
+   ------------------------------------------------------------
+   纪律：每个效果必须对应一个含义，不做纯装饰。
+     神经连线  = 目标正在被翻译成任务链
+     扫描掠过  = 系统在盘点你的材料
+     步骤流点  = 办理顺序的推进方向
+     光斑跟手  = 触点反馈（一体机没有鼠标，手感全靠这个）
+     数字滚动  = 数据刚刚到位
+     心跳条    = 设备按固定节拍上报（不是伪造的数据图）
+   全部只动 transform / opacity / filter，reduced-motion 下自动退化。
+   ============================================================ */
+
+/* ---------- 启动序列：像系统在开机，而不是网页在加载 ---------- */
+.rise { opacity: 0; transform: translateY(20px); filter: blur(10px); animation: boot var(--dur-4) var(--ease-out) forwards; }
+@keyframes boot { to { opacity: 1; transform: none; filter: none; } }
+.topbar, .actionbar, .navbar { animation: fadein var(--dur-4) var(--ease-out) both; }
+.actionbar { animation-delay: 260ms; }
+.navbar { animation-delay: 340ms; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- 活体标记：建议是"刚生成的活建议"，不是写死的静态文案 ----------
+   首页版面里顾问卡与办理单是紧邻的，没有空间走长连线；
+   连线机制保留在 fx.js，供有纵向空间的页面（如顾问驾驶舱）使用。 */
+.livebar {
+  position: absolute; left: 0; top: 22px; bottom: 22px; width: 3px;
+  border-radius: 0 3px 3px 0; overflow: hidden;
+  background: var(--jade-a20);
+}
+.livebar::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -40%; height: 40%;
+  background: linear-gradient(180deg, transparent, var(--jade-400), transparent);
+  animation: livebar 3.6s var(--ease-in-out) infinite;
+}
+@keyframes livebar { 0% { top: -40%; } 70%, 100% { top: 100%; } }
+.screen[data-state="ai-down"] .livebar { background: var(--surf-3); }
+.screen[data-state="ai-down"] .livebar::after { display: none; }
+.screen[data-state="device-off"] .livebar { background: var(--amber-a20); }
+.screen[data-state="device-off"] .livebar::after { background: linear-gradient(180deg, transparent, var(--amber-400), transparent); }
+
+/* ---------- 神经连线：顾问 → 任务链。JS 量好坐标后写入 path ---------- */
+.fx-link { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.fx-link path { fill: none; stroke: var(--jade-a32); stroke-width: 1.5; stroke-linecap: round; }
+.fx-link .flow {
+  stroke: var(--jade-400); stroke-width: 2;
+  stroke-dasharray: 3 15; stroke-dashoffset: 0;
+  filter: drop-shadow(0 0 6px var(--jade-a32));
+  animation: flow 2.4s linear infinite;
+}
+@keyframes flow { to { stroke-dashoffset: -180; } }
+.screen[data-state="ai-down"] .fx-link { opacity: 0; }
+
+/* ---------- 光斑跟手：一体机的触感全靠这一层 ---------- */
+.tile::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), var(--jade-a12), transparent 68%);
+  opacity: 0; transition: opacity var(--dur-2) var(--ease-out);
+  z-index: 1;
+}
+.tile:hover::before, .tile.is-touch::before { opacity: 1; }
+/* 印务台的主服务块同样跟手 */
+.slab::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(300px circle at var(--mx, 50%) var(--my, 0%), var(--jade-a12), transparent 66%);
+  opacity: 0; transition: opacity var(--dur-2) var(--ease-out);
+}
+.slab:hover::before { opacity: 1; }
+
+/* 涟漪：按下点扩散一次，不循环 */
+.ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, var(--jade-a32), transparent 70%);
+  transform: translate(-50%, -50%) scale(0); opacity: .9;
+  animation: ripple 620ms var(--ease-out) forwards;
+}
+@keyframes ripple { to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+
+/* ---------- 步骤流点：指出办理方向 ---------- */
+.steps-wrap { position: relative; }
+.steps-wrap::after {
+  content: ""; position: absolute; left: -1px; top: 0;
+  width: 2px; height: 46px; border-radius: 2px;
+  background: linear-gradient(180deg, transparent, var(--jade-400), transparent);
+  animation: spine 3.4s var(--ease-in-out) infinite;
+}
+@keyframes spine { 0% { top: 0; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { top: calc(100% - 46px); opacity: 0; } }
+.screen[data-state="ai-down"] .steps-wrap::after { display: none; }
+
+/* ---------- 盘点扫描：只在"系统正在读"时出现 ---------- */
+.band { position: relative; overflow: hidden; }
+.band.is-thinking::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -160px; height: 160px; z-index: 3;
+  background: linear-gradient(180deg, transparent, var(--jade-a20) 60%, transparent);
+  animation: sweep 1.1s var(--ease-in-out) 2;
+}
+@keyframes sweep { to { top: 100%; } }
+.band.is-thinking .steps .step { opacity: .35; }
+
+/* 印务台：建议区被扫描 + 肖像被一道光掠过 + 脊上节点转灰待写入 */
+.advice.is-thinking { position: relative; }
+.advice.is-thinking::after {
+  content: ""; position: absolute; left: -4px; right: 0; top: -120px; height: 120px; z-index: 3;
+  background: linear-gradient(180deg, transparent, var(--jade-a20) 62%, transparent);
+  animation: sweep 1.05s var(--ease-in-out) 2;
+}
+.advice.is-thinking .advice-h, .advice.is-thinking .advice-p { opacity: .4; }
+.figure.is-think::after {
+  content: ""; position: absolute; left: 0; right: 0; top: -50%; height: 50%; z-index: 2;
+  background: linear-gradient(180deg, transparent, var(--jade-a32) 58%, transparent);
+  animation: sweep 1.05s var(--ease-in-out) 2;
+}
+.node.is-writing { animation: writein 420ms var(--ease-out) both; }
+
+/* 思考中：球转得更快；顾问卡则由一道光掠过照片（人在看你的材料） */
+.orb.is-think i:nth-child(1) { animation-duration: 3.2s; opacity: .85; }
+.orb.is-think i:nth-child(2) { animation-duration: 1.1s; }
+.advisor.is-think .advisor-photo::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -60%; height: 60%; z-index: 1;
+  background: linear-gradient(180deg, transparent, var(--jade-a32) 62%, transparent);
+  animation: sweep 1.1s var(--ease-in-out) 2;
+}
+.advisor.is-think { border-color: var(--jade-a32); }
+
+/* 步骤逐条写入 */
+.step.is-writing { animation: writein 420ms var(--ease-out) both; }
+@keyframes writein { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- 数字滚动：数据刚到位 ---------- */
+.num { font-family: var(--ff-num); font-variant-numeric: tabular-nums; }
+
+/* ---------- 设备心跳条：表达上报节拍，不表达数值 ---------- */
+.beat { height: 2px; border-radius: 2px; background: var(--surf-3); position: relative; overflow: hidden; }
+.beat::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -30%; width: 30%;
+  background: linear-gradient(90deg, transparent, var(--jade-400), transparent);
+  animation: beat 5s var(--ease-in-out) infinite;
+}
+@keyframes beat { 0% { left: -30%; } 55%, 100% { left: 100%; } }
+.screen[data-state="device-off"] .beat::after { background: linear-gradient(90deg, transparent, var(--coral-400), transparent); animation-duration: 2.4s; }
+
+/* ---------- 主按钮：待命呼吸（只在它是唯一下一步时） ---------- */
+.btn--primary.is-next { animation: nextpulse 2.8s var(--ease-in-out) infinite; }
+@keyframes nextpulse {
+  0%, 100% { box-shadow: var(--sh-jade), var(--glass-hi); }
+  50%      { box-shadow: 0 14px 46px -12px var(--jade-a32), 0 0 0 6px var(--jade-a12), var(--glass-hi); }
+}
+
+/* ---------- 输入区：打字机光标只在没输入时闪 ---------- */
+.goalfield.has-value .caret { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-link .flow, .steps-wrap::after, .beat::after { animation: none; }
+  .fx-link .flow { stroke-dasharray: none; opacity: .5; }
+}

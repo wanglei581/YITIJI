@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P19 智慧校园 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P19 智慧校园">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P19 专用 ───────────────────────────────────────────────────────────
+   这一页的设计任务和别的页不一样：**它的主状态是「还没有」**。
+
+   智慧校园要学校方开通并授权才有数据。没开通时，页面绝不能摆假的报到人数、
+   假的宿舍分配、假的办事进度 —— 那是 CLAUDE.md §9「不伪造能力」直接命中的场景，
+   而且是最容易犯的那一类：空页面看着寒酸，就顺手填几个数字撑场面。
+
+   所以本页的纪律：
+   · s1 是本机此刻的真实状态，一个数字都不编，该显示「未接入」就显示「未接入」
+   · s2 / s3 是「接入后长什么样」，必须常驻横幅说明这不是当前状态
+   · 锁定态不是死页 —— 要给出此刻真正能用的替代路径
+   ──────────────────────────────────────────────────────────────────── */
+
+/* 锁定态主视觉：不用灰底大锁那种"故障感"，这不是坏了，是还没开通 */
+.lockcard { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.lock-ic { width:64px; height:64px; border-radius:var(--r-md); display:grid; place-items:center;
+           background:var(--fog-a08); border:1px solid var(--fog-a12); }
+.lock-ic .ic { width:30px; height:30px; color:var(--fog-600); }
+.lock-t { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.lock-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.62; max-width:34em; }
+.lock-p b { color:var(--fog-900); }
+
+/* 「接入后会有什么」：列的是能力，不是数据。每条都不带数字。 */
+.willhave { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); }
+.wh { display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-4);
+      border-radius:var(--r-xs); background:var(--fog-a04); border:1px dashed var(--fog-a12); }
+.wh .ic { width:19px; height:19px; color:var(--fog-600); flex:0 0 auto; margin-top:1px; }
+.wh-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.wh-t { font-size:var(--fz-3); color:var(--fog-700); }
+.wh-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 预览横幅：s2 / s3 常驻，不可关闭 */
+.previewbar { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.previewbar .ic { width:21px; height:21px; color:var(--amber-400); flex:0 0 auto; }
+.previewbar span { font-size:var(--fz-3); color:var(--amber-200); line-height:1.55; }
+.previewbar b { color:var(--fog-900); }
+
+/* 预览内容整体降饱和，进一步和真实状态拉开 */
+.previewwrap { opacity:.82; filter:saturate(.72); display:flex; flex-direction:column;
+               gap:var(--s-4); flex:1 1 auto; min-height:0; }
+
+/* 预览到此为止的收尾块。
+   s2/s3 是「不存在的功能」的预览 —— 空白处不能再填内容，
+   那等于编造更多不存在的东西，正好违背本页自己的主张。
+   所以这里放的是「为什么到此为止」，用诚实填，不用数据填。 */
+.stophere { flex:1 1 auto; margin-top:var(--s-4); padding:var(--s-6) var(--s-5);
+  border-radius:var(--r-md); border:1px dashed var(--fog-a20); background:var(--fog-a04);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.sh-t { font-size:var(--fz-4); color:var(--fog-800); font-weight:600; }
+.sh-p { font-size:var(--fz-2); color:var(--fog-600); line-height:1.7; max-width:36em; }
+.sh-p b { color:var(--fog-800); }
+
+/* 能用的替代路径 */
+.alt { display:flex; align-items:flex-start; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+       border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:var(--touch-min);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; }
+.alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+.tl-s2 { font-size:var(--fz-1); color:var(--fog-600); }
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">智慧校园</div>
+        <div class="brand-sub">职易达 · 01 号机 · 市人力资源市场 A 馆</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--down"></span>未接入学校系统</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>11:04</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">接入后 · 迎新</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">接入后 · 自助服务</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 本机当前状态（真实） ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="lockcard">
+          <span class="lock-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+          <div class="lock-t">这台机器还没有接入任何学校的校园系统</div>
+          <div class="lock-p">
+            智慧校园的迎新、学籍、成绩、宿舍这些数据<b>在学校手里</b>，
+            要学校方开通并授权，本机才能读到。
+            <b>本机不代替学校做这件事，也不会去猜。</b><br><br>
+            所以这一页现在<b>没有任何数据可以显示</b> ——
+            不是坏了，是还没开通。下面列的是接入后会有什么、以及你现在就能用的。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <b>学校接入后，这一页会有</b>
+          <span class="mt">列的是能力，不是数据 —— 没接入就没有数字</span>
+        </div>
+        <div class="sec">
+          <div class="willhave">
+            <div class="wh"><svg class="ic"><use href="#i-users"/></svg>
+              <span class="wh-b"><span class="wh-t">迎新报到指引</span>
+                <span class="wh-s">按你的院系给报到顺序与地点</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-file"/></svg>
+              <span class="wh-b"><span class="wh-t">在读 / 学籍证明</span>
+                <span class="wh-s">自助打印，不用跑教务处排队</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-book"/></svg>
+              <span class="wh-b"><span class="wh-t">成绩单</span>
+                <span class="wh-s">网申常要，本机直接出纸</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-map"/></svg>
+              <span class="wh-b"><span class="wh-t">校内导览</span>
+                <span class="wh-s">宿舍、院系楼、办事窗口位置</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-bell"/></svg>
+              <span class="wh-b"><span class="wh-t">学校就业通知</span>
+                <span class="wh-s">宣讲会、双选会由学校就业网同步</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-idcard"/></svg>
+              <span class="wh-b"><span class="wh-t">校园卡相关办理</span>
+                <span class="wh-s">具体范围由学校决定</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>即使接入，本机也只读学校授权范围内的数据，<b>不留存学籍信息</b>，
+                  办理结束即清。具体开放哪些由学校方决定，不由本机决定。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>不用等接入，现在就能做的</b>
+          <span class="mt">这些不依赖学校系统</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+          <a class="alt" href="12-material-factory.html">
+            <svg class="ic"><use href="#i-package"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">打印录取通知书、报到材料</span>
+              <span class="alt-s">你手机里的电子版，扫码传到本机就能打。新生报到常要交的几样，一次打齐。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="07-scan-workbench.html">
+            <svg class="ic"><use href="#i-scan"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">扫描身份证、学生证、纸质成绩单</span>
+              <span class="alt-s">扫成 PDF 存进「我的文档」，网申上传直接用。证件类扫描件办理结束即清，不留存。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="18-campus.html">
+            <svg class="ic"><use href="#i-campus"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">看校招活动与截止日期</span>
+              <span class="alt-s">来自学校就业网与主办方的公开公告，不需要接入学校系统就能看。</span>
+            </span>
+          </a>
+
+          <a class="alt" href="09-resume-workbench.html">
+            <svg class="ic"><use href="#i-resume"/></svg>
+            <span class="alt-b">
+              <span class="alt-t">改简历并打印</span>
+              <span class="alt-s">校招简历压到一页、项目经历补结果，本机能改能打。</span>
+            </span>
+          </a>
+
+        </div>
+      </div>
+
+      <!-- ─────────── S2 接入后 · 迎新（预览） ─────────── -->
+      <div class="previewbar" data-at="s2 s3">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span data-at="s2"><b>这是学校接入后的样子，不是本机当前状态。</b>
+              下面所有内容都是示意，<b>不是任何真实学生的数据</b> ——
+              本机现在读不到任何学校系统。</span>
+        <span data-at="s3"><b>这是学校接入后的样子，不是本机当前状态。</b>
+              下面的办理项是示意，<b>现在一项都办不了</b>。</span>
+      </div>
+
+      <div class="previewwrap" data-at="s2">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-users"/></svg>
+            <b>迎新报到 · 按院系给顺序</b>
+            <span class="mt">示意</span>
+          </div>
+          <div class="sec">
+            <div class="tline">
+              <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+                <span class="tl-b"><span class="tl-t">院系报到处 · 交录取通知书</span>
+                  <span class="tl-s2">接入后这里会显示你院系的具体楼栋与窗口</span></span></div>
+              <div class="tl tl--now"><span class="tl-dot">2</span>
+                <span class="tl-b"><span class="tl-t">缴费与保险确认</span>
+                  <span class="tl-s2">接入后显示是否已缴、缺哪一项</span></span></div>
+              <div class="tl"><span class="tl-dot">3</span>
+                <span class="tl-b"><span class="tl-t">宿舍分配与领钥匙</span>
+                  <span class="tl-s2">接入后显示楼号房号与领取地点</span></span></div>
+              <div class="tl"><span class="tl-dot">4</span>
+                <span class="tl-b"><span class="tl-t">校园卡激活</span>
+                  <span class="tl-s2">接入后显示办理窗口与所需材料</span></span></div>
+              <div class="tl"><span class="tl-dot">5</span>
+                <span class="tl-b"><span class="tl-t">打印报到确认单</span>
+                  <span class="tl-s2">本机出纸，这一步现在就能做（材料自带即可）</span></span></div>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-5)">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>上面每一步的具体内容<b>都由学校提供</b>。
+                    接入前本机显示的是流程骨架，<b>不会替学校编具体的楼栋、窗口和金额</b>。</span>
+            </div>
+          </div>
+        </div>
+        <div class="stophere" data-at="s2">
+          <div class="sh-t">这里到此为止</div>
+          <div class="sh-p">
+            接入后这一步下面还会有<b>具体的楼栋、窗口、时间、缴费状态</b> ——
+            但那些数据在学校手里，<b>本机不替学校编</b>。<br>
+            所以这块是空的，不是没做完，是<b>不该由本机填</b>。
+            学校开通后，这里会换成真实内容。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 接入后 · 自助服务（预览） ─────────── -->
+      <div class="previewwrap" data-at="s3">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <b>自助打印 · 接入后可办的</b>
+            <span class="mt">示意 · 实际开放哪些由学校决定</span>
+          </div>
+          <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+            <div class="alt" style="cursor:default">
+              <svg class="ic"><use href="#i-file"/></svg>
+              <span class="alt-b">
+                <span class="alt-t">在读证明 / 学籍证明</span>
+                <span class="alt-s">接入后凭本人身份核验自助打印。是否带电子章、是否需要学校审批，由学校设定。</span>
+              </span>
+              <span style="margin-left:auto"><span class="chip chip--info">未接入</span></span>
+            </div>
+
+            <div class="alt" style="cursor:default">
+              <svg class="ic"><use href="#i-book"/></svg>
+              <span class="alt-b">
+                <span class="alt-t">成绩单</span>
+                <span class="alt-s">网申和考研常要。接入后可选中英文、是否含绩点。</span>
+              </span>
+              <span style="margin-left:auto"><span class="chip chip--info">未接入</span></span>
+            </div>
+
+            <div class="alt" style="cursor:default">
+              <svg class="ic"><use href="#i-ticket"/></svg>
+              <span class="alt-b">
+                <span class="alt-t">校内活动与讲座报名凭证</span>
+                <span class="alt-s">接入后可打印凭证。报名本身仍在学校自己的系统里完成。</span>
+              </span>
+              <span style="margin-left:auto"><span class="chip chip--info">未接入</span></span>
+            </div>
+
+            <div class="alt" style="cursor:default">
+              <svg class="ic"><use href="#i-map"/></svg>
+              <span class="alt-b">
+                <span class="alt-t">校内导览图</span>
+                <span class="alt-s">宿舍、院系楼、办事窗口。接入后按你的院系高亮。</span>
+              </span>
+              <span style="margin-left:auto"><span class="chip chip--info">未接入</span></span>
+            </div>
+
+            <div class="notice notice--amber" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span>这类证明涉及学籍信息。接入后本机<b>只在办理当次读取，不落库、不留存</b>，
+                    打完即清；管理员也看不到你的学籍内容，只能看到"某台机器打了一份在读证明"这条流水。</span>
+            </div>
+          </div>
+        </div>
+        <div class="stophere" data-at="s3">
+          <div class="sh-t">这里到此为止</div>
+          <div class="sh-p">
+            接入后每一项下面还会有<b>办理条件、所需材料、是否需要审批、出多少份</b> ——
+            这些由学校设定，<b>本机不替学校编</b>。<br>
+            所以这块是空的。空着比编一套看起来合理的规则更诚实 ——
+            后者会让你按错的规则去准备。
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>本机接入状态</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">机器编号</span><span class="v">01 号机</span></div>
+            <div class="kv-row"><span class="k">所在地点</span><span class="v">市人力资源市场 A 馆</span></div>
+            <div class="kv-row"><span class="k">已接入学校</span><span class="v v--fog">无</span></div>
+            <div class="kv-row"><span class="k">可读学籍数据</span><span class="v v--fog">无</span></div>
+            <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未接入</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几行是本机的真实状态，不是示意。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>如果你是学校老师</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            智慧校园需要学校<b>就业处或学工处</b>发起，由学校决定开放哪些数据、开放到什么程度。
+          </div>
+
+          <div class="tline" style="margin-top:var(--s-4)">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">学校提出接入意向</span>
+                <span class="tl-s2">联系本机的运营方或合作机构</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">确定开放范围与授权方式</span>
+                <span class="tl-s2">哪些数据、给谁看、留不留存，学校说了算</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">对接与联调</span>
+                <span class="tl-s2">接口或数据同步方式按学校现有系统定</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">本机开通</span>
+                <span class="tl-s2">开通后这一页才会有真实数据</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>本机不做招聘闭环 —— <b>不代收学生简历、不向企业推荐学生</b>。
+                  校招信息只做学校就业网与主办方公告的展示入口。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            具体联系方式请咨询现场工作人员或机器背面的运维标签。
+            本页不展示未经核实的联系方式。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg><b>本机对你的数据做什么</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">学籍信息</span><span class="v">不落库</span></div>
+            <div class="kv-row"><span class="k">证件扫描件</span><span class="v">办完即清</span></div>
+            <div class="kv-row"><span class="k">管理员可见</span><span class="v">只见打印流水</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">不收集</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几条现在就成立，不等接入。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 / S3 右 -->
+      <div class="pane" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么给你看这个</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            让你知道<b>接入后能办什么</b>，好判断值不值得推动学校去开通。<br><br>
+            但页面上的每一项现在<b>都办不了</b> —— 所以这里不放任何看起来像真数据的东西：
+            没有姓名、没有学号、没有金额、没有房号。
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>空页面看着寒酸，就顺手填几个数字撑场面 ——
+                  这是最容易犯也最不该犯的错。<b>本页不这么做。</b></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2 s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <a class="alt" href="12-material-factory.html">
+            <svg class="ic"><use href="#i-package"/></svg>
+            <span class="alt-b"><span class="alt-t">打印报到材料</span>
+              <span class="alt-s">手机里的电子版扫码传过来就能打</span></span>
+          </a>
+          <a class="alt" href="07-scan-workbench.html">
+            <svg class="ic"><use href="#i-scan"/></svg>
+            <span class="alt-b"><span class="alt-t">扫描证件与纸质成绩单</span>
+              <span class="alt-s">扫成 PDF，网申上传直接用</span></span>
+          </a>
+          <a class="alt" href="18-campus.html">
+            <svg class="ic"><use href="#i-campus"/></svg>
+            <span class="alt-b"><span class="alt-t">看校招活动</span>
+              <span class="alt-s">不需要接入学校系统</span></span>
+          </a>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几件都不依赖学校系统，今天就能用。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用：一句话 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            学校系统还没接入，<b>这一页没有数据</b>。<br>
+            但打印报到材料、扫描证件、看校招活动，今天就能用。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到当前状态</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一页</button>
+
+    <span class="actionbar-hint" data-at="s1">本机未接入任何学校系统 · 这一页现在没有数据</span>
+    <span class="actionbar-hint" data-at="s2 s3">以上为接入后示意 · 现在一项都办不了</span>
+
+    <a class="btn btn--primary" data-at="s1" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" style="display:none"></button>
+    <a class="btn btn--primary" data-at="s2" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

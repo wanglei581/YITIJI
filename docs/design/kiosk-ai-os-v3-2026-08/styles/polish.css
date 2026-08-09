@@ -1,0 +1,213 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   polish.css — 追加式修正层（不改动既有样式文件，便于并行协作与回滚）
+
+   引入方式：在页面 <head> 现有 link 之后追加一行
+     <link rel="stylesheet" href="styles/polish.css?v=1">
+   放最后才能覆盖前面的层。
+
+   本层只做两件事：① 修真实缺陷 ② 降低常驻动效负载
+   不改颜色、不改构图、不改「鲜彩玻璃」的视觉主张。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   一、修复：办理单底部整行被裁切（P01 实测）
+
+   现象（1080×1920 实测）：.verrand 容器底 873px，其内部
+     「约 40 秒 / 免费 / 结果进「我的简历」」→ 超出 7px
+     「跳过，直接打印」                      → 超出 20px（可点按钮，用户点不到）
+
+   根因：.verrand 高度由外层 flex 分配，内容比分到的空间高 41px，
+   而容器 overflow:hidden，超出部分直接消失，页面级溢出仍为 0
+   —— 所以 v3Audit 的「纵向溢出 0 / 横向溢出 0」检不出来。
+
+   处理：允许该卡按内容取高（不再被压），并给它 min-height 兜底。
+   不改布局结构，只解除高度压制。
+   ─────────────────────────────────────────────────────────────────────── */
+
+.verrand {
+  flex: 0 0 auto;          /* 不再参与剩余空间分配，按内容取高 */
+  overflow: visible;       /* 内容不再被裁掉 */
+}
+
+/* 内容真的很长时（长文案/长文件名）改为内部滚动，而不是无声裁掉 */
+.verrand-main {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.verrand-main::-webkit-scrollbar { width: 5px; }
+.verrand-main::-webkit-scrollbar-thumb { background: rgba(0,0,0,.16); border-radius: 3px; }
+
+/* 底部这行是操作区，任何情况下都不许被压掉 */
+.verrand-main > *:last-child { flex: 0 0 auto; }
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   二、动效优化：常驻无限循环从 11 个降到 4 个
+
+   实测：34 个动画在跑，其中 11 个 infinite。
+   一体机 7×24 不关机，常驻合成负载会让真正的交互动画掉帧
+   （这台机器还要同时跑打印轮询、TRTC 数字人、设备心跳）。
+
+   做得对的地方保留：全部用 transform/opacity，无一动布局属性；
+   已有 prefers-reduced-motion 兜底。本层只调「哪些该常驻」。
+
+   分类原则（与项目既有口径一致）：动效必须承载状态，装饰性的不常驻。
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* 2.1 背景光斑：34s/41s/47s 三条超长循环，视觉上几乎察觉不到，
+   但一直占着合成器。改为只播一轮后停在终态 —— 静止画面完全一致。 */
+.vhero-field i:nth-child(1),
+.vhero-field i:nth-child(2),
+.vhero-field i:nth-child(3) {
+  animation-iteration-count: 1 !important;
+  animation-fill-mode: forwards !important;
+}
+
+/* 2.2 卡片高光扫过（sheen）：纯装饰，且在静止页面上反复扫会分散注意。
+   改为只在触摸/悬停时扫一次 —— 变成「我按到了」的反馈，从装饰变成状态。 */
+.card::before,
+.card::after {
+  animation-play-state: paused !important;
+}
+.card:hover::before,
+.card:active::before {
+  animation-play-state: running !important;
+  animation-iteration-count: 1 !important;
+}
+
+/* 2.3 品牌标高光：.brand-mark::after 的 sheen 是纯装饰，且顶栏一直在视野里，
+   反复扫会持续吸引余光。停掉。
+   主按钮 .btn--primary::after 的 sheen 保留 —— 它指示「这是主操作」，承载状态。 */
+.brand-mark::after { animation: none !important; }
+
+/* 2.4 保留的常驻动效（复核后确认都承载真实状态，不动）：
+   · pulse    → .dot--live       设备在线，机器活着
+   · fx2pulse → .pulseline::after 办理进行中
+   · fx2run   → .vtrack::after    办理路径在走
+   · fx2ring  → .vstep-dot::before 当前是第几步
+   · fx2flow  → SVG 连线          编排指向哪个功能
+   · sheen    → .btn--primary     这是主操作
+
+   初版曾把 fx2run/fx2ring/fx2flow 一并停掉，复核后确认误判 ——
+   它们都挂在状态元素上，不是装饰。原则不变：动的必须是真有状态的东西；
+   但判断「是不是状态」要看它挂在哪个元素上，不能只看动效名字。 */
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   三、触控反馈补强：站着操作需要更明确的「按到了」
+
+   一体机用户戴手套/手指粗/隔着防眩膜，视觉反馈要比桌面强一档。
+   只加按压反馈，不改静止态外观。
+   ─────────────────────────────────────────────────────────────────────── */
+
+.card, .vchip, .vbtn, .verrand-act, button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;   /* 去掉 300ms 点击延迟 */
+}
+
+/* 按下瞬间的确定感：比 hover 更快、更明显 */
+.card:active { transform: translateY(2px) scale(.994); transition-duration: .06s; }
+button:active, .vbtn:active, .vchip:active { transform: scale(.97); transition-duration: .06s; }
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   三B、左右联动（配合 scripts/linkage.js）
+
+   P11 底部已写「点左边任一条，右边原文定位到对应证据」，markup 也已布线
+   （.req[data-ev]），但没有脚本绑定行为 —— 点了没反应。
+   本段是该交互的视觉部分。
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* 左侧：当前选中的要求 */
+.req.is-active {
+  outline: 2px solid var(--c-accent, #0d8a6a);
+  outline-offset: 2px;
+}
+
+/* 右侧：证据原句。默认只做极轻的底纹，不干扰阅读 */
+#src [data-ev], .resume-src [data-ev] {
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: 0 -1px;
+  background: rgba(13,138,106,.10);
+  box-shadow: inset 0 -2px 0 rgba(13,138,106,.22);
+  transition: background .18s ease, box-shadow .18s ease;
+}
+
+/* 被点亮的那一句：明确但不刺眼，站在 1 米外也能一眼找到 */
+#src [data-ev].is-hot, .resume-src [data-ev].is-hot {
+  background: rgba(232,163,60,.28);
+  box-shadow: inset 0 -2px 0 rgba(207,95,51,.55), 0 0 0 3px rgba(232,163,60,.16);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  #src [data-ev], .resume-src [data-ev] { transition: none; }
+}
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   三C、卡片 pill：把「入口」和「状态」在视觉上分开
+
+   问题：首页功能卡里的 .card-pill 原本全是 <span>，但长得像 chip。
+   「本机上传 / 手机扫码传 / U 盘」看着能点，实际点不了 ——
+   与「底部写着可点却没绑事件」是同一类缺陷：**界面承诺了一个不存在的交互**。
+
+   而同一批 pill 里还有「已有 1 份待优化」「12 家来源 · 8 月 8 日同步」
+   「本周 3 场」「官方来源」—— 这些是状态，本来就不该可点。
+   一刀切都做成可点会制造另一种错误：用户点「12 家来源」期待发生什么。
+
+   处理：按语义分两类，视觉上可分辨。
+     .card-pill--go    入口 → <a>，可点，带箭头与按压反馈
+     .card-pill--info  状态 → <span>，明确是标签，无交互暗示
+   ─────────────────────────────────────────────────────────────────────── */
+
+/* 入口型：可点。
+   **零几何改动** —— 不加 padding、不改 min-height、不用绝对定位伪元素。
+   三次教训累积出这条约束：
+     ① ::before 撑 48px 热区 → 把 pill 顶出卡片，报 3 处裁切
+     ② min-height:34px      → 六张卡各高几像素，把页面底部
+                               「费用以现场公示价为准」「离场自动清空会话」顶出视口
+     ③ padding-left:12px    → pill 变宽到 348px，卡片再次变高，同样问题
+   首页版面已排满，任何增高增宽都会从底部挤掉东西，而挤掉的恰恰是合规必读文字。
+   所以可点性只能靠**不占空间的信号**表达：光标、悬停底色、按压缩放、下划线。 */
+.card-pill--go {
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .14s var(--ease-out, ease), transform .06s ease;
+}
+.card-pill--go:hover {
+  background: rgba(255,255,255,.22);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.card-pill--go:active { transform: scale(.95); }
+
+/* 状态型：明确不可点 */
+.card-pill--info {
+  cursor: default;
+  opacity: .92;
+}
+
+
+/* ───────────────────────────────────────────────────────────────────────
+   四、reduced-motion 与省电：兜底加严
+   ─────────────────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* 待机/无操作时（由 JS 给 body 加 .is-idle）彻底停掉所有循环动效，
+   宣传屏或长时间无人时不再空转合成器。 */
+body.is-idle *,
+body.is-idle *::before,
+body.is-idle *::after {
+  animation-play-state: paused !important;
+}

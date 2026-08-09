@@ -1,0 +1,27 @@
+/* ============================================================
+   V3 · 原型工作台外壳样式（生产不加载）
+   页面编号与状态开关只存在于评审工作台，不进入产品界面
+   ============================================================ */
+.shell {
+  position: fixed; left: 16px; top: 14px; z-index: var(--z-shell);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  padding: 7px 10px; border-radius: var(--r-lg);
+  background: rgba(8, 16, 18, .86);
+  border: 1px solid rgba(232, 241, 241, .12);
+  backdrop-filter: blur(14px);
+  font-family: var(--ff-ui); font-size: 12px;
+}
+.shell-id { color: var(--fog-600); letter-spacing: .1em; padding: 0 8px 0 4px; }
+.shell-btn {
+  appearance: none; border: 1px solid rgba(232, 241, 241, .12);
+  background: transparent; color: var(--fog-700);
+  height: 28px; padding: 0 11px; border-radius: var(--r-full);
+  font-size: 12px; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center;
+  transition: color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+}
+.shell-btn[aria-pressed="true"] { background: var(--jade-a20); color: var(--jade-200); border-color: var(--jade-a32); }
+.shell-btn--link { color: var(--fog-600); border-style: dashed; }
+.shell-div { width: 1px; height: 20px; background: rgba(232, 241, 241, .16); margin: 0 4px; }
+.shell-btn--theme[aria-pressed="true"] { background: rgba(232, 241, 241, .16); color: #fff; border-color: rgba(255, 255, 255, .3); }
