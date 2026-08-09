@@ -90,7 +90,11 @@ function candidate(
 function verifySourceSafety(): void {
   const source = readFileSync(join(__dirname, '../src/agent/scan-input/verified-folder.ts'), 'utf8')
   const adapter = readFileSync(join(__dirname, '../src/agent/scan-input/windows-secure-reader.ts'), 'utf8')
-  const native = readFileSync(join(__dirname, '../native/secure-scan-reader.c'), 'utf8')
+  const native = [
+    'secure-scan-reader.c',
+    'secure-scan-path.c',
+    'secure-scan-mutation.c',
+  ].map((name) => readFileSync(join(__dirname, '../native', name), 'utf8')).join('\n')
 
   assert.match(source, /\blstatSync\s*\(/, 'health inspection must use lstatSync for the configured directory')
   assert.match(source, /\baccessSync\s*\(/, 'health inspection must use accessSync for directory readability')
@@ -113,15 +117,17 @@ function verifySourceSafety(): void {
   assert.match(native, /int wmain\(void\)/, 'native helper must not accept argv')
   assert.match(native, /GetStdHandle\(STD_INPUT_HANDLE\)/, 'native helper must read the framed request from stdin')
   assert.match(native, /ERROR_BROKEN_PIPE/, 'Windows pipe closure must be accepted as EOF without accepting extra request bytes')
-  assert.equal(
-    native.match(/FILE_FLAG_OPEN_REPARSE_POINT/g)?.length,
-    2,
-    'root and candidate opens must both use FILE_FLAG_OPEN_REPARSE_POINT',
+  assert.ok(
+    (native.match(/FILE_FLAG_OPEN_REPARSE_POINT/g)?.length ?? 0) >= 2,
+    'every pinned directory and candidate open must reject reparses',
   )
   assert.match(native, /FileAttributeTagInfo/, 'native helper must inspect generic reparse attributes, not only symlink tags')
   assert.match(native, /FILE_ATTRIBUTE_REPARSE_POINT/, 'every reparse tag must be rejected')
   assert.match(native, /GetFinalPathNameByHandleW/, 'native helper must compare handle-resolved root and candidate paths')
-  assert.match(native, /same_file_information\(&before, &after\)/, 'native helper must re-check the same handle after reading')
+  assert.match(native, /ajps_information_matches\(&after/, 'native helper must re-check the same handle identity after reading')
+  assert.match(adapter, /AJPSR002/, 'adapter must reject legacy helpers without the v2 identity contract')
+  assert.match(native, /RootDirectory = unclaimed_handle/, 'quarantine must rename relative to the pinned _unclaimed handle')
+  assert.match(native, /FileDispositionInfo/, 'deletion must target an already verified handle')
 }
 
 function verifyHelperResultGate(): void {

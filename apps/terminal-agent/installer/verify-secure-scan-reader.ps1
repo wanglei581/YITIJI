@@ -29,8 +29,38 @@ if (request.mode === 'inspect') {
     expected = { name: request.filename, nodeKind: 'file', size: stat.size, mtimeMs: stat.mtimeMs }
   }
   try {
-    const bytes = secure.readTrustedWindowsCandidate(request.root, request.filename, expected)
-    result = { accepted: true, length: bytes.length, sha256: crypto.createHash('sha256').update(bytes).digest('hex') }
+    const candidate = secure.readTrustedWindowsCandidate(request.root, request.filename, expected)
+    result = { accepted: true, length: candidate.bytes.length, sha256: crypto.createHash('sha256').update(candidate.bytes).digest('hex') }
+  } catch {
+    result = { accepted: false }
+  }
+} else if (request.mode === 'finalize-delete' || request.mode === 'finalize-quarantine') {
+  try {
+    const candidatePath = path.join(request.root, request.filename)
+    const stat = fs.lstatSync(candidatePath)
+    const expected = { name: request.filename, nodeKind: 'file', size: stat.size, mtimeMs: stat.mtimeMs }
+    const candidate = secure.readTrustedWindowsCandidate(request.root, request.filename, expected)
+    if (request.replaceAfterRead) {
+      const displaced = candidatePath + '.original'
+      fs.renameSync(candidatePath, displaced)
+      fs.writeFileSync(candidatePath, Buffer.alloc(stat.size, 0x52))
+      fs.utimesSync(candidatePath, stat.atime, stat.mtime)
+    }
+    secure.finalizeTrustedWindowsCandidate(
+      request.root,
+      request.filename,
+      candidate,
+      request.mode === 'finalize-delete' ? 'delete' : 'quarantine',
+    )
+    result = { accepted: true }
+  } catch {
+    result = { accepted: false }
+  }
+} else if (request.mode === 'sweep') {
+  try {
+    const candidate = secure.inspectTrustedWindowsUnclaimedCandidate(request.root, request.filename)
+    secure.sweepTrustedWindowsUnclaimed(request.root, candidate)
+    result = { accepted: true }
   } catch {
     result = { accepted: false }
   }
@@ -103,6 +133,66 @@ try {
     throw "Ordinary Windows candidate did not pass the same-handle reader"
   }
 
+  $deleteFile = Join-Path $scanRoot "finalize-delete.pdf"
+  [System.IO.File]::WriteAllBytes($deleteFile, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 finalize delete"))
+  $deleteResult = Invoke-Probe @{ mode = "finalize-delete"; root = $scanRoot; filename = "finalize-delete.pdf" }
+  if (-not [bool]$deleteResult.accepted -or (Test-Path -LiteralPath $deleteFile)) {
+    throw "Native success-delete did not remove the identity-bound candidate"
+  }
+
+  $quarantineFile = Join-Path $scanRoot "finalize-quarantine.pdf"
+  [System.IO.File]::WriteAllBytes($quarantineFile, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 finalize quarantine"))
+  $quarantineResult = Invoke-Probe @{ mode = "finalize-quarantine"; root = $scanRoot; filename = "finalize-quarantine.pdf" }
+  if (-not [bool]$quarantineResult.accepted -or (Test-Path -LiteralPath $quarantineFile) -or
+      -not (Test-Path -LiteralPath (Join-Path $scanRoot "_unclaimed\finalize-quarantine.pdf") -PathType Leaf)) {
+    throw "Native quarantine did not use the pinned _unclaimed boundary"
+  }
+
+  $sweepFile = Join-Path $scanRoot "_unclaimed\sweep.pdf"
+  [System.IO.File]::WriteAllBytes($sweepFile, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 sweep"))
+  $sweepResult = Invoke-Probe @{ mode = "sweep"; root = $scanRoot; filename = "sweep.pdf" }
+  if (-not [bool]$sweepResult.accepted -or (Test-Path -LiteralPath $sweepFile)) {
+    throw "Native sweep did not delete the identity-bound _unclaimed candidate"
+  }
+
+  # same metadata replacement: the Node probe keeps the READ token, replaces the
+  # candidate with a different file of identical name/size/mtime, then FINALIZES.
+  $replacementFile = Join-Path $scanRoot "same-metadata-replacement.pdf"
+  [System.IO.File]::WriteAllBytes($replacementFile, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 identity-A"))
+  $replacementResult = Invoke-Probe @{
+    mode = "finalize-delete"; root = $scanRoot; filename = "same-metadata-replacement.pdf"; replaceAfterRead = $true
+  }
+  if ([bool]$replacementResult.accepted -or -not (Test-Path -LiteralPath $replacementFile -PathType Leaf)) {
+    throw "same metadata replacement with a different fileId was not rejected"
+  }
+
+  $realUnclaimed = Join-Path $scanRoot "_unclaimed"
+  $savedUnclaimed = Join-Path $scanRoot "_unclaimed-safe"
+  $outsideUnclaimed = Join-Path $temporaryRoot "outside-unclaimed"
+  Rename-Item -LiteralPath $realUnclaimed -NewName "_unclaimed-safe"
+  New-Item -ItemType Directory -Path $outsideUnclaimed | Out-Null
+  New-Junction -Path $realUnclaimed -Target $outsideUnclaimed
+  $junctionQuarantine = Join-Path $scanRoot "junction-quarantine.pdf"
+  [System.IO.File]::WriteAllBytes($junctionQuarantine, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 junction quarantine"))
+  $junctionQuarantineResult = Invoke-Probe @{
+    mode = "finalize-quarantine"; root = $scanRoot; filename = "junction-quarantine.pdf"
+  }
+  if ([bool]$junctionQuarantineResult.accepted -or -not (Test-Path -LiteralPath $junctionQuarantine -PathType Leaf) -or
+      (Test-Path -LiteralPath (Join-Path $outsideUnclaimed "junction-quarantine.pdf"))) {
+    throw "Quarantine accepted a reparse-point _unclaimed directory"
+  }
+  Remove-Link $realUnclaimed
+  Rename-Item -LiteralPath $savedUnclaimed -NewName "_unclaimed"
+
+  $sweepOutside = Join-Path $temporaryRoot "sweep-hardlink-target.pdf"
+  [System.IO.File]::WriteAllBytes($sweepOutside, [System.Text.Encoding]::ASCII.GetBytes("%PDF-1.4 sweep hardlink"))
+  $sweepHardlink = Join-Path $realUnclaimed "sweep-hardlink.pdf"
+  New-Item -ItemType HardLink -Path $sweepHardlink -Target $sweepOutside -ErrorAction Stop | Out-Null
+  $sweepHardlinkResult = Invoke-Probe @{ mode = "sweep"; root = $scanRoot; filename = "sweep-hardlink.pdf" }
+  if ([bool]$sweepHardlinkResult.accepted -or -not (Test-Path -LiteralPath $sweepHardlink -PathType Leaf)) {
+    throw "Secure sweep accepted a hard-linked candidate"
+  }
+
   $resultGate = Invoke-Probe @{ mode = "result-gate" }
   foreach ($property in @("exact", "nonzeroRejected", "timeoutRejected", "spawnFailureRejected", "overflowRejected", "stderrRejected")) {
     if (-not [bool]$resultGate.$property) { throw "Node helper result gate failed: $property" }
@@ -172,9 +262,9 @@ try {
     Move-Item -LiteralPath "$helperPath.disabled" -Destination $helperPath
   }
 
-  Write-Host "SECURE_SCAN_READER_PASS ordinary=true rootReparse=true ancestorReparse=true candidateReparse=true hardlink=true toctou=true helperFailures=true"
+  Write-Host "SECURE_SCAN_READER_PASS ordinary=true mutation=true sweep=true identitySwap=true rootReparse=true ancestorReparse=true candidateReparse=true hardlink=true toctou=true helperFailures=true"
 } finally {
-  foreach ($link in @($junctionRoot, $symlinkRoot, $ancestorJunction, $scanRoot)) {
+  foreach ($link in @($junctionRoot, $symlinkRoot, $ancestorJunction, $realUnclaimed, $scanRoot)) {
     if ($null -ne $link) { Remove-Link $link }
   }
   Remove-Item -LiteralPath $temporaryRoot -Recurse -Force -ErrorAction SilentlyContinue

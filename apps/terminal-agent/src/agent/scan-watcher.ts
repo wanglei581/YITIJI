@@ -45,7 +45,13 @@ import {
   inspectScanInputFolder,
   isStableScanInputCandidate,
 } from './scan-input/verified-folder'
-import { readTrustedWindowsCandidate } from './scan-input/windows-secure-reader'
+import {
+  finalizeTrustedWindowsCandidate,
+  inspectTrustedWindowsUnclaimedCandidate,
+  readTrustedWindowsCandidate,
+  sweepTrustedWindowsUnclaimed,
+  type TrustedWindowsCandidate,
+} from './scan-input/windows-secure-reader'
 import { log, warn, err } from '../logger'
 import type { ScanInputCandidateSnapshot } from './types'
 import {
@@ -158,9 +164,10 @@ function readVerifiedCandidate(
   scanWatchFolder: string,
   filename: string,
   stableSnapshot: ReturnType<typeof snapshotCandidate>,
-): Buffer {
+): { bytes: Buffer; trustedWindowsCandidate?: TrustedWindowsCandidate } {
   if (process.platform === 'win32') {
-    return readTrustedWindowsCandidate(scanWatchFolder, filename, stableSnapshot)
+    const trustedWindowsCandidate = readTrustedWindowsCandidate(scanWatchFolder, filename, stableSnapshot)
+    return { bytes: trustedWindowsCandidate.bytes, trustedWindowsCandidate }
   }
   if (fsConstants.O_NOFOLLOW === undefined) {
     throw new Error('SCAN_INPUT_NOFOLLOW_UNAVAILABLE')
@@ -177,10 +184,26 @@ function readVerifiedCandidate(
     ) {
       throw new Error('SCAN_INPUT_CHANGED_BEFORE_READ')
     }
-    return readFileSync(descriptor)
+    return { bytes: readFileSync(descriptor) }
   } finally {
     closeSync(descriptor)
   }
+}
+
+function finalizeCandidate(
+  filePath: string,
+  scanWatchFolder: string,
+  filename: string,
+  trusted: TrustedWindowsCandidate | undefined,
+  action: 'delete' | 'quarantine',
+): void {
+  if (process.platform === 'win32') {
+    if (!trusted) throw new Error('SCAN_INPUT_SECURE_MUTATION_TOKEN_MISSING')
+    finalizeTrustedWindowsCandidate(scanWatchFolder, filename, trusted, action)
+    return
+  }
+  if (action === 'delete') unlinkSync(filePath)
+  else renameSync(filePath, join(ensureUnclaimedDir(scanWatchFolder), filename))
 }
 
 function ensureUnclaimedDir(scanWatchFolder: string): string {
@@ -262,9 +285,9 @@ export async function processCandidate(
       return
     }
 
-    const buffer = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
+    const verified = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
     const form = new FormData()
-    form.append('file', buffer, { filename, contentType: guessMimeType(filename) })
+    form.append('file', verified.bytes, { filename, contentType: guessMimeType(filename) })
 
     const client = createApiClient(config.apiBaseUrl, config.agentToken, config.terminalId)
 
@@ -282,7 +305,7 @@ export async function processCandidate(
           ...NO_RETRY_CONFIG,
         })
       }
-      unlinkSync(filePath)
+      finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'delete')
       log(`scan-watcher: delivered and removed source file — ${filename}`)
     } catch (e) {
       if (preserveScanFileForUnauthorized(e)) {
@@ -291,8 +314,7 @@ export async function processCandidate(
       }
       const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
       if (code === 'NO_WAITING_SCAN_TASK') {
-        const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
-        renameSync(filePath, join(unclaimedDir, filename))
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         warn(`scan-watcher: no waiting scan task, moved to _unclaimed — ${filename}`)
         return
       }
@@ -307,8 +329,7 @@ export async function processCandidate(
       // 必须像 NO_WAITING_SCAN_TASK 一样立即隔离，绝不重试；日志措辞与两个既有 _unclaimed
       // 归宿（无等待任务 / 重试超时）分别不同，避免运维排查时混淆三种不同的原因。
       if (code === 'SCAN_TASK_STATE_CHANGED') {
-        const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
-        renameSync(filePath, join(unclaimedDir, filename))
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         warn(`scan-watcher: scan task state changed after match (no longer valid, will not retry), moved to _unclaimed — ${filename}`)
         return
       }
@@ -320,8 +341,7 @@ export async function processCandidate(
       // 风险（重试会被匹配到该终端当前最早一条 waiting 任务，可能已经属于另一个用户）——
       // 同样必须立即隔离，不重试。
       if (code === 'SCAN_FILE_ALREADY_DELIVERED') {
-        const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
-        renameSync(filePath, join(unclaimedDir, filename))
+        finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
         warn(`scan-watcher: file content already delivered previously (duplicate retry, likely a lost response), moved to _unclaimed — ${filename}`)
         return
       }
@@ -339,8 +359,7 @@ export async function processCandidate(
       }
       if (mtimeMs !== undefined && Date.now() - mtimeMs > DELIVERY_RETRY_MAX_MS) {
         try {
-          const unclaimedDir = ensureUnclaimedDir(config.scanWatchFolder!)
-          renameSync(filePath, join(unclaimedDir, filename))
+          finalizeCandidate(filePath, scanWatchFolder, filename, verified.trustedWindowsCandidate, 'quarantine')
           warn(
             `scan-watcher: delivery retry timeout exceeded (idle ${formatDuration(Date.now() - mtimeMs)}), ` +
               `abandoning retries and moved to _unclaimed — ${filename}`,
@@ -385,6 +404,78 @@ export function sweepUnclaimedDir(
   }
 
   const now = dependencies.now?.() ?? Date.now()
+  if (process.platform === 'win32') {
+    for (const name of entries) {
+      let candidate
+      try {
+        candidate = inspectTrustedWindowsUnclaimedCandidate(scanWatchFolder, name)
+      } catch {
+        continue
+      }
+      const ageMs = now - candidate.mtimeMs
+      if (ageMs <= UNCLAIMED_MAX_AGE_MS) continue
+      const fullPath = join(dir, name)
+      let eventId: string | undefined
+      let auditLabel = 'untracked'
+      let auditIntentRecorded = false
+      try {
+        if (auditDb) {
+          const hmacKey = Buffer.from(getOrCreateScanAuditHmacKey(auditDb), 'hex')
+          const identifierHash = createHmac('sha256', hmacKey)
+            .update(`unclaimed-scan-v1\0${resolve(fullPath)}\0${candidate.size}\0${candidate.mtimeMs}`)
+            .digest('hex')
+          eventId = createHmac('sha256', hmacKey)
+            .update(`unclaimed-expiry-delete-v1\0${identifierHash}\0${candidate.mtimeMs}`)
+            .digest('hex')
+          auditLabel = eventId.slice(0, 12)
+          beginScanDeletionAudit(
+            auditDb,
+            { eventId, reasonCode: UNCLAIMED_EXPIRY_REASON, identifierHash },
+            new Date(now).toISOString(),
+          )
+          auditIntentRecorded = true
+        } else {
+          warn(`scan-watcher: deletion audit unavailable; proceeding with TTL deletion — event=${auditLabel}`)
+        }
+      } catch (auditError) {
+        warn(
+          `scan-watcher: failed to persist deletion intent; proceeding with TTL deletion — ` +
+            `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+        )
+      }
+      try {
+        sweepTrustedWindowsUnclaimed(scanWatchFolder, candidate)
+        if (auditIntentRecorded && eventId) {
+          try {
+            finishScanDeletionAudit(auditDb, eventId, {
+              result: 'deleted',
+              deletedAt: new Date(dependencies.now?.() ?? Date.now()).toISOString(),
+            })
+          } catch (auditError) {
+            err(
+              `scan-watcher: deletion succeeded but audit result update failed — ` +
+                `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+            )
+          }
+        }
+        warn(`scan-watcher: deleted stale _unclaimed file after ${formatDuration(ageMs)} idle — event=${auditLabel}`)
+      } catch (deleteError) {
+        const errorCode = sanitizedErrorCode(deleteError, 'DELETE_FAILED')
+        if (auditIntentRecorded && eventId) {
+          try {
+            finishScanDeletionAudit(auditDb, eventId, { result: 'delete_failed', errorCode })
+          } catch (auditError) {
+            err(
+              `scan-watcher: delete and audit result update both failed — ` +
+                `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+            )
+          }
+        }
+        err(`scan-watcher: failed to delete stale _unclaimed file; will retry next sweep — event=${auditLabel} code=${errorCode}`)
+      }
+    }
+    return
+  }
   const unlinkFile = dependencies.unlinkFile ?? unlinkSync
   for (const name of entries) {
     const fullPath = join(dir, name)

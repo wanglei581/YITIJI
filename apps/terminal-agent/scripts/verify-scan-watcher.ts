@@ -46,9 +46,12 @@ function verifySourceStructure(): void {
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
   assert.match(
     source,
-    /return readTrustedWindowsCandidate\(scanWatchFolder, filename, stableSnapshot\)/,
+    /const trustedWindowsCandidate = readTrustedWindowsCandidate\(\s*scanWatchFolder,\s*filename,\s*stableSnapshot\s*\)/,
     'Windows candidate reads must cross the packaged same-handle trusted-reader boundary',
   )
+  assert.match(source, /finalizeTrustedWindowsCandidate\(/, 'Windows delivery deletion and quarantine must use the native identity token')
+  assert.match(source, /sweepTrustedWindowsUnclaimed\(/, 'Windows TTL deletion must use the native identity token')
+  assert.match(source, /if \(process\.platform === 'win32'\) \{[\s\S]*?sweepTrustedWindowsUnclaimed/, 'Windows sweep must branch into the secure native mutation path')
 
   // 以下三条是 Critical code-review 之后新增的并发安全加固，但在本脚本里没有实际
   // 可行的方式做成真实动态用例（原因分别标注在各行），因此保留成本低的静态正则

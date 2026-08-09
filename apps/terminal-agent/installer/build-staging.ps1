@@ -125,7 +125,11 @@ if ([string]::IsNullOrWhiteSpace($vsInstall) -or -not (Test-Path -LiteralPath $v
   Fail "Visual Studio C++ x64 build tools are required for secure-scan-reader.exe"
 }
 $nativeRoot = Join-Path $appRoot "native"
-$nativeSource = Join-Path $agentRoot "native\secure-scan-reader.c"
+$nativeSources = @(
+  (Join-Path $agentRoot "native\secure-scan-reader.c"),
+  (Join-Path $agentRoot "native\secure-scan-path.c"),
+  (Join-Path $agentRoot "native\secure-scan-mutation.c")
+)
 $nativeExecutable = Join-Path $nativeRoot "secure-scan-reader.exe"
 New-Item -ItemType Directory -Path $nativeRoot -Force | Out-Null
 $compileScript = Join-Path $cacheRoot "compile-secure-scan-reader.cmd"
@@ -133,7 +137,7 @@ $compileLines = @(
   "@echo off",
   "call `"$vsDevCmd`" -no_logo -arch=x64 -host_arch=x64",
   "if errorlevel 1 exit /b %errorlevel%",
-  "cl.exe /nologo /TC /std:c11 /O2 /GS /guard:cf /MT /W4 /WX /Fe:`"$nativeExecutable`" `"$nativeSource`" /link /Brepro /DYNAMICBASE /NXCOMPAT /guard:cf",
+  "cl.exe /nologo /TC /std:c11 /O2 /GS /guard:cf /MT /W4 /WX /Fe:`"$nativeExecutable`" " + (($nativeSources | ForEach-Object { "`"$_`"" }) -join " ") + " /link /Brepro /DYNAMICBASE /NXCOMPAT /guard:cf",
   "exit /b %errorlevel%"
 )
 [System.IO.File]::WriteAllLines($compileScript, $compileLines, [System.Text.Encoding]::ASCII)
