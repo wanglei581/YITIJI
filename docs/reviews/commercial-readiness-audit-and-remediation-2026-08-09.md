@@ -2,9 +2,10 @@
 
 > 审查根目录：`/Users/wanglei/AI求职打印服务终端-commercial-readiness-wave1`
 > 初始审查基线：`codex/commercial-readiness-wave1-20260809@83588b8f`
+> Wave 7 功能提交：`48ac2cd6`；文档生成前代码 HEAD：`93bdc7ab433d4b878cb164f31fb7dce51d0dc000`，已包含 `origin/main@65cd9cdf`，相对 main behind 0 / ahead 25、相对 upstream behind 0 / ahead 5，未部署
 > Wave 6A/6B 已全绿代码候选：`9211b6d13f589da8acc3adbe7617cedca51e23f9`；Linux/PG/browser manual dispatch run `31322152768` 与 Windows run `31322154074` 全部 SUCCESS，未部署
 > Wave 5 修复提交：`392c5de5`；已全绿代码候选：`codex/commercial-readiness-wave1-20260809@6d2ed3479f51cceffab9676917e0cd1d4e9531ce`，已包含 `origin/main@66e0d951`，相对 main behind 0 / ahead 14，与 upstream 一致；最终报告提交会位于该代码 SHA 之后并须再次跑 CI
-> 文档生成前合并候选：`8ffc886c`，已包含 `origin/main@1ecf5e98`，相对 main behind 0 / ahead 21、相对 upstream behind 0 / ahead 3；本轮 docs commit 位于 `9211b6d1` 之后，最终同一 HEAD 仍须重跑 CI
+> PR #570 当前仍绑定旧 head `67aee177`，OPEN/Draft、mergeability UNKNOWN；旧 head 四项 checks 全绿，但不能证明 Wave 7。最终 docs commit 位于 `93bdc7ab` 之后，须对最终同一 HEAD 重跑 Linux/PG/browser/Windows CI
 > 审查方式：源码、路由、Prisma、workspace、CI、Git/worktree、独立小程序仓库只读核验；未连接或修改生产数据库、服务器、Windows 主机、对象存储或硬件
 > 删除结果：**本轮没有删除代码、模型、迁移、目录或本地资产**
 
@@ -24,8 +25,8 @@
 
 本轮最重要的判断不是“项目没做完”，而是项目已经形成了相当多真实闭环，但仍混有四类不同状态，必须分开治理：
 
-1. **已经修复但未进入生产**：Wave 1–5 的仓库完整性、入口/打印状态真实性、AI 落库 fail-closed、文件 metadata-first 删除、Agent durable dead-letter、本人待续任务、spooler 不确定结果 fail-closed、打印参数白名单、材料 token header-only、会话 history 清理、写库 verifier 隔离和高风险 CI 防回退；Wave 6 代码候选 `9211b6d1` 又实现扫描删除本地→API durable 对账与 Windows secure reader，并已通过 Linux/PG/browser 与 Windows installer CI，但未部署、未做真实现场验收。
-2. **明确没有开始或只到诚实空态**：小程序 M0.4/M1、Partner 迎新内容/统计、Admin 补贴标签与退款异常处置、Agent dead-letter 人工重放。
+1. **已经修复但未进入生产**：Wave 1–6 的仓库完整性、状态真实性、持久化、扫描删除对账与 Windows secure reader；Wave 7 又新增 Agent dead-letter PII-safe 运维 CLI、修复 API 终态/CAS 合同，并补 11 条 direct deterministic CI。以上仍未部署，Wave 7 最终 HEAD 远程 CI 尚未运行。
+2. **明确没有开始或只到诚实空态**：小程序 M0.4/M1、Partner 迎新内容/统计、Admin 补贴标签与退款异常处置。Claude 整套新页面仍未完成，继续作为受保护设计资产。
 3. **接口已暴露但实现是假成功/空数组**：`/api/v1/kiosk/session|help|notifications|activities|screensaver-content` 共 8 个 handler。
 4. **看似废弃但尚不能删**：旧 Kiosk API 模块、五组无运行时访问 Prisma 模型、空壳 worker、旧分支/worktree、独立小程序仓库。
 
@@ -40,8 +41,7 @@
 | P0（扫描恢复前） | `_unclaimed` 删除审计本地→API 已获 CI，生产现场仍缺 | Agent durable ack/retry/dead-letter；API 鉴权、幂等状态机、双库 additive migration、PII-safe 字段     | CI 不能替代生产留存告警、集中对账和 Windows 现场               |
 | P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`       | 五个 controller 直接返回常量，service 全为空                                                          | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象             |
 | P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理   | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header      | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换 |
-| P0               | 最终 docs 提交尚无同 SHA 远程 CI                    | 代码候选 `9211b6d1` 的 Linux/PG/browser 与 Windows run 全绿；最终 docs commit 会位于其后              | 文档提交后须对最终同一 HEAD 重跑并保持全绿                     |
-| P0               | 最终 docs HEAD 尚未复验                             | `9211b6d1` 代码候选两组 CI 全绿；文档生成前候选 `8ffc886c` 已吸收最新 main                            | docs commit 位于代码候选之后，最终同一 HEAD 仍须重跑 CI        |
+| P0               | Wave 7 最终 HEAD 尚无远程 CI                        | 功能提交 `48ac2cd6`；`93bdc7ab` 已吸收最新 main；PR 仍绑定旧 head `67aee177`                          | docs commit 后须对最终同一 HEAD 重跑 Linux/PG/browser/Windows  |
 | P1（已修）       | Router history 曾保留 payment session token         | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复 | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验       |
 | P1               | 独立小程序存在 local-only 提交                      | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                     | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选          |
 
@@ -70,28 +70,28 @@
 
 ## 3. 前后端功能与接口总表
 
-| 端/功能域                    | 当前实现                                                                                              | 后端/外部依赖                           | 状态                  | 主要断层或边界                                                                                |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------- |
-| Kiosk 首页/导航              | 定版入口、API 健康与设备状态 fail-closed                                                              | health、terminal config/capabilities    | 已做，未部署最新 Wave | Wave 1 最新 feature config 与打印状态真实性仍在 PR #570                                       |
-| 会员登录/隐私清场            | 手机/扫码登录、路由级 idle/硬超时、本人资产隔离；Wave 5 统一清理 Router history                       | Redis、短信/微信登录、member auth       | 代码候选              | payment token 的 Back/Forward 恢复已修；真实短信、微信、27 寸 Kiosk 与 BFCache 现场仍待验     |
-| 会话恢复                     | `/me/pending-tasks` 只返回本人真实可续任务，退出/切换/重绑导航到固定目的地                            | PrintTask/Order/member auth             | Wave 2/5 已修，未部署 | 仅恢复明确白名单路由；生产版本尚无该修复                                                      |
-| AI 简历解析/诊断/优化/生成   | 真实 API、匿名 token、本人归属、导出/打印候选                                                         | AI provider、OCR、FileObject            | 主体已做              | Wave 2 才让 parse/optimize/generate 落库失败返回 503；真实模型/配额/密钥仍待生产验收          |
-| 模拟面试/TRTC/AI 顾问        | 文字、报告、语音/数字人代码路径存在                                                                   | TRTC、LLM、网络                         | 代码候选              | 真实 TRTC/设备/弱网未验，不能按本地 mock 记商用                                               |
-| 打印上传/预览/报价/支付/进度 | FileObject、报价、Order/PaymentAttempt/PrintTask、Agent claim/status；Wave 3 仅放行黑白/单面/1 页合一 | 支付渠道、对象存储、Windows Agent、奔图 | 代码候选              | 未验证参数已 fail-closed；真机出纸、驱动状态、断电恢复、真实支付/退款仍未验                   |
-| 扫描                         | ScanTask + Agent watcher + Kiosk 轮询                                                                 | SMB/Windows/扫描仪/FileObject           | **生产不可用**        | Windows reparse point 无可信检查，watcher 当前主动禁用                                        |
-| 文件删除/到期/隔离           | Wave 2 metadata-first tombstone/quarantine                                                            | Prisma + storage                        | 已修，未部署          | 真实 COS “远端成功但客户端超时”等不确定结果仍待故障注入                                       |
-| 岗位/企业/招聘会/政策        | 三端已有真实查询、审核、来源与合规外跳                                                                | 有授权内容源                            | 代码已做              | 生产公开数据已治理为空；真实来源与有效期审核待数据负责人提供                                  |
-| Kiosk 帮助                   | 本地静态 FAQ，明确为静态页                                                                            | 无                                      | 已做                  | 旧 `/kiosk/help` 空接口并非该页面数据源                                                       |
-| Kiosk 通知                   | `/me/notifications` 真实会员通知；顶层路由复用该能力                                                  | MemberNotification/SystemBroadcast      | 已做                  | 旧 `/kiosk/notifications` 仍返回空/假成功                                                     |
-| Kiosk 权益活动               | `/activities` + `/activities/:id` 真实 BenefitActivity                                                | BenefitActivity                         | 已做                  | 旧 `/kiosk/activities` 仍返回空/id 回显                                                       |
-| Kiosk 屏保                   | `/terminals/:terminalId/screensaver` 真实配置/播放列表                                                | AdAsset/TerminalScreensaverConfig       | 已做                  | 旧 `/kiosk/screensaver-content` 仍返回空数组                                                  |
-| Admin 运营后台               | 设备、订单、内容、计费、文件、机构、会员、审计等主体已接真                                            | 多域 API                                | 主体已做              | dead-letter 无处理 UI；补贴标签、退款异常处置明确未建（`admin/print-scan/index.tsx:761-763`） |
-| Partner 数据源/内容          | API/Webhook/Excel/CSV、审核、统计主体已接真                                                           | JobSource/导入审核                      | 主体已做              | 原生 Finder→浏览器 `DataTransfer` 未现场验；智慧校园迎新内容/使用统计无模型/管线              |
-| Miniapp M0.1–M0.3            | 四 Tab、登录、公开岗位/招聘会/政策/企业浏览                                                           | member/public API                       | 已合入主体            | `verify:static` 未接 CI；真实 AppID/开发者工具未验                                            |
-| Miniapp 外部 CTA             | 页面显示合规提示                                                                                      | 外部小程序/webview/URL 白名单           | **未完成**            | job/fair/policy 详情仍只有 toast + TODO（见第 5.4 节）                                        |
-| Miniapp 隐私/本人数据 M0.4   | 页面已注册                                                                                            | `/me/*`、数据请求状态机                 | **未完成**            | 本地 toggle、导出/注销 toast；尚未接后端                                                      |
-| Miniapp M1/M2                | 独立仓库已有更多候选页与 kiosk 登录/打印价格提交；monorepo 有 M2 方案                                 | 跨端订单/到机码/支付                    | 候选/方案             | 不得从独立旧仓直接发布；必须选择性迁入唯一 `apps/miniapp`                                     |
-| Worker                       | 只有 `package.json`，无 consumer/runtime                                                              | 规划中的 BullMQ                         | 占位                  | 当前任务在 API 内 BullMQ；短期不应为了目录完整强拆第二进程                                    |
+| 端/功能域                    | 当前实现                                                                                              | 后端/外部依赖                           | 状态                  | 主要断层或边界                                                                                            |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| Kiosk 首页/导航              | 定版入口、API 健康与设备状态 fail-closed                                                              | health、terminal config/capabilities    | 已做，未部署最新 Wave | Wave 1 最新 feature config 与打印状态真实性仍在 PR #570                                                   |
+| 会员登录/隐私清场            | 手机/扫码登录、路由级 idle/硬超时、本人资产隔离；Wave 5 统一清理 Router history                       | Redis、短信/微信登录、member auth       | 代码候选              | payment token 的 Back/Forward 恢复已修；真实短信、微信、27 寸 Kiosk 与 BFCache 现场仍待验                 |
+| 会话恢复                     | `/me/pending-tasks` 只返回本人真实可续任务，退出/切换/重绑导航到固定目的地                            | PrintTask/Order/member auth             | Wave 2/5 已修，未部署 | 仅恢复明确白名单路由；生产版本尚无该修复                                                                  |
+| AI 简历解析/诊断/优化/生成   | 真实 API、匿名 token、本人归属、导出/打印候选                                                         | AI provider、OCR、FileObject            | 主体已做              | Wave 2 才让 parse/optimize/generate 落库失败返回 503；真实模型/配额/密钥仍待生产验收                      |
+| 模拟面试/TRTC/AI 顾问        | 文字、报告、语音/数字人代码路径存在                                                                   | TRTC、LLM、网络                         | 代码候选              | 真实 TRTC/设备/弱网未验，不能按本地 mock 记商用                                                           |
+| 打印上传/预览/报价/支付/进度 | FileObject、报价、Order/PaymentAttempt/PrintTask、Agent claim/status；Wave 3 仅放行黑白/单面/1 页合一 | 支付渠道、对象存储、Windows Agent、奔图 | 代码候选              | 未验证参数已 fail-closed；真机出纸、驱动状态、断电恢复、真实支付/退款仍未验                               |
+| 扫描                         | ScanTask + Agent watcher + Kiosk 轮询                                                                 | SMB/Windows/扫描仪/FileObject           | **生产不可用**        | Windows reparse point 无可信检查，watcher 当前主动禁用                                                    |
+| 文件删除/到期/隔离           | Wave 2 metadata-first tombstone/quarantine                                                            | Prisma + storage                        | 已修，未部署          | 真实 COS “远端成功但客户端超时”等不确定结果仍待故障注入                                                   |
+| 岗位/企业/招聘会/政策        | 三端已有真实查询、审核、来源与合规外跳                                                                | 有授权内容源                            | 代码已做              | 生产公开数据已治理为空；真实来源与有效期审核待数据负责人提供                                              |
+| Kiosk 帮助                   | 本地静态 FAQ，明确为静态页                                                                            | 无                                      | 已做                  | 旧 `/kiosk/help` 空接口并非该页面数据源                                                                   |
+| Kiosk 通知                   | `/me/notifications` 真实会员通知；顶层路由复用该能力                                                  | MemberNotification/SystemBroadcast      | 已做                  | 旧 `/kiosk/notifications` 仍返回空/假成功                                                                 |
+| Kiosk 权益活动               | `/activities` + `/activities/:id` 真实 BenefitActivity                                                | BenefitActivity                         | 已做                  | 旧 `/kiosk/activities` 仍返回空/id 回显                                                                   |
+| Kiosk 屏保                   | `/terminals/:terminalId/screensaver` 真实配置/播放列表                                                | AdAsset/TerminalScreensaverConfig       | 已做                  | 旧 `/kiosk/screensaver-content` 仍返回空数组                                                              |
+| Admin 运营后台               | 设备、订单、内容、计费、文件、机构、会员、审计等主体已接真                                            | 多域 API                                | 主体已做              | dead-letter 已提供 Agent 本地 CLI；补贴标签、退款异常处置明确未建（`admin/print-scan/index.tsx:761-763`） |
+| Partner 数据源/内容          | API/Webhook/Excel/CSV、审核、统计主体已接真                                                           | JobSource/导入审核                      | 主体已做              | 原生 Finder→浏览器 `DataTransfer` 未现场验；智慧校园迎新内容/使用统计无模型/管线                          |
+| Miniapp M0.1–M0.3            | 四 Tab、登录、公开岗位/招聘会/政策/企业浏览                                                           | member/public API                       | 已合入主体            | `verify:static` 已在 Wave 7 接 CI；真实 AppID/开发者工具未验                                              |
+| Miniapp 外部 CTA             | 页面显示合规提示                                                                                      | 外部小程序/webview/URL 白名单           | **未完成**            | job/fair/policy 详情仍只有 toast + TODO（见第 5.4 节）                                                    |
+| Miniapp 隐私/本人数据 M0.4   | 页面已注册                                                                                            | `/me/*`、数据请求状态机                 | **未完成**            | 本地 toggle、导出/注销 toast；尚未接后端                                                                  |
+| Miniapp M1/M2                | 独立仓库已有更多候选页与 kiosk 登录/打印价格提交；monorepo 有 M2 方案                                 | 跨端订单/到机码/支付                    | 候选/方案             | 不得从独立旧仓直接发布；必须选择性迁入唯一 `apps/miniapp`                                                 |
+| Worker                       | 只有 `package.json`，无 consumer/runtime                                                              | 规划中的 BullMQ                         | 占位                  | 当前任务在 API 内 BullMQ；短期不应为了目录完整强拆第二进程                                                |
 
 ## 4. 已修复但尚未形成生产事实
 
@@ -143,6 +143,15 @@
 - Node 22 本地 typecheck、build 与 non-native verify 已通过；本机 Agent SQLite 动态曾受已安装原生模块的 Node 24 ABI 阻塞。manual dispatch run `31322152768` 在 fresh CI 中 **SUCCESS**：build-and-verify 8m19s、postgres-readiness 3m09s、kiosk-browser-smoke 9m02s，完成该环境边界的权威裁决。
 - 已全绿代码候选为 `9211b6d13f589da8acc3adbe7617cedca51e23f9`。文档生成前合并候选 `8ffc886c` 已包含 `origin/main@1ecf5e98`，相对 main behind 0 / ahead 21、相对 upstream behind 0 / ahead 3；本轮 docs commit 会位于代码候选之后，最终同一 HEAD 仍须重跑 CI。
 - 用户确认 Claude 整套新页面尚未全部完成。本轮不迁移、不覆盖设计资产；待全部定稿后另立 page→route→API→state/auth/failure mapping 与逐页接线任务，优先复用现有 API/Agent 能力，不能从静态页面反推或补造第二套后端闭环。
+
+### 4.8 Wave 7 代码候选 `48ac2cd6`
+
+- Terminal Agent 新增 `dead-letter list/show/audit/confirm/abandon/replay` 六项命令。输出不包含原始错误消息或凭证，只允许 `completed/failed`；replay 必须先 durable confirm，每次只发一条 PATCH，只有 HTTP 2xx 且 `acknowledged=true` 才归档。network/5xx 保留，4xx 清除确认等待人工重新判断；confirm、abandon、replay attempt/success/failure 全部写 durable audit。`audit --id <id>` 只读取精确单 ID（包括已归档记录），采用字段白名单与稳定顺序、无 PII，缺 ID 非零退出。
+- dead-letter 专项已在 Node 26 以真实临时 SQLite + loopback HTTP 通过；Node 22 typecheck、build、unauthorized 回归通过。fresh Node 22 的完整动态执行仍以最终 HEAD CI 为权威。
+- API RED 证明旧 `patchTaskStatus` 对已处于任一终态的任务统一 ack，且 CAS `updateMany.count=0` 仍返回 ack。现改为：同终态幂等；不同终态返回 409；终态回退返回 400；CAS 丢失后重读，同状态 ack、不同终态冲突、其它变化返回 `PRINT_TASK_STATUS_CHANGED` 409，所有冲突路径不写 status log/order。纯内存专项已绿，真实 SQLite/PostgreSQL 等待 CI。
+- 主 CI 新增 11 条 direct deterministic gates：CI coverage 元守卫、Miniapp static、Kiosk service-entry、6 条 Admin/Partner 静态门禁、Agent task-runner wake、API terminal-status-idempotency。Admin account settings 只把脆弱字符串 fixture 改为 AST 校准，没有产品页面改动。deploy authorization 在 Wave 7 前已经由 `ci.yml` 直接执行，不是遗漏。
+- 功能提交 `48ac2cd6` 已由 `93bdc7ab` 吸收；后者包含 `origin/main@65cd9cdf`，相对 main behind 0 / ahead 25、相对 upstream behind 0 / ahead 5。PR #570 仍绑定旧 head，故 Wave 7 不能借用旧绿灯；最终 docs HEAD 必须重跑四项 CI。
+- 本 Wave 零删除。旧 Kiosk 8 个 handler 与五组旧 Prisma model 继续等待 30 天访问日志/client census 和生产数据 census；Claude 未完成页面继续保护，不迁移、不覆盖。
 
 ## 5. 已确认的接口断层与缺陷
 
@@ -226,7 +235,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 | PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                              |
 | ------------------------------------------------ | ---------------------------------: | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 21 | **可迁入，当前首要候选** | `9211b6d1` Linux/PG/browser/Windows CI 全绿；最终 docs HEAD 再跑 CI、复审与生产/真机边界确认后再评估合并          |
+| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 25 | **可迁入，当前首要候选** | 本地 `93bdc7ab` 已含 Wave 7/最新 main；PR 仍为旧 head `67aee177`，最终 docs HEAD CI 后再评估合并                  |
 | #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
 | #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
 | #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
@@ -267,32 +276,32 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 
 ### 8.1 当前审查分支
 
-| 项                    | 值                                                                       |
-| --------------------- | ------------------------------------------------------------------------ |
-| branch                | `codex/commercial-readiness-wave1-20260809`                              |
-| green code candidate  | `9211b6d13f589da8acc3adbe7617cedca51e23f9`                               |
-| pre-doc merge HEAD    | `8ffc886c2f019bbcf10492fcf282ad00b4b842f2`                               |
-| upstream              | `origin/codex/commercial-readiness-wave1-20260809@9211b6d1`              |
-| upstream ahead/behind | local pre-doc HEAD ahead 3 / behind 0                                    |
-| `origin/main`         | `1ecf5e988a5a8ff91d445565153f4999a51bd7fd`                               |
-| `origin/main...HEAD`  | behind 0 / ahead 21；已包含 `origin/main@1ecf5e98`                       |
-| local `main`          | `73fd04a1`，相对 `origin/main` behind 19 / ahead 0                       |
-| CI                    | `9211b6d1` 的 Linux/PG/browser 与 Windows installer manual dispatch 全绿 |
+| 项                    | 值                                                                     |
+| --------------------- | ---------------------------------------------------------------------- |
+| branch                | `codex/commercial-readiness-wave1-20260809`                            |
+| Wave 7 feature commit | `48ac2cd6`                                                             |
+| pre-doc code HEAD     | `93bdc7ab433d4b878cb164f31fb7dce51d0dc000`                             |
+| upstream              | `origin/codex/commercial-readiness-wave1-20260809@67aee177`            |
+| upstream ahead/behind | local pre-doc HEAD ahead 5 / behind 0                                  |
+| `origin/main`         | `65cd9cdfb9579f58be3741e471c93d2056bd228f`                             |
+| `origin/main...HEAD`  | behind 0 / ahead 25；已包含 `origin/main@65cd9cdf`                     |
+| PR                    | #570 OPEN/Draft，head `67aee177`，mergeability UNKNOWN；旧 head 四项绿 |
+| Wave 7 CI             | 未运行；最终 docs HEAD 须重跑 Linux/PG/browser/Windows                 |
 
-Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文档生成前 `8ffc886c` 又吸收 `origin/main@1ecf5e98` 并保留双方正式进度。最终报告提交会位于代码候选之后并须再次跑 CI；分支在审查并合入 main 前不得视为主干或生产事实，PostgreSQL/Windows CI 全绿也不能替代生产与真机验收。
+Wave 7 功能提交 `48ac2cd6` 已由文档生成前代码 HEAD `93bdc7ab` 吸收，且后者已合并 `origin/main@65cd9cdf` 并保留双方正式进度。远端分支/PR 仍停在 `67aee177`，因此旧四绿不能证明 Wave 7；最终报告提交位于 `93bdc7ab` 之后并须重跑 CI。分支在审查并合入 main 前不得视为主干或生产事实，CI 全绿也不能替代生产与真机验收。
 
 ### 8.2 分支与 refs
 
-| 指标                                | 数量 | 解释                                                                         |
-| ----------------------------------- | ---: | ---------------------------------------------------------------------------- |
-| local branches                      |  584 | 不能按 merged/no-merged 数量直接删除                                         |
-| true remote heads (`git ls-remote`) |  322 | 真实 GitHub heads，不等同本地 tracking refs                                  |
-| local `refs/remotes/origin/*`       |  329 | 含 322 个真实 heads、6 个 stale tracking-only refs 和 `origin/HEAD` 符号引用 |
-| stale tracking-only                 |    6 | 只表示远程已无同名 head；未授权前不 prune                                    |
-| worktrees                           |   28 | 不能直接 prune/remove                                                        |
-| open PRs                            |    6 | 见第 7.1 节                                                                  |
+| 指标                                | 数量 | 解释                                                                          |
+| ----------------------------------- | ---: | ----------------------------------------------------------------------------- |
+| local branches                      |  591 | 不能按 merged/no-merged 数量直接删除                                          |
+| true remote heads (`git ls-remote`) |  321 | 真实 GitHub heads，不等同本地 tracking refs                                   |
+| local `refs/remotes/origin/*`       |  334 | 含 321 个真实 heads、12 个 stale tracking-only refs 和 `origin/HEAD` 符号引用 |
+| stale tracking-only                 |   12 | 只表示远程已无同名 head；未授权前不 prune                                     |
+| worktrees                           |   30 | 不能直接 prune/remove                                                         |
+| open PRs                            |    6 | 见第 7.1 节                                                                   |
 
-“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。584 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、未提交资产、堆叠基础分支和 local-only commits。脏 worktree 中仍有大量未提交资产，正好证明 stale ref 或分支 tip 祖先关系不能作为删除授权。
+“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。591 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、未提交资产、堆叠基础分支和 local-only commits。脏 worktree 中仍有大量未提交资产，正好证明 stale ref 或分支 tip 祖先关系不能作为删除授权。
 
 ### 8.3 可重建差异与真实功能差异
 
@@ -315,18 +324,11 @@ Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文�
 - repository integrity gate 在安装依赖前运行，只依赖 Node/Git/Ruby；当前五份 workflow YAML 均能语法解析，tracked 文件无冲突标记。
 - 部署有显式授权变量、备份、同提交构建、migration 与 provenance 设计；生产 seed 默认 fail-closed。
 
-### 9.2 本轮已补覆盖与剩余缺口
+### 9.2 Wave 7 已补 direct deterministic gates
 
-从最终 HEAD 静态提取所有 workspace `package.json` 得到 301 个 `verify:*`/`verify-*` 脚本，其中 76 个脚本名未直接出现在 `ci.yml`。这不等于 76 个都未覆盖或都应无条件进主 CI：聚合脚本可能间接调用；live provider、真实 COS/OCR、人工 acceptance 应保留为受控门禁。本轮已经把 AI/file/print/material token、Agent scan/reliability/monitor、Kiosk member/print 等高风险纯本地回归接入；仍需单独归类的代表项如下：
+Wave 7 没有把所有未直接命名的 verify 机械塞进单一 job，而是新增 CI coverage 元守卫并补 11 条已确认 Linux-safe、无外网/硬件/密钥/生产库依赖的 direct gates：元守卫本身、Miniapp `verify:static`、Kiosk `verify:service-entry-readiness`、Admin `refresh-safe` / `admin-job-materials-ui` / `toolbox-review-ui` / `admin-terminal-bind-code-ui` / `admin-account-settings-ui`、Partner `partner-refresh-safe`、Agent `verify:task-runner-wake`、API `verify:terminal-status-idempotency`。
 
-| 建议优先级 | 脚本                                                            | 原因                                                       |
-| ---------- | --------------------------------------------------------------- | ---------------------------------------------------------- |
-| P1         | Agent `verify:task-runner-wake`                                 | task reliability 已接；wake 脚本仍需确认是否被现有聚合覆盖 |
-| P1         | Miniapp `verify:static`                                         | 当前 monorepo 小程序没有任何 CI 调用命中                   |
-| P1         | Kiosk `verify:service-entry-readiness`                          | member session 已接；服务入口真实性脚本仍未直接命中        |
-| P1/P2      | `verify:deploy-authorization-gate`、部分 Admin/Partner 静态门禁 | 先核对是否被聚合脚本间接覆盖，再决定直接接线               |
-
-建议同时维护三类清单：`ci-required`、`manual-live`、`local-focused`，并记录 direct/aggregate 覆盖关系，避免“脚本存在但无人知道是否必须跑”。不要简单把 76 个全塞进单一 30 分钟 job；按 SQLite 串行、PG、浏览器、Agent、Miniapp 分 job/聚合脚本。
+Admin account settings 的旧 verifier 依赖易漂移的源码字符串，本轮只改为 AST 校准 fixture，没有修改产品页面或放宽断言。`verify:deploy-authorization-gate` 在此前 `ci.yml` 已直接执行，本轮报告将其从“可能遗漏”更正为“已有覆盖”。live provider、真实 COS/OCR/支付、Windows service/SMB/spooler 和人工 acceptance 继续留在受控门禁，不能为了 direct 命中率塞进 Linux 主 CI。
 
 ### 9.3 CI 仍不能证明的事项
 
@@ -341,13 +343,13 @@ Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文�
 
 ### 9.5 最终商用验收矩阵
 
-| 证据层级            | 已有事实                                                                                                | 放行前仍需                                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 代码可证明          | Wave 1–5 专项；Wave 6 删除审计 Agent→API 与 secure reader；Node 22 typecheck/build/non-native verify 绿 | 保持同 SHA 回归；不得以 CI 替代生产/硬件事实                                        |
-| 远程 CI             | `9211b6d1`：build/PG/browser 与 Windows MSVC/WiX/安装生命周期/installed helper call 全绿                | docs commit 位于其后，最终同一 HEAD 仍须重跑                                        |
-| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                                             | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA   |
-| Windows/Pantum 真机 | secure reader 已为 Windows CI verified；打印/扫描具备自动化回归                                         | 两台真实 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、奔图真实出纸/扫描           |
-| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                                    | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限 |
+| 证据层级            | 已有事实                                                                                 | 放行前仍需                                                                          |
+| ------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 代码可证明          | Wave 1–6 专项；Wave 7 dead-letter CLI、API 终态/CAS 合同与 11 条 direct gates 的本地验证 | dead-letter fresh Node 22、终态合同真 SQLite/PG 由 CI 裁决                          |
+| 远程 CI             | PR 旧 head `67aee177` 四项绿；Wave 7 本地代码 HEAD `93bdc7ab` 尚未推送                   | docs commit 位于其后，最终同一 HEAD 重跑 Linux/PG/browser/Windows                   |
+| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                              | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA   |
+| Windows/Pantum 真机 | secure reader 已为 Windows CI verified；打印/扫描具备自动化回归                          | 两台真实 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、奔图真实出纸/扫描           |
+| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                     | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限 |
 
 ## 10. 目录、数据、fixture 与文档渐进优化
 
@@ -385,7 +387,7 @@ Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文�
 
 ### P0：发布前必须完成
 
-1. **冻结唯一发布候选**：Wave 6 已全绿代码候选为 `9211b6d1`，但本轮 docs commit 位于其后；最终同一 HEAD 的 Linux checks 与 `windows-agent-installer` 必须重新全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
+1. **冻结唯一发布候选**：Wave 7 功能提交 `48ac2cd6` 已由 `93bdc7ab` 吸收，但远端 PR 仍绑定旧 head；本轮 docs commit 位于其后。最终同一 HEAD 的 Linux checks 与 `windows-agent-installer` 必须全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
 2. **生产只读对齐**：核对服务器源码、runtime、PM2、四端 bundle、migration、授权变量、备份/磁盘；确认后再申请具名发布窗口。
 3. **Windows/奔图验收**：两台主机覆盖安装升级、service 强杀、断网/断电、spooler/打印机重启、重复领取、终态补报、真实出纸；确认彩色 mode/pages-per-sheet，未知项必须拒绝或隐藏。
 4. **扫描恢复门禁**：secure reader 与删除审计本地→API 已获 Linux/Windows CI 验证；仍须覆盖真实 symlink/junction/reparse/写入替换/长驻 watcher，并在 Windows/SMB/ACL/杀毒占用/重启下验证删除上报、ack、dead-letter、留存告警与集中对账后再开放扫描。
@@ -398,8 +400,8 @@ Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文�
 1. 对 8 个旧 Kiosk 路由做访问日志/client census，设计弃用/410/移除方案。
 2. 对五组疑似孤儿 Prisma 表做生产只读 census；不得先删 model。
 3. 部署 materials header-only 契约；对边缘/历史日志做 `accessToken` query 脱敏与泄漏处置，监控拒绝事件但不记录 token。
-4. 为 Agent durable dead-letter 增加管理员/CLI 列表、确认、受控重放和审计；重放仍做 owner/admin/终态幂等校验。
-5. 本轮 AI persistence、file delete、Agent reliability/monitor、材料 token、打印参数和会员会话门禁已接入；继续完成 Miniapp static、Agent wake 与 service-entry 的 direct/aggregate 覆盖判定。
+4. Agent durable dead-letter 的 PII-safe CLI、确认、放弃、单次重放与审计已完成；剩余是最终 HEAD fresh Node 22 CI 和真实 Windows 运维演练，不再重复开发第二套 Admin 入口。
+5. Miniapp static、Kiosk service-entry、Agent wake、API terminal status 与代表性 Admin/Partner 静态门禁已 direct 接入；继续维护元守卫，不把 live/manual verify 强塞入 Linux CI。
 6. 完成 Partner 原生 DataTransfer、Miniapp 外部跳转和隐私/本人数据真实接线。
 
 ### P2：稳定性与维护性
@@ -431,23 +433,23 @@ Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文�
 
 ## 13. 复核命令与结果摘要
 
-| 命令/检查                                              | 结果                                                                       |
-| ------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `git status --porcelain=v2 --branch`（文档开始前）     | clean                                                                      |
-| `git rev-list --left-right --count @{upstream}...HEAD` | green code candidate：upstream behind 0 / local ahead 0                    |
-| `git rev-list --left-right --count origin/main...HEAD` | green code candidate：local behind 0 / ahead 14；含 `origin/main@66e0d951` |
-| `git worktree list --porcelain`                        | 28 个 worktree                                                             |
-| `git for-each-ref refs/heads`                          | 584 个 local branches；未做批量删除                                        |
-| `git ls-remote --heads origin`                         | 322 个真实 remote heads                                                    |
-| remote tracking 与 ls-remote 差集                      | 329 tracking refs（含 `origin/HEAD`），6 个 stale tracking-only；未 prune  |
-| 独立 miniapp `git status`/`rev-list`                   | clean，local-only ahead 1，未推送                                          |
-| worker route/import/docs/workspace 搜索                | tracked 占位且有正式文档引用；不删除                                       |
-| 旧 Kiosk module/controller/import 搜索                 | 5 module 注册、8 handler 可达；不删除                                      |
-| Prisma delegate 搜索                                   | 五组旧 model 0 个运行时访问命中；未做生产 census，不删除                   |
-| tracked DB/dump 搜索                                   | 0；本地 dev DB/storage 由 ignore 管理                                      |
-| tracked 大文件/hash/引用搜索                           | 两份 1.66 MB hero PNG hash 相同但消费者不同；不删除                        |
-| Wave 4/5 Agent/API/Kiosk 目标 verifier                 | 本地目标回归通过；Node 22 fresh DB schema engine 边界保留                  |
-| Security diff discovery / sealer                       | 52/52、6 candidates、唯一 Low 已修；缺 snapshotDigest，未 sealed           |
-| Wave 6 manual dispatch job logs                        | `9211b6d1`：build/PG/browser 与 Windows MSVC/WiX/installed helper 全绿     |
-| repository integrity / 显式 YAML / Prettier            | 3,091 tracked marker-free；5 workflow valid；`ci.yml` 通过                 |
-| `git diff --check` / 文档格式                          | 主干冲突解决后已通过；最终三文档小修再次复跑                               |
+| 命令/检查                                              | 结果                                                                               |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `git status --porcelain=v2 --branch`（文档开始前）     | clean                                                                              |
+| `git rev-list --left-right --count @{upstream}...HEAD` | pre-doc candidate：upstream behind 0 / local ahead 5                               |
+| `git rev-list --left-right --count origin/main...HEAD` | pre-doc candidate：local behind 0 / ahead 25；含 `origin/main@65cd9cdf`            |
+| `git worktree list --porcelain`                        | 30 个 worktree                                                                     |
+| `git for-each-ref refs/heads`                          | 591 个 local branches；未做批量删除                                                |
+| `git ls-remote --heads origin`                         | 321 个真实 remote heads                                                            |
+| remote tracking 与 ls-remote 差集                      | 334 tracking refs（含 `origin/HEAD`）；12 个 origin stale tracking-only；未 prune  |
+| 独立 miniapp `git status`/`rev-list`                   | 5 项 dirty，local-only ahead 1，未推送                                             |
+| worker route/import/docs/workspace 搜索                | tracked 占位且有正式文档引用；不删除                                               |
+| 旧 Kiosk module/controller/import 搜索                 | 5 module 注册、8 handler 可达；不删除                                              |
+| Prisma delegate 搜索                                   | 五组旧 model 0 个运行时访问命中；未做生产 census，不删除                           |
+| tracked DB/dump 搜索                                   | 0；本地 dev DB/storage 由 ignore 管理                                              |
+| tracked 大文件/hash/引用搜索                           | 两份 1.66 MB hero PNG hash 相同但消费者不同；不删除                                |
+| Wave 4/5 Agent/API/Kiosk 目标 verifier                 | 本地目标回归通过；Node 22 fresh DB schema engine 边界保留                          |
+| Security diff discovery / sealer                       | 52/52、6 candidates、唯一 Low 已修；缺 snapshotDigest，未 sealed                   |
+| Wave 7 本地专项                                        | dead-letter 真 SQLite/HTTP、Node 22 typecheck/build/unauthorized、终态纯内存专项绿 |
+| repository integrity / 显式 YAML / Prettier            | 3,113 tracked marker-free；5 workflow valid；`ci.yml` 通过                         |
+| `git diff --check` / 文档格式                          | 主干冲突解决后已通过；最终三文档小修再次复跑                                       |
