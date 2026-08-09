@@ -33,6 +33,10 @@ import {
   getConsentScope,
   type ConsentScope,
 } from '../../services/api/contractReview'
+import {
+  clearContractReviewSession,
+  startContractReviewSession,
+} from './contractReviewSession'
 import './contract-review.css'
 
 const CONTRACT_TYPES: Array<{ key: ContractType; name: string; hint: string }> = [
@@ -47,7 +51,7 @@ const MAX_SIZE_MB = 20
 
 export function ContractReviewHomePage() {
   const navigate = useNavigate()
-  const { getToken } = useAuth()
+  const { getToken, user } = useAuth()
 
   const [file, setFile] = useState<File | null>(null)
   const [contractType, setContractType] = useState<ContractType>('labor_contract')
@@ -62,6 +66,8 @@ export function ContractReviewHomePage() {
   useBusyLock(submitting)
 
   useEffect(() => {
+    // 上传页不恢复上一份合同；浏览器返回到这里也立即丢弃易失凭证与结果。
+    clearContractReviewSession()
     getConsentScope()
       .then(setConsentScope)
       .catch(() => setError('无法加载知情同意信息，请稍后重试'))
@@ -100,13 +106,14 @@ export function ContractReviewHomePage() {
         },
         { token: getToken() },
       )
-      navigate('/contract-review/processing', {
-        state: {
-          taskId: task.id,
-          accessToken: (task as unknown as { accessToken?: string }).accessToken ?? null,
-          contractType,
-        },
+      startContractReviewSession({
+        taskId: task.id,
+        accessToken: task.accessToken ?? null,
+        contractType,
+        expiresAt: task.expiresAt,
+        ownerMemberId: user?.id ?? null,
       })
+      navigate('/contract-review/processing')
     } catch {
       setError('创建审查任务失败，请检查文件格式后重试')
     } finally {

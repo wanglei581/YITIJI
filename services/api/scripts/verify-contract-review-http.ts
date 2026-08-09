@@ -112,6 +112,11 @@ class LifecycleHarness {
     throw new ServiceUnavailableException('REPORT_NOT_AVAILABLE')
   }
 
+  async abandonReport(fileId: string, token: string | null) {
+    if (fileId !== 'report-file-1' || token !== 'report-abandon-token-1') throw taskNotFound()
+    return { fileId, deleted: true, protectedByPrintTask: false }
+  }
+
   async remove(id: string, requester: ContractReviewRequester) {
     this.requireTask(id, requester)
     this.tasks.delete(id)
@@ -298,6 +303,22 @@ async function verifyExplicitHttpModule(): Promise<void> {
     }, tokenHeader), 400, 'VALIDATION_FAILED')
     assert.equal((await request(port, 'POST', `/contract-reviews/${task.id}/confirm`, confirmBody, tokenHeader)).status, 202)
     assertError(await request(port, 'POST', `/contract-reviews/${task.id}/report`, undefined, tokenHeader), 503, 'REPORT_NOT_AVAILABLE')
+    assertError(
+      await request(port, 'DELETE', '/contract-reviews/reports/report-file-1'),
+      404,
+      'CONTRACT_REVIEW_TASK_NOT_FOUND',
+    )
+    const abandoned = await request(
+      port,
+      'DELETE',
+      '/contract-reviews/reports/report-file-1',
+      undefined,
+      { 'X-Contract-Review-Report-Abandon-Token': 'report-abandon-token-1' },
+    )
+    assert.equal(abandoned.status, 200)
+    assert.deepEqual(abandoned.body.data, {
+      fileId: 'report-file-1', deleted: true, protectedByPrintTask: false,
+    })
 
     const throttleHeaders = {
       'X-Contract-Review-Source-File-Proof': 'proof:file-1',

@@ -97,6 +97,15 @@ export class ContractReviewController {
     return ApiResponse.ok(await this.lifecycle.createReport(id, await this.requesterOf(req)))
   }
 
+  @Delete('reports/:fileId')
+  @Throttle({ default: { ttl: 60_000, limit: 8 } })
+  async abandonReport(@Param('fileId') fileId: string, @Req() req: RequestLike) {
+    return ApiResponse.ok(await this.lifecycle.abandonReport(
+      fileId,
+      headerOf(req, 'x-contract-review-report-abandon-token'),
+    ))
+  }
+
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: RequestLike) {
     return ApiResponse.ok(await this.lifecycle.remove(id, await this.requesterOf(req)))

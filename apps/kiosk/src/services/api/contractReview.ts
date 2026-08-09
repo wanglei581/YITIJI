@@ -9,6 +9,8 @@
 // ============================================================
 
 import type {
+  ContractReviewStatus,
+  ContractReviewReportView,
   ContractReviewTaskView,
   ContractType,
 } from '@ai-job-print/shared'
@@ -30,6 +32,13 @@ export class ContractReviewApiError extends Error {
 export interface ContractReviewAccess {
   token?: string | null
   accessToken?: string | null
+}
+
+export interface ContractReviewCreatedTaskView {
+  id: string
+  status: ContractReviewStatus
+  expiresAt: string
+  accessToken?: string
 }
 
 export interface ConsentScope {
@@ -95,8 +104,8 @@ export async function createContractReview(
   contractType: ContractType,
   consent: { consentVersion: string; consentScopeHash: string; disclaimerVersion: string },
   access: ContractReviewAccess,
-): Promise<ContractReviewTaskView> {
-  if (API_MODE !== 'http') return mockCreateTask(contractType)
+): Promise<ContractReviewCreatedTaskView> {
+  if (API_MODE !== 'http') return mockCreateTask()
   // 1. 上传文件
   const upload = await kioskUploadFile(file, 'contract_upload', access.token)
   // 2. 创建审查任务。匿名用户需附带 source-file-proof（上传返回的签名 URL），
@@ -104,7 +113,7 @@ export async function createContractReview(
   const extraHeaders: Record<string, string> = !access.token && upload.signedUrl
     ? { 'x-contract-review-source-file-proof': upload.signedUrl }
     : {}
-  return call<ContractReviewTaskView>('/contract-reviews', access, {
+  return call<ContractReviewCreatedTaskView>('/contract-reviews', access, {
     method: 'POST',
     body: {
       sourceFileId: upload.fileId,
@@ -165,6 +174,42 @@ export async function deleteContractReview(
   await call(`/contract-reviews/${id}`, access, { method: 'DELETE' })
 }
 
+/** 生成短期 AI 风险提示 PDF；服务端开关关闭时固定 fail-closed。 */
+export async function createContractReviewReport(
+  id: string,
+  access: ContractReviewAccess,
+): Promise<ContractReviewReportView> {
+  if (API_MODE !== 'http') {
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    return {
+      fileId: 'mock-contract-report-001',
+      filename: 'AI签约风险提示报告.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 42_800,
+      pages: 2,
+      expiresAt,
+      printFileUrl: '/api/v1/files/mock-contract-report-001/content?expires=1&sig=mock',
+      abandonToken: 'mock-contract-report-abandon-token',
+      abandonTokenExpiresAt: expiresAt,
+    }
+  }
+  return call<ContractReviewReportView>(`/contract-reviews/${id}/report`, access, {
+    method: 'POST',
+  })
+}
+
+/** 放弃尚未创建 PrintTask 的报告；凭证不具备合同或报告读取权限。 */
+export async function abandonContractReviewReport(
+  fileId: string,
+  abandonToken: string,
+): Promise<void> {
+  if (API_MODE !== 'http') return
+  await call(`/contract-reviews/reports/${encodeURIComponent(fileId)}`, {}, {
+    method: 'DELETE',
+    extraHeaders: { 'x-contract-review-report-abandon-token': abandonToken },
+  })
+}
+
 // ── Mock 实现（开发调试用） ────────────────────────────────
 
 function mockConsentScope(): ConsentScope {
@@ -188,20 +233,14 @@ function mockConsentScope(): ConsentScope {
 let _mockStep = 0
 let _mockConfirmed = false
 
-function mockCreateTask(contractType: ContractType): ContractReviewTaskView {
+function mockCreateTask(): ContractReviewCreatedTaskView {
   _mockStep = 0
   _mockConfirmed = false
   return {
     id: 'mock-task-001',
     status: 'queued',
-    contractType,
-    analyzedPages: 0,
-    totalPages: null,
-    truncated: false,
-    ocrConfidence: null,
     expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-    progress: { stage: 'queued', completedPages: 0, totalPages: null },
-    result: null,
+    accessToken: 'mock-contract-review-access-token',
   }
 }
 

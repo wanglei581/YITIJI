@@ -23,6 +23,7 @@ test('default contract module never registers BullMQ processor, controller, or r
     { ContractReviewController },
     { ContractReviewHttpModule },
     { ContractReviewLifecycleService },
+    { CONTRACT_REVIEW_REPORT_ENABLED, ContractReviewReportService },
     { ContractReviewQueueService },
     { ContractReviewService },
     { ContractReviewTaskAccess },
@@ -31,6 +32,7 @@ test('default contract module never registers BullMQ processor, controller, or r
     import('../contract-review.controller'),
     import('../contract-review-http.module'),
     import('../contract-review-lifecycle.service'),
+    import('../contract-review-report.service'),
     import('../contract-review.queue'),
     import('../contract-review.service'),
     import('../contract-review-task-access'),
@@ -42,6 +44,7 @@ test('default contract module never registers BullMQ processor, controller, or r
   assert.equal(providers.includes(ContractReviewProcessor), false)
   assert.equal(providers.includes(ContractReviewProviderService), false)
   assert.equal(providers.includes(ContractReviewLifecycleService), true)
+  assert.equal(providers.includes(ContractReviewReportService), true)
   assert.equal(providers.includes(ContractReviewConsentService), true)
   assert.equal(providers.includes(ContractReviewTaskAccess), true)
   assert.equal(controllers.includes(ContractReviewController), false)
@@ -51,6 +54,21 @@ test('default contract module never registers BullMQ processor, controller, or r
     if (!value || typeof value !== 'object') return false
     return (value as { module?: { name?: string } }).module?.name === 'BullModule'
   }), false)
+
+  const reportFlag = providers.find((provider) => (
+    typeof provider === 'object' && provider !== null &&
+    (provider as { provide?: unknown }).provide === CONTRACT_REVIEW_REPORT_ENABLED
+  )) as { useFactory: () => boolean } | undefined
+  assert.ok(reportFlag)
+  const previous = process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  assert.equal(reportFlag.useFactory(), false)
+  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'TRUE'
+  assert.equal(reportFlag.useFactory(), false)
+  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'true'
+  assert.equal(reportFlag.useFactory(), true)
+  if (previous === undefined) delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  else process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = previous
 
   const exports = metadata<unknown>(MODULE_METADATA.EXPORTS, ContractReviewModule)
   assert.equal(exports.includes(ContractReviewLifecycleService), true)

@@ -99,7 +99,7 @@ export class FilesService {
     /** 仅服务端派生成果可收紧默认 system_short 到明确到期时间。 */
     expiresAtOverride?: Date
   }): Promise<FileUploadResponse> {
-    if (args.purpose === 'member_data_export') {
+    if (args.purpose === 'member_data_export' || args.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
           code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
@@ -258,7 +258,7 @@ export class FilesService {
     createdBy?: string | null
   }): Promise<UploadIntentResponse> {
     const { body } = args
-    if (body.purpose === 'member_data_export') {
+    if (body.purpose === 'member_data_export' || body.purpose === 'contract_review_report') {
       throw new BadRequestException({
         error: {
           code: 'FILE_PURPOSE_SERVER_GENERATED_ONLY',
@@ -572,7 +572,18 @@ export class FilesService {
   async readContent(
     fileId: string
   ): Promise<{ buffer: Buffer; mimeType: string; filename: string; purpose: FilePurpose }> {
-    const record = await this.requireAlive(fileId)
+    const record = await this.requireDeletable(fileId, { allowContractReviewReport: true })
+    const expired = Boolean(record.expiresAt && record.expiresAt.getTime() <= Date.now())
+    const malformedContract = record.purpose === 'contract_upload' && !record.expiresAt
+    if (
+      malformedContract ||
+      (expired && (
+        record.purpose !== 'contract_review_report' ||
+        !(await this.hasActivePrintTaskForFile(fileId))
+      ))
+    ) {
+      this.throwFileNotFound()
+    }
     const buffer = await this.storage.getObject(record.storageKey, record.bucket)
     return {
       buffer,
@@ -624,7 +635,9 @@ export class FilesService {
     const records = await this.prisma.fileObject.findMany({
       where: {
         ...(args.includeDeleted ? {} : { deletedAt: null }),
-        ...(args.purpose ? { purpose: args.purpose } : {}),
+        ...(args.purpose
+          ? { purpose: args.purpose === 'contract_review_report' ? '__hidden__' : args.purpose }
+          : { purpose: { not: 'contract_review_report' } }),
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(args.limit ?? 100, 500),
@@ -762,7 +775,10 @@ export class FilesService {
     allowMemberDataExport = false,
     sensitiveLog = false
   ): Promise<FileMetadata> {
-    const record = await this.requireDeletable(fileId, { allowMemberDataExport })
+    const record = await this.requireDeletable(fileId, {
+      allowMemberDataExport,
+      allowContractReviewReport: sensitiveLog,
+    })
     await this.storage.deleteObject(record.storageKey, record.bucket)
     const updated = await this.prisma.fileObject.update({
       where: { id: fileId },
@@ -805,7 +821,9 @@ export class FilesService {
           where: { fileObjectId: f.id },
           select: { id: true, status: true, revokedAt: true },
         })
-        if (bridge && (await this.hasActivePrintTaskForFile(f.id))) {
+        // 任意已建单且仍在履约中的文件都必须保留给 Agent 下载；合同风险提示报告
+        // 没有招聘会 bridge，不能把保护条件错误地绑在 bridge 存在上。
+        if (await this.hasActivePrintTaskForFile(f.id)) {
           continue
         }
         await this.storage.deleteObject(f.storageKey, f.bucket)
@@ -879,9 +897,9 @@ export class FilesService {
   private async hasActivePrintTaskForFile(fileId: string): Promise<boolean> {
     const tasks = await this.prisma.printTask.findMany({
       where: { status: { in: ['pending', 'claimed', 'printing'] } },
-      select: { fileUrl: true },
+      select: { fileId: true, fileUrl: true },
     })
-    return tasks.some((task) => parseContentFileId(task.fileUrl) === fileId)
+    return tasks.some((task) => task.fileId === fileId || parseContentFileId(task.fileUrl) === fileId)
   }
 
   private downloadUrlTtlSeconds(expiresAt: Date | null, purpose: string): number {
@@ -907,20 +925,27 @@ export class FilesService {
     return signedExpiresAt
   }
 
-  private async requireAlive(fileId: string, options: { allowMemberDataExport?: boolean } = {}) {
+  private async requireAlive(
+    fileId: string,
+    options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {},
+  ) {
     return this.requireFile(fileId, { ...options, allowExpired: false })
   }
 
   private async requireDeletable(
     fileId: string,
-    options: { allowMemberDataExport?: boolean } = {}
+    options: { allowMemberDataExport?: boolean; allowContractReviewReport?: boolean } = {}
   ) {
     return this.requireFile(fileId, { ...options, allowExpired: true })
   }
 
   private async requireFile(
     fileId: string,
-    options: { allowMemberDataExport?: boolean; allowExpired: boolean }
+    options: {
+      allowMemberDataExport?: boolean
+      allowContractReviewReport?: boolean
+      allowExpired: boolean
+    }
   ) {
     const record = await this.prisma.fileObject.findUnique({ where: { id: fileId } })
     if (
@@ -928,9 +953,10 @@ export class FilesService {
       record.deletedAt ||
       (!options.allowExpired && record.purpose === 'contract_upload' && !record.expiresAt) ||
       (!options.allowExpired && record.expiresAt && record.expiresAt.getTime() <= Date.now()) ||
-      (!options.allowMemberDataExport && record.purpose === 'member_data_export')
+      (!options.allowMemberDataExport && record.purpose === 'member_data_export') ||
+      (!options.allowContractReviewReport && record.purpose === 'contract_review_report')
     ) {
-      // 禁止通用端点成为导出 artifact 存在性探针。
+      // 禁止通用端点成为导出或合同风险报告 artifact 的存在性探针。
       this.throwFileNotFound()
     }
     return record

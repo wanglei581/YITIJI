@@ -56,7 +56,7 @@ export interface RetentionUpdateInput extends RetentionUploadInput {
 
 export function defaultRetentionForUpload(input: RetentionUploadInput): RetentionDecision {
   const now = input.now ?? new Date()
-  if (input.purpose === 'contract_upload') {
+  if (input.purpose === 'contract_upload' || input.purpose === 'contract_review_report') {
     return {
       expiresAt: new Date(now.getTime() + CONTRACT_REVIEW_TTL_MS),
       retentionPolicy: 'system_short',
@@ -98,6 +98,7 @@ export function allowedPoliciesForFile(input: {
   if (input.purpose === 'id_scan') return ['system_short']
   if (input.purpose === 'signature_image') return ['system_short']
   if (input.purpose === 'contract_upload') return ['system_short']
+  if (input.purpose === 'contract_review_report') return ['system_short']
   if (input.assetCategory === 'optimized' || input.assetCategory === 'derived') {
     return ['months_3', 'months_6', 'long_term']
   }

@@ -7,7 +7,7 @@
 // ============================================================
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Button,
   KioskModal,
@@ -32,13 +32,13 @@ import {
   deleteContractReview,
   getContractReview,
 } from '../../services/api/contractReview'
+import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
+import {
+  clearContractReviewSession,
+  readContractReviewSession,
+  updateContractReviewSession,
+} from './contractReviewSession'
 import './contract-review.css'
-
-interface PageState {
-  taskId?: string
-  accessToken?: string | null
-  contractType?: ContractType
-}
 
 const STAGES = [
   {
@@ -85,13 +85,12 @@ const STAGE_ORDER: string[] = [
 
 export function ContractReviewProcessingPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { getToken } = useAuth()
-  const state = (location.state ?? {}) as PageState
+  const { getToken, user } = useAuth()
+  const session = readContractReviewSession(user?.id ?? null)
 
-  const taskId = state.taskId ?? ''
-  const accessToken = state.accessToken ?? null
-  const contractType: ContractType = state.contractType ?? 'labor_contract'
+  const taskId = session?.taskId ?? ''
+  const accessToken = session?.accessToken ?? null
+  const contractType: ContractType = session?.contractType ?? 'labor_contract'
 
   const [task, setTask] = useState<ContractReviewTaskView | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -109,13 +108,11 @@ export function ContractReviewProcessingPage() {
     try {
       const t = await getContractReview(taskId, { token: getToken(), accessToken })
       if (!mountedRef.current) return
+      updateContractReviewSession(t)
       setTask(t)
 
       if (t.status === 'completed') {
-        navigate('/contract-review/result', {
-          replace: true,
-          state: { taskId, accessToken, result: t.result, contractType: t.contractType },
-        })
+        navigate('/contract-review/result', { replace: true })
         return
       }
       if (t.status === 'failed' || t.status === 'cancelled' || t.status === 'expired') {
@@ -179,6 +176,7 @@ export function ContractReviewProcessingPage() {
     setDeleteError(null)
     try {
       await deleteContractReview(taskId, { token: getToken(), accessToken })
+      clearContractReviewSession()
       navigate('/resume-service', { replace: true })
     } catch {
       setShowConfirmModal(false)
@@ -241,6 +239,7 @@ export function ContractReviewProcessingPage() {
           }
         >
         {/* 步骤指示器 */}
+        {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
             <div className="cr-step__dot">✓</div>

@@ -470,6 +470,8 @@ function matchesWhere(row: ContractReviewTaskRow, where: Record<string, unknown>
 function taskRow(overrides: Partial<ContractReviewTaskRow> = {}): ContractReviewTaskRow {
   return {
     id: 'task-1',
+    sourceFileId: 'source-1',
+    resultFileId: null,
     endUserId: 'member-a',
     accessTokenHash: null,
     contractType: 'labor_contract',

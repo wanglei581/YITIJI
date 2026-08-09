@@ -6,18 +6,15 @@
 // ============================================================
 
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Button,
   KioskActionBar,
+  KioskModal,
   KioskPageFrame,
   KioskPageHeader,
 } from '@ai-job-print/ui'
-import type {
-  ContractReviewFinding,
-  ContractReviewResult,
-  ContractType,
-} from '@ai-job-print/shared'
+import type { ContractReviewFinding } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -35,14 +32,16 @@ import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import { deleteContractReview } from '../../services/api/contractReview'
+import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
+import {
+  isContractReviewReportPrintEnabled,
+  prepareContractReviewReportPrint,
+} from './contractReviewReportPrintFlow'
+import {
+  clearContractReviewSession,
+  readContractReviewSession,
+} from './contractReviewSession'
 import './contract-review.css'
-
-interface PageState {
-  taskId?: string
-  accessToken?: string | null
-  contractType?: ContractType
-  result?: ContractReviewResult | null
-}
 
 const PRIORITY_LABELS: Record<string, string> = {
   priority_check: '优先核查',
@@ -66,6 +65,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   imbalance: '权利义务失衡',
   offer_conditions: '录用条件',
 }
+
+const REPORT_PRINT_ENABLED = isContractReviewReportPrintEnabled()
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (
@@ -145,28 +146,53 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
 
 export function ContractReviewResultPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const { getToken } = useAuth()
-  const state = (location.state ?? {}) as PageState
-  const result = state.result ?? null
+  const { getToken, user } = useAuth()
+  const session = readContractReviewSession(user?.id ?? null)
+  const result = session?.result ?? null
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [showPrintConfirm, setShowPrintConfirm] = useState(false)
+  const [generatingReport, setGeneratingReport] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
 
-  useBusyLock(deleting)
+  useBusyLock(deleting || generatingReport)
+
+  async function continueToReportPrint() {
+    if (!REPORT_PRINT_ENABLED || !session?.taskId || generatingReport) return
+    setGeneratingReport(true)
+    setReportError(null)
+    try {
+      const handoff = await prepareContractReviewReportPrint(session.taskId, {
+        token: getToken(),
+        accessToken: session.accessToken,
+      })
+      navigate('/print/confirm', {
+        replace: true,
+        state: handoff,
+      })
+    } catch {
+      setShowPrintConfirm(false)
+      setReportError('风险提示报告生成或原合同清理未完成，请稍后重试。当前不会进入收费或打印流程。')
+    } finally {
+      setGeneratingReport(false)
+    }
+  }
 
   async function deleteAndNavigate(destination: '/contract-review' | '/resume-service') {
     if (deleting) return
-    if (!state.taskId) {
+    if (!session?.taskId) {
+      clearContractReviewSession()
       navigate(destination, { replace: true })
       return
     }
     setDeleting(true)
     setDeleteError(null)
     try {
-      await deleteContractReview(state.taskId, {
+      await deleteContractReview(session.taskId, {
         token: getToken(),
-        accessToken: state.accessToken,
+        accessToken: session.accessToken,
       })
+      clearContractReviewSession()
       navigate(destination, { replace: true })
     } catch {
       setDeleteError('立即删除失败，合同仍可能处于短期保留状态。请重试；系统仍会按最长保留时限自动清理。')
@@ -241,11 +267,14 @@ export function ContractReviewResultPage() {
             <Button
               size="lg"
               style={{ flex: 2 }}
-              disabled
-              title="合同审查报告文件尚未开放"
+              disabled={!REPORT_PRINT_ENABLED || deleting || generatingReport}
+              title={REPORT_PRINT_ENABLED ? '生成并打印 AI 风险提示报告' : '合同审查报告文件尚未开放'}
+              onClick={() => setShowPrintConfirm(true)}
             >
-              <PrinterIcon size={20} className="mr-2" />
-              报告打印暂未开放
+              {generatingReport
+                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
+                : <PrinterIcon size={20} className="mr-2" />}
+              {REPORT_PRINT_ENABLED ? '打印风险提示报告' : '报告打印暂未开放'}
             </Button>
             <Button
               size="lg"
@@ -267,6 +296,13 @@ export function ContractReviewResultPage() {
             <span>{deleteError}</span>
           </div>
         )}
+        {reportError && (
+          <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
+            <AlertCircleIcon />
+            <span>{reportError}</span>
+          </div>
+        )}
+        {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
@@ -411,6 +447,47 @@ export function ContractReviewResultPage() {
         </div>
         </KioskPageFrame>
       </main>
+      <KioskModal
+        title="确认打印风险提示报告"
+        open={showPrintConfirm}
+        onClose={() => !generatingReport && setShowPrintConfirm(false)}
+        actions={
+          <div style={{ display: 'flex', gap: 16 }}>
+            <Button
+              variant="ghost"
+              disabled={generatingReport}
+              onClick={() => setShowPrintConfirm(false)}
+              style={{ flex: 1 }}
+            >
+              暂不打印
+            </Button>
+            <Button
+              disabled={generatingReport}
+              onClick={() => void continueToReportPrint()}
+              style={{ flex: 2 }}
+            >
+              {generatingReport
+                ? <Loader2Icon size={18} className="animate-spin mr-1" />
+                : <PrinterIcon size={18} className="mr-1" />}
+              生成报告并查看报价
+            </Button>
+          </div>
+        }
+      >
+        <div className="cr-confirm-modal">
+          <div className="cr-confirm-modal__info">
+            只生成并打印 AI 风险提示报告，不打印合同原件。报告生成成功后，系统会优先清理原合同。
+          </div>
+          <div>
+            <div className="cr-confirm-modal__row"><span>打印内容</span><span>风险提示报告</span></div>
+            <div className="cr-confirm-modal__row"><span>默认参数</span><span>黑白 · A4 · 单面 · 1 份</span></div>
+            <div className="cr-confirm-modal__row"><span>费用</span><span>下一步由服务端报价</span></div>
+          </div>
+          <p style={{ fontSize: 17, color: 'var(--muted)', lineHeight: 1.55 }}>
+            报告可能包含敏感条款摘要，请在机器旁等待并及时取走纸张。进入打印确认后放弃，系统会请求立即删除尚未建单的报告。
+          </p>
+        </div>
+      </KioskModal>
     </KioskFullscreenShell>
   )
 }

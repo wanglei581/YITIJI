@@ -226,6 +226,8 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:contract-review-session
+          pnpm --filter @ai-job-print/kiosk verify:contract-review-report-print
           pnpm --filter @ai-job-print/kiosk verify:device-status-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
           pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
@@ -278,6 +280,8 @@ jobs:
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
+          pnpm --filter @ai-job-print/api verify:contract-review:report
+          pnpm --filter @ai-job-print/api verify:contract-review:print-lifecycle
           pnpm --filter @ai-job-print/api verify:contract-review:schema
           pnpm --filter @ai-job-print/api verify:contract-review:consent
           pnpm --filter @ai-job-print/api verify:trust-proxy
@@ -604,6 +608,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk test:browser:w6
           pnpm --filter @ai-job-print/kiosk test:browser:privacy
           pnpm --filter @ai-job-print/kiosk test:browser:warning
+          pnpm --filter @ai-job-print/kiosk test:browser:contract-review
 
       - name: Upload Kiosk browser failure artifacts
         if: failure()

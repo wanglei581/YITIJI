@@ -38,7 +38,7 @@
 - [x] **干净候选冻结范围门禁（已闭环）**：已在干净 worktree 的审定候选 `origin/main@55105fa8`（Node `v22.23.1` / pnpm `11.2.2`）串行重跑全部 Kiosk fusion 静态合同：baseline、shell、home、W2、W3、W4、W5、W6 均 ALL PASS，其中 W3 的 6 个硬冻结文件 SHA 全部保持不变、W4 的 25 路由归属与硬冻结文件守卫通过；证明此前失败源于共享脏工作区的他人未提交改动，不是产品缺陷。浏览器 W3/W4 行为套件仍以 CI `kiosk-browser-smoke` 与既有 Node 22 回归证据为准。
 - [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。现场按 `docs/device/windows-field-acceptance-runsheet-2026-08.md` 逐项执行并记录证据；扫码枪付款码与打印机面板扫描 SMB 专项见 `docs/device/peripheral-field-acceptance-2026-08.md`（摄像头不接入）。未知彩色 mode 不得假设，打印机型号不得硬编码。
 - [ ] **生产文件链路验收**：在具名授权和备份/回滚方案下复验 PostgreSQL、Redis、COS/OSS、签名 URL 过期/刷新、匿名与会员归属、文件 TTL/删除、Admin 审计和跨账号隔离；本地 HMAC/SQLite/Mock 结果不得替代生产证据。
-- [ ] **未开放格式保持 fail-closed**：Word 打印转换/内嵌预览、政策附件、合同审查报告生成在真实转换/文件服务、数据模型、权限、审计和测试完成前继续保持未开放或诚实禁用，不得恢复成可点击占位流程。
+- [ ] **未开放能力保持 fail-closed**：Word 打印转换/内嵌预览与政策附件在真实转换/文件服务完成前继续保持未开放；合同风险提示报告的本地代码与浏览器候选已完成，但生产和 Windows 真机验收前双端开关必须保持关闭，不得恢复成可点击占位流程。
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
@@ -88,7 +88,7 @@
 
 ## Phase 0 真值收口后续
 
-- [ ] **AI签约风险提示生产验收**：本地候选已把入口归入「AI简历服务 → 签约与权益」并注册 API HTTP 契约，但 `VITE_ENABLE_CONTRACT_REVIEW` 继续默认 false。启用前必须在 Node 22 冻结候选完成 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、BOS/COS 高敏文件短期留存与立即删除、会员/匿名两轨、1080×1920 浏览器和公共终端隐私验收；报告文件生成和打印尚未实现，按钮必须保持“报告打印暂未开放”。
+- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已完成入口、易失会话、短期报告 PDF 和复用既有报价/支付/打印履约链的本地闭环；Node 22 下合同全量 `295 passed / 1 PostgreSQL 环境 skip`、fresh SQLite 78 migrations、打印/订单回归、API/Kiosk 构建和 1080×1920 浏览器 `3/3` 均通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。下一步依次完成 PR/CI 冻结、真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸；全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。

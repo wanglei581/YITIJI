@@ -48,3 +48,18 @@ approved_at: "2026-08-04T03:08:00+00:00"
 ## 验证边界
 
 `verify:contract-review:gate0` 只验证本记录的字段完整性和状态一致性。验证通过仅说明记录格式有效；只有 frontmatter 中 `status: approved` 且所有批准条件同时满足，才表示 Gate 0 已获批准。
+
+## 生产激活前置门禁
+
+Gate 0 获批只允许进入技术验收，不等于允许部署或打开用户入口。冻结候选还必须复用现有生产与现场验收体系关闭以下条件，不另建第二套上线标准：
+
+| 门禁 | 必须保留的证据 |
+| --- | --- |
+| PostgreSQL 与法务正文 | 冻结候选 migration / drift 通过；生产只存在一份有效且完整发布的合同免责声明；会员与匿名同意均绑定同一版本和 scope hash |
+| Redis / BullMQ | 真实 Redis 入队、worker 处理、幂等重放、超时和失败收敛通过；不得使用 inline 或 mock 冒充生产队列 |
+| 获准境内模型 | 实际 provider / base URL / model 与精确白名单一致；经授权的无个人信息 canary 成功；原合同、token 和未脱敏文本不进入日志 |
+| 私有对象存储 | 当前生产 driver 的私有桶上传、短签名读取、原合同优先删除、报告放弃删除、打印终态删除和 TTL 兜底均有真实证据；离线适配器测试不能替代 live 验收 |
+| 公共终端与双身份 | 会员、匿名、刷新、离席、硬隐私截止、BFCache 和切换用户均不恢复合同或报告上下文；失败时保持 fail-closed |
+| 报告打印 | 在目标 Windows Kiosk、Terminal Agent 与实际打印机完成报价、建单、支付门禁、领取、真实出纸、状态回流、失败恢复和敏感报告清理 |
+
+启用顺序必须可回滚：先完成后端依赖与真实链路验收，并保持所有合同开关关闭；再单独开启合同审查入口；最后才同时开启服务端 `CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 与前端 `VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`。任何一步失败立即关闭对应前端开关，服务端继续 fail-closed，不得通过 mock、占位结果或延长敏感文件寿命维持页面可用。
