@@ -194,8 +194,8 @@ export class JobsService {
 
   // ── Excel ──────────────────────────────────────────────────────────────────
 
-  parseExcelColumns(buffer: Buffer) {
-    return this.excel.parseExcelColumns(buffer)
+  parseExcelColumns(buffer: Buffer, fileName: string) {
+    return this.excel.parseExcelColumns(buffer, fileName)
   }
 
   previewExcelImport(args: {

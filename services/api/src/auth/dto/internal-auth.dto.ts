@@ -128,6 +128,20 @@ export class ChangePasswordDto {
   newPassword!: string
 }
 
+export class FirstAdminPasswordChangeDto {
+  @IsString()
+  @MinLength(48)
+  @MaxLength(256)
+  changeTicket!: string
+
+  @IsString()
+  @MinLength(12)
+  @MaxLength(72)
+  @IsBcryptSafeByteLength()
+  @IsCommercialStrongPassword()
+  newPassword!: string
+}
+
 export class SelfPhoneCodeDto {
   @IsOptional()
   @IsString()

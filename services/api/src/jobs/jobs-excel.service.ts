@@ -10,7 +10,6 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common'
-import { Workbook } from 'exceljs'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
 import { JobQualityService } from '../job-ai/job-quality.service'
@@ -25,6 +24,11 @@ import {
   type ParsedRow,
 } from './dto/excel-import.dto'
 import { JOB_WORK_TYPE_VALUES } from './work-type'
+import {
+  loadPartnerImportRows,
+  PARTNER_IMPORT_MAX_DATA_ROWS,
+  PARTNER_IMPORT_MAX_FILE_BYTES,
+} from './partner-import-file'
 import {
   type ExcelPreviewDto,
   type FieldMappingRuleDto,
@@ -56,61 +60,26 @@ export class JobsExcelService {
     }
   }
 
-  private async loadExcelRows(buffer: Buffer): Promise<string[][]> {
-    const wb = new Workbook()
+  private async loadExcelRows(buffer: Buffer, fileName: string): Promise<string[][]> {
     try {
-      await wb.xlsx.load(buffer as unknown as ArrayBuffer)
-    } catch {
-      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
-    }
-    const ws = wb.getWorksheet(1)
-    if (!ws) {
-      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel 文件为空或格式不正确' } })
-    }
-    const colCount = ws.columnCount
-    const rows: string[][] = []
-    ws.eachRow({ includeEmpty: false }, (row) => {
-      rows.push(Array.from({ length: colCount }, (_, i) => row.getCell(i + 1).text))
-    })
-    return rows
-  }
-
-  private async writeSyncLog(args: {
-    sourceId: string
-    orgId: string
-    dataType: 'job' | 'fair'
-    syncMode: 'manual' | 'webhook' | 'api' | 'excel'
-    addedCount: number
-    updatedCount: number
-    dupCount: number
-    errorCount: number
-    errorFields?: string[]
-    errorDetail?: string
-  }): Promise<string | null> {
-    try {
-      const result: 'success' | 'partial' | 'failed' =
-        args.errorCount === 0 ? 'success' :
-        args.addedCount > 0 || args.updatedCount > 0 ? 'partial' : 'failed'
-      const log = await this.prisma.syncLog.create({
-        data: {
-          sourceId: args.sourceId,
-          orgId: args.orgId,
-          dataType: args.dataType,
-          syncMode: args.syncMode,
-          totalCount: args.addedCount + args.updatedCount + args.dupCount + args.errorCount,
-          addedCount: args.addedCount,
-          updatedCount: args.updatedCount,
-          dupCount: args.dupCount,
-          errorCount: args.errorCount,
-          errorFields: JSON.stringify(args.errorFields ?? []),
-          errorDetail: args.errorDetail ?? null,
-          result,
-        },
-      })
-      return log.id
-    } catch (e) {
-      this.logger.warn(`writeSyncLog failed: ${(e as Error).message}`)
-      return null
+      return await loadPartnerImportRows(buffer, fileName)
+    } catch (error) {
+      if ((error as Error).message === 'IMPORT_FILE_TOO_LARGE') {
+        throw new BadRequestException({
+          error: { code: 'EXCEL_FILE_TOO_LARGE', message: `Excel/CSV 文件不能超过 ${PARTNER_IMPORT_MAX_FILE_BYTES / 1024 / 1024}MB` },
+        })
+      }
+      if ((error as Error).message === 'IMPORT_ROW_LIMIT_EXCEEDED') {
+        throw new BadRequestException({
+          error: { code: 'EXCEL_TOO_MANY_ROWS', message: `Excel/CSV 文件最多包含 ${PARTNER_IMPORT_MAX_DATA_ROWS} 行数据` },
+        })
+      }
+      if ((error as Error).message === 'IMPORT_XLSX_ARCHIVE_LIMIT_EXCEEDED') {
+        throw new BadRequestException({
+          error: { code: 'EXCEL_ARCHIVE_TOO_LARGE', message: 'Excel 解压后内容过大或结构过于复杂，请精简后重试' },
+        })
+      }
+      throw new BadRequestException({ error: { code: 'EXCEL_EMPTY', message: 'Excel/CSV 文件为空或格式不正确' } })
     }
   }
 
@@ -149,10 +118,10 @@ export class JobsExcelService {
     }
   }
 
-  async parseExcelColumns(buffer: Buffer): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }> {
-    const rows = await this.loadExcelRows(buffer)
-    if (rows.length < 2) {
-      throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 文件缺少数据行（至少需要表头行 + 1 行数据）' } })
+  async parseExcelColumns(buffer: Buffer, fileName: string): Promise<{ columns: string[]; sampleRows: Record<string, string>[] }> {
+    const rows = await this.loadExcelRows(buffer, fileName)
+    if (rows.length < 1) {
+      throw new BadRequestException({ error: { code: 'EXCEL_NO_HEADER', message: 'Excel/CSV 文件缺少表头行' } })
     }
     const columns = (rows[0] ?? []).map((c) => c.trim()).filter(Boolean)
     const sensitiveHeaders = columns.filter((c) => isSensitiveColumn(c))
@@ -187,9 +156,9 @@ export class JobsExcelService {
     if (!source || source.orgId !== args.user.orgId) {
       throw new NotFoundException({ error: { code: 'DATA_SOURCE_NOT_FOUND', message: '数据源不存在' } })
     }
-    const allRows = await this.loadExcelRows(args.buffer)
-    if (allRows.length < 2) {
-      throw new BadRequestException({ error: { code: 'EXCEL_NO_DATA', message: 'Excel 缺少数据行' } })
+    const allRows = await this.loadExcelRows(args.buffer, args.fileName)
+    if (allRows.length < 1) {
+      throw new BadRequestException({ error: { code: 'EXCEL_NO_HEADER', message: 'Excel/CSV 文件缺少表头行' } })
     }
     const headers = (allRows[0] ?? []).map((h) => h.trim())
     const dataRows = allRows.slice(1)
@@ -360,6 +329,11 @@ export class JobsExcelService {
         error: { code: 'BATCH_ALREADY_PROCESSED', message: `批次已处于 ${batch.status} 状态，无法重复确认` },
       })
     }
+    if (batch.records.length === 0) {
+      throw new BadRequestException({
+        error: { code: 'BATCH_NO_VALID_ROWS', message: '批次没有可导入的有效行，请返回检查文件与字段映射' },
+      })
+    }
     const org = await this.prisma.organization.findUnique({ where: { id: user.orgId } })
     if (!org || !org.enabled) {
       throw new BadRequestException({ error: { code: 'PARTNER_ORG_NOT_FOUND', message: '机构不存在或已停用' } })
@@ -369,9 +343,15 @@ export class JobsExcelService {
     const sync        = new Date()
     const totalValid  = batch.records.length
     const touchedJobIds: string[] = []
+    let syncLogId: string | null = null
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        const claim = await tx.importBatch.updateMany({
+          where: { id: batchId, orgId: sourceOrgId, status: 'pending' },
+          data: { status: 'processing' },
+        })
+        if (claim.count !== 1) throw new Error('IMPORT_BATCH_ALREADY_CLAIMED')
         for (const record of batch.records) {
           const mapped = JSON.parse(record.mappedJson) as Record<string, string>
           if (batch.dataType === 'job') {
@@ -464,11 +444,45 @@ export class JobsExcelService {
             })
           }
         }
+        await tx.jobSource.update({
+          where: { id: batch.sourceId },
+          data: {
+            lastSyncAt: sync,
+            lastSyncStatus: batch.invalidRows > 0 ? 'partial' : 'success',
+          },
+        })
+        const result = batch.invalidRows === 0 ? 'success' : totalValid > 0 ? 'partial' : 'failed'
+        const syncLog = await tx.syncLog.create({
+          data: {
+            sourceId: batch.sourceId,
+            orgId: sourceOrgId,
+            dataType: batch.dataType,
+            syncMode: 'excel',
+            totalCount: totalValid + batch.dupRows + batch.invalidRows,
+            addedCount: totalValid,
+            updatedCount: 0,
+            dupCount: batch.dupRows,
+            errorCount: batch.invalidRows,
+            errorFields: '[]',
+            errorDetail: null,
+            result,
+          },
+        })
+        syncLogId = syncLog.id
+        await tx.importBatch.update({
+          where: { id: batchId },
+          data: { status: 'confirmed', confirmedAt: new Date() },
+        })
       })
     } catch (e) {
+      if ((e as Error).message === 'IMPORT_BATCH_ALREADY_CLAIMED') {
+        throw new BadRequestException({
+          error: { code: 'BATCH_ALREADY_PROCESSED', message: '批次已被确认，无法重复提交' },
+        })
+      }
       this.logger.error(`confirmExcelImport transaction failed: batchId=${batchId}`, e as Error)
-      await this.prisma.importBatch.update({
-        where: { id: batchId },
+      await this.prisma.importBatch.updateMany({
+        where: { id: batchId, status: 'pending' },
         data: { status: 'failed' },
       })
       throw new InternalServerErrorException({
@@ -477,21 +491,6 @@ export class JobsExcelService {
     }
 
     const imported = totalValid
-    const syncLogId = await this.writeSyncLog({
-      sourceId: batch.sourceId,
-      orgId: user.orgId,
-      dataType: batch.dataType as 'job' | 'fair',
-      syncMode: 'excel',
-      addedCount: imported,
-      updatedCount: 0,
-      dupCount: batch.dupRows,
-      errorCount: batch.invalidRows,
-    })
-
-    await this.prisma.importBatch.update({
-      where: { id: batchId },
-      data: { status: 'confirmed', confirmedAt: new Date() },
-    })
 
     if (batch.dataType === 'job') {
       await this.refreshJobQualitySnapshots(touchedJobIds)

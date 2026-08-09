@@ -67,6 +67,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       code = 'RATE_LIMITED'
       message = '尝试过于频繁，请稍后再试'
     }
+    if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+      code = 'FILE_TOO_LARGE'
+      message = '上传文件过大，请缩小后重试'
+    }
 
     const errorBody: ErrorResponseBody = {
       success: false,

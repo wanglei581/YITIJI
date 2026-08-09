@@ -6,6 +6,7 @@ import type { StepperStep } from '@ai-job-print/ui'
 import {
   AlertCircleIcon,
   CheckCircle2Icon,
+  EyeIcon,
   FileDownIcon,
   FlaskConicalIcon,
   InfoIcon,
@@ -27,6 +28,7 @@ import { adjustResumeLayoutDraft, exportGeneratedResume, getResumeOptimize } fro
 import type { ResumeLayoutAdjustAction } from '../../services/api'
 import { getResumeTemplates } from '../../services/api/jobMaterials'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
+import { FilePreviewDialog } from '../../components/FilePreviewDialog'
 import { readAiResumeSession } from './aiResumeSession'
 import { OptimizedResumeEditor } from './components/OptimizedResumeEditor'
 import { ResumeLayoutControls } from './components/ResumeLayoutControls'
@@ -82,7 +84,6 @@ export function ResumeOptimizePage() {
   const taskId = stateTaskId ?? queryTaskId ?? session?.taskId
   const usingSessionTask = !stateTaskId && !queryTaskId && Boolean(session?.taskId)
   const accessToken = (typeof state?.accessToken === 'string' ? state.accessToken : undefined) ?? (usingSessionTask ? session?.accessToken : undefined)
-  const file   = state?.file as { name: string; size: string; format: string } | undefined
   const targetContext = state?.targetContext as ResumeTargetContext | undefined
   const summary = targetSummary(targetContext)
 
@@ -96,6 +97,7 @@ export function ResumeOptimizePage() {
   const [printNavigating, setPrintNavigating] = useState(false)
   const [exportFormat, setExportFormat] = useState<ResumeExportFormat>('pdf')
   const [exported, setExported] = useState<ResumeGenerateExportResponse | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [resumeTemplates, setResumeTemplates] = useState<ResumeTemplate[]>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
@@ -160,11 +162,16 @@ export function ResumeOptimizePage() {
     return () => { cancelled = true }
   }, [taskId, accessToken, getToken])
 
-  const handleSaveAdvice = () => {
-    const advice = modules.map((m) => ({ title: m.title, before: m.before, after: m.after }))
-    navigate('/profile', {
-      state: { savedResumeAdvice: { file, suggestions: advice, savedAt: new Date().toISOString() } },
-    })
+  // 不做「保存」动作：优化结果在生成时已由服务端落库
+  // （AiResumeResult kind='optimize'，见 services/api/src/ai/ai.service.ts），
+  // 此处只带用户去看真实那份记录。
+  //
+  // 原实现 navigate('/profile', { state: { savedResumeAdvice } }) 把建议塞进
+  // ProfilePage 的内存 useState（ProfilePage.tsx:46-53），刷新即丢，
+  // 却提示「优化建议已加入本次记录」—— 用户以为存下了，实际没有。
+  // 属 CLAUDE.md §9「不伪造能力」违规，已移除。
+  const handleViewRecord = () => {
+    navigate('/me/ai-records')
   }
 
   const requestLeave = (action: LeaveAction) => {
@@ -174,6 +181,7 @@ export function ResumeOptimizePage() {
 
   const markEdited = () => {
     setIsDirty(true)
+    setPreviewOpen(false)
     if (exported) setExported(null)
   }
 
@@ -185,7 +193,7 @@ export function ResumeOptimizePage() {
 
   const handleExport = async () => {
     if (!optimizedResume) return
-    setExporting(true); setExportError(null)
+    setExporting(true); setExportError(null); setPreviewOpen(false)
     try {
       const result = await exportGeneratedResume(optimizedResume, taskId, getToken(), exportFormat, layout, selectedTemplateId || undefined)
       setExported(result); setIsDirty(false)
@@ -212,7 +220,7 @@ export function ResumeOptimizePage() {
   }
 
   const handleExportFormatChange = (format: ResumeExportFormat) => {
-    setExportFormat(format); if (exported) setExported(null)
+    setExportFormat(format); setPreviewOpen(false); if (exported) setExported(null)
   }
 
   const handleTemplateChange = (templateId: string) => {
@@ -437,9 +445,9 @@ export function ResumeOptimizePage() {
                   <Button size="lg" variant="secondary" disabled={exporting} onClick={() => void handleExport()}>重新导出</Button>
                   {exported.signedUrl && (
                     <Button size="lg" variant="secondary" className="flex items-center justify-center gap-2"
-                      onClick={() => exported.signedUrl && window.open(exported.signedUrl, '_blank', 'noopener')}>
-                      <FileDownIcon className="h-5 w-5" />
-                      下载{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label}
+                      onClick={() => setPreviewOpen(true)}>
+                      <EyeIcon className="h-5 w-5" />
+                      查看或手机保存{EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label}
                     </Button>
                   )}
                   <Button size="lg" className="flex items-center justify-center gap-2"
@@ -455,8 +463,8 @@ export function ResumeOptimizePage() {
       </div>
 
       <KioskActionBar className="resume-lightflow__action-bar mt-6 flex gap-3">
-        <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleSaveAdvice)}>
-          保存优化建议
+        <Button size="lg" variant="secondary" className="flex-1" onClick={() => requestLeave(handleViewRecord)}>
+          在 AI 服务记录里查看
         </Button>
         <Button size="lg" className="flex flex-[2] items-center justify-center gap-2"
           disabled={exporting || !optimizedResume} onClick={() => void handleExport()}>
@@ -464,6 +472,16 @@ export function ResumeOptimizePage() {
           {exporting ? '正在生成文件…' : `确认优化版，导出 ${EXPORT_FORMAT_OPTIONS.find((o) => o.value === exportFormat)?.label ?? 'PDF'}`}
         </Button>
       </KioskActionBar>
+
+      {previewOpen && exported?.signedUrl && (
+        <FilePreviewDialog
+          fileUrl={exported.signedUrl}
+          fileName={exported.filename}
+          format={exportFormat}
+          phoneDownloadUrl={exported.signedUrl}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
 
       {confirmLeave && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/35 px-6">

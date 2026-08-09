@@ -1,0 +1,24 @@
+<view class="legal-wrap">
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+  <view class="legal-nav">
+    <view class="legal-back tap" hover-class="tap-press" bindtap="back">
+      <text class="ficon i-right legal-back-ic"></text>
+    </view>
+    <view class="legal-title">服务协议</view>
+    <view style="width:64rpx"></view>
+  </view>
+  <scroll-view scroll-y class="legal-body">
+    <view class="legal-card">
+      <text class="legal-h">1. 服务性质</text>
+      <text class="legal-p">本小程序提供 AI 求职辅助、简历工具、材料整理与打印服务的信息入口，不构成招聘平台，不承诺任何录用结果。</text>
+      <text class="legal-h">2. 信息来源</text>
+      <text class="legal-p">岗位、招聘会与政策内容来自第三方或官方来源，平台仅作信息展示；投递与预约请前往来源平台操作。</text>
+      <text class="legal-h">3. 账号与隐私</text>
+      <text class="legal-p">登录即视为同意按《隐私政策》处理手机号等必要信息。你可随时在“我的”中退出登录并清理本地会话。</text>
+      <text class="legal-h">4. 服务可用性</text>
+      <text class="legal-p">AI 结果仅作个人参考，重要决策请以官方信息为准；打印履约以实际终端与服务状态为准。</text>
+      <text class="legal-h">5. 联系我们</text>
+      <text class="legal-p">如对服务有疑问，可通过“我的”中的反馈渠道联系我们。</text>
+    </view>
+  </scroll-view>
+</view>

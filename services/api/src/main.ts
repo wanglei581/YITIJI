@@ -8,6 +8,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { installBodyParsers } from './config/body-parsers'
 import { assertProductionRuntimeGates } from './config/production-runtime-gates'
 import { resolveTrustProxyHops } from './config/trust-proxy'
+import { requirePaidBeforeClaim } from './terminals/terminal-utils'
 
 // rawBody 捕获与 body parser 装配已抽到 config/body-parsers.ts（与 verify 脚本共用，
 // 防真实入口与测试口径漂移 —— C5-6 双模型审查修复的守护点）。
@@ -102,6 +103,18 @@ async function bootstrap(): Promise<void> {
   const port = process.env['PORT'] ?? 3010
   await app.listen(port)
   console.log(`AI Job Print API running on http://localhost:${port}/api/v1`)
+
+  // 出纸资金门禁的可见性：生产已有启动期强制显式声明
+  // （production-runtime-gates.ts，缺省抛 PRODUCTION_PAID_BEFORE_CLAIM_UNDECLARED），
+  // 但非生产环境缺省即关闭，且此前**全程无任何提示** —— 演示机、预生产、
+  // 现场联调机都可能在运维不知情的情况下「未支付也能被 Agent 领走出纸」。
+  // 这里只做启动告警，不改变任何行为。
+  if (!requirePaidBeforeClaim()) {
+    console.warn(
+      '[WARN] PRINT_REQUIRE_PAID_BEFORE_CLAIM 未开启：未支付订单可被 Agent 领取并出纸。' +
+        '若本机用于真实收款场景，请显式设为 true。',
+    )
+  }
 }
 
 bootstrap()

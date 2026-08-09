@@ -99,7 +99,7 @@ const manifest = read('tests/visual/route-manifest.ts')
 for (const route of routes) check(manifest.includes(`'${route}'`), `manifest retains ${route}`)
 
 const frozen = {
-  'src/pages/upload/components/UploadSessionQrPanel.tsx': '0c1606a0cab8bfe63fedeaa6dfa39676e80b9f5d4cf3c320ef27d629d5f885db',
+  'src/pages/upload/components/UploadSessionQrPanel.tsx': 'c7757306daa80f82ce58adb188dce73b68ea9840e9cff8312f54a2af63b72f50',
   'src/pages/resume/aiResumeSession.ts': '5d023ee2388ecb12a3ba84a6b2b28c21e54ad65dece16eccc019f9dc43b5b164',
   'src/pages/resume/jobMaterialDraft.ts': '4a2404627c392c55cd39a6f525c522ce27cfec669f91d3b6ad5bb79f0de358ce',
   'src/pages/resume/hooks/useResumeLayout.ts': '2ef1c554e949344ce9d66430c521b986f5419db8627c4fcde1ef78d5927555e7',
@@ -232,7 +232,7 @@ includes('src/pages/assistant/AssistantPage.tsx', 'chatWithAssistant({', 'assist
 includes('src/pages/assistant/AssistantPage.tsx', "import('./AssistantCallPanel')", 'assistant keeps TRTC lazy loading')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'transcribeAnswer(', 'interview keeps real ASR review')
 includes('src/pages/interview/InterviewSessionPage.tsx', 'answerInterview(', 'interview keeps question progression')
-includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(uploading || phoneBusy)', 'upload busy lock remains')
+includes('src/pages/resume/ResumeSourcePage.tsx', 'useBusyLock(sourceBusy)', 'upload busy lock remains')
 includes('src/pages/resume/ResumeSourcePage.tsx', "navigate('/resume/parse'", 'source keeps parse handoff')
 includes('src/pages/resume/ResumeParsePage.tsx', 'saveAiResumeSession({ taskId: result.taskId, accessToken: result.accessToken })', 'anonymous session remains minimal')
 includes('src/pages/resume/ResumeReportPage.tsx', 'getResumeRecord(taskId, { token: getToken(), accessToken })', 'report read remains credential gated')
@@ -265,10 +265,12 @@ for (const forbidden of ['localStorage', 'sessionStorage']) check(!read('src/pag
 if (existsSync(join(ROOT, 'playwright.w3.config.ts'))) {
   const config = read('playwright.w3.config.ts')
   const spec = read('tests/visual/fusion-w3.spec.ts')
-  includes('playwright.w3.config.ts', 'testMatch: /fusion-w3\\.spec\\.ts$/', 'W3 browser config collects only its spec')
+  const selfAssessmentSpec = read('tests/visual/fusion-self-assessment-flow.spec.ts')
+  includes('playwright.w3.config.ts', 'testMatch: /(?:fusion-w3|fusion-self-assessment-flow)\\.spec\\.ts$/', 'W3 browser config collects W3 and the sensitive self-assessment preview scenario')
   includes('playwright.w3.config.ts', "port 4183 --strictPort", 'W3 browser config owns port 4183')
-  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001']) check(config.includes(env), `W3 browser build pins ${env}`)
-  for (const name of ['resume upload → parse → OCR report', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  for (const env of ['VITE_API_MODE=http', 'VITE_API_BASE_URL=/api/v1', 'VITE_USE_TRTC_CALL=true', 'VITE_ALLOW_TEXT_ONLY_ASSISTANT=false', 'VITE_TERMINAL_ID=KSK-001', 'VITE_TERMINAL_AGENT_BRIDGE_TOKEN=w3-synthetic-bridge-token']) check(config.includes(env), `W3 browser build pins ${env}`)
+  for (const name of ['resume upload → parse → OCR report', 'USB resume keeps its purpose and reaches AI parsing', 'resume preview recovers after replacing a failed file', 'resume parse failure remains honest', 'assistant filters actions and survives service failure', 'TRTC explicit gate fails back to text safely', 'interview setup → text answer → report']) check(spec.includes(name), `W3 browser scenario exists: ${name}`)
+  check(selfAssessmentSpec.includes('自评 PDF 在隐私根内预览且不打开新标签页 @w3-kiosk'), 'W3 browser scenario exists: self-assessment PDF stays inside the privacy root')
   for (const forbidden of ['addInitScript', 'localStorage', 'sessionStorage', 'waitForTimeout']) check(!spec.includes(forbidden), `W3 browser spec avoids ${forbidden}`)
 }
 

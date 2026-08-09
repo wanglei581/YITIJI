@@ -490,7 +490,7 @@ export default function SourcesPage() {
           onClose={() => setExcelSource(null)}
           onImported={(count) => {
             setExcelSource(null)
-            setImportNotice(`Excel 导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
+            setImportNotice(`文件导入完成，共 ${count} 条（默认待审核，管理员发布后才会在终端展示）`)
             void fetchSources()
           }}
         />

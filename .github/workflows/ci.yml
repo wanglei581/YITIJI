@@ -75,6 +75,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Deploy authorization gate
+        # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
+        run: node scripts/verify-deploy-authorization-gate.mjs
+
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
@@ -260,6 +264,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:db-load-indexes
           pnpm --filter @ai-job-print/api verify:production-runtime-gates
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
+          pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
@@ -270,6 +275,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:production-real-services
           pnpm --filter @ai-job-print/api verify:partner-smart-campus
           pnpm --filter @ai-job-print/api verify:partner-excel-template
+          pnpm --filter @ai-job-print/api verify:partner-excel-import
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
@@ -441,6 +447,12 @@ jobs:
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
+      - name: Verify first admin bootstrap concurrency on isolated PG
+        working-directory: services/api
+        env:
+          NODE_ENV: test
+          FIRST_ADMIN_BOOTSTRAP_VERIFY_TARGET: isolated
+        run: pnpm verify:first-admin-bootstrap:postgres
       - name: Seed on PG
         working-directory: services/api
         env:
@@ -597,3 +609,4 @@ jobs:
             test-results/kiosk-privacy-timeout/**
             test-results/kiosk-session-warning/**
           if-no-files-found: ignore
+          retention-days: 7

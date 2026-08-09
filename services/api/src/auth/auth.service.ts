@@ -1,7 +1,7 @@
 import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import * as bcrypt from 'bcryptjs'
-import { createHash, randomInt, randomUUID } from 'crypto'
+import { createHash, randomBytes, randomInt, randomUUID } from 'crypto'
 import { AuditService } from '../audit/audit.service'
 import {
   hashEmail,
@@ -30,6 +30,7 @@ import {
   passwordProofState,
   passwordProofStateAfterSelfChange,
 } from './password-proof-state'
+import { FIRST_ADMIN_BOOTSTRAP_AUDIT_ACTION } from './first-admin-bootstrap'
 
 type LoginPortal = 'admin' | 'partner' | 'kiosk'
 type SmsPortal = 'admin' | 'partner'
@@ -38,7 +39,7 @@ const RESET_TICKET_TTL = 600
 const RESET_UNKNOWN_IP_TTL = 60
 const RESET_UNKNOWN_IP_LIMIT = 5
 
-export interface LoginResult {
+interface FullLoginResult {
   token: string
   user: {
     id:          string
@@ -51,6 +52,14 @@ export interface LoginResult {
     emailVerifiedAt?: string | null
   }
 }
+
+interface FirstAdminPasswordChangeRequired {
+  passwordChangeRequired: true
+  changeTicket: string
+  expiresInSeconds: number
+}
+
+export type LoginResult = FullLoginResult | FirstAdminPasswordChangeRequired
 
 interface InternalUser {
   id: string
@@ -209,6 +218,76 @@ export class AuthService {
     if (updated.count !== 1) throw this.resetFailed()
     await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
     await this.writeAudit(user.id, user.role, 'auth.password_reset_complete', {})
+    return { success: true }
+  }
+
+  async completeFirstAdminPasswordChange(
+    changeTicket: string,
+    newPassword: string,
+  ): Promise<{ success: true }> {
+    const separator = changeTicket.indexOf('.')
+    if (separator <= 0 || separator === changeTicket.length - 1) throw this.firstAdminPasswordChangeFailed()
+    const userId = changeTicket.slice(0, separator)
+    const secret = changeTicket.slice(separator + 1)
+    if (!/^[A-Za-z0-9_-]{43}$/.test(secret)) throw this.firstAdminPasswordChangeFailed()
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        role: 'admin',
+        passwordProofState: PASSWORD_PROOF_STATE.TEMPORARY,
+        enabled: true,
+        deletedAt: null,
+      },
+    })
+    if (!user || !(await this.hasFirstAdminBootstrapAudit(user.id))) {
+      throw this.firstAdminPasswordChangeFailed()
+    }
+    const expectedTicketState = `${user.tokenVersion}:${this.hashFirstAdminTicketSecret(secret)}`
+    const consumed = await this.redis.getAndDelIfEquals(
+      this.firstAdminPasswordTicketKey(user.id),
+      expectedTicketState,
+    )
+    if (consumed !== 'matched') throw this.firstAdminPasswordChangeFailed()
+    if (await bcrypt.compare(newPassword, user.passwordHash)) {
+      throw new BadRequestException({
+        error: { code: 'AUTH_PASSWORD_UNCHANGED', message: '新密码不能与初始密码相同，请重新登录后再试' },
+      })
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10)
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.updateMany({
+        where: {
+          id: user.id,
+          role: 'admin',
+          passwordProofState: PASSWORD_PROOF_STATE.TEMPORARY,
+          tokenVersion: user.tokenVersion,
+          passwordHash: user.passwordHash,
+          enabled: true,
+          deletedAt: null,
+        },
+        data: {
+          passwordHash,
+          passwordProofState: PASSWORD_PROOF_STATE.OWNER_MANAGED,
+          tokenVersion: { increment: 1 },
+        },
+      })
+      if (result.count !== 1) throw this.firstAdminPasswordChangeFailed()
+      await tx.auditLog.create({
+        data: {
+          actorId: user.id,
+          actorRole: 'admin',
+          action: 'auth.first_admin_bootstrap.password_changed',
+          targetType: 'auth',
+          targetId: user.id,
+          payloadJson: '{}',
+        },
+      })
+      return result
+    })
+    if (updated.count !== 1) throw this.firstAdminPasswordChangeFailed()
+    await this.publishCredentialChangeSessionState({ ...user, tokenVersion: user.tokenVersion + 1 })
     return { success: true }
   }
 
@@ -435,6 +514,15 @@ export class AuthService {
   }
 
   private async issueLogin(user: InternalUser): Promise<LoginResult> {
+    if (user.role === 'admin' && user.passwordProofState === PASSWORD_PROOF_STATE.TEMPORARY) {
+      const isBootstrapAdmin = await this.hasFirstAdminBootstrapAudit(user.id)
+      if (isBootstrapAdmin) return this.issueFirstAdminPasswordChangeTicket(user)
+      if (process.env['NODE_ENV'] === 'production') {
+        throw new UnauthorizedException({
+          error: { code: 'AUTH_TEMPORARY_ADMIN_LOCKED', message: '临时管理员账号必须先完成受控改密' },
+        })
+      }
+    }
     const lastLoginAt = new Date()
     const updated = await this.prisma.user.updateMany({
       where: { id: user.id, enabled: true, deletedAt: null, passwordHash: user.passwordHash },
@@ -463,6 +551,40 @@ export class AuthService {
         emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       },
     }
+  }
+
+  private async issueFirstAdminPasswordChangeTicket(
+    user: InternalUser,
+  ): Promise<FirstAdminPasswordChangeRequired> {
+    const secret = randomBytes(32).toString('base64url')
+    const state = `${user.tokenVersion}:${this.hashFirstAdminTicketSecret(secret)}`
+    const created = await this.redis.setNxEx(this.firstAdminPasswordTicketKey(user.id), state, 600)
+    if (!created) {
+      throw new HttpException({
+        error: { code: 'AUTH_FIRST_ADMIN_PASSWORD_CHANGE_PENDING', message: '首次改密请求已签发，请稍后重试' },
+      }, HttpStatus.CONFLICT)
+    }
+    return {
+      passwordChangeRequired: true,
+      changeTicket: `${user.id}.${secret}`,
+      expiresInSeconds: 600,
+    }
+  }
+
+  private async hasFirstAdminBootstrapAudit(userId: string): Promise<boolean> {
+    const audit = await this.prisma.auditLog.findFirst({
+      where: { action: FIRST_ADMIN_BOOTSTRAP_AUDIT_ACTION, targetType: 'auth', targetId: userId },
+      select: { id: true },
+    })
+    return !!audit
+  }
+
+  private firstAdminPasswordTicketKey(userId: string): string {
+    return `internal:first-admin-password-change:${userId}`
+  }
+
+  private hashFirstAdminTicketSecret(secret: string): string {
+    return createHash('sha256').update(secret, 'utf8').digest('hex')
   }
 
   private normalizedPhoneOrNull(value: string): string | null {
@@ -607,6 +729,12 @@ export class AuthService {
   private resetFailed(): UnauthorizedException {
     return new UnauthorizedException({
       error: { code: 'AUTH_RESET_FAILED', message: '验证码已过期或重置请求无效' },
+    })
+  }
+
+  private firstAdminPasswordChangeFailed(): UnauthorizedException {
+    return new UnauthorizedException({
+      error: { code: 'AUTH_FIRST_ADMIN_PASSWORD_CHANGE_FAILED', message: '首次改密凭证无效或已过期' },
     })
   }
 

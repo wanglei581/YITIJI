@@ -1,0 +1,130 @@
+<!-- pages/home/home.wxml（M0.1 壳：布局沿用已核验视觉，入口收敛到四个 Tab） -->
+<view class="home-wrap">
+  <view style="height:{{statusBarHeight}}px;background:#FAF7F2"></view>
+
+  <view class="page-hd">
+    <view class="greet-col">
+      <text class="greet-main">{{greetWord}}，{{userName}}</text>
+      <text class="greet-date">{{todayStr}}</text>
+    </view>
+    <view class="head-tools">
+      <view class="head-icon tap" hover-class="tap-press" bindtap="tapComingSoon">
+        <view class="ficon i-bell"></view>
+      </view>
+    </view>
+  </view>
+
+  <view class="focus-strip tap" hover-class="tap-press" bindtap="tapComingSoon">
+    <view class="focus-mark"><view class="ficon i-file-search"></view></view>
+    <view class="focus-copy">
+      <text class="focus-label">今日建议</text>
+      <text class="focus-title">简历诊断将在 M1 上线</text>
+    </view>
+    <text class="focus-action">敬请期待 ›</text>
+  </view>
+
+  <view class="workspace">
+    <view class="work-panel prep-panel">
+      <view class="panel-hd">
+        <text class="panel-tag tag-clay">求职准备</text>
+        <text class="panel-note">AI 辅助</text>
+      </view>
+      <view class="prep-body">
+        <view
+          class="prep-lead tap"
+          hover-class="tap-press"
+          bindtap="tapService"
+          data-url="/pages/ai/ai"
+        >
+          <view class="lead-icon"><view class="ficon i-file-search"></view></view>
+          <text class="lead-title">诊断简历</text>
+          <text class="lead-sub">从真实内容找到修改重点</text>
+          <text class="lead-arrow">›</text>
+        </view>
+        <view class="prep-directory">
+          <view
+            class="prep-link tap"
+            wx:for="{{preparationTools}}"
+            wx:key="title"
+            hover-class="tap-press"
+            bindtap="tapService"
+            data-url="{{item.tab}}"
+          >
+            <view class="mini-icon"><view class="ficon i-{{item.icon}}"></view></view>
+            <text>{{item.title}}</text>
+            <text class="mini-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="work-panel material-panel">
+      <view class="panel-hd">
+        <text class="panel-tag tag-wheat">材料与打印</text>
+        <text class="panel-note">手机准备 · 到机交付</text>
+      </view>
+      <view class="material-body">
+        <view
+          class="bundle-lead tap"
+          hover-class="tap-press"
+          bindtap="tapService"
+          data-url="/pages/me/me"
+        >
+          <view class="bundle-icon"><view class="ficon i-folder"></view></view>
+          <text class="bundle-title">我的材料</text>
+          <text class="bundle-sub">简历与文档统一整理</text>
+          <text class="bundle-action">去查看 ›</text>
+        </view>
+        <view class="material-grid">
+          <view
+            class="material-link {{item.wide ? 'wide' : ''}} tap"
+            wx:for="{{materialLinks}}"
+            wx:key="title"
+            hover-class="tap-press"
+            bindtap="tapService"
+            data-url="{{item.tab}}"
+          >
+            <view class="material-icon"><view class="ficon i-{{item.icon}}"></view></view>
+            <text>{{item.title}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="work-panel discovery-panel">
+      <view class="panel-hd">
+        <text class="panel-tag tag-blue">可信信息</text>
+        <text class="panel-note">第三方 / 官方来源</text>
+      </view>
+      <view class="discovery-body">
+        <view
+          class="jobs-lead tap"
+          hover-class="tap-press"
+          bindtap="tapService"
+          data-url="/pages/jobs/jobs"
+        >
+          <view class="jobs-icon"><view class="ficon i-compass"></view></view>
+          <view class="jobs-copy">
+            <text class="jobs-title">浏览岗位</text>
+            <text class="jobs-sub">看清来源，再去来源平台投递</text>
+          </view>
+          <text class="jobs-arrow">›</text>
+        </view>
+        <view class="discovery-directory">
+          <view
+            class="discovery-link tap"
+            wx:for="{{discoveryLinks}}"
+            wx:key="title"
+            hover-class="tap-press"
+            bindtap="tapService"
+            data-url="{{item.tab}}"
+          >
+            <view class="discovery-icon"><view class="ficon i-{{item.icon}}"></view></view>
+            <text>{{item.title}}</text>
+            <text class="mini-arrow">›</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

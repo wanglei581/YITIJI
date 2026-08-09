@@ -1,0 +1,82 @@
+<!--pages/company-detail/company-detail.wxml · P22 企业详情-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">企业详情</view>
+    <view class="nav-right tap {{faved ? 'faved' : ''}}" hover-class="tap-press" bindtap="tapFav"><text class="ficon i-inbox"></text></view>
+  </view>
+
+  <view class="content has-bar">
+    <!-- 加载中 -->
+    <view wx:if="{{loading}}" class="detail-state">加载中…</view>
+
+    <!-- 加载失败 -->
+    <view wx:elif="{{loadError}}" class="detail-state">
+      <view class="ds-msg">{{loadError}}</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重新加载</view>
+      <view class="btn ghost-ink tap ds-back" hover-class="tap-press" bindtap="back">返回</view>
+    </view>
+
+    <!-- 详情内容 -->
+    <block wx:else>
+    <!-- 企业头部 -->
+    <view class="company-hero">
+      <view class="ch-logo">{{company.emoji}}</view>
+      <view class="ch-name">{{company.name}}</view>
+      <view class="ch-meta">
+        <text wx:for="{{company.metaParts}}" wx:key="*this">{{item}}</text>
+      </view>
+    </view>
+
+    <view class="chips ch-chips">
+      <view class="chip {{tag.tone}}" wx:for="{{company.tags}}" wx:for-item="tag" wx:key="text">{{tag.text}}</view>
+    </view>
+
+    <!-- 企业简介 -->
+    <view class="card">
+      <view class="card-inner">
+        <view class="cd-block-t">企业简介</view>
+        <view class="cd-desc" wx:for="{{company.desc}}" wx:key="*this">{{item}}</view>
+      </view>
+    </view>
+
+    <!-- 来源信息（合规必须） -->
+    <view class="section-cap">DATA SOURCE · 来源信息</view>
+    <view class="card flat">
+      <view class="card-inner tight">
+        <view class="src-row"><text class="sr-l">来源机构</text><text class="sr-v">{{company.sourceOrg}}</text></view>
+        <view class="src-row"><text class="sr-l">首次收录</text><text class="sr-v">{{company.firstSeen}}</text></view>
+        <view class="src-row"><text class="sr-l">数据说明</text><text class="sr-v faint">信息来源于招聘平台公开企业页，仅展示基础资料，不代表招聘关系</text></view>
+      </view>
+    </view>
+    <view class="notice info">
+      <text class="ficon i-info n-ic"></text>
+      <view>企业信息来源于招聘平台公开资料，仅供参考，不代表招聘关系。本终端不代企业招聘，不收取求职者简历。</view>
+    </view>
+
+    <!-- 在招岗位 -->
+    <view class="section-cap">IN RECRUITMENT · 在招岗位</view>
+    <view class="card">
+      <view class="card-inner">
+        <view class="job-row tap" wx:for="{{company.jobs}}" wx:key="id"
+          hover-class="tap-press" bindtap="tapJob" data-id="{{item.id}}">
+          <view class="jr-left">
+            <view class="jr-title">{{item.title}}</view>
+            <view class="jr-meta">{{item.meta}}</view>
+          </view>
+          <text class="jr-salary">{{item.salary}}</text>
+          <text class="jr-arrow">›</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="spacer-lg"></view>
+    </block>
+  </view>
+
+  <view class="actionbar">
+    <view class="btn ghost-ink lg block" bindtap="tapExternal">去来源平台了解更多</view>
+  </view>
+</view>

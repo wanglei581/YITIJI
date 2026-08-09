@@ -1,20 +1,36 @@
 # 下一步任务
 
-> 最后更新：2026-08-06
+> 最后更新：2026-08-08
+
+## 当前执行：文件流程候选冻结前外部门禁
+
+- [x] **代码与浏览器候选收口**：本机 / 手机 / U 盘简历上传后页内预览，`我的文档`、优化简历、自评 PDF 敏感文件不再打开 Kiosk 外部标签页；扫描结果、图片转 PDF、Admin 文件查看、Partner Excel 预览与合同报告打印真值已补齐。最终 W3 `11/11` 覆盖 U 盘 10MB / MIME、PDF 页内弹层、二维码、关闭清理与无新 Page；其余文件候选浏览器套件此前全绿。未部署。
+- [ ] **Windows U 盘真机验收**：在目标 Windows Kiosk + Terminal Agent 上覆盖插拔、空盘、隐藏文件、PDF / JPG / PNG、10MB 边界、会员 / 匿名身份和真实 AI 解析；确认 `resume_upload` 归属、错误恢复、重复点击锁与退出清场。自动化 Agent / Kiosk 夹具不能替代本项。
+- [ ] **Windows 文件显示与硬件验收**：用实际 Edge / Chrome Kiosk 模式肉眼或截图确认 PDF 插件显示真实内容，再覆盖真实扫描仪结果文件、图片缩略图、打印确认与实际出纸；不得只凭 iframe HTTP 200 宣称 PDF 已显示。
+- [~] **Partner Excel 运行时验收**：真实浏览器文件选择器已覆盖错误扩展名、空表、5 个必填字段自动映射、`2 有效 / 1 无效` XLSX 预览确认、三份 CSV 导入、岗位列表、同步日志、数据源 `5/1` 真实计数与 SQLite `pending+draft` 落库；最终代码另以独立 API `3023` + Partner `5176` + SQLite 一致性备份复跑。CSV 假支持、空表误拒绝、`.xls` 误宣称、错误吞掉、`0/0` 假计数、XLSX 压缩放大、零行 API 绕过和并发重复确认均已修复并进入专项门禁。受控浏览器无法构造操作系统原生 Finder → 浏览器拖放，`DataTransfer` 门禁仍待 Chrome 扩展或现场浏览器补验；本项因此保持进行中，不记全通过。
+- [~] **候选集成与部署决策**：文件流修复已形成 Draft PR [#518](https://github.com/wanglei581/YITIJI/pull/518)（基于最新 `main` 的干净集成并随 main 推进完成 rebase，取代旧 PR #509）；本地 Node 22 下增量 Claude 风险复核、API/Partner typecheck、lint、production build、HTTP 413 与 Partner Excel/CSV 专项 verifier、真实浏览器和 SQLite 证据均完成。中间 HEAD 的 CI 曾全绿；本次文档收口提交后的最终 HEAD 仍须以 PR #518 最新评论确认四项 CI（`build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness`、`windows-agent-installer`）全绿。PR 继续保持 Draft；Windows U 盘、文件真实显示 / 扫描 / 出纸和 Partner 原生 `DataTransfer` 全部通过后才能评估转 Ready / 合并。生产仍按下方统一恢复候选、数据库备份、同提交整体切换和部署后验收执行；本文件流候选本身不授权部署。
+- [ ] **超过 500 行页面拆分评估**：`ResumeSourcePage.tsx` 已抽出 U 盘面板但仍为 524 行，`ExcelImportModal.tsx` 为 504 行；本候选不做无关重构。两文件下一次新增功能前必须先按编排 / 数据加载 / 解析映射 / 预览职责评估拆分，期间禁止继续扩张。
 
 ## 当前执行：生产混合版本故障恢复
 
+- [ ] **取消部署现场只读复核**：2026-08-08 未授权 Deploy run `31259646187` 已在 Partner 构建阶段取消，日志证明未进入 API 发布、Nginx 覆盖或 reload，但服务器源码工作目录已检出 `b6f7ed2e` 并执行依赖安装、Kiosk/Admin 构建。下次具名授权发布前，先只读核对服务器 HEAD/工作区、运行目录 `DEPLOY_SOURCE`、PM2 commit/restart、三端线上 bundle 与备份空间；不得把服务器源码 HEAD 等同于已部署运行版本，不得在未重新授权时继续发布。
+- [x] **PR #511 主干 CI 回归修复已合入**：用户明确授权后，PR #511 已以 merge commit `200786a7` 合入 `main`；head `94e06944` 的 run `31107530315` 中 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项全绿。未部署，也未执行 bootstrap 或生产发布。
+- [x] **`js-yaml` 高危公告已由 PR #514 修复并完成 Kiosk 部署**：`js-yaml@4.3.1` 与唯一实例/标准 YAML 运行时防回退门禁已合入 `main@e7493dcd`，main run `31142486608` 三项全绿；重复 PR #513 已关闭。deploy run `31143067183` 第一次尝试被取消，随后经另一流程明确授权重跑 attempt 2 并成功完成依赖安装、Kiosk production build、Nginx 静态目录替换与 reload；只读验收确认线上首页/API health 200、Nginx active、API PM2 online。该工作流没有滚动 API PM2，不得把 API 运行时升级、数据库迁移、Windows 主机或硬件验收记作完成。
+- [~] **确认真实 API 发布入口与环境隔离**：2026-08-07 已合入 PR #519（`main@536c97f8`）：`DEPLOY_API_ENABLED=true` 仓库变量授权闸门 + 受控 API 发布脚本（备份→additive 迁移→构建→同步运行目录→PM2→健康→`DEPLOY_SOURCE`）+ 未启用时 fail-closed 预检（运行 API 版本与目标不一致时禁止继续发布 Kiosk）。2026-08-07 已按用户授权完成两次受控发布并线上验收通过（`main@e78f3668`、`main@389f37ff`，见 `current-progress.md` 顶部条目）：`DEPLOY_SOURCE`/PM2 COMMIT 均指向目标提交、迁移无 pending、health 与关键探针通过、备份/回滚锚点已记录。当时记录称发布后变量已关闭，但 2026-08-08 readback 发现仍为 `true`；取消未授权 run `31259646187` 后已恢复为 `false`，并由 Deploy job 顶层显式授权门禁锁定。发布入口与受控执行路径已可用；**仍未证明**预生产/生产隔离与独立预生产、完整 release/回滚流程，未获具名发布授权前不得再次覆盖或重启线上 API。
 - [x] **冻结统一恢复候选**：PR #504 已通过 `build-and-verify`、`kiosk-browser-smoke`、`postgres-readiness` 三项 CI，并以 `main@42913050` 作为唯一部署源；合同审查生产 fail-closed、PostgreSQL 默认值 drift migration 和当前服务中心路由均已纳入。
 - [x] **停写前数据保护**：生产 PostgreSQL custom-format `pg_dump`、SHA-256、`pg_restore -l` 可读校验和 DP-GATE before 已完成；未执行 `db:seed*`、`db:pg:migrate-data`、`migrate reset`、自动 `migrate resolve` 或 PG→SQLite 回滚。
 - [x] **同一提交整体切换**：API、Admin、Partner、Kiosk 已从同一冻结提交整体构建切换，仅执行 additive `migrate deploy`；旧应用回滚点、现有 `.env` 与 storage 均保留，Kiosk 未设置 `VITE_TERMINAL_ID`，合同审查入口保持关闭。
 - [x] **部署后验收**：DP-GATE after、migration、health、PM2/nginx、鉴权路由、微信登录正式路由、终端网络诊断、Admin/Partner/Kiosk 浏览器闭环均通过；`PolicyPost=0` 按真实空数据保留，禁止用 seed 或演示数据填充。后续仅保留 root 密码轮换/key-only SSH 与磁盘容量观察两项运维收尾。
+- [x] **生产 demo seed fail-closed**：[PR #508](https://github.com/wanglei581/YITIJI/pull/508) 已合入 `main@56939ace`；四个 `db:seed*` 默认非零拒绝，仅可丢弃的 `development|test` 环境加精确确认短语时放行。代码与三项 CI 已通过，但未随上述 `main@42913050` 恢复包部署，禁止把“已合入”写成“已上线”。
+- [x] **全新生产空库首个管理员 bootstrap 代码已合入**：[PR #510](https://github.com/wanglei581/YITIJI/pull/510) 最终 head `05c91679` 的 run `31144247594` 三项全绿，隔离 PostgreSQL 16 首管理员真并发门禁通过；已用带 `[skip ci]` 的 merge commit `19f7e715` 合入 main，未为该提交触发 main CI 或再次部署，也未执行 bootstrap。
+- [ ] **生产首次管理员执行仍为独立 NO-GO 门禁**：执行授权门禁文档已落地为 `docs/device/first-admin-bootstrap-execution-gate.md`（含授权要素、只读核对清单、执行步骤、三态 reconciliation 与证据模板）。仍须先确认 `productionF1` 明确 GO、生产确为空库、受控 Linux 账户与凭据目录、生产 PostgreSQL 凭据、双人审批、精确确认短语和 10 分钟窗口；执行后还须完成凭据交接、单次改密 ticket、owner-managed 改密、审计与三态 reconciliation。未获新的具名生产授权不得运行 CLI。
 
 ## 上线门禁：文件预览与操作流程现场验收
 
 - [x] **本地代码与浏览器候选**：简历本机/手机/U 盘、扫描结果、图片转 PDF 缩略图、我的文档/Admin 安全新窗口、Partner Excel 拖放/有效行样例和合同报告不可用态已完成接线；四端 typecheck/lint/build、专项门禁与 W2-W6/会话警告浏览器回归通过。候选未部署。
 - [x] **Node 22 本地功能复验**：已使用 Node `22.22.0` 完成 9 个 workspace 根级 typecheck/lint/build，并串行通过 W2 29/29、W3 6/6、W4 14/14、W5 18/18、W6 104/104、warning 19/19；Kiosk lint 0 error、7 条既有 warning。1080x1920 浏览器实查岗位、企业、简历生成及相关覆盖弹层无横向溢出、错位或关闭后布局位移；该结果不替代 Windows 真机。
-- [ ] **干净候选冻结范围门禁**：当前共享工作区含上传、文件、API、Agent、shared 等多任务未提交改动，`verify:fusion-w3` / `verify:fusion-w4` 的功能断言通过但冻结范围检查失败；须在不回退他人改动的前提下，从审定干净候选串行重跑专项 verify 与冻结范围门禁。
-- [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。未知彩色 mode 不得假设，打印机型号不得硬编码。
+- [x] **干净候选冻结范围门禁（已闭环）**：已在干净 worktree 的审定候选 `origin/main@55105fa8`（Node `v22.23.1` / pnpm `11.2.2`）串行重跑全部 Kiosk fusion 静态合同：baseline、shell、home、W2、W3、W4、W5、W6 均 ALL PASS，其中 W3 的 6 个硬冻结文件 SHA 全部保持不变、W4 的 25 路由归属与硬冻结文件守卫通过；证明此前失败源于共享脏工作区的他人未提交改动，不是产品缺陷。浏览器 W3/W4 行为套件仍以 CI `kiosk-browser-smoke` 与既有 Node 22 回归证据为准。
+- [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。现场按 `docs/device/windows-field-acceptance-runsheet-2026-08.md` 逐项执行并记录证据；扫码枪付款码与打印机面板扫描 SMB 专项见 `docs/device/peripheral-field-acceptance-2026-08.md`（摄像头不接入）。未知彩色 mode 不得假设，打印机型号不得硬编码。
 - [ ] **生产文件链路验收**：在具名授权和备份/回滚方案下复验 PostgreSQL、Redis、COS/OSS、签名 URL 过期/刷新、匿名与会员归属、文件 TTL/删除、Admin 审计和跨账号隔离；本地 HMAC/SQLite/Mock 结果不得替代生产证据。
 - [ ] **未开放格式保持 fail-closed**：Word 打印转换/内嵌预览、政策附件、合同审查报告生成在真实转换/文件服务、数据模型、权限、审计和测试完成前继续保持未开放或诚实禁用，不得恢复成可点击占位流程。
 
@@ -24,12 +40,12 @@
 
 - [x] **共享视觉基线与关键服务页**：共享壳/首页恢复 7 月原型色彩、字体、导航和纸感；`/print-scan` 与简历、岗位、招聘会、面试、政策五个一级服务中心已完成层级收口，路由回顶已修复。Kiosk typecheck/lint/build、专项静态守卫、`git diff --check` 和 1080x1920 首页/打印扫描/服务中心浏览器抽检通过；本地候选未部署。
 - [x] **入口真实性与不可用门禁**：首页打印/扫描/双面静态就绪声明已移除；打印扫描以本机 capability 成功响应为放行条件；五个一级服务中心以 `/health` 做入口级 fail-closed，只有线上招聘平台二维码、面试技巧、社保指南、档案/登记保留离线阅读。新增真实性静态守卫，受控失败/重试恢复浏览器验证及 W6 `104/104` 通过；只证明入口行为与失败状态，不证明具体 AI 模型、业务数据、支付或硬件可用。
-- [ ] **生产内容数据运营收口（需单独授权）**：只读抽检显示当前线上岗位仍含样例/预生产命名与过期记录，现有招聘会均已结束且部分来源为示例域名，政策为空，线下机构含演示内容。先由数据负责人确定合法真实来源、授权、有效期、下架与审核规则，再按 Admin/Partner 既有导入审核链路处理；未授权前不得直接删改生产数据库，也不得用 seed 或假数据填满页面。
-- [ ] **75 屏逐屏差异清单与证据**：按 `docs/design/kiosk-proto-2026-07-migration-matrix.md` 和真实 router 逐屏复核页面族、状态、布局与操作链路，先更新已经过时的 03/05/06 差异结论，再为仍有差异的页面建立“原型编号 → 生产路由 → 真实状态 → 修改文件 → 验证证据”清单。不得把当前三页抽检写成 75 页全部像素封板。
+- [ ] **生产内容数据运营收口（进行中，真实来源待接入）**：2026-08-07 已完成第一步（数据负责人确认后、先备份再执行，未删除数据）：215 条预生产/演示岗位全部下架、3 场已结束招聘会下架、演示机构/演示岗位下架、2 个预生产/样例数据源停用，公网 jobs/fairs 已为空态（`total=0`），审计行与备份锚点 `pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…`）已记录。替换清单与执行流程见 `docs/operations/production-content-data-replacement-list-2026-08.md`（数据负责人决策项、四类数据判定/导入路径/验证门禁、禁止项）。剩余：数据负责人提供有授权的真实岗位来源（含 API/Excel 授权与有效期）、真实政策正文，按 Admin/Partner 既有导入审核链路接入并发布；市人才网 API 与高校就业信息 Excel 两个数据源保持启用但当前无已发布岗位。未授权前不得继续删改生产数据库，也不得用 seed 或假数据填满页面。
+- [~] **75 屏逐屏差异清单与证据**：03/05/06 双栏差异已按 2026-08-07 当前 `main@f4981ce0` 源码与 `verify-fusion-w3.mjs` 契约复核为已落地（见 matrix 6.3：打印参数 `pp-split` 双栏、简历来源 `resume-source-split` 440px 方向栏、诊断报告分数/雷达行 + 两组 `lg` 双栏 grid），已从 `VISUAL_DIFF` 移除。剩余仍须为 21/23/26 决策型差异与 40 屏 `VISUAL_UNVERIFIED` 建立“原型编号 → 生产路由 → 真实状态 → 修改文件 → 验证证据”清单；不得把当前复核写成 75 页全部像素封板。
 - [ ] **Windows 真机验收**：Node 22 本地根级 typecheck/lint/build、W2-W6 和 warning 已通过；仍须在真实 Windows 1080x1920 触控一体机验证字体、缩放、触控目标、滚动、软键盘、支付、打印、扫描、异常恢复和隐私清场。打印机只能读取 `printerName` 配置，未知彩色 mode 不得硬编码。
 - [x] **本机打印即时唤醒代码候选**：不新增页面/按钮，Kiosk 真实 `/print/progress` 仅发送一次无 body/query 的 loopback wake；Agent 仍通过同一云端 claim 领取，并以 full-lifecycle single-flight 串行 interval/wake。Origin、bridge token、无 body/query、立即 `202`、不可用 `503`、并发合并、401 latch、付款配置与 Kiosk 静默回落专项门禁已通过；未部署。
 - [ ] **本机打印即时唤醒 Windows 验收**：必须先升级 Agent，再发布 Kiosk；在真实 `https://zyidai.cn` Edge/Chrome Kiosk 模式验证 `http://127.0.0.1:9527/local/print/wake` 的 Mixed Content / Private Network Access 与实际 Origin 白名单，分别覆盖 paid/free 即时 claim、未支付不可 claim、Agent/loopback 离线继续周期 claim、连续点击/刷新不重复出纸、两笔任务严格串行、PrintService/计数器/任务状态一致。通过前不得宣称该加速链路已上线或真机闭环。
-- [ ] **线上发布需单独授权**：仅在逐屏差异、CI、生产备份、同一冻结提交整体构建和回滚方案全部完成后申请发布窗口；未取得明确部署授权前，不连接或覆盖线上 Kiosk。
+- [ ] **线上发布需单独授权**：仅在逐屏差异、CI、生产备份、同一冻结提交整体构建和回滚方案全部完成后申请发布窗口；未取得明确部署授权前，不连接或覆盖线上 Kiosk。2026-08-07 起以仓库变量 `DEPLOY_API_ENABLED=true` 作为 API 受控发布授权闸门；未设置前部署会 fail-closed，不会继续放大前后端错位。
 
 ## P1：Kiosk 触控选择项分批收口
 
@@ -42,15 +58,21 @@
 
 权威方案：[微信小程序商业产品与 AI 求职操作系统方案](../product/miniprogram-os-architecture-plan-2026-08.md)；开发视觉基线候选：[41 页现代公共就业服务 V8.0 pilot 原型](../design/miniapp-os-prototype-2026-08/README.md)；找回源码对比：[找回小程序源码与 V8 方案功能对比](../reviews/recovered-miniapp-vs-v8-2026-08-06.md)；接口事实：[Gate 0 API 与履约契约审查](../reviews/recovered-miniapp-gate0-api-contract-audit-2026-08-06.md)。`/Users/wanglei/zhiyida-miniapp` 已找回 57 页原生微信小程序候选，但尚未迁入主仓唯一真源；V8.0 的行动队列、资产画布、情报流、服务台账、安全交接和实时设备监控继续作为产品布局目标。用户已确认四 Tab 为“首页 / AI百宝箱 / 求职 / 我的”；正式工程收敛前仍须确认产品名、首发阶段、到机履约范围和微信主体条件。
 
+- [~] **M0/M1 开发计划执行中（2026-08-07）**：按 `docs/product/miniprogram-m0m1-development-plan-2026-08-07.md` 分四批推进——M0 工程壳/登录/公开浏览/我的只读；M1 今天引擎、简历链路、岗位匹配真实结果页、模拟面试、自我探索、资产材料；视觉沿用找回工程既有风格，每批独立 PR + 门禁。M0.1 `main@305c7296`、M0.2 `main@57527e87`、M0.3（公开浏览：岗位/招聘会/政策/企业列表与详情，线上真实空态）`main@c0c73f04` 已合入；下一步 M0.4 本人数据只读（订单/权益/消息/反馈）。岗位匹配真实结果页 API 级验收已通过（用户真实简历），模拟器 UI 实点待开发者工具服务端口开启后执行。
+
 - [x] **Gate 0 API 事实冻结**：已基于 `origin/main@50896ed1` 完成只读对账。确认可复用公开内容、登录、AI 与本人资产底座；确认材料包、公开终端、订单取件详情、`claim-pickup`、JSAPI 支付和 Order-only 履约缺失；确认现有本人订单以 PrintTask 为主表、Kiosk 建单为 PrintTask-first，不能直接支持手机待到机订单。另锁定政策详情、CommonJS 解构、优化令牌、模拟面试 DTO 和会员岗位匹配 consent 等前端错误。未改运行时代码。
 - [x] **正式小程序岗位匹配参考真实化候选**：会员本人简历走 `job_ai` 授权，匿名任务走任务级 consent 且不附会员 Bearer；结果页已增加 JD 原文拆解、岗位要求与简历证据/缺口逐项对照、授权撤回，以及继续优化简历/按岗位模拟面试。后端 prompt、原文过滤、shared 契约和 PDF 同步完成，旧缓存兼容；只保留“较高 / 中等 / 偏低”，不做百分比、录用概率、人格适岗或站内投递。专项 verify、目标 typecheck/lint、微信开发者工具编译和空态验收通过，未发布。
 - [ ] **岗位匹配真实结果页验收**：2026-08-06 已用仓库内无个人信息的虚构简历和测试 JD 对正式 API 做受控验证，上传、解析、匿名未授权 `403`、任务级授权、真实模型三档结果、读回、内部签名 PDF 和测试授权撤回均通过；微信开发者工具已渲染真实结果页。正式 API 仍返回 `productionBreakdown=false`，缺少候选代码新增的 `decisionSupport.requirementBreakdown` 和逐项 `requirement`，证明 `zyidai.cn` 尚未部署最新 JD 拆解后端，因此本项保持未完成。下一步先按部署门禁发布同一冻结候选，再用经本人授权的真实可解析简历复验原文证据、PDF、撤回后拒绝和两个连续动作；不得为验收伪造生产结果或引入站内投递。
 - [x] **岗位匹配连续动作与诚实文案代码收口**：已删除“成功率约 17%”及相关内部断言，失败态改为非概率、非录用暗示的诚实说明，并新增数字概率承诺防回退门禁；岗位匹配跳转优化前强制校验当前 `RESUME_TASK.taskId`，上下文缺失时 fail-closed 提示重新上传，匿名 token 不进入 URL，优化页只读取同 taskId token。运行时连续动作 6/6、Node 22 岗位匹配 29/29、简历优化 35/35、模拟面试 58/58、shared typecheck、PDF 9/9 和微信重新编译通过。该项只关闭代码级断点；最新后端部署后仍须用正常上传产生的完整任务上下文，在真实结果页 UI 实点优化和模拟面试，结论并入上一项真实验收。
 - [ ] **Gate 0 产品与工程决策**：四 Tab 已冻结为“首页 / AI百宝箱 / 求职 / 我的”；仍需用户确认产品名、M0-M2 首发、选定终端履约与微信主体条件。当前推荐“职易达 · AI 求职与职业生活服务”、原生小程序渐进演进和下单时选定终端；不推荐当前迁移 Taro 4。确认后才从干净 `main` 新建独立分支/worktree，并为 M2 另做 schema/API/支付文件预算与验证计划。
 - [ ] **唯一工程底座**：按 Gate 0 技术决策将找回工程的已验证页面、接口适配和视觉资产选择性迁入 `apps/miniapp/`，建立唯一发布源码并接入 workspace、CI、typecheck/lint 或等价原生门禁、微信 build、合规文案和发布配置守卫；若选择 Taro 4，须重新审计依赖树与 `pnpm audit`，不得机械重写 57 页或继承旧 lockfile 结论。迁移完成后停止独立仓库继续产生正式功能提交，不使用微信云开发，不接真实生产密钥。
+
+- [x] **岗位匹配真实结果页 API 级验收（2026-08-07，用户真实简历）**：真实简历 `我的简历测试文件.pdf` + 多段真实 JD 已在生产验证：解析、任务级授权、匹配分析三档结论（`reference_low`，无百分比）、`requirementBreakdown` 四组原文拆解（3/4/2/1）、读回一致、PDF 生成、撤回后重新分析 403 `JOB_FIT_ANONYMOUS_CONSENT_REQUIRED`、撤回后读回仍可用；“继续优化”与“按岗位模拟面试”两个连续动作 API 均 200/201。剩余：微信开发者工具真实结果页 UI 实点（结果展示、继续优化/模拟面试跳转、PDF 预览，按 `docs/acceptance/miniprogram-jobfit-ui-real-click-runsheet-2026-08-07.md` 执行）与真实岗位/政策数据接入；不得为验收伪造生产结果或引入站内投递。
+- [x] **Gate 0 产品与工程决策（2026-08-07 已确认）**：四 Tab 冻结为“首页 / AI百宝箱 / 求职 / 我的”；产品定位“职易达 · AI 求职与职业生活服务”（以微信后台实际注册名为准）、原生小程序渐进演进（不迁 Taro 4）、首发 M0+M1、v1 不做下单/到机履约/支付（M2 延后）。正式结论见 `docs/product/miniprogram-gate0-decision-confirmation-2026-08-07.md`；微信 AppID/主体/类目/隐私、真实岗位与政策来源、真实简历列为待办清单，不阻塞 M0/M1 开发启动。
+- [ ] **唯一工程底座**：按 Gate 0 决策（原生演进）将找回工程的已验证页面、接口适配和视觉资产选择性迁入 `apps/miniapp/`，建立唯一发布源码并接入 workspace、CI、typecheck/lint 或等价原生门禁、微信 build、合规文案和发布配置守卫；不得机械重写 57 页或继承旧 lockfile 结论。迁移完成后停止独立仓库继续产生正式功能提交，不使用微信云开发，不接真实生产密钥。
 - [ ] **M0 可登录 Shell**：保持已确认的“首页 / AI百宝箱 / 求职 / 我的”四 Tab，完成微信一键登录与短信降级、协议隐私、公开岗位/招聘会/政策来源浏览，以及订单/权益/消息/反馈的本人真实只读闭环；开发者工具与真机预览均通过后再进入 M1。
 - [ ] **M1 AI 操作系统 MVP**：完成规则优先的“今天”下一步引擎、全局小青按端意图路由、简历上传/OCR/诊断/优化、成果资产与材料页；AI 不自由生成路由、按钮、外链、支付或打印动作，所有成果必须进入本人简历、文档、报告或后续材料包。同阶段提前在微信公众平台提交订阅消息模板与隐私声明材料，代码接线仍留 M3，避免后期才等待人工审核。
-- [ ] **M2 手机下单到到机打印**：材料包拆为本人模型/条目快照、CRUD/锁定 API、服务端页数与报价快照、远程订单/release/文件 TTL 集成四组任务；采用 Order-only 待释放路径，新增 additive 履约状态、有效期、释放终端与到机码使用字段/记录，到机事务才创建 `PrintTask`。待支付 15 分钟关闭，已支付待到机默认 24 小时有效，未释放取消或到期按真实渠道原路全退/返还权益；服务点首发读取 Admin 管理的 `terminalCode + locationLabel + enabled + 心跳`，不显示假距离。补 JSAPI `prepay_id`/签名/`wx.requestPayment`、AppID 商户绑定、回调、查单、退款与 1 分钱 live 冒烟；主干若仍无 `claim-pickup` 则明确新增其 CAS、限流、防爆破、过期/退款/错终端/重复使用门禁。锁定/报价/建单失败须恢复材料包，支付后文件或能力失效须阻断 PrintTask 并退款，release 失败须保持到机码未使用，响应丢失须返回同一任务。须在 Windows + 真实奔图设备验证不提前出纸、并发只释放一次、到期退款、失败不重复扣款或自动重打；证据记录 Windows/Agent/驱动/固件/网络/终端/`printerName`/订单任务与回流事件，代码不硬编码型号或未知彩色 mode。
+- [ ] **M2 手机下单到到机打印**：**第一片立项方案已落档** `docs/superpowers/plans/2026-08-07-miniapp-cloud-print-m2-first-slice.md`（用户 2026-08-07 确认：小程序预提交任务 + 到机码 + 到机核销 + 机端支付，小程序端本期不做远程支付；未决项待确认后开工）。完整 M2 仍为：材料包拆为本人模型/条目快照、CRUD/锁定 API、服务端页数与报价快照、远程订单/release/文件 TTL 集成四组任务；采用 Order-only 待释放路径，新增 additive 履约状态、有效期、释放终端与到机码使用字段/记录，到机事务才创建 `PrintTask`。待支付 15 分钟关闭，已支付待到机默认 24 小时有效，未释放取消或到期按真实渠道原路全退/返还权益；服务点首发读取 Admin 管理的 `terminalCode + locationLabel + enabled + 心跳`，不显示假距离。补 JSAPI `prepay_id`/签名/`wx.requestPayment`、AppID 商户绑定、回调、查单、退款与 1 分钱 live 冒烟；主干若仍无 `claim-pickup` 则明确新增其 CAS、限流、防爆破、过期/退款/错终端/重复使用门禁。锁定/报价/建单失败须恢复材料包，支付后文件或能力失效须阻断 PrintTask 并退款，release 失败须保持到机码未使用，响应丢失须返回同一任务。须在 Windows + 真实奔图设备验证不提前出纸、并发只释放一次、到期退款、失败不重复扣款或自动重打；证据记录 Windows/Agent/驱动/固件/网络/终端/`printerName`/订单任务与回流事件，代码不硬编码型号或未知彩色 mode。
 - [ ] **M3 手机独占能力**：在 M2 稳定后接微信订阅消息、真实位置与导航、私密语音模拟面试、招聘会行前助手和跨端权益激励；没有真实终端坐标、在线、队列数据前不显示“附近、空闲、预计等待”。
 - [ ] **M4 微应用与商业运营**：为既有 manifest 增量增加 `miniprogram` surface，先上 Offer 对比、薪资谈判话术、HR 常识问答三类低风险首方 AI 技能；复用 Admin 的审核、熔断、定价、成本和订单运营，不建第二套小程序后台。法律、合同、试卷和外部 skill 继续受既有 Gate 约束。
 - [ ] **发布与商业验收**：完成正式 AppID/类目/隐私保护指引、备案 HTTPS 合法域名、微信支付商户配置、订阅消息模板、生产凭证注入、小额 live 支付退款、真实跨端履约、文件 TTL 与本人隔离、单位经济和运营 runbook。未完成前不得宣称小程序商用上线。

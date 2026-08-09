@@ -150,6 +150,38 @@ export class MockAiProvider implements AiProvider {
         reply: '您可以咨询入职、试用期、社保、公积金、离职、请假等常见 HR 流程问题。我会按常识解释；涉及劳动争议、赔偿、仲裁或合同解除时，请以官方人社窗口、法律援助或专业律师意见为准。',
         actions: [{ label: '人社专区', route: '/renshi' }],
       },
+      self_intro_gen: {
+        reply: '请告诉我您的目标岗位、主要经历（学习/实习/项目各1-2条）和想突出的优势，我会生成1分钟和3分钟两版自我介绍文稿，您可以在本机打印准备。内容仅供参考，请根据实际情况核对修改。',
+        actions: [{ label: '打印文件', route: '/print/upload' }, { label: 'AI 简历服务', route: '/resume-service' }],
+      },
+      material_checklist: {
+        reply: '请告诉我您要参加的是面试、招聘会还是入职，以及岗位和公司类型，我会生成一份个性化材料清单，可直接在本机打印带走。具体要求以用人单位或活动官方通知为准。',
+        actions: [{ label: '打印清单', route: '/print/upload' }, { label: '查看招聘会', route: '/job-fairs' }],
+      },
+      jd_analysis: {
+        reply: '请粘贴或描述招聘要求，我会拆解每条要求的实际含义、区分明确门槛与加分项，并提示需要进一步确认的信息。解读仅供参考，不代表招聘方评价标准。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '去做模拟面试', route: '/interview/setup' }],
+      },
+      interview_questions: {
+        reply: '请告诉我目标岗位、公司类型和您的真实背景，我会整理8-10道该岗位练习题及参考回答思路，可直接打印带走。实际题目和评价以招聘方为准。',
+        actions: [{ label: '打印题目', route: '/print/upload' }, { label: 'AI 模拟面试', route: '/interview/setup' }],
+      },
+      career_explore: {
+        reply: '请告诉我您的专业背景、感兴趣的领域和现实约束，我们可以一起梳理可探索的岗位方向与验证行动。结果仅供个人探索参考，不构成职业、心理或医疗建议。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '自我探索', route: '/resume/self-assessment/intro?from=assistant' }],
+      },
+      cover_letter_gen: {
+        reply: '请告诉我目标公司名称、岗位、您的真实经历和想突出的优势，我会生成一封300-500字的求职信。内容仅供参考，请按事实核对修改，不保证录用结果。',
+        actions: [{ label: '打印求职信', route: '/print/upload' }, { label: '优化简历', route: '/resume-service' }],
+      },
+      resume_jd_match: {
+        reply: '请先粘贴或描述招聘要求，再告诉我您的真实经历和技能，我会列出有证据的匹配项、缺口项和准备建议。分析仅供参考，不代表招聘方实际评分或录用决定。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: '去做简历诊断', route: '/resume/source' }],
+      },
+      company_research: {
+        reply: '告诉我您要面试的公司名称和岗位，我会基于可确认的公开信息和行业常识整理概况、可能的考察方向与待核实问题。内容不构成企业官方说明。',
+        actions: [{ label: '查看岗位信息', route: '/jobs' }, { label: 'AI 模拟面试', route: '/interview/setup' }],
+      },
     }
     const sceneReply = input.skill ? sceneReplies[input.skill] : undefined
     if (sceneReply) {

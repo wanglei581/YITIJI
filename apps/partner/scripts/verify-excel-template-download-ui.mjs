@@ -69,6 +69,14 @@ mustContain('src/routes/sources/ExcelImportModal.tsx', [
   'onDragOver',
   'onDrop',
   'selectFile(e.dataTransfer.files[0])',
+  '/\\.(xlsx|csv)$/i',
+  'accept=".xlsx,.csv"',
+  'Excel / CSV 文件（.xlsx / .csv）',
+  'Excel / CSV 导入',
+  '对应文件列',
+  '单个文件不超过 10MB',
+  'CSV 请使用 UTF-8 编码',
+  "setError((e as Error).message",
   'preview.sampleValid',
   '有效行示例',
 ], 'Excel 导入弹窗提供模板下载按钮并覆盖 AI-ready/签到字段')
@@ -81,5 +89,10 @@ mustNotContain('src/routes/sources/ExcelImportModal.tsx', [
   '立即投递',
   '平台投递',
 ], 'Excel 导入弹窗不引入候选人、简历或平台投递闭环文案')
+
+mustNotContain('src/routes/sources/ExcelImportModal.tsx', [
+  'accept=".xlsx,.xls,.csv"',
+  'xlsx|xls|csv',
+], 'Excel 导入弹窗不再宣称支持后端无法解析的旧 .xls 格式')
 
 console.log('ALL PASS')

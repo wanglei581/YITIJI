@@ -109,9 +109,12 @@ function makeFileAccessHarness(
     getDownloadUrl: (args: { ttlSeconds: number }) => {
       signedUrlCalls += 1
       signedTtlSeconds.push(args.ttlSeconds)
+      // 受控 fake 把签名到期钳制到文件寿命内，避免两个 Date.now() 之间的毫秒漂移
+      // 让「签名到期 > 文件到期」偶发触发生产 fail-closed，造成 CI 竞态失败。
+      const fileExpiryMs = record.expiresAt?.getTime() ?? Number.POSITIVE_INFINITY
       return {
         url: 'https://files.local/contract-file-1',
-        expiresAt: new Date(Date.now() + args.ttlSeconds * 1000),
+        expiresAt: new Date(Math.min(Date.now() + args.ttlSeconds * 1000, fileExpiryMs)),
       }
     },
     getObject: async () => {
@@ -265,9 +268,13 @@ test('FilesService clamps the initial contract download URL to the persisted fil
     deleteObject: async () => undefined,
     getDownloadUrl: (args: { ttlSeconds: number }) => {
       signedTtlSeconds.push(args.ttlSeconds)
+      // 同受控钳制：模拟存储端返回的签名到期不得越过已持久化的文件寿命，
+      // 测试只验证 TTL 按剩余寿命收窄（600s < 1800s），不依赖两次 Date.now() 的时序。
       return {
         url: 'https://files.local/initial-contract-download',
-        expiresAt: new Date(Date.now() + args.ttlSeconds * 1000),
+        expiresAt: new Date(
+          Math.min(Date.now() + args.ttlSeconds * 1000, persistedExpiry.getTime())
+        ),
       }
     },
   }

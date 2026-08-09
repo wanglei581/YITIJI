@@ -33,6 +33,7 @@ import {
   verifyPasswordReset,
 } from '../../services/auth'
 import { LegalDocsModal, type LegalDocKind } from './LegalDocsModal'
+import { FirstAdminPasswordChangeModal } from './FirstAdminPasswordChangeModal'
 import './login.css'
 
 type LoginMode = 'password' | 'sms'
@@ -78,6 +79,13 @@ function utf8ByteLength(value: string): number {
 
 function unicodeCharacterLength(value: string): number {
   return Array.from(value).length
+}
+
+function validateCommercialPassword(value: string): string | null {
+  if (unicodeCharacterLength(value) < 12) return '新密码至少 12 位'
+  if (utf8ByteLength(value) > 72) return '新密码按 UTF-8 计算不能超过 72 字节'
+  if (passwordCategoryCount(value) < 3) return '新密码至少包含大写字母、小写字母、数字、特殊字符中的 3 类'
+  return null
 }
 
 /** 触控涟漪：命中 .ripple-host 的元素按压时扩散水纹（纯视觉，事件委托） */
@@ -137,6 +145,8 @@ export default function LoginPage() {
   const [phoneVerifyCode, setPhoneVerifyCode] = useState('')
   const [phoneVerifyError, setPhoneVerifyError] = useState<string | null>(null)
   const [phoneVerifyBusy, setPhoneVerifyBusy] = useState(false)
+  const [firstAdminChangeTicket, setFirstAdminChangeTicket] = useState<string | null>(null)
+  const [firstAdminChanged, setFirstAdminChanged] = useState(false)
 
   useEffect(() => {
     if (getToken()) nav('/', { replace: true })
@@ -175,7 +185,10 @@ export default function LoginPage() {
     setError(null)
     const r = await login(loginId.trim(), password)
     setLoading(false)
-    if (r.ok) completeLogin(r.user, loginId.trim())
+    if (r.ok && 'passwordChangeRequired' in r) {
+      setPassword('')
+      setFirstAdminChangeTicket(r.changeTicket)
+    } else if (r.ok) completeLogin(r.user, loginId.trim())
     else raiseError(r.message || '登录失败')
   }
 
@@ -187,7 +200,9 @@ export default function LoginPage() {
     setError(null)
     const r = await loginWithSms(phone.trim(), code.trim())
     setLoading(false)
-    if (r.ok) completeLogin(r.user, phone.trim())
+    if (r.ok && 'passwordChangeRequired' in r) {
+      setFirstAdminChangeTicket(r.changeTicket)
+    } else if (r.ok) completeLogin(r.user, phone.trim())
     else raiseError(r.message || '登录失败')
   }
 
@@ -228,16 +243,9 @@ export default function LoginPage() {
   async function completeReset(e: FormEvent) {
     e.preventDefault()
     setResetError(null)
-    if (unicodeCharacterLength(newPassword) < 12) {
-      setResetError('新密码至少 12 位')
-      return
-    }
-    if (utf8ByteLength(newPassword) > 72) {
-      setResetError('新密码按 UTF-8 计算不能超过 72 字节')
-      return
-    }
-    if (passwordCategoryCount(newPassword) < 3) {
-      setResetError('新密码至少包含大写字母、小写字母、数字、特殊字符中的 3 类')
+    const validationError = validateCommercialPassword(newPassword)
+    if (validationError) {
+      setResetError(validationError)
       return
     }
     const r = await completePasswordReset(resetTicket, newPassword)
@@ -334,6 +342,13 @@ export default function LoginPage() {
           </div>
           <h2 className="serif">管理员登录</h2>
           <p className="sub">支持账号或手机号登录，登录行为将记录审计日志</p>
+
+          {firstAdminChanged && (
+            <div className="c-hint" role="status">
+              <ShieldCheckIcon size={14} aria-hidden="true" />
+              初始密码已更新，请使用新密码重新登录
+            </div>
+          )}
 
           <div className="c-mode">
             <button
@@ -666,6 +681,18 @@ export default function LoginPage() {
             </div>
           </form>
         </div>
+      )}
+
+      {firstAdminChangeTicket && (
+        <FirstAdminPasswordChangeModal
+          changeTicket={firstAdminChangeTicket}
+          validatePassword={validateCommercialPassword}
+          onComplete={() => {
+            setFirstAdminChangeTicket(null)
+            setFirstAdminChanged(true)
+          }}
+          onReturnToLogin={() => setFirstAdminChangeTicket(null)}
+        />
       )}
 
       {legalDoc && <LegalDocsModal initialDoc={legalDoc} onClose={() => setLegalDoc(null)} />}

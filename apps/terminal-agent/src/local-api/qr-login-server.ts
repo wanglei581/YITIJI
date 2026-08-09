@@ -260,6 +260,16 @@ async function handleUsbUpload(
     sendJson(res, 400, { code: 'LOCAL_USB_SAFE_ID_REQUIRED', message: '缺少要导入的文件标识' }, origin)
     return
   }
+  const purpose = body.purpose ?? 'print_doc'
+  if (purpose !== 'print_doc' && purpose !== 'resume_upload') {
+    sendJson(res, 400, { code: 'LOCAL_USB_PURPOSE_INVALID', message: 'U 盘文件用途不受支持' }, origin)
+    return
+  }
+  const authorization = normalizeEndUserAuthorization(req.headers.authorization)
+  if (req.headers.authorization && !authorization) {
+    sendJson(res, 400, { code: 'LOCAL_USB_AUTHORIZATION_INVALID', message: '会员身份格式无效，请重新登录后再试' }, origin)
+    return
+  }
 
   const consumed = consumeUsbFile(safeId)
   if (!consumed) {
@@ -272,14 +282,17 @@ async function handleUsbUpload(
     filename: consumed.filename,
     contentType: guessUsbMimeType(consumed.extension),
   })
-  form.append('purpose', 'print_doc')
+  form.append('purpose', purpose)
 
   let uploaded: BackendKioskUploadResult
   try {
     // form-data 流一次发送后即被消费,自动重试会提交空体;上传也非幂等
     // (响应丢失时重试会重复落文件),所以这里显式禁用 api-client 的自动重试。
     const response = await client.post<ApiEnvelope<BackendKioskUploadResult>>('/files/kiosk-upload', form, {
-      headers: form.getHeaders(),
+      headers: {
+        ...form.getHeaders(),
+        ...(purpose === 'resume_upload' && authorization ? { Authorization: authorization } : {}),
+      },
       ...NO_RETRY_CONFIG,
     })
     uploaded = response.data.data
@@ -311,6 +324,12 @@ function guessUsbMimeType(extension: string): string {
     default:
       return 'application/octet-stream'
   }
+}
+
+function normalizeEndUserAuthorization(value: string | string[] | undefined): string | undefined {
+  const authorization = Array.isArray(value) ? value[0] : value
+  if (!authorization || authorization.length > 8 * 1024) return undefined
+  return /^Bearer\s+[^\s]+$/i.test(authorization) ? authorization : undefined
 }
 
 async function handleCreate(
@@ -475,7 +494,7 @@ function sendEmpty(res: ServerResponse, status: number, origin: string): void {
 function writeCorsHeaders(res: ServerResponse, origin: string): void {
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Local-Bridge-Token')
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Local-Bridge-Token')
   res.setHeader('Access-Control-Allow-Private-Network', 'true')
   res.setHeader('Access-Control-Max-Age', '300')
   res.setHeader('Vary', 'Origin')

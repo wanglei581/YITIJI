@@ -1,0 +1,40 @@
+{
+  "pages": [
+    "pages/home/home",
+    "pages/ai/ai",
+    "pages/jobs/jobs",
+    "pages/me/me",
+    "pages/login/login",
+    "pages/terms/terms",
+    "pages/privacy/privacy",
+    "pages/job-detail/job-detail",
+    "pages/fairs/fairs",
+    "pages/fair-detail/fair-detail",
+    "pages/policies/policies",
+    "pages/policy-detail/policy-detail",
+    "pages/companies/companies",
+    "pages/company-detail/company-detail"
+  ],
+  "window": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "职易达 · AI 求职与职业生活服务",
+    "navigationStyle": "custom",
+    "backgroundColor": "#f4f1e8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8a978f",
+    "selectedColor": "#1f9e86",
+    "backgroundColor": "#fffdf8",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "首页" },
+      { "pagePath": "pages/ai/ai", "text": "AI百宝箱" },
+      { "pagePath": "pages/jobs/jobs", "text": "求职" },
+      { "pagePath": "pages/me/me", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

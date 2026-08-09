@@ -1,20 +1,30 @@
 import { expect, type Page } from '@playwright/test'
 
 const FIXTURE_PATH = '/w2-fixtures/sample-visible.pdf'
-const MINIMAL_PDF = `%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 72 72]>>endobj
-xref
-0 4
-${'0000000000 65535 f '}
-${'0000000009 00000 n '}
-${'0000000052 00000 n '}
-${'0000000101 00000 n '}
-trailer<</Size 4/Root 1 0 R>>
-startxref
-162
-%%EOF`
+
+function buildVisiblePdf(): string {
+  const stream = '0 0 0 rg\n30 30 140 140 re f\n'
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Count 1 /Kids [3 0 R] >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Contents 4 0 R >>\nendobj\n',
+    `4 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}endstream\nendobj\n`,
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'ascii'))
+    pdf += object
+  }
+  const xrefOffset = Buffer.byteLength(pdf, 'ascii')
+  pdf += `xref\n0 ${objects.length + 1}\n`
+  pdf += '0000000000 65535 f \n'
+  for (const offset of offsets.slice(1)) pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+  return pdf
+}
+
+export const VISIBLE_PDF = buildVisiblePdf()
 
 export class FusionW2BinaryRoute {
   readonly #page: Page
@@ -37,12 +47,13 @@ export class FusionW2BinaryRoute {
         await route.abort('blockedbyclient')
         return
       }
-      await route.fulfill({ status: 200, contentType: 'application/pdf', body: MINIMAL_PDF })
+      await route.fulfill({ status: 200, contentType: 'application/pdf', body: VISIBLE_PDF })
     })
   }
 
   assertPdfCompleted(): void {
     expect(this.#completed, 'synthetic preview PDF must complete with HTTP 200').toBe(true)
     expect([...this.#unhandled], 'unexpected W2 binary fixture requests').toEqual([])
+    expect(VISIBLE_PDF, 'fixture PDF must contain a visible filled rectangle').toContain('140 140 re f')
   }
 }

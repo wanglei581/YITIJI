@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileTextIcon, LoaderIcon, RefreshCwIcon, UsbIcon } from 'lucide-react'
 import { Button, KioskStatePanel } from '@ai-job-print/ui'
+import { useAuth } from '../../../auth/useAuth'
 import {
   getUsbStatus,
   isUsbImportConfigured,
@@ -25,6 +26,8 @@ interface ResumeUsbImportPanelProps {
   onBusyChange?: (busy: boolean) => void
 }
 
+const MAX_RESUME_BYTES = 10 * 1024 * 1024
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
@@ -32,14 +35,20 @@ function formatBytes(bytes: number): string {
 }
 
 function inferFormat(mimeType: string, filename: string): string {
-  const value = `${mimeType} ${filename}`.toLowerCase()
-  if (value.includes('pdf')) return 'pdf'
-  if (value.includes('png')) return 'png'
-  if (value.includes('jpeg') || value.includes('jpg')) return 'jpg'
+  const normalizedMime = mimeType.split(';', 1)[0]?.trim().toLowerCase()
+  if (normalizedMime === 'application/pdf') return 'pdf'
+  if (normalizedMime === 'image/png') return 'png'
+  if (normalizedMime === 'image/jpeg') return 'jpg'
+  const extension = filename.trim().toLowerCase().match(/\.([^.]+)$/)?.[1]
+  if (extension === 'pdf') return 'pdf'
+  if (extension === 'png') return 'png'
+  if (extension === 'jpg' || extension === 'jpeg') return 'jpg'
   return 'unknown'
 }
 
 export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImportPanelProps) {
+  const { getToken } = useAuth()
+  const mountedRef = useRef(true)
   const [status, setStatus] = useState<UsbStatus | null>(null)
   const [files, setFiles] = useState<UsbFileListItem[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -48,8 +57,16 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
   const configured = isUsbImportConfigured()
 
   useEffect(() => {
-    onBusyChange?.(loading || importingId !== null)
-  }, [importingId, loading, onBusyChange])
+    onBusyChange?.(importingId !== null)
+  }, [importingId, onBusyChange])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      onBusyChange?.(false)
+    }
+  }, [onBusyChange])
 
   useEffect(() => {
     if (!configured || importingId) return undefined
@@ -62,7 +79,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         const nextStatus = await getUsbStatus()
         if (cancelled) return
         setStatus(nextStatus)
-        setFiles(nextStatus.present ? (await listUsbFiles()).files : null)
+        setFiles(nextStatus.present ? (await listUsbFiles()).files.filter((item) => item.sizeBytes <= MAX_RESUME_BYTES) : null)
         setError(null)
       } catch (err) {
         if (cancelled) return
@@ -88,8 +105,9 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
     setImportingId(item.safeId)
     setError(null)
     try {
-      const uploaded = await uploadUsbFile(item.safeId)
+      const uploaded = await uploadUsbFile(item.safeId, 'resume_upload', getToken())
       if (!uploaded.fileUrl) throw new Error('U盘文件已上传，但预览链接未生成，请重新选择')
+      if (!mountedRef.current) return
       onUploaded({
         name: uploaded.filename,
         size: formatBytes(uploaded.sizeBytes),
@@ -100,11 +118,12 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         channel: 'usb',
       })
     } catch (err) {
+      if (!mountedRef.current) return
       setError(err instanceof Error ? err.message : 'U盘文件导入失败，请重试')
       setFiles(null)
       setStatus(null)
     } finally {
-      setImportingId(null)
+      if (mountedRef.current) setImportingId(null)
     }
   }
 
@@ -127,7 +146,7 @@ export function ResumeUsbImportPanel({ onUploaded, onBusyChange }: ResumeUsbImpo
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold text-neutral-900">{status?.present ? status.driveLabel || '已检测到U盘' : '等待插入U盘'}</h2>
-          <p className="mt-1 text-sm text-neutral-500">仅显示 PDF、JPG、PNG 文件</p>
+          <p className="mt-1 text-sm text-neutral-500">仅显示 10MB 以内的 PDF、JPG、PNG 文件</p>
         </div>
         {loading && <LoaderIcon className="h-5 w-5 animate-spin text-primary-600" aria-label="正在读取U盘" />}
       </div>

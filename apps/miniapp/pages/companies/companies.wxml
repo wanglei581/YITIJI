@@ -1,0 +1,60 @@
+<!--pages/companies/companies.wxml · P21 找企业-->
+<view class="page-wrap">
+  <view style="height:{{statusBarHeight}}px"></view>
+
+  <view class="navbar">
+    <view class="nav-back tap" hover-class="tap-press" bindtap="back"><text class="ficon i-right nav-back-ic"></text></view>
+    <view class="nav-title">找企业</view>
+    <view class="nav-right"></view>
+  </view>
+
+  <view class="search-bar">
+    <view class="search-inp tap" hover-class="tap-press" bindtap="tapSearch">
+      <text class="ficon i-search"></text>
+      <text class="si-ph">搜企业名称、行业、关键词…</text>
+    </view>
+  </view>
+
+  <view class="filter-bar">
+    <view class="f-chip {{activeFilter === index ? 'on' : ''}}"
+      wx:for="{{filters}}" wx:key="*this" data-index="{{index}}" bindtap="tapFilter">{{item}}</view>
+  </view>
+
+  <view class="content has-bar">
+    <view wx:if="{{loading}}" class="list-state">加载中…</view>
+
+    <view wx:elif="{{loadError}}" class="empty">
+      <view class="e-ic">!</view>
+      <view class="e-title">加载失败</view>
+      <view class="e-desc">{{loadError}}</view>
+      <view class="state-retry tap" hover-class="tap-press" bindtap="reload">重试</view>
+    </view>
+
+    <view wx:elif="{{companies.length === 0}}" class="empty">
+      <view class="e-ic">🏢</view>
+      <view class="e-title">暂无企业</view>
+      <view class="e-desc">换个筛选条件试试</view>
+    </view>
+
+    <block wx:else>
+    <view class="company-card tap rise-d{{index+1}}" wx:for="{{companies}}" wx:key="id"
+      hover-class="tap-press" bindtap="tapCompany" data-id="{{item.id}}">
+      <view class="cc-logo">{{item.emoji}}</view>
+      <view class="cc-info">
+        <view class="cc-name">{{item.name}}</view>
+        <view class="cc-meta">{{item.meta}}</view>
+        <view class="cc-tags">
+          <view class="chip {{tag.tone}}" wx:for="{{item.tags}}" wx:for-item="tag" wx:key="text">{{tag.text}}</view>
+        </view>
+      </view>
+      <view class="cc-right">
+        <view class="jobs-count">在招 {{item.jobs}} 个</view>
+        <text class="cc-arrow">›</text>
+      </view>
+    </view>
+    </block>
+
+    <view class="compliance-note">企业信息来自第三方授权数据源，仅供参考，请到来源平台查看详细资料与岗位投递方式。</view>
+    <view class="spacer-lg"></view>
+  </view>
+</view>

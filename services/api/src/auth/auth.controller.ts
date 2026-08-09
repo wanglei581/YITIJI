@@ -11,6 +11,7 @@ import { AuthService, type LoginResult } from './auth.service'
 import { InitialPhoneBindService } from './initial-phone-bind.service'
 import {
   ChangePasswordDto,
+  FirstAdminPasswordChangeDto,
   InitialPhoneBindCancelDto,
   InitialPhoneBindStartDto,
   InitialPhoneBindVerifyDto,
@@ -85,6 +86,16 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   async completePasswordReset(@Body() dto: PasswordResetCompleteDto): Promise<ApiResponse<{ success: true }>> {
     return ApiResponse.ok(await this.authService.completePasswordReset(dto.resetTicket, dto.newPassword))
+  }
+
+  @Post('password/first-admin-change')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  async completeFirstAdminPasswordChange(
+    @Body() dto: FirstAdminPasswordChangeDto,
+  ): Promise<ApiResponse<{ success: true }>> {
+    return ApiResponse.ok(
+      await this.authService.completeFirstAdminPasswordChange(dto.changeTicket, dto.newPassword),
+    )
   }
 
   @Post('phone/code')

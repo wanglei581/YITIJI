@@ -167,8 +167,18 @@ export function CareerPlanPage() {
             <p className="career-plan-lightflow__eyebrow">已生成的规划</p>
             <h2 id="career-plan-summary-title">先看结论，再安排下一步</h2>
             <p>{plan.summary}</p>
+            {/*
+              原为硬编码「已存入 AI服务记录」，不校验任何返回字段。
+              后端确实 upsert 了 AiResumeResult(kind='career_plan')，但匿名用户那行
+              endUserId 为 null，而「我的 AI 记录」按 endUserId 过滤 —— 匿名场景下
+              该文案为假（CLAUDE.md §9 不伪造能力）。改为按真实登录态区分。
+            */}
             <div className="career-plan-lightflow__meta-chips">
-              <span className="career-plan-lightflow__chip">已存入 AI服务记录</span>
+              {getToken() ? (
+                <span className="career-plan-lightflow__chip">已存入 AI服务记录</span>
+              ) : (
+                <span className="career-plan-lightflow__chip">未登录 · 本次结果不进入「我的」记录，可先打印带走</span>
+              )}
             </div>
           </section>
           <ComplianceBanner tone="info">本建议仅供本人职业发展参考，不构成任何就业、薪资或录用承诺；行动请基于真实经历，不要虚构。</ComplianceBanner>
