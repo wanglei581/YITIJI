@@ -75,6 +75,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Repository integrity gate
+        # 全量 tracked 文件拒绝残留冲突标记；所有 GitHub Actions workflow 必须能通过 YAML 语法解析。
+        run: pnpm verify:repository-integrity
+
       - name: Deploy authorization gate
         # 纯静态检查：未显式授权时 Deploy job 必须在建立 SSH 前整体跳过。
         run: node scripts/verify-deploy-authorization-gate.mjs

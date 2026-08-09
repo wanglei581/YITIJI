@@ -23,6 +23,8 @@ const PROD_OK: Env = {
   PAYMENT_SESSION_SECRET: 'payment-session-secret-0123456789',
   // C5-6：生产必须显式声明 paid-before-claim（缺省即拒启动）
   PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'true',
+  // 商用隐私底线：用户原始材料必须完成 PII 检查后才能建打印任务。
+  PRINT_REQUIRE_PII_SCAN: 'true',
   // Task 11：生产必须显式声明 print-scan 能力开关未配置行语义
   PRINT_SCAN_CAPABILITY_MODE: 'managed',
   // 反代可信跳数：生产必须显式声明 1..9（禁止 true）
@@ -270,6 +272,33 @@ function main(): void {
     { ...PROD_OK, PAYMENT_PROVIDER: 'alipay', PRINT_REQUIRE_PAID_BEFORE_CLAIM: 'false' },
     'PRODUCTION_PAID_BEFORE_CLAIM_REQUIRED',
     'alipay 通道同样强制先付后印',
+  )
+
+  // 生产环境：打印前 PII 检查必须显式开启，不能保留观察期 bypass。
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: undefined },
+    'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
+    '生产环境拒绝未设置 PRINT_REQUIRE_PII_SCAN',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: 'false' },
+    'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
+    '生产环境拒绝关闭 PRINT_REQUIRE_PII_SCAN',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: 'yes' },
+    'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
+    '生产环境拒绝 PRINT_REQUIRE_PII_SCAN 非 true 取值',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: 'TRUE' },
+    'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
+    '生产环境拒绝大小写变体，保持与运行时精确判定一致',
+  )
+  expectRejected(
+    { ...PROD_OK, PRINT_REQUIRE_PII_SCAN: ' true ' },
+    'PRODUCTION_PRINT_PII_SCAN_REQUIRED',
+    '生产环境拒绝空格变体，避免启动门禁与建单门禁漂移',
   )
 
   // Task 11：print-scan feature gate 显式声明

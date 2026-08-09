@@ -446,6 +446,8 @@ function HomeContinueBar({ onLogin }: { onLogin: () => void }) {
 /** 8个扁平服务磁贴网格 */
 function SvcGrid() {
   const navigate = useNavigate()
+  const toolbox = useToolboxConfig()
+  const campus = useSmartCampusConfig()
   const tiles = [
     {
       to: '/print-scan',
@@ -512,9 +514,14 @@ function SvcGrid() {
       aiChip: 'AI场景引导',
     },
   ]
+  const visibleTiles = tiles.filter((tile) => {
+    if (tile.to === '/toolbox') return toolbox.enabled
+    if (tile.to === '/smart-campus') return campus.enabled
+    return true
+  })
   return (
     <div className="svc-grid" role="navigation" aria-label="服务入口">
-      {tiles.map((t) => (
+      {visibleTiles.map((t) => (
         <button
           key={t.to}
           type="button"

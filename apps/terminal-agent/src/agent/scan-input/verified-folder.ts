@@ -49,7 +49,7 @@ export function classifyScanInputCandidate(
 ): ScanInputCandidateClassification {
   if (snapshot.nodeKind === 'symbolic_link') return 'rejected_symbolic_link'
   if (snapshot.nodeKind !== 'file') return 'rejected_non_regular_file'
-  if (!snapshot.name.toLowerCase().endsWith('.pdf')) return 'rejected_non_pdf'
+  if (!/\.(?:pdf|jpe?g|png)$/i.test(snapshot.name)) return 'rejected_non_pdf'
   return 'accepted'
 }
 

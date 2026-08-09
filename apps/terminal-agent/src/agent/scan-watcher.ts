@@ -18,15 +18,34 @@
  * 或此前投递失败但文件本身未再变化的文件（不会有新的 chokidar change 事件）。
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'fs'
-import { join } from 'path'
+import {
+  closeSync,
+  constants as fsConstants,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'fs'
+import { basename, dirname, join, resolve } from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import FormData from 'form-data'
 import type { AgentConfig } from './types'
 import { createApiClient, axiosErrorMessage, isUnauthorizedHttpError, NO_RETRY_CONFIG } from './api-client'
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
+import {
+  classifyScanInputCandidate,
+  inspectScanInputFolder,
+  isStableScanInputCandidate,
+} from './scan-input/verified-folder'
 import { log, warn, err } from '../logger'
+import type { ScanInputCandidateSnapshot } from './types'
 
 const STABILITY_CHECK_INTERVAL_MS = 500
 const STABILITY_MAX_CHECKS = 10
@@ -76,17 +95,77 @@ export interface ScanWatcherHandle {
   stop: () => Promise<void>
 }
 
-/** 等待文件大小连续两次读取一致，判定为"写入完成"。超时仍返回 false。 */
-async function waitForStableFile(filePath: string): Promise<boolean> {
-  let lastSize = -1
+function snapshotCandidate(filePath: string, filename: string): ScanInputCandidateSnapshot & {
+  dev: number
+  ino: number
+  nlink: number
+} {
+  const metadata = lstatSync(filePath)
+  const nodeKind = metadata.isSymbolicLink()
+    ? 'symbolic_link'
+    : metadata.isFile()
+      ? 'file'
+      : metadata.isDirectory()
+        ? 'directory'
+        : 'other'
+  return {
+    name: filename,
+    size: metadata.size,
+    mtimeMs: metadata.mtimeMs,
+    nodeKind,
+    dev: metadata.dev,
+    ino: metadata.ino,
+    nlink: metadata.nlink,
+  }
+}
+
+function isDirectChild(filePath: string, filename: string, scanWatchFolder: string): boolean {
+  return basename(filePath) === filename
+    && !filename.includes('/')
+    && !filename.includes('\\')
+    && resolve(dirname(filePath)) === resolve(scanWatchFolder)
+}
+
+/** 等待候选文件的 lstat 快照连续两次一致，不跟随符号链接。 */
+async function waitForStableFile(
+  filePath: string,
+  filename: string,
+): Promise<ReturnType<typeof snapshotCandidate> | undefined> {
+  let previous: ReturnType<typeof snapshotCandidate> | undefined
   for (let i = 0; i < STABILITY_MAX_CHECKS; i++) {
-    if (!existsSync(filePath)) return false
-    const { size } = statSync(filePath)
-    if (size > 0 && size === lastSize) return true
-    lastSize = size
+    if (!existsSync(filePath)) return undefined
+    const current = snapshotCandidate(filePath, filename)
+    if (classifyScanInputCandidate(current) !== 'accepted' || current.nlink !== 1) return undefined
+    if (current.size > 0 && previous && isStableScanInputCandidate(previous, current)) return current
+    previous = current
     await new Promise((resolve) => setTimeout(resolve, STABILITY_CHECK_INTERVAL_MS))
   }
-  return false
+  return undefined
+}
+
+function readVerifiedCandidate(
+  filePath: string,
+  stableSnapshot: ReturnType<typeof snapshotCandidate>,
+): Buffer {
+  if (fsConstants.O_NOFOLLOW === undefined) {
+    throw new Error('SCAN_INPUT_NOFOLLOW_UNAVAILABLE')
+  }
+  const descriptor = openSync(filePath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+  try {
+    const opened = fstatSync(descriptor)
+    if (!opened.isFile() || opened.nlink !== 1) throw new Error('SCAN_INPUT_NOT_SINGLE_REGULAR_FILE')
+    if (
+      opened.dev !== stableSnapshot.dev
+      || opened.ino !== stableSnapshot.ino
+      || opened.size !== stableSnapshot.size
+      || opened.mtimeMs !== stableSnapshot.mtimeMs
+    ) {
+      throw new Error('SCAN_INPUT_CHANGED_BEFORE_READ')
+    }
+    return readFileSync(descriptor)
+  } finally {
+    closeSync(descriptor)
+  }
 }
 
 function ensureUnclaimedDir(scanWatchFolder: string): string {
@@ -124,7 +203,26 @@ export async function processCandidate(
   }
   inFlightPaths.add(filePath)
   try {
-    const stable = await waitForStableFile(filePath)
+    const scanWatchFolder = config.scanWatchFolder?.trim()
+    const health = inspectScanInputFolder(scanWatchFolder)
+    if (health.status !== 'ready' || !scanWatchFolder) {
+      warn(`scan-watcher: scan input blocked before candidate read — ${health.reason}`)
+      return
+    }
+    if (!isDirectChild(filePath, filename, scanWatchFolder)) {
+      warn(`scan-watcher: unsafe scan input path rejected before read — ${filename}`)
+      return
+    }
+
+    const initial = snapshotCandidate(filePath, filename)
+    const classification = classifyScanInputCandidate(initial)
+    if (classification !== 'accepted' || initial.nlink !== 1) {
+      const reason = initial.nlink !== 1 ? 'rejected_multiple_links' : classification
+      warn(`scan-watcher: unsafe scan input candidate rejected before read (${reason}) — ${filename}`)
+      return
+    }
+
+    const stable = await waitForStableFile(filePath, filename)
     if (!stable) {
       warn(`scan-watcher: file did not stabilize in time, skipping this round — ${filename}`)
       return
@@ -139,7 +237,17 @@ export async function processCandidate(
       return
     }
 
-    const buffer = readFileSync(filePath)
+    const finalSnapshot = snapshotCandidate(filePath, filename)
+    if (
+      classifyScanInputCandidate(finalSnapshot) !== 'accepted'
+      || finalSnapshot.nlink !== 1
+      || !isStableScanInputCandidate(stable, finalSnapshot)
+    ) {
+      warn(`scan-watcher: unsafe or changed scan input rejected before read — ${filename}`)
+      return
+    }
+
+    const buffer = readVerifiedCandidate(filePath, finalSnapshot)
     const form = new FormData()
     form.append('file', buffer, { filename, contentType: guessMimeType(filename) })
 
@@ -286,6 +394,12 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
   sweepUnclaimedDir(scanWatchFolder)
   if (isUnauthorized()) return
 
+  const health = inspectScanInputFolder(scanWatchFolder)
+  if (health.status !== 'ready') {
+    warn(`scan-watcher: scan input sweep blocked — ${health.reason}`)
+    return
+  }
+
   let entries: string[]
   try {
     entries = readdirSync(scanWatchFolder)
@@ -297,7 +411,11 @@ export async function sweepFolder(scanWatchFolder: string, config: AgentConfig):
     if (name === UNCLAIMED_DIRNAME) continue
     const fullPath = join(scanWatchFolder, name)
     try {
-      if (statSync(fullPath).isDirectory()) continue
+      const snapshot = snapshotCandidate(fullPath, name)
+      if (classifyScanInputCandidate(snapshot) !== 'accepted' || snapshot.nlink !== 1) {
+        warn(`scan-watcher: unsafe scan input candidate skipped during sweep — ${name}`)
+        continue
+      }
     } catch {
       continue
     }
@@ -317,6 +435,12 @@ export function startScanWatcher(config: AgentConfig): ScanWatcherHandle | undef
   const folder = config.scanWatchFolder?.trim()
   if (!folder) {
     log('scan-watcher: scanWatchFolder 未配置，跳过扫描监听')
+    return undefined
+  }
+
+  const health = inspectScanInputFolder(folder)
+  if (health.status !== 'ready') {
+    warn(`scan-watcher: scan input blocked; watcher not started — ${health.reason}`)
     return undefined
   }
 

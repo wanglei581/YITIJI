@@ -470,6 +470,14 @@ for (const marker of [
   'API_MODE',
   'taskId',
   'failureReasonForUser',
+  'realStatusPresentation',
+  "case 'pending'",
+  "case 'claimed'",
+  "case 'printing'",
+  '等待终端领取',
+  '终端已领取',
+  '打印机正在出纸',
+  'setBackendStatus',
 ]) {
   assert.match(
     printProgress,
@@ -477,6 +485,16 @@ for (const marker of [
     `print progress retains ${marker}`
   )
 }
+assert.doesNotMatch(
+  printProgress,
+  /:\s*'终端已接收任务，文件校验通过'/,
+  'pending/claimed 不得共用「终端已接收且校验通过」的错误话术'
+)
+assert.doesNotMatch(
+  printProgress,
+  /:\s*'正在打印'\s*}/,
+  '真实任务主状态不得无条件显示正在打印'
+)
 const printDone = read('src/pages/print/PrintDonePage.tsx')
 assert.match(printDone, /getPayStatus/, 'print done obtains pickup code from payment status')
 assert.ok(!/Math\.random|randomUUID/.test(printDone), 'print done never fabricates a pickup code')
