@@ -129,6 +129,13 @@ model PrintTask {
   endUserId    String?
   endUser      EndUser?  @relation(fields: [endUserId], references: [id], onDelete: SetNull)
   fileUrl      String
+  // fileId：指向被打印的 FileObject，补齐文件血缘在"实际出纸"这一跳的断点。
+  // 此前建单只解析出 fileId 写进 AuditLog payload，DB 里问不出"某文件被打印过几次、
+  // 打的是原件还是遮挡件"（FileObject.sourceFileId / assetCategory 的血缘断在这里）。
+  // nullable：历史任务无该值，且旧 HMAC URL 路径不保证可解析。
+  // onDelete: SetNull：文件被留存策略清理后打印任务记录必须保留（订单 / 审计依赖）。
+  fileId       String?
+  file         FileObject? @relation(fields: [fileId], references: [id], onDelete: SetNull)
   fileMd5      String
   paramsJson   String    @default("{}")
   status       String    @default("pending")
@@ -144,6 +151,7 @@ model PrintTask {
   order      Order?
 
   @@index([endUserId])
+  @@index([fileId])
   @@index([status, terminalId, createdAt])
   @@index([status, claimExpiry])
   @@index([status, claimedAt])
@@ -811,6 +819,8 @@ model FileObject {
   sourceDocumentTasks DocumentProcessTask[] @relation("DocumentProcessSourceFile")
   resultDocumentTasks DocumentProcessTask[] @relation("DocumentProcessResultFile")
   fairMaterialPrintBridges FairMaterialPrintBridge[]
+  // 该文件产生的打印任务（血缘终点：实际出纸）。
+  printTasks  PrintTask[]
 
   @@index([uploaderId])
   @@index([endUserId])
