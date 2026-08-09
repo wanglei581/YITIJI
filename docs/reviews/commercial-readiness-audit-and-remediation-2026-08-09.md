@@ -2,8 +2,8 @@
 
 > 审查根目录：`/Users/wanglei/AI求职打印服务终端-commercial-readiness-wave1`
 > 初始审查基线：`codex/commercial-readiness-wave1-20260809@83588b8f`
-> 合并主干前实现快照：`codex/commercial-readiness-wave1-20260809@4d6705ef`；相对 `origin/main@78c8e71d` behind 1 / ahead 4，merge-base `5d682142`
-> Git 初始快照时间：2026-08-09 20:33:24 +0800；本报告的最终主干对齐与 PR CI 状态仍须在合并 `origin/main` 后复核
+> Wave 5 修复提交：`392c5de5`；合并主干后当前候选：`codex/commercial-readiness-wave1-20260809@da8e9a51`，尚未推送；相对 `origin/main@0e318588` behind 0 / ahead 8，相对 upstream ahead 4 / behind 0
+> Git 快照时间：2026-08-09；PR #570 checks 仍绑定旧远端 head `254c1394`，须以同一新 HEAD 重跑
 > 审查方式：源码、路由、Prisma、workspace、CI、Git/worktree、独立小程序仓库只读核验；未连接或修改生产数据库、服务器、Windows 主机、对象存储或硬件
 > 删除结果：**本轮没有删除代码、模型、迁移、目录或本地资产**
 
@@ -14,7 +14,7 @@
 | 判定层级                         | 结论                   | 原因                                                                                                                                 |
 | -------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 现有 monorepo 结构               | **可继续使用**         | `apps/`、`services/`、`packages/` 职责总体清晰；当前不需要物理迁移                                                                   |
-| Kiosk / Admin / Partner 主体代码 | **代码候选有条件通过** | 既有三端验收覆盖较广，Wave 1/2 又关闭一批真实性与持久化缺陷；但本分支仍未合并、未部署                                                |
+| Kiosk / Admin / Partner 主体代码 | **代码候选有条件通过** | 既有三端验收覆盖较广，Wave 1–5 又关闭一批真实性、持久化与隐私缺陷；但本分支仍未合并、未部署                                          |
 | API 主体能力                     | **有条件通过**         | 核心业务已有真实 Prisma/状态机；材料任务 query token 已在代码候选中 fail-closed，仍存在 8 个注册中的旧占位接口和若干无运行时访问模型 |
 | Terminal Agent / 打印扫描        | **NO-GO**              | Windows 扫描 watcher 当前主动 fail-closed；打印参数、长驻恢复、真实奔图出纸/扫描仍缺现场证据                                         |
 | 微信小程序                       | **NO-GO**              | monorepo 仅完成 M0.1–M0.3；外部跳转、隐私本人数据和 M0.4/M1 未闭环；独立仓库另有未推送高价值提交                                     |
@@ -23,24 +23,25 @@
 
 本轮最重要的判断不是“项目没做完”，而是项目已经形成了相当多真实闭环，但仍混有四类不同状态，必须分开治理：
 
-1. **已经修复但未进入生产**：Wave 1–4 的仓库完整性、入口/打印状态真实性、AI 落库 fail-closed、文件 metadata-first 删除、Agent durable dead-letter、本人待续任务、spooler 不确定结果 fail-closed、打印参数白名单、扫描删除本地审计、材料 token header-only 和高风险 CI 防回退等。
+1. **已经修复但未进入生产**：Wave 1–5 的仓库完整性、入口/打印状态真实性、AI 落库 fail-closed、文件 metadata-first 删除、Agent durable dead-letter、本人待续任务、spooler 不确定结果 fail-closed、打印参数白名单、扫描删除本地审计、材料 token header-only、会话 history 清理、写库 verifier 隔离和高风险 CI 防回退等。
 2. **明确没有开始或只到诚实空态**：小程序 M0.4/M1、Partner 迎新内容/统计、Admin 补贴标签与退款异常处置、Agent dead-letter 人工重放。
 3. **接口已暴露但实现是假成功/空数组**：`/api/v1/kiosk/session|help|notifications|activities|screensaver-content` 共 8 个 handler。
 4. **看似废弃但尚不能删**：旧 Kiosk API 模块、五组无运行时访问 Prisma 模型、空壳 worker、旧分支/worktree、独立小程序仓库。
 
 ### 1.2 本轮确认的最高风险断层
 
-| 优先级           | 断层                                                                    | 当前事实                                                                                                         | 商用影响                                                         |
-| ---------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| P0               | Windows 扫描被安全门禁主动关闭                                          | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts:25-27` 在 Windows 返回 `reparse_point_unverifiable` | 真实扫描不能上线，但这是正确的 fail-closed，不应绕过             |
-| P0               | 代码候选与生产版本未对齐                                                | 合并主干前 HEAD 相对 `origin/main` behind 1 / ahead 4；Wave 1–4 明确“未部署”                                     | 本地修复不能当作线上事实                                         |
-| P0               | 生产公开内容为空                                                        | `docs/progress/current-progress.md` 记录 jobs/fairs/policies 公网为空态，真实来源待接入                          | 求职信息入口无法形成实际业务价值                                 |
-| P0               | Windows/奔图/支付/对象存储缺真实验收                                    | `docs/progress/next-tasks.md:5-9,41-43`                                                                          | 自动化不能证明真实出纸、扫描、扣款和删除                         |
-| P0（扫描恢复前） | `_unclaimed` 删除账本已有代码候选，但还没有上报/归档和 Windows 现场证据 | 本地 SQLite 账本使用 per-install HMAC、删除失败可重试；`pendingReport` 尚无 API/ack                              | 本地追责能力增强，但不能替代集中对账、DB 故障处置和真机验证      |
-| P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`                           | 五个 controller 直接返回常量，service 全为空                                                                     | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象               |
-| P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理                       | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header                 | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换   |
-| P1               | 本轮高风险回归已接入 CI，但尚无最终远程绿灯                             | `4d6705ef` 已接 Agent/API/Kiosk 10 条关键门禁；本地逐条与 YAML/integrity 通过                                    | 合并主干、Node 22 远程执行与 PR 全绿前仍不能视作主干防回退已生效 |
-| P1               | 独立小程序存在 local-only 提交                                          | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                                | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选            |
+| 优先级           | 断层                                                                    | 当前事实                                                                                                         | 商用影响                                                       |
+| ---------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| P0               | Windows 扫描被安全门禁主动关闭                                          | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts:25-27` 在 Windows 返回 `reparse_point_unverifiable` | 真实扫描不能上线，但这是正确的 fail-closed，不应绕过           |
+| P0               | 代码候选与远端/生产版本未对齐                                           | `da8e9a51` 已含修复提交 `392c5de5` 和最新 main，但尚未推送；Wave 1–5 明确“未部署”                                | 本地提交不能当作 PR、main 或线上事实                           |
+| P0               | 生产公开内容为空                                                        | `docs/progress/current-progress.md` 记录 jobs/fairs/policies 公网为空态，真实来源待接入                          | 求职信息入口无法形成实际业务价值                               |
+| P0               | Windows/奔图/支付/对象存储缺真实验收                                    | `docs/progress/next-tasks.md:5-9,41-43`                                                                          | 自动化不能证明真实出纸、扫描、扣款和删除                       |
+| P0（扫描恢复前） | `_unclaimed` 删除账本已有代码候选，但还没有上报/归档和 Windows 现场证据 | 本地 SQLite 账本使用 per-install HMAC、删除失败可重试；`pendingReport` 尚无 API/ack                              | 本地追责能力增强，但不能替代集中对账、DB 故障处置和真机验证    |
+| P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`                           | 五个 controller 直接返回常量，service 全为空                                                                     | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象             |
+| P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理                       | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header                 | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换 |
+| P0               | 新代码候选尚无同 SHA 远程 CI                                            | PR #570 旧 `254c1394` 的 build/PG 两红、browser/MSI 两绿；本地 `da8e9a51` 尚未推送                               | 必须以同一新 HEAD 重跑四项，未全绿不得合入                     |
+| P1（已修）       | Router history 曾保留 payment session token                             | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复            | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验       |
+| P1               | 独立小程序存在 local-only 提交                                          | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                                | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选          |
 
 ## 2. 审查范围与证据口径
 
@@ -70,8 +71,8 @@
 | 端/功能域                    | 当前实现                                                                                              | 后端/外部依赖                           | 状态                  | 主要断层或边界                                                                                |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------- | --------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------- |
 | Kiosk 首页/导航              | 定版入口、API 健康与设备状态 fail-closed                                                              | health、terminal config/capabilities    | 已做，未部署最新 Wave | Wave 1 最新 feature config 与打印状态真实性仍在 PR #570                                       |
-| 会员登录/隐私清场            | 手机/扫码登录、路由级 idle/硬超时、本人资产隔离                                                       | Redis、短信/微信登录、member auth       | 代码已做              | 真实短信、微信、27 寸 Kiosk 与 BFCache/浏览器现场仍待验                                       |
-| 会话恢复                     | `/me/pending-tasks` 只返回本人真实可续任务                                                            | PrintTask/Order/member auth             | Wave 2 已修，未部署   | 仅恢复明确白名单路由；生产版本尚无该修复                                                      |
+| 会员登录/隐私清场            | 手机/扫码登录、路由级 idle/硬超时、本人资产隔离；Wave 5 统一清理 Router history                       | Redis、短信/微信登录、member auth       | 代码候选              | payment token 的 Back/Forward 恢复已修；真实短信、微信、27 寸 Kiosk 与 BFCache 现场仍待验     |
+| 会话恢复                     | `/me/pending-tasks` 只返回本人真实可续任务，退出/切换/重绑导航到固定目的地                            | PrintTask/Order/member auth             | Wave 2/5 已修，未部署 | 仅恢复明确白名单路由；生产版本尚无该修复                                                      |
 | AI 简历解析/诊断/优化/生成   | 真实 API、匿名 token、本人归属、导出/打印候选                                                         | AI provider、OCR、FileObject            | 主体已做              | Wave 2 才让 parse/optimize/generate 落库失败返回 503；真实模型/配额/密钥仍待生产验收          |
 | 模拟面试/TRTC/AI 顾问        | 文字、报告、语音/数字人代码路径存在                                                                   | TRTC、LLM、网络                         | 代码候选              | 真实 TRTC/设备/弱网未验，不能按本地 mock 记商用                                               |
 | 打印上传/预览/报价/支付/进度 | FileObject、报价、Order/PaymentAttempt/PrintTask、Agent claim/status；Wave 3 仅放行黑白/单面/1 页合一 | 支付渠道、对象存储、Windows Agent、奔图 | 代码候选              | 未验证参数已 fail-closed；真机出纸、驱动状态、断电恢复、真实支付/退款仍未验                   |
@@ -119,12 +120,18 @@
 - `_unclaimed` TTL 删除已新增本地 SQLite `scan_deletion_audit` 账本：每个安装生成独立 256-bit HMAC 密钥，账本只保存 keyed digest、原因码、时间、结果、次数、安全错误码和 `pendingReport`，不保存路径、文件名、内容、异常消息或密钥。删除失败保持文件并记 `delete_failed`，重启后复用同一事件重试；审计 DB 不可用或写入失败时，为隐私仍继续 TTL 删除并输出不含 PII 的安全事件标识。
 - 材料任务正式客户端 census 只发现 Kiosk，且已使用 `x-material-task-token`。API 已删除 GET task / PII decision 的 query 声明和 fallback；任何 `accessToken` query 现在 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，响应不回显 token。会员 Bearer 和 header token 行为不变。
 - 主 CI 已接入本轮高风险本地回归：repository integrity；Agent scan input、扫描删除审计、task reliability、print monitor truth；API member pending tasks、AI persistence、file delete、print parameter、material token transport；Kiosk member session、print parameter。新增脚本只使用临时目录/SQLite、loopback 或注入 seam，可在 Linux Node 22 运行，不依赖生产、Windows、外部网络、密钥或真实硬件。
-- 本地 RED→GREEN 与回归结果：扫描删除旧实现无 durable API/状态后新专项全过；materials query 旧实现未拒绝后新专项全过；新增 CI 目标命令逐条全过；repository integrity 报告 2,994 个 tracked 文件无冲突标记、5 份 workflow YAML 有效，显式 `ci.yml` YAML 检查、Prettier 和 `git diff --check` 通过。行为复验所在机器实际 pnpm runtime 为 Node 24，仓库要求的 Node 22 仍以远程 CI 为准。
+- 本地 RED→GREEN 与回归结果：扫描删除旧实现无 durable API/状态后新专项全过；materials query 旧实现未拒绝后新专项全过；新增 CI 目标命令逐条全过；主干合并后 repository integrity 报告 3,091 个 tracked 文件无冲突标记、5 份 workflow YAML 有效，显式 `ci.yml` YAML 检查、Prettier 和 `git diff --check` 通过。行为复验所在机器实际 pnpm runtime 为 Node 24，仓库要求的 Node 22 仍以远程 CI 为准。
 - 有意不纳入 Linux 主 CI：live COS/OCR/LLM/支付、Windows service/installer/WMI/SMB/reparse point、真实 spooler/奔图出纸和微信开发者工具；这些依赖密钥、网络、操作系统或硬件，必须保留为部署/现场门禁，不能用 mock 绿灯替代。
 
-### 4.5 仍需注意
+### 4.5 Wave 5
 
-以上修改位于 Draft PR #570。合并主干前实现快照为 `4d6705ef`，尚未推送到 upstream，且相对 `origin/main@78c8e71d` behind 1 / ahead 4；PR 因主干前进处于 DIRTY，不能沿用旧远程结果作最终结论。远程基线 `83588b8f` 的 `build-and-verify`、`postgres-readiness`、`unsigned-msi-candidate` 曾成功，`kiosk-browser-smoke` 的 W6 `/session-resume` 旧 marker 漂移已在后续代码本地修复为 104/104。仍必须合并主干、推送并重新取得最终远程 CI；即使之后全绿，也只代表候选可继续评审，不代表已经 merge 到 main、deploy 或完成 Windows/COS 现场验证。
+- Kiosk `/session-resume` 曾把 `paymentSessionToken` 放进 Router history；Profile/MySettings 的手动退出、切换账号和重新绑定现统一调用 `KioskPrivacyGuard.clearSessionTo` 并导航到固定目的地。RED 复现 Back 可恢复 token，GREEN 证明 Back/Forward 均不能恢复。Node 22 机械重放同逻辑的 focused browser 1/1、full privacy 19/19 通过；当前工作树 focused 1/1、typecheck、build、static 通过。
+- 会写行的四条 verifier 在 Prisma 初始化前统一要求显式 `VERIFICATION_DATABASE_TARGET=isolated`；production、远程 PostgreSQL、非测试数据库或无 marker 一律 fail-closed。payment-flow、verify-order、device-status 的旧打印断言同步为已验证的 `black_white + simplex + 1-up` 与 80 分。Agent 四套隔离 SQLite 全绿；父任务 Node 22 在本机建全新临时库时遇到 Prisma schema engine generic error，未进入断言，故远程 CI 复验仍是硬门禁。
+- Codex Security diff discovery 已覆盖 52/52 changed files、提出 6 个候选；唯一 reportable Low 是上述 history token 残留，已经 RED→GREEN 修复。外置封存器因 `target.snapshotDigest` 缺失拒绝完成，不能把 discovery/validation 证据描述成 sealed final report。
+
+### 4.6 仍需注意
+
+PR #570 远端 head 仍为 `254c1394`，其旧四项 checks 已结束为 `build-and-verify` **FAILURE**、`postgres-readiness` **FAILURE**、`kiosk-browser-smoke` **SUCCESS**、`unsigned-msi-candidate` **SUCCESS**。两项红灯分别是设备状态静态合同与 `/me/print-orders` 旧彩色 200 分 fixture 漂移；修复提交 `392c5de5` 已改为真实设备合同和黑白 80 分。合并最新 main 后当前候选为 `da8e9a51`，相对 main behind 0 / ahead 8、相对 upstream ahead 4 / behind 0，但尚未推送。合并后 Node 22 的 QR UI、deploy authorization、ours static/typecheck、Kiosk production build 与 production config 全绿；缺少必需 env 时 production verifier 的一次失败是预期 fail-closed，不是产品失败。仍须让四项 checks 全部绑定同一新 HEAD 并全绿；任何本地专项结果都不能替代远程复验。
 
 ## 5. 已确认的接口断层与缺陷
 
@@ -207,13 +214,14 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 | PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                              |
 | ------------------------------------------------ | ---------------------------------: | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| #570 `codex/commercial-readiness-wave1-20260809` |                              0 / 2 | **可迁入，当前首要候选** | CI/复审/Windows与COS边界确认后合并；不得直接部署当前脏工作树                                                      |
-| #569 `feat/kiosk-home-v3-pilot`                  |                              4 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
-| #568 `wip/kiosk-design-snapshot-20260809`        |                             0 / 18 | **需保留设计资产**       | 对应主 worktree 有大量未提交设计/后端存储改动，禁止清理或直接合并                                                 |
-| #566 `feat/pii-redaction-text-layer`             |                              5 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
-| #565 `feat/kiosk-pii-redaction-contract`         |                              5 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
-| #548 `codex/print-first-order-evidence-20260807` |                             19 / 1 | **可选择性迁入**         | 只提取仍真实的硬件证据/文档提交，先对照当前 Agent/生产事实；不复活落后分支继续开发                                |
-| #117 `feature/job-master`                        |                          1187 / 23 | **无法判断，默认冻结**   | 分叉过深；先做 23 个独有提交的需求覆盖矩阵。已被 main 覆盖的放弃，仍有独特价值的重做/选择性提取，禁止整分支 merge |
+| #570 `codex/commercial-readiness-wave1-20260809` |                              0 / 8 | **可迁入，当前首要候选** | 本地 `da8e9a51` 已合并最新 main 但未推送；新 HEAD 四项 CI、复审与 Windows/COS 边界确认后再合并，不得直接部署      |
+| #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
+| #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
+| #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
+| #548 `codex/print-first-order-evidence-20260807` |                             20 / 1 | **可选择性迁入**         | 只提取仍真实的硬件证据/文档提交，先对照当前 Agent/生产事实；不复活落后分支继续开发                                |
+| #117 `feature/job-master`                        |                          1188 / 23 | **无法判断，默认冻结**   | 分叉过深；先做 23 个独有提交的需求覆盖矩阵。已被 main 覆盖的放弃，仍有独特价值的重做/选择性提取，禁止整分支 merge |
+
+PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktree 仍有 56 个未提交文件，这部分本地资产没有随 PR 合并而自动获得保护性迁移结论，仍禁止清理。
 
 ### 7.2 独立小程序仓库
 
@@ -230,47 +238,48 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 ### 7.3 本地 worktree 受保护资产
 
-合并主干前快照共有 28 个 worktree。除本审查 worktree 外，至少 5 个 worktree 有未提交资产：
+最新快照共有 28 个 worktree，其中 6 个存在未提交资产；本审查 worktree 的 3 项均为本轮正式文档更新，不是未迁移产品代码：
 
-| 路径/分支                                                                  | 状态数量 | 判定                                                             |
-| -------------------------------------------------------------------------- | -------: | ---------------------------------------------------------------- |
-| `.claude/worktrees/project-pages-features-audit-7bfeb0`                    |       54 | Miniapp 原型截图/CSS 设计资产，受保护                            |
-| `/Users/wanglei/AI求职打印服务终端` / `wip/kiosk-design-snapshot-20260809` |       41 | 设计文档 + BOS/storage/schema/API 组合候选，受保护且不可混合清理 |
-| `/Users/wanglei/AI求职打印服务终端-backend-p0`                             |       30 | Backend/三端导入与机构候选，需单独迁移审查                       |
-| `/Users/wanglei/AI求职打印服务终端-miniapp-native`                         |        6 | `apps/miniapp` 早期迁移候选，需与已合入 M0.1–M0.3 判重           |
-| `.claude/worktrees/restore-history-conversations-99016d`                   |        1 | 工具配置改动，归属不明，需 owner 判断                            |
+| 路径/分支                                                                  | 状态数量 | 判定                                                   |
+| -------------------------------------------------------------------------- | -------: | ------------------------------------------------------ |
+| `/Users/wanglei/AI求职打印服务终端` / `wip/kiosk-design-snapshot-20260809` |       58 | 设计/后端组合资产；受保护且不可混合清理                |
+| `.claude/worktrees/project-pages-features-audit-7bfeb0`                    |       54 | Miniapp 原型截图/CSS 设计资产，受保护                  |
+| 临时 worktree `design/v3-entry-remodel`                                    |       20 | V3 入口重塑候选，须由设计 owner 判定与迁移             |
+| `/Users/wanglei/AI求职打印服务终端-miniapp-native`                         |        6 | `apps/miniapp` 早期迁移候选，需与已合入 M0.1–M0.3 判重 |
+| 本审查 worktree `codex/commercial-readiness-wave1-20260809`                |        3 | 仅三份正式 docs；完成本轮后交由父任务提交/合并         |
+| `.claude/worktrees/restore-history-conversations-99016d`                   |        1 | 工具配置改动，归属不明，需 owner 判断                  |
 
-这些 worktree 不能按“分支 tip 已被 main 覆盖”直接删：未提交内容本身就是候选资产。其余 20 个 clean worktree 也不能批量删除；仍须逐个验证 unique commits、开放 PR、祖先关系、路径所有者和最近使用时间。
+这些 worktree 不能按“分支 tip 已被 main 覆盖”直接删：未提交内容本身就是候选资产。其余 22 个 clean worktree 也不能批量删除；仍须逐个验证 unique commits、开放 PR、祖先关系、路径所有者和最近使用时间。
 
 ## 8. Local ↔ Git/远程一致性精确快照
 
 ### 8.1 当前审查分支
 
-| 项                    | 值                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------- |
-| branch                | `codex/commercial-readiness-wave1-20260809`                                                       |
-| HEAD                  | `4d6705efe3bf0d5167b017b3bf56cf6016e5f4be`                                                        |
-| upstream              | `origin/codex/commercial-readiness-wave1-20260809@fbc762dd`                                       |
-| upstream ahead/behind | local ahead 1 / behind 0                                                                          |
-| `origin/main`         | `78c8e71df9d09957cae3e14143635c98062fe8ef`                                                        |
-| `origin/main...HEAD`  | behind 1 / ahead 4，merge-base `5d6821429ea77a7e6963297c40dbcb6141e88a01`                         |
-| local `main`          | `73fd04a1`，相对 `origin/main` behind 5 / ahead 0                                                 |
-| PR                    | Draft #570，OPEN；主干前进后 DIRTY；当前本地 Wave 4 commit 尚未推送，最终 checks 待主干对齐后重跑 |
+| 项                    | 值                                                                                  |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| branch                | `codex/commercial-readiness-wave1-20260809`                                         |
+| HEAD                  | `da8e9a51`（包含 Wave 5 修复提交 `392c5de5`）                                       |
+| upstream              | `origin/codex/commercial-readiness-wave1-20260809@254c1394`                         |
+| upstream ahead/behind | ahead 4 / behind 0；当前合并候选尚未推送                                            |
+| `origin/main`         | `0e318588bcb384cfd7f8375b42ffd136231a7726`                                          |
+| `origin/main...HEAD`  | behind 0 / ahead 8；已合并 `origin/main@0e318588`                                   |
+| local `main`          | `73fd04a1`，相对 `origin/main` behind 7 / ahead 0                                   |
+| PR                    | Draft #570 远端 head `254c1394`；旧 checks 为 build/PG FAILURE、browser/MSI SUCCESS |
 
-审查开始时该 worktree clean。Wave 1–4 产品/回归代码已收成至上述 HEAD；当前只剩本报告与两个正式 progress 文档未提交。这是**合并主干前快照**，不是最终远程一致性结论；必须在合并 `origin/main`、解决 progress 文档冲突、推送并触发 CI 后再读一次 HEAD/upstream/merge-base/checks。
+Wave 1–5 产品/回归代码已收成至本地 HEAD，且已合并最新 `origin/main`；当前候选仍未推送，工作树只留下本次三份正式 docs，不是未迁移产品代码。分支能力在推送、同 SHA CI、审查并合入 main 前不得视为主干或生产事实。
 
 ### 8.2 分支与 refs
 
-| 指标                                | 数量 | 解释                                                                                                                             |
-| ----------------------------------- | ---: | -------------------------------------------------------------------------------------------------------------------------------- |
-| local branches                      |  583 | 合并主干前本地复核；228 已是 `origin/main` 祖先，其余不能按数量直接删除                                                          |
-| true remote heads (`git ls-remote`) |  322 | 真实 GitHub heads，不等同本地 tracking refs                                                                                      |
-| local `refs/remotes/origin/*`       |  327 | 含 322 个真实 heads、4 个 stale tracking-only refs 和 `origin/HEAD` 符号引用                                                     |
-| stale tracking-only                 |    4 | `chore/deploy-backup-retention`、`docs/pii-redaction-decision`、`feat/print-task-file-id`、`fix/fair-company-fake-print-buttons` |
-| worktrees                           |   28 | 不能直接 prune/remove                                                                                                            |
-| open PRs                            |    7 | 见第 7.1 节                                                                                                                      |
+| 指标                                | 数量 | 解释                                                                         |
+| ----------------------------------- | ---: | ---------------------------------------------------------------------------- |
+| local branches                      |  584 | 不能按 merged/no-merged 数量直接删除                                         |
+| true remote heads (`git ls-remote`) |  322 | 真实 GitHub heads，不等同本地 tracking refs                                  |
+| local `refs/remotes/origin/*`       |  329 | 含 322 个真实 heads、6 个 stale tracking-only refs 和 `origin/HEAD` 符号引用 |
+| stale tracking-only                 |    6 | 只表示远程已无同名 head；未授权前不 prune                                    |
+| worktrees                           |   28 | 不能直接 prune/remove                                                        |
+| open PRs                            |    6 | 见第 7.1 节                                                                  |
 
-“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。583 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、未提交资产、堆叠基础分支和 local-only commits。真实 remote heads、tracking-only 差集与开放 PR 数在最终推送后还要重新查询，不能把本地 refs 当远程事实。
+“stale tracking-only”只表示远程已无同名 head；未授权前仍不执行 `git remote prune`。584 个本地分支也不能按 merged/no-merged 数量批量清理：有活跃 worktree、未提交资产、堆叠基础分支和 local-only commits。脏 worktree 中仍有大量未提交资产，正好证明 stale ref 或分支 tip 祖先关系不能作为删除授权。
 
 ### 8.3 可重建差异与真实功能差异
 
@@ -293,7 +302,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 ### 9.2 本轮已补覆盖与剩余缺口
 
-从合并主干前 HEAD 静态提取所有 workspace `package.json` 得到 301 个 `verify:*`/`verify-*` 脚本，其中 76 个脚本名未直接出现在 `ci.yml`。这不等于 76 个都未覆盖或都应无条件进主 CI：聚合脚本可能间接调用；live provider、真实 COS/OCR、人工 acceptance 应保留为受控门禁。本轮已经把 AI/file/print/material token、Agent scan/reliability/monitor、Kiosk member/print 等高风险纯本地回归接入；仍需单独归类的代表项如下：
+从最终 HEAD 静态提取所有 workspace `package.json` 得到 301 个 `verify:*`/`verify-*` 脚本，其中 76 个脚本名未直接出现在 `ci.yml`。这不等于 76 个都未覆盖或都应无条件进主 CI：聚合脚本可能间接调用；live provider、真实 COS/OCR、人工 acceptance 应保留为受控门禁。本轮已经把 AI/file/print/material token、Agent scan/reliability/monitor、Kiosk member/print 等高风险纯本地回归接入；仍需单独归类的代表项如下：
 
 | 建议优先级 | 脚本                                                            | 原因                                                       |
 | ---------- | --------------------------------------------------------------- | ---------------------------------------------------------- |
@@ -314,6 +323,16 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 ### 9.4 部署与运行版本
 
 仓库最后一次明确记录的同提交生产发布是 `main@389f37ff`（`current-progress.md` 2026-08-07 条目）。2026-08-08 未授权 Deploy run 已被取消，记录称未进入 API/Nginx 替换，但服务器源码工作目录曾被 checkout/build；因此下一次发布前必须重新只读核对：服务器源码 HEAD/dirty、`DEPLOY_SOURCE`、PM2 commit/restart、四端 bundle、migration、备份空间和授权变量。不能从本报告推断 2026-08-09 线上仍精确等于 `389f37ff`。
+
+### 9.5 最终商用验收矩阵
+
+| 证据层级            | 已有事实                                                                                 | 放行前仍需                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 代码可证明          | Wave 1–5 专项、会话 token RED→GREEN、写库 verifier fail-closed、52/52 Security discovery | 保持同 SHA 回归；外置封存器缺 snapshotDigest，不得声称 sealed final report              |
+| 远程 CI             | 旧 `254c1394` 为 build/PG 两红、browser/MSI 两绿；`da8e9a51` 已含 `392c5de5` 修复        | 推送同一新 HEAD，在 Node 22/PostgreSQL 16 上重跑四项并全部通过                          |
+| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                              | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA       |
+| Windows/Pantum 真机 | Agent/打印/扫描具备代码和 Linux/SQLite 回归                                              | 两台 Windows、SMB/reparse/ACL/杀毒/重启、spooler、真实出纸；厂家确认彩色/双面/N-up 参数 |
+| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                     | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限     |
 
 ## 10. 目录、数据、fixture 与文档渐进优化
 
@@ -337,6 +356,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 - 当前 fixture 分散在 `apps/kiosk/tests/fixtures`、`tests/visual/fixtures`、页面 `__fixtures__`、API 大量 `scripts/verify-*` 内嵌 fake。短期不搬目录，先为每个 fixture 加用途、是否写 DB、是否需要 Redis/PG、清理责任、是否允许 PII 的元数据注释/索引。
 - CI 中复制 `prisma/dev.db` 的旧模式已经造成过假失败；所有新 verifier 使用 `mktemp` + fresh schema/seed，禁止依赖开发库当前状态。
+- 所有会写行的 verifier 必须显式声明 `VERIFICATION_DATABASE_TARGET=isolated`，并在创建 Prisma client 前拒绝 production、远程 PostgreSQL、非测试库和缺 marker；本地 Node 22 新临时库 schema engine generic error 尚未闭合，保留远程 CI 复验。
 - 当前没有 tracked `.db/.sqlite/.dump`，保持这一点；真实验收样本只存脱敏摘要/hash/ID，不把用户简历或扫描件提交 Git。
 - `services/api/data`、storage、Agent `data/*.db`、`.env*` 保持 ignored；需要生产取证时只记录受控路径、hash、时间和恢复说明，不复制敏感文件进仓库。
 
@@ -350,7 +370,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 ### P0：发布前必须完成
 
-1. **冻结唯一发布候选**：PR #570 最终 CI 全绿、人工审查、合入 main；从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
+1. **冻结唯一发布候选**：推送已含 `392c5de5` 和最新 main 的候选 `da8e9a51`；PR #570 的四项 CI 必须全部绑定同一新 SHA、全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
 2. **生产只读对齐**：核对服务器源码、runtime、PM2、四端 bundle、migration、授权变量、备份/磁盘；确认后再申请具名发布窗口。
 3. **Windows/奔图验收**：两台主机覆盖安装升级、service 强杀、断网/断电、spooler/打印机重启、重复领取、终态补报、真实出纸；确认彩色 mode/pages-per-sheet，未知项必须拒绝或隐藏。
 4. **扫描恢复门禁**：实现可信 Win32/PowerShell reparse-point 检查，覆盖 symlink/junction/reparse/写入替换/长驻 watcher；验证 Wave 4A 本地删除账本在 Windows/SMB/ACL/杀毒占用/重启下的行为，并补集中上报/ack/归档后再开放扫描。
@@ -396,21 +416,23 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 ## 13. 复核命令与结果摘要
 
-| 命令/检查                                              | 结果                                                       |
-| ------------------------------------------------------ | ---------------------------------------------------------- |
-| `git status --porcelain=v2 --branch`（开始时）         | worktree clean；初始 HEAD/upstream 一致                    |
-| `git rev-list --left-right --count @{upstream}...HEAD` | 合并主干前 `0 1`（local ahead 1）                          |
-| `git rev-list --left-right --count origin/main...HEAD` | 合并主干前 `1 4`，merge-base `5d682142`                    |
-| `git worktree list --porcelain`                        | 合并主干前 28 个 worktree                                  |
-| `git for-each-ref refs/heads`                          | 合并主干前 583 个 local branches                           |
-| `git ls-remote --heads origin`                         | 322 个真实 remote heads                                    |
-| remote tracking 与 ls-remote 差集                      | 4 个 stale tracking-only；未 prune                         |
-| 独立 miniapp `git status`/`rev-list`                   | clean，local-only ahead 1，未推送                          |
-| worker route/import/docs/workspace 搜索                | tracked 占位且有正式文档引用；不删除                       |
-| 旧 Kiosk module/controller/import 搜索                 | 5 module 注册、8 handler 可达；不删除                      |
-| Prisma delegate 搜索                                   | 五组旧 model 0 个运行时访问命中；未做生产 census，不删除   |
-| tracked DB/dump 搜索                                   | 0；本地 dev DB/storage 由 ignore 管理                      |
-| tracked 大文件/hash/引用搜索                           | 两份 1.66 MB hero PNG hash 相同但消费者不同；不删除        |
-| Wave 4 Agent/API/Kiosk 目标 verifier                   | 逐条本地通过；无生产、网络、密钥、Windows 或硬件依赖       |
-| repository integrity / 显式 YAML / Prettier            | 2,994 tracked marker-free；5 workflow valid；`ci.yml` 通过 |
-| `git diff --check` / 文档格式                          | 合并主干前通过；最终冲突解决后须复跑                       |
+| 命令/检查                                              | 结果                                                                      |
+| ------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `git status --porcelain=v2 --branch`                   | 仅三份正式 docs modified；无未提交产品代码                                |
+| `git rev-list --left-right --count @{upstream}...HEAD` | upstream behind 0 / local ahead 4                                         |
+| `git rev-list --left-right --count origin/main...HEAD` | local behind 0 / ahead 8；已合并 `origin/main@0e318588`                   |
+| `git worktree list --porcelain`                        | 28 个 worktree                                                            |
+| `git for-each-ref refs/heads`                          | 584 个 local branches；未做批量删除                                       |
+| `git ls-remote --heads origin`                         | 322 个真实 remote heads                                                   |
+| remote tracking 与 ls-remote 差集                      | 329 tracking refs（含 `origin/HEAD`），6 个 stale tracking-only；未 prune |
+| 独立 miniapp `git status`/`rev-list`                   | clean，local-only ahead 1，未推送                                         |
+| worker route/import/docs/workspace 搜索                | tracked 占位且有正式文档引用；不删除                                      |
+| 旧 Kiosk module/controller/import 搜索                 | 5 module 注册、8 handler 可达；不删除                                     |
+| Prisma delegate 搜索                                   | 五组旧 model 0 个运行时访问命中；未做生产 census，不删除                  |
+| tracked DB/dump 搜索                                   | 0；本地 dev DB/storage 由 ignore 管理                                     |
+| tracked 大文件/hash/引用搜索                           | 两份 1.66 MB hero PNG hash 相同但消费者不同；不删除                       |
+| Wave 4/5 Agent/API/Kiosk 目标 verifier                 | 本地目标回归通过；Node 22 fresh DB schema engine 边界保留                 |
+| Security diff discovery / sealer                       | 52/52、6 candidates、唯一 Low 已修；缺 snapshotDigest，未 sealed          |
+| PR #570 `gh pr view` / job logs                        | 旧 `254c1394`：build/PG FAILURE，browser/MSI SUCCESS；新 HEAD 未推送      |
+| repository integrity / 显式 YAML / Prettier            | 3,091 tracked marker-free；5 workflow valid；`ci.yml` 通过                |
+| `git diff --check` / 文档格式                          | 主干冲突解决后已通过；最终三文档小修再次复跑                              |
