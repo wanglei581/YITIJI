@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=6">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -94,8 +94,34 @@
         <div class="steps4">
           <div class="st4"><b>01</b><span>取下订书钉与回形针，避免卡纸</span></div>
           <div class="st4"><b>02</b><span>多页正面朝上放进送稿器，对齐导轨</span></div>
-          <div class="st4"><b>03</b><span>证件掀盖放玻璃板<b>左上角</b>，压平</span></div>
-          <div class="st4"><b>04</b><span>按机器面板上的「开始扫描」实体键</span></div>
+          <div class="st4"><b>03</b><span>证件掀盖放玻璃板<b>左上角</b>并压平</span></div>
+          <div class="st4"><b>04</b><span>面板选<b>「扫描到 PC」</b>再按实体键</span></div>
+        </div>
+
+        <!-- 真机坑：奔图面板上「开始扫描」之前要先选目标。
+             选了「扫描到 U 盘」或「扫描到邮箱」，纸走完了但本机一张也收不到，
+             用户会以为机器坏了。这一条必须写在指引里，不能藏在帮助页。 -->
+        <div class="notice notice--amber" style="margin-top:var(--s-4)">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>面板上按「开始扫描」之前，先把目标选成「扫描到 PC」。</b>
+            如果选成<b>扫描到 U 盘 / 邮箱 / FTP</b>，纸会照走完，但文件进的是那个目标，
+            <b>本机一张也收不到</b>，这一屏会一直停在等待。<br>
+            已经扫错目标了：纸不用重放，回面板改目标再按一次「开始扫描」就行 ——
+            本机按<b>本次扫描任务号</b>接收，重扫会覆盖上一次，不会两份混在一起。</span>
+        </div>
+
+        <!-- 三方职责：谁能做什么、谁不能做什么。
+             不写清楚，用户会在屏幕上找"开始扫描"按钮找到放弃。 -->
+        <div class="notice" style="margin-top:10px">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span><b>这一步谁做什么：</b><br>
+            · <b>你</b>：放好原件、在面板上选「扫描到 PC」、按下实体键。<br>
+            · <b>打印机面板</b>：走纸、成像、按任务号把文件送到本机接收目录。
+              走纸只能由面板上的实体键启动。<br>
+            · <b>本屏</b>：只负责<b>接收和显示</b>结果，<b>不能替你启动走纸</b> ——
+              这是硬件安全设计，防止没人在机器旁时被远程启动。<br>
+            · <b>接收目录</b>由运维在终端上配好，你不需要知道路径；本机收到文件会自己认领，
+              认领后原始文件从接收目录移走，<b>不会留在公共目录里被下一位看到</b>。</span>
         </div>
       </div>
 
@@ -280,7 +306,7 @@
       <div class="pane pane--fill" data-at="s4">
         <div class="pane-hd"><span class="t">接下来放到哪</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="default first">
-          <b>建议先送 AI 简历诊断</b>。<br>
+          <b>建议先送 AI 简历诊断</b> <span class="ev ev--e3">E3 这条建议属 AI 判断</span>。<br>
           <span style="color:var(--fog-600)">依据：本机识别到「求职意向 / 工作经历」等简历字段 <span class="ev ev--e1">E1 你的材料</span>；第 3 页会自动排除。</span>
         </p>
         <p style="margin:0 0 14px;font-size:var(--fz-2);color:var(--fog-700);line-height:1.6" data-when="ai-down">
@@ -339,10 +365,10 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=16"></script>
-<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
-<script src="scripts/audit-plus.js?v=12"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

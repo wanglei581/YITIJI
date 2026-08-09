@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P04 系统态 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P04 系统态">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P04 系统态 ─────────────────────────────────────────────────────────
+   一页五形态：帮助 / 法务 / 会话超时 / 断网异常 / 会话恢复。
+   共同点是它们都在**用户没打算来这里的时候**出现 ——
+   要么他卡住了，要么系统出事了。所以五形态共用一条纪律：
+
+     **先说现在能做什么，再说发生了什么。**
+
+   出事时用户要的是出路，不是解释。把原因写在前面、把出路埋在下面，
+   是站在系统视角写文案，不是站在人的视角。
+
+   ── 各形态的具体判断 ────────────────────────────────────────────
+   · 帮助 —— 不堆 FAQ。一体机现场的真实求助路径只有三条：
+     自己看提示、找现场工作人员、打电话。FAQ 二十条不如这三条写清楚。
+   · 法务 —— 不做"点同意才能用"的墙。本机的功能不该以放弃知情权为前提。
+     全文可读、可打印带走，且用一屏说清最要紧的五件事。
+   · 会话超时 —— 倒计时**不能只是催**。要同时告诉他"点一下就能续"、
+     以及"到点会清掉什么"，让他判断值不值得续。
+   · 断网 —— 逐项列出还能用什么。断网时打印扫描本来就不受影响，
+     不说清会让人以为整台机器废了。
+   · 会话恢复 —— 恢复是好意，但**必须先问**。
+     公共机器上，上一个人的东西不该直接出现在下一个人眼前。
+
+   ── 结构 ────────────────────────────────────────────────────────
+   本页用标准两栏骨架，audit-plus 五项全部适用。
+   ──────────────────────────────────────────────────────────────── */
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-4); padding-bottom:var(--s-6); }
+
+/* 大状态头：出事时第一眼看到的东西 */
+.bighead { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.bh-ic { width:66px; height:66px; border-radius:var(--r-md); display:grid; place-items:center; }
+.bh-ic .ic { width:32px; height:32px; }
+.bh--warn .bh-ic { background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.bh--warn .bh-ic .ic { color:var(--amber-400); }
+.bh--calm .bh-ic { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.bh--calm .bh-ic .ic { color:var(--jade-400); }
+.bh-t { font-size:38px; font-weight:800; color:var(--fog-900); line-height:1.18; }
+.bh-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.62; max-width:32em; }
+.bh-p b { color:var(--fog-900); }
+
+/* 求助路径：三条，每条给可执行动作 */
+.helps { display:flex; flex-direction:column; gap:var(--s-3); }
+.help { display:flex; align-items:flex-start; gap:var(--s-5); padding:var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); }
+.help-no { width:38px; height:38px; border-radius:50%; flex:0 0 auto; display:grid;
+  place-items:center; background:var(--jade-a20); color:var(--jade-200);
+  font-size:var(--fz-4); font-weight:800; font-family:var(--ff-num); }
+.help-b { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.help-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.help-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+.help-s b { color:var(--fog-900); }
+
+/* 法务：五条最要紧的，先于全文 */
+.legal { display:flex; flex-direction:column; gap:var(--s-3); }
+.lg { display:grid; grid-template-columns:26px 1fr; gap:var(--s-4); align-items:start;
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-xs);
+  background:var(--surf-1); border:1px solid var(--brd-1); }
+.lg i { width:9px; height:9px; border-radius:50%; background:var(--jade-500);
+  margin-top:9px; display:block; }
+.lg-t { font-size:var(--fz-3); color:var(--fog-800); line-height:1.6; }
+.lg-t b { color:var(--fog-900); }
+
+/* 倒计时 */
+.tick { display:flex; align-items:center; gap:var(--s-5); padding:var(--s-6) var(--s-5);
+  border-radius:var(--r-md); background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.tick-n { font-size:76px; font-weight:800; font-family:var(--ff-num); color:var(--fog-900);
+  line-height:1; font-variant-numeric:tabular-nums; }
+.tick-b { min-width:0; display:flex; flex-direction:column; gap:4px; }
+.tick-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+.tick-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+/* 还能用 / 用不了 两栏 */
+.split { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.sp { padding:var(--s-5); border-radius:var(--r-md); display:flex; flex-direction:column; gap:var(--s-3); }
+.sp--ok { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.sp--no { background:var(--fog-a04); border:1px dashed var(--fog-a20); }
+.sp-hd { display:flex; align-items:center; gap:var(--s-3); }
+.sp-hd .ic { width:19px; height:19px; flex:0 0 auto; }
+.sp--ok .sp-hd .ic { color:var(--jade-400); }
+.sp-t { font-size:var(--fz-4); font-weight:700; color:var(--fog-900); }
+.sp-i { display:grid; grid-template-columns:13px 1fr; gap:var(--s-3); align-items:start;
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.sp-i i { width:6px; height:6px; border-radius:50%; margin-top:7px; flex:0 0 auto;
+  background:var(--fog-a20); display:block; }
+.sp--ok .sp-i i { background:var(--jade-500); }
+.sp-i b { color:var(--fog-900); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s3" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">职易达</div>
+        <div class="brand-sub">01 号机 · 市人力资源市场 A 馆</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-at="s1 s2 s3 s5"><span class="dot dot--live"></span>设备正常</div>
+    <div class="devpill" data-at="s4"><span class="dot dot--down"></span>网络中断 · 已自动重连中</div>
+    <div class="clock" data-clock>2026年8月9日 <b>17:52</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">帮助</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">法务</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">会话超时</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">断网</span></button>
+      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">会话恢复</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>五种系统态</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 帮助 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-help"/></svg></span>
+          <span class="bh-t">卡住了？这里只有三条路</span>
+          <span class="bh-p">
+            现场求助的真实路径就这三条。<b>不列二十条 FAQ</b> ——
+            你现在卡着，没心思翻目录。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="sec">
+          <div class="helps">
+            <div class="help">
+              <span class="help-no">1</span>
+              <span class="help-b">
+                <span class="help-t">按当前这一页上的提示走</span>
+                <span class="help-s">
+                  每一页底部那条横杠上，<b>右边永远是"下一步该点的"</b>，
+                  左边是退路。<br>
+                  不确定点哪个，就点右边那个大的 —— <b>本机没有点了会扣钱或删东西的按钮</b>，
+                  收费动作一律会先问你一次。
+                </span>
+              </span>
+            </div>
+
+            <div class="help">
+              <span class="help-no">2</span>
+              <span class="help-b">
+                <span class="help-t">找现场工作人员</span>
+                <span class="help-s">
+                  A 馆<b>服务台在正门左手第一个窗口</b>，工作日 09:00–17:00 有人。<br>
+                  卡纸、机器没反应、打印出来是白纸这类，<b>找人比在这儿点快</b>。
+                </span>
+              </span>
+            </div>
+
+            <div class="help">
+              <span class="help-no">3</span>
+              <span class="help-b">
+                <span class="help-t">打电话</span>
+                <span class="help-s">
+                  服务台没人、或者不在工作时间，打<b>机器背面贴的运维电话</b>。<br>
+                  电话号码<b>不显示在屏幕上</b> —— 屏幕上的号码可能被人改过，
+                  贴在机器上的那张更可信。
+                </span>
+              </span>
+            </div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>任何人以本机名义向你收钱，都是骗子。</b>
+                  本机只在打印时收纸张钱，且金额显示在屏幕上、可在打印订单里核对。<br>
+                  没有会员费、没有加急费、没有"帮你办"的服务费。</span>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>纸卡在里面<b>不要自己拆机器</b> —— 找工作人员。
+                  已经付过钱但没出纸的部分会自动退，不用你申请。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 法务 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <span class="bh-t">先给你五条，全文在下面</span>
+          <span class="bh-p">
+            <b>本机不做"点同意才能用"的墙。</b>
+            功能不该以你放弃知情权为前提 —— 你可以先用，也可以先读，
+            全文能打印带走。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="sec">
+          <div class="legal">
+            <div class="lg"><i></i><span class="lg-t">
+              <b>本机不是招聘平台。</b>岗位与招聘会只做第三方或官方来源的信息展示，
+              <b>不代收简历、不代为投递、不向企业推荐你</b>。
+            </span></div>
+            <div class="lg"><i></i><span class="lg-t">
+              <b>不登录也能用全部功能。</b>登录只决定文件存不存得下来，
+              不解锁任何额外能力，也不收费。
+            </span></div>
+            <div class="lg"><i></i><span class="lg-t">
+              <b>文件有保留期：</b>简历与生成的文档 90 天，证件类扫描件 7 天，
+              面试作答内容从不保存。到期自动删除，<b>删除会留日志</b>。
+            </span></div>
+            <div class="lg"><i></i><span class="lg-t">
+              <b>管理员看不到你的文件内容</b>，只看得到打印流水与设备日志。
+              因故障需要打开文件时<b>每次都留访问日志，日志删不掉</b>。
+            </span></div>
+            <div class="lg"><i></i><span class="lg-t">
+              <b>AI 生成的内容可能出错</b>，且不预测录用结果、不承诺薪资。
+              涉及钱和资格的事，一律以经办机构认定为准。
+            </span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span>《服务条款》与《隐私政策》全文共 6 页，<b>可以打印带走</b>（A4 黑白 1.20 元），
+                  也可以扫码存进手机<b>不收费</b>。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            上面五条是从全文里挑出的、<b>对你影响最大的五条</b>，不是全文的替代。
+            两者不一致时以全文为准 —— 但本机会尽力保证不出现不一致。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 会话超时 ─────────── -->
+      <div class="pane" data-at="s3">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-clock"/></svg></span>
+          <span class="bh-t">还在吗？</span>
+          <span class="bh-p">
+            你有 <b>4 分钟</b>没动屏幕了。这台机器在公共场所，
+            <b>无人操作会自动清空</b>，免得下一个人看到你的东西。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="sec">
+          <div class="tick">
+            <span class="tick-n">58</span>
+            <span class="tick-b">
+              <span class="tick-t">秒后自动清空并回到待机</span>
+              <span class="tick-s">碰一下屏幕就能继续，不用重新开始</span>
+            </span>
+          </div>
+
+          <div class="split" style="margin-top:var(--s-5)">
+            <div class="sp sp--ok">
+              <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">已经带走的</span></div>
+              <div class="sp-i"><i></i><span>你已打印的 <b>13 页纸</b> —— 在你手上，不受影响</span></div>
+              <div class="sp-i"><i></i><span>已付款的记录 —— 在打印订单里能查到</span></div>
+            </div>
+            <div class="sp sp--no">
+              <div class="sp-hd"><svg class="ic"><use href="#i-trash"/></svg><span class="sp-t">清空会没掉的</span></div>
+              <div class="sp-i"><i></i><span>刚上传的<b>简历原件和诊断结果</b></span></div>
+              <div class="sp-i"><i></i><span>面试练习答的内容、还没打印的复盘单</span></div>
+              <div class="sp-i"><i></i><span>没打印的作战单、办事清单</span></div>
+            </div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>右边那些<b>要打印或登录才留得下来</b>。
+                  如果还想要，现在碰一下屏幕，先把它们打出来。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            倒计时不是催你走 —— <b>是替你把东西收好</b>。
+            这台机器下一个人还要用。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 断网 ─────────── -->
+      <div class="pane" data-at="s4">
+        <div class="bighead bh--warn">
+          <span class="bh-ic"><svg class="ic"><use href="#i-offline"/></svg></span>
+          <span class="bh-t">网断了，但机器没坏</span>
+          <span class="bh-p">
+            正在自动重连。<b>打印和扫描不受影响</b> ——
+            这两件本来就在本机上完成，不走网络。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="sec">
+          <div class="split">
+            <div class="sp sp--ok">
+              <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">现在照常能用</span></div>
+              <div class="sp-i"><i></i><span><b>打印</b> —— U 盘、已上传的文件都能打</span></div>
+              <div class="sp-i"><i></i><span><b>扫描</b> —— 扫成 PDF 存 U 盘</span></div>
+              <div class="sp-i"><i></i><span>已经加载出来的岗位、招聘会、政策<b>还能看</b></span></div>
+              <div class="sp-i"><i></i><span>招聘会展位图与路线 —— 本机算的，不用联网</span></div>
+            </div>
+            <div class="sp sp--no">
+              <div class="sp-hd"><svg class="ic"><use href="#i-close"/></svg><span class="sp-t">现在用不了</span></div>
+              <div class="sp-i"><i></i><span>AI 相关：简历诊断、岗位匹配、面试点评</span></div>
+              <div class="sp-i"><i></i><span>登录与扫码上传（要连服务器）</span></div>
+              <div class="sp-i"><i></i><span>拉取<b>最新</b>岗位与招聘会</span></div>
+              <div class="sp-i"><i></i><span>在线支付 —— 可改用现场其他付款方式</span></div>
+            </div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>你现在看到的岗位与招聘会是<b>断网前缓存的，同步于 8月9日 07:30</b>。<br>
+                  <b>可能已经变了</b> —— 出发前建议在来源平台再确认一次。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>断网期间<b>不会先收你钱再说打不了</b> ——
+                  打印是本机完成的，收费按实际出纸计算。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S5 会话恢复 ─────────── -->
+      <div class="pane" data-at="s5">
+        <div class="bighead bh--calm">
+          <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
+          <span class="bh-t">上次没做完，要接着来吗？</span>
+          <span class="bh-p">
+            检测到<b>同一个账号</b>在 <b>8月2日 10:41</b> 于 03 号机有一件没做完的事。<br>
+            <b>要不要恢复由你决定</b> —— 本机不直接把它铺开。
+          </span>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s5">
+        <div class="sec">
+          <div class="jobrow-like" style="padding:var(--s-5);border-radius:var(--r-md);
+               background:var(--glass-1-bg);border:1px solid var(--glass-1-brd)">
+            <div style="font-size:var(--fz-5);font-weight:600;color:var(--fog-900)">
+              机械设计岗 · 面试练习</div>
+            <div style="font-size:var(--fz-2);color:var(--fog-600);margin-top:5px">
+              8月2日 10:41 · 03 号机 · 答完 5 / 8 题 · 复盘单未打印</div>
+            <div style="font-size:var(--fz-2);color:var(--fog-700);margin-top:var(--s-3);line-height:1.6">
+              可以恢复的是：<b>练到第几题、哪几道有缺口</b>。<br>
+              <b>你当时答的内容恢复不了</b> —— 面试作答从不保存，这是有意的。
+            </div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span><b>恢复要先问，不能直接铺开。</b>
+                  这台机器在公共场所 —— 万一站在这里的不是你本人，
+                  直接展示上次的内容就是把你的东西给了别人。<br>
+                  所以本机<b>只显示标题和进度，不显示内容，并且要你点一下才继续</b>。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>选「重新开始」不会删掉上次的记录 ——
+                  只是这次不接着它做。上次的进度仍在你的 AI 服务记录里。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            超过 <b>30 天</b>的未完成会话不再提示恢复，自动归档。
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>这台机器</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">编号</span><span class="v">01 号机</span></div>
+            <div class="kv-row"><span class="k">位置</span><span class="v">A 馆 · 正门右手</span></div>
+            <div class="kv-row"><span class="k">服务台</span><span class="v">正门左手第一窗</span></div>
+            <div class="kv-row"><span class="k">有人时段</span><span class="v">工作日 09:00–17:00</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            报修时报上<b>「01 号机」</b>，运维能直接定位到这一台。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>最常见的三个卡点</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">扫码传文件传不上去</span>
+                <span class="tl-s">多半是手机没连网。用手机流量试一次，别连大厅的公共 WiFi</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">打印出来是白纸</span>
+                <span class="tl-s">硒鼓可能到寿命了 —— 找工作人员，这一单会退</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">扫描件很花、字看不清</span>
+                <span class="tl-s">原件放歪了或压不平。掀开盖子重放一次，比调参数管用</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这三条是<b>本机实际报障里最多的三类</b>，不是编出来凑数的。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-file"/></svg><b>全文与版本</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">服务条款</span><span class="v">v2.3 · 2026-07-01</span></div>
+            <div class="kv-row"><span class="k">隐私政策</span><span class="v">v2.1 · 2026-06-15</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v">6 页</span></div>
+            <div class="kv-row"><span class="k">打印</span><span class="v">1.20 元</span></div>
+            <div class="kv-row"><span class="k">扫码存手机</span><span class="v v--fog">不收费</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>条款有变更时，<b>会在这一页顶部标出改了哪几条</b>，
+                  不是只把版本号加一。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机不弹"同意即视为接受"的遮罩 ——
+            <b>你什么都不点也能继续用</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>为什么会超时</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
+            这台机器摆在大厅里，<b>你走开之后屏幕还亮着</b>。<br><br>
+            简历上有你的姓名、电话，有时还有住址。
+            下一个人过来时不该看到这些。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">无操作多久提示</span><span class="v">4 分钟</span></div>
+            <div class="kv-row"><span class="k">提示后还有</span><span class="v">60 秒</span></div>
+            <div class="kv-row"><span class="k">碰一下能续</span><span class="v">能 · 无次数限制</span></div>
+            <div class="kv-row"><span class="k">正在打印时</span><span class="v v--fog">不会打断</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            打印进行中<b>不会因超时中断</b> —— 纸出完才算完。
+          </div>
+        </div>
+      </div>
+
+      <!-- S4 右 -->
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-refresh"/></svg><b>重连情况</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">断开于</span><span class="v">17:49</span></div>
+            <div class="kv-row"><span class="k">已尝试</span><span class="v">6 次</span></div>
+            <div class="kv-row"><span class="k">下次重试</span><span class="v">30 秒后</span></div>
+            <div class="kv-row"><span class="k">已自动上报</span><span class="v">是</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>你<b>不用做任何事</b> —— 恢复后会自动接上，
+                  正在做的事不会因此丢掉。</span>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>如果十分钟还没恢复，<b>建议先把要打的打了</b> ——
+                  打印不依赖网络，别干等。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            断网期间的操作会<b>暂存在本机</b>，恢复后再同步；
+            同步失败会明确告诉你，不会悄悄丢掉。
+          </div>
+        </div>
+      </div>
+
+      <!-- S5 右 -->
+      <div class="pane pane--grow" data-at="s5">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>恢复能拿回什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">进度（第几题）</span><span class="v">能</span></div>
+            <div class="kv-row"><span class="k">缺口类型</span><span class="v">能</span></div>
+            <div class="kv-row"><span class="k">你答的内容</span><span class="v v--fog">不能 · 从不保存</span></div>
+            <div class="kv-row"><span class="k">上传的文件</span><span class="v">能 · 若已登录</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>「你答的内容恢复不了」不是缺陷，是<b>面试作答从不保存</b>这条设计的必然结果 ——
+                  两者不能同时要。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            如果站在这里的不是本人，<b>点「重新开始」就什么都不会显示</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            系统提示都在这里：帮助、法务、超时、断网、恢复。<br>
+            共同的写法是：<b>先说现在能做什么，再说发生了什么</b>。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <a class="btn btn--lg btn--ghost" data-at="s1 s2" href="01-home-v5.html">回首页</a>
+    <button class="btn btn--lg btn--ghost" data-at="s3">结束并清空</button>
+    <a class="btn btn--lg btn--ghost" data-at="s4" href="06-print-workbench.html">先去打印</a>
+    <button class="btn btn--lg btn--ghost" data-at="s5">重新开始</button>
+
+    <span class="actionbar-hint" data-at="s1">卡纸和机器没反应，找工作人员比在这儿点快</span>
+    <span class="actionbar-hint" data-at="s2">不点同意也能继续用</span>
+    <span class="actionbar-hint" data-at="s3">碰一下屏幕就能继续，不用重新开始</span>
+    <span class="actionbar-hint" data-at="s4">打印和扫描不受影响</span>
+    <span class="actionbar-hint" data-at="s5">只显示标题和进度，内容要你点了才出来</span>
+
+    <a class="btn btn--primary" data-at="s1" href="25-advisor.html">问问小青<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <button class="btn btn--primary" data-at="s2"><svg class="ic"><use href="#i-qr"/></svg>扫码存全文</button>
+    <button class="btn btn--primary" data-at="s3">我还在，继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s4"><svg class="ic"><use href="#i-refresh"/></svg>立即重试</button>
+    <button class="btn btn--primary" data-at="s5">接着上次做<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

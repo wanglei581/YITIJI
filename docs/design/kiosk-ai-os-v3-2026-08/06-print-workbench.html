@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=3">
-<link rel="stylesheet" href="styles/pay.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/pay.css?v=5">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -26,7 +26,7 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-theme="warm">
+<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-job="printing" data-theme="warm">
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
@@ -53,7 +53,8 @@
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">材料体检</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">参数核价</span></button>
       <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">核对金额</span></button>
-      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">收银</span></button>
+      <button class="rstep" data-go="s5" data-pay="wait scan confirm paid expired query closed"><span class="rstep-dot">5</span><span class="rstep-name">收银</span></button>
+      <button class="rstep rstep--skip" data-go="s5" data-pay="free" aria-disabled="true"><span class="rstep-dot">5</span><span class="rstep-name">收银 · 免费跳过</span></button>
       <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">正在出纸</span></button>
       <button class="rstep" data-go="s7"><span class="rstep-dot">7</span><span class="rstep-name">取件</span></button>
     </div>
@@ -285,14 +286,69 @@
 
       <!-- S6 出纸进度 -->
       <div class="progress-wrap" data-at="s6">
-        <div class="dial">
+
+        <!-- 「已付款」到「纸出来」中间有三段，每段都可能卡住。
+             原来这里是一步跳到出纸中，用户卡在排队时会以为机器死了。 -->
+        <div class="jline">
+          <span class="jnode jn--done"><i></i><b>已提交</b><em>13:41:02</em></span>
+          <span class="jnode jn--done"><i></i><b>排队</b><em data-job="printing jam">前面 0 单</em><em data-job="queued">前面 2 单 · 约 3 分钟</em><em data-job="checking checkfail timeout">已过</em></span>
+          <span class="jnode jn--done" data-job="printing jam timeout"><i></i><b>服务端校验</b><em>通过</em></span>
+          <span class="jnode jn--now"  data-job="checking"><i></i><b>服务端校验</b><em>正在检查文件能不能打</em></span>
+          <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>服务端校验</b><em>没通过</em></span>
+          <span class="jnode jn--now"  data-job="printing"><i></i><b>正在出纸</b><em>3 / 15 面</em></span>
+          <span class="jnode"          data-job="queued checking"><i></i><b>出纸</b><em>还没开始</em></span>
+          <span class="jnode jn--bad"  data-job="checkfail"><i></i><b>出纸</b><em>不会开始</em></span>
+          <span class="jnode jn--bad"  data-job="jam"><i></i><b>出纸</b><em>卡纸暂停</em></span>
+          <span class="jnode jn--bad"  data-job="timeout"><i></i><b>出纸</b><em>超时未开始</em></span>
+        </div>
+
+        <div class="notice notice--amber" data-job="queued" style="max-width:40em">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <span>前面还有 <b>2 单</b>，约 3 分钟。<b>钱已经收了，不会重复收</b>；
+            排队期间你可以离开，凭取件码回来打，也可以在这里等。
+            超过 <b>10 分钟</b>还没开始出纸，本机会自动把它转成待打印订单并通知你。</span>
+        </div>
+
+        <div class="notice" data-job="checking" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>正在检查这份文件能不能真的打出来：页数、字体是否内嵌、有没有加密、幅面是否 A4。
+            <b>这一步在出纸之前</b> —— 宁可现在拦住，也不要出到第 7 页才发现字体丢了。</span>
+        </div>
+
+        <div class="notice notice--coral" data-job="checkfail" style="max-width:40em">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span><b>校验没通过：第 2 页有一处字体没内嵌，打出来会变成方框。</b>没有出任何纸，也没有扣这一单的钱
+            （已收的 3.00 元会<b>原路退回</b>，1–3 个工作日到账，退款记录进「我的 · 打印订单」）。<br>
+            两条路：<b>① 换一份文件</b> —— 回第 1 步重新上传，参数会保留；
+            <b>② 让本机转一次</b> —— 用「文件加工台」把它转成内嵌字体的 PDF 再打，转换免费。</span>
+        </div>
+
+        <div class="notice notice--coral" data-job="timeout" style="max-width:40em">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <span><b>超过 10 分钟没能开始出纸，已自动转成待打印订单。</b>钱不退也不重复收 ——
+            凭取件码 <b>7742 106 358</b> 在任一台空闲机器直接打，7 天内有效。<br>
+            如果你不想打了，在「我的 · 打印订单」里申请退款，按<b>未出面数</b>全额退。</span>
+        </div>
+
+        <div class="cash-demo" data-review style="position:static;justify-content:center;margin-bottom:var(--s-4)">
+          <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
+            原型演示 · 切任务处境（真实系统由服务端任务状态与超时任务驱动）</span>
+          <button data-job-btn="queued">排队</button>
+          <button data-job-btn="checking">校验中</button>
+          <button data-job-btn="checkfail">校验失败</button>
+          <button data-job-btn="printing" aria-pressed="true">出纸中</button>
+          <button data-job-btn="jam">卡纸</button>
+          <button data-job-btn="timeout">10 分钟超时</button>
+        </div>
+
+        <div class="dial" data-job="printing jam">
           <svg viewBox="0 0 100 100">
             <circle class="tk" cx="50" cy="50" r="43"/>
             <circle class="vl" cx="50" cy="50" r="43" stroke-dasharray="270" stroke-dashoffset="216"/>
           </svg>
           <div class="dial-txt"><div><b>3</b><span>已出 3 / 共 15 面</span></div></div>
         </div>
-        <div class="notice" data-when="default first ai-down" style="max-width:40em">
+        <div class="notice" data-when="default first ai-down" data-job="printing" style="max-width:40em">
           <svg class="ic"><use href="#i-printer"/></svg>
           <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
             凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
@@ -363,7 +419,7 @@
       <div class="pane pane--fill" data-at="s2">
         <div class="pane-hd"><span class="t">建议</span></div>
         <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="default device-off">
-          <b>建议先遮盖第 2 页的身份证号</b>，再进入参数。<br>
+          <b>建议先遮盖第 2 页的身份证号</b> <span class="ev ev--e3">E3 遮盖建议属 AI 判断</span>，再进入参数。<br>
           <span style="font-size:var(--fz-2);color:var(--fog-600)">依据：本机在第 2 页识别到 18 位身份证号格式 <span class="ev ev--e1">E1 你的材料</span></span>
         </p>
         <p style="margin:0 0 12px;font-size:var(--fz-3);line-height:1.6;color:var(--fog-800)" data-when="ai-down">
@@ -420,6 +476,46 @@
           </div>
         </div>
 
+        <!-- 翻页边只在自动双面下才有意义，所以挂在双面之后、且写清后果。
+             真机上这一项选错的代价很具体：双面简历翻过来是倒的，投出去就是这个样子。 -->
+        <div class="field" data-when="default first ai-down">
+          <div class="field-lb">双面翻页边
+            <span class="prefill">简历按长边翻 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">长边翻（像书）</button>
+            <button aria-pressed="false">短边翻（像记事本）</button>
+          </div>
+          <p class="fnote">选错这一项，纸翻过来背面是倒的 —— 简历、证明材料一律用长边翻。</p>
+        </div>
+
+        <div class="field">
+          <div class="field-lb">页面方向
+            <span class="prefill" data-when="default device-off">按文件里的方向 · 可改</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">跟随文件（纵向）</button>
+            <button aria-pressed="false">强制横向</button>
+          </div>
+          <p class="fnote">文件里第 3 页是横向表格。选「跟随文件」时它按横向出，其余页仍是纵向。</p>
+        </div>
+
+        <!-- 幅面与缩放：硬件只有 A4，不支持 A3。
+             非 A4 文件必须让用户明确选一次，不能静默缩放 —— 静默缩放会把表格压到看不清。 -->
+        <div class="field">
+          <div class="field-lb">幅面与缩放
+            <span class="prefill" data-when="default device-off">已检出 A4 · 无需缩放</span>
+          </div>
+          <div class="seg">
+            <button aria-pressed="true">按原尺寸（100%）</button>
+            <button aria-pressed="false">缩放到 A4</button>
+          </div>
+          <p class="fnote">
+            本机<b>只有 A4，不支持 A3</b>。这份文件检出为 A4，按原尺寸出即可。<br>
+            如果换成 A3 或 Letter，这里会强制你选一次，<b>不会静默缩放</b> —— 静默缩放会把表格压到看不清。
+          </p>
+        </div>
+
         <div class="field">
           <div class="field-lb">页码范围</div>
           <div class="seg">
@@ -445,11 +541,25 @@
           <div class="qrow"><span class="k">单价</span><span class="v">以现场公示价为准</span></div>
           <div class="qtotal">
             <span class="k">应付</span>
-            <span class="v" data-when="default first ai-down">未核价</span>
+            <span class="v" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed">未核价</span>
+            <span class="v" data-when="default first ai-down" data-pay="free" style="color:var(--jade-500)">0.00 元 · 免费</span>
             <span class="v" data-when="device-off" style="color:var(--coral-400)">暂不可下单</span>
           </div>
+          <p class="qnote" data-pay="free" data-when="default first ai-down">
+            本单金额为 <b>0 元</b>（只扫描 / 用了减免），<b>不进收银台、不出收款码</b>，第 5 站直接跳过。
+            不收钱也就没有退款问题；出纸完成一样有取件码和订单记录。</p>
           <p class="qnote" data-when="default first ai-down">金额由服务端按现场公示价计算。<b>核价结果显示出来之后，才会出现「确认并支付」</b>——不让你确认一个还没看见的金额。</p>
           <p class="qnote" data-when="device-off">打印机离线期间不接受支付。可先把文件存进「我的文档」，凭手机号在任一台空闲机器取回打印。</p>
+        </div>
+      </div>
+
+      <!-- 单据类型由服务端核价结果决定：金额 > 0 走收银，金额 = 0 跳过收银。
+           这里放切换是为了让两条真实路径都能看到，不是伪造用户选项 —— 所以标 data-review。 -->
+      <div class="pane" data-at="s4" data-review style="border-style:dashed">
+        <div class="pane-hd"><span class="t" style="color:var(--fog-600)">核价结果（服务端决定，此处可切换查看）</span></div>
+        <div class="cash-demo" style="position:static;justify-content:flex-start">
+          <button data-pay-btn="wait" aria-pressed="true">应付 3.00 元 · 走收银</button>
+          <button data-pay-btn="free">应付 0.00 元 · 跳过收银</button>
         </div>
       </div>
 
@@ -492,7 +602,7 @@
           <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
         </div>
         <p class="price-note">
-          <b>金额为 0 的订单不进收银台</b>，直接出纸（例如只扫描、或用了减免）。<br>
+          <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
           本机不接受现金，不找零；不支持刷卡。
         </p>
       </div>
@@ -518,9 +628,23 @@
       <div class="pane pane--fill" data-at="s6">
         <div class="pane-hd"><span class="t">任务</span><span class="s">#PT-20260808-0431</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">状态</span><span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>正在出纸</span><span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
-          <div class="kv-row"><span class="k">已完成</span><span class="v">3 / 15 面</span></div>
-          <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
+          <div class="kv-row"><span class="k">状态</span>
+            <span class="v" data-when="default first ai-down" data-job="printing"><span class="dot dot--live"></span>正在出纸</span>
+            <span class="v" data-when="default first ai-down" data-job="queued"><span class="dot dot--warn"></span>排队中 · 前面 2 单</span>
+            <span class="v" data-when="default first ai-down" data-job="checking"><span class="dot dot--warn"></span>服务端校验中</span>
+            <span class="v" data-when="default first ai-down" data-job="checkfail" style="color:var(--coral-400)"><span class="dot dot--down"></span>校验未通过，已终止</span>
+            <span class="v" data-when="default first ai-down" data-job="timeout" style="color:var(--coral-400)"><span class="dot dot--down"></span>超时，已转待打印</span>
+            <span class="v" data-when="default first ai-down" data-job="jam" style="color:var(--coral-400)"><span class="dot dot--down"></span>卡纸暂停</span>
+            <span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
+          <div class="kv-row"><span class="k">已完成</span>
+            <span class="v" data-job="printing">3 / 15 面</span>
+            <span class="v" data-job="jam">3 / 15 面（暂停在第 4 面）</span>
+            <span class="v" data-job="queued checking timeout">0 / 15 面 · 还没开始出纸</span>
+            <span class="v" data-job="checkfail">0 面 · 一张纸都没出</span></div>
+          <div class="kv-row"><span class="k">支付</span>
+            <span class="v" data-job="printing queued checking jam">已支付 3.00 元</span>
+            <span class="v" data-job="checkfail" style="color:var(--jade-500)">已原路退款 3.00 元</span>
+            <span class="v" data-job="timeout">已支付 3.00 元 · 未打可申请退款</span></div>
           <div class="kv-row"><span class="k">取件码</span><span class="v">7742 106 358</span></div>
         </div>
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
@@ -577,7 +701,8 @@
         <div data-when="ai-down first"><div class="t">请确认打印参数</div><div class="s">预填不可用，四项都需要你自己设</div></div>
       </div>
       <div data-at="s4">
-        <div data-when="default first ai-down" id="hint-quote"><div class="t">先获取核价，金额显示出来再决定要不要付</div><div class="s">本机不预先计算金额，也不承诺价格</div></div>
+        <div data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="hint-quote"><div class="t">先获取核价，金额显示出来再决定要不要付</div><div class="s">本机不预先计算金额，也不承诺价格</div></div>
+        <div data-when="default first ai-down" data-pay="free"><div class="t">本单金额 0 元，不需要付款</div><div class="s">不出收款码、不进收银 · 按「直接出纸」开始</div></div>
         <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
       </div>
       <div data-at="s5">
@@ -590,7 +715,12 @@
         <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印 · 文件还在本次会话</div></div>
       </div>
       <div data-at="s6">
-        <div data-when="default first ai-down"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
+        <div data-when="default first ai-down" data-job="printing"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
+        <div data-when="default first ai-down" data-job="queued"><div class="t">排队中，前面 2 单 · 约 3 分钟</div><div class="s">钱已收，不会重复收 · 可以离开，凭取件码回来打</div></div>
+        <div data-when="default first ai-down" data-job="checking"><div class="t">正在校验文件能不能打</div><div class="s">这一步在出纸之前 · 宁可现在拦住</div></div>
+        <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
+        <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
+        <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
         <div data-when="device-off"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
@@ -601,7 +731,8 @@
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">返回改参数</button>
-    <button class="btn btn--lg btn--ghost" data-at="s6">异常求助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s6" data-job="printing queued checking jam timeout">异常求助</button>
+    <a class="btn btn--lg btn--ghost" data-at="s6" data-job="checkfail" href="08-file-tools.html?tool=t1">让本机转成可打印 PDF</a>
     <button class="btn btn--lg btn--ghost" data-at="s7">再打一份</button>
 
     <!-- 右侧：唯一主动作。不可逆动作用朱砂 -->
@@ -611,10 +742,10 @@
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">去确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first ai-down" id="btn-quote" data-gate="unquoted">获取核价<svg class="ic"><use href="#i-refresh"/></svg></button>
-    <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
+    <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" data-pay="wait scan confirm paid expired query closed" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
+    <button class="btn btn--commit" data-at="s4" data-go="s6" data-when="default first ai-down" data-pay="free" data-gate="quoted">本单免费，直接出纸<svg class="ic"><use href="#i-printer"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <!-- 免费订单（只扫描 / 有减免）金额为 0，跳过收银直接出纸 -->
-    <button class="btn btn--lg btn--ghost" data-at="s4" data-when="default" data-go="s6">本单免费 · 直接出纸</button>
+
     <!-- 收银台：左侧退出路径 -->
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="wait scan expired query" data-go="s4">取消支付，返回</button>
     <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="confirm" data-pay-go="query">我已付款，帮我查</button>
@@ -627,7 +758,13 @@
     <button class="btn btn--primary" data-at="s5" data-pay="query" aria-disabled="true">查询中…</button>
     <button class="btn btn--primary" data-at="s5" data-pay="expired" data-pay-go="wait">重新出码<svg class="ic"><use href="#i-refresh"/></svg></button>
     <button class="btn btn--commit" data-at="s5" data-pay="paid" data-go="s6">开始出纸<svg class="ic"><use href="#i-printer"/></svg></button>
-    <button class="btn btn--primary" data-at="s6" aria-disabled="true">出纸中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="printing" aria-disabled="true">出纸中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="queued" aria-disabled="true">排队中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="checking" aria-disabled="true">校验中…</button>
+    <button class="btn btn--primary" data-at="s6" data-job="checkfail" data-go="s1">换一份文件重新上传<svg class="ic"><use href="#i-upload"/></svg></button>
+
+    <button class="btn btn--primary" data-at="s6" data-job="timeout" data-go="s7">看取件码<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s6" data-job="jam" aria-disabled="true">等你取出卡纸…</button>
     <button class="btn btn--primary" data-at="s7" data-go="s1">完成<svg class="ic"><use href="#i-check"/></svg></button>
   </div>
 
@@ -640,8 +777,8 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=16"></script>
-<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
@@ -712,6 +849,6 @@
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
 })()
 </script>
-<script src="scripts/audit-plus.js?v=12"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

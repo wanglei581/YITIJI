@@ -604,6 +604,60 @@
     return out;
   }
 
+
+  /* ── 卡内溢出：内容溢出容器但**没有被裁**，而是重叠在下一块上 ──────────
+     P05 手机接力实测抓到的一类，主检测器完全看不见：
+
+       .ph-body 是 flex 列，子项默认 flex-shrink:1。内容超过容器高度时
+       卡片被**压扁**而不是撑开，文字溢出到下一张卡上（实测 9–19px）。
+
+     为什么「内部裁切」抓不到：那一支只找 overflow:hidden/clip 的裁切容器，
+     而这些卡片没有 overflow —— 文字不是被裁掉，是**画在了别人身上**。
+     视觉上比裁切更糟（两段字叠着，都读不清），检测上却完全静默。
+
+     判据：叶子文本的底边超出其最近的「有背景或边框的卡片祖先」超过 2px。
+     ────────────────────────────────────────────────────────────────── */
+  function auditCardOverlap () {
+    var out = { '卡内溢出': 0, '明细': [] };
+    var cards = document.querySelectorAll(
+      '[class*="card"],[class*="note"],[class*="act"],[class*="pane"],[class*="row"],[class*="item"]');
+    var i, j, card, cs, cr, kids, k, kr, over;
+
+    for (i = 0; i < cards.length; i += 1) {
+      card = cards[i];
+      try { cs = window.getComputedStyle(card); } catch (e) { continue; }
+      if (cs.display === 'none') continue;
+      /* 只看「看起来是一块卡」的容器：有背景或边框 */
+      if (cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === '0px') continue;
+      /* 有裁切或滚动的交给别的检查，这里只管"不裁而溢出" */
+      if (/hidden|clip|auto|scroll/.test(cs.overflowY || '')) continue;
+      cr = card.getBoundingClientRect();
+      if (cr.height < 20) continue;
+
+      kids = card.querySelectorAll('*');
+      for (j = 0; j < kids.length; j += 1) {
+        k = kids[j];
+        if (k.childElementCount) continue;
+        try { if (window.getComputedStyle(k).display === 'none') continue; } catch (e) { continue; }
+        if (!(k.textContent || '').replace(/\s+/g, '')) continue;
+        kr = k.getBoundingClientRect();
+        over = kr.bottom - cr.bottom;
+        if (over > 2) {
+          out['卡内溢出'] += 1;
+          if (out['明细'].length < 8) {
+            out['明细'].push({
+              '容器': describeElement(card),
+              '文字': (k.textContent || '').replace(/\s+/g, ' ').substring(0, 26),
+              '溢出': Math.round(over) + 'px'
+            });
+          }
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
   window.v3AuditPlus = function () {
     var result = {};
     var baseError = false;
@@ -640,6 +694,7 @@
     result['假入口'] = auditFakeAffordance();
     result['版面留白'] = auditEmptyTail();
     result['主区空壳'] = auditEmptyShell();
+    result['卡内溢出'] = auditCardOverlap();
 
     hasProblem = baseError ||
       clipping['严重'] > 0 ||
@@ -647,7 +702,8 @@
       wiring['缺锚点'].length > 0 ||
       wiring['未绑定'].length > 0 ||
       result['版面留白']['主栏留白过大'] > 0 ||
-      result['主区空壳']['主区空壳'] > 0;
+      result['主区空壳']['主区空壳'] > 0 ||
+      result['卡内溢出']['卡内溢出'] > 0;
 
     for (i = 0; i < oldKeys.length; i += 1) {
       if (issueValue(result[oldKeys[i]])) {
