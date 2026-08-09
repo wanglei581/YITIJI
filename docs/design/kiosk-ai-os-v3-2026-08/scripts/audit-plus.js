@@ -573,6 +573,37 @@
     return out;
   }
 
+
+  /* ── 主区空壳：整块内容被状态门控漏配 ────────────────────────────────
+     P22 实测抓到的一类新缺陷：能力块写了 data-when="default first"，
+     兜底块写了 data-when="ai-down" —— device-off 态下**两块都不显示**，
+     主区整栏空白。而打印机离线跟能不能读简历本来没有关系。
+
+     这类漏配很难靠肉眼发现：默认态一切正常，只有切到某个状态才空，
+     而人不会每个状态都点一遍。留白检测能间接报出来（左栏空 1088px），
+     但报的是"留白过大"，不是"这一态压根没配内容"—— 两者该分开说。
+
+     判据：主区可见的文本叶子少于 6 个，视为空壳。
+     ──────────────────────────────────────────────────────────────── */
+  function auditEmptyShell () {
+    var out = { '主区空壳': 0, '明细': [] };
+    var main = document.querySelector('.wmain');
+    var nodes, i, node, count = 0;
+    if (!main) return out;
+    nodes = main.querySelectorAll('*');
+    for (i = 0; i < nodes.length; i += 1) {
+      node = nodes[i];
+      if (node.childElementCount) continue;
+      try { if (window.getComputedStyle(node).display === 'none') continue; } catch (e) { continue; }
+      if ((node.textContent || '').replace(/\s+/g, '')) count += 1;
+    }
+    if (count < 6) {
+      out['主区空壳'] = 1;
+      out['明细'].push({ '可见文本块': count, '说明': '当前 state/stage 组合下主区几乎无内容，检查 data-when / data-at 是否漏配' });
+    }
+    return out;
+  }
+
   window.v3AuditPlus = function () {
     var result = {};
     var baseError = false;
@@ -608,13 +639,15 @@
     result['联动接线'] = wiring;
     result['假入口'] = auditFakeAffordance();
     result['版面留白'] = auditEmptyTail();
+    result['主区空壳'] = auditEmptyShell();
 
     hasProblem = baseError ||
       clipping['严重'] > 0 ||
       clipping['一般'] > 0 ||
       wiring['缺锚点'].length > 0 ||
       wiring['未绑定'].length > 0 ||
-      result['版面留白']['主栏留白过大'] > 0;
+      result['版面留白']['主栏留白过大'] > 0 ||
+      result['主区空壳']['主区空壳'] > 0;
 
     for (i = 0; i < oldKeys.length; i += 1) {
       if (issueValue(result[oldKeys[i]])) {

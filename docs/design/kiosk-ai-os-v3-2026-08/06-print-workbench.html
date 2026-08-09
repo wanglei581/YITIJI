@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
 <link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/pay.css?v=3">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -25,7 +26,7 @@
 <script src="scripts/sprite.js?v=3"></script>
 
 <div class="stage">
-<div class="screen" data-state="default" data-stage="s3" data-theme="warm">
+<div class="screen" data-state="default" data-stage="s3" data-pay="wait" data-theme="warm">
 
   <div class="grain"></div>
   <div class="pulseline" title="终端每 5 秒上报一次状态"></div>
@@ -51,9 +52,10 @@
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">选来源</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">材料体检</span></button>
       <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">参数核价</span></button>
-      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">确认支付</span></button>
-      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">正在出纸</span></button>
-      <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">取件</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">核对金额</span></button>
+      <button class="rstep" data-go="s5"><span class="rstep-dot">5</span><span class="rstep-name">收银</span></button>
+      <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">正在出纸</span></button>
+      <button class="rstep" data-go="s7"><span class="rstep-dot">7</span><span class="rstep-name">取件</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>3</b> / 6 步</span>
   </div>
@@ -185,8 +187,104 @@
         <span class="thumbs-note" data-when="first">没有文件时不显示页面。</span>
       </div>
 
-      <!-- S5 出纸进度 -->
-      <div class="progress-wrap" data-at="s5">
+      <!-- ─────────── S5 收银台 ───────────
+           六种处境同版面切换：待付 / 扫用户码 / 到账中 / 已到账 / 码失效 / 已关单。
+           金额位与码位固定不动，只换状态行和按钮。 -->
+      <div class="cashier" data-at="s5">
+
+        <div class="cash-amt">
+          <span class="lb">应付</span>
+          <span class="num">3.00<i>元</i></span>
+          <span class="brk">15 个印刷面 × 0.20 元 · 黑白双面 · 5 份</span>
+        </div>
+
+        <div class="cash-mode" data-pay="wait expired query">
+          <button data-pay-btn="wait" aria-pressed="true"><svg class="ic"><use href="#i-qr"/></svg>屏上出码，你扫</button>
+          <button data-pay-btn="scan"><svg class="ic"><use href="#i-scan"/></svg>你出码，本机扫</button>
+        </div>
+
+        <!-- 码位：出码 / 取景 / 作废 共用同一个方框，尺寸不变 -->
+        <div class="cash-code" data-pay="wait confirm">
+          <svg class="cash-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" aria-label="收款二维码（原型示意）"><path d="M0 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="2" width="3" height="3" fill="#101613"/><path d="M18 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="20" y="2" width="3" height="3" fill="#101613"/><path d="M0 18h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="20" width="3" height="3" fill="#101613"/><rect x="7" y="0" width="1" height="1" fill="#101613"/><rect x="10" y="0" width="1" height="1" fill="#101613"/><rect x="14" y="0" width="1" height="1" fill="#101613"/><rect x="7" y="1" width="1" height="1" fill="#101613"/><rect x="13" y="1" width="1" height="1" fill="#101613"/><rect x="15" y="1" width="1" height="1" fill="#101613"/><rect x="16" y="1" width="1" height="1" fill="#101613"/><rect x="7" y="2" width="1" height="1" fill="#101613"/><rect x="9" y="2" width="1" height="1" fill="#101613"/><rect x="10" y="2" width="1" height="1" fill="#101613"/><rect x="13" y="2" width="1" height="1" fill="#101613"/><rect x="14" y="2" width="1" height="1" fill="#101613"/><rect x="15" y="2" width="1" height="1" fill="#101613"/><rect x="17" y="2" width="1" height="1" fill="#101613"/><rect x="8" y="3" width="1" height="1" fill="#101613"/><rect x="11" y="3" width="1" height="1" fill="#101613"/><rect x="12" y="3" width="1" height="1" fill="#101613"/><rect x="14" y="3" width="1" height="1" fill="#101613"/><rect x="17" y="3" width="1" height="1" fill="#101613"/><rect x="7" y="4" width="1" height="1" fill="#101613"/><rect x="12" y="4" width="1" height="1" fill="#101613"/><rect x="16" y="4" width="1" height="1" fill="#101613"/><rect x="17" y="4" width="1" height="1" fill="#101613"/><rect x="7" y="5" width="1" height="1" fill="#101613"/><rect x="12" y="5" width="1" height="1" fill="#101613"/><rect x="15" y="5" width="1" height="1" fill="#101613"/><rect x="17" y="5" width="1" height="1" fill="#101613"/><rect x="7" y="6" width="1" height="1" fill="#101613"/><rect x="8" y="6" width="1" height="1" fill="#101613"/><rect x="14" y="6" width="1" height="1" fill="#101613"/><rect x="15" y="6" width="1" height="1" fill="#101613"/><rect x="16" y="6" width="1" height="1" fill="#101613"/><rect x="5" y="7" width="1" height="1" fill="#101613"/><rect x="9" y="7" width="1" height="1" fill="#101613"/><rect x="16" y="7" width="1" height="1" fill="#101613"/><rect x="21" y="7" width="1" height="1" fill="#101613"/><rect x="23" y="7" width="1" height="1" fill="#101613"/><rect x="4" y="8" width="1" height="1" fill="#101613"/><rect x="5" y="8" width="1" height="1" fill="#101613"/><rect x="7" y="8" width="1" height="1" fill="#101613"/><rect x="9" y="8" width="1" height="1" fill="#101613"/><rect x="10" y="8" width="1" height="1" fill="#101613"/><rect x="16" y="8" width="1" height="1" fill="#101613"/><rect x="22" y="8" width="1" height="1" fill="#101613"/><rect x="23" y="8" width="1" height="1" fill="#101613"/><rect x="0" y="9" width="1" height="1" fill="#101613"/><rect x="5" y="9" width="1" height="1" fill="#101613"/><rect x="6" y="9" width="1" height="1" fill="#101613"/><rect x="9" y="9" width="1" height="1" fill="#101613"/><rect x="11" y="9" width="1" height="1" fill="#101613"/><rect x="15" y="9" width="1" height="1" fill="#101613"/><rect x="17" y="9" width="1" height="1" fill="#101613"/><rect x="19" y="9" width="1" height="1" fill="#101613"/><rect x="20" y="9" width="1" height="1" fill="#101613"/><rect x="23" y="9" width="1" height="1" fill="#101613"/><rect x="0" y="10" width="1" height="1" fill="#101613"/><rect x="3" y="10" width="1" height="1" fill="#101613"/><rect x="4" y="10" width="1" height="1" fill="#101613"/><rect x="6" y="10" width="1" height="1" fill="#101613"/><rect x="11" y="10" width="1" height="1" fill="#101613"/><rect x="15" y="10" width="1" height="1" fill="#101613"/><rect x="16" y="10" width="1" height="1" fill="#101613"/><rect x="17" y="10" width="1" height="1" fill="#101613"/><rect x="18" y="10" width="1" height="1" fill="#101613"/><rect x="19" y="10" width="1" height="1" fill="#101613"/><rect x="21" y="10" width="1" height="1" fill="#101613"/><rect x="23" y="10" width="1" height="1" fill="#101613"/><rect x="24" y="10" width="1" height="1" fill="#101613"/><rect x="0" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="11" width="1" height="1" fill="#101613"/><rect x="2" y="11" width="1" height="1" fill="#101613"/><rect x="4" y="11" width="1" height="1" fill="#101613"/><rect x="9" y="11" width="1" height="1" fill="#101613"/><rect x="11" y="11" width="1" height="1" fill="#101613"/><rect x="12" y="11" width="1" height="1" fill="#101613"/><rect x="14" y="11" width="1" height="1" fill="#101613"/><rect x="15" y="11" width="1" height="1" fill="#101613"/><rect x="16" y="11" width="1" height="1" fill="#101613"/><rect x="18" y="11" width="1" height="1" fill="#101613"/><rect x="20" y="11" width="1" height="1" fill="#101613"/><rect x="21" y="11" width="1" height="1" fill="#101613"/><rect x="22" y="11" width="1" height="1" fill="#101613"/><rect x="23" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="12" width="1" height="1" fill="#101613"/><rect x="2" y="12" width="1" height="1" fill="#101613"/><rect x="5" y="12" width="1" height="1" fill="#101613"/><rect x="8" y="12" width="1" height="1" fill="#101613"/><rect x="10" y="12" width="1" height="1" fill="#101613"/><rect x="11" y="12" width="1" height="1" fill="#101613"/><rect x="13" y="12" width="1" height="1" fill="#101613"/><rect x="15" y="12" width="1" height="1" fill="#101613"/><rect x="17" y="12" width="1" height="1" fill="#101613"/><rect x="18" y="12" width="1" height="1" fill="#101613"/><rect x="19" y="12" width="1" height="1" fill="#101613"/><rect x="20" y="12" width="1" height="1" fill="#101613"/><rect x="21" y="12" width="1" height="1" fill="#101613"/><rect x="22" y="12" width="1" height="1" fill="#101613"/><rect x="0" y="13" width="1" height="1" fill="#101613"/><rect x="2" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="13" width="1" height="1" fill="#101613"/><rect x="6" y="13" width="1" height="1" fill="#101613"/><rect x="8" y="13" width="1" height="1" fill="#101613"/><rect x="12" y="13" width="1" height="1" fill="#101613"/><rect x="13" y="13" width="1" height="1" fill="#101613"/><rect x="16" y="13" width="1" height="1" fill="#101613"/><rect x="17" y="13" width="1" height="1" fill="#101613"/><rect x="18" y="13" width="1" height="1" fill="#101613"/><rect x="20" y="13" width="1" height="1" fill="#101613"/><rect x="22" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="14" width="1" height="1" fill="#101613"/><rect x="7" y="14" width="1" height="1" fill="#101613"/><rect x="9" y="14" width="1" height="1" fill="#101613"/><rect x="11" y="14" width="1" height="1" fill="#101613"/><rect x="13" y="14" width="1" height="1" fill="#101613"/><rect x="15" y="14" width="1" height="1" fill="#101613"/><rect x="16" y="14" width="1" height="1" fill="#101613"/><rect x="17" y="14" width="1" height="1" fill="#101613"/><rect x="21" y="14" width="1" height="1" fill="#101613"/><rect x="23" y="14" width="1" height="1" fill="#101613"/><rect x="24" y="14" width="1" height="1" fill="#101613"/><rect x="1" y="15" width="1" height="1" fill="#101613"/><rect x="2" y="15" width="1" height="1" fill="#101613"/><rect x="3" y="15" width="1" height="1" fill="#101613"/><rect x="11" y="15" width="1" height="1" fill="#101613"/><rect x="13" y="15" width="1" height="1" fill="#101613"/><rect x="20" y="15" width="1" height="1" fill="#101613"/><rect x="22" y="15" width="1" height="1" fill="#101613"/><rect x="23" y="15" width="1" height="1" fill="#101613"/><rect x="0" y="16" width="1" height="1" fill="#101613"/><rect x="2" y="16" width="1" height="1" fill="#101613"/><rect x="4" y="16" width="1" height="1" fill="#101613"/><rect x="6" y="16" width="1" height="1" fill="#101613"/><rect x="12" y="16" width="1" height="1" fill="#101613"/><rect x="14" y="16" width="1" height="1" fill="#101613"/><rect x="18" y="16" width="1" height="1" fill="#101613"/><rect x="19" y="16" width="1" height="1" fill="#101613"/><rect x="20" y="16" width="1" height="1" fill="#101613"/><rect x="0" y="17" width="1" height="1" fill="#101613"/><rect x="1" y="17" width="1" height="1" fill="#101613"/><rect x="5" y="17" width="1" height="1" fill="#101613"/><rect x="9" y="17" width="1" height="1" fill="#101613"/><rect x="11" y="17" width="1" height="1" fill="#101613"/><rect x="16" y="17" width="1" height="1" fill="#101613"/><rect x="20" y="17" width="1" height="1" fill="#101613"/><rect x="24" y="17" width="1" height="1" fill="#101613"/><rect x="8" y="18" width="1" height="1" fill="#101613"/><rect x="12" y="18" width="1" height="1" fill="#101613"/><rect x="20" y="18" width="1" height="1" fill="#101613"/><rect x="24" y="18" width="1" height="1" fill="#101613"/><rect x="7" y="19" width="1" height="1" fill="#101613"/><rect x="11" y="19" width="1" height="1" fill="#101613"/><rect x="14" y="19" width="1" height="1" fill="#101613"/><rect x="15" y="19" width="1" height="1" fill="#101613"/><rect x="17" y="19" width="1" height="1" fill="#101613"/><rect x="18" y="19" width="1" height="1" fill="#101613"/><rect x="7" y="20" width="1" height="1" fill="#101613"/><rect x="11" y="20" width="1" height="1" fill="#101613"/><rect x="12" y="20" width="1" height="1" fill="#101613"/><rect x="20" y="20" width="1" height="1" fill="#101613"/><rect x="21" y="20" width="1" height="1" fill="#101613"/><rect x="22" y="20" width="1" height="1" fill="#101613"/><rect x="9" y="21" width="1" height="1" fill="#101613"/><rect x="10" y="21" width="1" height="1" fill="#101613"/><rect x="14" y="21" width="1" height="1" fill="#101613"/><rect x="18" y="21" width="1" height="1" fill="#101613"/><rect x="19" y="21" width="1" height="1" fill="#101613"/><rect x="21" y="21" width="1" height="1" fill="#101613"/><rect x="22" y="21" width="1" height="1" fill="#101613"/><rect x="7" y="22" width="1" height="1" fill="#101613"/><rect x="8" y="22" width="1" height="1" fill="#101613"/><rect x="13" y="22" width="1" height="1" fill="#101613"/><rect x="14" y="22" width="1" height="1" fill="#101613"/><rect x="15" y="22" width="1" height="1" fill="#101613"/><rect x="16" y="22" width="1" height="1" fill="#101613"/><rect x="17" y="22" width="1" height="1" fill="#101613"/><rect x="18" y="22" width="1" height="1" fill="#101613"/><rect x="19" y="22" width="1" height="1" fill="#101613"/><rect x="20" y="22" width="1" height="1" fill="#101613"/><rect x="21" y="22" width="1" height="1" fill="#101613"/><rect x="22" y="22" width="1" height="1" fill="#101613"/><rect x="9" y="23" width="1" height="1" fill="#101613"/><rect x="11" y="23" width="1" height="1" fill="#101613"/><rect x="15" y="23" width="1" height="1" fill="#101613"/><rect x="17" y="23" width="1" height="1" fill="#101613"/><rect x="19" y="23" width="1" height="1" fill="#101613"/><rect x="20" y="23" width="1" height="1" fill="#101613"/><rect x="21" y="23" width="1" height="1" fill="#101613"/><rect x="23" y="23" width="1" height="1" fill="#101613"/><rect x="24" y="23" width="1" height="1" fill="#101613"/><rect x="7" y="24" width="1" height="1" fill="#101613"/><rect x="9" y="24" width="1" height="1" fill="#101613"/><rect x="12" y="24" width="1" height="1" fill="#101613"/><rect x="13" y="24" width="1" height="1" fill="#101613"/><rect x="14" y="24" width="1" height="1" fill="#101613"/><rect x="15" y="24" width="1" height="1" fill="#101613"/></svg>
+        </div>
+        <div class="cash-code cash-code--dead" data-pay="expired">
+          <svg class="cash-qr" viewBox="0 0 25 25" shape-rendering="crispEdges" aria-label="收款二维码（原型示意）"><path d="M0 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="2" width="3" height="3" fill="#101613"/><path d="M18 0h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="20" y="2" width="3" height="3" fill="#101613"/><path d="M0 18h7v7h-7z" fill="none" stroke="#101613" stroke-width="1"/><rect x="2" y="20" width="3" height="3" fill="#101613"/><rect x="7" y="0" width="1" height="1" fill="#101613"/><rect x="10" y="0" width="1" height="1" fill="#101613"/><rect x="14" y="0" width="1" height="1" fill="#101613"/><rect x="7" y="1" width="1" height="1" fill="#101613"/><rect x="13" y="1" width="1" height="1" fill="#101613"/><rect x="15" y="1" width="1" height="1" fill="#101613"/><rect x="16" y="1" width="1" height="1" fill="#101613"/><rect x="7" y="2" width="1" height="1" fill="#101613"/><rect x="9" y="2" width="1" height="1" fill="#101613"/><rect x="10" y="2" width="1" height="1" fill="#101613"/><rect x="13" y="2" width="1" height="1" fill="#101613"/><rect x="14" y="2" width="1" height="1" fill="#101613"/><rect x="15" y="2" width="1" height="1" fill="#101613"/><rect x="17" y="2" width="1" height="1" fill="#101613"/><rect x="8" y="3" width="1" height="1" fill="#101613"/><rect x="11" y="3" width="1" height="1" fill="#101613"/><rect x="12" y="3" width="1" height="1" fill="#101613"/><rect x="14" y="3" width="1" height="1" fill="#101613"/><rect x="17" y="3" width="1" height="1" fill="#101613"/><rect x="7" y="4" width="1" height="1" fill="#101613"/><rect x="12" y="4" width="1" height="1" fill="#101613"/><rect x="16" y="4" width="1" height="1" fill="#101613"/><rect x="17" y="4" width="1" height="1" fill="#101613"/><rect x="7" y="5" width="1" height="1" fill="#101613"/><rect x="12" y="5" width="1" height="1" fill="#101613"/><rect x="15" y="5" width="1" height="1" fill="#101613"/><rect x="17" y="5" width="1" height="1" fill="#101613"/><rect x="7" y="6" width="1" height="1" fill="#101613"/><rect x="8" y="6" width="1" height="1" fill="#101613"/><rect x="14" y="6" width="1" height="1" fill="#101613"/><rect x="15" y="6" width="1" height="1" fill="#101613"/><rect x="16" y="6" width="1" height="1" fill="#101613"/><rect x="5" y="7" width="1" height="1" fill="#101613"/><rect x="9" y="7" width="1" height="1" fill="#101613"/><rect x="16" y="7" width="1" height="1" fill="#101613"/><rect x="21" y="7" width="1" height="1" fill="#101613"/><rect x="23" y="7" width="1" height="1" fill="#101613"/><rect x="4" y="8" width="1" height="1" fill="#101613"/><rect x="5" y="8" width="1" height="1" fill="#101613"/><rect x="7" y="8" width="1" height="1" fill="#101613"/><rect x="9" y="8" width="1" height="1" fill="#101613"/><rect x="10" y="8" width="1" height="1" fill="#101613"/><rect x="16" y="8" width="1" height="1" fill="#101613"/><rect x="22" y="8" width="1" height="1" fill="#101613"/><rect x="23" y="8" width="1" height="1" fill="#101613"/><rect x="0" y="9" width="1" height="1" fill="#101613"/><rect x="5" y="9" width="1" height="1" fill="#101613"/><rect x="6" y="9" width="1" height="1" fill="#101613"/><rect x="9" y="9" width="1" height="1" fill="#101613"/><rect x="11" y="9" width="1" height="1" fill="#101613"/><rect x="15" y="9" width="1" height="1" fill="#101613"/><rect x="17" y="9" width="1" height="1" fill="#101613"/><rect x="19" y="9" width="1" height="1" fill="#101613"/><rect x="20" y="9" width="1" height="1" fill="#101613"/><rect x="23" y="9" width="1" height="1" fill="#101613"/><rect x="0" y="10" width="1" height="1" fill="#101613"/><rect x="3" y="10" width="1" height="1" fill="#101613"/><rect x="4" y="10" width="1" height="1" fill="#101613"/><rect x="6" y="10" width="1" height="1" fill="#101613"/><rect x="11" y="10" width="1" height="1" fill="#101613"/><rect x="15" y="10" width="1" height="1" fill="#101613"/><rect x="16" y="10" width="1" height="1" fill="#101613"/><rect x="17" y="10" width="1" height="1" fill="#101613"/><rect x="18" y="10" width="1" height="1" fill="#101613"/><rect x="19" y="10" width="1" height="1" fill="#101613"/><rect x="21" y="10" width="1" height="1" fill="#101613"/><rect x="23" y="10" width="1" height="1" fill="#101613"/><rect x="24" y="10" width="1" height="1" fill="#101613"/><rect x="0" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="11" width="1" height="1" fill="#101613"/><rect x="2" y="11" width="1" height="1" fill="#101613"/><rect x="4" y="11" width="1" height="1" fill="#101613"/><rect x="9" y="11" width="1" height="1" fill="#101613"/><rect x="11" y="11" width="1" height="1" fill="#101613"/><rect x="12" y="11" width="1" height="1" fill="#101613"/><rect x="14" y="11" width="1" height="1" fill="#101613"/><rect x="15" y="11" width="1" height="1" fill="#101613"/><rect x="16" y="11" width="1" height="1" fill="#101613"/><rect x="18" y="11" width="1" height="1" fill="#101613"/><rect x="20" y="11" width="1" height="1" fill="#101613"/><rect x="21" y="11" width="1" height="1" fill="#101613"/><rect x="22" y="11" width="1" height="1" fill="#101613"/><rect x="23" y="11" width="1" height="1" fill="#101613"/><rect x="1" y="12" width="1" height="1" fill="#101613"/><rect x="2" y="12" width="1" height="1" fill="#101613"/><rect x="5" y="12" width="1" height="1" fill="#101613"/><rect x="8" y="12" width="1" height="1" fill="#101613"/><rect x="10" y="12" width="1" height="1" fill="#101613"/><rect x="11" y="12" width="1" height="1" fill="#101613"/><rect x="13" y="12" width="1" height="1" fill="#101613"/><rect x="15" y="12" width="1" height="1" fill="#101613"/><rect x="17" y="12" width="1" height="1" fill="#101613"/><rect x="18" y="12" width="1" height="1" fill="#101613"/><rect x="19" y="12" width="1" height="1" fill="#101613"/><rect x="20" y="12" width="1" height="1" fill="#101613"/><rect x="21" y="12" width="1" height="1" fill="#101613"/><rect x="22" y="12" width="1" height="1" fill="#101613"/><rect x="0" y="13" width="1" height="1" fill="#101613"/><rect x="2" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="13" width="1" height="1" fill="#101613"/><rect x="6" y="13" width="1" height="1" fill="#101613"/><rect x="8" y="13" width="1" height="1" fill="#101613"/><rect x="12" y="13" width="1" height="1" fill="#101613"/><rect x="13" y="13" width="1" height="1" fill="#101613"/><rect x="16" y="13" width="1" height="1" fill="#101613"/><rect x="17" y="13" width="1" height="1" fill="#101613"/><rect x="18" y="13" width="1" height="1" fill="#101613"/><rect x="20" y="13" width="1" height="1" fill="#101613"/><rect x="22" y="13" width="1" height="1" fill="#101613"/><rect x="4" y="14" width="1" height="1" fill="#101613"/><rect x="7" y="14" width="1" height="1" fill="#101613"/><rect x="9" y="14" width="1" height="1" fill="#101613"/><rect x="11" y="14" width="1" height="1" fill="#101613"/><rect x="13" y="14" width="1" height="1" fill="#101613"/><rect x="15" y="14" width="1" height="1" fill="#101613"/><rect x="16" y="14" width="1" height="1" fill="#101613"/><rect x="17" y="14" width="1" height="1" fill="#101613"/><rect x="21" y="14" width="1" height="1" fill="#101613"/><rect x="23" y="14" width="1" height="1" fill="#101613"/><rect x="24" y="14" width="1" height="1" fill="#101613"/><rect x="1" y="15" width="1" height="1" fill="#101613"/><rect x="2" y="15" width="1" height="1" fill="#101613"/><rect x="3" y="15" width="1" height="1" fill="#101613"/><rect x="11" y="15" width="1" height="1" fill="#101613"/><rect x="13" y="15" width="1" height="1" fill="#101613"/><rect x="20" y="15" width="1" height="1" fill="#101613"/><rect x="22" y="15" width="1" height="1" fill="#101613"/><rect x="23" y="15" width="1" height="1" fill="#101613"/><rect x="0" y="16" width="1" height="1" fill="#101613"/><rect x="2" y="16" width="1" height="1" fill="#101613"/><rect x="4" y="16" width="1" height="1" fill="#101613"/><rect x="6" y="16" width="1" height="1" fill="#101613"/><rect x="12" y="16" width="1" height="1" fill="#101613"/><rect x="14" y="16" width="1" height="1" fill="#101613"/><rect x="18" y="16" width="1" height="1" fill="#101613"/><rect x="19" y="16" width="1" height="1" fill="#101613"/><rect x="20" y="16" width="1" height="1" fill="#101613"/><rect x="0" y="17" width="1" height="1" fill="#101613"/><rect x="1" y="17" width="1" height="1" fill="#101613"/><rect x="5" y="17" width="1" height="1" fill="#101613"/><rect x="9" y="17" width="1" height="1" fill="#101613"/><rect x="11" y="17" width="1" height="1" fill="#101613"/><rect x="16" y="17" width="1" height="1" fill="#101613"/><rect x="20" y="17" width="1" height="1" fill="#101613"/><rect x="24" y="17" width="1" height="1" fill="#101613"/><rect x="8" y="18" width="1" height="1" fill="#101613"/><rect x="12" y="18" width="1" height="1" fill="#101613"/><rect x="20" y="18" width="1" height="1" fill="#101613"/><rect x="24" y="18" width="1" height="1" fill="#101613"/><rect x="7" y="19" width="1" height="1" fill="#101613"/><rect x="11" y="19" width="1" height="1" fill="#101613"/><rect x="14" y="19" width="1" height="1" fill="#101613"/><rect x="15" y="19" width="1" height="1" fill="#101613"/><rect x="17" y="19" width="1" height="1" fill="#101613"/><rect x="18" y="19" width="1" height="1" fill="#101613"/><rect x="7" y="20" width="1" height="1" fill="#101613"/><rect x="11" y="20" width="1" height="1" fill="#101613"/><rect x="12" y="20" width="1" height="1" fill="#101613"/><rect x="20" y="20" width="1" height="1" fill="#101613"/><rect x="21" y="20" width="1" height="1" fill="#101613"/><rect x="22" y="20" width="1" height="1" fill="#101613"/><rect x="9" y="21" width="1" height="1" fill="#101613"/><rect x="10" y="21" width="1" height="1" fill="#101613"/><rect x="14" y="21" width="1" height="1" fill="#101613"/><rect x="18" y="21" width="1" height="1" fill="#101613"/><rect x="19" y="21" width="1" height="1" fill="#101613"/><rect x="21" y="21" width="1" height="1" fill="#101613"/><rect x="22" y="21" width="1" height="1" fill="#101613"/><rect x="7" y="22" width="1" height="1" fill="#101613"/><rect x="8" y="22" width="1" height="1" fill="#101613"/><rect x="13" y="22" width="1" height="1" fill="#101613"/><rect x="14" y="22" width="1" height="1" fill="#101613"/><rect x="15" y="22" width="1" height="1" fill="#101613"/><rect x="16" y="22" width="1" height="1" fill="#101613"/><rect x="17" y="22" width="1" height="1" fill="#101613"/><rect x="18" y="22" width="1" height="1" fill="#101613"/><rect x="19" y="22" width="1" height="1" fill="#101613"/><rect x="20" y="22" width="1" height="1" fill="#101613"/><rect x="21" y="22" width="1" height="1" fill="#101613"/><rect x="22" y="22" width="1" height="1" fill="#101613"/><rect x="9" y="23" width="1" height="1" fill="#101613"/><rect x="11" y="23" width="1" height="1" fill="#101613"/><rect x="15" y="23" width="1" height="1" fill="#101613"/><rect x="17" y="23" width="1" height="1" fill="#101613"/><rect x="19" y="23" width="1" height="1" fill="#101613"/><rect x="20" y="23" width="1" height="1" fill="#101613"/><rect x="21" y="23" width="1" height="1" fill="#101613"/><rect x="23" y="23" width="1" height="1" fill="#101613"/><rect x="24" y="23" width="1" height="1" fill="#101613"/><rect x="7" y="24" width="1" height="1" fill="#101613"/><rect x="9" y="24" width="1" height="1" fill="#101613"/><rect x="12" y="24" width="1" height="1" fill="#101613"/><rect x="13" y="24" width="1" height="1" fill="#101613"/><rect x="14" y="24" width="1" height="1" fill="#101613"/><rect x="15" y="24" width="1" height="1" fill="#101613"/></svg>
+        </div>
+        <div class="cash-code" data-pay="scan">
+          <div class="cash-lens"><span></span></div>
+        </div>
+        <div class="cash-code" data-pay="paid" style="border-color:var(--jade-a32)">
+          <svg class="ic" style="width:96px;height:96px;color:var(--jade-500)"><use href="#i-check"/></svg>
+        </div>
+        <div class="cash-code" data-pay="closed" style="background:var(--surf-2)">
+          <svg class="ic" style="width:88px;height:88px;color:var(--fog-500)"><use href="#i-close"/></svg>
+        </div>
+        <div class="cash-code" data-pay="query">
+          <svg class="ic" style="width:88px;height:88px;color:var(--amber-500)"><use href="#i-search"/></svg>
+        </div>
+
+        <!-- 状态行：位置固定，只换字与色 -->
+        <span class="cash-st cash-st--wait" data-pay="wait">
+          <svg class="ic"><use href="#i-clock"/></svg>用微信或支付宝扫上面的码 · 本码 <b>4:32</b> 后失效
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="scan">
+          <svg class="ic"><use href="#i-qr"/></svg>把手机里的付款码对准取景框 · 本机只读码，不存你的付款码
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="confirm">
+          <svg class="ic"><use href="#i-clock"/></svg>已收到扫码，正在等支付渠道回传到账结果 · <b>不要重复支付</b>
+        </span>
+        <span class="cash-st cash-st--ok" data-pay="paid">
+          <svg class="ic"><use href="#i-check"/></svg>已到账 3.00 元 · 按下面的按钮开始出纸
+        </span>
+        <span class="cash-st cash-st--bad" data-pay="expired">
+          <svg class="ic"><use href="#i-alert"/></svg>本码已失效并作废 · 重新出码会同时关闭旧码，不会两个码都能付
+        </span>
+        <span class="cash-st cash-st--wait" data-pay="query">
+          <svg class="ic"><use href="#i-search"/></svg>正在按订单号向支付渠道查这笔钱到没到
+        </span>
+        <span class="cash-st cash-st--bad" data-pay="closed">
+          <svg class="ic"><use href="#i-close"/></svg>超时未支付，本单已关闭 · <b>没有收你钱，也没有打印</b>
+        </span>
+
+        <span class="cash-ch" data-pay="wait scan expired">
+          支持 <i>微信支付</i> <i>支付宝</i> · 收款方为本机运营方，收款主体与金额见屏上公示
+        </span>
+
+        <div class="notice" data-pay="confirm" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>渠道回传通常几秒内到。<b>如果你手机已显示付款成功但这里没动</b>，
+            按「我已付款，帮我查」——本机会按订单号主动查一次，不需要你再付一遍。
+            同一笔订单本机只接受一次收款；重复到账会自动退回原路。</span>
+        </div>
+
+        <div class="notice notice--amber" data-pay="query" style="max-width:40em">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>查单有三种结果：<b>已到账</b>→ 直接开始出纸；<b>渠道未收到</b>→ 这笔钱没扣，可以重新出码；
+            <b>渠道说处理中</b>→ 本机不会替渠道下结论，会把订单转成待打印，钱到账后凭手机号在任一台机器继续打。
+            <span class="ev ev--e2">E2 结果来自支付渠道，不是本机判断</span></span>
+        </div>
+
+        <div class="notice" data-pay="closed" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>关单时二维码已同步作废，之后扫它不会成功。文件还在本次会话里，
+            可以回上一步重新下单；离场或会话结束会自动清空。</span>
+        </div>
+
+        <div class="cash-demo" data-review>
+          <span style="width:100%;text-align:center;font-size:var(--fz-1);color:var(--fog-500);letter-spacing:.05em">
+            原型演示 · 切到某个处境（真实系统由支付渠道回传和超时任务驱动，不由用户点）</span>
+          <button data-pay-btn="wait" aria-pressed="true">待付</button>
+          <button data-pay-btn="scan">扫用户码</button>
+          <button data-pay-btn="confirm">到账中</button>
+          <button data-pay-btn="paid">已到账</button>
+          <button data-pay-btn="expired">码失效</button>
+          <button data-pay-btn="query">查单</button>
+          <button data-pay-btn="closed">已关单</button>
+        </div>
+      </div>
+
+      <!-- S6 出纸进度 -->
+      <div class="progress-wrap" data-at="s6">
         <div class="dial">
           <svg viewBox="0 0 100 100">
             <circle class="tk" cx="50" cy="50" r="43"/>
@@ -201,12 +299,20 @@
         </div>
         <div class="notice notice--coral" data-when="device-off" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机中途离线，已暂停。已支付金额不会重复扣款；剩余 12 面保留为待打印订单，凭取件码可在任一台空闲机器续打。</span>
+          <span><b>打印机中途离线，已暂停。你已经付过的钱不会再扣一次。</b>剩余 12 面有两条路，你选：<br>
+            · <b>继续打</b>：剩余份数保留为待打印订单，凭取件码在任一台空闲机器续打，不再收费。<br>
+            · <b>不打了</b>：按<b>未出的 12 面</b>退 2.40 元，已出的 3 面不退；退款走原渠道，1–3 个工作日到账。<br>
+            两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</span>
+        </div>
+        <div class="notice notice--coral" data-when="device-off" style="max-width:40em">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>本机<b>不会自己替你决定退还是续打</b>。你离场未选择时，订单默认转为待打印保留 7 天，
+            到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。</span>
         </div>
       </div>
 
       <!-- S6 取件 -->
-      <div class="progress-wrap" data-at="s6">
+      <div class="progress-wrap" data-at="s7">
         <div class="pickup">
           <span class="chip chip--jade"><span class="dot dot--live"></span>本次办理完成</span>
           <div class="pickup-code">7742 106 358</div>
@@ -373,8 +479,43 @@
         </div>
       </div>
 
-      <!-- S5 任务信息 -->
-      <div class="pane pane--fill" data-at="s5">
+
+      <!-- S4/S5 价目表：金额必须能被核对，不能只给一个总数 -->
+      <div class="pane" data-at="s4 s5">
+        <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
+        <div class="price">
+          <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
+          <div class="price-row"><span>黑白 · A4 · 每个印刷面</span><span class="v">0.20 元</span></div>
+          <div class="price-row"><span>彩色 · A4 · 每个印刷面</span><span class="v">1.50 元</span></div>
+          <div class="price-row"><span>双面（一张纸两面）</span><span class="v">按 2 面计</span></div>
+          <div class="price-row price-row--free"><span>扫描转 PDF</span><span class="v">免费</span></div>
+          <div class="price-row price-row--free"><span>AI 诊断 / 优化</span><span class="v">免费</span></div>
+        </div>
+        <p class="price-note">
+          <b>金额为 0 的订单不进收银台</b>，直接出纸（例如只扫描、或用了减免）。<br>
+          本机不接受现金，不找零；不支持刷卡。
+        </p>
+      </div>
+
+      <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
+      <div class="pane pane--fill pane--grow" data-at="s5">
+        <div class="pane-hd"><span class="t">退款怎么算</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">未出纸就取消</span><span class="v">全额退</span></div>
+          <div class="kv-row"><span class="k">机器故障没出完</span><span class="v">按未出面数退</span></div>
+          <div class="kv-row"><span class="k">已出纸但你不满意</span><span class="v" style="color:var(--amber-400)">不退，可折价复打</span></div>
+          <div class="kv-row"><span class="k">重复到账</span><span class="v">自动退回原路</span></div>
+          <div class="kv-row"><span class="k">退款到账</span><span class="v">原渠道 1–3 个工作日</span></div>
+        </div>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>退款由服务端按<b>实际出纸面数</b>算，不看你按了几次按钮。
+            所有退款都会写进你的打印订单记录，可在「我的 · 打印订单」里查到金额与原因。</span>
+        </div>
+      </div>
+
+      <!-- S6 任务信息 -->
+      <div class="pane pane--fill" data-at="s6">
         <div class="pane-hd"><span class="t">任务</span><span class="s">#PT-20260808-0431</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">状态</span><span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>正在出纸</span><span class="v" data-when="device-off"><span class="dot dot--down"></span>已暂停</span></div>
@@ -388,7 +529,7 @@
       </div>
 
       <!-- S6 订单 -->
-      <div class="pane pane--fill" data-at="s6">
+      <div class="pane pane--fill" data-at="s7">
         <div class="pane-hd"><span class="t">本次订单</span><span class="s">#PT-20260808-0431</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">文件</span><span class="v">个人简历.pdf</span></div>
@@ -440,10 +581,19 @@
         <div data-when="device-off"><div class="t">打印机离线，暂不能支付出纸</div><div class="s">可先转存「我的文档」，换机取回打印</div></div>
       </div>
       <div data-at="s5">
+        <div data-pay="wait"><div class="t">用手机扫屏上的码付 3.00 元</div><div class="s">本码 4:32 后失效 · 失效会自动作废，不会重复收款</div></div>
+        <div data-pay="scan"><div class="t">把手机付款码对准取景框</div><div class="s">本机只读取一次，不保存你的付款码</div></div>
+        <div data-pay="confirm"><div class="t">正在等支付渠道回传到账结果</div><div class="s">不要重复支付 · 手机已成功但这里没动，按「帮我查」</div></div>
+        <div data-pay="paid"><div class="t">已到账 3.00 元</div><div class="s">按「开始出纸」才会出纸 —— 付款不等于自动开印</div></div>
+        <div data-pay="expired"><div class="t">支付码已失效并作废</div><div class="s">重新出码会同时关闭旧码 · 这笔钱没有扣</div></div>
+        <div data-pay="query"><div class="t">正在按订单号向渠道查这笔钱</div><div class="s">查询结果来自支付渠道，本机不替渠道下结论</div></div>
+        <div data-pay="closed"><div class="t">超时未支付，本单已关闭</div><div class="s">没有收你钱，也没有打印 · 文件还在本次会话</div></div>
+      </div>
+      <div data-at="s6">
         <div data-when="default first ai-down"><div class="t">正在出纸，请勿离开取纸口</div><div class="s">已出 3 / 共 15 面 · 用纸 10 张</div></div>
         <div data-when="device-off"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
       </div>
-      <div data-at="s6"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
+      <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
     </div>
 
     <!-- 左侧：返回 / 备选 -->
@@ -451,8 +601,8 @@
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">上一步</button>
     <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">返回改参数</button>
-    <button class="btn btn--lg btn--ghost" data-at="s5">异常求助</button>
-    <button class="btn btn--lg btn--ghost" data-at="s6">再打一份</button>
+    <button class="btn btn--lg btn--ghost" data-at="s6">异常求助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s7">再打一份</button>
 
     <!-- 右侧：唯一主动作。不可逆动作用朱砂 -->
     <button class="btn btn--primary" data-at="s1" data-go="s2">本机上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -461,10 +611,24 @@
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="default first ai-down">去确认<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first ai-down" id="btn-quote" data-gate="unquoted">获取核价<svg class="ic"><use href="#i-refresh"/></svg></button>
-    <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" id="btn-pay" data-gate="quoted">确认并支付<svg class="ic"><use href="#i-card"/></svg></button>
+    <button class="btn btn--commit" data-at="s4" data-go="s5" data-when="default first ai-down" id="btn-pay" data-gate="quoted">确认金额，去付款<svg class="ic"><use href="#i-card"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s5" aria-disabled="true">出纸中…</button>
-    <button class="btn btn--primary" data-at="s6" data-go="s1">完成<svg class="ic"><use href="#i-check"/></svg></button>
+    <!-- 免费订单（只扫描 / 有减免）金额为 0，跳过收银直接出纸 -->
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-when="default" data-go="s6">本单免费 · 直接出纸</button>
+    <!-- 收银台：左侧退出路径 -->
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="wait scan expired query" data-go="s4">取消支付，返回</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="confirm" data-pay-go="query">我已付款，帮我查</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="closed" data-go="s4">重新下单</button>
+    <button class="btn btn--lg btn--ghost" data-at="s5" data-pay="paid" data-go="s4">先不打，转存我的文档</button>
+    <!-- 收银台：右侧主动作 -->
+    <button class="btn btn--primary" data-at="s5" data-pay="wait" data-pay-go="query">我已付款，帮我查<svg class="ic"><use href="#i-search"/></svg></button>
+    <button class="btn btn--primary" data-at="s5" data-pay="scan" aria-disabled="true">等待读取付款码…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="confirm" aria-disabled="true">等渠道回传到账…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="query" aria-disabled="true">查询中…</button>
+    <button class="btn btn--primary" data-at="s5" data-pay="expired" data-pay-go="wait">重新出码<svg class="ic"><use href="#i-refresh"/></svg></button>
+    <button class="btn btn--commit" data-at="s5" data-pay="paid" data-go="s6">开始出纸<svg class="ic"><use href="#i-printer"/></svg></button>
+    <button class="btn btn--primary" data-at="s6" aria-disabled="true">出纸中…</button>
+    <button class="btn btn--primary" data-at="s7" data-go="s1">完成<svg class="ic"><use href="#i-check"/></svg></button>
   </div>
 
   <nav class="navbar">
@@ -476,7 +640,7 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=13"></script>
+<script src="scripts/stage.js?v=16"></script>
 <script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
@@ -548,6 +712,6 @@
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
 })()
 </script>
-<script src="scripts/audit-plus.js?v=11"></script>
+<script src="scripts/audit-plus.js?v=12"></script>
 </body>
 </html>
