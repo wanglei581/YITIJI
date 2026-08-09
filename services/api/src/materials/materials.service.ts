@@ -1,5 +1,5 @@
-import { BadRequestException, ForbiddenException, GoneException, Injectable, NotFoundException } from '@nestjs/common'
-import { createHash, randomBytes, timingSafeEqual } from 'crypto'
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common'
+import { createHash, randomBytes } from 'crypto'
 import { countPdfPages, isSinglePageImage } from '../files/file-page-count.util'
 import { OcrService } from '../ai/resume/ocr/ocr.service'
 import { openPdfForRender } from '../ai/resume/ocr/pdf-page-renderer'
@@ -7,14 +7,17 @@ import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import type { CreateMaterialTaskDto } from './dto/create-material-task.dto'
 import type { DecidePiiFindingsDto, PiiDecisionAction } from './dto/decide-pii-findings.dto'
+import { assertCanAccessTask, assertTaskNotExpired, hashAccessToken } from './materials.access'
 import type {
   DocumentProcessTaskView,
   MaterialTaskKind,
   MaterialTaskStatus,
   MaterialsRequester,
   PiiFindingAction,
+  PiiFindingBoxView,
   PiiFindingView,
 } from './materials.types'
+import { injectRedactedFileUrl, parseFindingBoxes, PiiRedactionService } from './pii-redaction.service'
 import { buildPiiFindingsFromPages, extractTextForPiiScan } from './pii-scan.util'
 
 const TASK_TTL_HOURS = 24
@@ -53,6 +56,7 @@ type FindingRecord = {
   snippet: string | null
   confidence: number | null
   action: string
+  boxesJson: string | null
   createdAt: Date
 }
 
@@ -64,6 +68,7 @@ type SourceFileRecord = {
   mimeType: string
   sizeBytes: number
   purpose: string
+  sensitiveLevel: string
   endUserId: string | null
   uploaderId: string | null
   ownerType: string | null
@@ -103,18 +108,6 @@ type ImageQualitySummary = {
   quality: 'ok' | 'low'
 }
 
-type PiiRedactionSummary = {
-  canRedact: boolean
-  redactedFileId: string | null
-  resultFileCreated: boolean
-  decisionTaskId: string | null
-  findingCount: number
-  redactedCount: number
-  keptCount: number
-  pendingCount: number
-  warnings: string[]
-  messages: InspectionMessage[]
-}
 
 @Injectable()
 export class MaterialsService {
@@ -122,6 +115,7 @@ export class MaterialsService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly ocr: OcrService,
+    private readonly redaction: PiiRedactionService,
   ) {}
 
   async createTask(dto: CreateMaterialTaskDto, requester: MaterialsRequester): Promise<DocumentProcessTaskView> {
@@ -143,7 +137,8 @@ export class MaterialsService {
         requesterMode,
         accessTokenHash: accessToken ? hashAccessToken(accessToken) : null,
         sourceFileId: sourceFile.id,
-        resultFileId: null,
+        // 遮挡派生件在 initialResult 里同步生成，这里直接落血缘（未生成时为 null）。
+        resultFileId: result.resultFileId ?? null,
         endUserId: sourceFile.endUserId,
         paramsJson,
         resultJson: JSON.stringify(result.result),
@@ -176,7 +171,12 @@ export class MaterialsService {
         const findings = buildPiiFindingsFromPages(extraction.pages)
         if (findings.length > 0) {
           await this.prisma.piiFinding.createMany({
-            data: findings.map((finding) => ({ ...finding, taskId: task.id })),
+            data: findings.map(({ boxes, ...finding }) => ({
+              ...finding,
+              taskId: task.id,
+              // 只落坐标，不落 PII 原文；空数组落 null，语义即"拿不到坐标，不可遮挡"。
+              boxesJson: boxes.length > 0 ? JSON.stringify(boxes) : null,
+            })),
           })
         }
         // 页数受 PII_SCAN_MAX_OCR_PAGES 截断的扫描件：即使命中数为 0，也不能报告为完整扫描
@@ -208,8 +208,8 @@ export class MaterialsService {
     if (!task) {
       throw new NotFoundException({ error: { code: 'MATERIAL_TASK_NOT_FOUND', message: '材料处理任务不存在' } })
     }
-    this.assertNotExpired(task)
-    this.assertCanAccessTask(task, requester)
+    assertTaskNotExpired(task)
+    assertCanAccessTask(task, requester)
     return toTaskView(task)
   }
 
@@ -225,8 +225,8 @@ export class MaterialsService {
     if (!task) {
       throw new NotFoundException({ error: { code: 'MATERIAL_TASK_NOT_FOUND', message: '材料处理任务不存在' } })
     }
-    this.assertNotExpired(task)
-    this.assertCanAccessTask(task, requester)
+    assertTaskNotExpired(task)
+    assertCanAccessTask(task, requester)
     if (task.kind !== 'pii_scan' && task.kind !== 'pii_redact') {
       throw new BadRequestException({ error: { code: 'MATERIAL_TASK_KIND_INVALID', message: '该任务不支持 PII 决策' } })
     }
@@ -263,7 +263,7 @@ export class MaterialsService {
     sourceFile: SourceFileRecord,
     params: Record<string, unknown>,
     requester: MaterialsRequester,
-  ): Promise<{ status: MaterialTaskStatus; result: Record<string, unknown> }> {
+  ): Promise<{ status: MaterialTaskStatus; result: Record<string, unknown>; resultFileId?: string | null }> {
     if (kind === 'inspection') {
       const inspection = await this.inspectSourceFile(sourceFile)
       return {
@@ -310,13 +310,16 @@ export class MaterialsService {
       return { status: 'completed', result: { mode: 'pending_real_scan', findingCount: 0 } }
     }
     if (kind === 'pii_redact') {
-      const redaction = await this.evaluatePiiRedaction(sourceFile, params, requester)
+      const redaction = await this.redaction.evaluate(sourceFile, params, requester)
       return {
         status: 'completed',
         result: {
+          // mode 保持 'pii_redaction_evaluation' 不变：TASK_TTL_HOURS 内仍可能被读到的存量任务
+          // 与既有前端分支都按这个值取 checks；本轮变化在 checks 里（新增 claim / items / reverify）。
           mode: 'pii_redaction_evaluation',
           checks: redaction,
         },
+        resultFileId: redaction.redactedFileId,
       }
     }
     return { status: 'pending', result: { mode: 'skeleton', queued: false } }
@@ -527,47 +530,12 @@ export class MaterialsService {
     }
   }
 
-  private async evaluatePiiRedaction(
-    sourceFile: SourceFileRecord,
-    params: Record<string, unknown>,
-    requester: MaterialsRequester,
-  ): Promise<PiiRedactionSummary> {
-    const decisionTaskId = typeof params['decisionTaskId'] === 'string' ? params['decisionTaskId'] : null
-    if (!decisionTaskId) {
-      return buildPiiRedactionSummary({
-        decisionTaskId: null,
-        findings: [],
-        warnings: ['PII_DECISION_TASK_REQUIRED'],
-        message: { code: 'PII_DECISION_TASK_REQUIRED', severity: 'warning', text: '缺少隐私检查决策任务，暂不能评估遮挡产物' },
-      })
-    }
-
-    const decisionTask = await this.prisma.documentProcessTask.findUnique({
-      where: { id: decisionTaskId },
-      include: { findings: true },
-    })
-    if (!decisionTask || decisionTask.sourceFileId !== sourceFile.id || decisionTask.kind !== 'pii_scan') {
-      return buildPiiRedactionSummary({
-        decisionTaskId,
-        findings: [],
-        warnings: ['PII_DECISION_TASK_INVALID'],
-        message: { code: 'PII_DECISION_TASK_INVALID', severity: 'warning', text: '隐私检查决策任务不可用，请重新完成隐私检查' },
-      })
-    }
-
-    this.assertNotExpired(decisionTask)
-    this.assertCanAccessTask(decisionTask, requester)
-    return buildPiiRedactionSummary({
-      decisionTaskId,
-      findings: decisionTask.findings,
-      warnings: [],
-      message: {
-        code: 'PII_REDACTION_EVALUATED',
-        severity: 'info',
-        text: '已完成遮挡产物评估，当前版本不生成新文件，打印仍使用原文件',
-      },
-    })
-  }
+  /**
+   * 生成遮挡后的派生件（一级 · 文字层 PDF）。
+   *
+   * 铁律（决策文档 §3.4 / §五）：拿不到坐标时返回 not_supported 且**不产出任何文件** ——
+   * 宁可诚实说做不了，也不留半成品让用户以为已经遮挡。
+   */
 
   private async requireUsableSourceFile(sourceFileId: string): Promise<SourceFileRecord> {
     const file = await this.prisma.fileObject.findUnique({ where: { id: sourceFileId } })
@@ -585,56 +553,6 @@ export class MaterialsService {
     const isAnonymousFile = !file.uploaderId && (!file.ownerType || file.ownerType === 'system') && !file.ownerId
     if (isAnonymousFile) return
     throw new ForbiddenException({ error: { code: 'SOURCE_FILE_OWNER_UNSUPPORTED', message: '本期暂不支持该来源文件创建材料任务' } })
-  }
-
-  private assertCanAccessTask(task: { endUserId: string | null }, requester: MaterialsRequester): void {
-    if (!task.endUserId) {
-      if (requester.kind !== 'anonymous') {
-        throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_ACCESS_DENIED', message: '无权访问该材料处理任务' } })
-      }
-      const tokenHash = (task as { accessTokenHash?: string | null }).accessTokenHash
-      if (tokenHash && requester.accessToken && verifyAccessToken(requester.accessToken, tokenHash)) return
-      throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_TOKEN_REQUIRED', message: '缺少或无效的材料任务访问凭证' } })
-    }
-    if (requester.kind === 'member' && requester.endUserId === task.endUserId) return
-    throw new ForbiddenException({ error: { code: 'MATERIAL_TASK_ACCESS_DENIED', message: '无权访问该材料处理任务' } })
-  }
-
-  private assertNotExpired(task: { expiresAt: Date }): void {
-    if (task.expiresAt.getTime() > Date.now()) return
-    throw new GoneException({ error: { code: 'MATERIAL_TASK_EXPIRED', message: '材料处理任务已过期' } })
-  }
-}
-
-function buildPiiRedactionSummary(args: {
-  decisionTaskId: string | null
-  findings: Array<{ action: string }>
-  warnings: string[]
-  message: InspectionMessage
-}): PiiRedactionSummary {
-  const findingCount = args.findings.length
-  const redactedCount = args.findings.filter((finding) => finding.action === 'redact').length
-  const keptCount = args.findings.filter((finding) => finding.action === 'keep').length
-  const pendingCount = args.findings.filter((finding) => finding.action === 'pending').length
-  const pendingWarnings = pendingCount > 0 ? ['PII_DECISIONS_PENDING'] : []
-  const warnings = [...args.warnings, ...pendingWarnings]
-  const messages = [
-    args.message,
-    ...(pendingCount > 0
-      ? [{ code: 'PII_DECISIONS_PENDING', severity: 'warning' as const, text: '仍有隐私片段未选择保留或遮挡，暂不能生成遮挡评估' }]
-      : []),
-  ]
-  return {
-    canRedact: warnings.length === 0,
-    redactedFileId: null,
-    resultFileCreated: false,
-    decisionTaskId: args.decisionTaskId,
-    findingCount,
-    redactedCount,
-    keptCount,
-    pendingCount,
-    warnings,
-    messages,
   }
 }
 
@@ -777,7 +695,7 @@ function toTaskView(task: TaskRecord): DocumentProcessTaskView {
     resultFileId: task.resultFileId,
     endUserId: task.endUserId,
     params: parseJsonObject(task.paramsJson),
-    result: task.resultJson ? parseJsonObject(task.resultJson) : null,
+    result: injectRedactedFileUrl(task.kind, task.resultJson ? parseJsonObject(task.resultJson) : null),
     errorCode: task.errorCode,
     errorMessage: task.errorMessage,
     expiresAt: task.expiresAt.toISOString(),
@@ -785,17 +703,6 @@ function toTaskView(task: TaskRecord): DocumentProcessTaskView {
     updatedAt: task.updatedAt.toISOString(),
     piiFindings: task.findings?.map(toFindingView),
   }
-}
-
-function hashAccessToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
-}
-
-function verifyAccessToken(token: string, expectedHash: string): boolean {
-  const actual = Buffer.from(hashAccessToken(token), 'hex')
-  const expected = Buffer.from(expectedHash, 'hex')
-  if (actual.length !== expected.length) return false
-  return timingSafeEqual(actual, expected)
 }
 
 function toFindingView(finding: FindingRecord): PiiFindingView {
@@ -808,6 +715,7 @@ function toFindingView(finding: FindingRecord): PiiFindingView {
     snippet: finding.snippet,
     confidence: finding.confidence,
     action: finding.action as PiiFindingAction,
+    boxes: parseFindingBoxes(finding.boxesJson) as PiiFindingBoxView[],
     createdAt: finding.createdAt.toISOString(),
   }
 }
