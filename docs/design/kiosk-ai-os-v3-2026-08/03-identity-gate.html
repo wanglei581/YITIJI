@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P03 身份门 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P03 身份门">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P03 身份门 ─────────────────────────────────────────────────────────
+   规格要求**弹层形态，不做独立页跳转** —— 这条是对的：
+   身份门是打断，不是一段旅程。跳到独立页会让用户失去"我刚才在干嘛"的上下文，
+   回来还得重新找。所以它盖在当前页上，背后的内容仍然可见。
+
+   ── 这一页最要紧的三条 ────────────────────────────────────────────
+
+   ① **游客是平等选项，不是次等选项。**
+      常见做法是把"暂不登录"做成右下角一行灰色小字 —— 那是逼人给手机号。
+      本机不这么做：三个选项同样大小、同样醒目，且明说
+      「不登录能用全部功能，只是东西留不下来」。
+
+   ② **要手机号必须说清为什么、存多久、能不能不给。**
+      不说清就要，等于默认用户不会问。在公共场所对着找工作的人尤其不该。
+
+   ③ **公共场所输手机号，旁边有人看着。**
+      键盘上的数字、屏幕上的回显、短信验证码 —— 每一样都可能被看到。
+      所以：手机号中段默认打码、验证码输入区不回显完整号码、
+      并明确告诉用户「周围有人的话，扫码比输号码稳妥」。
+
+   ── 结构 ────────────────────────────────────────────────────────
+   本页是弹层，不用 .wmain / .wside 两栏骨架 ——
+   因此 audit-plus 的「版面留白 / 主区空壳」两项会自动跳过（全屏/弹层页通例）。
+   ──────────────────────────────────────────────────────────────── */
+
+/* 背后被打断的页面（示意，压暗） */
+.behind { position:absolute; inset:0; padding:var(--s-6); opacity:.34; filter:saturate(.6);
+  display:flex; flex-direction:column; gap:var(--s-4); pointer-events:none; }
+.behind-row { height:96px; border-radius:var(--r-md);
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); }
+.behind-row--tall { flex:1 1 auto; }
+
+.scrim { position:absolute; inset:0; background:rgba(12,18,16,.52); }
+
+/* 弹层 */
+.gate { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:880px; max-width:calc(100% - 96px); max-height:calc(100% - 120px);
+  border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column;
+  background:var(--surf-0, #f6f4ee); border:1px solid var(--glass-1-brd);
+  box-shadow:0 32px 90px rgba(0,0,0,.34); }
+.gate-hd { flex:0 0 auto; padding:var(--s-6) var(--s-6) var(--s-5); }
+.gate-h { font-size:34px; font-weight:800; color:var(--fog-900); line-height:1.2; }
+.gate-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.6; margin-top:var(--s-3); }
+.gate-p b { color:var(--fog-900); }
+.gate-body { flex:1 1 auto; min-height:0; overflow-y:auto; padding:0 var(--s-6) var(--s-6);
+  display:flex; flex-direction:column; gap:var(--s-4); }
+
+/* 三个选项：同样大小、同样醒目 */
+.ways { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--s-4); }
+.way { text-align:left; padding:var(--s-5); border-radius:var(--r-md); cursor:pointer;
+  background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); font-family:var(--ff-ui);
+  display:flex; flex-direction:column; gap:var(--s-3); min-height:190px;
+  transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.way:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.way--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.way-ic { width:46px; height:46px; border-radius:var(--r-xs); display:grid; place-items:center;
+  background:var(--fog-a08); flex:0 0 auto; }
+.way-ic .ic { width:23px; height:23px; color:var(--fog-700); }
+.way--on .way-ic { background:var(--jade-a20); }
+.way--on .way-ic .ic { color:var(--jade-400); }
+.way-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+.way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+/* 手机号输入：公共场所要打码 */
+.phone { display:flex; align-items:center; gap:var(--s-4); padding:var(--s-5);
+  border-radius:var(--r-md); background:var(--surf-1); border:1px solid var(--brd-1);
+  min-height:74px; }
+.phone-n { font-size:34px; font-weight:700; font-family:var(--ff-num); color:var(--fog-900);
+  letter-spacing:.14em; font-variant-numeric:tabular-nums; }
+.phone-n .mask { color:var(--fog-600); }
+.phone-cur { display:inline-block; width:3px; height:.9em; background:var(--jade-500);
+  vertical-align:-2px; }
+@media (prefers-reduced-motion:no-preference){ .phone-cur{ animation:p03cur 1.1s steps(2) infinite } }
+@keyframes p03cur { 50%{opacity:0} }
+
+.gate-foot { flex:0 0 auto; padding:var(--s-5) var(--s-6);
+  border-top:1px solid var(--brd-1); display:flex; align-items:center; gap:var(--s-5);
+  background:var(--fog-a04); flex-wrap:wrap; }
+.gate-foot .t { flex:1 1 320px; }
+.gate-foot .t { font-size:var(--fz-2); color:var(--fog-600); line-height:1.55; min-width:0; }
+.gate-foot .t b { color:var(--fog-800); }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+
+  <!-- 背后被打断的页面：仍然可见，用户知道自己刚才在干嘛 -->
+  <div class="behind">
+    <div class="behind-row"></div>
+    <div class="behind-row behind-row--tall"></div>
+    <div class="behind-row"></div>
+  </div>
+  <div class="scrim"></div>
+
+  <!-- ═══ 弹层 ═══ -->
+  <div class="gate">
+
+    <div class="gate-hd">
+      <div class="gate-h" data-at="s1">要把这份文件留下来吗？</div>
+      <div class="gate-h" data-at="s2">输入手机号</div>
+
+      <div class="gate-p" data-at="s1">
+        你刚生成的<b>赶场作战单</b>可以直接打印带走 —— 这个<b>不用登录</b>。<br>
+        只有想让它<b>留在账号里、换台机器还能取</b>，才需要下面三选一。
+      </div>
+      <div class="gate-p" data-at="s2">
+        用来给你发一条验证码，<b>只验一次</b>。<br>
+        本机<b>不用它推销、不卖给第三方、不给任何合作机构</b>。
+      </div>
+    </div>
+
+    <!-- ─────────── S1 三选一 ─────────── -->
+    <div class="gate-body" data-at="s1">
+      <div class="ways">
+        <button class="way">
+          <span class="way-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="way-t">手机扫码</span>
+          <span class="way-s">
+            用手机扫屏幕上的码，在<b>你自己手机上</b>完成。<br>
+            大厅里人多的话，<b>这个最稳妥</b> —— 号码不出现在这块屏幕上。
+          </span>
+        </button>
+
+        <button class="way" data-go="s2">
+          <span class="way-ic"><svg class="ic"><use href="#i-phone"/></svg></span>
+          <span class="way-t">输手机号</span>
+          <span class="way-s">
+            在这块屏幕上输入并接收验证码。<br>
+            中间四位会打码显示，但<b>旁边有人时仍可能被看到</b>。
+          </span>
+        </button>
+
+        <button class="way way--on">
+          <span class="way-ic"><svg class="ic"><use href="#i-user"/></svg></span>
+          <span class="way-t">不登录，继续用</span>
+          <span class="way-s">
+            <b>全部功能照常能用</b>，包括打印。<br>
+            只是文件留不下来 —— 离场自动清空，换台机器取不到。
+          </span>
+        </button>
+      </div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span><b>三个选项没有主次。</b>不登录不会少给你任何功能，也不会弹第二次。<br>
+              本机把"不登录"和另外两个做成一样大 —— 因为把它做成角落里一行灰字，
+              就是在逼你给手机号。</span>
+      </div>
+
+      <div class="notice" data-when="first">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>顺带说清：<b>登录不是会员，也不收费</b>。
+              它只决定文件存不存得下来，不解锁任何额外功能。</span>
+      </div>
+    </div>
+
+    <!-- ─────────── S2 输手机号 ─────────── -->
+    <div class="gate-body" data-at="s2">
+      <div class="phone">
+        <svg class="ic" style="width:26px;height:26px;color:var(--fog-600)"><use href="#i-phone"/></svg>
+        <span class="phone-n">138 <span class="mask">****</span> 8<span class="phone-cur"></span></span>
+        <span style="margin-left:auto"><span class="chip chip--info">中间四位已打码</span></span>
+      </div>
+
+      <div class="notice notice--amber">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span><b>你现在站在大厅里。</b>屏幕上的数字、你按的键、待会儿的验证码，
+              旁边的人都可能看到。<br>
+              如果周围有人，<b>返回上一步用手机扫码更稳妥</b> —— 号码不会出现在这块屏幕上。</span>
+      </div>
+
+      <div class="kv">
+        <div class="kv-row"><span class="k">用来做什么</span><span class="v">发一条验证码</span></div>
+        <div class="kv-row"><span class="k">验证后还留着吗</span><span class="v">留 · 作为你的账号标识</span></div>
+        <div class="kv-row"><span class="k">会用来推销吗</span><span class="v v--fog">不会</span></div>
+        <div class="kv-row"><span class="k">会给第三方吗</span><span class="v v--fog">不会</span></div>
+        <div class="kv-row"><span class="k">会用来提醒你吗</span><span class="v v--fog">不会 · 本机不发通知</span></div>
+        <div class="kv-row"><span class="k">能改成不给吗</span><span class="v">能 · 随时可退回不登录</span></div>
+      </div>
+
+      <div class="notice">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span>本机<b>只要手机号这一项</b>，不要姓名、身份证号、住址、学历。<br>
+              那些即使你在别的页面填过，也<b>不会和这个号码关联到一起</b>。</span>
+      </div>
+    </div>
+
+    <!-- 底部：合规与退路 + 操作。
+         弹层的操作按钮放在弹层里，不放页面级 ActionBar ——
+         页面级那条属于背后被打断的那一页，此刻不该由它承接弹层的操作。 -->
+    <div class="gate-foot">
+      <svg class="ic" style="width:22px;height:22px;color:var(--fog-600);flex:0 0 auto"><use href="#i-shield"/></svg>
+      <span class="t" data-at="s1">
+        无论选哪个，本机都<b>不代收简历、不代为投递</b>。
+        登录只影响文件存不存得下来。
+      </span>
+      <span class="t" data-at="s2">
+        随时可以退回去选<b>不登录</b> —— 已经做好的文件不会因此丢掉，
+        只是留不到账号里。
+      </span>
+
+      <span style="margin-left:auto;flex:0 0 auto;display:flex;gap:var(--s-3)">
+        <button class="btn btn--lg btn--ghost" data-at="s1">先不登录，继续用</button>
+        <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">返回 · 改用扫码</button>
+        <button class="btn btn--primary" data-at="s1" data-go="s2">继续<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+        <button class="btn btn--primary" data-at="s2">发送验证码<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+      </span>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=12"></script>
+</body>
+</html>
