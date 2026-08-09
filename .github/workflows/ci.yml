@@ -278,6 +278,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:demo-seed-guard
           pnpm --filter @ai-job-print/api verify:first-admin-bootstrap
           pnpm --filter @ai-job-print/api verify:contract-review:gate0
+          pnpm --filter @ai-job-print/api verify:contract-review:preprod-readiness
           pnpm --filter @ai-job-print/api verify:contract-review:contract
           pnpm --filter @ai-job-print/api verify:contract-review:file-policy
           pnpm --filter @ai-job-print/api verify:contract-review:report

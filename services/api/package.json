@@ -119,6 +119,7 @@
     "verify:contract-review:schema": "node -r @swc-node/register --test src/contract-review/__tests__/contract-review-schema.test.ts",
     "verify:contract-review:consent": "node -r @swc-node/register --test src/contract-review/__tests__/contract-review-consent.test.ts",
     "verify:contract-review:http": "node -r @swc-node/register scripts/verify-contract-review-http.ts",
+    "verify:contract-review:preprod-readiness": "node -r @swc-node/register scripts/verify-contract-review-preprod-readiness.ts",
     "verify:trust-proxy": "node -r @swc-node/register scripts/verify-trust-proxy.ts",
     "verify:release-provenance": "node -r @swc-node/register scripts/verify-release-provenance.ts",
     "verify:release-genesis": "node -r @swc-node/register scripts/verify-release-genesis.ts",

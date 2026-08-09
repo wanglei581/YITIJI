@@ -90,7 +90,7 @@
 
 ## Phase 0 真值收口后续
 
-- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已形成 Draft [PR #576](https://github.com/wanglei581/YITIJI/pull/576)，首轮 GitHub Actions 三项 job 全绿；合并前复核新增“合同原件禁止经通用打印接口建单”和“风险报告强制采用服务端 SHA-256”两条 fail-closed 边界，本地 Node 22 的真实 SQLite 打印回归、报告/打印生命周期、共享契约及 API typecheck/lint 已通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。合并前仍须确认 PR 最新 head 三项 CI 全绿；之后依次完成真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
+- [~] **AI签约风险提示生产验收**：[PR #576](https://github.com/wanglei581/YITIJI/pull/576) 已合并到 `main@eb3fd726`，合并后 GitHub Actions 三项 job 全绿且 deploy workflow 因授权门禁跳过。预生产执行入口已固定为 `docs/acceptance/contract-review-preprod-acceptance-runbook.md`，并由 `verify:contract-review:preprod-readiness` 在 CI 防漂移。下一步按 CR-G0 至 CR-G7 顺序执行：本地冻结候选、预生产只读就绪、PostgreSQL/法务正文、Redis/BullMQ、获准境内模型/日志净化、私有对象存储/生命周期、会员/匿名公共终端隐私、Windows 奔图报告出纸；远程写入、模型 canary、环境变量修改、部署和真机操作均须各自单独授权。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
