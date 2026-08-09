@@ -1,20 +1,19 @@
 /**
- * W8 BullMQ API pull worker — E2E verification script
+ * API pull review-reset — deterministic service integration verifier
  *
- * 用途：在有 REDIS_URL 的真实 Redis 环境下，验证 BullMQ API 拉取 worker 完整链路。
+ * 用途：在隔离验证库中运行生产 JobSyncService，验证内容变更强制重审。
  *
  * 前置条件：
- *   - services/api/.env 已配置 DATABASE_URL / JWT_SECRET / SECRET_ENCRYPTION_KEY / FILE_SIGNING_SECRET 等
- *   - REDIS_URL 已设置（有 Redis 时走真实 BullMQ；否则走 inline fallback）
- *   - Redis 进程已启动（docker run -d -p 6379:6379 redis:7-alpine）
+ *   - DATABASE_URL 指向全新 SQLite 或隔离 PostgreSQL
+ *   - 不需 Redis，固定走 JobSyncService inline fallback
  *
  * 运行方式（从 services/api/ 目录）：
- *   pnpm ts-node -r tsconfig-paths/register scripts/verify-job-sync.ts
+ *   pnpm verify:job-sync
  *
  * 验证链路：
- *   本地 mock HTTP 服务器（返回测试岗位 JSON）
- *   → 创建测试 Org + JobSource（指向 mock server）
- *   → enqueue（BullMQ or inline）
+ *   测试边界提供确定 JSON / 失败结果
+ *   → 创建测试 Org + JobSource
+ *   → enqueue（inline）
  *   → 轮询 SyncLog（最长 30s）
  *   → 验证 Job 记录 reviewStatus=pending / publishStatus=draft
  *   → 验证失败源记录 failed + errorDetail
@@ -22,11 +21,10 @@
  *   → 报告 PASS / FAIL
  */
 import 'dotenv/config'
-import * as http from 'http'
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from '../src/app.module'
 import { JobSyncService } from '../src/job-sync/job-sync.service'
 import { PrismaService } from '../src/prisma/prisma.service'
+import type { AuditService } from '../src/audit/audit.service'
+import type { JobQualityService } from '../src/job-ai/job-quality.service'
 
 // ── Mock data ──────────────────────────────────────────────────────────────────
 
@@ -36,32 +34,6 @@ const MOCK_JOBS = [
 ]
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-function startMockServer(): Promise<{ port: number; server: http.Server }> {
-  return new Promise((resolve) => {
-    const server = http.createServer((_req, res) => {
-      res.writeHead(200, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ jobs: MOCK_JOBS }))
-    })
-    server.listen(0, '127.0.0.1', () => {
-      const addr = server.address() as { port: number }
-      resolve({ port: addr.port, server })
-    })
-  })
-}
-
-function startBadMockServer(): Promise<{ port: number; server: http.Server }> {
-  return new Promise((resolve) => {
-    const server = http.createServer((_req, res) => {
-      res.writeHead(503, { 'Content-Type': 'text/plain' })
-      res.end('Service Unavailable')
-    })
-    server.listen(0, '127.0.0.1', () => {
-      const addr = server.address() as { port: number }
-      resolve({ port: addr.port, server })
-    })
-  })
-}
 
 async function pollForSyncLog(
   prisma: PrismaService,
@@ -80,6 +52,24 @@ async function pollForSyncLog(
   return null
 }
 
+async function pollForNewSyncLog(
+  prisma: PrismaService,
+  sourceId: string,
+  previousIds: string[],
+  timeoutMs = 30_000,
+) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    const log = await prisma.syncLog.findFirst({
+      where: { sourceId, id: { notIn: previousIds } },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (log) return log
+    await new Promise((r) => setTimeout(r, 1_000))
+  }
+  return null
+}
+
 function pass(msg: string) { console.log(`  ✅ ${msg}`) }
 function fail(msg: string) { console.error(`  ❌ ${msg}`); process.exitCode = 1 }
 function info(msg: string) { console.log(`  ℹ  ${msg}`) }
@@ -87,24 +77,21 @@ function info(msg: string) { console.log(`  ℹ  ${msg}`) }
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log('\n=== W8 BullMQ API pull worker — E2E verification ===')
-  console.log(`Redis: ${process.env['REDIS_URL'] ?? '(not set — inline fallback mode)'}`)
+  console.log('\n=== API pull review-reset integration verification ===')
+  console.log('Mode:  inline fallback with deterministic fetch boundary')
   console.log(`DB:    ${(process.env['DATABASE_URL'] ?? '').replace(/:[^@]+@/, ':***@').slice(0, 60)}\n`)
 
-  // ── 1. Start mock servers ──────────────────────────────────────────────────
-  const { port: goodPort, server: goodServer } = await startMockServer()
-  const { port: badPort, server: badServer } = await startBadMockServer()
-  info(`Mock OK  server: http://127.0.0.1:${goodPort}`)
-  info(`Mock BAD server: http://127.0.0.1:${badPort}`)
-
-  // ── 2. Bootstrap NestJS app context ───────────────────────────────────────
-  info('Bootstrapping NestJS app context (suppress info logs)...')
-  const app = await NestFactory.createApplicationContext(AppModule, {
-    logger: ['error', 'warn'],
-  })
-  const prisma = app.get(PrismaService)
-  const syncService = app.get(JobSyncService)
-  info('App context ready.\n')
+  // ── 1. Build production service against the isolated verifier DB ─────────
+  const prisma = new PrismaService()
+  await prisma.onModuleInit()
+  const quality = { refreshJobQualitySnapshots: async () => undefined } as unknown as JobQualityService
+  const audit = { write: async () => 'verify-job-sync-audit' } as unknown as AuditService
+  const syncService = new JobSyncService(prisma, quality, audit)
+  ;(syncService as unknown as { fetchJson: (endpoint: string) => Promise<unknown> }).fetchJson = async (endpoint) => {
+    if (endpoint.includes('bad-source')) throw new Error('HTTP_503')
+    return { jobs: MOCK_JOBS.map((job) => ({ ...job })) }
+  }
+  info('Production JobSyncService ready.\n')
 
   const TEST_ORG_ID = `e2e-verify-org-${Date.now()}`
   let goodSourceId = ''
@@ -126,7 +113,7 @@ async function main() {
         accessMode:     'api',
         syncFreq:       'manual',
         enabled:        true,
-        endpoint:       `http://127.0.0.1:${goodPort}`,
+        endpoint:       'https://good-source.invalid/jobs',
         authType:       null,
         // dataType=job；fields 把 url → sourceUrl
         responseConfig: JSON.stringify({ dataType: 'job', fields: { sourceUrl: 'url' } }),
@@ -144,7 +131,7 @@ async function main() {
         accessMode: 'api',
         syncFreq:   'manual',
         enabled:    true,
-        endpoint:   `http://127.0.0.1:${badPort}`,
+        endpoint:   'https://bad-source.invalid/jobs',
       },
     })
     badSourceId = badSource.id
@@ -170,6 +157,48 @@ async function main() {
       if (goodLog.addedCount === MOCK_JOBS.length) { pass(`addedCount = ${goodLog.addedCount}`) } else { fail(`addedCount = ${goodLog.addedCount} (expected ${MOCK_JOBS.length})`) }
       if (jobs.length === MOCK_JOBS.length) { pass(`Job records in DB = ${jobs.length}`) } else { fail(`Job records = ${jobs.length} (expected ${MOCK_JOBS.length})`) }
       if (allPending) { pass('reviewStatus=pending / publishStatus=draft') } else { fail('Some jobs NOT in pending/draft state') }
+
+      // ── Test A2: unchanged sync keeps approval; changed content re-enters review ──
+      await prisma.job.updateMany({
+        where: { sourceId: goodSourceId },
+        data: { reviewStatus: 'approved', publishStatus: 'published', reviewedAt: new Date() },
+      })
+
+      console.log('\n── Test A2: unchanged vs changed content review gate ─────────────────────')
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      await syncService.enqueue(goodSourceId, true)
+      const unchangedLog = await pollForNewSyncLog(prisma, goodSourceId, [goodLog.id])
+      if (!unchangedLog) {
+        fail('Unchanged re-sync did not produce a new SyncLog')
+      } else {
+        const unchangedJobs = await prisma.job.findMany({ where: { sourceId: goodSourceId } })
+        if (unchangedJobs.every((job) => job.reviewStatus === 'approved' && job.publishStatus === 'published')) {
+          pass('Unchanged content only refreshes syncTime and preserves approval')
+        } else {
+          fail('Unchanged content unexpectedly reset review state')
+        }
+
+        MOCK_JOBS[0]!.title = '前端工程师（E2E测试·来源已更新）'
+        await new Promise<void>((resolve) => setImmediate(resolve))
+        await syncService.enqueue(goodSourceId, true)
+        const changedLog = await pollForNewSyncLog(prisma, goodSourceId, [goodLog.id, unchangedLog.id])
+        if (!changedLog) {
+          fail('Changed re-sync did not produce a new SyncLog')
+        } else {
+          const changed = await prisma.job.findFirst({ where: { sourceId: goodSourceId, externalId: 'e2e-j001' } })
+          const untouched = await prisma.job.findFirst({ where: { sourceId: goodSourceId, externalId: 'e2e-j002' } })
+          if (changed?.reviewStatus === 'pending' && changed.publishStatus === 'draft' && changed.reviewedAt === null) {
+            pass('Changed source content resets to pending/draft and clears review metadata')
+          } else {
+            fail('Changed source content did not re-enter review')
+          }
+          if (untouched?.reviewStatus === 'approved' && untouched.publishStatus === 'published') {
+            pass('Unchanged sibling job remains approved/published')
+          } else {
+            fail('Unchanged sibling job was incorrectly reset')
+          }
+        }
+      }
     }
 
     // ── 6. Test B: failure path ───────────────────────────────────────────────
@@ -207,9 +236,7 @@ async function main() {
     await prisma.organization.deleteMany({ where: { id: TEST_ORG_ID } })
     info('Test data removed.')
 
-    goodServer.close()
-    badServer.close()
-    await app.close()
+    await prisma.onModuleDestroy()
   }
 
   const exitCode = process.exitCode ?? 0

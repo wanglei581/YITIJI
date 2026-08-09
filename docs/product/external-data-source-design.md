@@ -1,6 +1,6 @@
 # 外部数据源接入设计规范
 
-> 最后更新：2026-05-25  
+> 最后更新：2026-08-09
 > 对应代码：`packages/shared/src/types/job.ts`  
 > 关联文档：[CLAUDE.md §18](../../CLAUDE.md) | [feature-scope.md](./feature-scope.md)
 
@@ -105,7 +105,7 @@ pending → reviewing → approved
 |------|------------|------------|
 | 智联招聘官方 API | `job_platform` | `api` |
 | 高校就业系统 Excel | `school` | `excel` |
-| 招聘会主办方 Webhook | `fair_organizer` | `webhook` |
+| 招聘会主办方 API/Excel | `fair_organizer` | `api` / `excel` |
 | 管理员手动录入 | `manual` | `manual` |
 
 ---
@@ -162,6 +162,13 @@ interface DataSourceAccess {
 | `custom` | 自定义认证方式 |
 
 > 注意：禁止使用缩写 `key`，统一写 `api_key`。
+
+### 启用与停用语义
+
+- Partner 创建 API/Webhook 后默认停用，必须由 Admin 审批启用；文件/手工来源可按机构类型权限直接启用。
+- Admin 启用 API 前必须验证公网 HTTP(S) endpoint、机构类型、来源类型和 `responseConfig.dataType`；Webhook 必须存在服务端加密签名密钥。
+- `enabled=false` 只停止新同步，不改变已导入内容的审核/发布状态。批量下架是独立动作，必须先展示岗位/招聘会影响数量、二次确认并写审计。
+- `sourceKind` 与 `accessMode` 受 `Organization.type` 服务端 allowlist 约束，不能由前端自由声明。
 
 ---
 
