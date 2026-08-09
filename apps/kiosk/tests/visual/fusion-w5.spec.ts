@@ -355,7 +355,11 @@ test('legal document keeps its standalone theme and scrollable long body @w5-kio
     status: 200,
     json: {
       success: true,
-      data: { content: paragraphs.join('\n\n'), publishedAt: '2026-07-24T00:00:00.000Z' },
+      data: {
+        version: '2026.08.10-v1.0',
+        content: paragraphs.join('\n\n'),
+        publishedAt: '2026-07-24T00:00:00.000Z',
+      },
     },
   })
   api.respond('GET', '/api/v1/kiosk/legal/terms_of_service', {
@@ -370,6 +374,8 @@ test('legal document keeps its standalone theme and scrollable long body @w5-kio
   await expect(root).toHaveAttribute('data-ux-density', 'touch')
   await expectSharedPageShell(page, '隐私政策')
   await expect(page.getByText(paragraphs[0], { exact: true })).toBeVisible()
+  await expect(page.getByText('当前展示运营方已发布版本 2026.08.10-v1.0；如有疑问可咨询现场工作人员。', { exact: true })).toBeVisible()
+  await expect(page.getByText(/当前为本地试运营草稿/)).toHaveCount(0)
   const body = root.locator('.legal-doc-body')
   await expect(body).toBeVisible()
   expect(await body.evaluate((element) => element.scrollHeight)).toBeGreaterThan(
@@ -388,6 +394,7 @@ test('legal document keeps its header usable at 390x844 @w5-mobile', async ({ pa
     json: {
       success: true,
       data: {
+        version: '2026.08.10-v1.0',
         content: '移动端隐私政策正文，用于验证共享页头与字号控制不会互相覆盖。',
         publishedAt: '2026-07-24T00:00:00.000Z',
       },

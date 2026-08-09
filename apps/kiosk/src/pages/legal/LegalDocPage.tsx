@@ -1,9 +1,8 @@
 // ============================================================
 // 用户服务协议 / 隐私政策（审计修复：原登录页两个按钮只弹「即将上线」）。
 //
-// 内容为 v1 草拟版，与系统当前真实数据实践对齐（短 TTL 文件、不留简历库、
-// OCR 不留原文、会员手机号加密存储等）。正式运营前须经运营方法务审定后替换定稿
-// （见 docs/compliance/）。Kiosk 模式：大字号、可滚动、无外链。
+// API 有激活版本时展示运营方已发布全文；无激活版本或网络失败时展示本地兜底草稿。
+// Kiosk 模式：大字号、可滚动、无外链。
 // ============================================================
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
@@ -22,16 +21,70 @@ const DOC_TYPE_MAP: Record<string, string> = {
 }
 
 interface ApiDocContent {
+  version: string
   content: string
   publishedAt: string | null
 }
 
-/** 将 Markdown 纯文本按段落分行（不引入新依赖，仅分段落渲染） */
-function splitToParagraphs(content: string): string[] {
-  return content
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean)
+type LegalContentBlock =
+  | { kind: 'heading'; level: number; text: string }
+  | { kind: 'paragraph'; text: string }
+  | { kind: 'list'; ordered: boolean; items: string[] }
+
+/** 渲染法务后台保存的 Markdown 子集，不允许注入 HTML。 */
+function parseLegalContent(content: string): LegalContentBlock[] {
+  const blocks: LegalContentBlock[] = []
+  const lines = content.replace(/\r\n/g, '\n').split('\n')
+  let paragraph: string[] = []
+  let list: { ordered: boolean; items: string[] } | null = null
+
+  const flushParagraph = () => {
+    const text = paragraph.join('\n').trim()
+    if (text) blocks.push({ kind: 'paragraph', text })
+    paragraph = []
+  }
+  const flushList = () => {
+    if (list?.items.length) blocks.push({ kind: 'list', ...list })
+    list = null
+  }
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim()
+    if (!line) {
+      flushParagraph()
+      flushList()
+      return
+    }
+
+    const heading = /^(#{1,4})\s+(.+)$/.exec(line)
+    if (heading) {
+      flushParagraph()
+      flushList()
+      blocks.push({ kind: 'heading', level: heading[1].length, text: heading[2] })
+      return
+    }
+
+    const orderedItem = /^\d+[.)]\s+(.+)$/.exec(line)
+    const unorderedItem = /^[-*]\s+(.+)$/.exec(line)
+    const item = orderedItem ?? unorderedItem
+    if (item) {
+      flushParagraph()
+      const ordered = Boolean(orderedItem)
+      if (!list || list.ordered !== ordered) {
+        flushList()
+        list = { ordered, items: [] }
+      }
+      list.items.push(item[1])
+      return
+    }
+
+    flushList()
+    paragraph.push(line.replace(/\s{2}$/, ''))
+  })
+
+  flushParagraph()
+  flushList()
+  return blocks
 }
 
 interface Section {
@@ -159,6 +212,7 @@ export function LegalDocPage() {
 
   const currentDocType = DOC_TYPE_MAP[doc ?? 'terms'] ?? 'terms_of_service'
   const apiContent = apiDocs[currentDocType] ?? null
+  const legalBlocks = apiContent ? parseLegalContent(apiContent.content) : []
 
   const displayedAt = apiContent?.publishedAt
     ? new Date(apiContent.publishedAt).toLocaleDateString('zh-CN', {
@@ -223,9 +277,17 @@ export function LegalDocPage() {
                 </div>
                 <div className="legal-doc-sections">
                   <section>
-                    {splitToParagraphs(apiContent.content).map((para, idx) => (
-                      <p key={idx}>{para}</p>
-                    ))}
+                    {legalBlocks.map((block, idx) => {
+                      if (block.kind === 'heading') {
+                        const Heading = block.level <= 2 ? 'h3' : 'h4'
+                        return <Heading key={idx}>{block.text}</Heading>
+                      }
+                      if (block.kind === 'list') {
+                        const List = block.ordered ? 'ol' : 'ul'
+                        return <List key={idx}>{block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}</List>
+                      }
+                      return <p key={idx}>{block.text}</p>
+                    })}
                   </section>
                 </div>
               </>
@@ -251,7 +313,9 @@ export function LegalDocPage() {
         </article>
 
         <p className="legal-doc-notice">
-          本文本为试运营版本，正式运营前以运营方法务审定发布的版本为准；如有疑问可咨询现场工作人员。
+          {apiContent
+            ? `当前展示运营方已发布版本 ${apiContent.version}；如有疑问可咨询现场工作人员。`
+            : '当前为本地试运营草稿，正式运营前以运营方审定并在后台发布的版本为准；如有疑问可咨询现场工作人员。'}
         </p>
         </div>
       </KioskPageFrame>

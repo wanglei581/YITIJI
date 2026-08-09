@@ -1,5 +1,7 @@
 # 当前开发进度
 
+2026-08-10 完成 **生产法务文档发布与 Kiosk 法律页热修复候选**：运营主体明确确认后，生产 PostgreSQL 已备份并通过既有 Admin 法务 API 创建、逐字节哈希核对和激活 `terms_of_service` / `privacy_policy` 的 `2026.08.10-v1.0`，两类均仅有一个激活版本且写入 `legal_doc.activate` 审计记录；公网 API 复核版本、发布时间、字节数和正文摘要一致。线上浏览器发现正式内容已加载但页脚仍固定显示“试运营版本”，本分支从生产提交 `37025dc9` 单独修复：API 激活版本显示准确版本号，无激活版本才标记本地草稿，并安全渲染 Markdown 标题和有序/无序列表。Kiosk typecheck、1080×1920 与 390×844 法律页 Playwright 2/2、`git diff --check` 通过；尚需完成静态包受控部署后的公网复验。
+
 2026-08-09 修复 **生产发布门禁 `verify:member-step-up` 随机假阳性（PR #574，尚未部署）**：同一不可变主分支提交首次 CI 全绿，后续重跑却分别在 AuditLog JSON 与 Redis 键值扫描处失败；复核确认模块级敏感值集合会记录随机 6 位验证码，原断言再以普通子串扫描 SHA/HMAC 等高熵摘要，导致验证码偶然出现在摘要内部时误报。现将 6 位验证码和 11 位手机号改为仅按非字母数字边界识别明文，JSON/Redis 中的原始值仍会被拒绝；grant token、device identifier 等高熵秘密继续使用严格子串匹配。部署开关保持关闭，失败和取消的工作流均未触发生产部署；待本修复合入且新主分支 CI 全绿后再发布。
 
 2026-08-09 完成 **后台招聘数据 P0 冻结验收补强（独立 worktree，未部署）**：真实 Nest HTTP 复核发现 Admin 线下机构 controller 仍返回裸对象，而 Admin adapter 统一解包 `{ success, data }`，导致此前虽 typecheck/静态门禁全绿，真实 HTTP 列表、详情、新增仍会读到 `undefined`。现已将该 Admin controller 的机构与岗位 CRUD、审核、发布全部收口为标准 `ApiResponse`，并新增 `verify:backend-p0-http`，通过真实 JWT/role guard、全局 ValidationPipe、HttpExceptionFilter、Nest 路由与隔离 Prisma 库验证响应包络、PUT / `reason` / `publishStatus`、未知字段拒绝、岗位变更回待审、5 类机构 capability、跨机构 404、Webhook 默认停用/Admin 启用、停源不下架及确认后批量下架审计。同时把 `verify:job-sync` 改为无 Redis/无外网的确定性生产 service integration，修正旧 verifier 把历史 SyncLog 误认为新日志的竞态，动态确认“内容不变保留 approved/published，变更项单独回 pending/draft 并清空审核元数据，同批未变项不退审，失败写 SyncLog”。两条动态门禁已接入 SQLite 与 PostgreSQL CI。

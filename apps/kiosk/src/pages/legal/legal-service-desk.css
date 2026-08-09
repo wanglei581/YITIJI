@@ -22,7 +22,11 @@
 .k1-legal-doc .legal-doc-intro p { margin: 0; font-size: calc(18px * var(--legal-font-scale)); line-height: 1.55; }
 .k1-legal-doc .legal-doc-sections section { scroll-margin-top: 20px; }
 .k1-legal-doc .legal-doc-sections h3 { margin: 24px 0 0; font-family: var(--font-serif); font-size: calc(24px * var(--legal-font-scale)); font-weight: 700; letter-spacing: .02em; }
+.k1-legal-doc .legal-doc-sections h4 { margin: 20px 0 0; font-size: calc(21px * var(--legal-font-scale)); font-weight: 750; }
 .k1-legal-doc .legal-doc-sections p { margin: 10px 0 0; color: var(--color-neutral-800); font-size: calc(19px * var(--legal-font-scale)); line-height: 1.68; }
+.k1-legal-doc .legal-doc-sections ol,
+.k1-legal-doc .legal-doc-sections ul { margin: 10px 0 0; padding-left: 1.65em; color: var(--color-neutral-800); font-size: calc(19px * var(--legal-font-scale)); line-height: 1.68; }
+.k1-legal-doc .legal-doc-sections li + li { margin-top: 8px; }
 .k1-legal-doc .legal-doc-endmark { margin: 26px 0 0; padding-top: 16px; border-top: 1px dashed var(--color-neutral-200); color: var(--color-neutral-500); font-size: 16px; text-align: center; }
 .k1-legal-doc .legal-doc-notice { flex: 0 0 auto; margin: 0; padding: 12px 18px; border: 1px solid var(--color-neutral-200); border-radius: 14px; color: var(--color-neutral-500); background: var(--color-neutral-50); font-size: 15px; text-align: center; }
 .k1-legal-doc :is(button):active { transform: scale(.97); }
