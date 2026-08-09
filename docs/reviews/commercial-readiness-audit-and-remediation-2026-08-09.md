@@ -2,9 +2,9 @@
 
 > 审查根目录：`/Users/wanglei/AI求职打印服务终端-commercial-readiness-wave1`
 > 初始审查基线：`codex/commercial-readiness-wave1-20260809@83588b8f`
-> Wave 6A/6B 当前状态：修复提交 `03de6428` 已由合并候选 `5f7fb218` 吸收，候选已包含 `origin/main@37025dc9`，相对 main behind 0 / ahead 17、相对 upstream behind 0 / ahead 5；尚未推送、未部署，也没有绑定该 SHA 的新 PR checks
+> Wave 6A/6B 已全绿代码候选：`9211b6d13f589da8acc3adbe7617cedca51e23f9`；Linux/PG/browser manual dispatch run `31322152768` 与 Windows run `31322154074` 全部 SUCCESS，未部署
 > Wave 5 修复提交：`392c5de5`；已全绿代码候选：`codex/commercial-readiness-wave1-20260809@6d2ed3479f51cceffab9676917e0cd1d4e9531ce`，已包含 `origin/main@66e0d951`，相对 main behind 0 / ahead 14，与 upstream 一致；最终报告提交会位于该代码 SHA 之后并须再次跑 CI
-> Git/PR 快照时间：2026-08-09；PR #570 head `6d2ed347`，Draft/MERGEABLE；四项 checks 全部 SUCCESS
+> 文档生成前合并候选：`8ffc886c`，已包含 `origin/main@1ecf5e98`，相对 main behind 0 / ahead 21、相对 upstream behind 0 / ahead 3；本轮 docs commit 位于 `9211b6d1` 之后，最终同一 HEAD 仍须重跑 CI
 > 审查方式：源码、路由、Prisma、workspace、CI、Git/worktree、独立小程序仓库只读核验；未连接或修改生产数据库、服务器、Windows 主机、对象存储或硬件
 > 删除结果：**本轮没有删除代码、模型、迁移、目录或本地资产**
 
@@ -17,33 +17,33 @@
 | 现有 monorepo 结构               | **可继续使用**         | `apps/`、`services/`、`packages/` 职责总体清晰；当前不需要物理迁移                                                                   |
 | Kiosk / Admin / Partner 主体代码 | **代码候选有条件通过** | 既有三端验收覆盖较广，Wave 1–5 又关闭一批真实性、持久化与隐私缺陷；但本分支仍未合并、未部署                                          |
 | API 主体能力                     | **有条件通过**         | 核心业务已有真实 Prisma/状态机；材料任务 query token 已在代码候选中 fail-closed，仍存在 8 个注册中的旧占位接口和若干无运行时访问模型 |
-| Terminal Agent / 打印扫描        | **NO-GO**              | secure reader 与删除审计本地→API 源码已实现，但 Windows 验证仍为 `blocked_pending_windows_ci`；打印、长驻恢复与真实奔图仍缺现场证据  |
+| Terminal Agent / 打印扫描        | **NO-GO**              | secure reader 与删除审计已获 Linux/Windows CI 验证；真实 SMB/ACL/杀毒、长驻恢复与奔图出纸/扫描仍缺现场证据                           |
 | 微信小程序                       | **NO-GO**              | monorepo 仅完成 M0.1–M0.3；外部跳转、隐私本人数据和 M0.4/M1 未闭环；独立仓库另有未推送高价值提交                                     |
 | 生产内容与外部服务               | **NO-GO**              | 生产公开岗位/招聘会/政策当前真实空态；真实来源、支付、短信、TRTC、密钥、法务和生产对象存储仍有外部门禁                               |
 | 整体商用发布                     | **NO-GO**              | 任一 P0 未关闭都不能宣称商用上线                                                                                                     |
 
 本轮最重要的判断不是“项目没做完”，而是项目已经形成了相当多真实闭环，但仍混有四类不同状态，必须分开治理：
 
-1. **已经修复但未进入生产**：Wave 1–5 的仓库完整性、入口/打印状态真实性、AI 落库 fail-closed、文件 metadata-first 删除、Agent durable dead-letter、本人待续任务、spooler 不确定结果 fail-closed、打印参数白名单、材料 token header-only、会话 history 清理、写库 verifier 隔离和高风险 CI 防回退；Wave 6 候选 `5f7fb218` 又实现扫描删除本地→API durable 对账与 Windows secure reader，但尚未推送或取得新远程 CI。
+1. **已经修复但未进入生产**：Wave 1–5 的仓库完整性、入口/打印状态真实性、AI 落库 fail-closed、文件 metadata-first 删除、Agent durable dead-letter、本人待续任务、spooler 不确定结果 fail-closed、打印参数白名单、材料 token header-only、会话 history 清理、写库 verifier 隔离和高风险 CI 防回退；Wave 6 代码候选 `9211b6d1` 又实现扫描删除本地→API durable 对账与 Windows secure reader，并已通过 Linux/PG/browser 与 Windows installer CI，但未部署、未做真实现场验收。
 2. **明确没有开始或只到诚实空态**：小程序 M0.4/M1、Partner 迎新内容/统计、Admin 补贴标签与退款异常处置、Agent dead-letter 人工重放。
 3. **接口已暴露但实现是假成功/空数组**：`/api/v1/kiosk/session|help|notifications|activities|screensaver-content` 共 8 个 handler。
 4. **看似废弃但尚不能删**：旧 Kiosk API 模块、五组无运行时访问 Prisma 模型、空壳 worker、旧分支/worktree、独立小程序仓库。
 
 ### 1.2 本轮确认的最高风险断层
 
-| 优先级           | 断层                                                                 | 当前事实                                                                                                       | 商用影响                                                        |
-| ---------------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| P0               | Windows secure reader 已实现但未获 Windows CI                        | Wave 6 候选 `5f7fb218` 含原生 MSVC helper、安装包 staging 与动态 verifier；当前为 `blocked_pending_windows_ci` | 最终 SHA 的 MSVC/WiX/动态测试成功前，真实扫描仍不能上线         |
-| P0               | 代码候选与生产版本未对齐                                             | `6d2ed347` 已推送并四项 CI 全绿，但仍是 Draft PR、未合入 main、未部署；Wave 1–5 明确“未部署”                   | 全绿 PR 不能当作 main 或线上事实                                |
-| P0               | 生产公开内容为空                                                     | `docs/progress/current-progress.md` 记录 jobs/fairs/policies 公网为空态，真实来源待接入                        | 求职信息入口无法形成实际业务价值                                |
-| P0               | Windows/奔图/支付/对象存储缺真实验收                                 | `docs/progress/next-tasks.md:5-9,41-43`                                                                        | 自动化不能证明真实出纸、扫描、扣款和删除                        |
-| P0（扫描恢复前） | `_unclaimed` 删除审计本地→API 源码已闭合，候选尚无新 CI/生产现场证据 | Agent durable ack/retry/dead-letter；API 鉴权、幂等状态机、双库 additive migration、PII-safe 字段              | 代码闭环不能替代 fresh-install CI、生产留存告警和 Windows 现场  |
-| P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`                        | 五个 controller 直接返回常量，service 全为空                                                                   | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象              |
-| P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理                    | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header               | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换  |
-| P0               | 最终 docs 提交尚无同 SHA 远程 CI                                     | 代码候选 `6d2ed347` 四项全绿；最终 docs commit 会位于其后                                                      | 文档提交后须对最终同一 HEAD 再跑四项并保持全绿                  |
-| P0               | Wave 6 候选 `5f7fb218` 尚未推送                                      | 已含最新 main，但没有绑定该 SHA 的 PR checks；Node 22 非原生验证绿，Agent SQLite 动态受 Node 24 ABI 阻塞       | 必须由最终 SHA 的 Linux fresh install 与 Windows installer 裁决 |
-| P1（已修）       | Router history 曾保留 payment session token                          | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复          | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验        |
-| P1               | 独立小程序存在 local-only 提交                                       | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                              | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选           |
+| 优先级           | 断层                                                | 当前事实                                                                                              | 商用影响                                                       |
+| ---------------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| P0               | Windows secure reader 已获 CI，真实现场仍未验       | `9211b6d1` 的 `/W4 /WX` compile、动态边界、WiX、安装/修复/卸载、installed helper call 全绿            | 自动化不替代真实 SMB/ACL/杀毒/服务长驻，扫描仍不能上线         |
+| P0               | 代码候选与生产版本未对齐                            | `6d2ed347` 已推送并四项 CI 全绿，但仍是 Draft PR、未合入 main、未部署；Wave 1–5 明确“未部署”          | 全绿 PR 不能当作 main 或线上事实                               |
+| P0               | 生产公开内容为空                                    | `docs/progress/current-progress.md` 记录 jobs/fairs/policies 公网为空态，真实来源待接入               | 求职信息入口无法形成实际业务价值                               |
+| P0               | Windows/奔图/支付/对象存储缺真实验收                | `docs/progress/next-tasks.md:5-9,41-43`                                                               | 自动化不能证明真实出纸、扫描、扣款和删除                       |
+| P0（扫描恢复前） | `_unclaimed` 删除审计本地→API 已获 CI，生产现场仍缺 | Agent durable ack/retry/dead-letter；API 鉴权、幂等状态机、双库 additive migration、PII-safe 字段     | CI 不能替代生产留存告警、集中对账和 Windows 现场               |
+| P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`       | 五个 controller 直接返回常量，service 全为空                                                          | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象             |
+| P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理   | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header      | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换 |
+| P0               | 最终 docs 提交尚无同 SHA 远程 CI                    | 代码候选 `9211b6d1` 的 Linux/PG/browser 与 Windows run 全绿；最终 docs commit 会位于其后              | 文档提交后须对最终同一 HEAD 重跑并保持全绿                     |
+| P0               | 最终 docs HEAD 尚未复验                             | `9211b6d1` 代码候选两组 CI 全绿；文档生成前候选 `8ffc886c` 已吸收最新 main                            | docs commit 位于代码候选之后，最终同一 HEAD 仍须重跑 CI        |
+| P1（已修）       | Router history 曾保留 payment session token         | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复 | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验       |
+| P1               | 独立小程序存在 local-only 提交                      | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                     | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选          |
 
 ## 2. 审查范围与证据口径
 
@@ -135,12 +135,14 @@
 
 已全绿代码候选为 `6d2ed3479f51cceffab9676917e0cd1d4e9531ce`，已包含 `origin/main@66e0d951`，相对 main behind 0 / ahead 14、与 upstream 一致；本轮文档开始前工作树 clean。PR #570 为 Draft/MERGEABLE。run `31318707615`：`build-and-verify` **SUCCESS**（8m32s）、`postgres-readiness` **SUCCESS**（3m19s）、`kiosk-browser-smoke` **SUCCESS**（11m6s）；run `31318707647`：`unsigned-msi-candidate` **SUCCESS**（6m2s）。首轮 `2b18a1de` 的 build/PG 因两个旧 color payment/refund verifier 被正确拒绝；修复仅把 fixtures 对齐 `black_white + simplex + 1-up` 并使用订单实际 amount，隔离 SQLite payment 66 checks/refund 30 checks 全绿，生产门禁未放宽。最终 docs commit 会位于 `6d2ed347` 之后，仍须对最终同一 HEAD 再跑 CI。全绿代码候选不等于合入 main、部署或商用 GO；PR 继续保持 Draft。
 
-### 4.7 Wave 6A/6B 候选 `5f7fb218`
+### 4.7 Wave 6A/6B 已全绿代码候选 `9211b6d1`
 
 - 扫描删除审计已在源码层闭合 Agent→API：Agent 对待上报事件执行 durable ack / retry / dead-letter，只有服务端确认匹配事件才清除 pending；API 使用 Terminal Agent 身份鉴权、幂等状态机和 PII-safe 审计字段，并同时提供 SQLite / PostgreSQL additive migration。
-- Windows secure reader 已完整实现原生 MSVC helper、reparse-point fail-closed、安装包 staging 和动态 verifier，但当前只能标记 `blocked_pending_windows_ci`；源码完整不能替代 fresh Windows runner 的 MSVC 构建、WiX 打包、动态测试，更不能替代真实 SMB/NTFS/ACL/杀毒现场。
-- Node 22 本地 typecheck、build 与 non-native verify 已通过。Agent SQLite 动态验证没有进入断言：当前安装的原生模块面向 Node 24 ABI，必须由 CI fresh install 裁决，不能据此写成产品失败，也不能冒充本地动态全绿。
-- 修复提交 `03de6428` 已由合并候选 `5f7fb218` 吸收，且候选已包含 `origin/main@37025dc9`；当前尚未推送，没有绑定该 SHA 的 PR checks，Wave 5 `6d2ed347` 的全绿结果不能外推到 Wave 6。
+- Windows secure reader 已完整实现原生 MSVC helper、reparse-point fail-closed、安装包 staging 和动态 verifier。manual dispatch run `31322154074` **SUCCESS**（5m49s），真实执行 `/W4 /WX` compile、staged dynamic boundary、WiX MSI/EXE、install/repair/uninstall 与 installed helper call；状态现为 **Windows CI verified**，但真实 SMB/NTFS/ACL/杀毒现场仍 pending。
+- 首轮候选 `76483704` 因 BOM/cleanup harness 失败；二轮 `e347ecd7` 因 Win32 broken-pipe EOF 被误判为 helper 失败；`9211b6d1` 只做最小 BOM/cleanup 与 EOF 语义修复后全绿，未放宽 reparse-point fail-closed、路径边界或安装验证。
+- Node 22 本地 typecheck、build 与 non-native verify 已通过；本机 Agent SQLite 动态曾受已安装原生模块的 Node 24 ABI 阻塞。manual dispatch run `31322152768` 在 fresh CI 中 **SUCCESS**：build-and-verify 8m19s、postgres-readiness 3m09s、kiosk-browser-smoke 9m02s，完成该环境边界的权威裁决。
+- 已全绿代码候选为 `9211b6d13f589da8acc3adbe7617cedca51e23f9`。文档生成前合并候选 `8ffc886c` 已包含 `origin/main@1ecf5e98`，相对 main behind 0 / ahead 21、相对 upstream behind 0 / ahead 3；本轮 docs commit 会位于代码候选之后，最终同一 HEAD 仍须重跑 CI。
+- 用户确认 Claude 整套新页面尚未全部完成。本轮不迁移、不覆盖设计资产；待全部定稿后另立 page→route→API→state/auth/failure mapping 与逐页接线任务，优先复用现有 API/Agent 能力，不能从静态页面反推或补造第二套后端闭环。
 
 ## 5. 已确认的接口断层与缺陷
 
@@ -195,9 +197,9 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 - Wave 4A 已在 Agent SQLite 增加 `agent_metadata` 与 `scan_deletion_audit`；每安装随机 HMAC 密钥派生不可跨安装字典重算的 identifier/event，记录 intent、`deleted|delete_failed`、次数、时间、安全错误码和 `pendingReport`，不记明文路径/文件名/内容/异常消息。
 - EACCES 等删除失败会保留文件和 durable 失败状态，下一轮或重启后重试并复用事件；DB/审计写失败时不会为了审计继续留存高敏文件，仍执行 TTL 删除并输出 `untracked`/安全错误码。
 - 专项覆盖旧库增量升级、不同安装隔离、重启、失败重试、PII 不落库、审计不可用不阻塞删除，并已进入 CI。
-- Wave 6 候选 `5f7fb218` 新增 durable 上报状态：网络/5xx 保留并重试，永久 4xx 进入 durable dead-letter，只有匹配的服务端 ack 才清除 pending；API 入口由 Terminal Agent 鉴权，采用幂等状态机，并为 SQLite/PostgreSQL 各提供 additive migration，字段不携带路径、文件名、内容或原始异常。
+- Wave 6 代码候选 `9211b6d1` 新增 durable 上报状态：网络/5xx 保留并重试，永久 4xx 进入 durable dead-letter，只有匹配的服务端 ack 才清除 pending；API 入口由 Terminal Agent 鉴权，采用幂等状态机，并为 SQLite/PostgreSQL 各提供 additive migration，字段不携带路径、文件名、内容或原始异常；Linux/PG 与 Windows fresh-install CI 已通过。
 
-残余缺口不再是“没有 API/ack”，而是候选仍未取得 fresh-install CI/生产事实；生产端的留存、告警、人工处置和集中对账规则仍须验收。断电发生在“文件已删、结果未更新”之间会留下 `pending_delete`，只能标为待核查，不能虚构成功；SQLite 整体不可用时仍会删除但无法留下 durable 证据。恢复 Windows 扫描前还必须先让最终 SHA 的 `windows-agent-installer` 通过 MSVC/WiX/动态测试，再真机验证 SMB/NTFS 文件锁、ACL/杀毒占用、Agent 重启、外部删除/改写和 reparse point。
+残余缺口不再是“没有 API/ack”或“没有 Windows CI”，而是生产端的留存、告警、人工处置和集中对账规则尚未验收。断电发生在“文件已删、结果未更新”之间会留下 `pending_delete`，只能标为待核查，不能虚构成功；SQLite 整体不可用时仍会删除但无法留下 durable 证据。恢复 Windows 扫描前仍须真机验证 SMB/NTFS 文件锁、ACL/杀毒占用、Agent 重启、外部删除/改写和 reparse point。
 
 ## 6. 废弃、重复、孤儿与删除判定
 
@@ -224,7 +226,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 | PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                              |
 | ------------------------------------------------ | ---------------------------------: | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 14 | **可迁入，当前首要候选** | head `6d2ed347` 四项 CI 全绿，仍为 Draft；最终 docs HEAD 再跑 CI、复审与 Windows/COS 边界确认后再评估合并         |
+| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 21 | **可迁入，当前首要候选** | `9211b6d1` Linux/PG/browser/Windows CI 全绿；最终 docs HEAD 再跑 CI、复审与生产/真机边界确认后再评估合并          |
 | #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
 | #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
 | #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
@@ -265,18 +267,19 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 
 ### 8.1 当前审查分支
 
-| 项                    | 值                                                                        |
-| --------------------- | ------------------------------------------------------------------------- |
-| branch                | `codex/commercial-readiness-wave1-20260809`                               |
-| green code candidate  | `6d2ed3479f51cceffab9676917e0cd1d4e9531ce`（最终 docs commit 将位于其后） |
-| upstream              | `origin/codex/commercial-readiness-wave1-20260809@6d2ed347`               |
-| upstream ahead/behind | ahead 0 / behind 0；代码候选已推送                                        |
-| `origin/main`         | `66e0d951bc5bc2db78abd9c4346e4c77d583bd2d`                                |
-| `origin/main...HEAD`  | behind 0 / ahead 14；已包含 `origin/main@66e0d951`                        |
-| local `main`          | `73fd04a1`，相对 `origin/main` behind 14 / ahead 0                        |
-| PR                    | Draft #570，head `6d2ed347`，MERGEABLE；四项 checks SUCCESS               |
+| 项                    | 值                                                                       |
+| --------------------- | ------------------------------------------------------------------------ |
+| branch                | `codex/commercial-readiness-wave1-20260809`                              |
+| green code candidate  | `9211b6d13f589da8acc3adbe7617cedca51e23f9`                               |
+| pre-doc merge HEAD    | `8ffc886c2f019bbcf10492fcf282ad00b4b842f2`                               |
+| upstream              | `origin/codex/commercial-readiness-wave1-20260809@9211b6d1`              |
+| upstream ahead/behind | local pre-doc HEAD ahead 3 / behind 0                                    |
+| `origin/main`         | `1ecf5e988a5a8ff91d445565153f4999a51bd7fd`                               |
+| `origin/main...HEAD`  | behind 0 / ahead 21；已包含 `origin/main@1ecf5e98`                       |
+| local `main`          | `73fd04a1`，相对 `origin/main` behind 19 / ahead 0                       |
+| CI                    | `9211b6d1` 的 Linux/PG/browser 与 Windows installer manual dispatch 全绿 |
 
-Wave 1–5 产品/回归代码已收成至已全绿代码候选，包含最新 `origin/main`、#572 后台招聘 P0 progress 与 #573 部署 fetch resilience。最终报告提交会位于 `6d2ed347` 之后并须再次跑 CI；分支在审查并合入 main 前不得视为主干或生产事实，PostgreSQL 16 全绿也不能替代生产验收。
+Wave 1–6 产品/回归代码已收成至 `9211b6d1` 全绿代码候选；文档生成前 `8ffc886c` 又吸收 `origin/main@1ecf5e98` 并保留双方正式进度。最终报告提交会位于代码候选之后并须再次跑 CI；分支在审查并合入 main 前不得视为主干或生产事实，PostgreSQL/Windows CI 全绿也不能替代生产与真机验收。
 
 ### 8.2 分支与 refs
 
@@ -297,8 +300,10 @@ Wave 1–5 产品/回归代码已收成至已全绿代码候选，包含最新 `
 | -------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | 可重建         | `node_modules`、`dist`、Prisma generated、test-results、tsbuildinfo                       | 可在空闲 clean worktree 按锁文件重建；不进入功能迁移          |
 | 真实功能差异   | local-only commit、tracked modified、untracked source/migration/verify、PR unique commits | 必须 code review、验证、迁入/放弃决策，不能用缓存清理方式处理 |
-| 受保护设计资产 | 原型 HTML/CSS/截图、视觉审计                                                              | 保留直到用户验收与唯一真值决策，不把二进制截图当 cache        |
+| 受保护设计资产 | 原型 HTML/CSS/截图、视觉审计；Claude 整套新页面仍未全部完成                               | 本轮不迁移、不覆盖；全部定稿后再做映射和逐页接线              |
 | 生产/数据资产  | migration、schema、dump、FileObject/storage、Agent 本地 DB                                | 只按数据 census、备份、审计与授权 runbook 处理                |
+
+用户已确认 Claude 整套新页面仍在制作中。它们当前只属于受保护候选设计资产，不能覆盖现有运行时页面，也不能据此认定任何功能/API 已完成；待全部定稿后，另行建立 `page → route → API → state/auth/failure` 映射并逐页接线。现有 API、Agent、支付打印扫描和隐私门禁优先复用，不建立第二套平行业务能力。
 
 ## 9. CI、verify 与部署审查
 
@@ -336,13 +341,13 @@ Wave 1–5 产品/回归代码已收成至已全绿代码候选，包含最新 `
 
 ### 9.5 最终商用验收矩阵
 
-| 证据层级            | 已有事实                                                                                                     | 放行前仍需                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| 代码可证明          | Wave 1–5 专项；Wave 6 删除审计 Agent→API 与 secure reader 源码；Node 22 typecheck/build/non-native verify 绿 | 保持同 SHA 回归；Agent SQLite 动态受现有 Node 24 ABI 阻塞，不冒充动态已验证           |
-| 远程 CI             | `6d2ed347` 四项全绿只证明 Wave 5；Wave 6 候选 `5f7fb218` 尚未推送、无新 checks                               | 最终 SHA fresh install 跑 Linux 主 CI；`windows-agent-installer` 跑 MSVC/WiX/动态验证 |
-| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                                                  | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA     |
-| Windows/Pantum 真机 | secure reader 源码完整但状态仍为 `blocked_pending_windows_ci`；打印/扫描具备非原生回归                       | 新 SHA Windows CI 后，两台 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、真实出纸    |
-| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                                         | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限   |
+| 证据层级            | 已有事实                                                                                                | 放行前仍需                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 代码可证明          | Wave 1–5 专项；Wave 6 删除审计 Agent→API 与 secure reader；Node 22 typecheck/build/non-native verify 绿 | 保持同 SHA 回归；不得以 CI 替代生产/硬件事实                                        |
+| 远程 CI             | `9211b6d1`：build/PG/browser 与 Windows MSVC/WiX/安装生命周期/installed helper call 全绿                | docs commit 位于其后，最终同一 HEAD 仍须重跑                                        |
+| 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                                             | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA   |
+| Windows/Pantum 真机 | secure reader 已为 Windows CI verified；打印/扫描具备自动化回归                                         | 两台真实 Windows 验 SMB/reparse/ACL/杀毒/重启、spooler、奔图真实出纸/扫描           |
+| 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                                    | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限 |
 
 ## 10. 目录、数据、fixture 与文档渐进优化
 
@@ -380,10 +385,10 @@ Wave 1–5 产品/回归代码已收成至已全绿代码候选，包含最新 `
 
 ### P0：发布前必须完成
 
-1. **冻结唯一发布候选**：Wave 6 已形成并吸收最新 main 的候选 `5f7fb218`，但不能复用 `6d2ed347` 的 Wave 5 全绿结果；推送后 PR #570 的 Linux checks 与 `windows-agent-installer` 必须绑定最终同一 SHA、全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
+1. **冻结唯一发布候选**：Wave 6 已全绿代码候选为 `9211b6d1`，但本轮 docs commit 位于其后；最终同一 HEAD 的 Linux checks 与 `windows-agent-installer` 必须重新全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
 2. **生产只读对齐**：核对服务器源码、runtime、PM2、四端 bundle、migration、授权变量、备份/磁盘；确认后再申请具名发布窗口。
 3. **Windows/奔图验收**：两台主机覆盖安装升级、service 强杀、断网/断电、spooler/打印机重启、重复领取、终态补报、真实出纸；确认彩色 mode/pages-per-sheet，未知项必须拒绝或隐藏。
-4. **扫描恢复门禁**：secure reader 与删除审计本地→API 源码已经实现；先让新 SHA 的 Windows installer CI 完成 MSVC/WiX/动态测试，再覆盖 symlink/junction/reparse/写入替换/长驻 watcher，并在 Windows/SMB/ACL/杀毒占用/重启下验证删除上报、ack、dead-letter、留存告警与集中对账后再开放扫描。
+4. **扫描恢复门禁**：secure reader 与删除审计本地→API 已获 Linux/Windows CI 验证；仍须覆盖真实 symlink/junction/reparse/写入替换/长驻 watcher，并在 Windows/SMB/ACL/杀毒占用/重启下验证删除上报、ack、dead-letter、留存告警与集中对账后再开放扫描。
 5. **生产文件/支付**：真实 COS/OSS DELETE 超时与不确定结果、签名 URL、生命周期、支付/退款/对账、跨账号隔离和审计。
 6. **真实内容与合规**：接入经授权岗位/招聘会/政策来源，法务定稿，轮换已暴露/待轮换密钥；保持平台内不投递红线。
 7. **小程序若纳入首发**：外部 CTA、M0.4 本人数据、真实 AppID、开发者工具与真机验收全部完成；否则从发布范围明确排除并保持不可用入口不误导。
@@ -443,6 +448,6 @@ Wave 1–5 产品/回归代码已收成至已全绿代码候选，包含最新 `
 | tracked 大文件/hash/引用搜索                           | 两份 1.66 MB hero PNG hash 相同但消费者不同；不删除                        |
 | Wave 4/5 Agent/API/Kiosk 目标 verifier                 | 本地目标回归通过；Node 22 fresh DB schema engine 边界保留                  |
 | Security diff discovery / sealer                       | 52/52、6 candidates、唯一 Low 已修；缺 snapshotDigest，未 sealed           |
-| PR #570 `gh pr view` / job logs                        | `6d2ed347` Draft/MERGEABLE；build/PG/browser/MSI 全部 SUCCESS              |
+| Wave 6 manual dispatch job logs                        | `9211b6d1`：build/PG/browser 与 Windows MSVC/WiX/installed helper 全绿     |
 | repository integrity / 显式 YAML / Prettier            | 3,091 tracked marker-free；5 workflow valid；`ci.yml` 通过                 |
 | `git diff --check` / 文档格式                          | 主干冲突解决后已通过；最终三文档小修再次复跑                               |
