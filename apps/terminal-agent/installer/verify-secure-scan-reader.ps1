@@ -17,7 +17,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 const modulePath = process.argv[1]
-const request = JSON.parse(fs.readFileSync(0, 'utf8'))
+const request = JSON.parse(fs.readFileSync(0, 'utf8').replace(/^\uFEFF/, ''))
 const secure = require(modulePath)
 let result
 if (request.mode === 'inspect') {
@@ -73,6 +73,10 @@ function New-Junction([string]$Path, [string]$Target) {
 
 function Remove-Link([string]$Path) {
   if (Test-Path -LiteralPath $Path) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0) {
+      return
+    }
     & "$env:SystemRoot\System32\cmd.exe" /d /c "rmdir `"$Path`""
     if ($LASTEXITCODE -ne 0) { throw "Failed to remove reparse fixture" }
   }
