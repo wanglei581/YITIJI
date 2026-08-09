@@ -91,7 +91,8 @@ static wchar_t *read_utf8_field(HANDLE input, uint32_t length, BOOL allow_empty)
 static BOOL stdin_is_exhausted(HANDLE input) {
   BYTE extra = 0;
   DWORD received = 0;
-  return ReadFile(input, &extra, 1, &received, NULL) && received == 0;
+  if (ReadFile(input, &extra, 1, &received, NULL)) return received == 0;
+  return GetLastError() == ERROR_BROKEN_PIPE;
 }
 
 static void trim_trailing_separator(wchar_t *path) {

@@ -112,6 +112,7 @@ function verifySourceSafety(): void {
   assert.match(adapter, /maxBuffer:/, 'helper output must be bounded')
   assert.match(native, /int wmain\(void\)/, 'native helper must not accept argv')
   assert.match(native, /GetStdHandle\(STD_INPUT_HANDLE\)/, 'native helper must read the framed request from stdin')
+  assert.match(native, /ERROR_BROKEN_PIPE/, 'Windows pipe closure must be accepted as EOF without accepting extra request bytes')
   assert.equal(
     native.match(/FILE_FLAG_OPEN_REPARSE_POINT/g)?.length,
     2,
