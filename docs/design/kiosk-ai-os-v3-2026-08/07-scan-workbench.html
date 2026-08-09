@@ -88,13 +88,13 @@
             <circle cx="330" cy="118" r="9" stroke="var(--jade-500)"/>
           </svg>
           <span class="lbl" style="left:16%;top:8%">① 送稿器：多页放这里，正面朝上</span>
-          <span class="lbl" style="right:8%;top:44%">② 玻璃板：证件与单页掀盖放</span>
+          <span class="lbl" style="right:8%;top:44%">② 玻璃板：证件与单页掀盖放（对齐左上角）</span>
           <span class="lbl" style="left:32%;bottom:10%">③ 面板上按「开始扫描」</span>
         </div>
         <div class="steps4">
           <div class="st4"><b>01</b><span>取下订书钉与回形针，避免卡纸</span></div>
           <div class="st4"><b>02</b><span>多页正面朝上放进送稿器，对齐导轨</span></div>
-          <div class="st4"><b>03</b><span>证件掀盖放玻璃板右上角，压平</span></div>
+          <div class="st4"><b>03</b><span>证件掀盖放玻璃板<b>左上角</b>，压平</span></div>
           <div class="st4"><b>04</b><span>按机器面板上的「开始扫描」实体键</span></div>
         </div>
       </div>
@@ -179,7 +179,12 @@
         </div>
         <div class="notice" style="margin-top:14px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>证件类扫描件默认只保留到本次会话结束。要长期保存必须你本人在结果页选「存进我的文档」，并会写入操作日志。</span>
+          <span><b>你的材料去哪、留多久、谁能看：</b><br>
+            · <b>去向</b>：扫描件先存在本次会话；只有你在结果页选「存进我的文档」才会长期保存。<br>
+            · <b>保留</b>：未保存的扫描件<b>会话结束即删除</b>；证件类即使保存也默认 7 天到期清理。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会<b>写入审计日志</b>。<br>
+            · <b>外部服务</b>：需要识别文字时，图像<b>会送到第三方 OCR 服务</b>处理；不需要识别的普通扫描不外送。<br>
+            · <b>取消与删除</b>：中途取消会销毁已采集图像；到期删除会留删除日志。</span>
         </div>
       </div>
 
@@ -246,7 +251,9 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>不显示总进度百分比：页数由送稿器实际走纸决定，扫完才知道总数。这里只报已经完成的步骤。</span>
+          <span>不显示总进度百分比：页数由送稿器实际走纸决定，扫完才知道总数。这里只报已完成的步骤。<br>
+            <b>任务有效期 15 分钟</b>，超时自动作废并销毁已采集图像，需重新发起；
+            你点「取消」后若机器已回传新页，<b>以取消为准</b>，回传的页不会进结果。</span>
         </div>
       </div>
 
@@ -336,6 +343,6 @@
 <script src="scripts/stages.js?v=3"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
-<script src="scripts/audit-plus.js?v=9"></script>
+<script src="scripts/audit-plus.js?v=10"></script>
 </body>
 </html>

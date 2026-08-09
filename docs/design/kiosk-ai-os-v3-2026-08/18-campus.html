@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P18 校园招聘专区 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P18 校园招聘专区">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P18 专用 ───────────────────────────────────────────────────────────
+   组件复用备忘（做 P17 时逐个踩过）：
+   · .dir-lead 是 height:1px 的虚线引导线，不是内容容器
+   · .tl 本身就是一步，容器是 .tline，.tl-s 是副文
+   · .chk 是清单行容器不是复选框，复选框视觉是 .ck-box
+   · .jobrow / .ck 家族只在 11、12 页页内定义过，公共层没有 —— 本页自带
+   ──────────────────────────────────────────────────────────────────── */
+
+/* 校招季节条：这一页的骨架。学生最缺的不是信息，是"现在几月我该干什么" */
+.season { display: flex; gap: 2px; margin-top: var(--s-4); }
+.sn { flex: 1; padding: var(--s-4) var(--s-3); background: var(--fog-a04);
+      border-top: 3px solid var(--fog-a12); }
+.sn:first-child { border-radius: var(--r-xs) 0 0 var(--r-xs); }
+.sn:last-child  { border-radius: 0 var(--r-xs) var(--r-xs) 0; }
+.sn--now { background: var(--jade-a12); border-top-color: var(--jade-400); }
+.sn--past{ opacity: .55; }
+.sn-t { font-size: var(--fz-2); font-weight: 700; color: var(--fog-900); }
+.sn-d { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); margin-top: 2px; }
+.sn-s { font-size: var(--fz-1); color: var(--fog-700); margin-top: 5px; line-height: 1.5; }
+.sn--now .sn-t { color: var(--jade-200); }
+
+/* 活动行 */
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:var(--s-3); padding-bottom:var(--s-4); }
+.jobrow { text-align:left; width:100%; cursor:pointer; font-family:var(--ff-ui);
+  padding: var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; align-items:flex-start; gap:var(--s-5);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.jobrow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.jobrow-b { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.jobrow-t { font-size:var(--fz-5); color:var(--fog-900); font-weight:600; }
+.jobrow-s { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.04em; }
+.jobrow-m { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+.jobrow-when { flex:0 0 auto; width:66px; text-align:center; padding-top:2px; }
+.jw-d { font-size:var(--fz-6); font-family:var(--ff-num); font-weight:700; color:var(--fog-900); line-height:1; }
+.jw-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
+.jw--soon .jw-d { color: var(--coral-400); }
+
+/* 勾选行 */
+.ck { display:flex; align-items:flex-start; gap:var(--s-4);
+      min-height:var(--touch-min); padding:var(--s-3) var(--s-4);
+      border-radius:var(--r-xs); border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+.chip--info { cursor: inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+
+/* 计划表纸面 */
+.plan { padding: 30px 34px; color:#17222b; }
+.plan h1 { font-size:21px; font-weight:800; }
+.plan .pl-sub { font-size:12.5px; color:#5b6b78; margin-top:3px; }
+.plan .pl-hr { height:1px; background:#d9e1e8; margin:14px 0 12px; }
+.pl-w { font-size:13px; font-weight:800; color:#0f5a45; margin:12px 0 5px; }
+.pl-i { display:grid; grid-template-columns:16px 1fr; gap:9px; margin-bottom:7px;
+        font-size:12.5px; color:#2c3a45; line-height:1.5; }
+.pl-i i { width:11px; height:11px; border:1.5px solid #96a4ae; border-radius:2.5px; margin-top:3px; }
+.pl-i b { color:#0f5a45; }
+.pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
+           padding-top:9px; margin-top:14px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">校园招聘</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #C-1907</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>10:36</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">现在该做什么</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">这两周的活动</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走计划表</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 现在该做什么 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-clock"/></svg>
+          <b>今天是 8月9日，秋招刚开始</b>
+          <span class="mt" data-when="default first">按你的毕业年份算的</span>
+          <span class="mt" data-when="ai-down">按公开日历，未结合你的情况</span>
+        </div>
+        <div class="sec">
+          <div class="advice-act" data-when="default first">
+            你写的是 <b>2027 年 6 月毕业</b>，现在是<b>提前批和秋招网申的开头</b>。
+            这个月最要紧的不是投得多，是<b>把简历改到能投</b>。
+          </div>
+          <div class="advice-act" data-when="ai-down">
+            AI 暂时不可用。下面是公开的校招日历，<b>没有结合你的毕业年份和简历</b> ——
+            自己对照着看。
+          </div>
+
+          <div class="season">
+            <div class="sn sn--past">
+              <div class="sn-t">实习转正</div><div class="sn-d">3–6月</div>
+              <div class="sn-s">已经过去</div>
+            </div>
+            <div class="sn sn--now">
+              <div class="sn-t">提前批 · 秋招网申</div><div class="sn-d">7–9月</div>
+              <div class="sn-s">现在在这里。多数大厂开了提前批，网申陆续截止。</div>
+            </div>
+            <div class="sn">
+              <div class="sn-t">秋招正式批</div><div class="sn-d">9–11月</div>
+              <div class="sn-s">宣讲会和双选会最密的两个月</div>
+            </div>
+            <div class="sn">
+              <div class="sn-t">春招补录</div><div class="sn-d">次年 3–5月</div>
+              <div class="sn-s">岗位少，但还有机会</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <b>这个月，按顺序做这三件</b>
+          <span class="mt">做完一件再做下一件，别同时开三个头</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-4)">
+
+          <div class="advice">
+            <div class="advice-act">① 先把简历改到能投（本机能做）</div>
+            <div class="advice-why" data-when="default first">
+              <span class="ev ev--e1">读过你上传的简历</span>
+              你的简历现在有 <b>2 页</b>，第 2 页只有半页内容 ——
+              校招简历<b>压到一页</b>更容易被看完。
+              另外「项目经历」写了做什么，<b>没写结果</b>，这是校招简历最常见的问题。
+            </div>
+            <div class="advice-why" data-when="ai-down">
+              本机现在读不了你的简历，给不了针对你的意见。
+              通用建议：校招简历压到一页，项目经历要写出结果。
+            </div>
+            <div class="advice-act" style="margin-top:var(--s-3)">
+              <a class="btn btn--lg btn--quiet" href="09-resume-workbench.html">
+                <svg class="ic"><use href="#i-resume"/></svg>去改简历
+              </a>
+            </div>
+          </div>
+
+          <div class="advice">
+            <div class="advice-act">② 把要用的材料备齐（本机能打）</div>
+            <div class="advice-why">
+              校招常要的：成绩单、在读证明、四六级、获奖证明。
+              <b>宣讲会现场和网申上传都要用</b>，临时找最耽误事。
+              本机能打印，也能把扫描件存进「我的文档」。
+            </div>
+            <div class="advice-act" style="margin-top:var(--s-3)">
+              <a class="btn btn--lg btn--quiet" href="12-material-factory.html">
+                <svg class="ic"><use href="#i-package"/></svg>去备材料
+              </a>
+            </div>
+          </div>
+
+          <div class="advice">
+            <div class="advice-act">③ 网申去官方平台投（本机不代投）</div>
+            <div class="advice-why">
+              本机<b>不代收简历、不代为投递</b>，也拿不到你的投递结果。
+              这里只做两件事：帮你把材料准备好，把要投的公司和截止日期打成一张纸。
+            </div>
+            <div class="panel-note" style="margin-top:var(--s-3)">
+              网申入口都在企业官网或学校就业网，认准官方域名，别在第三方页面填身份证号。
+            </div>
+          </div>
+
+          <div class="advice">
+            <div class="advice-act">这个月<b>不用</b>做的</div>
+            <div class="advice-why">
+              · <b>不用海投。</b>提前批多数只能投 1–2 个岗，投多了反而占掉机会。<br>
+              · <b>不用买付费内推。</b>正规校招不收求职者的钱，内推不额外收费。<br>
+              · <b>不用改成"大厂模板"。</b>模板不解决"项目没写结果"这个真问题。<br>
+              · <b>不用现在焦虑双选会。</b>名单还没出，出来再准备来得及。
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─────────── S2 这两周的活动 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-campus"/></svg>
+          <b>这两周的校招活动</b>
+          <span class="mt">共 6 场 · 来自学校就业网与主办方公告</span>
+        </div>
+        <div class="sec">
+          <div class="notice" data-when="default first">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>下面按<b>截止或开场时间</b>排，不按"好不好"排 ——
+                  哪场值得去要你自己判断。本机只转述公告，不代为报名。</span>
+          </div>
+          <div class="notice notice--amber" data-when="ai-down">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>AI 暂时不可用，下面是原始公告列表，未做任何整理。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="joblist">
+
+          <label class="jobrow ck--have">
+            <span class="jobrow-when jw--soon"><span class="jw-d">11</span><span class="jw-m">8月 周一</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">某通信设备公司 · 2027 届提前批网申截止</span>
+              <span class="jobrow-s">网申 · 企业官网 · 还有 2 天</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过招聘公告正文</span>
+                公告写「本科及以上、专业不限」，你的专业对得上。
+                <b>要交成绩单扫描件</b> —— 本机可以扫。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
+          </label>
+
+          <label class="jobrow ck--have">
+            <span class="jobrow-when"><span class="jw-d">14</span><span class="jw-m">8月 周四</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">校内宣讲会 · 某汽车零部件集团</span>
+              <span class="jobrow-s">宣讲 · 学校第二报告厅 · 14:00–16:00</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过招聘公告正文</span>
+                现场收纸质简历，宣讲后有初面。
+                公告写「机械、材料、车辆工程优先」。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">已加进计划表</span></span>
+          </label>
+
+          <label class="jobrow">
+            <span class="jobrow-when"><span class="jw-d">16</span><span class="jw-m">8月 周六</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">2027 届毕业生秋季双选会（第一场）</span>
+              <span class="jobrow-s">双选会 · 学校体育馆 · 09:00–15:00 · 参会 46 家</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e2">只读到活动公告，没有企业名单</span>
+                主办方还没公布参会企业名单，我看不到里面有哪些公司。
+                名单出来后本机可以帮你排走法。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">名单未公布</span></span>
+          </label>
+
+          <label class="jobrow">
+            <span class="jobrow-when"><span class="jw-d">18</span><span class="jw-m">8月 周一</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">某电子制造 · 2027 届校招网申开启</span>
+              <span class="jobrow-s">网申 · 企业官网 · 截止 9月30日</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过招聘公告正文</span>
+                岗位里有「结构设计工程师」，和你简历里的课程设计沾边；
+                但公告要求<b>本科及以上</b>，你写的是专科 —— <b>去之前先看清楚</b>。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">学历要求需留意</span></span>
+          </label>
+
+          <label class="jobrow">
+            <span class="jobrow-when"><span class="jw-d">20</span><span class="jw-m">8月 周三</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">线上宣讲 · 某新能源企业</span>
+              <span class="jobrow-s">线上 · 需提前在来源平台报名 · 19:00</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过招聘公告正文</span>
+                线上场，本机帮不上现场的忙 —— 只把时间和报名入口打给你，别错过。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">需自行报名</span></span>
+          </label>
+
+          <label class="jobrow">
+            <span class="jobrow-when"><span class="jw-d">22</span><span class="jw-m">8月 周五</span></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">某机械集团 · 校园开放日</span>
+              <span class="jobrow-s">参观 · 需提前预约 · 09:00–12:00</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e2">只读到活动标题</span>
+                来源平台只给了标题和时间，没有正文。要不要去你自己判断。
+              </span>
+            </span>
+            <span class="jobrow-when"><span class="chip chip--info">信息不全</span></span>
+          </label>
+
+        </div>
+
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          活动信息来自<b>学校就业网与主办方公告</b>，同步于 8月9日 07:30。
+          报名、资格、是否如期举行以来源方为准，本机不代办、不代收简历。
+        </div>
+      </div>
+
+      <!-- ─────────── S3 带走计划表 ─────────── -->
+      <div class="paper-bar" data-at="s3">
+        <span class="nm">我的校招计划表 · 8月9日 – 8月22日</span>
+        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s3">
+        <div class="sheet-a4">
+          <div class="plan">
+            <h1>我的校招计划表</h1>
+            <div class="pl-sub">
+              2027 届 · 8月9日 – 8月22日 · 由职易达一体机打印<br>
+              活动信息来自学校就业网与主办方公告，同步于 8月9日 07:30
+            </div>
+            <div class="pl-hr"></div>
+
+            <div class="pl-w">这个月先做完这三件</div>
+            <div class="pl-i"><i></i><span>把简历<b>压到一页</b>，项目经历补上结果（本机可改可打）</span></div>
+            <div class="pl-i"><i></i><span>备齐成绩单、在读证明、四六级、获奖证明（本机可扫可打）</span></div>
+            <div class="pl-i"><i></i><span>网申到<b>企业官网或学校就业网</b>投，认准官方域名</span></div>
+
+            <div class="pl-w">8月11日 周一 · 还有 2 天</div>
+            <div class="pl-i"><i></i><span>某通信设备公司 提前批<b>网申截止</b> · 要交成绩单扫描件</span></div>
+
+            <div class="pl-w">8月14日 周四 14:00</div>
+            <div class="pl-i"><i></i><span>某汽车零部件集团 <b>校内宣讲</b> · 第二报告厅 · 现场收纸质简历，宣讲后有初面</span></div>
+
+            <div class="pl-w">8月16日 周六 09:00</div>
+            <div class="pl-i"><i></i><span>2027 届秋季双选会（第一场）· 学校体育馆 · 参会 46 家<br>
+              <b>参会企业名单主办方还没公布</b>，公布后可以再来本机排走法</span></div>
+
+            <div class="pl-w">8月18日 周一</div>
+            <div class="pl-i"><i></i><span>某电子制造 网申开启（截止 9月30日）·
+              <b>要求本科及以上，先看清楚学历门槛</b></span></div>
+
+            <div class="pl-w">8月20日 周三 19:00 · 8月22日 周五 09:00</div>
+            <div class="pl-i"><i></i><span>某新能源 线上宣讲（需提前报名）／某机械集团 校园开放日（需预约）</span></div>
+
+            <div class="pl-foot">
+              本表由职易达一体机根据公开的校招公告和你本人的简历生成，仅供你自己参考。<br>
+              本机不代收简历、不代为投递、不代为报名，也不预测录用结果。<br>
+              活动时间、地点、资格要求以主办方最新公告为准。本表不作为入场或报名凭证。
+            </div>
+          </div>
+        </div>
+
+        <div class="sheet-a4" style="margin-top:var(--s-5)">
+          <div class="plan" style="padding:26px 30px">
+            <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
+              同批第 2 份 · 共 6 份 · 每份 1 页
+            </div>
+            <h1 style="font-size:19px">王 磊</h1>
+            <div class="pl-sub">2027 届 · 机械设计与制造（专科）· 求职意向：机械设计 / 工艺</div>
+            <div class="pl-hr"></div>
+            <div class="pl-w">在校项目</div>
+            <div class="pl-i"><i style="border:0"></i><span>
+              自动化分拣装置结构设计（课程设计，3 人组，负责结构）<br>
+              用 SolidWorks 出图，做过 2 版样机，<b>第 2 版把卡料率从 12% 降到 3%</b>
+            </span></div>
+            <div class="pl-w">技能</div>
+            <div class="pl-i"><i style="border:0"></i><span>
+              SolidWorks / AutoCAD · 会看装配图与公差标注 · CET-4
+            </span></div>
+            <div class="pl-foot" style="margin-top:16px">
+              这是你在本机改过的版本：已压到一页，项目经历补上了结果。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-user"/></svg><b>按谁算的</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">毕业年份</span><span class="v">2027 年 6 月</span></div>
+            <div class="kv-row"><span class="k">学历</span><span class="v">专科 · 机械设计与制造</span></div>
+            <div class="kv-row"><span class="k">简历</span><span class="v">已上传 · 2 页</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">本机 8月9日 10:21</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这些只在本次办理里用，离场自动清空，不留存。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>校招和社招不一样在哪</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">看什么</span><span class="v">课程、项目、实习</span></div>
+            <div class="kv-row"><span class="k">简历长度</span><span class="v">一页最好</span></div>
+            <div class="kv-row"><span class="k">时间窗</span><span class="v">错过要等半年</span></div>
+            <div class="kv-row"><span class="k">投递渠道</span><span class="v">官网 / 就业网</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>校招最容易吃亏的是<b>错过截止日期</b>，不是简历不够好。
+                  所以这一页的重点是把日期打给你。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机不接学校学籍系统，不核验应届身份 ——
+            上面写的毕业年份是<b>你自己填的</b>，本机没有也不会去核实。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-alert"/></svg><b>校招常见的三个坑</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">收费内推</span>
+              <span class="v" style="text-align:right">正规校招<b>不向求职者收费</b></span>
+            </div>
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">代写简历</span>
+              <span class="v" style="text-align:right">面试问项目细节，写不出来更糟</span>
+            </div>
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">仿冒网申页</span>
+              <span class="v" style="text-align:right">认官方域名，别乱填身份证号</span>
+            </div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            本机也不向你收求职服务费 —— 只收打印纸张的钱，价格现场公示。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这 6 场我读到什么程度</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">读过公告正文</span><span class="v"><b>4</b> 场</span></div>
+            <div class="kv-row"><span class="k">只有标题或没名单</span><span class="v"><b>2</b> 场</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            双选会的<b>参会企业名单</b>主办方还没公布 —— 名单出来后再来，
+            本机可以帮你排展位走法。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>这几场要用到的材料</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">纸质简历 4–6 份</span>
+              <span class="ck-s">14日宣讲会现场收</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">成绩单扫描件</span>
+              <span class="ck-s">11日网申要传 · 本机可扫成 PDF</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">在读证明</span>
+              <span class="ck-s">双选会入场可能要查</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">学生证</span>
+              <span class="ck-s">校内活动进场用</span></span>
+          </label>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            证件类扫描件本机默认<b>不长期保存</b>，办理结束即清。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-clock"/></svg><b>这两周的时间</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">最近的截止</span><span class="v"><b>8月11日</b> · 2 天后</span></div>
+            <div class="kv-row"><span class="k">要到场的</span><span class="v">14日、16日、22日</span></div>
+            <div class="kv-row"><span class="k">线上的</span><span class="v">20日 19:00</span></div>
+            <div class="kv-row"><span class="k">时间冲突</span><span class="v">无</span></div>
+          </div>
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>11日那个网申<b>要传成绩单</b> —— 今天顺手在本机扫好，
+                  比截止当天临时找强。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>一起打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">校招计划表</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+          <label class="ck ck--have" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">纸质简历</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 6 份</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">7 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v"><b>1.40</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把计划表存进手机，或稍后再来打。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用以现场公示价为准。计划表同时存进「我的文档」。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走 7 页</span>
+                <span class="tl-s">计划表在最上面一页</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">计划表存进「我的文档」</span>
+                <span class="tl-s">今天之内可以再打一次，不重复收费</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">日期变了就回来重打</span>
+                <span class="tl-s">主办方改期本机不会通知你</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>本机<b>不会提醒你</b>截止日期 —— 没有你的手机号，也不会去要。
+                  纸拿在手上比什么提醒都靠谱。</span>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-toolbox"/></svg><b>这一季本机还能帮你做的</b>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="tl-b"><span class="tl-t">改简历 · 压到一页</span>
+                <span class="tl-s">项目经历补结果，是校招最该改的一处</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-scan"/></svg></span>
+              <span class="tl-b"><span class="tl-t">扫成绩单、在读证明</span>
+                <span class="tl-s">扫成 PDF，网申上传直接用</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-interview"/></svg></span>
+              <span class="tl-b"><span class="tl-t">练宣讲会后的初面</span>
+                <span class="tl-s">14日那场宣讲后有初面，可以先练一轮</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-fair"/></svg></span>
+              <span class="tl-b"><span class="tl-t">双选会名单出了再来排走法</span>
+                <span class="tl-s">16日那场，主办方公布名单后本机能排路线</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这几件都不额外收费，只有打印按现场公示价收纸张钱。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用：一句话 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            按你的毕业年份定位校招节奏，把这两周的截止日期和活动<b>打成一张纸</b>。<br>
+            本机不代收、不代投、不代报名。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到上一步</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">改选活动</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first">按 2027 届算 · 现在是提前批和秋招网申</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 只显示公开校招日历</span>
+    <span class="actionbar-hint" data-at="s2">已选 2 场 · 最近一个截止在 2 天后</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 7 页 · 1.40 元</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="default first ai-down">开始打印<svg class="ic"><use href="#i-printer"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=10"></script>
+</body>
+</html>

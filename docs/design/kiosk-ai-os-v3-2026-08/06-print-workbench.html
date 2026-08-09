@@ -196,7 +196,8 @@
         </div>
         <div class="notice" data-when="default first ai-down" style="max-width:40em">
           <svg class="ic"><use href="#i-printer"/></svg>
-          <span>正在出纸，请在取纸口等待，不要离开。中途卡纸会自动暂停并保留剩余份数，凭取件码可在任一台空闲机器续打。</span>
+          <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
+            凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
         </div>
         <div class="notice notice--coral" data-when="device-off" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -358,11 +359,17 @@
         </div>
         <div class="notice notice--amber" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>你选择了保持原样打印。含身份证号的纸质材料请自行妥善保管，不要留在取纸口。</span>
+          <span>你选择了保持原样打印。<b>本机不会自动遮盖</b>——遮盖版未生成，出纸内容就是你上传的原文件。
+            含身份证号的纸质材料请自行妥善保管，不要留在取纸口。</span>
         </div>
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>文件 7 天后自动清理并留删除日志；管理员如需访问会记录审计日志。出纸只在你按下确认后开始。</span>
+          <span><b>你的材料去哪、留多久、谁能看：</b><br>
+            · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
+            · <b>保留</b>：文件 7 天后自动清理，清理会留删除日志。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
+            · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<br>
+            · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span>
         </div>
       </div>
 
@@ -541,6 +548,6 @@
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
 })()
 </script>
-<script src="scripts/audit-plus.js?v=9"></script>
+<script src="scripts/audit-plus.js?v=10"></script>
 </body>
 </html>

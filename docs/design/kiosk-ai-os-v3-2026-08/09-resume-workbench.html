@@ -282,7 +282,11 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>AI 只生成新版本，永不覆盖你的原件。</b>未登录时文件只留到本次会话结束；要长期保存需你本人选「存进我的简历」。</span>
+          <span><b>AI 只生成新版本，永不覆盖你的原件。</b><br>
+            · <b>去向</b>：解析、诊断、改写结果<b>只进你本人的简历与记录</b>；<b>不发送给任何企业，不沉淀到任何简历库</b>。<br>
+            · <b>保留</b>：未登录时只留到本次会话结束；要长期保存需你本人选「存进我的简历」。<br>
+            · <b>外部服务</b>：诊断与改写由 AI 服务处理简历文本；扫描件走识别时会经第三方 OCR。<br>
+            · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。</span>
         </div>
       </div>
 
@@ -301,7 +305,8 @@
         </div>
         <div class="notice" data-when="default first" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>不显示百分比：可改点的数量要看完全文才知道。这里只报已完成的步骤。约 40 秒 · 免费。</span>
+          <span>不显示百分比：可改点的数量要看完全文才知道，这里只报已完成的步骤。约 40 秒 · 免费。<br>
+            解析只为给你出诊断，<b>不发送企业、不沉淀简历库</b>；失败可重试或换来源重新上传。</span>
         </div>
         <div class="notice notice--coral" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -506,6 +511,6 @@
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>
-<script src="scripts/audit-plus.js?v=9"></script>
+<script src="scripts/audit-plus.js?v=10"></script>
 </body>
 </html>

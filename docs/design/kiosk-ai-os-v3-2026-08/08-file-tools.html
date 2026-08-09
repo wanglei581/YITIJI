@@ -184,7 +184,10 @@
         </div>
         <div class="notice" data-when="default first ai-down" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>合成会生成一个新文件，原图不动。含身份证的文件默认只留到本次会话结束；要长期保存需你本人选「存进我的文档」，并写入操作日志。</span>
+          <span>合成生成新文件，原图不动。<br>
+            · <b>保留</b>：合成的 PDF 默认保存 <b>24 小时</b>，可在「我的 · 文档」里延期；含身份证的默认只留到本次会话结束。<br>
+            · <b>访问凭据</b>：签章后文件的访问链接 <b>30 分钟到期</b>，过期需重新在本机打开。<br>
+            · <b>谁能看</b>：只有你本人；管理员访问写审计日志。<b>不向任何企业提供。</b></span>
         </div>
         <div class="notice notice--amber" data-when="device-off" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -225,7 +228,8 @@
         </label>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>签名图像只用于本次合成，会话结束即删除，不会留在机器上、也不会用于其他文件。合成结果是新文件，原件不变。</span>
+          <span>签名图像只用于本次合成，<b>会话结束即删除</b>，不会留在机器上、也不会用于其他文件。合成结果是新文件，原件不变。
+            签名图片与待签 PDF 都有大小上限，超限会明确报错而不是静默失败。</span>
         </div>
       </div>
 
@@ -298,6 +302,6 @@
   sync()
 })()
 </script>
-<script src="scripts/audit-plus.js?v=9"></script>
+<script src="scripts/audit-plus.js?v=10"></script>
 </body>
 </html>
