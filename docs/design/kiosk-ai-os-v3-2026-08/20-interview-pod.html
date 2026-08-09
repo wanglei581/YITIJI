@@ -96,6 +96,14 @@
 .wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
 .wside .pane--grow { overflow:hidden; }
 
+/* 单页文件：纸面居中。
+   work.css 的 .paper-stage 注释解释了为什么默认顶对齐 ——
+   「多页要连续滚动，整页居中缩放会左右出界，下方还会留一大块死白」。
+   那个判断对多页成立；但这一单只有 1 页，顶对齐留下的恰恰就是那条注释
+   想避免的死白（实测纸底到栏底约 420px 的无容器背景空洞）。
+   所以只在「只有一张纸」时居中，多页仍走原有行为。 */
+.paper-stage:has(> .sheet-a4:only-child) { justify-content: center; }
+
 /* 复盘单纸面 */
 .rp { padding:30px 34px; color:#17222b; }
 .rp h1 { font-size:21px; font-weight:800; }
@@ -536,6 +544,30 @@
           <div class="panel-note" style="margin-top:var(--s-4)">
             这条是把今天和 8月2日 两次比出来的 ——
             本机只比"缺口类型"，<b>不保存你两次说过的内容</b>。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-interview"/></svg><b>还没答的 4 道</b>
+            <span class="mt">现在回去答还来得及</span>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">为什么想从现在的公司出来</span>
+                <span class="tl-s">别说前东家坏话，讲你想要什么</span></span></div>
+            <div class="tl"><span class="tl-dot">6</span>
+              <span class="tl-b"><span class="tl-t">和同事有过分歧吗，怎么处理的</span>
+                <span class="tl-s">答"没有过"最吃亏，等于说你没协作过</span></span></div>
+            <div class="tl"><span class="tl-dot">7</span>
+              <span class="tl-b"><span class="tl-t">这个岗最难的地方是什么</span>
+                <span class="tl-s">看你有没有真看过岗位正文</span></span></div>
+            <div class="tl"><span class="tl-dot">8</span>
+              <span class="tl-b"><span class="tl-t">你有什么想问我们的</span>
+                <span class="tl-s">答"没有"最吃亏，准备两个问题带过去</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这 4 道的<b>题目</b>会印在复盘单上，你可以带回去自己想 ——
+            但只有在本机答过的题才有点评。
           </div>
         </div>
       </div>
