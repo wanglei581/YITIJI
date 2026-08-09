@@ -53,8 +53,8 @@ if (request.mode === 'inspect') {
       request.mode === 'finalize-delete' ? 'delete' : 'quarantine',
     )
     result = { accepted: true }
-  } catch {
-    result = { accepted: false }
+  } catch (error) {
+    result = { accepted: false, errorCode: error instanceof Error ? error.message : 'SCAN_INPUT_SECURE_READER_REJECTED' }
   }
 } else if (request.mode === 'sweep') {
   try {
