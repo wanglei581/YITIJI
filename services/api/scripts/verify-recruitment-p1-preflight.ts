@@ -1,9 +1,15 @@
 import 'dotenv/config'
 import { createClient } from '@libsql/client'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { dbKindOf } from '../src/prisma/create-client'
 
 type CountQuery = (sql: string) => Promise<number>
+type DbKind = 'sqlite' | 'postgres'
+
+function dbKindOf(url: string): DbKind {
+  if (url.startsWith('file:')) return 'sqlite'
+  if (url.startsWith('postgres://') || url.startsWith('postgresql://')) return 'postgres'
+  throw new Error(`DATABASE_URL protocol is unsupported: ${url.split(':')[0]}:…`)
+}
 
 const inventorySql = {
   organizations: 'SELECT COUNT(*) AS count FROM "Organization"',
