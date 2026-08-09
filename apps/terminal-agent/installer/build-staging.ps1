@@ -133,11 +133,13 @@ $nativeSources = @(
 $nativeExecutable = Join-Path $nativeRoot "secure-scan-reader.exe"
 New-Item -ItemType Directory -Path $nativeRoot -Force | Out-Null
 $compileScript = Join-Path $cacheRoot "compile-secure-scan-reader.cmd"
+$quotedNativeSources = ($nativeSources | ForEach-Object { "`"$_`"" }) -join " "
+$compileCommand = "cl.exe /nologo /TC /std:c11 /O2 /GS /guard:cf /MT /W4 /WX /Fe:`"$nativeExecutable`" $quotedNativeSources /link /Brepro /DYNAMICBASE /NXCOMPAT /guard:cf"
 $compileLines = @(
   "@echo off",
   "call `"$vsDevCmd`" -no_logo -arch=x64 -host_arch=x64",
   "if errorlevel 1 exit /b %errorlevel%",
-  "cl.exe /nologo /TC /std:c11 /O2 /GS /guard:cf /MT /W4 /WX /Fe:`"$nativeExecutable`" " + (($nativeSources | ForEach-Object { "`"$_`"" }) -join " ") + " /link /Brepro /DYNAMICBASE /NXCOMPAT /guard:cf",
+  $compileCommand,
   "exit /b %errorlevel%"
 )
 [System.IO.File]::WriteAllLines($compileScript, $compileLines, [System.Text.Encoding]::ASCII)
