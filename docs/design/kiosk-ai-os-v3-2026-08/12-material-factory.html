@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -44,8 +44,21 @@
   .ck-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .ck-t { font-size: var(--fz-3); color: var(--fog-900); }
   .ck-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.5; }
-  .ck-tag { margin-left: auto; flex: 0 0 auto; }
-  .tplgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); overflow-y: auto; }
+  .ck-tag-status { margin-left: auto; flex: 0 0 auto; }
+  /* chip--info：状态标签，非入口（与 P17/P18/P20 同一先例） */
+  .chip--info { cursor: inherit; }
+  /* 2026-08-09 留白复核补实（先例见 06-print-workbench 同日注释）：
+     t2 稿子下方、t3 清单下方、t4 模板格下方原为无容器空洞（约 0.8–1.2k px）。
+     只补真实信息：t2 补「怎么写出来的」代写边界卡；t3 补招聘会/打印通道；
+     t4 模板格由 3 列改 2 列——预览图更大更可读（27 寸触控，CLAUDE.md §9），
+     不是塞装饰。locked / paper-empty 撑满所属区域：空态居中是意图，背景空洞不是。
+     另：first 态此前仍显示「已在打印队列 / 已扫描存档 / 已生成」，与「还没有你的材料」
+     矛盾——按不伪造能力红线，first 态这些勾与状态标签一并隐去。 */
+  .tplgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-4); overflow-y: auto; }
+  .speak > .locked { flex: 1 1 auto; }
+  .paper-stage .paper-empty { flex: 1 1 auto; }
+  .screen[data-state="first"] .ck--have .ck-box,
+  .screen[data-state="ai-down"] .ck--gen .ck-box { background: transparent; border-color: var(--brd-2); }
   .tpl {
     cursor: pointer; border-radius: var(--r-sm); overflow: hidden; position: relative;
     background: var(--paper-000); border: 2px solid transparent; box-shadow: var(--sh-2);
@@ -138,7 +151,7 @@
             <svg class="ic"><use href="#i-offline"/></svg>
             <b>生成服务中断</b>
             <p>求职信是纯 AI 生成能力，现在不可用。<br>可以打印一份<b>空白求职信格式纸</b>手写，格式要点印在页脚。</p>
-            <a class="btn btn--ghost" href="06-print-workbench.html">打印格式纸</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印格式纸</a>
           </div>
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
@@ -170,7 +183,18 @@
             这块是我接下来想补的。其他要求我基本都做过。
           </div>
         </div>
-        <div class="notice notice--amber" data-when="default device-off">
+        <!-- 2026-08-09 留白复核补实：代写边界卡——两版稿子里每个事实的出处，
+             与 t1「没有新增任何事实」同口径。 -->
+        <div class="speak-card" data-when="default device-off">
+          <div class="speak-hd"><span class="t">这两版是怎么写出来的</span><span class="s">代写边界</span></div>
+          <div class="speak-txt" style="font-size:var(--fz-3)">
+            里面每一个事实——2 年 3 个月、3000 到 12000、8 场活动、带 5 人地推——都取自你的简历 v2
+            <span class="ev ev--e1">E1 你的材料</span>，SQL 那句短板来自你诊断里的缺口。
+            AI 只把它们组织成口语稿 <span class="ev ev--e3">E3 表达属 AI 判断</span>，<b>没有替你新增任何经历</b>；
+            你没给过的内容，这里一个字也不会出现。
+          </div>
+        </div>
+        <div class="notice notice--amber" style="margin-top:auto" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>照着念会很假。</b>这是给你熟悉逻辑用的稿子——记住三个数字和一句短板，
             现场用自己的话说。缺点那句建议保留，主动说短板比被问出来好。<span class="ev ev--e3">E3 表达属 AI 判断</span></span>
@@ -179,7 +203,7 @@
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>生成中断</b>
           <p>可以先打印一张<b>自我介绍结构卡</b>：说什么、按什么顺序、哪三处该放数字。<br>不含具体内容，需要你自己填。</p>
-          <a class="btn btn--ghost" href="06-print-workbench.html">打印结构卡</a>
+          <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印结构卡</a>
         </div>
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
@@ -190,7 +214,8 @@
       </div>
 
       <!-- T3 材料清单 -->
-      <div class="pane pane--fill" data-at="t3" style="border:0;background:transparent;backdrop-filter:none;padding:0">
+      <!-- 2026-08-09 留白复核：wrapper 撑满主栏，清单吸收余量、通道垫底，不再有无容器空洞 -->
+      <div class="pane pane--fill" data-at="t3" style="border:0;background:transparent;backdrop-filter:none;padding:0;flex:1 1 auto;min-height:0">
         <div class="checks" style="margin-bottom:var(--s-4)">
           <div class="checks-hd">
             <svg class="ic" style="width:19px;height:19px;color:var(--azure-400)"><use href="#i-policy"/></svg>
@@ -205,23 +230,48 @@
         <div class="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
           <div class="ck ck--have"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">纸质简历 5 份</span><span class="ck-s">现场普遍收纸质件；128 家参展，5 份偏保守</span></span>
-            <span class="ck-tag"><span class="chip chip--jade">已在打印队列</span></span></div>
+            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已在打印队列</span></span></div>
           <div class="ck"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">身份证原件</span><span class="ck-s">入场登记需要，主办方公告第 3 条</span></span>
-            <span class="ck-tag"><span class="chip chip--amber">你自己带</span></span></div>
+            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
           <div class="ck ck--have"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">学位证 / 毕业证复印件 2 份</span><span class="ck-s">3 家收藏企业中 2 家在 JD 里要求</span></span>
-            <span class="ck-tag"><span class="chip chip--jade">已扫描存档</span></span></div>
+            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default ai-down device-off">已扫描存档</span></span></div>
           <div class="ck"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">证件照 2 张</span><span class="ck-s">部分企业现场填表要贴</span></span>
-            <span class="ck-tag"><span class="chip">本机暂不能拍</span></span></div>
+            <span class="ck-tag-status"><span class="chip chip--info">本机暂不能拍</span></span></div>
           <div class="ck"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">笔</span><span class="ck-s">现场填表用，主办方不一定提供</span></span>
-            <span class="ck-tag"><span class="chip chip--amber">你自己带</span></span></div>
-          <div class="ck ck--have"><span class="ck-box"></span>
+            <span class="ck-tag-status"><span class="chip chip--amber chip--info">你自己带</span></span></div>
+          <!-- 2026-08-09：求职信状态跟 AI 走——t1 的 ai-down 态明说「未生成」，这里不能仍标已生成 -->
+          <div class="ck ck--have ck--gen"><span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">求职信 1 份（可选）</span><span class="ck-s">投递明确目标企业时递上去更显诚意</span></span>
-            <span class="ck-tag"><span class="chip chip--jade">已生成</span></span></div>
+            <span class="ck-tag-status"><span class="chip chip--jade chip--info" data-when="default device-off">已生成</span><span class="chip chip--info" data-when="ai-down">未生成 · 可手写</span></span></div>
         </div>
+        <!-- 2026-08-09 留白复核补实：清单是给周五招聘会用的，就近给作战台与打印通道。
+             first 态不显示——locked 卡里已有「去准备材料」，避免重复入口。 -->
+        <div class="xlane" style="margin-top:var(--s-4)" data-when="default ai-down device-off">
+          <span class="xlane-hd">清单备齐之外，这两处也是给周五准备的</span>
+          <div class="xlane-row">
+            <a class="xlane-go" href="17-fair-desk.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">招聘会作战台</span>
+                <span class="xlane-ds">展位图、到场企业和现场提醒都在那边</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="xlane-go" href="09-resume-workbench.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">简历工作台</span>
+                <span class="xlane-ds">出发前想再顺一遍简历，从这里回去改</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+          </div>
+        </div>
+
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
           <b>清单可以看，勾选状态需要你的材料</b>
@@ -270,7 +320,7 @@
           <div class="seg"><button aria-pressed="true">写</button><button aria-pressed="false">不写</button></div>
         </div>
       </div>
-      <div class="pane pane--fill" data-at="t1">
+      <div class="pane pane--fill" data-at="t1" style="margin-top:auto">
         <div class="pane-hd"><span class="t">两处要你自己核</span></div>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -302,12 +352,13 @@
           <div class="seg"><button aria-pressed="true">公众号增长</button><button aria-pressed="false">校园地推</button></div>
         </div>
       </div>
-      <div class="pane pane--fill" data-at="t2">
+      <div class="pane pane--fill" data-at="t2" style="margin-top:auto">
         <div class="pane-hd"><span class="t">练一遍再上场</span></div>
         <div class="outs">
           <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>对着练一遍</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练习不可用</button>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片</button>
+          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
+          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-printer"/></svg>小卡片未生成</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
           <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
           <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
@@ -334,8 +385,20 @@
           </div>
         </div>
       </div>
-      <div class="pane pane--fill" data-at="t3">
-        <div class="pane-hd"><span class="t">还差两样</span><span class="s" data-when="default device-off">3 / 6 已有</span></div>
+      <!-- 2026-08-09：标题跟状态走——first 态没有材料谈不上「差几样」，
+           ai-down 态求职信未生成、结论也变了，不能沿用同一句。 -->
+      <div class="pane pane--fill" data-at="t3" style="margin-top:auto">
+        <div class="pane-hd">
+          <span class="t" data-when="default device-off">还差两样</span>
+          <span class="t" data-when="ai-down">清单不受影响</span>
+          <span class="t" data-when="first">先看该带什么</span>
+          <span class="s" data-when="default device-off">3 / 6 已有</span>
+        </div>
+        <div class="notice" data-when="first">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>还没有你的材料，这一栏先不下结论。有了简历、扫描件或生成好的求职信之后，
+            这里会标出<b>哪些已经有了、哪些本机办不了</b>。</span>
+        </div>
         <div class="notice notice--amber" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>证件照本机拍不了</b>——没配补光和背景板，拍出来不合规格。请到照相馆拍，或用已有的电子照去「文件加工」打印。</span>
@@ -364,7 +427,7 @@
           <span>带侧栏和双栏模板在部分企业的简历筛选系统里会<b>乱序</b>。投大公司建议用单栏。</span>
         </div>
       </div>
-      <div class="pane pane--fill" data-at="t4">
+      <div class="pane pane--fill" data-at="t4" style="margin-top:auto">
         <div class="pane-hd"><span class="t">换模板会怎样</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -372,7 +435,8 @@
         </div>
         <div class="outs" style="margin-top:14px">
           <a class="out" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-layers"/></svg>应用到我的简历</a>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打样一份</button>
+          <a class="out" data-when="default ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打样一份 · 去核价</a>
+          <a class="out" data-when="first" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>先去做简历</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
         </div>
       </div>
@@ -405,12 +469,13 @@
     <button class="btn btn--lg btn--ghost" data-at="t3">加一样自定义</button>
     <button class="btn btn--lg btn--ghost" data-at="t4" data-go="t1">回求职信</button>
 
-    <a class="btn btn--primary" data-at="t1" data-when="default first" href="06-print-workbench.html">核对 3 处后打印<svg class="ic"><use href="#i-printer"/></svg></a>
-    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="first" href="09-resume-workbench.html">先去做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="t1" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="t2" data-when="default device-off" href="20-interview-pod.html">对着练一遍<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html?stage=s3">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="t3" data-when="device-off">发到我手机<svg class="ic"><use href="#i-phone"/></svg></button>
     <a class="btn btn--primary" data-at="t4" href="09-resume-workbench.html?stage=s5">应用到我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
@@ -418,13 +483,13 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

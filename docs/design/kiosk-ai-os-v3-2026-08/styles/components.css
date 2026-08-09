@@ -388,3 +388,19 @@
   animation: scan 2.8s var(--ease-in-out) infinite;
 }
 @keyframes scan { 0% { top: -130px; } 100% { top: 100%; } }
+
+
+/* ---------------- 去向选择（outs）----------------
+   「做完这一步，接下来把结果拿去哪」的通用组件。
+   原来放在 resume.css 里，导致 P14 岗位详情引用不到、按钮塌成 19px 高——
+   凡是跨页复用的组件都必须放在 components.css，不能锁在某个业务样式层。 */
+.outs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+.out {
+  padding: var(--s-4); border-radius: var(--r-sm); cursor: pointer; text-align: center;
+  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800);
+  font-family: var(--ff-ui); font-size: var(--fz-2); min-height: 72px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+}
+.out .ic { width: 22px; height: 22px; color: var(--jade-500); }
+.out[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.out[aria-disabled="true"] .ic { color: var(--fog-600); }

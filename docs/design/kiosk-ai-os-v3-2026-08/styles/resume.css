@@ -105,17 +105,7 @@
 .ver-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); }
 .ver-tag { margin-left: auto; flex: 0 0 auto; }
 
-/* ---------- 导出去向 ---------- */
-.outs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-.out {
-  padding: var(--s-4); border-radius: var(--r-sm); cursor: pointer; text-align: center;
-  background: var(--surf-1); border: 1px solid var(--brd-2); color: var(--fog-800);
-  font-family: var(--ff-ui); font-size: var(--fz-2); min-height: 72px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
-}
-.out .ic { width: 22px; height: 22px; color: var(--jade-500); }
-.out[aria-disabled="true"] { opacity: .45; pointer-events: none; }
-.out[aria-disabled="true"] .ic { color: var(--fog-600); }
+/* ---------- 导出去向组件已上移到 components.css（P14 等非简历页也要用） ---------- */
 
 /* ============================================================
    岗位匹配对比（P11）

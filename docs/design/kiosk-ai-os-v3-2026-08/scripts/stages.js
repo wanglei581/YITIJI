@@ -14,8 +14,13 @@
   function apply (st) {
     screen.setAttribute('data-stage', st)
     if (window.v3ApplyVisibility) window.v3ApplyVisibility()
-    // 阶段轨状态
-    var order = [], rs = screen.querySelectorAll('.rstep')
+    // 阶段轨状态。
+    // 只数**当前可见**的站：同一站可能有多个变体（例如收银在免费单里是"跳过"态），
+    // 把隐藏的也数进去会把总步数虚报（曾经报成 4/8，实际 7 步）。
+    var rs = []
+    var all = screen.querySelectorAll('.rstep')
+    for (var i = 0; i < all.length; i++) if (!all[i].hidden) rs.push(all[i])
+    var order = []
     for (var j = 0; j < rs.length; j++) order.push(rs[j].getAttribute('data-go'))
     var cur = order.indexOf(st)
     for (var k = 0; k < rs.length; k++) {

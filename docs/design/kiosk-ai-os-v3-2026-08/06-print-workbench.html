@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/pay.css?v=5">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -58,7 +58,7 @@
       <button class="rstep" data-go="s6"><span class="rstep-dot">6</span><span class="rstep-name">正在出纸</span></button>
       <button class="rstep" data-go="s7"><span class="rstep-dot">7</span><span class="rstep-name">取件</span></button>
     </div>
-    <span class="rail-count" data-rail-count>第 <b>3</b> / 6 步</span>
+    <span class="rail-count" data-rail-count>第 <b>3</b> / 7 步</span>
   </div>
 
   <!-- ============ 工作区 ============ -->
@@ -93,6 +93,29 @@
           <span class="src-ds">把纸质原件放上玻璃板或送稿器，扫成 PDF 再打印。</span>
           <span class="src-tag"><span class="chip chip--jade">扫描仪就绪</span></span>
         </button>
+      </div>
+
+      <!-- S1 域内横向通道：打印扫描域 = P06 + P07 + P08（closed-loop-map §二） -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">不打印，只处理文件？这两个台面也在这里</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="07-scan-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">扫描工作台</span>
+              <span class="xlane-ds">纸质扫成 PDF，存「我的文档」或 U 盘带走，不出纸</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="08-file-tools.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-file"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">文件加工台</span>
+              <span class="xlane-ds">图片合成 PDF、加签章；处理完可回这里打印</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
       </div>
 
       <!-- S2–S4 体检结论 -->
@@ -353,14 +376,16 @@
           <span>正在出纸，请在取纸口等待，不要离开。<b>已开始的这一份不可取消</b>；中途卡纸会自动暂停并保留剩余份数，
             凭取件码可在任一台空闲机器续打。任务超过 <b>10 分钟</b>无进展会自动转为待打印订单，不重复扣款。</span>
         </div>
-        <div class="notice notice--coral" data-when="device-off" style="max-width:40em">
+        <!-- 2026-08-09 Codex 整改：中途离线文案只在真的出过纸的处境(printing/jam)出现,
+             排队/校验/超时各有自己的 0 面与退款事实,不能被这段"已出 3 面"覆盖。 -->
+        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>打印机中途离线，已暂停。你已经付过的钱不会再扣一次。</b>剩余 12 面有两条路，你选：<br>
             · <b>继续打</b>：剩余份数保留为待打印订单，凭取件码在任一台空闲机器续打，不再收费。<br>
             · <b>不打了</b>：按<b>未出的 12 面</b>退 2.40 元，已出的 3 面不退；退款走原渠道，1–3 个工作日到账。<br>
             两种处理都会写进「我的 · 打印订单」，含面数、金额和原因。</span>
         </div>
-        <div class="notice notice--coral" data-when="device-off" style="max-width:40em">
+        <div class="notice notice--coral" data-when="device-off" data-job="printing jam" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>本机<b>不会自己替你决定退还是续打</b>。你离场未选择时，订单默认转为待打印保留 7 天，
             到期未打自动按未出面数退款并留退款日志 —— 钱不会不声不响留在系统里。</span>
@@ -370,7 +395,7 @@
       <!-- S6 取件 -->
       <div class="progress-wrap" data-at="s7">
         <div class="pickup">
-          <span class="chip chip--jade"><span class="dot dot--live"></span>本次办理完成</span>
+          <span class="chip chip--jade chip--info"><span class="dot dot--live"></span>本次办理完成</span>
           <div class="pickup-code">7742 106 358</div>
           <p class="pickup-hint">这是你的取件码。<b>7 天内</b>凭码可在任一台空闲机器复打同一份文件；文件到期自动清理，清理会留删除日志。</p>
           <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
@@ -381,6 +406,10 @@
         <div class="notice" style="max-width:40em">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>离场或超时会自动清空本次会话。取件码只在你本人的订单里可见，不会显示给下一位用户。</span>
+        </div>
+        <div class="notice" style="max-width:40em">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span>离开前：<b>打印件</b>点一下份数；<b>纸质原件</b>从玻璃板 / 送稿器上取走；<b>U 盘</b>拔下带好。</span>
         </div>
       </div>
     </div>
@@ -582,7 +611,7 @@
           <svg class="ic"><use href="#i-shield"/></svg>
           <span><b>你的材料去哪、留多久、谁能看：</b><br>
             · <b>去向</b>：仅进入本机打印任务与你本人的打印订单；<b>不发送给任何企业，不进入任何简历库</b>。<br>
-            · <b>保留</b>：文件 7 天后自动清理，清理会留删除日志。<br>
+            · <b>保留</b>：未支付的临时文件随本次会话结束清空；已支付订单的文件保留 7 天供复打；登录后主动存入「我的文档」的按其保留期。到期清理都留删除日志。<br>
             · <b>谁能看</b>：只有你本人。管理员如需访问会写入审计日志。<br>
             · <b>外部服务</b>：打印走本机驱动，文件<b>不出本机与本项目服务端</b>。<br>
             · <b>出纸</b>：只在你按下确认后开始；<b>出纸中不可取消</b>，只能等本份完成或按急停。</span>
@@ -591,7 +620,10 @@
 
 
       <!-- S4/S5 价目表：金额必须能被核对，不能只给一个总数 -->
-      <div class="pane" data-at="s4 s5">
+      <!-- 2026-08-09 留白复核：公示价从 s4 挪到 s1 —— s4 已有服务端核价明细(冗余致右栏超高、
+           把「支付前请核对」挤出 14–39px)；s1 进门正需要价格预期。s5 保留(退款语境要对照价目)。
+           s2 试过放入,「建议」pane 被挤出 40px,退出。 -->
+      <div class="pane" data-at="s1 s5">
         <div class="pane-hd"><span class="t">现场公示价</span><span class="s">以本机屏上为准</span></div>
         <div class="price">
           <div class="price-row price-row--head"><span>项目</span><span class="v">单价</span></div>
@@ -605,6 +637,39 @@
           <b>金额为 0 的订单不进收银台</b>，第 5 站直接跳过、不出收款码（例如只扫描、或用了减免）。<br>
           本机不接受现金，不找零；不支持刷卡。
         </p>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：右栏常驻两卡 —— 本机事实(E2)与隐私规则。
+           s3/s4 栏内已满，不加；其余阶段垫底，杜绝无容器空洞。 -->
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:41</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">打印机</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+          <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">AI 服务</span>
+            <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+            <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 打印不受影响</span></div>
+        </div>
+      </div>
+      <div class="pane" data-at="s1 s2 s5 s6 s7">
+        <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· 文件默认只保留到<b>本次会话结束</b>；<br>
+            · 支付、出纸、删除都要<b>你本人确认</b>，系统不代按；<br>
+            · 离场或超时自动清空，下一位用户看不到任何痕迹；<br>
+            · 要长期保存：登录后存入「我的文档」，7 天自动清理并留删除日志。</span>
+        </div>
+      </div>
+      <div class="pane" data-at="s6">
+        <div class="pane-hd"><span class="t">出纸完成后</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <span>取件码会放大显示在屏幕上；已登录用户同步进「我的 · 打印订单」。<b>出纸完成前请不要离开本机。</b></span>
+        </div>
       </div>
 
       <!-- S5 退款规则：钱的规则必须在付款前就能看到 -->
@@ -721,7 +786,8 @@
         <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
         <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
         <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
-        <div data-when="device-off"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出 · 按各处境规则处理，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
     </div>
@@ -771,13 +837,13 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

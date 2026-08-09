@@ -7,9 +7,9 @@
 <meta name="screen-name" content="P05 手机接力">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
-<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
@@ -131,7 +131,15 @@
       <span class="ph-t">正在为 01 号机服务</span>
       <span class="ph-s">市人力资源市场 A 馆 · 办理单 #F-2318</span>
     </span>
-    <span class="ph-live" data-at="s1 s2"><i></i>已连上</span>
+    <!-- 手机页的四态不照抄一体机，而是「机器那边现在什么情况」：
+         已连上 / 刚扫进来 / 机器的识别不可用（仍能传） / 机器离线（传了也出不来）。
+         这一条最关键：用户在手机上看不到机器，机器出事只能靠这里说。 -->
+    <span class="ph-live" data-at="s1 s2" data-when="default"><i></i>已连上</span>
+    <span class="ph-live" data-at="s1 s2" data-when="first"><i></i>刚连上 · 等你选文件</span>
+    <span class="ph-live" data-at="s1 s2" data-when="ai-down" style="color:var(--amber-600)">
+      <i style="background:var(--amber-500)"></i>已连上 · 机器的识别功能不可用</span>
+    <span class="ph-live" data-at="s1 s2" data-when="device-off" style="color:var(--coral-400)">
+      <i style="background:var(--coral-400)"></i>机器离线 · 现在传过去也出不来</span>
     <span class="ph-live" data-at="s3" style="color:var(--fog-600)">
       <i style="background:var(--fog-600)"></i>已结束</span>
   </div>
@@ -145,40 +153,41 @@
     </div>
 
     <div class="grp">把手机上有的递过去</div>
+    <div class="panel-note" style="margin:-4px 0 8px">原型说明:以下动作在真机手机页由上传会话执行,此稿仅呈现形态。</div>
 
-    <a class="act" href="#">
+    <button class="act" type="button">
       <svg class="ic"><use href="#i-upload"/></svg>
       <span class="act-b">
         <span class="act-t">传文件到机器</span>
         <span class="act-s">简历、成绩单、证件照 —— 手机里的直接传，不用 U 盘</span>
       </span>
-    </a>
+    </button>
 
-    <a class="act" href="#">
+    <button class="act" type="button">
       <svg class="ic"><use href="#i-image"/></svg>
       <span class="act-b">
         <span class="act-t">拍照传过去</span>
         <span class="act-s">纸质材料不方便扫的，手机拍一张传过去也能打</span>
       </span>
-    </a>
+    </button>
 
-    <a class="act" href="#">
+    <button class="act" type="button">
       <svg class="ic"><use href="#i-phone"/></svg>
       <span class="act-b">
         <span class="act-t">在手机上完成登录</span>
         <span class="act-s"><b>号码不会出现在大厅那块屏幕上</b> —— 旁边有人时用这个</span>
       </span>
-    </a>
+    </button>
 
     <div class="grp">把机器上做完的接回来</div>
 
-    <a class="act" href="#">
+    <button class="act" type="button">
       <svg class="ic"><use href="#i-download"/></svg>
       <span class="act-b">
         <span class="act-t">存走刚生成的文件</span>
         <span class="act-s">作战单、复盘单、办事清单 —— 存进手机，纸和电子版都有</span>
       </span>
-    </a>
+    </button>
 
     <div class="ph-note ph-note--warn">
       <svg class="ic"><use href="#i-alert"/></svg>
@@ -270,8 +279,11 @@
 
   <!-- 底部：单一动作，没有导航栏 -->
   <div class="ph-foot">
-    <button class="ph-btn" data-at="s1" data-go="s2">
+    <button class="ph-btn" data-at="s1" data-go="s2" data-when="default first ai-down">
       <svg class="ic"><use href="#i-upload"/></svg>选文件传过去
+    </button>
+    <button class="ph-btn" data-at="s1" data-when="device-off" style="background:var(--fog-a12);color:var(--fog-800)">
+      先存到「我的文档」，等机器好了再打
     </button>
     <button class="ph-btn" data-at="s2" style="background:var(--fog-a12);color:var(--fog-800)">
       取消这次传输
@@ -280,7 +292,9 @@
       关闭这一页
     </button>
 
-    <span class="ph-hint" data-at="s1">要出纸请回到机器前面 · 这一页不能打印</span>
+    <span class="ph-hint" data-at="s1" data-when="default first">要出纸请回到机器前面 · 这一页不能打印</span>
+    <span class="ph-hint" data-at="s1" data-when="ai-down">文件照样能传 · 机器那边暂时不做识别与建议</span>
+    <span class="ph-hint" data-at="s1" data-when="device-off">机器离线，传过去也打不出来 · 别白跑一趟</span>
     <span class="ph-hint" data-at="s2">传完机器那边会自动出现，不用手动刷新</span>
     <span class="ph-hint" data-at="s3">没有 App 要装 · 下次到机器前扫码就行</span>
   </div>
@@ -288,8 +302,8 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=3"></script>
-<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

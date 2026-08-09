@@ -9,12 +9,25 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* 2026-08-09 留白复核（页内样式，不动 styles/*.css）：
+   1) .qa —— 一问一答的短条目，转 PDF 常见问题用；
+   2) t3 的 .locked 撑满主栏 —— 「未开放」是这一屏唯一的真话，居中呈现；
+      按 final-audit 口径，这里的余白属于诚实空态的呼吸感，不往里编内容。 */
+.qa { display: flex; flex-direction: column; gap: 10px; }
+.qa p { margin: 0; font-size: var(--fz-2); line-height: 1.55; color: var(--fog-700); }
+.qa b { color: var(--fog-900); }
+.wmain > .locked { flex: 1 1 auto; }
+/* 托盘不再抢占整列（work.css 默认 flex:1）：砖块是固定比例的，托盘撑高只会在
+   网格和下一张卡之间留一条无容器空带；改为按内容收高，信息卡紧随其后。 */
+.wmain > .tray { flex: 0 0 auto; }
+</style>
 </head>
 <body>
 <script src="scripts/sprite.js?v=3"></script>
@@ -103,6 +116,72 @@
         </div>
       </div>
 
+      <!-- 2026-08-09 留白复核补实：t1 左栏此前底部空 1020–1301px（无容器背景空洞）。
+           以下全部为本页语境内的真实信息，不是装饰填充。 -->
+
+      <!-- 首次使用：三个入口各自怎么走（与上方三块添加砖一一对应） -->
+      <div class="pane" data-at="t1" data-when="first">
+        <div class="pane-hd"><span class="t">三种把图片送进来的方式</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">手机扫码传</span><span class="v">扫屏幕上的二维码，手机里的照片直接传到本机</span></div>
+          <div class="kv-row"><span class="k">本机选择</span><span class="v">从本次会话已有的文件里挑（比如刚扫描的）</span></div>
+          <div class="kv-row"><span class="k">U 盘导入</span><span class="v">插入右侧 USB 口，选中要用的图</span></div>
+        </div>
+      </div>
+
+      <!-- 域内横向通道：closed-loop-map §二，与 P06/P07 s1 同款真链接 -->
+      <div class="xlane" data-at="t1">
+        <span class="xlane-hd">材料还是纸质的？或者已经处理完了？</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="07-scan-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-scan"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">扫描原件</span>
+              <span class="xlane-ds">纸质材料先扫成电子件，再回这里加工</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="06-print-workbench.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">处理完去打印</span>
+              <span class="xlane-ds">合成好的 PDF 送打印工作台出纸带走</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- 能力边界：三个工具各自是什么、不做什么（与各 tab 内文案同口径） -->
+      <div class="pane" data-at="t1">
+        <div class="pane-hd"><span class="t">这个台面能做什么</span><span class="s">先说清，免得白排队</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">图片转 PDF</span><span class="v">散图按序合成 A4（本机不支持 A3）</span></div>
+          <div class="kv-row"><span class="k">签名盖章</span><span class="v">手写签名合成到文件 · 非 CA 电子签</span></div>
+          <div class="kv-row"><span class="k">证件照</span><span class="v v--fog">未开放 · 硬件未配置</span></div>
+          <div class="kv-row"><span class="k">编辑文字 / 转 Word</span><span class="v v--fog">本机未提供</span></div>
+          <div class="kv-row"><span class="k">输出</span><span class="v">A4 PDF · 文件名可改</span></div>
+        </div>
+        <div class="notice" style="margin-top:12px">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>加工完的文件拿去打印时，费用为预估：黑白约 0.20 元、彩色约 1.50 元（A4 每面），以打印工作台核价为准；付费也在打印工作台完成，本页不收款。</span>
+        </div>
+      </div>
+
+      <!-- 常见问题：答案全部来自本页已有能力（每页几张 / 移除 / 原图不动 / 拖动排序） -->
+      <div class="pane" data-at="t1">
+        <div class="pane-hd"><span class="t">转 PDF 常见问题</span></div>
+        <div class="qa">
+          <p><b>身份证正反面能放同一页吗？</b>右侧「每页放几张」选 2 张，正反面就排在一页上。</p>
+          <p><b>有一张不想要了？</b>点它右上角的 ×，剩下的才进 PDF。</p>
+          <p><b>偏暗的照片会自动调亮吗？</b>不会，本机不改你的原图；建议重拍后重新传。</p>
+          <p><b>顺序不对？</b>拖动卡片调整，左上角序号就是装订顺序。</p>
+          <p><b>能把两份 PDF 合成一份吗？</b>这里只收图片；PDF 合并本机未提供。</p>
+          <p><b>合成后还能改吗？</b>合成生成的是新文件，原图一直都在；不满意删掉重排就行。</p>
+          <p><b>传上来的照片去哪了？</b>只在本机用于合成，只有你本人可见；不向任何企业提供。</p>
+        </div>
+      </div>
+
       <!-- T2 签名盖章 -->
       <div class="checks" data-at="t2">
         <div class="checks-hd">
@@ -182,7 +261,9 @@
           <div class="kv-row"><span class="k">预计大小</span><span class="v" data-when="default device-off">约 2.6 MB</span><span class="v v--fog" data-when="ai-down first">合成后可知</span></div>
           <div class="kv-row"><span class="k">原图</span><span class="v">保留，不修改</span></div>
         </div>
-        <div class="notice" data-when="default first ai-down" style="margin-top:12px">
+        <!-- 2026-08-09 留白复核：保留规则与打印机在不在线无关，device-off 也要能看到；
+             原 data-when="default first ai-down" 让离线态右栏只剩一条 amber，底部空 574px -->
+        <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>合成生成新文件，原图不动。<br>
             · <b>保留</b>：合成的 PDF 默认保存 <b>24 小时</b>，可在「我的 · 文档」里延期；含身份证的默认只留到本次会话结束。<br>
@@ -191,7 +272,7 @@
         </div>
         <div class="notice notice--amber" data-when="device-off" style="margin-top:12px">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span>打印机离线，合成后暂时不能直接打印。可先存进「我的文档」，凭手机号在任一台空闲机器取回打印。</span>
+          <span>打印机离线，暂不能直接打印；先存「我的文档」，换机取回。</span>
         </div>
         <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
           <button class="btn btn--ghost" style="width:100%" data-when="default ai-down device-off">预览合成结果</button>
@@ -247,6 +328,60 @@
           <span>按项目口径（CLAUDE.md §9「不伪造能力」），没有真实硬件与校验能力的功能一律显示为未开放，并给出替代路径，不做占位流程。</span>
         </div>
       </div>
+
+      <!-- ============ 2026-08-09 留白复核补实：右栏 t1/t2/t3 底部原空 411–1089px。
+           以下按阶段垫底，只写已确认事实（P06 先例同款）。 ============ -->
+
+      <!-- t2 专属：签完之后文件的去处（30 分钟链接口径来自 t1 保留规则） -->
+      <div class="pane" data-at="t2">
+        <div class="pane-hd"><span class="t">签完之后</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">输出</span><span class="v">生成新文件，原件保留不动</span></div>
+          <div class="kv-row"><span class="k">访问链接</span><span class="v">30 分钟到期，过期在本机重新打开</span></div>
+          <div class="kv-row"><span class="k">拿去打印</span>
+            <span class="v" data-when="default first ai-down">合成后可直接送打印工作台</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)">打印机离线 · 先存「我的文档」</span></div>
+        </div>
+      </div>
+
+      <!-- t3 专属：想要证件照的人，现在真实可行的路径 -->
+      <div class="pane" data-at="t3">
+        <div class="pane-hd"><span class="t">现在真实可行的路径</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">已有电子证件照</span><span class="v">用「图片转 PDF」排进 A4 打印</span></div>
+          <div class="kv-row"><span class="k">纸质证件照</span><span class="v">去「纸质扫描」存成电子件</span></div>
+          <div class="kv-row"><span class="k">现场拍摄</span><span class="v v--fog">本机未提供</span></div>
+          <div class="kv-row"><span class="k">打印载体</span><span class="v v--fog">仅 A4 普通纸 · 未配相纸与裁切</span></div>
+        </div>
+      </div>
+
+      <!-- 常驻：本机事实（E2），三个工具页脚同一份 -->
+      <div class="pane" data-at="t1 t2 t3">
+        <div class="pane-hd"><span class="t">本机状态</span><span class="s">上报 09:52</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">打印机</span>
+            <span class="v" data-when="default first ai-down"><span class="dot dot--live"></span>在线 · 碳粉充足</span>
+            <span class="v" data-when="device-off" style="color:var(--amber-400)"><span class="dot dot--down"></span>离线 · 已上报运维</span></div>
+          <div class="kv-row"><span class="k">A4 纸张</span><span class="v"><span class="side-meter"><i style="width:78%"></i></span>78%</span></div>
+          <div class="kv-row"><span class="k">扫描仪</span><span class="v"><span class="dot dot--live"></span>就绪</span></div>
+          <div class="kv-row"><span class="k">AI 服务</span>
+            <span class="v" data-when="default first device-off"><span class="dot dot--live"></span>正常</span>
+            <span class="v" data-when="ai-down" style="color:var(--amber-400)"><span class="dot dot--down"></span>中断 · 合成本身不受影响</span></div>
+        </div>
+      </div>
+
+      <!-- t3 专属：文件规矩（t1/t2 的隐私规则各在自己卡里，t3 原来一条都看不到） -->
+      <div class="pane" data-at="t3">
+        <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
+        <div class="notice">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>· 文件默认只保留到<b>本次会话结束</b>；含身份证的合成件也不例外；<br>
+            · 合成的 PDF 可存「我的 · 文档」，默认保存 <b>24 小时</b>，可延期；<br>
+            · 签名图像只用于本次合成，<b>会话结束即删除</b>；<br>
+            · 到期清理会保留删除日志，可查可追；<br>
+            · 只有你本人可见；管理员访问写审计日志，<b>不向任何企业提供</b>。</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -278,13 +413,13 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

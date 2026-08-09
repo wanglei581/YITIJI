@@ -9,9 +9,9 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
-<link rel="stylesheet" href="styles/listing.css?v=9">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/listing.css?v=10">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -70,7 +70,8 @@
         </div>
         <div class="checks-list" data-when="default device-off" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>收敛依据是你简历里出现过的<b>岗位名与技能词</b> <span class="ev ev--e1">E1 你的材料</span>，
-            以及岗位的<b>同步时间与来源</b> <span class="ev ev--e2">E2 来源信息</span>。<b>不是</b>录用可能性预测，也不改变岗位本身的排序权重。</span>
+            以及岗位的<b>同步时间与来源</b> <span class="ev ev--e2">E2 来源信息</span>。<b>不是</b>录用可能性预测，也不改变岗位本身的排序权重。
+            看中某一条后，可以<a href="11-jobfit-compare.html" style="color:var(--jade-600);font-weight:600">拿简历和它逐项对照</a>再决定投不投。</span>
         </div>
         <div class="checks-list" data-when="first" style="grid-template-columns:1fr">
           <span class="chk"><svg class="ic"><use href="#i-info"/></svg>有简历后这里会按你的经历收敛，并给出三档匹配参考。现在只按同步时间排，不做任何猜测。</span>
@@ -165,6 +166,22 @@
         </div>
       </div>
 
+      <!-- 2026-08-09 留白复核补实：ok 态列表下方原有 ~580px 无容器空洞。
+           补两块口径性事实：三档参考的读法（禁百分比）、同域另两条真实找法。不新造岗位数据。 -->
+      <div class="pane" data-at="ok">
+        <div class="pane-hd"><span class="t">三档参考怎么读</span><span class="s">只有三档，没有分数</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">参考：较高</span><span class="v">岗位要求里的多数关键项，能在你简历里找到对应文字</span></div>
+          <div class="kv-row"><span class="k">参考：中等</span><span class="v">一部分对上；差在哪几项，进详情页逐条看</span></div>
+          <div class="kv-row"><span class="k">参考：偏低</span><span class="v">多数关键项对不上；先补材料，再决定投不投</span></div>
+        </div>
+        <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
+          <span data-when="default device-off">档位只是<b>拿你简历的文字和岗位要求比对</b>的结果 <span class="ev ev--e1">E1 你的材料</span>——不打百分比、不预测录用概率，也不改变岗位本身的排序权重。投不投，由你定。</span>
+          <span data-when="first">现在还没有简历，列表里不显示档位。上传或在本机做一份简历后，按上面这套口径给参考。</span>
+          <span data-when="ai-down">比对服务中断，列表里暂不显示档位。恢复后按上面这套口径给参考，规则不变。</span>
+        </p>
+      </div>
+
       <!-- 空结果 -->
       <div class="blank" data-at="empty">
         <svg class="ic"><use href="#i-search"/></svg>
@@ -192,9 +209,42 @@
           <a class="btn btn--ghost" href="17-fair-desk.html">先看招聘会</a>
           <a class="btn btn--ghost" href="16-offline-agencies.html">看线下机构</a>
         </div>
-        <p style="font-size:var(--fz-2);color:var(--fog-600)">
-          上次成功同步：8 月 8 日 09:20 · 失败时间 10:32 · 已重试 2 次
-        </p>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：error 态底部原为无容器空洞。
+           把 blank 页脚一行小字的故障事实挪成结构化档案卡，不新造数据。 -->
+      <div class="pane" data-at="error">
+        <div class="pane-hd"><span class="t">故障档案</span><span class="s">给你看，也给运维看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 09:20</span></div>
+          <div class="kv-row"><span class="k">失败发生</span><span class="v">10:32</span></div>
+          <div class="kv-row"><span class="k">自动重试</span><span class="v">已试 2 次，仍失败</span></div>
+          <div class="kv-row"><span class="k">上报</span><span class="v">已自动上报运维，无需你操作</span></div>
+        </div>
+      </div>
+
+      <!-- 放在 wmain 末尾：ok 态排在三档卡之后，empty 态排在 blank（flex:1）之后，
+           两态都贴栏底，不在 blank 上方制造新空洞。 -->
+      <div class="xlane" data-at="ok empty">
+        <span class="xlane-hd">线上列表不是唯一一条路，这两处也有真机会</span>
+        <div class="xlane-row">
+          <a class="xlane-go" href="16-offline-agencies.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-agency"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">线下服务机构</span>
+              <span class="xlane-ds">7 家已审核 · 含官方公共就业服务机构，可办失业登记与补贴咨询</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="17-fair-desk.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">招聘会</span>
+              <span class="xlane-ds">现场和企业面对面聊，简历可先在本机打印带去</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
       </div>
     </div>
 
@@ -206,7 +256,7 @@
         <div class="filters">
           <div class="fgroup">
             <div class="fgroup-lb">岗位方向<span class="n">按你的简历排前</span></div>
-            <div class="fchips">
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">运营</button>
               <button class="fchip" aria-pressed="false">销售</button>
               <button class="fchip" aria-pressed="false">行政人事</button>
@@ -216,7 +266,7 @@
           </div>
           <div class="fgroup">
             <div class="fgroup-lb">地区</div>
-            <div class="fchips">
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">天河区</button>
               <button class="fchip" aria-pressed="false">海珠区</button>
               <button class="fchip" aria-pressed="false">番禺区</button>
@@ -225,7 +275,7 @@
           </div>
           <div class="fgroup">
             <div class="fgroup-lb">薪资</div>
-            <div class="fchips">
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">4K 以上</button>
               <button class="fchip" aria-pressed="false">6K 以上</button>
               <button class="fchip" aria-pressed="false">8K 以上</button>
@@ -234,7 +284,7 @@
           </div>
           <div class="fgroup">
             <div class="fgroup-lb">经验 / 学历</div>
-            <div class="fchips">
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">经验不限</button>
               <button class="fchip" aria-pressed="false">1–3 年</button>
               <button class="fchip" aria-pressed="false">本科</button>
@@ -243,7 +293,7 @@
           </div>
           <div class="fgroup">
             <div class="fgroup-lb">来源与形态<span class="n">合规必填</span></div>
-            <div class="fchips">
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">线上平台</button>
               <button class="fchip" aria-pressed="true">线下机构</button>
               <button class="fmore">按来源机构选</button>
@@ -272,12 +322,31 @@
         </div>
       </div>
 
-      <div class="pane" data-at="ok">
+      <!-- 2026-08-09 留白复核：此卡从仅 ok 扩到 ok empty —— 空结果态一样在记浏览，
+           右栏原来在 empty 态少这张卡，底部空 300px。 -->
+      <div class="pane" data-at="ok empty">
         <div class="pane-hd"><span class="t">你在这里的动作会被记下</span></div>
         <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.65">
-          只记<b>浏览</b>与<b>打开来源平台</b>两件事，存进「我的 · 浏览与跳转记录」，方便你回头找。<br>
+          只记<b>浏览</b>与<b>打开来源平台</b>两件事。登录后记录在<b>本岗位页的浏览记录</b>里，方便你回头找；未登录只留本次会话，离场即清。<br>
           <span style="color:var(--fog-600)">不记录你投没投、投没投成——那是来源平台的事，本机拿不到也不该拿。</span>
         </p>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：error 态右栏原只剩一张卡，底部 ~1064px 无容器空洞。
+           补「故障影响范围」事实卡并撑底：影响 / 不影响是真实边界，不是装饰填充。 -->
+      <div class="pane pane--fill pane--grow" data-at="error">
+        <div class="pane-hd"><span class="t">这次故障影响什么</span><span class="s">边界说清楚</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">岗位列表与详情</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
+          <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
+          <div class="kv-row"><span class="k">来源平台状态</span><span class="v">本机取不到数据，无法代为确认；可用手机直接访问来源平台确认</span></div>
+          <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
+          <div class="kv-row"><span class="k">招聘会与政策信息</span><span class="v">独立数据源 · 照常可看</span></div>
+        </div>
+        <div class="notice" style="margin-top:auto">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>恢复后列表自动回来，<b>你已选的筛选条件保留</b>。不想等，左边就有招聘会与线下机构的入口。</span>
+        </div>
       </div>
     </div>
   </div>
@@ -305,13 +374,13 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

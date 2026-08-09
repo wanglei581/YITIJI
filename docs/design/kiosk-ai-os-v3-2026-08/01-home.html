@@ -23,11 +23,17 @@
   .hero-ex .chip { height: var(--touch-min); padding: 0 var(--s-5); font-size: var(--fz-3); cursor: pointer; }
 
   /* 编排带：四态高度恒定，状态变化只换字与主按钮，不重排 */
-  .band { min-height: 272px; padding: var(--s-5) var(--s-6); }
-  .band .panel-head { margin-bottom: var(--s-4); }
+  .band { min-height: 272px; padding: 16px var(--s-6); }
+  .band .panel-head { margin-bottom: 12px; }
   .band .errand { min-height: 196px; }
   .band .advice-act { font-size: var(--fz-6); }
   .band .steps-wrap { border-left: 1px solid var(--glass-2-brd); padding-left: var(--s-6); }
+  /* 2026-08-09 终审补扫修复：advice 列被 grid 行高钉死后 flex 子项收缩，
+     底部两个按钮溢出容器 8px 被 overflow:hidden 裁掉（四态全中）。
+     子项禁收缩 + 列内省出等量高度，不动列总高预算。 */
+  .band .errand-advice > * { flex-shrink: 0; }
+  .band .advice-why { margin-block: 4px 8px; }
+  .band .advice-cost { margin-bottom: 8px; }
 
   /* 服务入口三行不等宽 */
   .svc-a { display: grid; grid-template-columns: 596px 1fr; gap: var(--s-4); }
@@ -349,7 +355,7 @@
     <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">
       打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg>
     </a>
-    <a class="btn btn--primary" href="23-profile.html" data-when="device-off">
+    <a class="btn btn--primary" href="23-me.html" data-when="device-off">
       转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg>
     </a>
   </div>
@@ -358,13 +364,13 @@
   <nav class="navbar">
     <a href="01-home.html" aria-current="page"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/fx.js?v=3"></script>
 </body>
 </html>

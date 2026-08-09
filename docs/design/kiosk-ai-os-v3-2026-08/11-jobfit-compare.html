@@ -10,8 +10,8 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -33,6 +33,10 @@
   .jobrow-m { font-size: var(--fz-2); color: var(--fog-700); }
   .jobrow-s { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .04em; }
   .jobrow-go { margin-left: auto; flex: 0 0 auto; color: var(--fog-600); }
+  /* 2026-08-09 留白复核补实（先例见 06-print-workbench 同日注释）：
+     s1 三行岗位下方、s2 无结论态（ai-down/first）JD 单栏下方原为无容器空洞（约 1.0k px）。
+     只补真实信息：三档口径卡（页面本来就在用三档却没在挑选时解释过）、
+     无结论态说明「这里会看到什么」、结果去向卡。s2 default 左栏已满，不动。 */
 </style>
 </head>
 <body>
@@ -122,6 +126,44 @@
           <span class="tier tier--low"><span class="tier-bars"><i></i><i></i><i></i></span><span class="tier-text">参考：偏低</span></span>
           <span class="jobrow-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </button>
+
+        <!-- 2026-08-09 留白复核补实：行上就挂着三档标签，挑选时就该解释三档是什么。 -->
+        <div class="pane" style="flex:0 0 auto">
+          <div class="pane-hd"><span class="t">行上的「参考」三档是什么意思</span><span class="s">只有三档，没有分数</span></div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">参考：较高</span><span class="v">多数要求能在你的简历原文里找到对应句子</span></div>
+            <div class="kv-row"><span class="k">参考：中等</span><span class="v">一部分对上了，一部分只差证据或表述</span></div>
+            <div class="kv-row"><span class="k">参考：偏低</span><span class="v">多条硬性要求在简历里没有对应内容</span></div>
+          </div>
+          <p style="margin:12px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.6">
+            档位是拿你的简历 <span class="ev ev--e1">E1 你的材料</span> 和岗位原文 <span class="ev ev--e2">E2 来源信息</span>
+            逐条比出来的文字结论 <span class="ev ev--e3">E3 AI 判断 · 仅供参考</span>——不是录用概率，所以不给百分比。
+            偏低不等于别投：差在哪、能不能补，点进去逐条看。
+          </p>
+        </div>
+
+        <!-- 域内横向通道：简历材料域 = P09 + P10 + P11 + P12（写法同 09 的 xlane） -->
+        <div class="xlane" style="margin-top:auto">
+          <span class="xlane-hd">想先看更多岗位，或先把简历弄好？</span>
+          <div class="xlane-row">
+            <a class="xlane-go" href="13-jobs-desk.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">岗位情报台</span>
+                <span class="xlane-ds">全部岗位和筛选都在那边，挑好了再回来比</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+            <a class="xlane-go" href="09-resume-workbench.html">
+              <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
+              <span class="xlane-tx">
+                <span class="xlane-nm">简历工作台</span>
+                <span class="xlane-ds">上传、从零做或逐条优化，都在工作台</span>
+              </span>
+              <svg class="ic"><use href="#i-arrowRight"/></svg>
+            </a>
+          </div>
+        </div>
       </div>
 
       <!-- S2 逐条比对 -->
@@ -233,6 +275,20 @@
               <div class="grp">数据来源</div>
               <div class="row" style="font-size:11px;color:var(--paper-fog)">来源机构 前程无忧 · 同步时间 2026-08-08 09:20 · 外部 ID JX-88214</div>
             </div>
+            <!-- 2026-08-09 留白复核补实：无结论态只说了「不给结论」，没说过这一步本来长什么样。
+                 说机制不给结果，不算伪造结论。 -->
+            <div class="pane" style="margin-top:auto">
+              <div class="pane-hd">
+                <span class="t" data-when="first">有简历之后，这里会看到什么</span>
+                <span class="t" data-when="ai-down">服务恢复后，这里会看到什么</span>
+              </div>
+              <p style="margin:0;font-size:var(--fz-2);color:var(--fog-700);line-height:1.7">
+                左边把上面 8 条要求逐条摊开，每条标「对上了 / 差一点 / 没写到」；右边放你的简历原文。
+                点任何一条，右边直接跳到对应句子——结论旁边一定有出处：
+                你的原句 <span class="ev ev--e1">E1 你的材料</span> 对照岗位原文 <span class="ev ev--e2">E2 来源信息</span>，
+                档位判断是 AI 给的 <span class="ev ev--e3">E3 仅供参考</span>。
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -293,7 +349,9 @@
           <a class="out" href="09-resume-workbench.html?stage=s4" data-when="default device-off"><svg class="ic"><use href="#i-pen"/></svg>去改这两处</a>
           <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>按这个岗位练面试</a>
           <a class="out" href="14-job-detail.html"><svg class="ic"><use href="#i-briefcase"/></svg>看岗位详情</a>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印这份对照</button>
+          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印对照 · 去核价</a>
+          <a class="out" data-when="first" href="09-resume-workbench.html"><svg class="ic"><use href="#i-pen"/></svg>先上传简历</a>
+          <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-printer"/></svg>结论不可用</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-pen"/></svg>改写不可用</button>
         </div>
@@ -305,6 +363,18 @@
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-external"/></svg>
           <span>投递在来源平台完成。点「看岗位详情」可以扫码在手机上打开该岗位的投递页，本机不代收简历。</span>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 留白复核补实：结果去向——与 s1「比对结果只给你看」的承诺同口径，
+           落到「我的」具体位置。s1 s2 共用，margin-top:auto 垫底。 -->
+      <div class="pane" data-at="s1 s2" style="margin-top:auto">
+        <div class="pane-hd"><span class="t">比对结果去哪，谁能看</span></div>
+        <div class="kv">
+          <div class="kv-row"><span class="k">登录后</span><span class="v">进「我的 · AI 服务记录」</span></div>
+          <div class="kv-row"><span class="k">未登录</span><span class="v">只留在本次会话，离场即清</span></div>
+          <div class="kv-row"><span class="k">打印的对照</span><span class="v">记进「我的 · 打印订单」</span></div>
+          <div class="kv-row"><span class="k">不会留下</span><span class="v">不进任何简历库 / 人才库</span></div>
         </div>
       </div>
     </div>
@@ -338,13 +408,13 @@
   <nav class="navbar">
     <a href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

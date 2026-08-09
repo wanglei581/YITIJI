@@ -52,23 +52,23 @@
 }
 
 .vhero-inner { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 330px; gap: var(--s-6); align-items: end; }
-.vhero-copy { padding-bottom: var(--s-8); }
+.vhero-copy { padding-bottom: 18px; } /* 2026-08-09 用户定:上半部收紧 */
 .vhero-title {
   font-family: var(--ff-display); font-weight: 600;
-  font-size: 82px; line-height: 1.02; letter-spacing: -.015em;
+  font-size: 76px; line-height: 1.02; letter-spacing: -.015em;
   color: var(--fog-900); margin: var(--s-4) 0 0; max-width: 8.4em;
   text-shadow: 0 1px 0 rgba(255,255,255,.45);
 }
 .vhero-title em { font-style: normal; color: var(--cat-print); }
-.vhero-sub { margin: var(--s-5) 0 0; font-size: var(--fz-5); line-height: 1.58; color: var(--fog-800); max-width: 26em; }
+.vhero-sub { margin: var(--s-3) 0 0; font-size: var(--fz-5); line-height: 1.58; color: var(--fog-800); max-width: 26em; }
 
 /* 顾问：整身出血站在版头底边上，带地面投影 */
-.vfigure { position: relative; height: 424px; }
+.vfigure { position: relative; height: 300px; } /* 424→392：字号上调后 hero 内容超 18px，先从人像高度还 */
 /* 肖像做成明确的圆角面板：宁可"有意为之"，不要一张浮着的方图。
    （试过 mix-blend-mode multiply 融进色域，但父层 z-index 造成
    stacking context，blend 取不到背后的色域，反而留下白框。） */
 .vfigure img {
-  position: absolute; right: 0; bottom: -18px; width: 318px; height: 406px;
+  position: absolute; right: 0; bottom: -18px; width: 282px; height: 356px;
   object-fit: cover; object-position: 50% 6%;
   border-radius: var(--r-lg) var(--r-lg) 0 0;
   filter: contrast(1.05) saturate(1.02);
@@ -87,7 +87,7 @@
 
 /* ---------- 指令条：跨在版头底边上的玻璃胶囊（纵深的关键一层） ---------- */
 .vcommand {
-  position: relative; z-index: 6; margin: -38px var(--gutter) 0;
+  position: relative; z-index: 6; margin: -26px var(--gutter) 0;
   display: flex; align-items: center; gap: var(--s-4);
   height: 84px; padding: 0 var(--s-4) 0 var(--s-6);
   border-radius: var(--r-full);
@@ -105,7 +105,7 @@
 .vcommand .btn--primary { border-radius: var(--r-full); }
 
 /* ---------- 场景快捷 ---------- */
-.vscenes { display: flex; gap: var(--s-3); flex-wrap: wrap; padding: var(--s-5) var(--gutter) 0; position: relative; z-index: 5; }
+.vscenes { display: flex; gap: var(--s-3); flex-wrap: wrap; padding: 6px var(--gutter) 0; position: relative; z-index: 5; }
 .vscene {
   display: inline-flex; align-items: center; gap: 8px;
   height: var(--touch-min); padding: 0 var(--s-5); border-radius: var(--r-full);
@@ -119,7 +119,7 @@
 .vscene--key:hover { color: #fff; }
 
 /* ================= 内容区 ================= */
-.vbody { flex: 1 1 auto; min-height: 0; padding: var(--s-5) var(--gutter) var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); overflow: hidden; }
+.vbody { flex: 1 1 auto; min-height: 0; padding: var(--s-4) var(--gutter) var(--s-4); display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 
 /* ---------- 办理单：横向时间轴 + 建议 ---------- */
 .verrand {
@@ -129,7 +129,7 @@
   box-shadow: var(--sh-3), var(--glass-hi);
   backdrop-filter: blur(var(--glass-blur));
 }
-.verrand-main { padding: var(--s-5) var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); }
+.verrand-main { padding: 8px var(--s-6); display: flex; flex-direction: column; gap: var(--s-3); }
 .verrand-kick {
   display: flex; align-items: center; gap: var(--s-3);
   font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .04em;
@@ -171,7 +171,7 @@
 
 /* ---------- 服务入口：身份色 + 大图标 + 网点 ---------- */
 .vgrid-a { display: grid; grid-template-columns: 1fr 348px; gap: var(--s-4); }
-.vgrid-b { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); }
+.vgrid-b { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3); } /* 2026-08-09 用户定:六卡两行,百宝箱/智慧校园与其他功能同级 */
 .card {
   position: relative; overflow: hidden;
   border-radius: var(--r-lg); padding: var(--s-5) var(--s-6);
@@ -196,20 +196,26 @@
   -webkit-mask-image: radial-gradient(120% 120% at 100% 100%, #000 8%, transparent 68%);
 }
 .card-ic {
-  width: 54px; height: 54px; border-radius: var(--r-md); flex: 0 0 auto;
+  width: 48px; height: 48px; border-radius: var(--r-md); flex: 0 0 auto;
   display: grid; place-items: center; margin-bottom: var(--s-2);
   background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.28);
   backdrop-filter: blur(6px);
 }
-.card-ic .ic { width: 28px; height: 28px; color: #fff; }
+.card-ic .ic { width: 25px; height: 25px; color: #fff; }
 .card-name { font-family: var(--ff-display); font-size: var(--fz-7); font-weight: 600; line-height: 1.16; letter-spacing: .01em; }
-.card-desc { font-size: var(--fz-2); line-height: 1.55; color: rgba(255,255,255,.86); }
-.card-foot { margin-top: auto; display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding-top: var(--s-3); }
+.card-desc { font-size: var(--fz-2); line-height: 1.48; color: rgba(255,255,255,.86); }
+.card-foot { margin-top: auto; display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; padding-top: var(--s-2); }
 .card-pill {
   display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 var(--s-4);
   border-radius: var(--r-full); background: rgba(255,255,255,.20); border: 1px solid rgba(255,255,255,.3);
   font-size: var(--fz-1); color: #fff; letter-spacing: .04em; white-space: nowrap;
+  max-width: 100%; /* 不加 overflow:hidden —— 那只是把"字被切掉"藏起来，自检的文字裁切项会抓它 */
 }
+/* 首页卡片上的快捷入口是真能点的（进 P06 并预选来源），
+   所以必须按可点区域算：站着操作，48px 是下限，不能只做成 30px 的小胶囊。
+   同一行里纯说明性的 --info 胶囊保持 30px —— 它不接受点击。 */
+.card-pill--go { height: var(--touch-min); padding: 0 var(--s-5); font-size: var(--fz-2); }
+.card-pill--go:active { background: rgba(255,255,255,.34); }
 .card-go { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.2); }
 .card-go .ic { width: 20px; height: 20px; color: #fff; }
 .card--print  { --c1: #12a37d; --c2: #08624c; }
@@ -218,9 +224,11 @@
 .card--fair   { --c1: #dd6f3c; --c2: #9c3f1a; }
 .card--mock   { --c1: #37909f; --c2: #175c6b; }
 .card--policy { --c1: #6b7c9f; --c2: #414e6b; }
+.card--tool   { --c1: #8a6d3b; --c2: #5b4522; } /* 百宝箱 · 岩茶褐 */
+.card--camp   { --c1: #5f8a4e; --c2: #38542b; } /* 智慧校园 · 橄榄绿 */
 /* 紧凑卡 */
-.card--sm { padding: var(--s-5); gap: 6px; }
-.card--sm .card-ic { width: 44px; height: 44px; border-radius: var(--r-sm); margin-bottom: var(--s-3); }
+.card--sm { padding: 16px; gap: 6px; }
+.card--sm .card-ic { width: 44px; height: 44px; border-radius: var(--r-sm); margin-bottom: 6px; }
 .card--sm .card-ic .ic { width: 23px; height: 23px; }
 .card--sm .card-name { font-size: var(--fz-5); }
 .card--sm .card-desc { font-size: var(--fz-1); }
@@ -228,8 +236,28 @@
 .screen[data-state="device-off"] .card--print::before { filter: grayscale(.72) brightness(.86); }
 
 /* ---------- 底部：现场大图 + 本机仪表（玻璃浮层压图） ---------- */
-.vfoot { display: grid; grid-template-columns: 1fr 348px; gap: var(--s-4); }
-.vsite { position: relative; border-radius: var(--r-lg); overflow: hidden; min-height: 176px; }
+.vfoot { display: grid; grid-template-columns: 1fr 348px; gap: var(--s-4); flex: 0 1 248px; min-height: 240px; overflow: hidden; }
+/* 更多服务:百宝箱/智慧校园(后台开关控制)。竖排双迷你卡,触控 ≥80px;
+   高度必须收在 vpanel 行高内,不许把 vfoot 撑出 vbody(2026-08-09 实测教训) */
+.vmore { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vmore-tile {
+  flex: 1 1 auto; min-height: 80px; display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-3) var(--s-4); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
+  text-decoration: none; color: inherit; cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+.vmore-tile:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
+.vmore-ic { width: 42px; height: 42px; border-radius: var(--r-sm); flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--jade-a12);
+  border: 1px solid var(--jade-a20); color: var(--jade-500); }
+.vmore-ic .ic { width: 22px; height: 22px; }
+.vmore-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.vmore-t { font-family: var(--ff-display); font-size: var(--fz-4); font-weight: 600; color: var(--fog-900); }
+.vmore-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.4; }
+.vmore-go { margin-left: auto; flex: 0 0 auto; width: 18px; height: 18px; color: var(--fog-600); }
+.vmore-note { font-size: 11px; color: var(--fog-600); text-align: center; }
+.vsite { position: relative; border-radius: var(--r-lg); overflow: hidden; min-height: 152px; }
 .vsite img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .vsite::after { content: ""; position: absolute; inset: 0; background: linear-gradient(96deg, rgba(10,16,14,.86), rgba(10,16,14,.18) 72%); }
 .vsite-in { position: relative; z-index: 2; padding: var(--s-5) var(--s-6); display: flex; flex-direction: column; gap: 7px; height: 100%; }
@@ -245,7 +273,7 @@
 }
 .vpanel-hd { display: flex; align-items: baseline; font-size: var(--fz-2); color: var(--fog-900); font-weight: 600; letter-spacing: .04em; }
 .vpanel-hd span { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-1); color: var(--fog-600); font-weight: 400; }
-.vrow { display: flex; align-items: center; min-height: 30px; font-size: var(--fz-2); }
+.vrow { display: flex; align-items: center; min-height: 28px; font-size: var(--fz-2); }
 .vrow .k { color: var(--fog-700); }
 .vrow .v { margin-left: auto; font-family: var(--ff-num); font-size: var(--fz-3); color: var(--fog-900); font-variant-numeric: tabular-nums; }
 .vbar { height: 6px; border-radius: 3px; background: var(--surf-3); overflow: hidden; }

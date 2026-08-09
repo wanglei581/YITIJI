@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -68,6 +68,17 @@
     <div class="vcommand">
       <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
       <input type="text" data-typewriter placeholder="例如：周五要去招聘会，简历还没改" aria-label="说一句你的处境">
+      <!-- 2026-08-09 愿景补齐 + Codex 整改：语音能力真实落点是 P25 顾问的语音咨询态
+           (本机没有独立语音下单能力,README §人机分工),麦克风=去找小青语音说。
+           ai-down 态语音不可用,如实置灰。 -->
+      <a class="btn btn--lg btn--ghost" data-when="default first device-off" href="25-advisor.html"
+         aria-label="语音找顾问小青,说出你的处境" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </a>
+      <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true"
+              aria-label="语音顾问暂不可用" style="flex:0 0 auto;padding:0 18px">
+        <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
+      </button>
       <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="default first"
               style="border-color:var(--jade-500);color:var(--jade-600);font-weight:600">
         排出办理顺序<svg class="ic" aria-hidden="true"><use href="#i-arrowRight"/></svg>
@@ -156,13 +167,14 @@
         <a class="card card--print" href="06-print-workbench.html">
           <span class="card-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
           <span class="card-name">打印扫描</span>
-          <span class="card-desc">上传 → 材料体检 → 参数核价 → 支付 → 出纸 → 取件码；也可扫描纸质原件转 PDF</span>
           <span class="card-foot">
             <!-- 这三个是真快捷入口（linkage.js 绑 data-href 并阻止冒泡到外层卡片链接）。
                  原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="07-scan-workbench.html">纸质扫描</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="08-file-tools.html">文件加工</span>
             <span class="card-pill card-pill--info" data-when="default first ai-down">自动双面 · 彩色可选</span>
             <span class="card-pill card-pill--info" data-when="device-off">打印离线 · 扫描可用</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -171,8 +183,14 @@
         <a class="card card--resume" href="09-resume-workbench.html">
           <span class="card-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
           <span class="card-name">AI 简历服务</span>
-          <span class="card-desc">诊断 · 按岗位优化 · 访谈式生成 · 导出打印</span>
           <span class="card-foot">
+            <!-- 2026-08-09 小功能真入口补齐：与打印卡同款 card-pill--go 模式(linkage.js 绑 data-href)。
+                 之前这里只有描述文字,域内四个小功能从首页点不到。 -->
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="09-resume-workbench.html?stage=s1">诊断优化</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="10-resume-interview.html">访谈式生成</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="11-jobfit-compare.html">岗位匹配</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="12-material-factory.html">材料工厂</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="22-career-plan.html">职业规划</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">已有 1 份待优化</span>
             <span class="card-pill card-pill--info" data-when="ai-down">AI 部分不可用 · 可看历史与打印</span>
             <span class="card-go"><svg class="ic"><use href="#i-arrowRight"/></svg></span>
@@ -184,20 +202,26 @@
         <a class="card card--sm card--job" href="13-jobs-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
           <span class="card-name">岗位信息</span>
-          <span class="card-desc">第三方来源岗位 · 三档匹配参考</span>
-          <span class="card-foot"><span class="card-pill" data-dots="12">12 家来源</span></span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="15-companies.html">找企业</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="16-offline-agencies.html">线下机构</span>
+            <span class="card-pill" data-dots="12">12 家来源</span>
+          </span>
         </a>
         <a class="card card--sm card--fair" href="17-fair-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="card-name">招聘会</span>
-          <span class="card-desc">场次 · 参展企业 · 展位导览</span>
-          <span class="card-foot"><span class="card-pill" data-dots="3">本周 3 场</span></span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="18-campus.html">校园招聘</span>
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="17-fair-desk.html?stage=s3">展位导览</span>
+            <span class="card-pill" data-dots="3">本周 3 场</span>
+          </span>
         </a>
         <a class="card card--sm card--mock" href="20-interview-pod.html">
           <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
           <span class="card-name">AI 面试训练</span>
-          <span class="card-desc">私密练习 · 逐题反馈 · 出报告</span>
           <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="20-interview-pod.html?stage=s3">往期点评</span>
             <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
             <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
           </span>
@@ -205,8 +229,19 @@
         <a class="card card--sm card--policy" href="21-policy.html">
           <span class="card-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
           <span class="card-name">政策服务</span>
-          <span class="card-desc">官方补贴与办事政策指引</span>
-          <span class="card-foot"><span class="card-pill card-pill--info">官方来源</span></span>
+          <span class="card-foot">
+            <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="21-policy.html?stage=s3">办事清单</span><span class="card-pill card-pill--info">官方来源</span></span>
+        </a>
+        <!-- 2026-08-09 用户定:百宝箱/智慧校园升为正式成员,与六服务同级同大(原角落迷你卡撤销) -->
+        <a class="card card--sm card--tool" href="27-toolbox.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
+          <span class="card-name">百宝箱</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">扩展服务 · 后台上架控制</span></span>
+        </a>
+        <a class="card card--sm card--camp" href="19-smart-campus.html">
+          <span class="card-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+          <span class="card-name">智慧校园</span>
+          <span class="card-foot"><span class="card-pill card-pill--info">学校接入后开放</span></span>
         </a>
       </section>
 
@@ -234,8 +269,8 @@
             <span class="t" data-when="default first ai-down">黑白 / 彩色均可 · 费用以现场公示价为准</span>
             <span class="t" data-when="device-off">打印能力暂不可用 · 扫描与转存正常</span>
           </div>
-          <div class="vrow" style="min-height:22px"><span class="k" style="font-size:11px">公共终端 · 离场或超时自动清空会话</span></div>
         </div>
+
       </section>
     </div>
   </div>
@@ -252,19 +287,19 @@
     <button class="btn btn--lg btn--ghost" data-when="first ai-down device-off"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <a class="btn btn--primary" href="09-resume-workbench.html" data-when="default">开始诊断<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" href="06-print-workbench.html" data-when="first ai-down">打开打印扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" href="23-profile.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" href="23-me.html" data-when="device-off">转存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
     <a href="01-home-v5.html" aria-current="page"><svg class="ic"><use href="#i-home"/></svg>首页</a>
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
-    <a href="23-profile.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+    <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
 
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=6"></script>

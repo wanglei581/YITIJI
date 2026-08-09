@@ -24,6 +24,8 @@ body.proto {
     radial-gradient(1200px 800px at 20% -10%, #0b1a1e 0%, #05090b 60%, #030607 100%);
   display: grid;
   place-items: start center;
+  /* 2026-08-09 二改：104px 顶距把整页"顶下去"观感更差(用户反馈)。
+     回到 28px,改由 .shell 平时隐身(shell.css)解决遮挡。 */
   padding: 28px 0 60px;
   overflow-x: hidden;
 }

@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -148,6 +148,18 @@
 .cb-ask b{ color: #0f5a45; }
 .cb-foot { font-size: 11px; color: #6b7a86; line-height: 1.65; border-top: 1px solid #d9e1e8;
            padding-top: 9px; margin-top: 4px; }
+
+/* 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin）。
+   到场后的动作，不是投递入口 —— 放在场次列表尾部，样式与 .alsoprint 同族。 */
+.checkin { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; align-items:center; gap:var(--s-5); }
+.checkin-ic { width:44px; height:44px; border-radius:var(--r-xs); background:var(--jade-a12);
+  display:grid; place-items:center; flex:0 0 auto; }
+.checkin-ic .ic { width:22px; height:22px; color:var(--jade-500); }
+.checkin-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.checkin-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.checkin-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
 </style>
 </head>
 <body>
@@ -297,6 +309,19 @@
           <svg class="ic"><use href="#i-info"/></svg>
           <span>以上场次信息由来源机构提供，本机只做展示与打印。
                 报名、预约、入场资格以来源平台为准，本机不代办、不代收简历。</span>
+        </div>
+
+        <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin） -->
+        <div class="checkin">
+          <span class="checkin-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="checkin-b">
+            <span class="checkin-t">已经在现场？先签到再逛</span>
+            <span class="checkin-s">到场后扫码或凭手机号签到，领现场资料 ——
+                  签到只用于领资料和到场统计，不是投递，也不改变入场资格。</span>
+          </span>
+          <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
+            <svg class="ic"><use href="#i-qr"/></svg>入场签到
+          </button>
         </div>
       </div>
 
@@ -585,7 +610,7 @@
             <div class="cb-hr"></div>
             <div class="cb-sub">
               建议路线：入口 → A-12 → A-27 → B-05 → 出口，全程约 240 米。<br>
-              建议带 <b>6 份</b>纸质简历（3 家 × 2 份），本机已同时打印。
+              建议带 <b>6 份</b>纸质简历（3 家 × 2 份），已加入本次打印清单，将同时打印。
             </div>
 
             <div class="cb-foot">
@@ -634,6 +659,19 @@
         <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">已按 3 家 × 2 份算</span></span>
       </div>
 
+      <!-- 2026-08-09 零落点补齐：活动资料（线上 /job-fairs/:id/materials）——
+           主办方场刊/地图可加入本批打印，默认不加，不替用户做主。 -->
+      <div class="alsoprint" data-at="s4">
+        <span class="ap-thumbs">
+          <span class="ap-th"><i></i><i></i><i></i><i></i></span>
+        </span>
+        <span class="ap-b">
+          <span class="ap-t">主办方活动资料也能加进这批：场刊 · 展位地图</span>
+          <span class="ap-s">主办方提供的公开资料，可加入本次打印清单一起打；加了页数会变，费用以打印工作台核价为准</span>
+        </span>
+        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">默认不加 · 可选</span></span>
+      </div>
+
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -647,7 +685,7 @@
           <label class="ck ck--have">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">纸质简历 6–10 份</span>
-              <span class="ck-s">你有 1 份可打 · 本机 A4 黑白 0.2 元/页</span></span>
+              <span class="ck-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估 · 以打印工作台核价为准）</span></span>
           </label>
           <label class="ck" style="margin-top:var(--s-3)">
             <span class="ck-box"></span>
@@ -703,6 +741,29 @@
         </div>
       </div>
 
+      <!-- 2026-08-09 域入口契约(closed-loop-map §二)：招聘会域 = P17 + P18 + P19，补横向入口 -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">校园相关的在这里</span>
+        <div class="xlane-row" style="grid-template-columns:1fr">
+          <a class="xlane-go" href="18-campus.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">校园招聘专区</span>
+              <span class="xlane-ds">校招季节条 · 逐场活动来源可核 · 计划表打印</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="19-smart-campus.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-agency"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">智慧校园</span>
+              <span class="xlane-ds">由学校接入后开放 · 未接入前只做说明</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
       <!-- S2 右：拿什么比的 → 读到什么程度 → 已选会带来什么 -->
       <div class="pane" data-at="s2">
         <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>拿来比对的是这份</b></div>
@@ -738,7 +799,7 @@
             <div class="kv-row"><span class="k">已选</span><span class="v"><b data-pick-n>3</b> 家</span></div>
             <div class="kv-row"><span class="k">建议带简历</span><span class="v"><b>6</b> 份（每家 2 份）</span></div>
             <div class="kv-row"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
-            <div class="kv-row"><span class="k">合计</span><span class="v">13 页 · <b>2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v">13 页 · <b>2.60</b> 元（预估 · 以打印工作台核价为准）</span></div>
           </div>
 
           <div class="notice" style="margin-top:var(--s-4)">
@@ -812,7 +873,7 @@
 
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">合计</span><span class="v">13 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v"><b>2.60</b> 元</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>2.60</b> 元</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -821,7 +882,26 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用以现场公示价为准。作战单同时存进「我的文档」。
+            费用为预估 · 以打印工作台核价为准。作战单同时存进「我的文档」。
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 零落点补齐：现场数据（线上 /job-fairs/:id/stats）。
+           开场当天才有真数据，此刻三场都没开场 —— 数字标「示例」，不冒充实时。 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-users"/></svg><b>开场当天 · 现场数据</b>
+          <span class="mt">主办方提供</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">今日到场</span><span class="v"><b>1,240</b> 人次（示例）</span></div>
+            <div class="kv-row"><span class="k">热门展位</span><span class="v">A-12 · A-27（示例）</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">主办方 · 每 10 分钟同步</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            <span class="ev ev--e2">E2 主办方数据</span>
+            三场都没开场，数字是示例 —— 开场当天你带着作战单到现场，本机这里换成主办方
+            同步的实时数据并标同步时间；主办方没提供的场次不显示。
           </div>
         </div>
       </div>
@@ -872,13 +952,13 @@
 
     <span class="actionbar-hint" data-at="s2" data-when="default first">已选 3 家 · 最多可选 8 家</span>
     <span class="actionbar-hint" data-at="s3">全程约 240 米 · 预计 1 小时 20 分</span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 13 页 · 2.60 元</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 13 页 · 预估 2.60 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">选这一场<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3">排今天的路线<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s3" data-go="s4">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="default first ai-down">开始打印<svg class="ic"><use href="#i-printer"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 
@@ -891,7 +971,7 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

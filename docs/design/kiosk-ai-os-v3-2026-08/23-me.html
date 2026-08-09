@@ -7,10 +7,10 @@
 <meta name="screen-name" content="P23 我的">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
-<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=3">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -344,6 +344,27 @@
           <div class="panel-note" style="margin-top:var(--s-3)">
             证件类文件（身份证、学位证等）保留期更短，到期自动删除，<b>删除会留日志</b>。
           </div>
+
+          <!-- 2026-08-09 路牌补齐：通知与反馈（线上 /me/notifications /me/feedback）。
+               与本页其他资产行同口径：只给数量 + 路牌，明细在对应页面。 -->
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-bell"/></svg><b>通知与反馈</b>
+            <span class="mt">只给数量 · 明细在对应页面看</span>
+          </div>
+          <div class="gates">
+            <button class="gate" type="button" style="width:100%;font:inherit;text-align:left;cursor:pointer">
+              <svg class="ic"><use href="#i-bell"/></svg>
+              <span class="gate-b"><span class="gate-t">通知 · 3 条</span>
+                <span class="gate-s">1 条未读：打印完成、文件到期提醒</span></span>
+              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+            </button>
+            <button class="gate" type="button" style="width:100%;font:inherit;text-align:left;cursor:pointer">
+              <svg class="ic"><use href="#i-pen"/></svg>
+              <span class="gate-b"><span class="gate-t">反馈工单 · 1 件</span>
+                <span class="gate-s">处理中 · 有结果会进左边的通知</span></span>
+              <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -354,12 +375,12 @@
         </div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
-          <a class="gate" href="#" style="min-height:64px">
+          <button class="gate" type="button" style="min-height:64px;width:100%;text-align:inherit;font:inherit;color:inherit;background:none;border:none;cursor:pointer">
             <svg class="ic"><use href="#i-close"/></svg>
             <span class="gate-b"><span class="gate-t">退出登录并清空本机会话</span>
-              <span class="gate-s">立即执行 · 账号里的文件不受影响</span></span>
+              <span class="gate-s">点击后需你确认 · 账号里的文件不受影响</span><span class="gate-s" style="opacity:.7">原型稿:确认弹层在落地实现,此处仅形态</span></span>
             <span class="gate-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
-          </a>
+          </button>
 
           <div class="ck">
             <span class="ck-b">
@@ -578,7 +599,7 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=26"></script>
+<script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P27 百宝箱区 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P27 百宝箱区">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=21">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P27 专用 ── 百宝箱区 = 后台配置驱动的扩展服务启动区（线上 /toolbox：
+   管理后台审核上架 · launchMode 三种 = 站内页面/扫码到手机/外部 H5 · 启动有
+   离场确认 · 只上报匿名使用事件）。照 P19 的诚实模式：主状态是「还没有」——
+   s1 = 本机真实状态（未配置就锁定，不摆假服务卡）；s2 = 配置后示意，常驻横幅
+   标明非当前状态。扩展服务不依赖 AI / 打印机：ai-down、device-off 照常，如实标注。 */
+
+/* 锁定态主视觉（同 P19 口径：不是坏了，是还没配置） */
+.lockcard { display:flex; flex-direction:column; gap:var(--s-4); padding:var(--s-6) var(--s-5); }
+.lock-ic { width:64px; height:64px; border-radius:var(--r-md); display:grid; place-items:center;
+           background:var(--fog-a08); border:1px solid var(--fog-a12); }
+.lock-ic .ic { width:30px; height:30px; color:var(--fog-600); }
+.lock-t { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.lock-p { font-size:var(--fz-4); color:var(--fog-700); line-height:1.62; max-width:34em; } .lock-p b { color:var(--fog-900); }
+
+/* 「上架后会有什么」：列的是机制，不是服务 —— 没上架就没有服务名 */
+.willhave { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3) var(--s-4); }
+.wh { display:flex; align-items:flex-start; gap:var(--s-3); padding:var(--s-4);
+      border-radius:var(--r-xs); background:var(--fog-a04); border:1px dashed var(--fog-a12); }
+.wh .ic { width:19px; height:19px; color:var(--fog-600); flex:0 0 auto; margin-top:1px; } .wh-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.wh-t { font-size:var(--fz-3); color:var(--fog-700); } .wh-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 预览横幅：s2 常驻，不可关闭 */
+.previewbar { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-4);
+  padding:var(--s-4) var(--s-5); border-radius:var(--r-md);
+  background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.previewbar .ic { width:21px; height:21px; color:var(--amber-400); flex:0 0 auto; }
+.previewbar span { font-size:var(--fz-3); color:var(--amber-200); line-height:1.55; } .previewbar b { color:var(--fog-900); }
+
+/* 预览内容整体降饱和，和真实状态拉开 */
+.previewwrap { opacity:.82; filter:saturate(.72); display:flex; flex-direction:column;
+               gap:var(--s-4); flex:1 1 auto; min-height:0; }
+
+/* 示例服务卡：不可点（cursor:default），右侧统一挂 chip--info 未上架 */
+.svc { display:flex; align-items:flex-start; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+       border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
+       min-height:var(--touch-min); cursor:default; }
+.svc .ic { width:21px; height:21px; color:var(--fog-600); flex:0 0 auto; margin-top:2px; } .svc-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.svc-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.svc-m { font-size:var(--fz-1); color:var(--jade-600); font-family:var(--ff-num); letter-spacing:.03em; }
+.svc-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+/* 预览到此为止的收尾块（同 P19：空白用诚实填，不用编造填） */
+.stophere { flex:1 1 auto; margin-top:var(--s-4); padding:var(--s-6) var(--s-5);
+  border-radius:var(--r-md); border:1px dashed var(--fog-a20); background:var(--fog-a04);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.sh-t { font-size:var(--fz-4); color:var(--fog-800); font-weight:600; }
+.sh-p { font-size:var(--fz-2); color:var(--fog-600); line-height:1.7; max-width:36em; } .sh-p b { color:var(--fog-800); }
+
+/* 现在就能用的替代路径 */
+.alt { display:flex; align-items:flex-start; gap:var(--s-4); padding:var(--s-4) var(--s-5);
+       border-radius:var(--r-xs); background:var(--surf-1); border:1px solid var(--brd-1);
+       text-decoration:none; color:inherit; min-height:var(--touch-min);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.alt:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.alt .ic { width:21px; height:21px; color:var(--jade-500); flex:0 0 auto; margin-top:2px; } .alt-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.alt-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; } .alt-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; } .wside .pane--grow { overflow:hidden; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">百宝箱区</div>
+        <div class="brand-sub">职易达 · 01 号机 · 市人力资源市场 A 馆</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot"></span>未上架扩展服务 · 由管理后台配置</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 本页不依赖 AI，照常</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 本页不依赖打印机，照常</div>
+    <div class="clock" data-clock>2026年8月9日 <b>11:20</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">本机当前状态</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">配置后 · 示意</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 2 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 本机当前状态（真实） ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="lockcard">
+          <span class="lock-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
+          <div class="lock-t">这台机器还没有上架任何扩展服务</div>
+          <div class="lock-p">
+            百宝箱里放的是<b>求职打印之外的扩展服务</b>（证件照预约、社保查询、
+            校园门户这类第三方或官方服务的启动入口）。上不上、上哪些，
+            <b>由管理后台审核后决定</b>，本机不自己加。<br><br>
+            所以这一页现在<b>没有任何服务可以启动</b> ——
+            不是坏了，是还没配置。下面说的是配置后会怎样、以及你现在就能用的。
+          </div>
+        </div>
+      </div>
+
+      <div class="notice" data-at="s1" data-when="ai-down">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>AI 暂时不可用 —— 扩展服务<b>不依赖 AI</b>，这一页的内容和入口都照常。</span>
+      </div>
+      <div class="notice" data-at="s1" data-when="device-off">
+        <svg class="ic"><use href="#i-info"/></svg>
+        <span>打印机离线 —— 扩展服务<b>不依赖打印机</b>，这一页照常；
+              下面「现在就能做的」里涉及打印的那条此刻打不了，可先转存「我的文档」。</span>
+      </div>
+
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <b>管理后台上架服务后，这一页会怎样</b>
+          <span class="mt">列的是机制，不是服务 —— 没上架就没有服务名</span>
+        </div>
+        <div class="sec">
+          <div class="willhave">
+            <div class="wh"><svg class="ic"><use href="#i-check"/></svg>
+              <span class="wh-b"><span class="wh-t">审核后才上架</span> <span class="wh-s">每个服务都经管理后台审核，来路不明的进不来</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-layers"/></svg>
+              <span class="wh-b"><span class="wh-t">三种启动方式</span> <span class="wh-s">站内页面 / 扫码到手机 / 外部 H5，卡片上写明是哪种</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-external"/></svg>
+              <span class="wh-b"><span class="wh-t">离开本页先确认</span> <span class="wh-s">要跳第三方页面时，先问你「要离开吗」，不静默跳走</span></span></div>
+            <div class="wh"><svg class="ic"><use href="#i-shield"/></svg>
+              <span class="wh-b"><span class="wh-t">只记匿名次数</span> <span class="wh-s">上报的只有「某服务被打开一次」，不含你的身份与办理内容</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>你在第三方服务页面里办了什么，<b>本机不记录、也看不到</b>。
+                  上架什么、下架什么由管理后台决定，页面上随配置实时变化。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-check"/></svg>
+          <b>不用等上架，现在就能做的</b>
+          <span class="mt">这些是本机自己的能力，不走百宝箱</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+          <a class="alt" href="08-file-tools.html">
+            <svg class="ic"><use href="#i-file"/></svg>
+            <span class="alt-b"><span class="alt-t">文件加工：图片转 PDF、加签名</span>
+              <span class="alt-s">手机里的照片拼成一份 PDF、文件上补个手写签名，本机直接办。</span></span>
+          </a>
+          <a class="alt" href="06-print-workbench.html">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span class="alt-b"><span class="alt-t">打印、扫描</span>
+              <span class="alt-s">本机上传、手机扫码传、U 盘都行；扫描出 PDF 存进「我的文档」。</span></span>
+          </a>
+          <a class="alt" href="21-policy.html">
+            <svg class="ic"><use href="#i-policy"/></svg>
+            <span class="alt-b"><span class="alt-t">政策服务与办事清单</span>
+              <span class="alt-s">补贴、档案、社保相关的官方政策入口在政策服务页，不在百宝箱。</span></span>
+          </a>
+          <a class="alt" href="12-material-factory.html">
+            <svg class="ic"><use href="#i-package"/></svg>
+            <span class="alt-b"><span class="alt-t">求职材料四件套</span>
+              <span class="alt-s">求职信、自我介绍、材料清单、简历模板，生成完可以打印。</span></span>
+          </a>
+          <div class="panel-note">这几件都不走百宝箱，今天就能用；扩展服务上没上架都不影响。</div>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 配置后 · 示意 ─────────── -->
+      <div class="previewbar" data-at="s2">
+        <svg class="ic"><use href="#i-alert"/></svg>
+        <span><b>这是管理后台配置后的样子，不是本机当前状态。</b>
+              下面的服务卡全是示意，<b>本机现在一个扩展服务都没有上架，一个都启动不了</b>。</span>
+      </div>
+
+      <div class="previewwrap" data-at="s2">
+        <div class="pane">
+          <div class="pane-hd">
+            <svg class="ic"><use href="#i-toolbox"/></svg>
+            <b>扩展服务 · 配置后长这样</b>
+            <span class="mt">示意 · 实际上哪些由管理后台决定</span>
+          </div>
+          <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+
+            <div class="svc">
+              <svg class="ic"><use href="#i-idcard"/></svg>
+              <span class="svc-b"><span class="svc-t">证件照预约（示例）</span>
+                <span class="svc-m">启动方式：站内页面 · 不离开本机</span>
+                <span class="svc-s">在本机直接打开预约页选时段，拍摄在合作照相点完成。</span></span>
+              <span class="chip chip--info" style="margin-left:auto;flex:0 0 auto">未上架</span>
+            </div>
+            <div class="svc">
+              <svg class="ic"><use href="#i-qr"/></svg>
+              <span class="svc-b"><span class="svc-t">社保查询（示例）</span>
+                <span class="svc-m">启动方式：扫码到手机</span>
+                <span class="svc-s">屏上出一个码，查询在你自己手机上完成 ——
+                      本机屏幕不显示、也不留存你的社保信息。</span></span>
+              <span class="chip chip--info" style="margin-left:auto;flex:0 0 auto">未上架</span>
+            </div>
+            <div class="svc">
+              <svg class="ic"><use href="#i-campus"/></svg>
+              <span class="svc-b"><span class="svc-t">校园门户（示例）</span>
+                <span class="svc-m">启动方式：外部 H5 · 离开本页会先确认</span>
+                <span class="svc-s">打开的是第三方页面。跳出去之前先弹「要离开本页吗」，
+                      你点了确认才走。</span></span>
+              <span class="chip chip--info" style="margin-left:auto;flex:0 0 auto">未上架</span>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-4)">
+              <svg class="ic"><use href="#i-shield"/></svg>
+              <span>无论哪种启动方式，本机都<b>不记录你在第三方页面里的办理结果</b>；
+                    卡片上的服务名与说明由管理后台在上架时填写。</span>
+            </div>
+          </div>
+        </div>
+        <div class="stophere">
+          <div class="sh-t">这里到此为止</div>
+          <div class="sh-p">
+            真上架后每张卡还会有<b>服务方名称、审核时间、能不能用的实时状态</b> ——
+            那些来自管理后台的真实配置，<b>本机不替后台编</b>。<br>
+            所以这块是空的，不是没做完：空着比编一排看起来能点的假服务更诚实。
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-gear"/></svg><b>本机配置状态</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">机器编号</span><span class="v">01 号机</span></div>
+            <div class="kv-row"><span class="k">所在地点</span><span class="v">市人力资源市场 A 馆</span></div>
+            <div class="kv-row"><span class="k">已上架服务</span><span class="v v--fog">0 个</span></div>
+            <div class="kv-row"><span class="k">配置来源</span><span class="v v--fog">管理后台</span></div>
+            <div class="kv-row"><span class="k">状态</span><span class="v"><span class="chip chip--info">未配置</span></span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几行是本机的真实状态，不是示意。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>服务是怎么上架的</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            扩展服务从提出到出现在这一页，<b>每一步都过管理后台</b>，
+            不存在谁塞一个链接进来就能上屏。
+          </div>
+
+          <div class="tline" style="margin-top:var(--s-4)">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">服务方或运营方提出</span> <span class="tl-s">说明服务内容与启动方式</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">管理后台审核</span> <span class="tl-s">内容、资质、合规边界逐项过</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">配置启动方式</span> <span class="tl-s">站内页面 / 扫码到手机 / 外部 H5 三选一</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">在指定终端上架</span> <span class="tl-s">上架后这一页才会出现服务卡</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>百宝箱不做招聘闭环 —— <b>不代收简历、不做平台内投递</b>。
+                  涉及岗位和招聘会的服务仍走岗位信息与招聘会页的来源入口。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            想接入服务的机构请咨询现场工作人员或机器背面的运维标签。
+            本页不展示未经核实的联系方式。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg><b>本机对使用记录做什么</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">启动了哪个服务</span><span class="v">匿名计数</span></div>
+            <div class="kv-row"><span class="k">你的身份</span><span class="v v--fog">不关联</span></div>
+            <div class="kv-row"><span class="k">第三方页面里的操作</span><span class="v v--fog">不记录</span></div>
+            <div class="kv-row"><span class="k">屏上出过的二维码</span><span class="v">失效即作废</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">这几条现在就成立，不等上架。</div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>为什么给你看这个</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3)">
+            让你知道<b>配置后这里能长出什么</b>。<br><br>
+            但示例卡现在<b>一张都启动不了</b> —— 所以它们不带链接、不出真码、
+            不写具体的服务方名称。
+          </div>
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">站内页面</span><span class="v">本机直接打开</span></div>
+            <div class="kv-row"><span class="k">扫码到手机</span><span class="v">屏上出码 · 手机继续</span></div>
+            <div class="kv-row"><span class="k">外部 H5</span><span class="v">先弹离场确认</span></div>
+            <div class="kv-row"><span class="k">使用记录</span><span class="v v--fog">匿名 · 只记次数</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
+          <a class="alt" href="08-file-tools.html"><svg class="ic"><use href="#i-file"/></svg>
+            <span class="alt-b"><span class="alt-t">文件加工台</span> <span class="alt-s">图片转 PDF、加签名，今天就能办</span></span></a>
+          <a class="alt" href="06-print-workbench.html"><svg class="ic"><use href="#i-printer"/></svg>
+            <span class="alt-b"><span class="alt-t">打印扫描</span> <span class="alt-s">本机的主业，不依赖百宝箱</span></span></a>
+          <a class="alt" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>
+            <span class="alt-b"><span class="alt-t">政策服务</span> <span class="alt-s">官方政策与办事清单在这里看</span></span></a>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这几件都是本机自己的能力，不用等任何服务上架。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用：一句话 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页现在能做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            扩展服务还没上架，<b>这一页没有可启动的服务</b>。<br>
+            但文件加工、打印扫描、政策查询，今天就能用。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s1" data-go="s2">看配置后的示意</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回到当前状态</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first ai-down">本机未上架任何扩展服务 · 由管理后台配置</span>
+    <span class="actionbar-hint" data-at="s1" data-when="device-off">扩展服务不依赖打印机 · 本页照常，打印相关除外</span>
+    <span class="actionbar-hint" data-at="s2">以上为配置后示意 · 现在一项都启动不了</span>
+
+    <a class="btn btn--primary" data-at="s1" href="08-file-tools.html">去文件加工台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s2" href="08-file-tools.html">去文件加工台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>
