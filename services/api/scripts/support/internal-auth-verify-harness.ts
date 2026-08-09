@@ -282,6 +282,11 @@ export function prepareIsolatedDatabase(): IsolatedVerificationDatabase {
           "sceneTemplate" TEXT,
           "enabledModulesJson" TEXT NOT NULL DEFAULT '[]',
           "enabled" BOOLEAN NOT NULL DEFAULT true,
+          "contentTrustStatus" TEXT,
+          "contentTrustReviewedBy" TEXT,
+          "contentTrustReviewedAt" DATETIME,
+          "contentTrustReason" TEXT,
+          "archivedAt" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
