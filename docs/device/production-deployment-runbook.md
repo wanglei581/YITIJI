@@ -227,8 +227,9 @@ pnpm --filter @ai-job-print/api bootstrap:first-admin
 - `User=0` 且无匹配审计：数据库未提交，人工删除该 0600 文件后重新申请执行窗口。
 - 其他组合：状态不一致，保持 **NO-GO**，备份并人工审查；不得用 seed 或直接 SQL 补写。
 
-> 若迁移旧 SQLite 数据：按 postgres-operations.md §3 用 `db:pg:migrate-data`，
-> 必须确认输出「迁移完成并对账通过」并记录孤儿行告警，不静默丢数据。
+> 当前生产已经使用 PostgreSQL。旧 SQLite→PostgreSQL 全库搬数工具已在招聘内容域 P1 Wave 1A
+> 退役并移除，禁止从 Git 历史恢复执行。若未来有外部旧库数据导入，必须另立具名授权的领域迁移
+> 方案、只读 preflight、脱敏演练、逐模型守恒对账和失败恢复步骤；本 runbook 不提供通用搬数命令。
 
 ---
 

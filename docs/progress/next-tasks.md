@@ -23,7 +23,7 @@
 
 - [x] **P0 后台招聘数据两波升级与生产发布**：Admin 线下机构真实 HTTP 契约、内容变更回待审、父机构深链门禁、Webhook/Excel 计数与审核、5 类 Organization capability、API/Webhook Admin 启用、停源不级联、影响预览、批量下架及审计已由 PR #572–#574 收口，并以 `37025dc9` 完成生产发布；SQLite/PG/浏览器 CI 与公网 health、三端 bundle、公开空态均已复验。部署授权已恢复为 `false`。
 - [x] **P1 Wave 0 统一模型与迁移方案冻结**：完成当前模型/双库/公开生产状态只读盘点，冻结 Organization、JobSource、OnlinePlatformDirectory、OfflineAgencyProfile/Branch、QualificationRecord 与 canonical Job 的职责、有效可见性、存量 blocker、生产只读盘点、expand/backfill/switch/contract 和回滚门禁；本波不改 schema、不写生产、不新增页面、不部署。正式方案见 `docs/product/recruitment-content-domain-model-2026-08.md`。
-- [ ] **P1 Wave 1A 迁移安全与 additive expand**：先修复或退役只覆盖 37 个模型、无法发现漏表的旧 SQLite→PG 搬数脚本；再以 SQLite schema 为 SSOT 增加 nullable/additive 模型与字段、双 migration、preflight/schema verifier 和 CI。必须覆盖 fresh/upgrade SQLite、fresh PG，以及“经授权的完整加密生产备份在同等级隔离 PostgreSQL 恢复并销毁”或“批准的招聘内容域脱敏 fixture”二选一 upgrade 演练；不改页面、不切读写、不部署。
+- [x] **P1 Wave 1A 迁移安全与 additive expand（PR #578）**：旧 37 模型全库搬数脚本/命令已退役删除；SQLite SSOT、PG 机械镜像、双 additive migration、旧 schema 只读 preflight、schema verifier 与独立 fresh/upgrade CI 已落地。PR CI run `31325581514` 的 build-and-verify、真实 PostgreSQL 16 fresh/upgrade/read-only preflight 和 Kiosk 浏览器冒烟全部通过。未改页面、未切 reader/writer、未迁生产数据、未部署。
 - [ ] **P1 Wave 1B 共享契约与只读 API 骨架**：建立平台目录、机构资料/门店/资质的共享类型与 Admin-only API，岗位仍不切换；真实 HTTP + Prisma 覆盖 RBAC、跨机构 404、审核发布、链接域名和证照访问审计。
 - [ ] **P1 Wave 2–5 数据迁移与切换**：具名授权后先在备份恢复库 dry-run/backfill；缺 employer、city、sourceUrl 或主体映射的 OfflineJob 进入 blocker，成功项也一律 `pending + draft`。随后分批完成 canonical Job 写切换、读切换、至少两个发布周期 legacy 零读写观察和独立 contract；禁止同批 drop OfflineJob 或把生产回退 SQLite。
 
@@ -107,7 +107,7 @@
 
 ## Phase 0 真值收口后续
 
-- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已形成 Draft [PR #576](https://github.com/wanglei581/YITIJI/pull/576)，首轮 GitHub Actions 三项 job 全绿；合并前复核新增“合同原件禁止经通用打印接口建单”和“风险报告强制采用服务端 SHA-256”两条 fail-closed 边界，本地 Node 22 的真实 SQLite 打印回归、报告/打印生命周期、共享契约及 API typecheck/lint 已通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。合并前仍须确认 PR 最新 head 三项 CI 全绿；之后依次完成真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
+- [~] **AI签约风险提示生产验收**：[PR #576](https://github.com/wanglei581/YITIJI/pull/576) 已合并到 `main@eb3fd726`，合并后 GitHub Actions 三项 job 全绿且 deploy workflow 因授权门禁跳过。预生产执行入口已固定为 `docs/acceptance/contract-review-preprod-acceptance-runbook.md`，并由 `verify:contract-review:preprod-readiness` 在 CI 防漂移。下一步按 CR-G0 至 CR-G7 顺序执行：本地冻结候选、预生产只读就绪、PostgreSQL/法务正文、Redis/BullMQ、获准境内模型/日志净化、私有对象存储/生命周期、会员/匿名公共终端隐私、Windows 奔图报告出纸；远程写入、模型 canary、环境变量修改、部署和真机操作均须各自单独授权。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
