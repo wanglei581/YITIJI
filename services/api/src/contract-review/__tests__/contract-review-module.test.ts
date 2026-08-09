@@ -23,6 +23,7 @@ test('default contract module never registers BullMQ processor, controller, or r
     { ContractReviewController },
     { ContractReviewHttpModule },
     { ContractReviewLifecycleService },
+    { CONTRACT_REVIEW_REPORT_ENABLED, ContractReviewReportService },
     { ContractReviewQueueService },
     { ContractReviewService },
     { ContractReviewTaskAccess },
@@ -31,6 +32,7 @@ test('default contract module never registers BullMQ processor, controller, or r
     import('../contract-review.controller'),
     import('../contract-review-http.module'),
     import('../contract-review-lifecycle.service'),
+    import('../contract-review-report.service'),
     import('../contract-review.queue'),
     import('../contract-review.service'),
     import('../contract-review-task-access'),
@@ -42,6 +44,7 @@ test('default contract module never registers BullMQ processor, controller, or r
   assert.equal(providers.includes(ContractReviewProcessor), false)
   assert.equal(providers.includes(ContractReviewProviderService), false)
   assert.equal(providers.includes(ContractReviewLifecycleService), true)
+  assert.equal(providers.includes(ContractReviewReportService), true)
   assert.equal(providers.includes(ContractReviewConsentService), true)
   assert.equal(providers.includes(ContractReviewTaskAccess), true)
   assert.equal(controllers.includes(ContractReviewController), false)
@@ -51,6 +54,21 @@ test('default contract module never registers BullMQ processor, controller, or r
     if (!value || typeof value !== 'object') return false
     return (value as { module?: { name?: string } }).module?.name === 'BullModule'
   }), false)
+
+  const reportFlag = providers.find((provider) => (
+    typeof provider === 'object' && provider !== null &&
+    (provider as { provide?: unknown }).provide === CONTRACT_REVIEW_REPORT_ENABLED
+  )) as { useFactory: () => boolean } | undefined
+  assert.ok(reportFlag)
+  const previous = process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  assert.equal(reportFlag.useFactory(), false)
+  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'TRUE'
+  assert.equal(reportFlag.useFactory(), false)
+  process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = 'true'
+  assert.equal(reportFlag.useFactory(), true)
+  if (previous === undefined) delete process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED']
+  else process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] = previous
 
   const exports = metadata<unknown>(MODULE_METADATA.EXPORTS, ContractReviewModule)
   assert.equal(exports.includes(ContractReviewLifecycleService), true)
@@ -75,11 +93,11 @@ test('blocked provider runtime never reads environment or performs a model reque
   assert.deepEqual({ ...process.env }, before)
 })
 
-test('AppModule source imports the same default-closed module for every env combination', async () => {
+test('AppModule exposes HTTP through the same default-closed runtime for every env combination', async () => {
   const { ContractReviewModule } = await loadContractModule()
   const source = readFileSync(resolve(__dirname, '../../app.module.ts'), 'utf8')
-  assert.match(source, /import \{ ContractReviewModule \} from '\.\/contract-review\/contract-review\.module'/u)
-  assert.match(source, /\n\s+ContractReviewModule,\n/u)
+  assert.match(source, /import \{ ContractReviewHttpModule \} from '\.\/contract-review\/contract-review-http\.module'/u)
+  assert.match(source, /\n\s+ContractReviewHttpModule,\n/u)
   assert.doesNotMatch(source, /CONTRACT_REVIEW_ENABLED/u)
   for (const redis of [undefined, 'redis://localhost:6379']) {
     for (const enabled of [undefined, 'true', 'false']) {

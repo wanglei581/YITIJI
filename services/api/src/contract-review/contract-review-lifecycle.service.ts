@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { ContractReviewCleanupTask } from './contract-review.cleanup.task'
+import { ContractReviewReportService } from './contract-review-report.service'
 import { ContractReviewQueueService } from './contract-review.queue'
 import { ContractReviewService } from './contract-review.service'
 import { ContractReviewTaskAccess } from './contract-review-task-access'
@@ -20,6 +21,7 @@ import {
   type ContractReviewCreateInput,
   type ContractReviewCreatedTask,
   type ContractReviewRequester,
+  type ContractReviewReportView,
   type ContractReviewTaskRow,
   type ContractReviewTaskView,
   type ContractType,
@@ -37,6 +39,8 @@ const TASK_SELECT = {
   id: true,
   endUserId: true,
   accessTokenHash: true,
+  sourceFileId: true,
+  resultFileId: true,
   contractType: true,
   status: true,
   analyzedPages: true,
@@ -60,6 +64,8 @@ export class ContractReviewLifecycleService {
     @Optional()
     @Inject(CONTRACT_REVIEW_CLOCK)
     private readonly clock?: ContractReviewClock,
+    @Optional()
+    private readonly reports?: ContractReviewReportService,
   ) {}
 
   async createAndEnqueue(
@@ -156,15 +162,27 @@ export class ContractReviewLifecycleService {
     return { id, deleted: true }
   }
 
-  async createReport(id: string, requester: ContractReviewRequester): Promise<never> {
-    await this.loadOwnedTask(id, requester)
-    throw new ServiceUnavailableException({
-      error: {
-        code: 'REPORT_NOT_AVAILABLE',
-        message: '合同审查报告暂不可用',
-        retryable: false,
-      },
-    })
+  async createReport(
+    id: string,
+    requester: ContractReviewRequester,
+  ): Promise<ContractReviewReportView> {
+    const task = await this.loadOwnedTask(id, requester)
+    if (!this.reports) throw reportUnavailable()
+    const view = this.safeTaskView(task)
+    if (view.status !== 'completed' || !view.result) {
+      throw new ConflictException({
+        error: {
+          code: 'CONTRACT_REVIEW_REPORT_STATE_INVALID',
+          message: '当前合同审查任务不能生成报告',
+        },
+      })
+    }
+    return this.reports.create({ task, result: view.result })
+  }
+
+  async abandonReport(fileId: string, token: string | null) {
+    if (!this.reports) throw reportUnavailable()
+    return this.reports.abandon(fileId, token)
   }
 
   private async expireFailedCreate(id: string): Promise<void> {
@@ -247,6 +265,16 @@ export class ContractReviewLifecycleService {
     if (!Number.isFinite(nowMs)) throw new Error('CONTRACT_REVIEW_CLOCK_INVALID')
     return new Date(nowMs)
   }
+}
+
+function reportUnavailable(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    error: {
+      code: 'REPORT_NOT_AVAILABLE',
+      message: '合同审查报告暂不可用',
+      retryable: false,
+    },
+  })
 }
 
 function invalidConfirmation(): BadRequestException {

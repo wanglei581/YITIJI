@@ -20,6 +20,7 @@ import {
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { AuditService } from '../audit/audit.service'
+import { ContractReportPrintLifecycleService } from '../files/contract-report-print-lifecycle.service'
 import type { RegisterTerminalDto } from './dto/register-terminal.dto'
 import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
@@ -186,6 +187,7 @@ export class TerminalAgentService implements OnModuleInit {
     audit: AuditService,
     @Optional() credentialSecurity?: TerminalCredentialSecurityService,
     @Optional() scanDeletionAudit?: TerminalScanDeletionAuditService,
+    @Optional() private readonly contractReportPrintLifecycle?: ContractReportPrintLifecycleService,
   ) {
     // Nest 运行时使用独立 provider；脚本 fixture 保留两参构造兼容。
     this.credentialSecurity = credentialSecurity ?? new TerminalCredentialSecurityService(prisma, audit)
@@ -503,6 +505,7 @@ export class TerminalAgentService implements OnModuleInit {
 
     if (TERMINAL_STATES.includes(preCheck.status as TaskStatus)) {
       if (preCheck.status === dto.status) {
+        await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
         return { acknowledged: true }
       }
       if (TERMINAL_STATES.includes(dto.status as TaskStatus)) {
@@ -583,6 +586,8 @@ export class TerminalAgentService implements OnModuleInit {
         data: { taskStatus: dto.status, terminalId },
       })
     })
+
+    if (isTerminal) await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
 
     return { acknowledged: true }
   }
@@ -722,7 +727,7 @@ export class TerminalAgentService implements OnModuleInit {
     const now = new Date()
     const printingTimeout = new Date(now.getTime() - 10 * 60 * 1000)
 
-    const { claimedCount, printingCount } = await this.prisma.$transaction(async (tx) => {
+    const { claimedCount, printingCount, terminalTaskIds } = await this.prisma.$transaction(async (tx) => {
       const candidates = await tx.printTask.findMany({
         where: {
           OR: [
@@ -734,6 +739,7 @@ export class TerminalAgentService implements OnModuleInit {
       })
       let claimedCount = 0
       let printingCount = 0
+      const terminalTaskIds: string[] = []
       for (const task of candidates) {
         const timeoutWhere = task.status === 'claimed'
           ? { id: task.id, status: 'claimed', claimExpiry: { lt: now } }
@@ -748,6 +754,7 @@ export class TerminalAgentService implements OnModuleInit {
           },
         })
         if (updated.count !== 1) continue
+        terminalTaskIds.push(task.id)
         if (task.status === 'claimed') claimedCount += 1
         else printingCount += 1
         await tx.printTaskStatusLog.create({
@@ -774,8 +781,12 @@ export class TerminalAgentService implements OnModuleInit {
           },
         })
       }
-      return { claimedCount, printingCount }
+      return { claimedCount, printingCount, terminalTaskIds }
     })
+
+    for (const taskId of terminalTaskIds) {
+      await this.contractReportPrintLifecycle?.cleanupTerminalTask(taskId)
+    }
 
     const total = claimedCount + printingCount
     if (total > 0) {

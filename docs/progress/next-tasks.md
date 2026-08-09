@@ -56,7 +56,7 @@
 - [x] **干净候选冻结范围门禁（已闭环）**：已在干净 worktree 的审定候选 `origin/main@55105fa8`（Node `v22.23.1` / pnpm `11.2.2`）串行重跑全部 Kiosk fusion 静态合同：baseline、shell、home、W2、W3、W4、W5、W6 均 ALL PASS，其中 W3 的 6 个硬冻结文件 SHA 全部保持不变、W4 的 25 路由归属与硬冻结文件守卫通过；证明此前失败源于共享脏工作区的他人未提交改动，不是产品缺陷。浏览器 W3/W4 行为套件仍以 CI `kiosk-browser-smoke` 与既有 Node 22 回归证据为准。
 - [ ] **Windows 文件/硬件现场验收**：在 27 寸竖屏 Edge/Chrome Kiosk 上分别用真实 PDF/JPG/PNG 完成本机上传、手机扫码上传、U 盘插拔/选择/导入/预览、扫描生成 PDF/预览、参数设置、免费或已支付建单、Agent 领取、真实出纸、进度回流、完成页与异常重试；保留文件 ID、订单/任务 ID、Agent 日志和脱敏截图。现场按 `docs/device/windows-field-acceptance-runsheet-2026-08.md` 逐项执行并记录证据；扫码枪付款码与打印机面板扫描 SMB 专项见 `docs/device/peripheral-field-acceptance-2026-08.md`（摄像头不接入）。未知彩色 mode 不得假设，打印机型号不得硬编码。
 - [ ] **生产文件链路验收**：在具名授权和备份/回滚方案下复验 PostgreSQL、Redis、COS/OSS、签名 URL 过期/刷新、匿名与会员归属、文件 TTL/删除、Admin 审计和跨账号隔离；本地 HMAC/SQLite/Mock 结果不得替代生产证据。
-- [ ] **未开放格式保持 fail-closed**：Word 打印转换/内嵌预览、政策附件、合同审查报告生成在真实转换/文件服务、数据模型、权限、审计和测试完成前继续保持未开放或诚实禁用，不得恢复成可点击占位流程。
+- [ ] **未开放能力保持 fail-closed**：Word 打印转换/内嵌预览与政策附件在真实转换/文件服务完成前继续保持未开放；合同风险提示报告的本地代码与浏览器候选已完成，但生产和 Windows 真机验收前双端开关必须保持关闭，不得恢复成可点击占位流程。
 
 ## P0 设计执行：线上 Kiosk 以 7 月 75 屏原型为视觉真值
 
@@ -102,9 +102,11 @@
 - [ ] **发布与商业验收**：完成正式 AppID/类目/隐私保护指引、备案 HTTPS 合法域名、微信支付商户配置、订阅消息模板、生产凭证注入、小额 live 支付退款、真实跨端履约、文件 TTL 与本人隔离、单位经济和运营 runbook。未完成前不得宣称小程序商用上线。
 - [ ] **自我探索 v1 小程序适配（M1 后候选）**：Gate 0、唯一工程底座和小程序隐私指引通过后，复用主仓现有 25 题五维共享数据、submit/get/withdraw/print API、纯函数评分、结果 TTL 与本人隔离，只重做原生小程序页面和会话清场；答案原文不进 Storage/URL/日志/埋点。先交付私人报告、撤回、删除、PDF 和本人记录；默认附加简历、综合总分、人格类型、岗位适配、企业/Partner/Admin 可见、朋友圈/微信群分享均禁止。
 - [ ] **视频自我介绍外链二维码试点（M2 后候选）**：只评审“审核过的外部 HTTPS 视频链接 + 至少 128 bit 随机分享令牌 + 哈希存储 + noindex 中性过渡页 + 本人撤回/过期 + 简历导出默认不勾选”，不托管视频、不记录扫码者身份/企业/招聘结果、不进入岗位投递。先补正式 PRD、威胁模型、中国法务与微信类目意见、域名白名单、失效体验和 20-50 人试点指标；任一 Gate 未通过不开发。平台托管视频不在当前 0-6 个月计划。
-- [ ] **职业生活服务试点（M4 候选）**：定位限于材料、入职决策、劳动权益、办事指引和公共就业服务机构；首批从合同风险提示、社保/公积金官方指引、服务机构三项中最多选择 3 项，全部通过既有百宝箱 `career/life/legal/hr` manifest、双人审核、域名白名单、数据政策和熔断发布，不新增首页卡片。贷款、保险销售、医疗/心理诊断、法律代理、泛 O2O、招聘撮合和政府事项代办永久不进入该阶段。
+- [ ] **职业生活服务试点（M4 候选）**：定位限于材料、入职决策、劳动权益、办事指引和公共就业服务机构；社保/公积金官方指引、服务机构等候选可通过既有百宝箱 `career/life/legal/hr` manifest、双人审核、域名白名单、数据政策和熔断发布，不新增首页卡片。合同风险提示已固定归入「AI简历服务 → 签约与权益」，不再进入百宝箱试点。贷款、保险销售、医疗/心理诊断、法律代理、泛 O2O、招聘撮合和政府事项代办永久不进入该阶段。
 
 ## Phase 0 真值收口后续
+
+- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已形成 Draft [PR #576](https://github.com/wanglei581/YITIJI/pull/576)，首轮 GitHub Actions 三项 job 全绿；合并前复核新增“合同原件禁止经通用打印接口建单”和“风险报告强制采用服务端 SHA-256”两条 fail-closed 边界，本地 Node 22 的真实 SQLite 打印回归、报告/打印生命周期、共享契约及 API typecheck/lint 已通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。合并前仍须确认 PR 最新 head 三项 CI 全绿；之后依次完成真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。

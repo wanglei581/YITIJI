@@ -5,6 +5,7 @@ import { FilesController } from './files.controller'
 import { FilesService } from './files.service'
 import { FilesCleanupTask } from './files.cleanup.task'
 import { MemberDataExportFileService } from './member-data-export-file.service'
+import { ContractReportPrintLifecycleService } from './contract-report-print-lifecycle.service'
 
 /**
  * BE-1 文件模块。
@@ -29,7 +30,12 @@ import { MemberDataExportFileService } from './member-data-export-file.service'
     JwtVerifierModule,
   ],
   controllers: [FilesController],
-  providers: [FilesService, MemberDataExportFileService, FilesCleanupTask],
-  exports: [FilesService, MemberDataExportFileService],
+  providers: [
+    FilesService,
+    MemberDataExportFileService,
+    FilesCleanupTask,
+    ContractReportPrintLifecycleService,
+  ],
+  exports: [FilesService, MemberDataExportFileService, ContractReportPrintLifecycleService],
 })
 export class FilesModule {}

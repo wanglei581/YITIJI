@@ -41,6 +41,17 @@ export const MEMBER_DATA_EXPORT_FILE_POLICY = {
   serverGeneratedOnly: true,
 } as const
 
+/** 合同风险提示报告只允许合同领域服务生成，不接受任何外部上传。 */
+export const CONTRACT_REVIEW_REPORT_FILE_POLICY = {
+  mimes: ['application/pdf'],
+  maxBytes: 5 * MB,
+  sensitiveLevel: 'highly_sensitive',
+  retentionPolicy: 'system_short',
+  retentionSetBy: 'system',
+  visibility: 'private',
+  serverGeneratedOnly: true,
+} as const
+
 /** MIME → 允许的扩展名集合(扩展名与 MIME 必须一致)。 */
 const MIME_EXTS: Record<string, string[]> = {
   'application/pdf': ['pdf'],
@@ -91,6 +102,10 @@ export const PURPOSE_POLICY: Record<FilePurpose, { mimes: string[]; maxBytes: nu
   temp: { mimes: [...PRINTABLE, 'image/webp'], maxBytes: 20 * MB },
   // 合同审查原件:仅用于会话级提取/分析，留存由 retention-policy.ts 锁定为两小时。
   contract_upload: { mimes: PDF_DOC_IMG, maxBytes: 20 * MB },
+  contract_review_report: {
+    mimes: [...CONTRACT_REVIEW_REPORT_FILE_POLICY.mimes],
+    maxBytes: CONTRACT_REVIEW_REPORT_FILE_POLICY.maxBytes,
+  },
   // 签名/印章图片:仅供签章合成读取,高敏、系统短期、锁定不可延期(见 retention-policy.ts)
   signature_image: { mimes: ['image/jpeg', 'image/png'], maxBytes: 10 * MB },
   member_data_export: {
@@ -123,6 +138,7 @@ export const DEFAULT_SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLeve
   admin_upload: 'normal',
   temp: 'sensitive',
   contract_upload: 'highly_sensitive',
+  contract_review_report: CONTRACT_REVIEW_REPORT_FILE_POLICY.sensitiveLevel,
   signature_image: 'highly_sensitive',
   member_data_export: MEMBER_DATA_EXPORT_FILE_POLICY.sensitiveLevel,
   self_assessment_report: 'sensitive',

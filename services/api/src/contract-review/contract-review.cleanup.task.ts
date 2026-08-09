@@ -186,6 +186,12 @@ export class ContractReviewCleanupTask {
     })
     if (!before || before.deletedAt) return 'complete'
 
+    const activePrintTask = await this.prisma.printTask.findFirst({
+      where: { fileId, status: { in: ['pending', 'claimed', 'printing'] } },
+      select: { id: true },
+    })
+    if (activePrintTask) return 'shared'
+
     const shared = await this.prisma.contractReviewTask.findFirst({
       where: {
         id: { not: taskId },

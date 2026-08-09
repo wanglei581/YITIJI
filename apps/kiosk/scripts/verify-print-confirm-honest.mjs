@@ -75,7 +75,7 @@ const httpIndex = confirmSrc.search(httpBranch)
 const guardIndex = confirmSrc.search(/if\s*\(\s*!file\.fileUrl\s*\)\s*\{\s*setSubmitError/)
 
 // SIM 跳转 = 无 taskId 的 /print/progress 导航(仅非 http mock 模式使用)
-const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.location\.state,\s*file,\s*params,\s*source\s*\}\s*\}\)/
+const simNavPattern = /navigate\('\/print\/progress',\s*\{\s*state:\s*\{\s*\.\.\.\(isContractReport\s*\?\s*\{\}\s*:\s*location\.state\),\s*file,\s*params,\s*source\s*\}\s*,?\s*\}\)/
 const simIndex = confirmSrc.search(simNavPattern)
 
 // C5-3:http 真实建单后按 amountCents 分流,两分支共用 nextState(履约状态载体)。
