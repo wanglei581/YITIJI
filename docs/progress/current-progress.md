@@ -1,5 +1,11 @@
 # 当前开发进度
 
+2026-08-09 修复 **`postgres-readiness` job 偶发失败（`verify:ai-cost-coverage` 运行时段读写竞态，未部署）**：PR #564 为纯文档改动却挂掉该 job、重跑全绿，确认是脚本自身竞态而非数据库行为。根因是 `AiLogService.record()` 以 `void this.persist(...)` 后台落库（刻意不阻塞用户请求），而 `verify-ai-cost-coverage.ts` 在四次 controller 调用后固定 `setTimeout(200ms)` 再回读 `AiServiceLog`——「已 record」与「已落库」之间没有任何因果同步，200ms 只是猜的。SQLite 下写是进程内文件操作（微秒级）怎么都能过；PG 下这几条并发 INSERT 各自可能要新建连接（TCP + SCRAM-SHA-256 握手），CI 的 CPU 争用让握手耗时抖动很大，而回读常能复用连接池里已暖的连接直接返回，于是读跑到写前面，偶发漏行。修复为 `AiLogService` 登记在途写入并新增 `flush()`，verify 脚本改用 `await aiLog.flush()`；`record()` 对业务调用方仍是非阻塞的，行为不变。未放宽断言、未加重试、未延长 sleep。
+
+同一份日志里的 `ERROR [AuditService] Audit write failed (action=fair.venue_guide.save…)` 经复核是 `verify:jobfair-venue-guide` 第 13 项断言的预期输出（故意用不存在的 actorId 触发 AuditLog 外键失败，证明审计写失败不阻塞业务保存），绿灯运行同样打印，与本次 flaky 无关，不需处理。
+
+复现与验证（本地 embedded PostgreSQL 17 + 连接握手抖动代理，等同条件 A/B）：修复前 11/15 次失败，修复后 0/15；±45ms/连接抖动下 0/20；直连 PG 连跑 30 次 0 失败；SQLite 路径 5 次全过。`postgres-readiness` 的 `Core verify suites on PG` 全量 62 条脚本全部通过（`verify:member-data-export-download` 首轮因本机缺 `redis-server` 报 ENOENT，补装后通过，属环境缺失非代码问题）。`services/api` typecheck 与 lint 通过。未改动数据库 schema、迁移、生产配置、密钥，未触碰岗位/招聘会/简历/文件/打印/硬件链路。
+
 2026-08-08 修复 **生产 Deploy 顶层显式授权门禁缺口（安全候选，未部署）**：仓库存储治理 PR 合入后复核发现 `DEPLOY_API_ENABLED` 自 2026-08-07 发布后仍遗留为 `true`，而 `deploy.yml` 只在远端脚本内部判断该变量，任一 `main` CI 成功都会先建立 SSH、切换服务器源码、安装依赖和构建三端。已立即取消 Deploy run `31259646187` 并把仓库变量恢复为 `false`；日志确认任务在 Partner 构建阶段终止，尚未进入 API 备份/迁移/PM2、Nginx 目录覆盖或 reload，生产运行产物未被替换，但服务器源码工作目录已检出 `b6f7ed2e` 并产生依赖/构建输出，须在下次具名授权发布前做只读现场复核。现将 Deploy job 收紧为“CI success 且 `vars.DEPLOY_API_ENABLED == 'true'`”才启动，false 时在 runner 调度层整体跳过、不得建立 SSH；新增 `verify-deploy-authorization-gate.mjs` 并接入 CI，静态锁定 job 级门禁、单一 SSH 动作、变量透传和远端二次检查。未连接数据库、未执行迁移、未重启 PM2、未覆盖线上前端、未操作 Windows/硬件。
 
 2026-08-08 修复 **nanoid 两项高危公告导致的依赖安全门禁阻塞（PR #550 已合入 `main@b6f7ed2e`，未部署）**：GitHub Advisory 在 2026-08-07 更新 `GHSA-28wg-ghj8-5hjv` 与 `GHSA-2v37-7h3g-55p8` 后，主干的动态 `pnpm audit` 开始拒绝 PostCSS 间接引入的 `nanoid@3.3.12`；`nanoid@5.1.16` 已满足两项公告的修复范围。仅增加精确覆盖 `nanoid@3.3.12 -> 3.3.17`，并在 `verify-dependency-security.mjs` 增加防回退断言；不跨主版本替换，不添加公告白名单，不修改应用逻辑、API、schema、数据库、生产配置、密钥或硬件链路。Node 22 frozen install、完整依赖安全门禁、全仓 typecheck / production build 与 PR 四项 CI 均通过。

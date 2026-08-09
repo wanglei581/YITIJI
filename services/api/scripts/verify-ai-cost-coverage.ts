@@ -237,8 +237,11 @@ async function runtimeChecks(): Promise<void> {
     () => undefined,
   )
 
-  // record() 内部 persist 是 void（不阻塞请求），等一拍再回读
-  await new Promise((r) => setTimeout(r, 200))
+  // record() 内部 persist 是 fire-and-forget（不阻塞请求），必须等它真的落库再回读。
+  // 这里不能用固定 sleep：SQLite 下写是进程内文件操作（微秒级）怎么都能过，
+  // PG 下这几条 INSERT 各自可能要新建连接（TCP + SCRAM 握手），在 CI 的 CPU 争用下
+  // 耗时抖动很大，而回读能捡到池里已暖的连接直接返回 —— 读会跑到写前面，偶发漏读。
+  await aiLog.flush()
 
   const rows = await prisma.aiServiceLog.findMany({
     where: { createdAt: { gte: since }, operation: { in: ['voiceTranscribe', 'voiceSynthesize'] } },

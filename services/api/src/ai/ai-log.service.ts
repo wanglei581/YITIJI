@@ -229,6 +229,8 @@ const AI_COST_ALERT_CNY = (() => {
 export class AiLogService {
   private readonly logger = new Logger(AiLogService.name)
   private readonly logs: Array<AiLogRecordInput & { createdAt: string }> = []
+  /** 已 record 但尚未落库的后台写入；见 flush()。 */
+  private readonly pendingWrites = new Set<Promise<void>>()
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -242,7 +244,7 @@ export class AiLogService {
     if (this.logs.length > MAX_IN_MEMORY_LOGS) {
       this.logs.splice(0, this.logs.length - MAX_IN_MEMORY_LOGS)
     }
-    void this.persist(full)
+    this.trackWrite(this.persist(full))
     // Phase 7.6: 控制台结构化输出；后续接入 DB 时替换此处
     console.log('[AI-LOG]', JSON.stringify({
       taskId:           full.taskId,
@@ -255,6 +257,35 @@ export class AiLogService {
       errorCode:        full.errorCode,
       createdAt:        full.createdAt,
     }))
+  }
+
+  /**
+   * 等 record() 触发的后台写入全部落库。
+   *
+   * record() 故意不阻塞调用方（AI 日志写库失败不该拖慢用户请求），代价是
+   * 「已 record」与「已落库」之间存在一段窗口。凡是 record 之后要立刻回读
+   * AiServiceLog 的地方（verify 脚本）都必须 await 本方法。
+   *
+   * 不要改回「固定 sleep 一小段再回读」：那在 SQLite 下恰好总能过（进程内文件
+   * 写，微秒级），在 PostgreSQL 下会偶发漏读——并发的几条 INSERT 各自可能要新建
+   * 连接（TCP + SCRAM-SHA-256 握手），在 CI 这种 CPU 争用环境里耗时抖动很大；
+   * 而回读往往能捡到连接池里已经暖好的连接直接返回，于是读跑到写前面去了。
+   */
+  async flush(): Promise<void> {
+    // 循环：flush 期间可能又有新的 record() 进来。
+    while (this.pendingWrites.size > 0) {
+      await Promise.all([...this.pendingWrites])
+    }
+  }
+
+  /** 把一次后台写入登记进 pendingWrites，完成后自动摘除。 */
+  private trackWrite(write: Promise<void>): void {
+    // persist() 内部已吞掉异常；这里再兜一层，确保 flush() 不会因写失败而 reject，
+    // 也不会产生 unhandledRejection。
+    const tracked: Promise<void> = write
+      .catch(() => undefined)
+      .finally(() => { this.pendingWrites.delete(tracked) })
+    this.pendingWrites.add(tracked)
   }
 
   async persist(entry: AiLogRecordInput): Promise<void> {
