@@ -11,7 +11,11 @@
   border: 1px solid rgba(232, 241, 241, .12);
   backdrop-filter: blur(14px);
   font-family: var(--ff-ui); font-size: 12px;
+  /* 2026-08-09：平时隐身(不遮页面顶栏、不把页面顶下去)，碰到/聚焦才现身 */
+  opacity: .1;
+  transition: opacity .18s ease-out;
 }
+.shell:hover, .shell:focus-within { opacity: 1; }
 .shell-id { color: var(--fog-600); letter-spacing: .1em; padding: 0 8px 0 4px; }
 .shell-btn {
   appearance: none; border: 1px solid rgba(232, 241, 241, .12);

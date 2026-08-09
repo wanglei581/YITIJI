@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/vivid.css?v=19">
 <link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
@@ -151,7 +151,7 @@
             <svg class="ic"><use href="#i-offline"/></svg>
             <b>生成服务中断</b>
             <p>求职信是纯 AI 生成能力，现在不可用。<br>可以打印一份<b>空白求职信格式纸</b>手写，格式要点印在页脚。</p>
-            <a class="btn btn--ghost" href="06-print-workbench.html">打印格式纸</a>
+            <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印格式纸</a>
           </div>
           <div class="paper-empty" data-when="first">
             <svg class="ic"><use href="#i-resume"/></svg>
@@ -203,7 +203,7 @@
           <svg class="ic"><use href="#i-offline"/></svg>
           <b>生成中断</b>
           <p>可以先打印一张<b>自我介绍结构卡</b>：说什么、按什么顺序、哪三处该放数字。<br>不含具体内容，需要你自己填。</p>
-          <a class="btn btn--ghost" href="06-print-workbench.html">打印结构卡</a>
+          <a class="btn btn--ghost" href="06-print-workbench.html?stage=s3">打印结构卡</a>
         </div>
         <div class="locked" data-when="first">
           <svg class="ic"><use href="#i-resume"/></svg>
@@ -471,11 +471,11 @@
 
     <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
     <a class="btn btn--primary" data-at="t1" data-when="first" href="09-resume-workbench.html">先去做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html?stage=s3">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="t1" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="t2" data-when="default device-off" href="20-interview-pod.html">对着练一遍<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t2" data-when="ai-down first" href="06-print-workbench.html?stage=s3">打印结构卡<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="t3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">打印这份清单<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="t3" data-when="device-off">发到我手机<svg class="ic"><use href="#i-phone"/></svg></button>
     <a class="btn btn--primary" data-at="t4" href="09-resume-workbench.html?stage=s5">应用到我的简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>

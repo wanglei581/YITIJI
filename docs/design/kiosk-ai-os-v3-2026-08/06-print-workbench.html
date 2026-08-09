@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=12">
+<link rel="stylesheet" href="styles/vivid.css?v=19">
 <link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/pay.css?v=5">
 <link rel="stylesheet" href="styles/fx.css?v=3">
@@ -786,7 +786,8 @@
         <div data-when="default first ai-down" data-job="checkfail"><div class="t">校验没通过：第 2 页字体没内嵌</div><div class="s">没出纸、已原路退款 · 换文件或让本机转一次</div></div>
         <div data-when="default first ai-down" data-job="timeout"><div class="t">超过 10 分钟未开始，已转待打印订单</div><div class="s">凭取件码 7742 106 358 在任一台机器打 · 7 天内有效</div></div>
         <div data-when="default first ai-down" data-job="jam"><div class="t">卡纸已暂停</div><div class="s">取出卡纸后可继续 · 剩余份数已保留</div></div>
-        <div data-when="device-off"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="printing jam"><div class="t">已暂停：打印机离线</div><div class="s">剩余 12 面已转为待打印订单，不会重复扣款</div></div>
+        <div data-when="device-off" data-job="queued checking checkfail timeout"><div class="t">打印机离线，任务未开始出纸</div><div class="s">一张未出 · 按各处境规则处理，不会重复扣款</div></div>
       </div>
       <div data-at="s7"><div class="t">取件码 7742 106 358</div><div class="s">7 天内凭码可在任一台空闲机器复打</div></div>
     </div>
