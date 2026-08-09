@@ -103,9 +103,6 @@ jobs:
             echo "=== 7. 本次发布需要的空间量级 ==="
             echo "PG_DB_SIZE_MB=$(sudo -n -u postgres psql -tAc \"SELECT pg_database_size(current_database())/1024/1024;\" 2>/dev/null || echo 'unknown（无免密 sudo，可忽略）')"
 
-<<<<<<< HEAD
-=======
-
             echo "=== 8. 发布后验证：#555 资金门禁启动告警是否出现在应用日志 ==="
             if pm2 logs "$EXPECT_PM2" --lines 200 --nostream 2>/dev/null | grep -q "PRINT_REQUIRE_PAID_BEFORE_CLAIM"; then
               echo "PAID_GATE_WARNING_PRESENT=yes"
@@ -123,7 +120,6 @@ jobs:
             if [ -f "$EXPECT_DIR/DEPLOY_SOURCE.txt" ]; then
               echo "DEPLOY_SOURCE_SHA8=$(sed -n 's/^source=origin\/main@\([0-9a-f]\{8\}\).*/\1/p' "$EXPECT_DIR/DEPLOY_SOURCE.txt" | head -1)"
             fi
->>>>>>> origin/main
             echo "=== 完成：以上均为只读探测，未做任何修改 ==="
         env:
           EXPECT_DIR: /srv/ai-job-print
