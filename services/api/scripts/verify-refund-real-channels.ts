@@ -236,7 +236,7 @@ function buildAlipayNotify(params: Record<string, string>): { rawBody: Buffer; h
 
 const PRINT_PARAMS = {
   copies: 2,
-  colorMode: 'color' as const,
+  colorMode: 'black_white' as const,
   duplex: 'simplex' as const,
   paperSize: 'A4' as const,
   orientation: 'auto' as const,
@@ -309,7 +309,7 @@ async function main(): Promise<void> {
   }
 
   /** 建打印单并经真实回调路径打成 paid（channel=wechat|alipay），返回 order/attempt。 */
-  async function makePaidOrder(label: string, channel: 'wechat' | 'alipay'): Promise<{ orderId: string; orderNo: string; taskId: string; attemptId: string }> {
+  async function makePaidOrder(label: string, channel: 'wechat' | 'alipay'): Promise<{ orderId: string; orderNo: string; taskId: string; attemptId: string; amountCents: number }> {
     const printed = await printJobs.create(
       { fileUrl: await seedPdfFixture(label, 2), fileMd5: `sha256-refundreal-${label}`, fileName: `${label}.pdf`, params: PRINT_PARAMS },
       { endUserId: null, terminalId },
@@ -341,7 +341,13 @@ async function main(): Promise<void> {
     }
     const paid = await prisma.order.findUnique({ where: { id: order.id } })
     if (paid?.payStatus !== 'paid') fail(`makePaidOrder(${label}): not paid`)
-    return { orderId: order.id, orderNo: order.orderNo, taskId: printed.taskId, attemptId: attempt.attemptId }
+    return {
+      orderId: order.id,
+      orderNo: order.orderNo,
+      taskId: printed.taskId,
+      attemptId: attempt.attemptId,
+      amountCents: order.amountCents,
+    }
   }
 
   async function orderState(orderId: string) {
@@ -599,7 +605,7 @@ async function main(): Promise<void> {
       data: {
         orderId: W6.orderId,
         channel: 'wechat',
-        amountCents: 200,
+        amountCents: W6.amountCents,
         status: 'success',
         prepayId: `pa_dup_${suffix}`,
         channelTxnNo: `wxtxn_dup_${randomBytes(6).toString('hex')}`,

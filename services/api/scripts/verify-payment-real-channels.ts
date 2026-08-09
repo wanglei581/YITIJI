@@ -60,6 +60,7 @@ import {
 } from '../src/payment/providers/wechat-pay.provider'
 import { PrintJobsService } from '../src/print-jobs/print-jobs.service'
 import { PrintPageCountService } from '../src/print-jobs/print-page-count.service'
+import { PRINT_UNIT_PRICE_CENTS } from '../src/print-jobs/print-pricing'
 import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { TerminalToolboxService } from '../src/terminals/terminal-toolbox.service'
@@ -311,7 +312,7 @@ function buildAlipayNotify(input: {
 
 const PRINT_PARAMS = {
   copies: 2,
-  colorMode: 'color' as const,
+  colorMode: 'black_white' as const,
   duplex: 'simplex' as const,
   paperSize: 'A4' as const,
   orientation: 'auto' as const,
@@ -319,6 +320,8 @@ const PRINT_PARAMS = {
   scale: 'fit' as const,
   pagesPerSheet: 1 as const,
 }
+const EXPECTED_PRINT_AMOUNT_CENTS =
+  2 * PRINT_PARAMS.copies * PRINT_UNIT_PRICE_CENTS[PRINT_PARAMS.colorMode]
 
 async function main(): Promise<void> {
   console.log('\n=== C5-6 real payment channels (wechat/alipay) + paid-before-claim verification ===')
@@ -480,7 +483,9 @@ async function main(): Promise<void> {
     }
 
     const A = await makePrintOrder('orderA')
-    if (A.amountCents !== 200) fail(`expected 200 cents quote, got ${A.amountCents}`)
+    if (A.amountCents !== EXPECTED_PRINT_AMOUNT_CENTS) {
+      fail(`expected ${EXPECTED_PRINT_AMOUNT_CENTS} cents quote, got ${A.amountCents}`)
+    }
 
     await expectCode('双通道时未指定 channel 出码被拒（不替用户默认选资金通道）', 'PAY_CHANNEL_REQUIRED', () =>
       payment.createPayAttempt(A.orderId, A.token),
@@ -505,7 +510,7 @@ async function main(): Promise<void> {
     }
     if (
       lastWechatCreate?.out_trade_no === attemptA.attemptId &&
-      lastWechatCreate?.amount?.total === 200 &&
+      lastWechatCreate?.amount?.total === A.amountCents &&
       lastWechatCreate?.notify_url === `${NOTIFY_BASE}${WX_CALLBACK_PATH}` &&
       isWechatNativeExpiry(lastWechatCreate?.time_expire, attemptA.expiresAt) &&
       JSON.parse(lastWechatCreate?.attach ?? '{}')?.orderId === A.orderId &&
@@ -590,7 +595,7 @@ async function main(): Promise<void> {
       codeSuccessState.paymentSource === 'alipay' &&
       lastAlipayCodePayBiz?.['scene'] === 'bar_code' &&
       lastAlipayCodePayBiz?.['auth_code'] === alipayAuthCode &&
-      lastAlipayCodePayBiz?.['total_amount'] === '2.00' &&
+      lastAlipayCodePayBiz?.['total_amount'] === centsToYuan(codeSuccess.amountCents) &&
       lastAlipayCodePayBiz?.['timeout_express'] === '5m'
     ) {
       pass('alipay 付款码同步成功：bar_code + 18 位付款码 + 金额校验后入账')
@@ -687,7 +692,7 @@ async function main(): Promise<void> {
       wechatTxn({
         out_trade_no: attemptA.attemptId,
         attach: JSON.stringify({ orderId: A.orderId }),
-        amount: { total: 200, currency: 'CNY' },
+        amount: { total: A.amountCents, currency: 'CNY' },
         ...over,
       })
 
@@ -803,7 +808,7 @@ async function main(): Promise<void> {
       out_trade_no: attemptB.attemptId,
       trade_no: `alitxn_${randomBytes(8).toString('hex')}`,
       trade_status: 'TRADE_SUCCESS',
-      total_amount: '2.00',
+      total_amount: centsToYuan(B.amountCents),
       passback_params: encodeURIComponent(JSON.stringify({ orderId: B.orderId })),
       ...over,
     })
@@ -873,7 +878,7 @@ async function main(): Promise<void> {
         out_trade_no: attemptC.attemptId,
         trade_no: `alitxn_closed_${randomBytes(6).toString('hex')}`,
         trade_status: 'TRADE_CLOSED',
-        total_amount: '2.00',
+        total_amount: centsToYuan(C.amountCents),
         passback_params: encodeURIComponent(JSON.stringify({ orderId: C.orderId })),
       },
     })
@@ -925,7 +930,7 @@ async function main(): Promise<void> {
           out_trade_no: attemptIA.attemptId,
           trade_no: `alitxn_http_${randomBytes(6).toString('hex')}`,
           trade_status: 'TRADE_SUCCESS',
-          total_amount: '2.00',
+          total_amount: centsToYuan(IA.amountCents),
           passback_params: encodeURIComponent(JSON.stringify({ orderId: IA.orderId })),
         },
       })
@@ -948,7 +953,7 @@ async function main(): Promise<void> {
         txn: wechatTxn({
           out_trade_no: attemptIW.attemptId,
           attach: JSON.stringify({ orderId: IW.orderId }),
-          amount: { total: 200, currency: 'CNY' },
+          amount: { total: IW.amountCents, currency: 'CNY' },
           transaction_id: `wxtxn_http_${randomBytes(6).toString('hex')}`,
         }),
       })
@@ -987,7 +992,7 @@ async function main(): Promise<void> {
       out_trade_no: attemptD.attemptId,
       transaction_id: wxQueryTxn,
       trade_state: 'SUCCESS',
-      amount: { total: 200, currency: 'CNY' },
+      amount: { total: D.amountCents, currency: 'CNY' },
     }
     const reconciled = await payment.reconcilePayment(D.orderId, D.token)
     const paidD = await orderState(D.orderId)
@@ -1054,7 +1059,7 @@ async function main(): Promise<void> {
       out_trade_no: attemptG.attemptId,
       trade_no: `alitxn_query_${randomBytes(6).toString('hex')}`,
       trade_status: 'TRADE_SUCCESS',
-      total_amount: '2.00',
+      total_amount: centsToYuan(G.amountCents),
     }
     const reconG = await payment.reconcilePayment(G.orderId, G.token)
     if (reconG.payStatus === 'paid' && (await orderState(G.orderId)).paymentSource === 'alipay') {
