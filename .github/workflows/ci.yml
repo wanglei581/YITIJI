@@ -109,6 +109,12 @@ jobs:
         working-directory: services/api
         run: pnpm db:pg:sync:check
 
+      - name: Recruitment P1 schema + SQLite fresh/upgrade gates
+        # Applies the full migration history and an old-schema fixture in isolated temp DBs.
+        # It must not replace the shared db-push baseline used by the verify suites below.
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-schema
+
       - name: Lint
         run: |
           pnpm --filter @ai-job-print/api lint
@@ -196,6 +202,10 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Recruitment P1 read-only preflight contract
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-preflight
 
       - name: Backend P0 real HTTP contracts
         working-directory: services/api
@@ -457,6 +467,14 @@ jobs:
       - name: PG schema drift check
         working-directory: services/api
         run: pnpm db:pg:sync:check
+      - name: Recruitment P1 isolated PostgreSQL upgrade gate
+        working-directory: services/api
+        env:
+          PGPASSWORD: ci
+          POSTGRES_UPGRADE_URL: postgresql://ci:ci@localhost:5432/ai_job_print_upgrade_ci
+        run: |
+          createdb -h localhost -U ci ai_job_print_upgrade_ci
+          pnpm verify:recruitment-p1-schema:postgres-upgrade
       - name: Generate clients (SQLite types + PG runtime)
         working-directory: services/api
         # create-client.ts 静态 import SQLite client(类型统一);两套产物都需生成
@@ -466,6 +484,14 @@ jobs:
       - name: Migrate deploy on fresh PG
         working-directory: services/api
         run: pnpm db:pg:deploy
+      - name: Recruitment P1 fresh PostgreSQL drift gate
+        working-directory: services/api
+        run: >-
+          npx prisma migrate diff --config prisma.postgres.config.ts
+          --from-config-datasource --to-schema prisma/postgres/schema.prisma --exit-code
+      - name: Recruitment P1 read-only preflight on fresh PG
+        working-directory: services/api
+        run: pnpm verify:recruitment-p1-preflight
       - name: Verify first admin bootstrap concurrency on isolated PG
         working-directory: services/api
         env:
