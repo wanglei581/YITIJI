@@ -26,6 +26,7 @@ export type PiiRedactionClaim =
   | 'redacted_unverified'
   | 'partial'
   | 'not_supported'
+  | 'nothing_to_redact'
 
 export type PiiRedactionApplied = 'redacted' | 'kept' | 'failed_no_position'
 export type PiiRedactionRequested = 'redact' | 'keep'
@@ -66,7 +67,13 @@ export interface PiiRedactionResult {
   notSupportedReason: PiiRedactionNotSupportedReason | null
 }
 
-const CLAIMS: readonly string[] = ['redacted_verified', 'redacted_unverified', 'partial', 'not_supported']
+const CLAIMS: readonly string[] = [
+  'redacted_verified',
+  'redacted_unverified',
+  'partial',
+  'not_supported',
+  'nothing_to_redact',
+]
 const APPLIED: readonly string[] = ['redacted', 'kept', 'failed_no_position']
 const NOT_SUPPORTED_REASONS: readonly string[] = ['scanned_no_position', 'encrypted', 'too_many_pages']
 const REVERIFY_METHODS: readonly string[] = ['text_layer', 'ocr', 'skipped']
@@ -202,6 +209,33 @@ export function piiRedactionCopy(result: PiiRedactionResult | null): PiiRedactio
   }
   if (!result || !result.claim) return unknown
 
+  // nothing_to_redact 分两种子情况，语义完全不同，不能合并成一句：
+  //   · 一处都没检出   → 本机不能因此声称文件干净（决策文档 §3.3：检出为 0 常常是漏检的表现）
+  //   · 用户全部保留   → 是本人的决定，纸上会有完整信息，要说重
+  if (result.claim === 'nothing_to_redact') {
+    const keptAll = result.items.length > 0
+    return keptAll
+      ? {
+          tone: 'danger',
+          title: '你选择了全部保留',
+          detail: '本机没有生成新文件，打印的是原件 —— 纸上会有完整信息。',
+          requiresPreviewConfirm: false,
+          confirmLabel: null,
+          continueLabel: '返回重新选择',
+          showFallbackOptions: false,
+        }
+      : {
+          tone: 'warning',
+          title: '本机没有检出需要遮挡的信息',
+          detail:
+            '没检出不等于没有 —— 本机的检出能力有限，扫描件、特殊排版都可能漏掉。打印前请自己核对纸面。',
+          requiresPreviewConfirm: false,
+          confirmLabel: null,
+          continueLabel: '继续',
+          showFallbackOptions: false,
+        }
+  }
+
   if (result.claim === 'not_supported') {
     return {
       tone: 'warning',
@@ -303,6 +337,9 @@ export function materialRedactionBadge(
   }
   if (summary.claim === 'not_supported') {
     return { text: '本机未能在这份文件上定位遮挡 · 打印使用原件', tone: 'warning' }
+  }
+  if (summary.claim === 'nothing_to_redact') {
+    return { text: '未做遮挡 · 打印使用原件，请自己核对纸面', tone: 'warning' }
   }
   if (!summary.claim || !summary.redactedFileId) {
     return { text: '本机未确认遮挡结果 · 打印使用原件', tone: 'danger' }

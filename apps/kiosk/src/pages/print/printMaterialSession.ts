@@ -40,7 +40,7 @@ export interface StoredMaterialTask {
  */
 export interface MaterialRedactionSummary {
   /** 来自后端 claim；null = 未知 / 未产出结论（fail-closed）。 */
-  claim: 'redacted_verified' | 'redacted_unverified' | 'partial' | 'not_supported' | null
+  claim: 'redacted_verified' | 'redacted_unverified' | 'partial' | 'not_supported' | 'nothing_to_redact' | null
   redactedFileId: string | null
   /** 逐项真实结果计数，不是笼统成功。 */
   appliedRedactedCount: number
