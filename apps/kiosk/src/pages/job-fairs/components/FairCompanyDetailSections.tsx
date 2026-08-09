@@ -32,12 +32,6 @@ export interface Filters {
   positionType: string
 }
 
-export interface PrintFile {
-  name:  string
-  size:  string
-  pages: number
-}
-
 // ─── Position type constants ──────────────────────────────────────────────────
 
 const POSITION_TYPE_LABELS: Record<string, string> = {
@@ -205,9 +199,25 @@ interface ActionBarProps {
   onOpenSource:     () => void
   onPrintProfile:   () => void
   onPrintPositions: () => void
+  /** 打印文件由后端实时渲染；准备中禁用两个打印入口，避免重复下发任务 */
+  printing?:        'profile' | 'positions' | null
+  /** 后端未接入(演示模式)或企业无岗位时，如实置灰而不是点了没反应 */
+  canPrintProfile?:   boolean
+  canPrintPositions?: boolean
+  printDisabledHint?: string
 }
 
-export function ActionBar({ sourceCanApply, onScanQr, onOpenSource, onPrintProfile, onPrintPositions }: ActionBarProps) {
+export function ActionBar({
+  sourceCanApply,
+  onScanQr,
+  onOpenSource,
+  onPrintProfile,
+  onPrintPositions,
+  printing = null,
+  canPrintProfile = true,
+  canPrintPositions = true,
+  printDisabledHint,
+}: ActionBarProps) {
   return (
     <section className="jf-action-zone company">
       <div className="jf-qr-panel">
@@ -224,13 +234,31 @@ export function ActionBar({ sourceCanApply, onScanQr, onOpenSource, onPrintProfi
           <span className="jf-tile-icon"><ExternalLinkIcon aria-hidden="true" /></span>
           <span><b>去来源平台投递</b><span>系统不接收简历</span></span>
         </button>
-        <button type="button" className="jf-tile" onClick={onPrintProfile}>
+        <button
+          type="button"
+          className="jf-tile"
+          onClick={onPrintProfile}
+          disabled={!canPrintProfile || printing !== null}
+          title={!canPrintProfile ? printDisabledHint : undefined}
+        >
           <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
-          <span><b>打印企业资料</b><span>用于现场咨询准备</span></span>
+          <span>
+            <b>打印企业资料</b>
+            <span>{printing === 'profile' ? '正在准备打印文件…' : '用于现场咨询准备'}</span>
+          </span>
         </button>
-        <button type="button" className="jf-tile" onClick={onPrintPositions}>
+        <button
+          type="button"
+          className="jf-tile"
+          onClick={onPrintPositions}
+          disabled={!canPrintPositions || printing !== null}
+          title={!canPrintPositions ? printDisabledHint : undefined}
+        >
           <span className="jf-tile-icon"><PrinterIcon aria-hidden="true" /></span>
-          <span><b>打印岗位清单</b><span>按需打印本企业岗位</span></span>
+          <span>
+            <b>打印岗位清单</b>
+            <span>{printing === 'positions' ? '正在准备打印文件…' : '按需打印本企业岗位'}</span>
+          </span>
         </button>
       </div>
     </section>
