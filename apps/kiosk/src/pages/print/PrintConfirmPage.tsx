@@ -26,6 +26,7 @@ import {
   type PrintMaterialSource,
   type PrintFileState,
 } from './printMaterialSession'
+import { materialRedactionBadge } from './piiRedaction'
 import { PrintPageFrame, PrintPrototypeHeader } from './PrintPrototypeLayout'
 
 type PrintFile = PrintFileState
@@ -286,8 +287,9 @@ export function PrintConfirmPage() {
             ? quote.reason
             : '页数待服务端确认，以最终计费为准'
 
-  const privWarnState = materialCheck?.redaction?.resultFileCreated === false
-    && (materialCheck?.redactedCount ?? 0) > 0
+  // 遮挡结论只从后端 claim 派生（piiRedaction.materialRedactionBadge），本页不自行拼装。
+  const redactionBadge = materialRedactionBadge(materialCheck?.redaction)
+  const privWarnState = redactionBadge !== null && redactionBadge.tone !== 'success'
 
   return (
     <PrintPageFrame>
@@ -350,10 +352,8 @@ export function PrintConfirmPage() {
               </div>
               <p className="print-priv-body">
                 {materialCheck.mode === 'demo' ? '已完成打印前材料检查流程演示' : '已完成打印前材料检查'}；
-                遮挡 {materialCheck.redactedCount} 项，保留 {materialCheck.keptCount} 项。
-                {privWarnState
-                  ? '当前版本尚未生成遮挡后文件，打印仍使用原文件；请确认是否继续。'
-                  : '本次打印前选择已记录，仅用于本次确认。'}
+                你选择遮挡 {materialCheck.redactedCount} 处、保留 {materialCheck.keptCount} 处。
+                {redactionBadge ? `${redactionBadge.text}。` : '本次没有需要遮挡的内容。'}
               </p>
             </div>
           )}

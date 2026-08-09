@@ -183,20 +183,20 @@ function createMockTaskResult(kind: MaterialTaskKind): Record<string, unknown> {
     }
   }
   if (kind === 'pii_redact') {
+    // mock 模式没有后端,不可能产出遮挡后文件 —— 因此如实返回 not_supported。
+    // 绝不返回正向 claim:那会让演示环境显示出一个本机并不具备的能力。
     return {
       mode: 'mock',
       note: '流程演示，未连接后端材料检查服务',
       checks: {
-        canRedact: true,
+        ok: false,
+        claim: 'not_supported',
+        notSupportedReason: 'scanned_no_position',
         redactedFileId: null,
-        resultFileCreated: false,
-        decisionTaskId: null,
-        findingCount: 0,
-        redactedCount: 0,
-        keptCount: 0,
-        pendingCount: 0,
-        warnings: [],
-        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，当前版本不生成遮挡后文件，打印仍使用原文件' }],
+        redactedFileUrl: null,
+        items: [],
+        reverify: { ran: false, remainingCount: 0, method: 'skipped' },
+        messages: [{ code: 'MOCK_PII_REDACT', severity: 'info', text: '流程演示模式，未连接后端，不产出遮挡后文件' }],
       },
     }
   }
@@ -254,6 +254,31 @@ export async function getMaterialTask(
     { method: 'GET' },
     access,
   )
+}
+
+/**
+ * 取某个文件的短期内嵌预览地址(`GET /files/:id/preview-url`)。
+ *
+ * 用途:pii_redact 派生件的强制预览。**只是兜底** —— 该端点要求登录,
+ * 一体机匿名用户会 401,所以派生件 URL 首选由 pii_redact 任务结果的
+ * `checks.redactedFileUrl` 直接带出。两处都拿不到时返回 null,
+ * 调用方必须 fail-closed:看不到就不允许确认,更不允许声称遮挡。
+ */
+export async function getFilePreviewUrl(
+  fileId: string,
+  access?: MaterialTaskAccess,
+): Promise<string | null> {
+  if (API_MODE !== 'http') return null
+  try {
+    const data = await request<{ url?: string; signedUrl?: string }>(
+      `/files/${encodeURIComponent(fileId)}/preview-url`,
+      { method: 'GET' },
+      access,
+    )
+    return data.url ?? data.signedUrl ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function decidePiiFindings(

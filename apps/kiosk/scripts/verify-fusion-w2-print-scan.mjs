@@ -46,8 +46,11 @@ const frozenHashes = new Map([
     '24523dad9d5641105e21c5d4d9bd2b12b6eea9cd6ad5ef831dcc514d74a5fd40',
   ],
   [
+    // 2026-08-09 重新冻结:MaterialCheckSummary.redaction 换成 claim 契约摘要
+    // (docs/product/pii-redaction-decision-2026-08.md §3.4)。原快照
+    // c222592c… 对应旧的 resultFileCreated 形状,已随该缺陷一并作废。
     'src/pages/print/printMaterialSession.ts',
-    'c222592ca559b5edb8f45e5f29b294ad01e264f6903e2436100d36a8e04a3c78',
+    '2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39',
   ],
 ])
 
@@ -161,7 +164,10 @@ for (const css of [
     new RegExp(`@import ["']\\./styles/${css}["']`)
   )
 
-const presentationFiles = ['src/pages/print/components/MaterialCheckPresentation.tsx']
+const presentationFiles = [
+  'src/pages/print/components/MaterialCheckPresentation.tsx',
+  'src/pages/print/components/RedactionReviewPresentation.tsx',
+]
 const forbiddenPresentationMarkers = [
   '../../services',
   'useAuth',

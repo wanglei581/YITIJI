@@ -205,6 +205,16 @@ const probe = [
   // 禁用声明:连续列举多个禁词,最后一个已超出回看窗口,靠整行标记豁免
   { text: '素材文案禁止出现「一键投递 / 立即投递 / 平台投递」等违规用语。', shouldPass: true },
   { text: '文案不得出现一键报名', shouldPass: true },
+  // 隐私遮挡文案天花板(docs/product/pii-redaction-decision-2026-08.md §3.3)。
+  // 唯一允许的正向说法带「你确认的 N 处」限定(靠否定前瞻放行);裸承诺一律违规。
+  { text: '已遮挡你确认的 3 处 · 请核对预览', shouldPass: true },
+  { text: '已遮挡你确认的 3 处 · 另有 1 处没能定位', shouldPass: true },
+  { text: '已遮挡,可以放心打印', shouldPass: false },
+  { text: '处理完成,已遮挡', shouldPass: false },
+  { text: '这份文件已无隐私信息', shouldPass: false },
+  { text: '打印件无隐私内容', shouldPass: false },
+  { text: '隐私已保护', shouldPass: false },
+  { text: '你的隐私已清除', shouldPass: false },
 ]
 
 let probeFailures = 0

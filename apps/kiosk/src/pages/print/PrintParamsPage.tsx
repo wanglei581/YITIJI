@@ -438,7 +438,7 @@ export function PrintParamsPage() {
               <ol className="space-y-3 text-sm text-neutral-600">
                 {[
                   '上传文件需清晰完整，当前支持 PDF、JPG、PNG；Word 页内预览和转换能力后续接入。',
-                  '隐私检查只用于本次打印前确认；当前遮挡产物未生成时会明确提示仍使用原文件。',
+                  '隐私检查只用于本次打印前确认；本机只能盖住它检出来的位置，最终以你核对过的预览为准。',
                   '打印完成后请从出纸口取件，如有质量问题请联系现场工作人员。',
                 ].map((item, index) => (
                   <li key={item} className="flex gap-3">

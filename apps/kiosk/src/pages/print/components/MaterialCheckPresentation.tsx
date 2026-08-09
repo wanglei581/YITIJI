@@ -10,11 +10,14 @@ import {
 
 export type MaterialCheckStage =
   | 'idle' | 'inspection' | 'normalize_a4' | 'pii_scan'
-  | 'review' | 'submitting' | 'done' | 'error'
+  | 'review' | 'submitting' | 'redaction_review' | 'done' | 'error'
 
 export interface MaterialFindingPresentation {
   id: string
   label: string
+  /** 第几页 —— 逐项裁决必须让用户知道位置（§四 第 1 步）。 */
+  pageLabel: string
+  /** 已掩码的片段。一体机在公共场所，屏幕上不重现完整证件号。 */
   maskedSnippet: string
   suggestion: string
   risk: 'high' | 'medium' | 'low'
@@ -36,8 +39,6 @@ export interface MaterialCheckPresentationProps {
   redactedCount: number
   onRetry: () => void
   onBack: () => void
-  onApplySuggested: () => void
-  onKeepAll: () => void
   onDecision: (findingId: string, action: 'keep' | 'redact') => void
   onContinue: () => void
 }
@@ -85,13 +86,12 @@ function SummaryCard({
 }
 
 export function MaterialCheckPresentation(props: MaterialCheckPresentationProps) {
-  const allDecided = props.findings.every((finding) => finding.selected !== 'pending')
   const workingTitle = props.stage === 'inspection'
     ? '正在检查文件格式'
     : props.stage === 'normalize_a4'
       ? '正在评估 A4 规范化'
       : props.stage === 'submitting'
-        ? '正在保存隐私选择'
+        ? '正在按你的选择处理文件'
         : '正在检查隐私片段'
 
   return (
@@ -107,9 +107,13 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
           </Card>
           <CheckStep label="文件体检" active={props.stage === 'inspection'} done={Boolean(props.inspection)} />
           <CheckStep label="A4 规范化评估" active={props.stage === 'normalize_a4'} done={Boolean(props.normalization)} />
-          <CheckStep label="隐私片段检查" active={props.stage === 'pii_scan'} done={props.stage === 'review' || props.stage === 'submitting' || props.stage === 'done'} />
+          <CheckStep
+            label="隐私片段检查"
+            active={props.stage === 'pii_scan'}
+            done={props.stage === 'review' || props.stage === 'submitting' || props.stage === 'redaction_review' || props.stage === 'done'}
+          />
           <p className="w2-material-privacy-note">
-            文档文字层可本地读取；扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示隐私片段，不展示完整原文。
+            文档文字层可本地读取；扫描件 / 图片可能通过第三方 OCR 服务识别文字后立即丢弃原文。页面只展示掩码后的片段，不展示完整原文。
           </p>
         </aside>
 
@@ -135,7 +139,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                     {props.privacyModeWarning
                       ? '如文件包含隐私信息，请打印前自行确认'
                       : props.findings.length > 0
-                        ? `发现 ${props.findings.length} 个需确认片段，请逐项选择保留或遮挡`
+                        ? `发现 ${props.findings.length} 处需确认的信息，默认全部遮挡；要保留哪一处，请单独点它的「保留」`
                         : '未发现需要确认的隐私片段'}
                   </p>
                 </div>
@@ -163,7 +167,7 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
 
               {props.findings.length > 0 && (
                 <p className="w2-material-redaction-note">
-                  当前版本会记录你的保留/遮挡选择并完成遮挡评估，但尚不生成遮挡后文件；进入确认页前会再次提示，打印仍使用原文件。
+                  下一步会按你的选择处理文件，并要求你看过原尺寸预览、亲自确认之后才能打印。本机只能盖住它检出来的位置，检不出来的它也盖不住 —— 所以预览这一步不能省。
                 </p>
               )}
 
@@ -177,18 +181,15 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
                 />
               ) : (
                 <div className="w2-material-findings">
-                  <Card className="w2-material-batch">
-                    <div><strong>批量处理</strong><span>可先按建议处理，再逐项微调</span></div>
-                    <div>
-                      <Button variant="secondary" onClick={props.onApplySuggested}>按建议处理</Button>
-                      <Button variant="secondary" onClick={props.onKeepAll}>全部保留</Button>
-                    </div>
-                  </Card>
                   {props.findings.map((finding) => (
                     <Card className="w2-material-finding" key={finding.id}>
                       <EyeOffIcon aria-hidden="true" />
                       <div>
-                        <header><strong>{finding.label}</strong><span data-risk={finding.risk}>{RISK_LABEL[finding.risk]}</span></header>
+                        <header>
+                          <strong>{finding.label}</strong>
+                          <span data-page="true">{finding.pageLabel}</span>
+                          <span data-risk={finding.risk}>{RISK_LABEL[finding.risk]}</span>
+                        </header>
                         <dl>
                           <dt>片段</dt><dd>{finding.maskedSnippet}</dd>
                           <dt>建议</dt><dd>{finding.suggestion}</dd>
@@ -222,12 +223,14 @@ export function MaterialCheckPresentation(props: MaterialCheckPresentationProps)
         <Button variant="secondary" disabled={props.isWorking} onClick={props.onBack}>返回上传</Button>
         <Button disabled={!props.canContinue} onClick={props.onContinue}>
           {props.stage === 'submitting'
-            ? '保存选择中…'
+            ? '正在处理…'
             : props.requiresFormatReview
               ? '请重新上传文件'
-              : props.findings.length > 0 && !allDecided
-                ? '请先完成全部选择'
-                : `继续打印设置${props.findings.length > 0 ? ` · 遮挡 ${props.redactedCount} 项` : ''}`}
+              : props.findings.length === 0
+                ? '继续打印设置'
+                : props.redactedCount > 0
+                  ? '下一步 · 处理并预览'
+                  : '下一步 · 不做遮挡，打印原件'}
         </Button>
       </KioskActionBar>
     </div>
