@@ -24,13 +24,13 @@
 
 ## 二、核心数据模型
 
-统一标准模型，所有数据源接入后适配到：
+统一标准模型，所有数据源接入后适配到实际 canonical 内容表：
 
 ```
-ExternalJob / ExternalJobFair
+Job / JobFair
 ```
 
-两个模型均继承 `ExternalJobSource`，强制包含来源溯源字段：
+两个模型均遵循 `ExternalJobSource` 契约，强制包含来源溯源字段。招聘内容域的主体、接入通道、线上平台目录、线下机构与岗位迁移关系，以 [招聘信息内容域统一模型与迁移方案](./recruitment-content-domain-model-2026-08.md) 为准。
 
 ```typescript
 interface ExternalJobSource {
@@ -170,6 +170,14 @@ interface DataSourceAccess {
 - `enabled=false` 只停止新同步，不改变已导入内容的审核/发布状态。批量下架是独立动作，必须先展示岗位/招聘会影响数量、二次确认并写审计。
 - `sourceKind` 与 `accessMode` 受 `Organization.type` 服务端 allowlist 约束，不能由前端自由声明。
 
+### 公开目录不等于数据接入源
+
+- `Organization` 是法律、合同、账号与内容责任主体。
+- `JobSource` 是 API / Webhook / Excel / manual 技术接入通道。
+- `OnlinePlatformDirectory` 是 Admin 审核发布的 Kiosk 官方平台导航目录。
+- 三者可以关联，但审批、启停、发布与归档状态互不继承；目录发布不自动授予数据接入权，数据源启用也不自动生成公开目录卡。
+- `OfflineJob` 不再扩展；所有新岗位最终统一写入 `Job`，迁移期只保留 legacy 兼容。
+
 ---
 
 ## 六、字段映射
@@ -192,7 +200,7 @@ interface MappingValidationError {
 }
 ```
 
-### ExternalJob 标准字段
+### Job 标准字段
 
 | 标准字段 | 说明 | 来源 |
 |---------|------|------|
@@ -211,7 +219,7 @@ interface MappingValidationError {
 | `reviewStatus` | 审核状态 | 系统默认 `pending` |
 | `publishStatus` | 发布状态 | 系统默认 `draft` |
 
-### ExternalJobFair 标准字段
+### JobFair 标准字段
 
 | 标准字段 | 说明 | 来源 |
 |---------|------|------|
@@ -250,7 +258,7 @@ interface ImportRecord {
   batchId: string
   rowIndex: number
   rawData: Record<string, string>
-  mappedData: Partial<ExternalJob | ExternalJobFair>
+  mappedData: Partial<Job | JobFair>
   status: 'ok' | 'invalid' | 'dup'
   errors: MappingValidationError[]
 }

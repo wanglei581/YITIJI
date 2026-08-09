@@ -14,14 +14,15 @@
 - [~] **Security diff 封板**：52/52 changed files 已逐文件 discovery，6 个候选中唯一 reportable Low（Router history 残留 payment token）已修并有 RED→GREEN；外置封存器因 `target.snapshotDigest` 缺失拒绝完成，不能声称已有 sealed final report。后续如需要正式封存，须补齐 immutable target digest 后重新生成，不重复冒充代码复核。
 - [ ] **商用外部门禁**：Node 22 CI、PostgreSQL 生产实例、真实内容来源、支付商户配置、密钥轮换、法务文本、两台 Windows 主机及打印/扫描/TRTC 现场验收全部完成前，发布判定保持 NO-GO。
 
-> 最后更新：2026-08-09
-> 最后更新：2026-08-09
+> 最后更新：2026-08-10
 
 ## 当前执行：后台招聘数据 P0/P1 收口
 
-- [x] **P0 第一波后端升级候选**：已在独立 worktree 对齐 Admin 线下机构 HTTP/DTO/分页契约，补机构编辑与线下岗位变更回待审、停用机构阻断岗位深链、驳回理由必填；同步仅在公开内容变化时回 `pending + draft`，未变化只刷新时间；Webhook 补成功/失败 SyncLog 与真实新增/更新计数；Excel 重复项和 Kiosk 机构审核文案已诚实化。专项静态/SQLite 服务契约、四端 typecheck/lint/build 已通过；未部署。
-- [~] **P0 第二波权限与运行时验收**：服务端 `Organization.type` capability allowlist、API/Webhook Admin 启用门禁、停源不级联、影响预览、独立批量下架和审计均已完成；Node 22 下 5 类机构 SQLite 契约、Admin/Partner 真实 Nest HTTP、跨机构 404、响应包络、动态 API sync changed/unchanged 及四端 typecheck/lint/build 已通过。本机 PGlite 只证明 50 条 PG migration 可完整应用，并发驱动会断连，不作为真实 PG 证据。剩余：先人工合并最新 `origin/main` 的进度文档，再由 PR `postgres:16` CI 跑新增 HTTP/sync 门禁，并复核既有 Excel/Webhook 导入套件全绿；通过前不得发布本候选。
-- [ ] **P1 模型收敛与新页面后台**：停止扩展第二套 `OfflineJob`，迁入统一 `Job` 审核/发布/来源链；`OfflineAgency` 关联 `Organization + Branch + QualificationRecord`，资质有效才允许发布；“线上招聘平台”新建独立 `OnlinePlatformDirectory` 供 Admin 管官方导航卡、域名、排序、上下架与链接巡检，可选关联 Organization/JobSource，但不得把导航目录与技术数据源混成同一对象。所有删除改为 archive/tombstone，发布/下架/凭证轮换补统一审计。
+- [x] **P0 后台招聘数据两波升级与生产发布**：Admin 线下机构真实 HTTP 契约、内容变更回待审、父机构深链门禁、Webhook/Excel 计数与审核、5 类 Organization capability、API/Webhook Admin 启用、停源不级联、影响预览、批量下架及审计已由 PR #572–#574 收口，并以 `37025dc9` 完成生产发布；SQLite/PG/浏览器 CI 与公网 health、三端 bundle、公开空态均已复验。部署授权已恢复为 `false`。
+- [x] **P1 Wave 0 统一模型与迁移方案冻结**：完成当前模型/双库/公开生产状态只读盘点，冻结 Organization、JobSource、OnlinePlatformDirectory、OfflineAgencyProfile/Branch、QualificationRecord 与 canonical Job 的职责、有效可见性、存量 blocker、生产只读盘点、expand/backfill/switch/contract 和回滚门禁；本波不改 schema、不写生产、不新增页面、不部署。正式方案见 `docs/product/recruitment-content-domain-model-2026-08.md`。
+- [ ] **P1 Wave 1A 迁移安全与 additive expand**：先修复或退役只覆盖 37 个模型、无法发现漏表的旧 SQLite→PG 搬数脚本；再以 SQLite schema 为 SSOT 增加 nullable/additive 模型与字段、双 migration、preflight/schema verifier 和 CI。必须覆盖 fresh/upgrade SQLite、fresh PG，以及“经授权的完整加密生产备份在同等级隔离 PostgreSQL 恢复并销毁”或“批准的招聘内容域脱敏 fixture”二选一 upgrade 演练；不改页面、不切读写、不部署。
+- [ ] **P1 Wave 1B 共享契约与只读 API 骨架**：建立平台目录、机构资料/门店/资质的共享类型与 Admin-only API，岗位仍不切换；真实 HTTP + Prisma 覆盖 RBAC、跨机构 404、审核发布、链接域名和证照访问审计。
+- [ ] **P1 Wave 2–5 数据迁移与切换**：具名授权后先在备份恢复库 dry-run/backfill；缺 employer、city、sourceUrl 或主体映射的 OfflineJob 进入 blocker，成功项也一律 `pending + draft`。随后分批完成 canonical Job 写切换、读切换、至少两个发布周期 legacy 零读写观察和独立 contract；禁止同批 drop OfflineJob 或把生产回退 SQLite。
 
 ## 当前执行：文件流程候选冻结前外部门禁
 
@@ -61,7 +62,7 @@
 
 - [x] **共享视觉基线与关键服务页**：共享壳/首页恢复 7 月原型色彩、字体、导航和纸感；`/print-scan` 与简历、岗位、招聘会、面试、政策五个一级服务中心已完成层级收口，路由回顶已修复。Kiosk typecheck/lint/build、专项静态守卫、`git diff --check` 和 1080x1920 首页/打印扫描/服务中心浏览器抽检通过；本地候选未部署。
 - [x] **入口真实性与不可用门禁**：首页打印/扫描/双面静态就绪声明已移除；打印扫描以本机 capability 成功响应为放行条件；五个一级服务中心以 `/health` 做入口级 fail-closed，只有线上招聘平台二维码、面试技巧、社保指南、档案/登记保留离线阅读。新增真实性静态守卫，受控失败/重试恢复浏览器验证及 W6 `104/104` 通过；只证明入口行为与失败状态，不证明具体 AI 模型、业务数据、支付或硬件可用。
-- [ ] **生产内容数据运营收口（进行中，真实来源待接入）**：2026-08-07 已完成第一步（数据负责人确认后、先备份再执行，未删除数据）：215 条预生产/演示岗位全部下架、3 场已结束招聘会下架、演示机构/演示岗位下架、2 个预生产/样例数据源停用，公网 jobs/fairs 已为空态（`total=0`），审计行与备份锚点 `pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…`）已记录。替换清单与执行流程见 `docs/operations/production-content-data-replacement-list-2026-08.md`（数据负责人决策项、四类数据判定/导入路径/验证门禁、禁止项）。剩余：数据负责人提供有授权的真实岗位来源（含 API/Excel 授权与有效期）、真实政策正文，按 Admin/Partner 既有导入审核链路接入并发布；市人才网 API 与高校就业信息 Excel 两个数据源保持启用但当前无已发布岗位。未授权前不得继续删改生产数据库，也不得用 seed 或假数据填满页面。
+- [ ] **生产内容数据运营收口（进行中，真实来源待接入）**：2026-08-07 已完成第一步（数据负责人确认后、先备份再执行，未删除数据）：215 条预生产/演示岗位全部下架、3 场已结束招聘会下架、演示机构/演示岗位下架、2 个预生产/样例数据源停用，公网 jobs/fairs 已为空态（`total=0`），审计行与备份锚点 `pre-content-cleanup-20260807T081738Z.dump`（SHA-256 `34f6304e…`）已记录。替换清单与执行流程见 `docs/operations/production-content-data-replacement-list-2026-08.md`（数据负责人决策项、岗位/招聘会/政策/线下机构/线上平台目录的判定、导入路径、验证门禁与禁止项）。剩余：数据负责人提供有授权的真实岗位来源（含 API/Excel 授权与有效期）、真实政策正文、线下机构资质/门店证据与官方平台目录核验依据，按冻结方案分波接入并发布；市人才网 API 与高校就业信息 Excel 两个数据源保持启用但当前无已发布岗位。未授权前不得继续删改生产数据库，也不得用 seed 或假数据填满页面。
 - [~] **75 屏逐屏差异清单与证据**：03/05/06 双栏差异已按 2026-08-07 当前 `main@f4981ce0` 源码与 `verify-fusion-w3.mjs` 契约复核为已落地（见 matrix 6.3：打印参数 `pp-split` 双栏、简历来源 `resume-source-split` 440px 方向栏、诊断报告分数/雷达行 + 两组 `lg` 双栏 grid），已从 `VISUAL_DIFF` 移除。剩余仍须为 21/23/26 决策型差异与 40 屏 `VISUAL_UNVERIFIED` 建立“原型编号 → 生产路由 → 真实状态 → 修改文件 → 验证证据”清单；不得把当前复核写成 75 页全部像素封板。
 - [ ] **Windows 真机验收**：Node 22 本地根级 typecheck/lint/build、W2-W6 和 warning 已通过；仍须在真实 Windows 1080x1920 触控一体机验证字体、缩放、触控目标、滚动、软键盘、支付、打印、扫描、异常恢复和隐私清场。打印机只能读取 `printerName` 配置，未知彩色 mode 不得硬编码。
 - [x] **本机打印即时唤醒代码候选**：不新增页面/按钮，Kiosk 真实 `/print/progress` 仅发送一次无 body/query 的 loopback wake；Agent 仍通过同一云端 claim 领取，并以 full-lifecycle single-flight 串行 interval/wake。Origin、bridge token、无 body/query、立即 `202`、不可用 `503`、并发合并、401 latch、付款配置与 Kiosk 静默回落专项门禁已通过；未部署。
