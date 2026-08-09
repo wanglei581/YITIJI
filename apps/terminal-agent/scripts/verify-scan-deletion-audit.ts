@@ -6,10 +6,24 @@ import { join, resolve } from 'node:path'
 import Database from 'better-sqlite3'
 import { sweepUnclaimedDir, UNCLAIMED_MAX_AGE_MS } from '../src/agent/scan-watcher'
 import {
+  beginScanDeletionAudit,
+  finishScanDeletionAudit,
+  getScanDeletionAuditReportDeadLetterCount,
   getScanDeletionAudits,
+  getPendingScanDeletionAuditReports,
   openDatabase,
   type AgentDatabase,
 } from '../src/agent/db'
+import {
+  processScanDeletionAuditReport,
+  runScanDeletionAuditReportLoop,
+} from '../src/agent/scan-deletion-audit-reporter'
+import {
+  __resetUnauthorizedForTests,
+  __setUnauthorizedMarkerPathForTests,
+  isUnauthorized,
+} from '../src/agent/auth-state'
+import type { AgentConfig } from '../src/agent/types'
 
 function backdate(filePath: string): void {
   const stale = new Date(Date.now() - UNCLAIMED_MAX_AGE_MS - 60_000)
@@ -38,9 +52,41 @@ function openLegacyDatabase(programData: string): AgentDatabase {
       errorCode TEXT, errorMessage TEXT, attempts INTEGER NOT NULL DEFAULT 0,
       nextRetryAt TEXT NOT NULL, createdAt TEXT NOT NULL
     );
+    CREATE TABLE scan_deletion_audit (
+      eventId TEXT PRIMARY KEY, reasonCode TEXT NOT NULL, identifierHash TEXT NOT NULL,
+      createdAt TEXT NOT NULL, deletedAt TEXT, result TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0, lastAttemptAt TEXT NOT NULL,
+      lastErrorCode TEXT, pendingReport INTEGER NOT NULL DEFAULT 1
+    );
   `)
   legacy.close()
   return openDatabase()
+}
+
+function reporterConfig(): AgentConfig {
+  return {
+    apiBaseUrl: 'http://127.0.0.1:1/api/v1',
+    terminalCode: 'SCAN-AUDIT-VERIFY',
+    terminalId: 'terminal-scan-audit-verify',
+    agentToken: 'scan-audit-agent-token',
+    printerName: 'unused',
+    agentVersion: 'verify',
+  }
+}
+
+function seedReportEvent(db: AgentDatabase, marker: string): void {
+  const eventId = marker.repeat(64)
+  const now = new Date().toISOString()
+  beginScanDeletionAudit(
+    db,
+    {
+      eventId,
+      reasonCode: 'UNCLAIMED_TTL_EXPIRED',
+      identifierHash: marker.toUpperCase().repeat(64).toLowerCase(),
+    },
+    now,
+  )
+  finishScanDeletionAudit(db, eventId, { result: 'deleted', deletedAt: now })
 }
 
 async function main(): Promise<void> {
@@ -64,6 +110,11 @@ async function main(): Promise<void> {
       'lastAttemptAt',
       'lastErrorCode',
       'pendingReport',
+      'reportAttempts',
+      'nextReportAt',
+      'reportedAt',
+      'reportDeadLetterAt',
+      'reportErrorCode',
     ]) {
       assert.ok(columns.includes(column), `legacy DB upgrade must add ${column}`)
     }
@@ -125,6 +176,93 @@ async function main(): Promise<void> {
     assert.equal(retried?.result, 'deleted')
     assert.equal(retried?.attempts, 2)
     assert.ok(retried?.deletedAt)
+
+    seedReportEvent(db, 'c')
+    seedReportEvent(db, 'd')
+    const reportRows = getPendingScanDeletionAuditReports(db)
+    const networkEvent = reportRows.find((row) => row.eventId === 'c'.repeat(64))
+    const serverEvent = reportRows.find((row) => row.eventId === 'd'.repeat(64))
+    assert.ok(networkEvent && serverEvent)
+
+    await processScanDeletionAuditReport(networkEvent, reporterConfig(), db, async () => {
+      throw new Error('network error containing C:\\Scans\\\u5f20\u4e09.pdf')
+    })
+    const networkAfter = getScanDeletionAudits(db).find((row) => row.eventId === networkEvent.eventId)
+    assert.equal(networkAfter?.pendingReport, true, 'network failure must retain the pending event')
+    assert.equal(networkAfter?.reportAttempts, 1)
+    assert.equal(networkAfter?.reportErrorCode, 'NETWORK_ERROR')
+    assert.doesNotMatch(JSON.stringify(networkAfter), /\u5f20\u4e09|Scans/)
+
+    await processScanDeletionAuditReport(serverEvent, reporterConfig(), db, async () => {
+      throw { isAxiosError: true, response: { status: 503 } }
+    })
+    const serverAfter = getScanDeletionAudits(db).find((row) => row.eventId === serverEvent.eventId)
+    assert.equal(serverAfter?.pendingReport, true, '5xx must retain the pending event')
+    assert.equal(serverAfter?.reportErrorCode, 'HTTP_503')
+    assert.ok(serverAfter?.nextReportAt, '5xx must schedule durable retry')
+
+    seedReportEvent(db, 'e')
+    seedReportEvent(db, 'f')
+    const sentPayloads: Array<Record<string, unknown>> = []
+    await runScanDeletionAuditReportLoop(reporterConfig(), db, async (payload) => {
+      sentPayloads.push(payload as unknown as Record<string, unknown>)
+      if (payload.eventId === 'e'.repeat(64)) {
+        throw { isAxiosError: true, response: { status: 422 } }
+      }
+      return { acknowledged: true, eventId: payload.eventId }
+    })
+    const deadLetter = getScanDeletionAudits(db).find((row) => row.eventId === 'e'.repeat(64))
+    const acknowledged = getScanDeletionAudits(db).find((row) => row.eventId === 'f'.repeat(64))
+    assert.equal(deadLetter?.pendingReport, true, 'permanent 4xx must never masquerade as acknowledged')
+    assert.ok(deadLetter?.reportDeadLetterAt, 'permanent 4xx must retain durable dead-letter evidence')
+    assert.equal(deadLetter?.reportErrorCode, 'HTTP_422')
+    assert.equal(getScanDeletionAuditReportDeadLetterCount(db), 1)
+    assert.equal(acknowledged?.pendingReport, false, 'a later valid event must not be starved by a bad event')
+    assert.ok(acknowledged?.reportedAt)
+    assert.deepEqual(
+      Object.keys(sentPayloads[0] ?? {}).sort(),
+      [
+        'createdAt',
+        'deleteAttempts',
+        'deletedAt',
+        'eventId',
+        'identifierHash',
+        'lastDeleteAttemptAt',
+        'lastErrorCode',
+        'reasonCode',
+        'result',
+      ],
+      'wire payload must contain only the PII-safe contract fields',
+    )
+
+    seedReportEvent(db, '1')
+    const invalidAckEvent = getPendingScanDeletionAuditReports(db)
+      .find((row) => row.eventId === '1'.repeat(64))
+    assert.ok(invalidAckEvent)
+    await processScanDeletionAuditReport(invalidAckEvent, reporterConfig(), db, async () => ({
+      acknowledged: false,
+      eventId: invalidAckEvent.eventId,
+    }))
+    const invalidAckAfter = getScanDeletionAudits(db)
+      .find((row) => row.eventId === invalidAckEvent.eventId)
+    assert.equal(invalidAckAfter?.pendingReport, true, 'invalid 2xx ack must retain the event')
+    assert.equal(invalidAckAfter?.reportErrorCode, 'INVALID_ACK')
+
+    seedReportEvent(db, '2')
+    const unauthorizedEvent = getPendingScanDeletionAuditReports(db)
+      .find((row) => row.eventId === '2'.repeat(64))
+    assert.ok(unauthorizedEvent)
+    __setUnauthorizedMarkerPathForTests(join(root, 'agent.unauthorized'))
+    await processScanDeletionAuditReport(unauthorizedEvent, reporterConfig(), db, async () => {
+      throw { isAxiosError: true, response: { status: 401 } }
+    })
+    assert.equal(isUnauthorized(), true, '401 must enter the existing unauthorized/re-bind latch')
+    const unauthorizedAfter = getScanDeletionAudits(db)
+      .find((row) => row.eventId === unauthorizedEvent.eventId)
+    assert.equal(unauthorizedAfter?.pendingReport, true)
+    assert.equal(unauthorizedAfter?.reportDeadLetterAt, null)
+    __resetUnauthorizedForTests(true)
+    __setUnauthorizedMarkerPathForTests(undefined)
 
     const crossInstallRoot = join(root, 'cross-install-scan-folder')
     const crossInstallPath = createStaleScan(

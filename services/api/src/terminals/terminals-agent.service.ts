@@ -24,6 +24,7 @@ import type { HeartbeatDto } from './dto/heartbeat.dto'
 import type { ClaimTasksDto } from './dto/claim-tasks.dto'
 import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
+import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 import {
   cleanNullable,
   normalizeMacAddress,
@@ -47,6 +48,7 @@ import {
   type TerminalBindCodeAuditContext,
   type EmergencyCredentialRevokeResult,
 } from './terminal-credential-security.service'
+import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit.service'
 
 // ── Task status type ───────────────────────────────────────────────────────────
 
@@ -176,14 +178,17 @@ function createActionToken(taskId: string, terminalId: string, expiresAt: Date):
 export class TerminalAgentService implements OnModuleInit {
   private readonly logger = new Logger(TerminalAgentService.name)
   private readonly credentialSecurity: TerminalCredentialSecurityService
+  private readonly scanDeletionAudit: TerminalScanDeletionAuditService
 
   constructor(
     private readonly prisma: PrismaService,
     audit: AuditService,
     @Optional() credentialSecurity?: TerminalCredentialSecurityService,
+    @Optional() scanDeletionAudit?: TerminalScanDeletionAuditService,
   ) {
     // Nest 运行时使用独立 provider；脚本 fixture 保留两参构造兼容。
     this.credentialSecurity = credentialSecurity ?? new TerminalCredentialSecurityService(prisma, audit)
+    this.scanDeletionAudit = scanDeletionAudit ?? new TerminalScanDeletionAuditService(prisma)
   }
 
   async onModuleInit(): Promise<void> {
@@ -540,6 +545,15 @@ export class TerminalAgentService implements OnModuleInit {
 
   async validateTerminalToken(terminalId: string, authHeader: string | undefined): Promise<void> {
     await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
+  }
+
+  async reportScanDeletionAudit(
+    terminalId: string,
+    dto: ReportScanDeletionAuditDto,
+    authHeader: string | undefined,
+  ): Promise<{ acknowledged: true; eventId: string }> {
+    await this.credentialSecurity.validateTerminalToken(terminalId, authHeader)
+    return this.scanDeletionAudit.persist(terminalId, dto)
   }
 
   /**

@@ -18,6 +18,7 @@ import type { PatchTaskStatusDto } from './dto/patch-task-status.dto'
 import type { ExchangeTerminalBindCodeDto } from './dto/exchange-terminal-bind-code.dto'
 import type { UpdateTerminalProfileDto } from './dto/update-terminal-profile.dto'
 import type { CreatePlannedTerminalDto } from './dto/create-planned-terminal.dto'
+import type { ReportScanDeletionAuditDto } from './dto/report-scan-deletion-audit.dto'
 
 // Re-export all types so existing import paths remain valid
 export type {
@@ -85,6 +86,14 @@ export class TerminalsService {
 
   claimTasks(terminalId: string, dto: ClaimTasksDto, authHeader: string | undefined) {
     return this.agent.claimTasks(terminalId, dto, authHeader)
+  }
+
+  reportScanDeletionAudit(
+    terminalId: string,
+    dto: ReportScanDeletionAuditDto,
+    authHeader: string | undefined,
+  ) {
+    return this.agent.reportScanDeletionAudit(terminalId, dto, authHeader)
   }
 
   patchTaskStatus(

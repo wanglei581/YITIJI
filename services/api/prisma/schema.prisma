@@ -42,6 +42,7 @@ model Terminal {
   bindCodes    TerminalBindCode[]
   credentials  TerminalCredential[]
   scanTasks    ScanTask[]
+  scanDeletionAudits TerminalScanDeletionAudit[]
   capabilities TerminalCapability[]
 
   @@index([orgId])
@@ -186,6 +187,28 @@ model ScanTask {
 }
 
 // ── TerminalHeartbeat ─────────────────────────────────────────────────────────
+
+// PII-safe cloud receipt of Terminal Agent `_unclaimed` TTL deletion evidence.
+// Paths, filenames, content, exception text, and the local HMAC key are absent.
+model TerminalScanDeletionAudit {
+  terminalId          String
+  terminal            Terminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  eventId             String
+  reasonCode          String
+  identifierHash      String
+  eventCreatedAt      DateTime
+  deletedAt           DateTime?
+  result              String
+  deleteAttempts      Int
+  lastDeleteAttemptAt DateTime
+  lastErrorCode       String?
+  receivedAt          DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@id([terminalId, eventId])
+  @@index([eventCreatedAt])
+  @@index([result, updatedAt])
+}
 
 model TerminalHeartbeat {
   id                         String   @id @default(cuid())

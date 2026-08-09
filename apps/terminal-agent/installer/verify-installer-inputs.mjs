@@ -18,6 +18,7 @@ const workflow = fs.readFileSync(
   path.join(root, '../../../.github/workflows/windows-agent-installer.yml'),
   'utf8',
 )
+const secureScanReaderVerify = read('verify-secure-scan-reader.ps1')
 
 console.log('\n=== verify Windows Agent installer inputs ===')
 
@@ -90,6 +91,11 @@ assert.match(
 )
 assert.match(staging, /node-windows must not be present in the MSI runtime/)
 assert.match(staging, /Unexpected executable in staging/)
+assert.match(staging, /Microsoft\.VisualStudio\.Component\.VC\.Tools\.x86\.x64/)
+assert.match(staging, /secure-scan-reader\.c/)
+assert.match(staging, /\/guard:cf/)
+assert.match(staging, /\/Brepro/)
+assert.match(staging, /\$nativeExecutable,/)
 assert.match(staging, /better-sqlite3/)
 assert.match(staging, /manifest\.json/)
 
@@ -114,6 +120,7 @@ assert.match(lifecycle, /bootstrap\\aijobprintagent\.exe/)
 assert.match(lifecycle, /bootstrap\\aijobprintagent\.xml/)
 assert.match(lifecycle, /node\\node\.exe/)
 assert.match(lifecycle, /app\\dist\\index\.js/)
+assert.match(lifecycle, /app\\native\\secure-scan-reader\.exe/)
 assert.match(lifecycle, /Get-FileHash -LiteralPath \$fullPath -Algorithm SHA256/)
 assert.match(lifecycle, /VersionInfo\.FileVersion/)
 assert.match(lifecycle, /& \$nodePath --version/)
@@ -130,6 +137,13 @@ assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
+assert.match(workflow, /Verify staged secure scan reader boundary/)
+assert.match(workflow, /verify-secure-scan-reader\.ps1 -InstallRoot apps\/terminal-agent\/installer\/artifacts\/staging/)
+assert.match(secureScanReaderVerify, /SECURE_SCAN_READER_PASS/)
+assert.match(secureScanReaderVerify, /New-Junction/)
+assert.match(secureScanReaderVerify, /SymbolicLink/)
+assert.match(secureScanReaderVerify, /HardLink/)
+assert.match(lifecycle, /Installed secure scan reader boundary verification failed/)
 assert.match(workflow, /unsigned-msi-candidate:/, 'keep the existing required Windows job identity stable')
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.ok(

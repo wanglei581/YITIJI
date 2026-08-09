@@ -71,6 +71,11 @@ export interface ScanDeletionAudit {
   lastAttemptAt: string
   lastErrorCode: string | null
   pendingReport: boolean
+  reportAttempts: number
+  nextReportAt: string | null
+  reportedAt: string | null
+  reportDeadLetterAt: string | null
+  reportErrorCode: string | null
 }
 
 // ── DB path ───────────────────────────────────────────────────────────────────
@@ -115,7 +120,12 @@ CREATE TABLE IF NOT EXISTS scan_deletion_audit (
   attempts       INTEGER NOT NULL DEFAULT 0,
   lastAttemptAt  TEXT NOT NULL,
   lastErrorCode  TEXT,
-  pendingReport  INTEGER NOT NULL DEFAULT 1
+  pendingReport  INTEGER NOT NULL DEFAULT 1,
+  reportAttempts INTEGER NOT NULL DEFAULT 0,
+  nextReportAt   TEXT,
+  reportedAt     TEXT,
+  reportDeadLetterAt TEXT,
+  reportErrorCode TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_scan_deletion_audit_pending
@@ -156,6 +166,11 @@ export function openDatabase(): AgentDatabase {
     db.exec(SCHEMA_SQL)
     ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
     ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportAttempts', 'INTEGER NOT NULL DEFAULT 0')
+    ensureColumn(db, 'scan_deletion_audit', 'nextReportAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportedAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportDeadLetterAt', 'TEXT')
+    ensureColumn(db, 'scan_deletion_audit', 'reportErrorCode', 'TEXT')
     activeDatabase = db
     log(`db: opened ${dbPath}`)
     return db
@@ -260,19 +275,26 @@ export function beginScanDeletionAudit(
   db.prepare(
     `INSERT INTO scan_deletion_audit
        (eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
-        attempts, lastAttemptAt, lastErrorCode, pendingReport)
-     VALUES (?, ?, ?, ?, NULL, 'pending_delete', 1, ?, NULL, 1)
+        attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+        nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode)
+     VALUES (?, ?, ?, ?, NULL, 'pending_delete', 1, ?, NULL, 1, 0, ?, NULL, NULL, NULL)
      ON CONFLICT(eventId) DO UPDATE SET
        result = 'pending_delete',
        deletedAt = NULL,
        attempts = scan_deletion_audit.attempts + 1,
        lastAttemptAt = excluded.lastAttemptAt,
        lastErrorCode = NULL,
-       pendingReport = 1`,
+       pendingReport = 1,
+       reportAttempts = 0,
+       nextReportAt = excluded.nextReportAt,
+       reportedAt = NULL,
+       reportDeadLetterAt = NULL,
+       reportErrorCode = NULL`,
   ).run(
     event.eventId,
     event.reasonCode,
     event.identifierHash,
+    attemptedAt,
     attemptedAt,
     attemptedAt,
   )
@@ -287,24 +309,29 @@ export function finishScanDeletionAudit(
   if (outcome.result === 'deleted') {
     db.prepare(
       `UPDATE scan_deletion_audit
-       SET result = 'deleted', deletedAt = ?, lastErrorCode = NULL, pendingReport = 1
+       SET result = 'deleted', deletedAt = ?, lastErrorCode = NULL, pendingReport = 1,
+           reportAttempts = 0, nextReportAt = ?, reportedAt = NULL,
+           reportDeadLetterAt = NULL, reportErrorCode = NULL
        WHERE eventId = ?`,
-    ).run(outcome.deletedAt, eventId)
+    ).run(outcome.deletedAt, outcome.deletedAt, eventId)
     return
   }
   db.prepare(
     `UPDATE scan_deletion_audit
-     SET result = 'delete_failed', deletedAt = NULL, lastErrorCode = ?, pendingReport = 1
+     SET result = 'delete_failed', deletedAt = NULL, lastErrorCode = ?, pendingReport = 1,
+         reportAttempts = 0, nextReportAt = ?, reportedAt = NULL,
+         reportDeadLetterAt = NULL, reportErrorCode = NULL
      WHERE eventId = ?`,
-  ).run(outcome.errorCode, eventId)
+  ).run(outcome.errorCode, new Date().toISOString(), eventId)
 }
 
-/** Local operator/diagnostic read model. No external reporting contract exists yet. */
+/** Local operator/diagnostic read model. */
 export function getScanDeletionAudits(db: AgentDatabase): ScanDeletionAudit[] {
   if (!db) return []
   const rows = db.prepare(
     `SELECT eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
-            attempts, lastAttemptAt, lastErrorCode, pendingReport
+            attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+            nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode
      FROM scan_deletion_audit ORDER BY createdAt ASC`,
   ).all()
   return rows.map((row) => ({
@@ -318,7 +345,100 @@ export function getScanDeletionAudits(db: AgentDatabase): ScanDeletionAudit[] {
     lastAttemptAt: String(row['lastAttemptAt']),
     lastErrorCode: row['lastErrorCode'] === null ? null : String(row['lastErrorCode']),
     pendingReport: Number(row['pendingReport']) === 1,
+    reportAttempts: Number(row['reportAttempts']),
+    nextReportAt: row['nextReportAt'] === null ? null : String(row['nextReportAt']),
+    reportedAt: row['reportedAt'] === null ? null : String(row['reportedAt']),
+    reportDeadLetterAt:
+      row['reportDeadLetterAt'] === null ? null : String(row['reportDeadLetterAt']),
+    reportErrorCode: row['reportErrorCode'] === null ? null : String(row['reportErrorCode']),
   }))
+}
+
+export function getPendingScanDeletionAuditReports(
+  db: AgentDatabase,
+  limit = 50,
+): ScanDeletionAudit[] {
+  if (!db) return []
+  const now = new Date().toISOString()
+  const rows = db.prepare(
+    `SELECT eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+            attempts, lastAttemptAt, lastErrorCode, pendingReport, reportAttempts,
+            nextReportAt, reportedAt, reportDeadLetterAt, reportErrorCode
+     FROM scan_deletion_audit
+     WHERE pendingReport = 1 AND reportDeadLetterAt IS NULL
+       AND COALESCE(nextReportAt, createdAt) <= ?
+     ORDER BY createdAt ASC
+     LIMIT ?`,
+  ).all(now, limit)
+  return rows.map((row) => ({
+    eventId: String(row['eventId']),
+    reasonCode: String(row['reasonCode']),
+    identifierHash: String(row['identifierHash']),
+    createdAt: String(row['createdAt']),
+    deletedAt: row['deletedAt'] === null ? null : String(row['deletedAt']),
+    result: row['result'] as ScanDeletionResult,
+    attempts: Number(row['attempts']),
+    lastAttemptAt: String(row['lastAttemptAt']),
+    lastErrorCode: row['lastErrorCode'] === null ? null : String(row['lastErrorCode']),
+    pendingReport: Number(row['pendingReport']) === 1,
+    reportAttempts: Number(row['reportAttempts']),
+    nextReportAt: row['nextReportAt'] === null ? null : String(row['nextReportAt']),
+    reportedAt: row['reportedAt'] === null ? null : String(row['reportedAt']),
+    reportDeadLetterAt:
+      row['reportDeadLetterAt'] === null ? null : String(row['reportDeadLetterAt']),
+    reportErrorCode: row['reportErrorCode'] === null ? null : String(row['reportErrorCode']),
+  }))
+}
+
+export function acknowledgeScanDeletionAuditReport(
+  db: AgentDatabase,
+  eventId: string,
+  reportedAt = new Date().toISOString(),
+): void {
+  if (!db) return
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET pendingReport = 0, reportedAt = ?, nextReportAt = NULL,
+         reportDeadLetterAt = NULL, reportErrorCode = NULL
+     WHERE eventId = ? AND pendingReport = 1`,
+  ).run(reportedAt, eventId)
+}
+
+export function markScanDeletionAuditReportRetry(
+  db: AgentDatabase,
+  eventId: string,
+  errorCode: string,
+  nextReportAt: string,
+): void {
+  if (!db) return
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET reportAttempts = reportAttempts + 1, nextReportAt = ?, reportErrorCode = ?
+     WHERE eventId = ? AND pendingReport = 1 AND reportDeadLetterAt IS NULL`,
+  ).run(nextReportAt, errorCode, eventId)
+}
+
+export function deadLetterScanDeletionAuditReport(
+  db: AgentDatabase,
+  eventId: string,
+  errorCode: string,
+): void {
+  if (!db) return
+  const now = new Date().toISOString()
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET reportAttempts = reportAttempts + 1, nextReportAt = NULL,
+         reportDeadLetterAt = ?, reportErrorCode = ?
+     WHERE eventId = ? AND pendingReport = 1 AND reportDeadLetterAt IS NULL`,
+  ).run(now, errorCode, eventId)
+}
+
+export function getScanDeletionAuditReportDeadLetterCount(db: AgentDatabase): number {
+  if (!db) return 0
+  const row = db.prepare(
+    'SELECT COUNT(*) AS count FROM scan_deletion_audit WHERE reportDeadLetterAt IS NOT NULL',
+  ).get()
+  return Number(row?.['count'] ?? 0)
 }
 
 // ── Offline PATCH queue ───────────────────────────────────────────────────────

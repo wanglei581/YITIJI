@@ -44,6 +44,11 @@ function verifySourceStructure(): void {
   assert.match(source, /if \(name === UNCLAIMED_DIRNAME\) continue/, 'sweepFolder must skip the _unclaimed quarantine directory itself in its main-file loop')
   assert.match(source, /const inFlightPaths\s*=\s*new Set<string>\(\)/, 'must have an in-flight path tracking Set to prevent concurrent double-processing of the same file')
   assert.match(source, /\}\s*finally\s*\{\s*inFlightPaths\.delete\(filePath\)/, 'the in-flight marker must be released in a finally block so it is cleared even when processing throws')
+  assert.match(
+    source,
+    /return readTrustedWindowsCandidate\(scanWatchFolder, filename, stableSnapshot\)/,
+    'Windows candidate reads must cross the packaged same-handle trusted-reader boundary',
+  )
 
   // 以下三条是 Critical code-review 之后新增的并发安全加固，但在本脚本里没有实际
   // 可行的方式做成真实动态用例（原因分别标注在各行），因此保留成本低的静态正则

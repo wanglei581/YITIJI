@@ -4,6 +4,7 @@ import type {
   ScanInputCandidateSnapshot,
   ScanInputHealth,
 } from '../types'
+import { inspectTrustedWindowsScanInputFolder } from './windows-secure-reader'
 
 function health(
   status: ScanInputHealth['status'],
@@ -23,7 +24,7 @@ export function inspectScanInputFolder(
   if (!folder) return health('unconfigured', 'not_configured')
 
   if (process.platform === 'win32') {
-    return health('degraded', 'reparse_point_unverifiable')
+    return inspectTrustedWindowsScanInputFolder(folder)
   }
 
   try {

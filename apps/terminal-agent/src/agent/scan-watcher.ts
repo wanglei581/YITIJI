@@ -45,6 +45,7 @@ import {
   inspectScanInputFolder,
   isStableScanInputCandidate,
 } from './scan-input/verified-folder'
+import { readTrustedWindowsCandidate } from './scan-input/windows-secure-reader'
 import { log, warn, err } from '../logger'
 import type { ScanInputCandidateSnapshot } from './types'
 import {
@@ -154,8 +155,13 @@ async function waitForStableFile(
 
 function readVerifiedCandidate(
   filePath: string,
+  scanWatchFolder: string,
+  filename: string,
   stableSnapshot: ReturnType<typeof snapshotCandidate>,
 ): Buffer {
+  if (process.platform === 'win32') {
+    return readTrustedWindowsCandidate(scanWatchFolder, filename, stableSnapshot)
+  }
   if (fsConstants.O_NOFOLLOW === undefined) {
     throw new Error('SCAN_INPUT_NOFOLLOW_UNAVAILABLE')
   }
@@ -256,7 +262,7 @@ export async function processCandidate(
       return
     }
 
-    const buffer = readVerifiedCandidate(filePath, finalSnapshot)
+    const buffer = readVerifiedCandidate(filePath, scanWatchFolder, filename, finalSnapshot)
     const form = new FormData()
     form.append('file', buffer, { filename, contentType: guessMimeType(filename) })
 

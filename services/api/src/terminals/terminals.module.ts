@@ -11,6 +11,7 @@ import { TerminalToolboxService } from './terminal-toolbox.service'
 import { ToolboxGovernanceService } from './toolbox-governance.service'
 import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 import { TerminalCredentialSecurityService } from './terminal-credential-security.service'
+import { TerminalScanDeletionAuditService } from './terminal-scan-deletion-audit.service'
 
 @Module({
   imports: [JwtVerifierModule],
@@ -18,6 +19,7 @@ import { TerminalCredentialSecurityService } from './terminal-credential-securit
   providers: [
     TerminalAgentService,
     TerminalCredentialSecurityService,
+    TerminalScanDeletionAuditService,
     TerminalAdminService,
     TerminalsService,
     TerminalToolboxService,

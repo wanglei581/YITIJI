@@ -41,6 +41,10 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-staging.ps1
 
+      - name: Verify staged secure scan reader boundary
+        shell: powershell
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/verify-secure-scan-reader.ps1 -InstallRoot apps/terminal-agent/installer/artifacts/staging
+
       - name: Build unsigned WiX MSI
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1

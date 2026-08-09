@@ -79,6 +79,7 @@
     "verify:terminal-credentials": "node -r @swc-node/register scripts/verify-terminal-credentials.ts",
     "verify:terminal-provisioning": "node -r @swc-node/register scripts/verify-terminal-provisioning.ts",
     "verify:terminal-network-diagnostics": "node -r @swc-node/register scripts/verify-terminal-network-diagnostics.ts",
+    "verify:scan-deletion-audit-reporting": "node -r @swc-node/register scripts/verify-scan-deletion-audit-reporting.ts",
     "maintenance:backfill-terminal-credentials": "node -r @swc-node/register scripts/backfill-terminal-credentials.ts",
     "verify:terminal-test-print-seed-guard": "node -r @swc-node/register scripts/verify-terminal-test-print-seed-guard.ts",
     "verify:demo-seed-guard": "node -r @swc-node/register scripts/verify-demo-seed-guard.ts",

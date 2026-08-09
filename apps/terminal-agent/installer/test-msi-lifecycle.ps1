@@ -80,6 +80,7 @@ function Export-LifecycleEvidence([string]$Phase) {
       Get-PayloadEvidence -Name "serviceXml" -RelativePath "bootstrap\aijobprintagent.xml"
       Get-PayloadEvidence -Name "nodeRuntime" -RelativePath "node\node.exe"
       Get-PayloadEvidence -Name "agentEntrypoint" -RelativePath "app\dist\index.js"
+      Get-PayloadEvidence -Name "secureScanReader" -RelativePath "app\native\secure-scan-reader.exe"
     )
     $nodeVersion = $null
     $nodePath = Join-Path $installRoot "node\node.exe"
@@ -199,8 +200,15 @@ if ($null -eq $service -or $service.State -ne "Stopped" -or $service.StartMode -
 if (-not (Test-Path -LiteralPath (Join-Path $installRoot "node\node.exe"))) {
   throw "Bundled Node runtime is missing after install"
 }
+if (-not (Test-Path -LiteralPath (Join-Path $installRoot "app\native\secure-scan-reader.exe"))) {
+  throw "Secure scan reader is missing after install"
+}
 if (-not (Test-Path -LiteralPath $stateRoot -PathType Container)) {
   throw "ProgramData state directory is missing after install"
+}
+powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot "verify-secure-scan-reader.ps1") -InstallRoot $installRoot
+if ($LASTEXITCODE -ne 0) {
+  throw "Installed secure scan reader boundary verification failed"
 }
 Export-LifecycleEvidence -Phase "post-install"
 

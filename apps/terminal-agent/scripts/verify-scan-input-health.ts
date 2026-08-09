@@ -10,6 +10,7 @@ import fs, {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ScanInputHealth } from '../src/agent/types'
+import { isAcceptedTrustedHelperResult } from '../src/agent/scan-input/windows-secure-reader'
 
 type CandidateNodeKind = 'file' | 'directory' | 'symbolic_link' | 'other'
 
@@ -88,6 +89,8 @@ function candidate(
 
 function verifySourceSafety(): void {
   const source = readFileSync(join(__dirname, '../src/agent/scan-input/verified-folder.ts'), 'utf8')
+  const adapter = readFileSync(join(__dirname, '../src/agent/scan-input/windows-secure-reader.ts'), 'utf8')
+  const native = readFileSync(join(__dirname, '../native/secure-scan-reader.c'), 'utf8')
 
   assert.match(source, /\blstatSync\s*\(/, 'health inspection must use lstatSync for the configured directory')
   assert.match(source, /\baccessSync\s*\(/, 'health inspection must use accessSync for directory readability')
@@ -98,6 +101,43 @@ function verifySourceSafety(): void {
   assert.doesNotMatch(source, /\brename(?:Sync)?\s*\(/, 'health inspection must not move files')
   assert.doesNotMatch(source, /\baxios\b/i, 'health inspection must not call axios')
   assert.doesNotMatch(source, /\bhttps?\b/i, 'health inspection must not make HTTP calls')
+  assert.match(
+    source,
+    /inspectTrustedWindowsScanInputFolder\(folder\)/,
+    'Windows health must use the packaged trusted helper instead of staying unconditionally degraded',
+  )
+  assert.match(adapter, /spawnSync\(packagedHelperPath\(\), \[\], \{/, 'helper paths and filenames must not enter argv')
+  assert.match(adapter, /input,/, 'helper requests must be framed over stdin')
+  assert.match(adapter, /timeout: HELPER_TIMEOUT_MS/, 'helper calls must have a bounded timeout')
+  assert.match(adapter, /maxBuffer:/, 'helper output must be bounded')
+  assert.match(native, /int wmain\(void\)/, 'native helper must not accept argv')
+  assert.match(native, /GetStdHandle\(STD_INPUT_HANDLE\)/, 'native helper must read the framed request from stdin')
+  assert.equal(
+    native.match(/FILE_FLAG_OPEN_REPARSE_POINT/g)?.length,
+    2,
+    'root and candidate opens must both use FILE_FLAG_OPEN_REPARSE_POINT',
+  )
+  assert.match(native, /FileAttributeTagInfo/, 'native helper must inspect generic reparse attributes, not only symlink tags')
+  assert.match(native, /FILE_ATTRIBUTE_REPARSE_POINT/, 'every reparse tag must be rejected')
+  assert.match(native, /GetFinalPathNameByHandleW/, 'native helper must compare handle-resolved root and candidate paths')
+  assert.match(native, /same_file_information\(&before, &after\)/, 'native helper must re-check the same handle after reading')
+}
+
+function verifyHelperResultGate(): void {
+  const accepted = {
+    pid: 1,
+    output: [null, Buffer.from('ok'), Buffer.alloc(0)],
+    stdout: Buffer.from('ok'),
+    stderr: Buffer.alloc(0),
+    status: 0,
+    signal: null,
+  } as Parameters<typeof isAcceptedTrustedHelperResult>[0]
+  assert.equal(isAcceptedTrustedHelperResult(accepted, 2), true, 'exact successful helper output must pass')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, status: 77 }, 2), false, 'unknown helper exit codes must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, signal: 'SIGTERM' as NodeJS.Signals }, 2), false, 'timed-out or signalled helpers must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, error: new Error('spawn failed') }, 2), false, 'missing helpers must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, stdout: Buffer.from('oversized') }, 2), false, 'oversized helper output must fail closed')
+  assert.equal(isAcceptedTrustedHelperResult({ ...accepted, stderr: Buffer.from('unexpected') }, 2), false, 'unexpected helper stderr must fail closed')
 }
 
 function verifyPureCandidateRules(): void {
@@ -313,6 +353,7 @@ function verifyHealthTypeIsReadonly(health: ScanInputHealth): void {
 }
 
 verifySourceSafety()
+verifyHelperResultGate()
 verifyPureCandidateRules()
 verifyReadAndTraversePermissions()
 verifyFolderHealth()
