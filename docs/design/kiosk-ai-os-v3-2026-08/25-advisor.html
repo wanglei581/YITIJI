@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -301,15 +301,15 @@
               <span class="cap-b"><span class="cap-t">看看我简历哪里不行</span>
                 <span class="cap-w">刚写完、或投了很久没回音的时候</span></span>
             </a>
-            <a class="cap" href="10-resume-interview.html">
+            <a class="cap" href="26-advisor-work.html?stage=sB">
               <svg class="ic"><use href="#i-pen"/></svg>
               <span class="cap-b"><span class="cap-t">我不会写，你问我我来答</span>
-                <span class="cap-w">对着空白页写不出来的时候</span></span>
+                <span class="cap-w">对着空白页写不出来的时候 · 她逐题问你，在作业面拼出来</span></span>
             </a>
-            <a class="cap" href="11-jobfit-compare.html">
+            <a class="cap" href="26-advisor-work.html?stage=sC">
               <svg class="ic"><use href="#i-target"/></svg>
               <span class="cap-b"><span class="cap-t">这个岗我够不够格</span>
-                <span class="cap-w">看到一条岗位拿不准要不要投的时候</span></span>
+                <span class="cap-w">看到一条岗位拿不准要不要投的时候 · 在作业面摆一起逐条比</span></span>
             </a>
             <a class="cap" href="20-interview-pod.html">
               <svg class="ic"><use href="#i-interview"/></svg>
@@ -336,10 +336,21 @@
               <span class="cap-b"><span class="cap-t">帮我把材料备齐</span>
                 <span class="cap-w">要交一堆证明、怕漏东西的时候</span></span>
             </a>
-            <a class="cap" href="06-print-workbench.html">
+            <a class="cap" href="26-advisor-work.html?stage=sA">
               <svg class="ic"><use href="#i-printer"/></svg>
               <span class="cap-b"><span class="cap-t">这台机器怎么用</span>
-                <span class="cap-w">不知道怎么打印、怎么扫描的时候</span></span>
+                <span class="cap-w">不知道怎么打印、怎么扫描的时候 · 她一步步答，答完带你去对应台面</span></span>
+            </a>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-orbit"/></svg><b>聊起来之后，活儿在作业面干</b>
+          </div>
+          <div class="caps">
+            <a class="cap" href="26-advisor-work.html">
+              <svg class="ic"><use href="#i-orbit"/></svg>
+              <span class="cap-b"><span class="cap-t">进入作业面</span>
+                <span class="cap-w">她问你答、摆一起比、钉住要点，都在同一个台面上 —— 按哪种方式干，由你的问题决定</span></span>
             </a>
           </div>
 
@@ -419,7 +430,7 @@
           <div class="kv">
             <div class="kv-row"><span class="k">内容</span><span class="v">钉住的 2 条 + 依据</span></div>
             <div class="kv-row"><span class="k">页数</span><span class="v">1 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v"><b>0.20</b> 元</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元 · 以打印工作台核价为准</span></div>
             <div class="kv-row"><span class="k">纸上含</span><span class="v v--fog">不含你的姓名与电话</span></div>
           </div>
 
@@ -594,12 +605,12 @@
     <span class="actionbar-hint" data-at="s1" data-when="default first device-off">对话不保存 · 有用的记得钉住</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 上面是不依赖 AI 的固定指引</span>
     <span class="actionbar-hint" data-at="s2">九件都能直接跟她说，不用先找入口</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 0.20 元 · 打完对话立即清空</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准 · 打完对话立即清空</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线 · 要点存不成纸</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s3">带走钉住的 2 条<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s1">去问她<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-when="default first ai-down">打印并清空对话<svg class="ic"><use href="#i-printer"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 

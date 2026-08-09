@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/listing.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -144,7 +144,7 @@
             <div class="kv-row"><span class="k">想暂缓</span><span class="v">先收藏或打印带走；岗位若被来源平台下架，本机会如实标注</span></div>
           </div>
           <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-            全程你的简历<b>不经过本机</b>。想带一份纸质版去面试，可以在本机打印——那是打印服务，不是投递。
+            投递这一步，本机<b>不上传、不转交你的简历</b>；匹配参考只在你本人的服务里处理，不给企业。想带一份纸质版去面试，可以在本机打印——那是打印服务，不是投递。
           </p>
         </div>
 
@@ -241,7 +241,7 @@
           </div>
           <span class="qr-cap">
             用手机扫这个码，会打开<b>来源平台的该岗位页面</b>，在手机上登录并投递。<br>
-            <span style="color:var(--fog-600)">码只在本次会话有效，离场即失效。本机不经手你的简历。</span>
+            <span style="color:var(--fog-600)">码只在本次会话有效，离场即失效。投递这一步，本机不上传、不转交你的简历。</span>
           </span>
         </div>
       </div>
@@ -252,7 +252,7 @@
         <div class="outs">
           <button class="out"><svg class="ic"><use href="#i-bookmark"/></svg>收藏这个岗位</button>
           <a class="out" href="15-companies.html"><svg class="ic"><use href="#i-company"/></svg>看这家企业</a>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印岗位信息</button>
+          <a class="out" href="06-print-workbench.html?stage=s3" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印岗位信息</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
           <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>按这岗位练面试</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练面试不可用</button>
@@ -260,7 +260,7 @@
         <div class="notice" style="margin-top:14px">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>本机<b>只记两件事</b>：你看过这个岗位、你打开过来源平台。
-            存进「我的 · 浏览与跳转记录」。<b>不记录你投没投、投没投成。</b></span>
+            登录后记录在岗位业务页的浏览记录里；未登录只留本次会话。<b>不记录你投没投、投没投成。</b></span>
         </div>
       </div>
 
@@ -271,7 +271,7 @@
         <div class="kv">
           <div class="kv-row"><span class="k">投递结果</span><span class="v">来源平台你自己的账号里</span></div>
           <div class="kv-row"><span class="k">面试邀约</span><span class="v">来源平台站内信，或企业直接联系你</span></div>
-          <div class="kv-row"><span class="k">本机能查的</span><span class="v">只有你的浏览与跳转记录 ·「我的」</span></div>
+          <div class="kv-row"><span class="k">本机能查的</span><span class="v">只有你的浏览与跳转记录 · 登录后在岗位页</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -301,7 +301,7 @@
       <div class="pane" data-at="expired">
         <div class="pane-hd"><span class="t">下架后，这条记录怎么处理</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">你的浏览记录</span><span class="v">保留 ·「我的 · 浏览与跳转记录」</span></div>
+          <div class="kv-row"><span class="k">你的浏览记录</span><span class="v">登录后保留在岗位页浏览记录；未登录只留本次会话</span></div>
           <div class="kv-row"><span class="k">你若收藏过</span><span class="v">收藏保留，并标注「已下架」</span></div>
           <div class="kv-row"><span class="k">这页快照</span><span class="v">本次会话结束即清，不再展示</span></div>
           <div class="kv-row"><span class="k">在招列表</span><span class="v">已把它移出，不再计入 128 条</span></div>
@@ -313,11 +313,11 @@
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>之后若有人以「用户运营专员 · 广州××科技」名义联系你，先在来源平台核对岗位是否真的在招。
-            <b>用已下架岗位的名义、又要你先交费或交证件的，直接拒绝并举报。</b></span>
+            <b>凡要你先交费或先交证件原件的，务必警惕；可向来源平台与人力资源社会保障部门核实、反映。</b></span>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>正规招聘不向求职者收费。这条口径在本机所有岗位页一致，与岗位是否下架无关。</span>
+          <span>本机不代收任何费用；招聘方是否收费、是否合规，以主管部门规定为准。这条口径在本机所有岗位页一致，与岗位是否下架无关。</span>
         </div>
       </div>
 
@@ -335,9 +335,9 @@
         <div class="pane-hd"><span class="t">这次故障影响什么</span><span class="s">边界说清楚</span></div>
         <div class="kv">
           <div class="kv-row"><span class="k">这条岗位详情</span><span class="v" style="color:var(--coral-400)">暂时取不到</span></div>
-          <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 在「我的」里</span></div>
+          <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在岗位页浏览记录里</span></div>
           <div class="kv-row"><span class="k">扫码投递</span><span class="v" style="color:var(--coral-400)">暂不可用 · 码要等详情恢复</span></div>
-          <div class="kv-row"><span class="k">来源平台本身</span><span class="v">不受影响 · 手机可直接访问</span></div>
+          <div class="kv-row"><span class="k">来源平台状态</span><span class="v">本机取不到数据，无法代为确认；可用手机直接访问来源平台确认</span></div>
           <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
         </div>
       </div>
@@ -345,11 +345,11 @@
       <div class="pane pane--fill pane--grow" data-at="error">
         <div class="pane-hd"><span class="t">刚才看过的，不用重新找</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-3);color:var(--fog-800);line-height:1.7">
-          这条岗位已在你的浏览记录里，含来源机构与外部 ID。详情恢复后，
-          从「我的 · 浏览与跳转记录」可以一步回到这页，不用回列表重新翻。
+          这条岗位已在你的浏览记录里，含来源机构与外部 ID——登录后记录在岗位业务页的浏览记录里，
+          未登录只留本次会话。详情恢复后，从岗位页的浏览记录可以一步回到这页，不用重新翻。
         </p>
         <div class="outs">
-          <a class="out" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>看我的浏览记录</a>
+          <a class="out" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>回岗位页找浏览记录</a>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -375,8 +375,8 @@
         https://（来源平台域名）/job/JX-88214
       </div>
       <p class="sheet-p" style="font-size:var(--fz-2);color:var(--fog-600)">
-        本机会记下「你在 10:38 打开了这个来源平台链接」，用于你在「我的」里回头查。
-        不会记录你在对方平台做了什么。<br>
+        本机会记下「你在 10:38 打开了这个来源平台链接」，登录后记录在岗位页的浏览记录里供你回头查；
+        未登录只留本次会话。不会记录你在对方平台做了什么。<br>
         公共终端提醒：在对方平台登录后，<b>离开前请退出账号</b>。本机会在你离场或超时时清空会话，但管不到对方网站。
       </p>
       <div class="sheet-acts">

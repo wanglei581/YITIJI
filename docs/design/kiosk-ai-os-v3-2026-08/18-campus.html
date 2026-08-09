@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/listing.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -587,7 +587,7 @@
 
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">合计</span><span class="v">7 页</span></div>
-            <div class="kv-row"><span class="k">费用</span><span class="v"><b>1.40</b> 元</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>1.40</b> 元</span></div>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
@@ -596,7 +596,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用以现场公示价为准。计划表同时存进「我的文档」。
+            费用为预估 · 以打印工作台核价为准。计划表同时存进「我的文档」。
           </div>
         </div>
       </div>
@@ -669,12 +669,12 @@
     <span class="actionbar-hint" data-at="s1" data-when="default first">按 2027 届算 · 现在是提前批和秋招网申</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 只显示公开校招日历</span>
     <span class="actionbar-hint" data-at="s2">已选 2 场 · 最近一个截止在 2 天后</span>
-    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 7 页 · 1.40 元</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 7 页 · 预估 1.40 元 · 以打印工作台核价为准</span>
     <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
 
     <button class="btn btn--primary" data-at="s1" data-go="s2">看这两周的活动<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-go="s3">生成计划表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s3" data-when="default first ai-down">开始打印<svg class="ic"><use href="#i-printer"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>
 

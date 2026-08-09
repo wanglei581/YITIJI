@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -357,7 +357,8 @@
         <div class="outs">
           <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>对着练一遍</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练习不可用</button>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片</button>
+          <a class="out" data-when="default" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
+          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-printer"/></svg>小卡片未生成</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
           <button class="out"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
           <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
@@ -434,7 +435,8 @@
         </div>
         <div class="outs" style="margin-top:14px">
           <a class="out" href="09-resume-workbench.html?stage=s5"><svg class="ic"><use href="#i-layers"/></svg>应用到我的简历</a>
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打样一份</button>
+          <a class="out" data-when="default ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打样一份 · 去核价</a>
+          <a class="out" data-when="first" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>先去做简历</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
         </div>
       </div>
@@ -467,7 +469,8 @@
     <button class="btn btn--lg btn--ghost" data-at="t3">加一样自定义</button>
     <button class="btn btn--lg btn--ghost" data-at="t4" data-go="t1">回求职信</button>
 
-    <a class="btn btn--primary" data-at="t1" data-when="default first" href="06-print-workbench.html">核对 3 处后打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="default" href="06-print-workbench.html?stage=s3">核对 3 处后去核价打印<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="t1" data-when="first" href="09-resume-workbench.html">先去做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="t1" data-when="ai-down" href="06-print-workbench.html">打印格式纸<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="t1" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="t2" data-when="default device-off" href="20-interview-pod.html">对着练一遍<svg class="ic"><use href="#i-arrowRight"/></svg></a>

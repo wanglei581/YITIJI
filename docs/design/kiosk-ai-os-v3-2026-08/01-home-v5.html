@@ -68,14 +68,15 @@
     <div class="vcommand">
       <svg class="ic" aria-hidden="true"><use href="#i-brain"/></svg>
       <input type="text" data-typewriter placeholder="例如：周五要去招聘会，简历还没改" aria-label="说一句你的处境">
-      <!-- 2026-08-09 愿景补齐：站立触控场景语音优先于打字；真实 App 首页本就有麦克风入口。
-           ai-down 态语音识别不可用，如实置灰。 -->
-      <button class="btn btn--lg btn--ghost" data-when="default first device-off"
-              aria-label="按住说话，语音说出你的处境" style="flex:0 0 auto;padding:0 18px">
+      <!-- 2026-08-09 愿景补齐 + Codex 整改：语音能力真实落点是 P25 顾问的语音咨询态
+           (本机没有独立语音下单能力,README §人机分工),麦克风=去找小青语音说。
+           ai-down 态语音不可用,如实置灰。 -->
+      <a class="btn btn--lg btn--ghost" data-when="default first device-off" href="25-advisor.html"
+         aria-label="语音找顾问小青,说出你的处境" style="flex:0 0 auto;padding:0 18px">
         <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
-      </button>
+      </a>
       <button class="btn btn--lg btn--ghost" data-when="ai-down" aria-disabled="true"
-              aria-label="语音输入暂不可用" style="flex:0 0 auto;padding:0 18px">
+              aria-label="语音顾问暂不可用" style="flex:0 0 auto;padding:0 18px">
         <svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg>
       </button>
       <button class="btn btn--lg btn--ghost" data-fx="submit" data-when="default first"

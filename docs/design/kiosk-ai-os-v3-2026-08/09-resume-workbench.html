@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=7">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/resume.css?v=9">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -88,10 +88,11 @@
         </a>
       </div>
 
-      <!-- S1 域内横向通道：简历材料域 = P09 + P10 + P11 + P12（closed-loop-map §二） -->
+      <!-- S1 域内横向通道：简历材料域 = P09 + P10 + P11 + P12 + P22（closed-loop-map §二；
+           2026-08-09 对照线上服务中心补齐职业规划入口——线上把它归在简历域） -->
       <div class="xlane" data-at="s1">
-        <span class="xlane-hd">简历已经是现成的？这两件事也在这个台面做</span>
-        <div class="xlane-row">
+        <span class="xlane-hd">简历已经是现成的？这几件事也在这个台面做</span>
+        <div class="xlane-row" style="grid-template-columns:1fr 1fr 1fr">
           <a class="xlane-go" href="11-jobfit-compare.html">
             <span class="src-ic"><svg class="ic"><use href="#i-target"/></svg></span>
             <span class="xlane-tx">
@@ -105,6 +106,14 @@
             <span class="xlane-tx">
               <span class="xlane-nm">材料工厂</span>
               <span class="xlane-ds">求职信、自我介绍、材料清单、简历模板四件套</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="22-career-plan.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">职业规划</span>
+              <span class="xlane-ds">现状、方向建议、行动项，可打印带走</span>
             </span>
             <svg class="ic"><use href="#i-arrowRight"/></svg>
           </a>
@@ -352,7 +361,7 @@
           <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-pen"/></svg></span>
             <span class="tl-b"><span class="tl-t">你逐条决定改不改</span><span class="tl-s">采纳的才进新版本</span></span></div>
           <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-printer"/></svg></span>
-            <span class="tl-b"><span class="tl-t">导出或打印</span><span class="tl-s">原件永远保留，可随时回退</span></span></div>
+            <span class="tl-b"><span class="tl-t">导出或打印</span><span class="tl-s">原件不被覆盖，可随时回退</span></span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
@@ -477,20 +486,20 @@
           </button>
           <button class="ver">
             <span class="ver-no">v1</span>
-            <span class="ver-b"><span class="ver-t">你上传的原件</span><span class="ver-s">09:43 上传 · 永久保留</span></span>
+            <span class="ver-b"><span class="ver-t">你上传的原件</span><span class="ver-s">09:43 上传 · 不被覆盖</span></span>
             <span class="ver-tag"><span class="chip">原件</span></span>
           </button>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>原件永远在列表里，删不掉也覆盖不了。切换版本只改「当前用哪一版」，不销毁任何一版。</span>
+          <span>优化<b>覆盖不了</b>原件：切换版本只改「当前用哪一版」，不销毁任何一版。未登录随本次会话清空；登录保存后想删除由你自己删，删除留日志。</span>
         </div>
       </div>
 
       <div class="pane pane--fill" data-at="s5">
         <div class="pane-hd"><span class="t">拿去做什么</span></div>
         <div class="outs">
-          <button class="out" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>去打印</button>
+          <a class="out" data-when="default first ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>去打印工作台核价</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
           <button class="out"><svg class="ic"><use href="#i-folder"/></svg>存进我的简历</button>
           <button class="out"><svg class="ic"><use href="#i-download"/></svg>导出 PDF</button>
@@ -512,7 +521,7 @@
         <div class="pane-hd"><span class="t">你的简历，规矩在先</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>· 原件<b>永远保留、不被覆盖</b>，优化只产生新版本，采不采纳由你定；<br>
+          <span>· 原件<b>不被覆盖</b>，优化只产生新版本，采不采纳由你定；登录保存后可自行删除，删除留日志；<br>
             · AI 只改表达，<b>不编造经历</b>，没写过的不会替你写；<br>
             · 会话结束自动清空；登录后可长期存进「我的简历」。</span>
         </div>
@@ -520,7 +529,7 @@
       <div class="pane" data-at="s1 s2 s3 s4 s5">
         <div class="pane-hd"><span class="t">费用与去向</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">免费</span></div>
+          <div class="kv-row"><span class="k">解析 / 诊断 / 优化</span><span class="v">本次权益内 0 元</span></div>
           <div class="kv-row"><span class="k">打印</span><span class="v">按现场公示价</span></div>
           <div class="kv-row"><span class="k">诊断报告</span><span class="v">进「AI 服务记录」</span></div>
           <div class="kv-row"><span class="k">新版本</span><span class="v">进「我的简历」</span></div>
@@ -541,7 +550,7 @@
 
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-at="s1"><div class="t">先给一份简历，四种来源任选</div><div class="s">不需要登录 · 原件永远保留不被覆盖</div></div>
+      <div data-at="s1"><div class="t">先给一份简历，四种来源任选</div><div class="s">不需要登录 · 原件不会被优化覆盖</div></div>
       <div data-at="s2">
         <div data-when="default first"><div class="t">正在解析，约 40 秒</div><div class="s">免费 · 可改点的数量要看完全文才知道</div></div>
         <div data-when="ai-down"><div class="t">解析中断，你的文件没有丢</div><div class="s">可直接打印或存进「我的文档」</div></div>
@@ -556,7 +565,7 @@
         <div data-when="ai-down first"><div class="t">改写不可用</div><div class="s">原件完好，可打印或存档</div></div>
       </div>
       <div data-at="s5">
-        <div data-when="default first ai-down"><div class="t">v2 已生成，v1 原件永久保留</div><div class="s">随时可回退 · 切换版本不销毁任何一版</div></div>
+        <div data-when="default first ai-down"><div class="t">v2 已生成，v1 原件保留不被覆盖</div><div class="s">随时可回退 · 切换版本不销毁任何一版</div></div>
         <div data-when="device-off"><div class="t">v2 已生成，打印机离线</div><div class="s">可先存进「我的简历」换机取回打印</div></div>
       </div>
     </div>

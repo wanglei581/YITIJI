@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=12">
-<link rel="stylesheet" href="styles/work.css?v=6">
+<link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -243,7 +243,8 @@
       </div>
       <!-- 2026-08-09 留白复核顺手修：注释原挤在 6 张缩略图右侧约 20px 宽的缝里，
            逐字竖排且溢出条带（148px 定高）。挪出条带单独一行，四态都完整可读。 -->
-      <div class="thumbs-note" data-at="s4" style="margin-left:auto;max-width:none">第 3 页红点：<b>预检</b>发现置信度偏低。终检在扫完后做，届时确认是否需要人工复核。</div>
+      <!-- 2026-08-09 Codex 整改:s4 已是扫完后,终检已出结果,不能再说"届时确认"。 -->
+      <div class="thumbs-note" data-at="s4" style="margin-left:auto;max-width:none">第 3 页红点：<b>终检</b>确认该页置信度偏低（原件折痕导致断行），已标记需人工复核后再送诊断。</div>
     </div>
 
     <!-- ================= 右 ================= -->
@@ -340,7 +341,9 @@
              只有置信度三行随识别服务隐藏。原来整个 kv 挂 data-when，ai-down 连任务号都没了。 -->
         <div class="kv">
           <div class="kv-row"><span class="k">扫描任务号</span><span class="v">SC-0947-31</span></div>
-          <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:49</span></div>
+          <!-- Codex 整改:device-off 是扫描中断,不存在"完成时间" -->
+          <div class="kv-row" data-when="default first ai-down"><span class="k">完成时间</span><span class="v">8 月 8 日 09:49</span></div>
+          <div class="kv-row" data-when="device-off"><span class="k">中断时间</span><span class="v">8 月 8 日 09:49</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">可识别页</span><span class="v" data-when="default first">5 / 6 页</span><span class="v" data-when="device-off">2 / 3 页</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">偏低页</span><span class="v" style="color:var(--amber-400)">第 3 页</span></div>
           <div class="kv-row" data-when="default first device-off"><span class="k">原因</span><span class="v">原件折痕导致断行</span></div>
@@ -372,7 +375,7 @@
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto">
           <button class="btn btn--ghost" style="width:100%" data-when="default first">送 AI 简历诊断</button>
           <button class="btn btn--ghost" style="width:100%" data-when="ai-down device-off" aria-disabled="true">AI 诊断不可用</button>
-          <button class="btn btn--ghost" style="width:100%" data-when="default first ai-down">拿去打印</button>
+          <a class="btn btn--ghost" style="width:100%" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">拿去打印工作台核价</a>
           <button class="btn btn--ghost" style="width:100%" data-when="device-off" aria-disabled="true">打印不可用</button>
           <button class="btn btn--ghost" style="width:100%">存进「我的文档」</button>
         </div>
@@ -485,7 +488,7 @@
     <button class="btn btn--primary" data-at="s3" aria-disabled="true" data-when="default first ai-down">扫描中…</button>
     <button class="btn btn--primary" data-at="s3" data-go="s4" data-when="device-off">看已扫的 3 页<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s4" data-when="default first">送 AI 诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s4" data-when="ai-down">拿去打印<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="06-print-workbench.html?stage=s3">拿去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off">存进我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></button>
   </div>
 

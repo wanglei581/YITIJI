@@ -97,7 +97,7 @@ AI 不可用(ai-down)时:建议卡整块换成「什么不可用、还能做什�
 | P03 身份门 | `/login`(短信 NumPad + 扫码)、`/member/qr-login` | ✅ 可直连 |
 | P04 系统态 | `/session-timeout`、`/error-offline`、`/legal/:doc`、`/help` | ✅ 可直连(help 后端有 API 前端未接) |
 | P05 手机接力 | `/upload/phone`(upload-sessions) | ✅ 可直连 |
-| P06 打印工作台 | `/print-scan` + `/print/upload→…→done` 8 页 + `pickup-claim`(支付/PII 预检/进度全真) | 已有全真;设计 6 阶段一页 ↔ 现实 8 页,落地需合流 |
+| P06 打印工作台 | `/print-scan` + `/print/upload→…→done` 8 页 + `pickup-claim`(支付/PII 预检/进度全真) | 已有全真;设计 7 阶段一页(选来源→体检→参数核价→核对金额→收银→出纸→取件)↔ 现实 8 页,落地需合流 |
 | P07 扫描工作台 | `/scan/start→settings→progress→result`(scan/sessions) | ✅ 可直连 |
 | P08 文件加工台 | `/print-scan/convert`(转PDF)、`/print-scan/sign`(签章);证件照=「即将上线」页 | ✅ 可直连;证件照未开放口径一致 |
 | P09 简历工作台 | `/resume/source→parse→report→optimize→export` | ✅ 可直连 |
@@ -120,5 +120,7 @@ AI 不可用(ai-down)时:建议卡整块换成「什么不可用、还能做什�
 | P26 顾问作业面 | `/ai/plan`(AiPlanPage **纯静态零 API**) | ⚠️ 设计超前,落地需接线 |
 
 盘点发现的真实 App 缺口(已另行立项,不在设计范围内动):`/session-resume` 调用后端不存在的 `GET /me/pending-tasks`(假接真);首页 `SERVICE_GROUPS`/`ServiceCard`/`ZoneRow` 死代码;placeholders 下 5 个同名未挂路由文件;百宝箱/智慧校园磁贴现为无条件渲染,与「后台开关未开启不显示」的设计口径不一致。
+
+反向缺口(线上有、V3 设计未覆盖,2026-08-09 对照 zyidai.cn 发现):**自我评估**(`/resume/self-assessment`,线上归简历服务中心)在 26 页中无对应页——落地时按线上功能补页或并入 P22 职业规划,当前不造假入口。职业规划在线上归简历域,V3 已在 P09-s1 补横向入口对齐。
 
 口径:**设计页不伪造能力**——真实后端没有的,页面必须呈现为「未开放/未接入」态(P19 智慧校园是范例);落地为第二阶段,需单独授权与文件预算(README §零 之约不变)。
