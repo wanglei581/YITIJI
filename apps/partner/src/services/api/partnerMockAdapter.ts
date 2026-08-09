@@ -1,5 +1,6 @@
 import type {
   PartnerDataSource,
+  PartnerDataSourceCapabilities,
   CreateDataSourcePayload,
   PartnerJobRecord,
   PartnerJobQualitySummary,
@@ -174,6 +175,18 @@ export const partnerMockAdapter = {
     await delay()
     return [...DATA_SOURCES]
   },
+  async getDataSourceCapabilities(): Promise<PartnerDataSourceCapabilities> {
+    await delay()
+    return {
+      orgType: 'licensed_hr_agency',
+      allowedAccessModes: ['api', 'excel', 'csv', 'json', 'webhook', 'manual'],
+      allowedSourceKinds: ['hr_company', 'job_platform', 'aggregator', 'manual'],
+      defaultSourceKind: 'hr_company',
+      adminManagedAccessModes: ['api', 'webhook'],
+      canImportJobs: true,
+      canImportFairs: false,
+    }
+  },
   async toggleDataSource(id: string): Promise<PartnerDataSource> {
     await delay()
     DATA_SOURCES = DATA_SOURCES.map((s) =>
@@ -193,12 +206,13 @@ export const partnerMockAdapter = {
       sourceKind: payload.sourceKind ?? 'manual',
       accessMode,
       syncFreq: payload.syncFreq ?? 'manual',
-      lastSyncTime: '刚刚', connStatus: 'connected', successCount: 0, failCount: 0,
+      lastSyncTime: '刚刚', connStatus: accessMode === 'api' || accessMode === 'webhook' ? 'disabled' : 'connected', successCount: 0, failCount: 0,
       description: payload.description ?? (accessMode === 'webhook' ? '等待外部系统推送岗位数据' : accessMode === 'api' ? '等待 API 连接测试' : '新建 Excel 数据源，导入批次待管理员审核'),
       credentialConfigured: Boolean(payload.credential) || accessMode === 'webhook',
       endpoint: payload.endpoint,
       webhookUrl: accessMode === 'webhook' ? `/api/v1/sync/webhook?source=${id}` : undefined,
       webhookSecretOnce: accessMode === 'webhook' ? 'mock_webhook_secret_only_once' : undefined,
+      activationManagedBy: accessMode === 'api' || accessMode === 'webhook' ? 'admin' : 'partner',
     }
     DATA_SOURCES = [...DATA_SOURCES, newSource]
     return newSource

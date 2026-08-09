@@ -57,6 +57,7 @@ const selectCls =
 
 export default function OfflineAgenciesPage() {
   const [rows,         setRows]         = useState<AdminOfflineAgencyListItem[]>([])
+  const [total,        setTotal]        = useState(0)
   const [listState,    setListState]    = useState<'loading' | 'error' | 'ready'>('loading')
   const [orgType,      setOrgType]      = useState('')
   const [reviewStatus, setReviewStatus] = useState('')
@@ -88,15 +89,18 @@ export default function OfflineAgenciesPage() {
       reviewStatus: reviewStatus || undefined,
       publishStatus: publishStatus || undefined,
       keyword: keyword || undefined,
+      page,
+      pageSize,
     }
     try {
-      const data = await offlineAgenciesAdminService.listAgencies(filters)
-      setRows(data)
+      const result = await offlineAgenciesAdminService.listAgencies(filters)
+      setRows(result.data)
+      setTotal(result.total)
       setListState('ready')
     } catch {
       setListState('error')
     }
-  }, [orgType, reviewStatus, publishStatus, keyword])
+  }, [orgType, reviewStatus, publishStatus, keyword, page, pageSize])
 
   useEffect(() => { void loadList() }, [loadList])
 
@@ -172,9 +176,6 @@ export default function OfflineAgenciesPage() {
 
   // ── 分页 ──────────────────────────────────────────────────────────────────
 
-  const total     = rows.length
-  const paginated = rows.slice((page - 1) * pageSize, page * pageSize)
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -229,7 +230,7 @@ export default function OfflineAgenciesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['机构名称', '类型', '地址', '联系人', '审核状态', '发布状态', '岗位数', '操作'].map((h) => (
+                {['机构名称', '类型', '地址', '联系电话', '审核状态', '发布状态', '岗位数', '操作'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -245,7 +246,7 @@ export default function OfflineAgenciesPage() {
                   <td colSpan={8} className="px-4 py-10 text-center text-sm text-red-500">加载失败，请刷新重试</td>
                 </tr>
               )}
-              {listState === 'ready' && paginated.length === 0 && (
+              {listState === 'ready' && rows.length === 0 && (
                 <tr>
                   <td colSpan={8}>
                     <EmptyState
@@ -257,7 +258,7 @@ export default function OfflineAgenciesPage() {
                   </td>
                 </tr>
               )}
-              {listState === 'ready' && paginated.map((row) => {
+              {listState === 'ready' && rows.map((row) => {
                 const rv = REVIEW_BADGE[row.reviewStatus]
                 const pv = PUBLISH_BADGE[row.publishStatus]
                 const canPublish   = row.reviewStatus === 'approved' && row.publishStatus !== 'published'
@@ -272,10 +273,7 @@ export default function OfflineAgenciesPage() {
                       {row.address ?? <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
-                      {row.contactName
-                        ? <span>{row.contactName}{row.contactPhone ? <span className="ml-1 text-neutral-400">{row.contactPhone}</span> : null}</span>
-                        : <span className="text-neutral-300">—</span>
-                      }
+                      {row.phone ?? <span className="text-neutral-300">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge dot status={rv?.status ?? 'default'} label={rv?.label ?? row.reviewStatus} />

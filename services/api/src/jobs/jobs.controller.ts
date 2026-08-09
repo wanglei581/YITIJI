@@ -315,6 +315,13 @@ export class JobsController {
     return this.jobsService.getPartnerDataSources(user)
   }
 
+  @Get('partner/data-sources/capabilities')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('partner')
+  getPartnerDataSourceCapabilities(@CurrentUser() user: AuthedUser) {
+    return this.jobsService.getPartnerDataSourceCapabilities(user)
+  }
+
   @Post('partner/data-sources')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('partner')

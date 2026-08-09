@@ -1,10 +1,13 @@
-import { Injectable, Logger, Optional } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bullmq'
 import { Queue } from 'bullmq'
 import { PrismaService } from '../prisma/prisma.service'
 import { decryptSecret } from '../common/crypto/secret-cipher'
 import { isSensitiveColumn } from '../jobs/dto/excel-import.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { AuditService } from '../audit/audit.service'
+import type { AuthedUser } from '../common/decorators/current-user.decorator'
+import { assertDataSourceCapability, assertPartnerDataTypeCapability } from '../jobs/partner-capabilities'
 import { mapJobWorkTypeToCategory } from '../jobs/work-type'
 import {
   JOB_SYNC_QUEUE,
@@ -133,6 +136,7 @@ export class JobSyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jobQuality: JobQualityService,
+    private readonly audit: AuditService,
     @Optional() @InjectQueue(JOB_SYNC_QUEUE) private readonly queue?: Queue,
   ) {}
 
@@ -176,11 +180,22 @@ export class JobSyncService {
   async enqueueDueSources(): Promise<number> {
     const sources = await this.prisma.jobSource.findMany({
       where: { enabled: true, accessMode: 'api' },
-      select: { id: true, syncFreq: true, lastSyncAt: true },
+      select: {
+        id: true, syncFreq: true, lastSyncAt: true, accessMode: true, sourceKind: true, responseConfig: true,
+        org: { select: { type: true, enabled: true } },
+      },
     })
     const now = Date.now()
     let enqueued = 0
     for (const s of sources) {
+      if (!s.org.enabled) continue
+      try {
+        assertDataSourceCapability(s.org.type, s.accessMode, s.sourceKind)
+        assertPartnerDataTypeCapability(s.org.type, this.parseResponseConfig(s.responseConfig).dataType)
+      } catch {
+        this.logger.warn(`Skipped capability-denied API source ${s.id}`)
+        continue
+      }
       const threshold = SYNC_FREQ_THRESHOLD_MS[s.syncFreq]
       if (threshold === undefined) continue   // manual / realtime: skip auto-schedule
       const lastMs = s.lastSyncAt ? s.lastSyncAt.getTime() : 0
@@ -199,22 +214,132 @@ export class JobSyncService {
   async getSourceForTrigger(sourceId: string): Promise<{ name: string; syncFreq: string; lastSyncAt: Date | null }> {
     const source = await this.prisma.jobSource.findUnique({
       where: { id: sourceId },
-      select: { name: true, syncFreq: true, lastSyncAt: true, enabled: true, accessMode: true, endpoint: true },
+      select: {
+        name: true, syncFreq: true, lastSyncAt: true, enabled: true, accessMode: true,
+        sourceKind: true, endpoint: true, responseConfig: true, org: { select: { type: true, enabled: true } },
+      },
     })
     if (!source) throw new Error('SOURCE_NOT_FOUND')
     if (!source.enabled) throw new Error('SOURCE_DISABLED')
+    if (!source.org.enabled) throw new Error('SOURCE_ORG_DISABLED')
     if (source.accessMode !== 'api') throw new Error('SOURCE_NOT_API')
+    assertDataSourceCapability(source.org.type, source.accessMode, source.sourceKind)
+    assertPartnerDataTypeCapability(source.org.type, this.parseResponseConfig(source.responseConfig).dataType)
     if (!source.endpoint) throw new Error('SOURCE_NO_ENDPOINT')
     return source
+  }
+
+  async getSourceImpact(sourceId: string) {
+    const source = await this.prisma.jobSource.findUnique({
+      where: { id: sourceId },
+      select: { id: true, name: true, enabled: true, accessMode: true },
+    })
+    if (!source) {
+      throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    const [jobsTotal, jobsPublished, fairsTotal, fairsPublished] = await Promise.all([
+      this.prisma.job.count({ where: { sourceId } }),
+      this.prisma.job.count({ where: { sourceId, publishStatus: 'published' } }),
+      this.prisma.jobFair.count({ where: { sourceId } }),
+      this.prisma.jobFair.count({ where: { sourceId, publishStatus: 'published' } }),
+    ])
+    return {
+      source,
+      content: {
+        jobs: { total: jobsTotal, published: jobsPublished },
+        fairs: { total: fairsTotal, published: fairsPublished },
+      },
+      disableBehavior: 'stop_new_sync_only' as const,
+    }
+  }
+
+  async setSourceEnabled(sourceId: string, enabled: boolean, user: AuthedUser) {
+    const source = await this.prisma.jobSource.findUnique({
+      where: { id: sourceId },
+      include: { org: true },
+    })
+    if (!source) {
+      throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    }
+    if (enabled) {
+      if (!source.org.enabled) {
+        throw new BadRequestException({ error: { code: 'SOURCE_ORG_DISABLED', message: '机构已停用，不能启用数据源' } })
+      }
+      assertDataSourceCapability(source.org.type, source.accessMode, source.sourceKind)
+      if (source.accessMode === 'api') {
+        assertPartnerDataTypeCapability(source.org.type, this.parseResponseConfig(source.responseConfig).dataType)
+      }
+      if (source.accessMode === 'api' && !source.endpoint) {
+        throw new BadRequestException({ error: { code: 'SOURCE_NO_ENDPOINT', message: 'API 数据源缺少 endpoint' } })
+      }
+      if (source.accessMode === 'api' && source.endpoint) {
+        try {
+          await validatePublicUrl(source.endpoint)
+        } catch {
+          throw new BadRequestException({
+            error: { code: 'SOURCE_ENDPOINT_NOT_PUBLIC', message: 'API endpoint 必须是可解析的公网 HTTP(S) 地址' },
+          })
+        }
+      }
+      if (source.accessMode === 'webhook' && !source.webhookSecret) {
+        throw new BadRequestException({ error: { code: 'SOURCE_NO_WEBHOOK_SECRET', message: 'Webhook 数据源缺少签名密钥' } })
+      }
+    }
+    const impact = await this.getSourceImpact(sourceId)
+    const updated = await this.prisma.jobSource.update({ where: { id: sourceId }, data: { enabled } })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: enabled ? 'data_source.admin_enable' : 'data_source.admin_disable',
+      targetType: 'job_source',
+      targetId: sourceId,
+      payload: {
+        accessMode: source.accessMode,
+        fromEnabled: source.enabled,
+        toEnabled: enabled,
+        contentAction: 'retain',
+        impact: impact.content,
+      },
+    })
+    return { updated, impact }
+  }
+
+  async unpublishSourceContent(sourceId: string, user: AuthedUser) {
+    const impact = await this.getSourceImpact(sourceId)
+    const unpublished = await this.prisma.$transaction(async (tx) => {
+      const jobs = await tx.job.updateMany({
+        where: { sourceId, publishStatus: 'published' },
+        data: { publishStatus: 'unpublished' },
+      })
+      const fairs = await tx.jobFair.updateMany({
+        where: { sourceId, publishStatus: 'published' },
+        data: { publishStatus: 'unpublished' },
+      })
+      return { jobs: jobs.count, fairs: fairs.count }
+    })
+    await this.audit.write({
+      actorId: user.userId,
+      actorRole: user.role,
+      action: 'data_source.content_bulk_unpublish',
+      targetType: 'job_source',
+      targetId: sourceId,
+      payload: {
+        preview: impact.content,
+        unpublishedJobs: unpublished.jobs,
+        unpublishedFairs: unpublished.fairs,
+      },
+    })
+    return { sourceId, unpublishedJobs: unpublished.jobs, unpublishedFairs: unpublished.fairs }
   }
 
   // ── Core pull logic ────────────────────────────────────────────────────────
 
   async pullApiSource(sourceId: string): Promise<SyncStats> {
-    const source = await this.prisma.jobSource.findUnique({ where: { id: sourceId } })
-    if (!source || !source.enabled || source.accessMode !== 'api' || !source.endpoint) {
+    const source = await this.prisma.jobSource.findUnique({ where: { id: sourceId }, include: { org: true } })
+    if (!source || !source.enabled || !source.org.enabled || source.accessMode !== 'api' || !source.endpoint) {
       throw new Error(`Source ${sourceId}: not a valid enabled API source with endpoint`)
     }
+    assertDataSourceCapability(source.org.type, source.accessMode, source.sourceKind)
 
     // 1. Decrypt credential (allowed to be absent for public APIs)
     let credential = ''
@@ -228,19 +353,26 @@ export class JobSyncService {
       }
     }
 
-    // 2. HTTP fetch
+    // 2. Parse responseConfig and enforce Organization.type capability before any network call.
+    const config = this.parseResponseConfig(source.responseConfig)
+    try {
+      assertPartnerDataTypeCapability(source.org.type, config.dataType)
+    } catch (error) {
+      await this.markStatus(sourceId, 'failed')
+      await this.writeSyncLog(sourceId, source.orgId, config.dataType, 0, 0, 0, 0, 'failed', 'PARTNER_CAPABILITY_DENIED')
+      throw error
+    }
+
+    // 3. HTTP fetch
     let rawData: unknown
     try {
       rawData = await this.fetchJson(source.endpoint, source.authType ?? null, credential)
     } catch (e) {
       const msg = (e as Error).message
       await this.markStatus(sourceId, 'failed')
-      await this.writeSyncLog(sourceId, source.orgId, 'job', 0, 0, 0, 0, 'failed', msg)
+      await this.writeSyncLog(sourceId, source.orgId, config.dataType, 0, 0, 0, 0, 'failed', msg)
       throw e
     }
-
-    // 3. Parse responseConfig
-    const config = this.parseResponseConfig(source.responseConfig)
 
     // 4. Extract raw items array from response
     const rawItems = this.extractArray(rawData, config.rootPath)
@@ -491,10 +623,40 @@ export class JobSyncService {
     const touchedJobIds: string[] = []
     await this.prisma.$transaction(async (tx) => {
       for (const { item } of valid) {
+        const tagsJson = JSON.stringify(buildJobTags(item.tags, item.industry))
+        const skillsJson = JSON.stringify(item.skills)
+        const benefitsJson = JSON.stringify(item.benefits)
         const existing = await tx.job.findUnique({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
-          select: { id: true },
         })
+        const contentChanged = !existing ||
+          existing.sourceId !== source.id ||
+          existing.sourceName !== source.name ||
+          existing.sourceUrl !== item.sourceUrl ||
+          existing.title !== item.title ||
+          existing.company !== item.company ||
+          existing.city !== item.city ||
+          existing.salary !== (item.salary ?? existing.salary) ||
+          existing.description !== (item.description ?? existing.description) ||
+          existing.requirements !== (item.requirements ?? existing.requirements) ||
+          existing.category !== (item.category ?? existing.category) ||
+          existing.tagsJson !== tagsJson ||
+          existing.educationRequirement !== (item.educationRequirement ?? existing.educationRequirement) ||
+          existing.experienceRequirement !== (item.experienceRequirement ?? existing.experienceRequirement) ||
+          existing.skillsJson !== skillsJson ||
+          existing.benefitsJson !== benefitsJson ||
+          existing.salaryMin !== (item.salaryMin ?? existing.salaryMin) ||
+          existing.salaryMax !== (item.salaryMax ?? existing.salaryMax) ||
+          existing.salaryUnit !== (item.salaryUnit ?? existing.salaryUnit) ||
+          existing.validThrough?.getTime() !== (item.validThrough ?? existing.validThrough)?.getTime()
+
+        if (existing && !contentChanged) {
+          await tx.job.update({ where: { id: existing.id }, data: { syncTime: sync } })
+          touchedJobIds.push(existing.id)
+          stats.updated++
+          continue
+        }
+
         const job = await tx.job.upsert({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
           create: {
@@ -503,11 +665,11 @@ export class JobSyncService {
             title: item.title, company: item.company, city: item.city,
             salary: item.salary, description: item.description,
             requirements: item.requirements,
-            category: item.category, tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            category: item.category, tagsJson,
             educationRequirement: item.educationRequirement,
             experienceRequirement: item.experienceRequirement,
-            skillsJson: JSON.stringify(item.skills),
-            benefitsJson: JSON.stringify(item.benefits),
+            skillsJson,
+            benefitsJson,
             salaryMin: item.salaryMin,
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
@@ -519,17 +681,22 @@ export class JobSyncService {
             title: item.title, company: item.company, city: item.city,
             salary: item.salary, description: item.description,
             requirements: item.requirements,
-            category: item.category, tagsJson: JSON.stringify(buildJobTags(item.tags, item.industry)),
+            category: item.category, tagsJson,
             educationRequirement: item.educationRequirement,
             experienceRequirement: item.experienceRequirement,
-            skillsJson: JSON.stringify(item.skills),
-            benefitsJson: JSON.stringify(item.benefits),
+            skillsJson,
+            benefitsJson,
             salaryMin: item.salaryMin,
             salaryMax: item.salaryMax,
             salaryUnit: item.salaryUnit,
             validThrough: item.validThrough,
+            // 此 upsert 只在 contentChanged=true 时执行；未变化分支仅刷新 syncTime。
+            reviewStatus: 'pending',
+            publishStatus: 'draft',
+            reviewedBy: null,
+            reviewedAt: null,
+            rejectReason: null,
             syncTime: sync,
-            // reviewStatus/publishStatus 不覆写，防绕过审核
           },
         })
         touchedJobIds.push(job.id)
@@ -580,12 +747,29 @@ export class JobSyncService {
       for (const { item } of valid) {
         const existing = await tx.jobFair.findUnique({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
-          select: { id: true },
         })
+        const contentChanged = !existing ||
+          existing.sourceId !== source.id ||
+          existing.sourceName !== source.name ||
+          existing.sourceUrl !== item.sourceUrl ||
+          existing.title !== item.title ||
+          existing.startAt.getTime() !== item.startAt.getTime() ||
+          existing.endAt.getTime() !== item.endAt.getTime() ||
+          existing.venue !== item.venue ||
+          existing.city !== item.city ||
+          existing.description !== (item.description ?? existing.description) ||
+          existing.companyCount !== (item.companyCount ?? existing.companyCount)
+
+        if (existing && !contentChanged) {
+          await tx.jobFair.update({ where: { id: existing.id }, data: { syncTime: sync } })
+          stats.updated++
+          continue
+        }
+
         await tx.jobFair.upsert({
           where: { sourceOrgId_externalId: { sourceOrgId: source.orgId, externalId: item.externalId } },
           create: {
-            sourceOrgId: source.orgId, externalId: item.externalId,
+            sourceOrgId: source.orgId, sourceId: source.id, externalId: item.externalId,
             sourceName: source.name, sourceUrl: item.sourceUrl,
             title: item.title, theme: 'general',
             startAt: item.startAt, endAt: item.endAt,
@@ -594,12 +778,18 @@ export class JobSyncService {
             reviewStatus: 'pending', publishStatus: 'draft', syncTime: sync,
           },
           update: {
-            sourceName: source.name, sourceUrl: item.sourceUrl,
+            sourceId: source.id, sourceName: source.name, sourceUrl: item.sourceUrl,
             title: item.title,
             startAt: item.startAt, endAt: item.endAt,
             venue: item.venue, city: item.city,
             description: item.description,
             companyCount: item.companyCount ?? undefined,
+            // 此 upsert 只在 contentChanged=true 时执行；未变化分支仅刷新 syncTime。
+            reviewStatus: 'pending',
+            publishStatus: 'draft',
+            reviewedBy: null,
+            reviewedAt: null,
+            rejectReason: null,
             syncTime: sync,
           },
         })

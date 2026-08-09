@@ -9,6 +9,7 @@ import type {
   ConnStatus,
   SyncFrequency,
   PartnerDataSourceView,
+  PartnerDataSourceCapabilities,
   DataSourceConfig,
   FieldMappingRule,
   MappingValidationError,
@@ -36,6 +37,7 @@ export type {
   SmartCampusModules,
   SmartCampusTerminalView,
   TerminalSmartCampusConfigView,
+  PartnerDataSourceCapabilities,
 }
 
 export type PartnerSmartCampusTerminal = SmartCampusTerminalView

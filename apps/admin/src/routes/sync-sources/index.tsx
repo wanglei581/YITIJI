@@ -29,6 +29,9 @@ interface ApiSyncSourceItem {
   id: string
   name: string
   orgId: string
+  orgName: string
+  sourceKind: string
+  accessMode: string
   syncFreq: string
   enabled: boolean
   lastSyncAt: string | null
@@ -36,6 +39,13 @@ interface ApiSyncSourceItem {
   hasEndpoint: boolean
   hasCredential: boolean
   hasResponseConfig: boolean
+}
+
+interface SourceImpact {
+  content: {
+    jobs: { total: number; published: number }
+    fairs: { total: number; published: number }
+  }
 }
 
 type TriggerState = 'idle' | 'loading' | 'ok' | 'error'
@@ -71,6 +81,9 @@ const MOCK_SOURCES: ApiSyncSourceItem[] = [
     id: 'mock-src-1',
     name: '示例岗位 API 数据源',
     orgId: 'org-1',
+    orgName: '演示机构',
+    sourceKind: 'aggregator',
+    accessMode: 'api',
     syncFreq: 'hourly',
     enabled: true,
     lastSyncAt: null,
@@ -103,6 +116,36 @@ async function triggerApiSync(sourceId: string): Promise<void> {
   }
 }
 
+async function setSourceEnabled(sourceId: string, enabled: boolean): Promise<void> {
+  if (API_MODE !== 'http') return
+  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/enabled`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
+async function fetchSourceImpact(sourceId: string): Promise<SourceImpact> {
+  if (API_MODE !== 'http') {
+    return { content: { jobs: { total: 3, published: 2 }, fairs: { total: 1, published: 1 } } }
+  }
+  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/impact`)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const body = await res.json() as { data: SourceImpact }
+  return body.data
+}
+
+async function unpublishSourceContent(sourceId: string): Promise<void> {
+  if (API_MODE !== 'http') return
+  const res = await authFetch(`/admin/job-sync/sources/${encodeURIComponent(sourceId)}/unpublish-content`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirmation: 'UNPUBLISH_SOURCE_CONTENT' }),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function SyncSourcesPage() {
@@ -114,6 +157,8 @@ export default function SyncSourcesPage() {
   const [configDraft,  setConfigDraft]  = useState<ConfigDraft | null>(null)
   const [configSaving, setConfigSaving] = useState(false)
   const [configErr,    setConfigErr]    = useState<string | null>(null)
+  const [sourceActionId, setSourceActionId] = useState<string | null>(null)
+  const [sourceActionError, setSourceActionError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -196,9 +241,46 @@ export default function SyncSourcesPage() {
     }
   }
 
+  const handleEnabled = async (source: ApiSyncSourceItem) => {
+    setSourceActionId(source.id)
+    setSourceActionError(null)
+    try {
+      await setSourceEnabled(source.id, !source.enabled)
+      load()
+    } catch {
+      setSourceActionError(source.id)
+    } finally {
+      setSourceActionId(null)
+    }
+  }
+
+  const handleBulkUnpublish = async (source: ApiSyncSourceItem) => {
+    setSourceActionId(source.id)
+    setSourceActionError(null)
+    try {
+      const impact = await fetchSourceImpact(source.id)
+      const published = impact.content.jobs.published + impact.content.fairs.published
+      if (published === 0) {
+        window.alert('该来源当前没有已发布岗位或招聘会。')
+        return
+      }
+      const confirmed = window.confirm(
+        `将下架 ${impact.content.jobs.published} 个岗位和 ${impact.content.fairs.published} 场招聘会。` +
+        '数据与审计记录会保留；此操作与“停用来源”相互独立。确认继续？',
+      )
+      if (!confirmed) return
+      await unpublishSourceContent(source.id)
+      load()
+    } catch {
+      setSourceActionError(source.id)
+    } finally {
+      setSourceActionId(null)
+    }
+  }
+
   if (loading) {
     return (
-      <Page title="API 同步数据源" subtitle="管理 API 拉取模式的数据源及手动触发同步">
+      <Page title="数据接入通道" subtitle="统一管理来源启停、同步配置和已发布内容影响">
         <div className="flex h-48 items-center justify-center">
           <LoadingState text="加载中…" className="py-12" />
         </div>
@@ -208,7 +290,7 @@ export default function SyncSourcesPage() {
 
   if (error) {
     return (
-      <Page title="API 同步数据源" subtitle="管理 API 拉取模式的数据源及手动触发同步">
+      <Page title="数据接入通道" subtitle="统一管理来源启停、同步配置和已发布内容影响">
         <div className="flex h-48 flex-col items-center justify-center gap-3">
           <RefreshCwIcon className="h-10 w-10 text-neutral-200" />
           <p className="text-sm text-neutral-400">加载失败，请稍后重试</p>
@@ -222,8 +304,8 @@ export default function SyncSourcesPage() {
 
   return (
     <Page
-      title="API 同步数据源"
-      subtitle="管理 API 拉取模式的数据源及手动触发同步"
+      title="数据接入通道"
+      subtitle="API/Webhook 由管理员审批启用；停用通道不会自动下架既有内容"
       actions={
         <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-surface px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
           <RefreshCwIcon className="h-3.5 w-3.5" />刷新
@@ -232,7 +314,7 @@ export default function SyncSourcesPage() {
     >
       {/* 说明 */}
       <div className="mb-4 rounded-lg border border-info/20 bg-info-bg px-4 py-2.5 text-sm text-info-fg">
-        Worker 每 30 分钟自动检查 syncFreq 到期的数据源。此页可手动触发单个源立即同步。
+        停用通道只停止后续 API 拉取、Webhook 接收或文件使用，既有已发布内容保持不变；如需下架，请使用独立的“批量下架内容”操作。
         {API_MODE !== 'http' && <span className="ml-2 font-medium text-info">（当前为 mock 模式，触发操作仅模拟）</span>}
       </div>
 
@@ -241,7 +323,7 @@ export default function SyncSourcesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr>
-                {['数据源名称', '机构 ID', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
+                {['数据源名称', '机构', '接入方式', '同步频率', '最后同步', '状态', '配置', '操作'].map((h) => (
                   <th key={h} className="whitespace-nowrap border-b border-neutral-900/10 bg-neutral-50/90 px-4 py-2.5 text-left text-[11.5px] font-bold tracking-[0.04em] text-neutral-500">{h}</th>
                 ))}
               </tr>
@@ -249,10 +331,10 @@ export default function SyncSourcesPage() {
             <tbody className="divide-y divide-neutral-900/[0.06]">
               {sources.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <EmptyState
-                      title="暂无 API 模式数据源"
-                      description="请在合作机构后台配置 accessMode=api 的数据源"
+                      title="暂无数据接入通道"
+                      description="合作机构创建数据来源后将在此显示"
                       icon={RefreshCwIcon}
                       className="py-12"
                     />
@@ -264,7 +346,11 @@ export default function SyncSourcesPage() {
                   return (
                     <tr key={s.id} className="hover:bg-neutral-50">
                       <td className="px-4 py-3 font-medium text-neutral-800">{s.name}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-neutral-400">{s.orgId.slice(0, 12)}…</td>
+                      <td className="px-4 py-3 text-xs text-neutral-600">
+                        <div>{s.orgName}</div>
+                        <div className="font-mono text-[10px] text-neutral-400">{s.orgId.slice(0, 12)}…</div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{s.accessMode.toUpperCase()}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">
                         {FREQ_LABELS[s.syncFreq] ?? s.syncFreq}
                       </td>
@@ -272,7 +358,9 @@ export default function SyncSourcesPage() {
                         {s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString('zh-CN') : '从未'}
                       </td>
                       <td className="px-4 py-3">
-                        {s.lastSyncStatus ? (
+                        {!s.enabled ? (
+                          <StatusBadge dot status="warning" label="待启用 / 已停用" />
+                        ) : s.lastSyncStatus ? (
                           <StatusBadge
                             dot
                             status={STATUS_BADGE[s.lastSyncStatus] ?? 'default'}
@@ -297,14 +385,14 @@ export default function SyncSourcesPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          <button
+                          {s.accessMode === 'api' && <button
                             onClick={() => openConfig(s)}
                             className="flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
                           >
                             <SettingsIcon className="h-3 w-3" />
                             mappings
-                          </button>
-                          <button
+                          </button>}
+                          {s.accessMode === 'api' && <button
                             disabled={trigState === 'loading' || !s.enabled || !s.hasEndpoint}
                             onClick={() => handleTrigger(s.id)}
                             className={`flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
@@ -319,7 +407,22 @@ export default function SyncSourcesPage() {
                              trigState === 'ok'      ? '已入队' :
                              trigState === 'error'   ? '触发失败' :
                              '立即同步'}
+                          </button>}
+                          <button
+                            disabled={sourceActionId === s.id}
+                            onClick={() => void handleEnabled(s)}
+                            className="rounded border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                          >
+                            {s.enabled ? '停用通道' : '审批并启用'}
                           </button>
+                          <button
+                            disabled={sourceActionId === s.id}
+                            onClick={() => void handleBulkUnpublish(s)}
+                            className="rounded px-2.5 py-1 text-xs font-medium text-error-fg hover:bg-error-bg disabled:opacity-50"
+                          >
+                            批量下架内容
+                          </button>
+                          {sourceActionError === s.id && <span className="text-xs text-error-fg">操作失败</span>}
                         </div>
                       </td>
                     </tr>
@@ -433,7 +536,7 @@ export default function SyncSourcesPage() {
       )}
 
       <p className="mt-3 text-xs text-neutral-400">
-        仅显示 accessMode=api 的数据源。同步结果在合作机构后台 "同步日志" 和 Admin "岗位信息源" 可查看。
+        所有操作写入审计。批量下架只改变岗位/招聘会发布状态，不删除来源、内容或历史记录。
       </p>
     </Page>
   )

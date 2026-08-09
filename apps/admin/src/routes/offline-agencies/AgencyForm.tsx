@@ -20,17 +20,16 @@ interface FormState {
   name: string
   orgType: string
   address: string
-  contactName: string
-  contactPhone: string
+  phone: string
+  contactEmail: string
   description: string
-  licenseNo: string
   website: string
   logoUrl: string
 }
 
 const EMPTY_FORM: FormState = {
-  name: '', orgType: 'other', address: '', contactName: '',
-  contactPhone: '', description: '', licenseNo: '', website: '', logoUrl: '',
+  name: '', orgType: 'recruitment', address: '', phone: '',
+  contactEmail: '', description: '', website: '', logoUrl: '',
 }
 
 function detailToForm(d: AdminOfflineAgencyDetail): FormState {
@@ -38,10 +37,9 @@ function detailToForm(d: AdminOfflineAgencyDetail): FormState {
     name: d.name,
     orgType: d.orgType,
     address: d.address ?? '',
-    contactName: d.contactName ?? '',
-    contactPhone: d.contactPhone ?? '',
+    phone: d.phone ?? '',
+    contactEmail: d.contactEmail ?? '',
     description: d.description ?? '',
-    licenseNo: d.licenseNo ?? '',
     website: d.website ?? '',
     logoUrl: d.logoUrl ?? '',
   }
@@ -52,6 +50,7 @@ function validateForm(f: FormState): string | null {
     return '机构名称长度需为 2–80 个字符'
   }
   if (!f.orgType) return '请选择机构类型'
+  if (!f.address.trim()) return '请填写机构地址'
   if (f.website.trim() && !/^https?:\/\//.test(f.website.trim())) {
     return '官网链接必须以 http:// 或 https:// 开头'
   }
@@ -67,11 +66,10 @@ function formToInput(f: FormState): OfflineAgencyInput {
   return {
     name: f.name.trim(),
     orgType: f.orgType as OfflineAgencyOrgType,
-    address: s(f.address),
-    contactName: s(f.contactName),
-    contactPhone: s(f.contactPhone),
+    address: f.address.trim(),
+    phone: s(f.phone),
+    contactEmail: s(f.contactEmail),
     description: s(f.description),
-    licenseNo: s(f.licenseNo),
     website: s(f.website),
     logoUrl: s(f.logoUrl),
   }
@@ -157,22 +155,22 @@ export function AgencyForm({ open, editing, onClose, onSaved }: AgencyFormProps)
           </select>
         </Field>
 
-        <Field label="地址">
+        <Field label="地址" required>
           <input className={inputCls} placeholder="如：北京市朝阳区 XX 路 XX 号" value={form.address} onChange={set('address')} />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="联系人">
-            <input className={inputCls} placeholder="联系人姓名" value={form.contactName} onChange={set('contactName')} />
-          </Field>
           <Field label="联系电话">
-            <input className={inputCls} placeholder="手机或固话" value={form.contactPhone} onChange={set('contactPhone')} />
+            <input className={inputCls} placeholder="手机或固话" value={form.phone} onChange={set('phone')} />
+          </Field>
+          <Field label="联系邮箱">
+            <input className={inputCls} placeholder="contact@example.com" value={form.contactEmail} onChange={set('contactEmail')} />
           </Field>
         </div>
 
-        <Field label="营业执照号">
-          <input className={inputCls} placeholder="统一社会信用代码（可选）" value={form.licenseNo} onChange={set('licenseNo')} />
-        </Field>
+        <p className="text-xs text-warning-fg">
+          资质证照将在 P1 的独立核验模块中维护；当前表单不代表资质核验通过。
+        </p>
 
         <Field label="官网链接" hint="以 http:// 或 https:// 开头">
           <input className={inputCls} placeholder="https://" value={form.website} onChange={set('website')} />

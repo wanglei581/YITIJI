@@ -96,10 +96,14 @@ jobs:
         run: pnpm verify:compliance-copy
 
       - name: Import review reset gate (forced re-review on partner import)
-        # 静态断言 Partner/Excel 主动导入的 job/jobFair upsert update 块一律回 pending+draft,
-        # 并反向断言 job-sync 自动拉取不覆写审核状态。纯 node,不需要 DB。
+        # 静态断言 Partner/Excel 导入及 job-sync 内容变化路径都回 pending+draft；
+        # job-sync 内容未变化路径只刷新 syncTime。纯 node,不需要 DB。
         working-directory: services/api
         run: pnpm verify:import-review-reset
+
+      - name: Backend P0 contract gates
+        working-directory: services/api
+        run: pnpm verify:backend-p0-contracts
 
       - name: Install CJK font + sqlite3 + redis-server (PDF / terminal verify)
         # sqlite3 CLI 当前 runner 镜像预装,显式安装使依赖成为工作流契约
@@ -202,6 +206,10 @@ jobs:
       - name: Prepare fresh SQLite db (schema push)
         working-directory: services/api
         run: npx prisma db push --accept-data-loss
+
+      - name: Backend P0 real HTTP contracts
+        working-directory: services/api
+        run: pnpm verify:backend-p0-http
 
       - name: Install SQLite terminal database guards
         working-directory: services/api
@@ -397,6 +405,10 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
+          pnpm --filter @ai-job-print/api verify:backend-p0-contracts
+          pnpm --filter @ai-job-print/api verify:offline-agencies-contract
+          pnpm --filter @ai-job-print/api verify:partner-source-capabilities
+          pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:resume-extraction
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
@@ -496,6 +508,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:policies
           pnpm --filter @ai-job-print/api verify:companies
           pnpm --filter @ai-job-print/api verify:offline-agencies-page
+          pnpm --filter @ai-job-print/api verify:backend-p0-contracts
+          pnpm --filter @ai-job-print/api verify:offline-agencies-contract
+          pnpm --filter @ai-job-print/api verify:partner-source-capabilities
+          pnpm --filter @ai-job-print/api verify:backend-p0-http
+          pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
           pnpm --filter @ai-job-print/api verify:member-auth

@@ -90,7 +90,23 @@ async function verifyConcurrentConfirm(): Promise<void> {
       },
       updateMany: async () => ({ count: 0 }),
     },
-    organization: { findUnique: async () => ({ id: 'org-1', name: '测试机构', enabled: true }) },
+    organization: {
+      findUnique: async () => ({
+        id: 'org-1',
+        name: '测试机构',
+        type: 'enterprise_source',
+        enabled: true,
+      }),
+    },
+    jobSource: {
+      findUnique: async () => ({
+        id: 'source-1',
+        orgId: 'org-1',
+        enabled: true,
+        accessMode: 'excel',
+        sourceKind: 'manual',
+      }),
+    },
     fieldMappingRule: { upsert: async () => ({}) },
     $transaction: async (callback: (client: typeof tx) => Promise<void>) => callback(tx),
   }
