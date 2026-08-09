@@ -32,25 +32,25 @@ pnpm --filter @ai-job-print/api db:pg:generate
 POSTGRES_URL="postgresql://user:pass@host:5432/db" \
   pnpm --filter @ai-job-print/api db:pg:deploy
 
-# 当前不提供 SQLite → PG 全库搬数命令；旧工具在修复或退役前禁止生产使用
+# 当前不提供 SQLite → PG 全库搬数命令；旧工具已退役并从工作树移除
 ```
 
-> **警告**：`db:pg:migrate-data` 的 `MODEL_ORDER` 只覆盖 37 个模型，且末尾对账仍只遍历
-> 同一清单，无法发现未列入清单的表。当前已确认 OfflineAgency、OfflineJob 等模型未被覆盖。
-> 在工具改为从 schema/数据库真实发现全部模型并通过 fresh/upgrade 双库门禁前，禁止用于生产
-> 全库搬迁，也禁止通过其“对账通过”输出推断整库完整。
+> **警告**：历史 `db:pg:migrate-data` 的 `MODEL_ORDER` 只覆盖 37 个模型，且末尾对账仍只遍历
+> 同一清单，无法发现未列入清单的表；OfflineAgency、OfflineJob 等模型均被遗漏。该命令和脚本
+> 已在招聘内容域 P1 Wave 1A 删除，禁止从 Git 历史恢复执行，也不能用历史“对账通过”输出推断
+> 当前整库完整。未来若确需导入其他旧库，必须新建按领域、可 dry-run、可守恒对账的迁移工具。
 
 ## 3. 历史首次切换步骤（SQLite → PostgreSQL，禁止直接复用）
 
 本节仅保留早期切库过程作为历史参考，不是当前生产操作手册。若未来确需从其他 SQLite
-环境向 PostgreSQL 搬数，必须先单独修复或替换 §7 所述工具、冻结模型清单、在备份恢复库
+环境向 PostgreSQL 搬数，必须单独设计替代工具、冻结模型清单、在备份恢复库
 完成 dry-run，并取得具名授权。
 
 1. 停止 API 写入（维护窗口；Kiosk 显示维护提示）。
 2. 备份 SQLite：复制 `dev.db`（见 §4）。
 3. 全新 PG 库：`createdb` → `db:pg:generate` → `db:pg:deploy`。
-4. 仅在搬数工具完成全模型发现修复并重新通过 fresh/upgrade 双库验收后，才可运行
-   `db:pg:migrate-data`；其输出只作为已覆盖模型的对账证据，还必须独立核对 schema 全模型集合。
+4. 仅运行另行评审和具名授权的新领域迁移工具；旧 `db:pg:migrate-data` 已删除，禁止恢复。
+   新工具输出只作为已覆盖领域的对账证据，还必须独立核对 schema 全模型集合。
 5. API 环境改 `DATABASE_URL=postgresql://...`，重启。
 6. 验证清单：API 启动日志 `DB connected — postgresql://…`；`GET /api/v1/jobs` 返回
    真实数据；会员登录 → `/me/resumes`；Admin 登录 → 告警中心；打印链路建任务。
@@ -85,7 +85,7 @@ cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
 | 故障 | 处置 |
 |------|------|
 | `migrate deploy` 失败 | 立即停写并保留现场；迁移可能处于部分应用状态，先核对 `_prisma_migrations.logs`、实际 schema/数据、日志和备份。`resolve --rolled-back` 仅限确认无残留或已安全清理；`resolve --applied` 仅限人工完成完全等价变更并通过 schema diff/验收；否则恢复到新 PostgreSQL 库 |
-| 历史搬数工具对账不一致 | 停止操作并保留源库/目标库；该工具当前不能证明全库完整，不得仅凭退出码继续生产切换 |
+| 历史搬数工具或命令被引用 | 立即停止；工具已退役删除，不得从 Git 历史恢复，改为另立具名授权的领域迁移方案 |
 | 孤儿行告警 | 如实记录在切换日志；属 SQLite 历史脏数据（FK 未强制），不迁移是正确行为 |
 | 连接池耗尽 | adapter-pg 默认池；高并发可在 POSTGRES_URL 加 `?connection_limit=` 或前置 pgbouncer |
 
@@ -93,8 +93,8 @@ cp services/api/prisma/dev.db backups/dev_$(date +%Y%m%d).db
 
 - 生产 PostgreSQL 已投入运行，但每次 schema 变更仍必须在 SQLite 主 CI 与真实
   PostgreSQL CI/恢复库分别验证 fresh install 和已有库 upgrade；公开 health 不能替代私有表盘点。
-- `db:pg:migrate-data` 当前的 `MODEL_ORDER` 只列 37 个模型，而 schema 约 81 个；
-  OfflineAgency、OfflineJob 等未列模型既不会搬迁，也不会被末尾对账发现。该工具必须先改成
-  基于 schema/数据库真实发现全模型，或明确退役并由一次性、可审计迁移替代。
+- 历史 `db:pg:migrate-data` 只列 37 个模型，无法发现 OfflineAgency、OfflineJob 等漏表，
+  已在招聘内容域 P1 Wave 1A 退役删除。任何后续旧库导入只能使用另行评审、可 dry-run、
+  可逐类守恒对账且获得具名授权的领域迁移工具。
 - SQLite 仍是开发默认；两库行为差异（如大小写排序、并发语义）由核心 verify 套件
   在 CI 双 job 上持续回归。生产恢复目标始终是 PostgreSQL，不设计 PG→SQLite 回滚。

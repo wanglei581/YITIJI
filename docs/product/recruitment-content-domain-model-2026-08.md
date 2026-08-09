@@ -61,9 +61,9 @@ Kiosk OnlinePlatformsPage ── 4 个代码常量（无数据库、审核、下
 ### 2.3 双库事实与旧工具风险
 
 - SQLite schema 是模型 SSOT；PostgreSQL schema 由 `sync-postgres-schema.ts` 机械生成，目标模型当前保持一致。
-- SQLite migration 目录当前 78 批，PostgreSQL migration 目录 50 批；两端历史 SQL 不能按目录数量或文件名一一对应，必须按最终 schema 与行为校验。
+- Wave 1A 合入后 SQLite migration 目录为 79 批、PostgreSQL migration 目录为 51 批；两端历史 SQL 不能按目录数量或文件名一一对应，必须按最终 schema 与行为校验。
 - 生产已经运行 PostgreSQL；本方案的“双库”是“SQLite 开发/主 CI 与 PostgreSQL 生产契约保持一致”，不是再次切库。
-- `migrate-sqlite-to-postgres.ts` 的 `MODEL_ORDER` 只覆盖 37 个模型，当前 schema 约 81 个模型；它漏掉 OfflineAgency、OfflineJob 等对象，且所谓“全表对账”仍只遍历 `MODEL_ORDER`。在修复覆盖清单与真实全表发现机制前，禁止把它当完整搬数工具。
+- 历史 `migrate-sqlite-to-postgres.ts` 的 `MODEL_ORDER` 只覆盖 37 个模型，遗漏 OfflineAgency、OfflineJob 等对象，且所谓“全表对账”仍只遍历 `MODEL_ORDER`；Wave 1A 已将该脚本与 package 命令退役删除，禁止从 Git 历史恢复执行。
 - 生产禁止回退 SQLite；数据库回滚以应用回退、保留 additive schema 和 PostgreSQL 备份恢复为准。
 
 ## 3. 统一领域模型
@@ -126,6 +126,7 @@ OfflineAgency / OfflineJob：迁移期 legacy，只兼容读取和映射，最�
 | `licenseNumber`                          | 服务端保存；公开展示策略独立配置，默认脱敏                                                                                              |
 | `validFrom / validUntil`                 | 有效期                                                                                                                                  |
 | `status`                                 | `pending / valid / rejected / expired / revoked`                                                                                        |
+| `contentVersion / contentHash / approvedContentHash / hashAlgorithmVersion` | 资质事实版本；`valid` 只有在批准 hash 等于当前 hash 时才生效                                             |
 | `evidenceFileId`                         | 私有 FileObject；不得返回永久公开 URL                                                                                                   |
 | `verifiedBy / verifiedAt / rejectReason` | 核验责任与结论                                                                                                                          |
 | `verificationSource / notes`             | 核验来源与内部备注                                                                                                                      |
@@ -143,7 +144,7 @@ OfflineAgency / OfflineJob：迁移期 legacy，只兼容读取和映射，最�
 | `fair_organizer`            | 默认不作为线下招聘机构发布    | 每场招聘会另验主办/承办授权，不能继承为常设机构资质                               |
 | `enterprise_source`         | 默认不作为线下招聘机构发布    | 企业主体登记只能证明来源企业，不能证明人力资源服务资质                            |
 
-QualificationRecord 还必须记录 `issuerName / jurisdiction / appliesToBranchId? / verificationSource`；服务范围只能由 Admin 从已核验证照投影，Partner 不能通过修改 `serviceScopeJson` 降低必需证照。到期/撤销任务按日扫描并立即 fail-closed，恢复必须产生新的核验决定。证据 FileObject 使用独立 `qualification_evidence` purpose、私有访问、替换留版本、到期后按法务留存期归档；Logo 使用公开品牌资产 purpose 和可撤销引用，不复用证照文件。
+QualificationRecord 还必须记录 `issuerName / jurisdiction / appliesToBranchId? / verificationSource`；服务范围只能由 Admin 从已核验证照投影，Partner 不能通过修改 `serviceScopeJson` 降低必需证照。证照号、有效期、证据文件、适用门店或核验来源变化必须 bump version、重算 hash 并退回 `pending`，不得让旧批准 hash 继续生效。到期/撤销任务按日扫描并立即 fail-closed，恢复必须产生新的核验决定。证据 FileObject 使用独立 `qualification_evidence` purpose、私有访问、替换留版本、到期后按法务留存期归档；Logo 使用公开品牌资产 purpose 和可撤销引用，不复用证照文件。
 
 ### 3.4 JobSource
 
@@ -166,13 +167,14 @@ QualificationRecord 还必须记录 `issuerName / jurisdiction / appliesToBranch
 
 建议字段：
 
-- `organizationId?`：可选关联已核实主体；不得因目录发布自动创建 Partner 账号或授予接入权。
+- `organizationId?`：可选关联已核实主体；不得因目录发布自动创建 Partner 账号或授予接入权。关联建立后使用删除限制，不能通过删除主体把“已关联”静默变成“从未关联”；显式解绑必须退审并写 ReviewDecision。
 - `name / slug / category / neutralDescription`。
 - `officialDomainsJson / landingUrl`：只允许 HTTPS；重定向最终域也必须在白名单。
 - `logoFileId`：可选，品牌使用授权未确认时不用 Logo。
 - `operatorLegalName / evidenceFileId?`：记录平台运营主体快照和内部核验依据；证据文件不公开。
 - `displayOrder / status`。
 - `reviewStatus / publishStatus / reviewedBy / reviewedAt / rejectReason`。
+- `contentVersion / contentHash / approvedContentHash / hashAlgorithmVersion`；链接、域名、主体或公开文案变化必须退审。
 - `linkCheckStatus / lastLinkCheckedAt / lastLinkCheckError`。
 - `validFrom / validUntil / archivedAt / createdAt / updatedAt`。
 
@@ -186,6 +188,7 @@ Profile 建议字段：
 
 - `organizationId @unique`、`displayName`、`description`、`serviceScopeJson`。
 - `reviewStatus / publishStatus / reviewedBy / reviewedAt / rejectReason`。
+- `contentVersion / contentHash / approvedContentHash / hashAlgorithmVersion`。
 - `archivedAt / createdAt / updatedAt`。
 
 Branch 建议字段：
@@ -195,6 +198,7 @@ Branch 建议字段：
 - `lat / lng / geoSource`；距离必须说明定位来源。
 - `serviceHours / serviceHoursSource`、`publicPhone / website`。
 - `status: active / suspended / closed`、`lastVerifiedAt / archivedAt`。
+- `reviewStatus / publishStatus / contentVersion / contentHash / approvedContentHash / hashAlgorithmVersion`；地址、电话、营业时间、网站、坐标或状态变化必须 bump version 并退回 `pending + draft`。
 
 不得新增预约名额、到店报名、简历接收邮箱、候选人联系、代收费或办理结果字段。
 
@@ -237,12 +241,14 @@ URL 校验在导入/upsert、审核、发布、公开读取和定时巡检各层
 
 ```text
 directoryVisible = directory.approved + published + notArchived + withinValidity
+  + approvedContentHash==contentHash
   + landingUrl/finalDomain/linkCheck valid
   + (linkedOrganization == null || organizationTrust active)
 
 agencyVisible = profile.approved + published + notArchived
-  + organizationTrust active + activeBranch exists
-  + requiredQualificationsByOrgTypeAndServiceScope valid
+  + profile.approvedContentHash==profile.contentHash + organizationTrust active
+  + approved/published/currentHash activeBranch exists
+  + requiredQualificationsByOrgTypeAndServiceScope valid/currentHash
 
 jobVisible = job.approved + published + approvedContentHash==contentHash
   + notArchived + withinValidity + organizationTrust active
@@ -250,7 +256,8 @@ jobVisible = job.approved + published + approvedContentHash==contentHash
   + sourceUrl/finalDomain matches source.allowedContentDomains
 
 offlineJobVisible = jobVisible + agencyVisible
-  + selectedBranch active + qualifications applicable to selectedBranch valid
+  + selectedBranch approved/published/currentHash/active
+  + qualifications applicable to selectedBranch valid/currentHash
 ```
 
 影响语义必须对运营人员写清：
@@ -322,9 +329,10 @@ offlineJobVisible = jobVisible + agencyVisible
 ### Wave 1：Expand（后续独立 PR，仍不部署）
 
 - 只增加 nullable/additive 表、列、索引和 FK：QualificationRecord、OnlinePlatformDirectory、Profile/Branch、Job/JobSource/Organization 扩展、OfflineJob.canonicalJobId。
+- `(sourceId, externalId)` 本波只建普通查询索引并由 preflight 报告重复组；生产重复清洗和 Wave 2 backfill 验收前不得提前收紧 unique。
 - SQLite 主 schema 为 SSOT，PG schema 机械生成；分别新增 SQLite/PG migration。
 - PostgreSQL FK 可先 `NOT VALID`，backfill 后 `VALIDATE CONSTRAINT`；SQLite 避免在 expand 阶段重建旧表。
-- 修复或明确退役 `migrate-sqlite-to-postgres.ts`，对账必须能发现 schema 中未列入的模型。
+- 退役删除 `migrate-sqlite-to-postgres.ts`；未来领域 backfill 另建只读 preflight、dry-run 和守恒对账工具。
 - 增加 fresh SQLite、upgrade SQLite、fresh PG，以及二选一的安全升级演练：经授权把完整加密生产备份恢复到同等级访问控制的隔离 PostgreSQL 并在验收后受控销毁，或使用批准的招聘内容域脱敏 fixture；原始 dump 不得复制到普通开发环境。
 
 ### Wave 2：Shadow backfill（先备份恢复库演练）
@@ -332,11 +340,13 @@ offlineJobVisible = jobVisible + agencyVisible
 - 新增 `--dry-run`、幂等、分批、带 checksum 的 preflight/backfill 工具。
 - 每条 legacy 记录只有三种结果：成功映射、明确 blocker、已归档跳过；计数必须守恒。
 - 所有新 Job 为 `pending + draft`，不打印业务正文，不伪造 employer/city/sourceUrl。
+- Wave 2 退出硬门禁：`(sourceId, externalId)` 重复组必须为 0；随后用 SQLite/PostgreSQL 独立 additive migration 把普通索引收紧为 `@@unique([sourceId, externalId])`，两库 fresh/upgrade 与并发幂等验证通过后才允许进入 Wave 3。
 - 生产执行必须另获写授权；失败只停止 backfill，新表数据保留为不可见，不删 legacy。
 
 ### Wave 3：写切换与观察
 
 - 先 shadow dual-write：canonical Job 为不可见影子记录，legacy 仍是既有读取源；双写必须在同一事务中完成，任一侧失败全部回滚。
+- 进入本波前必须确认双库 `(sourceId, externalId)` unique migration 已应用且验证通过；普通索引状态禁止开启 dual-write。
 - 对账稳定后关闭 OfflineJob writer，改为 canonical-only write；旧表只保留读取和 ID 映射，不再继续双写。
 - API/Excel/Webhook/manual upsert 统一使用 `(sourceId, externalId)`。
 - 至少观察一个完整审核发布周期并对账旧/新字段、公开集合和审计。
@@ -376,7 +386,7 @@ Wave 1 建议拆为两个独立 PR，避免模型、迁移工具和页面同时�
 - `services/api/prisma/schema.prisma`
 - 自动生成 `services/api/prisma/postgres/schema.prisma`
 - SQLite / PostgreSQL 各 1 个 additive migration
-- `services/api/scripts/migrate-sqlite-to-postgres.ts`
+- 删除 `services/api/scripts/migrate-sqlite-to-postgres.ts` 与 `db:pg:migrate-data` 命令
 - `services/api/scripts/verify-recruitment-p1-preflight.ts`（新增）
 - `services/api/scripts/verify-recruitment-p1-schema.ts`（新增）
 - `services/api/package.json`、`.github/workflows/ci.yml`

@@ -398,6 +398,12 @@ model Organization {
   sceneTemplate String?
   enabledModulesJson String @default("[]")
   enabled    Boolean  @default(true)
+  // P1 expand：nullable，旧 reader 不读取；Wave 2 经审计/人工清单回填后再切门禁。
+  contentTrustStatus String?
+  contentTrustReviewedBy String?
+  contentTrustReviewedAt DateTime?
+  contentTrustReason String?
+  archivedAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -409,6 +415,12 @@ model Organization {
   policyPosts PolicyPost[] @relation("PolicyOrg")
   companyProfiles CompanyProfile[] @relation("CompanyOrg")
   jobQualitySnapshots JobDataQualitySnapshot[] @relation("JobQualityOrg")
+  qualificationRecords QualificationRecord[]
+  offlineAgencyProfile OfflineAgencyProfile?
+  onlinePlatformDirectories OnlinePlatformDirectory[] @relation("PlatformDirectoryOrg")
+
+  @@index([contentTrustStatus])
+  @@index([archivedAt])
 }
 
 // ── PolicyPost ────────────────────────────────────────────────────────────────
@@ -495,6 +507,7 @@ model User {
   auditLogs     AuditLog[]
   createdBenefitActivities BenefitActivity[]
   feedbackReplies FeedbackReply[]
+  recruitmentReviewDecisions ReviewDecision[]
 
   @@index([orgId])
   @@index([phoneVerifiedAt])
@@ -565,6 +578,13 @@ model JobSource {
   accessMode     String
   syncFreq       String        @default("manual")
   enabled        Boolean       @default(true)
+  // P1 expand：approval/trust/sync 均不从 legacy enabled 推断；Wave 2 人工回填前新门禁不读取。
+  approvalStatus String?
+  syncEnabled    Boolean?
+  trustStatus    String?
+  allowedContentDomainsJson String?
+  redirectPolicy String?
+  archivedAt     DateTime?
   description    String?
   lastSyncAt     DateTime?
   lastSyncStatus String?
@@ -602,6 +622,8 @@ model JobSource {
   fairs         JobFair[]  @relation("FairSource")
 
   @@index([orgId])
+  @@index([approvalStatus, trustStatus])
+  @@index([archivedAt])
 }
 
 // ── Job ───────────────────────────────────────────────────────────────────────
@@ -647,6 +669,19 @@ model Job {
   salaryUnit     String?
   validThrough   DateTime?
 
+  // P1 canonical 内容版本与来源存活性；Wave 2 backfill 前均保持 nullable。
+  sourceLastSeenAt     DateTime?
+  contentHash          String?
+  contentVersion       Int?
+  approvedContentHash  String?
+  hashAlgorithmVersion String?
+  archivedAt           DateTime?
+
+  // 线下轨只关联门店；岗位本身仍必须具备 sourceId/sourceUrl。
+  offlineBranchId  String?
+  offlineBranch    OfflineAgencyBranch? @relation(fields: [offlineBranchId], references: [id], onDelete: Restrict)
+  legacyOfflineJob OfflineJob? @relation("LegacyOfflineJobCanonical")
+
   // 企业展示关联(可选,展示导览用;岗位本身的来源字段不依赖它)
   companyProfileId String?
   companyProfile   CompanyProfile? @relation(fields: [companyProfileId], references: [id], onDelete: SetNull)
@@ -674,6 +709,10 @@ model Job {
   @@index([sourceId])
   @@index([reviewStatus, publishStatus])
   @@index([companyProfileId])
+  // Wave 1A 先建查询索引；生产重复 preflight 与 Wave 2 清洗通过后再收紧为 unique。
+  @@index([sourceId, externalId])
+  @@index([offlineBranchId])
+  @@index([archivedAt])
 }
 
 // ── CompanyProfile ────────────────────────────────────────────────────────────
@@ -821,6 +860,9 @@ model FileObject {
   fairMaterialPrintBridges FairMaterialPrintBridge[]
   // 该文件产生的打印任务（血缘终点：实际出纸）。
   printTasks  PrintTask[]
+  qualificationEvidence QualificationRecord[] @relation("QualificationEvidence")
+  onlinePlatformLogos OnlinePlatformDirectory[] @relation("OnlinePlatformLogo")
+  onlinePlatformEvidence OnlinePlatformDirectory[] @relation("OnlinePlatformEvidence")
 
   @@index([uploaderId])
   @@index([endUserId])
@@ -2175,6 +2217,178 @@ model LegalDocVersion {
   @@index([docType, isActive])
 }
 
+// ── Recruitment content governance (P1 expand) ──────────────────────────────
+// 本波只增加不可见的数据结构；不切换现有读写，不回填 legacy 状态，不形成招聘闭环。
+
+model QualificationRecord {
+  id                  String   @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  qualificationType   String
+  licenseNumber       String?
+  issuerName          String?
+  jurisdiction        String?
+  appliesToBranchId   String?
+  appliesToBranch     OfflineAgencyBranch? @relation(fields: [appliesToBranchId], references: [id], onDelete: Restrict)
+  validFrom           DateTime?
+  validUntil          DateTime?
+  status              String   @default("pending")
+  contentVersion      Int      @default(1)
+  contentHash         String?
+  approvedContentHash String?
+  hashAlgorithmVersion String?
+  evidenceFileId      String?
+  evidenceFile        FileObject? @relation("QualificationEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+  verificationSource  String?
+  verifiedBy          String?
+  verifiedAt          DateTime?
+  rejectReason        String?
+  notes               String?
+  archivedAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([organizationId, status, validUntil])
+  @@index([appliesToBranchId])
+  @@index([evidenceFileId])
+  @@index([archivedAt])
+}
+
+model OnlinePlatformDirectory {
+  id                   String   @id @default(cuid())
+  organizationId       String?
+  organization         Organization? @relation("PlatformDirectoryOrg", fields: [organizationId], references: [id], onDelete: Restrict)
+  name                 String
+  slug                 String   @unique
+  category             String?
+  neutralDescription   String?
+  officialDomainsJson  String   @default("[]")
+  landingUrl           String
+  operatorLegalName    String
+  logoFileId           String?
+  logoFile             FileObject? @relation("OnlinePlatformLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+  evidenceFileId       String?
+  evidenceFile         FileObject? @relation("OnlinePlatformEvidence", fields: [evidenceFileId], references: [id], onDelete: Restrict)
+  displayOrder         Int      @default(0)
+  status               String   @default("inactive")
+  reviewStatus         String   @default("pending")
+  publishStatus        String   @default("draft")
+  contentVersion       Int      @default(1)
+  contentHash          String?
+  approvedContentHash  String?
+  hashAlgorithmVersion String?
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  rejectReason         String?
+  linkCheckStatus      String   @default("pending")
+  lastLinkCheckedAt    DateTime?
+  lastLinkCheckError   String?
+  validFrom            DateTime?
+  validUntil           DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([reviewStatus, publishStatus])
+  @@index([linkCheckStatus])
+  @@index([displayOrder])
+  @@index([archivedAt])
+}
+
+model OfflineAgencyProfile {
+  id                   String   @id @default(cuid())
+  organizationId       String   @unique
+  organization         Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  displayName          String
+  description          String?
+  serviceScopeJson     String   @default("[]")
+  reviewStatus         String   @default("pending")
+  publishStatus        String   @default("draft")
+  contentVersion       Int      @default(1)
+  contentHash          String?
+  approvedContentHash  String?
+  hashAlgorithmVersion String?
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  rejectReason         String?
+  archivedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  branches OfflineAgencyBranch[]
+
+  @@index([reviewStatus, publishStatus])
+  @@index([archivedAt])
+}
+
+model OfflineAgencyBranch {
+  id                 String   @id @default(cuid())
+  agencyProfileId    String
+  agencyProfile      OfflineAgencyProfile @relation(fields: [agencyProfileId], references: [id], onDelete: Restrict)
+  branchName         String
+  provinceCode       String?
+  cityCode           String?
+  districtCode       String?
+  address            String
+  lat                Float?
+  lng                Float?
+  geoSource          String?
+  serviceHours       String?
+  serviceHoursSource String?
+  publicPhone        String?
+  website            String?
+  status             String   @default("suspended")
+  reviewStatus       String   @default("pending")
+  publishStatus      String   @default("draft")
+  contentVersion     Int      @default(1)
+  contentHash        String?
+  approvedContentHash String?
+  hashAlgorithmVersion String?
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  rejectReason       String?
+  lastVerifiedAt     DateTime?
+  archivedAt         DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  qualifications QualificationRecord[]
+  jobs           Job[]
+
+  @@index([agencyProfileId, status])
+  @@index([reviewStatus, publishStatus])
+  @@index([provinceCode, cityCode, districtCode])
+  @@index([archivedAt])
+}
+
+// 追加写决定事实。无 updatedAt；后续 service 只允许 create/find，不提供 update/delete。
+model ReviewDecision {
+  id                   String   @id @default(cuid())
+  targetType           String
+  targetId             String
+  contentVersion       Int?
+  contentHash          String?
+  hashAlgorithmVersion String?
+  action               String
+  fromStatus           String?
+  toStatus             String?
+  reason               String?
+  actorId              String?
+  actor                User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  actorRole            String
+  occurredAt           DateTime @default(now())
+  correlationId        String?
+  requestId            String?
+  affectedCount        Int?
+  affectedIdsDigest    String?
+
+  @@index([targetType, targetId, occurredAt])
+  @@index([actorId])
+  @@index([correlationId])
+  @@index([requestId])
+}
+
 model OfflineAgency {
   id            String       @id @default(cuid())
   name          String
@@ -2218,6 +2432,9 @@ model OfflineJob {
   experience   String?
   externalUrl  String?
   externalId   String?
+  canonicalJobId String? @unique
+  canonicalJob   Job?    @relation("LegacyOfflineJobCanonical", fields: [canonicalJobId], references: [id], onDelete: Restrict)
+  migrationChecksum String?
   status       String        @default("active")
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
