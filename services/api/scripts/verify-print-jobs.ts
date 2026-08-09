@@ -13,7 +13,7 @@
  * 运行：pnpm --filter ./services/api verify:print-jobs
  */
 import 'dotenv/config'
-import { randomBytes } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
 
 // terminals.service 在模块加载期 requireEnv 这两项；signing 在调用期读 FILE_SIGNING_SECRET。
 // 测试兜底（||= 不覆盖外部已设值；CI 已注入这些测试值）。须在动态 import terminals.service 之前设好。
@@ -84,7 +84,13 @@ async function main() {
   const terminalId = `term_vpj_${suffix}`
   const agentToken = `vpj-agent-token-${suffix}`
   const fileId = `file_vpj_${suffix}`
+  const contractSourceFileId = `file_vpj_contract_${suffix}`
+  const contractReportFileId = `file_vpj_report_${suffix}`
   const storageKey = `verify/print-jobs/${fileId}.pdf`
+  const contractSourceStorageKey = `verify/print-jobs/${contractSourceFileId}.pdf`
+  const contractReportStorageKey = `verify/print-jobs/${contractReportFileId}.pdf`
+  const fixtureFileIds = [fileId, contractSourceFileId, contractReportFileId]
+  const fixtureStorageKeys = [storageKey, contractSourceStorageKey, contractReportStorageKey]
   const createdTaskIds: string[] = []
 
   async function cleanup() {
@@ -99,8 +105,10 @@ async function main() {
     await prisma.terminalHeartbeat.deleteMany({ where: { terminalId } })
     await prisma.terminal.deleteMany({ where: { id: terminalId } })
     // 计费接线后新增的真实 fixture / 价目清理。
-    await prisma.fileObject.deleteMany({ where: { id: fileId } })
-    await storage.deleteObject(storageKey, LOCAL_BUCKET_SENTINEL).catch(() => undefined)
+    await prisma.fileObject.deleteMany({ where: { id: { in: fixtureFileIds } } })
+    await Promise.all(fixtureStorageKeys.map((key) =>
+      storage.deleteObject(key, LOCAL_BUCKET_SENTINEL).catch(() => undefined),
+    ))
     await prisma.priceConfig.deleteMany({ where: { serviceKey: { in: ['print_bw_page', 'print_color_page'] } } })
   }
 
@@ -115,18 +123,49 @@ async function main() {
     // 计费接线后 create() 需真实 FileObject + 存储内容识别页数 + PriceConfig 报价（否则 fail-closed）。
     await seedDevDefaultPriceConfig(prisma)
     const pdfBytes = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Type /Page >>\nendobj\n%%EOF\n')
-    await storage.putObject(storageKey, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL)
-    await prisma.fileObject.create({
-      data: {
-        id: fileId,
-        storageKey,
-        filename: 'vpj.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: pdfBytes.length,
-        sha256: '',
-        purpose: 'print_source',
-        bucket: LOCAL_BUCKET_SENTINEL,
-      },
+    const reportSha256 = createHash('sha256').update(pdfBytes).digest('hex')
+    await Promise.all(fixtureStorageKeys.map((key) =>
+      storage.putObject(key, pdfBytes, 'application/pdf', LOCAL_BUCKET_SENTINEL),
+    ))
+    await prisma.fileObject.createMany({
+      data: [
+        {
+          id: fileId,
+          storageKey,
+          filename: 'vpj.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: '',
+          purpose: 'print_source',
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+        {
+          id: contractSourceFileId,
+          storageKey: contractSourceStorageKey,
+          filename: '劳动合同.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'contract_upload',
+          sensitiveLevel: 'highly_sensitive',
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+        {
+          id: contractReportFileId,
+          storageKey: contractReportStorageKey,
+          filename: 'AI签约风险提示报告.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: pdfBytes.length,
+          sha256: reportSha256,
+          purpose: 'contract_review_report',
+          sensitiveLevel: 'highly_sensitive',
+          assetCategory: 'derived',
+          sourceFileId: contractSourceFileId,
+          status: 'active',
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          bucket: LOCAL_BUCKET_SENTINEL,
+        },
+      ],
     })
 
     await terminals.heartbeat(
@@ -160,6 +199,36 @@ async function main() {
     if (created.status === 'pending' && created.taskId.startsWith('ptask_')) {
       pass('1. 合法签名 fileUrl + 目标终端 → 创建任务 pending')
     } else fail(`1. 创建异常: ${JSON.stringify(created)}`)
+
+    await expectCode(
+      () => printJobs.create({ fileUrl: signFileUrl(contractSourceFileId, 30 * 60 * 1000).url }, { terminalId }),
+      'PRINT_CONTRACT_SOURCE_FORBIDDEN',
+      '1a. 合同审查原件签名 URL → 拒绝直接创建打印任务',
+    )
+
+    const reportCreated = await printJobs.create({
+      fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+      fileMd5: 'client-supplied-hash-must-not-win',
+      fileName: 'AI签约风险提示报告.pdf',
+    }, { terminalId })
+    createdTaskIds.push(reportCreated.taskId)
+    const reportTask = await prisma.printTask.findUnique({ where: { id: reportCreated.taskId } })
+    if (reportTask?.fileMd5 === reportSha256) {
+      pass('1b. 合同风险提示报告 → PrintTask 强制使用服务端 SHA-256')
+    } else {
+      fail(`1b. 合同报告哈希未采用服务端值: ${reportTask?.fileMd5 ?? 'missing'}`)
+    }
+
+    await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: 'invalid-server-hash' } })
+    await expectCode(
+      () => printJobs.create({
+        fileUrl: signFileUrl(contractReportFileId, 30 * 60 * 1000).url,
+        fileMd5: reportSha256,
+      }, { terminalId }),
+      'PRINT_CONTRACT_REPORT_INVALID',
+      '1c. 合同风险提示报告缺少有效服务端 SHA-256 → fail-closed',
+    )
+    await prisma.fileObject.update({ where: { id: contractReportFileId }, data: { sha256: reportSha256 } })
 
     // ── 2. 非法 fileUrl 拦截（SSRF 防护）──────────────────────────────
     await expectCode(

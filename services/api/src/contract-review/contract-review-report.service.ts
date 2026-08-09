@@ -20,7 +20,7 @@ import type {
 export const CONTRACT_REVIEW_REPORT_ENABLED = Symbol('CONTRACT_REVIEW_REPORT_ENABLED')
 const SOURCE_DELETE_REASON = 'contract_review_report_generated'
 const LOSING_REPORT_DELETE_REASON = 'contract_review_report_race_loser'
-// 覆盖默认 15 分钟支付订单窗口、30 分钟 Agent 下载签名及少量渲染/交互余量。
+// 覆盖 5 分钟 Kiosk 建单交互窗口与 30 分钟 Agent 下载签名窗口。
 const MIN_REPORT_REMAINING_MS = 35 * 60 * 1000
 
 @Injectable()

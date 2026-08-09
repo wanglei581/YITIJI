@@ -88,7 +88,7 @@
 
 ## Phase 0 真值收口后续
 
-- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已完成入口、易失会话、短期报告 PDF 和复用既有报价/支付/打印履约链的本地闭环；Node 22 下合同全量 `295 passed / 1 PostgreSQL 环境 skip`、fresh SQLite 78 migrations、打印/订单回归、API/Kiosk 构建和 1080×1920 浏览器 `3/3` 均通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。下一步依次完成 PR/CI 冻结、真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸；全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
+- [~] **AI签约风险提示生产验收**：干净候选 `codex/contract-review-release-candidate` 已形成 Draft [PR #576](https://github.com/wanglei581/YITIJI/pull/576)，首轮 GitHub Actions 三项 job 全绿；合并前复核新增“合同原件禁止经通用打印接口建单”和“风险报告强制采用服务端 SHA-256”两条 fail-closed 边界，本地 Node 22 的真实 SQLite 打印回归、报告/打印生命周期、共享契约及 API typecheck/lint 已通过。候选没有新增 BOS 依赖或第二套存储模型，继续复用主线本地/COS `StorageService`。合并前仍须确认 PR 最新 head 三项 CI 全绿；之后依次完成真实 PostgreSQL 法务正文、Redis/BullMQ、获准境内模型、生产私有对象存储、会员/匿名公共终端隐私和 Windows 奔图真机出纸。全部完成前 `VITE_ENABLE_CONTRACT_REVIEW`、`VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT`、`CONTRACT_REVIEW_REPORT_PRINT_ENABLED` 保持 false，不部署、不宣称生产完成。
 
 - [x] **S0-A A1–A3 已合入**：[PR #426](https://github.com/wanglei581/YITIJI/pull/426) → `main@e909769c`；未部署。
 - [x] **S0-B 打印 SIM 演示真值已合入**：[PR #427](https://github.com/wanglei581/YITIJI/pull/427) → `main@7299e523`；真实性守卫、生产 HTTP build、W2 print 13/13、1080×1920 mock 浏览器和 GitHub 三项 CI 均通过；未部署。
