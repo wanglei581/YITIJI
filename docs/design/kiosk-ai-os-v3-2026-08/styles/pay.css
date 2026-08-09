@@ -1,0 +1,140 @@
+/* ============================================================
+   收银台（P06 S5）
+   ------------------------------------------------------------
+   钱的界面有两条铁律，样式必须替它们兜住：
+
+   1) 同版面切换。待付 / 到账中 / 已付 / 码失效 / 查单 / 关单 六种处境，
+      金额位、二维码位、状态行位置**永远不动**，只换里面的字和颜色。
+      收银界面一跳版式，用户立刻怀疑自己付错了。
+   2) 金额不做任何动效。没有 count-up、没有渐显、没有骨架屏占位。
+      一个正在变化的数字会被读成"还没算完"或"又涨价了"。
+
+   状态色只用语义色：jade=已到账可信，amber=等待/需核实，coral=不可逆或已关单。
+   身份色（--cat-*）不进收银台 —— 这里表达的是状态，不是服务种类。
+   ============================================================ */
+
+.cashier {
+  flex: 1 1 auto; min-height: 0; position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-5); padding: var(--s-6) var(--s-5) 118px;
+}
+/* 原型演示条钉在底部：它不是产品的一部分，不能参与正文的纵向节奏。
+   带 data-review，自检的触控尺寸检查会跳过它 —— 评审脚手架不该按 48px 要求，
+   但也必须一眼看得出"这不是给用户按的"，所以做成虚线描边的小控件。 */
+.cash-demo {
+  position: absolute; left: 0; right: 0; bottom: var(--s-5);
+  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+}
+.cash-demo button {
+  height: 34px; padding: 0 13px; border-radius: var(--r-xs);
+  border: 1px dashed var(--brd-2); background: transparent; color: var(--fog-600);
+  font-family: var(--ff-num); font-size: var(--fz-1); letter-spacing: .04em; cursor: pointer;
+}
+.cash-demo button[aria-pressed="true"] {
+  border-style: solid; border-color: var(--jade-a32);
+  background: var(--jade-a12); color: var(--jade-600);
+}
+
+/* ---------- 金额：整个收银台的锚，位置固定 ---------- */
+.cash-amt {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: var(--s-4) var(--s-8); border-radius: var(--r-lg);
+  background: var(--surf-1); border: 1px solid var(--brd-1);
+}
+.cash-amt .lb { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .05em; }
+.cash-amt .num {
+  font-family: var(--ff-num); font-size: 62px; line-height: 1; font-weight: 700;
+  color: var(--fog-900); letter-spacing: -.01em;
+}
+.cash-amt .num i { font-size: 26px; font-weight: 600; font-style: normal; margin-left: 6px; color: var(--fog-700); }
+.cash-amt .brk { font-size: var(--fz-1); color: var(--fog-600); font-family: var(--ff-num); letter-spacing: .04em; }
+
+/* ---------- 两种收银模式：屏上出码 / 本机扫码 ---------- */
+.cash-mode { display: flex; gap: var(--s-3); }
+.cash-mode button {
+  min-height: var(--touch-min); padding: 0 var(--s-5);
+  border-radius: var(--r-full); border: 1px solid var(--brd-2);
+  background: var(--surf-1); color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.cash-mode button[aria-pressed="true"] {
+  background: var(--jade-a12); border-color: var(--jade-a32); color: var(--jade-600);
+}
+.cash-mode .ic { width: 19px; height: 19px; }
+
+/* ---------- 码位：出码与取景框共用同一个方框，尺寸不变 ---------- */
+.cash-code {
+  width: 296px; height: 296px; flex: 0 0 auto; position: relative;
+  border-radius: var(--r-md); background: #fff;
+  border: 1px solid var(--brd-2); box-shadow: var(--sh-2);
+  display: grid; place-items: center; overflow: hidden;
+}
+/* 假二维码：不用真图也不用 CSS 花纹（斜纹一眼假），
+   用固定种子生成的 25×25 模块 SVG，带三个定位角 —— 一眼就是"码"。
+   sprite.js 不放它：它是页面内容不是图标，而且每页可以是不同的码。 */
+.cash-qr { width: 232px; height: 232px; display: block; }
+/* 码失效：整块打叉并压灰，不能只在旁边写一行字 */
+.cash-code--dead .cash-qr { filter: grayscale(1); opacity: .26; }
+.cash-code--dead::before {
+  content: "已作废"; position: absolute; z-index: 3;
+  font-family: var(--ff-ui); font-size: var(--fz-5); letter-spacing: .1em;
+  color: var(--coral-400); background: rgba(255,255,255,.9);
+  padding: 8px 18px; border-radius: var(--r-xs); border: 1px solid var(--coral-a32);
+}
+
+/* 取景框：本机扫用户付款码 */
+.cash-lens { position: absolute; inset: 0; display: grid; place-items: center; background: #0d1512; }
+.cash-lens span {
+  width: 188px; height: 188px; border-radius: var(--r-sm);
+  border: 2px solid var(--jade-400); box-shadow: 0 0 0 9999px rgba(6,12,10,.55);
+}
+.cash-lens::after { /* 扫描线 */
+  content: ""; position: absolute; left: 22%; right: 22%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--jade-400), transparent);
+  animation: cash-sweep 2.1s var(--ease-in-out) infinite;
+}
+@keyframes cash-sweep { 0%,100% { top: 26%; } 50% { top: 74%; } }
+@media (prefers-reduced-motion: reduce) { .cash-lens::after { animation: none; top: 50%; } }
+
+/* ---------- 状态行：位置固定，只换字与色 ---------- */
+.cash-st {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 0 var(--s-5); border-radius: var(--r-full);
+  font-family: var(--ff-ui); font-size: var(--fz-3);
+}
+.cash-st--wait { background: var(--amber-a12); color: var(--amber-600); border: 1px solid var(--amber-a20); }
+.cash-st--ok   { background: var(--jade-a12);  color: var(--jade-600);  border: 1px solid var(--jade-a32); }
+.cash-st--bad  { background: var(--coral-a12); color: var(--coral-400); border: 1px solid var(--coral-a32); }
+.cash-st .ic { width: 20px; height: 20px; }
+/* 倒计时用等宽数字，跳秒时不许左右抖 */
+.cash-st b { font-family: var(--ff-num); font-variant-numeric: tabular-nums; }
+
+/* 通道标记：只说明支持哪些，不假装已接通 */
+.cash-ch { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fz-1); color: var(--fog-600); }
+.cash-ch i {
+  display: inline-flex; align-items: center; height: 28px; padding: 0 11px;
+  border-radius: var(--r-xs); border: 1px solid var(--brd-2); background: var(--surf-1);
+  font-style: normal; letter-spacing: .04em; color: var(--fog-700);
+}
+
+/* ---------- 价目表：公示价，必须能在屏上看全 ---------- */
+.price { display: flex; flex-direction: column; gap: 1px; border-radius: var(--r-xs); overflow: hidden; }
+.price-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center; gap: var(--s-3);
+  min-height: 40px; padding: 6px var(--s-4); background: var(--surf-1);
+  font-size: var(--fz-2); color: var(--fog-800);
+}
+.price-row .v { font-family: var(--ff-num); letter-spacing: .03em; color: var(--fog-900); }
+.price-row--head { background: var(--fog-a04); color: var(--fog-600); font-size: var(--fz-1); letter-spacing: .06em; }
+.price-row--free .v { color: var(--jade-600); }
+.price-note { margin: var(--s-3) 0 0; font-size: var(--fz-1); line-height: 1.6; color: var(--fog-600); }
+
+/* 免费单：第 5 站不是"没走到"，是"按规则跳过"。
+   用虚线圈 + 灰字表达"这一站不存在"，不能画成待办（待办会让人以为还要付钱）。 */
+.rstep--skip .rstep-dot {
+  border-style: dashed !important; background: transparent !important;
+  color: var(--fog-500) !important;
+}
+.rstep--skip .rstep-name { color: var(--fog-500); }
+.rstep--skip { cursor: default; }

@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P17 招聘会作战台 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P17 招聘会作战台">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P17 专用：只放本页独有的东西，能复用的一律走公共层 ──────────────── */
+
+/* 展位平面图。用 SVG 而不是图片：展位要能高亮、路线要能画、断网要能渲染。 */
+.hall { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.hall-svg { width: 100%; height: 100%; display: block; border-radius: var(--r-3); }
+.booth      { fill: var(--fog-a08); stroke: var(--fog-a20); stroke-width: 1.5; }
+.booth--pick{ fill: var(--jade-a20); stroke: var(--jade-400); stroke-width: 2.5; }
+.booth--skip{ fill: var(--fog-a04); stroke: var(--fog-a12); stroke-dasharray: 3 3; }
+.booth-t    { font-size: 11px; font-family: var(--ff-num); fill: var(--fog-500); }
+.booth--pick + .booth-t { fill: var(--jade-200); font-weight: 700; }
+.route      { fill: none; stroke: var(--jade-400); stroke-width: 3; stroke-linecap: round;
+              stroke-linejoin: round; stroke-dasharray: 7 6; opacity: .85; }
+.route-no   { font-size: 13px; font-weight: 800; font-family: var(--ff-num); fill: #06281f; }
+.route-pin  { fill: var(--jade-400); }
+.hall-lg    { display: flex; gap: var(--s-5); flex-wrap: wrap; padding: var(--s-3) var(--s-4) 0; }
+.hall-lg i  { width: 13px; height: 13px; border-radius: 3px; display: inline-block; margin-right: 6px;
+              vertical-align: -1px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .route { animation: p17route 2.4s linear infinite; }
+}
+@keyframes p17route { to { stroke-dashoffset: -26; } }
+
+/* 场次卡：多行。不能用 .dir-row —— 那是单行目录行，
+   它的 .dir-lead 是 height:1px 的虚线引导线，不是内容容器。 */
+.sesscard { text-align:left; width:100%; cursor:pointer; font-family:var(--ff-ui);
+  padding: var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:grid; grid-template-columns: 46px 1fr auto; gap: var(--s-5); align-items:start;
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.sesscard:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.sesscard:active { transform: translateY(1px) scale(.996); }
+.sc-no { font-family:var(--ff-num); font-size:var(--fz-6); color:var(--brd-2);
+         font-variant-numeric:tabular-nums; line-height:1.1; }
+.sc-b { min-width:0; display:flex; flex-direction:column; gap:6px; }
+.sc-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.sc-m { font-size:var(--fz-2); color:var(--fog-700); }
+.sc-src { display:flex; flex-wrap:wrap; gap:3px var(--s-4);
+          font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); }
+.sc-go { align-self:center; }
+
+/* 岗位行（.jobrow 在 11 页是页内定义的，公共层没有，这里自带一份） */
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:var(--s-3); }
+.jobrow { text-align:left; width:100%; cursor:pointer; font-family:var(--ff-ui);
+  padding: var(--s-5); border-radius: var(--r-md);
+  background: var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; align-items:flex-start; gap:var(--s-5);
+  transition: border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.jobrow:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
+.jobrow-b { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.jobrow-t { font-size:var(--fz-5); color:var(--fog-900); font-weight:600; }
+.jobrow-s { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.04em; }
+.jobrow-m { font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+
+/* 右栏在 first 态会多出一块引导，挤到下方 pane —— 让 pane 内部滚，
+   而不是把「扫码预约」按钮无声裁掉。列表底部留白，避免最后一条贴边被裁。 */
+.wside .pane--grow > .sec { min-height: 0; overflow-y: auto; }
+.wside .pane--grow { overflow: hidden; }
+.joblist { padding-bottom: var(--s-4); }
+
+/* 同批打印的第二份文件。只显示作战单会漏掉这一单真正的大头：
+   13 页里作战单只占 1 页，其余 12 页是简历。 */
+.alsoprint { margin-top: var(--s-4); padding: var(--s-4) var(--s-5);
+  border-radius: var(--r-md); background: var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display: flex; align-items: center; gap: var(--s-5); }
+.ap-thumbs { display:flex; gap:6px; flex:0 0 auto; }
+.ap-th { width:38px; height:54px; border-radius:3px; background:#fff;
+  border:1px solid var(--brd-1); box-shadow:0 1px 3px rgba(0,0,0,.10);
+  display:flex; flex-direction:column; gap:3px; padding:6px 5px; }
+.ap-th i { display:block; height:2px; border-radius:1px; background:#c9d3da; }
+.ap-th i:nth-child(1){width:70%} .ap-th i:nth-child(2){width:100%}
+.ap-th i:nth-child(3){width:92%} .ap-th i:nth-child(4){width:60%}
+.ap-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.ap-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.ap-s { font-size:var(--fz-1); color:var(--fog-600); }
+
+/* 勾选行。公共层的 .chk 不是复选框，是带图标的清单行容器；
+   真正的复选框视觉是 .ck-box（22px 方块 div）。这套只在 12 页页内定义过。 */
+.ck { display:flex; align-items:flex-start; gap:var(--s-4);
+      min-height:var(--touch-min); padding:var(--s-3) var(--s-4);
+      border-radius:var(--r-xs); border:1px solid var(--brd-1); background:var(--surf-1);
+      cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px;
+          width:5px; height:10px; border:solid #fff; border-width:0 2.5px 2.5px 0;
+          transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* AI 分诊：这一屏真正的 AI —— 回答「这三场我该去哪场」 */
+.tri { display:flex; flex-direction:column; gap:var(--s-3); }
+.tri-row { display:grid; grid-template-columns:auto 1fr; gap:var(--s-4); align-items:start;
+           padding:var(--s-4) 0; border-bottom:1px solid var(--brd-1); }
+.tri-row:last-child { border-bottom:0; }
+.tri-vd { font-size:var(--fz-2); font-weight:700; padding:3px 11px; border-radius:999px;
+          white-space:nowrap; }
+.tri-vd--go   { background:var(--jade-a20); color:var(--jade-200); }
+.tri-vd--ok   { background:var(--fog-a08); color:var(--fog-700); }
+.tri-vd--stop { background:var(--amber-a12); color:var(--amber-200); }
+.tri-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.tri-w { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; margin-top:3px; }
+.tri-w b { color:var(--fog-900); }
+
+/* 状态标签，不是入口。与 polish.css 的 .card-pill--info 同一套语义：
+   描述这一场是什么情况，点它等于点整行（选这一场），不通向别处。 */
+.chip--info { cursor: inherit; }
+
+/* 场次卡：来源机构 / 同步时间 / 外部ID 是合规必须项，不能折叠进"更多" */
+.sess { display: flex; flex-direction: column; gap: var(--s-3); }
+.sess-hd { display: flex; align-items: baseline; gap: var(--s-3); }
+.sess-nm { font-size: 21px; font-weight: 700; }
+.sess-src { display: flex; flex-wrap: wrap; gap: 4px var(--s-4); font-size: 15px;
+            color: var(--fog-500); font-family: var(--ff-num); }
+
+/* 作战单纸面：这一页的真实交付物 */
+.combat { padding: 30px 34px; color: #17222b; }
+.combat h1 { font-size: 21px; font-weight: 800; letter-spacing: .3px; }
+.combat .cb-sub { font-size: 12.5px; color: #5b6b78; margin-top: 3px; }
+.combat .cb-hr { height: 1px; background: #d9e1e8; margin: 14px 0 12px; }
+.cb-stop { display: grid; grid-template-columns: 30px 1fr; gap: 11px; margin-bottom: 13px; }
+.cb-no   { width: 26px; height: 26px; border-radius: 50%; background: #123f33; color: #fff;
+           font-size: 13px; font-weight: 800; display: grid; place-items: center; }
+.cb-nm   { font-size: 15px; font-weight: 700; }
+.cb-mt   { font-size: 12px; color: #5b6b78; margin-top: 1px; }
+.cb-ask  { font-size: 12.5px; color: #2c3a45; margin-top: 5px; line-height: 1.5; }
+.cb-ask b{ color: #0f5a45; }
+.cb-foot { font-size: 11px; color: #6b7a86; line-height: 1.65; border-top: 1px solid #d9e1e8;
+           padding-top: 9px; margin-top: 4px; }
+
+/* 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin）。
+   到场后的动作，不是投递入口 —— 放在场次列表尾部，样式与 .alsoprint 同族。 */
+.checkin { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; align-items:center; gap:var(--s-5); }
+.checkin-ic { width:44px; height:44px; border-radius:var(--r-xs); background:var(--jade-a12);
+  display:grid; place-items:center; flex:0 0 auto; }
+.checkin-ic .ic { width:22px; height:22px; color:var(--jade-500); }
+.checkin-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.checkin-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.checkin-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">招聘会作战台</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #F-2318</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first ai-down"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>10:12</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">哪一场</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">去哪几家</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">怎么走</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走作战单</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 哪一场 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-brain"/></svg>
+          <b>这三场，你该去哪一场</b>
+          <span class="mt">读了你 8月9日 09:58 传的那份简历</span>
+        </div>
+        <div class="sec">
+          <div class="advice-act">你写的是机械设计方向。这三场差别不在"好不好"，在<b>密度</b>和<b>门槛</b>。</div>
+
+          <div class="tri" style="margin-top:var(--s-4)">
+            <div class="tri-row">
+              <span class="tri-vd tri-vd--go">值得去</span>
+              <span>
+                <span class="tri-t">8月15日 · 制造业专场</span>
+                <span class="tri-w">
+                  <span class="ev ev--e1">读过全部 32 家的岗位正文</span>
+                  只有 32 家，但<b>全是制造类</b>，其中 11 家写了机械设计或工艺岗。
+                  场地小，一上午能走完。<b>需要在来源平台先预约。</b>
+                </span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd tri-vd--ok">看你时间</span>
+              <span>
+                <span class="tri-t">8月12日 · 秋季综合人才交流会</span>
+                <span class="tri-w">
+                  <span class="ev ev--e1">读过 62 / 80 家的岗位正文</span>
+                  80 家里制造类 31 家，数量最多，但<b>摊子大、要走的路长</b>，
+                  另有 18 家来源平台没给岗位内容，我看不到里面是什么。免预约，凭身份证进。
+                </span>
+              </span>
+            </div>
+
+            <div class="tri-row">
+              <span class="tri-vd tri-vd--stop">先确认资格</span>
+              <span>
+                <span class="tri-t">8月20日 · 毕业生双选会</span>
+                <span class="tri-w">
+                  <span class="ev ev--e3">按主办方公告</span>
+                  这场<b>限应届</b>，入场要过学信网核验。你的简历写的是 <b>2021 年毕业</b> ——
+                  按这条规则你可能进不去。<b>去之前先在来源平台确认</b>，本机不代为核验、也定不了你能不能进。
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-fair"/></svg>
+          <b>本周及下周场次</b>
+          <span class="mt">共 3 场 · 均来自官方或合作机构</span>
+        </div>
+
+        <div class="joblist">
+
+          <button class="sesscard" data-go="s2">
+            <span class="sc-no">1</span>
+            <span class="sc-b">
+              <span class="sc-t">2026 年秋季综合人才交流会</span>
+              <span class="sc-m">8月12日 周三 09:00–16:00 · 市人力资源市场 A 馆 · 参会企业 80 家</span>
+              <span class="sc-m">免预约，凭身份证入场 · 现场收纸质简历</span>
+              <span class="sc-src">
+                <span>来源机构：市人力资源和社会保障局</span>
+                <span>同步时间：8月9日 07:30</span>
+                <span>外部ID：RC-2026-0812-A</span>
+              </span>
+            </span>
+            <span class="sc-go"><span class="chip chip--jade chip--info">本机可打作战单</span></span>
+          </button>
+
+          <button class="sesscard" data-go="s2">
+            <span class="sc-no">2</span>
+            <span class="sc-b">
+              <span class="sc-t">制造业专场招聘会</span>
+              <span class="sc-m">8月15日 周六 09:30–15:00 · 高新区人才驿站 · 参会企业 32 家</span>
+              <span class="sc-m">需在来源平台预约 · 现场收纸质简历</span>
+              <span class="sc-src">
+                <span>来源机构：高新区人才服务中心</span>
+                <span>同步时间：8月9日 07:30</span>
+                <span>外部ID：RC-2026-0815-M</span>
+              </span>
+            </span>
+            <span class="sc-go"><span class="chip chip--jade chip--info">本机可打作战单</span></span>
+          </button>
+
+          <button class="sesscard" data-go="s2">
+            <span class="sc-no">3</span>
+            <span class="sc-b">
+              <span class="sc-t">2026 届毕业生双选会（秋季首场）</span>
+              <span class="sc-m">8月20日 周四 13:00–17:00 · 职业技术学院体育馆 · 参会企业 46 家</span>
+              <span class="sc-m">限应届 · 入场需学信网核验</span>
+              <span class="sc-src">
+                <span>来源机构：省教育厅学生服务中心</span>
+                <span>同步时间：8月9日 07:30</span>
+                <span>外部ID：XZ-2026-0820</span>
+              </span>
+            </span>
+            <span class="sc-go"><span class="chip chip--info">资格待确认</span></span>
+          </button>
+
+        </div>
+
+        <div class="notice" style="margin-top:var(--s-4)">
+          <svg class="ic"><use href="#i-info"/></svg>
+          <span>以上场次信息由来源机构提供，本机只做展示与打印。
+                报名、预约、入场资格以来源平台为准，本机不代办、不代收简历。</span>
+        </div>
+
+        <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin） -->
+        <div class="checkin">
+          <span class="checkin-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="checkin-b">
+            <span class="checkin-t">已经在现场？先签到再逛</span>
+            <span class="checkin-s">到场后扫码或凭手机号签到，领现场资料 ——
+                  签到只用于领资料和到场统计，不是投递，也不改变入场资格。</span>
+          </span>
+          <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
+            <svg class="ic"><use href="#i-qr"/></svg>入场签到
+          </button>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 去哪几家 ─────────── -->
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-building"/></svg>
+          <b>这场有 80 家，先去哪几家</b>
+          <span class="mt" data-when="default first">已按你的简历排出先后</span>
+          <span class="mt" data-when="ai-down">AI 暂时不可用 · 现按展位号排</span>
+        </div>
+
+        <!-- 诚实边界：AI 读到什么程度，必须写在排序结果的正上方，不能藏进说明页 -->
+        <div class="notice" data-when="default first">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span><b>我读到了 62 家的岗位正文</b>，另外 18 家来源平台只给了公司名和展位号 ——
+                那 18 家我没法比，已单独列在最后，不是"不推荐"。
+                下面的先后只代表<b>和你简历的对应程度</b>，不预测你能不能被录用。</span>
+        </div>
+
+        <div class="notice notice--amber" data-when="ai-down">
+          <svg class="ic"><use href="#i-alert"/></svg>
+          <span>AI 排序暂时不可用。下面按<b>展位号顺序</b>列出，不做任何匹配判断 ——
+                这是原始名单，不是排过序的结果。你仍可自己勾选，路线和作战单照常能打。</span>
+        </div>
+
+        <div class="joblist">
+
+          <label class="jobrow ck--have">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">恒信精密制造 · A-12 号展位</span>
+              <span class="jobrow-s">机械设计工程师 / 工艺工程师 · 现场收纸质简历</span>
+              <span class="jobrow-m" data-when="default first">
+                <span class="ev ev--e1">读过岗位正文</span>
+                你简历里的「CAD 三年 + 夹具设计」和这家两个岗位的正文都对得上；
+                他们写了「接受应届以外的转行者」。
+              </span>
+              <span class="jobrow-m" data-when="ai-down">展位 A-12 · 来源：市人社局 · 同步 8月9日 07:30</span>
+            </span>
+          </label>
+
+          <label class="jobrow ck--have">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">华越自动化 · A-27 号展位</span>
+              <span class="jobrow-s">设备维护 / 电气调试 · 现场收纸质简历</span>
+              <span class="jobrow-m" data-when="default first">
+                <span class="ev ev--e1">读过岗位正文</span>
+                岗位正文要求「PLC 调试经验」，你写过西门子 S7；
+                但他们同时要求「持电工证」，<b>你的简历里没写</b> —— 带证去或当面说明。
+              </span>
+              <span class="jobrow-m" data-when="ai-down">展位 A-27 · 来源：市人社局 · 同步 8月9日 07:30</span>
+            </span>
+          </label>
+
+          <label class="jobrow ck--have">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">明德智能装备 · B-05 号展位</span>
+              <span class="jobrow-s">结构工程师 · 现场收纸质简历</span>
+              <span class="jobrow-m" data-when="default first">
+                <span class="ev ev--e2">只读到岗位标题</span>
+                这家来源平台没给正文，我只看到岗位名和展位号。
+                标题和你的方向沾边，<b>值不值得去要你自己判断</b>。
+              </span>
+              <span class="jobrow-m" data-when="ai-down">展位 B-05 · 来源：市人社局 · 同步 8月9日 07:30</span>
+            </span>
+          </label>
+
+          <label class="jobrow">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">瑞和新材料 · C-18 号展位</span>
+              <span class="jobrow-s">质量工程师 · 现场收纸质简历</span>
+              <span class="jobrow-m" data-when="default first">
+                <span class="ev ev--e1">读过岗位正文</span>
+                正文写「三年以上高分子材料经验」，你的经历在机械加工侧 ——
+                对不太上，放在这里供你自己决定。
+              </span>
+              <span class="jobrow-m" data-when="ai-down">展位 C-18 · 来源：市人社局 · 同步 8月9日 07:30</span>
+            </span>
+          </label>
+
+
+          <label class="jobrow">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">中鼎液压 · B-21 号展位</span>
+              <span class="jobrow-s">液压系统装配 / 售后技术 · 现场收纸质简历</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过岗位正文</span>
+                正文里「看得懂液压原理图」和你写的「参与过工装液压回路改造」对得上；
+                但这家在<b>邻市</b>，正文写了「需接受外派」。
+              </span>
+            </span>
+          </label>
+
+          <label class="jobrow">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">利丰模具 · B-28 号展位</span>
+              <span class="jobrow-s">模具设计 · 现场收纸质简历</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过岗位正文</span>
+                要求 UG/NX，你的简历里写的是 SolidWorks 和 CAD ——
+                <b>不是同一套软件</b>，去之前想好怎么说这件事。
+              </span>
+            </span>
+          </label>
+
+          <label class="jobrow">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">安泰重工 · A-33 号展位</span>
+              <span class="jobrow-s">焊接工艺 / 结构件 · 现场收纸质简历</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e2">只读到岗位标题</span>
+                来源平台没给正文。展位就在 A-27 隔壁两个，<b>顺路可以问一句</b>。
+              </span>
+            </span>
+          </label>
+
+          <label class="jobrow">
+            <span class="ck-box"></span>
+            <span class="jobrow-b">
+              <span class="jobrow-t">科捷传动 · C-24 号展位</span>
+              <span class="jobrow-s">齿轮工艺 / 热处理 · 现场收纸质简历</span>
+              <span class="jobrow-m">
+                <span class="ev ev--e1">读过岗位正文</span>
+                正文要求「热处理工艺经验」，你的简历里没有这一段 ——
+                对不上，列在这里只是让你知道有这家。
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div class="panel-note" data-when="default first" style="flex:0 0 auto;margin-top:var(--s-4)">
+          另有 <b>18 家</b>来源平台只给了公司名和展位号，我读不到岗位内容，因此不参与排序 ——
+          <b>这不等于它们不好</b>。<span class="chip chip--info">D-02 · D-07 · D-11 …</span>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 怎么走 ─────────── -->
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-map"/></svg>
+          <b>A 馆展位图 · 已排出最短路线</b>
+          <span class="mt">入口进 → 3 家 → 出口，全程约 240 米</span>
+        </div>
+
+        <div class="hall">
+          <svg class="hall-svg" viewBox="0 0 620 430" role="img"
+               aria-label="A 馆展位平面图，已标出 A-12、A-27、B-05 三个目标展位与步行路线">
+            <rect x="8" y="8" width="604" height="414" rx="10" fill="none"
+                  stroke="var(--fog-a20)" stroke-width="1.5"/>
+
+            <!-- 入口 / 出口 -->
+            <rect x="28" y="392" width="86" height="22" rx="5" fill="var(--fog-a12)"/>
+            <text x="71" y="407" class="booth-t" text-anchor="middle">入口</text>
+            <rect x="506" y="392" width="86" height="22" rx="5" fill="var(--fog-a12)"/>
+            <text x="549" y="407" class="booth-t" text-anchor="middle">出口</text>
+
+            <!-- A 排 -->
+            <rect class="booth booth--skip" x="40"  y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="78"  y="86">A-03</text>
+            <rect class="booth booth--pick" x="132" y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="170" y="86">A-12</text>
+            <rect class="booth booth--skip" x="224" y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="262" y="86">A-19</text>
+            <rect class="booth booth--pick" x="316" y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="354" y="86">A-27</text>
+            <rect class="booth booth--skip" x="408" y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="446" y="86">A-33</text>
+            <rect class="booth booth--skip" x="500" y="52" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="538" y="86">A-41</text>
+
+            <!-- B 排 -->
+            <rect class="booth booth--pick" x="40"  y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="78"  y="210">B-05</text>
+            <rect class="booth booth--skip" x="132" y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="170" y="210">B-09</text>
+            <rect class="booth booth--skip" x="224" y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="262" y="210">B-14</text>
+            <rect class="booth booth--skip" x="316" y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="354" y="210">B-21</text>
+            <rect class="booth booth--skip" x="408" y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="446" y="210">B-28</text>
+            <rect class="booth booth--skip" x="500" y="176" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="538" y="210">B-35</text>
+
+            <!-- C 排 -->
+            <rect class="booth booth--skip" x="40"  y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="78"  y="326">C-04</text>
+            <rect class="booth booth--skip" x="132" y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="170" y="326">C-11</text>
+            <rect class="booth booth--skip" x="224" y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="262" y="326">C-18</text>
+            <rect class="booth booth--skip" x="316" y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="354" y="326">C-24</text>
+            <rect class="booth booth--skip" x="408" y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="446" y="326">C-30</text>
+            <rect class="booth booth--skip" x="500" y="292" width="76" height="58" rx="6"/>
+            <text class="booth-t" x="538" y="326">C-37</text>
+
+            <!-- 路线：入口 → A-12 → A-27 → B-05 → 出口 -->
+            <path class="route" d="M71 388 L71 262 L170 262 L170 116"/>
+            <path class="route" d="M170 116 L170 140 L354 140 L354 116"/>
+            <path class="route" d="M354 116 L354 152 L78 152 L78 172"/>
+            <path class="route" d="M78 240 L78 262 L549 262 L549 388"/>
+
+            <circle class="route-pin" cx="170" cy="128" r="13"/>
+            <text class="route-no" x="170" y="133" text-anchor="middle">1</text>
+            <circle class="route-pin" cx="354" cy="128" r="13"/>
+            <text class="route-no" x="354" y="133" text-anchor="middle">2</text>
+            <circle class="route-pin" cx="78"  cy="252" r="13"/>
+            <text class="route-no" x="78"  y="257" text-anchor="middle">3</text>
+          </svg>
+        </div>
+
+        <div class="hall-lg">
+          <span><i style="background:var(--jade-a20);border:2px solid var(--jade-400)"></i>今天要去</span>
+          <span><i style="background:var(--fog-a04);border:1px dashed var(--fog-a20)"></i>其余展位</span>
+          <span><i style="background:var(--jade-400)"></i>路线顺序</span>
+          <span style="color:var(--fog-500)">平面图由主办方提供 · 现场以实际布展为准</span>
+        </div>
+      </div>
+
+      <!-- ─────────── S4 带走作战单 ─────────── -->
+      <div class="paper-bar" data-at="s4">
+        <span class="nm">赶场作战单 · 2026 秋季综合人才交流会</span>
+        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s4">
+        <div class="sheet-a4">
+          <div class="combat">
+            <h1>赶场作战单</h1>
+            <div class="cb-sub">
+              2026 年秋季综合人才交流会 · 8月12日 周三 09:00–16:00 · 市人力资源市场 A 馆<br>
+              主办：市人力资源和社会保障局 · 外部ID RC-2026-0812-A · 数据同步于 8月9日 07:30
+            </div>
+            <div class="cb-hr"></div>
+
+            <div class="cb-stop">
+              <span class="cb-no">1</span>
+              <span>
+                <span class="cb-nm">恒信精密制造 &nbsp;·&nbsp; A-12 号展位</span>
+                <span class="cb-mt">机械设计工程师 / 工艺工程师 · 现场收纸质简历</span>
+                <span class="cb-ask">
+                  可以问：<b>夹具设计岗现在缺几个人</b>／<b>转行过来的怎么算工龄</b><br>
+                  他们岗位正文写了「接受应届以外的转行者」。
+                </span>
+              </span>
+            </div>
+
+            <div class="cb-stop">
+              <span class="cb-no">2</span>
+              <span>
+                <span class="cb-nm">华越自动化 &nbsp;·&nbsp; A-27 号展位</span>
+                <span class="cb-mt">设备维护 / 电气调试 · 现场收纸质简历</span>
+                <span class="cb-ask">
+                  注意：岗位要求<b>持电工证</b>，你的简历里没写 —— 带上原件或当面说明。<br>
+                  可以问：<b>调试岗出差频率</b>／<b>没有电工证能不能先入职再考</b>
+                </span>
+              </span>
+            </div>
+
+            <div class="cb-stop">
+              <span class="cb-no">3</span>
+              <span>
+                <span class="cb-nm">明德智能装备 &nbsp;·&nbsp; B-05 号展位</span>
+                <span class="cb-mt">结构工程师 · 现场收纸质简历</span>
+                <span class="cb-ask">
+                  这家来源平台没给岗位正文，本机只看到岗位名和展位号 ——
+                  <b>到现场先问清楚做什么产品</b>再决定投不投。
+                </span>
+              </span>
+            </div>
+
+            <div class="cb-hr"></div>
+            <div class="cb-sub">
+              建议路线：入口 → A-12 → A-27 → B-05 → 出口，全程约 240 米。<br>
+              建议带 <b>6 份</b>纸质简历（3 家 × 2 份），已加入本次打印清单，将同时打印。
+            </div>
+
+            <div class="cb-foot">
+              本单由职易达一体机根据公开岗位信息和你本人的简历生成，仅供你自己参考。<br>
+              本机不代收简历、不代为投递、不预测录用结果；是否录用由用人单位决定。<br>
+              岗位与展位信息以主办方现场公布为准。本单不作为入场凭证。
+            </div>
+          </div>
+        </div>
+
+        <div class="sheet-a4" style="margin-top:var(--s-5)">
+          <div class="combat" style="padding:26px 30px">
+            <div style="font-size:11px;color:#8a97a2;letter-spacing:.08em;margin-bottom:10px">
+              同批第 2 份 · 共 6 份 · 每份 2 页
+            </div>
+            <h1 style="font-size:19px">王 磊</h1>
+            <div class="cb-sub">机械设计工程师 · 6 年经验 · 期望 深圳 / 东莞</div>
+            <div class="cb-hr"></div>
+            <div class="cb-nm">工作经历</div>
+            <div class="cb-ask" style="margin-top:6px">
+              2021.03 – 至今 &nbsp; 某精密机械 &nbsp;·&nbsp; 机械设计工程师<br>
+              负责非标自动化夹具设计，主导 3 条产线工装改造，
+              参与过工装液压回路改造。<br>
+              熟悉 SolidWorks / AutoCAD，会看液压原理图。
+            </div>
+            <div class="cb-nm" style="margin-top:14px">教育经历</div>
+            <div class="cb-ask" style="margin-top:6px">
+              2017.09 – 2021.06 &nbsp; 某职业技术学院 &nbsp;·&nbsp; 机械设计与制造（专科）
+            </div>
+            <div class="cb-foot" style="margin-top:16px">
+              这是你上传的原件，本机原样打印，没有改动其中任何内容。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="alsoprint" data-at="s4">
+        <span class="ap-thumbs">
+          <span class="ap-th"><i></i><i></i><i></i><i></i></span>
+          <span class="ap-th"><i></i><i></i><i></i><i></i></span>
+        </span>
+        <span class="ap-b">
+          <span class="ap-t">同批还要打：王磊_机械_2026.pdf</span>
+          <span class="ap-s">A4 黑白 · 2 页 × 6 份 = 12 页 —— 这一单 13 页里的大头是它，不是作战单</span>
+        </span>
+        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">已按 3 家 × 2 份算</span></span>
+      </div>
+
+      <!-- 2026-08-09 零落点补齐：活动资料（线上 /job-fairs/:id/materials）——
+           主办方场刊/地图可加入本批打印，默认不加，不替用户做主。 -->
+      <div class="alsoprint" data-at="s4">
+        <span class="ap-thumbs">
+          <span class="ap-th"><i></i><i></i><i></i><i></i></span>
+        </span>
+        <span class="ap-b">
+          <span class="ap-t">主办方活动资料也能加进这批：场刊 · 展位地图</span>
+          <span class="ap-s">主办方提供的公开资料，可加入本次打印清单一起打；加了页数会变，费用以打印工作台核价为准</span>
+        </span>
+        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">默认不加 · 可选</span></span>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右：先答"去之前要准备什么"，再答"这一场怎么参加"。
+           顺序不能反：用户还没选场次时，"这一场"指代不明。 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-package"/></svg><b>不管去哪一场，都要带</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">纸质简历 6–10 份</span>
+              <span class="ck-s">你有 1 份可打 · A4 黑白 0.2 元/页（预估 · 以打印工作台核价为准）</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">身份证原件</span>
+              <span class="ck-s">三场都要，进场核验用</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">电工证等资格证</span>
+              <span class="ck-s">你选的岗位里有 1 家写了要持证</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">一支笔</span>
+              <span class="ck-s">现场填表用，展位不一定有</span></span>
+          </label>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这份清单只在本机这次办理里用，离场自动清空，不留存。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-ticket"/></svg>
+          <b>制造业专场 · 怎么参加</b>
+        </div>
+        <div class="sec">
+          <div class="panel-note" style="margin-bottom:var(--s-4)">
+            下面这些是 <b>8月15日 制造业专场</b> 的规则 —— AI 建议的那一场。
+            点左边任一场可以换成看它的。
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">是否需预约</span><span class="v">是 · 来源平台预约</span></div>
+            <div class="kv-row"><span class="k">现场是否收纸质简历</span><span class="v">收 · 建议带 3 份</span></div>
+            <div class="kv-row"><span class="k">参会企业</span><span class="v">32 家 · 全制造类</span></div>
+            <div class="kv-row"><span class="k">怎么去</span><span class="v">地铁 3 号线 高新区站 B 口</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">高新区人才服务中心</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-external"/></svg>
+            <span>预约与入场资格以来源平台为准，本机不代办。</span>
+          </div>
+          <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)">
+            <svg class="ic"><use href="#i-external"/></svg>去来源平台预约
+          </button>
+          <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-3)">
+            <svg class="ic"><use href="#i-qr"/></svg>扫码预约
+          </button>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 域入口契约(closed-loop-map §二)：招聘会域 = P17 + P18 + P19，补横向入口 -->
+      <div class="xlane" data-at="s1">
+        <span class="xlane-hd">校园相关的在这里</span>
+        <div class="xlane-row" style="grid-template-columns:1fr">
+          <a class="xlane-go" href="18-campus.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">校园招聘专区</span>
+              <span class="xlane-ds">校招季节条 · 逐场活动来源可核 · 计划表打印</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+          <a class="xlane-go" href="19-smart-campus.html">
+            <span class="src-ic"><svg class="ic"><use href="#i-agency"/></svg></span>
+            <span class="xlane-tx">
+              <span class="xlane-nm">智慧校园</span>
+              <span class="xlane-ds">由学校接入后开放 · 未接入前只做说明</span>
+            </span>
+            <svg class="ic"><use href="#i-arrowRight"/></svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- S2 右：拿什么比的 → 读到什么程度 → 已选会带来什么 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>拿来比对的是这份</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">简历</span><span class="v">王磊_机械_2026.pdf</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">本机 8月9日 09:58 上传</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            比对用的是简历里的技能与经历段落，不含你的联系方式。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这 80 家我读到什么程度</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">读过完整岗位正文</span><span class="v"><b>62</b> 家</span></div>
+            <div class="kv-row"><span class="k">只有公司名与展位号</span><span class="v"><b>18</b> 家</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            那 18 家我看不到里面招什么，所以不参与排序 ——
+            <b>这不等于它们不好</b>。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>选完会带来什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已选</span><span class="v"><b data-pick-n>3</b> 家</span></div>
+            <div class="kv-row"><span class="k">建议带简历</span><span class="v"><b>6</b> 份（每家 2 份）</span></div>
+            <div class="kv-row"><span class="k">作战单</span><span class="v">1 页 · 含展位与要问的话</span></div>
+            <div class="kv-row"><span class="k">合计</span><span class="v">13 页 · <b>2.60</b> 元（预估 · 以打印工作台核价为准）</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>本机不代收、不代投简历。是否投递、投给谁，到现场由你自己决定。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            选得越多，要走的路和要带的纸越多。最多可选 8 家。
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右：顺序 + 到了现场怎么用这张图 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-route"/></svg><b>今天的顺序</b>
+          <span class="mt">按展位位置算，不代表好坏</span></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">恒信精密制造 · A-12</span>
+                <span class="tl-s">进门左手第二个 · 问夹具设计岗</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">华越自动化 · A-27</span>
+                <span class="tl-s">同一排往里走 · 记得带电工证</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">明德智能装备 · B-05</span>
+                <span class="tl-s">转到第二排最左 · 先问做什么产品</span></span></div>
+          </div>
+          <button class="btn btn--lg btn--quiet" style="width:100%;margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-pen"/></svg>调整顺序
+          </button>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-pin"/></svg><b>到了现场</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">全程</span><span class="v">约 240 米</span></div>
+            <div class="kv-row"><span class="k">预计用时</span><span class="v">1 小时 20 分</span></div>
+            <div class="kv-row"><span class="k">每家停留</span><span class="v">约 20 分钟</span></div>
+            <div class="kv-row"><span class="k">建议时段</span><span class="v">上午 10 点前</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这张图是主办方提前给的。<b>现场布展常有临时调整</b> ——
+                  找不到展位以现场指示牌和咨询台为准，别照着这张图硬找。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            下一步会把这三站、每站要问的话、展位号打成一页纸，你带着走。<br>
+            纸上不会有你的手机号和身份证号。
+          </div>
+        </div>
+      </div>
+
+      <!-- S4 右：打印参数 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>一起打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">赶场作战单</span><span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+          <label class="ck ck--have" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">纸质简历</span><span class="ck-s">A4 黑白 · 2 页 × 6 份</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">13 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>2.60</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把作战单存进手机，或稍后再来打。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用为预估 · 以打印工作台核价为准。作战单同时存进「我的文档」。
+          </div>
+        </div>
+      </div>
+
+      <!-- 2026-08-09 零落点补齐：现场数据（线上 /job-fairs/:id/stats）。
+           开场当天才有真数据，此刻三场都没开场 —— 数字标「示例」，不冒充实时。 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-users"/></svg><b>开场当天 · 现场数据</b>
+          <span class="mt">主办方提供</span></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">今日到场</span><span class="v"><b>1,240</b> 人次（示例）</span></div>
+            <div class="kv-row"><span class="k">热门展位</span><span class="v">A-12 · A-27（示例）</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">主办方 · 每 10 分钟同步</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            <span class="ev ev--e2">E2 主办方数据</span>
+            三场都没开场，数字是示例 —— 开场当天你带着作战单到现场，本机这里换成主办方
+            同步的实时数据并标同步时间；主办方没提供的场次不显示。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走 13 页</span>
+                <span class="mt">作战单在最上面一页</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">作战单存进「我的文档」</span>
+                <span class="mt">今天之内可以再打一次，不重复收费</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">这次记进「打印订单」</span>
+                <span class="mt">在「我的」里能查到</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机不记录你去没去、投没投 —— 只记录你在这台机器上打了什么。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用引导：只给一句话。
+           初版写了三段，把右栏第四块撑出来，把下面 pane 里的「扫码预约」挤成内滚 ——
+           在触控一体机上，把合规入口藏进内滚面板是坏设计。引导本来就该短。 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            挑出值得去的几家，排出少走路的顺序，<b>打成一张纸带进场</b>。<br>
+            本机不代收、不代投简历。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">换一场</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">改选企业</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">改路线</button>
+
+    <span class="actionbar-hint" data-at="s2" data-when="default first">已选 3 家 · 最多可选 8 家</span>
+    <span class="actionbar-hint" data-at="s3">全程约 240 米 · 预计 1 小时 20 分</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 13 页 · 预估 2.60 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2">选这一场<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">排今天的路线<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4">生成作战单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

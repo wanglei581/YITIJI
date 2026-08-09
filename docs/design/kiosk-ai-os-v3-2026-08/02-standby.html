@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P02 待机唤醒屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P02 待机唤醒屏">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P02 待机唤醒屏 ─────────────────────────────────────────────────────
+   这一页和别的 25 页结构完全不同：**没人在看的时候它才出现**。
+   所以它不用 .wmain / .wside 两栏骨架，是整屏的。
+
+   ── 一个容易被忽略的职责 ──────────────────────────────────────────
+   待机屏最该做的一件事，不是播广告，是**在人走近之前就告诉他这台机器能不能用**。
+
+   一个人穿过大厅走过来、站定、点亮屏幕、选功能、传完文件，
+   最后才看到「打印机缺纸」—— 这几十秒是白花的，而他可能是请假来的。
+   所以设备状态要**放在待机屏上，远距离可读**，让人在十米外就能决定要不要过来。
+
+   ── 广告的边界 ────────────────────────────────────────────────────
+   一期已上线的待机宣传屏支持管理员上传图/视频。这里的纪律：
+   · 赞助内容必须**标明是广告**，不能混在信息里冒充本机的推荐
+   · 待机屏不承接任何交互（不能在待机屏上领券、扫码、报名）——
+     碰一下就该唤醒进正常流程，而不是先被一个弹窗拦住
+   · 不在待机屏上显示上一位用户的任何痕迹
+
+   ── 离线 ──────────────────────────────────────────────────────────
+   断网时轮播用本地缓存继续播，但**任何带时效的内容必须标出同步时间**，
+   否则会把三天前的招聘会当成今天的。
+   ──────────────────────────────────────────────────────────────── */
+
+.standby { position:absolute; inset:0; display:flex; flex-direction:column;
+  padding:var(--s-7) var(--s-6); gap:var(--s-6); }
+
+/* 顶部：机器身份 + 设备状态。远距离可读是硬要求 */
+.sb-top { flex:0 0 auto; display:flex; align-items:flex-start; gap:var(--s-5); }
+.sb-mark { width:76px; height:76px; border-radius:var(--r-md); flex:0 0 auto;
+  background:var(--jade-a20); border:1px solid var(--jade-a32);
+  display:grid; place-items:center; font-size:38px; font-weight:800; color:var(--jade-200); }
+.sb-id { min-width:0; display:flex; flex-direction:column; gap:5px; }
+.sb-nm { font-size:40px; font-weight:800; color:var(--fog-900); line-height:1.1; letter-spacing:.5px; }
+.sb-sub { font-size:var(--fz-4); color:var(--fog-600); }
+.sb-clock { margin-left:auto; flex:0 0 auto; text-align:right; }
+.sb-time { font-size:44px; font-weight:800; font-family:var(--ff-num); color:var(--fog-900);
+  line-height:1; font-variant-numeric:tabular-nums; }
+.sb-date { font-size:var(--fz-3); color:var(--fog-600); margin-top:6px; }
+
+/* 设备状态条：十米外要能判断 */
+.sb-health { flex:0 0 auto; display:flex; gap:var(--s-4); }
+.hz { flex:1; padding:var(--s-5) var(--s-5); border-radius:var(--r-md);
+  display:flex; align-items:center; gap:var(--s-4); }
+.hz--ok { background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.hz--warn { background:var(--amber-a12); border:1px solid var(--amber-a20); }
+.hz--down { background:var(--fog-a08); border:1px dashed var(--fog-a20); }
+.hz-dot { width:16px; height:16px; border-radius:50%; flex:0 0 auto; }
+.hz--ok .hz-dot { background:var(--jade-500); }
+.hz--warn .hz-dot { background:var(--amber-400); }
+.hz--down .hz-dot { background:var(--fog-600); }
+.hz-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.hz-t { font-size:var(--fz-5); font-weight:700; color:var(--fog-900); }
+.hz-s { font-size:var(--fz-2); color:var(--fog-700); }
+
+/* 轮播主体 */
+.sb-stage { flex:1 1 auto; min-height:0; border-radius:var(--r-lg); position:relative;
+  overflow:hidden; background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; flex-direction:column; }
+.slide { flex:1 1 auto; min-height:0; padding:var(--s-7); display:flex; flex-direction:column;
+  justify-content:center; gap:var(--s-5); }
+.slide-kicker { font-size:var(--fz-3); color:var(--fog-600); letter-spacing:.14em; }
+.slide-h { font-size:56px; font-weight:800; color:var(--fog-900); line-height:1.14; letter-spacing:.5px; }
+.slide-p { font-size:var(--fz-5); color:var(--fog-700); line-height:1.6; max-width:26em; }
+.slide-p b { color:var(--fog-900); }
+.slide-meta { font-size:var(--fz-2); color:var(--fog-600); font-family:var(--ff-num);
+  display:flex; flex-wrap:wrap; gap:4px var(--s-5); }
+
+/* 广告必须标明 */
+.adflag { align-self:flex-start; font-size:var(--fz-2); font-weight:700; padding:4px 13px;
+  border-radius:var(--r-xs); background:var(--fog-a12); color:var(--fog-700); }
+
+/* 轮播指示 */
+.sb-dots { flex:0 0 auto; display:flex; gap:8px; padding:0 var(--s-7) var(--s-6); }
+.sb-dots i { width:38px; height:5px; border-radius:3px; background:var(--fog-a12); display:block; }
+.sb-dots i.on { background:var(--jade-400); }
+
+/* 底部唤醒提示 */
+.sb-wake { flex:0 0 auto; display:flex; align-items:center; justify-content:center;
+  gap:var(--s-4); padding:var(--s-6); border-radius:var(--r-md);
+  background:var(--jade-a12); border:1px solid var(--jade-a32); }
+.sb-wake .ic { width:32px; height:32px; color:var(--jade-400); }
+.sb-wake span { font-size:30px; font-weight:700; color:var(--fog-900); }
+@media (prefers-reduced-motion:no-preference){
+  .sb-wake { animation:p02breathe 3.4s ease-in-out infinite; }
+}
+@keyframes p02breathe { 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-4px) } }
+
+.sb-foot { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-5);
+  font-size:var(--fz-2); color:var(--fog-600); flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+
+  <div class="standby">
+
+    <!-- ═══ 机器身份 + 时间 ═══ -->
+    <div class="sb-top">
+      <span class="sb-mark">职</span>
+      <span class="sb-id">
+        <span class="sb-nm">职易达</span>
+        <span class="sb-sub">AI 求职打印服务终端 · 01 号机 · 市人力资源市场 A 馆</span>
+      </span>
+      <span class="sb-clock">
+        <span class="sb-time" data-clock>17:24</span>
+        <span class="sb-date">2026年8月9日 周日</span>
+      </span>
+    </div>
+
+    <!-- ═══ 设备状态：这一屏最该有的东西 ═══
+         让人在十米外就能决定要不要走过来 —— 走到跟前才发现缺纸，
+         那几十秒是白花的，而他可能是请假来的。 -->
+    <div class="sb-health" data-when="default first">
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">可以打印</span>
+          <span class="hz-s">黑白 / 彩色 · A4 · 纸量充足</span></span>
+      </span>
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">可以扫描</span>
+          <span class="hz-s">送稿器可用 · 最多 50 页</span></span>
+      </span>
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">AI 服务正常</span>
+          <span class="hz-s">简历诊断 · 岗位匹配 · 面试练习</span></span>
+      </span>
+    </div>
+
+    <div class="sb-health" data-when="device-off">
+      <span class="hz hz--down">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">暂时不能打印</span>
+          <span class="hz-s">打印机故障 · 已上报运维 · 预计 18:30 前恢复</span></span>
+      </span>
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">可以扫描</span>
+          <span class="hz-s">扫成 PDF 存手机，不受影响</span></span>
+      </span>
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">AI 服务正常</span>
+          <span class="hz-s">改简历、练面试照常可用</span></span>
+      </span>
+    </div>
+
+    <div class="sb-health" data-when="ai-down">
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">可以打印</span>
+          <span class="hz-s">黑白 / 彩色 · A4 · 纸量充足</span></span>
+      </span>
+      <span class="hz hz--ok">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">可以扫描</span>
+          <span class="hz-s">送稿器可用 · 最多 50 页</span></span>
+      </span>
+      <span class="hz hz--warn">
+        <span class="hz-dot"></span>
+        <span class="hz-b"><span class="hz-t">AI 暂时不可用</span>
+          <span class="hz-s">简历诊断、岗位匹配用不了 · 打印扫描不受影响</span></span>
+      </span>
+    </div>
+
+    <!-- ═══ 轮播 ═══ -->
+    <div class="sb-stage">
+
+      <!-- 幻灯 1：本机能做什么（default / first / ai-down） -->
+      <div class="slide" data-when="default first ai-down">
+        <span class="slide-kicker">这台机器能做什么</span>
+        <span class="slide-h">改简历、打材料、<br>算好招聘会先去哪几家。</span>
+        <span class="slide-p">
+          <b>不用登录也能全部用完</b>。上传简历看问题在哪、把材料打齐、
+          按你的简历排出招聘会当天的走法 —— 都在这台机器上。<br>
+          本机<b>不代收简历、不代为投递</b>，你带走的是纸。
+        </span>
+        <span class="slide-meta">
+          <span>打印 A4 黑白 0.20 元 / 页</span>
+          <span>AI 服务不收费</span>
+          <span>价格以现场公示为准</span>
+        </span>
+      </div>
+
+      <!-- 幻灯 1'：设备故障时换一张，不播「能做什么」 -->
+      <div class="slide" data-when="device-off">
+        <span class="slide-kicker">当前状态</span>
+        <span class="slide-h">打印机暂时坏了，<br>但别的还能用。</span>
+        <span class="slide-p">
+          扫描、改简历、练面试、查政策<b>都不受影响</b>。<br>
+          要打印的话，<b>可以先把文件在这里准备好</b>，
+          扫码存进手机，修好了再来打；或者去 B 馆 03 号机。
+        </span>
+        <span class="slide-meta">
+          <span>故障已自动上报运维</span>
+          <span>预计 18:30 前恢复</span>
+          <span>03 号机在 B 馆入口右手</span>
+        </span>
+      </div>
+
+      <div class="sb-dots">
+        <i class="on"></i><i></i><i></i><i></i>
+      </div>
+    </div>
+
+    <!-- ═══ 唤醒提示 ═══ -->
+    <div class="sb-wake">
+      <svg class="ic"><use href="#i-target"/></svg>
+      <span data-when="default first ai-down">碰一下屏幕开始</span>
+      <span data-when="device-off">碰一下屏幕，看还能做什么</span>
+    </div>
+
+    <!-- ═══ 页脚：同步时间与合规 ═══ -->
+    <div class="sb-foot">
+      <span data-when="default first ai-down device-off">岗位与招聘会信息同步于 <b>8月9日 07:30</b></span>
+      <span data-when="default first ai-down device-off">来源：市人社局 · 高新区人才服务中心 · 省教育厅学生服务中心</span>
+      <span data-when="default first ai-down device-off">本机只做信息展示与打印，不代办、不代收简历</span>
+    </div>
+
+  </div>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

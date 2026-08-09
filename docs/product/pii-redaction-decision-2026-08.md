@@ -155,7 +155,6 @@ POST /materials/:fileId/pii-redact
 
 同理 `reverify.remainingCount` 不可省略：省略解析为 `null` 而非 `0`，
 **「没报告残留」不等于「零残留」**。
-
 ---
 
 ## 四、交互契约（四步，第 3 步不可跳过）

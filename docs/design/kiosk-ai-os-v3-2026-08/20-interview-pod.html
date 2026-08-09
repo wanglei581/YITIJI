@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P20 面试训练舱 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P20 面试训练舱">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P20 专用 ───────────────────────────────────────────────────────────
+   这一页有个别的页没有的约束：**机器在公共场所**。
+
+   让人站在人才市场大厅里对着屏幕大声回答"你最大的缺点是什么"，
+   现实里不会发生。所以本页的默认答题方式是**打字**，语音是可选项，
+   并且在选语音前就把"周围有人能听见"说清楚 —— 而不是等他开口才发现。
+
+   另一条纪律：AI 能判断的是**你说清楚了没有**（有没有讲背景、有没有讲结果、
+   有没有答到问的点），判断不了**你说的是不是真的、行业里对不对**。
+   这条必须写在报告的正上方，否则用户会把"结构完整"当成"答得对"。
+
+   组件备忘：.tl 本身是一步（容器 .tline）；.chk 不是复选框（复选框是 .ck-box）；
+   .jobrow / .ck 只在 11、12 页页内定义过，本页自带。
+   ──────────────────────────────────────────────────────────────────── */
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-3); padding-bottom:var(--s-4); }
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 答题方式：打字为默认，语音要先说清公共场所这件事 */
+.ways { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-4); }
+.way { text-align:left; padding:var(--s-5); border-radius:var(--r-md); cursor:pointer;
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd); font-family:var(--ff-ui);
+       display:flex; flex-direction:column; gap:var(--s-3);
+       transition:border-color var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.way:hover { border-color:var(--jade-a32); transform:translateY(-2px); }
+.way--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.way-ic { width:44px; height:44px; border-radius:var(--r-xs); display:grid; place-items:center;
+          background:var(--fog-a08); }
+.way-ic .ic { width:22px; height:22px; color:var(--fog-700); }
+.way--on .way-ic { background:var(--jade-a20); }
+.way--on .way-ic .ic { color:var(--jade-400); }
+.way-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.way-s { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+
+/* 题目区 */
+.qbox { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:var(--s-4); }
+.q-no { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); letter-spacing:.06em; }
+.q-t  { font-size:var(--fz-7); font-weight:700; color:var(--fog-900); line-height:var(--lh-snug); }
+.q-why{ font-size:var(--fz-2); color:var(--fog-700); line-height:1.6; }
+.ansbox { flex:1 1 auto; min-height:0; padding:var(--s-5); border-radius:var(--r-md);
+          background:var(--surf-1); border:1px solid var(--brd-1);
+          font-size:var(--fz-4); color:var(--fog-800); line-height:1.7; overflow-y:auto; }
+.ansbox .cursor { display:inline-block; width:2px; height:1.05em; background:var(--jade-500);
+                  vertical-align:-2px; }
+@media (prefers-reduced-motion: no-preference) { .ansbox .cursor { animation: p20cur 1.1s steps(2) infinite; } }
+@keyframes p20cur { 50% { opacity:0 } }
+
+/* 报告：逐条点评，每条说清是"结构"还是"内容" */
+.rev { padding:var(--s-5); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.rev-hd { display:flex; align-items:baseline; gap:var(--s-3); }
+.rev-q { font-size:var(--fz-4); font-weight:600; color:var(--fog-900); }
+/* 状态标签，不是入口：说的是这一题的判定结果，点它不通向别处。
+   命名带 -status 是给自检认的（audit-plus 按类名放行状态类），也是给读代码的人看的。 */
+.rev-tag-status { font-size:var(--fz-1); padding:2px 9px; border-radius:999px; white-space:nowrap; }
+.rev-tag-status--ok  { background:var(--jade-a20); color:var(--jade-200); }
+.rev-tag-status--gap { background:var(--amber-a12); color:var(--amber-200); }
+.rev-p { font-size:var(--fz-2); color:var(--fog-700); line-height:1.62; }
+.rev-p b { color:var(--fog-900); }
+.rev-said { font-size:var(--fz-2); color:var(--fog-600); line-height:1.6;
+            padding-left:var(--s-4); border-left:2px solid var(--fog-a12); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+
+/* 单页文件：纸面居中。
+   work.css 的 .paper-stage 注释解释了为什么默认顶对齐 ——
+   「多页要连续滚动，整页居中缩放会左右出界，下方还会留一大块死白」。
+   那个判断对多页成立；但这一单只有 1 页，顶对齐留下的恰恰就是那条注释
+   想避免的死白（实测纸底到栏底约 420px 的无容器背景空洞）。
+   所以只在「只有一张纸」时居中，多页仍走原有行为。 */
+.paper-stage:has(> .sheet-a4:only-child) { justify-content: center; }
+
+/* 复盘单纸面 */
+.rp { padding:30px 34px; color:#17222b; }
+.rp h1 { font-size:21px; font-weight:800; }
+.rp .rp-sub { font-size:12.5px; color:#5b6b78; margin-top:3px; }
+.rp .rp-hr { height:1px; background:#d9e1e8; margin:14px 0 12px; }
+.rp-q { font-size:14px; font-weight:700; margin-top:13px; }
+.rp-a { font-size:12.5px; color:#2c3a45; line-height:1.55; margin-top:4px; }
+.rp-a b { color:#0f5a45; }
+.rp-fix { font-size:12.5px; color:#7a4a1e; line-height:1.55; margin-top:4px; }
+.rp-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
+           padding-top:9px; margin-top:14px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">面试训练</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #I-4406</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 只能看题不能点评</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>11:32</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">练什么·怎么答</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">逐题作答</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">看点评</span></button>
+      <button class="rstep" data-go="s4"><span class="rstep-dot">4</span><span class="rstep-name">带走复盘单</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 4 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 练什么 · 怎么答 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-target"/></svg>
+          <b>练哪个岗位</b>
+          <span class="mt" data-when="default first">按你简历和最近看过的岗位挑的</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 只能用通用题库</span>
+        </div>
+        <div class="sec">
+          <div class="advice-act" data-when="default first">
+            你 8月9日 看过<b>恒信精密制造</b>的机械设计岗，8月14日还有一场宣讲后初面 ——
+            先练这个方向最划算。
+          </div>
+          <div class="advice-act" data-when="ai-down">
+            AI 暂时不可用，点评做不了。下面是<b>通用题库</b>，可以看题、可以自己答、可以打印题目，
+            但<b>本机这次不会给你任何点评</b>。
+          </div>
+
+          <div class="ways" style="margin-top:var(--s-4)">
+            <button class="way way--on">
+              <span class="way-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
+              <span class="way-t">机械设计 / 工艺岗</span>
+              <span class="way-s">8 道题 · 约 15 分钟 · 含 2 道现场常问的追问</span>
+            </button>
+            <button class="way">
+              <span class="way-ic"><svg class="ic"><use href="#i-users"/></svg></span>
+              <span class="way-t">通用行为面</span>
+              <span class="way-s">6 道题 · 约 10 分钟 · 不限岗位</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-mic"/></svg>
+          <b>怎么答</b>
+          <span class="mt">这台机器在公共场所，先想清楚再选</span>
+        </div>
+        <div class="sec">
+          <div class="ways">
+            <button class="way way--on">
+              <span class="way-ic"><svg class="ic"><use href="#i-pen"/></svg></span>
+              <span class="way-t">打字作答<span class="chip chip--jade chip--info" style="margin-left:8px">推荐</span></span>
+              <span class="way-s">
+                旁边的人看不到你答什么。<b>大厅里这个更实际</b> ——
+                虽然真面试是说出来的，但先把要说的想清楚，比在人前大声练更有用。
+              </span>
+            </button>
+            <button class="way">
+              <span class="way-ic"><svg class="ic"><use href="#i-mic"/></svg></span>
+              <span class="way-t">语音作答</span>
+              <span class="way-s">
+                更接近真面试，能听出你的语速和停顿。
+                但<b>你要在大厅里出声说话，周围的人能听见</b> ——
+                如果这里人多，建议选打字。
+              </span>
+            </button>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>语音只在本次作答时用来转成文字，<b>录音不落盘、不上传、不留存</b>，
+                  这一题答完即删。转成的文字也只在本次办理里用，离场清空。</span>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>无论哪种方式，本机<b>不录像、不开摄像头</b>，也不做表情或"仪态"评分 ——
+                  那种评分没有可靠依据，本机不做。</span>
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-interview"/></svg><b>这 8 道大概问什么</b>
+            <span class="mt">先知道要答什么，比直接开始更容易开口</span>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">开场两道 · 自我介绍、为什么投这个岗</span>
+                <span class="tl-s">最常被答砸的其实是这两道</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">技术三道 · 按岗位正文出的</span>
+                <span class="tl-s">夹具设计、公差、排查问题的思路</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">追问两道 · 顺着你的回答再问一层</span>
+                <span class="tl-s">你说了数字，就会被问怎么测的</span></span></div>
+            <div class="tl"><span class="tl-dot">4</span>
+              <span class="tl-b"><span class="tl-t">收尾一道 · 你有什么想问我们的</span>
+                <span class="tl-s">这道答"没有"最吃亏</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            答不上来可以跳过，跳过不算错，也不影响后面的题。
+            这里没有及格线 —— <b>本机不打分</b>。
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 逐题作答 ─────────── -->
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-interview"/></svg>
+          <b>第 3 题 / 共 8 题</b>
+          <span class="mt">打字作答 · 想好再写，没有倒计时</span>
+        </div>
+        <div class="sec qbox">
+          <div>
+            <div class="q-no">追问题 · 上一题你提到了工装改造</div>
+            <div class="q-t">你说把卡料率从 12% 降到 3%，这个 3% 是怎么测出来的？</div>
+            <div class="q-why" data-when="default first">
+              <span class="ev ev--e1">这类追问在制造业面试里很常见</span>
+              问这个不是不信你，是想知道<b>你有没有真参与到验证环节</b>。
+              答不上来测法，前面那句数字就白说了。
+            </div>
+            <div class="q-why" data-when="ai-down">
+              AI 不可用，本题只显示题目，<b>答完不会有点评</b>。
+            </div>
+          </div>
+
+          <div class="ansbox">
+            我们改完第二版之后，连续跑了三天的量产单来统计。
+            每天记录进料总数和卡住停机的次数，卡料率就是停机次数除以进料总数。
+            改造前那一版我也有同样的记录，是 12% 左右。三天下来第二版平均是 3.1%<span class="cursor"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S3 看点评 ─────────── -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>先说清楚本机能判断什么</b>
+        </div>
+        <div class="sec">
+          <div class="advice-act">
+            本机能判断<b>你说清楚了没有</b> —— 有没有讲背景、有没有讲做法、有没有讲结果、
+            有没有答到问的那个点。
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>本机<b>判断不了</b>你说的是不是真的、数字对不对、这个做法在你们行业里合不合理 ——
+                  那要懂这一行的人才看得出来。<br>
+                  所以下面写「说清楚了」<b>不等于「答得对」</b>，
+                  更不代表你面试会不会通过 —— 那本机不预测、也预测不了。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="joblist">
+
+          <div class="rev">
+            <div class="rev-hd">
+              <span class="rev-q">第 3 题 · 3% 是怎么测出来的</span>
+              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto">说清楚了</span>
+            </div>
+            <div class="rev-said">
+              你说：连续跑三天量产单，记录进料总数和停机次数，卡料率＝停机次数／进料总数，
+              改造前同样口径是 12%，第二版平均 3.1%。
+            </div>
+            <div class="rev-p">
+              <b>好在</b>：说了测法、说了周期、说了改造前用的是同一口径 ——
+              最后这点最关键，两个数字口径一致，比较才成立。
+            </div>
+          </div>
+
+          <div class="rev">
+            <div class="rev-hd">
+              <span class="rev-q">第 1 题 · 自我介绍</span>
+              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto">有缺口</span>
+            </div>
+            <div class="rev-said">
+              你说：我叫王磊，做机械设计六年，主要做非标自动化夹具，用 SolidWorks 和 CAD。
+            </div>
+            <div class="rev-p">
+              <b>缺的是</b>：没说<b>为什么来应聘这个岗</b>。
+              自我介绍最后一句通常要落到"所以我想做什么"，否则听完不知道你要什么。<br>
+              另外六年经验只说了工具，<b>没说做成过什么</b> —— 你后面第 3 题讲的那个卡料率，
+              其实更适合放在这里。
+            </div>
+          </div>
+
+          <div class="rev">
+            <div class="rev-hd">
+              <span class="rev-q">第 2 题 · 遇到过最难的技术问题</span>
+              <span class="rev-tag-status rev-tag-status--gap" style="margin-left:auto">有缺口</span>
+            </div>
+            <div class="rev-said">
+              你说：有一次产线夹具老是定位不准，查了很久，后来换了个定位销的方案就好了。
+            </div>
+            <div class="rev-p">
+              <b>缺的是</b>：「查了很久」中间发生了什么。这类题问的就是<b>你怎么排查</b>，
+              不是最后换了什么。<br>
+              试着补：先怀疑什么、怎么排除的、怎么确定是定位销。
+              过程比结论值钱。
+            </div>
+          </div>
+
+          <div class="rev">
+            <div class="rev-hd">
+              <span class="rev-q">第 4 题 · 期望薪资</span>
+              <span class="rev-tag-status rev-tag-status--ok" style="margin-left:auto">说清楚了</span>
+            </div>
+            <div class="rev-said">
+              你说：参考同行水平，也看岗位具体职责，可以谈。
+            </div>
+            <div class="rev-p">
+              这样答没问题。<b>本机不给你建议报多少</b> ——
+              薪资跟地区、行业、公司规模都相关，本机没有可靠依据，编一个数字反而害你。
+            </div>
+          </div>
+
+        </div>
+
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          8 道题里，<b>4 道</b>本机给了点评，另外 4 道你还没答。没答的不算"不会答"。
+        </div>
+      </div>
+
+      <!-- ─────────── S4 带走复盘单 ─────────── -->
+      <div class="paper-bar" data-at="s4">
+        <span class="nm">面试复盘单 · 机械设计 / 工艺岗</span>
+        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s4">
+        <div class="sheet-a4">
+          <div class="rp">
+            <h1>面试复盘单</h1>
+            <div class="rp-sub">
+              机械设计 / 工艺岗 · 2026年8月9日 11:32 · 打字作答 · 已答 4 / 8 题<br>
+              由职易达一体机生成，仅供你自己参考
+            </div>
+            <div class="rp-hr"></div>
+
+            <div class="rp-q">1. 自我介绍 —— 有缺口</div>
+            <div class="rp-a">你说：做机械设计六年，非标自动化夹具，SolidWorks / CAD。</div>
+            <div class="rp-fix">补：最后落到<b>为什么来应聘这个岗</b>；把卡料率 12%→3% 这件事挪到这里。</div>
+
+            <div class="rp-q">2. 最难的技术问题 —— 有缺口</div>
+            <div class="rp-a">你说：夹具定位不准，查了很久，换了定位销方案。</div>
+            <div class="rp-fix">补：<b>怎么排查的</b> —— 先怀疑什么、怎么排除、怎么确定是定位销。过程比结论值钱。</div>
+
+            <div class="rp-q">3. 3% 怎么测出来的 —— 说清楚了</div>
+            <div class="rp-a">三天量产单，停机次数／进料总数，改造前同口径 12%。<b>两个数字口径一致，这点做得好。</b></div>
+
+            <div class="rp-q">4. 期望薪资 —— 说清楚了</div>
+            <div class="rp-a">参考同行水平，看岗位职责，可以谈。</div>
+
+            <div class="rp-q">还没答的 4 道（可以自己想）</div>
+            <div class="rp-a">
+              5. 为什么想从现在的公司出来？&nbsp; 6. 你和同事有过分歧吗，怎么处理的？<br>
+              7. 这个岗位你觉得最难的地方是什么？&nbsp; 8. 你有什么想问我们的？
+            </div>
+
+            <div class="rp-foot">
+              本单只判断你<b>说清楚了没有</b>（有没有讲背景、做法、结果，有没有答到点上）。<br>
+              本机<b>判断不了</b>你说的是否属实、数字是否准确、做法在你们行业里是否合理。<br>
+              本机<b>不预测录用结果</b>，本单不代表任何用人单位的评价，也不作为任何凭证。<br>
+              作答内容不留存，离场即清；本单不含你的手机号与身份证号。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>题目从哪来</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">你的简历</span><span class="v">王磊_机械_2026.pdf</span></div>
+            <div class="kv-row"><span class="k">看过的岗位</span><span class="v">恒信精密制造</span></div>
+            <div class="kv-row"><span class="k">题目数</span><span class="v">8 道</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">通用题库 + 岗位正文</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            题目不是那家公司给的，是按<b>公开岗位正文</b>和常见面试题生成的。
+            实际会问什么由面试官决定。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>你练过的</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">通用行为面 · 6 题</span>
+                <span class="tl-s">7月28日 · 答完 6 题 · 复盘单已打印</span></span></div>
+            <div class="tl tl--done"><span class="tl-dot"><svg class="ic"><use href="#i-check"/></svg></span>
+              <span class="tl-b"><span class="tl-t">机械设计岗 · 8 题</span>
+                <span class="tl-s">8月2日 · 答完 5 题 · 未打印</span></span></div>
+            <div class="tl tl--now"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">机械设计 / 工艺岗</span>
+                <span class="tl-s">今天 · 进行中</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>只记录<b>你练过几次、答了几题</b>，
+                  不保存你答的内容 —— 那些离场就清了。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            上次 8月2日 那次的缺口是「没讲排查过程」，今天第 2 题<b>还是同一个问题</b>。
+            这一条值得专门改。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这类题想答好</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.65">
+            追问数字的题，对方想确认三件事：
+          </div>
+          <div class="kv" style="margin-top:var(--s-3)">
+            <div class="kv-row"><span class="k">怎么测的</span><span class="v">口径说清</span></div>
+            <div class="kv-row"><span class="k">测了多久</span><span class="v">别只测一次</span></div>
+            <div class="kv-row"><span class="k">改前改后同口径吗</span><span class="v">最关键</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这三条是这类题的通用要点，不是针对你这一题的点评 ——
+            点评在你答完之后才有。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-interview"/></svg><b>进度</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">已答</span><span class="v"><b>2</b> / 8 题</span></div>
+            <div class="kv-row"><span class="k">当前</span><span class="v">第 3 题（追问）</span></div>
+            <div class="kv-row"><span class="k">用时</span><span class="v">6 分 12 秒</span></div>
+            <div class="kv-row"><span class="k">倒计时</span><span class="v v--fog">无</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span><b>没有倒计时是故意的。</b>这是练习不是考试 ——
+                  真面试有时间压力，但在这里逼你抢时间，只会让你练成背答案。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            随时可以跳过一题，跳过的不算错。答完当前这题就能看点评。
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这次的主要缺口</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">说清楚了</span><span class="v"><b>2</b> 题</span></div>
+            <div class="kv-row"><span class="k">有缺口</span><span class="v"><b>2</b> 题</span></div>
+            <div class="kv-row"><span class="k">还没答</span><span class="v"><b>4</b> 题</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            这里不打分、不排名 —— 分数会让你以为有个及格线，实际没有。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>反复出现的一条</b></div>
+        <div class="sec">
+          <div class="advice-act" style="font-size:var(--fz-4)">你讲结论，不讲过程。</div>
+          <div class="advice-why" style="margin-top:var(--s-3)">
+            8月2日那次第 2 题、今天第 2 题，<b>都是这个问题</b>：
+            「查了很久，后来换了方案就好了」——中间那段才是对方想听的。<br><br>
+            下次答这类题，试着按<b>先怀疑什么 → 怎么排除 → 怎么确认</b>说一遍，
+            哪怕说得慢一点。
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这条是把今天和 8月2日 两次比出来的 ——
+            本机只比"缺口类型"，<b>不保存你两次说过的内容</b>。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-interview"/></svg><b>还没答的 4 道</b>
+            <span class="mt">现在回去答还来得及</span>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot">5</span>
+              <span class="tl-b"><span class="tl-t">为什么想从现在的公司出来</span>
+                <span class="tl-s">别说前东家坏话，讲你想要什么</span></span></div>
+            <div class="tl"><span class="tl-dot">6</span>
+              <span class="tl-b"><span class="tl-t">和同事有过分歧吗，怎么处理的</span>
+                <span class="tl-s">答"没有过"最吃亏，等于说你没协作过</span></span></div>
+            <div class="tl"><span class="tl-dot">7</span>
+              <span class="tl-b"><span class="tl-t">这个岗最难的地方是什么</span>
+                <span class="tl-s">看你有没有真看过岗位正文</span></span></div>
+            <div class="tl"><span class="tl-dot">8</span>
+              <span class="tl-b"><span class="tl-t">你有什么想问我们的</span>
+                <span class="tl-s">答"没有"最吃亏，准备两个问题带过去</span></span></div>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            这 4 道的<b>题目</b>会印在复盘单上，你可以带回去自己想 ——
+            但只有在本机答过的题才有点评。
+          </div>
+        </div>
+      </div>
+
+      <!-- S4 右 -->
+      <div class="pane" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">面试复盘单</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">还没答的 4 道题</span>
+              <span class="ck-s">已含在复盘单里，不用单独打</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把复盘单存进手机。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用为预估 · 以打印工作台核价为准。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s4">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走 1 页</span>
+                <span class="tl-s">带着它去 8月14日 那场宣讲后的初面</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">这次练习记进「AI服务记录」</span>
+                <span class="tl-s">只记练了哪个岗、答了几题</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">你答的内容离场即清</span>
+                <span class="tl-s">复盘单也不存进「我的文档」，只有纸</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>面试答案里常有公司名、项目细节这类不该留在公共机器上的东西 ——
+                  所以这一项<b>只出纸，不入档</b>。想再要一份，得重新练一次。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            按岗位出题，你答完给你指<b>哪里没说清楚</b>，最后打成一张复盘单。<br>
+            不打分、不预测能不能过 —— 那本机说了不算。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2">跳过这题</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">继续答剩下 4 题</button>
+    <button class="btn btn--lg btn--ghost" data-at="s4" data-go="s3">回看点评</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first">8 道题 · 约 15 分钟 · 没有倒计时</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 本次只能看题，不会有点评</span>
+    <span class="actionbar-hint" data-at="s2">第 3 题 / 共 8 题 · 想好再写</span>
+    <span class="actionbar-hint" data-at="s3">2 题说清楚了 · 2 题有缺口 · 4 题没答</span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线，可先扫码带走</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看题目<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">答完了，看点评<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-go="s4">生成复盘单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s4" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>
