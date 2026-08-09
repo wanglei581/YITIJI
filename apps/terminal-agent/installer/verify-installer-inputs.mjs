@@ -181,6 +181,11 @@ assert.match(secureScanReader, /AJPSR002/, 'native helper must parse protocol v2
 assert.match(secureScanMutation, /RootDirectory\s*=\s*unclaimed/, 'quarantine rename must be relative to the pinned _unclaimed handle')
 assert.match(secureScanMutation, /NtSetInformationFile/, 'relative quarantine must use the native handle-relative rename API')
 assert.match(secureScanMutation, /AJPS_FILE_RENAME_INFORMATION_CLASS\s+10u/, 'native rename must remain FileRenameInformation')
+assert.doesNotMatch(
+  secureScanMutation,
+  /SetFileInformationByHandle\s*\(\s*candidate\s*,\s*FileRenameInfo/,
+  'relative quarantine must not regress to the Win32 wrapper rejected by Windows Server 2022',
+)
 assert.match(secureScanPath, /FILE_TRAVERSE/, 'pinned directory handles must support relative rename traversal')
 assert.match(secureScanMutation, /FileDispositionInfo/, 'deletion must target an already verified handle')
 assert.match(scanWatcher, /if \(process\.platform === 'win32'\) \{[\s\S]*?finalizeTrustedWindowsCandidate[\s\S]*?return\s*\}/, 'Windows finalize must return after the native boundary without Node fallback')
