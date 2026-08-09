@@ -343,6 +343,10 @@ export class PrintJobsService {
         data: {
           id:         taskId,
           fileUrl:    storedFileUrl,
+          // 文件血缘落库：此前 fileId 只进 AuditLog payload，DB 无法回答
+          // 「该文件被打印过几次 / 打的是原件还是遮挡件」。fileUrl 是带 TTL 的重签名
+          // 串，不能当稳定外键用，故单列持久化已验签的 fileId。
+          fileId,
           terminalId: targetTerminalId,
           endUserId:  ctx.endUserId ?? null,
           // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。

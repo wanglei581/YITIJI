@@ -18,6 +18,8 @@ import type {
   FairBoothDTO,
   FairMaterialDTO,
   FairMaterialPrintResponse,
+  FairCompanyPrintResponse,
+  FairCompanyPrintVariant,
   FairLiveStatsDTO,
   FairVenueGuideDTO,
   FairZoneBreakdown,
@@ -265,6 +267,18 @@ export const mockJobFairAdapter = {
     void _fairId
     void _materialId
     throw new Error('演示模式未生成真实招聘会资料文件，暂不可打印')
+  },
+
+  // 企业资料 PDF 由后端按库内数据实时渲染，mock 模式没有真实文件，如实报错而非假装可打印
+  async prepareFairCompanyPrint(
+    _fairId: string,
+    _companyId: string,
+    _variant: FairCompanyPrintVariant,
+  ): Promise<FairCompanyPrintResponse> {
+    void _fairId
+    void _companyId
+    void _variant
+    throw new Error('演示模式未生成真实企业资料文件，暂不可打印')
   },
 
   // 场馆导览:导览数据由 Admin 配置/后端 seed 提供,mock 模式诚实返回空态,不前端硬编码

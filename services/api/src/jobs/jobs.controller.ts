@@ -60,6 +60,7 @@ import { ImportFairsDto } from './dto/import-fairs.dto'
 import { UpdatePartnerFairDto, UpdatePartnerJobDto } from './dto/partner-edit.dto'
 import { CreateDataSourceDto } from './dto/data-source.dto'
 import { JobQualityService } from '../job-ai/job-quality.service'
+import { FairCompanyPrintService } from './fair-company-print.service'
 import { buildPartnerExcelTemplateBuffer, getPartnerExcelTemplateFileName } from './excel-template'
 import { mapJobWorkTypeToCategory } from './work-type'
 import { PARTNER_IMPORT_MAX_FILE_BYTES } from './partner-import-file'
@@ -86,6 +87,7 @@ export class JobsController {
     private readonly jobsService: JobsService,
     private readonly adminFairs: AdminFairsService,
     private readonly jobQuality: JobQualityService,
+    private readonly fairCompanyPrint: FairCompanyPrintService,
   ) {}
 
   // ── Kiosk ───────────────────────────────────────────────────────────────────
@@ -200,6 +202,21 @@ export class JobsController {
     @Param('materialId') materialId: string,
   ) {
     return this.adminFairs.prepareFairMaterialPrint(id, materialId)
+  }
+
+  /**
+   * 参会企业「企业资料 / 岗位清单」按需渲染打印文件。
+   * variant=profile|positions；服务端按库内展示字段渲染 PDF 并落成短期 FileObject，
+   * 返回内部 HMAC 签名 printFileUrl，前端据此进入正常打印流程（不再伪造 PrintFile）。
+   */
+  @Post('job-fairs/:id/companies/:companyId/print-url')
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  prepareFairCompanyPrint(
+    @Param('id') id: string,
+    @Param('companyId') companyId: string,
+    @Query('variant') variant?: string,
+  ) {
+    return this.fairCompanyPrint.prepare(id, companyId, variant)
   }
 
   /**
