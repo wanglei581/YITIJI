@@ -67,7 +67,7 @@ export default function OfflineAgencyDetailPage() {
           <div className="jf-row-sub">
             {services.map((svc) => <span key={svc} className="jf-chip">{svc}</span>)}
             <span className="jf-chip src">来源编号 {agency.orgCode}</span>
-            <span className="jf-chip ok">资质核验已通过</span>
+            <span className="jf-chip ok">机构信息已审核</span>
           </div>
         </div>
         <div className="oa-r-aside">

@@ -437,7 +437,7 @@ export function ExcelImportModal({ sourceId, sourceName, onClose, onImported }: 
 
               {preview.dupRows > 0 && (
                 <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
-                  {preview.dupRows} 行与已有数据重复，导入时将刷新展示字段，不覆盖审核/发布状态。
+                  {preview.dupRows} 行与已有数据重复，本次导入将跳过；如需更新，请先处理原记录后重新导入。
                 </div>
               )}
 

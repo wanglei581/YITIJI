@@ -4,6 +4,7 @@
 // 路由前缀：/api/v1（由 main.ts 全局设置）
 //
 // GET    /admin/offline-agencies                          — 全量机构列表（含草稿/待审）
+// GET    /admin/offline-agencies/:id                      — 机构详情
 // POST   /admin/offline-agencies                          — 创建机构
 // PUT    /admin/offline-agencies/:id                      — 更新机构
 // PATCH  /admin/offline-agencies/:id/review               — 审核（body: {action, reason?}）
@@ -32,6 +33,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
 import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
+import { ApiResponse } from '../common/dto/api-response.dto'
 import { AuditService } from '../audit/audit.service'
 import { resolveClientIp } from '../common/client-ip'
 import { OfflineAgenciesService, type AgencyListQuery, type JobListQuery } from './offline-agencies.service'
@@ -82,7 +84,12 @@ export class AdminOfflineAgenciesController {
 
   @Get()
   async findAll(@Query() query: AgencyListQuery) {
-    return this.service.adminFindAll(query)
+    return ApiResponse.ok(await this.service.adminFindAll(query))
+  }
+
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return ApiResponse.ok(await this.service.adminFindOne(id))
   }
 
   @Post()
@@ -103,7 +110,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Put(':id')
@@ -125,7 +132,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Patch(':id/review')
@@ -147,7 +154,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Patch(':id/publish')
@@ -169,7 +176,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Delete(':id')
@@ -190,14 +197,14 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   // ─── 机构岗位管理 ────────────────────────────────────────────────────────────
 
   @Get(':id/jobs')
   async getJobs(@Param('id') agencyId: string, @Query() query: JobListQuery) {
-    return this.service.adminFindJobsByAgency(agencyId, query)
+    return ApiResponse.ok(await this.service.adminFindJobsByAgency(agencyId, query))
   }
 
   @Post(':id/jobs')
@@ -219,7 +226,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Put(':id/jobs/:jobId')
@@ -242,7 +249,7 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 
   @Delete(':id/jobs/:jobId')
@@ -264,6 +271,6 @@ export class AdminOfflineAgenciesController {
       userAgent: extractUa(req),
       requestId: req.requestId ?? null,
     })
-    return result
+    return ApiResponse.ok(result)
   }
 }

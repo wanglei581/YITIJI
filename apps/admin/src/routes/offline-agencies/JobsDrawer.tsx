@@ -13,34 +13,43 @@ import {
 const inputCls =
   'w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500'
 
-const JOB_REVIEW_BADGE: Record<string, { status: 'success' | 'warning' | 'error' | 'info' | 'default'; label: string }> = {
-  pending:   { status: 'warning', label: '待审核' },
-  reviewing: { status: 'info',    label: '审核中' },
-  approved:  { status: 'success', label: '已通过' },
-  rejected:  { status: 'error',   label: '已驳回' },
+const JOB_STATUS_BADGE: Record<string, { status: 'success' | 'warning'; label: string }> = {
+  active:   { status: 'success', label: '正常收录' },
+  inactive: { status: 'warning', label: '暂停收录' },
+}
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+  fulltime: '全职',
+  parttime: '兼职',
+  internship: '实习',
 }
 
 // ─── 岗位表单 ─────────────────────────────────────────────────────────────────
 
 interface JobFormState {
   title: string
-  salary: string
-  city: string
-  category: string
+  jobType: 'fulltime' | 'parttime' | 'internship'
+  salaryMin: string
+  salaryMax: string
+  salaryUnit: 'month' | 'day' | 'hour'
+  location: string
   description: string
   requirements: string
 }
 
 const EMPTY_JOB: JobFormState = {
-  title: '', salary: '', city: '', category: '', description: '', requirements: '',
+  title: '', jobType: 'fulltime', salaryMin: '', salaryMax: '', salaryUnit: 'month',
+  location: '', description: '', requirements: '',
 }
 
 function jobToForm(j: OfflineAgencyJob): JobFormState {
   return {
     title: j.title,
-    salary: j.salary ?? '',
-    city: j.city ?? '',
-    category: j.category ?? '',
+    jobType: j.jobType,
+    salaryMin: j.salaryMin == null ? '' : String(j.salaryMin),
+    salaryMax: j.salaryMax == null ? '' : String(j.salaryMax),
+    salaryUnit: j.salaryUnit,
+    location: j.location ?? '',
     description: j.description ?? '',
     requirements: j.requirements ?? '',
   }
@@ -49,6 +58,11 @@ function jobToForm(j: OfflineAgencyJob): JobFormState {
 function validateJob(f: JobFormState): string | null {
   if (!f.title.trim() || f.title.trim().length < 2) return '岗位名称至少 2 个字符'
   if (f.title.trim().length > 100) return '岗位名称不能超过 100 个字符'
+  const salaryMin = f.salaryMin ? Number(f.salaryMin) : null
+  const salaryMax = f.salaryMax ? Number(f.salaryMax) : null
+  if (salaryMin != null && (!Number.isInteger(salaryMin) || salaryMin < 0)) return '最低薪资必须是非负整数'
+  if (salaryMax != null && (!Number.isInteger(salaryMax) || salaryMax < 0)) return '最高薪资必须是非负整数'
+  if (salaryMin != null && salaryMax != null && salaryMax < salaryMin) return '最高薪资不能低于最低薪资'
   return null
 }
 
@@ -56,9 +70,11 @@ function formToJobInput(f: JobFormState): OfflineAgencyJobInput {
   const s = (v: string) => (v.trim() ? v.trim() : null)
   return {
     title: f.title.trim(),
-    salary: s(f.salary),
-    city: s(f.city),
-    category: s(f.category),
+    jobType: f.jobType,
+    salaryMin: f.salaryMin ? Number(f.salaryMin) : null,
+    salaryMax: f.salaryMax ? Number(f.salaryMax) : null,
+    salaryUnit: f.salaryUnit,
+    location: s(f.location),
     description: s(f.description),
     requirements: s(f.requirements),
   }
@@ -80,7 +96,7 @@ function JobFormPanel({
   onSubmit: (f: JobFormState) => void
 }) {
   const [form, setForm] = useState<JobFormState>(initial)
-  const set = (key: keyof JobFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (key: keyof JobFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((prev) => ({ ...prev, [key]: e.target.value }))
 
   return (
@@ -91,18 +107,34 @@ function JobFormPanel({
         <input className={inputCls} placeholder="如：销售顾问" value={form.title} onChange={set('title')} />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="薪资范围">
-          <input className={inputCls} placeholder="如：8-12K" value={form.salary} onChange={set('salary')} />
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="最低薪资">
+          <input className={inputCls} inputMode="numeric" placeholder="8000" value={form.salaryMin} onChange={set('salaryMin')} />
         </Field>
-        <Field label="城市">
-          <input className={inputCls} placeholder="如：北京" value={form.city} onChange={set('city')} />
+        <Field label="最高薪资">
+          <input className={inputCls} inputMode="numeric" placeholder="12000" value={form.salaryMax} onChange={set('salaryMax')} />
+        </Field>
+        <Field label="薪资单位">
+          <select className={inputCls} value={form.salaryUnit} onChange={set('salaryUnit')}>
+            <option value="month">月</option>
+            <option value="day">日</option>
+            <option value="hour">小时</option>
+          </select>
         </Field>
       </div>
 
-      <Field label="岗位类别">
-        <input className={inputCls} placeholder="如：全职 / 兼职 / 实习" value={form.category} onChange={set('category')} />
-      </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="岗位类别">
+          <select className={inputCls} value={form.jobType} onChange={set('jobType')}>
+            <option value="fulltime">全职</option>
+            <option value="parttime">兼职</option>
+            <option value="internship">实习</option>
+          </select>
+        </Field>
+        <Field label="工作地点">
+          <input className={inputCls} placeholder="如：北京市朝阳区" value={form.location} onChange={set('location')} />
+        </Field>
+      </div>
 
       <Field label="岗位描述">
         <textarea className={`${inputCls} h-16 resize-none`} placeholder="岗位职责说明" value={form.description} onChange={set('description')} />
@@ -239,6 +271,9 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
       }
     >
       <div className="space-y-4">
+        <div className="rounded-lg border border-warning/20 bg-warning-bg px-3 py-2 text-xs text-warning-fg">
+          新增或修改岗位会使所属机构回到“待审核 + 草稿”，管理员重新审核发布后才会公开展示。
+        </div>
         {/* 新增按钮 */}
         {formMode === 'none' && (
           <button
@@ -301,12 +336,14 @@ export function JobsDrawer({ open, agencyId, agencyName, onClose, onJobCountChan
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium text-neutral-800">{job.title}</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
-                    {job.salary && <span>{job.salary}</span>}
-                    {job.city && <span>{job.city}</span>}
-                    {job.category && <span>{job.category}</span>}
+                    {(job.salaryMin != null || job.salaryMax != null) && (
+                      <span>{job.salaryMin ?? '—'}–{job.salaryMax ?? '—'} / {job.salaryUnit === 'month' ? '月' : job.salaryUnit === 'day' ? '日' : '小时'}</span>
+                    )}
+                    {job.location && <span>{job.location}</span>}
+                    <span>{JOB_TYPE_LABELS[job.jobType] ?? job.jobType}</span>
                   </div>
                   <div className="mt-1.5">
-                    <StatusBadge dot status={JOB_REVIEW_BADGE[job.reviewStatus]?.status ?? 'default'} label={JOB_REVIEW_BADGE[job.reviewStatus]?.label ?? job.reviewStatus} />
+                    <StatusBadge dot status={JOB_STATUS_BADGE[job.status]?.status ?? 'default'} label={JOB_STATUS_BADGE[job.status]?.label ?? job.status} />
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">

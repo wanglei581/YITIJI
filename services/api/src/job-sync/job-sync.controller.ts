@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Patch,
   Post,
   Put,
   Body,
@@ -14,15 +15,21 @@ import { Throttle } from '@nestjs/throttler'
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard'
 import { RolesGuard } from '../common/guards/roles.guard'
 import { Roles } from '../common/decorators/roles.decorator'
+import { CurrentUser, type AuthedUser } from '../common/decorators/current-user.decorator'
 import { ApiResponse } from '../common/dto/api-response.dto'
 import { JobSyncService } from './job-sync.service'
+import { UnpublishSourceContentDto, UpdateSourceEnabledDto } from './dto/source-operations.dto'
+import { assertPartnerDataTypeCapability } from '../jobs/partner-capabilities'
 
 /**
  * 路由前缀：/api/v1（由 main.ts 全局设置）
  *
  * Admin only:
  *   POST /admin/job-sync/sources/:sourceId/trigger  — 手动触发单个 API 数据源同步
- *   GET  /admin/job-sync/sources                    — 列出所有 API 模式数据源及同步状态
+ *   GET  /admin/job-sync/sources                    — 列出全部数据接入通道及同步状态
+ *   PATCH /admin/job-sync/sources/:sourceId/enabled — Admin 审批/启停通道（不级联内容）
+ *   GET  /admin/job-sync/sources/:sourceId/impact   — 启停/批量下架前影响预览
+ *   POST /admin/job-sync/sources/:sourceId/unpublish-content — 独立批量下架已发布内容
  */
 @Controller('admin/job-sync')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -95,8 +102,12 @@ export class JobSyncController {
     if (dto.dataType !== 'job' && dto.dataType !== 'fair') {
       throw new BadRequestException({ error: { code: 'INVALID_DATA_TYPE', message: 'dataType must be "job" or "fair"' } })
     }
-    const exists = await this.service['prisma'].jobSource.findUnique({ where: { id: sourceId }, select: { id: true } })
+    const exists = await this.service['prisma'].jobSource.findUnique({
+      where: { id: sourceId },
+      select: { id: true, org: { select: { type: true } } },
+    })
     if (!exists) throw new NotFoundException({ error: { code: 'SOURCE_NOT_FOUND', message: '数据源不存在' } })
+    assertPartnerDataTypeCapability(exists.org.type, dto.dataType)
     await this.service['prisma'].jobSource.update({
       where: { id: sourceId },
       data: { responseConfig: JSON.stringify(dto) },
@@ -104,14 +115,41 @@ export class JobSyncController {
     return ApiResponse.ok({ updated: true, sourceId })
   }
 
+  @Get('sources/:sourceId/impact')
+  async getSourceImpact(@Param('sourceId') sourceId: string) {
+    return ApiResponse.ok(await this.service.getSourceImpact(sourceId))
+  }
+
+  @Patch('sources/:sourceId/enabled')
+  async setSourceEnabled(
+    @Param('sourceId') sourceId: string,
+    @Body() dto: UpdateSourceEnabledDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return ApiResponse.ok(await this.service.setSourceEnabled(sourceId, dto.enabled, user))
+  }
+
+  @Post('sources/:sourceId/unpublish-content')
+  async unpublishSourceContent(
+    @Param('sourceId') sourceId: string,
+    @Body() _dto: UnpublishSourceContentDto,
+    @CurrentUser() user: AuthedUser,
+  ) {
+    return ApiResponse.ok(await this.service.unpublishSourceContent(sourceId, user))
+  }
+
   /**
-   * 列出所有 accessMode='api' 的数据源及其同步状态，供 Admin 工作台使用。
+   * 列出全部数据接入通道。API/Webhook 的 enabled 由 Admin 管理；
+   * 文件/手工来源也展示，便于统一做影响预览和批量下架。
    */
   @Get('sources')
   async listApiSources(): Promise<ApiResponse<{
     id: string
     name: string
     orgId: string
+    orgName: string
+    sourceKind: string
+    accessMode: string
     syncFreq: string
     enabled: boolean
     lastSyncAt: string | null
@@ -121,12 +159,13 @@ export class JobSyncController {
     hasResponseConfig: boolean
   }[]>> {
     const sources = await this.service['prisma'].jobSource.findMany({
-      where: { accessMode: 'api' },
       select: {
         id: true, name: true, orgId: true,
+        sourceKind: true, accessMode: true,
+        org: { select: { name: true } },
         syncFreq: true, enabled: true,
         lastSyncAt: true, lastSyncStatus: true,
-        endpoint: true, encryptedCredential: true, responseConfig: true,
+        endpoint: true, encryptedCredential: true, webhookSecret: true, responseConfig: true,
       },
       orderBy: { updatedAt: 'desc' },
     })
@@ -135,23 +174,30 @@ export class JobSyncController {
         id: string
         name: string
         orgId: string
+        sourceKind: string
+        accessMode: string
+        org: { name: string }
         syncFreq: string
         enabled: boolean
         lastSyncAt: Date | null
         lastSyncStatus: string | null
         endpoint: string | null
         encryptedCredential: string | null
+        webhookSecret: string | null
         responseConfig: string | null
       }>).map((s) => ({
         id: s.id,
         name: s.name,
         orgId: s.orgId,
+        orgName: s.org.name,
+        sourceKind: s.sourceKind,
+        accessMode: s.accessMode,
         syncFreq: s.syncFreq,
         enabled: s.enabled,
         lastSyncAt: s.lastSyncAt?.toISOString() ?? null,
         lastSyncStatus: s.lastSyncStatus ?? null,
         hasEndpoint: Boolean(s.endpoint),
-        hasCredential: Boolean(s.encryptedCredential),
+        hasCredential: Boolean(s.encryptedCredential || s.webhookSecret),
         hasResponseConfig: Boolean(s.responseConfig),
       })),
     )

@@ -1,6 +1,12 @@
 # 下一步任务
 
-> 最后更新：2026-08-08
+> 最后更新：2026-08-09
+
+## 当前执行：后台招聘数据 P0/P1 收口
+
+- [x] **P0 第一波后端升级候选**：已在独立 worktree 对齐 Admin 线下机构 HTTP/DTO/分页契约，补机构编辑与线下岗位变更回待审、停用机构阻断岗位深链、驳回理由必填；同步仅在公开内容变化时回 `pending + draft`，未变化只刷新时间；Webhook 补成功/失败 SyncLog 与真实新增/更新计数；Excel 重复项和 Kiosk 机构审核文案已诚实化。专项静态/SQLite 服务契约、四端 typecheck/lint/build 已通过；未部署。
+- [~] **P0 第二波权限与运行时验收**：服务端 `Organization.type` capability allowlist、API/Webhook Admin 启用门禁、停源不级联、影响预览、独立批量下架和审计均已完成；Node 22 下 5 类机构 SQLite 契约、Admin/Partner 真实 Nest HTTP、跨机构 404、响应包络、动态 API sync changed/unchanged 及四端 typecheck/lint/build 已通过。本机 PGlite 只证明 50 条 PG migration 可完整应用，并发驱动会断连，不作为真实 PG 证据。剩余：先人工合并最新 `origin/main` 的进度文档，再由 PR `postgres:16` CI 跑新增 HTTP/sync 门禁，并复核既有 Excel/Webhook 导入套件全绿；通过前不得发布本候选。
+- [ ] **P1 模型收敛与新页面后台**：停止扩展第二套 `OfflineJob`，迁入统一 `Job` 审核/发布/来源链；`OfflineAgency` 关联 `Organization + Branch + QualificationRecord`，资质有效才允许发布；“线上招聘平台”新建独立 `OnlinePlatformDirectory` 供 Admin 管官方导航卡、域名、排序、上下架与链接巡检，可选关联 Organization/JobSource，但不得把导航目录与技术数据源混成同一对象。所有删除改为 archive/tombstone，发布/下架/凭证轮换补统一审计。
 
 ## 当前执行：文件流程候选冻结前外部门禁
 

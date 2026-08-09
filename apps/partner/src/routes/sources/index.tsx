@@ -10,9 +10,9 @@ import {
   PlusIcon,
   XIcon,
 } from 'lucide-react'
-import type { AccessMode, PartnerDataSource, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
+import type { AccessMode, PartnerDataSource, PartnerDataSourceCapabilities, ConnStatus, SyncFrequency, CreateDataSourcePayload, SourceKind } from '../../services/api'
 import { API_BASE_URL } from '../../services/api/client'
-import { API_ORIGIN, getDataSources, toggleDataSource, createDataSource } from '../../services/api'
+import { API_ORIGIN, getDataSources, getDataSourceCapabilities, toggleDataSource, createDataSource } from '../../services/api'
 import { ExcelImportModal } from './ExcelImportModal'
 
 function resolveWebhookUrl(webhookUrl?: string): string {
@@ -43,6 +43,7 @@ const FREQ_LABELS: Record<SyncFrequency, string> = { realtime: '实时', hourly:
 // ─── Source creation constants ────────────────────────────────────────────────
 
 const SOURCE_KIND_OPTIONS: { value: SourceKind; label: string }[] = [
+  { value: 'job_platform',   label: '线上招聘平台'         },
   { value: 'hr_company',     label: '人力资源公司'       },
   { value: 'school',         label: '高校就业中心'       },
   { value: 'fair_organizer', label: '招聘会主办方'       },
@@ -66,14 +67,17 @@ const MODE_OPTIONS: Array<{
 ]
 
 interface SourceConnectPanelProps {
+  capabilities: PartnerDataSourceCapabilities
   onCreated: (payload: CreateDataSourcePayload) => Promise<PartnerDataSource>
   onCancel: () => void
 }
 
-function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
-  const [mode, setMode] = useState<SourceMode>('webhook')
+function SourceConnectPanel({ capabilities, onCreated, onCancel }: SourceConnectPanelProps) {
+  const availableModes = MODE_OPTIONS.filter((option) => capabilities.allowedAccessModes.includes(option.value))
+  const availableSourceKinds = SOURCE_KIND_OPTIONS.filter((option) => capabilities.allowedSourceKinds.includes(option.value))
+  const [mode, setMode] = useState<SourceMode>(() => availableModes[0]?.value ?? 'excel')
   const [name, setName] = useState('')
-  const [sourceKind, setSourceKind] = useState<SourceKind>('hr_company')
+  const [sourceKind, setSourceKind] = useState<SourceKind>(capabilities.defaultSourceKind)
   const [endpoint, setEndpoint] = useState('')
   const [authType, setAuthType] = useState<CreateDataSourcePayload['authType']>('bearer')
   const [credential, setCredential] = useState('')
@@ -143,7 +147,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        {MODE_OPTIONS.map((option) => {
+        {availableModes.map((option) => {
           const Icon = option.icon
           const active = mode === option.value
           return (
@@ -177,7 +181,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
             <div>
               <label className="mb-1 block text-sm font-medium text-neutral-700">来源类型</label>
               <select value={sourceKind} onChange={(e) => setSourceKind(e.target.value as SourceKind)} className="h-12 w-full rounded-lg border border-neutral-300 px-3 text-sm focus:border-primary-500 focus:outline-none">
-                {SOURCE_KIND_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {availableSourceKinds.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -258,6 +262,11 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
                 <div className="text-xs text-neutral-400">数据源 ID</div>
                 <div className="mt-1 font-mono text-xs text-neutral-700">{created.id}</div>
               </div>
+              {created.activationManagedBy === 'admin' && (
+                <div className="rounded-lg border border-warning/30 bg-warning-bg p-3 text-xs leading-5 text-warning-fg">
+                  通道已保存但尚未启用。管理员完成来源、地址、凭证和字段映射检查后才能接收或拉取数据。
+                </div>
+              )}
               {created.webhookUrl && (() => {
                 const fullUrl = resolveWebhookUrl(created.webhookUrl)
                 return (
@@ -297,6 +306,7 @@ function SourceConnectPanel({ onCreated, onCancel }: SourceConnectPanelProps) {
 
 export default function SourcesPage() {
   const [sources,    setSources]    = useState<PartnerDataSource[]>([])
+  const [capabilities, setCapabilities] = useState<PartnerDataSourceCapabilities | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(false)
   const [showWizard, setShowWizard] = useState(false)
@@ -317,8 +327,12 @@ export default function SourcesPage() {
 
   useEffect(() => {
     let cancelled = false
-    getDataSources()
-      .then((data) => { if (!cancelled) setSources(data) })
+    Promise.all([getDataSources(), getDataSourceCapabilities()])
+      .then(([data, caps]) => {
+        if (cancelled) return
+        setSources(data)
+        setCapabilities(caps)
+      })
       .catch(() => { if (!cancelled) setError(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
@@ -389,8 +403,9 @@ export default function SourcesPage() {
         )
       }
     >
-      {showWizard && (
+      {showWizard && capabilities && (
         <SourceConnectPanel
+          capabilities={capabilities}
           onCreated={handleSourceCreated}
           onCancel={() => setShowWizard(false)}
         />
@@ -426,7 +441,7 @@ export default function SourcesPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-600">{FREQ_LABELS[s.syncFreq]}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-neutral-400">{s.lastSyncTime}</td>
-                    <td className="px-4 py-3"><StatusBadge dot status={conn.badge} label={conn.label} /></td>
+                    <td className="px-4 py-3"><StatusBadge dot status={conn.badge} label={s.activationManagedBy === 'admin' && s.connStatus === 'disabled' ? '待管理员启用' : conn.label} /></td>
                     <td className="px-4 py-3 text-center font-medium text-success-fg">{s.successCount}</td>
                     <td className="px-4 py-3 text-center font-medium text-error-fg">{s.failCount}</td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -451,7 +466,11 @@ export default function SourcesPage() {
                               查看接入
                             </button>
                           )}
-                          <button
+                          {s.activationManagedBy === 'admin' ? (
+                            <span className="rounded bg-warning-bg px-2 py-1 text-xs font-medium text-warning-fg">
+                              {s.connStatus === 'disabled' ? '等待管理员启用' : '管理员管理启停'}
+                            </span>
+                          ) : <button
                             className={`rounded px-2 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${
                               s.connStatus === 'disabled'
                                 ? 'text-success-fg hover:bg-success-bg'
@@ -462,7 +481,7 @@ export default function SourcesPage() {
                             onClick={() => handleToggle(s.id)}
                           >
                             {togglingId === s.id ? '处理中…' : s.connStatus === 'disabled' ? '启用' : '停用'}
-                          </button>
+                          </button>}
                         </div>
                         {toggleError === s.id && (
                           <span className="text-xs text-error-fg">操作失败，请重试</span>
@@ -513,8 +532,8 @@ export default function SourcesPage() {
             </div>
             <div className="rounded-lg bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-600">
               <p className="mb-1 font-medium text-neutral-700">签名要求(请求方实现)</p>
-              <p>Header 携带 <code className="font-mono">x-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
-              <code className="font-mono">x-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-nonce</code>(防重放)。</p>
+              <p>Header 携带 <code className="font-mono">x-webhook-signature</code>(HMAC-SHA256,密钥为创建数据源时下发的 webhookSecret)、
+              <code className="font-mono">x-webhook-timestamp</code>(5 分钟内有效)与 <code className="font-mono">x-webhook-nonce</code>(防重放)。</p>
               <p className="mt-1.5">webhookSecret 仅在创建时下发一次,平台不再回显;如遗失请删除数据源后重建。</p>
             </div>
             <p className="text-xs text-neutral-400">payload 字段规范见对接文档;推送数据默认进入待审核,管理员审核通过后才会在终端展示。</p>
