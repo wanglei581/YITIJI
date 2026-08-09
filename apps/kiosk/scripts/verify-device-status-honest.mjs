@@ -110,7 +110,13 @@ expectMatches(
   /useTerminalDeviceStatus/,
   'PrintPreview 消费 useTerminalDeviceStatus',
 )
-expectMatches(previewSrc, /tonerKnown/, 'PrintPreview 以 tonerKnown 门控耗材告警')
+// 当前打印能力白名单仅开放黑白；PrintPreview 已删除彩色墨粉告警，不应为了满足
+// 旧静态断言重新读取虚构的 0 值耗材。未来开放彩色时，再恢复 tonerKnown 门控。
+expectNotMatches(
+  previewSrc,
+  /tonerKnown|tonerLevels|墨粉不足/,
+  'PrintPreview 在仅黑白能力下不读取或推导未知耗材告警',
+)
 expectMatches(previewSrc, /printerReady/, 'PrintPreview 以 printerReady 门控放行')
 
 expectNotMatches(

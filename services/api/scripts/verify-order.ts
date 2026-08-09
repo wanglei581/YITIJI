@@ -28,6 +28,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
 
@@ -41,6 +42,8 @@ const PRINT_PARAMS = {
   scale: 'fit' as const,
   pagesPerSheet: 1 as const,
 }
+const TWO_PAGE_PRINT_AMOUNT_CENTS =
+  2 * PRINT_PARAMS.copies * PRINT_UNIT_PRICE_CENTS[PRINT_PARAMS.colorMode]
 
 function pass(message: string): void {
   console.log(`  PASS ${message}`)
@@ -54,6 +57,7 @@ function fail(message: string): never {
 async function main(): Promise<void> {
   console.log('\n=== Order model + print-job accounting verification ===')
 
+  assertIsolatedVerificationDatabase()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
 
@@ -174,7 +178,7 @@ async function main(): Promise<void> {
       anonymousOrder &&
       ORDER_NO_PATTERN.test(anonymousOrder.orderNo) &&
       anonymousOrder.type === 'print' &&
-      anonymousOrder.amountCents === 80 && // 2 页 × 2 份 × 黑白 20 分
+      anonymousOrder.amountCents === TWO_PAGE_PRINT_AMOUNT_CENTS &&
       anonymousOrder.billablePages === 2 &&
       anonymousOrder.billingPageSource === 'pdf_lightweight_scan' &&
       anonymousOrder.currency === 'CNY' &&
@@ -185,7 +189,11 @@ async function main(): Promise<void> {
       anonymousOrder.endUserId === null &&
       anonymousOrder.terminalId === terminalId
     ) {
-      pass('anonymous print creates a terminal-bound unpaid Order priced from backend page-count (2 pages × 2 copies color = 200 cents; no fabricated pickupCode)')
+      pass(
+        'anonymous print creates a terminal-bound unpaid Order priced from backend page-count ' +
+          `(2 pages × ${PRINT_PARAMS.copies} copies × verified ${PRINT_PARAMS.colorMode} unit price ` +
+          `= ${TWO_PAGE_PRINT_AMOUNT_CENTS} cents; no fabricated pickupCode)`,
+      )
     } else {
       fail(`anonymous order mismatch: ${JSON.stringify(anonymousOrder)}`)
     }
@@ -405,7 +413,7 @@ async function main(): Promise<void> {
         (VALID_PAGE_SOURCES as readonly string[]).includes(o.billingPageSource)
       p0aCheck(
         ok,
-        'priced color order carries amountCents>0 + backend billablePages>0 + valid billingPageSource',
+        'priced verified-profile order carries amountCents>0 + backend billablePages>0 + valid billingPageSource',
         `amountCents=${o?.amountCents} billablePages=${o?.billablePages} billingPageSource=${o?.billingPageSource}`,
       )
     }
@@ -557,7 +565,7 @@ async function main(): Promise<void> {
         item['paymentSource'] === 'offline' &&
         item['paymentSource'] !== 'wechat' &&
         item['paymentSource'] !== 'alipay' &&
-        item['amountCents'] === 200 &&
+        item['amountCents'] === TWO_PAGE_PRINT_AMOUNT_CENTS &&
         item['billablePages'] === 2 &&
         item['billingPageSource'] === 'pdf_lightweight_scan'
       )

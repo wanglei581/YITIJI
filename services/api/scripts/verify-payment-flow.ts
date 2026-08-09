@@ -46,6 +46,7 @@ import { PrismaService } from '../src/prisma/prisma.service'
 import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilities.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const VERIFY_SECRET = 'verify-sandbox-payment-secret-0001'
 const CHANNEL = 'sandbox'
@@ -125,6 +126,7 @@ function buildCallback(input: {
 async function main(): Promise<void> {
   console.log('\n=== C5-2 online sandbox payment flow verification ===')
 
+  assertIsolatedVerificationDatabase()
   const prisma = new PrismaService()
   await prisma.onModuleInit()
 
@@ -249,7 +251,7 @@ async function main(): Promise<void> {
         fileName: '支付闭环.pdf',
         params: {
           copies: 2,
-          colorMode: 'color' as const,
+          colorMode: 'black_white' as const,
           duplex: 'simplex' as const,
           paperSize: 'A4' as const,
           orientation: 'auto' as const,
@@ -273,12 +275,12 @@ async function main(): Promise<void> {
     if (
       Array.isArray(items) &&
       items.length === 1 &&
-      items[0]?.['serviceKey'] === 'print_color_page' &&
+      items[0]?.['serviceKey'] === 'print_bw_page' &&
       items[0]?.['quantity'] === 4 &&
       items[0]?.['subtotalCents'] === orderA.amountCents &&
-      orderA.amountCents === 200
+      orderA.amountCents === 80
     ) {
-      pass('order creation snapshots PricingService lines into itemsJson (1 line, color 2p×2c = 200 cents)')
+      pass('order creation snapshots PricingService lines into itemsJson (1 line, black_white 2p×2c = 80 cents)')
     } else {
       fail(`itemsJson snapshot mismatch: ${orderA.itemsJson}`)
     }
@@ -307,7 +309,7 @@ async function main(): Promise<void> {
     if (
       attemptViewA.status === 'pending' &&
       attemptViewA.qrCodeContent?.startsWith('sandboxpay://qr?') &&
-      attemptViewA.amountCents === 200 &&
+      attemptViewA.amountCents === 80 &&
       attemptViewA.expiresAt &&
       attemptViewA.orderPayStatus === 'paying' &&
       attemptViewA.orderExpiresAt
@@ -459,7 +461,7 @@ async function main(): Promise<void> {
       attemptId: attemptA.id,
       prepayId: attemptA.prepayId,
       orderId: orderA.id,
-      amountCents: 200,
+      amountCents: orderA.amountCents,
       result: 'success',
       channelTxnNo: txnA,
     }

@@ -26,14 +26,16 @@ import { MemberPendingTasksController } from '../src/member-print-orders/member-
 import { MemberPrintOrdersService } from '../src/member-print-orders/member-print-orders.service'
 import { EndUserAuthGuard } from '../src/common/guards/end-user-auth.guard'
 import { verifyPaymentSessionToken } from '../src/payment/payment-session-token'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 const apiRoot = path.resolve(__dirname, '..')
 const fallbackDbName = process.env['DATABASE_URL'] ? null : `verify-member-print-orders-${randomUUID().slice(0, 8)}.db`
 const fallbackDbPath = fallbackDbName ? path.join(apiRoot, 'prisma', fallbackDbName) : null
 if (fallbackDbName) {
   process.env['DATABASE_URL'] = `file:./prisma/${fallbackDbName}`
-  prepareFallbackDb()
 }
+assertIsolatedVerificationDatabase()
+if (fallbackDbName) prepareFallbackDb()
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { KioskPageFrame } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
+import { useKioskSessionControl } from '../../auth/KioskSessionControlContext'
 import { KIcon } from '../../components/kiosk-icon'
 import { useInkRipple } from '../../hooks/useInkRipple'
 import { useMemberProfileOverview } from './assets/useMemberProfileOverview'
@@ -25,7 +26,8 @@ import './profile-inkpaper.css'
 export function ProfilePage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, isLoggedIn, displayName, logout, getToken } = useAuth()
+  const { user, isLoggedIn, displayName, getToken } = useAuth()
+  const { clearSessionTo } = useKioskSessionControl()
   const incoming = (location.state ?? {}) as IncomingState
   useInkRipple(
     '.kprofile.kprofile-lightflow .kp-entry:not(:disabled), .kprofile.kprofile-lightflow .p-btn, .kprofile.kprofile-lightflow .p-iconbtn, .kprofile.kprofile-lightflow .kp-pending-action',
@@ -133,7 +135,7 @@ export function ProfilePage() {
           statsLoading={statsLoading}
           reserveBannerSpace={isLoggedIn && hasSessionRecords}
           onLogin={goLogin}
-          onLogout={logout}
+          onLogout={() => clearSessionTo({ path: '/profile' })}
           onOpenSettings={() => navigate('/me/settings')}
           onOpenNotifications={() => navigate('/me/notifications')}
         />

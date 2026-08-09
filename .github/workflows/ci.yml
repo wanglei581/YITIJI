@@ -309,17 +309,18 @@ jobs:
           pnpm --filter @ai-job-print/api verify:closed-pending-print-task-disposition
           pnpm --filter @ai-job-print/api verify:admin-ops
           pnpm --filter @ai-job-print/api verify:admin-orders-readonly
-          pnpm --filter @ai-job-print/api verify:order
+          pnpm --filter @ai-job-print/api verify:isolated-verification-database
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
-          pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
           pnpm --filter @ai-job-print/api verify:job-materials
-          pnpm --filter @ai-job-print/api verify:payment-flow
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
-          pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
@@ -515,15 +516,15 @@ jobs:
           pnpm --filter @ai-job-print/api verify:print-conversion
           pnpm --filter @ai-job-print/api verify:print-sign
           pnpm --filter @ai-job-print/api verify:admin-print-scan
-          pnpm --filter @ai-job-print/api verify:order
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
-          pnpm --filter @ai-job-print/api verify:member-print-orders
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:member-print-orders
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:job-materials
-          pnpm --filter @ai-job-print/api verify:payment-flow
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
-          pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
           pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
