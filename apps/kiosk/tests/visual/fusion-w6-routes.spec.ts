@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test'
 import { test, expect } from '../fixtures/kiosk-test'
 import { assertNoHorizontalOverflow } from './assert-layout'
-import { registerW6Api } from './fixtures/fusion-w6-api'
+import { registerW6Api, W6_MEMBER_TOKEN } from './fixtures/fusion-w6-api'
 import { w6KioskCases, w6MobileCases, type W6RouteCase } from './fixtures/fusion-w6-route-cases'
 
 function collectRuntimeErrors(page: Page): string[] {
@@ -43,9 +43,39 @@ function screenshotName(route: W6RouteCase): string {
   return `${name}.png`
 }
 
+const W6_MEMBER_PHONE = '13800138000'
+const W6_MEMBER_CODE = '123456'
+
+async function loginThroughVisibleUi(page: Page, returnTo: string): Promise<void> {
+  await page.goto(`/login?from=${encodeURIComponent(returnTo)}`)
+  await page.getByRole('checkbox', { name: /我已阅读并同意/ }).click()
+  for (const digit of W6_MEMBER_PHONE) {
+    await page.getByRole('button', { name: digit, exact: true }).click()
+  }
+  await page.getByRole('button', { name: '获取验证码', exact: true }).click()
+  await page.getByRole('button', { name: '短信验证码', exact: true }).click()
+  for (const digit of W6_MEMBER_CODE) {
+    await page.getByRole('button', { name: digit, exact: true }).click()
+  }
+
+  const pendingTasksRequest = page.waitForRequest((request) =>
+    request.method() === 'GET' && new URL(request.url()).pathname === '/api/v1/me/pending-tasks',
+  )
+  await page.getByRole('button', { name: '验证并登录', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === returnTo)
+
+  const request = await pendingTasksRequest
+  const headers = await request.allHeaders()
+  expect(headers.authorization, '续办请求必须使用 AuthContext 内存 token 发送 Bearer').toBe(`Bearer ${W6_MEMBER_TOKEN}`)
+}
+
 async function acceptRoute(page: Page, route: W6RouteCase, errors: string[]): Promise<void> {
   if (route.seed) await route.seed(page)
-  await page.goto(route.url, { waitUntil: 'domcontentloaded' })
+  if (route.requiresMemberSession) {
+    await loginThroughVisibleUi(page, route.url)
+  } else {
+    await page.goto(route.url, { waitUntil: 'domcontentloaded' })
+  }
   if (route.expectedPath) await expect(page).toHaveURL((url) => url.pathname === route.expectedPath)
 
   await expect(page.locator(route.marker).first(), `稳定 marker: ${route.marker}`).toBeVisible()

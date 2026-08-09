@@ -33,7 +33,7 @@ const ORDER_NO_PATTERN = /^ORD-\d{8}-[0-9A-F]{10}$/
 
 const PRINT_PARAMS = {
   copies: 2,
-  colorMode: 'color' as const,
+  colorMode: 'black_white' as const,
   duplex: 'simplex' as const,
   paperSize: 'A4' as const,
   orientation: 'auto' as const,
@@ -174,7 +174,7 @@ async function main(): Promise<void> {
       anonymousOrder &&
       ORDER_NO_PATTERN.test(anonymousOrder.orderNo) &&
       anonymousOrder.type === 'print' &&
-      anonymousOrder.amountCents === 200 && // 2 页 × 2 份 × 彩色 50 分
+      anonymousOrder.amountCents === 80 && // 2 页 × 2 份 × 黑白 20 分
       anonymousOrder.billablePages === 2 &&
       anonymousOrder.billingPageSource === 'pdf_lightweight_scan' &&
       anonymousOrder.currency === 'CNY' &&
@@ -393,7 +393,7 @@ async function main(): Promise<void> {
     const readOrder = async (printTaskId: string): Promise<OrderRow | null> =>
       (await prisma.order.findUnique({ where: { printTaskId } })) as unknown as OrderRow | null
 
-    // (1) 报价 + 后端识别页数：彩色 2 份订单应有 amountCents>0、billablePages>0、billingPageSource 合法。
+    // (1) 报价 + 后端识别页数：当前已验证的黑白 2 份订单应有 amountCents>0、billablePages>0、billingPageSource 合法。
     {
       const o = await readOrder(memberPrint.taskId)
       const ok =

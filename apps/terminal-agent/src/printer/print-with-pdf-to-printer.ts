@@ -61,6 +61,7 @@ export async function printWithPdfToPrinter(
   filePath: string,
   printerName: string,
   params?: Partial<PrintJobParams>,
+  dependencies: PrintCommandDependencies = {},
 ): Promise<PrintResult> {
   const startedAt = new Date().toISOString()
   const t0 = Date.now()
@@ -84,16 +85,21 @@ export async function printWithPdfToPrinter(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const ptp = require('pdf-to-printer') as {
-      print: (file: string, options?: PrintOptions) => Promise<void>
+    let dispatch = dependencies.dispatch
+    if (!dispatch) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const ptp = require('pdf-to-printer') as {
+        print: (file: string, options?: PrintOptions) => Promise<void>
+      }
+      dispatch = ptp.print
     }
+    const timeoutMs = dependencies.timeoutMs ?? PRINT_TIMEOUT_MS
 
     // SumatraPDF exits after spooling (not after physical print). Guard against driver hangs.
     await Promise.race([
-      ptp.print(filePath, printOptions),
+      dispatch(filePath, printOptions),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('PRINT_TIMEOUT')), PRINT_TIMEOUT_MS),
+        setTimeout(() => reject(new Error('PRINT_TIMEOUT')), timeoutMs),
       ),
     ])
 
@@ -106,14 +112,20 @@ export async function printWithPdfToPrinter(
     const durationMs = Date.now() - t0
     const msg = e instanceof Error ? e.message : String(e)
 
-    const isTimeout = msg === 'PRINT_TIMEOUT' || durationMs >= PRINT_TIMEOUT_MS
+    const timeoutMs = dependencies.timeoutMs ?? PRINT_TIMEOUT_MS
+    const isTimeout = msg === 'PRINT_TIMEOUT' || durationMs >= timeoutMs
     const errorCode: PrintErrorCode = isTimeout ? 'PRINT_TIMEOUT' : 'PRINT_COMMAND_FAILED'
 
     return {
       success: false, method, printer: printerName, file: filePath,
       startedAt, finishedAt, durationMs,
       errorCode,
-      errorMessage: isTimeout ? `打印超时（${PRINT_TIMEOUT_MS / 1000}s）` : msg,
+      errorMessage: isTimeout ? `打印超时（${timeoutMs / 1000}s）` : msg,
     }
   }
+}
+
+export interface PrintCommandDependencies {
+  dispatch?: (file: string, options?: PrintOptions) => Promise<void>
+  timeoutMs?: number
 }

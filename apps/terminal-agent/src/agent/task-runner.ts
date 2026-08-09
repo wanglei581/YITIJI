@@ -42,7 +42,12 @@ import { createApiClient, createDirectHttpAgents, axiosErrorMessage, isUnauthori
 import { isUnauthorized, markUnauthorized } from './auth-state'
 import { writeStartupDiagnosticSafely } from './startup-diagnostics'
 import { print } from '../printer/print'
-import { getPrinterPreflight, getPrintJobStatus, type PrinterPreflight } from './wmi'
+import {
+  getPrinterPreflight,
+  getPrintJobStatus,
+  type PrinterPreflight,
+  type PrintJobMonitorStatus,
+} from './wmi'
 import { log, warn, err } from '../logger'
 import {
   isTaskDone,
@@ -438,7 +443,9 @@ export async function executeTask(
       // Windows spooler accepted the job (SumatraPDF already exited).
       // PaperOut requires 2 consecutive confirmations to guard against transient
       // driver state flicker.
-      // On timeout / job not found: conservative completed (no false failures).
+      // Ambiguous outcomes (timeout / never observed / monitor unavailable) fail
+      // closed. Only an explicit spooler completion or an observed job followed
+      // by queue removal may reach the server as completed.
       const monitorOutcome = await monitorPrintJob(
         resolvedPrinter,
         task.taskId,
@@ -524,12 +531,22 @@ export async function executeTask(
 
 // ── Post-spooling print job monitor ──────────────────────────────────────────
 
-interface MonitorOutcome {
+export interface MonitorOutcome {
   failed: boolean
   errorCode: string
   errorMessage?: string
   rawStatus?: string
   warn?: string
+}
+
+interface MonitorDependencies {
+  platform?: NodeJS.Platform
+  queryStatus?: (
+    printerName: string,
+    taskId: string,
+  ) => Promise<{ status: PrintJobMonitorStatus; rawStatus?: string }>
+  sleep?: (ms: number) => Promise<void>
+  now?: () => number
 }
 
 /**
@@ -538,49 +555,56 @@ interface MonitorOutcome {
  * Design invariants:
  *   - PaperOut must appear on 2 consecutive polls before returning 'paper_empty'
  *     (guards against transient driver state flicker).
- *   - If the job never appears (taskId not in DocumentName), return conservative
- *     completed + warn (no time-window fallback to avoid mismatching other jobs).
- *   - Timeout → conservative completed + warn (could be large/slow document).
- *   - Non-Windows → skip monitoring, return conservative completed immediately.
+ *   - Only an explicit spooler completion, or an observed active job followed by
+ *     queue removal, confirms completed. This confirms the Windows spooler
+ *     lifecycle only; it does not prove that paper physically reached the user.
+ *   - If the job never appears (taskId not in DocumentName), the query remains
+ *     unknown, or monitoring times out, return failed+PRINT_JOB_UNCONFIRMED.
+ *   - Non-Windows cannot provide spooler evidence and therefore fails closed.
  *
  * @param printerName     Windows printer name (from config)
  * @param taskId          Task ID — matched against DocumentName via "*taskId*"
  * @param timeoutMs       Maximum monitoring wall time (default 30 000 ms)
  * @param pollIntervalMs  Time between polls (default 1 500 ms)
  */
-async function monitorPrintJob(
+export async function monitorPrintJob(
   printerName: string,
   taskId: string,
   timeoutMs = 30_000,
   pollIntervalMs = 1_500,
+  dependencies: MonitorDependencies = {},
 ): Promise<MonitorOutcome> {
-  if (process.platform !== 'win32') {
-    return { failed: false, errorCode: '', warn: 'non-Windows: skipped print queue monitoring' }
+  const platform = dependencies.platform ?? process.platform
+  const queryStatus = dependencies.queryStatus ?? getPrintJobStatus
+  const wait = dependencies.sleep ?? sleep
+  const now = dependencies.now ?? Date.now
+
+  if (platform !== 'win32') {
+    return unconfirmedOutcome(
+      'non-Windows: print queue monitoring unavailable; completion cannot be confirmed',
+    )
   }
 
   // How many consecutive 'not_found' polls (without ever seeing the job) before
-  // we give up waiting and return conservative completed.  Fast single-page jobs
-  // complete and leave the spooler queue before the first 1.5s poll fires; 5
-  // consecutive not-found results (≈7.5s after print()) is long enough to catch
-  // any delayed spooler registration without making normal prints wait 30s.
+  // we fail closed. A fast job may leave the queue before the first poll, but that
+  // is indistinguishable from DocumentName mismatch or query/driver failure.
   const NOT_FOUND_LIMIT = 5
 
-  const deadline = Date.now() + timeoutMs
+  const deadline = now() + timeoutMs
   let paperEmptyCount = 0
   let notFoundCount = 0
-  let jobSeenOnce = false
+  let activeJobSeenOnce = false
   let seenRetainedOnce = false  // Pantum 'Printing, Retained' indeterminate flag
 
-  while (Date.now() < deadline) {
-    await sleep(pollIntervalMs)
+  while (now() < deadline) {
+    await wait(pollIntervalMs)
 
-    const { status, rawStatus } = await getPrintJobStatus(printerName, taskId)
+    const { status, rawStatus } = await queryStatus(printerName, taskId)
 
     switch (status) {
       case 'paper_empty':
         paperEmptyCount++
         notFoundCount = 0
-        jobSeenOnce = true
         // Require 2 consecutive PaperOut confirmations before declaring failure.
         if (paperEmptyCount >= 2) {
           return {
@@ -609,39 +633,38 @@ async function monitorPrintJob(
         // Pantum CM2800ADN: job submitted to printer + spooler retained copy.
         // Indeterminate: cannot distinguish "printed and kept" from "waiting for paper".
         // Keep polling — in case the driver eventually reports an explicit PaperOut or Error.
-        jobSeenOnce = true
+        activeJobSeenOnce = true
         seenRetainedOnce = true
         notFoundCount = 0
         paperEmptyCount = 0
         break
 
       case 'completed':
-        // Job disappeared from queue — normal successful completion (non-Pantum).
+        // Explicit Complete/Printed spooler state. This confirms the Windows
+        // spooler lifecycle, not physical delivery of paper to the user.
         return { failed: false, errorCode: '' }
 
       case 'printing':
         // Job still spooling/rendering (no Retained flag yet).
-        jobSeenOnce = true
+        activeJobSeenOnce = true
         paperEmptyCount = 0
         notFoundCount = 0
         break
 
       case 'not_found':
-        if (jobSeenOnce) {
-          // Job was visible and then disappeared — completed successfully.
+        if (activeJobSeenOnce) {
+          // The matching job was observed active and then removed. This confirms
+          // the Windows spooler lifecycle only, not physical paper delivery.
           return { failed: false, errorCode: '' }
         }
         notFoundCount++
         paperEmptyCount = 0
         if (notFoundCount >= NOT_FOUND_LIMIT) {
-          // Job never appeared after NOT_FOUND_LIMIT polls. Either it completed
-          // before we could observe it (fast job) or DocumentName didn't match.
-          // Conservative: completed + warn.
-          return {
-            failed: false,
-            errorCode: '',
-            warn: `job not found in queue after ${NOT_FOUND_LIMIT} polls (${(NOT_FOUND_LIMIT * pollIntervalMs / 1000).toFixed(1)}s); treating as completed`,
-          }
+          return unconfirmedOutcome(
+            `job not found in queue after ${NOT_FOUND_LIMIT} polls ` +
+              `(${(NOT_FOUND_LIMIT * pollIntervalMs / 1000).toFixed(1)}s); ` +
+              'the task was never observed and completion cannot be confirmed',
+          )
         }
         break
 
@@ -652,7 +675,7 @@ async function monitorPrintJob(
     }
   }
 
-  // Hard timeout reached.
+  // Hard timeout reached. Every remaining state is indeterminate, so fail closed.
   if (seenRetainedOnce) {
     // Pantum driver limitation: job was visible as 'Printing, Retained' throughout
     // the monitoring window. Cannot distinguish normal completion from waiting-for-paper.
@@ -662,21 +685,25 @@ async function monitorPrintJob(
       `job remained in 'Printing, Retained' state (Pantum CM2800ADN driver limitation — ` +
       `cannot distinguish completed vs paper-empty via Get-PrintJob); ` +
       `reporting PRINT_JOB_UNCONFIRMED — operator must check device`
-    return {
-      failed: true,
-      errorCode: 'PRINT_JOB_UNCONFIRMED',
-      errorMessage: '打印作业已提交到打印队列，但未确认完成，请工作人员检查纸张、卡纸和出纸状态',
-      rawStatus: 'Printing, Retained (timeout)',
-      warn: retainedMsg,
-    }
+    return unconfirmedOutcome(retainedMsg, 'Printing, Retained (timeout)')
   }
 
-  // Job never appeared or was in normal 'printing' state but timed out.
-  // Conservative: treat as completed + warn (large/slow document on non-Pantum printer).
-  const warnMsg = jobSeenOnce
-    ? `print queue monitoring timed out after ${timeoutMs}ms (job visible as 'printing' but did not complete); treating as completed`
-    : `print queue monitoring timed out after ${timeoutMs}ms (job never matched in queue); treating as completed`
-  return { failed: false, errorCode: '', warn: warnMsg }
+  const warnMsg = activeJobSeenOnce
+    ? `print queue monitoring timed out after ${timeoutMs}ms ` +
+      `(matching job remained active; completion cannot be confirmed)`
+    : `print queue monitoring timed out after ${timeoutMs}ms ` +
+      `(matching job was never observed or spooler queries were unavailable; completion cannot be confirmed)`
+  return unconfirmedOutcome(warnMsg)
+}
+
+function unconfirmedOutcome(warnMessage: string, rawStatus?: string): MonitorOutcome {
+  return {
+    failed: true,
+    errorCode: 'PRINT_JOB_UNCONFIRMED',
+    errorMessage: '打印作业已提交，但未确认打印队列完成，请工作人员现场检查纸张、卡纸和出纸状态；系统不会自动重印',
+    ...(rawStatus ? { rawStatus } : {}),
+    warn: warnMessage,
+  }
 }
 
 /** Async sleep helper (avoids blocking the event loop). */

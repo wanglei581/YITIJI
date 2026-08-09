@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common'
 import { countPagesInRange } from '../print-jobs/page-range.util'
 import { PrintPageCountService } from '../print-jobs/print-page-count.service'
+import { assertVerifiedPrintParameters } from '../print-jobs/verified-print-parameters'
 import type { QuotePrintOrderDto } from './dto/quote-print-order.dto'
 import { PricingService } from './pricing.service'
 import type { PrintPriceQuote } from './payment.types'
@@ -27,6 +28,7 @@ export class OrderQuoteService {
   ) {}
 
   async quote(dto: QuotePrintOrderDto): Promise<PrintPriceQuote> {
+    assertVerifiedPrintParameters(dto.params)
     const { billablePages: documentPages, billingPageSource } =
       await this.pageCount.resolveBillablePages(dto.fileUrl)
 

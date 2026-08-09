@@ -221,12 +221,12 @@ async function main(): Promise<void> {
 
     // ── (5) 免费单：amountCents=0 + payStatus=paid，门控下可 claim；出码被拒 ──
     await prisma.priceConfig.upsert({
-      where: { serviceKey: 'print_color_page' },
-      create: { serviceKey: 'print_color_page', unitCents: 0, unit: 'page', active: true, description: 'verify 免费' },
+      where: { serviceKey: 'print_bw_page' },
+      create: { serviceKey: 'print_bw_page', unitCents: 0, unit: 'page', active: true, description: 'verify 免费' },
       update: { unitCents: 0, active: true },
     })
     const free = await printJobs.create(
-      { fileUrl: await seedPdf('free', 1), fileMd5: 'sha256-cash-free', fileName: '免费打印.pdf', params: { copies: 1, colorMode: 'color' } },
+      { fileUrl: await seedPdf('free', 1), fileMd5: 'sha256-cash-free', fileName: '免费打印.pdf', params: { copies: 1, colorMode: 'black_white' } },
       { terminalId },
     )
     taskIds.push(free.taskId)

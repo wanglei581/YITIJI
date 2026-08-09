@@ -11,7 +11,11 @@ import {
   PackageCheckIcon,
   PrinterIcon,
 } from 'lucide-react'
-import type { PrintJobParams } from '@ai-job-print/shared'
+import {
+  hasUnverifiedPrintParams,
+  restrictToVerifiedPrintParams,
+  type PrintJobParams,
+} from '@ai-job-print/shared'
 import { KioskActionBar } from '@ai-job-print/ui'
 import { useAuth } from '../../auth/useAuth'
 import { API_MODE } from '../../services/api/client'
@@ -95,7 +99,9 @@ export function PrintConfirmPage() {
   const state = location.state as LocationState | null
   const restoredSession = useMemo(() => readPrintMaterialSession(), [])
   const file = state?.file ?? restoredSession?.file ?? { name: '未知文件', size: '-', pages: null }
-  const params = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
+  const incomingParams = state?.params ?? restoredSession?.printParams ?? DEFAULT_PARAMS
+  const paramsWereRestricted = hasUnverifiedPrintParams(incomingParams)
+  const params = restrictToVerifiedPrintParams(incomingParams)
   const materialCheck = state?.materialCheck ?? restoredSession?.materialCheck
   const source = state?.source ?? restoredSession?.source
   const uploadPath = printUploadPathForSource(source)
@@ -171,7 +177,7 @@ export function PrintConfirmPage() {
     { label: '文件页数', value: file.pages === null ? '待识别，以实际打印为准' : `${file.pages} 页` },
     { label: '纸张规格', value: 'A4（210 × 297 mm）' },
     { label: '打印份数', value: `${params.copies} 份` },
-    { label: '色彩模式', value: params.colorMode === 'color' ? '彩色' : '黑白' },
+    { label: '色彩模式', value: '黑白' },
     { label: '单双面', value: DUPLEX_LABEL[params.duplex] ?? params.duplex },
     { label: '页面方向', value: ORIENTATION_LABEL[params.orientation] ?? params.orientation },
     { label: '缩放方式', value: params.scale === 'fit' ? '适合页面' : '实际大小' },
@@ -305,6 +311,11 @@ export function PrintConfirmPage() {
         <div className="print-confirm-left" style={{ overflowY: 'auto' }}>
 
           {/* 文件条 */}
+          {paramsWereRestricted && (
+            <div className="mb-4 rounded-lg border border-warning bg-warning-bg px-4 py-3 text-sm text-warning-fg">
+              参数已按当前已验证能力收口：仅黑白、单面、每张 1 页。原彩色、双面或多页合一选择不会参与报价。
+            </div>
+          )}
           <div className="print-file-strip">
             <div className="print-file-icon">
               <FileTextIcon aria-hidden="true" />
@@ -375,11 +386,6 @@ export function PrintConfirmPage() {
               <span className="k">计费方式</span>
               <span className="v" style={{ fontSize: 16 }}>{costCalcLabel}</span>
             </div>
-            {params.colorMode === 'color' && (
-              <div className="print-est-row">
-                <span className="k print-color-hint">彩色效果以设备支持和当前耗材状态为准</span>
-              </div>
-            )}
             <div className="print-cost-total">
               <span className="print-cost-label">
                 预计费用<br />

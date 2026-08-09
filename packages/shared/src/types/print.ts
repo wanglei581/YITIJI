@@ -86,6 +86,34 @@ export const DEFAULT_PRINT_JOB_PARAMS: PrintJobParams = {
 }
 
 /**
+ * 当前已完成端到端验证的打印参数组合。
+ *
+ * wire 类型仍保留彩色、双面与 N-up，供历史数据读取和未来能力开放使用；在厂家确认
+ * 与 Windows 真机验收完成前，生产交互与服务端建单必须收口到本 profile。
+ */
+export const VERIFIED_PRINT_PARAMETER_PROFILE = {
+  colorMode: 'black_white',
+  duplex: 'simplex',
+  pagesPerSheet: 1,
+} as const satisfies Pick<PrintJobParams, 'colorMode' | 'duplex' | 'pagesPerSheet'>
+
+type CapabilitySensitivePrintParams = Pick<
+  PrintJobParams,
+  'colorMode' | 'duplex' | 'pagesPerSheet'
+>
+
+export function hasUnverifiedPrintParams(params: CapabilitySensitivePrintParams): boolean {
+  return params.colorMode !== VERIFIED_PRINT_PARAMETER_PROFILE.colorMode ||
+    params.duplex !== VERIFIED_PRINT_PARAMETER_PROFILE.duplex ||
+    params.pagesPerSheet !== VERIFIED_PRINT_PARAMETER_PROFILE.pagesPerSheet
+}
+
+/** 显式收口旧会话；调用方必须同时向用户说明参数发生了变化。 */
+export function restrictToVerifiedPrintParams(params: PrintJobParams): PrintJobParams {
+  return { ...params, ...VERIFIED_PRINT_PARAMETER_PROFILE }
+}
+
+/**
  * 旧扁平字段输入（历史遗留 / 简化调用方）。
  * 允许使用旧字段名 color / 旧 duplex 取值 'single' / 'double'，
  * 由 makePrintParams 归一化为合法 PrintJobParams。
