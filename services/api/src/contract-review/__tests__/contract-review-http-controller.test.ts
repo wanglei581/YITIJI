@@ -245,7 +245,7 @@ afterEach(async () => {
   await Promise.all(runningApps.splice(0).map((app) => app.close()))
 })
 
-test('HTTP module is explicit, contains no global guard, and stays outside default module wiring', async () => {
+test('HTTP module is explicit, contains no global guard, and is wired by AppModule', async () => {
   const [{ ContractReviewHttpModule }, { ContractReviewModule }, { ContractReviewController }, { JwtVerifierModule }, { RedisModule }] = await Promise.all([
     import('../contract-review-http.module'),
     import('../contract-review.module'),
@@ -265,7 +265,8 @@ test('HTTP module is explicit, contains no global guard, and stays outside defau
   const defaultModule = readFileSync(resolve(__dirname, '../contract-review.module.ts'), 'utf8')
   const appModule = readFileSync(resolve(__dirname, '../../app.module.ts'), 'utf8')
   assert.doesNotMatch(defaultModule, /ContractReviewHttpModule|ContractReviewController/u)
-  assert.doesNotMatch(appModule, /ContractReviewHttpModule|ContractReviewController/u)
+  assert.match(appModule, /ContractReviewHttpModule/u)
+  assert.doesNotMatch(appModule, /ContractReviewController/u)
 })
 
 test('real HTTP pipeline enforces exact DTO keys and endpoint status contracts', async () => {

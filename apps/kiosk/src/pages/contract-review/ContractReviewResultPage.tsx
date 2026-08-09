@@ -1,23 +1,20 @@
 // ============================================================
-// 合同审查结果页（步骤 3/3）
+// AI 签约风险提示结果页（步骤 3/3）
 //
 // 展示统计概览（优先核查 / 关注 / 信息不足）+ 各风险项详情。
 // 免责声明置顶，结果仅作参考；打印报告 / 完成操作。
 // ============================================================
 
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   Button,
   KioskActionBar,
+  KioskModal,
   KioskPageFrame,
   KioskPageHeader,
 } from '@ai-job-print/ui'
-import type {
-  ContractReviewFinding,
-  ContractReviewResult,
-  ContractType,
-} from '@ai-job-print/shared'
+import type { ContractReviewFinding } from '@ai-job-print/shared'
 import {
   AlertCircleIcon,
   AlertTriangleIcon,
@@ -27,17 +24,24 @@ import {
   HelpCircleIcon,
   HomeIcon,
   InfoIcon,
+  Loader2Icon,
   PrinterIcon,
+  Trash2Icon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { deleteContractReview } from '../../services/api/contractReview'
+import { ContractReviewSessionNotice } from './ContractReviewSessionNotice'
+import {
+  isContractReviewReportPrintEnabled,
+  prepareContractReviewReportPrint,
+} from './contractReviewReportPrintFlow'
+import {
+  clearContractReviewSession,
+  readContractReviewSession,
+} from './contractReviewSession'
 import './contract-review.css'
-
-interface PageState {
-  taskId?: string
-  accessToken?: string | null
-  contractType?: ContractType
-  result?: ContractReviewResult | null
-}
 
 const PRIORITY_LABELS: Record<string, string> = {
   priority_check: '优先核查',
@@ -61,6 +65,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   imbalance: '权利义务失衡',
   offer_conditions: '录用条件',
 }
+
+const REPORT_PRINT_ENABLED = isContractReviewReportPrintEnabled()
 
 function PriorityBadge({ priority }: { priority: string }) {
   return (
@@ -140,9 +146,60 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
 
 export function ContractReviewResultPage() {
   const navigate = useNavigate()
-  const location = useLocation()
-  const state = (location.state ?? {}) as PageState
-  const result = state.result ?? null
+  const { getToken, user } = useAuth()
+  const session = readContractReviewSession(user?.id ?? null)
+  const result = session?.result ?? null
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [showPrintConfirm, setShowPrintConfirm] = useState(false)
+  const [generatingReport, setGeneratingReport] = useState(false)
+  const [reportError, setReportError] = useState<string | null>(null)
+
+  useBusyLock(deleting || generatingReport)
+
+  async function continueToReportPrint() {
+    if (!REPORT_PRINT_ENABLED || !session?.taskId || generatingReport) return
+    setGeneratingReport(true)
+    setReportError(null)
+    try {
+      const handoff = await prepareContractReviewReportPrint(session.taskId, {
+        token: getToken(),
+        accessToken: session.accessToken,
+      })
+      navigate('/print/confirm', {
+        replace: true,
+        state: handoff,
+      })
+    } catch {
+      setShowPrintConfirm(false)
+      setReportError('风险提示报告生成或原合同清理未完成，请稍后重试。当前不会进入收费或打印流程。')
+    } finally {
+      setGeneratingReport(false)
+    }
+  }
+
+  async function deleteAndNavigate(destination: '/contract-review' | '/resume-service') {
+    if (deleting) return
+    if (!session?.taskId) {
+      clearContractReviewSession()
+      navigate(destination, { replace: true })
+      return
+    }
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteContractReview(session.taskId, {
+        token: getToken(),
+        accessToken: session.accessToken,
+      })
+      clearContractReviewSession()
+      navigate(destination, { replace: true })
+    } catch {
+      setDeleteError('立即删除失败，合同仍可能处于短期保留状态。请重试；系统仍会按最长保留时限自动清理。')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // 若直接进入此页但没有结果（刷新/深链），回首页
   if (!result) {
@@ -153,9 +210,9 @@ export function ContractReviewResultPage() {
             className="fusion-w3 fusion-w3--resume"
             header={
               <KioskPageHeader
-                title="AI 合同审查"
+                title="AI 签约风险提示"
                 description="结果"
-                onBack={() => navigate('/contract-review', { replace: true })}
+                onBack={() => void deleteAndNavigate('/contract-review')}
                 backLabel="返回"
               />
             }
@@ -165,8 +222,10 @@ export function ContractReviewResultPage() {
               <HelpCircleIcon size={52} />
             </div>
             <p className="cr-done-screen__title">未找到审查结果</p>
-            <p className="cr-done-screen__sub">请重新上传合同进行审查</p>
-            <Button size="lg" onClick={() => navigate('/contract-review', { replace: true })}>
+            <p className="cr-done-screen__sub">
+              {deleteError ?? '请重新上传合同进行审查'}
+            </p>
+            <Button size="lg" disabled={deleting} onClick={() => void deleteAndNavigate('/contract-review')}>
               重新上传
             </Button>
           </div>
@@ -188,8 +247,8 @@ export function ContractReviewResultPage() {
           header={
             <KioskPageHeader
               title="审查结果"
-              description="AI 合同审查 · 仅供参考"
-              onBack={() => navigate('/contract-review', { replace: true })}
+              description="AI 签约风险提示 · 仅供参考"
+              onBack={() => void deleteAndNavigate('/contract-review')}
               backLabel="重新审查"
             />
           }
@@ -199,23 +258,51 @@ export function ContractReviewResultPage() {
               variant="outline"
               size="lg"
               style={{ flex: 1 }}
-              onClick={() => navigate('/', { replace: true })}
+              disabled={deleting}
+              onClick={() => void deleteAndNavigate('/contract-review')}
             >
               <HomeIcon size={20} className="mr-2" />
-              返回首页
+              重新审查
             </Button>
             <Button
               size="lg"
               style={{ flex: 2 }}
-              disabled
-              title="合同审查报告文件尚未开放"
+              disabled={!REPORT_PRINT_ENABLED || deleting || generatingReport}
+              title={REPORT_PRINT_ENABLED ? '生成并打印 AI 风险提示报告' : '合同审查报告文件尚未开放'}
+              onClick={() => setShowPrintConfirm(true)}
             >
-              <PrinterIcon size={20} className="mr-2" />
-              报告打印暂未开放
+              {generatingReport
+                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
+                : <PrinterIcon size={20} className="mr-2" />}
+              {REPORT_PRINT_ENABLED ? '打印风险提示报告' : '报告打印暂未开放'}
+            </Button>
+            <Button
+              size="lg"
+              style={{ flex: 2 }}
+              disabled={deleting}
+              onClick={() => void deleteAndNavigate('/resume-service')}
+            >
+              {deleting
+                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
+                : <Trash2Icon size={20} className="mr-2" />}
+              结束并删除
             </Button>
             </KioskActionBar>
           }
         >
+        {deleteError && (
+          <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
+            <AlertCircleIcon />
+            <span>{deleteError}</span>
+          </div>
+        )}
+        {reportError && (
+          <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
+            <AlertCircleIcon />
+            <span>{reportError}</span>
+          </div>
+        )}
+        {session && <ContractReviewSessionNotice expiresAt={session.expiresAt} />}
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
@@ -284,7 +371,8 @@ export function ContractReviewResultPage() {
           <InfoIcon />
           <span>
             本结果由 AI 生成，<strong>仅作风险提示，不构成正式法律意见</strong>。
-            重大争议请咨询律师或官方机构。合同原文已在本次会话结束时删除。
+            重大争议请咨询律师或官方机构。点击“结束并删除”会立即请求清理合同原件；
+            异常情况下仍按知情同意中的最长保留时限自动清理。
           </span>
         </div>
 
@@ -359,6 +447,47 @@ export function ContractReviewResultPage() {
         </div>
         </KioskPageFrame>
       </main>
+      <KioskModal
+        title="确认打印风险提示报告"
+        open={showPrintConfirm}
+        onClose={() => !generatingReport && setShowPrintConfirm(false)}
+        actions={
+          <div style={{ display: 'flex', gap: 16 }}>
+            <Button
+              variant="ghost"
+              disabled={generatingReport}
+              onClick={() => setShowPrintConfirm(false)}
+              style={{ flex: 1 }}
+            >
+              暂不打印
+            </Button>
+            <Button
+              disabled={generatingReport}
+              onClick={() => void continueToReportPrint()}
+              style={{ flex: 2 }}
+            >
+              {generatingReport
+                ? <Loader2Icon size={18} className="animate-spin mr-1" />
+                : <PrinterIcon size={18} className="mr-1" />}
+              生成报告并查看报价
+            </Button>
+          </div>
+        }
+      >
+        <div className="cr-confirm-modal">
+          <div className="cr-confirm-modal__info">
+            只生成并打印 AI 风险提示报告，不打印合同原件。报告生成成功后，系统会优先清理原合同。
+          </div>
+          <div>
+            <div className="cr-confirm-modal__row"><span>打印内容</span><span>风险提示报告</span></div>
+            <div className="cr-confirm-modal__row"><span>默认参数</span><span>黑白 · A4 · 单面 · 1 份</span></div>
+            <div className="cr-confirm-modal__row"><span>费用</span><span>下一步由服务端报价</span></div>
+          </div>
+          <p style={{ fontSize: 17, color: 'var(--muted)', lineHeight: 1.55 }}>
+            报告可能包含敏感条款摘要，请在机器旁等待并及时取走纸张。进入打印确认后放弃，系统会请求立即删除尚未建单的报告。
+          </p>
+        </div>
+      </KioskModal>
     </KioskFullscreenShell>
   )
 }

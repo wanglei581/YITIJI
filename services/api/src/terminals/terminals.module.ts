@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { FilesModule } from '../files/files.module'
 import { JwtVerifierModule } from '../common/jwt-verifier.module'
 import { TerminalsController } from './terminals.controller'
 import { AdminTerminalsController } from './admin-terminals.controller'
@@ -13,7 +14,7 @@ import { TerminalCapabilitiesService } from './terminal-capabilities.service'
 import { TerminalCredentialSecurityService } from './terminal-credential-security.service'
 
 @Module({
-  imports: [JwtVerifierModule],
+  imports: [JwtVerifierModule, FilesModule],
   controllers: [TerminalsController, AdminTerminalsController, AdminPrintersController, AdminToolboxController],
   providers: [
     TerminalAgentService,

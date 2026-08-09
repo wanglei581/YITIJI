@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_ENABLE_CONTRACT_REVIEW_REPORT_PRINT?: string
   readonly VITE_API_BASE_URL: string
   readonly VITE_USE_TRTC_CALL: string
   readonly VITE_ALLOW_TEXT_ONLY_ASSISTANT: string

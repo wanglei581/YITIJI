@@ -156,7 +156,8 @@ function makeOrderNo(): string {
  * 派生产物与系统生成物（cover_letter / self_assessment_report / fair_material 等）
  * 不在此列——它们由本机生成，不是用户手里可能夹带证件号的原件。
  */
-const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan', 'contract_upload'])
+const PII_SCAN_REQUIRED_PURPOSES = new Set(['resume_upload', 'resume_scan', 'print_doc', 'id_scan'])
+const SHA256_HEX_PATTERN = /^[a-f0-9]{64}$/u
 
 /**
  * 打印前隐私预检门控。默认关闭，由 PRINT_REQUIRE_PII_SCAN=true 显式开启。
@@ -199,6 +200,34 @@ export class PrintJobsService {
           message: 'fileUrl 必须是本系统签发的有效签名文件链接',
         },
       })
+    }
+
+    // 合同审查只允许打印系统生成的风险提示报告，原合同属于短期高敏原件，
+    // 即使调用方拿到了仍有效的内部签名 URL，也不得绕过合同审查页面直接建打印单。
+    // 报告哈希必须采用服务端落库值，不能信任 Kiosk 可篡改/遗漏的 fileMd5。
+    const sourceFile = await this.prisma.fileObject.findUnique({
+      where: { id: fileId },
+      select: { purpose: true, sha256: true },
+    })
+    if (sourceFile?.purpose === 'contract_upload') {
+      throw new BadRequestException({
+        error: {
+          code: 'PRINT_CONTRACT_SOURCE_FORBIDDEN',
+          message: '合同审查原件不可直接打印，请仅打印风险提示报告',
+        },
+      })
+    }
+    let trustedFileHash = dto.fileMd5 ?? ''
+    if (sourceFile?.purpose === 'contract_review_report') {
+      if (!SHA256_HEX_PATTERN.test(sourceFile.sha256)) {
+        throw new BadRequestException({
+          error: {
+            code: 'PRINT_CONTRACT_REPORT_INVALID',
+            message: '合同风险提示报告校验信息无效，请重新生成后再打印',
+          },
+        })
+      }
+      trustedFileHash = sourceFile.sha256
     }
 
     // 招聘会资料 bridge 被下架/禁打/删除后，已确认任务可保留文件继续履约；
@@ -349,8 +378,9 @@ export class PrintJobsService {
           fileId,
           terminalId: targetTerminalId,
           endUserId:  ctx.endUserId ?? null,
-          // fileMd5 列名保留（方案②），实际承载 SHA-256（files 服务计算 → Kiosk 上送 → Agent SHA-256 比对）。
-          fileMd5:    dto.fileMd5 ?? '',
+          // fileMd5 列名保留（方案②），实际承载 SHA-256。合同报告强制使用服务端落库哈希，
+          // 其他既有打印流程暂保持 DTO 兼容，由 Agent 统一执行 SHA-256 比对。
+          fileMd5:    trustedFileHash,
           paramsJson: JSON.stringify(storedParams),
           status:     'pending',
         },
@@ -396,7 +426,7 @@ export class PrintJobsService {
       payload: {
         fileId,
         fileName:    dto.fileName ?? null,
-        hasFileHash: Boolean(dto.fileMd5),
+        hasFileHash: Boolean(trustedFileHash),
         params:      dto.params ?? DEFAULT_PARAMS,
         hasEndUser:  Boolean(ctx.endUserId),
         terminalId:  targetTerminalId,

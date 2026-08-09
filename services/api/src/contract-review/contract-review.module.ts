@@ -10,6 +10,12 @@ import { ContractReviewExtractionService } from './contract-review-extraction.se
 import { ContractReviewFactMerger } from './contract-review-fact-merger'
 import { ContractReviewFindingMapper } from './contract-review-finding-mapper'
 import { ContractReviewLifecycleService } from './contract-review-lifecycle.service'
+import { ContractReviewReportFileService } from './contract-review-report-file.service'
+import { ContractReviewReportPdfService } from './contract-review-report-pdf.service'
+import {
+  CONTRACT_REVIEW_REPORT_ENABLED,
+  ContractReviewReportService,
+} from './contract-review-report.service'
 import {
   CONTRACT_REVIEW_PROVIDER_RUNTIME,
   ContractReviewOrchestratorService,
@@ -90,6 +96,13 @@ function makeProviderRuntime(): ContractReviewProviderRuntime {
     ContractReviewConsentService,
     ContractReviewTaskAccess,
     ContractReviewLifecycleService,
+    ContractReviewReportFileService,
+    ContractReviewReportPdfService,
+    ContractReviewReportService,
+    {
+      provide: CONTRACT_REVIEW_REPORT_ENABLED,
+      useFactory: () => process.env['CONTRACT_REVIEW_REPORT_PRINT_ENABLED'] === 'true',
+    },
     ContractReviewExtractionService,
     ContractReviewFactMerger,
     ContractReviewRuleEngine,

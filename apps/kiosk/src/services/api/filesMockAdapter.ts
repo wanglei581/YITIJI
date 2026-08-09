@@ -35,6 +35,7 @@ const SENSITIVE_BY_PURPOSE: Record<FilePurpose, FileSensitiveLevel> = {
   signature_image: 'highly_sensitive',
   member_data_export: 'highly_sensitive',
   contract_upload: 'highly_sensitive',
+  contract_review_report: 'highly_sensitive',
   self_assessment_report: 'sensitive',
 }
 

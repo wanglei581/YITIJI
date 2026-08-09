@@ -31,6 +31,7 @@ export type FilePurpose =
   | 'admin_upload'         // 管理员通用上传
   | 'temp'                 // 临时 / 匿名上传
   | 'contract_upload'      // 合同审查会话上传(高敏、系统锁定两小时)
+  | 'contract_review_report' // 合同风险提示报告(服务端生成、高敏、系统短期)
   | 'signature_image'      // 签名/印章图片(高敏,锁定系统短期,不进"我的文档")
   | 'member_data_export'   // 会员本人数据导出(仅服务端生成,高敏短期 JSON)
   | 'self_assessment_report' // 自我探索 · 倾向参考 报告 PDF(本人参考,不可分享)

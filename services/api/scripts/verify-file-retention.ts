@@ -130,6 +130,9 @@ async function verifyMalformedContractCleanup(): Promise<void> {
     fairMaterialPrintBridge: {
       findFirst: async () => null,
     },
+    printTask: {
+      findMany: async () => [],
+    },
   }
   const storage = {
     deleteObject: async (storageKey: string) => {

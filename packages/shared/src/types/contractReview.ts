@@ -80,3 +80,17 @@ export interface ContractReviewTaskView {
   }
   result: ContractReviewResult | null
 }
+
+/** 服务端生成的短期风险提示报告；只供既有打印闭环消费。 */
+export interface ContractReviewReportView {
+  fileId: string
+  filename: string
+  mimeType: 'application/pdf'
+  sizeBytes: number
+  pages: number
+  expiresAt: string
+  printFileUrl: string
+  /** 仅允许放弃尚未建单的报告；不得作为合同任务访问凭证。 */
+  abandonToken: string
+  abandonTokenExpiresAt: string
+}

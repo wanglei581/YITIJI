@@ -53,7 +53,7 @@ import { LegalModule } from './legal/legal.module'
 import { NotificationsModule } from './notifications/notifications.module'
 import { ActivitiesModule } from './activities/activities.module'
 import { ScreensaverModule } from './screensaver/screensaver.module'
-import { ContractReviewModule } from './contract-review/contract-review.module'
+import { ContractReviewHttpModule } from './contract-review/contract-review-http.module'
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware'
 
 function parseRedisConnection(url: string): { host: string; port: number; password?: string; db?: number } {
@@ -134,8 +134,9 @@ const redisUrl = process.env['REDIS_URL']
     NotificationsModule,
     ActivitiesModule,
     ScreensaverModule,
-    // 仅装配默认关闭的合同域 service；生产根模块不注册 HTTP 或真实模型入口。
-    ContractReviewModule,
+    // 注册合同风险提示 HTTP 契约；真实模型与 BullMQ 仍须 Redis + API Key 同时就绪，
+    // 否则底层 runtime fail-closed，不会把未配置能力伪装为可用。
+    ContractReviewHttpModule,
   ],
   controllers: [HealthController],
   providers: [

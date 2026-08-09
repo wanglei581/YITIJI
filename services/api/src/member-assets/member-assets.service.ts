@@ -94,7 +94,7 @@ export class MemberAssetsService {
   ): Promise<MemberAssetPage<MemberDocumentItem>> {
     const where = {
       ...isVisibleMemberFileWhere(endUserId, new Date()),
-      purpose: { notIn: ['signature_image', 'contract_upload'] },
+      purpose: { notIn: ['signature_image', 'contract_upload', 'contract_review_report'] },
       AND: [
         {
           OR: [

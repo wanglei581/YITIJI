@@ -17,6 +17,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
  */
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000 // 5 分钟
+const REPORT_ABANDON_NAMESPACE = 'contract-report-abandon'
 
 function getSecret(): string {
   const secret = process.env['FILE_SIGNING_SECRET']
@@ -27,8 +28,12 @@ function getSecret(): string {
 }
 
 /** 生成签名 URL(返回 path + query,不含 host,host 由前端 / API_BASE_URL 拼)。 */
-export function signFileUrl(fileId: string, ttlMs: number = DEFAULT_TTL_MS): { url: string; expiresAt: Date } {
-  const expiresAtMs = Date.now() + ttlMs
+export function signFileUrl(
+  fileId: string,
+  ttlMs: number = DEFAULT_TTL_MS,
+  notAfterMs?: number,
+): { url: string; expiresAt: Date } {
+  const expiresAtMs = resolveSignedExpiry(ttlMs, notAfterMs)
   const message = `${fileId}.${expiresAtMs}`
   const signature = createHmac('sha256', getSecret()).update(message).digest('hex')
   const url = `/api/v1/files/${fileId}/content?expires=${expiresAtMs}&sig=${signature}`
@@ -50,6 +55,55 @@ export function verifyFileSignature(fileId: string, expires: string, sig: string
   if (sig.length !== expected.length) return false
   try {
     return timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expected, 'hex'))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 合同风险提示报告的最小放弃凭证。
+ *
+ * 该 token 只能由合同报告服务用于物理删除尚未进入 PrintTask 的报告；它不授权读取
+ * 报告或合同任务，也不包含匿名合同 access token。格式为 `<expiresMs>.<hmac>`。
+ */
+export function signContractReportAbandonToken(
+  fileId: string,
+  ttlMs: number = DEFAULT_TTL_MS,
+  notAfterMs?: number,
+): { token: string; expiresAt: Date } {
+  const expiresAtMs = resolveSignedExpiry(ttlMs, notAfterMs)
+  const signature = createHmac('sha256', getSecret())
+    .update(`${REPORT_ABANDON_NAMESPACE}.${fileId}.${expiresAtMs}`)
+    .digest('hex')
+  return { token: `${expiresAtMs}.${signature}`, expiresAt: new Date(expiresAtMs) }
+}
+
+function resolveSignedExpiry(ttlMs: number, notAfterMs?: number): number {
+  const now = Date.now()
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    throw new Error('FILE_SIGNING_TTL_INVALID')
+  }
+  const ttlExpiry = now + ttlMs
+  const expiresAtMs = notAfterMs === undefined ? ttlExpiry : Math.min(ttlExpiry, notAfterMs)
+  if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs <= now) {
+    throw new Error('FILE_SIGNING_EXPIRY_INVALID')
+  }
+  return expiresAtMs
+}
+
+export function verifyContractReportAbandonToken(fileId: string, token: string): boolean {
+  const separator = token.indexOf('.')
+  if (separator < 1 || separator !== token.lastIndexOf('.')) return false
+  const expires = token.slice(0, separator)
+  const signature = token.slice(separator + 1)
+  const expiresAtMs = Number(expires)
+  if (!Number.isSafeInteger(expiresAtMs) || expiresAtMs <= Date.now()) return false
+  const expected = createHmac('sha256', getSecret())
+    .update(`${REPORT_ABANDON_NAMESPACE}.${fileId}.${expiresAtMs}`)
+    .digest('hex')
+  if (signature.length !== expected.length) return false
+  try {
+    return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))
   } catch {
     return false
   }
