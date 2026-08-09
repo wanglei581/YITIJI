@@ -32,6 +32,7 @@ import {
   statSync,
   unlinkSync,
 } from 'fs'
+import { createHmac } from 'crypto'
 import { basename, dirname, join, resolve } from 'path'
 import chokidar, { FSWatcher } from 'chokidar'
 import FormData from 'form-data'
@@ -46,11 +47,19 @@ import {
 } from './scan-input/verified-folder'
 import { log, warn, err } from '../logger'
 import type { ScanInputCandidateSnapshot } from './types'
+import {
+  beginScanDeletionAudit,
+  finishScanDeletionAudit,
+  getActiveDatabase,
+  getOrCreateScanAuditHmacKey,
+  type AgentDatabase,
+} from './db'
 
 const STABILITY_CHECK_INTERVAL_MS = 500
 const STABILITY_MAX_CHECKS = 10
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000
 const UNCLAIMED_DIRNAME = '_unclaimed'
+const UNCLAIMED_EXPIRY_REASON = 'UNCLAIMED_TTL_EXPIRED'
 
 /** Returns true when a 401 requires preserving the source file for re-bind. */
 export function preserveScanFileForUnauthorized(error: unknown): boolean {
@@ -350,10 +359,14 @@ export async function processCandidate(
 
 /**
  * 清理 _unclaimed 隔离目录：删除 mtime 早于 UNCLAIMED_MAX_AGE_MS 的文件。
- * 只删文件本身，不产生审计记录——这些文件从未成功建档，不在 FileObject
- * 审计范围内；日志只记录文件名 + 滞留时长，绝不记录文件内容。
+ * 删除意图和结果写入本地 durable audit；账本只保存每安装密钥生成的 HMAC，不保存路径、
+ * 文件名、内容或其它明文 PII。审计失败不能阻止隐私删除。
  */
-export function sweepUnclaimedDir(scanWatchFolder: string): void {
+export function sweepUnclaimedDir(
+  scanWatchFolder: string,
+  auditDb: AgentDatabase = getActiveDatabase(),
+  dependencies: { unlinkFile?: (filePath: string) => void; now?: () => number } = {},
+): void {
   const dir = join(scanWatchFolder, UNCLAIMED_DIRNAME)
   if (!existsSync(dir)) return
 
@@ -365,14 +378,17 @@ export function sweepUnclaimedDir(scanWatchFolder: string): void {
     return
   }
 
-  const now = Date.now()
+  const now = dependencies.now?.() ?? Date.now()
+  const unlinkFile = dependencies.unlinkFile ?? unlinkSync
   for (const name of entries) {
     const fullPath = join(dir, name)
     let mtimeMs: number
+    let size: number
     try {
       const stat = statSync(fullPath)
       if (stat.isDirectory()) continue
       mtimeMs = stat.mtime.getTime()
+      size = stat.size
     } catch {
       continue
     }
@@ -380,13 +396,83 @@ export function sweepUnclaimedDir(scanWatchFolder: string): void {
     const ageMs = now - mtimeMs
     if (ageMs <= UNCLAIMED_MAX_AGE_MS) continue
 
+    // HMACs are domain-separated and keyed by a per-install random secret stored
+    // in local SQLite metadata. An attacker who guesses a filename/path cannot
+    // reproduce or correlate ledger identifiers without that local key.
+    let eventId: string | undefined
+    let auditLabel = 'untracked'
+    let auditIntentRecorded = false
     try {
-      unlinkSync(fullPath)
-      warn(`scan-watcher: deleted stale _unclaimed file after ${formatDuration(ageMs)} idle — ${name}`)
-    } catch (e) {
-      err(`scan-watcher: failed to delete stale _unclaimed file — ${name}: ${axiosErrorMessage(e)}`)
+      if (auditDb) {
+        const hmacKey = Buffer.from(getOrCreateScanAuditHmacKey(auditDb), 'hex')
+        const identifierHash = createHmac('sha256', hmacKey)
+          .update(`unclaimed-scan-v1\0${resolve(fullPath)}\0${size}\0${mtimeMs}`)
+          .digest('hex')
+        eventId = createHmac('sha256', hmacKey)
+          .update(`unclaimed-expiry-delete-v1\0${identifierHash}\0${mtimeMs}`)
+          .digest('hex')
+        auditLabel = eventId.slice(0, 12)
+        beginScanDeletionAudit(
+          auditDb,
+          { eventId, reasonCode: UNCLAIMED_EXPIRY_REASON, identifierHash },
+          new Date(now).toISOString(),
+        )
+        auditIntentRecorded = true
+      } else {
+        warn(`scan-watcher: deletion audit unavailable; proceeding with TTL deletion — event=${auditLabel}`)
+      }
+    } catch (auditError) {
+      warn(
+        `scan-watcher: failed to persist deletion intent; proceeding with TTL deletion — ` +
+          `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+      )
+    }
+
+    try {
+      unlinkFile(fullPath)
+      if (auditIntentRecorded && eventId) {
+        try {
+          finishScanDeletionAudit(auditDb, eventId, {
+            result: 'deleted',
+            deletedAt: new Date(dependencies.now?.() ?? Date.now()).toISOString(),
+          })
+        } catch (auditError) {
+          err(
+            `scan-watcher: deletion succeeded but audit result update failed — ` +
+              `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+          )
+        }
+      }
+      warn(
+        `scan-watcher: deleted stale _unclaimed file after ${formatDuration(ageMs)} idle — ` +
+          `event=${auditLabel}`,
+      )
+    } catch (deleteError) {
+      const errorCode = sanitizedErrorCode(deleteError, 'DELETE_FAILED')
+      if (auditIntentRecorded && eventId) {
+        try {
+          finishScanDeletionAudit(auditDb, eventId, { result: 'delete_failed', errorCode })
+        } catch (auditError) {
+          err(
+            `scan-watcher: delete and audit result update both failed — ` +
+              `event=${auditLabel}: ${sanitizedErrorCode(auditError, 'AUDIT_WRITE_FAILED')}`,
+          )
+        }
+      }
+      err(
+        `scan-watcher: failed to delete stale _unclaimed file; will retry next sweep — ` +
+          `event=${auditLabel} code=${errorCode}`,
+      )
     }
   }
+}
+
+/** Store/log only bounded machine-readable codes, never exception messages containing paths. */
+function sanitizedErrorCode(error: unknown, fallback: string): string {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  return typeof code === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(code)
+    ? code.toUpperCase()
+    : fallback
 }
 
 /** 目录清点：处理当前已存在、不在 _unclaimed 子目录里的文件；同时清理 _unclaimed 里的过期文件。 */

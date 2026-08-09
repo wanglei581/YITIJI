@@ -188,6 +188,12 @@ jobs:
           pnpm run verify:production-provisioning
           pnpm run verify:scan-watcher
           pnpm run verify:scan-input-health
+          # Temp directory + temp SQLite fault injection; no production scan folder or Windows dependency.
+          pnpm exec ts-node scripts/verify-scan-deletion-audit.ts
+          # Linux-safe fault injection only: temp SQLite + loopback HTTP fixture; no Windows printer or external network.
+          pnpm exec ts-node scripts/verify-task-reliability.ts
+          # Injected platform/clock/WMI/dispatch seams only; never invokes a real spooler or printer.
+          pnpm exec ts-node scripts/verify-print-monitor-truth.ts
           pnpm run verify:network-diagnostics
           pnpm run verify:local-qr-proxy
           pnpm run verify:usb-import-agent
@@ -220,6 +226,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:assistant-trtc-guard
           pnpm --filter @ai-job-print/kiosk verify:production-real-services
           pnpm --filter @ai-job-print/kiosk verify:print-confirm-honest
+          pnpm --filter @ai-job-print/kiosk verify:print-parameter-capability
           pnpm --filter @ai-job-print/kiosk verify:device-status-honest
           pnpm --filter @ai-job-print/kiosk verify:ai-artifact-print-url-contract
           pnpm --filter @ai-job-print/kiosk verify:job-fit-m1-5-ui
@@ -228,6 +235,7 @@ jobs:
           pnpm --filter @ai-job-print/kiosk verify:member-print-orders-ui
           pnpm --filter @ai-job-print/kiosk verify:profile-inkpaper-home
           pnpm --filter @ai-job-print/kiosk verify:user-center-wave0
+          pnpm --filter @ai-job-print/kiosk verify:member-session-closure
           pnpm --filter @ai-job-print/kiosk verify:lightflow-profile-entry
           pnpm --filter @ai-job-print/kiosk verify:profile-feedback-inkpaper
           pnpm --filter @ai-job-print/kiosk verify:profile-resumes-notifications-inkpaper
@@ -284,6 +292,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-org-self
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
           pnpm --filter @ai-job-print/api verify:print-jobs
+          pnpm --filter @ai-job-print/api verify:print-parameter-capability
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
@@ -303,7 +312,9 @@ jobs:
           pnpm --filter @ai-job-print/api verify:order
           pnpm --filter @ai-job-print/api verify:pricing
           pnpm --filter @ai-job-print/api verify:member-print-orders
+          pnpm --filter @ai-job-print/api verify:ai-persistence-consistency
           pnpm --filter @ai-job-print/api verify:materials-processing
+          pnpm --filter @ai-job-print/api verify:material-task-token-transport
           pnpm --filter @ai-job-print/api verify:job-materials
           pnpm --filter @ai-job-print/api verify:payment-flow
           pnpm --filter @ai-job-print/api verify:payment-real-channels
@@ -387,6 +398,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:multipart-field-nesting
           pnpm --filter @ai-job-print/api verify:upload-sessions
           pnpm --filter @ai-job-print/api verify:file-retention
+          pnpm --filter @ai-job-print/api verify:file-delete-consistency
           pnpm --filter @ai-job-print/api verify:cos:files
 
   # ── PostgreSQL 生产底座验证(第四阶段)──────────────────────────────────────

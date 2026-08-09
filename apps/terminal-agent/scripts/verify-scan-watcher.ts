@@ -178,8 +178,13 @@ function verifyUnclaimedCleanup(): void {
     )
     assert.equal(existsSync(join(unclaimedDir, 'a-subdir')), true, 'sweepUnclaimedDir must not touch subdirectories')
 
-    // 日志必须报告文件名 + 滞留时长，绝不能把文件内容写进日志。
-    assert.match(stdout, /stale-25h\.pdf/, 'cleanup log must mention the deleted filename')
+    // 日志只报告安全化事件标识 + 滞留时长，不得记录可能含 PII 的文件名或内容。
+    assert.match(
+      stdout,
+      /event=(?:[a-f0-9]{12}|untracked)/,
+      'cleanup log must mention only a keyed event id or the safe audit-unavailable marker',
+    )
+    assert.doesNotMatch(stdout, /stale-25h\.pdf/, 'cleanup log must not include the filename')
     assert.doesNotMatch(stdout, new RegExp(staleSecret), 'cleanup log must never include file content')
 
     console.log('PASS sweepUnclaimedDir real-fs checks (age threshold boundary, subdir safety, no content in logs)')

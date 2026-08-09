@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Req } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Param, Post, Req } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { Throttle } from '@nestjs/throttler'
 import { ApiResponse } from '../common/dto/api-response.dto'
@@ -32,10 +32,9 @@ export class MaterialsController {
   @Get('tasks/:id')
   async getTask(
     @Param('id') id: string,
-    @Query('accessToken') accessToken: string | undefined,
     @Req() req: ReqLike,
   ): Promise<ApiResponse<DocumentProcessTaskView>> {
-    const requester = await this.resolveRequester(req, accessToken)
+    const requester = await this.resolveRequester(req)
     return ApiResponse.ok(await this.materials.getTask(id, requester))
   }
 
@@ -43,24 +42,25 @@ export class MaterialsController {
   @Throttle({ default: { ttl: 60_000, limit: 60 } })
   async decidePiiFindings(
     @Param('id') id: string,
-    @Query('accessToken') accessToken: string | undefined,
     @Body() dto: DecidePiiFindingsDto,
     @Req() req: ReqLike,
   ): Promise<ApiResponse<DocumentProcessTaskView>> {
-    const requester = await this.resolveRequester(req, accessToken)
+    const requester = await this.resolveRequester(req)
     return ApiResponse.ok(await this.materials.decidePiiFindings(id, dto, requester))
   }
 
-  private async resolveRequester(req: ReqLike, queryToken?: string): Promise<MaterialsRequester> {
+  private async resolveRequester(req: ReqLike): Promise<MaterialsRequester> {
+    assertMaterialTaskTokenNotInQuery(req.query)
     const member = await resolveOptionalEndUser(extractAuth(req), this.jwt, this.redis, this.prisma)
     if (member) return { kind: 'member', endUserId: member.endUserId }
-    return { kind: 'anonymous', accessToken: extractAccessToken(req, queryToken) }
+    return { kind: 'anonymous', accessToken: extractMaterialTaskToken(req) }
   }
 }
 
 type ReqLike = Express.Request & {
   requestId?: string
   headers: Record<string, string | string[] | undefined>
+  query?: unknown
 }
 
 function extractAuth(req: { headers: Record<string, string | string[] | undefined> }): string | undefined {
@@ -70,12 +70,22 @@ function extractAuth(req: { headers: Record<string, string | string[] | undefine
   return undefined
 }
 
-function extractAccessToken(
+export function assertMaterialTaskTokenNotInQuery(query: unknown): void {
+  if (!query || typeof query !== 'object') return
+  if (!Object.prototype.hasOwnProperty.call(query, 'accessToken')) return
+  throw new BadRequestException({
+    error: {
+      code: 'MATERIAL_TOKEN_QUERY_FORBIDDEN',
+      message: '匿名材料任务凭证不得放入 URL query，请使用 x-material-task-token 请求头',
+    },
+  })
+}
+
+export function extractMaterialTaskToken(
   req: { headers: Record<string, string | string[] | undefined> },
-  queryToken?: string,
 ): string | undefined {
   const header = req.headers['x-material-task-token']
   if (typeof header === 'string' && header.trim()) return header.trim()
   if (Array.isArray(header) && header[0]?.trim()) return header[0].trim()
-  return queryToken?.trim() || undefined
+  return undefined
 }

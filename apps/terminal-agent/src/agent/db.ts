@@ -6,6 +6,7 @@
  * Tables:
  *   print_tasks     — records completed/failed tasks to prevent re-execution on restart
  *   pending_patches — offline PATCH queue retried by offline-queue.ts
+ *   scan_deletion_audit — durable, PII-safe audit of expired _unclaimed deletion
  *
  * Fail-closed behavior: if better-sqlite3 native module fails to load (e.g. first
  * run before npm rebuild on a new Windows machine), printing is disabled instead
@@ -19,6 +20,7 @@
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { randomBytes } from 'crypto'
 import { log, warn } from '../logger'
 import type { PatchStatusPayload } from './types'
 
@@ -56,6 +58,21 @@ export interface PendingPatch {
   deadLetterReason: string | null
 }
 
+export type ScanDeletionResult = 'pending_delete' | 'deleted' | 'delete_failed'
+
+export interface ScanDeletionAudit {
+  eventId: string
+  reasonCode: string
+  identifierHash: string
+  createdAt: string
+  deletedAt: string | null
+  result: ScanDeletionResult
+  attempts: number
+  lastAttemptAt: string
+  lastErrorCode: string | null
+  pendingReport: boolean
+}
+
 // ── DB path ───────────────────────────────────────────────────────────────────
 
 function getDbPath(): string {
@@ -87,6 +104,28 @@ CREATE TABLE IF NOT EXISTS pending_patches (
   deadLetterAt TEXT,
   deadLetterReason TEXT
 );
+
+CREATE TABLE IF NOT EXISTS scan_deletion_audit (
+  eventId        TEXT PRIMARY KEY,
+  reasonCode     TEXT NOT NULL,
+  identifierHash TEXT NOT NULL,
+  createdAt      TEXT NOT NULL,
+  deletedAt      TEXT,
+  result         TEXT NOT NULL,
+  attempts       INTEGER NOT NULL DEFAULT 0,
+  lastAttemptAt  TEXT NOT NULL,
+  lastErrorCode  TEXT,
+  pendingReport  INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_scan_deletion_audit_pending
+  ON scan_deletion_audit (pendingReport, createdAt);
+
+CREATE TABLE IF NOT EXISTS agent_metadata (
+  metadataKey   TEXT PRIMARY KEY,
+  metadataValue TEXT NOT NULL,
+  createdAt     TEXT NOT NULL
+);
 `
 
 function ensureColumn(db: SqliteDb, table: string, column: string, definition: string): void {
@@ -96,6 +135,8 @@ function ensureColumn(db: SqliteDb, table: string, column: string, definition: s
 }
 
 // ── Open ──────────────────────────────────────────────────────────────────────
+
+let activeDatabase: AgentDatabase = null
 
 /**
  * Open (and initialise schema for) the agent SQLite database.
@@ -115,15 +156,51 @@ export function openDatabase(): AgentDatabase {
     db.exec(SCHEMA_SQL)
     ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
     ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
+    activeDatabase = db
     log(`db: opened ${dbPath}`)
     return db
   } catch (e) {
+    activeDatabase = null
     warn(
       `db: local task database unavailable; printing disabled — ` +
         `better-sqlite3 加载失败，任务状态持久化不可用 — ${e instanceof Error ? e.message : String(e)}`,
     )
     return null
   }
+}
+
+/** Returns the process-wide DB opened during Agent startup, without opening a second connection. */
+export function getActiveDatabase(): AgentDatabase {
+  return activeDatabase
+}
+
+/**
+ * Per-install 256-bit HMAC key for scan audit identifiers. The key stays in local
+ * metadata and is never copied into the deletion audit ledger or logs.
+ */
+export function getOrCreateScanAuditHmacKey(db: AgentDatabase): string {
+  if (!db) throw new Error('SCAN_AUDIT_DB_UNAVAILABLE')
+  const metadataKey = 'scan_deletion_audit_hmac_key_v1'
+  const existing = db
+    .prepare('SELECT metadataValue FROM agent_metadata WHERE metadataKey = ?')
+    .get(metadataKey)
+  if (existing) {
+    const value = String(existing['metadataValue'])
+    if (!/^[a-f0-9]{64}$/.test(value)) throw new Error('SCAN_AUDIT_HMAC_KEY_INVALID')
+    return value
+  }
+
+  const generated = randomBytes(32).toString('hex')
+  db.prepare(
+    `INSERT OR IGNORE INTO agent_metadata (metadataKey, metadataValue, createdAt)
+     VALUES (?, ?, ?)`,
+  ).run(metadataKey, generated, new Date().toISOString())
+  const stored = db
+    .prepare('SELECT metadataValue FROM agent_metadata WHERE metadataKey = ?')
+    .get(metadataKey)
+  const value = String(stored?.['metadataValue'] ?? '')
+  if (!/^[a-f0-9]{64}$/.test(value)) throw new Error('SCAN_AUDIT_HMAC_KEY_PERSIST_FAILED')
+  return value
 }
 
 export function isDatabaseAvailable(db: AgentDatabase): db is SqliteDb {
@@ -165,6 +242,83 @@ export function markTaskDone(db: AgentDatabase, taskId: string, status: string):
       'INSERT OR REPLACE INTO print_tasks (taskId, status, completedAt, createdAt) VALUES (?, ?, ?, ?)',
     )
     .run(taskId, status, now, now)
+}
+
+// ── Expired scan deletion audit ───────────────────────────────────────────────
+
+/**
+ * Durably record delete intent before touching an expired high-sensitivity scan.
+ * eventId and identifierHash are caller-generated hashes; no path, filename,
+ * file content, or other plaintext PII is accepted by this schema/API.
+ */
+export function beginScanDeletionAudit(
+  db: AgentDatabase,
+  event: Pick<ScanDeletionAudit, 'eventId' | 'reasonCode' | 'identifierHash'>,
+  attemptedAt: string,
+): void {
+  if (!db) return
+  db.prepare(
+    `INSERT INTO scan_deletion_audit
+       (eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+        attempts, lastAttemptAt, lastErrorCode, pendingReport)
+     VALUES (?, ?, ?, ?, NULL, 'pending_delete', 1, ?, NULL, 1)
+     ON CONFLICT(eventId) DO UPDATE SET
+       result = 'pending_delete',
+       deletedAt = NULL,
+       attempts = scan_deletion_audit.attempts + 1,
+       lastAttemptAt = excluded.lastAttemptAt,
+       lastErrorCode = NULL,
+       pendingReport = 1`,
+  ).run(
+    event.eventId,
+    event.reasonCode,
+    event.identifierHash,
+    attemptedAt,
+    attemptedAt,
+  )
+}
+
+export function finishScanDeletionAudit(
+  db: AgentDatabase,
+  eventId: string,
+  outcome: { result: 'deleted'; deletedAt: string } | { result: 'delete_failed'; errorCode: string },
+): void {
+  if (!db) return
+  if (outcome.result === 'deleted') {
+    db.prepare(
+      `UPDATE scan_deletion_audit
+       SET result = 'deleted', deletedAt = ?, lastErrorCode = NULL, pendingReport = 1
+       WHERE eventId = ?`,
+    ).run(outcome.deletedAt, eventId)
+    return
+  }
+  db.prepare(
+    `UPDATE scan_deletion_audit
+     SET result = 'delete_failed', deletedAt = NULL, lastErrorCode = ?, pendingReport = 1
+     WHERE eventId = ?`,
+  ).run(outcome.errorCode, eventId)
+}
+
+/** Local operator/diagnostic read model. No external reporting contract exists yet. */
+export function getScanDeletionAudits(db: AgentDatabase): ScanDeletionAudit[] {
+  if (!db) return []
+  const rows = db.prepare(
+    `SELECT eventId, reasonCode, identifierHash, createdAt, deletedAt, result,
+            attempts, lastAttemptAt, lastErrorCode, pendingReport
+     FROM scan_deletion_audit ORDER BY createdAt ASC`,
+  ).all()
+  return rows.map((row) => ({
+    eventId: String(row['eventId']),
+    reasonCode: String(row['reasonCode']),
+    identifierHash: String(row['identifierHash']),
+    createdAt: String(row['createdAt']),
+    deletedAt: row['deletedAt'] === null ? null : String(row['deletedAt']),
+    result: row['result'] as ScanDeletionResult,
+    attempts: Number(row['attempts']),
+    lastAttemptAt: String(row['lastAttemptAt']),
+    lastErrorCode: row['lastErrorCode'] === null ? null : String(row['lastErrorCode']),
+    pendingReport: Number(row['pendingReport']) === 1,
+  }))
 }
 
 // ── Offline PATCH queue ───────────────────────────────────────────────────────
