@@ -106,6 +106,10 @@ function safeResolution(value: string | null): SafeDeadLetterView['resolution'] 
   return value === 'replayed' || value === 'abandoned' ? value : null
 }
 
+function resolvedTaskTombstone(id: number): string {
+  return `resolved-dead-letter:${id}`
+}
+
 function toSafeView(row: PendingPatch): SafeDeadLetterView {
   return {
     id: row.id,
@@ -274,11 +278,11 @@ export function abandonDeadLetter(
     live
       .prepare(
         `UPDATE pending_patches
-       SET operatorConfirmedAt = NULL, resolvedAt = ?, resolution = 'abandoned',
-           manualReplayErrorCode = NULL
+       SET taskId = ?, errorMessage = NULL, operatorConfirmedAt = NULL,
+           resolvedAt = ?, resolution = 'abandoned', manualReplayErrorCode = NULL
        WHERE id = ? AND resolvedAt IS NULL`
       )
-      .run(now, id)
+      .run(resolvedTaskTombstone(id), now, id)
     recordAction(live, id, 'abandon', 'succeeded', reason, now)
     const resolved = selectDeadLetter(live, id)
     if (!resolved) throw new DeadLetterOperatorError('DEAD_LETTER_NOT_FOUND')
@@ -345,11 +349,11 @@ export async function replayDeadLetter(
       live
         .prepare(
           `UPDATE pending_patches
-         SET operatorConfirmedAt = NULL, resolvedAt = ?, resolution = 'replayed',
-             manualReplayErrorCode = NULL
+         SET taskId = ?, errorMessage = NULL, operatorConfirmedAt = NULL,
+             resolvedAt = ?, resolution = 'replayed', manualReplayErrorCode = NULL
          WHERE id = ? AND resolvedAt IS NULL`
         )
-        .run(completedAt, id)
+        .run(resolvedTaskTombstone(id), completedAt, id)
       recordAction(live, id, 'replay_succeeded', 'archived', null, completedAt)
     })
     return { outcome: 'archived', errorCode: null }

@@ -36,6 +36,7 @@ import { seedDevDefaultPriceConfig } from '../src/payment/price-config.seed'
 import { StorageService } from '../src/storage/storage.service'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import type { CreatePrintJobDto } from '../src/print-jobs/dto/create-print-job.dto'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 function pass(m: string) { console.log(`  PASS ${m}`) }
 function fail(m: string): never { console.error(`  FAIL ${m}`); process.exit(1) }
@@ -59,6 +60,8 @@ async function expectCode(fn: () => Promise<unknown>, code: string, label: strin
 }
 
 async function main() {
+  assertIsolatedVerificationDatabase()
+
   // 动态 import：terminals.service 模块级 requireEnv 必须在上面 env 设好后再加载。
   const { TerminalsService } = await import('../src/terminals/terminals.service')
 

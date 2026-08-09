@@ -16,6 +16,7 @@ import {
   showDeadLetter,
 } from '../src/agent/dead-letter-operator'
 import {
+  enqueuePatch,
   getDeadLetterPatches,
   getPendingPatches,
   getTaskLocalStatus,
@@ -330,7 +331,18 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     return Number(inserted.lastInsertRowid)
   }
 
+  const storedSensitiveFields = (id: number) =>
+    db.prepare(
+      `SELECT taskId, errorMessage, resolvedAt, resolution
+       FROM pending_patches WHERE id = ?`,
+    ).get(id)
+
   try {
+    assert.equal(
+      db.prepare('PRAGMA secure_delete').get()?.['secure_delete'],
+      1,
+      'local task database must request SQLite secure-delete best effort',
+    )
     assert.equal(parseExactDeadLetterId('7'), 7)
     assert.throws(() => parseExactDeadLetterId('7x'), /DEAD_LETTER_ID_INVALID/)
 
@@ -369,12 +381,43 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     assert.deepEqual(server.requests[0]?.body, { status: 'completed' })
     assert.equal(listDeadLetters(db).some((row) => row.id === successId), false)
     assert.equal(showDeadLetter(db, successId).resolution, 'replayed')
+    const replayedStorage = storedSensitiveFields(successId)
+    assert.equal(
+      replayedStorage?.['taskId'],
+      `resolved-dead-letter:${successId}`,
+      'resolved replay must replace the original task identifier with a local tombstone',
+    )
+    assert.equal(
+      replayedStorage?.['errorMessage'],
+      null,
+      'resolved replay must scrub the raw error message',
+    )
+
+    enqueuePatch(db, 'task-success', { status: 'completed' })
+    assert.equal(
+      db.prepare(
+        `SELECT COUNT(*) AS count FROM pending_patches
+         WHERE taskId = ? AND status = ? AND resolvedAt IS NULL`,
+      ).get('task-success', 'completed')?.['count'],
+      1,
+      'a resolved archive must not suppress a new pending patch for the same task and status',
+    )
 
     const conflictId = seed('task-conflict', 'failed', secretMarker)
     confirmDeadLetter(db, conflictId)
     const conflicted = await replayDeadLetter(db, conflictId, operatorConfig)
     assert.deepEqual(conflicted, { outcome: 'retained', errorCode: 'HTTP_409' })
     assert.equal(showDeadLetter(db, conflictId).confirmedAt, null, '4xx must clear confirmation')
+    assert.deepEqual(
+      storedSensitiveFields(conflictId),
+      {
+        taskId: 'task-conflict',
+        errorMessage: secretMarker,
+        resolvedAt: null,
+        resolution: null,
+      },
+      'a failed replay must retain the active task identifier and error evidence for operator retry',
+    )
     assert.doesNotMatch(JSON.stringify(server.requests.at(-1)?.body), /errorMessage|张三|Scans|token/i)
     const requestCountAfterConflict = server.requests.length
     await assert.rejects(
@@ -416,6 +459,17 @@ async function verifyDeadLetterOperatorWorkflow(): Promise<void> {
     const abandoned = abandonDeadLetter(db, abandonedId, 'operator_policy')
     assert.equal(abandoned.resolution, 'abandoned')
     assert.equal(listDeadLetters(db).some((row) => row.id === abandonedId), false)
+    const abandonedStorage = storedSensitiveFields(abandonedId)
+    assert.equal(
+      abandonedStorage?.['taskId'],
+      `resolved-dead-letter:${abandonedId}`,
+      'abandoned dead letter must replace the original task identifier with a local tombstone',
+    )
+    assert.equal(
+      abandonedStorage?.['errorMessage'],
+      null,
+      'abandoned dead letter must scrub the raw error message',
+    )
 
     const actions = db.prepare(
       `SELECT patchId, action, outcome, reasonCode, createdAt

@@ -27,10 +27,6 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-refundreal-terminal-acti
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-refundreal-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-refundreal-payment-session-secret-0123456789'
 process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
-if (process.env['NODE_ENV'] === 'production') {
-  console.error('  FAIL verify:refund-real-channels 不得在 NODE_ENV=production 运行')
-  process.exit(1)
-}
 
 import 'dotenv/config'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http'
@@ -60,6 +56,7 @@ import { TerminalCapabilitiesService } from '../src/terminals/terminal-capabilit
 import { signFileUrl } from '../src/files/signing'
 import { LOCAL_BUCKET_SENTINEL } from '../src/storage/storage.interface'
 import { StorageService } from '../src/storage/storage.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 let passCount = 0
 function pass(message: string): void {
@@ -246,6 +243,8 @@ const PRINT_PARAMS = {
 }
 
 async function main(): Promise<void> {
+  assertIsolatedVerificationDatabase()
+
   console.log('\n=== W-B real channel refunds (wechat/alipay) verification ===')
 
   const { server, port } = await startFakeGateway()

@@ -321,7 +321,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:partner-edit
           pnpm --filter @ai-job-print/api verify:partner-org-self
           INTERNAL_AUTH_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:admin-phone-transfer
-          pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:print-parameter-capability
           pnpm --filter @ai-job-print/api verify:print-scan-first-release
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
@@ -350,11 +350,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:material-task-token-transport
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
-          pnpm --filter @ai-job-print/api verify:payment-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
-          pnpm --filter @ai-job-print/api verify:refund-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit
@@ -548,7 +548,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-export-files
           pnpm --filter @ai-job-print/api verify:member-data-export
           pnpm --filter @ai-job-print/api verify:member-data-export-download
-          pnpm --filter @ai-job-print/api verify:print-jobs
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:print-jobs
           pnpm --filter @ai-job-print/api verify:terminal-bind-code
           pnpm --filter @ai-job-print/api verify:terminal-credentials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:scan-deletion-audit-reporting
@@ -564,11 +564,11 @@ jobs:
           pnpm --filter @ai-job-print/api verify:materials-processing
           pnpm --filter @ai-job-print/api verify:job-materials
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-flow
-          pnpm --filter @ai-job-print/api verify:payment-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:payment-real-channels
           pnpm --filter @ai-job-print/api verify:payment-codepay
           VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:kiosk-cashier-ui
           pnpm --filter @ai-job-print/api verify:refund-idempotent
-          pnpm --filter @ai-job-print/api verify:refund-real-channels
+          VERIFICATION_DATABASE_TARGET=isolated pnpm --filter @ai-job-print/api verify:refund-real-channels
           pnpm --filter @ai-job-print/api verify:wechat-refund-notify
           pnpm --filter @ai-job-print/api verify:wechat-refund-regression
           pnpm --filter @ai-job-print/api verify:redemption-audit

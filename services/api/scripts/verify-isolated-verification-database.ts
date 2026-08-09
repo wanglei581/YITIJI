@@ -1,8 +1,16 @@
 import { strict as assert } from 'node:assert'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import {
   assertIsolatedVerificationDatabase,
   type VerificationDatabaseEnvironment,
 } from './support/isolated-verification-database'
+
+const ROW_WRITING_VERIFIERS = [
+  'verify-payment-real-channels.ts',
+  'verify-print-jobs.ts',
+  'verify-refund-real-channels.ts',
+] as const
 
 function expectRejected(
   env: VerificationDatabaseEnvironment,
@@ -14,6 +22,25 @@ function expectRejected(
     (error: unknown) => error instanceof Error && error.message.includes(expectedCode),
     label,
   )
+}
+
+function assertGuardPrecedesDatabaseWrites(source: string, filename: string): void {
+  const guardCall = source.indexOf('assertIsolatedVerificationDatabase()')
+  const protectedOperations = [
+    'new PrismaService()',
+    'await cleanup()',
+    'seedDevDefaultPriceConfig(',
+  ] as const
+
+  assert.notEqual(guardCall, -1, `${filename} must require the isolated verification database guard`)
+  for (const operation of protectedOperations) {
+    const operationIndex = source.indexOf(operation)
+    assert.notEqual(operationIndex, -1, `${filename} must contain ${operation} for this regression check`)
+    assert.ok(
+      guardCall < operationIndex,
+      `${filename} must enforce database isolation before ${operation}`,
+    )
+  }
 }
 
 function main(): void {
@@ -66,6 +93,11 @@ function main(): void {
       DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ai_job_print_ci',
     }),
   )
+
+  for (const filename of ROW_WRITING_VERIFIERS) {
+    const source = readFileSync(path.join(__dirname, filename), 'utf8')
+    assertGuardPrecedesDatabaseWrites(source, filename)
+  }
 
   console.log('verify-isolated-verification-database: all assertions passed')
 }

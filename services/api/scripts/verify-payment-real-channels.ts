@@ -25,10 +25,6 @@ process.env['TERMINAL_ACTION_TOKEN_SECRET'] ||= 'verify-realpay-terminal-action-
 process.env['FILE_SIGNING_SECRET'] ||= 'verify-realpay-file-signing-secret-0123456789abcd'
 process.env['PAYMENT_SESSION_SECRET'] ||= 'verify-realpay-payment-session-secret-0123456789'
 process.env['PRINT_REQUIRE_PAID_BEFORE_CLAIM'] = 'true'
-if (process.env['NODE_ENV'] === 'production') {
-  console.error('  FAIL verify:payment-real-channels 不得在 NODE_ENV=production 运行')
-  process.exit(1)
-}
 
 import 'dotenv/config'
 import express from 'express'
@@ -70,6 +66,7 @@ import { StorageService } from '../src/storage/storage.service'
 import { TerminalsService } from '../src/terminals/terminals.service'
 import { TerminalAgentService } from '../src/terminals/terminals-agent.service'
 import { TerminalAdminService } from '../src/terminals/terminals-admin.service'
+import { assertIsolatedVerificationDatabase } from './support/isolated-verification-database'
 
 // ── 断言基建 ────────────────────────────────────────────────────────────────
 let passCount = 0
@@ -324,6 +321,8 @@ const EXPECTED_PRINT_AMOUNT_CENTS =
   2 * PRINT_PARAMS.copies * PRINT_UNIT_PRICE_CENTS[PRINT_PARAMS.colorMode]
 
 async function main(): Promise<void> {
+  assertIsolatedVerificationDatabase()
+
   console.log('\n=== C5-6 real payment channels (wechat/alipay) + paid-before-claim verification ===')
 
   // 纯函数金额换算（元串 ↔ 分整数，绝不浮点）

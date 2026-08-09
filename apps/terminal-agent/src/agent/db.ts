@@ -188,6 +188,7 @@ export function openDatabase(): AgentDatabase {
     const dbPath = getDbPath()
     fs.mkdirSync(path.dirname(dbPath), { recursive: true })
     const db = new DatabaseCtor(dbPath)
+    db.exec('PRAGMA secure_delete = ON')
     db.exec(SCHEMA_SQL)
     ensureColumn(db, 'pending_patches', 'deadLetterAt', 'TEXT')
     ensureColumn(db, 'pending_patches', 'deadLetterReason', 'TEXT')
@@ -487,7 +488,8 @@ export function enqueuePatch(
   const existing = db
     .prepare(
       `SELECT id, deadLetterAt FROM pending_patches
-       WHERE taskId = ? AND status = ? ORDER BY id DESC LIMIT 1`,
+       WHERE taskId = ? AND status = ? AND resolvedAt IS NULL
+       ORDER BY id DESC LIMIT 1`,
     )
     .get(taskId, payload.status)
   if (existing) {
