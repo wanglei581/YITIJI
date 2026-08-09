@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>自检台 — 全页 × 全阶段 × 四态</title>
+<style>
+  body { margin:0; padding:22px 26px 60px; background:#0a0f10; color:#e8f1f1;
+         font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; }
+  h1 { font-family:"Songti SC","SimSun",serif; font-size:22px; margin:0 0 6px; }
+  p.s { margin:0 0 16px; color:#8ba4a9; line-height:1.7; }
+  button { height:40px; padding:0 18px; border-radius:99px; border:1px solid rgba(52,224,168,.4);
+           background:transparent; color:#34e0a8; cursor:pointer; font-size:14px; }
+  table { border-collapse:collapse; margin-top:18px; width:100%; }
+  th,td { text-align:left; padding:6px 10px; border-bottom:1px solid rgba(232,241,241,.1); font-size:13px; }
+  th { color:#6f8c90; font-weight:500; letter-spacing:.08em; }
+  td.ok { color:#34e0a8; } td.bad { color:#ff6f5e; font-weight:600; }
+  #sum { margin-top:14px; font-size:15px; }
+  iframe { position:fixed; left:0; top:0; width:1080px; height:1920px; border:0;
+            opacity:.01; pointer-events:none; z-index:-1; }
+  code { color:#a8f3d8; }
+</style>
+</head>
+<body>
+  <h1>自检台 · 全页 × 全阶段 × 四态</h1>
+  <p class="s">
+    逐页在 1080×1920 iframe 里加载，遍历每个阶段与四态，调用页面内置的 <code>window.v3Audit()</code>，
+    检查九项：主体纵向溢出 / 横向溢出 / 触控 &lt;48px / 文字被裁切 / 违禁文案 / 量化红线（禁百分比匹配·录用概率）/ 建议未标证据级别 / 来源三字段缺失 / 四态是否真落地 / 标点被顶到行首。<br>
+    只报不通过的组合。全绿说明这一轮改动没有引入回归。
+  </p>
+  <button id="run">开始全量自检</button>
+  <div id="sum"></div>
+  <table id="out"><thead><tr><th>页面</th><th>阶段</th><th>态</th><th>纵向溢出</th><th>横向</th><th>触控&lt;48</th><th>文字裁切</th><th>违禁文案</th><th>量化红线</th><th>建议无证据</th><th>来源三字段</th><th>四态</th><th>标点行首</th></tr></thead><tbody></tbody></table>
+
+<script>
+const DETAIL = []   // 裁切明细，跑完在 console 里 window.__CUT_DETAIL__ 看
+const PAGES = [
+  ['P01 首页',        '01-home-v5.html',        [null]],
+  ['P06 打印工作台',  '06-print-workbench.html',['s1','s2','s3','s4','s5','s6','s7']],
+  ['P07 扫描工作台',  '07-scan-workbench.html', ['s1','s2','s3','s4']],
+  ['P08 文件加工台',  '08-file-tools.html',     ['t1','t2','t3']],
+  ['P09 简历工作台',  '09-resume-workbench.html',['s1','s2','s3','s4','s5']],
+  ['P10 访谈式生成',  '10-resume-interview.html',['s1','s2','s3']],
+  ['P11 岗位匹配',    '11-jobfit-compare.html', ['s1','s2']],
+  ['P12 材料工厂',    '12-material-factory.html',['t1','t2','t3','t4']],
+  ['P13 岗位情报台',  '13-jobs-desk.html',      ['ok','empty','error']],
+  ['P14 岗位详情',    '14-job-detail.html',     ['ok','expired','error']],
+  ['P15 企业导览',    '15-companies.html',      ['list','detail','metricsoff','error']],
+  ['P16 线下机构',    '16-offline-agencies.html',['list','detail','joboffline','error']],
+  ['P17 招聘会作战台','17-fair-desk.html',      ['s1','s2','s3','s4']],
+  ['P18 校园招聘',    '18-campus.html',         ['s1','s2','s3']],
+  ['P19 智慧校园',    '19-smart-campus.html',   ['s1','s2','s3']],
+  ['P20 面试训练舱',  '20-interview-pod.html',  ['s1','s2','s3','s4']],
+  ['P21 政策服务',    '21-policy.html',         ['s1','s2','s3']],
+  ['P22 职业规划',    '22-career-plan.html',    ['s1','s2','s3']],
+  ['P02 待机唤醒',    '02-standby.html',        [null]],
+  ['P03 身份门',      '03-identity-gate.html',  ['s1','s2']],
+  ['P04 系统态',      '04-system-states.html',  ['s1','s2','s3','s4','s5']],
+  ['P05 手机接力',    '05-phone-relay.html',    ['s1','s2','s3']],
+  ['P23 我的·资产',   '23-me.html',             ['s1','s2','s3']],
+  ['P24 权益活动',    '24-benefits.html',       ['s1','s2','s3']],
+  ['P25 顾问驾驶舱',  '25-advisor.html',        ['s1','s2','s3']],
+  ['P26 顾问作业面',  '26-advisor-work.html',   ['sA','sB','sC']]
+]
+const STATES = ['default','first','ai-down','device-off']
+
+function load (file) {
+  return new Promise(res => {
+    const f = document.createElement('iframe')
+    f.src = file + '?capture=1&theme=warm'
+    f.onload = () => setTimeout(() => res(f), 500)   // 等入场动效与 JS 初始化跑完
+    document.body.appendChild(f)
+  })
+}
+
+document.getElementById('run').onclick = async () => {
+  const tb = document.querySelector('#out tbody'); tb.innerHTML = ''
+  const sum = document.getElementById('sum')
+  let total = 0, failed = 0
+  sum.textContent = '正在跑…'
+  for (const [name, file, stages] of PAGES) {
+    const f = await load(file)
+    const w = f.contentWindow, d = f.contentDocument
+    const scr = d.querySelector('.screen')
+    // 收银台还有第三条轴（data-pay）。s5 要把七个处境都走一遍，
+    // 否则「码失效」「已关单」这些分支永远没被检查过。
+    const PAYS = ['wait','scan','confirm','paid','expired','query','closed']
+    const JOBS = ['printing','queued','checking','checkfail','timeout','jam']
+    for (const stage of stages) for (const state of STATES) {
+      // s5 走收银七处境；s4 还有"付费单 / 免费单"两条分叉，免费单会换金额位、主按钮和 rail 第 5 站
+      const pays = scr.hasAttribute('data-pay')
+        ? (stage === 's5' ? PAYS : stage === 's4' ? ['wait', 'free'] : [null])
+        : [null]
+      // s6 出纸阶段还有六个任务处境（排队 / 校验 / 校验失败 / 出纸 / 卡纸 / 超时）
+      const jobs = (scr.hasAttribute('data-job') && stage === 's6') ? JOBS : [null]
+      for (const pay of pays) for (const job of jobs) {
+      if (stage) scr.setAttribute('data-stage', stage)
+      scr.setAttribute('data-state', state)
+      if (pay) scr.setAttribute('data-pay', pay)
+      if (job) scr.setAttribute('data-job', job)
+      if (w.v3ApplyVisibility) w.v3ApplyVisibility()
+      // 不能用 iframe 的 rAF：离屏 iframe 被 Chrome 重度节流，96 个组合会跑到天亮
+      await new Promise(r => setTimeout(r, 16))
+      w.v3Audit()
+      const a = w.__V3_AUDIT__
+      if (a.文字裁切 && w.__V3_CUT__) {
+        DETAIL.push({页: name, 阶段: (stage || '—') + (pay ? ' · ' + pay : ''), 态: state, 裁切: [...w.__V3_CUT__].map(e => ({
+          sel: (e.className && e.className.toString ? e.className.toString() : e.tagName).slice(0, 40),
+          文本: (e.textContent || '').trim().slice(0, 26),
+          少了: e.scrollWidth - e.clientWidth
+        }))})
+      }
+      const box = d.querySelector('.work') || d.querySelector('.main') || d.querySelector('.vbody')
+      const ov = box ? Math.max(0, box.scrollHeight - box.clientHeight) : 0
+      total++
+      const bad = ov || a.横向溢出 || a.触控不足48 || a.文字裁切 || a.违禁文案.length
+        || a.量化红线.length || a.建议无证据 || a.来源三字段缺.length || a.四态未落地 || a.标点在行首
+      if (bad) {
+        failed++
+        const tr = document.createElement('tr')
+        tr.innerHTML = `<td>${name}</td><td>${stage || '—'}${pay ? ' · ' + pay : ''}${job ? ' · ' + job : ''}</td><td>${state}</td>` +
+          `<td class="${ov?'bad':'ok'}">${ov}</td><td class="${a.横向溢出?'bad':'ok'}">${a.横向溢出}</td>` +
+          `<td class="${a.触控不足48?'bad':'ok'}">${a.触控不足48}</td>` +
+          `<td class="${a.文字裁切?'bad':'ok'}">${a.文字裁切||0}</td>` +
+          `<td class="${a.违禁文案.length?'bad':'ok'}">${a.违禁文案.join(',') || 0}</td>` +
+          `<td class="${a.量化红线.length?'bad':'ok'}">${a.量化红线.length || 0}</td>` +
+          `<td class="${a.建议无证据?'bad':'ok'}">${a.建议无证据 || 0}</td>` +
+          `<td class="${a.来源三字段缺.length?'bad':'ok'}">${a.来源三字段缺.join('/') || 0}</td>` +
+          `<td class="${a.四态未落地?'bad':'ok'}">${a.四态未落地 ? '假' : 'ok'}</td>` +
+          `<td class="${a.标点在行首?'bad':'ok'}">${a.标点在行首 || 0}</td>`
+        tb.appendChild(tr)
+      }
+      }
+    }
+    f.remove()
+  }
+  // 按页去重的问题清单：同一个问题在 12 个组合里重复 12 行，审的时候没法看。
+  const byPage = {}
+  ;[...tb.querySelectorAll('tr')].forEach(tr => {
+    const c = [...tr.children].map(td => td.textContent.trim())
+    const key = c[0]
+    byPage[key] = byPage[key] || { 页: key, 组合数: 0, 问题: new Set() }
+    byPage[key].组合数++
+    const NAMES = [null, null, null, '纵向溢出', '横向溢出', '触控<48', '文字裁切', '违禁文案', '量化红线', '建议无证据', '来源三字段', '四态']
+    for (let i = 3; i < c.length; i++) {
+      if (c[i] && c[i] !== '0' && c[i] !== 'ok') byPage[key].问题.add(NAMES[i] + '=' + c[i])
+    }
+  })
+  window.__BY_PAGE__ = Object.values(byPage).map(v => ({ ...v, 问题: [...v.问题] }))
+  sum.innerHTML = failed
+    ? `<b style="color:#ff6f5e">${failed} / ${total} 个组合不通过</b>（下表只列不通过的）`
+    : `<b style="color:#34e0a8">全部 ${total} 个组合通过</b>`
+  window.__CUT_DETAIL__ = DETAIL; window.__VERIFY__ = { total, failed }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,542 @@
+/* ═══════════════ 母版构图 ═══════════════ */
+/* 目录 / 列表：单列滚动 */
+.template-directory .screen-body,
+.template-collection .screen-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.template-directory .screen-main,
+.template-collection .screen-main {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 24px;
+}
+
+.template-directory .section-block.wide,
+.template-collection .section-block.wide {
+  grid-column: 1 / -1;
+}
+
+/* 详情：主内容 + 来源/操作栏 */
+.template-detail .screen-body {
+  grid-template-columns: minmax(0, 1.5fr) 340px;
+}
+
+/* 履约：主进度 + 状态栏 */
+.template-progress .screen-body {
+  grid-template-columns: minmax(0, 1.25fr) 340px;
+}
+
+/* 状态页：居中 */
+.template-state .screen-main {
+  justify-content: center;
+}
+
+.template-state .screen-body {
+  flex: none;
+  min-height: 900px;
+  grid-template-columns: 1fr;
+  align-content: center;
+  padding: 60px 120px;
+}
+
+.state-panel {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.state-code {
+  color: var(--sd-err);
+  font-size: 92px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.state-panel h1 {
+  margin: 16px 0 0;
+  font-size: 44px;
+}
+
+.state-panel p {
+  margin: 16px auto 0;
+  color: var(--sd-copy);
+  font-size: 19px;
+  line-height: 1.7;
+}
+
+.state-panel .action-buttons {
+  justify-content: center;
+  margin-top: 32px;
+}
+
+/* ── 首页专属：目标输入 + 六项服务 + 任务卡 ───────────── */
+.template-home .screen-body {
+  grid-template-columns: minmax(0, 1.35fr) 360px;
+  padding-top: 28px;
+}
+
+.home-goal-card {
+  padding: 28px;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(23, 105, 232, 0.08), transparent 42%),
+    var(--sd-surface);
+  border: 1px solid var(--sd-line);
+  border-radius: var(--sd-r-m);
+  box-shadow: var(--sd-shadow-soft);
+}
+
+.home-goal-card label {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--sd-text);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.home-goal-row {
+  display: flex;
+  gap: 14px;
+}
+
+.home-goal-row input {
+  flex: 1;
+  height: 76px;
+  padding: 0 24px;
+  color: var(--sd-text-strong);
+  background: var(--sd-surface);
+  border: 1.5px solid var(--sd-line-strong);
+  border-radius: 20px;
+  font-size: 19px;
+}
+
+.home-goal-row input:focus {
+  border-color: var(--sd-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 105, 232, 0.14);
+}
+
+.home-goal-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--sd-copy-muted);
+  font-size: 14px;
+}
+
+.home-goal-hint svg {
+  width: 16px;
+  height: 16px;
+  color: var(--sd-primary);
+}
+
+.home-services {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.service-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-height: 116px;
+  padding: 18px 20px;
+  color: var(--sd-text-strong);
+  background: var(--sd-surface);
+  border: 1.5px solid var(--sd-line);
+  border-radius: 24px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform var(--sd-t-press) var(--sd-ease),
+    border-color var(--sd-t-state) var(--sd-ease),
+    box-shadow var(--sd-t-state) var(--sd-ease);
+}
+
+.service-tile:hover {
+  border-color: var(--sd-primary);
+  box-shadow: var(--sd-shadow-soft);
+}
+
+.service-tile:active {
+  transform: scale(0.98);
+}
+
+.service-tile-icon {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 18px;
+}
+
+.service-tile-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.service-tile strong,
+.service-tile span {
+  display: block;
+}
+
+.service-tile strong {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.service-tile span {
+  margin-top: 5px;
+  color: var(--sd-copy);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tile-print {
+  grid-column: 1 / -1;
+  min-height: 132px;
+}
+
+.tile-print .service-tile-icon {
+  width: 72px;
+  height: 72px;
+}
+
+.home-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.today-task {
+  padding: 26px;
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-line);
+  border-radius: var(--sd-r-m);
+  box-shadow: var(--sd-shadow-soft);
+}
+
+.today-task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.today-task-head strong {
+  font-size: 19px;
+}
+
+.today-task-head span {
+  color: var(--sd-copy-muted);
+  font-size: 13px;
+}
+
+.today-task-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  color: var(--sd-text-strong);
+  background: var(--sd-primary-soft);
+  border-radius: 20px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  border: 0;
+}
+
+.today-task-card svg {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  color: var(--sd-primary);
+}
+
+.today-task-card strong,
+.today-task-card span {
+  display: block;
+}
+
+.today-task-card strong {
+  font-size: 17px;
+}
+
+.today-task-card span {
+  margin-top: 4px;
+  color: var(--sd-copy);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── 打印工作台：文件预览占主位 ───────────────────────── */
+.template-workbench .screen-body {
+  grid-template-columns: minmax(0, 1.5fr) 360px;
+}
+
+.workbench-file {
+  min-height: 760px;
+}
+
+.workbench-params {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  background: var(--sd-surface-2);
+  border-radius: 18px;
+}
+
+.param-row span {
+  color: var(--sd-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.param-row .segmented {
+  transform: scale(0.92);
+  transform-origin: right center;
+}
+
+.price-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 18px 4px 8px;
+  border-top: 1px dashed var(--sd-line-strong);
+}
+
+.price-line span {
+  color: var(--sd-copy);
+  font-size: 15px;
+}
+
+.price-line strong {
+  font-size: 36px;
+  font-weight: 850;
+  color: var(--sd-primary);
+}
+
+.price-note {
+  color: var(--sd-copy-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ── AI 顾问：任务计划板，不用聊天气泡 ────────────────── */
+.advisor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 24px;
+  min-height: 0;
+}
+
+.advisor-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.plan-card {
+  padding: 24px 28px;
+  background: var(--sd-surface);
+  border: 1.5px solid var(--sd-line);
+  border-radius: 24px;
+}
+
+.plan-card.is-next {
+  border-color: var(--sd-primary);
+  box-shadow: 0 0 0 4px var(--sd-primary-soft);
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.plan-card-head svg {
+  width: 24px;
+  height: 24px;
+  color: var(--sd-primary);
+}
+
+.plan-card-head strong {
+  font-size: 18px;
+}
+
+.plan-card-head .status-label,
+.plan-card-head .warning-label {
+  margin-left: auto;
+}
+
+.plan-card p {
+  margin: 0;
+  color: var(--sd-copy);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.plan-card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.plan-card-actions .button {
+  min-height: 52px;
+  padding: 0 22px;
+  font-size: 16px;
+}
+
+.advisor-portrait {
+  text-align: center;
+  padding: 28px 24px;
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-line);
+  border-radius: var(--sd-r-m);
+  box-shadow: var(--sd-shadow-soft);
+}
+
+.advisor-portrait img {
+  width: 180px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 4px solid var(--sd-primary-soft);
+}
+
+.advisor-portrait strong {
+  display: block;
+  margin-top: 14px;
+  font-size: 22px;
+}
+
+.advisor-portrait span {
+  display: block;
+  margin-top: 6px;
+  color: var(--sd-copy);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.advisor-input {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.advisor-input input {
+  flex: 1;
+  height: 62px;
+  padding: 0 20px;
+  border: 1.5px solid var(--sd-line-strong);
+  border-radius: 18px;
+  font-size: 16px;
+}
+
+.advisor-input input:focus {
+  border-color: var(--sd-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 105, 232, 0.14);
+}
+
+.advisor-input .button {
+  min-height: 62px;
+}
+
+/* ── 手机接力页 ───────────────────────────────────────── */
+.mobile-frame {
+  width: 390px;
+  min-height: 844px;
+  margin: 24px auto;
+  overflow: hidden;
+  background: var(--sd-surface);
+  border: 12px solid #0b1c3a;
+  border-radius: 36px;
+  box-shadow: var(--sd-shadow);
+}
+
+.mobile-frame header,
+.mobile-frame main,
+.mobile-frame footer {
+  padding: 24px;
+}
+
+.mobile-frame header {
+  color: #fff;
+  background: var(--sd-text-strong);
+}
+
+.mobile-frame h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.mobile-frame p {
+  color: var(--sd-copy);
+  line-height: 1.6;
+}
+
+.mobile-frame .button {
+  width: 100%;
+  margin-top: 14px;
+  min-height: 56px;
+  font-size: 16px;
+}
+
+/* ── 组合清单（材料检查等） ───────────────────────────── */
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--sd-surface-2);
+  border-radius: 18px;
+}
+
+.check-item svg {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  color: var(--sd-ok);
+}
+
+.check-item.is-missing svg {
+  color: var(--sd-warn);
+}
+
+.check-item strong,
+.check-item span {
+  display: block;
+}
+
+.check-item strong {
+  font-size: 16px;
+}
+
+.check-item span {
+  margin-top: 3px;
+  color: var(--sd-copy);
+  font-size: 14px;
+}

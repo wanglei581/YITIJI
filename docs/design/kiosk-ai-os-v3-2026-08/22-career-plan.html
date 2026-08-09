@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P22 职业规划 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P22 职业规划">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
+<link rel="stylesheet" href="styles/work.css?v=8">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P22 专用 ───────────────────────────────────────────────────────────
+   职业规划最容易做成算命：「这个方向前景好」「三年后你能到 XX 岗」
+   「薪资可达 XX」—— 全是本机没有依据的预测。
+   仓库里既有的 verify 已经把「薪资承诺 / 百分比」列为禁词，命中就诚实失败。
+
+   所以这一页只用一种依据说话：**本机真读过的岗位正文**。
+   说的不是"这个方向好"，而是"本机在这批岗位里见到 N 条要求这个"。
+   数量是可核对的事实，前景是预测 —— 只说前者。
+
+   同一条纪律的另一面：缺口必须是**可验证的**（缺证书、缺软件、缺某类经历），
+   不能写"沟通能力有待提升"这种没法验证也没法行动的话。
+
+   组件备忘：.tl 本身是一步（容器 .tline）；复选框是 .ck-box；
+   .ck / .jobrow 只在 11、12 页页内定义过，本页自带。
+   ──────────────────────────────────────────────────────────────────── */
+
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-4); padding-bottom:var(--s-6); }
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 能力块：从简历原文里读出来的，每块都带原文出处 */
+.skills { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
+.sk { padding:var(--s-4) var(--s-5); border-radius:var(--r-xs);
+      background:var(--surf-1); border:1px solid var(--brd-1);
+      display:flex; flex-direction:column; gap:4px; }
+.sk-t { font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.sk-src { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.sk--weak { border-style:dashed; opacity:.86; }
+
+/* 方向卡 */
+.dir { padding:var(--s-5); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.dir-hd { display:flex; align-items:flex-start; gap:var(--s-4); }
+.dir-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.dir-basis { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
+.dir-count-status { flex:0 0 auto; font-size:var(--fz-2); font-weight:700;
+       padding:3px 11px; border-radius:999px; white-space:nowrap;
+       background:var(--fog-a08); color:var(--fog-700); }
+.gap { display:flex; flex-direction:column; gap:6px; }
+.gp { display:grid; grid-template-columns:18px 1fr; gap:var(--s-3); align-items:start;
+      font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.gp i { width:13px; height:13px; border-radius:3px; margin-top:4px; flex:0 0 auto; display:block; }
+.gp--have i { background:var(--jade-500); }
+.gp--need i { background:var(--amber-400); }
+.gp b { color:var(--fog-900); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+.paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
+
+/* 行动清单纸面 */
+.pl { padding:30px 34px; color:#17222b; }
+.pl h1 { font-size:21px; font-weight:800; }
+.pl .pl-sub { font-size:12.5px; color:#5b6b78; margin-top:3px; }
+.pl .pl-hr { height:1px; background:#d9e1e8; margin:14px 0 12px; }
+.pl-w { font-size:14px; font-weight:800; color:#0f5a45; margin:13px 0 5px; }
+.pl-i { display:grid; grid-template-columns:15px 1fr; gap:9px; margin-bottom:6px;
+        font-size:12.5px; color:#2c3a45; line-height:1.5; }
+.pl-i i { width:10px; height:10px; border:1.5px solid #96a4ae; border-radius:2px; margin-top:3px; }
+.pl-i b { color:#0f5a45; }
+.pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
+           padding-top:9px; margin-top:14px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">职业规划</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #R-5920</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 只能看岗位统计</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>14:05</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">你现在会什么</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">能往哪走·缺什么</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走行动清单</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 你现在会什么 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>先说清楚这一页不做什么</b>
+        </div>
+        <div class="sec">
+          <div class="advice-act">
+            本机<b>不预测前景、不预测薪资、不说"三年后你能到什么岗"</b> ——
+            那些本机没有依据。
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>这一页只用一种依据：<b>本机真读过的岗位正文</b>。<br>
+                  说的不是「这个方向好」，而是「<b>本机在这批岗位里见到多少条要求这个</b>」——
+                  数量是可核对的事实，前景是预测。只说前者。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-resume"/></svg>
+          <b>从你的简历里读出来的</b>
+          <span class="mt" data-when="default first device-off">读的是经历段落，不是你写的岗位名</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 这一栏读不出来</span>
+        </div>
+        <div class="sec">
+
+          <!-- device-off 也要显示：打印机离线跟能不能读简历没关系。
+               初版只写了 default first，离线态下这一栏整块空白（实测左栏空 1088px）。 -->
+          <div data-when="default first device-off">
+            <div class="field-lb">写得实、有具体事例支撑的</div>
+            <div class="skills">
+              <div class="sk">
+                <span class="sk-t">非标夹具结构设计</span>
+                <span class="sk-src">原文：「主导 3 条产线工装改造」「负责结构」</span>
+              </div>
+              <div class="sk">
+                <span class="sk-t">SolidWorks / AutoCAD 出图</span>
+                <span class="sk-src">原文：「用 SolidWorks 出图，做过 2 版样机」</span>
+              </div>
+              <div class="sk">
+                <span class="sk-t">用数据验证改造效果</span>
+                <span class="sk-src">原文：「卡料率从 12% 降到 3%」，且说清了测法</span>
+              </div>
+              <div class="sk">
+                <span class="sk-t">看液压原理图</span>
+                <span class="sk-src">原文：「参与过工装液压回路改造」</span>
+              </div>
+            </div>
+
+            <div class="field-lb" style="margin-top:var(--s-5)">简历里提了、但没有事例撑着的</div>
+            <div class="skills">
+              <div class="sk sk--weak">
+                <span class="sk-t">团队协作</span>
+                <span class="sk-src">只在技能栏列了一行，正文里找不到对应的事</span>
+              </div>
+              <div class="sk sk--weak">
+                <span class="sk-t">项目管理</span>
+                <span class="sk-src">同上。这类词不写事例，面试一问就露</span>
+              </div>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-5)">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>上面这些是<b>从你写的经历里读出来的</b>，不是你自报的岗位名。<br>
+                    如果有你会但简历里没写的，本机就读不到 ——
+                    <b>那不是你不会，是简历没写</b>，可以去简历工作台补上。</span>
+            </div>
+          </div>
+
+          <div data-when="ai-down">
+            <div class="notice notice--amber">
+              <svg class="ic"><use href="#i-alert"/></svg>
+              <span>AI 暂时不可用，<b>本机这次读不出你的简历</b>，也给不了方向建议。<br>
+                    下一步只能看「本机这批岗位里各类要求出现了多少次」的原始统计 ——
+                    那是不依赖 AI 的计数，可以自己对照着看。</span>
+            </div>
+
+            <div class="field-lb" style="margin-top:var(--s-5)">不靠 AI 也能自己看的三件事</div>
+            <div class="tline">
+              <div class="tl"><span class="tl-dot">1</span>
+                <span class="tl-b"><span class="tl-t">技能栏里没有事例撑着的词，先删掉</span>
+                  <span class="tl-s">「团队协作」「项目管理」这类，正文里找不到对应的事就是虚的 ——
+                    这个判断不用 AI，你自己对着简历看一遍就知道</span></span></div>
+              <div class="tl"><span class="tl-dot">2</span>
+                <span class="tl-b"><span class="tl-t">每段经历问自己一句「结果是什么」</span>
+                  <span class="tl-s">写了做什么、没写做成什么，是最常见的一处。
+                    有数字写数字，没数字写变化</span></span></div>
+              <div class="tl"><span class="tl-dot">3</span>
+                <span class="tl-b"><span class="tl-t">下一步看岗位计数，自己对照</span>
+                  <span class="tl-s">哪类要求出现得多、你占了几条 ——
+                    计数不依赖 AI，是本机数出来的事实</span></span></div>
+            </div>
+
+            <div class="notice" style="margin-top:var(--s-5)">
+              <svg class="ic"><use href="#i-info"/></svg>
+              <span>这三条是<b>通用建议，不是针对你这份简历的</b> ——
+                    本机现在读不到它。<br>
+                    AI 恢复后再来，能给出按你原文逐条对应的版本。</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ─────────── S2 能往哪走 · 缺什么 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-route"/></svg>
+          <b>本机这批岗位里，你的能力还对得上哪些</b>
+          <span class="mt" data-when="default first">依据 = 本机读过正文的 214 条岗位</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 只有原始计数</span>
+        </div>
+        <div class="sec">
+          <div class="notice" data-when="default first">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>下面每个方向后面的数字，是<b>本机读过正文的岗位里出现的条数</b> ——
+                  不是"市场需求"，也不是"前景排名"。<br>
+                  本机只见过这一批（来自 3 家来源机构，同步于 8月9日），
+                  <b>见得多不等于岗位多，只等于本机见得多</b>。</span>
+          </div>
+          <div class="notice notice--amber" data-when="ai-down">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>AI 不可用，<b>不做方向建议、不算缺口</b>。
+                  下面只是各类要求在本机这批岗位里出现的原始条数。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="joblist">
+
+          <div class="dir">
+            <div class="dir-hd">
+              <span>
+                <span class="dir-t">继续做机械设计（本行往深走）</span>
+                <span class="dir-basis">本机读过正文的 214 条里，有 38 条属于这一类</span>
+              </span>
+              <span class="dir-count-status" style="margin-left:auto">38 条</span>
+            </div>
+            <div class="gap">
+              <div class="gp gp--have"><i></i><span>结构设计 + 出图 —— <b>你已经有事例</b></span></div>
+              <div class="gp gp--have"><i></i><span>用数据说明改造效果 —— 这条在 38 条里有 9 条明确写了「要能量化改善」</span></div>
+              <div class="gp gp--need"><i></i><span>这 38 条里 <b>14 条要求 UG/NX</b>，你写的是 SolidWorks ——
+                这是最常见的一道门槛，不是能力问题是软件问题</span></div>
+            </div>
+            <div class="panel-note">
+              这个方向你现在就能投，不用先补什么。UG/NX 那 14 条另说。
+            </div>
+          </div>
+
+          <div class="dir">
+            <div class="dir-hd">
+              <span>
+                <span class="dir-t">设备调试 / 现场工程</span>
+                <span class="dir-basis">本机读过正文的 214 条里，有 27 条属于这一类</span>
+              </span>
+              <span class="dir-count-status" style="margin-left:auto">27 条</span>
+            </div>
+            <div class="gap">
+              <div class="gp gp--have"><i></i><span>看液压原理图、动手改造过产线 —— <b>你有事例</b></span></div>
+              <div class="gp gp--need"><i></i><span>这 27 条里 <b>19 条要电工证</b>，你的简历里没有。
+                这是可验证的硬门槛，不是"能力有待提升"那种虚话</span></div>
+              <div class="gp gp--need"><i></i><span><b>16 条写了需接受出差或外派</b> ——
+                这不是缺口，是你要自己决定接不接受的条件</span></div>
+            </div>
+            <div class="panel-note">
+              电工证考下来这条就通了大半。本机不评价值不值得考 —— 那看你自己的情况。
+            </div>
+          </div>
+
+          <div class="dir">
+            <div class="dir-hd">
+              <span>
+                <span class="dir-t">工艺工程师</span>
+                <span class="dir-basis">本机读过正文的 214 条里，有 21 条属于这一类</span>
+              </span>
+              <span class="dir-count-status" style="margin-left:auto">21 条</span>
+            </div>
+            <div class="gap">
+              <div class="gp gp--have"><i></i><span>产线改造经历 —— 你有，且写清了结果</span></div>
+              <div class="gp gp--need"><i></i><span>这 21 条里 <b>12 条要求熟悉某类加工工艺</b>
+                （热处理、焊接、注塑等），你的简历里没提到具体工艺</span></div>
+              <div class="gp gp--need"><i></i><span>7 条要求做过 SOP 或作业指导书 —— 简历里也没写。
+                <b>如果你其实做过，这是简历漏写，不是你缺</b></span></div>
+            </div>
+          </div>
+
+          <div class="dir">
+            <div class="dir-hd">
+              <span>
+                <span class="dir-t">质量工程师</span>
+                <span class="dir-basis">本机读过正文的 214 条里，有 18 条属于这一类</span>
+              </span>
+              <span class="dir-count-status" style="margin-left:auto">18 条</span>
+            </div>
+            <div class="gap">
+              <div class="gp gp--have"><i></i><span>用数据验证、说清测法 —— 这条质量岗很看重，你有</span></div>
+              <div class="gp gp--need"><i></i><span>18 条里 <b>13 条要求懂 SPC、8D 或 MSA</b>，简历里完全没有</span></div>
+              <div class="gp gp--need"><i></i><span>9 条要求有体系审核经历（IATF16949 等）</span></div>
+            </div>
+            <div class="panel-note">
+              缺口比前面几个方向大。列在这里是让你知道有这条路，<b>不是建议你转</b>。
+            </div>
+          </div>
+
+        </div>
+
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          以上只覆盖<b>本机读过正文的 214 条岗位</b>（来自 3 家来源机构，同步 8月9日 07:30）。
+          本机没见过的岗位不在里面 —— <b>这不是市场全貌</b>。
+        </div>
+      </div>
+
+      <!-- ─────────── S3 带走行动清单 ─────────── -->
+      <div class="paper-bar" data-at="s3">
+        <span class="nm">行动清单 · 机械设计方向</span>
+        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s3">
+        <div class="sheet-a4">
+          <div class="pl">
+            <h1>行动清单</h1>
+            <div class="pl-sub">
+              2026年8月9日 14:05 由职易达一体机打印<br>
+              依据：本机读过正文的 214 条岗位（3 家来源机构，同步 8月9日 07:30）+ 你上传的简历
+            </div>
+            <div class="pl-hr"></div>
+
+            <div class="pl-w">这周能做完的（不用等任何条件）</div>
+            <div class="pl-i"><i></i><span>把「团队协作」「项目管理」这两行<b>删掉或补上事例</b> ——
+              没有事例的技能词，面试一问就露</span></div>
+            <div class="pl-i"><i></i><span>简历里补上<b>你做过的具体加工工艺</b>（如果做过）——
+              工艺岗那 21 条里有 12 条要这个，漏写等于白扔</span></div>
+            <div class="pl-i"><i></i><span>补上<b>做过 SOP / 作业指导书</b>的经历（如果做过）</span></div>
+
+            <div class="pl-w">现在就能投的方向</div>
+            <div class="pl-i"><i></i><span><b>机械设计（本行往深走）</b> —— 你的事例已经对得上，不用先补什么<br>
+              注意：本机见到的 38 条里有 14 条要 UG/NX，你会的是 SolidWorks</span></div>
+
+            <div class="pl-w">要花时间才能通的一条</div>
+            <div class="pl-i"><i></i><span><b>设备调试 / 现场工程</b>：本机见到的 27 条里 19 条要<b>电工证</b>。<br>
+              考下来这条就通了大半。本机不评价值不值得考 —— 那要看你自己的情况。<br>
+              另有 16 条写了需接受出差或外派，这是你要自己决定的条件，不是缺口。</span></div>
+
+            <div class="pl-w">缺口较大、只是让你知道有这条路</div>
+            <div class="pl-i"><i></i><span><b>质量工程师</b>：18 条里 13 条要 SPC / 8D / MSA，9 条要体系审核经历。
+              <b>不是建议你转</b>，是列出来供你自己判断。</span></div>
+
+            <div class="pl-foot">
+              本单只依据<b>本机读过正文的那 214 条岗位</b>和你上传的简历生成，仅供你自己参考。<br>
+              条数说的是「本机见到多少条」，<b>不是市场需求、不是前景排名</b>；本机没见过的岗位不在里面。<br>
+              本机<b>不预测薪资、不预测录用结果、不承诺任何职业发展结果</b>。<br>
+              本机不代收简历、不代为投递。是否转方向、是否考证，由你自己决定。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-resume"/></svg><b>读的是这份</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">简历</span><span class="v">王磊_机械_2026.pdf</span></div>
+            <div class="kv-row"><span class="k">来源</span><span class="v v--fog">本机 8月9日 09:58</span></div>
+            <div class="kv-row"><span class="k">读到的能力</span><span class="v"><b>4</b> 条有事例</span></div>
+            <div class="kv-row"><span class="k">没事例的</span><span class="v"><b>2</b> 条</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            读的是经历段落里的动词和结果，<b>不含你的联系方式</b>。
+            离场自动清空，不留存。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>本机不做的四件事</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">预测薪资</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">预测录用结果</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">排"前景好坏"</span><span class="v v--fog">不做</span></div>
+            <div class="kv-row"><span class="k">替你决定转不转</span><span class="v v--fog">不做</span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>这四件都要有可靠依据才能说，<b>本机没有</b>。<br>
+                  编一个听起来合理的答案，比不答更害人 ——
+                  你会照着它做决定。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机能做的只有一件：把<b>它真读过的岗位正文</b>和你的简历放在一起，
+            指出哪些对得上、哪些差一个可验证的条件。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>这些数字是什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">本机读过正文</span><span class="v"><b>214</b> 条</span></div>
+            <div class="kv-row"><span class="k">来源机构</span><span class="v">3 家</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
+            <div class="kv-row"><span class="k">只有标题的</span><span class="v"><b>61</b> 条 · 不计入</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            条数 = 本机见到的数量。<b>不是市场需求，不是前景排名。</b>
+            另有 61 条来源平台只给了标题，本机读不到内容，一律不参与计数。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>缺口分两种</b></div>
+        <div class="sec">
+          <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.65">
+            页面上标出来的缺口只有两类，都是<b>可验证的</b>：
+          </div>
+          <div class="kv" style="margin-top:var(--s-3)">
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">硬门槛</span>
+              <span class="v" style="text-align:right">证书、软件、体系经历</span>
+            </div>
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">简历漏写</span>
+              <span class="v" style="text-align:right">你可能有，只是没写上</span>
+            </div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>你会看到本页多次写「<b>如果你其实做过，这是简历漏写，不是你缺</b>」——
+                  这两种要分开：一种要花几个月，一种今天下午就能补。</span>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>本机<b>不写</b>「沟通能力有待提升」这类话 ——
+                  没法验证，也没法行动，写了等于没写。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            属于「简历漏写」的那几条，可以直接去简历工作台补。
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">行动清单</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">四个方向的完整缺口表</span>
+              <span class="ck-s">A4 黑白 · 2 页 · 清单已含要点，按需选</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把清单存进手机。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用为预估 · 以打印工作台核价为准。清单同时存进「我的文档」与「AI服务记录」。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>接下来</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">先做「这周能做完的」三条</span>
+                <span class="tl-s">都是改简历，不用等任何条件</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">改完回来重跑一次</span>
+                <span class="tl-s">补上工艺和 SOP 之后，对得上的方向会变</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">岗位数据每天同步</span>
+                <span class="tl-s">过一阵再来，条数和缺口都会变</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>这份清单<b>不是一次性的结论</b>。简历改了、岗位数据更新了，
+                  结果就会变 —— 值得隔一段时间重跑一次。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机不记录你有没有照着做、有没有转方向 ——
+            只记录你在这台机器上生成过一份清单。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            把<b>本机真读过的岗位正文</b>和你的简历放一起，
+            指出哪些对得上、哪些差一个<b>可验证的</b>条件。<br>
+            不预测薪资、不预测前景 —— 那些本机没有依据。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回看我会什么</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看方向与缺口</button>
+
+    <span class="actionbar-hint" data-at="s1" data-when="default first">4 条有事例 · 2 条没事例撑着</span>
+    <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 读不出简历，只能看岗位计数</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first">依据 214 条读过正文的岗位 · 不是市场全貌</span>
+    <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 只有原始计数，无方向建议</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 预估 0.20 元 · 以打印工作台核价为准</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看岗位计数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=29"></script>
+<script src="scripts/stages.js?v=2"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=13"></script>
+</body>
+</html>

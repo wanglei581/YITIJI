@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>方向 B · 墨青纸感暖色高级 · 首页</title>
+    <style>
+      :root {
+        --paper: #f4f1e8;
+        --paper-2: #ece8db;
+        --surface: #fffdf8;
+        --ink: #10302b;
+        --ink-2: #2c4a43;
+        --muted: #6b766f;
+        --teal: #1f9e86;
+        --teal-deep: #157a67;
+        --teal-soft: #e2f2ec;
+        --clay: #b8683c;
+        --clay-soft: #f4e8dd;
+        --wheat: #a9781f;
+        --wheat-soft: #f2ead6;
+        --slate: #3f68b0;
+        --slate-soft: #e5edf4;
+        --plum: #7a5a86;
+        --plum-soft: #efe7f1;
+        --red: #c14a34;
+        --red-soft: #f6e3de;
+        --line: #ddd8ca;
+        --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+        --sans: 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+      body {
+        font-family: var(--sans);
+        color: var(--ink);
+        background: var(--paper);
+        display: grid;
+        place-items: center;
+      }
+      .kiosk {
+        width: 1080px; height: 1920px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background:
+          radial-gradient(900px 500px at 90% -5%, rgba(31, 158, 134, 0.08), transparent 60%),
+          radial-gradient(800px 500px at -5% 40%, rgba(184, 104, 60, 0.07), transparent 55%),
+          var(--paper);
+      }
+
+      /* ── 顶栏：墨绿 ── */
+      .topbar {
+        height: 112px;
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 52px;
+        color: #f0f5f0;
+        background: linear-gradient(180deg, #123a33, #0d2c27);
+        box-shadow: 0 12px 30px rgba(13, 44, 39, 0.22);
+      }
+      .brand { display: flex; align-items: center; gap: 16px; }
+      .brand-mark {
+        width: 56px; height: 56px;
+        display: grid; place-items: center;
+        color: #fff;
+        background: var(--clay);
+        border-radius: 16px;
+        font-family: var(--serif);
+        font-size: 28px; font-weight: 800;
+        box-shadow: 0 8px 20px rgba(184, 104, 60, 0.35);
+      }
+      .brand strong {
+        display: block;
+        font-family: var(--serif);
+        font-size: 26px;
+        letter-spacing: 0.06em;
+      }
+      .brand span { display: block; margin-top: 2px; color: #9db8ae; font-size: 14px; }
+      .top-status { display: flex; align-items: center; gap: 12px; }
+      .clock { color: #b9cdc4; font-size: 16px; font-variant-numeric: tabular-nums; }
+      .device {
+        display: inline-flex; align-items: center; gap: 9px;
+        height: 44px; padding: 0 18px;
+        color: #d9eee6;
+        background: rgba(31, 158, 134, 0.18);
+        border: 1px solid rgba(31, 158, 134, 0.35);
+        border-radius: 999px;
+        font-size: 15px;
+      }
+      .device::before {
+        content: ''; width: 9px; height: 9px;
+        border-radius: 50%;
+        background: #35c9a8;
+        box-shadow: 0 0 0 4px rgba(53, 201, 168, 0.2);
+      }
+
+      /* ── 主区 ── */
+      .main {
+        flex: 1; min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) 380px;
+        gap: 30px;
+        padding: 36px 52px 160px;
+        overflow: auto;
+      }
+
+      .hero {
+        position: relative;
+        padding: 40px 42px 36px;
+        background:
+          radial-gradient(500px 260px at 92% -10%, rgba(31, 158, 134, 0.14), transparent 60%),
+          var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 34px;
+        box-shadow: 0 22px 60px rgba(45, 40, 25, 0.1);
+      }
+      .hero-kicker {
+        display: inline-flex; align-items: center; gap: 10px;
+        margin-bottom: 16px;
+        color: var(--clay);
+        font-family: var(--serif);
+        font-size: 16px; font-weight: 700;
+        letter-spacing: 0.14em;
+      }
+      .hero-kicker::before {
+        content: '';
+        width: 28px; height: 2px;
+        background: var(--clay);
+      }
+      .hero h1 {
+        font-family: var(--serif);
+        font-size: 46px;
+        font-weight: 800;
+        color: var(--ink);
+        line-height: 1.28;
+        letter-spacing: 0.02em;
+      }
+      .hero h1 em {
+        color: var(--teal-deep);
+        font-style: normal;
+      }
+      .hero-desc {
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 17px;
+        line-height: 1.7;
+      }
+      .hero-input {
+        display: flex;
+        gap: 14px;
+        margin-top: 28px;
+      }
+      .hero-input input {
+        flex: 1;
+        height: 74px;
+        padding: 0 26px;
+        color: var(--ink);
+        background: var(--paper);
+        border: 1.5px solid var(--line);
+        border-radius: 20px;
+        font-size: 18px;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .hero-input input:focus {
+        outline: none;
+        border-color: var(--teal);
+        box-shadow: 0 0 0 4px rgba(31, 158, 134, 0.14);
+      }
+      .hero-input .btn-go {
+        flex: none;
+        height: 74px;
+        padding: 0 34px;
+        color: #fff;
+        background: linear-gradient(180deg, #25ab92, #157a67);
+        border: 0;
+        border-radius: 20px;
+        font-size: 18px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 14px 30px rgba(21, 122, 103, 0.3);
+        transition: transform 0.14s ease, box-shadow 0.2s ease;
+      }
+      .hero-input .btn-go:hover { transform: translateY(-2px); box-shadow: 0 18px 36px rgba(21, 122, 103, 0.36); }
+      .hero-hint {
+        display: flex; align-items: center; gap: 8px;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      /* 六项服务 */
+      .services {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 24px;
+      }
+      .service {
+        position: relative;
+        min-height: 148px;
+        padding: 22px 24px 20px;
+        display: flex;
+        gap: 16px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 8px 24px rgba(45, 40, 25, 0.07);
+        cursor: pointer;
+        transition: transform 0.18s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+        animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.24, 1) both;
+      }
+      .service:nth-child(2) { animation-delay: 0.05s; }
+      .service:nth-child(3) { animation-delay: 0.1s; }
+      .service:nth-child(4) { animation-delay: 0.15s; }
+      .service:nth-child(5) { animation-delay: 0.2s; }
+      .service:nth-child(6) { animation-delay: 0.25s; }
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(16px); }
+        to { opacity: 1; transform: none; }
+      }
+      .service:hover {
+        transform: translateY(-4px);
+        border-color: rgba(31, 158, 134, 0.4);
+        box-shadow: 0 18px 40px rgba(45, 40, 25, 0.12);
+      }
+      .service:active { transform: scale(0.985); }
+      .service .ico {
+        width: 60px; height: 60px;
+        flex: none;
+        display: grid; place-items: center;
+        border-radius: 18px;
+      }
+      .service .ico svg { width: 29px; height: 29px; }
+      .service b {
+        display: block;
+        font-family: var(--serif);
+        font-size: 21px;
+        font-weight: 700;
+      }
+      .service p { margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+      .service .arrow {
+        position: absolute;
+        right: 18px; top: 20px;
+        color: #c9c3b2;
+        font-family: var(--serif);
+        font-size: 18px;
+        transition: transform 0.2s ease, color 0.2s ease;
+      }
+      .service:hover .arrow { transform: translateX(4px); color: var(--teal-deep); }
+      .i-print   { color: var(--teal-deep); background: var(--teal-soft); }
+      .i-resume  { color: var(--plum); background: var(--plum-soft); }
+      .i-jobs    { color: var(--slate); background: var(--slate-soft); }
+      .i-fairs   { color: var(--clay); background: var(--clay-soft); }
+      .i-interview { color: var(--wheat); background: var(--wheat-soft); }
+      .i-policy  { color: #3f6b5c; background: #e4eee8; }
+
+      /* 右列 */
+      .side { display: flex; flex-direction: column; gap: 22px; }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        box-shadow: 0 10px 30px rgba(45, 40, 25, 0.08);
+        overflow: hidden;
+      }
+      .card-head {
+        display: flex; align-items: baseline; justify-content: space-between;
+        padding: 22px 26px 0;
+      }
+      .card-head b {
+        font-family: var(--serif);
+        font-size: 21px;
+      }
+      .card-head span { color: var(--muted); font-size: 13px; }
+      .today-task { padding: 18px 26px 26px; }
+      .task-main {
+        display: flex; align-items: center; gap: 16px;
+        padding: 20px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, var(--teal-soft), #f2faf7);
+        border: 1px solid rgba(31, 158, 134, 0.22);
+      }
+      .task-main .ico {
+        width: 52px; height: 52px; flex: none;
+        display: grid; place-items: center;
+        color: #fff;
+        background: linear-gradient(180deg, #25ab92, #157a67);
+        border-radius: 16px;
+        box-shadow: 0 8px 18px rgba(21, 122, 103, 0.3);
+      }
+      .task-main svg { width: 25px; height: 25px; }
+      .task-main b { display: block; font-size: 17px; font-weight: 700; }
+      .task-main p { margin-top: 5px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+      .task-list { margin-top: 14px; }
+      .task-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 13px 4px;
+        border-bottom: 1px dashed var(--line);
+        font-size: 15px;
+        color: var(--ink-2);
+      }
+      .task-row:last-child { border-bottom: 0; }
+      .task-row i {
+        width: 8px; height: 8px; flex: none;
+        border-radius: 50%;
+        background: var(--teal);
+      }
+      .task-row em { margin-left: auto; color: var(--muted); font-style: normal; font-size: 13px; }
+      .photo img { width: 100%; height: 290px; object-fit: cover; display: block; }
+      .photo figcaption { padding: 14px 22px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+      .boundary {
+        padding: 18px 22px;
+        display: flex; gap: 12px;
+        color: var(--ink-2);
+        background: var(--wheat-soft);
+        border: 1px dashed #d8cba6;
+        border-radius: 22px;
+        font-size: 13.5px;
+        line-height: 1.6;
+      }
+      .boundary svg { width: 20px; height: 20px; flex: none; color: var(--wheat); }
+
+      /* ── 底栏 ── */
+      .bottomnav {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        height: 138px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        background: rgba(255, 253, 248, 0.95);
+        backdrop-filter: blur(20px);
+        border-top: 1px solid var(--line);
+      }
+      .bottomnav button {
+        position: relative;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 7px;
+        color: #9a9a8b;
+        background: transparent;
+        border: 0;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      .bottomnav button svg { width: 28px; height: 28px; }
+      .bottomnav button.active { color: var(--teal-deep); font-weight: 700; }
+      .bottomnav button.active::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        width: 44px; height: 4px;
+        border-radius: 0 0 6px 6px;
+        background: var(--teal);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="kiosk">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">职</span>
+          <div><strong>职易达</strong><span>就业服务终端 · 01 号机</span></div>
+        </div>
+        <div class="top-status">
+          <span class="clock">2026年8月7日 09:41</span>
+          <span class="device">打印机在线 · 纸量正常</span>
+        </div>
+      </header>
+
+      <main class="main">
+        <div>
+          <section class="hero">
+            <span class="hero-kicker">今天想办什么</span>
+            <h1>说出目标，<em>剩下交给我们</em></h1>
+            <p class="hero-desc">一句话即可。系统识别你的目标，给出建议办理顺序，每步由你确认。</p>
+            <div class="hero-input">
+              <input value="周五参加招聘会，想先优化简历并打印 5 份" />
+              <button class="btn-go">生成办理步骤</button>
+            </div>
+            <p class="hero-hint">✦ 例如：帮我优化简历 / 打印两份材料 / 准备招聘会</p>
+          </section>
+
+          <section class="services">
+            <div class="service">
+              <span class="ico i-print">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+              </span>
+              <div><b>打印扫描</b><p>上传、检查、支付、打印与材料扫描</p></div>
+              <span class="arrow">→</span>
+            </div>
+            <div class="service">
+              <span class="ico i-resume">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </span>
+              <div><b>AI 简历服务</b><p>诊断、优化、生成、模板与求职材料</p></div>
+              <span class="arrow">→</span>
+            </div>
+            <div class="service">
+              <span class="ico i-jobs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+              </span>
+              <div><b>岗位信息</b><p>第三方来源岗位与本人匹配参考</p></div>
+              <span class="arrow">→</span>
+            </div>
+            <div class="service">
+              <span class="ico i-fairs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </span>
+              <div><b>招聘会</b><p>场次、企业、场馆导览与参会准备</p></div>
+              <span class="arrow">→</span>
+            </div>
+            <div class="service">
+              <span class="ico i-interview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <div><b>AI 面试训练</b><p>私密练习、逐题反馈与历史报告</p></div>
+              <span class="arrow">→</span>
+            </div>
+            <div class="service">
+              <span class="ico i-policy">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 9h1"/><path d="M14 9h1"/><path d="M9 13h1"/><path d="M14 13h1"/></svg>
+              </span>
+              <div><b>政策服务</b><p>官方政策、材料清单与办理来源</p></div>
+              <span class="arrow">→</span>
+            </div>
+          </section>
+        </div>
+
+        <aside class="side">
+          <section class="card">
+            <div class="card-head"><b>今日办理</b><span>根据你的目标生成</span></div>
+            <div class="today-task">
+              <div class="task-main">
+                <span class="ico">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </span>
+                <div><b>优化简历并打印 5 份</b><p>建议顺序：诊断 → 优化 → 打印 → 准备招聘会</p></div>
+              </div>
+              <div class="task-list">
+                <div class="task-row"><i></i>简历诊断<span><em>下一步</em></span></div>
+                <div class="task-row"><i></i>简历优化<span><em>待办理</em></span></div>
+                <div class="task-row"><i></i>打印 5 份<span><em>待办理</em></span></div>
+              </div>
+            </div>
+          </section>
+
+          <figure class="card photo">
+            <img src="../kiosk-ai-os-fusion-2026-08/assets/kiosk-home-hero-job-fair.png" alt="招聘会现场" />
+            <figcaption>周五 2026 夏季综合招聘会 · 广州国际会展中心，可提前准备材料。</figcaption>
+          </figure>
+
+          <div class="boundary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>公共终端隐私保护：离场或超时自动清空会话；所有关键动作需你确认后才会执行。</span>
+          </div>
+        </aside>
+      </main>
+
+      <nav class="bottomnav">
+        <button class="active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          首页
+        </button>
+        <button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>
+          AI 顾问
+        </button>
+        <button>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          我的
+        </button>
+      </nav>
+    </div>
+  </body>
+</html>
