@@ -8,7 +8,7 @@
  * 纪律（vivid.css 三条 + 触控硬约束）：
  *  1) 服务身份色只用于入口识别（--hv3-cat-*），状态语义色沿用 dc-dot 既有映射；
  *  2) 玻璃层只浮在色域之上（版头胶囊/仪表），纯色卡上不用玻璃；
- *  3) 子入口 ≥48px，主入口/主按钮 ≥56px，任何规则不得下调。
+ *  3) 次级可点 ≥48px，主入口/主按钮 ≥56px，任何规则不得下调。
  * ============================================================ */
 
 .kpv1.hv3 {
@@ -195,17 +195,35 @@
   height: 26px;
   color: var(--hv3-cat-print);
 }
+/* 导航按钮（非输入框）：主文案用正文墨色 + 明确按钮描边，示例句降级为提示行；
+ * 不使用 placeholder 灰单行形态，避免被误读为可输入区。 */
 .kpv1.hv3 .hv3-cmd-ask {
   flex: 1;
   min-width: 0;
   min-height: var(--hv3-touch-primary);
-  border: 0;
-  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 16px;
+  border: 1px solid var(--hv3-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.55);
   text-align: left;
   font-family: inherit;
-  font-size: 20px;
-  color: var(--hv3-muted);
   cursor: pointer;
+  overflow: hidden;
+}
+.kpv1.hv3 .hv3-cmd-ask-label {
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--hv3-ink);
+}
+.kpv1.hv3 .hv3-cmd-ask-eg {
+  max-width: 100%;
+  font-size: 14px;
+  color: var(--hv3-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -248,8 +266,8 @@
 }
 .kpv1.hv3 .hv3-cmd-go:active,
 .kpv1.hv3 .hv3-cmd-mic:active,
+.kpv1.hv3 .hv3-cmd-ask:active,
 .kpv1.hv3 .hv3-scene:active,
-.kpv1.hv3 .hv3-sub:active,
 .kpv1.hv3 .login-btn:active {
   transform: scale(0.98);
 }
@@ -432,36 +450,10 @@
   height: 20px;
   color: #fff;
 }
-/* 子入口：小功能直点（≥48px 触控，白玻璃 pill） */
-.kpv1.hv3 .hv3-subs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.22);
-  margin-top: auto;
-}
-.kpv1.hv3 .hv3-sub {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--hv3-touch-min);
-  min-width: var(--hv3-touch-min);
-  padding: 0 20px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  color: #fff;
-  font-size: 16px;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.kpv1.hv3 .hv3-sub:active {
-  background: rgba(255, 255, 255, 0.34);
-}
-/* 紧凑卡：标题字号收敛，子入口纵向撑满列宽（更大可点面）；
- * 收起右侧箭头圈释放标题空间，避免四列窄卡中文标题竖排断行 */
+/* 干净磁贴口径（用户 2026-08-09 拍板）：卡内不放子功能小按钮，
+ * 子功能选择在各服务中心页完成；子入口 pill 类不得回潮（verify-fusion-home 钉死）。 */
+/* 紧凑卡：标题字号收敛；收起右侧箭头圈释放标题空间，
+ * 避免四列窄卡中文标题竖排断行 */
 .kpv1.hv3 .hv3-grid-b .hv3-card-text b {
   font-size: 20px;
 }
@@ -477,13 +469,6 @@
 .kpv1.hv3 .hv3-grid-b .hv3-card-ic {
   width: 44px;
   height: 44px;
-}
-.kpv1.hv3 .hv3-grid-b .hv3-subs {
-  flex-direction: column;
-  align-items: stretch;
-}
-.kpv1.hv3 .hv3-grid-b .hv3-sub {
-  justify-content: flex-start;
 }
 
 /* ── 动态专区（zone-row 复用 kpv1 基类，仅收位）── */
@@ -568,6 +553,91 @@
   flex: none;
 }
 
+/* ── 竖屏高屏（一体机 1080×1920 级）：干净磁贴内容变短后，按站立触控
+ * 场景整体放大构图（更大标题/胶囊/磁贴 = 更大可点面），留白自然收束在
+ * 页尾，不做 margin:auto 沉底（会把空洞挤到页中）。
+ * 不改 1080×1920 既有几何合同（.kpv1 仍 min-height:0 可收缩，无 1920px 硬高）。 */
+@media (min-height: 1500px) and (min-width: 1080px) {
+  .kpv1.hv3 .hv3-hero {
+    padding-top: 58px;
+  }
+  .kpv1.hv3 .hv3-hero-copy h1 {
+    font-size: 66px;
+  }
+  .kpv1.hv3 .hv3-hero-copy p {
+    font-size: 22px;
+    margin-top: 18px;
+  }
+  .kpv1.hv3 .hv3-command-wrap {
+    padding-top: 22px;
+  }
+  .kpv1.hv3 .hv3-command {
+    min-height: 100px;
+  }
+  .kpv1.hv3 .hv3-cmd-ask-label {
+    font-size: 21px;
+  }
+  .kpv1.hv3 .hv3-cmd-ask-eg {
+    font-size: 15px;
+  }
+  .kpv1.hv3 .hv3-scene {
+    min-height: 56px;
+    font-size: 17px;
+  }
+  .kpv1.hv3 .hv3-services {
+    gap: 24px;
+    padding-top: 30px;
+  }
+  .kpv1.hv3 .hv3-grid-a,
+  .kpv1.hv3 .hv3-grid-b {
+    gap: 24px;
+  }
+  .kpv1.hv3 .hv3-card {
+    padding: 34px 28px 36px;
+    border-radius: 30px;
+  }
+  .kpv1.hv3 .hv3-card-ic {
+    width: 58px;
+    height: 58px;
+  }
+  .kpv1.hv3 .hv3-card-ic svg {
+    width: 30px;
+    height: 30px;
+  }
+  .kpv1.hv3 .hv3-card-text b {
+    font-size: 32px;
+  }
+  .kpv1.hv3 .hv3-card-text span {
+    font-size: 16px;
+  }
+  .kpv1.hv3 .hv3-grid-b .hv3-card {
+    padding: 28px 22px 30px;
+  }
+  .kpv1.hv3 .hv3-grid-b .hv3-card-main.svc-tile {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    min-height: 190px;
+  }
+  .kpv1.hv3 .hv3-grid-b .hv3-card-text b {
+    font-size: 23px;
+  }
+  .kpv1.hv3 .hv3-grid-b .hv3-card-text span {
+    font-size: 14px;
+  }
+  .kpv1.hv3 .hv3-grid-b .hv3-card-ic {
+    width: 52px;
+    height: 52px;
+  }
+  .kpv1.hv3 .zone-row {
+    margin-top: 24px;
+  }
+  .kpv1.hv3 .hv3-foot {
+    margin-top: 24px;
+    padding-bottom: 26px;
+  }
+}
+
 /* ── 响应式：不破坏现有窄屏能力（1080 以下逐级收列）── */
 @media (max-width: 1079.98px) {
   .kpv1.hv3 .hv3-hero {
@@ -639,8 +709,8 @@
   }
   .kpv1.hv3 .hv3-cmd-go:active,
   .kpv1.hv3 .hv3-cmd-mic:active,
+  .kpv1.hv3 .hv3-cmd-ask:active,
   .kpv1.hv3 .hv3-scene:active,
-  .kpv1.hv3 .hv3-sub:active,
   .kpv1.hv3 .hv3-card-main.svc-tile:active,
   .kpv1.hv3 .login-btn:active {
     transform: none;

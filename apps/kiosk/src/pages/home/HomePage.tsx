@@ -1,14 +1,16 @@
-// 首页 · V3 意图台试点（docs/design/kiosk-ai-os-v3-2026-08/01-home-v5.html）
+// 首页 · V3 意图台试点（设计基线：docs/design/kiosk-ai-os-v3-2026-08/，main #568 入库后直接引用）
 //
 // 顶栏(76) + 底栏(116) 由共享 KioskLayout 提供；本页只渲染 V5「鲜彩玻璃 warm」
-// 内容区：暖色域版头 + 玻璃指令胶囊 + 六服务身份色卡（小功能直点子入口）+
-// 门控动态专区 + 本机状态仪表 + 合规提示。
-// 结构真值：phase2-home-pilot-plan.md §3；视觉真值：01-home-v5.html + styles/vivid.css。
+// 内容区：暖色域版头 + 指令胶囊（明确导航按钮，不伪装输入框）+ 六服务身份色
+// 干净磁贴 + 门控动态专区 + 本机状态仪表 + 合规提示。
+// 用户 2026-08-09 拍板口径：首页卡片不放子功能小按钮；磁贴点击进入服务中心页，
+// 子功能选择由 /print-scan 等六个服务中心页承担。
+// 批准偏差与延期项清单：见 verify-home-prototype-v1.mjs 的基线覆盖清单。
 //
 // 保留的真实能力（重排视觉不改语义）：
 // - 登录入口：未登录 → 统一全屏 /login；已登录 → /profile（真实 displayName）
 // - ContinuePanel 会员可恢复任务（自门控）
-// - AI 接待台：输入/麦克风/CTA → /assistant，chips 携带 state.topic
+// - AI 接待台：导航按钮/麦克风/CTA → /assistant，chips 携带 state.topic
 // - 本机能力：共享壳 useTerminalDeviceStatus 真实检测，未检测项不写「正常」
 // - 百宝箱/智慧校园：useToolboxConfig / useSmartCampusConfig enabled 门控渲染
 //   （修复旧 SvcGrid 无条件渲染两磁贴的盘点缺陷）
@@ -85,9 +87,11 @@ function HomeHero({ onOpenLogin }: { onOpenLogin: () => void }) {
   )
 }
 
-/* ── 玻璃指令胶囊 + 场景快捷（V5 .vcommand / .vscenes）──
- * 承接旧 HomeReception 的全部真实行为：输入区与麦克风 → /assistant，
- * CTA「让小青安排」→ /assistant，chips 携带 state.topic / 直达打印上传。 */
+/* ── 指令胶囊 + 场景快捷（V5 .vcommand / .vscenes 的批准偏差落地）──
+ * V5 原型此处是真实文本输入框；本机首页不提供文本输入闭环，故按 Codex 审查
+ * 结论改为「明确的导航按钮」：可见主文案直说去 AI 顾问描述处境，示例句降级
+ * 为按钮内提示行，不再伪装可输入。麦克风与 CTA「让小青安排」→ /assistant，
+ * chips 携带 state.topic / 直达打印上传（承接旧 HomeReception 真实行为）。 */
 function HomeCommand() {
   const navigate = useNavigate()
 
@@ -99,13 +103,9 @@ function HomeCommand() {
             <path d="M12 2l2.4 2.4L17 3l.6 2.8 2.8.6-1.4 2.6 1.4 2.6-2.8.6L17 15l-2.6-1.4L12 15l-2.4-1.4L7 15l-.6-2.8-2.8-.6 1.4-2.6L3.6 6.4l2.8-.6L7 3z" />
           </svg>
         </span>
-        <button
-          type="button"
-          className="hv3-cmd-ask"
-          onClick={() => navigate('/assistant')}
-          aria-label="说一句你的处境，进入 AI 顾问"
-        >
-          例如：我周五参加招聘会，需要准备简历并打印
+        <button type="button" className="hv3-cmd-ask" onClick={() => navigate('/assistant')}>
+          <span className="hv3-cmd-ask-label">打开 AI 顾问，描述你的处境</span>
+          <span className="hv3-cmd-ask-eg">例如：周五要参加招聘会，简历还没准备好</span>
         </button>
         <button
           type="button"
@@ -154,9 +154,10 @@ function HomeCommand() {
   )
 }
 
-/* ── 六服务身份色卡 + 小功能直点子入口（V5 .vgrid-a / .vgrid-b + card-pill--go）──
- * 主入口按钮（≥56px）与子入口按钮（≥48px）物理分离，天然规避原型
- * IMPLEMENTATION-NOTES §3.1 的 <a> 嵌套重构问题；子入口全部为真实路由。 */
+/* ── 六服务身份色干净磁贴（V5 .vgrid-a / .vgrid-b）──
+ * 用户 2026-08-09 拍板：首页卡片不放子功能小按钮。每张磁贴 = 图标 + 名称 +
+ * 一行真实描述，整卡一个按钮（≥56px）点击进入服务中心页；子功能选择在
+ * 各服务中心页完成（V5 原型的子功能直点行按此口径不落地）。 */
 function HomeServiceNav() {
   const navigate = useNavigate()
 
@@ -174,13 +175,6 @@ function HomeServiceNav() {
           <ProtoIcon name="arrow" />
         </span>
       </button>
-      <div className="hv3-subs">
-        {card.subs.map((sub) => (
-          <button key={sub.to} type="button" className="hv3-sub" onClick={() => navigate(sub.to)}>
-            {sub.label}
-          </button>
-        ))}
-      </div>
     </article>
   )
 
@@ -233,7 +227,9 @@ export function ZoneRow() {
   return (
     <div className="zone-row">
       {showToolbox && (
-        // 百宝箱聚合入口 → /toolbox 区页（可启动 items + 启动弹窗 + 事件上报在该页保留）
+        // 百宝箱聚合入口 → /toolbox 区页（可启动 items + 启动弹窗 + 事件上报在该页保留）。
+        // 状态标签只说有数据支撑的事实：items 数量（已上架 N 项）或空配置（待配置）；
+        // 审核类结论无后端字段支撑，按 CLAUDE.md §9 不伪造状态原则不使用。
         <button type="button" className="zone-card z-plum" onClick={() => navigate('/toolbox')}>
           <span className="z-top">
             <span className="z-icon">
@@ -241,10 +237,12 @@ export function ZoneRow() {
             </span>
             <span className="z-text">
               <b>百宝箱</b>
-              <span className="z-sub">本机扩展服务，审核后上架</span>
+              <span className="z-sub">本机扩展服务，由后台上架控制</span>
             </span>
             <span className="z-side">
-              <span className="z-tag">已审核</span>
+              <span className="z-tag">
+                {toolboxChips.length > 0 ? `已上架 ${toolboxChips.length} 项` : '待配置'}
+              </span>
               <span className="arrow">
                 <ProtoIcon name="arrow" />
               </span>
@@ -261,7 +259,7 @@ export function ZoneRow() {
                 {toolboxChips.length > 5 && <i>更多上架中</i>}
               </>
             ) : (
-              <i className="z-empty">待配置 · 审核后上架</i>
+              <i className="z-empty">服务待后台配置上架</i>
             )}
           </span>
         </button>
