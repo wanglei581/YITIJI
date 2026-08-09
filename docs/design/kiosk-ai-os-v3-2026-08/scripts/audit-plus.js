@@ -496,6 +496,46 @@
     return out;
   }
 
+
+  /* ── 版面留白：检测「内容没填满」──────────────────────────────────────
+     今天做 P17 时发现的盲区：本文件此前只查一个方向 ——「内容被挤出容器」。
+     反方向的失败完全检不出来：内容只写到最小可行，一屏 1728px 的内容区
+     底下空 900px。那一版 16 个状态组合全报绿，可页面一看就不能用。
+
+     用户对这套页面提过的原话是「功能布局排版都显示不全」—— 说的正是这一类。
+
+     判据取 200px：一两个卡片的高度。小于它是正常呼吸感，大于它是没写完。
+     只量 .wmain / .wside 两根主栏，不递归量每个 pane —— pane 内部留白是设计，
+     主栏见底才是欠内容。
+     ────────────────────────────────────────────────────────────────── */
+  function auditEmptyTail () {
+    var out = { '主栏留白过大': 0, '明细': [] };
+    var cols = [['左栏', '.wmain'], ['右栏', '.wside']];
+    var i, name, col, rect, maxBottom, gap, nodes, j, node, r;
+
+    for (i = 0; i < cols.length; i += 1) {
+      name = cols[i][0];
+      col = document.querySelector(cols[i][1]);
+      if (!col) continue;
+      rect = col.getBoundingClientRect();
+      if (rect.height < 400) continue;          // 栏本身很矮时不判
+      maxBottom = rect.top;
+      nodes = col.querySelectorAll('*');
+      for (j = 0; j < nodes.length; j += 1) {
+        node = nodes[j];
+        try { if (window.getComputedStyle(node).display === 'none') continue; } catch (e) { continue; }
+        r = node.getBoundingClientRect();
+        if (r.height > 0 && r.bottom > maxBottom) maxBottom = r.bottom;
+      }
+      gap = Math.round(rect.bottom - maxBottom);
+      if (gap > 200) {
+        out['主栏留白过大'] += 1;
+        out['明细'].push({ '栏': name, '底部空': gap + 'px' });
+      }
+    }
+    return out;
+  }
+
   window.v3AuditPlus = function () {
     var result = {};
     var baseError = false;
@@ -530,12 +570,14 @@
     result['内部裁切'] = clipping;
     result['联动接线'] = wiring;
     result['假入口'] = auditFakeAffordance();
+    result['版面留白'] = auditEmptyTail();
 
     hasProblem = baseError ||
       clipping['严重'] > 0 ||
       clipping['一般'] > 0 ||
       wiring['缺锚点'].length > 0 ||
-      wiring['未绑定'].length > 0;
+      wiring['未绑定'].length > 0 ||
+      result['版面留白']['主栏留白过大'] > 0;
 
     for (i = 0; i < oldKeys.length; i += 1) {
       if (issueValue(result[oldKeys[i]])) {

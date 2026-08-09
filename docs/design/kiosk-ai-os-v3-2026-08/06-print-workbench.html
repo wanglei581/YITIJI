@@ -7,7 +7,7 @@
 <meta name="screen-name" content="P06 打印工作台">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
-<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
 <link rel="stylesheet" href="styles/vivid.css?v=3">
 <link rel="stylesheet" href="styles/work.css?v=3">
@@ -316,9 +316,16 @@
         <div class="field">
           <div class="field-lb">页码范围</div>
           <div class="seg">
-            <button aria-pressed="true">全部 3 页</button>
-            <button aria-pressed="false">自定义</button>
+            <button aria-pressed="true" id="rng-all">全部 3 页</button>
+            <button aria-pressed="false" id="rng-custom">自定义</button>
           </div>
+          <label class="goalfield" id="rng-input" style="height:52px;border-radius:var(--r-xs);margin-top:10px;display:none">
+            <svg class="ic" aria-hidden="true"><use href="#i-file"/></svg>
+            <input type="text" value="2-3" placeholder="如 1,3 或 2-3" aria-label="自定义页码范围" style="font-size:var(--fz-3)">
+          </label>
+          <p id="rng-note" style="display:none;margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+            用逗号分隔单页、用连字符表示区间。超出 1–3 的页码会被忽略，不会静默按全部打印。
+          </p>
         </div>
       </div>
 
@@ -382,6 +389,23 @@
           <div class="kv-row"><span class="k">面数</span><span class="v">15 面 · 用纸 10 张</span></div>
           <div class="kv-row"><span class="k">支付</span><span class="v">已支付</span></div>
           <div class="kv-row"><span class="k">去向</span><span class="v">已进「我的 · 打印订单」</span></div>
+          <div class="kv-row"><span class="k">完成时间</span><span class="v">8 月 8 日 09:47</span></div>
+        </div>
+        <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+          <button class="btn btn--ghost" style="width:100%">
+            <svg class="ic"><use href="#i-alert"/></svg>这次打印有问题
+          </button>
+          <div>
+            <div style="font-size:var(--fz-2);color:var(--fog-700);margin-bottom:8px">这次办理还顺手吗？</div>
+            <div class="seg">
+              <button aria-pressed="false">满意</button>
+              <button aria-pressed="false">一般</button>
+              <button aria-pressed="false">不满意</button>
+            </div>
+            <p style="margin:8px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              评价只用于改进现场服务，不影响你的订单，也可以不评。
+            </p>
+          </div>
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -450,6 +474,22 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script>
+/* 页码范围：选「自定义」才出现输入框。原型 64 屏有输入能力，本页早前只做了切换按钮 */
+;(function () {
+  var all = document.getElementById('rng-all'), cus = document.getElementById('rng-custom')
+  var box = document.getElementById('rng-input'), note = document.getElementById('rng-note')
+  if (!all || !cus) return
+  function set (custom) {
+    all.setAttribute('aria-pressed', custom ? 'false' : 'true')
+    cus.setAttribute('aria-pressed', custom ? 'true' : 'false')
+    box.style.display = custom ? 'flex' : 'none'
+    note.style.display = custom ? 'block' : 'none'
+  }
+  all.addEventListener('click', function () { set(false) })
+  cus.addEventListener('click', function () { set(true) })
+})()
+</script>
+<script>
 /* 核价门控：没有金额就不给支付按钮。原型未接服务端，所以只把"金额位"标成待服务端填充，
    而不是编一个假数字——这一步的诚实性比演示流畅更重要。 */
 ;(function () {
@@ -501,6 +541,6 @@
   addEventListener('load', function () { goto(1); setTimeout(sync, 420) })  // 默认停在体检命中的第 2 页
 })()
 </script>
-<script src="scripts/audit-plus.js?v=8"></script>
+<script src="scripts/audit-plus.js?v=9"></script>
 </body>
 </html>
