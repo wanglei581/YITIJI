@@ -211,6 +211,12 @@ jobs:
         working-directory: services/api
         run: pnpm verify:backend-p0-http
 
+      - name: Recruitment content Admin read-only HTTP contracts
+        working-directory: services/api
+        env:
+          RECRUITMENT_CONTENT_VERIFY_TARGET: isolated
+        run: pnpm verify:recruitment-content-http
+
       - name: Install SQLite terminal database guards
         working-directory: services/api
         # db push intentionally remains the shared SQLite CI baseline; triggers are
@@ -526,6 +532,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:offline-agencies-contract
           pnpm --filter @ai-job-print/api verify:partner-source-capabilities
           pnpm --filter @ai-job-print/api verify:backend-p0-http
+          RECRUITMENT_CONTENT_VERIFY_TARGET=isolated pnpm --filter @ai-job-print/api verify:recruitment-content-http
           pnpm --filter @ai-job-print/api verify:job-sync
           pnpm --filter @ai-job-print/api verify:mock-interview
           pnpm --filter @ai-job-print/api verify:member-account-status
