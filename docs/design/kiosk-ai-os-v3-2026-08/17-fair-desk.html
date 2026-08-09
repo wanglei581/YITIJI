@@ -9,7 +9,7 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=19">
+<link rel="stylesheet" href="styles/vivid.css?v=22">
 <link rel="stylesheet" href="styles/work.css?v=8">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
@@ -148,6 +148,18 @@
 .cb-ask b{ color: #0f5a45; }
 .cb-foot { font-size: 11px; color: #6b7a86; line-height: 1.65; border-top: 1px solid #d9e1e8;
            padding-top: 9px; margin-top: 4px; }
+
+/* 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin）。
+   到场后的动作，不是投递入口 —— 放在场次列表尾部，样式与 .alsoprint 同族。 */
+.checkin { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4) var(--s-5);
+  border-radius:var(--r-md); background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+  display:flex; align-items:center; gap:var(--s-5); }
+.checkin-ic { width:44px; height:44px; border-radius:var(--r-xs); background:var(--jade-a12);
+  display:grid; place-items:center; flex:0 0 auto; }
+.checkin-ic .ic { width:22px; height:22px; color:var(--jade-500); }
+.checkin-b { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.checkin-t { font-size:var(--fz-3); color:var(--fog-900); font-weight:600; }
+.checkin-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
 </style>
 </head>
 <body>
@@ -297,6 +309,19 @@
           <svg class="ic"><use href="#i-info"/></svg>
           <span>以上场次信息由来源机构提供，本机只做展示与打印。
                 报名、预约、入场资格以来源平台为准，本机不代办、不代收简历。</span>
+        </div>
+
+        <!-- 2026-08-09 零落点补齐：入场签到（线上 /job-fairs/checkin） -->
+        <div class="checkin">
+          <span class="checkin-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+          <span class="checkin-b">
+            <span class="checkin-t">已经在现场？先签到再逛</span>
+            <span class="checkin-s">到场后扫码或凭手机号签到，领现场资料 ——
+                  签到只用于领资料和到场统计，不是投递，也不改变入场资格。</span>
+          </span>
+          <button class="btn btn--lg btn--quiet" style="flex:0 0 auto">
+            <svg class="ic"><use href="#i-qr"/></svg>入场签到
+          </button>
         </div>
       </div>
 
@@ -632,6 +657,19 @@
           <span class="ap-s">A4 黑白 · 2 页 × 6 份 = 12 页 —— 这一单 13 页里的大头是它，不是作战单</span>
         </span>
         <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">已按 3 家 × 2 份算</span></span>
+      </div>
+
+      <!-- 2026-08-09 零落点补齐：活动资料（线上 /job-fairs/:id/materials）——
+           主办方场刊/地图可加入本批打印，默认不加，不替用户做主。 -->
+      <div class="alsoprint" data-at="s4">
+        <span class="ap-thumbs">
+          <span class="ap-th"><i></i><i></i><i></i><i></i></span>
+        </span>
+        <span class="ap-b">
+          <span class="ap-t">主办方活动资料也能加进这批：场刊 · 展位地图</span>
+          <span class="ap-s">主办方提供的公开资料，可加入本次打印清单一起打；加了页数会变，费用以打印工作台核价为准</span>
+        </span>
+        <span style="margin-left:auto;flex:0 0 auto"><span class="chip chip--info">默认不加 · 可选</span></span>
       </div>
 
     </div>

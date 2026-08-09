@@ -117,7 +117,7 @@ AI 不可用(ai-down)时:建议卡整块换成「什么不可用、还能做什�
 | P23 我的·资产中心 | `/profile` + `/me/*` 11 个明细页(全真 API) | ✅ 可直连 |
 | P24 权益活动 | `/activities`、`/activities/:id`(+me/benefits) | ✅ 可直连 |
 | P25 顾问驾驶舱 | `/assistant`(chat 真;TRTC 语音由 `VITE_USE_TRTC_CALL` 开关) | ✅ 可直连 |
-| P26 顾问作业面 | `/ai/plan`(AiPlanPage **纯静态零 API**) | ⚠️ 设计超前,落地需接线 |
+| P26 顾问作业面 | `/ai/plan`(AiPlanPage **纯静态零 API**) | ⚠️ 设计超前,落地需接线;76 号「AI方案确认」已裁归 P26(原写 P22,README 反向自查已改),P26 页内已补「方案确认」落点(2026-08-09) |
 
 盘点发现的真实 App 缺口(已另行立项,不在设计范围内动):`/session-resume` 调用后端不存在的 `GET /me/pending-tasks`(假接真);首页 `SERVICE_GROUPS`/`ServiceCard`/`ZoneRow` 死代码;placeholders 下 5 个同名未挂路由文件;百宝箱/智慧校园磁贴现为无条件渲染,与「后台开关未开启不显示」的设计口径不一致。
 
