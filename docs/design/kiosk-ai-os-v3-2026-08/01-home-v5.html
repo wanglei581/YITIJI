@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
 <link rel="stylesheet" href="styles/themes.css?v=3">
-<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=12">
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
@@ -157,6 +157,8 @@
           <span class="card-name">打印扫描</span>
           <span class="card-desc">上传 → 材料体检 → 参数核价 → 支付 → 出纸 → 取件码；也可扫描纸质原件转 PDF</span>
           <span class="card-foot">
+            <!-- 这三个是真快捷入口（linkage.js 绑 data-href 并阻止冒泡到外层卡片链接）。
+                 原来只有 30px，27 寸站着点不准 —— 抬到 48px，功能保留。 -->
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=local">本机上传</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=qr">手机扫码传</span>
             <span class="card-pill card-pill--go" role="button" tabindex="0" data-href="06-print-workbench.html?stage=s1&source=usb">U 盘</span>
@@ -182,18 +184,18 @@
           <span class="card-ic"><svg class="ic"><use href="#i-briefcase"/></svg></span>
           <span class="card-name">岗位信息</span>
           <span class="card-desc">第三方来源岗位 · 三档匹配参考</span>
-          <span class="card-foot"><span class="card-pill" data-dots="12">12 家来源 · 8 月 8 日同步</span></span>
+          <span class="card-foot"><span class="card-pill" data-dots="12">12 家来源</span></span>
         </a>
         <a class="card card--sm card--fair" href="17-fair-desk.html">
           <span class="card-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
           <span class="card-name">招聘会</span>
-          <span class="card-desc">场次 · 参展企业 · 展位导览 · 准备单</span>
+          <span class="card-desc">场次 · 参展企业 · 展位导览</span>
           <span class="card-foot"><span class="card-pill" data-dots="3">本周 3 场</span></span>
         </a>
         <a class="card card--sm card--mock" href="20-interview-pod.html">
           <span class="card-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
           <span class="card-name">AI 面试训练</span>
-          <span class="card-desc">私密练习 · 逐题反馈 · 报告可打印</span>
+          <span class="card-desc">私密练习 · 逐题反馈 · 出报告</span>
           <span class="card-foot">
             <span class="card-pill card-pill--info" data-when="default first device-off">语音可选</span>
             <span class="card-pill card-pill--info" data-when="ai-down">暂不可用 · 可看历史报告</span>
@@ -261,10 +263,10 @@
 </div>
 </div>
 
-<script src="scripts/stage.js?v=3"></script>
+<script src="scripts/stage.js?v=13"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=6"></script>
-<script src="scripts/audit-plus.js?v=10"></script>
+<script src="scripts/audit-plus.js?v=11"></script>
 </body>
 </html>

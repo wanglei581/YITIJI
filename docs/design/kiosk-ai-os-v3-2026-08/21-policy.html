@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<title>P21 政策服务 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P21 政策服务">
+<link rel="stylesheet" href="styles/tokens.css?v=3">
+<link rel="stylesheet" href="styles/base.css?v=3">
+<link rel="stylesheet" href="styles/components.css?v=3">
+<link rel="stylesheet" href="styles/themes.css?v=3">
+<link rel="stylesheet" href="styles/vivid.css?v=3">
+<link rel="stylesheet" href="styles/work.css?v=3">
+<link rel="stylesheet" href="styles/fx.css?v=3">
+<link rel="stylesheet" href="styles/fx2.css?v=3">
+<link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/identity.css?v=2">
+<link rel="stylesheet" href="styles/polish.css?v=5">
+<style>
+/* ── P21 专用 ───────────────────────────────────────────────────────────
+   这一页的真问题不是"找不到政策"，是**看不出自己够不够格**。
+   政策原文写得像公文，条件写在第三段第二句，人读完还是不确定。
+
+   所以 AI 的落点是：把每一条拆成「你满足的 / 你不满足的 / 本机不知道的」三堆，
+   逐条指出**卡在哪一个条件上**。
+
+   最硬的一条纪律：**本机不做资格认定**。
+   够不够格由经办机构说了算，本机说的只是"按你填的信息看，像/不像"。
+   这不是免责声明摆设 —— 页面上每一条判断都必须带着这个前提出现，
+   否则用户会照着本机的话去办，扑空一趟。政策类扑空的成本是真实的：
+   请假、排队、来回车费。
+
+   组件备忘：.tl 本身是一步（容器 .tline）；复选框是 .ck-box；
+   .ck / .jobrow 只在 11、12 页页内定义过，本页自带。
+   ──────────────────────────────────────────────────────────────────── */
+
+/* padding-bottom 给足：最后一张政策卡的脚注曾被裁 49px。
+   它在滚动区内、滚得到，但贴边裁一半读起来像加载失败。 */
+.joblist { flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column;
+           gap:var(--s-4); padding-bottom:var(--s-6); }
+
+.ck { display:flex; align-items:flex-start; gap:var(--s-4); min-height:var(--touch-min);
+      padding:var(--s-3) var(--s-4); border-radius:var(--r-xs);
+      border:1px solid var(--brd-1); background:var(--surf-1); cursor:pointer; }
+.ck-box { width:22px; height:22px; border-radius:5px; border:2px solid var(--brd-2);
+          flex:0 0 auto; margin-top:2px; position:relative; }
+.ck--have .ck-box { background:var(--jade-500); border-color:var(--jade-500); }
+.ck--have .ck-box::after { content:''; position:absolute; left:6px; top:2px; width:5px; height:10px;
+          border:solid #fff; border-width:0 2.5px 2.5px 0; transform:rotate(42deg); }
+.ck-b { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ck-t { font-size:var(--fz-3); color:var(--fog-900); }
+.ck-s { font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+
+/* 情况选择：不问身份证号，只问判定政策要用的那几项 */
+.pick { display:grid; grid-template-columns:1fr 1fr; gap:var(--s-3); }
+.pk { text-align:left; padding:var(--s-4) var(--s-5); border-radius:var(--r-xs); cursor:pointer;
+      background:var(--surf-1); border:1px solid var(--brd-1); font-family:var(--ff-ui);
+      min-height:var(--touch-min); display:flex; align-items:center; gap:var(--s-3);
+      transition:border-color var(--dur-2) var(--ease-out); }
+.pk:hover { border-color:var(--jade-a32); }
+.pk--on { border-color:var(--jade-400); background:var(--jade-a12); }
+.pk-t { font-size:var(--fz-3); color:var(--fog-900); }
+.pk--on .pk-t { font-weight:600; }
+
+/* 政策卡：判定结论 + 逐条条件核对 */
+.pol { padding:var(--s-5); border-radius:var(--r-md);
+       background:var(--glass-1-bg); border:1px solid var(--glass-1-brd);
+       display:flex; flex-direction:column; gap:var(--s-3); }
+.pol-hd { display:flex; align-items:flex-start; gap:var(--s-4); }
+.pol-t { font-size:var(--fz-5); font-weight:600; color:var(--fog-900); }
+.pol-m { font-size:var(--fz-1); color:var(--fog-600); font-family:var(--ff-num); margin-top:3px; }
+.pol-verdict-status { flex:0 0 auto; font-size:var(--fz-2); font-weight:700;
+       padding:3px 11px; border-radius:999px; white-space:nowrap; }
+.pv--maybe { background:var(--jade-a20); color:var(--jade-200); }
+.pv--gap   { background:var(--amber-a12); color:var(--amber-200); }
+.pv--no    { background:var(--fog-a08); color:var(--fog-600); }
+.cond { display:flex; flex-direction:column; gap:6px; }
+.cd { display:grid; grid-template-columns:20px 1fr; gap:var(--s-3); align-items:start;
+      font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.cd i { width:15px; height:15px; border-radius:50%; margin-top:3px; flex:0 0 auto;
+        display:block; }
+.cd--ok i   { background:var(--jade-500); }
+.cd--no i   { background:var(--amber-400); }
+.cd--dunno i{ background:transparent; border:2px dashed var(--fog-a20); }
+.cd b { color:var(--fog-900); }
+
+.chip--info { cursor:inherit; }
+.wside .pane--grow > .sec { min-height:0; overflow-y:auto; }
+.wside .pane--grow { overflow:hidden; }
+.paper-stage:has(> .sheet-a4:only-child) { justify-content:center; }
+
+/* 办事清单纸面 */
+.gd { padding:30px 34px; color:#17222b; }
+.gd h1 { font-size:21px; font-weight:800; }
+.gd .gd-sub { font-size:12.5px; color:#5b6b78; margin-top:3px; }
+.gd .gd-hr { height:1px; background:#d9e1e8; margin:14px 0 12px; }
+.gd-w { font-size:14px; font-weight:800; color:#0f5a45; margin:13px 0 5px; }
+.gd-i { display:grid; grid-template-columns:15px 1fr; gap:9px; margin-bottom:6px;
+        font-size:12.5px; color:#2c3a45; line-height:1.5; }
+.gd-i i { width:10px; height:10px; border:1.5px solid #96a4ae; border-radius:2px; margin-top:3px; }
+.gd-i b { color:#0f5a45; }
+.gd-warn { font-size:12.5px; color:#7a4a1e; line-height:1.55; margin-top:6px; }
+.gd-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
+           padding-top:9px; margin-top:14px; }
+</style>
+</head>
+<body>
+<script src="scripts/sprite.js?v=3"></script>
+
+<div class="stage">
+<div class="screen" data-state="default" data-stage="s1" data-theme="warm">
+
+  <div class="grain"></div>
+  <div class="pulseline"></div>
+
+  <header class="topbar">
+    <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
+      <div class="brand-mark">职</div>
+      <div>
+        <div class="brand-name">政策服务</div>
+        <div class="brand-sub">职易达 · 01 号机 · 本次办理单 #P-3155</div>
+      </div>
+    </a>
+    <div class="topbar-spacer"></div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>打印机就绪 · A4 黑白</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 不可用 · 只能看原文</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 已上报运维</div>
+    <div class="clock" data-clock>2026年8月9日 <b>13:18</b></div>
+  </header>
+
+  <div class="rail">
+    <div class="rail-track">
+      <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">你的情况</span></button>
+      <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">卡在哪一条</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走办事清单</span></button>
+    </div>
+    <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
+  </div>
+
+  <div class="work">
+    <!-- ══════════════════ 左主区 ══════════════════ -->
+    <div class="wmain">
+
+      <!-- ─────────── S1 你的情况 ─────────── -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-policy"/></svg>
+          <b>先说清楚这一页做什么</b>
+        </div>
+        <div class="sec">
+          <div class="advice-act">
+            政策原文写得像公文，条件常常藏在第三段第二句 ——
+            大多数人读完还是<b>不确定自己够不够格</b>。这一页就干这一件事：
+            <b>把每一条拆开，告诉你卡在哪个条件上。</b>
+          </div>
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span><b>本机不做资格认定。</b>够不够格由经办机构说了算，
+                  本机说的只是「按你填的信息看，像 / 不像」。<br>
+                  政策扑空一趟的成本是真的 —— 请假、排队、来回车费。
+                  所以下面每条都会告诉你<b>去之前该先确认什么</b>。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-user"/></svg>
+          <b>选几项就够，不用填身份证号</b>
+          <span class="mt">只问判定政策要用的，多余的一律不问</span>
+        </div>
+        <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-5)">
+
+          <div>
+            <div class="field-lb">你现在的状态</div>
+            <div class="pick">
+              <button class="pk pk--on"><span class="pk-t">离职找工作中</span></button>
+              <button class="pk"><span class="pk-t">在职想换工作</span></button>
+              <button class="pk"><span class="pk-t">应届毕业生</span></button>
+              <button class="pk"><span class="pk-t">想创业 / 已创业</span></button>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-lb">户籍与社保</div>
+            <div class="pick">
+              <button class="pk pk--on"><span class="pk-t">本市户籍</span></button>
+              <button class="pk"><span class="pk-t">外地户籍 · 本市缴社保</span></button>
+              <button class="pk"><span class="pk-t">外地户籍 · 未缴社保</span></button>
+              <button class="pk"><span class="pk-t">不确定</span></button>
+            </div>
+          </div>
+
+          <div>
+            <div class="field-lb">离开上一份工作多久了</div>
+            <div class="pick">
+              <button class="pk"><span class="pk-t">1 个月以内</span></button>
+              <button class="pk pk--on"><span class="pk-t">1–6 个月</span></button>
+              <button class="pk"><span class="pk-t">6 个月以上</span></button>
+              <button class="pk"><span class="pk-t">没工作过</span></button>
+            </div>
+          </div>
+
+          <div class="notice">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>这几项<b>只在本次办理里用</b>，离场自动清空，不留存、不上传。
+                  本机不问也不存你的身份证号、手机号和银行卡号 ——
+                  政策申领要用这些，但那是<b>到经办窗口</b>才填的，不在这里。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─────────── S2 卡在哪一条 ─────────── -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <b>按你选的三项，逐条核对</b>
+          <span class="mt" data-when="default first">共 6 条相关政策</span>
+          <span class="mt" data-when="ai-down">AI 不可用 · 只能看原文</span>
+        </div>
+        <div class="sec">
+          <div class="notice" data-when="default first">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>圆点含义：<b style="color:var(--jade-200)">●</b> 按你填的看是满足的 ·
+                  <b style="color:var(--amber-200)">●</b> 按你填的看不满足 ·
+                  <b>○</b> 本机不知道，要你自己确认。<br>
+                  <b>三种都不是最终结论</b> —— 最终以经办机构认定为准。</span>
+          </div>
+          <div class="notice notice--amber" data-when="ai-down">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>AI 暂时不可用，<b>本机这次不做任何条件核对</b>。
+                  下面只列政策标题和原文出处，条件要你自己读。</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="joblist">
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">一次性求职创业补贴</span>
+                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕14 号</span>
+              </span>
+              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--ok"><i></i><span>本市户籍 —— <b>你选了本市户籍</b></span></div>
+              <div class="cd cd--ok"><i></i><span>处于失业状态并已做失业登记 —— 你选了离职找工作中</span></div>
+              <div class="cd cd--dunno"><i></i><span><b>你做过失业登记吗？</b>本机不知道。
+                没登记的话这条不成立 —— 登记可以在政务网或街道办办，<b>先办这个再去申领</b>。</span></div>
+              <div class="cd cd--dunno"><i></i><span>本年度未领取过同类补贴 —— 本机查不到你的领取记录。</span></div>
+            </div>
+          </div>
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">灵活就业人员社保补贴</span>
+                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕09 号</span>
+              </span>
+              <span class="pol-verdict-status pv--gap" style="margin-left:auto">卡一条</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--ok"><i></i><span>本市户籍 —— 满足</span></div>
+              <div class="cd cd--no"><i></i><span><b>要求以灵活就业身份连续缴纳社保满 3 个月</b> ——
+                你选的是「离职 1–6 个月」，如果这期间<b>没有自己交社保</b>，这条不成立。<br>
+                这是你目前卡住的那一条。</span></div>
+              <div class="cd cd--dunno"><i></i><span>年龄需在法定退休年龄前 —— 本机不知道你的年龄，也不问。</span></div>
+            </div>
+            <div class="panel-note">
+              如果你确实在自己交社保，把缴费记录带上再去 —— 这条可能就通了。
+            </div>
+          </div>
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">职业技能培训补贴</span>
+                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30 · 文号 人社〔2026〕21 号</span>
+              </span>
+              <span class="pol-verdict-status pv--maybe" style="margin-left:auto">像是符合</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--ok"><i></i><span>本市户籍或本市缴社保 —— 满足</span></div>
+              <div class="cd cd--ok"><i></i><span>法定劳动年龄内有就业需求 —— 满足</span></div>
+              <div class="cd cd--dunno"><i></i><span>需参加<b>目录内</b>的培训并取得证书才能申领 ——
+                培训目录每年调整，<b>去之前先查当年目录</b>，别先交钱再问。</span></div>
+            </div>
+          </div>
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">就业见习补贴</span>
+                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30</span>
+              </span>
+              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--no"><i></i><span>面向<b>毕业 2 年内未就业的高校毕业生</b>或 16–24 岁失业青年 ——
+                你选的是「离职找工作中」，不是应届。<br>
+                如果你其实是毕业两年内，<b>回上一步改一下</b>，这条会重新判。</span></div>
+            </div>
+          </div>
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">创业担保贷款贴息</span>
+                <span class="pol-m">来源：市人力资源和社会保障局 · 同步 8月9日 07:30</span>
+              </span>
+              <span class="pol-verdict-status pv--no" style="margin-left:auto">按你填的看不符合</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--no"><i></i><span>需已办理营业执照并正常经营 —— 你没选「想创业 / 已创业」。</span></div>
+            </div>
+          </div>
+
+          <div class="pol">
+            <div class="pol-hd">
+              <span>
+                <span class="pol-t">失业保险金申领</span>
+                <span class="pol-m">来源：市社会保险基金管理中心 · 同步 8月9日 07:30</span>
+              </span>
+              <span class="pol-verdict-status pv--gap" style="margin-left:auto">要你自己确认两条</span>
+            </div>
+            <div class="cond">
+              <div class="cd cd--dunno"><i></i><span><b>累计缴纳失业保险满 1 年</b> —— 本机查不到你的参保记录，
+                这条只能你自己查（社保 App 或社保窗口）。</span></div>
+              <div class="cd cd--dunno"><i></i><span><b>非因本人意愿中断就业</b> ——
+                主动辞职通常不算。这条以经办机构对你离职原因的认定为准。</span></div>
+            </div>
+            <div class="panel-note">
+              这两条本机都判不了，所以不给结论 —— <b>不猜比猜错强</b>。
+            </div>
+          </div>
+
+        </div>
+
+        <div class="panel-note" style="flex:0 0 auto;margin-top:var(--s-4)">
+          以上 6 条来自<b>官方公开文件</b>，同步于 8月9日 07:30。政策会调整，
+          <b>以经办机构当日执行口径为准</b>；本机只做展示与打印，不代办、不代领。
+        </div>
+      </div>
+
+      <!-- ─────────── S3 带走办事清单 ─────────── -->
+      <div class="paper-bar" data-at="s3">
+        <span class="nm">办事清单 · 一次性求职创业补贴等 3 项</span>
+        <span class="mt">A4 · 1 页 · 黑白</span>
+        <span class="pg">
+          <button class="pgbtn" aria-label="上一页">‹</button>
+          <span>第 1 / 1 页</span>
+          <button class="pgbtn" aria-label="下一页">›</button>
+        </span>
+      </div>
+
+      <div class="paper-stage" data-at="s3">
+        <div class="sheet-a4">
+          <div class="gd">
+            <h1>办事清单</h1>
+            <div class="gd-sub">
+              2026年8月9日 13:18 由职易达一体机打印 · 政策同步于 8月9日 07:30<br>
+              按你在本机选的「离职找工作中 / 本市户籍 / 离职 1–6 个月」生成
+            </div>
+            <div class="gd-hr"></div>
+
+            <div class="gd-w">① 一次性求职创业补贴 —— 去之前先办失业登记</div>
+            <div class="gd-i"><i></i><span><b>先做失业登记</b>（政务网或户籍地街道办），没登记这条不成立</span></div>
+            <div class="gd-i"><i></i><span>带：身份证原件、离职证明、本人银行卡</span></div>
+            <div class="gd-i"><i></i><span>办理：户籍地街道（社区）就业服务窗口</span></div>
+            <div class="gd-warn">本机查不到你本年度有没有领过同类补贴 —— 窗口会查，重复申领会被驳回。</div>
+
+            <div class="gd-w">② 职业技能培训补贴 —— 先查当年培训目录</div>
+            <div class="gd-i"><i></i><span><b>先查目录再报名</b>，目录每年调整，不在目录内的培训不补</span></div>
+            <div class="gd-i"><i></i><span>带：身份证原件、培训结业证书 / 职业技能等级证书</span></div>
+            <div class="gd-i"><i></i><span>办理：市人社局职业能力建设科 或 区人社分局</span></div>
+            <div class="gd-warn">别先交培训费再问能不能补 —— 顺序反了拿不回来。</div>
+
+            <div class="gd-w">③ 失业保险金 —— 两条要自己先查</div>
+            <div class="gd-i"><i></i><span>查：累计缴纳失业保险<b>是否满 1 年</b>（社保 App 可查）</span></div>
+            <div class="gd-i"><i></i><span>确认：离职原因是否属于<b>非因本人意愿中断就业</b>（主动辞职通常不算）</span></div>
+            <div class="gd-i"><i></i><span>带：身份证原件、离职证明、本人银行卡</span></div>
+            <div class="gd-i"><i></i><span>办理：社保经办机构窗口</span></div>
+
+            <div class="gd-w">你目前卡住的一条</div>
+            <div class="gd-i"><i></i><span>灵活就业社保补贴要求<b>以灵活就业身份连续缴社保满 3 个月</b>。
+              如果你这期间自己交了社保，<b>带上缴费记录</b>再去问，这条可能就通了。</span></div>
+
+            <div class="gd-foot">
+              本单由职易达一体机根据公开政策文件生成，<b>不是资格认定</b>，仅供你自己参考。<br>
+              是否符合条件、能否申领、发放多少，<b>一律以经办机构当日认定为准</b>。<br>
+              本机不代办、不代领、不收取任何政策申领相关费用。<br>
+              政策会调整，本单打印于 8月9日，去之前请再确认一次。本单不作为申领凭证。
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
+    <div class="wside">
+
+      <!-- S1 右 -->
+      <div class="pane" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-shield"/></svg><b>本机不问什么</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">身份证号</span><span class="v v--fog">不问</span></div>
+            <div class="kv-row"><span class="k">手机号</span><span class="v v--fog">不问</span></div>
+            <div class="kv-row"><span class="k">银行卡号</span><span class="v v--fog">不问</span></div>
+            <div class="kv-row"><span class="k">社保账号</span><span class="v v--fog">不问</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            申领确实要这些，但那是<b>到经办窗口</b>填的。
+            公共场所的机器不该收这些，本机也没有接口去查。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s1">
+        <div class="pane-hd"><svg class="ic"><use href="#i-alert"/></svg><b>政策类的三个坑</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">代办收费</span>
+              <span class="v" style="text-align:right">政策申领<b>本身不收费</b></span>
+            </div>
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">顺序做反</span>
+              <span class="v" style="text-align:right">先培训后查目录，钱拿不回</span>
+            </div>
+            <div class="kv-row" style="align-items:flex-start">
+              <span class="k">政策过期</span>
+              <span class="v" style="text-align:right">文件有有效期，去前再确认</span>
+            </div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>如果有人说「交钱就能帮你办下来」，<b>那是骗子</b>。
+                  本机也不收政策申领相关的任何费用 —— 只收打印纸张的钱，价格现场公示。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            本机只做展示与打印，<b>不代办、不代领、不替你提交任何申请</b>。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-agency"/></svg><b>政策从哪来</b>
+          </div>
+          <div class="kv">
+            <div class="kv-row"><span class="k">市人社局</span><span class="v">4 条</span></div>
+            <div class="kv-row"><span class="k">市社保中心</span><span class="v">1 条</span></div>
+            <div class="kv-row"><span class="k">区人社分局</span><span class="v">1 条</span></div>
+            <div class="kv-row"><span class="k">同步时间</span><span class="v v--fog">8月9日 07:30</span></div>
+            <div class="kv-row"><span class="k">数据来源</span><span class="v v--fog">官方公开文件</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            本机只转述官方公开发布的文件，<b>不做二次解释、不添加原文没有的条件</b>。
+            原文可以在这里打印出来带走对照。
+          </div>
+        </div>
+      </div>
+
+      <!-- S2 右 -->
+      <div class="pane" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-target"/></svg><b>这 6 条的结果</b></div>
+        <div class="sec">
+          <div class="kv">
+            <div class="kv-row"><span class="k">像是符合</span><span class="v"><b>2</b> 条</span></div>
+            <div class="kv-row"><span class="k">卡一条 / 待确认</span><span class="v"><b>2</b> 条</span></div>
+            <div class="kv-row"><span class="k">按你填的看不符合</span><span class="v"><b>2</b> 条</span></div>
+          </div>
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            「像是符合」<b>不等于能领到</b>。窗口还会查你的参保记录、
+            领取历史这些本机看不到的东西。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s2">
+        <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>去之前先做这两件</b></div>
+        <div class="sec">
+          <label class="ck">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">办失业登记</span>
+              <span class="ck-s">政务网或户籍地街道办 · 没登记，第 ① 条不成立</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">查失业保险缴了多久</span>
+              <span class="ck-s">社保 App 可查 · 不满 1 年领不了失业金</span></span>
+          </label>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>这两件<b>本机都办不了、也查不到</b> ——
+                  没有接口，也不该在公共机器上查你的社保。<br>
+                  先办完再跑窗口，能少跑一趟。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            办完回来可以再来本机重新核对一遍，重打清单不额外收费（只算纸张）。
+          </div>
+
+          <div class="pane-hd" style="margin-top:var(--s-5)">
+            <svg class="ic"><use href="#i-pin"/></svg><b>这几条去哪办</b>
+          </div>
+          <div class="tline">
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+              <span class="tl-b"><span class="tl-t">求职创业补贴 · 失业登记</span>
+                <span class="tl-s">户籍地街道（社区）就业服务窗口</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+              <span class="tl-b"><span class="tl-t">技能培训补贴</span>
+                <span class="tl-s">市人社局职业能力建设科 / 区人社分局</span></span></div>
+            <div class="tl"><span class="tl-dot"><svg class="ic"><use href="#i-building"/></svg></span>
+              <span class="tl-b"><span class="tl-t">失业保险金</span>
+                <span class="tl-s">社保经办机构窗口</span></span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>窗口地址与办公时间<b>本机不显示</b> ——
+                  这类信息变动频繁，本机同步不到最新的，写出来反而害你白跑。
+                  出发前打政务服务热线或官网确认一次。</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3 右 -->
+      <div class="pane" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印</b></div>
+        <div class="sec">
+          <label class="ck ck--have">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">办事清单</span>
+              <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">三份政策原文</span>
+              <span class="ck-s">A4 黑白 · 共 7 页 · 窗口一般不要，按需选</span></span>
+          </label>
+
+          <div class="kv" style="margin-top:var(--s-4)">
+            <div class="kv-row"><span class="k">合计</span><span class="v">1 页</span></div>
+            <div class="kv-row"><span class="k">费用</span><span class="v"><b>0.20</b> 元</span></div>
+          </div>
+
+          <div class="notice notice--amber" style="margin-top:var(--s-4)" data-when="device-off">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span>打印机离线，现在打不出来。可以扫码把清单存进手机。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-3)">
+            费用以现场公示价为准。清单同时存进「我的文档」。
+          </div>
+        </div>
+      </div>
+
+      <div class="pane pane--grow" data-at="s3">
+        <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>打完之后</b></div>
+        <div class="sec">
+          <div class="tline">
+            <div class="tl tl--now"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">出纸口取走 1 页</span>
+                <span class="tl-s">上面写了带什么、去哪个窗口</span></span></div>
+            <div class="tl"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">先办失业登记，再跑窗口</span>
+                <span class="tl-s">顺序反了要多跑一趟</span></span></div>
+            <div class="tl"><span class="tl-dot">3</span>
+              <span class="tl-b"><span class="tl-t">窗口口径和本单不一致时</span>
+                <span class="tl-s"><b>以窗口为准</b> —— 本机不是认定机构</span></span></div>
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>本机<b>不记录你去没去、领没领到</b> ——
+                  只记录你在这台机器上打了一份清单。</span>
+          </div>
+
+          <div class="panel-note" style="margin-top:var(--s-4)">
+            政策会调整。这份清单打印于 8月9日，隔一段时间再去办的话，
+            <b>回来重打一份</b>比照着旧的去更稳妥。
+          </div>
+        </div>
+      </div>
+
+      <!-- 首次使用 -->
+      <div class="pane" data-when="first">
+        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
+        <div class="sec">
+          <div class="panel-note" style="line-height:1.7">
+            把政策拆开，告诉你<b>卡在哪个条件上</b>，再打成一张办事清单。<br>
+            本机<b>不做资格认定</b>，也不代办 —— 最终以经办机构为准。
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ 常驻 ActionBar ══════════════════ -->
+  <div class="actionbar">
+    <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">改一下情况</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看核对结果</button>
+
+    <span class="actionbar-hint" data-at="s1">只用这三项判定 · 不问身份证号</span>
+    <span class="actionbar-hint" data-at="s2" data-when="default first">2 条像是符合 · 2 条待确认 · 2 条不符合</span>
+    <span class="actionbar-hint" data-at="s2" data-when="ai-down">AI 不可用 · 本次不做条件核对</span>
+    <span class="actionbar-hint" data-at="s3" data-when="default first ai-down">共 1 页 · 0.20 元</span>
+    <span class="actionbar-hint" data-at="s3" data-when="device-off">打印机离线，可先扫码带走</span>
+
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看我卡在哪<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3">生成办事清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="default first ai-down">开始打印<svg class="ic"><use href="#i-printer"/></svg></button>
+    <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
+  </div>
+
+  <nav class="navbar">
+    <a class="tab" href="01-home-v5.html"><svg class="ic"><use href="#i-home"/></svg>首页</a>
+    <a class="tab" href="25-advisor.html"><svg class="ic"><use href="#i-brain"/></svg>AI助手</a>
+    <a class="tab" href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
+  </nav>
+
+</div>
+</div>
+
+<script src="scripts/stage.js?v=13"></script>
+<script src="scripts/stages.js?v=3"></script>
+<script src="scripts/fx.js?v=3"></script>
+<script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/audit-plus.js?v=11"></script>
+</body>
+</html>

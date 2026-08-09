@@ -180,6 +180,21 @@
       return false;
     }
 
+    /** 元素到裁切容器之间（不含容器本身）是否存在可滚动祖先 —— 有则内容可达 */
+    function isReachableByScroll(element, container) {
+      var node = element.parentElement;
+      var style;
+      while (node && node !== container && node.nodeType === 1) {
+        style = window.getComputedStyle(node);
+        if (/auto|scroll/.test(style.overflowY || '') &&
+            node.scrollHeight > node.clientHeight + 4) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
     function findNearestClippingContainer(element) {
       var parent = element.parentElement;
 
@@ -294,6 +309,16 @@
 
       container = findNearestClippingContainer(element);
       if (!container) {
+        continue;
+      }
+
+      /* 元素与裁切容器之间若隔着一个**能滚的**列表，用户滚一下就看到了，不算缺陷。
+         这条此前只用在「视口外」判定上，「被容器裁切」这一支漏了 ——
+         而滚动容器是 overflow-y:auto，本身不算裁切容器（裁切容器只认 hidden/clip），
+         真正被判为裁切容器的是它外层 overflow:hidden 的 pane。
+         于是「元素超出 pane 底边」成立、报缺陷，但中间那个可滚列表被忽略了。
+         P21 实测：政策卡脚注报裁 49px，滚到底后实际还余 43px 完全可见 —— 纯误报。 */
+      if (isReachableByScroll(element, container)) {
         continue;
       }
 
