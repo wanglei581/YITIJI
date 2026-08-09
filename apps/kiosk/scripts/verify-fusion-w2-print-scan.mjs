@@ -50,7 +50,7 @@ const frozenHashes = new Map([
     // (docs/product/pii-redaction-decision-2026-08.md §3.4)。原快照
     // c222592c… 对应旧的 resultFileCreated 形状,已随该缺陷一并作废。
     'src/pages/print/printMaterialSession.ts',
-    '0d6478abf52f20901d2887b616e3dfa1cf74cbf791fed277dfe2211885731c54',
+    '2e3dc36bc95ad4c48dfedc6d84957210de5e6115389f7cfe44da7cf771ad2f39',
   ],
 ])
 
