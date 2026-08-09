@@ -2,7 +2,7 @@
 
 > 审查根目录：`/Users/wanglei/AI求职打印服务终端-commercial-readiness-wave1`
 > 初始审查基线：`codex/commercial-readiness-wave1-20260809@83588b8f`
-> Wave 5 修复提交：`392c5de5`；最终本地候选：`codex/commercial-readiness-wave1-20260809@1cc66965`，已包含 `origin/main@9f82157b`，尚未推送；相对 main behind 0 / ahead 10，相对 upstream ahead 11 / behind 0
+> Wave 5 修复提交：`392c5de5`；文档生成前候选快照：`codex/commercial-readiness-wave1-20260809@b0d1ce75`，已包含 `origin/main@66e0d951` 与 #573 部署 fetch resilience，尚未推送；相对 main behind 0 / ahead 12，相对 upstream ahead 15 / behind 0；最终报告提交会位于该快照之后
 > Git 快照时间：2026-08-09；PR #570 checks 仍绑定旧远端 head `254c1394`，须以同一新 HEAD 重跑
 > 审查方式：源码、路由、Prisma、workspace、CI、Git/worktree、独立小程序仓库只读核验；未连接或修改生产数据库、服务器、Windows 主机、对象存储或硬件
 > 删除结果：**本轮没有删除代码、模型、迁移、目录或本地资产**
@@ -33,13 +33,13 @@
 | 优先级           | 断层                                                                    | 当前事实                                                                                                         | 商用影响                                                       |
 | ---------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | P0               | Windows 扫描被安全门禁主动关闭                                          | `apps/terminal-agent/src/agent/scan-input/verified-folder.ts:25-27` 在 Windows 返回 `reparse_point_unverifiable` | 真实扫描不能上线，但这是正确的 fail-closed，不应绕过           |
-| P0               | 代码候选与远端/生产版本未对齐                                           | `1cc66965` 已含修复提交 `392c5de5` 和 `origin/main@9f82157b`，但尚未推送；Wave 1–5 明确“未部署”                  | 本地提交不能当作 PR、main 或线上事实                           |
+| P0               | 代码候选与远端/生产版本未对齐                                           | pre-doc `b0d1ce75` 已含 `392c5de5`、`origin/main@66e0d951` 与 #573，但尚未推送；Wave 1–5 明确“未部署”            | 本地提交不能当作 PR、main 或线上事实                           |
 | P0               | 生产公开内容为空                                                        | `docs/progress/current-progress.md` 记录 jobs/fairs/policies 公网为空态，真实来源待接入                          | 求职信息入口无法形成实际业务价值                               |
 | P0               | Windows/奔图/支付/对象存储缺真实验收                                    | `docs/progress/next-tasks.md:5-9,41-43`                                                                          | 自动化不能证明真实出纸、扫描、扣款和删除                       |
 | P0（扫描恢复前） | `_unclaimed` 删除账本已有代码候选，但还没有上报/归档和 Windows 现场证据 | 本地 SQLite 账本使用 per-install HMAC、删除失败可重试；`pendingReport` 尚无 API/ack                              | 本地追责能力增强，但不能替代集中对账、DB 故障处置和真机验证    |
 | P1               | 8 个旧 Kiosk handler 返回空数据或 `{ok:true}`                           | 五个 controller 直接返回常量，service 全为空                                                                     | 对任何仍调用旧契约的客户端形成“成功但没发生”的假象             |
 | P1               | 材料 query token 已拒绝，但边缘层历史日志仍需治理                       | GET/decision 遇 `accessToken` query 返回 400 `MATERIAL_TOKEN_QUERY_FORBIDDEN`，Kiosk 只发 header                 | CDN/Nginx/APM 可能在应用拒绝前已记录旧 URL；须脱敏、检索和轮换 |
-| P0               | 新代码候选尚无同 SHA 远程 CI                                            | PR #570 旧 `254c1394` 的 build/PG 两红、browser/MSI 两绿；本地 `1cc66965` 尚未推送                               | 必须以同一新 HEAD 重跑四项，未全绿不得合入                     |
+| P0               | 新代码候选尚无同 SHA 远程 CI                                            | PR #570 旧 `254c1394` 的 build/PG 两红、browser/MSI 两绿；pre-doc `b0d1ce75` 尚未推送                            | 必须以最终同一新 HEAD 重跑四项，未全绿不得合入                 |
 | P1（已修）       | Router history 曾保留 payment session token                             | RED 证明 Back 可恢复 token；Wave 5 统一 `KioskPrivacyGuard.clearSessionTo` 后 Back/Forward 均不能恢复            | 唯一 reportable Security Low 已关闭，仍待新 HEAD CI 复验       |
 | P1               | 独立小程序存在 local-only 提交                                          | `/Users/wanglei/zhiyida-miniapp@ee0ca9b` 比 upstream ahead 1，47 文件、+2022/-423                                | 删除仓库或分支会直接丢失 kiosk 登录与动态打印价格候选          |
 
@@ -131,7 +131,7 @@
 
 ### 4.6 仍需注意
 
-PR #570 远端 head 仍为 `254c1394`，其旧四项 checks 已结束为 `build-and-verify` **FAILURE**、`postgres-readiness` **FAILURE**、`kiosk-browser-smoke` **SUCCESS**、`unsigned-msi-candidate` **SUCCESS**。两项红灯分别是设备状态静态合同与 `/me/print-orders` 旧彩色 200 分 fixture 漂移；修复提交 `392c5de5` 已改为真实设备合同和黑白 80 分。第二次合并主干后的最终本地候选为 `1cc66965`，已包含 `origin/main@9f82157b`，相对 main behind 0 / ahead 10、相对 upstream ahead 11 / behind 0，但尚未推送。合并后 Node 22 的 QR UI、deploy authorization、ours static/typecheck、Kiosk production build 与 production config 全绿；缺少必需 env 时 production verifier 的一次失败是预期 fail-closed，不是产品失败。合并已保留 main #572 后台招聘 P0 的正式 progress；其 PostgreSQL 16 结论仍由新 HEAD 的 `postgres-readiness` 权威验证。仍须让四项 checks 全部绑定同一新 HEAD 并全绿；任何本地专项结果都不能替代远程复验。
+PR #570 远端 head 仍为 `254c1394`，其旧四项 checks 已结束为 `build-and-verify` **FAILURE**、`postgres-readiness` **FAILURE**、`kiosk-browser-smoke` **SUCCESS**、`unsigned-msi-candidate` **SUCCESS**。两项红灯分别是设备状态静态合同与 `/me/print-orders` 旧彩色 200 分 fixture 漂移；修复提交 `392c5de5` 已改为真实设备合同和黑白 80 分。文档生成前候选快照为 `b0d1ce75`，已包含 `origin/main@66e0d951` 与 #573 部署 fetch resilience，相对 main behind 0 / ahead 12、相对 upstream ahead 15 / behind 0，但尚未推送；最终报告提交会位于该快照之后。合并后 Node 22 的 QR UI、deploy authorization、ours static/typecheck、Kiosk production build 与 production config 全绿；缺少必需 env 时 production verifier 的一次失败是预期 fail-closed，不是产品失败。合并继续保留 main #572 后台招聘 P0 的正式 progress；其 PostgreSQL 16 结论仍由新 HEAD 的 `postgres-readiness` 权威验证。仍须让四项 checks 全部绑定最终同一新 HEAD 并全绿；任何本地专项结果都不能替代远程复验。
 
 ## 5. 已确认的接口断层与缺陷
 
@@ -214,7 +214,7 @@ SQLite 与 PostgreSQL 双 schema 均存在：`HelpItem`、`KioskSession`、`User
 
 | PR                                               | 相对 `origin/main`（behind/ahead） | 分类                     | 建议                                                                                                              |
 | ------------------------------------------------ | ---------------------------------: | ------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 10 | **可迁入，当前首要候选** | 本地 `1cc66965` 已包含最新 main 但未推送；新 HEAD 四项 CI、复审与 Windows/COS 边界确认后再合并，不得直接部署      |
+| #570 `codex/commercial-readiness-wave1-20260809` |                             0 / 12 | **可迁入，当前首要候选** | pre-doc `b0d1ce75` 已包含最新 main 但未推送；最终 HEAD 四项 CI、复审与 Windows/COS 边界确认后再合并               |
 | #569 `feat/kiosk-home-v3-pilot`                  |                              5 / 1 | **需保留候选**           | 用户视觉验收后决定；不要与 7 月定版入口并行形成第二套首页                                                         |
 | #566 `feat/pii-redaction-text-layer`             |                              6 / 1 | **可迁入但依赖审查**     | 与 #565 栈关系和生产开关/文件链路一起重放；不能只摘 UI 宣称“已遮挡”                                               |
 | #565 `feat/kiosk-pii-redaction-contract`         |                              6 / 3 | **需保留基础候选**       | 在 #566 去留确定前保留锚点；证明祖先关系后再清理中间分支名                                                        |
@@ -258,15 +258,15 @@ PR #568 已合入 `origin/main@78c8e71d`，不再是开放 PR；但其原 worktr
 | 项                    | 值                                                                                  |
 | --------------------- | ----------------------------------------------------------------------------------- |
 | branch                | `codex/commercial-readiness-wave1-20260809`                                         |
-| HEAD                  | `1cc66965`（包含 Wave 5 修复提交 `392c5de5`）                                       |
+| pre-doc candidate     | `b0d1ce75`（包含 Wave 5 修复提交 `392c5de5`；最终报告提交将位于其后）               |
 | upstream              | `origin/codex/commercial-readiness-wave1-20260809@254c1394`                         |
-| upstream ahead/behind | ahead 11 / behind 0；当前合并候选尚未推送                                           |
-| `origin/main`         | `9f82157bc30b68ac5a3385ce4d1955018cf47903`                                          |
-| `origin/main...HEAD`  | behind 0 / ahead 10；已包含 `origin/main@9f82157b`                                  |
-| local `main`          | `73fd04a1`，相对 `origin/main` behind 7 / ahead 0                                   |
+| upstream ahead/behind | ahead 15 / behind 0；文档生成前候选尚未推送                                         |
+| `origin/main`         | `66e0d951bc5bc2db78abd9c4346e4c77d583bd2d`                                          |
+| `origin/main...HEAD`  | behind 0 / ahead 12；已包含 `origin/main@66e0d951`                                  |
+| local `main`          | `73fd04a1`，相对 `origin/main` behind 14 / ahead 0                                  |
 | PR                    | Draft #570 远端 head `254c1394`；旧 checks 为 build/PG FAILURE、browser/MSI SUCCESS |
 
-Wave 1–5 产品/回归代码已收成至本地 HEAD，且已包含最新 `origin/main`；第二次主干合并保留了 main #572 后台招聘 P0 的正式 progress，当前候选仍未推送。分支能力在推送、同 SHA CI、审查并合入 main 前不得视为主干或生产事实；#572 的 PostgreSQL 16 也仍由新 HEAD `postgres-readiness` 权威验证。
+Wave 1–5 产品/回归代码已收成至文档生成前候选，且已包含最新 `origin/main` 与 #573 部署 fetch resilience；主干合并继续保留 main #572 后台招聘 P0 的正式 progress。当前候选仍未推送，最终报告提交会位于 pre-doc SHA 之后；分支能力在推送、同 SHA CI、审查并合入 main 前不得视为主干或生产事实，#572 的 PostgreSQL 16 也仍由新 HEAD `postgres-readiness` 权威验证。
 
 ### 8.2 分支与 refs
 
@@ -329,7 +329,7 @@ Wave 1–5 产品/回归代码已收成至本地 HEAD，且已包含最新 `orig
 | 证据层级            | 已有事实                                                                                 | 放行前仍需                                                                              |
 | ------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | 代码可证明          | Wave 1–5 专项、会话 token RED→GREEN、写库 verifier fail-closed、52/52 Security discovery | 保持同 SHA 回归；外置封存器缺 snapshotDigest，不得声称 sealed final report              |
-| 远程 CI             | 旧 `254c1394` 为 build/PG 两红、browser/MSI 两绿；`1cc66965` 已含 `392c5de5` 与 #572     | 推送同一新 HEAD，在 Node 22/PostgreSQL 16 上重跑四项并全部通过                          |
+| 远程 CI             | 旧 `254c1394` 两红两绿；pre-doc `b0d1ce75` 已含 `392c5de5`、#572、#573                   | 推送最终同一新 HEAD，在 Node 22/PostgreSQL 16 上重跑四项并全部通过                      |
 | 生产服务            | 仓库已有部署/备份/migration/provenance 门禁                                              | 具名授权下核对 PostgreSQL、Redis、COS/OSS、支付、OCR/LLM/TRTC、PM2/Nginx 与同 SHA       |
 | Windows/Pantum 真机 | Agent/打印/扫描具备代码和 Linux/SQLite 回归                                              | 两台 Windows、SMB/reparse/ACL/杀毒/重启、spooler、真实出纸；厂家确认彩色/双面/N-up 参数 |
 | 法务/内容/密钥      | 合规红线与第三方来源入口已有代码约束                                                     | 法务文本、来源授权/有效期/下架、真实岗位/招聘会/政策、商户与云服务密钥轮换/最小权限     |
@@ -370,7 +370,7 @@ Wave 1–5 产品/回归代码已收成至本地 HEAD，且已包含最新 `orig
 
 ### P0：发布前必须完成
 
-1. **冻结唯一发布候选**：推送已含 `392c5de5` 和 `origin/main@9f82157b` 的候选 `1cc66965`；PR #570 的四项 CI 必须全部绑定同一新 SHA、全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
+1. **冻结唯一发布候选**：以已含 `392c5de5`、`origin/main@66e0d951` 和 #573 的 pre-doc `b0d1ce75` 为生成前锚点；最终文档提交位于其后，PR #570 的四项 CI 必须全部绑定最终同一新 SHA、全绿并经人工审查后才合入 main，从合入后的同一 SHA 构建，不从共享脏 worktree 发布。
 2. **生产只读对齐**：核对服务器源码、runtime、PM2、四端 bundle、migration、授权变量、备份/磁盘；确认后再申请具名发布窗口。
 3. **Windows/奔图验收**：两台主机覆盖安装升级、service 强杀、断网/断电、spooler/打印机重启、重复领取、终态补报、真实出纸；确认彩色 mode/pages-per-sheet，未知项必须拒绝或隐藏。
 4. **扫描恢复门禁**：实现可信 Win32/PowerShell reparse-point 检查，覆盖 symlink/junction/reparse/写入替换/长驻 watcher；验证 Wave 4A 本地删除账本在 Windows/SMB/ACL/杀毒占用/重启下的行为，并补集中上报/ack/归档后再开放扫描。
@@ -419,8 +419,8 @@ Wave 1–5 产品/回归代码已收成至本地 HEAD，且已包含最新 `orig
 | 命令/检查                                              | 结果                                                                      |
 | ------------------------------------------------------ | ------------------------------------------------------------------------- |
 | `git status --porcelain=v2 --branch`                   | 仅三份正式 docs modified；无未提交产品代码                                |
-| `git rev-list --left-right --count @{upstream}...HEAD` | upstream behind 0 / local ahead 11                                        |
-| `git rev-list --left-right --count origin/main...HEAD` | local behind 0 / ahead 10；已包含 `origin/main@9f82157b`                  |
+| `git rev-list --left-right --count @{upstream}...HEAD` | pre-doc snapshot：upstream behind 0 / local ahead 15                      |
+| `git rev-list --left-right --count origin/main...HEAD` | pre-doc snapshot：local behind 0 / ahead 12；含 `origin/main@66e0d951`    |
 | `git worktree list --porcelain`                        | 28 个 worktree                                                            |
 | `git for-each-ref refs/heads`                          | 584 个 local branches；未做批量删除                                       |
 | `git ls-remote --heads origin`                         | 322 个真实 remote heads                                                   |
