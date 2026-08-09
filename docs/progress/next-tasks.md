@@ -2,10 +2,12 @@
 
 ## 2026-08-09 商用收口后续（Wave 1 代码候选之后）
 
+- [x] **Wave 3C 全栈/治理/资产审计报告**：已形成 [`commercial-readiness-audit-and-remediation-2026-08-09.md`](../reviews/commercial-readiness-audit-and-remediation-2026-08-09.md)，覆盖前后端功能与接口断层、已修/未做/缺陷、废弃/孤儿/未合并资产、local↔remote 精确快照、CI/部署、目录/数据/fixture 优化与商用 GO/NO-GO。没有删除 worker、旧 Kiosk 路由、Prisma model/migration、worktree、分支、独立小程序或用户设计资产；后续按报告 P0→P1→P2 分阶段执行，禁止把报告本身记作代码、部署或真机验收完成。
 - [ ] **Windows 扫描恢复门禁**：实现可验证的 Win32/PowerShell reparse-point 检查，并在真实 SMB 扫描目录覆盖普通 PDF/JPG/PNG、symlink/junction/reparse point、写入中替换、服务重启和长驻 watcher；未通过前保持 watcher fail-closed，不得宣称扫描可商用。
-- [~] **Agent 任务可靠性**：代码已改为 durable dead-letter、终态幂等补报及打印前 `dispatching` 持久化，故障注入与本地旧库升级回归通过；仍缺 Admin/CLI 人工确认/重放入口，以及 Windows 服务强杀、断网、真实 spooler/奔图重启证据，未完成前不记商用闭环。
-- [ ] **打印能力诚实门控**：厂家/驱动确认彩色 mode 与 pages-per-sheet 后做奔图真机验收；确认前生产应拒绝或关闭无法保证的参数，不能按彩色报价却依赖驱动默认值。
-- [x] **接口与持久化断层（代码候选）**：`/me/pending-tasks` 已以会员 Bearer/本人隔离接真；AI 未落库不再返回成功；文件删除、过期清理与违规直传已 metadata-first 并阻断非 active 访问。真实 COS DELETE 超时/远端成功但客户端超时、生产 cron 恢复演练仍归入下方商用外部门禁。
+- [~] **Agent 任务与扫描删除可靠性**：代码已改为 durable dead-letter、终态幂等补报及打印前 `dispatching` 持久化；`_unclaimed` 删除新增 per-install HMAC 本地 durable 账本、失败重试与 PII-safe 日志；相关故障注入和旧库升级回归已进入 CI。仍缺 Admin/CLI 人工确认/重放、删除账本 heartbeat/API ack/集中对账/归档，以及 Windows 服务强杀、断网、SMB/ACL/杀毒、真实 spooler/奔图重启证据，未完成前不记商用闭环。
+- [~] **打印能力诚实门控**：API DTO/service、公开报价/建单和 Kiosk 已只允许 `black_white + simplex + pagesPerSheet=1`，未验证彩色/双面/2 或 4 页合一全环境 fail-closed，专项已接 CI；厂家/驱动确认彩色 mode、duplex、pages-per-sheet 与参数级 terminal capability 后仍须奔图真机验收，确认前不得开放或报价。
+- [x] **接口与持久化断层（代码候选）**：`/me/pending-tasks` 已以会员 Bearer/本人隔离接真；AI 未落库不再返回成功；文件删除、过期清理与违规直传已 metadata-first 并阻断非 active 访问；materials 已 header-only，query token 统一 400 且不回显。以上高风险本地回归已接 CI。真实 COS DELETE 超时/远端成功但客户端超时、生产 cron 恢复演练，以及 CDN/Nginx/APM 历史 query 日志脱敏/泄漏处置仍归入下方商用外部门禁。
+- [~] **候选合并与 CI**：合并主干前 `4d6705ef` 相对 upstream ahead 1、相对 `origin/main@78c8e71d` behind 1 / ahead 4，PR #570 DIRTY；须合并主干、保留双方 progress 事实、推送，并在 Node 22 取得 build/PG/browser/installer 最终 checks。live COS/OCR/支付、Windows service/WMI/SMB/真打印不纳入 Linux CI，必须另做现场验收。
 - [ ] **商用外部门禁**：Node 22 CI、PostgreSQL 生产实例、真实内容来源、支付商户配置、密钥轮换、法务文本、两台 Windows 主机及打印/扫描/TRTC 现场验收全部完成前，发布判定保持 NO-GO。
 
 > 最后更新：2026-08-09
