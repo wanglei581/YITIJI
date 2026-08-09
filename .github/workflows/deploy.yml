@@ -35,12 +35,17 @@ jobs:
               echo "服务器已在目标提交 $EXPECTED_SHA，跳过拉取"
             else
               FETCH_OK=0
-              for ATTEMPT in 1 2; do
-                echo "fetch attempt $ATTEMPT/2"
-                if timeout --foreground --kill-after=10s 240s git fetch origin main; then
+              for ATTEMPT in 1 2 3 4; do
+                echo "fetch exact CI SHA attempt $ATTEMPT/4"
+                # 生产机网络偶发 early EOF。只拉取 CI 已验证的单个提交，避免
+                # 每次同步整条 main 历史；HTTP/1.1 可规避部分代理的 HTTP/2
+                # 长连接中断。目标 SHA 必须可从 origin/main 到达。
+                if timeout --foreground --kill-after=10s 180s \
+                  git -c http.version=HTTP/1.1 fetch --no-tags --depth=1 origin "$EXPECTED_SHA"; then
                   FETCH_OK=1
                   break
                 fi
+                sleep "$((ATTEMPT * 5))"
               done
               test "$FETCH_OK" = "1"
               # 只部署 CI 已验证的精确 SHA；即使 main 在此期间继续前进（文档/其他合并），
