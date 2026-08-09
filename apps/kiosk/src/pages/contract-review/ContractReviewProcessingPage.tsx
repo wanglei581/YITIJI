@@ -1,5 +1,5 @@
 // ============================================================
-// 合同审查 — 分析中（步骤 2/3）
+// AI 签约风险提示 — 分析中（步骤 2/3）
 //
 // 轮询后端状态，展示各阶段进度。awaiting_confirmation 时弹窗
 // 让用户确认页数/OCR 覆盖，再推进到 AI 分析。
@@ -24,6 +24,7 @@ import {
   ShieldCheckIcon,
   XCircleIcon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
 import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
 import {
@@ -82,16 +83,10 @@ const STAGE_ORDER: string[] = [
   'completed',
 ]
 
-function stageProgress(status: string): number {
-  const idx = STAGE_ORDER.indexOf(status)
-  if (idx < 0) return 0
-  return Math.round((idx / (STAGE_ORDER.length - 1)) * 100)
-}
-
-
 export function ContractReviewProcessingPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
 
   const taskId = state.taskId ?? ''
@@ -103,6 +98,7 @@ export function ContractReviewProcessingPage() {
   const [confirming, setConfirming] = useState(false)
   const [showConfirmModal, setShowConfirmModal] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mountedRef = useRef(true)
 
@@ -111,7 +107,7 @@ export function ContractReviewProcessingPage() {
   const poll = useCallback(async () => {
     if (!taskId || !mountedRef.current) return
     try {
-      const t = await getContractReview(taskId, { accessToken })
+      const t = await getContractReview(taskId, { token: getToken(), accessToken })
       if (!mountedRef.current) return
       setTask(t)
 
@@ -140,7 +136,7 @@ export function ContractReviewProcessingPage() {
       if (!mountedRef.current) return
       setError('获取任务状态失败，请稍后重试')
     }
-  }, [taskId, accessToken, contractType, navigate])
+  }, [taskId, accessToken, getToken, navigate])
 
   useEffect(() => {
     if (!taskId) {
@@ -168,7 +164,7 @@ export function ContractReviewProcessingPage() {
           analyzedPages: task.analyzedPages,
           truncated: task.truncated,
         },
-        { accessToken },
+        { token: getToken(), accessToken },
       )
       pollRef.current = setTimeout(poll, 1500)
     } catch {
@@ -180,13 +176,24 @@ export function ContractReviewProcessingPage() {
 
   async function handleCancel() {
     setCancelling(true)
-    await deleteContractReview(taskId, { accessToken })
-    navigate('/contract-review', { replace: true })
+    setDeleteError(null)
+    try {
+      await deleteContractReview(taskId, { token: getToken(), accessToken })
+      navigate('/resume-service', { replace: true })
+    } catch {
+      setShowConfirmModal(false)
+      setDeleteError('删除失败，合同仍可能处于短期保留状态，请重试。')
+    } finally {
+      if (mountedRef.current) setCancelling(false)
+    }
   }
 
-  const progress = task ? stageProgress(task.status) : 0
-  const circumference = 2 * Math.PI * 70 // r=70
-  const dashOffset = circumference - (circumference * progress) / 100
+  const currentStageLabel = task?.status === 'queued'
+    ? '等待开始'
+    : STAGES.find((stage) => stage.key === task?.status)?.label ?? '处理中'
+  const pageProgress = task?.totalPages
+    ? `已处理 ${task.progress.completedPages} / ${task.totalPages} 页`
+    : '等待服务端返回页数'
 
   if (error) {
     return (
@@ -196,10 +203,10 @@ export function ContractReviewProcessingPage() {
             className="fusion-w3 fusion-w3--resume"
             header={
               <KioskPageHeader
-                title="AI 合同审查"
+                title="AI 签约风险提示"
                 description="分析中"
-                onBack={() => navigate('/contract-review', { replace: true })}
-                backLabel="返回"
+                onBack={() => void handleCancel()}
+                backLabel="删除并返回"
               />
             }
           >
@@ -208,9 +215,10 @@ export function ContractReviewProcessingPage() {
               <XCircleIcon size={52} />
             </div>
             <p className="cr-done-screen__title">审查未完成</p>
-            <p className="cr-done-screen__sub">{error}</p>
-            <Button size="lg" onClick={() => navigate('/contract-review', { replace: true })}>
-              重新上传
+            <p className="cr-done-screen__sub">{deleteError ?? error}</p>
+            <Button size="lg" disabled={cancelling} onClick={handleCancel}>
+              {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
+              删除任务并返回简历服务
             </Button>
           </div>
           </KioskPageFrame>
@@ -226,7 +234,7 @@ export function ContractReviewProcessingPage() {
           className="fusion-w3 fusion-w3--resume"
           header={
             <KioskPageHeader
-              title="AI 合同审查"
+              title="AI 签约风险提示"
               description="正在分析，请稍候…"
               onBack={undefined}
             />
@@ -251,29 +259,15 @@ export function ContractReviewProcessingPage() {
         </div>
 
         <div className="cr-progress-shell">
-          {/* 环形进度 */}
-          <div className="cr-progress-ring">
-            <svg className="cr-progress-ring__svg" viewBox="0 0 160 160">
-              <circle className="cr-progress-ring__bg" cx="80" cy="80" r="70" />
-              <circle
-                className="cr-progress-ring__fg"
-                cx="80"
-                cy="80"
-                r="70"
-                strokeDasharray={circumference}
-                strokeDashoffset={dashOffset}
-              />
-            </svg>
-            <div className="cr-progress-ring__center">
-              {progress === 100 ? (
-                <CheckIcon size={44} style={{ color: 'var(--teal)' }} />
-              ) : (
-                <>
-                  <span className="cr-progress-ring__pct">{progress}%</span>
-                  <span className="cr-progress-ring__sub">分析中</span>
-                </>
-              )}
-            </div>
+          {/* 后端只返回阶段与页数，不展示推算百分比。 */}
+          <div
+            className="cr-progress-ring"
+            aria-live="polite"
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10 }}
+          >
+            <Loader2Icon size={52} className="animate-spin" style={{ color: 'var(--teal)' }} />
+            <strong style={{ fontSize: 20 }}>{currentStageLabel}</strong>
+            <span className="cr-progress-ring__sub">{pageProgress}</span>
           </div>
 
           {/* 阶段列表 */}
@@ -324,6 +318,11 @@ export function ContractReviewProcessingPage() {
             {cancelling ? <Loader2Icon size={18} className="animate-spin mr-1" /> : null}
             取消审查
           </Button>
+          {deleteError && (
+            <p role="alert" style={{ marginTop: -24, color: 'var(--error)', fontSize: 18 }}>
+              {deleteError}
+            </p>
+          )}
         </div>
         </KioskPageFrame>
       </main>

@@ -1,5 +1,5 @@
 // ============================================================
-// 合同审查结果页（步骤 3/3）
+// AI 签约风险提示结果页（步骤 3/3）
 //
 // 展示统计概览（优先核查 / 关注 / 信息不足）+ 各风险项详情。
 // 免责声明置顶，结果仅作参考；打印报告 / 完成操作。
@@ -27,9 +27,14 @@ import {
   HelpCircleIcon,
   HomeIcon,
   InfoIcon,
+  Loader2Icon,
   PrinterIcon,
+  Trash2Icon,
 } from 'lucide-react'
+import { useAuth } from '../../auth/useAuth'
+import { useBusyLock } from '../../contexts/KioskBusyContext'
 import { KioskFullscreenShell } from '../../components/kiosk-shell/KioskFullscreenShell'
+import { deleteContractReview } from '../../services/api/contractReview'
 import './contract-review.css'
 
 interface PageState {
@@ -141,8 +146,34 @@ function FindingCard({ finding }: { finding: ContractReviewFinding }) {
 export function ContractReviewResultPage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { getToken } = useAuth()
   const state = (location.state ?? {}) as PageState
   const result = state.result ?? null
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  useBusyLock(deleting)
+
+  async function deleteAndNavigate(destination: '/contract-review' | '/resume-service') {
+    if (deleting) return
+    if (!state.taskId) {
+      navigate(destination, { replace: true })
+      return
+    }
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await deleteContractReview(state.taskId, {
+        token: getToken(),
+        accessToken: state.accessToken,
+      })
+      navigate(destination, { replace: true })
+    } catch {
+      setDeleteError('立即删除失败，合同仍可能处于短期保留状态。请重试；系统仍会按最长保留时限自动清理。')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // 若直接进入此页但没有结果（刷新/深链），回首页
   if (!result) {
@@ -153,9 +184,9 @@ export function ContractReviewResultPage() {
             className="fusion-w3 fusion-w3--resume"
             header={
               <KioskPageHeader
-                title="AI 合同审查"
+                title="AI 签约风险提示"
                 description="结果"
-                onBack={() => navigate('/contract-review', { replace: true })}
+                onBack={() => void deleteAndNavigate('/contract-review')}
                 backLabel="返回"
               />
             }
@@ -165,8 +196,10 @@ export function ContractReviewResultPage() {
               <HelpCircleIcon size={52} />
             </div>
             <p className="cr-done-screen__title">未找到审查结果</p>
-            <p className="cr-done-screen__sub">请重新上传合同进行审查</p>
-            <Button size="lg" onClick={() => navigate('/contract-review', { replace: true })}>
+            <p className="cr-done-screen__sub">
+              {deleteError ?? '请重新上传合同进行审查'}
+            </p>
+            <Button size="lg" disabled={deleting} onClick={() => void deleteAndNavigate('/contract-review')}>
               重新上传
             </Button>
           </div>
@@ -188,8 +221,8 @@ export function ContractReviewResultPage() {
           header={
             <KioskPageHeader
               title="审查结果"
-              description="AI 合同审查 · 仅供参考"
-              onBack={() => navigate('/contract-review', { replace: true })}
+              description="AI 签约风险提示 · 仅供参考"
+              onBack={() => void deleteAndNavigate('/contract-review')}
               backLabel="重新审查"
             />
           }
@@ -199,10 +232,11 @@ export function ContractReviewResultPage() {
               variant="outline"
               size="lg"
               style={{ flex: 1 }}
-              onClick={() => navigate('/', { replace: true })}
+              disabled={deleting}
+              onClick={() => void deleteAndNavigate('/contract-review')}
             >
               <HomeIcon size={20} className="mr-2" />
-              返回首页
+              重新审查
             </Button>
             <Button
               size="lg"
@@ -213,9 +247,26 @@ export function ContractReviewResultPage() {
               <PrinterIcon size={20} className="mr-2" />
               报告打印暂未开放
             </Button>
+            <Button
+              size="lg"
+              style={{ flex: 2 }}
+              disabled={deleting}
+              onClick={() => void deleteAndNavigate('/resume-service')}
+            >
+              {deleting
+                ? <Loader2Icon size={20} className="mr-2 animate-spin" />
+                : <Trash2Icon size={20} className="mr-2" />}
+              结束并删除
+            </Button>
             </KioskActionBar>
           }
         >
+        {deleteError && (
+          <div className="cr-disclaimer-banner" role="alert" style={{ color: 'var(--error)', borderColor: 'rgba(193,74,52,.3)', background: 'var(--error-soft)' }}>
+            <AlertCircleIcon />
+            <span>{deleteError}</span>
+          </div>
+        )}
         {/* 步骤指示器 */}
         <div className="cr-steps">
           <div className="cr-step cr-step--done">
@@ -284,7 +335,8 @@ export function ContractReviewResultPage() {
           <InfoIcon />
           <span>
             本结果由 AI 生成，<strong>仅作风险提示，不构成正式法律意见</strong>。
-            重大争议请咨询律师或官方机构。合同原文已在本次会话结束时删除。
+            重大争议请咨询律师或官方机构。点击“结束并删除”会立即请求清理合同原件；
+            异常情况下仍按知情同意中的最长保留时限自动清理。
           </span>
         </div>
 

@@ -1,5 +1,5 @@
 // ============================================================
-// 合同审查首页 — 上传合同 + 选择类型 + 知情同意
+// AI 签约风险提示首页 — 上传合同 + 选择类型 + 知情同意
 //
 // 步骤 1/3。用户上传合同文件，选择合同类型，阅读并确认知情
 // 同意书后点击「开始 AI 审查」进入分析阶段。
@@ -123,10 +123,10 @@ export function ContractReviewHomePage() {
           className="fusion-w3 fusion-w3--resume"
           header={
             <KioskPageHeader
-              title="AI 合同审查"
+              title="AI 签约风险提示"
               description="风险提示 · 仅供参考 · 非法律意见"
-              onBack={() => navigate(-1)}
-              backLabel="返回"
+              onBack={() => navigate('/resume-service')}
+              backLabel="返回简历服务"
             />
           }
           footer={
@@ -145,7 +145,7 @@ export function ContractReviewHomePage() {
                 ) : (
                   <>
                     <ShieldAlertIcon size={22} className="mr-2" />
-                    开始 AI 审查
+                    开始风险分析
                   </>
                 )}
               </Button>
@@ -185,13 +185,18 @@ export function ContractReviewHomePage() {
           <div
             role="button"
             tabIndex={0}
+            aria-label={file ? `已选择 ${file.name}，点击重新选择合同文件` : '选择合同文件'}
             className={[
               'cr-upload-zone',
               drag ? 'cr-upload-zone--drag' : '',
               file ? 'cr-upload-zone--filled' : '',
             ].join(' ')}
             onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault()
+              fileInputRef.current?.click()
+            }}
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
             onDragLeave={() => setDrag(false)}
             onDrop={handleDrop}
@@ -232,11 +237,13 @@ export function ContractReviewHomePage() {
         {/* 合同类型 */}
         <Card>
           <p style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>合同类型</p>
-          <div className="cr-type-grid">
+          <div className="cr-type-grid" role="radiogroup" aria-label="合同类型">
             {CONTRACT_TYPES.map((t) => (
               <button
                 key={t.key}
                 type="button"
+                role="radio"
+                aria-checked={contractType === t.key}
                 className={`cr-type-btn${contractType === t.key ? ' cr-type-btn--active' : ''}`}
                 onClick={() => setContractType(t.key)}
               >
@@ -264,8 +271,8 @@ export function ContractReviewHomePage() {
                   <b>本服务仅作风险提示，不构成正式法律意见。</b>重大争议请咨询律师或官方机构。
                 </p>
                 <p style={{ marginBottom: 10 }}>
-                  您上传的合同文件仅在本次会话期间用于 OCR 文字提取和 AI 审查，
-                  <b>会话结束后立即删除，不保存至任何外部服务</b>，不向第三方泄露。
+                  您上传的合同原件仅在本项目受控存储中短期用于 OCR 与风险分析，
+                  <b>发送模型前脱敏，结束时优先删除</b>，不向招聘企业或合作机构回传。
                 </p>
                 {consentScope && (
                   <p style={{ fontSize: 17, color: 'var(--muted)' }}>
@@ -281,7 +288,7 @@ export function ContractReviewHomePage() {
                   onChange={(e) => setConsentChecked(e.target.checked)}
                 />
                 <span className="cr-consent-check__label">
-                  我已阅读上述说明，同意本次合同文件用于 AI 审查分析
+                  我已阅读上述说明，同意本次合同文件用于 AI 签约风险分析
                 </span>
               </label>
             </>

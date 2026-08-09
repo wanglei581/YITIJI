@@ -10,6 +10,9 @@ const agencies = read('src/pages/offline-agencies/OfflineAgenciesPage.tsx')
 const fairMap = read('src/pages/job-fairs/FairMapPage.tsx')
 const resumeExport = read('src/pages/resume/ResumeExportPage.tsx')
 const contractResult = read('src/pages/contract-review/ContractReviewResultPage.tsx')
+const contractProcessing = read('src/pages/contract-review/ContractReviewProcessingPage.tsx')
+const contractApi = read('src/services/api/contractReview.ts')
+const resumeHub = read('src/pages/resume/ResumeServiceHubPage.tsx')
 
 assert.match(agencies, /type="search"/)
 assert.match(agencies, /const \[searchInput, setSearchInput\] = useState\(''\)/)
@@ -38,5 +41,20 @@ assert.doesNotMatch(resumeExport, /new Blob|URL\.createObjectURL|signedUrl|print
 
 assert.match(contractResult, /disabled[\s\S]{0,160}?报告打印暂未开放/)
 assert.doesNotMatch(contractResult, /navigate\(['"]\/print\/upload/)
+assert.match(contractResult, /deleteContractReview/)
+assert.match(contractResult, /结束并删除/)
+assert.match(contractResult, /立即删除失败/)
+assert.doesNotMatch(contractResult, /合同原文已在本次会话结束时删除/)
+
+assert.match(contractProcessing, /token: getToken\(\), accessToken/)
+assert.doesNotMatch(contractProcessing, /stageProgress|cr-progress-ring__pct/)
+assert.match(contractApi, /if \(_mockStep !== 2 \|\| _mockConfirmed\)/)
+assert.match(contractApi, /_mockConfirmed = true/)
+assert.doesNotMatch(contractApi, /call\(`\/contract-reviews\/\$\{id\}`,[\s\S]{0,100}?\.catch\(\(\) => undefined\)/)
+
+assert.match(resumeHub, /VITE_ENABLE_CONTRACT_REVIEW === 'true'/)
+assert.match(resumeHub, /签约与权益/)
+assert.match(resumeHub, /AI签约风险提示/)
+assert.match(resumeHub, /navigate\('\/contract-review'\)/)
 
 console.log('PASS kiosk visible actions truth contract')

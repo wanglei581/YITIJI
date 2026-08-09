@@ -1,11 +1,11 @@
 // ============================================================
-// 合同审查 API service（Kiosk）
+// AI 签约风险提示 API service（Kiosk）
 //
 // 流程：GET consent-scope → 上传文件 → POST /contract-reviews →
 //        轮询 GET /:id → POST /:id/confirm → 结果展示
 //
 // 凭证：登录会员 Bearer；匿名用 x-contract-review-access-token。
-// 合规：结果仅作风险提示，不构成正式法律意见；原文会话后即弃。
+// 合规：结果仅作风险提示，不构成正式法律意见；原文按同意范围短期保留并优先删除。
 // ============================================================
 
 import type {
@@ -138,7 +138,10 @@ export async function confirmContractReview(
   },
   access: ContractReviewAccess,
 ): Promise<void> {
-  if (API_MODE !== 'http') return
+  if (API_MODE !== 'http') {
+    _mockConfirmed = true
+    return
+  }
   await call(`/contract-reviews/${id}/confirm`, access, {
     method: 'POST',
     body: {
@@ -154,8 +157,12 @@ export async function deleteContractReview(
   id: string,
   access: ContractReviewAccess,
 ): Promise<void> {
-  if (API_MODE !== 'http') return
-  await call(`/contract-reviews/${id}`, access, { method: 'DELETE' }).catch(() => undefined)
+  if (API_MODE !== 'http') {
+    _mockStep = 0
+    _mockConfirmed = false
+    return
+  }
+  await call(`/contract-reviews/${id}`, access, { method: 'DELETE' })
 }
 
 // ── Mock 实现（开发调试用） ────────────────────────────────
@@ -168,7 +175,7 @@ function mockConsentScope(): ConsentScope {
     disclaimer: {
       id: 'disclaimer-v1',
       version: 'v1.0',
-      content: '本 AI 合同审查服务仅作风险提示，不构成正式法律意见；重大争议请咨询律师或官方窗口。合同原文仅在本次会话期间用于分析，会话结束后立即删除，不保存至任何外部服务。',
+      content: '本 AI 签约风险提示服务仅作风险提示，不构成正式法律意见；重大争议请咨询律师或官方窗口。合同原文在受控存储中短期保留，发送模型前脱敏，结束时优先删除，异常情况下最长保留 2 小时。',
       publishedAt: new Date().toISOString(),
     },
     disclosures: {
@@ -179,9 +186,11 @@ function mockConsentScope(): ConsentScope {
 }
 
 let _mockStep = 0
+let _mockConfirmed = false
 
 function mockCreateTask(contractType: ContractType): ContractReviewTaskView {
   _mockStep = 0
+  _mockConfirmed = false
   return {
     id: 'mock-task-001',
     status: 'queued',
@@ -198,7 +207,9 @@ function mockCreateTask(contractType: ContractType): ContractReviewTaskView {
 
 function mockGetTask(id: string): ContractReviewTaskView {
   const stages = ['queued', 'extracting', 'awaiting_confirmation', 'rule_checking', 'ai_analyzing', 'safety_reviewing', 'completed'] as const
-  _mockStep = Math.min(_mockStep + 1, stages.length - 1)
+  if (_mockStep !== 2 || _mockConfirmed) {
+    _mockStep = Math.min(_mockStep + 1, stages.length - 1)
+  }
   const status = stages[_mockStep]
   if (status === 'completed') {
     return {
@@ -232,7 +243,7 @@ function mockGetTask(id: string): ContractReviewTaskView {
               charStart: null,
               charEnd: null,
             },
-            explanation: '根据《劳动合同法》第 19 条，劳动合同期限 3 年以上不满 8 年的，试用期不得超过 2 个月；满 8 年的不得超过 6 个月。合同未注明期限，请核实合同期限是否≥8 年。',
+            explanation: '根据《劳动合同法》第 19 条，三年以上固定期限和无固定期限劳动合同，试用期不得超过六个月。合同期限信息未被完整识别，请先核实合同期限，再判断六个月试用期是否适用。',
             basisRef: '《劳动合同法》第 19 条',
             verificationQuestion: '合同约定的劳动合同总期限是多久？',
             uncertainty: '合同中未明确注明总期限，本项结论存在不确定性。',

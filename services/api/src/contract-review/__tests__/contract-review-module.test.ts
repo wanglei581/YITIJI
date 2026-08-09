@@ -75,11 +75,11 @@ test('blocked provider runtime never reads environment or performs a model reque
   assert.deepEqual({ ...process.env }, before)
 })
 
-test('AppModule source imports the same default-closed module for every env combination', async () => {
+test('AppModule exposes HTTP through the same default-closed runtime for every env combination', async () => {
   const { ContractReviewModule } = await loadContractModule()
   const source = readFileSync(resolve(__dirname, '../../app.module.ts'), 'utf8')
-  assert.match(source, /import \{ ContractReviewModule \} from '\.\/contract-review\/contract-review\.module'/u)
-  assert.match(source, /\n\s+ContractReviewModule,\n/u)
+  assert.match(source, /import \{ ContractReviewHttpModule \} from '\.\/contract-review\/contract-review-http\.module'/u)
+  assert.match(source, /\n\s+ContractReviewHttpModule,\n/u)
   assert.doesNotMatch(source, /CONTRACT_REVIEW_ENABLED/u)
   for (const redis of [undefined, 'redis://localhost:6379']) {
     for (const enabled of [undefined, 'true', 'false']) {

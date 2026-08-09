@@ -24,6 +24,7 @@ import {
   InfoIcon,
   PlusSquareIcon,
   PrinterIcon,
+  ShieldCheckIcon,
   SparklesIcon,
   TargetIcon,
 } from 'lucide-react'
@@ -183,6 +184,8 @@ const QUICK_LINKS: QuickLink[] = [
   },
 ]
 
+const contractReviewEnabled = import.meta.env.VITE_ENABLE_CONTRACT_REVIEW === 'true'
+
 export function ResumeServiceHubPage() {
   const navigate = useNavigate()
   const { status: apiStatus, retry: retryApi } = useApiReadiness()
@@ -266,6 +269,42 @@ export function ResumeServiceHubPage() {
             )
           })}
         </div>
+
+        {/* 签约与权益：与简历制作能力分组展示，不作为百宝箱或岗位入口重复投放。 */}
+        {contractReviewEnabled && (
+          <section className="mt-6" aria-labelledby="contract-risk-title">
+            <div className="mb-2 flex items-baseline gap-3">
+              <b id="contract-risk-title" className="font-serif text-[24px] font-bold tracking-wide text-neutral-900">
+                签约与权益
+              </b>
+              <span className="text-[17px] text-neutral-500">签约前自主核查，仅作风险提示</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!apiBlocked) navigate('/contract-review')
+              }}
+              disabled={apiBlocked}
+              className={`flex min-h-28 w-full items-center gap-5 rounded-[var(--radius-lg)] border border-wheat/30 border-l-4 border-l-wheat bg-surface px-6 py-5 text-left shadow-sm active:scale-[0.99]${apiBlocked ? ' service-hub__quick--blocked' : ''}`}
+            >
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-wheat-soft text-wheat">
+                <ShieldCheckIcon className="h-8 w-8" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <b className="block font-serif text-[26px] font-bold tracking-wide text-neutral-900">
+                  AI签约风险提示
+                </b>
+                <span className="mt-1 block text-[17px] leading-relaxed text-neutral-500">
+                  上传劳动合同、实习协议或 Offer，核查试用期、薪酬、竞业等条款风险
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2 text-[18px] font-semibold text-wheat">
+                {apiBlocked ? '等待服务' : '进入'}
+                <ChevronRightIcon className="h-5 w-5" aria-hidden="true" />
+              </span>
+            </button>
+          </section>
+        )}
 
         {/* 快捷入口 */}
         <div className="service-hub__quick-section mt-6">
