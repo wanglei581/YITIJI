@@ -129,6 +129,7 @@ jobs:
 
   recruitment-wave2-provision:
     name: Provision dedicated recruitment Wave2 read-only role
+    if: false # One-time production mutation completed in run 31384197497.
     runs-on: ubuntu-latest
     steps:
       - name: Create least-scope role and protected connection config
@@ -368,7 +369,6 @@ jobs:
 
   recruitment-wave2-admission:
     name: Recruitment Wave2 production read-only admission
-    needs: recruitment-wave2-provision
     runs-on: ubuntu-latest
     steps:
       - name: Inspect production read-only prerequisites
@@ -550,3 +550,177 @@ jobs:
         env:
           EXPECT_DIR: /srv/ai-job-print
           EXPECT_PM2: ai-job-print-api
+
+  recruitment-wave2-full-inventory:
+    name: Capture full recruitment Wave2 production inventory
+    needs: recruitment-wave2-admission
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run DB/API sandwich with protected evidence
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 15m
+          envs: EXPECT_DIR,EVIDENCE_ROOT,RUN_ID,SOURCE_COMMIT,SOURCE_DIGEST,AUTHORIZED_UNTIL
+          script: |
+            set -euo pipefail
+            umask 077
+
+            TMP_ROOT="$(mktemp -d "/tmp/rw2-full-${RUN_ID}-XXXXXX")"
+            cleanup() {
+              rm -rf -- "$TMP_ROOT"
+            }
+            trap cleanup EXIT HUP INT TERM
+
+            python3 - "$AUTHORIZED_UNTIL" <<'PY'
+            import datetime
+            import sys
+            deadline = datetime.datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00'))
+            now = datetime.datetime.now(datetime.timezone.utc)
+            if deadline.tzinfo is None or now >= deadline or deadline - now > datetime.timedelta(hours=4):
+                raise SystemExit('AUTHORIZATION_WINDOW_INVALID')
+            PY
+
+            ARCHIVE="$TMP_ROOT/source.tar.gz"
+            curl --proto '=https' --tlsv1.2 -fsSL --max-redirs 3 \
+              --connect-timeout 10 --max-time 120 \
+              "https://github.com/wanglei581/YITIJI/archive/${SOURCE_COMMIT}.tar.gz" \
+              -o "$ARCHIVE"
+            tar -xzf "$ARCHIVE" -C "$TMP_ROOT"
+            SRC_ROOT="$(find "$TMP_ROOT" -mindepth 1 -maxdepth 1 -type d -name 'YITIJI-*' -print -quit)"
+            test -n "$SRC_ROOT"
+
+            CALCULATED_DIGEST="$(cd "$SRC_ROOT" && sha256sum \
+              services/api/scripts/recruitment-wave2-full-inventory.ts \
+              services/api/scripts/support/recruitment-wave2-full-inventory.ts \
+              services/api/scripts/support/recruitment-wave2-public-snapshot.ts \
+              services/api/scripts/support/recruitment-wave2-readonly-db.ts \
+              services/api/src/recruitment-content/recruitment-wave2-target.ts \
+              services/api/src/recruitment-content/recruitment-content-readiness.ts \
+              | sha256sum | awk '{print $1}')"
+            if [ "$CALCULATED_DIGEST" != "$SOURCE_DIGEST" ]; then
+              echo "INVENTORY_ERROR=SOURCE_DIGEST_MISMATCH"
+              exit 1
+            fi
+            test -d "$EXPECT_DIR/node_modules"
+            ln -s "$EXPECT_DIR/node_modules" "$SRC_ROOT/node_modules"
+            node -e "if (Number(process.versions.node.split('.')[0]) !== 22) process.exit(1)"
+
+            ENV_PATH="$EXPECT_DIR/services/api/.env"
+            test -f "$ENV_PATH"
+            eval "$(python3 - "$ENV_PATH" <<'PY'
+            import shlex
+            import sys
+            from urllib.parse import unquote, urlparse
+            values = {}
+            for raw in open(sys.argv[1], encoding='utf-8'):
+                line = raw.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, value = line.split('=', 1)
+                value = value.strip()
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                    value = value[1:-1]
+                values[key.strip()] = value
+            readonly_url = values.get('RECRUITMENT_WAVE2_PRODUCTION_READONLY_URL', '')
+            parsed = urlparse(readonly_url)
+            database = unquote(parsed.path.lstrip('/'))
+            if parsed.scheme not in ('postgres', 'postgresql') or not parsed.hostname or not database or '/' in database:
+                raise SystemExit('READONLY_URL_INVALID')
+            print('RW2_URL=' + shlex.quote(readonly_url))
+            print('RW2_DATABASE=' + shlex.quote(database))
+            PY
+            )"
+
+            install -d -m 700 "$EVIDENCE_ROOT"
+            REPORT_TMP="$TMP_ROOT/report.json"
+            ERROR_TMP="$TMP_ROOT/error.json"
+            unset DATABASE_URL DIRECT_URL POSTGRES_URL
+            set +e
+            (
+              cd "$SRC_ROOT/services/api"
+              RECRUITMENT_WAVE2_TARGET=authorized-readonly \
+              RECRUITMENT_WAVE2_AUTHORIZATION_REF=AUTH/recruitment-wave2/prod-readonly-20260810-user-approved-002 \
+              RECRUITMENT_WAVE2_AUTHORIZED_UNTIL="$AUTHORIZED_UNTIL" \
+              RECRUITMENT_WAVE2_EXPECTED_DATABASE="$RW2_DATABASE" \
+              RECRUITMENT_WAVE2_PRODUCTION_READONLY_URL="$RW2_URL" \
+              RECRUITMENT_WAVE2_PUBLIC_API_BASE_URL=https://zyidai.cn/api/v1 \
+              RECRUITMENT_WAVE2_EXPECTED_PUBLIC_API_ORIGIN=https://zyidai.cn \
+              RECRUITMENT_WAVE2_EXPECTED_EXCLUDE_DEMO_PUBLIC_DATA=false \
+              node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+              >"$REPORT_TMP" 2>"$ERROR_TMP"
+            )
+            CLI_STATUS=$?
+            set -e
+
+            if [ "$CLI_STATUS" -eq 1 ]; then
+              python3 - "$ERROR_TMP" <<'PY'
+            import json
+            import sys
+            code = 'RECRUITMENT_WAVE2_EXECUTION_FAILED'
+            try:
+                lines = [line for line in open(sys.argv[1], encoding='utf-8') if line.strip()]
+                value = json.loads(lines[-1]) if lines else {}
+                candidate = value.get('errorCode')
+                if isinstance(candidate, str) and candidate.startswith('RECRUITMENT_WAVE2_'):
+                    code = candidate
+            except Exception:
+                pass
+            print('INVENTORY_RESULT=execution_failed')
+            print('INVENTORY_ERROR_CODE=' + code)
+            PY
+              exit 1
+            fi
+            if [ "$CLI_STATUS" -ne 0 ] && [ "$CLI_STATUS" -ne 2 ]; then
+              echo "INVENTORY_RESULT=unexpected_exit"
+              exit 1
+            fi
+
+            EVIDENCE_TMP="$EVIDENCE_ROOT/.full-inventory-${RUN_ID}.tmp"
+            EVIDENCE_FINAL="$EVIDENCE_ROOT/full-inventory-${RUN_ID}.json"
+            test ! -e "$EVIDENCE_FINAL"
+            install -m 600 "$REPORT_TMP" "$EVIDENCE_TMP"
+            mv "$EVIDENCE_TMP" "$EVIDENCE_FINAL"
+            REPORT_DIGEST="$(sha256sum "$EVIDENCE_FINAL" | awk '{print $1}')"
+
+            python3 - "$EVIDENCE_FINAL" "$CLI_STATUS" "$REPORT_DIGEST" <<'PY'
+            import json
+            import re
+            import sys
+            report = json.load(open(sys.argv[1], encoding='utf-8'))
+            status = int(sys.argv[2])
+            print('INVENTORY_RESULT=' + ('pass' if status == 0 else 'business_blockers'))
+            print('INVENTORY_CLI_EXIT=' + str(status))
+            print('INVENTORY_REPORT_SHA256=' + sys.argv[3])
+            print('INVENTORY_EVIDENCE_STORED=yes')
+            print('INVENTORY_WAVE2_GO_DECISION=' + str(report.get('wave2GoDecision')).lower())
+            for key, value in sorted(report.get('counts', {}).items()):
+                safe = re.sub(r'[^A-Z0-9]+', '_', key.upper()).strip('_')
+                print(f'COUNT_{safe}={int(value)}')
+            issue_total = 0
+            for key, value in sorted(report.get('issues', {}).items()):
+                count = int(value.get('count', 0))
+                issue_total += count
+                if count:
+                    safe = re.sub(r'[^A-Z0-9]+', '_', key.upper()).strip('_')
+                    print(f'ISSUE_{safe}={count}')
+            print('ISSUE_TOTAL_ITEMS=' + str(issue_total))
+            diffs = report.get('sets', {}).get('currentReaderDiff', {})
+            for entity, value in sorted(diffs.items()):
+                safe = re.sub(r'[^A-Z0-9]+', '_', entity.upper()).strip('_')
+                print(f'DIFF_{safe}_MISSING={int(value["missingFromApi"]["count"])}')
+                print(f'DIFF_{safe}_UNEXPECTED={int(value["unexpectedInApi"]["count"])}')
+            snapshots = report.get('snapshots', {})
+            print('SNAPSHOT_DATABASE_STABLE=' + str(snapshots.get('databaseA') == snapshots.get('databaseB')).lower())
+            print('SNAPSHOT_PUBLIC_API_STABLE=' + str(snapshots.get('publicApiA') == snapshots.get('publicApiB')).lower())
+            PY
+        env:
+          EXPECT_DIR: /srv/ai-job-print
+          EVIDENCE_ROOT: /srv/ai-job-print-backups/recruitment-wave2-evidence
+          RUN_ID: ${{ github.run_id }}
+          SOURCE_COMMIT: b8369021177f95a9d76ca1d9130ad1afb249a720
+          SOURCE_DIGEST: ed80f77c97aeb83f93023b77add08b5cd802d6dba5cef60a555ec0e2bf51ceb0
+          AUTHORIZED_UNTIL: '2026-08-10T15:25:10Z'
