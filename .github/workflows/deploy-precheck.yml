@@ -556,6 +556,52 @@ jobs:
     needs: recruitment-wave2-admission
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout pinned inventory source
+        uses: actions/checkout@v4
+        with:
+          ref: b8369021177f95a9d76ca1d9130ad1afb249a720
+          path: inventory-source
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            tsconfig.base.json
+            services/api/tsconfig.json
+            services/api/scripts/recruitment-wave2-full-inventory.ts
+            services/api/scripts/support/recruitment-wave2-full-inventory.ts
+            services/api/scripts/support/recruitment-wave2-public-snapshot.ts
+            services/api/scripts/support/recruitment-wave2-readonly-db.ts
+            services/api/src/recruitment-content/recruitment-wave2-target.ts
+            services/api/src/recruitment-content/recruitment-content-readiness.ts
+            services/api/src/recruitment-content/recruitment-content.types.ts
+            services/api/src/recruitment-content/recruitment-wave2-plan.ts
+
+      - name: Verify pinned inventory source digest
+        run: |
+          set -euo pipefail
+          CALCULATED_DIGEST="$(cd inventory-source && sha256sum \
+            tsconfig.base.json \
+            services/api/tsconfig.json \
+            services/api/scripts/recruitment-wave2-full-inventory.ts \
+            services/api/scripts/support/recruitment-wave2-full-inventory.ts \
+            services/api/scripts/support/recruitment-wave2-public-snapshot.ts \
+            services/api/scripts/support/recruitment-wave2-readonly-db.ts \
+            services/api/src/recruitment-content/recruitment-wave2-target.ts \
+            services/api/src/recruitment-content/recruitment-content-readiness.ts \
+            services/api/src/recruitment-content/recruitment-content.types.ts \
+            services/api/src/recruitment-content/recruitment-wave2-plan.ts \
+            | sha256sum | awk '{print $1}')"
+          test "$CALCULATED_DIGEST" = '91b957fca1c2415fead68c050454076ec13a14a106e3bb22513fe143bb038502'
+
+      - name: Upload minimal verified source bundle
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          source: inventory-source/tsconfig.base.json,inventory-source/services/api/tsconfig.json,inventory-source/services/api/scripts/recruitment-wave2-full-inventory.ts,inventory-source/services/api/scripts/support/recruitment-wave2-full-inventory.ts,inventory-source/services/api/scripts/support/recruitment-wave2-public-snapshot.ts,inventory-source/services/api/scripts/support/recruitment-wave2-readonly-db.ts,inventory-source/services/api/src/recruitment-content/recruitment-wave2-target.ts,inventory-source/services/api/src/recruitment-content/recruitment-content-readiness.ts,inventory-source/services/api/src/recruitment-content/recruitment-content.types.ts,inventory-source/services/api/src/recruitment-content/recruitment-wave2-plan.ts
+          target: /tmp/rw2-upload-${{ github.run_id }}
+          overwrite: true
+
       - name: Run DB/API sandwich with protected evidence
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -569,9 +615,11 @@ jobs:
             set -euo pipefail
             umask 077
 
+            UPLOAD_ROOT="/tmp/rw2-upload-${RUN_ID}"
+            SRC_ROOT="$UPLOAD_ROOT/inventory-source"
             TMP_ROOT="$(mktemp -d "/tmp/rw2-full-${RUN_ID}-XXXXXX")"
             cleanup() {
-              rm -rf -- "$TMP_ROOT"
+              rm -rf -- "$TMP_ROOT" "$UPLOAD_ROOT"
             }
             trap cleanup EXIT HUP INT TERM
 
@@ -584,26 +632,7 @@ jobs:
                 raise SystemExit('AUTHORIZATION_WINDOW_INVALID')
             PY
 
-            SRC_ROOT="$TMP_ROOT/source"
-            SOURCE_FILES=(
-              tsconfig.base.json
-              services/api/tsconfig.json
-              services/api/scripts/recruitment-wave2-full-inventory.ts
-              services/api/scripts/support/recruitment-wave2-full-inventory.ts
-              services/api/scripts/support/recruitment-wave2-public-snapshot.ts
-              services/api/scripts/support/recruitment-wave2-readonly-db.ts
-              services/api/src/recruitment-content/recruitment-wave2-target.ts
-              services/api/src/recruitment-content/recruitment-content-readiness.ts
-              services/api/src/recruitment-content/recruitment-content.types.ts
-              services/api/src/recruitment-content/recruitment-wave2-plan.ts
-            )
-            for SOURCE_FILE in "${SOURCE_FILES[@]}"; do
-              mkdir -p "$SRC_ROOT/$(dirname "$SOURCE_FILE")"
-              curl --proto '=https' --tlsv1.2 -fsSL --max-redirs 0 \
-                --connect-timeout 10 --max-time 45 --retry 2 --retry-all-errors --retry-delay 1 \
-                "https://raw.githubusercontent.com/wanglei581/YITIJI/${SOURCE_COMMIT}/${SOURCE_FILE}" \
-                -o "$SRC_ROOT/$SOURCE_FILE"
-            done
+            test -f "$SRC_ROOT/services/api/scripts/recruitment-wave2-full-inventory.ts"
 
             CALCULATED_DIGEST="$(cd "$SRC_ROOT" && sha256sum \
               tsconfig.base.json \
@@ -819,3 +848,14 @@ jobs:
           SOURCE_COMMIT: b8369021177f95a9d76ca1d9130ad1afb249a720
           SOURCE_DIGEST: 91b957fca1c2415fead68c050454076ec13a14a106e3bb22513fe143bb038502
           AUTHORIZED_UNTIL: '2026-08-10T15:25:10Z'
+
+      - name: Remove exact temporary upload path
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 22
+          command_timeout: 1m
+          script: rm -rf -- /tmp/rw2-upload-${{ github.run_id }}
