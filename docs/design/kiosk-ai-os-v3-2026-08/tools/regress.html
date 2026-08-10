@@ -603,14 +603,25 @@ function auditCardVoid (win) {
     /* 可滚的卡不算空洞：内容在下面，滚得到 */
     if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') continue
 
-    var maxBottom = r.top
+    /* 只数**在文档流内**的叶子。
+       出了流的元素（绝对/固定定位）常常被钉在卡底当装饰 —— 页码、角标、水印。
+       它们一贴底，「最后一个叶子的底边」就等于卡底，空洞看起来就是 0。
+       09 的纸样一直不报数正是因为纸底有 bottom:22px 的页码；
+       与「页脚折叠条永远贴底导致主栏永远读 0」是同一类。
+       **凡是「量最后一个叶子底边」的检查，都会被贴底元素骗过。** */
+    var maxBottom = r.top, minTop = r.bottom
     var leaves = b.querySelectorAll('*')
     for (var j = 0; j < leaves.length; j++) {
       var n = leaves[j]
       if (n.childElementCount > 0) continue
-      try { if (win.getComputedStyle(n).display === 'none') continue } catch (e) { continue }
+      var ns
+      try { ns = win.getComputedStyle(n) } catch (e) { continue }
+      if (ns.display === 'none') continue
+      if (ns.position === 'absolute' || ns.position === 'fixed') continue
       var nr = n.getBoundingClientRect()
-      if (nr.height > 0 && nr.bottom > maxBottom) maxBottom = nr.bottom
+      if (nr.height <= 0) continue
+      if (nr.bottom > maxBottom) maxBottom = nr.bottom
+      if (nr.top < minTop) minTop = nr.top
     }
     /* 一个内容叶子都没有的元素**不是「卡里空了」，是背景层**。
        第一版没这条，于是 03 的全屏遮罩 .scrim 被报成「高 1920 空 1920」，
@@ -619,7 +630,17 @@ function auditCardVoid (win) {
     if (maxBottom <= r.top + 1) continue
 
     var pad = parseFloat(cs.paddingBottom) || 0
+    var padTop = parseFloat(cs.paddingTop) || 0
     var gap = Math.round(r.bottom - pad - maxBottom)
+    var gapTop = Math.round(minTop - (r.top + padTop))
+
+    /* 居中构图不是空洞。
+       27 的「示意到此为止」实测上留白 194px、下留白 194px —— 完全对称，
+       而检测器只量底边，只看见一半，于是报成「底部空 215px」。
+       上下差不多时它是**围绕主体的均衡空间**（复核意见 (f) 节的原话），
+       不是「没写完」。判据：两头差值小于较大一头的 1/3，且上头也有像样的留白。 */
+    if (gapTop > 40 && Math.abs(gap - gapTop) < Math.max(gap, gapTop) / 3) continue
+
     if (gap > 200) {
       out.push({ cls: (String(b.className).split(' ').slice(0, 2).join('.') || b.tagName),
                  gap: gap, h: Math.round(r.height) })
