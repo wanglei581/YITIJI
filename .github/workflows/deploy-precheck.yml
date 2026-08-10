@@ -659,12 +659,31 @@ jobs:
               ./scripts/support/recruitment-wave2-full-inventory
             )
             for INDEX in "${!MODULE_PATHS[@]}"; do
+              MODULE_ERROR="$TMP_ROOT/module-${MODULE_LABELS[$INDEX]}.error"
               if ! (
                 cd "$SRC_ROOT/services/api"
-                node -r @swc-node/register -e "require('${MODULE_PATHS[$INDEX]}')" >/dev/null 2>&1
+                node -r @swc-node/register -e "require('${MODULE_PATHS[$INDEX]}')" \
+                  >/dev/null 2>"$MODULE_ERROR"
               ); then
                 echo "INVENTORY_RESULT=execution_failed"
                 echo "INVENTORY_ERROR_CODE=MODULE_${MODULE_LABELS[$INDEX]}_INVALID"
+                python3 - "$MODULE_ERROR" <<'PY'
+            import hashlib
+            import re
+            import sys
+            raw = open(sys.argv[1], encoding='utf-8', errors='replace').read()
+            missing = re.search(r"Cannot find module ['\"]([^'\"]+)['\"]", raw)
+            if missing and re.fullmatch(r'[A-Za-z0-9@/_.-]{1,160}', missing.group(1)):
+                print('INVENTORY_MODULE_DIAGNOSTIC=missing_dependency')
+                print('INVENTORY_MISSING_MODULE=' + missing.group(1))
+            elif 'Unknown file extension ".ts"' in raw or 'Unexpected token' in raw:
+                print('INVENTORY_MODULE_DIAGNOSTIC=typescript_loader_incompatible')
+            elif 'tsconfig' in raw.lower():
+                print('INVENTORY_MODULE_DIAGNOSTIC=typescript_config_invalid')
+            else:
+                print('INVENTORY_MODULE_DIAGNOSTIC=unclassified')
+                print('INVENTORY_MODULE_ERROR_SHA256=' + hashlib.sha256(raw.encode()).hexdigest())
+            PY
                 exit 1
               fi
             done
