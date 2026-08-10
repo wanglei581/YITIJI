@@ -117,7 +117,7 @@ export async function collectPublicSnapshot(
   await assertHealth(await request('/health'))
   const jobs = await collectPagination(request, '/jobs', 'pagination', 100)
   const jobFairs = await collectPagination(request, '/job-fairs', 'pagination', 100)
-  const policies = await collectPagination(request, '/policies', 'pagination', 200)
+  const policies = await collectPolicies(request)
   const offlineAgencies = await collectPagination(request, '/kiosk/offline-agencies', 'legacy', 100)
   const offlineJobs: string[] = []
   for (const agencyId of offlineAgencies) {
@@ -135,6 +135,22 @@ export async function collectPublicSnapshot(
   const ids = normalizeSets({ jobs, jobFairs, policies, offlineAgencies, offlineJobs })
   const digests = mapDigests(ids)
   return { ids, digests, snapshotDigest: sha256(JSON.stringify(digests)), requestCount }
+}
+
+async function collectPolicies(
+  request: (path: string) => Promise<unknown>
+): Promise<string[]> {
+  const first = asObject(await request('/policies?page=1&pageSize=200'))
+  if (first['pagination'] !== undefined) {
+    return collectPagination(request, '/policies', 'pagination', 200, first)
+  }
+  const data = first['data']
+  if (!Array.isArray(data)) throw new Error('RECRUITMENT_WAVE2_PUBLIC_API_SCHEMA_INVALID')
+  if (data.length >= 200) throw new Error('RECRUITMENT_WAVE2_PUBLIC_API_NOT_PAGEABLE')
+  const ids = data.map(requireId)
+  if (new Set(ids).size !== ids.length)
+    throw new Error('RECRUITMENT_WAVE2_PUBLIC_API_DUPLICATE_ID')
+  return ids
 }
 
 export async function verifyPublicTargetHealth(
@@ -170,12 +186,16 @@ async function collectPagination(
   request: (path: string) => Promise<unknown>,
   pathname: string,
   envelope: 'pagination' | 'legacy',
-  pageSize: number
+  pageSize: number,
+  firstValue?: Record<string, unknown>
 ): Promise<string[]> {
   const ids: string[] = []
   let expectedTotal: number | null = null
   for (let page = 1; page <= 10_000; page++) {
-    const value = asObject(await request(`${pathname}?page=${page}&pageSize=${pageSize}`))
+    const value =
+      page === 1 && firstValue
+        ? firstValue
+        : asObject(await request(`${pathname}?page=${page}&pageSize=${pageSize}`))
     const data = value['data']
     if (!Array.isArray(data)) throw new Error('RECRUITMENT_WAVE2_PUBLIC_API_SCHEMA_INVALID')
     const meta = envelope === 'pagination' ? asObject(value['pagination']) : value
