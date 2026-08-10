@@ -228,15 +228,19 @@
         </div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
 
-          <a class="alt" href="12-material-factory.html">
-            <svg class="ic"><use href="#i-package"/></svg>
+          <!-- 2026-08-10 Codex 闭环整改：这条原来指「求职材料生成」(P12)。
+               用户手上已经有电子版录取通知书 / 报到材料，要的是「上传打印」，
+               不是再生成一份新材料 —— 改指打印工作台第 1 步（选文件）。
+               ?from=P19 让打印台把返回键指回智慧校园，不把人换到打印扫描域。 -->
+          <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19">
+            <svg class="ic"><use href="#i-printer"/></svg>
             <span class="alt-b">
               <span class="alt-t">打印录取通知书、报到材料</span>
               <span class="alt-s">你手机里的电子版，扫码传到本机就能打。新生报到常要交的几样，一次打齐。</span>
             </span>
           </a>
 
-          <a class="alt" href="07-scan-workbench.html">
+          <a class="alt" href="07-scan-workbench.html?from=P19">
             <svg class="ic"><use href="#i-scan"/></svg>
             <span class="alt-b">
               <span class="alt-t">扫描身份证、学生证、纸质成绩单</span>
@@ -244,7 +248,7 @@
             </span>
           </a>
 
-          <a class="alt" href="18-campus.html">
+          <a class="alt" href="18-campus.html?from=P19">
             <svg class="ic"><use href="#i-campus"/></svg>
             <span class="alt-b">
               <span class="alt-t">看校招活动与截止日期</span>
@@ -389,11 +393,13 @@
                 行李帮运、VR校园、校园卡、一卡通、校园网这五项<b>本机替不了</b>，
                 得走学校窗口或学校自己的系统 —— 这一条不会因为 AI 说得好听就变。</span>
           <span class="ag-row">
-            <a class="asug" href="06-print-workbench.html?stage=s3&amp;from=P19&amp;kind=material&amp;title=报到材料">
+            <!-- 2026-08-10：本机手上并没有「报到材料」这份文件，不能按交接契约直落 s3 参数页
+                 （那等于替用户认领一份不存在的材料）。改落 s1，让他先把电子版传进来。 -->
+            <a class="asug" href="06-print-workbench.html?stage=s1&amp;from=P19">
               <svg class="ic"><use href="#i-printer"/></svg>
               <span class="asug-b"><span class="asug-k">报到材料要打印</span>
                 <span class="asug-t">打印扫描台</span></span></a>
-            <a class="asug" href="07-scan-workbench.html">
+            <a class="asug" href="07-scan-workbench.html?from=P19">
               <svg class="ic"><use href="#i-scan"/></svg>
               <span class="asug-b"><span class="asug-k">证件、成绩单要电子版</span>
                 <span class="asug-t">扫描工作台</span></span></a>
@@ -583,17 +589,18 @@
       <div class="pane pane--grow" data-at="s2 s3">
         <div class="pane-hd"><svg class="ic"><use href="#i-check"/></svg><b>现在能用的</b></div>
         <div class="sec" style="display:flex;flex-direction:column;gap:var(--s-3)">
-          <a class="alt" href="12-material-factory.html">
-            <svg class="ic"><use href="#i-package"/></svg>
+          <!-- 2026-08-10：同上，打印入口由 P12 改指打印工作台第 1 步（上传打印） -->
+          <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19">
+            <svg class="ic"><use href="#i-printer"/></svg>
             <span class="alt-b"><span class="alt-t">打印报到材料</span>
               <span class="alt-s">手机里的电子版扫码传过来就能打</span></span>
           </a>
-          <a class="alt" href="07-scan-workbench.html">
+          <a class="alt" href="07-scan-workbench.html?from=P19">
             <svg class="ic"><use href="#i-scan"/></svg>
             <span class="alt-b"><span class="alt-t">扫描证件与纸质成绩单</span>
               <span class="alt-s">扫成 PDF，网申上传直接用</span></span>
           </a>
-          <a class="alt" href="18-campus.html">
+          <a class="alt" href="18-campus.html?from=P19">
             <svg class="ic"><use href="#i-campus"/></svg>
             <span class="alt-b"><span class="alt-t">看校招活动</span>
               <span class="alt-s">不需要接入学校系统</span></span>
@@ -644,16 +651,16 @@
             <svg class="ic"><use href="#i-check"/></svg><b>不用等开通，现在能做的</b>
           </div>
           <div style="display:flex;flex-direction:column;gap:var(--s-3)">
-            <a class="alt" href="06-print-workbench.html?stage=s3&amp;from=P19&amp;kind=material&amp;title=报到材料"><svg class="ic"><use href="#i-printer"/></svg>
+            <a class="alt" href="06-print-workbench.html?stage=s1&amp;from=P19"><svg class="ic"><use href="#i-printer"/></svg>
               <span class="alt-b"><span class="alt-t">打印报到材料</span>
-                <span class="alt-s">选纸张、看价格，确认后出纸</span></span></a>
-            <a class="alt" href="07-scan-workbench.html"><svg class="ic"><use href="#i-scan"/></svg>
+                <span class="alt-s">先把电子版传进来，再选纸张、看价格</span></span></a>
+            <a class="alt" href="07-scan-workbench.html?from=P19"><svg class="ic"><use href="#i-scan"/></svg>
               <span class="alt-b"><span class="alt-t">扫描证件与成绩单</span>
                 <span class="alt-s">扫成 PDF，网申上传直接用</span></span></a>
             <a class="alt" href="09-resume-workbench.html"><svg class="ic"><use href="#i-resume"/></svg>
               <span class="alt-b"><span class="alt-t">改简历</span>
                 <span class="alt-s">入学后的求职准备，本机能改能打</span></span></a>
-            <a class="alt" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>
+            <a class="alt" href="18-campus.html?from=P19"><svg class="ic"><use href="#i-campus"/></svg>
               <span class="alt-b"><span class="alt-t">看校招活动</span>
                 <span class="alt-s">学校就业网与主办方的公开公告</span></span></a>
           </div>
@@ -688,11 +695,14 @@
     <span class="actionbar-hint" data-at="s2 s3">以上为接入后示意 · 现在一项都办不了</span>
     <span class="actionbar-hint" data-at="s4">以上六项为学校开通后才有 · 本机校园开关现在是关的</span>
 
-    <a class="btn btn--primary" data-at="s1" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <!-- 2026-08-10 Codex 闭环整改（P1）：这三处主操作原来指 12-material-factory（求职材料生成），
+         但用户要办的是「把手机里已有的电子版打出来」，属于上传打印，不是生成新材料。
+         统一改指打印工作台第 1 步，并带 ?from=P19 让返回键回得到智慧校园。 -->
+    <a class="btn btn--primary" data-at="s1" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <button class="btn btn--primary" data-at="s1" data-go="s2" style="display:none"></button>
-    <a class="btn btn--primary" data-at="s2" href="12-material-factory.html">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-    <a class="btn btn--primary" data-at="s4" href="06-print-workbench.html?stage=s3&amp;from=P19&amp;kind=material&amp;title=报到材料">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s2" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s3" href="07-scan-workbench.html?from=P19">去扫描证件<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" href="06-print-workbench.html?stage=s1&amp;from=P19">去打印报到材料<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">

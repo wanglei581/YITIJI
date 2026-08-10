@@ -28,6 +28,26 @@
 /* 托盘不再抢占整列（work.css 默认 flex:1）：砖块是固定比例的，托盘撑高只会在
    网格和下一张卡之间留一条无容器空带；改为按内容收高，信息卡紧随其后。 */
 .wmain > .tray { flex: 0 0 auto; }
+/* 结果反馈层（2026-08-10 Codex 闭环整改）：
+   「合成 5 页 PDF」「授权并合成」两个主按钮此前按下去什么都不发生 —— 产物在本页终止，
+   用户做完了带不走。这一层给出产物成功态与三条真实出口（P07/P12 同款结构）。
+   无 data-when / data-at，applyVisibility() 不碰它。 */
+.fb { position: absolute; inset: 0; z-index: 80; display: grid; place-items: center;
+      background: rgba(4,8,10,.62); padding: var(--s-6); }
+.fb-box { width: min(640px, 100%); max-height: 76%; overflow-y: auto;
+      border-radius: var(--r-lg); padding: var(--s-6);
+      background: var(--ink-100); border: 1px solid var(--glass-1-brd);
+      box-shadow: 0 30px 80px -20px rgba(0,0,0,.7); display: flex; flex-direction: column; gap: var(--s-4); }
+.fb-ic { width: 56px; height: 56px; border-radius: var(--r-md); display: grid; place-items: center;
+      background: var(--jade-a12); border: 1px solid var(--jade-a20); }
+.fb-ic .ic { width: 27px; height: 27px; color: var(--jade-500); }
+.fb--warn .fb-ic { background: var(--amber-a12); border-color: var(--amber-a20); }
+.fb--warn .fb-ic .ic { color: var(--amber-400); }
+.fb-t { font-size: var(--fz-6); font-weight: 700; color: var(--fog-900); line-height: var(--lh-snug); }
+.fb-p { font-size: var(--fz-3); color: var(--fog-700); line-height: 1.66; }
+.fb-p b { color: var(--fog-900); }
+.fb-go { display: flex; gap: var(--s-3); flex-wrap: wrap; }
+.fb-go .btn { flex: 1 1 200px; min-height: 56px; }
 </style>
 </head>
 <body>
@@ -432,9 +452,9 @@
     <button class="btn btn--lg btn--ghost" data-at="t2" data-go="t1">换个工具</button>
     <button class="btn btn--lg btn--ghost" data-at="t3" data-go="t1">换个工具</button>
 
-    <button class="btn btn--primary" data-at="t1" data-when="default ai-down device-off">合成 5 页 PDF<svg class="ic"><use href="#i-layers"/></svg></button>
+    <button class="btn btn--primary" data-at="t1" data-when="default ai-down device-off" data-fb="merge">合成 5 页 PDF<svg class="ic"><use href="#i-layers"/></svg></button>
     <button class="btn btn--primary" data-at="t1" data-when="first">添加图片<svg class="ic"><use href="#i-plus"/></svg></button>
-    <button class="btn btn--commit" data-at="t2" data-when="default ai-down device-off">授权并合成<svg class="ic"><use href="#i-pen"/></svg></button>
+    <button class="btn btn--commit" data-at="t2" data-when="default ai-down device-off" data-fb="sign">授权并合成<svg class="ic"><use href="#i-pen"/></svg></button>
     <button class="btn btn--primary" data-at="t2" data-when="first" aria-disabled="true">先写签名</button>
     <a class="btn btn--primary" data-at="t3" href="07-scan-workbench.html">去纸质扫描<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
@@ -444,6 +464,16 @@
     <a href="25-advisor.html"><svg class="ic"><use href="#i-orbit"/></svg>AI 顾问</a>
     <a href="23-me.html"><svg class="ic"><use href="#i-user"/></svg>我的</a>
   </nav>
+
+  <!-- 结果反馈层：合成完必须有交代，并给出「带去哪」的真实出口 -->
+  <div class="fb" id="fb" hidden>
+    <div class="fb-box" role="dialog" aria-modal="true" aria-labelledby="fb-t">
+      <span class="fb-ic"><svg class="ic"><use href="#i-check" id="fb-use"/></svg></span>
+      <div class="fb-t" id="fb-t"></div>
+      <div class="fb-p" id="fb-p"></div>
+      <div class="fb-go" id="fb-go"></div>
+    </div>
+  </div>
 
 </div>
 </div>
@@ -464,6 +494,110 @@
   }
   new MutationObserver(sync).observe(scr, { attributes: true, attributeFilter: ['data-stage'] })
   sync()
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P08 · 产物出口（2026-08-10 Codex 闭环整改）
+   --------------------------------------------------------------------------
+   走查结论：「合成 5 页 PDF」和「授权并合成」按下去什么都不发生 —— 页面把材料
+   加工完了，产物却在本页终止，用户做完带不走。这是断头，不是省事。
+   现在补三样：
+     ① 成功态：合成出的是哪一份、几页、原件动没动，当场讲清；
+     ② 三条真实出口（全是真链接，按交接契约带载荷）：
+        · 去打印   06-print-workbench.html?stage=s3&from=P08&kind=material&title=…&pages=…
+        · 存文档   23-me.html?view=docs&from=P08&…
+        · 发手机   05-phone-relay.html?from=P08&…（原型上是示意码）
+     ③ device-off 降级：打印机离线时**不摆出纸出口**，改「存文档 / 发手机，换机再打」，
+        并写明为什么（interface-handoff §0：ai-down ≠ device-off，出纸类动作才禁用）。
+   另外补一条门控：签名合成的授权勾没勾，决定的是「有没有这份文件」。
+   没勾就弹成功态等于凭空认领一份没签过的文件 —— 改成告警态，明确「本次没有生成任何文件」。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  var fb = document.getElementById('fb')
+  if (!scr || !fb) return
+
+  function closeFb () { fb.hidden = true }
+  function openFb (o) {
+    document.getElementById('fb-t').textContent = o.t
+    document.getElementById('fb-p').innerHTML = o.p
+    fb.className = 'fb' + (o.warn ? ' fb--warn' : '')
+    document.getElementById('fb-use').setAttribute('href', o.warn ? '#i-alert' : '#i-check')
+    var go = document.getElementById('fb-go')
+    go.innerHTML = ''
+    o.go.forEach(function (b) {
+      var el = document.createElement(b.href ? 'a' : 'button')
+      el.className = 'btn ' + (b.primary ? 'btn--primary' : 'btn--ghost')
+      el.textContent = b.t
+      if (b.href) el.setAttribute('href', b.href)
+      else el.addEventListener('click', closeFb)
+      go.appendChild(el)
+    })
+    fb.hidden = false
+  }
+
+  /* 三条出口按同一份载荷拼；title 走 encodeURIComponent，中文名原样交到收件端 */
+  function exits (title, pages) {
+    var pay = 'from=P08&kind=material&title=' + encodeURIComponent(title)
+    var off = scr.getAttribute('data-state') === 'device-off'
+    var out = []
+    if (!off) {
+      out.push({
+        t: '去打印 · ' + pages + ' 页',
+        href: '06-print-workbench.html?stage=s3&' + pay + '&pages=' + pages + '&copies=1',
+        primary: true
+      })
+    }
+    out.push({ t: '存进「我的 · 文档」', href: '23-me.html?view=docs&' + pay, primary: off })
+    out.push({ t: '发到手机 · 看示意码', href: '05-phone-relay.html?' + pay })
+    out.push({ t: '留在加工台' })
+    return out
+  }
+  function offNote () {
+    return scr.getAttribute('data-state') === 'device-off'
+      ? '<br><b>打印机离线，本机暂不能出纸</b>：先存「我的文档」或发到手机，换一台空闲机器再打。'
+      : ''
+  }
+
+  var FB = {
+    merge: function () {
+      var nm = '合成_20260808_0952.pdf'
+      return {
+        t: '已合成 1 份 PDF · 5 页 A4',
+        p: '<b>' + nm + '</b>（5 页 A4，约 2.6 MB）已生成，<b>5 张原图保留不动</b>。' +
+           '文件只留到本次会话结束，访问链接 30 分钟到期。' + offNote() +
+           '<br>接下来把它带去哪：金额一律在打印工作台核价，本页不收款。',
+        go: exits(nm, 5)
+      }
+    },
+    sign: function () {
+      var ck = document.querySelector('.pane[data-at="t2"] input[type="checkbox"]')
+      if (ck && !ck.checked) {
+        return {
+          warn: true,
+          t: '还没勾选授权，本次没有合成',
+          p: '合成签名前要由你确认「这份签名是我本人手写」。<b>本次没有生成任何文件</b>，' +
+             '原件也一个字没动。<br>回左边把那一项勾上，再按一次「授权并合成」。',
+          go: [{ t: '回去勾选授权', primary: true }]
+        }
+      }
+      var nm2 = '求职信_运营助理_已签.pdf'
+      return {
+        t: '已合成 1 份带签名的新文件',
+        p: '<b>' + nm2 + '</b>（1 页）已生成，<b>原件不变</b>。签名图像只用于本次合成，' +
+           '<b>会话结束即删除</b>；这不是具有法律效力的电子签名。' + offNote() +
+           '<br>接下来把它带去哪：',
+        go: exits(nm2, 1)
+      }
+    }
+  }
+
+  scr.addEventListener('click', function (e) {
+    var f = e.target.closest('[data-fb]')
+    if (f) { openFb(FB[f.getAttribute('data-fb')]()); return }
+  })
+  fb.addEventListener('click', function (e) { if (e.target === fb) closeFb() })
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>

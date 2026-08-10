@@ -86,6 +86,16 @@
 .pl-i b { color:#0f5a45; }
 .pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
            padding-top:9px; margin-top:14px; }
+/* 本域次要入口：主返回键按 ?from= 改去业务域之后，本域首屏不能没有门。
+   只在返回键被改走时由脚本插入；虚线边框表示它是次要出口，不抢主返回键。 */
+.actionbar > .altbtn {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 56px; padding: 0 var(--s-4); margin-right: var(--s-3);
+  white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+  background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+}
+.actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
 </style>
 </head>
 <body>
@@ -198,7 +208,9 @@
               本机能打印，也能把扫描件存进「我的文档」。
             </div>
             <div class="advice-act" style="margin-top:var(--s-3)">
-              <a class="btn btn--lg btn--quiet" href="12-material-factory.html">
+              <!-- 2026-08-10：带上 ?from=P18，材料工厂那边才能把返回键指回招聘会域，
+                   不然用户从校招走过去备完材料，返回键会把他放到简历域。 -->
+              <a class="btn btn--lg btn--quiet" href="12-material-factory.html?from=P18">
                 <svg class="ic"><use href="#i-package"/></svg>去备材料
               </a>
             </div>
@@ -694,6 +706,78 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P18 · 来源感知返回（2026-08-10 Codex 闭环整改 · 06/07/12/18 同一份登记表）
+   --------------------------------------------------------------------------
+   校园招聘专区由招聘会域（36 / 17）和智慧校园（19）两条路进入，
+   可左下返回键写死跳「招聘会」。用户从智慧校园点「看校招活动」进来，看完一按返回，
+   人被放到招聘会域首屏 —— **被悄悄换了域**，回不到刚才那个智慧校园页面。
+   现在按交接契约的 ?from=<页号> 查登记表：
+     · 认识且不同域 → 返回键 href 与副标签改成**真实来源域**（?from=P19 → 智慧校园），
+                      右边补一个「招聘会首页」次要入口（既能回业务域也能回本域）
+     · 同域 / 不认识 / 缺失 → 一个字不改，保留 HTML 里的默认父级（现有行为）
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  var D = {
+    P01: ['首页', '01-home-v5.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+
+  var alt = document.createElement('a')
+  alt.className = 'altbtn'
+  alt.setAttribute('href', own.f)
+  alt.textContent = own.n + '首页'
+  back.parentNode.insertBefore(alt, back.nextSibling)
+})()
+</script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

@@ -24,6 +24,16 @@
   .chip--info { cursor: inherit; }
   /* s1 六卡里被设备离线拦下的卡：置灰 + 不可点，原因写在卡面 chip 上 */
   .src[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+  /* 本域次要入口：主返回键按 ?from= 改去业务域之后，打印扫描域首屏不能没有门。
+     只在返回键被改走时由脚本插入；虚线边框表示它是次要出口，不抢主返回键。 */
+  .actionbar > .altbtn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 var(--s-4); margin-right: var(--s-3);
+    white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+    background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+    font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  }
+  .actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
 
   /* ════════ 2026-08-10 Codex 走查整改 ════════
      走查第一名：「上传入口根本不收文件」—— 六卡里前三张一按就跳到「材料体检」，
@@ -1681,6 +1691,97 @@
     if (fp) fp.textContent = pages ? (pages + ' 页') : '以本机体检为准'
     if (fs && src) fs.textContent = src.n + ' 送来'
   }
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P06 · ① 无交接时的默认入口　② 来源感知返回（2026-08-10 Codex 闭环整改）
+   --------------------------------------------------------------------------
+   ① 默认入口：直接点开打印工作台（没有任何交接参数）时，页面停在 s3 参数页，
+      顶上还挂着「本次来自：简历工作台 · 诊断报告 · 3 页」。没有人送过材料，
+      那张回执是编的，参数页也无从谈起 —— 现在无交接参数时落到 s1（选文件），
+      并把回执整条摘掉。`?stage=` 直达保持原样（评审要按阶段逐屏看）。
+
+   ② 来源感知返回：打印台是共享页，简历 / 招聘会 / 政策 / 校园 / 百宝箱都会把
+      材料送进来，可左下返回键写死回「打印扫描」。从招聘会带简历过来打完一按返回，
+      落在打印扫描域首屏 —— 业务上下文没了，得回首页重新找招聘会。
+      现在按交接契约的 ?from=<页号> 查登记表：
+        · 认识且不同域 → 返回键 href 与副标签改成**真实来源域**，
+                         右边补一个「打印扫描首页」次要入口（既能回业务域也能回本域）
+        · 同域 / 不认识 / 缺失 → 一个字不改，保留 HTML 里的默认父级（现有行为）
+      登记表只登「域根」；回到具体那一页是回执里「不是这份？回去换」那条链接的活。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+
+  /* ── ① 无交接参数 → 落 s1，并摘掉写死的来源回执 ── */
+  var KEYS = ['from', 'kind', 'title', 'pages', 'copies']
+  var handed = false
+  for (var i = 0; i < KEYS.length; i++) if (q.get(KEYS[i])) handed = true
+  if (!handed && !q.get('stage')) {
+    if (typeof window.v3Stage === 'function') window.v3Stage('s1')
+    var rc = document.getElementById('handoff')
+    if (rc && rc.parentNode) rc.parentNode.removeChild(rc)
+  }
+
+  /* ── ② 来源感知返回 ── */
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var from = (q.get('from') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6)
+  /* 域根登记表：页号 → [域名, 域首屏文件]。与各页自己的 backbtn 去处一致。 */
+  var D = {
+    P01: ['首页', '01-home-v5.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return          /* 同域进来的，现有去处本来就对 */
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+
+  var alt = document.createElement('a')
+  alt.className = 'altbtn'
+  alt.setAttribute('href', own.f)
+  alt.textContent = own.n + '首页'
+  back.parentNode.insertBefore(alt, back.nextSibling)
 })()
 </script>
 <script src="scripts/audit-plus.js?v=13"></script>
