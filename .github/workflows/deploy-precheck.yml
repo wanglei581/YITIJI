@@ -691,7 +691,7 @@ jobs:
               MODULE_ERROR="$TMP_ROOT/module-${MODULE_LABELS[$INDEX]}.error"
               if ! (
                 cd "$SRC_ROOT/services/api"
-                node -r @swc-node/register -e "require('${MODULE_PATHS[$INDEX]}')" \
+                node --experimental-strip-types -e "require('${MODULE_PATHS[$INDEX]}')" \
                   >/dev/null 2>"$MODULE_ERROR"
               ); then
                 echo "INVENTORY_RESULT=execution_failed"
@@ -722,7 +722,7 @@ jobs:
             (
               cd "$SRC_ROOT/services/api"
               RW2_URL="$RW2_URL" RW2_DATABASE="$RW2_DATABASE" AUTHORIZED_UNTIL="$AUTHORIZED_UNTIL" \
-                node -r @swc-node/register <<'JS'
+                node --experimental-strip-types <<'JS'
             const { withRecruitmentWave2Readonly } = require('./scripts/support/recruitment-wave2-readonly-db')
             const { collectFullInventory } = require('./scripts/support/recruitment-wave2-full-inventory')
             const config = {
@@ -774,7 +774,7 @@ jobs:
               RECRUITMENT_WAVE2_PUBLIC_API_BASE_URL=https://zyidai.cn/api/v1 \
               RECRUITMENT_WAVE2_EXPECTED_PUBLIC_API_ORIGIN=https://zyidai.cn \
               RECRUITMENT_WAVE2_EXPECTED_EXCLUDE_DEMO_PUBLIC_DATA=false \
-              node -r @swc-node/register scripts/recruitment-wave2-full-inventory.ts \
+              node --experimental-strip-types scripts/recruitment-wave2-full-inventory.ts \
               >"$REPORT_TMP" 2>"$ERROR_TMP"
             )
             CLI_STATUS=$?
