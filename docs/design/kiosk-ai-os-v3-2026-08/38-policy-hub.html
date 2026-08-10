@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>P36 招聘会 · 域首屏 — AI 求职操作系统 V3</title>
-<meta name="screen-name" content="P36 招聘会域首屏">
+<title>P38 政策服务 · 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P38 政策服务域首屏">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
@@ -18,22 +18,20 @@
 <style>
 /* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
    骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
-   ① 文字密度：每卡正文只留一行（≤20 字）。合规、隐私、免责整页只在页脚写一条，
-      不在每张卡上重复 —— 用户不读满屏小字，只找"下一步点哪"。
-   ② 需要输入才能出结果的 AI 卡，把「先给什么」做成**可点的选择**（.pick），
-      不写成描述句。一体机没有定位权限，城市默认取**本机所在城市**并且可改，
-      不写"根据定位"。缺哪项先问，不猜。
+   ① 文字密度：每卡正文只留一行（≤20 字）。合规、免责整页只在页脚写一条。
+   ② 需要输入才能出结果的 AI 卡（政策条件核对要个人情况），把「先给什么」
+      做成**可点的选择**（.pick）：身份 / 参保状态 / 城市。城市默认取本机所在城市
+      并且可改，一体机没有定位权限，不写"根据定位"。缺哪项先问，不替你填。
    ③ 右上角标记必挂：AI 卡 chip「AI · 仅供参考」，非 AI 卡 chip--info「不依赖 AI」。
-   ai-down：AI 带整块换成四个照常能办的真入口；AI 卡置灰并各自给替代路径。
-   device-off：只影响打印类卡。
+   本页红线：政策结论一律「以经办窗口审核为准」，不出现"你一定能办 / 一定能领"。
+   ai-down：AI 带整块换成四个照常能办的真入口；AI 卡置灰并给替代路径。
+   device-off：只影响打印类入口。
    ──────────────────────────────────────────────────────────────── */
 .work--hub { grid-template-columns: 1fr; }
 
-/* 域副标题（占 .rail 槽位） */
 .dsub { flex: 1 1 auto; min-width: 0; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.45; }
 .dsub b { color: var(--fog-900); font-weight: 600; }
 
-/* 服务状态条 */
 .rdy { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
   min-height: 68px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
   background: var(--surf-1); border: 1px solid var(--brd-1); }
@@ -63,20 +61,18 @@
 .aibtn:hover { border-color: var(--jade-a32); transform: translateY(-2px); }
 .aibtn em { font-style: normal; font-size: var(--fz-1); font-weight: 400; color: var(--fog-600); line-height: 1.4; }
 .aibtn[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
+.aibtn--off { opacity: .68; }
 .aibar-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
 .aibar-note b { color: var(--fog-800); }
-/* ai-down：整带换成四个照常能办的真入口，不留空的 AI 壳子 */
 .aibar--down { border-color: var(--amber-a20); background: var(--amber-a12); }
 .aibar--down .aibar-hd > .ic { color: var(--amber-400); }
 
-/* ── 子能力卡（2 列） ──
-   顶边与图标用「招聘会 · 赤陶」服务身份色（README §6.1）；
-   AI / 非 AI 只由右上角标记说，不靠颜色暗示。 */
+/* ── 子能力卡（2 列）── 顶边与图标用「政策服务 · 石板蓝」服务身份色（README §6.1） */
 .dgrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
 .dcard { position: relative; overflow: hidden; min-height: 180px;
   border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
   background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-  border-top: 3px solid var(--cat-fair);
+  border-top: 3px solid var(--cat-policy);
   box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur));
   text-decoration: none; color: inherit; cursor: pointer;
   display: flex; flex-direction: column; gap: var(--s-3);
@@ -86,7 +82,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dcard-hd { display: flex; align-items: center; gap: var(--s-3); }
 .dcard-ic { width: 52px; height: 52px; border-radius: var(--r-sm); flex: 0 0 auto;
   display: grid; place-items: center;
-  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-fair); }
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-policy); }
 .dcard-ic .ic { width: 27px; height: 27px; }
 .dcard-hd .chip { margin-left: auto; flex: 0 0 auto; }
 .dcard-nm { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
@@ -115,27 +111,22 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .pick--empty .v { color: var(--amber-200); }
 .dcard--pick .dcard-go { min-height: 48px; text-decoration: none; }
 
-/* ai-down：AI 卡置灰（主动作仍是真链接，去向那一页的非 AI 部分照常） */
+/* ai-down：AI 卡置灰（主动作仍是真链接，政策原文与清单照常） */
 .screen[data-state="ai-down"] .dcard--ai { opacity: .72; border-color: var(--brd-1);
   border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
 .screen[data-state="ai-down"] .dcard--ai .dcard-nm,
 .screen[data-state="ai-down"] .dcard--ai .dcard-go,
 .screen[data-state="ai-down"] .dcard--ai .dcard-ic { color: var(--fog-600); }
-/* device-off：只影响打印类卡 */
-.screen[data-state="device-off"] .dcard--print { opacity: .72; border-color: var(--brd-1);
-  border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
-.screen[data-state="device-off"] .dcard--print .dcard-nm,
-.screen[data-state="device-off"] .dcard--print .dcard-go,
-.screen[data-state="device-off"] .dcard--print .dcard-ic { color: var(--fog-600); }
 
-/* 整行卡（首张大卡 + 整行卡）：横排，图标 / 文案 / 右侧标记与主动作 */
+/* 整行卡（首张大卡 + 整行的选择型 AI 卡）：横排，图标 / 文案与选择 / 右侧标记与主动作。
+   选择型卡竖排会把「图标行 + 标题 + 说明 + 选择 + 提示 + 主动作」堆到 310px 以上，
+   格子放不下就会被裁 —— 整行时改横排，高度回到 190px 左右。 */
 .dcard--row { flex-direction: row; align-items: center; gap: var(--s-5); min-height: 150px; }
 .dcard--row .dcard-bd { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
 .dcard--row .dcard-rt { margin-left: auto; flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-4); }
 .dcard--row .dcard-go { margin-top: 0; }
 .dcard--hero, .dcard--wide { grid-column: 1 / -1; }
-.dcard--wide { min-height: 150px; }
 
 /* ── 次卡：记录类，明细归业务页 ── */
 .dmore { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
@@ -155,7 +146,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dmore-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dmore-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
 .dmore-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
-/* 数量单独一行：真实环境常年是 0，不许编一个数，也不许把 0 藏进句子里 */
+/* 数量单独一行：真实环境常年是 0，不许编一个数 */
 .dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
 .dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
 </style>
@@ -174,19 +165,19 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">招聘会信息</div>
-        <div class="brand-sub">职易达 · 01 号机 · 第三方与官方来源</div>
+        <div class="brand-name">政策服务</div>
+        <div class="brand-sub">职易达 · 01 号机 · 官方来源 · 不代办</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>本机与来源服务在线</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 场次照常</div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>政策数据与官方入口在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 政策原文照常</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响打印</div>
     <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
   </header>
 
   <div class="rail">
-    <span class="dsub">场次查询&nbsp;· 校园专场&nbsp;· AI参会规划&nbsp;· 材料打印，<b>投递预约请前往来源平台</b></span>
+    <span class="dsub">就业政策&nbsp;· 社保指南&nbsp;· 档案登记&nbsp;· 补贴指引，<b>一切以经办窗口审核为准</b></span>
     <span class="rail-count">域首屏&nbsp;· <b>6</b> 个子能力</span>
   </div>
 
@@ -205,14 +196,14 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <span class="dot dot--down"></span>
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
-          <span class="rdy-s">停掉的只有排顺序与生成清单；场次、签到、打印照常</span>
+          <span class="rdy-s">停掉的只有条件对照；政策原文、办事清单、官方入口照常</span>
         </span>
       </div>
       <div class="rdy rdy--warn" data-when="device-off">
         <span class="dot dot--down"></span>
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，本机打印机离线</span>
-          <span class="rdy-s">只影响资料打印这一张卡，其余照常</span>
+          <span class="rdy-s">查政策照常，只有把要点打出来要换机取回</span>
         </span>
       </div>
 
@@ -220,15 +211,16 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div class="aibar" data-when="default first device-off">
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
-          <span class="aibar-t">你想做哪件事</span>
+          <span class="aibar-t">你要办哪件事</span>
           <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
         </div>
         <div class="aiuse">
-          <button class="aibtn" type="button" data-spot="c-social c-campus" aria-pressed="false">我要挑一场去<em>先看有哪些场次</em></button>
-          <button class="aibtn" type="button" data-spot="c-plan" aria-pressed="false">帮我排逛展顺序<em>先选城市、时间、方向</em></button>
-          <button class="aibtn" type="button" data-spot="c-material" aria-pressed="false">去之前带什么材料<em>按这一场列清单</em></button>
+          <button class="aibtn" type="button" data-spot="c-ai" aria-pressed="false">说说我的情况<em>对照能办哪些</em></button>
+          <button class="aibtn" type="button" data-spot="c-ai c-subsidy" aria-pressed="false">这一项要带什么材料<em>生成办事清单</em></button>
+          <a class="aibtn" data-when="default first" href="06-print-workbench.html?stage=s3">我要打印政策要点<em>去打印工作台核价</em></a>
+          <a class="aibtn aibtn--off" data-when="device-off" href="06-print-workbench.html?stage=s3">我要打印政策要点<em>打印机离线 · 先存我的文档</em></a>
         </div>
-        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只排顺序和列清单，<b>不替你报名或预约</b>。</div>
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只做条件对照与材料清单，<b>能不能办以经办窗口审核为准</b>。</div>
       </div>
 
       <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
@@ -239,22 +231,22 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
-          <a class="aibtn" href="17-fair-desk.html">看场次<em>时间、地点、企业名录</em></a>
-          <a class="aibtn" href="17-fair-desk.html">扫码签到<em>到场扫主办方的码</em></a>
-          <a class="aibtn" href="17-fair-desk.html">看展位图<em>顺序自己定</em></a>
-          <a class="aibtn" href="06-print-workbench.html?stage=s3">打印材料<em>简历与活动资料</em></a>
+          <a class="aibtn" href="21-policy.html">政策原文<em>官方发布口径</em></a>
+          <a class="aibtn" href="21-policy.html">办事材料清单<em>按事项列，不按人</em></a>
+          <a class="aibtn" href="21-policy.html">官方办理入口<em>去官方渠道办</em></a>
+          <a class="aibtn" href="06-print-workbench.html?stage=s3">打印政策要点<em>本机直接打印</em></a>
         </div>
       </div>
 
       <!-- ── 六张子能力卡 ── -->
       <div class="dgrid">
 
-        <!-- 1 社会招聘会（首张大卡 · 非 AI） -->
-        <a class="dcard dcard--hero dcard--row" id="c-social" href="17-fair-desk.html">
-          <span class="dcard-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+        <!-- 1 就业政策（首张大卡 · 非 AI） -->
+        <a class="dcard dcard--hero dcard--row" id="c-employ" href="21-policy.html">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
           <span class="dcard-bd">
-            <span class="dcard-nm">社会招聘会</span>
-            <span class="dcard-ds">场次、参会企业、时间和地点</span>
+            <span class="dcard-nm">就业政策</span>
+            <span class="dcard-ds">就业补贴、灵活就业等官方口径原文</span>
           </span>
           <span class="dcard-rt">
             <span class="chip chip--info">不依赖 AI</span>
@@ -262,93 +254,85 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           </span>
         </a>
 
-        <!-- 2 校园招聘会（非 AI） -->
-        <a class="dcard" id="c-campus" href="18-campus.html">
+        <!-- 2 社保指南（非 AI） -->
+        <a class="dcard" id="c-social" href="21-policy.html">
           <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
+            <span class="dcard-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
-          <span class="dcard-nm">校园招聘会</span>
-          <span class="dcard-ds">高校与机构的校园专场，含预约入口</span>
-          <span class="dcard-go">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-nm">社保指南</span>
+          <span class="dcard-ds">参保流程与办事材料清单</span>
+          <span class="dcard-hint">城镇职工与灵活就业两类险种说明</span>
+          <span class="dcard-go">看社保指南<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 3 扫码签到（非 AI） -->
-        <a class="dcard" id="c-checkin" href="17-fair-desk.html">
+        <!-- 3 档案与登记（非 AI） -->
+        <a class="dcard" id="c-archive" href="21-policy.html">
           <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
+            <span class="dcard-ic"><svg class="ic"><use href="#i-folder"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
-          <span class="dcard-nm">扫码签到</span>
-          <span class="dcard-ds">现场签到二维码展示与识别引导</span>
-          <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-nm">档案与登记</span>
+          <span class="dcard-ds">档案托管、就业登记与证明开具</span>
+          <span class="dcard-hint">按事项列材料，去哪办也写在里面</span>
+          <span class="dcard-go">看办理指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
 
-        <!-- 4 AI 参会规划（AI · 先选三样再排） -->
-        <div class="dcard dcard--ai dcard--pick" id="c-plan">
+        <!-- 4 补贴指引（非 AI） -->
+        <a class="dcard" id="c-subsidy" href="21-policy.html">
           <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+            <span class="dcard-ic"><svg class="ic"><use href="#i-ticket"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">补贴指引</span>
+          <span class="dcard-ds">失业保险、创业扶持与官方办理入口</span>
+          <span class="dcard-hint">只做说明与指引，不代办、不承诺到账</span>
+          <span class="dcard-go">看补贴指引<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 5 政策收藏（非 AI） -->
+        <a class="dcard" id="c-fav" href="21-policy.html">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-bookmark"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">政策收藏</span>
+          <span class="dcard-ds">收藏过的政策条目，方便回头再看</span>
+          <span class="dcard-hint" data-when="default ai-down device-off">本次会话 0 条</span>
+          <span class="dcard-hint" data-when="first">未登录，0 条，这一趟收藏的也留不下</span>
+          <span class="dcard-go">看我的收藏<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 6 AI 政策助手（AI · 先给三样再对照 · 整行横排） -->
+        <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-ai">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">AI政策助手</span>
+            <span class="dcard-ds" data-when="default first device-off">按你的情况对照能办哪些，再列要带的材料</span>
+            <span class="dcard-ds" data-when="ai-down">政策原文与办事清单照常看，条件自己对</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-opts="应届毕业生|失业登记|灵活就业|在职">
+                <span class="k">身份</span><span class="v">应届毕业生</span></button>
+              <button class="pick" type="button" data-when="default device-off" data-opts="灵活就业参保|城镇职工参保|暂未参保">
+                <span class="k">参保</span><span class="v">灵活就业参保</span></button>
+              <button class="pick pick--empty" type="button" data-when="first" data-opts="灵活就业参保|城镇职工参保|暂未参保">
+                <span class="k">参保</span><span class="v">未选</span></button>
+              <button class="pick" type="button" data-opts="广州 · 天河区|广州 · 越秀区|广州 · 海珠区|全广州">
+                <span class="k">城市</span><span class="v">广州 · 天河区</span></button>
+            </span>
+            <span class="dcard-hint" data-when="default device-off">城市默认本机所在地，点一下可改；缺哪项先问你，不替你填</span>
+            <span class="dcard-hint" data-when="first">城市默认本机所在地；没登录就手选，缺哪项先问你</span>
+          </span>
+          <span class="dcard-rt">
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
             <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <a class="dcard-go" data-when="default first device-off" href="21-policy.html">对照我能办哪些<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="21-policy.html">只看政策原文<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
-          <span class="dcard-nm">AI参会规划</span>
-          <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
-          <span class="dcard-ds" data-when="ai-down">展位图与企业名录照常看，顺序自己定</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="广州 · 天河区|广州 · 越秀区|广州 · 海珠区|全广州">
-              <span class="k">城市</span><span class="v">广州 · 天河区</span></button>
-            <button class="pick" type="button" data-opts="本周|本月|指定日期">
-              <span class="k">时间</span><span class="v">本周</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
-          </div>
-          <span class="dcard-hint" data-when="default device-off">城市默认本机所在地，点一下可改；方向取自你的简历</span>
-          <span class="dcard-hint" data-when="first">城市默认本机所在地；没登录就手选方向，缺哪项先问你，不猜</span>
-          <a class="dcard-go" data-when="default first device-off" href="17-fair-desk.html">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="17-fair-desk.html">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
         </div>
-
-        <!-- 5 求职材料准备（AI · 先选场次与方向） -->
-        <div class="dcard dcard--ai dcard--pick" id="c-material">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
-          </span>
-          <span class="dcard-nm">求职材料准备</span>
-          <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
-          <span class="dcard-ds" data-when="ai-down">求职信、自我介绍、清单模板都是现成的</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
-              <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
-          </div>
-          <span class="dcard-hint" data-when="default first device-off">没选场次就先让你选，带几份由你最后定</span>
-          <a class="dcard-go" data-when="default first device-off" href="12-material-factory.html">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="12-material-factory.html">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-        </div>
-
-        <!-- 6 活动资料打印（非 AI） -->
-        <a class="dcard dcard--wide dcard--print" id="c-print" href="06-print-workbench.html?stage=s3">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
-            <span class="chip chip--info">不依赖 AI</span>
-          </span>
-          <span class="dcard-nm">活动资料打印</span>
-          <span class="dcard-ds" data-when="default first ai-down">上传或扫描材料，本机直接打印</span>
-          <span class="dcard-ds" data-when="device-off">打印机离线，材料可先存进我的文档，换机取回</span>
-          <span class="dcard-hint" data-when="default first ai-down">本页不出价，以打印工作台核价为准</span>
-          <span class="dcard-go" data-when="default first ai-down">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-          <span class="dcard-go" data-when="device-off">先存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-        </a>
       </div>
 
-      <!-- ── 次卡：记录类，明细归招聘会业务页 ── -->
+      <!-- ── 次卡：记录类，明细归政策业务页 ── -->
       <div class="dmore">
         <div class="dmore-hd">
           <b>快捷入口</b>
@@ -356,23 +340,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span data-when="first">未登录，记录留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="17-fair-desk.html">
+          <a class="dmore-go" href="21-policy.html">
             <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
             <span class="dmore-b">
               <span class="dmore-t">浏览记录</span>
-              <span class="dmore-s">查看最近浏览的招聘会</span>
+              <span class="dmore-s">查看最近浏览的政策条目</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="17-fair-desk.html">
-            <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+          <a class="dmore-go" href="21-policy.html">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-history"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">外部跳转记录</span>
-              <span class="dmore-s">查看已前往来源平台的记录</span>
-              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 次</span>
-              <span class="dmore-n" data-when="first">未登录 · 0 次</span>
+              <span class="dmore-t">AI政策问答记录</span>
+              <span class="dmore-s">查看历次条件对照与问答</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
@@ -382,21 +366,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <!-- ── 页脚：整页只此一条合规声明 ── -->
       <div class="notice">
         <svg class="ic"><use href="#i-shield"/></svg>
-        <span>招聘会信息来自第三方或官方来源；预约、报名请前往来源平台完成，本终端只提供信息展示与跳转入口。</span>
+        <span>政策信息来自官方发布，仅供参考；本终端只做政策说明与材料指引，<b>不代办、不承诺办理结果</b>，
+          能不能办、能不能领一律<b>以经办窗口审核为准</b>。</span>
       </div>
     </div>
   </div>
 
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">预约报名在来源平台完成</div></div>
-      <div data-when="first"><div class="t">不登录也能用，六张卡一张都不锁</div><div class="s">这一趟的记录留不下，离场即清</div></div>
-      <div data-when="ai-down"><div class="t">AI 暂不可用，场次、签到、打印照常</div><div class="s">停掉的只有排顺序与生成清单</div></div>
-      <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
+      <div data-when="default"><div class="t">先说你的情况，再看能办哪些</div><div class="s">结论以经办窗口审核为准，本机不代办</div></div>
+      <div data-when="first"><div class="t">不登录也能查，六张卡一张都不锁</div><div class="s">这一趟的浏览与收藏留不下，离场即清</div></div>
+      <div data-when="ai-down"><div class="t">AI 暂不可用，政策原文与清单照常</div><div class="s">停掉的只有按你情况做的条件对照</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，查政策不受影响</div><div class="s">要点可先存我的文档，换机取回再打</div></div>
     </div>
 
-    <a class="btn btn--lg btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
-    <a class="btn btn--primary" href="17-fair-desk.html">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--lg btn--ghost" data-when="default first ai-down" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>打印政策要点</a>
+    <a class="btn btn--lg btn--ghost" data-when="device-off" href="06-print-workbench.html?stage=s3"><svg class="ic"><use href="#i-printer"/></svg>先存我的文档</a>
+    <a class="btn btn--primary" href="21-policy.html">查看政策<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
@@ -419,7 +405,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   scr.addEventListener('click', function (e) {
     if (!e.target.closest) return
 
-    /* ① 卡上的输入项：点一下换一个值。缺输入时先变成真实取值，再进下一页 */
+    /* ① 卡上的输入项：点一下换一个值。未选时先落到真实取值，再进下一页 */
     var p = e.target.closest('.pick')
     if (p) {
       var opts = (p.getAttribute('data-opts') || '').split('|')

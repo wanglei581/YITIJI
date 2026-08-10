@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-store">
-<title>P36 招聘会 · 域首屏 — AI 求职操作系统 V3</title>
-<meta name="screen-name" content="P36 招聘会域首屏">
+<title>P37 AI 面试训练 · 域首屏 — AI 求职操作系统 V3</title>
+<meta name="screen-name" content="P37 面试训练域首屏">
 <link rel="stylesheet" href="styles/tokens.css?v=3">
 <link rel="stylesheet" href="styles/base.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=9">
@@ -18,22 +18,19 @@
 <style>
 /* ── 域首屏专用（P36/P37/P38 三页同一套；不改任何共享文件）──────────────
    骨架照 13-jobs-desk / 27-toolbox。三条本页自定的规矩：
-   ① 文字密度：每卡正文只留一行（≤20 字）。合规、隐私、免责整页只在页脚写一条，
-      不在每张卡上重复 —— 用户不读满屏小字，只找"下一步点哪"。
-   ② 需要输入才能出结果的 AI 卡，把「先给什么」做成**可点的选择**（.pick），
-      不写成描述句。一体机没有定位权限，城市默认取**本机所在城市**并且可改，
-      不写"根据定位"。缺哪项先问，不猜。
+   ① 文字密度：每卡正文只留一行（≤20 字）。合规、免责整页只在页脚写一条。
+   ② 需要输入才能出结果的 AI 卡，把「先给什么」做成**可点的选择**（.pick）：
+      出题要岗位类型与难度，规划要目标方向与时间跨度。缺哪项先问，不默认。
    ③ 右上角标记必挂：AI 卡 chip「AI · 仅供参考」，非 AI 卡 chip--info「不依赖 AI」。
+   本页红线：不出录用概率、通过率、面试打分排名；点评一律 E3 且不代表用人单位判断。
    ai-down：AI 带整块换成四个照常能办的真入口；AI 卡置灰并各自给替代路径。
-   device-off：只影响打印类卡。
+   device-off：本页无打印主卡，只影响「训练报告」那条次卡的打印。
    ──────────────────────────────────────────────────────────────── */
 .work--hub { grid-template-columns: 1fr; }
 
-/* 域副标题（占 .rail 槽位） */
 .dsub { flex: 1 1 auto; min-width: 0; font-size: var(--fz-3); color: var(--fog-700); line-height: 1.45; }
 .dsub b { color: var(--fog-900); font-weight: 600; }
 
-/* 服务状态条 */
 .rdy { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
   min-height: 68px; padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
   background: var(--surf-1); border: 1px solid var(--brd-1); }
@@ -65,18 +62,15 @@
 .aibtn[aria-pressed="true"] { border-color: var(--jade-400); background: var(--jade-a12); }
 .aibar-note { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.55; }
 .aibar-note b { color: var(--fog-800); }
-/* ai-down：整带换成四个照常能办的真入口，不留空的 AI 壳子 */
 .aibar--down { border-color: var(--amber-a20); background: var(--amber-a12); }
 .aibar--down .aibar-hd > .ic { color: var(--amber-400); }
 
-/* ── 子能力卡（2 列） ──
-   顶边与图标用「招聘会 · 赤陶」服务身份色（README §6.1）；
-   AI / 非 AI 只由右上角标记说，不靠颜色暗示。 */
+/* ── 子能力卡（2 列）── 顶边与图标用「面试训练 · 湖青」服务身份色（README §6.1） */
 .dgrid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
 .dcard { position: relative; overflow: hidden; min-height: 180px;
   border-radius: var(--r-md); padding: var(--s-4) var(--s-5);
   background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-  border-top: 3px solid var(--cat-fair);
+  border-top: 3px solid var(--cat-mock);
   box-shadow: var(--sh-2), var(--glass-hi); backdrop-filter: blur(var(--glass-blur));
   text-decoration: none; color: inherit; cursor: pointer;
   display: flex; flex-direction: column; gap: var(--s-3);
@@ -86,9 +80,10 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dcard-hd { display: flex; align-items: center; gap: var(--s-3); }
 .dcard-ic { width: 52px; height: 52px; border-radius: var(--r-sm); flex: 0 0 auto;
   display: grid; place-items: center;
-  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-fair); }
+  background: var(--surf-2); border: 1px solid var(--brd-2); color: var(--cat-mock); }
 .dcard-ic .ic { width: 27px; height: 27px; }
 .dcard-hd .chip { margin-left: auto; flex: 0 0 auto; }
+.dcard-ttl { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
 .dcard-nm { font-family: var(--ff-display); font-size: var(--fz-6); color: var(--fog-900);
   font-weight: 600; letter-spacing: .02em; line-height: 1.25; word-break: keep-all; }
 .dcard-ds { font-size: var(--fz-2); color: var(--fog-700); line-height: 1.5; }
@@ -121,21 +116,18 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .screen[data-state="ai-down"] .dcard--ai .dcard-nm,
 .screen[data-state="ai-down"] .dcard--ai .dcard-go,
 .screen[data-state="ai-down"] .dcard--ai .dcard-ic { color: var(--fog-600); }
-/* device-off：只影响打印类卡 */
-.screen[data-state="device-off"] .dcard--print { opacity: .72; border-color: var(--brd-1);
-  border-top-color: var(--ink-500); background: var(--surf-1); box-shadow: none; }
-.screen[data-state="device-off"] .dcard--print .dcard-nm,
-.screen[data-state="device-off"] .dcard--print .dcard-go,
-.screen[data-state="device-off"] .dcard--print .dcard-ic { color: var(--fog-600); }
+/* device-off：本页只有训练报告那条次卡涉及打印 */
+.screen[data-state="device-off"] .dmore-go--print { opacity: .78; border-color: var(--brd-1); }
 
-/* 整行卡（首张大卡 + 整行卡）：横排，图标 / 文案 / 右侧标记与主动作 */
+/* 整行卡（首张大卡 + 整行的选择型 AI 卡）：横排，图标 / 文案与选择 / 右侧标记与主动作。
+   选择型卡竖排会把「图标行 + 标题 + 说明 + 选择 + 提示 + 主动作」堆到 310px 以上，
+   半宽格放不下会被裁 —— 整行时改横排，高度回到 190px 左右。 */
 .dcard--row { flex-direction: row; align-items: center; gap: var(--s-5); min-height: 150px; }
 .dcard--row .dcard-bd { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
 .dcard--row .dcard-rt { margin-left: auto; flex: 0 0 auto;
   display: flex; flex-direction: column; align-items: flex-end; gap: var(--s-4); }
 .dcard--row .dcard-go { margin-top: 0; }
 .dcard--hero, .dcard--wide { grid-column: 1 / -1; }
-.dcard--wide { min-height: 150px; }
 
 /* ── 次卡：记录类，明细归业务页 ── */
 .dmore { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--s-3); }
@@ -155,7 +147,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
 .dmore-b { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .dmore-t { font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
 .dmore-s { font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
-/* 数量单独一行：真实环境常年是 0，不许编一个数，也不许把 0 藏进句子里 */
+/* 数量单独一行：真实环境常年是 0，不许编一个数 */
 .dmore-n { font-size: var(--fz-1); color: var(--fog-700); font-family: var(--ff-num); letter-spacing: .03em; white-space: nowrap; }
 .dmore-go > .chip { margin-left: auto; flex: 0 0 auto; }
 </style>
@@ -174,19 +166,19 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
     <a class="brand" href="01-home-v5.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">招聘会信息</div>
-        <div class="brand-sub">职易达 · 01 号机 · 第三方与官方来源</div>
+        <div class="brand-name">AI 面试训练</div>
+        <div class="brand-sub">职易达 · 01 号机 · 练习用，结果只给你本人</div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
-    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>本机与来源服务在线</div>
-    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 场次照常</div>
+    <div class="devpill" data-when="default first"><span class="dot dot--live"></span>训练与评估服务在线</div>
+    <div class="devpill" data-when="ai-down"><span class="dot dot--down"></span>AI 暂不可用 · 题目照常</div>
     <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 只影响打印</div>
     <div class="clock" data-clock>2026年8月10日 <b>14:20</b></div>
   </header>
 
   <div class="rail">
-    <span class="dsub">场次查询&nbsp;· 校园专场&nbsp;· AI参会规划&nbsp;· 材料打印，<b>投递预约请前往来源平台</b></span>
+    <span class="dsub">模拟问答&nbsp;· 自我评估&nbsp;· 面试技巧&nbsp;· 训练报告，<b>仅供练习参考</b></span>
     <span class="rail-count">域首屏&nbsp;· <b>6</b> 个子能力</span>
   </div>
 
@@ -205,14 +197,14 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
         <span class="dot dot--down"></span>
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，AI 能力暂不可用</span>
-          <span class="rdy-s">停掉的只有排顺序与生成清单；场次、签到、打印照常</span>
+          <span class="rdy-s">停掉的是出题、点评与解读；题库、技巧、往期报告照常</span>
         </span>
       </div>
       <div class="rdy rdy--warn" data-when="device-off">
         <span class="dot dot--down"></span>
         <span class="rdy-b">
           <span class="rdy-t">在线服务已连接，本机打印机离线</span>
-          <span class="rdy-s">只影响资料打印这一张卡，其余照常</span>
+          <span class="rdy-s">练习与看报告照常，只有把复盘单打出来要换机</span>
         </span>
       </div>
 
@@ -220,15 +212,15 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <div class="aibar" data-when="default first device-off">
         <div class="aibar-hd">
           <svg class="ic"><use href="#i-brain"/></svg>
-          <span class="aibar-t">你想做哪件事</span>
+          <span class="aibar-t">你现在想做哪件事</span>
           <span class="ev ev--e3">E3 AI 判断，仅供参考</span>
         </div>
         <div class="aiuse">
-          <button class="aibtn" type="button" data-spot="c-social c-campus" aria-pressed="false">我要挑一场去<em>先看有哪些场次</em></button>
-          <button class="aibtn" type="button" data-spot="c-plan" aria-pressed="false">帮我排逛展顺序<em>先选城市、时间、方向</em></button>
-          <button class="aibtn" type="button" data-spot="c-material" aria-pressed="false">去之前带什么材料<em>按这一场列清单</em></button>
+          <button class="aibtn" type="button" data-spot="c-mock" aria-pressed="false">按岗位给我出题<em>先选岗位与难度</em></button>
+          <button class="aibtn" type="button" data-spot="c-report c-mock" aria-pressed="false">我刚练完想听点评<em>逐题点评在训练报告里</em></button>
+          <button class="aibtn" type="button" data-spot="c-assess" aria-pressed="false">我不知道自己适合什么<em>先做一次自我评估</em></button>
         </div>
-        <div class="aibar-note">点一个，下面对应的卡会亮起来；AI 只排顺序和列清单，<b>不替你报名或预约</b>。</div>
+        <div class="aibar-note">点一个，下面对应的卡会亮起来；点评标 E3，<b>不代表用人单位判断</b>。</div>
       </div>
 
       <!-- ── 顶部 AI 带（AI 不可用：整带换成四个照常能办的真入口）── -->
@@ -239,140 +231,151 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
           <span class="chip chip--info">已自动上报</span>
         </div>
         <div class="aiuse aiuse--4">
-          <a class="aibtn" href="17-fair-desk.html">看场次<em>时间、地点、企业名录</em></a>
-          <a class="aibtn" href="17-fair-desk.html">扫码签到<em>到场扫主办方的码</em></a>
-          <a class="aibtn" href="17-fair-desk.html">看展位图<em>顺序自己定</em></a>
-          <a class="aibtn" href="06-print-workbench.html?stage=s3">打印材料<em>简历与活动资料</em></a>
+          <a class="aibtn" href="20-interview-pod.html">只看题目<em>自己写答案、自己掐时间</em></a>
+          <a class="aibtn" href="20-interview-pod.html">面试技巧<em>常见问题与谈薪要点</em></a>
+          <a class="aibtn" href="28-self-assessment.html">往期报告<em>已生成的都还在</em></a>
+          <a class="aibtn" href="11-jobfit-compare.html">薪资区间<em>来源方原文转录</em></a>
         </div>
       </div>
 
       <!-- ── 六张子能力卡 ── -->
       <div class="dgrid">
 
-        <!-- 1 社会招聘会（首张大卡 · 非 AI） -->
-        <a class="dcard dcard--hero dcard--row" id="c-social" href="17-fair-desk.html">
-          <span class="dcard-ic"><svg class="ic"><use href="#i-fair"/></svg></span>
+        <!-- 1 开始模拟面试（首张大卡 · AI · 先选三样再开始） -->
+        <div class="dcard dcard--hero dcard--row dcard--ai dcard--pick" id="c-mock">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-interview"/></svg></span>
           <span class="dcard-bd">
-            <span class="dcard-nm">社会招聘会</span>
-            <span class="dcard-ds">场次、参会企业、时间和地点</span>
+            <span class="dcard-ttl">
+              <span class="dcard-nm">开始模拟面试</span>
+              <span class="chip chip--jade chip--label" data-when="default first device-off">立即开始</span>
+              <span class="chip chip--info" data-when="ai-down">只看题目</span>
+            </span>
+            <span class="dcard-ds" data-when="default first device-off">练完即时出报告：逐题点评加复盘单</span>
+            <span class="dcard-ds" data-when="ai-down">题库照常进，自己写答案；点评等 AI 恢复</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
+                <span class="k">岗位</span><span class="v">运营</span></button>
+              <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
+                <span class="k">岗位</span><span class="v">未选</span></button>
+              <button class="pick" type="button" data-opts="中等|入门|进阶">
+                <span class="k">难度</span><span class="v">中等</span></button>
+              <button class="pick" type="button" data-opts="6 题 · 约 15 分钟|10 题 · 约 25 分钟|3 题 · 约 8 分钟">
+                <span class="k">题量</span><span class="v">6 题 · 约 15 分钟</span></button>
+            </span>
+            <span class="dcard-hint" data-when="default first device-off">没选岗位就先问你，不给你默认一个</span>
           </span>
           <span class="dcard-rt">
-            <span class="chip chip--info">不依赖 AI</span>
-            <span class="dcard-go">进入<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <a class="dcard-go" data-when="default first device-off" href="20-interview-pod.html">开始这一场<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="20-interview-pod.html">只看题目<svg class="ic"><use href="#i-arrowRight"/></svg></a>
           </span>
-        </a>
+        </div>
 
-        <!-- 2 校园招聘会（非 AI） -->
-        <a class="dcard" id="c-campus" href="18-campus.html">
+        <!-- 2 职业自我评估（AI · 无需先填，答题即输入） -->
+        <a class="dcard dcard--ai" id="c-assess" href="28-self-assessment.html">
           <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-campus"/></svg></span>
-            <span class="chip chip--info">不依赖 AI</span>
-          </span>
-          <span class="dcard-nm">校园招聘会</span>
-          <span class="dcard-ds">高校与机构的校园专场，含预约入口</span>
-          <span class="dcard-go">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-        </a>
-
-        <!-- 3 扫码签到（非 AI） -->
-        <a class="dcard" id="c-checkin" href="17-fair-desk.html">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-qr"/></svg></span>
-            <span class="chip chip--info">不依赖 AI</span>
-          </span>
-          <span class="dcard-nm">扫码签到</span>
-          <span class="dcard-ds">现场签到二维码展示与识别引导</span>
-          <span class="dcard-go">去招聘会台<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-        </a>
-
-        <!-- 4 AI 参会规划（AI · 先选三样再排） -->
-        <div class="dcard dcard--ai dcard--pick" id="c-plan">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+            <span class="dcard-ic"><svg class="ic"><use href="#i-target"/></svg></span>
             <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
             <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
           </span>
-          <span class="dcard-nm">AI参会规划</span>
-          <span class="dcard-ds" data-when="default first device-off">排出去哪几场、几点到、先逛哪几个展位</span>
-          <span class="dcard-ds" data-when="ai-down">展位图与企业名录照常看，顺序自己定</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="广州 · 天河区|广州 · 越秀区|广州 · 海珠区|全广州">
-              <span class="k">城市</span><span class="v">广州 · 天河区</span></button>
-            <button class="pick" type="button" data-opts="本周|本月|指定日期">
-              <span class="k">时间</span><span class="v">本周</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
-          </div>
-          <span class="dcard-hint" data-when="default device-off">城市默认本机所在地，点一下可改；方向取自你的简历</span>
-          <span class="dcard-hint" data-when="first">城市默认本机所在地；没登录就手选方向，缺哪项先问你，不猜</span>
-          <a class="dcard-go" data-when="default first device-off" href="17-fair-desk.html">按这三项排顺序<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="17-fair-desk.html">只看展位图与名录<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-        </div>
+          <span class="dcard-nm">职业自我评估</span>
+          <span class="dcard-ds" data-when="default first device-off">答问卷，得优势、薄弱项与方向参考</span>
+          <span class="dcard-ds" data-when="ai-down">题目照常答，解读等 AI 恢复再出</span>
+          <span class="dcard-hint" data-when="default first device-off">陈述式解读，没有分数、没有人格标签</span>
+          <span class="dcard-go" data-when="default first device-off">做一次评估<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-go" data-when="ai-down">先答题，解读稍后<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
 
-        <!-- 5 求职材料准备（AI · 先选场次与方向） -->
-        <div class="dcard dcard--ai dcard--pick" id="c-material">
+        <!-- 3 面试技巧（非 AI） -->
+        <a class="dcard" id="c-tips" href="20-interview-pod.html">
           <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-package"/></svg></span>
-            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
-            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
-          </span>
-          <span class="dcard-nm">求职材料准备</span>
-          <span class="dcard-ds" data-when="default first device-off">列出带几份简历、带哪些证明材料</span>
-          <span class="dcard-ds" data-when="ai-down">求职信、自我介绍、清单模板都是现成的</span>
-          <div class="picks" data-when="default first device-off">
-            <button class="pick" type="button" data-opts="8月12日 · 综合场|8月15日 · 校园专场|还没定">
-              <span class="k">场次</span><span class="v">8月12日 · 综合场</span></button>
-            <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">运营</span></button>
-            <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
-              <span class="k">方向</span><span class="v">未选</span></button>
-          </div>
-          <span class="dcard-hint" data-when="default first device-off">没选场次就先让你选，带几份由你最后定</span>
-          <a class="dcard-go" data-when="default first device-off" href="12-material-factory.html">生成材料清单<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-          <a class="dcard-go" data-when="ai-down" href="12-material-factory.html">用现成模板自己填<svg class="ic"><use href="#i-arrowRight"/></svg></a>
-        </div>
-
-        <!-- 6 活动资料打印（非 AI） -->
-        <a class="dcard dcard--wide dcard--print" id="c-print" href="06-print-workbench.html?stage=s3">
-          <span class="dcard-hd">
-            <span class="dcard-ic"><svg class="ic"><use href="#i-printer"/></svg></span>
+            <span class="dcard-ic"><svg class="ic"><use href="#i-book"/></svg></span>
             <span class="chip chip--info">不依赖 AI</span>
           </span>
-          <span class="dcard-nm">活动资料打印</span>
-          <span class="dcard-ds" data-when="default first ai-down">上传或扫描材料，本机直接打印</span>
-          <span class="dcard-ds" data-when="device-off">打印机离线，材料可先存进我的文档，换机取回</span>
-          <span class="dcard-hint" data-when="default first ai-down">本页不出价，以打印工作台核价为准</span>
-          <span class="dcard-go" data-when="default first ai-down">去打印工作台核价<svg class="ic"><use href="#i-arrowRight"/></svg></span>
-          <span class="dcard-go" data-when="device-off">先存我的文档<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+          <span class="dcard-nm">面试技巧</span>
+          <span class="dcard-ds">常见问题、自我介绍模板、谈薪要点</span>
+          <span class="dcard-hint">人工整理的静态要点，内容不随人变</span>
+          <span class="dcard-go">看技巧要点<svg class="ic"><use href="#i-arrowRight"/></svg></span>
         </a>
+
+        <!-- 4 评估历史（非 AI） -->
+        <a class="dcard" id="c-history" href="28-self-assessment.html">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-history"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">评估历史</span>
+          <span class="dcard-ds">历次自我评估报告，只列你本人的</span>
+          <span class="dcard-hint" data-when="default ai-down device-off">本次会话 0 份</span>
+          <span class="dcard-hint" data-when="first">未登录，0 份，这一趟做的也留不下</span>
+          <span class="dcard-go">翻往期记录<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 5 行业薪资参考（非 AI · 原文转录） -->
+        <a class="dcard" id="c-salary" href="11-jobfit-compare.html">
+          <span class="dcard-hd">
+            <span class="dcard-ic"><svg class="ic"><use href="#i-card"/></svg></span>
+            <span class="chip chip--info">不依赖 AI</span>
+          </span>
+          <span class="dcard-nm">行业薪资参考</span>
+          <span class="dcard-ds">目标岗位的薪资区间与谈薪要点</span>
+          <span class="dcard-hint">来源方原文转录，不预测个人薪资</span>
+          <span class="dcard-go">看区间与要点<svg class="ic"><use href="#i-arrowRight"/></svg></span>
+        </a>
+
+        <!-- 6 职业规划建议（AI · 先选方向与跨度 · 整行横排） -->
+        <div class="dcard dcard--wide dcard--row dcard--ai dcard--pick" id="c-plan">
+          <span class="dcard-ic"><svg class="ic"><use href="#i-route"/></svg></span>
+          <span class="dcard-bd">
+            <span class="dcard-nm">职业规划建议</span>
+            <span class="dcard-ds" data-when="default first device-off">给方向，再给这段时间内的行动项</span>
+            <span class="dcard-ds" data-when="ai-down">岗位要求计数表照常看，方向自己判断</span>
+            <span class="picks" data-when="default first device-off">
+              <button class="pick" type="button" data-when="default device-off" data-opts="运营|销售|行政人事|技术">
+                <span class="k">目标</span><span class="v">运营</span></button>
+              <button class="pick pick--empty" type="button" data-when="first" data-opts="运营|销售|行政人事|技术">
+                <span class="k">目标</span><span class="v">未选</span></button>
+              <button class="pick" type="button" data-opts="3 个月|半年|一年">
+                <span class="k">跨度</span><span class="v">3 个月</span></button>
+            </span>
+            <span class="dcard-hint" data-when="default first device-off">没有目标方向就先问你，不承诺结果</span>
+          </span>
+          <span class="dcard-rt">
+            <span class="chip chip--amber chip--label" data-when="default first device-off">AI&nbsp;· 仅供参考</span>
+            <span class="chip chip--info" data-when="ai-down">AI 暂不可用</span>
+            <a class="dcard-go" data-when="default first device-off" href="22-career-plan.html">看方向与行动项<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+            <a class="dcard-go" data-when="ai-down" href="22-career-plan.html">只看计数表<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+          </span>
+        </div>
       </div>
 
-      <!-- ── 次卡：记录类，明细归招聘会业务页 ── -->
+      <!-- ── 次卡：记录类，明细归业务页 ── -->
       <div class="dmore">
         <div class="dmore-hd">
           <b>快捷入口</b>
           <span data-when="default ai-down device-off">登录后可查看历史记录</span>
-          <span data-when="first">未登录，记录留不下</span>
+          <span data-when="first">未登录，这一趟的报告留不下</span>
         </div>
         <div class="dmore-row">
-          <a class="dmore-go" href="17-fair-desk.html">
-            <span class="dmore-ic"><svg class="ic"><use href="#i-eye"/></svg></span>
+          <a class="dmore-go" href="23-me.html">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-brain"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">浏览记录</span>
-              <span class="dmore-s">查看最近浏览的招聘会</span>
+              <span class="dmore-t">AI服务记录</span>
+              <span class="dmore-s">查看历次 AI 服务调用记录</span>
               <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 条</span>
               <span class="dmore-n" data-when="first">未登录 · 0 条</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
-          <a class="dmore-go" href="17-fair-desk.html">
-            <span class="dmore-ic"><svg class="ic"><use href="#i-external"/></svg></span>
+          <a class="dmore-go dmore-go--print" id="c-report" href="20-interview-pod.html">
+            <span class="dmore-ic"><svg class="ic"><use href="#i-file"/></svg></span>
             <span class="dmore-b">
-              <span class="dmore-t">外部跳转记录</span>
-              <span class="dmore-s">查看已前往来源平台的记录</span>
-              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 次</span>
-              <span class="dmore-n" data-when="first">未登录 · 0 次</span>
+              <span class="dmore-t">训练报告</span>
+              <span class="dmore-s" data-when="default first ai-down">查看全部模拟面试报告</span>
+              <span class="dmore-s" data-when="device-off">可看可存，打印机离线暂时打不出来</span>
+              <span class="dmore-n" data-when="default ai-down device-off">本次会话 0 份</span>
+              <span class="dmore-n" data-when="first">未登录 · 0 份</span>
             </span>
             <span class="chip chip--info">不依赖 AI</span>
           </a>
@@ -382,21 +385,23 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
       <!-- ── 页脚：整页只此一条合规声明 ── -->
       <div class="notice">
         <svg class="ic"><use href="#i-shield"/></svg>
-        <span>招聘会信息来自第三方或官方来源；预约、报名请前往来源平台完成，本终端只提供信息展示与跳转入口。</span>
+        <span>AI 模拟面试内容仅供练习参考，不代表真实面试流程；评测结果不构成招聘意见，不对外共享，
+          <b>不预测录用概率、不给通过率、不做面试打分排名</b>。</span>
       </div>
     </div>
   </div>
 
   <div class="actionbar">
     <div class="actionbar-hint">
-      <div data-when="default"><div class="t">先挑一场，再决定带什么去</div><div class="s">预约报名在来源平台完成</div></div>
-      <div data-when="first"><div class="t">不登录也能用，六张卡一张都不锁</div><div class="s">这一趟的记录留不下，离场即清</div></div>
-      <div data-when="ai-down"><div class="t">AI 暂不可用，场次、签到、打印照常</div><div class="s">停掉的只有排顺序与生成清单</div></div>
-      <div data-when="device-off"><div class="t">打印机离线，只影响资料打印</div><div class="s">看场次、扫码签到都不受影响</div></div>
+      <div data-when="default"><div class="t">练一场，或者先弄清自己适合什么</div><div class="s">点评标 E3，只给你本人看</div></div>
+      <div data-when="first"><div class="t">不登录也能练，六张卡一张都不锁</div><div class="s">这一趟的报告与评估记录留不下</div></div>
+      <div data-when="ai-down"><div class="t">AI 暂不可用，题目、技巧、往期报告照常</div><div class="s">停掉的是出题、点评与解读</div></div>
+      <div data-when="device-off"><div class="t">打印机离线，练习与看报告不受影响</div><div class="s">只有打复盘单要换机取回</div></div>
     </div>
 
-    <a class="btn btn--lg btn--ghost" href="13-jobs-desk.html"><svg class="ic"><use href="#i-briefcase"/></svg>去岗位信息</a>
-    <a class="btn btn--primary" href="17-fair-desk.html">查看招聘会<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--lg btn--ghost" href="20-interview-pod.html"><svg class="ic"><use href="#i-book"/></svg>看面试技巧</a>
+    <a class="btn btn--primary" data-when="default first device-off" href="20-interview-pod.html">开始模拟面试<svg class="ic"><use href="#i-arrowRight"/></svg></a>
+    <a class="btn btn--primary" data-when="ai-down" href="20-interview-pod.html">只看题目，自己练<svg class="ic"><use href="#i-arrowRight"/></svg></a>
   </div>
 
   <nav class="navbar">
@@ -419,7 +424,7 @@ a.dcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); }
   scr.addEventListener('click', function (e) {
     if (!e.target.closest) return
 
-    /* ① 卡上的输入项：点一下换一个值。缺输入时先变成真实取值，再进下一页 */
+    /* ① 卡上的输入项：点一下换一个值。未选时先落到真实取值，再进下一页 */
     var p = e.target.closest('.pick')
     if (p) {
       var opts = (p.getAttribute('data-opts') || '').split('|')
