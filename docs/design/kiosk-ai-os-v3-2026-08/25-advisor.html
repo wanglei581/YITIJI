@@ -371,7 +371,7 @@
           <div class="notice">
             <svg class="ic"><use href="#i-info"/></svg>
             <span>受影响的是<b>要读你简历、要理解岗位正文</b>的那几件：
-                  简历诊断、访谈生成、岗位大师、面试陪练、自我评估、签约风险。
+                  简历诊断、访谈生成、岗位大师 · 决策台、面试陪练、自我评估、签约风险。
                   它们现在<b>会如实报错，不会给编出来的结果</b>。</span>
           </div>
         </div>
@@ -441,8 +441,24 @@
       <div class="pane">
         <div class="pane-hd">
           <span class="t">能帮你做的</span>
-          <span class="s" data-when="default first device-off">8 个真入口 · 点了直达</span>
+          <span class="s" data-when="default first device-off">9 个真入口 · 点了直达</span>
           <span class="s" data-when="ai-down">灰色的等 AI 恢复</span>
+        </div>
+
+        <!-- P26 顾问作业面的唯一产品入口（2026-08-10 补）：
+             此前 38 页里没有任何一处指向 26-advisor-work.html —— 它是真正的业务孤页。
+             作业面是「她动手替你办」的地方，和下面三组「去某个工作台」不是一类，
+             所以单起一组放在最前，且写清它是什么，不让人以为又是一个同义入口。 -->
+        <div class="cgrp">
+          <div class="cgrp-t">让她直接开工</div>
+          <div class="caps">
+            <a class="cap cap--ai" href="26-advisor-work.html">
+              <svg class="ic"><use href="#i-route"/></svg>
+              <span class="cap-b"><span class="cap-t">顾问作业面</span>
+                <span class="cap-w">小青帮你做事的作业面：摆开比 / 一问一答替你写 / 直接答</span></span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </a>
+          </div>
         </div>
 
         <div class="cgrp">
@@ -472,10 +488,14 @@
         <div class="cgrp">
           <div class="cgrp-t">帮你做决策</div>
           <div class="caps">
+            <!-- 命名对齐（2026-08-10）：P11/P30 的正式名是「岗位大师 · 决策台」，
+                 一句话说明全站统一为「拿简历和岗位逐条比对，给三档参考与差距」。
+                 上一版写「这个岗值不值得投」—— 那是替用户做投递决策的承诺，
+                 与三档参考口径冲突（投不投只能用户自己定），已删。 -->
             <a class="cap cap--ai" href="11-jobfit-compare.html">
               <svg class="ic"><use href="#i-target"/></svg>
-              <span class="cap-b"><span class="cap-t">岗位大师</span>
-                <span class="cap-w">这个岗值不值得投，摆开了比</span></span>
+              <span class="cap-b"><span class="cap-t">岗位大师 · 决策台</span>
+                <span class="cap-w">拿简历和岗位逐条比对，给三档参考与差距</span></span>
               <svg class="ic"><use href="#i-chevron"/></svg>
             </a>
             <a class="cap" href="21-policy.html">
@@ -532,7 +552,9 @@
           托盘还是空的 ——<br>聊出有用的回答后，点气泡下的「钉到托盘」。
         </div>
 
-        <div class="tray-how">
+        <!-- device-off 不显示：打印机离线时「走之前一次打成纸」是句办不到的话，
+             该态的做法写在下面那条橙色提示里（先存我的文档）。 -->
+        <div class="tray-how" data-when="default first ai-down">
           有用的回答点<b>「钉到托盘」</b>，聚到这里，走之前一次打成纸。
         </div>
 
@@ -546,11 +568,14 @@
         <div class="notice notice--amber" data-when="device-off" style="margin-top:var(--s-3)">
           <svg class="ic"><use href="#i-alert"/></svg>
           <span><b>出纸暂停 · 先存我的文档</b> —— 打印机离线，
-                钉住的内容可以先存起来，换机或改天再打。</span>
+                钉住的内容可以先存起来，换机或改天再打。<br>
+                存下来的和打出来的是同一份：<b>只有钉住的要点，不含姓名电话</b>。</span>
         </div>
 
         <div class="tray-bottom">
-          <div class="kv" data-when="default ai-down device-off">
+          <!-- device-off 不显示页数与费用：这一态的动作是「先存我的文档」，不出纸也不收钱，
+               摆一行「预估 0.20 元」是给一个不会发生的动作报价。 -->
+          <div class="kv" data-when="default ai-down">
             <div class="kv-row"><span class="k">页数</span><span class="v">1 页 · 黑白</span></div>
             <div class="kv-row"><span class="k">费用</span><span class="v">预估 <b>0.20</b> 元 · 以打印工作台核价为准</span></div>
             <div class="kv-row"><span class="k">纸上含</span><span class="v v--fog">只有钉住的要点，不含姓名电话</span></div>

@@ -106,6 +106,14 @@
 
 .sb-foot { flex:0 0 auto; display:flex; align-items:center; gap:var(--s-5);
   font-size:var(--fz-2); color:var(--fog-600); flex-wrap:wrap; }
+
+/* ── 整屏热区（2026-08-10 补）─────────────────────────────────────────
+   原来「碰一下屏幕开始」只是一行字，点它什么也不会发生 ——
+   待机屏承诺的唯一交互落空，是最不该出现的那种假承诺。
+   待机屏下面本来就没有别的可点元素，所以直接把**整块屏幕**做成跳转目标：
+   碰哪儿都进首页，和真机上「触摸唤醒」的行为一致。 */
+.sb-hit { position:absolute; inset:0; z-index:5; display:block;
+  text-decoration:none; -webkit-tap-highlight-color:transparent; }
 </style>
 </head>
 <body>
@@ -258,7 +266,14 @@
       <span data-when="default first ai-down device-off">岗位与招聘会信息同步于 <b>8月9日 07:30</b></span>
       <span data-when="default first ai-down device-off">来源：市人社局 · 高新区人才服务中心 · 省教育厅学生服务中心</span>
       <span data-when="default first ai-down device-off">本机只做信息展示与打印，不代办、不代收简历</span>
+      <!-- 入链说明：这一屏是**系统触发**的，不该也不需要有产品入口指向它。 -->
+      <span data-when="default first ai-down device-off">
+        本屏由<b>无操作超时</b>自动进入（系统触发）· 首页里没有指向它的入口 · <b>碰屏即回首页</b>
+      </span>
     </div>
+
+    <!-- 整屏唤醒热区：碰哪儿都算「碰一下屏幕」，直接进首页 -->
+    <a class="sb-hit" href="01-home-v5.html" aria-label="碰一下屏幕开始 · 进入首页"></a>
 
   </div>
 

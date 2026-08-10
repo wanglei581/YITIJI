@@ -839,12 +839,15 @@
     <!-- ================= 右 ================= -->
     <div class="wside">
 
-      <!-- S1 说明 -->
+      <!-- S1 说明。命名对齐（2026-08-10）：本页正式名「岗位大师 · 决策台」，
+           一句话说明全站统一为「拿简历和岗位逐条比对，给三档参考与差距」——
+           P25 顾问页那条能力用的是同一个名字、同一句话，不再各叫各的。 -->
       <div class="pane pane--grow" data-at="s1">
-        <div class="pane-hd"><span class="t">这个台子做什么</span></div>
+        <div class="pane-hd"><span class="t">这个台子做什么</span><span class="s">岗位大师 · 决策台</span></div>
         <p style="margin:0 0 14px;font-size:var(--fz-3);line-height:1.7;color:var(--fog-800)">
-          拿你的简历原文和<b>具体岗位</b>的要求逐条对照：哪条对上了、哪条差一点、哪条没写到；
-          再给差距的第一步、面试预测和带得走的报告。
+          <b>拿简历和岗位逐条比对，给三档参考与差距</b>：哪条对上了、哪条差一点、哪条没写到；
+          再给差距的第一步、面试预测和带得走的报告。<br>
+          <b>投不投由你定</b> —— 三档只是参考，本机不替你做这个决定，也不预测录用。
         </p>
         <div class="notice notice--amber">
           <svg class="ic"><use href="#i-alert"/></svg>
@@ -1008,7 +1011,9 @@
       </div>
       <div data-at="s4">
         <div data-when="default"><div class="t">A4 · 3 页 · 预估 0.60 元</div><div class="s">A4 黑白 · 三页一份</div></div>
-        <div data-when="device-off"><div class="t">打印机离线 · 报告可存不可打</div><div class="s">先存「我的文档」或扫码带走，换机再打</div></div>
+<!-- 副行原文「先存「我的文档」或扫码带走，换机再打」在本态会折成两行，
+             撑出操作栏 8px（自检：卡内溢出）—— device-off 的主按钮标题长，提示区被挤窄。缩到一行。 -->
+        <div data-when="device-off"><div class="t">打印机离线 · 报告可存不可打</div><div class="s">先存「我的文档」，换机再打</div></div>
         <div data-when="ai-down"><div class="t">AI 中断，本次生成不了报告</div><div class="s">之前的报告在「我的」，不受影响</div></div>
         <div data-when="first"><div class="t">报告只从真实比对里来，不拿模板凑</div></div>
       </div>
@@ -1031,7 +1036,7 @@
     <a class="btn btn--primary" data-at="s3" data-when="ai-down" href="13-jobs-desk.html">去岗位情报台<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s3" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>
 
-    <a class="btn btn--primary" data-at="s4" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师报告&amp;pages=3&amp;copies=1&amp;back=s4">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
+    <a class="btn btn--primary" data-at="s4" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P30&amp;kind=jobfit-report&amp;title=岗位大师 · 决策报告&amp;pages=3&amp;copies=1&amp;back=s4">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s4" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>存我的文档 · 扫码带走</button>
     <a class="btn btn--primary" data-at="s4" data-when="ai-down" href="23-me.html">看历史报告<svg class="ic"><use href="#i-arrowRight"/></svg></a>
     <a class="btn btn--primary" data-at="s4" data-when="first" href="09-resume-workbench.html">先做简历<svg class="ic"><use href="#i-arrowRight"/></svg></a>

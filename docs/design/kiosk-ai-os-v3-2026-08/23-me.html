@@ -27,7 +27,10 @@
    ① first（未登录）态 8 卡副文全部为功能说明式，零个性化计数；
    ② 不做假入口 —— 每张卡都真链现有页（09/06/08/13/20/24/11）或本页
       自有分区浮层（通知与反馈、账号设置）；链不出去的功能不上卡；
-   ③ 「90 天」保存期限说明不占数字槽位，写进「我的文档」卡副文正文；
+   ③ 保存期限说明不占数字槽位，写进「我的文档」卡副文正文；
+      （2026-08-10 收口：期限本来就按文件类型分档 —— 敏感件 7 天 / 一般文档 90 天 /
+       未登录会话离场即清。完整口径做成一张表放进「账号设置 · 文件保存期限」，
+       作为全站基准；卡副文只给一句概括，不再单写「90 天」。）
    ④ 「账号设置」卡副文压缩为 3 个事实：登录方式 / 隐私与删除 / 无障碍；
    ⑤ 删除记录带防肩窥：确认弹层不回显文件名全称，只显示「简历文件 ×N」。
 
@@ -422,6 +425,28 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
 .ovl-act { display: flex; align-items: center; gap: var(--s-3); }
 .ovl-act .btn { flex: 0 0 auto; }
 .btn--danger { border-color: var(--coral-a20); color: var(--coral-400); }
+
+/* ---------- 文件保存期限表（2026-08-10 · 全站口径基准） ----------
+   起因：同一件事三处打架 —— P08 写 24 小时、本页写 90 天、P07 写长期保存
+   或证件类 7 天。用户要的是"我的东西还在不在"，三个数字里没有一个能信。
+   收口方式不是挑一个数字统一，而是**承认它本来就按文件类型分档**，
+   把分档写成一张表；其余页面一律引用这张表，不得另立数字。 */
+.keep {
+  display: flex; flex-direction: column; gap: 1px;
+  border-radius: var(--r-sm); overflow: hidden;
+  border: 1px solid var(--brd-1); background: var(--brd-1);
+}
+.keep-hd, .keep-row {
+  display: grid; grid-template-columns: 1fr 104px 1.05fr; gap: var(--s-4);
+  align-items: center; padding: var(--s-3) var(--s-4); background: var(--surf-1);
+}
+.keep-hd { background: var(--surf-2); font-size: var(--fz-1); color: var(--fog-600); letter-spacing: .06em; }
+.keep-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fz-2); color: var(--fog-900); }
+.keep-t i { font-style: normal; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
+.keep-v { font-family: var(--ff-num); font-size: var(--fz-4); font-weight: 700; color: var(--fog-900); }
+.keep-row--warn .keep-v { color: var(--amber-200); }
+.keep-row--none .keep-v { font-size: var(--fz-3); color: var(--fog-700); }
+.keep-s { min-width: 0; font-size: var(--fz-1); color: var(--fog-600); line-height: 1.45; }
 </style>
 </head>
 <body>
@@ -564,13 +589,15 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </a>
 
-      <!-- 2 我的文档（「90 天」写进副文正文，不占数字槽位） -->
+      <!-- 2 我的文档（副文一句话概括保存期限；完整口径见「账号设置 · 文件保存期限」那张表。
+           2026-08-10 改：原来只写「保存 90 天」，与 P07/P08 的 24 小时 / 7 天三处打架，
+           而且它本来就不是一个数字 —— 副文改成"按类型分档"的概括，数字以表为准。） -->
       <a class="fcard rise" href="08-file-tools.html" style="--c1:var(--cat-mock)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-folder"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">7<i>份</i></span></span>
         <span class="fc-t">我的文档</span>
-        <span class="fc-s" data-when="default ai-down device-off">作战单与扫描件 · 保存 90 天到期自动删</span>
-        <span class="fc-s" data-when="first">作战单、扫描件与生成材料归在这里 · 保存 90 天</span>
+        <span class="fc-s" data-when="default ai-down device-off">作战单与扫描件 · 保存期限按文件类型定：一般 90 天、敏感件 7 天</span>
+        <span class="fc-s" data-when="first">作战单、扫描件与生成材料归在这里 · 未登录离场即清；登录后一般 90 天、敏感件 7 天</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </a>
 
@@ -628,7 +655,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       <!-- 8 账号设置（本页分区浮层；副文 = 3 个事实，四态同文） -->
       <button class="fcard rise" type="button" data-open="ovl-set" style="--c1:var(--fog-600)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-gear"/></svg></span></span><span class="fc-t">账号设置</span>
-        <span class="fc-s">登录方式 · 隐私与删除 · 无障碍</span>
+        <span class="fc-s">登录方式 · 文件保存期限 · 隐私与删除 · 无障碍</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
       </button>
 
@@ -688,12 +715,37 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
         <div class="kv-row" data-when="first"><span class="k">当前状态</span><span class="v"><span class="chip chip--info">未登录</span></span></div>
       </div>
 
-      <div class="ovl-sec">隐私与删除</div>
-      <div class="kv">
-        <div class="kv-row"><span class="k">简历 / 生成文档</span><span class="v">保存 90 天 · 到期自动删</span></div>
-        <div class="kv-row"><span class="k">证件类扫描件</span><span class="v">保存 7 天 · 到期自动删</span></div>
-        <div class="kv-row"><span class="k">面试练习作答</span><span class="v v--fog">从不保存</span></div>
+      <div class="ovl-sec">文件保存期限 · 全站口径</div>
+      <div class="keep">
+        <div class="keep-hd"><span>文件类型</span><span>保存多久</span><span>到期怎么处理</span></div>
+        <div class="keep-row keep-row--warn">
+          <span class="keep-t">敏感文件<i>证件照 · 身份证复印件 · 含身份证号的扫描件</i></span>
+          <span class="keep-v">7 天</span>
+          <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
+        </div>
+        <div class="keep-row">
+          <span class="keep-t">一般文档<i>简历 · 求职材料 · 扫描件 · 生成产物</i></span>
+          <span class="keep-v">90 天</span>
+          <span class="keep-s">到期自动删除 · 留删除日志（不含文件内容）</span>
+        </div>
+        <div class="keep-row keep-row--none">
+          <span class="keep-t">未登录的本次会话文件<i>没登录时上传或生成的东西</i></span>
+          <span class="keep-v">离场即清</span>
+          <span class="keep-s">不保存 · 结束或超时就没了，要留请先打印或登录</span>
+        </div>
+        <div class="keep-row keep-row--none">
+          <span class="keep-t">面试练习作答<i>你答的内容</i></span>
+          <span class="keep-v">从不保存</span>
+          <span class="keep-s">只记「练过一次」，不留内容</span>
+        </div>
       </div>
+      <div class="panel-note" style="margin-left:0">
+        <b>以文件类型定，不是所有文件都 90 天。</b>
+        一份文件里只要含身份证号，就按敏感文件的 7 天算，不按 90 天。<br>
+        这张表是<b>全站口径</b>：打印、扫描、我的文档各页显示的期限都以它为准。
+      </div>
+
+      <div class="ovl-sec">隐私与删除</div>
       <div class="ovl-act" data-when="default ai-down device-off">
         <button class="btn btn--ghost btn--danger" type="button" data-open="ovl-del"><svg class="ic"><use href="#i-trash"/></svg>删除已存的简历文件</button>
         <span class="panel-note" style="margin-left:0">删除会留日志 · 日志不含文件内容</span>
@@ -745,6 +797,10 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
   <div class="actionbar">
       <a class="backbtn" href="01-home-v5.html" data-parent-label="首页"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">首页</span></span></a>
     <button class="btn btn--lg btn--ghost"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
+    <!-- P04 系统态页由异常事件触发，全站没有别的入口指向它。
+         主动想看本机现在什么状况的，从这里进 —— 「我的」是查自己东西的地方，
+         "这台机器现在能不能用"属于同一类问题。 -->
+    <a class="btn btn--lg btn--ghost" href="04-system-states.html"><svg class="ic"><use href="#i-gear"/></svg>查看本机状态</a>
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">明细在各自的业务页里</div><div class="s">本页只做入口 · 浏览与跳转记录去岗位 / 招聘会 / 政策页看</div></div>
       <div data-when="first"><div class="t">未登录 · 东西留不下来</div><div class="s">功能不受影响</div></div>
