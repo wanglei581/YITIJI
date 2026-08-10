@@ -41,7 +41,7 @@ const scanWatcher = fs.readFileSync(path.join(root, '../src/agent/scan-watcher.t
 console.log('\n=== verify Windows Agent installer inputs ===')
 
 assert.equal(inputs.schemaVersion, 1)
-assert.equal(inputs.productVersion, '0.3.1')
+assert.equal(inputs.productVersion, '0.3.9')
 assert.equal(
   inputs.productVersion,
   agentPackage.version,
@@ -176,8 +176,8 @@ assert.match(exeLifecycle, /Remove-Item -LiteralPath \$nodePath -Force/)
 assert.match(exeLifecycle, /repair did not restore the managed Node runtime/)
 assert.match(exeLifecycle, /finally \{[\s\S]*cleanup-uninstall\.log/)
 assert.match(exeLifecycle, /ProgramData state directory must be retained/)
-assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.3\.0"/)
-assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.3\.1"/)
+assert.match(upgradeLifecycle, /PREDECESSOR_VERSION = "0\.3\.8"/)
+assert.match(upgradeLifecycle, /CANDIDATE_VERSION = "0\.3\.9"/)
 assert.match(upgradeLifecycle, /ProgramData sentinel was not preserved through upgrade/)
 assert.match(upgradeLifecycle, /EXE_UPGRADE_LIFECYCLE_PASS/)
 assert.match(workflow, /Build unsigned WiX Burn EXE/)
@@ -202,7 +202,7 @@ assert.match(
 )
 assert.match(workflow, /test-exe-lifecycle\.ps1/)
 assert.match(workflow, /test-exe-upgrade-lifecycle\.ps1/)
-assert.match(workflow, /-ProductVersion 0\.3\.0/)
+assert.match(workflow, /-ProductVersion 0\.3\.8/)
 assert.match(workflow, /artifacts\/upgrade\/predecessor\/exe/)
 assert.ok(
   workflow.indexOf('test-exe-lifecycle.ps1') < workflow.indexOf('test-msi-lifecycle.ps1'),
