@@ -136,7 +136,9 @@
     <div class="rail-track">
       <button class="rstep" data-go="s1"><span class="rstep-dot">1</span><span class="rstep-name">你现在会什么</span></button>
       <button class="rstep" data-go="s2"><span class="rstep-dot">2</span><span class="rstep-name">能往哪走·缺什么</span></button>
-      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span><span class="rstep-name">带走行动清单</span></button>
+      <button class="rstep" data-go="s3"><span class="rstep-dot">3</span>
+        <span class="rstep-name" data-when="default first device-off">带走行动清单</span>
+        <span class="rstep-name" data-when="ai-down">带走岗位计数表</span></button>
     </div>
     <span class="rail-count" data-rail-count>第 <b>1</b> / 3 步</span>
   </div>
@@ -363,7 +365,8 @@
 
       <!-- ─────────── S3 带走行动清单 ─────────── -->
       <div class="paper-bar" data-at="s3">
-        <span class="nm">行动清单 · 机械设计方向</span>
+        <span class="nm" data-when="default first device-off">行动清单 · 机械设计方向</span>
+        <span class="nm" data-when="ai-down">岗位要求计数表 · 四类方向</span>
         <span class="mt">A4 · 1 页 · 黑白</span>
         <span class="pg">
           <button class="pgbtn" aria-label="上一页">‹</button>
@@ -553,13 +556,19 @@
         <div class="sec">
           <label class="ck ck--have">
             <span class="ck-box"></span>
-            <span class="ck-b"><span class="ck-t">行动清单</span>
+            <span class="ck-b"><span class="ck-t" data-when="default first device-off">行动清单</span>
+              <span class="ck-t" data-when="ai-down">岗位要求计数表</span>
               <span class="ck-s">A4 黑白 · 1 页 × 1 份</span></span>
           </label>
-          <label class="ck" style="margin-top:var(--s-3)">
+          <label class="ck" style="margin-top:var(--s-3)" data-when="default first device-off">
             <span class="ck-box"></span>
             <span class="ck-b"><span class="ck-t">四个方向的完整缺口表</span>
               <span class="ck-s">A4 黑白 · 2 页 · 清单已含要点，按需选</span></span>
+          </label>
+          <label class="ck" style="margin-top:var(--s-3)" data-when="ai-down">
+            <span class="ck-box"></span>
+            <span class="ck-b"><span class="ck-t">四个方向的完整缺口表</span>
+              <span class="ck-s">AI 不可用 · 缺口要对着你的简历算，这次出不了</span></span>
           </label>
 
           <div class="kv" style="margin-top:var(--s-4)">
@@ -573,7 +582,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-3)">
-            费用为预估 · 以打印工作台核价为准。清单同时存进「我的文档」与「AI服务记录」。
+            费用为预估 · 以打印工作台核价为准。<span data-when="default first device-off">清单同时存进「我的文档」与「AI服务记录」。</span><span data-when="ai-down">这张计数表同时存进「我的文档」。</span>
           </div>
         </div>
       </div>
@@ -582,12 +591,18 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-history"/></svg><b>接下来</b></div>
         <div class="sec">
           <div class="tline">
-            <div class="tl tl--now"><span class="tl-dot">1</span>
+            <div class="tl tl--now" data-when="default first device-off"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">先做「这周能做完的」三条</span>
                 <span class="tl-s">都是改简历，不用等任何条件</span></span></div>
-            <div class="tl"><span class="tl-dot">2</span>
+            <div class="tl tl--now" data-when="ai-down"><span class="tl-dot">1</span>
+              <span class="tl-b"><span class="tl-t">AI 恢复后回来重跑一次</span>
+                <span class="tl-s">这次只有条数，没有对照你简历的缺口和先做哪几件</span></span></div>
+            <div class="tl" data-when="default first device-off"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">改完回来重跑一次</span>
                 <span class="tl-s">补上工艺和 SOP 之后，对得上的方向会变</span></span></div>
+            <div class="tl" data-when="ai-down"><span class="tl-dot">2</span>
+              <span class="tl-b"><span class="tl-t">这张表可以先带走</span>
+                <span class="tl-s">条数是本机数出来的，AI 恢复与否都成立</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">岗位数据每天同步</span>
                 <span class="tl-s">过一阵再来，条数和缺口都会变</span></span></div>
@@ -595,8 +610,10 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>这份清单<b>不是一次性的结论</b>。简历改了、岗位数据更新了，
+            <span data-when="default first device-off">这份清单<b>不是一次性的结论</b>。简历改了、岗位数据更新了，
                   结果就会变 —— 值得隔一段时间重跑一次。</span>
+            <span data-when="ai-down">这张计数表<b>不是一次性的结论</b>。岗位数据每天同步，条数会变；
+                  AI 恢复后重跑才会有对照你简历的那部分。</span>
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
@@ -625,7 +642,8 @@
   <div class="actionbar">
     <button class="btn btn--lg btn--ghost" data-at="s1"><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s2" data-go="s1">回看我会什么</button>
-    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2">回看方向与缺口</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="default first device-off">回看方向与缺口</button>
+    <button class="btn btn--lg btn--ghost" data-at="s3" data-go="s2" data-when="ai-down">回看岗位计数</button>
 
     <span class="actionbar-hint" data-at="s1" data-when="default first">4 条有事例 · 2 条没事例撑着</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 不可用 · 读不出简历，只能看岗位计数</span>
@@ -636,7 +654,8 @@
 
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="default first">看能往哪走<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s1" data-go="s2" data-when="ai-down">只看岗位计数<svg class="ic"><use href="#i-arrowRight"/></svg></button>
-    <button class="btn btn--primary" data-at="s2" data-go="s3">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="default first device-off">生成行动清单<svg class="ic"><use href="#i-arrowRight"/></svg></button>
+    <button class="btn btn--primary" data-at="s2" data-go="s3" data-when="ai-down">生成岗位要求计数表<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <a class="btn btn--primary" data-at="s3" data-when="default first ai-down" href="06-print-workbench.html?stage=s3">去打印工作台核价<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s3" data-when="device-off"><svg class="ic"><use href="#i-qr"/></svg>扫码带走</button>
   </div>

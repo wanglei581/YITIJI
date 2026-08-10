@@ -139,7 +139,7 @@ body.capture .stage { border-radius: 0; box-shadow: none; }
 .backbtn-t { font-size: var(--fz-2); }
 .brand { display: flex; align-items: center; gap: var(--s-4); min-width: 0; }
 .brand-mark {
-  width: 52px; height: 52px; border-radius: 15px;
+  width: 52px; height: 52px; border-radius: 15px; flex: 0 0 auto;
   background: linear-gradient(148deg, var(--jade-400), var(--jade-700) 78%);
   box-shadow: var(--sh-jade), var(--glass-hi);
   display: grid; place-items: center;
@@ -153,7 +153,8 @@ body.capture .stage { border-radius: 0; box-shadow: none; }
   animation: sheen 6.5s var(--ease-in-out) infinite;
 }
 @keyframes sheen { 0%, 72% { transform: translateX(-120%); } 88%, 100% { transform: translateX(130%); } }
-.brand-name { font-family: var(--ff-display); font-size: var(--fz-7); letter-spacing: .06em; color: var(--fog-900); line-height: 1.1; }
+.brand-name { font-family: var(--ff-display); font-size: var(--fz-7); letter-spacing: .06em; color: var(--fog-900); line-height: 1.1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-sub { font-size: var(--fz-2); color: var(--fog-600); letter-spacing: .04em; margin-top: 3px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-spacer { flex: 1; }
