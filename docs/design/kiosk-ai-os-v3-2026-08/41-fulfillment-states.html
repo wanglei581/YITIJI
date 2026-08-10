@@ -26,6 +26,12 @@
 
    1) **金额只在打印台产生，本页只做状态与出路。** 这一页一个字都不定价、
       不加价、不打折 —— 它只把「钱现在在哪一步」和「你能往哪走」说清楚。
+      计价单位一律是**印刷面**，跟 06 打印台同一口径：双面打印一张纸算两个面。
+      单价不写死在页面里，走 scripts/site-config.js 的 data-site-unit="bw"。
+      2026-08-11 修正：本页原先自成一套「0.30 元/页」，且本单金额写成 6.00 元，
+      与退款明细（1.20 + 1.80 + 0.00 = 3.00）差一倍、加不拢。现按 06 第 722 行
+      的真实构成对齐：15 个印刷面 × 0.20 元 · 黑白双面 · 5 份 = 3.00 元；
+      已出 6 面 = 1.20 元，没出 9 面 = 1.80 元，卡住 0.00 元，合计 3.00 元。
    2) **不做没有回执支撑的完成态断言。** 本机能确认的是「已提交到支付渠道」，
       不能确认「钱到你账上了」。所以写「退款已提交 · 到账以银行为准」，
       而不是「已退款」。差这一个词，用户就会停止追单，等一个不一定发生的结果。
@@ -35,7 +41,7 @@
      不先回答这个，后面写什么都读不进去。原因要分类，因为三类原因的出路不同。
    · 付后待确认 —— 竞态最凶的一格：钱扣了、回执没到。这一屏的责任是
      **把重复付款这条路堵死**，并给一个"5 分钟后自动转待打印订单"的兜底。
-   · 退款三态 —— 金额构成要逐项列出来（按未出页数），否则用户无法判断退得对不对。
+   · 退款三态 —— 金额构成要逐项列出来（按未出的印刷面数），否则用户无法判断退得对不对。
      「处理中 / 已提交 / 失败」三态分开，是因为出路完全不同。
    · 耗材异常 —— 三种故障对用户的意义不一样：仓门未关他自己能解决，
      缺纸缺粉他不能（纸盒上锁是防盗设计）。混成一句"设备异常"等于没说。
@@ -214,6 +220,11 @@
 .left-s b { color:var(--fog-900); }
 
 .notice { flex:0 0 auto; }
+
+/* 站点值缺配置时的兜底文案（「本机未配置就近终端 · 可问现场工作人员」）比普通取值长得多，
+   放进 kv 行会把键名挤成两行。键名不折行，值靠右换行 —— 兜底文案照显示，不因为排版就塞回假地址。 */
+.kv-row--site .k { white-space:nowrap; }
+.kv-row--site .v { text-align:right; }
 </style>
 </head>
 <body>
@@ -229,13 +240,13 @@
     <a class="brand" href="01-home-v6.html" style="text-decoration:none;color:inherit">
       <div class="brand-mark">职</div>
       <div>
-        <div class="brand-name">职易达</div>
-        <div class="brand-sub">01 号机 · 市人力资源市场 A 馆</div>
+        <div class="brand-name" data-site="brand">职易达</div>
+        <div class="brand-sub"><span data-site="terminalNo"></span> · <span data-site="venue"></span></div>
       </div>
     </a>
     <div class="topbar-spacer"></div>
     <div class="devpill" data-when="default first ai-down"><span class="dot dot--warn"></span>打印机 · 本单未完成</div>
-    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 未出页自动退</div>
+    <div class="devpill" data-when="device-off"><span class="dot dot--down"></span>打印机离线 · 未出的面自动退</div>
     <div class="clock" data-clock>2026年8月10日 <b>17:41</b></div>
   </header>
 
@@ -312,9 +323,9 @@
           </div>
 
           <div class="dl">
-            <div class="d"><span class="d-k">本单金额</span><span class="d-v">6.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">本单金额</span><span class="d-v">3.00 <em>元</em></span></div>
             <div class="d"><span class="d-k">已扣款</span><span class="d-v">0.00 <em>元</em></span></div>
-            <div class="d"><span class="d-k">已出纸</span><span class="d-v">0 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">0 <em>面</em></span></div>
           </div>
 
           <div class="notice notice--amber">
@@ -371,9 +382,9 @@
           </div>
 
           <div class="dl">
-            <div class="d"><span class="d-k">已扣款</span><span class="d-v">6.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已扣款</span><span class="d-v">3.00 <em>元</em></span></div>
             <div class="d"><span class="d-k">已等待</span><span class="d-v">47 <em>秒</em></span></div>
-            <div class="d"><span class="d-k">已出纸</span><span class="d-v">0 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">0 <em>面</em></span></div>
           </div>
 
           <div class="notice notice--amber">
@@ -388,16 +399,16 @@
         <div class="bighead bh--calm">
           <span class="bh-ic"><svg class="ic"><use href="#i-refresh"/></svg></span>
           <span class="bh-t">退款已提交，正在处理</span>
-          <span class="bh-p">按<b>没出的 6 页</b>退，已经出了的不退</span>
+          <span class="bh-p">按<b>没出的 9 面</b>退，已经出了的不退</span>
         </div>
       </div>
 
       <div class="pane pane--grow" data-at="refund-doing">
         <div class="sec">
           <div class="amt">
-            <span class="am"><em>本单已付</em><span class="am-x">微信支付 · 17:32</span><b>6.00 元</b></span>
-            <span class="am"><em>已出纸</em><span class="am-x">4 页 × 0.30 元 · 不退</span><b>1.20 元</b></span>
-            <span class="am"><em>没出的</em><span class="am-x">6 页 × 0.30 元 · 退</span><b>1.80 元</b></span>
+            <span class="am"><em>本单已付</em><span class="am-x">微信支付 · 17:32</span><b>3.00 元</b></span>
+            <span class="am"><em>已出的</em><span class="am-x">6 面 × <span data-site-unit="bw"></span> · 不退</span><b>1.20 元</b></span>
+            <span class="am"><em>没出的</em><span class="am-x">9 面 × <span data-site-unit="bw"></span> · 退</span><b>1.80 元</b></span>
             <span class="am"><em>卡在机器里的</em><span class="am-x">不计费</span><b>0.00 元</b></span>
             <span class="am am--sum"><em>本次退款</em><span class="am-x">原路退回 · 1–3 个工作日</span><b>1.80 元</b></span>
           </div>
@@ -409,26 +420,26 @@
             </button>
             <button class="pick" type="button">
               <span class="pick-t">回打印台重打</span>
-              <span class="pick-s">剩下 6 页可以重新排一次</span>
+              <span class="pick-s">剩下 9 面可以重新排一次</span>
             </button>
           </div>
 
           <div class="tri">
             <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
-              <span class="tb-v">打到第 4 页卡纸，剩下的没出来</span></div>
+              <span class="tb-v">打到第 6 面卡纸，剩下的没出来</span></div>
             <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
               <span class="tb-v">打张凭条带走，或回去重打剩下的</span></div>
             <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
               <span class="tb-v">退款照常走，不用你申请</span></div>
             <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
-              <span class="tb-v">按没出的页数原路退回</span></div>
+              <span class="tb-v">按没出的面数原路退回</span></div>
             <div class="tb tb--not"><span class="tb-k"><i></i>机器不会做什么</span>
               <span class="tb-v">不退已出的纸，也不换退款渠道</span></div>
           </div>
 
           <div class="dl">
-            <div class="d"><span class="d-k">已付</span><span class="d-v">6.00 <em>元</em></span></div>
-            <div class="d"><span class="d-k">已出</span><span class="d-v">4 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已付</span><span class="d-v">3.00 <em>元</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">6 <em>面</em></span></div>
             <div class="d"><span class="d-k">本次退款</span><span class="d-v">1.80 <em>元</em></span></div>
           </div>
 
@@ -451,7 +462,7 @@
       <div class="pane pane--grow" data-at="refund-done">
         <div class="sec">
           <div class="amt">
-            <span class="am"><em>退款金额</em><span class="am-x">按 6 页未出计算</span><b>1.80 元</b></span>
+            <span class="am"><em>退款金额</em><span class="am-x">按 9 面未出计算</span><b>1.80 元</b></span>
             <span class="am"><em>退回方式</em><span class="am-x">从哪付退到哪</span><b>原路</b></span>
             <span class="am"><em>提交时间</em><span class="am-x">本机已收到渠道受理</span><b>17:41</b></span>
             <span class="am"><em>本机能确认</em><span class="am-x">已提交到支付渠道</span><b>是</b></span>
@@ -568,9 +579,9 @@
           <div class="sup">
             <div class="sr sr--hd"><span>故障</span><span>你能不能自己处理</span><span>能不能换机</span><span>钱怎么算</span></div>
             <div class="sr"><span class="sr-n">缺纸</span>
-              <span>不能 · 纸盒上锁</span><span>能 · 换 02 号机</span><span>已出算钱 · 没出的退</span></div>
+              <span>不能 · 纸盒上锁</span><span>能 · 换一台机器</span><span>已出算钱 · 没出的退</span></div>
             <div class="sr"><span class="sr-n">缺碳粉</span>
-              <span>不能 · 要找人换</span><span>能 · 换 02 号机</span><span>已出算钱 · 没出的退</span></div>
+              <span>不能 · 要找人换</span><span>能 · 换一台机器</span><span>已出算钱 · 没出的退</span></div>
             <div class="sr sr--hit"><span class="sr-n">仓门未关</span>
               <span>能 · 关好就继续</span><span>不用换机</span><span>不产生新费用</span></div>
           </div>
@@ -578,19 +589,19 @@
           <div class="picks">
             <button class="pick pick--go" type="button">
               <span class="pick-t">我关好了，继续打</span>
-              <span class="pick-s">从没打完的第 5 页接着出</span>
+              <span class="pick-s">从没打完的第 7 面接着出</span>
             </button>
             <button class="pick" type="button">
-              <span class="pick-t">改到 02 号机</span>
-              <span class="pick-s">没出的先退，凭取件码在那台重打</span>
+              <span class="pick-t">改到另一台机器</span>
+              <span class="pick-s">没出的先退，凭取件码在另一台重打</span>
             </button>
           </div>
 
           <div class="tri">
             <div class="tb tb--why"><span class="tb-k"><i></i>为什么会到这</span>
-              <span class="tb-v">前盖没关严，走纸停在第 4 页</span></div>
+              <span class="tb-v">前盖没关严，走纸停在第 6 面</span></div>
             <div class="tb tb--you"><span class="tb-k"><i></i>你能做什么</span>
-              <span class="tb-v">关好仓门继续，或者改到 02 号机</span></div>
+              <span class="tb-v">关好仓门继续，或者改到另一台机器</span></div>
             <div class="tb tb--idle"><span class="tb-k"><i></i>什么都不做的话</span>
               <span class="tb-v">10 分钟后本单结算，没出的退回</span></div>
             <div class="tb tb--sys"><span class="tb-k"><i></i>机器会做什么</span>
@@ -600,8 +611,8 @@
           </div>
 
           <div class="dl">
-            <div class="d"><span class="d-k">已出</span><span class="d-v">4 <em>页</em></span></div>
-            <div class="d"><span class="d-k">没出</span><span class="d-v">6 <em>页</em></span></div>
+            <div class="d"><span class="d-k">已出</span><span class="d-v">6 <em>面</em></span></div>
+            <div class="d"><span class="d-k">没出</span><span class="d-v">9 <em>面</em></span></div>
             <div class="d"><span class="d-k">已产生费用</span><span class="d-v">1.20 <em>元</em></span></div>
           </div>
 
@@ -753,9 +764,9 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">本单金额</span><span class="v">6.00 元</span></div>
+            <div class="kv-row"><span class="k">本单金额</span><span class="v">3.00 元</span></div>
             <div class="kv-row"><span class="k">已扣款</span><span class="v v--fog">0.00 元</span></div>
-            <div class="kv-row"><span class="k">已出纸</span><span class="v v--fog">0 页</span></div>
+            <div class="kv-row"><span class="k">已出</span><span class="v v--fog">0 面</span></div>
             <div class="kv-row"><span class="k">失败原因</span><span class="v">支付超时</span></div>
             <div class="kv-row"><span class="k">单子保留</span><span class="v">30 分钟</span></div>
             <div class="kv-row"><span class="k">重试次数</span><span class="v">不限</span></div>
@@ -769,16 +780,16 @@
           <div class="tline">
             <div class="tl"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">出纸前先锁金额</span>
-                <span class="tl-s">页数份数当场核对</span></span></div>
+                <span class="tl-s">面数份数当场核对</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">只按实际出纸算</span>
-                <span class="tl-s">卡纸的那页不算钱</span></span></div>
+                <span class="tl-s">卡纸的那面不算钱</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">没出的自动退</span>
                 <span class="tl-s">不用你申请</span></span></div>
             <div class="tl"><span class="tl-dot">4</span>
               <span class="tl-b"><span class="tl-t">每笔进打印订单</span>
-                <span class="tl-s">金额与页数都在</span></span></div>
+                <span class="tl-s">金额与面数都在</span></span></div>
             <div class="tl"><span class="tl-dot">5</span>
               <span class="tl-b"><span class="tl-t">有异议按单号找人</span>
                 <span class="tl-s">服务台能查到同一笔</span></span></div>
@@ -798,7 +809,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">已扣款</span><span class="v">6.00 元</span></div>
+            <div class="kv-row"><span class="k">已扣款</span><span class="v">3.00 元</span></div>
             <div class="kv-row"><span class="k">支付平台</span><span class="v">微信支付</span></div>
             <div class="kv-row"><span class="k">已等待</span><span class="v">47 秒</span></div>
             <div class="kv-row"><span class="k">自动转单</span><span class="v">满 5 分钟</span></div>
@@ -843,10 +854,10 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-card"/></svg><b>这一单的钱</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">已付</span><span class="v">6.00 元</span></div>
-            <div class="kv-row"><span class="k">已出</span><span class="v">4 页</span></div>
-            <div class="kv-row"><span class="k">没出</span><span class="v">6 页</span></div>
-            <div class="kv-row"><span class="k">单页价</span><span class="v">0.30 元</span></div>
+            <div class="kv-row"><span class="k">已付</span><span class="v">3.00 元</span></div>
+            <div class="kv-row"><span class="k">已出</span><span class="v">6 面</span></div>
+            <div class="kv-row"><span class="k">没出</span><span class="v">9 面</span></div>
+            <div class="kv-row"><span class="k">每印刷面</span><span class="v" data-site-unit="bw"></span></div>
             <div class="kv-row"><span class="k">本次退款</span><span class="v">1.80 元</span></div>
             <div class="kv-row"><span class="k">退回方式</span><span class="v">原路</span></div>
           </div>
@@ -859,13 +870,13 @@
           <div class="tline">
             <div class="tl tl--done"><span class="tl-dot">1</span>
               <span class="tl-b"><span class="tl-t">按实际出纸计费</span>
-                <span class="tl-s">出一页算一页</span></span></div>
+                <span class="tl-s">出一面算一面</span></span></div>
             <div class="tl tl--done"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">卡在机器里的不算</span>
                 <span class="tl-s">这笔不收</span></span></div>
             <div class="tl tl--now"><span class="tl-dot">3</span>
-              <span class="tl-b"><span class="tl-t">没出页数 × 单价</span>
-                <span class="tl-s">6 × 0.30 = 1.80</span></span></div>
+              <span class="tl-b"><span class="tl-t">没出面数 × 单价</span>
+                <span class="tl-s">9 面 × <span data-site-unit="bw"></span> = 1.80 元</span></span></div>
             <div class="tl"><span class="tl-dot">4</span>
               <span class="tl-b"><span class="tl-t">原路退回</span>
                 <span class="tl-s">从哪付退到哪</span></span></div>
@@ -952,7 +963,7 @@
                 <span class="tl-s">本机不收这张的钱</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">拿凭条去服务台</span>
-                <span class="tl-s">正门左手第一窗</span></span></div>
+                <span class="tl-s" data-site="serviceDesk"></span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">按单号核对</span>
                 <span class="tl-s">后台能查到同一笔</span></span></div>
@@ -978,12 +989,12 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>本单出纸与费用</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">已出</span><span class="v">4 页</span></div>
-            <div class="kv-row"><span class="k">没出</span><span class="v">6 页</span></div>
+            <div class="kv-row"><span class="k">已出</span><span class="v">6 面</span></div>
+            <div class="kv-row"><span class="k">没出</span><span class="v">9 面</span></div>
             <div class="kv-row"><span class="k">已产生费用</span><span class="v">1.20 元</span></div>
             <div class="kv-row"><span class="k">自动退</span><span class="v">1.80 元</span></div>
             <div class="kv-row"><span class="k">当前故障</span><span class="v">仓门未关</span></div>
-            <div class="kv-row"><span class="k">可换机</span><span class="v">02 号机</span></div>
+            <div class="kv-row kv-row--site"><span class="k">可换机</span><span class="v" data-site="peerTerminal"></span></div>
           </div>
         </div>
       </div>
@@ -1011,10 +1022,10 @@
           <div class="sp sp--ok">
             <div class="sp-hd"><svg class="ic"><use href="#i-check"/></svg><span class="sp-t">换机怎么换</span></div>
             <div class="sp-i"><i></i><span>没出的<b>先退</b></span></div>
-            <div class="sp-i"><i></i><span>凭取件码去 <b>02 号机</b></span></div>
+            <div class="sp-i"><i></i><span>凭取件码去<b>另一台机器</b></span></div>
             <div class="sp-i"><i></i><span>参数会<b>带过去</b></span></div>
           </div>
-          <div class="panel-note">02 号机在同一馆，正门左手第二台。</div>
+          <div class="panel-note">没出的那部分先退回，再在另一台重新下单。</div>
         </div>
       </div>
 
@@ -1045,7 +1056,7 @@
                 <span class="tl-s">不翻看内容</span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">服务台保管 24 小时</span>
-                <span class="tl-s">正门左手第一窗</span></span></div>
+                <span class="tl-s" data-site="serviceDesk"></span></span></div>
             <div class="tl"><span class="tl-dot">4</span>
               <span class="tl-b"><span class="tl-t">本人凭尾号取</span>
                 <span class="tl-s">当面核对</span></span></div>
@@ -1087,7 +1098,7 @@
                 <span class="tl-s">连取件码一起</span></span></div>
             <div class="tl"><span class="tl-dot">2</span>
               <span class="tl-b"><span class="tl-t">服务台过来核对</span>
-                <span class="tl-s">工作日 09:00–17:00</span></span></div>
+                <span class="tl-s" data-site="serviceHours"></span></span></div>
             <div class="tl"><span class="tl-dot">3</span>
               <span class="tl-b"><span class="tl-t">你原样交回</span>
                 <span class="tl-s">不留副本</span></span></div>
@@ -1131,7 +1142,7 @@
             <div class="kv-row"><span class="k">是否依赖 AI</span><span class="v v--fog">都不依赖</span></div>
             <div class="kv-row"><span class="k">AI 挂了会怎样</span><span class="v">八态照常判定</span></div>
           </div>
-          <div class="panel-note">付没付、出了几页、退多少 —— 依据是<b>支付渠道回执与打印机出纸计数</b>，没有一步经过模型，也<b>不由模型决定退款金额</b>。<span class="ev ev--e2">E2 来自支付回执与出纸计数</span></div>
+          <div class="panel-note">付没付、出了几面、退多少 —— 依据是<b>支付渠道回执与打印机出纸计数</b>，没有一步经过模型，也<b>不由模型决定退款金额</b>。<span class="ev ev--e2">E2 来自支付回执与出纸计数</span></div>
         </div>
       </div>
 
@@ -1152,7 +1163,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-printer"/></svg><b>打印机离线时</b></div>
         <div class="sec">
           <div class="kv">
-            <div class="kv-row"><span class="k">没出的页</span><span class="v">自动退</span></div>
+            <div class="kv-row"><span class="k">没出的面</span><span class="v">自动退</span></div>
             <div class="kv-row"><span class="k">新的打印单</span><span class="v v--fog">暂时不能付</span></div>
             <div class="kv-row"><span class="k">取件与退款</span><span class="v">照常办</span></div>
           </div>
@@ -1180,13 +1191,13 @@
     <button class="btn btn--lg btn--ghost" data-at="refund-doing" type="button">回打印台重打</button>
     <a class="btn btn--lg btn--ghost" data-at="refund-done" href="01-home-v6.html">回首页</a>
     <button class="btn btn--lg btn--ghost" data-at="refund-fail" type="button">打印失败凭条</button>
-    <button class="btn btn--lg btn--ghost" data-at="supply" type="button">改到 02 号机</button>
+    <button class="btn btn--lg btn--ghost" data-at="supply" type="button">改到另一台机器</button>
     <button class="btn btn--lg btn--ghost" data-at="claim" type="button" data-help>叫服务台</button>
     <button class="btn btn--lg btn--ghost" data-at="wrongdoc" type="button" data-help>原样交回</button>
 
     <span class="actionbar-hint" data-at="pay-fail">这一单没扣钱，也没出纸</span>
     <span class="actionbar-hint" data-at="pay-pending">同一单只会扣一次，按多少次都一样</span>
-    <span class="actionbar-hint" data-at="refund-doing">按没出的 6 页退，1.80 元</span>
+    <span class="actionbar-hint" data-at="refund-doing">按没出的 9 面退，1.80 元</span>
     <span class="actionbar-hint" data-at="refund-done">已提交渠道，到账以银行为准</span>
     <span class="actionbar-hint" data-at="refund-fail">钱没消失，改走服务台线下</span>
     <span class="actionbar-hint" data-at="supply">已出照常算，没出的自动退</span>
@@ -1216,6 +1227,7 @@
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/site-config.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
