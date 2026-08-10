@@ -53,6 +53,18 @@ jobs:
         shell: powershell
         run: powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1
 
+      - name: Build predecessor 0.3.0 upgrade fixture
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-msi.ps1 `
+            -ProductVersion 0.3.0 `
+            -OutputDirectory apps/terminal-agent/installer/artifacts/upgrade/predecessor/msi
+          $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/upgrade/predecessor/msi -Filter *.msi | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/build-exe.ps1 `
+            -MsiPath $msi.FullName `
+            -ProductVersion 0.3.0 `
+            -OutputDirectory apps/terminal-agent/installer/artifacts/upgrade/predecessor/exe
+
       - name: Exercise EXE install, repair, and uninstall
         shell: powershell
         run: |
@@ -64,6 +76,15 @@ jobs:
         run: |
           $msi = Get-ChildItem apps/terminal-agent/installer/artifacts/msi -Filter *.msi | Select-Object -First 1
           powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-msi-lifecycle.ps1 -MsiPath $msi.FullName
+
+      - name: Exercise EXE predecessor-to-candidate upgrade
+        shell: powershell
+        run: |
+          $predecessor = Get-ChildItem apps/terminal-agent/installer/artifacts/upgrade/predecessor/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          $candidate = Get-ChildItem apps/terminal-agent/installer/artifacts/exe -Filter AIJobPrintTerminalSetup.exe | Select-Object -First 1
+          powershell -NoProfile -ExecutionPolicy Bypass -File apps/terminal-agent/installer/test-exe-upgrade-lifecycle.ps1 `
+            -PredecessorExePath $predecessor.FullName `
+            -CandidateExePath $candidate.FullName
 
       - name: Upload unsigned test evidence
         if: always()
