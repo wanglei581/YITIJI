@@ -16,8 +16,32 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
   .work--ag { grid-template-columns: 1fr 396px; }
+
+  /* 2026-08-10 筛选补全：本页「区域」原来是两个广州区名 + 一个点不动的「选区县」，
+     没有省、没有市、没有机构名搜索。现在区域走统一下钻组件，另补机构名搜索。
+     服务类型与机构性质**不编枚举**：后端没有这两个字典，标注「以管理端配置为准」。
+     筛选组变多后让筛选区自己滚——滚得到的内容不算被裁。 */
+  /* 高度分配：筛选卡按内容高，但**优先被压缩**（shrink 20 vs 默认 1）——
+     右栏放不下时该让内部能滚的筛选区退让，而不是把末卡的合规 notice 压掉一截。
+     内容不满时它也不抢空间（grow 0），免得卡片里留一大块空白。 */
+  .pane--filter { flex: 0 20 auto; min-height: 260px; overflow: hidden; }
+  .pane--filter .filters {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+  .fsearch {
+    width: 100%; min-height: 64px; padding: 0 var(--s-4);
+    border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+    background: var(--surf-1); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-3);
+  }
+  .fsearch::placeholder { color: var(--fog-600); }
+  /* 底部两个按钮各占约 170px，.btn 默认左右各 24px 内边距会把「用这些条件找」挤断成两行 */
+  .pane--filter .filters + div .btn { padding: 0 var(--s-3); white-space: nowrap; }
+  .agnone { display: flex; flex-direction: column; gap: var(--s-4); align-items: flex-start; }
   .open { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 11px;
           border-radius: var(--r-full); font-size: var(--fz-1); letter-spacing: .04em; white-space: nowrap; }
   .open--on { background: var(--jade-a12); color: var(--jade-600); border: 1px solid var(--jade-a20); }
@@ -93,7 +117,10 @@
 
       <!-- 机构列表 -->
       <div class="rlist" data-at="list">
-        <button class="rcard" data-go="detail">
+        <button class="rcard" data-go="detail" data-ag
+                data-ag-region="广东省|广州市|天河区" data-ag-nature="经营性机构"
+                data-ag-open="现在营业中 今天还开门" data-ag-svc="岗位推荐"
+                data-ag-kw="广州人力资源服务 天河客运站">
           <span class="rcard-top">
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××人力资源服务有限公司</span>
@@ -117,7 +144,10 @@
           </span>
         </button>
 
-        <button class="rcard" data-go="detail">
+        <button class="rcard" data-go="detail" data-ag
+                data-ag-region="广东省|广州市|海珠区" data-ag-nature="官方公共服务机构"
+                data-ag-open="" data-ag-svc="失业登记 补贴咨询"
+                data-ag-kw="广州就业服务中心 海珠 江南大道">
           <span class="rcard-top">
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州市××区就业服务中心</span>
@@ -141,9 +171,20 @@
           </span>
         </button>
 
+        <!-- 0 命中就地表达：本页状态轨是 列表/详情/线下岗位/失败，没有独立空结果位 -->
+        <div class="notice notice--amber agnone" data-agnone hidden>
+          <span><b>这些条件同时满足的机构，这一刻一家也没有。</b>不会凑几家不符合的充数。
+            当前条件：<b data-agcond>未设条件</b>。</span>
+          <span style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn--ghost" data-agrelax="region">区域放宽到整个广东省</button>
+            <button class="btn btn--primary" data-agrelax="all">清空全部条件</button>
+          </span>
+        </div>
+
         <div class="notice">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>共 7 家已审核机构。<b>营业状态来自机构填报的营业时间</b>，不是实时探测——
+          <span>共 7 家已审核机构，当前条件下显示 <b data-agcount>2</b> 家。
+            <b>营业状态来自机构填报的营业时间</b>，不是实时探测——
             出门前建议先打电话确认 <span class="ev ev--e3">E3 这条建议属 AI 判断</span>。本机<b>不显示"当前空闲/排队人数"这类它拿不到的信息</b>。</span>
         </div>
       </div>
@@ -394,43 +435,63 @@
     <!-- ================= 右 ================= -->
     <div class="wside">
 
-      <div class="pane pane--fill" data-at="list">
-        <div class="pane-hd"><span class="t">筛选</span><span class="s">7 家已审核</span></div>
+      <div class="pane pane--fill pane--filter" data-at="list">
+        <div class="pane-hd"><span class="t">筛选</span><span class="s" data-fcount>已选 0 项</span></div>
         <div class="filters">
-          <div class="fgroup">
-            <div class="fgroup-lb">机构性质<span class="n">官方 / 经营性</span></div>
+
+          <div class="fgroup" data-fgroup="kw">
+            <div class="fgroup-lb">机构名称<span class="n">屏幕键盘输入</span></div>
+            <input class="fsearch" type="text" data-keypad="text" data-fkw autocomplete="off"
+                   placeholder="点这里输入机构名的一部分" aria-label="搜索机构名称">
+          </div>
+
+          <!-- 区域：与全站同一个下钻组件，不再拿两个广州区名冒充「区域」 -->
+          <div class="fgroup" data-fgroup="region">
+            <div class="fgroup-lb">区域<span class="n">省 / 市 / 区县</span></div>
+            <button class="fpick" type="button" data-region data-region-value="广东省|广州市|"
+                    data-region-empty="全国不限">
+              <svg class="ic"><use href="#i-pin"/></svg>
+              <span class="fpick-v" data-region-text>广东省 · 广州市</span>
+              <span class="fpick-n">31 省</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+          </div>
+
+          <div class="fgroup" data-fgroup="nature" data-fmode="multi">
+            <div class="fgroup-lb">机构性质<span class="n">字典待定</span></div>
             <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">官方公共服务机构</button>
-              <button class="fchip" aria-pressed="false">经营性机构</button>
+              <button class="fchip" aria-pressed="false" data-v="官方公共服务机构">官方公共服务机构</button>
+              <button class="fchip" aria-pressed="false" data-v="经营性机构">经营性机构</button>
+            </div>
+            <p style="margin:6px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              后端暂无此字典，本稿按现有卡片归纳；<b>以管理端配置为准</b>。
+            </p>
+          </div>
+
+          <div class="fgroup" data-fgroup="open" data-fmode="multi">
+            <div class="fgroup-lb">现在能不能去<span class="n">按填报营业时间</span></div>
+            <div class="fgroup-row">
+              <button class="fchip" aria-pressed="false" data-v="现在营业中">现在营业中</button>
+              <button class="fchip" aria-pressed="false" data-v="今天还开门">今天还开门</button>
             </div>
           </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">现在能不能去</div>
+
+          <div class="fgroup" data-fgroup="svc" data-fmode="multi">
+            <div class="fgroup-lb">服务类型<span class="n">字典待定</span></div>
             <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">现在营业中</button>
-              <button class="fchip" aria-pressed="false">今天还开门</button>
+              <button class="fchip" aria-pressed="false" data-v="岗位推荐">岗位推荐</button>
+              <button class="fchip" aria-pressed="false" data-v="失业登记">失业登记</button>
+              <button class="fchip" aria-pressed="false" data-v="补贴咨询">补贴咨询</button>
             </div>
-          </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">区域</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">天河</button>
-              <button class="fchip" aria-pressed="false">海珠</button>
-              <button class="fmore">选区县</button>
-            </div>
-          </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">能办什么</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">岗位推荐</button>
-              <button class="fchip" aria-pressed="false">失业登记</button>
-              <button class="fchip" aria-pressed="false">补贴咨询</button>
-            </div>
+            <p style="margin:6px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              同样暂无后端字典，取自机构填报内容；<b>以管理端配置为准</b>。
+            </p>
           </div>
         </div>
-        <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>要办失业登记、补贴这类公共服务，先看官方公共就业服务机构</b>；是否收费以机构现场公示为准。</span>
+        <div style="margin-top:var(--s-4);display:flex;gap:10px;flex:0 0 auto">
+          <button class="btn btn--ghost" style="flex:1" data-agrelax="all">清空</button>
+          <button class="btn btn--primary" style="flex:1" data-agapply>用这些条件找</button>
         </div>
       </div>
 
@@ -443,6 +504,9 @@
           <div class="kv-row"><span class="k">经营性机构</span><span class="v">可代招荐岗；是否收费以现场公示与主管部门规定为准</span></div>
           <div class="kv-row"><span class="k">共同前提</span><span class="v">许可证信息为机构填报，经管理员审核后展示，本机未做核验</span></div>
         </div>
+        <p style="margin:10px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
+          要办<b>失业登记、补贴</b>这类公共服务，先看官方公共就业服务机构；是否收费以机构现场公示为准。
+        </p>
       </div>
 
       <div class="pane pane--fill pane--grow" data-at="list">
@@ -541,7 +605,7 @@
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-at="list"><div class="t">7 家已审核机构 · 公共服务先看官方机构</div><div class="s">营业状态来自机构填报，不是实时探测 · 出门前建议先电话确认</div></div>
+      <div data-at="list"><div class="t">7 家已审核机构，当前条件下显示 <b data-agcount>2</b> 家</div><div class="s">营业状态来自机构填报，不是实时探测 · 出门前建议先电话确认</div></div>
       <div data-at="detail"><div class="t">本机不代收任何费用</div><div class="s">带什么材料、是否收费，以机构现场公示与主管部门规定为准</div></div>
       <div data-at="joboffline"><div class="t">代招岗位，只能到店面谈</div><div class="s">本机不代投递、不代预约、不把你简历给机构</div></div>
       <div data-at="error"><div class="t">机构数据没取到，已自动上报</div><div class="s">不显示过期营业状态——门可能是锁着的</div></div>
@@ -591,5 +655,101 @@
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
+<script>
+/* ── 筛选真的能选，名单真的跟着变 ─────────────────────────────────────
+   本页原来四组筛选全是点不动的静态标签，「区域」拿两个广州区名 + 一个
+   死掉的「选区县」冒充全国区域。现在：
+
+   · 区域 = scripts/region.js 的省/市/区县下钻，前缀匹配；
+   · 机构名称 = 屏幕软键盘（一体机没有物理键盘）；
+   · 机构性质 / 服务类型 = 真多选，但**明确标注字典待定**——
+     后端这两项没有枚举，本机不编；正式取值以管理端配置为准。
+
+   判定写死可核对：两张卡各带 data-ag-* 字段，组内 OR、组间 AND。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var cards = [].slice.call(scr.querySelectorAll('[data-ag]'))
+  var noneEl = scr.querySelector('[data-agnone]')
+  var condEl = scr.querySelector('[data-agcond]')
+  var countEls = [].slice.call(scr.querySelectorAll('[data-agcount]'))
+  var kwEl = scr.querySelector('[data-fkw]')
+  var regionBtn = scr.querySelector('[data-region]')
+
+  function group (n) { return scr.querySelector('[data-fgroup="' + n + '"]') }
+  function on (n) {
+    var g = group(n)
+    return [].slice.call(g.querySelectorAll('.fchip'))
+      .filter(function (c) { return c.getAttribute('aria-pressed') === 'true' })
+      .map(function (c) { return c.getAttribute('data-v') })
+  }
+  function regionHit (card, v) {
+    var want = v.split('|'), got = String(card.getAttribute('data-ag-region') || '').split('|'), i
+    for (i = 0; i < 3; i++) { if (want[i] && want[i] !== got[i]) return false }
+    return true
+  }
+  function anyHit (want, got) {
+    var i, list = String(got || '').split(/\s+/)
+    if (!want.length) return true
+    for (i = 0; i < want.length; i++) if (list.indexOf(want[i]) > -1) return true
+    return false
+  }
+
+  function apply () {
+    var kw = (kwEl && kwEl.value || '').trim()
+    var region = String(regionBtn.getAttribute('data-region-value') || '')
+    var nature = on('nature'), open = on('open'), svc = on('svc')
+    var n = 0, i, c, ok, parts = []
+    for (i = 0; i < cards.length; i++) {
+      c = cards[i]; ok = true
+      if (kw && String(c.getAttribute('data-ag-kw') || '').indexOf(kw) === -1) ok = false
+      if (ok && region && !regionHit(c, region)) ok = false
+      if (ok && !anyHit(nature, c.getAttribute('data-ag-nature'))) ok = false
+      if (ok && !anyHit(open, c.getAttribute('data-ag-open'))) ok = false
+      if (ok && !anyHit(svc, c.getAttribute('data-ag-svc'))) ok = false
+      c.hidden = !ok
+      if (ok) n++
+    }
+    for (i = 0; i < countEls.length; i++) countEls[i].textContent = String(n)
+    if (noneEl) noneEl.hidden = n > 0
+
+    var cnt = (region ? 1 : 0) + (kw ? 1 : 0) + nature.length + open.length + svc.length
+    var fc = scr.querySelector('[data-fcount]')
+    if (fc) fc.textContent = '已选 ' + cnt + ' 项'
+    if (condEl) {
+      if (kw) parts.push('「' + kw + '」')
+      if (region && window.v3Region) parts.push(window.v3Region.get(regionBtn).text)
+      parts = parts.concat(nature, open, svc)
+      condEl.textContent = parts.length ? parts.join(' · ') : '未设条件'
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+
+  scr.addEventListener('click', function (e) {
+    var chip = e.target.closest('.fchip')
+    if (chip && chip.closest('[data-fgroup]')) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+      apply(); return
+    }
+    var relax = e.target.closest('[data-agrelax]')
+    if (relax) {
+      if (relax.getAttribute('data-agrelax') === 'region') { window.v3Region.set(regionBtn, '广东省||') }
+      else {
+        window.v3Region.set(regionBtn, '')
+        ;[].slice.call(scr.querySelectorAll('[data-fgroup] .fchip'))
+          .forEach(function (c) { c.setAttribute('aria-pressed', 'false') })
+        if (kwEl) kwEl.value = ''
+      }
+      apply(); return
+    }
+    if (e.target.closest('[data-agapply]')) apply()
+  })
+
+  scr.addEventListener('v3region:change', apply)
+  if (kwEl) { kwEl.addEventListener('input', apply); kwEl.addEventListener('change', apply) }
+  apply()
+})()
+</script>
 </body>
 </html>

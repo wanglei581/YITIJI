@@ -1,0 +1,207 @@
+/* ============================================================
+   V3 · 统一地区选择器 / 列表弹层（配 scripts/region.js）
+   ------------------------------------------------------------
+   与 kiosk-io.css 同一套硬约束，改动前先读：
+
+   1) 关闭态对自检零污染：弹层用 [hidden] 收起（base.css 已有
+      [hidden]{display:none!important}），本文件再兜一层。display:none 让
+      getBoundingClientRect 全为 0，stage.js 的横向溢出 / 触控 / 文字裁切
+      与 audit-plus.js 的内部裁切 / 卡内溢出全部跳过。
+
+   2) 类名一律 rgn- / fpick- / fsel 前缀，且**不得**包含
+      card / note / act / pane / row / item / pill / chip / tag / btn 子串
+      —— audit-plus.js 的「假入口」「卡内溢出」按 [class*=] 选元素，
+      沾上这些子串会被当成业务卡片或假 chip 误报。
+      （所以是 .rgn-box 不是 -panel，是 .rgn-go 不是 -btn，
+        是 .rgn-foot 不是 -actions，是 .fsel 不是 -chip。）
+
+   3) 任何**直接**包住文字的元素不写 overflow:hidden；
+      需要圆角裁切的只放在不直接含文字的 .rgn-box 上。
+
+   触控（CLAUDE.md §9 / 控件选型阈值）：
+      弹层选项 ≥64px（阈值要求 ≥56px，取 64px 留余量），
+      面包屑 / 关闭 / 底部按钮 ≥56px，触发器 .fpick ≥64px，
+      已选 chip .fsel ≥48px。
+      弹层宽度 = 屏宽 82%（1080 → 886px）：站立触控下，
+      生产那套 28rem 宽、44px 高的下拉够不着也点不准。
+   ============================================================ */
+
+/* 关闭态：不占位、不参与任何测量 */
+.rgn-mask[hidden] { display: none !important; }
+.rgn-mask [hidden] { display: none !important; }
+
+@keyframes rgn-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---------- 遮罩：停在底部导航之上，不遮住"回首页" ---------- */
+.rgn-mask {
+  position: absolute;
+  inset: 0 0 var(--rgn-navh, 0px) 0;
+  z-index: 68;                       /* 在页面内容之上，在软键盘(72)/帮助层(70)之下 */
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(2, 6, 7, .74);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  animation: rgn-fade var(--dur-2, 240ms) var(--ease-out, ease) both;
+}
+
+/* ---------- 弹层本体 ---------- */
+.rgn-box {
+  position: relative;
+  width: 82%; max-width: 900px;
+  max-height: calc(100% - var(--s-9, 48px));
+  display: flex; flex-direction: column;
+  border-radius: var(--r-lg, 24px);
+  background: var(--glass-3-bg); border: 1px solid var(--glass-3-brd);
+  backdrop-filter: blur(var(--glass-blur-heavy, 34px)); -webkit-backdrop-filter: blur(34px);
+  box-shadow: 0 40px 120px -30px rgba(1, 8, 10, .92);
+  overflow: hidden;                  /* 圆角裁切；本元素不直接含文字 */
+}
+
+.rgn-hd {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--s-4, 16px);
+  padding: var(--s-5, 20px) var(--s-6, 24px);
+  border-bottom: 1px solid var(--brd-1);
+}
+.rgn-t { font-family: var(--ff-display); font-size: var(--fz-6, 24px); color: var(--fog-900); }
+.rgn-s { font-family: var(--ff-num); font-size: var(--fz-2, 15px); color: var(--fog-600); }
+.rgn-x {
+  appearance: none; cursor: pointer; margin-left: auto; flex: 0 0 auto;
+  min-height: 56px; padding: 0 var(--s-5, 20px);
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-2); color: var(--fog-700);
+  font-family: var(--ff-ui); font-size: var(--fz-2, 15px);
+}
+.rgn-x .ic { width: 18px; height: 18px; }
+
+/* ---------- 面包屑：每一级都能点回去 ---------- */
+.rgn-crumbs {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--s-2, 8px); flex-wrap: wrap;
+  padding: var(--s-3, 12px) var(--s-6, 24px);
+  border-bottom: 1px solid var(--brd-1);
+}
+.rgn-crumb {
+  appearance: none; cursor: pointer;
+  min-height: 56px; padding: 0 var(--s-4, 16px);
+  border-radius: var(--r-xs, 8px); border: 1px solid transparent;
+  background: transparent; color: var(--azure-400);
+  font-family: var(--ff-ui); font-size: var(--fz-3, 16px);
+}
+.rgn-crumb:active { background: var(--surf-1); }
+.rgn-sp { color: var(--fog-600); font-size: var(--fz-3, 16px); }
+
+/* ---------- 搜索条 ---------- */
+.rgn-tools {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--s-3, 12px);
+  padding: var(--s-3, 12px) var(--s-6, 24px);
+  border-bottom: 1px solid var(--brd-1);
+}
+.rgn-tools .ic { width: 20px; height: 20px; color: var(--fog-600); flex: 0 0 auto; }
+.rgn-find {
+  flex: 1 1 auto; min-width: 0; min-height: 64px;
+  padding: 0 var(--s-4, 16px);
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-1); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-4, 18px);
+}
+.rgn-find::placeholder { color: var(--fog-600); }
+
+/* ---------- 选项区：可滚（被裁的内容"滚得到"，自检据此豁免） ---------- */
+.rgn-list {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--s-4, 16px) var(--s-6, 24px);
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-3, 12px);
+  align-content: start;
+}
+/* 两列形态（7–30 项的列表弹层）：本身就是一个跨满三列的栅格 */
+.rgn-two {
+  grid-column: 1 / -1;
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3, 12px);
+}
+.rgn-gp {
+  grid-column: 1 / -1;
+  padding: var(--s-3, 12px) 2px 2px;
+  font-size: var(--fz-2, 15px); color: var(--fog-600); letter-spacing: .08em;
+}
+.rgn-void {
+  grid-column: 1 / -1;
+  padding: var(--s-6, 24px) 2px;
+  font-size: var(--fz-3, 16px); color: var(--fog-600); line-height: 1.7;
+}
+
+.rgn-opt {
+  appearance: none; cursor: pointer; text-align: left;
+  min-height: 64px; padding: var(--s-3, 12px) var(--s-4, 16px);
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-1); color: var(--fog-900);
+  font-family: var(--ff-ui);
+}
+.rgn-opt:active { transform: scale(.985); background: var(--surf-3); }
+.rgn-opt--on { background: var(--jade-a12); border-color: var(--jade-500); }
+.rgn-opt--on .rgn-opt-n { color: var(--jade-600); font-weight: 600; }
+.rgn-opt-n { font-size: var(--fz-3, 16px); line-height: 1.35; }
+.rgn-opt-s { font-size: var(--fz-1, 13px); color: var(--fog-600); line-height: 1.3; }
+
+/* ---------- 底部 ---------- */
+.rgn-foot {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--s-3, 12px);
+  padding: var(--s-4, 16px) var(--s-6, 24px) var(--s-5, 20px);
+  border-top: 1px solid var(--brd-1);
+}
+.rgn-tip { flex: 1 1 auto; min-width: 0; font-size: var(--fz-2, 15px); color: var(--fog-600); line-height: 1.5; }
+.rgn-go {
+  appearance: none; cursor: pointer; flex: 0 0 auto;
+  min-height: 64px; padding: 0 var(--s-6, 24px);
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-2); color: var(--fog-800);
+  font-family: var(--ff-ui); font-size: var(--fz-3, 16px); font-weight: 600;
+}
+.rgn-go--ok {
+  background: linear-gradient(140deg, var(--jade-400), var(--jade-600));
+  color: var(--on-primary); border-color: transparent;
+}
+.rgn-go:active { transform: scale(.985); }
+
+/* ============================================================
+   页面侧：触发器与已选回显
+   ============================================================ */
+.fpick {
+  appearance: none; cursor: pointer; width: 100%; text-align: left;
+  min-height: 64px; padding: var(--s-3, 12px) var(--s-4, 16px);
+  display: flex; align-items: center; gap: var(--s-3, 12px);
+  border-radius: var(--r-sm, 12px); border: 1px solid var(--brd-2);
+  background: var(--surf-1); color: var(--fog-900);
+  font-family: var(--ff-ui); font-size: var(--fz-3, 16px);
+}
+.fpick:active { transform: scale(.99); background: var(--surf-3); }
+.fpick-v { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
+/* 数量必须写在入口上：「企业类型 · 全部 12 类」比「更多」诚实得多 ——
+   用户能据此判断点进去会看到什么，而不是点开才发现是个标签墙 */
+.fpick-n { flex: 0 0 auto; font-family: var(--ff-num); font-size: var(--fz-1, 13px); color: var(--fog-600); }
+.fpick .ic { width: 18px; height: 18px; flex: 0 0 auto; color: var(--fog-600); }
+
+/* 已选回显：每一项都能单独去掉 */
+[data-pickbag] { display: flex; flex-wrap: wrap; gap: var(--s-2, 8px); margin-top: var(--s-2, 8px); }
+[data-pickbag][hidden] { display: none !important; }
+.fsel {
+  appearance: none; cursor: pointer;
+  min-height: 48px; padding: 0 var(--s-3, 12px);
+  display: inline-flex; align-items: center; gap: 8px;
+  border-radius: var(--r-xs, 8px); border: 1px solid var(--jade-500);
+  background: var(--jade-a12); color: var(--jade-600);
+  font-family: var(--ff-ui); font-size: var(--fz-2, 15px); font-weight: 600;
+}
+.fsel-x { font-size: var(--fz-2, 15px); opacity: .72; }
+.fsel:active { transform: scale(.97); }
+
+/* 低性能机器：去掉两层 backdrop-filter（与 kiosk-io.css 同一先例） */
+html.lowgpu .rgn-mask, html.lowgpu .rgn-box {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rgn-mask { animation: none; }
+}

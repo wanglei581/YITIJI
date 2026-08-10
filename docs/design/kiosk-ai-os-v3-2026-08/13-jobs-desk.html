@@ -15,8 +15,31 @@
 <link rel="stylesheet" href="styles/fx.css?v=3">
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
   .work--list { grid-template-columns: 1fr 372px; }
+
+  /* 2026-08-10 筛选补全：
+     ① 「地区」原来是 3 个广州区名 +「选区县」原地展开成 5 个广州区名 ——
+        仍然只有广州，没有省、没有市。改用全站统一的省/市/区县下钻组件。
+     ② 「来源与形态」的「按来源机构选」只露 3 家，全站共 12 家来源；
+        改成带数量的弹层入口「全部 12 家来源」。
+     ③ 「岗位方向」的 fmore 原来写「全部 20 个门类」—— 这是**误标**：
+        GB/T 4754 的 20 门类是简历/面试域的口径，岗位这边 industry 在后端
+        是自由文本（services/api/src/jobs/excel-template.ts:31「行业名称」），
+        根本没有字典。改成「字典待定 · 以管理端配置为准」，不硬套。
+     筛选组变多后让筛选区自己滚——滚得到的内容不算被裁。 */
+  /* 高度分配：筛选卡按内容高，但**优先被压缩**（shrink 20 vs 默认 1）——
+     右栏放不下时该让内部能滚的筛选区退让，而不是把末卡内容压掉一截。
+     内容不满时它也不抢空间（grow 0），免得卡片里留一大块空白。 */
+  .pane--filter { flex: 0 20 auto; min-height: 260px; overflow: hidden; }
+  .pane--filter .filters {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+  /* 底部两个按钮各占 161px，.btn 默认左右各 24px 内边距会把「用这些条件找」挤断成两行 */
+  .pane--filter .btn { padding: 0 var(--s-3); white-space: nowrap; }
 
   /* 2026-08-10 Codex 走查整改（列表点不动 / 筛选点不动）——本页只补交互模型，不改公共层。 */
 
@@ -351,7 +374,7 @@
       <!-- 2026-08-10 Codex：所有 fchip / fmore 原来都没有绑定行为 —— 点不动。
            现在：方向/地区/经验学历/来源 多选，薪资单选（互斥，选中的再点一次取消）；
            fmore 真的展开更多标签；「用这些条件找」按当前条件切列表状态。 -->
-      <div class="pane pane--fill" data-at="ok empty">
+      <div class="pane pane--fill pane--filter" data-at="ok empty">
         <div class="pane-hd"><span class="t">筛选</span><span class="s" data-fcount>已选 5 项</span></div>
         <div class="filters">
           <div class="fgroup" data-fgroup="dir" data-fmode="multi">
@@ -361,7 +384,7 @@
               <button class="fchip" aria-pressed="false">销售</button>
               <button class="fchip" aria-pressed="false">行政人事</button>
               <button class="fchip" aria-pressed="false">技术</button>
-              <button class="fmore" aria-expanded="false" data-fmore="dir-more">全部 20 个门类</button>
+              <button class="fmore" aria-expanded="false" data-fmore="dir-more">更多方向</button>
             </div>
             <div class="fgroup-row fgroup-more" id="dir-more" hidden>
               <button class="fchip" aria-pressed="false">客服</button>
@@ -372,24 +395,38 @@
               <button class="fchip" aria-pressed="false">医疗护理</button>
             </div>
           </div>
-          <div class="fgroup" data-fgroup="area" data-fmode="multi">
-            <div class="fgroup-lb">地区</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="true">天河区</button>
-              <button class="fchip" aria-pressed="false">海珠区</button>
-              <button class="fchip" aria-pressed="false">番禺区</button>
-              <button class="fmore" aria-expanded="false" data-fmore="area-more">选区县</button>
-            </div>
-            <div class="fgroup-row fgroup-more" id="area-more" hidden>
-              <button class="fchip" aria-pressed="false">越秀区</button>
-              <button class="fchip" aria-pressed="false">白云区</button>
-              <button class="fchip" aria-pressed="false">黄埔区</button>
-              <button class="fchip" aria-pressed="false">花都区</button>
-              <button class="fchip" aria-pressed="false">增城区</button>
-            </div>
+
+          <!-- 地区：省 / 市 / 区县下钻，替掉原来那 8 个广州区名 -->
+          <div class="fgroup" data-fgroup="region">
+            <div class="fgroup-lb">城市<span class="n">省 / 市 / 区县</span></div>
+            <button class="fpick" type="button" data-region data-region-value="广东省|广州市|天河区"
+                    data-region-empty="全国不限">
+              <svg class="ic"><use href="#i-pin"/></svg>
+              <span class="fpick-v" data-region-text>广东省 · 广州市 · 天河区</span>
+              <span class="fpick-n">31 省</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
           </div>
+
+          <div class="fgroup" data-fgroup="ind">
+            <div class="fgroup-lb">行业<span class="n">字典待定</span></div>
+            <button class="fpick" type="button" data-listpick="ind" data-listpick-title="行业"
+                    data-listpick-src="#opt-jobind" data-listpick-mode="multi" data-listpick-find="1"
+                    data-listpick-value="" data-listpick-empty="不限行业"
+                    data-listpick-note="岗位的 industry 在后端是来源平台原文（自由文本），没有统一字典 —— 下面是本机已收到的取值，正式口径以管理端配置为准">
+              <span class="fpick-v" data-listpick-text>不限行业</span>
+              <span class="fpick-n">已收到 8 种</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+            <p style="margin:6px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              来源平台原文，无统一字典；只列已收到的取值，<b>以管理端配置为准</b>。
+            </p>
+          </div>
+
           <div class="fgroup" data-fgroup="pay" data-fmode="single">
-            <div class="fgroup-lb">薪资<span class="n">单选</span></div>
+            <div class="fgroup-lb">薪资<span class="n">单选 · 按最低薪资</span></div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">4K 以上</button>
               <button class="fchip" aria-pressed="false">6K 以上</button>
@@ -398,18 +435,23 @@
             </div>
           </div>
           <div class="fgroup" data-fgroup="exp" data-fmode="multi">
-            <div class="fgroup-lb">经验 / 学历</div>
+            <div class="fgroup-lb">经验<span class="n">来源平台原文归档</span></div>
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">经验不限</button>
+              <button class="fchip" aria-pressed="false">1 年以内</button>
               <button class="fchip" aria-pressed="false">1–3 年</button>
-              <button class="fchip" aria-pressed="false">本科</button>
-              <button class="fmore" aria-expanded="false" data-fmore="exp-more">更多</button>
-            </div>
-            <div class="fgroup-row fgroup-more" id="exp-more" hidden>
               <button class="fchip" aria-pressed="false">3–5 年</button>
               <button class="fchip" aria-pressed="false">5 年以上</button>
-              <button class="fchip" aria-pressed="false">大专</button>
+            </div>
+          </div>
+          <div class="fgroup" data-fgroup="edu" data-fmode="multi">
+            <div class="fgroup-lb">学历<span class="n">来源平台原文归档</span></div>
+            <div class="fgroup-row">
               <button class="fchip" aria-pressed="false">学历不限</button>
+              <button class="fchip" aria-pressed="false">中专 / 高中</button>
+              <button class="fchip" aria-pressed="false">大专</button>
+              <button class="fchip" aria-pressed="false">本科</button>
+              <button class="fchip" aria-pressed="false">硕士及以上</button>
             </div>
           </div>
           <div class="fgroup" data-fgroup="src" data-fmode="multi">
@@ -417,16 +459,22 @@
             <div class="fgroup-row">
               <button class="fchip" aria-pressed="true">线上平台</button>
               <button class="fchip" aria-pressed="true">线下机构</button>
-              <button class="fmore" aria-expanded="false" data-fmore="src-more">按来源机构选</button>
-            </div>
-            <div class="fgroup-row fgroup-more" id="src-more" hidden>
-              <button class="fchip" aria-pressed="false">前程无忧</button>
-              <button class="fchip" aria-pressed="false">广州市人才服务中心</button>
-              <button class="fchip" aria-pressed="false">高新区人才驿站</button>
             </div>
           </div>
+          <div class="fgroup" data-fgroup="org">
+            <div class="fgroup-lb">来源机构<span class="n">全站 12 家</span></div>
+            <button class="fpick" type="button" data-listpick="org" data-listpick-title="来源机构"
+                    data-listpick-src="#opt-org" data-listpick-mode="multi" data-listpick-find="1"
+                    data-listpick-value="" data-listpick-empty="全部 12 家来源"
+                    data-listpick-note="12 家已接入来源：线上平台 8 · 官方机构 2 · 线下机构 2，与左栏「数据是哪来的」同一份统计">
+              <span class="fpick-v" data-listpick-text>全部 12 家来源</span>
+              <span class="fpick-n">12 家</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+          </div>
         </div>
-        <div style="margin-top:var(--s-4);display:flex;gap:10px">
+        <div style="margin-top:var(--s-4);display:flex;gap:10px;flex:0 0 auto">
           <button class="btn btn--ghost" style="flex:1" data-relax="clear">清空</button>
           <button class="btn btn--primary" style="flex:1" data-fapply>用这些条件找</button>
         </div>
@@ -511,6 +559,12 @@
 </div>
 </div>
 
+<!-- 两份取值表。行业**不是字典**：后端 job.industry 是来源平台原文（自由文本），
+     这里只列本机已收到的 8 种取值，弹层里也这么标注，不冒充全集。
+     来源机构 12 家＝线上平台 8 + 官方机构 2 + 线下机构 2，与左栏统计同一份。 -->
+<template id="opt-jobind">["互联网/软件","文化传媒","先进制造","电子信息","金融","教育培训","医疗健康","商贸零售"]</template>
+<template id="opt-org">["前程无忧","智联招聘","BOSS 直聘","猎聘","拉勾","58 同城","赶集直招","中华英才网","广州市人才服务中心","高新区人才驿站","广州××人力资源服务有限公司","天河区就业服务中心"]</template>
+
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
@@ -546,28 +600,42 @@
   if (!scr) return
   var countEl = scr.querySelector('[data-fcount]')
   var condEl = scr.querySelector('[data-empty-cond]')
+  var regionBtn = scr.querySelector('[data-region]')
 
   function chips (g) { return [].slice.call(g.querySelectorAll('.fchip')) }
   function on (g) { return chips(g).filter(function (c) { return c.getAttribute('aria-pressed') === 'true' }) }
   function group (name) { return scr.querySelector('[data-fgroup="' + name + '"]') }
   function names (g) { return on(g).map(function (c) { return c.textContent.trim() }) }
+  function regionVal () { return String(regionBtn && regionBtn.getAttribute('data-region-value') || '') }
+  function picked (n) {
+    var b = scr.querySelector('[data-listpick="' + n + '"]')
+    return String(b && b.getAttribute('data-listpick-value') || '')
+      .split(',').filter(function (s) { return !!s })
+  }
 
   function refresh () {
     var groups = [].slice.call(scr.querySelectorAll('[data-fgroup]'))
     var n = 0
     groups.forEach(function (g) { n += on(g).length })
+    /* 地区算 1 项；来源机构与行业按已选个数算 */
+    n += (regionVal() ? 1 : 0) + picked('org').length + picked('ind').length
     if (countEl) countEl.textContent = '已选 ' + n + ' 项'
     if (condEl) {
-      var parts = names(group('dir')).concat(names(group('area')), names(group('pay')))
+      var parts = names(group('dir'))
+      if (regionVal() && window.v3Region) parts.push(window.v3Region.get(regionBtn).text)
+      parts = parts.concat(picked('ind'), names(group('pay')), names(group('exp')),
+        names(group('edu')), picked('org'))
       condEl.textContent = parts.length ? parts.join(' · ') : '未设条件'
     }
   }
 
-  /* 条件够窄就没有结果 —— 判据写死并可核对，不猜、不随机 */
+  /* 条件够窄就没有结果 —— 判据写死并可核对，不猜、不随机。
+     本原型的真实数据里「10K 以上 + 收窄到天河区」同时满足的确实是 0 条。
+     地区改成三级下钻后，判据也跟着变成「选到区县且正是天河区」。 */
   function isEmptyResult () {
     var pay = names(group('pay'))
-    var area = names(group('area'))
-    return pay.indexOf('10K 以上') > -1 && area.length === 1 && area[0] === '天河区'
+    var r = regionVal().split('|')
+    return pay.indexOf('10K 以上') > -1 && r[2] === '天河区'
   }
 
   function apply () {
@@ -610,15 +678,16 @@
           c.setAttribute('aria-pressed', c.textContent.trim() === '6K 以上' ? 'true' : 'false')
         })
       } else if (kind === 'area') {
-        chips(group('area')).forEach(function (c) { c.setAttribute('aria-pressed', 'true') })
-        var am = document.getElementById('area-more')
-        var amb = scr.querySelector('[data-fmore="area-more"]')
-        if (am) { am.hidden = false } ; if (amb) amb.setAttribute('aria-expanded', 'true')
+        /* 「扩到全广州」＝ 地区从区县退回整个广州市，不是把八个区都勾上 */
+        window.v3Region.set(regionBtn, '广东省|广州市|')
       } else {
         [].slice.call(scr.querySelectorAll('[data-fgroup] .fchip')).forEach(function (c) {
           c.setAttribute('aria-pressed', 'false')
         })
-        /* 只回到「线上平台 + 线下机构」两轨（合规必填），不把展开的来源机构也一并勾上 */
+        window.v3Region.set(regionBtn, '')
+        window.v3Pick.set(scr.querySelector('[data-listpick="ind"]'), [])
+        window.v3Pick.set(scr.querySelector('[data-listpick="org"]'), [])
+        /* 只回到「线上平台 + 线下机构」两轨（合规必填） */
         ;[].slice.call(group('src').querySelector('.fgroup-row').querySelectorAll('.fchip'))
           .forEach(function (c) { c.setAttribute('aria-pressed', 'true') })
       }
@@ -629,11 +698,17 @@
     if (e.target.closest('[data-fapply]')) apply()
   })
 
+  /* 地区与两个弹层选完就立刻重算 —— 它们不走 .fchip 那条路 */
+  scr.addEventListener('v3region:change', apply)
+  scr.addEventListener('v3pick:change', apply)
+
   refresh()
 })()
 </script>
 <!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
      于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
 </body>
 </html>

@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
 /* ── P21 专用 ───────────────────────────────────────────────────────────
    2026-08-10 按走查结论重做。上一版的病不是"没写清楚"，是**写太多、问太少**：
@@ -62,8 +64,10 @@
 .city-v--none { color:var(--amber-200); font-size:var(--fz-5); }
 
 .citypick { margin-top:var(--s-4); padding-top:var(--s-4); border-top:1px solid var(--brd-1); }
-/* 类名不带 tag/chip/pill/btn：自检把这类类名的非按钮容器判为「假入口」 */
-.oprow { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.citypick .field-lb { margin-bottom:var(--s-3); }
+/* 2026-08-10：省 / 市原来平铺在 .oprow 里（只有 5 个省，扩到 31 个必成标签墙）。
+   改用 scripts/region.js 的下钻选择器后 .oprow / .op--sm 已无引用，一并删掉，
+   不留死样式。.op 仍在用（下面九个问项）。 */
 
 /* ── ② 问项：单选有选中态 ── */
 .qs { display:flex; flex-direction:column; }
@@ -80,7 +84,6 @@
 .op:hover { border-color:var(--jade-a32); }
 .op[aria-pressed="true"] { background:var(--jade-a12); border-color:var(--jade-400);
   color:var(--fog-900); font-weight:600; }
-.op--sm { min-height:var(--touch-min); font-size:var(--fz-2); }
 
 /* 计数条：只报「答了几项、缺几项」。
    2026-08-10 Codex :319 整改：九项答案原来在这里铺一遍 chip、右栏「你答了什么」再铺一遍 kv，
@@ -295,13 +298,20 @@
           <div class="cityrow">
             <span class="city-v" id="cityV">广州市</span>
             <span class="city-k" id="cityK">广东省 · 本机所在城市 · 可改</span>
-            <button class="btn btn--ghost city-sw" id="citySw" aria-pressed="false">更换城市</button>
           </div>
-          <div class="citypick" id="cityPick" hidden>
-            <div class="field-lb">省 / 自治区</div>
-            <div class="oprow" id="provRow"></div>
-            <div class="field-lb" style="margin-top:var(--s-3)">市</div>
-            <div class="oprow" id="cityRow"></div>
+          <!-- 2026-08-10：省 / 市原来平铺成两排 .oprow 标签（只有 5 个省）。
+               扩到 31 个省必然变成标签墙，所以改用全站统一的下钻选择器
+               （scripts/region.js）。城市未定不出结论的门控逻辑一字不动：
+               选「整个某某省」= 没定到市 → 仍然是「城市未定」。 -->
+          <div class="citypick" id="cityPick">
+            <div class="field-lb"><span>政策按<b>市</b>走 —— 只选到省份不算定了城市</span></div>
+            <button class="fpick" type="button" id="cityBtn" data-region
+                    data-region-value="广东省|广州市|" data-region-empty="城市未定">
+              <svg class="ic"><use href="#i-pin"/></svg>
+              <span class="fpick-v" data-region-text>广东省 · 广州市</span>
+              <span class="fpick-n">31 省</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
           </div>
           <div class="notice notice--amber" id="cityWarn" hidden style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-alert"/></svg>
@@ -673,6 +683,8 @@
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
+<script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════
    P21 页内交互（静态设计稿，不连后端；只表达交互模型）
@@ -686,14 +698,9 @@
   var scr = document.querySelector('.screen')
   if (!scr) return
 
-  /* ---------- 城市：本机所在城市由终端配置下发（一体机无定位权限） ---------- */
-  var PROV = {
-    '广东省': ['广州市', '深圳市', '珠海市', '佛山市', '东莞市', '中山市'],
-    '湖南省': ['长沙市', '株洲市', '衡阳市', '岳阳市'],
-    '广西壮族自治区': ['南宁市', '柳州市', '桂林市'],
-    '江西省': ['南昌市', '赣州市', '九江市'],
-    '四川省': ['成都市', '绵阳市', '南充市']
-  }
+  /* ---------- 城市：本机所在城市由终端配置下发（一体机无定位权限） ----------
+     省 / 市字典不再写在本页：全国 31 省的名单由 scripts/region.js 统一提供，
+     这里只保管「当前选了哪个省、哪个市」以及「没定到市就不出结论」这条门控。 */
   var HOME = { prov: '广东省', city: '广州市' }
 
   /* ---------- 九个问项 ---------- */
@@ -887,24 +894,19 @@
     } else {
       v.textContent = '城市未定'
       v.className = 'city-v city-v--none'
-      k.textContent = city.prov + ' · 请在下面选一个市'
+      k.textContent = city.prov + ' · 还没定到市，点下面的地区按钮接着选'
     }
     $('cityWarn').hidden = cityOK()
     $('cityWarn2').hidden = cityOK()
 
-    var pr = '', i
-    var provs = Object.keys(PROV)
-    for (i = 0; i < provs.length; i++) {
-      pr += '<button class="op op--sm" data-prov="' + provs[i] + '" aria-pressed="' +
-            (provs[i] === city.prov) + '">' + provs[i] + '</button>'
-    }
-    $('provRow').innerHTML = pr
-    var cs = '', list = PROV[city.prov] || []
-    for (i = 0; i < list.length; i++) {
-      cs += '<button class="op op--sm" data-city="' + list[i] + '" aria-pressed="' +
-            (list[i] === city.city) + '">' + list[i] + '</button>'
-    }
-    $('cityRow').innerHTML = cs
+    /* 把本页状态同步回选择器触发器（不走 v3Region.set，免得触发 change 再回调 render） */
+    var rb = $('cityBtn')
+    rb.setAttribute('data-region-value',
+      city.city ? (city.prov + '|' + city.city + '|') : (city.prov ? city.prov + '||' : ''))
+    rb.querySelector('[data-region-text]').textContent = cityOK()
+      ? (city.prov === city.city ? city.city : city.prov + ' · ' + city.city)
+      : (city.prov ? city.prov + ' · 城市未定' : '城市未定')
+
     $('gdCity').textContent = cityOK() ? city.city : '城市未定'
   }
 
@@ -1102,21 +1104,6 @@
     if ((t = e.target.closest('.op[data-q]'))) {
       ans[t.getAttribute('data-q')] = t.getAttribute('data-v'); render(); return
     }
-    if ((t = e.target.closest('[data-prov]'))) {
-      var pv = t.getAttribute('data-prov')
-      if (pv !== city.prov) { city.prov = pv; city.city = null }   // 换省 → 城市未定，先选市
-      render(); return
-    }
-    if ((t = e.target.closest('[data-city]'))) {
-      city.city = t.getAttribute('data-city'); render(); return
-    }
-    if ((t = e.target.closest('#citySw'))) {
-      var box = $('cityPick')
-      box.hidden = !box.hidden
-      t.setAttribute('aria-pressed', box.hidden ? 'false' : 'true')
-      t.textContent = box.hidden ? '更换城市' : '收起'
-      return
-    }
     if ((t = e.target.closest('[data-pick]'))) {
       var pid = t.getAttribute('data-pick')
       if (pick[pid]) { delete pick[pid]; delete docs[pid] } else { pick[pid] = 1 }
@@ -1173,6 +1160,15 @@
     if (o.docs) { docs = o.docs }
     render()
   }
+
+  /* 地区选择器回来的结果：只到省 → 城市未定（门控不变）；到市或到区县 → 取市。
+     直辖市（北京/天津/上海/重庆）省市同名，city 直接取该市。 */
+  scr.addEventListener('v3region:change', function (e) {
+    var d = e.detail || {}
+    city.prov = d.province || ''
+    city.city = d.city || null
+    render()
+  })
 
   buildQs()
   buildPols()

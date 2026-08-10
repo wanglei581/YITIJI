@@ -16,8 +16,35 @@
 <link rel="stylesheet" href="styles/fx2.css?v=3">
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/region.css?v=1">
 <style>
   .work--co { grid-template-columns: 1fr 372px; }
+
+  /* 2026-08-10 筛选补全：本页原来只有 3 个广州区县标签，没有省、没有市、没有搜索，
+     「全部 20 个门类」「选区县」两个入口还点不动 —— 少数标签冒充全集。
+     现在：地区走统一下钻组件，企业类型 / 行业走带数量的弹层入口，其余按阈值平铺。
+     筛选组多了之后右栏放不下，让筛选区自己滚：被滚动区裹住的内容「滚得到」，
+     不是被裁（audit-plus.js 的 isReachableByScroll 据此豁免）。 */
+  /* 高度分配：筛选卡按内容高，但**优先被压缩**（shrink 20 vs 默认 1）——
+     右栏放不下时该让内部能滚的筛选区退让；不这么定的话 flex 按比例压每张卡，
+     末卡的合规 notice 当场被裁掉 15px（实测）。内容不满时它也不抢空间（grow 0）。 */
+  .pane--filter { flex: 0 20 auto; min-height: 260px; overflow: hidden; }
+  .pane--filter .filters {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+    padding-right: 4px;
+  }
+  .fsearch {
+    width: 100%; min-height: 64px; padding: 0 var(--s-4);
+    border-radius: var(--r-sm); border: 1px solid var(--brd-2);
+    background: var(--surf-1); color: var(--fog-900);
+    font-family: var(--ff-ui); font-size: var(--fz-3);
+  }
+  .fsearch::placeholder { color: var(--fog-600); }
+  /* 底部两个按钮各占约 160px，.btn 默认左右各 24px 内边距会把「用这些条件找」挤断成两行 */
+  .pane--filter .filters + div .btn { padding: 0 var(--s-3); white-space: nowrap; }
+  /* 空结果：本页没有独立的「空结果」状态位（状态轨是 列表/详情/指标未开启/失败），
+     所以 0 命中在列表内就地表达，不新增状态。 */
+  .conone { display: flex; flex-direction: column; gap: var(--s-4); align-items: flex-start; }
   .cologo {
     width: 56px; height: 56px; border-radius: var(--r-sm); flex: 0 0 auto;
     display: grid; place-items: center; font-family: var(--ff-display); font-size: var(--fz-6);
@@ -82,12 +109,16 @@
             企业信息由来源机构提供并经管理员审核后展示。</span>
         </div>
 
-        <button class="rcard" data-go="detail">
+        <button class="rcard" data-go="detail" data-co
+                data-co-region="广东省|广州市|天河区" data-co-type="民营企业"
+                data-co-ind="互联网/软件" data-co-size="100–499 人"
+                data-co-recruit="社招 实习" data-co-src="第三方合规平台"
+                data-co-kw="广州科技 互联网 软件 运营 技术 销售 天河">
           <span class="rcard-top">
             <span class="cologo">科</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××科技有限公司</span>
-              <span class="rcard-org">互联网&nbsp;· 100–499 人&nbsp;· 民营&nbsp;· 天河区</span>
+              <span class="rcard-org">互联网/软件&nbsp;· 100–499 人&nbsp;· 民营企业&nbsp;· 天河区</span>
             </span>
             <span class="rcard-pay"><b>6</b><span>个在招岗位</span></span>
           </span>
@@ -103,14 +134,18 @@
           </span>
         </button>
 
-        <button class="rcard" data-go="detail">
+        <button class="rcard" data-go="detail" data-co
+                data-co-region="广东省|广州市|海珠区" data-co-type="民营企业"
+                data-co-ind="文旅传媒" data-co-size="20–99 人"
+                data-co-recruit="社招" data-co-src="人社平台"
+                data-co-kw="广州文化传播 文旅传媒 内容运营 设计 海珠">
           <span class="rcard-top">
             <span class="cologo">文</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××文化传播有限公司</span>
-              <!-- 分隔点前用 &nbsp;：这一行在本宽度下断在「民营」与「·」之间，把「·」甩到行首
+              <!-- 分隔点前用 &nbsp;：这一行在本宽度下断在「民营企业」与「·」之间，把「·」甩到行首
                    （中文排版禁则）。不可断空格让断行落到「·」之后，字符与信息都不变。 -->
-              <span class="rcard-org">文化传媒&nbsp;· 20–99 人&nbsp;· 民营&nbsp;· 海珠区</span>
+              <span class="rcard-org">文旅传媒&nbsp;· 20–99 人&nbsp;· 民营企业&nbsp;· 海珠区</span>
             </span>
             <span class="rcard-pay"><b>2</b><span>个在招岗位</span></span>
           </span>
@@ -126,12 +161,16 @@
           </span>
         </button>
 
-        <button class="rcard" data-go="detail">
+        <button class="rcard" data-go="detail" data-co
+                data-co-region="广东省|广州市|番禺区" data-co-type="上市公司"
+                data-co-ind="智能制造" data-co-size="500 人以上"
+                data-co-recruit="社招 校招 招聘会参展" data-co-src="人社平台"
+                data-co-kw="广州智能制造 工艺 质量 行政 番禺">
           <span class="rcard-top">
             <span class="cologo">制</span>
             <span style="flex:1;min-width:0">
               <span class="rcard-t">广州××智能制造股份有限公司</span>
-              <span class="rcard-org">先进制造&nbsp;· 500–999 人&nbsp;· 上市&nbsp;· 番禺区</span>
+              <span class="rcard-org">智能制造&nbsp;· 500–999 人&nbsp;· 上市公司&nbsp;· 番禺区</span>
             </span>
             <span class="rcard-pay"><b>11</b><span>个在招岗位</span></span>
           </span>
@@ -147,9 +186,21 @@
           </span>
         </button>
 
+        <!-- 0 命中时就地表达，不新增状态位；三个动作都真的改右栏条件 -->
+        <div class="notice notice--amber conone" data-conone hidden>
+          <span><b>这些条件同时满足的企业，这一刻一家也没有。</b>不会凑几家不符合的充数。
+            当前条件：<b data-cocond>未设条件</b>。</span>
+          <span style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn--ghost" data-corelax="region">地区放宽到整个广州市</button>
+            <button class="btn btn--ghost" data-corelax="ind">去掉行业条件</button>
+            <button class="btn btn--primary" data-corelax="all">清空全部条件</button>
+          </span>
+        </div>
+
         <div class="notice">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>共 46 家已审核企业，显示 12 家。可按行业、规模、区域、是否参加本周招聘会筛选。</span>
+          <span>共 46 家已审核企业，当前条件下显示 <b data-cocount>3</b> 家。
+            地区、企业类型、行业三项走弹层选择器；招聘类型与来源直接点标签。</span>
         </div>
       </div>
 
@@ -345,47 +396,95 @@
     <!-- ================= 右 ================= -->
     <div class="wside">
 
-      <div class="pane pane--fill" data-at="list">
-        <div class="pane-hd"><span class="t">筛选</span><span class="s">46 家已审核</span></div>
+      <div class="pane pane--fill pane--filter" data-at="list">
+        <div class="pane-hd"><span class="t">筛选</span><span class="s" data-fcount>已选 0 项</span></div>
         <div class="filters">
-          <div class="fgroup">
-            <div class="fgroup-lb">行业<span class="n">GB/T 门类</span></div>
+
+          <div class="fgroup" data-fgroup="kw">
+            <div class="fgroup-lb">关键词<span class="n">企业名 / 岗位方向</span></div>
+            <input class="fsearch" type="text" data-keypad="text" data-fkw autocomplete="off"
+                   placeholder="点这里用屏幕键盘输入" aria-label="搜索企业名或岗位方向">
+          </div>
+
+          <!-- 地区：31 省 + 层级 → 按阈值走全屏下钻（scripts/region.js） -->
+          <div class="fgroup" data-fgroup="region">
+            <div class="fgroup-lb">地区<span class="n">省 / 市 / 区县</span></div>
+            <button class="fpick" type="button" data-region data-region-value="" data-region-empty="全国不限">
+              <svg class="ic"><use href="#i-pin"/></svg>
+              <span class="fpick-v" data-region-text>全国不限</span>
+              <span class="fpick-n">31 省</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+          </div>
+
+          <!-- 企业类型 12 项 → 两列弹层 -->
+          <div class="fgroup" data-fgroup="cotype">
+            <div class="fgroup-lb">企业类型<span class="n">字典 COMPANY_TYPES</span></div>
+            <button class="fpick" type="button" data-listpick="cotype" data-listpick-title="企业类型"
+                    data-listpick-src="#opt-cotype" data-listpick-mode="multi" data-listpick-value=""
+                    data-listpick-empty="全部 12 类"
+                    data-listpick-note="字典 packages/shared COMPANY_TYPES · 12 项，与后端 @IsIn 校验同源">
+              <span class="fpick-v" data-listpick-text>全部 12 类</span>
+              <span class="fpick-n">12 类</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+          </div>
+
+          <!-- 行业 18 项 → 两列弹层 + 搜索 -->
+          <div class="fgroup" data-fgroup="ind">
+            <div class="fgroup-lb">行业<span class="n">字典 COMPANY_INDUSTRIES</span></div>
+            <button class="fpick" type="button" data-listpick="ind" data-listpick-title="行业"
+                    data-listpick-src="#opt-ind" data-listpick-mode="multi" data-listpick-find="1"
+                    data-listpick-value="" data-listpick-empty="全部 18 类"
+                    data-listpick-note="字典 packages/shared COMPANY_INDUSTRIES · 18 项。不是 GB/T 4754 的 20 门类——那套在简历/面试域用，两套不通用">
+              <span class="fpick-v" data-listpick-text>全部 18 类</span>
+              <span class="fpick-n">18 类</span>
+              <svg class="ic"><use href="#i-chevron"/></svg>
+            </button>
+            <div data-pickbag hidden></div>
+          </div>
+
+          <!-- 5 项 → 平铺 -->
+          <div class="fgroup" data-fgroup="recruit" data-fmode="multi">
+            <div class="fgroup-lb">招聘类型<span class="n">可多选</span></div>
             <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">互联网</button>
-              <button class="fchip" aria-pressed="false">先进制造</button>
-              <button class="fchip" aria-pressed="false">文化传媒</button>
-              <button class="fmore">全部 20 个门类</button>
+              <button class="fchip" aria-pressed="false" data-v="社招">社招</button>
+              <button class="fchip" aria-pressed="false" data-v="校招">校招</button>
+              <button class="fchip" aria-pressed="false" data-v="实习">实习</button>
+              <button class="fchip" aria-pressed="false" data-v="兼职">兼职</button>
+              <button class="fchip" aria-pressed="false" data-v="招聘会参展">招聘会参展</button>
             </div>
           </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">规模</div>
+
+          <!-- 4 项 → 平铺 -->
+          <div class="fgroup" data-fgroup="src" data-fmode="multi">
+            <div class="fgroup-lb">来源<span class="n">字典 COMPANY_SOURCE_KINDS</span></div>
             <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">20 人以下</button>
-              <button class="fchip" aria-pressed="false">20–99</button>
-              <button class="fchip" aria-pressed="false">100–499</button>
-              <button class="fchip" aria-pressed="false">500 以上</button>
+              <button class="fchip" aria-pressed="false" data-v="人社平台">人社平台</button>
+              <button class="fchip" aria-pressed="false" data-v="大学就业网">大学就业网</button>
+              <button class="fchip" aria-pressed="false" data-v="招聘会主办方">招聘会主办方</button>
+              <button class="fchip" aria-pressed="false" data-v="第三方合规平台">第三方合规平台</button>
             </div>
           </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">区域</div>
+
+          <div class="fgroup" data-fgroup="size" data-fmode="multi">
+            <div class="fgroup-lb">企业规模<span class="n">站内自由文本</span></div>
             <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">天河</button>
-              <button class="fchip" aria-pressed="false">海珠</button>
-              <button class="fchip" aria-pressed="false">番禺</button>
-              <button class="fmore">选区县</button>
+              <button class="fchip" aria-pressed="false" data-v="20 人以下">20 人以下</button>
+              <button class="fchip" aria-pressed="false" data-v="20–99 人">20–99 人</button>
+              <button class="fchip" aria-pressed="false" data-v="100–499 人">100–499 人</button>
+              <button class="fchip" aria-pressed="false" data-v="500 人以上">500 人以上</button>
             </div>
-          </div>
-          <div class="fgroup">
-            <div class="fgroup-lb">现场机会</div>
-            <div class="fgroup-row">
-              <button class="fchip" aria-pressed="false">参加周五招聘会</button>
-              <button class="fchip" aria-pressed="false">校招进校</button>
-            </div>
+            <p style="margin:6px 0 0;font-size:var(--fz-1);color:var(--fog-600);line-height:1.5">
+              站内<b>自由文本</b>，<b>暂不做区间筛选</b>；按填报原文档位匹配。
+            </p>
           </div>
         </div>
-        <div style="margin-top:var(--s-4);display:flex;gap:10px">
-          <button class="btn btn--ghost" style="flex:1">清空</button>
-          <button class="btn btn--primary" style="flex:1">筛选</button>
+        <div style="margin-top:var(--s-4);display:flex;gap:10px;flex:0 0 auto">
+          <button class="btn btn--ghost" style="flex:1" data-corelax="all">清空</button>
+          <button class="btn btn--primary" style="flex:1" data-coapply>用这些条件找</button>
         </div>
       </div>
 
@@ -501,7 +600,7 @@
       <a class="backbtn" href="34-jobs-hub.html" data-parent-label="岗位信息"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">岗位信息</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
-      <div data-at="list"><div class="t">46 家已审核企业，显示 12 家</div><div class="s">来源企业与岗位导览 · 本机不代收简历、不做筛选与邀约</div></div>
+      <div data-at="list"><div class="t">46 家已审核企业，当前条件下显示 <b data-cocount>3</b> 家</div><div class="s">来源企业与岗位导览 · 本机不代收简历、不做筛选与邀约</div></div>
       <div data-at="detail"><div class="t">6 个在招岗位 · 参加周五招聘会 B-12 展位</div><div class="s">经营信息为来源机构填报，非本机工商核验</div></div>
       <div data-at="metricsoff"><div class="t">本机未开启企业指标展示</div><div class="s">不用来源数据凑数字充版面 · 岗位与展位照常可看</div></div>
       <div data-at="error"><div class="t">企业数据没取到，已自动上报</div><div class="s">不显示过期缓存——企业可能已停止招聘</div></div>
@@ -525,6 +624,11 @@
 </div>
 </div>
 
+<!-- 字典：与 packages/shared/src/types/company.ts 逐字对齐。
+     <template> 的内容是惰性片段，不进 DOM 树，不参与任何自检测量。 -->
+<template id="opt-cotype">["央企","国企","事业单位","民营企业","外资企业","合资企业","上市公司","专精特新","高新技术企业","校企合作单位","公共机构","其他"]</template>
+<template id="opt-ind">["智能制造","互联网/软件","AI/大数据","电子信息","新能源","新材料","生物医药","金融","教育培训","医疗健康","建筑地产","交通物流","商贸零售","文旅传媒","农业食品","专业服务","公共服务","其他"]</template>
+
 <script src="scripts/stage.js?v=29"></script>
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
@@ -547,5 +651,133 @@
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
+<script src="scripts/region.js?v=1"></script>
+<script>
+/* ── 筛选真的能选，名单真的跟着变 ─────────────────────────────────────
+   本页此前五组筛选全是静态标签：aria-pressed 写死、"全部 20 个门类"与"选区县"
+   点不动，而且用 3 个广州区县冒充全国地区。现在：
+
+   · 地区 = scripts/region.js 的省/市/区县下钻，前缀匹配（选到省就按省筛）；
+   · 企业类型 12 / 行业 18 = 同一组件的两列弹层，已选项回显成可单独清除的 chip；
+   · 招聘类型 5 / 来源 4 / 规模 4 = 平铺多选（≤6 项按阈值就该平铺）；
+   · 关键词 = 屏幕软键盘（scripts/keypad.js），一体机没有物理键盘。
+
+   判定是**写死可核对的**，不是随机：三张卡各自带 data-co-* 字段，
+   组内 OR、组间 AND，命中 0 家就地报空，不凑数。 */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+  var cards = [].slice.call(scr.querySelectorAll('[data-co]'))
+  var noneEl = scr.querySelector('[data-conone]')
+  var condEl = scr.querySelector('[data-cocond]')
+  var countEls = [].slice.call(scr.querySelectorAll('[data-cocount]'))
+  var kwEl = scr.querySelector('[data-fkw]')
+
+  function group (n) { return scr.querySelector('[data-fgroup="' + n + '"]') }
+  function chips (g) { return [].slice.call(g.querySelectorAll('.fchip')) }
+  function on (g) {
+    return chips(g).filter(function (c) { return c.getAttribute('aria-pressed') === 'true' })
+      .map(function (c) { return c.getAttribute('data-v') })
+  }
+  function picked (n) {
+    var b = scr.querySelector('[data-listpick="' + n + '"]')
+    return String(b && b.getAttribute('data-listpick-value') || '')
+      .split(',').filter(function (s) { return !!s })
+  }
+  function regionVal () {
+    var b = scr.querySelector('[data-region]')
+    return String(b && b.getAttribute('data-region-value') || '')
+  }
+
+  /* 地区前缀匹配：选「广东省」→ 广东省下全部；选到区县 → 只此区县 */
+  function regionHit (card, v) {
+    var want = v.split('|'), got = String(card.getAttribute('data-co-region') || '').split('|'), i
+    for (i = 0; i < 3; i++) { if (want[i] && want[i] !== got[i]) return false }
+    return true
+  }
+  function anyHit (want, got) {
+    var i, list = String(got || '').split(/\s+/)
+    if (!want.length) return true
+    for (i = 0; i < want.length; i++) if (list.indexOf(want[i]) > -1) return true
+    return false
+  }
+
+  function state () {
+    return {
+      kw: (kwEl && kwEl.value || '').trim(),
+      region: regionVal(),
+      cotype: picked('cotype'),
+      ind: picked('ind'),
+      recruit: on(group('recruit')),
+      src: on(group('src')),
+      size: on(group('size'))
+    }
+  }
+
+  function apply () {
+    var s = state(), n = 0, i, c, ok, parts = []
+    for (i = 0; i < cards.length; i++) {
+      c = cards[i]
+      ok = true
+      if (s.kw && String(c.getAttribute('data-co-kw') || '').indexOf(s.kw) === -1) ok = false
+      if (ok && s.region && !regionHit(c, s.region)) ok = false
+      if (ok && !anyHit(s.cotype, c.getAttribute('data-co-type'))) ok = false
+      if (ok && !anyHit(s.ind, c.getAttribute('data-co-ind'))) ok = false
+      if (ok && !anyHit(s.recruit, c.getAttribute('data-co-recruit'))) ok = false
+      if (ok && !anyHit(s.src, c.getAttribute('data-co-src'))) ok = false
+      if (ok && !anyHit(s.size, c.getAttribute('data-co-size'))) ok = false
+      c.hidden = !ok
+      if (ok) n++
+    }
+    for (i = 0; i < countEls.length; i++) countEls[i].textContent = String(n)
+    if (noneEl) noneEl.hidden = n > 0
+
+    /* 已选 N 项：地区算 1 项，其余按选中个数 */
+    var cnt = (s.region ? 1 : 0) + (s.kw ? 1 : 0) +
+      s.cotype.length + s.ind.length + s.recruit.length + s.src.length + s.size.length
+    var fc = scr.querySelector('[data-fcount]')
+    if (fc) fc.textContent = '已选 ' + cnt + ' 项'
+
+    if (condEl) {
+      if (s.kw) parts.push('「' + s.kw + '」')
+      if (s.region && window.v3Region) parts.push(window.v3Region.get(scr.querySelector('[data-region]')).text)
+      parts = parts.concat(s.cotype, s.ind, s.recruit, s.src, s.size)
+      condEl.textContent = parts.length ? parts.join(' · ') : '未设条件'
+    }
+    if (window.v3Audit) requestAnimationFrame(window.v3Audit)
+  }
+  window.p15Apply = apply
+
+  scr.addEventListener('click', function (e) {
+    var chip = e.target.closest('.fchip')
+    if (chip && chip.closest('[data-fgroup]')) {
+      chip.setAttribute('aria-pressed', chip.getAttribute('aria-pressed') === 'true' ? 'false' : 'true')
+      apply(); return
+    }
+    var relax = e.target.closest('[data-corelax]')
+    if (relax) {
+      var kind = relax.getAttribute('data-corelax')
+      var rb = scr.querySelector('[data-region]')
+      if (kind === 'region') { window.v3Region.set(rb, '广东省|广州市|') }
+      else if (kind === 'ind') { window.v3Pick.set(scr.querySelector('[data-listpick="ind"]'), []) }
+      else {
+        window.v3Region.set(rb, '')
+        window.v3Pick.set(scr.querySelector('[data-listpick="cotype"]'), [])
+        window.v3Pick.set(scr.querySelector('[data-listpick="ind"]'), [])
+        ;[].slice.call(scr.querySelectorAll('[data-fgroup] .fchip'))
+          .forEach(function (c) { c.setAttribute('aria-pressed', 'false') })
+        if (kwEl) kwEl.value = ''
+      }
+      apply(); return
+    }
+    if (e.target.closest('[data-coapply]')) apply()
+  })
+
+  scr.addEventListener('v3region:change', apply)
+  scr.addEventListener('v3pick:change', apply)
+  if (kwEl) { kwEl.addEventListener('input', apply); kwEl.addEventListener('change', apply) }
+  apply()
+})()
+</script>
 </body>
 </html>
