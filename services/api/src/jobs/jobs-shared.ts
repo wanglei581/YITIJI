@@ -36,7 +36,7 @@ export interface PublishedFairsParams {
 
 export interface PublishedFairQueryGroup {
   where: Prisma.JobFairWhereInput
-  orderBy: { startAt: 'asc' | 'desc' }
+  orderBy: Array<{ startAt?: 'asc' | 'desc'; id?: 'asc' | 'desc' }>
 }
 
 // ─── Exported DTO types ───────────────────────────────────────────────────────

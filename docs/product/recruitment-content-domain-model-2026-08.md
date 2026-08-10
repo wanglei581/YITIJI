@@ -314,7 +314,7 @@ offlineJobVisible = jobVisible + agencyVisible
 5. OfflineAgency 找出空/孤儿 sourceOrgId、重复名称地址、无结构化地区和无资质证据项。
 6. OfflineJob 找出无 employer、无 city、无 sourceUrl、重复 externalId、父机构不可见但自身 active 的项。
 7. AuditLog 汇总 create/update/review/publish/unpublish/archive/source/qualification 动作与无原因变更。
-8. 用数据库理论可见 ID 集合与公开 API ID 集合做差集，不只比较 total。
+8. 用数据库理论可见 ID 集合与公开 API ID 集合做差集，不只比较 total；必须分开报告“严格复刻当前部署 reader 的 `currentReaderIds`”与“冻结目标依赖门禁的 `targetSafeIds`”。前者用于识别分页/部署/接口漂移，后者用于识别当前公开内容的治理泄漏，二者不得混用。尚未冻结版本化可见性模型的 JobFair/PolicyPost 标记 unsupported，尚无公开 reader 的 OnlinePlatformDirectory/OfflineAgencyProfile 标记 endpoint absent，不把不存在的接口伪装成空集合。
 
 只允许输出聚合计数、内部 ID、脱敏域名、违规项分类、查询脚本 SHA-256 和执行时间；不得输出口令、加密凭证、完整联系方式、证照文件 URL、ImportRecord 原始行或用户数据。
 

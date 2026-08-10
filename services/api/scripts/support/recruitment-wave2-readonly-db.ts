@@ -6,7 +6,7 @@ import {
   type RecruitmentWave2TargetConfig,
 } from '../../src/recruitment-content/recruitment-wave2-target'
 
-type QueryRows = <T extends Record<string, unknown>>(sql: string, values?: unknown[]) => Promise<T[]>
+export type QueryRows = <T extends object>(sql: string, values?: unknown[]) => Promise<T[]>
 
 export interface RecruitmentWave2DatabaseIdentity {
   database: string
@@ -16,6 +16,7 @@ export interface RecruitmentWave2DatabaseIdentity {
   roleVerifiedReadonly: true
   snapshotAsOf: string | null
   markerExpiresAt: string | null
+  inventoryAsOf: string
   migrationCount: number
   latestMigration: string | null
 }
@@ -297,7 +298,9 @@ function nullableDate(value: unknown): Date | null {
 
 async function verifyIdentity(query: QueryRows, config: RecruitmentWave2TargetConfig): Promise<RecruitmentWave2DatabaseIdentity> {
   const rows = await query<Record<string, unknown>>(`SELECT current_database() AS database,current_schema() AS schema,
-    version() AS version,current_setting('transaction_read_only') AS read_only,r.rolsuper AS superuser,
+    version() AS version,
+    to_char(transaction_timestamp() AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS inventory_as_of,
+    current_setting('transaction_read_only') AS read_only,r.rolsuper AS superuser,
     r.rolcreatedb AS create_database,r.rolcreaterole AS create_role,r.rolreplication AS replication,
     r.rolbypassrls AS bypass_rls,
     has_schema_privilege(current_user,'public','CREATE') AS create_schema,
@@ -331,6 +334,7 @@ async function verifyIdentity(query: QueryRows, config: RecruitmentWave2TargetCo
     roleVerifiedReadonly: true,
     snapshotAsOf: marker?.snapshotAsOf ?? null,
     markerExpiresAt: marker?.expiresAt ?? null,
+    inventoryAsOf: requirePostgresMicrosecondTimestamp(row['inventory_as_of']),
     migrationCount: migrationRows.length,
     latestMigration: /^[A-Za-z0-9_]{1,128}$/u.test(migrationRows[0]?.migration_name ?? '')
       ? migrationRows[0]!.migration_name
@@ -363,3 +367,11 @@ async function countQueries(query: QueryRows, sqlMap: Record<string, string>): P
 }
 
 function sha256(value: string): string { return createHash('sha256').update(value, 'utf8').digest('hex') }
+
+function requirePostgresMicrosecondTimestamp(value: unknown): string {
+  const timestamp = typeof value === 'string' ? value : ''
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/u.test(timestamp)) {
+    throw new Error('RECRUITMENT_WAVE2_INVENTORY_TIME_INVALID')
+  }
+  return timestamp
+}
