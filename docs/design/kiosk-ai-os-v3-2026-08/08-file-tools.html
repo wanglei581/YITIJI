@@ -270,7 +270,12 @@
         </div>
       </div>
 
-      <div class="signpad" data-at="t2">
+      <!-- data-void-ok：回归台的「卡内空洞」检查会报这块在 first 态空 379px。
+           这里的空白就是它的功能 —— 手写板在等你落笔，往里填任何东西都是错的。
+           default 态有墨迹时读数为 0，可以对照。
+           例外写成声明式而不是让工具硬编码类名：改这一页的人一眼能读到
+           「这里为什么允许空」，不必去翻工具源码。 -->
+      <div class="signpad" data-at="t2" data-void-ok="手写板在等落笔，空白即功能；default 态有墨迹时读数为 0">
         <div class="hint" data-when="first">
           在这块区域用手指写下你的签名<br>
           <span style="font-size:var(--fz-2)">写坏了可以点右侧「清除重写」</span>

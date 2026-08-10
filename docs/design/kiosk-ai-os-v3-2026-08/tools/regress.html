@@ -528,6 +528,69 @@ function collectDefects (node, path, out, combo, evidence) {
 /* v3AuditPlus() 返回里属于「统计」而非「缺陷」的键 */
 var INFO_KEYS = ['声明条数']
 
+/* ── 卡内空洞 ────────────────────────────────────────────────────
+   audit-plus 的「版面留白」只量 .wmain / .wside 两根**主栏**的尾部，
+   理由写在它自己的注释里：「pane 内部留白是设计，主栏见底才是欠内容」。
+
+   这话对了一半。实测（28/27/08 整改时发现）存在一类它看不见的情况：
+   **主栏尾部读数是 0，但某一张卡片内部空着 400–800px。**
+   例如 28 的 s2，题干塞在 408px 小卡里，下面跟一张 952px 的卡而内容只有 285px；
+   主栏最后一个叶子贴着栏底，所以主栏读数 0，屏幕上却是一张大空盒。
+
+   这里补上：只看**有背景或边框的容器**（那才是「卡」，透明包裹层不算），
+   量它内容盒底边与最后一个内容叶子底边之差。
+   阈值同样取 200px，与主栏口径一致。
+
+   注意它同样是烟雾报警器：一张卡下方留 200px 也可能是刻意的呼吸带
+   （08 的手写板空着就是它的功能）。数值用来定位，改不改要看过。 */
+function auditCardVoid (win) {
+  var doc = win.document
+  var screen = doc.querySelector('.screen')
+  if (!screen) return []
+  if (doc.querySelector('.lg-mask:not([hidden]), .ovl:not([hidden])')) return []
+  var out = []
+  var boxes = screen.querySelectorAll('div, section, article, aside')
+  for (var i = 0; i < boxes.length; i++) {
+    var b = boxes[i]
+    if (b.hidden || b.closest('[hidden]')) continue
+    var cs = win.getComputedStyle(b)
+    if (cs.display === 'none' || cs.visibility === 'hidden') continue
+    /* 只看画出来的卡：有非透明背景，或有可见边框 */
+    var hasBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent'
+    var hasBd = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0
+    if (!hasBg && !hasBd) continue
+    /* 声明式例外：有些卡空着就是它的功能（等你落笔的手写板、留白的纸样）。
+       页面用 data-void-ok="理由" 显式豁免 —— **必须写理由**，空值不算豁免。
+       做成声明式而不是在工具里硬编码类名，是因为例外应该被看见：
+       改页面的人一眼能读到「这里为什么允许空」，而不是去翻工具源码。 */
+    var okReason = b.getAttribute('data-void-ok')
+    if (okReason && okReason.trim()) continue
+    var r = b.getBoundingClientRect()
+    if (r.height < 300) continue                    // 矮卡不判
+    if (r.bottom <= 0 || r.top >= win.innerHeight) continue
+    /* 可滚的卡不算空洞：内容在下面，滚得到 */
+    if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') continue
+
+    var maxBottom = r.top
+    var leaves = b.querySelectorAll('*')
+    for (var j = 0; j < leaves.length; j++) {
+      var n = leaves[j]
+      if (n.childElementCount > 0) continue
+      try { if (win.getComputedStyle(n).display === 'none') continue } catch (e) { continue }
+      var nr = n.getBoundingClientRect()
+      if (nr.height > 0 && nr.bottom > maxBottom) maxBottom = nr.bottom
+    }
+    var pad = parseFloat(cs.paddingBottom) || 0
+    var gap = Math.round(r.bottom - pad - maxBottom)
+    if (gap > 200) {
+      out.push({ cls: (String(b.className).split(' ').slice(0, 2).join('.') || b.tagName),
+                 gap: gap, h: Math.round(r.height) })
+    }
+  }
+  /* 只报最外层：父卡空，子卡通常也被算一遍，去掉重复噪声 */
+  return out.slice(0, 6)
+}
+
 function comboLabel (c) {
   var s = c.state + (c.stage ? '/' + c.stage : '')
   for (var i = 0; i < c.extra.length; i++) s += ' ' + c.extra[i][0].slice(5) + '=' + c.extra[i][1]
@@ -656,6 +719,14 @@ async function runAll (only) {
            附加轴（data-pay / data-job / data-redact…）改的是卡片内容，
            不改栏与页脚的几何，对遮挡没有影响 —— 所以按基线跑一次就够，
            而这一点是**判断**，写在这里以便日后有人推翻它。 */
+        if (!cb.list[j].varied) {
+          var voids = auditCardVoid(win)
+          for (var vi = 0; vi < voids.length; vi++) {
+            rec.defects.push({ combo: comboLabel(cb.list[j]),
+              check: '卡内空洞', value: voids[vi].gap,
+              detail: '.' + voids[vi].cls + ' 高 ' + voids[vi].h + 'px，底部空 ' + voids[vi].gap + 'px' })
+          }
+        }
         var occ = cb.list[j].varied ? [] : auditOcclusion(win)
         for (var oi = 0; oi < occ.length; oi++) {
           var cut = occ[oi].kind === '被裁掉'
