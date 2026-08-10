@@ -83,7 +83,10 @@ export interface AgentConfig {
    * 显式配置，不给默认值；未配置时扫描监听整体不启动，不影响其余 Agent 功能。
    */
   scanWatchFolder?: string
-  /** Agent version echoed in heartbeat. e.g. "0.2.0" */
+  /**
+   * Legacy provisioning metadata retained for backward-compatible config validation.
+   * Runtime heartbeat/version UI use the immutable installed package version instead.
+   */
   agentVersion: string
   /** Heartbeat interval in ms. Default: 30000. May be overridden by server response. */
   heartbeatIntervalMs?: number

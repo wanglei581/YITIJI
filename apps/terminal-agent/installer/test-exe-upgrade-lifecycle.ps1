@@ -5,14 +5,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$PREDECESSOR_VERSION = "0.3.8"
-$CANDIDATE_VERSION = "0.3.9"
+$PREDECESSOR_VERSION = "0.3.9"
+$CANDIDATE_VERSION = "0.4.0"
 $resolvedPredecessor = (Resolve-Path -LiteralPath $PredecessorExePath).Path
 $resolvedCandidate = (Resolve-Path -LiteralPath $CandidateExePath).Path
 $installRoot = Join-Path $env:ProgramFiles "AIJobPrintAgent"
 $stateRoot = Join-Path $env:ProgramData "AIJobPrintAgent"
 $nodePath = Join-Path $installRoot "node\node.exe"
 $serviceName = "aijobprintagent.exe"
+$panelShortcutPath = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\AI Job Print Terminal\AI Job Print Terminal.lnk"
 $sentinelPath = Join-Path $stateRoot "installer-upgrade-state-sentinel.json"
 $logRoot = Join-Path (Split-Path -Parent $resolvedCandidate) "lifecycle-logs"
 New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -54,6 +55,17 @@ function Assert-StoppedManualService {
   }
 }
 
+function Assert-PanelShortcut {
+  if (-not (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf)) {
+    throw "0.4.0 upgrade did not install the local status panel Start Menu shortcut"
+  }
+  $shell = New-Object -ComObject WScript.Shell
+  $shortcut = $shell.CreateShortcut($panelShortcutPath)
+  if ([string]$shortcut.Arguments -ne "url.dll,FileProtocolHandler http://127.0.0.1:9527/local/panel") {
+    throw "Upgraded local status panel shortcut does not use the fixed loopback URL"
+  }
+}
+
 $predecessorInstalled = $false
 $candidateInstalled = $false
 $upgradeCompleted = $false
@@ -78,6 +90,16 @@ try {
   Assert-AgentProductVersion -ExpectedVersion $PREDECESSOR_VERSION
   Assert-StoppedManualService
 
+  # The production 0.3.9 package predates the panel shortcut. The synthetic
+  # predecessor is built from the current payload only to exercise WiX version
+  # transitions, so remove this one candidate-only file before the upgrade.
+  if (Test-Path -LiteralPath $panelShortcutPath -PathType Leaf) {
+    Remove-Item -LiteralPath $panelShortcutPath -Force
+  }
+  if (Test-Path -LiteralPath $panelShortcutPath) {
+    throw "Failed to establish the 0.3.9 no-panel-shortcut predecessor fixture"
+  }
+
   New-Item -ItemType Directory -Path $stateRoot -Force | Out-Null
   [System.IO.File]::WriteAllText(
     $sentinelPath,
@@ -89,6 +111,7 @@ try {
   $candidateInstalled = $true
   Assert-AgentProductVersion -ExpectedVersion $CANDIDATE_VERSION
   Assert-StoppedManualService
+  Assert-PanelShortcut
   if (-not (Test-Path -LiteralPath $nodePath -PathType Leaf)) {
     throw "Bundled Node runtime is missing after upgrade"
   }
@@ -117,6 +140,9 @@ try {
   }
   if (-not (Test-Path -LiteralPath $sentinelPath -PathType Leaf)) {
     throw "ProgramData sentinel was not retained after upgraded candidate uninstall"
+  }
+  if (Test-Path -LiteralPath $panelShortcutPath) {
+    throw "Local status panel Start Menu shortcut remains after upgraded candidate uninstall"
   }
 
   Write-Host "EXE_UPGRADE_LIFECYCLE_PASS from=$PREDECESSOR_VERSION to=$CANDIDATE_VERSION stateRetained=true"

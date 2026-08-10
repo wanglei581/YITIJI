@@ -9,6 +9,7 @@ import { consumeUsbFile, getUsbStatus, refreshUsbFileList } from '../usb/usb-fil
 import { allowedOrigins, isLocalBridgeTokenValid, isOriginAllowed } from './origin-guard'
 import type {
   LocalApiError,
+  LocalAgentPanelStatus,
   LocalPrintWakeResponse,
   LocalQrClaimRequest,
   LocalQrCreateRequest,
@@ -19,6 +20,7 @@ import type {
   LocalUsbUploadRequest,
   LocalUsbUploadResponse,
 } from './types'
+import { sendLocalAgentStatusPanel } from './status-panel'
 import type {
   ApiEnvelope,
   ApiErrorEnvelope,
@@ -46,6 +48,7 @@ export interface LocalQrServerHandle {
 
 export interface LocalQrServerOptions {
   wakePrintQueue?: () => { accepted: boolean; coalesced: boolean }
+  getPanelStatus?: () => LocalAgentPanelStatus
 }
 
 export function startQrLoginLocalServer(
@@ -121,6 +124,25 @@ async function handleRequest(input: {
   const url = new URL(req.url ?? '/', `http://${LOCAL_HOST}`)
   const isUsbRoute = url.pathname.startsWith('/local/usb/')
   const isPrintRoute = url.pathname.startsWith('/local/print/')
+
+  if (url.pathname === '/local/panel') {
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', 'GET')
+      sendJson(res, 405, { code: 'LOCAL_PANEL_METHOD_NOT_ALLOWED', message: '本机状态页仅支持读取' })
+      return
+    }
+    if (url.search.length > 0) {
+      sendJson(res, 400, { code: 'LOCAL_PANEL_QUERY_NOT_ALLOWED', message: '本机状态页不接受查询参数' })
+      return
+    }
+    const status = options.getPanelStatus?.()
+    if (!status) {
+      sendJson(res, 503, { code: 'LOCAL_PANEL_UNAVAILABLE', message: '本机状态暂不可用' })
+      return
+    }
+    sendLocalAgentStatusPanel(res, status)
+    return
+  }
 
   if (!isOriginAllowed(origin, origins)) {
     sendJson(
