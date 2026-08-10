@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <link rel="stylesheet" href="styles/region.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
   /* ══════════════════════════════════════════════════════════════
      2026-08-10 版面重排 — 按 Codex 版面评审的数值规格执行
@@ -114,32 +115,14 @@
   .agline-fav:active { background: var(--fog-a04); }
   .agline-fav[aria-pressed="true"] { color: var(--jade-600); }
 
-  /* ── 折叠信息条 ── */
-  .fold { border: 1px solid var(--brd-1); border-radius: var(--r-sm); background: var(--surf-1); }
-  .fold > summary { list-style: none; cursor: pointer; min-height: 56px;
-    display: flex; align-items: center; gap: 10px; padding: 0 var(--s-4);
-    font-size: 20px; color: var(--fog-700); }
-  .fold > summary::-webkit-details-marker { display: none; }
-  .fold > summary::after { content: '展开'; margin-left: auto; flex: 0 0 auto;
-    font-family: var(--ff-num); font-size: 18px; color: var(--fog-600); }
-  .fold[open] > summary::after { content: '收起'; }
-  .fold-b { padding: 0 var(--s-4) var(--s-4); font-size: 22px; color: var(--fog-700); line-height: 1.7; }
-  .fold:not([open]) .fold-b { display: none; }
-  .fold-b .kv { margin: 8px 0; }
-  .fold-b b { color: var(--fog-900); }
-
-  /* ── 页脚口径条 ── */
-  .cfoot {
-    flex: 0 0 auto; display: flex; align-items: flex-start; gap: var(--s-4);
-    padding: 0 var(--s-4); border-radius: var(--r-md);
-    background: var(--glass-1-bg); border: 1px solid var(--glass-1-brd);
-  }
-  .cfoot-t { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
-    min-height: 56px; font-size: 20px; color: var(--fog-700); }
-  .cfoot-t > span { white-space: nowrap; }
-  .cfoot-t .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
-  .cfoot-t b { color: var(--fog-900); }
-  .cfoot .fold { flex: 0 0 auto; width: 260px; border: 0; background: transparent; }
+  /* ── 折叠信息条 ──
+     2026-08-10：原来本页有两个 <details class="fold"> + 两条 .cfoot 口径条
+     （list 一套、detail/joboffline 一套）。按产品所有者口径合并成**全页唯一**
+     一条页脚折叠条，组件在 styles/notebar.css + scripts/notebar.js。
+     .fold / .cfoot 已无引用，样式一并删除，避免留下没人用的死规则。
+     本页折叠条挂在 .wmain 末尾（不是 .screen 直接子级）——
+     .work--ag 是单栏，主栏底就是页脚位；这样也让 auditEmptyTail 量到底部有内容。 */
+  .nb-bar { margin-top: 0; }
 
   /* ── 出口行 ── */
   .exits { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
@@ -410,37 +393,8 @@
         </a>
       </div>
 
-      <!-- ⑤ 页脚：Codex 点名的五段口径全部收进这一个折叠区，原文一字不删 -->
-      <div class="cfoot" data-at="list">
-        <span class="cfoot-t">
-          <svg class="ic"><use href="#i-shield"/></svg>
-          <span>营业状态为机构填报，<b>非实时探测</b></span>
-          <span class="ev ev--e2">E2 机构填报</span>
-        </span>
-        <details class="fold">
-          <!-- 标题不写带空格的「 · 」：空格给了换行机会，下一行就以「·」开头（中文禁则，自检判缺陷） -->
-          <summary>到店准备与机构口径</summary>
-          <div class="fold-b">
-            营业时间是机构填报的，不是本机实时探测——<b>出门前建议先打电话确认</b>，免得白跑一趟。
-            <b>到店带什么。</b>
-            <div class="kv">
-              <div class="kv-row"><span class="k">纸质简历 2–3 份</span><span class="v">可在本机打印；现场直接交给面谈的人</span></div>
-              <div class="kv-row"><span class="k">身份证等证件</span><span class="v">带不带、用在哪一步，以机构现场公示与主管部门规定为准</span></div>
-              <div class="kv-row"><span class="k">笔</span><span class="v">现场填表用</span></div>
-              <div class="kv-row"><span class="k">费用</span><span class="v">机构是否收费，以现场公示与主管部门规定为准</span></div>
-            </div>
-            门店可能在楼上、手机没信号——地址与路线建议先打出来拿在手上，进详情页就能打印。
-            <b>两类机构差在哪。</b>官方公共机构办失业登记、补贴咨询等公共服务；经营性机构可代招荐岗，
-            是否收费以现场公示与主管部门规定为准。共同前提：许可证信息为机构填报，经管理员审核后展示，<b>本机未做核验</b>。
-            要办失业登记、补贴这类公共服务，先看官方公共就业服务机构。
-            <b>记录范围。</b>只记<b>浏览</b>与<b>收藏</b>。登录后记在本机构页的浏览记录里；未登录只留本次会话，离场即清。
-            机构那边不会收到「你看过它」的通知；你到不到店、和谁面谈，本机不知道也不记录。
-            展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。
-            本机也<b>不显示「当前空闲 / 排队人数」</b>这类它拿不到的信息。
-            共 7 家已审核机构，当前条件下显示 <b data-agcount>5</b> 家。
-          </div>
-        </details>
-      </div>
+      <!-- ⑤ 原页脚 .cfoot（营业状态口径 + 五段折叠）已并入本页唯一的「信息与边界」条，
+           见本 .wmain 末尾的 [data-notebar]。防诈骗警示条 .warnband 不动，仍常驻页首。 -->
 
       <!-- 机构详情 -->
       <div class="detail" data-at="detail">
@@ -453,11 +407,12 @@
           <span class="dhead-org">天河客运站店 · 人力资源服务许可证 A2019xxxx · 营业执照 91440101xxxxxxxx</span>
         </div>
 
-        <!-- 防骗提醒：法规层面的信息，比任何功能都值钱 -->
+        <!-- 防骗提醒：法规层面的信息，比任何功能都值钱。
+             2026-08-10 只做压紧凑，**不收进折叠条** —— 防诈骗提示必须显眼常驻。
+             收进折叠条的只是"为什么/怎么核实"那段解释，见页脚 [data-notebar]。 -->
         <div class="notice notice--coral">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span><b>到店前请留意：本机不代任何机构收费</b>，本机也不出现任何向你收钱的求职服务。遇到押金、服装费、体检费、培训费、建档费、"入职保证金"这类要求，
-            建议先向当地人社部门核实再决定；认为收费可疑，可向其反映。</span>
+          <span><b>到店前请留意：本机不代任何机构收费</b>，也不出现任何向你收钱的求职服务。遇到押金、服装费、体检费、培训费、建档费、"入职保证金"这类要求，先向当地人社部门核实。</span>
         </div>
 
         <div class="dsec">
@@ -512,9 +467,9 @@
             <span>同步时间：2026-08-08 07:40</span><span class="sep">·</span>
             <span>外部 ID：OA-3312</span>
           </div>
+          <!-- 来源三字段（上面那一行）必须常驻，只把"未核验、怎么自行核对"的长说明收进页脚折叠条 -->
           <p style="margin:8px 0 0;font-size:var(--fz-2);color:var(--fog-600);line-height:1.65">
-            许可证与执照编号为机构填报，本机<b>未做工商与许可核验</b>。可在「国家企业信用信息公示系统」
-            与当地人社部门官网自行核对。
+            许可证与执照编号为机构填报，本机<b>未做工商与许可核验</b>。
           </p>
         </div>
       </div>
@@ -635,24 +590,9 @@
         </div>
       </div>
 
-      <!-- 故障档案：折叠，不占一整块 -->
-      <div data-at="error" style="flex:0 0 auto">
-        <details class="fold">
-          <summary>故障档案 · 影响范围 · 为什么不显示缓存</summary>
-          <div class="fold-b">
-            <b>不显示上次缓存的机构与营业状态</b>——按过期的营业时间跑一趟，门可能是锁着的。
-            <div class="kv">
-              <div class="kv-row"><span class="k">上次成功同步</span><span class="v">8 月 8 日 07:40</span></div>
-              <div class="kv-row"><span class="k">失败发生</span><span class="v">10:54 · 已自动重试 2 次</span></div>
-              <div class="kv-row"><span class="k">你的收藏与浏览记录</span><span class="v">不受影响 · 登录后在本页浏览记录里</span></div>
-              <div class="kv-row"><span class="k">已打印的路线</span><span class="v">拿在手上的纸不受任何故障影响</span></div>
-              <div class="kv-row"><span class="k">线上岗位与政策服务</span><span class="v">独立入口 · 照常可看</span></div>
-              <div class="kv-row"><span class="k">打印扫描</span><span class="v" data-when="default first ai-down">照常可用</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
-            </div>
-            恢复后名单自动回来。要出门的话别按过期营业时间跑——<b>先电话确认</b>这条建议在故障时更要紧。
-          </div>
-        </details>
-      </div>
+      <!-- 故障档案：原来是本页第三个 <details class="fold">。
+           2026-08-10 并入页脚唯一折叠条，见 .wmain 末尾 [data-notebar] 里
+           data-at="error" 那一节。留在页面上的只有 .blank 里的当前状态说明。 -->
 
       <!-- ══ 详情 / 线下岗位态的第二屏：三个入口 + 一个口径折叠 ══
            原来这四块常驻右栏（带走这些信息 / 本机做什么 / 到店之后流程），
@@ -677,34 +617,60 @@
         </button>
       </div>
 
-      <div class="cfoot" data-at="detail joboffline">
-        <span class="cfoot-t">
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界与本机不做什么 / 两类机构差异 / 记录范围与排序口径 /
+                     到店准备与到店流程 / 证据分级解释 / 许可证核验口径 / AI 离线降级说明。
+           **没有**收进来（必须常驻）：页首防诈骗警示条 .warnband、详情页 .notice--coral
+           防骗提醒、来源三字段 .srcline、逐条的 E2 / E3 徽章、AI 生成标识、当前状态提示。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>本机与列表内机构<b>无代理、无分成、无导流返佣关系</b></span>
-        </span>
-        <details class="fold">
-          <!-- 标题不写带空格的「 · 」：空格给了换行机会，下一行就以「·」开头（中文禁则） -->
-          <summary>本机边界与到店流程</summary>
-          <div class="fold-b">
-            <b>本机在这一步会做什么。</b>
-            <div class="kv">
-              <div class="kv-row"><span class="k">简历代收 / 费用代收 / 预约登记</span><span class="v" style="color:var(--coral-400)">都不做</span></div>
-              <div class="kv-row"><span class="k">把你信息给机构</span><span class="v" style="color:var(--coral-400)">不做</span></div>
-              <div class="kv-row"><span class="k">记录你看过</span><span class="v">会记 · 登录后在本页浏览记录，未登录只留本次会话</span></div>
-              <div class="kv-row"><span class="k">打印带走</span><span class="v" data-when="default first ai-down">可以</span><span class="v v--fog" data-when="device-off">打印机离线</span></div>
-            </div>
-            展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。
-            <b>到店之后，大致会经历什么。</b>
-            <div class="kv">
-              <div class="kv-row"><span class="k">到店</span><span class="v">前台说明来意；是否需要证件登记，按机构现场指引</span></div>
-              <div class="kv-row"><span class="k">面谈</span><span class="v">机构介绍岗位与用人单位，你交纸质简历</span></div>
-              <div class="kv-row"><span class="k">决定</span><span class="v">去不去面试由你定；遇到收费要求，先对照现场公示与主管部门规定</span></div>
-              <div class="kv-row"><span class="k">后续</span><span class="v">与机构 / 用人单位直接联系，本机不参与</span></div>
-            </div>
-            本机的服务到「把信息给你、把材料打出来」为止；其余都发生在你和机构、用人单位之间。
-            门店可能在楼上、手机没信号，<b>建议把地址与岗位打出来带着</b>。
+          <span class="nb-sum-t" data-at="list detail joboffline">信息与边界 · <b>无代理无返佣</b> · 到店准备与记录口径</span>
+          <span class="nb-sum-t" data-at="error">信息与边界 · <b>故障档案</b> · 为什么不显示缓存</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+            <p class="nb-p">本机与列表内机构<b>无代理、无分成、无导流返佣关系</b>。简历代收、费用代收、预约登记<b>都不做</b>；也不会把你的信息给机构。本机的服务到「把信息给你、把材料打出来」为止；其余都发生在你和机构、用人单位之间。</p>
+            <p class="nb-p">线下机构岗位没有线上投递入口，只能到店面谈，所以这里不给投递按钮。</p>
           </div>
-        </details>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-alert"/></svg>防诈骗：为什么这么提醒</div>
+            <p class="nb-p">求职收费是纠纷高发点。是否收费<b>以门店依法公示与主管部门规定为准</b>；本机不代收、也无法代为判断某一笔收费是否合规。认为收费可疑，可向当地人社部门反映。页首与详情页那两条提醒<b>不会被折叠</b>，任何时候都在屏上。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>两类机构差在哪 · 许可证口径</div>
+            <p class="nb-p">官方公共机构办失业登记、补贴咨询等公共服务；经营性机构可代招荐岗，是否收费以现场公示与主管部门规定为准。要办失业登记、补贴这类公共服务，先看官方公共就业服务机构。</p>
+            <p class="nb-p">共同前提：许可证信息为机构填报，经管理员审核后展示，<b>本机未做工商与许可核验</b>。可在「国家企业信用信息公示系统」与当地人社部门官网自行核对。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-map"/></svg>到店准备与到店流程</div>
+            <p class="nb-p">营业时间是机构填报的，不是本机实时探测，<b>出门前建议先打电话确认</b>。门店可能在楼上、手机没信号，地址与路线建议先打出来拿在手上。</p>
+            <p class="nb-p"><b>带什么。</b>纸质简历 2–3 份（可在本机打印，现场交给面谈的人）、笔；身份证等证件带不带、用在哪一步，以机构现场公示与主管部门规定为准。</p>
+            <p class="nb-p"><b>到店之后。</b>前台说明来意；机构介绍岗位与用人单位，你交纸质简历；去不去面试由你定，遇到收费要求先对照现场公示与主管部门规定；后续与机构或用人单位直接联系，本机不参与。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围 · 排序口径 · 名单口径</div>
+            <p class="nb-p">只记<b>浏览</b>与<b>收藏</b>。登录后记在本机构页的浏览记录里；未登录只留本次会话，离场即清。机构那边不会收到「你看过它」的通知；你到不到店、和谁面谈，本机不知道也不记录。</p>
+            <p class="nb-p">展示顺序按同步时间与区域，<b>不接受机构付费排名</b>。本机也<b>不显示「当前空闲 / 排队人数」</b>这类它拿不到的信息。共 7 家已审核机构，当前条件下显示 <b data-agcount>5</b> 家。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你自己给的材料。<span class="nb-e nb-e--2">E2</span> 系统与来源方给的事实，例如机构填报并经审核的资料、同步时间。<span class="nb-e nb-e--3">E3</span> AI 生成的判断或建议，仅供参考，需要你自己核实。页面上挂在具体结论旁的小徽章就是这三档，本条只解释它们的含义。</p>
+          </div>
+          <div class="nb-sec" data-at="error">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-alert"/></svg>故障档案 · 影响范围 · 为什么不显示缓存</div>
+            <p class="nb-p"><b>不显示上次缓存的机构与营业状态</b>——按过期的营业时间跑一趟，门可能是锁着的。上次成功同步 8 月 8 日 07:40；失败发生在 10:54，已自动重试 2 次。</p>
+            <p class="nb-p">你的收藏与浏览记录不受影响（登录后在本页浏览记录里）；已打印的路线拿在手上，不受任何故障影响；线上岗位与政策服务是独立入口，照常可看。<span data-when="default first ai-down">打印扫描照常可用。</span><span data-when="device-off">打印机离线，暂时不出纸。</span></p>
+            <p class="nb-p">恢复后名单自动回来。要出门的话别按过期营业时间跑——<b>先电话确认</b>这条建议在故障时更要紧。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线与设备离线时会怎样</div>
+            <p class="nb-p">AI 不可用时，「到店问题清单」不生成；机构信息、地址路线、来源三字段、收藏与浏览照常，到店该核实的事项仍然成立。打印机离线时不出纸，路线与清单可以发到手机，或换一台在线的机器打印。</p>
+          </div>
+        </div>
       </div>
 
   </div>
@@ -833,6 +799,7 @@
 </script>
 <!-- 本页此前漏挂 audit-plus.js：v3AuditPlus 根本不存在，自检一跑就 TypeError，
      于是"全绿"只是没跑过。必须放在 stage.js 之后（它靠 window.v3Audit 合并九项基础检查）。 -->
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* 2026-08-09 留白复核（页内样式，不动 styles/*.css）：
    1) .qa —— 一问一答的短条目，转 PDF 常见问题用；
@@ -189,7 +190,7 @@
         </div>
         <div class="notice" style="margin-top:12px">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>加工完的文件拿去打印时，费用为预估：黑白约 0.20 元、彩色约 1.50 元（A4 每面），以打印工作台核价为准；付费也在打印工作台完成，本页不收款。</span>
+          <span>本页<b>不收款</b>，费用以打印工作台核价为准。</span>
         </div>
       </div>
 
@@ -264,12 +265,48 @@
         <b>证件照拍摄与排版尚未开放</b>
         <p>本机没有配置符合规格的补光与背景板，拍出来<b>不符合证件照标准</b>，
           大概率白花钱还得重拍。</p>
-        <p style="color:var(--fog-600);font-size:var(--fz-2)">
-          现在能做的替代路径：把已有的证件照电子文件用「图片转 PDF」整理后打印；
-          或用「打印扫描」把纸质证件照扫成电子件留存。</p>
+        <p style="color:var(--fog-600);font-size:var(--fz-2)">替代路径见下面两个按钮。</p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
           <button class="btn btn--ghost" data-go="t1">去图片转 PDF</button>
           <a class="btn btn--ghost" href="07-scan-workbench.html">去纸质扫描</a>
+        </div>
+      </div>
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界与未开放能力口径 / 隐私与保留期限与删除口径 /
+                     产物去向与费用参数 / 电子签名法律效力口径 / AI 离线降级说明。
+           **没有**收进来（必须常驻）：「未开放 · 硬件未配置」这类当前状态、
+           每张卡上的状态徽章、device-off / ai-down 的当前状态提示。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>本页不收款</b> · 保留期限 · 签名效力 · 打印去向</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：没有的能力不装有</div>
+            <p class="nb-p">按项目口径（CLAUDE.md §9「不伪造能力」），<b>没有真实硬件与校验能力的功能一律显示为未开放</b>，并给出替代路径，不做占位流程。证件照拍摄与排版就属于这一类：本机没有配置符合规格的补光与背景板，拍出来不符合证件照标准。</p>
+            <p class="nb-p">现在能做的替代路径：把已有的证件照电子文件用「图片转 PDF」整理后打印；或用「打印扫描」把纸质证件照扫成电子件留存。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-pen"/></svg>手写签名的法律效力口径</div>
+            <p class="nb-p">本机的手写签名是<b>图像合成</b>：把签名图片叠到 PDF 上，<b>不具备《电子签名法》意义上的可靠电子签名效力</b>，也不做时间戳与身份核验。需要法律效力请走线下签署或有资质的第三方 CA。签名图像只用于本次合成，<b>会话结束即删除</b>，不会留在机器上；合成结果是新文件，原件不变。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+            <p class="nb-p">没存进「我的 · 文档」的文件只保留到<b>本次会话结束</b>；未登录时一律离场即清。存进去之后按文件类型算：合成的 PDF 属一般文档 <b>90 天</b>，含身份证号的按敏感文件 <b>7 天</b>。</p>
+            <p class="nb-p">签章后文件的访问链接 <b>30 分钟到期</b>，过期需重新在本机打开。到期清理会保留删除日志，可查可追。只有你本人可见；管理员访问写审计日志，<b>不向任何企业提供</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用参数</div>
+            <p class="nb-p">加工完的文件拿去打印时，费用为<b>预估</b>：黑白约 0.20 元、彩色约 1.50 元（A4 每面），<b>以打印工作台核价为准</b>；付费也在打印工作台完成，<b>本页不收款</b>。输出统一为 A4 PDF，文件名可改。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">AI 不可用时，自动排序与清晰度检查停掉，<b>合成本身正常</b>：顺序请你自己核对，卡片左上角的序号就是装订顺序。文件类型判断也可能出错，不是求职信忽略那张卡即可。打印机离线时不出纸，成品可先存进「我的 · 文档」，换一台在线的机器再打。</p>
+          </div>
         </div>
       </div>
     </div>
@@ -374,7 +411,7 @@
         </div>
         <div class="notice" style="margin-top:14px">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>按项目口径（CLAUDE.md §9「不伪造能力」），没有真实硬件与校验能力的功能一律显示为未开放，并给出替代路径，不做占位流程。</span>
+          <span>没有真实硬件与校验能力的功能一律显示为<b>未开放</b>，不做占位流程。</span>
         </div>
       </div>
 
@@ -424,11 +461,7 @@
         <div class="pane-hd"><span class="t">你的文件，规矩在先</span></div>
         <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>· 没存进「我的 · 文档」的文件只保留到<b>本次会话结束</b>；未登录时一律离场即清；<br>
-            · 存进「我的 · 文档」后按文件类型算：合成的 PDF 属一般文档 <b>90 天</b>，含身份证号的按敏感文件 <b>7 天</b>；<br>
-            · 签名图像只用于本次合成，<b>会话结束即删除</b>；<br>
-            · 到期清理会保留删除日志，可查可追；<br>
-            · 只有你本人可见；管理员访问写审计日志，<b>不向任何企业提供</b>。</span>
+          <span>只有你本人可见，<b>不向任何企业提供</b>。保留期限与删除口径见页脚折叠条。</span>
         </div>
       </div>
     </div>
@@ -602,6 +635,7 @@
   fb.addEventListener('click', function (e) { if (e.target === fb) closeFb() })
 })()
 </script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

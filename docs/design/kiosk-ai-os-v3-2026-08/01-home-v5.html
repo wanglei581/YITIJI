@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
   /* ── 2026-08-10 品牌锁定升级（本页局部样式，不动共享 CSS）────────────
      topbar 左侧三段式：主名「职易达」+ 副名「AI 求职操作系统」+「NATIVE-OS」徽章。
@@ -312,6 +313,49 @@
   </div>
 
   <!-- ============ ActionBar ============ -->
+
+  <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+       收进来的：合规边界 / AIGC 生成说明 / 证据分级 E1·E2·E3 解释 /
+                 隐私与保留期限 / 产物去向与费用口径 / AI 与设备离线的降级说明。
+       **没有**收进来（必须常驻）：办理单上的 E1 / E2 / E3 逐条徽章、
+       顶栏设备状态药丸、四态各自的一句话状态提示、按钮旁的时长与费用参数。 -->
+  <div class="nb-bar" data-notebar>
+    <button type="button" class="nb-sum">
+      <svg class="ic"><use href="#i-shield"/></svg>
+      <span class="nb-sum-t">信息与边界 · <b>不代收简历</b> · 证据分级 · 隐私与费用口径</span>
+      <span class="nb-x">展开</span>
+      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+    </button>
+    <div class="nb-body" hidden>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+        <p class="nb-p">这台机器做的是<b>简历、材料、打印扫描与信息查询</b>。岗位、招聘会、校园招聘、企业展示都只是<b>第三方或官方来源的信息入口</b>：本机<b>不代收简历、不做平台内投递、不做企业筛选、不安排面试、不管 Offer</b>。要投递或预约，请到来源平台或主办方那边办。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-orbit"/></svg>哪些内容是 AI 生成的</div>
+        <p class="nb-p">办理单里的<b>顺序、建议与理由由 AI 生成</b>，页面上会挂 <span class="nb-e nb-e--3">E3</span> 标识，<b>仅供参考</b>，不是结论也不是承诺。本机<b>不预测录用结果、不给匹配百分比、不承诺薪资</b>；涉及钱和资格的事，一律以经办机构认定为准。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+        <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 来自<b>你自己的材料</b>：你上传的简历、你说过的话。<span class="nb-e nb-e--2">E2</span> 来自<b>系统与外部来源</b>：设备状态、来源机构同步过来的岗位与招聘会事实。<span class="nb-e nb-e--3">E3</span> 是 <b>AI 的判断</b>，需要你自己核实。页面上挂在具体结论旁的小徽章就是这三档，本条只解释含义。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+        <p class="nb-p"><b>不登录也能办事</b>：未登录时，本次上传的文件与生成的结果<b>只留在本次会话，离场或超时自动清空</b>，不进任何账号。登录只决定文件存不存得下来，<b>不解锁额外能力，也不收费</b>。</p>
+        <p class="nb-p">存进「我的文档」之后按文件类型算保留期：一般文档 <b>90 天</b>，含身份证号等敏感件 <b>7 天</b>；到期清理保留删除日志。文件只有你本人可见，管理员访问写审计日志，<b>不向任何企业提供</b>。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用口径</div>
+        <p class="nb-p">AI 简历诊断、优化、材料生成这些<b>不收费</b>；<b>只有出纸收费</b>，费用以打印工作台核价与现场公示价为准（A4 黑白与彩色分别计价，双面按面计价、用纸减半）。核价、支付、出纸、取件都在打印工作台完成，首页不收款。生成的材料会进「我的简历 / 我的文档」，打印后进「打印订单」。</p>
+      </div>
+      <div class="nb-sec">
+        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 或设备离线时会怎样</div>
+        <p class="nb-p"><b>AI 不可用：</b>对话与排序停掉，页面不会替你猜顺序；打印、扫描、上传、岗位与招聘会浏览<b>都不受影响</b>，故障已自动上报，不需要你操作。</p>
+        <p class="nb-p"><b>打印机离线：</b>不出纸，但材料可以先存进「我的文档」，<b>凭手机号在任一台空闲机器取回打印</b>；已支付的订单不受影响。当前处于哪一种状态，以顶栏状态与本页的状态提示为准。</p>
+      </div>
+    </div>
+  </div>
+
   <div class="actionbar">
     <div class="actionbar-hint">
       <div data-when="default"><div class="t">下一步：简历诊断</div><div class="s">约 40 秒 · 免费 · 你确认后才开始</div></div>
@@ -339,6 +383,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=6"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

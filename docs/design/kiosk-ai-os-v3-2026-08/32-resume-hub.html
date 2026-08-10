@@ -29,10 +29,13 @@
    AI 不可用时，纯 AI 卡置灰并给替代路径；素材库 / 打印 / 我的记录照常可用。
    ══════════════════════════════════════════════════════════ */
 
-/* 域首屏容器：全宽单栏（不套 .work 的右侧栏 —— 这一屏没有文件预览要占 55–65%） */
+/* 域首屏容器：全宽单栏（不套 .work 的右侧栏 —— 这一屏没有文件预览要占 55–65%）
+   2026-08-10 重心整改：页边 56 → 24，把宽度还给八张能力卡
+   （卡片网格占屏 38.5% → 50%）。这一屏真正要做的事就是"选一件事去做"，
+   卡片就是主体，分诊带、说明行、次卡都是配角。 */
 .hub {
   flex: 1 1 auto; min-height: 0; position: relative; z-index: var(--z-content);
-  padding: var(--s-5) var(--gutter);
+  padding: var(--s-5) var(--s-6);
   display: flex; flex-direction: column; gap: var(--s-3); overflow: hidden;
 }
 
@@ -238,17 +241,11 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="tband-s">分诊只指路，办不办由你按</span>
       </div>
 
-      <div class="goalbar">
-        <label class="goalfield">
-          <svg class="ic"><use href="#i-pen"/></svg>
-          <input type="text" data-keypad="text" placeholder="例：明天有场招聘会，简历还是去年的，想改一改再打两份" aria-label="用一句话说说你的情况">
-        </label>
-        <div class="goalnote">
-          <span class="chip chip--info chip--label">示意</span>
-          <span>点框弹出屏幕软键盘。<b>本稿不解析这句话</b>，分诊只认下面三种情况。</span>
-        </div>
-      </div>
-
+      <!-- 2026-08-10 重心整改：这里原来还有一条一句话输入框，旁边写着
+           「本稿不解析这句话」—— 一个按了不办事的输入框，占掉首屏一大块，
+           还要再花一句话解释它不办事。直接删；分诊就是下面三个按钮。
+           下面的四行建议（怎么用 / 代价 / 备选）也压成一行结论 ——
+           八张卡就在眼前，不需要先读一段说明书。 -->
       <div class="tpick" role="group" aria-label="你是哪种情况">
         <button type="button" data-tri="have" aria-pressed="false">我有简历要体检</button>
         <button type="button" data-tri="none" aria-pressed="false">我没简历要做一份</button>
@@ -256,10 +253,8 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       </div>
 
       <div class="tadv">
-        <div class="tadv-act" id="triAct">选一种情况，我给你一条带理由的下一步</div>
-        <div class="tadv-ln" id="triWhy"><span class="k">怎么用</span>点上面任一种情况，下面八张卡里对应的那张会亮起来；<b>不会替你跳走</b>，也不会替你按下任何一步。<span class="ev ev--e1">E1 你自己选的</span></div>
-        <div class="tadv-ln" id="triCost"><span class="k">代价</span>三种情况都不需要登录；用到 AI 的会记一次 AI 服务。</div>
-        <div class="tadv-ln" id="triAlt"><span class="k">备选</span>不想让机器分诊，直接看下面八张卡自己挑。</div>
+        <div class="tadv-act" id="triAct">选一种情况，下面对应的卡会亮起来</div>
+        <div class="tadv-ln" id="triWhy"><span class="k">口径</span><b>不会替你跳走</b>，也不会替你按下任何一步。<span class="ev ev--e1">E1 你自己选的</span></div>
       </div>
     </div>
 
@@ -275,17 +270,15 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span>一句话输入要模型来读，现在收不了 —— 请按下面三种情况自己对号入座</span>
       </div>
 
-      <div class="tmap">
-        <span>手里有简历 → 本轮<b>先自己核对</b></span>
-        <span>没有简历 → 先去<b>简历素材库</b>备料</span>
-        <span>只想打出来 → <b>简历打印</b>照常</span>
-      </div>
+      <!-- 原来这里还有三格对照（有简历→自己核对 / 没简历→素材库 / 只想打→简历打印），
+           和下面「照常」那行、以及八张卡上的降级替代链接是同一件事的第三遍，删。 -->
 
+      <!-- 降级说明与替代路径必须留，但压成两行：哪些按不动、哪些照常。
+           「要多久」那行删 —— 下面通知行已写「已上报运维」，同一件事第二遍。 -->
       <div class="tadv">
         <div class="tadv-act">分诊要模型判断，现在给不了 —— 但功能没被关掉</div>
-        <div class="tadv-ln"><span class="k">不可用的</span>诊断 / 优化 / 生成 / 职业规划 / 求职材料 / 岗位匹配这六项，<b>现在按不动</b>。</div>
-        <div class="tadv-ln"><span class="k">照常的</span>简历素材库、简历打印、我的简历与 AI服务记录，<b>不依赖 AI</b>，一张卡都没被藏起来。</div>
-        <div class="tadv-ln"><span class="k">要多久</span>本机已自动上报运维；恢复时间以现场公告为准，<b>本机不替系统承诺时间</b>。</div>
+        <div class="tadv-ln"><span class="k">按不动</span>诊断 / 优化 / 生成 / 职业规划 / 求职材料 / 岗位匹配这六项。</div>
+        <div class="tadv-ln"><span class="k">照常</span>素材库、简历打印、我的简历与 AI服务记录，<b>一张卡都没藏起来</b>。</div>
       </div>
     </div>
 
@@ -294,24 +287,24 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
          合规声明全页只留底部 .foot 那一条（同义的也算重复）。 -->
     <div class="notice" data-when="default">
       <svg class="ic"><use href="#i-info"/></svg>
-      <span>诊断 / 优化 / 岗位匹配都<b>从第一步开始</b>：先选简历（或岗位），再出结论 —— 没有材料时不会凭空给你一页结果。原简历只新增版本、<b>永不覆盖</b>。</span>
+      <span>诊断 / 优化 / 岗位匹配都<b>从第一步开始</b>：先选简历或岗位，再出结论。原简历只新增版本、<b>永不覆盖</b>。</span>
     </div>
     <div class="notice" data-when="first">
       <svg class="ic"><use href="#i-info"/></svg>
-      <span><b>不登录也能用</b>，八项功能都能进，只是<b>记录留不下</b>：离场或无操作 5 分钟本次会话清空。想留住，在保存那一步再登录。</span>
+      <span><b>不登录也能用</b>，八项都能进，只是<b>记录留不下</b>：离场或无操作 5 分钟即清。</span>
     </div>
     <div class="notice notice--amber" data-when="ai-down">
       <svg class="ic"><use href="#i-alert"/></svg>
-      <span>AI 暂不可用：诊断 / 优化 / 生成 / 职业规划 / 求职材料 / 岗位匹配这<b>六项做不了</b>。素材库、简历打印、我的记录<b>不依赖 AI，照常</b>。</span>
+      <span>AI 暂不可用，已上报运维；恢复时间以现场公告为准，<b>本机不替系统承诺时间</b>。</span>
     </div>
     <div class="notice notice--amber" data-when="device-off">
       <svg class="ic"><use href="#i-alert"/></svg>
-      <span>打印机离线：<b>简历打印</b>现在出不了纸，其余七项<b>都不受影响</b>；做完先存进「我的文档」，换台机器取回来打。</span>
+      <span>打印机离线：<b>简历打印</b>出不了纸，其余七项不受影响；先存「我的文档」，换台机器打。</span>
     </div>
 
     <div class="glabel">
       <b>这个台面能做的八件事</b>
-      <span>每张卡都标了「AI · 仅供参考」或「不依赖 AI」；AI 中断时改标「AI · 已降级」，标签不会消失</span>
+      <span>每张卡都标了是不是 AI 功能</span>
     </div>
 
     <!-- ══════════ 八张能力卡 ══════════ -->
@@ -485,12 +478,10 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
         <span class="qc-ic"><svg class="ic"><use href="#i-history"/></svg></span>
         <span class="qc-b"><span class="qc-t">AI服务记录</span><span class="qc-s">历次诊断与优化 · 只读记录</span></span>
       </a>
-      <a class="qcard" href="28-self-assessment.html">
-        <span class="qc-ic"><svg class="ic"><use href="#i-check"/></svg></span>
-        <span class="qc-b"><span class="qc-t">自我评估</span>
-          <span class="qc-s" data-when="default first device-off">25 题职业能力自测 · 无分数无排名</span>
-          <span class="qc-s" data-when="ai-down">题目照常作答 · 这次不会有解读</span></span>
-      </a>
+      <!-- 2026-08-10 重心整改：原来这里还有第三张「自我评估」——
+           它不是简历资产，也不是本域的产物去向，是横向入口；
+           28-self-assessment 另有 4 处入口（11 / 22 / 25 / 37），不是唯一路径，删。
+           这一行只留「你在这个域里存下的东西」两张。 -->
     </div>
 
     <!-- ══════════ 受能力开关控制的一项：不假装它在 ══════════ -->
@@ -498,7 +489,7 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       <svg class="ic"><use href="#i-shield"/></svg>
       <span class="gate-b">
         <span class="gate-t">签约与权益 · AI签约风险提示</span>
-        <span class="gate-s">上传劳动合同、实习协议或 Offer，核查试用期、薪酬、竞业等条款。受后台能力开关控制，默认关闭。</span>
+        <span class="gate-s">核查试用期、薪酬、竞业等条款 · 默认关闭</span>
       </span>
       <span class="chip chip--info" style="margin-left:auto;flex:0 0 auto">按开关显示</span>
     </a>
@@ -555,30 +546,24 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
       cap: 'diagnose',
       act: '你选了「手里已经有简历」 → 先做 AI简历诊断',
       why: '<span class="k">理由</span>先看清问题在哪再动手改，比直接改省一遍返工；诊断只读你的简历，<b>不动原件</b>。<span class="ev ev--e1">E1 你自己选的</span>',
-      cost: '<span class="k">代价</span>约 2 分钟；记一次 AI 服务；采不采用你定。',
-      alt: '<span class="k">备选</span>已经知道要改哪几处 → 直接进「AI简历优化」；只想把现有的打出来 → 「简历打印」。'
     },
     none: {
       cap: 'generate',
       act: '你选了「手上没有简历」 → 先做 简历生成',
       why: '<span class="k">理由</span>访谈式逐题问、你答，边答边成形；<b>你跳过的项不会被编造</b>出来。<span class="ev ev--e1">E1 你自己选的</span>',
-      cost: '<span class="k">代价</span>约 6 分钟；记一次 AI 服务；生成的是草稿，之后仍可逐条改。',
-      alt: '<span class="k">备选</span>想先看看版式长什么样 → 「简历素材库」；手里有纸质件 → 先扫描，再走诊断。'
     },
     job: {
       cap: 'jobfit',
       act: '你选了「对着某个岗位改」 → 先做 岗位匹配参考',
       why: '<span class="k">理由</span>先看出差在哪几项，再改才有的放矢；逐项列证据，<b>不预测录用概率</b>。<span class="ev ev--e1">E1 你自己选的</span>',
-      cost: '<span class="k">代价</span>约 3 分钟；记一次 AI 服务；只给较高 / 中等 / 偏低三档参考。',
-      alt: '<span class="k">备选</span>差距已经看过了 → 直接进「AI简历优化」；手上还没有简历 → 先「简历生成」。'
     }
   }
+  /* 2026-08-10：triCost / triAlt 两行已从版面删掉（说明压成一行），
+     这里只写还存在的两个节点；缺了任何一个就不接线，不留半截。 */
   var screen = document.querySelector('.screen')
   var act = document.getElementById('triAct')
   var why = document.getElementById('triWhy')
-  var cost = document.getElementById('triCost')
-  var alt = document.getElementById('triAlt')
-  if (!screen || !act) return
+  if (!screen || !act || !why) return
 
   screen.addEventListener('click', function (e) {
     var b = e.target.closest('[data-tri]')
@@ -593,8 +578,6 @@ a.hcard:hover { transform: translateY(-2px); border-color: var(--jade-a32); box-
     }
     act.textContent = d.act
     why.innerHTML = d.why
-    cost.innerHTML = d.cost
-    alt.innerHTML = d.alt
 
     var cards = screen.querySelectorAll('.hcard[data-cap]')
     for (var j = 0; j < cards.length; j++) {

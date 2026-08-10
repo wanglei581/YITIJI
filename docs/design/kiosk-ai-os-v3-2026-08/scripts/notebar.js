@@ -84,7 +84,25 @@
     return (!s || !isFinite(s) || s <= 0) ? 1 : s;
   }
 
-  /* 面板可用高度：横条上沿 → 内容区天花板，减一点呼吸；再与 CSS 上限取小 */
+  /* 最近的会裁切的祖先（.wmain / .work / .main 多半是 overflow:hidden）。
+     面板浮到它上面去就会被裁掉，而 auditInternalClipping 会如实报「文字被裁」，
+     所以天花板必须同时考虑它，而不只是顶栏。 */
+  function clipTop(bar) {
+    var node = bar.parentElement;
+    var st;
+    while (node && node.nodeType === 1 && node !== document.body) {
+      try { st = window.getComputedStyle(node); } catch (e) { break; }
+      if (/hidden|clip|auto|scroll/.test(st.overflowY || '') ||
+          /hidden|clip|auto|scroll/.test(st.overflow || '')) {
+        return node.getBoundingClientRect().top;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  /* 面板可用高度：横条上沿 → 天花板，减一点呼吸；再与 CSS 上限取小。
+     天花板 = max(顶栏下沿, 最近裁切祖先上沿) —— 取更靠下的那个才安全。 */
   function clampHeight(bar, body) {
     var host = closest(bar, '.screen') || document.body;
     var ceiling =
@@ -95,6 +113,8 @@
     var topPx = ceiling
       ? ceiling.getBoundingClientRect().bottom
       : host.getBoundingClientRect().top;
+    var clip = clipTop(bar);
+    if (clip !== null && clip > topPx) topPx = clip;
     var avail = (bar.getBoundingClientRect().top - topPx) / sc - 22;
     /* CSS 里的默认上限（560px）由 --nb-max 的初始值给出；这里只做"再收紧" */
     var cap = parseFloat(

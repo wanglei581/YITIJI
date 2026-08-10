@@ -1556,7 +1556,11 @@
     box.className = 'carryin'
     box.setAttribute('data-at', 's1 s2')
     var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
-            '<b>' + (hit ? ((FROM_SRC[q.get('from')]||'从招聘会现场带来：') + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
+            /* 2026-08-10：这里原写 q.get('from')，但本闭包里的实例叫 Q（:1501）——
+               带 need/jobId 进来就抛 Uncaught ReferenceError: q is not defined，
+               整条带入条不渲染。P15 新加的「拿这个岗位去逐条比对」正好走这条路，
+               实测复现后改成 Q。 */
+            '<b>' + (hit ? ((FROM_SRC[Q.get('from')]||'从招聘会现场带来：') + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
             '<span class="carryin-src">来自上一屏 · 可改</span></div>'
     if (items) h += '<div class="carryin-items">' + items + '</div>'
     for (i = 0; i < notes.length; i++) h += '<div class="carryin-note">' + notes[i] + '</div>'

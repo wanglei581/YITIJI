@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P04 系统态 ─────────────────────────────────────────────────────────
    一页五形态：帮助 / 法务 / 会话超时 / 断网异常 / 会话恢复。
@@ -233,9 +234,7 @@
 
           <div class="notice" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span><b>任何人以本机名义向你收钱，都是骗子。</b>
-                  本机只在打印时收纸张钱，且金额显示在屏幕上、可在打印订单里核对。<br>
-                  没有会员费、没有加急费、没有"帮你办"的服务费。</span>
+            <span><b>任何人以本机名义向你收钱，都是骗子。</b>本机只在打印时收纸张钱。</span>
           </div>
 
           <div class="notice notice--amber" style="margin-top:var(--s-4)">
@@ -251,11 +250,7 @@
         <div class="bighead bh--calm">
           <span class="bh-ic"><svg class="ic"><use href="#i-shield"/></svg></span>
           <span class="bh-t">先给你五条，全文在下面</span>
-          <span class="bh-p">
-            <b>本机不做"点同意才能用"的墙。</b>
-            功能不该以你放弃知情权为前提 —— 你可以先用，也可以先读，
-            全文能打印带走。
-          </span>
+          <span class="bh-p"><b>本机不做"点同意才能用"的墙。</b>全文能打印带走。</span>
         </div>
       </div>
 
@@ -296,8 +291,7 @@
           </div>
 
           <div class="panel-note" style="margin-top:var(--s-4)">
-            上面五条是从全文里挑出的、<b>对你影响最大的五条</b>，不是全文的替代。
-            两者不一致时以全文为准 —— 但本机会尽力保证不出现不一致。
+            上面五条不是全文的替代，<b>不一致时以全文为准</b>。
           </div>
         </div>
       </div>
@@ -556,6 +550,46 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界与防诈骗说明 / 隐私与超时清空口径 / 五条要点与全文的关系 /
+                     产物去向与费用口径 / AI 生成内容的免责口径 / 本区为什么存在。
+           **没有**收进来（必须常驻）：「任何人以本机名义向你收钱都是骗子」这条防诈骗提示、
+           每一态的当前状态说明、卡纸时「不要自己拆机器」这条安全提示、各类倒计时与参数。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>只收纸张钱</b> · 隐私与超时 · AI 免责口径</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-alert"/></svg>防诈骗与费用口径</div>
+            <p class="nb-p">本机<b>只在打印时收纸张钱</b>，金额显示在屏幕上、可在打印订单里核对。<b>没有会员费、没有加急费、没有「帮你办」的服务费</b>。任何人以本机名义向你收钱，都是骗子。屏幕上的号码可能被人改过，<b>贴在机器上的那张更可信</b>。</p>
+            <p class="nb-p">卡纸时<b>不要自己拆机器</b>，找工作人员。已经付过钱但没出纸的部分会<b>自动退</b>，不用你申请。扫码把文件存进手机<b>不收费</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界与知情权</div>
+            <p class="nb-p">本机<b>不做「点同意才能用」的墙</b>，也不弹「同意即视为接受」的遮罩——功能不该以你放弃知情权为前提。你可以先用，也可以先读，<b>全文能打印带走</b>，什么都不点也能继续用。</p>
+            <p class="nb-p">屏上摘出的五条是<b>对你影响最大的五条</b>，不是全文的替代；两者不一致时<b>以全文为准</b>，本机会尽力保证不出现不一致。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 超时清空 · 会话恢复</div>
+            <p class="nb-p">这台机器摆在大厅里，你走开之后屏幕还亮着；<b>简历上有你的姓名、电话，有时还有住址，下一个人过来时不该看到这些</b>——所以无操作会提示并清空。碰一下就能续，没有次数限制。</p>
+            <p class="nb-p">会话恢复也是同一个道理：<b>万一站在这里的不是你本人，直接展示上次的内容就是把你的东西给了别人</b>，所以要先确认身份。选「重新开始」<b>不会删掉上次的记录</b>，只是这次不接着它做，上次的进度仍在你的 AI 服务记录里。</p>
+            <p class="nb-p"><b>管理员看不到你的文件内容</b>，只看得到打印流水与设备日志；因故障需要打开文件时<b>每次都留访问日志，日志删不掉</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-orbit"/></svg>AI 生成内容的免责口径</div>
+            <p class="nb-p"><b>AI 生成的内容可能出错</b>，且<b>不预测录用结果、不承诺薪资</b>。涉及钱和资格的事，一律<b>以经办机构认定为准</b>。断网时 AI 相关能力停掉，打印、扫描与已加载出来的信息照常。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-info"/></svg>这一区为什么存在</div>
+            <p class="nb-p">这些页是<b>出了事才出现</b>的：卡纸或机器没反应走帮助，条款更新走法务，无操作 4 分钟走会话超时，网络中断走断网，同账号有没做完的事走会话恢复。<b>正在办事的用户不需要这一区</b>——真出事时，对应那一页会自己弹出来，不用在这儿找。这里列的是异常长什么样，不是本机现在的状态。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -677,10 +711,7 @@
                   不是只把版本号加一。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            本机不弹"同意即视为接受"的遮罩 ——
-            <b>你什么都不点也能继续用</b>。
-          </div>
+          <div class="panel-note" style="margin-top:var(--s-4)"><b>你什么都不点也能继续用</b>。</div>
         </div>
       </div>
 
@@ -689,9 +720,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-clock"/></svg><b>为什么会超时</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3);color:var(--fog-700);line-height:1.7">
-            这台机器摆在大厅里，<b>你走开之后屏幕还亮着</b>。<br><br>
-            简历上有你的姓名、电话，有时还有住址。
-            下一个人过来时不该看到这些。
+            这台机器摆在大厅里，<b>你走开之后屏幕还亮着</b>。
           </div>
           <div class="kv" style="margin-top:var(--s-4)">
             <div class="kv-row"><span class="k">无操作多久提示</span><span class="v">4 分钟</span></div>
@@ -811,6 +840,7 @@
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

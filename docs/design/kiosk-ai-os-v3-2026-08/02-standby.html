@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P02 待机唤醒屏 ─────────────────────────────────────────────────────
    这一页和别的 25 页结构完全不同：**没人在看的时候它才出现**。
@@ -114,6 +115,10 @@
    碰哪儿都进首页，和真机上「触摸唤醒」的行为一致。 */
 .sb-hit { position:absolute; inset:0; z-index:5; display:block;
   text-decoration:none; -webkit-tap-highlight-color:transparent; }
+/* 折叠条必须压在整屏热区之上（.sb-hit z-index:5），否则点「展开」会直接跳首页。
+   notebar.css 默认 z-index:38 已经够，这里只是把依赖写明，避免以后调 .sb-hit 时踩到。 */
+.standby .nb-bar { --nb-inset: 0; z-index: 6; }
+.standby .nb-body { --nb-max: 520px; }
 </style>
 </head>
 <body>
@@ -262,14 +267,46 @@
     </div>
 
     <!-- ═══ 页脚：同步时间与合规 ═══ -->
+    <!-- 页脚只留「同步时间」这一条来源事实（来源清单、合规声明、入链说明全部收进折叠条）。
+         待机屏跟前通常没有人，所以折叠条只是**留个可查的地方**，不承担引导。 -->
     <div class="sb-foot">
       <span data-when="default first ai-down device-off">岗位与招聘会信息同步于 <b>8月9日 07:30</b></span>
-      <span data-when="default first ai-down device-off">来源：市人社局 · 高新区人才服务中心 · 省教育厅学生服务中心</span>
-      <span data-when="default first ai-down device-off">本机只做信息展示与打印，不代办、不代收简历</span>
-      <!-- 入链说明：这一屏是**系统触发**的，不该也不需要有产品入口指向它。 -->
-      <span data-when="default first ai-down device-off">
-        本屏由<b>无操作超时</b>自动进入（系统触发）· 首页里没有指向它的入口 · <b>碰屏即回首页</b>
-      </span>
+    </div>
+
+    <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+         收进来的：合规边界 / 数据来源与同步口径 / 隐私（待机屏不含任何个人信息）/
+                   费用口径 / 本屏为什么会出现。
+         **没有**收进来（必须常驻）：三条设备与 AI 的当前状态、同步时间、
+         幻灯上的 E2 站内数据徽章、「碰一下屏幕开始」。 -->
+    <div class="nb-bar" data-notebar>
+      <button type="button" class="nb-sum">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span class="nb-sum-t">信息与边界 · <b>不代办、不代收简历</b> · 数据来源 · 费用口径</span>
+        <span class="nb-x">展开</span>
+        <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="nb-body" hidden>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+          <p class="nb-p">本机只做<b>信息展示与打印</b>，<b>不代办、不代收简历</b>、不做平台内投递、不参与企业筛选。岗位与招聘会只是第三方或官方来源的信息入口，投递与预约都在来源方那边完成。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>数据来源与同步口径</div>
+          <p class="nb-p">岗位与招聘会信息来源：市人社局、高新区人才服务中心、省教育厅学生服务中心。屏上这几条是<b>汇总口径</b>，每日更新；具体某一条岗位或招聘会的<b>来源机构、同步时间、外部 ID</b> 在它自己的详情页上展示。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>隐私：待机屏上没有任何个人信息</div>
+          <p class="nb-p">这一屏<b>不含任何个人信息</b>，也不做个性化：上一位用户的材料、记录与结果不会出现在这里。碰屏进首页后，未登录时办的事只留在本次会话，离场或超时自动清空。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>费用口径</div>
+          <p class="nb-p">AI 服务<b>不收费</b>；只有出纸收费，A4 黑白 0.20 元 / 页起，<b>价格以现场公示与打印工作台核价为准</b>。不用登录也能把事办完。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-clock"/></svg>这一屏为什么会出现</div>
+          <p class="nb-p">本屏由<b>无操作超时</b>自动进入（系统触发），首页里没有指向它的入口，<b>碰屏即回首页</b>。设备与 AI 的当前状态就在上面那三条，不收进这里。</p>
+        </div>
+      </div>
     </div>
 
     <!-- 整屏唤醒热区：碰哪儿都算「碰一下屏幕」，直接进首页 -->
@@ -284,6 +321,7 @@
 <script src="scripts/stages.js?v=2"></script>
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 </body>
 </html>

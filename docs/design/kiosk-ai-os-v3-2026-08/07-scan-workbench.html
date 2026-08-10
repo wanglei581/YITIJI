@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="styles/shell.css?v=3">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
   /* chip--info：状态标签，非入口（与 P12/P14/P17 同一先例） */
   .chip--info { cursor: inherit; }
@@ -227,19 +228,14 @@
              用户会以为机器坏了。这一条必须写在指引里，不能藏在帮助页。 -->
         <div class="notice notice--amber" style="margin-top:var(--s-4)">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>按「开始扫描」前，先把目标选成「扫描到 PC」。</b>选成 U 盘 / 邮箱 / FTP，纸会走完但<b>本机收不到</b>。<br>
-            扫错了：纸不用重放，改目标再按一次即可，按任务号覆盖，不会两份混在一起。</span>
+          <span><b>按「开始扫描」前，先把目标选成「扫描到 PC」。</b>选成 U 盘 / 邮箱 / FTP，纸会走完但<b>本机收不到</b>。</span>
         </div>
 
         <!-- 三方职责：谁能做什么、谁不能做什么。
              不写清楚，用户会在屏幕上找"开始扫描"按钮找到放弃。 -->
         <div class="notice" style="margin-top:10px">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span><b>这一步谁做什么：</b><br>
-            · <b>你</b>：放好原件、选「扫描到 PC」、按实体键。<br>
-            · <b>打印机</b>：走纸成像，按任务号送到本机。<br>
-            · <b>本屏</b>：只接收和显示，<b>不能替你启动走纸</b>（硬件安全设计）。<br>
-            · <b>接收目录</b>：收到即认领并移走，不留在公共目录。</span>
+          <span><b>本屏只接收和显示，不能替你启动走纸</b>（硬件安全设计）—— 走纸要你在机器上按实体键。</span>
         </div>
       </div>
 
@@ -359,6 +355,48 @@
            逐字竖排且溢出条带（148px 定高）。挪出条带单独一行，四态都完整可读。 -->
       <!-- 2026-08-09 Codex 整改:s4 已是扫完后,终检已出结果,不能再说"届时确认"。 -->
       <div class="thumbs-note" data-at="s4" style="margin-left:auto;max-width:none">第 3 页红点：<b>终检</b>确认该页置信度偏低（原件折痕导致断行），已标记需人工复核后再送诊断。</div>
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：三方职责与硬件安全口径 / 任务有效期与图像销毁 / 隐私与保留期限 /
+                     产物去向与费用参数 / 证据分级解释 / AI（识别）离线与设备离线降级说明。
+           **没有**收进来（必须常驻）：「先把目标选成扫描到 PC」这条 amber 操作警示、
+           每条结论旁的 E1 / E3 徽章、当前扫描状态与离线状态提示、来源与保存期限的短标签。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>本屏不替你走纸</b> · 有效期 · 隐私 · 费用</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-scan"/></svg>这一步谁做什么</div>
+            <p class="nb-p"><b>你：</b>放好原件、选「扫描到 PC」、按机器上的实体键。<b>打印机：</b>走纸成像，按任务号送到本机。<b>本屏：</b>只接收和显示，<b>不能替你启动走纸</b>——这是硬件安全设计，不是功能没做。<b>接收目录：</b>收到即认领并移走，不留在公共目录。</p>
+            <p class="nb-p">扫错了不用重放纸：改目标再按一次即可，<b>按任务号覆盖</b>，不会两份混在一起。证件、卡片、有折痕或破损的页、带订书钉回形针的原件都别走送稿器；超过 50 页分多次扫。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-clock"/></svg>任务有效期与图像销毁</div>
+            <p class="nb-p"><b>任务有效期 15 分钟</b>，超时自动作废并<b>销毁已采集图像</b>，需要重新发起；点「取消」之后机器再回传的页<b>不会进结果</b>。进度不报总百分比——总页数由送稿器实际走纸决定，扫完才知道，所以这里只报已完成的步骤，不编一个假的百分比。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+            <p class="nb-p">扫描件存进「我的文档」后按类型算保留期：一般扫描件 <b>90 天</b>，含身份证号等敏感件 <b>7 天</b>；没存进去的只留到本次会话结束，未登录一律离场即清。到期清理保留删除日志。只有你本人可见，管理员访问写审计日志，<b>不向任何企业提供</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用参数</div>
+            <p class="nb-p">扫完有三条去向：拿去打印、存进「我的文档」、扫码传手机带走。打印按现场公示价预估：<b>A4 黑白 0.20 元 / 面、彩色 1.50 元 / 面</b>，双面按面计价、用纸减半，<b>以打印工作台核价为准</b>；核价、支付与出纸都在打印工作台完成，本页不收款。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你的材料本身，例如识别到的简历字段。<span class="nb-e nb-e--2">E2</span> 系统与设备给的事实，例如页数、置信度、设备状态。<span class="nb-e nb-e--3">E3</span> AI 给的建议，仅供参考。页面上挂在结论旁的小徽章就是这三档。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>识别不可用与扫描仪离线时会怎样</div>
+            <p class="nb-p"><b>识别（AI）不可用：</b>不给去向建议，也不做置信度终检——三条去向照样可以直接选，扫描与出图不受影响。</p>
+            <p class="nb-p"><b>扫描仪离线：</b>已扫的页不会丢，故障自动上报；可改用手机拍照上传，或换一台机器接着扫，<b>凭手机号登录取回</b>。同机打印去向此时也不可用，可以先存进「我的文档」。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ================= 右 ================= -->
@@ -442,9 +480,7 @@
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>不报总进度百分比：总页数由送稿器实际走纸决定，扫完才知道；这里只报已完成的步骤。<br>
-            <b>任务有效期 15 分钟</b>，超时自动作废并销毁已采集图像，需重新发起；
-            点「取消」后机器再回传的页<b>不会进结果</b>。</span>
+          <span>不报总进度百分比，只报已完成的步骤。<b>任务有效期 15 分钟</b>。</span>
         </div>
       </div>
 
@@ -961,6 +997,7 @@
   back.parentNode.insertBefore(alt, back.nextSibling)
 })()
 </script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

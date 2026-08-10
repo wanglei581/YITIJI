@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P28 专用 ───────────────────────────────────────────────────────────
    自我探索（线上 /resume/self-assessment：25 题 5 组、必勾+可选双同意、
@@ -309,9 +310,6 @@
             <span><b>想好再选，这里不计时。</b>抢时间答出来的是手速，不是你的倾向。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            提交前，你的选择不出这台机器；提交后，库里只留摘要，不留原文。
-          </div>
         </div>
       </div>
 
@@ -447,8 +445,7 @@
         <div class="sec">
           <div class="notice">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>答案原文从不入库、陈述只留 24 小时、撤回是物理删除 ——
-                  本机手里剩下的<b>只有「做过」这件事</b>。</span>
+            <span>本机手里剩下的<b>只有「做过」这件事</b>。</span>
           </div>
 
           <div class="kv" style="margin-top:var(--s-4)">
@@ -474,6 +471,45 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：合规边界（不是测评、不构成能力证明）/ 隐私与保留期限 /
+                     结果去向与不挂钩口径 / 产物去向与费用 / AI 离线降级说明 / 会话超时口径。
+           **没有**收进来（必须常驻）：「这不是临床、心理或人格测评」这条 amber 警示、
+           顶栏与页内的当前状态提示、AI 生成解读的 AIGC 标识、逐条结论旁的证据徽章。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>不构成能力证明</b> · 隐私与产物去向</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：这份东西不是什么</div>
+            <p class="nb-p">这<b>不是临床、心理或人格测评</b>：不打分、不排名、不诊断、<b>不构成能力证明</b>——只是帮你把倾向说清楚。题目都是「你更愿意 / 更倾向哪个」，没有对错，也没有陷阱题，不用揣摩哪个答案更好看。</p>
+            <p class="nb-p">结果和岗位、招聘会<b>互不挂钩</b>：它不参与任何排序，也不会推给任何企业，对企业不可见。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-eye"/></svg>隐私 · 保留期限 · 删除口径</div>
+            <p class="nb-p">提交前，你的选择<b>不出这台机器</b>；提交后，库里只留摘要与陈述，<b>答案原文从不入库</b>。陈述只留 24 小时，过期自动清理；撤回是<b>物理删除</b>，不是隐藏。</p>
+            <p class="nb-p">游客也能做，记录只在本次会话里，连次数也不留；会员做完会在「AI 服务记录」里记一条「做过」，同样不含答案原文。中途走开超过 60 秒，本机退出并清空；已提交的结果不受影响。</p>
+            <p class="nb-p">因此本机<b>比不了两次结果的差异</b>——要能比，就得留原文，本机选了不留。这个取舍页面直说，不藏。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">打印出来的纸上<b>只有陈述与题号依据</b>，脚注印着「不构成能力证明」。核价、支付与出纸都在打印工作台完成，本页不收款。打印机离线时可以扫码把参考单存进手机，或换一台在线的机器再打。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-check"/></svg>证据分级怎么读</div>
+            <p class="nb-p"><span class="nb-e nb-e--1">E1</span> 你自己的选择与材料。<span class="nb-e nb-e--2">E2</span> 系统按固定权重算出来的事实。<span class="nb-e nb-e--3">E3</span> AI 写的解读文字，仅供参考。页面上挂在具体结论旁的小徽章就是这三档，本条只解释含义。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+            <p class="nb-p">记分是<b>按你选项的固定权重累加</b>的机械过程，不是 AI 猜的——所以 AI 不可用时<b>作答照常</b>，能拿到题号依据与分组结果，缺的只是最后那几段解读文字。当前是否可用以顶栏状态为准。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -488,9 +524,6 @@
             <div class="kv-row"><span class="k">用时</span><span class="v">约 5 分钟</span></div>
             <div class="kv-row"><span class="k">登录</span><span class="v v--fog">不需要</span></div>
             <div class="kv-row"><span class="k">结果保留</span><span class="v">24 小时</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            游客也能做；会员做完会在「AI 服务记录」里记一条「做过」，同样不含答案原文。
           </div>
         </div>
       </div>
@@ -522,9 +555,6 @@
                   <b>没有对错，也没有陷阱题</b>；不用揣摩「哪个答案更好看」。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            结果和岗位、招聘会互不挂钩：它不参与任何排序，也不会推给任何企业。
-          </div>
         </div>
       </div>
 
@@ -556,12 +586,7 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
-            <span>记分是<b>按你选项的固定权重累加</b>的机械过程，不是 AI 猜的 ——
-                  所以 AI 不可用时作答照常，缺的只是最后那几段话。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            中途走开超过 60 秒，本机退出并清空；已提交的结果不受影响。
+            <span>记分是<b>固定权重累加</b>，不是 AI 猜的。</span>
           </div>
         </div>
       </div>
@@ -586,9 +611,6 @@
             <span>打印机离线，现在打不出来。可以扫码把参考单存进手机。</span>
           </div>
 
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            纸上只有陈述与题号依据，脚注印着「不构成能力证明」。
-          </div>
         </div>
       </div>
 
@@ -667,9 +689,6 @@
             <div class="kv-row"><span class="k">对企业可见</span><span class="v v--fog">不可见</span></div>
             <div class="kv-row"><span class="k">参与岗位排序</span><span class="v v--fog">不参与</span></div>
           </div>
-          <div class="panel-note" style="margin-top:var(--s-3)">
-            游客的记录只在本次会话里，连次数也不留。
-          </div>
         </div>
       </div>
 
@@ -688,11 +707,6 @@
                 <span class="tl-s">本机比不了 —— 原文都删了</span></span></div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>「比不了」是隐私设计的代价：要能比，就得留原文 ——
-                  本机选了不留。这个取舍页面直说，不藏。</span>
-          </div>
         </div>
       </div>
 
@@ -701,8 +715,7 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
         <div class="sec">
           <div class="panel-note" style="line-height:1.7">
-            <span data-out="firstNote">25 道选择题、约 5 分钟</span>，把倾向整理成明白话，能打印带走。<br>
-            不打分、不诊断、不构成能力证明 —— 只是帮你把话说清楚。
+            <span data-out="firstNote">25 道选择题、约 5 分钟</span>，把倾向整理成明白话，能打印带走。
           </div>
         </div>
       </div>
@@ -923,6 +936,7 @@
   render()
 })()
 </script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

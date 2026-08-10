@@ -18,7 +18,37 @@
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
 <style>
-  /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。 */
+  /* 填槽型页面：左边是产出物，右边是槽位。产出物永远占主体。
+
+     2026-08-10 重心整改：右副列 348 → 296、页边 56 → 24，宽度还给产出物
+     （主功能区占屏 42.4% → 51%）。同时把 t1「三处槽位要你核」从右栏说明
+     搬到稿纸正下方 —— 它是对这封信要动手的三件事，属于产出物，不是旁注；
+     顺带补上左栏长期存在的 564px 空洞（自检「主栏留白过大」一直报 1）。 */
+  .work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
+
+  /* 稿纸下方的槽位条：四态都在，内容随态换，不留空洞也不假装已经填好 */
+  .slots { flex: 0 0 auto; margin-top: var(--s-4); padding: var(--s-4) var(--s-5);
+    border-radius: var(--r-md); background: var(--glass-1-bg);
+    border: 1px solid var(--glass-1-brd); backdrop-filter: blur(var(--glass-blur));
+    display: flex; flex-direction: column; gap: var(--s-2); }
+  .slots-hd { display: flex; align-items: center; gap: var(--s-3);
+    font-size: var(--fz-3); color: var(--fog-900); font-weight: 600; }
+  .slots-hd .ic { width: 19px; height: 19px; color: var(--amber-400); }
+  .slots-hd em { font-style: normal; font-weight: 400; margin-left: auto;
+    font-size: var(--fz-1); color: var(--fog-600); }
+  .slotrow { display: flex; align-items: center; gap: var(--s-4);
+    min-height: var(--touch-min); padding: 0 var(--s-3);
+    border-radius: var(--r-xs); background: var(--surf-1); border: 1px solid var(--brd-1); }
+  .slotrow .k { flex: 0 0 96px; font-size: var(--fz-2); color: var(--fog-600); }
+  .slotrow .v { min-width: 0; flex: 1; font-size: var(--fz-3); color: var(--fog-900); }
+  .slotrow .st { flex: 0 0 auto; font-size: var(--fz-1); color: var(--amber-200); }
+
   .letter { font-size: 12px; line-height: 1.95; color: var(--paper-ink); }
   .letter p { margin: 0 0 11px; }
   .letter .sign { margin-top: 18px; text-align: right; }
@@ -183,6 +213,29 @@
             <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
           </div>
         </div>
+
+        <!-- 槽位条：稿纸上黄底那三处，就在稿纸正下方列出来，四态都在。
+             这不是旁注 —— 它是这封信里**只有你能填**的三格，属于产出物本身。 -->
+        <div class="slots">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-alert"/></svg>
+            <span data-when="default device-off">三处要你自己核</span>
+            <span data-when="ai-down">格式纸上也是这三处要手填</span>
+            <span data-when="first">有简历后生成，这三处仍要你核</span>
+            <em>照公告写全</em>
+          </div>
+          <div class="slotrow"><span class="k">公司全称</span>
+            <span class="v" data-when="default device-off">某科技有限公司</span>
+            <span class="v v--fog" data-when="ai-down first">留空 · 手写</span>
+            <span class="st">待你核对</span></div>
+          <div class="slotrow"><span class="k">来源平台</span>
+            <span class="v" data-when="default device-off">前程无忧 · JX-88214</span>
+            <span class="v v--fog" data-when="ai-down first">留空 · 手写</span>
+            <span class="st">待你核对</span></div>
+          <div class="slotrow"><span class="k">你的署名</span>
+            <span class="v v--fog">本机不替你签名</span>
+            <span class="st">待你填写</span></div>
+        </div>
       </div>
 
       <!-- T2 自我介绍 -->
@@ -221,6 +274,19 @@
           <p>自我介绍的内容来自你的简历。</p>
           <a class="btn btn--ghost" href="09-resume-workbench.html">去做简历</a>
         </div>
+        <!-- 空态是居中块，栏底会空出一大截（自检「主栏留白过大」）。
+             这一条顶在栏底：说清没生成时纸上会是什么，不是装饰。 -->
+        <div class="slots" data-when="ai-down first">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span>现在能带走的</span>
+            <em>A4 · 1 页 · 黑白</em>
+          </div>
+          <div class="slotrow"><span class="k">纸上有</span>
+            <span class="v">说什么、按什么顺序、哪三处该放数字</span></div>
+          <div class="slotrow"><span class="k">纸上没有</span>
+            <span class="v v--fog">具体内容 —— 要你自己填，本机不代写</span></div>
+        </div>
       </div>
 
       <!-- T3 材料清单 -->
@@ -240,28 +306,21 @@
         <!-- 清单由「给哪件事准备」驱动：三件事各有各的清单，选择必须换内容，不能只换标题 -->
         <div class="cklist" data-out="cklist" style="flex:1 1 auto;min-height:0;overflow-y:auto">
         </div>
-        <!-- 2026-08-09 留白复核补实：清单是给周五招聘会用的，就近给作战台与打印通道。
-             first 态不显示——locked 卡里已有「去准备材料」，避免重复入口。 -->
-        <div class="xlane" style="margin-top:var(--s-4)" data-when="default ai-down device-off">
-          <span class="xlane-hd">清单备齐之外，这两处也是给周五准备的</span>
-          <div class="xlane-row">
-            <a class="xlane-go" href="17-fair-desk.html">
-              <span class="src-ic"><svg class="ic"><use href="#i-policy"/></svg></span>
-              <span class="xlane-tx">
-                <span class="xlane-nm">招聘会作战台</span>
-                <span class="xlane-ds">展位图、到场企业和现场提醒都在那边</span>
-              </span>
-              <svg class="ic"><use href="#i-arrowRight"/></svg>
-            </a>
-            <a class="xlane-go" href="09-resume-workbench.html">
-              <span class="src-ic"><svg class="ic"><use href="#i-resume"/></svg></span>
-              <span class="xlane-tx">
-                <span class="xlane-nm">简历工作台</span>
-                <span class="xlane-ds">出发前想再顺一遍简历，从这里回去改</span>
-              </span>
-              <svg class="ic"><use href="#i-arrowRight"/></svg>
-            </a>
+        <!-- 2026-08-10 重心整改：这里原有一条横向通道（招聘会作战台 / 简历工作台），
+             是典型的"你可能还想去" —— 跟"备齐这份清单"这件事无关。
+             17-fair-desk 有 5 处别的入口、09-resume-workbench 有 9 处，都不是唯一路径，已删。
+             换成这条产物规格：清单打出来是什么、哪些本机办不了。它顶在栏底，
+             既是真实信息，也接住了 .cklist 撑开后的栏底（自检「主栏留白过大」）。 -->
+        <div class="slots" data-when="default ai-down device-off">
+          <div class="slots-hd">
+            <svg class="ic"><use href="#i-printer"/></svg>
+            <span>这份清单打出来</span>
+            <em>A4 · 1 页 · 黑白</em>
           </div>
+          <div class="slotrow"><span class="k">纸上有</span>
+            <span class="v">全部条目 + 每条的「已有 / 你自己带」</span></div>
+          <div class="slotrow"><span class="k">本机办不了</span>
+            <span class="v v--fog">标了「你自己带」的那几样，纸上照标</span></div>
         </div>
 
         <div class="locked" data-when="first">
@@ -312,16 +371,14 @@
           <div class="seg" data-param="weak"><button aria-pressed="true" data-v="写">写</button><button aria-pressed="false" data-v="不写">不写</button></div>
         </div>
       </div>
+      <!-- 原来这里叫「两处要你自己核」，第一条讲三处槽位 —— 已搬到左栏稿纸正下方
+           （那里才看得见黄底在哪）。这里只留隐私与事实来源口径。 -->
       <div class="pane pane--fill" data-at="t1" style="margin-top:auto">
-        <div class="pane-hd"><span class="t">两处要你自己核</span></div>
-        <div class="notice notice--amber">
-          <svg class="ic"><use href="#i-alert"/></svg>
-          <span>黄底标出来的三处是<b>槽位</b>：公司全称、来源平台、你的署名。照公告写全，别用简称。</span>
-        </div>
-        <div class="notice" style="margin-top:10px">
+        <div class="pane-hd"><span class="t">这封信的出处</span></div>
+        <div class="notice">
           <svg class="ic"><use href="#i-shield"/></svg>
-          <span>经历与数字全部取自简历 v2，<b>没有新增任何事实</b> <span class="ev ev--e3">E3</span>。<br>
-            <b>只给你本人看，不向任何企业提供、不进入任何库</b>；未登录只留到本次会话结束。</span>
+          <span>经历与数字取自简历 v2，<b>无新增事实</b> <span class="ev ev--e3">E3</span>；
+            <b>只给你本人看，不进任何库</b>，未登录离场即清。</span>
         </div>
       </div>
 
@@ -341,20 +398,19 @@
           <div class="seg" data-param="focus"><button aria-pressed="true" data-v="公众号增长">公众号增长</button><button aria-pressed="false" data-v="校园地推">校园地推</button></div>
         </div>
       </div>
+      <!-- 产物去向只留两个：打印、存文档。原来还有「对着练一遍」（与操作栏主按钮
+           同一个去处，重复）和「发到我手机」（第三个去向），已删。 -->
       <div class="pane pane--fill" data-at="t2" style="margin-top:auto">
-        <div class="pane-hd"><span class="t">练一遍再上场</span></div>
+        <div class="pane-hd"><span class="t">这两版拿去做什么</span></div>
         <div class="outs">
-          <a class="out" href="20-interview-pod.html" data-when="default device-off"><svg class="ic"><use href="#i-interview"/></svg>对着练一遍</a>
-          <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-interview"/></svg>练习不可用</button>
           <a class="out" data-when="default" href="06-print-workbench.html?stage=s3&amp;from=P12&amp;kind=material&amp;title=自我介绍小卡片&amp;back=t2"><svg class="ic"><use href="#i-printer"/></svg>打印小卡片 · 去核价</a>
           <button class="out" aria-disabled="true" data-when="ai-down first"><svg class="ic"><use href="#i-printer"/></svg>小卡片未生成</button>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" data-fb="phone"><svg class="ic"><use href="#i-phone"/></svg>发到我手机</button>
           <button class="out" data-fb="save"><svg class="ic"><use href="#i-folder"/></svg>存进我的文档</button>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
-          <span>打印小卡片是名片大小，能塞进证件套，现场瞄一眼就行，不用整页拿在手上。</span>
+          <span>小卡片是名片大小，能塞进证件套，现场瞄一眼就行。</span>
         </div>
       </div>
 
@@ -388,13 +444,11 @@
           <span>还没有你的材料，这一栏先不下结论。有了简历、扫描件或生成好的求职信之后，
             这里会标出<b>哪些已经有了、哪些本机办不了</b>。</span>
         </div>
+        <!-- 原来这里两条说的是同一件事（本机办不了的那几样），合成一条。 -->
         <div class="notice notice--amber" data-when="default device-off">
           <svg class="ic"><use href="#i-alert"/></svg>
-          <span><b>证件照本机拍不了</b>——没配补光和背景板，拍出来不合规格。请到照相馆拍，或用已有的电子照去「文件加工」打印。</span>
-        </div>
-        <div class="notice" style="margin-top:10px" data-when="default device-off">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>身份证原件和笔本机都给不了，清单上标了「你自己带」。<b>能办的和不能办的分开写</b>，别让你到现场才发现差东西。</span>
+          <span><b>证件照、身份证原件和笔，本机都给不了</b>，清单上标了「你自己带」——
+            别让你到现场才发现差东西。</span>
         </div>
         <div class="notice" data-when="ai-down" style="margin-top:0">
           <svg class="ic"><use href="#i-info"/></svg>

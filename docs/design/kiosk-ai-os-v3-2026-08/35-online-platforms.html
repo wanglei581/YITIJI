@@ -182,6 +182,42 @@
         </div>
       </div>
 
+    <!-- ══════════ 页脚：信息与边界（全页唯一折叠条） ══════════ -->
+    <div class="nb-bar" data-notebar>
+      <button type="button" class="nb-sum">
+        <svg class="ic"><use href="#i-shield"/></svg>
+        <span class="nb-sum-t">信息与边界 · <b>不代收简历</b> · 名单与记录口径</span>
+        <span class="nb-x">展开</span>
+        <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+      </button>
+      <div class="nb-body" hidden>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+          <p class="nb-p">投递请前往来源平台。本机<b>不代收简历</b>、不参与企业筛选、不替你投递、也不打开对方页面。屏上只出码，扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。</p>
+          <p class="nb-p">公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>名单口径与排序口径</div>
+          <p class="nb-p">这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。</p>
+          <p class="nb-p">本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事。所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段，进具体岗位后才展示。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围与保留期限</div>
+          <p class="nb-p">只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。</p>
+          <p class="nb-p" data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</p>
+          <p class="nb-p" data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+          <p class="nb-p">这一页<b>不出纸、不收款</b>。想把岗位信息打出来带走，回岗位台选中那一条，从详情页走打印；核价、支付与取件都在打印工作台完成。</p>
+        </div>
+        <div class="nb-sec">
+          <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
+          <p class="nb-p">本页四个入口<b>全部不依赖 AI</b>：AI 不可用或打印扫描离线时，出码、跳转与本页说明照常。</p>
+        </div>
+      </div>
+    </div>
+
     </div>
   </div>
 
@@ -216,42 +252,6 @@
       </div>
       <div class="sheet-acts">
         <button class="btn btn--lg btn--ghost" id="qr-close">关闭</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══════════ 页脚：信息与边界（全页唯一折叠条） ══════════ -->
-  <div class="nb-bar" data-notebar>
-    <button type="button" class="nb-sum">
-      <svg class="ic"><use href="#i-shield"/></svg>
-      <span class="nb-sum-t">信息与边界 · <b>本机不代收简历</b> · 名单口径 · 记录范围 · 打印去向</span>
-      <span class="nb-x">展开</span>
-      <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
-    </button>
-    <div class="nb-body" hidden>
-      <div class="nb-sec">
-        <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
-        <p class="nb-p">投递请前往来源平台。本机<b>不代收简历</b>、不参与企业筛选、不替你投递、也不打开对方页面。屏上只出码，扫码之后的登录、填表、上传简历都在你自己手机上完成，本机看不到，也不留存。</p>
-        <p class="nb-p">公共终端提醒：<b>不需要在这台机器上登录你的求职账号</b>。</p>
-      </div>
-      <div class="nb-sec">
-        <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-info"/></svg>名单口径与排序口径</div>
-        <p class="nb-p">这份名单由管理后台维护，本机只出这四家的码，名单外的平台不出码，也不接受现场手输网址。四家都是公开的招聘平台，各自岗位池不一样；本机<b>不比较哪家更好，也不排名次</b>。</p>
-        <p class="nb-p">本机<b>不同步这四家的岗位数据</b>——你在本机岗位台看到的岗位来自另一批已审核来源，两边条目不是一回事。所以这一页不显示岗位数，也没有来源机构 / 同步时间 / 外部 ID 那一套，那是岗位条目的字段，进具体岗位后才展示。</p>
-      </div>
-      <div class="nb-sec">
-        <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围与保留期限</div>
-        <p class="nb-p">只记你打开过哪个入口；你在对方平台做了什么，本机拿不到。</p>
-        <p class="nb-p" data-when="default ai-down device-off">登录后这次打开记在岗位台的外部跳转记录里，你自己能回看。</p>
-        <p class="nb-p" data-when="first">现在未登录，只留本次会话，离场即清，不进任何账号。</p>
-      </div>
-      <div class="nb-sec">
-        <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
-        <p class="nb-p">这一页<b>不出纸、不收款</b>。想把岗位信息打出来带走，回岗位台选中那一条，从详情页走打印；核价、支付与取件都在打印工作台完成。</p>
-      </div>
-      <div class="nb-sec">
-        <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 离线时会怎样</div>
-        <p class="nb-p">本页四个入口<b>全部不依赖 AI</b>：AI 不可用或打印扫描离线时，出码、跳转与本页说明照常。</p>
       </div>
     </div>
   </div>

@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="styles/identity.css?v=2">
 <link rel="stylesheet" href="styles/polish.css?v=5">
 <link rel="stylesheet" href="styles/kiosk-io.css?v=1">
+<link rel="stylesheet" href="styles/notebar.css?v=1">
 <style>
 /* ── P27 专用 ── 百宝箱区 = 后台配置驱动的扩展服务启动区（线上 /toolbox：
    管理后台审核上架 · launchMode 三种 = 站内页面/扫码到手机/外部 H5 · 启动有
@@ -173,12 +174,10 @@
         <div class="lockcard">
           <span class="lock-ic"><svg class="ic"><use href="#i-toolbox"/></svg></span>
           <div class="lock-t">这台机器还没有上架任何扩展服务</div>
+          <!-- 状态提示本身留在页面上（CLAUDE.md §9「不伪造能力」）；
+               「百宝箱是什么 / 谁决定上架 / 配置后会怎样」这三段长说明收进页脚折叠条。 -->
           <div class="lock-p">
-            百宝箱里放的是<b>求职打印之外的扩展服务</b>（证件照预约、社保查询、
-            校园门户这类第三方或官方服务的启动入口）。上不上、上哪些，
-            <b>由管理后台审核后决定</b>，本机不自己加。<br><br>
-            所以这一页现在<b>没有任何服务可以启动</b> ——
-            不是坏了，是还没配置。下面说的是配置后会怎样、以及你现在就能用的。
+            这一页现在<b>没有任何服务可以启动</b>——不是坏了，是还没配置。
           </div>
         </div>
       </div>
@@ -212,8 +211,7 @@
 
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>你在第三方服务页面里办了什么，<b>本机不记录、也看不到</b>。
-                  上架什么、下架什么由管理后台决定，页面上随配置实时变化。</span>
+            <span>你在第三方服务页面里办了什么，<b>本机不记录、也看不到</b>。</span>
           </div>
         </div>
       </div>
@@ -292,8 +290,7 @@
 
             <div class="notice" style="margin-top:var(--s-4)">
               <svg class="ic"><use href="#i-shield"/></svg>
-              <span>无论哪种启动方式，本机都<b>不记录你在第三方页面里的办理结果</b>；
-                    卡片上的服务名与说明由管理后台在上架时填写。</span>
+              <span>无论哪种启动方式，本机都<b>不记录你在第三方页面里的办理结果</b>。</span>
             </div>
           </div>
         </div>
@@ -442,6 +439,49 @@
         </div>
       </div>
 
+
+      <!-- ══════════ 页脚：本页唯一的「信息与边界」折叠条 ══════════
+           收进来的：百宝箱是什么与合规边界 / 上架审核机制 / 隐私与记录范围 /
+                     三种启动方式的口径 / 产物去向与费用 / AI 与设备离线降级说明。
+           **没有**收进来（必须常驻）：本机当前状态（「没有服务可以启动」）、
+           每张卡上的「未上架」状态徽章、ai-down 与 device-off 的当前状态提示。 -->
+      <div class="nb-bar" data-notebar>
+        <button type="button" class="nb-sum">
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span class="nb-sum-t">信息与边界 · <b>不代收简历</b> · 上架审核与记录口径</span>
+          <span class="nb-x">展开</span>
+          <svg class="ic nb-cue"><use href="#i-chevron"/></svg>
+        </button>
+        <div class="nb-body" hidden>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--jade"><svg class="ic"><use href="#i-shield"/></svg>合规边界：本机不做什么</div>
+            <p class="nb-p">百宝箱<b>不做招聘闭环</b>——不代收简历、不做平台内投递、不做企业筛选。涉及岗位和招聘会的服务仍走岗位信息与招聘会页的来源入口。</p>
+            <p class="nb-p">想接入服务的机构请咨询现场工作人员。本页<b>不展示未经核实的联系方式</b>。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--azure"><svg class="ic"><use href="#i-toolbox"/></svg>百宝箱是什么 · 谁决定上架</div>
+            <p class="nb-p">百宝箱里放的是<b>求职打印之外的扩展服务</b>（证件照预约、社保查询、校园门户这类第三方或官方服务的启动入口）。上不上、上哪些，<b>由管理后台审核后决定</b>，本机不自己加。</p>
+            <p class="nb-p">扩展服务从提出到出现在这一页，<b>每一步都过管理后台</b>：服务方提出 → 内容与资质合规审核 → 配置启动方式 → 在指定终端上架。<b>不存在谁塞一个链接进来就能上屏</b>。上架什么、下架什么由管理后台决定，页面上随配置实时变化。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-layers"/></svg>三种启动方式的口径</div>
+            <p class="nb-p"><b>站内页面：</b>在这块屏上办完就回到百宝箱。<b>外部 H5：</b>跳出去前先弹「要离开吗」，打开的是第三方页面，内容与办理结果都不归本机管。<b>扫码到手机：</b>屏上只出码，码有有效期、过期作废；要登录、要看个人账户的事项都归这一类。</p>
+            <p class="nb-p">三组条目分类来自配置里的启动方式字段；卡片上的服务名与说明由管理后台在上架时填写。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-eye"/></svg>记录范围与隐私</div>
+            <p class="nb-p">本机只记「某个服务被打开过一次」的<b>匿名计数</b>，不关联你的身份，也不记你办了什么。你在第三方服务页面里办了什么，<b>本机不记录、也看不到</b>。屏上出过的二维码失效即作废。这几条现在就成立，不等上架。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h nb-h--amber"><svg class="ic"><use href="#i-printer"/></svg>产物去向与费用</div>
+            <p class="nb-p">本页<b>不出纸、不收款</b>。需要打印的东西走打印工作台核价与支付；文件加工的成品可存进「我的文档」再去打印。</p>
+          </div>
+          <div class="nb-sec">
+            <div class="nb-h"><svg class="ic"><use href="#i-offline"/></svg>AI 与设备离线时会怎样</div>
+            <p class="nb-p">扩展服务<b>不依赖 AI，也不依赖打印机</b>：AI 不可用时这一页的内容与入口照常；打印机离线时这一页照常，只有涉及打印的那条此刻打不了，可先转存「我的文档」。当前状态以顶栏与页面上的状态提示为准。</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ══════════════════ 右侧栏 348px ══════════════════ -->
@@ -465,8 +505,12 @@
         <div class="pane-hd"><svg class="ic"><use href="#i-agency"/></svg><b>服务是怎么上架的</b></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            扩展服务从提出到出现在这一页，<b>每一步都过管理后台</b>，
-            不存在谁塞一个链接进来就能上屏。
+            每一步都过管理后台。
+          </div>
+
+          <div class="notice" style="margin-top:var(--s-4)">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <span>百宝箱<b>不代收简历、不做平台内投递</b>。</span>
           </div>
 
           <div class="tline" style="margin-top:var(--s-4)">
@@ -480,16 +524,6 @@
               <span class="tl-b"><span class="tl-t">在指定终端上架</span> <span class="tl-s">上架后这一页才会出现服务卡</span></span></div>
           </div>
 
-          <div class="notice" style="margin-top:var(--s-4)">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>百宝箱不做招聘闭环 —— <b>不代收简历、不做平台内投递</b>。
-                  涉及岗位和招聘会的服务仍走岗位信息与招聘会页的来源入口。</span>
-          </div>
-
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            想接入服务的机构请咨询现场工作人员。本页不展示未经核实的联系方式。
-          </div>
-
           <div class="pane-hd" style="margin-top:var(--s-5)">
             <svg class="ic"><use href="#i-shield"/></svg><b>本机对使用记录做什么</b>
           </div>
@@ -500,6 +534,7 @@
             <div class="kv-row"><span class="k">屏上出过的二维码</span><span class="v">失效即作废</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3)">这几条现在就成立，不等上架。</div>
+          <div class="panel-note" style="margin-top:var(--s-3)">接入咨询请找现场工作人员。</div>
         </div>
       </div>
 
@@ -627,6 +662,7 @@
 <script src="scripts/fx.js?v=3"></script>
 <script src="scripts/fx2.js?v=3"></script>
 <script src="scripts/linkage.js?v=4"></script>
+<script src="scripts/notebar.js?v=1"></script>
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>

@@ -81,6 +81,22 @@
 .cond-t { font-size: var(--fz-3); color: var(--fog-900); }
 .cond-s { font-size: var(--fz-1); color: var(--fog-600); }
 .cond-st { flex: 0 0 auto; font-size: var(--fz-1); color: var(--amber-200); white-space: nowrap; }
+
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   三个阶段的主角分别是：报到流程 / 办卡指引 / 未开通的事实。
+   右副列 348 → 296、页边 56 → 24，宽度还给它们
+   （主功能区占屏 42.4% → 50.6%）。
+   同时删掉两张纯解释卡（「为什么不先放个示例图表 · 这是取舍不是没做」
+   「开通了会长什么样」）、一张与左栏重复的「证件照本机能出」，
+   以及五个横向入口（看校园招聘 / 做第一份简历 / 看智慧校园 / 看还锁着哪些
+   / 回迎新报到）—— 它们都不是本页在办的事，按返回键或 rail 标签都到得了。 */
+.work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
 </style>
 </head>
 <body>
@@ -137,13 +153,15 @@
           </div>
 
           <div class="dsec-t" style="margin-top:var(--s-2)">办事窗口</div>
+          <!-- 原来四行各写一遍「位置与时间按站点配置下发」，同一句话四遍；
+               口径合到下面那条 fee 里，窗口名单照留。 -->
           <div class="kv" style="flex:0 0 auto">
-            <div class="kv-row"><span class="k">学生处</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
-            <div class="kv-row"><span class="k">财务处</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
-            <div class="kv-row"><span class="k">后勤服务</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
-            <div class="kv-row"><span class="k">校医院</span><span class="v v--fog">位置与时间按站点配置下发</span></div>
+            <div class="kv-row"><span class="k">学生处</span><span class="v v--fog">—</span></div>
+            <div class="kv-row"><span class="k">财务处</span><span class="v v--fog">—</span></div>
+            <div class="kv-row"><span class="k">后勤服务</span><span class="v v--fog">—</span></div>
+            <div class="kv-row"><span class="k">校医院</span><span class="v v--fog">—</span></div>
           </div>
-          <p class="fee" style="flex:0 0 auto">本机<b>未配置本校窗口位置与时间，</b>请到现场服务台咨询。</p>
+          <p class="fee" style="flex:0 0 auto">四个窗口的位置与时间<b>按站点配置下发，本机未配置，</b>请到现场服务台咨询。</p>
 
           <div class="dsec-t" style="margin-top:var(--s-2)">求职准备 · 本机现在就能办</div>
           <div class="outs" style="flex:0 0 auto">
@@ -151,9 +169,8 @@
             <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
             <a class="out" href="29-id-photo.html" data-when="default first device-off"><svg class="ic"><use href="#i-image"/></svg>证件照排版</a>
             <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-image"/></svg>证件照不可用</button>
-            <a class="out" href="09-resume-workbench.html" data-when="default device-off"><svg class="ic"><use href="#i-resume"/></svg>做第一份简历</a>
-            <button class="out" aria-disabled="true" data-when="first ai-down"><svg class="ic"><use href="#i-resume"/></svg>简历诊断不可用</button>
-            <a class="out" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
+            <!-- 「做第一份简历」「看校园招聘」已删：跟报到这件事无关，是横向入口；
+                 09 有 9 处别的入口、18 有 5 处，都不是唯一路径。 -->
           </div>
 
           <div class="srcline srcline--detail" style="flex:0 0 auto;margin-top:var(--s-3)">
@@ -257,15 +274,9 @@
         </div>
       </div>
 
-      <!-- 常驻底卡：为什么不放示例图表。锁定态最容易被塞假数据，这里把理由写明。 -->
-      <div class="pane" data-at="bigdata" style="flex:0 0 auto">
-        <div class="pane-hd"><span class="t">为什么不先放个示例图表</span><span class="s">这是取舍，不是没做</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">示例图表</span><span class="v">看着像真的，会被当成本校数据</span></div>
-          <div class="kv-row"><span class="k">行业均值</span><span class="v">不是你学校的，参考不了</span></div>
-          <div class="kv-row"><span class="k">本机口径</span><span class="v">没有就写没有，空着不填</span></div>
-        </div>
-      </div>
+      <!-- 2026-08-10 重心整改：原来这里是「为什么不先放个示例图表 · 这是取舍，不是没做」
+           —— 解释设计意图。上面锁定卡已经写了「不展示任何统计，也不放示例图表凑数」，
+           结论在、理由不必占屏，删。 -->
     </div>
 
     <!-- ══════════════════ 右动作区 ══════════════════ -->
@@ -340,12 +351,13 @@
         <div class="outs">
           <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=迎新报到清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印报到清单</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" data-go="card"><svg class="ic"><use href="#i-idcard"/></svg>看校园卡办理</button>
-          <a class="out" href="19-smart-campus.html"><svg class="ic"><use href="#i-layers"/></svg>看智慧校园</a>
+          <!-- 「看校园卡办理」在 rail 上，「看智慧校园」是返回键的去处，两个都删。 -->
         </div>
+        <!-- 原来这条与左栏「本机未配置本校窗口位置与时间」同义（第二遍）。
+             换成这份纸自己的口径：印什么、不印什么。 -->
         <div class="notice" style="margin-top:auto">
-          <svg class="ic"><use href="#i-info"/></svg>
-          <span>窗口位置与时间<b>按站点配置下发；</b>本机没配就不写，免得你白跑。</span>
+          <svg class="ic"><use href="#i-shield"/></svg>
+          <span>清单只印材料名与状态，<b>不含你的姓名与证件号。</b></span>
         </div>
       </div>
 
@@ -353,11 +365,10 @@
       <div class="pane pane--fill" data-at="card">
         <div class="pane-hd"><span class="t">这页怎么来的</span></div>
         <div style="margin-bottom:10px"><span class="ev ev--e2">不依赖 AI · 只读指引</span></div>
+        <!-- 「线上办理」「受理地点」「本机代办吗」左栏常见问题里已逐条写过，不重复。 -->
         <div class="kv">
           <div class="kv-row"><span class="k">内容</span><span class="v">校方提供并经管理员审核</span></div>
-          <div class="kv-row"><span class="k">线上办理</span><span class="v v--fog">校方未开通</span></div>
-          <div class="kv-row"><span class="k">受理地点</span><span class="v">一卡通中心 · 行政楼一层</span></div>
-          <div class="kv-row"><span class="k">本机角色</span><span class="v">只展示与指引，不代办</span></div>
+          <div class="kv-row"><span class="k">同步时间</span><span class="v">2026-08-10 08:10</span></div>
         </div>
       </div>
 
@@ -370,14 +381,7 @@
         </div>
       </div>
 
-      <div class="pane" data-at="card">
-        <div class="pane-hd"><span class="t">证件照本机能出</span><span class="s">现拍现印</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">规格</span><span class="v">一寸 25×35mm</span></div>
-          <div class="kv-row"><span class="k">一张 A4</span><span class="v">排 8 张，够办卡用</span></div>
-          <div class="kv-row"><span class="k">照片保留</span><span class="v">敏感文件 · 7 天删除</span></div>
-        </div>
-      </div>
+      <!-- 「证件照本机能出」这张卡与左栏「照片没有？本机能出」逐行同义，删。 -->
 
       <div class="pane pane--fill pane--grow" data-at="card">
         <div class="pane-hd"><span class="t">现在能做的</span></div>
@@ -386,7 +390,7 @@
           <button class="out" aria-disabled="true" data-when="ai-down"><svg class="ic"><use href="#i-image"/></svg>证件照不可用</button>
           <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P46&amp;kind=policy-checklist&amp;title=校园卡办理清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印办卡清单</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" data-go="welcome"><svg class="ic"><use href="#i-campus"/></svg>回迎新报到</button>
+          <!-- 「回迎新报到」在 rail 上，删。 -->
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -406,22 +410,15 @@
         </div>
       </div>
 
-      <div class="pane" data-at="bigdata">
-        <div class="pane-hd"><span class="t">开通了会长什么样</span><span class="s">先说清楚</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">会有</span><span class="v">按院系的报到进度条</span></div>
-          <div class="kv-row"><span class="k">会有</span><span class="v">同届去向的聚合比例</span></div>
-          <div class="kv-row"><span class="k">不会有</span><span class="v">任何一个人的记录</span></div>
-        </div>
-      </div>
+      <!-- 「开通了会长什么样」是对没开通功能的预告，本页口径就是"没有就写没有"，删。 -->
 
+      <!-- 锁定态必须给真出路，这两条保留（不是"顺便看看"，是本页答不了时的替代路径）；
+           「回迎新报到」在 rail 上、「看还锁着哪些」是返回键的去处，两个删。 -->
       <div class="pane pane--fill pane--grow" data-at="bigdata">
         <div class="pane-hd"><span class="t">换条路走</span></div>
+        <!-- 「看校园招聘」已是右下角主按钮，这里不再摆第二遍。 -->
         <div class="outs">
-          <a class="out" href="18-campus.html"><svg class="ic"><use href="#i-campus"/></svg>看校园招聘</a>
           <a class="out" href="21-policy.html"><svg class="ic"><use href="#i-policy"/></svg>看官方公开数据</a>
-          <button class="out" data-go="welcome"><svg class="ic"><use href="#i-users"/></svg>回迎新报到</button>
-          <a class="out" href="19-smart-campus.html"><svg class="ic"><use href="#i-layers"/></svg>看还锁着哪些</a>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>

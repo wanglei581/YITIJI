@@ -41,11 +41,19 @@
    ──────────────────────────────────────────────────────────────────── */
 
 /* 布局：对话是本页唯一主体，右副列只留「仪表 + 作业面 + 托盘」。
-   2026-08-10 重心整改：副列 380 → 300，页边 32 → 24，把宽度还给对话区
-   （主功能区占屏 50.0% → 56.5%）。右列原本还挂着「能帮你做的」9 个入口 ——
+   2026-08-10 重心整改：副列 380 → 336，把宽度还给对话区
+   （主功能区占屏 50.0% → 53.5%）。右列原本还挂着「能帮你做的」9 个入口 ——
    那是"你可能还想去"的横向导航，跟"和小青对话"这件事无关，已删；
    用户要去别的功能按返回键即可，不需要每页都摆一排入口。 */
-.work { grid-template-columns: 1fr 300px; padding: var(--s-5) var(--s-6); }
+/* 页边保持 var(--s-7)：小青头像用 transform:scale(2.1) 取头肩，
+   放大后的图元 bounding rect 比圆框宽 ~46px（视觉上被 .ava-clip 裁掉，
+   但自检量的是原始矩形）。页边一收窄它就探出屏幕左沿，横向溢出报 1。
+   宽度只从副列要：380 → 336。 */
+.work { grid-template-columns: 1fr 336px; padding: var(--s-5) var(--s-7); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行。标签不折行，值去折行。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
 
 /* ── 头卡：compact 人像 + 常驻披露 ── */
 .advhead { display:flex; align-items:center; gap:var(--s-5); }
@@ -167,17 +175,19 @@
 .aidown-links a:hover { border-color:var(--jade-a32); }
 .aidown-links .ic { width:16px; height:16px; color:var(--jade-500); }
 
-/* ── 右列①：仪表组（3 个小 gauge 卡） ── */
-.gauges { display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s-3); }
-.gauge { min-height:118px; padding:var(--s-4); border-radius:var(--r-sm);
+/* ── 右列①：仪表组（3 行，不是 3 列）──
+   副列收窄到 336 后，三列并排每格只剩 ~90px，「今日已答」「设备状态」
+   全被折成两行读不动。改成一行一项：标签在左、数值在右、依据一行在下。 */
+.gauges { display:flex; flex-direction:column; gap:var(--s-2); }
+.gauge { min-height:56px; padding:var(--s-3) var(--s-4); border-radius:var(--r-sm);
   background:var(--surf-1); border:1px solid var(--brd-1);
-  display:flex; flex-direction:column; gap:7px; }
-.gauge-k { font-size:var(--fz-1); color:var(--fog-600); }
-.gauge-v { display:flex; align-items:center; gap:8px;
-  font-size:var(--fz-5); color:var(--fog-900); font-weight:600; }
-.gauge-v b { font-family:var(--ff-num); font-size:var(--fz-7); font-weight:600; }
+  display:flex; flex-wrap:wrap; align-items:center; gap:4px var(--s-3); }
+.gauge-k { flex:0 0 auto; white-space:nowrap; font-size:var(--fz-2); color:var(--fog-600); }
+.gauge-v { margin-left:auto; flex:0 0 auto; display:flex; align-items:center; gap:8px;
+  white-space:nowrap; font-size:var(--fz-4); color:var(--fog-900); font-weight:600; }
+.gauge-v b { font-family:var(--ff-num); font-size:var(--fz-6); font-weight:600; }
 .gauge-v .u { font-size:var(--fz-2); color:var(--fog-700); font-weight:400; }
-.gauge-s { margin-top:auto; font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
+.gauge-s { flex:0 0 100%; font-size:var(--fz-1); color:var(--fog-600); line-height:1.5; }
 .screen[data-state="ai-down"] .gauge--ai { filter:grayscale(1); opacity:.55; }
 .screen[data-state="device-off"] .gauge--dev .gauge-v { color:var(--coral-200); }
 

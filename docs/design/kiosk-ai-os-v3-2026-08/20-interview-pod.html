@@ -40,6 +40,19 @@
    本页自带 .ck / .opt / .fold / .qdot / .rev 等页内构件。
    ──────────────────────────────────────────────────────────────────── */
 
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   本页主角是「一题一答地练」。右副列 348 → 296、页边 56 → 24，
+   把宽度还给题面与作答区（主功能区占屏 42.4% → 50.6%）。
+   右列同时删掉三处纯说明：「这一页帮你做什么」（页面用途科普）、
+   「这是练习不是考试…」（解释设计意图）、「练完这里会留下…」（预告）。 */
+.work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
+
 /* ── 通用：折叠区 ────────────────────────────────────────────────────
    本轮大量文字从「铺在屏幕上」改成「收进折叠区」，全站用同一套构件。
    不用 hidden 控制开合 —— hidden 是四态机制（data-when/data-at）的地盘，
@@ -840,10 +853,6 @@
               <span class="tl-b"><span class="tl-t">今天这次</span>
                 <span class="tl-s">第一次用，还没有记录</span></span></div>
           </div>
-          <div class="panel-note" data-when="first" style="margin-top:var(--s-3)">
-            练完这次，这里会留下「练了哪个岗、答了几题」。
-          </div>
-
           <div class="notice" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
             <span>只记<b>练过几次、答了几题</b>，不保存你答的内容。</span>
@@ -885,9 +894,6 @@
             <div class="kv-row"><span class="k">已跳过</span><span class="v"><b data-f="s-skip">0</b> 题</span></div>
             <div class="kv-row"><span class="k">当前</span><span class="v">第 <span data-f="s-cur">1</span> 题</span></div>
             <div class="kv-row"><span class="k">计时</span><span class="v"><span class="chip chip--info">不限时</span></span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-4)">
-            这是练习不是考试，抢时间只会练成背答案。
           </div>
           <div class="notice tail" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-info"/></svg>
@@ -1081,16 +1087,9 @@
         </div>
       </div>
 
-      <!-- 首次使用说明：只在第 1 步出现一次，不跟着走完全程 -->
-      <div class="pane" data-when="first" data-at="s1">
-        <div class="pane-hd"><svg class="ic"><use href="#i-help"/></svg><b>这一页帮你做什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            按岗位出题 · 指出哪里没说清 · 打成一张复盘单。<br>
-            不打分，也不预测你能不能过。
-          </div>
-        </div>
-      </div>
+      <!-- 2026-08-10 重心整改：原来这里还有一张 first 态的「这一页帮你做什么」说明卡
+           （按岗位出题 / 指出哪里没说清 / 打成复盘单）—— 页面用途科普，
+           左栏第 1 步本来就在做这三件事，删。 -->
 
     </div>
   </div>

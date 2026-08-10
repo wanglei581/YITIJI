@@ -150,6 +150,21 @@
 .bigc b { display: block; font-family: var(--ff-num); font-size: var(--fz-8); color: var(--fog-900); line-height: 1.1; }
 .bigc span { display: block; font-size: var(--fz-1); color: var(--fog-600); margin-top: 3px; }
 .fee { font-size: var(--fz-2); color: var(--fog-600); line-height: 1.6; margin: 8px 0 0; }
+
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   四个阶段各自的主角是：展位企业 / 场馆图 / 资料勾选 / 现场数字。
+   右副列 348 → 296、页边 56 → 24，宽度还给它们
+   （主功能区占屏 42.4% → 50.6%）。
+   同时删掉右栏四处「还能做什么」里的阶段跳转按钮 —— 那几组和操作栏
+   （左下返回 + 中间次按钮 + 右下主按钮）逐个重复，也是典型的"顺便看看"；
+   阶段之间怎么切，rail 上四个标签一直都在。 */
+.work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
 </style>
 </head>
 <body>
@@ -419,13 +434,16 @@
         </div>
       </div>
 
-      <!-- 常驻底卡：原型 47 的「如何打印」三步。合并后步骤更短，所以照抄一遍口径。 -->
+      <!-- 2026-08-10 重心整改：原来这里是「怎么打 · 三步」流程科普卡
+           （勾选 → 按主按钮 → 出纸口取）—— 勾选就在上面、主按钮就在右下，
+           照着做即可，不需要先读一遍流程。换成右栏搬过来的取纸事实：
+           这几条是打完之后真会用到的，跟着资料一起看比放在副列合适。 -->
       <div class="pane" data-at="materials" style="flex:0 0 auto">
-        <div class="pane-hd"><span class="t">怎么打</span><span class="s">三步，免费出纸</span></div>
+        <div class="pane-hd"><span class="t">打完怎么取</span><span class="s">出纸口在本机右下方</span></div>
         <div class="kv">
-          <div class="kv-row"><span class="k">第 1 步</span><span class="v">在上面勾选要的几份，可多选</span></div>
-          <div class="kv-row"><span class="k">第 2 步</span><span class="v">按右下角主按钮，一次送去打印台</span></div>
-          <div class="kv-row"><span class="k">第 3 步</span><span class="v">在本机右下方出纸口取走</span></div>
+          <div class="kv-row"><span class="k">多份同时打</span><span class="v">按勾选顺序依次出，不用一份份点</span></div>
+          <div class="kv-row"><span class="k">打完去哪看</span><span class="v">打印订单里有这一单</span></div>
+          <div class="kv-row"><span class="k">要再打一份</span><span class="v">7 天内凭取件码复打</span></div>
         </div>
       </div>
 
@@ -496,26 +514,10 @@
         </div>
       </div>
 
-      <div class="pane pane--fill" data-at="booth">
-        <div class="pane-hd"><span class="t">还能做什么</span></div>
-        <div class="outs">
-          <a class="out" href="11-jobfit-compare.html?stage=s1&amp;need=job" data-when="default device-off"><svg class="ic"><use href="#i-target"/></svg>拿这个岗位去比对</a>
-          <button class="out" aria-disabled="true" data-when="first ai-down"><svg class="ic"><use href="#i-target"/></svg>比对不可用</button>
-          <button class="out" data-go="map"><svg class="ic"><use href="#i-map"/></svg>看它在场馆哪</button>
-          <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P45&amp;kind=job-list&amp;title=展位企业岗位清单&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印岗位清单</a>
-          <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" data-go="materials"><svg class="ic"><use href="#i-file"/></svg>拿活动资料</button>
-        </div>
-      </div>
-
-      <div class="pane" data-at="booth">
-        <div class="pane-hd"><span class="t">其余 9 个岗位在哪</span></div>
-        <div class="kv">
-          <div class="kv-row"><span class="k">现场</span><span class="v">A12 展位有全部岗位表</span></div>
-          <div class="kv-row"><span class="k">线上</span><span class="v">来源平台的企业页</span></div>
-          <div class="kv-row"><span class="k">本机只同步了</span><span class="v v--fog">3 个 · 不替它补齐</span></div>
-        </div>
-      </div>
+      <!-- 2026-08-10 重心整改：这里原来是「还能做什么」（比对 / 看场馆 / 打印 / 拿资料）
+           和「其余 9 个岗位在哪」两块。前者四个按钮里三个与 rail 标签或操作栏重复；
+           后者左栏在招岗位下面那句 fee 已经写过（"其余 9 个岗位在现场展位或来源平台可查"），
+           同一件事说两遍。两块都删。产物去向（打印岗位清单）留在操作栏主按钮。 -->
 
       <div class="pane pane--fill pane--grow" data-at="booth">
         <div class="pane-hd"><span class="t">现场怎么走这一家</span></div>
@@ -616,11 +618,10 @@
           <div class="kv-row"><span class="k">打什么</span><span class="v">分区图 + 展位顺序</span></div>
           <div class="kv-row"><span class="k">几页</span><span class="v">1 页 · A4 · 免费</span></div>
         </div>
+        <!-- 阶段跳转（看 A12 企业 / 看现场数据）已删：rail 四个标签一直在。 -->
         <div class="outs">
           <a class="out" href="06-print-workbench.html?stage=s3&amp;from=P45&amp;kind=fair-plan&amp;title=展位图与逛展顺序&amp;pages=1&amp;copies=1" data-when="default first ai-down"><svg class="ic"><use href="#i-printer"/></svg>打印图与顺序</a>
           <button class="out" aria-disabled="true" data-when="device-off"><svg class="ic"><use href="#i-printer"/></svg>打印机离线</button>
-          <button class="out" data-go="booth"><svg class="ic"><use href="#i-building"/></svg>看 A12 企业</button>
-          <button class="out" data-go="stats"><svg class="ic"><use href="#i-layers"/></svg>看现场数据</button>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -652,19 +653,14 @@
         </div>
       </div>
 
+      <!-- 原来这里叫「还能做什么」，四个 kv 已搬到左栏资料下方（打完怎么取），
+           四个阶段跳转按钮已删（rail 标签 + 返回键都到得了）。 -->
       <div class="pane pane--fill pane--grow" data-at="materials">
-        <div class="pane-hd"><span class="t">还能做什么</span></div>
+        <div class="pane-hd"><span class="t">这批资料的来源</span></div>
         <div class="kv" style="margin-bottom:var(--s-3)">
-          <div class="kv-row"><span class="k">取纸</span><span class="v">本机右下方出纸口</span></div>
-          <div class="kv-row"><span class="k">多份同时打</span><span class="v">按勾选顺序依次出</span></div>
-          <div class="kv-row"><span class="k">打完去哪看</span><span class="v">打印订单里有这一单</span></div>
-          <div class="kv-row"><span class="k">要再打一份</span><span class="v">7 天内凭取件码复打</span></div>
-        </div>
-        <div class="outs">
-          <button class="out" data-go="map"><svg class="ic"><use href="#i-map"/></svg>先看展位图</button>
-          <button class="out" data-go="stats"><svg class="ic"><use href="#i-layers"/></svg>看现场数据</button>
-          <button class="out" data-go="booth"><svg class="ic"><use href="#i-building"/></svg>回展位企业</button>
-          <a class="out" href="36-fairs-hub.html"><svg class="ic"><use href="#i-fair"/></svg>换一场看</a>
+          <div class="kv-row"><span class="k">上传方</span><span class="v">主办方 · 市就业服务中心</span></div>
+          <div class="kv-row"><span class="k">费用</span><span class="v">主办方资料 · 免费</span></div>
+          <div class="kv-row"><span class="k">未开放的</span><span class="v v--fog">交通指引 · 主办方更新中</span></div>
         </div>
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-info"/></svg>
@@ -703,12 +699,7 @@
           <div class="kv-row"><span class="k">数字有疑问</span><span class="v">找现场咨询服务台</span></div>
           <div class="kv-row"><span class="k">能打印吗</span><span class="v v--fog">现场数据不提供打印</span></div>
         </div>
-        <div class="outs">
-          <button class="out" data-go="map"><svg class="ic"><use href="#i-map"/></svg>看场馆导览</button>
-          <button class="out" data-go="booth"><svg class="ic"><use href="#i-building"/></svg>看展位企业</button>
-          <button class="out" data-go="materials"><svg class="ic"><use href="#i-file"/></svg>拿活动资料</button>
-          <a class="out" href="36-fairs-hub.html"><svg class="ic"><use href="#i-fair"/></svg>换一场看</a>
-        </div>
+        <!-- 阶段跳转与「换一场看」已删：rail 四个标签 + 返回键都到得了。 -->
         <div class="notice" style="margin-top:auto">
           <svg class="ic"><use href="#i-shield"/></svg>
           <span>只统计服务行为，<b>不含任何求职者个人信息。</b></span>

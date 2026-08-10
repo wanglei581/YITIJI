@@ -173,6 +173,21 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
 /* 全站统一标签口径：AI 卡「AI · 仅供参考」/ 非 AI 卡「不依赖 AI」/ ai-down 时改「AI · 已降级」 */
 .chip--label { cursor: inherit; }
 .wside .pane--grow > .sec { min-height: 0; overflow-y: auto; }
+
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   本页主角是版式卡本身（看它、选它、带它走）。右副列 348 → 296、
+   页边 56 → 24，宽度还给版式预览（主功能区占屏 45.1% → 51%）。
+   同时删掉右栏整块「下一步会发生什么」—— 它讲的"本页不保存、不套用、
+   只把 templateId 挂在出口上"，左栏顶部通知与三个出口的说明里各写过一遍，
+   全页第三遍；并删掉操作栏的「去材料工厂」横向入口
+   （12 另有 6 处入口，且折叠区里那条链接仍在，路径没断）。 */
+.work { grid-template-columns: 1fr 296px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
 </style>
 </head>
 <body>
@@ -209,7 +224,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
            原来这里和右栏各写一遍，同义重复（Codex 2026-08-10）。 -->
       <div class="notice">
         <svg class="ic"><use href="#i-book"/></svg>
-        <span><b>选择只代表版式参考，本页不会替你生成或套用简历。</b>正式内容要在后面的流程里结合你自己的经历生成；你在这里选中的版式，会作为参数带进优化与打印那两步。</span>
+        <span><b>选择只代表版式参考，本页不生成、不套用、不保存。</b>选中的版式会作为参数带进优化与打印那两步。</span>
       </div>
 
       <div class="flt" role="group" aria-label="简历素材分类">
@@ -280,10 +295,8 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           <span class="aibox-t">按岗位方向推荐素材：现在给不了</span>
           <span class="chip chip--amber chip--label">AI · 已降级</span>
         </div>
-        <div class="aibox-ln"><span class="k">不可用的</span>只有「按岗位方向挑素材」这一条，它要模型判断。本机已自动上报运维，<b>恢复时间以现场公告为准</b>。</div>
-        <div class="aibox-ln"><span class="k">照常的</span>上面的<b>分类浏览、选中版式、版式预览、打印带走</b>都不依赖 AI，现在全都能用。</div>
-        <div class="aibox-ln"><span class="k">自己挑的话</span>单栏版式适合大多数岗位，也最容易被招聘系统正确读取，先按它准备内容不会错。</div>
-        <div class="aibox-ln"><span class="k">要留档的话</span>先把版式打印带走，等 AI 恢复再回来做优化，材料不用重做。</div>
+        <div class="aibox-ln"><span class="k">不可用的</span>只有「按岗位方向挑素材」这一条，已上报运维，<b>恢复时间以现场公告为准</b>。</div>
+        <div class="aibox-ln"><span class="k">照常的</span><b>分类浏览、选中版式、版式预览、打印带走</b>都不依赖 AI。</div>
       </div>
 
       <details class="fold">
@@ -348,18 +361,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
             <div class="kv-row"><span class="k">段落顺序</span><span class="v">共 7 段</span></div>
           </div>
           <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
-            抬头 → 个人概述 → 教育经历 → 工作经历 → 项目经历 → 技能 → 证书。
-            这七段的顺序来自线上库的版式配置，不是本页排的。
-          </div>
-        </div>
-      </div>
-
-      <div class="pane">
-        <div class="pane-hd"><svg class="ic"><use href="#i-info"/></svg><b>下一步会发生什么</b></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            进入 AI 简历优化后，系统会<b>基于你自己的内容</b>生成正式简历，版式在优化页里<b>重新确认一次</b>。<br>
-            本页<b>不保存、也不套用</b>任何模板 —— 选中只是把 <b>templateId</b> 挂在下面几个出口上带过去，本页自己什么都不写库。
+            抬头 → 个人概述 → 教育 → 工作 → 项目 → 技能 → 证书（线上库配置）。
           </div>
         </div>
       </div>
@@ -376,12 +378,12 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
              href="09-resume-workbench.html?stage=s1&amp;intent=optimize&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-pen"/></svg>
             <span class="exit-b"><span class="exit-t">套用到简历优化</span>
-              <span class="exit-s">进去<b>先选你的简历</b>，再带着这个版式方向逐条改；改写按条采纳，原件只新增版本不覆盖。</span></span>
+              <span class="exit-s">进去<b>先选你的简历</b>，再带这个版式方向逐条改；原件只新增版本不覆盖。</span></span>
           </a>
           <div class="exit exit--off" data-when="ai-down">
             <svg class="ic"><use href="#i-offline"/></svg>
             <span class="exit-b"><span class="exit-t">套用到简历优化：现在按不动</span>
-              <span class="exit-s">改写要模型生成，AI 中断期间这一步做不了。<b>浏览、选中版式、预览、打印照常</b> —— 先打印带走，等恢复了再回来改。</span></span>
+              <span class="exit-s">改写要模型生成，中断期间做不了。<b>浏览、选版式、打印照常</b>。</span></span>
           </div>
 
           <a class="exit" data-when="default first ai-down" data-tpl-link
@@ -389,7 +391,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
              href="06-print-workbench.html?stage=s3&amp;from=P33&amp;kind=template&amp;title=简历版式样张&amp;templateId=resume-template-clean">
             <svg class="ic"><use href="#i-printer"/></svg>
             <span class="exit-b"><span class="exit-t">打印带走</span>
-              <span class="exit-s">按标准文档流程送进打印工作台；<b>金额以打印工作台核价与现场公示价为准</b>，本页不出价。</span></span>
+              <span class="exit-s">送进打印工作台；<b>金额以核价与现场公示价为准</b>，本页不出价。</span></span>
           </a>
           <div class="exit exit--off" data-when="device-off">
             <svg class="ic"><use href="#i-offline"/></svg>
@@ -404,8 +406,8 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
           <a class="exit" href="42-my-assets.html?stage=docs&amp;from=P33">
             <svg class="ic"><use href="#i-folder"/></svg>
             <span class="exit-b"><span class="exit-t">查看我的文档</span>
-              <span class="exit-s" data-when="default ai-down device-off">打开「我的文档」看已有的简历与材料。<b>本页不保存任何东西</b>，保存发生在优化或打印那一步。</span>
-              <span class="exit-s" data-when="first">打开「我的文档」<b>需要登录</b>；不登录可以照常浏览、选版式和打印，只是没有本人文档可看。</span></span>
+              <span class="exit-s" data-when="default ai-down device-off">看已有的简历与材料。<b>本页不保存任何东西</b>。</span>
+              <span class="exit-s" data-when="first">打开「我的文档」<b>需要登录</b>；不登录照常浏览、选版式和打印。</span></span>
           </a>
         </div>
       </div>
@@ -418,9 +420,6 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
             <div class="kv-row"><span class="k">你选中的版式</span><span class="v v--fog">不落库 · 只随链接带走</span></div>
             <div class="kv-row"><span class="k">你填的目标岗位</span><span class="v v--fog">离场即清</span></div>
             <div class="kv-row"><span class="k">查看我的文档</span><span class="v">需登录</span></div>
-          </div>
-          <div class="panel-note" style="margin-top:var(--s-3);line-height:1.6">
-            这四条现在就成立，和有没有登录无关。
           </div>
         </div>
       </div>
@@ -435,7 +434,7 @@ a.exit:hover { border-color: var(--jade-a32); transform: translateY(-1px); }
     <!-- 原来这里还有一个「回 AI简历服务」的 ghost 按钮，和左边 backbtn 去的是同一页 ——
          重复入口，还把 .actionbar-hint 挤到 0 宽（提示文字折成十来行、溢出操作条 160px+，
          自检按"卡内溢出"报硬缺陷）。删掉重复的那个，返回仍走 backbtn。 -->
-    <a class="btn btn--lg btn--ghost" href="12-material-factory.html"><svg class="ic"><use href="#i-package"/></svg>去材料工厂</a>
+    <!-- 「去材料工厂」横向入口已删（见页首整改说明）；折叠区里那条链接仍在。 -->
 
     <!-- 这一栏净宽只剩约 140px（左边四个按钮 + 右边主按钮之后的余量），
          提示句必须短，且**不要用带空格的「 · 」分隔**：空格给了换行机会，

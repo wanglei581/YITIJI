@@ -25,6 +25,20 @@
    faq = 常见签约问题静态参考，现在就真实可用。
    固定免责条「仅作风险提示，不构成法律意见」钉在每阶段底部（.legalbar）。 */
 
+/* ── 2026-08-10 重心整改 ────────────────────────────────────────────
+   本页主角：s0 = 本机真实门禁状态，faq = 现在真能用的 8 条。
+   右副列 348 → 280、页边 56 → 24，宽度还给门禁清单与条款卡
+   （主功能区占屏 41.3% → 50.4%）。同时删掉三处重复的免责声明
+   （s0 左、s0 右各写过一遍，与底部 .legalbar 同义）和两段解释设计意图的话
+   （「这台机器不拿你的合同当测试品」「为什么要逐条同意」的长篇理由）。 */
+.work { grid-template-columns: 1fr 280px; padding: var(--s-5) var(--s-6); }
+/* 副列变窄后，kv 左侧标签会被长值挤成两行（「投递在/哪」）。
+   标签不折行、值去折行 —— 值本来就是整句，折了也读得顺。 */
+.wside .kv-row { align-items: flex-start; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+.wside .kv-row .k { flex: 0 0 auto; white-space: nowrap; }
+.wside .kv-row .v { flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+
+
 /* 通用小节容器（本页自定，共享样式里没有 .sec 通用定义） */
 .sec { display:flex; flex-direction:column; gap:var(--s-3); }
 .pane--grow > .sec { flex:1 1 auto; min-height:0; overflow-y:auto; }
@@ -210,10 +224,8 @@
           <div class="lock-t">签约风险提示还没开放</div>
           <div class="lock-p">
             这项服务能把你的合同<b>逐条对照法律规定</b>，把值得核对的条款标出来。
-            流程、脱敏、安全门这些底子<b>已经建好</b>，
-            但它要过完下面<b>六道发布门禁</b>才允许对外服务 ——
-            现在一项都没过完，开关保持关闭。<br><br>
-            不是坏了，是<b>还不能用</b>。第 6 步的常见签约问题不受影响，现在就能看。
+            它要过完下面<b>六道发布门禁</b>才允许对外服务 —— 现在一项都没过完，
+            开关保持关闭。<b>不是坏了，是还不能用。</b>
           </div>
         </div>
       </div>
@@ -248,19 +260,19 @@
         </div>
       </div>
 
+      <!-- 原来这一块叫「为什么还不能用」，写的是"这台机器不拿你的合同当测试品"——
+           解释设计意图；底部那条免责与页脚 .legalbar 同义，全页第三遍。
+           改成本机此刻的事实与真正能用的那一步。 -->
       <div class="pane pane--grow" data-at="s0">
-        <div class="pane-hd"><span class="t">为什么还不能用</span></div>
+        <div class="pane-hd"><span class="t">现在这里能做什么</span></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            合同关系到你的钱和权利。AI 给出的每一条提示，都必须先过完监管与法务的这六道门，
-            才允许对你说出口 —— <b>这台机器不拿你的合同当测试品</b>。<br><br>
-            门禁没过完，开关就保持关闭：现在这里<b>收不进任何合同</b>，
+            门禁没过完，这里<b>收不进合同、发不起分析</b>，
             也不会假装分析给你一份看起来像样的结果。
           </div>
           <div class="notice" style="margin-top:auto">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>开放之后它也只做<b>风险提示</b>：帮你把值得核对的条款标出来，
-                  不代替律师，不出具法律意见。</span>
+            <svg class="ic"><use href="#i-check"/></svg>
+            <span>现在真能用的是<b>第 6 步 · 常见签约问题</b>：8 条静态法规参考，不依赖 AI。</span>
           </div>
         </div>
       </div>
@@ -659,10 +671,10 @@
             <button class="fprev" data-go="faq"><svg class="ic"><use href="#i-card"/></svg>
               <span class="fprev-t">什么情况下才能让我付违约金？</span><svg class="ic"><use href="#i-chevron"/></svg></button>
           </div>
-          <div class="panel-note">一共 8 条，不受上面门禁影响。</div>
+          <!-- 原来这里的免责与页脚 .legalbar 逐字同义（全页第二遍），删。 -->
           <div class="notice" style="margin-top:auto">
-            <svg class="ic"><use href="#i-shield"/></svg>
-            <span>开放之后这页也只做<b>风险提示</b>：不代替律师，不出具法律意见，重要合同请咨询专业律师或劳动保障部门。</span>
+            <svg class="ic"><use href="#i-info"/></svg>
+            <span>一共 <b>8 条</b>，不受上面门禁影响，现在就能看。</span>
           </div>
         </div>
       </div>
@@ -686,9 +698,8 @@
         <div class="pane-hd"><span class="t">为什么要逐条同意</span></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            合同里有你的名字、身份证号、工资数字 —— 这是<b>敏感个人信息</b>。
-            法律要求把「拿什么、怎么用、存多久、谁来处理」<b>逐项讲清并取得单独同意</b>，
-            所以这五项不设「一键全选」，每一项都要你自己看过、自己勾。
+            合同里有你的名字、身份证号、工资数字，属<b>敏感个人信息</b>，
+            法律要求逐项单独同意 —— 所以不设「一键全选」。
           </div>
           <div class="notice" style="margin-top:auto">
             <svg class="ic"><use href="#i-trash"/></svg>
@@ -766,8 +777,8 @@
         <div class="pane-hd"><span class="t">拿到纸之后</span></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            第 3 页的<b>追问清单</b>是给你带去谈判桌的：一条一条问，问完再签。
-            报告不发给任何企业、不进任何库 —— 它只属于你。
+            第 3 页的<b>追问清单</b>拿去谈判桌：一条一条问，问完再签。
+            报告<b>不发给任何企业、不进任何库</b>。
           </div>
           <div class="notice" data-when="device-off">
             <svg class="ic"><use href="#i-folder"/></svg>
@@ -796,8 +807,7 @@
         <div class="pane-hd"><span class="t">没找到你的问题？</span></div>
         <div class="sec">
           <div class="lock-p" style="font-size:var(--fz-3)">
-            这页<b>不做自由输入问答</b> —— 静态参考只答得了通用问题，
-            答不了你的具体合同。你的情况可以走这两条路：
+            静态参考答不了你的具体合同。你的情况走这两条路：
           </div>
           <a class="fprev" href="21-policy.html" style="border-top:1px solid var(--surf-2)">
             <svg class="ic"><use href="#i-policy"/></svg>
@@ -811,17 +821,9 @@
         </div>
       </div>
 
-      <!-- 首次使用：右栏引导（各步都在） -->
-      <div class="pane" data-when="first">
-        <div class="pane-hd"><span class="t">第一次来这页？</span></div>
-        <div class="sec">
-          <div class="panel-note" style="line-height:1.7">
-            现在真实能用的是<b>第 6 步 · 常见签约问题</b>；
-            第 2–5 步是功能开放后的流程示意，看看就好，还发不起真分析。
-          </div>
-          <button class="btn btn--ghost" data-go="faq" style="width:100%">先看常见签约问题</button>
-        </div>
-      </div>
+      <!-- 2026-08-10 重心整改：原来这里还有一张 first 态「第一次来这页？」引导卡，
+           说的和 s0 锁定卡、s1–s4 常驻横幅、s0 右栏那条「现在真能用第 6 步」
+           完全同义（第四遍），按钮也和操作栏的「常见签约问题」重复，删。 -->
 
     </div>
   </div>
