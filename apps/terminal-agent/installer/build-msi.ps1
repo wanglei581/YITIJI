@@ -33,20 +33,21 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-$fragment = Join-Path $OutputDirectory "GeneratedPayload.wxs"
+$resolvedOutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
+$fragment = Join-Path $resolvedOutputDirectory "GeneratedPayload.wxs"
 & (Join-Path $PSScriptRoot "generate-wix-fragment.ps1") -StagingRoot $resolvedStaging -OutputPath $fragment
 if (-not (Test-Path -LiteralPath $fragment -PathType Leaf)) { throw "WiX fragment generation failed" }
 
 $project = Join-Path $PSScriptRoot "AIJobPrintAgent.wixproj"
 & dotnet build $project `
   --configuration Release `
-  --output $OutputDirectory `
+  --output $resolvedOutputDirectory `
   -p:StagingRoot=$resolvedStaging `
   -p:GeneratedFragment=$fragment `
   -p:ProductVersion=$ProductVersion
 if ($LASTEXITCODE -ne 0) { throw "WiX MSI build failed" }
 
-$packages = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter "*.msi" -File)
+$packages = @(Get-ChildItem -LiteralPath $resolvedOutputDirectory -Filter "*.msi" -File)
 if ($packages.Count -ne 1) {
   throw "Expected exactly one MSI output, found $($packages.Count)"
 }

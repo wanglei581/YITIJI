@@ -34,16 +34,17 @@ if ($versionParts[0] -gt 255 -or $versionParts[1] -gt 255 -or $versionParts[2] -
   throw "ProductVersion exceeds Windows Installer bounds: $ProductVersion"
 }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+$resolvedOutputDirectory = (Resolve-Path -LiteralPath $OutputDirectory).Path
 
 $project = Join-Path $PSScriptRoot "AIJobPrintTerminalSetup.wixproj"
 & dotnet build $project `
   --configuration Release `
-  --output $OutputDirectory `
+  --output $resolvedOutputDirectory `
   -p:MsiPath=$resolvedMsi `
   -p:ProductVersion=$ProductVersion
 if ($LASTEXITCODE -ne 0) { throw "WiX Burn EXE build failed" }
 
-$bundles = @(Get-ChildItem -LiteralPath $OutputDirectory -Filter "*.exe" -File)
+$bundles = @(Get-ChildItem -LiteralPath $resolvedOutputDirectory -Filter "*.exe" -File)
 if ($bundles.Count -ne 1) {
   throw "Expected exactly one EXE output, found $($bundles.Count)"
 }
