@@ -988,7 +988,9 @@
 
           <div class="notice tail" style="margin-top:var(--s-4)">
             <svg class="ic"><use href="#i-shield"/></svg>
-            <span>离线时才存「我的文档」，<b>24 小时后自动清理</b>。</span>
+            <!-- 2026-08-10 口径统一：原写 24 小时，与全站基准表（我的 · 账号设置 · 文件保存期限）打架。
+                 复盘单属一般文档 90 天；「你答的内容从不保存」是另一行，不受影响。 -->
+            <span>离线时才存「我的文档」，属一般文档 <b>90 天后自动清理</b>；你答的内容仍然<b>从不保存</b>。</span>
           </div>
         </div>
       </div>
@@ -1045,7 +1047,8 @@
     <span class="actionbar-hint" data-at="s2" data-when="ai-down">第 <span data-f="h-qi2">1</span> 题 / 共 <span data-f="h-qm2">8</span> 题 · 答完不会有点评</span>
     <span class="actionbar-hint" data-at="s3" data-when="default first device-off"><span data-f="h-s3">还没作答</span></span>
     <span class="actionbar-hint" data-at="s3" data-when="ai-down"><span data-f="h-s3b">已答 0 题 · 本次无点评</span></span>
-    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down"><span data-f="h-s4">预估 0.20 元 · 以打印工作台核价为准</span></span>
+    <span class="actionbar-hint" data-at="s4" data-when="default first ai-down"><!-- 2026-08-10 全量回归修：hint 被挤窄后换行恰好落在「·」前，中文排版禁则。
+                 分隔点用 &nbsp; 绑到前一段，不让它起行。 --><span data-f="h-s4">预估 0.20 元&nbsp;· 以打印工作台核价为准</span></span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off"><span data-f="h-s4b">打印机离线 · 先存文档再扫码带走</span></span>
 
     <button class="btn btn--primary" data-at="s1" data-when="default device-off" data-go="s2" data-act="start">开始作答<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -1727,10 +1730,14 @@
     set('p-pages', n); set('t-pages', n)
     set('c-pages', n); set('c-fee', fee)
     set('f-pages', n); set('f-fee', fee)
-    set('h-s4', n > 0 ? '预估 ' + fee + ' 元 · 以打印工作台核价为准'
-                      : '三项都没勾 · 这一单不会打印，也不计费')
-    set('h-s4b', n > 0 ? '打印机离线 · 先存文档再扫码带走'
-                       : '三项都没勾 · 没有可存的内容')
+    /* 2026-08-10 全量回归修：这四条会用 innerHTML 覆盖 HTML 里的文案 ——
+       只改标签里的 &nbsp; 是白改。操作栏 hint 被挤窄后换行恰好落在「·」前
+       （中文排版禁则，实测 default / first / ai-down 三态各 1 处）。
+       分隔点一律用 &nbsp; 绑到前一段。 */
+    set('h-s4', n > 0 ? '预估 ' + fee + ' 元&nbsp;· 以打印工作台核价为准'
+                      : '三项都没勾&nbsp;· 这一单不会打印，也不计费')
+    set('h-s4b', n > 0 ? '打印机离线&nbsp;· 先存文档再扫码带走'
+                       : '三项都没勾&nbsp;· 没有可存的内容')
     setHandoff(n)
   }
 

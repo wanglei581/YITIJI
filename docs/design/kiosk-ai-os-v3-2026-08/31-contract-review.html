@@ -837,14 +837,23 @@
       <a class="backbtn" href="32-resume-hub.html" data-parent-label="AI 简历服务"><svg class="ic"><use href="#i-chevron" style="transform:rotate(180deg);transform-origin:center"/></svg><span class="backbtn-t">返回<span class="backbtn-sub">AI 简历服务</span></span></a>
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <button class="btn btn--lg btn--ghost" data-at="s0" data-go="faq">常见签约问题</button>
-    <button class="btn btn--lg btn--ghost" data-at="s1 s2 s3 s4" data-go="s0">回本机状态</button>
+    <!-- 2026-08-10 全量回归修：s2 / s3 这两步操作栏原来同时挂着「回本机状态」和
+         「取消并删除」，连同返回键、需要帮助、主按钮共五个控件把 968px 净宽占满，
+         留给 hint 只剩 8px —— 提示整条画到操作栏外（实测溢出 165px，四态全中）。
+         口径：只摘 s2 / s3 的「回本机状态」，不摘「取消并删除」——
+         后者是删除已上传合同的隐私动作，必须留；前者是快捷跳转，
+         按返回键逐级退到 s1 仍然到得了（stage.js「返回 = 上一级」），路径没断。 -->
+    <button class="btn btn--lg btn--ghost" data-at="s1 s4" data-go="s0">回本机状态</button>
     <button class="btn btn--lg btn--ghost" data-at="s2 s3">取消并删除</button>
     <button class="btn btn--lg btn--ghost" data-at="faq" data-go="s0">回本机状态</button>
 
     <span class="actionbar-hint" data-at="s0">功能未开放 · 六项门禁完成后才会开放，不提前、不例外</span>
     <span class="actionbar-hint" data-at="s1" data-when="default first device-off">示意 · 开放后需五项知情同意全部勾选才能继续</span>
     <span class="actionbar-hint" data-at="s1" data-when="ai-down">AI 暂不可用 · 不能发起新的合同分析</span>
-    <span class="actionbar-hint" data-at="s2">示意 · 你确认页数与类型之后，分析才继续往下走</span>
+    <!-- 同上：压到腾出来的宽度放得下的长度。「这是示意不是真分析」由 s1–s4 常驻
+         横幅（「这是开放后的流程示意，不是本机当前状态」）承担，不靠这一行兜合规。
+         「·」用 &nbsp; 绑住前一段，换行时不让它起行（中文排版禁则）。 -->
+    <span class="actionbar-hint" data-at="s2">示意&nbsp;· 确认后才继续</span>
     <span class="actionbar-hint" data-at="s3">缺口与局限已逐条标明</span>
     <span class="actionbar-hint" data-at="s4" data-when="default first ai-down">A4 · 3 页 · 黑白</span>
     <span class="actionbar-hint" data-at="s4" data-when="device-off">打印机离线 · 先存「我的文档」，换机或恢复后再打</span>

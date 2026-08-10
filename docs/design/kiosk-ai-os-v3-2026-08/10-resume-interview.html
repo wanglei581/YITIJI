@@ -44,7 +44,11 @@
   .qa-opt:hover { border-color: var(--jade-500); background: var(--jade-a12); }
   .qa-opt b { font-family: var(--ff-num); font-size: var(--fz-2); color: var(--fog-600); }
   .qa-free { display: flex; gap: var(--s-4); align-items: stretch; }
-  .qa-said { display: flex; flex-direction: column; gap: var(--s-3); overflow-y: auto; }
+  /* 2026-08-10 全量回归修：本来就写了 overflow-y:auto，但在 flex 列里
+     默认 flex:0 1 auto + min-height:auto —— 压不到内容高度以下，滚动条永远不出现，
+     第 10 条「联系方式」直接画到 .pane 外面（实测溢出 3px，主检测器看不见）。
+     补 flex:1 1 auto + min-height:0，让它真的能滚（同 P09 .issues 的既有写法）。 */
+  .qa-said { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: var(--s-3); overflow-y: auto; }
   .said {
     display: flex; gap: var(--s-4); align-items: flex-start;
     padding: var(--s-4); border-radius: var(--r-sm);

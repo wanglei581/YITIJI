@@ -437,7 +437,12 @@
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="t1">
-        <div data-when="default device-off"><div class="t" data-out="hint1">写给：用户运营专员 · 约 320 字 · 务实</div><div class="s">黄底三处是槽位：公司全称、来源平台、署名，要你自己核</div></div>
+        <!-- 2026-08-10 全量回归修：t1 这条最长，而 t1 的主按钮也最宽（核对 3 处后去核价打印），
+             操作栏留给 hint 的净宽只有 103px —— 两行文字被挤成 7 行、块高 152px，
+             从 118px 高的操作栏底下漏出去 17px（压在导航条上）。
+             这两句右栏本来就有：字数见槽位卡「长度 · 实际约 N 字」，
+             三处槽位见槽位卡整段说明。操作栏只留最短提示，信息一个字没丢。 -->
+        <div data-when="default device-off"><div class="t" data-out="hint1">写给用户运营专员</div><div class="s">三处槽位要你核对</div></div>
         <div data-when="ai-down"><div class="t">求职信生成不可用</div><div class="s">可打印空白格式纸手写</div></div>
         <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写求职信</div></div>
       </div>
@@ -447,7 +452,9 @@
         <div data-when="first"><div class="t">先得有简历</div><div class="s">做完简历再回来写口述稿</div></div>
       </div>
       <div data-at="t3">
-        <div data-when="default device-off"><div class="t" data-out="hint3">6 样里已有 3 样，还差 3 样</div><div class="s">清单来自主办方公告原文，不是模型凭经验列的</div></div>
+        <!-- 同上：device-off 的 t3 主按钮是「发到我手机 · 扫码带走」，同样把 hint 挤爆。
+             「来自主办方公告原文」在左栏清单卡里已逐条标注来源。 -->
+        <div data-when="default device-off"><div class="t" data-out="hint3">已有 3 样 · 差 3 样</div><div class="s">来自主办方公告原文</div></div>
         <div data-when="ai-down"><div class="t">清单照常显示，不依赖 AI</div><div class="s">只有「哪些你已经有了」需要读你的材料</div></div>
         <div data-when="first"><div class="t">清单可以看，勾选状态需要你的材料</div><div class="s">没有材料时只显示该带什么</div></div>
       </div>
@@ -685,7 +692,8 @@
     set('stepLb', L.stepLb); set('copiesUnit', L.unit); set('copies', P.copies); set('pfItem', L.pf)
     set('ckCount', have + ' / ' + items.length + ' 已有')
     set('ckLack', '还差 ' + (items.length - have) + ' 样')
-    set('hint3', items.length + ' 样里已有 ' + have + ' 样，还差 ' + (items.length - have) + ' 样')
+    /* 2026-08-10 全量回归修：同 hint1，脚本覆盖会盖掉 HTML 里的短文案 */
+    set('hint3', '已有 ' + have + ' 样 · 差 ' + (items.length - have) + ' 样')
     if (window.v3ApplyVisibility) window.v3ApplyVisibility()
   }
 
@@ -699,7 +707,9 @@
     set('fmeta', 'A4 · 1 页 · 约 ' + L.chars + ' 字')
     set('pfLen', '实际约 ' + L.chars + ' 字')
     set('pfTone', P.tone + '语气 · 第 ' + (P.variant % 2 + 1) + ' 版措辞')
-    set('hint1', '写给：' + j.nm + ' · 约 ' + L.chars + ' 字 · ' + P.tone)
+    /* 2026-08-10 全量回归修：这条会覆盖 HTML 里的短文案，不改这里等于白改。
+       字数与语气两项在右栏槽位卡（pfLen / pfTone）已有，操作栏只留「写给谁」。 */
+    set('hint1', '写给' + j.nm)
     setSeg('tone', P.tone); setSeg('len', P.len); setSeg('weak', P.weak)
     /* T2 */
     html('txt30', S.s30); html('txt60', S.s60)

@@ -167,7 +167,8 @@
             <span class="verrand-cost" data-when="default"><span>约 40 秒</span><span>免费</span><span>结果进「我的简历」</span></span>
             <span class="verrand-cost" data-when="first"><span>不收费</span><span>不需要登录</span><span>离场自动清空</span></span>
             <span class="verrand-cost" data-when="ai-down"><span>打印、扫描、上传、浏览正常</span><span>不影响已支付订单</span></span>
-            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>文件保留 7 天</span></span>
+            <!-- 2026-08-10 口径统一：这里存的是简历/求职材料 = 一般文档，基准表 90 天（原写 7 天串到取件码口径） -->
+            <span class="verrand-cost" data-when="device-off"><span>约 10 秒</span><span>免费</span><span>登录后存 90 天</span></span>
             <button class="btn btn--quiet" data-when="default" style="text-decoration:underline;text-underline-offset:4px">跳过，直接打印</button>
             <button class="btn btn--quiet" data-when="ai-down device-off" style="text-decoration:underline;text-underline-offset:4px">查看设备状态</button>
           </div>

@@ -48,8 +48,13 @@
   .screen[data-src="local"] [data-src]:not([data-src~="local"]),
   .screen[data-src="phone"] [data-src]:not([data-src~="phone"]),
   .screen[data-src="phone-got"] [data-src]:not([data-src~="phone-got"]),
-  .screen[data-src="usb"]   [data-src]:not([data-src~="usb"]),
-  .screen[data-src="usb-in"][data-src]:not([data-src~="usb-in"]),
+  /* 2026-08-10 全量回归删除：原来这里还抄了 P06 的 usb / usb-in 两行。
+     本页**没有 U 盘这条来源** —— 全文没有 data-src-go="usb"，也没有任何
+     带 usb / usb-in 令牌的门控元素，两行是从打印工作台复制过来的残留。
+     而且 usb-in 那一行还漏了后代组合子（写成 .screen[…][data-src]，
+     选中的是 .screen 自己），导致真把 data-src 置成 usb-in 时门控**失效开门**：
+     六种来源的内容同时显示、互相叠字。回归实测该状态下 内部裁切严重 3 /
+     卡内溢出 1 / 标点在行首 3。删掉死规则，不给一个不存在的状态留后门。 */
   .screen[data-file="none"] [data-file]:not([data-file~="none"]),
   .screen[data-file="on"]   [data-file]:not([data-file~="on"]) { display: none !important; }
 
@@ -124,6 +129,25 @@
   /* s3「可改点」：4 条比右栏高时，让列表自己滚，别把最后一条画到卡片外面
      （实测溢出 34px —— 不裁不滚，两段字叠着，主检测器看不见）。 */
   .wside .pane--fill > .issues { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+  /* 来源回执（2026-08-10 补）：解析阶段顶上先说清「这份是谁送来的」。
+     样式抄 P06 的 .receipt —— 同一个语义在全站长一个样，用户不用重新认。 */
+  .receipt { flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-3) var(--s-5); border-radius: var(--r-md);
+    background: var(--jade-a12); border: 1px solid var(--jade-a32); }
+  .receipt .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+  .receipt-t { font-size: var(--fz-3); color: var(--fog-900); line-height: 1.5; }
+
+  /* 本域次要入口：主返回键按 ?from= 改去来源域之后，AI 简历服务域首屏不能没有门。
+     只在返回键被改走时由脚本插入；虚线边框表示它是次要出口，不抢主返回键。 */
+  .actionbar > .altbtn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+    min-height: 56px; padding: 0 var(--s-4); margin-right: var(--s-3);
+    white-space: nowrap; border-radius: var(--r-md); text-decoration: none;
+    background: transparent; border: 1px dashed var(--brd-2); color: var(--fog-700);
+    font-family: var(--ff-ui); font-size: var(--fz-2); cursor: pointer;
+  }
+  .actionbar > .altbtn:hover { border-color: var(--jade-a32); color: var(--fog-900); }
 </style>
 </head>
 <body>
@@ -351,6 +375,15 @@
           <button data-job-btn="upfail">上传失败</button>
           <button data-job-btn="parsefail">解析失败</button>
           <button data-job-btn="ocrlow">识别置信低</button>
+        </div>
+
+        <!-- 来源回执：只在带 ?from=&src= 进来时由页尾脚本填内容并显示。
+             不带参数时保持 hidden，页面与原来完全一致（回归基线不变）。
+             刻意不挂 data-when/data-at/data-pay/data-job —— stage.js 的
+             applyVisibility() 独占 hidden，挂上去会被它按四态/阶段重算掉。 -->
+        <div class="receipt" id="p09-handoff" hidden>
+          <svg class="ic"><use href="#i-check"/></svg>
+          <span class="receipt-t" id="p09-handoff-t"></span>
         </div>
 
         <!-- 2026-08-09 留白复核：device-off 补入解析画面 —— 打印机离线不影响 AI 解析 -->
@@ -847,7 +880,8 @@
             <span class="relay-t" style="font-size:var(--fz-4)">扫码把 v2 带走</span>
             <div class="kv">
               <div class="kv-row"><span class="k">带走的是</span><span class="v">简历 v2 · PDF · 3 页</span></div>
-              <div class="kv-row"><span class="k">同时</span><span class="v">存进「我的文档」保留 7 天</span></div>
+              <!-- 2026-08-10 口径统一：简历属一般文档，基准表 90 天（原写 7 天是取件码口径） -->
+              <div class="kv-row"><span class="k">同时</span><span class="v">存进「我的文档」保留 90 天</span></div>
               <div class="kv-row"><span class="k">之后</span><span class="v">凭手机号在任一台空闲机器打印</span></div>
             </div>
           </span>
@@ -903,7 +937,12 @@
       </div>
       <div data-at="s2">
         <div data-when="default first device-off" data-job="ok"><div class="t">正在解析，约 40 秒</div><div class="s">免费 · 可改点的数量要看完全文才知道</div></div>
-        <div data-when="ai-down" data-job="ok"><div class="t">解析中断，你的文件没有丢</div><div class="s">可直接打印或存进「我的文档」</div></div>
+        <!-- 2026-08-10 全量回归修：这一格是 s2 里最挤的一态 —— 主按钮最长（带去打印…），
+             再加上带 ?from= 进来时插入的「本域首页」次要入口，留给 hint 只剩 86px，
+             两行文字被挤成 154px、从 118px 高的操作栏漏出去 18px。
+             压短到一行放得下；「可打印 / 可存档」两条出路主区 .locked 卡里各有一个真按钮，
+             主按钮自己也写着「带去打印」，信息没丢。 -->
+        <div data-when="ai-down" data-job="ok"><div class="t">解析中断，文件没有丢</div><div class="s">可打印或存档</div></div>
         <div data-job="upfail"><div class="t">文件没传上来，没收费</div><div class="s">回第 1 步重新上传，或换个来源</div></div>
         <div data-job="parsefail"><div class="t">读不出文字，你的文件完好</div><div class="s">可按图片识别再试，或直接打印、存档</div></div>
         <div data-job="ocrlow"><div class="t">第 2 页识别置信度偏低</div><div class="s">先核对这一页，你确认后才进诊断</div></div>
@@ -938,7 +977,8 @@
     <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="none" aria-disabled="true">先选文件</button>
     <button class="btn btn--primary" data-at="s1" data-src="local phone-got" data-file="on" data-go="s2">解析这份 · <span data-picked-pg>3 页</span><svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" aria-disabled="true" data-when="default first device-off" data-job="ok">解析中…</button>
-    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去打印：原件 1 份 · 共 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
+    <!-- 同上：份数是默认的 1，交接链接里 copies=1 原样保留，按钮上不再重复占宽 -->
+    <a class="btn btn--primary" data-at="s2" data-when="ai-down" data-job="ok" href="06-print-workbench.html?stage=s3&amp;from=P09&amp;kind=material&amp;title=简历原件&amp;pages=3&amp;copies=1&amp;back=s2">带去打印：原件 3 页<svg class="ic"><use href="#i-printer"/></svg></a>
     <button class="btn btn--primary" data-at="s2" data-job="upfail" data-go="s1">重新上传<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="parsefail" data-job-go="ocrlow">按图片识别再试<svg class="ic"><use href="#i-arrowRight"/></svg></button>
     <button class="btn btn--primary" data-at="s2" data-job="ocrlow" data-job-go="ok" data-go="s3">核对完了，进诊断<svg class="ic"><use href="#i-arrowRight"/></svg></button>
@@ -1036,6 +1076,132 @@
     if (f) file(f.getAttribute('data-file-go'))
   })
   src('none')
+})()
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P09 · 消费 ?from=&src=（2026-08-10 收口 · 与 06/07/12/18 同一份登记表）
+   --------------------------------------------------------------------------
+   缺口：P07 扫描台在「送 AI 简历诊断」里发的是
+     09-resume-workbench.html?stage=s2&from=P07&src=scan
+   本页一个参数都不读 —— 用户按下去落在「正在解析」，画面上是
+   「个人简历.pdf · A4 · 3 页」这份**原型样例**，跟他刚扫的那几页毫无关系，
+   而且左下返回键写死回「AI 简历服务」，刚才那条扫描线索直接断掉。
+
+   本轮补两件事：
+     ① s2 顶上出来源回执：「本次材料来自：扫描站 · 纸质简历」
+        —— 只写来源，**不改下面的样例页面**。参数无权改写本机对文件的读数，
+           这条规矩与 P06 收件端一致（那边也只改回执，不改体检结论）。
+     ② 返回键按 ?from= 查域登记表：来源在别的域 → 返回键指回真实来源域，
+        右边补一个「AI 简历服务首页」次要入口（既回得去业务域，也回得了本域）。
+   参数缺失 / 不认识 → 回执不出现、返回键一个字不改（现有行为）。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var q
+  try { q = new URLSearchParams(location.search) } catch (e) { return }
+  function pick (v, re, max) {
+    v = (v == null ? '' : String(v)).replace(re, '')
+    return v.length > max ? v.slice(0, max) : v
+  }
+  var from = pick((q.get('from') || '').toUpperCase(), /[^A-Z0-9]/g, 6)
+  var src  = pick((q.get('src') || '').toLowerCase(), /[^a-z-]/g, 12)
+
+  /* ── ① 来源回执 ────────────────────────────────────────────────────── */
+  /* 来源页登记表：页号 → 送料时用户看到的那个名字。不认识就不写来源。 */
+  var SRCPAGE = {
+    P01: '首页',          P05: '手机接力',      P06: '打印工作台',
+    P07: '扫描站',        P08: '文件加工台',    P10: '访谈式生成',
+    P12: '材料工厂',      P19: '智慧校园',      P20: '面试训练舱',
+    P23: '我的',          P30: '岗位大师决策台',
+    P32: 'AI 简历服务首屏', P33: '简历素材库',  P39: '打印扫描首屏'
+  }
+  /* 材料形态白名单：只认这四种，别的一律当没传（不猜） */
+  var SRCKIND = {
+    scan:  '纸质简历',
+    phone: '手机传来的文件',
+    local: '本机上传的文件',
+    usb:   'U 盘里的文件'
+  }
+  var bar = document.getElementById('p09-handoff')
+  var line = document.getElementById('p09-handoff-t')
+  var pageName = Object.prototype.hasOwnProperty.call(SRCPAGE, from) ? SRCPAGE[from] : ''
+  var kindName = Object.prototype.hasOwnProperty.call(SRCKIND, src) ? SRCKIND[src] : ''
+  if (bar && line && (pageName || kindName)) {
+    /* 全部 textContent 拼，URL 里带标签也只会当字面文字显示 */
+    function b (t) { var e = document.createElement('b'); e.textContent = t; return e }
+    function txt (t) { return document.createTextNode(t) }
+    while (line.firstChild) line.removeChild(line.firstChild)
+    line.appendChild(txt('本次材料来自：'))
+    line.appendChild(b(pageName || '上一步'))
+    if (kindName) { line.appendChild(txt(' · ')); line.appendChild(b(kindName)) }
+    /* 不写页数、不写文件名 —— 来源页没传，本机也还没读完，编一个就是伪造。 */
+    line.appendChild(txt('。下面显示的页数与文件名以本机读到的为准。'))
+    bar.hidden = false
+  }
+
+  /* ── ② 来源感知返回（登记表只登「域根」，不登具体页面） ─────────────── */
+  var back = document.querySelector('.actionbar > .backbtn')
+  if (!back) return
+  var D = {
+    P01: ['首页', '01-home-v5.html'],
+    P06: ['打印扫描', '39-print-hub.html'],
+    P07: ['打印扫描', '39-print-hub.html'],
+    P08: ['打印扫描', '39-print-hub.html'],
+    P09: ['AI 简历服务', '32-resume-hub.html'],
+    P10: ['AI 简历服务', '32-resume-hub.html'],
+    P11: ['AI 简历服务', '32-resume-hub.html'],
+    P12: ['AI 简历服务', '32-resume-hub.html'],
+    P13: ['岗位信息', '34-jobs-hub.html'],
+    P14: ['岗位信息', '34-jobs-hub.html'],
+    P15: ['岗位信息', '34-jobs-hub.html'],
+    P16: ['岗位信息', '34-jobs-hub.html'],
+    P17: ['招聘会', '36-fairs-hub.html'],
+    P18: ['招聘会', '36-fairs-hub.html'],
+    P19: ['智慧校园', '19-smart-campus.html'],
+    P20: ['面试训练', '37-interview-hub.html'],
+    P21: ['政策服务', '38-policy-hub.html'],
+    P22: ['面试训练', '37-interview-hub.html'],
+    P23: ['我的', '23-me.html'],
+    P24: ['我的', '23-me.html'],
+    P25: ['AI 顾问', '25-advisor.html'],
+    P26: ['AI 顾问', '25-advisor.html'],
+    P27: ['百宝箱', '27-toolbox.html'],
+    P28: ['面试训练', '37-interview-hub.html'],
+    P29: ['打印扫描', '39-print-hub.html'],
+    P30: ['AI 简历服务', '32-resume-hub.html'],
+    P31: ['AI 简历服务', '32-resume-hub.html'],
+    P32: ['AI 简历服务', '32-resume-hub.html'],
+    P33: ['AI 简历服务', '32-resume-hub.html'],
+    P34: ['岗位信息', '34-jobs-hub.html'],
+    P35: ['岗位信息', '34-jobs-hub.html'],
+    P36: ['招聘会', '36-fairs-hub.html'],
+    P37: ['面试训练', '37-interview-hub.html'],
+    P38: ['政策服务', '38-policy-hub.html'],
+    P39: ['打印扫描', '39-print-hub.html']
+  }
+  if (!Object.prototype.hasOwnProperty.call(D, from)) return
+  var own = { n: back.getAttribute('data-parent-label') || '', f: (back.getAttribute('href') || '').split('?')[0] }
+  var dm = { n: D[from][0], f: D[from][1] }
+  if (!own.f || dm.f === own.f) return
+
+  back.setAttribute('href', dm.f)
+  back.setAttribute('data-parent-label', dm.n)  /* stage.js 退到第 1 步时读这一项 */
+  var sub = back.querySelector('.backbtn-sub')
+  if (sub) sub.textContent = dm.n
+  /* 不在这里调 v3SyncBack()：06/07/12/18 都没调，调了会让本页在 s2 一进来就显示
+     「上一步 · 第 1 步」，与另外四页不一致。stage.js 会在用户真按下返回时自己同步。 */
+
+  var alt = document.createElement('a')
+  alt.className = 'altbtn'
+  alt.setAttribute('href', own.f)
+  /* 07/12/18 用的是「<域名>首页」，到本页会写成「AI 简历服务首页」= 128px。
+     本页操作栏本来就最挤（hint 两行 + 主按钮最长），多这 128px 会把
+     s3/ai-down、s4/default、s4/device-off、s5 的三态 hint 一起挤出栏外
+     （实测溢出 7–28px，共 6 个组合）。所以本页用短名 90px，实测六个组合全清零。
+     短名只影响这个次要入口的字面，去处仍是同一个 32-resume-hub.html。 */
+  alt.textContent = '简历首页'
+  alt.setAttribute('aria-label', own.n + '首页')
+  back.parentNode.insertBefore(alt, back.nextSibling)
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>

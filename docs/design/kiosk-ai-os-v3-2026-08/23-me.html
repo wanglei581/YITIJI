@@ -252,6 +252,41 @@ html.lowgpu .ub-radar, html.lowgpu .ub-scan, html.lowgpu .ub-spine { animation: 
 /* 未登录预览列表 */
 .ubprev { display: flex; flex-direction: column; gap: 8px; }
 
+/* ---------- 来源定位条（2026-08-10 补：消费 ?view= 参数） ----------
+   P07/P08/P36/P38/P39 早就在发 ?view=docs|orders|favorites，本页此前一律不读，
+   用户被送过来只看到八张一模一样的卡，得自己找 —— 交接等于断在最后一步。
+   这里只做**定位**：高亮那张卡 + 顶上一行说明「从哪来、落到哪张卡」。
+   刻意不写「已保存成功」：本页读不到保存结果，那种话是伪造能力（CLAUDE.md §9）。
+   条本身默认 hidden，没有 ?view= 时页面与原来一模一样（回归基线不变）。 */
+.viacue {
+  flex: 0 0 auto; display: flex; align-items: center; gap: var(--s-3);
+  min-height: 52px; padding: var(--s-3) var(--s-5);
+  border-radius: var(--r-md);
+  background: var(--jade-a12); border: 1px solid var(--jade-a32);
+  font-size: var(--fz-2); color: var(--fog-900); line-height: 1.5;
+}
+.viacue .ic { width: 20px; height: 20px; flex: 0 0 auto; color: var(--jade-500); }
+.viacue-x { min-width: 0; }
+.viacue-x b { font-weight: 600; }
+.viacue-s { color: var(--fog-600); }
+
+/* 命中卡的高亮：只加描边与内发光。
+   不用 outline / 外投影 —— .fc 是 overflow:hidden，画到卡外面会被切掉。 */
+.fcard.is-located {
+  border-color: color-mix(in srgb, var(--c1, var(--jade-600)) 62%, transparent);
+  box-shadow: var(--sh-3), var(--glass-hi),
+              inset 0 0 0 2px color-mix(in srgb, var(--c1, var(--jade-600)) 46%, transparent);
+}
+.fcard.is-located::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(120% 92% at -4% -12%,
+    color-mix(in srgb, var(--c1, var(--jade-600)) 16%, transparent), transparent 66%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fcard.is-located { animation: located-in var(--dur-3, .42s) var(--ease-out, ease-out) both; }
+  @keyframes located-in { from { transform: translateY(6px); } to { transform: none; } }
+}
+
 /* ---------- 8 张功能大卡：2 列 4 行，占满剩余高度 ---------- */
 .fgrid {
   flex: 1 1 auto; min-height: 0;
@@ -576,11 +611,17 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </div>
     </section>
 
+    <!-- 来源定位条：只在带 ?view= 进来时由页尾脚本填内容并显示 -->
+    <div class="viacue" id="viacue" hidden>
+      <svg class="ic"><use href="#i-check"/></svg>
+      <span class="viacue-x" id="viacue-t"></span>
+    </div>
+
     <!-- ══════════ 8 张功能大卡（卡序 codex 定稿） ══════════ -->
     <div class="fgrid">
 
       <!-- 1 我的简历 -->
-      <a class="fcard rise" href="09-resume-workbench.html?stage=s5" style="--c1:var(--cat-resume)">
+      <a class="fcard rise" href="09-resume-workbench.html?stage=s5" data-view="resume" style="--c1:var(--cat-resume)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-resume"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">2<i>份</i></span></span>
         <span class="fc-t">我的简历</span>
@@ -592,7 +633,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       <!-- 2 我的文档（副文一句话概括保存期限；完整口径见「账号设置 · 文件保存期限」那张表。
            2026-08-10 改：原来只写「保存 90 天」，与 P07/P08 的 24 小时 / 7 天三处打架，
            而且它本来就不是一个数字 —— 副文改成"按类型分档"的概括，数字以表为准。） -->
-      <a class="fcard rise" href="08-file-tools.html" style="--c1:var(--cat-mock)">
+      <a class="fcard rise" href="08-file-tools.html" data-view="docs" style="--c1:var(--cat-mock)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-folder"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">7<i>份</i></span></span>
         <span class="fc-t">我的文档</span>
@@ -602,7 +643,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </a>
 
       <!-- 3 打印订单 -->
-      <a class="fcard rise" href="06-print-workbench.html" style="--c1:var(--cat-print)">
+      <a class="fcard rise" href="06-print-workbench.html" data-view="orders" style="--c1:var(--cat-print)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-printer"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">5<i>单</i></span></span>
         <span class="fc-t">打印订单</span>
@@ -613,7 +654,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </a>
 
       <!-- 4 我的收藏（明细归岗位业务页，本页不聚合） -->
-      <a class="fcard rise" href="13-jobs-desk.html" style="--c1:var(--cat-job)">
+      <a class="fcard rise" href="13-jobs-desk.html" data-view="favorites" style="--c1:var(--cat-job)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-bookmark"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">3<i>条</i></span></span>
         <span class="fc-t">我的收藏</span>
@@ -623,7 +664,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </a>
 
       <!-- 5 AI 服务使用 -->
-      <a class="fcard rise" href="20-interview-pod.html?stage=s3" style="--c1:var(--jade-600)">
+      <a class="fcard rise" href="20-interview-pod.html?stage=s3" data-view="ai" style="--c1:var(--jade-600)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-brain"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">4<i>次</i></span></span>
         <span class="fc-t">AI 服务使用</span>
@@ -633,7 +674,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </a>
 
       <!-- 6 我的权益 -->
-      <a class="fcard rise" href="24-benefits.html" style="--c1:var(--cat-fair)">
+      <a class="fcard rise" href="24-benefits.html" data-view="benefits" style="--c1:var(--cat-fair)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-ticket"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">2<i>项</i></span></span>
         <span class="fc-t">我的权益</span>
@@ -643,7 +684,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </a>
 
       <!-- 7 通知与反馈（本页分区浮层） -->
-      <button class="fcard rise" type="button" data-open="ovl-notice" style="--c1:var(--cat-policy)">
+      <button class="fcard rise" type="button" data-open="ovl-notice" data-view="notice" style="--c1:var(--cat-policy)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-bell"/></svg></span>
         <span class="fc-num" data-when="default ai-down device-off">3<i>条</i></span></span>
         <span class="fc-t">通知与反馈</span>
@@ -653,7 +694,7 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
       </button>
 
       <!-- 8 账号设置（本页分区浮层；副文 = 3 个事实，四态同文） -->
-      <button class="fcard rise" type="button" data-open="ovl-set" style="--c1:var(--fog-600)">
+      <button class="fcard rise" type="button" data-open="ovl-set" data-view="settings" style="--c1:var(--fog-600)">
         <span class="fc-hd"><span class="fc-ic"><i class="fc-plate" aria-hidden="true"></i><i class="fc-ring" aria-hidden="true"></i><i class="fc-dot" aria-hidden="true"></i><svg class="ic"><use href="#i-gear"/></svg></span></span><span class="fc-t">账号设置</span>
         <span class="fc-s">登录方式 · 文件保存期限 · 隐私与删除 · 无障碍</span>
         <span class="fc-go"><svg class="ic"><use href="#i-chevron"/></svg></span>
@@ -738,10 +779,26 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
           <span class="keep-v">从不保存</span>
           <span class="keep-s">只记「练过一次」，不留内容</span>
         </div>
+        <!-- 2026-08-10 补第 5 行：P06/P17 的「保留 7 天」说的不是文件保存期，是**取件码有效期**。
+             不补这一行，读者会拿它跟上面「一般文档 90 天」对冲，以为又打架了。
+             这是订单口径，与文件保存期并列，不互相覆盖。 -->
+        <div class="keep-row keep-row--warn">
+          <span class="keep-t">待打印订单里的文件<i>已下单未出纸 · 已支付可复打</i></span>
+          <span class="keep-v">7 天</span>
+          <span class="keep-s">凭取件码复打 · 到期关单并清理 · 留删除日志</span>
+        </div>
       </div>
       <div class="panel-note" style="margin-left:0">
         <b>以文件类型定，不是所有文件都 90 天。</b>
         一份文件里只要含身份证号，就按敏感文件的 7 天算，不按 90 天。<br>
+        最后一行是<b>订单口径</b>：取件码 7 天说的是「还能不能复打」，不是「文件存多久」；
+        同一份文件你另外存进「我的文档」，按上面的类型算期限。<br>
+        <!-- 2026-08-10 补：P28 自评结果 24 小时、P31 合同分析 2 小时，都比本表更短。
+             不给它们各加一行（表会越滚越长），改成写清「只许更短、不许更长」的规则，
+             并把两个已知的更短档点名，读者对得上号，页面也不用改口径。 -->
+        <b>单个功能可以定得更短，但不许更长。</b>
+        已知更短的两处：自我评估结果 <b>24 小时</b>（可随时撤回，撤回即物理删除）、
+        合同分析文件 <b>2 小时</b>（打印完成或离场立即删除）。<br>
         这张表是<b>全站口径</b>：打印、扫描、我的文档各页显示的期限都以它为准。
       </div>
 
@@ -861,6 +918,103 @@ html.lowgpu .fc-ring, html.lowgpu .fc-dot, html.lowgpu .fc-plate { animation: no
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeAll();
   });
+})();
+</script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P23 · 消费 ?view= 与 ?from=（2026-08-10 收口）
+   --------------------------------------------------------------------------
+   缺口：P07/P08/P36/P38/P39 五页早就在发
+     23-me.html?view=docs|orders|favorites[&from=P07][&kind=…][&title=…]
+   本页一个参数都不读。用户从扫描站按「去我的文档核对」过来，落在八张卡的
+   通用页，还得自己找 —— 交接在最后一步断掉。
+
+   本轮只补**定位**，三件事：
+     ① 顶上出一行来源回执：「从 扫描工作台 过来 · 已定位到「我的文档」」
+     ② 对应功能卡加 .is-located 高亮
+     ③ scrollIntoView（本页设计成一屏不滚，这一步通常是空操作；
+        留着是为了将来卡片变多、或大字号下 .fc 出现滚动时仍然对）
+
+   刻意**不做**的事（CLAUDE.md §9 不伪造能力）：
+     · 不写「已保存」「已存好」「保存成功」—— 本页读不到保存结果，
+       那是服务端的事（interface-handoff.md I-04 文档列表接口）。
+       回执末尾固定写「是否已存好以列表为准」，把判定权交回真实列表。
+     · 不按 kind/title 编一条"刚存进来的文件"塞进卡里 —— 那是凭 URL 造数据。
+   参数不认识 / 不带参数 → 回执不出现，页面与原来完全一致。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  'use strict';
+  var bar = document.getElementById('viacue');
+  var line = document.getElementById('viacue-t');
+  if (!bar || !line) return;
+  var q;
+  try { q = new URLSearchParams(location.search); } catch (e) { return; }
+
+  /* 分区登记表：?view= 取值 → 卡名 + 「以什么为准」的口径。
+     只认这八个，别的一律当没传（不猜、不模糊匹配）。 */
+  var VIEW = {
+    resume:    { n: '我的简历',     w: '有没有这一份，以简历列表为准' },
+    docs:      { n: '我的文档',     w: '有没有存进来，以文档列表为准' },
+    orders:    { n: '打印订单',     w: '单子成没成，以订单列表为准' },
+    favorites: { n: '我的收藏',     w: '收藏明细在岗位情报台里看' },
+    ai:        { n: 'AI 服务使用',  w: '练过几次、点评在不在，以记录为准' },
+    benefits:  { n: '我的权益',     w: '能不能用、什么时候到期，以权益列表为准' },
+    notice:    { n: '通知与反馈',   w: '按这张卡展开看未读与工单' },
+    settings:  { n: '账号设置',     w: '按这张卡展开看登录方式与保存期限' }
+  };
+
+  /* 来源页登记表（与 06/07/12/18 同一份口径，只取页名）。
+     不认识的 from 就不写来源，绝不瞎猜是谁送过来的。 */
+  var SRC = {
+    P01: '首页',            P02: '待机屏',          P03: '身份门',
+    P04: '系统状态',        P05: '手机接力',        P06: '打印工作台',
+    P07: '扫描工作台',      P08: '文件加工台',      P09: '简历工作台',
+    P10: '访谈式生成',      P11: '岗位大师决策台',  P12: '材料工厂',
+    P13: '岗位情报台',      P14: '岗位详情',        P15: '企业导览',
+    P16: '线下机构',        P17: '招聘会作战台',    P18: '校园招聘专区',
+    P19: '智慧校园',        P20: '面试训练舱',      P21: '政策服务',
+    P22: '职业规划',        P24: '权益活动',        P25: '顾问驾驶舱',
+    P26: '顾问作业面',      P27: '百宝箱区',        P28: '自我探索',
+    P29: '证件照工作台',    P30: '岗位大师决策台',  P31: '签约风险提示',
+    P32: 'AI 简历服务首屏', P33: '简历素材库',      P34: '岗位信息首屏',
+    P35: '在线求职平台',    P36: '招聘会首屏',      P37: '面试训练首屏',
+    P38: '政策服务首屏',    P39: '打印扫描首屏'
+  };
+
+  function pick (v, re, max) {
+    v = (v == null ? '' : String(v)).replace(re, '');
+    return v.length > max ? v.slice(0, max) : v;
+  }
+  var view = pick((q.get('view') || '').toLowerCase(), /[^a-z]/g, 12);
+  var from = pick((q.get('from') || '').toUpperCase(), /[^A-Z0-9]/g, 6);
+  if (!Object.prototype.hasOwnProperty.call(VIEW, view)) return;
+
+  var card = document.querySelector('.fcard[data-view="' + view + '"]');
+  if (!card) return;
+  var v = VIEW[view];
+  var srcName = Object.prototype.hasOwnProperty.call(SRC, from) ? SRC[from] : '';
+
+  /* 回执正文一律 textContent 拼，URL 里带标签也只会当字面文字显示 */
+  function b (t) { var e = document.createElement('b'); e.textContent = t; return e; }
+  function txt (t) { return document.createTextNode(t); }
+  while (line.firstChild) line.removeChild(line.firstChild);
+  if (srcName) { line.appendChild(txt('从 ')); line.appendChild(b(srcName)); line.appendChild(txt(' 过来 · ')); }
+  line.appendChild(txt('已定位到「'));
+  line.appendChild(b(v.n));
+  line.appendChild(txt('」'));
+  var s = document.createElement('span');
+  s.className = 'viacue-s';
+  s.textContent = ' · ' + v.w;
+  line.appendChild(s);
+  bar.hidden = false;
+
+  card.classList.add('is-located');
+  /* 本页 .fc 是 overflow:hidden 的一屏版面，正常情况下滚不动；
+     这一句只在真的出现滚动容器时起作用，不起作用时也不报错。 */
+  if (card.scrollIntoView) {
+    try { card.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { card.scrollIntoView(); }
+  }
+  if (window.v3Audit) requestAnimationFrame(window.v3Audit);
 })();
 </script>
 <script src="scripts/help.js?v=1"></script>
