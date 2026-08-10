@@ -106,6 +106,48 @@
 .pl-i b { color:#0f5a45; }
 .pl-foot { font-size:11px; color:#6b7a86; line-height:1.65; border-top:1px solid #d9e1e8;
            padding-top:9px; margin-top:14px; }
+
+/* ── 上一屏带进来的选择：回执条 ──────────────────────────────────────
+   2026-08-10 参数消费整改。上游一直在 URL 里传用户已经做过的选择，
+   本页此前一个都不读 —— 用户在上一屏选完，进来还得重选一遍。
+   现在读了就必须让用户看见：静默预填比不预填更糟，用户会以为这些
+   值是本机自己猜的。三条规矩：① 有回执；② 可改；③ 只认白名单取值，
+   非法值当没传，绝不把 URL 里的字面量渲染出来。
+   只在**真的带了合法参数**时才插进 DOM —— 不带参数时这一块整个不存在。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-note b { color:var(--fog-800); }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
+
+/* 选中的方向卡：只做「你选的是这一张」的标记，不改它的计数与缺口 */
+.dir--focus { border-color:var(--jade-500); box-shadow:var(--sh-jade); }
+.dir-focus-mark { display:inline-flex; align-items:center; margin-left:var(--s-3);
+  padding:3px 9px; border-radius:var(--r-xs); background:var(--jade-a20);
+  border:1px solid var(--jade-500); color:var(--jade-200);
+  font-size:var(--fz-1); font-weight:600; white-space:nowrap; }
+.carryin-miss { font-size:var(--fz-1); color:var(--amber-200); line-height:1.55;
+  padding:8px 10px; border-radius:var(--r-xs);
+  background:var(--amber-a12); border:1px solid var(--amber-600); }
 </style>
 </head>
 <body>
@@ -673,5 +715,154 @@
 <script src="scripts/audit-plus.js?v=13"></script>
 <script src="scripts/help.js?v=1"></script>
 <script src="scripts/keypad.js?v=1"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   P22 · 上一屏带过来的选择（37-interview-hub「职业规划建议」卡 → 本页）
+
+   契约（对方一直在传，本页此前一个都不读 —— 用户在首屏选完方向和跨度，
+   进来一点痕迹都没有，等于白选）：
+       ?target=运营|销售|行政人事|技术      ?span=3m|6m|12m
+
+   本页的处境和 P20 不同：这里没有「目标方向」控件，四张方向卡是
+   **本机读这份简历 + 214 条岗位正文数出来的结果**，不是给用户挑的菜单。
+   所以参数消费分两种情况，两种都必须如实说，不能含糊：
+
+     · 带来的方向**正好是这四类之一** → 标出那一张（只标记，不改它的计数与
+       缺口 —— 那些数是数出来的，不随用户想去哪而变），并印在行动清单上。
+     · 带来的方向**不在这四类里**（运营 / 销售 / 行政人事 / 技术 都不在）→
+       照实说「本机读出来的四类里没有这一类，没有按它重算」，
+       但仍然把用户的选择记在单子上。**不假装筛过、不硬凑一个方向。**
+
+   跨度同理：本机不知道用户每周能投入多少时间，排不出可信的时间表，
+   所以 span 只作为「你给自己定的跨度」记录并印在纸上，
+   不用来给行动项分批、更不用来判断哪条「来得及」。
+
+   白名单：target 只认上一屏那四个词 + 本页自己的四类方向；span 只认
+   3m / 6m / 12m。表以外一律当没传，不报错、不把 URL 字面量渲染出来。
+   ══════════════════════════════════════════════════════════════════════════ */
+;(function () {
+  var scr = document.querySelector('.screen')
+  if (!scr) return
+
+  var SPAN_NM = { '3m': '3 个月', '6m': '半年', '12m': '一年' }
+  var HUB_TARGET = ['运营', '销售', '行政人事', '技术']
+
+  var dirs = [].slice.call(scr.querySelectorAll('.dir'))
+  var DIR_NM = dirs.map(function (d) {
+    var t = d.querySelector('.dir-t')
+    return t ? (t.textContent || '').replace(/^\s+|\s+$/g, '') : ''
+  })
+  /* 卡名带括号说明（「继续做机械设计（本行往深走）」），按钮上放不下也不好点，
+     所以按钮只显示括号前那截；比对用的仍是完整卡名 */
+  function shortNm (s) { return s.replace(/（.*$/, '') }
+
+  var Q = new URLSearchParams(location.search)
+  function qv (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+  function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+
+  var tRaw = qv('target'), sRaw = qv('span')
+  var target = (HUB_TARGET.indexOf(tRaw) > -1 || DIR_NM.indexOf(tRaw) > -1) ? tRaw : ''
+  var span = Object.prototype.hasOwnProperty.call(SPAN_NM, sRaw) ? sRaw : ''
+  if (!target && !span) return          // 没带合法参数 → 与整改前逐像素相同
+
+  var fromHub = !!target               // 记住第一次是从上一屏带进来的
+  function dirIndex () { return DIR_NM.indexOf(target) }
+
+  /* ---------- 顶部回执条 ---------- */
+  var box = document.createElement('div')
+  box.className = 'carryin'
+  box.setAttribute('data-at', 's1 s2 s3')
+  var wm = scr.querySelector('.wmain')
+  if (wm) wm.insertBefore(box, wm.firstChild)
+
+  /* 为什么这两项**不印到 A4 上**：实测这张 1 页的行动清单已经排满
+     （sheet-a4 clientHeight 809px，内容正好占满），再加一行就把页脚
+     「不预测薪资 / 不承诺职业发展结果」那条免责声明挤出纸外 —— 自检
+     「内部裁切」当场报出来。合规声明不能为了塞新内容让位，所以这两项
+     只留在屏幕上，并在下面如实告诉用户纸上没有它们。 */
+
+  function render () {
+    var idx = dirIndex(), i
+    var items = ''
+    if (target) items += '<span class="carryin-it"><i>目标方向</i><em>' + esc(target) + '</em></span>'
+    if (span) items += '<span class="carryin-it"><i>跨度</i><em>' + SPAN_NM[span] + '</em></span>'
+
+    var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+            '<b>已带入上一屏的选择 · 可改</b>' +
+            '<span class="carryin-src">来自面试训练首屏</span></div>' +
+            '<div class="carryin-items">' + items + '</div>'
+
+    if (target && idx > -1) {
+      h += '<div class="carryin-note">下面第 2 步里<b>「' + esc(shortNm(target)) +
+           '」那张卡已经标出来了</b>；卡上的条数与缺口是本机数出来的，' +
+           '不随你想去哪而变，所以只做标记、没有重算。</div>'
+    } else if (target) {
+      h += '<div class="carryin-miss">本机从你这份简历读出来的方向只有：' +
+           esc(DIR_NM.map(shortNm).join(' / ')) + '，<b>没有「' + esc(target) + '」这一类</b>。' +
+           '本机<b>没有按它重算</b>方向与缺口 —— 那要有对得上的岗位正文才做得出来。' +
+           '你的选择会记在行动清单上；想按本机数得出来的方向看，点下面换一个。</div>'
+    }
+    if (span) {
+      h += '<div class="carryin-note">跨度<b>' + SPAN_NM[span] + '</b>只记在这里：' +
+           '本机不知道你每周能投入多少时间，<b>不给行动项排时间表、也不判断哪条来得及</b>；' +
+           '第 3 步那张行动清单已经排满一页，<b>这两项没有印上去</b>，' +
+           '给页脚的免责声明让位。</div>'
+    }
+
+    h += '<div class="carryin-ops"><span class="carryin-lb">换一个方向</span>'
+    for (i = 0; i < DIR_NM.length; i++) {
+      h += '<button class="carryin-op" type="button" data-plandir="' + i + '" aria-pressed="' +
+           (idx === i ? 'true' : 'false') + '">' + esc(shortNm(DIR_NM[i])) + '</button>'
+    }
+    h += '</div><div class="carryin-ops"><span class="carryin-lb">换跨度</span>'
+    var keys = ['3m', '6m', '12m']
+    for (i = 0; i < keys.length; i++) {
+      h += '<button class="carryin-op" type="button" data-planspan="' + keys[i] + '" aria-pressed="' +
+           (span === keys[i] ? 'true' : 'false') + '">' + SPAN_NM[keys[i]] + '</button>'
+    }
+    h += '</div>'
+    box.innerHTML = h
+
+    /* 方向卡标记 */
+    for (i = 0; i < dirs.length; i++) {
+      dirs[i].classList.toggle('dir--focus', i === idx)
+      var old = dirs[i].querySelector('.dir-focus-mark')
+      if (i === idx && !old) {
+        var m = document.createElement('span')
+        m.className = 'dir-focus-mark'
+        m.textContent = '你选的方向'
+        var hd = dirs[i].querySelector('.dir-hd span')
+        if (hd) hd.appendChild(m)
+      } else if (i !== idx && old) {
+        old.parentNode.removeChild(old)
+      }
+    }
+
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+  }
+
+  scr.addEventListener('click', function (e) {
+    if (!e.target || !e.target.closest) return
+    var el
+    if ((el = e.target.closest('[data-plandir]'))) {
+      var i = +el.getAttribute('data-plandir')
+      target = (DIR_NM[i] === target) ? (fromHub ? tRaw : '') : DIR_NM[i]
+      render(); return
+    }
+    if ((el = e.target.closest('[data-planspan]'))) {
+      var k = el.getAttribute('data-planspan')
+      span = (span === k) ? '' : k
+      render(); return
+    }
+  })
+
+  render()
+
+  /* 走查把手：本页认下了 URL 里的哪几个值 */
+  window.v3P22Carry = function () {
+    return { targetRaw: tRaw, target: target, spanRaw: sRaw, span: span, dirIndex: dirIndex(), dirs: DIR_NM }
+  }
+})()
+</script>
 </body>
 </html>

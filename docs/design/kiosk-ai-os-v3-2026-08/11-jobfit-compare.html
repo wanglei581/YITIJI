@@ -219,6 +219,38 @@
   .rp-p { font-size: 12px; color: #2c3a45; line-height: 1.65; margin: 0; }
   .rp-p b { color: #17222b; }
   .rp-foot { font-size: 10.5px; color: #6b7a86; line-height: 1.65; border-top: 1px solid #d9e1e8; padding-top: 8px; margin-top: auto; }
+
+/* ── 上一屏带进来的选择：回执条 ──────────────────────────────────────
+   2026-08-10 参数消费整改。上游一直在 URL 里传用户已经做过的选择，
+   本页此前一个都不读 —— 用户在上一屏选完，进来还得重选一遍。
+   现在读了就必须让用户看见：静默预填比不预填更糟，用户会以为这些
+   值是本机自己猜的。三条规矩：① 有回执；② 可改；③ 只认白名单取值，
+   非法值当没传，绝不把 URL 里的字面量渲染出来。
+   只在**真的带了合法参数**时才插进 DOM —— 不带参数时这一块整个不存在。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-note b { color:var(--fog-800); }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
 </style>
 </head>
 <body>
@@ -1133,6 +1165,18 @@
       <button class="btn btn--ghost" type="button" data-help><svg class="ic"><use href="#i-help"/></svg>需要帮助</button>
     <div class="actionbar-hint">
       <div data-at="s1">
+<!-- 2026-08-10 参数消费整改时实测到的**既有**缺陷，记在这里不改文案：
+             主按钮回填岗位名后（「比这个岗位：内容运营（新媒体）」389px），
+             .actionbar-hint（flex:1 1 0%）被挤到 0 宽，这两行整条撑出操作栏 ——
+             自检报「卡内溢出 209px / 文字被裁 106px」。
+             复现与本次改动无关：不带任何参数进本页、手点任一岗位行即可复现，
+             改动前后是同一元素、同一数值。
+             试过的两条路都不能用：
+               · 给 .actionbar-hint 加 min-width → 主按钮被压到 272px，
+                 而 .btn 是 overflow:hidden，岗位名后半截被**静默截断**，比现状更糟；
+               · 只缩这两行文案 → 0 宽容器里再短也仍然溢出，治不了根。
+             真正的修法在共享层（styles/ 的 .actionbar 布局）或改「岗位名回填主按钮」
+             这条设计口径，两者都不在本轮改动范围内，故如实上报、不动文案。 -->
         <div data-when="default device-off"><div class="t" data-f="s1hint">搜岗位或手填 JD，选一个再开始比</div><div class="s">一次比一个 · 三档参考只是文字比对，不预测录用</div></div>
         <div data-when="ai-down"><div class="t">推荐排序不可用，列表可正常浏览</div><div class="s">选中后也不会给比对结论</div></div>
         <div data-when="first"><div class="t">还没有简历，无法逐条比对</div><div class="s">先去「AI 简历服务」给一份，或先做兴趣快测</div></div>
@@ -1336,6 +1380,100 @@
   })
 
   render()
+
+  /* ══════════════════════════════════════════════════════════════════════
+     招聘会现场带过来的岗位（45-fair-onsite「拿这个岗位去比对」→ 本页）
+
+     契约：?stage=s1&need=job[&jobId=…][&jobTitle=…]
+     现状：上游那条链接**只传 need=job、不带岗位**，而本页此前连 need 都不读，
+     于是用户在展位上点「拿这个岗位去比对」，进来看到一屏空的挑岗位列表，
+     完全看不出跟刚才那个展位有任何关系。
+
+     本页的处理：
+     · need 只认 'job'；jobId / jobTitle 只认本机已同步的这三条 ——
+       白名单直接从列表 DOM 里取，不另抄一份，免得两边对不上。
+     · 带了岗位 → 在第 1 步替他选好；带来的正是本机做过逐条比对的那一条，
+       就直接进第 2 步；不是那一条就停在第 1 步并说清为什么。
+     · 只带 need、没带岗位 → 停在第 1 步（本来就该停这），
+       但要说清「现场没把是哪个岗位带过来」，别让用户以为是自己点错了。
+     · 参数非法 → 当作没传，不报错、不渲染字面量。
+     门控没动：picked() 为空时 [data-gate-pick] 那道拦截照旧。
+     ══════════════════════════════════════════════════════════════════════ */
+  ;(function () {
+    var Q = new URLSearchParams(location.search)
+    function qv (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+    function esc (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;') }
+
+    var need = qv('need') === 'job' ? 'job' : ''
+    var idRaw = qv('jobId'), ttRaw = qv('jobTitle')
+    if (!need && !idRaw && !ttRaw) return        // 没带参数 → 与整改前逐像素相同
+
+    /* 白名单 = 列表里真有的这三条。外部 ID 从行上的来源行里取（「外部 ID JX-88214」） */
+    var LIST = rows.map(function (r) {
+      var s = (r.querySelector('.jobrow-s') || {}).textContent || ''
+      var m = s.match(/外部\s*ID\s*([A-Za-z0-9-]+)/)
+      return { t: r.getAttribute('data-jobpick'), id: m ? m[1] : '' }
+    })
+    /* 第 2 / 3 / 4 步的逐条比对、决策报告、纸面全是按这一条写死的静态样例。
+       带来别的岗位就不能直接跳进去 —— 那会拿这条的比对结果冒充另一条。 */
+    var ANALYZED = '用户运营专员'
+
+    var hit = null, i
+    for (i = 0; i < LIST.length; i++) {
+      if (idRaw && LIST[i].id === idRaw) { hit = LIST[i]; break }
+      if (ttRaw && LIST[i].t === ttRaw) { hit = LIST[i]; break }
+    }
+    var badRef = (!hit && !!(idRaw || ttRaw))    // 传了岗位，但本机没有这一条
+
+    var notes = [], items = ''
+    if (hit) {
+      S.job = hit.t
+      S.tab = 'list'
+      render()
+      items = '<span class="carryin-it"><i>岗位</i><em>' + esc(hit.t) + '</em></span>' +
+              '<span class="carryin-it"><i>外部 ID</i><em>' + esc(hit.id) + '</em></span>'
+      if (hit.t === ANALYZED && window.v3Stage && (!Q.get('stage') || Q.get('stage') === 's1')) {
+        window.v3Stage('s2')
+        notes.push('已替你选好这一条，<b>直接进了第 2 步逐条比对</b>；' +
+                   '想比别的，点下面「换一个岗位」回第 1 步。')
+      } else if (hit.t === ANALYZED) {
+        notes.push('已替你在第 1 步选好这一条，点动作条上的「比这个岗位」开始。')
+      } else {
+        notes.push('已替你在第 1 步<b>选好这一条</b>，但没有直接跳进比对：' +
+                   '本机这一版只对「' + ANALYZED + '」做过逐条比对，' +
+                   '拿它的结果套到这一条上就是假的。点动作条上的「比这个岗位」开始。')
+      }
+    } else if (badRef) {
+      notes.push('现场带过来的岗位<b>不在本机已同步的这几条里</b>，本机没有它的原文，' +
+                 '所以没替你选 —— 在下面挑一条，或切到「手填目标岗位」把 JD 粘进来。')
+    } else {
+      notes.push('展位那条「拿这个岗位去比对」<b>只说了要比对，没把是哪个岗位带过来</b>，' +
+                 '所以停在第 1 步：在下面挑一条，或切到「手填目标岗位」把 JD 粘进来。' +
+                 '<b>不是你点错了。</b>')
+    }
+    notes.push('比对<b>一次只比一个岗位</b>；手填的 JD 只当参考文本，不进岗位库，' +
+               '也不回传任何来源平台。')
+
+    var box = document.createElement('div')
+    box.className = 'carryin'
+    box.setAttribute('data-at', 's1 s2')
+    var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+            '<b>' + (hit ? ('从招聘会现场带来：' + esc(hit.t)) : '从招聘会现场过来比对岗位') + '</b>' +
+            '<span class="carryin-src">来自招聘会现场 · 可改</span></div>'
+    if (items) h += '<div class="carryin-items">' + items + '</div>'
+    for (i = 0; i < notes.length; i++) h += '<div class="carryin-note">' + notes[i] + '</div>'
+    /* data-at 写成静态属性：本条只建一次、不重排，切阶段交给 v3ApplyVisibility 管 */
+    h += '<div class="carryin-ops" data-at="s2">' +
+         '<button class="carryin-op" type="button" data-go="s1">换一个岗位</button></div>'
+    box.innerHTML = h
+    var wm = scr.querySelector('.wmain')
+    if (wm) wm.insertBefore(box, wm.firstChild)
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+
+    /* 走查把手：本页认下了 URL 里的哪几个值 */
+    window.v3P11Carry = { need: need, jobIdRaw: idRaw, jobTitleRaw: ttRaw,
+                          matched: hit ? hit.t : '', picked: S.job }
+  })()
 })()
 </script>
 <script src="scripts/linkage.js?v=6"></script>

@@ -384,6 +384,38 @@
 .rp-aigc { display:inline-block; margin-top:4px; padding:1px 7px;
            border:1px solid #b9c6cf; border-radius:3px;
            font-size:11px; color:#3f5361; letter-spacing:.04em; }
+
+/* ── 上一屏带进来的选择：回执条 ──────────────────────────────────────
+   2026-08-10 参数消费整改。上游一直在 URL 里传用户已经做过的选择，
+   本页此前一个都不读 —— 用户在上一屏选完，进来还得重选一遍。
+   现在读了就必须让用户看见：静默预填比不预填更糟，用户会以为这些
+   值是本机自己猜的。三条规矩：① 有回执；② 可改；③ 只认白名单取值，
+   非法值当没传，绝不把 URL 里的字面量渲染出来。
+   只在**真的带了合法参数**时才插进 DOM —— 不带参数时这一块整个不存在。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-note b { color:var(--fog-800); }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
 </style>
 </head>
 <body>
@@ -1372,9 +1404,14 @@
     set('c-way', S.way === 'voice' ? '语音' : '打字')
     set('c-level', LEVEL_NM[lv()] + (S.level ? '' : '（默认）'))
     set('peek-t', esc(P().qs[0].t)); set('peek-w', esc(P().qs[0].w))
-    set('rec', pk === 'job'
-      ? '你看过<b>恒信精密制造</b>的机械设计岗，先练这个方向。'
-      : '按<b>' + esc(lab) + '</b>出题。')
+    /* 手输过方向就按手输的说 —— 挂着「你看过恒信精密制造的机械设计岗」
+       在用户手填了别的方向时就是句假话（预填把这条老毛病照出来了） */
+    var mtx = mtext()
+    set('rec', (pk === 'job' && S.target === 'manual' && mtx)
+      ? '按你手输的方向<b>' + esc(mtx) + '</b>出题。'
+      : pk === 'job'
+        ? '你看过<b>恒信精密制造</b>的机械设计岗，先练这个方向。'
+        : '按<b>' + esc(lab) + '</b>出题。')
     set('k-src', esc(P().src))
     set('h-s1', '没有倒计时，答不上来可以跳过')
 
@@ -2125,6 +2162,103 @@
     var nx = Math.min(sheets.length - 1, Math.max(0, cur + dir))
     stage.scrollTop = sheets[nx].offsetTop - sheets[0].offsetTop
   })
+
+  /* ══════════════════════════════════════════════════════════════════════
+     上一屏带过来的选择（37-interview-hub → 本页）
+
+     契约（对方一直在传，本页此前一个都不读 —— 用户在首屏选完，进来还得重选）：
+       ?target=运营|销售|行政人事|技术     ?level=…     ?count=…
+
+     三处口径不一致，必须**在本页折算并如实写在回执里**，不能装作一样：
+     ① level：上一屏传的是 entry / mid / advanced，本页用的是生产枚举
+        easy / standard / pressure（InterviewDifficulty）。这里只认这两组
+        共 6 个已知键，别的一律当没传 —— 白名单是封闭的，不做任何猜测。
+     ② count：上一屏按「题量」问，生产参数里**没有题量**，题数由时长
+        （InterviewDuration = 3 | 5 | 8）派生。3 / 6 / 10 题折成 3 / 5 / 8 分钟，
+        折算结果写进回执，最终几题以「本次出题」为准。
+     ③ target：上一屏是四个方向词，本页的控件是「行业 + 目标岗位」。
+        运营 / 技术 / 行政人事 各自对得上一个垂直题库；**销售没有**，
+        所以不替用户选行业、也不硬塞进「手输方向」（那会让本机拿
+        自带的机械设计样例卷冒充销售题）——回执里说清楚，让他自己定。
+
+     门控一条没松：first 态「用哪份简历」照旧必选，missingKey() 一字未动。
+     ══════════════════════════════════════════════════════════════════════ */
+  ;(function () {
+    var Q = new URLSearchParams(location.search)
+    function qv (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+
+    /* 四个方向 → 本页真有的垂直题库（IND_NM 的键）。'' = 本机没有这一类 */
+    var HUB_TARGET = { '运营': 'mkt', '技术': 'tech', '行政人事': 'adm', '销售': '' }
+    /* 前三个是生产枚举，后三个是上一屏当前在发的别名。表以外的值一律不认 */
+    var LEVEL_MAP = { easy: 'easy', standard: 'standard', pressure: 'pressure',
+                      entry: 'easy', mid: 'standard', advanced: 'pressure' }
+    /* 题量 → 时长（生产 DURATIONS）。表以外的值一律不认 */
+    var COUNT_DUR = { '3': 3, '6': 5, '10': 8 }
+
+    var tRaw = qv('target'), lRaw = qv('level'), cRaw = qv('count')
+    var tOK = Object.prototype.hasOwnProperty.call(HUB_TARGET, tRaw) ? tRaw : ''
+    var lOK = Object.prototype.hasOwnProperty.call(LEVEL_MAP, lRaw) ? lRaw : ''
+    var cOK = Object.prototype.hasOwnProperty.call(COUNT_DUR, cRaw) ? cRaw : ''
+    if (!tOK && !lOK && !cOK) return          // 没带合法参数 → 与整改前逐像素相同
+
+    var items = [], notes = []
+
+    if (tOK) {
+      var bank = HUB_TARGET[tOK]
+      if (bank) {
+        S.industry = bank
+        S.target = 'manual'
+        var mi = document.getElementById('mtarget')
+        if (mi) mi.value = tOK
+        items.push(['目标岗位', tOK])
+        notes.push('目标方向<b>' + tOK + '</b>已落到本页的「行业 = ' + IND_NM[bank] +
+                   '」和「目标岗位 = 手输方向」两项上。')
+      } else {
+        items.push(['目标岗位', tOK])
+        notes.push('本机题库只有技术开发 / 市场运营 / 行政文员 / 生产制造四类，' +
+                   '<b>没有「' + tOK + '」这一类</b> —— 没替你选行业，也没往「手输方向」里塞，' +
+                   '免得拿本机自带的样例卷冒充这个方向；这一场按不限行业出题，想更贴近就在下面自己定。')
+      }
+    }
+
+    if (lOK) {
+      S.level = LEVEL_MAP[lOK]
+      items.push(['难度', LEVEL_NM[S.level]])
+      if (LEVEL_MAP[lOK] !== lOK) {
+        notes.push('难度上一屏传的是「' + lRaw + '」，本机按生产的三档口径记为<b>' +
+                   LEVEL_NM[S.level] + '</b>（' + S.level + '）。')
+      }
+    }
+
+    if (cOK) {
+      S.dur = COUNT_DUR[cOK]
+      items.push(['题量', cRaw + ' 题'])
+      notes.push('本机<b>按时长出题，没有题量这个参数</b>：' + cRaw + ' 题已折成 <b>' +
+                 S.dur + ' 分钟</b>，实际几题看下面「本次出题」那一行。')
+    }
+
+    notes.push('这些都<b>能改</b> —— 下面每一项照常能点；未登录时「用哪份简历」还是得你自己选，' +
+               '这道门控没有因为带了参数就放行。')
+
+    var box = document.createElement('div')
+    box.className = 'carryin'
+    box.setAttribute('data-at', 's1')      // 只在第 1 步设置区出现，不跟进作答与纸面
+    var h = '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg>' +
+            '<b>已带入上一屏的选择 · 可改</b>' +
+            '<span class="carryin-src">来自面试训练首屏</span></div><div class="carryin-items">'
+    for (var i = 0; i < items.length; i++) {
+      h += '<span class="carryin-it"><i>' + items[i][0] + '</i><em>' + esc(items[i][1]) + '</em></span>'
+    }
+    h += '</div>'
+    for (i = 0; i < notes.length; i++) h += '<div class="carryin-note">' + notes[i] + '</div>'
+    box.innerHTML = h
+    var wm = document.querySelector('.wmain')
+    if (wm) wm.insertBefore(box, wm.firstChild)
+
+    /* 走查把手：本页认下了哪几个值 */
+    window.v3P20Carry = { targetRaw: tRaw, target: tOK, levelRaw: lRaw, level: S.level,
+                          countRaw: cRaw, dur: S.dur, industry: S.industry }
+  })()
 
   syncState()
   render()

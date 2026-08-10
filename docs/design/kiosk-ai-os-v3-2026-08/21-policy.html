@@ -239,6 +239,51 @@
   font-size:12.5px; color:#2c3a45; padding:6px 0; border-bottom:1px solid #eef2f5; }
 .gd-rn { color:#0f5a45; font-weight:800; }
 .gd-rp { color:#5b6b78; font-size:11.5px; }
+
+/* ── ⑤ 上一屏带进来的选择：回执条 ────────────────────────────────────
+   2026-08-10 参数消费整改：38-policy-hub 一直在传 ?cat= 与 identity/insured/city，
+   本页此前一个都不读 —— 用户在域首屏点的四张分类卡、选的三项条件全部白选。
+   现在读了就必须**让用户看见**：静默预填比不预填更糟，用户会以为这些答案
+   是本机自己猜的。所以规矩是三条：
+     ① 有回执 —— 顶部一行写清带进来了什么、从哪来；
+     ② 可改   —— 分类可换、可看全部，带入的问项就在下面照常能点；
+     ③ 不越权 —— 只认白名单取值，非法值一律当没传，绝不把 URL 里的字面量渲染出来。
+   本条只在**真的带了参数**时才插进 DOM；不带参数时这一块整个不存在，
+   页面与整改前逐像素相同。 */
+.carryin { flex:0 0 auto; margin-bottom:var(--s-4);
+  padding:var(--s-4); padding-left:calc(var(--s-4) - 3px);
+  border-radius:var(--r-sm); background:var(--surf-2);
+  border:1px solid var(--brd-2); border-left:3px solid var(--azure-400);
+  display:flex; flex-direction:column; gap:var(--s-3); }
+.carryin-hd { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
+.carryin-hd .ic { width:18px; height:18px; color:var(--azure-400); flex:0 0 auto; }
+.carryin-hd b { font-size:var(--fz-3); color:var(--fog-900); font-weight:650; }
+.carryin-src { font-size:var(--fz-1); color:var(--fog-600); margin-left:auto; white-space:nowrap; }
+.carryin-items { display:flex; flex-wrap:wrap; gap:var(--s-2); }
+.carryin-it { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
+  border-radius:var(--r-xs); background:var(--field-bg); border:1px solid var(--brd-1);
+  white-space:nowrap; }
+.carryin-it i { font-style:normal; font-size:var(--fz-1); color:var(--fog-600); }
+.carryin-it em { font-style:normal; font-size:var(--fz-2); color:var(--fog-900); font-weight:600; }
+.carryin-note { font-size:var(--fz-1); color:var(--fog-700); line-height:1.55; }
+.carryin-ops { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; }
+.carryin-lb { font-size:var(--fz-1); color:var(--fog-600); white-space:nowrap; }
+.carryin-op { min-height:48px; padding:0 16px; border-radius:var(--r-xs);
+  background:var(--surf-2); border:1px solid var(--brd-2); color:var(--fog-800);
+  font-size:var(--fz-2); font-weight:600; white-space:nowrap; cursor:pointer; }
+.carryin-op[aria-pressed="true"] { background:var(--jade-a20);
+  border-color:var(--jade-500); color:var(--fog-900); }
+
+/* 分类筛掉的那几条，得让用户知道被筛掉了几条、一键看全部 —— 不做静默隐藏 */
+.polfilter-tail { flex:0 0 auto; margin-top:var(--s-3); padding:var(--s-4);
+  border-radius:var(--r-sm); background:var(--surf-1); border:1px dashed var(--brd-2);
+  display:flex; align-items:center; gap:var(--s-4); flex-wrap:wrap; }
+.polfilter-tail .t { font-size:var(--fz-2); color:var(--fog-700); line-height:1.55; }
+.polfilter-tail .carryin-op { margin-left:auto; }
+.polempty { padding:var(--s-6) var(--s-4); border-radius:var(--r-sm);
+  background:var(--surf-1); border:1px dashed var(--brd-2);
+  font-size:var(--fz-2); color:var(--fog-700); line-height:1.65; }
+.polempty b { color:var(--fog-900); }
 </style>
 </head>
 <body>
@@ -764,8 +809,16 @@
   }
   function cAlways () { return 'dunno' }
 
+  /* ---------- 政策分类 ----------
+     38-policy-hub 的四张分类卡传 ?cat=employment|social|archive|subsidy。
+     分类写在条目上，一条可属多类（就业见习补贴既是就业也是补贴）——
+     强行一条一类会让「按补贴看」漏掉一半真的是补贴的条目。 */
+  var CAT_NM = { employment: '就业政策', social: '社保指南', archive: '档案与登记', subsidy: '补贴指引' }
+  var CAT_KEYS = ['employment', 'social', 'archive', 'subsidy']
+
   var POL = [
     { id: 'p1', t: '一次性求职创业补贴', org: '市人社局', no: '人社〔2026〕14 号', pg: 2,
+      cat: ['employment', 'subsidy'],
       c: [ { t: '本市户籍或本市缴社保', f: cLocal,  q: 'hukou' },
            { t: '处于失业状态',         f: cJobless, q: 'status' },
            { t: '已办失业登记',         f: cReg,    q: 'reg' },
@@ -774,6 +827,7 @@
       gd: ['带：身份证、离职证明、本人银行卡', '办理：户籍地街道（社区）就业服务窗口'] },
 
     { id: 'p2', t: '灵活就业人员社保补贴', org: '市人社局', no: '人社〔2026〕09 号', pg: 2,
+      cat: ['social', 'subsidy'],
       c: [ { t: '本市户籍或本市缴社保', f: cLocal, q: 'hukou' },
            { t: '灵活就业连续缴满 3 个月', f: cSoc3, q: 'soc' },
            { t: '未达法定退休年龄',     f: cAgeWork, q: 'age' } ],
@@ -781,6 +835,7 @@
       gd: ['带：本人社保缴费记录（社保 App 可打印）', '办理：区人社分局'] },
 
     { id: 'p3', t: '职业技能培训补贴', org: '市人社局', no: '人社〔2026〕21 号', pg: 3,
+      cat: ['employment', 'subsidy'],
       c: [ { t: '本市户籍或本市缴社保', f: cLocal, q: 'hukou' },
            { t: '在法定劳动年龄内',     f: cAgeWork, q: 'age' },
            { t: '培训在当年目录内并取证', f: cAlways, q: '' } ],
@@ -788,6 +843,7 @@
       gd: ['先查当年培训目录，再报名交费', '带：身份证、结业证书 / 技能等级证书', '办理：市人社局职业能力建设科'] },
 
     { id: 'p4', t: '就业见习补贴', org: '区人社分局', no: '人社〔2026〕11 号', pg: 2,
+      cat: ['employment', 'subsidy'],
       c: [ { t: '毕业 2 年内或 16–24 岁', f: cFresh, q: 'grad' },
            { t: '目前未就业',             f: cJobless, q: 'status' },
            { t: '未参加过见习补贴',       f: cAlways, q: '' } ],
@@ -795,6 +851,7 @@
       gd: ['带：身份证、毕业证、离校未就业证明', '办理：区人社分局见习管理岗'] },
 
     { id: 'p5', t: '创业担保贷款贴息', org: '市人社局', no: '人社财〔2026〕05 号', pg: 3,
+      cat: ['subsidy'],
       c: [ { t: '已办营业执照并正常经营', f: cBiz, q: 'status' },
            { t: '本市户籍或本市缴社保',   f: cLocal, q: 'hukou' },
            { t: '创业项目在本市经营',     f: cBiz, q: 'status' } ],
@@ -802,6 +859,7 @@
       gd: ['带：营业执照、贷款合同、经营流水', '办理：市人社局创业担保贷款窗口'] },
 
     { id: 'p6', t: '失业保险金申领', org: '市社保中心', no: '穗社保〔2026〕02 号', pg: 2,
+      cat: ['social', 'subsidy'],
       c: [ { t: '累计缴失业保险满 1 年', f: cAlways, q: '' },
            { t: '非因本人意愿中断就业', f: cQuit, q: 'quit' },
            { t: '已办失业登记',         f: cReg, q: 'reg' } ],
@@ -813,6 +871,81 @@
   var docs = { p1: 1, p2: 1 }               // 要打印的政策原文
   var open = {}                             // 页内展开的原文
   var sheetAt = 0                           // 预览翻到第几张纸
+
+  /* ══════════════════════════════════════════════════════════════════════
+     上一屏带过来的参数（38-policy-hub → 本页）
+
+     契约（对方一直在传，本页此前一个都不读 —— 用户白选）：
+       ?cat=employment|social|archive|subsidy   四张分类卡
+       ?identity=&insured=&city=                AI政策助手卡上的三项预筛
+
+     三条硬规矩：
+     ① **白名单**：identity / insured 只认本页对应问项自己的选项表，
+        cat 只认四个已知键，city 只认 scripts/region.js 字典里真有的市。
+        非法值 = 当作没传，不报错、不渲染字面量 —— URL 是用户可改的，
+        把 ?identity=%3Cscript%3E 直接印到屏幕上就是把输入当结论。
+     ② **不静默**：带入了就在顶部出一条回执，写清带了什么、从哪来。
+        预填而不告知，用户会以为这些答案是本机自己猜的。
+     ③ **不夺权**：预填只是把光标放在起点 —— 九个问项照常能点、分类能换、
+        城市能改；「城市未定不出结论」那道门控一个字没动。
+     ══════════════════════════════════════════════════════════════════════ */
+  var Q = new URLSearchParams(location.search)
+  function qval (k) { return (Q.get(k) || '').replace(/^\s+|\s+$/g, '') }
+  function inList (v, list) { return v && list.indexOf(v) > -1 ? v : '' }
+  function optsOf (k) {
+    for (var i = 0; i < QS.length; i++) if (QS[i].k === k) return QS[i].o
+    return []
+  }
+  /* 城市白名单不另起一份 —— 直接问全站地区字典，字典里没有的市一律不认 */
+  function provOfCity (nm) {
+    var D = (window.v3Region && window.v3Region.DICT) || []
+    for (var i = 0; i < D.length; i++) {
+      for (var j = 0; j < D[i].c.length; j++) if (D[i].c[j].n === nm) return D[i].p
+    }
+    return ''
+  }
+
+  var carry = { cat: '', identity: '', insured: '', city: '', prov: '' }
+  var catSel = ''          // 当前生效的分类（'' = 全部）
+  var catBar = false       // URL 真带过分类，才出分类切换条
+
+  function readCarry () {
+    carry.cat = inList(qval('cat'), CAT_KEYS)
+    carry.identity = inList(qval('identity'), optsOf('status'))
+    carry.insured = inList(qval('insured'), optsOf('soc'))
+    var c = qval('city')
+    var pv = c ? provOfCity(c) : ''
+    if (pv) { carry.city = c; carry.prov = pv }
+    catSel = carry.cat
+    catBar = !!carry.cat
+    if (carry.identity) ans.status = carry.identity
+    if (carry.insured) ans.soc = carry.insured
+    if (carry.city) { city.prov = carry.prov; city.city = carry.city }
+  }
+  function carryItems () {
+    var a = []
+    if (carry.identity) a.push(['现在状态', carry.identity])
+    if (carry.insured) a.push(['连续缴费', carry.insured])
+    if (carry.city) a.push(['城市', carry.city])
+    return a
+  }
+  /* 当前分类下的政策。分类为空 = 全部，与整改前逐条一致 */
+  function polsIn () {
+    if (!catSel) return POL
+    var a = []
+    for (var i = 0; i < POL.length; i++) {
+      if ((POL[i].cat || []).indexOf(catSel) > -1) a.push(POL[i])
+    }
+    return a
+  }
+  /* 换分类后勾选要跟着收敛到看得见的那几条，
+     否则办事清单会印出屏幕上根本没显示的政策 */
+  function trimPick () {
+    var vis = {}, list = polsIn(), k
+    for (var i = 0; i < list.length; i++) vis[list[i].id] = 1
+    for (k in pick) if (!vis[k]) delete pick[k]
+    for (k in docs) if (!vis[k]) delete docs[k]
+  }
 
   /* ---------- 工具 ---------- */
   function $ (id) { return document.getElementById(id) }
@@ -856,9 +989,17 @@
   }
 
   function buildPols () {
-    var h = ''
-    for (var i = 0; i < POL.length; i++) {
-      var p = POL[i]
+    var h = '', list = polsIn()
+    /* 分类筛出 0 条时如实说「这一类本机一条都没有」，
+       不硬塞条目、也不悄悄退回全部 —— 那两种做法都是在骗人 */
+    if (!list.length) {
+      h += '<div class="polempty">本机政策库里<b>没有「' + esc(CAT_NM[catSel] || '') + '」这一类的条目</b>。' +
+           '现有 ' + POL.length + ' 条分别归就业政策 / 社保指南 / 补贴指引；' +
+           '档案托管、就业登记与证明开具这类事项本机还没收录，' +
+           '需要办的话按页脚的官方入口去经办窗口问。</div>'
+    }
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]
       h += '<div class="pol" data-pol="' + p.id + '">' +
              '<div class="pol-hd">' +
                '<button class="ckbox" data-pick="' + p.id + '" aria-pressed="false" ' +
@@ -879,6 +1020,16 @@
                '<div class="doc-p">' + p.doc + '</div>' +
              '</div>' +
            '</div>'
+    }
+    /* 被分类筛掉的那几条要说清筛掉了几条、一键能看全部。
+       静默隐藏 = 用户以为本机只有这么几条政策 */
+    if (catSel) {
+      var hid = POL.length - list.length
+      h += '<div class="polfilter-tail"><span class="t">已按<b>' + esc(CAT_NM[catSel]) + '</b>筛选' +
+           (hid ? ('，另有 ' + hid + ' 条属于其他分类没有列出。分类是本机给条目打的标签，一条可属多类。')
+                : ('：本机这 ' + POL.length + ' 条<b>全都属于这一类</b>，所以列出来和全部一样，不是筛选没生效。'))
+           + '</span>' +
+           '<button class="carryin-op" type="button" data-catset="all">看全部 ' + POL.length + ' 条</button></div>'
     }
     $('polList').innerHTML = h
   }
@@ -947,8 +1098,9 @@
 
   function renderPols () {
     var cnt = { maybe: 0, gap: 0, wait: 0, no: 0 }, nPick = 0
-    for (var i = 0; i < POL.length; i++) {
-      var p = POL[i]
+    var list = polsIn()          // 右栏四个计数只数当前分类里看得见的那几条
+    for (var i = 0; i < list.length; i++) {
+      var p = list[i]
       var v = verdictOf(p)
       cnt[v.k]++
       var chip = scr.querySelector('[data-verdict="' + p.id + '"]')
@@ -1015,9 +1167,10 @@
 
   function renderPaper (nPick) {
     var i, p, no = 0, gd = '', chosen = [], docList = [], docPg = 0
+    var vis = polsIn()           // 纸面只印当前分类里勾上的，屏幕与纸面同源
 
-    for (i = 0; i < POL.length; i++) {
-      p = POL[i]
+    for (i = 0; i < vis.length; i++) {
+      p = vis[i]
       if (!pick[p.id]) continue
       chosen.push(p)
       no++
@@ -1089,7 +1242,74 @@
     $('paperStage').className = docList.length ? 'paper-stage' : 'paper-stage is-one'
   }
 
+  /* ---------- 带入回执条 ----------
+     只在真的带了合法参数时才插进 DOM。不带参数 → 这一块整个不存在，
+     版面与整改前逐像素相同（自检基线不受影响）。 */
+  function buildCarry () {
+    if (!catBar && !carryItems().length) return
+    var box = document.createElement('div')
+    box.className = 'carryin'
+    box.id = 'carryBox'
+    box.setAttribute('data-at', 's1 s2')   // 第 3 步是纸面预览，回执不跟到纸上
+    var wm = document.querySelector('.wmain')
+    if (wm) wm.insertBefore(box, wm.firstChild)
+  }
+
+  function renderCarry () {
+    var box = $('carryBox')
+    if (!box) return
+    var items = carryItems(), h = '', i
+    /* 「回第 1 步改」只在第 2 步有意义（第 1 步问项就在眼前）。
+       这里按当前 stage 现算，不用 data-at —— 本函数由 v3ApplyVisibility
+       的包装钩子在算完可见性**之后**调用，新塞进来的 [data-at] 节点
+       这一帧不会被算到，会在第 1 步也露出来。 */
+    var atS2 = (scr.getAttribute('data-stage') || 's1') === 's2'
+    var ttl = items.length ? ('已带入你在上一屏选的 ' + items.length + ' 项') : '已按上一屏点的分类筛选'
+    if (items.length && catBar) ttl = '已带入上一屏的选择：' + items.length + ' 项条件 + 1 个分类'
+
+    h += '<div class="carryin-hd"><svg class="ic"><use href="#i-info"/></svg><b>' + ttl + '</b>' +
+         '<span class="carryin-src">来自政策服务首屏 · 可改</span></div>'
+
+    if (items.length) {
+      h += '<div class="carryin-items">'
+      for (i = 0; i < items.length; i++) {
+        h += '<span class="carryin-it"><i>' + items[i][0] + '</i><em>' + esc(items[i][1]) + '</em></span>'
+      }
+      h += '</div><div class="carryin-note">这几项已经填进第 2 步对应的问项，<b>点一下就能改</b>；' +
+           '其余问项本机没问过，一律按待确认算，不替你补答案。</div>'
+    }
+
+    if (catBar) {
+      h += '<div class="carryin-ops"><span class="carryin-lb">' +
+           (catSel ? ('已按「' + CAT_NM[catSel] + '」筛选 · 换一类') : ('已看全部 ' + POL.length + ' 条 · 可再选一类')) +
+           '</span>' +
+           '<button class="carryin-op" type="button" data-catset="all" aria-pressed="' +
+           (catSel ? 'false' : 'true') + '">全部</button>'
+      for (i = 0; i < CAT_KEYS.length; i++) {
+        h += '<button class="carryin-op" type="button" data-catset="' + CAT_KEYS[i] + '" aria-pressed="' +
+             (catSel === CAT_KEYS[i] ? 'true' : 'false') + '">' + CAT_NM[CAT_KEYS[i]] + '</button>'
+      }
+      h += '</div>'
+    }
+
+    if (items.length && atS2) {
+      h += '<div class="carryin-ops">' +
+           '<button class="carryin-op" type="button" data-go="s1">回第 1 步改这几项</button></div>'
+    }
+    box.innerHTML = h
+  }
+
+  /* 换分类：勾选收敛 → 重建列表 → 重算可见性（新节点带 data-when）→ 重排 */
+  function setCat (c) {
+    catSel = (c === 'all') ? '' : inList(c, CAT_KEYS)
+    trimPick()
+    buildPols()
+    if (window.v3ApplyVisibility) window.v3ApplyVisibility()
+    else render()
+  }
+
   function render () {
+    renderCarry()
     renderCity()
     renderQs()
     renderPaper(renderPols())
@@ -1101,6 +1321,9 @@
     if (!e.target || !e.target.closest) return
     var t
 
+    if ((t = e.target.closest('[data-catset]'))) {
+      setCat(t.getAttribute('data-catset')); return
+    }
     if ((t = e.target.closest('.op[data-q]'))) {
       ans[t.getAttribute('data-q')] = t.getAttribute('data-v'); render(); return
     }
@@ -1152,6 +1375,11 @@
        p21Set({ ans: { reg: '没办' } })   → 第 ① 条从「像是符合」变「卡一条」
        p21Set({ city: null })            → 城市未定时六条一律不出结论
      再配合 screen.setAttribute('data-state'|'data-stage') + v3ApplyVisibility() + v3AuditPlus() */
+  /* 参数消费的走查把手：看本页到底认下了 URL 里的哪几个值 */
+  window.p21Carry = function () {
+    return { carry: carry, catSel: catSel, catBar: catBar, status: ans.status, soc: ans.soc, city: city.city }
+  }
+
   window.p21Set = function (o) {
     if (o.ans) { for (var k in o.ans) { if (o.ans[k] === null) delete ans[k]; else ans[k] = o.ans[k] } }
     if (o.city !== undefined) city.city = o.city
@@ -1170,6 +1398,10 @@
     render()
   })
 
+  /* 先读参数再建 DOM：分类决定列表建哪几条，预填决定问项的初始选中态 */
+  readCarry()
+  trimPick()
+  buildCarry()
   buildQs()
   buildPols()
   render()
