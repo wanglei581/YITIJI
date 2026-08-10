@@ -102,7 +102,7 @@
   width: 48px; height: 48px; border-radius: var(--r-xs); border: 1px solid rgba(255,255,255,.24);
   background: rgba(255,255,255,.10); color: #fff; cursor: pointer;
   display: grid; place-items: center;
-}
+ flex: 0 0 48px;}
 .pgbtn .ic { width: 18px; height: 18px; }
 .paper-stage {
   /* 真实阅读器行为：按宽度铺满 + 多页连续滚动。
@@ -243,7 +243,7 @@
   background: var(--jade-a12); border: 1px solid var(--jade-a20);
   padding: 2px 7px; border-radius: 4px; margin-left: auto;
 }
-.seg { display: flex; gap: 6px; }
+.seg { display: flex; gap: 10px; }
 .seg button {
   flex: 1; min-height: var(--touch-min); padding: 0 var(--s-3);
   border-radius: var(--r-xs); border: 1px solid var(--brd-2);

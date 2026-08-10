@@ -26,6 +26,15 @@
   /* s4 去向三卡在右栏里用紧凑高度：栏宽 348px 放 88px 高卡会把栏顶爆（实测溢出 40px）。
      64px 仍满足 ≥48 触控。 */
   .wside .xlane-go { min-height: 60px; padding: 6px var(--s-4); }
+  /* s4 预览条：work.css 里 .pgbtn 已声明 48×48，但 .paper-bar 是 flex 行，
+     文件名 / 参数 / 页码三段都卡在各自 min-content 上（实测 169.9+224.6+153.5+间距 = 正好 572px 满栏），
+     .pgbtn 没有 flex-shrink:0，于是被压扁 —— 实测 default/first/ai-down 36px、device-off 32.1px，
+     且 device-off 下页码块还越出预览区 16.8px（「下一页」只剩 15.3px 可见），都低于 §9 的 ≥48px。
+     栏内没有空档，只能让可截断的文件名让位：文件名单行省略号，页码单行不折。
+     参数（A4 · 页数 · 灰度 · 体积）与页码文字都完整保留，不改 work.css（共享文件）。 */
+  .paper-bar .pgbtn { flex: 0 0 48px; }
+  .paper-bar .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .paper-bar .pg span { white-space: nowrap; }
   /* 输出格式 / 扫什么 选中态：复用 seg 的选中语义，卡面描边表达 */
   .src[data-fmt][aria-pressed="true"],
   .src[data-kind][aria-pressed="true"] { border-color: var(--jade-500); box-shadow: var(--sh-2), 0 0 0 1px var(--jade-500) inset; }
