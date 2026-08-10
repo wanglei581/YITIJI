@@ -647,8 +647,8 @@ jobs:
 
             test -f "$SRC_ROOT/scripts/recruitment-wave2-full-inventory.js"
             (cd "$SRC_ROOT" && sha256sum -c SHA256SUMS >/dev/null)
-            test -d "$EXPECT_DIR/node_modules"
-            ln -s "$EXPECT_DIR/node_modules" "$SRC_ROOT/node_modules"
+            test -d "$EXPECT_DIR/services/api/node_modules"
+            ln -s "$EXPECT_DIR/services/api/node_modules" "$SRC_ROOT/node_modules"
             node -e "if (Number(process.versions.node.split('.')[0]) !== 22) process.exit(1)"
 
             ENV_PATH="$EXPECT_DIR/services/api/.env"
