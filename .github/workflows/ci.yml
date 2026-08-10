@@ -442,6 +442,7 @@ jobs:
           pnpm --filter @ai-job-print/api verify:member-data-retention
           pnpm --filter @ai-job-print/api verify:job-ai-ops-dashboard
           pnpm --filter @ai-job-print/api verify:job-customer-sample-readiness
+          pnpm --filter @ai-job-print/api verify:recruitment-integration-readiness
           pnpm --filter @ai-job-print/api verify:job-info-ai-real-acceptance
           pnpm --filter @ai-job-print/api verify:career-plan
           pnpm --filter @ai-job-print/api verify:ai-cost-coverage
